@@ -91,3 +91,14 @@ STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 build: .download-proto-static .download-k6 # Build binary stroppy
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o $(STROPPY_OUT_FILE) $(CURDIR)/cmd/stroppy
 
+branch=main
+.PHONY: revision
+revision: # Recreate git tag with version tag=<semver>
+	@if [ -e $(tag) ]; then \
+		echo "error: Specify version 'tag='"; \
+		exit 1; \
+	fi
+	git tag -d v${tag} || true
+	git push --delete origin v${tag} || true
+	git tag v$(tag)
+	git push origin v$(tag)
