@@ -12,9 +12,10 @@ venv
 # logs
 *.log
 ./stroppy
-examples/tpcc/k6
-examples/tpcc/postgres
-examples/example
+dexample
+internal/static/stroppy-xk6
+internal/static/stroppy.pb.ts
+internal/static/stroppy.pb.js
 
 # Created by .ignore support plugin (hsz.mobi)
 ### JetBrains templatee

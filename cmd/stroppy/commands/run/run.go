@@ -1,4 +1,4 @@
-package commands
+package run
 
 import (
 	"context"
@@ -20,8 +20,7 @@ const (
 	stepFlagName   = "steps"
 )
 
-// runCmd represents the run command.
-var runCmd = &cobra.Command{ //nolint: gochecknoglobals
+var Cmd = &cobra.Command{ //nolint: gochecknoglobals
 	Use:   "run",
 	Short: "Run benchmark using configs",
 	Long:  ``,
@@ -39,7 +38,10 @@ var runCmd = &cobra.Command{ //nolint: gochecknoglobals
 			return fmt.Errorf("failed to load and validate configs: %w", err)
 		}
 		cfg.ResetPaths()
-		lg := logger.NewFromProtoConfig(cfg.GetRun().GetLogger()).Named(cfg.GetBenchmark().GetName() + "-main")
+		lg := logger.NewFromProtoConfig(cfg.GetRun().GetLogger()).
+			Named(cfg.GetBenchmark().GetName()).
+			WithOptions(zap.WithCaller(false))
+
 		requestedStepsNames := flagSteps
 		if len(requestedStepsNames) == 0 {
 			for _, step := range cfg.GetRun().GetSteps() {
@@ -89,17 +91,17 @@ var runCmd = &cobra.Command{ //nolint: gochecknoglobals
 }
 
 func init() { //nolint: gochecknoinits // allow in cmd
-	runCmd.PersistentFlags().String(
+	Cmd.PersistentFlags().String(
 		configFlagName,
-		configCmd.DefaultConfigFormat.FormatConfigName(configCmd.DefaultConfigName),
-		"--config=<path>",
+		configCmd.DefaultConfigFullPath,
+		"path to config",
 	)
 
-	_ = runCmd.MarkFlagRequired(configFlagName)
+	_ = Cmd.MarkFlagRequired(configFlagName)
 
-	runCmd.PersistentFlags().StringSlice(
+	Cmd.PersistentFlags().StringSlice(
 		stepFlagName,
 		[]string{},
-		"--steps=<step1>,<step2> ",
+		"steps to run (--steps=<step1>,<step2>), if not set all steps will be run",
 	)
 }

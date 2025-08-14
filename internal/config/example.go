@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/stroppy-io/stroppy/internal/static"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,8 +43,8 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 				CancelOnError: toPtr[bool](true),
 			},
 			K6Executor: &stroppy.K6Executor{
-				K6BinaryPath:   "./k6",
-				K6ScriptPath:   "./k6.ts",
+				K6BinaryPath:   "./" + static.K6PluginFileName.String(),
+				K6ScriptPath:   "./" + static.K6BenchmarkFileName.String(),
 				K6SetupTimeout: durationpb.New(8400 * time.Second), //nolint: mnd // not need const value here
 				K6Vus:          toPtr(uint64(10)),                  //nolint: mnd // not need const value here
 				K6MaxVus:       toPtr(uint64(100)),                 //nolint: mnd // not need const value here

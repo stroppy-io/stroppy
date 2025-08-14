@@ -9,23 +9,22 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy-core/pkg/logger"
-	"github.com/stroppy-io/stroppy-core/pkg/utils"
 
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/internal/config"
 )
 
 const (
-	configNewFormatFlagName = "format"
-	configNewOutputFlagName = "output"
+	configNewWorkdirFlagName = "workdir"
+	configNewFormatFlagName  = "format"
 )
 
-var newConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
+var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 	Use:   "new --output <output>",
 	Short: "Generate default stroppy config",
 	Long:  ``,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		output, err := cmd.Flags().GetString(configNewOutputFlagName)
+		output, err := cmd.Flags().GetString(configNewWorkdirFlagName)
 		if err != nil {
 			return err
 		}
@@ -36,7 +35,7 @@ var newConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 
 		example := config.NewExampleConfig()
 
-		runConfStr, err := marshalConfig(example, format.FormatConfigName(DefaultConfigName))
+		runConfStr, err := MarshalConfig(example, format.FormatConfigName(DefaultConfigName))
 		if err != nil {
 			return err
 		}
@@ -67,12 +66,12 @@ var newConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 var configFormatFlag config.Format //nolint: gochecknoglobals // allow in cmd as flag
 
 func init() { //nolint: gochecknoinits // allow in cmd
-	newConfigCmd.PersistentFlags().String(
-		configNewOutputFlagName,
-		utils.Must(os.Getwd()),
-		"Output directory (default is ${pwd})",
+	NewConfigCmd.PersistentFlags().String(
+		configNewWorkdirFlagName,
+		DefaultWorkdirPath,
+		"work directory",
 	)
-	newConfigCmd.PersistentFlags().Var(
+	NewConfigCmd.PersistentFlags().Var(
 		enumflag.New(
 			&configFormatFlag,
 			configNewFormatFlagName,
@@ -80,8 +79,8 @@ func init() { //nolint: gochecknoinits // allow in cmd
 			enumflag.EnumCaseInsensitive,
 		),
 		configNewFormatFlagName,
-		"Output config format, json or yaml (default is json)",
+		"output config format, json or yaml",
 	)
 
-	newConfigCmd.PersistentFlags().Lookup(configNewFormatFlagName).NoOptDefVal = config.FormatJSON.String()
+	NewConfigCmd.PersistentFlags().Lookup(configNewFormatFlagName).NoOptDefVal = config.FormatJSON.String()
 }

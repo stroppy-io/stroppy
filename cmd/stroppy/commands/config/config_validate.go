@@ -45,7 +45,7 @@ var validateCmd = &cobra.Command{ //nolint: gochecknoglobals
 		}
 		if setVersion {
 			cfg.Version = stroppy.Version
-			runConfStr, err := marshalConfig(cfg.Config, configPath)
+			runConfStr, err := MarshalConfig(cfg.Config, configPath)
 			if err != nil {
 				return err
 			}
@@ -68,17 +68,17 @@ var validateCmd = &cobra.Command{ //nolint: gochecknoglobals
 func init() { //nolint: gochecknoinits // allow in cmd
 	validateCmd.PersistentFlags().String(
 		configFlagName,
-		DefaultConfigFormat.FormatConfigName(DefaultConfigName),
-		"--config=<path>",
+		DefaultConfigFullPath,
+		"path to config",
 	)
 
 	validateCmd.PersistentFlags().Bool(
 		configSetVersion,
 		false,
-		"--set-version, set version in config to current version",
+		"set version in config to current version",
 	)
 
-	err := validateCmd.MarkFlagRequired(configFlagName)
+	err := validateCmd.MarkPersistentFlagRequired(configFlagName)
 	if err != nil {
 		panic(err)
 	}

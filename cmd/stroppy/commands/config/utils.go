@@ -18,7 +18,7 @@ const (
 	DefaultConfigFormat = config.FormatJSON
 )
 
-func marshalConfig(cfg *stroppy.Config, newPath string) ([]byte, error) {
+func MarshalConfig(cfg *stroppy.Config, newPath string) ([]byte, error) {
 	var marshaler func(m proto.Message) ([]byte, error)
 
 	switch path.Ext(newPath) {
