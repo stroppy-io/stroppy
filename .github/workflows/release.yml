@@ -95,7 +95,7 @@ jobs:
           make .download-k6 GO_OS=${{ matrix.os }} GO_ARCH=${{ matrix.arch }}
           make .download-proto-static
           mkdir -p "${{ steps.names.outputs.outdir }}"
-          go build -trimpath -ldflags "-s -2 ${LDFLAGS}" \
+          go build -trimpath -ldflags "-s -w ${LDFLAGS}" \
             -o "${{ steps.names.outputs.outdir }}/${{ steps.names.outputs.bin }}" \
             "${BUILD_PATH}"
 
