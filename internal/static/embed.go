@@ -6,6 +6,8 @@ import (
 	"os"
 	"path"
 	"slices"
+
+	"github.com/stroppy-io/stroppy/internal/common"
 )
 
 type FileName string
@@ -82,7 +84,7 @@ func CopyStaticFilesToPath(targetPath string, perm os.FileMode, files ...FileNam
 		}
 
 		if slices.Contains(Binaries, name) {
-			err = os.Chmod(path.Join(targetPath, string(name)), 0755)
+			err = os.Chmod(path.Join(targetPath, string(name)), common.FolderMode)
 			if err != nil {
 				return fmt.Errorf("failed to chmod file: %w", err) //nolint: err113
 			}

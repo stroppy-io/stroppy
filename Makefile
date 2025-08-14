@@ -85,11 +85,35 @@ STROPPY_PROTO_URL=https://github.com/stroppy-io/stroppy-proto/releases/latest/do
 		echo "$(STROPPY_PB_JS_NAME) installed to $(STROPPY_PB_JS_PATH)"; \
 	fi
 
+GITHUB_TOKEN:=
+.PHONY: .get-components-versions
+.get-components-versions:
+	@XK6_VERSION=$$(curl -s \
+		-H "Authorization: Bearer $(GITHUB_TOKEN)" \
+		-H "Accept: application/vnd.github+json" \
+		https://api.github.com/repos/stroppy-io/stroppy-xk6/releases/latest \
+		| grep '"tag_name":' \
+		| head -n 1 \
+		| sed -E 's/.*"([^"]+)".*/\1/'); \
+	echo $$XK6_VERSION
+
 STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 .PHONY: build
 build: .download-proto-static .download-k6 # Build binary stroppy
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o $(STROPPY_OUT_FILE) $(CURDIR)/cmd/stroppy
+	@XK6_VERSION=$$(curl -s \
+    		-H "Authorization: Bearer $(GITHUB_TOKEN)" \
+    		-H "Accept: application/vnd.github+json" \
+    		https://api.github.com/repos/stroppy-io/stroppy-xk6/releases/latest \
+    		| grep '"tag_name":' \
+    		| head -n 1 \
+    		| sed -E 's/.*"([^"]+)".*/\1/'); \
+	echo $$XK6_VERSION; \
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+  	go build -v -o $(STROPPY_OUT_FILE) \
+    -ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.StroppyXk6Version=$$XK6_VERSION'" \
+  	$(CURDIR)/cmd/stroppy
+
 
 branch=main
 .PHONY: revision

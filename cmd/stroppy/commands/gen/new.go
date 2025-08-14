@@ -2,17 +2,19 @@ package gen
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
-	"github.com/stroppy-io/stroppy-core/pkg/logger"
-	"github.com/stroppy-io/stroppy/internal/common"
-	"github.com/stroppy-io/stroppy/internal/config"
-	"github.com/stroppy-io/stroppy/internal/static"
-	"github.com/thediveo/enumflag"
-	"go.uber.org/zap"
 	"os"
 	"path"
 
+	"github.com/spf13/cobra"
+	"github.com/thediveo/enumflag"
+	"go.uber.org/zap"
+
+	"github.com/stroppy-io/stroppy-core/pkg/logger"
+
 	configCmd "github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
+	"github.com/stroppy-io/stroppy/internal/common"
+	"github.com/stroppy-io/stroppy/internal/config"
+	"github.com/stroppy-io/stroppy/internal/static"
 )
 
 const (
@@ -28,7 +30,7 @@ var Cmd = &cobra.Command{ //nolint: gochecknoglobals
 This command generates default stroppy workdir structure include config file,
 k6 script template, ts requirements and Makefile for run.
 `,
-	RunE: func(cmd *cobra.Command, fl []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		log := logger.Global().WithOptions(zap.WithCaller(false))
 		output, err := cmd.Flags().GetString(configNewWorkdirFlagName)
 		if err != nil {
@@ -92,7 +94,7 @@ k6 script template, ts requirements and Makefile for run.
 			return fmt.Errorf("failed to write self binary file: %w", err)
 		}
 
-		err = os.Chmod(path.Join(output, "stroppy"), 0755)
+		err = os.Chmod(path.Join(output, "stroppy"), common.FolderMode)
 		if err != nil {
 			return fmt.Errorf("failed to chmod self binary file: %w", err)
 		}
@@ -109,6 +111,7 @@ func init() { //nolint: gochecknoinits // allow in cmd
 		configCmd.DefaultWorkdirPath,
 		"work directory",
 	)
+
 	Cmd.PersistentFlags().Var(
 		enumflag.New(
 			&configFormatFlag,
@@ -119,10 +122,12 @@ func init() { //nolint: gochecknoinits // allow in cmd
 		configNewFormatFlagName,
 		"output config format, json or yaml",
 	)
+
 	Cmd.PersistentFlags().Bool(
 		configNewDevFlagName,
 		false,
 		"generate dev environment, includes package.json, Makefile.dev and ts requirements",
 	)
+
 	Cmd.PersistentFlags().Lookup(configNewFormatFlagName).NoOptDefVal = config.FormatJSON.String()
 }

@@ -1,13 +1,14 @@
 package config
 
 import (
-	"github.com/stroppy-io/stroppy/internal/static"
 	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+
+	"github.com/stroppy-io/stroppy/internal/static"
 )
 
 func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in example

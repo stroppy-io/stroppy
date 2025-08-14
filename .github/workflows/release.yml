@@ -16,9 +16,6 @@ env:
   # Path to main of golang code
   BUILD_PATH: ./cmd/stroppy
   # Common ldflags: inject version and commit; trim paths; strip symbols.
-  LDFLAGS: >-
-    -s -w
-
 
 jobs:
   golang-ci:
@@ -72,6 +69,17 @@ jobs:
           echo "outdir=${OUTDIR}" >> $GITHUB_OUTPUT
           echo "archive=${ARCHIVE}" >> $GITHUB_OUTPUT
 
+      - name: Get stroppy-xk6 version
+        run: |
+          XK6_VERSION=$(curl -s \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/stroppy-io/stroppy-xk6/releases/latest \
+            | grep '"tag_name":' \
+            | head -n 1 \
+            | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "LDFLAGS=-X 'github.com/stroppy-io/stroppy/internal/version.StroppyXk6Version=${XK6_VERSION}'" >> $GITHUB_ENV
+
       - name: Build
         env:
           CGO_ENABLED: "0"
@@ -81,7 +89,7 @@ jobs:
           make .download-k6 GO_OS=${{ matrix.os }} GO_ARCH=${{ matrix.arch }}
           make .download-proto-static
           mkdir -p "${{ steps.names.outputs.outdir }}"
-          go build -trimpath -ldflags "${LDFLAGS}" \
+          go build -trimpath -ldflags "-s -2 ${LDFLAGS}" \
             -o "${{ steps.names.outputs.outdir }}/${{ steps.names.outputs.bin }}" \
             "${BUILD_PATH}"
 
