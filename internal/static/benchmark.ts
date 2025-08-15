@@ -87,15 +87,19 @@ export const setup = (): Context => {
 export default (ctx: Context) => {
     let queries = DriverQueriesList.fromJsonString(INSTANCE.generateQueue())
     for (let queryIndex = 0; queryIndex < queries.queries.length; ++queryIndex) {
+        // add query name to tags for metrics differentiation
+        const metricsTags = {
+            "query": queries.queries[queryIndex].name
+        }
         const startTime = Date.now()
         const err = INSTANCE.runQuery(DriverQuery.toJsonString(queries.queries[queryIndex]));
-        METER_REQUESTS_COUNTER.add(1)
+        METER_REQUESTS_COUNTER.add(1, metricsTags)
         if (err) {
-            METER_REQUEST_ERROR_COUNTER.add(1)
+            METER_REQUEST_ERROR_COUNTER.add(1, metricsTags)
             console.error(queries[queryIndex].name, err)
             throw err
         } else {
-            METER_RESPONSES_TIME_TREND.add(Date.now() - startTime)
+            METER_RESPONSES_TIME_TREND.add(Date.now() - startTime, metricsTags)
         }
     }
 };
