@@ -54,7 +54,7 @@ DRIVER_ARCHIVE    := $(DRIVER_PKG_NAME).tar.gz
 DRIVER_URL        := https://github.com/stroppy-io/stroppy-postgres/releases/latest/download/$(DRIVER_ARCHIVE)
 .PHONY: install-driver
 install-driver: # Install driver plugin
-	@# Here example how to install driver plugin from stoppy github.
+	@# Here example how to install driver plugin from stroppy github.
 	@# You can install driver plugin from other source using your own logic.
 	$(info Installing postgres driver plugin...)
 	@if [ -x "$(CURDIR)/$(DRIVER_BIN_NAME)" ]; then \
