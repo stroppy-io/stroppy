@@ -3,6 +3,7 @@ package run
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -16,8 +17,9 @@ import (
 )
 
 const (
-	configFlagName = "config"
-	stepFlagName   = "steps"
+	configFlagName   = "config"
+	stepFlagName     = "steps"
+	skipStepFlagName = "skip-steps"
 )
 
 var Cmd = &cobra.Command{ //nolint: gochecknoglobals
@@ -28,6 +30,10 @@ var Cmd = &cobra.Command{ //nolint: gochecknoglobals
 		flagSteps, err := cmd.Flags().GetStringSlice(stepFlagName)
 		if err != nil {
 			return fmt.Errorf("failed to get steps: %w", err)
+		}
+		flagSkippedSteps, err := cmd.Flags().GetStringSlice(skipStepFlagName)
+		if err != nil {
+			return fmt.Errorf("failed to get skipped steps: %w", err)
 		}
 		runConfigPath, err := cmd.Flags().GetString(configFlagName)
 		if err != nil {
@@ -45,6 +51,9 @@ var Cmd = &cobra.Command{ //nolint: gochecknoglobals
 		requestedStepsNames := flagSteps
 		if len(requestedStepsNames) == 0 {
 			for _, step := range cfg.GetRun().GetSteps() {
+				if slices.Contains(flagSkippedSteps, step.GetName()) {
+					continue
+				}
 				requestedStepsNames = append(requestedStepsNames, step.GetName())
 			}
 		}
@@ -102,6 +111,21 @@ func init() { //nolint: gochecknoinits // allow in cmd
 	Cmd.PersistentFlags().StringSlice(
 		stepFlagName,
 		[]string{},
-		"steps to run (--steps=<step1>,<step2>), if not set all steps will be run",
+		fmt.Sprintf(
+			"steps to run (--%s=<step1>,<step2>), if not set all steps will be run",
+			stepFlagName,
+		),
 	)
+
+	Cmd.PersistentFlags().StringSlice(
+		skipStepFlagName,
+		[]string{},
+		fmt.Sprintf(
+			"steps to skip (--%s=<step1>,<step2>), if not set all steps will be run, not compatible with --%s",
+			skipStepFlagName,
+			stepFlagName,
+		),
+	)
+
+	Cmd.MarkFlagsMutuallyExclusive(stepFlagName, skipStepFlagName)
 }
