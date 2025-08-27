@@ -3,6 +3,7 @@ package gorun
 import (
 	"context"
 	"errors"
+
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy-core/pkg/plugins/driver"
@@ -60,8 +61,7 @@ func RunStep(
 	)
 	for _, unitDesc := range runContext.GetStep().GetUnits() {
 		stepPool.Go(func(ctx context.Context) error {
-			err := processUnitTransactions(ctx, drv, runContext, unitDesc)
-			return err
+			return processUnitTransactions(ctx, drv, runContext, unitDesc)
 		})
 	}
 
@@ -109,6 +109,7 @@ func processUnitTransactions(
 			if err != nil {
 				return err
 			}
+
 			err = drv.RunTransaction(ctx, tx)
 			if err != nil {
 				return err

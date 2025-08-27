@@ -2,11 +2,14 @@ package plugins
 
 import (
 	"context"
+
+	"go.uber.org/zap"
+
 	"github.com/stroppy-io/stroppy-core/pkg/plugins/sidecar"
 	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
 	"github.com/stroppy-io/stroppy-core/pkg/shutdown"
+
 	"github.com/stroppy-io/stroppy/internal/config"
-	"go.uber.org/zap"
 )
 
 type Manager struct {
@@ -17,6 +20,7 @@ func NewManagerFromConfig(logger *zap.Logger, config *config.Config) (*Manager, 
 	mgr := &Manager{
 		sidecars: make([]sidecar.Plugin, 0),
 	}
+
 	for _, pl := range config.GetRun().GetPlugins() {
 		if pl.GetType() == stroppy.Plugin_TYPE_SIDECAR {
 			plug, cancel, err := sidecar.ConnectToPlugin(config.GetRun(), logger)

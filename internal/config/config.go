@@ -119,6 +119,7 @@ func (c *Config) validatePlugins() error {
 	if len(c.GetRun().GetPlugins()) == 0 {
 		return nil
 	}
+
 	for _, pl := range c.GetRun().GetPlugins() {
 		err := validatePath(pl.GetPath(), true)
 		if err != nil {
@@ -148,12 +149,15 @@ func (c *Config) validatePaths() error {
 	}
 
 	needK6Config := false
+
 	for _, step := range c.GetRun().GetSteps() {
 		if step.GetExecutor() != stroppy.RequestedStep_EXECUTOR_TYPE_K6 {
 			continue
 		}
+
 		needK6Config = true
 	}
+
 	if needK6Config {
 		err := c.validateK6Config()
 		if err != nil {

@@ -3,7 +3,6 @@ package run
 import (
 	"context"
 	"fmt"
-	"github.com/stroppy-io/stroppy/internal/execution"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -15,6 +14,7 @@ import (
 
 	configCmd "github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
 	"github.com/stroppy-io/stroppy/internal/config"
+	"github.com/stroppy-io/stroppy/internal/execution"
 	"github.com/stroppy-io/stroppy/internal/plugins"
 )
 
@@ -94,8 +94,6 @@ var Cmd = &cobra.Command{ //nolint: gochecknoglobals
 
 			stepCtx := context.Background()
 			stepContext := &stroppy.StepContext{
-				//Config:       cfg.GetRun(),
-				//Benchmark:    cfg.GetBenchmark(),
 				GlobalConfig: cfg.Config,
 				Step:         stepDescr,
 			}
