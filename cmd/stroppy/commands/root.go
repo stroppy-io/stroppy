@@ -11,6 +11,7 @@ import (
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/gen"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
+	int_config "github.com/stroppy-io/stroppy/internal/config"
 	"github.com/stroppy-io/stroppy/internal/version"
 )
 
@@ -32,6 +33,20 @@ var versionCmd = &cobra.Command{ //nolint: gochecknoglobals
 	},
 }
 
+var envsCmd = &cobra.Command{ //nolint: gochecknoglobals
+	Use:   "envs",
+	Short: "Print envs to override config",
+	Long:  ``,
+	Run: func(_ *cobra.Command, _ []string) {
+		log := logger.Global().WithOptions(zap.WithCaller(false))
+		names := int_config.ValidEnvsNames()
+
+		for _, name := range names {
+			log.Info(name)
+		}
+	},
+}
+
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
@@ -45,6 +60,7 @@ func init() { //nolint: gochecknoinits // allow in cmd
 	rootCmd.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)
 
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(envsCmd)
 	rootCmd.AddCommand(config.TopLevelCommand)
 	rootCmd.AddCommand(run.Cmd)
 	rootCmd.AddCommand(gen.Cmd)

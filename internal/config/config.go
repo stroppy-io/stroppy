@@ -19,6 +19,11 @@ func LoadAndValidateConfig(runConfigPath string, validatePaths bool) (*Config, e
 		return nil, fmt.Errorf("failed to load run config: %w", err)
 	}
 
+	err = updateConfigWithDirectEnvs(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to override config with envs: %w", err)
+	}
+
 	err = config.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate run config: %w", err)
