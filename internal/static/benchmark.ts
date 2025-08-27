@@ -4,8 +4,8 @@
 
 import {Options} from 'k6/options';
 import {
-    DriverQueriesList,
-    DriverQuery,
+    DriverTransaction,
+    DriverTransactionList,
     INSTANCE,
     K6_DEFAULT_ERROR_THRESHOLD,
     K6_DEFAULT_TIME_UNITS,
@@ -19,6 +19,7 @@ import {
     METER_RESPONSES_TIME_TREND,
     METER_SETUP_TIME_COUNTER,
     ProtoSerialized,
+    resultToJsonString,
     RunResult,
     StepContext,
     STROPPY_CONTEXT,
@@ -27,8 +28,8 @@ import {
 export const options: Options = {
     setupTimeout: K6_SETUP_TIMEOUT,
     tags: {
-        runId: STROPPY_CONTEXT.config.runId,
-        benchmark: STROPPY_CONTEXT.benchmark.name,
+        runId: STROPPY_CONTEXT.globalConfig.run.runId,
+        benchmark: STROPPY_CONTEXT.globalConfig.benchmark.name,
         step: STROPPY_CONTEXT.step.name,
         // ...STROPPY_CONTEXT.config.metadata uncomment if needed pass metadata in metrics labels
     },
@@ -61,7 +62,7 @@ export const options: Options = {
 // This object will be created in setup function
 // and passed to "default" function as argument by k6
 class Context {
-    queries: ProtoSerialized<DriverQueriesList>
+    queries: ProtoSerialized<DriverTransactionList>
 }
 
 // @ts-ignore
@@ -70,6 +71,7 @@ export const setup = (): Context => {
     METER_REQUEST_ERROR_COUNTER.add(0);
 
     const startTime = Date.now();
+    console.log(STROPPY_CONTEXT)
 
     const err = INSTANCE.setup(StepContext.toJsonString(STROPPY_CONTEXT))
     if (err !== undefined) {
@@ -85,23 +87,21 @@ export const setup = (): Context => {
 };
 
 export default (ctx: Context) => {
-    let queries = DriverQueriesList.fromJsonString(INSTANCE.generateQueue())
-    for (let queryIndex = 0; queryIndex < queries.queries.length; ++queryIndex) {
-        // add query name to tags for metrics differentiation
+    let transactionList = DriverTransactionList.fromJsonString(INSTANCE.generateQueue()).transactions
+
+    transactionList.forEach((transaction) => {
         const metricsTags = {
-            "query": queries.queries[queryIndex].name
+            // "tx_name": transaction.name // TODO: add name field to transaction in proto
         }
         const startTime = Date.now()
-        const err = INSTANCE.runQuery(DriverQuery.toJsonString(queries.queries[queryIndex]));
-        METER_REQUESTS_COUNTER.add(1, metricsTags)
+        const err = INSTANCE.runQuery(DriverTransaction.toJsonString(transaction));
         if (err) {
+            console.error(transaction, err)
             METER_REQUEST_ERROR_COUNTER.add(1, metricsTags)
-            console.error(queries[queryIndex].name, err)
-            throw err
-        } else {
-            METER_RESPONSES_TIME_TREND.add(Date.now() - startTime, metricsTags)
         }
-    }
+        METER_REQUESTS_COUNTER.add(1, metricsTags)
+        METER_RESPONSES_TIME_TREND.add(Date.now() - startTime, metricsTags)
+    })
 };
 
 export const teardown = () => {
@@ -114,10 +114,6 @@ export const teardown = () => {
 // Summary function, that will create summary file with metrics.
 export function handleSummary(runResult: RunResult<Context>) {
     return {
-        // use `runResult.withBaggage` to add baggage for result json
-        // stdout: runResult.withBaggage({
-        //     some: "value",
-        // }).toJsonString()
-        stdout: runResult.toJsonString()
+        stdout: resultToJsonString<Context>(runResult, {"some": "baggage"})
     };
 }

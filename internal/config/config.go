@@ -76,7 +76,62 @@ func (c *Config) GetStepsByNames(names []string) ([]*stroppy.StepDescriptor, err
 	return result, nil
 }
 
-var ErrStepNameIsEmpty = errors.New("step name is empty")
+var (
+	ErrStepNameIsEmpty  = errors.New("step name is empty")
+	ErrK6ConfigNotFound = errors.New("k6 executor config is nil but step request k6 executor type")
+)
+
+func (c *Config) validateK6Config() error {
+	if c.GetRun().GetK6Executor() == nil {
+		return ErrK6ConfigNotFound
+	}
+
+	scriptPath, err := getRelativePath(
+		c.ConfigPath,
+		c.GetRun().GetK6Executor().GetK6ScriptPath(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get relative path to k6 script: %w", err) //nolint: err113
+	}
+
+	err = validatePath(scriptPath, false)
+	if err != nil {
+		return fmt.Errorf("failed to validate k6 script path: %w", err) //nolint: err113
+	}
+
+	binaryPath, err := getRelativePath(
+		c.ConfigPath,
+		c.GetRun().GetK6Executor().GetK6BinaryPath(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get relative path to k6 binary: %w", err) //nolint: err113
+	}
+
+	err = validatePath(binaryPath, true)
+	if err != nil {
+		return fmt.Errorf("failed to validate k6 binary path: %w", err) //nolint: err113
+	}
+
+	return nil
+}
+
+func (c *Config) validatePlugins() error {
+	if len(c.GetRun().GetPlugins()) == 0 {
+		return nil
+	}
+	for _, pl := range c.GetRun().GetPlugins() {
+		err := validatePath(pl.GetPath(), true)
+		if err != nil {
+			return fmt.Errorf( //nolint: err113
+				"failed to validate on of %s plugin binary path: %w",
+				pl.GetType(),
+				err,
+			)
+		}
+	}
+
+	return nil
+}
 
 func (c *Config) validatePaths() error {
 	driverPath, err := getRelativePath(
@@ -92,43 +147,23 @@ func (c *Config) validatePaths() error {
 		return fmt.Errorf("failed to validate driver plugin path: %w", err)
 	}
 
+	needK6Config := false
 	for _, step := range c.GetRun().GetSteps() {
 		if step.GetExecutor() != stroppy.RequestedStep_EXECUTOR_TYPE_K6 {
 			continue
 		}
-
-		if c.GetRun().GetK6Executor() == nil {
-			return fmt.Errorf( //nolint: err113
-				"k6 executor config is nil but step %s executor type is k6",
-				step.GetName(),
-			)
-		}
-
-		scriptPath, err := getRelativePath(
-			c.ConfigPath,
-			c.GetRun().GetK6Executor().GetK6ScriptPath(),
-		)
+		needK6Config = true
+	}
+	if needK6Config {
+		err := c.validateK6Config()
 		if err != nil {
-			return fmt.Errorf("failed to get relative path to k6 script: %w", err) //nolint: err113
+			return fmt.Errorf("failed to valodate k6 config: %w", err)
 		}
+	}
 
-		err = validatePath(scriptPath, false)
-		if err != nil {
-			return fmt.Errorf("failed to validate k6 script path: %w", err) //nolint: err113
-		}
-
-		binaryPath, err := getRelativePath(
-			c.ConfigPath,
-			c.GetRun().GetK6Executor().GetK6BinaryPath(),
-		)
-		if err != nil {
-			return fmt.Errorf("failed to get relative path to k6 binary: %w", err) //nolint: err113
-		}
-
-		err = validatePath(binaryPath, true)
-		if err != nil {
-			return fmt.Errorf("failed to validate k6 binary path: %w", err) //nolint: err113
-		}
+	err = c.validatePlugins()
+	if err != nil {
+		return fmt.Errorf("failed to validate plugins: %w", err)
 	}
 
 	return nil

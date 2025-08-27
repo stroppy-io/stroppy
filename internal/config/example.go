@@ -80,9 +80,9 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 			Steps: []*stroppy.StepDescriptor{
 				{
 					Name: "create_table",
-					Queries: []*stroppy.StepQueryDescriptor{
+					Units: []*stroppy.StepUnitDescriptor{
 						{
-							Type: &stroppy.StepQueryDescriptor_CreateTable{
+							Type: &stroppy.StepUnitDescriptor_CreateTable{
 								CreateTable: &stroppy.TableDescriptor{
 									Name: "users",
 									Columns: []*stroppy.ColumnDescriptor{
@@ -110,10 +110,10 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 				{
 					Name:  "insert_data",
 					Async: true,
-					Queries: []*stroppy.StepQueryDescriptor{
+					Units: []*stroppy.StepUnitDescriptor{
 						{
 							Async: true,
-							Type: &stroppy.StepQueryDescriptor_Query{
+							Type: &stroppy.StepUnitDescriptor_Query{
 								Query: &stroppy.QueryDescriptor{
 									Name:  "insert",
 									Count: 100000, //nolint: mnd // not need const value here
@@ -197,10 +197,10 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 				{
 					Name:  "warm_up",
 					Async: true,
-					Queries: []*stroppy.StepQueryDescriptor{
+					Units: []*stroppy.StepUnitDescriptor{
 						{
 							Async: true,
-							Type: &stroppy.StepQueryDescriptor_Query{
+							Type: &stroppy.StepUnitDescriptor_Query{
 								Query: &stroppy.QueryDescriptor{
 									Name:  "select",
 									Count: 1000, //nolint: mnd // not need const value here
@@ -229,10 +229,10 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 				{
 					Name:  "select_data",
 					Async: true,
-					Queries: []*stroppy.StepQueryDescriptor{
+					Units: []*stroppy.StepUnitDescriptor{
 						{
 							Async: true,
-							Type: &stroppy.StepQueryDescriptor_Query{
+							Type: &stroppy.StepUnitDescriptor_Query{
 								Query: &stroppy.QueryDescriptor{
 									Name:  "select",
 									Count: 1,
@@ -260,10 +260,10 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 				},
 				{
 					Name: "transaction",
-					Queries: []*stroppy.StepQueryDescriptor{
+					Units: []*stroppy.StepUnitDescriptor{
 						{
 							Async: true,
-							Type: &stroppy.StepQueryDescriptor_Transaction{
+							Type: &stroppy.StepUnitDescriptor_Transaction{
 								Transaction: &stroppy.TransactionDescriptor{
 									Name:           "transaction",
 									Count:          1,

@@ -20,6 +20,10 @@ help: # Show help in Makefile
 	$(info Installing binary dependencies...)
 	mkdir -p $(LOCAL_BIN)
 
+.PHONY: update-core
+update-core: # Update core by latest version
+	go get -u github.com/stroppy-io/stroppy-core@latest
+
 GOPROXY:=https://goproxy.io,direct
 .PHONY: .app-deps
 .app-deps: # Install application dependencies in ./bin

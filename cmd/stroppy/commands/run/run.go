@@ -3,17 +3,19 @@ package run
 import (
 	"context"
 	"fmt"
+	"github.com/stroppy-io/stroppy/internal/execution"
 	"slices"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy-core/pkg/execution"
 	"github.com/stroppy-io/stroppy-core/pkg/logger"
+	"github.com/stroppy-io/stroppy-core/pkg/plugins/sidecar"
 	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
 
 	configCmd "github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
 	"github.com/stroppy-io/stroppy/internal/config"
+	"github.com/stroppy-io/stroppy/internal/plugins"
 )
 
 const (
@@ -72,6 +74,10 @@ var Cmd = &cobra.Command{ //nolint: gochecknoglobals
 				return fmt.Errorf("step %s not found in config", step) //nolint: err113
 			}
 		}
+		pluginsManager, err := plugins.NewManagerFromConfig(lg, cfg)
+		if err != nil {
+			return fmt.Errorf("failed initialize plugins manger: %w", err)
+		}
 		for _, step := range requestedSteps {
 			lg.Info("run step", zap.String("step", step.GetName()))
 			stepDescr, err := cfg.GetStepByName(
@@ -85,13 +91,31 @@ var Cmd = &cobra.Command{ //nolint: gochecknoglobals
 			if err != nil {
 				return fmt.Errorf("failed to create executor: %w", err) //nolint: err113
 			}
-			err = exec.RunStep(context.Background(), lg, &stroppy.StepContext{
-				Config:    cfg.GetRun(),
-				Benchmark: cfg.GetBenchmark(),
-				Step:      stepDescr,
+
+			stepCtx := context.Background()
+			stepContext := &stroppy.StepContext{
+				//Config:       cfg.GetRun(),
+				//Benchmark:    cfg.GetBenchmark(),
+				GlobalConfig: cfg.Config,
+				Step:         stepDescr,
+			}
+			err = pluginsManager.ForEachSidecar(func(plugin sidecar.Plugin) error {
+				return plugin.OnStepStart(stepCtx, stepContext)
 			})
 			if err != nil {
+				return fmt.Errorf("failed to call sidecar before step: %w", err)
+			}
+
+			err = exec.RunStep(stepCtx, lg, stepContext)
+			if err != nil {
 				return fmt.Errorf("failed to run step: %w", err)
+			}
+
+			err = pluginsManager.ForEachSidecar(func(plugin sidecar.Plugin) error {
+				return plugin.OnStepEnd(stepCtx, stepContext)
+			})
+			if err != nil {
+				return fmt.Errorf("failed to call sidecar agfter step: %w", err)
 			}
 		}
 

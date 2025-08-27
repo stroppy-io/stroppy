@@ -13,6 +13,7 @@ venv
 *.log
 ./stroppy
 dexample
+config.shema.yaml
 internal/static/stroppy-xk6
 internal/static/stroppy.pb.ts
 internal/static/stroppy.pb.js
