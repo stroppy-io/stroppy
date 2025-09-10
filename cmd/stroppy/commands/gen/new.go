@@ -140,6 +140,4 @@ func init() { //nolint: gochecknoinits // allow in cmd
 		false,
 		"generate dev environment, includes package.json, Makefile.dev and ts requirements",
 	)
-
-	Cmd.PersistentFlags().Lookup(configNewFormatFlagName).NoOptDefVal = config.FormatJSON.String()
 }
