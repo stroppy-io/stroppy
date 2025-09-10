@@ -34,7 +34,7 @@ var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 		if err != nil {
 			return err
 		}
-		configName, err := cmd.Flags().GetString(configFlagName)
+		configName, err := cmd.Flags().GetString(configNewNameFlagName)
 		if err != nil {
 			return err
 		}
@@ -92,6 +92,4 @@ func init() { //nolint: gochecknoinits // allow in cmd
 		configNewFormatFlagName,
 		"output config format, json or yaml",
 	)
-
-	NewConfigCmd.PersistentFlags().Lookup(configNewFormatFlagName).NoOptDefVal = config.FormatJSON.String()
 }
