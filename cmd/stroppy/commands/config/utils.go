@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"path"
+	"slices"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -16,6 +17,13 @@ import (
 const (
 	DefaultConfigName   = "stroppy"
 	DefaultConfigFormat = config.FormatJSON
+)
+
+const (
+	yamlAnnotation = "# yaml-language-server: $schema=https://github.com/stroppy-io/stroppy-proto/releases/download/" +
+		stroppy.Version + "/config.schema.yaml\n"
+	jsonAnnotation = "\t" + `"$schema": "https://github.com/stroppy-io/stroppy-proto/releases/download/` +
+		stroppy.Version + `/config.schema.json",` + "\n"
 )
 
 func MarshalConfig(cfg *stroppy.Config, newPath string) ([]byte, error) {
@@ -33,6 +41,13 @@ func MarshalConfig(cfg *stroppy.Config, newPath string) ([]byte, error) {
 	configStr, err := marshaler(cfg)
 	if err != nil {
 		return nil, err
+	}
+
+	switch path.Ext(newPath) { // embed annotations into config file
+	case ".json":
+		configStr = slices.Concat(configStr[:2], []byte(jsonAnnotation), configStr[2:])
+	case ".yaml":
+		configStr = slices.Concat([]byte(yamlAnnotation), configStr)
 	}
 
 	return configStr, nil
