@@ -23,6 +23,7 @@ help: # Show help in Makefile
 .PHONY: update-core
 update-core: # Update core by latest version
 	go get -u github.com/stroppy-io/stroppy-core@latest
+	go mod tidy
 
 GOPROXY:=https://goproxy.io,direct
 .PHONY: .app-deps
@@ -49,10 +50,10 @@ K6_BIN_NAME=stroppy-xk6
 GO_OS:= $(shell uname -s | tr '[:upper:]' '[:lower:]')
 GO_ARCH:= $(shell uname -m)
 ifeq ($(GO_ARCH),x86_64)
-    GO_ARCH := amd64
+		GO_ARCH := amd64
 endif
 ifeq ($(GO_ARCH),aarch64)
-    GO_ARCH := arm64
+		GO_ARCH := arm64
 endif
 K6_PKG_NAME   := $(K6_BIN_NAME)_$(GO_OS)_$(GO_ARCH)
 K6_ARCHIVE    := $(K6_PKG_NAME).tar.gz
@@ -106,17 +107,17 @@ STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 .PHONY: build
 build: .download-proto-static .download-k6 # Build binary stroppy
 	@XK6_VERSION=$$(curl -s \
-    		-H "Authorization: Bearer $(GITHUB_TOKEN)" \
-    		-H "Accept: application/vnd.github+json" \
-    		https://api.github.com/repos/stroppy-io/stroppy-xk6/releases/latest \
-    		| grep '"tag_name":' \
-    		| head -n 1 \
-    		| sed -E 's/.*"([^"]+)".*/\1/'); \
+				-H "Authorization: Bearer $(GITHUB_TOKEN)" \
+				-H "Accept: application/vnd.github+json" \
+				https://api.github.com/repos/stroppy-io/stroppy-xk6/releases/latest \
+				| grep '"tag_name":' \
+				| head -n 1 \
+				| sed -E 's/.*"([^"]+)".*/\1/'); \
 	echo $$XK6_VERSION; \
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-  	go build -v -o $(STROPPY_OUT_FILE) \
-    -ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.StroppyXk6Version=$$XK6_VERSION'" \
-  	$(CURDIR)/cmd/stroppy
+		go build -v -o $(STROPPY_OUT_FILE) \
+		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.StroppyXk6Version=$$XK6_VERSION'" \
+		$(CURDIR)/cmd/stroppy
 
 
 branch=main
