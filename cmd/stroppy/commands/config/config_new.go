@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path"
 
@@ -17,10 +18,11 @@ import (
 const (
 	configNewWorkdirFlagName = "workdir"
 	configNewFormatFlagName  = "format"
+	configNewNameFlagName    = "name"
 )
 
 var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
-	Use:   "new --output <output>",
+	Use:   fmt.Sprintf("new --%s <dirpath>", configNewWorkdirFlagName),
 	Short: "Generate default stroppy config",
 	Long:  ``,
 	RunE: func(cmd *cobra.Command, _ []string) error {
@@ -32,10 +34,14 @@ var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 		if err != nil {
 			return err
 		}
+		configName, err := cmd.Flags().GetString(configNewNameFlagName)
+		if err != nil {
+			return err
+		}
 
 		example := config.NewExampleConfig()
 
-		runConfStr, err := MarshalConfig(example, format.FormatConfigName(DefaultConfigName))
+		runConfStr, err := MarshalConfig(example, format.FormatConfigName(configName))
 		if err != nil {
 			return err
 		}
@@ -46,7 +52,7 @@ var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 		}
 
 		err = os.WriteFile(
-			path.Join(output, format.FormatConfigName(DefaultConfigName)),
+			path.Join(output, format.FormatConfigName(configName)),
 			runConfStr,
 			common.FileMode,
 		)
@@ -56,7 +62,7 @@ var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 
 		logger.Global().WithOptions(zap.WithCaller(false)).Info("Config generated! Happy benchmarking!", zap.String(
 			"config_path",
-			path.Join(output, format.FormatConfigName(DefaultConfigName)),
+			path.Join(output, format.FormatConfigName(configName)),
 		))
 
 		return nil
@@ -71,6 +77,11 @@ func init() { //nolint: gochecknoinits // allow in cmd
 		DefaultWorkdirPath,
 		"work directory",
 	)
+	NewConfigCmd.PersistentFlags().String(
+		configNewNameFlagName,
+		DefaultConfigName,
+		"name of the config file",
+	)
 	NewConfigCmd.PersistentFlags().Var(
 		enumflag.New(
 			&configFormatFlag,
@@ -81,6 +92,4 @@ func init() { //nolint: gochecknoinits // allow in cmd
 		configNewFormatFlagName,
 		"output config format, json or yaml",
 	)
-
-	NewConfigCmd.PersistentFlags().Lookup(configNewFormatFlagName).NoOptDefVal = config.FormatJSON.String()
 }

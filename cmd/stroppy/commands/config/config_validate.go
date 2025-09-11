@@ -77,9 +77,4 @@ func init() { //nolint: gochecknoinits // allow in cmd
 		false,
 		"set version in config to current version",
 	)
-
-	err := validateCmd.MarkPersistentFlagRequired(configFlagName)
-	if err != nil {
-		panic(err)
-	}
 }

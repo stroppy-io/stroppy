@@ -1,9 +1,11 @@
 package gen
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/thediveo/enumflag"
@@ -84,17 +86,27 @@ k6 script template, ts requirements and Makefile for run.
 			return fmt.Errorf("failed to get self binary path: %w", err) //nolint: err113
 		}
 
+		pathToWriteItself := path.Join(output, "stroppy")
+		absTo, errTo := filepath.Abs(filepath.Clean(pathToWriteItself))
+		absFrom, errFrom := filepath.Abs(filepath.Clean(execPath))
+		if err = cmp.Or(errTo, errFrom); err != nil {
+			return err
+		}
+		if absTo == absFrom {
+			return nil // executable already in correct place
+		}
+
 		execBin, err := os.ReadFile(execPath)
 		if err != nil {
 			return fmt.Errorf("failed to read self binary file: %w", err) //nolint: err113
 		}
 
-		err = os.WriteFile(path.Join(output, "stroppy"), execBin, common.FileMode)
+		err = os.WriteFile(pathToWriteItself, execBin, common.FileMode)
 		if err != nil {
 			return fmt.Errorf("failed to write self binary file: %w", err)
 		}
 
-		err = os.Chmod(path.Join(output, "stroppy"), common.FolderMode)
+		err = os.Chmod(pathToWriteItself, common.FolderMode)
 		if err != nil {
 			return fmt.Errorf("failed to chmod self binary file: %w", err)
 		}
@@ -128,6 +140,4 @@ func init() { //nolint: gochecknoinits // allow in cmd
 		false,
 		"generate dev environment, includes package.json, Makefile.dev and ts requirements",
 	)
-
-	Cmd.PersistentFlags().Lookup(configNewFormatFlagName).NoOptDefVal = config.FormatJSON.String()
 }
