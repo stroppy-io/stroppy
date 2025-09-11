@@ -111,26 +111,7 @@ func RunStep(
 	}
 
 	if runContext.GetGlobalConfig().GetRun().GetK6Executor().GetOtlpExport() != nil {
-		os.Setenv("K6_OTEL_GRPC_EXPORTER_INSECURE", "true")
-		os.Setenv(
-			"K6_OTEL_METRIC_PREFIX",
-			utils2.StringOrDefault(
-				runContext.GetGlobalConfig().GetRun().GetK6Executor().GetOtlpExport().GetOtlpMetricsPrefix(),
-				"k6_",
-			),
-		)
-		os.Setenv(
-			"K6_OTEL_SERVICE_NAME",
-			fmt.Sprintf("%s_%s",
-				runContext.GetGlobalConfig().GetBenchmark().GetName(),
-				runContext.GetStep().GetName()),
-		)
-		os.Setenv("K6_OTEL_GRPC_EXPORTER_ENDPOINT", utils2.StringOrDefault(
-			runContext.GetGlobalConfig().GetRun().GetK6Executor().GetOtlpExport().GetOtlpGrpcEndpoint(),
-			"localhost:4317",
-		))
-
-		baseArgs = append(baseArgs, "--out", "experimental-opentelemetry")
+		baseArgs = k6ArgsOtelExport(runContext, baseArgs)
 	}
 
 	baseArgs = append(
@@ -149,4 +130,47 @@ func RunStep(
 		runContext.GetGlobalConfig().GetRun().GetK6Executor().GetK6BinaryPath(),
 		baseArgs...,
 	)
+}
+
+// k6ArgsOtelExport setups k6 OpenTelemetry exporter.
+// Docs: https://grafana.com/docs/k6/latest/results-output/real-time/opentelemetry/#opentelemetry
+func k6ArgsOtelExport(runContext *stroppy.StepContext, baseArgs []string) []string {
+	export := runContext.GetGlobalConfig().GetRun().GetK6Executor().GetOtlpExport()
+	os.Setenv(
+		"K6_OTEL_METRIC_PREFIX",
+		utils2.StringOrDefault(
+			export.GetOtlpMetricsPrefix(),
+			"k6_",
+		),
+	)
+	os.Setenv(
+		"K6_OTEL_SERVICE_NAME",
+		fmt.Sprintf("%s_%s",
+			runContext.GetGlobalConfig().GetBenchmark().GetName(),
+			runContext.GetStep().GetName()),
+	)
+
+	insecure := "false" // secure by default
+	if export.GetOtlpEndpointInsecure() {
+		insecure = "true"
+	}
+
+	if export.GetOtlpGrpcEndpoint() != "" {
+		os.Setenv("K6_OTEL_GRPC_EXPORTER_INSECURE", insecure)
+		os.Setenv("K6_OTEL_GRPC_EXPORTER_ENDPOINT", "localhost:4317")
+	} else {
+		os.Setenv("K6_OTEL_HTTP_EXPORTER_INSECURE", insecure)
+		os.Setenv("K6_OTEL_HTTP_EXPORTER_ENDPOINT", utils2.StringOrDefault(
+			export.GetOtlpHttpEndpoint(),
+			"localhost:4318",
+		))
+		os.Setenv("K6_OTEL_HTTP_EXPORTER_URL_PATH", utils2.StringOrDefault(
+			export.GetOtlpHttpExporterUrlPath(),
+			"/v1/metrics",
+		))
+	}
+
+	baseArgs = append(baseArgs, "--out", "experimental-opentelemetry")
+
+	return baseArgs
 }
