@@ -16,10 +16,8 @@ venv
 *.log
 ./stroppy
 dexample
-config.shema.yaml
+config.schema.yaml
 internal/static/stroppy-xk6
-internal/static/stroppy.pb.ts
-internal/static/stroppy.pb.js
 
 # Created by .ignore support plugin (hsz.mobi)
 ### JetBrains templatee
