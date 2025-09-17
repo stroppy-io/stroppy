@@ -9,23 +9,53 @@ default: help
 help: # Show help in Makefile
 	@grep -E '^[a-zA-Z0-9 _-]+:.*#'  Makefile | sort | while read -r l; do printf "\033[1;32m$$(echo $$l | cut -f 1 -d':')\033[00m:$$(echo $$l | cut -f 2- -d'#')\n"; done
 
+# List of required binaries (default checks PATH)
+# Optional: Specify custom paths for binaries not in PATH
+# Format: binary_name=/path/to/binary
+REQUIRED_BINS = git go \
+	xk6=$(LOCAL_BIN)/xk6
+.PHONY: .check-bins
+.check-bins: # Check for required binaries if build locally
+	@echo "Checking for required binaries..."
+	@missing=0; \
+	for bin_spec in $(REQUIRED_BINS); do \
+		bin=$${bin_spec%%=*}; \
+		custom_path=$${bin_spec#*=}; \
+		if [ "$$bin" != "$$custom_path" ]; then \
+			# Check custom path first \
+			if [ -x "$$custom_path" ]; then \
+				echo "✓ $$bin is installed at $$custom_path"; \
+				continue; \
+			fi; \
+		fi; \
+		# Fall back to PATH check \
+		if which $$bin > /dev/null; then \
+			echo "✓ $$bin is installed in PATH"; \
+		else \
+			echo "✗ $$bin is NOT found"; \
+			missing=1; \
+		fi; \
+	done; \
+	if [ $$missing -eq 1 ]; then \
+		echo "Error: Some required binaries are missing"; \
+		exit 1; \
+	else \
+		echo "All required binaries are available"; \
+	fi
+
 .PHONY: .install-linter
 .install-linter: # Install golangci-lint
 	$(info Installing golangci-lint...)
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 
 .PHONY: .bin-deps
 .bin-deps: .install-linter # Install binary dependencies in ./bin
 	$(info Installing binary dependencies...)
 	mkdir -p $(LOCAL_BIN)
+	$(info Installing xk6...)
+	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install go.k6.io/xk6@v1.1.4
 
-.PHONY: update-core
-update-core: # Update core by latest version
-	go get -u github.com/stroppy-io/stroppy-core@latest
-	go mod tidy
-
-GOPROXY:=https://goproxy.io,direct
 .PHONY: .app-deps
 .app-deps: # Install application dependencies in ./bin
 	GOPROXY=$(GOPROXY) go mod tidy
@@ -44,81 +74,19 @@ linter_fix: # Start linter with possible fixes
 tests: # Run tests with coverage
 	go test -race ./... -coverprofile=coverage.out
 
+SRC_PROTO_GO_PATH=$(CURDIR)/proto/build/go
+TARGET_PROTO_GO_PATH=$(CURDIR)/pkg/core/proto
+.PHONY: proto
+proto:
+	rm -rf $(TARGET_PROTO_GO_PATH)/*
+	cd proto && $(MAKE) build
+	mv $(SRC_PROTO_GO_PATH)/* $(TARGET_PROTO_GO_PATH)/
 
-STATIC_PATH := $(CURDIR)/internal/static
-K6_BIN_NAME=stroppy-xk6
-GO_OS:= $(shell uname -s | tr '[:upper:]' '[:lower:]')
-GO_ARCH:= $(shell uname -m)
-ifeq ($(GO_ARCH),x86_64)
-		GO_ARCH := amd64
-endif
-ifeq ($(GO_ARCH),aarch64)
-		GO_ARCH := arm64
-endif
-K6_PKG_NAME   := $(K6_BIN_NAME)_$(GO_OS)_$(GO_ARCH)
-K6_ARCHIVE    := $(K6_PKG_NAME).tar.gz
-K6_URL        := https://github.com/stroppy-io/stroppy-xk6/releases/latest/download/$(K6_ARCHIVE)
-.PHONY: .download-k6
-.download-k6:
-	@if [ -x "$(STATIC_PATH)/$(K6_BIN_NAME)" ]; then \
-			echo "$(STATIC_PATH)/$(K6_BIN_NAME) is already installed."; \
-	else \
-		wget -q -O $(STATIC_PATH)/$(K6_ARCHIVE) "$(K6_URL)"; \
-		tar -xzf $(STATIC_PATH)/$(K6_ARCHIVE) -C $(STATIC_PATH); \
-		chmod +x $(STATIC_PATH)/$(K6_BIN_NAME); \
-		rm $(STATIC_PATH)/$(K6_ARCHIVE); \
-		echo "$(K6_BIN_NAME) installed to $(STATIC_PATH)/$(K6_BIN_NAME)"; \
-	fi
-
-STROPPY_PB_TS_NAME=stroppy.pb.ts
-STROPPY_PB_TS_PATH=$(STATIC_PATH)/$(STROPPY_PB_TS_NAME)
-STROPPY_PB_JS_NAME=stroppy.pb.js
-STROPPY_PB_JS_PATH=$(STATIC_PATH)/$(STROPPY_PB_JS_NAME)
-STROPPY_PROTO_URL=https://github.com/stroppy-io/stroppy-proto/releases/latest/download
-.PHONY: .download-proto-static
-.download-proto-static:
-	@if [ -x "$(STROPPY_PB_TS_PATH)" ]; then \
-		echo "$(STROPPY_PB_TS_PATH) is already installed."; \
-	else \
-		wget -q -O $(STROPPY_PB_TS_PATH) "$(STROPPY_PROTO_URL)/$(STROPPY_PB_TS_NAME)"; \
-		echo "$(STROPPY_PB_TS_NAME) installed to $(STROPPY_PB_TS_PATH)"; \
-	fi
-	@if [ -x "$(STROPPY_PB_JS_PATH)" ]; then \
-		echo "$(STROPPY_PB_JS_PATH) is already installed."; \
-	else \
-		wget -q -O $(STROPPY_PB_JS_PATH) "$(STROPPY_PROTO_URL)/$(STROPPY_PB_JS_NAME)"; \
-		echo "$(STROPPY_PB_JS_NAME) installed to $(STROPPY_PB_JS_PATH)"; \
-	fi
-
-GITHUB_TOKEN:=
-.PHONY: .get-components-versions
-.get-components-versions:
-	@XK6_VERSION=$$(curl -s \
-		-H "Authorization: Bearer $(GITHUB_TOKEN)" \
-		-H "Accept: application/vnd.github+json" \
-		https://api.github.com/repos/stroppy-io/stroppy-xk6/releases/latest \
-		| grep '"tag_name":' \
-		| head -n 1 \
-		| sed -E 's/.*"([^"]+)".*/\1/'); \
-	echo $$XK6_VERSION
-
-STROPPY_BIN_NAME=stroppy
-STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
-.PHONY: build
-build: .download-proto-static .download-k6 # Build binary stroppy
-	@XK6_VERSION=$$(curl -s \
-				-H "Authorization: Bearer $(GITHUB_TOKEN)" \
-				-H "Accept: application/vnd.github+json" \
-				https://api.github.com/repos/stroppy-io/stroppy-xk6/releases/latest \
-				| grep '"tag_name":' \
-				| head -n 1 \
-				| sed -E 's/.*"([^"]+)".*/\1/'); \
-	echo $$XK6_VERSION; \
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-		go build -v -o $(STROPPY_OUT_FILE) \
-		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.StroppyXk6Version=$$XK6_VERSION'" \
-		$(CURDIR)/cmd/stroppy
-
+K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
+.PHONY: build-xk6
+build-xk6: .check-bins # Build k6 module
+	mkdir -p $(CURDIR)/build
+	XK6_RACE_DETECTOR=0 $(LOCAL_BIN)/xk6 build --verbose --with github.com/stroppy-io/stroppy/cmd/xk6=./cmd/xk6/ --output $(K6_OUT_FILE)
 
 branch=main
 .PHONY: revision
@@ -131,16 +99,3 @@ revision: # Recreate git tag with version tag=<semver>
 	git push --delete origin v${tag} || true
 	git tag v$(tag)
 	git push origin v$(tag)
-
-
-.PHONY: .install-k6
-.install-k6: # Install k6
-	$(info Installing xk6...)
-	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) go install go.k6.io/xk6@latest
-
-K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
-.PHONY: build-xk6
-build-xk6: # Build k6 module
-	mkdir -p $(CURDIR)/build
-	XK6_RACE_DETECTOR=0 $(LOCAL_BIN)/xk6 build --verbose --with github.com/stroppy-io/stroppy/cmd/xk6=./cmd/xk6/ --output $(K6_OUT_FILE)

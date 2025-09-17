@@ -1,3 +1,6 @@
+proto/easyp_vendor
+proto/build
+proto/bin
 # binary
 /bin
 # ide
