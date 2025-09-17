@@ -131,3 +131,16 @@ revision: # Recreate git tag with version tag=<semver>
 	git push --delete origin v${tag} || true
 	git tag v$(tag)
 	git push origin v$(tag)
+
+
+.PHONY: .install-k6
+.install-k6: # Install k6
+	$(info Installing xk6...)
+	mkdir -p $(LOCAL_BIN)
+	GOBIN=$(LOCAL_BIN) go install go.k6.io/xk6@latest
+
+K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
+.PHONY: build-xk6
+build-xk6: # Build k6 module
+	mkdir -p $(CURDIR)/build
+	XK6_RACE_DETECTOR=0 $(LOCAL_BIN)/xk6 build --verbose --with github.com/stroppy-io/stroppy/cmd/xk6=./cmd/xk6/ --output $(K6_OUT_FILE)
