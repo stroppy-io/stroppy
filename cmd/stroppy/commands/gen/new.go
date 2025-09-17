@@ -11,12 +11,11 @@ import (
 	"github.com/thediveo/enumflag"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
-
 	configCmd "github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/internal/config"
 	"github.com/stroppy-io/stroppy/internal/static"
+	"github.com/stroppy-io/stroppy/pkg/core/logger"
 )
 
 const (

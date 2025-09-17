@@ -89,6 +89,15 @@ build-xk6: .check-bins # Build k6 module
 	XK6_RACE_DETECTOR=0 $(LOCAL_BIN)/xk6 build --verbose --with github.com/stroppy-io/stroppy/cmd/xk6=./cmd/xk6/ --output $(K6_OUT_FILE)
 	cp $(CURDIR)/build/stroppy-k6 internal/static/stroppy-xk6
 
+STROPPY_BIN_NAME=stroppy
+STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
+.PHONY: build
+build: # Build binary stroppy
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+		go build -v -o $(STROPPY_OUT_FILE) \
+		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.StroppyXk6Version=$$XK6_VERSION'" \
+		$(CURDIR)/cmd/stroppy
+
 branch=main
 .PHONY: revision
 revision: # Recreate git tag with version tag=<semver>

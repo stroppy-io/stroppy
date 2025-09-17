@@ -6,13 +6,12 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
-
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/gen"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
 	int_config "github.com/stroppy-io/stroppy/internal/config"
 	"github.com/stroppy-io/stroppy/internal/version"
+	"github.com/stroppy-io/stroppy/pkg/core/logger"
 )
 
 var rootCmd = &cobra.Command{ //nolint: gochecknoglobals

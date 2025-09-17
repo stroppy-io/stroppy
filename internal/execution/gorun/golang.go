@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 
+	"go.uber.org/zap"
+
 	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
 	"github.com/stroppy-io/stroppy/pkg/core/utils"
 	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
-	"go.uber.org/zap"
 )
 
 var (
@@ -23,7 +24,7 @@ const minRunTxGoroutines = 2
 
 func RunStep(
 	ctx context.Context,
-	logger *zap.Logger,
+	_ *zap.Logger, // TODO: pass to driver
 	runContext *stroppy.StepContext,
 ) error {
 	if runContext == nil {
@@ -39,6 +40,7 @@ func RunStep(
 	}
 
 	var err error
+
 	drv := postgres.NewDriver()
 
 	err = drv.Initialize(ctx, runContext)

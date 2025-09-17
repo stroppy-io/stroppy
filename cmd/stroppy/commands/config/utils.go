@@ -8,10 +8,9 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
-
 	"github.com/stroppy-io/stroppy/internal/config"
 	"github.com/stroppy-io/stroppy/internal/protoyaml"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
 const (
