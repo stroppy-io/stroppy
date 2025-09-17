@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 
-	"go.uber.org/zap"
-
 	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
 	"github.com/stroppy-io/stroppy/pkg/core/utils"
 	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
+	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
+	"go.uber.org/zap"
 )
 
 var (
@@ -38,12 +38,8 @@ func RunStep(
 		return ErrConfigNil
 	}
 
-	drv, drvCancelFn, err := driver.ConnectToPlugin(runContext.GetGlobalConfig().GetRun(), logger)
-	if err != nil {
-		return err
-	}
-
-	shutdown.RegisterFn(drvCancelFn)
+	var err error
+	drv := postgres.NewDriver()
 
 	err = drv.Initialize(ctx, runContext)
 	if err != nil {

@@ -9,11 +9,12 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/core/logger"
 	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver"
+
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 
-	"github.com/stroppy-io/stroppy-postgres/internal/pool"
-	"github.com/stroppy-io/stroppy-postgres/internal/queries"
+	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
+	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
 
 type QueryBuilder interface {

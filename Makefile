@@ -87,6 +87,7 @@ K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
 build-xk6: .check-bins # Build k6 module
 	mkdir -p $(CURDIR)/build
 	XK6_RACE_DETECTOR=0 $(LOCAL_BIN)/xk6 build --verbose --with github.com/stroppy-io/stroppy/cmd/xk6=./cmd/xk6/ --output $(K6_OUT_FILE)
+	cp $(CURDIR)/build/stroppy-k6 internal/static/stroppy-xk6
 
 branch=main
 .PHONY: revision

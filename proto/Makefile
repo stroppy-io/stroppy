@@ -56,7 +56,7 @@ REQUIRED_BINS = git node npm go protoc \
 .go-deps:
 	mkdir -p $(LOCAL_BIN)
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.9
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
+	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/envoyproxy/protoc-gen-validate@v1.2.1
 
 .PHONY: .node-deps
@@ -141,8 +141,17 @@ DOCS_TARGET_DIR=$(BUILD_TARGET_DIR)/docs
 	--jsonschema_opt=int64_as_string=true \
 	--proto_path=$(PROTO_PATH) $(PROTO_PATH)/config.proto
 
+
+.PHONY: .move
+.move:
+	rm -rf ../pkg/core/proto/*
+	cp -r ./build/go/* ../pkg/core/proto/
+	cp ./build/ts/* ../internal/static/
+
+
 .PHONY: build
-build: .check-bins .build-go-sdk .build-ts-sdk .build-md-docs .build-json-schema # Build go sdk, ts code, docs and json schema
+build: .check-bins .build-go-sdk .build-ts-sdk .build-md-docs .build-json-schema .move # Build go sdk, ts code, docs and json schema
+
 
 branch=main
 .PHONY: revision

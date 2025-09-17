@@ -25,7 +25,7 @@ func newDriverServer(impl Plugin) *server {
 
 func (s server) Initialize(
 	ctx context.Context,
-	context *stroppy.StepContext,
+	context *stroppy.Config,
 ) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, s.impl.Initialize(ctx, context)
 }

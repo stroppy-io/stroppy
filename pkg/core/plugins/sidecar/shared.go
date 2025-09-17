@@ -24,7 +24,7 @@ var PluginHandshake = plugin.HandshakeConfig{ //nolint: gochecknoglobals // allo
 }
 
 type Plugin interface {
-	Initialize(ctx context.Context, runContext *stroppy.StepContext) error
+	Initialize(ctx context.Context, runContext *stroppy.Config) error
 	OnStepStart(ctx context.Context, event *stroppy.StepContext) error
 	OnStepEnd(ctx context.Context, event *stroppy.StepContext) error
 	Teardown(ctx context.Context) error

@@ -8,8 +8,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/core/logger"
-	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
 )
 
 const (
@@ -55,15 +55,8 @@ func (x *Instance) Setup(runContextBytes string) error {
 		"Setup",
 		zap.Uint64("seed", runContext.GetGlobalConfig().GetRun().GetSeed()),
 	)
-	// TODO: think about cancel
-	// Process leak !!!
-	drv, _, err := driver.ConnectToPlugin(
-		runContext.GetGlobalConfig().GetRun(),
-		x.logger,
-	)
-	if err != nil {
-		return err
-	}
+
+	drv := postgres.NewDriver()
 
 	err = drv.Initialize(x.vu.Context(), runContext)
 	if err != nil {

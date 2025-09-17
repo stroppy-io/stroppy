@@ -38,7 +38,7 @@ func NewManagerFromConfig(logger *zap.Logger, config *config.Config) (*Manager, 
 }
 
 type initializable interface {
-	Initialize(ctx context.Context, runContext *stroppy.StepContext) error
+	Initialize(ctx context.Context, runContext *stroppy.Config) error
 	Teardown(ctx context.Context) error
 }
 
@@ -62,7 +62,7 @@ func (m *Manager) ForEachSidecar(callback func(sidecar.Plugin) error) error {
 	return nil
 }
 
-func (m *Manager) Initialize(ctx context.Context, runContext *stroppy.StepContext) error {
+func (m *Manager) Initialize(ctx context.Context, runContext *stroppy.Config) error {
 	initable := m.mergeInitializable()
 	for _, ini := range initable {
 		err := ini.Initialize(ctx, runContext)

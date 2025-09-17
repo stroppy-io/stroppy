@@ -31,7 +31,7 @@ func newDriverClient(protoClient stroppy.SidecarPluginClient) *client {
 
 func (d *client) Initialize(
 	ctx context.Context,
-	runContext *stroppy.StepContext,
+	runContext *stroppy.Config,
 ) error {
 	_, err := d.protoClient.Initialize(ctx, runContext)
 
