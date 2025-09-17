@@ -6,8 +6,8 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
-	"github.com/stroppy-io/stroppy-core/pkg/utils/errchan"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 const (

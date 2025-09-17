@@ -6,7 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 
 	"github.com/stroppy-io/stroppy/internal/execution/gorun"
 	"github.com/stroppy-io/stroppy/internal/execution/k6run"

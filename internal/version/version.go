@@ -3,7 +3,7 @@ package version
 import (
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
 type Component struct {

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy-core/pkg/logger"
+	"github.com/stroppy-io/stroppy/pkg/core/logger"
 )
 
 func TestNewLoggerTracer(t *testing.T) {

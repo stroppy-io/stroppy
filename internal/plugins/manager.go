@@ -5,9 +5,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy-core/pkg/plugins/sidecar"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
-	"github.com/stroppy-io/stroppy-core/pkg/shutdown"
+	"github.com/stroppy-io/stroppy/pkg/core/plugins/sidecar"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
 
 	"github.com/stroppy-io/stroppy/internal/config"
 )

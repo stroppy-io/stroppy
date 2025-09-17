@@ -1,8 +1,8 @@
 package distribution
 
 import (
-	"github.com/stroppy-io/stroppy-core/pkg/generate/constraint"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/generate/constraint"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
 type rangesGetter[T constraint.Number] interface {

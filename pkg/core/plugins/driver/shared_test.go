@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
-	"github.com/stroppy-io/stroppy-core/pkg/utils/errchan"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 func TestPluginHandshake(t *testing.T) {

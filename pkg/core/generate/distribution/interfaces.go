@@ -1,7 +1,7 @@
 package distribution
 
 import (
-	"github.com/stroppy-io/stroppy-core/pkg/generate/constraint"
+	"github.com/stroppy-io/stroppy/pkg/core/generate/constraint"
 )
 
 type Distribution[T constraint.Number] interface {

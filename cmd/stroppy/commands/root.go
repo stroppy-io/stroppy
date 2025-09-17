@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy-core/pkg/logger"
+	"github.com/stroppy-io/stroppy/pkg/core/logger"
 
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/gen"

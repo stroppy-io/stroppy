@@ -3,7 +3,7 @@ package distribution
 import (
 	"math/rand/v2"
 
-	"github.com/stroppy-io/stroppy-core/pkg/generate/constraint"
+	"github.com/stroppy-io/stroppy/pkg/core/generate/constraint"
 )
 
 type ZipfDistribution[T constraint.Number] struct {

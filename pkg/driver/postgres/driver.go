@@ -7,10 +7,10 @@ import (
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy-core/pkg/logger"
-	"github.com/stroppy-io/stroppy-core/pkg/plugins/driver"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
-	"github.com/stroppy-io/stroppy-core/pkg/utils/errchan"
+	"github.com/stroppy-io/stroppy/pkg/core/logger"
+	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 
 	"github.com/stroppy-io/stroppy-postgres/internal/pool"
 	"github.com/stroppy-io/stroppy-postgres/internal/queries"

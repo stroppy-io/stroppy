@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
 const (

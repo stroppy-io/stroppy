@@ -14,10 +14,10 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/stroppy-io/stroppy-core/pkg/logger"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
-	"github.com/stroppy-io/stroppy-core/pkg/shutdown"
-	utils2 "github.com/stroppy-io/stroppy-core/pkg/utils"
+	"github.com/stroppy-io/stroppy/pkg/core/logger"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
+	utils2 "github.com/stroppy-io/stroppy/pkg/core/utils"
 )
 
 func runK6Binary(

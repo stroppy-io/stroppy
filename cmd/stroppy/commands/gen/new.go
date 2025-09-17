@@ -11,7 +11,7 @@ import (
 	"github.com/thediveo/enumflag"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy-core/pkg/logger"
+	"github.com/stroppy-io/stroppy/pkg/core/logger"
 
 	configCmd "github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
 	"github.com/stroppy-io/stroppy/internal/common"

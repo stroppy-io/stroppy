@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
 func TestNewDriverClient(t *testing.T) {

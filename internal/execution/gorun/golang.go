@@ -6,11 +6,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy-core/pkg/plugins/driver"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
-	"github.com/stroppy-io/stroppy-core/pkg/shutdown"
-	"github.com/stroppy-io/stroppy-core/pkg/utils"
-	"github.com/stroppy-io/stroppy-core/pkg/utils/errchan"
+	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
+	"github.com/stroppy-io/stroppy/pkg/core/utils"
+	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 var (

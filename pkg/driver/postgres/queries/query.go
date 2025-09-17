@@ -7,8 +7,8 @@ import (
 
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
-	"github.com/stroppy-io/stroppy-core/pkg/utils/errchan"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 func newQuery(

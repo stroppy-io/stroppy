@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 
 	"github.com/stroppy-io/stroppy/internal/static"
 )

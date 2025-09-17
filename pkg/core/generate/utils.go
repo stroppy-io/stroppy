@@ -6,9 +6,9 @@ import (
 	"github.com/shopspring/decimal"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/stroppy-io/stroppy-core/pkg/generate/constraint"
-	"github.com/stroppy-io/stroppy-core/pkg/generate/primitive"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/generate/constraint"
+	"github.com/stroppy-io/stroppy/pkg/core/generate/primitive"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
 type (

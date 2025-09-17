@@ -3,7 +3,7 @@ package distribution
 import (
 	"sync/atomic"
 
-	"github.com/stroppy-io/stroppy-core/pkg/generate/constraint"
+	"github.com/stroppy-io/stroppy/pkg/core/generate/constraint"
 )
 
 type UniqueNumberGenerator[T constraint.Number] struct {

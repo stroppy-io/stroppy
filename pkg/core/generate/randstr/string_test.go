@@ -5,8 +5,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/stroppy-io/stroppy-core/pkg/generate/constraint"
-	"github.com/stroppy-io/stroppy-core/pkg/generate/distribution"
+	"github.com/stroppy-io/stroppy/pkg/core/generate/constraint"
+	"github.com/stroppy-io/stroppy/pkg/core/generate/distribution"
 )
 
 func TestStringGenerator_Next(t *testing.T) {

@@ -9,10 +9,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	"github.com/stroppy-io/stroppy-core/pkg/generate/distribution"
-	"github.com/stroppy-io/stroppy-core/pkg/generate/primitive"
-	"github.com/stroppy-io/stroppy-core/pkg/generate/randstr"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/generate/distribution"
+	"github.com/stroppy-io/stroppy/pkg/core/generate/primitive"
+	"github.com/stroppy-io/stroppy/pkg/core/generate/randstr"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
 type ValueGenerator interface {

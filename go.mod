@@ -6,7 +6,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
-	github.com/stroppy-io/stroppy-core v0.1.1
 	github.com/thediveo/enumflag v0.10.1
 	go.uber.org/zap v1.27.0
 	google.golang.org/protobuf v1.36.7

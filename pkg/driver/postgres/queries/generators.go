@@ -5,8 +5,8 @@ import (
 
 	cmap "github.com/orcaman/concurrent-map/v2"
 
-	"github.com/stroppy-io/stroppy-core/pkg/generate"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/generate"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
 type (

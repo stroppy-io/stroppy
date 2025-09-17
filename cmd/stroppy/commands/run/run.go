@@ -8,9 +8,9 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy-core/pkg/logger"
-	"github.com/stroppy-io/stroppy-core/pkg/plugins/sidecar"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/logger"
+	"github.com/stroppy-io/stroppy/pkg/core/plugins/sidecar"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 
 	configCmd "github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
 	"github.com/stroppy-io/stroppy/internal/config"

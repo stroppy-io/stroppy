@@ -9,9 +9,9 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/stroppy-io/stroppy-core/pkg/generate"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
-	"github.com/stroppy-io/stroppy-core/pkg/utils/errchan"
+	"github.com/stroppy-io/stroppy/pkg/core/generate"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 func TestNewQuery_Success(t *testing.T) {

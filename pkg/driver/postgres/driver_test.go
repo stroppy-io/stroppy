@@ -7,8 +7,8 @@ import (
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/stretchr/testify/require"
 
-	"github.com/stroppy-io/stroppy-core/pkg/logger"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/logger"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
 type testDriver struct {

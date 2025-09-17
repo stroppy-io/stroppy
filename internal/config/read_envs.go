@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/stroppy-io/stroppy-core/pkg/logger"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/logger"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
 type visitorInFunc func(
