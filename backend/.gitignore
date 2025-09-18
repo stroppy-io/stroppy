@@ -1,0 +1,44 @@
+# Бинарные файлы
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# База данных
+*.db
+*.sqlite
+*.sqlite3
+
+# Тестовые файлы
+*.test
+coverage.out
+coverage.html
+
+# Логи
+*.log
+
+# Временные файлы
+*.tmp
+*.temp
+
+# Переменные окружения
+.env
+.env.local
+.env.production
+
+# Директории IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

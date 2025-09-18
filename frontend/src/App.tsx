@@ -1,87 +1,74 @@
 import { useState } from 'react'
-import { Button, Card, Layout, Typography, Space, Row, Col } from 'antd'
-import { ThunderboltOutlined, CloudOutlined, SettingOutlined } from '@ant-design/icons'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Layout, ConfigProvider } from 'antd'
+import { AuthProvider } from './contexts/AuthContext'
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'
+import ProtectedRoute from './components/ProtectedRoute'
+import Sidebar from './components/Sidebar'
+import PageWrapper from './components/PageWrapper'
+import ConfiguratorPage from './pages/ConfiguratorPage'
+import RunsPage from './pages/RunsPage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 
-const { Header, Content, Footer } = Layout
-const { Title, Paragraph } = Typography
+const { Footer } = Layout
 
-function App() {
-  const [count, setCount] = useState(0)
+// Внутренний компонент с доступом к ThemeContext
+const AppContent: React.FC = () => {
+  const [collapsed, setCollapsed] = useState(false)
+  const { antdTheme } = useTheme()
 
   return (
-    <Layout className="min-h-screen">
-      <Header className="bg-white shadow-sm">
-        <div className="flex items-center justify-between h-full px-6">
-          <div className="flex items-center space-x-2">
-            <CloudOutlined className="text-2xl text-blue-600" />
-            <Title level={3} className="!mb-0 text-blue-600">
-              Stroppy Cloud Panel
-            </Title>
-          </div>
-          <Space>
-            <Button icon={<SettingOutlined />}>Настройки</Button>
-            <Button type="primary" icon={<ThunderboltOutlined />}>
-              Запустить
-            </Button>
-          </Space>
-        </div>
-      </Header>
-      
-      <Content className="p-6">
-        <Row gutter={[16, 16]}>
-          <Col span={24}>
-            <Card className="text-center">
-              <Title level={1} className="!mb-4">
-                Добро пожаловать в Stroppy Cloud Panel
-              </Title>
-              <Paragraph className="text-lg text-gray-600 mb-6">
-                Современная панель управления облачными ресурсами
-              </Paragraph>
-              
-              <div className="mb-6">
-                <Button 
-                  type="primary" 
-                  size="large"
-                  onClick={() => setCount((count) => count + 1)}
-                  className="mr-4"
-                >
-                  Счетчик: {count}
-                </Button>
-                <Button size="large">
-                  Дополнительная кнопка
-                </Button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-                <Card className="text-center">
-                  <ThunderboltOutlined className="text-4xl text-blue-500 mb-4" />
-                  <Title level={4}>Быстрый старт</Title>
-                  <Paragraph>Быстрое развертывание и настройка</Paragraph>
-                </Card>
-                
-                <Card className="text-center">
-                  <CloudOutlined className="text-4xl text-green-500 mb-4" />
-                  <Title level={4}>Облачные ресурсы</Title>
-                  <Paragraph>Управление всеми облачными сервисами</Paragraph>
-                </Card>
-                
-                <Card className="text-center">
-                  <SettingOutlined className="text-4xl text-purple-500 mb-4" />
-                  <Title level={4}>Настройки</Title>
-                  <Paragraph>Гибкая конфигурация системы</Paragraph>
-                </Card>
-              </div>
-            </Card>
-          </Col>
-        </Row>
-      </Content>
-      
-      <Footer className="text-center bg-gray-50">
-        <Paragraph className="text-gray-500">
-          Stroppy Cloud Panel ©2024 - Создано с помощью React, TypeScript, Vite, Tailwind CSS и Ant Design
-        </Paragraph>
-      </Footer>
-    </Layout>
+    <ConfigProvider theme={antdTheme}>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            {/* Публичные маршруты */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            
+            {/* Защищенные маршруты */}
+            <Route path="/*" element={
+              <ProtectedRoute>
+                <Layout style={{ height: '100vh', overflow: 'hidden' }}>
+                  <Sidebar collapsed={collapsed} onCollapse={setCollapsed} />
+                  
+                  <Layout style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <PageWrapper>
+                      <Routes>
+                        <Route path="/" element={<Navigate to="/runs" replace />} />
+                        <Route path="/configurator" element={<ConfiguratorPage />} />
+                        <Route path="/runs" element={<RunsPage />} />
+                      </Routes>
+                    </PageWrapper>
+                    
+                    <Footer style={{ 
+                      textAlign: 'center', 
+                      padding: '8px 16px', 
+                      fontSize: '12px', 
+                      color: '#999',
+                      height: '32px',
+                      lineHeight: '16px',
+                      flexShrink: 0
+                    }}>
+                      Stroppy Cloud Panel ©2024
+                    </Footer>
+                  </Layout>
+                </Layout>
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </ConfigProvider>
+  )
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   )
 }
 

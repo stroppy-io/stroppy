@@ -1,0 +1,12 @@
+# Игнорируем ненужные файлы при сборке Docker образа
+bin/
+*.db
+.git
+.gitignore
+README.md
+Makefile
+coverage.out
+coverage.html
+*.log
+.env
+.env.local

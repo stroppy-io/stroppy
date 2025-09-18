@@ -1,0 +1,51 @@
+services:
+  # Backend в режиме разработки
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: stroppy-backend-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_PATH=/app/data/stroppy.db
+      - PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-not-for-production}
+      - GIN_MODE=debug
+    volumes:
+      - ./backend:/app
+      - backend_data:/app/data
+    working_dir: /app
+    command: ./stroppy-cloud-pannel
+    restart: unless-stopped
+    networks:
+      - stroppy_dev_network
+
+  # Frontend в режиме разработки
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: stroppy-frontend-dev
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8080/api/v1
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    working_dir: /app
+    command: yarn dev --host
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - stroppy_dev_network
+
+volumes:
+  backend_data:
+    driver: local
+
+networks:
+  stroppy_dev_network:
+    driver: bridge

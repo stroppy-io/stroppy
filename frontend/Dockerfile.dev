@@ -1,0 +1,17 @@
+FROM node:20-alpine
+
+# Установка рабочей директории
+WORKDIR /app
+
+# Копирование package.json и yarn.lock для установки зависимостей
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+# Копирование исходного кода
+COPY . .
+
+# Открытие порта
+EXPOSE 5173
+
+# Команда запуска в режиме разработки
+CMD ["yarn", "dev", "--host"]

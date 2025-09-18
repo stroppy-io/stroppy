@@ -1,3 +1,649 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Ant Design стили и сброс отступов */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  transition: background-color 0.3s ease;
+}
+
+#root {
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Светлая тема */
+body.light-theme {
+  background-color: #f5f5f5;
+  color: #000000;
+}
+
+/* Тёмная тема */
+body.dark-theme {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+/* Дополнительные стили для улучшения внешнего вида */
+.ant-layout {
+  transition: background-color 0.3s ease;
+}
+
+.ant-layout-sider {
+  transition: background-color 0.3s ease;
+}
+
+.ant-menu {
+  background: transparent !important;
+}
+
+/* Стили для переключателя темы */
+.theme-switch {
+  transition: all 0.3s ease;
+}
+
+/* Анимации для плавных переходов */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Стили для карточек в тёмной теме */
+body.dark-theme .ant-card {
+  background: #141414 !important;
+  border-color: #424242 !important;
+}
+
+body.dark-theme .ant-card-body {
+  background: #141414 !important;
+  color: #ffffff !important;
+}
+
+/* Стили для инпутов в тёмной теме */
+body.dark-theme .ant-input,
+body.dark-theme .ant-input-password,
+body.dark-theme .ant-input-password-input {
+  background: #1f1f1f !important;
+  border-color: #424242 !important;
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-input::placeholder,
+body.dark-theme .ant-input-password::placeholder {
+  color: #a6a6a6 !important;
+}
+
+body.dark-theme .ant-input:focus,
+body.dark-theme .ant-input-password:focus,
+body.dark-theme .ant-input-focused {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
+
+/* Стили для таблиц в тёмной теме */
+body.dark-theme .ant-table {
+  background: #141414 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+body.dark-theme .ant-table-thead > tr > th {
+  background: #1f1f1f !important;
+  border: none !important;
+  border-bottom: 1px solid #424242 !important;
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-table-tbody > tr > td {
+  background: #141414 !important;
+  border: none !important;
+  border-bottom: 1px solid transparent !important;
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-table-tbody > tr:hover > td {
+  background: #262626 !important;
+  border-bottom: 1px solid transparent !important;
+}
+
+body.dark-theme .ant-table-empty .ant-table-tbody > tr > td {
+  background: #141414 !important;
+  border: none !important;
+}
+
+/* Стили для кнопок в тёмной теме */
+body.dark-theme .ant-btn {
+  border-color: #424242 !important;
+}
+
+body.dark-theme .ant-btn:not(.ant-btn-primary) {
+  background: #1f1f1f !important;
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-btn:not(.ant-btn-primary):hover {
+  background: #262626 !important;
+  border-color: #1890ff !important;
+}
+
+/* Стили для статистики в тёмной теме */
+body.dark-theme .ant-statistic {
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-statistic-title {
+  color: #a6a6a6 !important;
+}
+
+body.dark-theme .ant-statistic-content {
+  color: #ffffff !important;
+}
+
+/* Стили для типографии в тёмной теме */
+body.dark-theme .ant-typography {
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-typography-caption {
+  color: #a6a6a6 !important;
+}
+
+/* Стили для дропдаунов в тёмной теме */
+body.dark-theme .ant-dropdown {
+  background: #1f1f1f !important;
+}
+
+body.dark-theme .ant-dropdown-menu {
+  background: #1f1f1f !important;
+  border-color: #424242 !important;
+}
+
+body.dark-theme .ant-dropdown-menu-item {
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-dropdown-menu-item:hover {
+  background: #262626 !important;
+}
+
+/* Стили для форм в тёмной теме */
+body.dark-theme .ant-form-item-label > label {
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-form-item-explain {
+  color: #a6a6a6 !important;
+}
+
+/* Стили для селектов в тёмной теме */
+body.dark-theme .ant-select {
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-select-selector {
+  background: #1f1f1f !important;
+  border-color: #424242 !important;
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-select-selection-placeholder {
+  color: #a6a6a6 !important;
+}
+
+/* Стили для модалок в тёмной теме */
+body.dark-theme .ant-modal-content {
+  background: #141414 !important;
+}
+
+body.dark-theme .ant-modal-header {
+  background: #141414 !important;
+  border-color: #424242 !important;
+}
+
+body.dark-theme .ant-modal-title {
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-modal-body {
+  color: #ffffff !important;
+}
+
+/* Стили для алертов в тёмной теме */
+body.dark-theme .ant-alert {
+  border-color: #424242 !important;
+}
+
+body.dark-theme .ant-alert-error {
+  background: #2a1215 !important;
+  border-color: #58181c !important;
+}
+
+body.dark-theme .ant-alert-success {
+  background: #162312 !important;
+  border-color: #274916 !important;
+}
+
+body.dark-theme .ant-alert-warning {
+  background: #2b2111 !important;
+  border-color: #594214 !important;
+}
+
+body.dark-theme .ant-alert-info {
+  background: #111b26 !important;
+  border-color: #153450 !important;
+}
+
+/* Стили для переключателей в тёмной теме */
+body.dark-theme .ant-switch {
+  background: #424242 !important;
+}
+
+body.dark-theme .ant-switch-checked {
+  background: #1890ff !important;
+}
+
+/* Стили для прогресс-баров в тёмной теме */
+body.dark-theme .ant-progress-bg {
+  background: #1890ff !important;
+}
+
+body.dark-theme .ant-progress-inner {
+  background: #424242 !important;
+}
+
+/* Стили для спиннеров в тёмной теме */
+body.dark-theme .ant-spin-dot-item {
+  background: #1890ff !important;
+}
+
+/* Стили для тегов в тёмной теме */
+body.dark-theme .ant-tag {
+  background: #1f1f1f !important;
+  border-color: #424242 !important;
+  color: #ffffff !important;
+}
+
+/* Стили для пагинации в тёмной теме */
+body.dark-theme .ant-pagination-item {
+  background: #1f1f1f !important;
+  border-color: #424242 !important;
+}
+
+body.dark-theme .ant-pagination-item a {
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-pagination-item-active {
+  background: #1890ff !important;
+  border-color: #1890ff !important;
+}
+
+body.dark-theme .ant-pagination-item-active a {
+  color: #ffffff !important;
+}
+
+/* Стили для layout в тёмной теме */
+body.dark-theme .ant-layout {
+  background: #000000 !important;
+}
+
+body.dark-theme .ant-layout-header {
+  background: #141414 !important;
+  border-bottom: 1px solid #424242 !important;
+}
+
+body.dark-theme .ant-layout-sider {
+  background: #141414 !important;
+}
+
+body.dark-theme .ant-layout-content {
+  background: #000000 !important;
+}
+
+/* Стили для footer в тёмной теме */
+body.dark-theme .ant-layout-footer {
+  background: #141414 !important;
+  color: #a6a6a6 !important;
+  border-top: 1px solid #424242 !important;
+}
+
+/* Стили для пустых состояний в тёмной теме */
+body.dark-theme .ant-empty {
+  color: #a6a6a6 !important;
+}
+
+body.dark-theme .ant-empty-description {
+  color: #a6a6a6 !important;
+}
+
+/* Дополнительные стили для лучшей поддержки темы */
+body.dark-theme .ant-divider {
+  border-color: #424242 !important;
+}
+
+body.dark-theme .ant-tooltip-inner {
+  background: #1f1f1f !important;
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-popover-inner {
+  background: #1f1f1f !important;
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-popover-arrow::before {
+  background: #1f1f1f !important;
+}
+
+/* Стили для скроллбара в тёмной теме */
+body.dark-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body.dark-theme ::-webkit-scrollbar-track {
+  background: #141414;
+}
+
+body.dark-theme ::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 4px;
+}
+
+body.dark-theme ::-webkit-scrollbar-thumb:hover {
+  background: #666666;
+}
+
+/* ИСПРАВЛЕНИЕ БЕЛЫХ ГРАНИЦ И ПОЛОС В ТЁМНОЙ ТЕМЕ */
+
+/* Исправляем все псевдоэлементы с границами */
+body.dark-theme *::before,
+body.dark-theme *::after {
+  border-color: #424242 !important;
+}
+
+/* Исправляем таблицы - убираем белые границы */
+body.dark-theme .ant-table-thead > tr > th::before {
+  background-color: #424242 !important;
+}
+
+body.dark-theme .ant-table-cell::before {
+  background-color: #424242 !important;
+}
+
+body.dark-theme .ant-table-container::before,
+body.dark-theme .ant-table-container::after {
+  background-color: #424242 !important;
+}
+
+body.dark-theme .ant-table-border-fix-left,
+body.dark-theme .ant-table-border-fix-right {
+  border-color: #424242 !important;
+}
+
+body.dark-theme .ant-table-thead > tr:not(:last-child) > th[colspan] {
+  border-bottom: 1px solid #424242 !important;
+}
+
+/* Исправляем hover состояния таблиц */
+body.dark-theme .ant-table-tbody > tr.ant-table-row:hover > td,
+body.dark-theme .ant-table-tbody > tr > td.ant-table-cell-row-hover {
+  background: #262626 !important;
+}
+
+body.dark-theme .ant-table-tbody > tr.ant-table-row-selected > td {
+  background: #111b26 !important;
+}
+
+body.dark-theme .ant-table-tbody > tr.ant-table-row-selected:hover > td {
+  background: #153450 !important;
+}
+
+/* Исправляем углы таблиц */
+body.dark-theme .ant-table-container table > thead > tr:first-child th:first-child,
+body.dark-theme .ant-table-container table > thead > tr:first-child td:first-child,
+body.dark-theme .ant-table-container table > tbody > tr:first-child th:first-child,
+body.dark-theme .ant-table-container table > tbody > tr:first-child td:first-child {
+  border-top-left-radius: 6px;
+  border-color: #424242 !important;
+}
+
+body.dark-theme .ant-table-container table > thead > tr:first-child th:last-child,
+body.dark-theme .ant-table-container table > thead > tr:first-child td:last-child,
+body.dark-theme .ant-table-container table > tbody > tr:first-child th:last-child,
+body.dark-theme .ant-table-container table > tbody > tr:first-child td:last-child {
+  border-top-right-radius: 6px;
+  border-color: #424242 !important;
+}
+
+/* Исправляем разделители таблиц */
+body.dark-theme .ant-table-thead > tr > th:not(:last-child):not(.ant-table-selection-column):not(.ant-table-row-expand-icon-cell):not([colspan])::before {
+  display: none !important;
+}
+
+/* Исправляем карточки */
+body.dark-theme .ant-card-head {
+  background: #141414 !important;
+  border-color: #424242 !important;
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-card-head-title {
+  color: #ffffff !important;
+}
+
+/* Исправляем тени для тёмной темы */
+body.dark-theme .ant-card,
+body.dark-theme .ant-modal-content,
+body.dark-theme .ant-dropdown,
+body.dark-theme .ant-tooltip-inner,
+body.dark-theme .ant-popover-inner {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+body.dark-theme .ant-table-wrapper {
+  box-shadow: none !important;
+}
+
+/* Исправляем все элементы форм */
+body.dark-theme .ant-select-selector,
+body.dark-theme .ant-input-group-addon,
+body.dark-theme .ant-picker,
+body.dark-theme .ant-cascader-picker,
+body.dark-theme .ant-mentions,
+body.dark-theme .ant-checkbox-wrapper,
+body.dark-theme .ant-radio-wrapper {
+  border-color: #424242 !important;
+}
+
+/* Исправляем разделители */
+body.dark-theme .ant-divider-horizontal {
+  border-top-color: #424242 !important;
+}
+
+body.dark-theme .ant-divider-vertical {
+  border-left-color: #424242 !important;
+}
+
+/* Исправляем статистику */
+body.dark-theme .ant-statistic-content::before,
+body.dark-theme .ant-statistic-content::after {
+  background-color: #424242 !important;
+}
+
+/* Исправляем пагинацию */
+body.dark-theme .ant-pagination-prev,
+body.dark-theme .ant-pagination-next,
+body.dark-theme .ant-pagination-jump-prev,
+body.dark-theme .ant-pagination-jump-next {
+  border-color: #424242 !important;
+}
+
+body.dark-theme .ant-pagination-prev:hover,
+body.dark-theme .ant-pagination-next:hover {
+  border-color: #1890ff !important;
+}
+
+/* Исправляем кнопки */
+body.dark-theme .ant-btn-default {
+  background: #1f1f1f !important;
+  border-color: #424242 !important;
+  color: #ffffff !important;
+}
+
+body.dark-theme .ant-btn-text {
+  color: #ffffff !important;
+  border: none !important;
+}
+
+/* Исправляем контейнеры таблиц */
+body.dark-theme .ant-table-container {
+  border: none !important;
+}
+
+body.dark-theme .ant-table-wrapper {
+  border: none !important;
+}
+
+body.dark-theme .ant-table-cell {
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+}
+
+body.dark-theme .ant-table-row {
+  border: none !important;
+}
+
+/* Убираем границы у всех таблиц в тёмной теме */
+body.dark-theme .ant-table [class*="ant-table"] {
+  border: none !important;
+}
+
+body.dark-theme .ant-table * {
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+}
+
+/* Убираем белые линии из всех компонентов Ant Design */
+body.dark-theme .ant-table-thead th,
+body.dark-theme .ant-table-tbody td {
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+}
+
+body.dark-theme .ant-table-thead th:not(:last-child):not(.ant-table-selection-column):not(.ant-table-row-expand-icon-cell):not([colspan])::before {
+  display: none !important;
+}
+
+/* Исправляем границы всех элементов */
+body.dark-theme .ant-table,
+body.dark-theme .ant-table-container,
+body.dark-theme .ant-table-content,
+body.dark-theme .ant-table-tbody,
+body.dark-theme .ant-table-thead {
+  border: none !important;
+}
+
+/* Специальные исправления для резистентных белых границ */
+body.dark-theme table,
+body.dark-theme tbody,
+body.dark-theme thead,
+body.dark-theme tr {
+  border: none !important;
+}
+
+body.dark-theme td,
+body.dark-theme th {
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+}
+
+/* Убираем белые outline и focus границы */
+body.dark-theme *:focus,
+body.dark-theme *:focus-visible {
+  outline-color: #1890ff !important;
+  border-color: #1890ff !important;
+}
+
+/* Исправляем все возможные белые элементы */
+body.dark-theme * {
+  border-color: #424242 !important;
+}
+
+/* Переопределяем для основных цветов */
+body.dark-theme .ant-btn-primary,
+body.dark-theme .ant-btn-primary:hover,
+body.dark-theme .ant-btn-primary:focus {
+  border-color: #1890ff !important;
+}
+
+/* Исправляем белые тени и блики */
+body.dark-theme * {
+  box-shadow: none !important;
+}
+
+body.dark-theme .ant-card,
+body.dark-theme .ant-modal-content,
+body.dark-theme .ant-dropdown-menu {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* ПОЛНОЕ УДАЛЕНИЕ ГРАНИЦ ТАБЛИЦЫ В ТЁМНОЙ ТЕМЕ */
+body.dark-theme .ant-table,
+body.dark-theme .ant-table *,
+body.dark-theme .ant-table-wrapper,
+body.dark-theme .ant-table-container,
+body.dark-theme .ant-table-content,
+body.dark-theme .ant-table-tbody,
+body.dark-theme .ant-table-thead,
+body.dark-theme .ant-table-header,
+body.dark-theme .ant-table-body,
+body.dark-theme .ant-table-row,
+body.dark-theme .ant-table-cell,
+body.dark-theme .ant-table thead,
+body.dark-theme .ant-table tbody,
+body.dark-theme .ant-table tr,
+body.dark-theme .ant-table td,
+body.dark-theme .ant-table th {
+  border: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  border-color: transparent !important;
+  outline: none !important;
+}
+
+/* Убираем псевдоэлементы с границами */
+body.dark-theme .ant-table *::before,
+body.dark-theme .ant-table *::after {
+  border: none !important;
+  background: transparent !important;
+  display: none !important;
+}
+
+/* Убираем все разделители колонок */
+body.dark-theme .ant-table-thead th::before,
+body.dark-theme .ant-table-tbody td::before {
+  display: none !important;
+}
+
+/* Только нижняя граница для заголовков */
+body.dark-theme .ant-table-thead > tr > th {
+  border-bottom: 1px solid #333333 !important;
+}
+
+/* Убираем границы между строками */
+body.dark-theme .ant-table-tbody > tr > td {
+  border-bottom: none !important;
+}
+
+/* Убираем границы при hover */
+body.dark-theme .ant-table-tbody > tr:hover > td {
+  border: none !important;
+}
