@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/hashicorp/go-plugin"
 	"go.uber.org/zap"
@@ -63,7 +62,7 @@ func (d *client) Teardown(ctx context.Context) error {
 }
 
 func ConnectToPlugin( //nolint: ireturn // need from lib
-	runConfig *stroppy.RunConfig,
+	runConfig *stroppy.RunConfig, // TODO: *stroppy.Plugin probably...
 	lg *zap.Logger,
 ) (Plugin, context.CancelFunc, error) {
 	logger.SetLoggerEnv(
@@ -79,8 +78,9 @@ func ConnectToPlugin( //nolint: ireturn // need from lib
 		Cmd: exec.Command( //nolint: gosec // allow
 			"sh",
 			"-c",
-			runConfig.GetDriver().GetDriverPluginPath()+" "+
-				strings.Join(runConfig.GetDriver().GetDriverPluginArgs(), " "),
+			// TODO: sidecars shouldn't depend on old drivers
+			// runConfig.GetDriver().GetDriverPluginPath()+" "+
+			// 	strings.Join(runConfig.GetDriver().GetDriverPluginArgs(), " "),
 		),
 		Logger:           common.NewLogger(lg.Named(driverClientLoggerName)),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},

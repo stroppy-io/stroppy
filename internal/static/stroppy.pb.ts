@@ -3194,18 +3194,6 @@ export interface K6Executor {
  */
 export interface DriverConfig {
     /**
-     * * Path to the driver plugin binary
-     *
-     * @generated from protobuf field: string driver_plugin_path = 1
-     */
-    driverPluginPath: string;
-    /**
-     * * Additional arguments for the driver plugin
-     *
-     * @generated from protobuf field: repeated string driver_plugin_args = 2
-     */
-    driverPluginArgs: string[];
-    /**
      * * Database connection URL
      *
      * @generated from protobuf field: string url = 3
@@ -3217,6 +3205,21 @@ export interface DriverConfig {
      * @generated from protobuf field: optional stroppy.Value.Struct db_specific = 4
      */
     dbSpecific?: Value_Struct;
+    /**
+     * * Name of choosen driver
+     *
+     * @generated from protobuf field: stroppy.DriverConfig.DriverName driver_name = 5
+     */
+    driverName: DriverConfig_DriverName;
+}
+/**
+ * @generated from protobuf enum stroppy.DriverConfig.DriverName
+ */
+export enum DriverConfig_DriverName {
+    /**
+     * @generated from protobuf enum value: postgres = 0;
+     */
+    postgres = 0
 }
 /**
  * *
@@ -3700,17 +3703,15 @@ export const K6Executor = new K6Executor$Type();
 class DriverConfig$Type extends MessageType<DriverConfig> {
     constructor() {
         super("stroppy.DriverConfig", [
-            { no: 1, name: "driver_plugin_path", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "driver_plugin_args", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "url", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 4, name: "db_specific", kind: "message", T: () => Value_Struct }
+            { no: 4, name: "db_specific", kind: "message", T: () => Value_Struct },
+            { no: 5, name: "driver_name", kind: "enum", T: () => ["stroppy.DriverConfig.DriverName", DriverConfig_DriverName] }
         ]);
     }
     create(value?: PartialMessage<DriverConfig>): DriverConfig {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.driverPluginPath = "";
-        message.driverPluginArgs = [];
         message.url = "";
+        message.driverName = 0;
         if (value !== undefined)
             reflectionMergePartial<DriverConfig>(this, message, value);
         return message;
@@ -3720,17 +3721,14 @@ class DriverConfig$Type extends MessageType<DriverConfig> {
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* string driver_plugin_path */ 1:
-                    message.driverPluginPath = reader.string();
-                    break;
-                case /* repeated string driver_plugin_args */ 2:
-                    message.driverPluginArgs.push(reader.string());
-                    break;
                 case /* string url */ 3:
                     message.url = reader.string();
                     break;
                 case /* optional stroppy.Value.Struct db_specific */ 4:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
+                    break;
+                case /* stroppy.DriverConfig.DriverName driver_name */ 5:
+                    message.driverName = reader.int32();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -3744,18 +3742,15 @@ class DriverConfig$Type extends MessageType<DriverConfig> {
         return message;
     }
     internalBinaryWrite(message: DriverConfig, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string driver_plugin_path = 1; */
-        if (message.driverPluginPath !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.driverPluginPath);
-        /* repeated string driver_plugin_args = 2; */
-        for (let i = 0; i < message.driverPluginArgs.length; i++)
-            writer.tag(2, WireType.LengthDelimited).string(message.driverPluginArgs[i]);
         /* string url = 3; */
         if (message.url !== "")
             writer.tag(3, WireType.LengthDelimited).string(message.url);
         /* optional stroppy.Value.Struct db_specific = 4; */
         if (message.dbSpecific)
             Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.DriverConfig.DriverName driver_name = 5; */
+        if (message.driverName !== 0)
+            writer.tag(5, WireType.Varint).int32(message.driverName);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

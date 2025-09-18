@@ -135,19 +135,6 @@ func (c *Config) validatePlugins() error {
 }
 
 func (c *Config) validatePaths() error {
-	driverPath, err := getRelativePath(
-		c.ConfigPath,
-		c.GetRun().GetDriver().GetDriverPluginPath(),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to get relative path to driver plugin: %w", err)
-	}
-
-	err = validatePath(driverPath, true)
-	if err != nil {
-		return fmt.Errorf("failed to validate driver plugin path: %w", err)
-	}
-
 	needK6Config := false
 
 	for _, step := range c.GetRun().GetSteps() {
@@ -165,7 +152,7 @@ func (c *Config) validatePaths() error {
 		}
 	}
 
-	err = c.validatePlugins()
+	err := c.validatePlugins()
 	if err != nil {
 		return fmt.Errorf("failed to validate plugins: %w", err)
 	}
@@ -197,10 +184,6 @@ func (c *Config) Validate(validatePaths bool) error {
 	return nil
 }
 
-func (c *Config) GetDriverPluginPath() string {
-	return utils.Must(getRelativePath(c.ConfigPath, c.GetRun().GetDriver().GetDriverPluginPath()))
-}
-
 func (c *Config) GetK6ScriptPath() string {
 	return utils.Must(getRelativePath(c.ConfigPath, c.GetRun().GetK6Executor().GetK6ScriptPath()))
 }
@@ -213,9 +196,5 @@ func (c *Config) ResetPaths() {
 	if c.GetRun().GetK6Executor() != nil {
 		c.Run.K6Executor.K6BinaryPath = c.GetK6BinaryPath()
 		c.Run.K6Executor.K6ScriptPath = c.GetK6ScriptPath()
-	}
-
-	if c.GetRun().GetDriver() != nil {
-		c.Run.Driver.DriverPluginPath = c.GetDriverPluginPath()
 	}
 }

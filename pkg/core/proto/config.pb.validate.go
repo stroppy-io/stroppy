@@ -583,9 +583,9 @@ func (m *DriverConfig) validate(all bool) error {
 
 	var errors []error
 
-	if _, err := url.Parse(m.GetDriverPluginPath()); err != nil {
+	if _, err := url.Parse(m.GetUrl()); err != nil {
 		err = DriverConfigValidationError{
-			field:  "DriverPluginPath",
+			field:  "Url",
 			reason: "value must be a valid URI",
 			cause:  err,
 		}
@@ -595,32 +595,10 @@ func (m *DriverConfig) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	_DriverConfig_DriverPluginArgs_Unique := make(map[string]struct{}, len(m.GetDriverPluginArgs()))
-
-	for idx, item := range m.GetDriverPluginArgs() {
-		_, _ = idx, item
-
-		if _, exists := _DriverConfig_DriverPluginArgs_Unique[item]; exists {
-			err := DriverConfigValidationError{
-				field:  fmt.Sprintf("DriverPluginArgs[%v]", idx),
-				reason: "repeated value must contain unique items",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		} else {
-			_DriverConfig_DriverPluginArgs_Unique[item] = struct{}{}
-		}
-
-		// no validation rules for DriverPluginArgs[idx]
-	}
-
-	if _, err := url.Parse(m.GetUrl()); err != nil {
-		err = DriverConfigValidationError{
-			field:  "Url",
-			reason: "value must be a valid URI",
-			cause:  err,
+	if _, ok := DriverConfig_DriverName_name[int32(m.GetDriverName())]; !ok {
+		err := DriverConfigValidationError{
+			field:  "DriverName",
+			reason: "value must be one of the defined enum values",
 		}
 		if !all {
 			return err

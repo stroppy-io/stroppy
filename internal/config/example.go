@@ -24,9 +24,8 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 				"example": "stroppy_metadata",
 			},
 			Driver: &stroppy.DriverConfig{
-				DriverPluginPath: "./stroppy-postgres",
-				DriverPluginArgs: []string{},
-				Url:              "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
+				DriverName: stroppy.DriverConfig_postgres,
+				Url:        "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
 				DbSpecific: &stroppy.Value_Struct{
 					Fields: []*stroppy.Value{
 						{Key: "trace_log_level", Type: &stroppy.Value_String_{String_: "warn"}},

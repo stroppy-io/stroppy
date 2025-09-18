@@ -74,18 +74,17 @@ message K6Executor {
  * It includes the driver plugin path, connection URL, and database-specific settings.
 */
 message DriverConfig {
-    /** Path to the driver plugin binary */
-    string driver_plugin_path = 1 [(validate.rules).string.uri_ref = true];
-    /** Additional arguments for the driver plugin */
-    repeated string driver_plugin_args = 2 [
-        (validate.rules).repeated = {
-            unique: true,
-        }
-    ];
     /** Database connection URL */
     string url = 3 [(validate.rules).string.uri_ref = true];
     /** Database-specific configuration options */
     optional Value.Struct db_specific = 4;
+
+    enum DriverName {
+        postgres = 0;
+    }
+
+    /** Name of choosen driver */
+    DriverName driver_name = 5 [(validate.rules).enum.defined_only = true];
 }
 
 /**

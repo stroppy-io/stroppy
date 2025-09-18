@@ -23,6 +23,49 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type DriverConfig_DriverName int32
+
+const (
+	DriverConfig_postgres DriverConfig_DriverName = 0
+)
+
+// Enum value maps for DriverConfig_DriverName.
+var (
+	DriverConfig_DriverName_name = map[int32]string{
+		0: "postgres",
+	}
+	DriverConfig_DriverName_value = map[string]int32{
+		"postgres": 0,
+	}
+)
+
+func (x DriverConfig_DriverName) Enum() *DriverConfig_DriverName {
+	p := new(DriverConfig_DriverName)
+	*p = x
+	return p
+}
+
+func (x DriverConfig_DriverName) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DriverConfig_DriverName) Descriptor() protoreflect.EnumDescriptor {
+	return file_config_proto_enumTypes[0].Descriptor()
+}
+
+func (DriverConfig_DriverName) Type() protoreflect.EnumType {
+	return &file_config_proto_enumTypes[0]
+}
+
+func (x DriverConfig_DriverName) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DriverConfig_DriverName.Descriptor instead.
+func (DriverConfig_DriverName) EnumDescriptor() ([]byte, []int) {
+	return file_config_proto_rawDescGZIP(), []int{3, 0}
+}
+
 type RequestedStep_ExecutorType int32
 
 const (
@@ -53,11 +96,11 @@ func (x RequestedStep_ExecutorType) String() string {
 }
 
 func (RequestedStep_ExecutorType) Descriptor() protoreflect.EnumDescriptor {
-	return file_config_proto_enumTypes[0].Descriptor()
+	return file_config_proto_enumTypes[1].Descriptor()
 }
 
 func (RequestedStep_ExecutorType) Type() protoreflect.EnumType {
-	return &file_config_proto_enumTypes[0]
+	return &file_config_proto_enumTypes[1]
 }
 
 func (x RequestedStep_ExecutorType) Number() protoreflect.EnumNumber {
@@ -108,11 +151,11 @@ func (x LoggerConfig_LogLevel) String() string {
 }
 
 func (LoggerConfig_LogLevel) Descriptor() protoreflect.EnumDescriptor {
-	return file_config_proto_enumTypes[1].Descriptor()
+	return file_config_proto_enumTypes[2].Descriptor()
 }
 
 func (LoggerConfig_LogLevel) Type() protoreflect.EnumType {
-	return &file_config_proto_enumTypes[1]
+	return &file_config_proto_enumTypes[2]
 }
 
 func (x LoggerConfig_LogLevel) Number() protoreflect.EnumNumber {
@@ -154,11 +197,11 @@ func (x LoggerConfig_LogMode) String() string {
 }
 
 func (LoggerConfig_LogMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_config_proto_enumTypes[2].Descriptor()
+	return file_config_proto_enumTypes[3].Descriptor()
 }
 
 func (LoggerConfig_LogMode) Type() protoreflect.EnumType {
-	return &file_config_proto_enumTypes[2]
+	return &file_config_proto_enumTypes[3]
 }
 
 func (x LoggerConfig_LogMode) Number() protoreflect.EnumNumber {
@@ -200,11 +243,11 @@ func (x Plugin_Type) String() string {
 }
 
 func (Plugin_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_config_proto_enumTypes[3].Descriptor()
+	return file_config_proto_enumTypes[4].Descriptor()
 }
 
 func (Plugin_Type) Type() protoreflect.EnumType {
-	return &file_config_proto_enumTypes[3]
+	return &file_config_proto_enumTypes[4]
 }
 
 func (x Plugin_Type) Number() protoreflect.EnumNumber {
@@ -483,14 +526,12 @@ func (x *K6Executor) GetOtlpExport() *OtlpExport {
 // It includes the driver plugin path, connection URL, and database-specific settings.
 type DriverConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Path to the driver plugin binary
-	DriverPluginPath string `protobuf:"bytes,1,opt,name=driver_plugin_path,json=driverPluginPath,proto3" json:"driver_plugin_path,omitempty"`
-	// * Additional arguments for the driver plugin
-	DriverPluginArgs []string `protobuf:"bytes,2,rep,name=driver_plugin_args,json=driverPluginArgs,proto3" json:"driver_plugin_args,omitempty"`
 	// * Database connection URL
 	Url string `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
 	// * Database-specific configuration options
-	DbSpecific    *Value_Struct `protobuf:"bytes,4,opt,name=db_specific,json=dbSpecific,proto3,oneof" json:"db_specific,omitempty"`
+	DbSpecific *Value_Struct `protobuf:"bytes,4,opt,name=db_specific,json=dbSpecific,proto3,oneof" json:"db_specific,omitempty"`
+	// * Name of choosen driver
+	DriverName    DriverConfig_DriverName `protobuf:"varint,5,opt,name=driver_name,json=driverName,proto3,enum=stroppy.DriverConfig_DriverName" json:"driver_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -525,20 +566,6 @@ func (*DriverConfig) Descriptor() ([]byte, []int) {
 	return file_config_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *DriverConfig) GetDriverPluginPath() string {
-	if x != nil {
-		return x.DriverPluginPath
-	}
-	return ""
-}
-
-func (x *DriverConfig) GetDriverPluginArgs() []string {
-	if x != nil {
-		return x.DriverPluginArgs
-	}
-	return nil
-}
-
 func (x *DriverConfig) GetUrl() string {
 	if x != nil {
 		return x.Url
@@ -551,6 +578,13 @@ func (x *DriverConfig) GetDbSpecific() *Value_Struct {
 		return x.DbSpecific
 	}
 	return nil
+}
+
+func (x *DriverConfig) GetDriverName() DriverConfig_DriverName {
+	if x != nil {
+		return x.DriverName
+	}
+	return DriverConfig_postgres
 }
 
 // *
@@ -1020,13 +1054,16 @@ const file_config_proto_rawDesc = "" +
 	"\n" +
 	"\b_k6_rateB\x0e\n" +
 	"\f_k6_durationB\x0e\n" +
-	"\f_otlp_export\"\xe7\x01\n" +
-	"\fDriverConfig\x126\n" +
-	"\x12driver_plugin_path\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x10driverPluginPath\x126\n" +
-	"\x12driver_plugin_args\x18\x02 \x03(\tB\b\xfaB\x05\x92\x01\x02\x18\x01R\x10driverPluginArgs\x12\x1a\n" +
+	"\f_otlp_export\"\xe0\x01\n" +
+	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x03 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12;\n" +
 	"\vdb_specific\x18\x04 \x01(\v2\x15.stroppy.Value.StructH\x00R\n" +
-	"dbSpecific\x88\x01\x01B\x0e\n" +
+	"dbSpecific\x88\x01\x01\x12K\n" +
+	"\vdriver_name\x18\x05 \x01(\x0e2 .stroppy.DriverConfig.DriverNameB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
+	"driverName\"\x1a\n" +
+	"\n" +
+	"DriverName\x12\f\n" +
+	"\bpostgres\x10\x00B\x0e\n" +
 	"\f_db_specific\"\xc5\x01\n" +
 	"\rRequestedStep\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12N\n" +
@@ -1090,55 +1127,57 @@ func file_config_proto_rawDescGZIP() []byte {
 	return file_config_proto_rawDescData
 }
 
-var file_config_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_config_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
 var file_config_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_config_proto_goTypes = []any{
-	(RequestedStep_ExecutorType)(0), // 0: stroppy.RequestedStep.ExecutorType
-	(LoggerConfig_LogLevel)(0),      // 1: stroppy.LoggerConfig.LogLevel
-	(LoggerConfig_LogMode)(0),       // 2: stroppy.LoggerConfig.LogMode
-	(Plugin_Type)(0),                // 3: stroppy.Plugin.Type
-	(*OtlpExport)(nil),              // 4: stroppy.OtlpExport
-	(*GoExecutor)(nil),              // 5: stroppy.GoExecutor
-	(*K6Executor)(nil),              // 6: stroppy.K6Executor
-	(*DriverConfig)(nil),            // 7: stroppy.DriverConfig
-	(*RequestedStep)(nil),           // 8: stroppy.RequestedStep
-	(*LoggerConfig)(nil),            // 9: stroppy.LoggerConfig
-	(*StepContext)(nil),             // 10: stroppy.StepContext
-	(*Plugin)(nil),                  // 11: stroppy.Plugin
-	(*RunConfig)(nil),               // 12: stroppy.RunConfig
-	(*Config)(nil),                  // 13: stroppy.Config
-	nil,                             // 14: stroppy.RunConfig.MetadataEntry
-	(*durationpb.Duration)(nil),     // 15: google.protobuf.Duration
-	(*Value_Struct)(nil),            // 16: stroppy.Value.Struct
-	(*StepDescriptor)(nil),          // 17: stroppy.StepDescriptor
-	(*BenchmarkDescriptor)(nil),     // 18: stroppy.BenchmarkDescriptor
+	(DriverConfig_DriverName)(0),    // 0: stroppy.DriverConfig.DriverName
+	(RequestedStep_ExecutorType)(0), // 1: stroppy.RequestedStep.ExecutorType
+	(LoggerConfig_LogLevel)(0),      // 2: stroppy.LoggerConfig.LogLevel
+	(LoggerConfig_LogMode)(0),       // 3: stroppy.LoggerConfig.LogMode
+	(Plugin_Type)(0),                // 4: stroppy.Plugin.Type
+	(*OtlpExport)(nil),              // 5: stroppy.OtlpExport
+	(*GoExecutor)(nil),              // 6: stroppy.GoExecutor
+	(*K6Executor)(nil),              // 7: stroppy.K6Executor
+	(*DriverConfig)(nil),            // 8: stroppy.DriverConfig
+	(*RequestedStep)(nil),           // 9: stroppy.RequestedStep
+	(*LoggerConfig)(nil),            // 10: stroppy.LoggerConfig
+	(*StepContext)(nil),             // 11: stroppy.StepContext
+	(*Plugin)(nil),                  // 12: stroppy.Plugin
+	(*RunConfig)(nil),               // 13: stroppy.RunConfig
+	(*Config)(nil),                  // 14: stroppy.Config
+	nil,                             // 15: stroppy.RunConfig.MetadataEntry
+	(*durationpb.Duration)(nil),     // 16: google.protobuf.Duration
+	(*Value_Struct)(nil),            // 17: stroppy.Value.Struct
+	(*StepDescriptor)(nil),          // 18: stroppy.StepDescriptor
+	(*BenchmarkDescriptor)(nil),     // 19: stroppy.BenchmarkDescriptor
 }
 var file_config_proto_depIdxs = []int32{
-	15, // 0: stroppy.K6Executor.k6_setup_timeout:type_name -> google.protobuf.Duration
-	15, // 1: stroppy.K6Executor.k6_duration:type_name -> google.protobuf.Duration
-	4,  // 2: stroppy.K6Executor.otlp_export:type_name -> stroppy.OtlpExport
-	16, // 3: stroppy.DriverConfig.db_specific:type_name -> stroppy.Value.Struct
-	0,  // 4: stroppy.RequestedStep.executor:type_name -> stroppy.RequestedStep.ExecutorType
-	1,  // 5: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
-	2,  // 6: stroppy.LoggerConfig.log_mode:type_name -> stroppy.LoggerConfig.LogMode
-	17, // 7: stroppy.StepContext.step:type_name -> stroppy.StepDescriptor
-	13, // 8: stroppy.StepContext.global_config:type_name -> stroppy.Config
-	3,  // 9: stroppy.Plugin.type:type_name -> stroppy.Plugin.Type
-	16, // 10: stroppy.Plugin.settings:type_name -> stroppy.Value.Struct
-	7,  // 11: stroppy.RunConfig.driver:type_name -> stroppy.DriverConfig
-	5,  // 12: stroppy.RunConfig.go_executor:type_name -> stroppy.GoExecutor
-	6,  // 13: stroppy.RunConfig.k6_executor:type_name -> stroppy.K6Executor
-	8,  // 14: stroppy.RunConfig.steps:type_name -> stroppy.RequestedStep
-	9,  // 15: stroppy.RunConfig.logger:type_name -> stroppy.LoggerConfig
-	14, // 16: stroppy.RunConfig.metadata:type_name -> stroppy.RunConfig.MetadataEntry
-	11, // 17: stroppy.RunConfig.plugins:type_name -> stroppy.Plugin
-	12, // 18: stroppy.Config.run:type_name -> stroppy.RunConfig
-	18, // 19: stroppy.Config.benchmark:type_name -> stroppy.BenchmarkDescriptor
-	20, // [20:20] is the sub-list for method output_type
-	20, // [20:20] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	16, // 0: stroppy.K6Executor.k6_setup_timeout:type_name -> google.protobuf.Duration
+	16, // 1: stroppy.K6Executor.k6_duration:type_name -> google.protobuf.Duration
+	5,  // 2: stroppy.K6Executor.otlp_export:type_name -> stroppy.OtlpExport
+	17, // 3: stroppy.DriverConfig.db_specific:type_name -> stroppy.Value.Struct
+	0,  // 4: stroppy.DriverConfig.driver_name:type_name -> stroppy.DriverConfig.DriverName
+	1,  // 5: stroppy.RequestedStep.executor:type_name -> stroppy.RequestedStep.ExecutorType
+	2,  // 6: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
+	3,  // 7: stroppy.LoggerConfig.log_mode:type_name -> stroppy.LoggerConfig.LogMode
+	18, // 8: stroppy.StepContext.step:type_name -> stroppy.StepDescriptor
+	14, // 9: stroppy.StepContext.global_config:type_name -> stroppy.Config
+	4,  // 10: stroppy.Plugin.type:type_name -> stroppy.Plugin.Type
+	17, // 11: stroppy.Plugin.settings:type_name -> stroppy.Value.Struct
+	8,  // 12: stroppy.RunConfig.driver:type_name -> stroppy.DriverConfig
+	6,  // 13: stroppy.RunConfig.go_executor:type_name -> stroppy.GoExecutor
+	7,  // 14: stroppy.RunConfig.k6_executor:type_name -> stroppy.K6Executor
+	9,  // 15: stroppy.RunConfig.steps:type_name -> stroppy.RequestedStep
+	10, // 16: stroppy.RunConfig.logger:type_name -> stroppy.LoggerConfig
+	15, // 17: stroppy.RunConfig.metadata:type_name -> stroppy.RunConfig.MetadataEntry
+	12, // 18: stroppy.RunConfig.plugins:type_name -> stroppy.Plugin
+	13, // 19: stroppy.Config.run:type_name -> stroppy.RunConfig
+	19, // 20: stroppy.Config.benchmark:type_name -> stroppy.BenchmarkDescriptor
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_config_proto_init() }
@@ -1159,7 +1198,7 @@ func file_config_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_config_proto_rawDesc), len(file_config_proto_rawDesc)),
-			NumEnums:      4,
+			NumEnums:      5,
 			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,

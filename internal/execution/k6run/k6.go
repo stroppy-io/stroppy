@@ -17,7 +17,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/core/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
-	utils2 "github.com/stroppy-io/stroppy/pkg/core/utils"
+	"github.com/stroppy-io/stroppy/pkg/core/utils"
 )
 
 func runK6Binary(
@@ -138,7 +138,7 @@ func k6ArgsOtelExport(runContext *stroppy.StepContext, baseArgs []string) []stri
 	export := runContext.GetGlobalConfig().GetRun().GetK6Executor().GetOtlpExport()
 	os.Setenv(
 		"K6_OTEL_METRIC_PREFIX",
-		utils2.StringOrDefault(
+		utils.StringOrDefault(
 			export.GetOtlpMetricsPrefix(),
 			"k6_",
 		),
@@ -160,11 +160,11 @@ func k6ArgsOtelExport(runContext *stroppy.StepContext, baseArgs []string) []stri
 		os.Setenv("K6_OTEL_GRPC_EXPORTER_ENDPOINT", "localhost:4317")
 	} else {
 		os.Setenv("K6_OTEL_HTTP_EXPORTER_INSECURE", insecure)
-		os.Setenv("K6_OTEL_HTTP_EXPORTER_ENDPOINT", utils2.StringOrDefault(
+		os.Setenv("K6_OTEL_HTTP_EXPORTER_ENDPOINT", utils.StringOrDefault(
 			export.GetOtlpHttpEndpoint(),
 			"localhost:4318",
 		))
-		os.Setenv("K6_OTEL_HTTP_EXPORTER_URL_PATH", utils2.StringOrDefault(
+		os.Setenv("K6_OTEL_HTTP_EXPORTER_URL_PATH", utils.StringOrDefault(
 			export.GetOtlpHttpExporterUrlPath(),
 			"/v1/metrics",
 		))
