@@ -94,8 +94,6 @@ message QueryDescriptor {
             items: {message: {required: true}}
         }
     ];
-    /** Number of times to execute this query */
-    uint64 count = 4 [(validate.rules).uint64.gt = 0];
     /** Database-specific query properties */
     Value.Struct db_specific = 5;
 }
@@ -126,8 +124,6 @@ message TransactionDescriptor {
             items: {message: {required: true}}
         }
     ];
-    /** Number of times to execute this transaction */
-    uint64 count = 4 [(validate.rules).uint64.gt = 0];
     /** Database-specific transaction properties */
     Value.Struct db_specific = 5;
 }
@@ -138,7 +134,7 @@ message TransactionDescriptor {
  * It also specifies whether to execute this operation asynchronously.
  */
 message StepUnitDescriptor {
-    oneof type {
+    oneof descriptor {
         option (validate.required) = true;
         /** Table creation operation */
         TableDescriptor create_table = 1;
@@ -147,8 +143,8 @@ message StepUnitDescriptor {
         /** Transaction execution operation */
         TransactionDescriptor transaction = 4;
     };
-    /** Whether to execute this operation asynchronously */
-    bool async = 100;
+    /** Number of times to execute this unit */
+    uint64 count = 5 [(validate.rules).uint64.gt = 0];
 }
 
 /**

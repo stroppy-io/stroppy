@@ -79,12 +79,13 @@ message DriverConfig {
     /** Database-specific configuration options */
     optional Value.Struct db_specific = 4;
 
-    enum DriverName {
-        postgres = 0;
+    enum DriverType {
+        DRIVER_TYPE_UNSPECIFIED = 0;
+        DRIVER_TYPE_POSTGRES = 1;
     }
 
-    /** Name of choosen driver */
-    DriverName driver_name = 5 [(validate.rules).enum.defined_only = true];
+    /** Name of chosen driver */
+    DriverType driver_type = 5 [(validate.rules).enum.defined_only = true];
 }
 
 /**
@@ -138,15 +139,9 @@ message StepContext {
 /**
  * Plugins contains configuration for plugins.
  */
-message Plugin {
-    enum Type {
-        TYPE_UNSPECIFIED = 0;
-        TYPE_SIDECAR = 1;
-    }
-    /** Type of the plugin */
-    Type type = 1 [(validate.rules).enum.defined_only = true];
-    /** Path to the plugin binary */
-    string path = 2 [(validate.rules).string.uri_ref = true];
+message SideCar {
+    /** Url to connect the plugin instance */
+    string url = 2 [(validate.rules).string.uri_ref = true];
     /** Additional plugin settings */
     optional Value.Struct settings = 3;
 }
@@ -177,7 +172,7 @@ message RunConfig {
     /** Arbitrary metadata, may be passed to result labels and json output */
     map<string, string> metadata = 8;
     /** Plugins configuration */
-    repeated Plugin plugins = 9;
+    repeated SideCar side_cars = 9;
 }
 
 
