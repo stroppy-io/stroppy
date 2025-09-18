@@ -30,7 +30,7 @@ func loadProtoConfig[T proto.Message](filePath string) (T, error) { //nolint: ir
 
 	switch path.Ext(filePath) {
 	case ".json":
-		return cfg, protojson.Unmarshal(data, cfg)
+		return cfg, protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(data, cfg)
 	case ".yaml", ".yml":
 		return cfg, protoyaml.Unmarshal(data, cfg)
 	default:
