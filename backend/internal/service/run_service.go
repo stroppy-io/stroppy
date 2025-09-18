@@ -50,6 +50,21 @@ func (s *RunService) GetAll(limit, offset int) ([]*run.Run, int, error) {
 	return runs, total, nil
 }
 
+// GetAllWithFilters получает запуски с фильтрацией и пагинацией
+func (s *RunService) GetAllWithFilters(limit, offset int, searchText, status, dateFrom, dateTo string) ([]*run.Run, int, error) {
+	runs, err := s.runRepo.GetAllWithFilters(limit, offset, searchText, status, dateFrom, dateTo)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	total, err := s.runRepo.CountWithFilters(searchText, status, dateFrom, dateTo)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return runs, total, nil
+}
+
 // Update обновляет запуск
 func (s *RunService) Update(id int, name, description, config string) (*run.Run, error) {
 	ru, err := s.runRepo.GetByID(id)

@@ -155,10 +155,22 @@ class ApiClient {
     return response.data;
   }
 
-  async getRuns(page: number = 1, limit: number = 20): Promise<RunListResponse> {
-    const response = await this.client.get('/runs', {
-      params: { page, limit },
-    });
+  async getRuns(
+    page: number = 1, 
+    limit: number = 20, 
+    search?: string,
+    status?: string,
+    dateFrom?: string,
+    dateTo?: string
+  ): Promise<RunListResponse> {
+    const params: any = { page, limit };
+    
+    if (search) params.search = search;
+    if (status) params.status = status;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+
+    const response = await this.client.get('/runs', { params });
     return response.data;
   }
 

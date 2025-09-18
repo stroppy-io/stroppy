@@ -14,7 +14,8 @@ import {
   Select,
   DatePicker,
   Tooltip,
-  Flex
+  Flex,
+  Pagination
 } from 'antd'
 import { 
   PlayCircleOutlined, 
@@ -26,12 +27,19 @@ import {
   PlusOutlined,
   ClockCircleOutlined,
   ClearOutlined,
-  UserOutlined
+  UserOutlined,
+  SwapOutlined,
+  SettingOutlined,
+  ThunderboltOutlined,
+  DatabaseOutlined,
+  CloudServerOutlined,
+  BugOutlined
 } from '@ant-design/icons'
 import { useState, useEffect, useMemo } from 'react'
 import type { ColumnsType, TableProps } from 'antd/es/table'
 import dayjs from 'dayjs'
 import RunCreationForm from '../components/RunCreationForm'
+import RunComparisonModal from '../components/RunComparisonModal'
 import type { RunCreationFormData } from '../types/run-creation'
 import { apiClient, getErrorMessage } from '../services/api'
 import type { Run } from '../services/api'
@@ -52,6 +60,7 @@ const RunsPage: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false)
   const [selectedRun, setSelectedRun] = useState<Run | null>(null)
   const [createRunModalVisible, setCreateRunModalVisible] = useState(false)
+  const [comparisonModalVisible, setComparisonModalVisible] = useState(false)
   const [runs, setRuns] = useState<Run[]>([])
   const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState({
@@ -67,11 +76,18 @@ const RunsPage: React.FC = () => {
     dateRange: null
   })
 
-  // Загрузка запусков с сервера
-  const fetchRuns = async (page: number = 1, limit: number = 50) => {
+  // Загрузка запусков с сервера с фильтрами
+  const fetchRuns = async (
+    page: number = 1, 
+    limit: number = 20,
+    searchText?: string,
+    status?: string,
+    dateFrom?: string,
+    dateTo?: string
+  ) => {
     try {
       setLoading(true)
-      const response = await apiClient.getRuns(page, limit)
+      const response = await apiClient.getRuns(page, limit, searchText, status, dateFrom, dateTo)
       setRuns(response.runs)
       setPagination({
         current: response.page,
@@ -85,45 +101,45 @@ const RunsPage: React.FC = () => {
     }
   }
 
-  // Фильтрованные данные
-  const filteredRuns = useMemo(() => {
-    let filtered = [...runs];
-
-    // Применяем поиск по тексту
-    if (filters.searchText) {
-      const searchLower = filters.searchText.toLowerCase();
-      filtered = filtered.filter(run => 
-        run.name.toLowerCase().includes(searchLower) ||
-        run.description.toLowerCase().includes(searchLower)
-      );
-    }
-
-    // Применяем фильтр по статусу
-    if (filters.status) {
-      filtered = filtered.filter(run => run.status === filters.status);
-    }
-
-    // Применяем фильтр по дате
+  // Вспомогательная функция для загрузки данных с текущими фильтрами
+  const fetchRunsWithCurrentFilters = (page?: number, pageSize?: number) => {
+    const currentPage = page || pagination.current;
+    const currentPageSize = pageSize || pagination.pageSize;
+    
+    let dateFrom, dateTo;
     if (filters.dateRange && filters.dateRange[0] && filters.dateRange[1]) {
-      const [startDate, endDate] = filters.dateRange;
-      filtered = filtered.filter(run => {
-        const createdAt = dayjs(run.created_at);
-        return createdAt.isAfter(startDate.startOf('day')) && 
-               createdAt.isBefore(endDate.endOf('day'));
-      });
+      dateFrom = filters.dateRange[0].format('YYYY-MM-DD');
+      dateTo = filters.dateRange[1].format('YYYY-MM-DD');
     }
 
-    return filtered;
-  }, [runs, filters]);
+    fetchRuns(
+      currentPage,
+      currentPageSize,
+      filters.searchText || undefined,
+      filters.status || undefined,
+      dateFrom,
+      dateTo
+    );
+  };
 
   // Загружаем данные при монтировании компонента
   useEffect(() => {
-    fetchRuns(1, 1000) // Загружаем все данные сразу для клиентской фильтрации
-  }, [])
+    fetchRunsWithCurrentFilters(1);
+  }, []);
+
 
   // Функции для работы с фильтрами
   const handleFilterChange = (key: keyof FilterState, value: any) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+    
+    // Сбрасываем пагинацию и загружаем данные с новыми фильтрами
+    setPagination(prev => ({ ...prev, current: 1 }));
+    
+    // Применяем фильтры с задержкой для лучшего UX
+    setTimeout(() => {
+      fetchRunsWithCurrentFilters(1);
+    }, 300);
   };
 
   const clearFilters = () => {
@@ -132,9 +148,84 @@ const RunsPage: React.FC = () => {
       status: '',
       dateRange: null
     });
+    setPagination(prev => ({ ...prev, current: 1 }));
+    
+    // Загружаем данные без фильтров
+    fetchRuns(1, pagination.pageSize);
   };
 
   const hasActiveFilters = filters.searchText || filters.status || filters.dateRange;
+
+  // Функция для преобразования API Run в тип для сравнения
+  const convertRunForComparison = (run: Run) => {
+    let config;
+    try {
+      config = JSON.parse(run.config);
+    } catch {
+      config = {};
+    }
+
+    return {
+      id: run.id.toString(),
+      runId: `run-${run.id}`,
+      name: run.name,
+      description: run.description,
+      status: run.status === 'completed' ? 'completed' as const : 'failed' as const,
+      progress: run.status === 'completed' ? 100 : 0,
+      startTime: dayjs(run.created_at).format('DD.MM.YYYY HH:mm'),
+      duration: run.completed_at 
+        ? dayjs(run.completed_at).diff(dayjs(run.started_at || run.created_at), 'minute') + ' мин'
+        : 'Не завершен',
+      
+      workloadType: config.workloadType || 'custom',
+      workloadProperties: {
+        runners: config.workloadProperties?.runners || 1,
+        duration: config.workloadProperties?.duration || 'Не указано',
+        ...config.workloadProperties
+      },
+      
+      databaseType: config.databaseType || 'postgres',
+      databaseVersion: config.databaseVersion?.version || 'Не указано',
+      databaseBuild: config.databaseVersion?.build,
+      
+      hardwareConfiguration: config.hardwareConfiguration ? {
+        ...config.hardwareConfiguration,
+        signature: config.hardwareConfiguration.signature || `${config.hardwareConfiguration.cpu?.cores || 0}c-${config.hardwareConfiguration.memory?.totalGB || 0}gb-${config.hardwareConfiguration.storage?.type || 'ssd'}-${config.hardwareConfiguration.storage?.capacityGB || 0}gb-${config.hardwareConfiguration.nodeCount || 1}n`
+      } : {
+        id: 'unknown',
+        name: 'Неизвестная конфигурация',
+        signature: '0c-0gb-ssd-0gb-1n',
+        cpu: { cores: 0, model: 'Неизвестно' },
+        memory: { totalGB: 0 },
+        storage: { type: 'ssd', capacityGB: 0 },
+        nodeCount: 1
+      },
+      
+      deploymentLayout: config.deploymentLayout || {
+        type: 'single-node',
+        signature: 'single-node',
+        configuration: {}
+      },
+      
+      nemesisSignature: config.nemesisSignature || {
+        signature: 'none',
+        nemeses: []
+      }
+    };
+  };
+
+  // Функция для открытия сравнения
+  const handleCompareRuns = () => {
+    if (selectedRowKeys.length !== 2) {
+      message.warning('Выберите ровно 2 запуска для сравнения');
+      return;
+    }
+    
+    const selectedRuns = runs.filter(run => selectedRowKeys.includes(run.id));
+    if (selectedRuns.length === 2) {
+      setComparisonModalVisible(true);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -333,41 +424,24 @@ const RunsPage: React.FC = () => {
 
   // Подсчет статистики
   const stats = useMemo(() => {
-    const total = filteredRuns.length;
-    const pending = filteredRuns.filter(r => r.status === 'pending').length;
-    const running = filteredRuns.filter(r => r.status === 'running').length;
-    const completed = filteredRuns.filter(r => r.status === 'completed').length;
-    const failed = filteredRuns.filter(r => r.status === 'failed').length;
+    const total = pagination.total; // Используем общее количество с сервера
+    const pending = runs.filter(r => r.status === 'pending').length;
+    const running = runs.filter(r => r.status === 'running').length;
+    const completed = runs.filter(r => r.status === 'completed').length;
+    const failed = runs.filter(r => r.status === 'failed').length;
 
     return { total, pending, running, completed, failed };
-  }, [filteredRuns]);
+  }, [runs, pagination.total]);
 
   const tableProps: TableProps<Run> = {
     rowSelection,
     columns,
-    dataSource: filteredRuns,
+    dataSource: runs, // Используем данные с сервера напрямую
     rowKey: "id",
     size: "small",
     loading,
-    pagination: {
-      current: pagination.current,
-      pageSize: pagination.pageSize,
-      total: filteredRuns.length,
-      showSizeChanger: true,
-      showQuickJumper: true,
-      showTotal: (total, range) => 
-        `${range[0]}-${range[1]} из ${total} запусков`,
-      size: 'small',
-      pageSizeOptions: ['20', '50', '100', '200'],
-      onChange: (page, pageSize) => {
-        setPagination(prev => ({
-          ...prev,
-          current: page,
-          pageSize: pageSize || prev.pageSize
-        }));
-      }
-    },
-    scroll: { x: 'max-content', y: 'calc(100vh - 350px)' }
+    pagination: false, // Отключаем встроенную пагинацию
+    scroll: { x: 'max-content', y: 'calc(100vh - 450px)' }
   };
 
   return (
@@ -488,6 +562,20 @@ const RunsPage: React.FC = () => {
           <div style={{ marginLeft: 'auto' }}>
             <Space>
               <Button 
+                type={selectedRowKeys.length === 2 ? 'primary' : 'default'}
+                icon={<SwapOutlined />}
+                disabled={selectedRowKeys.length !== 2}
+                onClick={handleCompareRuns}
+                title={selectedRowKeys.length === 2 ? 'Сравнить выбранные запуски' : 'Выберите ровно 2 запуска для сравнения'}
+                style={{
+                  backgroundColor: selectedRowKeys.length === 2 ? '#52c41a' : undefined,
+                  borderColor: selectedRowKeys.length === 2 ? '#52c41a' : undefined,
+                  animation: selectedRowKeys.length === 2 ? 'pulse 2s infinite' : undefined
+                }}
+              >
+                Сравнить ({selectedRowKeys.length}/2)
+              </Button>
+              <Button 
                 type="primary" 
                 icon={<PlusOutlined />}
                 onClick={() => setCreateRunModalVisible(true)}
@@ -497,7 +585,7 @@ const RunsPage: React.FC = () => {
               <Button 
                 icon={<ReloadOutlined />}
                 loading={loading}
-                onClick={() => fetchRuns(1, 1000)}
+                onClick={() => fetchRunsWithCurrentFilters()}
               >
                 Обновить
               </Button>
@@ -512,23 +600,60 @@ const RunsPage: React.FC = () => {
           flex: 1, 
           display: 'flex', 
           flexDirection: 'column', 
-          overflow: 'hidden',
-          minHeight: 0 
+          minHeight: 0,
+          overflow: 'hidden'
         }}
         bodyStyle={{ 
           flex: 1, 
           display: 'flex', 
           flexDirection: 'column', 
-          overflow: 'hidden',
-          padding: '16px'
+          padding: '16px',
+          overflow: 'hidden'
         }}
       >
-        <Table {...tableProps} />
+        <Table 
+          {...tableProps} 
+          style={{ height: '100%' }}
+        />
+        
+        {/* Пагинация */}
+        <div style={{ 
+          padding: '16px 0', 
+          borderTop: '1px solid #f0f0f0',
+          display: 'flex',
+          justifyContent: 'center'
+        }}>
+          <Pagination
+            current={pagination.current}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            showSizeChanger
+            showQuickJumper
+            showTotal={(total, range) => 
+              `${range[0]}-${range[1]} из ${total} запусков`
+            }
+            pageSizeOptions={['20', '50', '100', '200']}
+            onChange={(page, pageSize) => {
+              setPagination(prev => ({
+                ...prev,
+                current: page,
+                pageSize: pageSize || prev.pageSize
+              }));
+              // Загружаем новую страницу с сервера
+              fetchRunsWithCurrentFilters(page, pageSize);
+            }}
+          />
+        </div>
       </Card>
 
       {/* Модальное окно деталей */}
       <Modal
-        title="Детали запуска"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <EyeOutlined style={{ marginRight: 8 }} />
+            Детали запуска
+          </div>
+        }
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={[
@@ -536,67 +661,209 @@ const RunsPage: React.FC = () => {
             Закрыть
           </Button>
         ]}
-        width={800}
+        width={1200}
+        style={{ top: 20 }}
       >
-        {selectedRun && (
-          <div>
-            <Row gutter={16}>
-              <Col span={12}>
-                <p><strong>ID:</strong> {selectedRun.id}</p>
-                <p><strong>Название:</strong> {selectedRun.name}</p>
-                <p><strong>Описание:</strong> {selectedRun.description || 'Нет описания'}</p>
-                <p><strong>Пользователь ID:</strong> {selectedRun.user_id}</p>
-              </Col>
-              <Col span={12}>
-                <p><strong>Статус:</strong> 
-                  <Tag icon={getStatusIcon(selectedRun.status)} color={getStatusColor(selectedRun.status)} style={{ marginLeft: 8 }}>
-                    {getStatusText(selectedRun.status)}
-                  </Tag>
-                </p>
-                <p><strong>Создан:</strong> {dayjs(selectedRun.created_at).format('DD.MM.YYYY HH:mm:ss')}</p>
-                <p><strong>Обновлен:</strong> {dayjs(selectedRun.updated_at).format('DD.MM.YYYY HH:mm:ss')}</p>
-                {selectedRun.started_at && (
-                  <p><strong>Запущен:</strong> {dayjs(selectedRun.started_at).format('DD.MM.YYYY HH:mm:ss')}</p>
-                )}
-                {selectedRun.completed_at && (
-                  <p><strong>Завершен:</strong> {dayjs(selectedRun.completed_at).format('DD.MM.YYYY HH:mm:ss')}</p>
-                )}
-              </Col>
-            </Row>
-            
-            <div style={{ marginTop: 16 }}>
-              <strong>Конфигурация:</strong>
-              <pre style={{ 
-                background: '#f5f5f5', 
-                padding: 12, 
-                borderRadius: 4, 
-                marginTop: 8,
-                fontSize: '12px',
-                maxHeight: '200px',
-                overflow: 'auto'
-              }}>
-                {JSON.stringify(JSON.parse(selectedRun.config), null, 2)}
-              </pre>
-            </div>
-            
-            {selectedRun.result && (
-              <div style={{ marginTop: 16 }}>
-                <strong>Результат:</strong>
+        {selectedRun && (() => {
+          let config;
+          try {
+            config = JSON.parse(selectedRun.config);
+          } catch {
+            config = {};
+          }
+          
+          return (
+            <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+              {/* Основная информация */}
+              <Card title={<><SettingOutlined style={{ marginRight: 8 }} />Основная информация</>} size="small" style={{ marginBottom: 16 }}>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <p><strong>ID:</strong> <Tag color="blue">#{selectedRun.id}</Tag></p>
+                    <p><strong>Название:</strong> {selectedRun.name}</p>
+                    <p><strong>Описание:</strong> {selectedRun.description || <Text type="secondary">Нет описания</Text>}</p>
+                    <p><strong>Пользователь ID:</strong> <Tag icon={<UserOutlined />} color="purple">{selectedRun.user_id}</Tag></p>
+                  </Col>
+                  <Col span={12}>
+                    <p><strong>Статус:</strong> 
+                      <Tag icon={getStatusIcon(selectedRun.status)} color={getStatusColor(selectedRun.status)} style={{ marginLeft: 8 }}>
+                        {getStatusText(selectedRun.status)}
+                      </Tag>
+                    </p>
+                    <p><strong>Создан:</strong> {dayjs(selectedRun.created_at).format('DD.MM.YYYY HH:mm:ss')}</p>
+                    <p><strong>Обновлен:</strong> {dayjs(selectedRun.updated_at).format('DD.MM.YYYY HH:mm:ss')}</p>
+                    {selectedRun.started_at && (
+                      <p><strong>Запущен:</strong> {dayjs(selectedRun.started_at).format('DD.MM.YYYY HH:mm:ss')}</p>
+                    )}
+                    {selectedRun.completed_at && (
+                      <p><strong>Завершен:</strong> {dayjs(selectedRun.completed_at).format('DD.MM.YYYY HH:mm:ss')}</p>
+                    )}
+                    {selectedRun.completed_at && selectedRun.started_at && (
+                      <p><strong>Длительность:</strong> {dayjs(selectedRun.completed_at).diff(dayjs(selectedRun.started_at), 'minute')} мин</p>
+                    )}
+                  </Col>
+                </Row>
+              </Card>
+
+              {/* Тип нагрузки */}
+              {config.workloadType && (
+                <Card title={<><ThunderboltOutlined style={{ marginRight: 8 }} />Нагрузка</>} size="small" style={{ marginBottom: 16 }}>
+                  <Row gutter={16}>
+                    <Col span={8}>
+                      <p><strong>Тип:</strong> <Tag color="blue">{config.workloadType.toUpperCase()}</Tag></p>
+                    </Col>
+                    <Col span={8}>
+                      <p><strong>Раннеры:</strong> {config.workloadProperties?.runners || 'Не указано'}</p>
+                    </Col>
+                    <Col span={8}>
+                      <p><strong>Длительность:</strong> {config.workloadProperties?.duration || 'Не указано'}</p>
+                    </Col>
+                  </Row>
+                  {config.workloadProperties && Object.keys(config.workloadProperties).length > 2 && (
+                    <div style={{ marginTop: 12 }}>
+                      <strong>Дополнительные свойства:</strong>
+                      <div style={{ marginTop: 8 }}>
+                        {Object.entries(config.workloadProperties)
+                          .filter(([key]) => !['runners', 'duration'].includes(key))
+                          .map(([key, value]) => (
+                            <Tag key={key} style={{ marginBottom: 4 }}>
+                              {key}: {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                            </Tag>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* База данных */}
+              {config.databaseType && (
+                <Card title={<><DatabaseOutlined style={{ marginRight: 8 }} />База данных</>} size="small" style={{ marginBottom: 16 }}>
+                  <Row gutter={16}>
+                    <Col span={8}>
+                      <p><strong>Тип:</strong> <Tag color="green">{config.databaseType.toUpperCase()}</Tag></p>
+                    </Col>
+                    <Col span={8}>
+                      <p><strong>Версия:</strong> {config.databaseVersion?.version || 'Не указано'}</p>
+                    </Col>
+                    <Col span={8}>
+                      <p><strong>Сборка:</strong> {config.databaseVersion?.build || <Text type="secondary">Не указано</Text>}</p>
+                    </Col>
+                  </Row>
+                </Card>
+              )}
+
+              {/* Конфигурация железа */}
+              {config.hardwareConfiguration && (
+                <Card title={<><CloudServerOutlined style={{ marginRight: 8 }} />Конфигурация железа</>} size="small" style={{ marginBottom: 16 }}>
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <p><strong>Название:</strong> {config.hardwareConfiguration.name || 'Не указано'}</p>
+                      <p><strong>Узлы:</strong> {config.hardwareConfiguration.nodeCount || 1}</p>
+                      <p><strong>Процессор:</strong> {config.hardwareConfiguration.cpu?.cores || 0} ядер ({config.hardwareConfiguration.cpu?.model || 'Неизвестно'})</p>
+                    </Col>
+                    <Col span={12}>
+                      <p><strong>Память:</strong> {config.hardwareConfiguration.memory?.totalGB || 0} GB</p>
+                      <p><strong>Накопитель:</strong> {config.hardwareConfiguration.storage?.type?.toUpperCase() || 'SSD'} {config.hardwareConfiguration.storage?.capacityGB || 0} GB</p>
+                      {config.hardwareConfiguration.signature && (
+                        <p><strong>Сигнатура:</strong> <Tag color="orange">{config.hardwareConfiguration.signature}</Tag></p>
+                      )}
+                    </Col>
+                  </Row>
+                </Card>
+              )}
+
+              {/* Схема развертывания */}
+              {config.deploymentLayout && (
+                <Card title={<><CloudServerOutlined style={{ marginRight: 8 }} />Схема развертывания</>} size="small" style={{ marginBottom: 16 }}>
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <p><strong>Тип:</strong> <Tag color="cyan">{config.deploymentLayout.type}</Tag></p>
+                      {config.deploymentLayout.signature && (
+                        <p><strong>Сигнатура:</strong> <Tag color="purple">{config.deploymentLayout.signature}</Tag></p>
+                      )}
+                    </Col>
+                    <Col span={12}>
+                      {config.deploymentLayout.configuration && Object.keys(config.deploymentLayout.configuration).length > 0 && (
+                        <div>
+                          <strong>Конфигурация:</strong>
+                          <div style={{ marginTop: 4 }}>
+                            {Object.entries(config.deploymentLayout.configuration).map(([key, value]) => (
+                              <div key={key}>
+                                <Text type="secondary">{key}: </Text>
+                                <Text>{String(value)}</Text>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </Col>
+                  </Row>
+                </Card>
+              )}
+
+              {/* Немезисы */}
+              {config.nemesisSignature && (
+                <Card title={<><BugOutlined style={{ marginRight: 8 }} />Немезисы</>} size="small" style={{ marginBottom: 16 }}>
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <p><strong>Сигнатура:</strong> <Tag color="red">{config.nemesisSignature.signature}</Tag></p>
+                    </Col>
+                    <Col span={12}>
+                      {config.nemesisSignature.nemeses && config.nemesisSignature.nemeses.length > 0 ? (
+                        <div>
+                          <strong>Активные немезисы:</strong>
+                          <div style={{ marginTop: 4 }}>
+                            {config.nemesisSignature.nemeses
+                              .filter((n: any) => n.enabled)
+                              .map((nemesis: any, index: number) => (
+                                <Tag key={index} color="volcano" style={{ marginBottom: 4 }}>
+                                  {nemesis.type}
+                                </Tag>
+                              ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <Text type="secondary">Немезисы отсутствуют</Text>
+                      )}
+                    </Col>
+                  </Row>
+                </Card>
+              )}
+              
+              {/* Результат */}
+              {selectedRun.result && (
+                <Card title="Результат выполнения" size="small" style={{ marginBottom: 16 }}>
+                  <pre style={{ 
+                    background: '#f5f5f5', 
+                    padding: 12, 
+                    borderRadius: 4, 
+                    fontSize: '12px',
+                    maxHeight: '300px',
+                    overflow: 'auto',
+                    margin: 0
+                  }}>
+                    {JSON.stringify(JSON.parse(selectedRun.result), null, 2)}
+                  </pre>
+                </Card>
+              )}
+
+              {/* Полная конфигурация */}
+              <Card title="Полная конфигурация" size="small">
                 <pre style={{ 
                   background: '#f5f5f5', 
                   padding: 12, 
                   borderRadius: 4, 
-                  marginTop: 8,
                   fontSize: '12px',
-                  maxHeight: '200px',
-                  overflow: 'auto'
+                  maxHeight: '300px',
+                  overflow: 'auto',
+                  margin: 0
                 }}>
-                  {JSON.stringify(JSON.parse(selectedRun.result), null, 2)}
+                  {JSON.stringify(config, null, 2)}
                 </pre>
-              </div>
-            )}
-          </div>
-        )}
+              </Card>
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* Модальное окно создания запуска */}
@@ -613,6 +880,18 @@ const RunsPage: React.FC = () => {
           onCancel={() => setCreateRunModalVisible(false)}
         />
       </Modal>
+
+      {/* Модальное окно сравнения запусков */}
+      {selectedRowKeys.length === 2 && (
+        <RunComparisonModal
+          visible={comparisonModalVisible}
+          onClose={() => setComparisonModalVisible(false)}
+          runs={[
+            convertRunForComparison(runs.find(run => run.id === selectedRowKeys[0])!),
+            convertRunForComparison(runs.find(run => run.id === selectedRowKeys[1])!)
+          ] as [any, any]}
+        />
+      )}
     </div>
   )
 }

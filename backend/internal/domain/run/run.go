@@ -80,9 +80,11 @@ type Repository interface {
 	Create(run *Run) error
 	GetByID(id int) (*Run, error)
 	GetAll(limit, offset int) ([]*Run, error)
+	GetAllWithFilters(limit, offset int, searchText, status, dateFrom, dateTo string) ([]*Run, error)
 	Update(run *Run) error
 	Delete(id int) error
 	Count() (int, error)
+	CountWithFilters(searchText, status, dateFrom, dateTo string) (int, error)
 }
 
 // Service определяет интерфейс бизнес-логики запусков
@@ -90,6 +92,7 @@ type Service interface {
 	Create(name, description, config string) (*Run, error)
 	GetByID(id int) (*Run, error)
 	GetAll(limit, offset int) ([]*Run, int, error)
+	GetAllWithFilters(limit, offset int, searchText, status, dateFrom, dateTo string) ([]*Run, int, error)
 	Update(id int, name, description, config string) (*Run, error)
 	UpdateStatus(id int, status RunStatus, result string) (*Run, error)
 	Delete(id int) error

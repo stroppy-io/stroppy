@@ -1,21 +1,42 @@
 import React from 'react'
-import { Modal, Row, Col, Card, Typography, Tag, Statistic } from 'antd'
+import { 
+  Modal, 
+  Row, 
+  Col, 
+  Card, 
+  Typography, 
+  Tag, 
+  Statistic, 
+  Divider, 
+  Space, 
+  Badge,
+  Descriptions,
+  Alert,
+  Progress
+} from 'antd'
 import {
   DatabaseOutlined,
   ThunderboltOutlined,
   CloudServerOutlined,
   BugOutlined,
-  SettingOutlined
+  SettingOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  InfoCircleOutlined,
+  SwapOutlined,
+  CalendarOutlined,
+  ClockCircleOutlined,
+  UserOutlined
 } from '@ant-design/icons'
 
 const { Title, Text } = Typography
 
-interface Run {
+interface ComparisonRun {
   id: string
   runId: string
   name: string
   description?: string
-  status: 'completed' | 'failed' // | 'running' | 'paused' - убрали лишние статусы
+  status: 'completed' | 'failed'
   progress: number
   startTime: string
   duration: string
@@ -34,7 +55,7 @@ interface Run {
   hardwareConfiguration: {
     id: string
     name: string
-    signature: string
+    signature?: string
     cpu: { cores: number, model: string }
     memory: { totalGB: number }
     storage: { type: string, capacityGB: number }
@@ -56,7 +77,7 @@ interface Run {
 interface RunComparisonModalProps {
   visible: boolean
   onClose: () => void
-  runs: [Run, Run]
+  runs: [ComparisonRun, ComparisonRun]
 }
 
 const RunComparisonModal: React.FC<RunComparisonModalProps> = ({
@@ -72,47 +93,130 @@ const RunComparisonModal: React.FC<RunComparisonModalProps> = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      // case 'running': return 'processing'
       case 'completed': return 'success'
       case 'failed': return 'error'
-      // case 'paused': return 'warning'
       default: return 'default'
     }
   }
 
   const getStatusText = (status: string) => {
     switch (status) {
-      // case 'running': return 'Выполняется'
       case 'completed': return 'Завершен'
       case 'failed': return 'Ошибка'
-      // case 'paused': return 'Приостановлен'
       default: return 'Неизвестно'
     }
   }
 
-  const renderComparisonField = (label: string, value1: any, value2: any, highlight = false) => {
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': return <CheckCircleOutlined />
+      case 'failed': return <CloseCircleOutlined />
+      default: return <InfoCircleOutlined />
+    }
+  }
+
+  // Подсчет различий
+  const getDifferencesCount = () => {
+    let count = 0
+    
+    // Основные поля
+    if (run1.runId !== run2.runId) count++
+    if (run1.description !== run2.description) count++
+    if (run1.status !== run2.status) count++
+    if (run1.duration !== run2.duration) count++
+    
+    // Нагрузка
+    if (run1.workloadType !== run2.workloadType) count++
+    if (run1.workloadProperties.runners !== run2.workloadProperties.runners) count++
+    if (run1.workloadProperties.duration !== run2.workloadProperties.duration) count++
+    
+    // База данных
+    if (run1.databaseType !== run2.databaseType) count++
+    if (run1.databaseVersion !== run2.databaseVersion) count++
+    if (run1.databaseBuild !== run2.databaseBuild) count++
+    
+    // Железо
+    if (run1.hardwareConfiguration.signature !== run2.hardwareConfiguration.signature) count++
+    if (run1.hardwareConfiguration.cpu.cores !== run2.hardwareConfiguration.cpu.cores) count++
+    if (run1.hardwareConfiguration.memory.totalGB !== run2.hardwareConfiguration.memory.totalGB) count++
+    if (run1.hardwareConfiguration.storage.capacityGB !== run2.hardwareConfiguration.storage.capacityGB) count++
+    if (run1.hardwareConfiguration.nodeCount !== run2.hardwareConfiguration.nodeCount) count++
+    
+    // Развертывание
+    if (run1.deploymentLayout.type !== run2.deploymentLayout.type) count++
+    if (run1.deploymentLayout.signature !== run2.deploymentLayout.signature) count++
+    
+    // Немезисы
+    if (run1.nemesisSignature.signature !== run2.nemesisSignature.signature) count++
+    
+    return count
+  }
+
+  const renderComparisonRow = (
+    label: string, 
+    value1: any, 
+    value2: any, 
+    icon?: React.ReactNode,
+    highlight = false
+  ) => {
     const isDifferent = JSON.stringify(value1) !== JSON.stringify(value2)
+    const displayValue1 = typeof value1 === 'object' ? JSON.stringify(value1) : String(value1)
+    const displayValue2 = typeof value2 === 'object' ? JSON.stringify(value2) : String(value2)
     
     return (
-      <Row gutter={16} className="mb-2">
-        <Col span={6} className="font-medium text-gray-600">
-          {label}:
-        </Col>
-        <Col span={9}>
-          <Text className={isDifferent && highlight ? 'text-orange-600 font-medium' : ''}>
-            {typeof value1 === 'object' ? JSON.stringify(value1) : value1}
-          </Text>
-        </Col>
-        <Col span={9}>
-          <Text className={isDifferent && highlight ? 'text-orange-600 font-medium' : ''}>
-            {typeof value2 === 'object' ? JSON.stringify(value2) : value2}
-          </Text>
-        </Col>
-      </Row>
+      <Descriptions.Item 
+        label={
+          <Space>
+            {icon}
+            <Text strong>{label}</Text>
+            {isDifferent && highlight && <Badge status="warning" />}
+          </Space>
+        }
+        span={3}
+      >
+        <Row gutter={[16, 8]}>
+          <Col span={12}>
+            <Card 
+              size="small" 
+              style={{ 
+                backgroundColor: isDifferent && highlight ? '#fff7e6' : '#f6ffed',
+                borderColor: isDifferent && highlight ? '#ffa940' : '#b7eb8f'
+              }}
+            >
+              <Text 
+                style={{ 
+                  color: isDifferent && highlight ? '#fa8c16' : '#52c41a',
+                  fontWeight: isDifferent && highlight ? 600 : 400
+                }}
+              >
+                {displayValue1}
+              </Text>
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card 
+              size="small" 
+              style={{ 
+                backgroundColor: isDifferent && highlight ? '#fff7e6' : '#f6ffed',
+                borderColor: isDifferent && highlight ? '#ffa940' : '#b7eb8f'
+              }}
+            >
+              <Text 
+                style={{ 
+                  color: isDifferent && highlight ? '#fa8c16' : '#52c41a',
+                  fontWeight: isDifferent && highlight ? 600 : 400
+                }}
+              >
+                {displayValue2}
+              </Text>
+            </Card>
+          </Col>
+        </Row>
+      </Descriptions.Item>
     )
   }
 
-  const renderWorkloadProperties = (run: Run) => {
+  const renderWorkloadProperties = (run: ComparisonRun) => {
     const props = run.workloadProperties
     const entries = Object.entries(props).filter(([key]) => key !== 'runners' && key !== 'duration')
     
@@ -132,185 +236,336 @@ const RunComparisonModal: React.FC<RunComparisonModalProps> = ({
     )
   }
 
+  const differencesCount = getDifferencesCount()
+
   return (
     <Modal
       title={
-        <div className="flex items-center">
-          <SettingOutlined className="mr-2" />
-          Сравнение запусков
-        </div>
+        <Space align="center">
+          <SwapOutlined />
+          <Text strong style={{ fontSize: '18px' }}>Сравнение запусков</Text>
+          <Badge count={differencesCount} style={{ backgroundColor: '#faad14' }} />
+        </Space>
       }
       open={visible}
       onCancel={onClose}
       footer={null}
-      width={1400}
+      width={1600}
       style={{ top: 20 }}
     >
-      <div className="space-y-6">
+      <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
         {/* Заголовки запусков */}
-        <Row gutter={16}>
-          <Col span={6}></Col>
-          <Col span={9}>
-            <Card size="small" className="text-center bg-blue-50">
-              <Title level={4} className="mb-2">{run1.name}</Title>
-              <Tag color={getStatusColor(run1.status)}>
-                {getStatusText(run1.status)}
-              </Tag>
+        <Row gutter={24} style={{ marginBottom: 24 }}>
+          <Col span={12}>
+            <Card 
+              style={{ 
+                textAlign: 'center',
+                background: 'linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%)',
+                border: '2px solid #40a9ff'
+              }}
+            >
+              <Space direction="vertical" size="small">
+                <Title level={4} style={{ margin: 0, color: '#096dd9' }}>
+                  {run1.name}
+                </Title>
+                <Space>
+                  <Tag 
+                    icon={getStatusIcon(run1.status)} 
+                    color={getStatusColor(run1.status)}
+                    style={{ fontSize: '14px', padding: '4px 12px' }}
+                  >
+                    {getStatusText(run1.status)}
+                  </Tag>
+                  <Tag icon={<UserOutlined />} color="blue">ID: {run1.id}</Tag>
+                </Space>
+                <Progress 
+                  percent={run1.progress} 
+                  size="small" 
+                  status={run1.status === 'completed' ? 'success' : run1.status === 'failed' ? 'exception' : 'active'}
+                />
+              </Space>
             </Card>
           </Col>
-          <Col span={9}>
-            <Card size="small" className="text-center bg-green-50">
-              <Title level={4} className="mb-2">{run2.name}</Title>
-              <Tag color={getStatusColor(run2.status)}>
-                {getStatusText(run2.status)}
-              </Tag>
+          <Col span={12}>
+            <Card 
+              style={{ 
+                textAlign: 'center',
+                background: 'linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%)',
+                border: '2px solid #73d13d'
+              }}
+            >
+              <Space direction="vertical" size="small">
+                <Title level={4} style={{ margin: 0, color: '#389e0d' }}>
+                  {run2.name}
+                </Title>
+                <Space>
+                  <Tag 
+                    icon={getStatusIcon(run2.status)} 
+                    color={getStatusColor(run2.status)}
+                    style={{ fontSize: '14px', padding: '4px 12px' }}
+                  >
+                    {getStatusText(run2.status)}
+                  </Tag>
+                  <Tag icon={<UserOutlined />} color="green">ID: {run2.id}</Tag>
+                </Space>
+                <Progress 
+                  percent={run2.progress} 
+                  size="small" 
+                  status={run2.status === 'completed' ? 'success' : run2.status === 'failed' ? 'exception' : 'active'}
+                />
+              </Space>
             </Card>
           </Col>
         </Row>
 
+        {/* Статистика различий */}
+        {differencesCount > 0 && (
+          <Alert
+            message={`Обнаружено ${differencesCount} различий между запусками`}
+            description="Различающиеся поля выделены оранжевым цветом"
+            type="warning"
+            showIcon
+            style={{ marginBottom: 24 }}
+          />
+        )}
+
         {/* Основная информация */}
-        <Card title={<><SettingOutlined className="mr-2" />Основная информация</>}>
-          {renderComparisonField('Run ID', run1.runId, run2.runId, true)}
-          {renderComparisonField('Описание', run1.description || 'Не указано', run2.description || 'Не указано')}
-          {renderComparisonField('Время запуска', run1.startTime, run2.startTime)}
-          {renderComparisonField('Длительность', run1.duration, run2.duration)}
-          {renderComparisonField('Прогресс', `${run1.progress}%`, `${run2.progress}%`)}
+        <Card 
+          title={
+            <Space>
+              <SettingOutlined />
+              <Text strong>Основная информация</Text>
+            </Space>
+          }
+          style={{ marginBottom: 16 }}
+        >
+          <Descriptions column={1} bordered size="small">
+            {renderComparisonRow('Run ID', run1.runId, run2.runId, <InfoCircleOutlined />, true)}
+            {renderComparisonRow('Описание', run1.description || 'Не указано', run2.description || 'Не указано')}
+            {renderComparisonRow('Время запуска', run1.startTime, run2.startTime, <CalendarOutlined />)}
+            {renderComparisonRow('Длительность', run1.duration, run2.duration, <ClockCircleOutlined />, true)}
+            {renderComparisonRow('Прогресс', `${run1.progress}%`, `${run2.progress}%`)}
+          </Descriptions>
         </Card>
 
-        {/* Тип нагрузки */}
-        <Card title={<><ThunderboltOutlined className="mr-2" />Нагрузка</>}>
-          {renderComparisonField('Тип нагрузки', run1.workloadType.toUpperCase(), run2.workloadType.toUpperCase(), true)}
-          {renderComparisonField('Количество раннеров', run1.workloadProperties.runners, run2.workloadProperties.runners, true)}
-          {renderComparisonField('Продолжительность теста', run1.workloadProperties.duration || 'Не указано', run2.workloadProperties.duration || 'Не указано', true)}
+        {/* Нагрузка */}
+        <Card 
+          title={
+            <Space>
+              <ThunderboltOutlined />
+              <Text strong>Конфигурация нагрузки</Text>
+            </Space>
+          }
+          style={{ marginBottom: 16 }}
+        >
+          <Descriptions column={1} bordered size="small">
+            {renderComparisonRow('Тип нагрузки', run1.workloadType.toUpperCase(), run2.workloadType.toUpperCase(), <ThunderboltOutlined />, true)}
+            {renderComparisonRow('Количество раннеров', run1.workloadProperties.runners, run2.workloadProperties.runners, undefined, true)}
+            {renderComparisonRow('Продолжительность теста', run1.workloadProperties.duration || 'Не указано', run2.workloadProperties.duration || 'Не указано', undefined, true)}
+          </Descriptions>
           
-          <Row gutter={16} className="mt-4">
-            <Col span={6} className="font-medium text-gray-600">
-              Специфичные свойства:
+          {/* Дополнительные свойства нагрузки */}
+          <Divider orientation="left" plain>Дополнительные свойства</Divider>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Card size="small" title="Запуск 1">
+                {renderWorkloadProperties(run1)}
+              </Card>
             </Col>
-            <Col span={9}>
-              {renderWorkloadProperties(run1)}
-            </Col>
-            <Col span={9}>
-              {renderWorkloadProperties(run2)}
+            <Col span={12}>
+              <Card size="small" title="Запуск 2">
+                {renderWorkloadProperties(run2)}
+              </Card>
             </Col>
           </Row>
         </Card>
 
         {/* База данных */}
-        <Card title={<><DatabaseOutlined className="mr-2" />База данных</>}>
-          {renderComparisonField('Тип БД', run1.databaseType, run2.databaseType, true)}
-          {renderComparisonField('Версия', run1.databaseVersion, run2.databaseVersion, true)}
-          {renderComparisonField('Сборка', run1.databaseBuild || 'Не указано', run2.databaseBuild || 'Не указано')}
+        <Card 
+          title={
+            <Space>
+              <DatabaseOutlined />
+              <Text strong>Конфигурация базы данных</Text>
+            </Space>
+          }
+          style={{ marginBottom: 16 }}
+        >
+          <Descriptions column={1} bordered size="small">
+            {renderComparisonRow('Тип СУБД', run1.databaseType.toUpperCase(), run2.databaseType.toUpperCase(), <DatabaseOutlined />, true)}
+            {renderComparisonRow('Версия', run1.databaseVersion, run2.databaseVersion, undefined, true)}
+            {renderComparisonRow('Сборка', run1.databaseBuild || 'Не указано', run2.databaseBuild || 'Не указано')}
+          </Descriptions>
         </Card>
 
         {/* Конфигурация железа */}
-        <Card title={<><CloudServerOutlined className="mr-2" />Конфигурация железа</>}>
-          {renderComparisonField('Название конфигурации', run1.hardwareConfiguration.name, run2.hardwareConfiguration.name)}
-          {renderComparisonField('Сигнатура', run1.hardwareConfiguration.signature, run2.hardwareConfiguration.signature, true)}
-          {renderComparisonField('Процессор', `${run1.hardwareConfiguration.cpu.cores} ядер (${run1.hardwareConfiguration.cpu.model})`, `${run2.hardwareConfiguration.cpu.cores} ядер (${run2.hardwareConfiguration.cpu.model})`, true)}
-          {renderComparisonField('Память', `${run1.hardwareConfiguration.memory.totalGB} GB`, `${run2.hardwareConfiguration.memory.totalGB} GB`, true)}
-          {renderComparisonField('Накопитель', `${run1.hardwareConfiguration.storage.type.toUpperCase()} ${run1.hardwareConfiguration.storage.capacityGB} GB`, `${run2.hardwareConfiguration.storage.type.toUpperCase()} ${run2.hardwareConfiguration.storage.capacityGB} GB`, true)}
-          {renderComparisonField('Количество узлов', run1.hardwareConfiguration.nodeCount, run2.hardwareConfiguration.nodeCount, true)}
+        <Card 
+          title={
+            <Space>
+              <CloudServerOutlined />
+              <Text strong>Конфигурация железа</Text>
+            </Space>
+          }
+          style={{ marginBottom: 16 }}
+        >
+          <Descriptions column={1} bordered size="small">
+            {renderComparisonRow('Название конфигурации', run1.hardwareConfiguration.name, run2.hardwareConfiguration.name)}
+            {renderComparisonRow('Сигнатура', run1.hardwareConfiguration.signature || 'Не указано', run2.hardwareConfiguration.signature || 'Не указано', undefined, true)}
+            {renderComparisonRow('Процессор', `${run1.hardwareConfiguration.cpu.cores} ядер`, `${run2.hardwareConfiguration.cpu.cores} ядер`, undefined, true)}
+            {renderComparisonRow('Модель CPU', run1.hardwareConfiguration.cpu.model, run2.hardwareConfiguration.cpu.model)}
+            {renderComparisonRow('Память', `${run1.hardwareConfiguration.memory.totalGB} GB`, `${run2.hardwareConfiguration.memory.totalGB} GB`, undefined, true)}
+            {renderComparisonRow('Тип накопителя', run1.hardwareConfiguration.storage.type.toUpperCase(), run2.hardwareConfiguration.storage.type.toUpperCase())}
+            {renderComparisonRow('Объем накопителя', `${run1.hardwareConfiguration.storage.capacityGB} GB`, `${run2.hardwareConfiguration.storage.capacityGB} GB`, undefined, true)}
+            {renderComparisonRow('Количество узлов', run1.hardwareConfiguration.nodeCount, run2.hardwareConfiguration.nodeCount, undefined, true)}
+          </Descriptions>
         </Card>
 
         {/* Схема развертывания */}
-        <Card title={<><CloudServerOutlined className="mr-2" />Схема развертывания</>}>
-          {renderComparisonField('Тип развертывания', run1.deploymentLayout.type, run2.deploymentLayout.type, true)}
-          {renderComparisonField('Сигнатура', run1.deploymentLayout.signature, run2.deploymentLayout.signature, true)}
+        <Card 
+          title={
+            <Space>
+              <CloudServerOutlined />
+              <Text strong>Схема развертывания</Text>
+            </Space>
+          }
+          style={{ marginBottom: 16 }}
+        >
+          <Descriptions column={1} bordered size="small">
+            {renderComparisonRow('Тип развертывания', run1.deploymentLayout.type, run2.deploymentLayout.type, undefined, true)}
+            {renderComparisonRow('Сигнатура', run1.deploymentLayout.signature, run2.deploymentLayout.signature, undefined, true)}
+          </Descriptions>
           
-          <Row gutter={16} className="mt-4">
-            <Col span={6} className="font-medium text-gray-600">
-              Конфигурация:
+          {/* Конфигурация развертывания */}
+          <Divider orientation="left" plain>Параметры развертывания</Divider>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Card size="small" title="Запуск 1">
+                {Object.keys(run1.deploymentLayout.configuration).length > 0 ? (
+                  Object.entries(run1.deploymentLayout.configuration).map(([key, value]) => (
+                    <div key={key} style={{ marginBottom: 8 }}>
+                      <Text type="secondary">{key}: </Text>
+                      <Tag color="blue">{String(value)}</Tag>
+                    </div>
+                  ))
+                ) : (
+                  <Text type="secondary">Дополнительные параметры отсутствуют</Text>
+                )}
+              </Card>
             </Col>
-            <Col span={9}>
-              <div className="space-y-1">
-                {Object.entries(run1.deploymentLayout.configuration).map(([key, value]) => (
-                  <div key={key}>
-                    <Text type="secondary">{key}: </Text>
-                    <Text>{String(value)}</Text>
-                  </div>
-                ))}
-              </div>
-            </Col>
-            <Col span={9}>
-              <div className="space-y-1">
-                {Object.entries(run2.deploymentLayout.configuration).map(([key, value]) => (
-                  <div key={key}>
-                    <Text type="secondary">{key}: </Text>
-                    <Text>{String(value)}</Text>
-                  </div>
-                ))}
-              </div>
+            <Col span={12}>
+              <Card size="small" title="Запуск 2">
+                {Object.keys(run2.deploymentLayout.configuration).length > 0 ? (
+                  Object.entries(run2.deploymentLayout.configuration).map(([key, value]) => (
+                    <div key={key} style={{ marginBottom: 8 }}>
+                      <Text type="secondary">{key}: </Text>
+                      <Tag color="green">{String(value)}</Tag>
+                    </div>
+                  ))
+                ) : (
+                  <Text type="secondary">Дополнительные параметры отсутствуют</Text>
+                )}
+              </Card>
             </Col>
           </Row>
         </Card>
 
         {/* Немезисы */}
-        <Card title={<><BugOutlined className="mr-2" />Немезисы</>}>
-          {renderComparisonField('Сигнатура немезисов', run1.nemesisSignature.signature, run2.nemesisSignature.signature, true)}
+        <Card 
+          title={
+            <Space>
+              <BugOutlined />
+              <Text strong>Конфигурация немезисов</Text>
+            </Space>
+          }
+        >
+          <Descriptions column={1} bordered size="small">
+            {renderComparisonRow('Сигнатура немезисов', run1.nemesisSignature.signature, run2.nemesisSignature.signature, <BugOutlined />, true)}
+          </Descriptions>
           
-          <Row gutter={16} className="mt-4">
-            <Col span={6} className="font-medium text-gray-600">
-              Активные немезисы:
+          {/* Активные немезисы */}
+          <Divider orientation="left" plain>Активные немезисы</Divider>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Card size="small" title="Запуск 1">
+                <Space wrap>
+                  {run1.nemesisSignature.nemeses.length > 0 ? (
+                    run1.nemesisSignature.nemeses
+                      .filter(n => n.enabled)
+                      .map((nemesis, index) => (
+                        <Tag key={index} color="red" icon={<BugOutlined />}>
+                          {nemesis.type}
+                        </Tag>
+                      ))
+                  ) : (
+                    <Text type="secondary">Немезисы отсутствуют</Text>
+                  )}
+                </Space>
+              </Card>
             </Col>
-            <Col span={9}>
-              <div className="space-y-1">
-                {run1.nemesisSignature.nemeses.length > 0 ? (
-                  run1.nemesisSignature.nemeses
-                    .filter(n => n.enabled)
-                    .map((nemesis, index) => (
-                      <Tag key={index} color="red">
-                        {nemesis.type}
-                      </Tag>
-                    ))
-                ) : (
-                  <Text type="secondary">Немезисы отсутствуют</Text>
-                )}
-              </div>
-            </Col>
-            <Col span={9}>
-              <div className="space-y-1">
-                {run2.nemesisSignature.nemeses.length > 0 ? (
-                  run2.nemesisSignature.nemeses
-                    .filter(n => n.enabled)
-                    .map((nemesis, index) => (
-                      <Tag key={index} color="red">
-                        {nemesis.type}
-                      </Tag>
-                    ))
-                ) : (
-                  <Text type="secondary">Немезисы отсутствуют</Text>
-                )}
-              </div>
+            <Col span={12}>
+              <Card size="small" title="Запуск 2">
+                <Space wrap>
+                  {run2.nemesisSignature.nemeses.length > 0 ? (
+                    run2.nemesisSignature.nemeses
+                      .filter(n => n.enabled)
+                      .map((nemesis, index) => (
+                        <Tag key={index} color="red" icon={<BugOutlined />}>
+                          {nemesis.type}
+                        </Tag>
+                      ))
+                  ) : (
+                    <Text type="secondary">Немезисы отсутствуют</Text>
+                  )}
+                </Space>
+              </Card>
             </Col>
           </Row>
         </Card>
 
-        {/* Статистика различий */}
-        <Card title="Сводка различий" className="bg-gray-50">
+        {/* Итоговая статистика */}
+        <Card 
+          title="Сводка различий" 
+          style={{ 
+            marginTop: 16,
+            background: 'linear-gradient(135deg, #f0f2f5 0%, #e6f7ff 100%)'
+          }}
+        >
           <Row gutter={16}>
-            <Col span={8}>
+            <Col span={6}>
               <Statistic
-                title="Различия в конфигурации железа"
-                value={run1.hardwareConfiguration.signature === run2.hardwareConfiguration.signature ? 0 : 1}
-                suffix="/ 1"
-                valueStyle={{ color: run1.hardwareConfiguration.signature === run2.hardwareConfiguration.signature ? '#52c41a' : '#ff4d4f' }}
+                title="Всего различий"
+                value={differencesCount}
+                prefix={<SwapOutlined />}
+                valueStyle={{ color: differencesCount > 0 ? '#fa8c16' : '#52c41a' }}
               />
             </Col>
-            <Col span={8}>
+            <Col span={6}>
               <Statistic
-                title="Различия в типе нагрузки"
-                value={run1.workloadType === run2.workloadType ? 0 : 1}
-                suffix="/ 1"
-                valueStyle={{ color: run1.workloadType === run2.workloadType ? '#52c41a' : '#ff4d4f' }}
+                title="Железо"
+                value={run1.hardwareConfiguration.signature === run2.hardwareConfiguration.signature ? 'Идентично' : 'Различается'}
+                valueStyle={{ 
+                  color: run1.hardwareConfiguration.signature === run2.hardwareConfiguration.signature ? '#52c41a' : '#ff4d4f',
+                  fontSize: '16px'
+                }}
               />
             </Col>
-            <Col span={8}>
+            <Col span={6}>
               <Statistic
-                title="Различия в схеме развертывания"
-                value={run1.deploymentLayout.signature === run2.deploymentLayout.signature ? 0 : 1}
-                suffix="/ 1"
-                valueStyle={{ color: run1.deploymentLayout.signature === run2.deploymentLayout.signature ? '#52c41a' : '#ff4d4f' }}
+                title="Нагрузка"
+                value={run1.workloadType === run2.workloadType ? 'Идентична' : 'Различается'}
+                valueStyle={{ 
+                  color: run1.workloadType === run2.workloadType ? '#52c41a' : '#ff4d4f',
+                  fontSize: '16px'
+                }}
+              />
+            </Col>
+            <Col span={6}>
+              <Statistic
+                title="Развертывание"
+                value={run1.deploymentLayout.signature === run2.deploymentLayout.signature ? 'Идентично' : 'Различается'}
+                valueStyle={{ 
+                  color: run1.deploymentLayout.signature === run2.deploymentLayout.signature ? '#52c41a' : '#ff4d4f',
+                  fontSize: '16px'
+                }}
               />
             </Col>
           </Row>

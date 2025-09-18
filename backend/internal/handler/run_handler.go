@@ -157,9 +157,15 @@ func (h *RunHandler) GetRuns(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	log.Printf("DEBUG: Calling GetAll with limit=%d, offset=%d", limit, offset)
+	// Параметры фильтрации
+	searchText := c.Query("search")
+	status := c.Query("status")
+	dateFrom := c.Query("date_from")
+	dateTo := c.Query("date_to")
 
-	runs, total, err := h.runService.GetAll(limit, offset)
+	log.Printf("DEBUG: Calling GetAll with limit=%d, offset=%d, search=%s, status=%s", limit, offset, searchText, status)
+
+	runs, total, err := h.runService.GetAllWithFilters(limit, offset, searchText, status, dateFrom, dateTo)
 	if err != nil {
 		log.Printf("ERROR: GetAll failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{

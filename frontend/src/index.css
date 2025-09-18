@@ -647,3 +647,52 @@ body.dark-theme .ant-table-tbody > tr > td {
 body.dark-theme .ant-table-tbody > tr:hover > td {
   border: none !important;
 }
+
+/* Анимации для кнопки сравнения */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.7);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(82, 196, 26, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(82, 196, 26, 0);
+  }
+}
+
+/* Дополнительные стили для улучшения UX */
+.compare-button-ready {
+  animation: pulse 2s infinite;
+}
+
+/* Стили для красивых карточек сравнения */
+.comparison-card-run1 {
+  background: linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%);
+  border: 2px solid #40a9ff;
+}
+
+.comparison-card-run2 {
+  background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
+  border: 2px solid #73d13d;
+}
+
+/* Стили для различающихся полей */
+.field-different {
+  background-color: #fff7e6;
+  border-color: #ffa940;
+  padding: 8px;
+  border-radius: 4px;
+  margin: 2px 0;
+}
+
+.field-same {
+  background-color: #f6ffed;
+  border-color: #b7eb8f;
+  padding: 8px;
+  border-radius: 4px;
+  margin: 2px 0;
+}

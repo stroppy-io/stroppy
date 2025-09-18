@@ -193,3 +193,117 @@ func (r *RunRepository) Count() (int, error) {
 
 	return count, nil
 }
+
+// GetAllWithFilters получает все запуски с фильтрацией и пагинацией
+func (r *RunRepository) GetAllWithFilters(limit, offset int, searchText, status, dateFrom, dateTo string) ([]*run.Run, error) {
+	query := `
+		SELECT id, name, description, status, config, result,
+			   created_at, updated_at, started_at, completed_at
+		FROM runs 
+		WHERE 1=1
+	`
+	args := []interface{}{}
+
+	// Добавляем фильтр по тексту
+	if searchText != "" {
+		query += ` AND (name LIKE ? OR description LIKE ?)`
+		searchPattern := "%" + searchText + "%"
+		args = append(args, searchPattern, searchPattern)
+	}
+
+	// Добавляем фильтр по статусу
+	if status != "" {
+		query += ` AND status = ?`
+		args = append(args, status)
+	}
+
+	// Добавляем фильтр по дате
+	if dateFrom != "" {
+		query += ` AND created_at >= ?`
+		args = append(args, dateFrom)
+	}
+	if dateTo != "" {
+		query += ` AND created_at <= ?`
+		args = append(args, dateTo)
+	}
+
+	query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`
+	args = append(args, limit, offset)
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get filtered runs: %w", err)
+	}
+	defer rows.Close()
+
+	var runs []*run.Run
+	for rows.Next() {
+		ru := &run.Run{}
+		var startedAt, completedAt sql.NullTime
+		var result sql.NullString
+
+		err := rows.Scan(
+			&ru.ID, &ru.Name, &ru.Description, &ru.Status,
+			&ru.Config, &result, &ru.CreatedAt, &ru.UpdatedAt,
+			&startedAt, &completedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan run: %w", err)
+		}
+
+		if result.Valid {
+			ru.Result = result.String
+		}
+		if startedAt.Valid {
+			ru.StartedAt = &startedAt.Time
+		}
+		if completedAt.Valid {
+			ru.CompletedAt = &completedAt.Time
+		}
+
+		runs = append(runs, ru)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate runs: %w", err)
+	}
+
+	return runs, nil
+}
+
+// CountWithFilters возвращает количество запусков с учетом фильтров
+func (r *RunRepository) CountWithFilters(searchText, status, dateFrom, dateTo string) (int, error) {
+	query := `SELECT COUNT(*) FROM runs WHERE 1=1`
+	args := []interface{}{}
+
+	// Добавляем фильтр по тексту
+	if searchText != "" {
+		query += ` AND (name LIKE ? OR description LIKE ?)`
+		searchPattern := "%" + searchText + "%"
+		args = append(args, searchPattern, searchPattern)
+	}
+
+	// Добавляем фильтр по статусу
+	if status != "" {
+		query += ` AND status = ?`
+		args = append(args, status)
+	}
+
+	// Добавляем фильтр по дате
+	if dateFrom != "" {
+		query += ` AND created_at >= ?`
+		args = append(args, dateFrom)
+	}
+	if dateTo != "" {
+		query += ` AND created_at <= ?`
+		args = append(args, dateTo)
+	}
+
+	var count int
+	err := r.db.QueryRow(query, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count filtered runs: %w", err)
+	}
+
+	return count, nil
+}
