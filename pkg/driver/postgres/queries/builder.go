@@ -69,7 +69,7 @@ func (q *QueryBuilder) internalBuild(
 	buildQueriesContext *stroppy.UnitBuildContext,
 	channel errchan.Chan[stroppy.DriverTransaction],
 ) {
-	switch buildQueriesContext.GetUnit().GetType().(type) {
+	switch buildQueriesContext.GetUnit().GetDescriptor_().(type) {
 	case *stroppy.StepUnitDescriptor_CreateTable:
 		NewCreateTable(
 			ctx,

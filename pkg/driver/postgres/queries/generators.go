@@ -33,7 +33,7 @@ func collectQueryGenerators(
 
 		generator, err := generate.NewValueGenerator(
 			runContext.GetGlobalConfig().GetRun().GetSeed(),
-			queryDescriptor.GetCount(),
+			1, // TODO: get proper amount
 			param,
 		)
 		if err != nil {
@@ -51,7 +51,7 @@ func CollectStepGenerators(runContext *stroppy.StepContext) (Generators, error) 
 
 	for _, step := range runContext.GetGlobalConfig().GetBenchmark().GetSteps() {
 		for _, queryDescriptor := range step.GetUnits() {
-			switch queryDescriptor.GetType().(type) {
+			switch queryDescriptor.GetDescriptor_().(type) {
 			case *stroppy.StepUnitDescriptor_Query:
 				gens, err := collectQueryGenerators(runContext, queryDescriptor.GetQuery())
 				if err != nil {

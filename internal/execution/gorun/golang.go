@@ -92,7 +92,7 @@ func processUnitTransactions(
 
 	unitPool := utils.NewAsyncerFromExecType(
 		ctx,
-		unitDesc.GetAsync(),
+		true, // TODO: make async properly, pass count values down
 		// TODO: need count already running pools and set max goroutines?
 		max(
 			int(runContext.GetGlobalConfig().GetRun().GetGoExecutor().GetGoMaxProc()), //nolint: gosec // allow

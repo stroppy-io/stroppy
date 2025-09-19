@@ -115,25 +115,6 @@ func (c *Config) validateK6Config() error {
 	return nil
 }
 
-func (c *Config) validatePlugins() error {
-	if len(c.GetRun().GetPlugins()) == 0 {
-		return nil
-	}
-
-	for _, pl := range c.GetRun().GetPlugins() {
-		err := validatePath(pl.GetPath(), true)
-		if err != nil {
-			return fmt.Errorf( //nolint: err113
-				"failed to validate on of %s plugin binary path: %w",
-				pl.GetType(),
-				err,
-			)
-		}
-	}
-
-	return nil
-}
-
 func (c *Config) validatePaths() error {
 	needK6Config := false
 
@@ -150,11 +131,6 @@ func (c *Config) validatePaths() error {
 		if err != nil {
 			return fmt.Errorf("failed to valodate k6 config: %w", err)
 		}
-	}
-
-	err := c.validatePlugins()
-	if err != nil {
-		return fmt.Errorf("failed to validate plugins: %w", err)
 	}
 
 	return nil

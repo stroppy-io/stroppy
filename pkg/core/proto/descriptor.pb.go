@@ -421,8 +421,6 @@ type QueryDescriptor struct {
 	Sql string `protobuf:"bytes,2,opt,name=sql,proto3" json:"sql,omitempty"`
 	// * Parameters used in the query
 	Params []*QueryParamDescriptor `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty"`
-	// * Number of times to execute this query
-	Count uint64 `protobuf:"varint,4,opt,name=count,proto3" json:"count,omitempty"`
 	// * Database-specific query properties
 	DbSpecific    *Value_Struct `protobuf:"bytes,5,opt,name=db_specific,json=dbSpecific,proto3" json:"db_specific,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -480,13 +478,6 @@ func (x *QueryDescriptor) GetParams() []*QueryParamDescriptor {
 	return nil
 }
 
-func (x *QueryDescriptor) GetCount() uint64 {
-	if x != nil {
-		return x.Count
-	}
-	return 0
-}
-
 func (x *QueryDescriptor) GetDbSpecific() *Value_Struct {
 	if x != nil {
 		return x.DbSpecific
@@ -504,8 +495,6 @@ type TransactionDescriptor struct {
 	IsolationLevel TxIsolationLevel `protobuf:"varint,2,opt,name=isolation_level,json=isolationLevel,proto3,enum=stroppy.TxIsolationLevel" json:"isolation_level,omitempty"`
 	// * List of queries to execute in this transaction
 	Queries []*QueryDescriptor `protobuf:"bytes,3,rep,name=queries,proto3" json:"queries,omitempty"`
-	// * Number of times to execute this transaction
-	Count uint64 `protobuf:"varint,4,opt,name=count,proto3" json:"count,omitempty"`
 	// * Database-specific transaction properties
 	DbSpecific    *Value_Struct `protobuf:"bytes,5,opt,name=db_specific,json=dbSpecific,proto3" json:"db_specific,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -563,13 +552,6 @@ func (x *TransactionDescriptor) GetQueries() []*QueryDescriptor {
 	return nil
 }
 
-func (x *TransactionDescriptor) GetCount() uint64 {
-	if x != nil {
-		return x.Count
-	}
-	return 0
-}
-
 func (x *TransactionDescriptor) GetDbSpecific() *Value_Struct {
 	if x != nil {
 		return x.DbSpecific
@@ -583,14 +565,14 @@ func (x *TransactionDescriptor) GetDbSpecific() *Value_Struct {
 // It also specifies whether to execute this operation asynchronously.
 type StepUnitDescriptor struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Types that are valid to be assigned to Type:
+	// Types that are valid to be assigned to Descriptor_:
 	//
 	//	*StepUnitDescriptor_CreateTable
 	//	*StepUnitDescriptor_Query
 	//	*StepUnitDescriptor_Transaction
-	Type isStepUnitDescriptor_Type `protobuf_oneof:"type"`
-	// * Whether to execute this operation asynchronously
-	Async         bool `protobuf:"varint,100,opt,name=async,proto3" json:"async,omitempty"`
+	Descriptor_ isStepUnitDescriptor_Descriptor_ `protobuf_oneof:"descriptor"`
+	// * Number of times to execute this unit
+	Count         uint64 `protobuf:"varint,5,opt,name=count,proto3" json:"count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -625,16 +607,16 @@ func (*StepUnitDescriptor) Descriptor() ([]byte, []int) {
 	return file_descriptor_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *StepUnitDescriptor) GetType() isStepUnitDescriptor_Type {
+func (x *StepUnitDescriptor) GetDescriptor_() isStepUnitDescriptor_Descriptor_ {
 	if x != nil {
-		return x.Type
+		return x.Descriptor_
 	}
 	return nil
 }
 
 func (x *StepUnitDescriptor) GetCreateTable() *TableDescriptor {
 	if x != nil {
-		if x, ok := x.Type.(*StepUnitDescriptor_CreateTable); ok {
+		if x, ok := x.Descriptor_.(*StepUnitDescriptor_CreateTable); ok {
 			return x.CreateTable
 		}
 	}
@@ -643,7 +625,7 @@ func (x *StepUnitDescriptor) GetCreateTable() *TableDescriptor {
 
 func (x *StepUnitDescriptor) GetQuery() *QueryDescriptor {
 	if x != nil {
-		if x, ok := x.Type.(*StepUnitDescriptor_Query); ok {
+		if x, ok := x.Descriptor_.(*StepUnitDescriptor_Query); ok {
 			return x.Query
 		}
 	}
@@ -652,22 +634,22 @@ func (x *StepUnitDescriptor) GetQuery() *QueryDescriptor {
 
 func (x *StepUnitDescriptor) GetTransaction() *TransactionDescriptor {
 	if x != nil {
-		if x, ok := x.Type.(*StepUnitDescriptor_Transaction); ok {
+		if x, ok := x.Descriptor_.(*StepUnitDescriptor_Transaction); ok {
 			return x.Transaction
 		}
 	}
 	return nil
 }
 
-func (x *StepUnitDescriptor) GetAsync() bool {
+func (x *StepUnitDescriptor) GetCount() uint64 {
 	if x != nil {
-		return x.Async
+		return x.Count
 	}
-	return false
+	return 0
 }
 
-type isStepUnitDescriptor_Type interface {
-	isStepUnitDescriptor_Type()
+type isStepUnitDescriptor_Descriptor_ interface {
+	isStepUnitDescriptor_Descriptor_()
 }
 
 type StepUnitDescriptor_CreateTable struct {
@@ -685,11 +667,11 @@ type StepUnitDescriptor_Transaction struct {
 	Transaction *TransactionDescriptor `protobuf:"bytes,4,opt,name=transaction,proto3,oneof"`
 }
 
-func (*StepUnitDescriptor_CreateTable) isStepUnitDescriptor_Type() {}
+func (*StepUnitDescriptor_CreateTable) isStepUnitDescriptor_Descriptor_() {}
 
-func (*StepUnitDescriptor_Query) isStepUnitDescriptor_Type() {}
+func (*StepUnitDescriptor_Query) isStepUnitDescriptor_Descriptor_() {}
 
-func (*StepUnitDescriptor_Transaction) isStepUnitDescriptor_Type() {}
+func (*StepUnitDescriptor_Transaction) isStepUnitDescriptor_Descriptor_() {}
 
 // *
 // StepDescriptor represents a logical step in a benchmark.
@@ -851,28 +833,27 @@ const file_descriptor_proto_rawDesc = "" +
 	"\rreplace_regex\x18\x02 \x01(\tR\freplaceRegex\x12K\n" +
 	"\x0fgeneration_rule\x18\x03 \x01(\v2\x18.stroppy.Generation.RuleB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x0egenerationRule\x126\n" +
 	"\vdb_specific\x18\x04 \x01(\v2\x15.stroppy.Value.StructR\n" +
-	"dbSpecific\"\xe6\x01\n" +
+	"dbSpecific\"\xc7\x01\n" +
 	"\x0fQueryDescriptor\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12\x19\n" +
 	"\x03sql\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x03sql\x12D\n" +
 	"\x06params\x18\x03 \x03(\v2\x1d.stroppy.QueryParamDescriptorB\r\xfaB\n" +
-	"\x92\x01\a\"\x05\x8a\x01\x02\x10\x01R\x06params\x12\x1d\n" +
-	"\x05count\x18\x04 \x01(\x04B\a\xfaB\x042\x02 \x00R\x05count\x126\n" +
+	"\x92\x01\a\"\x05\x8a\x01\x02\x10\x01R\x06params\x126\n" +
 	"\vdb_specific\x18\x05 \x01(\v2\x15.stroppy.Value.StructR\n" +
-	"dbSpecific\"\x94\x02\n" +
+	"dbSpecific\"\xf5\x01\n" +
 	"\x15TransactionDescriptor\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12B\n" +
 	"\x0fisolation_level\x18\x02 \x01(\x0e2\x19.stroppy.TxIsolationLevelR\x0eisolationLevel\x12C\n" +
-	"\aqueries\x18\x03 \x03(\v2\x18.stroppy.QueryDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\aqueries\x12\x1d\n" +
-	"\x05count\x18\x04 \x01(\x04B\a\xfaB\x042\x02 \x00R\x05count\x126\n" +
+	"\aqueries\x18\x03 \x03(\v2\x18.stroppy.QueryDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\aqueries\x126\n" +
 	"\vdb_specific\x18\x05 \x01(\v2\x15.stroppy.Value.StructR\n" +
-	"dbSpecific\"\xec\x01\n" +
+	"dbSpecific\"\xfb\x01\n" +
 	"\x12StepUnitDescriptor\x12=\n" +
 	"\fcreate_table\x18\x01 \x01(\v2\x18.stroppy.TableDescriptorH\x00R\vcreateTable\x120\n" +
 	"\x05query\x18\x02 \x01(\v2\x18.stroppy.QueryDescriptorH\x00R\x05query\x12B\n" +
-	"\vtransaction\x18\x04 \x01(\v2\x1e.stroppy.TransactionDescriptorH\x00R\vtransaction\x12\x14\n" +
-	"\x05async\x18d \x01(\bR\x05asyncB\v\n" +
-	"\x04type\x12\x03\xf8B\x01\"\x87\x01\n" +
+	"\vtransaction\x18\x04 \x01(\v2\x1e.stroppy.TransactionDescriptorH\x00R\vtransaction\x12\x1d\n" +
+	"\x05count\x18\x05 \x01(\x04B\a\xfaB\x042\x02 \x00R\x05countB\x11\n" +
+	"\n" +
+	"descriptor\x12\x03\xf8B\x01\"\x87\x01\n" +
 	"\x0eStepDescriptor\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12B\n" +
 	"\x05units\x18\x02 \x03(\v2\x1b.stroppy.StepUnitDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\x05units\x12\x14\n" +

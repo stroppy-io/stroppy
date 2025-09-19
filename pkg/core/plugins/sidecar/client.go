@@ -62,7 +62,8 @@ func (d *client) Teardown(ctx context.Context) error {
 }
 
 func ConnectToPlugin( //nolint: ireturn // need from lib
-	runConfig *stroppy.RunConfig, // TODO: *stroppy.Plugin probably...
+	runConfig *stroppy.RunConfig,
+	_ *stroppy.SideCar, // TODO: use this sidecar
 	lg *zap.Logger,
 ) (Plugin, context.CancelFunc, error) {
 	logger.SetLoggerEnv(

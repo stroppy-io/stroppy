@@ -3206,20 +3206,24 @@ export interface DriverConfig {
      */
     dbSpecific?: Value_Struct;
     /**
-     * * Name of choosen driver
+     * * Name of chosen driver
      *
-     * @generated from protobuf field: stroppy.DriverConfig.DriverName driver_name = 5
+     * @generated from protobuf field: stroppy.DriverConfig.DriverType driver_type = 5
      */
-    driverName: DriverConfig_DriverName;
+    driverType: DriverConfig_DriverType;
 }
 /**
- * @generated from protobuf enum stroppy.DriverConfig.DriverName
+ * @generated from protobuf enum stroppy.DriverConfig.DriverType
  */
-export enum DriverConfig_DriverName {
+export enum DriverConfig_DriverType {
     /**
-     * @generated from protobuf enum value: postgres = 0;
+     * @generated from protobuf enum value: DRIVER_TYPE_UNSPECIFIED = 0;
      */
-    postgres = 0
+    DRIVER_TYPE_UNSPECIFIED = 0,
+    /**
+     * @generated from protobuf enum value: DRIVER_TYPE_POSTGRES = 1;
+     */
+    DRIVER_TYPE_POSTGRES = 1
 }
 /**
  * *
@@ -3339,40 +3343,21 @@ export interface StepContext {
  * *
  * Plugins contains configuration for plugins.
  *
- * @generated from protobuf message stroppy.Plugin
+ * @generated from protobuf message stroppy.SideCar
  */
-export interface Plugin {
+export interface SideCar {
     /**
-     * * Type of the plugin
+     * * Url to connect the plugin instance
      *
-     * @generated from protobuf field: stroppy.Plugin.Type type = 1
+     * @generated from protobuf field: string url = 2
      */
-    type: Plugin_Type;
-    /**
-     * * Path to the plugin binary
-     *
-     * @generated from protobuf field: string path = 2
-     */
-    path: string;
+    url: string;
     /**
      * * Additional plugin settings
      *
      * @generated from protobuf field: optional stroppy.Value.Struct settings = 3
      */
     settings?: Value_Struct;
-}
-/**
- * @generated from protobuf enum stroppy.Plugin.Type
- */
-export enum Plugin_Type {
-    /**
-     * @generated from protobuf enum value: TYPE_UNSPECIFIED = 0;
-     */
-    TYPE_UNSPECIFIED = 0,
-    /**
-     * @generated from protobuf enum value: TYPE_SIDECAR = 1;
-     */
-    TYPE_SIDECAR = 1
 }
 /**
  * *
@@ -3434,9 +3419,9 @@ export interface RunConfig {
     /**
      * * Plugins configuration
      *
-     * @generated from protobuf field: repeated stroppy.Plugin plugins = 9
+     * @generated from protobuf field: repeated stroppy.SideCar side_cars = 9
      */
-    plugins: Plugin[];
+    sideCars: SideCar[];
 }
 /**
  * *
@@ -3705,13 +3690,13 @@ class DriverConfig$Type extends MessageType<DriverConfig> {
         super("stroppy.DriverConfig", [
             { no: 3, name: "url", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 4, name: "db_specific", kind: "message", T: () => Value_Struct },
-            { no: 5, name: "driver_name", kind: "enum", T: () => ["stroppy.DriverConfig.DriverName", DriverConfig_DriverName] }
+            { no: 5, name: "driver_type", kind: "enum", T: () => ["stroppy.DriverConfig.DriverType", DriverConfig_DriverType] }
         ]);
     }
     create(value?: PartialMessage<DriverConfig>): DriverConfig {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.url = "";
-        message.driverName = 0;
+        message.driverType = 0;
         if (value !== undefined)
             reflectionMergePartial<DriverConfig>(this, message, value);
         return message;
@@ -3727,8 +3712,8 @@ class DriverConfig$Type extends MessageType<DriverConfig> {
                 case /* optional stroppy.Value.Struct db_specific */ 4:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
                     break;
-                case /* stroppy.DriverConfig.DriverName driver_name */ 5:
-                    message.driverName = reader.int32();
+                case /* stroppy.DriverConfig.DriverType driver_type */ 5:
+                    message.driverType = reader.int32();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -3748,9 +3733,9 @@ class DriverConfig$Type extends MessageType<DriverConfig> {
         /* optional stroppy.Value.Struct db_specific = 4; */
         if (message.dbSpecific)
             Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.DriverConfig.DriverName driver_name = 5; */
-        if (message.driverName !== 0)
-            writer.tag(5, WireType.Varint).int32(message.driverName);
+        /* stroppy.DriverConfig.DriverType driver_type = 5; */
+        if (message.driverType !== 0)
+            writer.tag(5, WireType.Varint).int32(message.driverType);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -3924,32 +3909,27 @@ class StepContext$Type extends MessageType<StepContext> {
  */
 export const StepContext = new StepContext$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Plugin$Type extends MessageType<Plugin> {
+class SideCar$Type extends MessageType<SideCar> {
     constructor() {
-        super("stroppy.Plugin", [
-            { no: 1, name: "type", kind: "enum", T: () => ["stroppy.Plugin.Type", Plugin_Type] },
-            { no: 2, name: "path", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+        super("stroppy.SideCar", [
+            { no: 2, name: "url", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "settings", kind: "message", T: () => Value_Struct }
         ]);
     }
-    create(value?: PartialMessage<Plugin>): Plugin {
+    create(value?: PartialMessage<SideCar>): SideCar {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.type = 0;
-        message.path = "";
+        message.url = "";
         if (value !== undefined)
-            reflectionMergePartial<Plugin>(this, message, value);
+            reflectionMergePartial<SideCar>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Plugin): Plugin {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: SideCar): SideCar {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* stroppy.Plugin.Type type */ 1:
-                    message.type = reader.int32();
-                    break;
-                case /* string path */ 2:
-                    message.path = reader.string();
+                case /* string url */ 2:
+                    message.url = reader.string();
                     break;
                 case /* optional stroppy.Value.Struct settings */ 3:
                     message.settings = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.settings);
@@ -3965,13 +3945,10 @@ class Plugin$Type extends MessageType<Plugin> {
         }
         return message;
     }
-    internalBinaryWrite(message: Plugin, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Plugin.Type type = 1; */
-        if (message.type !== 0)
-            writer.tag(1, WireType.Varint).int32(message.type);
-        /* string path = 2; */
-        if (message.path !== "")
-            writer.tag(2, WireType.LengthDelimited).string(message.path);
+    internalBinaryWrite(message: SideCar, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string url = 2; */
+        if (message.url !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.url);
         /* optional stroppy.Value.Struct settings = 3; */
         if (message.settings)
             Value_Struct.internalBinaryWrite(message.settings, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
@@ -3982,9 +3959,9 @@ class Plugin$Type extends MessageType<Plugin> {
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Plugin
+ * @generated MessageType for protobuf message stroppy.SideCar
  */
-export const Plugin = new Plugin$Type();
+export const SideCar = new SideCar$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class RunConfig$Type extends MessageType<RunConfig> {
     constructor() {
@@ -3997,7 +3974,7 @@ class RunConfig$Type extends MessageType<RunConfig> {
             { no: 6, name: "steps", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => RequestedStep },
             { no: 7, name: "logger", kind: "message", T: () => LoggerConfig },
             { no: 8, name: "metadata", kind: "map", K: 9 /*ScalarType.STRING*/, V: { kind: "scalar", T: 9 /*ScalarType.STRING*/ } },
-            { no: 9, name: "plugins", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Plugin }
+            { no: 9, name: "side_cars", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => SideCar }
         ]);
     }
     create(value?: PartialMessage<RunConfig>): RunConfig {
@@ -4006,7 +3983,7 @@ class RunConfig$Type extends MessageType<RunConfig> {
         message.seed = "0";
         message.steps = [];
         message.metadata = {};
-        message.plugins = [];
+        message.sideCars = [];
         if (value !== undefined)
             reflectionMergePartial<RunConfig>(this, message, value);
         return message;
@@ -4040,8 +4017,8 @@ class RunConfig$Type extends MessageType<RunConfig> {
                 case /* map<string, string> metadata */ 8:
                     this.binaryReadMap8(message.metadata, reader, options);
                     break;
-                case /* repeated stroppy.Plugin plugins */ 9:
-                    message.plugins.push(Plugin.internalBinaryRead(reader, reader.uint32(), options));
+                case /* repeated stroppy.SideCar side_cars */ 9:
+                    message.sideCars.push(SideCar.internalBinaryRead(reader, reader.uint32(), options));
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -4095,9 +4072,9 @@ class RunConfig$Type extends MessageType<RunConfig> {
         /* map<string, string> metadata = 8; */
         for (let k of globalThis.Object.keys(message.metadata))
             writer.tag(8, WireType.LengthDelimited).fork().tag(1, WireType.LengthDelimited).string(k).tag(2, WireType.LengthDelimited).string(message.metadata[k]).join();
-        /* repeated stroppy.Plugin plugins = 9; */
-        for (let i = 0; i < message.plugins.length; i++)
-            Plugin.internalBinaryWrite(message.plugins[i], writer.tag(9, WireType.LengthDelimited).fork(), options).join();
+        /* repeated stroppy.SideCar side_cars = 9; */
+        for (let i = 0; i < message.sideCars.length; i++)
+            SideCar.internalBinaryWrite(message.sideCars[i], writer.tag(9, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -4351,12 +4328,6 @@ export interface QueryDescriptor {
      */
     params: QueryParamDescriptor[];
     /**
-     * * Number of times to execute this query
-     *
-     * @generated from protobuf field: uint64 count = 4
-     */
-    count: string;
-    /**
      * * Database-specific query properties
      *
      * @generated from protobuf field: stroppy.Value.Struct db_specific = 5
@@ -4389,12 +4360,6 @@ export interface TransactionDescriptor {
      */
     queries: QueryDescriptor[];
     /**
-     * * Number of times to execute this transaction
-     *
-     * @generated from protobuf field: uint64 count = 4
-     */
-    count: string;
-    /**
      * * Database-specific transaction properties
      *
      * @generated from protobuf field: stroppy.Value.Struct db_specific = 5
@@ -4411,9 +4376,9 @@ export interface TransactionDescriptor {
  */
 export interface StepUnitDescriptor {
     /**
-     * @generated from protobuf oneof: type
+     * @generated from protobuf oneof: descriptor
      */
-    type: {
+    descriptor: {
         oneofKind: "createTable";
         /**
          * * Table creation operation
@@ -4441,11 +4406,11 @@ export interface StepUnitDescriptor {
         oneofKind: undefined;
     };
     /**
-     * * Whether to execute this operation asynchronously
+     * * Number of times to execute this unit
      *
-     * @generated from protobuf field: bool async = 100
+     * @generated from protobuf field: uint64 count = 5
      */
-    async: boolean;
+    count: string;
 }
 /**
  * *
@@ -4841,7 +4806,6 @@ class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "sql", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "params", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => QueryParamDescriptor },
-            { no: 4, name: "count", kind: "scalar", T: 4 /*ScalarType.UINT64*/ },
             { no: 5, name: "db_specific", kind: "message", T: () => Value_Struct }
         ]);
     }
@@ -4850,7 +4814,6 @@ class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
         message.name = "";
         message.sql = "";
         message.params = [];
-        message.count = "0";
         if (value !== undefined)
             reflectionMergePartial<QueryDescriptor>(this, message, value);
         return message;
@@ -4868,9 +4831,6 @@ class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
                     break;
                 case /* repeated stroppy.QueryParamDescriptor params */ 3:
                     message.params.push(QueryParamDescriptor.internalBinaryRead(reader, reader.uint32(), options));
-                    break;
-                case /* uint64 count */ 4:
-                    message.count = reader.uint64().toString();
                     break;
                 case /* stroppy.Value.Struct db_specific */ 5:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
@@ -4896,9 +4856,6 @@ class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
         /* repeated stroppy.QueryParamDescriptor params = 3; */
         for (let i = 0; i < message.params.length; i++)
             QueryParamDescriptor.internalBinaryWrite(message.params[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* uint64 count = 4; */
-        if (message.count !== "0")
-            writer.tag(4, WireType.Varint).uint64(message.count);
         /* stroppy.Value.Struct db_specific = 5; */
         if (message.dbSpecific)
             Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
@@ -4919,7 +4876,6 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "isolation_level", kind: "enum", T: () => ["stroppy.TxIsolationLevel", TxIsolationLevel] },
             { no: 3, name: "queries", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => QueryDescriptor },
-            { no: 4, name: "count", kind: "scalar", T: 4 /*ScalarType.UINT64*/ },
             { no: 5, name: "db_specific", kind: "message", T: () => Value_Struct }
         ]);
     }
@@ -4928,7 +4884,6 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
         message.name = "";
         message.isolationLevel = 0;
         message.queries = [];
-        message.count = "0";
         if (value !== undefined)
             reflectionMergePartial<TransactionDescriptor>(this, message, value);
         return message;
@@ -4946,9 +4901,6 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
                     break;
                 case /* repeated stroppy.QueryDescriptor queries */ 3:
                     message.queries.push(QueryDescriptor.internalBinaryRead(reader, reader.uint32(), options));
-                    break;
-                case /* uint64 count */ 4:
-                    message.count = reader.uint64().toString();
                     break;
                 case /* stroppy.Value.Struct db_specific */ 5:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
@@ -4974,9 +4926,6 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
         /* repeated stroppy.QueryDescriptor queries = 3; */
         for (let i = 0; i < message.queries.length; i++)
             QueryDescriptor.internalBinaryWrite(message.queries[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* uint64 count = 4; */
-        if (message.count !== "0")
-            writer.tag(4, WireType.Varint).uint64(message.count);
         /* stroppy.Value.Struct db_specific = 5; */
         if (message.dbSpecific)
             Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
@@ -4994,16 +4943,16 @@ export const TransactionDescriptor = new TransactionDescriptor$Type();
 class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
     constructor() {
         super("stroppy.StepUnitDescriptor", [
-            { no: 1, name: "create_table", kind: "message", oneof: "type", T: () => TableDescriptor },
-            { no: 2, name: "query", kind: "message", oneof: "type", T: () => QueryDescriptor },
-            { no: 4, name: "transaction", kind: "message", oneof: "type", T: () => TransactionDescriptor },
-            { no: 100, name: "async", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
+            { no: 1, name: "create_table", kind: "message", oneof: "descriptor", T: () => TableDescriptor },
+            { no: 2, name: "query", kind: "message", oneof: "descriptor", T: () => QueryDescriptor },
+            { no: 4, name: "transaction", kind: "message", oneof: "descriptor", T: () => TransactionDescriptor },
+            { no: 5, name: "count", kind: "scalar", T: 4 /*ScalarType.UINT64*/ }
         ]);
     }
     create(value?: PartialMessage<StepUnitDescriptor>): StepUnitDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.type = { oneofKind: undefined };
-        message.async = false;
+        message.descriptor = { oneofKind: undefined };
+        message.count = "0";
         if (value !== undefined)
             reflectionMergePartial<StepUnitDescriptor>(this, message, value);
         return message;
@@ -5014,25 +4963,25 @@ class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
                 case /* stroppy.TableDescriptor create_table */ 1:
-                    message.type = {
+                    message.descriptor = {
                         oneofKind: "createTable",
-                        createTable: TableDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).createTable)
+                        createTable: TableDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.descriptor as any).createTable)
                     };
                     break;
                 case /* stroppy.QueryDescriptor query */ 2:
-                    message.type = {
+                    message.descriptor = {
                         oneofKind: "query",
-                        query: QueryDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).query)
+                        query: QueryDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.descriptor as any).query)
                     };
                     break;
                 case /* stroppy.TransactionDescriptor transaction */ 4:
-                    message.type = {
+                    message.descriptor = {
                         oneofKind: "transaction",
-                        transaction: TransactionDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).transaction)
+                        transaction: TransactionDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.descriptor as any).transaction)
                     };
                     break;
-                case /* bool async */ 100:
-                    message.async = reader.bool();
+                case /* uint64 count */ 5:
+                    message.count = reader.uint64().toString();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -5047,17 +4996,17 @@ class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
     }
     internalBinaryWrite(message: StepUnitDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
         /* stroppy.TableDescriptor create_table = 1; */
-        if (message.type.oneofKind === "createTable")
-            TableDescriptor.internalBinaryWrite(message.type.createTable, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        if (message.descriptor.oneofKind === "createTable")
+            TableDescriptor.internalBinaryWrite(message.descriptor.createTable, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
         /* stroppy.QueryDescriptor query = 2; */
-        if (message.type.oneofKind === "query")
-            QueryDescriptor.internalBinaryWrite(message.type.query, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        if (message.descriptor.oneofKind === "query")
+            QueryDescriptor.internalBinaryWrite(message.descriptor.query, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
         /* stroppy.TransactionDescriptor transaction = 4; */
-        if (message.type.oneofKind === "transaction")
-            TransactionDescriptor.internalBinaryWrite(message.type.transaction, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-        /* bool async = 100; */
-        if (message.async !== false)
-            writer.tag(100, WireType.Varint).bool(message.async);
+        if (message.descriptor.oneofKind === "transaction")
+            TransactionDescriptor.internalBinaryWrite(message.descriptor.transaction, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* uint64 count = 5; */
+        if (message.count !== "0")
+            writer.tag(5, WireType.Varint).uint64(message.count);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

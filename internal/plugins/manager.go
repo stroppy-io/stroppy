@@ -20,17 +20,15 @@ func NewManagerFromConfig(logger *zap.Logger, config *config.Config) (*Manager, 
 		sidecars: make([]sidecar.Plugin, 0),
 	}
 
-	for _, pl := range config.GetRun().GetPlugins() {
-		if pl.GetType() == stroppy.Plugin_TYPE_SIDECAR {
-			plug, cancel, err := sidecar.ConnectToPlugin(config.GetRun(), logger)
-			if err != nil {
-				return nil, err
-			}
-
-			shutdown.RegisterFn(cancel)
-
-			mgr.sidecars = append(mgr.sidecars, plug)
+	for _, sc := range config.GetRun().GetSideCars() {
+		plug, cancel, err := sidecar.ConnectToPlugin(config.GetRun(), sc, logger)
+		if err != nil {
+			return nil, err
 		}
+
+		shutdown.RegisterFn(cancel)
+
+		mgr.sidecars = append(mgr.sidecars, plug)
 	}
 
 	return mgr, nil

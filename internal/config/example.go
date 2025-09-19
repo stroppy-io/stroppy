@@ -24,7 +24,7 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 				"example": "stroppy_metadata",
 			},
 			Driver: &stroppy.DriverConfig{
-				DriverName: stroppy.DriverConfig_postgres,
+				DriverType: stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
 				Url:        "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
 				DbSpecific: &stroppy.Value_Struct{
 					Fields: []*stroppy.Value{
@@ -80,7 +80,7 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 					Name: "create_table",
 					Units: []*stroppy.StepUnitDescriptor{
 						{
-							Type: &stroppy.StepUnitDescriptor_CreateTable{
+							Descriptor_: &stroppy.StepUnitDescriptor_CreateTable{
 								CreateTable: &stroppy.TableDescriptor{
 									Name: "users",
 									Columns: []*stroppy.ColumnDescriptor{
@@ -110,11 +110,10 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 					Async: true,
 					Units: []*stroppy.StepUnitDescriptor{
 						{
-							Async: true,
-							Type: &stroppy.StepUnitDescriptor_Query{
+							Count: 100000, //nolint: mnd // not need const value here
+							Descriptor_: &stroppy.StepUnitDescriptor_Query{
 								Query: &stroppy.QueryDescriptor{
-									Name:  "insert",
-									Count: 100000, //nolint: mnd // not need const value here
+									Name: "insert",
 									//noinspection *
 									Sql: "INSERT INTO users (id, name, email) VALUES (${id}, ${name}, ${email})",
 									Params: []*stroppy.QueryParamDescriptor{
@@ -197,11 +196,10 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 					Async: true,
 					Units: []*stroppy.StepUnitDescriptor{
 						{
-							Async: true,
-							Type: &stroppy.StepUnitDescriptor_Query{
+							Count: 1000, //nolint: mnd // not need const value here
+							Descriptor_: &stroppy.StepUnitDescriptor_Query{
 								Query: &stroppy.QueryDescriptor{
-									Name:  "select",
-									Count: 1000, //nolint: mnd // not need const value here
+									Name: "select",
 									//noinspection *
 									Sql: "SELECT * FROM users WHERE id = ${id}",
 									Params: []*stroppy.QueryParamDescriptor{
@@ -229,11 +227,10 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 					Async: true,
 					Units: []*stroppy.StepUnitDescriptor{
 						{
-							Async: true,
-							Type: &stroppy.StepUnitDescriptor_Query{
+							Count: 1,
+							Descriptor_: &stroppy.StepUnitDescriptor_Query{
 								Query: &stroppy.QueryDescriptor{
-									Name:  "select",
-									Count: 1,
+									Name: "select",
 									//noinspection *
 									Sql: "SELECT * FROM users WHERE id = ${id}",
 									Params: []*stroppy.QueryParamDescriptor{
@@ -260,16 +257,14 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 					Name: "transaction",
 					Units: []*stroppy.StepUnitDescriptor{
 						{
-							Async: true,
-							Type: &stroppy.StepUnitDescriptor_Transaction{
+							Count: 1,
+							Descriptor_: &stroppy.StepUnitDescriptor_Transaction{
 								Transaction: &stroppy.TransactionDescriptor{
 									Name:           "transaction",
-									Count:          1,
 									IsolationLevel: stroppy.TxIsolationLevel_TX_ISOLATION_LEVEL_REPEATABLE_READ,
 									Queries: []*stroppy.QueryDescriptor{
 										{
-											Name:  "select",
-											Count: 1,
+											Name: "select",
 											//noinspection *
 											Sql: "SELECT * FROM users WHERE id = ${id}",
 											Params: []*stroppy.QueryParamDescriptor{
@@ -289,8 +284,7 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 											},
 										},
 										{
-											Name:  "select2",
-											Count: 1,
+											Name: "select2",
 											//noinspection *
 											Sql: "SELECT * FROM users WHERE id = ${id}",
 											Params: []*stroppy.QueryParamDescriptor{

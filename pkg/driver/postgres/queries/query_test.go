@@ -25,13 +25,12 @@ func TestNewQuery_Success(t *testing.T) {
 				},
 			},
 		}}},
-		Count: 1,
 	}
 	step := &stroppy.StepDescriptor{
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Type: &stroppy.StepUnitDescriptor_Query{
+				Descriptor_: &stroppy.StepUnitDescriptor_Query{
 					Query: descriptor,
 				},
 			},
@@ -72,13 +71,12 @@ func TestNewQuery_Error(t *testing.T) {
 		Name:   "q1",
 		Sql:    "SELECT * FROM t WHERE id=${id}",
 		Params: []*stroppy.QueryParamDescriptor{}, // нет генераторов
-		Count:  1,
 	}
 	step := &stroppy.StepDescriptor{
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Type: &stroppy.StepUnitDescriptor_Query{
+				Descriptor_: &stroppy.StepUnitDescriptor_Query{
 					Query: descriptor,
 				},
 			},
@@ -121,13 +119,12 @@ func TestNewQuerySync_Success(t *testing.T) {
 				},
 			},
 		}}},
-		Count: 1,
 	}
 	step := &stroppy.StepDescriptor{
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Type: &stroppy.StepUnitDescriptor_Query{
+				Descriptor_: &stroppy.StepUnitDescriptor_Query{
 					Query: descriptor,
 				},
 			},

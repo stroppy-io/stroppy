@@ -49,6 +49,7 @@ func TestNewQueryBuilder_EmptyContext(t *testing.T) {
 	require.NotNil(t, builder.generators)
 }
 
+// TODO: repair tests after config changes
 func TestQueryBuilder_Build_Success(t *testing.T) {
 	descriptor := &stroppy.QueryDescriptor{
 		Name: "q1",
@@ -60,13 +61,12 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 				},
 			},
 		}}},
-		Count: 1,
 	}
 	step := &stroppy.StepDescriptor{
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Type: &stroppy.StepUnitDescriptor_Query{
+				Descriptor_: &stroppy.StepUnitDescriptor_Query{
 					Query: descriptor,
 				},
 			},
@@ -118,13 +118,12 @@ func TestQueryBuilder_BuildStream_Success(t *testing.T) {
 				},
 			},
 		}}},
-		Count: 1,
 	}
 	step := &stroppy.StepDescriptor{
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Type: &stroppy.StepUnitDescriptor_Query{
+				Descriptor_: &stroppy.StepUnitDescriptor_Query{
 					Query: descriptor,
 				},
 			},
@@ -181,7 +180,7 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Type: &stroppy.StepUnitDescriptor_CreateTable{
+				Descriptor_: &stroppy.StepUnitDescriptor_CreateTable{
 					CreateTable: createTableDescriptor,
 				},
 			},
@@ -232,7 +231,6 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 						},
 					},
 				}}},
-				Count: 1,
 			},
 		},
 	}
@@ -240,7 +238,7 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Type: &stroppy.StepUnitDescriptor_Transaction{
+				Descriptor_: &stroppy.StepUnitDescriptor_Transaction{
 					Transaction: transactionDescriptor,
 				},
 			},
@@ -286,7 +284,7 @@ func TestQueryBuilder_Build_UnknownType(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Type: nil, // неизвестный тип
+				Descriptor_: nil, // неизвестный тип
 			},
 		},
 	}

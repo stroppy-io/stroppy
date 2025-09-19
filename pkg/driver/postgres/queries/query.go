@@ -78,9 +78,10 @@ func NewQuery(
 		case <-ctx.Done():
 			return
 		default:
-			for i := uint64(0); i < descriptor.GetCount(); i++ { //nolint: intrange // allow
+			// TODO: set proper upper limit
+			for i := uint64(0); i < 42; i++ { //nolint: intrange // allow
 				if i%1000 == 0 {
-					lg.Info("newQuery", zap.Uint64("i", i))
+					lg.Debug("newQuery", zap.Uint64("i", i))
 				}
 
 				query, err := newQuery(generators, buildContext, descriptor)

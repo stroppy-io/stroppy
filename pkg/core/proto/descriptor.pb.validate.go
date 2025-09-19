@@ -828,17 +828,6 @@ func (m *QueryDescriptor) validate(all bool) error {
 
 	}
 
-	if m.GetCount() <= 0 {
-		err := QueryDescriptorValidationError{
-			field:  "Count",
-			reason: "value must be greater than 0",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
 	if all {
 		switch v := interface{}(m.GetDbSpecific()).(type) {
 		case interface{ ValidateAll() error }:
@@ -1037,17 +1026,6 @@ func (m *TransactionDescriptor) validate(all bool) error {
 
 	}
 
-	if m.GetCount() <= 0 {
-		err := TransactionDescriptorValidationError{
-			field:  "Count",
-			reason: "value must be greater than 0",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
 	if all {
 		switch v := interface{}(m.GetDbSpecific()).(type) {
 		case interface{ ValidateAll() error }:
@@ -1179,14 +1157,23 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Async
+	if m.GetCount() <= 0 {
+		err := StepUnitDescriptorValidationError{
+			field:  "Count",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	oneofTypePresent := false
-	switch v := m.Type.(type) {
+	oneofDescriptor_Present := false
+	switch v := m.Descriptor_.(type) {
 	case *StepUnitDescriptor_CreateTable:
 		if v == nil {
 			err := StepUnitDescriptorValidationError{
-				field:  "Type",
+				field:  "Descriptor_",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -1194,7 +1181,7 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofDescriptor_Present = true
 
 		if all {
 			switch v := interface{}(m.GetCreateTable()).(type) {
@@ -1228,7 +1215,7 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 	case *StepUnitDescriptor_Query:
 		if v == nil {
 			err := StepUnitDescriptorValidationError{
-				field:  "Type",
+				field:  "Descriptor_",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -1236,7 +1223,7 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofDescriptor_Present = true
 
 		if all {
 			switch v := interface{}(m.GetQuery()).(type) {
@@ -1270,7 +1257,7 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 	case *StepUnitDescriptor_Transaction:
 		if v == nil {
 			err := StepUnitDescriptorValidationError{
-				field:  "Type",
+				field:  "Descriptor_",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -1278,7 +1265,7 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofDescriptor_Present = true
 
 		if all {
 			switch v := interface{}(m.GetTransaction()).(type) {
@@ -1312,9 +1299,9 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 	default:
 		_ = v // ensures v is used
 	}
-	if !oneofTypePresent {
+	if !oneofDescriptor_Present {
 		err := StepUnitDescriptorValidationError{
-			field:  "Type",
+			field:  "Descriptor_",
 			reason: "value is required",
 		}
 		if !all {
