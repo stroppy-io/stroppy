@@ -118,7 +118,7 @@ func (uq *UnitQueue) worker(ctx context.Context, unit *proto.StepUnitDescriptor)
 	return nil
 }
 
-var ErrQueueIsDead = errors.New("dead")
+var ErrQueueIsDead = errors.New("unit queue channel closed")
 
 func (uq *UnitQueue) GetNextUnit() (*proto.DriverTransaction, error) {
 

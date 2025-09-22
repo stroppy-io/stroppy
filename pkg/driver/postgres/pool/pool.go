@@ -73,7 +73,9 @@ func parseConfig(
 		logLevel = "info"
 	}
 
-	lvl, err := zapcore.ParseLevel(logLevel.(string)) //nolint: errcheck,forcetypeassert // allow panic
+	lvl, err := zapcore.ParseLevel(
+		logLevel.(string),
+	) //nolint: errcheck,forcetypeassert // allow panic
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +91,9 @@ func parseConfig(
 
 	maxConnLifetime, ok := cfgMap[maxConnLifetimeKey]
 	if ok {
-		d, err := time.ParseDuration(maxConnLifetime.(string)) //nolint: errcheck,forcetypeassert // allow panic
+		d, err := time.ParseDuration(
+			maxConnLifetime.(string),
+		) //nolint: errcheck,forcetypeassert // allow panic
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +103,9 @@ func parseConfig(
 
 	maxConnIdleTime, ok := cfgMap[maxConnIdleTimeKey]
 	if ok {
-		d, err := time.ParseDuration(maxConnIdleTime.(string)) //nolint: errcheck,forcetypeassert // allow panic
+		d, err := time.ParseDuration(
+			maxConnIdleTime.(string),
+		) //nolint: errcheck,forcetypeassert // allow panic
 		if err != nil {
 			return nil, err
 		}
@@ -213,6 +219,12 @@ func NewPool(
 	pool, err := pgxpool.NewWithConfig(ctx, parsedConfig)
 	if err != nil {
 		return nil, err
+	}
+
+	err = pool.Ping(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("can't ping db, "+
+			"probably connectivity or connection string issue: %w", err)
 	}
 
 	return pool, nil

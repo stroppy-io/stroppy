@@ -17,20 +17,21 @@ func newQuery(
 	paramsValues := make([]*stroppy.Value, 0)
 
 	for _, column := range descriptor.GetParams() {
-		gen, ok := generators.Get(NewGeneratorID(
+		genID := NewGeneratorID(
 			"", // TODO: make it somehow // buildContext.GetStep().GetName(),
 			descriptor.GetName(),
 			column.GetName(),
-		))
+		)
+		gen, ok := generators.Get(genID)
 		if !ok {
-			return nil, fmt.Errorf("no generator for column %s", column.GetName()) //nolint: err113
+			return nil, fmt.Errorf("no generator for column '%s'", genID) //nolint: err113
 		}
 
 		protoValue, err := gen.Next()
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed to generate value for column %s: %w",
-				column.GetName(),
+				"failed to generate value for column '%s': %w",
+				genID,
 				err,
 			)
 		}

@@ -29,7 +29,11 @@ func collectQueryGenerators(
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 
 	for _, param := range queryDescriptor.GetParams() {
-		paramID := NewGeneratorID(runContext.GetStep().GetName(), queryDescriptor.GetName(), param.GetName())
+		paramID := NewGeneratorID(
+			"", // TODO:  //runContext.GetStep().GetName(),
+			queryDescriptor.GetName(),
+			param.GetName(),
+		)
 
 		generator, err := generate.NewValueGenerator(
 			runContext.GetGlobalConfig().GetRun().GetSeed(),
@@ -46,7 +50,9 @@ func collectQueryGenerators(
 	return generators, nil
 }
 
-func CollectStepGenerators(runContext *stroppy.StepContext) (Generators, error) { //nolint: gocognit // allow
+func CollectStepGenerators(
+	runContext *stroppy.StepContext,
+) (Generators, error) { //nolint: gocognit // allow
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 
 	for _, step := range runContext.GetGlobalConfig().GetBenchmark().GetSteps() {

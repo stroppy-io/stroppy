@@ -2,6 +2,7 @@ package xk6
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/modules"
@@ -93,7 +94,7 @@ func (x *Instance) GenerateQueue() error {
 func (x *Instance) RunQuery() error {
 	transaction, err := runPtr.unitQueue.GetNextUnit()
 	if err != nil {
-		return err
+		return fmt.Errorf("can't get query due to: %w", err)
 	}
 	runPtr.logger.Debug(
 		"RunQuery",
@@ -101,10 +102,15 @@ func (x *Instance) RunQuery() error {
 	)
 
 	// TODO: return stats
-	return runPtr.driver.RunTransaction(
+	err = runPtr.driver.RunTransaction(
 		x.vu.Context(),
 		transaction,
 	)
+	if err != nil {
+		return fmt.Errorf("can't run query due to: %w", err)
+	}
+
+	return nil
 }
 
 var ErrDriverIsNil = errors.New("driver is nil")

@@ -31,9 +31,18 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 						{Key: "trace_log_level", Type: &stroppy.Value_String_{String_: "warn"}},
 						{Key: "max_conn_lifetime", Type: &stroppy.Value_String_{String_: "1m"}},
 						{Key: "max_conn_idle_time", Type: &stroppy.Value_String_{String_: "30s"}},
-						{Key: "max_conns", Type: &stroppy.Value_Int32{Int32: 100}},     //nolint: mnd // not need const value here
-						{Key: "min_conns", Type: &stroppy.Value_Int32{Int32: 1}},       //nolint: mnd // not need const value here
-						{Key: "min_idle_conns", Type: &stroppy.Value_Int32{Int32: 10}}, //nolint: mnd // not need const value here
+						{
+							Key:  "max_conns",
+							Type: &stroppy.Value_Int32{Int32: 100},
+						}, //nolint: mnd // not need const value here
+						{
+							Key:  "min_conns",
+							Type: &stroppy.Value_Int32{Int32: 1},
+						}, //nolint: mnd // not need const value here
+						{
+							Key:  "min_idle_conns",
+							Type: &stroppy.Value_Int32{Int32: 10},
+						}, //nolint: mnd // not need const value here
 					},
 				},
 			},
@@ -42,13 +51,23 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 				CancelOnError: toPtr[bool](true),
 			},
 			K6Executor: &stroppy.K6Executor{
-				K6BinaryPath:   "./" + static.K6PluginFileName.String(),
-				K6ScriptPath:   "./" + static.K6BenchmarkFileName.String(),
-				K6SetupTimeout: durationpb.New(8400 * time.Second), //nolint: mnd // not need const value here
-				K6Vus:          toPtr(uint64(10)),                  //nolint: mnd // not need const value here
-				K6MaxVus:       toPtr(uint64(100)),                 //nolint: mnd // not need const value here
-				K6Rate:         toPtr(uint64(1000)),                //nolint: mnd // not need const value here
-				K6Duration:     durationpb.New(60 * time.Second),   //nolint: mnd // not need const value here
+				K6BinaryPath: "./" + static.K6PluginFileName.String(),
+				K6ScriptPath: "./" + static.K6BenchmarkFileName.String(),
+				K6SetupTimeout: durationpb.New(
+					8400 * time.Second,
+				), //nolint: mnd // not need const value here
+				K6Vus: toPtr(
+					uint64(10),
+				), //nolint: mnd // not need const value here
+				K6MaxVus: toPtr(
+					uint64(100),
+				), //nolint: mnd // not need const value here
+				K6Rate: toPtr(
+					uint64(1000),
+				), //nolint: mnd // not need const value here
+				K6Duration: durationpb.New(
+					60 * time.Second,
+				), //nolint: mnd // not need const value here
 				OtlpExport: &stroppy.OtlpExport{
 					OtlpGrpcEndpoint:  toPtr("localhost:4317"),
 					OtlpMetricsPrefix: toPtr("k6_"),
@@ -104,6 +123,7 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 									},
 								},
 							},
+							Count: 1,
 						},
 					},
 				},

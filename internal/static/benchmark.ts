@@ -2,7 +2,7 @@
 // Feel free to modify it to your needs of benchmarks
 // For more info please refer to https://github.com/stroppy-io/stroppy
 
-import {Options} from 'k6/options';
+import { Options } from 'k6/options';
 import {
     DriverTransaction,
     DriverTransactionList,
@@ -87,21 +87,17 @@ export const setup = (): Context => {
 };
 
 export default (ctx: Context) => {
-    let transactionList = DriverTransactionList.fromJsonString(INSTANCE.generateQueue()).transactions
-
-    transactionList.forEach((transaction) => {
-        const metricsTags = {
-            // "tx_name": transaction.name // TODO: add name field to transaction in proto
-        }
-        const startTime = Date.now()
-        const err = INSTANCE.runQuery(DriverTransaction.toJsonString(transaction));
-        if (err) {
-            console.error(transaction, err)
-            METER_REQUEST_ERROR_COUNTER.add(1, metricsTags)
-        }
-        METER_REQUESTS_COUNTER.add(1, metricsTags)
-        METER_RESPONSES_TIME_TREND.add(Date.now() - startTime, metricsTags)
-    })
+    const metricsTags = {
+        // "tx_name": transaction.name // TODO: add name field to transaction in proto
+    }
+    const startTime = Date.now()
+    const err = INSTANCE.runQuery()
+    if (err) {
+        console.error(transaction, err)
+        METER_REQUEST_ERROR_COUNTER.add(1, metricsTags)
+    }
+    METER_REQUESTS_COUNTER.add(1, metricsTags)
+    METER_RESPONSES_TIME_TREND.add(Date.now() - startTime, metricsTags)
 };
 
 export const teardown = () => {
@@ -114,6 +110,6 @@ export const teardown = () => {
 // Summary function, that will create summary file with metrics.
 export function handleSummary(runResult: RunResult<Context>) {
     return {
-        stdout: resultToJsonString<Context>(runResult, {"some": "baggage"})
+        stdout: resultToJsonString<Context>(runResult, { "some": "baggage" })
     };
 }
