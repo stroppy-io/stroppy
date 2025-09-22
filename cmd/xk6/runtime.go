@@ -12,17 +12,20 @@ type runtimeContext struct {
 	runContext *stroppy.StepContext
 	logger     *zap.Logger
 	driver     driver.Plugin
+	unitQueue  *UnitQueue
 }
 
 func newRuntimeContext(
 	drv driver.Plugin,
 	logger *zap.Logger,
 	runContext *stroppy.StepContext,
+	unitQueue *UnitQueue,
 ) *runtimeContext {
 	return &runtimeContext{
 		runContext: runContext,
 		logger:     logger,
 		driver:     drv,
+		unitQueue:  unitQueue,
 	}
 }
 

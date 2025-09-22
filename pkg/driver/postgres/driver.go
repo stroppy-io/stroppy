@@ -10,7 +10,6 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/core/logger"
 	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
-	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
@@ -19,14 +18,8 @@ type QueryBuilder interface {
 	Build(
 		ctx context.Context,
 		logger *zap.Logger,
-		buildQueriesContext *stroppy.UnitBuildContext,
-	) (*stroppy.DriverTransactionList, error)
-	BuildStream(
-		ctx context.Context,
-		logger *zap.Logger,
-		buildQueriesContext *stroppy.UnitBuildContext,
-		channel errchan.Chan[stroppy.DriverTransaction],
-	)
+		unit *stroppy.UnitDescriptor,
+	) (*stroppy.DriverTransaction, error)
 	ValueToPgxValue(value *stroppy.Value) (any, error)
 }
 
@@ -72,23 +65,11 @@ func (d *Driver) Initialize(ctx context.Context, runContext *stroppy.StepContext
 	return nil
 }
 
-func (d *Driver) BuildTransactionsFromUnit(
+func (d *Driver) GenerateNext(
 	ctx context.Context,
-	buildUnitContext *stroppy.UnitBuildContext,
-) (*stroppy.DriverTransactionList, error) {
-	return d.builder.Build(ctx, d.logger, buildUnitContext)
-}
-
-func (d *Driver) BuildTransactionsFromUnitStream(
-	ctx context.Context,
-	buildUnitContext *stroppy.UnitBuildContext,
-) (errchan.Chan[stroppy.DriverTransaction], error) {
-	channel := make(errchan.Chan[stroppy.DriverTransaction])
-	go func() {
-		d.builder.BuildStream(ctx, d.logger, buildUnitContext, channel)
-	}()
-
-	return channel, nil
+	unit *stroppy.UnitDescriptor,
+) (*stroppy.DriverTransaction, error) {
+	return d.builder.Build(ctx, d.logger, unit)
 }
 
 func (d *Driver) RunTransaction(

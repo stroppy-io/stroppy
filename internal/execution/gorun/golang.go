@@ -10,7 +10,6 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
 	"github.com/stroppy-io/stroppy/pkg/core/utils"
-	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
 )
 
@@ -82,38 +81,39 @@ func processUnitTransactions(
 	runContext *stroppy.StepContext,
 	unitDesc *stroppy.StepUnitDescriptor,
 ) error {
-	unitStream, err := drv.BuildTransactionsFromUnitStream(ctx, &stroppy.UnitBuildContext{
-		Context: runContext,
-		Unit:    unitDesc,
-	})
-	if err != nil {
-		return err
-	}
+	// unitStream, err := drv.BuildTransactionsFromUnitStream(ctx, &stroppy.UnitBuildContext{
+	// 	Context: runContext,
+	// 	Unit:    unitDesc,
+	// })
+	// if err != nil {
+	// 	return err
+	// }
 
-	unitPool := utils.NewAsyncerFromExecType(
-		ctx,
-		true, // TODO: make async properly, pass count values down
-		// TODO: need count already running pools and set max goroutines?
-		max(
-			int(runContext.GetGlobalConfig().GetRun().GetGoExecutor().GetGoMaxProc()), //nolint: gosec // allow
-			minRunTxGoroutines,
-		),
-		runContext.GetGlobalConfig().GetRun().GetGoExecutor().GetCancelOnError(),
-	)
+	// unitPool := utils.NewAsyncerFromExecType(
+	// 	ctx,
+	// 	true, // TODO: make async properly, pass count values down
+	// 	// TODO: need count already running pools and set max goroutines?
+	// 	max(
+	// 		int(runContext.GetGlobalConfig().GetRun().GetGoExecutor().GetGoMaxProc()), //nolint: gosec // allow
+	// 		minRunTxGoroutines,
+	// 	),
+	// 	runContext.GetGlobalConfig().GetRun().GetGoExecutor().GetCancelOnError(),
+	// )
 
-	unitPool.Go(func(_ context.Context) error {
-		for {
-			tx, err := errchan.ReceiveCtx[stroppy.DriverTransaction](ctx, unitStream)
-			if err != nil {
-				return err
-			}
+	// unitPool.Go(func(_ context.Context) error {
+	// 	for {
+	// 		tx, err := errchan.ReceiveCtx[stroppy.DriverTransaction](ctx, unitStream)
+	// 		if err != nil {
+	// 			return err
+	// 		}
 
-			err = drv.RunTransaction(ctx, tx)
-			if err != nil {
-				return err
-			}
-		}
-	})
+	// 		err = drv.RunTransaction(ctx, tx)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 	}
+	// })
 
-	return unitPool.Wait()
+	// return unitPool.Wait()
+	return nil
 }

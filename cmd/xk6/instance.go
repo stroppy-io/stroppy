@@ -16,10 +16,12 @@ const (
 	pluginLoggerName = "XK6Plugin"
 )
 
+// Instance is created by k6 for every VU.
 type Instance struct {
 	vu      modules.VU
 	exports *sobek.Object
 	logger  *zap.Logger
+	queue   *UnitQueue
 }
 
 func NewXK6Instance(vu modules.VU, exports *sobek.Object) *Instance {
@@ -46,6 +48,7 @@ func (x *Instance) Exports() modules.Exports {
 }
 
 func (x *Instance) Setup(runContextBytes string) error {
+
 	runContext, err := Serialized[*stroppy.StepContext](runContextBytes).Unmarshal()
 	if err != nil {
 		return err
@@ -56,55 +59,48 @@ func (x *Instance) Setup(runContextBytes string) error {
 		zap.Uint64("seed", runContext.GetGlobalConfig().GetRun().GetSeed()),
 	)
 
+	// TODO: it should be a module root context.
+	// Now it's the context of first VU, I guess.
+	// It's a potential issue, if k6 might to kill (cancel) first vu before the end of the test.
+	processCtx := x.vu.Context()
+
 	drv := postgres.NewDriver()
 
-	err = drv.Initialize(x.vu.Context(), runContext)
+	err = drv.Initialize(processCtx, runContext)
 	if err != nil {
 		return err
 	}
+
+	queue := NewUnitQueue(processCtx, drv, runContext.GetStep())
+
+	queue.StartGeneration()
 
 	runPtr = newRuntimeContext(
 		drv,
 		x.logger,
 		runContext,
+		queue,
 	)
 
 	return nil
 }
 
 //goland:noinspection t
-func (x *Instance) GenerateQueue() (string, error) {
-	stepTransactions := make([]*stroppy.DriverTransaction, 0)
-
-	for _, unitDescr := range runPtr.runContext.GetStep().GetUnits() {
-		queries, err := runPtr.driver.BuildTransactionsFromUnit(
-			x.vu.Context(),
-			&stroppy.UnitBuildContext{
-				Context: runPtr.runContext,
-				Unit:    unitDescr,
-			},
-		)
-		if err != nil {
-			return "", err
-		}
-
-		stepTransactions = append(stepTransactions, queries.GetTransactions()...)
-	}
-
-	return MarshalSerialized(&stroppy.DriverTransactionList{Transactions: stepTransactions})
+func (x *Instance) GenerateQueue() error {
+	return nil
 }
 
-func (x *Instance) RunQuery(queryData string) error {
-	transaction, err := Serialized[*stroppy.DriverTransaction](queryData).Unmarshal()
+func (x *Instance) RunQuery() error {
+	transaction, err := runPtr.unitQueue.GetNextUnit()
 	if err != nil {
 		return err
 	}
-
 	runPtr.logger.Debug(
 		"RunQuery",
 		zap.Any("transaction", transaction),
 	)
 
+	// TODO: return stats
 	return runPtr.driver.RunTransaction(
 		x.vu.Context(),
 		transaction,
@@ -117,6 +113,7 @@ func (x *Instance) Teardown() error {
 	if runPtr.driver == nil {
 		return ErrDriverIsNil
 	}
-
-	return runPtr.driver.Teardown(x.vu.Context())
+	errQueue := runPtr.unitQueue.Stop()
+	errDriver := runPtr.driver.Teardown(x.vu.Context())
+	return errors.Join(errQueue, errDriver)
 }

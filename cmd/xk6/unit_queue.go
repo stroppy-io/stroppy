@@ -10,15 +10,15 @@ import (
 )
 
 type Driver interface {
-	GenerateNextWithContext(context.Context, *proto.UnitDescriptor) (*proto.DriverTransaction, error)
+	GenerateNext(context.Context, *proto.UnitDescriptor) (*proto.DriverTransaction, error)
 }
 
-// myUnitQueue is an infinite *proto.DriverTransaction generator.
+// UnitQueue is an infinite *proto.DriverTransaction generator.
 // It requires *proto.StepDescriptor and driver.
 // Descripter defines generated sequence.
 // Driver is the actual source of new data.
-// myUnitQueue wraps and bufferize the driver to reduce latencies in cuncurrent scenarious.
-type myUnitQueue struct {
+// UnitQueue wraps and bufferize the driver to reduce latencies in cuncurrent scenarious.
+type UnitQueue struct {
 	step   *proto.StepDescriptor
 	ch     chan *proto.DriverTransaction
 	driver Driver
@@ -34,7 +34,7 @@ func NewUnitQueue(
 	ctx context.Context,
 	driver Driver,
 	step *proto.StepDescriptor,
-) *myUnitQueue {
+) *UnitQueue {
 	return newUnitQueue(ctx, driver, step, len(step.GetUnits())*3)
 }
 
@@ -43,8 +43,8 @@ func newUnitQueue(
 	drv Driver,
 	step *proto.StepDescriptor,
 	bufferSize int,
-) *myUnitQueue {
-	uq := &myUnitQueue{}
+) *UnitQueue {
+	uq := &UnitQueue{}
 
 	uq.driver = drv
 	uq.step = step
@@ -56,7 +56,7 @@ func newUnitQueue(
 	return uq
 }
 
-func (uq *myUnitQueue) StartGeneration() {
+func (uq *UnitQueue) StartGeneration() {
 
 	go func() {
 		<-uq.ctx.Done()
@@ -104,12 +104,12 @@ func (uq *myUnitQueue) StartGeneration() {
 	}()
 }
 
-func (uq *myUnitQueue) worker(ctx context.Context, unit *proto.StepUnitDescriptor) error {
+func (uq *UnitQueue) worker(ctx context.Context, unit *proto.StepUnitDescriptor) error {
 	for range unit.GetCount() {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		tx, err := uq.driver.GenerateNextWithContext(ctx, unit.GetDescriptor_())
+		tx, err := uq.driver.GenerateNext(ctx, unit.GetDescriptor_())
 		if err != nil {
 			return err
 		}
@@ -120,7 +120,7 @@ func (uq *myUnitQueue) worker(ctx context.Context, unit *proto.StepUnitDescripto
 
 var ErrQueueIsDead = errors.New("dead")
 
-func (uq *myUnitQueue) GetNextUnit() (*proto.DriverTransaction, error) {
+func (uq *UnitQueue) GetNextUnit() (*proto.DriverTransaction, error) {
 
 	if err := uq.getError(); err != nil {
 		return nil, err
@@ -133,10 +133,12 @@ func (uq *myUnitQueue) GetNextUnit() (*proto.DriverTransaction, error) {
 	return tx, nil
 }
 
-func (uq *myUnitQueue) Stop() {
+func (uq *UnitQueue) Stop() error {
 	uq.cancel()
+	return uq.getError()
 }
-func (uq *myUnitQueue) getError() error {
+
+func (uq *UnitQueue) getError() error {
 	if err := uq.err.Load(); err != nil {
 		return err.(error)
 	}

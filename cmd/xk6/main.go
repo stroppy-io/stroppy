@@ -4,6 +4,7 @@ import (
 	"go.k6.io/k6/js/modules"
 )
 
+// RootModule global object, runs with k6 process
 type RootModule struct{}
 
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance { //nolint:ireturn

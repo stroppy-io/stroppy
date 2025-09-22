@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
-	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 var (
@@ -34,67 +33,38 @@ func NewQueryBuilder(runContext *stroppy.StepContext) (*QueryBuilder, error) {
 	}, nil
 }
 
-func (q *QueryBuilder) BuildStream(
-	ctx context.Context,
-	logger *zap.Logger,
-	buildQueriesContext *stroppy.UnitBuildContext,
-	channel errchan.Chan[stroppy.DriverTransaction],
-) {
-	q.internalBuild(ctx, logger, buildQueriesContext, channel)
-}
-
 func (q *QueryBuilder) Build(
 	ctx context.Context,
 	logger *zap.Logger,
-	buildQueriesContext *stroppy.UnitBuildContext,
-) (*stroppy.DriverTransactionList, error) {
-	channel := make(errchan.Chan[stroppy.DriverTransaction])
-	go func() {
-		q.internalBuild(ctx, logger, buildQueriesContext, channel)
-	}()
-
-	transactions, err := errchan.CollectCtx[stroppy.DriverTransaction](ctx, channel)
-	if err != nil {
-		return nil, err
-	}
-
-	return &stroppy.DriverTransactionList{
-		Transactions: transactions,
-	}, nil
+	unit *stroppy.UnitDescriptor,
+) (*stroppy.DriverTransaction, error) {
+	return q.internalBuild(ctx, logger, unit)
 }
 
 func (q *QueryBuilder) internalBuild(
 	ctx context.Context,
 	logger *zap.Logger,
-	buildQueriesContext *stroppy.UnitBuildContext,
-	channel errchan.Chan[stroppy.DriverTransaction],
-) {
-	switch buildQueriesContext.GetUnit().GetDescriptor_().GetType().(type) {
+	unitDescriptor *stroppy.UnitDescriptor,
+) (*stroppy.DriverTransaction, error) {
+	switch unitDescriptor.GetType().(type) {
 	case *stroppy.UnitDescriptor_CreateTable:
-		NewCreateTable(
-			ctx,
+		return NewCreateTable(
 			logger,
-			buildQueriesContext.GetContext().GetGlobalConfig().GetRun().GetSeed(),
-			buildQueriesContext.GetUnit().GetDescriptor_().GetCreateTable(),
-			channel,
+			unitDescriptor.GetCreateTable(),
 		)
 	case *stroppy.UnitDescriptor_Query:
-		NewQuery(
+		return NewQuery(
 			ctx,
 			logger,
 			q.generators,
-			buildQueriesContext.GetContext(),
-			buildQueriesContext.GetUnit().GetDescriptor_().GetQuery(),
-			channel,
+			unitDescriptor.GetQuery(),
 		)
 	case *stroppy.UnitDescriptor_Transaction:
-		NewTransaction(
+		return NewTransaction(
 			ctx,
 			logger,
 			q.generators,
-			buildQueriesContext.GetContext(),
-			buildQueriesContext.GetUnit().GetDescriptor_().GetTransaction(),
-			channel,
+			unitDescriptor.GetTransaction(),
 		)
 	default:
 		panic(ErrUnknownQueryType)

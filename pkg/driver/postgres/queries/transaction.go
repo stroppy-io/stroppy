@@ -2,39 +2,31 @@ package queries
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/zap"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
-	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 func NewTransaction(
 	ctx context.Context,
 	lg *zap.Logger,
 	generators Generators,
-	buildContext *stroppy.StepContext,
 	descriptor *stroppy.TransactionDescriptor,
-	channel errchan.Chan[stroppy.DriverTransaction],
-) {
-	defer errchan.Close[stroppy.DriverTransaction](channel)
+) (*stroppy.DriverTransaction, error) {
 	lg.Debug("build transaction",
 		zap.String("name", descriptor.GetName()))
-
 	var queries []*stroppy.DriverQuery
-
 	for _, query := range descriptor.GetQueries() {
-		q, err := NewQuerySync(ctx, lg, generators, buildContext, query)
+		q, err := NewQuery(ctx, lg, generators, query)
 		if err != nil {
-			errchan.Send[stroppy.DriverTransaction](channel, nil, err)
-
-			return
+			return nil, fmt.Errorf("can't create query for tx due to: %w", err)
 		}
-
 		queries = append(queries, q.GetQueries()...)
 	}
-
-	errchan.Send[stroppy.DriverTransaction](channel, &stroppy.DriverTransaction{
-		Queries: queries,
-	}, nil)
+	return &stroppy.DriverTransaction{
+		IsolationLevel: descriptor.IsolationLevel,
+		Queries:        queries,
+	}, nil
 }
