@@ -90,6 +90,10 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 					Name:     "select_data",
 					Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_K6),
 				},
+				{
+					Name:     "clean_up",
+					Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO),
+				},
 			},
 		},
 		Benchmark: &stroppy.BenchmarkDescriptor{
@@ -333,6 +337,22 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 												},
 											},
 										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "clean_up",
+					Units: []*stroppy.StepUnitDescriptor{
+						&stroppy.StepUnitDescriptor{
+							Count: 1,
+							Descriptor_: &stroppy.UnitDescriptor{
+								Type: &stroppy.UnitDescriptor_Query{
+									Query: &stroppy.QueryDescriptor{
+										Name: "drop users",
+										Sql:  "DROP TABLE users",
 									},
 								},
 							},

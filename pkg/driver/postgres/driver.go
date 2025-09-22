@@ -34,11 +34,17 @@ type Driver struct {
 	builder    QueryBuilder
 }
 
-func NewDriver() driver.Plugin { //nolint: ireturn // allow
-	return &Driver{
-		logger: logger.NewFromEnv().
-			Named(pool.DriverLoggerName).
-			WithOptions(zap.AddCallerSkip(1)),
+func NewDriver(lg *zap.Logger) driver.Plugin { //nolint: ireturn // allow
+	if lg == nil {
+		return &Driver{
+			logger: logger.NewFromEnv().
+				Named(pool.DriverLoggerName).
+				WithOptions(zap.AddCallerSkip(1)),
+		}
+	} else {
+		return &Driver{
+			logger: lg,
+		}
 	}
 }
 

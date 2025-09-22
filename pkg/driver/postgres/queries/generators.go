@@ -37,7 +37,7 @@ func collectQueryGenerators(
 
 		generator, err := generate.NewValueGenerator(
 			runContext.GetGlobalConfig().GetRun().GetSeed(),
-			1, // TODO: get proper amount
+			1000000, // TODO: get proper amount
 			param,
 		)
 		if err != nil {

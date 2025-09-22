@@ -3,6 +3,7 @@ package gorun
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 
 	"go.uber.org/zap"
 
@@ -19,11 +20,9 @@ var (
 	ErrConfigNil     = errors.New("config is nil")
 )
 
-const minRunTxGoroutines = 2
-
 func RunStep(
 	ctx context.Context,
-	_ *zap.Logger, // TODO: pass to driver
+	lg *zap.Logger,
 	runContext *stroppy.StepContext,
 ) error {
 	if runContext == nil {
@@ -40,7 +39,7 @@ func RunStep(
 
 	var err error
 
-	drv := postgres.NewDriver()
+	drv := postgres.NewDriver(lg)
 
 	err = drv.Initialize(ctx, runContext)
 	if err != nil {
@@ -50,17 +49,41 @@ func RunStep(
 	cancelCtx, cancelFn := context.WithCancel(ctx)
 	shutdown.RegisterFn(cancelFn)
 
+	async := 10
+	if !runContext.GetStep().GetAsync() {
+		async = 1
+	}
+
 	stepPool := utils.NewAsyncerFromExecType(
 		cancelCtx,
 		runContext.GetStep().GetAsync(),
-		len(runContext.GetStep().GetUnits()),
+		len(runContext.GetStep().GetUnits())*async,
 		runContext.GetGlobalConfig().GetRun().GetGoExecutor().GetCancelOnError(),
 	)
+	var i atomic.Int32
 	for _, unitDesc := range runContext.GetStep().GetUnits() {
-		stepPool.Go(func(ctx context.Context) error {
-			return processUnitTransactions(ctx, drv, runContext, unitDesc)
-		})
+		for range async {
+			stepPool.Go(func(ctx context.Context) error {
+				for range unitDesc.GetCount() {
+					err := processUnitTransactions(ctx, drv, unitDesc)
+					if err != nil {
+						return err
+					}
+					i.Add(1)
+					lg.Info("i", zap.Int32("i", i.Load()))
+				}
+				return nil
+			})
+		}
 	}
+	// go func() {
+	// 	for {
+	// 		if m := i.Load(); (m % 1000) < 10 {
+	// 			lg.Info("i", zap.Int32("i", m))
+	// 		}
+	// 		time.Sleep(time.Millisecond * 100)
+	// 	}
+	// }()
 
 	err = stepPool.Wait()
 	if err != nil {
@@ -78,42 +101,15 @@ func RunStep(
 func processUnitTransactions(
 	ctx context.Context,
 	drv driver.Plugin,
-	runContext *stroppy.StepContext,
 	unitDesc *stroppy.StepUnitDescriptor,
 ) error {
-	// unitStream, err := drv.BuildTransactionsFromUnitStream(ctx, &stroppy.UnitBuildContext{
-	// 	Context: runContext,
-	// 	Unit:    unitDesc,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
-	// unitPool := utils.NewAsyncerFromExecType(
-	// 	ctx,
-	// 	true, // TODO: make async properly, pass count values down
-	// 	// TODO: need count already running pools and set max goroutines?
-	// 	max(
-	// 		int(runContext.GetGlobalConfig().GetRun().GetGoExecutor().GetGoMaxProc()), //nolint: gosec // allow
-	// 		minRunTxGoroutines,
-	// 	),
-	// 	runContext.GetGlobalConfig().GetRun().GetGoExecutor().GetCancelOnError(),
-	// )
-
-	// unitPool.Go(func(_ context.Context) error {
-	// 	for {
-	// 		tx, err := errchan.ReceiveCtx[stroppy.DriverTransaction](ctx, unitStream)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-
-	// 		err = drv.RunTransaction(ctx, tx)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 	}
-	// })
-
-	// return unitPool.Wait()
+	tx, err := drv.GenerateNext(ctx, unitDesc.GetDescriptor_())
+	if err != nil {
+		return err
+	}
+	err = drv.RunTransaction(ctx, tx)
+	if err != nil {
+		return err
+	}
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/core/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/unit_queue"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
 )
 
@@ -23,7 +24,7 @@ type Instance struct {
 	vu      modules.VU
 	exports *sobek.Object
 	logger  *zap.Logger
-	queue   *UnitQueue
+	queue   *unit_queue.UnitQueue
 }
 
 func NewXK6Instance(vu modules.VU, exports *sobek.Object) *Instance {
@@ -67,14 +68,14 @@ func (x *Instance) Setup(runContextBytes string) error {
 
 	processCtx := context.Background()
 
-	drv := postgres.NewDriver()
+	drv := postgres.NewDriver(x.logger)
 
 	err = drv.Initialize(processCtx, runContext)
 	if err != nil {
 		return err
 	}
 
-	queue := NewUnitQueue(processCtx, drv, runContext.GetStep())
+	queue := unit_queue.NewUnitQueue(processCtx, drv, runContext.GetStep())
 
 	queue.StartGeneration()
 

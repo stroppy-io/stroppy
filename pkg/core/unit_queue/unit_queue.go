@@ -1,4 +1,4 @@
-package xk6
+package unit_queue
 
 import (
 	"context"
@@ -18,6 +18,8 @@ type Driver interface {
 // Descripter defines generated sequence.
 // Driver is the actual source of new data.
 // UnitQueue wraps and bufferize the driver to reduce latencies in cuncurrent scenarious.
+//
+// TODO: make generic queue, polish, mb publish...
 type UnitQueue struct {
 	step   *proto.StepDescriptor
 	ch     chan *proto.DriverTransaction
@@ -83,7 +85,7 @@ func (uq *UnitQueue) StartGeneration() {
 		for {
 			for _, unit := range uq.step.GetUnits() {
 				uq.eg.Go(func() error {
-					return uq.worker(ctx, unit)
+					return uq.writer(ctx, unit)
 				})
 			}
 
@@ -104,7 +106,7 @@ func (uq *UnitQueue) StartGeneration() {
 	}()
 }
 
-func (uq *UnitQueue) worker(ctx context.Context, unit *proto.StepUnitDescriptor) error {
+func (uq *UnitQueue) writer(ctx context.Context, unit *proto.StepUnitDescriptor) error {
 	for range unit.GetCount() {
 		if ctx.Err() != nil {
 			return ctx.Err()

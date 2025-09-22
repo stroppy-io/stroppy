@@ -1,4 +1,4 @@
-package xk6
+package unit_queue
 
 import (
 	"context"
