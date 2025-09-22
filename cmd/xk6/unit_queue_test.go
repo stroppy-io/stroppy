@@ -26,20 +26,10 @@ func NewMockDriver() *MockDriver {
 	}
 }
 
-// Original interface method
-func (m *MockDriver) GenerateNext(desc *proto.UnitDescriptor) (*proto.DriverTransaction, error) {
-	atomic.AddInt64(&m.GenerateCount, 1)
-	if m.GenerateDelay > 0 {
-		time.Sleep(m.GenerateDelay)
-	}
-	if m.GenerateError != nil {
-		return nil, m.GenerateError
-	}
-	return &proto.DriverTransaction{}, nil
-}
-
-// New interface method with context
-func (m *MockDriver) GenerateNextWithContext(ctx context.Context, desc *proto.UnitDescriptor) (*proto.DriverTransaction, error) {
+func (m *MockDriver) GenerateNext(
+	ctx context.Context,
+	desc *proto.UnitDescriptor,
+) (*proto.DriverTransaction, error) {
 	atomic.AddInt64(&m.GenerateCount, 1)
 
 	if m.GenerateDelay > 0 {
@@ -330,7 +320,10 @@ func TestUnitQueue_ParallelConsumers(t *testing.T) {
 
 				if tx == nil {
 					mu.Lock()
-					errors = append(errors, fmt.Errorf("consumer %d: got nil transaction", consumerID))
+					errors = append(
+						errors,
+						fmt.Errorf("consumer %d: got nil transaction", consumerID),
+					)
 					mu.Unlock()
 					return
 				}

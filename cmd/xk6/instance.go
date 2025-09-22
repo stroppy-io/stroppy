@@ -1,6 +1,7 @@
 package xk6
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -48,6 +49,10 @@ func (x *Instance) Exports() modules.Exports {
 	return modules.Exports{Default: x}
 }
 
+// TODO: fix k6 "setup() { ... INSTANCE.setup(config_bytes)" + runPtr hack
+// RootModule + func init + os.env is more suitable for this.
+// Or put "func () Init" to RootModule.
+// k6 "setup()" is called once, but it's insane that there is some INSTANCE at this time.
 func (x *Instance) Setup(runContextBytes string) error {
 
 	runContext, err := Serialized[*stroppy.StepContext](runContextBytes).Unmarshal()
@@ -60,10 +65,7 @@ func (x *Instance) Setup(runContextBytes string) error {
 		zap.Uint64("seed", runContext.GetGlobalConfig().GetRun().GetSeed()),
 	)
 
-	// TODO: it should be a module root context.
-	// Now it's the context of first VU, I guess.
-	// It's a potential issue, if k6 might to kill (cancel) first vu before the end of the test.
-	processCtx := x.vu.Context()
+	processCtx := context.Background()
 
 	drv := postgres.NewDriver()
 
