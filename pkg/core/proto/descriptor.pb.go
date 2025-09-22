@@ -23,7 +23,8 @@ const (
 )
 
 // *
-// TransactionIsolationLevel defines the isolation level for a database transaction.
+// TransactionIsolationLevel defines the isolation level for a database
+// transaction.
 type TxIsolationLevel int32
 
 const (
@@ -343,7 +344,8 @@ type QueryParamDescriptor struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Name of the parameter
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// * Regular expression pattern to replace with the parameter value default is "${<param_name>}"
+	// * Regular expression pattern to replace with the parameter value default
+	// is "${<param_name>}"
 	ReplaceRegex string `protobuf:"bytes,2,opt,name=replace_regex,json=replaceRegex,proto3" json:"replace_regex,omitempty"`
 	// * Rule for generating parameter values
 	GenerationRule *Generation_Rule `protobuf:"bytes,3,opt,name=generation_rule,json=generationRule,proto3" json:"generation_rule,omitempty"`
@@ -412,7 +414,8 @@ func (x *QueryParamDescriptor) GetDbSpecific() *Value_Struct {
 }
 
 // *
-// QueryDescriptor defines a database query with its parameters and execution count.
+// QueryDescriptor defines a database query with its parameters and execution
+// count.
 type QueryDescriptor struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Name of the query
@@ -486,7 +489,8 @@ func (x *QueryDescriptor) GetDbSpecific() *Value_Struct {
 }
 
 // *
-// TransactionDescriptor defines a database transaction with its queries and execution count.
+// TransactionDescriptor defines a database transaction with its queries and
+// execution count.
 type TransactionDescriptor struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Name of the transaction
@@ -559,18 +563,115 @@ func (x *TransactionDescriptor) GetDbSpecific() *Value_Struct {
 	return nil
 }
 
+type UnitDescriptor struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Type:
+	//
+	//	*UnitDescriptor_CreateTable
+	//	*UnitDescriptor_Query
+	//	*UnitDescriptor_Transaction
+	Type          isUnitDescriptor_Type `protobuf_oneof:"type"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnitDescriptor) Reset() {
+	*x = UnitDescriptor{}
+	mi := &file_descriptor_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnitDescriptor) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnitDescriptor) ProtoMessage() {}
+
+func (x *UnitDescriptor) ProtoReflect() protoreflect.Message {
+	mi := &file_descriptor_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnitDescriptor.ProtoReflect.Descriptor instead.
+func (*UnitDescriptor) Descriptor() ([]byte, []int) {
+	return file_descriptor_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *UnitDescriptor) GetType() isUnitDescriptor_Type {
+	if x != nil {
+		return x.Type
+	}
+	return nil
+}
+
+func (x *UnitDescriptor) GetCreateTable() *TableDescriptor {
+	if x != nil {
+		if x, ok := x.Type.(*UnitDescriptor_CreateTable); ok {
+			return x.CreateTable
+		}
+	}
+	return nil
+}
+
+func (x *UnitDescriptor) GetQuery() *QueryDescriptor {
+	if x != nil {
+		if x, ok := x.Type.(*UnitDescriptor_Query); ok {
+			return x.Query
+		}
+	}
+	return nil
+}
+
+func (x *UnitDescriptor) GetTransaction() *TransactionDescriptor {
+	if x != nil {
+		if x, ok := x.Type.(*UnitDescriptor_Transaction); ok {
+			return x.Transaction
+		}
+	}
+	return nil
+}
+
+type isUnitDescriptor_Type interface {
+	isUnitDescriptor_Type()
+}
+
+type UnitDescriptor_CreateTable struct {
+	// * Table creation operation
+	CreateTable *TableDescriptor `protobuf:"bytes,1,opt,name=create_table,json=createTable,proto3,oneof"`
+}
+
+type UnitDescriptor_Query struct {
+	// * Query execution operation
+	Query *QueryDescriptor `protobuf:"bytes,2,opt,name=query,proto3,oneof"`
+}
+
+type UnitDescriptor_Transaction struct {
+	// * Transaction execution operation
+	Transaction *TransactionDescriptor `protobuf:"bytes,4,opt,name=transaction,proto3,oneof"`
+}
+
+func (*UnitDescriptor_CreateTable) isUnitDescriptor_Type() {}
+
+func (*UnitDescriptor_Query) isUnitDescriptor_Type() {}
+
+func (*UnitDescriptor_Transaction) isUnitDescriptor_Type() {}
+
 // *
 // StepUnitDescriptor represents a single unit of work.
-// It can be a table creation operation, a query execution operation, or a transaction execution operation.
-// It also specifies whether to execute this operation asynchronously.
+// It can be a table creation operation, a query execution operation, or a
+// transaction execution operation. It also specifies whether to execute this
+// operation asynchronously.
 type StepUnitDescriptor struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Types that are valid to be assigned to Descriptor_:
-	//
-	//	*StepUnitDescriptor_CreateTable
-	//	*StepUnitDescriptor_Query
-	//	*StepUnitDescriptor_Transaction
-	Descriptor_ isStepUnitDescriptor_Descriptor_ `protobuf_oneof:"descriptor"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Descriptor_ *UnitDescriptor        `protobuf:"bytes,6,opt,name=descriptor,proto3" json:"descriptor,omitempty"`
 	// * Number of times to execute this unit
 	Count         uint64 `protobuf:"varint,5,opt,name=count,proto3" json:"count,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -579,7 +680,7 @@ type StepUnitDescriptor struct {
 
 func (x *StepUnitDescriptor) Reset() {
 	*x = StepUnitDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[6]
+	mi := &file_descriptor_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -591,7 +692,7 @@ func (x *StepUnitDescriptor) String() string {
 func (*StepUnitDescriptor) ProtoMessage() {}
 
 func (x *StepUnitDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[6]
+	mi := &file_descriptor_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -604,39 +705,12 @@ func (x *StepUnitDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepUnitDescriptor.ProtoReflect.Descriptor instead.
 func (*StepUnitDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{6}
+	return file_descriptor_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *StepUnitDescriptor) GetDescriptor_() isStepUnitDescriptor_Descriptor_ {
+func (x *StepUnitDescriptor) GetDescriptor_() *UnitDescriptor {
 	if x != nil {
 		return x.Descriptor_
-	}
-	return nil
-}
-
-func (x *StepUnitDescriptor) GetCreateTable() *TableDescriptor {
-	if x != nil {
-		if x, ok := x.Descriptor_.(*StepUnitDescriptor_CreateTable); ok {
-			return x.CreateTable
-		}
-	}
-	return nil
-}
-
-func (x *StepUnitDescriptor) GetQuery() *QueryDescriptor {
-	if x != nil {
-		if x, ok := x.Descriptor_.(*StepUnitDescriptor_Query); ok {
-			return x.Query
-		}
-	}
-	return nil
-}
-
-func (x *StepUnitDescriptor) GetTransaction() *TransactionDescriptor {
-	if x != nil {
-		if x, ok := x.Descriptor_.(*StepUnitDescriptor_Transaction); ok {
-			return x.Transaction
-		}
 	}
 	return nil
 }
@@ -647,31 +721,6 @@ func (x *StepUnitDescriptor) GetCount() uint64 {
 	}
 	return 0
 }
-
-type isStepUnitDescriptor_Descriptor_ interface {
-	isStepUnitDescriptor_Descriptor_()
-}
-
-type StepUnitDescriptor_CreateTable struct {
-	// * Table creation operation
-	CreateTable *TableDescriptor `protobuf:"bytes,1,opt,name=create_table,json=createTable,proto3,oneof"`
-}
-
-type StepUnitDescriptor_Query struct {
-	// * Query execution operation
-	Query *QueryDescriptor `protobuf:"bytes,2,opt,name=query,proto3,oneof"`
-}
-
-type StepUnitDescriptor_Transaction struct {
-	// * Transaction execution operation
-	Transaction *TransactionDescriptor `protobuf:"bytes,4,opt,name=transaction,proto3,oneof"`
-}
-
-func (*StepUnitDescriptor_CreateTable) isStepUnitDescriptor_Descriptor_() {}
-
-func (*StepUnitDescriptor_Query) isStepUnitDescriptor_Descriptor_() {}
-
-func (*StepUnitDescriptor_Transaction) isStepUnitDescriptor_Descriptor_() {}
 
 // *
 // StepDescriptor represents a logical step in a benchmark.
@@ -690,7 +739,7 @@ type StepDescriptor struct {
 
 func (x *StepDescriptor) Reset() {
 	*x = StepDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[7]
+	mi := &file_descriptor_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -702,7 +751,7 @@ func (x *StepDescriptor) String() string {
 func (*StepDescriptor) ProtoMessage() {}
 
 func (x *StepDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[7]
+	mi := &file_descriptor_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -715,7 +764,7 @@ func (x *StepDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepDescriptor.ProtoReflect.Descriptor instead.
 func (*StepDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{7}
+	return file_descriptor_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *StepDescriptor) GetName() string {
@@ -740,7 +789,8 @@ func (x *StepDescriptor) GetAsync() bool {
 }
 
 // *
-// BenchmarkDescriptor defines a complete benchmark consisting of multiple steps.
+// BenchmarkDescriptor defines a complete benchmark consisting of multiple
+// steps.
 type BenchmarkDescriptor struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Name of the benchmark
@@ -753,7 +803,7 @@ type BenchmarkDescriptor struct {
 
 func (x *BenchmarkDescriptor) Reset() {
 	*x = BenchmarkDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[8]
+	mi := &file_descriptor_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -765,7 +815,7 @@ func (x *BenchmarkDescriptor) String() string {
 func (*BenchmarkDescriptor) ProtoMessage() {}
 
 func (x *BenchmarkDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[8]
+	mi := &file_descriptor_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -778,7 +828,7 @@ func (x *BenchmarkDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BenchmarkDescriptor.ProtoReflect.Descriptor instead.
 func (*BenchmarkDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{8}
+	return file_descriptor_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *BenchmarkDescriptor) GetName() string {
@@ -846,14 +896,17 @@ const file_descriptor_proto_rawDesc = "" +
 	"\x0fisolation_level\x18\x02 \x01(\x0e2\x19.stroppy.TxIsolationLevelR\x0eisolationLevel\x12C\n" +
 	"\aqueries\x18\x03 \x03(\v2\x18.stroppy.QueryDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\aqueries\x126\n" +
 	"\vdb_specific\x18\x05 \x01(\v2\x15.stroppy.Value.StructR\n" +
-	"dbSpecific\"\xfb\x01\n" +
-	"\x12StepUnitDescriptor\x12=\n" +
+	"dbSpecific\"\xd2\x01\n" +
+	"\x0eUnitDescriptor\x12=\n" +
 	"\fcreate_table\x18\x01 \x01(\v2\x18.stroppy.TableDescriptorH\x00R\vcreateTable\x120\n" +
 	"\x05query\x18\x02 \x01(\v2\x18.stroppy.QueryDescriptorH\x00R\x05query\x12B\n" +
-	"\vtransaction\x18\x04 \x01(\v2\x1e.stroppy.TransactionDescriptorH\x00R\vtransaction\x12\x1d\n" +
-	"\x05count\x18\x05 \x01(\x04B\a\xfaB\x042\x02 \x00R\x05countB\x11\n" +
+	"\vtransaction\x18\x04 \x01(\v2\x1e.stroppy.TransactionDescriptorH\x00R\vtransactionB\v\n" +
+	"\x04type\x12\x03\xf8B\x01\"l\n" +
+	"\x12StepUnitDescriptor\x127\n" +
 	"\n" +
-	"descriptor\x12\x03\xf8B\x01\"\x87\x01\n" +
+	"descriptor\x18\x06 \x01(\v2\x17.stroppy.UnitDescriptorR\n" +
+	"descriptor\x12\x1d\n" +
+	"\x05count\x18\x05 \x01(\x04B\a\xfaB\x042\x02 \x00R\x05count\"\x87\x01\n" +
 	"\x0eStepDescriptor\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12B\n" +
 	"\x05units\x18\x02 \x03(\v2\x1b.stroppy.StepUnitDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\x05units\x12\x14\n" +
@@ -881,7 +934,7 @@ func file_descriptor_proto_rawDescGZIP() []byte {
 }
 
 var file_descriptor_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_descriptor_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_descriptor_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_descriptor_proto_goTypes = []any{
 	(TxIsolationLevel)(0),         // 0: stroppy.TxIsolationLevel
 	(*IndexDescriptor)(nil),       // 1: stroppy.IndexDescriptor
@@ -890,34 +943,36 @@ var file_descriptor_proto_goTypes = []any{
 	(*QueryParamDescriptor)(nil),  // 4: stroppy.QueryParamDescriptor
 	(*QueryDescriptor)(nil),       // 5: stroppy.QueryDescriptor
 	(*TransactionDescriptor)(nil), // 6: stroppy.TransactionDescriptor
-	(*StepUnitDescriptor)(nil),    // 7: stroppy.StepUnitDescriptor
-	(*StepDescriptor)(nil),        // 8: stroppy.StepDescriptor
-	(*BenchmarkDescriptor)(nil),   // 9: stroppy.BenchmarkDescriptor
-	(*Value_Struct)(nil),          // 10: stroppy.Value.Struct
-	(*Generation_Rule)(nil),       // 11: stroppy.Generation.Rule
+	(*UnitDescriptor)(nil),        // 7: stroppy.UnitDescriptor
+	(*StepUnitDescriptor)(nil),    // 8: stroppy.StepUnitDescriptor
+	(*StepDescriptor)(nil),        // 9: stroppy.StepDescriptor
+	(*BenchmarkDescriptor)(nil),   // 10: stroppy.BenchmarkDescriptor
+	(*Value_Struct)(nil),          // 11: stroppy.Value.Struct
+	(*Generation_Rule)(nil),       // 12: stroppy.Generation.Rule
 }
 var file_descriptor_proto_depIdxs = []int32{
-	10, // 0: stroppy.IndexDescriptor.db_specific:type_name -> stroppy.Value.Struct
+	11, // 0: stroppy.IndexDescriptor.db_specific:type_name -> stroppy.Value.Struct
 	1,  // 1: stroppy.TableDescriptor.table_indexes:type_name -> stroppy.IndexDescriptor
-	10, // 2: stroppy.TableDescriptor.db_specific:type_name -> stroppy.Value.Struct
+	11, // 2: stroppy.TableDescriptor.db_specific:type_name -> stroppy.Value.Struct
 	2,  // 3: stroppy.TableDescriptor.columns:type_name -> stroppy.ColumnDescriptor
-	11, // 4: stroppy.QueryParamDescriptor.generation_rule:type_name -> stroppy.Generation.Rule
-	10, // 5: stroppy.QueryParamDescriptor.db_specific:type_name -> stroppy.Value.Struct
+	12, // 4: stroppy.QueryParamDescriptor.generation_rule:type_name -> stroppy.Generation.Rule
+	11, // 5: stroppy.QueryParamDescriptor.db_specific:type_name -> stroppy.Value.Struct
 	4,  // 6: stroppy.QueryDescriptor.params:type_name -> stroppy.QueryParamDescriptor
-	10, // 7: stroppy.QueryDescriptor.db_specific:type_name -> stroppy.Value.Struct
+	11, // 7: stroppy.QueryDescriptor.db_specific:type_name -> stroppy.Value.Struct
 	0,  // 8: stroppy.TransactionDescriptor.isolation_level:type_name -> stroppy.TxIsolationLevel
 	5,  // 9: stroppy.TransactionDescriptor.queries:type_name -> stroppy.QueryDescriptor
-	10, // 10: stroppy.TransactionDescriptor.db_specific:type_name -> stroppy.Value.Struct
-	3,  // 11: stroppy.StepUnitDescriptor.create_table:type_name -> stroppy.TableDescriptor
-	5,  // 12: stroppy.StepUnitDescriptor.query:type_name -> stroppy.QueryDescriptor
-	6,  // 13: stroppy.StepUnitDescriptor.transaction:type_name -> stroppy.TransactionDescriptor
-	7,  // 14: stroppy.StepDescriptor.units:type_name -> stroppy.StepUnitDescriptor
-	8,  // 15: stroppy.BenchmarkDescriptor.steps:type_name -> stroppy.StepDescriptor
-	16, // [16:16] is the sub-list for method output_type
-	16, // [16:16] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	11, // 10: stroppy.TransactionDescriptor.db_specific:type_name -> stroppy.Value.Struct
+	3,  // 11: stroppy.UnitDescriptor.create_table:type_name -> stroppy.TableDescriptor
+	5,  // 12: stroppy.UnitDescriptor.query:type_name -> stroppy.QueryDescriptor
+	6,  // 13: stroppy.UnitDescriptor.transaction:type_name -> stroppy.TransactionDescriptor
+	7,  // 14: stroppy.StepUnitDescriptor.descriptor:type_name -> stroppy.UnitDescriptor
+	8,  // 15: stroppy.StepDescriptor.units:type_name -> stroppy.StepUnitDescriptor
+	9,  // 16: stroppy.BenchmarkDescriptor.steps:type_name -> stroppy.StepDescriptor
+	17, // [17:17] is the sub-list for method output_type
+	17, // [17:17] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_descriptor_proto_init() }
@@ -928,9 +983,9 @@ func file_descriptor_proto_init() {
 	file_common_proto_init()
 	file_descriptor_proto_msgTypes[0].OneofWrappers = []any{}
 	file_descriptor_proto_msgTypes[6].OneofWrappers = []any{
-		(*StepUnitDescriptor_CreateTable)(nil),
-		(*StepUnitDescriptor_Query)(nil),
-		(*StepUnitDescriptor_Transaction)(nil),
+		(*UnitDescriptor_CreateTable)(nil),
+		(*UnitDescriptor_Query)(nil),
+		(*UnitDescriptor_Transaction)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -938,7 +993,7 @@ func file_descriptor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_descriptor_proto_rawDesc), len(file_descriptor_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

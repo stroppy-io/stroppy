@@ -35,9 +35,9 @@ func TestNewTransaction_Success(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Descriptor_: &stroppy.StepUnitDescriptor_Transaction{
+				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
 					Transaction: descriptor,
-				},
+				}},
 			},
 		},
 	}
@@ -94,9 +94,9 @@ func TestNewTransaction_Isolation(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Descriptor_: &stroppy.StepUnitDescriptor_Transaction{
+				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
 					Transaction: descriptor,
-				},
+				}},
 			},
 		},
 	}

@@ -69,31 +69,31 @@ func (q *QueryBuilder) internalBuild(
 	buildQueriesContext *stroppy.UnitBuildContext,
 	channel errchan.Chan[stroppy.DriverTransaction],
 ) {
-	switch buildQueriesContext.GetUnit().GetDescriptor_().(type) {
-	case *stroppy.StepUnitDescriptor_CreateTable:
+	switch buildQueriesContext.GetUnit().GetDescriptor_().GetType().(type) {
+	case *stroppy.UnitDescriptor_CreateTable:
 		NewCreateTable(
 			ctx,
 			logger,
 			buildQueriesContext.GetContext().GetGlobalConfig().GetRun().GetSeed(),
-			buildQueriesContext.GetUnit().GetCreateTable(),
+			buildQueriesContext.GetUnit().GetDescriptor_().GetCreateTable(),
 			channel,
 		)
-	case *stroppy.StepUnitDescriptor_Query:
+	case *stroppy.UnitDescriptor_Query:
 		NewQuery(
 			ctx,
 			logger,
 			q.generators,
 			buildQueriesContext.GetContext(),
-			buildQueriesContext.GetUnit().GetQuery(),
+			buildQueriesContext.GetUnit().GetDescriptor_().GetQuery(),
 			channel,
 		)
-	case *stroppy.StepUnitDescriptor_Transaction:
+	case *stroppy.UnitDescriptor_Transaction:
 		NewTransaction(
 			ctx,
 			logger,
 			q.generators,
 			buildQueriesContext.GetContext(),
-			buildQueriesContext.GetUnit().GetTransaction(),
+			buildQueriesContext.GetUnit().GetDescriptor_().GetTransaction(),
 			channel,
 		)
 	default:

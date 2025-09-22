@@ -66,9 +66,9 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Descriptor_: &stroppy.StepUnitDescriptor_Query{
+				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 					Query: descriptor,
-				},
+				}},
 			},
 		},
 	}
@@ -123,9 +123,9 @@ func TestQueryBuilder_BuildStream_Success(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Descriptor_: &stroppy.StepUnitDescriptor_Query{
+				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 					Query: descriptor,
-				},
+				}},
 			},
 		},
 	}
@@ -180,9 +180,9 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Descriptor_: &stroppy.StepUnitDescriptor_CreateTable{
+				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_CreateTable{
 					CreateTable: createTableDescriptor,
-				},
+				}},
 			},
 		},
 	}
@@ -238,9 +238,9 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Descriptor_: &stroppy.StepUnitDescriptor_Transaction{
+				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
 					Transaction: transactionDescriptor,
-				},
+				}},
 			},
 		},
 	}

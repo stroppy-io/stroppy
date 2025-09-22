@@ -716,7 +716,7 @@ func (x *StepContext) GetGlobalConfig() *Config {
 }
 
 // *
-// Plugins contains configuration for plugins.
+// SideCar contains configuration for plugins.
 type SideCar struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Url to connect the plugin instance

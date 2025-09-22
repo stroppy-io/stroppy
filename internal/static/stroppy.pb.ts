@@ -3341,7 +3341,7 @@ export interface StepContext {
 }
 /**
  * *
- * Plugins contains configuration for plugins.
+ * SideCar contains configuration for plugins.
  *
  * @generated from protobuf message stroppy.SideCar
  */
@@ -4284,7 +4284,8 @@ export interface QueryParamDescriptor {
      */
     name: string;
     /**
-     * * Regular expression pattern to replace with the parameter value default is "${<param_name>}"
+     * * Regular expression pattern to replace with the parameter value default
+     * is "${<param_name>}"
      *
      * @generated from protobuf field: string replace_regex = 2
      */
@@ -4304,7 +4305,8 @@ export interface QueryParamDescriptor {
 }
 /**
  * *
- * QueryDescriptor defines a database query with its parameters and execution count.
+ * QueryDescriptor defines a database query with its parameters and execution
+ * count.
  *
  * @generated from protobuf message stroppy.QueryDescriptor
  */
@@ -4336,7 +4338,8 @@ export interface QueryDescriptor {
 }
 /**
  * *
- * TransactionDescriptor defines a database transaction with its queries and execution count.
+ * TransactionDescriptor defines a database transaction with its queries and
+ * execution count.
  *
  * @generated from protobuf message stroppy.TransactionDescriptor
  */
@@ -4367,18 +4370,13 @@ export interface TransactionDescriptor {
     dbSpecific?: Value_Struct;
 }
 /**
- * *
- * StepUnitDescriptor represents a single unit of work.
- * It can be a table creation operation, a query execution operation, or a transaction execution operation.
- * It also specifies whether to execute this operation asynchronously.
- *
- * @generated from protobuf message stroppy.StepUnitDescriptor
+ * @generated from protobuf message stroppy.UnitDescriptor
  */
-export interface StepUnitDescriptor {
+export interface UnitDescriptor {
     /**
-     * @generated from protobuf oneof: descriptor
+     * @generated from protobuf oneof: type
      */
-    descriptor: {
+    type: {
         oneofKind: "createTable";
         /**
          * * Table creation operation
@@ -4405,6 +4403,21 @@ export interface StepUnitDescriptor {
     } | {
         oneofKind: undefined;
     };
+}
+/**
+ * *
+ * StepUnitDescriptor represents a single unit of work.
+ * It can be a table creation operation, a query execution operation, or a
+ * transaction execution operation. It also specifies whether to execute this
+ * operation asynchronously.
+ *
+ * @generated from protobuf message stroppy.StepUnitDescriptor
+ */
+export interface StepUnitDescriptor {
+    /**
+     * @generated from protobuf field: stroppy.UnitDescriptor descriptor = 6
+     */
+    descriptor?: UnitDescriptor;
     /**
      * * Number of times to execute this unit
      *
@@ -4441,7 +4454,8 @@ export interface StepDescriptor {
 }
 /**
  * *
- * BenchmarkDescriptor defines a complete benchmark consisting of multiple steps.
+ * BenchmarkDescriptor defines a complete benchmark consisting of multiple
+ * steps.
  *
  * @generated from protobuf message stroppy.BenchmarkDescriptor
  */
@@ -4461,7 +4475,8 @@ export interface BenchmarkDescriptor {
 }
 /**
  * *
- * TransactionIsolationLevel defines the isolation level for a database transaction.
+ * TransactionIsolationLevel defines the isolation level for a database
+ * transaction.
  *
  * @generated from protobuf enum stroppy.TxIsolationLevel
  */
@@ -4940,18 +4955,85 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
  */
 export const TransactionDescriptor = new TransactionDescriptor$Type();
 // @generated message type with reflection information, may provide speed optimized methods
+class UnitDescriptor$Type extends MessageType<UnitDescriptor> {
+    constructor() {
+        super("stroppy.UnitDescriptor", [
+            { no: 1, name: "create_table", kind: "message", oneof: "type", T: () => TableDescriptor },
+            { no: 2, name: "query", kind: "message", oneof: "type", T: () => QueryDescriptor },
+            { no: 4, name: "transaction", kind: "message", oneof: "type", T: () => TransactionDescriptor }
+        ]);
+    }
+    create(value?: PartialMessage<UnitDescriptor>): UnitDescriptor {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.type = { oneofKind: undefined };
+        if (value !== undefined)
+            reflectionMergePartial<UnitDescriptor>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: UnitDescriptor): UnitDescriptor {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* stroppy.TableDescriptor create_table */ 1:
+                    message.type = {
+                        oneofKind: "createTable",
+                        createTable: TableDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).createTable)
+                    };
+                    break;
+                case /* stroppy.QueryDescriptor query */ 2:
+                    message.type = {
+                        oneofKind: "query",
+                        query: QueryDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).query)
+                    };
+                    break;
+                case /* stroppy.TransactionDescriptor transaction */ 4:
+                    message.type = {
+                        oneofKind: "transaction",
+                        transaction: TransactionDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).transaction)
+                    };
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: UnitDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* stroppy.TableDescriptor create_table = 1; */
+        if (message.type.oneofKind === "createTable")
+            TableDescriptor.internalBinaryWrite(message.type.createTable, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.QueryDescriptor query = 2; */
+        if (message.type.oneofKind === "query")
+            QueryDescriptor.internalBinaryWrite(message.type.query, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.TransactionDescriptor transaction = 4; */
+        if (message.type.oneofKind === "transaction")
+            TransactionDescriptor.internalBinaryWrite(message.type.transaction, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.UnitDescriptor
+ */
+export const UnitDescriptor = new UnitDescriptor$Type();
+// @generated message type with reflection information, may provide speed optimized methods
 class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
     constructor() {
         super("stroppy.StepUnitDescriptor", [
-            { no: 1, name: "create_table", kind: "message", oneof: "descriptor", T: () => TableDescriptor },
-            { no: 2, name: "query", kind: "message", oneof: "descriptor", T: () => QueryDescriptor },
-            { no: 4, name: "transaction", kind: "message", oneof: "descriptor", T: () => TransactionDescriptor },
+            { no: 6, name: "descriptor", kind: "message", T: () => UnitDescriptor },
             { no: 5, name: "count", kind: "scalar", T: 4 /*ScalarType.UINT64*/ }
         ]);
     }
     create(value?: PartialMessage<StepUnitDescriptor>): StepUnitDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.descriptor = { oneofKind: undefined };
         message.count = "0";
         if (value !== undefined)
             reflectionMergePartial<StepUnitDescriptor>(this, message, value);
@@ -4962,23 +5044,8 @@ class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* stroppy.TableDescriptor create_table */ 1:
-                    message.descriptor = {
-                        oneofKind: "createTable",
-                        createTable: TableDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.descriptor as any).createTable)
-                    };
-                    break;
-                case /* stroppy.QueryDescriptor query */ 2:
-                    message.descriptor = {
-                        oneofKind: "query",
-                        query: QueryDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.descriptor as any).query)
-                    };
-                    break;
-                case /* stroppy.TransactionDescriptor transaction */ 4:
-                    message.descriptor = {
-                        oneofKind: "transaction",
-                        transaction: TransactionDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.descriptor as any).transaction)
-                    };
+                case /* stroppy.UnitDescriptor descriptor */ 6:
+                    message.descriptor = UnitDescriptor.internalBinaryRead(reader, reader.uint32(), options, message.descriptor);
                     break;
                 case /* uint64 count */ 5:
                     message.count = reader.uint64().toString();
@@ -4995,18 +5062,12 @@ class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
         return message;
     }
     internalBinaryWrite(message: StepUnitDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.TableDescriptor create_table = 1; */
-        if (message.descriptor.oneofKind === "createTable")
-            TableDescriptor.internalBinaryWrite(message.descriptor.createTable, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.QueryDescriptor query = 2; */
-        if (message.descriptor.oneofKind === "query")
-            QueryDescriptor.internalBinaryWrite(message.descriptor.query, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.TransactionDescriptor transaction = 4; */
-        if (message.descriptor.oneofKind === "transaction")
-            TransactionDescriptor.internalBinaryWrite(message.descriptor.transaction, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
         /* uint64 count = 5; */
         if (message.count !== "0")
             writer.tag(5, WireType.Varint).uint64(message.count);
+        /* stroppy.UnitDescriptor descriptor = 6; */
+        if (message.descriptor)
+            UnitDescriptor.internalBinaryWrite(message.descriptor, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

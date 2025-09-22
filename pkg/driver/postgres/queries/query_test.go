@@ -30,9 +30,9 @@ func TestNewQuery_Success(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Descriptor_: &stroppy.StepUnitDescriptor_Query{
+				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 					Query: descriptor,
-				},
+				}},
 			},
 		},
 	}
@@ -76,9 +76,9 @@ func TestNewQuery_Error(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Descriptor_: &stroppy.StepUnitDescriptor_Query{
+				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 					Query: descriptor,
-				},
+				}},
 			},
 		},
 	}
@@ -124,9 +124,9 @@ func TestNewQuerySync_Success(t *testing.T) {
 		Name: "test",
 		Units: []*stroppy.StepUnitDescriptor{
 			{
-				Descriptor_: &stroppy.StepUnitDescriptor_Query{
+				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 					Query: descriptor,
-				},
+				}},
 			},
 		},
 	}

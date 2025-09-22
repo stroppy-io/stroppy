@@ -51,17 +51,17 @@ func CollectStepGenerators(runContext *stroppy.StepContext) (Generators, error) 
 
 	for _, step := range runContext.GetGlobalConfig().GetBenchmark().GetSteps() {
 		for _, queryDescriptor := range step.GetUnits() {
-			switch queryDescriptor.GetDescriptor_().(type) {
-			case *stroppy.StepUnitDescriptor_Query:
-				gens, err := collectQueryGenerators(runContext, queryDescriptor.GetQuery())
+			switch queryDescriptor.GetDescriptor_().GetType().(type) {
+			case *stroppy.UnitDescriptor_Query:
+				gens, err := collectQueryGenerators(runContext, queryDescriptor.GetDescriptor_().GetQuery())
 				if err != nil {
 					return generators, err
 				}
 
 				generators.MSet(gens.Items())
 
-			case *stroppy.StepUnitDescriptor_Transaction:
-				for _, query := range queryDescriptor.GetTransaction().GetQueries() {
+			case *stroppy.UnitDescriptor_Transaction:
+				for _, query := range queryDescriptor.GetDescriptor_().GetTransaction().GetQueries() {
 					gens, err := collectQueryGenerators(runContext, query)
 					if err != nil {
 						return generators, err
