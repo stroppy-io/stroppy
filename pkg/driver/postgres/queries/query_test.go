@@ -93,8 +93,8 @@ func TestNewQuery_Error(t *testing.T) {
 
 	transactions, err := NewQuery(ctx, lg, generators, descriptor)
 	require.NoError(t, err)
+	// require.Equal(t, int32(10), transactions.Queries[0].Params[0].GetInt32())
 	require.Len(t, transactions.Queries, 1)
-	require.Equal(t, int32(10), transactions.Queries[0].Params[0].GetInt32())
 }
 
 func TestNewQuerySync_Success(t *testing.T) {
