@@ -10,7 +10,7 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
-//nolint: mnd // it is huge magic number
+//nolint:mnd // it is huge magic config itself
 func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx,mnd // allow in example
 	return &stroppy.Config{
 		Version: stroppy.Version,
