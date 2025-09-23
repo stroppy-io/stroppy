@@ -89,11 +89,6 @@ func (x *Instance) Setup(runContextBytes string) error {
 	return nil
 }
 
-//goland:noinspection t
-func (x *Instance) GenerateQueue() error {
-	return nil
-}
-
 func (x *Instance) RunQuery() error {
 	transaction, err := runPtr.unitQueue.GetNextUnit()
 	if err != nil {

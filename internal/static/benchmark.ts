@@ -62,7 +62,6 @@ export const options: Options = {
 // This object will be created in setup function
 // and passed to "default" function as argument by k6
 class Context {
-    queries: ProtoSerialized<DriverTransactionList>
 }
 
 // @ts-ignore
@@ -77,12 +76,10 @@ export const setup = (): Context => {
     if (err !== undefined) {
         throw err
     }
-    const queries = INSTANCE.generateQueue()
 
     METER_SETUP_TIME_COUNTER.add(Date.now() - startTime)
 
     return <Context>{
-        queries: queries
     }
 };
 
@@ -93,7 +90,6 @@ export default (ctx: Context) => {
     const startTime = Date.now()
     const err = INSTANCE.runQuery()
     if (err) {
-        console.error(transaction, err)
         METER_REQUEST_ERROR_COUNTER.add(1, metricsTags)
     }
     METER_REQUESTS_COUNTER.add(1, metricsTags)
