@@ -10,7 +10,7 @@ import (
 )
 
 type Driver interface {
-	GenerateNext(context.Context, *proto.UnitDescriptor) (*proto.DriverTransaction, error)
+	GenerateNextUnit(context.Context, *proto.UnitDescriptor) (*proto.DriverTransaction, error)
 }
 
 // UnitQueue is an infinite *proto.DriverTransaction generator.
@@ -111,7 +111,7 @@ func (uq *UnitQueue) writer(ctx context.Context, unit *proto.StepUnitDescriptor)
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		tx, err := uq.driver.GenerateNext(ctx, unit.GetDescriptor_())
+		tx, err := uq.driver.GenerateNextUnit(ctx, unit.GetDescriptor_())
 		if err != nil {
 			return err
 		}

@@ -12,7 +12,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/core/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 	"github.com/stroppy-io/stroppy/pkg/core/unit_queue"
-	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
 const (
@@ -68,7 +68,7 @@ func (x *Instance) Setup(runContextBytes string) error {
 
 	processCtx := context.Background()
 
-	drv := postgres.NewDriver(x.logger)
+	drv := driver.Dispatch(x.logger, runContext.GetGlobalConfig().GetRun().GetDriver())
 
 	err = drv.Initialize(processCtx, runContext)
 	if err != nil {

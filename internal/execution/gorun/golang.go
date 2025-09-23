@@ -7,11 +7,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver"
+	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver_interface"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
 	"github.com/stroppy-io/stroppy/pkg/core/utils"
-	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
 var (
@@ -39,7 +39,7 @@ func RunStep(
 
 	var err error
 
-	drv := postgres.NewDriver(lg)
+	drv := driver.Dispatch(lg, runContext.GetGlobalConfig().GetRun().GetDriver())
 
 	err = drv.Initialize(ctx, runContext)
 	if err != nil {
@@ -76,14 +76,6 @@ func RunStep(
 			})
 		}
 	}
-	// go func() {
-	// 	for {
-	// 		if m := i.Load(); (m % 1000) < 10 {
-	// 			lg.Info("i", zap.Int32("i", m))
-	// 		}
-	// 		time.Sleep(time.Millisecond * 100)
-	// 	}
-	// }()
 
 	err = stepPool.Wait()
 	if err != nil {
@@ -100,10 +92,10 @@ func RunStep(
 
 func processUnitTransactions(
 	ctx context.Context,
-	drv driver.Plugin,
+	drv driver_interface.Driver,
 	unitDesc *stroppy.StepUnitDescriptor,
 ) error {
-	tx, err := drv.GenerateNext(ctx, unitDesc.GetDescriptor_())
+	tx, err := drv.GenerateNextUnit(ctx, unitDesc.GetDescriptor_())
 	if err != nil {
 		return err
 	}

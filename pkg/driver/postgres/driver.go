@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/core/logger"
-	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver"
+	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver_interface"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
@@ -34,7 +34,7 @@ type Driver struct {
 	builder    QueryBuilder
 }
 
-func NewDriver(lg *zap.Logger) driver.Plugin { //nolint: ireturn // allow
+func NewDriver(lg *zap.Logger) driver_interface.Driver { //nolint: ireturn // allow
 	if lg == nil {
 		return &Driver{
 			logger: logger.NewFromEnv().
@@ -71,7 +71,7 @@ func (d *Driver) Initialize(ctx context.Context, runContext *stroppy.StepContext
 	return nil
 }
 
-func (d *Driver) GenerateNext(
+func (d *Driver) GenerateNextUnit(
 	ctx context.Context,
 	unit *stroppy.UnitDescriptor,
 ) (*stroppy.DriverTransaction, error) {

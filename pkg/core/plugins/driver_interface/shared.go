@@ -1,4 +1,4 @@
-package driver
+package driver_interface
 
 import (
 	"context"
@@ -6,9 +6,12 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
-type Plugin interface {
+type Driver interface {
 	Initialize(ctx context.Context, runContext *stroppy.StepContext) error
-	GenerateNext(context.Context, *stroppy.UnitDescriptor) (*stroppy.DriverTransaction, error)
+	GenerateNextUnit(
+		ctx context.Context,
+		unit *stroppy.UnitDescriptor,
+	) (*stroppy.DriverTransaction, error)
 	RunTransaction(ctx context.Context, transaction *stroppy.DriverTransaction) error
 	Teardown(ctx context.Context) error
 }
