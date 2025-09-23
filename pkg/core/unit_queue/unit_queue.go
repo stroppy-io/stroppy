@@ -39,7 +39,7 @@ func NewUnitQueue(
 	driver Driver,
 	step *proto.StepDescriptor,
 ) *UnitQueue {
-	const unitAsyncFactor = 3
+	const unitAsyncFactor = 10
 
 	return newUnitQueue(driver, step, len(step.GetUnits())*unitAsyncFactor)
 }
@@ -149,8 +149,8 @@ func (uq *UnitQueue) Stop() error {
 }
 
 func (uq *UnitQueue) getError() error {
-	if err := uq.err.Load().(error); err != nil { //nolint: errcheck,forcetypeassert // is known type
-		return err
+	if err := uq.err.Load(); err != nil {
+		return err.(error) //nolint: errcheck,forcetypeassert // is known type
 	}
 
 	return nil

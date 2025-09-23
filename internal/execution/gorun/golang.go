@@ -6,9 +6,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver_interface"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
+	"github.com/stroppy-io/stroppy/pkg/core/unit_queue"
 	"github.com/stroppy-io/stroppy/pkg/core/utils"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
@@ -46,57 +46,60 @@ func RunStep(
 	cancelCtx, cancelFn := context.WithCancel(ctx)
 	shutdown.RegisterFn(cancelFn)
 
-	async := 10
+	async := 100
 	if !runContext.GetStep().GetAsync() {
 		async = 1
 	}
 
-	stepPool := utils.NewAsyncerFromExecType(
+	txCount := uint64(0)
+	for _, unit := range runContext.GetStep().GetUnits() {
+		txCount += unit.GetCount()
+	}
+
+	lg.Info("start of query generation")
+
+	unitQueue := unit_queue.NewUnitQueue(drv, runContext.GetStep())
+	unitQueue.StartGeneration(cancelCtx)
+
+	asyncer := utils.NewAsyncerFromExecType(
 		cancelCtx,
 		runContext.GetStep().GetAsync(),
-		len(runContext.GetStep().GetUnits())*async,
+		async,
 		runContext.GetGlobalConfig().GetRun().GetGoExecutor().GetCancelOnError(),
 	)
 
-	for _, unitDesc := range runContext.GetStep().GetUnits() {
-		for range async {
-			stepPool.Go(func(ctx context.Context) error {
-				for range unitDesc.GetCount() {
-					err := processUnitTransactions(ctx, drv, unitDesc)
-					if err != nil {
-						return err
-					}
+	lg.Info("start of query execution")
+
+	for range txCount {
+		asyncer.Go(
+			func(ctx context.Context) error {
+				tx, err := unitQueue.GetNextUnit()
+				if err != nil {
+					return err
+				}
+
+				err = drv.RunTransaction(ctx, tx)
+				if err != nil {
+					return err
 				}
 
 				return nil
-			})
-		}
+			},
+		)
 	}
 
-	err = stepPool.Wait()
+	lg.Info("stop of query execution")
+
+	lg.Info("stop to queries generation")
+
+	err = unitQueue.Stop()
 	if err != nil {
 		return err
 	}
+
+	lg.Info("teardown driver")
 
 	err = drv.Teardown(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func processUnitTransactions(
-	ctx context.Context,
-	drv driver_interface.Driver,
-	unitDesc *stroppy.StepUnitDescriptor,
-) error {
-	tx, err := drv.GenerateNextUnit(ctx, unitDesc.GetDescriptor_())
-	if err != nil {
-		return err
-	}
-
-	err = drv.RunTransaction(ctx, tx)
 	if err != nil {
 		return err
 	}

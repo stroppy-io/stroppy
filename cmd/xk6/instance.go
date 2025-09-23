@@ -75,9 +75,9 @@ func (x *Instance) Setup(runContextBytes string) error {
 		return err
 	}
 
-	queue := unit_queue.NewUnitQueue(processCtx, drv, runContext.GetStep())
+	queue := unit_queue.NewUnitQueue(drv, runContext.GetStep())
 
-	queue.StartGeneration()
+	queue.StartGeneration(processCtx)
 
 	runPtr = newRuntimeContext(
 		drv,
