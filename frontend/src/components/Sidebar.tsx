@@ -1,12 +1,14 @@
+import React from 'react'
 import { Layout, Menu, Button, Avatar, Dropdown, Typography } from 'antd'
 import {
+  DashboardOutlined,
   SettingOutlined,
   PlayCircleOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  CloudOutlined,
   UserOutlined,
   LogoutOutlined,
+  CloudOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -27,14 +29,19 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onCollapse }) => {
 
   const menuItems = [
     {
-      key: '/configurator',
-      icon: <SettingOutlined />,
-      label: 'Конфигуратор',
+      key: '/dashboard',
+      icon: <DashboardOutlined />,
+      label: 'Главная',
     },
     {
       key: '/runs',
       icon: <PlayCircleOutlined />,
       label: 'Запуски',
+    },
+    {
+      key: '/configurator',
+      icon: <SettingOutlined />,
+      label: 'Конфигуратор',
     },
   ]
 

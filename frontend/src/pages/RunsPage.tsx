@@ -15,7 +15,10 @@ import {
   DatePicker,
   Tooltip,
   Flex,
-  Pagination
+  Pagination,
+  Progress,
+  Descriptions,
+  Divider
 } from 'antd'
 import { 
   PlayCircleOutlined, 
@@ -33,9 +36,10 @@ import {
   ThunderboltOutlined,
   DatabaseOutlined,
   CloudServerOutlined,
-  BugOutlined
+  BugOutlined,
+  CalendarOutlined
 } from '@ant-design/icons'
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import type { ColumnsType, TableProps } from 'antd/es/table'
 import dayjs from 'dayjs'
 import RunCreationForm from '../components/RunCreationForm'
@@ -53,6 +57,11 @@ interface FilterState {
   searchText: string;
   status: string;
   dateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null;
+}
+
+interface SortState {
+  field: string;
+  order: 'asc' | 'desc';
 }
 
 const RunsPage: React.FC = () => {
@@ -76,18 +85,28 @@ const RunsPage: React.FC = () => {
     dateRange: null
   })
 
-  // Загрузка запусков с сервера с фильтрами
+  // Состояние сортировки
+  const [sortState, setSortState] = useState<SortState>({
+    field: 'created_at',
+    order: 'desc'
+  })
+
+  // Обычная таблица без виртуализации
+
+  // Загрузка запусков с сервера с фильтрами и сортировкой
   const fetchRuns = async (
     page: number = 1, 
     limit: number = 20,
     searchText?: string,
     status?: string,
     dateFrom?: string,
-    dateTo?: string
+    dateTo?: string,
+    sortBy?: string,
+    sortOrder?: string
   ) => {
     try {
       setLoading(true)
-      const response = await apiClient.getRuns(page, limit, searchText, status, dateFrom, dateTo)
+      const response = await apiClient.getRuns(page, limit, searchText, status, dateFrom, dateTo, sortBy, sortOrder)
       setRuns(response.runs)
       setPagination({
         current: response.page,
@@ -101,7 +120,7 @@ const RunsPage: React.FC = () => {
     }
   }
 
-  // Вспомогательная функция для загрузки данных с текущими фильтрами
+  // Вспомогательная функция для загрузки данных с текущими фильтрами и сортировкой
   const fetchRunsWithCurrentFilters = (page?: number, pageSize?: number) => {
     const currentPage = page || pagination.current;
     const currentPageSize = pageSize || pagination.pageSize;
@@ -118,28 +137,62 @@ const RunsPage: React.FC = () => {
       filters.searchText || undefined,
       filters.status || undefined,
       dateFrom,
-      dateTo
+      dateTo,
+      sortState.field,
+      sortState.order
     );
   };
+
+  // Функция для применения фильтров
+  const applyFilters = useCallback((filtersToApply: FilterState) => {
+    const currentPageSize = pagination.pageSize;
+    
+    let dateFrom, dateTo;
+    if (filtersToApply.dateRange && filtersToApply.dateRange[0] && filtersToApply.dateRange[1]) {
+      dateFrom = filtersToApply.dateRange[0].format('YYYY-MM-DD');
+      dateTo = filtersToApply.dateRange[1].format('YYYY-MM-DD');
+    }
+
+    fetchRuns(
+      1,
+      currentPageSize,
+      filtersToApply.searchText || undefined,
+      filtersToApply.status || undefined,
+      dateFrom,
+      dateTo,
+      sortState.field,
+      sortState.order
+    );
+  }, [pagination.pageSize, sortState.field, sortState.order]);
 
   // Загружаем данные при монтировании компонента
   useEffect(() => {
     fetchRunsWithCurrentFilters(1);
   }, []);
 
+  // Debounce для поиска
+  useEffect(() => {
+    if (filters.searchText !== undefined) {
+      const timeoutId = setTimeout(() => {
+        applyFilters(filters);
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [filters.searchText, applyFilters, filters]);
 
   // Функции для работы с фильтрами
   const handleFilterChange = (key: keyof FilterState, value: any) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
     
-    // Сбрасываем пагинацию и загружаем данные с новыми фильтрами
+    // Сбрасываем пагинацию
     setPagination(prev => ({ ...prev, current: 1 }));
     
-    // Применяем фильтры с задержкой для лучшего UX
-    setTimeout(() => {
-      fetchRunsWithCurrentFilters(1);
-    }, 300);
+    // Для поиска debounce обрабатывается в useEffect, для остальных фильтров - немедленно
+    if (key !== 'searchText') {
+      applyFilters(newFilters);
+    }
   };
 
   const clearFilters = () => {
@@ -151,10 +204,36 @@ const RunsPage: React.FC = () => {
     setPagination(prev => ({ ...prev, current: 1 }));
     
     // Загружаем данные без фильтров
-    fetchRuns(1, pagination.pageSize);
+    fetchRuns(1, pagination.pageSize, undefined, undefined, undefined, undefined, sortState.field, sortState.order);
   };
 
   const hasActiveFilters = filters.searchText || filters.status || filters.dateRange;
+
+  // Обработка сортировки
+  const handleSort = (field: string, order: 'asc' | 'desc') => {
+    setSortState({ field, order });
+    setPagination(prev => ({ ...prev, current: 1 }));
+    
+    // Загружаем данные с новой сортировкой немедленно
+    const currentPageSize = pagination.pageSize;
+    
+    let dateFrom, dateTo;
+    if (filters.dateRange && filters.dateRange[0] && filters.dateRange[1]) {
+      dateFrom = filters.dateRange[0].format('YYYY-MM-DD');
+      dateTo = filters.dateRange[1].format('YYYY-MM-DD');
+    }
+
+    fetchRuns(
+      1,
+      currentPageSize,
+      filters.searchText || undefined,
+      filters.status || undefined,
+      dateFrom,
+      dateTo,
+      field,
+      order
+    );
+  };
 
   // Функция для преобразования API Run в тип для сравнения
   const convertRunForComparison = (run: Run) => {
@@ -210,7 +289,9 @@ const RunsPage: React.FC = () => {
       nemesisSignature: config.nemesisSignature || {
         signature: 'none',
         nemeses: []
-      }
+      },
+      
+      tpsMetrics: run.tps_metrics || config.tpsMetrics
     };
   };
 
@@ -318,14 +399,28 @@ const RunsPage: React.FC = () => {
       dataIndex: 'id',
       key: 'id',
       width: 80,
-      sorter: (a, b) => a.id - b.id,
+      sorter: true,
+      sortOrder: sortState.field === 'id' ? (sortState.order === 'asc' ? 'ascend' : 'descend') : null,
+      onHeaderCell: () => ({
+        onClick: () => {
+          const newOrder = sortState.field === 'id' && sortState.order === 'asc' ? 'desc' : 'asc';
+          handleSort('id', newOrder);
+        }
+      }),
       render: (id) => <Text code>#{id}</Text>
     },
     {
       title: 'Название',
       dataIndex: 'name',
       key: 'name',
-      sorter: (a, b) => a.name.localeCompare(b.name),
+      sorter: true,
+      sortOrder: sortState.field === 'name' ? (sortState.order === 'asc' ? 'ascend' : 'descend') : null,
+      onHeaderCell: () => ({
+        onClick: () => {
+          const newOrder = sortState.field === 'name' && sortState.order === 'asc' ? 'desc' : 'asc';
+          handleSort('name', newOrder);
+        }
+      }),
       render: (name, record) => (
         <div>
           <Text strong>{name}</Text>
@@ -346,22 +441,17 @@ const RunsPage: React.FC = () => {
       dataIndex: 'status',
       key: 'status',
       width: 120,
-      sorter: (a, b) => a.status.localeCompare(b.status),
+      sorter: true,
+      sortOrder: sortState.field === 'status' ? (sortState.order === 'asc' ? 'ascend' : 'descend') : null,
+      onHeaderCell: () => ({
+        onClick: () => {
+          const newOrder = sortState.field === 'status' && sortState.order === 'asc' ? 'desc' : 'asc';
+          handleSort('status', newOrder);
+        }
+      }),
       render: (status) => (
         <Tag icon={getStatusIcon(status)} color={getStatusColor(status)}>
           {getStatusText(status)}
-        </Tag>
-      )
-    },
-    {
-      title: 'Пользователь',
-      dataIndex: 'user_id',
-      key: 'user_id',
-      width: 100,
-      sorter: (a, b) => a.user_id - b.user_id,
-      render: (userId) => (
-        <Tag icon={<UserOutlined />} color="blue">
-          ID: {userId}
         </Tag>
       )
     },
@@ -370,7 +460,14 @@ const RunsPage: React.FC = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 150,
-      sorter: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      sorter: true,
+      sortOrder: sortState.field === 'created_at' ? (sortState.order === 'asc' ? 'ascend' : 'descend') : null,
+      onHeaderCell: () => ({
+        onClick: () => {
+          const newOrder = sortState.field === 'created_at' && sortState.order === 'asc' ? 'desc' : 'asc';
+          handleSort('created_at', newOrder);
+        }
+      }),
       render: (date) => (
         <Tooltip title={dayjs(date).format('DD.MM.YYYY HH:mm:ss')}>
           <Text>{dayjs(date).format('DD.MM HH:mm')}</Text>
@@ -378,15 +475,24 @@ const RunsPage: React.FC = () => {
       )
     },
     {
-      title: 'Обновлен',
-      dataIndex: 'updated_at',
-      key: 'updated_at',
-      width: 150,
-      sorter: (a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime(),
-      render: (date) => (
-        <Tooltip title={dayjs(date).format('DD.MM.YYYY HH:mm:ss')}>
-          <Text>{dayjs(date).format('DD.MM HH:mm')}</Text>
-        </Tooltip>
+      title: 'TPS Avg',
+      dataIndex: 'tps_metrics',
+      key: 'tps_average',
+      width: 100,
+      sorter: true,
+      sortOrder: sortState.field === 'tps_avg' ? (sortState.order === 'asc' ? 'ascend' : 'descend') : null,
+      onHeaderCell: () => ({
+        onClick: () => {
+          const newOrder = sortState.field === 'tps_avg' && sortState.order === 'asc' ? 'desc' : 'asc';
+          handleSort('tps_avg', newOrder);
+        }
+      }),
+      render: (tpsMetrics) => (
+        tpsMetrics?.average ? (
+          <Tag color="blue">{tpsMetrics.average.toFixed(1)}</Tag>
+        ) : (
+          <Text type="secondary">-</Text>
+        )
       )
     },
     {
@@ -443,6 +549,7 @@ const RunsPage: React.FC = () => {
     pagination: false, // Отключаем встроенную пагинацию
     scroll: { x: 'max-content', y: 'calc(100vh - 450px)' }
   };
+
 
   return (
     <div style={{ 
@@ -649,19 +756,15 @@ const RunsPage: React.FC = () => {
       {/* Модальное окно деталей */}
       <Modal
         title={
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <EyeOutlined style={{ marginRight: 8 }} />
-            Детали запуска
-          </div>
+          <Space align="center">
+            <EyeOutlined />
+            <Text strong style={{ fontSize: '18px' }}>Детали запуска</Text>
+          </Space>
         }
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setModalVisible(false)}>
-            Закрыть
-          </Button>
-        ]}
-        width={1200}
+        footer={null}
+        width={1400}
         style={{ top: 20 }}
       >
         {selectedRun && (() => {
@@ -672,164 +775,369 @@ const RunsPage: React.FC = () => {
             config = {};
           }
           
+          // Вычисляем прогресс на основе статуса
+          const getProgress = () => {
+            switch (selectedRun.status) {
+              case 'pending': return 0;
+              case 'running': return 50;
+              case 'completed': return 100;
+              case 'failed': return 75;
+              case 'cancelled': return 25;
+              default: return 0;
+            }
+          };
+
+          // Вычисляем длительность
+          const getDuration = () => {
+            if (selectedRun.completed_at && selectedRun.started_at) {
+              const duration = dayjs(selectedRun.completed_at).diff(dayjs(selectedRun.started_at), 'minute');
+              return `${duration} мин`;
+            }
+            return 'Не завершен';
+          };
+          
           return (
             <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
-              {/* Основная информация */}
-              <Card title={<><SettingOutlined style={{ marginRight: 8 }} />Основная информация</>} size="small" style={{ marginBottom: 16 }}>
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <p><strong>ID:</strong> <Tag color="blue">#{selectedRun.id}</Tag></p>
-                    <p><strong>Название:</strong> {selectedRun.name}</p>
-                    <p><strong>Описание:</strong> {selectedRun.description || <Text type="secondary">Нет описания</Text>}</p>
-                    <p><strong>Пользователь ID:</strong> <Tag icon={<UserOutlined />} color="purple">{selectedRun.user_id}</Tag></p>
-                  </Col>
-                  <Col span={12}>
-                    <p><strong>Статус:</strong> 
-                      <Tag icon={getStatusIcon(selectedRun.status)} color={getStatusColor(selectedRun.status)} style={{ marginLeft: 8 }}>
-                        {getStatusText(selectedRun.status)}
-                      </Tag>
-                    </p>
-                    <p><strong>Создан:</strong> {dayjs(selectedRun.created_at).format('DD.MM.YYYY HH:mm:ss')}</p>
-                    <p><strong>Обновлен:</strong> {dayjs(selectedRun.updated_at).format('DD.MM.YYYY HH:mm:ss')}</p>
-                    {selectedRun.started_at && (
-                      <p><strong>Запущен:</strong> {dayjs(selectedRun.started_at).format('DD.MM.YYYY HH:mm:ss')}</p>
-                    )}
-                    {selectedRun.completed_at && (
-                      <p><strong>Завершен:</strong> {dayjs(selectedRun.completed_at).format('DD.MM.YYYY HH:mm:ss')}</p>
-                    )}
-                    {selectedRun.completed_at && selectedRun.started_at && (
-                      <p><strong>Длительность:</strong> {dayjs(selectedRun.completed_at).diff(dayjs(selectedRun.started_at), 'minute')} мин</p>
-                    )}
-                  </Col>
-                </Row>
+              {/* Заголовок запуска */}
+              <Card 
+                style={{ 
+                  textAlign: 'center',
+                  background: 'linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%)',
+                  border: '2px solid #40a9ff',
+                  marginBottom: 24
+                }}
+              >
+                <Space direction="vertical" size="small">
+                  <Title level={3} style={{ margin: 0, color: '#096dd9' }}>
+                    {selectedRun.name}
+                  </Title>
+                  <Space>
+                    <Tag 
+                      icon={getStatusIcon(selectedRun.status)} 
+                      color={getStatusColor(selectedRun.status)}
+                      style={{ fontSize: '16px', padding: '6px 16px' }}
+                    >
+                      {getStatusText(selectedRun.status)}
+                    </Tag>
+                    <Tag icon={<UserOutlined />} color="blue">ID: {selectedRun.id}</Tag>
+                  </Space>
+                  <Progress 
+                    percent={getProgress()} 
+                    size="small" 
+                    status={selectedRun.status === 'completed' ? 'success' : selectedRun.status === 'failed' ? 'exception' : 'active'}
+                  />
+                </Space>
               </Card>
 
-              {/* Тип нагрузки */}
-              {config.workloadType && (
-                <Card title={<><ThunderboltOutlined style={{ marginRight: 8 }} />Нагрузка</>} size="small" style={{ marginBottom: 16 }}>
-                  <Row gutter={16}>
-                    <Col span={8}>
-                      <p><strong>Тип:</strong> <Tag color="blue">{config.workloadType.toUpperCase()}</Tag></p>
-                    </Col>
-                    <Col span={8}>
-                      <p><strong>Раннеры:</strong> {config.workloadProperties?.runners || 'Не указано'}</p>
-                    </Col>
-                    <Col span={8}>
-                      <p><strong>Длительность:</strong> {config.workloadProperties?.duration || 'Не указано'}</p>
-                    </Col>
-                  </Row>
-                  {config.workloadProperties && Object.keys(config.workloadProperties).length > 2 && (
-                    <div style={{ marginTop: 12 }}>
-                      <strong>Дополнительные свойства:</strong>
-                      <div style={{ marginTop: 8 }}>
-                        {Object.entries(config.workloadProperties)
-                          .filter(([key]) => !['runners', 'duration'].includes(key))
-                          .map(([key, value]) => (
-                            <Tag key={key} style={{ marginBottom: 4 }}>
-                              {key}: {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                            </Tag>
-                          ))}
-                      </div>
-                    </div>
+              {/* Основная информация */}
+              <Card 
+                title={
+                  <Space>
+                    <SettingOutlined />
+                    <Text strong>Основная информация</Text>
+                  </Space>
+                }
+                style={{ marginBottom: 16 }}
+              >
+                <Descriptions column={2} bordered size="small">
+                  <Descriptions.Item label="ID запуска" span={1}>
+                    <Tag color="blue">#{selectedRun.id}</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Run ID" span={1}>
+                    <Tag color="cyan">run-{selectedRun.id}</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Статус" span={1}>
+                    <Tag icon={getStatusIcon(selectedRun.status)} color={getStatusColor(selectedRun.status)}>
+                      {getStatusText(selectedRun.status)}
+                    </Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Прогресс" span={1}>
+                    <Progress 
+                      percent={getProgress()} 
+                      size="small" 
+                      status={selectedRun.status === 'completed' ? 'success' : selectedRun.status === 'failed' ? 'exception' : 'active'}
+                      style={{ width: '100px' }}
+                    />
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Описание" span={2}>
+                    {selectedRun.description || <Text type="secondary">Нет описания</Text>}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Время запуска" span={1}>
+                    <Space>
+                      <CalendarOutlined />
+                      {dayjs(selectedRun.created_at).format('DD.MM.YYYY HH:mm:ss')}
+                    </Space>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Обновлен" span={1}>
+                    <Space>
+                      <ClockCircleOutlined />
+                      {dayjs(selectedRun.updated_at).format('DD.MM.YYYY HH:mm:ss')}
+                    </Space>
+                  </Descriptions.Item>
+                  {selectedRun.started_at && (
+                    <Descriptions.Item label="Запущен" span={1}>
+                      <Space>
+                        <PlayCircleOutlined />
+                        {dayjs(selectedRun.started_at).format('DD.MM.YYYY HH:mm:ss')}
+                      </Space>
+                    </Descriptions.Item>
                   )}
-                </Card>
-              )}
+                  {selectedRun.completed_at && (
+                    <Descriptions.Item label="Завершен" span={1}>
+                      <Space>
+                        <CheckCircleOutlined />
+                        {dayjs(selectedRun.completed_at).format('DD.MM.YYYY HH:mm:ss')}
+                      </Space>
+                    </Descriptions.Item>
+                  )}
+                  <Descriptions.Item label="Длительность" span={2}>
+                    <Space>
+                      <ClockCircleOutlined />
+                      <Text strong>{getDuration()}</Text>
+                    </Space>
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
 
-              {/* База данных */}
-              {config.databaseType && (
-                <Card title={<><DatabaseOutlined style={{ marginRight: 8 }} />База данных</>} size="small" style={{ marginBottom: 16 }}>
-                  <Row gutter={16}>
-                    <Col span={8}>
-                      <p><strong>Тип:</strong> <Tag color="green">{config.databaseType.toUpperCase()}</Tag></p>
-                    </Col>
-                    <Col span={8}>
-                      <p><strong>Версия:</strong> {config.databaseVersion?.version || 'Не указано'}</p>
-                    </Col>
-                    <Col span={8}>
-                      <p><strong>Сборка:</strong> {config.databaseVersion?.build || <Text type="secondary">Не указано</Text>}</p>
-                    </Col>
-                  </Row>
-                </Card>
-              )}
+              {/* Конфигурация нагрузки */}
+              <Card 
+                title={
+                  <Space>
+                    <ThunderboltOutlined />
+                    <Text strong>Конфигурация нагрузки</Text>
+                  </Space>
+                }
+                style={{ marginBottom: 16 }}
+              >
+                <Descriptions column={2} bordered size="small">
+                  <Descriptions.Item label="Тип нагрузки" span={1}>
+                    <Tag color="blue">{(config.workloadType || 'custom').toUpperCase()}</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Количество раннеров" span={1}>
+                    {config.workloadProperties?.runners || 1}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Продолжительность теста" span={2}>
+                    {config.workloadProperties?.duration || 'Не указано'}
+                  </Descriptions.Item>
+                </Descriptions>
+                
+                {/* Дополнительные свойства нагрузки */}
+                {config.workloadProperties && Object.keys(config.workloadProperties).length > 0 && (
+                  <>
+                    <Divider orientation="left" plain>Дополнительные свойства</Divider>
+                    <div style={{ marginTop: 8 }}>
+                      {Object.entries(config.workloadProperties)
+                        .filter(([key]) => !['runners', 'duration'].includes(key))
+                        .map(([key, value]) => (
+                          <div key={key} style={{ marginBottom: 8 }}>
+                            <Text type="secondary">{key}: </Text>
+                            <Tag color="blue">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</Tag>
+                          </div>
+                        ))}
+                      {Object.keys(config.workloadProperties).filter(key => !['runners', 'duration'].includes(key)).length === 0 && (
+                        <Text type="secondary">Дополнительные свойства отсутствуют</Text>
+                      )}
+                    </div>
+                  </>
+                )}
+              </Card>
+
+              {/* Конфигурация базы данных */}
+              <Card 
+                title={
+                  <Space>
+                    <DatabaseOutlined />
+                    <Text strong>Конфигурация базы данных</Text>
+                  </Space>
+                }
+                style={{ marginBottom: 16 }}
+              >
+                <Descriptions column={2} bordered size="small">
+                  <Descriptions.Item label="Тип СУБД" span={1}>
+                    <Tag color="green">{(config.databaseType || 'postgres').toUpperCase()}</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Версия" span={1}>
+                    {config.databaseVersion?.version || 'Не указано'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Сборка" span={2}>
+                    {config.databaseVersion?.build || <Text type="secondary">Не указано</Text>}
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
 
               {/* Конфигурация железа */}
-              {config.hardwareConfiguration && (
-                <Card title={<><CloudServerOutlined style={{ marginRight: 8 }} />Конфигурация железа</>} size="small" style={{ marginBottom: 16 }}>
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <p><strong>Название:</strong> {config.hardwareConfiguration.name || 'Не указано'}</p>
-                      <p><strong>Узлы:</strong> {config.hardwareConfiguration.nodeCount || 1}</p>
-                      <p><strong>Процессор:</strong> {config.hardwareConfiguration.cpu?.cores || 0} ядер ({config.hardwareConfiguration.cpu?.model || 'Неизвестно'})</p>
-                    </Col>
-                    <Col span={12}>
-                      <p><strong>Память:</strong> {config.hardwareConfiguration.memory?.totalGB || 0} GB</p>
-                      <p><strong>Накопитель:</strong> {config.hardwareConfiguration.storage?.type?.toUpperCase() || 'SSD'} {config.hardwareConfiguration.storage?.capacityGB || 0} GB</p>
-                      {config.hardwareConfiguration.signature && (
-                        <p><strong>Сигнатура:</strong> <Tag color="orange">{config.hardwareConfiguration.signature}</Tag></p>
-                      )}
-                    </Col>
-                  </Row>
-                </Card>
-              )}
+              <Card 
+                title={
+                  <Space>
+                    <CloudServerOutlined />
+                    <Text strong>Конфигурация железа</Text>
+                  </Space>
+                }
+                style={{ marginBottom: 16 }}
+              >
+                <Descriptions column={2} bordered size="small">
+                  <Descriptions.Item label="Название конфигурации" span={1}>
+                    {config.hardwareConfiguration?.name || 'Неизвестная конфигурация'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Количество узлов" span={1}>
+                    {config.hardwareConfiguration?.nodeCount || 1}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Процессор" span={1}>
+                    {config.hardwareConfiguration?.cpu?.cores || 0} ядер
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Модель CPU" span={1}>
+                    {config.hardwareConfiguration?.cpu?.model || 'Неизвестно'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Память" span={1}>
+                    {config.hardwareConfiguration?.memory?.totalGB || 0} GB
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Тип накопителя" span={1}>
+                    {(config.hardwareConfiguration?.storage?.type || 'ssd').toUpperCase()}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Объем накопителя" span={1}>
+                    {config.hardwareConfiguration?.storage?.capacityGB || 0} GB
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Сигнатура" span={1}>
+                    <Tag color="orange">
+                      {config.hardwareConfiguration?.signature || 
+                       `${config.hardwareConfiguration?.cpu?.cores || 0}c-${config.hardwareConfiguration?.memory?.totalGB || 0}gb-${config.hardwareConfiguration?.storage?.type || 'ssd'}-${config.hardwareConfiguration?.storage?.capacityGB || 0}gb-${config.hardwareConfiguration?.nodeCount || 1}n`}
+                    </Tag>
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
 
               {/* Схема развертывания */}
-              {config.deploymentLayout && (
-                <Card title={<><CloudServerOutlined style={{ marginRight: 8 }} />Схема развертывания</>} size="small" style={{ marginBottom: 16 }}>
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <p><strong>Тип:</strong> <Tag color="cyan">{config.deploymentLayout.type}</Tag></p>
-                      {config.deploymentLayout.signature && (
-                        <p><strong>Сигнатура:</strong> <Tag color="purple">{config.deploymentLayout.signature}</Tag></p>
-                      )}
-                    </Col>
-                    <Col span={12}>
-                      {config.deploymentLayout.configuration && Object.keys(config.deploymentLayout.configuration).length > 0 && (
-                        <div>
-                          <strong>Конфигурация:</strong>
-                          <div style={{ marginTop: 4 }}>
-                            {Object.entries(config.deploymentLayout.configuration).map(([key, value]) => (
-                              <div key={key}>
-                                <Text type="secondary">{key}: </Text>
-                                <Text>{String(value)}</Text>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </Col>
-                  </Row>
-                </Card>
-              )}
+              <Card 
+                title={
+                  <Space>
+                    <CloudServerOutlined />
+                    <Text strong>Схема развертывания</Text>
+                  </Space>
+                }
+                style={{ marginBottom: 16 }}
+              >
+                <Descriptions column={2} bordered size="small">
+                  <Descriptions.Item label="Тип развертывания" span={1}>
+                    <Tag color="cyan">{config.deploymentLayout?.type || 'single-node'}</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Сигнатура" span={1}>
+                    <Tag color="purple">{config.deploymentLayout?.signature || 'single-node'}</Tag>
+                  </Descriptions.Item>
+                </Descriptions>
+                
+                {/* Конфигурация развертывания */}
+                <Divider orientation="left" plain>Параметры развертывания</Divider>
+                <div style={{ marginTop: 8 }}>
+                  {config.deploymentLayout?.configuration && Object.keys(config.deploymentLayout.configuration).length > 0 ? (
+                    Object.entries(config.deploymentLayout.configuration).map(([key, value]) => (
+                      <div key={key} style={{ marginBottom: 8 }}>
+                        <Text type="secondary">{key}: </Text>
+                        <Tag color="blue">{String(value)}</Tag>
+                      </div>
+                    ))
+                  ) : (
+                    <Text type="secondary">Дополнительные параметры отсутствуют</Text>
+                  )}
+                </div>
+              </Card>
 
-              {/* Немезисы */}
-              {config.nemesisSignature && (
-                <Card title={<><BugOutlined style={{ marginRight: 8 }} />Немезисы</>} size="small" style={{ marginBottom: 16 }}>
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <p><strong>Сигнатура:</strong> <Tag color="red">{config.nemesisSignature.signature}</Tag></p>
-                    </Col>
-                    <Col span={12}>
-                      {config.nemesisSignature.nemeses && config.nemesisSignature.nemeses.length > 0 ? (
-                        <div>
-                          <strong>Активные немезисы:</strong>
-                          <div style={{ marginTop: 4 }}>
-                            {config.nemesisSignature.nemeses
-                              .filter((n: any) => n.enabled)
-                              .map((nemesis: any, index: number) => (
-                                <Tag key={index} color="volcano" style={{ marginBottom: 4 }}>
-                                  {nemesis.type}
-                                </Tag>
-                              ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <Text type="secondary">Немезисы отсутствуют</Text>
+              {/* Конфигурация немезисов */}
+              <Card 
+                title={
+                  <Space>
+                    <BugOutlined />
+                    <Text strong>Конфигурация немезисов</Text>
+                  </Space>
+                }
+                style={{ marginBottom: 16 }}
+              >
+                <Descriptions column={1} bordered size="small">
+                  <Descriptions.Item label="Сигнатура немезисов">
+                    <Tag color="red">{config.nemesisSignature?.signature || 'none'}</Tag>
+                  </Descriptions.Item>
+                </Descriptions>
+                
+                {/* Активные немезисы */}
+                <Divider orientation="left" plain>Активные немезисы</Divider>
+                <div style={{ marginTop: 8 }}>
+                  {config.nemesisSignature?.nemeses && config.nemesisSignature.nemeses.length > 0 ? (
+                    <Space wrap>
+                      {config.nemesisSignature.nemeses
+                        .filter((n: any) => n.enabled)
+                        .map((nemesis: any, index: number) => (
+                          <Tag key={index} color="red" icon={<BugOutlined />}>
+                            {nemesis.type}
+                          </Tag>
+                        ))}
+                      {config.nemesisSignature.nemeses.filter((n: any) => n.enabled).length === 0 && (
+                        <Text type="secondary">Нет активных немезисов</Text>
                       )}
-                    </Col>
-                  </Row>
-                </Card>
-              )}
+                    </Space>
+                  ) : (
+                    <Text type="secondary">Немезисы отсутствуют</Text>
+                  )}
+                </div>
+              </Card>
               
+              {/* TPS Метрики */}
+              <Card 
+                title={
+                  <Space>
+                    <ThunderboltOutlined />
+                    <Text strong>TPS Метрики</Text>
+                  </Space>
+                }
+                style={{ marginBottom: 16 }}
+              >
+                <Descriptions column={2} bordered size="small">
+                  {selectedRun.tps_metrics?.max !== undefined ? (
+                    <Descriptions.Item label="Максимальный TPS" span={1}>
+                      <Tag color="green">{selectedRun.tps_metrics.max.toFixed(2)}</Tag>
+                    </Descriptions.Item>
+                  ) : (
+                    <Descriptions.Item label="Максимальный TPS" span={1}>
+                      <Text type="secondary">Не указано</Text>
+                    </Descriptions.Item>
+                  )}
+                  {selectedRun.tps_metrics?.min !== undefined ? (
+                    <Descriptions.Item label="Минимальный TPS" span={1}>
+                      <Tag color="red">{selectedRun.tps_metrics.min.toFixed(2)}</Tag>
+                    </Descriptions.Item>
+                  ) : (
+                    <Descriptions.Item label="Минимальный TPS" span={1}>
+                      <Text type="secondary">Не указано</Text>
+                    </Descriptions.Item>
+                  )}
+                  {selectedRun.tps_metrics?.average !== undefined ? (
+                    <Descriptions.Item label="Средний TPS" span={1}>
+                      <Tag color="blue">{selectedRun.tps_metrics.average.toFixed(2)}</Tag>
+                    </Descriptions.Item>
+                  ) : (
+                    <Descriptions.Item label="Средний TPS" span={1}>
+                      <Text type="secondary">Не указано</Text>
+                    </Descriptions.Item>
+                  )}
+                  {selectedRun.tps_metrics?.['95p'] !== undefined ? (
+                    <Descriptions.Item label="95-й процентиль TPS" span={1}>
+                      <Tag color="purple">{selectedRun.tps_metrics['95p'].toFixed(2)}</Tag>
+                    </Descriptions.Item>
+                  ) : (
+                    <Descriptions.Item label="95-й процентиль TPS" span={1}>
+                      <Text type="secondary">Не указано</Text>
+                    </Descriptions.Item>
+                  )}
+                  {selectedRun.tps_metrics?.['99p'] !== undefined ? (
+                    <Descriptions.Item label="99-й процентиль TPS" span={2}>
+                      <Tag color="orange">{selectedRun.tps_metrics['99p'].toFixed(2)}</Tag>
+                    </Descriptions.Item>
+                  ) : (
+                    <Descriptions.Item label="99-й процентиль TPS" span={2}>
+                      <Text type="secondary">Не указано</Text>
+                    </Descriptions.Item>
+                  )}
+                </Descriptions>
+              </Card>
+
               {/* Результат */}
               {selectedRun.result && (
                 <Card title="Результат выполнения" size="small" style={{ marginBottom: 16 }}>
@@ -846,6 +1154,54 @@ const RunsPage: React.FC = () => {
                   </pre>
                 </Card>
               )}
+
+              {/* Итоговая статистика */}
+              <Card 
+                title="Сводка конфигурации" 
+                style={{ 
+                  marginTop: 16,
+                  background: 'linear-gradient(135deg, #f0f2f5 0%, #e6f7ff 100%)'
+                }}
+              >
+                <Row gutter={16}>
+                  <Col span={6}>
+                    <Statistic
+                      title="Статус запуска"
+                      value={getStatusText(selectedRun.status)}
+                      prefix={getStatusIcon(selectedRun.status)}
+                      valueStyle={{ 
+                        color: selectedRun.status === 'completed' ? '#52c41a' : 
+                               selectedRun.status === 'failed' ? '#ff4d4f' : '#1890ff',
+                        fontSize: '16px'
+                      }}
+                    />
+                  </Col>
+                  <Col span={6}>
+                    <Statistic
+                      title="Тип нагрузки"
+                      value={(config.workloadType || 'custom').toUpperCase()}
+                      prefix={<ThunderboltOutlined />}
+                      valueStyle={{ color: '#1890ff', fontSize: '16px' }}
+                    />
+                  </Col>
+                  <Col span={6}>
+                    <Statistic
+                      title="Тип СУБД"
+                      value={(config.databaseType || 'postgres').toUpperCase()}
+                      prefix={<DatabaseOutlined />}
+                      valueStyle={{ color: '#52c41a', fontSize: '16px' }}
+                    />
+                  </Col>
+                  <Col span={6}>
+                    <Statistic
+                      title="Узлов"
+                      value={config.hardwareConfiguration?.nodeCount || 1}
+                      prefix={<CloudServerOutlined />}
+                      valueStyle={{ color: '#722ed1', fontSize: '16px' }}
+                    />
+                  </Col>
+                </Row>
+              </Card>
 
               {/* Полная конфигурация */}
               <Card title="Полная конфигурация" size="small">
@@ -897,3 +1253,186 @@ const RunsPage: React.FC = () => {
 }
 
 export default RunsPage
+
+// ============================================================================
+// КОД ВИРТУАЛИЗАЦИИ ТАБЛИЦЫ (для будущего использования)
+// ============================================================================
+// 
+// Для включения виртуализации:
+// 1. Установить: npm install @tanstack/react-virtual
+// 2. Добавить импорт: import { useVirtualizer } from '@tanstack/react-virtual'
+// 3. Заменить обычную таблицу на VirtualizedTable
+// 4. Убрать импорт Table из antd
+//
+// ============================================================================
+
+/*
+// Виртуализированная таблица
+const VirtualizedTable = () => {
+  const parentRef = React.useRef<HTMLDivElement>(null);
+  
+  const virtualizer = useVirtualizer({
+    count: runs.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 50, // Высота строки
+    overscan: 10, // Количество дополнительных строк для рендеринга
+  });
+
+  // Функция для рендеринга заголовка с сортировкой
+  const renderSortableHeader = (title: string, field: string, width: string) => {
+    const isActive = sortState.field === field;
+    const isAsc = isActive && sortState.order === 'asc';
+    const isDesc = isActive && sortState.order === 'desc';
+    
+    return (
+      <div
+        style={{
+          width,
+          padding: '8px 16px',
+          fontWeight: 'bold',
+          backgroundColor: '#fafafa',
+          borderBottom: '1px solid #f0f0f0',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          userSelect: 'none',
+        }}
+        onClick={() => {
+          const newOrder = isActive && sortState.order === 'asc' ? 'desc' : 'asc';
+          handleSort(field, newOrder);
+        }}
+      >
+        <span>{title}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', fontSize: '10px' }}>
+          <span style={{ color: isAsc ? '#1890ff' : '#d9d9d9' }}>▲</span>
+          <span style={{ color: isDesc ? '#1890ff' : '#d9d9d9' }}>▼</span>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ height: 'calc(100vh - 450px)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', borderBottom: '2px solid #f0f0f0' }}>
+        {renderSortableHeader('ID', 'id', '80px')}
+        {renderSortableHeader('Название', 'name', 'flex: 1')}
+        {renderSortableHeader('Статус', 'status', '120px')}
+        {renderSortableHeader('Создан', 'created_at', '150px')}
+        {renderSortableHeader('TPS Avg', 'tps_avg', '100px')}
+        <div style={{ width: '120px', padding: '8px 16px', fontWeight: 'bold', backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
+          Действия
+        </div>
+      </div>
+      
+      <div
+        ref={parentRef}
+        style={{
+          flex: 1,
+          overflow: 'auto',
+        }}
+      >
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualItem) => {
+            const run = runs[virtualItem.index];
+            return (
+              <div
+                key={virtualItem.key}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualItem.size}px`,
+                  transform: `translateY(${virtualItem.start}px)`,
+                  borderBottom: '1px solid #f0f0f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '8px 16px',
+                  backgroundColor: selectedRowKeys.includes(run.id) ? '#e6f7ff' : 'white',
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  const newKeys = selectedRowKeys.includes(run.id)
+                    ? selectedRowKeys.filter(key => key !== run.id)
+                    : [...selectedRowKeys, run.id];
+                  setSelectedRowKeys(newKeys);
+                }}
+              >
+                <div style={{ width: '80px' }}>
+                  <Text code>#{run.id}</Text>
+                </div>
+                <div style={{ flex: 1, marginLeft: '16px' }}>
+                  <Text strong>{run.name}</Text>
+                  {run.description && (
+                    <div>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                        {run.description.length > 50 
+                          ? `${run.description.substring(0, 50)}...` 
+                          : run.description}
+                      </Text>
+                    </div>
+                  )}
+                </div>
+                <div style={{ width: '120px', marginLeft: '16px' }}>
+                  <Tag icon={getStatusIcon(run.status)} color={getStatusColor(run.status)}>
+                    {getStatusText(run.status)}
+                  </Tag>
+                </div>
+                <div style={{ width: '150px', marginLeft: '16px' }}>
+                  <Tooltip title={dayjs(run.created_at).format('DD.MM.YYYY HH:mm:ss')}>
+                    <Text>{dayjs(run.created_at).format('DD.MM HH:mm')}</Text>
+                  </Tooltip>
+                </div>
+                <div style={{ width: '100px', marginLeft: '16px' }}>
+                  {run.tps_metrics?.average ? (
+                    <Tag color="blue">{run.tps_metrics.average.toFixed(1)}</Tag>
+                  ) : (
+                    <Text type="secondary">-</Text>
+                  )}
+                </div>
+                <div style={{ width: '120px', marginLeft: '16px' }}>
+                  <Space size="small">
+                    <Button
+                      type="text"
+                      icon={<EyeOutlined />}
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRunAction('view', run);
+                      }}
+                      title="Просмотр"
+                    />
+                    <Button
+                      type="text"
+                      icon={<DeleteOutlined />}
+                      size="small"
+                      danger
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRunAction('delete', run);
+                      }}
+                      title="Удалить"
+                    />
+                  </Space>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Для использования виртуализации заменить:
+// <Table {...tableProps} style={{ height: '100%' }} />
+// на:
+// <VirtualizedTable />
+*/

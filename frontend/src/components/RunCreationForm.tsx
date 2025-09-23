@@ -36,7 +36,8 @@ import type {
   DeploymentLayoutType,
   HardwareConfiguration,
   NemesisConfig,
-  WorkloadProperties
+  WorkloadProperties,
+  TPSMetrics
 } from '../types/run-creation'
 import {
   WORKLOAD_TYPES,
@@ -70,6 +71,7 @@ const RunCreationForm: React.FC<RunCreationFormProps> = ({
   const [selectedHardwareConfig, setSelectedHardwareConfig] = useState<string>()
   const [nemeses, setNemeses] = useState<NemesisConfig[]>([])
   const [deploymentLayoutType, setDeploymentLayoutType] = useState<DeploymentLayoutType>('single-node')
+  const [tpsMetrics, setTpsMetrics] = useState<TPSMetrics>({})
 
   // Инициализация формы
   useEffect(() => {
@@ -86,6 +88,9 @@ const RunCreationForm: React.FC<RunCreationFormProps> = ({
       }
       if (initialData.deploymentLayout?.type) {
         setDeploymentLayoutType(initialData.deploymentLayout.type)
+      }
+      if (initialData.tpsMetrics) {
+        setTpsMetrics(initialData.tpsMetrics)
       }
     }
   }, [initialData, form])
@@ -157,6 +162,14 @@ const RunCreationForm: React.FC<RunCreationFormProps> = ({
     setNemeses(current => current.filter((_, i) => i !== index))
   }
 
+  // Обновление TPS метрик
+  const updateTpsMetrics = (field: keyof TPSMetrics, value: number | undefined) => {
+    setTpsMetrics(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
   // Отправка формы
   const handleSubmit = async (values: any) => {
     try {
@@ -191,7 +204,8 @@ const RunCreationForm: React.FC<RunCreationFormProps> = ({
           runners: values.runners || 1,
           duration: values.duration,
           ...getWorkloadSpecificProperties(values)
-        }
+        },
+        tpsMetrics: tpsMetrics
       }
 
       onSubmit(formData)
@@ -888,6 +902,106 @@ const RunCreationForm: React.FC<RunCreationFormProps> = ({
             className="mt-2"
           />
         )}
+      </Card>
+
+      {/* TPS Метрики */}
+      <Card title={<><ThunderboltOutlined className="mr-2" />TPS Метрики</>} className="mb-4">
+        <Alert
+          message="Метрики производительности"
+          description="Укажите метрики TPS (Transactions Per Second) для данного запуска. Все поля необязательны."
+          type="info"
+          showIcon
+          className="mb-4"
+        />
+        
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="tps_max"
+              label="Максимальный TPS"
+              tooltip="Максимальное количество транзакций в секунду"
+            >
+              <InputNumber
+                min={0}
+                step={0.1}
+                placeholder="0.0"
+                style={{ width: '100%' }}
+                value={tpsMetrics.max}
+                onChange={(value) => updateTpsMetrics('max', value || undefined)}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="tps_min"
+              label="Минимальный TPS"
+              tooltip="Минимальное количество транзакций в секунду"
+            >
+              <InputNumber
+                min={0}
+                step={0.1}
+                placeholder="0.0"
+                style={{ width: '100%' }}
+                value={tpsMetrics.min}
+                onChange={(value) => updateTpsMetrics('min', value || undefined)}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+        
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="tps_average"
+              label="Средний TPS"
+              tooltip="Среднее количество транзакций в секунду"
+            >
+              <InputNumber
+                min={0}
+                step={0.1}
+                placeholder="0.0"
+                style={{ width: '100%' }}
+                value={tpsMetrics.average}
+                onChange={(value) => updateTpsMetrics('average', value || undefined)}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="tps_95p"
+              label="95-й процентиль TPS"
+              tooltip="95-й процентиль количества транзакций в секунду"
+            >
+              <InputNumber
+                min={0}
+                step={0.1}
+                placeholder="0.0"
+                style={{ width: '100%' }}
+                value={tpsMetrics['95p']}
+                onChange={(value) => updateTpsMetrics('95p', value || undefined)}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+        
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="tps_99p"
+              label="99-й процентиль TPS"
+              tooltip="99-й процентиль количества транзакций в секунду"
+            >
+              <InputNumber
+                min={0}
+                step={0.1}
+                placeholder="0.0"
+                style={{ width: '100%' }}
+                value={tpsMetrics['99p']}
+                onChange={(value) => updateTpsMetrics('99p', value || undefined)}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
       </Card>
 
       {/* Действия */}

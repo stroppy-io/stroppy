@@ -65,6 +65,21 @@ func (s *RunService) GetAllWithFilters(limit, offset int, searchText, status, da
 	return runs, total, nil
 }
 
+// GetAllWithFiltersAndSort получает запуски с фильтрацией, пагинацией и сортировкой
+func (s *RunService) GetAllWithFiltersAndSort(limit, offset int, searchText, status, dateFrom, dateTo, sortBy, sortOrder string) ([]*run.Run, int, error) {
+	runs, err := s.runRepo.GetAllWithFiltersAndSort(limit, offset, searchText, status, dateFrom, dateTo, sortBy, sortOrder)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	total, err := s.runRepo.CountWithFilters(searchText, status, dateFrom, dateTo)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return runs, total, nil
+}
+
 // Update обновляет запуск
 func (s *RunService) Update(id int, name, description, config string) (*run.Run, error) {
 	ru, err := s.runRepo.GetByID(id)
@@ -112,7 +127,29 @@ func (s *RunService) UpdateStatus(id int, status run.RunStatus, result string) (
 	return ru, nil
 }
 
+// UpdateTPSMetrics обновляет метрики TPS для запуска
+func (s *RunService) UpdateTPSMetrics(id int, metrics run.TPSMetrics) (*run.Run, error) {
+	ru, err := s.runRepo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Обновляем метрики TPS
+	ru.UpdateTPSMetrics(metrics)
+
+	if err := s.runRepo.Update(ru); err != nil {
+		return nil, err
+	}
+
+	return ru, nil
+}
+
 // Delete удаляет запуск
 func (s *RunService) Delete(id int) error {
 	return s.runRepo.Delete(id)
+}
+
+// GetFilterOptions возвращает уникальные значения для фильтров
+func (s *RunService) GetFilterOptions() (map[string][]string, error) {
+	return s.runRepo.GetFilterOptions()
 }

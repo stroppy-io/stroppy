@@ -26,6 +26,18 @@ export interface RunCreationFormData {
   
   // Свойства нагрузки
   workloadProperties: WorkloadProperties
+  
+  // TPS метрики
+  tpsMetrics?: TPSMetrics
+}
+
+// TPS метрики
+export interface TPSMetrics {
+  max?: number
+  min?: number
+  average?: number
+  '95p'?: number
+  '99p'?: number
 }
 
 // Типы нагрузки

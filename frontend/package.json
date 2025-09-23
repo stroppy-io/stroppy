@@ -12,9 +12,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@ant-design/charts": "^2.6.5",
     "@protobuf-ts/runtime": "^2.11.1",
+    "@tanstack/react-virtual": "^3.13.12",
     "antd": "^5.27.4",
     "axios": "^1.12.2",
+    "darkreader": "^4.9.109",
     "dayjs": "^1.11.18",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

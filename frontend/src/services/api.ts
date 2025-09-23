@@ -22,6 +22,14 @@ export interface AuthResponse {
   token: string;
 }
 
+export interface TPSMetrics {
+  max?: number;
+  min?: number;
+  average?: number;
+  '95p'?: number;
+  '99p'?: number;
+}
+
 export interface Run {
   id: number;
   user_id: number;
@@ -30,10 +38,16 @@ export interface Run {
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   config: string;
   result?: string;
+  tps_metrics?: TPSMetrics;
   created_at: string;
   updated_at: string;
   started_at?: string;
   completed_at?: string;
+  // Дополнительные поля для фильтрации (извлекаются из config)
+  load_type?: string;
+  database?: string;
+  deployment_schema?: string;
+  hardware_config?: string;
 }
 
 export interface CreateRunRequest {
@@ -53,11 +67,27 @@ export interface UpdateStatusRequest {
   result?: string;
 }
 
+export interface UpdateTPSMetricsRequest {
+  max?: number;
+  min?: number;
+  average?: number;
+  '95p'?: number;
+  '99p'?: number;
+}
+
 export interface RunListResponse {
   runs: Run[];
   total: number;
   page: number;
   limit: number;
+}
+
+export interface FilterOptionsResponse {
+  statuses: string[];
+  load_types: string[];
+  databases: string[];
+  deployment_schemas: string[];
+  hardware_configs: string[];
 }
 
 export interface ApiError {
@@ -161,7 +191,9 @@ class ApiClient {
     search?: string,
     status?: string,
     dateFrom?: string,
-    dateTo?: string
+    dateTo?: string,
+    sortBy?: string,
+    sortOrder?: string
   ): Promise<RunListResponse> {
     const params: any = { page, limit };
     
@@ -169,6 +201,8 @@ class ApiClient {
     if (status) params.status = status;
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
+    if (sortBy) params.sort_by = sortBy;
+    if (sortOrder) params.sort_order = sortOrder;
 
     const response = await this.client.get('/runs', { params });
     return response.data;
@@ -189,8 +223,18 @@ class ApiClient {
     return response.data;
   }
 
+  async updateRunTPSMetrics(id: number, data: UpdateTPSMetricsRequest): Promise<Run> {
+    const response = await this.client.put(`/runs/${id}/tps`, data);
+    return response.data;
+  }
+
   async deleteRun(id: number): Promise<void> {
     await this.client.delete(`/runs/${id}`);
+  }
+
+  async getFilterOptions(): Promise<FilterOptionsResponse> {
+    const response = await this.client.get('/runs/filter-options');
+    return response.data;
   }
 
   // Проверка состояния сервера

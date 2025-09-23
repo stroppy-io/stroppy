@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import React, { type ReactNode } from 'react'
 import { Layout, Button, Space, Dropdown, Avatar, Typography, Switch } from 'antd'
 import { 
   ThunderboltOutlined, 
@@ -6,12 +6,12 @@ import {
   SettingOutlined, 
   UserOutlined, 
   LogoutOutlined,
-  SunOutlined,
-  MoonOutlined
+  EyeOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import DarkReaderSettings from './DarkReaderSettings'
 
 const { Header, Content } = Layout
 const { Text } = Typography
@@ -22,8 +22,15 @@ interface PageWrapperProps {
 
 const PageWrapper: React.FC<PageWrapperProps> = ({ children }) => {
   const { user, logout } = useAuth()
-  const { mode, toggleTheme, antdTheme } = useTheme()
+  const { 
+    darkReaderEnabled, 
+    toggleDarkReader,
+    followSystemTheme,
+    stopFollowingSystem 
+  } = useTheme()
   const navigate = useNavigate()
+  
+  const [darkReaderSettingsVisible, setDarkReaderSettingsVisible] = React.useState(false)
 
   const handleLogout = async () => {
     await logout()
@@ -49,22 +56,34 @@ const PageWrapper: React.FC<PageWrapperProps> = ({ children }) => {
       type: 'divider' as const
     },
     {
-      key: 'theme',
+      key: 'darkreader',
       label: (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '140px' }}>
-          <span>Тёмная тема</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '160px' }}>
+          <span>Dark Reader</span>
           <Switch
             size="small"
-            checked={mode === 'dark'}
-            onChange={toggleTheme}
-            checkedChildren={<MoonOutlined />}
-            unCheckedChildren={<SunOutlined />}
+            checked={darkReaderEnabled}
+            onChange={toggleDarkReader}
+            checkedChildren={<EyeOutlined />}
+            unCheckedChildren={<EyeOutlined />}
           />
         </div>
       ),
       onClick: (e: any) => {
         e.domEvent.stopPropagation()
       }
+    },
+    {
+      key: 'darkreader-settings',
+      icon: <SettingOutlined />,
+      label: 'Настройки Dark Reader',
+      onClick: () => setDarkReaderSettingsVisible(true)
+    },
+    {
+      key: 'system-theme',
+      icon: <CloudOutlined />,
+      label: darkReaderEnabled ? 'Остановить следование системной теме' : 'Следовать системной теме',
+      onClick: darkReaderEnabled ? stopFollowingSystem : followSystemTheme
     },
     {
       type: 'divider' as const
@@ -82,13 +101,11 @@ const PageWrapper: React.FC<PageWrapperProps> = ({ children }) => {
     <>
       <Header 
         style={{ 
-          background: antdTheme.components?.Layout?.headerBg || '#fff', 
+          background: '#fff', 
           padding: '0 16px', 
           height: '56px',
           lineHeight: '56px',
-          boxShadow: mode === 'dark' 
-            ? '0 1px 4px rgba(255,255,255,.08)' 
-            : '0 1px 4px rgba(0,21,41,.08)'
+          boxShadow: '0 1px 4px rgba(0,21,41,.08)'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%' }}>
@@ -107,7 +124,7 @@ const PageWrapper: React.FC<PageWrapperProps> = ({ children }) => {
             <span style={{ 
               fontSize: '18px', 
               fontWeight: 'bold', 
-              color: mode === 'dark' ? '#ffffff' : '#262626' 
+              color: '#262626' 
             }}>
               Stroppy Cloud Panel
             </span>
@@ -118,7 +135,7 @@ const PageWrapper: React.FC<PageWrapperProps> = ({ children }) => {
               icon={<SettingOutlined />} 
               size="small" 
               type="text" 
-              style={{ color: mode === 'dark' ? '#a6a6a6' : '#666' }}
+              style={{ color: '#666' }}
             >
               Настройки
             </Button>
@@ -159,7 +176,7 @@ const PageWrapper: React.FC<PageWrapperProps> = ({ children }) => {
       </Header>
       
       <Content style={{ 
-        background: antdTheme.components?.Layout?.bodyBg || '#f5f5f5', 
+        background: '#f5f5f5', 
         padding: '24px',
         overflow: 'hidden',
         flex: 1,
@@ -170,6 +187,12 @@ const PageWrapper: React.FC<PageWrapperProps> = ({ children }) => {
           {children}
         </div>
       </Content>
+      
+      {/* Модальное окно настроек Dark Reader */}
+      <DarkReaderSettings
+        visible={darkReaderSettingsVisible}
+        onClose={() => setDarkReaderSettingsVisible(false)}
+      />
     </>
   )
 }

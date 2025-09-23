@@ -14,7 +14,7 @@ build:
 # Запуск в продакшн режиме
 run:
 	@echo "Запуск контейнера в продакшн режиме..."
-	@docker compose up -d
+	@docker compose up -d --build
 	@echo "Контейнер запущен на http://localhost:8080"
 
 # Запуск в режиме разработки

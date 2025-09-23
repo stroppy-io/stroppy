@@ -102,9 +102,11 @@ func main() {
 			{
 				runs.POST("", runHandler.CreateRun)
 				runs.GET("", runHandler.GetRuns)
+				runs.GET("/filter-options", runHandler.GetFilterOptions)
 				runs.GET("/:id", runHandler.GetRun)
 				runs.PUT("/:id", runHandler.UpdateRun)
 				runs.PUT("/:id/status", runHandler.UpdateRunStatus)
+				runs.PUT("/:id/tps", runHandler.UpdateRunTPSMetrics)
 				runs.DELETE("/:id", runHandler.DeleteRun)
 			}
 		}

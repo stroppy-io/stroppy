@@ -72,6 +72,14 @@ interface ComparisonRun {
     signature: string
     nemeses: Array<{ type: string, enabled: boolean }>
   }
+  
+  tpsMetrics?: {
+    max?: number
+    min?: number
+    average?: number
+    '95p'?: number
+    '99p'?: number
+  }
 }
 
 interface RunComparisonModalProps {
@@ -148,6 +156,13 @@ const RunComparisonModal: React.FC<RunComparisonModalProps> = ({
     
     // Немезисы
     if (run1.nemesisSignature.signature !== run2.nemesisSignature.signature) count++
+    
+    // TPS метрики
+    if (run1.tpsMetrics?.max !== run2.tpsMetrics?.max) count++
+    if (run1.tpsMetrics?.min !== run2.tpsMetrics?.min) count++
+    if (run1.tpsMetrics?.average !== run2.tpsMetrics?.average) count++
+    if (run1.tpsMetrics?.['95p'] !== run2.tpsMetrics?.['95p']) count++
+    if (run1.tpsMetrics?.['99p'] !== run2.tpsMetrics?.['99p']) count++
     
     return count
   }
@@ -232,6 +247,56 @@ const RunComparisonModal: React.FC<RunComparisonModalProps> = ({
             <Text>{Array.isArray(value) ? value.join(', ') : String(value)}</Text>
           </div>
         ))}
+      </div>
+    )
+  }
+
+  const renderTPSMetrics = (run: ComparisonRun) => {
+    if (!run.tpsMetrics) {
+      return <Text type="secondary">TPS метрики отсутствуют</Text>
+    }
+
+    const metrics = run.tpsMetrics
+    const hasMetrics = metrics.max !== undefined || metrics.min !== undefined || 
+                      metrics.average !== undefined || metrics['95p'] !== undefined || 
+                      metrics['99p'] !== undefined
+
+    if (!hasMetrics) {
+      return <Text type="secondary">TPS метрики не заполнены</Text>
+    }
+
+    return (
+      <div>
+        {metrics.max !== undefined && (
+          <div className="mb-1">
+            <Text type="secondary">Max: </Text>
+            <Text strong style={{ color: '#52c41a' }}>{metrics.max.toFixed(2)}</Text>
+          </div>
+        )}
+        {metrics.min !== undefined && (
+          <div className="mb-1">
+            <Text type="secondary">Min: </Text>
+            <Text strong style={{ color: '#ff4d4f' }}>{metrics.min.toFixed(2)}</Text>
+          </div>
+        )}
+        {metrics.average !== undefined && (
+          <div className="mb-1">
+            <Text type="secondary">Avg: </Text>
+            <Text strong style={{ color: '#1890ff' }}>{metrics.average.toFixed(2)}</Text>
+          </div>
+        )}
+        {metrics['95p'] !== undefined && (
+          <div className="mb-1">
+            <Text type="secondary">95p: </Text>
+            <Text strong style={{ color: '#722ed1' }}>{metrics['95p'].toFixed(2)}</Text>
+          </div>
+        )}
+        {metrics['99p'] !== undefined && (
+          <div className="mb-1">
+            <Text type="secondary">99p: </Text>
+            <Text strong style={{ color: '#fa8c16' }}>{metrics['99p'].toFixed(2)}</Text>
+          </div>
+        )}
       </div>
     )
   }
@@ -476,6 +541,7 @@ const RunComparisonModal: React.FC<RunComparisonModalProps> = ({
               <Text strong>Конфигурация немезисов</Text>
             </Space>
           }
+          style={{ marginBottom: 16 }}
         >
           <Descriptions column={1} bordered size="small">
             {renderComparisonRow('Сигнатура немезисов', run1.nemesisSignature.signature, run2.nemesisSignature.signature, <BugOutlined />, true)}
@@ -516,6 +582,55 @@ const RunComparisonModal: React.FC<RunComparisonModalProps> = ({
                     <Text type="secondary">Немезисы отсутствуют</Text>
                   )}
                 </Space>
+              </Card>
+            </Col>
+          </Row>
+        </Card>
+
+        {/* TPS Метрики */}
+        <Card 
+          title={
+            <Space>
+              <ThunderboltOutlined />
+              <Text strong>TPS Метрики</Text>
+            </Space>
+          }
+          style={{ marginBottom: 16 }}
+        >
+          <Descriptions column={1} bordered size="small">
+            {renderComparisonRow('Максимальный TPS', 
+              run1.tpsMetrics?.max?.toFixed(2) || 'Не указано', 
+              run2.tpsMetrics?.max?.toFixed(2) || 'Не указано', 
+              <ThunderboltOutlined />, true)}
+            {renderComparisonRow('Минимальный TPS', 
+              run1.tpsMetrics?.min?.toFixed(2) || 'Не указано', 
+              run2.tpsMetrics?.min?.toFixed(2) || 'Не указано', 
+              <ThunderboltOutlined />, true)}
+            {renderComparisonRow('Средний TPS', 
+              run1.tpsMetrics?.average?.toFixed(2) || 'Не указано', 
+              run2.tpsMetrics?.average?.toFixed(2) || 'Не указано', 
+              <ThunderboltOutlined />, true)}
+            {renderComparisonRow('95-й процентиль TPS', 
+              run1.tpsMetrics?.['95p']?.toFixed(2) || 'Не указано', 
+              run2.tpsMetrics?.['95p']?.toFixed(2) || 'Не указано', 
+              <ThunderboltOutlined />, true)}
+            {renderComparisonRow('99-й процентиль TPS', 
+              run1.tpsMetrics?.['99p']?.toFixed(2) || 'Не указано', 
+              run2.tpsMetrics?.['99p']?.toFixed(2) || 'Не указано', 
+              <ThunderboltOutlined />, true)}
+          </Descriptions>
+          
+          {/* Детальные TPS метрики */}
+          <Divider orientation="left" plain>Детальные метрики</Divider>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Card size="small" title="Запуск 1">
+                {renderTPSMetrics(run1)}
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card size="small" title="Запуск 2">
+                {renderTPSMetrics(run2)}
               </Card>
             </Col>
           </Row>

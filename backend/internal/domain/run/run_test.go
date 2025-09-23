@@ -9,7 +9,6 @@ import (
 func TestNewRun(t *testing.T) {
 	tests := []struct {
 		name        string
-		userID      int
 		runName     string
 		description string
 		config      string
@@ -18,24 +17,13 @@ func TestNewRun(t *testing.T) {
 	}{
 		{
 			name:        "valid run",
-			userID:      1,
 			runName:     "test run",
 			description: "test description",
 			config:      `{"key": "value"}`,
 			expectError: false,
 		},
 		{
-			name:        "invalid user id",
-			userID:      0,
-			runName:     "test run",
-			description: "test description",
-			config:      `{"key": "value"}`,
-			expectError: true,
-			expectedErr: ErrInvalidRunData,
-		},
-		{
 			name:        "empty name",
-			userID:      1,
 			runName:     "",
 			description: "test description",
 			config:      `{"key": "value"}`,
@@ -44,7 +32,6 @@ func TestNewRun(t *testing.T) {
 		},
 		{
 			name:        "empty config",
-			userID:      1,
 			runName:     "test run",
 			description: "test description",
 			config:      "",
@@ -55,7 +42,7 @@ func TestNewRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			run, err := NewRun(tt.userID, tt.runName, tt.description, tt.config)
+			run, err := NewRun(tt.runName, tt.description, tt.config)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -64,20 +51,21 @@ func TestNewRun(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, run)
-				assert.Equal(t, tt.userID, run.UserID)
 				assert.Equal(t, tt.runName, run.Name)
 				assert.Equal(t, tt.description, run.Description)
 				assert.Equal(t, tt.config, run.Config)
 				assert.Equal(t, StatusPending, run.Status)
 				assert.False(t, run.CreatedAt.IsZero())
 				assert.False(t, run.UpdatedAt.IsZero())
+				// Проверяем, что TPS метрики инициализированы
+				assert.NotNil(t, run.TPSMetrics)
 			}
 		})
 	}
 }
 
 func TestRun_UpdateStatus(t *testing.T) {
-	run, err := NewRun(1, "test run", "description", `{"key": "value"}`)
+	run, err := NewRun("test run", "description", `{"key": "value"}`)
 	assert.NoError(t, err)
 
 	// Test running status
@@ -93,10 +81,29 @@ func TestRun_UpdateStatus(t *testing.T) {
 	assert.NotNil(t, run.CompletedAt)
 }
 
-func TestRun_IsOwnedBy(t *testing.T) {
-	run, err := NewRun(1, "test run", "description", `{"key": "value"}`)
+func TestRun_UpdateTPSMetrics(t *testing.T) {
+	run, err := NewRun("test run", "description", `{"key": "value"}`)
 	assert.NoError(t, err)
 
-	assert.True(t, run.IsOwnedBy(1))
-	assert.False(t, run.IsOwnedBy(2))
+	// Test updating TPS metrics
+	max := 100.5
+	min := 50.0
+	average := 75.25
+	p95 := 95.0
+	p99 := 99.0
+
+	metrics := TPSMetrics{
+		Max:     &max,
+		Min:     &min,
+		Average: &average,
+		P95:     &p95,
+		P99:     &p99,
+	}
+
+	run.UpdateTPSMetrics(metrics)
+	assert.Equal(t, &max, run.TPSMetrics.Max)
+	assert.Equal(t, &min, run.TPSMetrics.Min)
+	assert.Equal(t, &average, run.TPSMetrics.Average)
+	assert.Equal(t, &p95, run.TPSMetrics.P95)
+	assert.Equal(t, &p99, run.TPSMetrics.P99)
 }

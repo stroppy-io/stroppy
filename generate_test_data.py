@@ -2,6 +2,15 @@
 """
 Скрипт для генерации тестовых данных в Stroppy Cloud Panel
 Регистрирует пользователя и создает 1000 тестовых запусков
+
+Включает генерацию TPS метрик:
+- Максимальный TPS (max)
+- Минимальный TPS (min)  
+- Средний TPS (average)
+- 95-й процентиль TPS (95p)
+- 99-й процентиль TPS (99p)
+
+TPS метрики генерируются для 85% всех тестов (включая все статусы)
 """
 
 import requests
@@ -58,6 +67,11 @@ def generate_test_runs(count):
         run_id = str(uuid.uuid4())[:8]
         
         # Генерация конфигурации
+        load_types = ["pgbench", "ycsb", "tpc-h", "tpc-c", "tpc-ds", "custom"]
+        databases = ["postgres", "greenplum", "cloudberry", "clickhouse", "mysql"]
+        deployment_schemas = ["single-node", "master-replica", "cluster", "distributed", "sharded", "cloud"]
+        hardware_configs = ["2CPU-4GB", "4CPU-8GB", "8CPU-16GB", "16CPU-32GB", "32CPU-64GB", "Cloud-Auto"]
+        
         config = {
             "environment": env,
             "threads": random.randint(1, 20),
@@ -65,6 +79,10 @@ def generate_test_runs(count):
             "target_url": f"https://{env}.example.com/api",
             "timeout": random.randint(5, 30),
             "ramp_up": random.randint(10, 300),
+            "load_type": random.choice(load_types),
+            "database": random.choice(databases),
+            "deployment_schema": random.choice(deployment_schemas),
+            "hardware_config": random.choice(hardware_configs),
             "test_data": {
                 "users_count": random.randint(10, 1000),
                 "iterations": random.randint(1, 100)
@@ -73,7 +91,35 @@ def generate_test_runs(count):
         
         # Генерация результатов для завершенных тестов
         result = None
-        if random.choice(statuses) in ["completed", "failed"]:
+        tps_metrics = None
+        
+        # Генерируем TPS метрики для большинства запусков (>80%)
+        if random.random() > 0.15:  # 85% запусков будут иметь TPS метрики
+            # Определяем базовый TPS в зависимости от статуса
+            selected_status = random.choices(statuses, weights=status_weights)[0]
+            
+            if selected_status in ["completed"]:
+                # Высокие TPS для завершенных тестов
+                base_tps = random.uniform(100, 1000)
+            elif selected_status in ["failed"]:
+                # Низкие TPS для неудачных тестов
+                base_tps = random.uniform(1, 50)
+            elif selected_status in ["running"]:
+                # Средние TPS для выполняющихся тестов
+                base_tps = random.uniform(50, 500)
+            else:  # pending, cancelled
+                # Случайные TPS для остальных статусов
+                base_tps = random.uniform(10, 200)
+            
+            tps_metrics = {
+                "max": round(base_tps * random.uniform(1.2, 2.0), 2),
+                "min": round(base_tps * random.uniform(0.3, 0.8), 2),
+                "average": round(base_tps, 2),
+                "95p": round(base_tps * random.uniform(1.1, 1.8), 2),
+                "99p": round(base_tps * random.uniform(1.3, 1.9), 2)
+            }
+        
+        if selected_status in ["completed", "failed"]:
             if random.random() > 0.2:  # 80% успешных
                 result = {
                     "success": True,
@@ -104,8 +150,9 @@ def generate_test_runs(count):
             "name": f"{run_type} #{i+1:04d} ({env})",
             "description": f"Автоматически сгенерированный {run_type.lower()} для окружения {env}. ID: {run_id}",
             "config": json.dumps(config),
-            "status": random.choices(statuses, weights=status_weights)[0],
-            "result": json.dumps(result) if result else None
+            "status": selected_status,
+            "result": json.dumps(result) if result else None,
+            "tps_metrics": tps_metrics
         }
         
         runs.append(run)
@@ -188,6 +235,10 @@ def create_run(token, run_data):
             if run_data.get("status") != "pending" or run_data.get("result"):
                 update_run_status(token, run_id, run_data.get("status", "pending"), run_data.get("result"))
             
+            # Если есть TPS метрики, обновляем их
+            if run_data.get("tps_metrics"):
+                update_run_tps_metrics(token, run_id, run_data.get("tps_metrics"))
+            
             return run_id
         else:
             print(f"❌ Ошибка создания запуска: {response.status_code} - {response.text}")
@@ -221,6 +272,28 @@ def update_run_status(token, run_id, status, result=None):
         
     except requests.exceptions.RequestException as e:
         print(f"❌ Ошибка обновления статуса: {e}")
+        return False
+
+def update_run_tps_metrics(token, run_id, tps_metrics):
+    """Обновляет TPS метрики запуска"""
+    if not run_id or not tps_metrics:
+        return False
+        
+    try:
+        response = requests.put(
+            f"{API_BASE}/runs/{run_id}/tps",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}"
+            },
+            json=tps_metrics,
+            timeout=10
+        )
+        
+        return response.status_code == 200
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Ошибка обновления TPS метрик: {e}")
         return False
 
 def check_server():
@@ -272,6 +345,7 @@ def main():
     print(f"⚡ Создание запусков (батчами по {BATCH_SIZE})...")
     created_count = 0
     failed_count = 0
+    tps_metrics_count = 0
     
     for i in range(0, len(runs), BATCH_SIZE):
         batch = runs[i:i+BATCH_SIZE]
@@ -284,6 +358,8 @@ def main():
             run_id = create_run(token, run)
             if run_id:
                 created_count += 1
+                if run.get("tps_metrics"):
+                    tps_metrics_count += 1
             else:
                 failed_count += 1
             
@@ -301,10 +377,18 @@ def main():
     print("📊 РЕЗУЛЬТАТЫ ГЕНЕРАЦИИ:")
     print(f"✅ Успешно создано запусков: {created_count}")
     print(f"❌ Ошибок при создании: {failed_count}")
+    print(f"📈 Запусков с TPS метриками: {tps_metrics_count}")
+    print(f"📊 Процент с TPS метриками: {(tps_metrics_count/created_count*100):.1f}%" if created_count > 0 else "0%")
     print(f"👤 Пользователь: {user_data['username']}")
     print(f"🔑 Пароль: {user_data['password']}")
     print("\n🎉 Генерация тестовых данных завершена!")
     print(f"🌐 Откройте http://localhost:5173 для просмотра данных")
+    print("\n💡 TPS метрики включают:")
+    print("   • Максимальный TPS (max)")
+    print("   • Минимальный TPS (min)")  
+    print("   • Средний TPS (average)")
+    print("   • 95-й процентиль TPS (95p)")
+    print("   • 99-й процентиль TPS (99p)")
 
 if __name__ == "__main__":
     main()

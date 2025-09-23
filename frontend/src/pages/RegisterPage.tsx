@@ -7,20 +7,14 @@ import {
   Button, 
   Typography, 
   Alert, 
-  Space, 
-  Switch,
-  ConfigProvider,
   Layout
 } from 'antd';
 import { 
   UserOutlined, 
   LockOutlined, 
-  CloudOutlined, 
-  SunOutlined, 
-  MoonOutlined 
+  CloudOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
 import { getErrorMessage } from '../services/api';
 
 const { Title, Text } = Typography;
@@ -30,7 +24,6 @@ const RegisterPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { register } = useAuth();
-  const { mode, toggleTheme, antdTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleSubmit = async (values: { 
@@ -60,8 +53,7 @@ const RegisterPage: React.FC = () => {
   };
 
   return (
-    <ConfigProvider theme={antdTheme}>
-      <Layout style={{ minHeight: '100vh', background: antdTheme.token?.colorBgLayout }}>
+    <Layout style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
         <div style={{
           display: 'flex',
           justifyContent: 'center',
@@ -70,32 +62,12 @@ const RegisterPage: React.FC = () => {
           padding: '24px',
           position: 'relative'
         }}>
-          {/* Переключатель темы в правом верхнем углу */}
-          <div style={{
-            position: 'absolute',
-            top: '24px',
-            right: '24px',
-            zIndex: 1000
-          }}>
-            <Space>
-              <SunOutlined style={{ color: mode === 'light' ? '#1890ff' : '#666' }} />
-              <Switch
-                checked={mode === 'dark'}
-                onChange={toggleTheme}
-                checkedChildren={<MoonOutlined />}
-                unCheckedChildren={<SunOutlined />}
-              />
-              <MoonOutlined style={{ color: mode === 'dark' ? '#1890ff' : '#666' }} />
-            </Space>
-          </div>
 
           <Card
             style={{
               width: '100%',
               maxWidth: '400px',
-              boxShadow: mode === 'dark' 
-                ? '0 8px 32px rgba(0,0,0,0.3)' 
-                : '0 8px 32px rgba(0,0,0,0.12)'
+              boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
             }}
           >
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
@@ -218,7 +190,6 @@ const RegisterPage: React.FC = () => {
           </Card>
         </div>
       </Layout>
-    </ConfigProvider>
   );
 };
 

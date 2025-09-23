@@ -44,6 +44,15 @@ type UpdateStatusRequest struct {
 	Result string        `json:"result,omitempty"`
 }
 
+// UpdateTPSMetricsRequest представляет запрос на обновление TPS метрик
+type UpdateTPSMetricsRequest struct {
+	Max     *float64 `json:"max,omitempty"`
+	Min     *float64 `json:"min,omitempty"`
+	Average *float64 `json:"average,omitempty"`
+	P95     *float64 `json:"95p,omitempty"`
+	P99     *float64 `json:"99p,omitempty"`
+}
+
 // RunResponse представляет запуск в ответе
 type RunResponse struct {
 	*run.Run
@@ -55,6 +64,15 @@ type RunListResponse struct {
 	Total int            `json:"total"`
 	Page  int            `json:"page"`
 	Limit int            `json:"limit"`
+}
+
+// FilterOptionsResponse представляет опции для фильтров
+type FilterOptionsResponse struct {
+	Statuses          []string `json:"statuses"`
+	LoadTypes         []string `json:"load_types"`
+	Databases         []string `json:"databases"`
+	DeploymentSchemas []string `json:"deployment_schemas"`
+	HardwareConfigs   []string `json:"hardware_configs"`
 }
 
 // CreateRun создает новый запуск
@@ -163,9 +181,13 @@ func (h *RunHandler) GetRuns(c *gin.Context) {
 	dateFrom := c.Query("date_from")
 	dateTo := c.Query("date_to")
 
-	log.Printf("DEBUG: Calling GetAll with limit=%d, offset=%d, search=%s, status=%s", limit, offset, searchText, status)
+	// Параметры сортировки
+	sortBy := c.Query("sort_by")
+	sortOrder := c.Query("sort_order") // "asc" или "desc"
 
-	runs, total, err := h.runService.GetAllWithFilters(limit, offset, searchText, status, dateFrom, dateTo)
+	log.Printf("DEBUG: Calling GetAll with limit=%d, offset=%d, search=%s, status=%s, sort_by=%s, sort_order=%s", limit, offset, searchText, status, sortBy, sortOrder)
+
+	runs, total, err := h.runService.GetAllWithFiltersAndSort(limit, offset, searchText, status, dateFrom, dateTo, sortBy, sortOrder)
 	if err != nil {
 		log.Printf("ERROR: GetAll failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -188,6 +210,28 @@ func (h *RunHandler) GetRuns(c *gin.Context) {
 		Page:  page,
 		Limit: limit,
 	})
+}
+
+// GetFilterOptions возвращает уникальные значения для фильтров
+func (h *RunHandler) GetFilterOptions(c *gin.Context) {
+	_, ok := middleware.GetUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "User not authenticated",
+		})
+		return
+	}
+
+	options, err := h.runService.GetFilterOptions()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to get filter options",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, options)
 }
 
 // UpdateRun обновляет запуск
@@ -277,6 +321,59 @@ func (h *RunHandler) UpdateRunStatus(c *gin.Context) {
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to update run status",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, &RunResponse{Run: ru})
+}
+
+// UpdateRunTPSMetrics обновляет TPS метрики запуска
+func (h *RunHandler) UpdateRunTPSMetrics(c *gin.Context) {
+	_, ok := middleware.GetUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "User not authenticated",
+		})
+		return
+	}
+
+	runID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid run ID",
+		})
+		return
+	}
+
+	var req UpdateTPSMetricsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Преобразуем запрос в доменную модель
+	metrics := run.TPSMetrics{
+		Max:     req.Max,
+		Min:     req.Min,
+		Average: req.Average,
+		P95:     req.P95,
+		P99:     req.P99,
+	}
+
+	ru, err := h.runService.UpdateTPSMetrics(runID, metrics)
+	if err != nil {
+		if errors.Is(err, run.ErrRunNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Run not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to update TPS metrics",
 		})
 		return
 	}
