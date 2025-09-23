@@ -87,8 +87,9 @@ export default (ctx: Context) => {
     const metricsTags = {
         // "tx_name": transaction.name // TODO: add name field to transaction in proto
     }
+    // TODO: add driver metrics
     const startTime = Date.now()
-    const err = INSTANCE.runQuery()
+    const err = INSTANCE.runTransaction()
     if (err) {
         METER_REQUEST_ERROR_COUNTER.add(1, metricsTags)
     }

@@ -14,8 +14,8 @@ type (
 	Generators  = cmap.ConcurrentMap[GeneratorID, generate.ValueGenerator]
 )
 
-func NewGeneratorID(stepID, queryID, paramID string) GeneratorID {
-	return GeneratorID(fmt.Sprintf("%s:%s:%s", stepID, queryID, paramID))
+func NewGeneratorID(queryID, paramID string) GeneratorID {
+	return GeneratorID(fmt.Sprintf("%s:%s", queryID, paramID))
 }
 
 func (g GeneratorID) String() string {
@@ -30,7 +30,6 @@ func collectQueryGenerators(
 
 	for _, param := range queryDescriptor.GetParams() {
 		paramID := NewGeneratorID(
-			"", // TODO:  //runContext.GetStep().GetName(),
 			queryDescriptor.GetName(),
 			param.GetName(),
 		)

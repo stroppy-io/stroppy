@@ -18,7 +18,6 @@ func newQuery(
 
 	for _, column := range descriptor.GetParams() {
 		genID := NewGeneratorID(
-			"", // TODO: make it somehow // buildContext.GetStep().GetName(),
 			descriptor.GetName(),
 			column.GetName(),
 		)

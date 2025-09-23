@@ -19,7 +19,7 @@ import (
 
 func TestNewQueryBuilder_Success(t *testing.T) {
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	paramID := NewGeneratorID("test", "q1", "id")
+	paramID := NewGeneratorID("q1", "id")
 	generator, err := generate.NewValueGenerator(42, 1, &stroppy.QueryParamDescriptor{
 		Name: "id",
 		GenerationRule: &stroppy.Generation_Rule{
@@ -54,13 +54,15 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 	descriptor := &stroppy.QueryDescriptor{
 		Name: "q1",
 		Sql:  "SELECT * FROM t WHERE id=${id}",
-		Params: []*stroppy.QueryParamDescriptor{{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-			Type: &stroppy.Generation_Rule_Int32Rules{
-				Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-					Constant: proto.Int32(10),
+		Params: []*stroppy.QueryParamDescriptor{
+			{Name: "id", GenerationRule: &stroppy.Generation_Rule{
+				Type: &stroppy.Generation_Rule_Int32Rules{
+					Int32Rules: &stroppy.Generation_Rules_Int32Rule{
+						Constant: proto.Int32(10),
+					},
 				},
-			},
-		}}},
+			}},
+		},
 	}
 	step := &stroppy.StepDescriptor{
 		Name: "test",
@@ -82,7 +84,7 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	paramID := NewGeneratorID("test", "q1", "id")
+	paramID := NewGeneratorID("q1", "id")
 	generator, err := generate.NewValueGenerator(42, 1, descriptor.GetParams()[0])
 	require.NoError(t, err)
 	generators.Set(paramID, generator)
@@ -111,13 +113,15 @@ func TestQueryBuilder_BuildStream_Success(t *testing.T) {
 	descriptor := &stroppy.QueryDescriptor{
 		Name: "q1",
 		Sql:  "SELECT * FROM t WHERE id=${id}",
-		Params: []*stroppy.QueryParamDescriptor{{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-			Type: &stroppy.Generation_Rule_Int32Rules{
-				Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-					Constant: proto.Int32(10),
+		Params: []*stroppy.QueryParamDescriptor{
+			{Name: "id", GenerationRule: &stroppy.Generation_Rule{
+				Type: &stroppy.Generation_Rule_Int32Rules{
+					Int32Rules: &stroppy.Generation_Rules_Int32Rule{
+						Constant: proto.Int32(10),
+					},
 				},
-			},
-		}}},
+			}},
+		},
 	}
 	step := &stroppy.StepDescriptor{
 		Name: "test",
@@ -139,7 +143,7 @@ func TestQueryBuilder_BuildStream_Success(t *testing.T) {
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	paramID := NewGeneratorID("test", "q1", "id")
+	paramID := NewGeneratorID("q1", "id")
 	generator, err := generate.NewValueGenerator(42, 1, descriptor.GetParams()[0])
 	require.NoError(t, err)
 	generators.Set(paramID, generator)
@@ -224,13 +228,15 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 			{
 				Name: "q1",
 				Sql:  "SELECT * FROM t WHERE id=${id}",
-				Params: []*stroppy.QueryParamDescriptor{{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-					Type: &stroppy.Generation_Rule_Int32Rules{
-						Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-							Constant: proto.Int32(10),
+				Params: []*stroppy.QueryParamDescriptor{
+					{Name: "id", GenerationRule: &stroppy.Generation_Rule{
+						Type: &stroppy.Generation_Rule_Int32Rules{
+							Int32Rules: &stroppy.Generation_Rules_Int32Rule{
+								Constant: proto.Int32(10),
+							},
 						},
-					},
-				}}},
+					}},
+				},
 			},
 		},
 	}
@@ -254,8 +260,12 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	paramID := NewGeneratorID("test", "q1", "id")
-	generator, err := generate.NewValueGenerator(42, 1, transactionDescriptor.GetQueries()[0].GetParams()[0])
+	paramID := NewGeneratorID("q1", "id")
+	generator, err := generate.NewValueGenerator(
+		42,
+		1,
+		transactionDescriptor.GetQueries()[0].GetParams()[0],
+	)
 	require.NoError(t, err)
 	generators.Set(paramID, generator)
 
@@ -333,8 +343,14 @@ func TestValueToPgxValue_AllTypes(t *testing.T) {
 		{"double", &stroppy.Value{Type: &stroppy.Value_Double{Double: 2.71}}},
 		{"string", &stroppy.Value{Type: &stroppy.Value_String_{String_: "abc"}}},
 		{"bool", &stroppy.Value{Type: &stroppy.Value_Bool{Bool: true}}},
-		{"decimal", &stroppy.Value{Type: &stroppy.Value_Decimal{Decimal: &stroppy.Decimal{Value: "1.23"}}}},
-		{"uuid", &stroppy.Value{Type: &stroppy.Value_Uuid{Uuid: &stroppy.Uuid{Value: uuid.NewString()}}}},
+		{
+			"decimal",
+			&stroppy.Value{Type: &stroppy.Value_Decimal{Decimal: &stroppy.Decimal{Value: "1.23"}}},
+		},
+		{
+			"uuid",
+			&stroppy.Value{Type: &stroppy.Value_Uuid{Uuid: &stroppy.Uuid{Value: uuid.NewString()}}},
+		},
 		{
 			"datetime",
 			&stroppy.Value{Type: &stroppy.Value_Datetime{

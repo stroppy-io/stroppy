@@ -18,13 +18,15 @@ func TestNewQuery_Success(t *testing.T) {
 	descriptor := &stroppy.QueryDescriptor{
 		Name: "q1",
 		Sql:  "SELECT * FROM t WHERE id=${id}",
-		Params: []*stroppy.QueryParamDescriptor{{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-			Type: &stroppy.Generation_Rule_Int32Rules{
-				Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-					Constant: proto.Int32(10),
+		Params: []*stroppy.QueryParamDescriptor{
+			{Name: "id", GenerationRule: &stroppy.Generation_Rule{
+				Type: &stroppy.Generation_Rule_Int32Rules{
+					Int32Rules: &stroppy.Generation_Rules_Int32Rule{
+						Constant: proto.Int32(10),
+					},
 				},
-			},
-		}}},
+			}},
+		},
 	}
 	step := &stroppy.StepDescriptor{
 		Name: "test",
@@ -46,7 +48,7 @@ func TestNewQuery_Success(t *testing.T) {
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	paramID := NewGeneratorID("test", "q1", "id")
+	paramID := NewGeneratorID("q1", "id")
 	generator, err := generate.NewValueGenerator(42, 1, descriptor.GetParams()[0])
 	require.NoError(t, err)
 	generators.Set(paramID, generator)
@@ -112,13 +114,15 @@ func TestNewQuerySync_Success(t *testing.T) {
 	descriptor := &stroppy.QueryDescriptor{
 		Name: "q1",
 		Sql:  "SELECT * FROM t WHERE id=${id}",
-		Params: []*stroppy.QueryParamDescriptor{{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-			Type: &stroppy.Generation_Rule_Int32Rules{
-				Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-					Constant: proto.Int32(10),
+		Params: []*stroppy.QueryParamDescriptor{
+			{Name: "id", GenerationRule: &stroppy.Generation_Rule{
+				Type: &stroppy.Generation_Rule_Int32Rules{
+					Int32Rules: &stroppy.Generation_Rules_Int32Rule{
+						Constant: proto.Int32(10),
+					},
 				},
-			},
-		}}},
+			}},
+		},
 	}
 	step := &stroppy.StepDescriptor{
 		Name: "test",
@@ -140,7 +144,7 @@ func TestNewQuerySync_Success(t *testing.T) {
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	paramID := NewGeneratorID("test", "q1", "id")
+	paramID := NewGeneratorID("q1", "id")
 	generator, err := generate.NewValueGenerator(42, 1, descriptor.GetParams()[0])
 	require.NoError(t, err)
 	generators.Set(paramID, generator)

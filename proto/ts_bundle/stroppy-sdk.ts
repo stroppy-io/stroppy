@@ -7,7 +7,7 @@ export type ProtoSerialized<T extends any> = string;
 export interface StroppyXk6Instance {
     setup(config: ProtoSerialized<StepContext>): Error | undefined;
 
-    runQuery(): Error | undefined;
+    runTransaction(): Error | undefined;
 
     teardown(): Error | undefined;
 }

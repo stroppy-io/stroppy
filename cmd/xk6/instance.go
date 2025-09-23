@@ -89,13 +89,13 @@ func (x *Instance) Setup(runContextBytes string) error {
 	return nil
 }
 
-func (x *Instance) RunQuery() error {
+func (x *Instance) RunTransaction() error {
 	transaction, err := runPtr.unitQueue.GetNextUnit()
 	if err != nil {
 		return fmt.Errorf("can't get query due to: %w", err)
 	}
 	runPtr.logger.Debug(
-		"RunQuery",
+		"RunTransaction",
 		zap.Any("transaction", transaction),
 	)
 
