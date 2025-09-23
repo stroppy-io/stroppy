@@ -14,7 +14,6 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/core/generate"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
-	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 func TestNewQueryBuilder_Success(t *testing.T) {
@@ -101,75 +100,11 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext)
+	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnit().GetDescriptor_())
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
-	require.Len(t, transactionList.Transactions, 1)
-	require.Len(t, transactionList.Transactions[0].Queries, 1)
-	require.Equal(t, int32(10), transactionList.Transactions[0].Queries[0].Params[0].GetInt32())
-}
-
-func TestQueryBuilder_BuildStream_Success(t *testing.T) {
-	descriptor := &stroppy.QueryDescriptor{
-		Name: "q1",
-		Sql:  "SELECT * FROM t WHERE id=${id}",
-		Params: []*stroppy.QueryParamDescriptor{
-			{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-				Type: &stroppy.Generation_Rule_Int32Rules{
-					Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-						Constant: proto.Int32(10),
-					},
-				},
-			}},
-		},
-	}
-	step := &stroppy.StepDescriptor{
-		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
-			{
-				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
-					Query: descriptor,
-				}},
-			},
-		},
-	}
-	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
-		},
-		Step: step,
-	}
-
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	paramID := NewGeneratorID("q1", "id")
-	generator, err := generate.NewValueGenerator(42, 1, descriptor.GetParams()[0])
-	require.NoError(t, err)
-	generators.Set(paramID, generator)
-
-	builder := &QueryBuilder{
-		generators: generators,
-	}
-
-	unitBuildContext := &stroppy.UnitBuildContext{
-		Context: buildContext,
-		Unit:    step.GetUnits()[0],
-	}
-
-	ctx := context.Background()
-	lg := zap.NewNop()
-
-	channel := make(errchan.Chan[stroppy.DriverTransaction], 1)
-	go func() {
-		builder.BuildStream(ctx, lg, unitBuildContext, channel)
-	}()
-
-	transactions, err := errchan.Collect[stroppy.DriverTransaction](channel)
-	require.NoError(t, err)
-	require.Len(t, transactions, 1)
-	require.Len(t, transactions[0].Queries, 1)
-	require.Equal(t, int32(10), transactions[0].Queries[0].Params[0].GetInt32())
+	require.Len(t, transactionList.Queries, 1)
+	require.Equal(t, int32(10), transactionList.Queries[0].Params[0].GetInt32())
 }
 
 func TestQueryBuilder_Build_CreateTable(t *testing.T) {
@@ -213,12 +148,11 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext)
+	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnit().GetDescriptor_())
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
-	require.Len(t, transactionList.Transactions, 1)
-	require.Len(t, transactionList.Transactions[0].Queries, 1)
-	require.Contains(t, transactionList.Transactions[0].Queries[0].Request, "CREATE TABLE")
+	require.Len(t, transactionList.Queries, 1)
+	require.Contains(t, transactionList.Queries[0].Request, "CREATE TABLE")
 }
 
 func TestQueryBuilder_Build_Transaction(t *testing.T) {
@@ -281,52 +215,11 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext)
+	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnit().GetDescriptor_())
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
-	require.Len(t, transactionList.Transactions, 1)
-	require.Len(t, transactionList.Transactions[0].Queries, 1)
-	require.Equal(t, int32(10), transactionList.Transactions[0].Queries[0].Params[0].GetInt32())
-}
-
-func TestQueryBuilder_Build_UnknownType(t *testing.T) {
-	step := &stroppy.StepDescriptor{
-		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
-			{
-				Descriptor_: nil, // неизвестный тип
-			},
-		},
-	}
-	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
-		},
-		Step: step,
-	}
-
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-
-	builder := &QueryBuilder{
-		generators: generators,
-	}
-
-	unitBuildContext := &stroppy.UnitBuildContext{
-		Context: buildContext,
-		Unit:    step.GetUnits()[0],
-	}
-
-	ctx := context.Background()
-	lg := zap.NewNop()
-
-	// Тестируем BuildStream напрямую, чтобы поймать панику
-	channel := make(errchan.Chan[stroppy.DriverTransaction])
-
-	require.Panics(t, func() {
-		builder.BuildStream(ctx, lg, unitBuildContext, channel)
-	})
+	require.Len(t, transactionList.Queries, 1)
+	require.Equal(t, int32(10), transactionList.Queries[0].Params[0].GetInt32())
 }
 
 func TestValueToPgxValue_AllTypes(t *testing.T) {

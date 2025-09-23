@@ -1,14 +1,12 @@
 package queries
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
-	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 func TestNewCreateTable_Success(t *testing.T) {
@@ -16,18 +14,12 @@ func TestNewCreateTable_Success(t *testing.T) {
 		Name:    "t1",
 		Columns: []*stroppy.ColumnDescriptor{{Name: "id", SqlType: "INT", PrimaryKey: true}},
 	}
-	ctx := context.Background()
+	// ctx := context.Background()
 	lg := zap.NewNop()
 
-	channel := make(errchan.Chan[stroppy.DriverTransaction])
-	go func() {
-		NewCreateTable(ctx, lg, 42, descriptor, channel)
-	}()
-
-	transactions, err := errchan.Collect[stroppy.DriverTransaction](channel)
+	transactions, err := NewCreateTable(lg, descriptor)
 	require.NoError(t, err)
-	require.NotEmpty(t, transactions)
-	require.NotEmpty(t, transactions[0].Queries)
+	require.NotEmpty(t, transactions.Queries)
 }
 
 func TestNewCreateTable_Error(t *testing.T) {
@@ -35,17 +27,11 @@ func TestNewCreateTable_Error(t *testing.T) {
 		Name:    "t1",
 		Columns: nil, // нет колонок
 	}
-	ctx := context.Background()
+	// ctx := context.Background()
 	lg := zap.NewNop()
 
-	channel := make(errchan.Chan[stroppy.DriverTransaction])
-	go func() {
-		NewCreateTable(ctx, lg, 42, descriptor, channel)
-	}()
-
-	transactions, err := errchan.Collect[stroppy.DriverTransaction](channel)
+	transactions, err := NewCreateTable(lg, descriptor)
 	require.NoError(t, err)
-	require.NotEmpty(t, transactions)
-	require.NotEmpty(t, transactions[0].Queries)
-	require.Empty(t, transactions[0].Queries[0].Params)
+	require.NotEmpty(t, transactions.Queries)
+	require.Empty(t, transactions.Queries[0].Params)
 }

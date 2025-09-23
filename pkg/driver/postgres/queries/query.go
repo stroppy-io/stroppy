@@ -22,6 +22,7 @@ func newQuery(
 			column.GetName(),
 		)
 		gen, ok := generators.Get(genID)
+
 		if !ok {
 			return nil, fmt.Errorf("no generator for column '%s'", genID) //nolint: err113
 		}
@@ -57,7 +58,7 @@ func newQuery(
 }
 
 func NewQuery(
-	ctx context.Context,
+	_ context.Context,
 	lg *zap.Logger,
 	generators Generators,
 	// buildContext *stroppy.StepContext,
@@ -77,5 +78,4 @@ func NewQuery(
 	return &stroppy.DriverTransaction{
 		Queries: []*stroppy.DriverQuery{query},
 	}, nil
-
 }

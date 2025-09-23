@@ -77,22 +77,25 @@ func NewCreateTable(
 	lg.Debug("build table",
 		zap.String("name", descriptor.GetName()),
 		zap.Any("columns", descriptor.GetColumns()))
-	createTableQ, err := newCreateTable(descriptor.GetName(), descriptor.GetColumns())
 
+	createTableQ, err := newCreateTable(descriptor.GetName(), descriptor.GetColumns())
 	if err != nil {
 		return nil, fmt.Errorf("can't create table query due to: %w", err)
 	}
+
 	lg.Debug("create table query",
 		zap.String("name", descriptor.GetName()),
 		zap.Any("columns", descriptor.GetColumns()),
 		zap.Any("query", createTableQ),
 		zap.Error(err),
 	)
+
 	for _, index := range descriptor.GetTableIndexes() {
 		indexQ, err := newIndex(descriptor.GetName(), index)
 		if err != nil {
 			return nil, fmt.Errorf("can't create table query due to: %w", err)
 		}
+
 		lg.Debug(
 			"create index query",
 			zap.String("name", descriptor.GetName()),
@@ -100,7 +103,9 @@ func NewCreateTable(
 			zap.Any("query", indexQ),
 			zap.Error(err),
 		)
+
 		createTableQ.Queries = append(createTableQ.Queries, indexQ.GetQueries()...)
 	}
+
 	return createTableQ, nil
 }

@@ -41,10 +41,10 @@ func NewDriver(lg *zap.Logger) driver_interface.Driver { //nolint: ireturn // al
 				Named(pool.DriverLoggerName).
 				WithOptions(zap.AddCallerSkip(1)),
 		}
-	} else {
-		return &Driver{
-			logger: lg,
-		}
+	}
+
+	return &Driver{
+		logger: lg,
 	}
 }
 

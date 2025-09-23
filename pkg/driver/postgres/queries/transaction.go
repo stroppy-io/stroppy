@@ -17,16 +17,20 @@ func NewTransaction(
 ) (*stroppy.DriverTransaction, error) {
 	lg.Debug("build transaction",
 		zap.String("name", descriptor.GetName()))
+
 	var queries []*stroppy.DriverQuery
+
 	for _, query := range descriptor.GetQueries() {
 		q, err := NewQuery(ctx, lg, generators, query)
 		if err != nil {
 			return nil, fmt.Errorf("can't create query for tx due to: %w", err)
 		}
+
 		queries = append(queries, q.GetQueries()...)
 	}
+
 	return &stroppy.DriverTransaction{
-		IsolationLevel: descriptor.IsolationLevel,
+		IsolationLevel: descriptor.GetIsolationLevel(),
 		Queries:        queries,
 	}, nil
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
-// Update MockDriver to support both interfaces
+// Update MockDriver to support both interfaces.
 type MockDriver struct {
 	GenerateCount  int64
 	GenerateDelay  time.Duration
@@ -26,9 +26,9 @@ func NewMockDriver() *MockDriver {
 	}
 }
 
-func (m *MockDriver) GenerateNext(
+func (m *MockDriver) GenerateNextUnit(
 	ctx context.Context,
-	desc *proto.UnitDescriptor,
+	_ *proto.UnitDescriptor,
 ) (*proto.DriverTransaction, error) {
 	atomic.AddInt64(&m.GenerateCount, 1)
 
@@ -43,6 +43,7 @@ func (m *MockDriver) GenerateNext(
 	if m.GenerateError != nil {
 		return nil, m.GenerateError
 	}
+
 	return &proto.DriverTransaction{}, nil
 }
 
@@ -54,7 +55,7 @@ func (m *MockDriver) ResetCount() {
 	atomic.StoreInt64(&m.GenerateCount, 0)
 }
 
-// Helper function to create test step descriptor
+// Helper function to create test step descriptor.
 func createTestStepDescriptor(async bool, units []*proto.StepUnitDescriptor) *proto.StepDescriptor {
 	return &proto.StepDescriptor{
 		Async: async,
@@ -71,15 +72,14 @@ func createTestStepUnitDescriptor(count uint64) *proto.StepUnitDescriptor {
 	}
 }
 
-// Basic functionality tests
+// Basic functionality tests.
 func TestNewUnitQueue(t *testing.T) {
-	ctx := context.Background()
 	driver := NewMockDriver()
 	step := createTestStepDescriptor(false, []*proto.StepUnitDescriptor{
 		createTestStepUnitDescriptor(1),
 	})
 
-	queue := NewUnitQueue(ctx, driver, step)
+	queue := NewUnitQueue(driver, step)
 
 	if queue == nil {
 		t.Fatal("NewUnitQueue returned nil")
@@ -101,22 +101,25 @@ func TestUnitQueue_BasicOperation(t *testing.T) {
 		createTestStepUnitDescriptor(3),
 	})
 
-	queue := NewUnitQueue(ctx, driver, step)
-	queue.StartGeneration()
+	queue := NewUnitQueue(driver, step)
+	queue.StartGeneration(ctx)
 
 	// Give some time for generation to start
 	time.Sleep(100 * time.Millisecond)
 
 	// Get transactions
-	var transactions []*proto.DriverTransaction
-	for i := 0; i < 3; i++ {
+	transactions := make([]*proto.DriverTransaction, 0, 3)
+
+	for i := range 3 {
 		tx, err := queue.GetNextUnit()
 		if err != nil {
 			t.Fatalf("Failed to get transaction %d: %v", i, err)
 		}
+
 		if tx == nil {
 			t.Fatalf("Got nil transaction at index %d", i)
 		}
+
 		transactions = append(transactions, tx)
 	}
 
@@ -139,18 +142,20 @@ func TestUnitQueue_MultipleUnits(t *testing.T) {
 		createTestStepUnitDescriptor(3),
 	})
 
-	queue := NewUnitQueue(ctx, driver, step)
-	queue.StartGeneration()
+	queue := NewUnitQueue(driver, step)
+	queue.StartGeneration(ctx)
 
 	time.Sleep(200 * time.Millisecond)
 
 	// Should generate 2 + 3 = 5 transactions
-	var transactions []*proto.DriverTransaction
-	for i := 0; i < 5; i++ {
+	transactions := make([]*proto.DriverTransaction, 0, 5)
+
+	for i := range 5 {
 		tx, err := queue.GetNextUnit()
 		if err != nil {
 			t.Fatalf("Failed to get transaction %d: %v", i, err)
 		}
+
 		transactions = append(transactions, tx)
 	}
 
@@ -170,8 +175,8 @@ func TestUnitQueue_ContextCancellation(t *testing.T) {
 		createTestStepUnitDescriptor(100), // Large number
 	})
 
-	queue := NewUnitQueue(ctx, driver, step)
-	queue.StartGeneration()
+	queue := NewUnitQueue(driver, step)
+	queue.StartGeneration(ctx)
 
 	// Cancel after short time
 	time.Sleep(100 * time.Millisecond)
@@ -184,8 +189,9 @@ func TestUnitQueue_ContextCancellation(t *testing.T) {
 	_, err := queue.GetNextUnit()
 	if err == nil {
 		// Try a few more times as cancellation might take time
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			time.Sleep(10 * time.Millisecond)
+
 			_, err = queue.GetNextUnit()
 			if err != nil {
 				break
@@ -210,8 +216,8 @@ func TestUnitQueue_DriverError(t *testing.T) {
 		createTestStepUnitDescriptor(1),
 	})
 
-	queue := NewUnitQueue(ctx, driver, step)
-	queue.StartGeneration()
+	queue := NewUnitQueue(driver, step)
+	queue.StartGeneration(ctx)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -223,7 +229,7 @@ func TestUnitQueue_DriverError(t *testing.T) {
 	}
 }
 
-// Consistency tests
+// Consistency tests.
 func TestUnitQueue_Consistency(t *testing.T) {
 	t.Run("SingleUnit", func(t *testing.T) {
 		testConsistency(t, 1, 1, false)
@@ -239,23 +245,27 @@ func TestUnitQueue_Consistency(t *testing.T) {
 }
 
 func testConsistency(t *testing.T, numUnits, countPerUnit int, async bool) {
+	t.Helper()
+
 	ctx := context.Background()
 	driver := NewMockDriver()
 
-	var units []*proto.StepUnitDescriptor
-	for i := 0; i < numUnits; i++ {
+	units := make([]*proto.StepUnitDescriptor, 0, numUnits)
+	for range numUnits {
 		units = append(units, createTestStepUnitDescriptor(uint64(countPerUnit)))
 	}
 
 	step := createTestStepDescriptor(async, units)
-	queue := NewUnitQueue(ctx, driver, step)
-	queue.StartGeneration()
+	queue := NewUnitQueue(driver, step)
+	queue.StartGeneration(ctx)
 
 	expectedTotal := numUnits * countPerUnit
+
 	var transactions []*proto.DriverTransaction
 
 	// Collect all expected transactions
 	timeout := time.After(5 * time.Second)
+
 	for len(transactions) < expectedTotal {
 		select {
 		case <-timeout:
@@ -266,9 +276,11 @@ func testConsistency(t *testing.T, numUnits, countPerUnit int, async bool) {
 			if err != nil {
 				t.Fatalf("Error getting transaction: %v", err)
 			}
+
 			if tx == nil {
 				t.Fatal("Got nil transaction")
 			}
+
 			transactions = append(transactions, tx)
 		}
 	}
@@ -284,7 +296,7 @@ func testConsistency(t *testing.T, numUnits, countPerUnit int, async bool) {
 	}
 }
 
-// Parallel and race detection tests
+// Parallel and race detection tests.
 func TestUnitQueue_ParallelConsumers(t *testing.T) {
 	t.Parallel()
 
@@ -294,27 +306,33 @@ func TestUnitQueue_ParallelConsumers(t *testing.T) {
 		createTestStepUnitDescriptor(100),
 	})
 
-	queue := NewUnitQueue(ctx, driver, step)
-	queue.StartGeneration()
+	queue := NewUnitQueue(driver, step)
+	queue.StartGeneration(ctx)
 
 	const numConsumers = 10
+
 	var wg sync.WaitGroup
+
 	var totalReceived int64
+
 	var errors []error
+
 	var mu sync.Mutex
 
 	// Start multiple consumers
-	for i := 0; i < numConsumers; i++ {
+	for i := range numConsumers {
 		wg.Add(1)
+
 		go func(consumerID int) {
 			defer wg.Done()
 
-			for j := 0; j < 10; j++ { // Each consumer gets 10 transactions
+			for range 10 { // Each consumer gets 10 transactions
 				tx, err := queue.GetNextUnit()
 				if err != nil {
 					mu.Lock()
-					errors = append(errors, fmt.Errorf("consumer %d: %v", consumerID, err))
+					errors = append(errors, fmt.Errorf("consumer %d: %w", consumerID, err))
 					mu.Unlock()
+
 					return
 				}
 
@@ -325,6 +343,7 @@ func TestUnitQueue_ParallelConsumers(t *testing.T) {
 						fmt.Errorf("consumer %d: got nil transaction", consumerID),
 					)
 					mu.Unlock()
+
 					return
 				}
 
@@ -349,7 +368,7 @@ func TestUnitQueue_RaceConditions(t *testing.T) {
 	// This test is designed to be run with -race flag
 	t.Parallel()
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		t.Run(fmt.Sprintf("iteration_%d", i), func(t *testing.T) {
 			t.Parallel()
 
@@ -359,17 +378,19 @@ func TestUnitQueue_RaceConditions(t *testing.T) {
 				createTestStepUnitDescriptor(50),
 			})
 
-			queue := NewUnitQueue(ctx, driver, step)
-			queue.StartGeneration()
+			queue := NewUnitQueue(driver, step)
+			queue.StartGeneration(ctx)
 
 			var wg sync.WaitGroup
 
 			// Multiple consumers
-			for j := 0; j < 5; j++ {
+			for range 5 {
 				wg.Add(1)
+
 				go func() {
 					defer wg.Done()
-					for k := 0; k < 10; k++ {
+
+					for range 10 {
 						_, err := queue.GetNextUnit()
 						if err != nil {
 							return // Stop on error
@@ -388,7 +409,7 @@ func TestUnitQueue_StopRace(t *testing.T) {
 	t.Parallel()
 
 	// Test concurrent Stop() calls
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		t.Run(fmt.Sprintf("stop_race_%d", i), func(t *testing.T) {
 			t.Parallel()
 
@@ -398,14 +419,15 @@ func TestUnitQueue_StopRace(t *testing.T) {
 				createTestStepUnitDescriptor(10),
 			})
 
-			queue := NewUnitQueue(ctx, driver, step)
-			queue.StartGeneration()
+			queue := NewUnitQueue(driver, step)
+			queue.StartGeneration(ctx)
 
 			var wg sync.WaitGroup
 
 			// Multiple goroutines calling Stop()
-			for j := 0; j < 3; j++ {
+			for j := range 3 {
 				wg.Add(1)
+
 				go func() {
 					defer wg.Done()
 					time.Sleep(time.Duration(j*10) * time.Millisecond)
@@ -415,8 +437,10 @@ func TestUnitQueue_StopRace(t *testing.T) {
 
 			// One goroutine consuming
 			wg.Add(1)
+
 			go func() {
 				defer wg.Done()
+
 				for {
 					_, err := queue.GetNextUnit()
 					if err != nil {
@@ -439,10 +463,10 @@ func BenchmarkUnitQueue_SingleConsumer(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		ctx := context.Background()
-		queue := NewUnitQueue(ctx, driver, step)
-		queue.StartGeneration()
+		queue := NewUnitQueue(driver, step)
+		queue.StartGeneration(ctx)
 
 		_, err := queue.GetNextUnit()
 		if err != nil {
@@ -462,8 +486,8 @@ func BenchmarkUnitQueue_ParallelConsumers(b *testing.B) {
 		})
 
 		ctx := context.Background()
-		queue := NewUnitQueue(ctx, driver, step)
-		queue.StartGeneration()
+		queue := NewUnitQueue(driver, step)
+		queue.StartGeneration(ctx)
 
 		for pb.Next() {
 			_, err := queue.GetNextUnit()
@@ -471,8 +495,8 @@ func BenchmarkUnitQueue_ParallelConsumers(b *testing.B) {
 				// Reset if we hit an error
 				queue.Stop()
 				driver.ResetCount()
-				queue = NewUnitQueue(ctx, driver, step)
-				queue.StartGeneration()
+				queue = NewUnitQueue(driver, step)
+				queue.StartGeneration(ctx)
 			}
 		}
 
@@ -489,8 +513,8 @@ func BenchmarkUnitQueue_HighThroughput(b *testing.B) {
 	})
 
 	ctx := context.Background()
-	queue := NewUnitQueue(ctx, driver, step)
-	queue.StartGeneration()
+	queue := NewUnitQueue(driver, step)
+	queue.StartGeneration(ctx)
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -515,13 +539,13 @@ func BenchmarkUnitQueue_MemoryUsage(b *testing.B) {
 		createTestStepUnitDescriptor(10),
 	})
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		ctx := context.Background()
-		queue := NewUnitQueue(ctx, driver, step)
-		queue.StartGeneration()
+		queue := NewUnitQueue(driver, step)
+		queue.StartGeneration(ctx)
 
 		// Consume all transactions
-		for j := 0; j < 10; j++ {
+		for range 10 {
 			_, err := queue.GetNextUnit()
 			if err != nil {
 				break
@@ -531,28 +555,4 @@ func BenchmarkUnitQueue_MemoryUsage(b *testing.B) {
 		queue.Stop()
 		driver.ResetCount()
 	}
-}
-
-// Example usage test
-func Example_unitQueue() {
-	ctx := context.Background()
-	driver := NewMockDriver()
-	step := createTestStepDescriptor(false, []*proto.StepUnitDescriptor{
-		createTestStepUnitDescriptor(3),
-	})
-
-	queue := NewUnitQueue(ctx, driver, step)
-	queue.StartGeneration()
-
-	// Get transactions
-	for i := 0; i < 3; i++ {
-		_, err := queue.GetNextUnit()
-		if err != nil {
-			fmt.Printf("Error: %v", err)
-			break
-		}
-		fmt.Printf("Got transaction:\n")
-	}
-
-	queue.Stop()
 }

@@ -3,7 +3,6 @@ package gorun
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 
 	"go.uber.org/zap"
 
@@ -37,11 +36,9 @@ func RunStep(
 		return ErrConfigNil
 	}
 
-	var err error
-
 	drv := driver.Dispatch(lg, runContext.GetGlobalConfig().GetRun().GetDriver())
 
-	err = drv.Initialize(ctx, runContext)
+	err := drv.Initialize(ctx, runContext)
 	if err != nil {
 		return err
 	}
@@ -60,7 +57,7 @@ func RunStep(
 		len(runContext.GetStep().GetUnits())*async,
 		runContext.GetGlobalConfig().GetRun().GetGoExecutor().GetCancelOnError(),
 	)
-	var i atomic.Int32
+
 	for _, unitDesc := range runContext.GetStep().GetUnits() {
 		for range async {
 			stepPool.Go(func(ctx context.Context) error {
@@ -69,9 +66,8 @@ func RunStep(
 					if err != nil {
 						return err
 					}
-					i.Add(1)
-					lg.Info("i", zap.Int32("i", i.Load()))
 				}
+
 				return nil
 			})
 		}
@@ -99,9 +95,11 @@ func processUnitTransactions(
 	if err != nil {
 		return err
 	}
+
 	err = drv.RunTransaction(ctx, tx)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

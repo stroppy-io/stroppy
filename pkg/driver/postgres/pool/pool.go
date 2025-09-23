@@ -73,9 +73,9 @@ func parseConfig(
 		logLevel = "info"
 	}
 
-	lvl, err := zapcore.ParseLevel(
-		logLevel.(string),
-	) //nolint: errcheck,forcetypeassert // allow panic
+	lvl, err := zapcore.ParseLevel( //nolint: forcetypeassert // allow panic
+		logLevel.(string), //nolint: errcheck // allow panic
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -91,9 +91,9 @@ func parseConfig(
 
 	maxConnLifetime, ok := cfgMap[maxConnLifetimeKey]
 	if ok {
-		d, err := time.ParseDuration(
-			maxConnLifetime.(string),
-		) //nolint: errcheck,forcetypeassert // allow panic
+		d, err := time.ParseDuration( //nolint: forcetypeassert // allow panic
+			maxConnLifetime.(string), //nolint: errcheck // allow panic
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -103,9 +103,9 @@ func parseConfig(
 
 	maxConnIdleTime, ok := cfgMap[maxConnIdleTimeKey]
 	if ok {
-		d, err := time.ParseDuration(
-			maxConnIdleTime.(string),
-		) //nolint: errcheck,forcetypeassert // allow panic
+		d, err := time.ParseDuration( //nolint: forcetypeassert // allow panic
+			maxConnIdleTime.(string), //nolint: errcheck // allow panic
+		)
 		if err != nil {
 			return nil, err
 		}

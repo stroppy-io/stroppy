@@ -10,6 +10,7 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
+// nolint: mnd // it's a huge magic number/config
 func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in example
 	return &stroppy.Config{
 		Version: stroppy.Version,
@@ -31,69 +32,35 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 						{Key: "trace_log_level", Type: &stroppy.Value_String_{String_: "warn"}},
 						{Key: "max_conn_lifetime", Type: &stroppy.Value_String_{String_: "1m"}},
 						{Key: "max_conn_idle_time", Type: &stroppy.Value_String_{String_: "30s"}},
-						{
-							Key:  "max_conns",
-							Type: &stroppy.Value_Int32{Int32: 100},
-						}, //nolint: mnd // not need const value here
-						{
-							Key:  "min_conns",
-							Type: &stroppy.Value_Int32{Int32: 1},
-						}, //nolint: mnd // not need const value here
-						{
-							Key:  "min_idle_conns",
-							Type: &stroppy.Value_Int32{Int32: 10},
-						}, //nolint: mnd // not need const value here
+						{Key: "max_conns", Type: &stroppy.Value_Int32{Int32: 100}},
+						{Key: "min_conns", Type: &stroppy.Value_Int32{Int32: 1}},
+						{Key: "min_idle_conns", Type: &stroppy.Value_Int32{Int32: 10}},
 					},
 				},
 			},
 			GoExecutor: &stroppy.GoExecutor{
-				GoMaxProc:     toPtr[uint64](100), //nolint: mnd // not need const value here
+				GoMaxProc:     toPtr[uint64](100),
 				CancelOnError: toPtr[bool](true),
 			},
 			K6Executor: &stroppy.K6Executor{
-				K6BinaryPath: "./" + static.K6PluginFileName.String(),
-				K6ScriptPath: "./" + static.K6BenchmarkFileName.String(),
-				K6SetupTimeout: durationpb.New(
-					8400 * time.Second,
-				), //nolint: mnd // not need const value here
-				K6Vus: toPtr(
-					uint64(10),
-				), //nolint: mnd // not need const value here
-				K6MaxVus: toPtr(
-					uint64(100),
-				), //nolint: mnd // not need const value here
-				K6Rate: toPtr(
-					uint64(1000),
-				), //nolint: mnd // not need const value here
-				K6Duration: durationpb.New(
-					60 * time.Second,
-				), //nolint: mnd // not need const value here
+				K6BinaryPath:   "./" + static.K6PluginFileName.String(),
+				K6ScriptPath:   "./" + static.K6BenchmarkFileName.String(),
+				K6SetupTimeout: durationpb.New(8400 * time.Second),
+				K6Vus:          toPtr(uint64(10)),
+				K6MaxVus:       toPtr(uint64(100)),
+				K6Rate:         toPtr(uint64(1000)),
+				K6Duration:     durationpb.New(60 * time.Second),
 				OtlpExport: &stroppy.OtlpExport{
 					OtlpGrpcEndpoint:  toPtr("localhost:4317"),
 					OtlpMetricsPrefix: toPtr("k6_"),
 				},
 			},
 			Steps: []*stroppy.RequestedStep{
-				{
-					Name:     "create_table",
-					Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO),
-				},
-				{
-					Name:     "insert_data",
-					Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO),
-				},
-				{
-					Name:     "warm_up",
-					Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO),
-				},
-				{
-					Name:     "select_data",
-					Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_K6),
-				},
-				{
-					Name:     "clean_up",
-					Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO),
-				},
+				{Name: "create_table", Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO)},
+				{Name: "insert_data", Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO)},
+				{Name: "warm_up", Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO)},
+				{Name: "select_data", Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_K6)},
+				{Name: "clean_up", Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO)},
 			},
 		},
 		Benchmark: &stroppy.BenchmarkDescriptor{
@@ -108,16 +75,8 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 									CreateTable: &stroppy.TableDescriptor{
 										Name: "users",
 										Columns: []*stroppy.ColumnDescriptor{
-											{
-												Name:       "id",
-												SqlType:    "INT",
-												PrimaryKey: true,
-											},
-											{
-												Name:     "name",
-												SqlType:  "TEXT",
-												Nullable: true,
-											},
+											{Name: "id", SqlType: "INT", PrimaryKey: true},
+											{Name: "name", SqlType: "TEXT", Nullable: true},
 											{
 												Name:       "email",
 												SqlType:    "TEXT",
@@ -136,7 +95,7 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 					Async: true,
 					Units: []*stroppy.StepUnitDescriptor{
 						{
-							Count: 100000, //nolint: mnd // not need const value here
+							Count: 100000,
 							Descriptor_: &stroppy.UnitDescriptor{
 								Type: &stroppy.UnitDescriptor_Query{
 									Query: &stroppy.QueryDescriptor{
@@ -150,13 +109,13 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 													Unique: toPtr(true),
 													Distribution: &stroppy.Generation_Distribution{
 														Type:  stroppy.Generation_Distribution_ZIPF,
-														Screw: 1.1, //nolint: mnd // not need const value here
+														Screw: 1.1,
 													},
 													Type: &stroppy.Generation_Rule_Int32Rules{
 														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
 															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,      //nolint: mnd // not need const value here
-																Max: 100000, //nolint: mnd // not need const value here
+																Min: 1,
+																Max: 100000,
 															},
 														},
 													},
@@ -168,19 +127,13 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 													Type: &stroppy.Generation_Rule_StringRules{
 														StringRules: &stroppy.Generation_Rules_StringRule{
 															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 1,   //nolint: mnd // not need const value here
-																Max: 100, //nolint: mnd // not need const value here
+																Min: 1,
+																Max: 100,
 															},
 															Alphabet: &stroppy.Generation_Alphabet{
 																Ranges: []*stroppy.Generation_Range_UInt32Range{
-																	{
-																		Min: 65, //nolint: mnd // not need const value here
-																		Max: 90, //nolint: mnd // not need const value here
-																	},
-																	{
-																		Min: 97,  //nolint: mnd // not need const value here
-																		Max: 122, //nolint: mnd // not need const value here
-																	},
+																	{Min: 65, Max: 90},
+																	{Min: 97, Max: 122},
 																},
 															},
 														},
@@ -193,19 +146,13 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 													Type: &stroppy.Generation_Rule_StringRules{
 														StringRules: &stroppy.Generation_Rules_StringRule{
 															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 10, //nolint: mnd // not need const value here
-																Max: 50, //nolint: mnd // not need const value here
+																Min: 10,
+																Max: 50,
 															},
 															Alphabet: &stroppy.Generation_Alphabet{
 																Ranges: []*stroppy.Generation_Range_UInt32Range{
-																	{
-																		Min: 65, //nolint: mnd // not need const value here
-																		Max: 90, //nolint: mnd // not need const value here
-																	},
-																	{
-																		Min: 97,  //nolint: mnd // not need const value here
-																		Max: 122, //nolint: mnd // not need const value here
-																	},
+																	{Min: 65, Max: 90},
+																	{Min: 97, Max: 122},
 																},
 															},
 														},
@@ -224,7 +171,7 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 					Async: true,
 					Units: []*stroppy.StepUnitDescriptor{
 						{
-							Count: 1000, //nolint: mnd // not need const value here
+							Count: 1000,
 							Descriptor_: &stroppy.UnitDescriptor{
 								Type: &stroppy.UnitDescriptor_Query{
 									Query: &stroppy.QueryDescriptor{
@@ -238,8 +185,8 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 													Type: &stroppy.Generation_Rule_Int32Rules{
 														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
 															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,   //nolint: mnd // not need const value here
-																Max: 100, //nolint: mnd // not need const value here
+																Min: 1,
+																Max: 100,
 															},
 														},
 													},
@@ -271,8 +218,8 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 													Type: &stroppy.Generation_Rule_Int32Rules{
 														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
 															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,   //nolint: mnd // not need const value here
-																Max: 100, //nolint: mnd // not need const value here
+																Min: 1,
+																Max: 100,
 															},
 														},
 													},
@@ -307,8 +254,8 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 															Type: &stroppy.Generation_Rule_Int32Rules{
 																Int32Rules: &stroppy.Generation_Rules_Int32Rule{
 																	Range: &stroppy.Generation_Range_Int32Range{
-																		Min: 1,   //nolint: mnd // not need const value here
-																		Max: 100, //nolint: mnd // not need const value here
+																		Min: 1,
+																		Max: 100,
 																	},
 																},
 															},
@@ -327,8 +274,8 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 															Type: &stroppy.Generation_Rule_Int32Rules{
 																Int32Rules: &stroppy.Generation_Rules_Int32Rule{
 																	Range: &stroppy.Generation_Range_Int32Range{
-																		Min: 1,   //nolint: mnd // not need const value here
-																		Max: 100, //nolint: mnd // not need const value here
+																		Min: 1,
+																		Max: 100,
 																	},
 																},
 															},
@@ -346,7 +293,7 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx // allow in 
 				{
 					Name: "clean_up",
 					Units: []*stroppy.StepUnitDescriptor{
-						&stroppy.StepUnitDescriptor{
+						{
 							Count: 1,
 							Descriptor_: &stroppy.UnitDescriptor{
 								Type: &stroppy.UnitDescriptor_Query{

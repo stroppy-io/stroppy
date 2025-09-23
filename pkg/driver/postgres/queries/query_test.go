@@ -11,7 +11,6 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/core/generate"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
-	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 func TestNewQuery_Success(t *testing.T) {
@@ -28,24 +27,24 @@ func TestNewQuery_Success(t *testing.T) {
 			}},
 		},
 	}
-	step := &stroppy.StepDescriptor{
-		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
-			{
-				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
-					Query: descriptor,
-				}},
-			},
-		},
-	}
-	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
-		},
-		Step: step,
-	}
+	// step := &stroppy.StepDescriptor{
+	// 	Name: "test",
+	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 		{
+	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
+	// 				Query: descriptor,
+	// 			}},
+	// 		},
+	// 	},
+	// }
+	// buildContext := &stroppy.StepContext{
+	// 	GlobalConfig: &stroppy.Config{
+	// 		Run: &stroppy.RunConfig{
+	// 			Seed: 42,
+	// 		},
+	// 	},
+	// 	Step: step,
+	// }
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 	paramID := NewGeneratorID("q1", "id")
@@ -56,16 +55,10 @@ func TestNewQuery_Success(t *testing.T) {
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	channel := make(errchan.Chan[stroppy.DriverTransaction], 1)
-	go func() {
-		NewQuery(ctx, lg, generators, buildContext, descriptor, channel)
-	}()
-
-	transactions, err := errchan.Collect[stroppy.DriverTransaction](channel)
+	transactions, err := NewQuery(ctx, lg, generators, descriptor)
 	require.NoError(t, err)
-	require.Len(t, transactions, 1)
-	require.Len(t, transactions[0].Queries, 1)
-	require.Equal(t, int32(10), transactions[0].Queries[0].Params[0].GetInt32())
+	require.Len(t, transactions.Queries, 1)
+	require.Equal(t, int32(10), transactions.Queries[0].Params[0].GetInt32())
 }
 
 func TestNewQuery_Error(t *testing.T) {
@@ -74,40 +67,34 @@ func TestNewQuery_Error(t *testing.T) {
 		Sql:    "SELECT * FROM t WHERE id=${id}",
 		Params: []*stroppy.QueryParamDescriptor{}, // нет генераторов
 	}
-	step := &stroppy.StepDescriptor{
-		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
-			{
-				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
-					Query: descriptor,
-				}},
-			},
-		},
-	}
-	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
-		},
-		Step: step,
-	}
+	// step := &stroppy.StepDescriptor{
+	// 	Name: "test",
+	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 		{
+	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
+	// 				Query: descriptor,
+	// 			}},
+	// 		},
+	// 	},
+	// }
+	// buildContext := &stroppy.StepContext{
+	// 	GlobalConfig: &stroppy.Config{
+	// 		Run: &stroppy.RunConfig{
+	// 			Seed: 42,
+	// 		},
+	// 	},
+	// 	Step: step,
+	// }
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	channel := make(errchan.Chan[stroppy.DriverTransaction])
-	go func() {
-		NewQuery(ctx, lg, generators, buildContext, descriptor, channel)
-	}()
-
-	transactions, err := errchan.Collect[stroppy.DriverTransaction](channel)
+	transactions, err := NewQuery(ctx, lg, generators, descriptor)
 	require.NoError(t, err)
-	require.Len(t, transactions, 1)
-	require.Len(t, transactions[0].Queries, 1)
-	require.Empty(t, transactions[0].Queries[0].Params)
+	require.Len(t, transactions.Queries, 1)
+	require.Equal(t, int32(10), transactions.Queries[0].Params[0].GetInt32())
 }
 
 func TestNewQuerySync_Success(t *testing.T) {
@@ -124,24 +111,24 @@ func TestNewQuerySync_Success(t *testing.T) {
 			}},
 		},
 	}
-	step := &stroppy.StepDescriptor{
-		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
-			{
-				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
-					Query: descriptor,
-				}},
-			},
-		},
-	}
-	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
-		},
-		Step: step,
-	}
+	// step := &stroppy.StepDescriptor{
+	// 	Name: "test",
+	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 		{
+	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
+	// 				Query: descriptor,
+	// 			}},
+	// 		},
+	// 	},
+	// }
+	// buildContext := &stroppy.StepContext{
+	// 	GlobalConfig: &stroppy.Config{
+	// 		Run: &stroppy.RunConfig{
+	// 			Seed: 42,
+	// 		},
+	// 	},
+	// 	Step: step,
+	// }
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 	paramID := NewGeneratorID("q1", "id")
@@ -152,7 +139,7 @@ func TestNewQuerySync_Success(t *testing.T) {
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transaction, err := NewQuerySync(ctx, lg, generators, buildContext, descriptor)
+	transaction, err := NewQuery(ctx, lg, generators, descriptor)
 	require.NoError(t, err)
 	require.NotNil(t, transaction)
 	require.Len(t, transaction.Queries, 1)

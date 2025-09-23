@@ -11,7 +11,6 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/core/generate"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
-	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 func TestNewTransaction_Success(t *testing.T) {
@@ -33,24 +32,24 @@ func TestNewTransaction_Success(t *testing.T) {
 			},
 		},
 	}
-	step := &stroppy.StepDescriptor{
-		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
-			{
-				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
-					Transaction: descriptor,
-				}},
-			},
-		},
-	}
-	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
-		},
-		Step: step,
-	}
+	// step := &stroppy.StepDescriptor{
+	// 	Name: "test",
+	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 		{
+	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
+	// 				Transaction: descriptor,
+	// 			}},
+	// 		},
+	// 	},
+	// }
+	// buildContext := &stroppy.StepContext{
+	// 	GlobalConfig: &stroppy.Config{
+	// 		Run: &stroppy.RunConfig{
+	// 			Seed: 42,
+	// 		},
+	// 	},
+	// 	Step: step,
+	// }
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 	paramID := NewGeneratorID("q1", "id")
@@ -61,17 +60,11 @@ func TestNewTransaction_Success(t *testing.T) {
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	channel := make(errchan.Chan[stroppy.DriverTransaction], 1)
-	go func() {
-		NewTransaction(ctx, lg, generators, buildContext, descriptor, channel)
-	}()
-
-	transactions, err := errchan.Collect[stroppy.DriverTransaction](channel)
+	transactions, err := NewTransaction(ctx, lg, generators, descriptor)
 	require.NoError(t, err)
-	require.Len(t, transactions, 1)
-	require.Len(t, transactions[0].Queries, 1)
-	require.Equal(t, "SELECT * FROM t WHERE id=$1", transactions[0].Queries[0].Request)
-	require.Equal(t, int32(10), transactions[0].Queries[0].Params[0].GetInt32())
+	require.Len(t, transactions.Queries, 1)
+	require.Equal(t, "SELECT * FROM t WHERE id=$1", transactions.Queries[0].Request)
+	require.Equal(t, int32(10), transactions.Queries[0].Params[0].GetInt32())
 }
 
 func TestNewTransaction_Isolation(t *testing.T) {
@@ -94,24 +87,24 @@ func TestNewTransaction_Isolation(t *testing.T) {
 			},
 		},
 	}
-	step := &stroppy.StepDescriptor{
-		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
-			{
-				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
-					Transaction: descriptor,
-				}},
-			},
-		},
-	}
-	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
-		},
-		Step: step,
-	}
+	// step := &stroppy.StepDescriptor{
+	// 	Name: "test",
+	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 		{
+	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
+	// 				Transaction: descriptor,
+	// 			}},
+	// 		},
+	// 	},
+	// }
+	// buildContext := &stroppy.StepContext{
+	// 	GlobalConfig: &stroppy.Config{
+	// 		Run: &stroppy.RunConfig{
+	// 			Seed: 42,
+	// 		},
+	// 	},
+	// 	Step: step,
+	// }
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 	paramID := NewGeneratorID("q1", "id")
@@ -122,15 +115,9 @@ func TestNewTransaction_Isolation(t *testing.T) {
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	channel := make(errchan.Chan[stroppy.DriverTransaction])
-	go func() {
-		NewTransaction(ctx, lg, generators, buildContext, descriptor, channel)
-	}()
-
-	transactions, err := errchan.Collect[stroppy.DriverTransaction](channel)
+	transactions, err := NewTransaction(ctx, lg, generators, descriptor)
 	require.NoError(t, err)
-	require.Len(t, transactions, 1)
-	require.Len(t, transactions[0].Queries, 1)
-	require.Equal(t, "SELECT * FROM t WHERE id=$1", transactions[0].Queries[0].Request)
-	require.Equal(t, int32(10), transactions[0].Queries[0].Params[0].GetInt32())
+	require.Len(t, transactions.Queries, 1)
+	require.Equal(t, "SELECT * FROM t WHERE id=$1", transactions.Queries[0].Request)
+	require.Equal(t, int32(10), transactions.Queries[0].Params[0].GetInt32())
 }
