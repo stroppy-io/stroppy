@@ -52,15 +52,15 @@ stroppy-cloud-panel:
   replicaCount: 1
 
   secrets:
-    stroppy-cloud-panel-env:
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_USER: stroppy
-      DB_PASSWORD: stroppy
-      DB_NAME: stroppy
-      DB_SSLMODE: disable
-      PORT: "8080"
-      JWT_SECRET: change-this-in-production
+#    stroppy-cloud-panel-env:
+#      DB_HOST: postgres
+#      DB_PORT: "5432"
+#      DB_USER: stroppy
+#      DB_PASSWORD: stroppy
+#      DB_NAME: stroppy
+#      DB_SSLMODE: disable
+#      PORT: "8080"
+#      JWT_SECRET: change-this-in-production
     # Дополнительные секреты можно добавить здесь:
     # SECRET_NAME:
     #   KEY1: VALUE1
