@@ -113,3 +113,16 @@ help:
 	@echo "  monitor    - Мониторинг ресурсов"
 	@echo "  info       - Информация о образе"
 	@echo "  help       - Показать эту справку"
+
+
+branch=main
+.PHONY: revision
+revision: # Создание тега
+	@if [ -e $(tag) ]; then \
+		echo "error: Specify version 'tag='"; \
+		exit 1; \
+	fi
+	git tag -d ${tag} || true
+	git push --delete origin ${tag} || true
+	git tag $(tag)
+	git push origin $(tag)
