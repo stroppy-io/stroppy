@@ -44,8 +44,7 @@ env: { }
 #      key: key_from_secret
 
 ## existing K8s secret name containing auth details
-imagePullSecrets:
-  - name: komeet-ghcr-credentials
+imagePullSecrets: {}
   # - name: my-private-repo-secret
 # number of app replicas for deployment
 
