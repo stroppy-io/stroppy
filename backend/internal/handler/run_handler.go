@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"stroppy-cloud-pannel/internal/domain/run"
-	"stroppy-cloud-pannel/internal/middleware"
+	"stroppy-cloud-panel/internal/domain/run"
+	"stroppy-cloud-panel/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )

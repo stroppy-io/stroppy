@@ -41,7 +41,7 @@ services:
     volumes:
       - ./backend:/app
     working_dir: /app
-    command: ./stroppy-cloud-pannel
+    command: ./stroppy-cloud-panel
     depends_on:
       postgres:
         condition: service_healthy

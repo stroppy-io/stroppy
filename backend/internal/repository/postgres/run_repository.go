@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"stroppy-cloud-pannel/internal/domain/run"
+	"stroppy-cloud-panel/internal/domain/run"
 )
 
 // RunRepository реализует интерфейс run.Repository для PostgreSQL

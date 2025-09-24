@@ -37,7 +37,7 @@ RUN go mod download
 COPY backend/ ./
 
 # Сборка backend приложения
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o bin/stroppy-cloud-pannel ./cmd/stroppy-cloud-pannel
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o bin/stroppy-cloud-panel ./cmd/stroppy-cloud-panel
 
 # Этап 3: Финальный образ
 FROM ubuntu:22.04
@@ -56,7 +56,7 @@ RUN useradd -r -s /bin/false appuser
 WORKDIR /app
 
 # Копирование бинарного файла backend из builder образа
-COPY --from=backend-builder /app/backend/bin/stroppy-cloud-pannel ./stroppy-cloud-pannel
+COPY --from=backend-builder /app/backend/bin/stroppy-cloud-panel ./stroppy-cloud-panel
 
 # Копирование собранного frontend из builder образа
 COPY --from=frontend-builder /app/frontend/dist ./web
@@ -84,4 +84,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Команда запуска
-CMD ["./stroppy-cloud-pannel"]
+CMD ["./stroppy-cloud-panel"]

@@ -7,7 +7,7 @@
 make run
 
 # Или напрямую
-./bin/stroppy-cloud-pannel
+./bin/stroppy-cloud-panel
 ```
 
 Сервер запустится на порту 8080 (по умолчанию).

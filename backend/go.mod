@@ -1,4 +1,4 @@
-module stroppy-cloud-pannel
+module stroppy-cloud-panel
 
 go 1.21
 

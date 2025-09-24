@@ -1,31 +1,31 @@
-{{- if (index .Values "stroppy-cloud-pannel").service.enabled  }}
+{{- if (index .Values "stroppy-cloud-panel").service.enabled  }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "stroppy-cloud-pannel.fullname" . }}
+  name: {{ include "stroppy-cloud-panel.fullname" . }}
   annotations:
-    {{- if (index .Values "stroppy-cloud-pannel").serviceAnnotations }}
-    {{- with (index .Values "stroppy-cloud-pannel").serviceAnnotations }}
+    {{- if (index .Values "stroppy-cloud-panel").serviceAnnotations }}
+    {{- with (index .Values "stroppy-cloud-panel").serviceAnnotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
     {{- end }}
   labels:
-    {{- include "stroppy-cloud-pannel.labels" . | nindent 4 }}
-    {{- if (index .Values "stroppy-cloud-pannel").extraServiceLabels }}
-    {{- include "stroppy-cloud-pannel.extraServiceLabels" . | nindent 4 }}
+    {{- include "stroppy-cloud-panel.labels" . | nindent 4 }}
+    {{- if (index .Values "stroppy-cloud-panel").extraServiceLabels }}
+    {{- include "stroppy-cloud-panel.extraServiceLabels" . | nindent 4 }}
     {{- end }}
 spec:
-  type: {{ (index .Values "stroppy-cloud-pannel").service.type }}
+  type: {{ (index .Values "stroppy-cloud-panel").service.type }}
   ports:
-  {{- if (index .Values "stroppy-cloud-pannel").service.useAllAppPorts }}
-  {{- range $k, $v := (index .Values "stroppy-cloud-pannel").appPorts }}
+  {{- if (index .Values "stroppy-cloud-panel").service.useAllAppPorts }}
+  {{- range $k, $v := (index .Values "stroppy-cloud-panel").appPorts }}
     - name: {{ $k }}
       targetPort: {{ $k }}
       port: {{ $v }}
       protocol: TCP
   {{- end }}
   {{ else }}
-  {{- range $k, $v := (index .Values "stroppy-cloud-pannel").service.ports }}
+  {{- range $k, $v := (index .Values "stroppy-cloud-panel").service.ports }}
     - name: {{ $k }}
       targetPort: {{ $k }}
       port: {{ $v }}
@@ -33,8 +33,8 @@ spec:
   {{- end }}
   {{- end }}
   selector:
-    {{- include "stroppy-cloud-pannel.labels" . | nindent 4 }}
-    {{- if (index .Values "stroppy-cloud-pannel").extraPodLabels }}
-    {{- include "stroppy-cloud-pannel.extraPodLabels" . | nindent 4 }}
+    {{- include "stroppy-cloud-panel.labels" . | nindent 4 }}
+    {{- if (index .Values "stroppy-cloud-panel").extraPodLabels }}
+    {{- include "stroppy-cloud-panel.extraPodLabels" . | nindent 4 }}
     {{- end }}
 {{- end }}

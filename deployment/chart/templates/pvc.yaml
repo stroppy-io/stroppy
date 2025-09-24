@@ -1,17 +1,17 @@
-{{- if (index .Values "stroppy-cloud-pannel").persistentVolume.enabled -}}
+{{- if (index .Values "stroppy-cloud-panel").persistentVolume.enabled -}}
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: {{ include "stroppy-cloud-pannel.fullname" . }}
+  name: {{ include "stroppy-cloud-panel.fullname" . }}
   labels:
-    {{- include "stroppy-cloud-pannel.labels" . | nindent 4 }}
+    {{- include "stroppy-cloud-panel.labels" . | nindent 4 }}
 spec:
   accessModes:
     - ReadWriteOnce
-  {{- if (index .Values "stroppy-cloud-pannel").persistentVolume.storageClass}}
-  storageClassName: {{ (index .Values "stroppy-cloud-pannel").persistentVolume.storageClass}}
+  {{- if (index .Values "stroppy-cloud-panel").persistentVolume.storageClass}}
+  storageClassName: {{ (index .Values "stroppy-cloud-panel").persistentVolume.storageClass}}
   {{ end }}
   resources:
     requests:
-      storage: {{ (index .Values "stroppy-cloud-pannel").persistentVolume.size| default "8Gi" }}
+      storage: {{ (index .Values "stroppy-cloud-panel").persistentVolume.size| default "8Gi" }}
 {{- end -}}

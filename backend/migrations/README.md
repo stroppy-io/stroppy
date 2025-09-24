@@ -100,7 +100,7 @@ docker exec -i stroppy-postgres python3 /path/to/migrate_from_sqlite.py /tmp/str
 
 ```bash
 docker-compose down
-docker volume rm stroppy-cloud-pannel_postgres_data
+docker volume rm stroppy-cloud-panel_postgres_data
 ```
 
 ## Примечания

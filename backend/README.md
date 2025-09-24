@@ -8,7 +8,7 @@ Golang backend для Stroppy Cloud Panel с использованием Gin, S
 
 ```
 backend/
-├── cmd/stroppy-cloud-pannel/    # Точка входа приложения
+├── cmd/stroppy-cloud-panel/    # Точка входа приложения
 ├── internal/
 │   ├── domain/                  # Доменные модели и интерфейсы
 │   │   ├── user/               # Доменная модель пользователя

@@ -1,9 +1,9 @@
-{{- if (index .Values "stroppy-cloud-pannel").ingress.enabled  -}}
-{{- $fullName := include "stroppy-cloud-pannel.fullname" . -}}
-{{- $svcPort := (index .Values "stroppy-cloud-pannel").service.port -}}
-{{- if and (index .Values "stroppy-cloud-pannel").ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
-  {{- if not (hasKey (index .Values "stroppy-cloud-pannel").ingress.annotations "kubernetes.io/ingress.class") }}
-  {{- $_ := set (index .Values "stroppy-cloud-pannel").ingress.annotations "kubernetes.io/ingress.class" (index .Values "stroppy-cloud-pannel").ingress.className}}
+{{- if (index .Values "stroppy-cloud-panel").ingress.enabled  -}}
+{{- $fullName := include "stroppy-cloud-panel.fullname" . -}}
+{{- $svcPort := (index .Values "stroppy-cloud-panel").service.port -}}
+{{- if and (index .Values "stroppy-cloud-panel").ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
+  {{- if not (hasKey (index .Values "stroppy-cloud-panel").ingress.annotations "kubernetes.io/ingress.class") }}
+  {{- $_ := set (index .Values "stroppy-cloud-panel").ingress.annotations "kubernetes.io/ingress.class" (index .Values "stroppy-cloud-panel").ingress.className}}
   {{- end }}
 {{- end }}
 {{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
@@ -17,22 +17,22 @@ kind: Ingress
 metadata:
   name: {{ $fullName }}
   labels:
-     {{- include "stroppy-cloud-pannel.labels" . | nindent 4 }}
-  {{- with (index .Values "stroppy-cloud-pannel").ingress.annotations }}
+     {{- include "stroppy-cloud-panel.labels" . | nindent 4 }}
+  {{- with (index .Values "stroppy-cloud-panel").ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- with (index .Values "stroppy-cloud-pannel").ingress.annotations }}
+  {{- with (index .Values "stroppy-cloud-panel").ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if and (index .Values "stroppy-cloud-pannel").ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
-  ingressClassName: {{ (index .Values "stroppy-cloud-pannel").ingress.className }}
+  {{- if and (index .Values "stroppy-cloud-panel").ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ (index .Values "stroppy-cloud-panel").ingress.className }}
   {{- end }}
-  {{- if (index .Values "stroppy-cloud-pannel").ingress.tls }}
+  {{- if (index .Values "stroppy-cloud-panel").ingress.tls }}
   tls:
-    {{- range (index .Values "stroppy-cloud-pannel").ingress.tls }}
+    {{- range (index .Values "stroppy-cloud-panel").ingress.tls }}
     - hosts:
         {{- range .hosts }}
         - {{ . | quote }}
@@ -41,7 +41,7 @@ spec:
     {{- end }}
   {{- end }}
   rules:
-    {{- range (index .Values "stroppy-cloud-pannel").ingress.hosts }}
+    {{- range (index .Values "stroppy-cloud-panel").ingress.hosts }}
     - host: {{ .host | quote }}
       http:
         paths:

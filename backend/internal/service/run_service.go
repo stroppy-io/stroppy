@@ -1,7 +1,7 @@
 package service
 
 import (
-	"stroppy-cloud-pannel/internal/domain/run"
+	"stroppy-cloud-panel/internal/domain/run"
 )
 
 // RunService реализует бизнес-логику запусков

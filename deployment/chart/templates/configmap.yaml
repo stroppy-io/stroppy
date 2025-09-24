@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: stroppy-cloud-pannel-configmap-values
+  name: stroppy-cloud-panel-configmap-values
   namespace: {{ .Release.Namespace }}
 data:
   {{- range $key, $value := .Values.configmap.configMapValues }}
@@ -14,7 +14,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: stroppy-cloud-pannel-yaml-files
+  name: stroppy-cloud-panel-yaml-files
   namespace: {{ .Release.Namespace }}
 data:
   {{- range $fileName, $fileContent := .Values.configmap.yamlFiles }}
@@ -27,7 +27,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: stroppy-cloud-pannel-json-files
+  name: stroppy-cloud-panel-json-files
   namespace: {{ .Release.Namespace }}
 data:
   {{- range $fileName, $fileContent := .Values.configmap.jsonFiles }}
@@ -40,7 +40,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: stroppy-cloud-pannel-custom-files
+  name: stroppy-cloud-panel-custom-files
   namespace: {{ .Release.Namespace }}
 data:
   {{- range $fileName, $fileContent := .Values.configmap.customFiles }}

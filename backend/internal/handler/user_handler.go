@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"stroppy-cloud-pannel/internal/domain/user"
+	"stroppy-cloud-panel/internal/domain/user"
 
 	"github.com/gin-gonic/gin"
 )

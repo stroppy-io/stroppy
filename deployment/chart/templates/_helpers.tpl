@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "stroppy-cloud-pannel.name" -}}
+{{- define "stroppy-cloud-panel.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "stroppy-cloud-pannel.fullname" -}}
+{{- define "stroppy-cloud-panel.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "stroppy-cloud-pannel.chart" -}}
+{{- define "stroppy-cloud-panel.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "stroppy-cloud-pannel.labels" -}}
-app.kubernetes.io/name: stroppy-cloud-pannel
-helm.sh/chart: {{ include "stroppy-cloud-pannel.chart" . }}
+{{- define "stroppy-cloud-panel.labels" -}}
+app.kubernetes.io/name: stroppy-cloud-panel
+helm.sh/chart: {{ include "stroppy-cloud-panel.chart" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,29 +45,29 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "stroppy-cloud-pannel.serviceAccountName" }}
-{{- if (index .Values "stroppy-cloud-pannel").serviceAccount.create }}
-{{- default (include "stroppy-cloud-pannel.fullname" .) (index .Values "stroppy-cloud-pannel").serviceAccount.name }}
+{{- define "stroppy-cloud-panel.serviceAccountName" }}
+{{- if (index .Values "stroppy-cloud-panel").serviceAccount.create }}
+{{- default (include "stroppy-cloud-panel.fullname" .) (index .Values "stroppy-cloud-panel").serviceAccount.name }}
 {{- else }}
-{{- default "default" (index .Values "stroppy-cloud-pannel").serviceAccount.name }}
+{{- default "default" (index .Values "stroppy-cloud-panel").serviceAccount.name }}
 {{- end }}
 {{- end }}
 
 {{/*
 Extra labels for services
 */}}
-{{- define "stroppy-cloud-pannel.extraServiceLabels"  -}}
-{{- if (index .Values "stroppy-cloud-pannel").extraServiceLabels  }}
-{{- toYaml (index .Values "stroppy-cloud-pannel").extraServiceLabels  }}
+{{- define "stroppy-cloud-panel.extraServiceLabels"  -}}
+{{- if (index .Values "stroppy-cloud-panel").extraServiceLabels  }}
+{{- toYaml (index .Values "stroppy-cloud-panel").extraServiceLabels  }}
 {{- end }}
 {{- end }}
 
 {{/*
 Extra labels for pods
 */}}
-{{- define "stroppy-cloud-pannel.extraPodLabels" -}}
-{{- if (index .Values "stroppy-cloud-pannel").extraPodLabels  }}
-{{- toYaml (index .Values "stroppy-cloud-pannel").extraPodLabels  }}
+{{- define "stroppy-cloud-panel.extraPodLabels" -}}
+{{- if (index .Values "stroppy-cloud-panel").extraPodLabels  }}
+{{- toYaml (index .Values "stroppy-cloud-panel").extraPodLabels  }}
 {{- end }}
 {{- end }}
 

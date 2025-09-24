@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"stroppy-cloud-pannel/internal/domain/user"
+	"stroppy-cloud-panel/internal/domain/user"
 )
 
 // UserRepository реализует интерфейс user.Repository для PostgreSQL

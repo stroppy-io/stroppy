@@ -2,7 +2,7 @@
 fullnameOverride: ""
 ## image details
 image:
-  repository: ghcr.io/naukograd-software/stroppy-cloud-pannel
+  repository: ghcr.io/naukograd-software/stroppy-cloud-panel
   pullPolicy: Always
   ## image tag serves as the app version
   ## Use specific tag from CI/CD pipeline
@@ -49,11 +49,11 @@ imagePullSecrets:
   # - name: my-private-repo-secret
 # number of app replicas for deployment
 
-stroppy-cloud-pannel:
+stroppy-cloud-panel:
   replicaCount: 1
 
   secrets:
-    stroppy-cloud-pannel-env:
+    stroppy-cloud-panel-env:
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: stroppy
@@ -73,35 +73,35 @@ stroppy-cloud-pannel:
     # Переменные окружения из секрета
     DB_HOST:
       secretKeyRef:
-        name: stroppy-cloud-pannel-env
+        name: stroppy-cloud-panel-env
         key: DB_HOST
     DB_PORT:
       secretKeyRef:
-        name: stroppy-cloud-pannel-env
+        name: stroppy-cloud-panel-env
         key: DB_PORT
     DB_USER:
       secretKeyRef:
-        name: stroppy-cloud-pannel-env
+        name: stroppy-cloud-panel-env
         key: DB_USER
     DB_PASSWORD:
       secretKeyRef:
-        name: stroppy-cloud-pannel-env
+        name: stroppy-cloud-panel-env
         key: DB_PASSWORD
     DB_NAME:
       secretKeyRef:
-        name: stroppy-cloud-pannel-env
+        name: stroppy-cloud-panel-env
         key: DB_NAME
     DB_SSLMODE:
       secretKeyRef:
-        name: stroppy-cloud-pannel-env
+        name: stroppy-cloud-panel-env
         key: DB_SSLMODE
     PORT:
       secretKeyRef:
-        name: stroppy-cloud-pannel-env
+        name: stroppy-cloud-panel-env
         key: PORT
     JWT_SECRET:
       secretKeyRef:
-        name: stroppy-cloud-pannel-env
+        name: stroppy-cloud-panel-env
         key: JWT_SECRET
     # Дополнительные переменные можно добавить здесь:
     #  KEY: VALUE

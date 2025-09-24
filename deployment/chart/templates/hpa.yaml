@@ -1,32 +1,32 @@
-{{- if (index .Values "stroppy-cloud-pannel").autoscaling.enabled  }}
+{{- if (index .Values "stroppy-cloud-panel").autoscaling.enabled  }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "stroppy-cloud-pannel.fullname" . }}
+  name: {{ include "stroppy-cloud-panel.fullname" . }}
   labels:
-    {{- include "stroppy-cloud-pannel.labels" . | nindent 4 }}
+    {{- include "stroppy-cloud-panel.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "stroppy-cloud-pannel.fullname" . }}
-  minReplicas: {{ (index .Values "stroppy-cloud-pannel").autoscaling.minReplicas }}
-  maxReplicas: {{ (index .Values "stroppy-cloud-pannel").autoscaling.maxReplicas }}
+    name: {{ include "stroppy-cloud-panel.fullname" . }}
+  minReplicas: {{ (index .Values "stroppy-cloud-panel").autoscaling.minReplicas }}
+  maxReplicas: {{ (index .Values "stroppy-cloud-panel").autoscaling.maxReplicas }}
   metrics:
-    {{- if (index .Values "stroppy-cloud-pannel").autoscaling.targetCPUUtilizationPercentage }}
+    {{- if (index .Values "stroppy-cloud-panel").autoscaling.targetCPUUtilizationPercentage }}
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: {{ (index .Values "stroppy-cloud-pannel").autoscaling.targetCPUUtilizationPercentage }}
+          averageUtilization: {{ (index .Values "stroppy-cloud-panel").autoscaling.targetCPUUtilizationPercentage }}
     {{- end }}
-    {{- if (index .Values "stroppy-cloud-pannel").autoscaling.targetMemoryUtilizationPercentage }}
+    {{- if (index .Values "stroppy-cloud-panel").autoscaling.targetMemoryUtilizationPercentage }}
     - type: Resource
       resource:
         name: memory
         target:
           type: Utilization
-          averageUtilization: {{(index .Values "stroppy-cloud-pannel").autoscaling.targetMemoryUtilizationPercentage }}
+          averageUtilization: {{(index .Values "stroppy-cloud-panel").autoscaling.targetMemoryUtilizationPercentage }}
     {{- end }}
 {{- end }}

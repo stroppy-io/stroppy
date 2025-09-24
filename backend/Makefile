@@ -1,8 +1,8 @@
 .PHONY: build run test clean deps dev
 
 # Переменные
-BINARY_NAME=stroppy-cloud-pannel
-MAIN_PATH=./cmd/stroppy-cloud-pannel
+BINARY_NAME=stroppy-cloud-panel
+MAIN_PATH=./cmd/stroppy-cloud-panel
 BUILD_DIR=./bin
 
 # Сборка приложения

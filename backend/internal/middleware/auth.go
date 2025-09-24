@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"stroppy-cloud-pannel/pkg/auth"
+	"stroppy-cloud-panel/pkg/auth"
 
 	"github.com/gin-gonic/gin"
 )

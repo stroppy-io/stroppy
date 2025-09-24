@@ -1,9 +1,9 @@
 # Production конфигурация для Stroppy Cloud Panel
 # Этот файл показывает, как переопределить настройки для production окружения
 
-stroppy-cloud-pannel:
+stroppy-cloud-panel:
   secrets:
-    stroppy-cloud-pannel-env:
+    stroppy-cloud-panel-env:
       # Production значения для переменных окружения
       DB_HOST: postgres-prod.example.com
       DB_PORT: "5432"
@@ -17,7 +17,7 @@ stroppy-cloud-pannel:
   # Дополнительные аннотации для секретов
   secretsAnnotations:
     kubernetes.io/managed-by: "Helm"
-    app.kubernetes.io/part-of: "stroppy-cloud-pannel"
+    app.kubernetes.io/part-of: "stroppy-cloud-panel"
 
   # Production ресурсы
   resources:
@@ -116,5 +116,5 @@ stroppy-cloud-pannel:
             - key: app.kubernetes.io/name
               operator: In
               values:
-              - stroppy-cloud-pannel
+              - stroppy-cloud-panel
           topologyKey: kubernetes.io/hostname

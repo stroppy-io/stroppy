@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"stroppy-cloud-pannel/internal/handler"
-	"stroppy-cloud-pannel/internal/middleware"
-	"stroppy-cloud-pannel/internal/repository/postgres"
-	"stroppy-cloud-pannel/internal/service"
-	"stroppy-cloud-pannel/pkg/auth"
-	"stroppy-cloud-pannel/pkg/database"
-	"stroppy-cloud-pannel/pkg/migrations"
+	"stroppy-cloud-panel/internal/handler"
+	"stroppy-cloud-panel/internal/middleware"
+	"stroppy-cloud-panel/internal/repository/postgres"
+	"stroppy-cloud-panel/internal/service"
+	"stroppy-cloud-panel/pkg/auth"
+	"stroppy-cloud-panel/pkg/database"
+	"stroppy-cloud-panel/pkg/migrations"
 
 	"github.com/gin-gonic/gin"
 )

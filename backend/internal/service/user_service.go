@@ -3,8 +3,8 @@ package service
 import (
 	"errors"
 
-	"stroppy-cloud-pannel/internal/domain/user"
-	"stroppy-cloud-pannel/pkg/auth"
+	"stroppy-cloud-panel/internal/domain/user"
+	"stroppy-cloud-panel/pkg/auth"
 )
 
 // UserService реализует бизнес-логику пользователей

@@ -1,46 +1,46 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "stroppy-cloud-pannel.fullname" . }}
+  name: {{ include "stroppy-cloud-panel.fullname" . }}
   labels:
-    {{- include "stroppy-cloud-pannel.labels" . | nindent 4 }}
+    {{- include "stroppy-cloud-panel.labels" . | nindent 4 }}
 spec:
-  {{- if not (index .Values "stroppy-cloud-pannel").autoscaling.enabled }}
-  replicas: {{ (index .Values "stroppy-cloud-pannel").replicaCount }}
+  {{- if not (index .Values "stroppy-cloud-panel").autoscaling.enabled }}
+  replicas: {{ (index .Values "stroppy-cloud-panel").replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: stroppy-cloud-pannel
+      app.kubernetes.io/name: stroppy-cloud-panel
   template:
     metadata:
-      {{- with (index .Values "stroppy-cloud-pannel").podAnnotations }}
+      {{- with (index .Values "stroppy-cloud-panel").podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "stroppy-cloud-pannel.labels" . | nindent 10 }}
-        {{- if (index .Values "stroppy-cloud-pannel").extraPodLabels }}
-        {{- include "stroppy-cloud-pannel.extraPodLabels" . | nindent 10 }}
+        {{- include "stroppy-cloud-panel.labels" . | nindent 10 }}
+        {{- if (index .Values "stroppy-cloud-panel").extraPodLabels }}
+        {{- include "stroppy-cloud-panel.extraPodLabels" . | nindent 10 }}
         {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "stroppy-cloud-pannel.serviceAccountName" . }}
+      serviceAccountName: {{ include "stroppy-cloud-panel.serviceAccountName" . }}
       securityContext:
-        {{- toYaml (index .Values "stroppy-cloud-pannel").podSecurityContext | nindent 8 }}
+        {{- toYaml (index .Values "stroppy-cloud-panel").podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
-            {{- toYaml (index .Values "stroppy-cloud-pannel").securityContext | nindent 12 }}
+            {{- toYaml (index .Values "stroppy-cloud-panel").securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if (index .Values "stroppy-cloud-pannel").command }}
-          command: {{ (index .Values "stroppy-cloud-pannel").command  }}
+          {{- if (index .Values "stroppy-cloud-panel").command }}
+          command: {{ (index .Values "stroppy-cloud-panel").command  }}
           {{- end }}
-          {{- if (index .Values "stroppy-cloud-pannel").args  }}
-          args: {{ (index .Values "stroppy-cloud-pannel").args  }}
+          {{- if (index .Values "stroppy-cloud-panel").args  }}
+          args: {{ (index .Values "stroppy-cloud-panel").args  }}
           {{- end }}
           env:
           {{- if .Values.configmap.yamlFiles }}
@@ -63,7 +63,7 @@ spec:
                   key: {{ quote $value.configMapKeyRef.key }}
               {{- end }}
           {{- end }}
-          {{- range $key, $value := (index .Values "stroppy-cloud-pannel").env  }}
+          {{- range $key, $value := (index .Values "stroppy-cloud-panel").env  }}
             - name: {{ quote $key }}
               {{- if or (typeIs "string" $value) (typeIs "int" $value) (typeIs "float64" $value) (typeIs "bool" $value) }}
               value: {{ $value | quote }}
@@ -80,22 +80,22 @@ spec:
               {{- end }}
           {{- end }}
           ports:
-          {{- range $k, $v := (index .Values "stroppy-cloud-pannel").appPorts }}
+          {{- range $k, $v := (index .Values "stroppy-cloud-panel").appPorts }}
             - name: {{ $k }}
               containerPort: {{ $v }}
               protocol: TCP
           {{- end }}
-          {{- if (index .Values "stroppy-cloud-pannel").livenessProbe }}
+          {{- if (index .Values "stroppy-cloud-panel").livenessProbe }}
           livenessProbe:
-            {{- toYaml (index .Values "stroppy-cloud-pannel").livenessProbe | nindent 12 }}
+            {{- toYaml (index .Values "stroppy-cloud-panel").livenessProbe | nindent 12 }}
           {{- end }}
-          {{- if (index .Values "stroppy-cloud-pannel").readinessProbe }}
+          {{- if (index .Values "stroppy-cloud-panel").readinessProbe }}
           readinessProbe:
-            {{- toYaml (index .Values "stroppy-cloud-pannel").readinessProbe | nindent 12 }}
+            {{- toYaml (index .Values "stroppy-cloud-panel").readinessProbe | nindent 12 }}
           {{- end }}
-          {{- if (index .Values "stroppy-cloud-pannel").resources }}
+          {{- if (index .Values "stroppy-cloud-panel").resources }}
           resources:
-            {{- toYaml (index .Values "stroppy-cloud-pannel").resources | nindent 12 }}
+            {{- toYaml (index .Values "stroppy-cloud-panel").resources | nindent 12 }}
           {{- end }}
           volumeMounts:
           {{- if .Values.configmap.yamlFiles }}
@@ -103,12 +103,12 @@ spec:
             mountPath: /etc/config
             readOnly: true
           {{- end }}
-          {{- if  (index .Values "stroppy-cloud-pannel").extraVolumeMounts }}
-          {{- toYaml (index .Values "stroppy-cloud-pannel").extraVolumeMounts | nindent 12 -}}
+          {{- if  (index .Values "stroppy-cloud-panel").extraVolumeMounts }}
+          {{- toYaml (index .Values "stroppy-cloud-panel").extraVolumeMounts | nindent 12 -}}
           {{- end }}
       ### Extra containers
-      {{- if  (index .Values "stroppy-cloud-pannel").extraContainers }}
-      {{- range  (index .Values "stroppy-cloud-pannel").extraContainers  }}
+      {{- if  (index .Values "stroppy-cloud-panel").extraContainers }}
+      {{- range  (index .Values "stroppy-cloud-panel").extraContainers  }}
         - name: {{ .name }}
           image: "{{ .image }}:{{ .tag }}"
           imagePullPolicy: {{ .imagePullPolicy | default "IfNotPresent" }}
@@ -164,20 +164,20 @@ spec:
       {{- if .Values.configmap.yamlFiles }}
       - name: config-volume
         configMap:
-          name: stroppy-cloud-pannel-yaml-files
+          name: stroppy-cloud-panel-yaml-files
       {{- end }}
-      {{- if (index .Values "stroppy-cloud-pannel").extraVolumes }}
-      {{- toYaml (index .Values "stroppy-cloud-pannel").extraVolumes | nindent 8 }}
+      {{- if (index .Values "stroppy-cloud-panel").extraVolumes }}
+      {{- toYaml (index .Values "stroppy-cloud-panel").extraVolumes | nindent 8 }}
       {{- end }}
-      {{- with  (index .Values "stroppy-cloud-pannel").nodeSelector }}
+      {{- with  (index .Values "stroppy-cloud-panel").nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with (index .Values "stroppy-cloud-pannel").affinity }}
+      {{- with (index .Values "stroppy-cloud-panel").affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with (index .Values "stroppy-cloud-pannel").tolerations }}
+      {{- with (index .Values "stroppy-cloud-panel").tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
