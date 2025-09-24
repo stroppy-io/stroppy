@@ -595,9 +595,9 @@ func (m *DriverConfig) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if _, ok := DriverConfig_DriverName_name[int32(m.GetDriverName())]; !ok {
+	if _, ok := DriverConfig_DriverType_name[int32(m.GetDriverType())]; !ok {
 		err := DriverConfigValidationError{
-			field:  "DriverName",
+			field:  "DriverType",
 			reason: "value must be one of the defined enum values",
 		}
 		if !all {
@@ -1120,41 +1120,30 @@ var _ interface {
 	ErrorName() string
 } = StepContextValidationError{}
 
-// Validate checks the field values on Plugin with the rules defined in the
+// Validate checks the field values on SideCar with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
-func (m *Plugin) Validate() error {
+func (m *SideCar) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Plugin with the rules defined in the
+// ValidateAll checks the field values on SideCar with the rules defined in the
 // proto definition for this message. If any rules are violated, the result is
-// a list of violation errors wrapped in PluginMultiError, or nil if none found.
-func (m *Plugin) ValidateAll() error {
+// a list of violation errors wrapped in SideCarMultiError, or nil if none found.
+func (m *SideCar) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Plugin) validate(all bool) error {
+func (m *SideCar) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	if _, ok := Plugin_Type_name[int32(m.GetType())]; !ok {
-		err := PluginValidationError{
-			field:  "Type",
-			reason: "value must be one of the defined enum values",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if _, err := url.Parse(m.GetPath()); err != nil {
-		err = PluginValidationError{
-			field:  "Path",
+	if _, err := url.Parse(m.GetUrl()); err != nil {
+		err = SideCarValidationError{
+			field:  "Url",
 			reason: "value must be a valid URI",
 			cause:  err,
 		}
@@ -1170,7 +1159,7 @@ func (m *Plugin) validate(all bool) error {
 			switch v := interface{}(m.GetSettings()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, PluginValidationError{
+					errors = append(errors, SideCarValidationError{
 						field:  "Settings",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -1178,7 +1167,7 @@ func (m *Plugin) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, PluginValidationError{
+					errors = append(errors, SideCarValidationError{
 						field:  "Settings",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -1187,7 +1176,7 @@ func (m *Plugin) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(m.GetSettings()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return PluginValidationError{
+				return SideCarValidationError{
 					field:  "Settings",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -1198,18 +1187,18 @@ func (m *Plugin) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return PluginMultiError(errors)
+		return SideCarMultiError(errors)
 	}
 
 	return nil
 }
 
-// PluginMultiError is an error wrapping multiple validation errors returned by
-// Plugin.ValidateAll() if the designated constraints aren't met.
-type PluginMultiError []error
+// SideCarMultiError is an error wrapping multiple validation errors returned
+// by SideCar.ValidateAll() if the designated constraints aren't met.
+type SideCarMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m PluginMultiError) Error() string {
+func (m SideCarMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -1218,11 +1207,11 @@ func (m PluginMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m PluginMultiError) AllErrors() []error { return m }
+func (m SideCarMultiError) AllErrors() []error { return m }
 
-// PluginValidationError is the validation error returned by Plugin.Validate if
-// the designated constraints aren't met.
-type PluginValidationError struct {
+// SideCarValidationError is the validation error returned by SideCar.Validate
+// if the designated constraints aren't met.
+type SideCarValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -1230,22 +1219,22 @@ type PluginValidationError struct {
 }
 
 // Field function returns field value.
-func (e PluginValidationError) Field() string { return e.field }
+func (e SideCarValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e PluginValidationError) Reason() string { return e.reason }
+func (e SideCarValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e PluginValidationError) Cause() error { return e.cause }
+func (e SideCarValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e PluginValidationError) Key() bool { return e.key }
+func (e SideCarValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e PluginValidationError) ErrorName() string { return "PluginValidationError" }
+func (e SideCarValidationError) ErrorName() string { return "SideCarValidationError" }
 
 // Error satisfies the builtin error interface
-func (e PluginValidationError) Error() string {
+func (e SideCarValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -1257,14 +1246,14 @@ func (e PluginValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sPlugin.%s: %s%s",
+		"invalid %sSideCar.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = PluginValidationError{}
+var _ error = SideCarValidationError{}
 
 var _ interface {
 	Field() string
@@ -1272,7 +1261,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = PluginValidationError{}
+} = SideCarValidationError{}
 
 // Validate checks the field values on RunConfig with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
@@ -1494,7 +1483,7 @@ func (m *RunConfig) validate(all bool) error {
 
 	// no validation rules for Metadata
 
-	for idx, item := range m.GetPlugins() {
+	for idx, item := range m.GetSideCars() {
 		_, _ = idx, item
 
 		if all {
@@ -1502,7 +1491,7 @@ func (m *RunConfig) validate(all bool) error {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, RunConfigValidationError{
-						field:  fmt.Sprintf("Plugins[%v]", idx),
+						field:  fmt.Sprintf("SideCars[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1510,7 +1499,7 @@ func (m *RunConfig) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, RunConfigValidationError{
-						field:  fmt.Sprintf("Plugins[%v]", idx),
+						field:  fmt.Sprintf("SideCars[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1519,7 +1508,7 @@ func (m *RunConfig) validate(all bool) error {
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return RunConfigValidationError{
-					field:  fmt.Sprintf("Plugins[%v]", idx),
+					field:  fmt.Sprintf("SideCars[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

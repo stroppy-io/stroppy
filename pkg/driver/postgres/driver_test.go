@@ -24,7 +24,7 @@ func newTestDriver(mockPool pgxmock.PgxPoolIface) *testDriver {
 	}
 }
 
-func TestDriver_RunQuery(t *testing.T) {
+func TestDriver_RunTransaction(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	require.NoError(t, err)
 	defer mock.Close()

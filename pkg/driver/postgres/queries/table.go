@@ -1,14 +1,12 @@
 package queries
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
 	"go.uber.org/zap"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
-	"github.com/stroppy-io/stroppy/pkg/core/utils/errchan"
 )
 
 func newIndex(
@@ -73,25 +71,17 @@ func newCreateTable(
 
 //goland:noinspection t
 func NewCreateTable(
-	_ context.Context,
 	lg *zap.Logger,
-	_ uint64,
 	descriptor *stroppy.TableDescriptor,
-	channel errchan.Chan[stroppy.DriverTransaction],
-) {
-	defer errchan.Close[stroppy.DriverTransaction](channel)
+) (*stroppy.DriverTransaction, error) {
 	lg.Debug("build table",
 		zap.String("name", descriptor.GetName()),
 		zap.Any("columns", descriptor.GetColumns()))
 
 	createTableQ, err := newCreateTable(descriptor.GetName(), descriptor.GetColumns())
 	if err != nil {
-		errchan.Send[stroppy.DriverTransaction](channel, nil, err)
-
-		return
+		return nil, fmt.Errorf("can't create table query due to: %w", err)
 	}
-
-	errchan.Send[stroppy.DriverTransaction](channel, createTableQ, err)
 
 	lg.Debug("create table query",
 		zap.String("name", descriptor.GetName()),
@@ -103,18 +93,19 @@ func NewCreateTable(
 	for _, index := range descriptor.GetTableIndexes() {
 		indexQ, err := newIndex(descriptor.GetName(), index)
 		if err != nil {
-			errchan.Send[stroppy.DriverTransaction](channel, nil, err)
-
-			return
+			return nil, fmt.Errorf("can't create table query due to: %w", err)
 		}
 
-		lg.Debug("create index query",
+		lg.Debug(
+			"create index query",
 			zap.String("name", descriptor.GetName()),
 			zap.Any("index", index),
 			zap.Any("query", indexQ),
 			zap.Error(err),
 		)
 
-		errchan.Send[stroppy.DriverTransaction](channel, indexQ, nil)
+		createTableQ.Queries = append(createTableQ.Queries, indexQ.GetQueries()...)
 	}
+
+	return createTableQ, nil
 }

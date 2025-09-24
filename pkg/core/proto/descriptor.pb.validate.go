@@ -828,17 +828,6 @@ func (m *QueryDescriptor) validate(all bool) error {
 
 	}
 
-	if m.GetCount() <= 0 {
-		err := QueryDescriptorValidationError{
-			field:  "Count",
-			reason: "value must be greater than 0",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
 	if all {
 		switch v := interface{}(m.GetDbSpecific()).(type) {
 		case interface{ ValidateAll() error }:
@@ -1037,17 +1026,6 @@ func (m *TransactionDescriptor) validate(all bool) error {
 
 	}
 
-	if m.GetCount() <= 0 {
-		err := TransactionDescriptorValidationError{
-			field:  "Count",
-			reason: "value must be greater than 0",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
 	if all {
 		switch v := interface{}(m.GetDbSpecific()).(type) {
 		case interface{ ValidateAll() error }:
@@ -1157,6 +1135,248 @@ var _ interface {
 	ErrorName() string
 } = TransactionDescriptorValidationError{}
 
+// Validate checks the field values on UnitDescriptor with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *UnitDescriptor) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on UnitDescriptor with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in UnitDescriptorMultiError,
+// or nil if none found.
+func (m *UnitDescriptor) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *UnitDescriptor) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	oneofTypePresent := false
+	switch v := m.Type.(type) {
+	case *UnitDescriptor_CreateTable:
+		if v == nil {
+			err := UnitDescriptorValidationError{
+				field:  "Type",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofTypePresent = true
+
+		if all {
+			switch v := interface{}(m.GetCreateTable()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, UnitDescriptorValidationError{
+						field:  "CreateTable",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, UnitDescriptorValidationError{
+						field:  "CreateTable",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetCreateTable()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return UnitDescriptorValidationError{
+					field:  "CreateTable",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *UnitDescriptor_Query:
+		if v == nil {
+			err := UnitDescriptorValidationError{
+				field:  "Type",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofTypePresent = true
+
+		if all {
+			switch v := interface{}(m.GetQuery()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, UnitDescriptorValidationError{
+						field:  "Query",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, UnitDescriptorValidationError{
+						field:  "Query",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetQuery()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return UnitDescriptorValidationError{
+					field:  "Query",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *UnitDescriptor_Transaction:
+		if v == nil {
+			err := UnitDescriptorValidationError{
+				field:  "Type",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofTypePresent = true
+
+		if all {
+			switch v := interface{}(m.GetTransaction()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, UnitDescriptorValidationError{
+						field:  "Transaction",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, UnitDescriptorValidationError{
+						field:  "Transaction",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTransaction()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return UnitDescriptorValidationError{
+					field:  "Transaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+	if !oneofTypePresent {
+		err := UnitDescriptorValidationError{
+			field:  "Type",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return UnitDescriptorMultiError(errors)
+	}
+
+	return nil
+}
+
+// UnitDescriptorMultiError is an error wrapping multiple validation errors
+// returned by UnitDescriptor.ValidateAll() if the designated constraints
+// aren't met.
+type UnitDescriptorMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m UnitDescriptorMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m UnitDescriptorMultiError) AllErrors() []error { return m }
+
+// UnitDescriptorValidationError is the validation error returned by
+// UnitDescriptor.Validate if the designated constraints aren't met.
+type UnitDescriptorValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e UnitDescriptorValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e UnitDescriptorValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e UnitDescriptorValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e UnitDescriptorValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e UnitDescriptorValidationError) ErrorName() string { return "UnitDescriptorValidationError" }
+
+// Error satisfies the builtin error interface
+func (e UnitDescriptorValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sUnitDescriptor.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = UnitDescriptorValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = UnitDescriptorValidationError{}
+
 // Validate checks the field values on StepUnitDescriptor with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -1179,143 +1399,39 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Async
-
-	oneofTypePresent := false
-	switch v := m.Type.(type) {
-	case *StepUnitDescriptor_CreateTable:
-		if v == nil {
-			err := StepUnitDescriptorValidationError{
-				field:  "Type",
-				reason: "oneof value cannot be a typed-nil",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		}
-		oneofTypePresent = true
-
-		if all {
-			switch v := interface{}(m.GetCreateTable()).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, StepUnitDescriptorValidationError{
-						field:  "CreateTable",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, StepUnitDescriptorValidationError{
-						field:  "CreateTable",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(m.GetCreateTable()).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return StepUnitDescriptorValidationError{
-					field:  "CreateTable",
+	if all {
+		switch v := interface{}(m.GetDescriptor_()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, StepUnitDescriptorValidationError{
+					field:  "Descriptor_",
 					reason: "embedded message failed validation",
 					cause:  err,
-				}
+				})
 			}
-		}
-
-	case *StepUnitDescriptor_Query:
-		if v == nil {
-			err := StepUnitDescriptorValidationError{
-				field:  "Type",
-				reason: "oneof value cannot be a typed-nil",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		}
-		oneofTypePresent = true
-
-		if all {
-			switch v := interface{}(m.GetQuery()).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, StepUnitDescriptorValidationError{
-						field:  "Query",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, StepUnitDescriptorValidationError{
-						field:  "Query",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(m.GetQuery()).(interface{ Validate() error }); ok {
+		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				return StepUnitDescriptorValidationError{
-					field:  "Query",
+				errors = append(errors, StepUnitDescriptorValidationError{
+					field:  "Descriptor_",
 					reason: "embedded message failed validation",
 					cause:  err,
-				}
+				})
 			}
 		}
-
-	case *StepUnitDescriptor_Transaction:
-		if v == nil {
-			err := StepUnitDescriptorValidationError{
-				field:  "Type",
-				reason: "oneof value cannot be a typed-nil",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		}
-		oneofTypePresent = true
-
-		if all {
-			switch v := interface{}(m.GetTransaction()).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, StepUnitDescriptorValidationError{
-						field:  "Transaction",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, StepUnitDescriptorValidationError{
-						field:  "Transaction",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(m.GetTransaction()).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return StepUnitDescriptorValidationError{
-					field:  "Transaction",
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
+	} else if v, ok := interface{}(m.GetDescriptor_()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return StepUnitDescriptorValidationError{
+				field:  "Descriptor_",
+				reason: "embedded message failed validation",
+				cause:  err,
 			}
 		}
-
-	default:
-		_ = v // ensures v is used
 	}
-	if !oneofTypePresent {
+
+	if m.GetCount() <= 0 {
 		err := StepUnitDescriptorValidationError{
-			field:  "Type",
-			reason: "value is required",
+			field:  "Count",
+			reason: "value must be greater than 0",
 		}
 		if !all {
 			return err

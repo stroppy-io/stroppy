@@ -14,8 +14,8 @@ type (
 	Generators  = cmap.ConcurrentMap[GeneratorID, generate.ValueGenerator]
 )
 
-func NewGeneratorID(stepID, queryID, paramID string) GeneratorID {
-	return GeneratorID(fmt.Sprintf("%s:%s:%s", stepID, queryID, paramID))
+func NewGeneratorID(queryID, paramID string) GeneratorID {
+	return GeneratorID(fmt.Sprintf("%s:%s", queryID, paramID))
 }
 
 func (g GeneratorID) String() string {
@@ -29,11 +29,14 @@ func collectQueryGenerators(
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 
 	for _, param := range queryDescriptor.GetParams() {
-		paramID := NewGeneratorID(runContext.GetStep().GetName(), queryDescriptor.GetName(), param.GetName())
+		paramID := NewGeneratorID(
+			queryDescriptor.GetName(),
+			param.GetName(),
+		)
 
 		generator, err := generate.NewValueGenerator(
 			runContext.GetGlobalConfig().GetRun().GetSeed(),
-			queryDescriptor.GetCount(),
+			1000000, //nolint: mnd // TODO: get proper amount
 			param,
 		)
 		if err != nil {
@@ -46,30 +49,46 @@ func collectQueryGenerators(
 	return generators, nil
 }
 
-func CollectStepGenerators(runContext *stroppy.StepContext) (Generators, error) { //nolint: gocognit // allow
+func CollectStepGenerators(
+	runContext *stroppy.StepContext,
+) (Generators, error) { //nolint: gocognit // allow
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 
 	for _, step := range runContext.GetGlobalConfig().GetBenchmark().GetSteps() {
 		for _, queryDescriptor := range step.GetUnits() {
-			switch queryDescriptor.GetType().(type) {
-			case *stroppy.StepUnitDescriptor_Query:
-				gens, err := collectQueryGenerators(runContext, queryDescriptor.GetQuery())
-				if err != nil {
-					return generators, err
-				}
+			var err error
 
-				generators.MSet(gens.Items())
-
-			case *stroppy.StepUnitDescriptor_Transaction:
-				for _, query := range queryDescriptor.GetTransaction().GetQueries() {
-					gens, err := collectQueryGenerators(runContext, query)
-					if err != nil {
-						return generators, err
-					}
-
-					generators.MSet(gens.Items())
-				}
+			generators, err = collectUnitGenerators(queryDescriptor, runContext, generators)
+			if err != nil {
+				return generators, err
 			}
+		}
+	}
+
+	return generators, nil
+}
+
+func collectUnitGenerators(
+	queryDescriptor *stroppy.StepUnitDescriptor,
+	runContext *stroppy.StepContext,
+	generators cmap.ConcurrentMap[GeneratorID, generate.ValueGenerator],
+) (Generators, error) {
+	switch queryDescriptor.GetDescriptor_().GetType().(type) {
+	case *stroppy.UnitDescriptor_Query:
+		gens, err := collectQueryGenerators(runContext, queryDescriptor.GetDescriptor_().GetQuery())
+		if err != nil {
+			return generators, err
+		}
+
+		generators.MSet(gens.Items())
+	case *stroppy.UnitDescriptor_Transaction:
+		for _, query := range queryDescriptor.GetDescriptor_().GetTransaction().GetQueries() {
+			gens, err := collectQueryGenerators(runContext, query)
+			if err != nil {
+				return generators, err
+			}
+
+			generators.MSet(gens.Items())
 		}
 	}
 

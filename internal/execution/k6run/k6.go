@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"os/exec"
-	"slices"
 	"syscall"
 	"time"
 
@@ -90,15 +88,6 @@ func RunStep(
 		return ErrConfigIsNil
 	}
 
-	if runContext.GetStep().GetAsync() {
-		units := slices.Clone(runContext.GetStep().GetUnits())
-		rand.Shuffle(len(units), func(i, j int) {
-			units[i], units[j] = units[j], units[i]
-		})
-
-		runContext.GetStep().Units = units
-	}
-
 	contextStr, err := protojson.Marshal(runContext)
 	if err != nil {
 		return err
@@ -120,7 +109,9 @@ func RunStep(
 	)
 	currentLogger.Debug("Running K6", zap.String("args", fmt.Sprintf("%v", baseArgs)))
 	logger.SetLoggerEnv(
-		logger.LevelFromProtoConfig(runContext.GetGlobalConfig().GetRun().GetLogger().GetLogLevel()),
+		logger.LevelFromProtoConfig(
+			runContext.GetGlobalConfig().GetRun().GetLogger().GetLogLevel(),
+		),
 		logger.ModeFromProtoConfig(runContext.GetGlobalConfig().GetRun().GetLogger().GetLogMode()),
 	)
 

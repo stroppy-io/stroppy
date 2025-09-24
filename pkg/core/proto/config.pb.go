@@ -23,46 +23,49 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type DriverConfig_DriverName int32
+type DriverConfig_DriverType int32
 
 const (
-	DriverConfig_postgres DriverConfig_DriverName = 0
+	DriverConfig_DRIVER_TYPE_UNSPECIFIED DriverConfig_DriverType = 0
+	DriverConfig_DRIVER_TYPE_POSTGRES    DriverConfig_DriverType = 1
 )
 
-// Enum value maps for DriverConfig_DriverName.
+// Enum value maps for DriverConfig_DriverType.
 var (
-	DriverConfig_DriverName_name = map[int32]string{
-		0: "postgres",
+	DriverConfig_DriverType_name = map[int32]string{
+		0: "DRIVER_TYPE_UNSPECIFIED",
+		1: "DRIVER_TYPE_POSTGRES",
 	}
-	DriverConfig_DriverName_value = map[string]int32{
-		"postgres": 0,
+	DriverConfig_DriverType_value = map[string]int32{
+		"DRIVER_TYPE_UNSPECIFIED": 0,
+		"DRIVER_TYPE_POSTGRES":    1,
 	}
 )
 
-func (x DriverConfig_DriverName) Enum() *DriverConfig_DriverName {
-	p := new(DriverConfig_DriverName)
+func (x DriverConfig_DriverType) Enum() *DriverConfig_DriverType {
+	p := new(DriverConfig_DriverType)
 	*p = x
 	return p
 }
 
-func (x DriverConfig_DriverName) String() string {
+func (x DriverConfig_DriverType) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (DriverConfig_DriverName) Descriptor() protoreflect.EnumDescriptor {
+func (DriverConfig_DriverType) Descriptor() protoreflect.EnumDescriptor {
 	return file_config_proto_enumTypes[0].Descriptor()
 }
 
-func (DriverConfig_DriverName) Type() protoreflect.EnumType {
+func (DriverConfig_DriverType) Type() protoreflect.EnumType {
 	return &file_config_proto_enumTypes[0]
 }
 
-func (x DriverConfig_DriverName) Number() protoreflect.EnumNumber {
+func (x DriverConfig_DriverType) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use DriverConfig_DriverName.Descriptor instead.
-func (DriverConfig_DriverName) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use DriverConfig_DriverType.Descriptor instead.
+func (DriverConfig_DriverType) EnumDescriptor() ([]byte, []int) {
 	return file_config_proto_rawDescGZIP(), []int{3, 0}
 }
 
@@ -211,52 +214,6 @@ func (x LoggerConfig_LogMode) Number() protoreflect.EnumNumber {
 // Deprecated: Use LoggerConfig_LogMode.Descriptor instead.
 func (LoggerConfig_LogMode) EnumDescriptor() ([]byte, []int) {
 	return file_config_proto_rawDescGZIP(), []int{5, 1}
-}
-
-type Plugin_Type int32
-
-const (
-	Plugin_TYPE_UNSPECIFIED Plugin_Type = 0
-	Plugin_TYPE_SIDECAR     Plugin_Type = 1
-)
-
-// Enum value maps for Plugin_Type.
-var (
-	Plugin_Type_name = map[int32]string{
-		0: "TYPE_UNSPECIFIED",
-		1: "TYPE_SIDECAR",
-	}
-	Plugin_Type_value = map[string]int32{
-		"TYPE_UNSPECIFIED": 0,
-		"TYPE_SIDECAR":     1,
-	}
-)
-
-func (x Plugin_Type) Enum() *Plugin_Type {
-	p := new(Plugin_Type)
-	*p = x
-	return p
-}
-
-func (x Plugin_Type) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (Plugin_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_config_proto_enumTypes[4].Descriptor()
-}
-
-func (Plugin_Type) Type() protoreflect.EnumType {
-	return &file_config_proto_enumTypes[4]
-}
-
-func (x Plugin_Type) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use Plugin_Type.Descriptor instead.
-func (Plugin_Type) EnumDescriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{7, 0}
 }
 
 // *
@@ -530,8 +487,8 @@ type DriverConfig struct {
 	Url string `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
 	// * Database-specific configuration options
 	DbSpecific *Value_Struct `protobuf:"bytes,4,opt,name=db_specific,json=dbSpecific,proto3,oneof" json:"db_specific,omitempty"`
-	// * Name of choosen driver
-	DriverName    DriverConfig_DriverName `protobuf:"varint,5,opt,name=driver_name,json=driverName,proto3,enum=stroppy.DriverConfig_DriverName" json:"driver_name,omitempty"`
+	// * Name of chosen driver
+	DriverType    DriverConfig_DriverType `protobuf:"varint,5,opt,name=driver_type,json=driverType,proto3,enum=stroppy.DriverConfig_DriverType" json:"driver_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -580,11 +537,11 @@ func (x *DriverConfig) GetDbSpecific() *Value_Struct {
 	return nil
 }
 
-func (x *DriverConfig) GetDriverName() DriverConfig_DriverName {
+func (x *DriverConfig) GetDriverType() DriverConfig_DriverType {
 	if x != nil {
-		return x.DriverName
+		return x.DriverType
 	}
-	return DriverConfig_postgres
+	return DriverConfig_DRIVER_TYPE_UNSPECIFIED
 }
 
 // *
@@ -759,33 +716,31 @@ func (x *StepContext) GetGlobalConfig() *Config {
 }
 
 // *
-// Plugins contains configuration for plugins.
-type Plugin struct {
+// SideCar contains configuration for plugins.
+type SideCar struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Type of the plugin
-	Type Plugin_Type `protobuf:"varint,1,opt,name=type,proto3,enum=stroppy.Plugin_Type" json:"type,omitempty"`
-	// * Path to the plugin binary
-	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	// * Url to connect the plugin instance
+	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
 	// * Additional plugin settings
 	Settings      *Value_Struct `protobuf:"bytes,3,opt,name=settings,proto3,oneof" json:"settings,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Plugin) Reset() {
-	*x = Plugin{}
+func (x *SideCar) Reset() {
+	*x = SideCar{}
 	mi := &file_config_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Plugin) String() string {
+func (x *SideCar) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Plugin) ProtoMessage() {}
+func (*SideCar) ProtoMessage() {}
 
-func (x *Plugin) ProtoReflect() protoreflect.Message {
+func (x *SideCar) ProtoReflect() protoreflect.Message {
 	mi := &file_config_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -797,26 +752,19 @@ func (x *Plugin) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Plugin.ProtoReflect.Descriptor instead.
-func (*Plugin) Descriptor() ([]byte, []int) {
+// Deprecated: Use SideCar.ProtoReflect.Descriptor instead.
+func (*SideCar) Descriptor() ([]byte, []int) {
 	return file_config_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *Plugin) GetType() Plugin_Type {
+func (x *SideCar) GetUrl() string {
 	if x != nil {
-		return x.Type
-	}
-	return Plugin_TYPE_UNSPECIFIED
-}
-
-func (x *Plugin) GetPath() string {
-	if x != nil {
-		return x.Path
+		return x.Url
 	}
 	return ""
 }
 
-func (x *Plugin) GetSettings() *Value_Struct {
+func (x *SideCar) GetSettings() *Value_Struct {
 	if x != nil {
 		return x.Settings
 	}
@@ -844,7 +792,7 @@ type RunConfig struct {
 	// * Arbitrary metadata, may be passed to result labels and json output
 	Metadata map[string]string `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// * Plugins configuration
-	Plugins       []*Plugin `protobuf:"bytes,9,rep,name=plugins,proto3" json:"plugins,omitempty"`
+	SideCars      []*SideCar `protobuf:"bytes,9,rep,name=side_cars,json=sideCars,proto3" json:"side_cars,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -935,9 +883,9 @@ func (x *RunConfig) GetMetadata() map[string]string {
 	return nil
 }
 
-func (x *RunConfig) GetPlugins() []*Plugin {
+func (x *RunConfig) GetSideCars() []*SideCar {
 	if x != nil {
-		return x.Plugins
+		return x.SideCars
 	}
 	return nil
 }
@@ -1054,16 +1002,17 @@ const file_config_proto_rawDesc = "" +
 	"\n" +
 	"\b_k6_rateB\x0e\n" +
 	"\f_k6_durationB\x0e\n" +
-	"\f_otlp_export\"\xe0\x01\n" +
+	"\f_otlp_export\"\x89\x02\n" +
 	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x03 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12;\n" +
 	"\vdb_specific\x18\x04 \x01(\v2\x15.stroppy.Value.StructH\x00R\n" +
 	"dbSpecific\x88\x01\x01\x12K\n" +
-	"\vdriver_name\x18\x05 \x01(\x0e2 .stroppy.DriverConfig.DriverNameB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
-	"driverName\"\x1a\n" +
+	"\vdriver_type\x18\x05 \x01(\x0e2 .stroppy.DriverConfig.DriverTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
+	"driverType\"C\n" +
 	"\n" +
-	"DriverName\x12\f\n" +
-	"\bpostgres\x10\x00B\x0e\n" +
+	"DriverType\x12\x1b\n" +
+	"\x17DRIVER_TYPE_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14DRIVER_TYPE_POSTGRES\x10\x01B\x0e\n" +
 	"\f_db_specific\"\xc5\x01\n" +
 	"\rRequestedStep\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12N\n" +
@@ -1086,15 +1035,11 @@ const file_config_proto_rawDesc = "" +
 	"\x13LOG_MODE_PRODUCTION\x10\x01\"p\n" +
 	"\vStepContext\x12+\n" +
 	"\x04step\x18\x05 \x01(\v2\x17.stroppy.StepDescriptorR\x04step\x124\n" +
-	"\rglobal_config\x18\x06 \x01(\v2\x0f.stroppy.ConfigR\fglobalConfig\"\xcf\x01\n" +
-	"\x06Plugin\x122\n" +
-	"\x04type\x18\x01 \x01(\x0e2\x14.stroppy.Plugin.TypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\x04type\x12\x1c\n" +
-	"\x04path\x18\x02 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x04path\x126\n" +
-	"\bsettings\x18\x03 \x01(\v2\x15.stroppy.Value.StructH\x00R\bsettings\x88\x01\x01\".\n" +
-	"\x04Type\x12\x14\n" +
-	"\x10TYPE_UNSPECIFIED\x10\x00\x12\x10\n" +
-	"\fTYPE_SIDECAR\x10\x01B\v\n" +
-	"\t_settings\"\xf8\x03\n" +
+	"\rglobal_config\x18\x06 \x01(\v2\x0f.stroppy.ConfigR\fglobalConfig\"j\n" +
+	"\aSideCar\x12\x1a\n" +
+	"\x03url\x18\x02 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x126\n" +
+	"\bsettings\x18\x03 \x01(\v2\x15.stroppy.Value.StructH\x00R\bsettings\x88\x01\x01B\v\n" +
+	"\t_settings\"\xfc\x03\n" +
 	"\tRunConfig\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1b\n" +
 	"\x04seed\x18\x02 \x01(\x04B\a\xfaB\x042\x02(\x00R\x04seed\x127\n" +
@@ -1105,8 +1050,8 @@ const file_config_proto_rawDesc = "" +
 	"k6Executor\x12=\n" +
 	"\x05steps\x18\x06 \x03(\v2\x16.stroppy.RequestedStepB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\x05steps\x12-\n" +
 	"\x06logger\x18\a \x01(\v2\x15.stroppy.LoggerConfigR\x06logger\x12<\n" +
-	"\bmetadata\x18\b \x03(\v2 .stroppy.RunConfig.MetadataEntryR\bmetadata\x12)\n" +
-	"\aplugins\x18\t \x03(\v2\x0f.stroppy.PluginR\aplugins\x1a;\n" +
+	"\bmetadata\x18\b \x03(\v2 .stroppy.RunConfig.MetadataEntryR\bmetadata\x12-\n" +
+	"\tside_cars\x18\t \x03(\v2\x10.stroppy.SideCarR\bsideCars\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x98\x01\n" +
@@ -1127,57 +1072,55 @@ func file_config_proto_rawDescGZIP() []byte {
 	return file_config_proto_rawDescData
 }
 
-var file_config_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_config_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
 var file_config_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_config_proto_goTypes = []any{
-	(DriverConfig_DriverName)(0),    // 0: stroppy.DriverConfig.DriverName
+	(DriverConfig_DriverType)(0),    // 0: stroppy.DriverConfig.DriverType
 	(RequestedStep_ExecutorType)(0), // 1: stroppy.RequestedStep.ExecutorType
 	(LoggerConfig_LogLevel)(0),      // 2: stroppy.LoggerConfig.LogLevel
 	(LoggerConfig_LogMode)(0),       // 3: stroppy.LoggerConfig.LogMode
-	(Plugin_Type)(0),                // 4: stroppy.Plugin.Type
-	(*OtlpExport)(nil),              // 5: stroppy.OtlpExport
-	(*GoExecutor)(nil),              // 6: stroppy.GoExecutor
-	(*K6Executor)(nil),              // 7: stroppy.K6Executor
-	(*DriverConfig)(nil),            // 8: stroppy.DriverConfig
-	(*RequestedStep)(nil),           // 9: stroppy.RequestedStep
-	(*LoggerConfig)(nil),            // 10: stroppy.LoggerConfig
-	(*StepContext)(nil),             // 11: stroppy.StepContext
-	(*Plugin)(nil),                  // 12: stroppy.Plugin
-	(*RunConfig)(nil),               // 13: stroppy.RunConfig
-	(*Config)(nil),                  // 14: stroppy.Config
-	nil,                             // 15: stroppy.RunConfig.MetadataEntry
-	(*durationpb.Duration)(nil),     // 16: google.protobuf.Duration
-	(*Value_Struct)(nil),            // 17: stroppy.Value.Struct
-	(*StepDescriptor)(nil),          // 18: stroppy.StepDescriptor
-	(*BenchmarkDescriptor)(nil),     // 19: stroppy.BenchmarkDescriptor
+	(*OtlpExport)(nil),              // 4: stroppy.OtlpExport
+	(*GoExecutor)(nil),              // 5: stroppy.GoExecutor
+	(*K6Executor)(nil),              // 6: stroppy.K6Executor
+	(*DriverConfig)(nil),            // 7: stroppy.DriverConfig
+	(*RequestedStep)(nil),           // 8: stroppy.RequestedStep
+	(*LoggerConfig)(nil),            // 9: stroppy.LoggerConfig
+	(*StepContext)(nil),             // 10: stroppy.StepContext
+	(*SideCar)(nil),                 // 11: stroppy.SideCar
+	(*RunConfig)(nil),               // 12: stroppy.RunConfig
+	(*Config)(nil),                  // 13: stroppy.Config
+	nil,                             // 14: stroppy.RunConfig.MetadataEntry
+	(*durationpb.Duration)(nil),     // 15: google.protobuf.Duration
+	(*Value_Struct)(nil),            // 16: stroppy.Value.Struct
+	(*StepDescriptor)(nil),          // 17: stroppy.StepDescriptor
+	(*BenchmarkDescriptor)(nil),     // 18: stroppy.BenchmarkDescriptor
 }
 var file_config_proto_depIdxs = []int32{
-	16, // 0: stroppy.K6Executor.k6_setup_timeout:type_name -> google.protobuf.Duration
-	16, // 1: stroppy.K6Executor.k6_duration:type_name -> google.protobuf.Duration
-	5,  // 2: stroppy.K6Executor.otlp_export:type_name -> stroppy.OtlpExport
-	17, // 3: stroppy.DriverConfig.db_specific:type_name -> stroppy.Value.Struct
-	0,  // 4: stroppy.DriverConfig.driver_name:type_name -> stroppy.DriverConfig.DriverName
+	15, // 0: stroppy.K6Executor.k6_setup_timeout:type_name -> google.protobuf.Duration
+	15, // 1: stroppy.K6Executor.k6_duration:type_name -> google.protobuf.Duration
+	4,  // 2: stroppy.K6Executor.otlp_export:type_name -> stroppy.OtlpExport
+	16, // 3: stroppy.DriverConfig.db_specific:type_name -> stroppy.Value.Struct
+	0,  // 4: stroppy.DriverConfig.driver_type:type_name -> stroppy.DriverConfig.DriverType
 	1,  // 5: stroppy.RequestedStep.executor:type_name -> stroppy.RequestedStep.ExecutorType
 	2,  // 6: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
 	3,  // 7: stroppy.LoggerConfig.log_mode:type_name -> stroppy.LoggerConfig.LogMode
-	18, // 8: stroppy.StepContext.step:type_name -> stroppy.StepDescriptor
-	14, // 9: stroppy.StepContext.global_config:type_name -> stroppy.Config
-	4,  // 10: stroppy.Plugin.type:type_name -> stroppy.Plugin.Type
-	17, // 11: stroppy.Plugin.settings:type_name -> stroppy.Value.Struct
-	8,  // 12: stroppy.RunConfig.driver:type_name -> stroppy.DriverConfig
-	6,  // 13: stroppy.RunConfig.go_executor:type_name -> stroppy.GoExecutor
-	7,  // 14: stroppy.RunConfig.k6_executor:type_name -> stroppy.K6Executor
-	9,  // 15: stroppy.RunConfig.steps:type_name -> stroppy.RequestedStep
-	10, // 16: stroppy.RunConfig.logger:type_name -> stroppy.LoggerConfig
-	15, // 17: stroppy.RunConfig.metadata:type_name -> stroppy.RunConfig.MetadataEntry
-	12, // 18: stroppy.RunConfig.plugins:type_name -> stroppy.Plugin
-	13, // 19: stroppy.Config.run:type_name -> stroppy.RunConfig
-	19, // 20: stroppy.Config.benchmark:type_name -> stroppy.BenchmarkDescriptor
-	21, // [21:21] is the sub-list for method output_type
-	21, // [21:21] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	17, // 8: stroppy.StepContext.step:type_name -> stroppy.StepDescriptor
+	13, // 9: stroppy.StepContext.global_config:type_name -> stroppy.Config
+	16, // 10: stroppy.SideCar.settings:type_name -> stroppy.Value.Struct
+	7,  // 11: stroppy.RunConfig.driver:type_name -> stroppy.DriverConfig
+	5,  // 12: stroppy.RunConfig.go_executor:type_name -> stroppy.GoExecutor
+	6,  // 13: stroppy.RunConfig.k6_executor:type_name -> stroppy.K6Executor
+	8,  // 14: stroppy.RunConfig.steps:type_name -> stroppy.RequestedStep
+	9,  // 15: stroppy.RunConfig.logger:type_name -> stroppy.LoggerConfig
+	14, // 16: stroppy.RunConfig.metadata:type_name -> stroppy.RunConfig.MetadataEntry
+	11, // 17: stroppy.RunConfig.side_cars:type_name -> stroppy.SideCar
+	12, // 18: stroppy.Config.run:type_name -> stroppy.RunConfig
+	18, // 19: stroppy.Config.benchmark:type_name -> stroppy.BenchmarkDescriptor
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_config_proto_init() }
@@ -1198,7 +1141,7 @@ func file_config_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_config_proto_rawDesc), len(file_config_proto_rawDesc)),
-			NumEnums:      5,
+			NumEnums:      4,
 			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,

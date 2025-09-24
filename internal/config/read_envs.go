@@ -40,7 +40,7 @@ func traverseMessage(
 
 		value := msg.Get(field)
 		// TODO: add support for List[Message], Map, probably Enums
-		if (field.Kind() == protoreflect.MessageKind && !(field.IsList() || field.IsMap())) ||
+		if (field.Kind() == protoreflect.MessageKind && (!field.IsList() && !field.IsMap())) ||
 			field.Kind() != protoreflect.MessageKind && !field.IsMap() {
 			inFunc(msg, field, value)
 
