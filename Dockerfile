@@ -22,7 +22,6 @@ FROM golang:1.22 AS backend-builder
 RUN apt-get update && apt-get install -y \
     gcc \
     libc6-dev \
-    libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Установка рабочей директории
@@ -38,13 +37,13 @@ RUN go mod download
 COPY backend/ ./
 
 # Сборка backend приложения
-RUN CGO_ENABLED=1 GOOS=linux go build -tags "sqlite_omit_load_extension" -ldflags="-s -w" -o bin/stroppy-cloud-pannel ./cmd/stroppy-cloud-pannel
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o bin/stroppy-cloud-pannel ./cmd/stroppy-cloud-pannel
 
 # Этап 3: Финальный образ
 FROM ubuntu:22.04
 
 # Установка зависимостей времени выполнения
-RUN apt-get update && apt-get install -y ca-certificates sqlite3 tzdata wget && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates tzdata wget && rm -rf /var/lib/apt/lists/*
 
 # Установка временной зоны
 RUN ln -fs /usr/share/zoneinfo/Europe/Moscow /etc/localtime && \
@@ -62,14 +61,16 @@ COPY --from=backend-builder /app/backend/bin/stroppy-cloud-pannel ./stroppy-clou
 # Копирование собранного frontend из builder образа
 COPY --from=frontend-builder /app/frontend/dist ./web
 
-# Создание директории для базы данных
-RUN mkdir -p /app/data && chown -R appuser:appuser /app
-
 # Переключение на непривилегированного пользователя
 USER appuser
 
 # Настройка переменных окружения
-ENV DB_PATH=/app/data/stroppy.db
+ENV DB_HOST=postgres
+ENV DB_PORT=5432
+ENV DB_USER=stroppy
+ENV DB_PASSWORD=stroppy
+ENV DB_NAME=stroppy
+ENV DB_SSLMODE=disable
 ENV STATIC_DIR=/app/web
 ENV PORT=8080
 ENV JWT_SECRET=change-this-in-production-please-use-strong-secret

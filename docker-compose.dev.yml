@@ -1,4 +1,25 @@
 services:
+  # PostgreSQL для разработки
+  postgres:
+    image: postgres:15-alpine
+    container_name: stroppy-postgres-dev
+    environment:
+      - POSTGRES_DB=stroppy
+      - POSTGRES_USER=stroppy
+      - POSTGRES_PASSWORD=stroppy
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stroppy -d stroppy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stroppy_dev_network
+
   # Backend в режиме разработки
   backend:
     build:
@@ -8,15 +29,22 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DB_PATH=/app/data/stroppy.db
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=stroppy
+      - DB_PASSWORD=stroppy
+      - DB_NAME=stroppy
+      - DB_SSLMODE=disable
       - PORT=8080
       - JWT_SECRET=${JWT_SECRET:-dev-secret-key-not-for-production}
       - GIN_MODE=debug
     volumes:
       - ./backend:/app
-      - backend_data:/app/data
     working_dir: /app
     command: ./stroppy-cloud-pannel
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - stroppy_dev_network
@@ -43,7 +71,7 @@ services:
       - stroppy_dev_network
 
 volumes:
-  backend_data:
+  postgres_dev_data:
     driver: local
 
 networks:

@@ -9,10 +9,11 @@ import (
 
 	"stroppy-cloud-pannel/internal/handler"
 	"stroppy-cloud-pannel/internal/middleware"
-	"stroppy-cloud-pannel/internal/repository/sqlite"
+	"stroppy-cloud-pannel/internal/repository/postgres"
 	"stroppy-cloud-pannel/internal/service"
 	"stroppy-cloud-pannel/pkg/auth"
 	"stroppy-cloud-pannel/pkg/database"
+	"stroppy-cloud-pannel/pkg/migrations"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,31 +23,35 @@ func main() {
 	log.Println("=== MAIN DEBUG: Application starting ===")
 
 	// Настройки из переменных окружения
-	dbPath := getEnv("DB_PATH", "./stroppy.db")
 	jwtSecret := getEnv("JWT_SECRET", "your-secret-key-change-in-production")
 	port := getEnv("PORT", "8080")
 	staticDir := getEnv("STATIC_DIR", "./web")
 
-	fmt.Printf("MAIN DEBUG: Config - dbPath=%s, port=%s\n", dbPath, port)
-	log.Printf("MAIN DEBUG: Config - dbPath=%s, port=%s", dbPath, port)
+	// Конфигурация базы данных
+	dbConfig := database.NewConfigFromEnv()
+	dbDSN := dbConfig.DSN()
+
+	fmt.Printf("MAIN DEBUG: Config - dbHost=%s, dbPort=%s, dbName=%s, port=%s\n", dbConfig.Host, dbConfig.Port, dbConfig.DBName, port)
+	log.Printf("MAIN DEBUG: Config - dbHost=%s, dbPort=%s, dbName=%s, port=%s", dbConfig.Host, dbConfig.Port, dbConfig.DBName, port)
 
 	// Инициализация базы данных
-	db, err := database.NewSQLiteDB(dbPath)
+	db, err := database.NewPostgresDB(dbDSN)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
-	if err := database.InitSchema(db); err != nil {
-		log.Fatalf("Failed to initialize database schema: %v", err)
+	// Применение миграций
+	if err := migrations.RunMigrations(db); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
 	// Инициализация JWT менеджера
 	jwtManager := auth.NewJWTManager(jwtSecret, 24*time.Hour)
 
 	// Инициализация репозиториев
-	userRepo := sqlite.NewUserRepository(db)
-	runRepo := sqlite.NewRunRepository(db)
+	userRepo := postgres.NewUserRepository(db)
+	runRepo := postgres.NewRunRepository(db)
 
 	// Инициализация сервисов
 	userService := service.NewUserService(userRepo, jwtManager)
