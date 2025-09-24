@@ -60,6 +60,7 @@ func main() {
 	// Инициализация обработчиков
 	userHandler := handler.NewUserHandler(userService)
 	runHandler := handler.NewRunHandler(runService)
+	healthHandler := handler.NewHealthHandler(db)
 
 	// Настройка Gin
 	gin.SetMode(gin.ReleaseMode)
@@ -72,18 +73,7 @@ func main() {
 	r.Use(gin.Recovery())
 
 	// CORS middleware
-	r.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-
-		c.Next()
-	})
+	r.Use(middleware.CORSMiddleware())
 
 	// Публичные маршруты
 	api := r.Group("/api/v1")
@@ -119,13 +109,19 @@ func main() {
 		log.Println("MAIN DEBUG: Routes configured successfully")
 	}
 
-	// Healthcheck endpoint
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status":    "ok",
-			"timestamp": time.Now().Unix(),
-		})
-	})
+	// Health check endpoints для Kubernetes проб
+	healthz := r.Group("/healthz")
+	{
+		healthz.GET("/liveness", healthHandler.Liveness)
+		healthz.HEAD("/liveness", healthHandler.Liveness)
+		healthz.GET("/readiness", healthHandler.Readiness)
+		healthz.HEAD("/readiness", healthHandler.Readiness)
+		healthz.GET("/startup", healthHandler.Startup)
+		healthz.HEAD("/startup", healthHandler.Startup)
+	}
+
+	// Общий health endpoint
+	r.GET("/health", healthHandler.Health)
 
 	// Обслуживание статических файлов
 	if _, err := os.Stat(staticDir); err == nil {
@@ -144,8 +140,9 @@ func main() {
 				return
 			}
 
-			// Если запрос к health endpoint, возвращаем 404
-			if c.Request.URL.Path == "/health" {
+			// Если запрос к health endpoints, возвращаем 404
+			if c.Request.URL.Path == "/health" ||
+				(len(c.Request.URL.Path) > 7 && c.Request.URL.Path[:8] == "/healthz") {
 				c.JSON(404, gin.H{"error": "Endpoint not found"})
 				return
 			}
@@ -162,11 +159,15 @@ func main() {
 				"message": "Stroppy Cloud Panel API",
 				"version": "1.0.0",
 				"endpoints": gin.H{
-					"health":  "/health",
-					"api":     "/api/v1",
-					"auth":    "/api/v1/auth",
-					"runs":    "/api/v1/runs",
-					"profile": "/api/v1/profile",
+					"health":    "/health",
+					"healthz":   "/healthz",
+					"liveness":  "/healthz/liveness",
+					"readiness": "/healthz/readiness",
+					"startup":   "/healthz/startup",
+					"api":       "/api/v1",
+					"auth":      "/api/v1/auth",
+					"runs":      "/api/v1/runs",
+					"profile":   "/api/v1/profile",
 				},
 			})
 		})

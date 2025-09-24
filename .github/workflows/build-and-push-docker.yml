@@ -1,0 +1,94 @@
+name: Build and Push Docker image
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  docker-build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: false
+      - name: Name lowercase
+        id: lowercase
+        uses: vishalmamidi/lowercase-action@v1
+        with:
+          string: ${{ github.repository }}
+
+#      - name: Set up QEMU
+#        uses: docker/setup-qemu-action@v3
+#
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          file: Dockerfile
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            GITHUB_TOKEN=${{ secrets.PERSONAL_ACCESS_TOKEN }}
+            GITHUB_USER=${{ github.actor }}
+          platforms: linux/amd64
+          github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          tags: |
+            ghcr.io/${{ steps.lowercase.outputs.lowercase }}:${{ github.ref_name }}.${{ github.run_number }}
+            ghcr.io/${{ steps.lowercase.outputs.lowercase }}:latest
+#          cache-from: type=gha
+#          cache-to: type=gha,mode=max
+
+  helm-build-and-push:
+    needs:
+      - docker-build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      
+      - name: Install yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+
+      - name: Get repository name
+        id: repo-name
+        uses: MariachiBear/get-repo-name-action@v1.1.0
+        with:
+          with-owner: 'false'
+          string-case: 'lowercase'
+
+      - name: Lint Helm
+        uses: WyriHaximus/github-action-helm3@v4
+        with:
+          exec: helm lint ./deployment/chart
+
+      - name: Build Helm
+        uses: WyriHaximus/github-action-helm3@v4
+        with:
+          exec: |
+            # Update values.yaml with the correct image tag using yq
+            yq eval '.image.tag = "${{ github.ref_name }}.${{ github.run_number }}"' -i ./deployment/chart/values.yaml
+            # Package the chart
+            helm package ./deployment/chart/ --version ${{ github.ref_name }}-${{ github.run_number }} --app-version ${{ github.ref_name }}-${{ github.run_number }}
+
+      - name: Log in to GitHub Docker Registry
+        uses: WyriHaximus/github-action-helm3@v4
+        with:
+          exec: echo ${{ secrets.PERSONAL_ACCESS_TOKEN }} | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
+
+      - name: Push Helm
+        uses: WyriHaximus/github-action-helm3@v4
+        with:
+          exec: helm push ./${{ steps.repo-name.outputs.repository-name }}-${{ github.ref_name }}-${{ github.run_number }}.tgz oci://ghcr.io/${{ github.repository_owner }}/helm

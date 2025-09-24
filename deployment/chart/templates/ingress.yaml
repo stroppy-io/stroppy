@@ -1,0 +1,65 @@
+{{- if (index .Values "stroppy-cloud-pannel").ingress.enabled  -}}
+{{- $fullName := include "stroppy-cloud-pannel.fullname" . -}}
+{{- $svcPort := (index .Values "stroppy-cloud-pannel").service.port -}}
+{{- if and (index .Values "stroppy-cloud-pannel").ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
+  {{- if not (hasKey (index .Values "stroppy-cloud-pannel").ingress.annotations "kubernetes.io/ingress.class") }}
+  {{- $_ := set (index .Values "stroppy-cloud-pannel").ingress.annotations "kubernetes.io/ingress.class" (index .Values "stroppy-cloud-pannel").ingress.className}}
+  {{- end }}
+{{- end }}
+{{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1
+{{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1beta1
+{{- else -}}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  labels:
+     {{- include "stroppy-cloud-pannel.labels" . | nindent 4 }}
+  {{- with (index .Values "stroppy-cloud-pannel").ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with (index .Values "stroppy-cloud-pannel").ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if and (index .Values "stroppy-cloud-pannel").ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ (index .Values "stroppy-cloud-pannel").ingress.className }}
+  {{- end }}
+  {{- if (index .Values "stroppy-cloud-pannel").ingress.tls }}
+  tls:
+    {{- range (index .Values "stroppy-cloud-pannel").ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range (index .Values "stroppy-cloud-pannel").ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $fullName }}
+                port:
+                  name: {{ .portName }}
+              {{- else }}
+              serviceName: {{ $fullName }}
+              servicePort: {{ $svcPort }}
+              {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

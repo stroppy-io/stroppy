@@ -1,0 +1,32 @@
+{{- if (index .Values "stroppy-cloud-pannel").autoscaling.enabled  }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "stroppy-cloud-pannel.fullname" . }}
+  labels:
+    {{- include "stroppy-cloud-pannel.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "stroppy-cloud-pannel.fullname" . }}
+  minReplicas: {{ (index .Values "stroppy-cloud-pannel").autoscaling.minReplicas }}
+  maxReplicas: {{ (index .Values "stroppy-cloud-pannel").autoscaling.maxReplicas }}
+  metrics:
+    {{- if (index .Values "stroppy-cloud-pannel").autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ (index .Values "stroppy-cloud-pannel").autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if (index .Values "stroppy-cloud-pannel").autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{(index .Values "stroppy-cloud-pannel").autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
