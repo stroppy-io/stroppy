@@ -3094,6 +3094,12 @@ export interface OtlpExport {
      */
     otlpEndpointInsecure?: boolean;
     /**
+     * * Headers for otlp requests e.g. Authorization=...
+     *
+     * @generated from protobuf field: optional string otlp_headers = 6
+     */
+    otlpHeaders?: string;
+    /**
      * * Prefix to be added to all exported metrics
      *
      * @generated from protobuf field: optional string otlp_metrics_prefix = 2
@@ -3460,6 +3466,7 @@ class OtlpExport$Type extends MessageType<OtlpExport> {
             { no: 3, name: "otlp_http_endpoint", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
             { no: 4, name: "otlp_http_exporter_url_path", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
             { no: 5, name: "otlp_endpoint_insecure", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
+            { no: 6, name: "otlp_headers", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "otlp_metrics_prefix", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
         ]);
     }
@@ -3485,6 +3492,9 @@ class OtlpExport$Type extends MessageType<OtlpExport> {
                     break;
                 case /* optional bool otlp_endpoint_insecure */ 5:
                     message.otlpEndpointInsecure = reader.bool();
+                    break;
+                case /* optional string otlp_headers */ 6:
+                    message.otlpHeaders = reader.string();
                     break;
                 case /* optional string otlp_metrics_prefix */ 2:
                     message.otlpMetricsPrefix = reader.string();
@@ -3516,6 +3526,9 @@ class OtlpExport$Type extends MessageType<OtlpExport> {
         /* optional bool otlp_endpoint_insecure = 5; */
         if (message.otlpEndpointInsecure !== undefined)
             writer.tag(5, WireType.Varint).bool(message.otlpEndpointInsecure);
+        /* optional string otlp_headers = 6; */
+        if (message.otlpHeaders !== undefined)
+            writer.tag(6, WireType.LengthDelimited).string(message.otlpHeaders);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

@@ -22,6 +22,8 @@ message OtlpExport {
     optional string otlp_http_exporter_url_path = 4;
     /** Disable transport security for the exporter */
     optional bool otlp_endpoint_insecure = 5;
+    /** Headers for otlp requests e.g. Authorization=... */
+    optional string otlp_headers = 6;
 
     /** Prefix to be added to all exported metrics */
     optional string otlp_metrics_prefix = 2;

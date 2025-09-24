@@ -53,7 +53,7 @@ REQUIRED_BINS = git go \
 .install-xk6:
 	$(info Installing xk6...)
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install go.k6.io/xk6@v1.1.4
+	GOBIN=$(LOCAL_BIN) go install go.k6.io/xk6@v1.1.5
 
 .PHONY: .bin-deps
 .bin-deps: .install-linter .install-xk6 # Install binary dependencies in ./bin
