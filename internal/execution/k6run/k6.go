@@ -4,20 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"os/exec"
-	"slices"
 	"syscall"
 	"time"
 
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/stroppy-io/stroppy-core/pkg/logger"
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
-	"github.com/stroppy-io/stroppy-core/pkg/shutdown"
-	utils2 "github.com/stroppy-io/stroppy-core/pkg/utils"
+	"github.com/stroppy-io/stroppy/pkg/core/logger"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
+	"github.com/stroppy-io/stroppy/pkg/core/utils"
 )
 
 func runK6Binary(
@@ -90,15 +88,6 @@ func RunStep(
 		return ErrConfigIsNil
 	}
 
-	if runContext.GetStep().GetAsync() {
-		units := slices.Clone(runContext.GetStep().GetUnits())
-		rand.Shuffle(len(units), func(i, j int) {
-			units[i], units[j] = units[j], units[i]
-		})
-
-		runContext.GetStep().Units = units
-	}
-
 	contextStr, err := protojson.Marshal(runContext)
 	if err != nil {
 		return err
@@ -120,7 +109,9 @@ func RunStep(
 	)
 	currentLogger.Debug("Running K6", zap.String("args", fmt.Sprintf("%v", baseArgs)))
 	logger.SetLoggerEnv(
-		logger.LevelFromProtoConfig(runContext.GetGlobalConfig().GetRun().GetLogger().GetLogLevel()),
+		logger.LevelFromProtoConfig(
+			runContext.GetGlobalConfig().GetRun().GetLogger().GetLogLevel(),
+		),
 		logger.ModeFromProtoConfig(runContext.GetGlobalConfig().GetRun().GetLogger().GetLogMode()),
 	)
 
@@ -138,7 +129,7 @@ func k6ArgsOtelExport(runContext *stroppy.StepContext, baseArgs []string) []stri
 	export := runContext.GetGlobalConfig().GetRun().GetK6Executor().GetOtlpExport()
 	os.Setenv(
 		"K6_OTEL_METRIC_PREFIX",
-		utils2.StringOrDefault(
+		utils.StringOrDefault(
 			export.GetOtlpMetricsPrefix(),
 			"k6_",
 		),
@@ -160,11 +151,11 @@ func k6ArgsOtelExport(runContext *stroppy.StepContext, baseArgs []string) []stri
 		os.Setenv("K6_OTEL_GRPC_EXPORTER_ENDPOINT", "localhost:4317")
 	} else {
 		os.Setenv("K6_OTEL_HTTP_EXPORTER_INSECURE", insecure)
-		os.Setenv("K6_OTEL_HTTP_EXPORTER_ENDPOINT", utils2.StringOrDefault(
+		os.Setenv("K6_OTEL_HTTP_EXPORTER_ENDPOINT", utils.StringOrDefault(
 			export.GetOtlpHttpEndpoint(),
 			"localhost:4318",
 		))
-		os.Setenv("K6_OTEL_HTTP_EXPORTER_URL_PATH", utils2.StringOrDefault(
+		os.Setenv("K6_OTEL_HTTP_EXPORTER_URL_PATH", utils.StringOrDefault(
 			export.GetOtlpHttpExporterUrlPath(),
 			"/v1/metrics",
 		))

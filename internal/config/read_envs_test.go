@@ -10,17 +10,14 @@ import (
 
 func TestMutateConfigByEnvs(t *testing.T) {
 	testVersion := "123.0.0"
-	testPath := "./path/to/stroppy-postgres"
 
 	t.Setenv("CONFIG__VERSION", testVersion)
-	t.Setenv("CONFIG__RUN__DRIVER__DRIVER_PLUGIN_PATH", testPath)
 
 	cfg := NewExampleConfig()
 
 	updateConfigWithDirectEnvs(cfg)
 
 	require.Equal(t, cfg.Version, testVersion)
-	require.Equal(t, cfg.Run.Driver.DriverPluginPath, testPath)
 }
 
 func Example_updateConfigWithDirectEnvs() { //nolint: testableexamples // not reproduceble

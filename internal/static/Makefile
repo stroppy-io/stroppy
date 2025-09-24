@@ -40,33 +40,6 @@ REQUIRED_BINS := wget node npm
 		echo "All required binaries are available"; \
 	fi
 
-DRIVER_BIN_NAME=stroppy-postgres
-GO_OS= $(shell uname -s | tr '[:upper:]' '[:lower:]')
-GO_ARCH= $(shell uname -m)
-ifeq ($(GO_ARCH),x86_64)
-    GO_ARCH := amd64
-endif
-ifeq ($(GO_ARCH),aarch64)
-    GO_ARCH := arm64
-endif
-DRIVER_PKG_NAME   := $(DRIVER_BIN_NAME)_$(GO_OS)_$(GO_ARCH)
-DRIVER_ARCHIVE    := $(DRIVER_PKG_NAME).tar.gz
-DRIVER_URL        := https://github.com/stroppy-io/stroppy-postgres/releases/latest/download/$(DRIVER_ARCHIVE)
-.PHONY: install-driver
-install-driver: # Install driver plugin
-	@# Here example how to install driver plugin from stroppy github.
-	@# You can install driver plugin from other source using your own logic.
-	$(info Installing postgres driver plugin...)
-	@if [ -x "$(CURDIR)/$(DRIVER_BIN_NAME)" ]; then \
-		echo "$(CURDIR)/$(DRIVER_BIN_NAME) is already installed."; \
-	else \
-		echo "Downloading $(DRIVER_BIN_NAME)..."; \
-    	wget -q -O $(CURDIR)/$(DRIVER_ARCHIVE) "$(DRIVER_URL)"; \
-    	tar -xzf $(CURDIR)/$(DRIVER_ARCHIVE) -C $(CURDIR); \
-		chmod +x $(CURDIR)/$(DRIVER_BIN_NAME); \
-		rm $(CURDIR)/$(DRIVER_ARCHIVE); \
-	fi
-
 .PHONY: .install-node-modules
 .install-node-modules: # Install node modules
 	$(info Installing node modules...)
@@ -85,7 +58,7 @@ validate-config: # Validate config
 	@./stroppy config validate --config=$(STROPPY_CONFIG)
 
 .PHONY: configure
-configure: .check-dev-bins install-driver .install-node-modules validate-config # Configure development environment for stroppy
+configure: .check-dev-bins .install-node-modules validate-config # Configure development environment for stroppy
 
 .PHONY: re-configure
 re-configure: # Re-configure development environment

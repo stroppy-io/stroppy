@@ -5,7 +5,7 @@ run:
   # Timeout for analysis, e.g. 30s, 5m.
   # Default: 1m
   timeout: 1m
-  go: '1.24'
+  go: "1.24"
 
 output:
   formats:
@@ -53,7 +53,7 @@ linters:
     - gocritic # provides diagnostics that check for bugs, performance and style issues
     - gocyclo # computes and checks the cyclomatic complexity of functions
     - godot # checks if comments end in a period
-#    - godox # extract speficic comments from Go code based on keywords
+    #    - godox # extract speficic comments from Go code based on keywords
     - gofumpt # checks whether code was gofmt-ed
     - goimports # in addition to fixing imports, goimports also formats your code in the same style as gofmt
     - gomoddirectives # handle `replace`, `retract`, `exclude` directives into `go.mod`
@@ -211,7 +211,8 @@ linters-settings:
   nolintlint:
     # Exclude following linters from requiring an explanation.
     # Default: []
-    allow-no-explanation: [ funlen, gocognit, lll, mnd, gochecknoglobals, err113, ireturn ]
+    allow-no-explanation:
+      [funlen, gocognit, lll, mnd, gochecknoglobals, err113, ireturn]
     # Enable to require an explanation of nonzero length after each nolint directive.
     # Default: false
     require-explanation: true
@@ -329,13 +330,13 @@ issues:
   #    - internal/repositories/model
   exclude-rules:
     - source: "^//\\s*go:generate\\s"
-      linters: [ lll ]
+      linters: [lll]
     - source: "(noinspection|TODO)"
-      linters: [ godot ]
+      linters: [godot]
     - source: "//noinspection"
-      linters: [ gocritic ]
+      linters: [gocritic]
     - source: "^\\s+if _, ok := err\\.\\([^.]+\\.InternalError\\); ok {"
-      linters: [ errorlint ]
+      linters: [errorlint]
     - path: "_test\\.go"
       linters:
         - bodyclose
@@ -359,4 +360,6 @@ issues:
         - unused
         - gochecknoglobals
     - text: 'shadow: declaration of "(err|ctx)" shadows declaration at'
-      linters: [ govet ]
+      linters: [govet]
+    - text: "in package name"
+      linters: [revive, stylecheck]

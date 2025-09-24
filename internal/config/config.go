@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	stroppy "github.com/stroppy-io/stroppy-core/pkg/proto"
-	"github.com/stroppy-io/stroppy-core/pkg/utils"
+	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/utils"
 )
 
 type Config struct {
@@ -115,39 +115,7 @@ func (c *Config) validateK6Config() error {
 	return nil
 }
 
-func (c *Config) validatePlugins() error {
-	if len(c.GetRun().GetPlugins()) == 0 {
-		return nil
-	}
-
-	for _, pl := range c.GetRun().GetPlugins() {
-		err := validatePath(pl.GetPath(), true)
-		if err != nil {
-			return fmt.Errorf( //nolint: err113
-				"failed to validate on of %s plugin binary path: %w",
-				pl.GetType(),
-				err,
-			)
-		}
-	}
-
-	return nil
-}
-
 func (c *Config) validatePaths() error {
-	driverPath, err := getRelativePath(
-		c.ConfigPath,
-		c.GetRun().GetDriver().GetDriverPluginPath(),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to get relative path to driver plugin: %w", err)
-	}
-
-	err = validatePath(driverPath, true)
-	if err != nil {
-		return fmt.Errorf("failed to validate driver plugin path: %w", err)
-	}
-
 	needK6Config := false
 
 	for _, step := range c.GetRun().GetSteps() {
@@ -163,11 +131,6 @@ func (c *Config) validatePaths() error {
 		if err != nil {
 			return fmt.Errorf("failed to valodate k6 config: %w", err)
 		}
-	}
-
-	err = c.validatePlugins()
-	if err != nil {
-		return fmt.Errorf("failed to validate plugins: %w", err)
 	}
 
 	return nil
@@ -197,10 +160,6 @@ func (c *Config) Validate(validatePaths bool) error {
 	return nil
 }
 
-func (c *Config) GetDriverPluginPath() string {
-	return utils.Must(getRelativePath(c.ConfigPath, c.GetRun().GetDriver().GetDriverPluginPath()))
-}
-
 func (c *Config) GetK6ScriptPath() string {
 	return utils.Must(getRelativePath(c.ConfigPath, c.GetRun().GetK6Executor().GetK6ScriptPath()))
 }
@@ -213,9 +172,5 @@ func (c *Config) ResetPaths() {
 	if c.GetRun().GetK6Executor() != nil {
 		c.Run.K6Executor.K6BinaryPath = c.GetK6BinaryPath()
 		c.Run.K6Executor.K6ScriptPath = c.GetK6ScriptPath()
-	}
-
-	if c.GetRun().GetDriver() != nil {
-		c.Run.Driver.DriverPluginPath = c.GetDriverPluginPath()
 	}
 }

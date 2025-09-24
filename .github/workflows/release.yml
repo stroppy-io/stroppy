@@ -9,7 +9,6 @@ on:
 permissions:
   contents: write
 
-
 env:
   # Use repo name as binary name by default; override if you need.
   BINARY_NAME: ${{ github.event.repository.name }}
@@ -27,13 +26,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.3'
+          go-version: "1.24.3"
 
       - name: Mock files
         run: |
           echo ".gitkeep" | tee internal/static/stroppy-xk6
-          echo ".gitkeep" | tee internal/static/stroppy.pb.ts
-          echo ".gitkeep" | tee internal/static/stroppy.pb.js
 
       - name: Install linter dependencies
         run: make .install-linter
@@ -75,25 +72,15 @@ jobs:
           echo "outdir=${OUTDIR}" >> $GITHUB_OUTPUT
           echo "archive=${ARCHIVE}" >> $GITHUB_OUTPUT
 
-      - name: Get stroppy-xk6 version
-        run: |
-          XK6_VERSION=$(curl -s \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/stroppy-io/stroppy-xk6/releases/latest \
-            | grep '"tag_name":' \
-            | head -n 1 \
-            | sed -E 's/.*"([^"]+)".*/\1/')
-          echo "LDFLAGS=-X 'github.com/stroppy-io/stroppy/internal/version.StroppyXk6Version=${XK6_VERSION}'" >> $GITHUB_ENV
-
       - name: Build
         env:
           CGO_ENABLED: "0"
+          XK6_RACE_DETECTOR: "0"
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
-          make .download-k6 GO_OS=${{ matrix.os }} GO_ARCH=${{ matrix.arch }}
-          make .download-proto-static
+          make .install-xk6
+          make build-xk6
           mkdir -p "${{ steps.names.outputs.outdir }}"
           go build -trimpath -ldflags "-s -w ${LDFLAGS}" \
             -o "${{ steps.names.outputs.outdir }}/${{ steps.names.outputs.bin }}" \
