@@ -72,6 +72,12 @@ jobs:
           echo "outdir=${OUTDIR}" >> $GITHUB_OUTPUT
           echo "archive=${ARCHIVE}" >> $GITHUB_OUTPUT
 
+      - name: Install xk6 (k6 builder)
+        shell: bash
+        run: |
+          go install go.k6.io/xk6@latest
+          xk6 --version
+
       - name: Build
         env:
           CGO_ENABLED: "0"
@@ -79,7 +85,6 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
-          make .install-xk6
           make build-xk6
           mkdir -p "${{ steps.names.outputs.outdir }}"
           go build -trimpath -ldflags "-s -w ${LDFLAGS}" \

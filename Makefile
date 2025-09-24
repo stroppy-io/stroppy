@@ -53,7 +53,7 @@ REQUIRED_BINS = git go \
 .install-xk6:
 	$(info Installing xk6...)
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install go.k6.io/xk6@v1.1.4
+	GOBIN=$(LOCAL_BIN) go install go.k6.io/xk6@v1.1.5
 
 .PHONY: .bin-deps
 .bin-deps: .install-linter .install-xk6 # Install binary dependencies in ./bin
@@ -89,7 +89,7 @@ K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
 .PHONY: build-xk6
 build-xk6: .check-bins # Build k6 module
 	mkdir -p $(CURDIR)/build
-	XK6_RACE_DETECTOR=0 $(LOCAL_BIN)/xk6 build --verbose \
+	XK6_RACE_DETECTOR=0 PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
 		--with github.com/stroppy-io/stroppy/cmd/xk6=./cmd/xk6/ \
 		--replace github.com/stroppy-io/stroppy=./ \
 		--output $(K6_OUT_FILE)

@@ -73,6 +73,10 @@ func (m *OtlpExport) validate(all bool) error {
 		// no validation rules for OtlpEndpointInsecure
 	}
 
+	if m.OtlpHeaders != nil {
+		// no validation rules for OtlpHeaders
+	}
+
 	if m.OtlpMetricsPrefix != nil {
 		// no validation rules for OtlpMetricsPrefix
 	}

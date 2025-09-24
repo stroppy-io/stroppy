@@ -146,10 +146,15 @@ func k6ArgsOtelExport(runContext *stroppy.StepContext, baseArgs []string) []stri
 		insecure = "true"
 	}
 
+	if export.GetOtlpHeaders() != "" {
+		os.Setenv("K6_OTEL_HEADERS", export.GetOtlpHeaders())
+	}
+
 	if export.GetOtlpGrpcEndpoint() != "" {
 		os.Setenv("K6_OTEL_GRPC_EXPORTER_INSECURE", insecure)
 		os.Setenv("K6_OTEL_GRPC_EXPORTER_ENDPOINT", "localhost:4317")
 	} else {
+		os.Setenv("K6_OTEL_EXPORTER_TYPE", "http")
 		os.Setenv("K6_OTEL_HTTP_EXPORTER_INSECURE", insecure)
 		os.Setenv("K6_OTEL_HTTP_EXPORTER_ENDPOINT", utils.StringOrDefault(
 			export.GetOtlpHttpEndpoint(),
