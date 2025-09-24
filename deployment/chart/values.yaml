@@ -2,7 +2,7 @@
 fullnameOverride: ""
 ## image details
 image:
-  repository: ghcr.io/naukograd-software/stroppy-cloud-panel
+  repository: ghcr.io/stroppy-io/stroppy-cloud-panel
   pullPolicy: Always
   ## image tag serves as the app version
   ## Use specific tag from CI/CD pipeline
