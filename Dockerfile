@@ -18,11 +18,7 @@ RUN yarn build
 # Этап 2: Сборка backend
 FROM golang:1.22 AS backend-builder
 
-# Установка зависимостей для сборки
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libc6-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Статическая сборка без CGO - зависимости не нужны
 
 # Установка рабочей директории
 WORKDIR /app/backend
@@ -37,20 +33,10 @@ RUN go mod download
 COPY backend/ ./
 
 # Сборка backend приложения
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o bin/stroppy-cloud-panel ./cmd/stroppy-cloud-panel
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o bin/stroppy-cloud-panel ./cmd/stroppy-cloud-panel
 
 # Этап 3: Финальный образ
-FROM ubuntu:22.04
-
-# Установка зависимостей времени выполнения
-RUN apt-get update && apt-get install -y ca-certificates tzdata wget && rm -rf /var/lib/apt/lists/*
-
-# Установка временной зоны
-RUN ln -fs /usr/share/zoneinfo/Europe/Moscow /etc/localtime && \
-    dpkg-reconfigure -f noninteractive tzdata
-
-# Создание пользователя для безопасности
-RUN useradd -r -s /bin/false appuser
+FROM gcr.io/distroless/static-debian12:nonroot
 
 # Установка рабочей директории
 WORKDIR /app
@@ -60,9 +46,6 @@ COPY --from=backend-builder /app/backend/bin/stroppy-cloud-panel ./stroppy-cloud
 
 # Копирование собранного frontend из builder образа
 COPY --from=frontend-builder /app/frontend/dist ./web
-
-# Переключение на непривилегированного пользователя
-USER appuser
 
 # Настройка переменных окружения
 ENV DB_HOST=postgres
@@ -79,9 +62,5 @@ ENV GIN_MODE=release
 # Открытие порта
 EXPOSE 8080
 
-# Проверка здоровья контейнера
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
-
 # Команда запуска
-CMD ["./stroppy-cloud-panel"]
+CMD ["/app/stroppy-cloud-panel"]

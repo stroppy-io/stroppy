@@ -1,8 +1,8 @@
 # Многоэтапная сборка для минимизации размера образа
-FROM golang:1.22 AS builder
+FROM golang:1.22-alpine AS builder
 
 # Установка зависимостей для сборки
-RUN apt-get update && apt-get install -y gcc libc6-dev && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache gcc musl-dev
 
 # Установка рабочей директории
 WORKDIR /app
@@ -25,13 +25,13 @@ ENV GOOS=linux
 RUN go build -ldflags="-s -w" -o bin/stroppy-cloud-panel ./cmd/stroppy-cloud-panel
 
 # Финальный образ
-FROM ubuntu:22.04
+FROM golang:1.22-alpine
 
 # Установка зависимостей времени выполнения
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates tzdata
 
 # Создание пользователя для безопасности
-RUN useradd -r -s /bin/false appuser
+RUN adduser -D -s /bin/false appuser
 
 # Установка рабочей директории
 WORKDIR /app
