@@ -12,6 +12,10 @@ RUN yarn install --frozen-lockfile
 # Копирование исходного кода frontend
 COPY frontend/ ./
 
+# Установка переменных окружения для frontend
+ARG VITE_API_BASE_URL=/api/v1
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 # Сборка frontend для продакшена
 RUN yarn build
 

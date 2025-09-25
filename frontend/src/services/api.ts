@@ -96,7 +96,7 @@ export interface ApiError {
 }
 
 // Конфигурация API
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -239,7 +239,10 @@ class ApiClient {
 
   // Проверка состояния сервера
   async healthCheck(): Promise<{ status: string; timestamp: number }> {
-    const response = await axios.get(`${API_BASE_URL.replace('/api/v1', '')}/health`);
+    const baseUrl = API_BASE_URL.startsWith('http') 
+      ? API_BASE_URL.replace('/api/v1', '') 
+      : window.location.origin;
+    const response = await axios.get(`${baseUrl}/health`);
     return response.data;
   }
 }
