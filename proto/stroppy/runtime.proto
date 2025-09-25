@@ -14,7 +14,7 @@ option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
  */
 message RunContext {
     /** Global configuration of the benchmark and its steps */
-    Config config = 1;
+    GlobalConfig config = 1;
     /** Executor configuration */
     ExecutorConfig executor = 2;
     /** Exporter configuration */

@@ -102,17 +102,18 @@ message SideCarConfig {
  */
 message CloudConfig {}
 
-/**
- * Config contains the complete configuration for a benchmark run.
- */
-message Config {
+
+message GlobalConfig {
     /**
      * Version of the configuration format e.g. proto files version.
      * This is used for backward compatibility of configs
      * and will be set automatically from binary run if not present.
      */
     string version = 1;
-    /** Run identifier for reproducible test runs or debugging */
+    /**
+     * Run identifier for reproducible test runs or debugging
+     * If set to "generate()" stroppy eval ulid for run_id
+     */
     string run_id = 2;
     /** Random seed for reproducible test runs */
     uint64 seed = 3 [(validate.rules).uint64.gte = 0];
@@ -122,14 +123,22 @@ message Config {
     DriverConfig driver = 5 [(validate.rules).message.required = true];
     /** Logging configuration */
     LoggerConfig logger = 6;
+}
+
+/**
+ * ConfigFile contains the complete configuration for a benchmark run in file.
+ */
+message ConfigFile {
+    /** Global configuration */
+    GlobalConfig global = 1;
     /** Exporters configuration */
-    repeated ExporterConfig exporters = 7;
+    repeated ExporterConfig exporters = 2;
     /** Executors configuration */
-    repeated ExecutorConfig executors = 8;
+    repeated ExecutorConfig executors = 3;
     /** Step to executor mapping configuration */
-    StepExecutionMapping step_executor_mappings = 9;
+    repeated StepExecutionMapping step_executor_mappings = 4;
     /** Plugins configuration */
-    repeated SideCarConfig side_cars = 10;
+    repeated SideCarConfig side_cars = 5;
     /** BenchmarkDescriptor defines a complete benchmark consisting of multiple steps. */
-    BenchmarkDescriptor benchmark = 11 [(validate.rules).message.required = true];
+    BenchmarkDescriptor benchmark = 6 [(validate.rules).message.required = true];
 }
