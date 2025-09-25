@@ -123,6 +123,11 @@ message TransactionDescriptor {
     Value.Struct db_specific = 5;
 }
 
+/**
+ * UnitDescriptor represents a single workload.
+ * It can be a table creation operation, a query execution operation, or a
+ * transaction execution operation.
+ */
 message UnitDescriptor {
     oneof type {
         option (validate.required) = true;
@@ -138,8 +143,7 @@ message UnitDescriptor {
 /**
  * StepUnitDescriptor represents a single unit of work.
  * It can be a table creation operation, a query execution operation, or a
- * transaction execution operation. It also specifies whether to execute this
- * operation asynchronously.
+ * transaction execution operation.
  */
 message StepUnitDescriptor {
     UnitDescriptor descriptor = 6;
@@ -159,8 +163,6 @@ message StepDescriptor {
         min_items : 1,
         items : {message : {required : true}}
     } ];
-    /** Whether to execute all operations in this step asynchronously */
-    bool async = 3;
 }
 
 /**

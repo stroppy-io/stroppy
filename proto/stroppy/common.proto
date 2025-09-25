@@ -8,6 +8,25 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
 
 /**
+ * OtlpExport contains configuration for exporting metrics via OpenTelemetry Protocol (OTLP).
+ * It specifies the endpoint and metrics prefix for telemetry data export.
+ */
+message OtlpExport {
+    /** gRPC endpoint for OpenTelemetry collector */
+    optional string otlp_grpc_endpoint = 1;
+    /** HTTP endpoint for the OpenTelemetry collector */
+    optional string otlp_http_endpoint = 3;
+    /** HTTP exporter path. Default is '/v1/metrics' */
+    optional string otlp_http_exporter_url_path = 4;
+    /** Disable transport security for the exporter */
+    optional bool otlp_endpoint_insecure = 5;
+    /** Headers for otlp requests e.g. Authorization=... */
+    optional string otlp_headers = 6;
+    /** Prefix to be added to all exported metrics */
+    optional string otlp_metrics_prefix = 2;
+}
+
+/**
  * Decimal represents an arbitrary-precision decimal number.
  */
 message Decimal {
