@@ -1,0 +1,173 @@
+syntax = "proto3";
+
+package stroppy;
+
+import "gen/validate/validate.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
+
+/**
+ * K6Executor contains configuration for k6 load testing tool integration.
+ * It contains paths to the k6 binary and the k6 test script, as well as
+ * additional arguments to pass to the k6 binary.
+ */
+message K6Options {
+    /** Additional arguments to pass to the k6 binary */
+    repeated string k6_args = 2 [
+        (validate.rules).repeated = {
+            unique: true,
+        }
+    ];
+    /** Timeout for k6 setup phase */
+    optional google.protobuf.Duration setup_timeout = 10;
+    /** Scenario configuration */
+    K6Scenario scenario = 200 [(validate.rules).message.required = true];
+}
+
+
+/**
+ * Scenario defines the overall test scenario configuration.
+ * It contains user tags, maximum duration, and executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/
+ */
+message K6Scenario {
+    /** Maximum duration for scenario execution.
+     * Used as a time limiter if main parameters (iterations, stages, duration) 
+     * do not complete in time. */
+    google.protobuf.Duration max_duration = 3;
+
+    /** Executor configuration (exactly one of these must be specified) */
+    oneof executor {
+        /** Shared iterations executor */
+        SharedIterations shared_iterations = 10;
+        /** Per-VU iterations executor */
+        PerVuIterations per_vu_iterations = 11;
+        /** Constant VUs executor */
+        ConstantVUs constant_vus = 12;
+        /** Ramping VUs executor */
+        RampingVUs ramping_vus = 13;
+        /** Constant arrival rate executor */
+        ConstantArrivalRate constant_arrival_rate = 14;
+        /** Ramping arrival rate executor */
+        RampingArrivalRate ramping_arrival_rate = 15;
+    }
+}
+
+/**
+ * SharedIterations executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
+ */
+message SharedIterations {
+    /** Total number of iterations to be executed by all VUs together.
+     * Iterations are distributed dynamically among available VUs. */
+    int64 iterations = 1;
+
+    /** Number of virtual users that will execute these iterations in parallel */
+    uint32 vus = 2;
+}
+
+/**
+ * PerVuIterations executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
+ */
+message PerVuIterations {
+    /** Number of virtual users */
+    uint32 vus = 1;
+
+    /** Number of iterations that each VU should execute */
+    int64 iterations = 2;
+}
+
+/**
+ * ConstantVUs executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
+ */
+message ConstantVUs {
+    /** Fixed number of virtual users that will be simultaneously active at all times */
+    uint32 vus = 1;
+
+    /** Duration of the scenario execution.
+     * All VUs will start and execute iterations until this time is completed. */
+    google.protobuf.Duration duration = 2;
+}
+
+/**
+ * RampingVUs executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
+ */
+message RampingVUs {
+    /** VU stage configuration for ramping */
+    message VUStage {
+        /** Duration of the stage (e.g., "30s") */
+        google.protobuf.Duration duration = 1;
+
+        /** Target number of VUs at the end of the stage */
+        uint32 target = 2;
+    }
+
+    /** Initial number of virtual users */
+    uint32 start_vus = 1;
+
+    /** List of stages where VU count changes to target value over specified time */
+    repeated VUStage stages = 2;
+
+    /** Number of VUs allocated in advance.
+     * Helps avoid delays when creating new VUs during the test. */
+    uint32 pre_allocated_vus = 3;
+
+    /** Maximum number of VUs available for pool expansion */
+    uint32 max_vus = 4;
+}
+
+/**
+ * ConstantArrivalRate executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
+ */
+message ConstantArrivalRate {
+    /** Rate of iteration generation (number per time unit) */
+    uint32 rate = 1;
+
+    /** Time unit for the "rate" field (e.g., "1s") */
+    google.protobuf.Duration time_unit = 2;
+
+    /** Duration of the scenario */
+    google.protobuf.Duration duration = 3;
+
+    /** Number of VUs allocated in advance */
+    uint32 pre_allocated_vus = 4;
+
+    /** Maximum allowed number of VUs if load increases */
+    uint32 max_vus = 5;
+}
+
+/**
+ * RampingArrivalRate executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
+ */
+message RampingArrivalRate {
+    /** Rate stage configuration for ramping arrival rate */
+    message RateStage {
+        /** Target rate (iterations per time_unit) at the end of the stage */
+        uint32 target = 1;
+
+        /** Duration of the stage */
+        google.protobuf.Duration duration = 2;
+    }
+
+    /** Initial rate (iterations per time_unit) */
+    uint32 start_rate = 1;
+
+    /** Time unit for the rate (e.g., "1s") */
+    google.protobuf.Duration time_unit = 2;
+
+    /** List of rate change stages */
+    repeated RateStage stages = 3;
+
+    /** Number of VUs allocated in advance */
+    uint32 pre_allocated_vus = 4;
+
+    /** Maximum number of VUs available for pool expansion */
+    uint32 max_vus = 5;
+}
+

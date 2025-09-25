@@ -16,17 +16,17 @@ option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
 */
 message DriverConfig {
     /** Database connection URL */
-    string url = 3 [(validate.rules).string.uri_ref = true];
+    string url = 1 [(validate.rules).string.uri_ref = true];
     /** Database-specific configuration options */
-    optional Value.Struct db_specific = 4;
+    optional Value.Struct db_specific = 2;
 
     enum DriverType {
         DRIVER_TYPE_UNSPECIFIED = 0;
         DRIVER_TYPE_POSTGRES = 1;
     }
 
-    /** Name of chosen driver */
-    DriverType driver_type = 5 [(validate.rules).enum.defined_only = true];
+    /** Name/Type of chosen driver */
+    DriverType driver_type = 3 [(validate.rules).enum.defined_only = true];
 }
 
 /**
@@ -80,7 +80,7 @@ message StepExecutionMapping {
     /** Name of the executor */
     string executor_name = 2 [(validate.rules).string.min_len = 1];
     /** Name of the exporter */
-    string exporter_name = 3 [(validate.rules).string.min_len = 1];
+    optional string exporter_name = 3;
     /** Whether to execute all operations in this step asynchronously */
     bool async = 4;
 }

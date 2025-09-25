@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package stroppy;
+
+import "common.proto";
+import "config.proto";
+import "descriptor.proto";
+
+option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
+
+/**
+ * InfrastructureContext provides contextual information to a benchmark step during execution.
+ * It contains the current configuration and descriptors relevant to the run.
+ */
+message RunContext {
+    /** Global configuration of the benchmark and its steps */
+    Config config = 1;
+    /** Executor configuration */
+    ExecutorConfig executor = 2;
+    /** Exporter configuration */
+    optional ExporterConfig exporter = 3;
+}
+
+/**
+ * StepContext provides contextual information to a benchmark step during execution.
+ * It contains the run context and the step descriptor.
+ */
+message StepContext {
+    /** Run context */
+    RunContext run_context = 1;
+    /** Current step descriptor */
+    StepDescriptor step_descriptor = 2;
+}
+
+/**
+ * UnitBuildContext provides the context needed to build a unit from a StepUnitDescriptor.
+ */
+message UnitContext {
+    /** Step context */
+    StepContext step_context = 1;
+    /** Current unit descriptor */
+    StepUnitDescriptor unit_descriptor = 2;
+}
+
+/**
+ * DriverQuery represents a query that can be executed by a database driver.
+ */
+message DriverQuery {
+    /** Name of the query */
+    string name = 1;
+    /** Request of the query */
+    string request = 2;
+    /** Parameters of the query */
+    repeated Value params = 3;
+}
+
+/**
+ * DriverTransaction represents a transaction that can be executed by a database
+ * driver.
+ */
+message DriverTransaction {
+    /** Queries of the transaction */
+    repeated DriverQuery queries = 1;
+    /** Isolation level of the transaction */
+    TxIsolationLevel isolation_level = 2;
+}

@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package stroppy;
 
-import "config.proto";
 import "google/protobuf/empty.proto";
 import "runtime.proto";
 
@@ -16,7 +15,7 @@ service SidecarService {
      * Initialize is called once before the benchmark starts.
      * Used to initialize resources of SidecarPlugin.
      */
-    rpc Initialize (stroppy.Config) returns (google.protobuf.Empty);
+    rpc Initialize (RunContext) returns (google.protobuf.Empty);
     /**
      * OnStepStart is called once before each step starts.
      */
@@ -29,5 +28,5 @@ service SidecarService {
      * Teardown is called once after the benchmark ends.
      * Used to clean up resources.
      */
-    rpc Teardown (google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc Teardown (RunContext) returns (google.protobuf.Empty);
 }
