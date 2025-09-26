@@ -58,7 +58,11 @@ func RunStep(
 
 	lg.Info("start of query generation")
 
-	unitQueue := unit_queue.NewUnitQueue(drv, runContext.GetStep())
+	unitQueue := unit_queue.NewQueue(drv.GenerateNextUnit, 100, 100)
+	for _, unit := range runContext.GetStep().GetUnits() {
+		unitQueue.PrepareGenerator(unit.GetDescriptor_(), 1, uint(unit.GetCount()))
+	}
+
 	unitQueue.StartGeneration(cancelCtx)
 
 	asyncer := utils.NewAsyncerFromExecType(
@@ -73,7 +77,7 @@ func RunStep(
 	for range txCount {
 		asyncer.Go(
 			func(ctx context.Context) error {
-				tx, err := unitQueue.GetNextUnit()
+				tx, err := unitQueue.GetNextElement()
 				if err != nil {
 					return err
 				}

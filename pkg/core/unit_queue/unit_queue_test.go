@@ -1,558 +1,633 @@
-package unit_queue
+package unit_queue_test
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/core/unit_queue"
 )
 
-// Update MockDriver to support both interfaces.
-type MockDriver struct {
-	GenerateCount  int64
-	GenerateDelay  time.Duration
-	GenerateError  error
-	GenerateResult *proto.DriverTransaction
-}
+func NewQueueExample() {
+	generator := func(_ context.Context, x int) (int, error) { return x * 42, nil }
+	// setup a generator function, workers limit and internal buffer size
+	queue := unit_queue.NewQueue(generator, 1, 100)
 
-func NewMockDriver() *MockDriver {
-	return &MockDriver{
-		GenerateResult: &proto.DriverTransaction{},
-	}
-}
-
-func (m *MockDriver) GenerateNextUnit(
-	ctx context.Context,
-	_ *proto.UnitDescriptor,
-) (*proto.DriverTransaction, error) {
-	atomic.AddInt64(&m.GenerateCount, 1)
-
-	if m.GenerateDelay > 0 {
-		select {
-		case <-time.After(m.GenerateDelay):
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
+	for _, seed := range []int{1, 2, 3, 4} {
+		// put the initial value, generator will use
+		// also how many workers will run it simultaniously
+		// and how many times generator will be started with this value
+		queue.PrepareGenerator(seed, 1, 1)
 	}
 
-	if m.GenerateError != nil {
-		return nil, m.GenerateError
-	}
+	// start the value generation
+	queue.StartGeneration(context.Background())
 
-	return &proto.DriverTransaction{}, nil
-}
-
-func (m *MockDriver) GetGenerateCount() int64 {
-	return atomic.LoadInt64(&m.GenerateCount)
-}
-
-func (m *MockDriver) ResetCount() {
-	atomic.StoreInt64(&m.GenerateCount, 0)
-}
-
-// Helper function to create test step descriptor.
-func createTestStepDescriptor(async bool, units []*proto.StepUnitDescriptor) *proto.StepDescriptor {
-	return &proto.StepDescriptor{
-		Async: async,
-		Units: units,
-	}
-}
-
-func createTestStepUnitDescriptor(count uint64) *proto.StepUnitDescriptor {
-	return &proto.StepUnitDescriptor{
-		Count:       count,
-		Descriptor_: &proto.UnitDescriptor{
-			// Add required fields
-		},
-	}
-}
-
-// Basic functionality tests.
-func TestNewUnitQueue(t *testing.T) {
-	driver := NewMockDriver()
-	step := createTestStepDescriptor(false, []*proto.StepUnitDescriptor{
-		createTestStepUnitDescriptor(1),
-	})
-
-	queue := NewUnitQueue(driver, step)
-
-	if queue == nil {
-		t.Fatal("NewUnitQueue returned nil")
-	}
-
-	if queue.driver != driver {
-		t.Error("Driver not set correctly")
-	}
-
-	if queue.step != step {
-		t.Error("Step descriptor not set correctly")
-	}
-}
-
-func TestUnitQueue_BasicOperation(t *testing.T) {
-	ctx := context.Background()
-	driver := NewMockDriver()
-	step := createTestStepDescriptor(false, []*proto.StepUnitDescriptor{
-		createTestStepUnitDescriptor(3),
-	})
-
-	queue := NewUnitQueue(driver, step)
-	queue.StartGeneration(ctx)
-
-	// Give some time for generation to start
-	time.Sleep(100 * time.Millisecond)
-
-	// Get transactions
-	transactions := make([]*proto.DriverTransaction, 0, 3)
-
-	for i := range 3 {
-		tx, err := queue.GetNextUnit()
-		if err != nil {
-			t.Fatalf("Failed to get transaction %d: %v", i, err)
-		}
-
-		if tx == nil {
-			t.Fatalf("Got nil transaction at index %d", i)
-		}
-
-		transactions = append(transactions, tx)
+	for range 5 {
+		// take value by one in any concurent context
+		value, _ := queue.GetNextElement()
+		fmt.Println(value)
 	}
 
 	queue.Stop()
 
-	if len(transactions) < 3 {
-		t.Errorf("Expected at least 3 transactions, got %d", len(transactions))
-	}
-
-	if driver.GetGenerateCount() < 3 {
-		t.Errorf("Expected at least 3 generate calls, got %d", driver.GetGenerateCount())
-	}
+	// Output: 42
+	// 84
+	// 126
+	// 168
+	// 210
 }
 
-func TestUnitQueue_MultipleUnits(t *testing.T) {
-	ctx := context.Background()
-	driver := NewMockDriver()
-	step := createTestStepDescriptor(true, []*proto.StepUnitDescriptor{
-		createTestStepUnitDescriptor(2),
-		createTestStepUnitDescriptor(3),
-	})
+// Test basic functionality
+func TestQueuedGenerator_BasicOperation(t *testing.T) {
+	generator := func(_ context.Context, x int) (int, error) {
+		return x * 10, nil
+	}
 
-	queue := NewUnitQueue(driver, step)
+	queue := unit_queue.NewQueue(generator, 2, 100)
+
+	// Add seeds
+	queue.PrepareGenerator(1, 1, 2) // should produce 10, 10
+	queue.PrepareGenerator(2, 1, 1) // should produce 20
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	queue.StartGeneration(ctx)
 
-	time.Sleep(200 * time.Millisecond)
+	// Collect results
+	results := make(map[int]int)
+	expectedCount := 3 // 2 + 1 = 3 total results per cycle
 
-	// Should generate 2 + 3 = 5 transactions
-	transactions := make([]*proto.DriverTransaction, 0, 5)
-
-	for i := range 5 {
-		tx, err := queue.GetNextUnit()
+	for i := 0; i < expectedCount*2; i++ { // Get 2 cycles worth
+		value, err := queue.GetNextElement()
 		if err != nil {
-			t.Fatalf("Failed to get transaction %d: %v", i, err)
+			t.Fatalf("Unexpected error: %v", err)
 		}
-
-		transactions = append(transactions, tx)
+		results[value]++
 	}
 
 	queue.Stop()
 
-	if len(transactions) != 5 {
-		t.Errorf("Expected 5 transactions, got %d", len(transactions))
+	// Verify proportions (values should appear according to their repeat counts)
+	if results[10] == 0 || results[20] == 0 {
+		t.Errorf("Missing expected values. Got: %v", results)
+	}
+
+	// In 2 cycles: 10 should appear 4 times (2*2), 20 should appear 2 times (1*2)
+	expectedRatio := float64(results[10]) / float64(results[20])
+	if math.Abs(expectedRatio-2.0) > 0.1 {
+		t.Errorf("Expected ratio ~2:1, got %f", expectedRatio)
 	}
 }
 
-func TestUnitQueue_ContextCancellation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	driver := NewMockDriver()
-	driver.GenerateDelay = 50 * time.Millisecond // Add delay to test cancellation
+// Test the proportional distribution property
+func TestQueuedGenerator_ProportionalDistribution(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping proportional distribution test in short mode")
+	}
 
-	step := createTestStepDescriptor(false, []*proto.StepUnitDescriptor{
-		createTestStepUnitDescriptor(100), // Large number
-	})
+	generator := func(_ context.Context, seed int) (int, error) {
+		return seed, nil
+	}
 
-	queue := NewUnitQueue(driver, step)
+	queue := unit_queue.NewQueue(generator, 10, 1000)
+
+	// Configure seeds with different repeat counts
+	// Seed 1: 1*50 = 50 per cycle
+	// Seed 2: 1*20 = 20 per cycle
+	// Seed 3: 1*30 = 30 per cycle
+	// Total per cycle: 100, ratios 5:2:3
+	queue.PrepareGenerator(1, 1, 50)
+	queue.PrepareGenerator(2, 1, 20)
+	queue.PrepareGenerator(3, 1, 30)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	queue.StartGeneration(ctx)
 
-	// Cancel after short time
-	time.Sleep(100 * time.Millisecond)
-	cancel()
+	// Collect large number of samples
+	const sampleSize = 100000
+	counts := make(map[int]int64)
 
-	// Wait a bit for cancellation to propagate
-	time.Sleep(100 * time.Millisecond)
-
-	// Try to get transaction - should eventually get error or closed channel
-	_, err := queue.GetNextUnit()
-	if err == nil {
-		// Try a few more times as cancellation might take time
-		for range 10 {
-			time.Sleep(10 * time.Millisecond)
-
-			_, err = queue.GetNextUnit()
-			if err != nil {
+	for i := 0; i < sampleSize; i++ {
+		value, err := queue.GetNextElement()
+		if err != nil {
+			if errors.Is(err, unit_queue.ErrQueueIsDead) {
 				break
 			}
+			t.Fatalf("Unexpected error at sample %d: %v", i, err)
 		}
+		var some = counts[value]
+		atomic.AddInt64(&some, 1)
 	}
 
 	queue.Stop()
 
-	// We should eventually get an error due to context cancellation
-	if err == nil {
-		t.Log("Warning: Expected error due to context cancellation, but got none")
+	total := counts[1] + counts[2] + counts[3]
+	if total == 0 {
+		t.Fatal("No values collected")
+	}
+
+	// Calculate actual ratios
+	ratio1 := float64(counts[1]) / float64(total)
+	ratio2 := float64(counts[2]) / float64(total)
+	ratio3 := float64(counts[3]) / float64(total)
+
+	// Expected ratios: 5:2:3 = 50%, 20%, 30%
+	expectedRatio1 := 0.50
+	expectedRatio2 := 0.20
+	expectedRatio3 := 0.30
+
+	tolerance := 0.05 // 5% tolerance
+
+	t.Logf("Collected %d samples. Ratios: %.3f:%.3f:%.3f (expected: %.3f:%.3f:%.3f)",
+		total, ratio1, ratio2, ratio3, expectedRatio1, expectedRatio2, expectedRatio3)
+
+	if math.Abs(ratio1-expectedRatio1) > tolerance {
+		t.Errorf("Seed 1 ratio %.3f differs from expected %.3f by more than %.3f",
+			ratio1, expectedRatio1, tolerance)
+	}
+	if math.Abs(ratio2-expectedRatio2) > tolerance {
+		t.Errorf("Seed 2 ratio %.3f differs from expected %.3f by more than %.3f",
+			ratio2, expectedRatio2, tolerance)
+	}
+	if math.Abs(ratio3-expectedRatio3) > tolerance {
+		t.Errorf("Seed 3 ratio %.3f differs from expected %.3f by more than %.3f",
+			ratio3, expectedRatio3, tolerance)
 	}
 }
 
-func TestUnitQueue_DriverError(t *testing.T) {
-	ctx := context.Background()
-	driver := NewMockDriver()
-	driver.GenerateError = errors.New("driver error")
+// Test concurrent access safety
+func TestQueuedGenerator_ConcurrentAccess(t *testing.T) {
+	generator := func(_ context.Context, x int) (int, error) {
+		time.Sleep(time.Microsecond) // Simulate work
+		return x, nil
+	}
 
-	step := createTestStepDescriptor(false, []*proto.StepUnitDescriptor{
-		createTestStepUnitDescriptor(1),
-	})
+	queue := unit_queue.NewQueue(generator, 5, 100)
+	queue.PrepareGenerator(42, 3, 10)
 
-	queue := NewUnitQueue(driver, step)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	queue.StartGeneration(ctx)
 
-	time.Sleep(100 * time.Millisecond)
-
-	_, err := queue.GetNextUnit()
-	queue.Stop()
-
-	if err == nil {
-		t.Error("Expected error from driver, got none")
-	}
-}
-
-// Consistency tests.
-func TestUnitQueue_Consistency(t *testing.T) {
-	t.Run("SingleUnit", func(t *testing.T) {
-		testConsistency(t, 1, 1, false)
-	})
-
-	t.Run("MultipleUnitsSync", func(t *testing.T) {
-		testConsistency(t, 3, 5, false)
-	})
-
-	t.Run("MultipleUnitsAsync", func(t *testing.T) {
-		testConsistency(t, 3, 5, true)
-	})
-}
-
-func testConsistency(t *testing.T, numUnits, countPerUnit int, async bool) {
-	t.Helper()
-
-	ctx := context.Background()
-	driver := NewMockDriver()
-
-	units := make([]*proto.StepUnitDescriptor, 0, numUnits)
-	for range numUnits {
-		units = append(units, createTestStepUnitDescriptor(uint64(countPerUnit)))
-	}
-
-	step := createTestStepDescriptor(async, units)
-	queue := NewUnitQueue(driver, step)
-	queue.StartGeneration(ctx)
-
-	expectedTotal := numUnits * countPerUnit
-
-	var transactions []*proto.DriverTransaction
-
-	// Collect all expected transactions
-	timeout := time.After(5 * time.Second)
-
-	for len(transactions) < expectedTotal {
-		select {
-		case <-timeout:
-			t.Fatalf("Timeout waiting for transactions. Got %d, expected %d",
-				len(transactions), expectedTotal)
-		default:
-			tx, err := queue.GetNextUnit()
-			if err != nil {
-				t.Fatalf("Error getting transaction: %v", err)
-			}
-
-			if tx == nil {
-				t.Fatal("Got nil transaction")
-			}
-
-			transactions = append(transactions, tx)
-		}
-	}
-
-	queue.Stop()
-
-	if len(transactions) < expectedTotal {
-		t.Errorf("Expected %d transactions, got %d", expectedTotal, len(transactions))
-	}
-
-	if driver.GetGenerateCount() < int64(expectedTotal) {
-		t.Errorf("Expected %d generate calls, got %d", expectedTotal, driver.GetGenerateCount())
-	}
-}
-
-// Parallel and race detection tests.
-func TestUnitQueue_ParallelConsumers(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	driver := NewMockDriver()
-	step := createTestStepDescriptor(true, []*proto.StepUnitDescriptor{
-		createTestStepUnitDescriptor(100),
-	})
-
-	queue := NewUnitQueue(driver, step)
-	queue.StartGeneration(ctx)
-
+	// Multiple concurrent consumers
 	const numConsumers = 10
+	const samplesPerConsumer = 50
 
 	var wg sync.WaitGroup
+	results := make([][]int, numConsumers)
+	errors := make([]error, numConsumers)
 
-	var totalReceived int64
-
-	var errors []error
-
-	var mu sync.Mutex
-
-	// Start multiple consumers
-	for i := range numConsumers {
+	for i := 0; i < numConsumers; i++ {
 		wg.Add(1)
-
 		go func(consumerID int) {
 			defer wg.Done()
 
-			for range 10 { // Each consumer gets 10 transactions
-				tx, err := queue.GetNextUnit()
+			var samples []int
+			for j := 0; j < samplesPerConsumer; j++ {
+				value, err := queue.GetNextElement()
 				if err != nil {
-					mu.Lock()
-					errors = append(errors, fmt.Errorf("consumer %d: %w", consumerID, err))
-					mu.Unlock()
-
+					errors[consumerID] = err
 					return
 				}
-
-				if tx == nil {
-					mu.Lock()
-					errors = append(
-						errors,
-						fmt.Errorf("consumer %d: got nil transaction", consumerID),
-					)
-					mu.Unlock()
-
-					return
-				}
-
-				atomic.AddInt64(&totalReceived, 1)
+				samples = append(samples, value)
 			}
+			results[consumerID] = samples
 		}(i)
 	}
 
 	wg.Wait()
 	queue.Stop()
 
-	if len(errors) > 0 {
-		t.Fatalf("Got %d errors: %v", len(errors), errors[0])
+	// Check for errors
+	for i, err := range errors {
+		if err != nil {
+			t.Errorf("Consumer %d encountered error: %v", i, err)
+		}
 	}
 
-	if totalReceived != 100 {
-		t.Errorf("Expected 100 transactions received, got %d", totalReceived)
+	// Verify all consumers got expected values
+	totalSamples := 0
+	for i, samples := range results {
+		if len(samples) != samplesPerConsumer {
+			t.Errorf("Consumer %d got %d samples, expected %d",
+				i, len(samples), samplesPerConsumer)
+		}
+		for _, value := range samples {
+			if value != 42 {
+				t.Errorf("Consumer %d got unexpected value %d", i, value)
+			}
+		}
+		totalSamples += len(samples)
+	}
+
+	expectedTotal := numConsumers * samplesPerConsumer
+	if totalSamples != expectedTotal {
+		t.Errorf("Total samples %d, expected %d", totalSamples, expectedTotal)
 	}
 }
 
-func TestUnitQueue_RaceConditions(t *testing.T) {
-	// This test is designed to be run with -race flag
-	t.Parallel()
+// Test race conditions
+func TestQueuedGenerator_RaceConditions(t *testing.T) {
+	// Test race between Stop() and GetNextElement()
+	t.Run("stop_get_race", func(t *testing.T) {
+		generator := func(ctx context.Context, x int) (int, error) {
+			time.Sleep(time.Millisecond)
+			return x, nil
+		}
 
-	for i := range 10 {
-		t.Run(fmt.Sprintf("iteration_%d", i), func(t *testing.T) {
-			t.Parallel()
+		queue := unit_queue.NewQueue(generator, 2, 10)
+		queue.PrepareGenerator(1, 1, 100)
 
-			ctx := context.Background()
-			driver := NewMockDriver()
-			step := createTestStepDescriptor(true, []*proto.StepUnitDescriptor{
-				createTestStepUnitDescriptor(50),
-			})
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-			queue := NewUnitQueue(driver, step)
+		queue.StartGeneration(ctx)
+
+		var wg sync.WaitGroup
+		errChan := make(chan error, 2)
+
+		// Consumer goroutine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 10; i++ {
+				_, err := queue.GetNextElement()
+				if err != nil {
+					if !errors.Is(err, unit_queue.ErrQueueIsDead) &&
+						!errors.Is(err, unit_queue.ErrQueueIsStopped) {
+						errChan <- err
+					}
+					return
+				}
+			}
+		}()
+
+		// Stopper goroutine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			time.Sleep(5 * time.Millisecond)
+			if err := queue.Stop(); err != nil {
+				errChan <- err
+			}
+		}()
+
+		wg.Wait()
+		close(errChan)
+
+		for err := range errChan {
+			t.Errorf("Race condition error: %v", err)
+		}
+	})
+}
+
+// Test error propagation
+func TestQueuedGenerator_ErrorHandling(t *testing.T) {
+	testError := errors.New("generator error")
+	callCount := int64(0)
+
+	generator := func(_ context.Context, x int) (int, error) {
+		count := atomic.AddInt64(&callCount, 1)
+		if count == 5 { // Fail on 5th call
+			return 0, testError
+		}
+		return x, nil
+	}
+
+	queue := unit_queue.NewQueue(generator, 2, 10)
+	queue.PrepareGenerator(1, 2, 10) // Should trigger error
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	queue.StartGeneration(ctx)
+
+	// Consume until we hit the error
+	var lastErr error
+	for i := 0; i < 20; i++ {
+		_, err := queue.GetNextElement()
+		if err != nil {
+			lastErr = err
+			break
+		}
+	}
+
+	queue.Stop()
+
+	if lastErr == nil {
+		t.Error("Expected error but got none")
+	}
+}
+
+// Test goroutine leak detection
+func TestQueuedGenerator_GoroutineLeak(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping goroutine leak test in short mode")
+	}
+
+	initialGoroutines := runtime.NumGoroutine()
+
+	generator := func(ctx context.Context, x int) (int, error) {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(time.Millisecond):
+			return x, nil
+		}
+	}
+
+	// Run multiple short-lived queues
+	for i := 0; i < 50; i++ {
+		func() {
+			queue := unit_queue.NewQueue(generator, 2, 10)
+			queue.PrepareGenerator(i, 1, 5)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			defer cancel()
+
 			queue.StartGeneration(ctx)
 
-			var wg sync.WaitGroup
-
-			// Multiple consumers
-			for range 5 {
-				wg.Add(1)
-
-				go func() {
-					defer wg.Done()
-
-					for range 10 {
-						_, err := queue.GetNextUnit()
-						if err != nil {
-							return // Stop on error
-						}
-					}
-				}()
+			// Consume a few values
+			for j := 0; j < 3; j++ {
+				_, err := queue.GetNextElement()
+				if err != nil {
+					break
+				}
 			}
 
-			wg.Wait()
+			queue.Stop()
+		}()
+	}
+
+	// Allow cleanup time
+	time.Sleep(500 * time.Millisecond)
+	runtime.GC()
+	runtime.GC() // Force GC
+	time.Sleep(100 * time.Millisecond)
+
+	finalGoroutines := runtime.NumGoroutine()
+	leaked := finalGoroutines - initialGoroutines
+
+	t.Logf("Goroutines: initial=%d, final=%d, leaked=%d",
+		initialGoroutines, finalGoroutines, leaked)
+
+	// Allow some tolerance for test framework goroutines
+	if leaked > 5 {
+		t.Errorf("Possible goroutine leak: %d goroutines remain", leaked)
+	}
+}
+
+// Test worker count limits
+func TestQueuedGenerator_WorkerLimits(t *testing.T) {
+	activeWorkers := int64(0)
+	maxActiveWorkers := int64(0)
+
+	generator := func(_ context.Context, x int) (int, error) {
+		current := atomic.AddInt64(&activeWorkers, 1)
+		defer atomic.AddInt64(&activeWorkers, -1)
+
+		// Track maximum concurrent workers
+		for {
+			max := atomic.LoadInt64(&maxActiveWorkers)
+			if current <= max || atomic.CompareAndSwapInt64(&maxActiveWorkers, max, current) {
+				break
+			}
+		}
+
+		time.Sleep(10 * time.Millisecond) // Hold worker for some time
+		return x, nil
+	}
+
+	const workerLimit = 3
+	queue := unit_queue.NewQueue(generator, workerLimit, 100)
+	queue.PrepareGenerator(1, 10, 5) // Try to create 10 workers, but limit is 3
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	queue.StartGeneration(ctx)
+
+	// Consume some values to trigger workers
+	for i := 0; i < 20; i++ {
+		_, err := queue.GetNextElement()
+		if err != nil {
+			break
+		}
+	}
+
+	queue.Stop()
+
+	maxWorkers := atomic.LoadInt64(&maxActiveWorkers)
+	t.Logf("Maximum concurrent workers observed: %d (limit: %d)", maxWorkers, workerLimit)
+
+	if maxWorkers > int64(workerLimit) {
+		t.Errorf("Worker limit violated: observed %d workers, limit %d",
+			maxWorkers, workerLimit)
+	}
+}
+
+// BENCHMARKS
+
+func BenchmarkQueuedGenerator_SingleWorker(b *testing.B) {
+	generator := func(_ context.Context, x int) (int, error) {
+		return x * 2, nil
+	}
+
+	queue := unit_queue.NewQueue(generator, 1, 1000)
+	queue.PrepareGenerator(1, 1, 1000)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	queue.StartGeneration(ctx)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := queue.GetNextElement()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	b.StopTimer()
+	queue.Stop()
+}
+
+func BenchmarkQueuedGenerator_MultipleWorkers(b *testing.B) {
+	generator := func(_ context.Context, x int) (int, error) {
+		return x * 2, nil
+	}
+
+	queue := unit_queue.NewQueue(generator, 10, 10000)
+	queue.PrepareGenerator(1, 5, 1000)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	queue.StartGeneration(ctx)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := queue.GetNextElement()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	b.StopTimer()
+	queue.Stop()
+}
+
+func BenchmarkQueuedGenerator_WorkerScaling(b *testing.B) {
+	generator := func(_ context.Context, x int) (int, error) {
+		// Simulate some work
+		sum := 0
+		for i := 0; i < 100; i++ {
+			sum += i * x
+		}
+		return sum, nil
+	}
+
+	workerCounts := []int{1, 2, 4, 8, 16}
+
+	for _, workers := range workerCounts {
+		b.Run(fmt.Sprintf("workers_%d", workers), func(b *testing.B) {
+			queue := unit_queue.NewQueue(generator, workers, 1000)
+			queue.PrepareGenerator(1, uint(workers), 1000)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			queue.StartGeneration(ctx)
+
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				_, err := queue.GetNextElement()
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+
+			b.StopTimer()
 			queue.Stop()
 		})
 	}
 }
 
-func TestUnitQueue_StopRace(t *testing.T) {
-	t.Parallel()
-
-	// Test concurrent Stop() calls
-	for i := range 20 {
-		t.Run(fmt.Sprintf("stop_race_%d", i), func(t *testing.T) {
-			t.Parallel()
-
-			ctx := context.Background()
-			driver := NewMockDriver()
-			step := createTestStepDescriptor(true, []*proto.StepUnitDescriptor{
-				createTestStepUnitDescriptor(10),
-			})
-
-			queue := NewUnitQueue(driver, step)
-			queue.StartGeneration(ctx)
-
-			var wg sync.WaitGroup
-
-			// Multiple goroutines calling Stop()
-			for j := range 3 {
-				wg.Add(1)
-
-				go func() {
-					defer wg.Done()
-					time.Sleep(time.Duration(j*10) * time.Millisecond)
-					queue.Stop()
-				}()
-			}
-
-			// One goroutine consuming
-			wg.Add(1)
-
-			go func() {
-				defer wg.Done()
-
-				for {
-					_, err := queue.GetNextUnit()
-					if err != nil {
-						return
-					}
-				}
-			}()
-
-			wg.Wait()
-		})
+// Test for exact proportions with large sample size
+func TestQueuedGenerator_ExactProportions(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping exact proportions test in short mode")
 	}
-}
 
-func BenchmarkUnitQueue_SingleConsumer(b *testing.B) {
-	driver := NewMockDriver()
-	step := createTestStepDescriptor(false, []*proto.StepUnitDescriptor{
-		createTestStepUnitDescriptor(1),
-	})
-
-	b.ResetTimer()
-	b.ReportAllocs()
-
-	for range b.N {
-		ctx := context.Background()
-		queue := NewUnitQueue(driver, step)
-		queue.StartGeneration(ctx)
-
-		_, err := queue.GetNextUnit()
-		if err != nil {
-			b.Fatalf("Error getting transaction: %v", err)
-		}
-
-		queue.Stop()
-		driver.ResetCount()
+	generator := func(_ context.Context, seed int) (int, error) {
+		return seed, nil
 	}
-}
 
-func BenchmarkUnitQueue_ParallelConsumers(b *testing.B) {
-	b.RunParallel(func(pb *testing.PB) {
-		driver := NewMockDriver()
-		step := createTestStepDescriptor(true, []*proto.StepUnitDescriptor{
-			createTestStepUnitDescriptor(100),
-		})
+	// Test the exact scenario from the user query
+	queue := unit_queue.NewQueue(generator, 3, 10000) // Large capacity
 
-		ctx := context.Background()
-		queue := NewUnitQueue(driver, step)
-		queue.StartGeneration(ctx)
+	// Generator 1: 1*50 = 50 per cycle
+	// Generator 2: 1*20 = 20 per cycle
+	// Generator 3: 1*30 = 30 per cycle
+	// Ratio: 5:2:3
+	queue.PrepareGenerator(1, 1, 50)
+	queue.PrepareGenerator(2, 1, 20)
+	queue.PrepareGenerator(3, 1, 30)
 
-		for pb.Next() {
-			_, err := queue.GetNextUnit()
-			if err != nil {
-				// Reset if we hit an error
-				queue.Stop()
-				driver.ResetCount()
-				queue = NewUnitQueue(driver, step)
-				queue.StartGeneration(ctx)
-			}
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
 
-		queue.Stop()
-	})
-}
-
-func BenchmarkUnitQueue_HighThroughput(b *testing.B) {
-	driver := NewMockDriver()
-	step := createTestStepDescriptor(true, []*proto.StepUnitDescriptor{
-		createTestStepUnitDescriptor(1000),
-		createTestStepUnitDescriptor(1000),
-		createTestStepUnitDescriptor(1000),
-	})
-
-	ctx := context.Background()
-	queue := NewUnitQueue(driver, step)
 	queue.StartGeneration(ctx)
 
-	b.ResetTimer()
-	b.ReportAllocs()
+	// Collect 100,000 samples as requested
+	const targetSamples = 100000
+	counts := make(map[int]int64)
 
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			_, err := queue.GetNextUnit()
-			if err != nil {
-				b.Fatalf("Error getting transaction: %v", err)
-			}
+	for i := 0; i < targetSamples; i++ {
+		if i%10000 == 0 {
+			t.Logf("Processed %d samples...", i)
 		}
-	})
+
+		value, err := queue.GetNextElement()
+		if err != nil {
+			t.Fatalf("Error at sample %d: %v", i, err)
+		}
+
+		if value < 1 || value > 3 {
+			t.Fatalf("Unexpected value %d at sample %d", value, i)
+		}
+
+		some := counts[value]
+		atomic.AddInt64(&some, 1)
+	}
 
 	queue.Stop()
-}
 
-func BenchmarkUnitQueue_MemoryUsage(b *testing.B) {
-	b.ReportAllocs()
+	total := counts[1] + counts[2] + counts[3]
+	t.Logf("Final counts: %d:%d:%d (total: %d)", counts[1], counts[2], counts[3], total)
 
-	driver := NewMockDriver()
-	step := createTestStepDescriptor(false, []*proto.StepUnitDescriptor{
-		createTestStepUnitDescriptor(10),
-	})
+	// Calculate exact ratios
+	ratio1 := float64(counts[1]) / float64(total)
+	ratio2 := float64(counts[2]) / float64(total)
+	ratio3 := float64(counts[3]) / float64(total)
 
-	for range b.N {
-		ctx := context.Background()
-		queue := NewUnitQueue(driver, step)
-		queue.StartGeneration(ctx)
+	// Expected: 50%, 20%, 30%
+	expected1, expected2, expected3 := 0.5, 0.2, 0.3
 
-		// Consume all transactions
-		for range 10 {
-			_, err := queue.GetNextUnit()
-			if err != nil {
-				break
-			}
-		}
+	// Very strict tolerance for large sample
+	tolerance := 0.01 // 1%
 
-		queue.Stop()
-		driver.ResetCount()
+	t.Logf("Actual ratios: %.4f:%.4f:%.4f", ratio1, ratio2, ratio3)
+	t.Logf("Expected ratios: %.4f:%.4f:%.4f", expected1, expected2, expected3)
+
+	if math.Abs(ratio1-expected1) > tolerance {
+		t.Errorf("Generator 1 ratio %.4f differs from expected %.4f by %.4f (tolerance: %.4f)",
+			ratio1, expected1, math.Abs(ratio1-expected1), tolerance)
+	}
+	if math.Abs(ratio2-expected2) > tolerance {
+		t.Errorf("Generator 2 ratio %.4f differs from expected %.4f by %.4f (tolerance: %.4f)",
+			ratio2, expected2, math.Abs(ratio2-expected2), tolerance)
+	}
+	if math.Abs(ratio3-expected3) > tolerance {
+		t.Errorf("Generator 3 ratio %.4f differs from expected %.4f by %.4f (tolerance: %.4f)",
+			ratio3, expected3, math.Abs(ratio3-expected3), tolerance)
+	}
+
+	// Additional check: verify the exact ratio relationships
+	// Ratio should be 50:20:30 = 5:2:3
+	ratio12 := float64(counts[1]) / float64(counts[2]) // Should be ~2.5 (5/2)
+	ratio13 := float64(counts[1]) / float64(counts[3]) // Should be ~1.67 (5/3)
+	ratio23 := float64(counts[2]) / float64(counts[3]) // Should be ~0.67 (2/3)
+
+	expected12, expected13, expected23 := 2.5, 5.0/3.0, 2.0/3.0
+
+	t.Logf("Ratio relationships: 1:2=%.3f (exp=%.3f), 1:3=%.3f (exp=%.3f), 2:3=%.3f (exp=%.3f)",
+		ratio12, expected12, ratio13, expected13, ratio23, expected23)
+
+	ratioTolerance := 0.05 // 5% for ratio relationships
+
+	if math.Abs(ratio12-expected12) > ratioTolerance {
+		t.Errorf("Ratio 1:2 = %.3f differs from expected %.3f", ratio12, expected12)
+	}
+	if math.Abs(ratio13-expected13) > ratioTolerance {
+		t.Errorf("Ratio 1:3 = %.3f differs from expected %.3f", ratio13, expected13)
+	}
+	if math.Abs(ratio23-expected23) > ratioTolerance {
+		t.Errorf("Ratio 2:3 = %.3f differs from expected %.3f", ratio23, expected23)
 	}
 }
