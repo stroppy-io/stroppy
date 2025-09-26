@@ -19,7 +19,7 @@ import (
 func TestNewQueryBuilder_Success(t *testing.T) {
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 	paramID := NewGeneratorID("q1", "id")
-	generator, err := generate.NewValueGenerator(42, 1, &stroppy.QueryParamDescriptor{
+	generator, err := generate.NewValueGenerator(42, &stroppy.QueryParamDescriptor{
 		Name: "id",
 		GenerationRule: &stroppy.Generation_Rule{
 			Type: &stroppy.Generation_Rule_Int32Rules{
@@ -84,7 +84,7 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 	paramID := NewGeneratorID("q1", "id")
-	generator, err := generate.NewValueGenerator(42, 1, descriptor.GetParams()[0])
+	generator, err := generate.NewValueGenerator(42, descriptor.GetParams()[0])
 	require.NoError(t, err)
 	generators.Set(paramID, generator)
 
@@ -197,7 +197,6 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 	paramID := NewGeneratorID("q1", "id")
 	generator, err := generate.NewValueGenerator(
 		42,
-		1,
 		transactionDescriptor.GetQueries()[0].GetParams()[0],
 	)
 	require.NoError(t, err)

@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"math/rand/v2"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -23,35 +24,17 @@ func (f valueGeneratorFn) Next() (*stroppy.Value, error) {
 	return f()
 }
 
-func newNilQuota(quota uint64) func() bool {
-	quotaBuf := quota
-	done := false
-
-	return func() bool {
-		if quotaBuf == 0 {
-			done = true
-
-			return done
-		}
-
-		quotaBuf--
-
-		return done
-	}
-}
-
 const Persent100 = 100
 
 func wrapNilQuota( //nolint: ireturn // need from lib
 	gen ValueGenerator,
 	nullPercent uint32,
-	size uint64,
 ) ValueGenerator {
-	if nullPercent > 0 {
-		nilQuota := newNilQuota(size * uint64(nullPercent) / Persent100)
+	percent := float64(nullPercent) / Persent100
 
+	if nullPercent > 0 {
 		return valueGeneratorFn(func() (*stroppy.Value, error) {
-			if !nilQuota() {
+			if rand.Float64() < percent { //nolint:gosec // performance in priority here (against crypto/rand)
 				return &stroppy.Value{
 					Type: &stroppy.Value_Null{
 						Null: stroppy.Value_NULL_VALUE,
@@ -70,7 +53,6 @@ func newValueGenerator[T primitive.Primitive]( //nolint: ireturn // need from li
 	distribution primitiveGenerator[T],
 	transformer valueTransformer[T],
 	nullPercent uint32,
-	size uint64,
 	constant *T,
 ) ValueGenerator {
 	if constant != nil {
@@ -81,7 +63,7 @@ func newValueGenerator[T primitive.Primitive]( //nolint: ireturn // need from li
 
 	return wrapNilQuota(valueGeneratorFn(func() (*stroppy.Value, error) {
 		return transformer(distribution.Next())
-	}), nullPercent, size)
+	}), nullPercent)
 }
 
 type rangeWrapper[T constraint.Number] struct {

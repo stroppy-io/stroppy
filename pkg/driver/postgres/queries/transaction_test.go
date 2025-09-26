@@ -53,7 +53,7 @@ func TestNewTransaction_Success(t *testing.T) {
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 	paramID := NewGeneratorID("q1", "id")
-	generator, err := generate.NewValueGenerator(42, 1, descriptor.GetQueries()[0].GetParams()[0])
+	generator, err := generate.NewValueGenerator(42, descriptor.GetQueries()[0].GetParams()[0])
 	require.NoError(t, err)
 	generators.Set(paramID, generator)
 
@@ -108,7 +108,7 @@ func TestNewTransaction_Isolation(t *testing.T) {
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 	paramID := NewGeneratorID("q1", "id")
-	generator, err := generate.NewValueGenerator(42, 1, descriptor.GetQueries()[0].GetParams()[0])
+	generator, err := generate.NewValueGenerator(42, descriptor.GetQueries()[0].GetParams()[0])
 	require.NoError(t, err)
 	generators.Set(paramID, generator)
 

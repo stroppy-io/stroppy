@@ -26,12 +26,15 @@ type GenAbleStruct interface {
 
 func NewValueGenerator( //nolint: ireturn // need as lib part
 	seed uint64,
-	totalSize uint64,
 	genInfo GenAbleStruct,
 ) (ValueGenerator, error) {
-	gen, err := NewValueGeneratorByRule(seed, totalSize, genInfo.GetGenerationRule())
+	gen, err := NewValueGeneratorByRule(seed, genInfo.GetGenerationRule())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create generator for entity '%s': %w", genInfo.GetName(), err)
+		return nil, fmt.Errorf(
+			"failed to create generator for entity '%s': %w",
+			genInfo.GetName(),
+			err,
+		)
 	}
 
 	return gen, nil
@@ -39,7 +42,7 @@ func NewValueGenerator( //nolint: ireturn // need as lib part
 
 func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 	seed uint64,
-	size uint64,
+
 	rule *stroppy.Generation_Rule,
 ) (ValueGenerator, error) {
 	switch rule.GetType().(type) {
@@ -55,7 +58,6 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 				)),
 			float32ToValue,
 			rule.GetNullPercentage(),
-			size,
 			rule.GetFloatRules().Constant, //nolint: protogetter // allow cause need pointer
 		), nil
 	case *stroppy.Generation_Rule_DoubleRules:
@@ -70,7 +72,6 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 				)),
 			float64ToValue,
 			rule.GetNullPercentage(),
-			size,
 			rule.GetDoubleRules().Constant, //nolint: protogetter // allow cause need pointer
 		), nil
 	case *stroppy.Generation_Rule_Int32Rules:
@@ -85,7 +86,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 				)),
 			int32ToValue,
 			rule.GetNullPercentage(),
-			size,
+
 			rule.GetInt32Rules().Constant, //nolint: protogetter // allow cause need pointer
 		), nil
 	case *stroppy.Generation_Rule_Int64Rules:
@@ -100,7 +101,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 				)),
 			int64ToValue,
 			rule.GetNullPercentage(),
-			size,
+
 			rule.GetInt64Rules().Constant, //nolint: protogetter // allow cause need pointer
 		), nil
 
@@ -116,7 +117,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 				)),
 			uint32ToValue,
 			rule.GetNullPercentage(),
-			size,
+
 			rule.GetUint32Rules().Constant, //nolint: protogetter // allow cause need pointer
 		), nil
 	case *stroppy.Generation_Rule_Uint64Rules:
@@ -131,7 +132,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 				)),
 			uint64ToValue,
 			rule.GetNullPercentage(),
-			size,
+
 			rule.GetUint64Rules().Constant, //nolint: protogetter // allow cause need pointer
 		), nil
 	case *stroppy.Generation_Rule_BoolRules:
@@ -146,7 +147,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 				)),
 			uint8ToBoolValue,
 			rule.GetNullPercentage(),
-			size,
+
 			boolPtrToUint8Ptr(rule.GetBoolRules().Constant), //nolint: protogetter // allow cause need pointer
 		), nil
 	case *stroppy.Generation_Rule_StringRules:
@@ -165,7 +166,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 			),
 			stringToValue,
 			rule.GetNullPercentage(),
-			size,
+
 			rule.GetStringRules().Constant, //nolint: protogetter // allow cause need pointer
 		), nil
 	case *stroppy.Generation_Rule_DatetimeRules:
@@ -175,7 +176,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 			rule.GetDatetimeRules().GetRange(),
 			rule.GetUnique(),
 			rule.GetNullPercentage(),
-			size,
+
 			rule.GetDatetimeRules().Constant, //nolint: protogetter // allow cause need pointer
 		)
 	case *stroppy.Generation_Rule_UuidRules:
@@ -183,7 +184,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 			rule.GetDistribution(),
 			seed,
 			rule.GetNullPercentage(),
-			size,
+
 			rule.GetUuidRules().Constant, //nolint: protogetter // allow cause need pointer
 		), nil
 	case *stroppy.Generation_Rule_DecimalRules:
@@ -193,7 +194,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 			rule.GetDecimalRules().GetRange(),
 			rule.GetUnique(),
 			rule.GetNullPercentage(),
-			size,
+
 			rule.GetDecimalRules().Constant, //nolint: protogetter // allow cause need pointer
 		)
 	}
@@ -207,7 +208,7 @@ func newDateTimeGenerator( //nolint: ireturn // need from lib
 	ranges *stroppy.Generation_Range_DateTimeRange,
 	unique bool,
 	nullPercentage uint32,
-	size uint64,
+
 	constant *stroppy.DateTime,
 ) (ValueGenerator, error) {
 	var intRange [2]time.Time
@@ -255,7 +256,7 @@ func newDateTimeGenerator( //nolint: ireturn // need from lib
 		),
 		dateTimeToValue,
 		nullPercentage,
-		size,
+
 		dateTimePtrToTimePtr(constant),
 	), nil
 }
@@ -264,7 +265,6 @@ func newUUIDGenerator( //nolint: ireturn // need from lib
 	_ *stroppy.Generation_Distribution,
 	seed uint64,
 	nullPercentage uint32,
-	size uint64,
 	constant *stroppy.Uuid,
 ) ValueGenerator {
 	var byteSlice [32]byte
@@ -297,7 +297,7 @@ func newUUIDGenerator( //nolint: ireturn // need from lib
 				},
 			},
 		}, nil
-	}), nullPercentage, size)
+	}), nullPercentage)
 }
 
 func newDecimalGenerator( //nolint: ireturn // need from lib
@@ -306,7 +306,7 @@ func newDecimalGenerator( //nolint: ireturn // need from lib
 	ranges *stroppy.Generation_Range_DecimalRange,
 	unique bool,
 	nullPercentage uint32,
-	size uint64,
+
 	constant *stroppy.Decimal,
 ) (ValueGenerator, error) {
 	var decRanges [2]decimal.Decimal
@@ -359,7 +359,6 @@ func newDecimalGenerator( //nolint: ireturn // need from lib
 		),
 		decimalToValue,
 		nullPercentage,
-		size,
 		decimalPtrToDecimalPtr(constant),
 	), nil
 }

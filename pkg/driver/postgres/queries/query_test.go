@@ -48,7 +48,7 @@ func TestNewQuery_Success(t *testing.T) {
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 	paramID := NewGeneratorID("q1", "id")
-	generator, err := generate.NewValueGenerator(42, 1, descriptor.GetParams()[0])
+	generator, err := generate.NewValueGenerator(42, descriptor.GetParams()[0])
 	require.NoError(t, err)
 	generators.Set(paramID, generator)
 
@@ -132,7 +132,7 @@ func TestNewQuerySync_Success(t *testing.T) {
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 	paramID := NewGeneratorID("q1", "id")
-	generator, err := generate.NewValueGenerator(42, 1, descriptor.GetParams()[0])
+	generator, err := generate.NewValueGenerator(42, descriptor.GetParams()[0])
 	require.NoError(t, err)
 	generators.Set(paramID, generator)
 

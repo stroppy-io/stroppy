@@ -2,7 +2,7 @@
 // Feel free to modify it to your needs of benchmarks
 // For more info please refer to https://github.com/stroppy-io/stroppy
 
-import { Options } from 'k6/options';
+import { Options } from "k6/options";
 import {
     DriverTransaction,
     DriverTransactionList,
@@ -23,7 +23,7 @@ import {
     RunResult,
     StepContext,
     STROPPY_CONTEXT,
-} from './stroppy.pb.js';
+} from "./stroppy.pb.js";
 
 export const options: Options = {
     setupTimeout: K6_SETUP_TIMEOUT,
@@ -46,23 +46,22 @@ export const options: Options = {
             // Pre-allocate VUs
             preAllocatedVUs: K6_STEP_PRE_ALLOCATED_VUS,
             // Max number of VUs can be dynamicly usedisNaN(Number(STEP_RUN_CONTEXT.config.k6Executor)) === true ? -1 : Number(__ENV.vu)
-            maxVUs: K6_STEP_MAX_VUS
-        }
+            maxVUs: K6_STEP_MAX_VUS,
+        },
     },
     thresholds: {
         total_errors: [
             {
                 threshold: `count < ${K6_DEFAULT_ERROR_THRESHOLD}`,
-                abortOnFail: true
-            }
-        ]
-    }
+                abortOnFail: true,
+            },
+        ],
+    },
 };
 
 // This object will be created in setup function
 // and passed to "default" function as argument by k6
-class Context {
-}
+class Context {}
 
 // @ts-ignore
 export const setup = (): Context => {
@@ -70,43 +69,42 @@ export const setup = (): Context => {
     METER_REQUEST_ERROR_COUNTER.add(0);
 
     const startTime = Date.now();
-    console.log(STROPPY_CONTEXT)
+    console.log(STROPPY_CONTEXT);
 
-    const err = INSTANCE.setup(StepContext.toJsonString(STROPPY_CONTEXT))
+    const err = INSTANCE.setup(StepContext.toJsonString(STROPPY_CONTEXT));
     if (err !== undefined) {
-        throw err
+        throw err;
     }
 
-    METER_SETUP_TIME_COUNTER.add(Date.now() - startTime)
+    METER_SETUP_TIME_COUNTER.add(Date.now() - startTime);
 
-    return <Context>{
-    }
+    return <Context>{};
 };
 
 export default (ctx: Context) => {
     const metricsTags = {
         // "tx_name": transaction.name // TODO: add name field to transaction in proto
-    }
+    };
     // TODO: add driver metrics
-    const startTime = Date.now()
-    const err = INSTANCE.runTransaction()
+    const startTime = Date.now();
+    const err = INSTANCE.runTransaction();
     if (err) {
-        METER_REQUEST_ERROR_COUNTER.add(1, metricsTags)
+        METER_REQUEST_ERROR_COUNTER.add(1, metricsTags);
     }
-    METER_REQUESTS_COUNTER.add(1, metricsTags)
-    METER_RESPONSES_TIME_TREND.add(Date.now() - startTime, metricsTags)
+    METER_REQUESTS_COUNTER.add(1, metricsTags);
+    METER_RESPONSES_TIME_TREND.add(Date.now() - startTime, metricsTags);
 };
 
 export const teardown = () => {
-    const err = INSTANCE.teardown()
+    const err = INSTANCE.teardown();
     if (err !== undefined) {
-        throw err
+        throw err;
     }
-}
+};
 
 // Summary function, that will create summary file with metrics.
 export function handleSummary(runResult: RunResult<Context>) {
     return {
-        stdout: resultToJsonString<Context>(runResult, { "some": "baggage" })
+        stdout: resultToJsonString<Context>(runResult, { some: "baggage" }),
     };
 }
