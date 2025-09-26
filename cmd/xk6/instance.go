@@ -24,7 +24,6 @@ type Instance struct {
 	vu      modules.VU
 	exports *sobek.Object
 	logger  *zap.Logger
-	queue   *unit_queue.UnitQueue
 }
 
 func NewXK6Instance(vu modules.VU, exports *sobek.Object) *Instance {
@@ -75,7 +74,10 @@ func (x *Instance) Setup(runContextBytes string) error {
 		return err
 	}
 
-	queue := unit_queue.NewUnitQueue(drv, runContext.GetStep())
+	queue := unit_queue.NewQueue(drv.GenerateNextUnit, 0, 100)
+	for _, u := range runContext.GetStep().GetUnits() {
+		queue.PrepareGenerator(u.GetDescriptor_(), 1, uint(u.GetCount()))
+	}
 
 	queue.StartGeneration(processCtx)
 
@@ -90,7 +92,7 @@ func (x *Instance) Setup(runContextBytes string) error {
 }
 
 func (x *Instance) RunTransaction() error {
-	transaction, err := runPtr.unitQueue.GetNextUnit()
+	transaction, err := runPtr.unitQueue.GetNextElement()
 	if err != nil {
 		return fmt.Errorf("can't get query due to: %w", err)
 	}

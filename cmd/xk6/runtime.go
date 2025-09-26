@@ -13,14 +13,14 @@ type runtimeContext struct {
 	runContext *stroppy.StepContext
 	logger     *zap.Logger
 	driver     driver_interface.Driver
-	unitQueue  *unit_queue.UnitQueue
+	unitQueue  *unit_queue.QueuedGenerator[*stroppy.UnitDescriptor, *stroppy.DriverTransaction]
 }
 
 func newRuntimeContext(
 	drv driver_interface.Driver,
 	logger *zap.Logger,
 	runContext *stroppy.StepContext,
-	unitQueue *unit_queue.UnitQueue,
+	unitQueue *unit_queue.QueuedGenerator[*stroppy.UnitDescriptor, *stroppy.DriverTransaction],
 ) *runtimeContext {
 	return &runtimeContext{
 		runContext: runContext,
