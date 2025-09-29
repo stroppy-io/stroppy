@@ -1,9 +1,10 @@
 package distribution
 
 import (
-	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
 	"math"
 	r "math/rand/v2"
+
+	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
 )
 
 type NormalDistribution[T constraint.Number] struct {

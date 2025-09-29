@@ -1,8 +1,9 @@
 package randstr
 
 import (
-	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 	"strings"
+
+	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 )
 
 type Cutter interface {

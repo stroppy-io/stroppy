@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/stroppy-io/stroppy/internal/config"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"go.uber.org/zap"
 )
 
 const (
@@ -45,9 +46,8 @@ func (r *Runner) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize sidecars: %w", err)
 	}
 
-	defer r.sidecars.Teardown(ctx, r.config.GetGlobal())
-
 	r.logger.Info("running benchmark", zap.Any("config", r.config))
+
 	for stepName, stepCtx := range r.config.StepContexts {
 		r.logger.Info("running step", zap.String("step", stepName))
 
@@ -65,7 +65,6 @@ func (r *Runner) Run(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to on step end: %w", err)
 		}
-
 	}
 
 	err = r.sidecars.Teardown(ctx, r.config.GetGlobal())

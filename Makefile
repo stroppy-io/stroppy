@@ -99,9 +99,10 @@ STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 .PHONY: build
 build: # Build binary stroppy
+	echo $(VERSION)
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 		go build -v -o $(STROPPY_OUT_FILE) \
-		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.StroppyXk6Version=$$XK6_VERSION'" \
+		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'" \
 		$(CURDIR)/cmd/stroppy
 
 branch=main

@@ -1,14 +1,14 @@
 package generate
 
 import (
-	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
-	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
 	"math/rand/v2"
 	"time"
 
 	"github.com/shopspring/decimal"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
+	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 

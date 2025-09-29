@@ -1,11 +1,12 @@
 package randstr
 
 import (
-	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
-	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 	"sync"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
+	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 )
 
 func TestStringGenerator_Next(t *testing.T) {

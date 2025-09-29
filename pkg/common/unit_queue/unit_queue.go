@@ -12,15 +12,15 @@ type generatorFunc[Seed, Result any] func(ctx context.Context, seed Seed) (Resul
 
 type seedAndOpts[Seed any] struct {
 	seed                      Seed
-	workersCount, repeatCount int
+	workersCount, repeatCount uint
 }
 
 // FIXME: There is the leak somewhere, it blocks forever.
 
-// QueuedGenerator is up to infinit queued value generator.
+// QueuedGenerator is up to infinite queued value generator.
 type QueuedGenerator[Seed, Result any] struct {
 	seeds        []seedAndOpts[Seed]
-	workersLimit int
+	workersLimit uint
 	ch           chan Result
 	generator    generatorFunc[Seed, Result]
 
@@ -30,18 +30,11 @@ type QueuedGenerator[Seed, Result any] struct {
 	done   chan struct{}
 }
 
-// NewQueue - first step, cerate queue.
-// workersLimit - maximum amount of workers.
-//
-//	0 - will calculate limit to run all the generator.
-//	1 - run sequencially.
-//
-// bufferSize - size of queue
+// bufferSize - size of queue.
 func NewQueue[Seed, Result any](
 	generator generatorFunc[Seed, Result],
-	workersLimit, bufferSize int,
+	workersLimit, bufferSize uint,
 ) *QueuedGenerator[Seed, Result] {
-
 	return &QueuedGenerator[Seed, Result]{
 		generator:    generator,
 		ch:           make(chan Result, bufferSize),
@@ -64,14 +57,17 @@ func (uq *QueuedGenerator[Seed, Result]) PrepareGenerator(
 		seed:         seed,
 	}
 	if workersCount >= 1 {
-		opts.workersCount = int(workersCount)
+		opts.workersCount = workersCount
 	}
+
 	if repeatCount >= 1 {
-		opts.repeatCount = int(repeatCount)
+		opts.repeatCount = repeatCount
 	}
+
 	if uq.workersLimit <= 0 {
 		uq.workersLimit -= opts.workersCount
 	}
+
 	uq.seeds = append(uq.seeds, opts)
 }
 
@@ -79,11 +75,11 @@ func (uq *QueuedGenerator[Seed, Result]) PrepareGenerator(
 func (uq *QueuedGenerator[Seed, Result]) StartGeneration(ctx context.Context) {
 	ctx, cancel := context.WithCancelCause(ctx)
 	uq.cancel = cancel
+
 	go uq.finalizer(ctx)
-	if uq.workersLimit < 0 {
-		uq.workersLimit = -uq.workersLimit
-	}
-	uq.eg.SetLimit(uq.workersLimit)
+
+	uq.eg.SetLimit(int(uq.workersLimit)) //nolint: gosec // allow here
+
 	go uq.infinitRunner(ctx)
 }
 
@@ -145,11 +141,13 @@ func (uq *QueuedGenerator[Seed, Result]) writer(ctx context.Context, seed seedAn
 	return nil
 }
 
-var ErrQueueIsDead = errors.New("seed queue channel closed")
-var ErrQueueIsStopped = errors.New("queue is stopped with .Stop()")
+var (
+	ErrQueueIsDead    = errors.New("seed queue channel closed")
+	ErrQueueIsStopped = errors.New("queue is stopped with .Stop()")
+)
 
 // GetNextElement - forth step, take as many elements as you want concurrently.
-func (uq *QueuedGenerator[Seed, Result]) GetNextElement() (Result, error) {
+func (uq *QueuedGenerator[Seed, Result]) GetNextElement() (Result, error) { //nolint: ireturn // generic
 	if err := uq.getError(); err != nil {
 		return *new(Result), err
 	}
@@ -173,5 +171,6 @@ func (uq *QueuedGenerator[Seed, Result]) getError() error {
 // Stop - stops the generation.
 func (uq *QueuedGenerator[Seed, Result]) Stop() error {
 	uq.cancel(ErrQueueIsStopped)
+
 	return uq.getError()
 }

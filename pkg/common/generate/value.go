@@ -3,15 +3,15 @@ package generate
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
-	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
-	"github.com/stroppy-io/stroppy/pkg/common/generate/randstr"
 	"math/rand/v2"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
+	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
+	"github.com/stroppy-io/stroppy/pkg/common/generate/randstr"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 

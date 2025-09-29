@@ -45,7 +45,10 @@ var (
 	ErrExporterNotFound            = errors.New("exporter not found")
 )
 
-func selectExecutorMapping(stepName string, config *stroppy.ConfigFile) (*stroppy.StepExecutionMapping, error) {
+func selectExecutorMapping(
+	stepName string,
+	config *stroppy.ConfigFile,
+) (*stroppy.StepExecutionMapping, error) {
 	for _, mapping := range config.GetStepExecutorMappings() {
 		if mapping.GetStepName() == stepName {
 			return mapping, nil
@@ -55,7 +58,10 @@ func selectExecutorMapping(stepName string, config *stroppy.ConfigFile) (*stropp
 	return nil, ErrStepExecutorMappingNotFound
 }
 
-func selectExecutor(config *stroppy.ConfigFile, mapping *stroppy.StepExecutionMapping) (*stroppy.ExecutorConfig, error) {
+func selectExecutor(
+	config *stroppy.ConfigFile,
+	mapping *stroppy.StepExecutionMapping,
+) (*stroppy.ExecutorConfig, error) {
 	for _, executor := range config.GetExecutors() {
 		if executor.GetName() == mapping.GetExecutorName() {
 			return executor, nil
@@ -65,10 +71,14 @@ func selectExecutor(config *stroppy.ConfigFile, mapping *stroppy.StepExecutionMa
 	return nil, ErrExecutorNotFound
 }
 
-func selectExporter(config *stroppy.ConfigFile, mapping *stroppy.StepExecutionMapping) (*stroppy.ExporterConfig, error) {
+func selectExporter(
+	config *stroppy.ConfigFile,
+	mapping *stroppy.StepExecutionMapping,
+) (*stroppy.ExporterConfig, error) {
 	if mapping.GetExporterName() == "" {
-		return nil, nil
+		return nil, nil //nolint: nilnil // allow for undefined exporter
 	}
+
 	for _, exporter := range config.GetExporters() {
 		if exporter.GetName() == mapping.GetExporterName() {
 			return exporter, nil
@@ -78,7 +88,10 @@ func selectExporter(config *stroppy.ConfigFile, mapping *stroppy.StepExecutionMa
 	return nil, ErrExporterNotFound
 }
 
-func selectStepDescriptor(stepName string, config *stroppy.ConfigFile) (*stroppy.StepDescriptor, error) {
+func selectStepDescriptor(
+	stepName string,
+	config *stroppy.ConfigFile,
+) (*stroppy.StepDescriptor, error) {
 	for _, step := range config.GetBenchmark().GetSteps() {
 		if step.GetName() == stepName {
 			return step, nil

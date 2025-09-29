@@ -1,8 +1,9 @@
 package distribution
 
 import (
-	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
 	"math/rand/v2"
+
+	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
 )
 
 type ZipfDistribution[T constraint.Number] struct {

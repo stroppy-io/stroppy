@@ -1,12 +1,13 @@
 package primitive
 
 import (
-	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
-	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+
+	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
+	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 )
 
 type Primitive interface {

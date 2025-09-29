@@ -354,6 +354,8 @@ issues:
         - ireturn
         - gocognit
         - gocritic
+        - varnamelen
+        - forbidigo
     # bind is wire config
     - path: "bind.go"
       linters:

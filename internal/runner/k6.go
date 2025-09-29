@@ -9,17 +9,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/stroppy-io/stroppy/internal/common"
-
-	"github.com/stroppy-io/stroppy/internal/static"
-	"github.com/stroppy-io/stroppy/pkg/utils"
-
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/stroppy-io/stroppy/internal/common"
+	"github.com/stroppy-io/stroppy/internal/static"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 	"github.com/stroppy-io/stroppy/pkg/common/shutdown"
+	"github.com/stroppy-io/stroppy/pkg/utils"
 )
 
 func runK6Binary(

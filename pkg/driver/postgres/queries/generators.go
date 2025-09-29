@@ -2,9 +2,10 @@ package queries
 
 import (
 	"fmt"
-	cmap "github.com/orcaman/concurrent-map/v2"
-	"github.com/stroppy-io/stroppy/pkg/common/generate"
 
+	cmap "github.com/orcaman/concurrent-map/v2"
+
+	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
@@ -34,7 +35,7 @@ func collectQueryGenerators(
 		)
 
 		generator, err := generate.NewValueGenerator(
-			runContext.GetGlobalConfig().GetRun().GetSeed(),
+			runContext.GetConfig().GetSeed(),
 			param,
 		)
 		if err != nil {
@@ -52,14 +53,12 @@ func CollectStepGenerators(
 ) (Generators, error) { //nolint: gocognit // allow
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 
-	for _, step := range runContext.GetGlobalConfig().GetBenchmark().GetSteps() {
-		for _, queryDescriptor := range step.GetUnits() {
-			var err error
+	for _, queryDescriptor := range runContext.GetStepDescriptor().GetUnits() {
+		var err error
 
-			generators, err = collectUnitGenerators(queryDescriptor, runContext, generators)
-			if err != nil {
-				return generators, err
-			}
+		generators, err = collectUnitGenerators(queryDescriptor, runContext, generators)
+		if err != nil {
+			return generators, err
 		}
 	}
 

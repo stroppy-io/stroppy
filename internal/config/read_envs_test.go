@@ -15,9 +15,14 @@ func TestMutateConfigByEnvs(t *testing.T) {
 
 	cfg := NewExampleConfig()
 
-	updateConfigWithDirectEnvs(cfg)
+	err := updateConfigWithDirectEnvs(cfg)
+	if err != nil {
+		t.Error(err)
 
-	require.Equal(t, cfg.Version, testVersion)
+		return
+	}
+
+	require.Equal(t, cfg.GetGlobal().GetVersion(), testVersion)
 }
 
 func Example_updateConfigWithDirectEnvs() { //nolint: testableexamples // not reproduceble

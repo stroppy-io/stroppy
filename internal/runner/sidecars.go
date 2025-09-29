@@ -13,6 +13,7 @@ import (
 )
 
 type SidecarManager struct {
+	logger   *zap.Logger
 	sidecars []stroppy.SidecarServiceClient
 }
 
@@ -21,6 +22,7 @@ func NewSidecarManagerFromConfig(
 	config *config.Config,
 ) (*SidecarManager, error) {
 	mgr := &SidecarManager{
+		logger:   logger,
 		sidecars: make([]stroppy.SidecarServiceClient, 0),
 	}
 
@@ -29,6 +31,7 @@ func NewSidecarManagerFromConfig(
 		if err != nil {
 			return nil, err
 		}
+
 		service := stroppy.NewSidecarServiceClient(client)
 
 		shutdown.RegisterFn(func() {

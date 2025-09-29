@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/stroppy-io/stroppy/internal/runner"
-
 	"github.com/spf13/cobra"
 
 	configCmd "github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
 	"github.com/stroppy-io/stroppy/internal/config"
+	"github.com/stroppy-io/stroppy/internal/runner"
 )
 
 const (

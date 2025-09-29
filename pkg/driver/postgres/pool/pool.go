@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/stroppy-io/stroppy/pkg/utils/protovalue"
 	"maps"
 	"slices"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	"github.com/stroppy-io/stroppy/pkg/utils/protovalue"
 )
 
 const (

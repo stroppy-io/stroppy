@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"github.com/stroppy-io/stroppy/pkg/utils/protoyaml"
 	"path"
 	"slices"
 
@@ -11,6 +10,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/internal/config"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	"github.com/stroppy-io/stroppy/pkg/utils/protoyaml"
 )
 
 const (

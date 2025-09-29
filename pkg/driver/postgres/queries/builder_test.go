@@ -2,7 +2,6 @@ package queries
 
 import (
 	"context"
-	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"testing"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
@@ -74,12 +74,10 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 		},
 	}
 	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
+		Config: &stroppy.GlobalConfig{
+			Seed: 42,
 		},
-		Step: step,
+		StepDescriptor: step,
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
@@ -92,15 +90,15 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 		generators: generators,
 	}
 
-	unitBuildContext := &stroppy.UnitBuildContext{
-		Context: buildContext,
-		Unit:    step.GetUnits()[0],
+	unitBuildContext := &stroppy.UnitContext{
+		StepContext:    buildContext,
+		UnitDescriptor: step.GetUnits()[0],
 	}
 
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnit().GetDescriptor_())
+	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnitDescriptor().GetDescriptor_())
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
 	require.Len(t, transactionList.Queries, 1)
@@ -126,12 +124,10 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 		},
 	}
 	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
+		Config: &stroppy.GlobalConfig{
+			Seed: 42,
 		},
-		Step: step,
+		StepDescriptor: step,
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
@@ -140,15 +136,15 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 		generators: generators,
 	}
 
-	unitBuildContext := &stroppy.UnitBuildContext{
-		Context: buildContext,
-		Unit:    step.GetUnits()[0],
+	unitBuildContext := &stroppy.UnitContext{
+		StepContext:    buildContext,
+		UnitDescriptor: step.GetUnits()[0],
 	}
 
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnit().GetDescriptor_())
+	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnitDescriptor().GetDescriptor_())
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
 	require.Len(t, transactionList.Queries, 1)
@@ -185,12 +181,10 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 		},
 	}
 	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
+		Config: &stroppy.GlobalConfig{
+			Seed: 42,
 		},
-		Step: step,
+		StepDescriptor: step,
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
@@ -206,15 +200,15 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 		generators: generators,
 	}
 
-	unitBuildContext := &stroppy.UnitBuildContext{
-		Context: buildContext,
-		Unit:    step.GetUnits()[0],
+	unitBuildContext := &stroppy.UnitContext{
+		StepContext:    buildContext,
+		UnitDescriptor: step.GetUnits()[0],
 	}
 
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnit().GetDescriptor_())
+	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnitDescriptor().GetDescriptor_())
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
 	require.Len(t, transactionList.Queries, 1)

@@ -34,11 +34,13 @@ func LoadAndValidateConfig(runConfigPath string, requestedSteps ...string) (*Con
 	}
 
 	stepContexts := make(map[string]*stroppy.StepContext)
+
 	for _, reqStep := range requestedSteps {
 		stepContext, err := NewStepContext(reqStep, config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create step context: %w", err)
 		}
+
 		stepContexts[reqStep] = stepContext
 	}
 
@@ -51,7 +53,7 @@ func LoadAndValidateConfig(runConfigPath string, requestedSteps ...string) (*Con
 func (c *Config) GetStepContext(stepName string) (*stroppy.StepContext, error) {
 	stepContext, ok := c.StepContexts[stepName]
 	if !ok {
-		return nil, fmt.Errorf("step context %s not found", stepName)
+		return nil, fmt.Errorf("step context %s not found", stepName) //nolint: err113 // allow
 	}
 
 	return stepContext, nil

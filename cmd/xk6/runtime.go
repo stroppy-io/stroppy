@@ -4,20 +4,20 @@ import (
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/plugins/driver_interface"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 	"github.com/stroppy-io/stroppy/pkg/common/unit_queue"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
 type runtimeContext struct {
 	runContext *stroppy.StepContext
 	logger     *zap.Logger
-	driver     driver_interface.Driver
+	driver     driver.Driver
 	unitQueue  *unit_queue.QueuedGenerator[*stroppy.UnitDescriptor, *stroppy.DriverTransaction]
 }
 
 func newRuntimeContext(
-	drv driver_interface.Driver,
+	drv driver.Driver,
 	logger *zap.Logger,
 	runContext *stroppy.StepContext,
 	unitQueue *unit_queue.QueuedGenerator[*stroppy.UnitDescriptor, *stroppy.DriverTransaction],
