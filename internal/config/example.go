@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/stroppy-io/stroppy/internal/static"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 //nolint:mnd // it is huge magic config itself

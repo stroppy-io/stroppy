@@ -9,27 +9,18 @@ import "descriptor.proto";
 option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
 
 /**
- * InfrastructureContext provides contextual information to a benchmark step during execution.
- * It contains the current configuration and descriptors relevant to the run.
+ * StepContext provides contextual information to a benchmark step during execution.
+ * It contains the run context and the step descriptor.
  */
-message RunContext {
+message StepContext {
     /** Global configuration of the benchmark and its steps */
     GlobalConfig config = 1;
     /** Executor configuration */
     ExecutorConfig executor = 2;
     /** Exporter configuration */
     optional ExporterConfig exporter = 3;
-}
-
-/**
- * StepContext provides contextual information to a benchmark step during execution.
- * It contains the run context and the step descriptor.
- */
-message StepContext {
-    /** Run context */
-    RunContext run_context = 1;
     /** Current step descriptor */
-    StepDescriptor step_descriptor = 2;
+    StepDescriptor step_descriptor = 4;
 }
 
 /**

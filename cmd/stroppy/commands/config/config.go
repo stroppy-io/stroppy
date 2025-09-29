@@ -1,12 +1,11 @@
 package config
 
 import (
+	"github.com/stroppy-io/stroppy/pkg/utils"
 	"os"
 	"path"
 
 	"github.com/spf13/cobra"
-
-	"github.com/stroppy-io/stroppy/pkg/core/utils"
 )
 
 var TopLevelCommand = &cobra.Command{ //nolint: gochecknoglobals

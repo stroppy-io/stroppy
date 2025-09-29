@@ -4,9 +4,9 @@ import (
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver_interface"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
-	"github.com/stroppy-io/stroppy/pkg/core/unit_queue"
+	"github.com/stroppy-io/stroppy/pkg/common/plugins/driver_interface"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	"github.com/stroppy-io/stroppy/pkg/common/unit_queue"
 )
 
 type runtimeContext struct {

@@ -100,7 +100,7 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 	cp $(TS_BUNDLE_DIR)/tsconfig.json $(TMP_BUNDLE_DIR)/
 	cp $(TS_BUNDLE_DIR)/webpack.config.js $(TMP_BUNDLE_DIR)/
 	cd $(TMP_BUNDLE_DIR) && npm install && node combine.js
-	cat $(TS_BUNDLE_DIR)/stroppy-sdk.ts >> $(TMP_BUNDLE_DIR)/stroppy.pb.ts
+	#cat $(TS_BUNDLE_DIR)/stroppy-sdk.ts >> $(TMP_BUNDLE_DIR)/stroppy.pb.ts
 	cd $(TMP_BUNDLE_DIR) && npm run build
 	cp $(TMP_BUNDLE_DIR)/stroppy.pb.ts $(TS_TARGET_DIR)/stroppy.pb.ts
 	cp $(TMP_BUNDLE_DIR)/dist/bundle.js $(TS_TARGET_DIR)/stroppy.pb.js
@@ -144,8 +144,8 @@ DOCS_TARGET_DIR=$(BUILD_TARGET_DIR)/docs
 
 .PHONY: .move
 .move:
-	rm -rf ../pkg/core/proto/*
-	cp -r ./build/go/* ../pkg/core/proto/
+	rm -rf ../pkg/common/proto/*
+	cp -r ./build/go/* ../pkg/common/proto/
 	cp ./build/ts/* ../internal/static/
 
 

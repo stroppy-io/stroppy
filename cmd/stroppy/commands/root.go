@@ -11,7 +11,7 @@ import (
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
 	int_config "github.com/stroppy-io/stroppy/internal/config"
 	"github.com/stroppy-io/stroppy/internal/version"
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
 )
 
 var rootCmd = &cobra.Command{ //nolint: gochecknoglobals

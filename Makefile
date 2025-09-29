@@ -78,7 +78,7 @@ tests: # Run tests with coverage
 	go test -race ./... -coverprofile=coverage.out
 
 SRC_PROTO_GO_PATH=$(CURDIR)/proto/build/go
-TARGET_PROTO_GO_PATH=$(CURDIR)/pkg/core/proto
+TARGET_PROTO_GO_PATH=$(CURDIR)/pkg/common/proto
 .PHONY: proto
 proto:
 	rm -rf $(TARGET_PROTO_GO_PATH)/*

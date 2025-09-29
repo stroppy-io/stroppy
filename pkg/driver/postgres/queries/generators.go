@@ -2,11 +2,10 @@ package queries
 
 import (
 	"fmt"
-
 	cmap "github.com/orcaman/concurrent-map/v2"
+	"github.com/stroppy-io/stroppy/pkg/common/generate"
 
-	"github.com/stroppy-io/stroppy/pkg/core/generate"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 type (

@@ -3,13 +3,12 @@ package config
 import (
 	"errors"
 	"fmt"
+	"github.com/stroppy-io/stroppy/pkg/utils/protoyaml"
 	"os"
 	"path"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-
-	"github.com/stroppy-io/stroppy/internal/protoyaml"
 )
 
 func toPtr[T any](value T) *T {

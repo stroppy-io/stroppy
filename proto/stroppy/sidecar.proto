@@ -4,6 +4,7 @@ package stroppy;
 
 import "google/protobuf/empty.proto";
 import "runtime.proto";
+import "config.proto";
 
 option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
 
@@ -15,7 +16,7 @@ service SidecarService {
      * Initialize is called once before the benchmark starts.
      * Used to initialize resources of SidecarPlugin.
      */
-    rpc Initialize (RunContext) returns (google.protobuf.Empty);
+    rpc Initialize (GlobalConfig) returns (google.protobuf.Empty);
     /**
      * OnStepStart is called once before each step starts.
      */
@@ -28,5 +29,5 @@ service SidecarService {
      * Teardown is called once after the benchmark ends.
      * Used to clean up resources.
      */
-    rpc Teardown (RunContext) returns (google.protobuf.Empty);
+    rpc Teardown (GlobalConfig) returns (google.protobuf.Empty);
 }

@@ -9,9 +9,9 @@ import (
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
-	"github.com/stroppy-io/stroppy/pkg/core/unit_queue"
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	"github.com/stroppy-io/stroppy/pkg/common/unit_queue"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 

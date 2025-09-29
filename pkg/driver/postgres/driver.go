@@ -7,9 +7,9 @@ import (
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
-	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver_interface"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/pkg/common/plugins/driver_interface"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )

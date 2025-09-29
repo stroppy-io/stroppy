@@ -2,6 +2,7 @@ package queries
 
 import (
 	"context"
+	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"testing"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
@@ -9,8 +10,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/stroppy-io/stroppy/pkg/core/generate"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 func TestNewQuery_Success(t *testing.T) {

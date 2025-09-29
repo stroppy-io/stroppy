@@ -5,8 +5,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver_interface"
-	"github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/common/plugins/driver_interface"
+	"github.com/stroppy-io/stroppy/pkg/common/proto"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
 )
 

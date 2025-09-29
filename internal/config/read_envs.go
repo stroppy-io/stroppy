@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 type visitorInFunc func(
@@ -53,7 +53,7 @@ func traverseMessage(
 	}
 }
 
-func updateConfigWithDirectEnvs(config *stroppy.Config) error {
+func updateConfigWithDirectEnvs(config *stroppy.ConfigFile) error {
 	var errTotal error
 
 	log := logger.Global().WithOptions(zap.WithCaller(false))
@@ -94,7 +94,7 @@ func updateConfigWithDirectEnvs(config *stroppy.Config) error {
 }
 
 func ValidEnvsNames() []string {
-	config := protoNew[*stroppy.Config]()
+	config := protoNew[*stroppy.ConfigFile]()
 
 	var envs []string
 	// TODO: deduplicate algorithm here and in updateConfigWithDirectEnvs somehow
