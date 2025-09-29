@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/common/unit_queue"
+	"github.com/stroppy-io/stroppy/pkg/core/unit_queue"
 )
 
-func NewQueueExample() {
+func Example() {
 	generator := func(_ context.Context, x int) (int, error) { return x * 42, nil }
 	// setup a generator function, workers limit and internal buffer size
 	queue := unit_queue.NewQueue(generator, 1, 100)
@@ -34,12 +34,13 @@ func NewQueueExample() {
 		value, _ := queue.GetNextElement()
 		fmt.Println(value)
 	}
+
+	queue.Stop()
 	// Output: 42
 	// 84
 	// 126
 	// 168
-	// 210
-	queue.Stop()
+	// 42
 }
 
 // Test basic functionality.
@@ -116,6 +117,7 @@ func TestQueuedGenerator_ProportionalDistribution(t *testing.T) {
 	const sampleSize = 100000
 
 	counts := make(map[int]int64)
+	countsMutex := sync.Mutex{}
 
 	for i := range sampleSize {
 		value, err := queue.GetNextElement()
@@ -127,9 +129,9 @@ func TestQueuedGenerator_ProportionalDistribution(t *testing.T) {
 			t.Fatalf("Unexpected error at sample %d: %v", i, err)
 		}
 
-		some := counts[value]
-
-		atomic.AddInt64(&some, 1)
+		countsMutex.Lock()
+		counts[value]++
+		countsMutex.Unlock()
 	}
 
 	queue.Stop()
@@ -419,21 +421,22 @@ func TestQueuedGenerator_WorkerLimits(t *testing.T) {
 	activeWorkers := int64(0)
 	maxActiveWorkers := int64(0)
 
-	generator := func(_ context.Context, x int) (int, error) {
+	generator := func(_ context.Context, val int) (int, error) {
 		current := atomic.AddInt64(&activeWorkers, 1)
 		defer atomic.AddInt64(&activeWorkers, -1)
 
 		// Track maximum concurrent workers
 		for {
-			mx := atomic.LoadInt64(&maxActiveWorkers)
-			if current <= mx || atomic.CompareAndSwapInt64(&maxActiveWorkers, mx, current) {
+			maximum := atomic.LoadInt64(&maxActiveWorkers)
+			if current <= maximum ||
+				atomic.CompareAndSwapInt64(&maxActiveWorkers, maximum, current) {
 				break
 			}
 		}
 
 		time.Sleep(10 * time.Millisecond) // Hold worker for some time
 
-		return x, nil
+		return val, nil
 	}
 
 	const workerLimit = 3
@@ -479,9 +482,7 @@ func BenchmarkQueuedGenerator_SingleWorker(b *testing.B) {
 
 	queue.StartGeneration(ctx)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_, err := queue.GetNextElement()
 		if err != nil {
 			b.Fatal(err)
@@ -505,9 +506,7 @@ func BenchmarkQueuedGenerator_MultipleWorkers(b *testing.B) {
 
 	queue.StartGeneration(ctx)
 
-	b.ResetTimer()
-
-	for range b.N {
+	for b.Loop() {
 		_, err := queue.GetNextElement()
 		if err != nil {
 			b.Fatal(err)
@@ -533,7 +532,7 @@ func BenchmarkQueuedGenerator_WorkerScaling(b *testing.B) {
 
 	for _, workers := range workerCounts {
 		b.Run(fmt.Sprintf("workers_%d", workers), func(b *testing.B) {
-			queue := unit_queue.NewQueue(generator, uint(workers), 1000)
+			queue := unit_queue.NewQueue(generator, workers, 1000)
 			queue.PrepareGenerator(1, uint(workers), 1000)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -543,7 +542,7 @@ func BenchmarkQueuedGenerator_WorkerScaling(b *testing.B) {
 
 			b.ResetTimer()
 
-			for range b.N {
+			for b.Loop() {
 				_, err := queue.GetNextElement()
 				if err != nil {
 					b.Fatal(err)
@@ -586,6 +585,7 @@ func TestQueuedGenerator_ExactProportions(t *testing.T) {
 	const targetSamples = 100000
 
 	counts := make(map[int]int64)
+	countsMutex := sync.Mutex{}
 
 	for i := range targetSamples {
 		if i%10000 == 0 {
@@ -601,8 +601,9 @@ func TestQueuedGenerator_ExactProportions(t *testing.T) {
 			t.Fatalf("Unexpected value %d at sample %d", value, i)
 		}
 
-		some := counts[value]
-		atomic.AddInt64(&some, 1)
+		countsMutex.Lock()
+		counts[value]++
+		countsMutex.Unlock()
 	}
 
 	queue.Stop()
