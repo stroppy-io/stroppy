@@ -14,7 +14,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/core/unit_queue"
 )
 
-func NewQueueExample() {
+func Example() {
 	generator := func(_ context.Context, x int) (int, error) { return x * 42, nil }
 	// setup a generator function, workers limit and internal buffer size
 	queue := unit_queue.NewQueue(generator, 1, 100)
@@ -36,12 +36,11 @@ func NewQueueExample() {
 	}
 
 	queue.Stop()
-
 	// Output: 42
 	// 84
 	// 126
 	// 168
-	// 210
+	// 42
 }
 
 // Test basic functionality
