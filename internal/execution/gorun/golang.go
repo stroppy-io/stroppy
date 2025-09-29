@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver_interface"
 	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
 	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
 	"github.com/stroppy-io/stroppy/pkg/core/unit_queue"
@@ -58,7 +59,16 @@ func RunStep(
 
 	lg.Info("start of query generation")
 
-	unitQueue := unit_queue.NewUnitQueue(drv, runContext.GetStep())
+	const (
+		workerLimit = 0
+		bufferSize  = 100
+	)
+
+	unitQueue := unit_queue.NewQueue(drv.GenerateNextUnit, workerLimit, bufferSize)
+	for _, unit := range runContext.GetStep().GetUnits() {
+		unitQueue.PrepareGenerator(unit.GetDescriptor_(), 1, uint(unit.GetCount()))
+	}
+
 	unitQueue.StartGeneration(cancelCtx)
 
 	asyncer := utils.NewAsyncerFromExecType(
@@ -71,21 +81,7 @@ func RunStep(
 	lg.Info("start of query execution")
 
 	for range txCount {
-		asyncer.Go(
-			func(ctx context.Context) error {
-				tx, err := unitQueue.GetNextUnit()
-				if err != nil {
-					return err
-				}
-
-				err = drv.RunTransaction(ctx, tx)
-				if err != nil {
-					return err
-				}
-
-				return nil
-			},
-		)
+		runTransaction(asyncer, unitQueue, drv)
 	}
 
 	lg.Info("stop of query execution")
@@ -105,4 +101,26 @@ func RunStep(
 	}
 
 	return nil
+}
+
+func runTransaction(
+	asyncer utils.Asyncer,
+	unitQueue *unit_queue.QueuedGenerator[*stroppy.UnitDescriptor, *stroppy.DriverTransaction],
+	drv driver_interface.Driver,
+) {
+	asyncer.Go(
+		func(ctx context.Context) error {
+			tx, err := unitQueue.GetNextElement()
+			if err != nil {
+				return err
+			}
+
+			err = drv.RunTransaction(ctx, tx)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+	)
 }

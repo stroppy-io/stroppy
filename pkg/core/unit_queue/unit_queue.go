@@ -6,81 +6,124 @@ import (
 	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
-
-	"github.com/stroppy-io/stroppy/pkg/core/proto"
 )
 
-type Driver interface {
-	GenerateNextUnit(
-		ctx context.Context,
-		unitDesc *proto.UnitDescriptor,
-	) (*proto.DriverTransaction, error)
+type generatorFunc[Seed, Result any] func(ctx context.Context, seed Seed) (Result, error)
+
+type seedAndOpts[Seed any] struct {
+	seed                      Seed
+	workersCount, repeatCount int
 }
 
-// UnitQueue is an infinite *proto.DriverTransaction generator.
-// It requires *proto.StepDescriptor and driver.
-// Descripter defines generated sequence.
-// Driver is the actual source of new data.
-// UnitQueue wraps and bufferize the driver to reduce latencies in cuncurrent scenarios.
-//
-// TODO: make generic queue, polish, mb publish...
-type UnitQueue struct {
-	step   *proto.StepDescriptor
-	ch     chan *proto.DriverTransaction
-	driver Driver
+// QueuedGenerator is up to infinite queued value generator.
+type QueuedGenerator[Seed, Result any] struct {
+	seeds     []seedAndOpts[Seed]
+	ch        chan Result
+	generator generatorFunc[Seed, Result]
 
-	cancel context.CancelFunc
+	workersLimit, bufferSize int
+
+	cancel context.CancelCauseFunc
 	err    atomic.Value
 	eg     errgroup.Group
 	done   chan struct{}
 }
 
-func NewUnitQueue(
-	driver Driver,
-	step *proto.StepDescriptor,
-) *UnitQueue {
-	const unitAsyncFactor = 10
-
-	return newUnitQueue(driver, step, len(step.GetUnits())*unitAsyncFactor)
-}
-
-func newUnitQueue(
-	drv Driver,
-	step *proto.StepDescriptor,
-	bufferSize int,
-) *UnitQueue {
-	return &UnitQueue{
-		driver: drv,
-		step:   step,
-		ch:     make(chan *proto.DriverTransaction, bufferSize),
-		done:   make(chan struct{}),
+// NewQueue creates new queue based on generator.
+// workersLimit - limitation for warkers.
+//
+//   - == 1 - single worker, sequentially generation
+//   - >= 2 - multible worker, generate asyncronously
+//   - <= 0 - "unlimited", limit calculated to run all generator workers simultaneously
+//
+// bufferSize - size of queue.
+//
+//   - == 0 - blocking queue, no buffer.
+//   - >= 1 - async queue, with buffer size.
+//   - <=-1 - set buffer size to workersLimit (even if it set to 0).
+func NewQueue[Seed, Result any](
+	generator generatorFunc[Seed, Result],
+	workersLimit, bufferSize int,
+) *QueuedGenerator[Seed, Result] {
+	return &QueuedGenerator[Seed, Result]{
+		generator:    generator,
+		ch:           nil,
+		done:         make(chan struct{}),
+		workersLimit: workersLimit,
+		bufferSize:   bufferSize,
 	}
 }
 
-func (uq *UnitQueue) StartGeneration(ctx context.Context) {
-	ctx, cancel := context.WithCancel(ctx)
-	uq.cancel = cancel
+// PrepareGenerator - second step, add generator seeds.
+//
+//   - seed - value passed to generator.
+//   - workersCount - how many workers will started with that seed.
+//   - repeatCount - how many times worker will run this generator with that seed.
+func (uq *QueuedGenerator[Seed, Result]) PrepareGenerator(
+	seed Seed,
+	workersCount, repeatCount uint,
+) {
+	opts := seedAndOpts[Seed]{
+		workersCount: 1,
+		repeatCount:  1,
+		seed:         seed,
+	}
+	if workersCount >= 1 {
+		opts.workersCount = int(workersCount) //nolint:gosec // insane values may overflow
+	}
 
+	if repeatCount >= 1 {
+		opts.repeatCount = int(repeatCount) //nolint:gosec // insane values may overflow
+	}
+
+	if uq.workersLimit <= 0 {
+		uq.workersLimit -= opts.workersCount
+	}
+
+	uq.seeds = append(uq.seeds, opts)
+}
+
+// StartGeneration - third step, starts the generation of values.
+func (uq *QueuedGenerator[Seed, Result]) StartGeneration(ctx context.Context) {
+	ctx, uq.cancel = context.WithCancelCause(ctx)
 	go uq.finalizer(ctx)
 
-	async := uq.step.GetAsync()
-
-	poolSize := len(uq.step.GetUnits())
-	if !async {
-		poolSize = 1
+	if uq.workersLimit < 0 {
+		uq.workersLimit = -uq.workersLimit
 	}
 
-	uq.eg.SetLimit(poolSize)
+	uq.eg.SetLimit(uq.workersLimit)
 
-	go uq.infinitStepRunner(ctx)
+	if uq.bufferSize < 0 {
+		uq.ch = make(chan Result, uq.workersLimit)
+	} else {
+		uq.ch = make(chan Result, uq.bufferSize)
+	}
+
+	go uq.infinitRunner(ctx)
 }
 
-func (uq *UnitQueue) infinitStepRunner(ctx context.Context) {
+// gracefully drains the queue at the end and closes the channel.
+func (uq *QueuedGenerator[Seed, Result]) finalizer(ctx context.Context) {
+	<-ctx.Done()
+
+	go func() {
+		for range uq.ch { //nolint: revive // this block empty, but it drains channel
+		}
+	}()
+	<-uq.done
+	close(uq.ch)
+}
+
+// infinitRunner - runs the generation until the stop.
+func (uq *QueuedGenerator[Seed, Result]) infinitRunner(ctx context.Context) {
 	for {
-		for _, unit := range uq.step.GetUnits() {
-			uq.eg.Go(func() error {
-				return uq.writer(ctx, unit)
-			})
+		for _, seed := range uq.seeds {
+			for range seed.workersCount {
+				uq.eg.Go(func() error {
+					return uq.writer(ctx, seed)
+				})
+			}
 		}
 
 		if ctx.Err() != nil {
@@ -92,7 +135,9 @@ func (uq *UnitQueue) infinitStepRunner(ctx context.Context) {
 			uq.err.CompareAndSwap(nil, err)
 		}
 
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		if errors.Is(err, context.Canceled) ||
+			errors.Is(err, context.DeadlineExceeded) ||
+			errors.Is(err, ErrQueueIsStopped) {
 			break
 		}
 	}
@@ -100,58 +145,56 @@ func (uq *UnitQueue) infinitStepRunner(ctx context.Context) {
 	close(uq.done)
 }
 
-func (uq *UnitQueue) finalizer(ctx context.Context) {
-	<-ctx.Done()
-
-	go func() {
-		for range uq.ch { //nolint: revive // this block empty, but it drains channel
-		}
-	}()
-	<-uq.done
-	close(uq.ch)
-}
-
-func (uq *UnitQueue) writer(ctx context.Context, unit *proto.StepUnitDescriptor) error {
-	for range unit.GetCount() {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		tx, err := uq.driver.GenerateNextUnit(ctx, unit.GetDescriptor_())
+func (uq *QueuedGenerator[Seed, Result]) writer(ctx context.Context, seed seedAndOpts[Seed]) error {
+	for range seed.repeatCount {
+		tx, err := uq.generator(ctx, seed.seed)
 		if err != nil {
 			return err
 		}
-		uq.ch <- tx // blocking here is fine
+
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case uq.ch <- tx: // blocking here is fine
+		}
 	}
 
 	return nil
 }
 
-var ErrQueueIsDead = errors.New("unit queue channel closed")
+var (
+	ErrQueueIsDead    = errors.New("seed queue channel closed")
+	ErrQueueIsStopped = errors.New("queue is stopped with .Stop()")
+)
 
-func (uq *UnitQueue) GetNextUnit() (*proto.DriverTransaction, error) {
+// GetNextElement - forth step, take as many elements as you want concurrently.
+func (uq *QueuedGenerator[Seed, Result]) GetNextElement() (Result, error) { //nolint:ireturn // allow
 	if err := uq.getError(); err != nil {
-		return nil, err
+		return *new(Result), err
 	}
 
 	tx, ok := <-uq.ch
 	if !ok {
-		return nil, ErrQueueIsDead
+		return *new(Result), ErrQueueIsDead
 	}
 
 	return tx, nil
 }
 
-func (uq *UnitQueue) Stop() error {
-	uq.cancel()
-
-	return uq.getError()
-}
-
-func (uq *UnitQueue) getError() error {
+func (uq *QueuedGenerator[Seed, Result]) getError() error {
 	if err := uq.err.Load(); err != nil {
 		return err.(error) //nolint: errcheck,forcetypeassert // is known type
 	}
 
 	return nil
+}
+
+// Stop - stops the generation.
+func (uq *QueuedGenerator[Seed, Result]) Stop() error {
+	uq.cancel(ErrQueueIsStopped)
+
+	return uq.getError()
 }
