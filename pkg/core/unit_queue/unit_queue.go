@@ -15,8 +15,6 @@ type seedAndOpts[Seed any] struct {
 	workersCount, repeatCount int
 }
 
-// FIXME: There is the leak somewhere, it blocks forever.
-
 // QueuedGenerator is up to infinit queued value generator.
 type QueuedGenerator[Seed, Result any] struct {
 	seeds        []seedAndOpts[Seed]
@@ -77,8 +75,7 @@ func (uq *QueuedGenerator[Seed, Result]) PrepareGenerator(
 
 // StartGeneration - third step, starts the generation of values.
 func (uq *QueuedGenerator[Seed, Result]) StartGeneration(ctx context.Context) {
-	ctx, cancel := context.WithCancelCause(ctx)
-	uq.cancel = cancel
+	ctx, uq.cancel = context.WithCancelCause(ctx)
 	go uq.finalizer(ctx)
 	if uq.workersLimit < 0 {
 		uq.workersLimit = -uq.workersLimit
@@ -131,15 +128,18 @@ func (uq *QueuedGenerator[Seed, Result]) infinitRunner(ctx context.Context) {
 
 func (uq *QueuedGenerator[Seed, Result]) writer(ctx context.Context, seed seedAndOpts[Seed]) error {
 	for range seed.repeatCount {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
 		tx, err := uq.generator(ctx, seed.seed)
 		if err != nil {
 			return err
 		}
-		uq.ch <- tx // blocking here is fine
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case uq.ch <- tx: // blocking here is fine
+		}
 	}
 
 	return nil

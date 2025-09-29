@@ -116,8 +116,9 @@ func TestQueuedGenerator_ProportionalDistribution(t *testing.T) {
 	// Collect large number of samples
 	const sampleSize = 100000
 	counts := make(map[int]int64)
+	countsMutex := sync.Mutex{}
 
-	for i := 0; i < sampleSize; i++ {
+	for i := range sampleSize {
 		value, err := queue.GetNextElement()
 		if err != nil {
 			if errors.Is(err, unit_queue.ErrQueueIsDead) {
@@ -125,8 +126,9 @@ func TestQueuedGenerator_ProportionalDistribution(t *testing.T) {
 			}
 			t.Fatalf("Unexpected error at sample %d: %v", i, err)
 		}
-		var some = counts[value]
-		atomic.AddInt64(&some, 1)
+		countsMutex.Lock()
+		counts[value]++
+		countsMutex.Unlock()
 	}
 
 	queue.Stop()
@@ -188,13 +190,13 @@ func TestQueuedGenerator_ConcurrentAccess(t *testing.T) {
 	results := make([][]int, numConsumers)
 	errors := make([]error, numConsumers)
 
-	for i := 0; i < numConsumers; i++ {
+	for i := range numConsumers {
 		wg.Add(1)
 		go func(consumerID int) {
 			defer wg.Done()
 
 			var samples []int
-			for j := 0; j < samplesPerConsumer; j++ {
+			for range samplesPerConsumer {
 				value, err := queue.GetNextElement()
 				if err != nil {
 					errors[consumerID] = err
@@ -261,7 +263,7 @@ func TestQueuedGenerator_RaceConditions(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				_, err := queue.GetNextElement()
 				if err != nil {
 					if !errors.Is(err, unit_queue.ErrQueueIsDead) &&
@@ -315,7 +317,7 @@ func TestQueuedGenerator_ErrorHandling(t *testing.T) {
 
 	// Consume until we hit the error
 	var lastErr error
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		_, err := queue.GetNextElement()
 		if err != nil {
 			lastErr = err
@@ -348,7 +350,7 @@ func TestQueuedGenerator_GoroutineLeak(t *testing.T) {
 	}
 
 	// Run multiple short-lived queues
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		func() {
 			queue := unit_queue.NewQueue(generator, 2, 10)
 			queue.PrepareGenerator(i, 1, 5)
@@ -359,7 +361,7 @@ func TestQueuedGenerator_GoroutineLeak(t *testing.T) {
 			queue.StartGeneration(ctx)
 
 			// Consume a few values
-			for j := 0; j < 3; j++ {
+			for range 3 {
 				_, err := queue.GetNextElement()
 				if err != nil {
 					break
@@ -419,7 +421,7 @@ func TestQueuedGenerator_WorkerLimits(t *testing.T) {
 	queue.StartGeneration(ctx)
 
 	// Consume some values to trigger workers
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		_, err := queue.GetNextElement()
 		if err != nil {
 			break
@@ -452,9 +454,7 @@ func BenchmarkQueuedGenerator_SingleWorker(b *testing.B) {
 
 	queue.StartGeneration(ctx)
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := queue.GetNextElement()
 		if err != nil {
 			b.Fatal(err)
@@ -478,9 +478,7 @@ func BenchmarkQueuedGenerator_MultipleWorkers(b *testing.B) {
 
 	queue.StartGeneration(ctx)
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := queue.GetNextElement()
 		if err != nil {
 			b.Fatal(err)
@@ -495,7 +493,7 @@ func BenchmarkQueuedGenerator_WorkerScaling(b *testing.B) {
 	generator := func(_ context.Context, x int) (int, error) {
 		// Simulate some work
 		sum := 0
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			sum += i * x
 		}
 		return sum, nil
@@ -515,7 +513,7 @@ func BenchmarkQueuedGenerator_WorkerScaling(b *testing.B) {
 
 			b.ResetTimer()
 
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_, err := queue.GetNextElement()
 				if err != nil {
 					b.Fatal(err)
@@ -557,8 +555,9 @@ func TestQueuedGenerator_ExactProportions(t *testing.T) {
 	// Collect 100,000 samples as requested
 	const targetSamples = 100000
 	counts := make(map[int]int64)
+	countsMutex := sync.Mutex{}
 
-	for i := 0; i < targetSamples; i++ {
+	for i := range targetSamples {
 		if i%10000 == 0 {
 			t.Logf("Processed %d samples...", i)
 		}
@@ -572,8 +571,9 @@ func TestQueuedGenerator_ExactProportions(t *testing.T) {
 			t.Fatalf("Unexpected value %d at sample %d", value, i)
 		}
 
-		some := counts[value]
-		atomic.AddInt64(&some, 1)
+		countsMutex.Lock()
+		counts[value]++
+		countsMutex.Unlock()
 	}
 
 	queue.Stop()
