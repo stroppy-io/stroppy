@@ -62,12 +62,12 @@ func (x *Instance) Setup(runContextBytes string) error {
 
 	x.logger.Debug(
 		"Setup",
-		zap.Uint64("seed", runContext.GetGlobalConfig().GetRun().GetSeed()),
+		zap.Uint64("seed", runContext.GetConfig().GetSeed()),
 	)
 
 	processCtx := context.Background()
 
-	drv := driver.Dispatch(x.logger, runContext.GetGlobalConfig().GetRun().GetDriver())
+	drv := driver.Dispatch(x.logger, runContext.GetConfig().GetDriver())
 
 	err = drv.Initialize(processCtx, runContext)
 	if err != nil {
@@ -75,7 +75,7 @@ func (x *Instance) Setup(runContextBytes string) error {
 	}
 
 	queue := unit_queue.NewQueue(drv.GenerateNextUnit, 0, 100)
-	for _, u := range runContext.GetStep().GetUnits() {
+	for _, u := range runContext.GetStepDescriptor().GetUnits() {
 		queue.PrepareGenerator(u.GetDescriptor_(), 1, uint(u.GetCount()))
 	}
 

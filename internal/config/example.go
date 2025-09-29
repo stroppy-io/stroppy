@@ -6,21 +6,20 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/stroppy-io/stroppy/internal/static"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
+func ptr[T any](x T) *T {
+	return &x
+}
+
 //nolint:mnd // it is huge magic config itself
-func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx,mnd // allow in example
-	return &stroppy.Config{
-		Version: stroppy.Version,
-		Run: &stroppy.RunConfig{
-			Logger: &stroppy.LoggerConfig{
-				LogLevel: stroppy.LoggerConfig_LOG_LEVEL_INFO,
-				LogMode:  stroppy.LoggerConfig_LOG_MODE_PRODUCTION,
-			},
-			RunId: uuid.New().String(),
-			Seed:  uint64(time.Now().Unix()), //nolint: gosec // allow
+func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // allow in example
+	return &stroppy.ConfigFile{
+		Global: &stroppy.GlobalConfig{
+			Version: stroppy.Version,
+			RunId:   uuid.New().String(),
+			Seed:    uint64(time.Now().Unix()), //nolint: gosec // allow
 			Metadata: map[string]string{
 				"example": "stroppy_metadata",
 			},
@@ -38,29 +37,88 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx,mnd // allow
 					},
 				},
 			},
-			GoExecutor: &stroppy.GoExecutor{
-				GoMaxProc:     toPtr[uint64](100),
-				CancelOnError: toPtr[bool](true),
+			Logger: &stroppy.LoggerConfig{
+				LogLevel: stroppy.LoggerConfig_LOG_LEVEL_INFO,
+				LogMode:  stroppy.LoggerConfig_LOG_MODE_PRODUCTION,
 			},
-			K6Executor: &stroppy.K6Executor{
-				K6BinaryPath:   "./" + static.K6PluginFileName.String(),
-				K6ScriptPath:   "./" + static.K6BenchmarkFileName.String(),
-				K6SetupTimeout: durationpb.New(8400 * time.Second),
-				K6Vus:          toPtr(uint64(10)),
-				K6MaxVus:       toPtr(uint64(100)),
-				K6Rate:         toPtr(uint64(1000)),
-				K6Duration:     durationpb.New(60 * time.Second),
+		},
+		Executors: []*stroppy.ExecutorConfig{
+			{
+				Name: "single-vus-single-step",
+				K6: &stroppy.K6Options{
+					Scenario: &stroppy.K6Scenario{
+						Executor: &stroppy.K6Scenario_PerVuIterations{
+							PerVuIterations: &stroppy.PerVuIterations{
+								Vus:        1,
+								Iterations: 1,
+							},
+						},
+					},
+				},
+			},
+			{
+				Name: "max-workload",
+				K6: &stroppy.K6Options{
+					Scenario: &stroppy.K6Scenario{
+						Executor: &stroppy.K6Scenario_ConstantArrivalRate{
+							ConstantArrivalRate: &stroppy.ConstantArrivalRate{
+								Rate: 1000,
+								TimeUnit: &durationpb.Duration{
+									Seconds: 1,
+								},
+								PreAllocatedVus: 1,
+								MaxVus:          100,
+							},
+						},
+					},
+				},
+			},
+		},
+		Exporters: []*stroppy.ExporterConfig{
+			{
+				Name: "otlp-cloud-export",
 				OtlpExport: &stroppy.OtlpExport{
 					OtlpGrpcEndpoint:  toPtr("localhost:4317"),
 					OtlpMetricsPrefix: toPtr("k6_"),
 				},
 			},
-			Steps: []*stroppy.RequestedStep{
-				{Name: "create_table", Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO)},
-				{Name: "insert_data", Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO)},
-				{Name: "warm_up", Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO)},
-				{Name: "select_data", Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_K6)},
-				{Name: "clean_up", Executor: toPtr(stroppy.RequestedStep_EXECUTOR_TYPE_GO)},
+		},
+		StepExecutorMappings: []*stroppy.StepExecutionMapping{
+			{
+				StepName:     "create_table",
+				ExecutorName: "single-vus-single-step",
+				ExporterName: ptr("otlp-cloud-export"),
+				Async:        false,
+			},
+			{
+				StepName:     "insert_data",
+				ExecutorName: "max-workload",
+				ExporterName: ptr("otlp-cloud-export"),
+				Async:        false,
+			},
+			{
+				StepName:     "warm_up",
+				ExecutorName: "max-workload",
+				ExporterName: ptr("otlp-cloud-export"),
+				Async:        false,
+			},
+			{
+				StepName:     "select_data",
+				ExecutorName: "max-workload",
+				ExporterName: ptr("otlp-cloud-export"),
+				Async:        false,
+			},
+			{
+				StepName:     "transaction",
+				ExecutorName: "max-workload",
+				ExporterName: ptr("otlp-cloud-export"),
+				Async:        false,
+			},
+			{
+				StepName:     "clean_up",
+				ExecutorName: "single-vus-single-step",
+				ExporterName: ptr("otlp-cloud-export"),
+				Async:        false,
 			},
 		},
 		Benchmark: &stroppy.BenchmarkDescriptor{
@@ -91,8 +149,7 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx,mnd // allow
 					},
 				},
 				{
-					Name:  "insert_data",
-					Async: true,
+					Name: "insert_data",
 					Units: []*stroppy.StepUnitDescriptor{
 						{
 							Count: 100000,
@@ -167,8 +224,7 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx,mnd // allow
 					},
 				},
 				{
-					Name:  "warm_up",
-					Async: true,
+					Name: "warm_up",
 					Units: []*stroppy.StepUnitDescriptor{
 						{
 							Count: 1000,
@@ -200,8 +256,7 @@ func NewExampleConfig() *stroppy.Config { //nolint: funlen,maintidx,mnd // allow
 					},
 				},
 				{
-					Name:  "select_data",
-					Async: true,
+					Name: "select_data",
 					Units: []*stroppy.StepUnitDescriptor{
 						{
 							Count: 1,

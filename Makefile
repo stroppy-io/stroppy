@@ -12,7 +12,7 @@ help: # Show help in Makefile
 # List of required binaries (default checks PATH)
 # Optional: Specify custom paths for binaries not in PATH
 # Format: binary_name=/path/to/binary
-REQUIRED_BINS = git go \
+REQUIRED_BINS = git go curl unzip \
 	xk6=$(LOCAL_BIN)/xk6
 .PHONY: .check-bins
 .check-bins: # Check for required binaries if build locally

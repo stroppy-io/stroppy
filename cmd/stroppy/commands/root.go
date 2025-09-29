@@ -9,8 +9,8 @@ import (
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/gen"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
+	"github.com/stroppy-io/stroppy/internal/build"
 	int_config "github.com/stroppy-io/stroppy/internal/config"
-	"github.com/stroppy-io/stroppy/internal/version"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 )
 
@@ -28,7 +28,7 @@ var versionCmd = &cobra.Command{ //nolint: gochecknoglobals
 	Short: "Print versions of stroppy components",
 	Long:  ``,
 	Run: func(_ *cobra.Command, _ []string) {
-		version.AllComponents.DisplayVersions(logger.Global().WithOptions(zap.WithCaller(false)))
+		logger.Info("Stroppy version", zap.String("version", build.Version))
 	},
 }
 
