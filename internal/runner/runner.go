@@ -46,10 +46,10 @@ func (r *Runner) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize sidecars: %w", err)
 	}
 
-	r.logger.Info("running benchmark", zap.Any("config", r.config))
+	r.logger.Info("Running benchmark", zap.String("benchmark", r.config.Benchmark.Name))
 
-	for stepName, stepCtx := range r.config.StepContexts {
-		r.logger.Info("running step", zap.String("step", stepName))
+	for _, stepCtx := range r.config.StepContexts {
+		r.logger.Info("Running step", zap.String("step", stepCtx.StepDescriptor.GetName()))
 
 		err = r.sidecars.OnStepStart(ctx, stepCtx)
 		if err != nil {

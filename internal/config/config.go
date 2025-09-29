@@ -8,7 +8,7 @@ import (
 
 type Config struct {
 	*stroppy.ConfigFile
-	StepContexts map[string]*stroppy.StepContext
+	StepContexts []*stroppy.StepContext
 }
 
 func LoadAndValidateConfig(runConfigPath string, requestedSteps ...string) (*Config, error) {
@@ -33,7 +33,7 @@ func LoadAndValidateConfig(runConfigPath string, requestedSteps ...string) (*Con
 		}
 	}
 
-	stepContexts := make(map[string]*stroppy.StepContext)
+	stepContexts := make([]*stroppy.StepContext, 0)
 
 	for _, reqStep := range requestedSteps {
 		stepContext, err := NewStepContext(reqStep, config)
@@ -41,20 +41,11 @@ func LoadAndValidateConfig(runConfigPath string, requestedSteps ...string) (*Con
 			return nil, fmt.Errorf("failed to create step context: %w", err)
 		}
 
-		stepContexts[reqStep] = stepContext
+		stepContexts = append(stepContexts, stepContext)
 	}
 
 	return &Config{
 		ConfigFile:   config,
 		StepContexts: stepContexts,
 	}, nil
-}
-
-func (c *Config) GetStepContext(stepName string) (*stroppy.StepContext, error) {
-	stepContext, ok := c.StepContexts[stepName]
-	if !ok {
-		return nil, fmt.Errorf("step context %s not found", stepName) //nolint: err113 // allow
-	}
-
-	return stepContext, nil
 }

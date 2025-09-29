@@ -20,13 +20,11 @@ const (
 	PackageJSONFileName FileName = "package.json"
 	ProtoTSFileName     FileName = "stroppy.pb.ts"
 	ProtoJSFileName     FileName = "stroppy.pb.js"
-	MakefileFileName    FileName = "Makefile"
 	K6PluginFileName    FileName = "stroppy-xk6"
 	K6BenchmarkFileName FileName = "benchmark.ts"
 )
 
 var StaticFiles = []FileName{ //nolint: gochecknoglobals
-	MakefileFileName,
 	ProtoJSFileName,
 	K6PluginFileName,
 	K6BenchmarkFileName,
@@ -42,7 +40,6 @@ var Binaries = []FileName{ //nolint: gochecknoglobals
 }
 
 //go:embed package.json
-//go:embed Makefile
 //go:embed stroppy-xk6
 //go:embed benchmark.ts
 //go:embed *.pb.*

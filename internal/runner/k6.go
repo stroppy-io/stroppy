@@ -29,7 +29,7 @@ func runK6Binary(
 ) error {
 	binExec := exec.Cmd{
 		Path: binaryPath,
-		Args: args,
+		Args: append([]string{binaryPath}, args...), // avoid to strip first arg
 		Dir:  workdir,
 	}
 	binExec.Stdout = os.Stdout
@@ -38,6 +38,7 @@ func runK6Binary(
 	if err := binExec.Start(); err != nil {
 		return fmt.Errorf("fail run k6 binary %s: %w", binaryPath, err)
 	}
+	lg.Debug("Exec k6", zap.String("cmd", binExec.String()))
 
 	shutdown.RegisterFn(func() {
 		// Send a termination signal to the process
@@ -94,6 +95,8 @@ func RunStepInK6(
 		return fmt.Errorf("failed to copy static files: %w", err)
 	}
 
+	lg.Info("Working dir is: ", zap.String("tmp_dir", tempDir))
+
 	defer os.RemoveAll(tempDir)
 
 	contextStr, err := protojson.Marshal(runContext)
@@ -111,7 +114,7 @@ func RunStepInK6(
 		baseArgs,
 		runContext.GetExecutor().GetK6().GetK6Args()...,
 	)
-	lg.Debug("Running K6", zap.String("args", fmt.Sprintf("%v", baseArgs)))
+	lg.Debug("Running K6", zap.Any("args", baseArgs))
 	logger.SetLoggerEnv(
 		logger.LevelFromProtoConfig(
 			runContext.GetConfig().GetLogger().GetLogLevel(),
