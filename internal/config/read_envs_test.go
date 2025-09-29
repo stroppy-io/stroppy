@@ -11,7 +11,7 @@ import (
 func TestMutateConfigByEnvs(t *testing.T) {
 	testVersion := "123.0.0"
 
-	t.Setenv("CONFIG__VERSION", testVersion)
+	t.Setenv("CONFIG__GLOBAL__VERSION", testVersion)
 
 	cfg := NewExampleConfig()
 

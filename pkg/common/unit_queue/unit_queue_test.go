@@ -34,13 +34,12 @@ func NewQueueExample() {
 		value, _ := queue.GetNextElement()
 		fmt.Println(value)
 	}
-
-	queue.Stop()
 	// Output: 42
 	// 84
 	// 126
 	// 168
 	// 210
+	queue.Stop()
 }
 
 // Test basic functionality.
