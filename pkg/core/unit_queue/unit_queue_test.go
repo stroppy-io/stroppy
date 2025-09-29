@@ -21,7 +21,7 @@ func Example() {
 
 	for _, seed := range []int{1, 2, 3, 4} {
 		// put the initial value, generator will use
-		// also how many workers will run it simultaniously
+		// also how many workers will run it simultaneously
 		// and how many times generator will be started with this value
 		queue.PrepareGenerator(seed, 1, 1)
 	}
@@ -43,7 +43,7 @@ func Example() {
 	// 42
 }
 
-// Test basic functionality
+// Test basic functionality.
 func TestQueuedGenerator_BasicOperation(t *testing.T) {
 	generator := func(_ context.Context, x int) (int, error) {
 		return x * 10, nil
@@ -64,11 +64,12 @@ func TestQueuedGenerator_BasicOperation(t *testing.T) {
 	results := make(map[int]int)
 	expectedCount := 3 // 2 + 1 = 3 total results per cycle
 
-	for i := 0; i < expectedCount*2; i++ { // Get 2 cycles worth
+	for range expectedCount * 2 { // Get 2 cycles worth
 		value, err := queue.GetNextElement()
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
+
 		results[value]++
 	}
 
@@ -86,7 +87,7 @@ func TestQueuedGenerator_BasicOperation(t *testing.T) {
 	}
 }
 
-// Test the proportional distribution property
+// Test the proportional distribution property.
 func TestQueuedGenerator_ProportionalDistribution(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping proportional distribution test in short mode")
@@ -114,6 +115,7 @@ func TestQueuedGenerator_ProportionalDistribution(t *testing.T) {
 
 	// Collect large number of samples
 	const sampleSize = 100000
+
 	counts := make(map[int]int64)
 	countsMutex := sync.Mutex{}
 
@@ -123,8 +125,10 @@ func TestQueuedGenerator_ProportionalDistribution(t *testing.T) {
 			if errors.Is(err, unit_queue.ErrQueueIsDead) {
 				break
 			}
+
 			t.Fatalf("Unexpected error at sample %d: %v", i, err)
 		}
+
 		countsMutex.Lock()
 		counts[value]++
 		countsMutex.Unlock()
@@ -156,20 +160,23 @@ func TestQueuedGenerator_ProportionalDistribution(t *testing.T) {
 		t.Errorf("Seed 1 ratio %.3f differs from expected %.3f by more than %.3f",
 			ratio1, expectedRatio1, tolerance)
 	}
+
 	if math.Abs(ratio2-expectedRatio2) > tolerance {
 		t.Errorf("Seed 2 ratio %.3f differs from expected %.3f by more than %.3f",
 			ratio2, expectedRatio2, tolerance)
 	}
+
 	if math.Abs(ratio3-expectedRatio3) > tolerance {
 		t.Errorf("Seed 3 ratio %.3f differs from expected %.3f by more than %.3f",
 			ratio3, expectedRatio3, tolerance)
 	}
 }
 
-// Test concurrent access safety
+// Test concurrent access safety.
 func TestQueuedGenerator_ConcurrentAccess(t *testing.T) {
 	generator := func(_ context.Context, x int) (int, error) {
 		time.Sleep(time.Microsecond) // Simulate work
+
 		return x, nil
 	}
 
@@ -183,26 +190,33 @@ func TestQueuedGenerator_ConcurrentAccess(t *testing.T) {
 
 	// Multiple concurrent consumers
 	const numConsumers = 10
+
 	const samplesPerConsumer = 50
 
 	var wg sync.WaitGroup
+
 	results := make([][]int, numConsumers)
 	errors := make([]error, numConsumers)
 
 	for i := range numConsumers {
 		wg.Add(1)
+
 		go func(consumerID int) {
 			defer wg.Done()
 
 			var samples []int
+
 			for range samplesPerConsumer {
 				value, err := queue.GetNextElement()
 				if err != nil {
 					errors[consumerID] = err
+
 					return
 				}
+
 				samples = append(samples, value)
 			}
+
 			results[consumerID] = samples
 		}(i)
 	}
@@ -219,16 +233,19 @@ func TestQueuedGenerator_ConcurrentAccess(t *testing.T) {
 
 	// Verify all consumers got expected values
 	totalSamples := 0
+
 	for i, samples := range results {
 		if len(samples) != samplesPerConsumer {
 			t.Errorf("Consumer %d got %d samples, expected %d",
 				i, len(samples), samplesPerConsumer)
 		}
+
 		for _, value := range samples {
 			if value != 42 {
 				t.Errorf("Consumer %d got unexpected value %d", i, value)
 			}
 		}
+
 		totalSamples += len(samples)
 	}
 
@@ -238,12 +255,13 @@ func TestQueuedGenerator_ConcurrentAccess(t *testing.T) {
 	}
 }
 
-// Test race conditions
+// Test race conditions.
 func TestQueuedGenerator_RaceConditions(t *testing.T) {
 	// Test race between Stop() and GetNextElement()
 	t.Run("stop_get_race", func(t *testing.T) {
-		generator := func(ctx context.Context, x int) (int, error) {
+		generator := func(_ context.Context, x int) (int, error) {
 			time.Sleep(time.Millisecond)
+
 			return x, nil
 		}
 
@@ -256,12 +274,15 @@ func TestQueuedGenerator_RaceConditions(t *testing.T) {
 		queue.StartGeneration(ctx)
 
 		var wg sync.WaitGroup
+
 		errChan := make(chan error, 2)
 
 		// Consumer goroutine
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
+
 			for range 10 {
 				_, err := queue.GetNextElement()
 				if err != nil {
@@ -269,6 +290,7 @@ func TestQueuedGenerator_RaceConditions(t *testing.T) {
 						!errors.Is(err, unit_queue.ErrQueueIsStopped) {
 						errChan <- err
 					}
+
 					return
 				}
 			}
@@ -276,9 +298,11 @@ func TestQueuedGenerator_RaceConditions(t *testing.T) {
 
 		// Stopper goroutine
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 			time.Sleep(5 * time.Millisecond)
+
 			if err := queue.Stop(); err != nil {
 				errChan <- err
 			}
@@ -293,7 +317,7 @@ func TestQueuedGenerator_RaceConditions(t *testing.T) {
 	})
 }
 
-// Test error propagation
+// Test error propagation.
 func TestQueuedGenerator_ErrorHandling(t *testing.T) {
 	testError := errors.New("generator error")
 	callCount := int64(0)
@@ -303,6 +327,7 @@ func TestQueuedGenerator_ErrorHandling(t *testing.T) {
 		if count == 5 { // Fail on 5th call
 			return 0, testError
 		}
+
 		return x, nil
 	}
 
@@ -316,10 +341,12 @@ func TestQueuedGenerator_ErrorHandling(t *testing.T) {
 
 	// Consume until we hit the error
 	var lastErr error
+
 	for range 20 {
 		_, err := queue.GetNextElement()
 		if err != nil {
 			lastErr = err
+
 			break
 		}
 	}
@@ -331,7 +358,7 @@ func TestQueuedGenerator_ErrorHandling(t *testing.T) {
 	}
 }
 
-// Test goroutine leak detection
+// Test goroutine leak detection.
 func TestQueuedGenerator_GoroutineLeak(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping goroutine leak test in short mode")
@@ -389,25 +416,27 @@ func TestQueuedGenerator_GoroutineLeak(t *testing.T) {
 	}
 }
 
-// Test worker count limits
+// Test worker count limits.
 func TestQueuedGenerator_WorkerLimits(t *testing.T) {
 	activeWorkers := int64(0)
 	maxActiveWorkers := int64(0)
 
-	generator := func(_ context.Context, x int) (int, error) {
+	generator := func(_ context.Context, val int) (int, error) {
 		current := atomic.AddInt64(&activeWorkers, 1)
 		defer atomic.AddInt64(&activeWorkers, -1)
 
 		// Track maximum concurrent workers
 		for {
-			max := atomic.LoadInt64(&maxActiveWorkers)
-			if current <= max || atomic.CompareAndSwapInt64(&maxActiveWorkers, max, current) {
+			maximum := atomic.LoadInt64(&maxActiveWorkers)
+			if current <= maximum ||
+				atomic.CompareAndSwapInt64(&maxActiveWorkers, maximum, current) {
 				break
 			}
 		}
 
 		time.Sleep(10 * time.Millisecond) // Hold worker for some time
-		return x, nil
+
+		return val, nil
 	}
 
 	const workerLimit = 3
@@ -495,6 +524,7 @@ func BenchmarkQueuedGenerator_WorkerScaling(b *testing.B) {
 		for i := range 100 {
 			sum += i * x
 		}
+
 		return sum, nil
 	}
 
@@ -525,7 +555,7 @@ func BenchmarkQueuedGenerator_WorkerScaling(b *testing.B) {
 	}
 }
 
-// Test for exact proportions with large sample size
+// Test for exact proportions with large sample size.
 func TestQueuedGenerator_ExactProportions(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping exact proportions test in short mode")
@@ -553,6 +583,7 @@ func TestQueuedGenerator_ExactProportions(t *testing.T) {
 
 	// Collect 100,000 samples as requested
 	const targetSamples = 100000
+
 	counts := make(map[int]int64)
 	countsMutex := sync.Mutex{}
 
@@ -598,10 +629,12 @@ func TestQueuedGenerator_ExactProportions(t *testing.T) {
 		t.Errorf("Generator 1 ratio %.4f differs from expected %.4f by %.4f (tolerance: %.4f)",
 			ratio1, expected1, math.Abs(ratio1-expected1), tolerance)
 	}
+
 	if math.Abs(ratio2-expected2) > tolerance {
 		t.Errorf("Generator 2 ratio %.4f differs from expected %.4f by %.4f (tolerance: %.4f)",
 			ratio2, expected2, math.Abs(ratio2-expected2), tolerance)
 	}
+
 	if math.Abs(ratio3-expected3) > tolerance {
 		t.Errorf("Generator 3 ratio %.4f differs from expected %.4f by %.4f (tolerance: %.4f)",
 			ratio3, expected3, math.Abs(ratio3-expected3), tolerance)
@@ -623,9 +656,11 @@ func TestQueuedGenerator_ExactProportions(t *testing.T) {
 	if math.Abs(ratio12-expected12) > ratioTolerance {
 		t.Errorf("Ratio 1:2 = %.3f differs from expected %.3f", ratio12, expected12)
 	}
+
 	if math.Abs(ratio13-expected13) > ratioTolerance {
 		t.Errorf("Ratio 1:3 = %.3f differs from expected %.3f", ratio13, expected13)
 	}
+
 	if math.Abs(ratio23-expected23) > ratioTolerance {
 		t.Errorf("Ratio 2:3 = %.3f differs from expected %.3f", ratio23, expected23)
 	}
