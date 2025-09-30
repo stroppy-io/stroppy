@@ -25,9 +25,11 @@ func runK6Binary(
 	lg *zap.Logger,
 	workdir string,
 	binaryPath string,
-	args ...string,
+	args []string,
+	envs []string,
 ) error {
 	binExec := exec.Cmd{
+		Env:  envs,
 		Path: binaryPath,
 		Args: append([]string{binaryPath}, args...), // avoid to strip first arg
 		Dir:  workdir,
@@ -105,22 +107,25 @@ func RunStepInK6(
 		return err
 	}
 
-	baseArgs := []string{"run", static.K6BenchmarkFileName.String(), "-econtext=" + string(contextStr)}
+	baseArgs := []string{"run", static.K6BenchmarkFileName.String()}
+	envs := []string{"context=" + string(contextStr)}
 
 	if runContext.GetExporter().GetOtlpExport() != nil {
-		baseArgs = k6ArgsOtelExport(runContext, baseArgs)
+		baseArgs, envs = k6ArgsOtelExport(runContext, baseArgs, envs)
 	}
 
 	baseArgs = append(
 		baseArgs,
 		runContext.GetExecutor().GetK6().GetK6Args()...,
 	)
+
 	lg.Debug("Running K6", zap.Any("args", baseArgs))
-	logger.SetLoggerEnv(
-		logger.LevelFromProtoConfig(
-			runContext.GetConfig().GetLogger().GetLogLevel(),
-		),
-		logger.ModeFromProtoConfig(runContext.GetConfig().GetLogger().GetLogMode()),
+
+	envs = append(envs,
+		logger.PrepareLoggerEnvs(
+			logger.LevelFromProtoConfig(runContext.GetConfig().GetLogger().GetLogLevel()),
+			logger.ModeFromProtoConfig(runContext.GetConfig().GetLogger().GetLogMode()),
+		)...,
 	)
 
 	return runK6Binary(
@@ -128,31 +133,31 @@ func RunStepInK6(
 		lg,
 		tempDir,
 		path.Join(tempDir, static.K6PluginFileName.String()),
-		baseArgs...,
+		baseArgs,
+		envs,
 	)
 }
 
 // k6ArgsOtelExport setups k6 OpenTelemetry exporter.
 // Docs: https://grafana.com/docs/k6/latest/results-output/real-time/opentelemetry/#opentelemetry
-func k6ArgsOtelExport(runContext *stroppy.StepContext, baseArgs []string) []string {
+func k6ArgsOtelExport(
+	runContext *stroppy.StepContext,
+	baseArgs []string,
+	envs []string,
+) ([]string, []string) {
 	export := runContext.GetExporter().GetOtlpExport()
 	if export == nil {
-		return baseArgs
+		return baseArgs, envs
 	}
 
-	os.Setenv(
-		"K6_OTEL_METRIC_PREFIX",
-		utils.StringOrDefault(
-			export.GetOtlpMetricsPrefix(),
-			"k6_",
-		),
-	)
-	os.Setenv(
-		"K6_OTEL_SERVICE_NAME", "stroppy", // TODO: do we really need to add benchmark and step name?
-		// fmt.Sprintf("stroppy_%s_%s",
-		// runContext.GetConfig().GetBenchmark().GetName(),
-		// runContext.GetStep().GetName()),
-	)
+	envs = append(
+		envs,
+		"K6_OTEL_METRIC_PREFIX="+utils.StringOrDefault(export.GetOtlpMetricsPrefix(), "k6_"),
+		"K6_OTEL_SERVICE_NAME=stroppy")
+	// TODO: do we really need to add benchmark and step name?
+	// fmt.Sprintf("stroppy_%s_%s",
+	// runContext.GetConfig().GetBenchmark().GetName(),
+	// runContext.GetStep().GetName()),
 
 	insecure := "false" // secure by default
 	if export.GetOtlpEndpointInsecure() {
@@ -160,26 +165,24 @@ func k6ArgsOtelExport(runContext *stroppy.StepContext, baseArgs []string) []stri
 	}
 
 	if export.GetOtlpHeaders() != "" {
-		os.Setenv("K6_OTEL_HEADERS", export.GetOtlpHeaders())
+		envs = append(envs, "K6_OTEL_HEADERS="+export.GetOtlpHeaders())
 	}
 
 	if export.GetOtlpGrpcEndpoint() != "" {
-		os.Setenv("K6_OTEL_GRPC_EXPORTER_INSECURE", insecure)
-		os.Setenv("K6_OTEL_GRPC_EXPORTER_ENDPOINT", "localhost:4317")
+		envs = append(envs,
+			"K6_OTEL_GRPC_EXPORTER_INSECURE="+insecure,
+			"K6_OTEL_GRPC_EXPORTER_ENDPOINT=localhost:4317")
 	} else {
-		os.Setenv("K6_OTEL_EXPORTER_TYPE", "http")
-		os.Setenv("K6_OTEL_HTTP_EXPORTER_INSECURE", insecure)
-		os.Setenv("K6_OTEL_HTTP_EXPORTER_ENDPOINT", utils.StringOrDefault(
-			export.GetOtlpHttpEndpoint(),
-			"localhost:4318",
-		))
-		os.Setenv("K6_OTEL_HTTP_EXPORTER_URL_PATH", utils.StringOrDefault(
-			export.GetOtlpHttpExporterUrlPath(),
-			"/v1/metrics",
-		))
+		envs = append(envs, "K6_OTEL_EXPORTER_TYPE=http",
+			"K6_OTEL_HTTP_EXPORTER_INSECURE="+insecure,
+			"K6_OTEL_HTTP_EXPORTER_ENDPOINT="+
+				utils.StringOrDefault(export.GetOtlpHttpEndpoint(), "localhost:4318"),
+			"K6_OTEL_HTTP_EXPORTER_URL_PATH="+
+				utils.StringOrDefault(export.GetOtlpHttpExporterUrlPath(), "/v1/metrics"),
+		)
 	}
 
 	baseArgs = append(baseArgs, "--out", "experimental-opentelemetry")
 
-	return baseArgs
+	return baseArgs, envs
 }
