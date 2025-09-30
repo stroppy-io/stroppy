@@ -65,7 +65,6 @@ var validateCmd = &cobra.Command{ //nolint: gochecknoglobals
 }
 
 func init() { //nolint: gochecknoinits // allow in cmd
-	// TODO: add steps to run with
 	validateCmd.PersistentFlags().String(
 		configFlagName,
 		DefaultConfigFullPath,

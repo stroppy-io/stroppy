@@ -53,7 +53,7 @@ func CollectStepGenerators(
 ) (Generators, error) { //nolint: gocognit // allow
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 
-	for _, queryDescriptor := range runContext.GetStepDescriptor().GetUnits() {
+	for _, queryDescriptor := range runContext.GetWorkload().GetUnits() {
 		var err error
 
 		generators, err = collectUnitGenerators(queryDescriptor, runContext, generators)
@@ -66,7 +66,7 @@ func CollectStepGenerators(
 }
 
 func collectUnitGenerators(
-	queryDescriptor *stroppy.StepUnitDescriptor,
+	queryDescriptor *stroppy.WorkloadUnitDescriptor,
 	runContext *stroppy.StepContext,
 	generators cmap.ConcurrentMap[GeneratorID, generate.ValueGenerator],
 ) (Generators, error) {

@@ -45,6 +45,7 @@ if (!STROPPY_CONTEXT) {
     throw new Error("Please define step run config (-econtext={...})");
 }
 
+export const METER_SETUP_TIME_COUNTER = new Counter("setup_time");
 export const METER_REQUESTS_COUNTER = new Counter("total_requests");
 export const METER_REQUEST_ERROR_COUNTER = new Counter("total_errors");
 export const METER_RESPONSES_TIME_TREND = new Trend("response_time");
@@ -56,7 +57,7 @@ export const options: Options = {
         runId: STROPPY_CONTEXT.config.runId,
         // TODO: add benchmark name in config
         // benchmark: STROPPY_CONTEXT.benchmark.name,
-        step: STROPPY_CONTEXT.stepDescriptor.name,
+        step: STROPPY_CONTEXT.workload.name,
         // ...STROPPY_CONTEXT.config.metadata uncomment if needed pass metadata in metrics labels
     },
     scenarios: {
@@ -83,12 +84,15 @@ export const setup = (): Context => {
     // this metric must be initialized before benchmark execution
     METER_REQUEST_ERROR_COUNTER.add(0);
 
+    const startTime = Date.now();
     console.log(STROPPY_CONTEXT);
 
     const err = INSTANCE.setup(StepContext.toJsonString(STROPPY_CONTEXT));
     if (err !== undefined) {
         throw err;
     }
+
+    METER_SETUP_TIME_COUNTER.add(Date.now() - startTime);
 
     return <Context>{};
 };
@@ -171,7 +175,7 @@ function resultToJsonString<T extends any>(
         runId: STROPPY_CONTEXT.config.runId,
         // TODO: add benchmark name in config
         // benchmark: STROPPY_CONTEXT.globalConfig.benchmark.name,
-        step: STROPPY_CONTEXT.stepDescriptor.name,
+        step: STROPPY_CONTEXT.workload.name,
         seed: STROPPY_CONTEXT.config.seed,
         date: new Date().toLocaleString(),
         ...baggage,

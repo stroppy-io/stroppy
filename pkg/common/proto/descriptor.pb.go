@@ -669,10 +669,10 @@ func (*UnitDescriptor_Query) isUnitDescriptor_Type() {}
 func (*UnitDescriptor_Transaction) isUnitDescriptor_Type() {}
 
 // *
-// StepUnitDescriptor represents a single unit of work.
+// WorkloadUnitDescriptor represents a single unit of work.
 // It can be a table creation operation, a query execution operation, or a
 // transaction execution operation.
-type StepUnitDescriptor struct {
+type WorkloadUnitDescriptor struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	Descriptor_ *UnitDescriptor        `protobuf:"bytes,6,opt,name=descriptor,proto3" json:"descriptor,omitempty"`
 	// * Number of times to execute this unit
@@ -681,20 +681,20 @@ type StepUnitDescriptor struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StepUnitDescriptor) Reset() {
-	*x = StepUnitDescriptor{}
+func (x *WorkloadUnitDescriptor) Reset() {
+	*x = WorkloadUnitDescriptor{}
 	mi := &file_descriptor_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StepUnitDescriptor) String() string {
+func (x *WorkloadUnitDescriptor) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StepUnitDescriptor) ProtoMessage() {}
+func (*WorkloadUnitDescriptor) ProtoMessage() {}
 
-func (x *StepUnitDescriptor) ProtoReflect() protoreflect.Message {
+func (x *WorkloadUnitDescriptor) ProtoReflect() protoreflect.Message {
 	mi := &file_descriptor_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -706,19 +706,19 @@ func (x *StepUnitDescriptor) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StepUnitDescriptor.ProtoReflect.Descriptor instead.
-func (*StepUnitDescriptor) Descriptor() ([]byte, []int) {
+// Deprecated: Use WorkloadUnitDescriptor.ProtoReflect.Descriptor instead.
+func (*WorkloadUnitDescriptor) Descriptor() ([]byte, []int) {
 	return file_descriptor_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *StepUnitDescriptor) GetDescriptor_() *UnitDescriptor {
+func (x *WorkloadUnitDescriptor) GetDescriptor_() *UnitDescriptor {
 	if x != nil {
 		return x.Descriptor_
 	}
 	return nil
 }
 
-func (x *StepUnitDescriptor) GetCount() uint64 {
+func (x *WorkloadUnitDescriptor) GetCount() uint64 {
 	if x != nil {
 		return x.Count
 	}
@@ -726,32 +726,34 @@ func (x *StepUnitDescriptor) GetCount() uint64 {
 }
 
 // *
-// StepDescriptor represents a logical step in a benchmark.
+// WorkloadDescriptor represents a logical step in a benchmark.
 // It contains a list of operations to perform in this step.
-type StepDescriptor struct {
+type WorkloadDescriptor struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Name of the step
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// * Whether to execute all operations in this workload asynchronously
+	Async bool `protobuf:"varint,2,opt,name=async,proto3" json:"async,omitempty"`
 	// * List of operations to perform in this step
-	Units         []*StepUnitDescriptor `protobuf:"bytes,2,rep,name=units,proto3" json:"units,omitempty"`
+	Units         []*WorkloadUnitDescriptor `protobuf:"bytes,3,rep,name=units,proto3" json:"units,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StepDescriptor) Reset() {
-	*x = StepDescriptor{}
+func (x *WorkloadDescriptor) Reset() {
+	*x = WorkloadDescriptor{}
 	mi := &file_descriptor_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StepDescriptor) String() string {
+func (x *WorkloadDescriptor) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StepDescriptor) ProtoMessage() {}
+func (*WorkloadDescriptor) ProtoMessage() {}
 
-func (x *StepDescriptor) ProtoReflect() protoreflect.Message {
+func (x *WorkloadDescriptor) ProtoReflect() protoreflect.Message {
 	mi := &file_descriptor_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -763,19 +765,26 @@ func (x *StepDescriptor) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StepDescriptor.ProtoReflect.Descriptor instead.
-func (*StepDescriptor) Descriptor() ([]byte, []int) {
+// Deprecated: Use WorkloadDescriptor.ProtoReflect.Descriptor instead.
+func (*WorkloadDescriptor) Descriptor() ([]byte, []int) {
 	return file_descriptor_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *StepDescriptor) GetName() string {
+func (x *WorkloadDescriptor) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *StepDescriptor) GetUnits() []*StepUnitDescriptor {
+func (x *WorkloadDescriptor) GetAsync() bool {
+	if x != nil {
+		return x.Async
+	}
+	return false
+}
+
+func (x *WorkloadDescriptor) GetUnits() []*WorkloadUnitDescriptor {
 	if x != nil {
 		return x.Units
 	}
@@ -790,7 +799,7 @@ type BenchmarkDescriptor struct {
 	// * Name of the benchmark
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// * List of steps to execute in the benchmark
-	Steps         []*StepDescriptor `protobuf:"bytes,100,rep,name=steps,proto3" json:"steps,omitempty"`
+	Workloads     []*WorkloadDescriptor `protobuf:"bytes,100,rep,name=workloads,proto3" json:"workloads,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -832,9 +841,9 @@ func (x *BenchmarkDescriptor) GetName() string {
 	return ""
 }
 
-func (x *BenchmarkDescriptor) GetSteps() []*StepDescriptor {
+func (x *BenchmarkDescriptor) GetWorkloads() []*WorkloadDescriptor {
 	if x != nil {
-		return x.Steps
+		return x.Workloads
 	}
 	return nil
 }
@@ -895,18 +904,19 @@ const file_descriptor_proto_rawDesc = "" +
 	"\fcreate_table\x18\x01 \x01(\v2\x18.stroppy.TableDescriptorH\x00R\vcreateTable\x120\n" +
 	"\x05query\x18\x02 \x01(\v2\x18.stroppy.QueryDescriptorH\x00R\x05query\x12B\n" +
 	"\vtransaction\x18\x04 \x01(\v2\x1e.stroppy.TransactionDescriptorH\x00R\vtransactionB\v\n" +
-	"\x04type\x12\x03\xf8B\x01\"l\n" +
-	"\x12StepUnitDescriptor\x127\n" +
+	"\x04type\x12\x03\xf8B\x01\"p\n" +
+	"\x16WorkloadUnitDescriptor\x127\n" +
 	"\n" +
 	"descriptor\x18\x06 \x01(\v2\x17.stroppy.UnitDescriptorR\n" +
 	"descriptor\x12\x1d\n" +
-	"\x05count\x18\x05 \x01(\x04B\a\xfaB\x042\x02 \x00R\x05count\"q\n" +
-	"\x0eStepDescriptor\x12\x1b\n" +
-	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12B\n" +
-	"\x05units\x18\x02 \x03(\v2\x1b.stroppy.StepUnitDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\x05units\"r\n" +
+	"\x05count\x18\x05 \x01(\x04B\a\xfaB\x042\x02 \x00R\x05count\"\x8f\x01\n" +
+	"\x12WorkloadDescriptor\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12\x14\n" +
+	"\x05async\x18\x02 \x01(\bR\x05async\x12F\n" +
+	"\x05units\x18\x03 \x03(\v2\x1f.stroppy.WorkloadUnitDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\x05units\"~\n" +
 	"\x13BenchmarkDescriptor\x12\x1b\n" +
-	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12>\n" +
-	"\x05steps\x18d \x03(\v2\x17.stroppy.StepDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\x05steps*\xd3\x01\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12J\n" +
+	"\tworkloads\x18d \x03(\v2\x1b.stroppy.WorkloadDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\tworkloads*\xd3\x01\n" +
 	"\x10TxIsolationLevel\x12\"\n" +
 	"\x1eTX_ISOLATION_LEVEL_UNSPECIFIED\x10\x00\x12'\n" +
 	"#TX_ISOLATION_LEVEL_READ_UNCOMMITTED\x10\x01\x12%\n" +
@@ -929,19 +939,19 @@ func file_descriptor_proto_rawDescGZIP() []byte {
 var file_descriptor_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_descriptor_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_descriptor_proto_goTypes = []any{
-	(TxIsolationLevel)(0),         // 0: stroppy.TxIsolationLevel
-	(*IndexDescriptor)(nil),       // 1: stroppy.IndexDescriptor
-	(*ColumnDescriptor)(nil),      // 2: stroppy.ColumnDescriptor
-	(*TableDescriptor)(nil),       // 3: stroppy.TableDescriptor
-	(*QueryParamDescriptor)(nil),  // 4: stroppy.QueryParamDescriptor
-	(*QueryDescriptor)(nil),       // 5: stroppy.QueryDescriptor
-	(*TransactionDescriptor)(nil), // 6: stroppy.TransactionDescriptor
-	(*UnitDescriptor)(nil),        // 7: stroppy.UnitDescriptor
-	(*StepUnitDescriptor)(nil),    // 8: stroppy.StepUnitDescriptor
-	(*StepDescriptor)(nil),        // 9: stroppy.StepDescriptor
-	(*BenchmarkDescriptor)(nil),   // 10: stroppy.BenchmarkDescriptor
-	(*Value_Struct)(nil),          // 11: stroppy.Value.Struct
-	(*Generation_Rule)(nil),       // 12: stroppy.Generation.Rule
+	(TxIsolationLevel)(0),          // 0: stroppy.TxIsolationLevel
+	(*IndexDescriptor)(nil),        // 1: stroppy.IndexDescriptor
+	(*ColumnDescriptor)(nil),       // 2: stroppy.ColumnDescriptor
+	(*TableDescriptor)(nil),        // 3: stroppy.TableDescriptor
+	(*QueryParamDescriptor)(nil),   // 4: stroppy.QueryParamDescriptor
+	(*QueryDescriptor)(nil),        // 5: stroppy.QueryDescriptor
+	(*TransactionDescriptor)(nil),  // 6: stroppy.TransactionDescriptor
+	(*UnitDescriptor)(nil),         // 7: stroppy.UnitDescriptor
+	(*WorkloadUnitDescriptor)(nil), // 8: stroppy.WorkloadUnitDescriptor
+	(*WorkloadDescriptor)(nil),     // 9: stroppy.WorkloadDescriptor
+	(*BenchmarkDescriptor)(nil),    // 10: stroppy.BenchmarkDescriptor
+	(*Value_Struct)(nil),           // 11: stroppy.Value.Struct
+	(*Generation_Rule)(nil),        // 12: stroppy.Generation.Rule
 }
 var file_descriptor_proto_depIdxs = []int32{
 	11, // 0: stroppy.IndexDescriptor.db_specific:type_name -> stroppy.Value.Struct
@@ -958,9 +968,9 @@ var file_descriptor_proto_depIdxs = []int32{
 	3,  // 11: stroppy.UnitDescriptor.create_table:type_name -> stroppy.TableDescriptor
 	5,  // 12: stroppy.UnitDescriptor.query:type_name -> stroppy.QueryDescriptor
 	6,  // 13: stroppy.UnitDescriptor.transaction:type_name -> stroppy.TransactionDescriptor
-	7,  // 14: stroppy.StepUnitDescriptor.descriptor:type_name -> stroppy.UnitDescriptor
-	8,  // 15: stroppy.StepDescriptor.units:type_name -> stroppy.StepUnitDescriptor
-	9,  // 16: stroppy.BenchmarkDescriptor.steps:type_name -> stroppy.StepDescriptor
+	7,  // 14: stroppy.WorkloadUnitDescriptor.descriptor:type_name -> stroppy.UnitDescriptor
+	8,  // 15: stroppy.WorkloadDescriptor.units:type_name -> stroppy.WorkloadUnitDescriptor
+	9,  // 16: stroppy.BenchmarkDescriptor.workloads:type_name -> stroppy.WorkloadDescriptor
 	17, // [17:17] is the sub-list for method output_type
 	17, // [17:17] is the sub-list for method input_type
 	17, // [17:17] is the sub-list for extension type_name

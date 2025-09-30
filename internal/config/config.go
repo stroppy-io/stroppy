@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"slices"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
@@ -11,7 +12,34 @@ type Config struct {
 	StepContexts []*stroppy.StepContext
 }
 
-func LoadAndValidateConfig(runConfigPath string, requestedSteps ...string) (*Config, error) {
+type configLoadOptions struct {
+	requestSteps     []string
+	requestSkipSteps []string
+}
+
+type LoadOption func(options *configLoadOptions)
+
+func WithRequestedSteps(steps []string) LoadOption {
+	return func(options *configLoadOptions) {
+		if len(steps) == 0 {
+			return
+		}
+
+		options.requestSteps = steps
+	}
+}
+
+func WithRequestedSkipSteps(steps []string) LoadOption {
+	return func(options *configLoadOptions) {
+		if len(steps) == 0 {
+			return
+		}
+
+		options.requestSkipSteps = steps
+	}
+}
+
+func LoadAndValidateConfig(runConfigPath string, options ...LoadOption) (*Config, error) {
 	config, err := loadProtoConfig[*stroppy.ConfigFile](runConfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load run config: %w", err)
@@ -27,8 +55,24 @@ func LoadAndValidateConfig(runConfigPath string, requestedSteps ...string) (*Con
 		return nil, fmt.Errorf("failed to validate run config: %w", err)
 	}
 
-	if len(requestedSteps) == 0 {
-		for _, step := range config.GetBenchmark().GetSteps() {
+	allSteps := make([]string, 0)
+	for _, step := range config.GetSteps() {
+		allSteps = append(allSteps, step.GetName())
+	}
+
+	opts := &configLoadOptions{
+		requestSteps:     allSteps,
+		requestSkipSteps: make([]string, 0),
+	}
+	for _, option := range options {
+		option(opts)
+	}
+
+	requestedSteps := make([]string, 0)
+
+	for _, step := range config.GetSteps() {
+		if slices.Contains(opts.requestSteps, step.GetName()) &&
+			!slices.Contains(opts.requestSkipSteps, step.GetName()) {
 			requestedSteps = append(requestedSteps, step.GetName())
 		}
 	}

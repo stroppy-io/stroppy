@@ -28,14 +28,16 @@ type StepContext struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Global configuration of the benchmark and its steps
 	Config *GlobalConfig `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	// * Current step
+	Step *Step `protobuf:"bytes,2,opt,name=step,proto3" json:"step,omitempty"`
 	// * Executor configuration
-	Executor *ExecutorConfig `protobuf:"bytes,2,opt,name=executor,proto3" json:"executor,omitempty"`
+	Executor *ExecutorConfig `protobuf:"bytes,3,opt,name=executor,proto3" json:"executor,omitempty"`
 	// * Exporter configuration
-	Exporter *ExporterConfig `protobuf:"bytes,3,opt,name=exporter,proto3,oneof" json:"exporter,omitempty"`
-	// * Current step descriptor
-	StepDescriptor *StepDescriptor `protobuf:"bytes,4,opt,name=step_descriptor,json=stepDescriptor,proto3" json:"step_descriptor,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	Exporter *ExporterConfig `protobuf:"bytes,4,opt,name=exporter,proto3,oneof" json:"exporter,omitempty"`
+	// * Current workload descriptor
+	Workload      *WorkloadDescriptor `protobuf:"bytes,5,opt,name=workload,proto3" json:"workload,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StepContext) Reset() {
@@ -75,6 +77,13 @@ func (x *StepContext) GetConfig() *GlobalConfig {
 	return nil
 }
 
+func (x *StepContext) GetStep() *Step {
+	if x != nil {
+		return x.Step
+	}
+	return nil
+}
+
 func (x *StepContext) GetExecutor() *ExecutorConfig {
 	if x != nil {
 		return x.Executor
@@ -89,21 +98,21 @@ func (x *StepContext) GetExporter() *ExporterConfig {
 	return nil
 }
 
-func (x *StepContext) GetStepDescriptor() *StepDescriptor {
+func (x *StepContext) GetWorkload() *WorkloadDescriptor {
 	if x != nil {
-		return x.StepDescriptor
+		return x.Workload
 	}
 	return nil
 }
 
 // *
-// UnitBuildContext provides the context needed to build a unit from a StepUnitDescriptor.
+// UnitBuildContext provides the context needed to build a unit from a WorkloadUnitDescriptor.
 type UnitContext struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Step context
 	StepContext *StepContext `protobuf:"bytes,1,opt,name=step_context,json=stepContext,proto3" json:"step_context,omitempty"`
 	// * Current unit descriptor
-	UnitDescriptor *StepUnitDescriptor `protobuf:"bytes,2,opt,name=unit_descriptor,json=unitDescriptor,proto3" json:"unit_descriptor,omitempty"`
+	UnitDescriptor *WorkloadUnitDescriptor `protobuf:"bytes,2,opt,name=unit_descriptor,json=unitDescriptor,proto3" json:"unit_descriptor,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -145,7 +154,7 @@ func (x *UnitContext) GetStepContext() *StepContext {
 	return nil
 }
 
-func (x *UnitContext) GetUnitDescriptor() *StepUnitDescriptor {
+func (x *UnitContext) GetUnitDescriptor() *WorkloadUnitDescriptor {
 	if x != nil {
 		return x.UnitDescriptor
 	}
@@ -278,16 +287,17 @@ var File_runtime_proto protoreflect.FileDescriptor
 
 const file_runtime_proto_rawDesc = "" +
 	"\n" +
-	"\rruntime.proto\x12\astroppy\x1a\fcommon.proto\x1a\fconfig.proto\x1a\x10descriptor.proto\"\xfa\x01\n" +
+	"\rruntime.proto\x12\astroppy\x1a\fcommon.proto\x1a\fconfig.proto\x1a\x10descriptor.proto\"\x94\x02\n" +
 	"\vStepContext\x12-\n" +
-	"\x06config\x18\x01 \x01(\v2\x15.stroppy.GlobalConfigR\x06config\x123\n" +
-	"\bexecutor\x18\x02 \x01(\v2\x17.stroppy.ExecutorConfigR\bexecutor\x128\n" +
-	"\bexporter\x18\x03 \x01(\v2\x17.stroppy.ExporterConfigH\x00R\bexporter\x88\x01\x01\x12@\n" +
-	"\x0fstep_descriptor\x18\x04 \x01(\v2\x17.stroppy.StepDescriptorR\x0estepDescriptorB\v\n" +
-	"\t_exporter\"\x8c\x01\n" +
+	"\x06config\x18\x01 \x01(\v2\x15.stroppy.GlobalConfigR\x06config\x12!\n" +
+	"\x04step\x18\x02 \x01(\v2\r.stroppy.StepR\x04step\x123\n" +
+	"\bexecutor\x18\x03 \x01(\v2\x17.stroppy.ExecutorConfigR\bexecutor\x128\n" +
+	"\bexporter\x18\x04 \x01(\v2\x17.stroppy.ExporterConfigH\x00R\bexporter\x88\x01\x01\x127\n" +
+	"\bworkload\x18\x05 \x01(\v2\x1b.stroppy.WorkloadDescriptorR\bworkloadB\v\n" +
+	"\t_exporter\"\x90\x01\n" +
 	"\vUnitContext\x127\n" +
-	"\fstep_context\x18\x01 \x01(\v2\x14.stroppy.StepContextR\vstepContext\x12D\n" +
-	"\x0funit_descriptor\x18\x02 \x01(\v2\x1b.stroppy.StepUnitDescriptorR\x0eunitDescriptor\"c\n" +
+	"\fstep_context\x18\x01 \x01(\v2\x14.stroppy.StepContextR\vstepContext\x12H\n" +
+	"\x0funit_descriptor\x18\x02 \x01(\v2\x1f.stroppy.WorkloadUnitDescriptorR\x0eunitDescriptor\"c\n" +
 	"\vDriverQuery\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\arequest\x18\x02 \x01(\tR\arequest\x12&\n" +
@@ -310,33 +320,35 @@ func file_runtime_proto_rawDescGZIP() []byte {
 
 var file_runtime_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_runtime_proto_goTypes = []any{
-	(*StepContext)(nil),        // 0: stroppy.StepContext
-	(*UnitContext)(nil),        // 1: stroppy.UnitContext
-	(*DriverQuery)(nil),        // 2: stroppy.DriverQuery
-	(*DriverTransaction)(nil),  // 3: stroppy.DriverTransaction
-	(*GlobalConfig)(nil),       // 4: stroppy.GlobalConfig
-	(*ExecutorConfig)(nil),     // 5: stroppy.ExecutorConfig
-	(*ExporterConfig)(nil),     // 6: stroppy.ExporterConfig
-	(*StepDescriptor)(nil),     // 7: stroppy.StepDescriptor
-	(*StepUnitDescriptor)(nil), // 8: stroppy.StepUnitDescriptor
-	(*Value)(nil),              // 9: stroppy.Value
-	(TxIsolationLevel)(0),      // 10: stroppy.TxIsolationLevel
+	(*StepContext)(nil),            // 0: stroppy.StepContext
+	(*UnitContext)(nil),            // 1: stroppy.UnitContext
+	(*DriverQuery)(nil),            // 2: stroppy.DriverQuery
+	(*DriverTransaction)(nil),      // 3: stroppy.DriverTransaction
+	(*GlobalConfig)(nil),           // 4: stroppy.GlobalConfig
+	(*Step)(nil),                   // 5: stroppy.Step
+	(*ExecutorConfig)(nil),         // 6: stroppy.ExecutorConfig
+	(*ExporterConfig)(nil),         // 7: stroppy.ExporterConfig
+	(*WorkloadDescriptor)(nil),     // 8: stroppy.WorkloadDescriptor
+	(*WorkloadUnitDescriptor)(nil), // 9: stroppy.WorkloadUnitDescriptor
+	(*Value)(nil),                  // 10: stroppy.Value
+	(TxIsolationLevel)(0),          // 11: stroppy.TxIsolationLevel
 }
 var file_runtime_proto_depIdxs = []int32{
 	4,  // 0: stroppy.StepContext.config:type_name -> stroppy.GlobalConfig
-	5,  // 1: stroppy.StepContext.executor:type_name -> stroppy.ExecutorConfig
-	6,  // 2: stroppy.StepContext.exporter:type_name -> stroppy.ExporterConfig
-	7,  // 3: stroppy.StepContext.step_descriptor:type_name -> stroppy.StepDescriptor
-	0,  // 4: stroppy.UnitContext.step_context:type_name -> stroppy.StepContext
-	8,  // 5: stroppy.UnitContext.unit_descriptor:type_name -> stroppy.StepUnitDescriptor
-	9,  // 6: stroppy.DriverQuery.params:type_name -> stroppy.Value
-	2,  // 7: stroppy.DriverTransaction.queries:type_name -> stroppy.DriverQuery
-	10, // 8: stroppy.DriverTransaction.isolation_level:type_name -> stroppy.TxIsolationLevel
-	9,  // [9:9] is the sub-list for method output_type
-	9,  // [9:9] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	5,  // 1: stroppy.StepContext.step:type_name -> stroppy.Step
+	6,  // 2: stroppy.StepContext.executor:type_name -> stroppy.ExecutorConfig
+	7,  // 3: stroppy.StepContext.exporter:type_name -> stroppy.ExporterConfig
+	8,  // 4: stroppy.StepContext.workload:type_name -> stroppy.WorkloadDescriptor
+	0,  // 5: stroppy.UnitContext.step_context:type_name -> stroppy.StepContext
+	9,  // 6: stroppy.UnitContext.unit_descriptor:type_name -> stroppy.WorkloadUnitDescriptor
+	10, // 7: stroppy.DriverQuery.params:type_name -> stroppy.Value
+	2,  // 8: stroppy.DriverTransaction.queries:type_name -> stroppy.DriverQuery
+	11, // 9: stroppy.DriverTransaction.isolation_level:type_name -> stroppy.TxIsolationLevel
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_runtime_proto_init() }

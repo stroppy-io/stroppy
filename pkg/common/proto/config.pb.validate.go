@@ -602,31 +602,30 @@ var _ interface {
 	ErrorName() string
 } = ExecutorConfigValidationError{}
 
-// Validate checks the field values on StepExecutionMapping with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *StepExecutionMapping) Validate() error {
+// Validate checks the field values on Step with the rules defined in the proto
+// definition for this message. If any rules are violated, the first error
+// encountered is returned, or nil if there are no violations.
+func (m *Step) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on StepExecutionMapping with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// StepExecutionMappingMultiError, or nil if none found.
-func (m *StepExecutionMapping) ValidateAll() error {
+// ValidateAll checks the field values on Step with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in StepMultiError, or nil if none found.
+func (m *Step) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *StepExecutionMapping) validate(all bool) error {
+func (m *Step) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	if utf8.RuneCountInString(m.GetStepName()) < 1 {
-		err := StepExecutionMappingValidationError{
-			field:  "StepName",
+	if utf8.RuneCountInString(m.GetName()) < 1 {
+		err := StepValidationError{
+			field:  "Name",
 			reason: "value length must be at least 1 runes",
 		}
 		if !all {
@@ -635,9 +634,9 @@ func (m *StepExecutionMapping) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if utf8.RuneCountInString(m.GetExecutorName()) < 1 {
-		err := StepExecutionMappingValidationError{
-			field:  "ExecutorName",
+	if utf8.RuneCountInString(m.GetWorkload()) < 1 {
+		err := StepValidationError{
+			field:  "Workload",
 			reason: "value length must be at least 1 runes",
 		}
 		if !all {
@@ -646,26 +645,34 @@ func (m *StepExecutionMapping) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	// no validation rules for Async
+	if utf8.RuneCountInString(m.GetExecutor()) < 1 {
+		err := StepValidationError{
+			field:  "Executor",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	if m.ExporterName != nil {
-		// no validation rules for ExporterName
+	if m.Exporter != nil {
+		// no validation rules for Exporter
 	}
 
 	if len(errors) > 0 {
-		return StepExecutionMappingMultiError(errors)
+		return StepMultiError(errors)
 	}
 
 	return nil
 }
 
-// StepExecutionMappingMultiError is an error wrapping multiple validation
-// errors returned by StepExecutionMapping.ValidateAll() if the designated
-// constraints aren't met.
-type StepExecutionMappingMultiError []error
+// StepMultiError is an error wrapping multiple validation errors returned by
+// Step.ValidateAll() if the designated constraints aren't met.
+type StepMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m StepExecutionMappingMultiError) Error() string {
+func (m StepMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -674,11 +681,11 @@ func (m StepExecutionMappingMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m StepExecutionMappingMultiError) AllErrors() []error { return m }
+func (m StepMultiError) AllErrors() []error { return m }
 
-// StepExecutionMappingValidationError is the validation error returned by
-// StepExecutionMapping.Validate if the designated constraints aren't met.
-type StepExecutionMappingValidationError struct {
+// StepValidationError is the validation error returned by Step.Validate if the
+// designated constraints aren't met.
+type StepValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -686,24 +693,22 @@ type StepExecutionMappingValidationError struct {
 }
 
 // Field function returns field value.
-func (e StepExecutionMappingValidationError) Field() string { return e.field }
+func (e StepValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e StepExecutionMappingValidationError) Reason() string { return e.reason }
+func (e StepValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e StepExecutionMappingValidationError) Cause() error { return e.cause }
+func (e StepValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e StepExecutionMappingValidationError) Key() bool { return e.key }
+func (e StepValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e StepExecutionMappingValidationError) ErrorName() string {
-	return "StepExecutionMappingValidationError"
-}
+func (e StepValidationError) ErrorName() string { return "StepValidationError" }
 
 // Error satisfies the builtin error interface
-func (e StepExecutionMappingValidationError) Error() string {
+func (e StepValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -715,14 +720,14 @@ func (e StepExecutionMappingValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sStepExecutionMapping.%s: %s%s",
+		"invalid %sStep.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = StepExecutionMappingValidationError{}
+var _ error = StepValidationError{}
 
 var _ interface {
 	Field() string
@@ -730,7 +735,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = StepExecutionMappingValidationError{}
+} = StepValidationError{}
 
 // Validate checks the field values on SideCarConfig with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
@@ -1280,7 +1285,7 @@ func (m *ConfigFile) validate(all bool) error {
 
 	}
 
-	for idx, item := range m.GetStepExecutorMappings() {
+	for idx, item := range m.GetSteps() {
 		_, _ = idx, item
 
 		if all {
@@ -1288,7 +1293,7 @@ func (m *ConfigFile) validate(all bool) error {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, ConfigFileValidationError{
-						field:  fmt.Sprintf("StepExecutorMappings[%v]", idx),
+						field:  fmt.Sprintf("Steps[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1296,7 +1301,7 @@ func (m *ConfigFile) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, ConfigFileValidationError{
-						field:  fmt.Sprintf("StepExecutorMappings[%v]", idx),
+						field:  fmt.Sprintf("Steps[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1305,7 +1310,7 @@ func (m *ConfigFile) validate(all bool) error {
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return ConfigFileValidationError{
-					field:  fmt.Sprintf("StepExecutorMappings[%v]", idx),
+					field:  fmt.Sprintf("Steps[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

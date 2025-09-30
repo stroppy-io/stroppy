@@ -3330,33 +3330,33 @@ export interface ExecutorConfig {
  * *
  * StepExecutorMappingConfig contains configuration for mapping steps to executors.
  *
- * @generated from protobuf message stroppy.StepExecutionMapping
+ * @generated from protobuf message stroppy.Step
  */
-export interface StepExecutionMapping {
+export interface Step {
     /**
      * * Name of the step
      *
-     * @generated from protobuf field: string step_name = 1
+     * @generated from protobuf field: string name = 1
      */
-    stepName: string;
+    name: string;
+    /**
+     * * Name of the step
+     *
+     * @generated from protobuf field: string workload = 2
+     */
+    workload: string;
     /**
      * * Name of the executor
      *
-     * @generated from protobuf field: string executor_name = 2
+     * @generated from protobuf field: string executor = 3
      */
-    executorName: string;
+    executor: string;
     /**
      * * Name of the exporter
      *
-     * @generated from protobuf field: optional string exporter_name = 3
+     * @generated from protobuf field: optional string exporter = 4
      */
-    exporterName?: string;
-    /**
-     * * Whether to execute all operations in this step asynchronously
-     *
-     * @generated from protobuf field: bool async = 4
-     */
-    async: boolean;
+    exporter?: string;
 }
 /**
  * *
@@ -3464,9 +3464,9 @@ export interface ConfigFile {
     /**
      * * Step to executor mapping configuration
      *
-     * @generated from protobuf field: repeated stroppy.StepExecutionMapping step_executor_mappings = 4
+     * @generated from protobuf field: repeated stroppy.Step steps = 4
      */
-    stepExecutorMappings: StepExecutionMapping[];
+    steps: Step[];
     /**
      * * Plugins configuration
      *
@@ -3706,40 +3706,40 @@ class ExecutorConfig$Type extends MessageType<ExecutorConfig> {
  */
 export const ExecutorConfig = new ExecutorConfig$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class StepExecutionMapping$Type extends MessageType<StepExecutionMapping> {
+class Step$Type extends MessageType<Step> {
     constructor() {
-        super("stroppy.StepExecutionMapping", [
-            { no: 1, name: "step_name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "executor_name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "exporter_name", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
-            { no: 4, name: "async", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
+        super("stroppy.Step", [
+            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "workload", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "executor", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 4, name: "exporter", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
         ]);
     }
-    create(value?: PartialMessage<StepExecutionMapping>): StepExecutionMapping {
+    create(value?: PartialMessage<Step>): Step {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.stepName = "";
-        message.executorName = "";
-        message.async = false;
+        message.name = "";
+        message.workload = "";
+        message.executor = "";
         if (value !== undefined)
-            reflectionMergePartial<StepExecutionMapping>(this, message, value);
+            reflectionMergePartial<Step>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StepExecutionMapping): StepExecutionMapping {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Step): Step {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* string step_name */ 1:
-                    message.stepName = reader.string();
+                case /* string name */ 1:
+                    message.name = reader.string();
                     break;
-                case /* string executor_name */ 2:
-                    message.executorName = reader.string();
+                case /* string workload */ 2:
+                    message.workload = reader.string();
                     break;
-                case /* optional string exporter_name */ 3:
-                    message.exporterName = reader.string();
+                case /* string executor */ 3:
+                    message.executor = reader.string();
                     break;
-                case /* bool async */ 4:
-                    message.async = reader.bool();
+                case /* optional string exporter */ 4:
+                    message.exporter = reader.string();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -3752,19 +3752,19 @@ class StepExecutionMapping$Type extends MessageType<StepExecutionMapping> {
         }
         return message;
     }
-    internalBinaryWrite(message: StepExecutionMapping, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string step_name = 1; */
-        if (message.stepName !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.stepName);
-        /* string executor_name = 2; */
-        if (message.executorName !== "")
-            writer.tag(2, WireType.LengthDelimited).string(message.executorName);
-        /* optional string exporter_name = 3; */
-        if (message.exporterName !== undefined)
-            writer.tag(3, WireType.LengthDelimited).string(message.exporterName);
-        /* bool async = 4; */
-        if (message.async !== false)
-            writer.tag(4, WireType.Varint).bool(message.async);
+    internalBinaryWrite(message: Step, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string name = 1; */
+        if (message.name !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.name);
+        /* string workload = 2; */
+        if (message.workload !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.workload);
+        /* string executor = 3; */
+        if (message.executor !== "")
+            writer.tag(3, WireType.LengthDelimited).string(message.executor);
+        /* optional string exporter = 4; */
+        if (message.exporter !== undefined)
+            writer.tag(4, WireType.LengthDelimited).string(message.exporter);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -3772,9 +3772,9 @@ class StepExecutionMapping$Type extends MessageType<StepExecutionMapping> {
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.StepExecutionMapping
+ * @generated MessageType for protobuf message stroppy.Step
  */
-export const StepExecutionMapping = new StepExecutionMapping$Type();
+export const Step = new Step$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class SideCarConfig$Type extends MessageType<SideCarConfig> {
     constructor() {
@@ -3975,7 +3975,7 @@ class ConfigFile$Type extends MessageType<ConfigFile> {
             { no: 1, name: "global", kind: "message", T: () => GlobalConfig },
             { no: 2, name: "exporters", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => ExporterConfig },
             { no: 3, name: "executors", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => ExecutorConfig },
-            { no: 4, name: "step_executor_mappings", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => StepExecutionMapping },
+            { no: 4, name: "steps", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Step },
             { no: 5, name: "side_cars", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => SideCarConfig },
             { no: 6, name: "benchmark", kind: "message", T: () => BenchmarkDescriptor }
         ]);
@@ -3984,7 +3984,7 @@ class ConfigFile$Type extends MessageType<ConfigFile> {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.exporters = [];
         message.executors = [];
-        message.stepExecutorMappings = [];
+        message.steps = [];
         message.sideCars = [];
         if (value !== undefined)
             reflectionMergePartial<ConfigFile>(this, message, value);
@@ -4004,8 +4004,8 @@ class ConfigFile$Type extends MessageType<ConfigFile> {
                 case /* repeated stroppy.ExecutorConfig executors */ 3:
                     message.executors.push(ExecutorConfig.internalBinaryRead(reader, reader.uint32(), options));
                     break;
-                case /* repeated stroppy.StepExecutionMapping step_executor_mappings */ 4:
-                    message.stepExecutorMappings.push(StepExecutionMapping.internalBinaryRead(reader, reader.uint32(), options));
+                case /* repeated stroppy.Step steps */ 4:
+                    message.steps.push(Step.internalBinaryRead(reader, reader.uint32(), options));
                     break;
                 case /* repeated stroppy.SideCarConfig side_cars */ 5:
                     message.sideCars.push(SideCarConfig.internalBinaryRead(reader, reader.uint32(), options));
@@ -4034,9 +4034,9 @@ class ConfigFile$Type extends MessageType<ConfigFile> {
         /* repeated stroppy.ExecutorConfig executors = 3; */
         for (let i = 0; i < message.executors.length; i++)
             ExecutorConfig.internalBinaryWrite(message.executors[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* repeated stroppy.StepExecutionMapping step_executor_mappings = 4; */
-        for (let i = 0; i < message.stepExecutorMappings.length; i++)
-            StepExecutionMapping.internalBinaryWrite(message.stepExecutorMappings[i], writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* repeated stroppy.Step steps = 4; */
+        for (let i = 0; i < message.steps.length; i++)
+            Step.internalBinaryWrite(message.steps[i], writer.tag(4, WireType.LengthDelimited).fork(), options).join();
         /* repeated stroppy.SideCarConfig side_cars = 5; */
         for (let i = 0; i < message.sideCars.length; i++)
             SideCarConfig.internalBinaryWrite(message.sideCars[i], writer.tag(5, WireType.LengthDelimited).fork(), options).join();
@@ -4318,13 +4318,13 @@ export interface UnitDescriptor {
 }
 /**
  * *
- * StepUnitDescriptor represents a single unit of work.
+ * WorkloadUnitDescriptor represents a single unit of work.
  * It can be a table creation operation, a query execution operation, or a
  * transaction execution operation.
  *
- * @generated from protobuf message stroppy.StepUnitDescriptor
+ * @generated from protobuf message stroppy.WorkloadUnitDescriptor
  */
-export interface StepUnitDescriptor {
+export interface WorkloadUnitDescriptor {
     /**
      * @generated from protobuf field: stroppy.UnitDescriptor descriptor = 6
      */
@@ -4338,12 +4338,12 @@ export interface StepUnitDescriptor {
 }
 /**
  * *
- * StepDescriptor represents a logical step in a benchmark.
+ * WorkloadDescriptor represents a logical step in a benchmark.
  * It contains a list of operations to perform in this step.
  *
- * @generated from protobuf message stroppy.StepDescriptor
+ * @generated from protobuf message stroppy.WorkloadDescriptor
  */
-export interface StepDescriptor {
+export interface WorkloadDescriptor {
     /**
      * * Name of the step
      *
@@ -4351,11 +4351,17 @@ export interface StepDescriptor {
      */
     name: string;
     /**
+     * * Whether to execute all operations in this workload asynchronously
+     *
+     * @generated from protobuf field: bool async = 2
+     */
+    async: boolean;
+    /**
      * * List of operations to perform in this step
      *
-     * @generated from protobuf field: repeated stroppy.StepUnitDescriptor units = 2
+     * @generated from protobuf field: repeated stroppy.WorkloadUnitDescriptor units = 3
      */
-    units: StepUnitDescriptor[];
+    units: WorkloadUnitDescriptor[];
 }
 /**
  * *
@@ -4374,9 +4380,9 @@ export interface BenchmarkDescriptor {
     /**
      * * List of steps to execute in the benchmark
      *
-     * @generated from protobuf field: repeated stroppy.StepDescriptor steps = 100
+     * @generated from protobuf field: repeated stroppy.WorkloadDescriptor workloads = 100
      */
-    steps: StepDescriptor[];
+    workloads: WorkloadDescriptor[];
 }
 /**
  * *
@@ -4930,21 +4936,21 @@ class UnitDescriptor$Type extends MessageType<UnitDescriptor> {
  */
 export const UnitDescriptor = new UnitDescriptor$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
+class WorkloadUnitDescriptor$Type extends MessageType<WorkloadUnitDescriptor> {
     constructor() {
-        super("stroppy.StepUnitDescriptor", [
+        super("stroppy.WorkloadUnitDescriptor", [
             { no: 6, name: "descriptor", kind: "message", T: () => UnitDescriptor },
             { no: 5, name: "count", kind: "scalar", T: 4 /*ScalarType.UINT64*/ }
         ]);
     }
-    create(value?: PartialMessage<StepUnitDescriptor>): StepUnitDescriptor {
+    create(value?: PartialMessage<WorkloadUnitDescriptor>): WorkloadUnitDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.count = "0";
         if (value !== undefined)
-            reflectionMergePartial<StepUnitDescriptor>(this, message, value);
+            reflectionMergePartial<WorkloadUnitDescriptor>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StepUnitDescriptor): StepUnitDescriptor {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: WorkloadUnitDescriptor): WorkloadUnitDescriptor {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
@@ -4966,7 +4972,7 @@ class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
         }
         return message;
     }
-    internalBinaryWrite(message: StepUnitDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+    internalBinaryWrite(message: WorkloadUnitDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
         /* uint64 count = 5; */
         if (message.count !== "0")
             writer.tag(5, WireType.Varint).uint64(message.count);
@@ -4980,26 +4986,28 @@ class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.StepUnitDescriptor
+ * @generated MessageType for protobuf message stroppy.WorkloadUnitDescriptor
  */
-export const StepUnitDescriptor = new StepUnitDescriptor$Type();
+export const WorkloadUnitDescriptor = new WorkloadUnitDescriptor$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class StepDescriptor$Type extends MessageType<StepDescriptor> {
+class WorkloadDescriptor$Type extends MessageType<WorkloadDescriptor> {
     constructor() {
-        super("stroppy.StepDescriptor", [
+        super("stroppy.WorkloadDescriptor", [
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "units", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => StepUnitDescriptor }
+            { no: 2, name: "async", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 3, name: "units", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => WorkloadUnitDescriptor }
         ]);
     }
-    create(value?: PartialMessage<StepDescriptor>): StepDescriptor {
+    create(value?: PartialMessage<WorkloadDescriptor>): WorkloadDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.name = "";
+        message.async = false;
         message.units = [];
         if (value !== undefined)
-            reflectionMergePartial<StepDescriptor>(this, message, value);
+            reflectionMergePartial<WorkloadDescriptor>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StepDescriptor): StepDescriptor {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: WorkloadDescriptor): WorkloadDescriptor {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
@@ -5007,8 +5015,11 @@ class StepDescriptor$Type extends MessageType<StepDescriptor> {
                 case /* string name */ 1:
                     message.name = reader.string();
                     break;
-                case /* repeated stroppy.StepUnitDescriptor units */ 2:
-                    message.units.push(StepUnitDescriptor.internalBinaryRead(reader, reader.uint32(), options));
+                case /* bool async */ 2:
+                    message.async = reader.bool();
+                    break;
+                case /* repeated stroppy.WorkloadUnitDescriptor units */ 3:
+                    message.units.push(WorkloadUnitDescriptor.internalBinaryRead(reader, reader.uint32(), options));
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -5021,13 +5032,16 @@ class StepDescriptor$Type extends MessageType<StepDescriptor> {
         }
         return message;
     }
-    internalBinaryWrite(message: StepDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+    internalBinaryWrite(message: WorkloadDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
         /* string name = 1; */
         if (message.name !== "")
             writer.tag(1, WireType.LengthDelimited).string(message.name);
-        /* repeated stroppy.StepUnitDescriptor units = 2; */
+        /* bool async = 2; */
+        if (message.async !== false)
+            writer.tag(2, WireType.Varint).bool(message.async);
+        /* repeated stroppy.WorkloadUnitDescriptor units = 3; */
         for (let i = 0; i < message.units.length; i++)
-            StepUnitDescriptor.internalBinaryWrite(message.units[i], writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+            WorkloadUnitDescriptor.internalBinaryWrite(message.units[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -5035,21 +5049,21 @@ class StepDescriptor$Type extends MessageType<StepDescriptor> {
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.StepDescriptor
+ * @generated MessageType for protobuf message stroppy.WorkloadDescriptor
  */
-export const StepDescriptor = new StepDescriptor$Type();
+export const WorkloadDescriptor = new WorkloadDescriptor$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class BenchmarkDescriptor$Type extends MessageType<BenchmarkDescriptor> {
     constructor() {
         super("stroppy.BenchmarkDescriptor", [
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 100, name: "steps", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => StepDescriptor }
+            { no: 100, name: "workloads", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => WorkloadDescriptor }
         ]);
     }
     create(value?: PartialMessage<BenchmarkDescriptor>): BenchmarkDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.name = "";
-        message.steps = [];
+        message.workloads = [];
         if (value !== undefined)
             reflectionMergePartial<BenchmarkDescriptor>(this, message, value);
         return message;
@@ -5062,8 +5076,8 @@ class BenchmarkDescriptor$Type extends MessageType<BenchmarkDescriptor> {
                 case /* string name */ 1:
                     message.name = reader.string();
                     break;
-                case /* repeated stroppy.StepDescriptor steps */ 100:
-                    message.steps.push(StepDescriptor.internalBinaryRead(reader, reader.uint32(), options));
+                case /* repeated stroppy.WorkloadDescriptor workloads */ 100:
+                    message.workloads.push(WorkloadDescriptor.internalBinaryRead(reader, reader.uint32(), options));
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -5080,9 +5094,9 @@ class BenchmarkDescriptor$Type extends MessageType<BenchmarkDescriptor> {
         /* string name = 1; */
         if (message.name !== "")
             writer.tag(1, WireType.LengthDelimited).string(message.name);
-        /* repeated stroppy.StepDescriptor steps = 100; */
-        for (let i = 0; i < message.steps.length; i++)
-            StepDescriptor.internalBinaryWrite(message.steps[i], writer.tag(100, WireType.LengthDelimited).fork(), options).join();
+        /* repeated stroppy.WorkloadDescriptor workloads = 100; */
+        for (let i = 0; i < message.workloads.length; i++)
+            WorkloadDescriptor.internalBinaryWrite(message.workloads[i], writer.tag(100, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -6099,27 +6113,33 @@ export interface StepContext {
      */
     config?: GlobalConfig;
     /**
+     * * Current step
+     *
+     * @generated from protobuf field: stroppy.Step step = 2
+     */
+    step?: Step;
+    /**
      * * Executor configuration
      *
-     * @generated from protobuf field: stroppy.ExecutorConfig executor = 2
+     * @generated from protobuf field: stroppy.ExecutorConfig executor = 3
      */
     executor?: ExecutorConfig;
     /**
      * * Exporter configuration
      *
-     * @generated from protobuf field: optional stroppy.ExporterConfig exporter = 3
+     * @generated from protobuf field: optional stroppy.ExporterConfig exporter = 4
      */
     exporter?: ExporterConfig;
     /**
-     * * Current step descriptor
+     * * Current workload descriptor
      *
-     * @generated from protobuf field: stroppy.StepDescriptor step_descriptor = 4
+     * @generated from protobuf field: stroppy.WorkloadDescriptor workload = 5
      */
-    stepDescriptor?: StepDescriptor;
+    workload?: WorkloadDescriptor;
 }
 /**
  * *
- * UnitBuildContext provides the context needed to build a unit from a StepUnitDescriptor.
+ * UnitBuildContext provides the context needed to build a unit from a WorkloadUnitDescriptor.
  *
  * @generated from protobuf message stroppy.UnitContext
  */
@@ -6133,9 +6153,9 @@ export interface UnitContext {
     /**
      * * Current unit descriptor
      *
-     * @generated from protobuf field: stroppy.StepUnitDescriptor unit_descriptor = 2
+     * @generated from protobuf field: stroppy.WorkloadUnitDescriptor unit_descriptor = 2
      */
-    unitDescriptor?: StepUnitDescriptor;
+    unitDescriptor?: WorkloadUnitDescriptor;
 }
 /**
  * *
@@ -6189,9 +6209,10 @@ class StepContext$Type extends MessageType<StepContext> {
     constructor() {
         super("stroppy.StepContext", [
             { no: 1, name: "config", kind: "message", T: () => GlobalConfig },
-            { no: 2, name: "executor", kind: "message", T: () => ExecutorConfig },
-            { no: 3, name: "exporter", kind: "message", T: () => ExporterConfig },
-            { no: 4, name: "step_descriptor", kind: "message", T: () => StepDescriptor }
+            { no: 2, name: "step", kind: "message", T: () => Step },
+            { no: 3, name: "executor", kind: "message", T: () => ExecutorConfig },
+            { no: 4, name: "exporter", kind: "message", T: () => ExporterConfig },
+            { no: 5, name: "workload", kind: "message", T: () => WorkloadDescriptor }
         ]);
     }
     create(value?: PartialMessage<StepContext>): StepContext {
@@ -6208,14 +6229,17 @@ class StepContext$Type extends MessageType<StepContext> {
                 case /* stroppy.GlobalConfig config */ 1:
                     message.config = GlobalConfig.internalBinaryRead(reader, reader.uint32(), options, message.config);
                     break;
-                case /* stroppy.ExecutorConfig executor */ 2:
+                case /* stroppy.Step step */ 2:
+                    message.step = Step.internalBinaryRead(reader, reader.uint32(), options, message.step);
+                    break;
+                case /* stroppy.ExecutorConfig executor */ 3:
                     message.executor = ExecutorConfig.internalBinaryRead(reader, reader.uint32(), options, message.executor);
                     break;
-                case /* optional stroppy.ExporterConfig exporter */ 3:
+                case /* optional stroppy.ExporterConfig exporter */ 4:
                     message.exporter = ExporterConfig.internalBinaryRead(reader, reader.uint32(), options, message.exporter);
                     break;
-                case /* stroppy.StepDescriptor step_descriptor */ 4:
-                    message.stepDescriptor = StepDescriptor.internalBinaryRead(reader, reader.uint32(), options, message.stepDescriptor);
+                case /* stroppy.WorkloadDescriptor workload */ 5:
+                    message.workload = WorkloadDescriptor.internalBinaryRead(reader, reader.uint32(), options, message.workload);
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -6232,15 +6256,18 @@ class StepContext$Type extends MessageType<StepContext> {
         /* stroppy.GlobalConfig config = 1; */
         if (message.config)
             GlobalConfig.internalBinaryWrite(message.config, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.ExecutorConfig executor = 2; */
+        /* stroppy.Step step = 2; */
+        if (message.step)
+            Step.internalBinaryWrite(message.step, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.ExecutorConfig executor = 3; */
         if (message.executor)
-            ExecutorConfig.internalBinaryWrite(message.executor, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        /* optional stroppy.ExporterConfig exporter = 3; */
+            ExecutorConfig.internalBinaryWrite(message.executor, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* optional stroppy.ExporterConfig exporter = 4; */
         if (message.exporter)
-            ExporterConfig.internalBinaryWrite(message.exporter, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.StepDescriptor step_descriptor = 4; */
-        if (message.stepDescriptor)
-            StepDescriptor.internalBinaryWrite(message.stepDescriptor, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+            ExporterConfig.internalBinaryWrite(message.exporter, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.WorkloadDescriptor workload = 5; */
+        if (message.workload)
+            WorkloadDescriptor.internalBinaryWrite(message.workload, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -6256,7 +6283,7 @@ class UnitContext$Type extends MessageType<UnitContext> {
     constructor() {
         super("stroppy.UnitContext", [
             { no: 1, name: "step_context", kind: "message", T: () => StepContext },
-            { no: 2, name: "unit_descriptor", kind: "message", T: () => StepUnitDescriptor }
+            { no: 2, name: "unit_descriptor", kind: "message", T: () => WorkloadUnitDescriptor }
         ]);
     }
     create(value?: PartialMessage<UnitContext>): UnitContext {
@@ -6273,8 +6300,8 @@ class UnitContext$Type extends MessageType<UnitContext> {
                 case /* stroppy.StepContext step_context */ 1:
                     message.stepContext = StepContext.internalBinaryRead(reader, reader.uint32(), options, message.stepContext);
                     break;
-                case /* stroppy.StepUnitDescriptor unit_descriptor */ 2:
-                    message.unitDescriptor = StepUnitDescriptor.internalBinaryRead(reader, reader.uint32(), options, message.unitDescriptor);
+                case /* stroppy.WorkloadUnitDescriptor unit_descriptor */ 2:
+                    message.unitDescriptor = WorkloadUnitDescriptor.internalBinaryRead(reader, reader.uint32(), options, message.unitDescriptor);
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -6291,9 +6318,9 @@ class UnitContext$Type extends MessageType<UnitContext> {
         /* stroppy.StepContext step_context = 1; */
         if (message.stepContext)
             StepContext.internalBinaryWrite(message.stepContext, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.StepUnitDescriptor unit_descriptor = 2; */
+        /* stroppy.WorkloadUnitDescriptor unit_descriptor = 2; */
         if (message.unitDescriptor)
-            StepUnitDescriptor.internalBinaryWrite(message.unitDescriptor, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+            WorkloadUnitDescriptor.internalBinaryWrite(message.unitDescriptor, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

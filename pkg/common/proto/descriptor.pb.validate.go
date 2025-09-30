@@ -1377,22 +1377,22 @@ var _ interface {
 	ErrorName() string
 } = UnitDescriptorValidationError{}
 
-// Validate checks the field values on StepUnitDescriptor with the rules
+// Validate checks the field values on WorkloadUnitDescriptor with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *StepUnitDescriptor) Validate() error {
+func (m *WorkloadUnitDescriptor) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on StepUnitDescriptor with the rules
+// ValidateAll checks the field values on WorkloadUnitDescriptor with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// StepUnitDescriptorMultiError, or nil if none found.
-func (m *StepUnitDescriptor) ValidateAll() error {
+// WorkloadUnitDescriptorMultiError, or nil if none found.
+func (m *WorkloadUnitDescriptor) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *StepUnitDescriptor) validate(all bool) error {
+func (m *WorkloadUnitDescriptor) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -1403,7 +1403,7 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 		switch v := interface{}(m.GetDescriptor_()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, StepUnitDescriptorValidationError{
+				errors = append(errors, WorkloadUnitDescriptorValidationError{
 					field:  "Descriptor_",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -1411,7 +1411,7 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, StepUnitDescriptorValidationError{
+				errors = append(errors, WorkloadUnitDescriptorValidationError{
 					field:  "Descriptor_",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -1420,7 +1420,7 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetDescriptor_()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return StepUnitDescriptorValidationError{
+			return WorkloadUnitDescriptorValidationError{
 				field:  "Descriptor_",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -1429,7 +1429,7 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 	}
 
 	if m.GetCount() <= 0 {
-		err := StepUnitDescriptorValidationError{
+		err := WorkloadUnitDescriptorValidationError{
 			field:  "Count",
 			reason: "value must be greater than 0",
 		}
@@ -1440,19 +1440,19 @@ func (m *StepUnitDescriptor) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return StepUnitDescriptorMultiError(errors)
+		return WorkloadUnitDescriptorMultiError(errors)
 	}
 
 	return nil
 }
 
-// StepUnitDescriptorMultiError is an error wrapping multiple validation errors
-// returned by StepUnitDescriptor.ValidateAll() if the designated constraints
-// aren't met.
-type StepUnitDescriptorMultiError []error
+// WorkloadUnitDescriptorMultiError is an error wrapping multiple validation
+// errors returned by WorkloadUnitDescriptor.ValidateAll() if the designated
+// constraints aren't met.
+type WorkloadUnitDescriptorMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m StepUnitDescriptorMultiError) Error() string {
+func (m WorkloadUnitDescriptorMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -1461,11 +1461,11 @@ func (m StepUnitDescriptorMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m StepUnitDescriptorMultiError) AllErrors() []error { return m }
+func (m WorkloadUnitDescriptorMultiError) AllErrors() []error { return m }
 
-// StepUnitDescriptorValidationError is the validation error returned by
-// StepUnitDescriptor.Validate if the designated constraints aren't met.
-type StepUnitDescriptorValidationError struct {
+// WorkloadUnitDescriptorValidationError is the validation error returned by
+// WorkloadUnitDescriptor.Validate if the designated constraints aren't met.
+type WorkloadUnitDescriptorValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -1473,24 +1473,24 @@ type StepUnitDescriptorValidationError struct {
 }
 
 // Field function returns field value.
-func (e StepUnitDescriptorValidationError) Field() string { return e.field }
+func (e WorkloadUnitDescriptorValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e StepUnitDescriptorValidationError) Reason() string { return e.reason }
+func (e WorkloadUnitDescriptorValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e StepUnitDescriptorValidationError) Cause() error { return e.cause }
+func (e WorkloadUnitDescriptorValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e StepUnitDescriptorValidationError) Key() bool { return e.key }
+func (e WorkloadUnitDescriptorValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e StepUnitDescriptorValidationError) ErrorName() string {
-	return "StepUnitDescriptorValidationError"
+func (e WorkloadUnitDescriptorValidationError) ErrorName() string {
+	return "WorkloadUnitDescriptorValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e StepUnitDescriptorValidationError) Error() string {
+func (e WorkloadUnitDescriptorValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -1502,14 +1502,14 @@ func (e StepUnitDescriptorValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sStepUnitDescriptor.%s: %s%s",
+		"invalid %sWorkloadUnitDescriptor.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = StepUnitDescriptorValidationError{}
+var _ error = WorkloadUnitDescriptorValidationError{}
 
 var _ interface {
 	Field() string
@@ -1517,24 +1517,24 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = StepUnitDescriptorValidationError{}
+} = WorkloadUnitDescriptorValidationError{}
 
-// Validate checks the field values on StepDescriptor with the rules defined in
-// the proto definition for this message. If any rules are violated, the first
-// error encountered is returned, or nil if there are no violations.
-func (m *StepDescriptor) Validate() error {
+// Validate checks the field values on WorkloadDescriptor with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *WorkloadDescriptor) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on StepDescriptor with the rules defined
-// in the proto definition for this message. If any rules are violated, the
-// result is a list of violation errors wrapped in StepDescriptorMultiError,
-// or nil if none found.
-func (m *StepDescriptor) ValidateAll() error {
+// ValidateAll checks the field values on WorkloadDescriptor with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// WorkloadDescriptorMultiError, or nil if none found.
+func (m *WorkloadDescriptor) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *StepDescriptor) validate(all bool) error {
+func (m *WorkloadDescriptor) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -1542,7 +1542,7 @@ func (m *StepDescriptor) validate(all bool) error {
 	var errors []error
 
 	if utf8.RuneCountInString(m.GetName()) < 1 {
-		err := StepDescriptorValidationError{
+		err := WorkloadDescriptorValidationError{
 			field:  "Name",
 			reason: "value length must be at least 1 runes",
 		}
@@ -1552,8 +1552,10 @@ func (m *StepDescriptor) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for Async
+
 	if len(m.GetUnits()) < 1 {
-		err := StepDescriptorValidationError{
+		err := WorkloadDescriptorValidationError{
 			field:  "Units",
 			reason: "value must contain at least 1 item(s)",
 		}
@@ -1567,7 +1569,7 @@ func (m *StepDescriptor) validate(all bool) error {
 		_, _ = idx, item
 
 		if item == nil {
-			err := StepDescriptorValidationError{
+			err := WorkloadDescriptorValidationError{
 				field:  fmt.Sprintf("Units[%v]", idx),
 				reason: "value is required",
 			}
@@ -1581,7 +1583,7 @@ func (m *StepDescriptor) validate(all bool) error {
 			switch v := interface{}(item).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, StepDescriptorValidationError{
+					errors = append(errors, WorkloadDescriptorValidationError{
 						field:  fmt.Sprintf("Units[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -1589,7 +1591,7 @@ func (m *StepDescriptor) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, StepDescriptorValidationError{
+					errors = append(errors, WorkloadDescriptorValidationError{
 						field:  fmt.Sprintf("Units[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -1598,7 +1600,7 @@ func (m *StepDescriptor) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return StepDescriptorValidationError{
+				return WorkloadDescriptorValidationError{
 					field:  fmt.Sprintf("Units[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -1609,19 +1611,19 @@ func (m *StepDescriptor) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return StepDescriptorMultiError(errors)
+		return WorkloadDescriptorMultiError(errors)
 	}
 
 	return nil
 }
 
-// StepDescriptorMultiError is an error wrapping multiple validation errors
-// returned by StepDescriptor.ValidateAll() if the designated constraints
+// WorkloadDescriptorMultiError is an error wrapping multiple validation errors
+// returned by WorkloadDescriptor.ValidateAll() if the designated constraints
 // aren't met.
-type StepDescriptorMultiError []error
+type WorkloadDescriptorMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m StepDescriptorMultiError) Error() string {
+func (m WorkloadDescriptorMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -1630,11 +1632,11 @@ func (m StepDescriptorMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m StepDescriptorMultiError) AllErrors() []error { return m }
+func (m WorkloadDescriptorMultiError) AllErrors() []error { return m }
 
-// StepDescriptorValidationError is the validation error returned by
-// StepDescriptor.Validate if the designated constraints aren't met.
-type StepDescriptorValidationError struct {
+// WorkloadDescriptorValidationError is the validation error returned by
+// WorkloadDescriptor.Validate if the designated constraints aren't met.
+type WorkloadDescriptorValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -1642,22 +1644,24 @@ type StepDescriptorValidationError struct {
 }
 
 // Field function returns field value.
-func (e StepDescriptorValidationError) Field() string { return e.field }
+func (e WorkloadDescriptorValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e StepDescriptorValidationError) Reason() string { return e.reason }
+func (e WorkloadDescriptorValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e StepDescriptorValidationError) Cause() error { return e.cause }
+func (e WorkloadDescriptorValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e StepDescriptorValidationError) Key() bool { return e.key }
+func (e WorkloadDescriptorValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e StepDescriptorValidationError) ErrorName() string { return "StepDescriptorValidationError" }
+func (e WorkloadDescriptorValidationError) ErrorName() string {
+	return "WorkloadDescriptorValidationError"
+}
 
 // Error satisfies the builtin error interface
-func (e StepDescriptorValidationError) Error() string {
+func (e WorkloadDescriptorValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -1669,14 +1673,14 @@ func (e StepDescriptorValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sStepDescriptor.%s: %s%s",
+		"invalid %sWorkloadDescriptor.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = StepDescriptorValidationError{}
+var _ error = WorkloadDescriptorValidationError{}
 
 var _ interface {
 	Field() string
@@ -1684,7 +1688,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = StepDescriptorValidationError{}
+} = WorkloadDescriptorValidationError{}
 
 // Validate checks the field values on BenchmarkDescriptor with the rules
 // defined in the proto definition for this message. If any rules are
@@ -1719,9 +1723,9 @@ func (m *BenchmarkDescriptor) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if len(m.GetSteps()) < 1 {
+	if len(m.GetWorkloads()) < 1 {
 		err := BenchmarkDescriptorValidationError{
-			field:  "Steps",
+			field:  "Workloads",
 			reason: "value must contain at least 1 item(s)",
 		}
 		if !all {
@@ -1730,12 +1734,12 @@ func (m *BenchmarkDescriptor) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	for idx, item := range m.GetSteps() {
+	for idx, item := range m.GetWorkloads() {
 		_, _ = idx, item
 
 		if item == nil {
 			err := BenchmarkDescriptorValidationError{
-				field:  fmt.Sprintf("Steps[%v]", idx),
+				field:  fmt.Sprintf("Workloads[%v]", idx),
 				reason: "value is required",
 			}
 			if !all {
@@ -1749,7 +1753,7 @@ func (m *BenchmarkDescriptor) validate(all bool) error {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, BenchmarkDescriptorValidationError{
-						field:  fmt.Sprintf("Steps[%v]", idx),
+						field:  fmt.Sprintf("Workloads[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1757,7 +1761,7 @@ func (m *BenchmarkDescriptor) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, BenchmarkDescriptorValidationError{
-						field:  fmt.Sprintf("Steps[%v]", idx),
+						field:  fmt.Sprintf("Workloads[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1766,7 +1770,7 @@ func (m *BenchmarkDescriptor) validate(all bool) error {
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return BenchmarkDescriptorValidationError{
-					field:  fmt.Sprintf("Steps[%v]", idx),
+					field:  fmt.Sprintf("Workloads[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

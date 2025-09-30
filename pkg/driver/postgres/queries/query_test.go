@@ -27,9 +27,9 @@ func TestNewQuery_Success(t *testing.T) {
 			}},
 		},
 	}
-	// step := &stroppy.StepDescriptor{
+	// step := &stroppy.WorkloadDescriptor{
 	// 	Name: "test",
-	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 	Units: []*stroppy.WorkloadUnitDescriptor{
 	// 		{
 	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 	// 				Query: descriptor,
@@ -67,9 +67,9 @@ func TestNewQuery_Error(t *testing.T) {
 		Sql:    "SELECT * FROM t WHERE id=${id}",
 		Params: []*stroppy.QueryParamDescriptor{}, // нет генераторов
 	}
-	// step := &stroppy.StepDescriptor{
+	// step := &stroppy.WorkloadDescriptor{
 	// 	Name: "test",
-	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 	Units: []*stroppy.WorkloadUnitDescriptor{
 	// 		{
 	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 	// 				Query: descriptor,
@@ -111,9 +111,9 @@ func TestNewQuerySync_Success(t *testing.T) {
 			}},
 		},
 	}
-	// step := &stroppy.StepDescriptor{
+	// step := &stroppy.WorkloadDescriptor{
 	// 	Name: "test",
-	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 	Units: []*stroppy.WorkloadUnitDescriptor{
 	// 		{
 	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 	// 				Query: descriptor,

@@ -406,34 +406,34 @@ func (x *ExecutorConfig) GetK6() *K6Options {
 
 // *
 // StepExecutorMappingConfig contains configuration for mapping steps to executors.
-type StepExecutionMapping struct {
+type Step struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Name of the step
-	StepName string `protobuf:"bytes,1,opt,name=step_name,json=stepName,proto3" json:"step_name,omitempty"`
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// * Name of the step
+	Workload string `protobuf:"bytes,2,opt,name=workload,proto3" json:"workload,omitempty"`
 	// * Name of the executor
-	ExecutorName string `protobuf:"bytes,2,opt,name=executor_name,json=executorName,proto3" json:"executor_name,omitempty"`
+	Executor string `protobuf:"bytes,3,opt,name=executor,proto3" json:"executor,omitempty"`
 	// * Name of the exporter
-	ExporterName *string `protobuf:"bytes,3,opt,name=exporter_name,json=exporterName,proto3,oneof" json:"exporter_name,omitempty"`
-	// * Whether to execute all operations in this step asynchronously
-	Async         bool `protobuf:"varint,4,opt,name=async,proto3" json:"async,omitempty"`
+	Exporter      *string `protobuf:"bytes,4,opt,name=exporter,proto3,oneof" json:"exporter,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StepExecutionMapping) Reset() {
-	*x = StepExecutionMapping{}
+func (x *Step) Reset() {
+	*x = Step{}
 	mi := &file_config_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StepExecutionMapping) String() string {
+func (x *Step) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StepExecutionMapping) ProtoMessage() {}
+func (*Step) ProtoMessage() {}
 
-func (x *StepExecutionMapping) ProtoReflect() protoreflect.Message {
+func (x *Step) ProtoReflect() protoreflect.Message {
 	mi := &file_config_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -445,37 +445,37 @@ func (x *StepExecutionMapping) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StepExecutionMapping.ProtoReflect.Descriptor instead.
-func (*StepExecutionMapping) Descriptor() ([]byte, []int) {
+// Deprecated: Use Step.ProtoReflect.Descriptor instead.
+func (*Step) Descriptor() ([]byte, []int) {
 	return file_config_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *StepExecutionMapping) GetStepName() string {
+func (x *Step) GetName() string {
 	if x != nil {
-		return x.StepName
+		return x.Name
 	}
 	return ""
 }
 
-func (x *StepExecutionMapping) GetExecutorName() string {
+func (x *Step) GetWorkload() string {
 	if x != nil {
-		return x.ExecutorName
+		return x.Workload
 	}
 	return ""
 }
 
-func (x *StepExecutionMapping) GetExporterName() string {
-	if x != nil && x.ExporterName != nil {
-		return *x.ExporterName
+func (x *Step) GetExecutor() string {
+	if x != nil {
+		return x.Executor
 	}
 	return ""
 }
 
-func (x *StepExecutionMapping) GetAsync() bool {
-	if x != nil {
-		return x.Async
+func (x *Step) GetExporter() string {
+	if x != nil && x.Exporter != nil {
+		return *x.Exporter
 	}
-	return false
+	return ""
 }
 
 // *
@@ -678,7 +678,7 @@ type ConfigFile struct {
 	// * Executors configuration
 	Executors []*ExecutorConfig `protobuf:"bytes,3,rep,name=executors,proto3" json:"executors,omitempty"`
 	// * Step to executor mapping configuration
-	StepExecutorMappings []*StepExecutionMapping `protobuf:"bytes,4,rep,name=step_executor_mappings,json=stepExecutorMappings,proto3" json:"step_executor_mappings,omitempty"`
+	Steps []*Step `protobuf:"bytes,4,rep,name=steps,proto3" json:"steps,omitempty"`
 	// * Plugins configuration
 	SideCars []*SideCarConfig `protobuf:"bytes,5,rep,name=side_cars,json=sideCars,proto3" json:"side_cars,omitempty"`
 	// * BenchmarkDescriptor defines a complete benchmark consisting of multiple steps.
@@ -738,9 +738,9 @@ func (x *ConfigFile) GetExecutors() []*ExecutorConfig {
 	return nil
 }
 
-func (x *ConfigFile) GetStepExecutorMappings() []*StepExecutionMapping {
+func (x *ConfigFile) GetSteps() []*Step {
 	if x != nil {
-		return x.StepExecutorMappings
+		return x.Steps
 	}
 	return nil
 }
@@ -793,13 +793,13 @@ const file_config_proto_rawDesc = "" +
 	"otlpExport\"Q\n" +
 	"\x0eExecutorConfig\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12\"\n" +
-	"\x02k6\x18\x02 \x01(\v2\x12.stroppy.K6OptionsR\x02k6\"\xbc\x01\n" +
-	"\x14StepExecutionMapping\x12$\n" +
-	"\tstep_name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\bstepName\x12,\n" +
-	"\rexecutor_name\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\fexecutorName\x12(\n" +
-	"\rexporter_name\x18\x03 \x01(\tH\x00R\fexporterName\x88\x01\x01\x12\x14\n" +
-	"\x05async\x18\x04 \x01(\bR\x05asyncB\x10\n" +
-	"\x0e_exporter_name\"p\n" +
+	"\x02k6\x18\x02 \x01(\v2\x12.stroppy.K6OptionsR\x02k6\"\x9b\x01\n" +
+	"\x04Step\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12#\n" +
+	"\bworkload\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\bworkload\x12#\n" +
+	"\bexecutor\x18\x03 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\bexecutor\x12\x1f\n" +
+	"\bexporter\x18\x04 \x01(\tH\x00R\bexporter\x88\x01\x01B\v\n" +
+	"\t_exporter\"p\n" +
 	"\rSideCarConfig\x12\x1a\n" +
 	"\x03url\x18\x02 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x126\n" +
 	"\bsettings\x18\x03 \x01(\v2\x15.stroppy.Value.StructH\x00R\bsettings\x88\x01\x01B\v\n" +
@@ -814,13 +814,13 @@ const file_config_proto_rawDesc = "" +
 	"\x06logger\x18\x06 \x01(\v2\x15.stroppy.LoggerConfigR\x06logger\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf9\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc9\x02\n" +
 	"\n" +
 	"ConfigFile\x12-\n" +
 	"\x06global\x18\x01 \x01(\v2\x15.stroppy.GlobalConfigR\x06global\x125\n" +
 	"\texporters\x18\x02 \x03(\v2\x17.stroppy.ExporterConfigR\texporters\x125\n" +
-	"\texecutors\x18\x03 \x03(\v2\x17.stroppy.ExecutorConfigR\texecutors\x12S\n" +
-	"\x16step_executor_mappings\x18\x04 \x03(\v2\x1d.stroppy.StepExecutionMappingR\x14stepExecutorMappings\x123\n" +
+	"\texecutors\x18\x03 \x03(\v2\x17.stroppy.ExecutorConfigR\texecutors\x12#\n" +
+	"\x05steps\x18\x04 \x03(\v2\r.stroppy.StepR\x05steps\x123\n" +
 	"\tside_cars\x18\x05 \x03(\v2\x16.stroppy.SideCarConfigR\bsideCars\x12D\n" +
 	"\tbenchmark\x18\x06 \x01(\v2\x1c.stroppy.BenchmarkDescriptorB\b\xfaB\x05\x8a\x01\x02\x10\x01R\tbenchmarkB.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
 
@@ -846,7 +846,7 @@ var file_config_proto_goTypes = []any{
 	(*LoggerConfig)(nil),         // 4: stroppy.LoggerConfig
 	(*ExporterConfig)(nil),       // 5: stroppy.ExporterConfig
 	(*ExecutorConfig)(nil),       // 6: stroppy.ExecutorConfig
-	(*StepExecutionMapping)(nil), // 7: stroppy.StepExecutionMapping
+	(*Step)(nil),                 // 7: stroppy.Step
 	(*SideCarConfig)(nil),        // 8: stroppy.SideCarConfig
 	(*CloudConfig)(nil),          // 9: stroppy.CloudConfig
 	(*GlobalConfig)(nil),         // 10: stroppy.GlobalConfig
@@ -871,7 +871,7 @@ var file_config_proto_depIdxs = []int32{
 	10, // 10: stroppy.ConfigFile.global:type_name -> stroppy.GlobalConfig
 	5,  // 11: stroppy.ConfigFile.exporters:type_name -> stroppy.ExporterConfig
 	6,  // 12: stroppy.ConfigFile.executors:type_name -> stroppy.ExecutorConfig
-	7,  // 13: stroppy.ConfigFile.step_executor_mappings:type_name -> stroppy.StepExecutionMapping
+	7,  // 13: stroppy.ConfigFile.steps:type_name -> stroppy.Step
 	8,  // 14: stroppy.ConfigFile.side_cars:type_name -> stroppy.SideCarConfig
 	16, // 15: stroppy.ConfigFile.benchmark:type_name -> stroppy.BenchmarkDescriptor
 	16, // [16:16] is the sub-list for method output_type

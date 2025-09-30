@@ -38,6 +38,7 @@ func runK6Binary(
 	if err := binExec.Start(); err != nil {
 		return fmt.Errorf("fail run k6 binary %s: %w", binaryPath, err)
 	}
+
 	lg.Debug("Exec k6", zap.String("cmd", binExec.String()))
 
 	shutdown.RegisterFn(func() {
@@ -78,7 +79,7 @@ func RunStepInK6(
 ) error {
 	tempDir, err := os.MkdirTemp(os.TempDir(), fmt.Sprintf("stroppy-k6-%s-%s",
 		runContext.GetConfig().GetRunId(),
-		runContext.GetStepDescriptor().GetName()))
+		runContext.GetStep().GetName()))
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}

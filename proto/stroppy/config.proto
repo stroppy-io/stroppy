@@ -74,15 +74,15 @@ message ExecutorConfig {
 /**
  * StepExecutorMappingConfig contains configuration for mapping steps to executors.
  */
-message StepExecutionMapping {
+message Step {
     /** Name of the step */
-    string step_name = 1 [(validate.rules).string.min_len = 1];
+    string name = 1 [(validate.rules).string.min_len = 1];
+    /** Name of the step */
+    string workload = 2 [(validate.rules).string.min_len = 1];
     /** Name of the executor */
-    string executor_name = 2 [(validate.rules).string.min_len = 1];
+    string executor = 3 [(validate.rules).string.min_len = 1];
     /** Name of the exporter */
-    optional string exporter_name = 3;
-    /** Whether to execute all operations in this step asynchronously */
-    bool async = 4;
+    optional string exporter = 4;
 }
 
 /**
@@ -136,7 +136,7 @@ message ConfigFile {
     /** Executors configuration */
     repeated ExecutorConfig executors = 3;
     /** Step to executor mapping configuration */
-    repeated StepExecutionMapping step_executor_mappings = 4;
+    repeated Step steps = 4;
     /** Plugins configuration */
     repeated SideCarConfig side_cars = 5;
     /** BenchmarkDescriptor defines a complete benchmark consisting of multiple steps. */

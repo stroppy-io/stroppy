@@ -32,9 +32,9 @@ func TestNewTransaction_Success(t *testing.T) {
 			},
 		},
 	}
-	// step := &stroppy.StepDescriptor{
+	// step := &stroppy.WorkloadDescriptor{
 	// 	Name: "test",
-	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 	Units: []*stroppy.WorkloadUnitDescriptor{
 	// 		{
 	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
 	// 				Transaction: descriptor,
@@ -87,9 +87,9 @@ func TestNewTransaction_Isolation(t *testing.T) {
 			},
 		},
 	}
-	// step := &stroppy.StepDescriptor{
+	// step := &stroppy.WorkloadDescriptor{
 	// 	Name: "test",
-	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 	Units: []*stroppy.WorkloadUnitDescriptor{
 	// 		{
 	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
 	// 				Transaction: descriptor,

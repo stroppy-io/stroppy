@@ -83,50 +83,50 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 				},
 			},
 		},
-		StepExecutorMappings: []*stroppy.StepExecutionMapping{
+		Steps: []*stroppy.Step{
 			{
-				StepName:     "create_table",
-				ExecutorName: "single-vus-single-step",
-				ExporterName: ptr("otlp-cloud-export"),
-				Async:        false,
+				Name:     "create_table",
+				Workload: "create_table",
+				Executor: "single-vus-single-step",
+				Exporter: ptr("otlp-cloud-export"),
 			},
 			{
-				StepName:     "insert_data",
-				ExecutorName: "max-workload",
-				ExporterName: ptr("otlp-cloud-export"),
-				Async:        false,
+				Name:     "insert_data",
+				Workload: "insert_data",
+				Executor: "max-workload",
+				Exporter: ptr("otlp-cloud-export"),
 			},
 			{
-				StepName:     "warm_up",
-				ExecutorName: "max-workload",
-				ExporterName: ptr("otlp-cloud-export"),
-				Async:        false,
+				Name:     "warm_up",
+				Workload: "warm_up",
+				Executor: "max-workload",
+				Exporter: ptr("otlp-cloud-export"),
 			},
 			{
-				StepName:     "select_data",
-				ExecutorName: "max-workload",
-				ExporterName: ptr("otlp-cloud-export"),
-				Async:        false,
+				Name:     "select_data",
+				Workload: "select_data",
+				Executor: "max-workload",
+				Exporter: ptr("otlp-cloud-export"),
 			},
 			{
-				StepName:     "transaction",
-				ExecutorName: "max-workload",
-				ExporterName: ptr("otlp-cloud-export"),
-				Async:        false,
+				Name:     "transaction",
+				Workload: "transaction",
+				Executor: "max-workload",
+				Exporter: ptr("otlp-cloud-export"),
 			},
 			{
-				StepName:     "clean_up",
-				ExecutorName: "single-vus-single-step",
-				ExporterName: ptr("otlp-cloud-export"),
-				Async:        false,
+				Name:     "clean_up",
+				Workload: "clean_up",
+				Executor: "single-vus-single-step",
+				Exporter: ptr("otlp-cloud-export"),
 			},
 		},
 		Benchmark: &stroppy.BenchmarkDescriptor{
 			Name: "example",
-			Steps: []*stroppy.StepDescriptor{
+			Workloads: []*stroppy.WorkloadDescriptor{
 				{
 					Name: "create_table",
-					Units: []*stroppy.StepUnitDescriptor{
+					Units: []*stroppy.WorkloadUnitDescriptor{
 						{
 							Descriptor_: &stroppy.UnitDescriptor{
 								Type: &stroppy.UnitDescriptor_CreateTable{
@@ -150,7 +150,7 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 				},
 				{
 					Name: "insert_data",
-					Units: []*stroppy.StepUnitDescriptor{
+					Units: []*stroppy.WorkloadUnitDescriptor{
 						{
 							Count: 100000,
 							Descriptor_: &stroppy.UnitDescriptor{
@@ -225,7 +225,7 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 				},
 				{
 					Name: "warm_up",
-					Units: []*stroppy.StepUnitDescriptor{
+					Units: []*stroppy.WorkloadUnitDescriptor{
 						{
 							Count: 1000,
 							Descriptor_: &stroppy.UnitDescriptor{
@@ -257,7 +257,7 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 				},
 				{
 					Name: "select_data",
-					Units: []*stroppy.StepUnitDescriptor{
+					Units: []*stroppy.WorkloadUnitDescriptor{
 						{
 							Count: 1,
 							Descriptor_: &stroppy.UnitDescriptor{
@@ -289,7 +289,7 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 				},
 				{
 					Name: "transaction",
-					Units: []*stroppy.StepUnitDescriptor{
+					Units: []*stroppy.WorkloadUnitDescriptor{
 						{
 							Count: 1,
 							Descriptor_: &stroppy.UnitDescriptor{
@@ -347,7 +347,7 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 				},
 				{
 					Name: "clean_up",
-					Units: []*stroppy.StepUnitDescriptor{
+					Units: []*stroppy.WorkloadUnitDescriptor{
 						{
 							Count: 1,
 							Descriptor_: &stroppy.UnitDescriptor{

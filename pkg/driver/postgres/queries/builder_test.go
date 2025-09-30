@@ -63,9 +63,9 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 			}},
 		},
 	}
-	step := &stroppy.StepDescriptor{
+	wrk := &stroppy.WorkloadDescriptor{
 		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
+		Units: []*stroppy.WorkloadUnitDescriptor{
 			{
 				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 					Query: descriptor,
@@ -77,7 +77,7 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 		Config: &stroppy.GlobalConfig{
 			Seed: 42,
 		},
-		StepDescriptor: step,
+		Workload: wrk,
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
@@ -92,7 +92,7 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 
 	unitBuildContext := &stroppy.UnitContext{
 		StepContext:    buildContext,
-		UnitDescriptor: step.GetUnits()[0],
+		UnitDescriptor: wrk.GetUnits()[0],
 	}
 
 	ctx := context.Background()
@@ -113,9 +113,9 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 			{Name: "name", SqlType: "VARCHAR(255)"},
 		},
 	}
-	step := &stroppy.StepDescriptor{
+	wrk := &stroppy.WorkloadDescriptor{
 		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
+		Units: []*stroppy.WorkloadUnitDescriptor{
 			{
 				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_CreateTable{
 					CreateTable: createTableDescriptor,
@@ -127,7 +127,7 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 		Config: &stroppy.GlobalConfig{
 			Seed: 42,
 		},
-		StepDescriptor: step,
+		Workload: wrk,
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
@@ -138,7 +138,7 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 
 	unitBuildContext := &stroppy.UnitContext{
 		StepContext:    buildContext,
-		UnitDescriptor: step.GetUnits()[0],
+		UnitDescriptor: wrk.GetUnits()[0],
 	}
 
 	ctx := context.Background()
@@ -170,9 +170,9 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 			},
 		},
 	}
-	step := &stroppy.StepDescriptor{
+	wrk := &stroppy.WorkloadDescriptor{
 		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
+		Units: []*stroppy.WorkloadUnitDescriptor{
 			{
 				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
 					Transaction: transactionDescriptor,
@@ -184,7 +184,7 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 		Config: &stroppy.GlobalConfig{
 			Seed: 42,
 		},
-		StepDescriptor: step,
+		Workload: wrk,
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
@@ -202,7 +202,7 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 
 	unitBuildContext := &stroppy.UnitContext{
 		StepContext:    buildContext,
-		UnitDescriptor: step.GetUnits()[0],
+		UnitDescriptor: wrk.GetUnits()[0],
 	}
 
 	ctx := context.Background()

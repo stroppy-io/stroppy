@@ -10,47 +10,48 @@ func NewStepContext(
 	stepName string,
 	config *stroppy.ConfigFile,
 ) (*stroppy.StepContext, error) {
-	mapping, err := selectExecutorMapping(stepName, config)
+	step, err := selectStep(stepName, config)
 	if err != nil {
 		return nil, err
 	}
 
-	executor, err := selectExecutor(config, mapping)
+	executor, err := selectExecutor(config, step)
 	if err != nil {
 		return nil, err
 	}
 
-	exporter, err := selectExporter(config, mapping)
+	exporter, err := selectExporter(config, step)
 	if err != nil {
 		return nil, err
 	}
 
-	stepDescriptor, err := selectStepDescriptor(stepName, config)
+	workloadDescriptor, err := selectWorkloadDescriptor(config, step)
 	if err != nil {
 		return nil, err
 	}
 
 	return &stroppy.StepContext{
-		Config:         config.GetGlobal(),
-		Executor:       executor,
-		Exporter:       exporter,
-		StepDescriptor: stepDescriptor,
+		Config:   config.GetGlobal(),
+		Step:     step,
+		Executor: executor,
+		Exporter: exporter,
+		Workload: workloadDescriptor,
 	}, nil
 }
 
 var (
-	ErrStepDescriptorNotFound      = errors.New("step descriptor not found")
+	ErrWorkloadDescriptorNotFound  = errors.New("step descriptor not found")
 	ErrStepExecutorMappingNotFound = errors.New("step executor mapping not found")
 	ErrExecutorNotFound            = errors.New("executor not found")
 	ErrExporterNotFound            = errors.New("exporter not found")
 )
 
-func selectExecutorMapping(
+func selectStep(
 	stepName string,
 	config *stroppy.ConfigFile,
-) (*stroppy.StepExecutionMapping, error) {
-	for _, mapping := range config.GetStepExecutorMappings() {
-		if mapping.GetStepName() == stepName {
+) (*stroppy.Step, error) {
+	for _, mapping := range config.GetSteps() {
+		if mapping.GetName() == stepName {
 			return mapping, nil
 		}
 	}
@@ -60,10 +61,10 @@ func selectExecutorMapping(
 
 func selectExecutor(
 	config *stroppy.ConfigFile,
-	mapping *stroppy.StepExecutionMapping,
+	mapping *stroppy.Step,
 ) (*stroppy.ExecutorConfig, error) {
 	for _, executor := range config.GetExecutors() {
-		if executor.GetName() == mapping.GetExecutorName() {
+		if executor.GetName() == mapping.GetExecutor() {
 			return executor, nil
 		}
 	}
@@ -73,14 +74,14 @@ func selectExecutor(
 
 func selectExporter(
 	config *stroppy.ConfigFile,
-	mapping *stroppy.StepExecutionMapping,
+	mapping *stroppy.Step,
 ) (*stroppy.ExporterConfig, error) {
-	if mapping.GetExporterName() == "" {
+	if mapping.GetExporter() == "" {
 		return nil, nil //nolint: nilnil // allow for undefined exporter
 	}
 
 	for _, exporter := range config.GetExporters() {
-		if exporter.GetName() == mapping.GetExporterName() {
+		if exporter.GetName() == mapping.GetExporter() {
 			return exporter, nil
 		}
 	}
@@ -88,15 +89,15 @@ func selectExporter(
 	return nil, ErrExporterNotFound
 }
 
-func selectStepDescriptor(
-	stepName string,
+func selectWorkloadDescriptor(
 	config *stroppy.ConfigFile,
-) (*stroppy.StepDescriptor, error) {
-	for _, step := range config.GetBenchmark().GetSteps() {
-		if step.GetName() == stepName {
-			return step, nil
+	step *stroppy.Step,
+) (*stroppy.WorkloadDescriptor, error) {
+	for _, wrk := range config.GetBenchmark().GetWorkloads() {
+		if wrk.GetName() == step.GetWorkload() {
+			return wrk, nil
 		}
 	}
 
-	return nil, ErrStepDescriptorNotFound
+	return nil, ErrWorkloadDescriptorNotFound
 }

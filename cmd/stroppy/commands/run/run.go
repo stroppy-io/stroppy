@@ -27,17 +27,21 @@ var Cmd = &cobra.Command{ //nolint: gochecknoglobals
 			return fmt.Errorf("failed to get steps: %w", err)
 		}
 		// TODO: now not used cause config validate checks if steps are valid
-		// flagSkippedSteps, err := cmd.Flags().GetStringSlice(skipStepFlagName)
-		// if err != nil {
-		// 	return fmt.Errorf("failed to get skipped steps: %w", err)
-		// }
+		flagSkippedSteps, err := cmd.Flags().GetStringSlice(skipStepFlagName)
+		if err != nil {
+			return fmt.Errorf("failed to get skipped steps: %w", err)
+		}
 
 		runConfigPath, err := cmd.Flags().GetString(configFlagName)
 		if err != nil {
 			return fmt.Errorf("failed to get run config path: %w", err)
 		}
 
-		cfg, err := config.LoadAndValidateConfig(runConfigPath, flagSteps...)
+		cfg, err := config.LoadAndValidateConfig(
+			runConfigPath,
+			config.WithRequestedSteps(flagSteps),
+			config.WithRequestedSkipSteps(flagSkippedSteps),
+		)
 		if err != nil {
 			return fmt.Errorf("failed to load and validate configs: %w", err)
 		}

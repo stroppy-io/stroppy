@@ -74,8 +74,9 @@ func (x *Instance) Setup(runContextBytes string) error {
 		return err
 	}
 
-	queue := unit_queue.NewQueue(drv.GenerateNextUnit, 0, 100)
-	for _, u := range runContext.GetStepDescriptor().GetUnits() {
+	// TODO: solve limits and buffers with k6 scenario config from runContext.GetExecutor().GetK6().GetScenario().GetExecutor()
+	queue := unit_queue.NewQueue(drv.GenerateNextUnit, 0, 1)
+	for _, u := range runContext.GetWorkload().GetUnits() {
 		queue.PrepareGenerator(u.GetDescriptor_(), 1, uint(u.GetCount()))
 	}
 

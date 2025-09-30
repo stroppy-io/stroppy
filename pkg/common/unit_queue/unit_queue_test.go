@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/core/unit_queue"
+	"github.com/stroppy-io/stroppy/pkg/common/unit_queue"
 )
 
 func Example() {
