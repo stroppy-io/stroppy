@@ -178,7 +178,7 @@ DOCS_TARGET_DIR=$(BUILD_TARGET_DIR)/docs
 	cp ./build/ts/* ../internal/static/
 
 .PHONY: build
-build: .check-bins .build-go-sdk .build-ts-sdk .build-md-docs .build-json-schema .move # Build go sdk, ts code, docs and json schema
+build: .check-bins .build-go-sdk .build-ts-sdk .build-md-docs .build-json-schema # Build go sdk, ts code, docs and json schema
 
 
 branch=main
