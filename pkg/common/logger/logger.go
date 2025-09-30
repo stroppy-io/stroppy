@@ -80,6 +80,7 @@ func SetLoggerEnv(level zapcore.Level, mod LogMod) {
 	os.Setenv(envLogLevel, strings.ToLower(level.String()))
 	os.Setenv(envLogMod, strings.ToLower(string(mod)))
 }
+
 func PrepareLoggerEnvs(level zapcore.Level, mod LogMod) []string {
 	return []string{
 		envLogLevel + "=" + strings.ToLower(level.String()),

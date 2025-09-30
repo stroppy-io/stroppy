@@ -23,10 +23,8 @@ import (
 func runK6Binary(
 	_ context.Context,
 	lg *zap.Logger,
-	workdir string,
-	binaryPath string,
-	args []string,
-	envs []string,
+	workdir, binaryPath string,
+	args, envs []string,
 ) error {
 	binExec := exec.Cmd{
 		Env:  envs,
@@ -140,11 +138,12 @@ func RunStepInK6(
 
 // k6ArgsOtelExport setups k6 OpenTelemetry exporter.
 // Docs: https://grafana.com/docs/k6/latest/results-output/real-time/opentelemetry/#opentelemetry
+//
+//nolint:nonamedreturns // an unnamed returns are confusing and trigers other linter
 func k6ArgsOtelExport(
 	runContext *stroppy.StepContext,
-	baseArgs []string,
-	envs []string,
-) ([]string, []string) {
+	baseArgs, envs []string,
+) (argsOut, envsOut []string) {
 	export := runContext.GetExporter().GetOtlpExport()
 	if export == nil {
 		return baseArgs, envs
