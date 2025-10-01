@@ -26,7 +26,6 @@ var Cmd = &cobra.Command{ //nolint: gochecknoglobals
 		if err != nil {
 			return fmt.Errorf("failed to get steps: %w", err)
 		}
-		// TODO: now not used cause config validate checks if steps are valid
 		flagSkippedSteps, err := cmd.Flags().GetStringSlice(skipStepFlagName)
 		if err != nil {
 			return fmt.Errorf("failed to get skipped steps: %w", err)

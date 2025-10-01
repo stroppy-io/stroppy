@@ -165,17 +165,10 @@ DOCS_TARGET_DIR=$(BUILD_TARGET_DIR)/docs
 	mkdir -p $(DOCS_TARGET_DIR)
 	$(PROTOC_BIN) --plugin=$(LOCAL_BIN)/protoc-gen-jsonschema \
 	--jsonschema_out=$(DOCS_TARGET_DIR) \
-	--jsonschema_opt=entrypoint_message=Config \
+	--jsonschema_opt=entrypoint_message=ConfigFile \
 	--jsonschema_opt=output_file_suffix=.schema.json \
 	--jsonschema_opt=int64_as_string=true \
 	--proto_path=$(PROTO_PATH) $(PROTO_PATH)/config.proto
-
-# TODO: move to upper makefile
-.PHONY: .move
-.move:
-	rm -rf ../pkg/common/proto/*
-	cp -r ./build/go/* ../pkg/common/proto/
-	cp ./build/ts/* ../internal/static/
 
 .PHONY: build
 build: .check-bins .build-go-sdk .build-ts-sdk .build-md-docs .build-json-schema # Build go sdk, ts code, docs and json schema

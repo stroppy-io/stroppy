@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$ref": "#/$defs/.stroppy.Config",
+  "$ref": "#/$defs/.stroppy.ConfigFile",
   "$defs": {
     ".stroppy.BenchmarkDescriptor": {
       "properties": {
         "name": {
           "$ref": "#/$defs/.stroppy.BenchmarkDescriptor.name"
         },
-        "steps": {
-          "$ref": "#/$defs/.stroppy.BenchmarkDescriptor.steps"
+        "workloads": {
+          "$ref": "#/$defs/.stroppy.BenchmarkDescriptor.workloads"
         }
       },
       "type": "object",
@@ -21,7 +21,7 @@
       "type": "string",
       "description": "* Name of the benchmark"
     },
-    ".stroppy.BenchmarkDescriptor.steps": {
+    ".stroppy.BenchmarkDescriptor.workloads": {
       "items": {
         "$ref": "#/$defs/.stroppy.WorkloadDescriptor",
         "description": "* List of steps to execute in the benchmark"
@@ -85,37 +85,148 @@
       "type": "boolean",
       "description": "* Whether the column has a UNIQUE constraint"
     },
-    ".stroppy.Config": {
+    ".stroppy.ConfigFile": {
       "properties": {
-        "version": {
-          "$ref": "#/$defs/.stroppy.Config.version"
+        "global": {
+          "$ref": "#/$defs/.stroppy.ConfigFile.global"
         },
-        "run": {
-          "$ref": "#/$defs/.stroppy.Config.run"
+        "exporters": {
+          "$ref": "#/$defs/.stroppy.ConfigFile.exporters"
+        },
+        "executors": {
+          "$ref": "#/$defs/.stroppy.ConfigFile.executors"
+        },
+        "steps": {
+          "$ref": "#/$defs/.stroppy.ConfigFile.steps"
+        },
+        "sideCars": {
+          "$ref": "#/$defs/.stroppy.ConfigFile.side_cars"
         },
         "benchmark": {
-          "$ref": "#/$defs/.stroppy.Config.benchmark"
+          "$ref": "#/$defs/.stroppy.ConfigFile.benchmark"
         }
       },
       "type": "object",
       "required": [
-        "version",
-        "run",
+        "global",
         "benchmark"
       ],
-      "description": "*\n Config contains the complete configuration for a benchmark run."
+      "description": "*\n ConfigFile contains the complete configuration for a benchmark run in file."
     },
-    ".stroppy.Config.benchmark": {
+    ".stroppy.ConfigFile.benchmark": {
       "$ref": "#/$defs/.stroppy.BenchmarkDescriptor",
       "description": "* BenchmarkDescriptor defines a complete benchmark consisting of multiple steps."
     },
-    ".stroppy.Config.run": {
-      "$ref": "#/$defs/.stroppy.RunConfig",
-      "description": "* RunConfig contains the complete configuration for a benchmark run."
+    ".stroppy.ConfigFile.executors": {
+      "items": {
+        "$ref": "#/$defs/.stroppy.ExecutorConfig",
+        "description": "* Executors configuration"
+      },
+      "type": "array",
+      "description": "* Executors configuration"
     },
-    ".stroppy.Config.version": {
+    ".stroppy.ConfigFile.exporters": {
+      "items": {
+        "$ref": "#/$defs/.stroppy.ExporterConfig",
+        "description": "* Exporters configuration"
+      },
+      "type": "array",
+      "description": "* Exporters configuration"
+    },
+    ".stroppy.ConfigFile.global": {
+      "$ref": "#/$defs/.stroppy.GlobalConfig",
+      "description": "* Global configuration"
+    },
+    ".stroppy.ConfigFile.side_cars": {
+      "items": {
+        "$ref": "#/$defs/.stroppy.SideCarConfig",
+        "description": "* Plugins configuration"
+      },
+      "type": "array",
+      "description": "* Plugins configuration"
+    },
+    ".stroppy.ConfigFile.steps": {
+      "items": {
+        "$ref": "#/$defs/.stroppy.Step",
+        "description": "* Step to executor mapping configuration"
+      },
+      "type": "array",
+      "description": "* Step to executor mapping configuration"
+    },
+    ".stroppy.ConstantArrivalRate": {
+      "properties": {
+        "rate": {
+          "$ref": "#/$defs/.stroppy.ConstantArrivalRate.rate"
+        },
+        "timeUnit": {
+          "$ref": "#/$defs/.stroppy.ConstantArrivalRate.time_unit"
+        },
+        "duration": {
+          "$ref": "#/$defs/.stroppy.ConstantArrivalRate.duration"
+        },
+        "preAllocatedVus": {
+          "$ref": "#/$defs/.stroppy.ConstantArrivalRate.pre_allocated_vus"
+        },
+        "maxVus": {
+          "$ref": "#/$defs/.stroppy.ConstantArrivalRate.max_vus"
+        }
+      },
+      "type": "object",
+      "required": [
+        "rate",
+        "timeUnit",
+        "duration",
+        "preAllocatedVus",
+        "maxVus"
+      ],
+      "description": "*\n ConstantArrivalRate executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/"
+    },
+    ".stroppy.ConstantArrivalRate.duration": {
       "type": "string",
-      "description": "*\n Version of the configuration format e.g. proto files version.\n This is used for backward compatibility of configs\n and will be set automatically from binary run if not present."
+      "format": "duration",
+      "description": "* Duration of the scenario"
+    },
+    ".stroppy.ConstantArrivalRate.max_vus": {
+      "type": "integer",
+      "description": "* Maximum allowed number of VUs if load increases"
+    },
+    ".stroppy.ConstantArrivalRate.pre_allocated_vus": {
+      "type": "integer",
+      "description": "* Number of VUs allocated in advance"
+    },
+    ".stroppy.ConstantArrivalRate.rate": {
+      "type": "integer",
+      "description": "* Rate of iteration generation (number per time unit)"
+    },
+    ".stroppy.ConstantArrivalRate.time_unit": {
+      "type": "string",
+      "format": "duration",
+      "description": "* Time unit for the \"rate\" field (e.g., \"1s\")"
+    },
+    ".stroppy.ConstantVUs": {
+      "properties": {
+        "vus": {
+          "$ref": "#/$defs/.stroppy.ConstantVUs.vus"
+        },
+        "duration": {
+          "$ref": "#/$defs/.stroppy.ConstantVUs.duration"
+        }
+      },
+      "type": "object",
+      "required": [
+        "vus",
+        "duration"
+      ],
+      "description": "*\n ConstantVUs executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/"
+    },
+    ".stroppy.ConstantVUs.duration": {
+      "type": "string",
+      "format": "duration",
+      "description": "* Duration of the scenario execution.\n All VUs will start and execute iterations until this time is completed."
+    },
+    ".stroppy.ConstantVUs.vus": {
+      "type": "integer",
+      "description": "* Fixed number of virtual users that will be simultaneously active at all times"
     },
     ".stroppy.DateTime": {
       "properties": {
@@ -211,11 +322,59 @@
     },
     ".stroppy.DriverConfig.driver_type": {
       "$ref": "#/$defs/.stroppy.DriverConfig.DriverType",
-      "description": "* Name of chosen driver"
+      "description": "* Name/Type of chosen driver"
     },
     ".stroppy.DriverConfig.url": {
       "type": "string",
       "description": "* Database connection URL"
+    },
+    ".stroppy.ExecutorConfig": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/.stroppy.ExecutorConfig.name"
+        },
+        "k6": {
+          "$ref": "#/$defs/.stroppy.ExecutorConfig.k6"
+        }
+      },
+      "type": "object",
+      "required": [
+        "name",
+        "k6"
+      ],
+      "description": "*\n ExecutorConfig contains configuration for an executor."
+    },
+    ".stroppy.ExecutorConfig.k6": {
+      "$ref": "#/$defs/.stroppy.K6Options",
+      "description": "* Configuration for the executor"
+    },
+    ".stroppy.ExecutorConfig.name": {
+      "type": "string",
+      "description": "* Name of the executor"
+    },
+    ".stroppy.ExporterConfig": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/.stroppy.ExporterConfig.name"
+        },
+        "otlpExport": {
+          "$ref": "#/$defs/.stroppy.ExporterConfig.otlp_export"
+        }
+      },
+      "type": "object",
+      "required": [
+        "name",
+        "otlpExport"
+      ],
+      "description": "*\n OtlpExporterConfig contains named configuration for an OTLP exporter."
+    },
+    ".stroppy.ExporterConfig.name": {
+      "type": "string",
+      "description": "* Name of the OTLP exporter"
+    },
+    ".stroppy.ExporterConfig.otlp_export": {
+      "$ref": "#/$defs/.stroppy.OtlpExport",
+      "description": "* Configuration for the OTLP exporter"
     },
     ".stroppy.Generation.Alphabet": {
       "properties": {
@@ -1733,82 +1892,63 @@
       "$ref": "#/$defs/.stroppy.Uuid",
       "description": "* Fixed UUID (if not specified, generates random UUIDs)"
     },
-    ".stroppy.GoExecutor": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "goMaxProc"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "goMaxProc"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "cancelOnError"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "cancelOnError"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
+    ".stroppy.GlobalConfig": {
       "properties": {
-        "goMaxProc": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.GoExecutor.go_max_proc"
-            }
-          ]
+        "version": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.version"
         },
-        "cancelOnError": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.GoExecutor.cancel_on_error"
-            }
-          ]
+        "runId": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.run_id"
+        },
+        "seed": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.seed"
+        },
+        "metadata": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.metadata"
+        },
+        "driver": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.driver"
+        },
+        "logger": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.logger"
         }
       },
       "type": "object",
-      "description": "*\n GoExecutor contains configuration specific to Go-based test execution.\n It controls Go runtime parameters and error handling behavior."
+      "required": [
+        "version",
+        "runId",
+        "seed",
+        "driver",
+        "logger"
+      ]
     },
-    ".stroppy.GoExecutor.cancel_on_error": {
-      "type": "boolean",
-      "description": "* Whether to cancel execution on first error"
+    ".stroppy.GlobalConfig.driver": {
+      "$ref": "#/$defs/.stroppy.DriverConfig",
+      "description": "* Database driver configuration"
     },
-    ".stroppy.GoExecutor.go_max_proc": {
+    ".stroppy.GlobalConfig.logger": {
+      "$ref": "#/$defs/.stroppy.LoggerConfig",
+      "description": "* Logging configuration"
+    },
+    ".stroppy.GlobalConfig.metadata": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object",
+      "description": "* Arbitrary metadata, may be passed to result labels and json output"
+    },
+    ".stroppy.GlobalConfig.run_id": {
+      "type": "string",
+      "description": "*\n Run identifier for reproducible test runs or debugging\n If set to \"generate()\" stroppy eval ulid for run_id"
+    },
+    ".stroppy.GlobalConfig.seed": {
       "type": "string",
       "format": "int64",
-      "description": "* Maximum number of OS threads that the Go runtime can use (0 = use default)"
+      "description": "* Random seed for reproducible test runs"
+    },
+    ".stroppy.GlobalConfig.version": {
+      "type": "string",
+      "description": "*\n Version of the configuration format e.g. proto files version.\n This is used for backward compatibility of configs\n and will be set automatically from binary run if not present."
     },
     ".stroppy.IndexDescriptor": {
       "allOf": [
@@ -1889,13 +2029,13 @@
       "type": "boolean",
       "description": "* Whether this is a unique index"
     },
-    ".stroppy.K6Executor": {
+    ".stroppy.K6Options": {
       "allOf": [
         {
           "oneOf": [
             {
               "required": [
-                "k6SetupTimeout"
+                "setupTimeout"
               ]
             },
             {
@@ -1903,107 +2043,7 @@
                 "anyOf": [
                   {
                     "required": [
-                      "k6SetupTimeout"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "k6Vus"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "k6Vus"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "k6MaxVus"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "k6MaxVus"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "k6Rate"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "k6Rate"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "k6Duration"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "k6Duration"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "otlpExport"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "otlpExport"
+                      "setupTimeout"
                     ]
                   }
                 ]
@@ -2013,84 +2053,30 @@
         }
       ],
       "properties": {
-        "k6BinaryPath": {
-          "$ref": "#/$defs/.stroppy.K6Executor.k6_binary_path"
+        "k6Args": {
+          "$ref": "#/$defs/.stroppy.K6Options.k6_args"
         },
-        "k6BinaryArgs": {
-          "$ref": "#/$defs/.stroppy.K6Executor.k6_binary_args"
-        },
-        "k6ScriptPath": {
-          "$ref": "#/$defs/.stroppy.K6Executor.k6_script_path"
-        },
-        "k6SetupTimeout": {
+        "setupTimeout": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.K6Executor.k6_setup_timeout"
+              "$ref": "#/$defs/.stroppy.K6Options.setup_timeout"
             }
           ]
         },
-        "k6Vus": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.K6Executor.k6_vus"
-            }
-          ]
-        },
-        "k6MaxVus": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.K6Executor.k6_max_vus"
-            }
-          ]
-        },
-        "k6Rate": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.K6Executor.k6_rate"
-            }
-          ]
-        },
-        "k6Duration": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.K6Executor.k6_duration"
-            }
-          ]
-        },
-        "otlpExport": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.K6Executor.otlp_export"
-            }
-          ]
+        "scenario": {
+          "$ref": "#/$defs/.stroppy.K6Options.scenario"
         }
       },
       "type": "object",
       "required": [
-        "k6BinaryPath",
-        "k6ScriptPath"
+        "scenario"
       ],
       "description": "*\n K6Executor contains configuration for k6 load testing tool integration.\n It contains paths to the k6 binary and the k6 test script, as well as\n additional arguments to pass to the k6 binary."
     },
-    ".stroppy.K6Executor.k6_binary_args": {
+    ".stroppy.K6Options.k6_args": {
       "items": {
         "type": "string",
         "description": "* Additional arguments to pass to the k6 binary"
@@ -2098,42 +2084,187 @@
       "type": "array",
       "description": "* Additional arguments to pass to the k6 binary"
     },
-    ".stroppy.K6Executor.k6_binary_path": {
-      "type": "string",
-      "description": "* Path to the k6 binary"
+    ".stroppy.K6Options.scenario": {
+      "$ref": "#/$defs/.stroppy.K6Scenario",
+      "description": "* Scenario configuration"
     },
-    ".stroppy.K6Executor.k6_duration": {
-      "type": "string",
-      "format": "duration",
-      "description": "* Duration of the test"
-    },
-    ".stroppy.K6Executor.k6_max_vus": {
-      "type": "string",
-      "format": "int64",
-      "description": "* Maximum number of virtual users"
-    },
-    ".stroppy.K6Executor.k6_rate": {
-      "type": "string",
-      "format": "int64",
-      "description": "* Number of requests per second"
-    },
-    ".stroppy.K6Executor.k6_script_path": {
-      "type": "string",
-      "description": "* Path to the k6 test script"
-    },
-    ".stroppy.K6Executor.k6_setup_timeout": {
+    ".stroppy.K6Options.setup_timeout": {
       "type": "string",
       "format": "duration",
       "description": "* Timeout for k6 setup phase"
     },
-    ".stroppy.K6Executor.k6_vus": {
-      "type": "string",
-      "format": "int64",
-      "description": "* Number of virtual users"
+    ".stroppy.K6Scenario": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "sharedIterations"
+              ]
+            },
+            {
+              "required": [
+                "perVuIterations"
+              ]
+            },
+            {
+              "required": [
+                "constantVus"
+              ]
+            },
+            {
+              "required": [
+                "rampingVus"
+              ]
+            },
+            {
+              "required": [
+                "constantArrivalRate"
+              ]
+            },
+            {
+              "required": [
+                "rampingArrivalRate"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "sharedIterations"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "perVuIterations"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "constantVus"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "rampingVus"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "constantArrivalRate"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "rampingArrivalRate"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "maxDuration": {
+          "$ref": "#/$defs/.stroppy.K6Scenario.max_duration"
+        },
+        "sharedIterations": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.K6Scenario.shared_iterations"
+            }
+          ]
+        },
+        "perVuIterations": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.K6Scenario.per_vu_iterations"
+            }
+          ]
+        },
+        "constantVus": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.K6Scenario.constant_vus"
+            }
+          ]
+        },
+        "rampingVus": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.K6Scenario.ramping_vus"
+            }
+          ]
+        },
+        "constantArrivalRate": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.K6Scenario.constant_arrival_rate"
+            }
+          ]
+        },
+        "rampingArrivalRate": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.K6Scenario.ramping_arrival_rate"
+            }
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "maxDuration"
+      ],
+      "description": "*\n Scenario defines the overall test scenario configuration.\n It contains user tags, maximum duration, and executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/"
     },
-    ".stroppy.K6Executor.otlp_export": {
-      "$ref": "#/$defs/.stroppy.OtlpExport",
-      "description": "* OpenTelemetry export configuration"
+    ".stroppy.K6Scenario.constant_arrival_rate": {
+      "$ref": "#/$defs/.stroppy.ConstantArrivalRate",
+      "description": "* Constant arrival rate executor"
+    },
+    ".stroppy.K6Scenario.constant_vus": {
+      "$ref": "#/$defs/.stroppy.ConstantVUs",
+      "description": "* Constant VUs executor"
+    },
+    ".stroppy.K6Scenario.max_duration": {
+      "type": "string",
+      "format": "duration",
+      "description": "* Maximum duration for scenario execution.\n Used as a time limiter if main parameters (iterations, stages, duration) \n do not complete in time."
+    },
+    ".stroppy.K6Scenario.per_vu_iterations": {
+      "$ref": "#/$defs/.stroppy.PerVuIterations",
+      "description": "* Per-VU iterations executor"
+    },
+    ".stroppy.K6Scenario.ramping_arrival_rate": {
+      "$ref": "#/$defs/.stroppy.RampingArrivalRate",
+      "description": "* Ramping arrival rate executor"
+    },
+    ".stroppy.K6Scenario.ramping_vus": {
+      "$ref": "#/$defs/.stroppy.RampingVUs",
+      "description": "* Ramping VUs executor"
+    },
+    ".stroppy.K6Scenario.shared_iterations": {
+      "$ref": "#/$defs/.stroppy.SharedIterations",
+      "description": "* Shared iterations executor"
     },
     ".stroppy.LoggerConfig": {
       "properties": {
@@ -2262,6 +2393,26 @@
           "oneOf": [
             {
               "required": [
+                "otlpHeaders"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "otlpHeaders"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
                 "otlpMetricsPrefix"
               ]
             },
@@ -2320,6 +2471,16 @@
             }
           ]
         },
+        "otlpHeaders": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_headers"
+            }
+          ]
+        },
         "otlpMetricsPrefix": {
           "oneOf": [
             {
@@ -2342,6 +2503,10 @@
       "type": "string",
       "description": "* gRPC endpoint for OpenTelemetry collector"
     },
+    ".stroppy.OtlpExport.otlp_headers": {
+      "type": "string",
+      "description": "* Headers for otlp requests e.g. Authorization=..."
+    },
     ".stroppy.OtlpExport.otlp_http_endpoint": {
       "type": "string",
       "description": "* HTTP endpoint for the OpenTelemetry collector"
@@ -2353,6 +2518,31 @@
     ".stroppy.OtlpExport.otlp_metrics_prefix": {
       "type": "string",
       "description": "* Prefix to be added to all exported metrics"
+    },
+    ".stroppy.PerVuIterations": {
+      "properties": {
+        "vus": {
+          "$ref": "#/$defs/.stroppy.PerVuIterations.vus"
+        },
+        "iterations": {
+          "$ref": "#/$defs/.stroppy.PerVuIterations.iterations"
+        }
+      },
+      "type": "object",
+      "required": [
+        "vus",
+        "iterations"
+      ],
+      "description": "*\n PerVuIterations executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/"
+    },
+    ".stroppy.PerVuIterations.iterations": {
+      "type": "string",
+      "format": "int64",
+      "description": "* Number of iterations that each VU should execute"
+    },
+    ".stroppy.PerVuIterations.vus": {
+      "type": "integer",
+      "description": "* Number of virtual users"
     },
     ".stroppy.QueryDescriptor": {
       "properties": {
@@ -2437,155 +2627,177 @@
       "type": "string",
       "description": "* Regular expression pattern to replace with the parameter value default\n is \"${\u003cparam_name\u003e}\""
     },
-    ".stroppy.RequestedStep": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "executor"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "executor"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
+    ".stroppy.RampingArrivalRate": {
       "properties": {
-        "name": {
-          "$ref": "#/$defs/.stroppy.RequestedStep.name"
+        "startRate": {
+          "$ref": "#/$defs/.stroppy.RampingArrivalRate.start_rate"
         },
-        "executor": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.RequestedStep.executor"
-            }
-          ]
+        "timeUnit": {
+          "$ref": "#/$defs/.stroppy.RampingArrivalRate.time_unit"
+        },
+        "stages": {
+          "$ref": "#/$defs/.stroppy.RampingArrivalRate.stages"
+        },
+        "preAllocatedVus": {
+          "$ref": "#/$defs/.stroppy.RampingArrivalRate.pre_allocated_vus"
+        },
+        "maxVus": {
+          "$ref": "#/$defs/.stroppy.RampingArrivalRate.max_vus"
         }
       },
       "type": "object",
       "required": [
-        "name"
+        "startRate",
+        "timeUnit",
+        "preAllocatedVus",
+        "maxVus"
       ],
-      "description": "*\n RequestedStep defines a step that should be executed during the benchmark.\n It specifies the step name and the type of executor to use."
+      "description": "*\n RampingArrivalRate executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/"
     },
-    ".stroppy.RequestedStep.ExecutorType": {
-      "type": "string",
-      "enum": [
-        "EXECUTOR_TYPE_GO",
-        "EXECUTOR_TYPE_K6"
-      ]
-    },
-    ".stroppy.RequestedStep.executor": {
-      "$ref": "#/$defs/.stroppy.RequestedStep.ExecutorType",
-      "description": "* Type of executor to use for this step"
-    },
-    ".stroppy.RequestedStep.name": {
-      "type": "string",
-      "description": "* Unique name of the step"
-    },
-    ".stroppy.RunConfig": {
+    ".stroppy.RampingArrivalRate.RateStage": {
       "properties": {
-        "runId": {
-          "$ref": "#/$defs/.stroppy.RunConfig.run_id"
+        "target": {
+          "$ref": "#/$defs/.stroppy.RampingArrivalRate.RateStage.target"
         },
-        "seed": {
-          "$ref": "#/$defs/.stroppy.RunConfig.seed"
-        },
-        "driver": {
-          "$ref": "#/$defs/.stroppy.RunConfig.driver"
-        },
-        "goExecutor": {
-          "$ref": "#/$defs/.stroppy.RunConfig.go_executor"
-        },
-        "k6Executor": {
-          "$ref": "#/$defs/.stroppy.RunConfig.k6_executor"
-        },
-        "steps": {
-          "$ref": "#/$defs/.stroppy.RunConfig.steps"
-        },
-        "logger": {
-          "$ref": "#/$defs/.stroppy.RunConfig.logger"
-        },
-        "metadata": {
-          "$ref": "#/$defs/.stroppy.RunConfig.metadata"
-        },
-        "sideCars": {
-          "$ref": "#/$defs/.stroppy.RunConfig.side_cars"
+        "duration": {
+          "$ref": "#/$defs/.stroppy.RampingArrivalRate.RateStage.duration"
         }
       },
       "type": "object",
       "required": [
-        "runId",
-        "seed",
-        "driver",
-        "goExecutor",
-        "k6Executor",
-        "logger"
+        "target",
+        "duration"
       ],
-      "description": "*\n RunConfig contains the complete configuration for a benchmark run."
+      "description": "* Rate stage configuration for ramping arrival rate"
     },
-    ".stroppy.RunConfig.driver": {
-      "$ref": "#/$defs/.stroppy.DriverConfig",
-      "description": "* Database driver configuration"
+    ".stroppy.RampingArrivalRate.RateStage.duration": {
+      "type": "string",
+      "format": "duration",
+      "description": "* Duration of the stage"
     },
-    ".stroppy.RunConfig.go_executor": {
-      "$ref": "#/$defs/.stroppy.GoExecutor",
-      "description": "* Go executor configuration"
+    ".stroppy.RampingArrivalRate.RateStage.target": {
+      "type": "integer",
+      "description": "* Target rate (iterations per time_unit) at the end of the stage"
     },
-    ".stroppy.RunConfig.k6_executor": {
-      "$ref": "#/$defs/.stroppy.K6Executor",
-      "description": "* k6 executor configuration"
+    ".stroppy.RampingArrivalRate.max_vus": {
+      "type": "integer",
+      "description": "* Maximum number of VUs available for pool expansion"
     },
-    ".stroppy.RunConfig.logger": {
-      "$ref": "#/$defs/.stroppy.LoggerConfig",
-      "description": "* Logging configuration"
+    ".stroppy.RampingArrivalRate.pre_allocated_vus": {
+      "type": "integer",
+      "description": "* Number of VUs allocated in advance"
     },
-    ".stroppy.RunConfig.metadata": {
-      "additionalProperties": {
-        "type": "string"
+    ".stroppy.RampingArrivalRate.stages": {
+      "items": {
+        "$ref": "#/$defs/.stroppy.RampingArrivalRate.RateStage",
+        "description": "* List of rate change stages"
+      },
+      "type": "array",
+      "description": "* List of rate change stages"
+    },
+    ".stroppy.RampingArrivalRate.start_rate": {
+      "type": "integer",
+      "description": "* Initial rate (iterations per time_unit)"
+    },
+    ".stroppy.RampingArrivalRate.time_unit": {
+      "type": "string",
+      "format": "duration",
+      "description": "* Time unit for the rate (e.g., \"1s\")"
+    },
+    ".stroppy.RampingVUs": {
+      "properties": {
+        "startVus": {
+          "$ref": "#/$defs/.stroppy.RampingVUs.start_vus"
+        },
+        "stages": {
+          "$ref": "#/$defs/.stroppy.RampingVUs.stages"
+        },
+        "preAllocatedVus": {
+          "$ref": "#/$defs/.stroppy.RampingVUs.pre_allocated_vus"
+        },
+        "maxVus": {
+          "$ref": "#/$defs/.stroppy.RampingVUs.max_vus"
+        }
       },
       "type": "object",
-      "description": "* Arbitrary metadata, may be passed to result labels and json output"
+      "required": [
+        "startVus",
+        "preAllocatedVus",
+        "maxVus"
+      ],
+      "description": "*\n RampingVUs executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/"
     },
-    ".stroppy.RunConfig.run_id": {
+    ".stroppy.RampingVUs.VUStage": {
+      "properties": {
+        "duration": {
+          "$ref": "#/$defs/.stroppy.RampingVUs.VUStage.duration"
+        },
+        "target": {
+          "$ref": "#/$defs/.stroppy.RampingVUs.VUStage.target"
+        }
+      },
+      "type": "object",
+      "required": [
+        "duration",
+        "target"
+      ],
+      "description": "* VU stage configuration for ramping"
+    },
+    ".stroppy.RampingVUs.VUStage.duration": {
       "type": "string",
-      "description": "* Run identifier for reproducible test runs or debugging"
+      "format": "duration",
+      "description": "* Duration of the stage (e.g., \"30s\")"
     },
-    ".stroppy.RunConfig.seed": {
+    ".stroppy.RampingVUs.VUStage.target": {
+      "type": "integer",
+      "description": "* Target number of VUs at the end of the stage"
+    },
+    ".stroppy.RampingVUs.max_vus": {
+      "type": "integer",
+      "description": "* Maximum number of VUs available for pool expansion"
+    },
+    ".stroppy.RampingVUs.pre_allocated_vus": {
+      "type": "integer",
+      "description": "* Number of VUs allocated in advance.\n Helps avoid delays when creating new VUs during the test."
+    },
+    ".stroppy.RampingVUs.stages": {
+      "items": {
+        "$ref": "#/$defs/.stroppy.RampingVUs.VUStage",
+        "description": "* List of stages where VU count changes to target value over specified time"
+      },
+      "type": "array",
+      "description": "* List of stages where VU count changes to target value over specified time"
+    },
+    ".stroppy.RampingVUs.start_vus": {
+      "type": "integer",
+      "description": "* Initial number of virtual users"
+    },
+    ".stroppy.SharedIterations": {
+      "properties": {
+        "iterations": {
+          "$ref": "#/$defs/.stroppy.SharedIterations.iterations"
+        },
+        "vus": {
+          "$ref": "#/$defs/.stroppy.SharedIterations.vus"
+        }
+      },
+      "type": "object",
+      "required": [
+        "iterations",
+        "vus"
+      ],
+      "description": "*\n SharedIterations executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/"
+    },
+    ".stroppy.SharedIterations.iterations": {
       "type": "string",
       "format": "int64",
-      "description": "* Random seed for reproducible test runs"
+      "description": "* Total number of iterations to be executed by all VUs together.\n Iterations are distributed dynamically among available VUs."
     },
-    ".stroppy.RunConfig.side_cars": {
-      "items": {
-        "$ref": "#/$defs/.stroppy.SideCar",
-        "description": "* Plugins configuration"
-      },
-      "type": "array",
-      "description": "* Plugins configuration"
+    ".stroppy.SharedIterations.vus": {
+      "type": "integer",
+      "description": "* Number of virtual users that will execute these iterations in parallel"
     },
-    ".stroppy.RunConfig.steps": {
-      "items": {
-        "$ref": "#/$defs/.stroppy.RequestedStep",
-        "description": "* List of steps to execute in order"
-      },
-      "type": "array",
-      "description": "* List of steps to execute in order"
-    },
-    ".stroppy.SideCar": {
+    ".stroppy.SideCarConfig": {
       "allOf": [
         {
           "oneOf": [
@@ -2610,7 +2822,7 @@
       ],
       "properties": {
         "url": {
-          "$ref": "#/$defs/.stroppy.SideCar.url"
+          "$ref": "#/$defs/.stroppy.SideCarConfig.url"
         },
         "settings": {
           "oneOf": [
@@ -2618,7 +2830,7 @@
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.SideCar.settings"
+              "$ref": "#/$defs/.stroppy.SideCarConfig.settings"
             }
           ]
         }
@@ -2629,72 +2841,81 @@
       ],
       "description": "*\n SideCar contains configuration for plugins."
     },
-    ".stroppy.SideCar.settings": {
+    ".stroppy.SideCarConfig.settings": {
       "$ref": "#/$defs/.stroppy.Value.Struct",
       "description": "* Additional plugin settings"
     },
-    ".stroppy.SideCar.url": {
+    ".stroppy.SideCarConfig.url": {
       "type": "string",
       "description": "* Url to connect the plugin instance"
     },
-    ".stroppy.WorkloadDescriptor": {
+    ".stroppy.Step": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "exporter"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "exporter"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "name": {
-          "$ref": "#/$defs/.stroppy.WorkloadDescriptor.name"
+          "$ref": "#/$defs/.stroppy.Step.name"
         },
-        "units": {
-          "$ref": "#/$defs/.stroppy.WorkloadDescriptor.units"
+        "workload": {
+          "$ref": "#/$defs/.stroppy.Step.workload"
         },
-        "async": {
-          "$ref": "#/$defs/.stroppy.WorkloadDescriptor.async"
+        "executor": {
+          "$ref": "#/$defs/.stroppy.Step.executor"
+        },
+        "exporter": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Step.exporter"
+            }
+          ]
         }
       },
       "type": "object",
       "required": [
         "name",
-        "async"
+        "workload",
+        "executor"
       ],
-      "description": "*\n WorkloadDescriptor represents a logical step in a benchmark.\n It contains a list of operations to perform in this step."
+      "description": "*\n StepExecutorMappingConfig contains configuration for mapping steps to executors."
     },
-    ".stroppy.WorkloadDescriptor.async": {
-      "type": "boolean",
-      "description": "* Whether to execute all operations in this step asynchronously"
+    ".stroppy.Step.executor": {
+      "type": "string",
+      "description": "* Name of the executor"
     },
-    ".stroppy.WorkloadDescriptor.name": {
+    ".stroppy.Step.exporter": {
+      "type": "string",
+      "description": "* Name of the exporter"
+    },
+    ".stroppy.Step.name": {
       "type": "string",
       "description": "* Name of the step"
     },
-    ".stroppy.WorkloadDescriptor.units": {
-      "items": {
-        "$ref": "#/$defs/.stroppy.WorkloadUnitDescriptor",
-        "description": "* List of operations to perform in this step"
-      },
-      "type": "array",
-      "description": "* List of operations to perform in this step"
-    },
-    ".stroppy.WorkloadUnitDescriptor": {
-      "properties": {
-        "descriptor": {
-          "$ref": "#/$defs/.stroppy.WorkloadUnitDescriptor.descriptor"
-        },
-        "count": {
-          "$ref": "#/$defs/.stroppy.WorkloadUnitDescriptor.count"
-        }
-      },
-      "type": "object",
-      "required": [
-        "descriptor",
-        "count"
-      ],
-      "description": "*\n WorkloadUnitDescriptor represents a single unit of work.\n It can be a table creation operation, a query execution operation, or a\n transaction execution operation. It also specifies whether to execute this\n operation asynchronously."
-    },
-    ".stroppy.WorkloadUnitDescriptor.count": {
+    ".stroppy.Step.workload": {
       "type": "string",
-      "format": "int64",
-      "description": "* Number of times to execute this unit"
-    },
-    ".stroppy.WorkloadUnitDescriptor.descriptor": {
-      "$ref": "#/$defs/.stroppy.UnitDescriptor"
+      "description": "* Name of the step"
     },
     ".stroppy.TableDescriptor": {
       "properties": {
@@ -2879,7 +3100,8 @@
           ]
         }
       },
-      "type": "object"
+      "type": "object",
+      "description": "*\n UnitDescriptor represents a single workload.\n It can be a table creation operation, a query execution operation, or a\n transaction execution operation."
     },
     ".stroppy.UnitDescriptor.create_table": {
       "$ref": "#/$defs/.stroppy.TableDescriptor",
@@ -3312,6 +3534,65 @@
     ".stroppy.Value.uuid": {
       "$ref": "#/$defs/.stroppy.Uuid",
       "description": "* Universally unique identifier"
+    },
+    ".stroppy.WorkloadDescriptor": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/.stroppy.WorkloadDescriptor.name"
+        },
+        "async": {
+          "$ref": "#/$defs/.stroppy.WorkloadDescriptor.async"
+        },
+        "units": {
+          "$ref": "#/$defs/.stroppy.WorkloadDescriptor.units"
+        }
+      },
+      "type": "object",
+      "required": [
+        "name",
+        "async"
+      ],
+      "description": "*\n WorkloadDescriptor represents a logical step in a benchmark.\n It contains a list of operations to perform in this step."
+    },
+    ".stroppy.WorkloadDescriptor.async": {
+      "type": "boolean",
+      "description": "* Whether to execute all operations in this workload asynchronously"
+    },
+    ".stroppy.WorkloadDescriptor.name": {
+      "type": "string",
+      "description": "* Name of the step"
+    },
+    ".stroppy.WorkloadDescriptor.units": {
+      "items": {
+        "$ref": "#/$defs/.stroppy.WorkloadUnitDescriptor",
+        "description": "* List of operations to perform in this step"
+      },
+      "type": "array",
+      "description": "* List of operations to perform in this step"
+    },
+    ".stroppy.WorkloadUnitDescriptor": {
+      "properties": {
+        "descriptor": {
+          "$ref": "#/$defs/.stroppy.WorkloadUnitDescriptor.descriptor"
+        },
+        "count": {
+          "$ref": "#/$defs/.stroppy.WorkloadUnitDescriptor.count"
+        }
+      },
+      "type": "object",
+      "required": [
+        "descriptor",
+        "count"
+      ],
+      "description": "*\n WorkloadUnitDescriptor represents a single unit of work.\n It can be a table creation operation, a query execution operation, or a\n transaction execution operation."
+    },
+    ".stroppy.WorkloadUnitDescriptor.count": {
+      "type": "string",
+      "format": "int64",
+      "description": "* Number of times to execute this unit"
+    },
+    ".stroppy.WorkloadUnitDescriptor.descriptor": {
+      "$ref": "#/$defs/.stroppy.UnitDescriptor"
     }
   },
   "type": "object"
