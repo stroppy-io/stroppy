@@ -10,23 +10,23 @@ import (
 )
 
 type runtimeContext struct {
-	runContext *stroppy.StepContext
-	logger     *zap.Logger
-	driver     driver.Driver
-	unitQueue  *unit_queue.QueuedGenerator[*stroppy.UnitDescriptor, *stroppy.DriverTransaction]
+	stepContext *stroppy.StepContext
+	logger      *zap.Logger
+	driver      driver.Driver
+	unitQueue   *unit_queue.QueuedGenerator[*stroppy.UnitDescriptor, *stroppy.DriverTransaction]
 }
 
 func newRuntimeContext(
 	drv driver.Driver,
 	logger *zap.Logger,
-	runContext *stroppy.StepContext,
+	stepContext *stroppy.StepContext,
 	unitQueue *unit_queue.QueuedGenerator[*stroppy.UnitDescriptor, *stroppy.DriverTransaction],
 ) *runtimeContext {
 	return &runtimeContext{
-		runContext: runContext,
-		logger:     logger,
-		driver:     drv,
-		unitQueue:  unitQueue,
+		stepContext: stepContext,
+		logger:      logger,
+		driver:      drv,
+		unitQueue:   unitQueue,
 	}
 }
 
