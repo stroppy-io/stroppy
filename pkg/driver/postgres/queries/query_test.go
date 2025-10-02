@@ -9,8 +9,8 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/stroppy-io/stroppy/pkg/core/generate"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/common/generate"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 func TestNewQuery_Success(t *testing.T) {
@@ -27,9 +27,9 @@ func TestNewQuery_Success(t *testing.T) {
 			}},
 		},
 	}
-	// step := &stroppy.StepDescriptor{
+	// step := &stroppy.WorkloadDescriptor{
 	// 	Name: "test",
-	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 	Units: []*stroppy.WorkloadUnitDescriptor{
 	// 		{
 	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 	// 				Query: descriptor,
@@ -67,9 +67,9 @@ func TestNewQuery_Error(t *testing.T) {
 		Sql:    "SELECT * FROM t WHERE id=${id}",
 		Params: []*stroppy.QueryParamDescriptor{}, // нет генераторов
 	}
-	// step := &stroppy.StepDescriptor{
+	// step := &stroppy.WorkloadDescriptor{
 	// 	Name: "test",
-	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 	Units: []*stroppy.WorkloadUnitDescriptor{
 	// 		{
 	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 	// 				Query: descriptor,
@@ -111,9 +111,9 @@ func TestNewQuerySync_Success(t *testing.T) {
 			}},
 		},
 	}
-	// step := &stroppy.StepDescriptor{
+	// step := &stroppy.WorkloadDescriptor{
 	// 	Name: "test",
-	// 	Units: []*stroppy.StepUnitDescriptor{
+	// 	Units: []*stroppy.WorkloadUnitDescriptor{
 	// 		{
 	// 			Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 	// 				Query: descriptor,

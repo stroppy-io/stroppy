@@ -6,8 +6,6 @@ require (
 	github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2 v2.0.1
 	github.com/avito-tech/go-transaction-manager/trm/v2 v2.0.1-rc3
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/go-hclog v1.6.3
-	github.com/hashicorp/go-plugin v1.6.3
 	github.com/jackc/pgx-shopspring-decimal v0.0.0-20220624020537-1d36b5a1853e
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/orcaman/concurrent-map/v2 v2.0.1
@@ -26,19 +24,12 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/fatih/color v1.18.0 // indirect
-	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/jhump/protoreflect v1.17.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
-	github.com/oklog/run v1.0.0 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.38.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

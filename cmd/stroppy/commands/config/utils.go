@@ -9,8 +9,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/stroppy-io/stroppy/internal/config"
-	"github.com/stroppy-io/stroppy/internal/protoyaml"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	"github.com/stroppy-io/stroppy/pkg/utils/protoyaml"
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 		stroppy.Version + `/config.schema.json",` + "\n"
 )
 
-func MarshalConfig(cfg *stroppy.Config, newPath string) ([]byte, error) {
+func MarshalConfig(cfg *stroppy.ConfigFile, newPath string) ([]byte, error) {
 	var marshaler func(m proto.Message) ([]byte, error)
 
 	switch path.Ext(newPath) {

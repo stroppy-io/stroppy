@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 func TestNewCreateTable_Success(t *testing.T) {

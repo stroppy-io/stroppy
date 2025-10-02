@@ -19,6 +19,7 @@ dexample
 config.schema.yaml
 internal/static/stroppy-xk6
 
+.vscode
 # Created by .ignore support plugin (hsz.mobi)
 ### JetBrains templatee
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider

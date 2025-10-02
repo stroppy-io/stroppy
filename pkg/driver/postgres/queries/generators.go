@@ -5,8 +5,8 @@ import (
 
 	cmap "github.com/orcaman/concurrent-map/v2"
 
-	"github.com/stroppy-io/stroppy/pkg/core/generate"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/common/generate"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 type (
@@ -35,7 +35,7 @@ func collectQueryGenerators(
 		)
 
 		generator, err := generate.NewValueGenerator(
-			runContext.GetGlobalConfig().GetRun().GetSeed(),
+			runContext.GetConfig().GetSeed(),
 			param,
 		)
 		if err != nil {
@@ -53,14 +53,12 @@ func CollectStepGenerators(
 ) (Generators, error) { //nolint: gocognit // allow
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 
-	for _, step := range runContext.GetGlobalConfig().GetBenchmark().GetSteps() {
-		for _, queryDescriptor := range step.GetUnits() {
-			var err error
+	for _, queryDescriptor := range runContext.GetWorkload().GetUnits() {
+		var err error
 
-			generators, err = collectUnitGenerators(queryDescriptor, runContext, generators)
-			if err != nil {
-				return generators, err
-			}
+		generators, err = collectUnitGenerators(queryDescriptor, runContext, generators)
+		if err != nil {
+			return generators, err
 		}
 	}
 
@@ -68,7 +66,7 @@ func CollectStepGenerators(
 }
 
 func collectUnitGenerators(
-	queryDescriptor *stroppy.StepUnitDescriptor,
+	queryDescriptor *stroppy.WorkloadUnitDescriptor,
 	runContext *stroppy.StepContext,
 	generators cmap.ConcurrentMap[GeneratorID, generate.ValueGenerator],
 ) (Generators, error) {

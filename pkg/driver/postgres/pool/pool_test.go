@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 func TestParseConfig_Success(t *testing.T) {

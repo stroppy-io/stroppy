@@ -1,11 +1,18 @@
-
 LOCAL_BIN:=$(CURDIR)/bin
 BUILD_TARGET_DIR=$(CURDIR)/build
-
 PATH:=$(PATH):$(LOCAL_BIN)
 GOPROXY:=https://goproxy.io,direct
-
 VERSION=$(shell git describe --tags --always 2>/dev/null || echo "0.0.0")
+
+OS := linux
+UNAME_M := $(shell uname -m)
+ifeq ($(UNAME_M),x86_64)
+  ARCH := x86_64
+else ifeq ($(UNAME_M),aarch64)
+  ARCH := aarch_64
+else
+  $(error Unsupported architecture: $(UNAME_M))
+endif
 
 default: help
 
@@ -13,10 +20,30 @@ default: help
 help: # Show help in Makefile
 	@grep -E '^[a-zA-Z0-9 _-]+:.*#'  Makefile | sort | while read -r l; do printf "\033[1;32m$$(echo $$l | cut -f 1 -d':')\033[00m:$$(echo $$l | cut -f 2- -d'#')\n"; done
 
+PROTOC_VERSION ?= 32.1
+PROTOC_BIN := $(LOCAL_BIN)/protoc
+PROTOC_URL := https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH).zip
+PROTOC_ZIP := /tmp/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH).zip
+PROTOC_TMP := /tmp/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH)
+.PHONY: .install-protoc
+.install-protoc:
+	@echo ">>> Installing protoc v$(PROTOC_VERSION) to $(PROTOC_BIN)"
+	@mkdir -p $(LOCAL_BIN)
+	@rm -rf $(PROTOC_TMP) && rm -rf $(PROTOC_ZIP) && rm -rf $(LOCAL_BIN)/include && rm -rf $(LOCAL_BIN)/protoc
+	@echo ">>> Downloading $(PROTOC_URL)"
+	@curl -SL -o $(PROTOC_ZIP) $(PROTOC_URL)
+	@unzip -o -q $(PROTOC_ZIP) -d $(PROTOC_TMP)
+	@mkdir -p $(LOCAL_BIN)/include
+	@cp $(PROTOC_TMP)/bin/protoc $(PROTOC_BIN)
+	@cp -r $(PROTOC_TMP)/include/* $(LOCAL_BIN)/include/
+	@chmod +x $(PROTOC_BIN)
+	@rm $(PROTOC_ZIP) && rm -rf $(PROTOC_TMP)
+
 # List of required binaries (default checks PATH)
 # Optional: Specify custom paths for binaries not in PATH
 # Format: binary_name=/path/to/binary
-REQUIRED_BINS = git node npm go protoc \
+REQUIRED_BINS = git node npm go \
+				protoc=$(LOCAL_BIN)/protoc \
 				protoc-gen-ts=$(LOCAL_BIN)/node_bin/bin/protoc-gen-ts \
 				protoc-gen-go=$(LOCAL_BIN)/protoc-gen-go \
 				protoc-gen-go-grpc=$(LOCAL_BIN)/protoc-gen-go-grpc \
@@ -70,7 +97,9 @@ REQUIRED_BINS = git node npm go protoc \
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/pubg/protoc-gen-jsonschema@v0.8.0
 
 .PHONY: bin-deps
-bin-deps: .go-deps .node-deps .doc-deps # Install binary dependencies in ./bin
+bin-deps: .install-protoc .go-deps .node-deps .doc-deps # Install binary dependencies in ./bin
+
+PROTOC_BIN=$(LOCAL_BIN)/protoc
 
 PROTO_PATH=./stroppy
 PROTO_PATH_FULL=$(CURDIR)/stroppy
@@ -100,7 +129,7 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 	cp $(TS_BUNDLE_DIR)/tsconfig.json $(TMP_BUNDLE_DIR)/
 	cp $(TS_BUNDLE_DIR)/webpack.config.js $(TMP_BUNDLE_DIR)/
 	cd $(TMP_BUNDLE_DIR) && npm install && node combine.js
-	cat $(TS_BUNDLE_DIR)/stroppy-sdk.ts >> $(TMP_BUNDLE_DIR)/stroppy.pb.ts
+	#cat $(TS_BUNDLE_DIR)/stroppy-sdk.ts >> $(TMP_BUNDLE_DIR)/stroppy.pb.ts
 	cd $(TMP_BUNDLE_DIR) && npm run build
 	cp $(TMP_BUNDLE_DIR)/stroppy.pb.ts $(TS_TARGET_DIR)/stroppy.pb.ts
 	cp $(TMP_BUNDLE_DIR)/dist/bundle.js $(TS_TARGET_DIR)/stroppy.pb.js
@@ -110,7 +139,7 @@ GO_TARGET_DIR=$(BUILD_TARGET_DIR)/go
 .PHONY: .build-go-sdk
 .build-go-sdk: # Build go sdk
 	mkdir -p $(GO_TARGET_DIR)
-	protoc \
+	$(PROTOC_BIN) \
 		--plugin=$(LOCAL_BIN)/protoc-gen-go \
 		--go_out=$(GO_TARGET_DIR) \
 		--go_opt=paths=source_relative \
@@ -125,7 +154,7 @@ GO_TARGET_DIR=$(BUILD_TARGET_DIR)/go
 .PHONY: .build-md-docs
 .build-md-docs: # Build proto docs
 	mkdir -p $(DOCS_TARGET_DIR)
-	protoc --plugin=$(LOCAL_BIN)/protoc-gen-doc \
+	$(PROTOC_BIN) --plugin=$(LOCAL_BIN)/protoc-gen-doc \
 	--doc_out=$(DOCS_TARGET_DIR) \
 	--doc_opt=markdown,proto.md \
 	--proto_path=$(PROTO_PATH) $(PROTO_FILES_NO_GEN)
@@ -134,23 +163,15 @@ DOCS_TARGET_DIR=$(BUILD_TARGET_DIR)/docs
 .PHONY: .build-json-schema
 .build-json-schema: # Build json schema for proto files
 	mkdir -p $(DOCS_TARGET_DIR)
-	protoc --plugin=$(LOCAL_BIN)/protoc-gen-jsonschema \
+	$(PROTOC_BIN) --plugin=$(LOCAL_BIN)/protoc-gen-jsonschema \
 	--jsonschema_out=$(DOCS_TARGET_DIR) \
-	--jsonschema_opt=entrypoint_message=Config \
+	--jsonschema_opt=entrypoint_message=ConfigFile \
 	--jsonschema_opt=output_file_suffix=.schema.json \
 	--jsonschema_opt=int64_as_string=true \
 	--proto_path=$(PROTO_PATH) $(PROTO_PATH)/config.proto
 
-
-.PHONY: .move
-.move:
-	rm -rf ../pkg/core/proto/*
-	cp -r ./build/go/* ../pkg/core/proto/
-	cp ./build/ts/* ../internal/static/
-
-
 .PHONY: build
-build: .check-bins .build-go-sdk .build-ts-sdk .build-md-docs .build-json-schema .move # Build go sdk, ts code, docs and json schema
+build: .check-bins .build-go-sdk .build-ts-sdk .build-md-docs .build-json-schema # Build go sdk, ts code, docs and json schema
 
 
 branch=main

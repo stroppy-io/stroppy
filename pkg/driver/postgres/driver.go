@@ -7,9 +7,8 @@ import (
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
-	"github.com/stroppy-io/stroppy/pkg/core/plugins/driver_interface"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
@@ -34,7 +33,7 @@ type Driver struct {
 	builder    QueryBuilder
 }
 
-func NewDriver(lg *zap.Logger) driver_interface.Driver { //nolint: ireturn // allow
+func NewDriver(lg *zap.Logger) *Driver { //nolint: ireturn // allow
 	if lg == nil {
 		return &Driver{
 			logger: logger.NewFromEnv().
@@ -51,7 +50,7 @@ func NewDriver(lg *zap.Logger) driver_interface.Driver { //nolint: ireturn // al
 func (d *Driver) Initialize(ctx context.Context, runContext *stroppy.StepContext) error {
 	connPool, err := pool.NewPool(
 		ctx,
-		runContext.GetGlobalConfig().GetRun().GetDriver(),
+		runContext.GetConfig().GetDriver(),
 		d.logger.Named(pool.LoggerName),
 	)
 	if err != nil {

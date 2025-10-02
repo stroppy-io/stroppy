@@ -12,8 +12,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/stroppy-io/stroppy/pkg/core/generate"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/common/generate"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 func TestNewQueryBuilder_Success(t *testing.T) {
@@ -63,9 +63,9 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 			}},
 		},
 	}
-	step := &stroppy.StepDescriptor{
+	wrk := &stroppy.WorkloadDescriptor{
 		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
+		Units: []*stroppy.WorkloadUnitDescriptor{
 			{
 				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
 					Query: descriptor,
@@ -74,12 +74,10 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 		},
 	}
 	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
+		Config: &stroppy.GlobalConfig{
+			Seed: 42,
 		},
-		Step: step,
+		Workload: wrk,
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
@@ -92,15 +90,15 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 		generators: generators,
 	}
 
-	unitBuildContext := &stroppy.UnitBuildContext{
-		Context: buildContext,
-		Unit:    step.GetUnits()[0],
+	unitBuildContext := &stroppy.UnitContext{
+		StepContext:    buildContext,
+		UnitDescriptor: wrk.GetUnits()[0],
 	}
 
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnit().GetDescriptor_())
+	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnitDescriptor().GetDescriptor_())
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
 	require.Len(t, transactionList.Queries, 1)
@@ -115,9 +113,9 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 			{Name: "name", SqlType: "VARCHAR(255)"},
 		},
 	}
-	step := &stroppy.StepDescriptor{
+	wrk := &stroppy.WorkloadDescriptor{
 		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
+		Units: []*stroppy.WorkloadUnitDescriptor{
 			{
 				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_CreateTable{
 					CreateTable: createTableDescriptor,
@@ -126,12 +124,10 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 		},
 	}
 	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
+		Config: &stroppy.GlobalConfig{
+			Seed: 42,
 		},
-		Step: step,
+		Workload: wrk,
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
@@ -140,15 +136,15 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 		generators: generators,
 	}
 
-	unitBuildContext := &stroppy.UnitBuildContext{
-		Context: buildContext,
-		Unit:    step.GetUnits()[0],
+	unitBuildContext := &stroppy.UnitContext{
+		StepContext:    buildContext,
+		UnitDescriptor: wrk.GetUnits()[0],
 	}
 
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnit().GetDescriptor_())
+	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnitDescriptor().GetDescriptor_())
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
 	require.Len(t, transactionList.Queries, 1)
@@ -174,9 +170,9 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 			},
 		},
 	}
-	step := &stroppy.StepDescriptor{
+	wrk := &stroppy.WorkloadDescriptor{
 		Name: "test",
-		Units: []*stroppy.StepUnitDescriptor{
+		Units: []*stroppy.WorkloadUnitDescriptor{
 			{
 				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
 					Transaction: transactionDescriptor,
@@ -185,12 +181,10 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 		},
 	}
 	buildContext := &stroppy.StepContext{
-		GlobalConfig: &stroppy.Config{
-			Run: &stroppy.RunConfig{
-				Seed: 42,
-			},
+		Config: &stroppy.GlobalConfig{
+			Seed: 42,
 		},
-		Step: step,
+		Workload: wrk,
 	}
 
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
@@ -206,15 +200,15 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 		generators: generators,
 	}
 
-	unitBuildContext := &stroppy.UnitBuildContext{
-		Context: buildContext,
-		Unit:    step.GetUnits()[0],
+	unitBuildContext := &stroppy.UnitContext{
+		StepContext:    buildContext,
+		UnitDescriptor: wrk.GetUnits()[0],
 	}
 
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnit().GetDescriptor_())
+	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnitDescriptor().GetDescriptor_())
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
 	require.Len(t, transactionList.Queries, 1)

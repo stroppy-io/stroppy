@@ -8,8 +8,8 @@ import (
 
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/internal/config"
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 const (
@@ -28,7 +28,7 @@ var validateCmd = &cobra.Command{ //nolint: gochecknoglobals
 			return err
 		}
 
-		cfg, err := config.LoadAndValidateConfig(configPath, true)
+		cfg, err := config.LoadAndValidateConfig(configPath)
 		if err != nil {
 			return err
 		}
@@ -43,8 +43,8 @@ var validateCmd = &cobra.Command{ //nolint: gochecknoglobals
 			return err
 		}
 		if setVersion {
-			cfg.Version = stroppy.Version
-			runConfStr, err := MarshalConfig(cfg.Config, configPath)
+			cfg.GetGlobal().Version = stroppy.Version
+			runConfStr, err := MarshalConfig(cfg.ConfigFile, configPath)
 			if err != nil {
 				return err
 			}

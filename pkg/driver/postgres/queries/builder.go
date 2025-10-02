@@ -10,7 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/core/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 var (

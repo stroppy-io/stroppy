@@ -12,7 +12,7 @@ help: # Show help in Makefile
 # List of required binaries (default checks PATH)
 # Optional: Specify custom paths for binaries not in PATH
 # Format: binary_name=/path/to/binary
-REQUIRED_BINS = git go \
+REQUIRED_BINS = git go curl unzip \
 	xk6=$(LOCAL_BIN)/xk6
 .PHONY: .check-bins
 .check-bins: # Check for required binaries if build locally
@@ -77,13 +77,14 @@ linter_fix: # Start linter with possible fixes
 tests: # Run tests with coverage
 	go test -race ./... -coverprofile=coverage.out
 
-SRC_PROTO_GO_PATH=$(CURDIR)/proto/build/go
-TARGET_PROTO_GO_PATH=$(CURDIR)/pkg/core/proto
+SRC_PROTO_PATH=$(CURDIR)/proto/build
 .PHONY: proto
 proto:
-	rm -rf $(TARGET_PROTO_GO_PATH)/*
+	rm -rf $(CURDIR)/pkg/common/proto/*
 	cd proto && $(MAKE) build
-	mv $(SRC_PROTO_GO_PATH)/* $(TARGET_PROTO_GO_PATH)/
+	cp -r $(SRC_PROTO_PATH)/go/* $(CURDIR)/pkg/common/proto
+	cp $(SRC_PROTO_PATH)/ts/* $(CURDIR)/internal/static/
+	cp $(SRC_PROTO_PATH)/docs/* $(CURDIR)/docs
 
 K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
 .PHONY: build-xk6
@@ -99,9 +100,10 @@ STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 .PHONY: build
 build: # Build binary stroppy
+	echo $(VERSION)
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 		go build -v -o $(STROPPY_OUT_FILE) \
-		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.StroppyXk6Version=$$XK6_VERSION'" \
+		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'" \
 		$(CURDIR)/cmd/stroppy
 
 branch=main

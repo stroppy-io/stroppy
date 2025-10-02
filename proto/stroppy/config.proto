@@ -5,71 +5,10 @@ package stroppy;
 import "common.proto";
 import "descriptor.proto";
 import "gen/validate/validate.proto";
-import "google/protobuf/duration.proto";
+import "k6.proto";
 
 option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
 
-/**
- * OtlpExport contains configuration for exporting metrics via OpenTelemetry Protocol (OTLP).
- * It specifies the endpoint and metrics prefix for telemetry data export.
- */
-message OtlpExport {
-    /** gRPC endpoint for OpenTelemetry collector */
-    optional string otlp_grpc_endpoint = 1;
-    /** HTTP endpoint for the OpenTelemetry collector */
-    optional string otlp_http_endpoint = 3;
-    /** HTTP exporter path. Default is '/v1/metrics' */
-    optional string otlp_http_exporter_url_path = 4;
-    /** Disable transport security for the exporter */
-    optional bool otlp_endpoint_insecure = 5;
-    /** Headers for otlp requests e.g. Authorization=... */
-    optional string otlp_headers = 6;
-
-    /** Prefix to be added to all exported metrics */
-    optional string otlp_metrics_prefix = 2;
-}
-
-/**
- * GoExecutor contains configuration specific to Go-based test execution.
- * It controls Go runtime parameters and error handling behavior.
- */
-message GoExecutor {
-    /** Maximum number of OS threads that the Go runtime can use (0 = use default) */
-    optional uint64 go_max_proc = 1;
-    /** Whether to cancel execution on first error */
-    optional bool cancel_on_error = 2;
-}
-
-/**
- * K6Executor contains configuration for k6 load testing tool integration.
- * It contains paths to the k6 binary and the k6 test script, as well as
- * additional arguments to pass to the k6 binary.
- */
-message K6Executor {
-    /** Path to the k6 binary */
-    string k6_binary_path = 1 [(validate.rules).string.uri_ref = true];
-    /** Additional arguments to pass to the k6 binary */
-    repeated string k6_binary_args = 2 [
-        (validate.rules).repeated = {
-            unique: true,
-        }
-    ];
-    /** Path to the k6 test script */
-    string k6_script_path = 3 [(validate.rules).string.uri_ref = true];
-
-    /** Timeout for k6 setup phase */
-    optional google.protobuf.Duration k6_setup_timeout = 10;
-    /** Number of virtual users */
-    optional uint64 k6_vus = 12 [(validate.rules).uint64 = {ignore_empty: true, gte: 0}];
-    /** Maximum number of virtual users */
-    optional uint64 k6_max_vus = 13 [(validate.rules).uint64 = {ignore_empty: true, gte: 0}];
-    /** Number of requests per second */
-    optional uint64 k6_rate = 14 [(validate.rules).uint64 = {ignore_empty: true, gte: 0}];
-    /** Duration of the test */
-    optional google.protobuf.Duration k6_duration = 15;
-    /** OpenTelemetry export configuration */
-    optional OtlpExport otlp_export = 100;
-}
 
 /**
  * DriverConfig contains configuration for connecting to a database driver.
@@ -77,32 +16,17 @@ message K6Executor {
 */
 message DriverConfig {
     /** Database connection URL */
-    string url = 3 [(validate.rules).string.uri_ref = true];
+    string url = 1 [(validate.rules).string.uri_ref = true];
     /** Database-specific configuration options */
-    optional Value.Struct db_specific = 4;
+    optional Value.Struct db_specific = 2;
 
     enum DriverType {
         DRIVER_TYPE_UNSPECIFIED = 0;
         DRIVER_TYPE_POSTGRES = 1;
     }
 
-    /** Name of chosen driver */
-    DriverType driver_type = 5 [(validate.rules).enum.defined_only = true];
-}
-
-/**
- * RequestedStep defines a step that should be executed during the benchmark.
- * It specifies the step name and the type of executor to use.
- */
-message RequestedStep {
-    enum ExecutorType {
-        EXECUTOR_TYPE_GO = 0;
-        EXECUTOR_TYPE_K6 = 1;
-    }
-    /** Unique name of the step */
-    string name = 1 [(validate.rules).string.min_len = 1];
-    /** Type of executor to use for this step */
-    optional ExecutorType executor = 2 [(validate.rules).enum.defined_only = true];
+    /** Name/Type of chosen driver */
+    DriverType driver_type = 3 [(validate.rules).enum.defined_only = true];
 }
 
 /**
@@ -128,68 +52,93 @@ message LoggerConfig {
 }
 
 /**
- * StepContext provides contextual information to a benchmark step during execution.
- * It contains the current configuration and descriptors relevant to the step.
+ * OtlpExporterConfig contains named configuration for an OTLP exporter.
  */
-message StepContext {
-    /** Current step descriptor */
-    StepDescriptor step = 5;
-    /** Global configuration of the benchmark and its steps */
-    Config global_config = 6;
+message ExporterConfig {
+    /** Name of the OTLP exporter */
+    string name = 1 [(validate.rules).string.min_len = 1];
+    /** Configuration for the OTLP exporter */
+    OtlpExport otlp_export = 2 [(validate.rules).message.required = true];
+}
+
+/**
+ * ExecutorConfig contains configuration for an executor.
+ */
+message ExecutorConfig {
+    /** Name of the executor */
+    string name = 1 [(validate.rules).string.min_len = 1];
+    /** Configuration for the executor */
+    K6Options k6 = 2;
+}
+
+/**
+ * StepExecutorMappingConfig contains configuration for mapping steps to executors.
+ */
+message Step {
+    /** Name of the step */
+    string name = 1 [(validate.rules).string.min_len = 1];
+    /** Name of the step */
+    string workload = 2 [(validate.rules).string.min_len = 1];
+    /** Name of the executor */
+    string executor = 3 [(validate.rules).string.min_len = 1];
+    /** Name of the exporter */
+    optional string exporter = 4;
 }
 
 /**
  * SideCar contains configuration for plugins.
  */
-message SideCar {
+message SideCarConfig {
     /** Url to connect the plugin instance */
     string url = 2 [(validate.rules).string.uri_ref = true];
     /** Additional plugin settings */
     optional Value.Struct settings = 3;
 }
 
+
+// TODO: use it later
 /**
- * RunConfig contains the complete configuration for a benchmark run.
+ * CloudConfig contains configuration for stroppy cloud backend.
  */
-message RunConfig {
-    /** Run identifier for reproducible test runs or debugging */
-    string run_id = 1;
-    /** Random seed for reproducible test runs */
-    uint64 seed = 2 [(validate.rules).uint64.gte = 0];
-    /** Database driver configuration */
-    DriverConfig driver = 3 [(validate.rules).message.required = true];
-    /** Go executor configuration */
-    GoExecutor go_executor = 4;
-    /** k6 executor configuration */
-    K6Executor k6_executor = 5;
-    /** List of steps to execute in order */
-    repeated RequestedStep steps = 6 [
-        (validate.rules).repeated = {
-            min_items: 1,
-            items: {message: {required: true}}
-        }
-    ];
-    /** Logging configuration */
-    LoggerConfig logger = 7;
-    /** Arbitrary metadata, may be passed to result labels and json output */
-    map<string, string> metadata = 8;
-    /** Plugins configuration */
-    repeated SideCar side_cars = 9;
-}
+message CloudConfig {}
 
 
-/**
- * Config contains the complete configuration for a benchmark run.
- */
-message Config {
+message GlobalConfig {
     /**
      * Version of the configuration format e.g. proto files version.
      * This is used for backward compatibility of configs
      * and will be set automatically from binary run if not present.
      */
     string version = 1;
-    /** RunConfig contains the complete configuration for a benchmark run. */
-    RunConfig run = 2 [(validate.rules).message.required = true];
+    /**
+     * Run identifier for reproducible test runs or debugging
+     * If set to "generate()" stroppy eval ulid for run_id
+     */
+    string run_id = 2;
+    /** Random seed for reproducible test runs */
+    uint64 seed = 3 [(validate.rules).uint64.gte = 0];
+    /** Arbitrary metadata, may be passed to result labels and json output */
+    map<string, string> metadata = 4;
+    /** Database driver configuration */
+    DriverConfig driver = 5 [(validate.rules).message.required = true];
+    /** Logging configuration */
+    LoggerConfig logger = 6;
+}
+
+/**
+ * ConfigFile contains the complete configuration for a benchmark run in file.
+ */
+message ConfigFile {
+    /** Global configuration */
+    GlobalConfig global = 1;
+    /** Exporters configuration */
+    repeated ExporterConfig exporters = 2;
+    /** Executors configuration */
+    repeated ExecutorConfig executors = 3;
+    /** Step to executor mapping configuration */
+    repeated Step steps = 4;
+    /** Plugins configuration */
+    repeated SideCarConfig side_cars = 5;
     /** BenchmarkDescriptor defines a complete benchmark consisting of multiple steps. */
-    BenchmarkDescriptor benchmark = 3 [(validate.rules).message.required = true];
+    BenchmarkDescriptor benchmark = 6 [(validate.rules).message.required = true];
 }
