@@ -2,6 +2,7 @@ package generate
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"iter"
 	"math/rand/v2"
@@ -26,60 +27,71 @@ type GenAbleStruct interface {
 	GetName() string
 }
 
+var ErrNoGenerators = errors.New("no generators provided")
+
+//nolint:gocognit // it's hard indeed
 func NewTupleGenerator(
 	seed uint64,
 	genInfos []GenAbleStruct,
-) valueGeneratorFn {
+) valueGeneratorFn { //nolint:revive // revive is annoying to use
 	if len(genInfos) == 0 {
-		return func() (*stroppy.Value, error) { return nil, fmt.Errorf("no generators provided") }
+		return func() (*stroppy.Value, error) { return nil, ErrNoGenerators }
 	}
-	var s iter.Seq2[[]*stroppy.Value, error]
-	s = func(yield func([]*stroppy.Value, error) bool) {
+
+	var seqFunc iter.Seq2[[]*stroppy.Value, error] = func(yield func([]*stroppy.Value, error) bool) {
 		// Recursive function to iterate through all combinations
 		var iterate func(depth int, current []*stroppy.Value) bool
 		iterate = func(depth int, current []*stroppy.Value) bool {
 			if depth == len(genInfos) {
-				// We've filled all positions, yield the tuple
 				result := make([]*stroppy.Value, len(current))
 				copy(result, current)
+
 				return yield(result, nil)
 			}
-			// Init the generator
+
 			gen, err := NewValueGenerator(seed, genInfos[depth])
 			if err != nil {
 				yield(nil, err)
+
 				return false
 			}
-			// Prefetch the first value
+
 			val, err := gen.Next()
 			if err != nil {
 				yield(nil, err)
+
 				return false
 			}
+
 			for {
-				// Go deeper into the next generator
 				current[depth] = val
 				if !iterate(depth+1, current) {
 					return false
 				}
+
 				newVal, err := gen.Next()
 				if err != nil {
 					yield(nil, err)
+
 					return false
 				}
-				// Check if the end of the generator reached
+
 				if proto.Equal(val, newVal) {
 					return true
 				}
+
 				val = newVal
 			}
 		}
-		// Start iteration with empty tuple
+
 		iterate(0, make([]*stroppy.Value, len(genInfos)))
 	}
-	pull, _ := iter.Pull2(s)
+
+	pull, _ := iter.Pull2(seqFunc)
+
 	return func() (*stroppy.Value, error) {
 		vals, err, _ := pull()
+
 		return &stroppy.Value{
 			Type: &stroppy.Value_List_{List: &stroppy.Value_List{Values: vals}},
 		}, err

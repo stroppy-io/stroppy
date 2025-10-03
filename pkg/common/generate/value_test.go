@@ -3,25 +3,29 @@ package generate
 import (
 	"testing"
 
-	pb "github.com/stroppy-io/stroppy/pkg/common/proto"
 	"google.golang.org/protobuf/proto"
+
+	pb "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 func ptr[T any](x T) *T {
 	return &x
 }
 
+//nolint:maintidx // table tests supposed to be long
 func TestNewTupleGenerator(t *testing.T) {
 	type args struct {
 		seed     uint64
 		genInfos []GenAbleStruct
 	}
+
 	tests := []struct {
 		name string
 		args args
 		want [][]*pb.Value
 	}{
-		{name: "simple",
+		{
+			name: "simple",
 			args: args{seed: 1, genInfos: []GenAbleStruct{
 				&pb.QueryParamDescriptor{
 					Name: "w_id",
@@ -47,29 +51,29 @@ func TestNewTupleGenerator(t *testing.T) {
 				},
 			}},
 			want: [][]*pb.Value{
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 1}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 10}},
+				{
+					{Type: &pb.Value_Int64{Int64: 1}},
+					{Type: &pb.Value_Int64{Int64: 10}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 1}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 11}},
+				{
+					{Type: &pb.Value_Int64{Int64: 1}},
+					{Type: &pb.Value_Int64{Int64: 11}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 1}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 12}},
+				{
+					{Type: &pb.Value_Int64{Int64: 1}},
+					{Type: &pb.Value_Int64{Int64: 12}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 2}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 10}},
+				{
+					{Type: &pb.Value_Int64{Int64: 2}},
+					{Type: &pb.Value_Int64{Int64: 10}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 2}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 11}},
+				{
+					{Type: &pb.Value_Int64{Int64: 2}},
+					{Type: &pb.Value_Int64{Int64: 11}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 2}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 12}},
+				{
+					{Type: &pb.Value_Int64{Int64: 2}},
+					{Type: &pb.Value_Int64{Int64: 12}},
 				},
 			},
 		},
@@ -94,9 +98,9 @@ func TestNewTupleGenerator(t *testing.T) {
 				},
 			}},
 			want: [][]*pb.Value{
-				[]*pb.Value{&pb.Value{Type: &pb.Value_Int64{Int64: 5}}},
-				[]*pb.Value{&pb.Value{Type: &pb.Value_Int64{Int64: 6}}},
-				[]*pb.Value{&pb.Value{Type: &pb.Value_Int64{Int64: 7}}},
+				{{Type: &pb.Value_Int64{Int64: 5}}},
+				{{Type: &pb.Value_Int64{Int64: 6}}},
+				{{Type: &pb.Value_Int64{Int64: 7}}},
 			},
 		},
 		{
@@ -126,13 +130,13 @@ func TestNewTupleGenerator(t *testing.T) {
 				},
 			}},
 			want: [][]*pb.Value{
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 42}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 1}},
+				{
+					{Type: &pb.Value_Int64{Int64: 42}},
+					{Type: &pb.Value_Int64{Int64: 1}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 42}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 2}},
+				{
+					{Type: &pb.Value_Int64{Int64: 42}},
+					{Type: &pb.Value_Int64{Int64: 2}},
 				},
 			},
 		},
@@ -174,45 +178,45 @@ func TestNewTupleGenerator(t *testing.T) {
 				},
 			}},
 			want: [][]*pb.Value{
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 1}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 10}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 100}},
+				{
+					{Type: &pb.Value_Int64{Int64: 1}},
+					{Type: &pb.Value_Int64{Int64: 10}},
+					{Type: &pb.Value_Int64{Int64: 100}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 1}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 10}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 101}},
+				{
+					{Type: &pb.Value_Int64{Int64: 1}},
+					{Type: &pb.Value_Int64{Int64: 10}},
+					{Type: &pb.Value_Int64{Int64: 101}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 1}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 11}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 100}},
+				{
+					{Type: &pb.Value_Int64{Int64: 1}},
+					{Type: &pb.Value_Int64{Int64: 11}},
+					{Type: &pb.Value_Int64{Int64: 100}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 1}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 11}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 101}},
+				{
+					{Type: &pb.Value_Int64{Int64: 1}},
+					{Type: &pb.Value_Int64{Int64: 11}},
+					{Type: &pb.Value_Int64{Int64: 101}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 2}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 10}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 100}},
+				{
+					{Type: &pb.Value_Int64{Int64: 2}},
+					{Type: &pb.Value_Int64{Int64: 10}},
+					{Type: &pb.Value_Int64{Int64: 100}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 2}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 10}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 101}},
+				{
+					{Type: &pb.Value_Int64{Int64: 2}},
+					{Type: &pb.Value_Int64{Int64: 10}},
+					{Type: &pb.Value_Int64{Int64: 101}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 2}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 11}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 100}},
+				{
+					{Type: &pb.Value_Int64{Int64: 2}},
+					{Type: &pb.Value_Int64{Int64: 11}},
+					{Type: &pb.Value_Int64{Int64: 100}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 2}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 11}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 101}},
+				{
+					{Type: &pb.Value_Int64{Int64: 2}},
+					{Type: &pb.Value_Int64{Int64: 11}},
+					{Type: &pb.Value_Int64{Int64: 101}},
 				},
 			},
 		},
@@ -243,41 +247,41 @@ func TestNewTupleGenerator(t *testing.T) {
 				},
 			}},
 			want: [][]*pb.Value{
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: -2}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: -1}},
+				{
+					{Type: &pb.Value_Int64{Int64: -2}},
+					{Type: &pb.Value_Int64{Int64: -1}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: -2}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 0}},
+				{
+					{Type: &pb.Value_Int64{Int64: -2}},
+					{Type: &pb.Value_Int64{Int64: 0}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: -2}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 1}},
+				{
+					{Type: &pb.Value_Int64{Int64: -2}},
+					{Type: &pb.Value_Int64{Int64: 1}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: -1}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: -1}},
+				{
+					{Type: &pb.Value_Int64{Int64: -1}},
+					{Type: &pb.Value_Int64{Int64: -1}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: -1}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 0}},
+				{
+					{Type: &pb.Value_Int64{Int64: -1}},
+					{Type: &pb.Value_Int64{Int64: 0}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: -1}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 1}},
+				{
+					{Type: &pb.Value_Int64{Int64: -1}},
+					{Type: &pb.Value_Int64{Int64: 1}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 0}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: -1}},
+				{
+					{Type: &pb.Value_Int64{Int64: 0}},
+					{Type: &pb.Value_Int64{Int64: -1}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 0}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 0}},
+				{
+					{Type: &pb.Value_Int64{Int64: 0}},
+					{Type: &pb.Value_Int64{Int64: 0}},
 				},
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 0}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 1}},
+				{
+					{Type: &pb.Value_Int64{Int64: 0}},
+					{Type: &pb.Value_Int64{Int64: 1}},
 				},
 			},
 		},
@@ -308,22 +312,25 @@ func TestNewTupleGenerator(t *testing.T) {
 				},
 			}},
 			want: [][]*pb.Value{
-				[]*pb.Value{
-					&pb.Value{Type: &pb.Value_Int64{Int64: 7}},
-					&pb.Value{Type: &pb.Value_Int64{Int64: 9}},
+				{
+					{Type: &pb.Value_Int64{Int64: 7}},
+					{Type: &pb.Value_Int64{Int64: 9}},
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gen := NewTupleGenerator(tt.args.seed, tt.args.genInfos...)
+			gen := NewTupleGenerator(tt.args.seed, tt.args.genInfos)
+
 			for i, pair := range tt.want {
 				wrapped := &pb.Value{Type: &pb.Value_List_{List: &pb.Value_List{Values: pair}}}
+
 				got, err := gen.Next()
 				if err != nil {
 					t.Errorf("generator returned error: %s", err)
 				}
+
 				if !proto.Equal(
 					got,
 					wrapped,

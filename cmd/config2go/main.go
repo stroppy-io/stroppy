@@ -13,8 +13,9 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/stroppy-io/stroppy/internal/protoyaml"
-	"github.com/stroppy-io/stroppy/pkg/core/proto"
+	"github.com/stroppy-io/stroppy-core/pkg/proto"
+
+	"github.com/stroppy-io/stroppy/pkg/utils/protoyaml"
 )
 
 // TODO: add entire file generation (with package, imports, formatting)

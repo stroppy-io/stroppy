@@ -7,16 +7,19 @@ import (
 	"regexp"
 	"strings"
 
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"go.uber.org/zap"
 
-	cmap "github.com/orcaman/concurrent-map/v2"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
-var ErrNoColumnGen = errors.New("no generator for column")
-var ErrNoGroupGen = errors.New("no generator for group")
+var (
+	ErrNoColumnGen = errors.New("no generator for column")
+	ErrNoGroupGen  = errors.New("no generator for group")
+)
 
-var reStorage = cmap.New[*regexp.Regexp]()
+// FIXME: is there any better place for it? delete comment if no.
+var reStorage = cmap.New[*regexp.Regexp]() //nolint:gochecknoglobals // it's just works
 
 func newQuery(
 	generators Generators,
@@ -67,20 +70,21 @@ func newQuery(
 			)
 		}
 
-		list := protoValues.GetType().(*stroppy.Value_List_) //nolint:forceassert // allow panic
+		list := protoValues.GetType().(*stroppy.Value_List_) //nolint:errcheck,forcetypeassert // allow panic
 		paramsValues = append(paramsValues, list.List.GetValues()...)
 	}
 
 	resSQL := descriptor.GetSql()
 
 	for idx, param := range descriptor.GetParams() {
-		if pattern := param.GetReplaceRegex(); len(pattern) != 0 {
+		if pattern := param.GetReplaceRegex(); pattern != "" {
 			// TODO: add pattern validation at the config reading stage
 			re, ok := reStorage.Get(pattern)
 			if !ok {
 				re = regexp.MustCompile(pattern)
 				reStorage.Set(pattern, re)
 			}
+
 			re.ReplaceAllString(resSQL, fmt.Sprintf("$%d", idx+1))
 		} else { // fallback to name replace
 			resSQL = strings.ReplaceAll(
