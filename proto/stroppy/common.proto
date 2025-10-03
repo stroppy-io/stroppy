@@ -8,8 +8,9 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
 
 /**
- * OtlpExport contains configuration for exporting metrics via OpenTelemetry Protocol (OTLP).
- * It specifies the endpoint and metrics prefix for telemetry data export.
+ * OtlpExport contains configuration for exporting metrics via OpenTelemetry
+ * Protocol (OTLP). It specifies the endpoint and metrics prefix for telemetry
+ * data export.
  */
 message OtlpExport {
     /** gRPC endpoint for OpenTelemetry collector */
@@ -31,19 +32,21 @@ message OtlpExport {
  */
 message Decimal {
     /** String representation of the decimal number */
-    string value = 1 [(validate.rules).string.min_len = 1];
+    string value = 1 [ (validate.rules).string.min_len = 1 ];
 }
 
 /**
  * Uuid represents a universally unique identifier (UUID).
  */
 message Uuid {
-    /** String representation of UUID (e.g., "123e4567-e89b-12d3-a456-426614174000") */
-    string value = 1 [(validate.rules).string.uuid = true];
+    /** String representation of UUID (e.g.,
+     * "123e4567-e89b-12d3-a456-426614174000") */
+    string value = 1 [ (validate.rules).string.uuid = true ];
 }
 
 /**
- * DateTime represents a point in time, independent of any time zone or calendar.
+ * DateTime represents a point in time, independent of any time zone or
+ * calendar.
  */
 message DateTime {
     /** Timestamp in UTC */
@@ -52,7 +55,8 @@ message DateTime {
 
 /**
  * Value is a variant type that can represent different types of values.
- * It's used to represent values that can be of multiple types in a type-safe way.
+ * It's used to represent values that can be of multiple types in a type-safe
+ * way.
  */
 message Value {
     enum NullValue {
@@ -113,12 +117,11 @@ message Generation {
      */
     message Alphabet {
         /** List of character ranges for this alphabet */
-        repeated Generation.Range.UInt32Range ranges = 1 [
-            (validate.rules).repeated = {
-                min_items: 1,
-                items: {message: {required: true}}
-            }
-        ];
+        repeated Generation.Range.UInt32Range ranges = 1
+            [ (validate.rules).repeated = {
+                min_items : 1,
+                items : {message : {required : true}}
+            } ];
     }
 
     /**
@@ -135,9 +138,10 @@ message Generation {
         }
 
         /** Type of distribution to use */
-        DistributionType type = 1 [(validate.rules).enum.defined_only = true];
-        /** Distribution parameter (e.g., standard deviation for normal distribution) */
-        double screw = 2 [(validate.rules).double.gte = 0];
+        DistributionType type = 1 [ (validate.rules).enum.defined_only = true ];
+        /** Distribution parameter (e.g., standard deviation for normal
+         * distribution) */
+        double screw = 2 [ (validate.rules).double.gte = 0 ];
     }
 
     /**
@@ -257,42 +261,48 @@ message Generation {
         /** Rules for generating 32-bit floating point numbers */
         message FloatRule {
             /** Valid value range */
-            Range.FloatRange range = 1 [(validate.rules).message.required = true];
+            Range.FloatRange range = 1
+                [ (validate.rules).message.required = true ];
             /** Fixed value (if specified, overrides range) */
             optional float constant = 2;
         }
         /** Rules for generating 64-bit floating point numbers */
         message DoubleRule {
             /** Valid value range */
-            Range.DoubleRange range = 1 [(validate.rules).message.required = true];
+            Range.DoubleRange range = 1
+                [ (validate.rules).message.required = true ];
             /** Fixed value (if specified, overrides range) */
             optional double constant = 2;
         }
         /** Rules for generating 32-bit signed integers */
         message Int32Rule {
             /** Valid value range */
-            Range.Int32Range range = 1 [(validate.rules).message.required = true];
+            Range.Int32Range range = 1
+                [ (validate.rules).message.required = true ];
             /** Fixed value (if specified, overrides range) */
             optional int32 constant = 2;
         }
         /** Rules for generating 64-bit signed integers */
         message Int64Rule {
             /** Valid value range */
-            Range.Int64Range range = 1 [(validate.rules).message.required = true];
+            Range.Int64Range range = 1
+                [ (validate.rules).message.required = true ];
             /** Fixed value (if specified, overrides range) */
             optional int64 constant = 2;
         }
         /** Rules for generating 32-bit unsigned integers */
         message UInt32Rule {
             /** Valid value range */
-            Range.UInt32Range range = 1 [(validate.rules).message.required = true];
+            Range.UInt32Range range = 1
+                [ (validate.rules).message.required = true ];
             /** Fixed value (if specified, overrides range) */
             optional uint32 constant = 2;
         }
         /** Rules for generating 64-bit unsigned integers */
         message UInt64Rule {
             /** Valid value range */
-            Range.UInt64Range range = 1 [(validate.rules).message.required = true];
+            Range.UInt64Range range = 1
+                [ (validate.rules).message.required = true ];
             /** Fixed value (if specified, overrides range) */
             optional uint64 constant = 2;
         }
@@ -306,14 +316,16 @@ message Generation {
             /** Character set to use for generation */
             optional Alphabet alphabet = 1;
             /** Valid length range for the string */
-            Range.UInt64Range len_range = 2 [(validate.rules).message.required = true];
+            Range.UInt64Range len_range = 2
+                [ (validate.rules).message.required = true ];
             /** Fixed value (if specified, overrides generation) */
             optional string constant = 3;
         }
         /** Rules for generating date/time values */
         message DateTimeRule {
             /** Valid time range */
-            Range.DateTimeRange range = 1 [(validate.rules).message.required = true];
+            Range.DateTimeRange range = 1
+                [ (validate.rules).message.required = true ];
             /** Fixed value (if specified, overrides range) */
             optional DateTime constant = 2;
         }
@@ -325,7 +337,8 @@ message Generation {
         /** Rules for generating decimal numbers */
         message DecimalRule {
             /** Valid value range */
-            Range.DecimalRange range = 1 [(validate.rules).message.required = true];
+            Range.DecimalRange range = 1
+                [ (validate.rules).message.required = true ];
             /** Fixed value (if specified, overrides range) */
             optional Decimal constant = 2;
         }
@@ -361,7 +374,8 @@ message Generation {
             Rules.DecimalRule decimal_rules = 103;
         }
         optional Distribution distribution = 1000;
-        optional uint32 null_percentage = 1001 [(validate.rules).uint32.gt = 0];
+        optional uint32 null_percentage = 1001
+            [ (validate.rules).uint32.gt = 0 ];
         optional bool unique = 1002;
     }
 }

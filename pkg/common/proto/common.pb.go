@@ -120,8 +120,9 @@ func (Generation_Distribution_DistributionType) EnumDescriptor() ([]byte, []int)
 }
 
 // *
-// OtlpExport contains configuration for exporting metrics via OpenTelemetry Protocol (OTLP).
-// It specifies the endpoint and metrics prefix for telemetry data export.
+// OtlpExport contains configuration for exporting metrics via OpenTelemetry
+// Protocol (OTLP). It specifies the endpoint and metrics prefix for telemetry
+// data export.
 type OtlpExport struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * gRPC endpoint for OpenTelemetry collector
@@ -263,7 +264,8 @@ func (x *Decimal) GetValue() string {
 // Uuid represents a universally unique identifier (UUID).
 type Uuid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// * String representation of UUID (e.g., "123e4567-e89b-12d3-a456-426614174000")
+	// * String representation of UUID (e.g.,
+	// "123e4567-e89b-12d3-a456-426614174000")
 	Value         string `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -307,7 +309,8 @@ func (x *Uuid) GetValue() string {
 }
 
 // *
-// DateTime represents a point in time, independent of any time zone or calendar.
+// DateTime represents a point in time, independent of any time zone or
+// calendar.
 type DateTime struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Timestamp in UTC
@@ -355,7 +358,8 @@ func (x *DateTime) GetValue() *timestamppb.Timestamp {
 
 // *
 // Value is a variant type that can represent different types of values.
-// It's used to represent values that can be of multiple types in a type-safe way.
+// It's used to represent values that can be of multiple types in a type-safe
+// way.
 type Value struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Type:
@@ -835,7 +839,8 @@ type Generation_Distribution struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Type of distribution to use
 	Type Generation_Distribution_DistributionType `protobuf:"varint,1,opt,name=type,proto3,enum=stroppy.Generation_Distribution_DistributionType" json:"type,omitempty"`
-	// * Distribution parameter (e.g., standard deviation for normal distribution)
+	// * Distribution parameter (e.g., standard deviation for normal
+	// distribution)
 	Screw         float64 `protobuf:"fixed64,2,opt,name=screw,proto3" json:"screw,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

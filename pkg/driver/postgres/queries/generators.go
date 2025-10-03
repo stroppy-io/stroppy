@@ -22,13 +22,22 @@ func (g GeneratorID) String() string {
 	return string(g)
 }
 
+// should be [T ~R], but it's not allowed by syntax
+func out[R any, T any](xs []T) (res []R) {
+	res = make([]R, 0, len(xs))
+	for _, x := range xs {
+		res = append(res, any(x).(R)) //nolint:forceassert // allow panic
+	}
+	return res
+}
+
 func collectQueryGenerators(
 	runContext *stroppy.StepContext,
 	queryDescriptor *stroppy.QueryDescriptor,
 ) (Generators, error) {
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-
 	for _, param := range queryDescriptor.GetParams() {
+		// TODO: tuple generator
 		paramID := NewGeneratorID(
 			queryDescriptor.GetName(),
 			param.GetName(),
@@ -45,6 +54,13 @@ func collectQueryGenerators(
 		generators.Set(paramID, generator)
 	}
 
+	for _, group := range queryDescriptor.GetGroups() {
+		generator := generate.NewTupleGenerator(
+			runContext.GetConfig().GetSeed(),
+			out[generate.GenAbleStruct](group.GetParams()),
+		)
+		generators.Set(NewGeneratorID(queryDescriptor.GetName(), group.GetName()), generator)
+	}
 	return generators, nil
 }
 

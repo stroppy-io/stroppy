@@ -3,11 +3,13 @@ package generate
 import (
 	"encoding/binary"
 	"fmt"
+	"iter"
 	"math/rand/v2"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
@@ -22,6 +24,66 @@ type ValueGenerator interface {
 type GenAbleStruct interface {
 	GetGenerationRule() *stroppy.Generation_Rule
 	GetName() string
+}
+
+func NewTupleGenerator(
+	seed uint64,
+	genInfos []GenAbleStruct,
+) valueGeneratorFn {
+	if len(genInfos) == 0 {
+		return func() (*stroppy.Value, error) { return nil, fmt.Errorf("no generators provided") }
+	}
+	var s iter.Seq2[[]*stroppy.Value, error]
+	s = func(yield func([]*stroppy.Value, error) bool) {
+		// Recursive function to iterate through all combinations
+		var iterate func(depth int, current []*stroppy.Value) bool
+		iterate = func(depth int, current []*stroppy.Value) bool {
+			if depth == len(genInfos) {
+				// We've filled all positions, yield the tuple
+				result := make([]*stroppy.Value, len(current))
+				copy(result, current)
+				return yield(result, nil)
+			}
+			// Init the generator
+			gen, err := NewValueGenerator(seed, genInfos[depth])
+			if err != nil {
+				yield(nil, err)
+				return false
+			}
+			// Prefetch the first value
+			val, err := gen.Next()
+			if err != nil {
+				yield(nil, err)
+				return false
+			}
+			for {
+				// Go deeper into the next generator
+				current[depth] = val
+				if !iterate(depth+1, current) {
+					return false
+				}
+				newVal, err := gen.Next()
+				if err != nil {
+					yield(nil, err)
+					return false
+				}
+				// Check if the end of the generator reached
+				if proto.Equal(val, newVal) {
+					return true
+				}
+				val = newVal
+			}
+		}
+		// Start iteration with empty tuple
+		iterate(0, make([]*stroppy.Value, len(genInfos)))
+	}
+	pull, _ := iter.Pull2(s)
+	return func() (*stroppy.Value, error) {
+		vals, err, _ := pull()
+		return &stroppy.Value{
+			Type: &stroppy.Value_List_{List: &stroppy.Value_List{Values: vals}},
+		}, err
+	}
 }
 
 func NewValueGenerator( //nolint: ireturn // need as lib part
@@ -42,7 +104,6 @@ func NewValueGenerator( //nolint: ireturn // need as lib part
 
 func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 	seed uint64,
-
 	rule *stroppy.Generation_Rule,
 ) (ValueGenerator, error) {
 	switch rule.GetType().(type) {
