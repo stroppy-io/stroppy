@@ -13,8 +13,8 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/stroppy-io/stroppy/internal/protoyaml"
-	"github.com/stroppy-io/stroppy/pkg/core/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	"github.com/stroppy-io/stroppy/pkg/utils/protoyaml"
 )
 
 // TODO: add entire file generation (with package, imports, formatting)
@@ -47,7 +47,7 @@ func main() {
 		return
 	}
 
-	var cfg proto.Config
+	var cfg stroppy.ConfigFile
 
 	switch path.Ext(configPath) {
 	case "json":
