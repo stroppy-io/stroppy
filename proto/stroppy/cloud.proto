@@ -5,6 +5,7 @@ package stroppy;
 import "config.proto";
 import "google/protobuf/empty.proto";
 import "runtime.proto";
+import "common.proto";
 
 option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
 
@@ -17,14 +18,14 @@ enum Status {
 }
 
 message StroppyStepRun {
-    string id = 1;
-    string stroppy_run_id = 2;
+    Ulid id = 1;
+    Ulid stroppy_run_id = 2;
     StepContext context = 3;
     Status status = 4;
 }
 
 message StroppyRun {
-    string id = 1;
+    Ulid id = 1;
     Status status = 2;
     ConfigFile config = 3;
     string cmd = 4;
