@@ -115,6 +115,15 @@ help:
 	@echo "  help       - Показать эту справку"
 
 
+SRC_PROTO_PATH=$(CURDIR)/tools/stroppy/proto/build
+.PHONY: proto
+proto:
+	rm -rf $(CURDIR)/pkg/common/proto/*
+	cd  $(CURDIR)/tools/stroppy/proto && $(MAKE) build
+	cp -r $(SRC_PROTO_PATH)/go/* $(CURDIR)/backend/pkg/proto
+	cp $(SRC_PROTO_PATH)/ts/* $(CURDIR)/frontend/src/proto
+	cp $(SRC_PROTO_PATH)/docs/* $(CURDIR)/docs
+
 branch=main
 .PHONY: revision
 revision: # Создание тега

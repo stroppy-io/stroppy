@@ -1,0 +1,3 @@
+[submodule "tools/stroppy"]
+	path = tools/stroppy
+	url = git@github.com:stroppy-io/stroppy.git

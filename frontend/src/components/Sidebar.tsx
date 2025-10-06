@@ -25,17 +25,17 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onCollapse }) => {
 
   const menuItems = [
     {
-      key: '/dashboard',
+      key: '/app/dashboard',
       icon: <DashboardOutlined />,
       label: t('navigation.dashboard'),
     },
     {
-      key: '/runs',
+      key: '/app/runs',
       icon: <PlayCircleOutlined />,
       label: t('navigation.runs'),
     },
     {
-      key: '/configurator',
+      key: '/app/configurator',
       icon: <SettingOutlined />,
       label: t('navigation.configurator'),
     },

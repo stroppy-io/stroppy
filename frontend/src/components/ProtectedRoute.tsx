@@ -20,9 +20,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
-  // Если пользователь не авторизован, перенаправляем на страницу входа
+  // Если пользователь не авторизован, перенаправляем на лендинг страницу
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   // Если авторизован, показываем защищенный контент

@@ -6,6 +6,52 @@ import { MessageType, reflectionMergePartial, UnknownFieldHandler, WireType } fr
 
 /**
  * *
+ * OtlpExport contains configuration for exporting metrics via OpenTelemetry
+ * Protocol (OTLP). It specifies the endpoint and metrics prefix for telemetry
+ * data export.
+ *
+ * @generated from protobuf message stroppy.OtlpExport
+ */
+export interface OtlpExport {
+    /**
+     * * gRPC endpoint for OpenTelemetry collector
+     *
+     * @generated from protobuf field: optional string otlp_grpc_endpoint = 1
+     */
+    otlpGrpcEndpoint?: string;
+    /**
+     * * HTTP endpoint for the OpenTelemetry collector
+     *
+     * @generated from protobuf field: optional string otlp_http_endpoint = 3
+     */
+    otlpHttpEndpoint?: string;
+    /**
+     * * HTTP exporter path. Default is '/v1/metrics'
+     *
+     * @generated from protobuf field: optional string otlp_http_exporter_url_path = 4
+     */
+    otlpHttpExporterUrlPath?: string;
+    /**
+     * * Disable transport security for the exporter
+     *
+     * @generated from protobuf field: optional bool otlp_endpoint_insecure = 5
+     */
+    otlpEndpointInsecure?: boolean;
+    /**
+     * * Headers for otlp requests e.g. Authorization=...
+     *
+     * @generated from protobuf field: optional string otlp_headers = 6
+     */
+    otlpHeaders?: string;
+    /**
+     * * Prefix to be added to all exported metrics
+     *
+     * @generated from protobuf field: optional string otlp_metrics_prefix = 2
+     */
+    otlpMetricsPrefix?: string;
+}
+/**
+ * *
  * Decimal represents an arbitrary-precision decimal number.
  *
  * @generated from protobuf message stroppy.Decimal
@@ -26,7 +72,8 @@ export interface Decimal {
  */
 export interface Uuid {
     /**
-     * * String representation of UUID (e.g., "123e4567-e89b-12d3-a456-426614174000")
+     * * String representation of UUID (e.g.,
+     * "123e4567-e89b-12d3-a456-426614174000")
      *
      * @generated from protobuf field: string value = 1
      */
@@ -34,7 +81,8 @@ export interface Uuid {
 }
 /**
  * *
- * DateTime represents a point in time, independent of any time zone or calendar.
+ * DateTime represents a point in time, independent of any time zone or
+ * calendar.
  *
  * @generated from protobuf message stroppy.DateTime
  */
@@ -49,7 +97,8 @@ export interface DateTime {
 /**
  * *
  * Value is a variant type that can represent different types of values.
- * It's used to represent values that can be of multiple types in a type-safe way.
+ * It's used to represent values that can be of multiple types in a type-safe
+ * way.
  *
  * @generated from protobuf message stroppy.Value
  */
@@ -252,7 +301,8 @@ export interface Generation_Distribution {
      */
     type: Generation_Distribution_DistributionType;
     /**
-     * * Distribution parameter (e.g., standard deviation for normal distribution)
+     * * Distribution parameter (e.g., standard deviation for normal
+     * distribution)
      *
      * @generated from protobuf field: double screw = 2
      */
@@ -913,6 +963,87 @@ export interface Generation_Rule {
      */
     unique?: boolean;
 }
+// @generated message type with reflection information, may provide speed optimized methods
+class OtlpExport$Type extends MessageType<OtlpExport> {
+    constructor() {
+        super("stroppy.OtlpExport", [
+            { no: 1, name: "otlp_grpc_endpoint", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "otlp_http_endpoint", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
+            { no: 4, name: "otlp_http_exporter_url_path", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
+            { no: 5, name: "otlp_endpoint_insecure", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
+            { no: 6, name: "otlp_headers", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "otlp_metrics_prefix", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<OtlpExport>): OtlpExport {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        if (value !== undefined)
+            reflectionMergePartial<OtlpExport>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: OtlpExport): OtlpExport {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* optional string otlp_grpc_endpoint */ 1:
+                    message.otlpGrpcEndpoint = reader.string();
+                    break;
+                case /* optional string otlp_http_endpoint */ 3:
+                    message.otlpHttpEndpoint = reader.string();
+                    break;
+                case /* optional string otlp_http_exporter_url_path */ 4:
+                    message.otlpHttpExporterUrlPath = reader.string();
+                    break;
+                case /* optional bool otlp_endpoint_insecure */ 5:
+                    message.otlpEndpointInsecure = reader.bool();
+                    break;
+                case /* optional string otlp_headers */ 6:
+                    message.otlpHeaders = reader.string();
+                    break;
+                case /* optional string otlp_metrics_prefix */ 2:
+                    message.otlpMetricsPrefix = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: OtlpExport, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* optional string otlp_grpc_endpoint = 1; */
+        if (message.otlpGrpcEndpoint !== undefined)
+            writer.tag(1, WireType.LengthDelimited).string(message.otlpGrpcEndpoint);
+        /* optional string otlp_metrics_prefix = 2; */
+        if (message.otlpMetricsPrefix !== undefined)
+            writer.tag(2, WireType.LengthDelimited).string(message.otlpMetricsPrefix);
+        /* optional string otlp_http_endpoint = 3; */
+        if (message.otlpHttpEndpoint !== undefined)
+            writer.tag(3, WireType.LengthDelimited).string(message.otlpHttpEndpoint);
+        /* optional string otlp_http_exporter_url_path = 4; */
+        if (message.otlpHttpExporterUrlPath !== undefined)
+            writer.tag(4, WireType.LengthDelimited).string(message.otlpHttpExporterUrlPath);
+        /* optional bool otlp_endpoint_insecure = 5; */
+        if (message.otlpEndpointInsecure !== undefined)
+            writer.tag(5, WireType.Varint).bool(message.otlpEndpointInsecure);
+        /* optional string otlp_headers = 6; */
+        if (message.otlpHeaders !== undefined)
+            writer.tag(6, WireType.LengthDelimited).string(message.otlpHeaders);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.OtlpExport
+ */
+export const OtlpExport = new OtlpExport$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class Decimal$Type extends MessageType<Decimal> {
     constructor() {
@@ -3063,130 +3194,6 @@ export const Generation_Rule = new Generation_Rule$Type();
 
 /**
  * *
- * OtlpExport contains configuration for exporting metrics via OpenTelemetry Protocol (OTLP).
- * It specifies the endpoint and metrics prefix for telemetry data export.
- *
- * @generated from protobuf message stroppy.OtlpExport
- */
-export interface OtlpExport {
-    /**
-     * * gRPC endpoint for OpenTelemetry collector
-     *
-     * @generated from protobuf field: optional string otlp_grpc_endpoint = 1
-     */
-    otlpGrpcEndpoint?: string;
-    /**
-     * * HTTP endpoint for the OpenTelemetry collector
-     *
-     * @generated from protobuf field: optional string otlp_http_endpoint = 3
-     */
-    otlpHttpEndpoint?: string;
-    /**
-     * * HTTP exporter path. Default is '/v1/metrics'
-     *
-     * @generated from protobuf field: optional string otlp_http_exporter_url_path = 4
-     */
-    otlpHttpExporterUrlPath?: string;
-    /**
-     * * Disable transport security for the exporter
-     *
-     * @generated from protobuf field: optional bool otlp_endpoint_insecure = 5
-     */
-    otlpEndpointInsecure?: boolean;
-    /**
-     * * Prefix to be added to all exported metrics
-     *
-     * @generated from protobuf field: optional string otlp_metrics_prefix = 2
-     */
-    otlpMetricsPrefix?: string;
-}
-/**
- * *
- * GoExecutor contains configuration specific to Go-based test execution.
- * It controls Go runtime parameters and error handling behavior.
- *
- * @generated from protobuf message stroppy.GoExecutor
- */
-export interface GoExecutor {
-    /**
-     * * Maximum number of OS threads that the Go runtime can use (0 = use default)
-     *
-     * @generated from protobuf field: optional uint64 go_max_proc = 1
-     */
-    goMaxProc?: string;
-    /**
-     * * Whether to cancel execution on first error
-     *
-     * @generated from protobuf field: optional bool cancel_on_error = 2
-     */
-    cancelOnError?: boolean;
-}
-/**
- * *
- * K6Executor contains configuration for k6 load testing tool integration.
- * It contains paths to the k6 binary and the k6 test script, as well as
- * additional arguments to pass to the k6 binary.
- *
- * @generated from protobuf message stroppy.K6Executor
- */
-export interface K6Executor {
-    /**
-     * * Path to the k6 binary
-     *
-     * @generated from protobuf field: string k6_binary_path = 1
-     */
-    k6BinaryPath: string;
-    /**
-     * * Additional arguments to pass to the k6 binary
-     *
-     * @generated from protobuf field: repeated string k6_binary_args = 2
-     */
-    k6BinaryArgs: string[];
-    /**
-     * * Path to the k6 test script
-     *
-     * @generated from protobuf field: string k6_script_path = 3
-     */
-    k6ScriptPath: string;
-    /**
-     * * Timeout for k6 setup phase
-     *
-     * @generated from protobuf field: optional google.protobuf.Duration k6_setup_timeout = 10
-     */
-    k6SetupTimeout?: Duration;
-    /**
-     * * Number of virtual users
-     *
-     * @generated from protobuf field: optional uint64 k6_vus = 12
-     */
-    k6Vus?: string;
-    /**
-     * * Maximum number of virtual users
-     *
-     * @generated from protobuf field: optional uint64 k6_max_vus = 13
-     */
-    k6MaxVus?: string;
-    /**
-     * * Number of requests per second
-     *
-     * @generated from protobuf field: optional uint64 k6_rate = 14
-     */
-    k6Rate?: string;
-    /**
-     * * Duration of the test
-     *
-     * @generated from protobuf field: optional google.protobuf.Duration k6_duration = 15
-     */
-    k6Duration?: Duration;
-    /**
-     * * OpenTelemetry export configuration
-     *
-     * @generated from protobuf field: optional stroppy.OtlpExport otlp_export = 100
-     */
-    otlpExport?: OtlpExport;
-}
-/**
- * *
  * DriverConfig contains configuration for connecting to a database driver.
  * It includes the driver plugin path, connection URL, and database-specific settings.
  *
@@ -3194,63 +3201,36 @@ export interface K6Executor {
  */
 export interface DriverConfig {
     /**
-     * * Path to the driver plugin binary
-     *
-     * @generated from protobuf field: string driver_plugin_path = 1
-     */
-    driverPluginPath: string;
-    /**
-     * * Additional arguments for the driver plugin
-     *
-     * @generated from protobuf field: repeated string driver_plugin_args = 2
-     */
-    driverPluginArgs: string[];
-    /**
      * * Database connection URL
      *
-     * @generated from protobuf field: string url = 3
+     * @generated from protobuf field: string url = 1
      */
     url: string;
     /**
      * * Database-specific configuration options
      *
-     * @generated from protobuf field: optional stroppy.Value.Struct db_specific = 4
+     * @generated from protobuf field: optional stroppy.Value.Struct db_specific = 2
      */
     dbSpecific?: Value_Struct;
+    /**
+     * * Name/Type of chosen driver
+     *
+     * @generated from protobuf field: stroppy.DriverConfig.DriverType driver_type = 3
+     */
+    driverType: DriverConfig_DriverType;
 }
 /**
- * *
- * RequestedStep defines a step that should be executed during the benchmark.
- * It specifies the step name and the type of executor to use.
- *
- * @generated from protobuf message stroppy.RequestedStep
+ * @generated from protobuf enum stroppy.DriverConfig.DriverType
  */
-export interface RequestedStep {
+export enum DriverConfig_DriverType {
     /**
-     * * Unique name of the step
-     *
-     * @generated from protobuf field: string name = 1
+     * @generated from protobuf enum value: DRIVER_TYPE_UNSPECIFIED = 0;
      */
-    name: string;
+    DRIVER_TYPE_UNSPECIFIED = 0,
     /**
-     * * Type of executor to use for this step
-     *
-     * @generated from protobuf field: optional stroppy.RequestedStep.ExecutorType executor = 2
+     * @generated from protobuf enum value: DRIVER_TYPE_POSTGRES = 1;
      */
-    executor?: RequestedStep_ExecutorType;
-}
-/**
- * @generated from protobuf enum stroppy.RequestedStep.ExecutorType
- */
-export enum RequestedStep_ExecutorType {
-    /**
-     * @generated from protobuf enum value: EXECUTOR_TYPE_GO = 0;
-     */
-    EXECUTOR_TYPE_GO = 0,
-    /**
-     * @generated from protobuf enum value: EXECUTOR_TYPE_K6 = 1;
-     */
-    EXECUTOR_TYPE_K6 = 1
+    DRIVER_TYPE_POSTGRES = 1
 }
 /**
  * *
@@ -3313,44 +3293,89 @@ export enum LoggerConfig_LogMode {
 }
 /**
  * *
- * StepContext provides contextual information to a benchmark step during execution.
- * It contains the current configuration and descriptors relevant to the step.
+ * OtlpExporterConfig contains named configuration for an OTLP exporter.
  *
- * @generated from protobuf message stroppy.StepContext
+ * @generated from protobuf message stroppy.ExporterConfig
  */
-export interface StepContext {
+export interface ExporterConfig {
     /**
-     * * Current step descriptor
+     * * Name of the OTLP exporter
      *
-     * @generated from protobuf field: stroppy.StepDescriptor step = 5
+     * @generated from protobuf field: string name = 1
      */
-    step?: StepDescriptor;
+    name: string;
     /**
-     * * Global configuration of the benchmark and its steps
+     * * Configuration for the OTLP exporter
      *
-     * @generated from protobuf field: stroppy.Config global_config = 6
+     * @generated from protobuf field: stroppy.OtlpExport otlp_export = 2
      */
-    globalConfig?: Config;
+    otlpExport?: OtlpExport;
 }
 /**
  * *
- * Plugins contains configuration for plugins.
+ * ExecutorConfig contains configuration for an executor.
  *
- * @generated from protobuf message stroppy.Plugin
+ * @generated from protobuf message stroppy.ExecutorConfig
  */
-export interface Plugin {
+export interface ExecutorConfig {
     /**
-     * * Type of the plugin
+     * * Name of the executor
      *
-     * @generated from protobuf field: stroppy.Plugin.Type type = 1
+     * @generated from protobuf field: string name = 1
      */
-    type: Plugin_Type;
+    name: string;
     /**
-     * * Path to the plugin binary
+     * * Configuration for the executor
      *
-     * @generated from protobuf field: string path = 2
+     * @generated from protobuf field: stroppy.K6Options k6 = 2
      */
-    path: string;
+    k6?: K6Options;
+}
+/**
+ * *
+ * StepExecutorMappingConfig contains configuration for mapping steps to executors.
+ *
+ * @generated from protobuf message stroppy.Step
+ */
+export interface Step {
+    /**
+     * * Name of the step
+     *
+     * @generated from protobuf field: string name = 1
+     */
+    name: string;
+    /**
+     * * Name of the step
+     *
+     * @generated from protobuf field: string workload = 2
+     */
+    workload: string;
+    /**
+     * * Name of the executor
+     *
+     * @generated from protobuf field: string executor = 3
+     */
+    executor: string;
+    /**
+     * * Name of the exporter
+     *
+     * @generated from protobuf field: optional string exporter = 4
+     */
+    exporter?: string;
+}
+/**
+ * *
+ * SideCar contains configuration for plugins.
+ *
+ * @generated from protobuf message stroppy.SideCarConfig
+ */
+export interface SideCarConfig {
+    /**
+     * * Url to connect the plugin instance
+     *
+     * @generated from protobuf field: string url = 2
+     */
+    url: string;
     /**
      * * Additional plugin settings
      *
@@ -3358,90 +3383,20 @@ export interface Plugin {
      */
     settings?: Value_Struct;
 }
-/**
- * @generated from protobuf enum stroppy.Plugin.Type
- */
-export enum Plugin_Type {
-    /**
-     * @generated from protobuf enum value: TYPE_UNSPECIFIED = 0;
-     */
-    TYPE_UNSPECIFIED = 0,
-    /**
-     * @generated from protobuf enum value: TYPE_SIDECAR = 1;
-     */
-    TYPE_SIDECAR = 1
-}
+// TODO: use it later
+
 /**
  * *
- * RunConfig contains the complete configuration for a benchmark run.
+ * CloudConfig contains configuration for stroppy cloud backend.
  *
- * @generated from protobuf message stroppy.RunConfig
+ * @generated from protobuf message stroppy.CloudConfig
  */
-export interface RunConfig {
-    /**
-     * * Run identifier for reproducible test runs or debugging
-     *
-     * @generated from protobuf field: string run_id = 1
-     */
-    runId: string;
-    /**
-     * * Random seed for reproducible test runs
-     *
-     * @generated from protobuf field: uint64 seed = 2
-     */
-    seed: string;
-    /**
-     * * Database driver configuration
-     *
-     * @generated from protobuf field: stroppy.DriverConfig driver = 3
-     */
-    driver?: DriverConfig;
-    /**
-     * * Go executor configuration
-     *
-     * @generated from protobuf field: stroppy.GoExecutor go_executor = 4
-     */
-    goExecutor?: GoExecutor;
-    /**
-     * * k6 executor configuration
-     *
-     * @generated from protobuf field: stroppy.K6Executor k6_executor = 5
-     */
-    k6Executor?: K6Executor;
-    /**
-     * * List of steps to execute in order
-     *
-     * @generated from protobuf field: repeated stroppy.RequestedStep steps = 6
-     */
-    steps: RequestedStep[];
-    /**
-     * * Logging configuration
-     *
-     * @generated from protobuf field: stroppy.LoggerConfig logger = 7
-     */
-    logger?: LoggerConfig;
-    /**
-     * * Arbitrary metadata, may be passed to result labels and json output
-     *
-     * @generated from protobuf field: map<string, string> metadata = 8
-     */
-    metadata: {
-        [key: string]: string;
-    };
-    /**
-     * * Plugins configuration
-     *
-     * @generated from protobuf field: repeated stroppy.Plugin plugins = 9
-     */
-    plugins: Plugin[];
+export interface CloudConfig {
 }
 /**
- * *
- * Config contains the complete configuration for a benchmark run.
- *
- * @generated from protobuf message stroppy.Config
+ * @generated from protobuf message stroppy.GlobalConfig
  */
-export interface Config {
+export interface GlobalConfig {
     /**
      * *
      * Version of the configuration format e.g. proto files version.
@@ -3452,265 +3407,97 @@ export interface Config {
      */
     version: string;
     /**
-     * * RunConfig contains the complete configuration for a benchmark run.
+     * *
+     * Run identifier for reproducible test runs or debugging
+     * If set to "generate()" stroppy eval ulid for run_id
      *
-     * @generated from protobuf field: stroppy.RunConfig run = 2
+     * @generated from protobuf field: string run_id = 2
      */
-    run?: RunConfig;
+    runId: string;
+    /**
+     * * Random seed for reproducible test runs
+     *
+     * @generated from protobuf field: uint64 seed = 3
+     */
+    seed: string;
+    /**
+     * * Arbitrary metadata, may be passed to result labels and json output
+     *
+     * @generated from protobuf field: map<string, string> metadata = 4
+     */
+    metadata: {
+        [key: string]: string;
+    };
+    /**
+     * * Database driver configuration
+     *
+     * @generated from protobuf field: stroppy.DriverConfig driver = 5
+     */
+    driver?: DriverConfig;
+    /**
+     * * Logging configuration
+     *
+     * @generated from protobuf field: stroppy.LoggerConfig logger = 6
+     */
+    logger?: LoggerConfig;
+}
+/**
+ * *
+ * ConfigFile contains the complete configuration for a benchmark run in file.
+ *
+ * @generated from protobuf message stroppy.ConfigFile
+ */
+export interface ConfigFile {
+    /**
+     * * Global configuration
+     *
+     * @generated from protobuf field: stroppy.GlobalConfig global = 1
+     */
+    global?: GlobalConfig;
+    /**
+     * * Exporters configuration
+     *
+     * @generated from protobuf field: repeated stroppy.ExporterConfig exporters = 2
+     */
+    exporters: ExporterConfig[];
+    /**
+     * * Executors configuration
+     *
+     * @generated from protobuf field: repeated stroppy.ExecutorConfig executors = 3
+     */
+    executors: ExecutorConfig[];
+    /**
+     * * Step to executor mapping configuration
+     *
+     * @generated from protobuf field: repeated stroppy.Step steps = 4
+     */
+    steps: Step[];
+    /**
+     * * Plugins configuration
+     *
+     * @generated from protobuf field: repeated stroppy.SideCarConfig side_cars = 5
+     */
+    sideCars: SideCarConfig[];
     /**
      * * BenchmarkDescriptor defines a complete benchmark consisting of multiple steps.
      *
-     * @generated from protobuf field: stroppy.BenchmarkDescriptor benchmark = 3
+     * @generated from protobuf field: stroppy.BenchmarkDescriptor benchmark = 6
      */
     benchmark?: BenchmarkDescriptor;
 }
 // @generated message type with reflection information, may provide speed optimized methods
-class OtlpExport$Type extends MessageType<OtlpExport> {
-    constructor() {
-        super("stroppy.OtlpExport", [
-            { no: 1, name: "otlp_grpc_endpoint", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "otlp_http_endpoint", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
-            { no: 4, name: "otlp_http_exporter_url_path", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
-            { no: 5, name: "otlp_endpoint_insecure", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
-            { no: 2, name: "otlp_metrics_prefix", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
-        ]);
-    }
-    create(value?: PartialMessage<OtlpExport>): OtlpExport {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<OtlpExport>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: OtlpExport): OtlpExport {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* optional string otlp_grpc_endpoint */ 1:
-                    message.otlpGrpcEndpoint = reader.string();
-                    break;
-                case /* optional string otlp_http_endpoint */ 3:
-                    message.otlpHttpEndpoint = reader.string();
-                    break;
-                case /* optional string otlp_http_exporter_url_path */ 4:
-                    message.otlpHttpExporterUrlPath = reader.string();
-                    break;
-                case /* optional bool otlp_endpoint_insecure */ 5:
-                    message.otlpEndpointInsecure = reader.bool();
-                    break;
-                case /* optional string otlp_metrics_prefix */ 2:
-                    message.otlpMetricsPrefix = reader.string();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: OtlpExport, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* optional string otlp_grpc_endpoint = 1; */
-        if (message.otlpGrpcEndpoint !== undefined)
-            writer.tag(1, WireType.LengthDelimited).string(message.otlpGrpcEndpoint);
-        /* optional string otlp_metrics_prefix = 2; */
-        if (message.otlpMetricsPrefix !== undefined)
-            writer.tag(2, WireType.LengthDelimited).string(message.otlpMetricsPrefix);
-        /* optional string otlp_http_endpoint = 3; */
-        if (message.otlpHttpEndpoint !== undefined)
-            writer.tag(3, WireType.LengthDelimited).string(message.otlpHttpEndpoint);
-        /* optional string otlp_http_exporter_url_path = 4; */
-        if (message.otlpHttpExporterUrlPath !== undefined)
-            writer.tag(4, WireType.LengthDelimited).string(message.otlpHttpExporterUrlPath);
-        /* optional bool otlp_endpoint_insecure = 5; */
-        if (message.otlpEndpointInsecure !== undefined)
-            writer.tag(5, WireType.Varint).bool(message.otlpEndpointInsecure);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.OtlpExport
- */
-export const OtlpExport = new OtlpExport$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class GoExecutor$Type extends MessageType<GoExecutor> {
-    constructor() {
-        super("stroppy.GoExecutor", [
-            { no: 1, name: "go_max_proc", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/ },
-            { no: 2, name: "cancel_on_error", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ }
-        ]);
-    }
-    create(value?: PartialMessage<GoExecutor>): GoExecutor {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<GoExecutor>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: GoExecutor): GoExecutor {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* optional uint64 go_max_proc */ 1:
-                    message.goMaxProc = reader.uint64().toString();
-                    break;
-                case /* optional bool cancel_on_error */ 2:
-                    message.cancelOnError = reader.bool();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: GoExecutor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* optional uint64 go_max_proc = 1; */
-        if (message.goMaxProc !== undefined)
-            writer.tag(1, WireType.Varint).uint64(message.goMaxProc);
-        /* optional bool cancel_on_error = 2; */
-        if (message.cancelOnError !== undefined)
-            writer.tag(2, WireType.Varint).bool(message.cancelOnError);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.GoExecutor
- */
-export const GoExecutor = new GoExecutor$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class K6Executor$Type extends MessageType<K6Executor> {
-    constructor() {
-        super("stroppy.K6Executor", [
-            { no: 1, name: "k6_binary_path", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "k6_binary_args", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "k6_script_path", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 10, name: "k6_setup_timeout", kind: "message", T: () => Duration },
-            { no: 12, name: "k6_vus", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/ },
-            { no: 13, name: "k6_max_vus", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/ },
-            { no: 14, name: "k6_rate", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/ },
-            { no: 15, name: "k6_duration", kind: "message", T: () => Duration },
-            { no: 100, name: "otlp_export", kind: "message", T: () => OtlpExport }
-        ]);
-    }
-    create(value?: PartialMessage<K6Executor>): K6Executor {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        message.k6BinaryPath = "";
-        message.k6BinaryArgs = [];
-        message.k6ScriptPath = "";
-        if (value !== undefined)
-            reflectionMergePartial<K6Executor>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: K6Executor): K6Executor {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* string k6_binary_path */ 1:
-                    message.k6BinaryPath = reader.string();
-                    break;
-                case /* repeated string k6_binary_args */ 2:
-                    message.k6BinaryArgs.push(reader.string());
-                    break;
-                case /* string k6_script_path */ 3:
-                    message.k6ScriptPath = reader.string();
-                    break;
-                case /* optional google.protobuf.Duration k6_setup_timeout */ 10:
-                    message.k6SetupTimeout = Duration.internalBinaryRead(reader, reader.uint32(), options, message.k6SetupTimeout);
-                    break;
-                case /* optional uint64 k6_vus */ 12:
-                    message.k6Vus = reader.uint64().toString();
-                    break;
-                case /* optional uint64 k6_max_vus */ 13:
-                    message.k6MaxVus = reader.uint64().toString();
-                    break;
-                case /* optional uint64 k6_rate */ 14:
-                    message.k6Rate = reader.uint64().toString();
-                    break;
-                case /* optional google.protobuf.Duration k6_duration */ 15:
-                    message.k6Duration = Duration.internalBinaryRead(reader, reader.uint32(), options, message.k6Duration);
-                    break;
-                case /* optional stroppy.OtlpExport otlp_export */ 100:
-                    message.otlpExport = OtlpExport.internalBinaryRead(reader, reader.uint32(), options, message.otlpExport);
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: K6Executor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string k6_binary_path = 1; */
-        if (message.k6BinaryPath !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.k6BinaryPath);
-        /* repeated string k6_binary_args = 2; */
-        for (let i = 0; i < message.k6BinaryArgs.length; i++)
-            writer.tag(2, WireType.LengthDelimited).string(message.k6BinaryArgs[i]);
-        /* string k6_script_path = 3; */
-        if (message.k6ScriptPath !== "")
-            writer.tag(3, WireType.LengthDelimited).string(message.k6ScriptPath);
-        /* optional google.protobuf.Duration k6_setup_timeout = 10; */
-        if (message.k6SetupTimeout)
-            Duration.internalBinaryWrite(message.k6SetupTimeout, writer.tag(10, WireType.LengthDelimited).fork(), options).join();
-        /* optional uint64 k6_vus = 12; */
-        if (message.k6Vus !== undefined)
-            writer.tag(12, WireType.Varint).uint64(message.k6Vus);
-        /* optional uint64 k6_max_vus = 13; */
-        if (message.k6MaxVus !== undefined)
-            writer.tag(13, WireType.Varint).uint64(message.k6MaxVus);
-        /* optional uint64 k6_rate = 14; */
-        if (message.k6Rate !== undefined)
-            writer.tag(14, WireType.Varint).uint64(message.k6Rate);
-        /* optional google.protobuf.Duration k6_duration = 15; */
-        if (message.k6Duration)
-            Duration.internalBinaryWrite(message.k6Duration, writer.tag(15, WireType.LengthDelimited).fork(), options).join();
-        /* optional stroppy.OtlpExport otlp_export = 100; */
-        if (message.otlpExport)
-            OtlpExport.internalBinaryWrite(message.otlpExport, writer.tag(100, WireType.LengthDelimited).fork(), options).join();
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.K6Executor
- */
-export const K6Executor = new K6Executor$Type();
-// @generated message type with reflection information, may provide speed optimized methods
 class DriverConfig$Type extends MessageType<DriverConfig> {
     constructor() {
         super("stroppy.DriverConfig", [
-            { no: 1, name: "driver_plugin_path", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "driver_plugin_args", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "url", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 4, name: "db_specific", kind: "message", T: () => Value_Struct }
+            { no: 1, name: "url", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "db_specific", kind: "message", T: () => Value_Struct },
+            { no: 3, name: "driver_type", kind: "enum", T: () => ["stroppy.DriverConfig.DriverType", DriverConfig_DriverType] }
         ]);
     }
     create(value?: PartialMessage<DriverConfig>): DriverConfig {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.driverPluginPath = "";
-        message.driverPluginArgs = [];
         message.url = "";
+        message.driverType = 0;
         if (value !== undefined)
             reflectionMergePartial<DriverConfig>(this, message, value);
         return message;
@@ -3720,17 +3507,14 @@ class DriverConfig$Type extends MessageType<DriverConfig> {
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* string driver_plugin_path */ 1:
-                    message.driverPluginPath = reader.string();
-                    break;
-                case /* repeated string driver_plugin_args */ 2:
-                    message.driverPluginArgs.push(reader.string());
-                    break;
-                case /* string url */ 3:
+                case /* string url */ 1:
                     message.url = reader.string();
                     break;
-                case /* optional stroppy.Value.Struct db_specific */ 4:
+                case /* optional stroppy.Value.Struct db_specific */ 2:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
+                    break;
+                case /* stroppy.DriverConfig.DriverType driver_type */ 3:
+                    message.driverType = reader.int32();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -3744,18 +3528,15 @@ class DriverConfig$Type extends MessageType<DriverConfig> {
         return message;
     }
     internalBinaryWrite(message: DriverConfig, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string driver_plugin_path = 1; */
-        if (message.driverPluginPath !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.driverPluginPath);
-        /* repeated string driver_plugin_args = 2; */
-        for (let i = 0; i < message.driverPluginArgs.length; i++)
-            writer.tag(2, WireType.LengthDelimited).string(message.driverPluginArgs[i]);
-        /* string url = 3; */
+        /* string url = 1; */
         if (message.url !== "")
-            writer.tag(3, WireType.LengthDelimited).string(message.url);
-        /* optional stroppy.Value.Struct db_specific = 4; */
+            writer.tag(1, WireType.LengthDelimited).string(message.url);
+        /* optional stroppy.Value.Struct db_specific = 2; */
         if (message.dbSpecific)
-            Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+            Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.DriverConfig.DriverType driver_type = 3; */
+        if (message.driverType !== 0)
+            writer.tag(3, WireType.Varint).int32(message.driverType);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -3766,60 +3547,6 @@ class DriverConfig$Type extends MessageType<DriverConfig> {
  * @generated MessageType for protobuf message stroppy.DriverConfig
  */
 export const DriverConfig = new DriverConfig$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class RequestedStep$Type extends MessageType<RequestedStep> {
-    constructor() {
-        super("stroppy.RequestedStep", [
-            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "executor", kind: "enum", opt: true, T: () => ["stroppy.RequestedStep.ExecutorType", RequestedStep_ExecutorType] }
-        ]);
-    }
-    create(value?: PartialMessage<RequestedStep>): RequestedStep {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        message.name = "";
-        if (value !== undefined)
-            reflectionMergePartial<RequestedStep>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RequestedStep): RequestedStep {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* string name */ 1:
-                    message.name = reader.string();
-                    break;
-                case /* optional stroppy.RequestedStep.ExecutorType executor */ 2:
-                    message.executor = reader.int32();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: RequestedStep, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string name = 1; */
-        if (message.name !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.name);
-        /* optional stroppy.RequestedStep.ExecutorType executor = 2; */
-        if (message.executor !== undefined)
-            writer.tag(2, WireType.Varint).int32(message.executor);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.RequestedStep
- */
-export const RequestedStep = new RequestedStep$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class LoggerConfig$Type extends MessageType<LoggerConfig> {
     constructor() {
@@ -3876,29 +3603,30 @@ class LoggerConfig$Type extends MessageType<LoggerConfig> {
  */
 export const LoggerConfig = new LoggerConfig$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class StepContext$Type extends MessageType<StepContext> {
+class ExporterConfig$Type extends MessageType<ExporterConfig> {
     constructor() {
-        super("stroppy.StepContext", [
-            { no: 5, name: "step", kind: "message", T: () => StepDescriptor },
-            { no: 6, name: "global_config", kind: "message", T: () => Config }
+        super("stroppy.ExporterConfig", [
+            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "otlp_export", kind: "message", T: () => OtlpExport }
         ]);
     }
-    create(value?: PartialMessage<StepContext>): StepContext {
+    create(value?: PartialMessage<ExporterConfig>): ExporterConfig {
         const message = globalThis.Object.create((this.messagePrototype!));
+        message.name = "";
         if (value !== undefined)
-            reflectionMergePartial<StepContext>(this, message, value);
+            reflectionMergePartial<ExporterConfig>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StepContext): StepContext {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ExporterConfig): ExporterConfig {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* stroppy.StepDescriptor step */ 5:
-                    message.step = StepDescriptor.internalBinaryRead(reader, reader.uint32(), options, message.step);
+                case /* string name */ 1:
+                    message.name = reader.string();
                     break;
-                case /* stroppy.Config global_config */ 6:
-                    message.globalConfig = Config.internalBinaryRead(reader, reader.uint32(), options, message.globalConfig);
+                case /* stroppy.OtlpExport otlp_export */ 2:
+                    message.otlpExport = OtlpExport.internalBinaryRead(reader, reader.uint32(), options, message.otlpExport);
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -3911,13 +3639,13 @@ class StepContext$Type extends MessageType<StepContext> {
         }
         return message;
     }
-    internalBinaryWrite(message: StepContext, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.StepDescriptor step = 5; */
-        if (message.step)
-            StepDescriptor.internalBinaryWrite(message.step, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Config global_config = 6; */
-        if (message.globalConfig)
-            Config.internalBinaryWrite(message.globalConfig, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
+    internalBinaryWrite(message: ExporterConfig, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string name = 1; */
+        if (message.name !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.name);
+        /* stroppy.OtlpExport otlp_export = 2; */
+        if (message.otlpExport)
+            OtlpExport.internalBinaryWrite(message.otlpExport, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -3925,36 +3653,155 @@ class StepContext$Type extends MessageType<StepContext> {
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.StepContext
+ * @generated MessageType for protobuf message stroppy.ExporterConfig
  */
-export const StepContext = new StepContext$Type();
+export const ExporterConfig = new ExporterConfig$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Plugin$Type extends MessageType<Plugin> {
+class ExecutorConfig$Type extends MessageType<ExecutorConfig> {
     constructor() {
-        super("stroppy.Plugin", [
-            { no: 1, name: "type", kind: "enum", T: () => ["stroppy.Plugin.Type", Plugin_Type] },
-            { no: 2, name: "path", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "settings", kind: "message", T: () => Value_Struct }
+        super("stroppy.ExecutorConfig", [
+            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "k6", kind: "message", T: () => K6Options }
         ]);
     }
-    create(value?: PartialMessage<Plugin>): Plugin {
+    create(value?: PartialMessage<ExecutorConfig>): ExecutorConfig {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.type = 0;
-        message.path = "";
+        message.name = "";
         if (value !== undefined)
-            reflectionMergePartial<Plugin>(this, message, value);
+            reflectionMergePartial<ExecutorConfig>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Plugin): Plugin {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ExecutorConfig): ExecutorConfig {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* stroppy.Plugin.Type type */ 1:
-                    message.type = reader.int32();
+                case /* string name */ 1:
+                    message.name = reader.string();
                     break;
-                case /* string path */ 2:
-                    message.path = reader.string();
+                case /* stroppy.K6Options k6 */ 2:
+                    message.k6 = K6Options.internalBinaryRead(reader, reader.uint32(), options, message.k6);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ExecutorConfig, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string name = 1; */
+        if (message.name !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.name);
+        /* stroppy.K6Options k6 = 2; */
+        if (message.k6)
+            K6Options.internalBinaryWrite(message.k6, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.ExecutorConfig
+ */
+export const ExecutorConfig = new ExecutorConfig$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class Step$Type extends MessageType<Step> {
+    constructor() {
+        super("stroppy.Step", [
+            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "workload", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "executor", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 4, name: "exporter", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<Step>): Step {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.name = "";
+        message.workload = "";
+        message.executor = "";
+        if (value !== undefined)
+            reflectionMergePartial<Step>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Step): Step {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string name */ 1:
+                    message.name = reader.string();
+                    break;
+                case /* string workload */ 2:
+                    message.workload = reader.string();
+                    break;
+                case /* string executor */ 3:
+                    message.executor = reader.string();
+                    break;
+                case /* optional string exporter */ 4:
+                    message.exporter = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: Step, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string name = 1; */
+        if (message.name !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.name);
+        /* string workload = 2; */
+        if (message.workload !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.workload);
+        /* string executor = 3; */
+        if (message.executor !== "")
+            writer.tag(3, WireType.LengthDelimited).string(message.executor);
+        /* optional string exporter = 4; */
+        if (message.exporter !== undefined)
+            writer.tag(4, WireType.LengthDelimited).string(message.exporter);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.Step
+ */
+export const Step = new Step$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class SideCarConfig$Type extends MessageType<SideCarConfig> {
+    constructor() {
+        super("stroppy.SideCarConfig", [
+            { no: 2, name: "url", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "settings", kind: "message", T: () => Value_Struct }
+        ]);
+    }
+    create(value?: PartialMessage<SideCarConfig>): SideCarConfig {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.url = "";
+        if (value !== undefined)
+            reflectionMergePartial<SideCarConfig>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: SideCarConfig): SideCarConfig {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string url */ 2:
+                    message.url = reader.string();
                     break;
                 case /* optional stroppy.Value.Struct settings */ 3:
                     message.settings = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.settings);
@@ -3970,13 +3817,10 @@ class Plugin$Type extends MessageType<Plugin> {
         }
         return message;
     }
-    internalBinaryWrite(message: Plugin, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Plugin.Type type = 1; */
-        if (message.type !== 0)
-            writer.tag(1, WireType.Varint).int32(message.type);
-        /* string path = 2; */
-        if (message.path !== "")
-            writer.tag(2, WireType.LengthDelimited).string(message.path);
+    internalBinaryWrite(message: SideCarConfig, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string url = 2; */
+        if (message.url !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.url);
         /* optional stroppy.Value.Struct settings = 3; */
         if (message.settings)
             Value_Struct.internalBinaryWrite(message.settings, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
@@ -3987,66 +3831,91 @@ class Plugin$Type extends MessageType<Plugin> {
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Plugin
+ * @generated MessageType for protobuf message stroppy.SideCarConfig
  */
-export const Plugin = new Plugin$Type();
+export const SideCarConfig = new SideCarConfig$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class RunConfig$Type extends MessageType<RunConfig> {
+class CloudConfig$Type extends MessageType<CloudConfig> {
     constructor() {
-        super("stroppy.RunConfig", [
-            { no: 1, name: "run_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "seed", kind: "scalar", T: 4 /*ScalarType.UINT64*/ },
-            { no: 3, name: "driver", kind: "message", T: () => DriverConfig },
-            { no: 4, name: "go_executor", kind: "message", T: () => GoExecutor },
-            { no: 5, name: "k6_executor", kind: "message", T: () => K6Executor },
-            { no: 6, name: "steps", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => RequestedStep },
-            { no: 7, name: "logger", kind: "message", T: () => LoggerConfig },
-            { no: 8, name: "metadata", kind: "map", K: 9 /*ScalarType.STRING*/, V: { kind: "scalar", T: 9 /*ScalarType.STRING*/ } },
-            { no: 9, name: "plugins", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Plugin }
-        ]);
+        super("stroppy.CloudConfig", []);
     }
-    create(value?: PartialMessage<RunConfig>): RunConfig {
+    create(value?: PartialMessage<CloudConfig>): CloudConfig {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.runId = "";
-        message.seed = "0";
-        message.steps = [];
-        message.metadata = {};
-        message.plugins = [];
         if (value !== undefined)
-            reflectionMergePartial<RunConfig>(this, message, value);
+            reflectionMergePartial<CloudConfig>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RunConfig): RunConfig {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: CloudConfig): CloudConfig {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* string run_id */ 1:
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: CloudConfig, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.CloudConfig
+ */
+export const CloudConfig = new CloudConfig$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class GlobalConfig$Type extends MessageType<GlobalConfig> {
+    constructor() {
+        super("stroppy.GlobalConfig", [
+            { no: 1, name: "version", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "run_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "seed", kind: "scalar", T: 4 /*ScalarType.UINT64*/ },
+            { no: 4, name: "metadata", kind: "map", K: 9 /*ScalarType.STRING*/, V: { kind: "scalar", T: 9 /*ScalarType.STRING*/ } },
+            { no: 5, name: "driver", kind: "message", T: () => DriverConfig },
+            { no: 6, name: "logger", kind: "message", T: () => LoggerConfig }
+        ]);
+    }
+    create(value?: PartialMessage<GlobalConfig>): GlobalConfig {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.version = "";
+        message.runId = "";
+        message.seed = "0";
+        message.metadata = {};
+        if (value !== undefined)
+            reflectionMergePartial<GlobalConfig>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: GlobalConfig): GlobalConfig {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string version */ 1:
+                    message.version = reader.string();
+                    break;
+                case /* string run_id */ 2:
                     message.runId = reader.string();
                     break;
-                case /* uint64 seed */ 2:
+                case /* uint64 seed */ 3:
                     message.seed = reader.uint64().toString();
                     break;
-                case /* stroppy.DriverConfig driver */ 3:
+                case /* map<string, string> metadata */ 4:
+                    this.binaryReadMap4(message.metadata, reader, options);
+                    break;
+                case /* stroppy.DriverConfig driver */ 5:
                     message.driver = DriverConfig.internalBinaryRead(reader, reader.uint32(), options, message.driver);
                     break;
-                case /* stroppy.GoExecutor go_executor */ 4:
-                    message.goExecutor = GoExecutor.internalBinaryRead(reader, reader.uint32(), options, message.goExecutor);
-                    break;
-                case /* stroppy.K6Executor k6_executor */ 5:
-                    message.k6Executor = K6Executor.internalBinaryRead(reader, reader.uint32(), options, message.k6Executor);
-                    break;
-                case /* repeated stroppy.RequestedStep steps */ 6:
-                    message.steps.push(RequestedStep.internalBinaryRead(reader, reader.uint32(), options));
-                    break;
-                case /* stroppy.LoggerConfig logger */ 7:
+                case /* stroppy.LoggerConfig logger */ 6:
                     message.logger = LoggerConfig.internalBinaryRead(reader, reader.uint32(), options, message.logger);
-                    break;
-                case /* map<string, string> metadata */ 8:
-                    this.binaryReadMap8(message.metadata, reader, options);
-                    break;
-                case /* repeated stroppy.Plugin plugins */ 9:
-                    message.plugins.push(Plugin.internalBinaryRead(reader, reader.uint32(), options));
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -4059,8 +3928,8 @@ class RunConfig$Type extends MessageType<RunConfig> {
         }
         return message;
     }
-    private binaryReadMap8(map: RunConfig["metadata"], reader: IBinaryReader, options: BinaryReadOptions): void {
-        let len = reader.uint32(), end = reader.pos + len, key: keyof RunConfig["metadata"] | undefined, val: RunConfig["metadata"][any] | undefined;
+    private binaryReadMap4(map: GlobalConfig["metadata"], reader: IBinaryReader, options: BinaryReadOptions): void {
+        let len = reader.uint32(), end = reader.pos + len, key: keyof GlobalConfig["metadata"] | undefined, val: GlobalConfig["metadata"][any] | undefined;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
@@ -4070,39 +3939,30 @@ class RunConfig$Type extends MessageType<RunConfig> {
                 case 2:
                     val = reader.string();
                     break;
-                default: throw new globalThis.Error("unknown map entry field for stroppy.RunConfig.metadata");
+                default: throw new globalThis.Error("unknown map entry field for stroppy.GlobalConfig.metadata");
             }
         }
         map[key ?? ""] = val ?? "";
     }
-    internalBinaryWrite(message: RunConfig, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string run_id = 1; */
+    internalBinaryWrite(message: GlobalConfig, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string version = 1; */
+        if (message.version !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.version);
+        /* string run_id = 2; */
         if (message.runId !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.runId);
-        /* uint64 seed = 2; */
+            writer.tag(2, WireType.LengthDelimited).string(message.runId);
+        /* uint64 seed = 3; */
         if (message.seed !== "0")
-            writer.tag(2, WireType.Varint).uint64(message.seed);
-        /* stroppy.DriverConfig driver = 3; */
-        if (message.driver)
-            DriverConfig.internalBinaryWrite(message.driver, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.GoExecutor go_executor = 4; */
-        if (message.goExecutor)
-            GoExecutor.internalBinaryWrite(message.goExecutor, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.K6Executor k6_executor = 5; */
-        if (message.k6Executor)
-            K6Executor.internalBinaryWrite(message.k6Executor, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
-        /* repeated stroppy.RequestedStep steps = 6; */
-        for (let i = 0; i < message.steps.length; i++)
-            RequestedStep.internalBinaryWrite(message.steps[i], writer.tag(6, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.LoggerConfig logger = 7; */
-        if (message.logger)
-            LoggerConfig.internalBinaryWrite(message.logger, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
-        /* map<string, string> metadata = 8; */
+            writer.tag(3, WireType.Varint).uint64(message.seed);
+        /* map<string, string> metadata = 4; */
         for (let k of globalThis.Object.keys(message.metadata))
-            writer.tag(8, WireType.LengthDelimited).fork().tag(1, WireType.LengthDelimited).string(k).tag(2, WireType.LengthDelimited).string(message.metadata[k]).join();
-        /* repeated stroppy.Plugin plugins = 9; */
-        for (let i = 0; i < message.plugins.length; i++)
-            Plugin.internalBinaryWrite(message.plugins[i], writer.tag(9, WireType.LengthDelimited).fork(), options).join();
+            writer.tag(4, WireType.LengthDelimited).fork().tag(1, WireType.LengthDelimited).string(k).tag(2, WireType.LengthDelimited).string(message.metadata[k]).join();
+        /* stroppy.DriverConfig driver = 5; */
+        if (message.driver)
+            DriverConfig.internalBinaryWrite(message.driver, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.LoggerConfig logger = 6; */
+        if (message.logger)
+            LoggerConfig.internalBinaryWrite(message.logger, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -4110,37 +3970,52 @@ class RunConfig$Type extends MessageType<RunConfig> {
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.RunConfig
+ * @generated MessageType for protobuf message stroppy.GlobalConfig
  */
-export const RunConfig = new RunConfig$Type();
+export const GlobalConfig = new GlobalConfig$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Config$Type extends MessageType<Config> {
+class ConfigFile$Type extends MessageType<ConfigFile> {
     constructor() {
-        super("stroppy.Config", [
-            { no: 1, name: "version", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "run", kind: "message", T: () => RunConfig },
-            { no: 3, name: "benchmark", kind: "message", T: () => BenchmarkDescriptor }
+        super("stroppy.ConfigFile", [
+            { no: 1, name: "global", kind: "message", T: () => GlobalConfig },
+            { no: 2, name: "exporters", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => ExporterConfig },
+            { no: 3, name: "executors", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => ExecutorConfig },
+            { no: 4, name: "steps", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Step },
+            { no: 5, name: "side_cars", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => SideCarConfig },
+            { no: 6, name: "benchmark", kind: "message", T: () => BenchmarkDescriptor }
         ]);
     }
-    create(value?: PartialMessage<Config>): Config {
+    create(value?: PartialMessage<ConfigFile>): ConfigFile {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.version = "";
+        message.exporters = [];
+        message.executors = [];
+        message.steps = [];
+        message.sideCars = [];
         if (value !== undefined)
-            reflectionMergePartial<Config>(this, message, value);
+            reflectionMergePartial<ConfigFile>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Config): Config {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ConfigFile): ConfigFile {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* string version */ 1:
-                    message.version = reader.string();
+                case /* stroppy.GlobalConfig global */ 1:
+                    message.global = GlobalConfig.internalBinaryRead(reader, reader.uint32(), options, message.global);
                     break;
-                case /* stroppy.RunConfig run */ 2:
-                    message.run = RunConfig.internalBinaryRead(reader, reader.uint32(), options, message.run);
+                case /* repeated stroppy.ExporterConfig exporters */ 2:
+                    message.exporters.push(ExporterConfig.internalBinaryRead(reader, reader.uint32(), options));
                     break;
-                case /* stroppy.BenchmarkDescriptor benchmark */ 3:
+                case /* repeated stroppy.ExecutorConfig executors */ 3:
+                    message.executors.push(ExecutorConfig.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                case /* repeated stroppy.Step steps */ 4:
+                    message.steps.push(Step.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                case /* repeated stroppy.SideCarConfig side_cars */ 5:
+                    message.sideCars.push(SideCarConfig.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                case /* stroppy.BenchmarkDescriptor benchmark */ 6:
                     message.benchmark = BenchmarkDescriptor.internalBinaryRead(reader, reader.uint32(), options, message.benchmark);
                     break;
                 default:
@@ -4154,16 +4029,25 @@ class Config$Type extends MessageType<Config> {
         }
         return message;
     }
-    internalBinaryWrite(message: Config, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string version = 1; */
-        if (message.version !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.version);
-        /* stroppy.RunConfig run = 2; */
-        if (message.run)
-            RunConfig.internalBinaryWrite(message.run, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.BenchmarkDescriptor benchmark = 3; */
+    internalBinaryWrite(message: ConfigFile, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* stroppy.GlobalConfig global = 1; */
+        if (message.global)
+            GlobalConfig.internalBinaryWrite(message.global, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* repeated stroppy.ExporterConfig exporters = 2; */
+        for (let i = 0; i < message.exporters.length; i++)
+            ExporterConfig.internalBinaryWrite(message.exporters[i], writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* repeated stroppy.ExecutorConfig executors = 3; */
+        for (let i = 0; i < message.executors.length; i++)
+            ExecutorConfig.internalBinaryWrite(message.executors[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* repeated stroppy.Step steps = 4; */
+        for (let i = 0; i < message.steps.length; i++)
+            Step.internalBinaryWrite(message.steps[i], writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* repeated stroppy.SideCarConfig side_cars = 5; */
+        for (let i = 0; i < message.sideCars.length; i++)
+            SideCarConfig.internalBinaryWrite(message.sideCars[i], writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.BenchmarkDescriptor benchmark = 6; */
         if (message.benchmark)
-            BenchmarkDescriptor.internalBinaryWrite(message.benchmark, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+            BenchmarkDescriptor.internalBinaryWrite(message.benchmark, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -4171,9 +4055,9 @@ class Config$Type extends MessageType<Config> {
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Config
+ * @generated MessageType for protobuf message stroppy.ConfigFile
  */
-export const Config = new Config$Type();
+export const ConfigFile = new ConfigFile$Type();
 // @generated by protobuf-ts 2.11.1 with parameter force_disable_services,force_client_none,force_exclude_all_options,keep_enum_prefix,add_pb_suffix,long_type_string
 // @generated from protobuf file "descriptor.proto" (package "stroppy", syntax proto3)
 // tslint:disable
@@ -4312,11 +4196,12 @@ export interface QueryParamDescriptor {
      */
     name: string;
     /**
-     * * Regular expression pattern to replace with the parameter value default is "${<param_name>}"
+     * * Regular expression pattern to replace with the parameter value default
+     * is "${<param_name>}"
      *
-     * @generated from protobuf field: string replace_regex = 2
+     * @generated from protobuf field: optional string replace_regex = 2
      */
-    replaceRegex: string;
+    replaceRegex?: string;
     /**
      * * Rule for generating parameter values
      *
@@ -4326,13 +4211,27 @@ export interface QueryParamDescriptor {
     /**
      * * Database-specific parameter properties
      *
-     * @generated from protobuf field: stroppy.Value.Struct db_specific = 4
+     * @generated from protobuf field: optional stroppy.Value.Struct db_specific = 4
      */
     dbSpecific?: Value_Struct;
 }
 /**
+ * @generated from protobuf message stroppy.QueryParamGroup
+ */
+export interface QueryParamGroup {
+    /**
+     * @generated from protobuf field: string name = 1
+     */
+    name: string;
+    /**
+     * @generated from protobuf field: repeated stroppy.QueryParamDescriptor params = 2
+     */
+    params: QueryParamDescriptor[];
+}
+/**
  * *
- * QueryDescriptor defines a database query with its parameters and execution count.
+ * QueryDescriptor defines a database query with its parameters and execution
+ * count.
  *
  * @generated from protobuf message stroppy.QueryDescriptor
  */
@@ -4356,21 +4255,20 @@ export interface QueryDescriptor {
      */
     params: QueryParamDescriptor[];
     /**
-     * * Number of times to execute this query
-     *
-     * @generated from protobuf field: uint64 count = 4
+     * @generated from protobuf field: repeated stroppy.QueryParamGroup groups = 4
      */
-    count: string;
+    groups: QueryParamGroup[];
     /**
      * * Database-specific query properties
      *
-     * @generated from protobuf field: stroppy.Value.Struct db_specific = 5
+     * @generated from protobuf field: optional stroppy.Value.Struct db_specific = 5
      */
     dbSpecific?: Value_Struct;
 }
 /**
  * *
- * TransactionDescriptor defines a database transaction with its queries and execution count.
+ * TransactionDescriptor defines a database transaction with its queries and
+ * execution count.
  *
  * @generated from protobuf message stroppy.TransactionDescriptor
  */
@@ -4394,27 +4292,21 @@ export interface TransactionDescriptor {
      */
     queries: QueryDescriptor[];
     /**
-     * * Number of times to execute this transaction
-     *
-     * @generated from protobuf field: uint64 count = 4
-     */
-    count: string;
-    /**
      * * Database-specific transaction properties
      *
-     * @generated from protobuf field: stroppy.Value.Struct db_specific = 5
+     * @generated from protobuf field: optional stroppy.Value.Struct db_specific = 5
      */
     dbSpecific?: Value_Struct;
 }
 /**
  * *
- * StepUnitDescriptor represents a single unit of work.
- * It can be a table creation operation, a query execution operation, or a transaction execution operation.
- * It also specifies whether to execute this operation asynchronously.
+ * UnitDescriptor represents a single workload.
+ * It can be a table creation operation, a query execution operation, or a
+ * transaction execution operation.
  *
- * @generated from protobuf message stroppy.StepUnitDescriptor
+ * @generated from protobuf message stroppy.UnitDescriptor
  */
-export interface StepUnitDescriptor {
+export interface UnitDescriptor {
     /**
      * @generated from protobuf oneof: type
      */
@@ -4445,21 +4337,35 @@ export interface StepUnitDescriptor {
     } | {
         oneofKind: undefined;
     };
-    /**
-     * * Whether to execute this operation asynchronously
-     *
-     * @generated from protobuf field: bool async = 100
-     */
-    async: boolean;
 }
 /**
  * *
- * StepDescriptor represents a logical step in a benchmark.
+ * WorkloadUnitDescriptor represents a single unit of work.
+ * It can be a table creation operation, a query execution operation, or a
+ * transaction execution operation.
+ *
+ * @generated from protobuf message stroppy.WorkloadUnitDescriptor
+ */
+export interface WorkloadUnitDescriptor {
+    /**
+     * @generated from protobuf field: stroppy.UnitDescriptor descriptor = 6
+     */
+    descriptor?: UnitDescriptor;
+    /**
+     * * Number of times to execute this unit
+     *
+     * @generated from protobuf field: uint64 count = 5
+     */
+    count: string;
+}
+/**
+ * *
+ * WorkloadDescriptor represents a logical step in a benchmark.
  * It contains a list of operations to perform in this step.
  *
- * @generated from protobuf message stroppy.StepDescriptor
+ * @generated from protobuf message stroppy.WorkloadDescriptor
  */
-export interface StepDescriptor {
+export interface WorkloadDescriptor {
     /**
      * * Name of the step
      *
@@ -4467,21 +4373,22 @@ export interface StepDescriptor {
      */
     name: string;
     /**
-     * * List of operations to perform in this step
+     * * Whether to execute all operations in this workload asynchronously
      *
-     * @generated from protobuf field: repeated stroppy.StepUnitDescriptor units = 2
-     */
-    units: StepUnitDescriptor[];
-    /**
-     * * Whether to execute all operations in this step asynchronously
-     *
-     * @generated from protobuf field: bool async = 3
+     * @generated from protobuf field: bool async = 2
      */
     async: boolean;
+    /**
+     * * List of operations to perform in this step
+     *
+     * @generated from protobuf field: repeated stroppy.WorkloadUnitDescriptor units = 3
+     */
+    units: WorkloadUnitDescriptor[];
 }
 /**
  * *
- * BenchmarkDescriptor defines a complete benchmark consisting of multiple steps.
+ * BenchmarkDescriptor defines a complete benchmark consisting of multiple
+ * steps.
  *
  * @generated from protobuf message stroppy.BenchmarkDescriptor
  */
@@ -4495,13 +4402,14 @@ export interface BenchmarkDescriptor {
     /**
      * * List of steps to execute in the benchmark
      *
-     * @generated from protobuf field: repeated stroppy.StepDescriptor steps = 100
+     * @generated from protobuf field: repeated stroppy.WorkloadDescriptor workloads = 100
      */
-    steps: StepDescriptor[];
+    workloads: WorkloadDescriptor[];
 }
 /**
  * *
- * TransactionIsolationLevel defines the isolation level for a database transaction.
+ * TransactionIsolationLevel defines the isolation level for a database
+ * transaction.
  *
  * @generated from protobuf enum stroppy.TxIsolationLevel
  */
@@ -4775,7 +4683,7 @@ class QueryParamDescriptor$Type extends MessageType<QueryParamDescriptor> {
     constructor() {
         super("stroppy.QueryParamDescriptor", [
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "replace_regex", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "replace_regex", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "generation_rule", kind: "message", T: () => Generation_Rule },
             { no: 4, name: "db_specific", kind: "message", T: () => Value_Struct }
         ]);
@@ -4783,7 +4691,6 @@ class QueryParamDescriptor$Type extends MessageType<QueryParamDescriptor> {
     create(value?: PartialMessage<QueryParamDescriptor>): QueryParamDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.name = "";
-        message.replaceRegex = "";
         if (value !== undefined)
             reflectionMergePartial<QueryParamDescriptor>(this, message, value);
         return message;
@@ -4796,13 +4703,13 @@ class QueryParamDescriptor$Type extends MessageType<QueryParamDescriptor> {
                 case /* string name */ 1:
                     message.name = reader.string();
                     break;
-                case /* string replace_regex */ 2:
+                case /* optional string replace_regex */ 2:
                     message.replaceRegex = reader.string();
                     break;
                 case /* stroppy.Generation.Rule generation_rule */ 3:
                     message.generationRule = Generation_Rule.internalBinaryRead(reader, reader.uint32(), options, message.generationRule);
                     break;
-                case /* stroppy.Value.Struct db_specific */ 4:
+                case /* optional stroppy.Value.Struct db_specific */ 4:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
                     break;
                 default:
@@ -4820,13 +4727,13 @@ class QueryParamDescriptor$Type extends MessageType<QueryParamDescriptor> {
         /* string name = 1; */
         if (message.name !== "")
             writer.tag(1, WireType.LengthDelimited).string(message.name);
-        /* string replace_regex = 2; */
-        if (message.replaceRegex !== "")
+        /* optional string replace_regex = 2; */
+        if (message.replaceRegex !== undefined)
             writer.tag(2, WireType.LengthDelimited).string(message.replaceRegex);
         /* stroppy.Generation.Rule generation_rule = 3; */
         if (message.generationRule)
             Generation_Rule.internalBinaryWrite(message.generationRule, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Value.Struct db_specific = 4; */
+        /* optional stroppy.Value.Struct db_specific = 4; */
         if (message.dbSpecific)
             Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
@@ -4840,13 +4747,68 @@ class QueryParamDescriptor$Type extends MessageType<QueryParamDescriptor> {
  */
 export const QueryParamDescriptor = new QueryParamDescriptor$Type();
 // @generated message type with reflection information, may provide speed optimized methods
+class QueryParamGroup$Type extends MessageType<QueryParamGroup> {
+    constructor() {
+        super("stroppy.QueryParamGroup", [
+            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "params", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => QueryParamDescriptor }
+        ]);
+    }
+    create(value?: PartialMessage<QueryParamGroup>): QueryParamGroup {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.name = "";
+        message.params = [];
+        if (value !== undefined)
+            reflectionMergePartial<QueryParamGroup>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: QueryParamGroup): QueryParamGroup {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string name */ 1:
+                    message.name = reader.string();
+                    break;
+                case /* repeated stroppy.QueryParamDescriptor params */ 2:
+                    message.params.push(QueryParamDescriptor.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: QueryParamGroup, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string name = 1; */
+        if (message.name !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.name);
+        /* repeated stroppy.QueryParamDescriptor params = 2; */
+        for (let i = 0; i < message.params.length; i++)
+            QueryParamDescriptor.internalBinaryWrite(message.params[i], writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.QueryParamGroup
+ */
+export const QueryParamGroup = new QueryParamGroup$Type();
+// @generated message type with reflection information, may provide speed optimized methods
 class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
     constructor() {
         super("stroppy.QueryDescriptor", [
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "sql", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "params", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => QueryParamDescriptor },
-            { no: 4, name: "count", kind: "scalar", T: 4 /*ScalarType.UINT64*/ },
+            { no: 4, name: "groups", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => QueryParamGroup },
             { no: 5, name: "db_specific", kind: "message", T: () => Value_Struct }
         ]);
     }
@@ -4855,7 +4817,7 @@ class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
         message.name = "";
         message.sql = "";
         message.params = [];
-        message.count = "0";
+        message.groups = [];
         if (value !== undefined)
             reflectionMergePartial<QueryDescriptor>(this, message, value);
         return message;
@@ -4874,10 +4836,10 @@ class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
                 case /* repeated stroppy.QueryParamDescriptor params */ 3:
                     message.params.push(QueryParamDescriptor.internalBinaryRead(reader, reader.uint32(), options));
                     break;
-                case /* uint64 count */ 4:
-                    message.count = reader.uint64().toString();
+                case /* repeated stroppy.QueryParamGroup groups */ 4:
+                    message.groups.push(QueryParamGroup.internalBinaryRead(reader, reader.uint32(), options));
                     break;
-                case /* stroppy.Value.Struct db_specific */ 5:
+                case /* optional stroppy.Value.Struct db_specific */ 5:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
                     break;
                 default:
@@ -4901,10 +4863,10 @@ class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
         /* repeated stroppy.QueryParamDescriptor params = 3; */
         for (let i = 0; i < message.params.length; i++)
             QueryParamDescriptor.internalBinaryWrite(message.params[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* uint64 count = 4; */
-        if (message.count !== "0")
-            writer.tag(4, WireType.Varint).uint64(message.count);
-        /* stroppy.Value.Struct db_specific = 5; */
+        /* repeated stroppy.QueryParamGroup groups = 4; */
+        for (let i = 0; i < message.groups.length; i++)
+            QueryParamGroup.internalBinaryWrite(message.groups[i], writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* optional stroppy.Value.Struct db_specific = 5; */
         if (message.dbSpecific)
             Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
@@ -4924,7 +4886,6 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "isolation_level", kind: "enum", T: () => ["stroppy.TxIsolationLevel", TxIsolationLevel] },
             { no: 3, name: "queries", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => QueryDescriptor },
-            { no: 4, name: "count", kind: "scalar", T: 4 /*ScalarType.UINT64*/ },
             { no: 5, name: "db_specific", kind: "message", T: () => Value_Struct }
         ]);
     }
@@ -4933,7 +4894,6 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
         message.name = "";
         message.isolationLevel = 0;
         message.queries = [];
-        message.count = "0";
         if (value !== undefined)
             reflectionMergePartial<TransactionDescriptor>(this, message, value);
         return message;
@@ -4952,10 +4912,7 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
                 case /* repeated stroppy.QueryDescriptor queries */ 3:
                     message.queries.push(QueryDescriptor.internalBinaryRead(reader, reader.uint32(), options));
                     break;
-                case /* uint64 count */ 4:
-                    message.count = reader.uint64().toString();
-                    break;
-                case /* stroppy.Value.Struct db_specific */ 5:
+                case /* optional stroppy.Value.Struct db_specific */ 5:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
                     break;
                 default:
@@ -4979,10 +4936,7 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
         /* repeated stroppy.QueryDescriptor queries = 3; */
         for (let i = 0; i < message.queries.length; i++)
             QueryDescriptor.internalBinaryWrite(message.queries[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* uint64 count = 4; */
-        if (message.count !== "0")
-            writer.tag(4, WireType.Varint).uint64(message.count);
-        /* stroppy.Value.Struct db_specific = 5; */
+        /* optional stroppy.Value.Struct db_specific = 5; */
         if (message.dbSpecific)
             Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
@@ -4996,24 +4950,22 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
  */
 export const TransactionDescriptor = new TransactionDescriptor$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
+class UnitDescriptor$Type extends MessageType<UnitDescriptor> {
     constructor() {
-        super("stroppy.StepUnitDescriptor", [
+        super("stroppy.UnitDescriptor", [
             { no: 1, name: "create_table", kind: "message", oneof: "type", T: () => TableDescriptor },
             { no: 2, name: "query", kind: "message", oneof: "type", T: () => QueryDescriptor },
-            { no: 4, name: "transaction", kind: "message", oneof: "type", T: () => TransactionDescriptor },
-            { no: 100, name: "async", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
+            { no: 4, name: "transaction", kind: "message", oneof: "type", T: () => TransactionDescriptor }
         ]);
     }
-    create(value?: PartialMessage<StepUnitDescriptor>): StepUnitDescriptor {
+    create(value?: PartialMessage<UnitDescriptor>): UnitDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.type = { oneofKind: undefined };
-        message.async = false;
         if (value !== undefined)
-            reflectionMergePartial<StepUnitDescriptor>(this, message, value);
+            reflectionMergePartial<UnitDescriptor>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StepUnitDescriptor): StepUnitDescriptor {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: UnitDescriptor): UnitDescriptor {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
@@ -5036,9 +4988,6 @@ class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
                         transaction: TransactionDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).transaction)
                     };
                     break;
-                case /* bool async */ 100:
-                    message.async = reader.bool();
-                    break;
                 default:
                     let u = options.readUnknownField;
                     if (u === "throw")
@@ -5050,7 +4999,7 @@ class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
         }
         return message;
     }
-    internalBinaryWrite(message: StepUnitDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+    internalBinaryWrite(message: UnitDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
         /* stroppy.TableDescriptor create_table = 1; */
         if (message.type.oneofKind === "createTable")
             TableDescriptor.internalBinaryWrite(message.type.createTable, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
@@ -5060,9 +5009,6 @@ class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
         /* stroppy.TransactionDescriptor transaction = 4; */
         if (message.type.oneofKind === "transaction")
             TransactionDescriptor.internalBinaryWrite(message.type.transaction, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-        /* bool async = 100; */
-        if (message.async !== false)
-            writer.tag(100, WireType.Varint).bool(message.async);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -5070,40 +5016,34 @@ class StepUnitDescriptor$Type extends MessageType<StepUnitDescriptor> {
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.StepUnitDescriptor
+ * @generated MessageType for protobuf message stroppy.UnitDescriptor
  */
-export const StepUnitDescriptor = new StepUnitDescriptor$Type();
+export const UnitDescriptor = new UnitDescriptor$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class StepDescriptor$Type extends MessageType<StepDescriptor> {
+class WorkloadUnitDescriptor$Type extends MessageType<WorkloadUnitDescriptor> {
     constructor() {
-        super("stroppy.StepDescriptor", [
-            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "units", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => StepUnitDescriptor },
-            { no: 3, name: "async", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
+        super("stroppy.WorkloadUnitDescriptor", [
+            { no: 6, name: "descriptor", kind: "message", T: () => UnitDescriptor },
+            { no: 5, name: "count", kind: "scalar", T: 4 /*ScalarType.UINT64*/ }
         ]);
     }
-    create(value?: PartialMessage<StepDescriptor>): StepDescriptor {
+    create(value?: PartialMessage<WorkloadUnitDescriptor>): WorkloadUnitDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.name = "";
-        message.units = [];
-        message.async = false;
+        message.count = "0";
         if (value !== undefined)
-            reflectionMergePartial<StepDescriptor>(this, message, value);
+            reflectionMergePartial<WorkloadUnitDescriptor>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StepDescriptor): StepDescriptor {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: WorkloadUnitDescriptor): WorkloadUnitDescriptor {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* string name */ 1:
-                    message.name = reader.string();
+                case /* stroppy.UnitDescriptor descriptor */ 6:
+                    message.descriptor = UnitDescriptor.internalBinaryRead(reader, reader.uint32(), options, message.descriptor);
                     break;
-                case /* repeated stroppy.StepUnitDescriptor units */ 2:
-                    message.units.push(StepUnitDescriptor.internalBinaryRead(reader, reader.uint32(), options));
-                    break;
-                case /* bool async */ 3:
-                    message.async = reader.bool();
+                case /* uint64 count */ 5:
+                    message.count = reader.uint64().toString();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -5116,16 +5056,13 @@ class StepDescriptor$Type extends MessageType<StepDescriptor> {
         }
         return message;
     }
-    internalBinaryWrite(message: StepDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string name = 1; */
-        if (message.name !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.name);
-        /* repeated stroppy.StepUnitDescriptor units = 2; */
-        for (let i = 0; i < message.units.length; i++)
-            StepUnitDescriptor.internalBinaryWrite(message.units[i], writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        /* bool async = 3; */
-        if (message.async !== false)
-            writer.tag(3, WireType.Varint).bool(message.async);
+    internalBinaryWrite(message: WorkloadUnitDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* uint64 count = 5; */
+        if (message.count !== "0")
+            writer.tag(5, WireType.Varint).uint64(message.count);
+        /* stroppy.UnitDescriptor descriptor = 6; */
+        if (message.descriptor)
+            UnitDescriptor.internalBinaryWrite(message.descriptor, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -5133,21 +5070,84 @@ class StepDescriptor$Type extends MessageType<StepDescriptor> {
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.StepDescriptor
+ * @generated MessageType for protobuf message stroppy.WorkloadUnitDescriptor
  */
-export const StepDescriptor = new StepDescriptor$Type();
+export const WorkloadUnitDescriptor = new WorkloadUnitDescriptor$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class WorkloadDescriptor$Type extends MessageType<WorkloadDescriptor> {
+    constructor() {
+        super("stroppy.WorkloadDescriptor", [
+            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "async", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 3, name: "units", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => WorkloadUnitDescriptor }
+        ]);
+    }
+    create(value?: PartialMessage<WorkloadDescriptor>): WorkloadDescriptor {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.name = "";
+        message.async = false;
+        message.units = [];
+        if (value !== undefined)
+            reflectionMergePartial<WorkloadDescriptor>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: WorkloadDescriptor): WorkloadDescriptor {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string name */ 1:
+                    message.name = reader.string();
+                    break;
+                case /* bool async */ 2:
+                    message.async = reader.bool();
+                    break;
+                case /* repeated stroppy.WorkloadUnitDescriptor units */ 3:
+                    message.units.push(WorkloadUnitDescriptor.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: WorkloadDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string name = 1; */
+        if (message.name !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.name);
+        /* bool async = 2; */
+        if (message.async !== false)
+            writer.tag(2, WireType.Varint).bool(message.async);
+        /* repeated stroppy.WorkloadUnitDescriptor units = 3; */
+        for (let i = 0; i < message.units.length; i++)
+            WorkloadUnitDescriptor.internalBinaryWrite(message.units[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.WorkloadDescriptor
+ */
+export const WorkloadDescriptor = new WorkloadDescriptor$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class BenchmarkDescriptor$Type extends MessageType<BenchmarkDescriptor> {
     constructor() {
         super("stroppy.BenchmarkDescriptor", [
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 100, name: "steps", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => StepDescriptor }
+            { no: 100, name: "workloads", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => WorkloadDescriptor }
         ]);
     }
     create(value?: PartialMessage<BenchmarkDescriptor>): BenchmarkDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.name = "";
-        message.steps = [];
+        message.workloads = [];
         if (value !== undefined)
             reflectionMergePartial<BenchmarkDescriptor>(this, message, value);
         return message;
@@ -5160,8 +5160,8 @@ class BenchmarkDescriptor$Type extends MessageType<BenchmarkDescriptor> {
                 case /* string name */ 1:
                     message.name = reader.string();
                     break;
-                case /* repeated stroppy.StepDescriptor steps */ 100:
-                    message.steps.push(StepDescriptor.internalBinaryRead(reader, reader.uint32(), options));
+                case /* repeated stroppy.WorkloadDescriptor workloads */ 100:
+                    message.workloads.push(WorkloadDescriptor.internalBinaryRead(reader, reader.uint32(), options));
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -5178,9 +5178,9 @@ class BenchmarkDescriptor$Type extends MessageType<BenchmarkDescriptor> {
         /* string name = 1; */
         if (message.name !== "")
             writer.tag(1, WireType.LengthDelimited).string(message.name);
-        /* repeated stroppy.StepDescriptor steps = 100; */
-        for (let i = 0; i < message.steps.length; i++)
-            StepDescriptor.internalBinaryWrite(message.steps[i], writer.tag(100, WireType.LengthDelimited).fork(), options).join();
+        /* repeated stroppy.WorkloadDescriptor workloads = 100; */
+        for (let i = 0; i < message.workloads.length; i++)
+            WorkloadDescriptor.internalBinaryWrite(message.workloads[i], writer.tag(100, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -5191,6 +5191,1348 @@ class BenchmarkDescriptor$Type extends MessageType<BenchmarkDescriptor> {
  * @generated MessageType for protobuf message stroppy.BenchmarkDescriptor
  */
 export const BenchmarkDescriptor = new BenchmarkDescriptor$Type();
+// @generated by protobuf-ts 2.11.1 with parameter force_disable_services,force_client_none,force_exclude_all_options,keep_enum_prefix,add_pb_suffix,long_type_string
+// @generated from protobuf file "k6.proto" (package "stroppy", syntax proto3)
+// tslint:disable
+
+/**
+ * *
+ * K6Executor contains configuration for k6 load testing tool integration.
+ * It contains paths to the k6 binary and the k6 test script, as well as
+ * additional arguments to pass to the k6 binary.
+ *
+ * @generated from protobuf message stroppy.K6Options
+ */
+export interface K6Options {
+    /**
+     * * Additional arguments to pass to the k6 binary
+     *
+     * @generated from protobuf field: repeated string k6_args = 2
+     */
+    k6Args: string[];
+    /**
+     * * Timeout for k6 setup phase
+     *
+     * @generated from protobuf field: optional google.protobuf.Duration setup_timeout = 10
+     */
+    setupTimeout?: Duration;
+    /**
+     * * Scenario configuration
+     *
+     * @generated from protobuf field: stroppy.K6Scenario scenario = 200
+     */
+    scenario?: K6Scenario;
+}
+/**
+ * *
+ * Scenario defines the overall test scenario configuration.
+ * It contains user tags, maximum duration, and executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/
+ *
+ * @generated from protobuf message stroppy.K6Scenario
+ */
+export interface K6Scenario {
+    /**
+     * * Maximum duration for scenario execution.
+     * Used as a time limiter if main parameters (iterations, stages, duration)
+     * do not complete in time.
+     *
+     * @generated from protobuf field: google.protobuf.Duration max_duration = 3
+     */
+    maxDuration?: Duration;
+    /**
+     * * Executor configuration (exactly one of these must be specified)
+     *
+     * @generated from protobuf oneof: executor
+     */
+    executor: {
+        oneofKind: "sharedIterations";
+        /**
+         * * Shared iterations executor
+         *
+         * @generated from protobuf field: stroppy.SharedIterations shared_iterations = 10
+         */
+        sharedIterations: SharedIterations;
+    } | {
+        oneofKind: "perVuIterations";
+        /**
+         * * Per-VU iterations executor
+         *
+         * @generated from protobuf field: stroppy.PerVuIterations per_vu_iterations = 11
+         */
+        perVuIterations: PerVuIterations;
+    } | {
+        oneofKind: "constantVus";
+        /**
+         * * Constant VUs executor
+         *
+         * @generated from protobuf field: stroppy.ConstantVUs constant_vus = 12
+         */
+        constantVus: ConstantVUs;
+    } | {
+        oneofKind: "rampingVus";
+        /**
+         * * Ramping VUs executor
+         *
+         * @generated from protobuf field: stroppy.RampingVUs ramping_vus = 13
+         */
+        rampingVus: RampingVUs;
+    } | {
+        oneofKind: "constantArrivalRate";
+        /**
+         * * Constant arrival rate executor
+         *
+         * @generated from protobuf field: stroppy.ConstantArrivalRate constant_arrival_rate = 14
+         */
+        constantArrivalRate: ConstantArrivalRate;
+    } | {
+        oneofKind: "rampingArrivalRate";
+        /**
+         * * Ramping arrival rate executor
+         *
+         * @generated from protobuf field: stroppy.RampingArrivalRate ramping_arrival_rate = 15
+         */
+        rampingArrivalRate: RampingArrivalRate;
+    } | {
+        oneofKind: undefined;
+    };
+}
+/**
+ * *
+ * SharedIterations executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
+ *
+ * @generated from protobuf message stroppy.SharedIterations
+ */
+export interface SharedIterations {
+    /**
+     * * Total number of iterations to be executed by all VUs together.
+     * Iterations are distributed dynamically among available VUs.
+     *
+     * @generated from protobuf field: int64 iterations = 1
+     */
+    iterations: string;
+    /**
+     * * Number of virtual users that will execute these iterations in parallel
+     *
+     * @generated from protobuf field: uint32 vus = 2
+     */
+    vus: number;
+}
+/**
+ * *
+ * PerVuIterations executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
+ *
+ * @generated from protobuf message stroppy.PerVuIterations
+ */
+export interface PerVuIterations {
+    /**
+     * * Number of virtual users
+     *
+     * @generated from protobuf field: uint32 vus = 1
+     */
+    vus: number;
+    /**
+     * * Number of iterations that each VU should execute
+     *
+     * @generated from protobuf field: int64 iterations = 2
+     */
+    iterations: string;
+}
+/**
+ * *
+ * ConstantVUs executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
+ *
+ * @generated from protobuf message stroppy.ConstantVUs
+ */
+export interface ConstantVUs {
+    /**
+     * * Fixed number of virtual users that will be simultaneously active at all times
+     *
+     * @generated from protobuf field: uint32 vus = 1
+     */
+    vus: number;
+    /**
+     * * Duration of the scenario execution.
+     * All VUs will start and execute iterations until this time is completed.
+     *
+     * @generated from protobuf field: google.protobuf.Duration duration = 2
+     */
+    duration?: Duration;
+}
+/**
+ * *
+ * RampingVUs executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
+ *
+ * @generated from protobuf message stroppy.RampingVUs
+ */
+export interface RampingVUs {
+    /**
+     * * Initial number of virtual users
+     *
+     * @generated from protobuf field: uint32 start_vus = 1
+     */
+    startVus: number;
+    /**
+     * * List of stages where VU count changes to target value over specified time
+     *
+     * @generated from protobuf field: repeated stroppy.RampingVUs.VUStage stages = 2
+     */
+    stages: RampingVUs_VUStage[];
+    /**
+     * * Number of VUs allocated in advance.
+     * Helps avoid delays when creating new VUs during the test.
+     *
+     * @generated from protobuf field: uint32 pre_allocated_vus = 3
+     */
+    preAllocatedVus: number;
+    /**
+     * * Maximum number of VUs available for pool expansion
+     *
+     * @generated from protobuf field: uint32 max_vus = 4
+     */
+    maxVus: number;
+}
+/**
+ * * VU stage configuration for ramping
+ *
+ * @generated from protobuf message stroppy.RampingVUs.VUStage
+ */
+export interface RampingVUs_VUStage {
+    /**
+     * * Duration of the stage (e.g., "30s")
+     *
+     * @generated from protobuf field: google.protobuf.Duration duration = 1
+     */
+    duration?: Duration;
+    /**
+     * * Target number of VUs at the end of the stage
+     *
+     * @generated from protobuf field: uint32 target = 2
+     */
+    target: number;
+}
+/**
+ * *
+ * ConstantArrivalRate executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
+ *
+ * @generated from protobuf message stroppy.ConstantArrivalRate
+ */
+export interface ConstantArrivalRate {
+    /**
+     * * Rate of iteration generation (number per time unit)
+     *
+     * @generated from protobuf field: uint32 rate = 1
+     */
+    rate: number;
+    /**
+     * * Time unit for the "rate" field (e.g., "1s")
+     *
+     * @generated from protobuf field: google.protobuf.Duration time_unit = 2
+     */
+    timeUnit?: Duration;
+    /**
+     * * Duration of the scenario
+     *
+     * @generated from protobuf field: google.protobuf.Duration duration = 3
+     */
+    duration?: Duration;
+    /**
+     * * Number of VUs allocated in advance
+     *
+     * @generated from protobuf field: uint32 pre_allocated_vus = 4
+     */
+    preAllocatedVus: number;
+    /**
+     * * Maximum allowed number of VUs if load increases
+     *
+     * @generated from protobuf field: uint32 max_vus = 5
+     */
+    maxVus: number;
+}
+/**
+ * *
+ * RampingArrivalRate executor configuration.
+ * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
+ *
+ * @generated from protobuf message stroppy.RampingArrivalRate
+ */
+export interface RampingArrivalRate {
+    /**
+     * * Initial rate (iterations per time_unit)
+     *
+     * @generated from protobuf field: uint32 start_rate = 1
+     */
+    startRate: number;
+    /**
+     * * Time unit for the rate (e.g., "1s")
+     *
+     * @generated from protobuf field: google.protobuf.Duration time_unit = 2
+     */
+    timeUnit?: Duration;
+    /**
+     * * List of rate change stages
+     *
+     * @generated from protobuf field: repeated stroppy.RampingArrivalRate.RateStage stages = 3
+     */
+    stages: RampingArrivalRate_RateStage[];
+    /**
+     * * Number of VUs allocated in advance
+     *
+     * @generated from protobuf field: uint32 pre_allocated_vus = 4
+     */
+    preAllocatedVus: number;
+    /**
+     * * Maximum number of VUs available for pool expansion
+     *
+     * @generated from protobuf field: uint32 max_vus = 5
+     */
+    maxVus: number;
+}
+/**
+ * * Rate stage configuration for ramping arrival rate
+ *
+ * @generated from protobuf message stroppy.RampingArrivalRate.RateStage
+ */
+export interface RampingArrivalRate_RateStage {
+    /**
+     * * Target rate (iterations per time_unit) at the end of the stage
+     *
+     * @generated from protobuf field: uint32 target = 1
+     */
+    target: number;
+    /**
+     * * Duration of the stage
+     *
+     * @generated from protobuf field: google.protobuf.Duration duration = 2
+     */
+    duration?: Duration;
+}
+// @generated message type with reflection information, may provide speed optimized methods
+class K6Options$Type extends MessageType<K6Options> {
+    constructor() {
+        super("stroppy.K6Options", [
+            { no: 2, name: "k6_args", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ },
+            { no: 10, name: "setup_timeout", kind: "message", T: () => Duration },
+            { no: 200, name: "scenario", kind: "message", T: () => K6Scenario }
+        ]);
+    }
+    create(value?: PartialMessage<K6Options>): K6Options {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.k6Args = [];
+        if (value !== undefined)
+            reflectionMergePartial<K6Options>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: K6Options): K6Options {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* repeated string k6_args */ 2:
+                    message.k6Args.push(reader.string());
+                    break;
+                case /* optional google.protobuf.Duration setup_timeout */ 10:
+                    message.setupTimeout = Duration.internalBinaryRead(reader, reader.uint32(), options, message.setupTimeout);
+                    break;
+                case /* stroppy.K6Scenario scenario */ 200:
+                    message.scenario = K6Scenario.internalBinaryRead(reader, reader.uint32(), options, message.scenario);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: K6Options, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* repeated string k6_args = 2; */
+        for (let i = 0; i < message.k6Args.length; i++)
+            writer.tag(2, WireType.LengthDelimited).string(message.k6Args[i]);
+        /* optional google.protobuf.Duration setup_timeout = 10; */
+        if (message.setupTimeout)
+            Duration.internalBinaryWrite(message.setupTimeout, writer.tag(10, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.K6Scenario scenario = 200; */
+        if (message.scenario)
+            K6Scenario.internalBinaryWrite(message.scenario, writer.tag(200, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.K6Options
+ */
+export const K6Options = new K6Options$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class K6Scenario$Type extends MessageType<K6Scenario> {
+    constructor() {
+        super("stroppy.K6Scenario", [
+            { no: 3, name: "max_duration", kind: "message", T: () => Duration },
+            { no: 10, name: "shared_iterations", kind: "message", oneof: "executor", T: () => SharedIterations },
+            { no: 11, name: "per_vu_iterations", kind: "message", oneof: "executor", T: () => PerVuIterations },
+            { no: 12, name: "constant_vus", kind: "message", oneof: "executor", T: () => ConstantVUs },
+            { no: 13, name: "ramping_vus", kind: "message", oneof: "executor", T: () => RampingVUs },
+            { no: 14, name: "constant_arrival_rate", kind: "message", oneof: "executor", T: () => ConstantArrivalRate },
+            { no: 15, name: "ramping_arrival_rate", kind: "message", oneof: "executor", T: () => RampingArrivalRate }
+        ]);
+    }
+    create(value?: PartialMessage<K6Scenario>): K6Scenario {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.executor = { oneofKind: undefined };
+        if (value !== undefined)
+            reflectionMergePartial<K6Scenario>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: K6Scenario): K6Scenario {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* google.protobuf.Duration max_duration */ 3:
+                    message.maxDuration = Duration.internalBinaryRead(reader, reader.uint32(), options, message.maxDuration);
+                    break;
+                case /* stroppy.SharedIterations shared_iterations */ 10:
+                    message.executor = {
+                        oneofKind: "sharedIterations",
+                        sharedIterations: SharedIterations.internalBinaryRead(reader, reader.uint32(), options, (message.executor as any).sharedIterations)
+                    };
+                    break;
+                case /* stroppy.PerVuIterations per_vu_iterations */ 11:
+                    message.executor = {
+                        oneofKind: "perVuIterations",
+                        perVuIterations: PerVuIterations.internalBinaryRead(reader, reader.uint32(), options, (message.executor as any).perVuIterations)
+                    };
+                    break;
+                case /* stroppy.ConstantVUs constant_vus */ 12:
+                    message.executor = {
+                        oneofKind: "constantVus",
+                        constantVus: ConstantVUs.internalBinaryRead(reader, reader.uint32(), options, (message.executor as any).constantVus)
+                    };
+                    break;
+                case /* stroppy.RampingVUs ramping_vus */ 13:
+                    message.executor = {
+                        oneofKind: "rampingVus",
+                        rampingVus: RampingVUs.internalBinaryRead(reader, reader.uint32(), options, (message.executor as any).rampingVus)
+                    };
+                    break;
+                case /* stroppy.ConstantArrivalRate constant_arrival_rate */ 14:
+                    message.executor = {
+                        oneofKind: "constantArrivalRate",
+                        constantArrivalRate: ConstantArrivalRate.internalBinaryRead(reader, reader.uint32(), options, (message.executor as any).constantArrivalRate)
+                    };
+                    break;
+                case /* stroppy.RampingArrivalRate ramping_arrival_rate */ 15:
+                    message.executor = {
+                        oneofKind: "rampingArrivalRate",
+                        rampingArrivalRate: RampingArrivalRate.internalBinaryRead(reader, reader.uint32(), options, (message.executor as any).rampingArrivalRate)
+                    };
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: K6Scenario, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* google.protobuf.Duration max_duration = 3; */
+        if (message.maxDuration)
+            Duration.internalBinaryWrite(message.maxDuration, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.SharedIterations shared_iterations = 10; */
+        if (message.executor.oneofKind === "sharedIterations")
+            SharedIterations.internalBinaryWrite(message.executor.sharedIterations, writer.tag(10, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.PerVuIterations per_vu_iterations = 11; */
+        if (message.executor.oneofKind === "perVuIterations")
+            PerVuIterations.internalBinaryWrite(message.executor.perVuIterations, writer.tag(11, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.ConstantVUs constant_vus = 12; */
+        if (message.executor.oneofKind === "constantVus")
+            ConstantVUs.internalBinaryWrite(message.executor.constantVus, writer.tag(12, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.RampingVUs ramping_vus = 13; */
+        if (message.executor.oneofKind === "rampingVus")
+            RampingVUs.internalBinaryWrite(message.executor.rampingVus, writer.tag(13, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.ConstantArrivalRate constant_arrival_rate = 14; */
+        if (message.executor.oneofKind === "constantArrivalRate")
+            ConstantArrivalRate.internalBinaryWrite(message.executor.constantArrivalRate, writer.tag(14, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.RampingArrivalRate ramping_arrival_rate = 15; */
+        if (message.executor.oneofKind === "rampingArrivalRate")
+            RampingArrivalRate.internalBinaryWrite(message.executor.rampingArrivalRate, writer.tag(15, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.K6Scenario
+ */
+export const K6Scenario = new K6Scenario$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class SharedIterations$Type extends MessageType<SharedIterations> {
+    constructor() {
+        super("stroppy.SharedIterations", [
+            { no: 1, name: "iterations", kind: "scalar", T: 3 /*ScalarType.INT64*/ },
+            { no: 2, name: "vus", kind: "scalar", T: 13 /*ScalarType.UINT32*/ }
+        ]);
+    }
+    create(value?: PartialMessage<SharedIterations>): SharedIterations {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.iterations = "0";
+        message.vus = 0;
+        if (value !== undefined)
+            reflectionMergePartial<SharedIterations>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: SharedIterations): SharedIterations {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* int64 iterations */ 1:
+                    message.iterations = reader.int64().toString();
+                    break;
+                case /* uint32 vus */ 2:
+                    message.vus = reader.uint32();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: SharedIterations, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* int64 iterations = 1; */
+        if (message.iterations !== "0")
+            writer.tag(1, WireType.Varint).int64(message.iterations);
+        /* uint32 vus = 2; */
+        if (message.vus !== 0)
+            writer.tag(2, WireType.Varint).uint32(message.vus);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.SharedIterations
+ */
+export const SharedIterations = new SharedIterations$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class PerVuIterations$Type extends MessageType<PerVuIterations> {
+    constructor() {
+        super("stroppy.PerVuIterations", [
+            { no: 1, name: "vus", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 2, name: "iterations", kind: "scalar", T: 3 /*ScalarType.INT64*/ }
+        ]);
+    }
+    create(value?: PartialMessage<PerVuIterations>): PerVuIterations {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.vus = 0;
+        message.iterations = "0";
+        if (value !== undefined)
+            reflectionMergePartial<PerVuIterations>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: PerVuIterations): PerVuIterations {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* uint32 vus */ 1:
+                    message.vus = reader.uint32();
+                    break;
+                case /* int64 iterations */ 2:
+                    message.iterations = reader.int64().toString();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: PerVuIterations, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* uint32 vus = 1; */
+        if (message.vus !== 0)
+            writer.tag(1, WireType.Varint).uint32(message.vus);
+        /* int64 iterations = 2; */
+        if (message.iterations !== "0")
+            writer.tag(2, WireType.Varint).int64(message.iterations);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.PerVuIterations
+ */
+export const PerVuIterations = new PerVuIterations$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class ConstantVUs$Type extends MessageType<ConstantVUs> {
+    constructor() {
+        super("stroppy.ConstantVUs", [
+            { no: 1, name: "vus", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 2, name: "duration", kind: "message", T: () => Duration }
+        ]);
+    }
+    create(value?: PartialMessage<ConstantVUs>): ConstantVUs {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.vus = 0;
+        if (value !== undefined)
+            reflectionMergePartial<ConstantVUs>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ConstantVUs): ConstantVUs {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* uint32 vus */ 1:
+                    message.vus = reader.uint32();
+                    break;
+                case /* google.protobuf.Duration duration */ 2:
+                    message.duration = Duration.internalBinaryRead(reader, reader.uint32(), options, message.duration);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ConstantVUs, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* uint32 vus = 1; */
+        if (message.vus !== 0)
+            writer.tag(1, WireType.Varint).uint32(message.vus);
+        /* google.protobuf.Duration duration = 2; */
+        if (message.duration)
+            Duration.internalBinaryWrite(message.duration, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.ConstantVUs
+ */
+export const ConstantVUs = new ConstantVUs$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RampingVUs$Type extends MessageType<RampingVUs> {
+    constructor() {
+        super("stroppy.RampingVUs", [
+            { no: 1, name: "start_vus", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 2, name: "stages", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => RampingVUs_VUStage },
+            { no: 3, name: "pre_allocated_vus", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 4, name: "max_vus", kind: "scalar", T: 13 /*ScalarType.UINT32*/ }
+        ]);
+    }
+    create(value?: PartialMessage<RampingVUs>): RampingVUs {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.startVus = 0;
+        message.stages = [];
+        message.preAllocatedVus = 0;
+        message.maxVus = 0;
+        if (value !== undefined)
+            reflectionMergePartial<RampingVUs>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RampingVUs): RampingVUs {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* uint32 start_vus */ 1:
+                    message.startVus = reader.uint32();
+                    break;
+                case /* repeated stroppy.RampingVUs.VUStage stages */ 2:
+                    message.stages.push(RampingVUs_VUStage.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                case /* uint32 pre_allocated_vus */ 3:
+                    message.preAllocatedVus = reader.uint32();
+                    break;
+                case /* uint32 max_vus */ 4:
+                    message.maxVus = reader.uint32();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RampingVUs, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* uint32 start_vus = 1; */
+        if (message.startVus !== 0)
+            writer.tag(1, WireType.Varint).uint32(message.startVus);
+        /* repeated stroppy.RampingVUs.VUStage stages = 2; */
+        for (let i = 0; i < message.stages.length; i++)
+            RampingVUs_VUStage.internalBinaryWrite(message.stages[i], writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* uint32 pre_allocated_vus = 3; */
+        if (message.preAllocatedVus !== 0)
+            writer.tag(3, WireType.Varint).uint32(message.preAllocatedVus);
+        /* uint32 max_vus = 4; */
+        if (message.maxVus !== 0)
+            writer.tag(4, WireType.Varint).uint32(message.maxVus);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.RampingVUs
+ */
+export const RampingVUs = new RampingVUs$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RampingVUs_VUStage$Type extends MessageType<RampingVUs_VUStage> {
+    constructor() {
+        super("stroppy.RampingVUs.VUStage", [
+            { no: 1, name: "duration", kind: "message", T: () => Duration },
+            { no: 2, name: "target", kind: "scalar", T: 13 /*ScalarType.UINT32*/ }
+        ]);
+    }
+    create(value?: PartialMessage<RampingVUs_VUStage>): RampingVUs_VUStage {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.target = 0;
+        if (value !== undefined)
+            reflectionMergePartial<RampingVUs_VUStage>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RampingVUs_VUStage): RampingVUs_VUStage {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* google.protobuf.Duration duration */ 1:
+                    message.duration = Duration.internalBinaryRead(reader, reader.uint32(), options, message.duration);
+                    break;
+                case /* uint32 target */ 2:
+                    message.target = reader.uint32();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RampingVUs_VUStage, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* google.protobuf.Duration duration = 1; */
+        if (message.duration)
+            Duration.internalBinaryWrite(message.duration, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* uint32 target = 2; */
+        if (message.target !== 0)
+            writer.tag(2, WireType.Varint).uint32(message.target);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.RampingVUs.VUStage
+ */
+export const RampingVUs_VUStage = new RampingVUs_VUStage$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class ConstantArrivalRate$Type extends MessageType<ConstantArrivalRate> {
+    constructor() {
+        super("stroppy.ConstantArrivalRate", [
+            { no: 1, name: "rate", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 2, name: "time_unit", kind: "message", T: () => Duration },
+            { no: 3, name: "duration", kind: "message", T: () => Duration },
+            { no: 4, name: "pre_allocated_vus", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 5, name: "max_vus", kind: "scalar", T: 13 /*ScalarType.UINT32*/ }
+        ]);
+    }
+    create(value?: PartialMessage<ConstantArrivalRate>): ConstantArrivalRate {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.rate = 0;
+        message.preAllocatedVus = 0;
+        message.maxVus = 0;
+        if (value !== undefined)
+            reflectionMergePartial<ConstantArrivalRate>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ConstantArrivalRate): ConstantArrivalRate {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* uint32 rate */ 1:
+                    message.rate = reader.uint32();
+                    break;
+                case /* google.protobuf.Duration time_unit */ 2:
+                    message.timeUnit = Duration.internalBinaryRead(reader, reader.uint32(), options, message.timeUnit);
+                    break;
+                case /* google.protobuf.Duration duration */ 3:
+                    message.duration = Duration.internalBinaryRead(reader, reader.uint32(), options, message.duration);
+                    break;
+                case /* uint32 pre_allocated_vus */ 4:
+                    message.preAllocatedVus = reader.uint32();
+                    break;
+                case /* uint32 max_vus */ 5:
+                    message.maxVus = reader.uint32();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ConstantArrivalRate, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* uint32 rate = 1; */
+        if (message.rate !== 0)
+            writer.tag(1, WireType.Varint).uint32(message.rate);
+        /* google.protobuf.Duration time_unit = 2; */
+        if (message.timeUnit)
+            Duration.internalBinaryWrite(message.timeUnit, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* google.protobuf.Duration duration = 3; */
+        if (message.duration)
+            Duration.internalBinaryWrite(message.duration, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* uint32 pre_allocated_vus = 4; */
+        if (message.preAllocatedVus !== 0)
+            writer.tag(4, WireType.Varint).uint32(message.preAllocatedVus);
+        /* uint32 max_vus = 5; */
+        if (message.maxVus !== 0)
+            writer.tag(5, WireType.Varint).uint32(message.maxVus);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.ConstantArrivalRate
+ */
+export const ConstantArrivalRate = new ConstantArrivalRate$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RampingArrivalRate$Type extends MessageType<RampingArrivalRate> {
+    constructor() {
+        super("stroppy.RampingArrivalRate", [
+            { no: 1, name: "start_rate", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 2, name: "time_unit", kind: "message", T: () => Duration },
+            { no: 3, name: "stages", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => RampingArrivalRate_RateStage },
+            { no: 4, name: "pre_allocated_vus", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 5, name: "max_vus", kind: "scalar", T: 13 /*ScalarType.UINT32*/ }
+        ]);
+    }
+    create(value?: PartialMessage<RampingArrivalRate>): RampingArrivalRate {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.startRate = 0;
+        message.stages = [];
+        message.preAllocatedVus = 0;
+        message.maxVus = 0;
+        if (value !== undefined)
+            reflectionMergePartial<RampingArrivalRate>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RampingArrivalRate): RampingArrivalRate {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* uint32 start_rate */ 1:
+                    message.startRate = reader.uint32();
+                    break;
+                case /* google.protobuf.Duration time_unit */ 2:
+                    message.timeUnit = Duration.internalBinaryRead(reader, reader.uint32(), options, message.timeUnit);
+                    break;
+                case /* repeated stroppy.RampingArrivalRate.RateStage stages */ 3:
+                    message.stages.push(RampingArrivalRate_RateStage.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                case /* uint32 pre_allocated_vus */ 4:
+                    message.preAllocatedVus = reader.uint32();
+                    break;
+                case /* uint32 max_vus */ 5:
+                    message.maxVus = reader.uint32();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RampingArrivalRate, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* uint32 start_rate = 1; */
+        if (message.startRate !== 0)
+            writer.tag(1, WireType.Varint).uint32(message.startRate);
+        /* google.protobuf.Duration time_unit = 2; */
+        if (message.timeUnit)
+            Duration.internalBinaryWrite(message.timeUnit, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* repeated stroppy.RampingArrivalRate.RateStage stages = 3; */
+        for (let i = 0; i < message.stages.length; i++)
+            RampingArrivalRate_RateStage.internalBinaryWrite(message.stages[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* uint32 pre_allocated_vus = 4; */
+        if (message.preAllocatedVus !== 0)
+            writer.tag(4, WireType.Varint).uint32(message.preAllocatedVus);
+        /* uint32 max_vus = 5; */
+        if (message.maxVus !== 0)
+            writer.tag(5, WireType.Varint).uint32(message.maxVus);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.RampingArrivalRate
+ */
+export const RampingArrivalRate = new RampingArrivalRate$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RampingArrivalRate_RateStage$Type extends MessageType<RampingArrivalRate_RateStage> {
+    constructor() {
+        super("stroppy.RampingArrivalRate.RateStage", [
+            { no: 1, name: "target", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 2, name: "duration", kind: "message", T: () => Duration }
+        ]);
+    }
+    create(value?: PartialMessage<RampingArrivalRate_RateStage>): RampingArrivalRate_RateStage {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.target = 0;
+        if (value !== undefined)
+            reflectionMergePartial<RampingArrivalRate_RateStage>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RampingArrivalRate_RateStage): RampingArrivalRate_RateStage {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* uint32 target */ 1:
+                    message.target = reader.uint32();
+                    break;
+                case /* google.protobuf.Duration duration */ 2:
+                    message.duration = Duration.internalBinaryRead(reader, reader.uint32(), options, message.duration);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RampingArrivalRate_RateStage, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* uint32 target = 1; */
+        if (message.target !== 0)
+            writer.tag(1, WireType.Varint).uint32(message.target);
+        /* google.protobuf.Duration duration = 2; */
+        if (message.duration)
+            Duration.internalBinaryWrite(message.duration, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.RampingArrivalRate.RateStage
+ */
+export const RampingArrivalRate_RateStage = new RampingArrivalRate_RateStage$Type();
+// @generated by protobuf-ts 2.11.1 with parameter force_disable_services,force_client_none,force_exclude_all_options,keep_enum_prefix,add_pb_suffix,long_type_string
+// @generated from protobuf file "runtime.proto" (package "stroppy", syntax proto3)
+// tslint:disable
+
+/**
+ * *
+ * StepContext provides contextual information to a benchmark step during execution.
+ * It contains the run context and the step descriptor.
+ *
+ * @generated from protobuf message stroppy.StepContext
+ */
+export interface StepContext {
+    /**
+     * * Global configuration of the benchmark and its steps
+     *
+     * @generated from protobuf field: stroppy.GlobalConfig config = 1
+     */
+    config?: GlobalConfig;
+    /**
+     * * Current step
+     *
+     * @generated from protobuf field: stroppy.Step step = 2
+     */
+    step?: Step;
+    /**
+     * * Executor configuration
+     *
+     * @generated from protobuf field: stroppy.ExecutorConfig executor = 3
+     */
+    executor?: ExecutorConfig;
+    /**
+     * * Exporter configuration
+     *
+     * @generated from protobuf field: optional stroppy.ExporterConfig exporter = 4
+     */
+    exporter?: ExporterConfig;
+    /**
+     * * Current workload descriptor
+     *
+     * @generated from protobuf field: stroppy.WorkloadDescriptor workload = 5
+     */
+    workload?: WorkloadDescriptor;
+}
+/**
+ * *
+ * UnitBuildContext provides the context needed to build a unit from a WorkloadUnitDescriptor.
+ *
+ * @generated from protobuf message stroppy.UnitContext
+ */
+export interface UnitContext {
+    /**
+     * * Step context
+     *
+     * @generated from protobuf field: stroppy.StepContext step_context = 1
+     */
+    stepContext?: StepContext;
+    /**
+     * * Current unit descriptor
+     *
+     * @generated from protobuf field: stroppy.WorkloadUnitDescriptor unit_descriptor = 2
+     */
+    unitDescriptor?: WorkloadUnitDescriptor;
+}
+/**
+ * *
+ * DriverQuery represents a query that can be executed by a database driver.
+ *
+ * @generated from protobuf message stroppy.DriverQuery
+ */
+export interface DriverQuery {
+    /**
+     * * Name of the query
+     *
+     * @generated from protobuf field: string name = 1
+     */
+    name: string;
+    /**
+     * * Request of the query
+     *
+     * @generated from protobuf field: string request = 2
+     */
+    request: string;
+    /**
+     * * Parameters of the query
+     *
+     * @generated from protobuf field: repeated stroppy.Value params = 3
+     */
+    params: Value[];
+}
+/**
+ * *
+ * DriverTransaction represents a transaction that can be executed by a database
+ * driver.
+ *
+ * @generated from protobuf message stroppy.DriverTransaction
+ */
+export interface DriverTransaction {
+    /**
+     * * Queries of the transaction
+     *
+     * @generated from protobuf field: repeated stroppy.DriverQuery queries = 1
+     */
+    queries: DriverQuery[];
+    /**
+     * * Isolation level of the transaction
+     *
+     * @generated from protobuf field: stroppy.TxIsolationLevel isolation_level = 2
+     */
+    isolationLevel: TxIsolationLevel;
+}
+// @generated message type with reflection information, may provide speed optimized methods
+class StepContext$Type extends MessageType<StepContext> {
+    constructor() {
+        super("stroppy.StepContext", [
+            { no: 1, name: "config", kind: "message", T: () => GlobalConfig },
+            { no: 2, name: "step", kind: "message", T: () => Step },
+            { no: 3, name: "executor", kind: "message", T: () => ExecutorConfig },
+            { no: 4, name: "exporter", kind: "message", T: () => ExporterConfig },
+            { no: 5, name: "workload", kind: "message", T: () => WorkloadDescriptor }
+        ]);
+    }
+    create(value?: PartialMessage<StepContext>): StepContext {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        if (value !== undefined)
+            reflectionMergePartial<StepContext>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StepContext): StepContext {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* stroppy.GlobalConfig config */ 1:
+                    message.config = GlobalConfig.internalBinaryRead(reader, reader.uint32(), options, message.config);
+                    break;
+                case /* stroppy.Step step */ 2:
+                    message.step = Step.internalBinaryRead(reader, reader.uint32(), options, message.step);
+                    break;
+                case /* stroppy.ExecutorConfig executor */ 3:
+                    message.executor = ExecutorConfig.internalBinaryRead(reader, reader.uint32(), options, message.executor);
+                    break;
+                case /* optional stroppy.ExporterConfig exporter */ 4:
+                    message.exporter = ExporterConfig.internalBinaryRead(reader, reader.uint32(), options, message.exporter);
+                    break;
+                case /* stroppy.WorkloadDescriptor workload */ 5:
+                    message.workload = WorkloadDescriptor.internalBinaryRead(reader, reader.uint32(), options, message.workload);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: StepContext, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* stroppy.GlobalConfig config = 1; */
+        if (message.config)
+            GlobalConfig.internalBinaryWrite(message.config, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Step step = 2; */
+        if (message.step)
+            Step.internalBinaryWrite(message.step, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.ExecutorConfig executor = 3; */
+        if (message.executor)
+            ExecutorConfig.internalBinaryWrite(message.executor, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* optional stroppy.ExporterConfig exporter = 4; */
+        if (message.exporter)
+            ExporterConfig.internalBinaryWrite(message.exporter, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.WorkloadDescriptor workload = 5; */
+        if (message.workload)
+            WorkloadDescriptor.internalBinaryWrite(message.workload, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.StepContext
+ */
+export const StepContext = new StepContext$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class UnitContext$Type extends MessageType<UnitContext> {
+    constructor() {
+        super("stroppy.UnitContext", [
+            { no: 1, name: "step_context", kind: "message", T: () => StepContext },
+            { no: 2, name: "unit_descriptor", kind: "message", T: () => WorkloadUnitDescriptor }
+        ]);
+    }
+    create(value?: PartialMessage<UnitContext>): UnitContext {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        if (value !== undefined)
+            reflectionMergePartial<UnitContext>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: UnitContext): UnitContext {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* stroppy.StepContext step_context */ 1:
+                    message.stepContext = StepContext.internalBinaryRead(reader, reader.uint32(), options, message.stepContext);
+                    break;
+                case /* stroppy.WorkloadUnitDescriptor unit_descriptor */ 2:
+                    message.unitDescriptor = WorkloadUnitDescriptor.internalBinaryRead(reader, reader.uint32(), options, message.unitDescriptor);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: UnitContext, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* stroppy.StepContext step_context = 1; */
+        if (message.stepContext)
+            StepContext.internalBinaryWrite(message.stepContext, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.WorkloadUnitDescriptor unit_descriptor = 2; */
+        if (message.unitDescriptor)
+            WorkloadUnitDescriptor.internalBinaryWrite(message.unitDescriptor, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.UnitContext
+ */
+export const UnitContext = new UnitContext$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class DriverQuery$Type extends MessageType<DriverQuery> {
+    constructor() {
+        super("stroppy.DriverQuery", [
+            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "request", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "params", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Value }
+        ]);
+    }
+    create(value?: PartialMessage<DriverQuery>): DriverQuery {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.name = "";
+        message.request = "";
+        message.params = [];
+        if (value !== undefined)
+            reflectionMergePartial<DriverQuery>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: DriverQuery): DriverQuery {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string name */ 1:
+                    message.name = reader.string();
+                    break;
+                case /* string request */ 2:
+                    message.request = reader.string();
+                    break;
+                case /* repeated stroppy.Value params */ 3:
+                    message.params.push(Value.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: DriverQuery, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string name = 1; */
+        if (message.name !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.name);
+        /* string request = 2; */
+        if (message.request !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.request);
+        /* repeated stroppy.Value params = 3; */
+        for (let i = 0; i < message.params.length; i++)
+            Value.internalBinaryWrite(message.params[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.DriverQuery
+ */
+export const DriverQuery = new DriverQuery$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class DriverTransaction$Type extends MessageType<DriverTransaction> {
+    constructor() {
+        super("stroppy.DriverTransaction", [
+            { no: 1, name: "queries", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => DriverQuery },
+            { no: 2, name: "isolation_level", kind: "enum", T: () => ["stroppy.TxIsolationLevel", TxIsolationLevel] }
+        ]);
+    }
+    create(value?: PartialMessage<DriverTransaction>): DriverTransaction {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.queries = [];
+        message.isolationLevel = 0;
+        if (value !== undefined)
+            reflectionMergePartial<DriverTransaction>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: DriverTransaction): DriverTransaction {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* repeated stroppy.DriverQuery queries */ 1:
+                    message.queries.push(DriverQuery.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                case /* stroppy.TxIsolationLevel isolation_level */ 2:
+                    message.isolationLevel = reader.int32();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: DriverTransaction, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* repeated stroppy.DriverQuery queries = 1; */
+        for (let i = 0; i < message.queries.length; i++)
+            DriverQuery.internalBinaryWrite(message.queries[i], writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.TxIsolationLevel isolation_level = 2; */
+        if (message.isolationLevel !== 0)
+            writer.tag(2, WireType.Varint).int32(message.isolationLevel);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.DriverTransaction
+ */
+export const DriverTransaction = new DriverTransaction$Type();
 // @generated by protobuf-ts 2.11.1 with parameter force_disable_services,force_client_none,force_exclude_all_options,keep_enum_prefix,add_pb_suffix,long_type_string
 // @generated from protobuf file "google/protobuf/descriptor.proto" (package "google.protobuf", syntax proto2)
 // tslint:disable

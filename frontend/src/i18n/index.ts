@@ -10,6 +10,8 @@ import dashboardRu from '../locales/ru/dashboard.json'
 import dashboardEn from '../locales/en/dashboard.json'
 import configuratorRu from '../locales/ru/configurator.json'
 import configuratorEn from '../locales/en/configurator.json'
+import landingRu from '../locales/ru/landing.json'
+import landingEn from '../locales/en/landing.json'
 
 const resources = {
   ru: {
@@ -17,12 +19,14 @@ const resources = {
     runs: runsRu,
     dashboard: dashboardRu,
     configurator: configuratorRu,
+    landing: landingRu,
   },
   en: {
     common: commonEn,
     runs: runsEn,
     dashboard: dashboardEn,
     configurator: configuratorEn,
+    landing: landingEn,
   },
 }
 
@@ -40,7 +44,7 @@ i18n
     
     // Namespace configuration
     defaultNS: 'common',
-    ns: ['common', 'runs', 'dashboard', 'configurator'],
+    ns: ['common', 'runs', 'dashboard', 'configurator', 'landing'],
     
     // Key separator
     keySeparator: '.',

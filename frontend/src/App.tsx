@@ -12,6 +12,7 @@ import ConfiguratorPage from './pages/ConfiguratorPage'
 import RunsPage from './pages/RunsPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import LandingPage from './pages/LandingPage'
 
 const { Footer } = Layout
 
@@ -24,11 +25,12 @@ const AppContent: React.FC = () => {
       <Router>
         <Routes>
           {/* Публичные маршруты */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           
           {/* Защищенные маршруты */}
-          <Route path="/*" element={
+          <Route path="/app/*" element={
             <ProtectedRoute>
               <Layout style={{ height: '100vh', overflow: 'hidden' }}>
                 <Sidebar collapsed={collapsed} onCollapse={setCollapsed} />
@@ -38,7 +40,7 @@ const AppContent: React.FC = () => {
                   
                   <PageWrapper>
                     <Routes>
-                      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                      <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
                       <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/configurator" element={<ConfiguratorPage />} />
                       <Route path="/runs" element={<RunsPage />} />

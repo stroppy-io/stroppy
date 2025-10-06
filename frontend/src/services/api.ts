@@ -237,6 +237,12 @@ class ApiClient {
     return response.data;
   }
 
+  // Получение топов запусков (публичный endpoint, без авторизации)
+  async getTopRuns(limit: number = 10): Promise<RunListResponse> {
+    const response = await this.client.get(`/public/runs/top?limit=${limit}`);
+    return response.data;
+  }
+
   // Проверка состояния сервера
   async healthCheck(): Promise<{ status: string; timestamp: number }> {
     const baseUrl = API_BASE_URL.startsWith('http') 

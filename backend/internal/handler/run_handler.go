@@ -417,3 +417,34 @@ func (h *RunHandler) DeleteRun(c *gin.Context) {
 		"message": "Run deleted successfully",
 	})
 }
+
+// GetTopRuns получает топ запусков для публичного просмотра (без авторизации)
+func (h *RunHandler) GetTopRuns(c *gin.Context) {
+	// Параметры пагинации
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if err != nil || limit < 1 || limit > 50 {
+		limit = 10
+	}
+
+	// Получаем топ завершенных запусков, отсортированных по TPS (средний)
+	runs, total, err := h.runService.GetAllWithFiltersAndSort(limit, 0, "", "completed", "", "", "tps_avg", "desc")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to get top runs",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	runResponses := make([]*RunResponse, len(runs))
+	for i, ru := range runs {
+		runResponses[i] = &RunResponse{Run: ru}
+	}
+
+	c.JSON(http.StatusOK, &RunListResponse{
+		Runs:  runResponses,
+		Total: total,
+		Page:  1,
+		Limit: limit,
+	})
+}

@@ -85,6 +85,12 @@ func main() {
 			auth.POST("/login", userHandler.Login)
 		}
 
+		// Публичные маршруты для просмотра топов (без авторизации)
+		public := api.Group("/public")
+		{
+			public.GET("/runs/top", runHandler.GetTopRuns)
+		}
+
 		// Защищенные маршруты
 		protected := api.Group("/")
 		protected.Use(middleware.AuthMiddleware(jwtManager))
