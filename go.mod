@@ -10,10 +10,11 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/pashagolub/pgxmock/v4 v4.8.0
-	github.com/shopspring/decimal v1.3.1
+	github.com/shopspring/decimal v1.4.0
 	github.com/sourcegraph/conc v0.3.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
+	github.com/stroppy-io/stroppy-core v0.1.1
 	github.com/thediveo/enumflag v0.10.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.16.0
@@ -28,12 +29,10 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/kr/pretty v0.3.1 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.38.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	go.opentelemetry.io/otel v1.37.0 // indirect

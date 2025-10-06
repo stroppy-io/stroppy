@@ -238,7 +238,7 @@
       "required": [
         "value"
       ],
-      "description": "*\n DateTime represents a point in time, independent of any time zone or calendar."
+      "description": "*\n DateTime represents a point in time, independent of any time zone or\n calendar."
     },
     ".stroppy.DateTime.value": {
       "type": "string",
@@ -419,7 +419,7 @@
     },
     ".stroppy.Generation.Distribution.screw": {
       "type": "number",
-      "description": "* Distribution parameter (e.g., standard deviation for normal distribution)"
+      "description": "* Distribution parameter (e.g., standard deviation for normal\n distribution)"
     },
     ".stroppy.Generation.Distribution.type": {
       "$ref": "#/$defs/.stroppy.Generation.Distribution.DistributionType",
@@ -2493,7 +2493,7 @@
         }
       },
       "type": "object",
-      "description": "*\n OtlpExport contains configuration for exporting metrics via OpenTelemetry Protocol (OTLP).\n It specifies the endpoint and metrics prefix for telemetry data export."
+      "description": "*\n OtlpExport contains configuration for exporting metrics via OpenTelemetry\n Protocol (OTLP). It specifies the endpoint and metrics prefix for telemetry\n data export."
     },
     ".stroppy.OtlpExport.otlp_endpoint_insecure": {
       "type": "boolean",
@@ -2545,6 +2545,28 @@
       "description": "* Number of virtual users"
     },
     ".stroppy.QueryDescriptor": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "dbSpecific"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "dbSpecific"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "name": {
           "$ref": "#/$defs/.stroppy.QueryDescriptor.name"
@@ -2555,21 +2577,36 @@
         "params": {
           "$ref": "#/$defs/.stroppy.QueryDescriptor.params"
         },
+        "groups": {
+          "$ref": "#/$defs/.stroppy.QueryDescriptor.groups"
+        },
         "dbSpecific": {
-          "$ref": "#/$defs/.stroppy.QueryDescriptor.db_specific"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.QueryDescriptor.db_specific"
+            }
+          ]
         }
       },
       "type": "object",
       "required": [
         "name",
-        "sql",
-        "dbSpecific"
+        "sql"
       ],
       "description": "*\n QueryDescriptor defines a database query with its parameters and execution\n count."
     },
     ".stroppy.QueryDescriptor.db_specific": {
       "$ref": "#/$defs/.stroppy.Value.Struct",
       "description": "* Database-specific query properties"
+    },
+    ".stroppy.QueryDescriptor.groups": {
+      "items": {
+        "$ref": "#/$defs/.stroppy.QueryParamGroup"
+      },
+      "type": "array"
     },
     ".stroppy.QueryDescriptor.name": {
       "type": "string",
@@ -2588,26 +2625,80 @@
       "description": "* SQL query text"
     },
     ".stroppy.QueryParamDescriptor": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "replaceRegex"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "replaceRegex"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "dbSpecific"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "dbSpecific"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "name": {
           "$ref": "#/$defs/.stroppy.QueryParamDescriptor.name"
         },
         "replaceRegex": {
-          "$ref": "#/$defs/.stroppy.QueryParamDescriptor.replace_regex"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.QueryParamDescriptor.replace_regex"
+            }
+          ]
         },
         "generationRule": {
           "$ref": "#/$defs/.stroppy.QueryParamDescriptor.generation_rule"
         },
         "dbSpecific": {
-          "$ref": "#/$defs/.stroppy.QueryParamDescriptor.db_specific"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.QueryParamDescriptor.db_specific"
+            }
+          ]
         }
       },
       "type": "object",
       "required": [
         "name",
-        "replaceRegex",
-        "generationRule",
-        "dbSpecific"
+        "generationRule"
       ],
       "description": "*\n QueryParamDescriptor defines a parameter that can be used in a query."
     },
@@ -2626,6 +2717,29 @@
     ".stroppy.QueryParamDescriptor.replace_regex": {
       "type": "string",
       "description": "* Regular expression pattern to replace with the parameter value default\n is \"${\u003cparam_name\u003e}\""
+    },
+    ".stroppy.QueryParamGroup": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/.stroppy.QueryParamGroup.name"
+        },
+        "params": {
+          "$ref": "#/$defs/.stroppy.QueryParamGroup.params"
+        }
+      },
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    ".stroppy.QueryParamGroup.name": {
+      "type": "string"
+    },
+    ".stroppy.QueryParamGroup.params": {
+      "items": {
+        "$ref": "#/$defs/.stroppy.QueryParamDescriptor"
+      },
+      "type": "array"
     },
     ".stroppy.RampingArrivalRate": {
       "properties": {
@@ -2972,6 +3086,28 @@
       "description": "* List of indexes defined on this table"
     },
     ".stroppy.TransactionDescriptor": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "dbSpecific"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "dbSpecific"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "name": {
           "$ref": "#/$defs/.stroppy.TransactionDescriptor.name"
@@ -2983,14 +3119,20 @@
           "$ref": "#/$defs/.stroppy.TransactionDescriptor.queries"
         },
         "dbSpecific": {
-          "$ref": "#/$defs/.stroppy.TransactionDescriptor.db_specific"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.TransactionDescriptor.db_specific"
+            }
+          ]
         }
       },
       "type": "object",
       "required": [
         "name",
-        "isolationLevel",
-        "dbSpecific"
+        "isolationLevel"
       ],
       "description": "*\n TransactionDescriptor defines a database transaction with its queries and\n execution count."
     },
@@ -3129,7 +3271,7 @@
     },
     ".stroppy.Uuid.value": {
       "type": "string",
-      "description": "* String representation of UUID (e.g., \"123e4567-e89b-12d3-a456-426614174000\")"
+      "description": "* String representation of UUID (e.g.,\n \"123e4567-e89b-12d3-a456-426614174000\")"
     },
     ".stroppy.Value": {
       "allOf": [
@@ -3433,7 +3575,7 @@
       "required": [
         "key"
       ],
-      "description": "*\n Value is a variant type that can represent different types of values.\n It's used to represent values that can be of multiple types in a type-safe way."
+      "description": "*\n Value is a variant type that can represent different types of values.\n It's used to represent values that can be of multiple types in a type-safe\n way."
     },
     ".stroppy.Value.List": {
       "properties": {

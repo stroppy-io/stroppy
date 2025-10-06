@@ -6,8 +6,9 @@ import { MessageType, reflectionMergePartial, UnknownFieldHandler, WireType } fr
 
 /**
  * *
- * OtlpExport contains configuration for exporting metrics via OpenTelemetry Protocol (OTLP).
- * It specifies the endpoint and metrics prefix for telemetry data export.
+ * OtlpExport contains configuration for exporting metrics via OpenTelemetry
+ * Protocol (OTLP). It specifies the endpoint and metrics prefix for telemetry
+ * data export.
  *
  * @generated from protobuf message stroppy.OtlpExport
  */
@@ -71,7 +72,8 @@ export interface Decimal {
  */
 export interface Uuid {
     /**
-     * * String representation of UUID (e.g., "123e4567-e89b-12d3-a456-426614174000")
+     * * String representation of UUID (e.g.,
+     * "123e4567-e89b-12d3-a456-426614174000")
      *
      * @generated from protobuf field: string value = 1
      */
@@ -79,7 +81,8 @@ export interface Uuid {
 }
 /**
  * *
- * DateTime represents a point in time, independent of any time zone or calendar.
+ * DateTime represents a point in time, independent of any time zone or
+ * calendar.
  *
  * @generated from protobuf message stroppy.DateTime
  */
@@ -94,7 +97,8 @@ export interface DateTime {
 /**
  * *
  * Value is a variant type that can represent different types of values.
- * It's used to represent values that can be of multiple types in a type-safe way.
+ * It's used to represent values that can be of multiple types in a type-safe
+ * way.
  *
  * @generated from protobuf message stroppy.Value
  */
@@ -297,7 +301,8 @@ export interface Generation_Distribution {
      */
     type: Generation_Distribution_DistributionType;
     /**
-     * * Distribution parameter (e.g., standard deviation for normal distribution)
+     * * Distribution parameter (e.g., standard deviation for normal
+     * distribution)
      *
      * @generated from protobuf field: double screw = 2
      */
@@ -4194,9 +4199,9 @@ export interface QueryParamDescriptor {
      * * Regular expression pattern to replace with the parameter value default
      * is "${<param_name>}"
      *
-     * @generated from protobuf field: string replace_regex = 2
+     * @generated from protobuf field: optional string replace_regex = 2
      */
-    replaceRegex: string;
+    replaceRegex?: string;
     /**
      * * Rule for generating parameter values
      *
@@ -4206,9 +4211,22 @@ export interface QueryParamDescriptor {
     /**
      * * Database-specific parameter properties
      *
-     * @generated from protobuf field: stroppy.Value.Struct db_specific = 4
+     * @generated from protobuf field: optional stroppy.Value.Struct db_specific = 4
      */
     dbSpecific?: Value_Struct;
+}
+/**
+ * @generated from protobuf message stroppy.QueryParamGroup
+ */
+export interface QueryParamGroup {
+    /**
+     * @generated from protobuf field: string name = 1
+     */
+    name: string;
+    /**
+     * @generated from protobuf field: repeated stroppy.QueryParamDescriptor params = 2
+     */
+    params: QueryParamDescriptor[];
 }
 /**
  * *
@@ -4237,9 +4255,13 @@ export interface QueryDescriptor {
      */
     params: QueryParamDescriptor[];
     /**
+     * @generated from protobuf field: repeated stroppy.QueryParamGroup groups = 4
+     */
+    groups: QueryParamGroup[];
+    /**
      * * Database-specific query properties
      *
-     * @generated from protobuf field: stroppy.Value.Struct db_specific = 5
+     * @generated from protobuf field: optional stroppy.Value.Struct db_specific = 5
      */
     dbSpecific?: Value_Struct;
 }
@@ -4272,7 +4294,7 @@ export interface TransactionDescriptor {
     /**
      * * Database-specific transaction properties
      *
-     * @generated from protobuf field: stroppy.Value.Struct db_specific = 5
+     * @generated from protobuf field: optional stroppy.Value.Struct db_specific = 5
      */
     dbSpecific?: Value_Struct;
 }
@@ -4661,7 +4683,7 @@ class QueryParamDescriptor$Type extends MessageType<QueryParamDescriptor> {
     constructor() {
         super("stroppy.QueryParamDescriptor", [
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "replace_regex", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "replace_regex", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "generation_rule", kind: "message", T: () => Generation_Rule },
             { no: 4, name: "db_specific", kind: "message", T: () => Value_Struct }
         ]);
@@ -4669,7 +4691,6 @@ class QueryParamDescriptor$Type extends MessageType<QueryParamDescriptor> {
     create(value?: PartialMessage<QueryParamDescriptor>): QueryParamDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.name = "";
-        message.replaceRegex = "";
         if (value !== undefined)
             reflectionMergePartial<QueryParamDescriptor>(this, message, value);
         return message;
@@ -4682,13 +4703,13 @@ class QueryParamDescriptor$Type extends MessageType<QueryParamDescriptor> {
                 case /* string name */ 1:
                     message.name = reader.string();
                     break;
-                case /* string replace_regex */ 2:
+                case /* optional string replace_regex */ 2:
                     message.replaceRegex = reader.string();
                     break;
                 case /* stroppy.Generation.Rule generation_rule */ 3:
                     message.generationRule = Generation_Rule.internalBinaryRead(reader, reader.uint32(), options, message.generationRule);
                     break;
-                case /* stroppy.Value.Struct db_specific */ 4:
+                case /* optional stroppy.Value.Struct db_specific */ 4:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
                     break;
                 default:
@@ -4706,13 +4727,13 @@ class QueryParamDescriptor$Type extends MessageType<QueryParamDescriptor> {
         /* string name = 1; */
         if (message.name !== "")
             writer.tag(1, WireType.LengthDelimited).string(message.name);
-        /* string replace_regex = 2; */
-        if (message.replaceRegex !== "")
+        /* optional string replace_regex = 2; */
+        if (message.replaceRegex !== undefined)
             writer.tag(2, WireType.LengthDelimited).string(message.replaceRegex);
         /* stroppy.Generation.Rule generation_rule = 3; */
         if (message.generationRule)
             Generation_Rule.internalBinaryWrite(message.generationRule, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Value.Struct db_specific = 4; */
+        /* optional stroppy.Value.Struct db_specific = 4; */
         if (message.dbSpecific)
             Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
@@ -4726,12 +4747,68 @@ class QueryParamDescriptor$Type extends MessageType<QueryParamDescriptor> {
  */
 export const QueryParamDescriptor = new QueryParamDescriptor$Type();
 // @generated message type with reflection information, may provide speed optimized methods
+class QueryParamGroup$Type extends MessageType<QueryParamGroup> {
+    constructor() {
+        super("stroppy.QueryParamGroup", [
+            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "params", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => QueryParamDescriptor }
+        ]);
+    }
+    create(value?: PartialMessage<QueryParamGroup>): QueryParamGroup {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.name = "";
+        message.params = [];
+        if (value !== undefined)
+            reflectionMergePartial<QueryParamGroup>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: QueryParamGroup): QueryParamGroup {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string name */ 1:
+                    message.name = reader.string();
+                    break;
+                case /* repeated stroppy.QueryParamDescriptor params */ 2:
+                    message.params.push(QueryParamDescriptor.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: QueryParamGroup, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string name = 1; */
+        if (message.name !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.name);
+        /* repeated stroppy.QueryParamDescriptor params = 2; */
+        for (let i = 0; i < message.params.length; i++)
+            QueryParamDescriptor.internalBinaryWrite(message.params[i], writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.QueryParamGroup
+ */
+export const QueryParamGroup = new QueryParamGroup$Type();
+// @generated message type with reflection information, may provide speed optimized methods
 class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
     constructor() {
         super("stroppy.QueryDescriptor", [
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "sql", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "params", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => QueryParamDescriptor },
+            { no: 4, name: "groups", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => QueryParamGroup },
             { no: 5, name: "db_specific", kind: "message", T: () => Value_Struct }
         ]);
     }
@@ -4740,6 +4817,7 @@ class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
         message.name = "";
         message.sql = "";
         message.params = [];
+        message.groups = [];
         if (value !== undefined)
             reflectionMergePartial<QueryDescriptor>(this, message, value);
         return message;
@@ -4758,7 +4836,10 @@ class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
                 case /* repeated stroppy.QueryParamDescriptor params */ 3:
                     message.params.push(QueryParamDescriptor.internalBinaryRead(reader, reader.uint32(), options));
                     break;
-                case /* stroppy.Value.Struct db_specific */ 5:
+                case /* repeated stroppy.QueryParamGroup groups */ 4:
+                    message.groups.push(QueryParamGroup.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                case /* optional stroppy.Value.Struct db_specific */ 5:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
                     break;
                 default:
@@ -4782,7 +4863,10 @@ class QueryDescriptor$Type extends MessageType<QueryDescriptor> {
         /* repeated stroppy.QueryParamDescriptor params = 3; */
         for (let i = 0; i < message.params.length; i++)
             QueryParamDescriptor.internalBinaryWrite(message.params[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Value.Struct db_specific = 5; */
+        /* repeated stroppy.QueryParamGroup groups = 4; */
+        for (let i = 0; i < message.groups.length; i++)
+            QueryParamGroup.internalBinaryWrite(message.groups[i], writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* optional stroppy.Value.Struct db_specific = 5; */
         if (message.dbSpecific)
             Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
@@ -4828,7 +4912,7 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
                 case /* repeated stroppy.QueryDescriptor queries */ 3:
                     message.queries.push(QueryDescriptor.internalBinaryRead(reader, reader.uint32(), options));
                     break;
-                case /* stroppy.Value.Struct db_specific */ 5:
+                case /* optional stroppy.Value.Struct db_specific */ 5:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
                     break;
                 default:
@@ -4852,7 +4936,7 @@ class TransactionDescriptor$Type extends MessageType<TransactionDescriptor> {
         /* repeated stroppy.QueryDescriptor queries = 3; */
         for (let i = 0; i < message.queries.length; i++)
             QueryDescriptor.internalBinaryWrite(message.queries[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Value.Struct db_specific = 5; */
+        /* optional stroppy.Value.Struct db_specific = 5; */
         if (message.dbSpecific)
             Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
@@ -6570,19 +6654,11 @@ export interface FileDescriptorProto {
     sourceCodeInfo?: SourceCodeInfo;
     /**
      * The syntax of the proto file.
-     * The supported values are "proto2", "proto3", and "editions".
-     *
-     * If `edition` is present, this value must be "editions".
+     * The supported values are "proto2" and "proto3".
      *
      * @generated from protobuf field: optional string syntax = 12
      */
     syntax?: string;
-    /**
-     * The edition of the proto file.
-     *
-     * @generated from protobuf field: optional google.protobuf.Edition edition = 14
-     */
-    edition?: Edition;
 }
 /**
  * Describes a message type.
@@ -6678,86 +6754,6 @@ export interface ExtensionRangeOptions {
      * @generated from protobuf field: repeated google.protobuf.UninterpretedOption uninterpreted_option = 999
      */
     uninterpretedOption: UninterpretedOption[];
-    /**
-     * For external users: DO NOT USE. We are in the process of open sourcing
-     * extension declaration and executing internal cleanups before it can be
-     * used externally.
-     *
-     * @generated from protobuf field: repeated google.protobuf.ExtensionRangeOptions.Declaration declaration = 2
-     */
-    declaration: ExtensionRangeOptions_Declaration[];
-    /**
-     * Any features defined in the specific edition.
-     *
-     * @generated from protobuf field: optional google.protobuf.FeatureSet features = 50
-     */
-    features?: FeatureSet;
-    /**
-     * The verification state of the range.
-     * TODO: flip the default to DECLARATION once all empty ranges
-     * are marked as UNVERIFIED.
-     *
-     * @generated from protobuf field: optional google.protobuf.ExtensionRangeOptions.VerificationState verification = 3 [default = UNVERIFIED]
-     */
-    verification?: ExtensionRangeOptions_VerificationState;
-}
-/**
- * @generated from protobuf message google.protobuf.ExtensionRangeOptions.Declaration
- */
-export interface ExtensionRangeOptions_Declaration {
-    /**
-     * The extension number declared within the extension range.
-     *
-     * @generated from protobuf field: optional int32 number = 1
-     */
-    number?: number;
-    /**
-     * The fully-qualified name of the extension field. There must be a leading
-     * dot in front of the full name.
-     *
-     * @generated from protobuf field: optional string full_name = 2
-     */
-    fullName?: string;
-    /**
-     * The fully-qualified type name of the extension field. Unlike
-     * Metadata.type, Declaration.type must have a leading dot for messages
-     * and enums.
-     *
-     * @generated from protobuf field: optional string type = 3
-     */
-    type?: string;
-    /**
-     * If true, indicates that the number is reserved in the extension range,
-     * and any extension field with the number will fail to compile. Set this
-     * when a declared extension field is deleted.
-     *
-     * @generated from protobuf field: optional bool reserved = 5
-     */
-    reserved?: boolean;
-    /**
-     * If true, indicates that the extension must be defined as repeated.
-     * Otherwise the extension must be defined as optional.
-     *
-     * @generated from protobuf field: optional bool repeated = 6
-     */
-    repeated?: boolean;
-}
-/**
- * The verification state of the extension range.
- *
- * @generated from protobuf enum google.protobuf.ExtensionRangeOptions.VerificationState
- */
-export enum ExtensionRangeOptions_VerificationState {
-    /**
-     * All the extensions of the range must be declared.
-     *
-     * @generated from protobuf enum value: DECLARATION = 0;
-     */
-    DECLARATION = 0,
-    /**
-     * @generated from protobuf enum value: UNVERIFIED = 1;
-     */
-    UNVERIFIED = 1
 }
 /**
  * Describes a field within a message.
@@ -6806,6 +6802,7 @@ export interface FieldDescriptorProto {
      * For booleans, "true" or "false".
      * For strings, contains the default text contents (not escaped in any way).
      * For bytes, contains the C escaped value.  All bytes >= 128 are escaped.
+     * TODO(kenton):  Base-64 encode?
      *
      * @generated from protobuf field: optional string default_value = 7
      */
@@ -6834,12 +6831,12 @@ export interface FieldDescriptorProto {
      * If true, this is a proto3 "optional". When a proto3 field is optional, it
      * tracks presence regardless of field type.
      *
-     * When proto3_optional is true, this field must belong to a oneof to signal
-     * to old proto3 clients that presence is tracked for this field. This oneof
-     * is known as a "synthetic" oneof, and this field must be its sole member
-     * (each proto3 optional field gets its own synthetic oneof). Synthetic oneofs
-     * exist in the descriptor only, and do not generate any API. Synthetic oneofs
-     * must be ordered after all "real" oneofs.
+     * When proto3_optional is true, this field must be belong to a oneof to
+     * signal to old proto3 clients that presence is tracked for this field. This
+     * oneof is known as a "synthetic" oneof, and this field must be its sole
+     * member (each proto3 optional field gets its own synthetic oneof). Synthetic
+     * oneofs exist in the descriptor only, and do not generate any API. Synthetic
+     * oneofs must be ordered after all "real" oneofs.
      *
      * For message fields, proto3_optional doesn't create any semantic change,
      * since non-repeated message fields always track presence. However it still
@@ -6912,10 +6909,9 @@ export enum FieldDescriptorProto_Type {
     TYPE_STRING = 9,
     /**
      * Tag-delimited aggregate.
-     * Group type is deprecated and not supported after google.protobuf. However, Proto3
+     * Group type is deprecated and not supported in proto3. However, Proto3
      * implementations should still be able to parse the group wire format and
-     * treat group fields as unknown fields.  In Editions, the group wire format
-     * can be enabled via the `message_encoding` feature.
+     * treat group fields as unknown fields.
      *
      * @generated from protobuf enum value: TYPE_GROUP = 10;
      */
@@ -6976,17 +6972,13 @@ export enum FieldDescriptorProto_Label {
      */
     LABEL_OPTIONAL = 1,
     /**
-     * @generated from protobuf enum value: LABEL_REPEATED = 3;
-     */
-    LABEL_REPEATED = 3,
-    /**
-     * The required label is only allowed in google.protobuf.  In proto3 and Editions
-     * it's explicitly prohibited.  In Editions, the `field_presence` feature
-     * can be used to get this behavior.
-     *
      * @generated from protobuf enum value: LABEL_REQUIRED = 2;
      */
-    LABEL_REQUIRED = 2
+    LABEL_REQUIRED = 2,
+    /**
+     * @generated from protobuf enum value: LABEL_REPEATED = 3;
+     */
+    LABEL_REPEATED = 3
 }
 /**
  * Describes a oneof.
@@ -7255,6 +7247,10 @@ export interface FileOptions {
      */
     pyGenericServices?: boolean;
     /**
+     * @generated from protobuf field: optional bool php_generic_services = 42 [default = false]
+     */
+    phpGenericServices?: boolean;
+    /**
      * Is this file deprecated?
      * Depending on the target platform, this can emit Deprecated annotations
      * for everything in the file, or it will be completely ignored; in the very
@@ -7323,12 +7319,6 @@ export interface FileOptions {
      * @generated from protobuf field: optional string ruby_package = 45
      */
     rubyPackage?: string;
-    /**
-     * Any features defined in the specific edition.
-     *
-     * @generated from protobuf field: optional google.protobuf.FeatureSet features = 50
-     */
-    features?: FeatureSet;
     /**
      * The parser stores options it doesn't recognize here.
      * See the documentation for the "Options" section above.
@@ -7439,28 +7429,6 @@ export interface MessageOptions {
      */
     mapEntry?: boolean;
     /**
-     * Enable the legacy handling of JSON field name conflicts.  This lowercases
-     * and strips underscored from the fields before comparison in proto3 only.
-     * The new behavior takes `json_name` into account and applies to proto2 as
-     * well.
-     *
-     * This should only be used as a temporary measure against broken builds due
-     * to the change in behavior for JSON field name conflicts.
-     *
-     * TODO This is legacy behavior we plan to remove once downstream
-     * teams have had time to migrate.
-     *
-     * @deprecated
-     * @generated from protobuf field: optional bool deprecated_legacy_json_field_conflicts = 11 [deprecated = true]
-     */
-    deprecatedLegacyJsonFieldConflicts?: boolean;
-    /**
-     * Any features defined in the specific edition.
-     *
-     * @generated from protobuf field: optional google.protobuf.FeatureSet features = 12
-     */
-    features?: FeatureSet;
-    /**
      * The parser stores options it doesn't recognize here. See above.
      *
      * @generated from protobuf field: repeated google.protobuf.UninterpretedOption uninterpreted_option = 999
@@ -7474,10 +7442,8 @@ export interface FieldOptions {
     /**
      * The ctype option instructs the C++ code generator to use a different
      * representation of the field than it normally would.  See the specific
-     * options below.  This option is only implemented to support use of
-     * [ctype=CORD] and [ctype=STRING] (the default) on non-repeated fields of
-     * type "bytes" in the open source release -- sorry, we'll try to include
-     * other types in a future version!
+     * options below.  This option is not yet implemented in the open source
+     * release -- sorry, we'll try to include it in a future version!
      *
      * @generated from protobuf field: optional google.protobuf.FieldOptions.CType ctype = 1 [default = STRING]
      */
@@ -7487,9 +7453,7 @@ export interface FieldOptions {
      * a more efficient representation on the wire. Rather than repeatedly
      * writing the tag and type for each element, the entire array is encoded as
      * a single length-delimited blob. In proto3, only explicit setting it to
-     * false will avoid using packed encoding.  This option is prohibited in
-     * Editions, but the `repeated_field_encoding` feature can be used to control
-     * the behavior.
+     * false will avoid using packed encoding.
      *
      * @generated from protobuf field: optional bool packed = 2
      */
@@ -7528,23 +7492,21 @@ export interface FieldOptions {
      * call from multiple threads concurrently, while non-const methods continue
      * to require exclusive access.
      *
-     * Note that lazy message fields are still eagerly verified to check
-     * ill-formed wireformat or missing required fields. Calling IsInitialized()
-     * on the outer message would fail if the inner message has missing required
-     * fields. Failed verification would result in parsing failure (except when
-     * uninitialized messages are acceptable).
+     *
+     * Note that implementations may choose not to check required fields within
+     * a lazy sub-message.  That is, calling IsInitialized() on the outer message
+     * may return true even if the inner message has missing required fields.
+     * This is necessary because otherwise the inner message would have to be
+     * parsed in order to perform the check, defeating the purpose of lazy
+     * parsing.  An implementation which chooses not to check required fields
+     * must be consistent about it.  That is, for any particular sub-message, the
+     * implementation must either *always* check its required fields, or *never*
+     * check its required fields, regardless of whether or not the message has
+     * been parsed.
      *
      * @generated from protobuf field: optional bool lazy = 5 [default = false]
      */
     lazy?: boolean;
-    /**
-     * unverified_lazy does no correctness checks on the byte stream. This should
-     * only be used where lazy with verification is prohibitive for performance
-     * reasons.
-     *
-     * @generated from protobuf field: optional bool unverified_lazy = 15 [default = false]
-     */
-    unverifiedLazy?: boolean;
     /**
      * Is this field deprecated?
      * Depending on the target platform, this can emit Deprecated annotations
@@ -7561,49 +7523,11 @@ export interface FieldOptions {
      */
     weak?: boolean;
     /**
-     * Indicate that the field value should not be printed out when using debug
-     * formats, e.g. when the field contains sensitive credentials.
-     *
-     * @generated from protobuf field: optional bool debug_redact = 16 [default = false]
-     */
-    debugRedact?: boolean;
-    /**
-     * @generated from protobuf field: optional google.protobuf.FieldOptions.OptionRetention retention = 17
-     */
-    retention?: FieldOptions_OptionRetention;
-    /**
-     * @generated from protobuf field: repeated google.protobuf.FieldOptions.OptionTargetType targets = 19
-     */
-    targets: FieldOptions_OptionTargetType[];
-    /**
-     * @generated from protobuf field: repeated google.protobuf.FieldOptions.EditionDefault edition_defaults = 20
-     */
-    editionDefaults: FieldOptions_EditionDefault[];
-    /**
-     * Any features defined in the specific edition.
-     *
-     * @generated from protobuf field: optional google.protobuf.FeatureSet features = 21
-     */
-    features?: FeatureSet;
-    /**
      * The parser stores options it doesn't recognize here. See above.
      *
      * @generated from protobuf field: repeated google.protobuf.UninterpretedOption uninterpreted_option = 999
      */
     uninterpretedOption: UninterpretedOption[];
-}
-/**
- * @generated from protobuf message google.protobuf.FieldOptions.EditionDefault
- */
-export interface FieldOptions_EditionDefault {
-    /**
-     * @generated from protobuf field: optional google.protobuf.Edition edition = 3
-     */
-    edition?: Edition;
-    /**
-     * @generated from protobuf field: optional string value = 2
-     */
-    value?: string; // Textproto value.
 }
 /**
  * @generated from protobuf enum google.protobuf.FieldOptions.CType
@@ -7616,13 +7540,6 @@ export enum FieldOptions_CType {
      */
     STRING = 0,
     /**
-     * The option [ctype=CORD] may be applied to a non-repeated field of type
-     * "bytes". It indicates that in C++, the data should be stored in a Cord
-     * instead of a string.  For very large strings, this may reduce memory
-     * fragmentation. It may also allow better performance when parsing from a
-     * Cord, or when parsing with aliasing enabled, as the parsed Cord may then
-     * alias the original buffer.
-     *
      * @generated from protobuf enum value: CORD = 1;
      */
     CORD = 1,
@@ -7655,86 +7572,9 @@ export enum FieldOptions_JSType {
     JS_NUMBER = 2
 }
 /**
- * If set to RETENTION_SOURCE, the option will be omitted from the binary.
- * Note: as of January 2023, support for this is in progress and does not yet
- * have an effect (b/264593489).
- *
- * @generated from protobuf enum google.protobuf.FieldOptions.OptionRetention
- */
-export enum FieldOptions_OptionRetention {
-    /**
-     * @generated from protobuf enum value: RETENTION_UNKNOWN = 0;
-     */
-    RETENTION_UNKNOWN = 0,
-    /**
-     * @generated from protobuf enum value: RETENTION_RUNTIME = 1;
-     */
-    RETENTION_RUNTIME = 1,
-    /**
-     * @generated from protobuf enum value: RETENTION_SOURCE = 2;
-     */
-    RETENTION_SOURCE = 2
-}
-/**
- * This indicates the types of entities that the field may apply to when used
- * as an option. If it is unset, then the field may be freely used as an
- * option on any kind of entity. Note: as of January 2023, support for this is
- * in progress and does not yet have an effect (b/264593489).
- *
- * @generated from protobuf enum google.protobuf.FieldOptions.OptionTargetType
- */
-export enum FieldOptions_OptionTargetType {
-    /**
-     * @generated from protobuf enum value: TARGET_TYPE_UNKNOWN = 0;
-     */
-    TARGET_TYPE_UNKNOWN = 0,
-    /**
-     * @generated from protobuf enum value: TARGET_TYPE_FILE = 1;
-     */
-    TARGET_TYPE_FILE = 1,
-    /**
-     * @generated from protobuf enum value: TARGET_TYPE_EXTENSION_RANGE = 2;
-     */
-    TARGET_TYPE_EXTENSION_RANGE = 2,
-    /**
-     * @generated from protobuf enum value: TARGET_TYPE_MESSAGE = 3;
-     */
-    TARGET_TYPE_MESSAGE = 3,
-    /**
-     * @generated from protobuf enum value: TARGET_TYPE_FIELD = 4;
-     */
-    TARGET_TYPE_FIELD = 4,
-    /**
-     * @generated from protobuf enum value: TARGET_TYPE_ONEOF = 5;
-     */
-    TARGET_TYPE_ONEOF = 5,
-    /**
-     * @generated from protobuf enum value: TARGET_TYPE_ENUM = 6;
-     */
-    TARGET_TYPE_ENUM = 6,
-    /**
-     * @generated from protobuf enum value: TARGET_TYPE_ENUM_ENTRY = 7;
-     */
-    TARGET_TYPE_ENUM_ENTRY = 7,
-    /**
-     * @generated from protobuf enum value: TARGET_TYPE_SERVICE = 8;
-     */
-    TARGET_TYPE_SERVICE = 8,
-    /**
-     * @generated from protobuf enum value: TARGET_TYPE_METHOD = 9;
-     */
-    TARGET_TYPE_METHOD = 9
-}
-/**
  * @generated from protobuf message google.protobuf.OneofOptions
  */
 export interface OneofOptions {
-    /**
-     * Any features defined in the specific edition.
-     *
-     * @generated from protobuf field: optional google.protobuf.FeatureSet features = 1
-     */
-    features?: FeatureSet;
     /**
      * The parser stores options it doesn't recognize here. See above.
      *
@@ -7763,24 +7603,6 @@ export interface EnumOptions {
      */
     deprecated?: boolean;
     /**
-     * Enable the legacy handling of JSON field name conflicts.  This lowercases
-     * and strips underscored from the fields before comparison in proto3 only.
-     * The new behavior takes `json_name` into account and applies to proto2 as
-     * well.
-     * TODO Remove this legacy behavior once downstream teams have
-     * had time to migrate.
-     *
-     * @deprecated
-     * @generated from protobuf field: optional bool deprecated_legacy_json_field_conflicts = 6 [deprecated = true]
-     */
-    deprecatedLegacyJsonFieldConflicts?: boolean;
-    /**
-     * Any features defined in the specific edition.
-     *
-     * @generated from protobuf field: optional google.protobuf.FeatureSet features = 7
-     */
-    features?: FeatureSet;
-    /**
      * The parser stores options it doesn't recognize here. See above.
      *
      * @generated from protobuf field: repeated google.protobuf.UninterpretedOption uninterpreted_option = 999
@@ -7801,20 +7623,6 @@ export interface EnumValueOptions {
      */
     deprecated?: boolean;
     /**
-     * Any features defined in the specific edition.
-     *
-     * @generated from protobuf field: optional google.protobuf.FeatureSet features = 2
-     */
-    features?: FeatureSet;
-    /**
-     * Indicate that fields annotated with this enum value should not be printed
-     * out when using debug formats, e.g. when the field contains sensitive
-     * credentials.
-     *
-     * @generated from protobuf field: optional bool debug_redact = 3 [default = false]
-     */
-    debugRedact?: boolean;
-    /**
      * The parser stores options it doesn't recognize here. See above.
      *
      * @generated from protobuf field: repeated google.protobuf.UninterpretedOption uninterpreted_option = 999
@@ -7825,12 +7633,6 @@ export interface EnumValueOptions {
  * @generated from protobuf message google.protobuf.ServiceOptions
  */
 export interface ServiceOptions {
-    /**
-     * Any features defined in the specific edition.
-     *
-     * @generated from protobuf field: optional google.protobuf.FeatureSet features = 34
-     */
-    features?: FeatureSet;
     // Note:  Field numbers 1 through 32 are reserved for Google's internal RPC
     //   framework.  We apologize for hoarding these numbers to ourselves, but
     //   we were already using them long before we decided to release Protocol
@@ -7874,12 +7676,6 @@ export interface MethodOptions {
      * @generated from protobuf field: optional google.protobuf.MethodOptions.IdempotencyLevel idempotency_level = 34 [default = IDEMPOTENCY_UNKNOWN]
      */
     idempotencyLevel?: MethodOptions_IdempotencyLevel;
-    /**
-     * Any features defined in the specific edition.
-     *
-     * @generated from protobuf field: optional google.protobuf.FeatureSet features = 35
-     */
-    features?: FeatureSet;
     /**
      * The parser stores options it doesn't recognize here. See above.
      *
@@ -7959,8 +7755,8 @@ export interface UninterpretedOption {
  * The name of the uninterpreted option.  Each string represents a segment in
  * a dot-separated name.  is_extension is true iff a segment represents an
  * extension (denoted with parentheses in options specs in .proto files).
- * E.g.,{ ["foo", false], ["bar.baz", true], ["moo", false] } represents
- * "foo.(bar.baz).moo".
+ * E.g.,{ ["foo", false], ["bar.baz", true], ["qux", false] } represents
+ * "foo.(bar.baz).qux".
  *
  * @generated from protobuf message google.protobuf.UninterpretedOption.NamePart
  */
@@ -7973,197 +7769,6 @@ export interface UninterpretedOption_NamePart {
      * @generated from protobuf field: required bool is_extension = 2
      */
     isExtension: boolean;
-}
-// ===================================================================
-// Features
-
-/**
- * TODO Enums in C++ gencode (and potentially other languages) are
- * not well scoped.  This means that each of the feature enums below can clash
- * with each other.  The short names we've chosen maximize call-site
- * readability, but leave us very open to this scenario.  A future feature will
- * be designed and implemented to handle this, hopefully before we ever hit a
- * conflict here.
- *
- * @generated from protobuf message google.protobuf.FeatureSet
- */
-export interface FeatureSet {
-    /**
-     * @generated from protobuf field: optional google.protobuf.FeatureSet.FieldPresence field_presence = 1
-     */
-    fieldPresence?: FeatureSet_FieldPresence;
-    /**
-     * @generated from protobuf field: optional google.protobuf.FeatureSet.EnumType enum_type = 2
-     */
-    enumType?: FeatureSet_EnumType;
-    /**
-     * @generated from protobuf field: optional google.protobuf.FeatureSet.RepeatedFieldEncoding repeated_field_encoding = 3
-     */
-    repeatedFieldEncoding?: FeatureSet_RepeatedFieldEncoding;
-    /**
-     * @generated from protobuf field: optional google.protobuf.FeatureSet.Utf8Validation utf8_validation = 4
-     */
-    utf8Validation?: FeatureSet_Utf8Validation;
-    /**
-     * @generated from protobuf field: optional google.protobuf.FeatureSet.MessageEncoding message_encoding = 5
-     */
-    messageEncoding?: FeatureSet_MessageEncoding;
-    /**
-     * @generated from protobuf field: optional google.protobuf.FeatureSet.JsonFormat json_format = 6
-     */
-    jsonFormat?: FeatureSet_JsonFormat;
-}
-/**
- * @generated from protobuf enum google.protobuf.FeatureSet.FieldPresence
- */
-export enum FeatureSet_FieldPresence {
-    /**
-     * @generated from protobuf enum value: FIELD_PRESENCE_UNKNOWN = 0;
-     */
-    FIELD_PRESENCE_UNKNOWN = 0,
-    /**
-     * @generated from protobuf enum value: EXPLICIT = 1;
-     */
-    EXPLICIT = 1,
-    /**
-     * @generated from protobuf enum value: IMPLICIT = 2;
-     */
-    IMPLICIT = 2,
-    /**
-     * @generated from protobuf enum value: LEGACY_REQUIRED = 3;
-     */
-    LEGACY_REQUIRED = 3
-}
-/**
- * @generated from protobuf enum google.protobuf.FeatureSet.EnumType
- */
-export enum FeatureSet_EnumType {
-    /**
-     * @generated from protobuf enum value: ENUM_TYPE_UNKNOWN = 0;
-     */
-    ENUM_TYPE_UNKNOWN = 0,
-    /**
-     * @generated from protobuf enum value: OPEN = 1;
-     */
-    OPEN = 1,
-    /**
-     * @generated from protobuf enum value: CLOSED = 2;
-     */
-    CLOSED = 2
-}
-/**
- * @generated from protobuf enum google.protobuf.FeatureSet.RepeatedFieldEncoding
- */
-export enum FeatureSet_RepeatedFieldEncoding {
-    /**
-     * @generated from protobuf enum value: REPEATED_FIELD_ENCODING_UNKNOWN = 0;
-     */
-    REPEATED_FIELD_ENCODING_UNKNOWN = 0,
-    /**
-     * @generated from protobuf enum value: PACKED = 1;
-     */
-    PACKED = 1,
-    /**
-     * @generated from protobuf enum value: EXPANDED = 2;
-     */
-    EXPANDED = 2
-}
-/**
- * @generated from protobuf enum google.protobuf.FeatureSet.Utf8Validation
- */
-export enum FeatureSet_Utf8Validation {
-    /**
-     * @generated from protobuf enum value: UTF8_VALIDATION_UNKNOWN = 0;
-     */
-    UTF8_VALIDATION_UNKNOWN = 0,
-    /**
-     * @generated from protobuf enum value: VERIFY = 2;
-     */
-    VERIFY = 2,
-    /**
-     * @generated from protobuf enum value: NONE = 3;
-     */
-    NONE = 3
-}
-/**
- * @generated from protobuf enum google.protobuf.FeatureSet.MessageEncoding
- */
-export enum FeatureSet_MessageEncoding {
-    /**
-     * @generated from protobuf enum value: MESSAGE_ENCODING_UNKNOWN = 0;
-     */
-    MESSAGE_ENCODING_UNKNOWN = 0,
-    /**
-     * @generated from protobuf enum value: LENGTH_PREFIXED = 1;
-     */
-    LENGTH_PREFIXED = 1,
-    /**
-     * @generated from protobuf enum value: DELIMITED = 2;
-     */
-    DELIMITED = 2
-}
-/**
- * @generated from protobuf enum google.protobuf.FeatureSet.JsonFormat
- */
-export enum FeatureSet_JsonFormat {
-    /**
-     * @generated from protobuf enum value: JSON_FORMAT_UNKNOWN = 0;
-     */
-    JSON_FORMAT_UNKNOWN = 0,
-    /**
-     * @generated from protobuf enum value: ALLOW = 1;
-     */
-    ALLOW = 1,
-    /**
-     * @generated from protobuf enum value: LEGACY_BEST_EFFORT = 2;
-     */
-    LEGACY_BEST_EFFORT = 2
-}
-/**
- * A compiled specification for the defaults of a set of features.  These
- * messages are generated from FeatureSet extensions and can be used to seed
- * feature resolution. The resolution with this object becomes a simple search
- * for the closest matching edition, followed by proto merges.
- *
- * @generated from protobuf message google.protobuf.FeatureSetDefaults
- */
-export interface FeatureSetDefaults {
-    /**
-     * @generated from protobuf field: repeated google.protobuf.FeatureSetDefaults.FeatureSetEditionDefault defaults = 1
-     */
-    defaults: FeatureSetDefaults_FeatureSetEditionDefault[];
-    /**
-     * The minimum supported edition (inclusive) when this was constructed.
-     * Editions before this will not have defaults.
-     *
-     * @generated from protobuf field: optional google.protobuf.Edition minimum_edition = 4
-     */
-    minimumEdition?: Edition;
-    /**
-     * The maximum known edition (inclusive) when this was constructed. Editions
-     * after this will not have reliable defaults.
-     *
-     * @generated from protobuf field: optional google.protobuf.Edition maximum_edition = 5
-     */
-    maximumEdition?: Edition;
-}
-/**
- * A map from every known edition with a unique set of defaults to its
- * defaults. Not all editions may be contained here.  For a given edition,
- * the defaults at the closest matching edition ordered at or before it should
- * be used.  This field must be in strict ascending order by edition.
- *
- * @generated from protobuf message google.protobuf.FeatureSetDefaults.FeatureSetEditionDefault
- */
-export interface FeatureSetDefaults_FeatureSetEditionDefault {
-    /**
-     * @generated from protobuf field: optional google.protobuf.Edition edition = 3
-     */
-    edition?: Edition;
-    /**
-     * @generated from protobuf field: optional google.protobuf.FeatureSet features = 2
-     */
-    features?: FeatureSet;
 }
 // ===================================================================
 // Optional source code info
@@ -8233,8 +7838,8 @@ export interface SourceCodeInfo_Location {
      * location.
      *
      * Each element is a field number or an index.  They form a path from
-     * the root FileDescriptorProto to the place where the definition appears.
-     * For example, this path:
+     * the root FileDescriptorProto to the place where the definition.  For
+     * example, this path:
      *   [ 4, 3, 2, 7, 1 ]
      * refers to:
      *   file.message_type(3)  // 4, 3
@@ -8294,13 +7899,13 @@ export interface SourceCodeInfo_Location {
      *   // Comment attached to baz.
      *   // Another line attached to baz.
      *
-     *   // Comment attached to moo.
+     *   // Comment attached to qux.
      *   //
-     *   // Another line attached to moo.
-     *   optional double moo = 4;
+     *   // Another line attached to qux.
+     *   optional double qux = 4;
      *
      *   // Detached comment for corge. This is not leading or trailing comments
-     *   // to moo or corge because there are blank lines separating it from
+     *   // to qux or corge because there are blank lines separating it from
      *   // both.
      *
      *   // Detached comment for corge paragraph 2.
@@ -8369,111 +7974,12 @@ export interface GeneratedCodeInfo_Annotation {
     begin?: number;
     /**
      * Identifies the ending offset in bytes in the generated code that
-     * relates to the identified object. The end offset should be one past
+     * relates to the identified offset. The end offset should be one past
      * the last relevant byte (so the length of the text = end - begin).
      *
      * @generated from protobuf field: optional int32 end = 4
      */
     end?: number;
-    /**
-     * @generated from protobuf field: optional google.protobuf.GeneratedCodeInfo.Annotation.Semantic semantic = 5
-     */
-    semantic?: GeneratedCodeInfo_Annotation_Semantic;
-}
-/**
- * Represents the identified object's effect on the element in the original
- * .proto file.
- *
- * @generated from protobuf enum google.protobuf.GeneratedCodeInfo.Annotation.Semantic
- */
-export enum GeneratedCodeInfo_Annotation_Semantic {
-    /**
-     * There is no effect or the effect is indescribable.
-     *
-     * @generated from protobuf enum value: NONE = 0;
-     */
-    NONE = 0,
-    /**
-     * The element is set or otherwise mutated.
-     *
-     * @generated from protobuf enum value: SET = 1;
-     */
-    SET = 1,
-    /**
-     * An alias to the element is returned.
-     *
-     * @generated from protobuf enum value: ALIAS = 2;
-     */
-    ALIAS = 2
-}
-/**
- * The full set of known editions.
- *
- * @generated from protobuf enum google.protobuf.Edition
- */
-export enum Edition {
-    /**
-     * A placeholder for an unknown edition value.
-     *
-     * @generated from protobuf enum value: EDITION_UNKNOWN = 0;
-     */
-    EDITION_UNKNOWN = 0,
-    /**
-     * Legacy syntax "editions".  These pre-date editions, but behave much like
-     * distinct editions.  These can't be used to specify the edition of proto
-     * files, but feature definitions must supply proto2/proto3 defaults for
-     * backwards compatibility.
-     *
-     * @generated from protobuf enum value: EDITION_PROTO2 = 998;
-     */
-    EDITION_PROTO2 = 998,
-    /**
-     * @generated from protobuf enum value: EDITION_PROTO3 = 999;
-     */
-    EDITION_PROTO3 = 999,
-    /**
-     * Editions that have been released.  The specific values are arbitrary and
-     * should not be depended on, but they will always be time-ordered for easy
-     * comparison.
-     *
-     * @generated from protobuf enum value: EDITION_2023 = 1000;
-     */
-    EDITION_2023 = 1000,
-    /**
-     * @generated from protobuf enum value: EDITION_2024 = 1001;
-     */
-    EDITION_2024 = 1001,
-    /**
-     * Placeholder editions for testing feature resolution.  These should not be
-     * used or relyed on outside of tests.
-     *
-     * @generated from protobuf enum value: EDITION_1_TEST_ONLY = 1;
-     */
-    EDITION_1_TEST_ONLY = 1,
-    /**
-     * @generated from protobuf enum value: EDITION_2_TEST_ONLY = 2;
-     */
-    EDITION_2_TEST_ONLY = 2,
-    /**
-     * @generated from protobuf enum value: EDITION_99997_TEST_ONLY = 99997;
-     */
-    EDITION_99997_TEST_ONLY = 99997,
-    /**
-     * @generated from protobuf enum value: EDITION_99998_TEST_ONLY = 99998;
-     */
-    EDITION_99998_TEST_ONLY = 99998,
-    /**
-     * @generated from protobuf enum value: EDITION_99999_TEST_ONLY = 99999;
-     */
-    EDITION_99999_TEST_ONLY = 99999,
-    /**
-     * Placeholder for specifying unbounded edition support.  This should only
-     * ever be used by plugins that can expect to never require any changes to
-     * support a new edition.
-     *
-     * @generated from protobuf enum value: EDITION_MAX = 2147483647;
-     */
-    EDITION_MAX = 2147483647
 }
 // @generated message type with reflection information, may provide speed optimized methods
 class FileDescriptorSet$Type extends MessageType<FileDescriptorSet> {
@@ -8537,8 +8043,7 @@ class FileDescriptorProto$Type extends MessageType<FileDescriptorProto> {
             { no: 7, name: "extension", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => FieldDescriptorProto },
             { no: 8, name: "options", kind: "message", T: () => FileOptions },
             { no: 9, name: "source_code_info", kind: "message", T: () => SourceCodeInfo },
-            { no: 12, name: "syntax", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
-            { no: 14, name: "edition", kind: "enum", opt: true, T: () => ["google.protobuf.Edition", Edition] }
+            { no: 12, name: "syntax", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
         ]);
     }
     create(value?: PartialMessage<FileDescriptorProto>): FileDescriptorProto {
@@ -8603,9 +8108,6 @@ class FileDescriptorProto$Type extends MessageType<FileDescriptorProto> {
                 case /* optional string syntax */ 12:
                     message.syntax = reader.string();
                     break;
-                case /* optional google.protobuf.Edition edition */ 14:
-                    message.edition = reader.int32();
-                    break;
                 default:
                     let u = options.readUnknownField;
                     if (u === "throw")
@@ -8654,9 +8156,6 @@ class FileDescriptorProto$Type extends MessageType<FileDescriptorProto> {
         /* optional string syntax = 12; */
         if (message.syntax !== undefined)
             writer.tag(12, WireType.LengthDelimited).string(message.syntax);
-        /* optional google.protobuf.Edition edition = 14; */
-        if (message.edition !== undefined)
-            writer.tag(14, WireType.Varint).int32(message.edition);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -8901,16 +8400,12 @@ export const DescriptorProto_ReservedRange = new DescriptorProto_ReservedRange$T
 class ExtensionRangeOptions$Type extends MessageType<ExtensionRangeOptions> {
     constructor() {
         super("google.protobuf.ExtensionRangeOptions", [
-            { no: 999, name: "uninterpreted_option", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => UninterpretedOption },
-            { no: 2, name: "declaration", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => ExtensionRangeOptions_Declaration },
-            { no: 50, name: "features", kind: "message", T: () => FeatureSet },
-            { no: 3, name: "verification", kind: "enum", opt: true, T: () => ["google.protobuf.ExtensionRangeOptions.VerificationState", ExtensionRangeOptions_VerificationState] }
+            { no: 999, name: "uninterpreted_option", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => UninterpretedOption }
         ]);
     }
     create(value?: PartialMessage<ExtensionRangeOptions>): ExtensionRangeOptions {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.uninterpretedOption = [];
-        message.declaration = [];
         if (value !== undefined)
             reflectionMergePartial<ExtensionRangeOptions>(this, message, value);
         return message;
@@ -8922,15 +8417,6 @@ class ExtensionRangeOptions$Type extends MessageType<ExtensionRangeOptions> {
             switch (fieldNo) {
                 case /* repeated google.protobuf.UninterpretedOption uninterpreted_option */ 999:
                     message.uninterpretedOption.push(UninterpretedOption.internalBinaryRead(reader, reader.uint32(), options));
-                    break;
-                case /* repeated google.protobuf.ExtensionRangeOptions.Declaration declaration */ 2:
-                    message.declaration.push(ExtensionRangeOptions_Declaration.internalBinaryRead(reader, reader.uint32(), options));
-                    break;
-                case /* optional google.protobuf.FeatureSet features */ 50:
-                    message.features = FeatureSet.internalBinaryRead(reader, reader.uint32(), options, message.features);
-                    break;
-                case /* optional google.protobuf.ExtensionRangeOptions.VerificationState verification = 3 [default = UNVERIFIED] */ 3:
-                    message.verification = reader.int32();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -8944,15 +8430,6 @@ class ExtensionRangeOptions$Type extends MessageType<ExtensionRangeOptions> {
         return message;
     }
     internalBinaryWrite(message: ExtensionRangeOptions, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* repeated google.protobuf.ExtensionRangeOptions.Declaration declaration = 2; */
-        for (let i = 0; i < message.declaration.length; i++)
-            ExtensionRangeOptions_Declaration.internalBinaryWrite(message.declaration[i], writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        /* optional google.protobuf.ExtensionRangeOptions.VerificationState verification = 3 [default = UNVERIFIED]; */
-        if (message.verification !== undefined)
-            writer.tag(3, WireType.Varint).int32(message.verification);
-        /* optional google.protobuf.FeatureSet features = 50; */
-        if (message.features)
-            FeatureSet.internalBinaryWrite(message.features, writer.tag(50, WireType.LengthDelimited).fork(), options).join();
         /* repeated google.protobuf.UninterpretedOption uninterpreted_option = 999; */
         for (let i = 0; i < message.uninterpretedOption.length; i++)
             UninterpretedOption.internalBinaryWrite(message.uninterpretedOption[i], writer.tag(999, WireType.LengthDelimited).fork(), options).join();
@@ -8966,80 +8443,6 @@ class ExtensionRangeOptions$Type extends MessageType<ExtensionRangeOptions> {
  * @generated MessageType for protobuf message google.protobuf.ExtensionRangeOptions
  */
 export const ExtensionRangeOptions = new ExtensionRangeOptions$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class ExtensionRangeOptions_Declaration$Type extends MessageType<ExtensionRangeOptions_Declaration> {
-    constructor() {
-        super("google.protobuf.ExtensionRangeOptions.Declaration", [
-            { no: 1, name: "number", kind: "scalar", opt: true, T: 5 /*ScalarType.INT32*/ },
-            { no: 2, name: "full_name", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "type", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
-            { no: 5, name: "reserved", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
-            { no: 6, name: "repeated", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ }
-        ]);
-    }
-    create(value?: PartialMessage<ExtensionRangeOptions_Declaration>): ExtensionRangeOptions_Declaration {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<ExtensionRangeOptions_Declaration>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ExtensionRangeOptions_Declaration): ExtensionRangeOptions_Declaration {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* optional int32 number */ 1:
-                    message.number = reader.int32();
-                    break;
-                case /* optional string full_name */ 2:
-                    message.fullName = reader.string();
-                    break;
-                case /* optional string type */ 3:
-                    message.type = reader.string();
-                    break;
-                case /* optional bool reserved */ 5:
-                    message.reserved = reader.bool();
-                    break;
-                case /* optional bool repeated */ 6:
-                    message.repeated = reader.bool();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: ExtensionRangeOptions_Declaration, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* optional int32 number = 1; */
-        if (message.number !== undefined)
-            writer.tag(1, WireType.Varint).int32(message.number);
-        /* optional string full_name = 2; */
-        if (message.fullName !== undefined)
-            writer.tag(2, WireType.LengthDelimited).string(message.fullName);
-        /* optional string type = 3; */
-        if (message.type !== undefined)
-            writer.tag(3, WireType.LengthDelimited).string(message.type);
-        /* optional bool reserved = 5; */
-        if (message.reserved !== undefined)
-            writer.tag(5, WireType.Varint).bool(message.reserved);
-        /* optional bool repeated = 6; */
-        if (message.repeated !== undefined)
-            writer.tag(6, WireType.Varint).bool(message.repeated);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message google.protobuf.ExtensionRangeOptions.Declaration
- */
-export const ExtensionRangeOptions_Declaration = new ExtensionRangeOptions_Declaration$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class FieldDescriptorProto$Type extends MessageType<FieldDescriptorProto> {
     constructor() {
@@ -9555,6 +8958,7 @@ class FileOptions$Type extends MessageType<FileOptions> {
             { no: 16, name: "cc_generic_services", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 17, name: "java_generic_services", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 18, name: "py_generic_services", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
+            { no: 42, name: "php_generic_services", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 23, name: "deprecated", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 31, name: "cc_enable_arenas", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 36, name: "objc_class_prefix", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
@@ -9564,7 +8968,6 @@ class FileOptions$Type extends MessageType<FileOptions> {
             { no: 41, name: "php_namespace", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
             { no: 44, name: "php_metadata_namespace", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
             { no: 45, name: "ruby_package", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
-            { no: 50, name: "features", kind: "message", T: () => FeatureSet },
             { no: 999, name: "uninterpreted_option", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => UninterpretedOption }
         ]);
     }
@@ -9610,6 +9013,9 @@ class FileOptions$Type extends MessageType<FileOptions> {
                 case /* optional bool py_generic_services = 18 [default = false] */ 18:
                     message.pyGenericServices = reader.bool();
                     break;
+                case /* optional bool php_generic_services = 42 [default = false] */ 42:
+                    message.phpGenericServices = reader.bool();
+                    break;
                 case /* optional bool deprecated = 23 [default = false] */ 23:
                     message.deprecated = reader.bool();
                     break;
@@ -9636,9 +9042,6 @@ class FileOptions$Type extends MessageType<FileOptions> {
                     break;
                 case /* optional string ruby_package */ 45:
                     message.rubyPackage = reader.string();
-                    break;
-                case /* optional google.protobuf.FeatureSet features */ 50:
-                    message.features = FeatureSet.internalBinaryRead(reader, reader.uint32(), options, message.features);
                     break;
                 case /* repeated google.protobuf.UninterpretedOption uninterpreted_option */ 999:
                     message.uninterpretedOption.push(UninterpretedOption.internalBinaryRead(reader, reader.uint32(), options));
@@ -9706,15 +9109,15 @@ class FileOptions$Type extends MessageType<FileOptions> {
         /* optional string php_namespace = 41; */
         if (message.phpNamespace !== undefined)
             writer.tag(41, WireType.LengthDelimited).string(message.phpNamespace);
+        /* optional bool php_generic_services = 42 [default = false]; */
+        if (message.phpGenericServices !== undefined)
+            writer.tag(42, WireType.Varint).bool(message.phpGenericServices);
         /* optional string php_metadata_namespace = 44; */
         if (message.phpMetadataNamespace !== undefined)
             writer.tag(44, WireType.LengthDelimited).string(message.phpMetadataNamespace);
         /* optional string ruby_package = 45; */
         if (message.rubyPackage !== undefined)
             writer.tag(45, WireType.LengthDelimited).string(message.rubyPackage);
-        /* optional google.protobuf.FeatureSet features = 50; */
-        if (message.features)
-            FeatureSet.internalBinaryWrite(message.features, writer.tag(50, WireType.LengthDelimited).fork(), options).join();
         /* repeated google.protobuf.UninterpretedOption uninterpreted_option = 999; */
         for (let i = 0; i < message.uninterpretedOption.length; i++)
             UninterpretedOption.internalBinaryWrite(message.uninterpretedOption[i], writer.tag(999, WireType.LengthDelimited).fork(), options).join();
@@ -9736,8 +9139,6 @@ class MessageOptions$Type extends MessageType<MessageOptions> {
             { no: 2, name: "no_standard_descriptor_accessor", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 3, name: "deprecated", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 7, name: "map_entry", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
-            { no: 11, name: "deprecated_legacy_json_field_conflicts", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
-            { no: 12, name: "features", kind: "message", T: () => FeatureSet },
             { no: 999, name: "uninterpreted_option", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => UninterpretedOption }
         ]);
     }
@@ -9764,12 +9165,6 @@ class MessageOptions$Type extends MessageType<MessageOptions> {
                     break;
                 case /* optional bool map_entry */ 7:
                     message.mapEntry = reader.bool();
-                    break;
-                case /* optional bool deprecated_legacy_json_field_conflicts = 11 [deprecated = true] */ 11:
-                    message.deprecatedLegacyJsonFieldConflicts = reader.bool();
-                    break;
-                case /* optional google.protobuf.FeatureSet features */ 12:
-                    message.features = FeatureSet.internalBinaryRead(reader, reader.uint32(), options, message.features);
                     break;
                 case /* repeated google.protobuf.UninterpretedOption uninterpreted_option */ 999:
                     message.uninterpretedOption.push(UninterpretedOption.internalBinaryRead(reader, reader.uint32(), options));
@@ -9798,12 +9193,6 @@ class MessageOptions$Type extends MessageType<MessageOptions> {
         /* optional bool map_entry = 7; */
         if (message.mapEntry !== undefined)
             writer.tag(7, WireType.Varint).bool(message.mapEntry);
-        /* optional bool deprecated_legacy_json_field_conflicts = 11 [deprecated = true]; */
-        if (message.deprecatedLegacyJsonFieldConflicts !== undefined)
-            writer.tag(11, WireType.Varint).bool(message.deprecatedLegacyJsonFieldConflicts);
-        /* optional google.protobuf.FeatureSet features = 12; */
-        if (message.features)
-            FeatureSet.internalBinaryWrite(message.features, writer.tag(12, WireType.LengthDelimited).fork(), options).join();
         /* repeated google.protobuf.UninterpretedOption uninterpreted_option = 999; */
         for (let i = 0; i < message.uninterpretedOption.length; i++)
             UninterpretedOption.internalBinaryWrite(message.uninterpretedOption[i], writer.tag(999, WireType.LengthDelimited).fork(), options).join();
@@ -9825,21 +9214,13 @@ class FieldOptions$Type extends MessageType<FieldOptions> {
             { no: 2, name: "packed", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 6, name: "jstype", kind: "enum", opt: true, T: () => ["google.protobuf.FieldOptions.JSType", FieldOptions_JSType] },
             { no: 5, name: "lazy", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
-            { no: 15, name: "unverified_lazy", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 3, name: "deprecated", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 10, name: "weak", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
-            { no: 16, name: "debug_redact", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
-            { no: 17, name: "retention", kind: "enum", opt: true, T: () => ["google.protobuf.FieldOptions.OptionRetention", FieldOptions_OptionRetention] },
-            { no: 19, name: "targets", kind: "enum", repeat: 2 /*RepeatType.UNPACKED*/, T: () => ["google.protobuf.FieldOptions.OptionTargetType", FieldOptions_OptionTargetType] },
-            { no: 20, name: "edition_defaults", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => FieldOptions_EditionDefault },
-            { no: 21, name: "features", kind: "message", T: () => FeatureSet },
             { no: 999, name: "uninterpreted_option", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => UninterpretedOption }
         ]);
     }
     create(value?: PartialMessage<FieldOptions>): FieldOptions {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.targets = [];
-        message.editionDefaults = [];
         message.uninterpretedOption = [];
         if (value !== undefined)
             reflectionMergePartial<FieldOptions>(this, message, value);
@@ -9862,33 +9243,11 @@ class FieldOptions$Type extends MessageType<FieldOptions> {
                 case /* optional bool lazy = 5 [default = false] */ 5:
                     message.lazy = reader.bool();
                     break;
-                case /* optional bool unverified_lazy = 15 [default = false] */ 15:
-                    message.unverifiedLazy = reader.bool();
-                    break;
                 case /* optional bool deprecated = 3 [default = false] */ 3:
                     message.deprecated = reader.bool();
                     break;
                 case /* optional bool weak = 10 [default = false] */ 10:
                     message.weak = reader.bool();
-                    break;
-                case /* optional bool debug_redact = 16 [default = false] */ 16:
-                    message.debugRedact = reader.bool();
-                    break;
-                case /* optional google.protobuf.FieldOptions.OptionRetention retention */ 17:
-                    message.retention = reader.int32();
-                    break;
-                case /* repeated google.protobuf.FieldOptions.OptionTargetType targets */ 19:
-                    if (wireType === WireType.LengthDelimited)
-                        for (let e = reader.int32() + reader.pos; reader.pos < e;)
-                            message.targets.push(reader.int32());
-                    else
-                        message.targets.push(reader.int32());
-                    break;
-                case /* repeated google.protobuf.FieldOptions.EditionDefault edition_defaults */ 20:
-                    message.editionDefaults.push(FieldOptions_EditionDefault.internalBinaryRead(reader, reader.uint32(), options));
-                    break;
-                case /* optional google.protobuf.FeatureSet features */ 21:
-                    message.features = FeatureSet.internalBinaryRead(reader, reader.uint32(), options, message.features);
                     break;
                 case /* repeated google.protobuf.UninterpretedOption uninterpreted_option */ 999:
                     message.uninterpretedOption.push(UninterpretedOption.internalBinaryRead(reader, reader.uint32(), options));
@@ -9923,24 +9282,6 @@ class FieldOptions$Type extends MessageType<FieldOptions> {
         /* optional bool weak = 10 [default = false]; */
         if (message.weak !== undefined)
             writer.tag(10, WireType.Varint).bool(message.weak);
-        /* optional bool unverified_lazy = 15 [default = false]; */
-        if (message.unverifiedLazy !== undefined)
-            writer.tag(15, WireType.Varint).bool(message.unverifiedLazy);
-        /* optional bool debug_redact = 16 [default = false]; */
-        if (message.debugRedact !== undefined)
-            writer.tag(16, WireType.Varint).bool(message.debugRedact);
-        /* optional google.protobuf.FieldOptions.OptionRetention retention = 17; */
-        if (message.retention !== undefined)
-            writer.tag(17, WireType.Varint).int32(message.retention);
-        /* repeated google.protobuf.FieldOptions.OptionTargetType targets = 19; */
-        for (let i = 0; i < message.targets.length; i++)
-            writer.tag(19, WireType.Varint).int32(message.targets[i]);
-        /* repeated google.protobuf.FieldOptions.EditionDefault edition_defaults = 20; */
-        for (let i = 0; i < message.editionDefaults.length; i++)
-            FieldOptions_EditionDefault.internalBinaryWrite(message.editionDefaults[i], writer.tag(20, WireType.LengthDelimited).fork(), options).join();
-        /* optional google.protobuf.FeatureSet features = 21; */
-        if (message.features)
-            FeatureSet.internalBinaryWrite(message.features, writer.tag(21, WireType.LengthDelimited).fork(), options).join();
         /* repeated google.protobuf.UninterpretedOption uninterpreted_option = 999; */
         for (let i = 0; i < message.uninterpretedOption.length; i++)
             UninterpretedOption.internalBinaryWrite(message.uninterpretedOption[i], writer.tag(999, WireType.LengthDelimited).fork(), options).join();
@@ -9955,63 +9296,9 @@ class FieldOptions$Type extends MessageType<FieldOptions> {
  */
 export const FieldOptions = new FieldOptions$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class FieldOptions_EditionDefault$Type extends MessageType<FieldOptions_EditionDefault> {
-    constructor() {
-        super("google.protobuf.FieldOptions.EditionDefault", [
-            { no: 3, name: "edition", kind: "enum", opt: true, T: () => ["google.protobuf.Edition", Edition] },
-            { no: 2, name: "value", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
-        ]);
-    }
-    create(value?: PartialMessage<FieldOptions_EditionDefault>): FieldOptions_EditionDefault {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<FieldOptions_EditionDefault>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: FieldOptions_EditionDefault): FieldOptions_EditionDefault {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* optional google.protobuf.Edition edition */ 3:
-                    message.edition = reader.int32();
-                    break;
-                case /* optional string value */ 2:
-                    message.value = reader.string();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: FieldOptions_EditionDefault, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* optional string value = 2; */
-        if (message.value !== undefined)
-            writer.tag(2, WireType.LengthDelimited).string(message.value);
-        /* optional google.protobuf.Edition edition = 3; */
-        if (message.edition !== undefined)
-            writer.tag(3, WireType.Varint).int32(message.edition);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message google.protobuf.FieldOptions.EditionDefault
- */
-export const FieldOptions_EditionDefault = new FieldOptions_EditionDefault$Type();
-// @generated message type with reflection information, may provide speed optimized methods
 class OneofOptions$Type extends MessageType<OneofOptions> {
     constructor() {
         super("google.protobuf.OneofOptions", [
-            { no: 1, name: "features", kind: "message", T: () => FeatureSet },
             { no: 999, name: "uninterpreted_option", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => UninterpretedOption }
         ]);
     }
@@ -10027,9 +9314,6 @@ class OneofOptions$Type extends MessageType<OneofOptions> {
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* optional google.protobuf.FeatureSet features */ 1:
-                    message.features = FeatureSet.internalBinaryRead(reader, reader.uint32(), options, message.features);
-                    break;
                 case /* repeated google.protobuf.UninterpretedOption uninterpreted_option */ 999:
                     message.uninterpretedOption.push(UninterpretedOption.internalBinaryRead(reader, reader.uint32(), options));
                     break;
@@ -10045,9 +9329,6 @@ class OneofOptions$Type extends MessageType<OneofOptions> {
         return message;
     }
     internalBinaryWrite(message: OneofOptions, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* optional google.protobuf.FeatureSet features = 1; */
-        if (message.features)
-            FeatureSet.internalBinaryWrite(message.features, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
         /* repeated google.protobuf.UninterpretedOption uninterpreted_option = 999; */
         for (let i = 0; i < message.uninterpretedOption.length; i++)
             UninterpretedOption.internalBinaryWrite(message.uninterpretedOption[i], writer.tag(999, WireType.LengthDelimited).fork(), options).join();
@@ -10067,8 +9348,6 @@ class EnumOptions$Type extends MessageType<EnumOptions> {
         super("google.protobuf.EnumOptions", [
             { no: 2, name: "allow_alias", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 3, name: "deprecated", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
-            { no: 6, name: "deprecated_legacy_json_field_conflicts", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
-            { no: 7, name: "features", kind: "message", T: () => FeatureSet },
             { no: 999, name: "uninterpreted_option", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => UninterpretedOption }
         ]);
     }
@@ -10089,12 +9368,6 @@ class EnumOptions$Type extends MessageType<EnumOptions> {
                     break;
                 case /* optional bool deprecated = 3 [default = false] */ 3:
                     message.deprecated = reader.bool();
-                    break;
-                case /* optional bool deprecated_legacy_json_field_conflicts = 6 [deprecated = true] */ 6:
-                    message.deprecatedLegacyJsonFieldConflicts = reader.bool();
-                    break;
-                case /* optional google.protobuf.FeatureSet features */ 7:
-                    message.features = FeatureSet.internalBinaryRead(reader, reader.uint32(), options, message.features);
                     break;
                 case /* repeated google.protobuf.UninterpretedOption uninterpreted_option */ 999:
                     message.uninterpretedOption.push(UninterpretedOption.internalBinaryRead(reader, reader.uint32(), options));
@@ -10117,12 +9390,6 @@ class EnumOptions$Type extends MessageType<EnumOptions> {
         /* optional bool deprecated = 3 [default = false]; */
         if (message.deprecated !== undefined)
             writer.tag(3, WireType.Varint).bool(message.deprecated);
-        /* optional bool deprecated_legacy_json_field_conflicts = 6 [deprecated = true]; */
-        if (message.deprecatedLegacyJsonFieldConflicts !== undefined)
-            writer.tag(6, WireType.Varint).bool(message.deprecatedLegacyJsonFieldConflicts);
-        /* optional google.protobuf.FeatureSet features = 7; */
-        if (message.features)
-            FeatureSet.internalBinaryWrite(message.features, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
         /* repeated google.protobuf.UninterpretedOption uninterpreted_option = 999; */
         for (let i = 0; i < message.uninterpretedOption.length; i++)
             UninterpretedOption.internalBinaryWrite(message.uninterpretedOption[i], writer.tag(999, WireType.LengthDelimited).fork(), options).join();
@@ -10141,8 +9408,6 @@ class EnumValueOptions$Type extends MessageType<EnumValueOptions> {
     constructor() {
         super("google.protobuf.EnumValueOptions", [
             { no: 1, name: "deprecated", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
-            { no: 2, name: "features", kind: "message", T: () => FeatureSet },
-            { no: 3, name: "debug_redact", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 999, name: "uninterpreted_option", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => UninterpretedOption }
         ]);
     }
@@ -10160,12 +9425,6 @@ class EnumValueOptions$Type extends MessageType<EnumValueOptions> {
             switch (fieldNo) {
                 case /* optional bool deprecated = 1 [default = false] */ 1:
                     message.deprecated = reader.bool();
-                    break;
-                case /* optional google.protobuf.FeatureSet features */ 2:
-                    message.features = FeatureSet.internalBinaryRead(reader, reader.uint32(), options, message.features);
-                    break;
-                case /* optional bool debug_redact = 3 [default = false] */ 3:
-                    message.debugRedact = reader.bool();
                     break;
                 case /* repeated google.protobuf.UninterpretedOption uninterpreted_option */ 999:
                     message.uninterpretedOption.push(UninterpretedOption.internalBinaryRead(reader, reader.uint32(), options));
@@ -10185,12 +9444,6 @@ class EnumValueOptions$Type extends MessageType<EnumValueOptions> {
         /* optional bool deprecated = 1 [default = false]; */
         if (message.deprecated !== undefined)
             writer.tag(1, WireType.Varint).bool(message.deprecated);
-        /* optional google.protobuf.FeatureSet features = 2; */
-        if (message.features)
-            FeatureSet.internalBinaryWrite(message.features, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        /* optional bool debug_redact = 3 [default = false]; */
-        if (message.debugRedact !== undefined)
-            writer.tag(3, WireType.Varint).bool(message.debugRedact);
         /* repeated google.protobuf.UninterpretedOption uninterpreted_option = 999; */
         for (let i = 0; i < message.uninterpretedOption.length; i++)
             UninterpretedOption.internalBinaryWrite(message.uninterpretedOption[i], writer.tag(999, WireType.LengthDelimited).fork(), options).join();
@@ -10208,7 +9461,6 @@ export const EnumValueOptions = new EnumValueOptions$Type();
 class ServiceOptions$Type extends MessageType<ServiceOptions> {
     constructor() {
         super("google.protobuf.ServiceOptions", [
-            { no: 34, name: "features", kind: "message", T: () => FeatureSet },
             { no: 33, name: "deprecated", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 999, name: "uninterpreted_option", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => UninterpretedOption }
         ]);
@@ -10225,9 +9477,6 @@ class ServiceOptions$Type extends MessageType<ServiceOptions> {
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* optional google.protobuf.FeatureSet features */ 34:
-                    message.features = FeatureSet.internalBinaryRead(reader, reader.uint32(), options, message.features);
-                    break;
                 case /* optional bool deprecated = 33 [default = false] */ 33:
                     message.deprecated = reader.bool();
                     break;
@@ -10249,9 +9498,6 @@ class ServiceOptions$Type extends MessageType<ServiceOptions> {
         /* optional bool deprecated = 33 [default = false]; */
         if (message.deprecated !== undefined)
             writer.tag(33, WireType.Varint).bool(message.deprecated);
-        /* optional google.protobuf.FeatureSet features = 34; */
-        if (message.features)
-            FeatureSet.internalBinaryWrite(message.features, writer.tag(34, WireType.LengthDelimited).fork(), options).join();
         /* repeated google.protobuf.UninterpretedOption uninterpreted_option = 999; */
         for (let i = 0; i < message.uninterpretedOption.length; i++)
             UninterpretedOption.internalBinaryWrite(message.uninterpretedOption[i], writer.tag(999, WireType.LengthDelimited).fork(), options).join();
@@ -10271,7 +9517,6 @@ class MethodOptions$Type extends MessageType<MethodOptions> {
         super("google.protobuf.MethodOptions", [
             { no: 33, name: "deprecated", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 34, name: "idempotency_level", kind: "enum", opt: true, T: () => ["google.protobuf.MethodOptions.IdempotencyLevel", MethodOptions_IdempotencyLevel] },
-            { no: 35, name: "features", kind: "message", T: () => FeatureSet },
             { no: 999, name: "uninterpreted_option", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => UninterpretedOption }
         ]);
     }
@@ -10292,9 +9537,6 @@ class MethodOptions$Type extends MessageType<MethodOptions> {
                     break;
                 case /* optional google.protobuf.MethodOptions.IdempotencyLevel idempotency_level = 34 [default = IDEMPOTENCY_UNKNOWN] */ 34:
                     message.idempotencyLevel = reader.int32();
-                    break;
-                case /* optional google.protobuf.FeatureSet features */ 35:
-                    message.features = FeatureSet.internalBinaryRead(reader, reader.uint32(), options, message.features);
                     break;
                 case /* repeated google.protobuf.UninterpretedOption uninterpreted_option */ 999:
                     message.uninterpretedOption.push(UninterpretedOption.internalBinaryRead(reader, reader.uint32(), options));
@@ -10317,9 +9559,6 @@ class MethodOptions$Type extends MessageType<MethodOptions> {
         /* optional google.protobuf.MethodOptions.IdempotencyLevel idempotency_level = 34 [default = IDEMPOTENCY_UNKNOWN]; */
         if (message.idempotencyLevel !== undefined)
             writer.tag(34, WireType.Varint).int32(message.idempotencyLevel);
-        /* optional google.protobuf.FeatureSet features = 35; */
-        if (message.features)
-            FeatureSet.internalBinaryWrite(message.features, writer.tag(35, WireType.LengthDelimited).fork(), options).join();
         /* repeated google.protobuf.UninterpretedOption uninterpreted_option = 999; */
         for (let i = 0; i < message.uninterpretedOption.length; i++)
             UninterpretedOption.internalBinaryWrite(message.uninterpretedOption[i], writer.tag(999, WireType.LengthDelimited).fork(), options).join();
@@ -10477,201 +9716,6 @@ class UninterpretedOption_NamePart$Type extends MessageType<UninterpretedOption_
  * @generated MessageType for protobuf message google.protobuf.UninterpretedOption.NamePart
  */
 export const UninterpretedOption_NamePart = new UninterpretedOption_NamePart$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class FeatureSet$Type extends MessageType<FeatureSet> {
-    constructor() {
-        super("google.protobuf.FeatureSet", [
-            { no: 1, name: "field_presence", kind: "enum", opt: true, T: () => ["google.protobuf.FeatureSet.FieldPresence", FeatureSet_FieldPresence] },
-            { no: 2, name: "enum_type", kind: "enum", opt: true, T: () => ["google.protobuf.FeatureSet.EnumType", FeatureSet_EnumType] },
-            { no: 3, name: "repeated_field_encoding", kind: "enum", opt: true, T: () => ["google.protobuf.FeatureSet.RepeatedFieldEncoding", FeatureSet_RepeatedFieldEncoding] },
-            { no: 4, name: "utf8_validation", kind: "enum", opt: true, T: () => ["google.protobuf.FeatureSet.Utf8Validation", FeatureSet_Utf8Validation] },
-            { no: 5, name: "message_encoding", kind: "enum", opt: true, T: () => ["google.protobuf.FeatureSet.MessageEncoding", FeatureSet_MessageEncoding] },
-            { no: 6, name: "json_format", kind: "enum", opt: true, T: () => ["google.protobuf.FeatureSet.JsonFormat", FeatureSet_JsonFormat] }
-        ]);
-    }
-    create(value?: PartialMessage<FeatureSet>): FeatureSet {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<FeatureSet>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: FeatureSet): FeatureSet {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* optional google.protobuf.FeatureSet.FieldPresence field_presence */ 1:
-                    message.fieldPresence = reader.int32();
-                    break;
-                case /* optional google.protobuf.FeatureSet.EnumType enum_type */ 2:
-                    message.enumType = reader.int32();
-                    break;
-                case /* optional google.protobuf.FeatureSet.RepeatedFieldEncoding repeated_field_encoding */ 3:
-                    message.repeatedFieldEncoding = reader.int32();
-                    break;
-                case /* optional google.protobuf.FeatureSet.Utf8Validation utf8_validation */ 4:
-                    message.utf8Validation = reader.int32();
-                    break;
-                case /* optional google.protobuf.FeatureSet.MessageEncoding message_encoding */ 5:
-                    message.messageEncoding = reader.int32();
-                    break;
-                case /* optional google.protobuf.FeatureSet.JsonFormat json_format */ 6:
-                    message.jsonFormat = reader.int32();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: FeatureSet, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* optional google.protobuf.FeatureSet.FieldPresence field_presence = 1; */
-        if (message.fieldPresence !== undefined)
-            writer.tag(1, WireType.Varint).int32(message.fieldPresence);
-        /* optional google.protobuf.FeatureSet.EnumType enum_type = 2; */
-        if (message.enumType !== undefined)
-            writer.tag(2, WireType.Varint).int32(message.enumType);
-        /* optional google.protobuf.FeatureSet.RepeatedFieldEncoding repeated_field_encoding = 3; */
-        if (message.repeatedFieldEncoding !== undefined)
-            writer.tag(3, WireType.Varint).int32(message.repeatedFieldEncoding);
-        /* optional google.protobuf.FeatureSet.Utf8Validation utf8_validation = 4; */
-        if (message.utf8Validation !== undefined)
-            writer.tag(4, WireType.Varint).int32(message.utf8Validation);
-        /* optional google.protobuf.FeatureSet.MessageEncoding message_encoding = 5; */
-        if (message.messageEncoding !== undefined)
-            writer.tag(5, WireType.Varint).int32(message.messageEncoding);
-        /* optional google.protobuf.FeatureSet.JsonFormat json_format = 6; */
-        if (message.jsonFormat !== undefined)
-            writer.tag(6, WireType.Varint).int32(message.jsonFormat);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message google.protobuf.FeatureSet
- */
-export const FeatureSet = new FeatureSet$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class FeatureSetDefaults$Type extends MessageType<FeatureSetDefaults> {
-    constructor() {
-        super("google.protobuf.FeatureSetDefaults", [
-            { no: 1, name: "defaults", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => FeatureSetDefaults_FeatureSetEditionDefault },
-            { no: 4, name: "minimum_edition", kind: "enum", opt: true, T: () => ["google.protobuf.Edition", Edition] },
-            { no: 5, name: "maximum_edition", kind: "enum", opt: true, T: () => ["google.protobuf.Edition", Edition] }
-        ]);
-    }
-    create(value?: PartialMessage<FeatureSetDefaults>): FeatureSetDefaults {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        message.defaults = [];
-        if (value !== undefined)
-            reflectionMergePartial<FeatureSetDefaults>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: FeatureSetDefaults): FeatureSetDefaults {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* repeated google.protobuf.FeatureSetDefaults.FeatureSetEditionDefault defaults */ 1:
-                    message.defaults.push(FeatureSetDefaults_FeatureSetEditionDefault.internalBinaryRead(reader, reader.uint32(), options));
-                    break;
-                case /* optional google.protobuf.Edition minimum_edition */ 4:
-                    message.minimumEdition = reader.int32();
-                    break;
-                case /* optional google.protobuf.Edition maximum_edition */ 5:
-                    message.maximumEdition = reader.int32();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: FeatureSetDefaults, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* repeated google.protobuf.FeatureSetDefaults.FeatureSetEditionDefault defaults = 1; */
-        for (let i = 0; i < message.defaults.length; i++)
-            FeatureSetDefaults_FeatureSetEditionDefault.internalBinaryWrite(message.defaults[i], writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* optional google.protobuf.Edition minimum_edition = 4; */
-        if (message.minimumEdition !== undefined)
-            writer.tag(4, WireType.Varint).int32(message.minimumEdition);
-        /* optional google.protobuf.Edition maximum_edition = 5; */
-        if (message.maximumEdition !== undefined)
-            writer.tag(5, WireType.Varint).int32(message.maximumEdition);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message google.protobuf.FeatureSetDefaults
- */
-export const FeatureSetDefaults = new FeatureSetDefaults$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class FeatureSetDefaults_FeatureSetEditionDefault$Type extends MessageType<FeatureSetDefaults_FeatureSetEditionDefault> {
-    constructor() {
-        super("google.protobuf.FeatureSetDefaults.FeatureSetEditionDefault", [
-            { no: 3, name: "edition", kind: "enum", opt: true, T: () => ["google.protobuf.Edition", Edition] },
-            { no: 2, name: "features", kind: "message", T: () => FeatureSet }
-        ]);
-    }
-    create(value?: PartialMessage<FeatureSetDefaults_FeatureSetEditionDefault>): FeatureSetDefaults_FeatureSetEditionDefault {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<FeatureSetDefaults_FeatureSetEditionDefault>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: FeatureSetDefaults_FeatureSetEditionDefault): FeatureSetDefaults_FeatureSetEditionDefault {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* optional google.protobuf.Edition edition */ 3:
-                    message.edition = reader.int32();
-                    break;
-                case /* optional google.protobuf.FeatureSet features */ 2:
-                    message.features = FeatureSet.internalBinaryRead(reader, reader.uint32(), options, message.features);
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: FeatureSetDefaults_FeatureSetEditionDefault, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* optional google.protobuf.FeatureSet features = 2; */
-        if (message.features)
-            FeatureSet.internalBinaryWrite(message.features, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        /* optional google.protobuf.Edition edition = 3; */
-        if (message.edition !== undefined)
-            writer.tag(3, WireType.Varint).int32(message.edition);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message google.protobuf.FeatureSetDefaults.FeatureSetEditionDefault
- */
-export const FeatureSetDefaults_FeatureSetEditionDefault = new FeatureSetDefaults_FeatureSetEditionDefault$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class SourceCodeInfo$Type extends MessageType<SourceCodeInfo> {
     constructor() {
@@ -10866,8 +9910,7 @@ class GeneratedCodeInfo_Annotation$Type extends MessageType<GeneratedCodeInfo_An
             { no: 1, name: "path", kind: "scalar", repeat: 1 /*RepeatType.PACKED*/, T: 5 /*ScalarType.INT32*/ },
             { no: 2, name: "source_file", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "begin", kind: "scalar", opt: true, T: 5 /*ScalarType.INT32*/ },
-            { no: 4, name: "end", kind: "scalar", opt: true, T: 5 /*ScalarType.INT32*/ },
-            { no: 5, name: "semantic", kind: "enum", opt: true, T: () => ["google.protobuf.GeneratedCodeInfo.Annotation.Semantic", GeneratedCodeInfo_Annotation_Semantic] }
+            { no: 4, name: "end", kind: "scalar", opt: true, T: 5 /*ScalarType.INT32*/ }
         ]);
     }
     create(value?: PartialMessage<GeneratedCodeInfo_Annotation>): GeneratedCodeInfo_Annotation {
@@ -10898,9 +9941,6 @@ class GeneratedCodeInfo_Annotation$Type extends MessageType<GeneratedCodeInfo_An
                 case /* optional int32 end */ 4:
                     message.end = reader.int32();
                     break;
-                case /* optional google.protobuf.GeneratedCodeInfo.Annotation.Semantic semantic */ 5:
-                    message.semantic = reader.int32();
-                    break;
                 default:
                     let u = options.readUnknownField;
                     if (u === "throw")
@@ -10929,9 +9969,6 @@ class GeneratedCodeInfo_Annotation$Type extends MessageType<GeneratedCodeInfo_An
         /* optional int32 end = 4; */
         if (message.end !== undefined)
             writer.tag(4, WireType.Varint).int32(message.end);
-        /* optional google.protobuf.GeneratedCodeInfo.Annotation.Semantic semantic = 5; */
-        if (message.semantic !== undefined)
-            writer.tag(5, WireType.Varint).int32(message.semantic);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -11037,6 +10074,7 @@ import { PbLong, typeofJsonValue } from "@protobuf-ts/runtime";
  * encoded in JSON format as "3s", while 3 seconds and 1 nanosecond should
  * be expressed in JSON format as "3.000000001s", and 3 seconds and 1
  * microsecond should be expressed in JSON format as "3.000001s".
+ *
  *
  *
  * @generated from protobuf message google.protobuf.Duration
@@ -11203,6 +10241,7 @@ export const Duration = new Duration$Type();
  *       rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);
  *     }
  *
+ * The JSON representation for `Empty` is empty JSON object `{}`.
  *
  * @generated from protobuf message google.protobuf.Empty
  */
@@ -11331,6 +10370,7 @@ export const Empty = new Empty$Type();
  *     Timestamp timestamp = Timestamp.newBuilder().setSeconds(millis / 1000)
  *         .setNanos((int) ((millis % 1000) * 1000000)).build();
  *
+ *
  * Example 5: Compute Timestamp from Java `Instant.now()`.
  *
  *     Instant now = Instant.now();
@@ -11338,6 +10378,7 @@ export const Empty = new Empty$Type();
  *     Timestamp timestamp =
  *         Timestamp.newBuilder().setSeconds(now.getEpochSecond())
  *             .setNanos(now.getNano()).build();
+ *
  *
  * Example 6: Compute Timestamp from current time in Python.
  *
@@ -11368,8 +10409,9 @@ export const Empty = new Empty$Type();
  * [`strftime`](https://docs.python.org/2/library/time.html#time.strftime) with
  * the time format spec '%Y-%m-%dT%H:%M:%S.%fZ'. Likewise, in Java, one can use
  * the Joda Time's [`ISODateTimeFormat.dateTime()`](
- * http://joda-time.sourceforge.net/apidocs/org/joda/time/format/ISODateTimeFormat.html#dateTime()
+ * http://www.joda.org/joda-time/apidocs/org/joda/time/format/ISODateTimeFormat.html#dateTime%2D%2D
  * ) to obtain a formatter capable of generating timestamps in this format.
+ *
  *
  *
  * @generated from protobuf message google.protobuf.Timestamp
