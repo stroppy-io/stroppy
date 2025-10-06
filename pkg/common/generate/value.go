@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"iter"
 	"math/rand/v2"
 	"time"
 
@@ -38,27 +37,41 @@ func NewTupleGenerator(
 		return func() (*stroppy.Value, error) { return nil, ErrNoGenerators }
 	}
 
-	var seqFunc iter.Seq2[[]*stroppy.Value, error] = func(yield func([]*stroppy.Value, error) bool) {
+	// Result type to send both value and error through channel
+	type result struct {
+		vals []*stroppy.Value
+		err  error
+	}
+
+	// Create buffered channel for results
+	resultCh := make(chan result, 1)
+
+	// Start goroutine to generate cartesian product
+	go func() {
+		defer close(resultCh)
+
 		// Recursive function to iterate through all combinations
 		var iterate func(depth int, current []*stroppy.Value) bool
 		iterate = func(depth int, current []*stroppy.Value) bool {
 			if depth == len(genInfos) {
-				result := make([]*stroppy.Value, len(current))
-				copy(result, current)
+				res := make([]*stroppy.Value, len(current))
+				copy(res, current)
 
-				return yield(result, nil)
+				resultCh <- result{vals: res, err: nil}
+
+				return true
 			}
 
 			gen, err := NewValueGenerator(seed, genInfos[depth])
 			if err != nil {
-				yield(nil, err)
+				resultCh <- result{vals: nil, err: err}
 
 				return false
 			}
 
 			val, err := gen.Next()
 			if err != nil {
-				yield(nil, err)
+				resultCh <- result{vals: nil, err: err}
 
 				return false
 			}
@@ -71,7 +84,7 @@ func NewTupleGenerator(
 
 				newVal, err := gen.Next()
 				if err != nil {
-					yield(nil, err)
+					resultCh <- result{vals: nil, err: err}
 
 					return false
 				}
@@ -85,16 +98,23 @@ func NewTupleGenerator(
 		}
 
 		iterate(0, make([]*stroppy.Value, len(genInfos)))
-	}
+	}()
 
-	pull, _ := iter.Pull2(seqFunc)
-
+	// Return function that reads from channel
 	return func() (*stroppy.Value, error) {
-		vals, err, _ := pull()
+		res, ok := <-resultCh
+		if !ok {
+			// Channel closed, no more values
+			return nil, nil
+		}
+
+		if res.err != nil {
+			return nil, res.err
+		}
 
 		return &stroppy.Value{
-			Type: &stroppy.Value_List_{List: &stroppy.Value_List{Values: vals}},
-		}, err
+			Type: &stroppy.Value_List_{List: &stroppy.Value_List{Values: res.vals}},
+		}, nil
 	}
 }
 

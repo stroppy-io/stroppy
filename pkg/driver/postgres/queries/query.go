@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	ErrNoColumnGen = errors.New("no generator for column")
-	ErrNoGroupGen  = errors.New("no generator for group")
+	ErrNoColumnGen      = errors.New("no generator for column")
+	ErrNoGroupGen       = errors.New("no generator for group")
+	ErrInvalidGroupType = errors.New("invalid group type")
 )
 
 // FIXME: is there any better place for it? delete comment if no.
@@ -70,13 +71,27 @@ func newQuery(
 			)
 		}
 
-		list := protoValues.GetType().(*stroppy.Value_List_) //nolint:errcheck,forcetypeassert // allow panic
+		list, ok := protoValues.GetType().(*stroppy.Value_List_)
+		if !ok {
+			return nil, fmt.Errorf(
+				"%w: '%T' != 'Value_List_': value is '%v'",
+				ErrInvalidGroupType,
+				protoValues.GetType(),
+				protoValues.GetType(),
+			)
+		}
+
 		paramsValues = append(paramsValues, list.List.GetValues()...)
 	}
 
 	resSQL := descriptor.GetSql()
 
-	for idx, param := range descriptor.GetParams() {
+	params := descriptor.GetParams()
+	for _, group := range descriptor.GetGroups() {
+		params = append(params, group.GetParams()...)
+	}
+
+	for idx, param := range params {
 		if pattern := param.GetReplaceRegex(); pattern != "" {
 			// TODO: add pattern validation at the config reading stage
 			re, ok := reStorage.Get(pattern)

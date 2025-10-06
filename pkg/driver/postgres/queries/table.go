@@ -29,13 +29,14 @@ func newCreateTable(
 	tableName string,
 	columns []*stroppy.ColumnDescriptor,
 ) (*stroppy.DriverTransaction, error) { //nolint: unparam // maybe later
-	columnsStr := make([]string, len(columns))
+	columnsStr := make([]string, 0, len(columns))
+	pkColumns := make([]string, 0)
 
-	for i, column := range columns {
+	for _, column := range columns {
 		constants := make([]string, 0)
 
 		if column.GetPrimaryKey() {
-			constants = append(constants, "PRIMARY KEY")
+			pkColumns = append(pkColumns, column.GetName())
 		}
 
 		if !column.GetNullable() {
@@ -50,13 +51,15 @@ func newCreateTable(
 			constants = []string{column.GetConstraint()}
 		}
 
-		columnsStr[i] = fmt.Sprintf(
+		columnsStr = append(columnsStr, fmt.Sprintf(
 			"%s %s %s",
 			column.GetName(),
 			column.GetSqlType(),
 			strings.Join(constants, " "),
-		)
+		))
 	}
+
+	columnsStr = append(columnsStr, "PRIMARY KEY ("+strings.Join(pkColumns, ", ")+")")
 
 	return &stroppy.DriverTransaction{
 		Queries: []*stroppy.DriverQuery{
