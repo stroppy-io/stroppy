@@ -2,12 +2,14 @@ package generate
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
@@ -22,6 +24,98 @@ type ValueGenerator interface {
 type GenAbleStruct interface {
 	GetGenerationRule() *stroppy.Generation_Rule
 	GetName() string
+}
+
+var ErrNoGenerators = errors.New("no generators provided")
+
+//nolint:gocognit // it's hard indeed
+func NewTupleGenerator(
+	seed uint64,
+	genInfos []GenAbleStruct,
+) valueGeneratorFn { //nolint:revive // revive is annoying to use
+	if len(genInfos) == 0 {
+		return func() (*stroppy.Value, error) { return nil, ErrNoGenerators }
+	}
+
+	// Result type to send both value and error through channel
+	type result struct {
+		vals []*stroppy.Value
+		err  error
+	}
+
+	// Create buffered channel for results
+	resultCh := make(chan result, 1)
+
+	// Start goroutine to generate cartesian product
+	go func() {
+		defer close(resultCh)
+
+		// Recursive function to iterate through all combinations
+		var iterate func(depth int, current []*stroppy.Value) bool
+		iterate = func(depth int, current []*stroppy.Value) bool {
+			if depth == len(genInfos) {
+				res := make([]*stroppy.Value, len(current))
+				copy(res, current)
+
+				resultCh <- result{vals: res, err: nil}
+
+				return true
+			}
+
+			gen, err := NewValueGenerator(seed, genInfos[depth])
+			if err != nil {
+				resultCh <- result{vals: nil, err: err}
+
+				return false
+			}
+
+			val, err := gen.Next()
+			if err != nil {
+				resultCh <- result{vals: nil, err: err}
+
+				return false
+			}
+
+			for {
+				current[depth] = val
+				if !iterate(depth+1, current) {
+					return false
+				}
+
+				newVal, err := gen.Next()
+				if err != nil {
+					resultCh <- result{vals: nil, err: err}
+
+					return false
+				}
+
+				if proto.Equal(val, newVal) {
+					return true
+				}
+
+				val = newVal
+			}
+		}
+
+		iterate(0, make([]*stroppy.Value, len(genInfos)))
+	}()
+
+	// Return function that reads from channel
+	return func() (*stroppy.Value, error) {
+		res, ok := <-resultCh
+		if !ok {
+			// Channel closed, no more values
+			return nil, nil
+		}
+
+		if res.err != nil {
+			return nil, res.err
+		}
+
+		return &stroppy.Value{
+			Type: &stroppy.Value_List_{List: &stroppy.Value_List{Values: res.vals}},
+		}, nil
+	}
 }
 
 func NewValueGenerator( //nolint: ireturn // need as lib part
@@ -42,7 +136,6 @@ func NewValueGenerator( //nolint: ireturn // need as lib part
 
 func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 	seed uint64,
-
 	rule *stroppy.Generation_Rule,
 ) (ValueGenerator, error) {
 	switch rule.GetType().(type) {

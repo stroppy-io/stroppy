@@ -12,12 +12,12 @@ option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
  */
 message IndexDescriptor {
     /** Name of the index */
-    string name = 1 [(validate.rules).string.min_len = 1];
+    string name = 1 [ (validate.rules).string.min_len = 1 ];
     /** List of column names that are part of this index */
-    repeated string columns = 2 [(validate.rules).repeated = {
-        unique: true,
-        items: {message: {required: true}}
-    }];
+    repeated string columns = 2 [ (validate.rules).repeated = {
+        unique : true,
+        items : {message : {required : true}}
+    } ];
     /** Type of index (e.g., BTREE, HASH, etc.) */
     string type = 3;
     /** Whether this is a unique index */
@@ -31,9 +31,9 @@ message IndexDescriptor {
  */
 message ColumnDescriptor {
     /** Name of the column */
-    string name = 1 [(validate.rules).string.min_len = 1];
+    string name = 1 [ (validate.rules).string.min_len = 1 ];
     /** SQL data type of the column */
-    string sql_type = 2 [(validate.rules).string.min_len = 1];
+    string sql_type = 2 [ (validate.rules).string.min_len = 1 ];
     /** Whether the column can be NULL */
     bool nullable = 3;
     /** Whether the column is part of the primary key */
@@ -49,10 +49,10 @@ message ColumnDescriptor {
  */
 message TableDescriptor {
     /** Name of the table */
-    string name = 1 [(validate.rules).string.min_len = 1];
+    string name = 1 [ (validate.rules).string.min_len = 1 ];
     /** List of indexes defined on this table */
     repeated IndexDescriptor table_indexes = 3
-    [(validate.rules).repeated = {items: {message: {required: true}}}];
+        [ (validate.rules).repeated = {items : {message : {required : true}}} ];
     /** Table-level constraints */
     string constraint = 5;
     /** Database-specific table properties */
@@ -66,15 +66,20 @@ message TableDescriptor {
  */
 message QueryParamDescriptor {
     /** Name of the parameter */
-    string name = 1 [(validate.rules).string.min_len = 1];
+    string name = 1 [ (validate.rules).string.min_len = 1 ];
     /** Regular expression pattern to replace with the parameter value default
      * is "${<param_name>}" */
-    string replace_regex = 2;
+    optional string replace_regex = 2;
     /** Rule for generating parameter values */
     Generation.Rule generation_rule = 3
-    [(validate.rules).message.required = true];
+        [ (validate.rules).message.required = true ];
     /** Database-specific parameter properties */
-    Value.Struct db_specific = 4;
+    optional Value.Struct db_specific = 4;
+}
+
+message QueryParamGroup {
+    string name = 1;
+    repeated QueryParamDescriptor params = 2;
 }
 
 /**
@@ -83,14 +88,15 @@ message QueryParamDescriptor {
  */
 message QueryDescriptor {
     /** Name of the query */
-    string name = 1 [(validate.rules).string.min_len = 1];
+    string name = 1 [ (validate.rules).string.min_len = 1 ];
     /** SQL query text */
-    string sql = 2 [(validate.rules).string.min_len = 1];
+    string sql = 2 [ (validate.rules).string.min_len = 1 ];
     /** Parameters used in the query */
     repeated QueryParamDescriptor params = 3
-    [(validate.rules).repeated = {items: {message: {required: true}}}];
+        [ (validate.rules).repeated = {items : {message : {required : true}}} ];
+    repeated QueryParamGroup groups = 4;
     /** Database-specific query properties */
-    Value.Struct db_specific = 5;
+    optional Value.Struct db_specific = 5;
 }
 
 /**
@@ -111,16 +117,16 @@ enum TxIsolationLevel {
  */
 message TransactionDescriptor {
     /** Name of the transaction */
-    string name = 1 [(validate.rules).string.min_len = 1];
+    string name = 1 [ (validate.rules).string.min_len = 1 ];
     /** Transaction isolation level */
     TxIsolationLevel isolation_level = 2;
     /** List of queries to execute in this transaction */
-    repeated QueryDescriptor queries = 3 [(validate.rules).repeated = {
-        min_items: 1,
-        items: {message: {required: true}}
-    }];
+    repeated QueryDescriptor queries = 3 [ (validate.rules).repeated = {
+        min_items : 1,
+        items : {message : {required : true}}
+    } ];
     /** Database-specific transaction properties */
-    Value.Struct db_specific = 5;
+    optional Value.Struct db_specific = 5;
 }
 
 /**
@@ -148,7 +154,7 @@ message UnitDescriptor {
 message WorkloadUnitDescriptor {
     UnitDescriptor descriptor = 6;
     /** Number of times to execute this unit */
-    uint64 count = 5 [(validate.rules).uint64.gt = 0];
+    uint64 count = 5 [ (validate.rules).uint64.gt = 0 ];
 }
 
 /**
@@ -157,15 +163,14 @@ message WorkloadUnitDescriptor {
  */
 message WorkloadDescriptor {
     /** Name of the step */
-    string name = 1 [(validate.rules).string.min_len = 1];
+    string name = 1 [ (validate.rules).string.min_len = 1 ];
     /** Whether to execute all operations in this workload asynchronously */
     bool async = 2;
     /** List of operations to perform in this step */
-    repeated WorkloadUnitDescriptor units = 3 [(validate.rules).repeated = {
-        min_items: 1,
-        items: {message: {required: true}}
-    }];
-
+    repeated WorkloadUnitDescriptor units = 3 [ (validate.rules).repeated = {
+        min_items : 1,
+        items : {message : {required : true}}
+    } ];
 }
 
 /**
@@ -174,10 +179,10 @@ message WorkloadDescriptor {
  */
 message BenchmarkDescriptor {
     /** Name of the benchmark */
-    string name = 1 [(validate.rules).string.min_len = 1];
+    string name = 1 [ (validate.rules).string.min_len = 1 ];
     /** List of steps to execute in the benchmark */
-    repeated WorkloadDescriptor workloads = 100 [(validate.rules).repeated = {
-        min_items: 1,
-        items: {message: {required: true}}
-    }];
+    repeated WorkloadDescriptor workloads = 100 [ (validate.rules).repeated = {
+        min_items : 1,
+        items : {message : {required : true}}
+    } ];
 }

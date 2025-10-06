@@ -106,6 +106,7 @@
     - [IndexDescriptor](#stroppy-IndexDescriptor)
     - [QueryDescriptor](#stroppy-QueryDescriptor)
     - [QueryParamDescriptor](#stroppy-QueryParamDescriptor)
+    - [QueryParamGroup](#stroppy-QueryParamGroup)
     - [TableDescriptor](#stroppy-TableDescriptor)
     - [TransactionDescriptor](#stroppy-TransactionDescriptor)
     - [UnitDescriptor](#stroppy-UnitDescriptor)
@@ -722,7 +723,8 @@ WellKnownRegex contain some well-known patterns.
 <a name="stroppy-DateTime"></a>
 
 ### DateTime
-DateTime represents a point in time, independent of any time zone or calendar.
+DateTime represents a point in time, independent of any time zone or
+calendar.
 
 
 | Field | Type | Label | Description |
@@ -1232,8 +1234,9 @@ Rules for generating UUIDs
 <a name="stroppy-OtlpExport"></a>
 
 ### OtlpExport
-OtlpExport contains configuration for exporting metrics via OpenTelemetry Protocol (OTLP).
-It specifies the endpoint and metrics prefix for telemetry data export.
+OtlpExport contains configuration for exporting metrics via OpenTelemetry
+Protocol (OTLP). It specifies the endpoint and metrics prefix for telemetry
+data export.
 
 
 | Field | Type | Label | Description |
@@ -1269,7 +1272,8 @@ Uuid represents a universally unique identifier (UUID).
 
 ### Value
 Value is a variant type that can represent different types of values.
-It&#39;s used to represent values that can be of multiple types in a type-safe way.
+It&#39;s used to represent values that can be of multiple types in a type-safe
+way.
 
 
 | Field | Type | Label | Description |
@@ -1655,7 +1659,8 @@ count.
 | name | [string](#string) |  | Name of the query |
 | sql | [string](#string) |  | SQL query text |
 | params | [QueryParamDescriptor](#stroppy-QueryParamDescriptor) | repeated | Parameters used in the query |
-| db_specific | [Value.Struct](#stroppy-Value-Struct) |  | Database-specific query properties |
+| groups | [QueryParamGroup](#stroppy-QueryParamGroup) | repeated |  |
+| db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific query properties |
 
 
 
@@ -1671,9 +1676,25 @@ QueryParamDescriptor defines a parameter that can be used in a query.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Name of the parameter |
-| replace_regex | [string](#string) |  | Regular expression pattern to replace with the parameter value default is &#34;${&lt;param_name&gt;}&#34; |
+| replace_regex | [string](#string) | optional | Regular expression pattern to replace with the parameter value default is &#34;${&lt;param_name&gt;}&#34; |
 | generation_rule | [Generation.Rule](#stroppy-Generation-Rule) |  | Rule for generating parameter values |
-| db_specific | [Value.Struct](#stroppy-Value-Struct) |  | Database-specific parameter properties |
+| db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific parameter properties |
+
+
+
+
+
+
+<a name="stroppy-QueryParamGroup"></a>
+
+### QueryParamGroup
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| params | [QueryParamDescriptor](#stroppy-QueryParamDescriptor) | repeated |  |
 
 
 
@@ -1711,7 +1732,7 @@ execution count.
 | name | [string](#string) |  | Name of the transaction |
 | isolation_level | [TxIsolationLevel](#stroppy-TxIsolationLevel) |  | Transaction isolation level |
 | queries | [QueryDescriptor](#stroppy-QueryDescriptor) | repeated | List of queries to execute in this transaction |
-| db_specific | [Value.Struct](#stroppy-Value-Struct) |  | Database-specific transaction properties |
+| db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific transaction properties |
 
 
 

@@ -346,11 +346,11 @@ type QueryParamDescriptor struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// * Regular expression pattern to replace with the parameter value default
 	// is "${<param_name>}"
-	ReplaceRegex string `protobuf:"bytes,2,opt,name=replace_regex,json=replaceRegex,proto3" json:"replace_regex,omitempty"`
+	ReplaceRegex *string `protobuf:"bytes,2,opt,name=replace_regex,json=replaceRegex,proto3,oneof" json:"replace_regex,omitempty"`
 	// * Rule for generating parameter values
 	GenerationRule *Generation_Rule `protobuf:"bytes,3,opt,name=generation_rule,json=generationRule,proto3" json:"generation_rule,omitempty"`
 	// * Database-specific parameter properties
-	DbSpecific    *Value_Struct `protobuf:"bytes,4,opt,name=db_specific,json=dbSpecific,proto3" json:"db_specific,omitempty"`
+	DbSpecific    *Value_Struct `protobuf:"bytes,4,opt,name=db_specific,json=dbSpecific,proto3,oneof" json:"db_specific,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -393,8 +393,8 @@ func (x *QueryParamDescriptor) GetName() string {
 }
 
 func (x *QueryParamDescriptor) GetReplaceRegex() string {
-	if x != nil {
-		return x.ReplaceRegex
+	if x != nil && x.ReplaceRegex != nil {
+		return *x.ReplaceRegex
 	}
 	return ""
 }
@@ -413,6 +413,58 @@ func (x *QueryParamDescriptor) GetDbSpecific() *Value_Struct {
 	return nil
 }
 
+type QueryParamGroup struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Name          string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Params        []*QueryParamDescriptor `protobuf:"bytes,2,rep,name=params,proto3" json:"params,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueryParamGroup) Reset() {
+	*x = QueryParamGroup{}
+	mi := &file_descriptor_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryParamGroup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryParamGroup) ProtoMessage() {}
+
+func (x *QueryParamGroup) ProtoReflect() protoreflect.Message {
+	mi := &file_descriptor_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryParamGroup.ProtoReflect.Descriptor instead.
+func (*QueryParamGroup) Descriptor() ([]byte, []int) {
+	return file_descriptor_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *QueryParamGroup) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *QueryParamGroup) GetParams() []*QueryParamDescriptor {
+	if x != nil {
+		return x.Params
+	}
+	return nil
+}
+
 // *
 // QueryDescriptor defines a database query with its parameters and execution
 // count.
@@ -424,15 +476,16 @@ type QueryDescriptor struct {
 	Sql string `protobuf:"bytes,2,opt,name=sql,proto3" json:"sql,omitempty"`
 	// * Parameters used in the query
 	Params []*QueryParamDescriptor `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty"`
+	Groups []*QueryParamGroup      `protobuf:"bytes,4,rep,name=groups,proto3" json:"groups,omitempty"`
 	// * Database-specific query properties
-	DbSpecific    *Value_Struct `protobuf:"bytes,5,opt,name=db_specific,json=dbSpecific,proto3" json:"db_specific,omitempty"`
+	DbSpecific    *Value_Struct `protobuf:"bytes,5,opt,name=db_specific,json=dbSpecific,proto3,oneof" json:"db_specific,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *QueryDescriptor) Reset() {
 	*x = QueryDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[4]
+	mi := &file_descriptor_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -444,7 +497,7 @@ func (x *QueryDescriptor) String() string {
 func (*QueryDescriptor) ProtoMessage() {}
 
 func (x *QueryDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[4]
+	mi := &file_descriptor_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -457,7 +510,7 @@ func (x *QueryDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryDescriptor.ProtoReflect.Descriptor instead.
 func (*QueryDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{4}
+	return file_descriptor_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *QueryDescriptor) GetName() string {
@@ -481,6 +534,13 @@ func (x *QueryDescriptor) GetParams() []*QueryParamDescriptor {
 	return nil
 }
 
+func (x *QueryDescriptor) GetGroups() []*QueryParamGroup {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
 func (x *QueryDescriptor) GetDbSpecific() *Value_Struct {
 	if x != nil {
 		return x.DbSpecific
@@ -500,14 +560,14 @@ type TransactionDescriptor struct {
 	// * List of queries to execute in this transaction
 	Queries []*QueryDescriptor `protobuf:"bytes,3,rep,name=queries,proto3" json:"queries,omitempty"`
 	// * Database-specific transaction properties
-	DbSpecific    *Value_Struct `protobuf:"bytes,5,opt,name=db_specific,json=dbSpecific,proto3" json:"db_specific,omitempty"`
+	DbSpecific    *Value_Struct `protobuf:"bytes,5,opt,name=db_specific,json=dbSpecific,proto3,oneof" json:"db_specific,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TransactionDescriptor) Reset() {
 	*x = TransactionDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[5]
+	mi := &file_descriptor_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -519,7 +579,7 @@ func (x *TransactionDescriptor) String() string {
 func (*TransactionDescriptor) ProtoMessage() {}
 
 func (x *TransactionDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[5]
+	mi := &file_descriptor_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -532,7 +592,7 @@ func (x *TransactionDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransactionDescriptor.ProtoReflect.Descriptor instead.
 func (*TransactionDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{5}
+	return file_descriptor_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *TransactionDescriptor) GetName() string {
@@ -581,7 +641,7 @@ type UnitDescriptor struct {
 
 func (x *UnitDescriptor) Reset() {
 	*x = UnitDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[6]
+	mi := &file_descriptor_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -593,7 +653,7 @@ func (x *UnitDescriptor) String() string {
 func (*UnitDescriptor) ProtoMessage() {}
 
 func (x *UnitDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[6]
+	mi := &file_descriptor_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -606,7 +666,7 @@ func (x *UnitDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitDescriptor.ProtoReflect.Descriptor instead.
 func (*UnitDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{6}
+	return file_descriptor_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UnitDescriptor) GetType() isUnitDescriptor_Type {
@@ -683,7 +743,7 @@ type WorkloadUnitDescriptor struct {
 
 func (x *WorkloadUnitDescriptor) Reset() {
 	*x = WorkloadUnitDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[7]
+	mi := &file_descriptor_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -695,7 +755,7 @@ func (x *WorkloadUnitDescriptor) String() string {
 func (*WorkloadUnitDescriptor) ProtoMessage() {}
 
 func (x *WorkloadUnitDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[7]
+	mi := &file_descriptor_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -708,7 +768,7 @@ func (x *WorkloadUnitDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkloadUnitDescriptor.ProtoReflect.Descriptor instead.
 func (*WorkloadUnitDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{7}
+	return file_descriptor_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *WorkloadUnitDescriptor) GetDescriptor_() *UnitDescriptor {
@@ -742,7 +802,7 @@ type WorkloadDescriptor struct {
 
 func (x *WorkloadDescriptor) Reset() {
 	*x = WorkloadDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[8]
+	mi := &file_descriptor_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -754,7 +814,7 @@ func (x *WorkloadDescriptor) String() string {
 func (*WorkloadDescriptor) ProtoMessage() {}
 
 func (x *WorkloadDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[8]
+	mi := &file_descriptor_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -767,7 +827,7 @@ func (x *WorkloadDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkloadDescriptor.ProtoReflect.Descriptor instead.
 func (*WorkloadDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{8}
+	return file_descriptor_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *WorkloadDescriptor) GetName() string {
@@ -806,7 +866,7 @@ type BenchmarkDescriptor struct {
 
 func (x *BenchmarkDescriptor) Reset() {
 	*x = BenchmarkDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[9]
+	mi := &file_descriptor_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -818,7 +878,7 @@ func (x *BenchmarkDescriptor) String() string {
 func (*BenchmarkDescriptor) ProtoMessage() {}
 
 func (x *BenchmarkDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[9]
+	mi := &file_descriptor_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -831,7 +891,7 @@ func (x *BenchmarkDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BenchmarkDescriptor.ProtoReflect.Descriptor instead.
 func (*BenchmarkDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{9}
+	return file_descriptor_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BenchmarkDescriptor) GetName() string {
@@ -880,26 +940,34 @@ const file_descriptor_proto_rawDesc = "" +
 	"constraint\x126\n" +
 	"\vdb_specific\x18\x06 \x01(\v2\x15.stroppy.Value.StructR\n" +
 	"dbSpecific\x123\n" +
-	"\acolumns\x18d \x03(\v2\x19.stroppy.ColumnDescriptorR\acolumns\"\xdd\x01\n" +
+	"\acolumns\x18d \x03(\v2\x19.stroppy.ColumnDescriptorR\acolumns\"\x89\x02\n" +
 	"\x14QueryParamDescriptor\x12\x1b\n" +
-	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12#\n" +
-	"\rreplace_regex\x18\x02 \x01(\tR\freplaceRegex\x12K\n" +
-	"\x0fgeneration_rule\x18\x03 \x01(\v2\x18.stroppy.Generation.RuleB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x0egenerationRule\x126\n" +
-	"\vdb_specific\x18\x04 \x01(\v2\x15.stroppy.Value.StructR\n" +
-	"dbSpecific\"\xc7\x01\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12(\n" +
+	"\rreplace_regex\x18\x02 \x01(\tH\x00R\freplaceRegex\x88\x01\x01\x12K\n" +
+	"\x0fgeneration_rule\x18\x03 \x01(\v2\x18.stroppy.Generation.RuleB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x0egenerationRule\x12;\n" +
+	"\vdb_specific\x18\x04 \x01(\v2\x15.stroppy.Value.StructH\x01R\n" +
+	"dbSpecific\x88\x01\x01B\x10\n" +
+	"\x0e_replace_regexB\x0e\n" +
+	"\f_db_specific\"\\\n" +
+	"\x0fQueryParamGroup\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x125\n" +
+	"\x06params\x18\x02 \x03(\v2\x1d.stroppy.QueryParamDescriptorR\x06params\"\x8e\x02\n" +
 	"\x0fQueryDescriptor\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12\x19\n" +
 	"\x03sql\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x03sql\x12D\n" +
 	"\x06params\x18\x03 \x03(\v2\x1d.stroppy.QueryParamDescriptorB\r\xfaB\n" +
-	"\x92\x01\a\"\x05\x8a\x01\x02\x10\x01R\x06params\x126\n" +
-	"\vdb_specific\x18\x05 \x01(\v2\x15.stroppy.Value.StructR\n" +
-	"dbSpecific\"\xf5\x01\n" +
+	"\x92\x01\a\"\x05\x8a\x01\x02\x10\x01R\x06params\x120\n" +
+	"\x06groups\x18\x04 \x03(\v2\x18.stroppy.QueryParamGroupR\x06groups\x12;\n" +
+	"\vdb_specific\x18\x05 \x01(\v2\x15.stroppy.Value.StructH\x00R\n" +
+	"dbSpecific\x88\x01\x01B\x0e\n" +
+	"\f_db_specific\"\x8a\x02\n" +
 	"\x15TransactionDescriptor\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12B\n" +
 	"\x0fisolation_level\x18\x02 \x01(\x0e2\x19.stroppy.TxIsolationLevelR\x0eisolationLevel\x12C\n" +
-	"\aqueries\x18\x03 \x03(\v2\x18.stroppy.QueryDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\aqueries\x126\n" +
-	"\vdb_specific\x18\x05 \x01(\v2\x15.stroppy.Value.StructR\n" +
-	"dbSpecific\"\xd2\x01\n" +
+	"\aqueries\x18\x03 \x03(\v2\x18.stroppy.QueryDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\aqueries\x12;\n" +
+	"\vdb_specific\x18\x05 \x01(\v2\x15.stroppy.Value.StructH\x00R\n" +
+	"dbSpecific\x88\x01\x01B\x0e\n" +
+	"\f_db_specific\"\xd2\x01\n" +
 	"\x0eUnitDescriptor\x12=\n" +
 	"\fcreate_table\x18\x01 \x01(\v2\x18.stroppy.TableDescriptorH\x00R\vcreateTable\x120\n" +
 	"\x05query\x18\x02 \x01(\v2\x18.stroppy.QueryDescriptorH\x00R\x05query\x12B\n" +
@@ -937,45 +1005,48 @@ func file_descriptor_proto_rawDescGZIP() []byte {
 }
 
 var file_descriptor_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_descriptor_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_descriptor_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_descriptor_proto_goTypes = []any{
 	(TxIsolationLevel)(0),          // 0: stroppy.TxIsolationLevel
 	(*IndexDescriptor)(nil),        // 1: stroppy.IndexDescriptor
 	(*ColumnDescriptor)(nil),       // 2: stroppy.ColumnDescriptor
 	(*TableDescriptor)(nil),        // 3: stroppy.TableDescriptor
 	(*QueryParamDescriptor)(nil),   // 4: stroppy.QueryParamDescriptor
-	(*QueryDescriptor)(nil),        // 5: stroppy.QueryDescriptor
-	(*TransactionDescriptor)(nil),  // 6: stroppy.TransactionDescriptor
-	(*UnitDescriptor)(nil),         // 7: stroppy.UnitDescriptor
-	(*WorkloadUnitDescriptor)(nil), // 8: stroppy.WorkloadUnitDescriptor
-	(*WorkloadDescriptor)(nil),     // 9: stroppy.WorkloadDescriptor
-	(*BenchmarkDescriptor)(nil),    // 10: stroppy.BenchmarkDescriptor
-	(*Value_Struct)(nil),           // 11: stroppy.Value.Struct
-	(*Generation_Rule)(nil),        // 12: stroppy.Generation.Rule
+	(*QueryParamGroup)(nil),        // 5: stroppy.QueryParamGroup
+	(*QueryDescriptor)(nil),        // 6: stroppy.QueryDescriptor
+	(*TransactionDescriptor)(nil),  // 7: stroppy.TransactionDescriptor
+	(*UnitDescriptor)(nil),         // 8: stroppy.UnitDescriptor
+	(*WorkloadUnitDescriptor)(nil), // 9: stroppy.WorkloadUnitDescriptor
+	(*WorkloadDescriptor)(nil),     // 10: stroppy.WorkloadDescriptor
+	(*BenchmarkDescriptor)(nil),    // 11: stroppy.BenchmarkDescriptor
+	(*Value_Struct)(nil),           // 12: stroppy.Value.Struct
+	(*Generation_Rule)(nil),        // 13: stroppy.Generation.Rule
 }
 var file_descriptor_proto_depIdxs = []int32{
-	11, // 0: stroppy.IndexDescriptor.db_specific:type_name -> stroppy.Value.Struct
+	12, // 0: stroppy.IndexDescriptor.db_specific:type_name -> stroppy.Value.Struct
 	1,  // 1: stroppy.TableDescriptor.table_indexes:type_name -> stroppy.IndexDescriptor
-	11, // 2: stroppy.TableDescriptor.db_specific:type_name -> stroppy.Value.Struct
+	12, // 2: stroppy.TableDescriptor.db_specific:type_name -> stroppy.Value.Struct
 	2,  // 3: stroppy.TableDescriptor.columns:type_name -> stroppy.ColumnDescriptor
-	12, // 4: stroppy.QueryParamDescriptor.generation_rule:type_name -> stroppy.Generation.Rule
-	11, // 5: stroppy.QueryParamDescriptor.db_specific:type_name -> stroppy.Value.Struct
-	4,  // 6: stroppy.QueryDescriptor.params:type_name -> stroppy.QueryParamDescriptor
-	11, // 7: stroppy.QueryDescriptor.db_specific:type_name -> stroppy.Value.Struct
-	0,  // 8: stroppy.TransactionDescriptor.isolation_level:type_name -> stroppy.TxIsolationLevel
-	5,  // 9: stroppy.TransactionDescriptor.queries:type_name -> stroppy.QueryDescriptor
-	11, // 10: stroppy.TransactionDescriptor.db_specific:type_name -> stroppy.Value.Struct
-	3,  // 11: stroppy.UnitDescriptor.create_table:type_name -> stroppy.TableDescriptor
-	5,  // 12: stroppy.UnitDescriptor.query:type_name -> stroppy.QueryDescriptor
-	6,  // 13: stroppy.UnitDescriptor.transaction:type_name -> stroppy.TransactionDescriptor
-	7,  // 14: stroppy.WorkloadUnitDescriptor.descriptor:type_name -> stroppy.UnitDescriptor
-	8,  // 15: stroppy.WorkloadDescriptor.units:type_name -> stroppy.WorkloadUnitDescriptor
-	9,  // 16: stroppy.BenchmarkDescriptor.workloads:type_name -> stroppy.WorkloadDescriptor
-	17, // [17:17] is the sub-list for method output_type
-	17, // [17:17] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	13, // 4: stroppy.QueryParamDescriptor.generation_rule:type_name -> stroppy.Generation.Rule
+	12, // 5: stroppy.QueryParamDescriptor.db_specific:type_name -> stroppy.Value.Struct
+	4,  // 6: stroppy.QueryParamGroup.params:type_name -> stroppy.QueryParamDescriptor
+	4,  // 7: stroppy.QueryDescriptor.params:type_name -> stroppy.QueryParamDescriptor
+	5,  // 8: stroppy.QueryDescriptor.groups:type_name -> stroppy.QueryParamGroup
+	12, // 9: stroppy.QueryDescriptor.db_specific:type_name -> stroppy.Value.Struct
+	0,  // 10: stroppy.TransactionDescriptor.isolation_level:type_name -> stroppy.TxIsolationLevel
+	6,  // 11: stroppy.TransactionDescriptor.queries:type_name -> stroppy.QueryDescriptor
+	12, // 12: stroppy.TransactionDescriptor.db_specific:type_name -> stroppy.Value.Struct
+	3,  // 13: stroppy.UnitDescriptor.create_table:type_name -> stroppy.TableDescriptor
+	6,  // 14: stroppy.UnitDescriptor.query:type_name -> stroppy.QueryDescriptor
+	7,  // 15: stroppy.UnitDescriptor.transaction:type_name -> stroppy.TransactionDescriptor
+	8,  // 16: stroppy.WorkloadUnitDescriptor.descriptor:type_name -> stroppy.UnitDescriptor
+	9,  // 17: stroppy.WorkloadDescriptor.units:type_name -> stroppy.WorkloadUnitDescriptor
+	10, // 18: stroppy.BenchmarkDescriptor.workloads:type_name -> stroppy.WorkloadDescriptor
+	19, // [19:19] is the sub-list for method output_type
+	19, // [19:19] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_descriptor_proto_init() }
@@ -985,7 +1056,10 @@ func file_descriptor_proto_init() {
 	}
 	file_common_proto_init()
 	file_descriptor_proto_msgTypes[0].OneofWrappers = []any{}
-	file_descriptor_proto_msgTypes[6].OneofWrappers = []any{
+	file_descriptor_proto_msgTypes[3].OneofWrappers = []any{}
+	file_descriptor_proto_msgTypes[5].OneofWrappers = []any{}
+	file_descriptor_proto_msgTypes[6].OneofWrappers = []any{}
+	file_descriptor_proto_msgTypes[7].OneofWrappers = []any{
 		(*UnitDescriptor_CreateTable)(nil),
 		(*UnitDescriptor_Query)(nil),
 		(*UnitDescriptor_Transaction)(nil),
@@ -996,7 +1070,7 @@ func file_descriptor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_descriptor_proto_rawDesc), len(file_descriptor_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
