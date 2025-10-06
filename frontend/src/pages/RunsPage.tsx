@@ -47,6 +47,7 @@ import RunComparisonModal from '../components/RunComparisonModal'
 import type { RunCreationFormData } from '../types/run-creation'
 import { apiClient, getErrorMessage } from '../services/api'
 import type { Run } from '../services/api'
+import { useTranslation } from '../hooks/useTranslation'
 
 const { Title, Paragraph, Text } = Typography
 const { Option } = Select
@@ -71,6 +72,7 @@ const RunsPage: React.FC = () => {
   const [createRunModalVisible, setCreateRunModalVisible] = useState(false)
   const [comparisonModalVisible, setComparisonModalVisible] = useState(false)
   const [runs, setRuns] = useState<Run[]>([])
+  const { t } = useTranslation('runs')
   const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState({
     current: 1,
@@ -351,7 +353,7 @@ const RunsPage: React.FC = () => {
           title: 'Подтвердите удаление',
           content: `Вы уверены, что хотите удалить запуск "${record.name}"?`,
           okText: 'Удалить',
-          cancelText: 'Отмена',
+          cancelText: t('common:cancel'),
           okType: 'danger',
           onOk: async () => {
             try {
@@ -563,10 +565,10 @@ const RunsPage: React.FC = () => {
       {/* Заголовок */}
       <div>
         <Title level={2} style={{ margin: 0 }}>
-          Запуски тестирования
+          {t('page.title')}
         </Title>
         <Paragraph type="secondary" style={{ margin: '8px 0 0 0' }}>
-          Управление и мониторинг всех запусков тестирования в системе
+          {t('page.subtitle')}
         </Paragraph>
       </div>
 
@@ -1224,7 +1226,7 @@ const RunsPage: React.FC = () => {
 
       {/* Модальное окно создания запуска */}
       <Modal
-        title="Создать новый запуск"
+        title={t('modals.createRun.title')}
         open={createRunModalVisible}
         onCancel={() => setCreateRunModalVisible(false)}
         footer={null}

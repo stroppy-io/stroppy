@@ -1,19 +1,15 @@
 import React from 'react'
-import { Layout, Menu, Button, Avatar, Dropdown, Typography } from 'antd'
+import { Layout, Menu, Button } from 'antd'
 import {
   DashboardOutlined,
   SettingOutlined,
   PlayCircleOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  UserOutlined,
-  LogoutOutlined,
   CloudOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-
-const { Text } = Typography
+import { useTranslation } from '../hooks/useTranslation'
 
 const { Sider } = Layout
 
@@ -25,51 +21,29 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ collapsed, onCollapse }) => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout } = useAuth()
+  const { t } = useTranslation('common')
 
   const menuItems = [
     {
       key: '/dashboard',
       icon: <DashboardOutlined />,
-      label: 'Главная',
+      label: t('navigation.dashboard'),
     },
     {
       key: '/runs',
       icon: <PlayCircleOutlined />,
-      label: 'Запуски',
+      label: t('navigation.runs'),
     },
     {
       key: '/configurator',
       icon: <SettingOutlined />,
-      label: 'Конфигуратор',
+      label: t('navigation.configurator'),
     },
   ]
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
   }
-
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login')
-  }
-
-  const userMenuItems = [
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: 'Профиль',
-    },
-    {
-      type: 'divider' as const,
-    },
-    {
-      key: 'logout',
-      icon: <LogoutOutlined />,
-      label: 'Выйти',
-      onClick: handleLogout,
-    },
-  ]
 
   return (
     <Sider
@@ -128,43 +102,8 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onCollapse }) => {
           />
         </div>
 
-        {/* Информация о пользователе */}
+        {/* Кнопка сворачивания */}
         <div style={{ padding: '8px', borderTop: '1px solid #f0f0f0' }}>
-          {!collapsed && user && (
-            <div style={{ marginBottom: '8px' }}>
-              <Dropdown
-                menu={{ items: userMenuItems }}
-                trigger={['click']}
-                placement="topRight"
-              >
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '8px', 
-                  padding: '8px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f5f5f5'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                }}
-                >
-                  <Avatar size="small" icon={<UserOutlined />} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ fontSize: '12px', color: '#666' }}>
-                      {user.username}
-                    </Text>
-                  </div>
-                </div>
-              </Dropdown>
-            </div>
-          )}
-          
-          {/* Кнопка сворачивания */}
           <Button
             type="text"
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}

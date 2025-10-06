@@ -47,6 +47,7 @@ import {
   generateDeploymentSignature,
   generateNemesisSignature
 } from '../types/run-creation'
+import { useTranslation } from '../hooks/useTranslation'
 
 const { Title } = Typography
 const { Panel } = Collapse
@@ -66,6 +67,7 @@ const RunCreationForm: React.FC<RunCreationFormProps> = ({
 }) => {
   const [form] = Form.useForm()
   const [selectedWorkloadType, setSelectedWorkloadType] = useState<WorkloadType>('pgbench')
+  const { t } = useTranslation('configurator')
   const [selectedDatabaseType, setSelectedDatabaseType] = useState<DatabaseType>('postgres')
   const [hardwareConfigs, setHardwareConfigs] = useState<HardwareConfiguration[]>([])
   const [selectedHardwareConfig, setSelectedHardwareConfig] = useState<string>()
@@ -486,29 +488,29 @@ const RunCreationForm: React.FC<RunCreationFormProps> = ({
       }}
     >
       {/* Основная информация */}
-      <Card title={<><SettingOutlined className="mr-2" />Основная информация</>} className="mb-4">
+      <Card title={<><SettingOutlined className="mr-2" />{t('form.basicInfo')}</>} className="mb-4">
         <Row gutter={16}>
           <Col span={6}>
             <Form.Item
               name="runId"
-              label="ID запуска"
-              rules={[{ required: true, message: 'Введите ID запуска' }]}
+              label={t('fields.runId')}
+              rules={[{ required: true, message: t('validation.runIdRequired') }]}
             >
-              <Input placeholder="run-001" />
+              <Input placeholder={t('placeholders.runId')} />
             </Form.Item>
           </Col>
           <Col span={6}>
             <Form.Item
               name="name"
-              label="Название запуска"
-              rules={[{ required: true, message: 'Введите название запуска' }]}
+              label={t('fields.runName')}
+              rules={[{ required: true, message: t('validation.runNameRequired') }]}
             >
-              <Input placeholder="Введите название запуска" />
+              <Input placeholder={t('placeholders.runName')} />
             </Form.Item>
           </Col>
           <Col span={6}>
-            <Form.Item name="description" label="Описание">
-              <Input placeholder="Краткое описание запуска" />
+            <Form.Item name="description" label={t('fields.runDescription')}>
+              <Input placeholder={t('placeholders.runDescription')} />
             </Form.Item>
           </Col>
           <Col span={6}>
@@ -1008,9 +1010,9 @@ const RunCreationForm: React.FC<RunCreationFormProps> = ({
       <Card>
         <div className="flex justify-end">
           <Space>
-            <Button onClick={onCancel}>Отмена</Button>
+            <Button onClick={onCancel}>{t('actions.cancel')}</Button>
             <Button type="primary" htmlType="submit">
-              Создать запуск
+              {t('actions.createRun')}
             </Button>
           </Space>
         </div>

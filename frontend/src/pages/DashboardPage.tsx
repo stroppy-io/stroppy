@@ -39,6 +39,7 @@ import dayjs from 'dayjs'
 import { apiClient } from '../services/api'
 import type { Run, FilterOptionsResponse } from '../services/api'
 import RunComparisonModal from '../components/RunComparisonModal'
+import { useTranslation } from '../hooks/useTranslation'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -54,6 +55,7 @@ interface TopRun extends Run {
 const DashboardPage: React.FC = () => {
   const [runs, setRuns] = useState<Run[]>([])
   const [loading, setLoading] = useState(true)
+  const { t } = useTranslation('dashboard')
   const [filterOptions, setFilterOptions] = useState<FilterOptionsResponse>({
     statuses: [],
     load_types: [],
@@ -166,12 +168,12 @@ const DashboardPage: React.FC = () => {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'running': return 'Выполняется'
-      case 'completed': return 'Завершен'
-      case 'failed': return 'Ошибка'
-      case 'cancelled': return 'Отменен'
-      case 'pending': return 'Ожидает'
-      default: return 'Неизвестно'
+      case 'running': return t('common:status.running')
+      case 'completed': return t('common:status.completed')
+      case 'failed': return t('common:status.failed')
+      case 'cancelled': return t('common:status.cancelled')
+      case 'pending': return t('common:status.pending')
+      default: return t('common:status.unknown')
     }
   }
 
@@ -238,7 +240,7 @@ const DashboardPage: React.FC = () => {
   // Функция для открытия сравнения
   const handleCompareRuns = () => {
     if (selectedRowKeys.length !== 2) {
-      message.warning('Выберите ровно 2 запуска для сравнения');
+      message.warning(t('messages.selectTwoRuns'));
       return;
     }
     
@@ -383,7 +385,7 @@ const DashboardPage: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <Title level={2} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
             <TrophyOutlined style={{ color: '#faad14' }} />
-            ТОП Запусков
+            {t('page.title')}
           </Title>
           <Space>
             <Button 
@@ -391,18 +393,18 @@ const DashboardPage: React.FC = () => {
               icon={<SwapOutlined />}
               disabled={selectedRowKeys.length !== 2}
               onClick={handleCompareRuns}
-              title={selectedRowKeys.length === 2 ? 'Сравнить выбранные запуски' : 'Выберите ровно 2 запуска для сравнения'}
+              title={selectedRowKeys.length === 2 ? t('actions.compareSelected') : t('actions.selectTwoRuns')}
               style={{
                 backgroundColor: selectedRowKeys.length === 2 ? '#52c41a' : undefined,
                 borderColor: selectedRowKeys.length === 2 ? '#52c41a' : undefined,
                 animation: selectedRowKeys.length === 2 ? 'pulse 2s infinite' : undefined
               }}
             >
-              Сравнить ({selectedRowKeys.length}/2)
+              {t('actions.compare')} ({selectedRowKeys.length}/2)
             </Button>
           </Space>
         </div>
-        <Text type="secondary">Анализ и рейтинг лучших запусков тестирования</Text>
+        <Text type="secondary">{t('page.subtitle')}</Text>
       </div>
 
       {/* ТОП запусков с фильтрами */}
@@ -410,8 +412,8 @@ const DashboardPage: React.FC = () => {
         title={
           <Space>
             <TrophyOutlined />
-            <span>ТОП 10 Запусков</span>
-            <Tag color="green">Найдено: {filteredAndSortedRuns.length}</Tag>
+            <span>{t('topRuns.title')}</span>
+            <Tag color="green">{t('topRuns.found')}: {filteredAndSortedRuns.length}</Tag>
           </Space>
         }
         loading={loading}
@@ -423,8 +425,8 @@ const DashboardPage: React.FC = () => {
             <div style={{ height: '600px', overflowY: 'auto' }}>
         {topRuns.length === 0 ? (
           <Alert
-            message="Нет данных"
-            description="Не найдено запусков, соответствующих выбранным фильтрам"
+            message={t('topRuns.noData')}
+            description={t('topRuns.noDataDescription')}
             type="info"
             showIcon
           />
@@ -474,7 +476,7 @@ const DashboardPage: React.FC = () => {
                           icon={<EyeOutlined />}
                           size="small"
                           onClick={() => handleViewRun(run)}
-                          title="Просмотр деталей"
+                          title={t('actions.viewDetails')}
                         />
                         <Tag color={getStatusColor(run.status)}>
                           {getStatusText(run.status)}
@@ -512,11 +514,11 @@ const DashboardPage: React.FC = () => {
           {/* Фильтры - правая колонка */}
           <Col span={8}>
             <div style={{ padding: '16px', background: '#fafafa', borderRadius: '6px', height: '600px', overflowY: 'auto' }}>
-              <Title level={5} style={{ marginBottom: 16 }}>Фильтры</Title>
+              <Title level={5} style={{ marginBottom: 16 }}>{t('filters.title')}</Title>
               
               <Space direction="vertical" size="middle" style={{ width: '100%' }}>
                 <div>
-                  <Text strong>Период:</Text>
+                  <Text strong>{t('filters.period')}</Text>
                   <RangePicker
                     value={filters.dateRange}
                     onChange={(dates) => setFilters(prev => ({ ...prev, dateRange: dates }))}
@@ -526,11 +528,11 @@ const DashboardPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <Text strong>Статус:</Text>
+                  <Text strong>{t('filters.status')}</Text>
                   <Select
                     value={filters.status}
                     onChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
-                    placeholder="Выберите статус"
+                    placeholder={t('filters.selectStatus')}
                     style={{ width: '100%', marginTop: 4 }}
                     allowClear
                   >
@@ -543,11 +545,11 @@ const DashboardPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <Text strong>Тип нагрузки:</Text>
+                  <Text strong>{t('filters.loadType')}</Text>
                   <Select
                     value={filters.loadType}
                     onChange={(value) => setFilters(prev => ({ ...prev, loadType: value }))}
-                    placeholder="Выберите тип нагрузки"
+                    placeholder={t('filters.selectLoadType')}
                     style={{ width: '100%', marginTop: 4 }}
                     allowClear
                   >
@@ -560,11 +562,11 @@ const DashboardPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <Text strong>База данных:</Text>
+                  <Text strong>{t('filters.database')}</Text>
                   <Select
                     value={filters.database}
                     onChange={(value) => setFilters(prev => ({ ...prev, database: value }))}
-                    placeholder="Выберите БД"
+                    placeholder={t('filters.selectDatabase')}
                     style={{ width: '100%', marginTop: 4 }}
                     allowClear
                   >
@@ -577,11 +579,11 @@ const DashboardPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <Text strong>Схема развертывания:</Text>
+                  <Text strong>{t('filters.deploymentSchema')}</Text>
                   <Select
                     value={filters.deploymentSchema}
                     onChange={(value) => setFilters(prev => ({ ...prev, deploymentSchema: value }))}
-                    placeholder="Выберите схему"
+                    placeholder={t('filters.selectSchema')}
                     style={{ width: '100%', marginTop: 4 }}
                     allowClear
                   >
@@ -594,11 +596,11 @@ const DashboardPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <Text strong>Конфигурация железа:</Text>
+                  <Text strong>{t('filters.hardwareConfig')}</Text>
                   <Select
                     value={filters.hardwareConfig}
                     onChange={(value) => setFilters(prev => ({ ...prev, hardwareConfig: value }))}
-                    placeholder="Выберите конфигурацию"
+                    placeholder={t('filters.selectHardware')}
                     style={{ width: '100%', marginTop: 4 }}
                     allowClear
                   >
@@ -611,19 +613,19 @@ const DashboardPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <Text strong>TPS диапазон:</Text>
+                  <Text strong>{t('filters.tpsRange')}</Text>
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                     <InputNumber
                       value={filters.tpsMin}
                       onChange={(value) => setFilters(prev => ({ ...prev, tpsMin: value }))}
-                      placeholder="От"
+                      placeholder={t('filters.from')}
                       style={{ flex: 1 }}
                       min={0}
                     />
                     <InputNumber
                       value={filters.tpsMax}
                       onChange={(value) => setFilters(prev => ({ ...prev, tpsMax: value }))}
-                      placeholder="До"
+                      placeholder={t('filters.to')}
                       style={{ flex: 1 }}
                       min={0}
                     />
@@ -638,9 +640,9 @@ const DashboardPage: React.FC = () => {
                       disabled={selectedRowKeys.length !== 2}
                       onClick={handleCompareRuns}
                       style={{ width: '100%' }}
-                      title={selectedRowKeys.length === 2 ? 'Сравнить выбранные запуски' : 'Выберите ровно 2 запуска для сравнения'}
+                      title={selectedRowKeys.length === 2 ? t('actions.compareSelected') : t('actions.selectTwoRuns')}
                     >
-                      Сравнить ({selectedRowKeys.length}/2)
+                      {t('actions.compare')} ({selectedRowKeys.length}/2)
                     </Button>
                     <Button 
                       icon={<ReloadOutlined />} 
@@ -648,14 +650,14 @@ const DashboardPage: React.FC = () => {
                       loading={loading}
                       style={{ width: '100%' }}
                     >
-                      Обновить
+                      {t('actions.refresh')}
                     </Button>
                     <Button 
                       onClick={clearAllFilters}
                       type="default"
                       style={{ width: '100%' }}
                     >
-                      Очистить фильтры
+                      {t('actions.clearFilters')}
                     </Button>
                   </Space>
                 </div>
@@ -670,7 +672,7 @@ const DashboardPage: React.FC = () => {
         title={
           <Space align="center">
             <EyeOutlined />
-            <Text strong style={{ fontSize: '18px' }}>Детали запуска</Text>
+            <Text strong style={{ fontSize: '18px' }}>{t('details.title')}</Text>
           </Space>
         }
         open={modalVisible}
@@ -746,7 +748,7 @@ const DashboardPage: React.FC = () => {
                 title={
                   <Space>
                     <SettingOutlined />
-                    <Text strong>Основная информация</Text>
+                    <Text strong>{t('details.basicInfo')}</Text>
                   </Space>
                 }
                 style={{ marginBottom: 16 }}

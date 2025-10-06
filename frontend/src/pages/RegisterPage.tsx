@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { getErrorMessage } from '../services/api';
+import { useTranslation } from '../hooks/useTranslation';
 
 const { Title, Text } = Typography;
 
@@ -25,6 +26,7 @@ const RegisterPage: React.FC = () => {
 
   const { register } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
 
   const handleSubmit = async (values: { 
     username: string; 
@@ -34,7 +36,7 @@ const RegisterPage: React.FC = () => {
     setError('');
 
     if (values.password !== values.confirmPassword) {
-      setError('Пароли не совпадают');
+      setError(t('auth.register.passwordsNotMatchError'));
       return;
     }
 
@@ -85,11 +87,11 @@ const RegisterPage: React.FC = () => {
               </div>
               
               <Title level={2} style={{ margin: '0 0 8px 0' }}>
-                Создание аккаунта
+                {t('auth.register.title')}
               </Title>
               
               <Text type="secondary">
-                Создайте новый аккаунт для доступа к системе
+                {t('auth.register.subtitle')}
               </Text>
             </div>
 
@@ -110,58 +112,58 @@ const RegisterPage: React.FC = () => {
             >
               <Form.Item
                 name="username"
-                label="Имя пользователя"
+                label={t('auth.register.username')}
                 rules={[
-                  { required: true, message: 'Пожалуйста, введите имя пользователя!' },
-                  { min: 3, message: 'Имя пользователя должно содержать минимум 3 символа!' },
-                  { max: 50, message: 'Имя пользователя не должно превышать 50 символов!' },
+                  { required: true, message: t('auth.register.usernameRequired') },
+                  { min: 3, message: t('auth.register.usernameMinLength') },
+                  { max: 50, message: t('auth.register.usernameMaxLength') },
                   { 
                     pattern: /^[a-zA-Z0-9_-]+$/, 
-                    message: 'Имя пользователя может содержать только буквы, цифры, дефисы и подчеркивания!' 
+                    message: t('auth.register.usernamePattern') 
                   }
                 ]}
               >
                 <Input
                   prefix={<UserOutlined />}
-                  placeholder="Введите имя пользователя"
+                  placeholder={t('auth.register.usernamePlaceholder')}
                   disabled={isLoading}
                 />
               </Form.Item>
 
               <Form.Item
                 name="password"
-                label="Пароль"
+                label={t('auth.register.password')}
                 rules={[
-                  { required: true, message: 'Пожалуйста, введите пароль!' },
-                  { min: 6, message: 'Пароль должен содержать минимум 6 символов!' }
+                  { required: true, message: t('auth.register.passwordRequired') },
+                  { min: 6, message: t('auth.register.passwordMinLength') }
                 ]}
               >
                 <Input.Password
                   prefix={<LockOutlined />}
-                  placeholder="Введите пароль"
+                  placeholder={t('auth.register.passwordPlaceholder')}
                   disabled={isLoading}
                 />
               </Form.Item>
 
               <Form.Item
                 name="confirmPassword"
-                label="Подтверждение пароля"
+                label={t('auth.register.confirmPassword')}
                 dependencies={['password']}
                 rules={[
-                  { required: true, message: 'Пожалуйста, подтвердите пароль!' },
+                  { required: true, message: t('auth.register.confirmPasswordRequired') },
                   ({ getFieldValue }) => ({
                     validator(_, value) {
                       if (!value || getFieldValue('password') === value) {
                         return Promise.resolve();
                       }
-                      return Promise.reject(new Error('Пароли не совпадают!'));
+                      return Promise.reject(new Error(t('auth.register.passwordsNotMatch')));
                     },
                   }),
                 ]}
               >
                 <Input.Password
                   prefix={<LockOutlined />}
-                  placeholder="Повторите пароль"
+                  placeholder={t('auth.register.confirmPasswordPlaceholder')}
                   disabled={isLoading}
                 />
               </Form.Item>
@@ -174,16 +176,16 @@ const RegisterPage: React.FC = () => {
                   block
                   style={{ height: '44px', fontSize: '16px' }}
                 >
-                  Создать аккаунт
+                  {t('auth.register.submitButton')}
                 </Button>
               </Form.Item>
             </Form>
 
             <div style={{ textAlign: 'center', marginTop: '24px' }}>
               <Text type="secondary">
-                Уже есть аккаунт?{' '}
+                {t('auth.register.hasAccount')}{' '}
                 <Link to="/login" style={{ fontWeight: 500 }}>
-                  Войти в систему
+                  {t('auth.register.loginLink')}
                 </Link>
               </Text>
             </div>

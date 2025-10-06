@@ -5,6 +5,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Sidebar from './components/Sidebar'
+import Header from './components/Header'
 import PageWrapper from './components/PageWrapper'
 import DashboardPage from './pages/DashboardPage'
 import ConfiguratorPage from './pages/ConfiguratorPage'
@@ -33,6 +34,8 @@ const AppContent: React.FC = () => {
                 <Sidebar collapsed={collapsed} onCollapse={setCollapsed} />
                 
                 <Layout style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <Header collapsed={collapsed} />
+                  
                   <PageWrapper>
                     <Routes>
                       <Route path="/" element={<Navigate to="/dashboard" replace />} />

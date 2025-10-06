@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { getErrorMessage } from '../services/api';
+import { useTranslation } from '../hooks/useTranslation';
 
 const { Title, Text } = Typography;
 
@@ -26,6 +27,7 @@ const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation('common');
 
   // Получаем путь, откуда пользователь был перенаправлен
   const from = location.state?.from?.pathname || '/';
@@ -77,11 +79,11 @@ const LoginPage: React.FC = () => {
               </div>
               
               <Title level={2} style={{ margin: '0 0 8px 0' }}>
-                Вход в систему
+                {t('auth.login.title')}
               </Title>
               
               <Text type="secondary">
-                Добро пожаловать в Stroppy Cloud Panel
+                {t('auth.login.subtitle')}
               </Text>
             </div>
 
@@ -102,30 +104,30 @@ const LoginPage: React.FC = () => {
             >
               <Form.Item
                 name="username"
-                label="Имя пользователя"
+                label={t('auth.login.username')}
                 rules={[
-                  { required: true, message: 'Пожалуйста, введите имя пользователя!' },
-                  { min: 3, message: 'Имя пользователя должно содержать минимум 3 символа!' }
+                  { required: true, message: t('auth.login.usernameRequired') },
+                  { min: 3, message: t('auth.login.usernameMinLength') }
                 ]}
               >
                 <Input
                   prefix={<UserOutlined />}
-                  placeholder="Введите имя пользователя"
+                  placeholder={t('auth.login.usernamePlaceholder')}
                   disabled={isLoading}
                 />
               </Form.Item>
 
               <Form.Item
                 name="password"
-                label="Пароль"
+                label={t('auth.login.password')}
                 rules={[
-                  { required: true, message: 'Пожалуйста, введите пароль!' },
-                  { min: 6, message: 'Пароль должен содержать минимум 6 символов!' }
+                  { required: true, message: t('auth.login.passwordRequired') },
+                  { min: 6, message: t('auth.login.passwordMinLength') }
                 ]}
               >
                 <Input.Password
                   prefix={<LockOutlined />}
-                  placeholder="Введите пароль"
+                  placeholder={t('auth.login.passwordPlaceholder')}
                   disabled={isLoading}
                 />
               </Form.Item>
@@ -138,16 +140,16 @@ const LoginPage: React.FC = () => {
                   block
                   style={{ height: '44px', fontSize: '16px' }}
                 >
-                  Войти в систему
+                  {t('auth.login.submitButton')}
                 </Button>
               </Form.Item>
             </Form>
 
             <div style={{ textAlign: 'center', marginTop: '24px' }}>
               <Text type="secondary">
-                Нет аккаунта?{' '}
+                {t('auth.login.noAccount')}{' '}
                 <Link to="/register" style={{ fontWeight: 500 }}>
-                  Создать новый аккаунт
+                  {t('auth.login.createAccount')}
                 </Link>
               </Text>
             </div>

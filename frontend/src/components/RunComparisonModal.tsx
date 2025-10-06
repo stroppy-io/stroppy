@@ -28,6 +28,7 @@ import {
   ClockCircleOutlined,
   UserOutlined
 } from '@ant-design/icons'
+import { useTranslation } from '../hooks/useTranslation'
 
 const { Title, Text } = Typography
 
@@ -98,6 +99,7 @@ const RunComparisonModal: React.FC<RunComparisonModalProps> = ({
   }
 
   const [run1, run2] = runs
+  const { t } = useTranslation('runs')
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -109,9 +111,9 @@ const RunComparisonModal: React.FC<RunComparisonModalProps> = ({
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'completed': return 'Завершен'
-      case 'failed': return 'Ошибка'
-      default: return 'Неизвестно'
+      case 'completed': return t('common:status.completed')
+      case 'failed': return t('common:status.failed')
+      default: return t('common:status.unknown')
     }
   }
 
@@ -308,7 +310,7 @@ const RunComparisonModal: React.FC<RunComparisonModalProps> = ({
       title={
         <Space align="center">
           <SwapOutlined />
-          <Text strong style={{ fontSize: '18px' }}>Сравнение запусков</Text>
+          <Text strong style={{ fontSize: '18px' }}>{t('comparison.title')}</Text>
           <Badge count={differencesCount} style={{ backgroundColor: '#faad14' }} />
         </Space>
       }
