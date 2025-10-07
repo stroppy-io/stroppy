@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package stroppy;
 
+import "google/protobuf/duration.proto";
+
 import "common.proto";
 import "config.proto";
 import "descriptor.proto";
@@ -9,8 +11,8 @@ import "descriptor.proto";
 option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
 
 /**
- * StepContext provides contextual information to a benchmark step during execution.
- * It contains the run context and the step descriptor.
+ * StepContext provides contextual information to a benchmark step during
+ * execution. It contains the run context and the step descriptor.
  */
 message StepContext {
     /** Global configuration of the benchmark and its steps */
@@ -26,7 +28,8 @@ message StepContext {
 }
 
 /**
- * UnitBuildContext provides the context needed to build a unit from a WorkloadUnitDescriptor.
+ * UnitBuildContext provides the context needed to build a unit from a
+ * WorkloadUnitDescriptor.
  */
 message UnitContext {
     /** Step context */
@@ -56,4 +59,15 @@ message DriverTransaction {
     repeated DriverQuery queries = 1;
     /** Isolation level of the transaction */
     TxIsolationLevel isolation_level = 2;
+}
+
+message DriverQueryStat {
+    string name = 1;
+    google.protobuf.Duration exec_duration = 2;
+}
+
+message DriverTransactionStat {
+    repeated DriverQueryStat queries = 1;
+    google.protobuf.Duration exec_duration = 2;
+    TxIsolationLevel isolation_level = 3;
 }

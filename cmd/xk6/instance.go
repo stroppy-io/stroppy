@@ -7,6 +7,7 @@ import (
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -46,26 +47,30 @@ func (x *Instance) Setup(_ string) error {
 	return nil
 }
 
-func (x *Instance) RunTransaction() error {
+func (x *Instance) RunTransaction() string {
 	transaction, err := runPtr.unitQueue.GetNextElement()
 	if err != nil {
-		return fmt.Errorf("can't get query due to: %w", err)
+		return fmt.Errorf("can't get query due to: %w", err).Error()
 	}
 	runPtr.logger.Debug(
 		"RunTransaction",
 		zap.Any("transaction", transaction),
 	)
 
-	// TODO: return stats
-	err = runPtr.driver.RunTransaction(
+	stats, err := runPtr.driver.RunTransaction(
 		x.vu.Context(),
 		transaction,
 	)
 	if err != nil {
-		return fmt.Errorf("can't run query due to: %w", err)
+		return fmt.Errorf("can't run query due to: %w", err).Error()
 	}
 
-	return nil
+	bytes, err := protojson.MarshalOptions{Multiline: false}.Marshal(stats)
+	if err != nil {
+		return fmt.Errorf("can't marshall stats due to: %w", err).Error()
+	}
+
+	return string(bytes)
 }
 
 var ErrDriverIsNil = errors.New("driver is nil")

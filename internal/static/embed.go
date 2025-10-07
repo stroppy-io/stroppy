@@ -72,7 +72,11 @@ func CopyStaticFilesToPath(targetPath string, perm os.FileMode, files ...FileNam
 	for _, name := range files {
 		data, err := openFile(name)
 		if err != nil {
-			return fmt.Errorf("failed to open static file name: %s, error: %w", name, err) //nolint: err113
+			return fmt.Errorf(
+				"failed to open static file name: %s, error: %w",
+				name,
+				err,
+			) //nolint: err113
 		}
 
 		err = os.WriteFile(path.Join(targetPath, string(name)), data, perm)

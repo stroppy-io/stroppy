@@ -2,7 +2,6 @@ package driver
 
 import (
 	"context"
-	"fmt"
 
 	"go.uber.org/zap"
 
@@ -16,7 +15,10 @@ type Driver interface {
 		ctx context.Context,
 		unit *stroppy.UnitDescriptor,
 	) (*stroppy.DriverTransaction, error)
-	RunTransaction(ctx context.Context, transaction *stroppy.DriverTransaction) error
+	RunTransaction(
+		ctx context.Context,
+		transaction *stroppy.DriverTransaction,
+	) (*stroppy.DriverTransactionStat, error)
 	Teardown(ctx context.Context) error
 }
 
@@ -29,10 +31,12 @@ func Dispatch( //nolint: ireturn // better than return any
 		lg.Sugar().
 			Warnf("driver type UNSPECIFIED, fall back to %s", stroppy.DriverConfig_DRIVER_TYPE_POSTGRES)
 
-		fallthrough
+		fallthrough // as good suggestion
 	case stroppy.DriverConfig_DRIVER_TYPE_POSTGRES:
 		return postgres.NewDriver(lg)
 	default:
-		panic(fmt.Sprintf("driver type '%s' not dispatchable", drvType.String()))
+		lg.Sugar().Panicf("driver type '%s' not dispatchable", drvType.String())
+
+		return nil
 	}
 }

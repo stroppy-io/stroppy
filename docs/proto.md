@@ -42,6 +42,45 @@
     - [File-level Extensions](#gen_validate_validate-proto-extensions)
     - [File-level Extensions](#gen_validate_validate-proto-extensions)
   
+- [config.proto](#config-proto)
+    - [CloudConfig](#stroppy-CloudConfig)
+    - [ConfigFile](#stroppy-ConfigFile)
+    - [DriverConfig](#stroppy-DriverConfig)
+    - [ExecutorConfig](#stroppy-ExecutorConfig)
+    - [ExporterConfig](#stroppy-ExporterConfig)
+    - [GlobalConfig](#stroppy-GlobalConfig)
+    - [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry)
+    - [LoggerConfig](#stroppy-LoggerConfig)
+    - [SideCarConfig](#stroppy-SideCarConfig)
+    - [Step](#stroppy-Step)
+  
+    - [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType)
+    - [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel)
+    - [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode)
+  
+- [k6.proto](#k6-proto)
+    - [ConstantArrivalRate](#stroppy-ConstantArrivalRate)
+    - [ConstantVUs](#stroppy-ConstantVUs)
+    - [K6Options](#stroppy-K6Options)
+    - [K6Scenario](#stroppy-K6Scenario)
+    - [PerVuIterations](#stroppy-PerVuIterations)
+    - [RampingArrivalRate](#stroppy-RampingArrivalRate)
+    - [RampingArrivalRate.RateStage](#stroppy-RampingArrivalRate-RateStage)
+    - [RampingVUs](#stroppy-RampingVUs)
+    - [RampingVUs.VUStage](#stroppy-RampingVUs-VUStage)
+    - [SharedIterations](#stroppy-SharedIterations)
+  
+- [runtime.proto](#runtime-proto)
+    - [DriverQuery](#stroppy-DriverQuery)
+    - [DriverQueryStat](#stroppy-DriverQueryStat)
+    - [DriverTransaction](#stroppy-DriverTransaction)
+    - [DriverTransactionStat](#stroppy-DriverTransactionStat)
+    - [StepContext](#stroppy-StepContext)
+    - [UnitContext](#stroppy-UnitContext)
+  
+- [sidecar.proto](#sidecar-proto)
+    - [SidecarService](#stroppy-SidecarService)
+  
 - [common.proto](#common-proto)
     - [DateTime](#stroppy-DateTime)
     - [Decimal](#stroppy-Decimal)
@@ -84,22 +123,6 @@
     - [Generation.Distribution.DistributionType](#stroppy-Generation-Distribution-DistributionType)
     - [Value.NullValue](#stroppy-Value-NullValue)
   
-- [config.proto](#config-proto)
-    - [CloudConfig](#stroppy-CloudConfig)
-    - [ConfigFile](#stroppy-ConfigFile)
-    - [DriverConfig](#stroppy-DriverConfig)
-    - [ExecutorConfig](#stroppy-ExecutorConfig)
-    - [ExporterConfig](#stroppy-ExporterConfig)
-    - [GlobalConfig](#stroppy-GlobalConfig)
-    - [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry)
-    - [LoggerConfig](#stroppy-LoggerConfig)
-    - [SideCarConfig](#stroppy-SideCarConfig)
-    - [Step](#stroppy-Step)
-  
-    - [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType)
-    - [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel)
-    - [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode)
-  
 - [descriptor.proto](#descriptor-proto)
     - [BenchmarkDescriptor](#stroppy-BenchmarkDescriptor)
     - [ColumnDescriptor](#stroppy-ColumnDescriptor)
@@ -114,27 +137,6 @@
     - [WorkloadUnitDescriptor](#stroppy-WorkloadUnitDescriptor)
   
     - [TxIsolationLevel](#stroppy-TxIsolationLevel)
-  
-- [k6.proto](#k6-proto)
-    - [ConstantArrivalRate](#stroppy-ConstantArrivalRate)
-    - [ConstantVUs](#stroppy-ConstantVUs)
-    - [K6Options](#stroppy-K6Options)
-    - [K6Scenario](#stroppy-K6Scenario)
-    - [PerVuIterations](#stroppy-PerVuIterations)
-    - [RampingArrivalRate](#stroppy-RampingArrivalRate)
-    - [RampingArrivalRate.RateStage](#stroppy-RampingArrivalRate-RateStage)
-    - [RampingVUs](#stroppy-RampingVUs)
-    - [RampingVUs.VUStage](#stroppy-RampingVUs-VUStage)
-    - [SharedIterations](#stroppy-SharedIterations)
-  
-- [runtime.proto](#runtime-proto)
-    - [DriverQuery](#stroppy-DriverQuery)
-    - [DriverTransaction](#stroppy-DriverTransaction)
-    - [StepContext](#stroppy-StepContext)
-    - [UnitContext](#stroppy-UnitContext)
-  
-- [sidecar.proto](#sidecar-proto)
-    - [SidecarService](#stroppy-SidecarService)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -708,6 +710,577 @@ WellKnownRegex contain some well-known patterns.
 | required | bool | .google.protobuf.OneofOptions | 1071 | Required ensures that exactly one the field options in a oneof is set; validation fails if no fields in the oneof are set. |
 
  
+
+ 
+
+
+
+<a name="config-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## config.proto
+
+
+
+<a name="stroppy-CloudConfig"></a>
+
+### CloudConfig
+CloudConfig contains configuration for stroppy cloud backend.
+
+
+
+
+
+
+<a name="stroppy-ConfigFile"></a>
+
+### ConfigFile
+ConfigFile contains the complete configuration for a benchmark run in file.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| global | [GlobalConfig](#stroppy-GlobalConfig) |  | Global configuration |
+| exporters | [ExporterConfig](#stroppy-ExporterConfig) | repeated | Exporters configuration |
+| executors | [ExecutorConfig](#stroppy-ExecutorConfig) | repeated | Executors configuration |
+| steps | [Step](#stroppy-Step) | repeated | Step to executor mapping configuration |
+| side_cars | [SideCarConfig](#stroppy-SideCarConfig) | repeated | Plugins configuration |
+| benchmark | [BenchmarkDescriptor](#stroppy-BenchmarkDescriptor) |  | BenchmarkDescriptor defines a complete benchmark consisting of multiple steps. |
+
+
+
+
+
+
+<a name="stroppy-DriverConfig"></a>
+
+### DriverConfig
+DriverConfig contains configuration for connecting to a database driver.
+It includes the driver plugin path, connection URL, and database-specific settings.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| url | [string](#string) |  | Database connection URL |
+| db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific configuration options |
+| driver_type | [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType) |  | Name/Type of chosen driver |
+
+
+
+
+
+
+<a name="stroppy-ExecutorConfig"></a>
+
+### ExecutorConfig
+ExecutorConfig contains configuration for an executor.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Name of the executor |
+| k6 | [K6Options](#stroppy-K6Options) |  | Configuration for the executor |
+
+
+
+
+
+
+<a name="stroppy-ExporterConfig"></a>
+
+### ExporterConfig
+OtlpExporterConfig contains named configuration for an OTLP exporter.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Name of the OTLP exporter |
+| otlp_export | [OtlpExport](#stroppy-OtlpExport) |  | Configuration for the OTLP exporter |
+
+
+
+
+
+
+<a name="stroppy-GlobalConfig"></a>
+
+### GlobalConfig
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| version | [string](#string) |  | Version of the configuration format e.g. proto files version. This is used for backward compatibility of configs and will be set automatically from binary run if not present. |
+| run_id | [string](#string) |  | Run identifier for reproducible test runs or debugging If set to &#34;generate()&#34; stroppy eval ulid for run_id |
+| seed | [uint64](#uint64) |  | Random seed for reproducible test runs |
+| metadata | [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry) | repeated | Arbitrary metadata, may be passed to result labels and json output |
+| driver | [DriverConfig](#stroppy-DriverConfig) |  | Database driver configuration |
+| logger | [LoggerConfig](#stroppy-LoggerConfig) |  | Logging configuration |
+
+
+
+
+
+
+<a name="stroppy-GlobalConfig-MetadataEntry"></a>
+
+### GlobalConfig.MetadataEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="stroppy-LoggerConfig"></a>
+
+### LoggerConfig
+LoggerConfig contains configuration for the logging system.
+It controls log levels and output formatting.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| log_level | [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel) |  | Minimum log level to output |
+| log_mode | [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode) |  | Logging mode (development or production) |
+
+
+
+
+
+
+<a name="stroppy-SideCarConfig"></a>
+
+### SideCarConfig
+SideCar contains configuration for plugins.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| url | [string](#string) |  | Url to connect the plugin instance |
+| settings | [Value.Struct](#stroppy-Value-Struct) | optional | Additional plugin settings |
+
+
+
+
+
+
+<a name="stroppy-Step"></a>
+
+### Step
+StepExecutorMappingConfig contains configuration for mapping steps to executors.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Name of the step |
+| workload | [string](#string) |  | Name of the step |
+| executor | [string](#string) |  | Name of the executor |
+| exporter | [string](#string) | optional | Name of the exporter |
+
+
+
+
+
+ 
+
+
+<a name="stroppy-DriverConfig-DriverType"></a>
+
+### DriverConfig.DriverType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| DRIVER_TYPE_UNSPECIFIED | 0 |  |
+| DRIVER_TYPE_POSTGRES | 1 |  |
+
+
+
+<a name="stroppy-LoggerConfig-LogLevel"></a>
+
+### LoggerConfig.LogLevel
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| LOG_LEVEL_DEBUG | 0 |  |
+| LOG_LEVEL_INFO | 1 |  |
+| LOG_LEVEL_WARN | 2 |  |
+| LOG_LEVEL_ERROR | 3 |  |
+| LOG_LEVEL_FATAL | 4 |  |
+
+
+
+<a name="stroppy-LoggerConfig-LogMode"></a>
+
+### LoggerConfig.LogMode
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| LOG_MODE_DEVELOPMENT | 0 |  |
+| LOG_MODE_PRODUCTION | 1 |  |
+
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="k6-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## k6.proto
+
+
+
+<a name="stroppy-ConstantArrivalRate"></a>
+
+### ConstantArrivalRate
+ConstantArrivalRate executor configuration.
+Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| rate | [uint32](#uint32) |  | Rate of iteration generation (number per time unit) |
+| time_unit | [google.protobuf.Duration](#google-protobuf-Duration) |  | Time unit for the &#34;rate&#34; field (e.g., &#34;1s&#34;) |
+| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the scenario |
+| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance |
+| max_vus | [uint32](#uint32) |  | Maximum allowed number of VUs if load increases |
+
+
+
+
+
+
+<a name="stroppy-ConstantVUs"></a>
+
+### ConstantVUs
+ConstantVUs executor configuration.
+Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| vus | [uint32](#uint32) |  | Fixed number of virtual users that will be simultaneously active at all times |
+| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the scenario execution. All VUs will start and execute iterations until this time is completed. |
+
+
+
+
+
+
+<a name="stroppy-K6Options"></a>
+
+### K6Options
+K6Executor contains configuration for k6 load testing tool integration.
+It contains paths to the k6 binary and the k6 test script, as well as
+additional arguments to pass to the k6 binary.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| k6_args | [string](#string) | repeated | Additional arguments to pass to the k6 binary |
+| setup_timeout | [google.protobuf.Duration](#google-protobuf-Duration) | optional | Timeout for k6 setup phase |
+| scenario | [K6Scenario](#stroppy-K6Scenario) |  | Scenario configuration |
+
+
+
+
+
+
+<a name="stroppy-K6Scenario"></a>
+
+### K6Scenario
+Scenario defines the overall test scenario configuration.
+It contains user tags, maximum duration, and executor configuration.
+Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| max_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Maximum duration for scenario execution. Used as a time limiter if main parameters (iterations, stages, duration) do not complete in time. |
+| shared_iterations | [SharedIterations](#stroppy-SharedIterations) |  | Shared iterations executor |
+| per_vu_iterations | [PerVuIterations](#stroppy-PerVuIterations) |  | Per-VU iterations executor |
+| constant_vus | [ConstantVUs](#stroppy-ConstantVUs) |  | Constant VUs executor |
+| ramping_vus | [RampingVUs](#stroppy-RampingVUs) |  | Ramping VUs executor |
+| constant_arrival_rate | [ConstantArrivalRate](#stroppy-ConstantArrivalRate) |  | Constant arrival rate executor |
+| ramping_arrival_rate | [RampingArrivalRate](#stroppy-RampingArrivalRate) |  | Ramping arrival rate executor |
+
+
+
+
+
+
+<a name="stroppy-PerVuIterations"></a>
+
+### PerVuIterations
+PerVuIterations executor configuration.
+Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| vus | [uint32](#uint32) |  | Number of virtual users |
+| iterations | [int64](#int64) |  | Number of iterations that each VU should execute |
+
+
+
+
+
+
+<a name="stroppy-RampingArrivalRate"></a>
+
+### RampingArrivalRate
+RampingArrivalRate executor configuration.
+Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| start_rate | [uint32](#uint32) |  | Initial rate (iterations per time_unit) |
+| time_unit | [google.protobuf.Duration](#google-protobuf-Duration) |  | Time unit for the rate (e.g., &#34;1s&#34;) |
+| stages | [RampingArrivalRate.RateStage](#stroppy-RampingArrivalRate-RateStage) | repeated | List of rate change stages |
+| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance |
+| max_vus | [uint32](#uint32) |  | Maximum number of VUs available for pool expansion |
+
+
+
+
+
+
+<a name="stroppy-RampingArrivalRate-RateStage"></a>
+
+### RampingArrivalRate.RateStage
+Rate stage configuration for ramping arrival rate
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| target | [uint32](#uint32) |  | Target rate (iterations per time_unit) at the end of the stage |
+| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the stage |
+
+
+
+
+
+
+<a name="stroppy-RampingVUs"></a>
+
+### RampingVUs
+RampingVUs executor configuration.
+Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| start_vus | [uint32](#uint32) |  | Initial number of virtual users |
+| stages | [RampingVUs.VUStage](#stroppy-RampingVUs-VUStage) | repeated | List of stages where VU count changes to target value over specified time |
+| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance. Helps avoid delays when creating new VUs during the test. |
+| max_vus | [uint32](#uint32) |  | Maximum number of VUs available for pool expansion |
+
+
+
+
+
+
+<a name="stroppy-RampingVUs-VUStage"></a>
+
+### RampingVUs.VUStage
+VU stage configuration for ramping
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the stage (e.g., &#34;30s&#34;) |
+| target | [uint32](#uint32) |  | Target number of VUs at the end of the stage |
+
+
+
+
+
+
+<a name="stroppy-SharedIterations"></a>
+
+### SharedIterations
+SharedIterations executor configuration.
+Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| iterations | [int64](#int64) |  | Total number of iterations to be executed by all VUs together. Iterations are distributed dynamically among available VUs. |
+| vus | [uint32](#uint32) |  | Number of virtual users that will execute these iterations in parallel |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="runtime-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## runtime.proto
+
+
+
+<a name="stroppy-DriverQuery"></a>
+
+### DriverQuery
+DriverQuery represents a query that can be executed by a database driver.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Name of the query |
+| request | [string](#string) |  | Request of the query |
+| params | [Value](#stroppy-Value) | repeated | Parameters of the query |
+
+
+
+
+
+
+<a name="stroppy-DriverQueryStat"></a>
+
+### DriverQueryStat
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| exec_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
+
+
+
+
+
+
+<a name="stroppy-DriverTransaction"></a>
+
+### DriverTransaction
+DriverTransaction represents a transaction that can be executed by a database
+driver.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| queries | [DriverQuery](#stroppy-DriverQuery) | repeated | Queries of the transaction |
+| isolation_level | [TxIsolationLevel](#stroppy-TxIsolationLevel) |  | Isolation level of the transaction |
+
+
+
+
+
+
+<a name="stroppy-DriverTransactionStat"></a>
+
+### DriverTransactionStat
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| queries | [DriverQueryStat](#stroppy-DriverQueryStat) | repeated |  |
+| exec_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
+| isolation_level | [TxIsolationLevel](#stroppy-TxIsolationLevel) |  |  |
+
+
+
+
+
+
+<a name="stroppy-StepContext"></a>
+
+### StepContext
+StepContext provides contextual information to a benchmark step during
+execution. It contains the run context and the step descriptor.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| config | [GlobalConfig](#stroppy-GlobalConfig) |  | Global configuration of the benchmark and its steps |
+| step | [Step](#stroppy-Step) |  | Current step |
+| executor | [ExecutorConfig](#stroppy-ExecutorConfig) |  | Executor configuration |
+| exporter | [ExporterConfig](#stroppy-ExporterConfig) | optional | Exporter configuration |
+| workload | [WorkloadDescriptor](#stroppy-WorkloadDescriptor) |  | Current workload descriptor |
+
+
+
+
+
+
+<a name="stroppy-UnitContext"></a>
+
+### UnitContext
+UnitBuildContext provides the context needed to build a unit from a
+WorkloadUnitDescriptor.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| step_context | [StepContext](#stroppy-StepContext) |  | Step context |
+| unit_descriptor | [WorkloadUnitDescriptor](#stroppy-WorkloadUnitDescriptor) |  | Current unit descriptor |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="sidecar-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## sidecar.proto
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="stroppy-SidecarService"></a>
+
+### SidecarService
+SidecarPlugin defines the gRPC service that sidecar plugins must implement.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| Initialize | [GlobalConfig](#stroppy-GlobalConfig) | [.google.protobuf.Empty](#google-protobuf-Empty) | Initialize is called once before the benchmark starts. Used to initialize resources of SidecarPlugin. |
+| OnStepStart | [StepContext](#stroppy-StepContext) | [.google.protobuf.Empty](#google-protobuf-Empty) | OnStepStart is called once before each step starts. |
+| OnStepEnd | [StepContext](#stroppy-StepContext) | [.google.protobuf.Empty](#google-protobuf-Empty) | OnStepEnd is called once after each step ends. |
+| Teardown | [GlobalConfig](#stroppy-GlobalConfig) | [.google.protobuf.Empty](#google-protobuf-Empty) | Teardown is called once after the benchmark ends. Used to clean up resources. |
 
  
 
@@ -1362,228 +1935,6 @@ way.
 
 
 
-<a name="config-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## config.proto
-
-
-
-<a name="stroppy-CloudConfig"></a>
-
-### CloudConfig
-CloudConfig contains configuration for stroppy cloud backend.
-
-
-
-
-
-
-<a name="stroppy-ConfigFile"></a>
-
-### ConfigFile
-ConfigFile contains the complete configuration for a benchmark run in file.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| global | [GlobalConfig](#stroppy-GlobalConfig) |  | Global configuration |
-| exporters | [ExporterConfig](#stroppy-ExporterConfig) | repeated | Exporters configuration |
-| executors | [ExecutorConfig](#stroppy-ExecutorConfig) | repeated | Executors configuration |
-| steps | [Step](#stroppy-Step) | repeated | Step to executor mapping configuration |
-| side_cars | [SideCarConfig](#stroppy-SideCarConfig) | repeated | Plugins configuration |
-| benchmark | [BenchmarkDescriptor](#stroppy-BenchmarkDescriptor) |  | BenchmarkDescriptor defines a complete benchmark consisting of multiple steps. |
-
-
-
-
-
-
-<a name="stroppy-DriverConfig"></a>
-
-### DriverConfig
-DriverConfig contains configuration for connecting to a database driver.
-It includes the driver plugin path, connection URL, and database-specific settings.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| url | [string](#string) |  | Database connection URL |
-| db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific configuration options |
-| driver_type | [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType) |  | Name/Type of chosen driver |
-
-
-
-
-
-
-<a name="stroppy-ExecutorConfig"></a>
-
-### ExecutorConfig
-ExecutorConfig contains configuration for an executor.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | Name of the executor |
-| k6 | [K6Options](#stroppy-K6Options) |  | Configuration for the executor |
-
-
-
-
-
-
-<a name="stroppy-ExporterConfig"></a>
-
-### ExporterConfig
-OtlpExporterConfig contains named configuration for an OTLP exporter.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | Name of the OTLP exporter |
-| otlp_export | [OtlpExport](#stroppy-OtlpExport) |  | Configuration for the OTLP exporter |
-
-
-
-
-
-
-<a name="stroppy-GlobalConfig"></a>
-
-### GlobalConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| version | [string](#string) |  | Version of the configuration format e.g. proto files version. This is used for backward compatibility of configs and will be set automatically from binary run if not present. |
-| run_id | [string](#string) |  | Run identifier for reproducible test runs or debugging If set to &#34;generate()&#34; stroppy eval ulid for run_id |
-| seed | [uint64](#uint64) |  | Random seed for reproducible test runs |
-| metadata | [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry) | repeated | Arbitrary metadata, may be passed to result labels and json output |
-| driver | [DriverConfig](#stroppy-DriverConfig) |  | Database driver configuration |
-| logger | [LoggerConfig](#stroppy-LoggerConfig) |  | Logging configuration |
-
-
-
-
-
-
-<a name="stroppy-GlobalConfig-MetadataEntry"></a>
-
-### GlobalConfig.MetadataEntry
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| value | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="stroppy-LoggerConfig"></a>
-
-### LoggerConfig
-LoggerConfig contains configuration for the logging system.
-It controls log levels and output formatting.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| log_level | [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel) |  | Minimum log level to output |
-| log_mode | [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode) |  | Logging mode (development or production) |
-
-
-
-
-
-
-<a name="stroppy-SideCarConfig"></a>
-
-### SideCarConfig
-SideCar contains configuration for plugins.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| url | [string](#string) |  | Url to connect the plugin instance |
-| settings | [Value.Struct](#stroppy-Value-Struct) | optional | Additional plugin settings |
-
-
-
-
-
-
-<a name="stroppy-Step"></a>
-
-### Step
-StepExecutorMappingConfig contains configuration for mapping steps to executors.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | Name of the step |
-| workload | [string](#string) |  | Name of the step |
-| executor | [string](#string) |  | Name of the executor |
-| exporter | [string](#string) | optional | Name of the exporter |
-
-
-
-
-
- 
-
-
-<a name="stroppy-DriverConfig-DriverType"></a>
-
-### DriverConfig.DriverType
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| DRIVER_TYPE_UNSPECIFIED | 0 |  |
-| DRIVER_TYPE_POSTGRES | 1 |  |
-
-
-
-<a name="stroppy-LoggerConfig-LogLevel"></a>
-
-### LoggerConfig.LogLevel
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| LOG_LEVEL_DEBUG | 0 |  |
-| LOG_LEVEL_INFO | 1 |  |
-| LOG_LEVEL_WARN | 2 |  |
-| LOG_LEVEL_ERROR | 3 |  |
-| LOG_LEVEL_FATAL | 4 |  |
-
-
-
-<a name="stroppy-LoggerConfig-LogMode"></a>
-
-### LoggerConfig.LogMode
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| LOG_MODE_DEVELOPMENT | 0 |  |
-| LOG_MODE_PRODUCTION | 1 |  |
-
-
- 
-
- 
-
- 
-
-
-
 <a name="descriptor-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -1814,321 +2165,6 @@ transaction.
  
 
  
-
- 
-
-
-
-<a name="k6-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## k6.proto
-
-
-
-<a name="stroppy-ConstantArrivalRate"></a>
-
-### ConstantArrivalRate
-ConstantArrivalRate executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| rate | [uint32](#uint32) |  | Rate of iteration generation (number per time unit) |
-| time_unit | [google.protobuf.Duration](#google-protobuf-Duration) |  | Time unit for the &#34;rate&#34; field (e.g., &#34;1s&#34;) |
-| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the scenario |
-| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance |
-| max_vus | [uint32](#uint32) |  | Maximum allowed number of VUs if load increases |
-
-
-
-
-
-
-<a name="stroppy-ConstantVUs"></a>
-
-### ConstantVUs
-ConstantVUs executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| vus | [uint32](#uint32) |  | Fixed number of virtual users that will be simultaneously active at all times |
-| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the scenario execution. All VUs will start and execute iterations until this time is completed. |
-
-
-
-
-
-
-<a name="stroppy-K6Options"></a>
-
-### K6Options
-K6Executor contains configuration for k6 load testing tool integration.
-It contains paths to the k6 binary and the k6 test script, as well as
-additional arguments to pass to the k6 binary.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| k6_args | [string](#string) | repeated | Additional arguments to pass to the k6 binary |
-| setup_timeout | [google.protobuf.Duration](#google-protobuf-Duration) | optional | Timeout for k6 setup phase |
-| scenario | [K6Scenario](#stroppy-K6Scenario) |  | Scenario configuration |
-
-
-
-
-
-
-<a name="stroppy-K6Scenario"></a>
-
-### K6Scenario
-Scenario defines the overall test scenario configuration.
-It contains user tags, maximum duration, and executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| max_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Maximum duration for scenario execution. Used as a time limiter if main parameters (iterations, stages, duration) do not complete in time. |
-| shared_iterations | [SharedIterations](#stroppy-SharedIterations) |  | Shared iterations executor |
-| per_vu_iterations | [PerVuIterations](#stroppy-PerVuIterations) |  | Per-VU iterations executor |
-| constant_vus | [ConstantVUs](#stroppy-ConstantVUs) |  | Constant VUs executor |
-| ramping_vus | [RampingVUs](#stroppy-RampingVUs) |  | Ramping VUs executor |
-| constant_arrival_rate | [ConstantArrivalRate](#stroppy-ConstantArrivalRate) |  | Constant arrival rate executor |
-| ramping_arrival_rate | [RampingArrivalRate](#stroppy-RampingArrivalRate) |  | Ramping arrival rate executor |
-
-
-
-
-
-
-<a name="stroppy-PerVuIterations"></a>
-
-### PerVuIterations
-PerVuIterations executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| vus | [uint32](#uint32) |  | Number of virtual users |
-| iterations | [int64](#int64) |  | Number of iterations that each VU should execute |
-
-
-
-
-
-
-<a name="stroppy-RampingArrivalRate"></a>
-
-### RampingArrivalRate
-RampingArrivalRate executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| start_rate | [uint32](#uint32) |  | Initial rate (iterations per time_unit) |
-| time_unit | [google.protobuf.Duration](#google-protobuf-Duration) |  | Time unit for the rate (e.g., &#34;1s&#34;) |
-| stages | [RampingArrivalRate.RateStage](#stroppy-RampingArrivalRate-RateStage) | repeated | List of rate change stages |
-| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance |
-| max_vus | [uint32](#uint32) |  | Maximum number of VUs available for pool expansion |
-
-
-
-
-
-
-<a name="stroppy-RampingArrivalRate-RateStage"></a>
-
-### RampingArrivalRate.RateStage
-Rate stage configuration for ramping arrival rate
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| target | [uint32](#uint32) |  | Target rate (iterations per time_unit) at the end of the stage |
-| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the stage |
-
-
-
-
-
-
-<a name="stroppy-RampingVUs"></a>
-
-### RampingVUs
-RampingVUs executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| start_vus | [uint32](#uint32) |  | Initial number of virtual users |
-| stages | [RampingVUs.VUStage](#stroppy-RampingVUs-VUStage) | repeated | List of stages where VU count changes to target value over specified time |
-| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance. Helps avoid delays when creating new VUs during the test. |
-| max_vus | [uint32](#uint32) |  | Maximum number of VUs available for pool expansion |
-
-
-
-
-
-
-<a name="stroppy-RampingVUs-VUStage"></a>
-
-### RampingVUs.VUStage
-VU stage configuration for ramping
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the stage (e.g., &#34;30s&#34;) |
-| target | [uint32](#uint32) |  | Target number of VUs at the end of the stage |
-
-
-
-
-
-
-<a name="stroppy-SharedIterations"></a>
-
-### SharedIterations
-SharedIterations executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| iterations | [int64](#int64) |  | Total number of iterations to be executed by all VUs together. Iterations are distributed dynamically among available VUs. |
-| vus | [uint32](#uint32) |  | Number of virtual users that will execute these iterations in parallel |
-
-
-
-
-
- 
-
- 
-
- 
-
- 
-
-
-
-<a name="runtime-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## runtime.proto
-
-
-
-<a name="stroppy-DriverQuery"></a>
-
-### DriverQuery
-DriverQuery represents a query that can be executed by a database driver.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | Name of the query |
-| request | [string](#string) |  | Request of the query |
-| params | [Value](#stroppy-Value) | repeated | Parameters of the query |
-
-
-
-
-
-
-<a name="stroppy-DriverTransaction"></a>
-
-### DriverTransaction
-DriverTransaction represents a transaction that can be executed by a database
-driver.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| queries | [DriverQuery](#stroppy-DriverQuery) | repeated | Queries of the transaction |
-| isolation_level | [TxIsolationLevel](#stroppy-TxIsolationLevel) |  | Isolation level of the transaction |
-
-
-
-
-
-
-<a name="stroppy-StepContext"></a>
-
-### StepContext
-StepContext provides contextual information to a benchmark step during execution.
-It contains the run context and the step descriptor.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| config | [GlobalConfig](#stroppy-GlobalConfig) |  | Global configuration of the benchmark and its steps |
-| step | [Step](#stroppy-Step) |  | Current step |
-| executor | [ExecutorConfig](#stroppy-ExecutorConfig) |  | Executor configuration |
-| exporter | [ExporterConfig](#stroppy-ExporterConfig) | optional | Exporter configuration |
-| workload | [WorkloadDescriptor](#stroppy-WorkloadDescriptor) |  | Current workload descriptor |
-
-
-
-
-
-
-<a name="stroppy-UnitContext"></a>
-
-### UnitContext
-UnitBuildContext provides the context needed to build a unit from a WorkloadUnitDescriptor.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| step_context | [StepContext](#stroppy-StepContext) |  | Step context |
-| unit_descriptor | [WorkloadUnitDescriptor](#stroppy-WorkloadUnitDescriptor) |  | Current unit descriptor |
-
-
-
-
-
- 
-
- 
-
- 
-
- 
-
-
-
-<a name="sidecar-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## sidecar.proto
-
-
- 
-
- 
-
- 
-
-
-<a name="stroppy-SidecarService"></a>
-
-### SidecarService
-SidecarPlugin defines the gRPC service that sidecar plugins must implement.
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| Initialize | [GlobalConfig](#stroppy-GlobalConfig) | [.google.protobuf.Empty](#google-protobuf-Empty) | Initialize is called once before the benchmark starts. Used to initialize resources of SidecarPlugin. |
-| OnStepStart | [StepContext](#stroppy-StepContext) | [.google.protobuf.Empty](#google-protobuf-Empty) | OnStepStart is called once before each step starts. |
-| OnStepEnd | [StepContext](#stroppy-StepContext) | [.google.protobuf.Empty](#google-protobuf-Empty) | OnStepEnd is called once after each step ends. |
-| Teardown | [GlobalConfig](#stroppy-GlobalConfig) | [.google.protobuf.Empty](#google-protobuf-Empty) | Teardown is called once after the benchmark ends. Used to clean up resources. |
 
  
 
