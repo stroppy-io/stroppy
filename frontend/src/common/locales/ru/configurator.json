@@ -1,0 +1,219 @@
+{
+  "page": {
+    "title": "Конфигуратор",
+    "subtitle": "Создание и настройка тестовых конфигураций"
+  },
+  "form": {
+    "basicInfo": "Основная информация",
+    "workloadType": "Тип нагрузки",
+    "database": "База данных",
+    "deploymentLayout": "Схема развертывания",
+    "hardwareConfig": "Конфигурация железа",
+    "nemeses": "Немезисы",
+    "tpsMetrics": "TPS Метрики",
+    "actions": "Действия"
+  },
+  "fields": {
+    "runId": "ID запуска",
+    "runName": "Название запуска",
+    "runDescription": "Описание запуска",
+    "runStatus": "Статус запуска",
+    "workloadType": "Выберите тип нагрузки",
+    "databaseType": "Тип базы данных",
+    "databaseVersion": "Версия",
+    "databaseBuild": "Сборка",
+    "deploymentLayoutType": "Тип развертывания",
+    "runners": "Количество раннеров",
+    "duration": "Продолжительность",
+    "tpsMax": "Максимальный TPS",
+    "tpsMin": "Минимальный TPS",
+    "tpsAverage": "Средний TPS",
+    "tps95p": "95-й процентиль TPS",
+    "tps99p": "99-й процентиль TPS"
+  },
+  "placeholders": {
+    "runId": "run-001",
+    "runName": "Введите название запуска",
+    "runDescription": "Краткое описание запуска",
+    "selectWorkloadType": "Выберите тип нагрузки",
+    "selectDatabaseType": "Выберите тип БД",
+    "selectDatabaseVersion": "Выберите версию",
+    "selectDeploymentType": "Выберите тип развертывания",
+    "databaseBuild": "Номер сборки (необязательно)",
+    "duration": "10m",
+    "tpsValue": "0.0"
+  },
+  "workloadTypes": {
+    "pgbench": {
+      "label": "PgBench",
+      "description": "Стандартный бенчмарк PostgreSQL"
+    },
+    "ycsb": {
+      "label": "YCSB",
+      "description": "Yahoo! Cloud Serving Benchmark"
+    },
+    "tpch": {
+      "label": "TPC-H",
+      "description": "Transaction Processing Performance Council - H"
+    },
+    "tpcc": {
+      "label": "TPC-C",
+      "description": "Transaction Processing Performance Council - C"
+    },
+    "custom": {
+      "label": "Пользовательский",
+      "description": "Пользовательская нагрузка"
+    }
+  },
+  "workloadProperties": {
+    "title": "Свойства нагрузки",
+    "runners": "Количество раннеров",
+    "runnersTooltip": "Количество параллельных процессов выполнения нагрузки",
+    "duration": "Продолжительность",
+    "durationTooltip": "Продолжительность выполнения теста (например: 10m, 1h)",
+    "pgbench": {
+      "scaleFactor": "Масштабный коэффициент",
+      "scaleFactorTooltip": "Количество строк в таблице pgbench_accounts",
+      "clients": "Количество клиентов",
+      "clientsTooltip": "Количество одновременных клиентских соединений",
+      "threads": "Количество потоков",
+      "threadsTooltip": "Количество рабочих потоков",
+      "transactions": "Количество транзакций",
+      "transactionsTooltip": "Общее количество транзакций для выполнения",
+      "customScript": "Пользовательский скрипт",
+      "customScriptTooltip": "Путь к пользовательскому скрипту pgbench"
+    },
+    "ycsb": {
+      "recordCount": "Количество записей",
+      "recordCountTooltip": "Количество записей для загрузки в БД",
+      "operationCount": "Количество операций",
+      "operationCountTooltip": "Количество операций для выполнения",
+      "workload": "Тип нагрузки",
+      "workloadTooltip": "Предустановленный тип нагрузки YCSB",
+      "workloadA": "Workload A (50% read, 50% update)",
+      "workloadB": "Workload B (95% read, 5% update)",
+      "workloadC": "Workload C (100% read)",
+      "workloadD": "Workload D (95% read, 5% insert)",
+      "workloadE": "Workload E (95% scan, 5% insert)",
+      "workloadF": "Workload F (50% read, 50% read-modify-write)"
+    },
+    "tpch": {
+      "scaleFactor": "Масштабный коэффициент",
+      "scaleFactorTooltip": "Размер базы данных в GB",
+      "streams": "Количество потоков",
+      "streamsTooltip": "Количество параллельных потоков выполнения запросов",
+      "queries": "Запросы для выполнения",
+      "queriesTooltip": "Список запросов TPC-H для выполнения"
+    },
+    "tpcc": {
+      "warehouses": "Количество складов",
+      "warehousesTooltip": "Количество складов в базе данных TPC-C",
+      "terminals": "Количество терминалов",
+      "terminalsTooltip": "Количество терминалов на склад",
+      "rampupTime": "Время разогрева",
+      "rampupTimeTooltip": "Время разогрева перед началом измерений",
+      "measureTime": "Время измерений",
+      "measureTimeTooltip": "Время выполнения измерений"
+    },
+    "custom": {
+      "properties": "Пользовательские свойства",
+      "propertiesTooltip": "JSON объект с пользовательскими свойствами нагрузки"
+    }
+  },
+  "databaseTypes": {
+    "postgres": {
+      "label": "PostgreSQL",
+      "description": "Популярная объектно-реляционная СУБД"
+    },
+    "mysql": {
+      "label": "MySQL",
+      "description": "Реляционная система управления базами данных"
+    },
+    "mongodb": {
+      "label": "MongoDB",
+      "description": "Документо-ориентированная NoSQL база данных"
+    },
+    "cassandra": {
+      "label": "Apache Cassandra",
+      "description": "Распределенная NoSQL база данных"
+    }
+  },
+  "deploymentLayouts": {
+    "singleNode": "single-node",
+    "masterReplica": "master-replica",
+    "cluster": "cluster",
+    "distributed": "distributed",
+    "sharded": "sharded"
+  },
+  "deploymentConfig": {
+    "title": "Конфигурация развертывания",
+    "masters": "Мастеры",
+    "replicas": "Реплики",
+    "segments": "Сегменты",
+    "coordinators": "Координаторы",
+    "witnesses": "Свидетели",
+    "shards": "Шарды"
+  },
+  "hardwareConfig": {
+    "title": "Конфигурация железа",
+    "addConfig": "Добавить конфигурацию железа",
+    "configName": "Название конфигурации",
+    "nodeCount": "Количество узлов",
+    "cpuCores": "Ядра CPU",
+    "memoryGB": "Память (GB)",
+    "storageType": "Тип накопителя",
+    "storageCapacity": "Объем (GB)",
+    "selectedConfig": "Выбранная конфигурация железа",
+    "configSignature": "Конфигурация: {signature}",
+    "storageTypes": {
+      "ssd": "SSD",
+      "nvme": "NVMe",
+      "hdd": "HDD",
+      "mixed": "Смешанный"
+    }
+  },
+  "nemeses": {
+    "title": "Немезисы",
+    "addNemesis": "Добавить немезис",
+    "nemesisType": "Тип немезиса",
+    "enabled": "Включен",
+    "disabled": "Отключен",
+    "signature": "Сигнатура немезисов",
+    "signatureValue": "Сигнатура: {signature}",
+    "types": {
+      "nodeFailure": "Отказ узла",
+      "networkPartition": "Разделение сети",
+      "clockSkew": "Расхождение часов",
+      "diskFailure": "Отказ диска",
+      "cpuOverload": "Перегрузка CPU",
+      "memoryLeak": "Утечка памяти"
+    }
+  },
+  "tpsMetrics": {
+    "title": "TPS Метрики",
+    "description": "Укажите метрики TPS (Transactions Per Second) для данного запуска. Все поля необязательны.",
+    "maxTooltip": "Максимальное количество транзакций в секунду",
+    "minTooltip": "Минимальное количество транзакций в секунду",
+    "averageTooltip": "Среднее количество транзакций в секунду",
+    "p95Tooltip": "95-й процентиль количества транзакций в секунду",
+    "p99Tooltip": "99-й процентиль количества транзакций в секунду"
+  },
+  "actions": {
+    "cancel": "Отмена",
+    "createRun": "Создать запуск"
+  },
+  "messages": {
+    "runCreated": "Запуск создан успешно!",
+    "errorCreatingRun": "Ошибка при создании запуска",
+    "selectHardwareConfig": "Выберите конфигурацию железа"
+  },
+  "validation": {
+    "runIdRequired": "Введите ID запуска",
+    "runNameRequired": "Введите название запуска",
+    "workloadTypeRequired": "Выберите тип нагрузки",
+    "databaseTypeRequired": "Выберите тип базы данных",
+    "databaseVersionRequired": "Выберите версию БД",
+    "deploymentTypeRequired": "Выберите тип развертывания",
+    "runnersRequired": "Укажите количество раннеров"
+  }
+}

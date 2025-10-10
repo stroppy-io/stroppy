@@ -1,0 +1,219 @@
+{
+  "page": {
+    "title": "Configurator",
+    "subtitle": "Create and configure test configurations"
+  },
+  "form": {
+    "basicInfo": "Basic Information",
+    "workloadType": "Workload Type",
+    "database": "Database",
+    "deploymentLayout": "Deployment Layout",
+    "hardwareConfig": "Hardware Configuration",
+    "nemeses": "Nemeses",
+    "tpsMetrics": "TPS Metrics",
+    "actions": "Actions"
+  },
+  "fields": {
+    "runId": "Run ID",
+    "runName": "Run Name",
+    "runDescription": "Run Description",
+    "runStatus": "Run Status",
+    "workloadType": "Select workload type",
+    "databaseType": "Database type",
+    "databaseVersion": "Version",
+    "databaseBuild": "Build",
+    "deploymentLayoutType": "Deployment type",
+    "runners": "Number of runners",
+    "duration": "Duration",
+    "tpsMax": "Max TPS",
+    "tpsMin": "Min TPS",
+    "tpsAverage": "Average TPS",
+    "tps95p": "95th Percentile TPS",
+    "tps99p": "99th Percentile TPS"
+  },
+  "placeholders": {
+    "runId": "run-001",
+    "runName": "Enter run name",
+    "runDescription": "Brief run description",
+    "selectWorkloadType": "Select workload type",
+    "selectDatabaseType": "Select database type",
+    "selectDatabaseVersion": "Select version",
+    "selectDeploymentType": "Select deployment type",
+    "databaseBuild": "Build number (optional)",
+    "duration": "10m",
+    "tpsValue": "0.0"
+  },
+  "workloadTypes": {
+    "pgbench": {
+      "label": "PgBench",
+      "description": "Standard PostgreSQL benchmark"
+    },
+    "ycsb": {
+      "label": "YCSB",
+      "description": "Yahoo! Cloud Serving Benchmark"
+    },
+    "tpch": {
+      "label": "TPC-H",
+      "description": "Transaction Processing Performance Council - H"
+    },
+    "tpcc": {
+      "label": "TPC-C",
+      "description": "Transaction Processing Performance Council - C"
+    },
+    "custom": {
+      "label": "Custom",
+      "description": "Custom workload"
+    }
+  },
+  "workloadProperties": {
+    "title": "Workload Properties",
+    "runners": "Number of runners",
+    "runnersTooltip": "Number of parallel workload execution processes",
+    "duration": "Duration",
+    "durationTooltip": "Test execution duration (e.g.: 10m, 1h)",
+    "pgbench": {
+      "scaleFactor": "Scale factor",
+      "scaleFactorTooltip": "Number of rows in pgbench_accounts table",
+      "clients": "Number of clients",
+      "clientsTooltip": "Number of simultaneous client connections",
+      "threads": "Number of threads",
+      "threadsTooltip": "Number of worker threads",
+      "transactions": "Number of transactions",
+      "transactionsTooltip": "Total number of transactions to execute",
+      "customScript": "Custom script",
+      "customScriptTooltip": "Path to custom pgbench script"
+    },
+    "ycsb": {
+      "recordCount": "Record count",
+      "recordCountTooltip": "Number of records to load into database",
+      "operationCount": "Operation count",
+      "operationCountTooltip": "Number of operations to execute",
+      "workload": "Workload type",
+      "workloadTooltip": "Predefined YCSB workload type",
+      "workloadA": "Workload A (50% read, 50% update)",
+      "workloadB": "Workload B (95% read, 5% update)",
+      "workloadC": "Workload C (100% read)",
+      "workloadD": "Workload D (95% read, 5% insert)",
+      "workloadE": "Workload E (95% scan, 5% insert)",
+      "workloadF": "Workload F (50% read, 50% read-modify-write)"
+    },
+    "tpch": {
+      "scaleFactor": "Scale factor",
+      "scaleFactorTooltip": "Database size in GB",
+      "streams": "Number of streams",
+      "streamsTooltip": "Number of parallel query execution streams",
+      "queries": "Queries to execute",
+      "queriesTooltip": "List of TPC-H queries to execute"
+    },
+    "tpcc": {
+      "warehouses": "Number of warehouses",
+      "warehousesTooltip": "Number of warehouses in TPC-C database",
+      "terminals": "Number of terminals",
+      "terminalsTooltip": "Number of terminals per warehouse",
+      "rampupTime": "Ramp-up time",
+      "rampupTimeTooltip": "Ramp-up time before starting measurements",
+      "measureTime": "Measurement time",
+      "measureTimeTooltip": "Measurement execution time"
+    },
+    "custom": {
+      "properties": "Custom properties",
+      "propertiesTooltip": "JSON object with custom workload properties"
+    }
+  },
+  "databaseTypes": {
+    "postgres": {
+      "label": "PostgreSQL",
+      "description": "Popular object-relational database"
+    },
+    "mysql": {
+      "label": "MySQL",
+      "description": "Relational database management system"
+    },
+    "mongodb": {
+      "label": "MongoDB",
+      "description": "Document-oriented NoSQL database"
+    },
+    "cassandra": {
+      "label": "Apache Cassandra",
+      "description": "Distributed NoSQL database"
+    }
+  },
+  "deploymentLayouts": {
+    "singleNode": "single-node",
+    "masterReplica": "master-replica",
+    "cluster": "cluster",
+    "distributed": "distributed",
+    "sharded": "sharded"
+  },
+  "deploymentConfig": {
+    "title": "Deployment Configuration",
+    "masters": "Masters",
+    "replicas": "Replicas",
+    "segments": "Segments",
+    "coordinators": "Coordinators",
+    "witnesses": "Witnesses",
+    "shards": "Shards"
+  },
+  "hardwareConfig": {
+    "title": "Hardware Configuration",
+    "addConfig": "Add hardware configuration",
+    "configName": "Configuration name",
+    "nodeCount": "Number of nodes",
+    "cpuCores": "CPU cores",
+    "memoryGB": "Memory (GB)",
+    "storageType": "Storage type",
+    "storageCapacity": "Capacity (GB)",
+    "selectedConfig": "Selected hardware configuration",
+    "configSignature": "Configuration: {signature}",
+    "storageTypes": {
+      "ssd": "SSD",
+      "nvme": "NVMe",
+      "hdd": "HDD",
+      "mixed": "Mixed"
+    }
+  },
+  "nemeses": {
+    "title": "Nemeses",
+    "addNemesis": "Add nemesis",
+    "nemesisType": "Nemesis type",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "signature": "Nemesis signature",
+    "signatureValue": "Signature: {signature}",
+    "types": {
+      "nodeFailure": "Node failure",
+      "networkPartition": "Network partition",
+      "clockSkew": "Clock skew",
+      "diskFailure": "Disk failure",
+      "cpuOverload": "CPU overload",
+      "memoryLeak": "Memory leak"
+    }
+  },
+  "tpsMetrics": {
+    "title": "TPS Metrics",
+    "description": "Specify TPS (Transactions Per Second) metrics for this run. All fields are optional.",
+    "maxTooltip": "Maximum number of transactions per second",
+    "minTooltip": "Minimum number of transactions per second",
+    "averageTooltip": "Average number of transactions per second",
+    "p95Tooltip": "95th percentile of transactions per second",
+    "p99Tooltip": "99th percentile of transactions per second"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "createRun": "Create Run"
+  },
+  "messages": {
+    "runCreated": "Run created successfully!",
+    "errorCreatingRun": "Error creating run",
+    "selectHardwareConfig": "Select hardware configuration"
+  },
+  "validation": {
+    "runIdRequired": "Enter run ID",
+    "runNameRequired": "Enter run name",
+    "workloadTypeRequired": "Select workload type",
+    "databaseTypeRequired": "Select database type",
+    "databaseVersionRequired": "Select database version",
+    "deploymentTypeRequired": "Select deployment type",
+    "runnersRequired": "Specify number of runners"
+  }
+}
