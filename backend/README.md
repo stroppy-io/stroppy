@@ -1,6 +1,6 @@
 # Stroppy Cloud Panel Backend
 
-Golang backend для Stroppy Cloud Panel с использованием Gin, SQLite, DDD архитектуры и TDD подхода.
+Golang backend для Stroppy Cloud Panel с использованием Gin, PostgreSQL, DDD архитектуры и TDD подхода.
 
 ## Архитектура
 
@@ -13,7 +13,7 @@ backend/
 │   ├── domain/                  # Доменные модели и интерфейсы
 │   │   ├── user/               # Доменная модель пользователя
 │   │   └── run/                # Доменная модель запуска
-│   ├── repository/sqlite/       # Реализация репозиториев для SQLite
+│   ├── repository/postgres/     # Реализация репозиториев для PostgreSQL
 │   ├── service/                # Бизнес-логика
 │   ├── handler/                # HTTP обработчики
 │   └── middleware/             # Middleware для аутентификации
@@ -32,7 +32,7 @@ backend/
 - ✅ Валидация входных данных
 - ✅ Обработка ошибок
 - ✅ Unit тесты
-- ✅ SQLite база данных
+- ✅ PostgreSQL база данных
 - ✅ CORS поддержка
 
 ## API Endpoints
@@ -64,7 +64,7 @@ backend/
 ### Требования
 
 - Go 1.21+
-- SQLite3
+- PostgreSQL
 
 ### Установка зависимостей
 
@@ -100,7 +100,12 @@ make test-coverage
 
 Приложение настраивается через переменные окружения:
 
-- `DB_PATH` - Путь к файлу базы данных SQLite (по умолчанию: `./stroppy.db`)
+- `DB_HOST` - Хост PostgreSQL (по умолчанию: `localhost`)
+- `DB_PORT` - Порт PostgreSQL (по умолчанию: `5432`)
+- `DB_USER` - Пользователь PostgreSQL (по умолчанию: `stroppy`)
+- `DB_PASSWORD` - Пароль PostgreSQL (по умолчанию: `stroppy`)
+- `DB_NAME` - Имя базы данных PostgreSQL (по умолчанию: `stroppy`)
+- `DB_SSLMODE` - Режим SSL для PostgreSQL (по умолчанию: `disable`)
 - `JWT_SECRET` - Секретный ключ для JWT токенов (по умолчанию: `your-secret-key-change-in-production`)
 - `PORT` - Порт для HTTP сервера (по умолчанию: `8080`)
 

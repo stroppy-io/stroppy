@@ -1,18 +1,19 @@
 import { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from 'antd'
-import { AuthProvider } from './contexts/AuthContext'
-import { ThemeProvider } from './contexts/ThemeContext'
-import ProtectedRoute from './components/ProtectedRoute'
-import Sidebar from './components/Sidebar'
-import Header from './components/Header'
-import PageWrapper from './components/PageWrapper'
-import DashboardPage from './pages/DashboardPage'
-import ConfiguratorPage from './pages/ConfiguratorPage'
-import RunsPage from './pages/RunsPage'
-import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
-import LandingPage from './pages/LandingPage'
+import { AuthProvider } from './common/contexts/AuthContext'
+import { ThemeProvider } from './common/contexts/ThemeContext'
+import ProtectedRoute from './panel/components/ProtectedRoute'
+import Sidebar from './panel/components/Sidebar'
+import Header from './panel/components/Header'
+import PageWrapper from './panel/components/PageWrapper'
+import DashboardPage from './panel/pages/DashboardPage'
+import ConfiguratorPage from './panel/pages/ConfiguratorPage'
+import RunsPage from './panel/pages/RunsPage'
+import LoginPage from './landing/pages/LoginPage'
+import RegisterPage from './landing/pages/RegisterPage'
+import LandingPage from './landing/pages/LandingPage'
+import DocumentationPage from './landing/pages/DocumentationPage'
 
 const { Footer } = Layout
 
@@ -28,6 +29,9 @@ const AppContent: React.FC = () => {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/docs" element={<DocumentationPage />} />
+          <Route path="/docs/:sectionId" element={<DocumentationPage />} />
+          <Route path="/docs/:sectionId/:fileId" element={<DocumentationPage />} />
           
           {/* Защищенные маршруты */}
           <Route path="/app/*" element={

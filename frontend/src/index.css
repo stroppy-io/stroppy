@@ -1096,3 +1096,31 @@ body {
   background: rgba(0, 0, 0, 0.1) !important;
   border: 1px solid rgba(0, 0, 0, 0.2) !important;
 }
+
+/* Стили для страницы документации */
+.documentation-page .ant-layout {
+  background: transparent !important;
+}
+
+.documentation-page .ant-layout-sider {
+  background: transparent !important;
+}
+
+.documentation-page .ant-layout-content {
+  background: transparent !important;
+}
+
+/* Переопределяем глобальные стили для документации */
+.documentation-page .ant-layout {
+  margin-top: 60px !important;
+}
+
+.documentation-page .ant-layout-sider {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.documentation-page .ant-layout-content {
+  position: relative !important;
+  z-index: 1 !important;
+}

@@ -32,7 +32,7 @@ func GetEmbeddedMigrations() ([]*Migration, error) {
 
 		content, err := migrationFiles.ReadFile(entry.Name())
 		if err != nil {
-			return nil, fmt.Errorf("failed to read migration file %s: %w", err)
+			return nil, fmt.Errorf("failed to read migration file %s: %w", entry.Name(), err)
 		}
 
 		migration := &Migration{
