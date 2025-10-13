@@ -2,10 +2,12 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
@@ -80,16 +82,25 @@ func (d *Driver) GenerateNextUnit(
 func (d *Driver) RunTransaction(
 	ctx context.Context,
 	transaction *stroppy.DriverTransaction,
-) error {
+) (*stroppy.DriverTransactionStat, error) {
+	var (
+		stat *stroppy.DriverTransactionStat
+		err  error
+	)
+
 	if transaction.GetIsolationLevel() == stroppy.TxIsolationLevel_TX_ISOLATION_LEVEL_UNSPECIFIED {
-		return d.runTransactionInternal(ctx, transaction, d.pgxPool)
+		stat, err = d.runTransactionInternal(ctx, transaction, d.pgxPool)
+
+		return stat, err
 	}
 
-	return d.txManager.DoWithSettings(
+	return stat, d.txManager.DoWithSettings(
 		ctx,
 		NewStroppyIsolationSettings(transaction),
 		func(ctx context.Context) error {
-			return d.runTransactionInternal(ctx, transaction, d.txExecutor)
+			stat, err = d.runTransactionInternal(ctx, transaction, d.txExecutor)
+
+			return err
 		})
 }
 
@@ -97,26 +108,40 @@ func (d *Driver) runTransactionInternal(
 	ctx context.Context,
 	transaction *stroppy.DriverTransaction,
 	executor Executor,
-) error {
+) (*stroppy.DriverTransactionStat, error) {
+	queries := make([]*stroppy.DriverQueryStat, 0, len(transaction.GetQueries()))
+	txStart := time.Now()
+
 	for _, query := range transaction.GetQueries() {
 		values := make([]any, len(query.GetParams()))
 
 		for i, v := range query.GetParams() {
 			val, err := d.builder.ValueToPgxValue(v)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			values[i] = val
 		}
 
+		start := time.Now()
+
 		_, err := executor.Exec(ctx, query.GetRequest(), values...)
 		if err != nil {
-			return err
+			return nil, err
 		}
+
+		queries = append(queries, &stroppy.DriverQueryStat{
+			Name:         query.GetName(),
+			ExecDuration: durationpb.New(time.Since(start)),
+		})
 	}
 
-	return nil
+	return &stroppy.DriverTransactionStat{
+		IsolationLevel: transaction.GetIsolationLevel(),
+		ExecDuration:   durationpb.New(time.Since(txStart)),
+		Queries:        queries,
+	}, nil
 }
 
 func (d *Driver) Teardown(_ context.Context) error {

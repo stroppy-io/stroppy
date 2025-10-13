@@ -9,6 +9,7 @@ package proto
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -22,8 +23,8 @@ const (
 )
 
 // *
-// StepContext provides contextual information to a benchmark step during execution.
-// It contains the run context and the step descriptor.
+// StepContext provides contextual information to a benchmark step during
+// execution. It contains the run context and the step descriptor.
 type StepContext struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Global configuration of the benchmark and its steps
@@ -106,7 +107,8 @@ func (x *StepContext) GetWorkload() *WorkloadDescriptor {
 }
 
 // *
-// UnitBuildContext provides the context needed to build a unit from a WorkloadUnitDescriptor.
+// UnitBuildContext provides the context needed to build a unit from a
+// WorkloadUnitDescriptor.
 type UnitContext struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Step context
@@ -283,11 +285,123 @@ func (x *DriverTransaction) GetIsolationLevel() TxIsolationLevel {
 	return TxIsolationLevel_TX_ISOLATION_LEVEL_UNSPECIFIED
 }
 
+type DriverQueryStat struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	ExecDuration  *durationpb.Duration   `protobuf:"bytes,2,opt,name=exec_duration,json=execDuration,proto3" json:"exec_duration,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DriverQueryStat) Reset() {
+	*x = DriverQueryStat{}
+	mi := &file_runtime_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DriverQueryStat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DriverQueryStat) ProtoMessage() {}
+
+func (x *DriverQueryStat) ProtoReflect() protoreflect.Message {
+	mi := &file_runtime_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DriverQueryStat.ProtoReflect.Descriptor instead.
+func (*DriverQueryStat) Descriptor() ([]byte, []int) {
+	return file_runtime_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DriverQueryStat) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DriverQueryStat) GetExecDuration() *durationpb.Duration {
+	if x != nil {
+		return x.ExecDuration
+	}
+	return nil
+}
+
+type DriverTransactionStat struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Queries        []*DriverQueryStat     `protobuf:"bytes,1,rep,name=queries,proto3" json:"queries,omitempty"`
+	ExecDuration   *durationpb.Duration   `protobuf:"bytes,2,opt,name=exec_duration,json=execDuration,proto3" json:"exec_duration,omitempty"`
+	IsolationLevel TxIsolationLevel       `protobuf:"varint,3,opt,name=isolation_level,json=isolationLevel,proto3,enum=stroppy.TxIsolationLevel" json:"isolation_level,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *DriverTransactionStat) Reset() {
+	*x = DriverTransactionStat{}
+	mi := &file_runtime_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DriverTransactionStat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DriverTransactionStat) ProtoMessage() {}
+
+func (x *DriverTransactionStat) ProtoReflect() protoreflect.Message {
+	mi := &file_runtime_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DriverTransactionStat.ProtoReflect.Descriptor instead.
+func (*DriverTransactionStat) Descriptor() ([]byte, []int) {
+	return file_runtime_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *DriverTransactionStat) GetQueries() []*DriverQueryStat {
+	if x != nil {
+		return x.Queries
+	}
+	return nil
+}
+
+func (x *DriverTransactionStat) GetExecDuration() *durationpb.Duration {
+	if x != nil {
+		return x.ExecDuration
+	}
+	return nil
+}
+
+func (x *DriverTransactionStat) GetIsolationLevel() TxIsolationLevel {
+	if x != nil {
+		return x.IsolationLevel
+	}
+	return TxIsolationLevel_TX_ISOLATION_LEVEL_UNSPECIFIED
+}
+
 var File_runtime_proto protoreflect.FileDescriptor
 
 const file_runtime_proto_rawDesc = "" +
 	"\n" +
-	"\rruntime.proto\x12\astroppy\x1a\fcommon.proto\x1a\fconfig.proto\x1a\x10descriptor.proto\"\x94\x02\n" +
+	"\rruntime.proto\x12\astroppy\x1a\x1egoogle/protobuf/duration.proto\x1a\fcommon.proto\x1a\fconfig.proto\x1a\x10descriptor.proto\"\x94\x02\n" +
 	"\vStepContext\x12-\n" +
 	"\x06config\x18\x01 \x01(\v2\x15.stroppy.GlobalConfigR\x06config\x12!\n" +
 	"\x04step\x18\x02 \x01(\v2\r.stroppy.StepR\x04step\x123\n" +
@@ -304,7 +418,14 @@ const file_runtime_proto_rawDesc = "" +
 	"\x06params\x18\x03 \x03(\v2\x0e.stroppy.ValueR\x06params\"\x87\x01\n" +
 	"\x11DriverTransaction\x12.\n" +
 	"\aqueries\x18\x01 \x03(\v2\x14.stroppy.DriverQueryR\aqueries\x12B\n" +
-	"\x0fisolation_level\x18\x02 \x01(\x0e2\x19.stroppy.TxIsolationLevelR\x0eisolationLevelB.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
+	"\x0fisolation_level\x18\x02 \x01(\x0e2\x19.stroppy.TxIsolationLevelR\x0eisolationLevel\"e\n" +
+	"\x0fDriverQueryStat\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12>\n" +
+	"\rexec_duration\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\fexecDuration\"\xcf\x01\n" +
+	"\x15DriverTransactionStat\x122\n" +
+	"\aqueries\x18\x01 \x03(\v2\x18.stroppy.DriverQueryStatR\aqueries\x12>\n" +
+	"\rexec_duration\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\fexecDuration\x12B\n" +
+	"\x0fisolation_level\x18\x03 \x01(\x0e2\x19.stroppy.TxIsolationLevelR\x0eisolationLevelB.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
 
 var (
 	file_runtime_proto_rawDescOnce sync.Once
@@ -318,37 +439,44 @@ func file_runtime_proto_rawDescGZIP() []byte {
 	return file_runtime_proto_rawDescData
 }
 
-var file_runtime_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_runtime_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_runtime_proto_goTypes = []any{
 	(*StepContext)(nil),            // 0: stroppy.StepContext
 	(*UnitContext)(nil),            // 1: stroppy.UnitContext
 	(*DriverQuery)(nil),            // 2: stroppy.DriverQuery
 	(*DriverTransaction)(nil),      // 3: stroppy.DriverTransaction
-	(*GlobalConfig)(nil),           // 4: stroppy.GlobalConfig
-	(*Step)(nil),                   // 5: stroppy.Step
-	(*ExecutorConfig)(nil),         // 6: stroppy.ExecutorConfig
-	(*ExporterConfig)(nil),         // 7: stroppy.ExporterConfig
-	(*WorkloadDescriptor)(nil),     // 8: stroppy.WorkloadDescriptor
-	(*WorkloadUnitDescriptor)(nil), // 9: stroppy.WorkloadUnitDescriptor
-	(*Value)(nil),                  // 10: stroppy.Value
-	(TxIsolationLevel)(0),          // 11: stroppy.TxIsolationLevel
+	(*DriverQueryStat)(nil),        // 4: stroppy.DriverQueryStat
+	(*DriverTransactionStat)(nil),  // 5: stroppy.DriverTransactionStat
+	(*GlobalConfig)(nil),           // 6: stroppy.GlobalConfig
+	(*Step)(nil),                   // 7: stroppy.Step
+	(*ExecutorConfig)(nil),         // 8: stroppy.ExecutorConfig
+	(*ExporterConfig)(nil),         // 9: stroppy.ExporterConfig
+	(*WorkloadDescriptor)(nil),     // 10: stroppy.WorkloadDescriptor
+	(*WorkloadUnitDescriptor)(nil), // 11: stroppy.WorkloadUnitDescriptor
+	(*Value)(nil),                  // 12: stroppy.Value
+	(TxIsolationLevel)(0),          // 13: stroppy.TxIsolationLevel
+	(*durationpb.Duration)(nil),    // 14: google.protobuf.Duration
 }
 var file_runtime_proto_depIdxs = []int32{
-	4,  // 0: stroppy.StepContext.config:type_name -> stroppy.GlobalConfig
-	5,  // 1: stroppy.StepContext.step:type_name -> stroppy.Step
-	6,  // 2: stroppy.StepContext.executor:type_name -> stroppy.ExecutorConfig
-	7,  // 3: stroppy.StepContext.exporter:type_name -> stroppy.ExporterConfig
-	8,  // 4: stroppy.StepContext.workload:type_name -> stroppy.WorkloadDescriptor
+	6,  // 0: stroppy.StepContext.config:type_name -> stroppy.GlobalConfig
+	7,  // 1: stroppy.StepContext.step:type_name -> stroppy.Step
+	8,  // 2: stroppy.StepContext.executor:type_name -> stroppy.ExecutorConfig
+	9,  // 3: stroppy.StepContext.exporter:type_name -> stroppy.ExporterConfig
+	10, // 4: stroppy.StepContext.workload:type_name -> stroppy.WorkloadDescriptor
 	0,  // 5: stroppy.UnitContext.step_context:type_name -> stroppy.StepContext
-	9,  // 6: stroppy.UnitContext.unit_descriptor:type_name -> stroppy.WorkloadUnitDescriptor
-	10, // 7: stroppy.DriverQuery.params:type_name -> stroppy.Value
+	11, // 6: stroppy.UnitContext.unit_descriptor:type_name -> stroppy.WorkloadUnitDescriptor
+	12, // 7: stroppy.DriverQuery.params:type_name -> stroppy.Value
 	2,  // 8: stroppy.DriverTransaction.queries:type_name -> stroppy.DriverQuery
-	11, // 9: stroppy.DriverTransaction.isolation_level:type_name -> stroppy.TxIsolationLevel
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	13, // 9: stroppy.DriverTransaction.isolation_level:type_name -> stroppy.TxIsolationLevel
+	14, // 10: stroppy.DriverQueryStat.exec_duration:type_name -> google.protobuf.Duration
+	4,  // 11: stroppy.DriverTransactionStat.queries:type_name -> stroppy.DriverQueryStat
+	14, // 12: stroppy.DriverTransactionStat.exec_duration:type_name -> google.protobuf.Duration
+	13, // 13: stroppy.DriverTransactionStat.isolation_level:type_name -> stroppy.TxIsolationLevel
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_runtime_proto_init() }
@@ -366,7 +494,7 @@ func file_runtime_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_runtime_proto_rawDesc), len(file_runtime_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

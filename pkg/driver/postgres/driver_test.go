@@ -44,8 +44,9 @@ func TestDriver_RunTransaction(t *testing.T) {
 
 	mock.ExpectExec("SELECT 1").WillReturnResult(pgxmock.NewResult("SELECT", 1))
 
-	err = drv.RunTransaction(ctx, query)
+	stats, err := drv.RunTransaction(ctx, query)
 	require.NoError(t, err)
+	require.NotEmpty(t, stats)
 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
