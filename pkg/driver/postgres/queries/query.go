@@ -132,7 +132,7 @@ func NewQuery(
 
 	query, err := newQuery(generators, descriptor)
 	if err != nil { // TODO: add ctx.Err() check
-		return nil, fmt.Errorf("can't create new query due to: %w", err)
+		return nil, fmt.Errorf("can't create new query '%s' due to: %w", descriptor.GetName(), err)
 	}
 
 	return &stroppy.DriverTransaction{

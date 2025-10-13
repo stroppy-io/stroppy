@@ -254,6 +254,23 @@ message Generation {
             }
         }
     }
+
+    // TODO: Add range rule to limit amount of random value.
+    //       So limit 5 will generate randoms (2, 1, 3, 3, 5) and then stops.
+    // TODO: Add limit continuation politics.
+    //       If generator stopped it can behave differently after it.
+    //       repeat - strart itself from again.
+    //       bounce - start itself in backward direction.
+    //       max - produce max value.
+    //       min - produce min value.
+    //       null - nulls if allowed.
+    // TODO: add control over random repeatability.
+    //       Now every generator with the same params will generate an identical
+    //       sequence. Two gens with (min: 1, max: 10) will generate
+    //       1, 5, 9, 5... parallely as seed is common for every gen. It's do a
+    //       random data with the same gen definitions not so random
+    //       occasionally.
+
     /**
      * Rules contains type-specific generation configurations.
      */
@@ -318,6 +335,9 @@ message Generation {
             /** Valid length range for the string */
             Range.UInt64Range len_range = 2
                 [ (validate.rules).message.required = true ];
+
+            // TODO: 'constant' shouldn't require 'len_range' to use it.
+
             /** Fixed value (if specified, overrides generation) */
             optional string constant = 3;
         }

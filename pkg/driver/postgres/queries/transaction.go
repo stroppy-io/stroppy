@@ -23,7 +23,11 @@ func NewTransaction(
 	for _, query := range descriptor.GetQueries() {
 		q, err := NewQuery(ctx, lg, generators, query)
 		if err != nil {
-			return nil, fmt.Errorf("can't create query for tx due to: %w", err)
+			return nil, fmt.Errorf(
+				"can't create query for tx '%s' due to: %w",
+				descriptor.GetName(),
+				err,
+			)
 		}
 
 		queries = append(queries, q.GetQueries()...)

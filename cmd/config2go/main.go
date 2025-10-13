@@ -49,21 +49,23 @@ func main() {
 
 	var cfg stroppy.ConfigFile
 
-	switch path.Ext(configPath) {
-	case "json":
+	switch ext := path.Ext(configPath); ext {
+	case ".json":
 		err = protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(configBytes, &cfg)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "can't unmarshall json config: %s\n", err)
 
 			return
 		}
-	case "yaml", "yml":
+	case ".yaml", ".yml":
 		err = protoyaml.Unmarshal(configBytes, &cfg)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "can't unmarshall yaml config: %s\n", err)
 
 			return
 		}
+	default:
+		fmt.Fprintf(os.Stdout, "unmatched extension %s", ext)
 	}
 
 	if helperNeeded {
@@ -73,8 +75,8 @@ func main() {
 			"}\n\n")
 	}
 
-	fmt.Fprintf(os.Stdout, `//nolint:mnd
-func %sConfig() *proto.Config {
+	fmt.Fprintf(os.Stdout, `//nolint:mnd,funlen,lll,maintidx // a huge and long magic constant
+func %sConfig() *proto.ConfigFile {
 	return %s
 }
 `, configName, ProtoToGoLiteral(&cfg))
