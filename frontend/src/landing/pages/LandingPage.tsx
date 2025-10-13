@@ -15,10 +15,8 @@ import {
   Modal,
   Descriptions,
   Progress,
-  Dropdown
 } from 'antd'
 import { 
-  GlobalOutlined,
   RocketOutlined,
   CheckCircleOutlined,
   ArrowRightOutlined,
@@ -35,16 +33,13 @@ import {
   UserOutlined,
   SettingOutlined,
   ThunderboltOutlined,
-  LogoutOutlined,
-  DownOutlined,
-  SunOutlined,
-  MoonOutlined,
-  TranslationOutlined
+  GlobalOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from '../../common/hooks/useTranslation'
 import { useAuth } from '../../common/contexts/AuthContext'
 import { useTheme } from '../../common/contexts/ThemeContext'
+import Header from '../components/Header'
 import dayjs from 'dayjs'
 import { apiClient } from '../../common/services/api'
 import type { Run } from '../../common/services/api'
@@ -63,9 +58,8 @@ const { Title, Paragraph, Text } = Typography
 const LandingPage: React.FC = () => {
   const navigate = useNavigate()
   const { t } = useTranslation('landing')
-  const { isAuthenticated, user, logout } = useAuth()
-  const { darkReaderEnabled, toggleDarkReader } = useTheme()
-  const { changeLanguage, getCurrentLanguage, getAvailableLanguages } = useTranslation()
+  const { isAuthenticated } = useAuth()
+  const { darkReaderEnabled } = useTheme()
   // Убираем состояния связанные со скроллом
   
   // Состояния для Dashboard функциональности
@@ -110,23 +104,7 @@ const LandingPage: React.FC = () => {
     navigate('/app/dashboard')
   }
 
-  const handleLogout = async () => {
-    try {
-      await logout()
-      // После выхода перенаправляем на главную страницу
-      navigate('/')
-    } catch (error) {
-      console.error('Ошибка выхода:', error)
-    }
-  }
 
-  const handleLanguageChange = (languageCode: string) => {
-    changeLanguage(languageCode)
-  }
-
-  const handleThemeToggle = () => {
-    toggleDarkReader()
-  }
 
   // Убираем функции связанные со скроллом
 
@@ -163,12 +141,12 @@ const LandingPage: React.FC = () => {
   ]
 
   const benefits = [
-    t('benefits.1'),
-    t('benefits.2'),
-    t('benefits.3'),
-    t('benefits.4'),
-    t('benefits.5'),
-    t('benefits.6')
+    t('about.benefits.1'),
+    t('about.benefits.2'),
+    t('about.benefits.3'),
+    t('about.benefits.4'),
+    t('about.benefits.5'),
+    t('about.benefits.6')
   ]
 
   // Функции для работы с данными запусков
@@ -292,6 +270,7 @@ const LandingPage: React.FC = () => {
   // Фильтрация и сортировка данных
   // Показываем только завершенные запуски в топах
   const filteredAndSortedRuns = useMemo(() => {
+    if (!runs || !Array.isArray(runs)) return []
     return runs
       .filter(run => run.status === 'completed') // Фильтруем только завершенные запуски
       .map((run, index) => ({
@@ -307,225 +286,7 @@ const LandingPage: React.FC = () => {
 
   return (
     <>
-      {/* Упрощенный Header без навигации по секциям */}
-              <div
-                style={{
-                  background: darkReaderEnabled ? '#1f1f1f' : '#fafafa',
-                  padding: '8px 32px',
-                  boxShadow: darkReaderEnabled ? '0 2px 8px rgba(0,0,0,0.2)' : '0 2px 8px rgba(0,0,0,0.05)',
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  zIndex: 1000,
-                  width: '100%',
-                  height: '60px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  borderBottom: darkReaderEnabled ? '1px solid #333' : '1px solid #e8e8e8'
-                }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          maxWidth: '1200px',
-          margin: '0 auto',
-          width: '100%'
-        }}>
-          {/* Логотип - левый край */}
-          <div 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '16px', 
-              flex: '0 0 auto', 
-              padding: '8px 0',
-              cursor: 'pointer',
-              transition: 'opacity 0.3s ease'
-            }}
-            onClick={() => navigate('/')}
-            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
-            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-          >
-            <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'linear-gradient(135deg, #1890ff, #096dd9)',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <GlobalOutlined style={{ color: 'white', fontSize: '20px' }} />
-            </div>
-            <Title level={3} style={{ margin: 0, color: darkReaderEnabled ? '#ffffff' : '#595959' }}>
-              Stroppy Cloud Panel
-            </Title>
-          </div>
-          
-          {/* Пользователь - правый край */}
-          <div style={{ flex: '0 0 auto', padding: '8px 0' }}>
-            <Space size="middle">
-              {/* Ссылка на документацию */}
-              <Button 
-                type="text" 
-                onClick={() => navigate('/docs')}
-                style={{ 
-                  color: darkReaderEnabled ? '#ffffff' : '#595959',
-                  fontWeight: '500',
-                  borderRadius: '6px',
-                  padding: '6px 12px',
-                  background: darkReaderEnabled ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.03)',
-                  border: '1px solid transparent',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                Документация
-              </Button>
-              
-              {/* Переключатель языка */}
-              <Dropdown
-                menu={{
-                  items: getAvailableLanguages().map((lang) => ({
-                    key: lang.code,
-                    label: lang.nativeName,
-                    onClick: () => handleLanguageChange(lang.code),
-                    icon: <TranslationOutlined />
-                  }))
-                }}
-                placement="bottomRight"
-                trigger={['click']}
-              >
-                <Button 
-                  type="text" 
-                  icon={<TranslationOutlined />}
-                  style={{ 
-                    color: darkReaderEnabled ? '#ffffff' : '#595959',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontWeight: '500',
-                    borderRadius: '6px',
-                    padding: '6px 12px',
-                    background: darkReaderEnabled ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.03)',
-                    border: '1px solid transparent',
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {getCurrentLanguage().toUpperCase()}
-                </Button>
-              </Dropdown>
-
-              {/* Переключатель темы */}
-              <Button 
-                type="text" 
-                icon={darkReaderEnabled ? <MoonOutlined /> : <SunOutlined />}
-                onClick={handleThemeToggle}
-                style={{ 
-                  color: darkReaderEnabled ? '#40a9ff' : '#1890ff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontWeight: '500',
-                  borderRadius: '6px',
-                  padding: '6px 12px',
-                  background: darkReaderEnabled ? 'rgba(64, 169, 255, 0.08)' : 'rgba(24, 144, 255, 0.08)',
-                  border: '1px solid transparent',
-                  transition: 'all 0.3s ease'
-                }}
-                title={darkReaderEnabled ? t('settings.theme.dark') : t('settings.theme.light')}
-              />
-              {isAuthenticated ? (
-                <>
-                  <Dropdown
-                    menu={{
-                      items: [
-                        {
-                          key: 'profile',
-                          label: (
-                            <div style={{ padding: '8px 0' }}>
-                              <div style={{ fontWeight: 'bold', color: '#262626' }}>
-                                {user?.username || 'Пользователь'}
-                              </div>
-                              <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                                ID: {user?.id || ''}
-                              </div>
-                            </div>
-                          ),
-                          disabled: true
-                        },
-                        {
-                          type: 'divider'
-                        },
-                        {
-                          key: 'logout',
-                          label: 'Выйти',
-                          icon: <LogoutOutlined />,
-                          onClick: handleLogout
-                        }
-                      ]
-                    }}
-                    placement="bottomRight"
-                    trigger={['click']}
-                  >
-                    <Button 
-                      type="text" 
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '8px',
-                        color: darkReaderEnabled ? '#40a9ff' : '#1890ff',
-                        fontWeight: '500',
-                        borderRadius: '6px',
-                        padding: '6px 12px',
-                        background: darkReaderEnabled ? 'rgba(64, 169, 255, 0.08)' : 'rgba(24, 144, 255, 0.08)',
-                        border: '1px solid transparent',
-                        transition: 'all 0.3s ease'
-                      }}
-                    >
-                      <UserOutlined />
-                      {user?.username || 'Пользователь'}
-                      <DownOutlined style={{ fontSize: '10px' }} />
-                    </Button>
-                  </Dropdown>
-                  <Button 
-                    type="default" 
-                    onClick={handleGoToPanel}
-                    style={{
-                      background: 'linear-gradient(135deg, #52c41a, #389e0d)',
-                      borderColor: '#52c41a',
-                      color: 'white'
-                    }}
-                  >
-                    Панель
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button 
-                    type="text" 
-                    onClick={handleLogin}
-                    style={{ 
-                      color: darkReaderEnabled ? '#ffffff' : '#595959',
-                      fontWeight: '500',
-                      borderRadius: '6px',
-                      padding: '6px 16px',
-                      background: darkReaderEnabled ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.03)',
-                      border: '1px solid transparent',
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    {t('navigation.login')}
-                  </Button>
-                  <Button type="primary" onClick={handleGetStarted}>
-                    {t('navigation.getStarted')}
-                  </Button>
-                </>
-              )}
-            </Space>
-          </div>
-        </div>
-      </div>
+      <Header showDocsButton={true} />
 
       {/* Основной контент */}
       <Layout style={{ minHeight: '100vh' }}>

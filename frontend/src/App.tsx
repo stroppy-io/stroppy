@@ -30,8 +30,6 @@ const AppContent: React.FC = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/docs" element={<DocumentationPage />} />
-          <Route path="/docs/:sectionId" element={<DocumentationPage />} />
-          <Route path="/docs/:sectionId/:fileId" element={<DocumentationPage />} />
           
           {/* Защищенные маршруты */}
           <Route path="/app/*" element={

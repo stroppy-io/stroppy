@@ -11,7 +11,8 @@
     "theme": {
       "light": "Светлая тема",
       "dark": "Темная тема",
-      "system": "Системная тема"
+      "system": "Системная тема",
+      "toggle": "Переключить тему"
     },
     "language": {
       "ru": "Русский",
@@ -93,5 +94,27 @@
       "website": "stroppy.io"
     },
     "copyright": "© 2024 Stroppy. Распространяется под лицензией BSD 2-Clause License."
+  },
+  "documentation": {
+    "title": "Документация",
+    "loadingError": "Ошибка загрузки документации",
+    "mainTitle": "Документация Stroppy Cloud Panel",
+    "mainDescription": "Полное руководство по использованию платформы для нагрузочного тестирования баз данных и облачных приложений",
+    "search": {
+      "title": "Поиск по документации",
+      "placeholder": "Введите запрос для поиска...",
+      "foundResults": "Найдено {{count}} результатов:",
+      "noResults": "Ничего не найдено",
+      "noResultsDescription": "Попробуйте изменить запрос",
+      "startTyping": "Начните вводить запрос для поиска",
+      "shortcut": "Используйте Ctrl+K для быстрого доступа к поиску"
+    },
+    "breadcrumb": {
+      "home": "Главная",
+      "documentation": "Документация"
+    },
+    "footer": {
+      "copyright": "Stroppy Cloud Panel ©2024. Все права защищены."
+    }
   }
 }

@@ -5,6 +5,8 @@ export interface DocSection {
   description: string
   path: string
   files: DocFile[]
+  subsections?: DocSection[] // Подразделы
+  parentId?: string // ID родительского раздела
 }
 
 export interface DocFile {
@@ -14,6 +16,8 @@ export interface DocFile {
   content?: string
   lastModified?: string
   language: string
+  sectionId: string // ID раздела, к которому принадлежит файл
+  subsectionId?: string // ID подраздела, если файл находится в подразделе
 }
 
 export interface DocStructure {
@@ -31,8 +35,8 @@ const markdownModules = import.meta.glob('/src/docs/**/*.md', { query: '?raw', i
 const scanDocsStructure = async (language: SupportedLanguage = 'ru'): Promise<DocStructure> => {
   const sections: DocSection[] = []
   
-  // Автоматически определяем разделы на основе структуры папок
-  const sectionMap = new Map<string, DocFile[]>()
+  // Структура для хранения разделов и подразделов
+  const sectionMap = new Map<string, { files: DocFile[], subsections: Map<string, DocFile[]> }>()
   
   // Загружаем все markdown файлы динамически
   const filePromises = Object.entries(markdownModules).map(async ([filePath, importFn]) => {
@@ -47,7 +51,7 @@ const scanDocsStructure = async (language: SupportedLanguage = 'ru'): Promise<Do
   
   const files = (await Promise.all(filePromises)).filter(Boolean) as Array<{ filePath: string; content: string }>
   
-  // Проходим по всем файлам и группируем их по разделам
+  // Проходим по всем файлам и группируем их по разделам и подразделам
   for (const { filePath, content } of files) {
     // Преобразуем путь из /src/docs/... в /docs/...
     const normalizedPath = filePath.replace('/src', '')
@@ -72,32 +76,72 @@ const scanDocsStructure = async (language: SupportedLanguage = 'ru'): Promise<Do
     if (pathParts.length >= 3 && pathParts[1] === 'docs') {
       const sectionId = pathParts[2]
       
+      // Инициализируем раздел, если его еще нет
       if (!sectionMap.has(sectionId)) {
-        sectionMap.set(sectionId, [])
+        sectionMap.set(sectionId, { files: [], subsections: new Map() })
       }
       
       const title = extractTitleFromContent(content) || baseFileName
-      sectionMap.get(sectionId)!.push({
-        id: baseFileName,
+      const docFile: DocFile = {
+        id: `${sectionId}-${baseFileName}`,
         title: title,
         path: normalizedPath,
-        language: fileLanguage
-      })
+        language: fileLanguage,
+        sectionId: sectionId
+      }
+      
+      // Проверяем, есть ли подраздел (глубина 5: /docs/section/subsection/file.md)
+      // Пример: /docs/api/authentication_ru.md -> length 4 (файл в корне раздела)
+      // Пример: /docs/api/test/first-test_ru.md -> length 5 (файл в подразделе)
+      if (pathParts.length >= 5) {
+        const subsectionId = pathParts[3]
+        docFile.subsectionId = subsectionId
+        
+        // Инициализируем подраздел, если его еще нет
+        if (!sectionMap.get(sectionId)!.subsections.has(subsectionId)) {
+          sectionMap.get(sectionId)!.subsections.set(subsectionId, [])
+        }
+        
+        sectionMap.get(sectionId)!.subsections.get(subsectionId)!.push(docFile)
+      } else {
+        // Файл находится в корне раздела
+        sectionMap.get(sectionId)!.files.push(docFile)
+      }
     }
   }
   
   // Создаем разделы на основе найденных папок
-  for (const [sectionId, files] of sectionMap) {
+  for (const [sectionId, sectionData] of sectionMap) {
     // Автоматически генерируем название и описание на основе ID раздела
     const title = generateSectionTitle(sectionId, language)
     const description = generateSectionDescription(sectionId, language)
+    
+    // Создаем подразделы
+    const subsections: DocSection[] = []
+    for (const [subsectionId, subsectionFiles] of sectionData.subsections) {
+      const subsectionTitle = generateSectionTitle(subsectionId, language)
+      const subsectionDescription = generateSectionDescription(subsectionId, language)
+      
+      subsections.push({
+        id: `${sectionId}-${subsectionId}`,
+        title: subsectionTitle,
+        description: subsectionDescription,
+        path: `/docs/${sectionId}/${subsectionId}`,
+        files: subsectionFiles,
+        parentId: sectionId
+      })
+    }
+    
+    // Сортируем подразделы по алфавиту
+    subsections.sort((a, b) => a.id.localeCompare(b.id))
     
     sections.push({
       id: sectionId,
       title: title,
       description: description,
       path: `/docs/${sectionId}`,
-      files: files
+      files: sectionData.files,
+      subsections: subsections.length > 0 ? subsections : undefined
     })
   }
   
@@ -256,12 +300,32 @@ export const docsService = {
         const baseFileName = fileNameWithoutExt.replace(`_${language}`, '')
         const title = extractTitleFromContent(content) || baseFileName
         
-        return {
-          id: baseFileName,
-          title: title,
-          path: filePath,
-          content: content,
-          language: language
+        // Определяем раздел и подраздел из пути
+        const sectionId = pathParts[pathParts.length - 2] // папка раздела или подраздела
+        let subsectionId: string | undefined
+        
+        // Если глубина пути больше 3, значит есть подраздел
+        if (pathParts.length > 4) {
+          subsectionId = pathParts[pathParts.length - 2] // подраздел
+          const mainSectionId = pathParts[pathParts.length - 3] // основной раздел
+          return {
+            id: `${mainSectionId}-${subsectionId}-${baseFileName}`,
+            title: title,
+            path: filePath,
+            content: content,
+            language: language,
+            sectionId: mainSectionId,
+            subsectionId: subsectionId
+          }
+        } else {
+          return {
+            id: `${sectionId}-${baseFileName}`,
+            title: title,
+            path: filePath,
+            content: content,
+            language: language,
+            sectionId: sectionId
+          }
         }
       }
       return null
@@ -278,6 +342,7 @@ export const docsService = {
     const lowerCaseQuery = query.toLowerCase()
 
     for (const section of sections) {
+      // Поиск в файлах основного раздела
       for (const file of section.files) {
         try {
           const fileContent = await this.getFile(file.path, language)
@@ -290,6 +355,26 @@ export const docsService = {
           }
         } catch (error) {
           console.debug(`Error searching in file: ${file.path}`)
+        }
+      }
+      
+      // Поиск в подразделах
+      if (section.subsections) {
+        for (const subsection of section.subsections) {
+          for (const file of subsection.files) {
+            try {
+              const fileContent = await this.getFile(file.path, language)
+              if (fileContent && fileContent.content) {
+                // Поиск по заголовку и содержимому
+                const searchText = `${fileContent.title} ${fileContent.content}`.toLowerCase()
+                if (searchText.includes(lowerCaseQuery)) {
+                  results.push(fileContent)
+                }
+              }
+            } catch (error) {
+              console.debug(`Error searching in file: ${file.path}`)
+            }
+          }
         }
       }
     }

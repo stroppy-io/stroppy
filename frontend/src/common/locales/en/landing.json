@@ -11,7 +11,8 @@
     "theme": {
       "light": "Light Theme",
       "dark": "Dark Theme",
-      "system": "System Theme"
+      "system": "System Theme",
+      "toggle": "Toggle Theme"
     },
     "language": {
       "ru": "Русский",
@@ -93,5 +94,27 @@
       "website": "stroppy.io"
     },
     "copyright": "© 2024 Stroppy. Distributed under BSD 2-Clause License."
+  },
+  "documentation": {
+    "title": "Documentation",
+    "loadingError": "Error loading documentation",
+    "mainTitle": "Stroppy Cloud Panel Documentation",
+    "mainDescription": "Complete guide to using the platform for database and cloud application load testing",
+    "search": {
+      "title": "Search Documentation",
+      "placeholder": "Enter search query...",
+      "foundResults": "Found {{count}} results:",
+      "noResults": "Nothing found",
+      "noResultsDescription": "Try changing your query",
+      "startTyping": "Start typing to search",
+      "shortcut": "Use Ctrl+K for quick access to search"
+    },
+    "breadcrumb": {
+      "home": "Home",
+      "documentation": "Documentation"
+    },
+    "footer": {
+      "copyright": "Stroppy Cloud Panel ©2024. All rights reserved."
+    }
   }
 }
