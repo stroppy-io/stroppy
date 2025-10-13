@@ -6184,8 +6184,8 @@ export const RampingArrivalRate_RateStage = new RampingArrivalRate_RateStage$Typ
 
 /**
  * *
- * StepContext provides contextual information to a benchmark step during execution.
- * It contains the run context and the step descriptor.
+ * StepContext provides contextual information to a benchmark step during
+ * execution. It contains the run context and the step descriptor.
  *
  * @generated from protobuf message stroppy.StepContext
  */
@@ -6223,7 +6223,8 @@ export interface StepContext {
 }
 /**
  * *
- * UnitBuildContext provides the context needed to build a unit from a WorkloadUnitDescriptor.
+ * UnitBuildContext provides the context needed to build a unit from a
+ * WorkloadUnitDescriptor.
  *
  * @generated from protobuf message stroppy.UnitContext
  */
@@ -6285,6 +6286,36 @@ export interface DriverTransaction {
      * * Isolation level of the transaction
      *
      * @generated from protobuf field: stroppy.TxIsolationLevel isolation_level = 2
+     */
+    isolationLevel: TxIsolationLevel;
+}
+/**
+ * @generated from protobuf message stroppy.DriverQueryStat
+ */
+export interface DriverQueryStat {
+    /**
+     * @generated from protobuf field: string name = 1
+     */
+    name: string;
+    /**
+     * @generated from protobuf field: google.protobuf.Duration exec_duration = 2
+     */
+    execDuration?: Duration;
+}
+/**
+ * @generated from protobuf message stroppy.DriverTransactionStat
+ */
+export interface DriverTransactionStat {
+    /**
+     * @generated from protobuf field: repeated stroppy.DriverQueryStat queries = 1
+     */
+    queries: DriverQueryStat[];
+    /**
+     * @generated from protobuf field: google.protobuf.Duration exec_duration = 2
+     */
+    execDuration?: Duration;
+    /**
+     * @generated from protobuf field: stroppy.TxIsolationLevel isolation_level = 3
      */
     isolationLevel: TxIsolationLevel;
 }
@@ -6533,6 +6564,122 @@ class DriverTransaction$Type extends MessageType<DriverTransaction> {
  * @generated MessageType for protobuf message stroppy.DriverTransaction
  */
 export const DriverTransaction = new DriverTransaction$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class DriverQueryStat$Type extends MessageType<DriverQueryStat> {
+    constructor() {
+        super("stroppy.DriverQueryStat", [
+            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "exec_duration", kind: "message", T: () => Duration }
+        ]);
+    }
+    create(value?: PartialMessage<DriverQueryStat>): DriverQueryStat {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.name = "";
+        if (value !== undefined)
+            reflectionMergePartial<DriverQueryStat>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: DriverQueryStat): DriverQueryStat {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string name */ 1:
+                    message.name = reader.string();
+                    break;
+                case /* google.protobuf.Duration exec_duration */ 2:
+                    message.execDuration = Duration.internalBinaryRead(reader, reader.uint32(), options, message.execDuration);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: DriverQueryStat, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string name = 1; */
+        if (message.name !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.name);
+        /* google.protobuf.Duration exec_duration = 2; */
+        if (message.execDuration)
+            Duration.internalBinaryWrite(message.execDuration, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.DriverQueryStat
+ */
+export const DriverQueryStat = new DriverQueryStat$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class DriverTransactionStat$Type extends MessageType<DriverTransactionStat> {
+    constructor() {
+        super("stroppy.DriverTransactionStat", [
+            { no: 1, name: "queries", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => DriverQueryStat },
+            { no: 2, name: "exec_duration", kind: "message", T: () => Duration },
+            { no: 3, name: "isolation_level", kind: "enum", T: () => ["stroppy.TxIsolationLevel", TxIsolationLevel] }
+        ]);
+    }
+    create(value?: PartialMessage<DriverTransactionStat>): DriverTransactionStat {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.queries = [];
+        message.isolationLevel = 0;
+        if (value !== undefined)
+            reflectionMergePartial<DriverTransactionStat>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: DriverTransactionStat): DriverTransactionStat {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* repeated stroppy.DriverQueryStat queries */ 1:
+                    message.queries.push(DriverQueryStat.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                case /* google.protobuf.Duration exec_duration */ 2:
+                    message.execDuration = Duration.internalBinaryRead(reader, reader.uint32(), options, message.execDuration);
+                    break;
+                case /* stroppy.TxIsolationLevel isolation_level */ 3:
+                    message.isolationLevel = reader.int32();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: DriverTransactionStat, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* repeated stroppy.DriverQueryStat queries = 1; */
+        for (let i = 0; i < message.queries.length; i++)
+            DriverQueryStat.internalBinaryWrite(message.queries[i], writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* google.protobuf.Duration exec_duration = 2; */
+        if (message.execDuration)
+            Duration.internalBinaryWrite(message.execDuration, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.TxIsolationLevel isolation_level = 3; */
+        if (message.isolationLevel !== 0)
+            writer.tag(3, WireType.Varint).int32(message.isolationLevel);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.DriverTransactionStat
+ */
+export const DriverTransactionStat = new DriverTransactionStat$Type();
 // @generated by protobuf-ts 2.11.1 with parameter force_disable_services,force_client_none,force_exclude_all_options,keep_enum_prefix,add_pb_suffix,long_type_string
 // @generated from protobuf file "google/protobuf/descriptor.proto" (package "google.protobuf", syntax proto2)
 // tslint:disable
