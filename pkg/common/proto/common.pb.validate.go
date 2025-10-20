@@ -1681,106 +1681,6 @@ var _ interface {
 	ErrorName() string
 } = Generation_RangeValidationError{}
 
-// Validate checks the field values on Generation_Rules with the rules defined
-// in the proto definition for this message. If any rules are violated, the
-// first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// Generation_RulesMultiError, or nil if none found.
-func (m *Generation_Rules) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if len(errors) > 0 {
-		return Generation_RulesMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_RulesMultiError is an error wrapping multiple validation errors
-// returned by Generation_Rules.ValidateAll() if the designated constraints
-// aren't met.
-type Generation_RulesMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_RulesMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_RulesMultiError) AllErrors() []error { return m }
-
-// Generation_RulesValidationError is the validation error returned by
-// Generation_Rules.Validate if the designated constraints aren't met.
-type Generation_RulesValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_RulesValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_RulesValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_RulesValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_RulesValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_RulesValidationError) ErrorName() string { return "Generation_RulesValidationError" }
-
-// Error satisfies the builtin error interface
-func (e Generation_RulesValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_RulesValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_RulesValidationError{}
-
 // Validate checks the field values on Generation_Rule with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
@@ -1803,12 +1703,12 @@ func (m *Generation_Rule) validate(all bool) error {
 
 	var errors []error
 
-	oneofTypePresent := false
-	switch v := m.Type.(type) {
-	case *Generation_Rule_FloatRules:
+	oneofKindPresent := false
+	switch v := m.Kind.(type) {
+	case *Generation_Rule_Int32Range:
 		if v == nil {
 			err := Generation_RuleValidationError{
-				field:  "Type",
+				field:  "Kind",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -1816,14 +1716,14 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofKindPresent = true
 
 		if all {
-			switch v := interface{}(m.GetFloatRules()).(type) {
+			switch v := interface{}(m.GetInt32Range()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "FloatRules",
+						field:  "Int32Range",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1831,26 +1731,26 @@ func (m *Generation_Rule) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "FloatRules",
+						field:  "Int32Range",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetFloatRules()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetInt32Range()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
-					field:  "FloatRules",
+					field:  "Int32Range",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *Generation_Rule_DoubleRules:
+	case *Generation_Rule_Int64Range:
 		if v == nil {
 			err := Generation_RuleValidationError{
-				field:  "Type",
+				field:  "Kind",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -1858,14 +1758,14 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofKindPresent = true
 
 		if all {
-			switch v := interface{}(m.GetDoubleRules()).(type) {
+			switch v := interface{}(m.GetInt64Range()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "DoubleRules",
+						field:  "Int64Range",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1873,26 +1773,26 @@ func (m *Generation_Rule) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "DoubleRules",
+						field:  "Int64Range",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetDoubleRules()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetInt64Range()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
-					field:  "DoubleRules",
+					field:  "Int64Range",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *Generation_Rule_Int32Rules:
+	case *Generation_Rule_Uint32Range:
 		if v == nil {
 			err := Generation_RuleValidationError{
-				field:  "Type",
+				field:  "Kind",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -1900,14 +1800,14 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofKindPresent = true
 
 		if all {
-			switch v := interface{}(m.GetInt32Rules()).(type) {
+			switch v := interface{}(m.GetUint32Range()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "Int32Rules",
+						field:  "Uint32Range",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1915,26 +1815,26 @@ func (m *Generation_Rule) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "Int32Rules",
+						field:  "Uint32Range",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetInt32Rules()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetUint32Range()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
-					field:  "Int32Rules",
+					field:  "Uint32Range",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *Generation_Rule_Int64Rules:
+	case *Generation_Rule_Uint64Range:
 		if v == nil {
 			err := Generation_RuleValidationError{
-				field:  "Type",
+				field:  "Kind",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -1942,14 +1842,14 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofKindPresent = true
 
 		if all {
-			switch v := interface{}(m.GetInt64Rules()).(type) {
+			switch v := interface{}(m.GetUint64Range()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "Int64Rules",
+						field:  "Uint64Range",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1957,26 +1857,26 @@ func (m *Generation_Rule) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "Int64Rules",
+						field:  "Uint64Range",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetInt64Rules()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetUint64Range()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
-					field:  "Int64Rules",
+					field:  "Uint64Range",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *Generation_Rule_Uint32Rules:
+	case *Generation_Rule_FloatRange:
 		if v == nil {
 			err := Generation_RuleValidationError{
-				field:  "Type",
+				field:  "Kind",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -1984,14 +1884,14 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofKindPresent = true
 
 		if all {
-			switch v := interface{}(m.GetUint32Rules()).(type) {
+			switch v := interface{}(m.GetFloatRange()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "Uint32Rules",
+						field:  "FloatRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1999,26 +1899,26 @@ func (m *Generation_Rule) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "Uint32Rules",
+						field:  "FloatRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetUint32Rules()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetFloatRange()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
-					field:  "Uint32Rules",
+					field:  "FloatRange",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *Generation_Rule_Uint64Rules:
+	case *Generation_Rule_DoubleRange:
 		if v == nil {
 			err := Generation_RuleValidationError{
-				field:  "Type",
+				field:  "Kind",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -2026,14 +1926,14 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofKindPresent = true
 
 		if all {
-			switch v := interface{}(m.GetUint64Rules()).(type) {
+			switch v := interface{}(m.GetDoubleRange()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "Uint64Rules",
+						field:  "DoubleRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -2041,26 +1941,26 @@ func (m *Generation_Rule) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "Uint64Rules",
+						field:  "DoubleRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetUint64Rules()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetDoubleRange()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
-					field:  "Uint64Rules",
+					field:  "DoubleRange",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *Generation_Rule_BoolRules:
+	case *Generation_Rule_DecimalRange:
 		if v == nil {
 			err := Generation_RuleValidationError{
-				field:  "Type",
+				field:  "Kind",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -2068,14 +1968,14 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofKindPresent = true
 
 		if all {
-			switch v := interface{}(m.GetBoolRules()).(type) {
+			switch v := interface{}(m.GetDecimalRange()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "BoolRules",
+						field:  "DecimalRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -2083,26 +1983,26 @@ func (m *Generation_Rule) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "BoolRules",
+						field:  "DecimalRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetBoolRules()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetDecimalRange()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
-					field:  "BoolRules",
+					field:  "DecimalRange",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *Generation_Rule_StringRules:
+	case *Generation_Rule_StringRange:
 		if v == nil {
 			err := Generation_RuleValidationError{
-				field:  "Type",
+				field:  "Kind",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -2110,14 +2010,14 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofKindPresent = true
 
 		if all {
-			switch v := interface{}(m.GetStringRules()).(type) {
+			switch v := interface{}(m.GetStringRange()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "StringRules",
+						field:  "StringRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -2125,26 +2025,26 @@ func (m *Generation_Rule) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "StringRules",
+						field:  "StringRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetStringRules()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetStringRange()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
-					field:  "StringRules",
+					field:  "StringRange",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *Generation_Rule_DatetimeRules:
+	case *Generation_Rule_BoolRange:
 		if v == nil {
 			err := Generation_RuleValidationError{
-				field:  "Type",
+				field:  "Kind",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -2152,14 +2052,14 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofKindPresent = true
 
 		if all {
-			switch v := interface{}(m.GetDatetimeRules()).(type) {
+			switch v := interface{}(m.GetBoolRange()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "DatetimeRules",
+						field:  "BoolRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -2167,26 +2067,26 @@ func (m *Generation_Rule) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "DatetimeRules",
+						field:  "BoolRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetDatetimeRules()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetBoolRange()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
-					field:  "DatetimeRules",
+					field:  "BoolRange",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *Generation_Rule_UuidRules:
+	case *Generation_Rule_DatetimeRange:
 		if v == nil {
 			err := Generation_RuleValidationError{
-				field:  "Type",
+				field:  "Kind",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -2194,14 +2094,14 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofKindPresent = true
 
 		if all {
-			switch v := interface{}(m.GetUuidRules()).(type) {
+			switch v := interface{}(m.GetDatetimeRange()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "UuidRules",
+						field:  "DatetimeRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -2209,26 +2109,26 @@ func (m *Generation_Rule) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "UuidRules",
+						field:  "DatetimeRange",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetUuidRules()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetDatetimeRange()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
-					field:  "UuidRules",
+					field:  "DatetimeRange",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *Generation_Rule_DecimalRules:
+	case *Generation_Rule_Int32Const:
 		if v == nil {
 			err := Generation_RuleValidationError{
-				field:  "Type",
+				field:  "Kind",
 				reason: "oneof value cannot be a typed-nil",
 			}
 			if !all {
@@ -2236,14 +2136,92 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		oneofTypePresent = true
+		oneofKindPresent = true
+		// no validation rules for Int32Const
+	case *Generation_Rule_Int64Const:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+		// no validation rules for Int64Const
+	case *Generation_Rule_Uint32Const:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+		// no validation rules for Uint32Const
+	case *Generation_Rule_Uint64Const:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+		// no validation rules for Uint64Const
+	case *Generation_Rule_FloatConst:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+		// no validation rules for FloatConst
+	case *Generation_Rule_DoubleConst:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+		// no validation rules for DoubleConst
+	case *Generation_Rule_DecimalConst:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
 
 		if all {
-			switch v := interface{}(m.GetDecimalRules()).(type) {
+			switch v := interface{}(m.GetDecimalConst()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "DecimalRules",
+						field:  "DecimalConst",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -2251,16 +2229,84 @@ func (m *Generation_Rule) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, Generation_RuleValidationError{
-						field:  "DecimalRules",
+						field:  "DecimalConst",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetDecimalRules()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetDecimalConst()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
-					field:  "DecimalRules",
+					field:  "DecimalConst",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Generation_Rule_StringConst:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+		// no validation rules for StringConst
+	case *Generation_Rule_BoolConst:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+		// no validation rules for BoolConst
+	case *Generation_Rule_DatetimeConst:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+
+		if all {
+			switch v := interface{}(m.GetDatetimeConst()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "DatetimeConst",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "DatetimeConst",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetDatetimeConst()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return Generation_RuleValidationError{
+					field:  "DatetimeConst",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
@@ -2270,9 +2316,9 @@ func (m *Generation_Rule) validate(all bool) error {
 	default:
 		_ = v // ensures v is used
 	}
-	if !oneofTypePresent {
+	if !oneofKindPresent {
 		err := Generation_RuleValidationError{
-			field:  "Type",
+			field:  "Kind",
 			reason: "value is required",
 		}
 		if !all {
@@ -2316,10 +2362,10 @@ func (m *Generation_Rule) validate(all bool) error {
 
 	if m.NullPercentage != nil {
 
-		if m.GetNullPercentage() <= 0 {
+		if val := m.GetNullPercentage(); val < 0 || val > 100 {
 			err := Generation_RuleValidationError{
 				field:  "NullPercentage",
-				reason: "value must be greater than 0",
+				reason: "value must be inside range [0, 100]",
 			}
 			if !all {
 				return err
@@ -2411,60 +2457,57 @@ var _ interface {
 	ErrorName() string
 } = Generation_RuleValidationError{}
 
-// Validate checks the field values on Generation_Range_AnyStringRange with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on Generation_Range_Bool with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Range_AnyStringRange) Validate() error {
+func (m *Generation_Range_Bool) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Generation_Range_AnyStringRange with
-// the rules defined in the proto definition for this message. If any rules
-// are violated, the result is a list of violation errors wrapped in
-// Generation_Range_AnyStringRangeMultiError, or nil if none found.
-func (m *Generation_Range_AnyStringRange) ValidateAll() error {
+// ValidateAll checks the field values on Generation_Range_Bool with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// Generation_Range_BoolMultiError, or nil if none found.
+func (m *Generation_Range_Bool) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Generation_Range_AnyStringRange) validate(all bool) error {
+func (m *Generation_Range_Bool) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	// no validation rules for Min
-
-	// no validation rules for Max
+	// no validation rules for Ratio
 
 	if len(errors) > 0 {
-		return Generation_Range_AnyStringRangeMultiError(errors)
+		return Generation_Range_BoolMultiError(errors)
 	}
 
 	return nil
 }
 
-// Generation_Range_AnyStringRangeMultiError is an error wrapping multiple
-// validation errors returned by Generation_Range_AnyStringRange.ValidateAll()
-// if the designated constraints aren't met.
-type Generation_Range_AnyStringRangeMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_AnyStringRangeMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Range_AnyStringRangeMultiError) AllErrors() []error { return m }
-
-// Generation_Range_AnyStringRangeValidationError is the validation error
-// returned by Generation_Range_AnyStringRange.Validate if the designated
+// Generation_Range_BoolMultiError is an error wrapping multiple validation
+// errors returned by Generation_Range_Bool.ValidateAll() if the designated
 // constraints aren't met.
-type Generation_Range_AnyStringRangeValidationError struct {
+type Generation_Range_BoolMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m Generation_Range_BoolMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m Generation_Range_BoolMultiError) AllErrors() []error { return m }
+
+// Generation_Range_BoolValidationError is the validation error returned by
+// Generation_Range_Bool.Validate if the designated constraints aren't met.
+type Generation_Range_BoolValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -2472,24 +2515,24 @@ type Generation_Range_AnyStringRangeValidationError struct {
 }
 
 // Field function returns field value.
-func (e Generation_Range_AnyStringRangeValidationError) Field() string { return e.field }
+func (e Generation_Range_BoolValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e Generation_Range_AnyStringRangeValidationError) Reason() string { return e.reason }
+func (e Generation_Range_BoolValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e Generation_Range_AnyStringRangeValidationError) Cause() error { return e.cause }
+func (e Generation_Range_BoolValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e Generation_Range_AnyStringRangeValidationError) Key() bool { return e.key }
+func (e Generation_Range_BoolValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e Generation_Range_AnyStringRangeValidationError) ErrorName() string {
-	return "Generation_Range_AnyStringRangeValidationError"
+func (e Generation_Range_BoolValidationError) ErrorName() string {
+	return "Generation_Range_BoolValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e Generation_Range_AnyStringRangeValidationError) Error() string {
+func (e Generation_Range_BoolValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -2501,14 +2544,14 @@ func (e Generation_Range_AnyStringRangeValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGeneration_Range_AnyStringRange.%s: %s%s",
+		"invalid %sGeneration_Range_Bool.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = Generation_Range_AnyStringRangeValidationError{}
+var _ error = Generation_Range_BoolValidationError{}
 
 var _ interface {
 	Field() string
@@ -2516,24 +2559,165 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = Generation_Range_AnyStringRangeValidationError{}
+} = Generation_Range_BoolValidationError{}
 
-// Validate checks the field values on Generation_Range_FloatRange with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on Generation_Range_String with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Range_FloatRange) Validate() error {
+func (m *Generation_Range_String) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Generation_Range_FloatRange with the
+// ValidateAll checks the field values on Generation_Range_String with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// Generation_Range_FloatRangeMultiError, or nil if none found.
-func (m *Generation_Range_FloatRange) ValidateAll() error {
+// Generation_Range_StringMultiError, or nil if none found.
+func (m *Generation_Range_String) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Generation_Range_FloatRange) validate(all bool) error {
+func (m *Generation_Range_String) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for MaxLen
+
+	if m.Alphabet != nil {
+
+		if all {
+			switch v := interface{}(m.GetAlphabet()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, Generation_Range_StringValidationError{
+						field:  "Alphabet",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, Generation_Range_StringValidationError{
+						field:  "Alphabet",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetAlphabet()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return Generation_Range_StringValidationError{
+					field:  "Alphabet",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if m.MinLen != nil {
+		// no validation rules for MinLen
+	}
+
+	if len(errors) > 0 {
+		return Generation_Range_StringMultiError(errors)
+	}
+
+	return nil
+}
+
+// Generation_Range_StringMultiError is an error wrapping multiple validation
+// errors returned by Generation_Range_String.ValidateAll() if the designated
+// constraints aren't met.
+type Generation_Range_StringMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m Generation_Range_StringMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m Generation_Range_StringMultiError) AllErrors() []error { return m }
+
+// Generation_Range_StringValidationError is the validation error returned by
+// Generation_Range_String.Validate if the designated constraints aren't met.
+type Generation_Range_StringValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e Generation_Range_StringValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e Generation_Range_StringValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e Generation_Range_StringValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e Generation_Range_StringValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e Generation_Range_StringValidationError) ErrorName() string {
+	return "Generation_Range_StringValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e Generation_Range_StringValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGeneration_Range_String.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = Generation_Range_StringValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = Generation_Range_StringValidationError{}
+
+// Validate checks the field values on Generation_Range_AnyString with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *Generation_Range_AnyString) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Generation_Range_AnyString with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// Generation_Range_AnyStringMultiError, or nil if none found.
+func (m *Generation_Range_AnyString) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Generation_Range_AnyString) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -2545,19 +2729,19 @@ func (m *Generation_Range_FloatRange) validate(all bool) error {
 	// no validation rules for Max
 
 	if len(errors) > 0 {
-		return Generation_Range_FloatRangeMultiError(errors)
+		return Generation_Range_AnyStringMultiError(errors)
 	}
 
 	return nil
 }
 
-// Generation_Range_FloatRangeMultiError is an error wrapping multiple
-// validation errors returned by Generation_Range_FloatRange.ValidateAll() if
+// Generation_Range_AnyStringMultiError is an error wrapping multiple
+// validation errors returned by Generation_Range_AnyString.ValidateAll() if
 // the designated constraints aren't met.
-type Generation_Range_FloatRangeMultiError []error
+type Generation_Range_AnyStringMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_FloatRangeMultiError) Error() string {
+func (m Generation_Range_AnyStringMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -2566,12 +2750,11 @@ func (m Generation_Range_FloatRangeMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m Generation_Range_FloatRangeMultiError) AllErrors() []error { return m }
+func (m Generation_Range_AnyStringMultiError) AllErrors() []error { return m }
 
-// Generation_Range_FloatRangeValidationError is the validation error returned
-// by Generation_Range_FloatRange.Validate if the designated constraints
-// aren't met.
-type Generation_Range_FloatRangeValidationError struct {
+// Generation_Range_AnyStringValidationError is the validation error returned
+// by Generation_Range_AnyString.Validate if the designated constraints aren't met.
+type Generation_Range_AnyStringValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -2579,24 +2762,24 @@ type Generation_Range_FloatRangeValidationError struct {
 }
 
 // Field function returns field value.
-func (e Generation_Range_FloatRangeValidationError) Field() string { return e.field }
+func (e Generation_Range_AnyStringValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e Generation_Range_FloatRangeValidationError) Reason() string { return e.reason }
+func (e Generation_Range_AnyStringValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e Generation_Range_FloatRangeValidationError) Cause() error { return e.cause }
+func (e Generation_Range_AnyStringValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e Generation_Range_FloatRangeValidationError) Key() bool { return e.key }
+func (e Generation_Range_AnyStringValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e Generation_Range_FloatRangeValidationError) ErrorName() string {
-	return "Generation_Range_FloatRangeValidationError"
+func (e Generation_Range_AnyStringValidationError) ErrorName() string {
+	return "Generation_Range_AnyStringValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e Generation_Range_FloatRangeValidationError) Error() string {
+func (e Generation_Range_AnyStringValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -2608,14 +2791,14 @@ func (e Generation_Range_FloatRangeValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGeneration_Range_FloatRange.%s: %s%s",
+		"invalid %sGeneration_Range_AnyString.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = Generation_Range_FloatRangeValidationError{}
+var _ error = Generation_Range_AnyStringValidationError{}
 
 var _ interface {
 	Field() string
@@ -2623,48 +2806,50 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = Generation_Range_FloatRangeValidationError{}
+} = Generation_Range_AnyStringValidationError{}
 
-// Validate checks the field values on Generation_Range_DoubleRange with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on Generation_Range_Float with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Range_DoubleRange) Validate() error {
+func (m *Generation_Range_Float) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Generation_Range_DoubleRange with the
-// rules defined in the proto definition for this message. If any rules are
+// ValidateAll checks the field values on Generation_Range_Float with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// Generation_Range_DoubleRangeMultiError, or nil if none found.
-func (m *Generation_Range_DoubleRange) ValidateAll() error {
+// Generation_Range_FloatMultiError, or nil if none found.
+func (m *Generation_Range_Float) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Generation_Range_DoubleRange) validate(all bool) error {
+func (m *Generation_Range_Float) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	// no validation rules for Min
-
 	// no validation rules for Max
 
+	if m.Min != nil {
+		// no validation rules for Min
+	}
+
 	if len(errors) > 0 {
-		return Generation_Range_DoubleRangeMultiError(errors)
+		return Generation_Range_FloatMultiError(errors)
 	}
 
 	return nil
 }
 
-// Generation_Range_DoubleRangeMultiError is an error wrapping multiple
-// validation errors returned by Generation_Range_DoubleRange.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Range_DoubleRangeMultiError []error
+// Generation_Range_FloatMultiError is an error wrapping multiple validation
+// errors returned by Generation_Range_Float.ValidateAll() if the designated
+// constraints aren't met.
+type Generation_Range_FloatMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_DoubleRangeMultiError) Error() string {
+func (m Generation_Range_FloatMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -2673,12 +2858,11 @@ func (m Generation_Range_DoubleRangeMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m Generation_Range_DoubleRangeMultiError) AllErrors() []error { return m }
+func (m Generation_Range_FloatMultiError) AllErrors() []error { return m }
 
-// Generation_Range_DoubleRangeValidationError is the validation error returned
-// by Generation_Range_DoubleRange.Validate if the designated constraints
-// aren't met.
-type Generation_Range_DoubleRangeValidationError struct {
+// Generation_Range_FloatValidationError is the validation error returned by
+// Generation_Range_Float.Validate if the designated constraints aren't met.
+type Generation_Range_FloatValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -2686,24 +2870,24 @@ type Generation_Range_DoubleRangeValidationError struct {
 }
 
 // Field function returns field value.
-func (e Generation_Range_DoubleRangeValidationError) Field() string { return e.field }
+func (e Generation_Range_FloatValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e Generation_Range_DoubleRangeValidationError) Reason() string { return e.reason }
+func (e Generation_Range_FloatValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e Generation_Range_DoubleRangeValidationError) Cause() error { return e.cause }
+func (e Generation_Range_FloatValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e Generation_Range_DoubleRangeValidationError) Key() bool { return e.key }
+func (e Generation_Range_FloatValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e Generation_Range_DoubleRangeValidationError) ErrorName() string {
-	return "Generation_Range_DoubleRangeValidationError"
+func (e Generation_Range_FloatValidationError) ErrorName() string {
+	return "Generation_Range_FloatValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e Generation_Range_DoubleRangeValidationError) Error() string {
+func (e Generation_Range_FloatValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -2715,14 +2899,14 @@ func (e Generation_Range_DoubleRangeValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGeneration_Range_DoubleRange.%s: %s%s",
+		"invalid %sGeneration_Range_Float.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = Generation_Range_DoubleRangeValidationError{}
+var _ error = Generation_Range_FloatValidationError{}
 
 var _ interface {
 	Field() string
@@ -2730,48 +2914,50 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = Generation_Range_DoubleRangeValidationError{}
+} = Generation_Range_FloatValidationError{}
 
-// Validate checks the field values on Generation_Range_Int32Range with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on Generation_Range_Double with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Range_Int32Range) Validate() error {
+func (m *Generation_Range_Double) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Generation_Range_Int32Range with the
+// ValidateAll checks the field values on Generation_Range_Double with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// Generation_Range_Int32RangeMultiError, or nil if none found.
-func (m *Generation_Range_Int32Range) ValidateAll() error {
+// Generation_Range_DoubleMultiError, or nil if none found.
+func (m *Generation_Range_Double) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Generation_Range_Int32Range) validate(all bool) error {
+func (m *Generation_Range_Double) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	// no validation rules for Min
-
 	// no validation rules for Max
 
+	if m.Min != nil {
+		// no validation rules for Min
+	}
+
 	if len(errors) > 0 {
-		return Generation_Range_Int32RangeMultiError(errors)
+		return Generation_Range_DoubleMultiError(errors)
 	}
 
 	return nil
 }
 
-// Generation_Range_Int32RangeMultiError is an error wrapping multiple
-// validation errors returned by Generation_Range_Int32Range.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Range_Int32RangeMultiError []error
+// Generation_Range_DoubleMultiError is an error wrapping multiple validation
+// errors returned by Generation_Range_Double.ValidateAll() if the designated
+// constraints aren't met.
+type Generation_Range_DoubleMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_Int32RangeMultiError) Error() string {
+func (m Generation_Range_DoubleMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -2780,12 +2966,11 @@ func (m Generation_Range_Int32RangeMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m Generation_Range_Int32RangeMultiError) AllErrors() []error { return m }
+func (m Generation_Range_DoubleMultiError) AllErrors() []error { return m }
 
-// Generation_Range_Int32RangeValidationError is the validation error returned
-// by Generation_Range_Int32Range.Validate if the designated constraints
-// aren't met.
-type Generation_Range_Int32RangeValidationError struct {
+// Generation_Range_DoubleValidationError is the validation error returned by
+// Generation_Range_Double.Validate if the designated constraints aren't met.
+type Generation_Range_DoubleValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -2793,24 +2978,24 @@ type Generation_Range_Int32RangeValidationError struct {
 }
 
 // Field function returns field value.
-func (e Generation_Range_Int32RangeValidationError) Field() string { return e.field }
+func (e Generation_Range_DoubleValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e Generation_Range_Int32RangeValidationError) Reason() string { return e.reason }
+func (e Generation_Range_DoubleValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e Generation_Range_Int32RangeValidationError) Cause() error { return e.cause }
+func (e Generation_Range_DoubleValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e Generation_Range_Int32RangeValidationError) Key() bool { return e.key }
+func (e Generation_Range_DoubleValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e Generation_Range_Int32RangeValidationError) ErrorName() string {
-	return "Generation_Range_Int32RangeValidationError"
+func (e Generation_Range_DoubleValidationError) ErrorName() string {
+	return "Generation_Range_DoubleValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e Generation_Range_Int32RangeValidationError) Error() string {
+func (e Generation_Range_DoubleValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -2822,14 +3007,14 @@ func (e Generation_Range_Int32RangeValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGeneration_Range_Int32Range.%s: %s%s",
+		"invalid %sGeneration_Range_Double.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = Generation_Range_Int32RangeValidationError{}
+var _ error = Generation_Range_DoubleValidationError{}
 
 var _ interface {
 	Field() string
@@ -2837,48 +3022,50 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = Generation_Range_Int32RangeValidationError{}
+} = Generation_Range_DoubleValidationError{}
 
-// Validate checks the field values on Generation_Range_Int64Range with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on Generation_Range_Int32 with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Range_Int64Range) Validate() error {
+func (m *Generation_Range_Int32) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Generation_Range_Int64Range with the
-// rules defined in the proto definition for this message. If any rules are
+// ValidateAll checks the field values on Generation_Range_Int32 with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// Generation_Range_Int64RangeMultiError, or nil if none found.
-func (m *Generation_Range_Int64Range) ValidateAll() error {
+// Generation_Range_Int32MultiError, or nil if none found.
+func (m *Generation_Range_Int32) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Generation_Range_Int64Range) validate(all bool) error {
+func (m *Generation_Range_Int32) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	// no validation rules for Min
-
 	// no validation rules for Max
 
+	if m.Min != nil {
+		// no validation rules for Min
+	}
+
 	if len(errors) > 0 {
-		return Generation_Range_Int64RangeMultiError(errors)
+		return Generation_Range_Int32MultiError(errors)
 	}
 
 	return nil
 }
 
-// Generation_Range_Int64RangeMultiError is an error wrapping multiple
-// validation errors returned by Generation_Range_Int64Range.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Range_Int64RangeMultiError []error
+// Generation_Range_Int32MultiError is an error wrapping multiple validation
+// errors returned by Generation_Range_Int32.ValidateAll() if the designated
+// constraints aren't met.
+type Generation_Range_Int32MultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_Int64RangeMultiError) Error() string {
+func (m Generation_Range_Int32MultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -2887,12 +3074,11 @@ func (m Generation_Range_Int64RangeMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m Generation_Range_Int64RangeMultiError) AllErrors() []error { return m }
+func (m Generation_Range_Int32MultiError) AllErrors() []error { return m }
 
-// Generation_Range_Int64RangeValidationError is the validation error returned
-// by Generation_Range_Int64Range.Validate if the designated constraints
-// aren't met.
-type Generation_Range_Int64RangeValidationError struct {
+// Generation_Range_Int32ValidationError is the validation error returned by
+// Generation_Range_Int32.Validate if the designated constraints aren't met.
+type Generation_Range_Int32ValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -2900,24 +3086,24 @@ type Generation_Range_Int64RangeValidationError struct {
 }
 
 // Field function returns field value.
-func (e Generation_Range_Int64RangeValidationError) Field() string { return e.field }
+func (e Generation_Range_Int32ValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e Generation_Range_Int64RangeValidationError) Reason() string { return e.reason }
+func (e Generation_Range_Int32ValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e Generation_Range_Int64RangeValidationError) Cause() error { return e.cause }
+func (e Generation_Range_Int32ValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e Generation_Range_Int64RangeValidationError) Key() bool { return e.key }
+func (e Generation_Range_Int32ValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e Generation_Range_Int64RangeValidationError) ErrorName() string {
-	return "Generation_Range_Int64RangeValidationError"
+func (e Generation_Range_Int32ValidationError) ErrorName() string {
+	return "Generation_Range_Int32ValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e Generation_Range_Int64RangeValidationError) Error() string {
+func (e Generation_Range_Int32ValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -2929,14 +3115,14 @@ func (e Generation_Range_Int64RangeValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGeneration_Range_Int64Range.%s: %s%s",
+		"invalid %sGeneration_Range_Int32.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = Generation_Range_Int64RangeValidationError{}
+var _ error = Generation_Range_Int32ValidationError{}
 
 var _ interface {
 	Field() string
@@ -2944,48 +3130,50 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = Generation_Range_Int64RangeValidationError{}
+} = Generation_Range_Int32ValidationError{}
 
-// Validate checks the field values on Generation_Range_UInt32Range with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on Generation_Range_Int64 with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Range_UInt32Range) Validate() error {
+func (m *Generation_Range_Int64) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Generation_Range_UInt32Range with the
-// rules defined in the proto definition for this message. If any rules are
+// ValidateAll checks the field values on Generation_Range_Int64 with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// Generation_Range_UInt32RangeMultiError, or nil if none found.
-func (m *Generation_Range_UInt32Range) ValidateAll() error {
+// Generation_Range_Int64MultiError, or nil if none found.
+func (m *Generation_Range_Int64) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Generation_Range_UInt32Range) validate(all bool) error {
+func (m *Generation_Range_Int64) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	// no validation rules for Min
-
 	// no validation rules for Max
 
+	if m.Min != nil {
+		// no validation rules for Min
+	}
+
 	if len(errors) > 0 {
-		return Generation_Range_UInt32RangeMultiError(errors)
+		return Generation_Range_Int64MultiError(errors)
 	}
 
 	return nil
 }
 
-// Generation_Range_UInt32RangeMultiError is an error wrapping multiple
-// validation errors returned by Generation_Range_UInt32Range.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Range_UInt32RangeMultiError []error
+// Generation_Range_Int64MultiError is an error wrapping multiple validation
+// errors returned by Generation_Range_Int64.ValidateAll() if the designated
+// constraints aren't met.
+type Generation_Range_Int64MultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_UInt32RangeMultiError) Error() string {
+func (m Generation_Range_Int64MultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -2994,12 +3182,11 @@ func (m Generation_Range_UInt32RangeMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m Generation_Range_UInt32RangeMultiError) AllErrors() []error { return m }
+func (m Generation_Range_Int64MultiError) AllErrors() []error { return m }
 
-// Generation_Range_UInt32RangeValidationError is the validation error returned
-// by Generation_Range_UInt32Range.Validate if the designated constraints
-// aren't met.
-type Generation_Range_UInt32RangeValidationError struct {
+// Generation_Range_Int64ValidationError is the validation error returned by
+// Generation_Range_Int64.Validate if the designated constraints aren't met.
+type Generation_Range_Int64ValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -3007,24 +3194,24 @@ type Generation_Range_UInt32RangeValidationError struct {
 }
 
 // Field function returns field value.
-func (e Generation_Range_UInt32RangeValidationError) Field() string { return e.field }
+func (e Generation_Range_Int64ValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e Generation_Range_UInt32RangeValidationError) Reason() string { return e.reason }
+func (e Generation_Range_Int64ValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e Generation_Range_UInt32RangeValidationError) Cause() error { return e.cause }
+func (e Generation_Range_Int64ValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e Generation_Range_UInt32RangeValidationError) Key() bool { return e.key }
+func (e Generation_Range_Int64ValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e Generation_Range_UInt32RangeValidationError) ErrorName() string {
-	return "Generation_Range_UInt32RangeValidationError"
+func (e Generation_Range_Int64ValidationError) ErrorName() string {
+	return "Generation_Range_Int64ValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e Generation_Range_UInt32RangeValidationError) Error() string {
+func (e Generation_Range_Int64ValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -3036,14 +3223,14 @@ func (e Generation_Range_UInt32RangeValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGeneration_Range_UInt32Range.%s: %s%s",
+		"invalid %sGeneration_Range_Int64.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = Generation_Range_UInt32RangeValidationError{}
+var _ error = Generation_Range_Int64ValidationError{}
 
 var _ interface {
 	Field() string
@@ -3051,48 +3238,50 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = Generation_Range_UInt32RangeValidationError{}
+} = Generation_Range_Int64ValidationError{}
 
-// Validate checks the field values on Generation_Range_UInt64Range with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on Generation_Range_UInt32 with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Range_UInt64Range) Validate() error {
+func (m *Generation_Range_UInt32) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Generation_Range_UInt64Range with the
+// ValidateAll checks the field values on Generation_Range_UInt32 with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// Generation_Range_UInt64RangeMultiError, or nil if none found.
-func (m *Generation_Range_UInt64Range) ValidateAll() error {
+// Generation_Range_UInt32MultiError, or nil if none found.
+func (m *Generation_Range_UInt32) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Generation_Range_UInt64Range) validate(all bool) error {
+func (m *Generation_Range_UInt32) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	// no validation rules for Min
-
 	// no validation rules for Max
 
+	if m.Min != nil {
+		// no validation rules for Min
+	}
+
 	if len(errors) > 0 {
-		return Generation_Range_UInt64RangeMultiError(errors)
+		return Generation_Range_UInt32MultiError(errors)
 	}
 
 	return nil
 }
 
-// Generation_Range_UInt64RangeMultiError is an error wrapping multiple
-// validation errors returned by Generation_Range_UInt64Range.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Range_UInt64RangeMultiError []error
+// Generation_Range_UInt32MultiError is an error wrapping multiple validation
+// errors returned by Generation_Range_UInt32.ValidateAll() if the designated
+// constraints aren't met.
+type Generation_Range_UInt32MultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_UInt64RangeMultiError) Error() string {
+func (m Generation_Range_UInt32MultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -3101,12 +3290,11 @@ func (m Generation_Range_UInt64RangeMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m Generation_Range_UInt64RangeMultiError) AllErrors() []error { return m }
+func (m Generation_Range_UInt32MultiError) AllErrors() []error { return m }
 
-// Generation_Range_UInt64RangeValidationError is the validation error returned
-// by Generation_Range_UInt64Range.Validate if the designated constraints
-// aren't met.
-type Generation_Range_UInt64RangeValidationError struct {
+// Generation_Range_UInt32ValidationError is the validation error returned by
+// Generation_Range_UInt32.Validate if the designated constraints aren't met.
+type Generation_Range_UInt32ValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -3114,24 +3302,24 @@ type Generation_Range_UInt64RangeValidationError struct {
 }
 
 // Field function returns field value.
-func (e Generation_Range_UInt64RangeValidationError) Field() string { return e.field }
+func (e Generation_Range_UInt32ValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e Generation_Range_UInt64RangeValidationError) Reason() string { return e.reason }
+func (e Generation_Range_UInt32ValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e Generation_Range_UInt64RangeValidationError) Cause() error { return e.cause }
+func (e Generation_Range_UInt32ValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e Generation_Range_UInt64RangeValidationError) Key() bool { return e.key }
+func (e Generation_Range_UInt32ValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e Generation_Range_UInt64RangeValidationError) ErrorName() string {
-	return "Generation_Range_UInt64RangeValidationError"
+func (e Generation_Range_UInt32ValidationError) ErrorName() string {
+	return "Generation_Range_UInt32ValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e Generation_Range_UInt64RangeValidationError) Error() string {
+func (e Generation_Range_UInt32ValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -3143,14 +3331,14 @@ func (e Generation_Range_UInt64RangeValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGeneration_Range_UInt64Range.%s: %s%s",
+		"invalid %sGeneration_Range_UInt32.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = Generation_Range_UInt64RangeValidationError{}
+var _ error = Generation_Range_UInt32ValidationError{}
 
 var _ interface {
 	Field() string
@@ -3158,7 +3346,115 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = Generation_Range_UInt64RangeValidationError{}
+} = Generation_Range_UInt32ValidationError{}
+
+// Validate checks the field values on Generation_Range_UInt64 with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *Generation_Range_UInt64) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Generation_Range_UInt64 with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// Generation_Range_UInt64MultiError, or nil if none found.
+func (m *Generation_Range_UInt64) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Generation_Range_UInt64) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Max
+
+	if m.Min != nil {
+		// no validation rules for Min
+	}
+
+	if len(errors) > 0 {
+		return Generation_Range_UInt64MultiError(errors)
+	}
+
+	return nil
+}
+
+// Generation_Range_UInt64MultiError is an error wrapping multiple validation
+// errors returned by Generation_Range_UInt64.ValidateAll() if the designated
+// constraints aren't met.
+type Generation_Range_UInt64MultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m Generation_Range_UInt64MultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m Generation_Range_UInt64MultiError) AllErrors() []error { return m }
+
+// Generation_Range_UInt64ValidationError is the validation error returned by
+// Generation_Range_UInt64.Validate if the designated constraints aren't met.
+type Generation_Range_UInt64ValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e Generation_Range_UInt64ValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e Generation_Range_UInt64ValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e Generation_Range_UInt64ValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e Generation_Range_UInt64ValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e Generation_Range_UInt64ValidationError) ErrorName() string {
+	return "Generation_Range_UInt64ValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e Generation_Range_UInt64ValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGeneration_Range_UInt64.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = Generation_Range_UInt64ValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = Generation_Range_UInt64ValidationError{}
 
 // Validate checks the field values on Generation_Range_DecimalRange with the
 // rules defined in the proto definition for this message. If any rules are
@@ -3184,48 +3480,6 @@ func (m *Generation_Range_DecimalRange) validate(all bool) error {
 
 	oneofTypePresent := false
 	switch v := m.Type.(type) {
-	case *Generation_Range_DecimalRange_Default_:
-		if v == nil {
-			err := Generation_Range_DecimalRangeValidationError{
-				field:  "Type",
-				reason: "oneof value cannot be a typed-nil",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		}
-		oneofTypePresent = true
-
-		if all {
-			switch v := interface{}(m.GetDefault()).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, Generation_Range_DecimalRangeValidationError{
-						field:  "Default",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, Generation_Range_DecimalRangeValidationError{
-						field:  "Default",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(m.GetDefault()).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return Generation_Range_DecimalRangeValidationError{
-					field:  "Default",
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
-		}
-
 	case *Generation_Range_DecimalRange_Float:
 		if v == nil {
 			err := Generation_Range_DecimalRangeValidationError{
@@ -3447,22 +3701,22 @@ var _ interface {
 	ErrorName() string
 } = Generation_Range_DecimalRangeValidationError{}
 
-// Validate checks the field values on Generation_Range_DateTimeRange with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on Generation_Range_DateTime with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Range_DateTimeRange) Validate() error {
+func (m *Generation_Range_DateTime) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Generation_Range_DateTimeRange with
-// the rules defined in the proto definition for this message. If any rules
-// are violated, the result is a list of violation errors wrapped in
-// Generation_Range_DateTimeRangeMultiError, or nil if none found.
-func (m *Generation_Range_DateTimeRange) ValidateAll() error {
+// ValidateAll checks the field values on Generation_Range_DateTime with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// Generation_Range_DateTimeMultiError, or nil if none found.
+func (m *Generation_Range_DateTime) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Generation_Range_DateTimeRange) validate(all bool) error {
+func (m *Generation_Range_DateTime) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -3471,51 +3725,9 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 
 	oneofTypePresent := false
 	switch v := m.Type.(type) {
-	case *Generation_Range_DateTimeRange_Default_:
+	case *Generation_Range_DateTime_String_:
 		if v == nil {
-			err := Generation_Range_DateTimeRangeValidationError{
-				field:  "Type",
-				reason: "oneof value cannot be a typed-nil",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		}
-		oneofTypePresent = true
-
-		if all {
-			switch v := interface{}(m.GetDefault()).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, Generation_Range_DateTimeRangeValidationError{
-						field:  "Default",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, Generation_Range_DateTimeRangeValidationError{
-						field:  "Default",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(m.GetDefault()).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return Generation_Range_DateTimeRangeValidationError{
-					field:  "Default",
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
-		}
-
-	case *Generation_Range_DateTimeRange_String_:
-		if v == nil {
-			err := Generation_Range_DateTimeRangeValidationError{
+			err := Generation_Range_DateTimeValidationError{
 				field:  "Type",
 				reason: "oneof value cannot be a typed-nil",
 			}
@@ -3530,7 +3742,7 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 			switch v := interface{}(m.GetString_()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, Generation_Range_DateTimeRangeValidationError{
+					errors = append(errors, Generation_Range_DateTimeValidationError{
 						field:  "String_",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -3538,7 +3750,7 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, Generation_Range_DateTimeRangeValidationError{
+					errors = append(errors, Generation_Range_DateTimeValidationError{
 						field:  "String_",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -3547,7 +3759,7 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(m.GetString_()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return Generation_Range_DateTimeRangeValidationError{
+				return Generation_Range_DateTimeValidationError{
 					field:  "String_",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -3555,9 +3767,9 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 			}
 		}
 
-	case *Generation_Range_DateTimeRange_TimestampPb_:
+	case *Generation_Range_DateTime_TimestampPb_:
 		if v == nil {
-			err := Generation_Range_DateTimeRangeValidationError{
+			err := Generation_Range_DateTimeValidationError{
 				field:  "Type",
 				reason: "oneof value cannot be a typed-nil",
 			}
@@ -3572,7 +3784,7 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 			switch v := interface{}(m.GetTimestampPb()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, Generation_Range_DateTimeRangeValidationError{
+					errors = append(errors, Generation_Range_DateTimeValidationError{
 						field:  "TimestampPb",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -3580,7 +3792,7 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, Generation_Range_DateTimeRangeValidationError{
+					errors = append(errors, Generation_Range_DateTimeValidationError{
 						field:  "TimestampPb",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -3589,7 +3801,7 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(m.GetTimestampPb()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return Generation_Range_DateTimeRangeValidationError{
+				return Generation_Range_DateTimeValidationError{
 					field:  "TimestampPb",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -3597,9 +3809,9 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 			}
 		}
 
-	case *Generation_Range_DateTimeRange_Timestamp_:
+	case *Generation_Range_DateTime_Timestamp:
 		if v == nil {
-			err := Generation_Range_DateTimeRangeValidationError{
+			err := Generation_Range_DateTimeValidationError{
 				field:  "Type",
 				reason: "oneof value cannot be a typed-nil",
 			}
@@ -3614,7 +3826,7 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 			switch v := interface{}(m.GetTimestamp()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, Generation_Range_DateTimeRangeValidationError{
+					errors = append(errors, Generation_Range_DateTimeValidationError{
 						field:  "Timestamp",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -3622,7 +3834,7 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, Generation_Range_DateTimeRangeValidationError{
+					errors = append(errors, Generation_Range_DateTimeValidationError{
 						field:  "Timestamp",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -3631,7 +3843,7 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(m.GetTimestamp()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return Generation_Range_DateTimeRangeValidationError{
+				return Generation_Range_DateTimeValidationError{
 					field:  "Timestamp",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -3643,7 +3855,7 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 		_ = v // ensures v is used
 	}
 	if !oneofTypePresent {
-		err := Generation_Range_DateTimeRangeValidationError{
+		err := Generation_Range_DateTimeValidationError{
 			field:  "Type",
 			reason: "value is required",
 		}
@@ -3654,19 +3866,19 @@ func (m *Generation_Range_DateTimeRange) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return Generation_Range_DateTimeRangeMultiError(errors)
+		return Generation_Range_DateTimeMultiError(errors)
 	}
 
 	return nil
 }
 
-// Generation_Range_DateTimeRangeMultiError is an error wrapping multiple
-// validation errors returned by Generation_Range_DateTimeRange.ValidateAll()
-// if the designated constraints aren't met.
-type Generation_Range_DateTimeRangeMultiError []error
+// Generation_Range_DateTimeMultiError is an error wrapping multiple validation
+// errors returned by Generation_Range_DateTime.ValidateAll() if the
+// designated constraints aren't met.
+type Generation_Range_DateTimeMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_DateTimeRangeMultiError) Error() string {
+func (m Generation_Range_DateTimeMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -3675,12 +3887,11 @@ func (m Generation_Range_DateTimeRangeMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m Generation_Range_DateTimeRangeMultiError) AllErrors() []error { return m }
+func (m Generation_Range_DateTimeMultiError) AllErrors() []error { return m }
 
-// Generation_Range_DateTimeRangeValidationError is the validation error
-// returned by Generation_Range_DateTimeRange.Validate if the designated
-// constraints aren't met.
-type Generation_Range_DateTimeRangeValidationError struct {
+// Generation_Range_DateTimeValidationError is the validation error returned by
+// Generation_Range_DateTime.Validate if the designated constraints aren't met.
+type Generation_Range_DateTimeValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -3688,24 +3899,24 @@ type Generation_Range_DateTimeRangeValidationError struct {
 }
 
 // Field function returns field value.
-func (e Generation_Range_DateTimeRangeValidationError) Field() string { return e.field }
+func (e Generation_Range_DateTimeValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e Generation_Range_DateTimeRangeValidationError) Reason() string { return e.reason }
+func (e Generation_Range_DateTimeValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e Generation_Range_DateTimeRangeValidationError) Cause() error { return e.cause }
+func (e Generation_Range_DateTimeValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e Generation_Range_DateTimeRangeValidationError) Key() bool { return e.key }
+func (e Generation_Range_DateTimeValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e Generation_Range_DateTimeRangeValidationError) ErrorName() string {
-	return "Generation_Range_DateTimeRangeValidationError"
+func (e Generation_Range_DateTimeValidationError) ErrorName() string {
+	return "Generation_Range_DateTimeValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e Generation_Range_DateTimeRangeValidationError) Error() string {
+func (e Generation_Range_DateTimeValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -3717,14 +3928,14 @@ func (e Generation_Range_DateTimeRangeValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGeneration_Range_DateTimeRange.%s: %s%s",
+		"invalid %sGeneration_Range_DateTime.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = Generation_Range_DateTimeRangeValidationError{}
+var _ error = Generation_Range_DateTimeValidationError{}
 
 var _ interface {
 	Field() string
@@ -3732,25 +3943,25 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = Generation_Range_DateTimeRangeValidationError{}
+} = Generation_Range_DateTimeValidationError{}
 
-// Validate checks the field values on Generation_Range_DecimalRange_Default
+// Validate checks the field values on Generation_Range_DateTime_TimestampPb
 // with the rules defined in the proto definition for this message. If any
 // rules are violated, the first error encountered is returned, or nil if
 // there are no violations.
-func (m *Generation_Range_DecimalRange_Default) Validate() error {
+func (m *Generation_Range_DateTime_TimestampPb) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Generation_Range_DecimalRange_Default
+// ValidateAll checks the field values on Generation_Range_DateTime_TimestampPb
 // with the rules defined in the proto definition for this message. If any
 // rules are violated, the result is a list of violation errors wrapped in
-// Generation_Range_DecimalRange_DefaultMultiError, or nil if none found.
-func (m *Generation_Range_DecimalRange_Default) ValidateAll() error {
+// Generation_Range_DateTime_TimestampPbMultiError, or nil if none found.
+func (m *Generation_Range_DateTime_TimestampPb) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Generation_Range_DecimalRange_Default) validate(all bool) error {
+func (m *Generation_Range_DateTime_TimestampPb) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -3761,7 +3972,7 @@ func (m *Generation_Range_DecimalRange_Default) validate(all bool) error {
 		switch v := interface{}(m.GetMin()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Range_DecimalRange_DefaultValidationError{
+				errors = append(errors, Generation_Range_DateTime_TimestampPbValidationError{
 					field:  "Min",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -3769,7 +3980,7 @@ func (m *Generation_Range_DecimalRange_Default) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Range_DecimalRange_DefaultValidationError{
+				errors = append(errors, Generation_Range_DateTime_TimestampPbValidationError{
 					field:  "Min",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -3778,7 +3989,7 @@ func (m *Generation_Range_DecimalRange_Default) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetMin()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return Generation_Range_DecimalRange_DefaultValidationError{
+			return Generation_Range_DateTime_TimestampPbValidationError{
 				field:  "Min",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -3790,7 +4001,7 @@ func (m *Generation_Range_DecimalRange_Default) validate(all bool) error {
 		switch v := interface{}(m.GetMax()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Range_DecimalRange_DefaultValidationError{
+				errors = append(errors, Generation_Range_DateTime_TimestampPbValidationError{
 					field:  "Max",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -3798,7 +4009,7 @@ func (m *Generation_Range_DecimalRange_Default) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Range_DecimalRange_DefaultValidationError{
+				errors = append(errors, Generation_Range_DateTime_TimestampPbValidationError{
 					field:  "Max",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -3807,7 +4018,7 @@ func (m *Generation_Range_DecimalRange_Default) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetMax()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return Generation_Range_DecimalRange_DefaultValidationError{
+			return Generation_Range_DateTime_TimestampPbValidationError{
 				field:  "Max",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -3816,20 +4027,20 @@ func (m *Generation_Range_DecimalRange_Default) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return Generation_Range_DecimalRange_DefaultMultiError(errors)
+		return Generation_Range_DateTime_TimestampPbMultiError(errors)
 	}
 
 	return nil
 }
 
-// Generation_Range_DecimalRange_DefaultMultiError is an error wrapping
+// Generation_Range_DateTime_TimestampPbMultiError is an error wrapping
 // multiple validation errors returned by
-// Generation_Range_DecimalRange_Default.ValidateAll() if the designated
+// Generation_Range_DateTime_TimestampPb.ValidateAll() if the designated
 // constraints aren't met.
-type Generation_Range_DecimalRange_DefaultMultiError []error
+type Generation_Range_DateTime_TimestampPbMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_DecimalRange_DefaultMultiError) Error() string {
+func (m Generation_Range_DateTime_TimestampPbMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -3838,12 +4049,12 @@ func (m Generation_Range_DecimalRange_DefaultMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m Generation_Range_DecimalRange_DefaultMultiError) AllErrors() []error { return m }
+func (m Generation_Range_DateTime_TimestampPbMultiError) AllErrors() []error { return m }
 
-// Generation_Range_DecimalRange_DefaultValidationError is the validation error
-// returned by Generation_Range_DecimalRange_Default.Validate if the
+// Generation_Range_DateTime_TimestampPbValidationError is the validation error
+// returned by Generation_Range_DateTime_TimestampPb.Validate if the
 // designated constraints aren't met.
-type Generation_Range_DecimalRange_DefaultValidationError struct {
+type Generation_Range_DateTime_TimestampPbValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -3851,24 +4062,24 @@ type Generation_Range_DecimalRange_DefaultValidationError struct {
 }
 
 // Field function returns field value.
-func (e Generation_Range_DecimalRange_DefaultValidationError) Field() string { return e.field }
+func (e Generation_Range_DateTime_TimestampPbValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e Generation_Range_DecimalRange_DefaultValidationError) Reason() string { return e.reason }
+func (e Generation_Range_DateTime_TimestampPbValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e Generation_Range_DecimalRange_DefaultValidationError) Cause() error { return e.cause }
+func (e Generation_Range_DateTime_TimestampPbValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e Generation_Range_DecimalRange_DefaultValidationError) Key() bool { return e.key }
+func (e Generation_Range_DateTime_TimestampPbValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e Generation_Range_DecimalRange_DefaultValidationError) ErrorName() string {
-	return "Generation_Range_DecimalRange_DefaultValidationError"
+func (e Generation_Range_DateTime_TimestampPbValidationError) ErrorName() string {
+	return "Generation_Range_DateTime_TimestampPbValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e Generation_Range_DecimalRange_DefaultValidationError) Error() string {
+func (e Generation_Range_DateTime_TimestampPbValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -3880,14 +4091,14 @@ func (e Generation_Range_DecimalRange_DefaultValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGeneration_Range_DecimalRange_Default.%s: %s%s",
+		"invalid %sGeneration_Range_DateTime_TimestampPb.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = Generation_Range_DecimalRange_DefaultValidationError{}
+var _ error = Generation_Range_DateTime_TimestampPbValidationError{}
 
 var _ interface {
 	Field() string
@@ -3895,354 +4106,26 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = Generation_Range_DecimalRange_DefaultValidationError{}
+} = Generation_Range_DateTime_TimestampPbValidationError{}
 
-// Validate checks the field values on Generation_Range_DateTimeRange_Default
+// Validate checks the field values on Generation_Range_DateTime_TimestampUnix
 // with the rules defined in the proto definition for this message. If any
 // rules are violated, the first error encountered is returned, or nil if
 // there are no violations.
-func (m *Generation_Range_DateTimeRange_Default) Validate() error {
+func (m *Generation_Range_DateTime_TimestampUnix) Validate() error {
 	return m.validate(false)
 }
 
 // ValidateAll checks the field values on
-// Generation_Range_DateTimeRange_Default with the rules defined in the proto
+// Generation_Range_DateTime_TimestampUnix with the rules defined in the proto
 // definition for this message. If any rules are violated, the result is a
 // list of violation errors wrapped in
-// Generation_Range_DateTimeRange_DefaultMultiError, or nil if none found.
-func (m *Generation_Range_DateTimeRange_Default) ValidateAll() error {
+// Generation_Range_DateTime_TimestampUnixMultiError, or nil if none found.
+func (m *Generation_Range_DateTime_TimestampUnix) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Generation_Range_DateTimeRange_Default) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if all {
-		switch v := interface{}(m.GetMin()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Range_DateTimeRange_DefaultValidationError{
-					field:  "Min",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Range_DateTimeRange_DefaultValidationError{
-					field:  "Min",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetMin()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Range_DateTimeRange_DefaultValidationError{
-				field:  "Min",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if all {
-		switch v := interface{}(m.GetMax()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Range_DateTimeRange_DefaultValidationError{
-					field:  "Max",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Range_DateTimeRange_DefaultValidationError{
-					field:  "Max",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetMax()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Range_DateTimeRange_DefaultValidationError{
-				field:  "Max",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if len(errors) > 0 {
-		return Generation_Range_DateTimeRange_DefaultMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Range_DateTimeRange_DefaultMultiError is an error wrapping
-// multiple validation errors returned by
-// Generation_Range_DateTimeRange_Default.ValidateAll() if the designated
-// constraints aren't met.
-type Generation_Range_DateTimeRange_DefaultMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_DateTimeRange_DefaultMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Range_DateTimeRange_DefaultMultiError) AllErrors() []error { return m }
-
-// Generation_Range_DateTimeRange_DefaultValidationError is the validation
-// error returned by Generation_Range_DateTimeRange_Default.Validate if the
-// designated constraints aren't met.
-type Generation_Range_DateTimeRange_DefaultValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Range_DateTimeRange_DefaultValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Range_DateTimeRange_DefaultValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Range_DateTimeRange_DefaultValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Range_DateTimeRange_DefaultValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Range_DateTimeRange_DefaultValidationError) ErrorName() string {
-	return "Generation_Range_DateTimeRange_DefaultValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Range_DateTimeRange_DefaultValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Range_DateTimeRange_Default.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Range_DateTimeRange_DefaultValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Range_DateTimeRange_DefaultValidationError{}
-
-// Validate checks the field values on
-// Generation_Range_DateTimeRange_TimestampPb with the rules defined in the
-// proto definition for this message. If any rules are violated, the first
-// error encountered is returned, or nil if there are no violations.
-func (m *Generation_Range_DateTimeRange_TimestampPb) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on
-// Generation_Range_DateTimeRange_TimestampPb with the rules defined in the
-// proto definition for this message. If any rules are violated, the result is
-// a list of violation errors wrapped in
-// Generation_Range_DateTimeRange_TimestampPbMultiError, or nil if none found.
-func (m *Generation_Range_DateTimeRange_TimestampPb) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Range_DateTimeRange_TimestampPb) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if all {
-		switch v := interface{}(m.GetMin()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Range_DateTimeRange_TimestampPbValidationError{
-					field:  "Min",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Range_DateTimeRange_TimestampPbValidationError{
-					field:  "Min",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetMin()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Range_DateTimeRange_TimestampPbValidationError{
-				field:  "Min",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if all {
-		switch v := interface{}(m.GetMax()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Range_DateTimeRange_TimestampPbValidationError{
-					field:  "Max",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Range_DateTimeRange_TimestampPbValidationError{
-					field:  "Max",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetMax()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Range_DateTimeRange_TimestampPbValidationError{
-				field:  "Max",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if len(errors) > 0 {
-		return Generation_Range_DateTimeRange_TimestampPbMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Range_DateTimeRange_TimestampPbMultiError is an error wrapping
-// multiple validation errors returned by
-// Generation_Range_DateTimeRange_TimestampPb.ValidateAll() if the designated
-// constraints aren't met.
-type Generation_Range_DateTimeRange_TimestampPbMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_DateTimeRange_TimestampPbMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Range_DateTimeRange_TimestampPbMultiError) AllErrors() []error { return m }
-
-// Generation_Range_DateTimeRange_TimestampPbValidationError is the validation
-// error returned by Generation_Range_DateTimeRange_TimestampPb.Validate if
-// the designated constraints aren't met.
-type Generation_Range_DateTimeRange_TimestampPbValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Range_DateTimeRange_TimestampPbValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Range_DateTimeRange_TimestampPbValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Range_DateTimeRange_TimestampPbValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Range_DateTimeRange_TimestampPbValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Range_DateTimeRange_TimestampPbValidationError) ErrorName() string {
-	return "Generation_Range_DateTimeRange_TimestampPbValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Range_DateTimeRange_TimestampPbValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Range_DateTimeRange_TimestampPb.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Range_DateTimeRange_TimestampPbValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Range_DateTimeRange_TimestampPbValidationError{}
-
-// Validate checks the field values on Generation_Range_DateTimeRange_Timestamp
-// with the rules defined in the proto definition for this message. If any
-// rules are violated, the first error encountered is returned, or nil if
-// there are no violations.
-func (m *Generation_Range_DateTimeRange_Timestamp) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on
-// Generation_Range_DateTimeRange_Timestamp with the rules defined in the
-// proto definition for this message. If any rules are violated, the result is
-// a list of violation errors wrapped in
-// Generation_Range_DateTimeRange_TimestampMultiError, or nil if none found.
-func (m *Generation_Range_DateTimeRange_Timestamp) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Range_DateTimeRange_Timestamp) validate(all bool) error {
+func (m *Generation_Range_DateTime_TimestampUnix) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -4254,20 +4137,20 @@ func (m *Generation_Range_DateTimeRange_Timestamp) validate(all bool) error {
 	// no validation rules for Max
 
 	if len(errors) > 0 {
-		return Generation_Range_DateTimeRange_TimestampMultiError(errors)
+		return Generation_Range_DateTime_TimestampUnixMultiError(errors)
 	}
 
 	return nil
 }
 
-// Generation_Range_DateTimeRange_TimestampMultiError is an error wrapping
+// Generation_Range_DateTime_TimestampUnixMultiError is an error wrapping
 // multiple validation errors returned by
-// Generation_Range_DateTimeRange_Timestamp.ValidateAll() if the designated
+// Generation_Range_DateTime_TimestampUnix.ValidateAll() if the designated
 // constraints aren't met.
-type Generation_Range_DateTimeRange_TimestampMultiError []error
+type Generation_Range_DateTime_TimestampUnixMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Range_DateTimeRange_TimestampMultiError) Error() string {
+func (m Generation_Range_DateTime_TimestampUnixMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -4276,12 +4159,12 @@ func (m Generation_Range_DateTimeRange_TimestampMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m Generation_Range_DateTimeRange_TimestampMultiError) AllErrors() []error { return m }
+func (m Generation_Range_DateTime_TimestampUnixMultiError) AllErrors() []error { return m }
 
-// Generation_Range_DateTimeRange_TimestampValidationError is the validation
-// error returned by Generation_Range_DateTimeRange_Timestamp.Validate if the
+// Generation_Range_DateTime_TimestampUnixValidationError is the validation
+// error returned by Generation_Range_DateTime_TimestampUnix.Validate if the
 // designated constraints aren't met.
-type Generation_Range_DateTimeRange_TimestampValidationError struct {
+type Generation_Range_DateTime_TimestampUnixValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -4289,24 +4172,24 @@ type Generation_Range_DateTimeRange_TimestampValidationError struct {
 }
 
 // Field function returns field value.
-func (e Generation_Range_DateTimeRange_TimestampValidationError) Field() string { return e.field }
+func (e Generation_Range_DateTime_TimestampUnixValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e Generation_Range_DateTimeRange_TimestampValidationError) Reason() string { return e.reason }
+func (e Generation_Range_DateTime_TimestampUnixValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e Generation_Range_DateTimeRange_TimestampValidationError) Cause() error { return e.cause }
+func (e Generation_Range_DateTime_TimestampUnixValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e Generation_Range_DateTimeRange_TimestampValidationError) Key() bool { return e.key }
+func (e Generation_Range_DateTime_TimestampUnixValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e Generation_Range_DateTimeRange_TimestampValidationError) ErrorName() string {
-	return "Generation_Range_DateTimeRange_TimestampValidationError"
+func (e Generation_Range_DateTime_TimestampUnixValidationError) ErrorName() string {
+	return "Generation_Range_DateTime_TimestampUnixValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e Generation_Range_DateTimeRange_TimestampValidationError) Error() string {
+func (e Generation_Range_DateTime_TimestampUnixValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -4318,14 +4201,14 @@ func (e Generation_Range_DateTimeRange_TimestampValidationError) Error() string 
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGeneration_Range_DateTimeRange_Timestamp.%s: %s%s",
+		"invalid %sGeneration_Range_DateTime_TimestampUnix.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = Generation_Range_DateTimeRange_TimestampValidationError{}
+var _ error = Generation_Range_DateTime_TimestampUnixValidationError{}
 
 var _ interface {
 	Field() string
@@ -4333,1656 +4216,4 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = Generation_Range_DateTimeRange_TimestampValidationError{}
-
-// Validate checks the field values on Generation_Rules_FloatRule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules_FloatRule) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules_FloatRule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// Generation_Rules_FloatRuleMultiError, or nil if none found.
-func (m *Generation_Rules_FloatRule) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules_FloatRule) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.GetRange() == nil {
-		err := Generation_Rules_FloatRuleValidationError{
-			field:  "Range",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetRange()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Rules_FloatRuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Rules_FloatRuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetRange()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Rules_FloatRuleValidationError{
-				field:  "Range",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if m.Constant != nil {
-		// no validation rules for Constant
-	}
-
-	if len(errors) > 0 {
-		return Generation_Rules_FloatRuleMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Rules_FloatRuleMultiError is an error wrapping multiple
-// validation errors returned by Generation_Rules_FloatRule.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Rules_FloatRuleMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Rules_FloatRuleMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Rules_FloatRuleMultiError) AllErrors() []error { return m }
-
-// Generation_Rules_FloatRuleValidationError is the validation error returned
-// by Generation_Rules_FloatRule.Validate if the designated constraints aren't met.
-type Generation_Rules_FloatRuleValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Rules_FloatRuleValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Rules_FloatRuleValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Rules_FloatRuleValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Rules_FloatRuleValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Rules_FloatRuleValidationError) ErrorName() string {
-	return "Generation_Rules_FloatRuleValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Rules_FloatRuleValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules_FloatRule.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Rules_FloatRuleValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Rules_FloatRuleValidationError{}
-
-// Validate checks the field values on Generation_Rules_DoubleRule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules_DoubleRule) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules_DoubleRule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// Generation_Rules_DoubleRuleMultiError, or nil if none found.
-func (m *Generation_Rules_DoubleRule) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules_DoubleRule) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.GetRange() == nil {
-		err := Generation_Rules_DoubleRuleValidationError{
-			field:  "Range",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetRange()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Rules_DoubleRuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Rules_DoubleRuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetRange()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Rules_DoubleRuleValidationError{
-				field:  "Range",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if m.Constant != nil {
-		// no validation rules for Constant
-	}
-
-	if len(errors) > 0 {
-		return Generation_Rules_DoubleRuleMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Rules_DoubleRuleMultiError is an error wrapping multiple
-// validation errors returned by Generation_Rules_DoubleRule.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Rules_DoubleRuleMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Rules_DoubleRuleMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Rules_DoubleRuleMultiError) AllErrors() []error { return m }
-
-// Generation_Rules_DoubleRuleValidationError is the validation error returned
-// by Generation_Rules_DoubleRule.Validate if the designated constraints
-// aren't met.
-type Generation_Rules_DoubleRuleValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Rules_DoubleRuleValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Rules_DoubleRuleValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Rules_DoubleRuleValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Rules_DoubleRuleValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Rules_DoubleRuleValidationError) ErrorName() string {
-	return "Generation_Rules_DoubleRuleValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Rules_DoubleRuleValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules_DoubleRule.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Rules_DoubleRuleValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Rules_DoubleRuleValidationError{}
-
-// Validate checks the field values on Generation_Rules_Int32Rule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules_Int32Rule) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules_Int32Rule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// Generation_Rules_Int32RuleMultiError, or nil if none found.
-func (m *Generation_Rules_Int32Rule) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules_Int32Rule) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.GetRange() == nil {
-		err := Generation_Rules_Int32RuleValidationError{
-			field:  "Range",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetRange()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Rules_Int32RuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Rules_Int32RuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetRange()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Rules_Int32RuleValidationError{
-				field:  "Range",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if m.Constant != nil {
-		// no validation rules for Constant
-	}
-
-	if len(errors) > 0 {
-		return Generation_Rules_Int32RuleMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Rules_Int32RuleMultiError is an error wrapping multiple
-// validation errors returned by Generation_Rules_Int32Rule.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Rules_Int32RuleMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Rules_Int32RuleMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Rules_Int32RuleMultiError) AllErrors() []error { return m }
-
-// Generation_Rules_Int32RuleValidationError is the validation error returned
-// by Generation_Rules_Int32Rule.Validate if the designated constraints aren't met.
-type Generation_Rules_Int32RuleValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Rules_Int32RuleValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Rules_Int32RuleValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Rules_Int32RuleValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Rules_Int32RuleValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Rules_Int32RuleValidationError) ErrorName() string {
-	return "Generation_Rules_Int32RuleValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Rules_Int32RuleValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules_Int32Rule.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Rules_Int32RuleValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Rules_Int32RuleValidationError{}
-
-// Validate checks the field values on Generation_Rules_Int64Rule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules_Int64Rule) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules_Int64Rule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// Generation_Rules_Int64RuleMultiError, or nil if none found.
-func (m *Generation_Rules_Int64Rule) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules_Int64Rule) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.GetRange() == nil {
-		err := Generation_Rules_Int64RuleValidationError{
-			field:  "Range",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetRange()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Rules_Int64RuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Rules_Int64RuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetRange()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Rules_Int64RuleValidationError{
-				field:  "Range",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if m.Constant != nil {
-		// no validation rules for Constant
-	}
-
-	if len(errors) > 0 {
-		return Generation_Rules_Int64RuleMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Rules_Int64RuleMultiError is an error wrapping multiple
-// validation errors returned by Generation_Rules_Int64Rule.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Rules_Int64RuleMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Rules_Int64RuleMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Rules_Int64RuleMultiError) AllErrors() []error { return m }
-
-// Generation_Rules_Int64RuleValidationError is the validation error returned
-// by Generation_Rules_Int64Rule.Validate if the designated constraints aren't met.
-type Generation_Rules_Int64RuleValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Rules_Int64RuleValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Rules_Int64RuleValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Rules_Int64RuleValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Rules_Int64RuleValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Rules_Int64RuleValidationError) ErrorName() string {
-	return "Generation_Rules_Int64RuleValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Rules_Int64RuleValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules_Int64Rule.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Rules_Int64RuleValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Rules_Int64RuleValidationError{}
-
-// Validate checks the field values on Generation_Rules_UInt32Rule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules_UInt32Rule) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules_UInt32Rule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// Generation_Rules_UInt32RuleMultiError, or nil if none found.
-func (m *Generation_Rules_UInt32Rule) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules_UInt32Rule) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.GetRange() == nil {
-		err := Generation_Rules_UInt32RuleValidationError{
-			field:  "Range",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetRange()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Rules_UInt32RuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Rules_UInt32RuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetRange()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Rules_UInt32RuleValidationError{
-				field:  "Range",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if m.Constant != nil {
-		// no validation rules for Constant
-	}
-
-	if len(errors) > 0 {
-		return Generation_Rules_UInt32RuleMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Rules_UInt32RuleMultiError is an error wrapping multiple
-// validation errors returned by Generation_Rules_UInt32Rule.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Rules_UInt32RuleMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Rules_UInt32RuleMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Rules_UInt32RuleMultiError) AllErrors() []error { return m }
-
-// Generation_Rules_UInt32RuleValidationError is the validation error returned
-// by Generation_Rules_UInt32Rule.Validate if the designated constraints
-// aren't met.
-type Generation_Rules_UInt32RuleValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Rules_UInt32RuleValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Rules_UInt32RuleValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Rules_UInt32RuleValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Rules_UInt32RuleValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Rules_UInt32RuleValidationError) ErrorName() string {
-	return "Generation_Rules_UInt32RuleValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Rules_UInt32RuleValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules_UInt32Rule.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Rules_UInt32RuleValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Rules_UInt32RuleValidationError{}
-
-// Validate checks the field values on Generation_Rules_UInt64Rule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules_UInt64Rule) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules_UInt64Rule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// Generation_Rules_UInt64RuleMultiError, or nil if none found.
-func (m *Generation_Rules_UInt64Rule) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules_UInt64Rule) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.GetRange() == nil {
-		err := Generation_Rules_UInt64RuleValidationError{
-			field:  "Range",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetRange()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Rules_UInt64RuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Rules_UInt64RuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetRange()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Rules_UInt64RuleValidationError{
-				field:  "Range",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if m.Constant != nil {
-		// no validation rules for Constant
-	}
-
-	if len(errors) > 0 {
-		return Generation_Rules_UInt64RuleMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Rules_UInt64RuleMultiError is an error wrapping multiple
-// validation errors returned by Generation_Rules_UInt64Rule.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Rules_UInt64RuleMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Rules_UInt64RuleMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Rules_UInt64RuleMultiError) AllErrors() []error { return m }
-
-// Generation_Rules_UInt64RuleValidationError is the validation error returned
-// by Generation_Rules_UInt64Rule.Validate if the designated constraints
-// aren't met.
-type Generation_Rules_UInt64RuleValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Rules_UInt64RuleValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Rules_UInt64RuleValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Rules_UInt64RuleValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Rules_UInt64RuleValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Rules_UInt64RuleValidationError) ErrorName() string {
-	return "Generation_Rules_UInt64RuleValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Rules_UInt64RuleValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules_UInt64Rule.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Rules_UInt64RuleValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Rules_UInt64RuleValidationError{}
-
-// Validate checks the field values on Generation_Rules_BoolRule with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules_BoolRule) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules_BoolRule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// Generation_Rules_BoolRuleMultiError, or nil if none found.
-func (m *Generation_Rules_BoolRule) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules_BoolRule) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.Constant != nil {
-		// no validation rules for Constant
-	}
-
-	if len(errors) > 0 {
-		return Generation_Rules_BoolRuleMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Rules_BoolRuleMultiError is an error wrapping multiple validation
-// errors returned by Generation_Rules_BoolRule.ValidateAll() if the
-// designated constraints aren't met.
-type Generation_Rules_BoolRuleMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Rules_BoolRuleMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Rules_BoolRuleMultiError) AllErrors() []error { return m }
-
-// Generation_Rules_BoolRuleValidationError is the validation error returned by
-// Generation_Rules_BoolRule.Validate if the designated constraints aren't met.
-type Generation_Rules_BoolRuleValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Rules_BoolRuleValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Rules_BoolRuleValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Rules_BoolRuleValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Rules_BoolRuleValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Rules_BoolRuleValidationError) ErrorName() string {
-	return "Generation_Rules_BoolRuleValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Rules_BoolRuleValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules_BoolRule.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Rules_BoolRuleValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Rules_BoolRuleValidationError{}
-
-// Validate checks the field values on Generation_Rules_StringRule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules_StringRule) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules_StringRule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// Generation_Rules_StringRuleMultiError, or nil if none found.
-func (m *Generation_Rules_StringRule) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules_StringRule) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.GetLenRange() == nil {
-		err := Generation_Rules_StringRuleValidationError{
-			field:  "LenRange",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetLenRange()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Rules_StringRuleValidationError{
-					field:  "LenRange",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Rules_StringRuleValidationError{
-					field:  "LenRange",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetLenRange()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Rules_StringRuleValidationError{
-				field:  "LenRange",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if m.Alphabet != nil {
-
-		if all {
-			switch v := interface{}(m.GetAlphabet()).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, Generation_Rules_StringRuleValidationError{
-						field:  "Alphabet",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, Generation_Rules_StringRuleValidationError{
-						field:  "Alphabet",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(m.GetAlphabet()).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return Generation_Rules_StringRuleValidationError{
-					field:  "Alphabet",
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
-		}
-
-	}
-
-	if m.Constant != nil {
-		// no validation rules for Constant
-	}
-
-	if len(errors) > 0 {
-		return Generation_Rules_StringRuleMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Rules_StringRuleMultiError is an error wrapping multiple
-// validation errors returned by Generation_Rules_StringRule.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Rules_StringRuleMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Rules_StringRuleMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Rules_StringRuleMultiError) AllErrors() []error { return m }
-
-// Generation_Rules_StringRuleValidationError is the validation error returned
-// by Generation_Rules_StringRule.Validate if the designated constraints
-// aren't met.
-type Generation_Rules_StringRuleValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Rules_StringRuleValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Rules_StringRuleValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Rules_StringRuleValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Rules_StringRuleValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Rules_StringRuleValidationError) ErrorName() string {
-	return "Generation_Rules_StringRuleValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Rules_StringRuleValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules_StringRule.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Rules_StringRuleValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Rules_StringRuleValidationError{}
-
-// Validate checks the field values on Generation_Rules_DateTimeRule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules_DateTimeRule) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules_DateTimeRule with
-// the rules defined in the proto definition for this message. If any rules
-// are violated, the result is a list of violation errors wrapped in
-// Generation_Rules_DateTimeRuleMultiError, or nil if none found.
-func (m *Generation_Rules_DateTimeRule) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules_DateTimeRule) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.GetRange() == nil {
-		err := Generation_Rules_DateTimeRuleValidationError{
-			field:  "Range",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetRange()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Rules_DateTimeRuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Rules_DateTimeRuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetRange()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Rules_DateTimeRuleValidationError{
-				field:  "Range",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if m.Constant != nil {
-
-		if all {
-			switch v := interface{}(m.GetConstant()).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, Generation_Rules_DateTimeRuleValidationError{
-						field:  "Constant",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, Generation_Rules_DateTimeRuleValidationError{
-						field:  "Constant",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(m.GetConstant()).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return Generation_Rules_DateTimeRuleValidationError{
-					field:  "Constant",
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
-		}
-
-	}
-
-	if len(errors) > 0 {
-		return Generation_Rules_DateTimeRuleMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Rules_DateTimeRuleMultiError is an error wrapping multiple
-// validation errors returned by Generation_Rules_DateTimeRule.ValidateAll()
-// if the designated constraints aren't met.
-type Generation_Rules_DateTimeRuleMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Rules_DateTimeRuleMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Rules_DateTimeRuleMultiError) AllErrors() []error { return m }
-
-// Generation_Rules_DateTimeRuleValidationError is the validation error
-// returned by Generation_Rules_DateTimeRule.Validate if the designated
-// constraints aren't met.
-type Generation_Rules_DateTimeRuleValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Rules_DateTimeRuleValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Rules_DateTimeRuleValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Rules_DateTimeRuleValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Rules_DateTimeRuleValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Rules_DateTimeRuleValidationError) ErrorName() string {
-	return "Generation_Rules_DateTimeRuleValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Rules_DateTimeRuleValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules_DateTimeRule.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Rules_DateTimeRuleValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Rules_DateTimeRuleValidationError{}
-
-// Validate checks the field values on Generation_Rules_UuidRule with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules_UuidRule) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules_UuidRule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// Generation_Rules_UuidRuleMultiError, or nil if none found.
-func (m *Generation_Rules_UuidRule) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules_UuidRule) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.Constant != nil {
-
-		if all {
-			switch v := interface{}(m.GetConstant()).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, Generation_Rules_UuidRuleValidationError{
-						field:  "Constant",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, Generation_Rules_UuidRuleValidationError{
-						field:  "Constant",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(m.GetConstant()).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return Generation_Rules_UuidRuleValidationError{
-					field:  "Constant",
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
-		}
-
-	}
-
-	if len(errors) > 0 {
-		return Generation_Rules_UuidRuleMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Rules_UuidRuleMultiError is an error wrapping multiple validation
-// errors returned by Generation_Rules_UuidRule.ValidateAll() if the
-// designated constraints aren't met.
-type Generation_Rules_UuidRuleMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Rules_UuidRuleMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Rules_UuidRuleMultiError) AllErrors() []error { return m }
-
-// Generation_Rules_UuidRuleValidationError is the validation error returned by
-// Generation_Rules_UuidRule.Validate if the designated constraints aren't met.
-type Generation_Rules_UuidRuleValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Rules_UuidRuleValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Rules_UuidRuleValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Rules_UuidRuleValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Rules_UuidRuleValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Rules_UuidRuleValidationError) ErrorName() string {
-	return "Generation_Rules_UuidRuleValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Rules_UuidRuleValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules_UuidRule.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Rules_UuidRuleValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Rules_UuidRuleValidationError{}
-
-// Validate checks the field values on Generation_Rules_DecimalRule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *Generation_Rules_DecimalRule) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Generation_Rules_DecimalRule with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// Generation_Rules_DecimalRuleMultiError, or nil if none found.
-func (m *Generation_Rules_DecimalRule) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Generation_Rules_DecimalRule) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.GetRange() == nil {
-		err := Generation_Rules_DecimalRuleValidationError{
-			field:  "Range",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetRange()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, Generation_Rules_DecimalRuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, Generation_Rules_DecimalRuleValidationError{
-					field:  "Range",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetRange()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return Generation_Rules_DecimalRuleValidationError{
-				field:  "Range",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if m.Constant != nil {
-
-		if all {
-			switch v := interface{}(m.GetConstant()).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, Generation_Rules_DecimalRuleValidationError{
-						field:  "Constant",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, Generation_Rules_DecimalRuleValidationError{
-						field:  "Constant",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(m.GetConstant()).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return Generation_Rules_DecimalRuleValidationError{
-					field:  "Constant",
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
-		}
-
-	}
-
-	if len(errors) > 0 {
-		return Generation_Rules_DecimalRuleMultiError(errors)
-	}
-
-	return nil
-}
-
-// Generation_Rules_DecimalRuleMultiError is an error wrapping multiple
-// validation errors returned by Generation_Rules_DecimalRule.ValidateAll() if
-// the designated constraints aren't met.
-type Generation_Rules_DecimalRuleMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m Generation_Rules_DecimalRuleMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m Generation_Rules_DecimalRuleMultiError) AllErrors() []error { return m }
-
-// Generation_Rules_DecimalRuleValidationError is the validation error returned
-// by Generation_Rules_DecimalRule.Validate if the designated constraints
-// aren't met.
-type Generation_Rules_DecimalRuleValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e Generation_Rules_DecimalRuleValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e Generation_Rules_DecimalRuleValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e Generation_Rules_DecimalRuleValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e Generation_Rules_DecimalRuleValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e Generation_Rules_DecimalRuleValidationError) ErrorName() string {
-	return "Generation_Rules_DecimalRuleValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e Generation_Rules_DecimalRuleValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sGeneration_Rules_DecimalRule.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = Generation_Rules_DecimalRuleValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = Generation_Rules_DecimalRuleValidationError{}
+} = Generation_Range_DateTime_TimestampUnixValidationError{}

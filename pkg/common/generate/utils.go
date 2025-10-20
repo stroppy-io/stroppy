@@ -9,6 +9,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
@@ -32,38 +33,55 @@ func wrapNilQuota( //nolint: ireturn // need from lib
 ) ValueGenerator {
 	percent := float64(nullPercent) / Persent100
 
-	if nullPercent > 0 {
-		return valueGeneratorFn(func() (*stroppy.Value, error) {
-			if rand.Float64() < percent { //nolint:gosec // performance in priority here (against crypto/rand)
-				return &stroppy.Value{
-					Type: &stroppy.Value_Null{
-						Null: stroppy.Value_NULL_VALUE,
-					},
-				}, nil
-			}
+	return valueGeneratorFn(func() (*stroppy.Value, error) {
+		if rand.Float64() < percent { //nolint:gosec // performance in priority here (against crypto/rand)
+			return &stroppy.Value{Type: &stroppy.Value_Null{Null: stroppy.Value_NULL_VALUE}}, nil
+		}
 
-			return gen.Next()
-		})
-	}
-
-	return gen
+		return gen.Next()
+	})
 }
 
+func newConstValueGenerator[T primitive.Primitive](
+	constant T,
+	transformer valueTransformer[T],
+) ValueGenerator {
+	return valueGeneratorFn(func() (*stroppy.Value, error) {
+		return transformer(constant)
+	})
+}
+func newRangeGenerator[T primitive.Primitive](
+	distribution primitiveGenerator[T],
+	transformer valueTransformer[T],
+) ValueGenerator {
+	return valueGeneratorFn(func() (*stroppy.Value, error) {
+		return transformer(distribution.Next())
+	})
+}
+
+// Deprecated
+// it was so beutifull refactor I don't want to kill it
 func newValueGenerator[T primitive.Primitive]( //nolint: ireturn // need from lib
 	distribution primitiveGenerator[T],
 	transformer valueTransformer[T],
 	nullPercent uint32,
 	constant *T,
 ) ValueGenerator {
+	var generator ValueGenerator
+
 	if constant != nil {
-		return valueGeneratorFn(func() (*stroppy.Value, error) {
-			return transformer(*constant)
-		})
+		generator = newConstValueGenerator(*constant, transformer)
 	}
 
-	return wrapNilQuota(valueGeneratorFn(func() (*stroppy.Value, error) {
-		return transformer(distribution.Next())
-	}), nullPercent)
+	if distribution != nil {
+		generator = newRangeGenerator(distribution, transformer)
+	}
+
+	if nullPercent > 0 {
+		generator = wrapNilQuota(generator, nullPercent)
+	}
+
+	return generator
 }
 
 type rangeWrapper[T constraint.Number] struct {
@@ -169,40 +187,34 @@ func dateTimeToValue(t time.Time) (*stroppy.Value, error) {
 	}, nil
 }
 
-func boolPtrToUint8Ptr(boolean *bool) *uint8 {
-	if boolean == nil {
-		return nil
-	}
+func boolToUint8(boolean bool) uint8 {
 
 	val := uint8(0)
-	if *boolean {
+	if boolean {
 		val = 1
 	}
 
-	return &val
+	return val
 }
 
-func dateTimePtrToTimePtr(dt *stroppy.DateTime) *time.Time {
-	if dt == nil {
-		return nil
-	}
-
+func dateTimePtrToTimePtr(dt *stroppy.DateTime) time.Time {
 	val := dt.GetValue().AsTime()
-
-	return &val
+	return val
 }
 
-func decimalPtrToDecimalPtr(d *stroppy.Decimal) *decimal.Decimal {
+func decimalPtrToDecimalPtr(d *stroppy.Decimal) decimal.Decimal {
 	if d == nil {
-		return nil
+		logger.Global().Sugar().Error("nil Decimal value", d.GetValue())
+		var dd decimal.Decimal
+		return dd
 	}
 
 	val, err := decimal.NewFromString(d.GetValue())
 	if err != nil {
-		return nil
+		logger.Global().Sugar().Error("can't parse decimal value", d.GetValue(), err)
 	}
 
-	return &val
+	return val
 }
 
 func alphabetToChars(alphabet *stroppy.Generation_Alphabet) [][2]int32 {

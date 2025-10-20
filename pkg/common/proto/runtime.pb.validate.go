@@ -500,6 +500,10 @@ func (m *DriverQuery) validate(all bool) error {
 
 	}
 
+	if m.Method != nil {
+		// no validation rules for Method
+	}
+
 	if len(errors) > 0 {
 		return DriverQueryMultiError(errors)
 	}

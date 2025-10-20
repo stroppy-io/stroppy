@@ -1,8 +1,11 @@
 package config
 
 import (
+	"time"
+
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/google/uuid"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
@@ -11,8 +14,8 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 	return &stroppy.ConfigFile{
 		Global: &stroppy.GlobalConfig{
 			Version: "v1.0.2",
-			RunId:   "4e4ba39c-4c85-4105-980c-589acc902d25",
-			Seed:    987654321,
+			RunId:   uuid.New().String(),
+			Seed:    uint64(time.Now().Unix()), //nolint: gosec // allow
 			Metadata: map[string]string{
 				"benchmark_type":        "tpc_c_with_procedures",
 				"description":           "TPC-C Benchmark with Stored Procedures",
@@ -72,9 +75,9 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 		Exporters: []*stroppy.ExporterConfig{{
 			Name: "tpcc-metrics",
 			OtlpExport: &stroppy.OtlpExport{
-				OtlpGrpcEndpoint:     ptr[string]("localhost:4317"),
-				OtlpEndpointInsecure: ptr[bool](false),
-				OtlpMetricsPrefix:    ptr[string]("stroppy_k6_tpcc_"),
+				OtlpGrpcEndpoint:     ptr("localhost:4317"),
+				OtlpEndpointInsecure: ptr(false),
+				OtlpMetricsPrefix:    ptr("stroppy_k6_tpcc_"),
 			},
 		}},
 		Executors: []*stroppy.ExecutorConfig{
@@ -82,6 +85,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 				Name: "single-execution",
 				K6: &stroppy.K6Options{
 					Scenario: &stroppy.K6Scenario{
+						MaxDuration: durationpb.New(time.Hour),
 						Executor: &stroppy.K6Scenario_PerVuIterations{
 							PerVuIterations: &stroppy.PerVuIterations{
 								Vus:        1,
@@ -95,9 +99,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 				Name: "data-load-executor",
 				K6: &stroppy.K6Options{
 					Scenario: &stroppy.K6Scenario{
+						MaxDuration: durationpb.New(time.Hour),
 						Executor: &stroppy.K6Scenario_PerVuIterations{
 							PerVuIterations: &stroppy.PerVuIterations{
-								Vus:        100,
+								Vus:        1,
 								Iterations: -1,
 							},
 						},
@@ -108,6 +113,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 				Name: "tpcc-benchmark",
 				K6: &stroppy.K6Options{
 					Scenario: &stroppy.K6Scenario{
+						MaxDuration: durationpb.New(time.Hour),
 						Executor: &stroppy.K6Scenario_ConstantArrivalRate{
 							ConstantArrivalRate: &stroppy.ConstantArrivalRate{
 								Rate: 500,
@@ -128,6 +134,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 				Name: "tpcc-benchmark-ramping-rate",
 				K6: &stroppy.K6Options{
 					Scenario: &stroppy.K6Scenario{
+						MaxDuration: durationpb.New(time.Hour),
 						Executor: &stroppy.K6Scenario_RampingArrivalRate{
 							RampingArrivalRate: &stroppy.RampingArrivalRate{
 								StartRate: 500,
@@ -227,35 +234,35 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 				Name:     "create_schema",
 				Workload: "create_schema",
 				Executor: "single-execution",
-				Exporter: ptr[string]("tpcc-metrics"),
+				Exporter: ptr("tpcc-metrics"),
 			},
 			{
 				Name:     "create_procedures",
 				Workload: "create_stored_procedures",
 				Executor: "single-execution",
-				Exporter: ptr[string]("tpcc-metrics"),
+				Exporter: ptr("tpcc-metrics"),
 			},
 			{
 				Name:     "load_data",
 				Workload: "load_data",
 				Executor: "data-load-executor",
-				Exporter: ptr[string]("tpcc-metrics"),
+				Exporter: ptr("tpcc-metrics"),
 			},
 			{
 				Name:     "tpcc_workload",
 				Workload: "tpcc_workload",
 				Executor: "tpcc-benchmark",
-				Exporter: ptr[string]("tpcc-metrics"),
+				Exporter: ptr("tpcc-metrics"),
 			},
 			{
 				Name:     "cleanup",
 				Workload: "cleanup",
 				Executor: "single-execution",
-				Exporter: ptr[string]("tpcc-metrics"),
+				Exporter: ptr("tpcc-metrics"),
 			},
 		},
 		Benchmark: &stroppy.BenchmarkDescriptor{
-			Name: "tpcc_postgresq",
+			Name: "tpcc_postgresql",
 			Workloads: []*stroppy.WorkloadDescriptor{
 				{
 					Name: "create_schema",
@@ -270,40 +277,16 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name:       "w_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
-											{
-												Name:    "w_name",
-												SqlType: "VARCHAR(10)",
-											},
-											{
-												Name:    "w_street_1",
-												SqlType: "VARCHAR(20)",
-											},
-											{
-												Name:    "w_street_2",
-												SqlType: "VARCHAR(20)",
-											},
-											{
-												Name:    "w_city",
-												SqlType: "VARCHAR(20)",
-											},
-											{
-												Name:    "w_state",
-												SqlType: "CHAR(2)",
-											},
-											{
-												Name:    "w_zip",
-												SqlType: "CHAR(9)",
-											},
-											{
-												Name:    "w_tax",
-												SqlType: "DECIMAL(4,4)",
-											},
-											{
-												Name:    "w_ytd",
-												SqlType: "DECIMAL(12,2)",
-											},
+											{Name: "w_name", SqlType: "VARCHAR(10)"},
+											{Name: "w_street_1", SqlType: "VARCHAR(20)"},
+											{Name: "w_street_2", SqlType: "VARCHAR(20)"},
+											{Name: "w_city", SqlType: "VARCHAR(20)"},
+											{Name: "w_state", SqlType: "CHAR(2)"},
+											{Name: "w_zip", SqlType: "CHAR(9)"},
+											{Name: "w_tax", SqlType: "DECIMAL(4,4)"},
+											{Name: "w_ytd", SqlType: "DECIMAL(12,2)"},
 										},
 									},
 								},
@@ -320,50 +303,23 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name:       "d_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
 											{
 												Name:       "d_w_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
-												Constraint: "REFERENCES warehouse(w_id)",
+												PrimaryKey: ptr(true),
+												Constraint: ptr("REFERENCES warehouse(w_id)"),
 											},
-											{
-												Name:    "d_name",
-												SqlType: "VARCHAR(10)",
-											},
-											{
-												Name:    "d_street_1",
-												SqlType: "VARCHAR(20)",
-											},
-											{
-												Name:    "d_street_2",
-												SqlType: "VARCHAR(20)",
-											},
-											{
-												Name:    "d_city",
-												SqlType: "VARCHAR(20)",
-											},
-											{
-												Name:    "d_state",
-												SqlType: "CHAR(2)",
-											},
-											{
-												Name:    "d_zip",
-												SqlType: "CHAR(9)",
-											},
-											{
-												Name:    "d_tax",
-												SqlType: "DECIMAL(4,4)",
-											},
-											{
-												Name:    "d_ytd",
-												SqlType: "DECIMAL(12,2)",
-											},
-											{
-												Name:    "d_next_o_id",
-												SqlType: "INTEGER",
-											},
+											{Name: "d_name", SqlType: "VARCHAR(10)"},
+											{Name: "d_street_1", SqlType: "VARCHAR(20)"},
+											{Name: "d_street_2", SqlType: "VARCHAR(20)"},
+											{Name: "d_city", SqlType: "VARCHAR(20)"},
+											{Name: "d_state", SqlType: "CHAR(2)"},
+											{Name: "d_zip", SqlType: "CHAR(9)"},
+											{Name: "d_tax", SqlType: "DECIMAL(4,4)"},
+											{Name: "d_ytd", SqlType: "DECIMAL(12,2)"},
+											{Name: "d_next_o_id", SqlType: "INTEGER"},
 										},
 									},
 								},
@@ -380,91 +336,37 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name:       "c_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
 											{
 												Name:       "c_d_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
 											{
 												Name:       "c_w_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
-												Constraint: "REFERENCES warehouse(w_id)",
+												PrimaryKey: ptr(true),
+												Constraint: ptr("REFERENCES warehouse(w_id)"),
 											},
-											{
-												Name:    "c_first",
-												SqlType: "VARCHAR(16)",
-											},
-											{
-												Name:    "c_middle",
-												SqlType: "CHAR(2)",
-											},
-											{
-												Name:    "c_last",
-												SqlType: "VARCHAR(16)",
-											},
-											{
-												Name:    "c_street_1",
-												SqlType: "VARCHAR(20)",
-											},
-											{
-												Name:    "c_street_2",
-												SqlType: "VARCHAR(20)",
-											},
-											{
-												Name:    "c_city",
-												SqlType: "VARCHAR(20)",
-											},
-											{
-												Name:    "c_state",
-												SqlType: "CHAR(2)",
-											},
-											{
-												Name:    "c_zip",
-												SqlType: "CHAR(9)",
-											},
-											{
-												Name:    "c_phone",
-												SqlType: "CHAR(16)",
-											},
-											{
-												Name:    "c_since",
-												SqlType: "TIMESTAMP",
-											},
-											{
-												Name:    "c_credit",
-												SqlType: "CHAR(2)",
-											},
-											{
-												Name:    "c_credit_lim",
-												SqlType: "DECIMAL(12,2)",
-											},
-											{
-												Name:    "c_discount",
-												SqlType: "DECIMAL(4,4)",
-											},
-											{
-												Name:    "c_balance",
-												SqlType: "DECIMAL(12,2)",
-											},
-											{
-												Name:    "c_ytd_payment",
-												SqlType: "DECIMAL(12,2)",
-											},
-											{
-												Name:    "c_payment_cnt",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "c_delivery_cnt",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "c_data",
-												SqlType: "VARCHAR(500)",
-											},
+											{Name: "c_first", SqlType: "VARCHAR(16)"},
+											{Name: "c_middle", SqlType: "CHAR(2)"},
+											{Name: "c_last", SqlType: "VARCHAR(16)"},
+											{Name: "c_street_1", SqlType: "VARCHAR(20)"},
+											{Name: "c_street_2", SqlType: "VARCHAR(20)"},
+											{Name: "c_city", SqlType: "VARCHAR(20)"},
+											{Name: "c_state", SqlType: "CHAR(2)"},
+											{Name: "c_zip", SqlType: "CHAR(9)"},
+											{Name: "c_phone", SqlType: "CHAR(16)"},
+											{Name: "c_since", SqlType: "TIMESTAMP"},
+											{Name: "c_credit", SqlType: "CHAR(2)"},
+											{Name: "c_credit_lim", SqlType: "DECIMAL(12,2)"},
+											{Name: "c_discount", SqlType: "DECIMAL(4,4)"},
+											{Name: "c_balance", SqlType: "DECIMAL(12,2)"},
+											{Name: "c_ytd_payment", SqlType: "DECIMAL(12,2)"},
+											{Name: "c_payment_cnt", SqlType: "INTEGER"},
+											{Name: "c_delivery_cnt", SqlType: "INTEGER"},
+											{Name: "c_data", SqlType: "VARCHAR(500)"},
 										},
 									},
 								},
@@ -478,38 +380,14 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 										Name:       "history",
 										DbSpecific: &stroppy.Value_Struct{},
 										Columns: []*stroppy.ColumnDescriptor{
-											{
-												Name:    "h_c_id",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "h_c_d_id",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "h_c_w_id",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "h_d_id",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "h_w_id",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "h_date",
-												SqlType: "TIMESTAMP",
-											},
-											{
-												Name:    "h_amount",
-												SqlType: "DECIMAL(6,2)",
-											},
-											{
-												Name:    "h_data",
-												SqlType: "VARCHAR(24)",
-											},
+											{Name: "h_c_id", SqlType: "INTEGER"},
+											{Name: "h_c_d_id", SqlType: "INTEGER"},
+											{Name: "h_c_w_id", SqlType: "INTEGER"},
+											{Name: "h_d_id", SqlType: "INTEGER"},
+											{Name: "h_w_id", SqlType: "INTEGER"},
+											{Name: "h_date", SqlType: "TIMESTAMP"},
+											{Name: "h_amount", SqlType: "DECIMAL(6,2)"},
+											{Name: "h_data", SqlType: "VARCHAR(24)"},
 										},
 									},
 								},
@@ -526,18 +404,18 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name:       "no_o_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
 											{
 												Name:       "no_d_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
 											{
 												Name:       "no_w_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
-												Constraint: "REFERENCES warehouse(w_id)",
+												PrimaryKey: ptr(true),
+												Constraint: ptr("REFERENCES warehouse(w_id)"),
 											},
 										},
 									},
@@ -555,40 +433,28 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name:       "o_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
 											{
 												Name:       "o_d_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
 											{
 												Name:       "o_w_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
-												Constraint: "REFERENCES warehouse(w_id)",
+												PrimaryKey: ptr(true),
+												Constraint: ptr("REFERENCES warehouse(w_id)"),
 											},
-											{
-												Name:    "o_c_id",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "o_entry_d",
-												SqlType: "TIMESTAMP",
-											},
+											{Name: "o_c_id", SqlType: "INTEGER"},
+											{Name: "o_entry_d", SqlType: "TIMESTAMP"},
 											{
 												Name:     "o_carrier_id",
 												SqlType:  "INTEGER",
-												Nullable: true,
+												Nullable: ptr(true),
 											},
-											{
-												Name:    "o_ol_cnt",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "o_all_local",
-												SqlType: "INTEGER",
-											},
+											{Name: "o_ol_cnt", SqlType: "INTEGER"},
+											{Name: "o_all_local", SqlType: "INTEGER"},
 										},
 									},
 								},
@@ -605,49 +471,34 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name:       "ol_o_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
 											{
 												Name:       "ol_d_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
 											{
 												Name:       "ol_w_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
-												Constraint: "REFERENCES warehouse(w_id)",
+												PrimaryKey: ptr(true),
+												Constraint: ptr("REFERENCES warehouse(w_id)"),
 											},
 											{
 												Name:       "ol_number",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
-											{
-												Name:    "ol_i_id",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "ol_supply_w_id",
-												SqlType: "INTEGER",
-											},
+											{Name: "ol_i_id", SqlType: "INTEGER"},
+											{Name: "ol_supply_w_id", SqlType: "INTEGER"},
 											{
 												Name:     "ol_delivery_d",
 												SqlType:  "TIMESTAMP",
-												Nullable: true,
+												Nullable: ptr(true),
 											},
-											{
-												Name:    "ol_quantity",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "ol_amount",
-												SqlType: "DECIMAL(6,2)",
-											},
-											{
-												Name:    "ol_dist_info",
-												SqlType: "CHAR(24)",
-											},
+											{Name: "ol_quantity", SqlType: "INTEGER"},
+											{Name: "ol_amount", SqlType: "DECIMAL(6,2)"},
+											{Name: "ol_dist_info", SqlType: "CHAR(24)"},
 										},
 									},
 								},
@@ -664,24 +515,12 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name:       "i_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
+												PrimaryKey: ptr(true),
 											},
-											{
-												Name:    "i_im_id",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "i_name",
-												SqlType: "VARCHAR(24)",
-											},
-											{
-												Name:    "i_price",
-												SqlType: "DECIMAL(5,2)",
-											},
-											{
-												Name:    "i_data",
-												SqlType: "VARCHAR(50)",
-											},
+											{Name: "i_im_id", SqlType: "INTEGER"},
+											{Name: "i_name", SqlType: "VARCHAR(24)"},
+											{Name: "i_price", SqlType: "DECIMAL(5,2)"},
+											{Name: "i_data", SqlType: "VARCHAR(50)"},
 										},
 									},
 								},
@@ -698,75 +537,30 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name:       "s_i_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
-												Constraint: "REFERENCES item(i_id)",
+												PrimaryKey: ptr(true),
+												Constraint: ptr("REFERENCES item(i_id)"),
 											},
 											{
 												Name:       "s_w_id",
 												SqlType:    "INTEGER",
-												PrimaryKey: true,
-												Constraint: "REFERENCES warehouse(w_id)",
+												PrimaryKey: ptr(true),
+												Constraint: ptr("REFERENCES warehouse(w_id)"),
 											},
-											{
-												Name:    "s_quantity",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "s_dist_01",
-												SqlType: "CHAR(24)",
-											},
-											{
-												Name:    "s_dist_02",
-												SqlType: "CHAR(24)",
-											},
-											{
-												Name:    "s_dist_03",
-												SqlType: "CHAR(24)",
-											},
-											{
-												Name:    "s_dist_04",
-												SqlType: "CHAR(24)",
-											},
-											{
-												Name:    "s_dist_05",
-												SqlType: "CHAR(24)",
-											},
-											{
-												Name:    "s_dist_06",
-												SqlType: "CHAR(24)",
-											},
-											{
-												Name:    "s_dist_07",
-												SqlType: "CHAR(24)",
-											},
-											{
-												Name:    "s_dist_08",
-												SqlType: "CHAR(24)",
-											},
-											{
-												Name:    "s_dist_09",
-												SqlType: "CHAR(24)",
-											},
-											{
-												Name:    "s_dist_10",
-												SqlType: "CHAR(24)",
-											},
-											{
-												Name:    "s_ytd",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "s_order_cnt",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "s_remote_cnt",
-												SqlType: "INTEGER",
-											},
-											{
-												Name:    "s_data",
-												SqlType: "VARCHAR(50)",
-											},
+											{Name: "s_quantity", SqlType: "INTEGER"},
+											{Name: "s_dist_01", SqlType: "CHAR(24)"},
+											{Name: "s_dist_02", SqlType: "CHAR(24)"},
+											{Name: "s_dist_03", SqlType: "CHAR(24)"},
+											{Name: "s_dist_04", SqlType: "CHAR(24)"},
+											{Name: "s_dist_05", SqlType: "CHAR(24)"},
+											{Name: "s_dist_06", SqlType: "CHAR(24)"},
+											{Name: "s_dist_07", SqlType: "CHAR(24)"},
+											{Name: "s_dist_08", SqlType: "CHAR(24)"},
+											{Name: "s_dist_09", SqlType: "CHAR(24)"},
+											{Name: "s_dist_10", SqlType: "CHAR(24)"},
+											{Name: "s_ytd", SqlType: "INTEGER"},
+											{Name: "s_order_cnt", SqlType: "INTEGER"},
+											{Name: "s_remote_cnt", SqlType: "INTEGER"},
+											{Name: "s_data", SqlType: "VARCHAR(50)"},
 										},
 									},
 								},
@@ -851,34 +645,31 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 					Units: []*stroppy.WorkloadUnitDescriptor{
 						{
 							Descriptor_: &stroppy.UnitDescriptor{
-								Type: &stroppy.UnitDescriptor_Query{
-									Query: &stroppy.QueryDescriptor{
-										Name: "load_items",
-										Sql:  "INSERT INTO item (i_id, i_im_id, i_name, i_price, i_data)\nVALUES (${i_id}, ${i_im_id}, ${i_name}, ${i_price}, ${i_data})",
+								Type: &stroppy.UnitDescriptor_Insert{
+									Insert: &stroppy.InsertDescriptor{
+										Name:      "load_items",
+										TableName: "item",
+										Method:    stroppy.InsertMethod_COPY_FROM.Enum(),
 										Params: []*stroppy.QueryParamDescriptor{
 											{
 												Name: "i_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 100000,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 100000,
 														},
 													},
-													Unique: ptr[bool](true),
+													Unique: ptr(true),
 												},
 											},
 											{
 												Name: "i_im_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10000,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10000,
 														},
 													},
 												},
@@ -886,28 +677,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "i_name",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 32,
+																		Min: ptr[uint32](32),
 																		Max: 33,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 14,
-																Max: 24,
-															},
+															MinLen: ptr[uint64](14),
+															MaxLen: 24,
 														},
 													},
 												},
@@ -915,12 +704,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "i_price",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_FloatRules{
-														FloatRules: &stroppy.Generation_Rules_FloatRule{
-															Range: &stroppy.Generation_Range_FloatRange{
-																Min: 1,
-																Max: 100,
-															},
+													Kind: &stroppy.Generation_Rule_FloatRange{
+														FloatRange: &stroppy.Generation_Range_Float{
+															Min: ptr[float32](1),
+															Max: 100,
 														},
 													},
 												},
@@ -928,28 +715,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "i_data",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 32,
+																		Min: ptr[uint32](32),
 																		Max: 33,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 26,
-																Max: 50,
-															},
+															MinLen: ptr[uint64](26),
+															MaxLen: 50,
 														},
 													},
 												},
@@ -962,34 +747,31 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 						},
 						{
 							Descriptor_: &stroppy.UnitDescriptor{
-								Type: &stroppy.UnitDescriptor_Query{
-									Query: &stroppy.QueryDescriptor{
-										Name: "load_warehouses",
-										Sql:  "INSERT INTO warehouse (w_id, w_name, w_street_1, w_street_2,\nw_city, w_state, w_zip, w_tax, w_ytd)\nVALUES (${w_id}, ${w_name}, ${w_street_1}, ${w_street_2},\n${w_city}, ${w_state}, ${w_zip}, ${w_tax}, 300000.00)",
+								Type: &stroppy.UnitDescriptor_Insert{
+									Insert: &stroppy.InsertDescriptor{
+										Name:      "load_warehouses",
+										TableName: "warehouse",
+										Method:    stroppy.InsertMethod_COPY_FROM.Enum(),
 										Params: []*stroppy.QueryParamDescriptor{
 											{
 												Name: "w_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
-													Unique: ptr[bool](true),
+													Unique: ptr(true),
 												},
 											},
 											{
 												Name: "w_name",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 6,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
+															MinLen: ptr[uint64](6),
+															MaxLen: 10,
 														},
 													},
 												},
@@ -997,12 +779,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "w_street_1",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 10,
-																Max: 20,
-															},
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
+															MinLen: ptr[uint64](10),
+															MaxLen: 20,
 														},
 													},
 												},
@@ -1010,12 +790,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "w_street_2",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 10,
-																Max: 20,
-															},
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
+															MinLen: ptr[uint64](10),
+															MaxLen: 20,
 														},
 													},
 												},
@@ -1023,12 +801,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "w_city",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 10,
-																Max: 20,
-															},
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
+															MinLen: ptr[uint64](10),
+															MaxLen: 20,
 														},
 													},
 												},
@@ -1036,12 +812,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "w_state",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 2,
-																Max: 2,
-															},
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
+															MinLen: ptr[uint64](2),
+															MaxLen: 2,
 														},
 													},
 												},
@@ -1049,20 +823,18 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "w_zip",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 6,
-																Max: 6,
-															},
+															MinLen: ptr[uint64](6),
+															MaxLen: 6,
 														},
 													},
 												},
@@ -1070,11 +842,9 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "w_tax",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_FloatRules{
-														FloatRules: &stroppy.Generation_Rules_FloatRule{
-															Range: &stroppy.Generation_Range_FloatRange{
-																Max: 0.20000000298023224,
-															},
+													Kind: &stroppy.Generation_Rule_FloatRange{
+														FloatRange: &stroppy.Generation_Range_Float{
+															Max: 0.20000000298023224,
 														},
 													},
 												},
@@ -1087,32 +857,31 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 						},
 						{
 							Descriptor_: &stroppy.UnitDescriptor{
-								Type: &stroppy.UnitDescriptor_Query{
-									Query: &stroppy.QueryDescriptor{
-										Name: "load_districts",
-										Sql:  "INSERT INTO district (d_id, d_w_id, d_name, d_street_1, d_street_2,\nd_city, d_state, d_zip, d_tax, d_ytd, d_next_o_id)\nVALUES (${d_id}, ${d_w_id}, ${d_name}, ${d_street_1}, ${d_street_2},\n${d_city}, ${d_state}, ${d_zip}, ${d_tax}, 30000.00, 3001)",
+								Type: &stroppy.UnitDescriptor_Insert{
+									Insert: &stroppy.InsertDescriptor{
+										Name:      "load_districts",
+										TableName: "district",
+										Method:    stroppy.InsertMethod_COPY_FROM.Enum(),
 										Params: []*stroppy.QueryParamDescriptor{
 											{
 												Name: "d_name",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 6,
-																Max: 10,
-															},
+															MinLen: ptr[uint64](6),
+															MaxLen: 10,
 														},
 													},
 												},
@@ -1120,28 +889,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "d_street_1",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 32,
+																		Min: ptr[uint32](32),
 																		Max: 33,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 10,
-																Max: 20,
-															},
+															MinLen: ptr[uint64](10),
+															MaxLen: 20,
 														},
 													},
 												},
@@ -1149,28 +916,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "d_street_2",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 32,
+																		Min: ptr[uint32](32),
 																		Max: 33,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 10,
-																Max: 20,
-															},
+															MinLen: ptr[uint64](10),
+															MaxLen: 20,
 														},
 													},
 												},
@@ -1178,28 +943,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "d_city",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 32,
+																		Min: ptr[uint32](32),
 																		Max: 33,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 10,
-																Max: 20,
-															},
+															MinLen: ptr[uint64](10),
+															MaxLen: 20,
 														},
 													},
 												},
@@ -1207,20 +970,18 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "d_state",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 2,
-																Max: 2,
-															},
+															MinLen: ptr[uint64](2),
+															MaxLen: 2,
 														},
 													},
 												},
@@ -1228,20 +989,18 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "d_zip",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 6,
-																Max: 6,
-															},
+															MinLen: ptr[uint64](6),
+															MaxLen: 6,
 														},
 													},
 												},
@@ -1249,11 +1008,9 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "d_tax",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_FloatRules{
-														FloatRules: &stroppy.Generation_Rules_FloatRule{
-															Range: &stroppy.Generation_Range_FloatRange{
-																Max: 0.20000000298023224,
-															},
+													Kind: &stroppy.Generation_Rule_FloatRange{
+														FloatRange: &stroppy.Generation_Range_Float{
+															Max: 0.20000000298023224,
 														},
 													},
 												},
@@ -1265,29 +1022,25 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 												{
 													Name: "d_w_id",
 													GenerationRule: &stroppy.Generation_Rule{
-														Type: &stroppy.Generation_Rule_Int32Rules{
-															Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-																Range: &stroppy.Generation_Range_Int32Range{
-																	Min: 1,
-																	Max: 10,
-																},
+														Kind: &stroppy.Generation_Rule_Int32Range{
+															Int32Range: &stroppy.Generation_Range_Int32{
+																Min: ptr[int32](1),
+																Max: 10,
 															},
 														},
-														Unique: ptr[bool](true),
+														Unique: ptr(true),
 													},
 												},
 												{
 													Name: "d_id",
 													GenerationRule: &stroppy.Generation_Rule{
-														Type: &stroppy.Generation_Rule_Int32Rules{
-															Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-																Range: &stroppy.Generation_Range_Int32Range{
-																	Min: 1,
-																	Max: 10,
-																},
+														Kind: &stroppy.Generation_Rule_Int32Range{
+															Int32Range: &stroppy.Generation_Range_Int32{
+																Min: ptr[int32](1),
+																Max: 10,
 															},
 														},
-														Unique: ptr[bool](true),
+														Unique: ptr(true),
 													},
 												},
 											},
@@ -1299,32 +1052,31 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 						},
 						{
 							Descriptor_: &stroppy.UnitDescriptor{
-								Type: &stroppy.UnitDescriptor_Query{
-									Query: &stroppy.QueryDescriptor{
-										Name: "load_customers",
-										Sql:  "INSERT INTO customer (c_id, c_d_id, c_w_id, c_first, c_middle, c_last,\nc_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_since,\nc_credit, c_credit_lim, c_discount,\nc_balance, c_ytd_payment,\nc_payment_cnt, c_delivery_cnt, c_data)\nVALUES (${c_id}, ${c_d_id}, ${c_w_id}, ${c_first}, ${c_middle}, ${c_last},\n${c_street_1}, ${c_street_2}, ${c_city}, ${c_state}, ${c_zip},\n${c_phone}, now(), ${c_credit}, 50000.00, ${c_discount},\n-10.00, 10.00,\n1, 0, ${c_data})\n",
+								Type: &stroppy.UnitDescriptor_Insert{
+									Insert: &stroppy.InsertDescriptor{
+										Name:      "load_customers",
+										TableName: "customer",
+										Method:    stroppy.InsertMethod_COPY_FROM.Enum(),
 										Params: []*stroppy.QueryParamDescriptor{
 											{
 												Name: "c_first",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 8,
-																Max: 16,
-															},
+															MinLen: ptr[uint64](8),
+															MaxLen: 16,
 														},
 													},
 												},
@@ -1332,60 +1084,50 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "c_middle",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 2,
-																Max: 2,
-															},
-															Constant: ptr[string]("OE"),
-														},
+													Kind: &stroppy.Generation_Rule_StringConst{
+														StringConst: "OE",
 													},
 												},
 											},
 											{
 												Name: "c_last",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 6,
-																Max: 16,
-															},
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
+															MinLen: ptr[uint64](6),
+															MaxLen: 16,
 														},
 													},
-													Unique: ptr[bool](true),
+													Unique: ptr(true),
 												},
 											},
 											{
 												Name: "c_street_1",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																	{
-																		Min: 32,
+																		Min: ptr[uint32](32),
 																		Max: 33,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 10,
-																Max: 20,
-															},
+															MinLen: ptr[uint64](10),
+															MaxLen: 20,
 														},
 													},
 												},
@@ -1393,32 +1135,30 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "c_street_2",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																	{
-																		Min: 32,
+																		Min: ptr[uint32](32),
 																		Max: 33,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 10,
-																Max: 20,
-															},
+															MinLen: ptr[uint64](10),
+															MaxLen: 20,
 														},
 													},
 												},
@@ -1426,28 +1166,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "c_city",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 32,
+																		Min: ptr[uint32](32),
 																		Max: 33,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 10,
-																Max: 20,
-															},
+															MinLen: ptr[uint64](10),
+															MaxLen: 20,
 														},
 													},
 												},
@@ -1455,20 +1193,18 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "c_state",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 2,
-																Max: 2,
-															},
+															MinLen: ptr[uint64](2),
+															MaxLen: 2,
 														},
 													},
 												},
@@ -1476,34 +1212,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "c_zip",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 9,
-																Max: 10,
-															},
-															Constant: ptr[string]("123456789"),
-														},
+													Kind: &stroppy.Generation_Rule_StringConst{
+														StringConst: "123456789",
 													},
 												},
 											},
 											{
 												Name: "c_phone",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 16,
-																Max: 16,
-															},
+															MinLen: ptr[uint64](16),
+															MaxLen: 16,
 														},
 													},
 												},
@@ -1511,25 +1239,17 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "c_credit",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 2,
-																Max: 2,
-															},
-															Constant: ptr[string]("GC"),
-														},
+													Kind: &stroppy.Generation_Rule_StringConst{
+														StringConst: "GC",
 													},
 												},
 											},
 											{
 												Name: "c_discount",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_FloatRules{
-														FloatRules: &stroppy.Generation_Rules_FloatRule{
-															Range: &stroppy.Generation_Range_FloatRange{
-																Max: 0.5,
-															},
+													Kind: &stroppy.Generation_Rule_FloatRange{
+														FloatRange: &stroppy.Generation_Range_Float{
+															Max: 0.5,
 														},
 													},
 												},
@@ -1537,32 +1257,30 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "c_data",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																	{
-																		Min: 32,
+																		Min: ptr[uint32](32),
 																		Max: 33,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 300,
-																Max: 500,
-															},
+															MinLen: ptr[uint64](300),
+															MaxLen: 500,
 														},
 													},
 												},
@@ -1574,43 +1292,37 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 												{
 													Name: "c_d_id",
 													GenerationRule: &stroppy.Generation_Rule{
-														Type: &stroppy.Generation_Rule_Int32Rules{
-															Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-																Range: &stroppy.Generation_Range_Int32Range{
-																	Min: 1,
-																	Max: 10,
-																},
+														Kind: &stroppy.Generation_Rule_Int32Range{
+															Int32Range: &stroppy.Generation_Range_Int32{
+																Min: ptr[int32](1),
+																Max: 10,
 															},
 														},
-														Unique: ptr[bool](true),
+														Unique: ptr(true),
 													},
 												},
 												{
 													Name: "c_w_id",
 													GenerationRule: &stroppy.Generation_Rule{
-														Type: &stroppy.Generation_Rule_Int32Rules{
-															Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-																Range: &stroppy.Generation_Range_Int32Range{
-																	Min: 1,
-																	Max: 10,
-																},
+														Kind: &stroppy.Generation_Rule_Int32Range{
+															Int32Range: &stroppy.Generation_Range_Int32{
+																Min: ptr[int32](1),
+																Max: 10,
 															},
 														},
-														Unique: ptr[bool](true),
+														Unique: ptr(true),
 													},
 												},
 												{
 													Name: "c_id",
 													GenerationRule: &stroppy.Generation_Rule{
-														Type: &stroppy.Generation_Rule_Int32Rules{
-															Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-																Range: &stroppy.Generation_Range_Int32Range{
-																	Min: 1,
-																	Max: 3000,
-																},
+														Kind: &stroppy.Generation_Rule_Int32Range{
+															Int32Range: &stroppy.Generation_Range_Int32{
+																Min: ptr[int32](1),
+																Max: 3000,
 															},
 														},
-														Unique: ptr[bool](true),
+														Unique: ptr(true),
 													},
 												},
 											},
@@ -1622,20 +1334,19 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 						},
 						{
 							Descriptor_: &stroppy.UnitDescriptor{
-								Type: &stroppy.UnitDescriptor_Query{
-									Query: &stroppy.QueryDescriptor{
-										Name: "load_stock",
-										Sql:  "INSERT INTO stock\n     (s_i_id, s_w_id, s_quantity, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05,\n      s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10, s_ytd, s_order_cnt, s_remote_cnt, s_data)\n     VALUES\n     (${s_i_id}, ${s_w_id}, ${s_quantity}, ${s_dist_01}, ${s_dist_02}, ${s_dist_03}, ${s_dist_04}, ${s_dist_05},\n      ${s_dist_06}, ${s_dist_07}, ${s_dist_08}, ${s_dist_09}, ${s_dist_10}, 0, 0, 0, ${s_data})",
+								Type: &stroppy.UnitDescriptor_Insert{
+									Insert: &stroppy.InsertDescriptor{
+										Name:      "load_stock",
+										TableName: "stock",
+										Method:    stroppy.InsertMethod_COPY_FROM.Enum(),
 										Params: []*stroppy.QueryParamDescriptor{
 											{
 												Name: "s_quantity",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 10,
-																Max: 100,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](10),
+															Max: 100,
 														},
 													},
 												},
@@ -1643,28 +1354,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "s_dist_01",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 24,
-																Max: 24,
-															},
+															MinLen: ptr[uint64](24),
+															MaxLen: 24,
 														},
 													},
 												},
@@ -1672,28 +1381,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "s_dist_02",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 24,
-																Max: 24,
-															},
+															MinLen: ptr[uint64](24),
+															MaxLen: 24,
 														},
 													},
 												},
@@ -1701,28 +1408,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "s_dist_03",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 24,
-																Max: 24,
-															},
+															MinLen: ptr[uint64](24),
+															MaxLen: 24,
 														},
 													},
 												},
@@ -1730,28 +1435,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "s_dist_04",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 24,
-																Max: 24,
-															},
+															MinLen: ptr[uint64](24),
+															MaxLen: 24,
 														},
 													},
 												},
@@ -1759,28 +1462,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "s_dist_05",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 24,
-																Max: 24,
-															},
+															MinLen: ptr[uint64](24),
+															MaxLen: 24,
 														},
 													},
 												},
@@ -1788,28 +1489,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "s_dist_06",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 24,
-																Max: 24,
-															},
+															MinLen: ptr[uint64](24),
+															MaxLen: 24,
 														},
 													},
 												},
@@ -1817,28 +1516,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "s_dist_07",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 24,
-																Max: 24,
-															},
+															MinLen: ptr[uint64](24),
+															MaxLen: 24,
 														},
 													},
 												},
@@ -1846,28 +1543,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "s_dist_08",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 24,
-																Max: 24,
-															},
+															MinLen: ptr[uint64](24),
+															MaxLen: 24,
 														},
 													},
 												},
@@ -1875,28 +1570,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "s_dist_09",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 24,
-																Max: 24,
-															},
+															MinLen: ptr[uint64](24),
+															MaxLen: 24,
 														},
 													},
 												},
@@ -1904,28 +1597,26 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "s_dist_10",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 24,
-																Max: 24,
-															},
+															MinLen: ptr[uint64](24),
+															MaxLen: 24,
 														},
 													},
 												},
@@ -1933,32 +1624,30 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "s_data",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
+																Ranges: []*stroppy.Generation_Range_UInt32{
 																	{
-																		Min: 65,
+																		Min: ptr[uint32](65),
 																		Max: 90,
 																	},
 																	{
-																		Min: 97,
+																		Min: ptr[uint32](97),
 																		Max: 122,
 																	},
 																	{
-																		Min: 48,
+																		Min: ptr[uint32](48),
 																		Max: 57,
 																	},
 																	{
-																		Min: 32,
+																		Min: ptr[uint32](32),
 																		Max: 33,
 																	},
 																},
 															},
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 26,
-																Max: 50,
-															},
+															MinLen: ptr[uint64](26),
+															MaxLen: 50,
 														},
 													},
 												},
@@ -1970,29 +1659,25 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 												{
 													Name: "s_i_id",
 													GenerationRule: &stroppy.Generation_Rule{
-														Type: &stroppy.Generation_Rule_Int32Rules{
-															Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-																Range: &stroppy.Generation_Range_Int32Range{
-																	Min: 1,
-																	Max: 100000,
-																},
+														Kind: &stroppy.Generation_Rule_Int32Range{
+															Int32Range: &stroppy.Generation_Range_Int32{
+																Min: ptr[int32](1),
+																Max: 100000,
 															},
 														},
-														Unique: ptr[bool](true),
+														Unique: ptr(true),
 													},
 												},
 												{
 													Name: "s_w_id",
 													GenerationRule: &stroppy.Generation_Rule{
-														Type: &stroppy.Generation_Rule_Int32Rules{
-															Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-																Range: &stroppy.Generation_Range_Int32Range{
-																	Min: 1,
-																	Max: 10,
-																},
+														Kind: &stroppy.Generation_Rule_Int32Range{
+															Int32Range: &stroppy.Generation_Range_Int32{
+																Min: ptr[int32](1),
+																Max: 10,
 															},
 														},
-														Unique: ptr[bool](true),
+														Unique: ptr(true),
 													},
 												},
 											},
@@ -2006,7 +1691,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 				},
 				{
 					Name:  "tpcc_workload",
-					Async: true,
+					Async: ptr(true),
 					Units: []*stroppy.WorkloadUnitDescriptor{
 						{
 							Descriptor_: &stroppy.UnitDescriptor{
@@ -2018,12 +1703,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "w_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2031,12 +1714,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "max_w_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 10,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](10),
+															Max: 10,
 														},
 													},
 												},
@@ -2044,12 +1725,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "d_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2057,12 +1736,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "c_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 3000,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 3000,
 														},
 													},
 												},
@@ -2070,12 +1747,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "ol_cnt",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 5,
-																Max: 15,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](5),
+															Max: 15,
 														},
 													},
 												},
@@ -2096,12 +1771,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "p_w_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2109,12 +1782,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "p_d_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2122,12 +1793,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "p_c_w_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2135,12 +1804,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "p_c_d_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2148,12 +1815,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "p_c_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 3000,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 3000,
 														},
 													},
 												},
@@ -2161,9 +1826,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "byname",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](0),
+															Max: 0,
 														},
 													},
 												},
@@ -2171,12 +1837,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "h_amount",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_DoubleRules{
-														DoubleRules: &stroppy.Generation_Rules_DoubleRule{
-															Range: &stroppy.Generation_Range_DoubleRange{
-																Min: 1,
-																Max: 5000,
-															},
+													Kind: &stroppy.Generation_Rule_DoubleRange{
+														DoubleRange: &stroppy.Generation_Range_Double{
+															Min: ptr[float64](1),
+															Max: 5000,
 														},
 													},
 												},
@@ -2184,15 +1848,13 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "c_last",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 6,
-																Max: 16,
-															},
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
+															MinLen: ptr[uint64](6),
+															MaxLen: 16,
 														},
 													},
-													Unique: ptr[bool](true),
+													Unique: ptr(true),
 												},
 											},
 										},
@@ -2211,12 +1873,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "os_w_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2224,12 +1884,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "os_d_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2237,12 +1895,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "os_c_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 3000,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 3000,
 														},
 													},
 												},
@@ -2250,11 +1906,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "byname",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Max: 1,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](0),
+															Max: 0,
 														},
 													},
 												},
@@ -2262,12 +1917,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "os_c_last",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 8,
-																Max: 16,
-															},
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
+															MinLen: ptr[uint64](8),
+															MaxLen: 16,
 														},
 													},
 												},
@@ -2288,12 +1941,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "d_w_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2301,12 +1952,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "d_o_carrier_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2327,12 +1976,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "st_w_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2340,12 +1987,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "st_d_id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 10,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 10,
 														},
 													},
 												},
@@ -2353,12 +1998,10 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 											{
 												Name: "threshold",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 10,
-																Max: 20,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](10),
+															Max: 20,
 														},
 													},
 												},

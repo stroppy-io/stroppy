@@ -32,7 +32,9 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: 1, Max: 2},
+								Range: &pb.Generation_Range_Int64Range{
+									Min: ptr[int64](1), Max: 2,
+								},
 							},
 						},
 						Unique: ptr(true),
@@ -43,7 +45,10 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: 10, Max: 12},
+								Range: &pb.Generation_Range_Int64Range{
+									Min: ptr[int64](10),
+									Max: 12,
+								},
 							},
 						},
 						Unique: ptr(true),
@@ -90,7 +95,7 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: 5, Max: 7},
+								Range: &pb.Generation_Range_Int64Range{Min: ptr[int64](5), Max: 7},
 							},
 						},
 						Unique: ptr(true),
@@ -111,7 +116,10 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: 42, Max: 42},
+								Range: &pb.Generation_Range_Int64Range{
+									Min: ptr[int64](42),
+									Max: 42,
+								},
 							},
 						},
 						Unique: ptr(true),
@@ -122,7 +130,7 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: 1, Max: 2},
+								Range: &pb.Generation_Range_Int64Range{Min: ptr[int64](1), Max: 2},
 							},
 						},
 						Unique: ptr(true),
@@ -148,7 +156,7 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: 1, Max: 2},
+								Range: &pb.Generation_Range_Int64Range{Min: ptr[int64](1), Max: 2},
 							},
 						},
 						Unique: ptr(true),
@@ -159,7 +167,10 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: 10, Max: 11},
+								Range: &pb.Generation_Range_Int64Range{
+									Min: ptr[int64](10),
+									Max: 11,
+								},
 							},
 						},
 						Unique: ptr(true),
@@ -170,7 +181,10 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: 100, Max: 101},
+								Range: &pb.Generation_Range_Int64Range{
+									Min: ptr[int64](100),
+									Max: 101,
+								},
 							},
 						},
 						Unique: ptr(true),
@@ -228,7 +242,7 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: -2, Max: 0},
+								Range: &pb.Generation_Range_Int64Range{Min: ptr[int64](-2), Max: 0},
 							},
 						},
 						Unique: ptr(true),
@@ -239,7 +253,7 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: -1, Max: 1},
+								Range: &pb.Generation_Range_Int64Range{Min: ptr[int64](-1), Max: 1},
 							},
 						},
 						Unique: ptr(true),
@@ -293,7 +307,7 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: 7, Max: 7},
+								Range: &pb.Generation_Range_Int64Range{Min: ptr[int64](7), Max: 7},
 							},
 						},
 						Unique: ptr(true),
@@ -304,7 +318,7 @@ func TestNewTupleGenerator(t *testing.T) {
 					GenerationRule: &pb.Generation_Rule{
 						Type: &pb.Generation_Rule_Int64Rules{
 							Int64Rules: &pb.Generation_Rules_Int64Rule{
-								Range: &pb.Generation_Range_Int64Range{Min: 9, Max: 9},
+								Range: &pb.Generation_Range_Int64Range{Min: ptr[int64](9), Max: 9},
 							},
 						},
 						Unique: ptr(true),

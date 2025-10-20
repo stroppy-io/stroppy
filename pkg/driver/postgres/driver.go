@@ -6,6 +6,9 @@ import (
 
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/durationpb"
 
@@ -29,10 +32,15 @@ type Driver struct {
 	pgxPool interface {
 		Executor
 		Close()
+		CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
 	}
 	txManager  *manager.Manager
 	txExecutor *TxExecutor
-	builder    QueryBuilder
+
+	connMap cmap.ConcurrentMap[string, chan []any]
+	f       func(tableName string, paramsNames []string) chan []any
+
+	builder QueryBuilder
 }
 
 func NewDriver(lg *zap.Logger) *Driver { //nolint: ireturn // allow
@@ -50,6 +58,7 @@ func NewDriver(lg *zap.Logger) *Driver { //nolint: ireturn // allow
 }
 
 func (d *Driver) Initialize(ctx context.Context, runContext *stroppy.StepContext) error {
+
 	connPool, err := pool.NewPool(
 		ctx,
 		runContext.GetConfig().GetDriver(),
@@ -68,7 +77,28 @@ func (d *Driver) Initialize(ctx context.Context, runContext *stroppy.StepContext
 
 	d.txManager = manager.Must(trmpgx.NewDefaultFactory(connPool))
 	d.txExecutor = NewTxExecutor(connPool)
+	d.connMap = cmap.New[chan []any]()
 
+	d.f = func(tableName string, columnNames []string) chan []any {
+		source := make(chan []any, 10)
+		go func() {
+			d.logger.Sugar().Warn("START COPY FROM")
+			connPool.CopyFrom(
+				ctx,
+				pgx.Identifier{tableName},
+				columnNames,
+				pgx.CopyFromFunc(func() (row []any, err error) {
+					vals, ok := <-source
+					if !ok {
+						return nil, nil
+					}
+					return vals, nil
+				}),
+			)
+			d.logger.Sugar().Warn("END COPY FROM")
+		}()
+		return source
+	}
 	return nil
 }
 
@@ -88,7 +118,7 @@ func (d *Driver) RunTransaction(
 		err  error
 	)
 
-	if transaction.GetIsolationLevel() == stroppy.TxIsolationLevel_TX_ISOLATION_LEVEL_UNSPECIFIED {
+	if transaction.GetIsolationLevel() == stroppy.TxIsolationLevel_UNSPECIFIED {
 		stat, err = d.runTransactionInternal(ctx, transaction, d.pgxPool)
 
 		return stat, err
@@ -115,20 +145,27 @@ func (d *Driver) runTransactionInternal(
 	for _, query := range transaction.GetQueries() {
 		values := make([]any, len(query.GetParams()))
 
-		for i, v := range query.GetParams() {
-			val, err := d.builder.ValueToPgxValue(v)
-			if err != nil {
-				return nil, err
-			}
-
-			values[i] = val
+		err := d.fillParamsToValues(query, values)
+		if err != nil {
+			return nil, err
 		}
 
 		start := time.Now()
 
-		_, err := executor.Exec(ctx, query.GetRequest(), values...)
-		if err != nil {
-			return nil, err
+		switch query.GetMethod() {
+		case stroppy.InsertMethod_PLAIN_QUERY:
+			_, err := executor.Exec(ctx, query.GetRequest(), values...)
+			if err != nil {
+				return nil, err
+			}
+		case stroppy.InsertMethod_COPY_FROM:
+			// NOTE: ignores tx_level and sends a data trought the dedicated connection
+			err := d.CopyFromQuery(query)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			d.logger.Panic("unexpected proto.InsertMethod")
 		}
 
 		queries = append(queries, &stroppy.DriverQueryStat{
@@ -144,8 +181,30 @@ func (d *Driver) runTransactionInternal(
 	}, nil
 }
 
+func (d *Driver) fillParamsToValues(query *stroppy.DriverQuery, valuesOut []any) error {
+	for i, v := range query.GetParams() {
+		val, err := d.builder.ValueToPgxValue(v)
+		if err != nil {
+			return err
+		}
+
+		valuesOut[i] = val
+	}
+	return nil
+}
+
 func (d *Driver) Teardown(_ context.Context) error {
+	d.logger.Sugar().Warn("Driver Teradown")
+
+	d.ResetCopyFrom()
+
+	p := d.pgxPool.(*pgxpool.Pool)
+
+	d.logger.Sugar().Warn("Driver STAT", p.Stat().AcquiredConns(), p.Stat().TotalConns())
+
+	d.logger.Sugar().Warn("Driver Teradown pgx")
 	d.pgxPool.Close()
 
+	d.logger.Sugar().Warn("Driver Teradown end")
 	return nil
 }

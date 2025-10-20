@@ -70,7 +70,7 @@ func TestNewTransaction_Success(t *testing.T) {
 func TestNewTransaction_Isolation(t *testing.T) {
 	descriptor := &stroppy.TransactionDescriptor{
 		Name:           "t1",
-		IsolationLevel: stroppy.TxIsolationLevel_TX_ISOLATION_LEVEL_READ_UNCOMMITTED,
+		IsolationLevel: stroppy.TxIsolationLevel_READ_UNCOMMITTED,
 		Queries: []*stroppy.QueryDescriptor{
 			{
 				Name: "q1",
