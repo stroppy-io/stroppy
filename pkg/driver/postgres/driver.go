@@ -7,7 +7,6 @@ import (
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -32,13 +31,18 @@ type Driver struct {
 	pgxPool interface {
 		Executor
 		Close()
-		CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
+		CopyFrom(
+			ctx context.Context,
+			tableName pgx.Identifier,
+			columnNames []string,
+			rowSrc pgx.CopyFromSource,
+		) (int64, error)
 	}
 	txManager  *manager.Manager
 	txExecutor *TxExecutor
 
-	connMap cmap.ConcurrentMap[string, chan []any]
-	f       func(tableName string, paramsNames []string) chan []any
+	tableToCopyChannel cmap.ConcurrentMap[string, chan []any]
+	copyFromStarter    func(tableName string, paramsNames []string) chan []any
 
 	builder QueryBuilder
 }
@@ -58,7 +62,6 @@ func NewDriver(lg *zap.Logger) *Driver { //nolint: ireturn // allow
 }
 
 func (d *Driver) Initialize(ctx context.Context, runContext *stroppy.StepContext) error {
-
 	connPool, err := pool.NewPool(
 		ctx,
 		runContext.GetConfig().GetDriver(),
@@ -77,28 +80,33 @@ func (d *Driver) Initialize(ctx context.Context, runContext *stroppy.StepContext
 
 	d.txManager = manager.Must(trmpgx.NewDefaultFactory(connPool))
 	d.txExecutor = NewTxExecutor(connPool)
-	d.connMap = cmap.New[chan []any]()
+	d.tableToCopyChannel = cmap.New[chan []any]()
 
-	d.f = func(tableName string, columnNames []string) chan []any {
-		source := make(chan []any, 10)
+	d.copyFromStarter = func(tableName string, columnNames []string) chan []any {
+		source := make(chan []any)
+
 		go func() {
-			d.logger.Sugar().Warn("START COPY FROM")
-			connPool.CopyFrom(
+			_, err := connPool.CopyFrom(
 				ctx,
 				pgx.Identifier{tableName},
 				columnNames,
-				pgx.CopyFromFunc(func() (row []any, err error) {
+				pgx.CopyFromFunc(func() ([]any, error) {
 					vals, ok := <-source
 					if !ok {
 						return nil, nil
 					}
+
 					return vals, nil
 				}),
 			)
-			d.logger.Sugar().Warn("END COPY FROM")
+			if err != nil {
+				d.logger.Error("copy from connection ended with error", zap.Error(err))
+			}
 		}()
+
 		return source
 	}
+
 	return nil
 }
 
@@ -190,21 +198,20 @@ func (d *Driver) fillParamsToValues(query *stroppy.DriverQuery, valuesOut []any)
 
 		valuesOut[i] = val
 	}
+
 	return nil
 }
 
 func (d *Driver) Teardown(_ context.Context) error {
-	d.logger.Sugar().Warn("Driver Teradown")
+	d.logger.Debug("Driver Teardown Start")
 
-	d.ResetCopyFrom()
+	d.logger.Debug("Driver Teardown Close copy channels")
+	d.CloseCopyChannels()
 
-	p := d.pgxPool.(*pgxpool.Pool)
-
-	d.logger.Sugar().Warn("Driver STAT", p.Stat().AcquiredConns(), p.Stat().TotalConns())
-
-	d.logger.Sugar().Warn("Driver Teradown pgx")
+	d.logger.Debug("Driver Teardown Close pgxpool")
 	d.pgxPool.Close()
 
-	d.logger.Sugar().Warn("Driver Teradown end")
+	d.logger.Debug("Driver Teardown End")
+
 	return nil
 }

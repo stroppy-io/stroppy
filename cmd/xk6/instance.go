@@ -76,14 +76,14 @@ func (x *Instance) RunTransaction() string {
 var ErrDriverIsNil = errors.New("driver is nil")
 
 func (x *Instance) Teardown() error {
-	x.logger.Sugar().Warn("Instance Teradown")
+	x.logger.Debug("K6 Teardown Start")
 	if runPtr.driver == nil {
 		return ErrDriverIsNil
 	}
-	x.logger.Sugar().Warn("Instance Teradown drv")
+	x.logger.Debug("K6 Teardown driver")
 	errDriver := runPtr.driver.Teardown(x.vu.Context())
-	x.logger.Sugar().Warn("Instance Teradown queue")
+	x.logger.Debug("K6 Teardown unit queue")
 	errQueue := runPtr.unitQueue.Stop()
-	x.logger.Sugar().Warn("Instance Teradown End")
+	x.logger.Debug("K6 Teardown End")
 	return errors.Join(errQueue, errDriver)
 }

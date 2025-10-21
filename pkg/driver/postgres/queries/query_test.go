@@ -6,10 +6,10 @@ import (
 
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestNewQuery_Success(t *testing.T) {
@@ -18,10 +18,8 @@ func TestNewQuery_Success(t *testing.T) {
 		Sql:  "SELECT * FROM t WHERE id=${id}",
 		Params: []*stroppy.QueryParamDescriptor{
 			{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-				Type: &stroppy.Generation_Rule_Int32Rules{
-					Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-						Constant: proto.Int32(10),
-					},
+				Kind: &stroppy.Generation_Rule_Int32Const{
+					Int32Const: 10,
 				},
 			}},
 		},
@@ -102,10 +100,8 @@ func TestNewQuerySync_Success(t *testing.T) {
 		Sql:  "SELECT * FROM t WHERE id=${id}",
 		Params: []*stroppy.QueryParamDescriptor{
 			{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-				Type: &stroppy.Generation_Rule_Int32Rules{
-					Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-						Constant: proto.Int32(10),
-					},
+				Kind: &stroppy.Generation_Rule_Int32Const{
+					Int32Const: 10,
 				},
 			}},
 		},
@@ -148,8 +144,8 @@ func TestNewQuerySync_Success(t *testing.T) {
 func Test_interpolateSQL(t *testing.T) {
 	type args struct {
 		descriptor *stroppy.QueryDescriptor
-		resSQL     string
 	}
+
 	tests := []struct {
 		name string
 		args args
@@ -163,10 +159,8 @@ func Test_interpolateSQL(t *testing.T) {
 					Sql:  "SELECT * FROM t WHERE id=${id}",
 					Params: []*stroppy.QueryParamDescriptor{
 						{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-							Type: &stroppy.Generation_Rule_Int32Rules{
-								Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-									Constant: proto.Int32(10),
-								},
+							Kind: &stroppy.Generation_Rule_Int32Const{
+								Int32Const: 10,
 							},
 						}},
 					},

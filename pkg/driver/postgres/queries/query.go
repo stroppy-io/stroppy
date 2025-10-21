@@ -24,7 +24,6 @@ func newQuery(
 	generators Generators,
 	descriptor *stroppy.QueryDescriptor,
 ) (*stroppy.DriverQuery, error) {
-
 	genIDs := queryGenIDs(descriptor)
 
 	paramsValues, err := genParamValues(genIDs, generators)
@@ -42,13 +41,15 @@ func newQuery(
 }
 
 func queryGenIDs(descriptor *stroppy.QueryDescriptor) []GeneratorID {
-	var genIDs []GeneratorID
+	genIDs := make([]GeneratorID, 0, len(descriptor.GetParams())+len(descriptor.GetGroups()))
 	for _, param := range descriptor.GetParams() {
 		genIDs = append(genIDs, NewGeneratorID(descriptor.GetName(), param.GetName()))
 	}
+
 	for _, group := range descriptor.GetGroups() {
 		genIDs = append(genIDs, NewGeneratorID(descriptor.GetName(), group.GetName()))
 	}
+
 	return genIDs
 }
 
@@ -57,26 +58,34 @@ func interpolateSQL(descriptor *stroppy.QueryDescriptor) string {
 	for _, group := range descriptor.GetGroups() {
 		params = append(params, group.GetParams()...)
 	}
+
 	resSQL := descriptor.GetSql()
+
 	for idx, param := range params {
 		pattern := param.GetReplaceRegex()
 		if pattern == "" { // fallback to name replace
 			pattern = regexp.QuoteMeta(fmt.Sprintf(`${%s}`, param.GetName()))
 		}
+
 		re, ok := reStorage.Get(pattern)
 		if !ok { // TODO: add pattern validation add reStorage filling at the config reading stage
 			re = regexp.MustCompile(pattern)
 			reStorage.Set(pattern, re)
 		}
+
 		resSQL = re.ReplaceAllString(resSQL, fmt.Sprintf(`$$%d`, idx+1))
 	}
+
 	return resSQL
 }
+
+var ErrNilProtoValue = errors.New("nil proto value type for parameter")
 
 func genParamValues(
 	genIDs []GeneratorID,
 	generators Generators,
-) (paramsValues []*stroppy.Value, err error) {
+) ([]*stroppy.Value, error) {
+	var paramsValues []*stroppy.Value
 
 	for _, genID := range genIDs {
 		gen, ok := generators.Get(genID)
@@ -96,7 +105,7 @@ func genParamValues(
 
 		switch actual := protoValue.GetType().(type) {
 		case nil:
-			return nil, fmt.Errorf("nil proto value type for parameter %s", genID)
+			return nil, fmt.Errorf("%w: %s", ErrNilProtoValue, genID)
 		case *stroppy.Value_List_:
 			paramsValues = append(paramsValues, actual.List.GetValues()...)
 		case *stroppy.Value_Bool,

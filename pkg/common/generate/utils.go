@@ -42,6 +42,7 @@ func wrapNilQuota( //nolint: ireturn // need from lib
 	})
 }
 
+//nolint:ireturn // need it
 func newConstValueGenerator[T primitive.Primitive](
 	constant T,
 	transformer valueTransformer[T],
@@ -50,6 +51,8 @@ func newConstValueGenerator[T primitive.Primitive](
 		return transformer(constant)
 	})
 }
+
+//nolint:ireturn // need it
 func newRangeGenerator[T primitive.Primitive](
 	distribution primitiveGenerator[T],
 	transformer valueTransformer[T],
@@ -57,31 +60,6 @@ func newRangeGenerator[T primitive.Primitive](
 	return valueGeneratorFn(func() (*stroppy.Value, error) {
 		return transformer(distribution.Next())
 	})
-}
-
-// Deprecated
-// it was so beutifull refactor I don't want to kill it
-func newValueGenerator[T primitive.Primitive]( //nolint: ireturn // need from lib
-	distribution primitiveGenerator[T],
-	transformer valueTransformer[T],
-	nullPercent uint32,
-	constant *T,
-) ValueGenerator {
-	var generator ValueGenerator
-
-	if constant != nil {
-		generator = newConstValueGenerator(*constant, transformer)
-	}
-
-	if distribution != nil {
-		generator = newRangeGenerator(distribution, transformer)
-	}
-
-	if nullPercent > 0 {
-		generator = wrapNilQuota(generator, nullPercent)
-	}
-
-	return generator
 }
 
 type rangeWrapper[T constraint.Number] struct {
@@ -188,7 +166,6 @@ func dateTimeToValue(t time.Time) (*stroppy.Value, error) {
 }
 
 func boolToUint8(boolean bool) uint8 {
-
 	val := uint8(0)
 	if boolean {
 		val = 1
@@ -197,21 +174,22 @@ func boolToUint8(boolean bool) uint8 {
 	return val
 }
 
-func dateTimePtrToTimePtr(dt *stroppy.DateTime) time.Time {
+func dateTimePtrToTime(dt *stroppy.DateTime) time.Time {
 	val := dt.GetValue().AsTime()
+
 	return val
 }
 
-func decimalPtrToDecimalPtr(d *stroppy.Decimal) decimal.Decimal {
-	if d == nil {
-		logger.Global().Sugar().Error("nil Decimal value", d.GetValue())
-		var dd decimal.Decimal
-		return dd
+func decimalPtrToDecimal(decimalPtr *stroppy.Decimal) decimal.Decimal {
+	if decimalPtr == nil {
+		logger.Global().Sugar().Error("nil Decimal value", decimalPtr.GetValue())
+
+		return decimal.Decimal{}
 	}
 
-	val, err := decimal.NewFromString(d.GetValue())
+	val, err := decimal.NewFromString(decimalPtr.GetValue())
 	if err != nil {
-		logger.Global().Sugar().Error("can't parse decimal value", d.GetValue(), err)
+		logger.Global().Sugar().Error("can't parse decimal value", decimalPtr.GetValue(), err)
 	}
 
 	return val

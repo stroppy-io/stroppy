@@ -3,13 +3,13 @@ package config
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/google/uuid"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
-//nolint:mnd,funlen,lll,maintidx // a huge and long magic constant
+//nolint:mnd,funlen,lll,maintidx,dupl // a huge and long magic constant
 func NewTPCCConfig() *stroppy.ConfigFile {
 	return &stroppy.ConfigFile{
 		Global: &stroppy.GlobalConfig{

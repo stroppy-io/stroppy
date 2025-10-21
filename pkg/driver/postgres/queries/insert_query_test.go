@@ -10,6 +10,7 @@ func Test_badInsertSQL(t *testing.T) {
 	type args struct {
 		descriptor *stroppy.InsertDescriptor
 	}
+
 	tests := []struct {
 		name string
 		args args
@@ -44,6 +45,7 @@ func Test_insertSQL(t *testing.T) {
 	type args struct {
 		descriptor *stroppy.InsertDescriptor
 	}
+
 	tests := []struct {
 		name string
 		args args

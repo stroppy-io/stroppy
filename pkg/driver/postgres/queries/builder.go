@@ -84,16 +84,19 @@ func (q *QueryBuilder) ValueToPgxValue(value *stroppy.Value) (any, error) {
 		if value.GetDecimal() == nil {
 			return &pgxdecimal.NullDecimal{}, nil
 		}
+
 		dec, err := decimal.NewFromString(value.GetDecimal().GetValue())
 		if err != nil {
 			return nil, err
 		}
+
 		return pgxdecimal.Decimal(dec), nil
 	case *stroppy.Value_Uuid:
 		uuidVal, err := uuid.Parse(value.GetUuid().GetValue())
 		if err != nil {
 			return nil, err
 		}
+
 		return &pgtype.UUID{Valid: true, Bytes: uuidVal}, nil
 	case *stroppy.Value_Datetime:
 		return &pgtype.Timestamptz{

@@ -6,32 +6,34 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
-func (d *Driver) CopyFromQuery(query *stroppy.DriverQuery) (err error) {
-
+func (d *Driver) CopyFromQuery(query *stroppy.DriverQuery) error {
 	// here it's a bad query
 	table := strings.Split(query.GetRequest(), " ")
 	tableName := table[0]
 	paramsNames := table[1:]
 
 	values := make([]any, len(query.GetParams()))
-	err = d.fillParamsToValues(query, values)
+
+	err := d.fillParamsToValues(query, values)
 	if err != nil {
 		return err
 	}
 
-	source, ok := d.connMap.Get(tableName)
+	source, ok := d.tableToCopyChannel.Get(tableName)
 	if !ok { // init
-		source = d.f(tableName, paramsNames)
-		d.connMap.SetIfAbsent(tableName, source)
+		source = d.copyFromStarter(tableName, paramsNames)
+		d.tableToCopyChannel.SetIfAbsent(tableName, source)
 	}
 
 	source <- values
+
 	return nil
 }
 
-func (d *Driver) ResetCopyFrom() {
-	for _, source := range d.connMap.Items() {
+func (d *Driver) CloseCopyChannels() {
+	for _, source := range d.tableToCopyChannel.Items() {
 		close(source)
 	}
-	d.connMap.Clear()
+
+	d.tableToCopyChannel.Clear()
 }

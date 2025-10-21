@@ -110,6 +110,7 @@ func CollectStepGenerators(
 		if err != nil {
 			return generators, err
 		}
+
 		generators.MSet(gens.Items())
 	}
 
@@ -125,13 +126,16 @@ func collectUnitGenerators(
 		return collectQueryGenerators(runContext, typed.Query)
 	case *stroppy.UnitDescriptor_Transaction:
 		generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
+
 		for _, query := range typed.Transaction.GetQueries() {
 			gens, err := collectQueryGenerators(runContext, query)
 			if err != nil {
 				return generators, err
 			}
+
 			generators.MSet(gens.Items())
 		}
+
 		return generators, nil
 	case *stroppy.UnitDescriptor_Insert:
 		return collectInsertGenerators(runContext, typed.Insert)

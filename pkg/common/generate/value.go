@@ -1,13 +1,10 @@
 package generate
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"google.golang.org/protobuf/proto"
 
@@ -134,11 +131,11 @@ func NewValueGenerator( //nolint: ireturn // need as lib part
 	return gen, nil
 }
 
-func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
+//nolint:funlen,cyclop,ireturn // need from lib
+func NewValueGeneratorByRule(
 	seed uint64,
 	rule *stroppy.Generation_Rule,
 ) (ValueGenerator, error) {
-
 	var generator ValueGenerator
 
 	switch rule.GetKind().(type) {
@@ -260,6 +257,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 		generator = newConstValueGenerator(rule.GetStringConst(), stringToValue)
 	case *stroppy.Generation_Rule_DatetimeRange:
 		var err error
+
 		generator, err = newDateTimeGenerator(
 			rule.GetDistribution(),
 			seed,
@@ -270,7 +268,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 			return nil, err
 		}
 	case *stroppy.Generation_Rule_DatetimeConst:
-		generator = newConstValueGenerator(dateTimePtrToTimePtr(rule.GetDatetimeConst()), dateTimeToValue)
+		generator = newConstValueGenerator(dateTimePtrToTime(rule.GetDatetimeConst()), dateTimeToValue)
 	// TODO: make it better
 	// case *stroppy.Generation_Rule_UuidRules:
 	// 	return newUUIDGenerator(
@@ -282,6 +280,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 	// 	), nil
 	case *stroppy.Generation_Rule_DecimalRange:
 		var err error
+
 		generator, err = newDecimalGenerator(
 			rule.GetDistribution(),
 			seed,
@@ -292,7 +291,7 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 			return nil, err
 		}
 	case *stroppy.Generation_Rule_DecimalConst:
-		generator = newConstValueGenerator(decimalPtrToDecimalPtr(rule.GetDecimalConst()), decimalToValue)
+		generator = newConstValueGenerator(decimalPtrToDecimal(rule.GetDecimalConst()), decimalToValue)
 	default:
 		return nil, fmt.Errorf("unknown rule type: %T", rule) //nolint: err113
 	}
@@ -302,7 +301,6 @@ func NewValueGeneratorByRule( //nolint: funlen,ireturn // need from lib
 	}
 
 	return generator, nil
-
 }
 
 func newDateTimeGenerator( //nolint: ireturn // need from lib
@@ -312,6 +310,7 @@ func newDateTimeGenerator( //nolint: ireturn // need from lib
 	unique bool,
 ) (ValueGenerator, error) {
 	var intRange [2]time.Time
+
 	switch ranges.GetType().(type) {
 	case *stroppy.Generation_Range_DateTime_String_:
 		mins, err := time.Parse(time.RFC3339, ranges.GetString_().GetMin())
@@ -355,44 +354,45 @@ func newDateTimeGenerator( //nolint: ireturn // need from lib
 	), nil
 }
 
-func newUUIDGenerator( //nolint: ireturn // need from lib
-	_ *stroppy.Generation_Distribution,
-	seed uint64,
-	nullPercentage uint32,
-	constant *stroppy.Uuid,
-) ValueGenerator {
-	var byteSlice [32]byte
+// FIXME: UUID generator
+// func newUUIDGenerator( //nolint: ireturn // need from lib
+// 	_ *stroppy.Generation_Distribution,
+// 	seed uint64,
+// 	nullPercentage uint32,
+// 	constant *stroppy.Uuid,
+// ) ValueGenerator {
+// 	var byteSlice [32]byte
 
-	binary.LittleEndian.PutUint64(byteSlice[:8], seed)
-	prng := rand.NewChaCha8(byteSlice)
+// 	binary.LittleEndian.PutUint64(byteSlice[:8], seed)
+// 	prng := rand.NewChaCha8(byteSlice)
 
-	if constant != nil {
-		return valueGeneratorFn(func() (*stroppy.Value, error) {
-			return &stroppy.Value{
-				Type: &stroppy.Value_Uuid{
-					Uuid: &stroppy.Uuid{
-						Value: constant.GetValue(),
-					},
-				},
-			}, nil
-		})
-	}
+// 	if constant != nil {
+// 		return valueGeneratorFn(func() (*stroppy.Value, error) {
+// 			return &stroppy.Value{
+// 				Type: &stroppy.Value_Uuid{
+// 					Uuid: &stroppy.Uuid{
+// 						Value: constant.GetValue(),
+// 					},
+// 				},
+// 			}, nil
+// 		})
+// 	}
 
-	return wrapNilQuota(valueGeneratorFn(func() (*stroppy.Value, error) {
-		uid, err := uuid.NewRandomFromReader(prng)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate uuid: %w", err)
-		}
+// 	return wrapNilQuota(valueGeneratorFn(func() (*stroppy.Value, error) {
+// 		uid, err := uuid.NewRandomFromReader(prng)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to generate uuid: %w", err)
+// 		}
 
-		return &stroppy.Value{
-			Type: &stroppy.Value_Uuid{
-				Uuid: &stroppy.Uuid{
-					Value: uid.String(),
-				},
-			},
-		}, nil
-	}), nullPercentage)
-}
+// 		return &stroppy.Value{
+// 			Type: &stroppy.Value_Uuid{
+// 				Uuid: &stroppy.Uuid{
+// 					Value: uid.String(),
+// 				},
+// 			},
+// 		}, nil
+// 	}), nullPercentage)
+// }
 
 func newDecimalGenerator( //nolint: ireturn // need from lib
 	distributeParams *stroppy.Generation_Distribution,
