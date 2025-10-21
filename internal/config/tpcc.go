@@ -5,12 +5,15 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
-//nolint:mnd,funlen,lll,maintidx,dupl // a huge and long magic constant
-func NewTPCCConfig() *stroppy.ConfigFile {
+//nolint:mnd,funlen,lll,maintidx,dupl,gosec // a huge and long magic constant
+func NewTPCCConfig(warehouseMax int32) *stroppy.ConfigFile {
+	itemsMax := int32(100000)
+
 	return &stroppy.ConfigFile{
 		Global: &stroppy.GlobalConfig{
 			Version: "v1.0.2",
@@ -632,7 +635,33 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 								Type: &stroppy.UnitDescriptor_Query{
 									Query: &stroppy.QueryDescriptor{
 										Name: "create_slev_procedure",
-										Sql:  "CREATE OR REPLACE FUNCTION SLEV (\n  st_w_id INTEGER,\n  st_d_id INTEGER,\n  threshold INTEGER\n) RETURNS INTEGER AS $$\nDECLARE\n  stock_count INTEGER;\nBEGIN\n  SELECT COUNT(DISTINCT (s_i_id)) INTO stock_count\n  FROM order_line, stock, district\n  WHERE ol_w_id = st_w_id\n    AND ol_d_id = st_d_id\n    AND d_w_id = st_w_id\n    AND d_id = st_d_id\n    AND (ol_o_id < d_next_o_id)\n    AND ol_o_id >= (d_next_o_id - 20)\n    AND s_w_id = st_w_id\n    AND s_i_id = ol_i_id\n    AND s_quantity < threshold;\n\n  RETURN stock_count;\nEXCEPTION\n  WHEN serialization_failure OR deadlock_detected OR no_data_found\n  THEN RETURN -1;\nEND;\n$$ LANGUAGE 'plpgsql';\n",
+										Sql: `CREATE OR REPLACE FUNCTION SLEV (
+  st_w_id INTEGER,
+  st_d_id INTEGER,
+  threshold INTEGER
+) RETURNS INTEGER AS $$
+DECLARE
+  stock_count INTEGER;
+BEGIN
+  SELECT COUNT(DISTINCT (s_i_id)) INTO stock_count
+  FROM order_line, stock, district
+  WHERE ol_w_id = st_w_id
+    AND ol_d_id = st_d_id
+    AND d_w_id = st_w_id
+    AND d_id = st_d_id
+    AND (ol_o_id < d_next_o_id)
+    AND ol_o_id >= (d_next_o_id - 20)
+    AND s_w_id = st_w_id
+    AND s_i_id = ol_i_id
+    AND s_quantity < threshold;
+
+  RETURN stock_count;
+EXCEPTION
+  WHEN serialization_failure OR deadlock_detected OR no_data_found
+  THEN RETURN -1;
+END;
+$$ LANGUAGE 'plpgsql';
+`,
 									},
 								},
 							},
@@ -657,7 +686,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 													Kind: &stroppy.Generation_Rule_Int32Range{
 														Int32Range: &stroppy.Generation_Range_Int32{
 															Min: ptr[int32](1),
-															Max: 100000,
+															Max: itemsMax,
 														},
 													},
 													Unique: ptr(true),
@@ -669,7 +698,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 													Kind: &stroppy.Generation_Rule_Int32Range{
 														Int32Range: &stroppy.Generation_Range_Int32{
 															Min: ptr[int32](1),
-															Max: 10000,
+															Max: itemsMax,
 														},
 													},
 												},
@@ -743,7 +772,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 									},
 								},
 							},
-							Count: 100000,
+							Count: uint64(itemsMax),
 						},
 						{
 							Descriptor_: &stroppy.UnitDescriptor{
@@ -759,7 +788,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 													Kind: &stroppy.Generation_Rule_Int32Range{
 														Int32Range: &stroppy.Generation_Range_Int32{
 															Min: ptr[int32](1),
-															Max: 10,
+															Max: warehouseMax,
 														},
 													},
 													Unique: ptr(true),
@@ -833,8 +862,8 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 																	},
 																},
 															},
-															MinLen: ptr[uint64](6),
-															MaxLen: 6,
+															MinLen: ptr[uint64](9),
+															MaxLen: 9,
 														},
 													},
 												},
@@ -849,11 +878,19 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 													},
 												},
 											},
+											{
+												Name: "w_ytd",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_FloatConst{
+														FloatConst: 300000.00,
+													},
+												},
+											},
 										},
 									},
 								},
 							},
-							Count: 10,
+							Count: uint64(warehouseMax),
 						},
 						{
 							Descriptor_: &stroppy.UnitDescriptor{
@@ -999,8 +1036,8 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 																	},
 																},
 															},
-															MinLen: ptr[uint64](6),
-															MaxLen: 6,
+															MinLen: ptr[uint64](9),
+															MaxLen: 9,
 														},
 													},
 												},
@@ -1015,6 +1052,22 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 													},
 												},
 											},
+											{
+												Name: "d_ytd",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_FloatConst{
+														FloatConst: 30000.00,
+													},
+												},
+											},
+											{
+												Name: "d_next_o_id",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_Int32Const{
+														Int32Const: 3001,
+													},
+												},
+											},
 										},
 										Groups: []*stroppy.QueryParamGroup{{
 											Name: "district_pk",
@@ -1025,7 +1078,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 														Kind: &stroppy.Generation_Rule_Int32Range{
 															Int32Range: &stroppy.Generation_Range_Int32{
 																Min: ptr[int32](1),
-																Max: 10,
+																Max: warehouseMax,
 															},
 														},
 														Unique: ptr(true),
@@ -1048,7 +1101,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 									},
 								},
 							},
-							Count: 100,
+							Count: uint64(warehouseMax) * 10,
 						},
 						{
 							Descriptor_: &stroppy.UnitDescriptor{
@@ -1237,10 +1290,28 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 												},
 											},
 											{
+												Name: "c_since",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_DatetimeConst{
+														DatetimeConst: &stroppy.DateTime{
+															Value: timestamppb.Now(), // TODO: add now()
+														},
+													},
+												},
+											},
+											{
 												Name: "c_credit",
 												GenerationRule: &stroppy.Generation_Rule{
 													Kind: &stroppy.Generation_Rule_StringConst{
 														StringConst: "GC",
+													},
+												},
+											},
+											{
+												Name: "c_credit_lim",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_FloatConst{
+														FloatConst: 50000.00,
 													},
 												},
 											},
@@ -1251,6 +1322,38 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 														FloatRange: &stroppy.Generation_Range_Float{
 															Max: 0.5,
 														},
+													},
+												},
+											},
+											{
+												Name: "c_balance",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_FloatConst{
+														FloatConst: -10.00,
+													},
+												},
+											},
+											{
+												Name: "c_ytd_payment",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_FloatConst{
+														FloatConst: 10.00,
+													},
+												},
+											},
+											{
+												Name: "c_payment_cnt",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_Int32Const{
+														Int32Const: 1,
+													},
+												},
+											},
+											{
+												Name: "c_delivery_cnt",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_Int32Const{
+														Int32Const: 0,
 													},
 												},
 											},
@@ -1307,7 +1410,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 														Kind: &stroppy.Generation_Rule_Int32Range{
 															Int32Range: &stroppy.Generation_Range_Int32{
 																Min: ptr[int32](1),
-																Max: 10,
+																Max: warehouseMax,
 															},
 														},
 														Unique: ptr(true),
@@ -1330,7 +1433,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 									},
 								},
 							},
-							Count: 300000,
+							Count: 3000 * 10 * uint64(warehouseMax),
 						},
 						{
 							Descriptor_: &stroppy.UnitDescriptor{
@@ -1622,6 +1725,30 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 												},
 											},
 											{
+												Name: "s_ytd",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_Int32Const{
+														Int32Const: 0,
+													},
+												},
+											},
+											{
+												Name: "s_order_cnt",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_Int32Const{
+														Int32Const: 0,
+													},
+												},
+											},
+											{
+												Name: "s_remote_cnt",
+												GenerationRule: &stroppy.Generation_Rule{
+													Kind: &stroppy.Generation_Rule_Int32Const{
+														Int32Const: 0,
+													},
+												},
+											},
+											{
 												Name: "s_data",
 												GenerationRule: &stroppy.Generation_Rule{
 													Kind: &stroppy.Generation_Rule_StringRange{
@@ -1662,7 +1789,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 														Kind: &stroppy.Generation_Rule_Int32Range{
 															Int32Range: &stroppy.Generation_Range_Int32{
 																Min: ptr[int32](1),
-																Max: 100000,
+																Max: itemsMax,
 															},
 														},
 														Unique: ptr(true),
@@ -1674,7 +1801,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 														Kind: &stroppy.Generation_Rule_Int32Range{
 															Int32Range: &stroppy.Generation_Range_Int32{
 																Min: ptr[int32](1),
-																Max: 10,
+																Max: warehouseMax,
 															},
 														},
 														Unique: ptr(true),
@@ -1685,7 +1812,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 									},
 								},
 							},
-							Count: 1000000,
+							Count: uint64(warehouseMax) * uint64(itemsMax),
 						},
 					},
 				},
@@ -1774,7 +1901,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 													Kind: &stroppy.Generation_Rule_Int32Range{
 														Int32Range: &stroppy.Generation_Range_Int32{
 															Min: ptr[int32](1),
-															Max: 10,
+															Max: warehouseMax,
 														},
 													},
 												},
@@ -1796,7 +1923,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 													Kind: &stroppy.Generation_Rule_Int32Range{
 														Int32Range: &stroppy.Generation_Range_Int32{
 															Min: ptr[int32](1),
-															Max: 10,
+															Max: warehouseMax,
 														},
 													},
 												},
@@ -1876,7 +2003,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 													Kind: &stroppy.Generation_Rule_Int32Range{
 														Int32Range: &stroppy.Generation_Range_Int32{
 															Min: ptr[int32](1),
-															Max: 10,
+															Max: warehouseMax,
 														},
 													},
 												},
@@ -1944,7 +2071,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 													Kind: &stroppy.Generation_Rule_Int32Range{
 														Int32Range: &stroppy.Generation_Range_Int32{
 															Min: ptr[int32](1),
-															Max: 10,
+															Max: warehouseMax,
 														},
 													},
 												},
@@ -1979,7 +2106,7 @@ func NewTPCCConfig() *stroppy.ConfigFile {
 													Kind: &stroppy.Generation_Rule_Int32Range{
 														Int32Range: &stroppy.Generation_Range_Int32{
 															Min: ptr[int32](1),
-															Max: 10,
+															Max: warehouseMax,
 														},
 													},
 												},
