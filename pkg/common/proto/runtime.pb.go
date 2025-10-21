@@ -285,6 +285,9 @@ func (x *DriverTransaction) GetIsolationLevel() TxIsolationLevel {
 	return TxIsolationLevel_TX_ISOLATION_LEVEL_UNSPECIFIED
 }
 
+// *
+// DriverQueryStat represent an actual time spent on single query.
+// exec_duration includes the network round-trip and exection on dbms.
 type DriverQueryStat struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -337,6 +340,9 @@ func (x *DriverQueryStat) GetExecDuration() *durationpb.Duration {
 	return nil
 }
 
+// *
+// DriverTransactionStat represents an actual time spent on transaction.
+// exec_duration includes the network round-trip and exection on dbms.
 type DriverTransactionStat struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Queries        []*DriverQueryStat     `protobuf:"bytes,1,rep,name=queries,proto3" json:"queries,omitempty"`

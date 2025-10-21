@@ -63,7 +63,7 @@
     },
     ".stroppy.ColumnDescriptor.constraint": {
       "type": "string",
-      "description": "* SQL constraint definition for the column"
+      "description": "* SQL constraint definition for the column in free form"
     },
     ".stroppy.ColumnDescriptor.name": {
       "type": "string",
@@ -75,7 +75,7 @@
     },
     ".stroppy.ColumnDescriptor.primary_key": {
       "type": "boolean",
-      "description": "* Whether the column is part of the primary key"
+      "description": "* Whether the column is part of the primary key.\n  Multiple primary keys creates composite primary key."
     },
     ".stroppy.ColumnDescriptor.sql_type": {
       "type": "string",
@@ -1739,7 +1739,7 @@
     },
     ".stroppy.Generation.Rules.StringRule.constant": {
       "type": "string",
-      "description": "* Fixed value (if specified, overrides generation)"
+      "description": "TODO: 'constant' shouldn't require 'len_range' to use it.\n* Fixed value (if specified, overrides generation)"
     },
     ".stroppy.Generation.Rules.StringRule.len_range": {
       "$ref": "#/$defs/.stroppy.Generation.Range.UInt64Range",
@@ -2604,9 +2604,11 @@
     },
     ".stroppy.QueryDescriptor.groups": {
       "items": {
-        "$ref": "#/$defs/.stroppy.QueryParamGroup"
+        "$ref": "#/$defs/.stroppy.QueryParamGroup",
+        "description": "* Grouped parameter groups"
       },
-      "type": "array"
+      "type": "array",
+      "description": "* Grouped parameter groups"
     },
     ".stroppy.QueryDescriptor.name": {
       "type": "string",
@@ -2730,16 +2732,20 @@
       "type": "object",
       "required": [
         "name"
-      ]
+      ],
+      "description": "*\n QueryParamGroup defines a group of dependent parameters.\n New values generated in Carthesian product manner.\n It's useful to define composite primary keys.\n Every evaluation step only one param changes."
     },
     ".stroppy.QueryParamGroup.name": {
-      "type": "string"
+      "type": "string",
+      "description": "* Group name"
     },
     ".stroppy.QueryParamGroup.params": {
       "items": {
-        "$ref": "#/$defs/.stroppy.QueryParamDescriptor"
+        "$ref": "#/$defs/.stroppy.QueryParamDescriptor",
+        "description": "* Grouped dependent parameters"
       },
-      "type": "array"
+      "type": "array",
+      "description": "* Grouped dependent parameters"
     },
     ".stroppy.RampingArrivalRate": {
       "properties": {

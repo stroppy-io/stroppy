@@ -638,6 +638,22 @@ export interface Generation_Range_DateTimeRange_Timestamp {
      */
     max: number;
 }
+// TODO: Add range rule to limit amount of random value.
+//       So limit 5 will generate randoms (2, 1, 3, 3, 5) and then stops.
+// TODO: Add limit continuation politics.
+//       If generator stopped it can behave differently after it.
+//       repeat - strart itself from again.
+//       bounce - start itself in backward direction.
+//       max - produce max value.
+//       min - produce min value.
+//       null - nulls if allowed.
+// TODO: add control over random repeatability.
+//       Now every generator with the same params will generate an identical
+//       sequence. Two gens with (min: 1, max: 10) will generate
+//       1, 5, 9, 5... parallely as seed is common for every gen. It's do a
+//       random data with the same gen definitions not so random
+//       occasionally.
+
 /**
  * *
  * Rules contains type-specific generation configurations.
@@ -791,6 +807,8 @@ export interface Generation_Rules_StringRule {
      * @generated from protobuf field: stroppy.Generation.Range.UInt64Range len_range = 2
      */
     lenRange?: Generation_Range_UInt64Range;
+    // TODO: 'constant' shouldn't require 'len_range' to use it.
+
     /**
      * * Fixed value (if specified, overrides generation)
      *
@@ -4126,7 +4144,8 @@ export interface ColumnDescriptor {
      */
     nullable: boolean;
     /**
-     * * Whether the column is part of the primary key
+     * * Whether the column is part of the primary key.
+     *  Multiple primary keys creates composite primary key.
      *
      * @generated from protobuf field: bool primary_key = 4
      */
@@ -4138,7 +4157,7 @@ export interface ColumnDescriptor {
      */
     unique: boolean;
     /**
-     * * SQL constraint definition for the column
+     * * SQL constraint definition for the column in free form
      *
      * @generated from protobuf field: string constraint = 6
      */
@@ -4216,14 +4235,24 @@ export interface QueryParamDescriptor {
     dbSpecific?: Value_Struct;
 }
 /**
+ * *
+ * QueryParamGroup defines a group of dependent parameters.
+ * New values generated in Carthesian product manner.
+ * It's useful to define composite primary keys.
+ * Every evaluation step only one param changes.
+ *
  * @generated from protobuf message stroppy.QueryParamGroup
  */
 export interface QueryParamGroup {
     /**
+     * * Group name
+     *
      * @generated from protobuf field: string name = 1
      */
     name: string;
     /**
+     * * Grouped dependent parameters
+     *
      * @generated from protobuf field: repeated stroppy.QueryParamDescriptor params = 2
      */
     params: QueryParamDescriptor[];
@@ -4255,6 +4284,8 @@ export interface QueryDescriptor {
      */
     params: QueryParamDescriptor[];
     /**
+     * * Grouped parameter groups
+     *
      * @generated from protobuf field: repeated stroppy.QueryParamGroup groups = 4
      */
     groups: QueryParamGroup[];
@@ -6290,6 +6321,10 @@ export interface DriverTransaction {
     isolationLevel: TxIsolationLevel;
 }
 /**
+ * *
+ * DriverQueryStat represent an actual time spent on single query.
+ * exec_duration includes the network round-trip and exection on dbms.
+ *
  * @generated from protobuf message stroppy.DriverQueryStat
  */
 export interface DriverQueryStat {
@@ -6303,6 +6338,10 @@ export interface DriverQueryStat {
     execDuration?: Duration;
 }
 /**
+ * *
+ * DriverTransactionStat represents an actual time spent on transaction.
+ * exec_duration includes the network round-trip and exection on dbms.
+ *
  * @generated from protobuf message stroppy.DriverTransactionStat
  */
 export interface DriverTransactionStat {

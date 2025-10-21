@@ -2,6 +2,8 @@ package randstr
 
 import (
 	r "math/rand/v2"
+
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
 )
 
 type Tape interface {
@@ -21,6 +23,17 @@ func NewCharTape(seed uint64, chars [][2]int32) *CharTape {
 
 func (t *CharTape) Next() rune {
 	rangeIdx := t.generator.IntN(len(t.chars))
+	maxVal := t.chars[rangeIdx][1]
+	minVal := t.chars[rangeIdx][0]
 
-	return t.generator.Int32N(t.chars[rangeIdx][1]-t.chars[rangeIdx][0]) + t.chars[rangeIdx][0]
+	defer func() { // TODO: better constraints handling (validation maybe)
+		if err := recover(); err != nil {
+			logger.Global().Sugar().Errorf(
+				"t.chars %v,maxVal %d, minVal %d, rangeIdx %d\n%v\n\n",
+				t.chars, maxVal, minVal, rangeIdx, err,
+			)
+		}
+	}()
+
+	return t.generator.Int32N(maxVal-minVal) + minVal
 }

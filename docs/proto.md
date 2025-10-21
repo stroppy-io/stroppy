@@ -1164,7 +1164,8 @@ DriverQuery represents a query that can be executed by a database driver.
 <a name="stroppy-DriverQueryStat"></a>
 
 ### DriverQueryStat
-
+DriverQueryStat represent an actual time spent on single query.
+exec_duration includes the network round-trip and exection on dbms.
 
 
 | Field | Type | Label | Description |
@@ -1197,7 +1198,8 @@ driver.
 <a name="stroppy-DriverTransactionStat"></a>
 
 ### DriverTransactionStat
-
+DriverTransactionStat represents an actual time spent on transaction.
+exec_duration includes the network round-trip and exection on dbms.
 
 
 | Field | Type | Label | Description |
@@ -1970,9 +1972,9 @@ ColumnDescriptor defines the structure of a database column.
 | name | [string](#string) |  | Name of the column |
 | sql_type | [string](#string) |  | SQL data type of the column |
 | nullable | [bool](#bool) |  | Whether the column can be NULL |
-| primary_key | [bool](#bool) |  | Whether the column is part of the primary key |
+| primary_key | [bool](#bool) |  | Whether the column is part of the primary key. Multiple primary keys creates composite primary key. |
 | unique | [bool](#bool) |  | Whether the column has a UNIQUE constraint |
-| constraint | [string](#string) |  | SQL constraint definition for the column |
+| constraint | [string](#string) |  | SQL constraint definition for the column in free form |
 
 
 
@@ -2010,7 +2012,7 @@ count.
 | name | [string](#string) |  | Name of the query |
 | sql | [string](#string) |  | SQL query text |
 | params | [QueryParamDescriptor](#stroppy-QueryParamDescriptor) | repeated | Parameters used in the query |
-| groups | [QueryParamGroup](#stroppy-QueryParamGroup) | repeated |  |
+| groups | [QueryParamGroup](#stroppy-QueryParamGroup) | repeated | Grouped parameter groups |
 | db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific query properties |
 
 
@@ -2039,13 +2041,16 @@ QueryParamDescriptor defines a parameter that can be used in a query.
 <a name="stroppy-QueryParamGroup"></a>
 
 ### QueryParamGroup
-
+QueryParamGroup defines a group of dependent parameters.
+New values generated in Carthesian product manner.
+It&#39;s useful to define composite primary keys.
+Every evaluation step only one param changes.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  |  |
-| params | [QueryParamDescriptor](#stroppy-QueryParamDescriptor) | repeated |  |
+| name | [string](#string) |  | Group name |
+| params | [QueryParamDescriptor](#stroppy-QueryParamDescriptor) | repeated | Grouped dependent parameters |
 
 
 
