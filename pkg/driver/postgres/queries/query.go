@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strings"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"go.uber.org/zap"
@@ -14,107 +13,121 @@ import (
 )
 
 var (
-	ErrNoColumnGen      = errors.New("no generator for column")
-	ErrNoGroupGen       = errors.New("no generator for group")
-	ErrInvalidGroupType = errors.New("invalid group type")
+	ErrNoParamGen       = errors.New("no generator for parameter")
+	ErrUnknownParamType = errors.New("unknown parameter value type")
 )
 
-// FIXME: is there any better place for it? delete comment if no.
+// TODO: move the initialization into the validation stage
 var reStorage = cmap.New[*regexp.Regexp]() //nolint:gochecknoglobals // it's just works
 
 func newQuery(
 	generators Generators,
 	descriptor *stroppy.QueryDescriptor,
 ) (*stroppy.DriverQuery, error) {
-	paramsValues := make([]*stroppy.Value, 0)
+	genIDs := queryGenIDs(descriptor)
 
-	for _, column := range descriptor.GetParams() {
-		genID := NewGeneratorID(
-			descriptor.GetName(),
-			column.GetName(),
-		)
-		gen, ok := generators.Get(genID)
-
-		if !ok {
-			return nil, fmt.Errorf("%w: '%s'", ErrNoColumnGen, genID)
-		}
-
-		protoValue, err := gen.Next()
-		if err != nil {
-			return nil, fmt.Errorf(
-				"failed to generate value for column '%s': %w",
-				genID,
-				err,
-			)
-		}
-
-		paramsValues = append(paramsValues, protoValue)
+	paramsValues, err := genParamValues(genIDs, generators)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, group := range descriptor.GetGroups() {
-		genID := NewGeneratorID(
-			descriptor.GetName(),
-			group.GetName(),
-		)
-		gen, ok := generators.Get(genID)
-
-		if !ok {
-			return nil, fmt.Errorf("%w: '%s'", ErrNoGroupGen, genID)
-		}
-
-		protoValues, err := gen.Next()
-		if err != nil {
-			return nil, fmt.Errorf(
-				"failed to generate values for group '%s': %w",
-				genID,
-				err,
-			)
-		}
-
-		list, ok := protoValues.GetType().(*stroppy.Value_List_)
-		if !ok {
-			return nil, fmt.Errorf(
-				"%w: '%T' != 'Value_List_': value is '%v'",
-				ErrInvalidGroupType,
-				protoValues.GetType(),
-				protoValues.GetType(),
-			)
-		}
-
-		paramsValues = append(paramsValues, list.List.GetValues()...)
-	}
-
-	resSQL := descriptor.GetSql()
-
-	params := descriptor.GetParams()
-	for _, group := range descriptor.GetGroups() {
-		params = append(params, group.GetParams()...)
-	}
-
-	for idx, param := range params {
-		if pattern := param.GetReplaceRegex(); pattern != "" {
-			// TODO: add pattern validation at the config reading stage
-			re, ok := reStorage.Get(pattern)
-			if !ok {
-				re = regexp.MustCompile(pattern)
-				reStorage.Set(pattern, re)
-			}
-
-			re.ReplaceAllString(resSQL, fmt.Sprintf("$%d", idx+1))
-		} else { // fallback to name replace
-			resSQL = strings.ReplaceAll(
-				resSQL,
-				fmt.Sprintf("${%s}", param.GetName()),
-				fmt.Sprintf("$%d", idx+1),
-			)
-		}
-	}
+	resSQL := interpolateSQL(descriptor)
 
 	return &stroppy.DriverQuery{
 		Name:    descriptor.GetName(),
 		Request: resSQL,
 		Params:  paramsValues,
 	}, nil
+}
+
+func queryGenIDs(descriptor *stroppy.QueryDescriptor) []GeneratorID {
+	genIDs := make([]GeneratorID, 0, len(descriptor.GetParams())+len(descriptor.GetGroups()))
+	for _, param := range descriptor.GetParams() {
+		genIDs = append(genIDs, NewGeneratorID(descriptor.GetName(), param.GetName()))
+	}
+
+	for _, group := range descriptor.GetGroups() {
+		genIDs = append(genIDs, NewGeneratorID(descriptor.GetName(), group.GetName()))
+	}
+
+	return genIDs
+}
+
+func interpolateSQL(descriptor *stroppy.QueryDescriptor) string {
+	params := descriptor.GetParams()
+	for _, group := range descriptor.GetGroups() {
+		params = append(params, group.GetParams()...)
+	}
+
+	resSQL := descriptor.GetSql()
+
+	for idx, param := range params {
+		pattern := param.GetReplaceRegex()
+		if pattern == "" { // fallback to name replace
+			pattern = regexp.QuoteMeta(fmt.Sprintf(`${%s}`, param.GetName()))
+		}
+
+		re, ok := reStorage.Get(pattern)
+		if !ok { // TODO: add pattern validation add reStorage filling at the config reading stage
+			re = regexp.MustCompile(pattern)
+			reStorage.Set(pattern, re)
+		}
+
+		resSQL = re.ReplaceAllString(resSQL, fmt.Sprintf(`$$%d`, idx+1))
+	}
+
+	return resSQL
+}
+
+var ErrNilProtoValue = errors.New("nil proto value type for parameter")
+
+func genParamValues(
+	genIDs []GeneratorID,
+	generators Generators,
+) ([]*stroppy.Value, error) {
+	var paramsValues []*stroppy.Value
+
+	for _, genID := range genIDs {
+		gen, ok := generators.Get(genID)
+
+		if !ok {
+			return nil, fmt.Errorf("%w: '%s'", ErrNoParamGen, genID)
+		}
+
+		protoValue, err := gen.Next()
+		if err != nil {
+			return nil, fmt.Errorf(
+				"failed to generate value for parameter '%s': %w",
+				genID,
+				err,
+			)
+		}
+
+		switch actual := protoValue.GetType().(type) {
+		case nil:
+			return nil, fmt.Errorf("%w: %s", ErrNilProtoValue, genID)
+		case *stroppy.Value_List_:
+			paramsValues = append(paramsValues, actual.List.GetValues()...)
+		case *stroppy.Value_Bool,
+			*stroppy.Value_Datetime,
+			*stroppy.Value_Decimal,
+			*stroppy.Value_Double,
+			*stroppy.Value_Float,
+			*stroppy.Value_Int32,
+			*stroppy.Value_Int64,
+			*stroppy.Value_Null,
+			*stroppy.Value_String_,
+			*stroppy.Value_Struct_,
+			*stroppy.Value_Uint32,
+			*stroppy.Value_Uint64,
+			*stroppy.Value_Uuid:
+			paramsValues = append(paramsValues, protoValue)
+		default:
+			return nil, fmt.Errorf("%w: '%T': value is '%v'", ErrUnknownParamType, actual, actual)
+		}
+	}
+
+	return paramsValues, nil
 }
 
 func NewQuery(

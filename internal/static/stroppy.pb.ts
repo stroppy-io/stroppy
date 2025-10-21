@@ -283,9 +283,9 @@ export interface Generation_Alphabet {
     /**
      * * List of character ranges for this alphabet
      *
-     * @generated from protobuf field: repeated stroppy.Generation.Range.UInt32Range ranges = 1
+     * @generated from protobuf field: repeated stroppy.Generation.Range.UInt32 ranges = 1
      */
-    ranges: Generation_Range_UInt32Range[];
+    ranges: Generation_Range_UInt32[];
 }
 /**
  * *
@@ -340,11 +340,39 @@ export enum Generation_Distribution_DistributionType {
 export interface Generation_Range {
 }
 /**
+ * @generated from protobuf message stroppy.Generation.Range.Bool
+ */
+export interface Generation_Range_Bool {
+    /**
+     * @generated from protobuf field: float ratio = 1
+     */
+    ratio: number;
+}
+/**
+ * @generated from protobuf message stroppy.Generation.Range.String
+ */
+export interface Generation_Range_String {
+    /**
+     * * Character set to use for generation
+     *
+     * @generated from protobuf field: optional stroppy.Generation.Alphabet alphabet = 1
+     */
+    alphabet?: Generation_Alphabet;
+    /**
+     * @generated from protobuf field: optional uint64 min_len = 2
+     */
+    minLen?: string;
+    /**
+     * @generated from protobuf field: uint64 max_len = 3
+     */
+    maxLen: string;
+}
+/**
  * * Range for string values that can be parsed into other types
  *
- * @generated from protobuf message stroppy.Generation.Range.AnyStringRange
+ * @generated from protobuf message stroppy.Generation.Range.AnyString
  */
-export interface Generation_Range_AnyStringRange {
+export interface Generation_Range_AnyString {
     /**
      * * Minimum value (inclusive)
      *
@@ -361,15 +389,15 @@ export interface Generation_Range_AnyStringRange {
 /**
  * * Range for 32-bit floating point numbers
  *
- * @generated from protobuf message stroppy.Generation.Range.FloatRange
+ * @generated from protobuf message stroppy.Generation.Range.Float
  */
-export interface Generation_Range_FloatRange {
+export interface Generation_Range_Float {
     /**
      * * Minimum value (inclusive)
      *
-     * @generated from protobuf field: float min = 1
+     * @generated from protobuf field: optional float min = 1
      */
-    min: number;
+    min?: number;
     /**
      * * Maximum value (inclusive)
      *
@@ -380,15 +408,15 @@ export interface Generation_Range_FloatRange {
 /**
  * * Range for 64-bit floating point numbers
  *
- * @generated from protobuf message stroppy.Generation.Range.DoubleRange
+ * @generated from protobuf message stroppy.Generation.Range.Double
  */
-export interface Generation_Range_DoubleRange {
+export interface Generation_Range_Double {
     /**
      * * Minimum value (inclusive)
      *
-     * @generated from protobuf field: double min = 1
+     * @generated from protobuf field: optional double min = 1
      */
-    min: number;
+    min?: number;
     /**
      * * Maximum value (inclusive)
      *
@@ -399,15 +427,15 @@ export interface Generation_Range_DoubleRange {
 /**
  * * Range for 32-bit signed integers
  *
- * @generated from protobuf message stroppy.Generation.Range.Int32Range
+ * @generated from protobuf message stroppy.Generation.Range.Int32
  */
-export interface Generation_Range_Int32Range {
+export interface Generation_Range_Int32 {
     /**
      * * Minimum value (inclusive)
      *
-     * @generated from protobuf field: int32 min = 1
+     * @generated from protobuf field: optional int32 min = 1
      */
-    min: number;
+    min?: number;
     /**
      * * Maximum value (inclusive)
      *
@@ -418,15 +446,15 @@ export interface Generation_Range_Int32Range {
 /**
  * * Range for 64-bit signed integers
  *
- * @generated from protobuf message stroppy.Generation.Range.Int64Range
+ * @generated from protobuf message stroppy.Generation.Range.Int64
  */
-export interface Generation_Range_Int64Range {
+export interface Generation_Range_Int64 {
     /**
      * * Minimum value (inclusive)
      *
-     * @generated from protobuf field: int64 min = 1
+     * @generated from protobuf field: optional int64 min = 1
      */
-    min: string;
+    min?: string;
     /**
      * * Maximum value (inclusive)
      *
@@ -437,15 +465,15 @@ export interface Generation_Range_Int64Range {
 /**
  * * Range for 32-bit unsigned integers
  *
- * @generated from protobuf message stroppy.Generation.Range.UInt32Range
+ * @generated from protobuf message stroppy.Generation.Range.UInt32
  */
-export interface Generation_Range_UInt32Range {
+export interface Generation_Range_UInt32 {
     /**
      * * Minimum value (inclusive)
      *
-     * @generated from protobuf field: uint32 min = 1
+     * @generated from protobuf field: optional uint32 min = 1
      */
-    min: number;
+    min?: number;
     /**
      * * Maximum value (inclusive)
      *
@@ -456,15 +484,15 @@ export interface Generation_Range_UInt32Range {
 /**
  * * Range for 64-bit unsigned integers
  *
- * @generated from protobuf message stroppy.Generation.Range.UInt64Range
+ * @generated from protobuf message stroppy.Generation.Range.UInt64
  */
-export interface Generation_Range_UInt64Range {
+export interface Generation_Range_UInt64 {
     /**
      * * Minimum value (inclusive)
      *
-     * @generated from protobuf field: uint64 min = 1
+     * @generated from protobuf field: optional uint64 min = 1
      */
-    min: string;
+    min?: string;
     /**
      * * Maximum value (inclusive)
      *
@@ -482,130 +510,76 @@ export interface Generation_Range_DecimalRange {
      * @generated from protobuf oneof: type
      */
     type: {
-        oneofKind: "default";
-        /**
-         * * Exact decimal range
-         *
-         * @generated from protobuf field: stroppy.Generation.Range.DecimalRange.Default default = 1
-         */
-        default: Generation_Range_DecimalRange_Default;
-    } | {
         oneofKind: "float";
         /**
          * * Float-based range
          *
-         * @generated from protobuf field: stroppy.Generation.Range.FloatRange float = 2
+         * @generated from protobuf field: stroppy.Generation.Range.Float float = 2
          */
-        float: Generation_Range_FloatRange;
+        float: Generation_Range_Float;
     } | {
         oneofKind: "double";
         /**
          * * Double-based range
          *
-         * @generated from protobuf field: stroppy.Generation.Range.DoubleRange double = 3
+         * @generated from protobuf field: stroppy.Generation.Range.Double double = 3
          */
-        double: Generation_Range_DoubleRange;
+        double: Generation_Range_Double;
     } | {
         oneofKind: "string";
         /**
-         * * String-based range (supports scientific notation)
+         * * String-bsed range (supports scientific notation)
          *
-         * @generated from protobuf field: stroppy.Generation.Range.AnyStringRange string = 4
+         * @generated from protobuf field: stroppy.Generation.Range.AnyString string = 4
          */
-        string: Generation_Range_AnyStringRange;
+        string: Generation_Range_AnyString;
     } | {
         oneofKind: undefined;
     };
 }
 /**
- * * Default decimal range
- *
- * @generated from protobuf message stroppy.Generation.Range.DecimalRange.Default
- */
-export interface Generation_Range_DecimalRange_Default {
-    /**
-     * * Minimum value (inclusive)
-     *
-     * @generated from protobuf field: stroppy.Decimal min = 1
-     */
-    min?: Decimal;
-    /**
-     * * Maximum value (inclusive)
-     *
-     * @generated from protobuf field: stroppy.Decimal max = 2
-     */
-    max?: Decimal;
-}
-/**
  * * Range for date/time values
  *
- * @generated from protobuf message stroppy.Generation.Range.DateTimeRange
+ * @generated from protobuf message stroppy.Generation.Range.DateTime
  */
-export interface Generation_Range_DateTimeRange {
+export interface Generation_Range_DateTime {
     /**
      * @generated from protobuf oneof: type
      */
     type: {
-        oneofKind: "default";
-        /**
-         * * Exact date/time range
-         *
-         * @generated from protobuf field: stroppy.Generation.Range.DateTimeRange.Default default = 1
-         */
-        default: Generation_Range_DateTimeRange_Default;
-    } | {
         oneofKind: "string";
         /**
          * * String-based range (ISO 8601 format)
          *
-         * @generated from protobuf field: stroppy.Generation.Range.AnyStringRange string = 2
+         * @generated from protobuf field: stroppy.Generation.Range.AnyString string = 2
          */
-        string: Generation_Range_AnyStringRange;
+        string: Generation_Range_AnyString;
     } | {
         oneofKind: "timestampPb";
         /**
          * * Protocol Buffers timestamp range
          *
-         * @generated from protobuf field: stroppy.Generation.Range.DateTimeRange.TimestampPb timestamp_pb = 3
+         * @generated from protobuf field: stroppy.Generation.Range.DateTime.TimestampPb timestamp_pb = 3
          */
-        timestampPb: Generation_Range_DateTimeRange_TimestampPb;
+        timestampPb: Generation_Range_DateTime_TimestampPb;
     } | {
         oneofKind: "timestamp";
         /**
          * * Unix timestamp range
          *
-         * @generated from protobuf field: stroppy.Generation.Range.DateTimeRange.Timestamp timestamp = 4
+         * @generated from protobuf field: stroppy.Generation.Range.DateTime.TimestampUnix timestamp = 4
          */
-        timestamp: Generation_Range_DateTimeRange_Timestamp;
+        timestamp: Generation_Range_DateTime_TimestampUnix;
     } | {
         oneofKind: undefined;
     };
 }
 /**
- * * Default date/time range
- *
- * @generated from protobuf message stroppy.Generation.Range.DateTimeRange.Default
- */
-export interface Generation_Range_DateTimeRange_Default {
-    /**
-     * * Minimum timestamp (inclusive)
-     *
-     * @generated from protobuf field: stroppy.DateTime min = 1
-     */
-    min?: DateTime;
-    /**
-     * * Maximum timestamp (inclusive)
-     *
-     * @generated from protobuf field: stroppy.DateTime max = 2
-     */
-    max?: DateTime;
-}
-/**
  * * Protocol Buffers timestamp range
  *
- * @generated from protobuf message stroppy.Generation.Range.DateTimeRange.TimestampPb
+ * @generated from protobuf message stroppy.Generation.Range.DateTime.TimestampPb
  */
-export interface Generation_Range_DateTimeRange_TimestampPb {
+export interface Generation_Range_DateTime_TimestampPb {
     /**
      * * Minimum timestamp (inclusive)
      *
@@ -622,9 +596,9 @@ export interface Generation_Range_DateTimeRange_TimestampPb {
 /**
  * * Unix timestamp range
  *
- * @generated from protobuf message stroppy.Generation.Range.DateTimeRange.Timestamp
+ * @generated from protobuf message stroppy.Generation.Range.DateTime.TimestampUnix
  */
-export interface Generation_Range_DateTimeRange_Timestamp {
+export interface Generation_Range_DateTime_TimestampUnix {
     /**
      * * Minimum Unix timestamp (inclusive)
      *
@@ -656,328 +630,205 @@ export interface Generation_Range_DateTimeRange_Timestamp {
 
 /**
  * *
- * Rules contains type-specific generation configurations.
- *
- * @generated from protobuf message stroppy.Generation.Rules
- */
-export interface Generation_Rules {
-}
-/**
- * * Rules for generating 32-bit floating point numbers
- *
- * @generated from protobuf message stroppy.Generation.Rules.FloatRule
- */
-export interface Generation_Rules_FloatRule {
-    /**
-     * * Valid value range
-     *
-     * @generated from protobuf field: stroppy.Generation.Range.FloatRange range = 1
-     */
-    range?: Generation_Range_FloatRange;
-    /**
-     * * Fixed value (if specified, overrides range)
-     *
-     * @generated from protobuf field: optional float constant = 2
-     */
-    constant?: number;
-}
-/**
- * * Rules for generating 64-bit floating point numbers
- *
- * @generated from protobuf message stroppy.Generation.Rules.DoubleRule
- */
-export interface Generation_Rules_DoubleRule {
-    /**
-     * * Valid value range
-     *
-     * @generated from protobuf field: stroppy.Generation.Range.DoubleRange range = 1
-     */
-    range?: Generation_Range_DoubleRange;
-    /**
-     * * Fixed value (if specified, overrides range)
-     *
-     * @generated from protobuf field: optional double constant = 2
-     */
-    constant?: number;
-}
-/**
- * * Rules for generating 32-bit signed integers
- *
- * @generated from protobuf message stroppy.Generation.Rules.Int32Rule
- */
-export interface Generation_Rules_Int32Rule {
-    /**
-     * * Valid value range
-     *
-     * @generated from protobuf field: stroppy.Generation.Range.Int32Range range = 1
-     */
-    range?: Generation_Range_Int32Range;
-    /**
-     * * Fixed value (if specified, overrides range)
-     *
-     * @generated from protobuf field: optional int32 constant = 2
-     */
-    constant?: number;
-}
-/**
- * * Rules for generating 64-bit signed integers
- *
- * @generated from protobuf message stroppy.Generation.Rules.Int64Rule
- */
-export interface Generation_Rules_Int64Rule {
-    /**
-     * * Valid value range
-     *
-     * @generated from protobuf field: stroppy.Generation.Range.Int64Range range = 1
-     */
-    range?: Generation_Range_Int64Range;
-    /**
-     * * Fixed value (if specified, overrides range)
-     *
-     * @generated from protobuf field: optional int64 constant = 2
-     */
-    constant?: string;
-}
-/**
- * * Rules for generating 32-bit unsigned integers
- *
- * @generated from protobuf message stroppy.Generation.Rules.UInt32Rule
- */
-export interface Generation_Rules_UInt32Rule {
-    /**
-     * * Valid value range
-     *
-     * @generated from protobuf field: stroppy.Generation.Range.UInt32Range range = 1
-     */
-    range?: Generation_Range_UInt32Range;
-    /**
-     * * Fixed value (if specified, overrides range)
-     *
-     * @generated from protobuf field: optional uint32 constant = 2
-     */
-    constant?: number;
-}
-/**
- * * Rules for generating 64-bit unsigned integers
- *
- * @generated from protobuf message stroppy.Generation.Rules.UInt64Rule
- */
-export interface Generation_Rules_UInt64Rule {
-    /**
-     * * Valid value range
-     *
-     * @generated from protobuf field: stroppy.Generation.Range.UInt64Range range = 1
-     */
-    range?: Generation_Range_UInt64Range;
-    /**
-     * * Fixed value (if specified, overrides range)
-     *
-     * @generated from protobuf field: optional uint64 constant = 2
-     */
-    constant?: string;
-}
-/**
- * * Rules for generating boolean values
- *
- * @generated from protobuf message stroppy.Generation.Rules.BoolRule
- */
-export interface Generation_Rules_BoolRule {
-    /**
-     * * Fixed value (if not specified, generates random booleans)
-     *
-     * @generated from protobuf field: optional bool constant = 1
-     */
-    constant?: boolean;
-}
-/**
- * * Rules for generating string values
- *
- * @generated from protobuf message stroppy.Generation.Rules.StringRule
- */
-export interface Generation_Rules_StringRule {
-    /**
-     * * Character set to use for generation
-     *
-     * @generated from protobuf field: optional stroppy.Generation.Alphabet alphabet = 1
-     */
-    alphabet?: Generation_Alphabet;
-    /**
-     * * Valid length range for the string
-     *
-     * @generated from protobuf field: stroppy.Generation.Range.UInt64Range len_range = 2
-     */
-    lenRange?: Generation_Range_UInt64Range;
-    // TODO: 'constant' shouldn't require 'len_range' to use it.
-
-    /**
-     * * Fixed value (if specified, overrides generation)
-     *
-     * @generated from protobuf field: optional string constant = 3
-     */
-    constant?: string;
-}
-/**
- * * Rules for generating date/time values
- *
- * @generated from protobuf message stroppy.Generation.Rules.DateTimeRule
- */
-export interface Generation_Rules_DateTimeRule {
-    /**
-     * * Valid time range
-     *
-     * @generated from protobuf field: stroppy.Generation.Range.DateTimeRange range = 1
-     */
-    range?: Generation_Range_DateTimeRange;
-    /**
-     * * Fixed value (if specified, overrides range)
-     *
-     * @generated from protobuf field: optional stroppy.DateTime constant = 2
-     */
-    constant?: DateTime;
-}
-/**
- * * Rules for generating UUIDs
- *
- * @generated from protobuf message stroppy.Generation.Rules.UuidRule
- */
-export interface Generation_Rules_UuidRule {
-    /**
-     * * Fixed UUID (if not specified, generates random UUIDs)
-     *
-     * @generated from protobuf field: optional stroppy.Uuid constant = 1
-     */
-    constant?: Uuid;
-}
-/**
- * * Rules for generating decimal numbers
- *
- * @generated from protobuf message stroppy.Generation.Rules.DecimalRule
- */
-export interface Generation_Rules_DecimalRule {
-    /**
-     * * Valid value range
-     *
-     * @generated from protobuf field: stroppy.Generation.Range.DecimalRange range = 1
-     */
-    range?: Generation_Range_DecimalRange;
-    /**
-     * * Fixed value (if specified, overrides range)
-     *
-     * @generated from protobuf field: optional stroppy.Decimal constant = 2
-     */
-    constant?: Decimal;
-}
-/**
- * *
  * Rule defines generation rules for a specific data type.
  *
  * @generated from protobuf message stroppy.Generation.Rule
  */
 export interface Generation_Rule {
     /**
-     * @generated from protobuf oneof: type
+     * *
+     * Exactly one variant must be set; tooling treats this as mutually
+     * exclusive. Prefer ranges for variability and consts for fixed values.
+     *
+     * @generated from protobuf oneof: kind
      */
-    type: {
-        oneofKind: "floatRules";
+    kind: {
+        oneofKind: "int32Range";
+        // Numeric ranges (frequent)
+
         /**
-         * * Rules for 32-bit floating point numbers
+         * * Signed 32‑bit integer range (inclusive). Example: 1..100 for
+         * IDs.
          *
-         * @generated from protobuf field: stroppy.Generation.Rules.FloatRule float_rules = 1
+         * @generated from protobuf field: stroppy.Generation.Range.Int32 int32_range = 1
          */
-        floatRules: Generation_Rules_FloatRule;
+        int32Range: Generation_Range_Int32;
     } | {
-        oneofKind: "doubleRules";
+        oneofKind: "int64Range";
         /**
-         * * Rules for 64-bit floating point numbers
+         * * Signed 64‑bit integer range for large counters or timestamps.
          *
-         * @generated from protobuf field: stroppy.Generation.Rules.DoubleRule double_rules = 2
+         * @generated from protobuf field: stroppy.Generation.Range.Int64 int64_range = 2
          */
-        doubleRules: Generation_Rules_DoubleRule;
+        int64Range: Generation_Range_Int64;
     } | {
-        oneofKind: "int32Rules";
+        oneofKind: "uint32Range";
         /**
-         * * Rules for 32-bit signed integers
+         * * Unsigned 32‑bit integer range; use for sizes/indices.
          *
-         * @generated from protobuf field: stroppy.Generation.Rules.Int32Rule int32_rules = 3
+         * @generated from protobuf field: stroppy.Generation.Range.UInt32 uint32_range = 3
          */
-        int32Rules: Generation_Rules_Int32Rule;
+        uint32Range: Generation_Range_UInt32;
     } | {
-        oneofKind: "int64Rules";
+        oneofKind: "uint64Range";
         /**
-         * * Rules for 64-bit signed integers
+         * * Unsigned 64‑bit integer range; use for large sizes.
          *
-         * @generated from protobuf field: stroppy.Generation.Rules.Int64Rule int64_rules = 4
+         * @generated from protobuf field: stroppy.Generation.Range.UInt64 uint64_range = 4
          */
-        int64Rules: Generation_Rules_Int64Rule;
+        uint64Range: Generation_Range_UInt64;
     } | {
-        oneofKind: "uint32Rules";
+        oneofKind: "floatRange";
         /**
-         * * Rules for 32-bit unsigned integers
+         * * 32‑bit float bounds; beware precision for currency.
          *
-         * @generated from protobuf field: stroppy.Generation.Rules.UInt32Rule uint32_rules = 5
+         * @generated from protobuf field: stroppy.Generation.Range.Float float_range = 5
          */
-        uint32Rules: Generation_Rules_UInt32Rule;
+        floatRange: Generation_Range_Float;
     } | {
-        oneofKind: "uint64Rules";
+        oneofKind: "doubleRange";
         /**
-         * * Rules for 64-bit unsigned integers
+         * * 64‑bit float bounds for high‑precision numeric data.
          *
-         * @generated from protobuf field: stroppy.Generation.Rules.UInt64Rule uint64_rules = 6
+         * @generated from protobuf field: stroppy.Generation.Range.Double double_range = 6
          */
-        uint64Rules: Generation_Rules_UInt64Rule;
+        doubleRange: Generation_Range_Double;
     } | {
-        oneofKind: "boolRules";
+        oneofKind: "decimalRange";
         /**
-         * * Rules for boolean values
+         * * Arbitrary‑precision decimal bounds for money/ratios.
          *
-         * @generated from protobuf field: stroppy.Generation.Rules.BoolRule bool_rules = 13
+         * @generated from protobuf field: stroppy.Generation.Range.DecimalRange decimal_range = 7
          */
-        boolRules: Generation_Rules_BoolRule;
+        decimalRange: Generation_Range_DecimalRange;
     } | {
-        oneofKind: "stringRules";
+        oneofKind: "stringRange";
+        // Non‑numeric ranges
+
         /**
-         * * Rules for string values
+         * * String constraints (length, alphabet).
          *
-         * @generated from protobuf field: stroppy.Generation.Rules.StringRule string_rules = 14
+         * @generated from protobuf field: stroppy.Generation.Range.String string_range = 8
          */
-        stringRules: Generation_Rules_StringRule;
+        stringRange: Generation_Range_String;
     } | {
-        oneofKind: "datetimeRules";
+        oneofKind: "boolRange";
         /**
-         * * Rules for date/time values
+         * * Boolean constraints (e.g., force true/false).
          *
-         * @generated from protobuf field: stroppy.Generation.Rules.DateTimeRule datetime_rules = 101
+         * @generated from protobuf field: stroppy.Generation.Range.Bool bool_range = 9
          */
-        datetimeRules: Generation_Rules_DateTimeRule;
+        boolRange: Generation_Range_Bool;
     } | {
-        oneofKind: "uuidRules";
+        oneofKind: "datetimeRange";
         /**
-         * * Rules for UUIDs
+         * * Date/time window (e.g., not before/after).
          *
-         * @generated from protobuf field: stroppy.Generation.Rules.UuidRule uuid_rules = 102
+         * @generated from protobuf field: stroppy.Generation.Range.DateTime datetime_range = 10
          */
-        uuidRules: Generation_Rules_UuidRule;
+        datetimeRange: Generation_Range_DateTime;
     } | {
-        oneofKind: "decimalRules";
+        oneofKind: "int32Const";
+        // Constants
+
         /**
-         * * Rules for decimal numbers
+         * * Fixed 32‑bit integer value.
          *
-         * @generated from protobuf field: stroppy.Generation.Rules.DecimalRule decimal_rules = 103
+         * @generated from protobuf field: int32 int32_const = 11
          */
-        decimalRules: Generation_Rules_DecimalRule;
+        int32Const: number;
+    } | {
+        oneofKind: "int64Const";
+        /**
+         * * Fixed 64‑bit integer value.
+         *
+         * @generated from protobuf field: int64 int64_const = 12
+         */
+        int64Const: string;
+    } | {
+        oneofKind: "uint32Const";
+        /**
+         * * Fixed unsigned 32‑bit integer value.
+         *
+         * @generated from protobuf field: uint32 uint32_const = 13
+         */
+        uint32Const: number;
+    } | {
+        oneofKind: "uint64Const";
+        /**
+         * * Fixed unsigned 64‑bit integer value.
+         *
+         * @generated from protobuf field: uint64 uint64_const = 14
+         */
+        uint64Const: string;
+    } | {
+        oneofKind: "floatConst";
+        /**
+         * * Fixed 32‑bit float value.
+         *
+         * @generated from protobuf field: float float_const = 15
+         */
+        floatConst: number;
+    } | {
+        oneofKind: "doubleConst";
+        /**
+         * * Fixed 64‑bit float value.
+         *
+         * @generated from protobuf field: double double_const = 16
+         */
+        doubleConst: number;
+    } | {
+        oneofKind: "decimalConst";
+        /**
+         * * Fixed decimal value.
+         *
+         * @generated from protobuf field: stroppy.Decimal decimal_const = 17
+         */
+        decimalConst: Decimal;
+    } | {
+        oneofKind: "stringConst";
+        /**
+         * * Fixed string value.
+         *
+         * @generated from protobuf field: string string_const = 18
+         */
+        stringConst: string;
+    } | {
+        oneofKind: "boolConst";
+        /**
+         * * Fixed boolean value.
+         *
+         * @generated from protobuf field: bool bool_const = 19
+         */
+        boolConst: boolean;
+    } | {
+        oneofKind: "datetimeConst";
+        /**
+         * * Fixed date/time value.
+         *
+         * @generated from protobuf field: stroppy.DateTime datetime_const = 20
+         */
+        datetimeConst: DateTime;
     } | {
         oneofKind: undefined;
     };
     /**
-     * @generated from protobuf field: optional stroppy.Generation.Distribution distribution = 1000
+     * * Shape of randomness; Normal by default
+     *
+     * @generated from protobuf field: optional stroppy.Generation.Distribution distribution = 30
      */
     distribution?: Generation_Distribution;
     /**
-     * @generated from protobuf field: optional uint32 null_percentage = 1001
+     * * Percentage of nulls to inject [0..100]; 0 by default
+     *
+     * @generated from protobuf field: optional uint32 null_percentage = 31
      */
     nullPercentage?: number;
     /**
-     * @generated from protobuf field: optional bool unique = 1002
+     * * Enforce uniqueness across generated values;
+     * Linear sequence for ranges
+     *
+     * @generated from protobuf field: optional bool unique = 32
      */
     unique?: boolean;
 }
@@ -1526,7 +1377,7 @@ export const Generation = new Generation$Type();
 class Generation_Alphabet$Type extends MessageType<Generation_Alphabet> {
     constructor() {
         super("stroppy.Generation.Alphabet", [
-            { no: 1, name: "ranges", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Generation_Range_UInt32Range }
+            { no: 1, name: "ranges", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Generation_Range_UInt32 }
         ]);
     }
     create(value?: PartialMessage<Generation_Alphabet>): Generation_Alphabet {
@@ -1541,8 +1392,8 @@ class Generation_Alphabet$Type extends MessageType<Generation_Alphabet> {
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* repeated stroppy.Generation.Range.UInt32Range ranges */ 1:
-                    message.ranges.push(Generation_Range_UInt32Range.internalBinaryRead(reader, reader.uint32(), options));
+                case /* repeated stroppy.Generation.Range.UInt32 ranges */ 1:
+                    message.ranges.push(Generation_Range_UInt32.internalBinaryRead(reader, reader.uint32(), options));
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -1556,9 +1407,9 @@ class Generation_Alphabet$Type extends MessageType<Generation_Alphabet> {
         return message;
     }
     internalBinaryWrite(message: Generation_Alphabet, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* repeated stroppy.Generation.Range.UInt32Range ranges = 1; */
+        /* repeated stroppy.Generation.Range.UInt32 ranges = 1; */
         for (let i = 0; i < message.ranges.length; i++)
-            Generation_Range_UInt32Range.internalBinaryWrite(message.ranges[i], writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+            Generation_Range_UInt32.internalBinaryWrite(message.ranges[i], writer.tag(1, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -1663,22 +1514,130 @@ class Generation_Range$Type extends MessageType<Generation_Range> {
  */
 export const Generation_Range = new Generation_Range$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_AnyStringRange$Type extends MessageType<Generation_Range_AnyStringRange> {
+class Generation_Range_Bool$Type extends MessageType<Generation_Range_Bool> {
     constructor() {
-        super("stroppy.Generation.Range.AnyStringRange", [
+        super("stroppy.Generation.Range.Bool", [
+            { no: 1, name: "ratio", kind: "scalar", T: 2 /*ScalarType.FLOAT*/ }
+        ]);
+    }
+    create(value?: PartialMessage<Generation_Range_Bool>): Generation_Range_Bool {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.ratio = 0;
+        if (value !== undefined)
+            reflectionMergePartial<Generation_Range_Bool>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_Bool): Generation_Range_Bool {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* float ratio */ 1:
+                    message.ratio = reader.float();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: Generation_Range_Bool, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* float ratio = 1; */
+        if (message.ratio !== 0)
+            writer.tag(1, WireType.Bit32).float(message.ratio);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.Generation.Range.Bool
+ */
+export const Generation_Range_Bool = new Generation_Range_Bool$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class Generation_Range_String$Type extends MessageType<Generation_Range_String> {
+    constructor() {
+        super("stroppy.Generation.Range.String", [
+            { no: 1, name: "alphabet", kind: "message", T: () => Generation_Alphabet },
+            { no: 2, name: "min_len", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/ },
+            { no: 3, name: "max_len", kind: "scalar", T: 4 /*ScalarType.UINT64*/ }
+        ]);
+    }
+    create(value?: PartialMessage<Generation_Range_String>): Generation_Range_String {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.maxLen = "0";
+        if (value !== undefined)
+            reflectionMergePartial<Generation_Range_String>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_String): Generation_Range_String {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* optional stroppy.Generation.Alphabet alphabet */ 1:
+                    message.alphabet = Generation_Alphabet.internalBinaryRead(reader, reader.uint32(), options, message.alphabet);
+                    break;
+                case /* optional uint64 min_len */ 2:
+                    message.minLen = reader.uint64().toString();
+                    break;
+                case /* uint64 max_len */ 3:
+                    message.maxLen = reader.uint64().toString();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: Generation_Range_String, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* optional stroppy.Generation.Alphabet alphabet = 1; */
+        if (message.alphabet)
+            Generation_Alphabet.internalBinaryWrite(message.alphabet, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* optional uint64 min_len = 2; */
+        if (message.minLen !== undefined)
+            writer.tag(2, WireType.Varint).uint64(message.minLen);
+        /* uint64 max_len = 3; */
+        if (message.maxLen !== "0")
+            writer.tag(3, WireType.Varint).uint64(message.maxLen);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.Generation.Range.String
+ */
+export const Generation_Range_String = new Generation_Range_String$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class Generation_Range_AnyString$Type extends MessageType<Generation_Range_AnyString> {
+    constructor() {
+        super("stroppy.Generation.Range.AnyString", [
             { no: 1, name: "min", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "max", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
         ]);
     }
-    create(value?: PartialMessage<Generation_Range_AnyStringRange>): Generation_Range_AnyStringRange {
+    create(value?: PartialMessage<Generation_Range_AnyString>): Generation_Range_AnyString {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.min = "";
         message.max = "";
         if (value !== undefined)
-            reflectionMergePartial<Generation_Range_AnyStringRange>(this, message, value);
+            reflectionMergePartial<Generation_Range_AnyString>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_AnyStringRange): Generation_Range_AnyStringRange {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_AnyString): Generation_Range_AnyString {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
@@ -1700,7 +1659,7 @@ class Generation_Range_AnyStringRange$Type extends MessageType<Generation_Range_
         }
         return message;
     }
-    internalBinaryWrite(message: Generation_Range_AnyStringRange, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+    internalBinaryWrite(message: Generation_Range_AnyString, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
         /* string min = 1; */
         if (message.min !== "")
             writer.tag(1, WireType.LengthDelimited).string(message.min);
@@ -1714,31 +1673,30 @@ class Generation_Range_AnyStringRange$Type extends MessageType<Generation_Range_
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Generation.Range.AnyStringRange
+ * @generated MessageType for protobuf message stroppy.Generation.Range.AnyString
  */
-export const Generation_Range_AnyStringRange = new Generation_Range_AnyStringRange$Type();
+export const Generation_Range_AnyString = new Generation_Range_AnyString$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_FloatRange$Type extends MessageType<Generation_Range_FloatRange> {
+class Generation_Range_Float$Type extends MessageType<Generation_Range_Float> {
     constructor() {
-        super("stroppy.Generation.Range.FloatRange", [
-            { no: 1, name: "min", kind: "scalar", T: 2 /*ScalarType.FLOAT*/ },
+        super("stroppy.Generation.Range.Float", [
+            { no: 1, name: "min", kind: "scalar", opt: true, T: 2 /*ScalarType.FLOAT*/ },
             { no: 2, name: "max", kind: "scalar", T: 2 /*ScalarType.FLOAT*/ }
         ]);
     }
-    create(value?: PartialMessage<Generation_Range_FloatRange>): Generation_Range_FloatRange {
+    create(value?: PartialMessage<Generation_Range_Float>): Generation_Range_Float {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.min = 0;
         message.max = 0;
         if (value !== undefined)
-            reflectionMergePartial<Generation_Range_FloatRange>(this, message, value);
+            reflectionMergePartial<Generation_Range_Float>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_FloatRange): Generation_Range_FloatRange {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_Float): Generation_Range_Float {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* float min */ 1:
+                case /* optional float min */ 1:
                     message.min = reader.float();
                     break;
                 case /* float max */ 2:
@@ -1755,9 +1713,9 @@ class Generation_Range_FloatRange$Type extends MessageType<Generation_Range_Floa
         }
         return message;
     }
-    internalBinaryWrite(message: Generation_Range_FloatRange, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* float min = 1; */
-        if (message.min !== 0)
+    internalBinaryWrite(message: Generation_Range_Float, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* optional float min = 1; */
+        if (message.min !== undefined)
             writer.tag(1, WireType.Bit32).float(message.min);
         /* float max = 2; */
         if (message.max !== 0)
@@ -1769,31 +1727,30 @@ class Generation_Range_FloatRange$Type extends MessageType<Generation_Range_Floa
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Generation.Range.FloatRange
+ * @generated MessageType for protobuf message stroppy.Generation.Range.Float
  */
-export const Generation_Range_FloatRange = new Generation_Range_FloatRange$Type();
+export const Generation_Range_Float = new Generation_Range_Float$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_DoubleRange$Type extends MessageType<Generation_Range_DoubleRange> {
+class Generation_Range_Double$Type extends MessageType<Generation_Range_Double> {
     constructor() {
-        super("stroppy.Generation.Range.DoubleRange", [
-            { no: 1, name: "min", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ },
+        super("stroppy.Generation.Range.Double", [
+            { no: 1, name: "min", kind: "scalar", opt: true, T: 1 /*ScalarType.DOUBLE*/ },
             { no: 2, name: "max", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ }
         ]);
     }
-    create(value?: PartialMessage<Generation_Range_DoubleRange>): Generation_Range_DoubleRange {
+    create(value?: PartialMessage<Generation_Range_Double>): Generation_Range_Double {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.min = 0;
         message.max = 0;
         if (value !== undefined)
-            reflectionMergePartial<Generation_Range_DoubleRange>(this, message, value);
+            reflectionMergePartial<Generation_Range_Double>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_DoubleRange): Generation_Range_DoubleRange {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_Double): Generation_Range_Double {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* double min */ 1:
+                case /* optional double min */ 1:
                     message.min = reader.double();
                     break;
                 case /* double max */ 2:
@@ -1810,9 +1767,9 @@ class Generation_Range_DoubleRange$Type extends MessageType<Generation_Range_Dou
         }
         return message;
     }
-    internalBinaryWrite(message: Generation_Range_DoubleRange, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* double min = 1; */
-        if (message.min !== 0)
+    internalBinaryWrite(message: Generation_Range_Double, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* optional double min = 1; */
+        if (message.min !== undefined)
             writer.tag(1, WireType.Bit64).double(message.min);
         /* double max = 2; */
         if (message.max !== 0)
@@ -1824,31 +1781,30 @@ class Generation_Range_DoubleRange$Type extends MessageType<Generation_Range_Dou
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Generation.Range.DoubleRange
+ * @generated MessageType for protobuf message stroppy.Generation.Range.Double
  */
-export const Generation_Range_DoubleRange = new Generation_Range_DoubleRange$Type();
+export const Generation_Range_Double = new Generation_Range_Double$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_Int32Range$Type extends MessageType<Generation_Range_Int32Range> {
+class Generation_Range_Int32$Type extends MessageType<Generation_Range_Int32> {
     constructor() {
-        super("stroppy.Generation.Range.Int32Range", [
-            { no: 1, name: "min", kind: "scalar", T: 5 /*ScalarType.INT32*/ },
+        super("stroppy.Generation.Range.Int32", [
+            { no: 1, name: "min", kind: "scalar", opt: true, T: 5 /*ScalarType.INT32*/ },
             { no: 2, name: "max", kind: "scalar", T: 5 /*ScalarType.INT32*/ }
         ]);
     }
-    create(value?: PartialMessage<Generation_Range_Int32Range>): Generation_Range_Int32Range {
+    create(value?: PartialMessage<Generation_Range_Int32>): Generation_Range_Int32 {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.min = 0;
         message.max = 0;
         if (value !== undefined)
-            reflectionMergePartial<Generation_Range_Int32Range>(this, message, value);
+            reflectionMergePartial<Generation_Range_Int32>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_Int32Range): Generation_Range_Int32Range {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_Int32): Generation_Range_Int32 {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* int32 min */ 1:
+                case /* optional int32 min */ 1:
                     message.min = reader.int32();
                     break;
                 case /* int32 max */ 2:
@@ -1865,9 +1821,9 @@ class Generation_Range_Int32Range$Type extends MessageType<Generation_Range_Int3
         }
         return message;
     }
-    internalBinaryWrite(message: Generation_Range_Int32Range, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* int32 min = 1; */
-        if (message.min !== 0)
+    internalBinaryWrite(message: Generation_Range_Int32, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* optional int32 min = 1; */
+        if (message.min !== undefined)
             writer.tag(1, WireType.Varint).int32(message.min);
         /* int32 max = 2; */
         if (message.max !== 0)
@@ -1879,31 +1835,30 @@ class Generation_Range_Int32Range$Type extends MessageType<Generation_Range_Int3
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Generation.Range.Int32Range
+ * @generated MessageType for protobuf message stroppy.Generation.Range.Int32
  */
-export const Generation_Range_Int32Range = new Generation_Range_Int32Range$Type();
+export const Generation_Range_Int32 = new Generation_Range_Int32$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_Int64Range$Type extends MessageType<Generation_Range_Int64Range> {
+class Generation_Range_Int64$Type extends MessageType<Generation_Range_Int64> {
     constructor() {
-        super("stroppy.Generation.Range.Int64Range", [
-            { no: 1, name: "min", kind: "scalar", T: 3 /*ScalarType.INT64*/ },
+        super("stroppy.Generation.Range.Int64", [
+            { no: 1, name: "min", kind: "scalar", opt: true, T: 3 /*ScalarType.INT64*/ },
             { no: 2, name: "max", kind: "scalar", T: 3 /*ScalarType.INT64*/ }
         ]);
     }
-    create(value?: PartialMessage<Generation_Range_Int64Range>): Generation_Range_Int64Range {
+    create(value?: PartialMessage<Generation_Range_Int64>): Generation_Range_Int64 {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.min = "0";
         message.max = "0";
         if (value !== undefined)
-            reflectionMergePartial<Generation_Range_Int64Range>(this, message, value);
+            reflectionMergePartial<Generation_Range_Int64>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_Int64Range): Generation_Range_Int64Range {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_Int64): Generation_Range_Int64 {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* int64 min */ 1:
+                case /* optional int64 min */ 1:
                     message.min = reader.int64().toString();
                     break;
                 case /* int64 max */ 2:
@@ -1920,9 +1875,9 @@ class Generation_Range_Int64Range$Type extends MessageType<Generation_Range_Int6
         }
         return message;
     }
-    internalBinaryWrite(message: Generation_Range_Int64Range, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* int64 min = 1; */
-        if (message.min !== "0")
+    internalBinaryWrite(message: Generation_Range_Int64, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* optional int64 min = 1; */
+        if (message.min !== undefined)
             writer.tag(1, WireType.Varint).int64(message.min);
         /* int64 max = 2; */
         if (message.max !== "0")
@@ -1934,31 +1889,30 @@ class Generation_Range_Int64Range$Type extends MessageType<Generation_Range_Int6
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Generation.Range.Int64Range
+ * @generated MessageType for protobuf message stroppy.Generation.Range.Int64
  */
-export const Generation_Range_Int64Range = new Generation_Range_Int64Range$Type();
+export const Generation_Range_Int64 = new Generation_Range_Int64$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_UInt32Range$Type extends MessageType<Generation_Range_UInt32Range> {
+class Generation_Range_UInt32$Type extends MessageType<Generation_Range_UInt32> {
     constructor() {
-        super("stroppy.Generation.Range.UInt32Range", [
-            { no: 1, name: "min", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+        super("stroppy.Generation.Range.UInt32", [
+            { no: 1, name: "min", kind: "scalar", opt: true, T: 13 /*ScalarType.UINT32*/ },
             { no: 2, name: "max", kind: "scalar", T: 13 /*ScalarType.UINT32*/ }
         ]);
     }
-    create(value?: PartialMessage<Generation_Range_UInt32Range>): Generation_Range_UInt32Range {
+    create(value?: PartialMessage<Generation_Range_UInt32>): Generation_Range_UInt32 {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.min = 0;
         message.max = 0;
         if (value !== undefined)
-            reflectionMergePartial<Generation_Range_UInt32Range>(this, message, value);
+            reflectionMergePartial<Generation_Range_UInt32>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_UInt32Range): Generation_Range_UInt32Range {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_UInt32): Generation_Range_UInt32 {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* uint32 min */ 1:
+                case /* optional uint32 min */ 1:
                     message.min = reader.uint32();
                     break;
                 case /* uint32 max */ 2:
@@ -1975,9 +1929,9 @@ class Generation_Range_UInt32Range$Type extends MessageType<Generation_Range_UIn
         }
         return message;
     }
-    internalBinaryWrite(message: Generation_Range_UInt32Range, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* uint32 min = 1; */
-        if (message.min !== 0)
+    internalBinaryWrite(message: Generation_Range_UInt32, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* optional uint32 min = 1; */
+        if (message.min !== undefined)
             writer.tag(1, WireType.Varint).uint32(message.min);
         /* uint32 max = 2; */
         if (message.max !== 0)
@@ -1989,31 +1943,30 @@ class Generation_Range_UInt32Range$Type extends MessageType<Generation_Range_UIn
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Generation.Range.UInt32Range
+ * @generated MessageType for protobuf message stroppy.Generation.Range.UInt32
  */
-export const Generation_Range_UInt32Range = new Generation_Range_UInt32Range$Type();
+export const Generation_Range_UInt32 = new Generation_Range_UInt32$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_UInt64Range$Type extends MessageType<Generation_Range_UInt64Range> {
+class Generation_Range_UInt64$Type extends MessageType<Generation_Range_UInt64> {
     constructor() {
-        super("stroppy.Generation.Range.UInt64Range", [
-            { no: 1, name: "min", kind: "scalar", T: 4 /*ScalarType.UINT64*/ },
+        super("stroppy.Generation.Range.UInt64", [
+            { no: 1, name: "min", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/ },
             { no: 2, name: "max", kind: "scalar", T: 4 /*ScalarType.UINT64*/ }
         ]);
     }
-    create(value?: PartialMessage<Generation_Range_UInt64Range>): Generation_Range_UInt64Range {
+    create(value?: PartialMessage<Generation_Range_UInt64>): Generation_Range_UInt64 {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.min = "0";
         message.max = "0";
         if (value !== undefined)
-            reflectionMergePartial<Generation_Range_UInt64Range>(this, message, value);
+            reflectionMergePartial<Generation_Range_UInt64>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_UInt64Range): Generation_Range_UInt64Range {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_UInt64): Generation_Range_UInt64 {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* uint64 min */ 1:
+                case /* optional uint64 min */ 1:
                     message.min = reader.uint64().toString();
                     break;
                 case /* uint64 max */ 2:
@@ -2030,9 +1983,9 @@ class Generation_Range_UInt64Range$Type extends MessageType<Generation_Range_UIn
         }
         return message;
     }
-    internalBinaryWrite(message: Generation_Range_UInt64Range, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* uint64 min = 1; */
-        if (message.min !== "0")
+    internalBinaryWrite(message: Generation_Range_UInt64, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* optional uint64 min = 1; */
+        if (message.min !== undefined)
             writer.tag(1, WireType.Varint).uint64(message.min);
         /* uint64 max = 2; */
         if (message.max !== "0")
@@ -2044,17 +1997,16 @@ class Generation_Range_UInt64Range$Type extends MessageType<Generation_Range_UIn
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Generation.Range.UInt64Range
+ * @generated MessageType for protobuf message stroppy.Generation.Range.UInt64
  */
-export const Generation_Range_UInt64Range = new Generation_Range_UInt64Range$Type();
+export const Generation_Range_UInt64 = new Generation_Range_UInt64$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class Generation_Range_DecimalRange$Type extends MessageType<Generation_Range_DecimalRange> {
     constructor() {
         super("stroppy.Generation.Range.DecimalRange", [
-            { no: 1, name: "default", kind: "message", oneof: "type", T: () => Generation_Range_DecimalRange_Default },
-            { no: 2, name: "float", kind: "message", oneof: "type", T: () => Generation_Range_FloatRange },
-            { no: 3, name: "double", kind: "message", oneof: "type", T: () => Generation_Range_DoubleRange },
-            { no: 4, name: "string", kind: "message", oneof: "type", T: () => Generation_Range_AnyStringRange }
+            { no: 2, name: "float", kind: "message", oneof: "type", T: () => Generation_Range_Float },
+            { no: 3, name: "double", kind: "message", oneof: "type", T: () => Generation_Range_Double },
+            { no: 4, name: "string", kind: "message", oneof: "type", T: () => Generation_Range_AnyString }
         ]);
     }
     create(value?: PartialMessage<Generation_Range_DecimalRange>): Generation_Range_DecimalRange {
@@ -2069,28 +2021,22 @@ class Generation_Range_DecimalRange$Type extends MessageType<Generation_Range_De
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* stroppy.Generation.Range.DecimalRange.Default default */ 1:
-                    message.type = {
-                        oneofKind: "default",
-                        default: Generation_Range_DecimalRange_Default.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).default)
-                    };
-                    break;
-                case /* stroppy.Generation.Range.FloatRange float */ 2:
+                case /* stroppy.Generation.Range.Float float */ 2:
                     message.type = {
                         oneofKind: "float",
-                        float: Generation_Range_FloatRange.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).float)
+                        float: Generation_Range_Float.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).float)
                     };
                     break;
-                case /* stroppy.Generation.Range.DoubleRange double */ 3:
+                case /* stroppy.Generation.Range.Double double */ 3:
                     message.type = {
                         oneofKind: "double",
-                        double: Generation_Range_DoubleRange.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).double)
+                        double: Generation_Range_Double.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).double)
                     };
                     break;
-                case /* stroppy.Generation.Range.AnyStringRange string */ 4:
+                case /* stroppy.Generation.Range.AnyString string */ 4:
                     message.type = {
                         oneofKind: "string",
-                        string: Generation_Range_AnyStringRange.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).string)
+                        string: Generation_Range_AnyString.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).string)
                     };
                     break;
                 default:
@@ -2105,18 +2051,15 @@ class Generation_Range_DecimalRange$Type extends MessageType<Generation_Range_De
         return message;
     }
     internalBinaryWrite(message: Generation_Range_DecimalRange, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Generation.Range.DecimalRange.Default default = 1; */
-        if (message.type.oneofKind === "default")
-            Generation_Range_DecimalRange_Default.internalBinaryWrite(message.type.default, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Range.FloatRange float = 2; */
+        /* stroppy.Generation.Range.Float float = 2; */
         if (message.type.oneofKind === "float")
-            Generation_Range_FloatRange.internalBinaryWrite(message.type.float, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Range.DoubleRange double = 3; */
+            Generation_Range_Float.internalBinaryWrite(message.type.float, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.Double double = 3; */
         if (message.type.oneofKind === "double")
-            Generation_Range_DoubleRange.internalBinaryWrite(message.type.double, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Range.AnyStringRange string = 4; */
+            Generation_Range_Double.internalBinaryWrite(message.type.double, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.AnyString string = 4; */
         if (message.type.oneofKind === "string")
-            Generation_Range_AnyStringRange.internalBinaryWrite(message.type.string, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+            Generation_Range_AnyString.internalBinaryWrite(message.type.string, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -2128,102 +2071,42 @@ class Generation_Range_DecimalRange$Type extends MessageType<Generation_Range_De
  */
 export const Generation_Range_DecimalRange = new Generation_Range_DecimalRange$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_DecimalRange_Default$Type extends MessageType<Generation_Range_DecimalRange_Default> {
+class Generation_Range_DateTime$Type extends MessageType<Generation_Range_DateTime> {
     constructor() {
-        super("stroppy.Generation.Range.DecimalRange.Default", [
-            { no: 1, name: "min", kind: "message", T: () => Decimal },
-            { no: 2, name: "max", kind: "message", T: () => Decimal }
+        super("stroppy.Generation.Range.DateTime", [
+            { no: 2, name: "string", kind: "message", oneof: "type", T: () => Generation_Range_AnyString },
+            { no: 3, name: "timestamp_pb", kind: "message", oneof: "type", T: () => Generation_Range_DateTime_TimestampPb },
+            { no: 4, name: "timestamp", kind: "message", oneof: "type", T: () => Generation_Range_DateTime_TimestampUnix }
         ]);
     }
-    create(value?: PartialMessage<Generation_Range_DecimalRange_Default>): Generation_Range_DecimalRange_Default {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Range_DecimalRange_Default>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_DecimalRange_Default): Generation_Range_DecimalRange_Default {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* stroppy.Decimal min */ 1:
-                    message.min = Decimal.internalBinaryRead(reader, reader.uint32(), options, message.min);
-                    break;
-                case /* stroppy.Decimal max */ 2:
-                    message.max = Decimal.internalBinaryRead(reader, reader.uint32(), options, message.max);
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Range_DecimalRange_Default, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Decimal min = 1; */
-        if (message.min)
-            Decimal.internalBinaryWrite(message.min, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Decimal max = 2; */
-        if (message.max)
-            Decimal.internalBinaryWrite(message.max, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Range.DecimalRange.Default
- */
-export const Generation_Range_DecimalRange_Default = new Generation_Range_DecimalRange_Default$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_DateTimeRange$Type extends MessageType<Generation_Range_DateTimeRange> {
-    constructor() {
-        super("stroppy.Generation.Range.DateTimeRange", [
-            { no: 1, name: "default", kind: "message", oneof: "type", T: () => Generation_Range_DateTimeRange_Default },
-            { no: 2, name: "string", kind: "message", oneof: "type", T: () => Generation_Range_AnyStringRange },
-            { no: 3, name: "timestamp_pb", kind: "message", oneof: "type", T: () => Generation_Range_DateTimeRange_TimestampPb },
-            { no: 4, name: "timestamp", kind: "message", oneof: "type", T: () => Generation_Range_DateTimeRange_Timestamp }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Range_DateTimeRange>): Generation_Range_DateTimeRange {
+    create(value?: PartialMessage<Generation_Range_DateTime>): Generation_Range_DateTime {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.type = { oneofKind: undefined };
         if (value !== undefined)
-            reflectionMergePartial<Generation_Range_DateTimeRange>(this, message, value);
+            reflectionMergePartial<Generation_Range_DateTime>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_DateTimeRange): Generation_Range_DateTimeRange {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_DateTime): Generation_Range_DateTime {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* stroppy.Generation.Range.DateTimeRange.Default default */ 1:
-                    message.type = {
-                        oneofKind: "default",
-                        default: Generation_Range_DateTimeRange_Default.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).default)
-                    };
-                    break;
-                case /* stroppy.Generation.Range.AnyStringRange string */ 2:
+                case /* stroppy.Generation.Range.AnyString string */ 2:
                     message.type = {
                         oneofKind: "string",
-                        string: Generation_Range_AnyStringRange.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).string)
+                        string: Generation_Range_AnyString.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).string)
                     };
                     break;
-                case /* stroppy.Generation.Range.DateTimeRange.TimestampPb timestamp_pb */ 3:
+                case /* stroppy.Generation.Range.DateTime.TimestampPb timestamp_pb */ 3:
                     message.type = {
                         oneofKind: "timestampPb",
-                        timestampPb: Generation_Range_DateTimeRange_TimestampPb.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).timestampPb)
+                        timestampPb: Generation_Range_DateTime_TimestampPb.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).timestampPb)
                     };
                     break;
-                case /* stroppy.Generation.Range.DateTimeRange.Timestamp timestamp */ 4:
+                case /* stroppy.Generation.Range.DateTime.TimestampUnix timestamp */ 4:
                     message.type = {
                         oneofKind: "timestamp",
-                        timestamp: Generation_Range_DateTimeRange_Timestamp.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).timestamp)
+                        timestamp: Generation_Range_DateTime_TimestampUnix.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).timestamp)
                     };
                     break;
                 default:
@@ -2237,19 +2120,16 @@ class Generation_Range_DateTimeRange$Type extends MessageType<Generation_Range_D
         }
         return message;
     }
-    internalBinaryWrite(message: Generation_Range_DateTimeRange, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Generation.Range.DateTimeRange.Default default = 1; */
-        if (message.type.oneofKind === "default")
-            Generation_Range_DateTimeRange_Default.internalBinaryWrite(message.type.default, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Range.AnyStringRange string = 2; */
+    internalBinaryWrite(message: Generation_Range_DateTime, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* stroppy.Generation.Range.AnyString string = 2; */
         if (message.type.oneofKind === "string")
-            Generation_Range_AnyStringRange.internalBinaryWrite(message.type.string, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Range.DateTimeRange.TimestampPb timestamp_pb = 3; */
+            Generation_Range_AnyString.internalBinaryWrite(message.type.string, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.DateTime.TimestampPb timestamp_pb = 3; */
         if (message.type.oneofKind === "timestampPb")
-            Generation_Range_DateTimeRange_TimestampPb.internalBinaryWrite(message.type.timestampPb, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Range.DateTimeRange.Timestamp timestamp = 4; */
+            Generation_Range_DateTime_TimestampPb.internalBinaryWrite(message.type.timestampPb, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.DateTime.TimestampUnix timestamp = 4; */
         if (message.type.oneofKind === "timestamp")
-            Generation_Range_DateTimeRange_Timestamp.internalBinaryWrite(message.type.timestamp, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+            Generation_Range_DateTime_TimestampUnix.internalBinaryWrite(message.type.timestamp, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -2257,77 +2137,24 @@ class Generation_Range_DateTimeRange$Type extends MessageType<Generation_Range_D
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Generation.Range.DateTimeRange
+ * @generated MessageType for protobuf message stroppy.Generation.Range.DateTime
  */
-export const Generation_Range_DateTimeRange = new Generation_Range_DateTimeRange$Type();
+export const Generation_Range_DateTime = new Generation_Range_DateTime$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_DateTimeRange_Default$Type extends MessageType<Generation_Range_DateTimeRange_Default> {
+class Generation_Range_DateTime_TimestampPb$Type extends MessageType<Generation_Range_DateTime_TimestampPb> {
     constructor() {
-        super("stroppy.Generation.Range.DateTimeRange.Default", [
-            { no: 1, name: "min", kind: "message", T: () => DateTime },
-            { no: 2, name: "max", kind: "message", T: () => DateTime }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Range_DateTimeRange_Default>): Generation_Range_DateTimeRange_Default {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Range_DateTimeRange_Default>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_DateTimeRange_Default): Generation_Range_DateTimeRange_Default {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* stroppy.DateTime min */ 1:
-                    message.min = DateTime.internalBinaryRead(reader, reader.uint32(), options, message.min);
-                    break;
-                case /* stroppy.DateTime max */ 2:
-                    message.max = DateTime.internalBinaryRead(reader, reader.uint32(), options, message.max);
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Range_DateTimeRange_Default, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.DateTime min = 1; */
-        if (message.min)
-            DateTime.internalBinaryWrite(message.min, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.DateTime max = 2; */
-        if (message.max)
-            DateTime.internalBinaryWrite(message.max, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Range.DateTimeRange.Default
- */
-export const Generation_Range_DateTimeRange_Default = new Generation_Range_DateTimeRange_Default$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_DateTimeRange_TimestampPb$Type extends MessageType<Generation_Range_DateTimeRange_TimestampPb> {
-    constructor() {
-        super("stroppy.Generation.Range.DateTimeRange.TimestampPb", [
+        super("stroppy.Generation.Range.DateTime.TimestampPb", [
             { no: 1, name: "min", kind: "message", T: () => Timestamp },
             { no: 2, name: "max", kind: "message", T: () => Timestamp }
         ]);
     }
-    create(value?: PartialMessage<Generation_Range_DateTimeRange_TimestampPb>): Generation_Range_DateTimeRange_TimestampPb {
+    create(value?: PartialMessage<Generation_Range_DateTime_TimestampPb>): Generation_Range_DateTime_TimestampPb {
         const message = globalThis.Object.create((this.messagePrototype!));
         if (value !== undefined)
-            reflectionMergePartial<Generation_Range_DateTimeRange_TimestampPb>(this, message, value);
+            reflectionMergePartial<Generation_Range_DateTime_TimestampPb>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_DateTimeRange_TimestampPb): Generation_Range_DateTimeRange_TimestampPb {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_DateTime_TimestampPb): Generation_Range_DateTime_TimestampPb {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
@@ -2349,7 +2176,7 @@ class Generation_Range_DateTimeRange_TimestampPb$Type extends MessageType<Genera
         }
         return message;
     }
-    internalBinaryWrite(message: Generation_Range_DateTimeRange_TimestampPb, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+    internalBinaryWrite(message: Generation_Range_DateTime_TimestampPb, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
         /* google.protobuf.Timestamp min = 1; */
         if (message.min)
             Timestamp.internalBinaryWrite(message.min, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
@@ -2363,26 +2190,26 @@ class Generation_Range_DateTimeRange_TimestampPb$Type extends MessageType<Genera
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Generation.Range.DateTimeRange.TimestampPb
+ * @generated MessageType for protobuf message stroppy.Generation.Range.DateTime.TimestampPb
  */
-export const Generation_Range_DateTimeRange_TimestampPb = new Generation_Range_DateTimeRange_TimestampPb$Type();
+export const Generation_Range_DateTime_TimestampPb = new Generation_Range_DateTime_TimestampPb$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class Generation_Range_DateTimeRange_Timestamp$Type extends MessageType<Generation_Range_DateTimeRange_Timestamp> {
+class Generation_Range_DateTime_TimestampUnix$Type extends MessageType<Generation_Range_DateTime_TimestampUnix> {
     constructor() {
-        super("stroppy.Generation.Range.DateTimeRange.Timestamp", [
+        super("stroppy.Generation.Range.DateTime.TimestampUnix", [
             { no: 1, name: "min", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
             { no: 2, name: "max", kind: "scalar", T: 13 /*ScalarType.UINT32*/ }
         ]);
     }
-    create(value?: PartialMessage<Generation_Range_DateTimeRange_Timestamp>): Generation_Range_DateTimeRange_Timestamp {
+    create(value?: PartialMessage<Generation_Range_DateTime_TimestampUnix>): Generation_Range_DateTime_TimestampUnix {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.min = 0;
         message.max = 0;
         if (value !== undefined)
-            reflectionMergePartial<Generation_Range_DateTimeRange_Timestamp>(this, message, value);
+            reflectionMergePartial<Generation_Range_DateTime_TimestampUnix>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_DateTimeRange_Timestamp): Generation_Range_DateTimeRange_Timestamp {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Range_DateTime_TimestampUnix): Generation_Range_DateTime_TimestampUnix {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
@@ -2404,7 +2231,7 @@ class Generation_Range_DateTimeRange_Timestamp$Type extends MessageType<Generati
         }
         return message;
     }
-    internalBinaryWrite(message: Generation_Range_DateTimeRange_Timestamp, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+    internalBinaryWrite(message: Generation_Range_DateTime_TimestampUnix, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
         /* uint32 min = 1; */
         if (message.min !== 0)
             writer.tag(1, WireType.Varint).uint32(message.min);
@@ -2418,646 +2245,41 @@ class Generation_Range_DateTimeRange_Timestamp$Type extends MessageType<Generati
     }
 }
 /**
- * @generated MessageType for protobuf message stroppy.Generation.Range.DateTimeRange.Timestamp
+ * @generated MessageType for protobuf message stroppy.Generation.Range.DateTime.TimestampUnix
  */
-export const Generation_Range_DateTimeRange_Timestamp = new Generation_Range_DateTimeRange_Timestamp$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules$Type extends MessageType<Generation_Rules> {
-    constructor() {
-        super("stroppy.Generation.Rules", []);
-    }
-    create(value?: PartialMessage<Generation_Rules>): Generation_Rules {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules): Generation_Rules {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules
- */
-export const Generation_Rules = new Generation_Rules$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules_FloatRule$Type extends MessageType<Generation_Rules_FloatRule> {
-    constructor() {
-        super("stroppy.Generation.Rules.FloatRule", [
-            { no: 1, name: "range", kind: "message", T: () => Generation_Range_FloatRange },
-            { no: 2, name: "constant", kind: "scalar", opt: true, T: 2 /*ScalarType.FLOAT*/ }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Rules_FloatRule>): Generation_Rules_FloatRule {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules_FloatRule>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules_FloatRule): Generation_Rules_FloatRule {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* stroppy.Generation.Range.FloatRange range */ 1:
-                    message.range = Generation_Range_FloatRange.internalBinaryRead(reader, reader.uint32(), options, message.range);
-                    break;
-                case /* optional float constant */ 2:
-                    message.constant = reader.float();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules_FloatRule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Generation.Range.FloatRange range = 1; */
-        if (message.range)
-            Generation_Range_FloatRange.internalBinaryWrite(message.range, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* optional float constant = 2; */
-        if (message.constant !== undefined)
-            writer.tag(2, WireType.Bit32).float(message.constant);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules.FloatRule
- */
-export const Generation_Rules_FloatRule = new Generation_Rules_FloatRule$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules_DoubleRule$Type extends MessageType<Generation_Rules_DoubleRule> {
-    constructor() {
-        super("stroppy.Generation.Rules.DoubleRule", [
-            { no: 1, name: "range", kind: "message", T: () => Generation_Range_DoubleRange },
-            { no: 2, name: "constant", kind: "scalar", opt: true, T: 1 /*ScalarType.DOUBLE*/ }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Rules_DoubleRule>): Generation_Rules_DoubleRule {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules_DoubleRule>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules_DoubleRule): Generation_Rules_DoubleRule {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* stroppy.Generation.Range.DoubleRange range */ 1:
-                    message.range = Generation_Range_DoubleRange.internalBinaryRead(reader, reader.uint32(), options, message.range);
-                    break;
-                case /* optional double constant */ 2:
-                    message.constant = reader.double();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules_DoubleRule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Generation.Range.DoubleRange range = 1; */
-        if (message.range)
-            Generation_Range_DoubleRange.internalBinaryWrite(message.range, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* optional double constant = 2; */
-        if (message.constant !== undefined)
-            writer.tag(2, WireType.Bit64).double(message.constant);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules.DoubleRule
- */
-export const Generation_Rules_DoubleRule = new Generation_Rules_DoubleRule$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules_Int32Rule$Type extends MessageType<Generation_Rules_Int32Rule> {
-    constructor() {
-        super("stroppy.Generation.Rules.Int32Rule", [
-            { no: 1, name: "range", kind: "message", T: () => Generation_Range_Int32Range },
-            { no: 2, name: "constant", kind: "scalar", opt: true, T: 5 /*ScalarType.INT32*/ }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Rules_Int32Rule>): Generation_Rules_Int32Rule {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules_Int32Rule>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules_Int32Rule): Generation_Rules_Int32Rule {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* stroppy.Generation.Range.Int32Range range */ 1:
-                    message.range = Generation_Range_Int32Range.internalBinaryRead(reader, reader.uint32(), options, message.range);
-                    break;
-                case /* optional int32 constant */ 2:
-                    message.constant = reader.int32();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules_Int32Rule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Generation.Range.Int32Range range = 1; */
-        if (message.range)
-            Generation_Range_Int32Range.internalBinaryWrite(message.range, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* optional int32 constant = 2; */
-        if (message.constant !== undefined)
-            writer.tag(2, WireType.Varint).int32(message.constant);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules.Int32Rule
- */
-export const Generation_Rules_Int32Rule = new Generation_Rules_Int32Rule$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules_Int64Rule$Type extends MessageType<Generation_Rules_Int64Rule> {
-    constructor() {
-        super("stroppy.Generation.Rules.Int64Rule", [
-            { no: 1, name: "range", kind: "message", T: () => Generation_Range_Int64Range },
-            { no: 2, name: "constant", kind: "scalar", opt: true, T: 3 /*ScalarType.INT64*/ }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Rules_Int64Rule>): Generation_Rules_Int64Rule {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules_Int64Rule>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules_Int64Rule): Generation_Rules_Int64Rule {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* stroppy.Generation.Range.Int64Range range */ 1:
-                    message.range = Generation_Range_Int64Range.internalBinaryRead(reader, reader.uint32(), options, message.range);
-                    break;
-                case /* optional int64 constant */ 2:
-                    message.constant = reader.int64().toString();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules_Int64Rule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Generation.Range.Int64Range range = 1; */
-        if (message.range)
-            Generation_Range_Int64Range.internalBinaryWrite(message.range, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* optional int64 constant = 2; */
-        if (message.constant !== undefined)
-            writer.tag(2, WireType.Varint).int64(message.constant);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules.Int64Rule
- */
-export const Generation_Rules_Int64Rule = new Generation_Rules_Int64Rule$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules_UInt32Rule$Type extends MessageType<Generation_Rules_UInt32Rule> {
-    constructor() {
-        super("stroppy.Generation.Rules.UInt32Rule", [
-            { no: 1, name: "range", kind: "message", T: () => Generation_Range_UInt32Range },
-            { no: 2, name: "constant", kind: "scalar", opt: true, T: 13 /*ScalarType.UINT32*/ }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Rules_UInt32Rule>): Generation_Rules_UInt32Rule {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules_UInt32Rule>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules_UInt32Rule): Generation_Rules_UInt32Rule {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* stroppy.Generation.Range.UInt32Range range */ 1:
-                    message.range = Generation_Range_UInt32Range.internalBinaryRead(reader, reader.uint32(), options, message.range);
-                    break;
-                case /* optional uint32 constant */ 2:
-                    message.constant = reader.uint32();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules_UInt32Rule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Generation.Range.UInt32Range range = 1; */
-        if (message.range)
-            Generation_Range_UInt32Range.internalBinaryWrite(message.range, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* optional uint32 constant = 2; */
-        if (message.constant !== undefined)
-            writer.tag(2, WireType.Varint).uint32(message.constant);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules.UInt32Rule
- */
-export const Generation_Rules_UInt32Rule = new Generation_Rules_UInt32Rule$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules_UInt64Rule$Type extends MessageType<Generation_Rules_UInt64Rule> {
-    constructor() {
-        super("stroppy.Generation.Rules.UInt64Rule", [
-            { no: 1, name: "range", kind: "message", T: () => Generation_Range_UInt64Range },
-            { no: 2, name: "constant", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/ }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Rules_UInt64Rule>): Generation_Rules_UInt64Rule {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules_UInt64Rule>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules_UInt64Rule): Generation_Rules_UInt64Rule {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* stroppy.Generation.Range.UInt64Range range */ 1:
-                    message.range = Generation_Range_UInt64Range.internalBinaryRead(reader, reader.uint32(), options, message.range);
-                    break;
-                case /* optional uint64 constant */ 2:
-                    message.constant = reader.uint64().toString();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules_UInt64Rule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Generation.Range.UInt64Range range = 1; */
-        if (message.range)
-            Generation_Range_UInt64Range.internalBinaryWrite(message.range, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* optional uint64 constant = 2; */
-        if (message.constant !== undefined)
-            writer.tag(2, WireType.Varint).uint64(message.constant);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules.UInt64Rule
- */
-export const Generation_Rules_UInt64Rule = new Generation_Rules_UInt64Rule$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules_BoolRule$Type extends MessageType<Generation_Rules_BoolRule> {
-    constructor() {
-        super("stroppy.Generation.Rules.BoolRule", [
-            { no: 1, name: "constant", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Rules_BoolRule>): Generation_Rules_BoolRule {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules_BoolRule>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules_BoolRule): Generation_Rules_BoolRule {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* optional bool constant */ 1:
-                    message.constant = reader.bool();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules_BoolRule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* optional bool constant = 1; */
-        if (message.constant !== undefined)
-            writer.tag(1, WireType.Varint).bool(message.constant);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules.BoolRule
- */
-export const Generation_Rules_BoolRule = new Generation_Rules_BoolRule$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules_StringRule$Type extends MessageType<Generation_Rules_StringRule> {
-    constructor() {
-        super("stroppy.Generation.Rules.StringRule", [
-            { no: 1, name: "alphabet", kind: "message", T: () => Generation_Alphabet },
-            { no: 2, name: "len_range", kind: "message", T: () => Generation_Range_UInt64Range },
-            { no: 3, name: "constant", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Rules_StringRule>): Generation_Rules_StringRule {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules_StringRule>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules_StringRule): Generation_Rules_StringRule {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* optional stroppy.Generation.Alphabet alphabet */ 1:
-                    message.alphabet = Generation_Alphabet.internalBinaryRead(reader, reader.uint32(), options, message.alphabet);
-                    break;
-                case /* stroppy.Generation.Range.UInt64Range len_range */ 2:
-                    message.lenRange = Generation_Range_UInt64Range.internalBinaryRead(reader, reader.uint32(), options, message.lenRange);
-                    break;
-                case /* optional string constant */ 3:
-                    message.constant = reader.string();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules_StringRule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* optional stroppy.Generation.Alphabet alphabet = 1; */
-        if (message.alphabet)
-            Generation_Alphabet.internalBinaryWrite(message.alphabet, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Range.UInt64Range len_range = 2; */
-        if (message.lenRange)
-            Generation_Range_UInt64Range.internalBinaryWrite(message.lenRange, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        /* optional string constant = 3; */
-        if (message.constant !== undefined)
-            writer.tag(3, WireType.LengthDelimited).string(message.constant);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules.StringRule
- */
-export const Generation_Rules_StringRule = new Generation_Rules_StringRule$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules_DateTimeRule$Type extends MessageType<Generation_Rules_DateTimeRule> {
-    constructor() {
-        super("stroppy.Generation.Rules.DateTimeRule", [
-            { no: 1, name: "range", kind: "message", T: () => Generation_Range_DateTimeRange },
-            { no: 2, name: "constant", kind: "message", T: () => DateTime }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Rules_DateTimeRule>): Generation_Rules_DateTimeRule {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules_DateTimeRule>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules_DateTimeRule): Generation_Rules_DateTimeRule {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* stroppy.Generation.Range.DateTimeRange range */ 1:
-                    message.range = Generation_Range_DateTimeRange.internalBinaryRead(reader, reader.uint32(), options, message.range);
-                    break;
-                case /* optional stroppy.DateTime constant */ 2:
-                    message.constant = DateTime.internalBinaryRead(reader, reader.uint32(), options, message.constant);
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules_DateTimeRule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Generation.Range.DateTimeRange range = 1; */
-        if (message.range)
-            Generation_Range_DateTimeRange.internalBinaryWrite(message.range, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* optional stroppy.DateTime constant = 2; */
-        if (message.constant)
-            DateTime.internalBinaryWrite(message.constant, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules.DateTimeRule
- */
-export const Generation_Rules_DateTimeRule = new Generation_Rules_DateTimeRule$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules_UuidRule$Type extends MessageType<Generation_Rules_UuidRule> {
-    constructor() {
-        super("stroppy.Generation.Rules.UuidRule", [
-            { no: 1, name: "constant", kind: "message", T: () => Uuid }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Rules_UuidRule>): Generation_Rules_UuidRule {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules_UuidRule>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules_UuidRule): Generation_Rules_UuidRule {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* optional stroppy.Uuid constant */ 1:
-                    message.constant = Uuid.internalBinaryRead(reader, reader.uint32(), options, message.constant);
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules_UuidRule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* optional stroppy.Uuid constant = 1; */
-        if (message.constant)
-            Uuid.internalBinaryWrite(message.constant, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules.UuidRule
- */
-export const Generation_Rules_UuidRule = new Generation_Rules_UuidRule$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class Generation_Rules_DecimalRule$Type extends MessageType<Generation_Rules_DecimalRule> {
-    constructor() {
-        super("stroppy.Generation.Rules.DecimalRule", [
-            { no: 1, name: "range", kind: "message", T: () => Generation_Range_DecimalRange },
-            { no: 2, name: "constant", kind: "message", T: () => Decimal }
-        ]);
-    }
-    create(value?: PartialMessage<Generation_Rules_DecimalRule>): Generation_Rules_DecimalRule {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        if (value !== undefined)
-            reflectionMergePartial<Generation_Rules_DecimalRule>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_Rules_DecimalRule): Generation_Rules_DecimalRule {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* stroppy.Generation.Range.DecimalRange range */ 1:
-                    message.range = Generation_Range_DecimalRange.internalBinaryRead(reader, reader.uint32(), options, message.range);
-                    break;
-                case /* optional stroppy.Decimal constant */ 2:
-                    message.constant = Decimal.internalBinaryRead(reader, reader.uint32(), options, message.constant);
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: Generation_Rules_DecimalRule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Generation.Range.DecimalRange range = 1; */
-        if (message.range)
-            Generation_Range_DecimalRange.internalBinaryWrite(message.range, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* optional stroppy.Decimal constant = 2; */
-        if (message.constant)
-            Decimal.internalBinaryWrite(message.constant, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message stroppy.Generation.Rules.DecimalRule
- */
-export const Generation_Rules_DecimalRule = new Generation_Rules_DecimalRule$Type();
+export const Generation_Range_DateTime_TimestampUnix = new Generation_Range_DateTime_TimestampUnix$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class Generation_Rule$Type extends MessageType<Generation_Rule> {
     constructor() {
         super("stroppy.Generation.Rule", [
-            { no: 1, name: "float_rules", kind: "message", oneof: "type", T: () => Generation_Rules_FloatRule },
-            { no: 2, name: "double_rules", kind: "message", oneof: "type", T: () => Generation_Rules_DoubleRule },
-            { no: 3, name: "int32_rules", kind: "message", oneof: "type", T: () => Generation_Rules_Int32Rule },
-            { no: 4, name: "int64_rules", kind: "message", oneof: "type", T: () => Generation_Rules_Int64Rule },
-            { no: 5, name: "uint32_rules", kind: "message", oneof: "type", T: () => Generation_Rules_UInt32Rule },
-            { no: 6, name: "uint64_rules", kind: "message", oneof: "type", T: () => Generation_Rules_UInt64Rule },
-            { no: 13, name: "bool_rules", kind: "message", oneof: "type", T: () => Generation_Rules_BoolRule },
-            { no: 14, name: "string_rules", kind: "message", oneof: "type", T: () => Generation_Rules_StringRule },
-            { no: 101, name: "datetime_rules", kind: "message", oneof: "type", T: () => Generation_Rules_DateTimeRule },
-            { no: 102, name: "uuid_rules", kind: "message", oneof: "type", T: () => Generation_Rules_UuidRule },
-            { no: 103, name: "decimal_rules", kind: "message", oneof: "type", T: () => Generation_Rules_DecimalRule },
-            { no: 1000, name: "distribution", kind: "message", T: () => Generation_Distribution },
-            { no: 1001, name: "null_percentage", kind: "scalar", opt: true, T: 13 /*ScalarType.UINT32*/ },
-            { no: 1002, name: "unique", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ }
+            { no: 1, name: "int32_range", kind: "message", oneof: "kind", T: () => Generation_Range_Int32 },
+            { no: 2, name: "int64_range", kind: "message", oneof: "kind", T: () => Generation_Range_Int64 },
+            { no: 3, name: "uint32_range", kind: "message", oneof: "kind", T: () => Generation_Range_UInt32 },
+            { no: 4, name: "uint64_range", kind: "message", oneof: "kind", T: () => Generation_Range_UInt64 },
+            { no: 5, name: "float_range", kind: "message", oneof: "kind", T: () => Generation_Range_Float },
+            { no: 6, name: "double_range", kind: "message", oneof: "kind", T: () => Generation_Range_Double },
+            { no: 7, name: "decimal_range", kind: "message", oneof: "kind", T: () => Generation_Range_DecimalRange },
+            { no: 8, name: "string_range", kind: "message", oneof: "kind", T: () => Generation_Range_String },
+            { no: 9, name: "bool_range", kind: "message", oneof: "kind", T: () => Generation_Range_Bool },
+            { no: 10, name: "datetime_range", kind: "message", oneof: "kind", T: () => Generation_Range_DateTime },
+            { no: 11, name: "int32_const", kind: "scalar", oneof: "kind", T: 5 /*ScalarType.INT32*/ },
+            { no: 12, name: "int64_const", kind: "scalar", oneof: "kind", T: 3 /*ScalarType.INT64*/ },
+            { no: 13, name: "uint32_const", kind: "scalar", oneof: "kind", T: 13 /*ScalarType.UINT32*/ },
+            { no: 14, name: "uint64_const", kind: "scalar", oneof: "kind", T: 4 /*ScalarType.UINT64*/ },
+            { no: 15, name: "float_const", kind: "scalar", oneof: "kind", T: 2 /*ScalarType.FLOAT*/ },
+            { no: 16, name: "double_const", kind: "scalar", oneof: "kind", T: 1 /*ScalarType.DOUBLE*/ },
+            { no: 17, name: "decimal_const", kind: "message", oneof: "kind", T: () => Decimal },
+            { no: 18, name: "string_const", kind: "scalar", oneof: "kind", T: 9 /*ScalarType.STRING*/ },
+            { no: 19, name: "bool_const", kind: "scalar", oneof: "kind", T: 8 /*ScalarType.BOOL*/ },
+            { no: 20, name: "datetime_const", kind: "message", oneof: "kind", T: () => DateTime },
+            { no: 30, name: "distribution", kind: "message", T: () => Generation_Distribution },
+            { no: 31, name: "null_percentage", kind: "scalar", opt: true, T: 13 /*ScalarType.UINT32*/ },
+            { no: 32, name: "unique", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ }
         ]);
     }
     create(value?: PartialMessage<Generation_Rule>): Generation_Rule {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.type = { oneofKind: undefined };
+        message.kind = { oneofKind: undefined };
         if (value !== undefined)
             reflectionMergePartial<Generation_Rule>(this, message, value);
         return message;
@@ -3067,79 +2289,133 @@ class Generation_Rule$Type extends MessageType<Generation_Rule> {
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* stroppy.Generation.Rules.FloatRule float_rules */ 1:
-                    message.type = {
-                        oneofKind: "floatRules",
-                        floatRules: Generation_Rules_FloatRule.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).floatRules)
+                case /* stroppy.Generation.Range.Int32 int32_range */ 1:
+                    message.kind = {
+                        oneofKind: "int32Range",
+                        int32Range: Generation_Range_Int32.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).int32Range)
                     };
                     break;
-                case /* stroppy.Generation.Rules.DoubleRule double_rules */ 2:
-                    message.type = {
-                        oneofKind: "doubleRules",
-                        doubleRules: Generation_Rules_DoubleRule.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).doubleRules)
+                case /* stroppy.Generation.Range.Int64 int64_range */ 2:
+                    message.kind = {
+                        oneofKind: "int64Range",
+                        int64Range: Generation_Range_Int64.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).int64Range)
                     };
                     break;
-                case /* stroppy.Generation.Rules.Int32Rule int32_rules */ 3:
-                    message.type = {
-                        oneofKind: "int32Rules",
-                        int32Rules: Generation_Rules_Int32Rule.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).int32Rules)
+                case /* stroppy.Generation.Range.UInt32 uint32_range */ 3:
+                    message.kind = {
+                        oneofKind: "uint32Range",
+                        uint32Range: Generation_Range_UInt32.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).uint32Range)
                     };
                     break;
-                case /* stroppy.Generation.Rules.Int64Rule int64_rules */ 4:
-                    message.type = {
-                        oneofKind: "int64Rules",
-                        int64Rules: Generation_Rules_Int64Rule.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).int64Rules)
+                case /* stroppy.Generation.Range.UInt64 uint64_range */ 4:
+                    message.kind = {
+                        oneofKind: "uint64Range",
+                        uint64Range: Generation_Range_UInt64.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).uint64Range)
                     };
                     break;
-                case /* stroppy.Generation.Rules.UInt32Rule uint32_rules */ 5:
-                    message.type = {
-                        oneofKind: "uint32Rules",
-                        uint32Rules: Generation_Rules_UInt32Rule.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).uint32Rules)
+                case /* stroppy.Generation.Range.Float float_range */ 5:
+                    message.kind = {
+                        oneofKind: "floatRange",
+                        floatRange: Generation_Range_Float.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).floatRange)
                     };
                     break;
-                case /* stroppy.Generation.Rules.UInt64Rule uint64_rules */ 6:
-                    message.type = {
-                        oneofKind: "uint64Rules",
-                        uint64Rules: Generation_Rules_UInt64Rule.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).uint64Rules)
+                case /* stroppy.Generation.Range.Double double_range */ 6:
+                    message.kind = {
+                        oneofKind: "doubleRange",
+                        doubleRange: Generation_Range_Double.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).doubleRange)
                     };
                     break;
-                case /* stroppy.Generation.Rules.BoolRule bool_rules */ 13:
-                    message.type = {
-                        oneofKind: "boolRules",
-                        boolRules: Generation_Rules_BoolRule.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).boolRules)
+                case /* stroppy.Generation.Range.DecimalRange decimal_range */ 7:
+                    message.kind = {
+                        oneofKind: "decimalRange",
+                        decimalRange: Generation_Range_DecimalRange.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).decimalRange)
                     };
                     break;
-                case /* stroppy.Generation.Rules.StringRule string_rules */ 14:
-                    message.type = {
-                        oneofKind: "stringRules",
-                        stringRules: Generation_Rules_StringRule.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).stringRules)
+                case /* stroppy.Generation.Range.String string_range */ 8:
+                    message.kind = {
+                        oneofKind: "stringRange",
+                        stringRange: Generation_Range_String.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).stringRange)
                     };
                     break;
-                case /* stroppy.Generation.Rules.DateTimeRule datetime_rules */ 101:
-                    message.type = {
-                        oneofKind: "datetimeRules",
-                        datetimeRules: Generation_Rules_DateTimeRule.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).datetimeRules)
+                case /* stroppy.Generation.Range.Bool bool_range */ 9:
+                    message.kind = {
+                        oneofKind: "boolRange",
+                        boolRange: Generation_Range_Bool.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).boolRange)
                     };
                     break;
-                case /* stroppy.Generation.Rules.UuidRule uuid_rules */ 102:
-                    message.type = {
-                        oneofKind: "uuidRules",
-                        uuidRules: Generation_Rules_UuidRule.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).uuidRules)
+                case /* stroppy.Generation.Range.DateTime datetime_range */ 10:
+                    message.kind = {
+                        oneofKind: "datetimeRange",
+                        datetimeRange: Generation_Range_DateTime.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).datetimeRange)
                     };
                     break;
-                case /* stroppy.Generation.Rules.DecimalRule decimal_rules */ 103:
-                    message.type = {
-                        oneofKind: "decimalRules",
-                        decimalRules: Generation_Rules_DecimalRule.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).decimalRules)
+                case /* int32 int32_const */ 11:
+                    message.kind = {
+                        oneofKind: "int32Const",
+                        int32Const: reader.int32()
                     };
                     break;
-                case /* optional stroppy.Generation.Distribution distribution */ 1000:
+                case /* int64 int64_const */ 12:
+                    message.kind = {
+                        oneofKind: "int64Const",
+                        int64Const: reader.int64().toString()
+                    };
+                    break;
+                case /* uint32 uint32_const */ 13:
+                    message.kind = {
+                        oneofKind: "uint32Const",
+                        uint32Const: reader.uint32()
+                    };
+                    break;
+                case /* uint64 uint64_const */ 14:
+                    message.kind = {
+                        oneofKind: "uint64Const",
+                        uint64Const: reader.uint64().toString()
+                    };
+                    break;
+                case /* float float_const */ 15:
+                    message.kind = {
+                        oneofKind: "floatConst",
+                        floatConst: reader.float()
+                    };
+                    break;
+                case /* double double_const */ 16:
+                    message.kind = {
+                        oneofKind: "doubleConst",
+                        doubleConst: reader.double()
+                    };
+                    break;
+                case /* stroppy.Decimal decimal_const */ 17:
+                    message.kind = {
+                        oneofKind: "decimalConst",
+                        decimalConst: Decimal.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).decimalConst)
+                    };
+                    break;
+                case /* string string_const */ 18:
+                    message.kind = {
+                        oneofKind: "stringConst",
+                        stringConst: reader.string()
+                    };
+                    break;
+                case /* bool bool_const */ 19:
+                    message.kind = {
+                        oneofKind: "boolConst",
+                        boolConst: reader.bool()
+                    };
+                    break;
+                case /* stroppy.DateTime datetime_const */ 20:
+                    message.kind = {
+                        oneofKind: "datetimeConst",
+                        datetimeConst: DateTime.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).datetimeConst)
+                    };
+                    break;
+                case /* optional stroppy.Generation.Distribution distribution */ 30:
                     message.distribution = Generation_Distribution.internalBinaryRead(reader, reader.uint32(), options, message.distribution);
                     break;
-                case /* optional uint32 null_percentage */ 1001:
+                case /* optional uint32 null_percentage */ 31:
                     message.nullPercentage = reader.uint32();
                     break;
-                case /* optional bool unique */ 1002:
+                case /* optional bool unique */ 32:
                     message.unique = reader.bool();
                     break;
                 default:
@@ -3154,48 +2430,75 @@ class Generation_Rule$Type extends MessageType<Generation_Rule> {
         return message;
     }
     internalBinaryWrite(message: Generation_Rule, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* stroppy.Generation.Rules.FloatRule float_rules = 1; */
-        if (message.type.oneofKind === "floatRules")
-            Generation_Rules_FloatRule.internalBinaryWrite(message.type.floatRules, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Rules.DoubleRule double_rules = 2; */
-        if (message.type.oneofKind === "doubleRules")
-            Generation_Rules_DoubleRule.internalBinaryWrite(message.type.doubleRules, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Rules.Int32Rule int32_rules = 3; */
-        if (message.type.oneofKind === "int32Rules")
-            Generation_Rules_Int32Rule.internalBinaryWrite(message.type.int32Rules, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Rules.Int64Rule int64_rules = 4; */
-        if (message.type.oneofKind === "int64Rules")
-            Generation_Rules_Int64Rule.internalBinaryWrite(message.type.int64Rules, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Rules.UInt32Rule uint32_rules = 5; */
-        if (message.type.oneofKind === "uint32Rules")
-            Generation_Rules_UInt32Rule.internalBinaryWrite(message.type.uint32Rules, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Rules.UInt64Rule uint64_rules = 6; */
-        if (message.type.oneofKind === "uint64Rules")
-            Generation_Rules_UInt64Rule.internalBinaryWrite(message.type.uint64Rules, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Rules.BoolRule bool_rules = 13; */
-        if (message.type.oneofKind === "boolRules")
-            Generation_Rules_BoolRule.internalBinaryWrite(message.type.boolRules, writer.tag(13, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Rules.StringRule string_rules = 14; */
-        if (message.type.oneofKind === "stringRules")
-            Generation_Rules_StringRule.internalBinaryWrite(message.type.stringRules, writer.tag(14, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Rules.DateTimeRule datetime_rules = 101; */
-        if (message.type.oneofKind === "datetimeRules")
-            Generation_Rules_DateTimeRule.internalBinaryWrite(message.type.datetimeRules, writer.tag(101, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Rules.UuidRule uuid_rules = 102; */
-        if (message.type.oneofKind === "uuidRules")
-            Generation_Rules_UuidRule.internalBinaryWrite(message.type.uuidRules, writer.tag(102, WireType.LengthDelimited).fork(), options).join();
-        /* stroppy.Generation.Rules.DecimalRule decimal_rules = 103; */
-        if (message.type.oneofKind === "decimalRules")
-            Generation_Rules_DecimalRule.internalBinaryWrite(message.type.decimalRules, writer.tag(103, WireType.LengthDelimited).fork(), options).join();
-        /* optional stroppy.Generation.Distribution distribution = 1000; */
+        /* stroppy.Generation.Range.Int32 int32_range = 1; */
+        if (message.kind.oneofKind === "int32Range")
+            Generation_Range_Int32.internalBinaryWrite(message.kind.int32Range, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.Int64 int64_range = 2; */
+        if (message.kind.oneofKind === "int64Range")
+            Generation_Range_Int64.internalBinaryWrite(message.kind.int64Range, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.UInt32 uint32_range = 3; */
+        if (message.kind.oneofKind === "uint32Range")
+            Generation_Range_UInt32.internalBinaryWrite(message.kind.uint32Range, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.UInt64 uint64_range = 4; */
+        if (message.kind.oneofKind === "uint64Range")
+            Generation_Range_UInt64.internalBinaryWrite(message.kind.uint64Range, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.Float float_range = 5; */
+        if (message.kind.oneofKind === "floatRange")
+            Generation_Range_Float.internalBinaryWrite(message.kind.floatRange, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.Double double_range = 6; */
+        if (message.kind.oneofKind === "doubleRange")
+            Generation_Range_Double.internalBinaryWrite(message.kind.doubleRange, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.DecimalRange decimal_range = 7; */
+        if (message.kind.oneofKind === "decimalRange")
+            Generation_Range_DecimalRange.internalBinaryWrite(message.kind.decimalRange, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.String string_range = 8; */
+        if (message.kind.oneofKind === "stringRange")
+            Generation_Range_String.internalBinaryWrite(message.kind.stringRange, writer.tag(8, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.Bool bool_range = 9; */
+        if (message.kind.oneofKind === "boolRange")
+            Generation_Range_Bool.internalBinaryWrite(message.kind.boolRange, writer.tag(9, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.Range.DateTime datetime_range = 10; */
+        if (message.kind.oneofKind === "datetimeRange")
+            Generation_Range_DateTime.internalBinaryWrite(message.kind.datetimeRange, writer.tag(10, WireType.LengthDelimited).fork(), options).join();
+        /* int32 int32_const = 11; */
+        if (message.kind.oneofKind === "int32Const")
+            writer.tag(11, WireType.Varint).int32(message.kind.int32Const);
+        /* int64 int64_const = 12; */
+        if (message.kind.oneofKind === "int64Const")
+            writer.tag(12, WireType.Varint).int64(message.kind.int64Const);
+        /* uint32 uint32_const = 13; */
+        if (message.kind.oneofKind === "uint32Const")
+            writer.tag(13, WireType.Varint).uint32(message.kind.uint32Const);
+        /* uint64 uint64_const = 14; */
+        if (message.kind.oneofKind === "uint64Const")
+            writer.tag(14, WireType.Varint).uint64(message.kind.uint64Const);
+        /* float float_const = 15; */
+        if (message.kind.oneofKind === "floatConst")
+            writer.tag(15, WireType.Bit32).float(message.kind.floatConst);
+        /* double double_const = 16; */
+        if (message.kind.oneofKind === "doubleConst")
+            writer.tag(16, WireType.Bit64).double(message.kind.doubleConst);
+        /* stroppy.Decimal decimal_const = 17; */
+        if (message.kind.oneofKind === "decimalConst")
+            Decimal.internalBinaryWrite(message.kind.decimalConst, writer.tag(17, WireType.LengthDelimited).fork(), options).join();
+        /* string string_const = 18; */
+        if (message.kind.oneofKind === "stringConst")
+            writer.tag(18, WireType.LengthDelimited).string(message.kind.stringConst);
+        /* bool bool_const = 19; */
+        if (message.kind.oneofKind === "boolConst")
+            writer.tag(19, WireType.Varint).bool(message.kind.boolConst);
+        /* stroppy.DateTime datetime_const = 20; */
+        if (message.kind.oneofKind === "datetimeConst")
+            DateTime.internalBinaryWrite(message.kind.datetimeConst, writer.tag(20, WireType.LengthDelimited).fork(), options).join();
+        /* optional stroppy.Generation.Distribution distribution = 30; */
         if (message.distribution)
-            Generation_Distribution.internalBinaryWrite(message.distribution, writer.tag(1000, WireType.LengthDelimited).fork(), options).join();
-        /* optional uint32 null_percentage = 1001; */
+            Generation_Distribution.internalBinaryWrite(message.distribution, writer.tag(30, WireType.LengthDelimited).fork(), options).join();
+        /* optional uint32 null_percentage = 31; */
         if (message.nullPercentage !== undefined)
-            writer.tag(1001, WireType.Varint).uint32(message.nullPercentage);
-        /* optional bool unique = 1002; */
+            writer.tag(31, WireType.Varint).uint32(message.nullPercentage);
+        /* optional bool unique = 32; */
         if (message.unique !== undefined)
-            writer.tag(1002, WireType.Varint).bool(message.unique);
+            writer.tag(32, WireType.Varint).bool(message.unique);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -4140,28 +3443,29 @@ export interface ColumnDescriptor {
     /**
      * * Whether the column can be NULL
      *
-     * @generated from protobuf field: bool nullable = 3
+     * @generated from protobuf field: optional bool nullable = 3
      */
-    nullable: boolean;
+    nullable?: boolean;
     /**
-     * * Whether the column is part of the primary key.
-     *  Multiple primary keys creates composite primary key.
+     * *
+     * Whether the column is part of the primary key.
+     * Multiple primary keys creates composite primary key.
      *
-     * @generated from protobuf field: bool primary_key = 4
+     * @generated from protobuf field: optional bool primary_key = 4
      */
-    primaryKey: boolean;
+    primaryKey?: boolean;
     /**
      * * Whether the column has a UNIQUE constraint
      *
-     * @generated from protobuf field: bool unique = 5
+     * @generated from protobuf field: optional bool unique = 5
      */
-    unique: boolean;
+    unique?: boolean;
     /**
      * * SQL constraint definition for the column in free form
      *
-     * @generated from protobuf field: string constraint = 6
+     * @generated from protobuf field: optional string constraint = 6
      */
-    constraint: string;
+    constraint?: string;
 }
 /**
  * *
@@ -4185,13 +3489,13 @@ export interface TableDescriptor {
     /**
      * * Table-level constraints
      *
-     * @generated from protobuf field: string constraint = 5
+     * @generated from protobuf field: optional string constraint = 5
      */
-    constraint: string;
+    constraint?: string;
     /**
      * * Database-specific table properties
      *
-     * @generated from protobuf field: stroppy.Value.Struct db_specific = 6
+     * @generated from protobuf field: optional stroppy.Value.Struct db_specific = 6
      */
     dbSpecific?: Value_Struct;
     /**
@@ -4200,6 +3504,46 @@ export interface TableDescriptor {
      * @generated from protobuf field: repeated stroppy.ColumnDescriptor columns = 100
      */
     columns: ColumnDescriptor[];
+}
+/**
+ * *
+ * InsertDescription defines data to fill database.
+ *
+ * @generated from protobuf message stroppy.InsertDescriptor
+ */
+export interface InsertDescriptor {
+    /**
+     * * Name of the Insert query
+     *
+     * @generated from protobuf field: string name = 1
+     */
+    name: string;
+    /**
+     * * Which table to insert the values
+     *
+     * @generated from protobuf field: string table_name = 2
+     */
+    tableName: string;
+    /**
+     * * Allows to use a percise method of data insertion
+     *
+     * @generated from protobuf field: optional stroppy.InsertMethod method = 3
+     */
+    method?: InsertMethod;
+    /**
+     * *
+     * Parameters used in the insert.
+     * Names threated as db columns names, regexp is ignored.
+     *
+     * @generated from protobuf field: repeated stroppy.QueryParamDescriptor params = 4
+     */
+    params: QueryParamDescriptor[];
+    /**
+     * * Groups of the columns
+     *
+     * @generated from protobuf field: repeated stroppy.QueryParamGroup groups = 5
+     */
+    groups: QueryParamGroup[];
 }
 /**
  * *
@@ -4284,7 +3628,7 @@ export interface QueryDescriptor {
      */
     params: QueryParamDescriptor[];
     /**
-     * * Grouped parameter groups
+     * * Groups of the parameters
      *
      * @generated from protobuf field: repeated stroppy.QueryParamGroup groups = 4
      */
@@ -4350,6 +3694,14 @@ export interface UnitDescriptor {
          */
         createTable: TableDescriptor;
     } | {
+        oneofKind: "insert";
+        /**
+         * * Data insertion operation
+         *
+         * @generated from protobuf field: stroppy.InsertDescriptor insert = 5
+         */
+        insert: InsertDescriptor;
+    } | {
         oneofKind: "query";
         /**
          * * Query execution operation
@@ -4406,9 +3758,9 @@ export interface WorkloadDescriptor {
     /**
      * * Whether to execute all operations in this workload asynchronously
      *
-     * @generated from protobuf field: bool async = 2
+     * @generated from protobuf field: optional bool async = 2
      */
-    async: boolean;
+    async?: boolean;
     /**
      * * List of operations to perform in this step
      *
@@ -4438,6 +3790,21 @@ export interface BenchmarkDescriptor {
     workloads: WorkloadDescriptor[];
 }
 /**
+ * * Data insertion method
+ *
+ * @generated from protobuf enum stroppy.InsertMethod
+ */
+export enum InsertMethod {
+    /**
+     * @generated from protobuf enum value: PLAIN_QUERY = 0;
+     */
+    PLAIN_QUERY = 0,
+    /**
+     * @generated from protobuf enum value: COPY_FROM = 1;
+     */
+    COPY_FROM = 1
+}
+/**
  * *
  * TransactionIsolationLevel defines the isolation level for a database
  * transaction.
@@ -4446,25 +3813,25 @@ export interface BenchmarkDescriptor {
  */
 export enum TxIsolationLevel {
     /**
-     * @generated from protobuf enum value: TX_ISOLATION_LEVEL_UNSPECIFIED = 0;
+     * @generated from protobuf enum value: UNSPECIFIED = 0;
      */
-    TX_ISOLATION_LEVEL_UNSPECIFIED = 0,
+    UNSPECIFIED = 0,
     /**
-     * @generated from protobuf enum value: TX_ISOLATION_LEVEL_READ_UNCOMMITTED = 1;
+     * @generated from protobuf enum value: READ_UNCOMMITTED = 1;
      */
-    TX_ISOLATION_LEVEL_READ_UNCOMMITTED = 1,
+    READ_UNCOMMITTED = 1,
     /**
-     * @generated from protobuf enum value: TX_ISOLATION_LEVEL_READ_COMMITTED = 2;
+     * @generated from protobuf enum value: READ_COMMITTED = 2;
      */
-    TX_ISOLATION_LEVEL_READ_COMMITTED = 2,
+    READ_COMMITTED = 2,
     /**
-     * @generated from protobuf enum value: TX_ISOLATION_LEVEL_REPEATABLE_READ = 3;
+     * @generated from protobuf enum value: REPEATABLE_READ = 3;
      */
-    TX_ISOLATION_LEVEL_REPEATABLE_READ = 3,
+    REPEATABLE_READ = 3,
     /**
-     * @generated from protobuf enum value: TX_ISOLATION_LEVEL_SERIALIZABLE = 4;
+     * @generated from protobuf enum value: SERIALIZABLE = 4;
      */
-    TX_ISOLATION_LEVEL_SERIALIZABLE = 4
+    SERIALIZABLE = 4
 }
 // @generated message type with reflection information, may provide speed optimized methods
 class IndexDescriptor$Type extends MessageType<IndexDescriptor> {
@@ -4550,20 +3917,16 @@ class ColumnDescriptor$Type extends MessageType<ColumnDescriptor> {
         super("stroppy.ColumnDescriptor", [
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "sql_type", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "nullable", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
-            { no: 4, name: "primary_key", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
-            { no: 5, name: "unique", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
-            { no: 6, name: "constraint", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+            { no: 3, name: "nullable", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
+            { no: 4, name: "primary_key", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
+            { no: 5, name: "unique", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
+            { no: 6, name: "constraint", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
         ]);
     }
     create(value?: PartialMessage<ColumnDescriptor>): ColumnDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.name = "";
         message.sqlType = "";
-        message.nullable = false;
-        message.primaryKey = false;
-        message.unique = false;
-        message.constraint = "";
         if (value !== undefined)
             reflectionMergePartial<ColumnDescriptor>(this, message, value);
         return message;
@@ -4579,16 +3942,16 @@ class ColumnDescriptor$Type extends MessageType<ColumnDescriptor> {
                 case /* string sql_type */ 2:
                     message.sqlType = reader.string();
                     break;
-                case /* bool nullable */ 3:
+                case /* optional bool nullable */ 3:
                     message.nullable = reader.bool();
                     break;
-                case /* bool primary_key */ 4:
+                case /* optional bool primary_key */ 4:
                     message.primaryKey = reader.bool();
                     break;
-                case /* bool unique */ 5:
+                case /* optional bool unique */ 5:
                     message.unique = reader.bool();
                     break;
-                case /* string constraint */ 6:
+                case /* optional string constraint */ 6:
                     message.constraint = reader.string();
                     break;
                 default:
@@ -4609,17 +3972,17 @@ class ColumnDescriptor$Type extends MessageType<ColumnDescriptor> {
         /* string sql_type = 2; */
         if (message.sqlType !== "")
             writer.tag(2, WireType.LengthDelimited).string(message.sqlType);
-        /* bool nullable = 3; */
-        if (message.nullable !== false)
+        /* optional bool nullable = 3; */
+        if (message.nullable !== undefined)
             writer.tag(3, WireType.Varint).bool(message.nullable);
-        /* bool primary_key = 4; */
-        if (message.primaryKey !== false)
+        /* optional bool primary_key = 4; */
+        if (message.primaryKey !== undefined)
             writer.tag(4, WireType.Varint).bool(message.primaryKey);
-        /* bool unique = 5; */
-        if (message.unique !== false)
+        /* optional bool unique = 5; */
+        if (message.unique !== undefined)
             writer.tag(5, WireType.Varint).bool(message.unique);
-        /* string constraint = 6; */
-        if (message.constraint !== "")
+        /* optional string constraint = 6; */
+        if (message.constraint !== undefined)
             writer.tag(6, WireType.LengthDelimited).string(message.constraint);
         let u = options.writeUnknownFields;
         if (u !== false)
@@ -4637,7 +4000,7 @@ class TableDescriptor$Type extends MessageType<TableDescriptor> {
         super("stroppy.TableDescriptor", [
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "table_indexes", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => IndexDescriptor },
-            { no: 5, name: "constraint", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 5, name: "constraint", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
             { no: 6, name: "db_specific", kind: "message", T: () => Value_Struct },
             { no: 100, name: "columns", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => ColumnDescriptor }
         ]);
@@ -4646,7 +4009,6 @@ class TableDescriptor$Type extends MessageType<TableDescriptor> {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.name = "";
         message.tableIndexes = [];
-        message.constraint = "";
         message.columns = [];
         if (value !== undefined)
             reflectionMergePartial<TableDescriptor>(this, message, value);
@@ -4663,10 +4025,10 @@ class TableDescriptor$Type extends MessageType<TableDescriptor> {
                 case /* repeated stroppy.IndexDescriptor table_indexes */ 3:
                     message.tableIndexes.push(IndexDescriptor.internalBinaryRead(reader, reader.uint32(), options));
                     break;
-                case /* string constraint */ 5:
+                case /* optional string constraint */ 5:
                     message.constraint = reader.string();
                     break;
-                case /* stroppy.Value.Struct db_specific */ 6:
+                case /* optional stroppy.Value.Struct db_specific */ 6:
                     message.dbSpecific = Value_Struct.internalBinaryRead(reader, reader.uint32(), options, message.dbSpecific);
                     break;
                 case /* repeated stroppy.ColumnDescriptor columns */ 100:
@@ -4690,10 +4052,10 @@ class TableDescriptor$Type extends MessageType<TableDescriptor> {
         /* repeated stroppy.IndexDescriptor table_indexes = 3; */
         for (let i = 0; i < message.tableIndexes.length; i++)
             IndexDescriptor.internalBinaryWrite(message.tableIndexes[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-        /* string constraint = 5; */
-        if (message.constraint !== "")
+        /* optional string constraint = 5; */
+        if (message.constraint !== undefined)
             writer.tag(5, WireType.LengthDelimited).string(message.constraint);
-        /* stroppy.Value.Struct db_specific = 6; */
+        /* optional stroppy.Value.Struct db_specific = 6; */
         if (message.dbSpecific)
             Value_Struct.internalBinaryWrite(message.dbSpecific, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
         /* repeated stroppy.ColumnDescriptor columns = 100; */
@@ -4709,6 +4071,84 @@ class TableDescriptor$Type extends MessageType<TableDescriptor> {
  * @generated MessageType for protobuf message stroppy.TableDescriptor
  */
 export const TableDescriptor = new TableDescriptor$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class InsertDescriptor$Type extends MessageType<InsertDescriptor> {
+    constructor() {
+        super("stroppy.InsertDescriptor", [
+            { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "table_name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "method", kind: "enum", opt: true, T: () => ["stroppy.InsertMethod", InsertMethod] },
+            { no: 4, name: "params", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => QueryParamDescriptor },
+            { no: 5, name: "groups", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => QueryParamGroup }
+        ]);
+    }
+    create(value?: PartialMessage<InsertDescriptor>): InsertDescriptor {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.name = "";
+        message.tableName = "";
+        message.params = [];
+        message.groups = [];
+        if (value !== undefined)
+            reflectionMergePartial<InsertDescriptor>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: InsertDescriptor): InsertDescriptor {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string name */ 1:
+                    message.name = reader.string();
+                    break;
+                case /* string table_name */ 2:
+                    message.tableName = reader.string();
+                    break;
+                case /* optional stroppy.InsertMethod method */ 3:
+                    message.method = reader.int32();
+                    break;
+                case /* repeated stroppy.QueryParamDescriptor params */ 4:
+                    message.params.push(QueryParamDescriptor.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                case /* repeated stroppy.QueryParamGroup groups */ 5:
+                    message.groups.push(QueryParamGroup.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: InsertDescriptor, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string name = 1; */
+        if (message.name !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.name);
+        /* string table_name = 2; */
+        if (message.tableName !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.tableName);
+        /* optional stroppy.InsertMethod method = 3; */
+        if (message.method !== undefined)
+            writer.tag(3, WireType.Varint).int32(message.method);
+        /* repeated stroppy.QueryParamDescriptor params = 4; */
+        for (let i = 0; i < message.params.length; i++)
+            QueryParamDescriptor.internalBinaryWrite(message.params[i], writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* repeated stroppy.QueryParamGroup groups = 5; */
+        for (let i = 0; i < message.groups.length; i++)
+            QueryParamGroup.internalBinaryWrite(message.groups[i], writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.InsertDescriptor
+ */
+export const InsertDescriptor = new InsertDescriptor$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class QueryParamDescriptor$Type extends MessageType<QueryParamDescriptor> {
     constructor() {
@@ -4985,6 +4425,7 @@ class UnitDescriptor$Type extends MessageType<UnitDescriptor> {
     constructor() {
         super("stroppy.UnitDescriptor", [
             { no: 1, name: "create_table", kind: "message", oneof: "type", T: () => TableDescriptor },
+            { no: 5, name: "insert", kind: "message", oneof: "type", T: () => InsertDescriptor },
             { no: 2, name: "query", kind: "message", oneof: "type", T: () => QueryDescriptor },
             { no: 4, name: "transaction", kind: "message", oneof: "type", T: () => TransactionDescriptor }
         ]);
@@ -5005,6 +4446,12 @@ class UnitDescriptor$Type extends MessageType<UnitDescriptor> {
                     message.type = {
                         oneofKind: "createTable",
                         createTable: TableDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).createTable)
+                    };
+                    break;
+                case /* stroppy.InsertDescriptor insert */ 5:
+                    message.type = {
+                        oneofKind: "insert",
+                        insert: InsertDescriptor.internalBinaryRead(reader, reader.uint32(), options, (message.type as any).insert)
                     };
                     break;
                 case /* stroppy.QueryDescriptor query */ 2:
@@ -5040,6 +4487,9 @@ class UnitDescriptor$Type extends MessageType<UnitDescriptor> {
         /* stroppy.TransactionDescriptor transaction = 4; */
         if (message.type.oneofKind === "transaction")
             TransactionDescriptor.internalBinaryWrite(message.type.transaction, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.InsertDescriptor insert = 5; */
+        if (message.type.oneofKind === "insert")
+            InsertDescriptor.internalBinaryWrite(message.type.insert, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -5109,14 +4559,13 @@ class WorkloadDescriptor$Type extends MessageType<WorkloadDescriptor> {
     constructor() {
         super("stroppy.WorkloadDescriptor", [
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "async", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 2, name: "async", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ },
             { no: 3, name: "units", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => WorkloadUnitDescriptor }
         ]);
     }
     create(value?: PartialMessage<WorkloadDescriptor>): WorkloadDescriptor {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.name = "";
-        message.async = false;
         message.units = [];
         if (value !== undefined)
             reflectionMergePartial<WorkloadDescriptor>(this, message, value);
@@ -5130,7 +4579,7 @@ class WorkloadDescriptor$Type extends MessageType<WorkloadDescriptor> {
                 case /* string name */ 1:
                     message.name = reader.string();
                     break;
-                case /* bool async */ 2:
+                case /* optional bool async */ 2:
                     message.async = reader.bool();
                     break;
                 case /* repeated stroppy.WorkloadUnitDescriptor units */ 3:
@@ -5151,8 +4600,8 @@ class WorkloadDescriptor$Type extends MessageType<WorkloadDescriptor> {
         /* string name = 1; */
         if (message.name !== "")
             writer.tag(1, WireType.LengthDelimited).string(message.name);
-        /* bool async = 2; */
-        if (message.async !== false)
+        /* optional bool async = 2; */
+        if (message.async !== undefined)
             writer.tag(2, WireType.Varint).bool(message.async);
         /* repeated stroppy.WorkloadUnitDescriptor units = 3; */
         for (let i = 0; i < message.units.length; i++)
@@ -5331,20 +4780,24 @@ export interface K6Scenario {
 /**
  * *
  * SharedIterations executor configuration.
- * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
+ * Documentation:
+ * https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
  *
  * @generated from protobuf message stroppy.SharedIterations
  */
 export interface SharedIterations {
     /**
-     * * Total number of iterations to be executed by all VUs together.
+     * *
+     * Total number of iterations to be executed by all VUs together.
      * Iterations are distributed dynamically among available VUs.
+     * "-1" is a special value to run all the units from step.
      *
      * @generated from protobuf field: int64 iterations = 1
      */
     iterations: string;
     /**
-     * * Number of virtual users that will execute these iterations in parallel
+     * *
+     * Number of virtual users that will execute these iterations in parallel
      *
      * @generated from protobuf field: uint32 vus = 2
      */
@@ -5353,7 +4806,8 @@ export interface SharedIterations {
 /**
  * *
  * PerVuIterations executor configuration.
- * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
+ * Documentation:
+ * https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
  *
  * @generated from protobuf message stroppy.PerVuIterations
  */
@@ -5366,6 +4820,7 @@ export interface PerVuIterations {
     vus: number;
     /**
      * * Number of iterations that each VU should execute
+     * "-1" is a special value to run all the units from by every vu.
      *
      * @generated from protobuf field: int64 iterations = 2
      */
@@ -5374,13 +4829,15 @@ export interface PerVuIterations {
 /**
  * *
  * ConstantVUs executor configuration.
- * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
+ * Documentation:
+ * https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
  *
  * @generated from protobuf message stroppy.ConstantVUs
  */
 export interface ConstantVUs {
     /**
-     * * Fixed number of virtual users that will be simultaneously active at all times
+     * * Fixed number of virtual users that will be simultaneously active at all
+     * times
      *
      * @generated from protobuf field: uint32 vus = 1
      */
@@ -5396,7 +4853,8 @@ export interface ConstantVUs {
 /**
  * *
  * RampingVUs executor configuration.
- * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
+ * Documentation:
+ * https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
  *
  * @generated from protobuf message stroppy.RampingVUs
  */
@@ -5408,7 +4866,8 @@ export interface RampingVUs {
      */
     startVus: number;
     /**
-     * * List of stages where VU count changes to target value over specified time
+     * * List of stages where VU count changes to target value over specified
+     * time
      *
      * @generated from protobuf field: repeated stroppy.RampingVUs.VUStage stages = 2
      */
@@ -5449,7 +4908,8 @@ export interface RampingVUs_VUStage {
 /**
  * *
  * ConstantArrivalRate executor configuration.
- * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
+ * Documentation:
+ * https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
  *
  * @generated from protobuf message stroppy.ConstantArrivalRate
  */
@@ -5488,7 +4948,8 @@ export interface ConstantArrivalRate {
 /**
  * *
  * RampingArrivalRate executor configuration.
- * Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
+ * Documentation:
+ * https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
  *
  * @generated from protobuf message stroppy.RampingArrivalRate
  */
@@ -6298,6 +5759,12 @@ export interface DriverQuery {
      * @generated from protobuf field: repeated stroppy.Value params = 3
      */
     params: Value[];
+    /**
+     * * If alternate insertion method required
+     *
+     * @generated from protobuf field: optional stroppy.InsertMethod method = 4
+     */
+    method?: InsertMethod;
 }
 /**
  * *
@@ -6491,7 +5958,8 @@ class DriverQuery$Type extends MessageType<DriverQuery> {
         super("stroppy.DriverQuery", [
             { no: 1, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "request", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "params", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Value }
+            { no: 3, name: "params", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Value },
+            { no: 4, name: "method", kind: "enum", opt: true, T: () => ["stroppy.InsertMethod", InsertMethod] }
         ]);
     }
     create(value?: PartialMessage<DriverQuery>): DriverQuery {
@@ -6517,6 +5985,9 @@ class DriverQuery$Type extends MessageType<DriverQuery> {
                 case /* repeated stroppy.Value params */ 3:
                     message.params.push(Value.internalBinaryRead(reader, reader.uint32(), options));
                     break;
+                case /* optional stroppy.InsertMethod method */ 4:
+                    message.method = reader.int32();
+                    break;
                 default:
                     let u = options.readUnknownField;
                     if (u === "throw")
@@ -6538,6 +6009,9 @@ class DriverQuery$Type extends MessageType<DriverQuery> {
         /* repeated stroppy.Value params = 3; */
         for (let i = 0; i < message.params.length; i++)
             Value.internalBinaryWrite(message.params[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* optional stroppy.InsertMethod method = 4; */
+        if (message.method !== undefined)
+            writer.tag(4, WireType.Varint).int32(message.method);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

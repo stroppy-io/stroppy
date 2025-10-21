@@ -4,7 +4,7 @@ go 1.24.3
 
 require (
 	github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2 v2.0.1
-	github.com/avito-tech/go-transaction-manager/trm/v2 v2.0.1-rc3
+	github.com/avito-tech/go-transaction-manager/trm/v2 v2.0.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx-shopspring-decimal v0.0.0-20220624020537-1d36b5a1853e
 	github.com/jackc/pgx/v5 v5.7.6
@@ -12,15 +12,15 @@ require (
 	github.com/pashagolub/pgxmock/v4 v4.8.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/sourcegraph/conc v0.3.0
-	github.com/spf13/cobra v1.9.1
+	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.10.0
 	github.com/stroppy-io/stroppy-core v0.1.1
 	github.com/thediveo/enumflag v0.10.1
 	go.uber.org/zap v1.27.0
-	golang.org/x/sync v0.16.0
-	google.golang.org/grpc v1.74.2
-	google.golang.org/protobuf v1.36.8
-	sigs.k8s.io/yaml v1.4.0
+	golang.org/x/sync v0.17.0
+	google.golang.org/grpc v1.76.0
+	google.golang.org/protobuf v1.36.10
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -34,14 +34,15 @@ require (
 	github.com/onsi/gomega v1.38.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	go.opentelemetry.io/otel v1.37.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.37.0 // indirect
-	go.uber.org/multierr v1.10.0 // indirect
-	golang.org/x/crypto v0.41.0 // indirect
-	golang.org/x/net v0.43.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250826171959-ef028d996bc1 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.3 // indirect
+	golang.org/x/crypto v0.43.0 // indirect
+	golang.org/x/net v0.46.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
+	golang.org/x/text v0.30.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251014184007-4626949a642f // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

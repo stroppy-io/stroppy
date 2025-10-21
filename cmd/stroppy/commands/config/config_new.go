@@ -21,6 +21,7 @@ const (
 	configNewNameFlagName    = "name"
 	configTPCCFlagName       = "tpcc"
 )
+const defaultTPCCFactor = 10
 
 var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 	Use:   fmt.Sprintf("new --%s <dirpath>", configNewWorkdirFlagName),
@@ -42,14 +43,14 @@ var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 			return err
 		}
 
-		isTpcc, err := cmd.Flags().GetBool(configTPCCFlagName)
+		isTpcc := cmd.Flags().Changed(configTPCCFlagName)
+		warehouseMax, err := cmd.Flags().GetUint(configTPCCFlagName)
 		if err != nil {
 			return err
 		}
-
 		var protoConfig *proto.ConfigFile
 		if isTpcc { // TODO: proper --preset tpcc|simple|etc.. option
-			protoConfig = config.NewTPCCConfig()
+			protoConfig = config.NewTPCCConfig(int32(warehouseMax))
 		} else {
 			protoConfig = config.NewExampleConfig()
 		}
@@ -108,5 +109,5 @@ func init() { //nolint: gochecknoinits // allow in cmd
 		"output config format, json or yaml",
 	)
 	NewConfigCmd.PersistentFlags().
-		Bool(configTPCCFlagName, false, "whether to use tpc-c test preset")
+		Uint(configTPCCFlagName, defaultTPCCFactor, "whether to use tpc-c test preset and W factor")
 }

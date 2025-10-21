@@ -9,10 +9,14 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
+func ptr[T any](x T) *T {
+	return &x
+}
+
 func TestNewCreateTable_Success(t *testing.T) {
 	descriptor := &stroppy.TableDescriptor{
 		Name:    "t1",
-		Columns: []*stroppy.ColumnDescriptor{{Name: "id", SqlType: "INT", PrimaryKey: true}},
+		Columns: []*stroppy.ColumnDescriptor{{Name: "id", SqlType: "INT", PrimaryKey: ptr(true)}},
 	}
 	// ctx := context.Background()
 	lg := zap.NewNop()

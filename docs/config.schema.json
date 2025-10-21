@@ -30,6 +30,88 @@
       "description": "* List of steps to execute in the benchmark"
     },
     ".stroppy.ColumnDescriptor": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "nullable"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "nullable"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "primaryKey"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "primaryKey"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "unique"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "unique"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "constraint"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "constraint"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "name": {
           "$ref": "#/$defs/.stroppy.ColumnDescriptor.name"
@@ -38,26 +120,50 @@
           "$ref": "#/$defs/.stroppy.ColumnDescriptor.sql_type"
         },
         "nullable": {
-          "$ref": "#/$defs/.stroppy.ColumnDescriptor.nullable"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.ColumnDescriptor.nullable"
+            }
+          ]
         },
         "primaryKey": {
-          "$ref": "#/$defs/.stroppy.ColumnDescriptor.primary_key"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.ColumnDescriptor.primary_key"
+            }
+          ]
         },
         "unique": {
-          "$ref": "#/$defs/.stroppy.ColumnDescriptor.unique"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.ColumnDescriptor.unique"
+            }
+          ]
         },
         "constraint": {
-          "$ref": "#/$defs/.stroppy.ColumnDescriptor.constraint"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.ColumnDescriptor.constraint"
+            }
+          ]
         }
       },
       "type": "object",
       "required": [
         "name",
-        "sqlType",
-        "nullable",
-        "primaryKey",
-        "unique",
-        "constraint"
+        "sqlType"
       ],
       "description": "*\n ColumnDescriptor defines the structure of a database column."
     },
@@ -75,7 +181,7 @@
     },
     ".stroppy.ColumnDescriptor.primary_key": {
       "type": "boolean",
-      "description": "* Whether the column is part of the primary key.\n  Multiple primary keys creates composite primary key."
+      "description": "*\n Whether the column is part of the primary key.\n Multiple primary keys creates composite primary key."
     },
     ".stroppy.ColumnDescriptor.sql_type": {
       "type": "string",
@@ -179,7 +285,7 @@
         "preAllocatedVus",
         "maxVus"
       ],
-      "description": "*\n ConstantArrivalRate executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/"
+      "description": "*\n ConstantArrivalRate executor configuration.\n Documentation:\n https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/"
     },
     ".stroppy.ConstantArrivalRate.duration": {
       "type": "string",
@@ -217,7 +323,7 @@
         "vus",
         "duration"
       ],
-      "description": "*\n ConstantVUs executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/"
+      "description": "*\n ConstantVUs executor configuration.\n Documentation:\n https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/"
     },
     ".stroppy.ConstantVUs.duration": {
       "type": "string",
@@ -226,7 +332,7 @@
     },
     ".stroppy.ConstantVUs.vus": {
       "type": "integer",
-      "description": "* Fixed number of virtual users that will be simultaneously active at all times"
+      "description": "* Fixed number of virtual users that will be simultaneously active at all\n times"
     },
     ".stroppy.DateTime": {
       "properties": {
@@ -387,7 +493,7 @@
     },
     ".stroppy.Generation.Alphabet.ranges": {
       "items": {
-        "$ref": "#/$defs/.stroppy.Generation.Range.UInt32Range",
+        "$ref": "#/$defs/.stroppy.Generation.Range.UInt32",
         "description": "* List of character ranges for this alphabet"
       },
       "type": "array",
@@ -425,13 +531,13 @@
       "$ref": "#/$defs/.stroppy.Generation.Distribution.DistributionType",
       "description": "* Type of distribution to use"
     },
-    ".stroppy.Generation.Range.AnyStringRange": {
+    ".stroppy.Generation.Range.AnyString": {
       "properties": {
         "min": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.AnyStringRange.min"
+          "$ref": "#/$defs/.stroppy.Generation.Range.AnyString.min"
         },
         "max": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.AnyStringRange.max"
+          "$ref": "#/$defs/.stroppy.Generation.Range.AnyString.max"
         }
       },
       "type": "object",
@@ -441,23 +547,32 @@
       ],
       "description": "* Range for string values that can be parsed into other types"
     },
-    ".stroppy.Generation.Range.AnyStringRange.max": {
+    ".stroppy.Generation.Range.AnyString.max": {
       "type": "string",
       "description": "* Maximum value (inclusive)"
     },
-    ".stroppy.Generation.Range.AnyStringRange.min": {
+    ".stroppy.Generation.Range.AnyString.min": {
       "type": "string",
       "description": "* Minimum value (inclusive)"
     },
-    ".stroppy.Generation.Range.DateTimeRange": {
+    ".stroppy.Generation.Range.Bool": {
+      "properties": {
+        "ratio": {
+          "$ref": "#/$defs/.stroppy.Generation.Range.Bool.ratio"
+        }
+      },
+      "type": "object",
+      "required": [
+        "ratio"
+      ]
+    },
+    ".stroppy.Generation.Range.Bool.ratio": {
+      "type": "number"
+    },
+    ".stroppy.Generation.Range.DateTime": {
       "allOf": [
         {
           "oneOf": [
-            {
-              "required": [
-                "default"
-              ]
-            },
             {
               "required": [
                 "string"
@@ -476,11 +591,6 @@
             {
               "not": {
                 "anyOf": [
-                  {
-                    "required": [
-                      "default"
-                    ]
-                  },
                   {
                     "required": [
                       "string"
@@ -503,23 +613,13 @@
         }
       ],
       "properties": {
-        "default": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.default"
-            }
-          ]
-        },
         "string": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.string"
+              "$ref": "#/$defs/.stroppy.Generation.Range.DateTime.string"
             }
           ]
         },
@@ -529,7 +629,7 @@
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.timestamp_pb"
+              "$ref": "#/$defs/.stroppy.Generation.Range.DateTime.timestamp_pb"
             }
           ]
         },
@@ -539,7 +639,7 @@
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.timestamp"
+              "$ref": "#/$defs/.stroppy.Generation.Range.DateTime.timestamp"
             }
           ]
         }
@@ -547,61 +647,13 @@
       "type": "object",
       "description": "* Range for date/time values"
     },
-    ".stroppy.Generation.Range.DateTimeRange.Default": {
+    ".stroppy.Generation.Range.DateTime.TimestampPb": {
       "properties": {
         "min": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.Default.min"
+          "$ref": "#/$defs/.stroppy.Generation.Range.DateTime.TimestampPb.min"
         },
         "max": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.Default.max"
-        }
-      },
-      "type": "object",
-      "required": [
-        "min",
-        "max"
-      ],
-      "description": "* Default date/time range"
-    },
-    ".stroppy.Generation.Range.DateTimeRange.Default.max": {
-      "$ref": "#/$defs/.stroppy.DateTime",
-      "description": "* Maximum timestamp (inclusive)"
-    },
-    ".stroppy.Generation.Range.DateTimeRange.Default.min": {
-      "$ref": "#/$defs/.stroppy.DateTime",
-      "description": "* Minimum timestamp (inclusive)"
-    },
-    ".stroppy.Generation.Range.DateTimeRange.Timestamp": {
-      "properties": {
-        "min": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.Timestamp.min"
-        },
-        "max": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.Timestamp.max"
-        }
-      },
-      "type": "object",
-      "required": [
-        "min",
-        "max"
-      ],
-      "description": "* Unix timestamp range"
-    },
-    ".stroppy.Generation.Range.DateTimeRange.Timestamp.max": {
-      "type": "integer",
-      "description": "* Maximum Unix timestamp (inclusive)"
-    },
-    ".stroppy.Generation.Range.DateTimeRange.Timestamp.min": {
-      "type": "integer",
-      "description": "* Minimum Unix timestamp (inclusive)"
-    },
-    ".stroppy.Generation.Range.DateTimeRange.TimestampPb": {
-      "properties": {
-        "min": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.TimestampPb.min"
-        },
-        "max": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.TimestampPb.max"
+          "$ref": "#/$defs/.stroppy.Generation.Range.DateTime.TimestampPb.max"
         }
       },
       "type": "object",
@@ -611,41 +663,56 @@
       ],
       "description": "* Protocol Buffers timestamp range"
     },
-    ".stroppy.Generation.Range.DateTimeRange.TimestampPb.max": {
+    ".stroppy.Generation.Range.DateTime.TimestampPb.max": {
       "type": "string",
       "format": "date-time",
       "description": "* Maximum timestamp (inclusive)"
     },
-    ".stroppy.Generation.Range.DateTimeRange.TimestampPb.min": {
+    ".stroppy.Generation.Range.DateTime.TimestampPb.min": {
       "type": "string",
       "format": "date-time",
       "description": "* Minimum timestamp (inclusive)"
     },
-    ".stroppy.Generation.Range.DateTimeRange.default": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.Default",
-      "description": "* Exact date/time range"
-    },
-    ".stroppy.Generation.Range.DateTimeRange.string": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.AnyStringRange",
-      "description": "* String-based range (ISO 8601 format)"
-    },
-    ".stroppy.Generation.Range.DateTimeRange.timestamp": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.Timestamp",
+    ".stroppy.Generation.Range.DateTime.TimestampUnix": {
+      "properties": {
+        "min": {
+          "$ref": "#/$defs/.stroppy.Generation.Range.DateTime.TimestampUnix.min"
+        },
+        "max": {
+          "$ref": "#/$defs/.stroppy.Generation.Range.DateTime.TimestampUnix.max"
+        }
+      },
+      "type": "object",
+      "required": [
+        "min",
+        "max"
+      ],
       "description": "* Unix timestamp range"
     },
-    ".stroppy.Generation.Range.DateTimeRange.timestamp_pb": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange.TimestampPb",
+    ".stroppy.Generation.Range.DateTime.TimestampUnix.max": {
+      "type": "integer",
+      "description": "* Maximum Unix timestamp (inclusive)"
+    },
+    ".stroppy.Generation.Range.DateTime.TimestampUnix.min": {
+      "type": "integer",
+      "description": "* Minimum Unix timestamp (inclusive)"
+    },
+    ".stroppy.Generation.Range.DateTime.string": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.AnyString",
+      "description": "* String-based range (ISO 8601 format)"
+    },
+    ".stroppy.Generation.Range.DateTime.timestamp": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.DateTime.TimestampUnix",
+      "description": "* Unix timestamp range"
+    },
+    ".stroppy.Generation.Range.DateTime.timestamp_pb": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.DateTime.TimestampPb",
       "description": "* Protocol Buffers timestamp range"
     },
     ".stroppy.Generation.Range.DecimalRange": {
       "allOf": [
         {
           "oneOf": [
-            {
-              "required": [
-                "default"
-              ]
-            },
             {
               "required": [
                 "float"
@@ -664,11 +731,6 @@
             {
               "not": {
                 "anyOf": [
-                  {
-                    "required": [
-                      "default"
-                    ]
-                  },
                   {
                     "required": [
                       "float"
@@ -691,16 +753,6 @@
         }
       ],
       "properties": {
-        "default": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Range.DecimalRange.default"
-            }
-          ]
-        },
         "float": {
           "oneOf": [
             {
@@ -735,190 +787,415 @@
       "type": "object",
       "description": "* Range for decimal numbers"
     },
-    ".stroppy.Generation.Range.DecimalRange.Default": {
-      "properties": {
-        "min": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.DecimalRange.Default.min"
-        },
-        "max": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.DecimalRange.Default.max"
-        }
-      },
-      "type": "object",
-      "required": [
-        "min",
-        "max"
-      ],
-      "description": "* Default decimal range"
-    },
-    ".stroppy.Generation.Range.DecimalRange.Default.max": {
-      "$ref": "#/$defs/.stroppy.Decimal",
-      "description": "* Maximum value (inclusive)"
-    },
-    ".stroppy.Generation.Range.DecimalRange.Default.min": {
-      "$ref": "#/$defs/.stroppy.Decimal",
-      "description": "* Minimum value (inclusive)"
-    },
-    ".stroppy.Generation.Range.DecimalRange.default": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.DecimalRange.Default",
-      "description": "* Exact decimal range"
-    },
     ".stroppy.Generation.Range.DecimalRange.double": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.DoubleRange",
+      "$ref": "#/$defs/.stroppy.Generation.Range.Double",
       "description": "* Double-based range"
     },
     ".stroppy.Generation.Range.DecimalRange.float": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.FloatRange",
+      "$ref": "#/$defs/.stroppy.Generation.Range.Float",
       "description": "* Float-based range"
     },
     ".stroppy.Generation.Range.DecimalRange.string": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.AnyStringRange",
-      "description": "* String-based range (supports scientific notation)"
+      "$ref": "#/$defs/.stroppy.Generation.Range.AnyString",
+      "description": "* String-bsed range (supports scientific notation)"
     },
-    ".stroppy.Generation.Range.DoubleRange": {
+    ".stroppy.Generation.Range.Double": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "min"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "min"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "min": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.DoubleRange.min"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Range.Double.min"
+            }
+          ]
         },
         "max": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.DoubleRange.max"
+          "$ref": "#/$defs/.stroppy.Generation.Range.Double.max"
         }
       },
       "type": "object",
       "required": [
-        "min",
         "max"
       ],
       "description": "* Range for 64-bit floating point numbers"
     },
-    ".stroppy.Generation.Range.DoubleRange.max": {
+    ".stroppy.Generation.Range.Double.max": {
       "type": "number",
       "description": "* Maximum value (inclusive)"
     },
-    ".stroppy.Generation.Range.DoubleRange.min": {
+    ".stroppy.Generation.Range.Double.min": {
       "type": "number",
       "description": "* Minimum value (inclusive)"
     },
-    ".stroppy.Generation.Range.FloatRange": {
+    ".stroppy.Generation.Range.Float": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "min"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "min"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "min": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.FloatRange.min"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Range.Float.min"
+            }
+          ]
         },
         "max": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.FloatRange.max"
+          "$ref": "#/$defs/.stroppy.Generation.Range.Float.max"
         }
       },
       "type": "object",
       "required": [
-        "min",
         "max"
       ],
       "description": "* Range for 32-bit floating point numbers"
     },
-    ".stroppy.Generation.Range.FloatRange.max": {
+    ".stroppy.Generation.Range.Float.max": {
       "type": "number",
       "description": "* Maximum value (inclusive)"
     },
-    ".stroppy.Generation.Range.FloatRange.min": {
+    ".stroppy.Generation.Range.Float.min": {
       "type": "number",
       "description": "* Minimum value (inclusive)"
     },
-    ".stroppy.Generation.Range.Int32Range": {
+    ".stroppy.Generation.Range.Int32": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "min"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "min"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "min": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.Int32Range.min"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Range.Int32.min"
+            }
+          ]
         },
         "max": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.Int32Range.max"
+          "$ref": "#/$defs/.stroppy.Generation.Range.Int32.max"
         }
       },
       "type": "object",
       "required": [
-        "min",
         "max"
       ],
       "description": "* Range for 32-bit signed integers"
     },
-    ".stroppy.Generation.Range.Int32Range.max": {
+    ".stroppy.Generation.Range.Int32.max": {
       "type": "integer",
       "description": "* Maximum value (inclusive)"
     },
-    ".stroppy.Generation.Range.Int32Range.min": {
+    ".stroppy.Generation.Range.Int32.min": {
       "type": "integer",
       "description": "* Minimum value (inclusive)"
     },
-    ".stroppy.Generation.Range.Int64Range": {
+    ".stroppy.Generation.Range.Int64": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "min"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "min"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "min": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.Int64Range.min"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Range.Int64.min"
+            }
+          ]
         },
         "max": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.Int64Range.max"
+          "$ref": "#/$defs/.stroppy.Generation.Range.Int64.max"
         }
       },
       "type": "object",
       "required": [
-        "min",
         "max"
       ],
       "description": "* Range for 64-bit signed integers"
     },
-    ".stroppy.Generation.Range.Int64Range.max": {
+    ".stroppy.Generation.Range.Int64.max": {
       "type": "string",
       "format": "int64",
       "description": "* Maximum value (inclusive)"
     },
-    ".stroppy.Generation.Range.Int64Range.min": {
+    ".stroppy.Generation.Range.Int64.min": {
       "type": "string",
       "format": "int64",
       "description": "* Minimum value (inclusive)"
     },
-    ".stroppy.Generation.Range.UInt32Range": {
-      "properties": {
-        "min": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.UInt32Range.min"
+    ".stroppy.Generation.Range.String": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "alphabet"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "alphabet"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
         },
-        "max": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.UInt32Range.max"
+        {
+          "oneOf": [
+            {
+              "required": [
+                "minLen"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "minLen"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "alphabet": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Range.String.alphabet"
+            }
+          ]
+        },
+        "minLen": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Range.String.min_len"
+            }
+          ]
+        },
+        "maxLen": {
+          "$ref": "#/$defs/.stroppy.Generation.Range.String.max_len"
         }
       },
       "type": "object",
       "required": [
-        "min",
+        "maxLen"
+      ]
+    },
+    ".stroppy.Generation.Range.String.alphabet": {
+      "$ref": "#/$defs/.stroppy.Generation.Alphabet",
+      "description": "* Character set to use for generation"
+    },
+    ".stroppy.Generation.Range.String.max_len": {
+      "type": "string",
+      "format": "int64"
+    },
+    ".stroppy.Generation.Range.String.min_len": {
+      "type": "string",
+      "format": "int64"
+    },
+    ".stroppy.Generation.Range.UInt32": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "min"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "min"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "min": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Range.UInt32.min"
+            }
+          ]
+        },
+        "max": {
+          "$ref": "#/$defs/.stroppy.Generation.Range.UInt32.max"
+        }
+      },
+      "type": "object",
+      "required": [
         "max"
       ],
       "description": "* Range for 32-bit unsigned integers"
     },
-    ".stroppy.Generation.Range.UInt32Range.max": {
+    ".stroppy.Generation.Range.UInt32.max": {
       "type": "integer",
       "description": "* Maximum value (inclusive)"
     },
-    ".stroppy.Generation.Range.UInt32Range.min": {
+    ".stroppy.Generation.Range.UInt32.min": {
       "type": "integer",
       "description": "* Minimum value (inclusive)"
     },
-    ".stroppy.Generation.Range.UInt64Range": {
+    ".stroppy.Generation.Range.UInt64": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "min"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "min"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "min": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.UInt64Range.min"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Range.UInt64.min"
+            }
+          ]
         },
         "max": {
-          "$ref": "#/$defs/.stroppy.Generation.Range.UInt64Range.max"
+          "$ref": "#/$defs/.stroppy.Generation.Range.UInt64.max"
         }
       },
       "type": "object",
       "required": [
-        "min",
         "max"
       ],
       "description": "* Range for 64-bit unsigned integers"
     },
-    ".stroppy.Generation.Range.UInt64Range.max": {
+    ".stroppy.Generation.Range.UInt64.max": {
       "type": "string",
       "format": "int64",
       "description": "* Maximum value (inclusive)"
     },
-    ".stroppy.Generation.Range.UInt64Range.min": {
+    ".stroppy.Generation.Range.UInt64.min": {
       "type": "string",
       "format": "int64",
       "description": "* Minimum value (inclusive)"
@@ -929,57 +1206,102 @@
           "oneOf": [
             {
               "required": [
-                "floatRules"
+                "int32Range"
               ]
             },
             {
               "required": [
-                "doubleRules"
+                "int64Range"
               ]
             },
             {
               "required": [
-                "int32Rules"
+                "uint32Range"
               ]
             },
             {
               "required": [
-                "int64Rules"
+                "uint64Range"
               ]
             },
             {
               "required": [
-                "uint32Rules"
+                "floatRange"
               ]
             },
             {
               "required": [
-                "uint64Rules"
+                "doubleRange"
               ]
             },
             {
               "required": [
-                "boolRules"
+                "decimalRange"
               ]
             },
             {
               "required": [
-                "stringRules"
+                "stringRange"
               ]
             },
             {
               "required": [
-                "datetimeRules"
+                "boolRange"
               ]
             },
             {
               "required": [
-                "uuidRules"
+                "datetimeRange"
               ]
             },
             {
               "required": [
-                "decimalRules"
+                "int32Const"
+              ]
+            },
+            {
+              "required": [
+                "int64Const"
+              ]
+            },
+            {
+              "required": [
+                "uint32Const"
+              ]
+            },
+            {
+              "required": [
+                "uint64Const"
+              ]
+            },
+            {
+              "required": [
+                "floatConst"
+              ]
+            },
+            {
+              "required": [
+                "doubleConst"
+              ]
+            },
+            {
+              "required": [
+                "decimalConst"
+              ]
+            },
+            {
+              "required": [
+                "stringConst"
+              ]
+            },
+            {
+              "required": [
+                "boolConst"
+              ]
+            },
+            {
+              "required": [
+                "datetimeConst"
               ]
             },
             {
@@ -987,57 +1309,102 @@
                 "anyOf": [
                   {
                     "required": [
-                      "floatRules"
+                      "int32Range"
                     ]
                   },
                   {
                     "required": [
-                      "doubleRules"
+                      "int64Range"
                     ]
                   },
                   {
                     "required": [
-                      "int32Rules"
+                      "uint32Range"
                     ]
                   },
                   {
                     "required": [
-                      "int64Rules"
+                      "uint64Range"
                     ]
                   },
                   {
                     "required": [
-                      "uint32Rules"
+                      "floatRange"
                     ]
                   },
                   {
                     "required": [
-                      "uint64Rules"
+                      "doubleRange"
                     ]
                   },
                   {
                     "required": [
-                      "boolRules"
+                      "decimalRange"
                     ]
                   },
                   {
                     "required": [
-                      "stringRules"
+                      "stringRange"
                     ]
                   },
                   {
                     "required": [
-                      "datetimeRules"
+                      "boolRange"
                     ]
                   },
                   {
                     "required": [
-                      "uuidRules"
+                      "datetimeRange"
                     ]
                   },
                   {
                     "required": [
-                      "decimalRules"
+                      "int32Const"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "int64Const"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "uint32Const"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "uint64Const"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "floatConst"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "doubleConst"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "decimalConst"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "stringConst"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "boolConst"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "datetimeConst"
                     ]
                   }
                 ]
@@ -1107,113 +1474,203 @@
         }
       ],
       "properties": {
-        "floatRules": {
+        "int32Range": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Rule.float_rules"
+              "$ref": "#/$defs/.stroppy.Generation.Rule.int32_range"
             }
           ]
         },
-        "doubleRules": {
+        "int64Range": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Rule.double_rules"
+              "$ref": "#/$defs/.stroppy.Generation.Rule.int64_range"
             }
           ]
         },
-        "int32Rules": {
+        "uint32Range": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Rule.int32_rules"
+              "$ref": "#/$defs/.stroppy.Generation.Rule.uint32_range"
             }
           ]
         },
-        "int64Rules": {
+        "uint64Range": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Rule.int64_rules"
+              "$ref": "#/$defs/.stroppy.Generation.Rule.uint64_range"
             }
           ]
         },
-        "uint32Rules": {
+        "floatRange": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Rule.uint32_rules"
+              "$ref": "#/$defs/.stroppy.Generation.Rule.float_range"
             }
           ]
         },
-        "uint64Rules": {
+        "doubleRange": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Rule.uint64_rules"
+              "$ref": "#/$defs/.stroppy.Generation.Rule.double_range"
             }
           ]
         },
-        "boolRules": {
+        "decimalRange": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Rule.bool_rules"
+              "$ref": "#/$defs/.stroppy.Generation.Rule.decimal_range"
             }
           ]
         },
-        "stringRules": {
+        "stringRange": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Rule.string_rules"
+              "$ref": "#/$defs/.stroppy.Generation.Rule.string_range"
             }
           ]
         },
-        "datetimeRules": {
+        "boolRange": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Rule.datetime_rules"
+              "$ref": "#/$defs/.stroppy.Generation.Rule.bool_range"
             }
           ]
         },
-        "uuidRules": {
+        "datetimeRange": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Rule.uuid_rules"
+              "$ref": "#/$defs/.stroppy.Generation.Rule.datetime_range"
             }
           ]
         },
-        "decimalRules": {
+        "int32Const": {
           "oneOf": [
             {
               "type": "null"
             },
             {
-              "$ref": "#/$defs/.stroppy.Generation.Rule.decimal_rules"
+              "$ref": "#/$defs/.stroppy.Generation.Rule.int32_const"
+            }
+          ]
+        },
+        "int64Const": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Rule.int64_const"
+            }
+          ]
+        },
+        "uint32Const": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Rule.uint32_const"
+            }
+          ]
+        },
+        "uint64Const": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Rule.uint64_const"
+            }
+          ]
+        },
+        "floatConst": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Rule.float_const"
+            }
+          ]
+        },
+        "doubleConst": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Rule.double_const"
+            }
+          ]
+        },
+        "decimalConst": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Rule.decimal_const"
+            }
+          ]
+        },
+        "stringConst": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Rule.string_const"
+            }
+          ]
+        },
+        "boolConst": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Rule.bool_const"
+            }
+          ]
+        },
+        "datetimeConst": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.Generation.Rule.datetime_const"
             }
           ]
         },
@@ -1249,648 +1706,101 @@
         }
       },
       "type": "object",
-      "description": "*\n Rule defines generation rules for a specific data type."
+      "description": "TODO: Add range rule to limit amount of random value.\n       So limit 5 will generate randoms (2, 1, 3, 3, 5) and then stops.\n TODO: Add limit continuation politics.\n       If generator stopped it can behave differently after it.\n       repeat - strart itself from again.\n       bounce - start itself in backward direction.\n       max - produce max value.\n       min - produce min value.\n       null - nulls if allowed.\n TODO: add control over random repeatability.\n       Now every generator with the same params will generate an identical\n       sequence. Two gens with (min: 1, max: 10) will generate\n       1, 5, 9, 5... parallely as seed is common for every gen. It's do a\n       random data with the same gen definitions not so random\n       occasionally.\n*\n Rule defines generation rules for a specific data type."
     },
-    ".stroppy.Generation.Rule.bool_rules": {
-      "$ref": "#/$defs/.stroppy.Generation.Rules.BoolRule",
-      "description": "* Rules for boolean values"
+    ".stroppy.Generation.Rule.bool_const": {
+      "type": "boolean",
+      "description": "* Fixed boolean value."
     },
-    ".stroppy.Generation.Rule.datetime_rules": {
-      "$ref": "#/$defs/.stroppy.Generation.Rules.DateTimeRule",
-      "description": "* Rules for date/time values"
+    ".stroppy.Generation.Rule.bool_range": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.Bool",
+      "description": "* Boolean constraints (e.g., force true/false)."
     },
-    ".stroppy.Generation.Rule.decimal_rules": {
-      "$ref": "#/$defs/.stroppy.Generation.Rules.DecimalRule",
-      "description": "* Rules for decimal numbers"
+    ".stroppy.Generation.Rule.datetime_const": {
+      "$ref": "#/$defs/.stroppy.DateTime",
+      "description": "* Fixed date/time value."
+    },
+    ".stroppy.Generation.Rule.datetime_range": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.DateTime",
+      "description": "* Date/time window (e.g., not before/after)."
+    },
+    ".stroppy.Generation.Rule.decimal_const": {
+      "$ref": "#/$defs/.stroppy.Decimal",
+      "description": "* Fixed decimal value."
+    },
+    ".stroppy.Generation.Rule.decimal_range": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.DecimalRange",
+      "description": "* Arbitrary‑precision decimal bounds for money/ratios."
     },
     ".stroppy.Generation.Rule.distribution": {
-      "$ref": "#/$defs/.stroppy.Generation.Distribution"
+      "$ref": "#/$defs/.stroppy.Generation.Distribution",
+      "description": "* Shape of randomness; Normal by default"
     },
-    ".stroppy.Generation.Rule.double_rules": {
-      "$ref": "#/$defs/.stroppy.Generation.Rules.DoubleRule",
-      "description": "* Rules for 64-bit floating point numbers"
+    ".stroppy.Generation.Rule.double_const": {
+      "type": "number",
+      "description": "* Fixed 64‑bit float value."
     },
-    ".stroppy.Generation.Rule.float_rules": {
-      "$ref": "#/$defs/.stroppy.Generation.Rules.FloatRule",
-      "description": "* Rules for 32-bit floating point numbers"
+    ".stroppy.Generation.Rule.double_range": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.Double",
+      "description": "* 64‑bit float bounds for high‑precision numeric data."
     },
-    ".stroppy.Generation.Rule.int32_rules": {
-      "$ref": "#/$defs/.stroppy.Generation.Rules.Int32Rule",
-      "description": "* Rules for 32-bit signed integers"
+    ".stroppy.Generation.Rule.float_const": {
+      "type": "number",
+      "description": "* Fixed 32‑bit float value."
     },
-    ".stroppy.Generation.Rule.int64_rules": {
-      "$ref": "#/$defs/.stroppy.Generation.Rules.Int64Rule",
-      "description": "* Rules for 64-bit signed integers"
+    ".stroppy.Generation.Rule.float_range": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.Float",
+      "description": "* 32‑bit float bounds; beware precision for currency."
+    },
+    ".stroppy.Generation.Rule.int32_const": {
+      "type": "integer",
+      "description": "Constants\n* Fixed 32‑bit integer value."
+    },
+    ".stroppy.Generation.Rule.int32_range": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.Int32",
+      "description": "Numeric ranges (frequent)\n* Signed 32‑bit integer range (inclusive). Example: 1..100 for\n IDs."
+    },
+    ".stroppy.Generation.Rule.int64_const": {
+      "type": "string",
+      "format": "int64",
+      "description": "* Fixed 64‑bit integer value."
+    },
+    ".stroppy.Generation.Rule.int64_range": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.Int64",
+      "description": "* Signed 64‑bit integer range for large counters or timestamps."
     },
     ".stroppy.Generation.Rule.null_percentage": {
-      "type": "integer"
+      "type": "integer",
+      "description": "* Percentage of nulls to inject [0..100]; 0 by default"
     },
-    ".stroppy.Generation.Rule.string_rules": {
-      "$ref": "#/$defs/.stroppy.Generation.Rules.StringRule",
-      "description": "* Rules for string values"
+    ".stroppy.Generation.Rule.string_const": {
+      "type": "string",
+      "description": "* Fixed string value."
     },
-    ".stroppy.Generation.Rule.uint32_rules": {
-      "$ref": "#/$defs/.stroppy.Generation.Rules.UInt32Rule",
-      "description": "* Rules for 32-bit unsigned integers"
+    ".stroppy.Generation.Rule.string_range": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.String",
+      "description": "Non‑numeric ranges\n* String constraints (length, alphabet)."
     },
-    ".stroppy.Generation.Rule.uint64_rules": {
-      "$ref": "#/$defs/.stroppy.Generation.Rules.UInt64Rule",
-      "description": "* Rules for 64-bit unsigned integers"
+    ".stroppy.Generation.Rule.uint32_const": {
+      "type": "integer",
+      "description": "* Fixed unsigned 32‑bit integer value."
+    },
+    ".stroppy.Generation.Rule.uint32_range": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.UInt32",
+      "description": "* Unsigned 32‑bit integer range; use for sizes/indices."
+    },
+    ".stroppy.Generation.Rule.uint64_const": {
+      "type": "string",
+      "format": "int64",
+      "description": "* Fixed unsigned 64‑bit integer value."
+    },
+    ".stroppy.Generation.Rule.uint64_range": {
+      "$ref": "#/$defs/.stroppy.Generation.Range.UInt64",
+      "description": "* Unsigned 64‑bit integer range; use for large sizes."
     },
     ".stroppy.Generation.Rule.unique": {
-      "type": "boolean"
-    },
-    ".stroppy.Generation.Rule.uuid_rules": {
-      "$ref": "#/$defs/.stroppy.Generation.Rules.UuidRule",
-      "description": "* Rules for UUIDs"
-    },
-    ".stroppy.Generation.Rules.BoolRule": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "constant"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "constant"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "constant": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.BoolRule.constant"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "description": "* Rules for generating boolean values"
-    },
-    ".stroppy.Generation.Rules.BoolRule.constant": {
       "type": "boolean",
-      "description": "* Fixed value (if not specified, generates random booleans)"
-    },
-    ".stroppy.Generation.Rules.DateTimeRule": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "constant"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "constant"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "range": {
-          "$ref": "#/$defs/.stroppy.Generation.Rules.DateTimeRule.range"
-        },
-        "constant": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.DateTimeRule.constant"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "required": [
-        "range"
-      ],
-      "description": "* Rules for generating date/time values"
-    },
-    ".stroppy.Generation.Rules.DateTimeRule.constant": {
-      "$ref": "#/$defs/.stroppy.DateTime",
-      "description": "* Fixed value (if specified, overrides range)"
-    },
-    ".stroppy.Generation.Rules.DateTimeRule.range": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.DateTimeRange",
-      "description": "* Valid time range"
-    },
-    ".stroppy.Generation.Rules.DecimalRule": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "constant"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "constant"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "range": {
-          "$ref": "#/$defs/.stroppy.Generation.Rules.DecimalRule.range"
-        },
-        "constant": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.DecimalRule.constant"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "required": [
-        "range"
-      ],
-      "description": "* Rules for generating decimal numbers"
-    },
-    ".stroppy.Generation.Rules.DecimalRule.constant": {
-      "$ref": "#/$defs/.stroppy.Decimal",
-      "description": "* Fixed value (if specified, overrides range)"
-    },
-    ".stroppy.Generation.Rules.DecimalRule.range": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.DecimalRange",
-      "description": "* Valid value range"
-    },
-    ".stroppy.Generation.Rules.DoubleRule": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "constant"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "constant"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "range": {
-          "$ref": "#/$defs/.stroppy.Generation.Rules.DoubleRule.range"
-        },
-        "constant": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.DoubleRule.constant"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "required": [
-        "range"
-      ],
-      "description": "* Rules for generating 64-bit floating point numbers"
-    },
-    ".stroppy.Generation.Rules.DoubleRule.constant": {
-      "type": "number",
-      "description": "* Fixed value (if specified, overrides range)"
-    },
-    ".stroppy.Generation.Rules.DoubleRule.range": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.DoubleRange",
-      "description": "* Valid value range"
-    },
-    ".stroppy.Generation.Rules.FloatRule": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "constant"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "constant"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "range": {
-          "$ref": "#/$defs/.stroppy.Generation.Rules.FloatRule.range"
-        },
-        "constant": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.FloatRule.constant"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "required": [
-        "range"
-      ],
-      "description": "* Rules for generating 32-bit floating point numbers"
-    },
-    ".stroppy.Generation.Rules.FloatRule.constant": {
-      "type": "number",
-      "description": "* Fixed value (if specified, overrides range)"
-    },
-    ".stroppy.Generation.Rules.FloatRule.range": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.FloatRange",
-      "description": "* Valid value range"
-    },
-    ".stroppy.Generation.Rules.Int32Rule": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "constant"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "constant"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "range": {
-          "$ref": "#/$defs/.stroppy.Generation.Rules.Int32Rule.range"
-        },
-        "constant": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.Int32Rule.constant"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "required": [
-        "range"
-      ],
-      "description": "* Rules for generating 32-bit signed integers"
-    },
-    ".stroppy.Generation.Rules.Int32Rule.constant": {
-      "type": "integer",
-      "description": "* Fixed value (if specified, overrides range)"
-    },
-    ".stroppy.Generation.Rules.Int32Rule.range": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.Int32Range",
-      "description": "* Valid value range"
-    },
-    ".stroppy.Generation.Rules.Int64Rule": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "constant"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "constant"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "range": {
-          "$ref": "#/$defs/.stroppy.Generation.Rules.Int64Rule.range"
-        },
-        "constant": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.Int64Rule.constant"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "required": [
-        "range"
-      ],
-      "description": "* Rules for generating 64-bit signed integers"
-    },
-    ".stroppy.Generation.Rules.Int64Rule.constant": {
-      "type": "string",
-      "format": "int64",
-      "description": "* Fixed value (if specified, overrides range)"
-    },
-    ".stroppy.Generation.Rules.Int64Rule.range": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.Int64Range",
-      "description": "* Valid value range"
-    },
-    ".stroppy.Generation.Rules.StringRule": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "alphabet"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "alphabet"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "constant"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "constant"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "alphabet": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.StringRule.alphabet"
-            }
-          ]
-        },
-        "lenRange": {
-          "$ref": "#/$defs/.stroppy.Generation.Rules.StringRule.len_range"
-        },
-        "constant": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.StringRule.constant"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "required": [
-        "lenRange"
-      ],
-      "description": "* Rules for generating string values"
-    },
-    ".stroppy.Generation.Rules.StringRule.alphabet": {
-      "$ref": "#/$defs/.stroppy.Generation.Alphabet",
-      "description": "* Character set to use for generation"
-    },
-    ".stroppy.Generation.Rules.StringRule.constant": {
-      "type": "string",
-      "description": "TODO: 'constant' shouldn't require 'len_range' to use it.\n* Fixed value (if specified, overrides generation)"
-    },
-    ".stroppy.Generation.Rules.StringRule.len_range": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.UInt64Range",
-      "description": "* Valid length range for the string"
-    },
-    ".stroppy.Generation.Rules.UInt32Rule": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "constant"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "constant"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "range": {
-          "$ref": "#/$defs/.stroppy.Generation.Rules.UInt32Rule.range"
-        },
-        "constant": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.UInt32Rule.constant"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "required": [
-        "range"
-      ],
-      "description": "* Rules for generating 32-bit unsigned integers"
-    },
-    ".stroppy.Generation.Rules.UInt32Rule.constant": {
-      "type": "integer",
-      "description": "* Fixed value (if specified, overrides range)"
-    },
-    ".stroppy.Generation.Rules.UInt32Rule.range": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.UInt32Range",
-      "description": "* Valid value range"
-    },
-    ".stroppy.Generation.Rules.UInt64Rule": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "constant"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "constant"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "range": {
-          "$ref": "#/$defs/.stroppy.Generation.Rules.UInt64Rule.range"
-        },
-        "constant": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.UInt64Rule.constant"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "required": [
-        "range"
-      ],
-      "description": "* Rules for generating 64-bit unsigned integers"
-    },
-    ".stroppy.Generation.Rules.UInt64Rule.constant": {
-      "type": "string",
-      "format": "int64",
-      "description": "* Fixed value (if specified, overrides range)"
-    },
-    ".stroppy.Generation.Rules.UInt64Rule.range": {
-      "$ref": "#/$defs/.stroppy.Generation.Range.UInt64Range",
-      "description": "* Valid value range"
-    },
-    ".stroppy.Generation.Rules.UuidRule": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "constant"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "constant"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "constant": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.Generation.Rules.UuidRule.constant"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "description": "* Rules for generating UUIDs"
-    },
-    ".stroppy.Generation.Rules.UuidRule.constant": {
-      "$ref": "#/$defs/.stroppy.Uuid",
-      "description": "* Fixed UUID (if not specified, generates random UUIDs)"
+      "description": "* Enforce uniqueness across generated values;\n Linear sequence for ranges"
     },
     ".stroppy.GlobalConfig": {
       "properties": {
@@ -2028,6 +1938,96 @@
     ".stroppy.IndexDescriptor.unique": {
       "type": "boolean",
       "description": "* Whether this is a unique index"
+    },
+    ".stroppy.InsertDescriptor": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "method"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "method"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/.stroppy.InsertDescriptor.name"
+        },
+        "tableName": {
+          "$ref": "#/$defs/.stroppy.InsertDescriptor.table_name"
+        },
+        "method": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.InsertDescriptor.method"
+            }
+          ]
+        },
+        "params": {
+          "$ref": "#/$defs/.stroppy.InsertDescriptor.params"
+        },
+        "groups": {
+          "$ref": "#/$defs/.stroppy.InsertDescriptor.groups"
+        }
+      },
+      "type": "object",
+      "required": [
+        "name",
+        "tableName"
+      ],
+      "description": "*\n InsertDescription defines data to fill database."
+    },
+    ".stroppy.InsertDescriptor.groups": {
+      "items": {
+        "$ref": "#/$defs/.stroppy.QueryParamGroup",
+        "description": "* Groups of the columns"
+      },
+      "type": "array",
+      "description": "* Groups of the columns"
+    },
+    ".stroppy.InsertDescriptor.method": {
+      "$ref": "#/$defs/.stroppy.InsertMethod",
+      "description": "* Allows to use a percise method of data insertion"
+    },
+    ".stroppy.InsertDescriptor.name": {
+      "type": "string",
+      "description": "* Name of the Insert query"
+    },
+    ".stroppy.InsertDescriptor.params": {
+      "items": {
+        "$ref": "#/$defs/.stroppy.QueryParamDescriptor",
+        "description": "*\n Parameters used in the insert.\n Names threated as db columns names, regexp is ignored."
+      },
+      "type": "array",
+      "description": "*\n Parameters used in the insert.\n Names threated as db columns names, regexp is ignored."
+    },
+    ".stroppy.InsertDescriptor.table_name": {
+      "type": "string",
+      "description": "* Which table to insert the values"
+    },
+    ".stroppy.InsertMethod": {
+      "type": "string",
+      "enum": [
+        "PLAIN_QUERY",
+        "COPY_FROM"
+      ],
+      "description": "* Data insertion method"
     },
     ".stroppy.K6Options": {
       "allOf": [
@@ -2248,7 +2248,7 @@
     ".stroppy.K6Scenario.max_duration": {
       "type": "string",
       "format": "duration",
-      "description": "* Maximum duration for scenario execution.\n Used as a time limiter if main parameters (iterations, stages, duration) \n do not complete in time."
+      "description": "* Maximum duration for scenario execution.\n Used as a time limiter if main parameters (iterations, stages, duration)\n do not complete in time."
     },
     ".stroppy.K6Scenario.per_vu_iterations": {
       "$ref": "#/$defs/.stroppy.PerVuIterations",
@@ -2533,12 +2533,12 @@
         "vus",
         "iterations"
       ],
-      "description": "*\n PerVuIterations executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/"
+      "description": "*\n PerVuIterations executor configuration.\n Documentation:\n https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/"
     },
     ".stroppy.PerVuIterations.iterations": {
       "type": "string",
       "format": "int64",
-      "description": "* Number of iterations that each VU should execute"
+      "description": "* Number of iterations that each VU should execute\n \"-1\" is a special value to run all the units from by every vu."
     },
     ".stroppy.PerVuIterations.vus": {
       "type": "integer",
@@ -2605,10 +2605,10 @@
     ".stroppy.QueryDescriptor.groups": {
       "items": {
         "$ref": "#/$defs/.stroppy.QueryParamGroup",
-        "description": "* Grouped parameter groups"
+        "description": "* Groups of the parameters"
       },
       "type": "array",
-      "description": "* Grouped parameter groups"
+      "description": "* Groups of the parameters"
     },
     ".stroppy.QueryDescriptor.name": {
       "type": "string",
@@ -2772,7 +2772,7 @@
         "preAllocatedVus",
         "maxVus"
       ],
-      "description": "*\n RampingArrivalRate executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/"
+      "description": "*\n RampingArrivalRate executor configuration.\n Documentation:\n https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/"
     },
     ".stroppy.RampingArrivalRate.RateStage": {
       "properties": {
@@ -2845,7 +2845,7 @@
         "preAllocatedVus",
         "maxVus"
       ],
-      "description": "*\n RampingVUs executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/"
+      "description": "*\n RampingVUs executor configuration.\n Documentation:\n https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/"
     },
     ".stroppy.RampingVUs.VUStage": {
       "properties": {
@@ -2883,10 +2883,10 @@
     ".stroppy.RampingVUs.stages": {
       "items": {
         "$ref": "#/$defs/.stroppy.RampingVUs.VUStage",
-        "description": "* List of stages where VU count changes to target value over specified time"
+        "description": "* List of stages where VU count changes to target value over specified\n time"
       },
       "type": "array",
-      "description": "* List of stages where VU count changes to target value over specified time"
+      "description": "* List of stages where VU count changes to target value over specified\n time"
     },
     ".stroppy.RampingVUs.start_vus": {
       "type": "integer",
@@ -2906,16 +2906,16 @@
         "iterations",
         "vus"
       ],
-      "description": "*\n SharedIterations executor configuration.\n Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/"
+      "description": "*\n SharedIterations executor configuration.\n Documentation:\n https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/"
     },
     ".stroppy.SharedIterations.iterations": {
       "type": "string",
       "format": "int64",
-      "description": "* Total number of iterations to be executed by all VUs together.\n Iterations are distributed dynamically among available VUs."
+      "description": "*\n Total number of iterations to be executed by all VUs together.\n Iterations are distributed dynamically among available VUs.\n \"-1\" is a special value to run all the units from step."
     },
     ".stroppy.SharedIterations.vus": {
       "type": "integer",
-      "description": "* Number of virtual users that will execute these iterations in parallel"
+      "description": "*\n Number of virtual users that will execute these iterations in parallel"
     },
     ".stroppy.SideCarConfig": {
       "allOf": [
@@ -3038,6 +3038,48 @@
       "description": "* Name of the step"
     },
     ".stroppy.TableDescriptor": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "constraint"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "constraint"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "dbSpecific"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "dbSpecific"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "name": {
           "$ref": "#/$defs/.stroppy.TableDescriptor.name"
@@ -3046,10 +3088,24 @@
           "$ref": "#/$defs/.stroppy.TableDescriptor.table_indexes"
         },
         "constraint": {
-          "$ref": "#/$defs/.stroppy.TableDescriptor.constraint"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.TableDescriptor.constraint"
+            }
+          ]
         },
         "dbSpecific": {
-          "$ref": "#/$defs/.stroppy.TableDescriptor.db_specific"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.TableDescriptor.db_specific"
+            }
+          ]
         },
         "columns": {
           "$ref": "#/$defs/.stroppy.TableDescriptor.columns"
@@ -3057,9 +3113,7 @@
       },
       "type": "object",
       "required": [
-        "name",
-        "constraint",
-        "dbSpecific"
+        "name"
       ],
       "description": "*\n TableDescriptor defines the structure of a database table."
     },
@@ -3165,11 +3219,11 @@
     ".stroppy.TxIsolationLevel": {
       "type": "string",
       "enum": [
-        "TX_ISOLATION_LEVEL_UNSPECIFIED",
-        "TX_ISOLATION_LEVEL_READ_UNCOMMITTED",
-        "TX_ISOLATION_LEVEL_READ_COMMITTED",
-        "TX_ISOLATION_LEVEL_REPEATABLE_READ",
-        "TX_ISOLATION_LEVEL_SERIALIZABLE"
+        "UNSPECIFIED",
+        "READ_UNCOMMITTED",
+        "READ_COMMITTED",
+        "REPEATABLE_READ",
+        "SERIALIZABLE"
       ],
       "description": "*\n TransactionIsolationLevel defines the isolation level for a database\n transaction."
     },
@@ -3180,6 +3234,11 @@
             {
               "required": [
                 "createTable"
+              ]
+            },
+            {
+              "required": [
+                "insert"
               ]
             },
             {
@@ -3198,6 +3257,11 @@
                   {
                     "required": [
                       "createTable"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "insert"
                     ]
                   },
                   {
@@ -3224,6 +3288,16 @@
             },
             {
               "$ref": "#/$defs/.stroppy.UnitDescriptor.create_table"
+            }
+          ]
+        },
+        "insert": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.UnitDescriptor.insert"
             }
           ]
         },
@@ -3254,6 +3328,10 @@
     ".stroppy.UnitDescriptor.create_table": {
       "$ref": "#/$defs/.stroppy.TableDescriptor",
       "description": "* Table creation operation"
+    },
+    ".stroppy.UnitDescriptor.insert": {
+      "$ref": "#/$defs/.stroppy.InsertDescriptor",
+      "description": "* Data insertion operation"
     },
     ".stroppy.UnitDescriptor.query": {
       "$ref": "#/$defs/.stroppy.QueryDescriptor",
@@ -3684,12 +3762,41 @@
       "description": "* Universally unique identifier"
     },
     ".stroppy.WorkloadDescriptor": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "async"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "async"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
       "properties": {
         "name": {
           "$ref": "#/$defs/.stroppy.WorkloadDescriptor.name"
         },
         "async": {
-          "$ref": "#/$defs/.stroppy.WorkloadDescriptor.async"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.WorkloadDescriptor.async"
+            }
+          ]
         },
         "units": {
           "$ref": "#/$defs/.stroppy.WorkloadDescriptor.units"
@@ -3697,8 +3804,7 @@
       },
       "type": "object",
       "required": [
-        "name",
-        "async"
+        "name"
       ],
       "description": "*\n WorkloadDescriptor represents a logical step in a benchmark.\n It contains a list of operations to perform in this step."
     },

@@ -9,7 +9,6 @@ import (
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
@@ -22,10 +21,8 @@ func TestNewQueryBuilder_Success(t *testing.T) {
 	generator, err := generate.NewValueGenerator(42, &stroppy.QueryParamDescriptor{
 		Name: "id",
 		GenerationRule: &stroppy.Generation_Rule{
-			Type: &stroppy.Generation_Rule_Int32Rules{
-				Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-					Constant: proto.Int32(10),
-				},
+			Kind: &stroppy.Generation_Rule_Int32Const{
+				Int32Const: 10,
 			},
 		},
 	})
@@ -55,10 +52,8 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 		Sql:  "SELECT * FROM t WHERE id=${id}",
 		Params: []*stroppy.QueryParamDescriptor{
 			{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-				Type: &stroppy.Generation_Rule_Int32Rules{
-					Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-						Constant: proto.Int32(10),
-					},
+				Kind: &stroppy.Generation_Rule_Int32Const{
+					Int32Const: 10,
 				},
 			}},
 		},
@@ -98,7 +93,11 @@ func TestQueryBuilder_Build_Success(t *testing.T) {
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnitDescriptor().GetDescriptor_())
+	transactionList, err := builder.Build(
+		ctx,
+		lg,
+		unitBuildContext.GetUnitDescriptor().GetDescriptor_(),
+	)
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
 	require.Len(t, transactionList.Queries, 1)
@@ -144,7 +143,11 @@ func TestQueryBuilder_Build_CreateTable(t *testing.T) {
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnitDescriptor().GetDescriptor_())
+	transactionList, err := builder.Build(
+		ctx,
+		lg,
+		unitBuildContext.GetUnitDescriptor().GetDescriptor_(),
+	)
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
 	require.Len(t, transactionList.Queries, 1)
@@ -160,10 +163,8 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 				Sql:  "SELECT * FROM t WHERE id=${id}",
 				Params: []*stroppy.QueryParamDescriptor{
 					{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-						Type: &stroppy.Generation_Rule_Int32Rules{
-							Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-								Constant: proto.Int32(10),
-							},
+						Kind: &stroppy.Generation_Rule_Int32Const{
+							Int32Const: 10,
 						},
 					}},
 				},
@@ -171,7 +172,6 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 		},
 	}
 	wrk := &stroppy.WorkloadDescriptor{
-		Name: "test",
 		Units: []*stroppy.WorkloadUnitDescriptor{
 			{
 				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
@@ -208,7 +208,11 @@ func TestQueryBuilder_Build_Transaction(t *testing.T) {
 	ctx := context.Background()
 	lg := zap.NewNop()
 
-	transactionList, err := builder.Build(ctx, lg, unitBuildContext.GetUnitDescriptor().GetDescriptor_())
+	transactionList, err := builder.Build(
+		ctx,
+		lg,
+		unitBuildContext.GetUnitDescriptor().GetDescriptor_(),
+	)
 	require.NoError(t, err)
 	require.NotNil(t, transactionList)
 	require.Len(t, transactionList.Queries, 1)

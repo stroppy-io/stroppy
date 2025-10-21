@@ -18,7 +18,7 @@ type Executor interface {
 	// Returns:
 	// - pgconn.CommandTag: The command tag returned by the execution.
 	// - error: An error if the execution fails.
-	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 }
 
 type ctxGetter interface {
@@ -90,7 +90,7 @@ func (e *TxExecutor) tr(ctx context.Context) trmpgx.Tr { //nolint:ireturn // lib
 func (e *TxExecutor) Exec(
 	ctx context.Context,
 	sql string,
-	arguments ...interface{},
+	arguments ...any,
 ) (pgconn.CommandTag, error) {
 	tag, err := e.tr(ctx).Exec(ctx, sql, arguments...)
 	if err != nil {

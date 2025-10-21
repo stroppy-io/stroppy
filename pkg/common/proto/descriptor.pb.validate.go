@@ -248,13 +248,21 @@ func (m *ColumnDescriptor) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	// no validation rules for Nullable
+	if m.Nullable != nil {
+		// no validation rules for Nullable
+	}
 
-	// no validation rules for PrimaryKey
+	if m.PrimaryKey != nil {
+		// no validation rules for PrimaryKey
+	}
 
-	// no validation rules for Unique
+	if m.Unique != nil {
+		// no validation rules for Unique
+	}
 
-	// no validation rules for Constraint
+	if m.Constraint != nil {
+		// no validation rules for Constraint
+	}
 
 	if len(errors) > 0 {
 		return ColumnDescriptorMultiError(errors)
@@ -412,37 +420,6 @@ func (m *TableDescriptor) validate(all bool) error {
 
 	}
 
-	// no validation rules for Constraint
-
-	if all {
-		switch v := interface{}(m.GetDbSpecific()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, TableDescriptorValidationError{
-					field:  "DbSpecific",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, TableDescriptorValidationError{
-					field:  "DbSpecific",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetDbSpecific()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return TableDescriptorValidationError{
-				field:  "DbSpecific",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
 	for idx, item := range m.GetColumns() {
 		_, _ = idx, item
 
@@ -469,6 +446,43 @@ func (m *TableDescriptor) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return TableDescriptorValidationError{
 					field:  fmt.Sprintf("Columns[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if m.Constraint != nil {
+		// no validation rules for Constraint
+	}
+
+	if m.DbSpecific != nil {
+
+		if all {
+			switch v := interface{}(m.GetDbSpecific()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TableDescriptorValidationError{
+						field:  "DbSpecific",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TableDescriptorValidationError{
+						field:  "DbSpecific",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetDbSpecific()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TableDescriptorValidationError{
+					field:  "DbSpecific",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
@@ -554,6 +568,211 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = TableDescriptorValidationError{}
+
+// Validate checks the field values on InsertDescriptor with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *InsertDescriptor) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InsertDescriptor with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// InsertDescriptorMultiError, or nil if none found.
+func (m *InsertDescriptor) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InsertDescriptor) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetName()) < 1 {
+		err := InsertDescriptorValidationError{
+			field:  "Name",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetTableName()) < 1 {
+		err := InsertDescriptorValidationError{
+			field:  "TableName",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetParams() {
+		_, _ = idx, item
+
+		if item == nil {
+			err := InsertDescriptorValidationError{
+				field:  fmt.Sprintf("Params[%v]", idx),
+				reason: "value is required",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InsertDescriptorValidationError{
+						field:  fmt.Sprintf("Params[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InsertDescriptorValidationError{
+						field:  fmt.Sprintf("Params[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InsertDescriptorValidationError{
+					field:  fmt.Sprintf("Params[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	for idx, item := range m.GetGroups() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InsertDescriptorValidationError{
+						field:  fmt.Sprintf("Groups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InsertDescriptorValidationError{
+						field:  fmt.Sprintf("Groups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InsertDescriptorValidationError{
+					field:  fmt.Sprintf("Groups[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if m.Method != nil {
+		// no validation rules for Method
+	}
+
+	if len(errors) > 0 {
+		return InsertDescriptorMultiError(errors)
+	}
+
+	return nil
+}
+
+// InsertDescriptorMultiError is an error wrapping multiple validation errors
+// returned by InsertDescriptor.ValidateAll() if the designated constraints
+// aren't met.
+type InsertDescriptorMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InsertDescriptorMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InsertDescriptorMultiError) AllErrors() []error { return m }
+
+// InsertDescriptorValidationError is the validation error returned by
+// InsertDescriptor.Validate if the designated constraints aren't met.
+type InsertDescriptorValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InsertDescriptorValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InsertDescriptorValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InsertDescriptorValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InsertDescriptorValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InsertDescriptorValidationError) ErrorName() string { return "InsertDescriptorValidationError" }
+
+// Error satisfies the builtin error interface
+func (e InsertDescriptorValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInsertDescriptor.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InsertDescriptorValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InsertDescriptorValidationError{}
 
 // Validate checks the field values on QueryParamDescriptor with the rules
 // defined in the proto definition for this message. If any rules are
@@ -1385,6 +1604,48 @@ func (m *UnitDescriptor) validate(all bool) error {
 			}
 		}
 
+	case *UnitDescriptor_Insert:
+		if v == nil {
+			err := UnitDescriptorValidationError{
+				field:  "Type",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofTypePresent = true
+
+		if all {
+			switch v := interface{}(m.GetInsert()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, UnitDescriptorValidationError{
+						field:  "Insert",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, UnitDescriptorValidationError{
+						field:  "Insert",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetInsert()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return UnitDescriptorValidationError{
+					field:  "Insert",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	case *UnitDescriptor_Query:
 		if v == nil {
 			err := UnitDescriptorValidationError{
@@ -1736,8 +1997,6 @@ func (m *WorkloadDescriptor) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	// no validation rules for Async
-
 	if len(m.GetUnits()) < 1 {
 		err := WorkloadDescriptorValidationError{
 			field:  "Units",
@@ -1792,6 +2051,10 @@ func (m *WorkloadDescriptor) validate(all bool) error {
 			}
 		}
 
+	}
+
+	if m.Async != nil {
+		// no validation rules for Async
 	}
 
 	if len(errors) > 0 {
