@@ -173,11 +173,12 @@ type ColumnDescriptor struct {
 	SqlType string `protobuf:"bytes,2,opt,name=sql_type,json=sqlType,proto3" json:"sql_type,omitempty"`
 	// * Whether the column can be NULL
 	Nullable bool `protobuf:"varint,3,opt,name=nullable,proto3" json:"nullable,omitempty"`
-	// * Whether the column is part of the primary key
+	//   - Whether the column is part of the primary key.
+	//     Multiple primary keys creates composite primary key.
 	PrimaryKey bool `protobuf:"varint,4,opt,name=primary_key,json=primaryKey,proto3" json:"primary_key,omitempty"`
 	// * Whether the column has a UNIQUE constraint
 	Unique bool `protobuf:"varint,5,opt,name=unique,proto3" json:"unique,omitempty"`
-	// * SQL constraint definition for the column
+	// * SQL constraint definition for the column in free form
 	Constraint    string `protobuf:"bytes,6,opt,name=constraint,proto3" json:"constraint,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -413,9 +414,16 @@ func (x *QueryParamDescriptor) GetDbSpecific() *Value_Struct {
 	return nil
 }
 
+// *
+// QueryParamGroup defines a group of dependent parameters.
+// New values generated in Carthesian product manner.
+// It's useful to define composite primary keys.
+// Every evaluation step only one param changes.
 type QueryParamGroup struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	Name          string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// * Group name
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// * Grouped dependent parameters
 	Params        []*QueryParamDescriptor `protobuf:"bytes,2,rep,name=params,proto3" json:"params,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -476,7 +484,8 @@ type QueryDescriptor struct {
 	Sql string `protobuf:"bytes,2,opt,name=sql,proto3" json:"sql,omitempty"`
 	// * Parameters used in the query
 	Params []*QueryParamDescriptor `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty"`
-	Groups []*QueryParamGroup      `protobuf:"bytes,4,rep,name=groups,proto3" json:"groups,omitempty"`
+	// * Grouped parameter groups
+	Groups []*QueryParamGroup `protobuf:"bytes,4,rep,name=groups,proto3" json:"groups,omitempty"`
 	// * Database-specific query properties
 	DbSpecific    *Value_Struct `protobuf:"bytes,5,opt,name=db_specific,json=dbSpecific,proto3,oneof" json:"db_specific,omitempty"`
 	unknownFields protoimpl.UnknownFields

@@ -12,12 +12,14 @@ import (
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/internal/config"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/pkg/common/proto"
 )
 
 const (
 	configNewWorkdirFlagName = "workdir"
 	configNewFormatFlagName  = "format"
 	configNewNameFlagName    = "name"
+	configTPCCFlagName       = "tpcc"
 )
 
 var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
@@ -29,7 +31,9 @@ var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 		if err != nil {
 			return err
 		}
-		format, err := config.NewFormatFromString(cmd.PersistentFlags().Lookup(configNewFormatFlagName).Value.String())
+		format, err := config.NewFormatFromString(
+			cmd.PersistentFlags().Lookup(configNewFormatFlagName).Value.String(),
+		)
 		if err != nil {
 			return err
 		}
@@ -38,9 +42,19 @@ var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 			return err
 		}
 
-		example := config.NewExampleConfig()
+		isTpcc, err := cmd.Flags().GetBool(configTPCCFlagName)
+		if err != nil {
+			return err
+		}
 
-		runConfStr, err := MarshalConfig(example, format.FormatConfigName(configName))
+		var protoConfig *proto.ConfigFile
+		if isTpcc { // TODO: proper --preset tpcc|simple|etc.. option
+			protoConfig = config.NewTPCCConfig()
+		} else {
+			protoConfig = config.NewExampleConfig()
+		}
+
+		runConfStr, err := MarshalConfig(protoConfig, format.FormatConfigName(configName))
 		if err != nil {
 			return err
 		}
@@ -59,10 +73,12 @@ var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 			return err
 		}
 
-		logger.Global().WithOptions(zap.WithCaller(false)).Info("Config generated! Happy benchmarking!", zap.String(
-			"config_path",
-			path.Join(output, format.FormatConfigName(configName)),
-		))
+		logger.Global().
+			WithOptions(zap.WithCaller(false)).
+			Info("Config generated! Happy benchmarking!", zap.String(
+				"config_path",
+				path.Join(output, format.FormatConfigName(configName)),
+			))
 
 		return nil
 	},
@@ -91,4 +107,6 @@ func init() { //nolint: gochecknoinits // allow in cmd
 		configNewFormatFlagName,
 		"output config format, json or yaml",
 	)
+	NewConfigCmd.PersistentFlags().
+		Bool(configTPCCFlagName, false, "whether to use tpc-c test preset")
 }

@@ -13,7 +13,7 @@ func ptr[T any](x T) *T {
 	return &x
 }
 
-//nolint:mnd // it is huge magic config itself
+//nolint:mnd // it is a huge magic config by itself
 func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // allow in example
 	return &stroppy.ConfigFile{
 		Global: &stroppy.GlobalConfig{

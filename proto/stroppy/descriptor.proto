@@ -36,11 +36,12 @@ message ColumnDescriptor {
     string sql_type = 2 [ (validate.rules).string.min_len = 1 ];
     /** Whether the column can be NULL */
     bool nullable = 3;
-    /** Whether the column is part of the primary key */
+    /** Whether the column is part of the primary key.
+     *  Multiple primary keys creates composite primary key. */
     bool primary_key = 4;
     /** Whether the column has a UNIQUE constraint */
     bool unique = 5;
-    /** SQL constraint definition for the column */
+    /** SQL constraint definition for the column in free form */
     string constraint = 6;
 }
 
@@ -77,8 +78,16 @@ message QueryParamDescriptor {
     optional Value.Struct db_specific = 4;
 }
 
+/**
+ * QueryParamGroup defines a group of dependent parameters.
+ * New values generated in Carthesian product manner.
+ * It's useful to define composite primary keys.
+ * Every evaluation step only one param changes.
+ */
 message QueryParamGroup {
+    /** Group name */
     string name = 1;
+    /** Grouped dependent parameters */
     repeated QueryParamDescriptor params = 2;
 }
 
@@ -94,6 +103,7 @@ message QueryDescriptor {
     /** Parameters used in the query */
     repeated QueryParamDescriptor params = 3
         [ (validate.rules).repeated = {items : {message : {required : true}}} ];
+    /** Grouped parameter groups */
     repeated QueryParamGroup groups = 4;
     /** Database-specific query properties */
     optional Value.Struct db_specific = 5;

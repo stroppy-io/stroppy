@@ -59,7 +59,9 @@ func newCreateTable(
 		))
 	}
 
-	columnsStr = append(columnsStr, "PRIMARY KEY ("+strings.Join(pkColumns, ", ")+")")
+	if len(pkColumns) > 0 {
+		columnsStr = append(columnsStr, "PRIMARY KEY ("+strings.Join(pkColumns, ", ")+")")
+	}
 
 	return &stroppy.DriverTransaction{
 		Queries: []*stroppy.DriverQuery{

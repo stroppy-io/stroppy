@@ -61,11 +61,19 @@ message DriverTransaction {
     TxIsolationLevel isolation_level = 2;
 }
 
+/**
+ * DriverQueryStat represent an actual time spent on single query.
+ * exec_duration includes the network round-trip and exection on dbms.
+ */
 message DriverQueryStat {
     string name = 1;
     google.protobuf.Duration exec_duration = 2;
 }
 
+/**
+ * DriverTransactionStat represents an actual time spent on transaction.
+ * exec_duration includes the network round-trip and exection on dbms.
+ */
 message DriverTransactionStat {
     repeated DriverQueryStat queries = 1;
     google.protobuf.Duration exec_duration = 2;
