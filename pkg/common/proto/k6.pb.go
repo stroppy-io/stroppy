@@ -260,13 +260,17 @@ func (*K6Scenario_RampingArrivalRate) isK6Scenario_Executor() {}
 
 // *
 // SharedIterations executor configuration.
-// Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
+// Documentation:
+// https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
 type SharedIterations struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Total number of iterations to be executed by all VUs together.
+	// *
+	// Total number of iterations to be executed by all VUs together.
 	// Iterations are distributed dynamically among available VUs.
+	// "-1" is a special value to run all the units from step.
 	Iterations int64 `protobuf:"varint,1,opt,name=iterations,proto3" json:"iterations,omitempty"`
-	// * Number of virtual users that will execute these iterations in parallel
+	// *
+	// Number of virtual users that will execute these iterations in parallel
 	Vus           uint32 `protobuf:"varint,2,opt,name=vus,proto3" json:"vus,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -318,12 +322,14 @@ func (x *SharedIterations) GetVus() uint32 {
 
 // *
 // PerVuIterations executor configuration.
-// Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
+// Documentation:
+// https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
 type PerVuIterations struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Number of virtual users
 	Vus uint32 `protobuf:"varint,1,opt,name=vus,proto3" json:"vus,omitempty"`
 	// * Number of iterations that each VU should execute
+	// "-1" is a special value to run all the units from by every vu.
 	Iterations    int64 `protobuf:"varint,2,opt,name=iterations,proto3" json:"iterations,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -375,10 +381,12 @@ func (x *PerVuIterations) GetIterations() int64 {
 
 // *
 // ConstantVUs executor configuration.
-// Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
+// Documentation:
+// https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
 type ConstantVUs struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Fixed number of virtual users that will be simultaneously active at all times
+	// * Fixed number of virtual users that will be simultaneously active at all
+	// times
 	Vus uint32 `protobuf:"varint,1,opt,name=vus,proto3" json:"vus,omitempty"`
 	// * Duration of the scenario execution.
 	// All VUs will start and execute iterations until this time is completed.
@@ -433,12 +441,14 @@ func (x *ConstantVUs) GetDuration() *durationpb.Duration {
 
 // *
 // RampingVUs executor configuration.
-// Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
+// Documentation:
+// https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
 type RampingVUs struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Initial number of virtual users
 	StartVus uint32 `protobuf:"varint,1,opt,name=start_vus,json=startVus,proto3" json:"start_vus,omitempty"`
-	// * List of stages where VU count changes to target value over specified time
+	// * List of stages where VU count changes to target value over specified
+	// time
 	Stages []*RampingVUs_VUStage `protobuf:"bytes,2,rep,name=stages,proto3" json:"stages,omitempty"`
 	// * Number of VUs allocated in advance.
 	// Helps avoid delays when creating new VUs during the test.
@@ -509,7 +519,8 @@ func (x *RampingVUs) GetMaxVus() uint32 {
 
 // *
 // ConstantArrivalRate executor configuration.
-// Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
+// Documentation:
+// https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
 type ConstantArrivalRate struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Rate of iteration generation (number per time unit)
@@ -593,7 +604,8 @@ func (x *ConstantArrivalRate) GetMaxVus() uint32 {
 
 // *
 // RampingArrivalRate executor configuration.
-// Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
+// Documentation:
+// https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
 type RampingArrivalRate struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Initial rate (iterations per time_unit)

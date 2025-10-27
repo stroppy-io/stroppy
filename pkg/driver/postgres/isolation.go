@@ -40,13 +40,13 @@ var ErrUnsupportedIsolationLevel = errors.New("unsupported isolation level")
 
 func NewStroppyIsolationSettings(transaction *stroppy.DriverTransaction, opts ...settings.Opt) *trmpgx.Settings {
 	switch transaction.GetIsolationLevel() {
-	case stroppy.TxIsolationLevel_TX_ISOLATION_LEVEL_READ_UNCOMMITTED:
+	case stroppy.TxIsolationLevel_READ_UNCOMMITTED:
 		return ReadUncommittedSettings(opts...)
-	case stroppy.TxIsolationLevel_TX_ISOLATION_LEVEL_READ_COMMITTED:
+	case stroppy.TxIsolationLevel_READ_COMMITTED:
 		return ReadCommittedSettings(opts...)
-	case stroppy.TxIsolationLevel_TX_ISOLATION_LEVEL_REPEATABLE_READ:
+	case stroppy.TxIsolationLevel_REPEATABLE_READ:
 		return RepeatableReadSettings(opts...)
-	case stroppy.TxIsolationLevel_TX_ISOLATION_LEVEL_SERIALIZABLE:
+	case stroppy.TxIsolationLevel_SERIALIZABLE:
 		return SerializableSettings(opts...)
 	default:
 		panic(ErrUnsupportedIsolationLevel)

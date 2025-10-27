@@ -70,14 +70,6 @@
     - [RampingVUs.VUStage](#stroppy-RampingVUs-VUStage)
     - [SharedIterations](#stroppy-SharedIterations)
   
-- [runtime.proto](#runtime-proto)
-    - [DriverQuery](#stroppy-DriverQuery)
-    - [DriverQueryStat](#stroppy-DriverQueryStat)
-    - [DriverTransaction](#stroppy-DriverTransaction)
-    - [DriverTransactionStat](#stroppy-DriverTransactionStat)
-    - [StepContext](#stroppy-StepContext)
-    - [UnitContext](#stroppy-UnitContext)
-  
 - [sidecar.proto](#sidecar-proto)
     - [SidecarService](#stroppy-SidecarService)
   
@@ -88,32 +80,20 @@
     - [Generation.Alphabet](#stroppy-Generation-Alphabet)
     - [Generation.Distribution](#stroppy-Generation-Distribution)
     - [Generation.Range](#stroppy-Generation-Range)
-    - [Generation.Range.AnyStringRange](#stroppy-Generation-Range-AnyStringRange)
-    - [Generation.Range.DateTimeRange](#stroppy-Generation-Range-DateTimeRange)
-    - [Generation.Range.DateTimeRange.Default](#stroppy-Generation-Range-DateTimeRange-Default)
-    - [Generation.Range.DateTimeRange.Timestamp](#stroppy-Generation-Range-DateTimeRange-Timestamp)
-    - [Generation.Range.DateTimeRange.TimestampPb](#stroppy-Generation-Range-DateTimeRange-TimestampPb)
+    - [Generation.Range.AnyString](#stroppy-Generation-Range-AnyString)
+    - [Generation.Range.Bool](#stroppy-Generation-Range-Bool)
+    - [Generation.Range.DateTime](#stroppy-Generation-Range-DateTime)
+    - [Generation.Range.DateTime.TimestampPb](#stroppy-Generation-Range-DateTime-TimestampPb)
+    - [Generation.Range.DateTime.TimestampUnix](#stroppy-Generation-Range-DateTime-TimestampUnix)
     - [Generation.Range.DecimalRange](#stroppy-Generation-Range-DecimalRange)
-    - [Generation.Range.DecimalRange.Default](#stroppy-Generation-Range-DecimalRange-Default)
-    - [Generation.Range.DoubleRange](#stroppy-Generation-Range-DoubleRange)
-    - [Generation.Range.FloatRange](#stroppy-Generation-Range-FloatRange)
-    - [Generation.Range.Int32Range](#stroppy-Generation-Range-Int32Range)
-    - [Generation.Range.Int64Range](#stroppy-Generation-Range-Int64Range)
-    - [Generation.Range.UInt32Range](#stroppy-Generation-Range-UInt32Range)
-    - [Generation.Range.UInt64Range](#stroppy-Generation-Range-UInt64Range)
+    - [Generation.Range.Double](#stroppy-Generation-Range-Double)
+    - [Generation.Range.Float](#stroppy-Generation-Range-Float)
+    - [Generation.Range.Int32](#stroppy-Generation-Range-Int32)
+    - [Generation.Range.Int64](#stroppy-Generation-Range-Int64)
+    - [Generation.Range.String](#stroppy-Generation-Range-String)
+    - [Generation.Range.UInt32](#stroppy-Generation-Range-UInt32)
+    - [Generation.Range.UInt64](#stroppy-Generation-Range-UInt64)
     - [Generation.Rule](#stroppy-Generation-Rule)
-    - [Generation.Rules](#stroppy-Generation-Rules)
-    - [Generation.Rules.BoolRule](#stroppy-Generation-Rules-BoolRule)
-    - [Generation.Rules.DateTimeRule](#stroppy-Generation-Rules-DateTimeRule)
-    - [Generation.Rules.DecimalRule](#stroppy-Generation-Rules-DecimalRule)
-    - [Generation.Rules.DoubleRule](#stroppy-Generation-Rules-DoubleRule)
-    - [Generation.Rules.FloatRule](#stroppy-Generation-Rules-FloatRule)
-    - [Generation.Rules.Int32Rule](#stroppy-Generation-Rules-Int32Rule)
-    - [Generation.Rules.Int64Rule](#stroppy-Generation-Rules-Int64Rule)
-    - [Generation.Rules.StringRule](#stroppy-Generation-Rules-StringRule)
-    - [Generation.Rules.UInt32Rule](#stroppy-Generation-Rules-UInt32Rule)
-    - [Generation.Rules.UInt64Rule](#stroppy-Generation-Rules-UInt64Rule)
-    - [Generation.Rules.UuidRule](#stroppy-Generation-Rules-UuidRule)
     - [OtlpExport](#stroppy-OtlpExport)
     - [Uuid](#stroppy-Uuid)
     - [Value](#stroppy-Value)
@@ -127,6 +107,7 @@
     - [BenchmarkDescriptor](#stroppy-BenchmarkDescriptor)
     - [ColumnDescriptor](#stroppy-ColumnDescriptor)
     - [IndexDescriptor](#stroppy-IndexDescriptor)
+    - [InsertDescriptor](#stroppy-InsertDescriptor)
     - [QueryDescriptor](#stroppy-QueryDescriptor)
     - [QueryParamDescriptor](#stroppy-QueryParamDescriptor)
     - [QueryParamGroup](#stroppy-QueryParamGroup)
@@ -136,7 +117,16 @@
     - [WorkloadDescriptor](#stroppy-WorkloadDescriptor)
     - [WorkloadUnitDescriptor](#stroppy-WorkloadUnitDescriptor)
   
+    - [InsertMethod](#stroppy-InsertMethod)
     - [TxIsolationLevel](#stroppy-TxIsolationLevel)
+  
+- [runtime.proto](#runtime-proto)
+    - [DriverQuery](#stroppy-DriverQuery)
+    - [DriverQueryStat](#stroppy-DriverQueryStat)
+    - [DriverTransaction](#stroppy-DriverTransaction)
+    - [DriverTransactionStat](#stroppy-DriverTransactionStat)
+    - [StepContext](#stroppy-StepContext)
+    - [UnitContext](#stroppy-UnitContext)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -948,7 +938,8 @@ StepExecutorMappingConfig contains configuration for mapping steps to executors.
 
 ### ConstantArrivalRate
 ConstantArrivalRate executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
 
 
 | Field | Type | Label | Description |
@@ -968,7 +959,8 @@ Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/c
 
 ### ConstantVUs
 ConstantVUs executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
 
 
 | Field | Type | Label | Description |
@@ -1027,13 +1019,14 @@ Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/
 
 ### PerVuIterations
 PerVuIterations executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | vus | [uint32](#uint32) |  | Number of virtual users |
-| iterations | [int64](#int64) |  | Number of iterations that each VU should execute |
+| iterations | [int64](#int64) |  | Number of iterations that each VU should execute &#34;-1&#34; is a special value to run all the units from by every vu. |
 
 
 
@@ -1044,7 +1037,8 @@ Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/p
 
 ### RampingArrivalRate
 RampingArrivalRate executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
 
 
 | Field | Type | Label | Description |
@@ -1080,7 +1074,8 @@ Rate stage configuration for ramping arrival rate
 
 ### RampingVUs
 RampingVUs executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
 
 
 | Field | Type | Label | Description |
@@ -1115,135 +1110,14 @@ VU stage configuration for ramping
 
 ### SharedIterations
 SharedIterations executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| iterations | [int64](#int64) |  | Total number of iterations to be executed by all VUs together. Iterations are distributed dynamically among available VUs. |
+| iterations | [int64](#int64) |  | Total number of iterations to be executed by all VUs together. Iterations are distributed dynamically among available VUs. &#34;-1&#34; is a special value to run all the units from step. |
 | vus | [uint32](#uint32) |  | Number of virtual users that will execute these iterations in parallel |
-
-
-
-
-
- 
-
- 
-
- 
-
- 
-
-
-
-<a name="runtime-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## runtime.proto
-
-
-
-<a name="stroppy-DriverQuery"></a>
-
-### DriverQuery
-DriverQuery represents a query that can be executed by a database driver.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | Name of the query |
-| request | [string](#string) |  | Request of the query |
-| params | [Value](#stroppy-Value) | repeated | Parameters of the query |
-
-
-
-
-
-
-<a name="stroppy-DriverQueryStat"></a>
-
-### DriverQueryStat
-DriverQueryStat represent an actual time spent on single query.
-exec_duration includes the network round-trip and exection on dbms.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  |  |
-| exec_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
-
-
-
-
-
-
-<a name="stroppy-DriverTransaction"></a>
-
-### DriverTransaction
-DriverTransaction represents a transaction that can be executed by a database
-driver.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| queries | [DriverQuery](#stroppy-DriverQuery) | repeated | Queries of the transaction |
-| isolation_level | [TxIsolationLevel](#stroppy-TxIsolationLevel) |  | Isolation level of the transaction |
-
-
-
-
-
-
-<a name="stroppy-DriverTransactionStat"></a>
-
-### DriverTransactionStat
-DriverTransactionStat represents an actual time spent on transaction.
-exec_duration includes the network round-trip and exection on dbms.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| queries | [DriverQueryStat](#stroppy-DriverQueryStat) | repeated |  |
-| exec_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
-| isolation_level | [TxIsolationLevel](#stroppy-TxIsolationLevel) |  |  |
-
-
-
-
-
-
-<a name="stroppy-StepContext"></a>
-
-### StepContext
-StepContext provides contextual information to a benchmark step during
-execution. It contains the run context and the step descriptor.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| config | [GlobalConfig](#stroppy-GlobalConfig) |  | Global configuration of the benchmark and its steps |
-| step | [Step](#stroppy-Step) |  | Current step |
-| executor | [ExecutorConfig](#stroppy-ExecutorConfig) |  | Executor configuration |
-| exporter | [ExporterConfig](#stroppy-ExporterConfig) | optional | Exporter configuration |
-| workload | [WorkloadDescriptor](#stroppy-WorkloadDescriptor) |  | Current workload descriptor |
-
-
-
-
-
-
-<a name="stroppy-UnitContext"></a>
-
-### UnitContext
-UnitBuildContext provides the context needed to build a unit from a
-WorkloadUnitDescriptor.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| step_context | [StepContext](#stroppy-StepContext) |  | Step context |
-| unit_descriptor | [WorkloadUnitDescriptor](#stroppy-WorkloadUnitDescriptor) |  | Current unit descriptor |
 
 
 
@@ -1348,7 +1222,7 @@ Alphabet defines character ranges for string generation.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| ranges | [Generation.Range.UInt32Range](#stroppy-Generation-Range-UInt32Range) | repeated | List of character ranges for this alphabet |
+| ranges | [Generation.Range.UInt32](#stroppy-Generation-Range-UInt32) | repeated | List of character ranges for this alphabet |
 
 
 
@@ -1381,9 +1255,9 @@ Range defines value constraints for generation.
 
 
 
-<a name="stroppy-Generation-Range-AnyStringRange"></a>
+<a name="stroppy-Generation-Range-AnyString"></a>
 
-### Generation.Range.AnyStringRange
+### Generation.Range.AnyString
 Range for string values that can be parsed into other types
 
 
@@ -1397,59 +1271,41 @@ Range for string values that can be parsed into other types
 
 
 
-<a name="stroppy-Generation-Range-DateTimeRange"></a>
+<a name="stroppy-Generation-Range-Bool"></a>
 
-### Generation.Range.DateTimeRange
+### Generation.Range.Bool
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| ratio | [float](#float) |  |  |
+
+
+
+
+
+
+<a name="stroppy-Generation-Range-DateTime"></a>
+
+### Generation.Range.DateTime
 Range for date/time values
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| default | [Generation.Range.DateTimeRange.Default](#stroppy-Generation-Range-DateTimeRange-Default) |  | Exact date/time range |
-| string | [Generation.Range.AnyStringRange](#stroppy-Generation-Range-AnyStringRange) |  | String-based range (ISO 8601 format) |
-| timestamp_pb | [Generation.Range.DateTimeRange.TimestampPb](#stroppy-Generation-Range-DateTimeRange-TimestampPb) |  | Protocol Buffers timestamp range |
-| timestamp | [Generation.Range.DateTimeRange.Timestamp](#stroppy-Generation-Range-DateTimeRange-Timestamp) |  | Unix timestamp range |
+| string | [Generation.Range.AnyString](#stroppy-Generation-Range-AnyString) |  | String-based range (ISO 8601 format) |
+| timestamp_pb | [Generation.Range.DateTime.TimestampPb](#stroppy-Generation-Range-DateTime-TimestampPb) |  | Protocol Buffers timestamp range |
+| timestamp | [Generation.Range.DateTime.TimestampUnix](#stroppy-Generation-Range-DateTime-TimestampUnix) |  | Unix timestamp range |
 
 
 
 
 
 
-<a name="stroppy-Generation-Range-DateTimeRange-Default"></a>
+<a name="stroppy-Generation-Range-DateTime-TimestampPb"></a>
 
-### Generation.Range.DateTimeRange.Default
-Default date/time range
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| min | [DateTime](#stroppy-DateTime) |  | Minimum timestamp (inclusive) |
-| max | [DateTime](#stroppy-DateTime) |  | Maximum timestamp (inclusive) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Range-DateTimeRange-Timestamp"></a>
-
-### Generation.Range.DateTimeRange.Timestamp
-Unix timestamp range
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| min | [uint32](#uint32) |  | Minimum Unix timestamp (inclusive) |
-| max | [uint32](#uint32) |  | Maximum Unix timestamp (inclusive) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Range-DateTimeRange-TimestampPb"></a>
-
-### Generation.Range.DateTimeRange.TimestampPb
+### Generation.Range.DateTime.TimestampPb
 Protocol Buffers timestamp range
 
 
@@ -1457,6 +1313,22 @@ Protocol Buffers timestamp range
 | ----- | ---- | ----- | ----------- |
 | min | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Minimum timestamp (inclusive) |
 | max | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Maximum timestamp (inclusive) |
+
+
+
+
+
+
+<a name="stroppy-Generation-Range-DateTime-TimestampUnix"></a>
+
+### Generation.Range.DateTime.TimestampUnix
+Unix timestamp range
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min | [uint32](#uint32) |  | Minimum Unix timestamp (inclusive) |
+| max | [uint32](#uint32) |  | Maximum Unix timestamp (inclusive) |
 
 
 
@@ -1471,41 +1343,24 @@ Range for decimal numbers
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| default | [Generation.Range.DecimalRange.Default](#stroppy-Generation-Range-DecimalRange-Default) |  | Exact decimal range |
-| float | [Generation.Range.FloatRange](#stroppy-Generation-Range-FloatRange) |  | Float-based range |
-| double | [Generation.Range.DoubleRange](#stroppy-Generation-Range-DoubleRange) |  | Double-based range |
-| string | [Generation.Range.AnyStringRange](#stroppy-Generation-Range-AnyStringRange) |  | String-based range (supports scientific notation) |
+| float | [Generation.Range.Float](#stroppy-Generation-Range-Float) |  | Float-based range |
+| double | [Generation.Range.Double](#stroppy-Generation-Range-Double) |  | Double-based range |
+| string | [Generation.Range.AnyString](#stroppy-Generation-Range-AnyString) |  | String-bsed range (supports scientific notation) |
 
 
 
 
 
 
-<a name="stroppy-Generation-Range-DecimalRange-Default"></a>
+<a name="stroppy-Generation-Range-Double"></a>
 
-### Generation.Range.DecimalRange.Default
-Default decimal range
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| min | [Decimal](#stroppy-Decimal) |  | Minimum value (inclusive) |
-| max | [Decimal](#stroppy-Decimal) |  | Maximum value (inclusive) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Range-DoubleRange"></a>
-
-### Generation.Range.DoubleRange
+### Generation.Range.Double
 Range for 64-bit floating point numbers
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| min | [double](#double) |  | Minimum value (inclusive) |
+| min | [double](#double) | optional | Minimum value (inclusive) |
 | max | [double](#double) |  | Maximum value (inclusive) |
 
 
@@ -1513,15 +1368,15 @@ Range for 64-bit floating point numbers
 
 
 
-<a name="stroppy-Generation-Range-FloatRange"></a>
+<a name="stroppy-Generation-Range-Float"></a>
 
-### Generation.Range.FloatRange
+### Generation.Range.Float
 Range for 32-bit floating point numbers
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| min | [float](#float) |  | Minimum value (inclusive) |
+| min | [float](#float) | optional | Minimum value (inclusive) |
 | max | [float](#float) |  | Maximum value (inclusive) |
 
 
@@ -1529,15 +1384,15 @@ Range for 32-bit floating point numbers
 
 
 
-<a name="stroppy-Generation-Range-Int32Range"></a>
+<a name="stroppy-Generation-Range-Int32"></a>
 
-### Generation.Range.Int32Range
+### Generation.Range.Int32
 Range for 32-bit signed integers
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| min | [int32](#int32) |  | Minimum value (inclusive) |
+| min | [int32](#int32) | optional | Minimum value (inclusive) |
 | max | [int32](#int32) |  | Maximum value (inclusive) |
 
 
@@ -1545,15 +1400,15 @@ Range for 32-bit signed integers
 
 
 
-<a name="stroppy-Generation-Range-Int64Range"></a>
+<a name="stroppy-Generation-Range-Int64"></a>
 
-### Generation.Range.Int64Range
+### Generation.Range.Int64
 Range for 64-bit signed integers
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| min | [int64](#int64) |  | Minimum value (inclusive) |
+| min | [int64](#int64) | optional | Minimum value (inclusive) |
 | max | [int64](#int64) |  | Maximum value (inclusive) |
 
 
@@ -1561,15 +1416,32 @@ Range for 64-bit signed integers
 
 
 
-<a name="stroppy-Generation-Range-UInt32Range"></a>
+<a name="stroppy-Generation-Range-String"></a>
 
-### Generation.Range.UInt32Range
+### Generation.Range.String
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| alphabet | [Generation.Alphabet](#stroppy-Generation-Alphabet) | optional | Character set to use for generation |
+| min_len | [uint64](#uint64) | optional |  |
+| max_len | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="stroppy-Generation-Range-UInt32"></a>
+
+### Generation.Range.UInt32
 Range for 32-bit unsigned integers
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| min | [uint32](#uint32) |  | Minimum value (inclusive) |
+| min | [uint32](#uint32) | optional | Minimum value (inclusive) |
 | max | [uint32](#uint32) |  | Maximum value (inclusive) |
 
 
@@ -1577,15 +1449,15 @@ Range for 32-bit unsigned integers
 
 
 
-<a name="stroppy-Generation-Range-UInt64Range"></a>
+<a name="stroppy-Generation-Range-UInt64"></a>
 
-### Generation.Range.UInt64Range
+### Generation.Range.UInt64
 Range for 64-bit unsigned integers
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| min | [uint64](#uint64) |  | Minimum value (inclusive) |
+| min | [uint64](#uint64) | optional | Minimum value (inclusive) |
 | max | [uint64](#uint64) |  | Maximum value (inclusive) |
 
 
@@ -1601,205 +1473,29 @@ Rule defines generation rules for a specific data type.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| float_rules | [Generation.Rules.FloatRule](#stroppy-Generation-Rules-FloatRule) |  | Rules for 32-bit floating point numbers |
-| double_rules | [Generation.Rules.DoubleRule](#stroppy-Generation-Rules-DoubleRule) |  | Rules for 64-bit floating point numbers |
-| int32_rules | [Generation.Rules.Int32Rule](#stroppy-Generation-Rules-Int32Rule) |  | Rules for 32-bit signed integers |
-| int64_rules | [Generation.Rules.Int64Rule](#stroppy-Generation-Rules-Int64Rule) |  | Rules for 64-bit signed integers |
-| uint32_rules | [Generation.Rules.UInt32Rule](#stroppy-Generation-Rules-UInt32Rule) |  | Rules for 32-bit unsigned integers |
-| uint64_rules | [Generation.Rules.UInt64Rule](#stroppy-Generation-Rules-UInt64Rule) |  | Rules for 64-bit unsigned integers |
-| bool_rules | [Generation.Rules.BoolRule](#stroppy-Generation-Rules-BoolRule) |  | Rules for boolean values |
-| string_rules | [Generation.Rules.StringRule](#stroppy-Generation-Rules-StringRule) |  | Rules for string values |
-| datetime_rules | [Generation.Rules.DateTimeRule](#stroppy-Generation-Rules-DateTimeRule) |  | Rules for date/time values |
-| uuid_rules | [Generation.Rules.UuidRule](#stroppy-Generation-Rules-UuidRule) |  | Rules for UUIDs |
-| decimal_rules | [Generation.Rules.DecimalRule](#stroppy-Generation-Rules-DecimalRule) |  | Rules for decimal numbers |
-| distribution | [Generation.Distribution](#stroppy-Generation-Distribution) | optional |  |
-| null_percentage | [uint32](#uint32) | optional |  |
-| unique | [bool](#bool) | optional |  |
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules"></a>
-
-### Generation.Rules
-Rules contains type-specific generation configurations.
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules-BoolRule"></a>
-
-### Generation.Rules.BoolRule
-Rules for generating boolean values
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| constant | [bool](#bool) | optional | Fixed value (if not specified, generates random booleans) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules-DateTimeRule"></a>
-
-### Generation.Rules.DateTimeRule
-Rules for generating date/time values
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| range | [Generation.Range.DateTimeRange](#stroppy-Generation-Range-DateTimeRange) |  | Valid time range |
-| constant | [DateTime](#stroppy-DateTime) | optional | Fixed value (if specified, overrides range) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules-DecimalRule"></a>
-
-### Generation.Rules.DecimalRule
-Rules for generating decimal numbers
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| range | [Generation.Range.DecimalRange](#stroppy-Generation-Range-DecimalRange) |  | Valid value range |
-| constant | [Decimal](#stroppy-Decimal) | optional | Fixed value (if specified, overrides range) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules-DoubleRule"></a>
-
-### Generation.Rules.DoubleRule
-Rules for generating 64-bit floating point numbers
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| range | [Generation.Range.DoubleRange](#stroppy-Generation-Range-DoubleRange) |  | Valid value range |
-| constant | [double](#double) | optional | Fixed value (if specified, overrides range) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules-FloatRule"></a>
-
-### Generation.Rules.FloatRule
-Rules for generating 32-bit floating point numbers
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| range | [Generation.Range.FloatRange](#stroppy-Generation-Range-FloatRange) |  | Valid value range |
-| constant | [float](#float) | optional | Fixed value (if specified, overrides range) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules-Int32Rule"></a>
-
-### Generation.Rules.Int32Rule
-Rules for generating 32-bit signed integers
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| range | [Generation.Range.Int32Range](#stroppy-Generation-Range-Int32Range) |  | Valid value range |
-| constant | [int32](#int32) | optional | Fixed value (if specified, overrides range) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules-Int64Rule"></a>
-
-### Generation.Rules.Int64Rule
-Rules for generating 64-bit signed integers
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| range | [Generation.Range.Int64Range](#stroppy-Generation-Range-Int64Range) |  | Valid value range |
-| constant | [int64](#int64) | optional | Fixed value (if specified, overrides range) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules-StringRule"></a>
-
-### Generation.Rules.StringRule
-Rules for generating string values
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| alphabet | [Generation.Alphabet](#stroppy-Generation-Alphabet) | optional | Character set to use for generation |
-| len_range | [Generation.Range.UInt64Range](#stroppy-Generation-Range-UInt64Range) |  | Valid length range for the string |
-| constant | [string](#string) | optional | Fixed value (if specified, overrides generation) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules-UInt32Rule"></a>
-
-### Generation.Rules.UInt32Rule
-Rules for generating 32-bit unsigned integers
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| range | [Generation.Range.UInt32Range](#stroppy-Generation-Range-UInt32Range) |  | Valid value range |
-| constant | [uint32](#uint32) | optional | Fixed value (if specified, overrides range) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules-UInt64Rule"></a>
-
-### Generation.Rules.UInt64Rule
-Rules for generating 64-bit unsigned integers
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| range | [Generation.Range.UInt64Range](#stroppy-Generation-Range-UInt64Range) |  | Valid value range |
-| constant | [uint64](#uint64) | optional | Fixed value (if specified, overrides range) |
-
-
-
-
-
-
-<a name="stroppy-Generation-Rules-UuidRule"></a>
-
-### Generation.Rules.UuidRule
-Rules for generating UUIDs
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| constant | [Uuid](#stroppy-Uuid) | optional | Fixed UUID (if not specified, generates random UUIDs) |
+| int32_range | [Generation.Range.Int32](#stroppy-Generation-Range-Int32) |  | Signed 32‑bit integer range (inclusive). Example: 1..100 for IDs. |
+| int64_range | [Generation.Range.Int64](#stroppy-Generation-Range-Int64) |  | Signed 64‑bit integer range for large counters or timestamps. |
+| uint32_range | [Generation.Range.UInt32](#stroppy-Generation-Range-UInt32) |  | Unsigned 32‑bit integer range; use for sizes/indices. |
+| uint64_range | [Generation.Range.UInt64](#stroppy-Generation-Range-UInt64) |  | Unsigned 64‑bit integer range; use for large sizes. |
+| float_range | [Generation.Range.Float](#stroppy-Generation-Range-Float) |  | 32‑bit float bounds; beware precision for currency. |
+| double_range | [Generation.Range.Double](#stroppy-Generation-Range-Double) |  | 64‑bit float bounds for high‑precision numeric data. |
+| decimal_range | [Generation.Range.DecimalRange](#stroppy-Generation-Range-DecimalRange) |  | Arbitrary‑precision decimal bounds for money/ratios. |
+| string_range | [Generation.Range.String](#stroppy-Generation-Range-String) |  | String constraints (length, alphabet). |
+| bool_range | [Generation.Range.Bool](#stroppy-Generation-Range-Bool) |  | Boolean constraints (e.g., force true/false). |
+| datetime_range | [Generation.Range.DateTime](#stroppy-Generation-Range-DateTime) |  | Date/time window (e.g., not before/after). |
+| int32_const | [int32](#int32) |  | Fixed 32‑bit integer value. |
+| int64_const | [int64](#int64) |  | Fixed 64‑bit integer value. |
+| uint32_const | [uint32](#uint32) |  | Fixed unsigned 32‑bit integer value. |
+| uint64_const | [uint64](#uint64) |  | Fixed unsigned 64‑bit integer value. |
+| float_const | [float](#float) |  | Fixed 32‑bit float value. |
+| double_const | [double](#double) |  | Fixed 64‑bit float value. |
+| decimal_const | [Decimal](#stroppy-Decimal) |  | Fixed decimal value. |
+| string_const | [string](#string) |  | Fixed string value. |
+| bool_const | [bool](#bool) |  | Fixed boolean value. |
+| datetime_const | [DateTime](#stroppy-DateTime) |  | Fixed date/time value. |
+| distribution | [Generation.Distribution](#stroppy-Generation-Distribution) | optional | Shape of randomness; Normal by default |
+| null_percentage | [uint32](#uint32) | optional | Percentage of nulls to inject [0..100]; 0 by default |
+| unique | [bool](#bool) | optional | Enforce uniqueness across generated values; Linear sequence for ranges |
 
 
 
@@ -1971,10 +1667,10 @@ ColumnDescriptor defines the structure of a database column.
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Name of the column |
 | sql_type | [string](#string) |  | SQL data type of the column |
-| nullable | [bool](#bool) |  | Whether the column can be NULL |
-| primary_key | [bool](#bool) |  | Whether the column is part of the primary key. Multiple primary keys creates composite primary key. |
-| unique | [bool](#bool) |  | Whether the column has a UNIQUE constraint |
-| constraint | [string](#string) |  | SQL constraint definition for the column in free form |
+| nullable | [bool](#bool) | optional | Whether the column can be NULL |
+| primary_key | [bool](#bool) | optional | Whether the column is part of the primary key. Multiple primary keys creates composite primary key. |
+| unique | [bool](#bool) | optional | Whether the column has a UNIQUE constraint |
+| constraint | [string](#string) | optional | SQL constraint definition for the column in free form |
 
 
 
@@ -2000,6 +1696,25 @@ IndexDescriptor defines the structure of a database index.
 
 
 
+<a name="stroppy-InsertDescriptor"></a>
+
+### InsertDescriptor
+InsertDescription defines data to fill database.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Name of the Insert query |
+| table_name | [string](#string) |  | Which table to insert the values |
+| method | [InsertMethod](#stroppy-InsertMethod) | optional | Allows to use a percise method of data insertion |
+| params | [QueryParamDescriptor](#stroppy-QueryParamDescriptor) | repeated | Parameters used in the insert. Names threated as db columns names, regexp is ignored. |
+| groups | [QueryParamGroup](#stroppy-QueryParamGroup) | repeated | Groups of the columns |
+
+
+
+
+
+
 <a name="stroppy-QueryDescriptor"></a>
 
 ### QueryDescriptor
@@ -2012,7 +1727,7 @@ count.
 | name | [string](#string) |  | Name of the query |
 | sql | [string](#string) |  | SQL query text |
 | params | [QueryParamDescriptor](#stroppy-QueryParamDescriptor) | repeated | Parameters used in the query |
-| groups | [QueryParamGroup](#stroppy-QueryParamGroup) | repeated | Grouped parameter groups |
+| groups | [QueryParamGroup](#stroppy-QueryParamGroup) | repeated | Groups of the parameters |
 | db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific query properties |
 
 
@@ -2067,8 +1782,8 @@ TableDescriptor defines the structure of a database table.
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Name of the table |
 | table_indexes | [IndexDescriptor](#stroppy-IndexDescriptor) | repeated | List of indexes defined on this table |
-| constraint | [string](#string) |  | Table-level constraints |
-| db_specific | [Value.Struct](#stroppy-Value-Struct) |  | Database-specific table properties |
+| constraint | [string](#string) | optional | Table-level constraints |
+| db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific table properties |
 | columns | [ColumnDescriptor](#stroppy-ColumnDescriptor) | repeated | Columns defined in this table |
 
 
@@ -2106,6 +1821,7 @@ transaction execution operation.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | create_table | [TableDescriptor](#stroppy-TableDescriptor) |  | Table creation operation |
+| insert | [InsertDescriptor](#stroppy-InsertDescriptor) |  | Data insertion operation |
 | query | [QueryDescriptor](#stroppy-QueryDescriptor) |  | Query execution operation |
 | transaction | [TransactionDescriptor](#stroppy-TransactionDescriptor) |  | Transaction execution operation |
 
@@ -2124,7 +1840,7 @@ It contains a list of operations to perform in this step.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Name of the step |
-| async | [bool](#bool) |  | Whether to execute all operations in this workload asynchronously |
+| async | [bool](#bool) | optional | Whether to execute all operations in this workload asynchronously |
 | units | [WorkloadUnitDescriptor](#stroppy-WorkloadUnitDescriptor) | repeated | List of operations to perform in this step |
 
 
@@ -2152,6 +1868,18 @@ transaction execution operation.
  
 
 
+<a name="stroppy-InsertMethod"></a>
+
+### InsertMethod
+Data insertion method
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| PLAIN_QUERY | 0 |  |
+| COPY_FROM | 1 |  |
+
+
+
 <a name="stroppy-TxIsolationLevel"></a>
 
 ### TxIsolationLevel
@@ -2160,12 +1888,135 @@ transaction.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| TX_ISOLATION_LEVEL_UNSPECIFIED | 0 |  |
-| TX_ISOLATION_LEVEL_READ_UNCOMMITTED | 1 |  |
-| TX_ISOLATION_LEVEL_READ_COMMITTED | 2 |  |
-| TX_ISOLATION_LEVEL_REPEATABLE_READ | 3 |  |
-| TX_ISOLATION_LEVEL_SERIALIZABLE | 4 |  |
+| UNSPECIFIED | 0 |  |
+| READ_UNCOMMITTED | 1 |  |
+| READ_COMMITTED | 2 |  |
+| REPEATABLE_READ | 3 |  |
+| SERIALIZABLE | 4 |  |
 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="runtime-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## runtime.proto
+
+
+
+<a name="stroppy-DriverQuery"></a>
+
+### DriverQuery
+DriverQuery represents a query that can be executed by a database driver.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Name of the query |
+| request | [string](#string) |  | Request of the query |
+| params | [Value](#stroppy-Value) | repeated | Parameters of the query |
+| method | [InsertMethod](#stroppy-InsertMethod) | optional | If alternate insertion method required |
+
+
+
+
+
+
+<a name="stroppy-DriverQueryStat"></a>
+
+### DriverQueryStat
+DriverQueryStat represent an actual time spent on single query.
+exec_duration includes the network round-trip and exection on dbms.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| exec_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
+
+
+
+
+
+
+<a name="stroppy-DriverTransaction"></a>
+
+### DriverTransaction
+DriverTransaction represents a transaction that can be executed by a database
+driver.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| queries | [DriverQuery](#stroppy-DriverQuery) | repeated | Queries of the transaction |
+| isolation_level | [TxIsolationLevel](#stroppy-TxIsolationLevel) |  | Isolation level of the transaction |
+
+
+
+
+
+
+<a name="stroppy-DriverTransactionStat"></a>
+
+### DriverTransactionStat
+DriverTransactionStat represents an actual time spent on transaction.
+exec_duration includes the network round-trip and exection on dbms.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| queries | [DriverQueryStat](#stroppy-DriverQueryStat) | repeated |  |
+| exec_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
+| isolation_level | [TxIsolationLevel](#stroppy-TxIsolationLevel) |  |  |
+
+
+
+
+
+
+<a name="stroppy-StepContext"></a>
+
+### StepContext
+StepContext provides contextual information to a benchmark step during
+execution. It contains the run context and the step descriptor.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| config | [GlobalConfig](#stroppy-GlobalConfig) |  | Global configuration of the benchmark and its steps |
+| step | [Step](#stroppy-Step) |  | Current step |
+| executor | [ExecutorConfig](#stroppy-ExecutorConfig) |  | Executor configuration |
+| exporter | [ExporterConfig](#stroppy-ExporterConfig) | optional | Exporter configuration |
+| workload | [WorkloadDescriptor](#stroppy-WorkloadDescriptor) |  | Current workload descriptor |
+
+
+
+
+
+
+<a name="stroppy-UnitContext"></a>
+
+### UnitContext
+UnitBuildContext provides the context needed to build a unit from a
+WorkloadUnitDescriptor.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| step_context | [StepContext](#stroppy-StepContext) |  | Step context |
+| unit_descriptor | [WorkloadUnitDescriptor](#stroppy-WorkloadUnitDescriptor) |  | Current unit descriptor |
+
+
+
+
+
+ 
 
  
 

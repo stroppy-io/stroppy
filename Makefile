@@ -90,7 +90,7 @@ K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
 .PHONY: build-xk6
 build-xk6: .check-bins # Build k6 module
 	mkdir -p $(CURDIR)/build
-	XK6_RACE_DETECTOR=0 PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
+	XK6_RACE_DETECTOR=1 PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
 		--with github.com/stroppy-io/stroppy/cmd/xk6=./cmd/xk6/ \
 		--replace github.com/stroppy-io/stroppy=./ \
 		--output $(K6_OUT_FILE)
@@ -101,8 +101,8 @@ STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 .PHONY: build
 build: # Build binary stroppy
 	echo $(VERSION)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-		go build -v -o $(STROPPY_OUT_FILE) \
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+		go build -race -v -o $(STROPPY_OUT_FILE) \
 		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'" \
 		$(CURDIR)/cmd/stroppy
 

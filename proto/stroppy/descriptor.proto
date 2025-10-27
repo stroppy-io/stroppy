@@ -35,14 +35,16 @@ message ColumnDescriptor {
     /** SQL data type of the column */
     string sql_type = 2 [ (validate.rules).string.min_len = 1 ];
     /** Whether the column can be NULL */
-    bool nullable = 3;
-    /** Whether the column is part of the primary key.
-     *  Multiple primary keys creates composite primary key. */
-    bool primary_key = 4;
+    optional bool nullable = 3;
+    /**
+     * Whether the column is part of the primary key.
+     * Multiple primary keys creates composite primary key.
+     */
+    optional bool primary_key = 4;
     /** Whether the column has a UNIQUE constraint */
-    bool unique = 5;
+    optional bool unique = 5;
     /** SQL constraint definition for the column in free form */
-    string constraint = 6;
+    optional string constraint = 6;
 }
 
 /**
@@ -55,11 +57,37 @@ message TableDescriptor {
     repeated IndexDescriptor table_indexes = 3
         [ (validate.rules).repeated = {items : {message : {required : true}}} ];
     /** Table-level constraints */
-    string constraint = 5;
+    optional string constraint = 5;
     /** Database-specific table properties */
-    Value.Struct db_specific = 6;
+    optional Value.Struct db_specific = 6;
     /** Columns defined in this table */
     repeated ColumnDescriptor columns = 100;
+}
+
+/**
+ * InsertDescription defines data to fill database.
+ */
+message InsertDescriptor {
+    /** Name of the Insert query */
+    string name = 1 [ (validate.rules).string.min_len = 1 ];
+    /** Which table to insert the values */
+    string table_name = 2 [ (validate.rules).string.min_len = 1 ];
+    /** Allows to use a percise method of data insertion */
+    optional InsertMethod method = 3;
+    /**
+     * Parameters used in the insert.
+     * Names threated as db columns names, regexp is ignored.
+     */
+    repeated QueryParamDescriptor params = 4
+        [ (validate.rules).repeated = {items : {message : {required : true}}} ];
+    /** Groups of the columns */
+    repeated QueryParamGroup groups = 5;
+}
+
+/** Data insertion method */
+enum InsertMethod {
+    PLAIN_QUERY = 0;
+    COPY_FROM = 1;
 }
 
 /**
@@ -103,7 +131,7 @@ message QueryDescriptor {
     /** Parameters used in the query */
     repeated QueryParamDescriptor params = 3
         [ (validate.rules).repeated = {items : {message : {required : true}}} ];
-    /** Grouped parameter groups */
+    /** Groups of the parameters */
     repeated QueryParamGroup groups = 4;
     /** Database-specific query properties */
     optional Value.Struct db_specific = 5;
@@ -114,11 +142,11 @@ message QueryDescriptor {
  * transaction.
  */
 enum TxIsolationLevel {
-    TX_ISOLATION_LEVEL_UNSPECIFIED = 0;
-    TX_ISOLATION_LEVEL_READ_UNCOMMITTED = 1;
-    TX_ISOLATION_LEVEL_READ_COMMITTED = 2;
-    TX_ISOLATION_LEVEL_REPEATABLE_READ = 3;
-    TX_ISOLATION_LEVEL_SERIALIZABLE = 4;
+    UNSPECIFIED = 0;
+    READ_UNCOMMITTED = 1;
+    READ_COMMITTED = 2;
+    REPEATABLE_READ = 3;
+    SERIALIZABLE = 4;
 }
 
 /**
@@ -149,6 +177,8 @@ message UnitDescriptor {
         option (validate.required) = true;
         /** Table creation operation */
         TableDescriptor create_table = 1;
+        /** Data insertion operation */
+        InsertDescriptor insert = 5;
         /** Query execution operation */
         QueryDescriptor query = 2;
         /** Transaction execution operation */
@@ -175,7 +205,7 @@ message WorkloadDescriptor {
     /** Name of the step */
     string name = 1 [ (validate.rules).string.min_len = 1 ];
     /** Whether to execute all operations in this workload asynchronously */
-    bool async = 2;
+    optional bool async = 2;
     /** List of operations to perform in this step */
     repeated WorkloadUnitDescriptor units = 3 [ (validate.rules).repeated = {
         min_items : 1,

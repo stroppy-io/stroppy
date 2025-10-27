@@ -43,29 +43,18 @@ func (q *QueryBuilder) Build(
 
 func (q *QueryBuilder) internalBuild(
 	ctx context.Context,
-	logger *zap.Logger,
-	unitDescriptor *stroppy.UnitDescriptor,
+	lg *zap.Logger,
+	descriptor *stroppy.UnitDescriptor,
 ) (*stroppy.DriverTransaction, error) {
-	switch unitDescriptor.GetType().(type) {
+	switch descriptor.GetType().(type) {
 	case *stroppy.UnitDescriptor_CreateTable:
-		return NewCreateTable(
-			logger,
-			unitDescriptor.GetCreateTable(),
-		)
+		return NewCreateTable(lg, descriptor.GetCreateTable())
+	case *stroppy.UnitDescriptor_Insert:
+		return NewInsertQuery(ctx, lg, q.generators, descriptor.GetInsert())
 	case *stroppy.UnitDescriptor_Query:
-		return NewQuery(
-			ctx,
-			logger,
-			q.generators,
-			unitDescriptor.GetQuery(),
-		)
+		return NewQuery(ctx, lg, q.generators, descriptor.GetQuery())
 	case *stroppy.UnitDescriptor_Transaction:
-		return NewTransaction(
-			ctx,
-			logger,
-			q.generators,
-			unitDescriptor.GetTransaction(),
-		)
+		return NewTransaction(ctx, lg, q.generators, descriptor.GetTransaction())
 	default:
 		panic(ErrUnknownQueryType)
 	}
@@ -74,47 +63,23 @@ func (q *QueryBuilder) internalBuild(
 func (q *QueryBuilder) ValueToPgxValue(value *stroppy.Value) (any, error) {
 	switch value.GetType().(type) {
 	case *stroppy.Value_Null:
-		return nil, nil //nolint: nilnil // allow to set nil in db
+		return nil, nil //nolint: nilnil               // allow to set nil in db
 	case *stroppy.Value_Int32:
-		return pgtype.Int4{
-			Valid: true,
-			Int32: value.GetInt32(),
-		}, nil
+		return &pgtype.Int4{Valid: true, Int32: value.GetInt32()}, nil
 	case *stroppy.Value_Uint32:
-		return pgtype.Uint32{
-			Valid:  true,
-			Uint32: value.GetUint32(),
-		}, nil
+		return &pgtype.Uint32{Valid: true, Uint32: value.GetUint32()}, nil
 	case *stroppy.Value_Int64:
-		return &pgtype.Int8{
-			Valid: true,
-			Int64: value.GetInt64(),
-		}, nil
+		return &pgtype.Int8{Valid: true, Int64: value.GetInt64()}, nil
 	case *stroppy.Value_Uint64:
-		return &pgtype.Uint64{
-			Valid:  true,
-			Uint64: value.GetUint64(),
-		}, nil
+		return &pgtype.Uint64{Valid: true, Uint64: value.GetUint64()}, nil
 	case *stroppy.Value_Float:
-		return &pgtype.Float4{
-			Valid:   true,
-			Float32: value.GetFloat(),
-		}, nil
+		return &pgtype.Float4{Valid: true, Float32: value.GetFloat()}, nil
 	case *stroppy.Value_Double:
-		return &pgtype.Float8{
-			Valid:   true,
-			Float64: value.GetDouble(),
-		}, nil
+		return &pgtype.Float8{Valid: true, Float64: value.GetDouble()}, nil
 	case *stroppy.Value_String_:
-		return &pgtype.Text{
-			Valid:  true,
-			String: value.GetString_(),
-		}, nil
+		return &pgtype.Text{Valid: true, String: value.GetString_()}, nil
 	case *stroppy.Value_Bool:
-		return &pgtype.Bool{
-			Valid: true,
-			Bool:  value.GetBool(),
-		}, nil
+		return &pgtype.Bool{Valid: true, Bool: value.GetBool()}, nil
 	case *stroppy.Value_Decimal:
 		if value.GetDecimal() == nil {
 			return &pgxdecimal.NullDecimal{}, nil
@@ -132,10 +97,7 @@ func (q *QueryBuilder) ValueToPgxValue(value *stroppy.Value) (any, error) {
 			return nil, err
 		}
 
-		return &pgtype.UUID{
-			Valid: true,
-			Bytes: uuidVal,
-		}, nil
+		return &pgtype.UUID{Valid: true, Bytes: uuidVal}, nil
 	case *stroppy.Value_Datetime:
 		return &pgtype.Timestamptz{
 			Valid: true,

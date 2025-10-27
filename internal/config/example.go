@@ -50,7 +50,7 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 						Executor: &stroppy.K6Scenario_PerVuIterations{
 							PerVuIterations: &stroppy.PerVuIterations{
 								Vus:        1,
-								Iterations: 1,
+								Iterations: -1,
 							},
 						},
 					},
@@ -133,13 +133,9 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 									CreateTable: &stroppy.TableDescriptor{
 										Name: "users",
 										Columns: []*stroppy.ColumnDescriptor{
-											{Name: "id", SqlType: "INT", PrimaryKey: true},
-											{Name: "name", SqlType: "TEXT", Nullable: true},
-											{
-												Name:       "email",
-												SqlType:    "TEXT",
-												Constraint: "NOT NULL",
-											},
+											{Name: "id", SqlType: "INT", PrimaryKey: ptr(true)},
+											{Name: "name", SqlType: "TEXT", Nullable: ptr(true)},
+											{Name: "email", SqlType: "TEXT", Nullable: ptr(false)},
 										},
 									},
 								},
@@ -168,12 +164,10 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 														Type:  stroppy.Generation_Distribution_ZIPF,
 														Screw: 1.1,
 													},
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 100000,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 100000,
 														},
 													},
 												},
@@ -181,16 +175,17 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 											{
 												Name: "name",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 1,
-																Max: 100,
-															},
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
+															MinLen: ptr[uint64](1),
+															MaxLen: 100,
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
-																	{Min: 65, Max: 90},
-																	{Min: 97, Max: 122},
+																Ranges: []*stroppy.Generation_Range_UInt32{
+																	{Min: ptr[uint32](65), Max: 90},
+																	{
+																		Min: ptr[uint32](97),
+																		Max: 122,
+																	},
 																},
 															},
 														},
@@ -200,16 +195,17 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 											{
 												Name: "email",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_StringRules{
-														StringRules: &stroppy.Generation_Rules_StringRule{
-															LenRange: &stroppy.Generation_Range_UInt64Range{
-																Min: 10,
-																Max: 50,
-															},
+													Kind: &stroppy.Generation_Rule_StringRange{
+														StringRange: &stroppy.Generation_Range_String{
+															MinLen: ptr[uint64](10),
+															MaxLen: 50,
 															Alphabet: &stroppy.Generation_Alphabet{
-																Ranges: []*stroppy.Generation_Range_UInt32Range{
-																	{Min: 65, Max: 90},
-																	{Min: 97, Max: 122},
+																Ranges: []*stroppy.Generation_Range_UInt32{
+																	{Min: ptr[uint32](65), Max: 90},
+																	{
+																		Min: ptr[uint32](97),
+																		Max: 122,
+																	},
 																},
 															},
 														},
@@ -238,12 +234,10 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 											{
 												Name: "id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 100,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 100,
 														},
 													},
 												},
@@ -270,12 +264,10 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 											{
 												Name: "id",
 												GenerationRule: &stroppy.Generation_Rule{
-													Type: &stroppy.Generation_Rule_Int32Rules{
-														Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-															Range: &stroppy.Generation_Range_Int32Range{
-																Min: 1,
-																Max: 100,
-															},
+													Kind: &stroppy.Generation_Rule_Int32Range{
+														Int32Range: &stroppy.Generation_Range_Int32{
+															Min: ptr[int32](1),
+															Max: 100,
 														},
 													},
 												},
@@ -296,7 +288,7 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 								Type: &stroppy.UnitDescriptor_Transaction{
 									Transaction: &stroppy.TransactionDescriptor{
 										Name:           "transaction",
-										IsolationLevel: stroppy.TxIsolationLevel_TX_ISOLATION_LEVEL_REPEATABLE_READ,
+										IsolationLevel: stroppy.TxIsolationLevel_REPEATABLE_READ,
 										Queries: []*stroppy.QueryDescriptor{
 											{
 												Name: "select",
@@ -306,12 +298,10 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 													{
 														Name: "id",
 														GenerationRule: &stroppy.Generation_Rule{
-															Type: &stroppy.Generation_Rule_Int32Rules{
-																Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-																	Range: &stroppy.Generation_Range_Int32Range{
-																		Min: 1,
-																		Max: 100,
-																	},
+															Kind: &stroppy.Generation_Rule_Int32Range{
+																Int32Range: &stroppy.Generation_Range_Int32{
+																	Min: ptr[int32](1),
+																	Max: 100,
 																},
 															},
 														},
@@ -326,12 +316,10 @@ func NewExampleConfig() *stroppy.ConfigFile { //nolint: funlen,maintidx,mnd // a
 													{
 														Name: "id",
 														GenerationRule: &stroppy.Generation_Rule{
-															Type: &stroppy.Generation_Rule_Int32Rules{
-																Int32Rules: &stroppy.Generation_Rules_Int32Rule{
-																	Range: &stroppy.Generation_Range_Int32Range{
-																		Min: 1,
-																		Max: 100,
-																	},
+															Kind: &stroppy.Generation_Rule_Int32Range{
+																Int32Range: &stroppy.Generation_Range_Int32{
+																	Min: ptr[int32](1),
+																	Max: 100,
 																},
 															},
 														},

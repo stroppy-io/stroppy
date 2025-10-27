@@ -172,7 +172,9 @@ type DriverQuery struct {
 	// * Request of the query
 	Request string `protobuf:"bytes,2,opt,name=request,proto3" json:"request,omitempty"`
 	// * Parameters of the query
-	Params        []*Value `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty"`
+	Params []*Value `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty"`
+	// * If alternate insertion method required
+	Method        *InsertMethod `protobuf:"varint,4,opt,name=method,proto3,enum=stroppy.InsertMethod,oneof" json:"method,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -226,6 +228,13 @@ func (x *DriverQuery) GetParams() []*Value {
 		return x.Params
 	}
 	return nil
+}
+
+func (x *DriverQuery) GetMethod() InsertMethod {
+	if x != nil && x.Method != nil {
+		return *x.Method
+	}
+	return InsertMethod_PLAIN_QUERY
 }
 
 // *
@@ -282,7 +291,7 @@ func (x *DriverTransaction) GetIsolationLevel() TxIsolationLevel {
 	if x != nil {
 		return x.IsolationLevel
 	}
-	return TxIsolationLevel_TX_ISOLATION_LEVEL_UNSPECIFIED
+	return TxIsolationLevel_UNSPECIFIED
 }
 
 // *
@@ -400,7 +409,7 @@ func (x *DriverTransactionStat) GetIsolationLevel() TxIsolationLevel {
 	if x != nil {
 		return x.IsolationLevel
 	}
-	return TxIsolationLevel_TX_ISOLATION_LEVEL_UNSPECIFIED
+	return TxIsolationLevel_UNSPECIFIED
 }
 
 var File_runtime_proto protoreflect.FileDescriptor
@@ -417,11 +426,13 @@ const file_runtime_proto_rawDesc = "" +
 	"\t_exporter\"\x90\x01\n" +
 	"\vUnitContext\x127\n" +
 	"\fstep_context\x18\x01 \x01(\v2\x14.stroppy.StepContextR\vstepContext\x12H\n" +
-	"\x0funit_descriptor\x18\x02 \x01(\v2\x1f.stroppy.WorkloadUnitDescriptorR\x0eunitDescriptor\"c\n" +
+	"\x0funit_descriptor\x18\x02 \x01(\v2\x1f.stroppy.WorkloadUnitDescriptorR\x0eunitDescriptor\"\xa2\x01\n" +
 	"\vDriverQuery\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\arequest\x18\x02 \x01(\tR\arequest\x12&\n" +
-	"\x06params\x18\x03 \x03(\v2\x0e.stroppy.ValueR\x06params\"\x87\x01\n" +
+	"\x06params\x18\x03 \x03(\v2\x0e.stroppy.ValueR\x06params\x122\n" +
+	"\x06method\x18\x04 \x01(\x0e2\x15.stroppy.InsertMethodH\x00R\x06method\x88\x01\x01B\t\n" +
+	"\a_method\"\x87\x01\n" +
 	"\x11DriverTransaction\x12.\n" +
 	"\aqueries\x18\x01 \x03(\v2\x14.stroppy.DriverQueryR\aqueries\x12B\n" +
 	"\x0fisolation_level\x18\x02 \x01(\x0e2\x19.stroppy.TxIsolationLevelR\x0eisolationLevel\"e\n" +
@@ -460,8 +471,9 @@ var file_runtime_proto_goTypes = []any{
 	(*WorkloadDescriptor)(nil),     // 10: stroppy.WorkloadDescriptor
 	(*WorkloadUnitDescriptor)(nil), // 11: stroppy.WorkloadUnitDescriptor
 	(*Value)(nil),                  // 12: stroppy.Value
-	(TxIsolationLevel)(0),          // 13: stroppy.TxIsolationLevel
-	(*durationpb.Duration)(nil),    // 14: google.protobuf.Duration
+	(InsertMethod)(0),              // 13: stroppy.InsertMethod
+	(TxIsolationLevel)(0),          // 14: stroppy.TxIsolationLevel
+	(*durationpb.Duration)(nil),    // 15: google.protobuf.Duration
 }
 var file_runtime_proto_depIdxs = []int32{
 	6,  // 0: stroppy.StepContext.config:type_name -> stroppy.GlobalConfig
@@ -472,17 +484,18 @@ var file_runtime_proto_depIdxs = []int32{
 	0,  // 5: stroppy.UnitContext.step_context:type_name -> stroppy.StepContext
 	11, // 6: stroppy.UnitContext.unit_descriptor:type_name -> stroppy.WorkloadUnitDescriptor
 	12, // 7: stroppy.DriverQuery.params:type_name -> stroppy.Value
-	2,  // 8: stroppy.DriverTransaction.queries:type_name -> stroppy.DriverQuery
-	13, // 9: stroppy.DriverTransaction.isolation_level:type_name -> stroppy.TxIsolationLevel
-	14, // 10: stroppy.DriverQueryStat.exec_duration:type_name -> google.protobuf.Duration
-	4,  // 11: stroppy.DriverTransactionStat.queries:type_name -> stroppy.DriverQueryStat
-	14, // 12: stroppy.DriverTransactionStat.exec_duration:type_name -> google.protobuf.Duration
-	13, // 13: stroppy.DriverTransactionStat.isolation_level:type_name -> stroppy.TxIsolationLevel
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	13, // 8: stroppy.DriverQuery.method:type_name -> stroppy.InsertMethod
+	2,  // 9: stroppy.DriverTransaction.queries:type_name -> stroppy.DriverQuery
+	14, // 10: stroppy.DriverTransaction.isolation_level:type_name -> stroppy.TxIsolationLevel
+	15, // 11: stroppy.DriverQueryStat.exec_duration:type_name -> google.protobuf.Duration
+	4,  // 12: stroppy.DriverTransactionStat.queries:type_name -> stroppy.DriverQueryStat
+	15, // 13: stroppy.DriverTransactionStat.exec_duration:type_name -> google.protobuf.Duration
+	14, // 14: stroppy.DriverTransactionStat.isolation_level:type_name -> stroppy.TxIsolationLevel
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_runtime_proto_init() }
@@ -494,6 +507,7 @@ func file_runtime_proto_init() {
 	file_config_proto_init()
 	file_descriptor_proto_init()
 	file_runtime_proto_msgTypes[0].OneofWrappers = []any{}
+	file_runtime_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
