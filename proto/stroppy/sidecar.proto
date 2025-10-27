@@ -6,7 +6,7 @@ import "google/protobuf/empty.proto";
 import "runtime.proto";
 import "config.proto";
 
-option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
+option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto";
 
 /**
  * SidecarPlugin defines the gRPC service that sidecar plugins must implement.

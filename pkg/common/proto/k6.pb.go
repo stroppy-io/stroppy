@@ -858,7 +858,7 @@ const file_k6_proto_rawDesc = "" +
 	"\amax_vus\x18\x05 \x01(\rR\x06maxVus\x1aZ\n" +
 	"\tRateStage\x12\x16\n" +
 	"\x06target\x18\x01 \x01(\rR\x06target\x125\n" +
-	"\bduration\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\bdurationB.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
+	"\bduration\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\bdurationB0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
 var (
 	file_k6_proto_rawDescOnce sync.Once
