@@ -822,7 +822,7 @@ const file_config_proto_rawDesc = "" +
 	"\texecutors\x18\x03 \x03(\v2\x17.stroppy.ExecutorConfigR\texecutors\x12#\n" +
 	"\x05steps\x18\x04 \x03(\v2\r.stroppy.StepR\x05steps\x123\n" +
 	"\tside_cars\x18\x05 \x03(\v2\x16.stroppy.SideCarConfigR\bsideCars\x12D\n" +
-	"\tbenchmark\x18\x06 \x01(\v2\x1c.stroppy.BenchmarkDescriptorB\b\xfaB\x05\x8a\x01\x02\x10\x01R\tbenchmarkB.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
+	"\tbenchmark\x18\x06 \x01(\v2\x1c.stroppy.BenchmarkDescriptorB\b\xfaB\x05\x8a\x01\x02\x10\x01R\tbenchmarkB0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
 var (
 	file_config_proto_rawDescOnce sync.Once

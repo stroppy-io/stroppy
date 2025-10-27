@@ -1169,7 +1169,7 @@ const file_descriptor_proto_rawDesc = "" +
 	"\x10READ_UNCOMMITTED\x10\x01\x12\x12\n" +
 	"\x0eREAD_COMMITTED\x10\x02\x12\x13\n" +
 	"\x0fREPEATABLE_READ\x10\x03\x12\x10\n" +
-	"\fSERIALIZABLE\x10\x04B.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
+	"\fSERIALIZABLE\x10\x04B0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
 var (
 	file_descriptor_proto_rawDescOnce sync.Once

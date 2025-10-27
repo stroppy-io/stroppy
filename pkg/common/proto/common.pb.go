@@ -2358,7 +2358,7 @@ const file_common_proto_rawDesc = "" +
 	"\x04kind\x12\x03\xf8B\x01B\x0f\n" +
 	"\r_distributionB\x12\n" +
 	"\x10_null_percentageB\t\n" +
-	"\a_uniqueB.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
+	"\a_uniqueB0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
 var (
 	file_common_proto_rawDescOnce sync.Once

@@ -31,7 +31,7 @@ const file_sidecar_proto_rawDesc = "" +
 	"Initialize\x12\x15.stroppy.GlobalConfig\x1a\x16.google.protobuf.Empty\x12;\n" +
 	"\vOnStepStart\x12\x14.stroppy.StepContext\x1a\x16.google.protobuf.Empty\x129\n" +
 	"\tOnStepEnd\x12\x14.stroppy.StepContext\x1a\x16.google.protobuf.Empty\x129\n" +
-	"\bTeardown\x12\x15.stroppy.GlobalConfig\x1a\x16.google.protobuf.EmptyB.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
+	"\bTeardown\x12\x15.stroppy.GlobalConfig\x1a\x16.google.protobuf.EmptyB0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
 var file_sidecar_proto_goTypes = []any{
 	(*GlobalConfig)(nil),  // 0: stroppy.GlobalConfig

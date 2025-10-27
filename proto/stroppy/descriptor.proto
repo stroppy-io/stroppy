@@ -5,7 +5,7 @@ package stroppy;
 import "common.proto";
 import "gen/validate/validate.proto";
 
-option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
+option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto";
 
 /**
  * IndexDescriptor defines the structure of a database index.

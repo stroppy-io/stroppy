@@ -256,7 +256,7 @@ const file_cloud_proto_rawDesc = "" +
 	"\x12CloudStatusService\x128\n" +
 	"\tNotifyRun\x12\x13.stroppy.StroppyRun\x1a\x16.google.protobuf.Empty\x12=\n" +
 	"\n" +
-	"NotifyStep\x12\x17.stroppy.StroppyStepRun\x1a\x16.google.protobuf.EmptyB.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
+	"NotifyStep\x12\x17.stroppy.StroppyStepRun\x1a\x16.google.protobuf.EmptyB0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
 var (
 	file_cloud_proto_rawDescOnce sync.Once

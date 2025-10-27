@@ -442,7 +442,7 @@ const file_runtime_proto_rawDesc = "" +
 	"\x15DriverTransactionStat\x122\n" +
 	"\aqueries\x18\x01 \x03(\v2\x18.stroppy.DriverQueryStatR\aqueries\x12>\n" +
 	"\rexec_duration\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\fexecDuration\x12B\n" +
-	"\x0fisolation_level\x18\x03 \x01(\x0e2\x19.stroppy.TxIsolationLevelR\x0eisolationLevelB.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
+	"\x0fisolation_level\x18\x03 \x01(\x0e2\x19.stroppy.TxIsolationLevelR\x0eisolationLevelB0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
 var (
 	file_runtime_proto_rawDescOnce sync.Once

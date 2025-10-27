@@ -5,7 +5,7 @@ package stroppy;
 import "gen/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
+option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto";
 
 /**
  * OtlpExport contains configuration for exporting metrics via OpenTelemetry
