@@ -54,6 +54,14 @@ message DateTime {
 }
 
 /**
+ * Ulid represents a universally universally unique lexicographically sortable identifier (ULID).
+ */
+message Ulid {
+    /** String representation of ULID (e.g., "01ANQWJZ000000000000000000") */
+    string value = 1 [(validate.rules).string.len = 26];
+}
+
+/**
  * Value is a variant type that can represent different types of values.
  * It's used to represent values that can be of multiple types in a type-safe
  * way.
