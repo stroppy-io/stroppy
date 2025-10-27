@@ -58,18 +58,6 @@
     - [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel)
     - [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode)
   
-- [k6.proto](#k6-proto)
-    - [ConstantArrivalRate](#stroppy-ConstantArrivalRate)
-    - [ConstantVUs](#stroppy-ConstantVUs)
-    - [K6Options](#stroppy-K6Options)
-    - [K6Scenario](#stroppy-K6Scenario)
-    - [PerVuIterations](#stroppy-PerVuIterations)
-    - [RampingArrivalRate](#stroppy-RampingArrivalRate)
-    - [RampingArrivalRate.RateStage](#stroppy-RampingArrivalRate-RateStage)
-    - [RampingVUs](#stroppy-RampingVUs)
-    - [RampingVUs.VUStage](#stroppy-RampingVUs-VUStage)
-    - [SharedIterations](#stroppy-SharedIterations)
-  
 - [sidecar.proto](#sidecar-proto)
     - [SidecarService](#stroppy-SidecarService)
   
@@ -95,6 +83,7 @@
     - [Generation.Range.UInt64](#stroppy-Generation-Range-UInt64)
     - [Generation.Rule](#stroppy-Generation-Rule)
     - [OtlpExport](#stroppy-OtlpExport)
+    - [Ulid](#stroppy-Ulid)
     - [Uuid](#stroppy-Uuid)
     - [Value](#stroppy-Value)
     - [Value.List](#stroppy-Value-List)
@@ -120,6 +109,18 @@
     - [InsertMethod](#stroppy-InsertMethod)
     - [TxIsolationLevel](#stroppy-TxIsolationLevel)
   
+- [k6.proto](#k6-proto)
+    - [ConstantArrivalRate](#stroppy-ConstantArrivalRate)
+    - [ConstantVUs](#stroppy-ConstantVUs)
+    - [K6Options](#stroppy-K6Options)
+    - [K6Scenario](#stroppy-K6Scenario)
+    - [PerVuIterations](#stroppy-PerVuIterations)
+    - [RampingArrivalRate](#stroppy-RampingArrivalRate)
+    - [RampingArrivalRate.RateStage](#stroppy-RampingArrivalRate-RateStage)
+    - [RampingVUs](#stroppy-RampingVUs)
+    - [RampingVUs.VUStage](#stroppy-RampingVUs-VUStage)
+    - [SharedIterations](#stroppy-SharedIterations)
+  
 - [runtime.proto](#runtime-proto)
     - [DriverQuery](#stroppy-DriverQuery)
     - [DriverQueryStat](#stroppy-DriverQueryStat)
@@ -127,6 +128,14 @@
     - [DriverTransactionStat](#stroppy-DriverTransactionStat)
     - [StepContext](#stroppy-StepContext)
     - [UnitContext](#stroppy-UnitContext)
+  
+- [cloud.proto](#cloud-proto)
+    - [StroppyRun](#stroppy-StroppyRun)
+    - [StroppyStepRun](#stroppy-StroppyStepRun)
+  
+    - [Status](#stroppy-Status)
+  
+    - [CloudStatusService](#stroppy-CloudStatusService)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -927,212 +936,6 @@ StepExecutorMappingConfig contains configuration for mapping steps to executors.
 
 
 
-<a name="k6-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## k6.proto
-
-
-
-<a name="stroppy-ConstantArrivalRate"></a>
-
-### ConstantArrivalRate
-ConstantArrivalRate executor configuration.
-Documentation:
-https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| rate | [uint32](#uint32) |  | Rate of iteration generation (number per time unit) |
-| time_unit | [google.protobuf.Duration](#google-protobuf-Duration) |  | Time unit for the &#34;rate&#34; field (e.g., &#34;1s&#34;) |
-| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the scenario |
-| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance |
-| max_vus | [uint32](#uint32) |  | Maximum allowed number of VUs if load increases |
-
-
-
-
-
-
-<a name="stroppy-ConstantVUs"></a>
-
-### ConstantVUs
-ConstantVUs executor configuration.
-Documentation:
-https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| vus | [uint32](#uint32) |  | Fixed number of virtual users that will be simultaneously active at all times |
-| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the scenario execution. All VUs will start and execute iterations until this time is completed. |
-
-
-
-
-
-
-<a name="stroppy-K6Options"></a>
-
-### K6Options
-K6Executor contains configuration for k6 load testing tool integration.
-It contains paths to the k6 binary and the k6 test script, as well as
-additional arguments to pass to the k6 binary.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| k6_args | [string](#string) | repeated | Additional arguments to pass to the k6 binary |
-| setup_timeout | [google.protobuf.Duration](#google-protobuf-Duration) | optional | Timeout for k6 setup phase |
-| scenario | [K6Scenario](#stroppy-K6Scenario) |  | Scenario configuration |
-
-
-
-
-
-
-<a name="stroppy-K6Scenario"></a>
-
-### K6Scenario
-Scenario defines the overall test scenario configuration.
-It contains user tags, maximum duration, and executor configuration.
-Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| max_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Maximum duration for scenario execution. Used as a time limiter if main parameters (iterations, stages, duration) do not complete in time. |
-| shared_iterations | [SharedIterations](#stroppy-SharedIterations) |  | Shared iterations executor |
-| per_vu_iterations | [PerVuIterations](#stroppy-PerVuIterations) |  | Per-VU iterations executor |
-| constant_vus | [ConstantVUs](#stroppy-ConstantVUs) |  | Constant VUs executor |
-| ramping_vus | [RampingVUs](#stroppy-RampingVUs) |  | Ramping VUs executor |
-| constant_arrival_rate | [ConstantArrivalRate](#stroppy-ConstantArrivalRate) |  | Constant arrival rate executor |
-| ramping_arrival_rate | [RampingArrivalRate](#stroppy-RampingArrivalRate) |  | Ramping arrival rate executor |
-
-
-
-
-
-
-<a name="stroppy-PerVuIterations"></a>
-
-### PerVuIterations
-PerVuIterations executor configuration.
-Documentation:
-https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| vus | [uint32](#uint32) |  | Number of virtual users |
-| iterations | [int64](#int64) |  | Number of iterations that each VU should execute &#34;-1&#34; is a special value to run all the units from by every vu. |
-
-
-
-
-
-
-<a name="stroppy-RampingArrivalRate"></a>
-
-### RampingArrivalRate
-RampingArrivalRate executor configuration.
-Documentation:
-https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| start_rate | [uint32](#uint32) |  | Initial rate (iterations per time_unit) |
-| time_unit | [google.protobuf.Duration](#google-protobuf-Duration) |  | Time unit for the rate (e.g., &#34;1s&#34;) |
-| stages | [RampingArrivalRate.RateStage](#stroppy-RampingArrivalRate-RateStage) | repeated | List of rate change stages |
-| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance |
-| max_vus | [uint32](#uint32) |  | Maximum number of VUs available for pool expansion |
-
-
-
-
-
-
-<a name="stroppy-RampingArrivalRate-RateStage"></a>
-
-### RampingArrivalRate.RateStage
-Rate stage configuration for ramping arrival rate
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| target | [uint32](#uint32) |  | Target rate (iterations per time_unit) at the end of the stage |
-| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the stage |
-
-
-
-
-
-
-<a name="stroppy-RampingVUs"></a>
-
-### RampingVUs
-RampingVUs executor configuration.
-Documentation:
-https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| start_vus | [uint32](#uint32) |  | Initial number of virtual users |
-| stages | [RampingVUs.VUStage](#stroppy-RampingVUs-VUStage) | repeated | List of stages where VU count changes to target value over specified time |
-| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance. Helps avoid delays when creating new VUs during the test. |
-| max_vus | [uint32](#uint32) |  | Maximum number of VUs available for pool expansion |
-
-
-
-
-
-
-<a name="stroppy-RampingVUs-VUStage"></a>
-
-### RampingVUs.VUStage
-VU stage configuration for ramping
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the stage (e.g., &#34;30s&#34;) |
-| target | [uint32](#uint32) |  | Target number of VUs at the end of the stage |
-
-
-
-
-
-
-<a name="stroppy-SharedIterations"></a>
-
-### SharedIterations
-SharedIterations executor configuration.
-Documentation:
-https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| iterations | [int64](#int64) |  | Total number of iterations to be executed by all VUs together. Iterations are distributed dynamically among available VUs. &#34;-1&#34; is a special value to run all the units from step. |
-| vus | [uint32](#uint32) |  | Number of virtual users that will execute these iterations in parallel |
-
-
-
-
-
- 
-
- 
-
- 
-
- 
-
-
-
 <a name="sidecar-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -1524,6 +1327,21 @@ data export.
 
 
 
+<a name="stroppy-Ulid"></a>
+
+### Ulid
+Ulid represents a universally universally unique lexicographically sortable identifier (ULID).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| value | [string](#string) |  | String representation of ULID (e.g., &#34;01ANQWJZ000000000000000000&#34;) |
+
+
+
+
+
+
 <a name="stroppy-Uuid"></a>
 
 ### Uuid
@@ -1903,6 +1721,212 @@ transaction.
 
 
 
+<a name="k6-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## k6.proto
+
+
+
+<a name="stroppy-ConstantArrivalRate"></a>
+
+### ConstantArrivalRate
+ConstantArrivalRate executor configuration.
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| rate | [uint32](#uint32) |  | Rate of iteration generation (number per time unit) |
+| time_unit | [google.protobuf.Duration](#google-protobuf-Duration) |  | Time unit for the &#34;rate&#34; field (e.g., &#34;1s&#34;) |
+| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the scenario |
+| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance |
+| max_vus | [uint32](#uint32) |  | Maximum allowed number of VUs if load increases |
+
+
+
+
+
+
+<a name="stroppy-ConstantVUs"></a>
+
+### ConstantVUs
+ConstantVUs executor configuration.
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-vus/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| vus | [uint32](#uint32) |  | Fixed number of virtual users that will be simultaneously active at all times |
+| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the scenario execution. All VUs will start and execute iterations until this time is completed. |
+
+
+
+
+
+
+<a name="stroppy-K6Options"></a>
+
+### K6Options
+K6Executor contains configuration for k6 load testing tool integration.
+It contains paths to the k6 binary and the k6 test script, as well as
+additional arguments to pass to the k6 binary.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| k6_args | [string](#string) | repeated | Additional arguments to pass to the k6 binary |
+| setup_timeout | [google.protobuf.Duration](#google-protobuf-Duration) | optional | Timeout for k6 setup phase |
+| scenario | [K6Scenario](#stroppy-K6Scenario) |  | Scenario configuration |
+
+
+
+
+
+
+<a name="stroppy-K6Scenario"></a>
+
+### K6Scenario
+Scenario defines the overall test scenario configuration.
+It contains user tags, maximum duration, and executor configuration.
+Documentation: https://grafana.com/docs/k6/latest/using-k6/scenarios/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| max_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Maximum duration for scenario execution. Used as a time limiter if main parameters (iterations, stages, duration) do not complete in time. |
+| shared_iterations | [SharedIterations](#stroppy-SharedIterations) |  | Shared iterations executor |
+| per_vu_iterations | [PerVuIterations](#stroppy-PerVuIterations) |  | Per-VU iterations executor |
+| constant_vus | [ConstantVUs](#stroppy-ConstantVUs) |  | Constant VUs executor |
+| ramping_vus | [RampingVUs](#stroppy-RampingVUs) |  | Ramping VUs executor |
+| constant_arrival_rate | [ConstantArrivalRate](#stroppy-ConstantArrivalRate) |  | Constant arrival rate executor |
+| ramping_arrival_rate | [RampingArrivalRate](#stroppy-RampingArrivalRate) |  | Ramping arrival rate executor |
+
+
+
+
+
+
+<a name="stroppy-PerVuIterations"></a>
+
+### PerVuIterations
+PerVuIterations executor configuration.
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/per-vu-iterations/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| vus | [uint32](#uint32) |  | Number of virtual users |
+| iterations | [int64](#int64) |  | Number of iterations that each VU should execute &#34;-1&#34; is a special value to run all the units from by every vu. |
+
+
+
+
+
+
+<a name="stroppy-RampingArrivalRate"></a>
+
+### RampingArrivalRate
+RampingArrivalRate executor configuration.
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-arrival-rate/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| start_rate | [uint32](#uint32) |  | Initial rate (iterations per time_unit) |
+| time_unit | [google.protobuf.Duration](#google-protobuf-Duration) |  | Time unit for the rate (e.g., &#34;1s&#34;) |
+| stages | [RampingArrivalRate.RateStage](#stroppy-RampingArrivalRate-RateStage) | repeated | List of rate change stages |
+| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance |
+| max_vus | [uint32](#uint32) |  | Maximum number of VUs available for pool expansion |
+
+
+
+
+
+
+<a name="stroppy-RampingArrivalRate-RateStage"></a>
+
+### RampingArrivalRate.RateStage
+Rate stage configuration for ramping arrival rate
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| target | [uint32](#uint32) |  | Target rate (iterations per time_unit) at the end of the stage |
+| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the stage |
+
+
+
+
+
+
+<a name="stroppy-RampingVUs"></a>
+
+### RampingVUs
+RampingVUs executor configuration.
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ramping-vus/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| start_vus | [uint32](#uint32) |  | Initial number of virtual users |
+| stages | [RampingVUs.VUStage](#stroppy-RampingVUs-VUStage) | repeated | List of stages where VU count changes to target value over specified time |
+| pre_allocated_vus | [uint32](#uint32) |  | Number of VUs allocated in advance. Helps avoid delays when creating new VUs during the test. |
+| max_vus | [uint32](#uint32) |  | Maximum number of VUs available for pool expansion |
+
+
+
+
+
+
+<a name="stroppy-RampingVUs-VUStage"></a>
+
+### RampingVUs.VUStage
+VU stage configuration for ramping
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Duration of the stage (e.g., &#34;30s&#34;) |
+| target | [uint32](#uint32) |  | Target number of VUs at the end of the stage |
+
+
+
+
+
+
+<a name="stroppy-SharedIterations"></a>
+
+### SharedIterations
+SharedIterations executor configuration.
+Documentation:
+https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iterations/
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| iterations | [int64](#int64) |  | Total number of iterations to be executed by all VUs together. Iterations are distributed dynamically among available VUs. &#34;-1&#34; is a special value to run all the units from step. |
+| vus | [uint32](#uint32) |  | Number of virtual users that will execute these iterations in parallel |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
 <a name="runtime-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -2021,6 +2045,84 @@ WorkloadUnitDescriptor.
  
 
  
+
+ 
+
+
+
+<a name="cloud-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## cloud.proto
+
+
+
+<a name="stroppy-StroppyRun"></a>
+
+### StroppyRun
+StroppyRun represents a benchmark run on the stroppy cli.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | [Ulid](#stroppy-Ulid) |  | Unique identifier for the run generated by stroppy-cli |
+| status | [Status](#stroppy-Status) |  | Status of the run |
+| config | [ConfigFile](#stroppy-ConfigFile) |  | Configuration for the benchmark run |
+| cmd | [string](#string) |  | Command used to run the benchmark |
+
+
+
+
+
+
+<a name="stroppy-StroppyStepRun"></a>
+
+### StroppyStepRun
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | [Ulid](#stroppy-Ulid) |  | Unique identifier for the step run generated by stroppy-cli |
+| stroppy_run_id | [Ulid](#stroppy-Ulid) |  | Unique identifier for the parent stroppy run generated by stroppy-cli |
+| context | [StepContext](#stroppy-StepContext) |  | Context for the step run |
+| status | [Status](#stroppy-Status) |  | Status of the step run |
+
+
+
+
+
+ 
+
+
+<a name="stroppy-Status"></a>
+
+### Status
+Status represents the status of a stroppy run or step run.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| STATUS_IDLE | 0 | Run or step is idle |
+| STATUS_RUNNING | 1 | Run or step is running |
+| STATUS_COMPLETED | 2 | Run or step has completed successfully |
+| STATUS_FAILED | 3 | Run or step has failed |
+| STATUS_CANCELLED | 4 | Run or step has been cancelled |
+
+
+ 
+
+ 
+
+
+<a name="stroppy-CloudStatusService"></a>
+
+### CloudStatusService
+CloudStatusService is a service for notifying the cloud status of runs and steps.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| NotifyRun | [StroppyRun](#stroppy-StroppyRun) | [.google.protobuf.Empty](#google-protobuf-Empty) | Notifies the cloud status of a benchmark run |
+| NotifyStep | [StroppyStepRun](#stroppy-StroppyStepRun) | [.google.protobuf.Empty](#google-protobuf-Empty) | Notifies the cloud status of a benchmark step |
 
  
 
