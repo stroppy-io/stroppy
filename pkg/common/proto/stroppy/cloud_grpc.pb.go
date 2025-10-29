@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v6.32.1
-// source: cloud.proto
+// source: stroppy/cloud.proto
 
 package proto
 
@@ -166,5 +166,5 @@ var CloudStatusService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "cloud.proto",
+	Metadata: "stroppy/cloud.proto",
 }

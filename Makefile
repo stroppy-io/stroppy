@@ -83,8 +83,10 @@ proto:
 	rm -rf $(CURDIR)/pkg/common/proto/*
 	cd proto && $(MAKE) build
 	cp -r $(SRC_PROTO_PATH)/go/* $(CURDIR)/pkg/common/proto
-	cp $(SRC_PROTO_PATH)/ts/* $(CURDIR)/internal/static/
-	cp $(SRC_PROTO_PATH)/docs/* $(CURDIR)/docs
+	cp $(SRC_PROTO_PATH)/ts/stroppy.pb.ts $(CURDIR)/internal/static/
+	cp $(SRC_PROTO_PATH)/ts/stroppy.pb.js $(CURDIR)/internal/static/
+	cp $(SRC_PROTO_PATH)/docs/proto.md $(CURDIR)/docs
+	cp $(SRC_PROTO_PATH)/docs/stroppy/config.schema.json $(CURDIR)/docs
 
 K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
 .PHONY: build-xk6

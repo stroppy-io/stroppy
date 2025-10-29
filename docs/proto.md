@@ -3,20 +3,12 @@
 
 ## Table of Contents
 
-- [gen/defaults/defaults.proto](#gen_defaults_defaults-proto)
-    - [FieldDefaults](#defaults-FieldDefaults)
-    - [MessageDefaults](#defaults-MessageDefaults)
-  
-    - [File-level Extensions](#gen_defaults_defaults-proto-extensions)
-    - [File-level Extensions](#gen_defaults_defaults-proto-extensions)
-    - [File-level Extensions](#gen_defaults_defaults-proto-extensions)
-    - [File-level Extensions](#gen_defaults_defaults-proto-extensions)
-    - [File-level Extensions](#gen_defaults_defaults-proto-extensions)
-  
-- [gen/validate/validate.proto](#gen_validate_validate-proto)
+- [validate/validate.proto](#validate_validate-proto)
+    - [AnyRules](#validate-AnyRules)
     - [BoolRules](#validate-BoolRules)
     - [BytesRules](#validate-BytesRules)
     - [DoubleRules](#validate-DoubleRules)
+    - [DurationRules](#validate-DurationRules)
     - [EnumRules](#validate-EnumRules)
     - [FieldRules](#validate-FieldRules)
     - [Fixed32Rules](#validate-Fixed32Rules)
@@ -32,36 +24,26 @@
     - [SInt32Rules](#validate-SInt32Rules)
     - [SInt64Rules](#validate-SInt64Rules)
     - [StringRules](#validate-StringRules)
+    - [TimestampRules](#validate-TimestampRules)
     - [UInt32Rules](#validate-UInt32Rules)
     - [UInt64Rules](#validate-UInt64Rules)
   
     - [KnownRegex](#validate-KnownRegex)
   
-    - [File-level Extensions](#gen_validate_validate-proto-extensions)
-    - [File-level Extensions](#gen_validate_validate-proto-extensions)
-    - [File-level Extensions](#gen_validate_validate-proto-extensions)
-    - [File-level Extensions](#gen_validate_validate-proto-extensions)
+    - [File-level Extensions](#validate_validate-proto-extensions)
+    - [File-level Extensions](#validate_validate-proto-extensions)
+    - [File-level Extensions](#validate_validate-proto-extensions)
+    - [File-level Extensions](#validate_validate-proto-extensions)
   
-- [config.proto](#config-proto)
-    - [CloudConfig](#stroppy-CloudConfig)
-    - [ConfigFile](#stroppy-ConfigFile)
-    - [DriverConfig](#stroppy-DriverConfig)
-    - [ExecutorConfig](#stroppy-ExecutorConfig)
-    - [ExporterConfig](#stroppy-ExporterConfig)
-    - [GlobalConfig](#stroppy-GlobalConfig)
-    - [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry)
-    - [LoggerConfig](#stroppy-LoggerConfig)
-    - [SideCarConfig](#stroppy-SideCarConfig)
-    - [Step](#stroppy-Step)
+- [stroppy/cloud.proto](#stroppy_cloud-proto)
+    - [StroppyRun](#stroppy-StroppyRun)
+    - [StroppyStepRun](#stroppy-StroppyStepRun)
   
-    - [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType)
-    - [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel)
-    - [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode)
+    - [Status](#stroppy-Status)
   
-- [sidecar.proto](#sidecar-proto)
-    - [SidecarService](#stroppy-SidecarService)
+    - [CloudStatusService](#stroppy-CloudStatusService)
   
-- [common.proto](#common-proto)
+- [stroppy/common.proto](#stroppy_common-proto)
     - [DateTime](#stroppy-DateTime)
     - [Decimal](#stroppy-Decimal)
     - [Generation](#stroppy-Generation)
@@ -92,7 +74,23 @@
     - [Generation.Distribution.DistributionType](#stroppy-Generation-Distribution-DistributionType)
     - [Value.NullValue](#stroppy-Value-NullValue)
   
-- [descriptor.proto](#descriptor-proto)
+- [stroppy/config.proto](#stroppy_config-proto)
+    - [CloudConfig](#stroppy-CloudConfig)
+    - [ConfigFile](#stroppy-ConfigFile)
+    - [DriverConfig](#stroppy-DriverConfig)
+    - [ExecutorConfig](#stroppy-ExecutorConfig)
+    - [ExporterConfig](#stroppy-ExporterConfig)
+    - [GlobalConfig](#stroppy-GlobalConfig)
+    - [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry)
+    - [LoggerConfig](#stroppy-LoggerConfig)
+    - [SideCarConfig](#stroppy-SideCarConfig)
+    - [Step](#stroppy-Step)
+  
+    - [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType)
+    - [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel)
+    - [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode)
+  
+- [stroppy/descriptor.proto](#stroppy_descriptor-proto)
     - [BenchmarkDescriptor](#stroppy-BenchmarkDescriptor)
     - [ColumnDescriptor](#stroppy-ColumnDescriptor)
     - [IndexDescriptor](#stroppy-IndexDescriptor)
@@ -109,7 +107,7 @@
     - [InsertMethod](#stroppy-InsertMethod)
     - [TxIsolationLevel](#stroppy-TxIsolationLevel)
   
-- [k6.proto](#k6-proto)
+- [stroppy/k6.proto](#stroppy_k6-proto)
     - [ConstantArrivalRate](#stroppy-ConstantArrivalRate)
     - [ConstantVUs](#stroppy-ConstantVUs)
     - [K6Options](#stroppy-K6Options)
@@ -121,7 +119,7 @@
     - [RampingVUs.VUStage](#stroppy-RampingVUs-VUStage)
     - [SharedIterations](#stroppy-SharedIterations)
   
-- [runtime.proto](#runtime-proto)
+- [stroppy/runtime.proto](#stroppy_runtime-proto)
     - [DriverQuery](#stroppy-DriverQuery)
     - [DriverQueryStat](#stroppy-DriverQueryStat)
     - [DriverTransaction](#stroppy-DriverTransaction)
@@ -129,100 +127,35 @@
     - [StepContext](#stroppy-StepContext)
     - [UnitContext](#stroppy-UnitContext)
   
-- [cloud.proto](#cloud-proto)
-    - [StroppyRun](#stroppy-StroppyRun)
-    - [StroppyStepRun](#stroppy-StroppyStepRun)
-  
-    - [Status](#stroppy-Status)
-  
-    - [CloudStatusService](#stroppy-CloudStatusService)
+- [stroppy/sidecar.proto](#stroppy_sidecar-proto)
+    - [SidecarService](#stroppy-SidecarService)
   
 - [Scalar Value Types](#scalar-value-types)
 
 
 
-<a name="gen_defaults_defaults-proto"></a>
+<a name="validate_validate-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## gen/defaults/defaults.proto
+## validate/validate.proto
 
 
 
-<a name="defaults-FieldDefaults"></a>
+<a name="validate-AnyRules"></a>
 
-### FieldDefaults
-FieldDefaults encapsulates the default values for each type of field. Depending on the
-field, the correct set should be used to ensure proper defaults generation.
+### AnyRules
+AnyRules describe constraints applied exclusively to the
+`google.protobuf.Any` well-known type
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| float | [float](#float) | optional | Scalar Field Types |
-| double | [double](#double) | optional |  |
-| int32 | [int32](#int32) | optional |  |
-| int64 | [int64](#int64) | optional |  |
-| uint32 | [uint32](#uint32) | optional |  |
-| uint64 | [uint64](#uint64) | optional |  |
-| sint32 | [sint32](#sint32) | optional |  |
-| sint64 | [sint64](#sint64) | optional |  |
-| fixed32 | [fixed32](#fixed32) | optional |  |
-| fixed64 | [fixed64](#fixed64) | optional |  |
-| sfixed32 | [sfixed32](#sfixed32) | optional |  |
-| sfixed64 | [sfixed64](#sfixed64) | optional |  |
-| bool | [bool](#bool) | optional |  |
-| string | [string](#string) | optional |  |
-| bytes | [bytes](#bytes) | optional |  |
-| enum | [uint32](#uint32) | optional | Complex Field Types |
-| message | [MessageDefaults](#defaults-MessageDefaults) | optional | repeated = 18; map = 19; |
-| duration | [string](#string) | optional | Well-Known Field Types any = 20; |
-| timestamp | [string](#string) | optional |  |
+| required | [bool](#bool) | optional | Required specifies that this field must be set |
+| in | [string](#string) | repeated | In specifies that this field&#39;s `type_url` must be equal to one of the specified values. |
+| not_in | [string](#string) | repeated | NotIn specifies that this field&#39;s `type_url` must not be equal to any of the specified values. |
 
 
 
-
-
-
-<a name="defaults-MessageDefaults"></a>
-
-### MessageDefaults
-MessageDefaults define the default behaviour for this field.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| initialize | [bool](#bool) | optional | Initialize specify that the message should be initialized |
-| defaults | [bool](#bool) | optional | Defaults specifies that the messages&#39; defaults should be applied |
-
-
-
-
-
- 
-
- 
-
-
-<a name="gen_defaults_defaults-proto-extensions"></a>
-
-### File-level Extensions
-| Extension | Type | Base | Number | Description |
-| --------- | ---- | ---- | ------ | ----------- |
-| value | FieldDefaults | .google.protobuf.FieldOptions | 1171 | Value specify the default value to set on this field. By default, none is set on a field. |
-| disabled | bool | .google.protobuf.MessageOptions | 1171 | Disabled nullifies any defaults for this message, including any message fields associated with it that do support defaults. |
-| ignored | bool | .google.protobuf.MessageOptions | 1172 | Ignore skips generation of default methods for this message. |
-| unexported | bool | .google.protobuf.MessageOptions | 1173 | Unexported generate an unexported defaults method, this can be useful when we want both the generated defaults and a custom defaults method that will call the unexported method. |
-| oneof | string | .google.protobuf.OneofOptions | 1171 |  |
-
- 
-
- 
-
-
-
-<a name="gen_validate_validate-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## gen/validate/validate.proto
 
 
 
@@ -291,6 +224,29 @@ DoubleRules describes the constraints applied to `double` values
 
 
 
+<a name="validate-DurationRules"></a>
+
+### DurationRules
+DurationRules describe the constraints applied exclusively to the
+`google.protobuf.Duration` well-known type
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| required | [bool](#bool) | optional | Required specifies that this field must be set |
+| const | [google.protobuf.Duration](#google-protobuf-Duration) | optional | Const specifies that this field must be exactly the specified value |
+| lt | [google.protobuf.Duration](#google-protobuf-Duration) | optional | Lt specifies that this field must be less than the specified value, exclusive |
+| lte | [google.protobuf.Duration](#google-protobuf-Duration) | optional | Lt specifies that this field must be less than the specified value, inclusive |
+| gt | [google.protobuf.Duration](#google-protobuf-Duration) | optional | Gt specifies that this field must be greater than the specified value, exclusive |
+| gte | [google.protobuf.Duration](#google-protobuf-Duration) | optional | Gte specifies that this field must be greater than the specified value, inclusive |
+| in | [google.protobuf.Duration](#google-protobuf-Duration) | repeated | In specifies that this field must be equal to one of the specified values |
+| not_in | [google.protobuf.Duration](#google-protobuf-Duration) | repeated | NotIn specifies that this field cannot be equal to one of the specified values |
+
+
+
+
+
+
 <a name="validate-EnumRules"></a>
 
 ### EnumRules
@@ -337,6 +293,9 @@ field, the correct set should be used to ensure proper validations.
 | enum | [EnumRules](#validate-EnumRules) | optional | Complex Field Types |
 | repeated | [RepeatedRules](#validate-RepeatedRules) | optional |  |
 | map | [MapRules](#validate-MapRules) | optional |  |
+| any | [AnyRules](#validate-AnyRules) | optional | Well-Known Field Types |
+| duration | [DurationRules](#validate-DurationRules) | optional |  |
+| timestamp | [TimestampRules](#validate-TimestampRules) | optional |  |
 
 
 
@@ -637,6 +596,30 @@ StringRules describe the constraints applied to `string` values
 
 
 
+<a name="validate-TimestampRules"></a>
+
+### TimestampRules
+TimestampRules describe the constraints applied exclusively to the
+`google.protobuf.Timestamp` well-known type
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| required | [bool](#bool) | optional | Required specifies that this field must be set |
+| const | [google.protobuf.Timestamp](#google-protobuf-Timestamp) | optional | Const specifies that this field must be exactly the specified value |
+| lt | [google.protobuf.Timestamp](#google-protobuf-Timestamp) | optional | Lt specifies that this field must be less than the specified value, exclusive |
+| lte | [google.protobuf.Timestamp](#google-protobuf-Timestamp) | optional | Lte specifies that this field must be less than the specified value, inclusive |
+| gt | [google.protobuf.Timestamp](#google-protobuf-Timestamp) | optional | Gt specifies that this field must be greater than the specified value, exclusive |
+| gte | [google.protobuf.Timestamp](#google-protobuf-Timestamp) | optional | Gte specifies that this field must be greater than the specified value, inclusive |
+| lt_now | [bool](#bool) | optional | LtNow specifies that this must be less than the current time. LtNow can only be used with the Within rule. |
+| gt_now | [bool](#bool) | optional | GtNow specifies that this must be greater than the current time. GtNow can only be used with the Within rule. |
+| within | [google.protobuf.Duration](#google-protobuf-Duration) | optional | Within specifies that this field must be within this duration of the current time. This constraint can be used alone or with the LtNow and GtNow rules. |
+
+
+
+
+
+
 <a name="validate-UInt32Rules"></a>
 
 ### UInt32Rules
@@ -698,7 +681,7 @@ WellKnownRegex contain some well-known patterns.
  
 
 
-<a name="gen_validate_validate-proto-extensions"></a>
+<a name="validate_validate-proto-extensions"></a>
 
 ### File-level Extensions
 | Extension | Type | Base | Number | Description |
@@ -714,174 +697,43 @@ WellKnownRegex contain some well-known patterns.
 
 
 
-<a name="config-proto"></a>
+<a name="stroppy_cloud-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## config.proto
+## stroppy/cloud.proto
 
 
 
-<a name="stroppy-CloudConfig"></a>
+<a name="stroppy-StroppyRun"></a>
 
-### CloudConfig
-CloudConfig contains configuration for stroppy cloud backend.
-
-
-
-
-
-
-<a name="stroppy-ConfigFile"></a>
-
-### ConfigFile
-ConfigFile contains the complete configuration for a benchmark run in file.
+### StroppyRun
+StroppyRun represents a benchmark run on the stroppy cli.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| global | [GlobalConfig](#stroppy-GlobalConfig) |  | Global configuration |
-| exporters | [ExporterConfig](#stroppy-ExporterConfig) | repeated | Exporters configuration |
-| executors | [ExecutorConfig](#stroppy-ExecutorConfig) | repeated | Executors configuration |
-| steps | [Step](#stroppy-Step) | repeated | Step to executor mapping configuration |
-| side_cars | [SideCarConfig](#stroppy-SideCarConfig) | repeated | Plugins configuration |
-| benchmark | [BenchmarkDescriptor](#stroppy-BenchmarkDescriptor) |  | BenchmarkDescriptor defines a complete benchmark consisting of multiple steps. |
+| id | [Ulid](#stroppy-Ulid) |  | Unique identifier for the run generated by stroppy-cli |
+| status | [Status](#stroppy-Status) |  | Status of the run |
+| config | [ConfigFile](#stroppy-ConfigFile) |  | Configuration for the benchmark run |
+| cmd | [string](#string) |  | Command used to run the benchmark |
 
 
 
 
 
 
-<a name="stroppy-DriverConfig"></a>
+<a name="stroppy-StroppyStepRun"></a>
 
-### DriverConfig
-DriverConfig contains configuration for connecting to a database driver.
-It includes the driver plugin path, connection URL, and database-specific settings.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| url | [string](#string) |  | Database connection URL |
-| db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific configuration options |
-| driver_type | [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType) |  | Name/Type of chosen driver |
-
-
-
-
-
-
-<a name="stroppy-ExecutorConfig"></a>
-
-### ExecutorConfig
-ExecutorConfig contains configuration for an executor.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | Name of the executor |
-| k6 | [K6Options](#stroppy-K6Options) |  | Configuration for the executor |
-
-
-
-
-
-
-<a name="stroppy-ExporterConfig"></a>
-
-### ExporterConfig
-OtlpExporterConfig contains named configuration for an OTLP exporter.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | Name of the OTLP exporter |
-| otlp_export | [OtlpExport](#stroppy-OtlpExport) |  | Configuration for the OTLP exporter |
-
-
-
-
-
-
-<a name="stroppy-GlobalConfig"></a>
-
-### GlobalConfig
+### StroppyStepRun
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| version | [string](#string) |  | Version of the configuration format e.g. proto files version. This is used for backward compatibility of configs and will be set automatically from binary run if not present. |
-| run_id | [string](#string) |  | Run identifier for reproducible test runs or debugging If set to &#34;generate()&#34; stroppy eval ulid for run_id |
-| seed | [uint64](#uint64) |  | Random seed for reproducible test runs |
-| metadata | [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry) | repeated | Arbitrary metadata, may be passed to result labels and json output |
-| driver | [DriverConfig](#stroppy-DriverConfig) |  | Database driver configuration |
-| logger | [LoggerConfig](#stroppy-LoggerConfig) |  | Logging configuration |
-
-
-
-
-
-
-<a name="stroppy-GlobalConfig-MetadataEntry"></a>
-
-### GlobalConfig.MetadataEntry
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| value | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="stroppy-LoggerConfig"></a>
-
-### LoggerConfig
-LoggerConfig contains configuration for the logging system.
-It controls log levels and output formatting.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| log_level | [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel) |  | Minimum log level to output |
-| log_mode | [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode) |  | Logging mode (development or production) |
-
-
-
-
-
-
-<a name="stroppy-SideCarConfig"></a>
-
-### SideCarConfig
-SideCar contains configuration for plugins.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| url | [string](#string) |  | Url to connect the plugin instance |
-| settings | [Value.Struct](#stroppy-Value-Struct) | optional | Additional plugin settings |
-
-
-
-
-
-
-<a name="stroppy-Step"></a>
-
-### Step
-StepExecutorMappingConfig contains configuration for mapping steps to executors.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | Name of the step |
-| workload | [string](#string) |  | Name of the step |
-| executor | [string](#string) |  | Name of the executor |
-| exporter | [string](#string) | optional | Name of the exporter |
+| id | [Ulid](#stroppy-Ulid) |  | Unique identifier for the step run generated by stroppy-cli |
+| stroppy_run_id | [Ulid](#stroppy-Ulid) |  | Unique identifier for the parent stroppy run generated by stroppy-cli |
+| context | [StepContext](#stroppy-StepContext) |  | Context for the step run |
+| status | [Status](#stroppy-Status) |  | Status of the step run |
 
 
 
@@ -890,85 +742,43 @@ StepExecutorMappingConfig contains configuration for mapping steps to executors.
  
 
 
-<a name="stroppy-DriverConfig-DriverType"></a>
+<a name="stroppy-Status"></a>
 
-### DriverConfig.DriverType
-
+### Status
+Status represents the status of a stroppy run or step run.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| DRIVER_TYPE_UNSPECIFIED | 0 |  |
-| DRIVER_TYPE_POSTGRES | 1 |  |
-
-
-
-<a name="stroppy-LoggerConfig-LogLevel"></a>
-
-### LoggerConfig.LogLevel
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| LOG_LEVEL_DEBUG | 0 |  |
-| LOG_LEVEL_INFO | 1 |  |
-| LOG_LEVEL_WARN | 2 |  |
-| LOG_LEVEL_ERROR | 3 |  |
-| LOG_LEVEL_FATAL | 4 |  |
-
-
-
-<a name="stroppy-LoggerConfig-LogMode"></a>
-
-### LoggerConfig.LogMode
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| LOG_MODE_DEVELOPMENT | 0 |  |
-| LOG_MODE_PRODUCTION | 1 |  |
+| STATUS_IDLE | 0 | Run or step is idle |
+| STATUS_RUNNING | 1 | Run or step is running |
+| STATUS_COMPLETED | 2 | Run or step has completed successfully |
+| STATUS_FAILED | 3 | Run or step has failed |
+| STATUS_CANCELLED | 4 | Run or step has been cancelled |
 
 
  
 
  
 
- 
 
+<a name="stroppy-CloudStatusService"></a>
 
-
-<a name="sidecar-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## sidecar.proto
-
-
- 
-
- 
-
- 
-
-
-<a name="stroppy-SidecarService"></a>
-
-### SidecarService
-SidecarPlugin defines the gRPC service that sidecar plugins must implement.
+### CloudStatusService
+CloudStatusService is a service for notifying the cloud status of runs and steps.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| Initialize | [GlobalConfig](#stroppy-GlobalConfig) | [.google.protobuf.Empty](#google-protobuf-Empty) | Initialize is called once before the benchmark starts. Used to initialize resources of SidecarPlugin. |
-| OnStepStart | [StepContext](#stroppy-StepContext) | [.google.protobuf.Empty](#google-protobuf-Empty) | OnStepStart is called once before each step starts. |
-| OnStepEnd | [StepContext](#stroppy-StepContext) | [.google.protobuf.Empty](#google-protobuf-Empty) | OnStepEnd is called once after each step ends. |
-| Teardown | [GlobalConfig](#stroppy-GlobalConfig) | [.google.protobuf.Empty](#google-protobuf-Empty) | Teardown is called once after the benchmark ends. Used to clean up resources. |
+| NotifyRun | [StroppyRun](#stroppy-StroppyRun) | [.google.protobuf.Empty](#google-protobuf-Empty) | Notifies the cloud status of a benchmark run |
+| NotifyStep | [StroppyStepRun](#stroppy-StroppyStepRun) | [.google.protobuf.Empty](#google-protobuf-Empty) | Notifies the cloud status of a benchmark step |
 
  
 
 
 
-<a name="common-proto"></a>
+<a name="stroppy_common-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## common.proto
+## stroppy/common.proto
 
 
 
@@ -1451,10 +1261,232 @@ way.
 
 
 
-<a name="descriptor-proto"></a>
+<a name="stroppy_config-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## descriptor.proto
+## stroppy/config.proto
+
+
+
+<a name="stroppy-CloudConfig"></a>
+
+### CloudConfig
+CloudConfig contains configuration for stroppy cloud backend.
+
+
+
+
+
+
+<a name="stroppy-ConfigFile"></a>
+
+### ConfigFile
+ConfigFile contains the complete configuration for a benchmark run in file.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| global | [GlobalConfig](#stroppy-GlobalConfig) |  | Global configuration |
+| exporters | [ExporterConfig](#stroppy-ExporterConfig) | repeated | Exporters configuration |
+| executors | [ExecutorConfig](#stroppy-ExecutorConfig) | repeated | Executors configuration |
+| steps | [Step](#stroppy-Step) | repeated | Step to executor mapping configuration |
+| side_cars | [SideCarConfig](#stroppy-SideCarConfig) | repeated | Plugins configuration |
+| benchmark | [BenchmarkDescriptor](#stroppy-BenchmarkDescriptor) |  | BenchmarkDescriptor defines a complete benchmark consisting of multiple steps. |
+
+
+
+
+
+
+<a name="stroppy-DriverConfig"></a>
+
+### DriverConfig
+DriverConfig contains configuration for connecting to a database driver.
+It includes the driver plugin path, connection URL, and database-specific settings.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| url | [string](#string) |  | Database connection URL |
+| db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific configuration options |
+| driver_type | [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType) |  | Name/Type of chosen driver |
+
+
+
+
+
+
+<a name="stroppy-ExecutorConfig"></a>
+
+### ExecutorConfig
+ExecutorConfig contains configuration for an executor.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Name of the executor |
+| k6 | [K6Options](#stroppy-K6Options) |  | Configuration for the executor |
+
+
+
+
+
+
+<a name="stroppy-ExporterConfig"></a>
+
+### ExporterConfig
+OtlpExporterConfig contains named configuration for an OTLP exporter.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Name of the OTLP exporter |
+| otlp_export | [OtlpExport](#stroppy-OtlpExport) |  | Configuration for the OTLP exporter |
+
+
+
+
+
+
+<a name="stroppy-GlobalConfig"></a>
+
+### GlobalConfig
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| version | [string](#string) |  | Version of the configuration format e.g. proto files version. This is used for backward compatibility of configs and will be set automatically from binary run if not present. |
+| run_id | [string](#string) |  | Run identifier for reproducible test runs or debugging If set to &#34;generate()&#34; stroppy eval ulid for run_id |
+| seed | [uint64](#uint64) |  | Random seed for reproducible test runs |
+| metadata | [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry) | repeated | Arbitrary metadata, may be passed to result labels and json output |
+| driver | [DriverConfig](#stroppy-DriverConfig) |  | Database driver configuration |
+| logger | [LoggerConfig](#stroppy-LoggerConfig) |  | Logging configuration |
+
+
+
+
+
+
+<a name="stroppy-GlobalConfig-MetadataEntry"></a>
+
+### GlobalConfig.MetadataEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="stroppy-LoggerConfig"></a>
+
+### LoggerConfig
+LoggerConfig contains configuration for the logging system.
+It controls log levels and output formatting.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| log_level | [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel) |  | Minimum log level to output |
+| log_mode | [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode) |  | Logging mode (development or production) |
+
+
+
+
+
+
+<a name="stroppy-SideCarConfig"></a>
+
+### SideCarConfig
+SideCar contains configuration for plugins.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| url | [string](#string) |  | Url to connect the plugin instance |
+| settings | [Value.Struct](#stroppy-Value-Struct) | optional | Additional plugin settings |
+
+
+
+
+
+
+<a name="stroppy-Step"></a>
+
+### Step
+StepExecutorMappingConfig contains configuration for mapping steps to executors.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Name of the step |
+| workload | [string](#string) |  | Name of the step |
+| executor | [string](#string) |  | Name of the executor |
+| exporter | [string](#string) | optional | Name of the exporter |
+
+
+
+
+
+ 
+
+
+<a name="stroppy-DriverConfig-DriverType"></a>
+
+### DriverConfig.DriverType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| DRIVER_TYPE_UNSPECIFIED | 0 |  |
+| DRIVER_TYPE_POSTGRES | 1 |  |
+
+
+
+<a name="stroppy-LoggerConfig-LogLevel"></a>
+
+### LoggerConfig.LogLevel
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| LOG_LEVEL_DEBUG | 0 |  |
+| LOG_LEVEL_INFO | 1 |  |
+| LOG_LEVEL_WARN | 2 |  |
+| LOG_LEVEL_ERROR | 3 |  |
+| LOG_LEVEL_FATAL | 4 |  |
+
+
+
+<a name="stroppy-LoggerConfig-LogMode"></a>
+
+### LoggerConfig.LogMode
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| LOG_MODE_DEVELOPMENT | 0 |  |
+| LOG_MODE_PRODUCTION | 1 |  |
+
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="stroppy_descriptor-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## stroppy/descriptor.proto
 
 
 
@@ -1721,10 +1753,10 @@ transaction.
 
 
 
-<a name="k6-proto"></a>
+<a name="stroppy_k6-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## k6.proto
+## stroppy/k6.proto
 
 
 
@@ -1927,10 +1959,10 @@ https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iteration
 
 
 
-<a name="runtime-proto"></a>
+<a name="stroppy_runtime-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## runtime.proto
+## stroppy/runtime.proto
 
 
 
@@ -2050,79 +2082,30 @@ WorkloadUnitDescriptor.
 
 
 
-<a name="cloud-proto"></a>
+<a name="stroppy_sidecar-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## cloud.proto
-
-
-
-<a name="stroppy-StroppyRun"></a>
-
-### StroppyRun
-StroppyRun represents a benchmark run on the stroppy cli.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| id | [Ulid](#stroppy-Ulid) |  | Unique identifier for the run generated by stroppy-cli |
-| status | [Status](#stroppy-Status) |  | Status of the run |
-| config | [ConfigFile](#stroppy-ConfigFile) |  | Configuration for the benchmark run |
-| cmd | [string](#string) |  | Command used to run the benchmark |
-
-
-
-
-
-
-<a name="stroppy-StroppyStepRun"></a>
-
-### StroppyStepRun
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| id | [Ulid](#stroppy-Ulid) |  | Unique identifier for the step run generated by stroppy-cli |
-| stroppy_run_id | [Ulid](#stroppy-Ulid) |  | Unique identifier for the parent stroppy run generated by stroppy-cli |
-| context | [StepContext](#stroppy-StepContext) |  | Context for the step run |
-| status | [Status](#stroppy-Status) |  | Status of the step run |
-
-
-
-
-
- 
-
-
-<a name="stroppy-Status"></a>
-
-### Status
-Status represents the status of a stroppy run or step run.
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| STATUS_IDLE | 0 | Run or step is idle |
-| STATUS_RUNNING | 1 | Run or step is running |
-| STATUS_COMPLETED | 2 | Run or step has completed successfully |
-| STATUS_FAILED | 3 | Run or step has failed |
-| STATUS_CANCELLED | 4 | Run or step has been cancelled |
+## stroppy/sidecar.proto
 
 
  
 
  
 
+ 
 
-<a name="stroppy-CloudStatusService"></a>
 
-### CloudStatusService
-CloudStatusService is a service for notifying the cloud status of runs and steps.
+<a name="stroppy-SidecarService"></a>
+
+### SidecarService
+SidecarPlugin defines the gRPC service that sidecar plugins must implement.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| NotifyRun | [StroppyRun](#stroppy-StroppyRun) | [.google.protobuf.Empty](#google-protobuf-Empty) | Notifies the cloud status of a benchmark run |
-| NotifyStep | [StroppyStepRun](#stroppy-StroppyStepRun) | [.google.protobuf.Empty](#google-protobuf-Empty) | Notifies the cloud status of a benchmark step |
+| Initialize | [GlobalConfig](#stroppy-GlobalConfig) | [.google.protobuf.Empty](#google-protobuf-Empty) | Initialize is called once before the benchmark starts. Used to initialize resources of SidecarPlugin. |
+| OnStepStart | [StepContext](#stroppy-StepContext) | [.google.protobuf.Empty](#google-protobuf-Empty) | OnStepStart is called once before each step starts. |
+| OnStepEnd | [StepContext](#stroppy-StepContext) | [.google.protobuf.Empty](#google-protobuf-Empty) | OnStepEnd is called once after each step ends. |
+| Teardown | [GlobalConfig](#stroppy-GlobalConfig) | [.google.protobuf.Empty](#google-protobuf-Empty) | Teardown is called once after the benchmark ends. Used to clean up resources. |
 
  
 

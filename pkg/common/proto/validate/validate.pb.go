@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.9
 // 	protoc        v6.32.1
-// source: gen/validate/validate.proto
+// source: validate/validate.proto
 
 package validate
 
@@ -10,6 +10,8 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	descriptorpb "google.golang.org/protobuf/types/descriptorpb"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -58,11 +60,11 @@ func (x KnownRegex) String() string {
 }
 
 func (KnownRegex) Descriptor() protoreflect.EnumDescriptor {
-	return file_gen_validate_validate_proto_enumTypes[0].Descriptor()
+	return file_validate_validate_proto_enumTypes[0].Descriptor()
 }
 
 func (KnownRegex) Type() protoreflect.EnumType {
-	return &file_gen_validate_validate_proto_enumTypes[0]
+	return &file_validate_validate_proto_enumTypes[0]
 }
 
 func (x KnownRegex) Number() protoreflect.EnumNumber {
@@ -81,7 +83,7 @@ func (x *KnownRegex) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use KnownRegex.Descriptor instead.
 func (KnownRegex) EnumDescriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{0}
+	return file_validate_validate_proto_rawDescGZIP(), []int{0}
 }
 
 // FieldRules encapsulates the rules for each type of field. Depending on the
@@ -109,6 +111,9 @@ type FieldRules struct {
 	//	*FieldRules_Enum
 	//	*FieldRules_Repeated
 	//	*FieldRules_Map
+	//	*FieldRules_Any
+	//	*FieldRules_Duration
+	//	*FieldRules_Timestamp
 	Type          isFieldRules_Type `protobuf_oneof:"type"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -116,7 +121,7 @@ type FieldRules struct {
 
 func (x *FieldRules) Reset() {
 	*x = FieldRules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[0]
+	mi := &file_validate_validate_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -128,7 +133,7 @@ func (x *FieldRules) String() string {
 func (*FieldRules) ProtoMessage() {}
 
 func (x *FieldRules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[0]
+	mi := &file_validate_validate_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -141,7 +146,7 @@ func (x *FieldRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FieldRules.ProtoReflect.Descriptor instead.
 func (*FieldRules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{0}
+	return file_validate_validate_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *FieldRules) GetMessage() *MessageRules {
@@ -320,6 +325,33 @@ func (x *FieldRules) GetMap() *MapRules {
 	return nil
 }
 
+func (x *FieldRules) GetAny() *AnyRules {
+	if x != nil {
+		if x, ok := x.Type.(*FieldRules_Any); ok {
+			return x.Any
+		}
+	}
+	return nil
+}
+
+func (x *FieldRules) GetDuration() *DurationRules {
+	if x != nil {
+		if x, ok := x.Type.(*FieldRules_Duration); ok {
+			return x.Duration
+		}
+	}
+	return nil
+}
+
+func (x *FieldRules) GetTimestamp() *TimestampRules {
+	if x != nil {
+		if x, ok := x.Type.(*FieldRules_Timestamp); ok {
+			return x.Timestamp
+		}
+	}
+	return nil
+}
+
 type isFieldRules_Type interface {
 	isFieldRules_Type()
 }
@@ -398,6 +430,19 @@ type FieldRules_Map struct {
 	Map *MapRules `protobuf:"bytes,19,opt,name=map,oneof"`
 }
 
+type FieldRules_Any struct {
+	// Well-Known Field Types
+	Any *AnyRules `protobuf:"bytes,20,opt,name=any,oneof"`
+}
+
+type FieldRules_Duration struct {
+	Duration *DurationRules `protobuf:"bytes,21,opt,name=duration,oneof"`
+}
+
+type FieldRules_Timestamp struct {
+	Timestamp *TimestampRules `protobuf:"bytes,22,opt,name=timestamp,oneof"`
+}
+
 func (*FieldRules_Float) isFieldRules_Type() {}
 
 func (*FieldRules_Double) isFieldRules_Type() {}
@@ -434,6 +479,12 @@ func (*FieldRules_Repeated) isFieldRules_Type() {}
 
 func (*FieldRules_Map) isFieldRules_Type() {}
 
+func (*FieldRules_Any) isFieldRules_Type() {}
+
+func (*FieldRules_Duration) isFieldRules_Type() {}
+
+func (*FieldRules_Timestamp) isFieldRules_Type() {}
+
 // FloatRules describes the constraints applied to `float` values
 type FloatRules struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -468,7 +519,7 @@ type FloatRules struct {
 
 func (x *FloatRules) Reset() {
 	*x = FloatRules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[1]
+	mi := &file_validate_validate_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -480,7 +531,7 @@ func (x *FloatRules) String() string {
 func (*FloatRules) ProtoMessage() {}
 
 func (x *FloatRules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[1]
+	mi := &file_validate_validate_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -493,7 +544,7 @@ func (x *FloatRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FloatRules.ProtoReflect.Descriptor instead.
 func (*FloatRules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{1}
+	return file_validate_validate_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *FloatRules) GetConst() float32 {
@@ -586,7 +637,7 @@ type DoubleRules struct {
 
 func (x *DoubleRules) Reset() {
 	*x = DoubleRules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[2]
+	mi := &file_validate_validate_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -598,7 +649,7 @@ func (x *DoubleRules) String() string {
 func (*DoubleRules) ProtoMessage() {}
 
 func (x *DoubleRules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[2]
+	mi := &file_validate_validate_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -611,7 +662,7 @@ func (x *DoubleRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DoubleRules.ProtoReflect.Descriptor instead.
 func (*DoubleRules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{2}
+	return file_validate_validate_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *DoubleRules) GetConst() float64 {
@@ -704,7 +755,7 @@ type Int32Rules struct {
 
 func (x *Int32Rules) Reset() {
 	*x = Int32Rules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[3]
+	mi := &file_validate_validate_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -716,7 +767,7 @@ func (x *Int32Rules) String() string {
 func (*Int32Rules) ProtoMessage() {}
 
 func (x *Int32Rules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[3]
+	mi := &file_validate_validate_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -729,7 +780,7 @@ func (x *Int32Rules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Int32Rules.ProtoReflect.Descriptor instead.
 func (*Int32Rules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{3}
+	return file_validate_validate_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Int32Rules) GetConst() int32 {
@@ -822,7 +873,7 @@ type Int64Rules struct {
 
 func (x *Int64Rules) Reset() {
 	*x = Int64Rules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[4]
+	mi := &file_validate_validate_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -834,7 +885,7 @@ func (x *Int64Rules) String() string {
 func (*Int64Rules) ProtoMessage() {}
 
 func (x *Int64Rules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[4]
+	mi := &file_validate_validate_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -847,7 +898,7 @@ func (x *Int64Rules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Int64Rules.ProtoReflect.Descriptor instead.
 func (*Int64Rules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{4}
+	return file_validate_validate_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Int64Rules) GetConst() int64 {
@@ -940,7 +991,7 @@ type UInt32Rules struct {
 
 func (x *UInt32Rules) Reset() {
 	*x = UInt32Rules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[5]
+	mi := &file_validate_validate_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -952,7 +1003,7 @@ func (x *UInt32Rules) String() string {
 func (*UInt32Rules) ProtoMessage() {}
 
 func (x *UInt32Rules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[5]
+	mi := &file_validate_validate_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -965,7 +1016,7 @@ func (x *UInt32Rules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UInt32Rules.ProtoReflect.Descriptor instead.
 func (*UInt32Rules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{5}
+	return file_validate_validate_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UInt32Rules) GetConst() uint32 {
@@ -1058,7 +1109,7 @@ type UInt64Rules struct {
 
 func (x *UInt64Rules) Reset() {
 	*x = UInt64Rules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[6]
+	mi := &file_validate_validate_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1070,7 +1121,7 @@ func (x *UInt64Rules) String() string {
 func (*UInt64Rules) ProtoMessage() {}
 
 func (x *UInt64Rules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[6]
+	mi := &file_validate_validate_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1083,7 +1134,7 @@ func (x *UInt64Rules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UInt64Rules.ProtoReflect.Descriptor instead.
 func (*UInt64Rules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{6}
+	return file_validate_validate_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UInt64Rules) GetConst() uint64 {
@@ -1176,7 +1227,7 @@ type SInt32Rules struct {
 
 func (x *SInt32Rules) Reset() {
 	*x = SInt32Rules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[7]
+	mi := &file_validate_validate_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1188,7 +1239,7 @@ func (x *SInt32Rules) String() string {
 func (*SInt32Rules) ProtoMessage() {}
 
 func (x *SInt32Rules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[7]
+	mi := &file_validate_validate_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1201,7 +1252,7 @@ func (x *SInt32Rules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SInt32Rules.ProtoReflect.Descriptor instead.
 func (*SInt32Rules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{7}
+	return file_validate_validate_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SInt32Rules) GetConst() int32 {
@@ -1294,7 +1345,7 @@ type SInt64Rules struct {
 
 func (x *SInt64Rules) Reset() {
 	*x = SInt64Rules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[8]
+	mi := &file_validate_validate_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1306,7 +1357,7 @@ func (x *SInt64Rules) String() string {
 func (*SInt64Rules) ProtoMessage() {}
 
 func (x *SInt64Rules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[8]
+	mi := &file_validate_validate_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1319,7 +1370,7 @@ func (x *SInt64Rules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SInt64Rules.ProtoReflect.Descriptor instead.
 func (*SInt64Rules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{8}
+	return file_validate_validate_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SInt64Rules) GetConst() int64 {
@@ -1412,7 +1463,7 @@ type Fixed32Rules struct {
 
 func (x *Fixed32Rules) Reset() {
 	*x = Fixed32Rules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[9]
+	mi := &file_validate_validate_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1424,7 +1475,7 @@ func (x *Fixed32Rules) String() string {
 func (*Fixed32Rules) ProtoMessage() {}
 
 func (x *Fixed32Rules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[9]
+	mi := &file_validate_validate_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1437,7 +1488,7 @@ func (x *Fixed32Rules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Fixed32Rules.ProtoReflect.Descriptor instead.
 func (*Fixed32Rules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{9}
+	return file_validate_validate_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Fixed32Rules) GetConst() uint32 {
@@ -1530,7 +1581,7 @@ type Fixed64Rules struct {
 
 func (x *Fixed64Rules) Reset() {
 	*x = Fixed64Rules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[10]
+	mi := &file_validate_validate_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1542,7 +1593,7 @@ func (x *Fixed64Rules) String() string {
 func (*Fixed64Rules) ProtoMessage() {}
 
 func (x *Fixed64Rules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[10]
+	mi := &file_validate_validate_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1555,7 +1606,7 @@ func (x *Fixed64Rules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Fixed64Rules.ProtoReflect.Descriptor instead.
 func (*Fixed64Rules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{10}
+	return file_validate_validate_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Fixed64Rules) GetConst() uint64 {
@@ -1648,7 +1699,7 @@ type SFixed32Rules struct {
 
 func (x *SFixed32Rules) Reset() {
 	*x = SFixed32Rules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[11]
+	mi := &file_validate_validate_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1660,7 +1711,7 @@ func (x *SFixed32Rules) String() string {
 func (*SFixed32Rules) ProtoMessage() {}
 
 func (x *SFixed32Rules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[11]
+	mi := &file_validate_validate_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1673,7 +1724,7 @@ func (x *SFixed32Rules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SFixed32Rules.ProtoReflect.Descriptor instead.
 func (*SFixed32Rules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{11}
+	return file_validate_validate_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *SFixed32Rules) GetConst() int32 {
@@ -1766,7 +1817,7 @@ type SFixed64Rules struct {
 
 func (x *SFixed64Rules) Reset() {
 	*x = SFixed64Rules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[12]
+	mi := &file_validate_validate_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1778,7 +1829,7 @@ func (x *SFixed64Rules) String() string {
 func (*SFixed64Rules) ProtoMessage() {}
 
 func (x *SFixed64Rules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[12]
+	mi := &file_validate_validate_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1791,7 +1842,7 @@ func (x *SFixed64Rules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SFixed64Rules.ProtoReflect.Descriptor instead.
 func (*SFixed64Rules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{12}
+	return file_validate_validate_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SFixed64Rules) GetConst() int64 {
@@ -1861,7 +1912,7 @@ type BoolRules struct {
 
 func (x *BoolRules) Reset() {
 	*x = BoolRules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[13]
+	mi := &file_validate_validate_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1873,7 +1924,7 @@ func (x *BoolRules) String() string {
 func (*BoolRules) ProtoMessage() {}
 
 func (x *BoolRules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[13]
+	mi := &file_validate_validate_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1886,7 +1937,7 @@ func (x *BoolRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BoolRules.ProtoReflect.Descriptor instead.
 func (*BoolRules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{13}
+	return file_validate_validate_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *BoolRules) GetConst() bool {
@@ -1979,7 +2030,7 @@ const (
 
 func (x *StringRules) Reset() {
 	*x = StringRules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[14]
+	mi := &file_validate_validate_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1991,7 +2042,7 @@ func (x *StringRules) String() string {
 func (*StringRules) ProtoMessage() {}
 
 func (x *StringRules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[14]
+	mi := &file_validate_validate_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2004,7 +2055,7 @@ func (x *StringRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringRules.ProtoReflect.Descriptor instead.
 func (*StringRules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{14}
+	return file_validate_validate_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *StringRules) GetConst() string {
@@ -2350,7 +2401,7 @@ type BytesRules struct {
 
 func (x *BytesRules) Reset() {
 	*x = BytesRules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[15]
+	mi := &file_validate_validate_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2362,7 +2413,7 @@ func (x *BytesRules) String() string {
 func (*BytesRules) ProtoMessage() {}
 
 func (x *BytesRules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[15]
+	mi := &file_validate_validate_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2375,7 +2426,7 @@ func (x *BytesRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BytesRules.ProtoReflect.Descriptor instead.
 func (*BytesRules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{15}
+	return file_validate_validate_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *BytesRules) GetConst() []byte {
@@ -2537,7 +2588,7 @@ type EnumRules struct {
 
 func (x *EnumRules) Reset() {
 	*x = EnumRules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[16]
+	mi := &file_validate_validate_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2549,7 +2600,7 @@ func (x *EnumRules) String() string {
 func (*EnumRules) ProtoMessage() {}
 
 func (x *EnumRules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[16]
+	mi := &file_validate_validate_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2562,7 +2613,7 @@ func (x *EnumRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnumRules.ProtoReflect.Descriptor instead.
 func (*EnumRules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{16}
+	return file_validate_validate_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *EnumRules) GetConst() int32 {
@@ -2608,7 +2659,7 @@ type MessageRules struct {
 
 func (x *MessageRules) Reset() {
 	*x = MessageRules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[17]
+	mi := &file_validate_validate_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2620,7 +2671,7 @@ func (x *MessageRules) String() string {
 func (*MessageRules) ProtoMessage() {}
 
 func (x *MessageRules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[17]
+	mi := &file_validate_validate_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2633,7 +2684,7 @@ func (x *MessageRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageRules.ProtoReflect.Descriptor instead.
 func (*MessageRules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{17}
+	return file_validate_validate_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *MessageRules) GetSkip() bool {
@@ -2676,7 +2727,7 @@ type RepeatedRules struct {
 
 func (x *RepeatedRules) Reset() {
 	*x = RepeatedRules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[18]
+	mi := &file_validate_validate_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2688,7 +2739,7 @@ func (x *RepeatedRules) String() string {
 func (*RepeatedRules) ProtoMessage() {}
 
 func (x *RepeatedRules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[18]
+	mi := &file_validate_validate_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2701,7 +2752,7 @@ func (x *RepeatedRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepeatedRules.ProtoReflect.Descriptor instead.
 func (*RepeatedRules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{18}
+	return file_validate_validate_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RepeatedRules) GetMinItems() uint64 {
@@ -2766,7 +2817,7 @@ type MapRules struct {
 
 func (x *MapRules) Reset() {
 	*x = MapRules{}
-	mi := &file_gen_validate_validate_proto_msgTypes[19]
+	mi := &file_validate_validate_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2778,7 +2829,7 @@ func (x *MapRules) String() string {
 func (*MapRules) ProtoMessage() {}
 
 func (x *MapRules) ProtoReflect() protoreflect.Message {
-	mi := &file_gen_validate_validate_proto_msgTypes[19]
+	mi := &file_validate_validate_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2791,7 +2842,7 @@ func (x *MapRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MapRules.ProtoReflect.Descriptor instead.
 func (*MapRules) Descriptor() ([]byte, []int) {
-	return file_gen_validate_validate_proto_rawDescGZIP(), []int{19}
+	return file_validate_validate_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *MapRules) GetMinPairs() uint64 {
@@ -2836,14 +2887,324 @@ func (x *MapRules) GetIgnoreEmpty() bool {
 	return false
 }
 
-var file_gen_validate_validate_proto_extTypes = []protoimpl.ExtensionInfo{
+// AnyRules describe constraints applied exclusively to the
+// `google.protobuf.Any` well-known type
+type AnyRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required specifies that this field must be set
+	Required *bool `protobuf:"varint,1,opt,name=required" json:"required,omitempty"`
+	// In specifies that this field's `type_url` must be equal to one of the
+	// specified values.
+	In []string `protobuf:"bytes,2,rep,name=in" json:"in,omitempty"`
+	// NotIn specifies that this field's `type_url` must not be equal to any of
+	// the specified values.
+	NotIn         []string `protobuf:"bytes,3,rep,name=not_in,json=notIn" json:"not_in,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AnyRules) Reset() {
+	*x = AnyRules{}
+	mi := &file_validate_validate_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AnyRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AnyRules) ProtoMessage() {}
+
+func (x *AnyRules) ProtoReflect() protoreflect.Message {
+	mi := &file_validate_validate_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AnyRules.ProtoReflect.Descriptor instead.
+func (*AnyRules) Descriptor() ([]byte, []int) {
+	return file_validate_validate_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *AnyRules) GetRequired() bool {
+	if x != nil && x.Required != nil {
+		return *x.Required
+	}
+	return false
+}
+
+func (x *AnyRules) GetIn() []string {
+	if x != nil {
+		return x.In
+	}
+	return nil
+}
+
+func (x *AnyRules) GetNotIn() []string {
+	if x != nil {
+		return x.NotIn
+	}
+	return nil
+}
+
+// DurationRules describe the constraints applied exclusively to the
+// `google.protobuf.Duration` well-known type
+type DurationRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required specifies that this field must be set
+	Required *bool `protobuf:"varint,1,opt,name=required" json:"required,omitempty"`
+	// Const specifies that this field must be exactly the specified value
+	Const *durationpb.Duration `protobuf:"bytes,2,opt,name=const" json:"const,omitempty"`
+	// Lt specifies that this field must be less than the specified value,
+	// exclusive
+	Lt *durationpb.Duration `protobuf:"bytes,3,opt,name=lt" json:"lt,omitempty"`
+	// Lt specifies that this field must be less than the specified value,
+	// inclusive
+	Lte *durationpb.Duration `protobuf:"bytes,4,opt,name=lte" json:"lte,omitempty"`
+	// Gt specifies that this field must be greater than the specified value,
+	// exclusive
+	Gt *durationpb.Duration `protobuf:"bytes,5,opt,name=gt" json:"gt,omitempty"`
+	// Gte specifies that this field must be greater than the specified value,
+	// inclusive
+	Gte *durationpb.Duration `protobuf:"bytes,6,opt,name=gte" json:"gte,omitempty"`
+	// In specifies that this field must be equal to one of the specified
+	// values
+	In []*durationpb.Duration `protobuf:"bytes,7,rep,name=in" json:"in,omitempty"`
+	// NotIn specifies that this field cannot be equal to one of the specified
+	// values
+	NotIn         []*durationpb.Duration `protobuf:"bytes,8,rep,name=not_in,json=notIn" json:"not_in,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DurationRules) Reset() {
+	*x = DurationRules{}
+	mi := &file_validate_validate_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DurationRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DurationRules) ProtoMessage() {}
+
+func (x *DurationRules) ProtoReflect() protoreflect.Message {
+	mi := &file_validate_validate_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DurationRules.ProtoReflect.Descriptor instead.
+func (*DurationRules) Descriptor() ([]byte, []int) {
+	return file_validate_validate_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *DurationRules) GetRequired() bool {
+	if x != nil && x.Required != nil {
+		return *x.Required
+	}
+	return false
+}
+
+func (x *DurationRules) GetConst() *durationpb.Duration {
+	if x != nil {
+		return x.Const
+	}
+	return nil
+}
+
+func (x *DurationRules) GetLt() *durationpb.Duration {
+	if x != nil {
+		return x.Lt
+	}
+	return nil
+}
+
+func (x *DurationRules) GetLte() *durationpb.Duration {
+	if x != nil {
+		return x.Lte
+	}
+	return nil
+}
+
+func (x *DurationRules) GetGt() *durationpb.Duration {
+	if x != nil {
+		return x.Gt
+	}
+	return nil
+}
+
+func (x *DurationRules) GetGte() *durationpb.Duration {
+	if x != nil {
+		return x.Gte
+	}
+	return nil
+}
+
+func (x *DurationRules) GetIn() []*durationpb.Duration {
+	if x != nil {
+		return x.In
+	}
+	return nil
+}
+
+func (x *DurationRules) GetNotIn() []*durationpb.Duration {
+	if x != nil {
+		return x.NotIn
+	}
+	return nil
+}
+
+// TimestampRules describe the constraints applied exclusively to the
+// `google.protobuf.Timestamp` well-known type
+type TimestampRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required specifies that this field must be set
+	Required *bool `protobuf:"varint,1,opt,name=required" json:"required,omitempty"`
+	// Const specifies that this field must be exactly the specified value
+	Const *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=const" json:"const,omitempty"`
+	// Lt specifies that this field must be less than the specified value,
+	// exclusive
+	Lt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=lt" json:"lt,omitempty"`
+	// Lte specifies that this field must be less than the specified value,
+	// inclusive
+	Lte *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=lte" json:"lte,omitempty"`
+	// Gt specifies that this field must be greater than the specified value,
+	// exclusive
+	Gt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=gt" json:"gt,omitempty"`
+	// Gte specifies that this field must be greater than the specified value,
+	// inclusive
+	Gte *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=gte" json:"gte,omitempty"`
+	// LtNow specifies that this must be less than the current time. LtNow
+	// can only be used with the Within rule.
+	LtNow *bool `protobuf:"varint,7,opt,name=lt_now,json=ltNow" json:"lt_now,omitempty"`
+	// GtNow specifies that this must be greater than the current time. GtNow
+	// can only be used with the Within rule.
+	GtNow *bool `protobuf:"varint,8,opt,name=gt_now,json=gtNow" json:"gt_now,omitempty"`
+	// Within specifies that this field must be within this duration of the
+	// current time. This constraint can be used alone or with the LtNow and
+	// GtNow rules.
+	Within        *durationpb.Duration `protobuf:"bytes,9,opt,name=within" json:"within,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TimestampRules) Reset() {
+	*x = TimestampRules{}
+	mi := &file_validate_validate_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimestampRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimestampRules) ProtoMessage() {}
+
+func (x *TimestampRules) ProtoReflect() protoreflect.Message {
+	mi := &file_validate_validate_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimestampRules.ProtoReflect.Descriptor instead.
+func (*TimestampRules) Descriptor() ([]byte, []int) {
+	return file_validate_validate_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *TimestampRules) GetRequired() bool {
+	if x != nil && x.Required != nil {
+		return *x.Required
+	}
+	return false
+}
+
+func (x *TimestampRules) GetConst() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Const
+	}
+	return nil
+}
+
+func (x *TimestampRules) GetLt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Lt
+	}
+	return nil
+}
+
+func (x *TimestampRules) GetLte() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Lte
+	}
+	return nil
+}
+
+func (x *TimestampRules) GetGt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Gt
+	}
+	return nil
+}
+
+func (x *TimestampRules) GetGte() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Gte
+	}
+	return nil
+}
+
+func (x *TimestampRules) GetLtNow() bool {
+	if x != nil && x.LtNow != nil {
+		return *x.LtNow
+	}
+	return false
+}
+
+func (x *TimestampRules) GetGtNow() bool {
+	if x != nil && x.GtNow != nil {
+		return *x.GtNow
+	}
+	return false
+}
+
+func (x *TimestampRules) GetWithin() *durationpb.Duration {
+	if x != nil {
+		return x.Within
+	}
+	return nil
+}
+
+var file_validate_validate_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptorpb.MessageOptions)(nil),
 		ExtensionType: (*bool)(nil),
 		Field:         1071,
 		Name:          "validate.disabled",
 		Tag:           "varint,1071,opt,name=disabled",
-		Filename:      "gen/validate/validate.proto",
+		Filename:      "validate/validate.proto",
 	},
 	{
 		ExtendedType:  (*descriptorpb.MessageOptions)(nil),
@@ -2851,7 +3212,7 @@ var file_gen_validate_validate_proto_extTypes = []protoimpl.ExtensionInfo{
 		Field:         1072,
 		Name:          "validate.ignored",
 		Tag:           "varint,1072,opt,name=ignored",
-		Filename:      "gen/validate/validate.proto",
+		Filename:      "validate/validate.proto",
 	},
 	{
 		ExtendedType:  (*descriptorpb.OneofOptions)(nil),
@@ -2859,7 +3220,7 @@ var file_gen_validate_validate_proto_extTypes = []protoimpl.ExtensionInfo{
 		Field:         1071,
 		Name:          "validate.required",
 		Tag:           "varint,1071,opt,name=required",
-		Filename:      "gen/validate/validate.proto",
+		Filename:      "validate/validate.proto",
 	},
 	{
 		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
@@ -2867,7 +3228,7 @@ var file_gen_validate_validate_proto_extTypes = []protoimpl.ExtensionInfo{
 		Field:         1071,
 		Name:          "validate.rules",
 		Tag:           "bytes,1071,opt,name=rules",
-		Filename:      "gen/validate/validate.proto",
+		Filename:      "validate/validate.proto",
 	},
 }
 
@@ -2877,11 +3238,11 @@ var (
 	// message fields associated with it that do support validation.
 	//
 	// optional bool disabled = 1071;
-	E_Disabled = &file_gen_validate_validate_proto_extTypes[0]
+	E_Disabled = &file_validate_validate_proto_extTypes[0]
 	// Ignore skips generation of validation methods for this message.
 	//
 	// optional bool ignored = 1072;
-	E_Ignored = &file_gen_validate_validate_proto_extTypes[1]
+	E_Ignored = &file_validate_validate_proto_extTypes[1]
 )
 
 // Extension fields to descriptorpb.OneofOptions.
@@ -2890,7 +3251,7 @@ var (
 	// validation fails if no fields in the oneof are set.
 	//
 	// optional bool required = 1071;
-	E_Required = &file_gen_validate_validate_proto_extTypes[2]
+	E_Required = &file_validate_validate_proto_extTypes[2]
 )
 
 // Extension fields to descriptorpb.FieldOptions.
@@ -2899,14 +3260,14 @@ var (
 	// no validation is performed against a field.
 	//
 	// optional validate.FieldRules rules = 1071;
-	E_Rules = &file_gen_validate_validate_proto_extTypes[3]
+	E_Rules = &file_validate_validate_proto_extTypes[3]
 )
 
-var File_gen_validate_validate_proto protoreflect.FileDescriptor
+var File_validate_validate_proto protoreflect.FileDescriptor
 
-const file_gen_validate_validate_proto_rawDesc = "" +
+const file_validate_validate_proto_rawDesc = "" +
 	"\n" +
-	"\x1bgen/validate/validate.proto\x12\bvalidate\x1a google/protobuf/descriptor.proto\"\xaf\a\n" +
+	"\x17validate/validate.proto\x12\bvalidate\x1a google/protobuf/descriptor.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc8\b\n" +
 	"\n" +
 	"FieldRules\x120\n" +
 	"\amessage\x18\x11 \x01(\v2\x16.validate.MessageRulesR\amessage\x12,\n" +
@@ -2928,7 +3289,10 @@ const file_gen_validate_validate_proto_rawDesc = "" +
 	"\x05bytes\x18\x0f \x01(\v2\x14.validate.BytesRulesH\x00R\x05bytes\x12)\n" +
 	"\x04enum\x18\x10 \x01(\v2\x13.validate.EnumRulesH\x00R\x04enum\x125\n" +
 	"\brepeated\x18\x12 \x01(\v2\x17.validate.RepeatedRulesH\x00R\brepeated\x12&\n" +
-	"\x03map\x18\x13 \x01(\v2\x12.validate.MapRulesH\x00R\x03mapB\x06\n" +
+	"\x03map\x18\x13 \x01(\v2\x12.validate.MapRulesH\x00R\x03map\x12&\n" +
+	"\x03any\x18\x14 \x01(\v2\x12.validate.AnyRulesH\x00R\x03any\x125\n" +
+	"\bduration\x18\x15 \x01(\v2\x17.validate.DurationRulesH\x00R\bduration\x128\n" +
+	"\ttimestamp\x18\x16 \x01(\v2\x18.validate.TimestampRulesH\x00R\ttimestampB\x06\n" +
 	"\x04type\"\xb0\x01\n" +
 	"\n" +
 	"FloatRules\x12\x14\n" +
@@ -3112,7 +3476,30 @@ const file_gen_validate_validate_proto_rawDesc = "" +
 	"\tno_sparse\x18\x03 \x01(\bR\bnoSparse\x12(\n" +
 	"\x04keys\x18\x04 \x01(\v2\x14.validate.FieldRulesR\x04keys\x12,\n" +
 	"\x06values\x18\x05 \x01(\v2\x14.validate.FieldRulesR\x06values\x12!\n" +
-	"\fignore_empty\x18\x06 \x01(\bR\vignoreEmpty*F\n" +
+	"\fignore_empty\x18\x06 \x01(\bR\vignoreEmpty\"M\n" +
+	"\bAnyRules\x12\x1a\n" +
+	"\brequired\x18\x01 \x01(\bR\brequired\x12\x0e\n" +
+	"\x02in\x18\x02 \x03(\tR\x02in\x12\x15\n" +
+	"\x06not_in\x18\x03 \x03(\tR\x05notIn\"\xe9\x02\n" +
+	"\rDurationRules\x12\x1a\n" +
+	"\brequired\x18\x01 \x01(\bR\brequired\x12/\n" +
+	"\x05const\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x05const\x12)\n" +
+	"\x02lt\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x02lt\x12+\n" +
+	"\x03lte\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\x03lte\x12)\n" +
+	"\x02gt\x18\x05 \x01(\v2\x19.google.protobuf.DurationR\x02gt\x12+\n" +
+	"\x03gte\x18\x06 \x01(\v2\x19.google.protobuf.DurationR\x03gte\x12)\n" +
+	"\x02in\x18\a \x03(\v2\x19.google.protobuf.DurationR\x02in\x120\n" +
+	"\x06not_in\x18\b \x03(\v2\x19.google.protobuf.DurationR\x05notIn\"\xf3\x02\n" +
+	"\x0eTimestampRules\x12\x1a\n" +
+	"\brequired\x18\x01 \x01(\bR\brequired\x120\n" +
+	"\x05const\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05const\x12*\n" +
+	"\x02lt\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02lt\x12,\n" +
+	"\x03lte\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x03lte\x12*\n" +
+	"\x02gt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x02gt\x12,\n" +
+	"\x03gte\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x03gte\x12\x15\n" +
+	"\x06lt_now\x18\a \x01(\bR\x05ltNow\x12\x15\n" +
+	"\x06gt_now\x18\b \x01(\bR\x05gtNow\x121\n" +
+	"\x06within\x18\t \x01(\v2\x19.google.protobuf.DurationR\x06within*F\n" +
 	"\n" +
 	"KnownRegex\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\x14\n" +
@@ -3121,23 +3508,24 @@ const file_gen_validate_validate_proto_rawDesc = "" +
 	"\bdisabled\x12\x1f.google.protobuf.MessageOptions\x18\xaf\b \x01(\bR\bdisabled::\n" +
 	"\aignored\x12\x1f.google.protobuf.MessageOptions\x18\xb0\b \x01(\bR\aignored::\n" +
 	"\brequired\x12\x1d.google.protobuf.OneofOptions\x18\xaf\b \x01(\bR\brequired:J\n" +
-	"\x05rules\x12\x1d.google.protobuf.FieldOptions\x18\xaf\b \x01(\v2\x14.validate.FieldRulesR\x05rulesB=Z;github.com/stroppy-io/stroppy/pkg/common/proto/gen/validate"
+	"\x05rules\x12\x1d.google.protobuf.FieldOptions\x18\xaf\b \x01(\v2\x14.validate.FieldRulesR\x05rulesBP\n" +
+	"\x1aio.envoyproxy.pgv.validateZ2github.com/envoyproxy/protoc-gen-validate/validate"
 
 var (
-	file_gen_validate_validate_proto_rawDescOnce sync.Once
-	file_gen_validate_validate_proto_rawDescData []byte
+	file_validate_validate_proto_rawDescOnce sync.Once
+	file_validate_validate_proto_rawDescData []byte
 )
 
-func file_gen_validate_validate_proto_rawDescGZIP() []byte {
-	file_gen_validate_validate_proto_rawDescOnce.Do(func() {
-		file_gen_validate_validate_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_gen_validate_validate_proto_rawDesc), len(file_gen_validate_validate_proto_rawDesc)))
+func file_validate_validate_proto_rawDescGZIP() []byte {
+	file_validate_validate_proto_rawDescOnce.Do(func() {
+		file_validate_validate_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_validate_validate_proto_rawDesc), len(file_validate_validate_proto_rawDesc)))
 	})
-	return file_gen_validate_validate_proto_rawDescData
+	return file_validate_validate_proto_rawDescData
 }
 
-var file_gen_validate_validate_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_gen_validate_validate_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
-var file_gen_validate_validate_proto_goTypes = []any{
+var file_validate_validate_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_validate_validate_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_validate_validate_proto_goTypes = []any{
 	(KnownRegex)(0),                     // 0: validate.KnownRegex
 	(*FieldRules)(nil),                  // 1: validate.FieldRules
 	(*FloatRules)(nil),                  // 2: validate.FloatRules
@@ -3159,11 +3547,16 @@ var file_gen_validate_validate_proto_goTypes = []any{
 	(*MessageRules)(nil),                // 18: validate.MessageRules
 	(*RepeatedRules)(nil),               // 19: validate.RepeatedRules
 	(*MapRules)(nil),                    // 20: validate.MapRules
-	(*descriptorpb.MessageOptions)(nil), // 21: google.protobuf.MessageOptions
-	(*descriptorpb.OneofOptions)(nil),   // 22: google.protobuf.OneofOptions
-	(*descriptorpb.FieldOptions)(nil),   // 23: google.protobuf.FieldOptions
+	(*AnyRules)(nil),                    // 21: validate.AnyRules
+	(*DurationRules)(nil),               // 22: validate.DurationRules
+	(*TimestampRules)(nil),              // 23: validate.TimestampRules
+	(*durationpb.Duration)(nil),         // 24: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),       // 25: google.protobuf.Timestamp
+	(*descriptorpb.MessageOptions)(nil), // 26: google.protobuf.MessageOptions
+	(*descriptorpb.OneofOptions)(nil),   // 27: google.protobuf.OneofOptions
+	(*descriptorpb.FieldOptions)(nil),   // 28: google.protobuf.FieldOptions
 }
-var file_gen_validate_validate_proto_depIdxs = []int32{
+var file_validate_validate_proto_depIdxs = []int32{
 	18, // 0: validate.FieldRules.message:type_name -> validate.MessageRules
 	2,  // 1: validate.FieldRules.float:type_name -> validate.FloatRules
 	3,  // 2: validate.FieldRules.double:type_name -> validate.DoubleRules
@@ -3183,28 +3576,44 @@ var file_gen_validate_validate_proto_depIdxs = []int32{
 	17, // 16: validate.FieldRules.enum:type_name -> validate.EnumRules
 	19, // 17: validate.FieldRules.repeated:type_name -> validate.RepeatedRules
 	20, // 18: validate.FieldRules.map:type_name -> validate.MapRules
-	0,  // 19: validate.StringRules.well_known_regex:type_name -> validate.KnownRegex
-	1,  // 20: validate.RepeatedRules.items:type_name -> validate.FieldRules
-	1,  // 21: validate.MapRules.keys:type_name -> validate.FieldRules
-	1,  // 22: validate.MapRules.values:type_name -> validate.FieldRules
-	21, // 23: validate.disabled:extendee -> google.protobuf.MessageOptions
-	21, // 24: validate.ignored:extendee -> google.protobuf.MessageOptions
-	22, // 25: validate.required:extendee -> google.protobuf.OneofOptions
-	23, // 26: validate.rules:extendee -> google.protobuf.FieldOptions
-	1,  // 27: validate.rules:type_name -> validate.FieldRules
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	27, // [27:28] is the sub-list for extension type_name
-	23, // [23:27] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	21, // 19: validate.FieldRules.any:type_name -> validate.AnyRules
+	22, // 20: validate.FieldRules.duration:type_name -> validate.DurationRules
+	23, // 21: validate.FieldRules.timestamp:type_name -> validate.TimestampRules
+	0,  // 22: validate.StringRules.well_known_regex:type_name -> validate.KnownRegex
+	1,  // 23: validate.RepeatedRules.items:type_name -> validate.FieldRules
+	1,  // 24: validate.MapRules.keys:type_name -> validate.FieldRules
+	1,  // 25: validate.MapRules.values:type_name -> validate.FieldRules
+	24, // 26: validate.DurationRules.const:type_name -> google.protobuf.Duration
+	24, // 27: validate.DurationRules.lt:type_name -> google.protobuf.Duration
+	24, // 28: validate.DurationRules.lte:type_name -> google.protobuf.Duration
+	24, // 29: validate.DurationRules.gt:type_name -> google.protobuf.Duration
+	24, // 30: validate.DurationRules.gte:type_name -> google.protobuf.Duration
+	24, // 31: validate.DurationRules.in:type_name -> google.protobuf.Duration
+	24, // 32: validate.DurationRules.not_in:type_name -> google.protobuf.Duration
+	25, // 33: validate.TimestampRules.const:type_name -> google.protobuf.Timestamp
+	25, // 34: validate.TimestampRules.lt:type_name -> google.protobuf.Timestamp
+	25, // 35: validate.TimestampRules.lte:type_name -> google.protobuf.Timestamp
+	25, // 36: validate.TimestampRules.gt:type_name -> google.protobuf.Timestamp
+	25, // 37: validate.TimestampRules.gte:type_name -> google.protobuf.Timestamp
+	24, // 38: validate.TimestampRules.within:type_name -> google.protobuf.Duration
+	26, // 39: validate.disabled:extendee -> google.protobuf.MessageOptions
+	26, // 40: validate.ignored:extendee -> google.protobuf.MessageOptions
+	27, // 41: validate.required:extendee -> google.protobuf.OneofOptions
+	28, // 42: validate.rules:extendee -> google.protobuf.FieldOptions
+	1,  // 43: validate.rules:type_name -> validate.FieldRules
+	44, // [44:44] is the sub-list for method output_type
+	44, // [44:44] is the sub-list for method input_type
+	43, // [43:44] is the sub-list for extension type_name
+	39, // [39:43] is the sub-list for extension extendee
+	0,  // [0:39] is the sub-list for field type_name
 }
 
-func init() { file_gen_validate_validate_proto_init() }
-func file_gen_validate_validate_proto_init() {
-	if File_gen_validate_validate_proto != nil {
+func init() { file_validate_validate_proto_init() }
+func file_validate_validate_proto_init() {
+	if File_validate_validate_proto != nil {
 		return
 	}
-	file_gen_validate_validate_proto_msgTypes[0].OneofWrappers = []any{
+	file_validate_validate_proto_msgTypes[0].OneofWrappers = []any{
 		(*FieldRules_Float)(nil),
 		(*FieldRules_Double)(nil),
 		(*FieldRules_Int32)(nil),
@@ -3223,8 +3632,11 @@ func file_gen_validate_validate_proto_init() {
 		(*FieldRules_Enum)(nil),
 		(*FieldRules_Repeated)(nil),
 		(*FieldRules_Map)(nil),
+		(*FieldRules_Any)(nil),
+		(*FieldRules_Duration)(nil),
+		(*FieldRules_Timestamp)(nil),
 	}
-	file_gen_validate_validate_proto_msgTypes[14].OneofWrappers = []any{
+	file_validate_validate_proto_msgTypes[14].OneofWrappers = []any{
 		(*StringRules_Email)(nil),
 		(*StringRules_Hostname)(nil),
 		(*StringRules_Ip)(nil),
@@ -3236,7 +3648,7 @@ func file_gen_validate_validate_proto_init() {
 		(*StringRules_Uuid)(nil),
 		(*StringRules_WellKnownRegex)(nil),
 	}
-	file_gen_validate_validate_proto_msgTypes[15].OneofWrappers = []any{
+	file_validate_validate_proto_msgTypes[15].OneofWrappers = []any{
 		(*BytesRules_Ip)(nil),
 		(*BytesRules_Ipv4)(nil),
 		(*BytesRules_Ipv6)(nil),
@@ -3245,19 +3657,19 @@ func file_gen_validate_validate_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gen_validate_validate_proto_rawDesc), len(file_gen_validate_validate_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_validate_validate_proto_rawDesc), len(file_validate_validate_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   20,
+			NumMessages:   23,
 			NumExtensions: 4,
 			NumServices:   0,
 		},
-		GoTypes:           file_gen_validate_validate_proto_goTypes,
-		DependencyIndexes: file_gen_validate_validate_proto_depIdxs,
-		EnumInfos:         file_gen_validate_validate_proto_enumTypes,
-		MessageInfos:      file_gen_validate_validate_proto_msgTypes,
-		ExtensionInfos:    file_gen_validate_validate_proto_extTypes,
+		GoTypes:           file_validate_validate_proto_goTypes,
+		DependencyIndexes: file_validate_validate_proto_depIdxs,
+		EnumInfos:         file_validate_validate_proto_enumTypes,
+		MessageInfos:      file_validate_validate_proto_msgTypes,
+		ExtensionInfos:    file_validate_validate_proto_extTypes,
 	}.Build()
-	File_gen_validate_validate_proto = out.File
-	file_gen_validate_validate_proto_goTypes = nil
-	file_gen_validate_validate_proto_depIdxs = nil
+	File_validate_validate_proto = out.File
+	file_validate_validate_proto_goTypes = nil
+	file_validate_validate_proto_depIdxs = nil
 }

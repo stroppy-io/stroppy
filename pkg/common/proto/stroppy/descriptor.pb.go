@@ -2,12 +2,12 @@
 // versions:
 // 	protoc-gen-go v1.36.9
 // 	protoc        v6.32.1
-// source: descriptor.proto
+// source: stroppy/descriptor.proto
 
 package proto
 
 import (
-	_ "github.com/stroppy-io/stroppy/pkg/common/proto/gen/validate"
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -53,11 +53,11 @@ func (x InsertMethod) String() string {
 }
 
 func (InsertMethod) Descriptor() protoreflect.EnumDescriptor {
-	return file_descriptor_proto_enumTypes[0].Descriptor()
+	return file_stroppy_descriptor_proto_enumTypes[0].Descriptor()
 }
 
 func (InsertMethod) Type() protoreflect.EnumType {
-	return &file_descriptor_proto_enumTypes[0]
+	return &file_stroppy_descriptor_proto_enumTypes[0]
 }
 
 func (x InsertMethod) Number() protoreflect.EnumNumber {
@@ -66,7 +66,7 @@ func (x InsertMethod) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use InsertMethod.Descriptor instead.
 func (InsertMethod) EnumDescriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{0}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{0}
 }
 
 // *
@@ -111,11 +111,11 @@ func (x TxIsolationLevel) String() string {
 }
 
 func (TxIsolationLevel) Descriptor() protoreflect.EnumDescriptor {
-	return file_descriptor_proto_enumTypes[1].Descriptor()
+	return file_stroppy_descriptor_proto_enumTypes[1].Descriptor()
 }
 
 func (TxIsolationLevel) Type() protoreflect.EnumType {
-	return &file_descriptor_proto_enumTypes[1]
+	return &file_stroppy_descriptor_proto_enumTypes[1]
 }
 
 func (x TxIsolationLevel) Number() protoreflect.EnumNumber {
@@ -124,7 +124,7 @@ func (x TxIsolationLevel) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TxIsolationLevel.Descriptor instead.
 func (TxIsolationLevel) EnumDescriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{1}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{1}
 }
 
 // *
@@ -147,7 +147,7 @@ type IndexDescriptor struct {
 
 func (x *IndexDescriptor) Reset() {
 	*x = IndexDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[0]
+	mi := &file_stroppy_descriptor_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -159,7 +159,7 @@ func (x *IndexDescriptor) String() string {
 func (*IndexDescriptor) ProtoMessage() {}
 
 func (x *IndexDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[0]
+	mi := &file_stroppy_descriptor_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -172,7 +172,7 @@ func (x *IndexDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IndexDescriptor.ProtoReflect.Descriptor instead.
 func (*IndexDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{0}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *IndexDescriptor) GetName() string {
@@ -234,7 +234,7 @@ type ColumnDescriptor struct {
 
 func (x *ColumnDescriptor) Reset() {
 	*x = ColumnDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[1]
+	mi := &file_stroppy_descriptor_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -246,7 +246,7 @@ func (x *ColumnDescriptor) String() string {
 func (*ColumnDescriptor) ProtoMessage() {}
 
 func (x *ColumnDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[1]
+	mi := &file_stroppy_descriptor_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -259,7 +259,7 @@ func (x *ColumnDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ColumnDescriptor.ProtoReflect.Descriptor instead.
 func (*ColumnDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{1}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ColumnDescriptor) GetName() string {
@@ -324,7 +324,7 @@ type TableDescriptor struct {
 
 func (x *TableDescriptor) Reset() {
 	*x = TableDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[2]
+	mi := &file_stroppy_descriptor_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -336,7 +336,7 @@ func (x *TableDescriptor) String() string {
 func (*TableDescriptor) ProtoMessage() {}
 
 func (x *TableDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[2]
+	mi := &file_stroppy_descriptor_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -349,7 +349,7 @@ func (x *TableDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TableDescriptor.ProtoReflect.Descriptor instead.
 func (*TableDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{2}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *TableDescriptor) GetName() string {
@@ -409,7 +409,7 @@ type InsertDescriptor struct {
 
 func (x *InsertDescriptor) Reset() {
 	*x = InsertDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[3]
+	mi := &file_stroppy_descriptor_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -421,7 +421,7 @@ func (x *InsertDescriptor) String() string {
 func (*InsertDescriptor) ProtoMessage() {}
 
 func (x *InsertDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[3]
+	mi := &file_stroppy_descriptor_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -434,7 +434,7 @@ func (x *InsertDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsertDescriptor.ProtoReflect.Descriptor instead.
 func (*InsertDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{3}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *InsertDescriptor) GetName() string {
@@ -491,7 +491,7 @@ type QueryParamDescriptor struct {
 
 func (x *QueryParamDescriptor) Reset() {
 	*x = QueryParamDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[4]
+	mi := &file_stroppy_descriptor_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -503,7 +503,7 @@ func (x *QueryParamDescriptor) String() string {
 func (*QueryParamDescriptor) ProtoMessage() {}
 
 func (x *QueryParamDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[4]
+	mi := &file_stroppy_descriptor_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -516,7 +516,7 @@ func (x *QueryParamDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryParamDescriptor.ProtoReflect.Descriptor instead.
 func (*QueryParamDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{4}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *QueryParamDescriptor) GetName() string {
@@ -564,7 +564,7 @@ type QueryParamGroup struct {
 
 func (x *QueryParamGroup) Reset() {
 	*x = QueryParamGroup{}
-	mi := &file_descriptor_proto_msgTypes[5]
+	mi := &file_stroppy_descriptor_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -576,7 +576,7 @@ func (x *QueryParamGroup) String() string {
 func (*QueryParamGroup) ProtoMessage() {}
 
 func (x *QueryParamGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[5]
+	mi := &file_stroppy_descriptor_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -589,7 +589,7 @@ func (x *QueryParamGroup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryParamGroup.ProtoReflect.Descriptor instead.
 func (*QueryParamGroup) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{5}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *QueryParamGroup) GetName() string {
@@ -627,7 +627,7 @@ type QueryDescriptor struct {
 
 func (x *QueryDescriptor) Reset() {
 	*x = QueryDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[6]
+	mi := &file_stroppy_descriptor_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -639,7 +639,7 @@ func (x *QueryDescriptor) String() string {
 func (*QueryDescriptor) ProtoMessage() {}
 
 func (x *QueryDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[6]
+	mi := &file_stroppy_descriptor_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -652,7 +652,7 @@ func (x *QueryDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryDescriptor.ProtoReflect.Descriptor instead.
 func (*QueryDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{6}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *QueryDescriptor) GetName() string {
@@ -709,7 +709,7 @@ type TransactionDescriptor struct {
 
 func (x *TransactionDescriptor) Reset() {
 	*x = TransactionDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[7]
+	mi := &file_stroppy_descriptor_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -721,7 +721,7 @@ func (x *TransactionDescriptor) String() string {
 func (*TransactionDescriptor) ProtoMessage() {}
 
 func (x *TransactionDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[7]
+	mi := &file_stroppy_descriptor_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -734,7 +734,7 @@ func (x *TransactionDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransactionDescriptor.ProtoReflect.Descriptor instead.
 func (*TransactionDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{7}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TransactionDescriptor) GetName() string {
@@ -784,7 +784,7 @@ type UnitDescriptor struct {
 
 func (x *UnitDescriptor) Reset() {
 	*x = UnitDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[8]
+	mi := &file_stroppy_descriptor_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -796,7 +796,7 @@ func (x *UnitDescriptor) String() string {
 func (*UnitDescriptor) ProtoMessage() {}
 
 func (x *UnitDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[8]
+	mi := &file_stroppy_descriptor_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -809,7 +809,7 @@ func (x *UnitDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitDescriptor.ProtoReflect.Descriptor instead.
 func (*UnitDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{8}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UnitDescriptor) GetType() isUnitDescriptor_Type {
@@ -902,7 +902,7 @@ type WorkloadUnitDescriptor struct {
 
 func (x *WorkloadUnitDescriptor) Reset() {
 	*x = WorkloadUnitDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[9]
+	mi := &file_stroppy_descriptor_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -914,7 +914,7 @@ func (x *WorkloadUnitDescriptor) String() string {
 func (*WorkloadUnitDescriptor) ProtoMessage() {}
 
 func (x *WorkloadUnitDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[9]
+	mi := &file_stroppy_descriptor_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -927,7 +927,7 @@ func (x *WorkloadUnitDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkloadUnitDescriptor.ProtoReflect.Descriptor instead.
 func (*WorkloadUnitDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{9}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *WorkloadUnitDescriptor) GetDescriptor_() *UnitDescriptor {
@@ -961,7 +961,7 @@ type WorkloadDescriptor struct {
 
 func (x *WorkloadDescriptor) Reset() {
 	*x = WorkloadDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[10]
+	mi := &file_stroppy_descriptor_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -973,7 +973,7 @@ func (x *WorkloadDescriptor) String() string {
 func (*WorkloadDescriptor) ProtoMessage() {}
 
 func (x *WorkloadDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[10]
+	mi := &file_stroppy_descriptor_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -986,7 +986,7 @@ func (x *WorkloadDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkloadDescriptor.ProtoReflect.Descriptor instead.
 func (*WorkloadDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{10}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *WorkloadDescriptor) GetName() string {
@@ -1025,7 +1025,7 @@ type BenchmarkDescriptor struct {
 
 func (x *BenchmarkDescriptor) Reset() {
 	*x = BenchmarkDescriptor{}
-	mi := &file_descriptor_proto_msgTypes[11]
+	mi := &file_stroppy_descriptor_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1037,7 +1037,7 @@ func (x *BenchmarkDescriptor) String() string {
 func (*BenchmarkDescriptor) ProtoMessage() {}
 
 func (x *BenchmarkDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_descriptor_proto_msgTypes[11]
+	mi := &file_stroppy_descriptor_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1050,7 +1050,7 @@ func (x *BenchmarkDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BenchmarkDescriptor.ProtoReflect.Descriptor instead.
 func (*BenchmarkDescriptor) Descriptor() ([]byte, []int) {
-	return file_descriptor_proto_rawDescGZIP(), []int{11}
+	return file_stroppy_descriptor_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *BenchmarkDescriptor) GetName() string {
@@ -1067,11 +1067,11 @@ func (x *BenchmarkDescriptor) GetWorkloads() []*WorkloadDescriptor {
 	return nil
 }
 
-var File_descriptor_proto protoreflect.FileDescriptor
+var File_stroppy_descriptor_proto protoreflect.FileDescriptor
 
-const file_descriptor_proto_rawDesc = "" +
+const file_stroppy_descriptor_proto_rawDesc = "" +
 	"\n" +
-	"\x10descriptor.proto\x12\astroppy\x1a\fcommon.proto\x1a\x1bgen/validate/validate.proto\"\xd2\x01\n" +
+	"\x18stroppy/descriptor.proto\x12\astroppy\x1a\x14stroppy/common.proto\x1a\x17validate/validate.proto\"\xd2\x01\n" +
 	"\x0fIndexDescriptor\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12)\n" +
 	"\acolumns\x18\x02 \x03(\tB\x0f\xfaB\f\x92\x01\t\x18\x01\"\x05\x8a\x01\x02\x10\x01R\acolumns\x12\x12\n" +
@@ -1172,20 +1172,20 @@ const file_descriptor_proto_rawDesc = "" +
 	"\fSERIALIZABLE\x10\x04B0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
 var (
-	file_descriptor_proto_rawDescOnce sync.Once
-	file_descriptor_proto_rawDescData []byte
+	file_stroppy_descriptor_proto_rawDescOnce sync.Once
+	file_stroppy_descriptor_proto_rawDescData []byte
 )
 
-func file_descriptor_proto_rawDescGZIP() []byte {
-	file_descriptor_proto_rawDescOnce.Do(func() {
-		file_descriptor_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_descriptor_proto_rawDesc), len(file_descriptor_proto_rawDesc)))
+func file_stroppy_descriptor_proto_rawDescGZIP() []byte {
+	file_stroppy_descriptor_proto_rawDescOnce.Do(func() {
+		file_stroppy_descriptor_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_stroppy_descriptor_proto_rawDesc), len(file_stroppy_descriptor_proto_rawDesc)))
 	})
-	return file_descriptor_proto_rawDescData
+	return file_stroppy_descriptor_proto_rawDescData
 }
 
-var file_descriptor_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_descriptor_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
-var file_descriptor_proto_goTypes = []any{
+var file_stroppy_descriptor_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_stroppy_descriptor_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_stroppy_descriptor_proto_goTypes = []any{
 	(InsertMethod)(0),              // 0: stroppy.InsertMethod
 	(TxIsolationLevel)(0),          // 1: stroppy.TxIsolationLevel
 	(*IndexDescriptor)(nil),        // 2: stroppy.IndexDescriptor
@@ -1203,7 +1203,7 @@ var file_descriptor_proto_goTypes = []any{
 	(*Value_Struct)(nil),           // 14: stroppy.Value.Struct
 	(*Generation_Rule)(nil),        // 15: stroppy.Generation.Rule
 }
-var file_descriptor_proto_depIdxs = []int32{
+var file_stroppy_descriptor_proto_depIdxs = []int32{
 	14, // 0: stroppy.IndexDescriptor.db_specific:type_name -> stroppy.Value.Struct
 	2,  // 1: stroppy.TableDescriptor.table_indexes:type_name -> stroppy.IndexDescriptor
 	14, // 2: stroppy.TableDescriptor.db_specific:type_name -> stroppy.Value.Struct
@@ -1234,42 +1234,42 @@ var file_descriptor_proto_depIdxs = []int32{
 	0,  // [0:23] is the sub-list for field type_name
 }
 
-func init() { file_descriptor_proto_init() }
-func file_descriptor_proto_init() {
-	if File_descriptor_proto != nil {
+func init() { file_stroppy_descriptor_proto_init() }
+func file_stroppy_descriptor_proto_init() {
+	if File_stroppy_descriptor_proto != nil {
 		return
 	}
-	file_common_proto_init()
-	file_descriptor_proto_msgTypes[0].OneofWrappers = []any{}
-	file_descriptor_proto_msgTypes[1].OneofWrappers = []any{}
-	file_descriptor_proto_msgTypes[2].OneofWrappers = []any{}
-	file_descriptor_proto_msgTypes[3].OneofWrappers = []any{}
-	file_descriptor_proto_msgTypes[4].OneofWrappers = []any{}
-	file_descriptor_proto_msgTypes[6].OneofWrappers = []any{}
-	file_descriptor_proto_msgTypes[7].OneofWrappers = []any{}
-	file_descriptor_proto_msgTypes[8].OneofWrappers = []any{
+	file_stroppy_common_proto_init()
+	file_stroppy_descriptor_proto_msgTypes[0].OneofWrappers = []any{}
+	file_stroppy_descriptor_proto_msgTypes[1].OneofWrappers = []any{}
+	file_stroppy_descriptor_proto_msgTypes[2].OneofWrappers = []any{}
+	file_stroppy_descriptor_proto_msgTypes[3].OneofWrappers = []any{}
+	file_stroppy_descriptor_proto_msgTypes[4].OneofWrappers = []any{}
+	file_stroppy_descriptor_proto_msgTypes[6].OneofWrappers = []any{}
+	file_stroppy_descriptor_proto_msgTypes[7].OneofWrappers = []any{}
+	file_stroppy_descriptor_proto_msgTypes[8].OneofWrappers = []any{
 		(*UnitDescriptor_CreateTable)(nil),
 		(*UnitDescriptor_Insert)(nil),
 		(*UnitDescriptor_Query)(nil),
 		(*UnitDescriptor_Transaction)(nil),
 	}
-	file_descriptor_proto_msgTypes[10].OneofWrappers = []any{}
+	file_stroppy_descriptor_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_descriptor_proto_rawDesc), len(file_descriptor_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_stroppy_descriptor_proto_rawDesc), len(file_stroppy_descriptor_proto_rawDesc)),
 			NumEnums:      2,
 			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_descriptor_proto_goTypes,
-		DependencyIndexes: file_descriptor_proto_depIdxs,
-		EnumInfos:         file_descriptor_proto_enumTypes,
-		MessageInfos:      file_descriptor_proto_msgTypes,
+		GoTypes:           file_stroppy_descriptor_proto_goTypes,
+		DependencyIndexes: file_stroppy_descriptor_proto_depIdxs,
+		EnumInfos:         file_stroppy_descriptor_proto_enumTypes,
+		MessageInfos:      file_stroppy_descriptor_proto_msgTypes,
 	}.Build()
-	File_descriptor_proto = out.File
-	file_descriptor_proto_goTypes = nil
-	file_descriptor_proto_depIdxs = nil
+	File_stroppy_descriptor_proto = out.File
+	file_stroppy_descriptor_proto_goTypes = nil
+	file_stroppy_descriptor_proto_depIdxs = nil
 }
