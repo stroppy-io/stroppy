@@ -12,9 +12,6 @@ deps:
 generate:
   inputs:
     - directory: stroppy
-    - git_repo:
-        url: github.com/bufbuild/protoc-gen-validate
-        sub_directory: validate
   plugins:
     - name: go
       out: ./build/go

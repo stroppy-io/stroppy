@@ -82,7 +82,7 @@ SRC_PROTO_PATH=$(CURDIR)/proto/build
 proto:
 	rm -rf $(CURDIR)/pkg/common/proto/*
 	cd proto && $(MAKE) build
-	cp -r $(SRC_PROTO_PATH)/go/* $(CURDIR)/pkg/common/proto
+	cp -r $(SRC_PROTO_PATH)/go/stroppy/* $(CURDIR)/pkg/common/proto/
 	cp $(SRC_PROTO_PATH)/ts/stroppy.pb.ts $(CURDIR)/internal/static/
 	cp $(SRC_PROTO_PATH)/ts/stroppy.pb.js $(CURDIR)/internal/static/
 	cp $(SRC_PROTO_PATH)/docs/proto.md $(CURDIR)/docs
