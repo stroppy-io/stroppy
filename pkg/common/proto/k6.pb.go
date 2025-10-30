@@ -2,12 +2,12 @@
 // versions:
 // 	protoc-gen-go v1.36.9
 // 	protoc        v6.32.1
-// source: k6.proto
+// source: stroppy/k6.proto
 
 package proto
 
 import (
-	_ "github.com/stroppy-io/stroppy/pkg/common/proto/gen/validate"
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -41,7 +41,7 @@ type K6Options struct {
 
 func (x *K6Options) Reset() {
 	*x = K6Options{}
-	mi := &file_k6_proto_msgTypes[0]
+	mi := &file_stroppy_k6_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -53,7 +53,7 @@ func (x *K6Options) String() string {
 func (*K6Options) ProtoMessage() {}
 
 func (x *K6Options) ProtoReflect() protoreflect.Message {
-	mi := &file_k6_proto_msgTypes[0]
+	mi := &file_stroppy_k6_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -66,7 +66,7 @@ func (x *K6Options) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use K6Options.ProtoReflect.Descriptor instead.
 func (*K6Options) Descriptor() ([]byte, []int) {
-	return file_k6_proto_rawDescGZIP(), []int{0}
+	return file_stroppy_k6_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *K6Options) GetK6Args() []string {
@@ -116,7 +116,7 @@ type K6Scenario struct {
 
 func (x *K6Scenario) Reset() {
 	*x = K6Scenario{}
-	mi := &file_k6_proto_msgTypes[1]
+	mi := &file_stroppy_k6_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -128,7 +128,7 @@ func (x *K6Scenario) String() string {
 func (*K6Scenario) ProtoMessage() {}
 
 func (x *K6Scenario) ProtoReflect() protoreflect.Message {
-	mi := &file_k6_proto_msgTypes[1]
+	mi := &file_stroppy_k6_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -141,7 +141,7 @@ func (x *K6Scenario) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use K6Scenario.ProtoReflect.Descriptor instead.
 func (*K6Scenario) Descriptor() ([]byte, []int) {
-	return file_k6_proto_rawDescGZIP(), []int{1}
+	return file_stroppy_k6_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *K6Scenario) GetMaxDuration() *durationpb.Duration {
@@ -278,7 +278,7 @@ type SharedIterations struct {
 
 func (x *SharedIterations) Reset() {
 	*x = SharedIterations{}
-	mi := &file_k6_proto_msgTypes[2]
+	mi := &file_stroppy_k6_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -290,7 +290,7 @@ func (x *SharedIterations) String() string {
 func (*SharedIterations) ProtoMessage() {}
 
 func (x *SharedIterations) ProtoReflect() protoreflect.Message {
-	mi := &file_k6_proto_msgTypes[2]
+	mi := &file_stroppy_k6_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -303,7 +303,7 @@ func (x *SharedIterations) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SharedIterations.ProtoReflect.Descriptor instead.
 func (*SharedIterations) Descriptor() ([]byte, []int) {
-	return file_k6_proto_rawDescGZIP(), []int{2}
+	return file_stroppy_k6_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SharedIterations) GetIterations() int64 {
@@ -337,7 +337,7 @@ type PerVuIterations struct {
 
 func (x *PerVuIterations) Reset() {
 	*x = PerVuIterations{}
-	mi := &file_k6_proto_msgTypes[3]
+	mi := &file_stroppy_k6_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -349,7 +349,7 @@ func (x *PerVuIterations) String() string {
 func (*PerVuIterations) ProtoMessage() {}
 
 func (x *PerVuIterations) ProtoReflect() protoreflect.Message {
-	mi := &file_k6_proto_msgTypes[3]
+	mi := &file_stroppy_k6_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -362,7 +362,7 @@ func (x *PerVuIterations) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PerVuIterations.ProtoReflect.Descriptor instead.
 func (*PerVuIterations) Descriptor() ([]byte, []int) {
-	return file_k6_proto_rawDescGZIP(), []int{3}
+	return file_stroppy_k6_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PerVuIterations) GetVus() uint32 {
@@ -397,7 +397,7 @@ type ConstantVUs struct {
 
 func (x *ConstantVUs) Reset() {
 	*x = ConstantVUs{}
-	mi := &file_k6_proto_msgTypes[4]
+	mi := &file_stroppy_k6_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -409,7 +409,7 @@ func (x *ConstantVUs) String() string {
 func (*ConstantVUs) ProtoMessage() {}
 
 func (x *ConstantVUs) ProtoReflect() protoreflect.Message {
-	mi := &file_k6_proto_msgTypes[4]
+	mi := &file_stroppy_k6_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -422,7 +422,7 @@ func (x *ConstantVUs) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConstantVUs.ProtoReflect.Descriptor instead.
 func (*ConstantVUs) Descriptor() ([]byte, []int) {
-	return file_k6_proto_rawDescGZIP(), []int{4}
+	return file_stroppy_k6_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ConstantVUs) GetVus() uint32 {
@@ -461,7 +461,7 @@ type RampingVUs struct {
 
 func (x *RampingVUs) Reset() {
 	*x = RampingVUs{}
-	mi := &file_k6_proto_msgTypes[5]
+	mi := &file_stroppy_k6_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -473,7 +473,7 @@ func (x *RampingVUs) String() string {
 func (*RampingVUs) ProtoMessage() {}
 
 func (x *RampingVUs) ProtoReflect() protoreflect.Message {
-	mi := &file_k6_proto_msgTypes[5]
+	mi := &file_stroppy_k6_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -486,7 +486,7 @@ func (x *RampingVUs) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RampingVUs.ProtoReflect.Descriptor instead.
 func (*RampingVUs) Descriptor() ([]byte, []int) {
-	return file_k6_proto_rawDescGZIP(), []int{5}
+	return file_stroppy_k6_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RampingVUs) GetStartVus() uint32 {
@@ -539,7 +539,7 @@ type ConstantArrivalRate struct {
 
 func (x *ConstantArrivalRate) Reset() {
 	*x = ConstantArrivalRate{}
-	mi := &file_k6_proto_msgTypes[6]
+	mi := &file_stroppy_k6_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -551,7 +551,7 @@ func (x *ConstantArrivalRate) String() string {
 func (*ConstantArrivalRate) ProtoMessage() {}
 
 func (x *ConstantArrivalRate) ProtoReflect() protoreflect.Message {
-	mi := &file_k6_proto_msgTypes[6]
+	mi := &file_stroppy_k6_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +564,7 @@ func (x *ConstantArrivalRate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConstantArrivalRate.ProtoReflect.Descriptor instead.
 func (*ConstantArrivalRate) Descriptor() ([]byte, []int) {
-	return file_k6_proto_rawDescGZIP(), []int{6}
+	return file_stroppy_k6_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ConstantArrivalRate) GetRate() uint32 {
@@ -624,7 +624,7 @@ type RampingArrivalRate struct {
 
 func (x *RampingArrivalRate) Reset() {
 	*x = RampingArrivalRate{}
-	mi := &file_k6_proto_msgTypes[7]
+	mi := &file_stroppy_k6_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -636,7 +636,7 @@ func (x *RampingArrivalRate) String() string {
 func (*RampingArrivalRate) ProtoMessage() {}
 
 func (x *RampingArrivalRate) ProtoReflect() protoreflect.Message {
-	mi := &file_k6_proto_msgTypes[7]
+	mi := &file_stroppy_k6_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -649,7 +649,7 @@ func (x *RampingArrivalRate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RampingArrivalRate.ProtoReflect.Descriptor instead.
 func (*RampingArrivalRate) Descriptor() ([]byte, []int) {
-	return file_k6_proto_rawDescGZIP(), []int{7}
+	return file_stroppy_k6_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RampingArrivalRate) GetStartRate() uint32 {
@@ -700,7 +700,7 @@ type RampingVUs_VUStage struct {
 
 func (x *RampingVUs_VUStage) Reset() {
 	*x = RampingVUs_VUStage{}
-	mi := &file_k6_proto_msgTypes[8]
+	mi := &file_stroppy_k6_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -712,7 +712,7 @@ func (x *RampingVUs_VUStage) String() string {
 func (*RampingVUs_VUStage) ProtoMessage() {}
 
 func (x *RampingVUs_VUStage) ProtoReflect() protoreflect.Message {
-	mi := &file_k6_proto_msgTypes[8]
+	mi := &file_stroppy_k6_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -725,7 +725,7 @@ func (x *RampingVUs_VUStage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RampingVUs_VUStage.ProtoReflect.Descriptor instead.
 func (*RampingVUs_VUStage) Descriptor() ([]byte, []int) {
-	return file_k6_proto_rawDescGZIP(), []int{5, 0}
+	return file_stroppy_k6_proto_rawDescGZIP(), []int{5, 0}
 }
 
 func (x *RampingVUs_VUStage) GetDuration() *durationpb.Duration {
@@ -755,7 +755,7 @@ type RampingArrivalRate_RateStage struct {
 
 func (x *RampingArrivalRate_RateStage) Reset() {
 	*x = RampingArrivalRate_RateStage{}
-	mi := &file_k6_proto_msgTypes[9]
+	mi := &file_stroppy_k6_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -767,7 +767,7 @@ func (x *RampingArrivalRate_RateStage) String() string {
 func (*RampingArrivalRate_RateStage) ProtoMessage() {}
 
 func (x *RampingArrivalRate_RateStage) ProtoReflect() protoreflect.Message {
-	mi := &file_k6_proto_msgTypes[9]
+	mi := &file_stroppy_k6_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -780,7 +780,7 @@ func (x *RampingArrivalRate_RateStage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RampingArrivalRate_RateStage.ProtoReflect.Descriptor instead.
 func (*RampingArrivalRate_RateStage) Descriptor() ([]byte, []int) {
-	return file_k6_proto_rawDescGZIP(), []int{7, 0}
+	return file_stroppy_k6_proto_rawDescGZIP(), []int{7, 0}
 }
 
 func (x *RampingArrivalRate_RateStage) GetTarget() uint32 {
@@ -797,11 +797,11 @@ func (x *RampingArrivalRate_RateStage) GetDuration() *durationpb.Duration {
 	return nil
 }
 
-var File_k6_proto protoreflect.FileDescriptor
+var File_stroppy_k6_proto protoreflect.FileDescriptor
 
-const file_k6_proto_rawDesc = "" +
+const file_stroppy_k6_proto_rawDesc = "" +
 	"\n" +
-	"\bk6.proto\x12\astroppy\x1a\x1bgen/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\"\xc1\x01\n" +
+	"\x10stroppy/k6.proto\x12\astroppy\x1a\x17validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\"\xc1\x01\n" +
 	"\tK6Options\x12!\n" +
 	"\ak6_args\x18\x02 \x03(\tB\b\xfaB\x05\x92\x01\x02\x18\x01R\x06k6Args\x12C\n" +
 	"\rsetup_timeout\x18\n" +
@@ -861,19 +861,19 @@ const file_k6_proto_rawDesc = "" +
 	"\bduration\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\bdurationB0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
 var (
-	file_k6_proto_rawDescOnce sync.Once
-	file_k6_proto_rawDescData []byte
+	file_stroppy_k6_proto_rawDescOnce sync.Once
+	file_stroppy_k6_proto_rawDescData []byte
 )
 
-func file_k6_proto_rawDescGZIP() []byte {
-	file_k6_proto_rawDescOnce.Do(func() {
-		file_k6_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_k6_proto_rawDesc), len(file_k6_proto_rawDesc)))
+func file_stroppy_k6_proto_rawDescGZIP() []byte {
+	file_stroppy_k6_proto_rawDescOnce.Do(func() {
+		file_stroppy_k6_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_stroppy_k6_proto_rawDesc), len(file_stroppy_k6_proto_rawDesc)))
 	})
-	return file_k6_proto_rawDescData
+	return file_stroppy_k6_proto_rawDescData
 }
 
-var file_k6_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
-var file_k6_proto_goTypes = []any{
+var file_stroppy_k6_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_stroppy_k6_proto_goTypes = []any{
 	(*K6Options)(nil),                    // 0: stroppy.K6Options
 	(*K6Scenario)(nil),                   // 1: stroppy.K6Scenario
 	(*SharedIterations)(nil),             // 2: stroppy.SharedIterations
@@ -886,7 +886,7 @@ var file_k6_proto_goTypes = []any{
 	(*RampingArrivalRate_RateStage)(nil), // 9: stroppy.RampingArrivalRate.RateStage
 	(*durationpb.Duration)(nil),          // 10: google.protobuf.Duration
 }
-var file_k6_proto_depIdxs = []int32{
+var file_stroppy_k6_proto_depIdxs = []int32{
 	10, // 0: stroppy.K6Options.setup_timeout:type_name -> google.protobuf.Duration
 	1,  // 1: stroppy.K6Options.scenario:type_name -> stroppy.K6Scenario
 	10, // 2: stroppy.K6Scenario.max_duration:type_name -> google.protobuf.Duration
@@ -911,13 +911,13 @@ var file_k6_proto_depIdxs = []int32{
 	0,  // [0:17] is the sub-list for field type_name
 }
 
-func init() { file_k6_proto_init() }
-func file_k6_proto_init() {
-	if File_k6_proto != nil {
+func init() { file_stroppy_k6_proto_init() }
+func file_stroppy_k6_proto_init() {
+	if File_stroppy_k6_proto != nil {
 		return
 	}
-	file_k6_proto_msgTypes[0].OneofWrappers = []any{}
-	file_k6_proto_msgTypes[1].OneofWrappers = []any{
+	file_stroppy_k6_proto_msgTypes[0].OneofWrappers = []any{}
+	file_stroppy_k6_proto_msgTypes[1].OneofWrappers = []any{
 		(*K6Scenario_SharedIterations)(nil),
 		(*K6Scenario_PerVuIterations)(nil),
 		(*K6Scenario_ConstantVus)(nil),
@@ -929,17 +929,17 @@ func file_k6_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_k6_proto_rawDesc), len(file_k6_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_stroppy_k6_proto_rawDesc), len(file_stroppy_k6_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_k6_proto_goTypes,
-		DependencyIndexes: file_k6_proto_depIdxs,
-		MessageInfos:      file_k6_proto_msgTypes,
+		GoTypes:           file_stroppy_k6_proto_goTypes,
+		DependencyIndexes: file_stroppy_k6_proto_depIdxs,
+		MessageInfos:      file_stroppy_k6_proto_msgTypes,
 	}.Build()
-	File_k6_proto = out.File
-	file_k6_proto_goTypes = nil
-	file_k6_proto_depIdxs = nil
+	File_stroppy_k6_proto = out.File
+	file_stroppy_k6_proto_goTypes = nil
+	file_stroppy_k6_proto_depIdxs = nil
 }

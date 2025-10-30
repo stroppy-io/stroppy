@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v6.32.1
-// source: sidecar.proto
+// source: stroppy/sidecar.proto
 
 package proto
 
@@ -258,5 +258,5 @@ var SidecarService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "sidecar.proto",
+	Metadata: "stroppy/sidecar.proto",
 }

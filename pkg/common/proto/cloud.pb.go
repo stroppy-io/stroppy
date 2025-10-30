@@ -2,12 +2,12 @@
 // versions:
 // 	protoc-gen-go v1.36.9
 // 	protoc        v6.32.1
-// source: cloud.proto
+// source: stroppy/cloud.proto
 
 package proto
 
 import (
-	_ "github.com/stroppy-io/stroppy/pkg/common/proto/gen/validate"
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -69,11 +69,11 @@ func (x Status) String() string {
 }
 
 func (Status) Descriptor() protoreflect.EnumDescriptor {
-	return file_cloud_proto_enumTypes[0].Descriptor()
+	return file_stroppy_cloud_proto_enumTypes[0].Descriptor()
 }
 
 func (Status) Type() protoreflect.EnumType {
-	return &file_cloud_proto_enumTypes[0]
+	return &file_stroppy_cloud_proto_enumTypes[0]
 }
 
 func (x Status) Number() protoreflect.EnumNumber {
@@ -82,7 +82,7 @@ func (x Status) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Status.Descriptor instead.
 func (Status) EnumDescriptor() ([]byte, []int) {
-	return file_cloud_proto_rawDescGZIP(), []int{0}
+	return file_stroppy_cloud_proto_rawDescGZIP(), []int{0}
 }
 
 type StroppyStepRun struct {
@@ -101,7 +101,7 @@ type StroppyStepRun struct {
 
 func (x *StroppyStepRun) Reset() {
 	*x = StroppyStepRun{}
-	mi := &file_cloud_proto_msgTypes[0]
+	mi := &file_stroppy_cloud_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -113,7 +113,7 @@ func (x *StroppyStepRun) String() string {
 func (*StroppyStepRun) ProtoMessage() {}
 
 func (x *StroppyStepRun) ProtoReflect() protoreflect.Message {
-	mi := &file_cloud_proto_msgTypes[0]
+	mi := &file_stroppy_cloud_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -126,7 +126,7 @@ func (x *StroppyStepRun) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StroppyStepRun.ProtoReflect.Descriptor instead.
 func (*StroppyStepRun) Descriptor() ([]byte, []int) {
-	return file_cloud_proto_rawDescGZIP(), []int{0}
+	return file_stroppy_cloud_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *StroppyStepRun) GetId() *Ulid {
@@ -175,7 +175,7 @@ type StroppyRun struct {
 
 func (x *StroppyRun) Reset() {
 	*x = StroppyRun{}
-	mi := &file_cloud_proto_msgTypes[1]
+	mi := &file_stroppy_cloud_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -187,7 +187,7 @@ func (x *StroppyRun) String() string {
 func (*StroppyRun) ProtoMessage() {}
 
 func (x *StroppyRun) ProtoReflect() protoreflect.Message {
-	mi := &file_cloud_proto_msgTypes[1]
+	mi := &file_stroppy_cloud_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -200,7 +200,7 @@ func (x *StroppyRun) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StroppyRun.ProtoReflect.Descriptor instead.
 func (*StroppyRun) Descriptor() ([]byte, []int) {
-	return file_cloud_proto_rawDescGZIP(), []int{1}
+	return file_stroppy_cloud_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *StroppyRun) GetId() *Ulid {
@@ -231,11 +231,11 @@ func (x *StroppyRun) GetCmd() string {
 	return ""
 }
 
-var File_cloud_proto protoreflect.FileDescriptor
+var File_stroppy_cloud_proto protoreflect.FileDescriptor
 
-const file_cloud_proto_rawDesc = "" +
+const file_stroppy_cloud_proto_rawDesc = "" +
 	"\n" +
-	"\vcloud.proto\x12\astroppy\x1a\fcommon.proto\x1a\x1bgen/validate/validate.proto\x1a\fconfig.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\rruntime.proto\"\xe5\x01\n" +
+	"\x13stroppy/cloud.proto\x12\astroppy\x1a\x14stroppy/common.proto\x1a\x17validate/validate.proto\x1a\x14stroppy/config.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x15stroppy/runtime.proto\"\xe5\x01\n" +
 	"\x0eStroppyStepRun\x12'\n" +
 	"\x02id\x18\x01 \x01(\v2\r.stroppy.UlidB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x02id\x12=\n" +
 	"\x0estroppy_run_id\x18\x02 \x01(\v2\r.stroppy.UlidB\b\xfaB\x05\x8a\x01\x02\x10\x01R\fstroppyRunId\x128\n" +
@@ -259,20 +259,20 @@ const file_cloud_proto_rawDesc = "" +
 	"NotifyStep\x12\x17.stroppy.StroppyStepRun\x1a\x16.google.protobuf.EmptyB0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
 var (
-	file_cloud_proto_rawDescOnce sync.Once
-	file_cloud_proto_rawDescData []byte
+	file_stroppy_cloud_proto_rawDescOnce sync.Once
+	file_stroppy_cloud_proto_rawDescData []byte
 )
 
-func file_cloud_proto_rawDescGZIP() []byte {
-	file_cloud_proto_rawDescOnce.Do(func() {
-		file_cloud_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_cloud_proto_rawDesc), len(file_cloud_proto_rawDesc)))
+func file_stroppy_cloud_proto_rawDescGZIP() []byte {
+	file_stroppy_cloud_proto_rawDescOnce.Do(func() {
+		file_stroppy_cloud_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_stroppy_cloud_proto_rawDesc), len(file_stroppy_cloud_proto_rawDesc)))
 	})
-	return file_cloud_proto_rawDescData
+	return file_stroppy_cloud_proto_rawDescData
 }
 
-var file_cloud_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_cloud_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_cloud_proto_goTypes = []any{
+var file_stroppy_cloud_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_stroppy_cloud_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_stroppy_cloud_proto_goTypes = []any{
 	(Status)(0),            // 0: stroppy.Status
 	(*StroppyStepRun)(nil), // 1: stroppy.StroppyStepRun
 	(*StroppyRun)(nil),     // 2: stroppy.StroppyRun
@@ -281,7 +281,7 @@ var file_cloud_proto_goTypes = []any{
 	(*ConfigFile)(nil),     // 5: stroppy.ConfigFile
 	(*emptypb.Empty)(nil),  // 6: google.protobuf.Empty
 }
-var file_cloud_proto_depIdxs = []int32{
+var file_stroppy_cloud_proto_depIdxs = []int32{
 	3, // 0: stroppy.StroppyStepRun.id:type_name -> stroppy.Ulid
 	3, // 1: stroppy.StroppyStepRun.stroppy_run_id:type_name -> stroppy.Ulid
 	4, // 2: stroppy.StroppyStepRun.context:type_name -> stroppy.StepContext
@@ -300,30 +300,30 @@ var file_cloud_proto_depIdxs = []int32{
 	0, // [0:7] is the sub-list for field type_name
 }
 
-func init() { file_cloud_proto_init() }
-func file_cloud_proto_init() {
-	if File_cloud_proto != nil {
+func init() { file_stroppy_cloud_proto_init() }
+func file_stroppy_cloud_proto_init() {
+	if File_stroppy_cloud_proto != nil {
 		return
 	}
-	file_common_proto_init()
-	file_config_proto_init()
-	file_runtime_proto_init()
+	file_stroppy_common_proto_init()
+	file_stroppy_config_proto_init()
+	file_stroppy_runtime_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cloud_proto_rawDesc), len(file_cloud_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_stroppy_cloud_proto_rawDesc), len(file_stroppy_cloud_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_cloud_proto_goTypes,
-		DependencyIndexes: file_cloud_proto_depIdxs,
-		EnumInfos:         file_cloud_proto_enumTypes,
-		MessageInfos:      file_cloud_proto_msgTypes,
+		GoTypes:           file_stroppy_cloud_proto_goTypes,
+		DependencyIndexes: file_stroppy_cloud_proto_depIdxs,
+		EnumInfos:         file_stroppy_cloud_proto_enumTypes,
+		MessageInfos:      file_stroppy_cloud_proto_msgTypes,
 	}.Build()
-	File_cloud_proto = out.File
-	file_cloud_proto_goTypes = nil
-	file_cloud_proto_depIdxs = nil
+	File_stroppy_cloud_proto = out.File
+	file_stroppy_cloud_proto_goTypes = nil
+	file_stroppy_cloud_proto_depIdxs = nil
 }
