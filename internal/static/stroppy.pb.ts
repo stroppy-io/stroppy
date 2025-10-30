@@ -7836,6 +7836,9 @@ class MethodOptions$Type extends MessageType<MethodOptions> {
                 case /* repeated google.protobuf.UninterpretedOption uninterpreted_option */ 999:
                     message.uninterpretedOption.push(UninterpretedOption.internalBinaryRead(reader, reader.uint32(), options));
                     break;
+                case /* optional google.protobuf.Edition edition */ 14:
+                    message.edition = reader.int32();
+                    break;
                 default:
                     let u = options.readUnknownField;
                     if (u === "throw")
@@ -10158,6 +10161,9 @@ class DriverQuery$Type extends MessageType<DriverQuery> {
                     break;
                 case /* optional stroppy.InsertMethod method */ 4:
                     message.method = reader.int32();
+                    break;
+                case /* optional google.protobuf.GeneratedCodeInfo.Annotation.Semantic semantic */ 5:
+                    message.semantic = reader.int32();
                     break;
                 default:
                     let u = options.readUnknownField;
