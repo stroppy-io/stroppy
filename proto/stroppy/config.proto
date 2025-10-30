@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package stroppy;
 
-import "common.proto";
-import "descriptor.proto";
+import "proto/stroppy/common.proto";
+import "proto/stroppy/descriptor.proto";
 import "validate/validate.proto";
-import "k6.proto";
+import "proto/stroppy/k6.proto";
 
 option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto";
 

@@ -11,28 +11,28 @@ deps:
   - github.com/bufbuild/protoc-gen-validate@v1.2.1
 generate:
   inputs:
-    - directory: stroppy
+    - directory: proto/stroppy
   plugins:
     - name: go
-      out: ./build/go
+      out: ./proto/build/go
       opts:
         paths: source_relative
     - name: go-grpc
-      out: ./build/go
+      out: ./proto/build/go
       opts:
         paths: source_relative
     - name: validate
-      out: ./build/go
+      out: ./proto/build/go
       opts:
         lang: go
         paths: source_relative
     - name: connect-go
-      out: ./build/go
+      out: ./proto/build/go
       opts:
         paths: source_relative
         simple: true
     - name: ts
-      out: ./build/ts
+      out: ./proto/build/ts
       opts:
         force_disable_services:
         force_client_none:
@@ -41,14 +41,14 @@ generate:
         add_pb_suffix:
         long_type_string:
     - name: jsonschema
-      out: ./build/docs
+      out: ./proto/build/docs
       opts:
         entrypoint_message: ConfigFile
         output_file_suffix: .schema.json
         int64_as_string: true
         paths: source_relative
     - name: doc
-      out: ./build/docs
+      out: ./proto/build/docs
       opts:
         markdown,proto.md:
 
