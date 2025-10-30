@@ -4,9 +4,9 @@ package stroppy;
 
 import "google/protobuf/duration.proto";
 
-import "stroppy/common.proto";
-import "stroppy/config.proto";
-import "stroppy/descriptor.proto";
+import "common.proto";
+import "config.proto";
+import "descriptor.proto";
 
 option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto";
 
