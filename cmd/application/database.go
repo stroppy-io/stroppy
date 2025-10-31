@@ -8,8 +8,6 @@ import (
 	"github.com/stroppy-io/stroppy-cloud-panel/tools/sql/migrations"
 )
 
-const migrationsValkeyLockName = "komeet-migrations"
-
 func NewDatabasePollWithTx(
 	cfg *Config,
 ) (
