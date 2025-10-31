@@ -6,7 +6,6 @@ import (
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/token"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/httpserv"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"net/http"
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/build"
@@ -23,14 +22,6 @@ type Application struct {
 
 	server *http.Server
 }
-
-const (
-	restLoggerName  = "komeet-server-rest"
-	restTracingName = "komeet-server-rest"
-	s3LoggerName    = "komeet-server-s3"
-	rpcLoggerName   = "komeet-server-rpc"
-	amqpLoggerName  = "komeet-server-amqp"
-)
 
 var (
 	startupProbe = probes.NewBoolProbe()
@@ -100,14 +91,14 @@ func (a *Application) Run() error {
 	}()
 	go func() {
 		logger.Info(
-			"REST server started",
-			zap.String("host", a.config.Service.REST.Host),
-			zap.Int("port", a.config.Service.REST.Port),
+			"HTTP server started",
+			zap.String("host", a.config.Service.Server.Host),
+			zap.Int("port", a.config.Service.Server.Port),
 		)
-		err := a.restServer.Serve()
+		err := a.server.ListenAndServe()
 		if err != nil {
 			logger.Error("failed to start rest server", zap.Error(err))
 		}
 	}()
-	return grpc.RunGrpcServer(&a.config.Service.GRPC, a.server)
+	return nil
 }
