@@ -26,7 +26,7 @@ func newQuery(
 ) (*stroppy.DriverQuery, error) {
 	genIDs := queryGenIDs(descriptor)
 
-	paramsValues, err := genParamValues(genIDs, generators)
+	paramsValues, err := GenParamValues(genIDs, generators)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func interpolateSQL(descriptor *stroppy.QueryDescriptor) string {
 
 var ErrNilProtoValue = errors.New("nil proto value type for parameter")
 
-func genParamValues(
+func GenParamValues(
 	genIDs []GeneratorID,
 	generators Generators,
 ) ([]*stroppy.Value, error) {
@@ -134,7 +134,6 @@ func NewQuery(
 	_ context.Context,
 	lg *zap.Logger,
 	generators Generators,
-	// buildContext *stroppy.StepContext,
 	descriptor *stroppy.QueryDescriptor,
 ) (*stroppy.DriverTransaction, error) {
 	lg.Debug("build query",

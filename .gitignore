@@ -99,3 +99,4 @@ fabric.properties
 http-client.private.env.json
 /.netrc
 /xexample
+internal/static/stroppy-k6

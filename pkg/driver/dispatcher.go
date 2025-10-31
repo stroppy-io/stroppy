@@ -10,22 +10,23 @@ import (
 )
 
 type Driver interface {
-	Initialize(ctx context.Context, runContext *stroppy.StepContext) error
-	GenerateNextUnit(
-		ctx context.Context,
-		unit *stroppy.UnitDescriptor,
-	) (*stroppy.DriverTransaction, error)
 	RunTransaction(
 		ctx context.Context,
-		transaction *stroppy.DriverTransaction,
+		unit *stroppy.UnitDescriptor,
+	) (*stroppy.DriverTransactionStat, error)
+	InsertValues(
+		ctx context.Context,
+		unit *stroppy.InsertDescriptor,
+		count int64,
 	) (*stroppy.DriverTransactionStat, error)
 	Teardown(ctx context.Context) error
 }
 
 func Dispatch( //nolint: ireturn // better than return any
+	ctx context.Context,
 	lg *zap.Logger,
 	config *stroppy.DriverConfig,
-) Driver {
+) (Driver, error) {
 	switch drvType := config.GetDriverType(); drvType {
 	case stroppy.DriverConfig_DRIVER_TYPE_UNSPECIFIED:
 		lg.Sugar().
@@ -33,10 +34,11 @@ func Dispatch( //nolint: ireturn // better than return any
 
 		fallthrough // as good suggestion
 	case stroppy.DriverConfig_DRIVER_TYPE_POSTGRES:
-		return postgres.NewDriver(lg)
+		drv, err := postgres.NewDriver(ctx, lg, config)
+		return drv, err
 	default:
 		lg.Sugar().Panicf("driver type '%s' not dispatchable", drvType.String())
 
-		return nil
+		return nil, nil
 	}
 }

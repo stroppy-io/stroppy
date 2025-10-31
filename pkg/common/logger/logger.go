@@ -45,8 +45,10 @@ func newZapCfg(mod LogMod, logLevel zapcore.Level) zap.Config {
 		cfg.Level.SetLevel(logLevel)
 	case DevelopmentMod:
 		cfg = zap.NewDevelopmentConfig()
+		cfg.Level.SetLevel(logLevel)
 	default:
 		cfg = zap.NewDevelopmentConfig()
+		cfg.Level.SetLevel(logLevel)
 	}
 
 	return cfg

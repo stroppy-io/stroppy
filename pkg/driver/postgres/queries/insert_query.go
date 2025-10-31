@@ -16,9 +16,9 @@ func NewInsertQuery(
 	generators Generators,
 	descriptor *stroppy.InsertDescriptor,
 ) (*stroppy.DriverTransaction, error) {
-	genIDs := insertGenIDs(descriptor)
+	genIDs := InsertGenIDs(descriptor)
 
-	params, err := genParamValues(genIDs, generators)
+	params, err := GenParamValues(genIDs, generators)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func NewInsertQuery(
 
 	switch descriptor.GetMethod() {
 	case stroppy.InsertMethod_COPY_FROM:
-		resSQL = badInsertSQL(descriptor)
+		resSQL = BadInsertSQL(descriptor)
 	case stroppy.InsertMethod_PLAIN_QUERY:
 		resSQL = insertSQL(descriptor)
 	default:
@@ -47,7 +47,7 @@ func NewInsertQuery(
 	}, nil
 }
 
-func badInsertSQL(descriptor *stroppy.InsertDescriptor) string {
+func BadInsertSQL(descriptor *stroppy.InsertDescriptor) string {
 	parts := []string{descriptor.GetTableName()}
 	for _, param := range descriptor.GetParams() {
 		parts = append(parts, param.GetName())
@@ -95,7 +95,7 @@ func insertSQL(descriptor *stroppy.InsertDescriptor) string {
 	return sb.String()
 }
 
-func insertGenIDs(descriptor *stroppy.InsertDescriptor) []GeneratorID {
+func InsertGenIDs(descriptor *stroppy.InsertDescriptor) []GeneratorID {
 	genIDs := make([]GeneratorID, 0, len(descriptor.GetParams())+len(descriptor.GetGroups()))
 	for _, param := range descriptor.GetParams() {
 		genIDs = append(genIDs, NewGeneratorID(descriptor.GetName(), param.GetName()))

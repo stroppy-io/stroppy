@@ -34,7 +34,7 @@ func Test_badInsertSQL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := badInsertSQL(tt.args.descriptor); got != tt.want {
+			if got := BadInsertSQL(tt.args.descriptor); got != tt.want {
 				t.Errorf("badInsertSQL() = %v, want %v", got, tt.want)
 			}
 		})

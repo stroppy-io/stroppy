@@ -40,7 +40,7 @@ var Binaries = []FileName{ //nolint: gochecknoglobals
 }
 
 //go:embed package.json
-//go:embed stroppy-xk6
+//go:embed stroppy-k6
 //go:embed benchmark.ts
 //go:embed *.pb.*
 var Content embed.FS

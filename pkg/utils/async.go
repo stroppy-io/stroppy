@@ -18,7 +18,7 @@ type NoopAsyncer struct {
 	err           error
 }
 
-func (n NoopAsyncer) Go(f func(ctx context.Context) error) {
+func (n *NoopAsyncer) Go(f func(ctx context.Context) error) {
 	if n.cancelOnError && n.err != nil {
 		return
 	}
@@ -29,7 +29,7 @@ func (n NoopAsyncer) Go(f func(ctx context.Context) error) {
 	}
 }
 
-func (n NoopAsyncer) Wait() error {
+func (n *NoopAsyncer) Wait() error {
 	return n.err
 }
 

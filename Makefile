@@ -47,7 +47,7 @@ REQUIRED_BINS = git go curl unzip \
 .install-linter: # Install golangci-lint
 	$(info Installing golangci-lint...)
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.0
 
 .PHONY: .install-xk6
 .install-xk6:
@@ -90,11 +90,12 @@ K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
 .PHONY: build-xk6
 build-xk6: .check-bins # Build k6 module
 	mkdir -p $(CURDIR)/build
-	XK6_RACE_DETECTOR=1 PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
-		--with github.com/stroppy-io/stroppy/cmd/xk6=./cmd/xk6/ \
+	PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
+		--with github.com/stroppy-io/stroppy/cmd/xk6air=./cmd/xk6air/ \
 		--replace github.com/stroppy-io/stroppy=./ \
+		--with github.com/oleiade/xk6-encoding@latest \
 		--output $(K6_OUT_FILE)
-	cp $(CURDIR)/build/stroppy-k6 internal/static/stroppy-xk6
+	cp $(CURDIR)/build/stroppy-k6 internal/static/stroppy-k6
 
 STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
