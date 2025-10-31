@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+import "crossplane/crossplane.proto";
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/backend/proto/panel";
+
+message CreateResourceRequest {
+    Resource resource = 1 [(validate.rules).message.required = true];
+    bool wait_for_sync = 2;
+}
+
+message CreateResourcesManyRequest {
+    repeated Resource resources = 1 [(validate.rules).repeated.min_items = 1];
+    bool wait_for_sync = 2;
+}
+
+message CreateResourcesManyResponse {
+    repeated ResourceWithStatus responses = 1 [(validate.rules).repeated.min_items = 1];
+}
+
+message DeleteResourceRequest {
+    Ref ref = 1 [(validate.rules).message.required = true];
+    bool wait_for_sync = 2;
+}
+
+message GetResourceStatusRequest {
+    Ref ref = 1 [(validate.rules).message.required = true];
+}
+
+message DeleteResourceResponse {
+    bool synced = 1;
+    bool deleted = 2;
+}
+
+service Crossplane {
+    rpc CreateResource (CreateResourceRequest) returns (ResourceWithStatus);
+    rpc CreateResourcesMany (CreateResourcesManyRequest) returns (CreateResourcesManyResponse);
+    rpc GetResourceStatus (GetResourceStatusRequest) returns (ResourceWithStatus);
+    rpc DeleteResource (DeleteResourceRequest) returns (DeleteResourceResponse);
+}

@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/backend/proto/panel";
+
+
+message YandexCloud {
+    enum ResourceKind {
+        RESOURCE_KIND_UNSPECIFIED = 0;
+        INSTANCE = 1; // Yandex Cloud VM Instance
+        NETWORK = 2; // Yandex Cloud Network
+        SUBNET = 3; // Yandex Cloud Subnet
+    }
+    message Network {
+        string name = 1 [(validate.rules).string.min_len = 1];
+    }
+    message Subnet {
+        message NetworkIdRef {
+            string name = 1 [(validate.rules).string.min_len = 1];
+        }
+        string name = 1 [(validate.rules).string.min_len = 1];
+        NetworkIdRef network_id_ref = 2 [(validate.rules).message.required = true];
+        repeated string v4_cidr_block = 3 [(validate.rules).string.min_len = 1];
+    }
+    message Vm {
+        message Resources {
+            uint64 cores = 1 [(validate.rules).uint64.gte = 1];
+            uint64 memory = 2 [(validate.rules).uint64.gte = 1]; // in GB
+        }
+        message Disk {
+            message InitializeParams {
+                string image_id = 1 [(validate.rules).string.min_len = 1];
+            }
+            InitializeParams initialize_params = 1 [(validate.rules).message.required = true];
+        }
+        message NetworkInterface {
+            string subnet_id_ref = 1 [(validate.rules).string.min_len = 1];
+        }
+        string name = 2 [(validate.rules).string.min_len = 1];
+        string platform_id = 3 [(validate.rules).string.const = "standard-v2"];
+        string zone = 4 [(validate.rules).string.const = "ru-central1-d"];
+        Resources resources = 5 [(validate.rules).message.required = true];
+        repeated Disk.InitializeParams boot_disk = 6 [(validate.rules).repeated.min_items = 1];
+        repeated NetworkInterface network_interface = 7 [(validate.rules).repeated.min_items = 1];
+    }
+}

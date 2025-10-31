@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+import "crossplane/crossplane.proto";
+import "protopgx/pgx.proto";
+import "proto/stroppy/cloud.proto";
+import "proto/stroppy/common.proto";
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/backend/proto/panel";
+
+message StroppyStep {
+    stroppy.Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    stroppy.StroppyStepRun stroppy_step_run = 3 [(sql.sql_field).embedded_message = true];
+}
+
+message StroppyRun {
+    stroppy.Ulid id = 1 [(sql.sql_field) = {
+        sql_type: {type: TEXT,user_cast: true}
+        constraints: {primary_key: true}
+    }];
+    optional stroppy.StroppyRun stroppy_run = 2 [(sql.sql_field).embedded_message = true];
+    ResourceWithStatus target_vm = 4 [(validate.rules).message.required = true,
+        (sql.sql_field).serialized_message = true
+    ];
+    ResourceWithStatus runner_vm = 5 [(validate.rules).message.required = true,
+        (sql.sql_field).serialized_message = true
+    ];
+}
