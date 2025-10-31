@@ -1,0 +1,24 @@
+Err: exit status 1; Stderr: crossplane/crossplane.proto:4:1: warning: Import google/protobuf/duration.proto is unused.
+warn\tprotoc-gen-pgx-orm\tsql_file=../sql/schema/models.sql,orm_folder=../../internal/infrastructure/orm,paths=source_relative
+warn\tprotoc-gen-pgx-orm\tskip message field cause not serialized mark\t{\"name\": \"ResourceWithStatus.additional_fields\"}
+warn\tprotoc-gen-pgx-orm\tskip parsing embed for field, cause not embed message
+panic: runtime error: index out of range [0] with length 0
+
+goroutine 1 [running]:
+github.com/yaroher/protoc-gen-pgx-orm/tabletree.NewFromProtoField(0xc00053b7a0)
+\t/home/yaroha/go/pkg/mod/github.com/yaroher/protoc-gen-pgx-orm@v1.0.19/tabletree/field.go:60 +0x712
+github.com/yaroher/protoc-gen-pgx-orm/tabletree.CollectFieldsFromMessage(0xc0005a6360)
+\t/home/yaroha/go/pkg/mod/github.com/yaroher/protoc-gen-pgx-orm@v1.0.19/tabletree/field.go:220 +0x1c9
+github.com/yaroher/protoc-gen-pgx-orm/tabletree.CollectTablesFromProto({0xc0004f7e80, 0xb, 0x10})
+\t/home/yaroha/go/pkg/mod/github.com/yaroher/protoc-gen-pgx-orm@v1.0.19/tabletree/tabletree.go:191 +0x1a5
+main.Generate(0xc0004b4180)
+\t/home/yaroha/go/pkg/mod/github.com/yaroher/protoc-gen-pgx-orm@v1.0.19/main.go:55 +0x4c
+main.main.func1(0x0?)
+\t/home/yaroha/go/pkg/mod/github.com/yaroher/protoc-gen-pgx-orm@v1.0.19/main.go:135 +0x1b
+google.golang.org/protobuf/compiler/protogen.run({0x0?, 0x0?, 0x0?, 0x0?}, 0xb741e8)
+\t/home/yaroha/go/pkg/mod/google.golang.org/protobuf@v1.36.6/compiler/protogen/protogen.go:77 +0x150
+google.golang.org/protobuf/compiler/protogen.Options.Run({0x0?, 0x0?, 0x0?, 0x109e1a8?}, 0xc000002380?)
+\t/home/yaroha/go/pkg/mod/google.golang.org/protobuf@v1.36.6/compiler/protogen/protogen.go:55 +0x2c
+main.main()
+\t/home/yaroha/go/pkg/mod/github.com/yaroher/protoc-gen-pgx-orm@v1.0.19/main.go:133 +0x25
+--pgx-orm_out: protoc-gen-pgx-orm: Plugin failed with status code 2.

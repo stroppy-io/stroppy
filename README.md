@@ -1,68 +1,73 @@
 # Stroppy Cloud Panel
 
-Современная панель управления облачными ресурсами для Stroppy.
+Полноценная панель управления облачными нагрузками Stroppy. Репозиторий объединяет backend на Go и frontend на React, а также инфраструктурные манифесты.
 
-## Структура проекта
+## Структура
 
 ```
-stroppy-cloud-panel/
-├── frontend/              # React frontend приложение
-│   ├── src/              # Исходный код
-│   ├── public/           # Статические файлы
-│   ├── package.json      # Зависимости frontend
-│   └── README.md         # Документация frontend
-└── README.md             # Этот файл
+.
+├── cmd/                     # Точки входа бинарей
+├── internal/                # Бизнес-логика и HTTP-слой
+├── pkg/                     # Переиспользуемые Go-пакеты (auth, db, proto)
+├── web/                     # Frontend (React + Vite)
+├── deployments/             # Docker/Compose/Helm/Caddy конфигурации
+├── docs/                    # Дополнительная документация и примеры API
+├── proto/                   # Источник protobuf-схем
+├── Makefile                 # Унифицированные задачи для разработки
+└── env*.example             # Образцы переменных окружения
 ```
 
-## Frontend
+## Backend (Go 1.21+)
 
-Frontend приложение построено на современном стеке:
+Основная точка входа: `cmd/stroppy-cloud-panel/main.go`.
 
-- **React 19** - библиотека для создания пользовательских интерфейсов
-- **TypeScript** - типизированный JavaScript
-- **Vite** - быстрый инструмент сборки и dev-сервер
-- **Tailwind CSS** - utility-first CSS фреймворк
-- **Ant Design 5.0** - библиотека React компонентов
-- **Yarn** - менеджер пакетов
+```bash
+# Установка зависимостей
+make deps
 
-### Быстрый старт
+# Сборка бинаря в ./bin
+make build
 
-1. Перейдите в папку frontend:
-   ```bash
-   cd frontend
-   ```
+# Запуск локально
+make run
 
-2. Установите зависимости:
-   ```bash
-   yarn install
-   ```
+# Тесты и покрытие
+make test
+make test-coverage
+```
 
-3. Запустите dev-сервер:
-   ```bash
-   yarn dev
-   ```
+Полный список целей `make help`.
 
-4. Откройте браузер по адресу: http://localhost:5173
+## Frontend (`web/`)
 
-### Доступные команды
+Stack: React 19, TypeScript, Vite, Tailwind CSS, Ant Design.
 
-- `yarn dev` - запуск в режиме разработки
-- `yarn build` - сборка для продакшена
-- `yarn preview` - предварительный просмотр сборки
-- `yarn type-check` - проверка типов TypeScript
-- `yarn lint` - линтинг кода
-- `yarn clean` - очистка папки сборки
+```bash
+cd web
+yarn install
+yarn dev        # localhost:5173
+yarn build      # продакшен сборка в web/dist
+```
 
-## Разработка
+Переменные окружения описаны в `web/env.example`.
 
-Проект использует современные инструменты разработки:
+## Контейнеры и деплой
 
-- **Hot Module Replacement (HMR)** - мгновенная перезагрузка при изменениях
-- **TypeScript** - полная типизация для надежности
-- **ESLint** - проверка качества кода
-- **PostCSS** - обработка CSS с автопрефиксером
-- **Vite** - быстрая сборка и оптимизация
+Все Docker/Compose/Helm файлы лежат в `deployments/`.
 
-## Лицензия
+```bash
+# Сборка образа (deployments/docker/Dockerfile)
+make docker-build
 
-© 2024 Stroppy Cloud Panel. Все права защищены.
+# Продакшен compose-стек
+make docker-up
+
+# Dev-стек (hot reload для Go и React)
+make docker-dev
+
+# Остановка и очистка
+make docker-stop
+make docker-clean
+```
+
+Дополнительная документация по API и примерам запросов находится в `docs/`.

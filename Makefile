@@ -1,137 +1,166 @@
-.PHONY: build run dev stop clean logs help
+.PHONY: build run dev test test-coverage deps fmt lint clean init-db \
+	docker-build docker-up docker-dev docker-stop docker-clean docker-logs \
+	docker-logs-dev docker-shell docker-status docker-test-api docker-backup \
+	docker-restore docker-update docker-monitor docker-info proto help
 
-# Переменные
-IMAGE_NAME=stroppy-cloud-panel
-CONTAINER_NAME=stroppy-cloud-panel
-VERSION=latest
+# Go application settings
+BINARY_NAME ?= stroppy-cloud-panel
+MAIN_PKG ?= ./cmd/stroppy-cloud-panel
+BUILD_DIR ?= ./bin
 
-# Сборка Docker образа
+# Container/deployment settings
+IMAGE_NAME ?= stroppy-cloud-panel
+VERSION ?= latest
+CONTAINER_NAME ?= stroppy-cloud-panel
+DEPLOYMENTS_DIR := ./deployments/docker
+DOCKER_COMPOSE := $(DEPLOYMENTS_DIR)/docker-compose.yml
+DOCKER_COMPOSE_DEV := $(DEPLOYMENTS_DIR)/docker-compose.dev.yml
+DOCKERFILE := $(DEPLOYMENTS_DIR)/Dockerfile
+
+# -----------------------------------------------------------------------------
+# Go targets
+
 build:
-	@echo "Сборка Docker образа..."
-	@docker build -t $(IMAGE_NAME):$(VERSION) .
-	@echo "Образ $(IMAGE_NAME):$(VERSION) собран успешно"
+	@echo "➜ Building $(BINARY_NAME)..."
+	@mkdir -p $(BUILD_DIR)
+	@go build -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PKG)
 
-# Запуск в продакшн режиме
 run:
-	@echo "Запуск контейнера в продакшн режиме..."
-	@docker compose up -d --build
-	@echo "Контейнер запущен на http://localhost:8080"
+	@echo "➜ Running $(BINARY_NAME)..."
+	@go run $(MAIN_PKG)
 
-# Запуск в режиме разработки
-dev:
-	@echo "Запуск в режиме разработки..."
-	@docker compose -f docker-compose.dev.yml up -d
-	@echo "Backend: http://localhost:8080"
+dev: run
+
+test:
+	@echo "➜ Running tests..."
+	@go test ./...
+
+test-coverage:
+	@echo "➜ Running tests with coverage..."
+	@go test -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated at coverage.html"
+
+deps:
+	@echo "➜ Installing dependencies..."
+	@go mod download
+	@go mod tidy
+
+fmt:
+	@echo "➜ Formatting Go sources..."
+	@go fmt ./...
+
+lint:
+	@echo "➜ Running golangci-lint..."
+	@golangci-lint run
+
+clean:
+	@echo "➜ Cleaning build artifacts..."
+	@rm -rf $(BUILD_DIR)
+	@rm -f coverage.out coverage.html
+	@rm -f *.db
+
+init-db:
+	@echo "➜ Initializing local database..."
+	@rm -f stroppy.db
+	@go run $(MAIN_PKG) &
+	@sleep 2
+	@pkill -f $(BINARY_NAME) || true
+	@echo "Database initialized"
+
+# -----------------------------------------------------------------------------
+# Docker & Compose targets
+
+docker-build:
+	@echo "➜ Building container image $(IMAGE_NAME):$(VERSION)..."
+	@docker build -f $(DOCKERFILE) -t $(IMAGE_NAME):$(VERSION) .
+
+docker-up:
+	@echo "➜ Starting stack (production compose)..."
+	@docker compose -f $(DOCKER_COMPOSE) up -d --build
+	@echo "Application available at http://localhost:8080"
+
+docker-dev:
+	@echo "➜ Starting development stack..."
+	@docker compose -f $(DOCKER_COMPOSE_DEV) up -d --build
+	@echo "Backend:  http://localhost:8080"
 	@echo "Frontend: http://localhost:5173"
 
-# Остановка контейнеров
-stop:
-	@echo "Остановка контейнеров..."
-	@docker compose down
-	@docker compose -f docker-compose.dev.yml down
+docker-stop:
+	@echo "➜ Stopping compose stacks..."
+	@docker compose -f $(DOCKER_COMPOSE) down
+	@docker compose -f $(DOCKER_COMPOSE_DEV) down
 
-# Перестройка и запуск
-rebuild: clean build run
-
-# Очистка
-clean:
-	@echo "Очистка Docker ресурсов..."
-	@docker compose down -v --remove-orphans
-	@docker compose -f docker-compose.dev.yml down -v --remove-orphans
+docker-clean:
+	@echo "➜ Cleaning compose resources..."
+	@docker compose -f $(DOCKER_COMPOSE) down -v --remove-orphans
+	@docker compose -f $(DOCKER_COMPOSE_DEV) down -v --remove-orphans
 	@docker image prune -f
 	@docker volume prune -f
 
-# Просмотр логов
-logs:
-	@docker compose logs -f
+docker-logs:
+	@docker compose -f $(DOCKER_COMPOSE) logs -f
 
-# Просмотр логов в режиме разработки
-logs-dev:
-	@docker compose -f docker-compose.dev.yml logs -f
+docker-logs-dev:
+	@docker compose -f $(DOCKER_COMPOSE_DEV) logs -f
 
-# Вход в контейнер
-shell:
+docker-shell:
 	@docker exec -it $(CONTAINER_NAME) /bin/sh
 
-# Проверка статуса
-status:
-	@docker compose ps
+docker-status:
+	@docker compose -f $(DOCKER_COMPOSE) ps
 	@echo ""
-	@docker compose -f docker-compose.dev.yml ps
+	@docker compose -f $(DOCKER_COMPOSE_DEV) ps
 
-# Тестирование API
-test-api:
-	@echo "Тестирование API..."
+docker-test-api:
+	@echo "➜ Smoke testing API..."
 	@sleep 5
-	@curl -s http://localhost:8080/health | grep -q "ok" && echo "✅ Health check прошел" || echo "❌ Health check не прошел"
-	@echo "Тестирование регистрации..."
+	@curl -s http://localhost:8080/health | grep -q "ok" && echo "✅ Health check passed" || echo "❌ Health check failed"
+	@echo "➜ Testing registration endpoint..."
 	@curl -s -X POST http://localhost:8080/api/v1/auth/register \
 		-H "Content-Type: application/json" \
-		-d '{"username": "testuser", "password": "testpass123"}' | grep -q "user" && echo "✅ Регистрация работает" || echo "⚠️  Пользователь может уже существовать"
+		-d '{"username": "testuser", "password": "testpass123"}' | grep -q "user" && echo "✅ Registration endpoint OK" || echo "⚠️  Registration may have failed or user already exists"
 
-# Резервное копирование данных
-backup:
-	@echo "Создание резервной копии данных..."
+docker-backup:
+	@echo "➜ Creating data backup..."
 	@docker run --rm -v stroppy-cloud-panel_stroppy_data:/data -v $(PWD):/backup alpine tar czf /backup/stroppy_backup_$(shell date +%Y%m%d_%H%M%S).tar.gz -C /data .
-	@echo "Резервная копия создана"
+	@echo "Backup created in $(PWD)"
 
-# Восстановление данных
-restore:
-	@echo "Для восстановления данных используйте:"
+docker-restore:
+	@echo "Use the following command to restore from a backup:"
 	@echo "docker run --rm -v stroppy-cloud-panel_stroppy_data:/data -v \$$(PWD):/backup alpine tar xzf /backup/your_backup_file.tar.gz -C /data"
 
-# Обновление образа
-update: stop build run
+docker-update: docker-stop docker-build docker-up
 
-# Мониторинг ресурсов
-monitor:
+docker-monitor:
 	@docker stats $(CONTAINER_NAME)
 
-# Информация о образе
-info:
+docker-info:
 	@docker images $(IMAGE_NAME)
 	@echo ""
 	@docker inspect $(IMAGE_NAME):$(VERSION) | grep -A 5 -B 5 "Created\|Size"
 
-# Помощь
-help:
-	@echo "Доступные команды:"
-	@echo "  build      - Сборка Docker образа"
-	@echo "  run        - Запуск в продакшн режиме"
-	@echo "  dev        - Запуск в режиме разработки"
-	@echo "  stop       - Остановка контейнеров"
-	@echo "  rebuild    - Перестройка и запуск"
-	@echo "  clean      - Очистка Docker ресурсов"
-	@echo "  logs       - Просмотр логов"
-	@echo "  logs-dev   - Просмотр логов в режиме разработки"
-	@echo "  shell      - Вход в контейнер"
-	@echo "  status     - Проверка статуса контейнеров"
-	@echo "  test-api   - Тестирование API"
-	@echo "  backup     - Резервное копирование данных"
-	@echo "  restore    - Информация о восстановлении данных"
-	@echo "  update     - Обновление образа"
-	@echo "  monitor    - Мониторинг ресурсов"
-	@echo "  info       - Информация о образе"
-	@echo "  help       - Показать эту справку"
+# -----------------------------------------------------------------------------
+# Proto generation
 
+SRC_PROTO_PATH := $(CURDIR)/tools/stroppy/proto/build
 
-SRC_PROTO_PATH=$(CURDIR)/tools/stroppy/proto/build
-.PHONY: proto
 proto:
-	rm -rf $(CURDIR)/pkg/common/proto/*
-	cd  $(CURDIR)/tools/stroppy/proto && $(MAKE) build
-	cp -r $(SRC_PROTO_PATH)/go/* $(CURDIR)/backend/pkg/proto
-	cp $(SRC_PROTO_PATH)/ts/* $(CURDIR)/frontend/src/proto
+	rm -rf $(CURDIR)/pkg/proto/*
+	cd $(CURDIR)/tools/stroppy/proto && $(MAKE) build
+	cp -r $(SRC_PROTO_PATH)/go/* $(CURDIR)/pkg/proto
+	cp $(SRC_PROTO_PATH)/ts/* $(CURDIR)/web/src/proto
 	cp $(SRC_PROTO_PATH)/docs/* $(CURDIR)/docs
 
-branch=main
-.PHONY: revision
-revision: # Создание тега
-	@if [ -e $(tag) ]; then \
-		echo "error: Specify version 'tag='"; \
-		exit 1; \
-	fi
-	git tag -d ${tag} || true
-	git push --delete origin ${tag} || true
-	git tag $(tag)
-	git push origin $(tag)
+# -----------------------------------------------------------------------------
+# Helper
+
+help:
+	@echo "Common targets:"
+	@echo "  build            - Build the Go binary"
+	@echo "  run              - Run the application locally"
+	@echo "  test             - Execute Go tests"
+	@echo "  docker-up        - Start the production docker-compose stack"
+	@echo "  docker-dev       - Start the development docker-compose stack"
+	@echo "  docker-clean     - Remove compose resources and prune Docker"
+	@echo "  proto            - Regenerate protobuf artefacts"

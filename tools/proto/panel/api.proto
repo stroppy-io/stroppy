@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package panel;
+
+import "google/protobuf/empty.proto";
+import "panel/database.proto";
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
+
+
+message RegisterRequest {
+    string email = 1 [(validate.rules).string = {min_len: 3,max_len: 255}];
+    string password = 2 [(validate.rules).string = {min_len: 8,max_len: 255}];
+}
+
+message LoginRequest {
+    string email = 1;
+    string password = 3;
+}
+
+message LoginResponse {
+    string access_token = 1;
+    string refresh_token = 2;
+}
+
+message RefreshTokensRequest {
+    string refresh_token = 1;
+}
+
+message RefreshTokensResponse {
+    string access_token = 1;
+}
+
+message ListRunsRequest {
+    optional int32 limit = 1 [(validate.rules).int32.gte = 1];
+    optional int32 offset = 2 [(validate.rules).int32.gte = 0];
+    optional Run.Status status = 3 [(validate.rules).enum.defined_only = true];
+}
+
+service PanelService {
+    rpc Register (RegisterRequest) returns (google.protobuf.Empty);
+    rpc Login (LoginRequest) returns (LoginResponse);
+    rpc RefreshTokens (RefreshTokensRequest) returns (RefreshTokensResponse);
+
+    rpc ListRuns (ListRunsRequest) returns (Run.List);
+    rpc ListTopRuns (ListRunsRequest) returns (Run.List);
+
+    rpc GetResource (Ulid) returns (Resource.TreeNode);
+}
+

@@ -1,0 +1,50 @@
+lint:
+  use:
+    - DEFAULT
+  enum_zero_value_suffix: _NONE
+  service_suffix: API
+  ignore: []
+  except: []
+  allow_comment_ignores: false
+  ignore_only: {}
+deps:
+  - github.com/yaroher/protoc-gen-pgx-orm@v1.0.5
+  - github.com/bufbuild/protoc-gen-validate@v1.2.1
+#  - github.com/stroppy-io/stroppy@926eb8daee3fa81429a6238424ac08be934aa079
+generate:
+  inputs:
+    - directory: panel
+    - directory: crossplane
+#    - git_repo:
+#        url: github.com/stroppy-io/stroppy
+#        sub_directory: proto
+  plugins:
+    - name: go
+      out: ../../internal/proto
+      opts:
+        paths: source_relative
+    - name: go-grpc
+      out: ../../internal/proto
+      opts:
+        paths: source_relative
+    - name: connect-go
+      out: ../../internal/proto
+      opts:
+        paths: source_relative
+        simple: true
+    - name: pgx-orm
+      out: ./go_output
+      opts:
+        paths: source_relative
+        sql_file: ../sql/schema/models.sql
+        orm_folder: ../../internal/infrastructure/orm
+    - name: es
+      out: ../../web/src/proto
+      opts:
+        target: ts
+        import_extension: ts
+        json_types: true
+        valid_types: legacy_required+protovalidate_required
+breaking:
+  ignore: []
+  against_git_ref: master

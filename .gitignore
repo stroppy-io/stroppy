@@ -1,25 +1,46 @@
 easyp_vendor
-proto/go_output
-# binary
+tools/proto/go_output
+
+# Go binaries and build artifacts
 /bin
-# ide
-.idea
-# test coverage
+stroppy-cloud-panel
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Test coverage
 coverage.out
-#
-venv
-*node_modules
-# env files
-.env
-# logs
+coverage.html
+
+# Logs
 *.log
+
+# Python virtualenvs
+venv
+
+# Node/NPM
+*node_modules
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE configs
+.idea
+.vscode
 
 # Created by .ignore support plugin (hsz.mobi)
 ### JetBrains templatee
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
-backend/stroppy-cloud-panel
-.vscode
 # User-specific stuff
 ../.idea/
 .idea/**/workspace.xml

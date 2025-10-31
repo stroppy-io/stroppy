@@ -1,0 +1,33 @@
+volumes:
+  postgres-dev:
+
+services:
+  postgres-dev:
+    profiles:
+      - migrate
+    container_name: postgres-dev
+    extends:
+      service: postgres-migrations
+      file: ./docker-compose.yaml
+    volumes:
+      - postgres-dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_MULTIPLE_DATABASES: postgres,migrator
+  migrate:
+    profiles:
+      - migrate
+    container_name: migrate
+    user: ${CURRENT_UID}
+    image: arigaio/atlas:latest
+    command: migrate ${ARG} --env dev
+    depends_on:
+      postgres-dev:
+        condition: service_healthy
+    links:
+      - postgres-dev
+    volumes:
+      - ./atlas.hcl:/atlas.hcl
+      - ./migrations:/migrations
+      - ./schema:/schema

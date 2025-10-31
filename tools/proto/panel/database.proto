@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package panel;
+
+import "crossplane/crossplane.proto";
+import "google/protobuf/timestamp.proto";
+import "protopgx/pgx.proto";
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
+
+message Ulid {
+    string id = 1 [(validate.rules).string.len = 26];
+}
+
+message Timing {
+    google.protobuf.Timestamp created_at = 1;
+    google.protobuf.Timestamp updated_at = 2;
+    optional google.protobuf.Timestamp deleted_at = 3;
+}
+
+message User {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "users"
+        virtual_fields: {
+            sql_name: "password_hash"
+            sql_type: {type: TEXT}
+            constraints: {constraint: "NOT NULL"}
+        }
+    };
+    Ulid id = 1 [
+        (validate.rules).string.len = 26,
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    string email = 3 [
+        (validate.rules).string.min_len = 3,
+        (validate.rules).string.max_len = 255,
+        (sql.sql_field) = {
+            sql_type: {type: TEXT}
+            constraints: {unique: true}
+        }
+    ];
+}
+
+message StroppyStep {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "stroppy_steps"
+    };
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    Ulid run_id = 3 [
+        (sql.sql_field) = {sql_type: {type: TEXT,user_cast: true},
+            constraints: {constraint: "NOT NULL REFERENCES runs(id) ON DELETE CASCADE"}
+        }
+    ];
+    bytes step_run_info = 4 [(sql.sql_field).embedded_message = true];
+}
+
+message Resource {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "resources"
+    };
+    message TreeNode {
+        Ulid id = 1 [(validate.rules).string.len = 26];
+        Resource resource = 2 [(sql.sql_field).embedded_message = true];
+        repeated TreeNode children = 3 [(sql.sql_field).embedded_message = true];
+    }
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    crossplane.ResourceWithStatus resource = 3 [
+        (sql.sql_field).embedded_message = true
+    ];
+    optional Ulid parent_resource_id = 4 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+}
+
+message Run {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "runs"
+    };
+    message List {
+        repeated Run runs = 1;
+    }
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        STATUS_IDLE = 1;
+        STATUS_RUNNING = 2;
+        STATUS_COMPLETED = 3;
+        STATUS_FAILED = 4;
+        STATUS_CANCELLED = 5;
+    }
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    Status status = 3 [(validate.rules).enum.defined_only = true];
+    Ulid target_vm_resource_id = 4 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    Ulid runner_vm_resource_id = 5 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    bytes run_info = 6;
+    optional string grafana_dashboard_url = 7;
+    repeated StroppyStep steps = 8 [(sql.sql_relation) = {
+        one_to_many: {
+            ref_name: "run_id"
+            on_delete_cascade: true
+            existed_field: true
+        }
+    }];
+}

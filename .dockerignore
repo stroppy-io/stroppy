@@ -1,14 +1,12 @@
-# Игнорируем ненужные файлы при сборке Docker образа
-
 # Git
 .git
 .gitignore
 
-# Documentation
+# Documentation and metadata
 *.md
-docs/
+LICENSE
 
-# Development files
+# IDE / editor
 .vscode/
 .idea/
 *.swp
@@ -23,32 +21,27 @@ docs/
 ehthumbs.db
 Thumbs.db
 
-# Backend specific
-backend/bin/
-backend/*.db
-backend/*.sqlite
-backend/*.sqlite3
-backend/coverage.out
-backend/coverage.html
-backend/*.log
+# Go build artifacts
+bin/
+coverage.out
+coverage.html
+*.db
+*.sqlite
+*.sqlite3
+*.log
 
-# Frontend specific
-frontend/node_modules/
-frontend/dist/
-frontend/.env*
-frontend/*.log
-frontend/.vite/
+# Node build artifacts
+web/node_modules/
+web/dist/
+web/.env*
+web/.vite/
 
-# Docker
-Dockerfile*
-docker-compose*.yml
-.dockerignore
+# Python virtual environments
+venv/
 
-# CI/CD
-.github/
-.gitlab-ci.yml
+# Local environment files
+.env*
 
-# Temporary files
+# Misc temporary files
 *.tmp
 *.temp
-.env*
