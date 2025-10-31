@@ -81,6 +81,7 @@ venv
 # CMake
 cmake-build-*/
 build
+!/internal/core/build
 # Mongo Explorer plugin
 .idea/**/mongoSettings.xml
 

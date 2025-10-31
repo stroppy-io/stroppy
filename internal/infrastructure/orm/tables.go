@@ -1061,11 +1061,6 @@ func ScannerToResource(
 			Id:               upcastId(model.Id),
 			ParentResourceId: upcastParentResourceId(model.ParentResourceId),
 		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
-		}
 		entity.Resource = &crossplane.ResourceWithStatus{
 			Ref:          MessageFromSliceByte[*crossplane.Ref](model.Ref),
 			ResourceDef:  MessageFromSliceByte[*crossplane.ResourceDef](model.ResourceDef),
@@ -1073,6 +1068,11 @@ func ScannerToResource(
 			Synced:       model.Synced,
 			Ready:        model.Ready,
 			ExternalId:   model.ExternalId,
+		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
 		}
 
 		return entity

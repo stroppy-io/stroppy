@@ -33,7 +33,7 @@ generate:
         paths: source_relative
         simple: true
     - name: pgx-orm
-      out: ./go_output
+      out: ../../internal/infrastructure/orm
       opts:
         paths: source_relative
         sql_file: ../sql/schema/models.sql
