@@ -3,7 +3,6 @@ package token
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/golang-jwt/jwt/v4"
 	"math/big"
 	"time"
 

@@ -1,6 +1,7 @@
 package httpserv
 
 import (
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/claims"
 	"google.golang.org/grpc"
 	"net"
 	"net/http"
@@ -62,7 +63,7 @@ func NewServer(
 				grpcHandler,
 				connect.WithInterceptors(
 					loggerMiddleware(log.Named("connect")),
-					authMiddleware[panel.User](
+					authMiddleware[claims.Claims](
 						protectedGrpcService(
 							userTokenProtector,
 							[]grpc.ServiceDesc{panel.PanelService_ServiceDesc},

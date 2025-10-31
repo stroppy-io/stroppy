@@ -28,6 +28,12 @@ message User {
             sql_type: {type: TEXT}
             constraints: {constraint: "NOT NULL"}
         }
+        virtual_fields: {
+            sql_name: "refresh_tokens"
+            sql_type: {type: TEXT}
+            is_nullable: true
+            is_array: true
+        }
     };
     Ulid id = 1 [
         (validate.rules).string.len = 26,

@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS "users" (
 	updated_at TIMESTAMPTZ  NOT NULL,
 	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
 	email TEXT  UNIQUE NOT NULL,
-	password_hash TEXT NOT NULL
+	password_hash TEXT NOT NULL,
+	refresh_tokens TEXT[]  NULL
 );
 CREATE TABLE IF NOT EXISTS "stroppy_steps" (
 	id TEXT  PRIMARY KEY NOT NULL,

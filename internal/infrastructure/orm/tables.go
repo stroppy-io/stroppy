@@ -34,21 +34,23 @@ type (
 	}
 )
 type (
-	useridFieldImpl           struct{ *column[string, UserField] }
-	usercreatedAtFieldImpl    struct{ *column[time.Time, UserField] }
-	userupdatedAtFieldImpl    struct{ *column[time.Time, UserField] }
-	userdeletedAtFieldImpl    struct{ *column[*time.Time, UserField] }
-	useremailFieldImpl        struct{ *column[string, UserField] }
-	userpasswordHashFieldImpl struct{ *column[string, UserField] }
+	useridFieldImpl            struct{ *column[string, UserField] }
+	usercreatedAtFieldImpl     struct{ *column[time.Time, UserField] }
+	userupdatedAtFieldImpl     struct{ *column[time.Time, UserField] }
+	userdeletedAtFieldImpl     struct{ *column[*time.Time, UserField] }
+	useremailFieldImpl         struct{ *column[string, UserField] }
+	userpasswordHashFieldImpl  struct{ *column[string, UserField] }
+	userrefreshTokensFieldImpl struct{ *column[[]string, UserField] }
 )
 
-func (f *useridFieldImpl) mustUserField()           {}
-func (f *usercreatedAtFieldImpl) mustUserField()    {}
-func (f *userupdatedAtFieldImpl) mustUserField()    {}
-func (f *userdeletedAtFieldImpl) mustUserField()    {}
-func (f *useremailFieldImpl) mustUserField()        {}
-func (f *userpasswordHashFieldImpl) mustUserField() {}
-func (f fieldAliasImpl) mustUserField()             {}
+func (f *useridFieldImpl) mustUserField()            {}
+func (f *usercreatedAtFieldImpl) mustUserField()     {}
+func (f *userupdatedAtFieldImpl) mustUserField()     {}
+func (f *userdeletedAtFieldImpl) mustUserField()     {}
+func (f *useremailFieldImpl) mustUserField()         {}
+func (f *userpasswordHashFieldImpl) mustUserField()  {}
+func (f *userrefreshTokensFieldImpl) mustUserField() {}
+func (f fieldAliasImpl) mustUserField()              {}
 
 type (
 	stroppyStepidFieldImpl struct {
@@ -141,12 +143,13 @@ func (f fieldAliasImpl) mustRunField()                   {}
 
 type (
 	UserScanner struct {
-		Id           string
-		CreatedAt    time.Time
-		UpdatedAt    time.Time
-		DeletedAt    *time.Time
-		Email        string
-		PasswordHash string
+		Id            string
+		CreatedAt     time.Time
+		UpdatedAt     time.Time
+		DeletedAt     *time.Time
+		Email         string
+		PasswordHash  string
+		RefreshTokens []string
 	}
 	StroppyStepScanner struct {
 		Id          string
@@ -193,6 +196,7 @@ func (s *UserScanner) values() []any {
 		s.DeletedAt,
 		s.Email,
 		s.PasswordHash,
+		s.RefreshTokens,
 	}
 }
 func (s *UserScanner) getTarget(field string) func() any {
@@ -209,6 +213,8 @@ func (s *UserScanner) getTarget(field string) func() any {
 		return func() any { return &s.Email }
 	case "password_hash":
 		return func() any { return &s.PasswordHash }
+	case "refresh_tokens":
+		return func() any { return &s.RefreshTokens }
 	default:
 		panic("unknown field: " + field)
 	}
@@ -239,6 +245,10 @@ func (s *UserScanner) getSetter(field UserField) func() ValueSetter[UserField] {
 		return func() ValueSetter[UserField] {
 			return NewValueSetter[UserField](User.PasswordHash, s.PasswordHash)
 		}
+	case "refresh_tokens":
+		return func() ValueSetter[UserField] {
+			return NewValueSetter[UserField](User.RefreshTokens, s.RefreshTokens)
+		}
 	default:
 		panic("unknown field: " + field.String())
 	}
@@ -257,6 +267,8 @@ func (s *UserScanner) getValue(field UserField) func() any {
 		return func() any { return s.Email }
 	case "password_hash":
 		return func() any { return s.PasswordHash }
+	case "refresh_tokens":
+		return func() any { return s.RefreshTokens }
 	default:
 		panic("unknown field: " + field.String())
 	}
@@ -608,6 +620,13 @@ type (
 			ScalarOperator[string, UserField]
 			LikeOperator[string, UserField]
 		}
+		RefreshTokens interface {
+			UserField
+			CommonOperator[[]string, UserField]
+			ScalarOperator[[]string, UserField]
+			LikeOperator[[]string, UserField]
+			IsNullOperator[[]string, UserField]
+		}
 	}
 	stroppyStepTableImpl struct {
 		*table[StroppyStepField, *StroppyStepScanner]
@@ -769,6 +788,7 @@ func newUserTableImpl() *userTableImpl {
 	deletedAt := &userdeletedAtFieldImpl{column: newColumn[*time.Time, UserField](fieldAliasImpl("deleted_at"))}
 	email := &useremailFieldImpl{column: newColumn[string, UserField](fieldAliasImpl("email"))}
 	passwordHash := &userpasswordHashFieldImpl{column: newColumn[string, UserField](fieldAliasImpl("password_hash"))}
+	refreshTokens := &userrefreshTokensFieldImpl{column: newColumn[[]string, UserField](fieldAliasImpl("refresh_tokens"))}
 	return &userTableImpl{
 		table: newTable[UserField, *UserScanner](
 			"users",
@@ -779,13 +799,15 @@ func newUserTableImpl() *userTableImpl {
 			deletedAt,
 			email,
 			passwordHash,
+			refreshTokens,
 		),
-		Id:           id,
-		CreatedAt:    createdAt,
-		UpdatedAt:    updatedAt,
-		DeletedAt:    deletedAt,
-		Email:        email,
-		PasswordHash: passwordHash,
+		Id:            id,
+		CreatedAt:     createdAt,
+		UpdatedAt:     updatedAt,
+		DeletedAt:     deletedAt,
+		Email:         email,
+		PasswordHash:  passwordHash,
+		RefreshTokens: refreshTokens,
 	}
 }
 func newStroppyStepTableImpl() *stroppyStepTableImpl {
@@ -903,7 +925,8 @@ type (
 )
 type (
 	upcastUserOptions struct {
-		PasswordHash string
+		PasswordHash  string
+		RefreshTokens []string
 	}
 	upcastUserOption func(*upcastUserOptions)
 )
@@ -911,6 +934,11 @@ type (
 func WithUserPasswordHash(value string) upcastUserOption {
 	return func(options *upcastUserOptions) {
 		options.PasswordHash = value
+	}
+}
+func WithUserRefreshTokens(value []string) upcastUserOption {
+	return func(options *upcastUserOptions) {
+		options.RefreshTokens = value
 	}
 }
 func UserToScanner(
@@ -933,6 +961,7 @@ func UserToScanner(
 			opt(options)
 		}
 		scanner.PasswordHash = options.PasswordHash
+		scanner.RefreshTokens = options.RefreshTokens
 		return scanner
 	}
 }
@@ -1061,6 +1090,11 @@ func ScannerToResource(
 			Id:               upcastId(model.Id),
 			ParentResourceId: upcastParentResourceId(model.ParentResourceId),
 		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
+		}
 		entity.Resource = &crossplane.ResourceWithStatus{
 			Ref:          MessageFromSliceByte[*crossplane.Ref](model.Ref),
 			ResourceDef:  MessageFromSliceByte[*crossplane.ResourceDef](model.ResourceDef),
@@ -1068,11 +1102,6 @@ func ScannerToResource(
 			Synced:       model.Synced,
 			Ready:        model.Ready,
 			ExternalId:   model.ExternalId,
-		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
 		}
 
 		return entity

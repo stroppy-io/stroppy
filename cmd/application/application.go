@@ -51,7 +51,7 @@ func New() (*Application, error) {
 	tokenActor := token.NewTokenActor(&cfg.Service.Auth)
 	readyProbe := NewReadyProbe(pgxPool)
 
-	grpcHandler := api.NewPanelService(executor, txManager)
+	grpcHandler := api.NewPanelService(executor, txManager, tokenActor)
 	server, err := httpserv.NewServer(
 		&cfg.Service.Server,
 		appLogger,
