@@ -1,0 +1,76 @@
+volumes:
+  postgres:
+    driver: local
+#  caddy_data:
+#    driver: local
+#  caddy_config:
+#    driver: local
+services:
+  postgres:
+    container_name: postgres
+    extends:
+      service: postgres-migrations
+      file: ./tools/sql/docker-compose.yaml
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    restart: always
+    ports: !override
+      - "5432:5432"
+
+#  stroppy-cloud-panel:
+#    build:
+#      context: ../..
+#      dockerfile: deployments/docker/Dockerfile
+#      args:
+#        VITE_API_BASE_URL: /api/v1
+#    container_name: stroppy-cloud-panel
+#    ports:
+#      - "127.0.0.1:8080:8080"
+#    environment:
+#      - DB_HOST=postgres
+#      - DB_PORT=5432
+#      - DB_USER=stroppy
+#      - DB_PASSWORD=stroppy
+#      - DB_NAME=stroppy
+#      - DB_SSLMODE=disable
+#      - STATIC_DIR=/app/web
+#      - PORT=8080
+#      - JWT_SECRET=${JWT_SECRET:-change-this-in-production-please-use-strong-secret}
+#      - GIN_MODE=release
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#    restart: unless-stopped
+#    healthcheck:
+#      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz/readiness"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 40s
+#    networks:
+#      - stroppy_network
+#
+#  caddy:
+#    image: caddy:2-alpine
+#    container_name: stroppy-caddy
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#    volumes:
+#      - ../caddy/Caddyfile:/etc/caddy/Caddyfile
+#      - caddy_data:/data
+#      - caddy_config:/config
+#    environment:
+#      - CADDY_INGRESS_NETWORKS=stroppy_network
+#    depends_on:
+#      - stroppy-cloud-panel
+#    restart: unless-stopped
+#    networks:
+#      - stroppy_network
+
+
+
+
+#networks:
+#  stroppy_network:
+#    driver: bridge

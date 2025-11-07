@@ -12,7 +12,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
 )
 
 const (

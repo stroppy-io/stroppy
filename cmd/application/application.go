@@ -2,19 +2,23 @@ package application
 
 import (
 	"fmt"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/api"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/token"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/httpserv"
 	"go.uber.org/zap"
 	"net/http"
 
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/api"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/automate"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/build"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/configurator"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/probes"
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
-	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
-
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/shutdown"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/token"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/httpserv"
 	postgres "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql"
+)
+
+const (
+	panelServiceNameLoggerName = "panel-service"
 )
 
 type Application struct {
@@ -51,18 +55,39 @@ func New() (*Application, error) {
 	tokenActor := token.NewTokenActor(&cfg.Service.Auth)
 	readyProbe := NewReadyProbe(pgxPool)
 
-	grpcHandler := api.NewPanelService(executor, txManager, tokenActor)
+	crossplaneImpl, err := automate.NewCrossplaneApi(cfg.Service.K8S.KubeconfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CrossplaneApiImpl: %w", err)
+	}
+	crossplaneClient, cancel := NewLocalCrossplaneClient(crossplaneImpl)
+	if cancel != nil {
+		shutdown.RegisterFn(cancel)
+	}
+	service := api.NewPanelService(
+		appLogger.Named(panelServiceNameLoggerName),
+		executor,
+		txManager,
+		tokenActor,
+		&cfg.Service.K8S,
+		crossplaneClient,
+	)
 	server, err := httpserv.NewServer(
 		&cfg.Service.Server,
 		appLogger,
 		startupProbe,
 		readyProbe,
 		tokenActor,
-		grpcHandler,
+		service,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http server: %w", err)
 	}
+	cancelAutomate, err := automate.NewBackgroundWorker(&cfg.Service.Background, appLogger, service)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create background worker: %w", err)
+	}
+	shutdown.RegisterFn(cancelAutomate)
+
 	return &Application{
 		config: cfg,
 		server: server,

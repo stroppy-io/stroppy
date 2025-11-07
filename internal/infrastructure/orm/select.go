@@ -13,6 +13,7 @@ type SelectQuery[F fieldAlias] struct {
 	groupBy      []F
 	orderByASC   []F
 	orderByDESC  []F
+	orderByRaw   []string
 	limit        int
 	offset       int
 	forUpdate    bool
@@ -25,7 +26,7 @@ func (q *SelectQuery[F]) Build() (string, []any) {
 	sb.Reset()
 
 	// heuristics: 128 базовый + ~32 на каждый where/order/group + ~16 на поле
-	approxCap := 128 + (len(q.whereClauses)+len(q.orderByASC)+len(q.orderByDESC)+len(q.groupBy))*32 + len(q.usingFields)*16
+	approxCap := 128 + (len(q.whereClauses)+len(q.orderByASC)+len(q.orderByDESC)+len(q.orderByRaw)+len(q.groupBy))*32 + len(q.usingFields)*16
 	sb.Grow(approxCap)
 
 	args := make([]any, 0, len(q.whereClauses)*2) // простой грубый estimate
@@ -95,7 +96,7 @@ func (q *SelectQuery[F]) build(buf *strings.Builder, ta string, paramIndex *int,
 	}
 
 	// ---------- ORDER BY ----------
-	if len(q.orderByASC) > 0 || len(q.orderByDESC) > 0 {
+	if len(q.orderByASC) > 0 || len(q.orderByDESC) > 0 || len(q.orderByRaw) > 0 {
 		buf.WriteString(" ORDER BY ")
 		first := true
 		for _, f := range q.orderByASC {
@@ -116,6 +117,13 @@ func (q *SelectQuery[F]) build(buf *strings.Builder, ta string, paramIndex *int,
 			buf.WriteByte('.')
 			buf.WriteString(f.String())
 			buf.WriteString(" DESC")
+			first = false
+		}
+		for _, raw := range q.orderByRaw {
+			if !first {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(raw)
 			first = false
 		}
 	}
@@ -168,6 +176,10 @@ func (q *SelectQuery[F]) OrderByASC(fields ...F) *SelectQuery[F] {
 }
 func (q *SelectQuery[F]) OrderByDESC(fields ...F) *SelectQuery[F] {
 	q.orderByDESC = append(q.orderByDESC, fields...)
+	return q
+}
+func (q *SelectQuery[F]) OrderByRaw(rawSQL ...string) *SelectQuery[F] {
+	q.orderByRaw = append(q.orderByRaw, rawSQL...)
 	return q
 }
 func (q *SelectQuery[F]) Limit(limit int) *SelectQuery[F] {

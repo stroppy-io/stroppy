@@ -1,0 +1,39 @@
+infra:
+  postgres:
+    host: localhost
+    port: 5432
+    username: postgres
+    password: developer
+    database: postgres
+    log_level: debug
+
+service:
+  domain: "*"
+  logger:
+    level: debug
+    mod: production
+  auth:
+    hmac_secret_key: "your_hmac_secret_key"
+    issuer: "stroppy-cloud-panel"
+    leeway: "30s"
+    access_expire: "10m"
+    refresh_expire: "24h"
+  background:
+    periodic_automate_check_interval: 10s
+  k8s:
+    kubeconfig_path: "/home/yaroha/devel/arenadata/stroppy-io/stroppy-cloud/monitoring/.kubectl.config.yaml"
+    crossplane:
+      yandex_cloud_provider:
+        default_network_id: "enp7b429s2br5pja0jci"
+        default_subnet_id: "fl85dq0cam3ed6cfg2st"
+        default_network_cidr_block: "10.1.0.0/16"
+        default_vm_zone: "ru-central1-d"
+        default_vm_platform_id: "standard-v2"
+        default_ubuntu_image_id: "fd82pkek8uu0ejjkh4vn"
+  server:
+    host: 0.0.0.0
+    port: 8080
+    read_timeout: 5s
+    write_timeout: 10s
+    idle_timeout: 120s
+    cors_domain: "*"

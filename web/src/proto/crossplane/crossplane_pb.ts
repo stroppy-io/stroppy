@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file crossplane/crossplane.proto.
  */
 export const file_crossplane_crossplane: GenFile = /*@__PURE__*/
-  fileDesc("Chtjcm9zc3BsYW5lL2Nyb3NzcGxhbmUucHJvdG8SCmNyb3NzcGxhbmUiOAoDUmVmEhoKCW5hbWVzcGFjZRgBIAEoCUIH+kIEcgIQARIVCgRuYW1lGAIgASgJQgf6QgRyAhABIrwGCgtSZXNvdXJjZURlZhIdCgthcGlfdmVyc2lvbhgCIAEoCUII+kIFigECEAESFgoEa2luZBgBIAEoCUII+kIFigECEAESNwoIbWV0YWRhdGEYAyADKAsyJS5jcm9zc3BsYW5lLlJlc291cmNlRGVmLk1ldGFkYXRhRW50cnkSNAoEc3BlYxgEIAEoCzIcLmNyb3NzcGxhbmUuUmVzb3VyY2VEZWYuU3BlY0II+kIFigECEAEa1QQKBFNwZWMSQQoed3JpdGVfY29ubmVjdGlvbl9zZWNyZXRfdG9fcmVmGAEgASgLMg8uY3Jvc3NwbGFuZS5SZWZCCPpCBYoBAhABEk4KD2RlbGV0aW9uX3BvbGljeRgCIAEoDjIrLmNyb3NzcGxhbmUuUmVzb3VyY2VEZWYuU3BlYy5EZWxldGlvblBvbGljeUII+kIFggECEAESUAoTcHJvdmlkZXJfY29uZmlnX3JlZhgDIAMoCzIzLmNyb3NzcGxhbmUuUmVzb3VyY2VEZWYuU3BlYy5Qcm92aWRlckNvbmZpZ1JlZkVudHJ5Ej8KD3lhbmRleF9jbG91ZF92bRhkIAEoCzIaLmNyb3NzcGxhbmUuWWFuZGV4Q2xvdWQuVm1CCPpCBYoBAhABSAASSQoUeWFuZGV4X2Nsb3VkX25ldHdvcmsYZSABKAsyHy5jcm9zc3BsYW5lLllhbmRleENsb3VkLk5ldHdvcmtCCPpCBYoBAhABSAASRwoTeWFuZGV4X2Nsb3VkX3N1Ym5ldBhmIAEoCzIeLmNyb3NzcGxhbmUuWWFuZGV4Q2xvdWQuU3VibmV0Qgj6QgWKAQIQAUgAGjgKFlByb3ZpZGVyQ29uZmlnUmVmRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJJCg5EZWxldGlvblBvbGljeRIfChtERUxFVElPTl9QT0xJQ1lfVU5TUEVDSUZJRUQQABIKCgZERUxFVEUQARIKCgZPUlBIQU4QAkIOCgxmb3JfcHJvdmlkZXIaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIvEBChJSZXNvdXJjZVdpdGhTdGF0dXMSKwoDcmVmGAEgASgLMg8uY3Jvc3NwbGFuZS5SZWZCDco+AkgB+kIFigECEAESPAoMcmVzb3VyY2VfZGVmGAIgASgLMhcuY3Jvc3NwbGFuZS5SZXNvdXJjZURlZkINyj4CSAH6QgWKAQIQARIeCg1yZXNvdXJjZV95YW1sGAMgASgJQgf6QgRyAhABEg4KBnN5bmNlZBgEIAEoCBINCgVyZWFkeRgFIAEoCBIhCgtleHRlcm5hbF9pZBgGIAEoCUIH+kIEcgIQAUgAiAEBQg4KDF9leHRlcm5hbF9pZEJFWkNnaXRodWIuY29tL3N0cm9wcHktaW8vc3Ryb3BweS1jbG91ZC1wYW5lbC9pbnRlcm5hbC9wcm90by9jcm9zc3BsYW5lYgZwcm90bzM", [file_crossplane_yandex, file_protopgx_pgx, file_validate_validate]);
+  fileDesc("Chtjcm9zc3BsYW5lL2Nyb3NzcGxhbmUucHJvdG8SCmNyb3NzcGxhbmUiOAoDUmVmEhoKCW5hbWVzcGFjZRgBIAEoCUIH+kIEcgIQARIVCgRuYW1lGAIgASgJQgf6QgRyAhABIq0BCghNZXRhZGF0YRIVCgRuYW1lGAEgASgJQgf6QgRyAhABEhoKCW5hbWVzcGFjZRgCIAEoCUIH+kIEcgIQARI6Cgthbm5vdGF0aW9ucxgDIAMoCzIlLmNyb3NzcGxhbmUuTWV0YWRhdGEuQW5ub3RhdGlvbnNFbnRyeRoyChBBbm5vdGF0aW9uc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEi+gUKC1Jlc291cmNlRGVmEh0KC2FwaV92ZXJzaW9uGAIgASgJQgj6QgWKAQIQARIWCgRraW5kGAEgASgJQgj6QgWKAQIQARImCghtZXRhZGF0YRgDIAEoCzIULmNyb3NzcGxhbmUuTWV0YWRhdGESNAoEc3BlYxgEIAEoCzIcLmNyb3NzcGxhbmUuUmVzb3VyY2VEZWYuU3BlY0II+kIFigECEAEa1QQKBFNwZWMSQQoed3JpdGVfY29ubmVjdGlvbl9zZWNyZXRfdG9fcmVmGAEgASgLMg8uY3Jvc3NwbGFuZS5SZWZCCPpCBYoBAhABEk4KD2RlbGV0aW9uX3BvbGljeRgCIAEoDjIrLmNyb3NzcGxhbmUuUmVzb3VyY2VEZWYuU3BlYy5EZWxldGlvblBvbGljeUII+kIFggECEAESUAoTcHJvdmlkZXJfY29uZmlnX3JlZhgDIAMoCzIzLmNyb3NzcGxhbmUuUmVzb3VyY2VEZWYuU3BlYy5Qcm92aWRlckNvbmZpZ1JlZkVudHJ5Ej8KD3lhbmRleF9jbG91ZF92bRhkIAEoCzIaLmNyb3NzcGxhbmUuWWFuZGV4Q2xvdWQuVm1CCPpCBYoBAhABSAASSQoUeWFuZGV4X2Nsb3VkX25ldHdvcmsYZSABKAsyHy5jcm9zc3BsYW5lLllhbmRleENsb3VkLk5ldHdvcmtCCPpCBYoBAhABSAASRwoTeWFuZGV4X2Nsb3VkX3N1Ym5ldBhmIAEoCzIeLmNyb3NzcGxhbmUuWWFuZGV4Q2xvdWQuU3VibmV0Qgj6QgWKAQIQAUgAGjgKFlByb3ZpZGVyQ29uZmlnUmVmRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJJCg5EZWxldGlvblBvbGljeRIfChtERUxFVElPTl9QT0xJQ1lfVU5TUEVDSUZJRUQQABIKCgZERUxFVEUQARIKCgZPUlBIQU4QAkIOCgxmb3JfcHJvdmlkZXIi0wEKElJlc291cmNlV2l0aFN0YXR1cxIrCgNyZWYYASABKAsyDy5jcm9zc3BsYW5lLlJlZkINyj4CSAH6QgWKAQIQARI8CgxyZXNvdXJjZV9kZWYYAiABKAsyFy5jcm9zc3BsYW5lLlJlc291cmNlRGVmQg3KPgJIAfpCBYoBAhABEh4KDXJlc291cmNlX3lhbWwYAyABKAlCB/pCBHICEAESDgoGc3luY2VkGAQgASgIEg0KBXJlYWR5GAUgASgIEhMKC2V4dGVybmFsX2lkGAYgASgJKk0KDlN1cHBvcnRlZENsb3VkEh8KG1NVUFBPUlRFRF9DTE9VRF9VTlNQRUNJRklFRBAAEhoKFlNVUFBPUlRFRF9DTE9VRF9ZQU5ERVgQAUJFWkNnaXRodWIuY29tL3N0cm9wcHktaW8vc3Ryb3BweS1jbG91ZC1wYW5lbC9pbnRlcm5hbC9wcm90by9jcm9zc3BsYW5lYgZwcm90bzM", [file_crossplane_yandex, file_protopgx_pgx, file_validate_validate]);
 
 /**
  * @generated from message crossplane.Ref
@@ -56,6 +56,55 @@ export const RefSchema: GenMessage<Ref, {jsonType: RefJson, validType: RefValid}
   messageDesc(file_crossplane_crossplane, 0);
 
 /**
+ * @generated from message crossplane.Metadata
+ */
+export type Metadata = Message<"crossplane.Metadata"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string namespace = 2;
+   */
+  namespace: string;
+
+  /**
+   * @generated from field: map<string, string> annotations = 3;
+   */
+  annotations: { [key: string]: string };
+};
+
+/**
+ * @generated from message crossplane.Metadata
+ */
+export type MetadataJson = {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name?: string;
+
+  /**
+   * @generated from field: string namespace = 2;
+   */
+  namespace?: string;
+
+  /**
+   * @generated from field: map<string, string> annotations = 3;
+   */
+  annotations?: { [key: string]: string };
+};
+
+export type MetadataValid = Metadata;
+
+/**
+ * Describes the message crossplane.Metadata.
+ * Use `create(MetadataSchema)` to create a new message.
+ */
+export const MetadataSchema: GenMessage<Metadata, {jsonType: MetadataJson, validType: MetadataValid}> = /*@__PURE__*/
+  messageDesc(file_crossplane_crossplane, 1);
+
+/**
  * @generated from message crossplane.ResourceDef
  */
 export type ResourceDef = Message<"crossplane.ResourceDef"> & {
@@ -70,9 +119,9 @@ export type ResourceDef = Message<"crossplane.ResourceDef"> & {
   kind: string;
 
   /**
-   * @generated from field: map<string, string> metadata = 3;
+   * @generated from field: crossplane.Metadata metadata = 3;
    */
-  metadata: { [key: string]: string };
+  metadata?: Metadata;
 
   /**
    * @generated from field: crossplane.ResourceDef.Spec spec = 4;
@@ -95,9 +144,9 @@ export type ResourceDefJson = {
   kind?: string;
 
   /**
-   * @generated from field: map<string, string> metadata = 3;
+   * @generated from field: crossplane.Metadata metadata = 3;
    */
-  metadata?: { [key: string]: string };
+  metadata?: MetadataJson;
 
   /**
    * @generated from field: crossplane.ResourceDef.Spec spec = 4;
@@ -112,7 +161,7 @@ export type ResourceDefValid = ResourceDef;
  * Use `create(ResourceDefSchema)` to create a new message.
  */
 export const ResourceDefSchema: GenMessage<ResourceDef, {jsonType: ResourceDefJson, validType: ResourceDefValid}> = /*@__PURE__*/
-  messageDesc(file_crossplane_crossplane, 1);
+  messageDesc(file_crossplane_crossplane, 2);
 
 /**
  * @generated from message crossplane.ResourceDef.Spec
@@ -199,7 +248,7 @@ export type ResourceDef_SpecValid = ResourceDef_Spec;
  * Use `create(ResourceDef_SpecSchema)` to create a new message.
  */
 export const ResourceDef_SpecSchema: GenMessage<ResourceDef_Spec, {jsonType: ResourceDef_SpecJson, validType: ResourceDef_SpecValid}> = /*@__PURE__*/
-  messageDesc(file_crossplane_crossplane, 1, 0);
+  messageDesc(file_crossplane_crossplane, 2, 0);
 
 /**
  * @generated from enum crossplane.ResourceDef.Spec.DeletionPolicy
@@ -230,7 +279,7 @@ export type ResourceDef_Spec_DeletionPolicyJson = "DELETION_POLICY_UNSPECIFIED" 
  * Describes the enum crossplane.ResourceDef.Spec.DeletionPolicy.
  */
 export const ResourceDef_Spec_DeletionPolicySchema: GenEnum<ResourceDef_Spec_DeletionPolicy, ResourceDef_Spec_DeletionPolicyJson> = /*@__PURE__*/
-  enumDesc(file_crossplane_crossplane, 1, 0, 0);
+  enumDesc(file_crossplane_crossplane, 2, 0, 0);
 
 /**
  * @generated from message crossplane.ResourceWithStatus
@@ -264,9 +313,9 @@ export type ResourceWithStatus = Message<"crossplane.ResourceWithStatus"> & {
   /**
    *    map<string, string> additional_fields = 8 [(sql.sql_field).serialized_message = true]; // leave here for future use
    *
-   * @generated from field: optional string external_id = 6;
+   * @generated from field: string external_id = 6;
    */
-  externalId?: string;
+  externalId: string;
 };
 
 /**
@@ -301,7 +350,7 @@ export type ResourceWithStatusJson = {
   /**
    *    map<string, string> additional_fields = 8 [(sql.sql_field).serialized_message = true]; // leave here for future use
    *
-   * @generated from field: optional string external_id = 6;
+   * @generated from field: string external_id = 6;
    */
   externalId?: string;
 };
@@ -313,5 +362,31 @@ export type ResourceWithStatusValid = ResourceWithStatus;
  * Use `create(ResourceWithStatusSchema)` to create a new message.
  */
 export const ResourceWithStatusSchema: GenMessage<ResourceWithStatus, {jsonType: ResourceWithStatusJson, validType: ResourceWithStatusValid}> = /*@__PURE__*/
-  messageDesc(file_crossplane_crossplane, 2);
+  messageDesc(file_crossplane_crossplane, 3);
+
+/**
+ * @generated from enum crossplane.SupportedCloud
+ */
+export enum SupportedCloud {
+  /**
+   * @generated from enum value: SUPPORTED_CLOUD_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: SUPPORTED_CLOUD_YANDEX = 1;
+   */
+  YANDEX = 1,
+}
+
+/**
+ * @generated from enum crossplane.SupportedCloud
+ */
+export type SupportedCloudJson = "SUPPORTED_CLOUD_UNSPECIFIED" | "SUPPORTED_CLOUD_YANDEX";
+
+/**
+ * Describes the enum crossplane.SupportedCloud.
+ */
+export const SupportedCloudSchema: GenEnum<SupportedCloud, SupportedCloudJson> = /*@__PURE__*/
+  enumDesc(file_crossplane_crossplane, 0);
 

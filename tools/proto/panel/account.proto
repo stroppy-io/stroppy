@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package panel;
+
+import "google/protobuf/empty.proto";
+import "panel/types.proto";
+import "protopgx/pgx.proto";
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
+
+
+message User {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "users"
+        virtual_fields: {
+            sql_name: "password_hash"
+            sql_type: {type: TEXT}
+            constraints: {constraint: "NOT NULL"}
+        }
+        virtual_fields: {
+            sql_name: "refresh_tokens"
+            sql_type: {type: TEXT}
+            is_nullable: true
+            is_array: true
+        }
+    };
+    Ulid id = 1 [
+        (validate.rules).string.len = 26,
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    string email = 3 [
+        (validate.rules).string.min_len = 3,
+        (validate.rules).string.max_len = 255,
+        (sql.sql_field) = {
+            sql_type: {type: TEXT}
+            constraints: {unique: true}
+        }
+    ];
+    bool admin = 4;
+}
+
+//------------------------------------------__ACCOUNT_SERVICE__---------------------------------------------------------
+
+message RegisterRequest {
+    string email = 1 [(validate.rules).string = {min_len: 3,max_len: 255}];
+    string password = 2 [(validate.rules).string = {min_len: 8,max_len: 255}];
+}
+
+message LoginRequest {
+    string email = 1;
+    string password = 3;
+}
+
+message LoginResponse {
+    string access_token = 1;
+    string refresh_token = 2;
+}
+
+message RefreshTokensRequest {
+    string refresh_token = 1;
+}
+
+message RefreshTokensResponse {
+    string access_token = 1;
+}
+
+
+service AccountService {
+    rpc Register (RegisterRequest) returns (google.protobuf.Empty);
+    rpc Login (LoginRequest) returns (LoginResponse);
+    rpc RefreshTokens (RefreshTokensRequest) returns (RefreshTokensResponse);
+}

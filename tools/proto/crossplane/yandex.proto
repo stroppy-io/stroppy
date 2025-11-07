@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package crossplane;
 
+import "crossplane/types.proto";
 import "validate/validate.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane";
@@ -27,23 +28,25 @@ message YandexCloud {
     }
     message Vm {
         message Resources {
-            uint64 cores = 1 [(validate.rules).uint64.gte = 1];
-            uint64 memory = 2 [(validate.rules).uint64.gte = 1]; // in GB
+            uint32 cores = 1 [(validate.rules).uint32.gte = 1];
+            uint32 memory = 2 [(validate.rules).uint32.gte = 1]; // in GB
         }
         message Disk {
             message InitializeParams {
                 string image_id = 1 [(validate.rules).string.min_len = 1];
             }
-            InitializeParams initialize_params = 1 [(validate.rules).message.required = true];
+            repeated InitializeParams initialize_params = 1 [(validate.rules).repeated.min_items = 1];
         }
         message NetworkInterface {
-            string subnet_id_ref = 1 [(validate.rules).string.min_len = 1];
+            Ref subnet_id_ref = 1 [(validate.rules).message.required = true];
+            bool nat = 2;
         }
         string name = 2 [(validate.rules).string.min_len = 1];
         string platform_id = 3 [(validate.rules).string.const = "standard-v2"];
         string zone = 4 [(validate.rules).string.const = "ru-central1-d"];
         Resources resources = 5 [(validate.rules).message.required = true];
-        repeated Disk.InitializeParams boot_disk = 6 [(validate.rules).repeated.min_items = 1];
+        repeated Disk boot_disk = 6 [(validate.rules).repeated.min_items = 1];
         repeated NetworkInterface network_interface = 7 [(validate.rules).repeated.min_items = 1];
+        map<string, string> metadata = 8 [(validate.rules).message.required = true];
     }
 }

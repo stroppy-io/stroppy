@@ -45,14 +45,18 @@ const (
 	// CrossplaneDeleteResourceProcedure is the fully-qualified name of the Crossplane's DeleteResource
 	// RPC.
 	CrossplaneDeleteResourceProcedure = "/crossplane.Crossplane/DeleteResource"
+	// CrossplaneDeleteResourcesManyProcedure is the fully-qualified name of the Crossplane's
+	// DeleteResourcesMany RPC.
+	CrossplaneDeleteResourcesManyProcedure = "/crossplane.Crossplane/DeleteResourcesMany"
 )
 
 // CrossplaneClient is a client for the crossplane.Crossplane service.
 type CrossplaneClient interface {
 	CreateResource(context.Context, *crossplane.CreateResourceRequest) (*crossplane.ResourceWithStatus, error)
 	CreateResourcesMany(context.Context, *crossplane.CreateResourcesManyRequest) (*crossplane.CreateResourcesManyResponse, error)
-	GetResourceStatus(context.Context, *crossplane.GetResourceStatusRequest) (*crossplane.ResourceWithStatus, error)
+	GetResourceStatus(context.Context, *crossplane.GetResourceStatusRequest) (*crossplane.GetResourceStatusResponse, error)
 	DeleteResource(context.Context, *crossplane.DeleteResourceRequest) (*crossplane.DeleteResourceResponse, error)
+	DeleteResourcesMany(context.Context, *crossplane.DeleteResourcesManyRequest) (*crossplane.DeleteResourcesManyResponse, error)
 }
 
 // NewCrossplaneClient constructs a client for the crossplane.Crossplane service. By default, it
@@ -78,7 +82,7 @@ func NewCrossplaneClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(crossplaneMethods.ByName("CreateResourcesMany")),
 			connect.WithClientOptions(opts...),
 		),
-		getResourceStatus: connect.NewClient[crossplane.GetResourceStatusRequest, crossplane.ResourceWithStatus](
+		getResourceStatus: connect.NewClient[crossplane.GetResourceStatusRequest, crossplane.GetResourceStatusResponse](
 			httpClient,
 			baseURL+CrossplaneGetResourceStatusProcedure,
 			connect.WithSchema(crossplaneMethods.ByName("GetResourceStatus")),
@@ -90,6 +94,12 @@ func NewCrossplaneClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(crossplaneMethods.ByName("DeleteResource")),
 			connect.WithClientOptions(opts...),
 		),
+		deleteResourcesMany: connect.NewClient[crossplane.DeleteResourcesManyRequest, crossplane.DeleteResourcesManyResponse](
+			httpClient,
+			baseURL+CrossplaneDeleteResourcesManyProcedure,
+			connect.WithSchema(crossplaneMethods.ByName("DeleteResourcesMany")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -97,8 +107,9 @@ func NewCrossplaneClient(httpClient connect.HTTPClient, baseURL string, opts ...
 type crossplaneClient struct {
 	createResource      *connect.Client[crossplane.CreateResourceRequest, crossplane.ResourceWithStatus]
 	createResourcesMany *connect.Client[crossplane.CreateResourcesManyRequest, crossplane.CreateResourcesManyResponse]
-	getResourceStatus   *connect.Client[crossplane.GetResourceStatusRequest, crossplane.ResourceWithStatus]
+	getResourceStatus   *connect.Client[crossplane.GetResourceStatusRequest, crossplane.GetResourceStatusResponse]
 	deleteResource      *connect.Client[crossplane.DeleteResourceRequest, crossplane.DeleteResourceResponse]
+	deleteResourcesMany *connect.Client[crossplane.DeleteResourcesManyRequest, crossplane.DeleteResourcesManyResponse]
 }
 
 // CreateResource calls crossplane.Crossplane.CreateResource.
@@ -120,7 +131,7 @@ func (c *crossplaneClient) CreateResourcesMany(ctx context.Context, req *crosspl
 }
 
 // GetResourceStatus calls crossplane.Crossplane.GetResourceStatus.
-func (c *crossplaneClient) GetResourceStatus(ctx context.Context, req *crossplane.GetResourceStatusRequest) (*crossplane.ResourceWithStatus, error) {
+func (c *crossplaneClient) GetResourceStatus(ctx context.Context, req *crossplane.GetResourceStatusRequest) (*crossplane.GetResourceStatusResponse, error) {
 	response, err := c.getResourceStatus.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
@@ -137,12 +148,22 @@ func (c *crossplaneClient) DeleteResource(ctx context.Context, req *crossplane.D
 	return nil, err
 }
 
+// DeleteResourcesMany calls crossplane.Crossplane.DeleteResourcesMany.
+func (c *crossplaneClient) DeleteResourcesMany(ctx context.Context, req *crossplane.DeleteResourcesManyRequest) (*crossplane.DeleteResourcesManyResponse, error) {
+	response, err := c.deleteResourcesMany.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
 // CrossplaneHandler is an implementation of the crossplane.Crossplane service.
 type CrossplaneHandler interface {
 	CreateResource(context.Context, *crossplane.CreateResourceRequest) (*crossplane.ResourceWithStatus, error)
 	CreateResourcesMany(context.Context, *crossplane.CreateResourcesManyRequest) (*crossplane.CreateResourcesManyResponse, error)
-	GetResourceStatus(context.Context, *crossplane.GetResourceStatusRequest) (*crossplane.ResourceWithStatus, error)
+	GetResourceStatus(context.Context, *crossplane.GetResourceStatusRequest) (*crossplane.GetResourceStatusResponse, error)
 	DeleteResource(context.Context, *crossplane.DeleteResourceRequest) (*crossplane.DeleteResourceResponse, error)
+	DeleteResourcesMany(context.Context, *crossplane.DeleteResourcesManyRequest) (*crossplane.DeleteResourcesManyResponse, error)
 }
 
 // NewCrossplaneHandler builds an HTTP handler from the service implementation. It returns the path
@@ -176,6 +197,12 @@ func NewCrossplaneHandler(svc CrossplaneHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(crossplaneMethods.ByName("DeleteResource")),
 		connect.WithHandlerOptions(opts...),
 	)
+	crossplaneDeleteResourcesManyHandler := connect.NewUnaryHandlerSimple(
+		CrossplaneDeleteResourcesManyProcedure,
+		svc.DeleteResourcesMany,
+		connect.WithSchema(crossplaneMethods.ByName("DeleteResourcesMany")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/crossplane.Crossplane/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CrossplaneCreateResourceProcedure:
@@ -186,6 +213,8 @@ func NewCrossplaneHandler(svc CrossplaneHandler, opts ...connect.HandlerOption) 
 			crossplaneGetResourceStatusHandler.ServeHTTP(w, r)
 		case CrossplaneDeleteResourceProcedure:
 			crossplaneDeleteResourceHandler.ServeHTTP(w, r)
+		case CrossplaneDeleteResourcesManyProcedure:
+			crossplaneDeleteResourcesManyHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -203,10 +232,14 @@ func (UnimplementedCrossplaneHandler) CreateResourcesMany(context.Context, *cros
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("crossplane.Crossplane.CreateResourcesMany is not implemented"))
 }
 
-func (UnimplementedCrossplaneHandler) GetResourceStatus(context.Context, *crossplane.GetResourceStatusRequest) (*crossplane.ResourceWithStatus, error) {
+func (UnimplementedCrossplaneHandler) GetResourceStatus(context.Context, *crossplane.GetResourceStatusRequest) (*crossplane.GetResourceStatusResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("crossplane.Crossplane.GetResourceStatus is not implemented"))
 }
 
 func (UnimplementedCrossplaneHandler) DeleteResource(context.Context, *crossplane.DeleteResourceRequest) (*crossplane.DeleteResourceResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("crossplane.Crossplane.DeleteResource is not implemented"))
+}
+
+func (UnimplementedCrossplaneHandler) DeleteResourcesMany(context.Context, *crossplane.DeleteResourcesManyRequest) (*crossplane.DeleteResourcesManyResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("crossplane.Crossplane.DeleteResourcesMany is not implemented"))
 }

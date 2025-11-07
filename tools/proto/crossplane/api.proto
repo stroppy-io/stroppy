@@ -2,14 +2,16 @@ syntax = "proto3";
 
 package crossplane;
 
-import "crossplane/crossplane.proto";
+import "crossplane/resource.proto";
+import "crossplane/types.proto";
 import "validate/validate.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane";
 
 message CreateResourceRequest {
     ResourceDef resource = 1 [(validate.rules).message.required = true];
-    bool wait_for_sync = 2;
+    Ref ref = 2 [(validate.rules).message.required = true];
+    bool wait_for_sync = 3;
 }
 
 message CreateResourcesManyRequest {
@@ -22,22 +24,37 @@ message CreateResourcesManyResponse {
 }
 
 message DeleteResourceRequest {
-    Ref ref = 1 [(validate.rules).message.required = true];
+    ExtRef ref = 1 [(validate.rules).message.required = true];
     bool wait_for_sync = 2;
 }
 
 message GetResourceStatusRequest {
-    Ref ref = 1 [(validate.rules).message.required = true];
+    ExtRef ref = 1 [(validate.rules).message.required = true];
+}
+
+message GetResourceStatusResponse {
+    bool synced = 1;
+    bool ready = 2;
+    string external_id = 3;
 }
 
 message DeleteResourceResponse {
     bool synced = 1;
-    bool deleted = 2;
+}
+
+message DeleteResourcesManyRequest {
+    repeated ExtRef refs = 1 [(validate.rules).repeated.min_items = 1];
+    bool wait_for_sync = 2;
+}
+
+message DeleteResourcesManyResponse {
+    repeated DeleteResourceResponse responses = 1 [(validate.rules).repeated.min_items = 1];
 }
 
 service Crossplane {
     rpc CreateResource (CreateResourceRequest) returns (ResourceWithStatus);
     rpc CreateResourcesMany (CreateResourcesManyRequest) returns (CreateResourcesManyResponse);
-    rpc GetResourceStatus (GetResourceStatusRequest) returns (ResourceWithStatus);
+    rpc GetResourceStatus (GetResourceStatusRequest) returns (GetResourceStatusResponse);
     rpc DeleteResource (DeleteResourceRequest) returns (DeleteResourceResponse);
+    rpc DeleteResourcesMany (DeleteResourcesManyRequest) returns (DeleteResourcesManyResponse);
 }

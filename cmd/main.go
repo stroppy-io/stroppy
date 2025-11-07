@@ -6,7 +6,7 @@ import (
 	"syscall"
 
 	"github.com/stroppy-io/stroppy-cloud-panel/cmd/application"
-	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/shutdown"
 )
 
 func makeQuitSignal() chan os.Signal {

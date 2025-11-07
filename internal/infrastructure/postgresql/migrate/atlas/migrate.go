@@ -12,9 +12,9 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/mfs"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlexec"
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
 )
 
 func AtlasMigrate(pool *pgxpool.Pool, migrations ...fs.FS) error {

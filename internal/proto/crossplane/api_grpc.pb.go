@@ -23,6 +23,7 @@ const (
 	Crossplane_CreateResourcesMany_FullMethodName = "/crossplane.Crossplane/CreateResourcesMany"
 	Crossplane_GetResourceStatus_FullMethodName   = "/crossplane.Crossplane/GetResourceStatus"
 	Crossplane_DeleteResource_FullMethodName      = "/crossplane.Crossplane/DeleteResource"
+	Crossplane_DeleteResourcesMany_FullMethodName = "/crossplane.Crossplane/DeleteResourcesMany"
 )
 
 // CrossplaneClient is the client API for Crossplane service.
@@ -31,8 +32,9 @@ const (
 type CrossplaneClient interface {
 	CreateResource(ctx context.Context, in *CreateResourceRequest, opts ...grpc.CallOption) (*ResourceWithStatus, error)
 	CreateResourcesMany(ctx context.Context, in *CreateResourcesManyRequest, opts ...grpc.CallOption) (*CreateResourcesManyResponse, error)
-	GetResourceStatus(ctx context.Context, in *GetResourceStatusRequest, opts ...grpc.CallOption) (*ResourceWithStatus, error)
+	GetResourceStatus(ctx context.Context, in *GetResourceStatusRequest, opts ...grpc.CallOption) (*GetResourceStatusResponse, error)
 	DeleteResource(ctx context.Context, in *DeleteResourceRequest, opts ...grpc.CallOption) (*DeleteResourceResponse, error)
+	DeleteResourcesMany(ctx context.Context, in *DeleteResourcesManyRequest, opts ...grpc.CallOption) (*DeleteResourcesManyResponse, error)
 }
 
 type crossplaneClient struct {
@@ -61,8 +63,8 @@ func (c *crossplaneClient) CreateResourcesMany(ctx context.Context, in *CreateRe
 	return out, nil
 }
 
-func (c *crossplaneClient) GetResourceStatus(ctx context.Context, in *GetResourceStatusRequest, opts ...grpc.CallOption) (*ResourceWithStatus, error) {
-	out := new(ResourceWithStatus)
+func (c *crossplaneClient) GetResourceStatus(ctx context.Context, in *GetResourceStatusRequest, opts ...grpc.CallOption) (*GetResourceStatusResponse, error) {
+	out := new(GetResourceStatusResponse)
 	err := c.cc.Invoke(ctx, Crossplane_GetResourceStatus_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -79,14 +81,24 @@ func (c *crossplaneClient) DeleteResource(ctx context.Context, in *DeleteResourc
 	return out, nil
 }
 
+func (c *crossplaneClient) DeleteResourcesMany(ctx context.Context, in *DeleteResourcesManyRequest, opts ...grpc.CallOption) (*DeleteResourcesManyResponse, error) {
+	out := new(DeleteResourcesManyResponse)
+	err := c.cc.Invoke(ctx, Crossplane_DeleteResourcesMany_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CrossplaneServer is the server API for Crossplane service.
 // All implementations must embed UnimplementedCrossplaneServer
 // for forward compatibility
 type CrossplaneServer interface {
 	CreateResource(context.Context, *CreateResourceRequest) (*ResourceWithStatus, error)
 	CreateResourcesMany(context.Context, *CreateResourcesManyRequest) (*CreateResourcesManyResponse, error)
-	GetResourceStatus(context.Context, *GetResourceStatusRequest) (*ResourceWithStatus, error)
+	GetResourceStatus(context.Context, *GetResourceStatusRequest) (*GetResourceStatusResponse, error)
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
+	DeleteResourcesMany(context.Context, *DeleteResourcesManyRequest) (*DeleteResourcesManyResponse, error)
 	mustEmbedUnimplementedCrossplaneServer()
 }
 
@@ -100,11 +112,14 @@ func (UnimplementedCrossplaneServer) CreateResource(context.Context, *CreateReso
 func (UnimplementedCrossplaneServer) CreateResourcesMany(context.Context, *CreateResourcesManyRequest) (*CreateResourcesManyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateResourcesMany not implemented")
 }
-func (UnimplementedCrossplaneServer) GetResourceStatus(context.Context, *GetResourceStatusRequest) (*ResourceWithStatus, error) {
+func (UnimplementedCrossplaneServer) GetResourceStatus(context.Context, *GetResourceStatusRequest) (*GetResourceStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetResourceStatus not implemented")
 }
 func (UnimplementedCrossplaneServer) DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteResource not implemented")
+}
+func (UnimplementedCrossplaneServer) DeleteResourcesMany(context.Context, *DeleteResourcesManyRequest) (*DeleteResourcesManyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteResourcesMany not implemented")
 }
 func (UnimplementedCrossplaneServer) mustEmbedUnimplementedCrossplaneServer() {}
 
@@ -191,6 +206,24 @@ func _Crossplane_DeleteResource_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Crossplane_DeleteResourcesMany_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteResourcesManyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CrossplaneServer).DeleteResourcesMany(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Crossplane_DeleteResourcesMany_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CrossplaneServer).DeleteResourcesMany(ctx, req.(*DeleteResourcesManyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Crossplane_ServiceDesc is the grpc.ServiceDesc for Crossplane service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -213,6 +246,10 @@ var Crossplane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteResource",
 			Handler:    _Crossplane_DeleteResource_Handler,
+		},
+		{
+			MethodName: "DeleteResourcesMany",
+			Handler:    _Crossplane_DeleteResourcesMany_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

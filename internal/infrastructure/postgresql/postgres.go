@@ -8,8 +8,8 @@ import (
 	"github.com/jackc/pgx/v5/multitracer"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/shutdown"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/migrate/atlas"
-	"github.com/stroppy-io/stroppy/pkg/core/shutdown"
 )
 
 const defaultMigrateDialect = "postgres"

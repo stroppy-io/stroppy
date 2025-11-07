@@ -215,13 +215,14 @@ func (x *YandexCloud_Subnet) GetV4CidrBlock() []string {
 }
 
 type YandexCloud_Vm struct {
-	state            protoimpl.MessageState                  `protogen:"open.v1"`
-	Name             string                                  `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	PlatformId       string                                  `protobuf:"bytes,3,opt,name=platform_id,json=platformId,proto3" json:"platform_id,omitempty"`
-	Zone             string                                  `protobuf:"bytes,4,opt,name=zone,proto3" json:"zone,omitempty"`
-	Resources        *YandexCloud_Vm_Resources               `protobuf:"bytes,5,opt,name=resources,proto3" json:"resources,omitempty"`
-	BootDisk         []*YandexCloud_Vm_Disk_InitializeParams `protobuf:"bytes,6,rep,name=boot_disk,json=bootDisk,proto3" json:"boot_disk,omitempty"`
-	NetworkInterface []*YandexCloud_Vm_NetworkInterface      `protobuf:"bytes,7,rep,name=network_interface,json=networkInterface,proto3" json:"network_interface,omitempty"`
+	state            protoimpl.MessageState             `protogen:"open.v1"`
+	Name             string                             `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	PlatformId       string                             `protobuf:"bytes,3,opt,name=platform_id,json=platformId,proto3" json:"platform_id,omitempty"`
+	Zone             string                             `protobuf:"bytes,4,opt,name=zone,proto3" json:"zone,omitempty"`
+	Resources        *YandexCloud_Vm_Resources          `protobuf:"bytes,5,opt,name=resources,proto3" json:"resources,omitempty"`
+	BootDisk         []*YandexCloud_Vm_Disk             `protobuf:"bytes,6,rep,name=boot_disk,json=bootDisk,proto3" json:"boot_disk,omitempty"`
+	NetworkInterface []*YandexCloud_Vm_NetworkInterface `protobuf:"bytes,7,rep,name=network_interface,json=networkInterface,proto3" json:"network_interface,omitempty"`
+	Metadata         map[string]string                  `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -284,7 +285,7 @@ func (x *YandexCloud_Vm) GetResources() *YandexCloud_Vm_Resources {
 	return nil
 }
 
-func (x *YandexCloud_Vm) GetBootDisk() []*YandexCloud_Vm_Disk_InitializeParams {
+func (x *YandexCloud_Vm) GetBootDisk() []*YandexCloud_Vm_Disk {
 	if x != nil {
 		return x.BootDisk
 	}
@@ -294,6 +295,13 @@ func (x *YandexCloud_Vm) GetBootDisk() []*YandexCloud_Vm_Disk_InitializeParams {
 func (x *YandexCloud_Vm) GetNetworkInterface() []*YandexCloud_Vm_NetworkInterface {
 	if x != nil {
 		return x.NetworkInterface
+	}
+	return nil
+}
+
+func (x *YandexCloud_Vm) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
 	}
 	return nil
 }
@@ -344,8 +352,8 @@ func (x *YandexCloud_Subnet_NetworkIdRef) GetName() string {
 
 type YandexCloud_Vm_Resources struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Cores         uint64                 `protobuf:"varint,1,opt,name=cores,proto3" json:"cores,omitempty"`
-	Memory        uint64                 `protobuf:"varint,2,opt,name=memory,proto3" json:"memory,omitempty"` // in GB
+	Cores         uint32                 `protobuf:"varint,1,opt,name=cores,proto3" json:"cores,omitempty"`
+	Memory        uint32                 `protobuf:"varint,2,opt,name=memory,proto3" json:"memory,omitempty"` // in GB
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -380,14 +388,14 @@ func (*YandexCloud_Vm_Resources) Descriptor() ([]byte, []int) {
 	return file_crossplane_yandex_proto_rawDescGZIP(), []int{0, 2, 0}
 }
 
-func (x *YandexCloud_Vm_Resources) GetCores() uint64 {
+func (x *YandexCloud_Vm_Resources) GetCores() uint32 {
 	if x != nil {
 		return x.Cores
 	}
 	return 0
 }
 
-func (x *YandexCloud_Vm_Resources) GetMemory() uint64 {
+func (x *YandexCloud_Vm_Resources) GetMemory() uint32 {
 	if x != nil {
 		return x.Memory
 	}
@@ -395,8 +403,8 @@ func (x *YandexCloud_Vm_Resources) GetMemory() uint64 {
 }
 
 type YandexCloud_Vm_Disk struct {
-	state            protoimpl.MessageState                `protogen:"open.v1"`
-	InitializeParams *YandexCloud_Vm_Disk_InitializeParams `protobuf:"bytes,1,opt,name=initialize_params,json=initializeParams,proto3" json:"initialize_params,omitempty"`
+	state            protoimpl.MessageState                  `protogen:"open.v1"`
+	InitializeParams []*YandexCloud_Vm_Disk_InitializeParams `protobuf:"bytes,1,rep,name=initialize_params,json=initializeParams,proto3" json:"initialize_params,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -431,7 +439,7 @@ func (*YandexCloud_Vm_Disk) Descriptor() ([]byte, []int) {
 	return file_crossplane_yandex_proto_rawDescGZIP(), []int{0, 2, 1}
 }
 
-func (x *YandexCloud_Vm_Disk) GetInitializeParams() *YandexCloud_Vm_Disk_InitializeParams {
+func (x *YandexCloud_Vm_Disk) GetInitializeParams() []*YandexCloud_Vm_Disk_InitializeParams {
 	if x != nil {
 		return x.InitializeParams
 	}
@@ -440,7 +448,8 @@ func (x *YandexCloud_Vm_Disk) GetInitializeParams() *YandexCloud_Vm_Disk_Initial
 
 type YandexCloud_Vm_NetworkInterface struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SubnetIdRef   string                 `protobuf:"bytes,1,opt,name=subnet_id_ref,json=subnetIdRef,proto3" json:"subnet_id_ref,omitempty"`
+	SubnetIdRef   *Ref                   `protobuf:"bytes,1,opt,name=subnet_id_ref,json=subnetIdRef,proto3" json:"subnet_id_ref,omitempty"`
+	Nat           bool                   `protobuf:"varint,2,opt,name=nat,proto3" json:"nat,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -475,11 +484,18 @@ func (*YandexCloud_Vm_NetworkInterface) Descriptor() ([]byte, []int) {
 	return file_crossplane_yandex_proto_rawDescGZIP(), []int{0, 2, 2}
 }
 
-func (x *YandexCloud_Vm_NetworkInterface) GetSubnetIdRef() string {
+func (x *YandexCloud_Vm_NetworkInterface) GetSubnetIdRef() *Ref {
 	if x != nil {
 		return x.SubnetIdRef
 	}
-	return ""
+	return nil
+}
+
+func (x *YandexCloud_Vm_NetworkInterface) GetNat() bool {
+	if x != nil {
+		return x.Nat
+	}
+	return false
 }
 
 type YandexCloud_Vm_Disk_InitializeParams struct {
@@ -491,7 +507,7 @@ type YandexCloud_Vm_Disk_InitializeParams struct {
 
 func (x *YandexCloud_Vm_Disk_InitializeParams) Reset() {
 	*x = YandexCloud_Vm_Disk_InitializeParams{}
-	mi := &file_crossplane_yandex_proto_msgTypes[8]
+	mi := &file_crossplane_yandex_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -503,7 +519,7 @@ func (x *YandexCloud_Vm_Disk_InitializeParams) String() string {
 func (*YandexCloud_Vm_Disk_InitializeParams) ProtoMessage() {}
 
 func (x *YandexCloud_Vm_Disk_InitializeParams) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_yandex_proto_msgTypes[8]
+	mi := &file_crossplane_yandex_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -531,7 +547,7 @@ var File_crossplane_yandex_proto protoreflect.FileDescriptor
 const file_crossplane_yandex_proto_rawDesc = "" +
 	"\n" +
 	"\x17crossplane/yandex.proto\x12\n" +
-	"crossplane\x1a\x17validate/validate.proto\"\xb0\b\n" +
+	"crossplane\x1a\x16crossplane/types.proto\x1a\x17validate/validate.proto\"\xd0\t\n" +
 	"\vYandexCloud\x1a&\n" +
 	"\aNetwork\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x1a\xdc\x01\n" +
@@ -540,7 +556,7 @@ const file_crossplane_yandex_proto_rawDesc = "" +
 	"\x0enetwork_id_ref\x18\x02 \x01(\v2+.crossplane.YandexCloud.Subnet.NetworkIdRefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\fnetworkIdRef\x12+\n" +
 	"\rv4_cidr_block\x18\x03 \x03(\tB\a\xfaB\x04r\x02\x10\x01R\vv4CidrBlock\x1a+\n" +
 	"\fNetworkIdRef\x12\x1b\n" +
-	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x1a\xc3\x05\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x1a\xe3\x06\n" +
 	"\x02Vm\x12\x1b\n" +
 	"\x04name\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x123\n" +
 	"\vplatform_id\x18\x03 \x01(\tB\x12\xfaB\x0fr\r\n" +
@@ -548,18 +564,23 @@ const file_crossplane_yandex_proto_rawDesc = "" +
 	"platformId\x12(\n" +
 	"\x04zone\x18\x04 \x01(\tB\x14\xfaB\x11r\x0f\n" +
 	"\rru-central1-dR\x04zone\x12L\n" +
-	"\tresources\x18\x05 \x01(\v2$.crossplane.YandexCloud.Vm.ResourcesB\b\xfaB\x05\x8a\x01\x02\x10\x01R\tresources\x12W\n" +
-	"\tboot_disk\x18\x06 \x03(\v20.crossplane.YandexCloud.Vm.Disk.InitializeParamsB\b\xfaB\x05\x92\x01\x02\b\x01R\bbootDisk\x12b\n" +
-	"\x11network_interface\x18\a \x03(\v2+.crossplane.YandexCloud.Vm.NetworkInterfaceB\b\xfaB\x05\x92\x01\x02\b\x01R\x10networkInterface\x1aK\n" +
+	"\tresources\x18\x05 \x01(\v2$.crossplane.YandexCloud.Vm.ResourcesB\b\xfaB\x05\x8a\x01\x02\x10\x01R\tresources\x12F\n" +
+	"\tboot_disk\x18\x06 \x03(\v2\x1f.crossplane.YandexCloud.Vm.DiskB\b\xfaB\x05\x92\x01\x02\b\x01R\bbootDisk\x12b\n" +
+	"\x11network_interface\x18\a \x03(\v2+.crossplane.YandexCloud.Vm.NetworkInterfaceB\b\xfaB\x05\x92\x01\x02\b\x01R\x10networkInterface\x12N\n" +
+	"\bmetadata\x18\b \x03(\v2(.crossplane.YandexCloud.Vm.MetadataEntryB\b\xfaB\x05\x8a\x01\x02\x10\x01R\bmetadata\x1aK\n" +
 	"\tResources\x12\x1d\n" +
-	"\x05cores\x18\x01 \x01(\x04B\a\xfaB\x042\x02(\x01R\x05cores\x12\x1f\n" +
-	"\x06memory\x18\x02 \x01(\x04B\a\xfaB\x042\x02(\x01R\x06memory\x1a\xa7\x01\n" +
+	"\x05cores\x18\x01 \x01(\rB\a\xfaB\x04*\x02(\x01R\x05cores\x12\x1f\n" +
+	"\x06memory\x18\x02 \x01(\rB\a\xfaB\x04*\x02(\x01R\x06memory\x1a\xa7\x01\n" +
 	"\x04Disk\x12g\n" +
-	"\x11initialize_params\x18\x01 \x01(\v20.crossplane.YandexCloud.Vm.Disk.InitializeParamsB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x10initializeParams\x1a6\n" +
+	"\x11initialize_params\x18\x01 \x03(\v20.crossplane.YandexCloud.Vm.Disk.InitializeParamsB\b\xfaB\x05\x92\x01\x02\b\x01R\x10initializeParams\x1a6\n" +
 	"\x10InitializeParams\x12\"\n" +
-	"\bimage_id\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\aimageId\x1a?\n" +
-	"\x10NetworkInterface\x12+\n" +
-	"\rsubnet_id_ref\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\vsubnetIdRef\"T\n" +
+	"\bimage_id\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\aimageId\x1ac\n" +
+	"\x10NetworkInterface\x12=\n" +
+	"\rsubnet_id_ref\x18\x01 \x01(\v2\x0f.crossplane.RefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\vsubnetIdRef\x12\x10\n" +
+	"\x03nat\x18\x02 \x01(\bR\x03nat\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"T\n" +
 	"\fResourceKind\x12\x1d\n" +
 	"\x19RESOURCE_KIND_UNSPECIFIED\x10\x00\x12\f\n" +
 	"\bINSTANCE\x10\x01\x12\v\n" +
@@ -580,7 +601,7 @@ func file_crossplane_yandex_proto_rawDescGZIP() []byte {
 }
 
 var file_crossplane_yandex_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_crossplane_yandex_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_crossplane_yandex_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_crossplane_yandex_proto_goTypes = []any{
 	(YandexCloud_ResourceKind)(0),                // 0: crossplane.YandexCloud.ResourceKind
 	(*YandexCloud)(nil),                          // 1: crossplane.YandexCloud
@@ -591,19 +612,23 @@ var file_crossplane_yandex_proto_goTypes = []any{
 	(*YandexCloud_Vm_Resources)(nil),             // 6: crossplane.YandexCloud.Vm.Resources
 	(*YandexCloud_Vm_Disk)(nil),                  // 7: crossplane.YandexCloud.Vm.Disk
 	(*YandexCloud_Vm_NetworkInterface)(nil),      // 8: crossplane.YandexCloud.Vm.NetworkInterface
-	(*YandexCloud_Vm_Disk_InitializeParams)(nil), // 9: crossplane.YandexCloud.Vm.Disk.InitializeParams
+	nil,                                          // 9: crossplane.YandexCloud.Vm.MetadataEntry
+	(*YandexCloud_Vm_Disk_InitializeParams)(nil), // 10: crossplane.YandexCloud.Vm.Disk.InitializeParams
+	(*Ref)(nil),                                  // 11: crossplane.Ref
 }
 var file_crossplane_yandex_proto_depIdxs = []int32{
-	5, // 0: crossplane.YandexCloud.Subnet.network_id_ref:type_name -> crossplane.YandexCloud.Subnet.NetworkIdRef
-	6, // 1: crossplane.YandexCloud.Vm.resources:type_name -> crossplane.YandexCloud.Vm.Resources
-	9, // 2: crossplane.YandexCloud.Vm.boot_disk:type_name -> crossplane.YandexCloud.Vm.Disk.InitializeParams
-	8, // 3: crossplane.YandexCloud.Vm.network_interface:type_name -> crossplane.YandexCloud.Vm.NetworkInterface
-	9, // 4: crossplane.YandexCloud.Vm.Disk.initialize_params:type_name -> crossplane.YandexCloud.Vm.Disk.InitializeParams
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	5,  // 0: crossplane.YandexCloud.Subnet.network_id_ref:type_name -> crossplane.YandexCloud.Subnet.NetworkIdRef
+	6,  // 1: crossplane.YandexCloud.Vm.resources:type_name -> crossplane.YandexCloud.Vm.Resources
+	7,  // 2: crossplane.YandexCloud.Vm.boot_disk:type_name -> crossplane.YandexCloud.Vm.Disk
+	8,  // 3: crossplane.YandexCloud.Vm.network_interface:type_name -> crossplane.YandexCloud.Vm.NetworkInterface
+	9,  // 4: crossplane.YandexCloud.Vm.metadata:type_name -> crossplane.YandexCloud.Vm.MetadataEntry
+	10, // 5: crossplane.YandexCloud.Vm.Disk.initialize_params:type_name -> crossplane.YandexCloud.Vm.Disk.InitializeParams
+	11, // 6: crossplane.YandexCloud.Vm.NetworkInterface.subnet_id_ref:type_name -> crossplane.Ref
+	7,  // [7:7] is the sub-list for method output_type
+	7,  // [7:7] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_crossplane_yandex_proto_init() }
@@ -611,13 +636,14 @@ func file_crossplane_yandex_proto_init() {
 	if File_crossplane_yandex_proto != nil {
 		return
 	}
+	file_crossplane_types_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_crossplane_yandex_proto_rawDesc), len(file_crossplane_yandex_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

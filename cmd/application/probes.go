@@ -3,8 +3,8 @@ package application
 import (
 	"context"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/probes"
-	"github.com/stroppy-io/stroppy/pkg/core/logger"
 	"go.uber.org/zap"
 )
 

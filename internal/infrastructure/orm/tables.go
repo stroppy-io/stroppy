@@ -9,10 +9,12 @@ import (
 )
 
 var (
-	User        = newUserTableImpl()
-	StroppyStep = newStroppyStepTableImpl()
-	Resource    = newResourceTableImpl()
-	Run         = newRunTableImpl()
+	User            = newUserTableImpl()
+	RunRecord       = newRunRecordTableImpl()
+	CloudResource   = newCloudResourceTableImpl()
+	CloudAutomation = newCloudAutomationTableImpl()
+	StroppyRun      = newStroppyRunTableImpl()
+	StroppyStep     = newStroppyStepTableImpl()
 )
 
 type (
@@ -20,17 +22,25 @@ type (
 		fieldAlias
 		mustUserField()
 	}
+	RunRecordField interface {
+		fieldAlias
+		mustRunRecordField()
+	}
+	CloudResourceField interface {
+		fieldAlias
+		mustCloudResourceField()
+	}
+	CloudAutomationField interface {
+		fieldAlias
+		mustCloudAutomationField()
+	}
+	StroppyRunField interface {
+		fieldAlias
+		mustStroppyRunField()
+	}
 	StroppyStepField interface {
 		fieldAlias
 		mustStroppyStepField()
-	}
-	ResourceField interface {
-		fieldAlias
-		mustResourceField()
-	}
-	RunField interface {
-		fieldAlias
-		mustRunField()
 	}
 )
 type (
@@ -39,6 +49,7 @@ type (
 	userupdatedAtFieldImpl     struct{ *column[time.Time, UserField] }
 	userdeletedAtFieldImpl     struct{ *column[*time.Time, UserField] }
 	useremailFieldImpl         struct{ *column[string, UserField] }
+	useradminFieldImpl         struct{ *column[bool, UserField] }
 	userpasswordHashFieldImpl  struct{ *column[string, UserField] }
 	userrefreshTokensFieldImpl struct{ *column[[]string, UserField] }
 )
@@ -48,9 +59,156 @@ func (f *usercreatedAtFieldImpl) mustUserField()     {}
 func (f *userupdatedAtFieldImpl) mustUserField()     {}
 func (f *userdeletedAtFieldImpl) mustUserField()     {}
 func (f *useremailFieldImpl) mustUserField()         {}
+func (f *useradminFieldImpl) mustUserField()         {}
 func (f *userpasswordHashFieldImpl) mustUserField()  {}
 func (f *userrefreshTokensFieldImpl) mustUserField() {}
 func (f fieldAliasImpl) mustUserField()              {}
+
+type (
+	runRecordidFieldImpl struct {
+		*column[string, RunRecordField]
+	}
+	runRecordauthorIdFieldImpl struct {
+		*column[string, RunRecordField]
+	}
+	runRecordcreatedAtFieldImpl struct {
+		*column[time.Time, RunRecordField]
+	}
+	runRecordupdatedAtFieldImpl struct {
+		*column[time.Time, RunRecordField]
+	}
+	runRecorddeletedAtFieldImpl struct {
+		*column[*time.Time, RunRecordField]
+	}
+	runRecordstatusFieldImpl struct{ *column[int32, RunRecordField] }
+	runRecordtpsFieldImpl    struct {
+		*column[[]byte, RunRecordField]
+	}
+	runRecorddatabaseFieldImpl struct {
+		*column[[]byte, RunRecordField]
+	}
+	runRecordworkloadFieldImpl struct {
+		*column[[]byte, RunRecordField]
+	}
+	runRecordcloudAutomationIdFieldImpl struct {
+		*column[*string, RunRecordField]
+	}
+)
+
+func (f *runRecordidFieldImpl) mustRunRecordField()                {}
+func (f *runRecordauthorIdFieldImpl) mustRunRecordField()          {}
+func (f *runRecordcreatedAtFieldImpl) mustRunRecordField()         {}
+func (f *runRecordupdatedAtFieldImpl) mustRunRecordField()         {}
+func (f *runRecorddeletedAtFieldImpl) mustRunRecordField()         {}
+func (f *runRecordstatusFieldImpl) mustRunRecordField()            {}
+func (f *runRecordtpsFieldImpl) mustRunRecordField()               {}
+func (f *runRecorddatabaseFieldImpl) mustRunRecordField()          {}
+func (f *runRecordworkloadFieldImpl) mustRunRecordField()          {}
+func (f *runRecordcloudAutomationIdFieldImpl) mustRunRecordField() {}
+func (f fieldAliasImpl) mustRunRecordField()                       {}
+
+type (
+	cloudResourceidFieldImpl struct {
+		*column[string, CloudResourceField]
+	}
+	cloudResourcecreatedAtFieldImpl struct {
+		*column[time.Time, CloudResourceField]
+	}
+	cloudResourceupdatedAtFieldImpl struct {
+		*column[time.Time, CloudResourceField]
+	}
+	cloudResourcedeletedAtFieldImpl struct {
+		*column[*time.Time, CloudResourceField]
+	}
+	cloudResourcerefFieldImpl struct {
+		*column[[]byte, CloudResourceField]
+	}
+	cloudResourceresourceDefFieldImpl struct {
+		*column[[]byte, CloudResourceField]
+	}
+	cloudResourceresourceYamlFieldImpl struct {
+		*column[string, CloudResourceField]
+	}
+	cloudResourcesyncedFieldImpl struct {
+		*column[bool, CloudResourceField]
+	}
+	cloudResourcereadyFieldImpl struct {
+		*column[bool, CloudResourceField]
+	}
+	cloudResourceexternalIdFieldImpl struct {
+		*column[string, CloudResourceField]
+	}
+	cloudResourceparentResourceIdFieldImpl struct {
+		*column[*string, CloudResourceField]
+	}
+)
+
+func (f *cloudResourceidFieldImpl) mustCloudResourceField()               {}
+func (f *cloudResourcecreatedAtFieldImpl) mustCloudResourceField()        {}
+func (f *cloudResourceupdatedAtFieldImpl) mustCloudResourceField()        {}
+func (f *cloudResourcedeletedAtFieldImpl) mustCloudResourceField()        {}
+func (f *cloudResourcerefFieldImpl) mustCloudResourceField()              {}
+func (f *cloudResourceresourceDefFieldImpl) mustCloudResourceField()      {}
+func (f *cloudResourceresourceYamlFieldImpl) mustCloudResourceField()     {}
+func (f *cloudResourcesyncedFieldImpl) mustCloudResourceField()           {}
+func (f *cloudResourcereadyFieldImpl) mustCloudResourceField()            {}
+func (f *cloudResourceexternalIdFieldImpl) mustCloudResourceField()       {}
+func (f *cloudResourceparentResourceIdFieldImpl) mustCloudResourceField() {}
+func (f fieldAliasImpl) mustCloudResourceField()                          {}
+
+type (
+	cloudAutomationidFieldImpl struct {
+		*column[string, CloudAutomationField]
+	}
+	cloudAutomationdatabaseRootResourceIdFieldImpl struct {
+		*column[string, CloudAutomationField]
+	}
+	cloudAutomationworkloadRootResourceIdFieldImpl struct {
+		*column[string, CloudAutomationField]
+	}
+	cloudAutomationstroppyRunIdFieldImpl struct {
+		*column[*string, CloudAutomationField]
+	}
+)
+
+func (f *cloudAutomationidFieldImpl) mustCloudAutomationField()                     {}
+func (f *cloudAutomationdatabaseRootResourceIdFieldImpl) mustCloudAutomationField() {}
+func (f *cloudAutomationworkloadRootResourceIdFieldImpl) mustCloudAutomationField() {}
+func (f *cloudAutomationstroppyRunIdFieldImpl) mustCloudAutomationField()           {}
+func (f fieldAliasImpl) mustCloudAutomationField()                                  {}
+
+type (
+	stroppyRunidFieldImpl struct {
+		*column[string, StroppyRunField]
+	}
+	stroppyRuncreatedAtFieldImpl struct {
+		*column[time.Time, StroppyRunField]
+	}
+	stroppyRunupdatedAtFieldImpl struct {
+		*column[time.Time, StroppyRunField]
+	}
+	stroppyRundeletedAtFieldImpl struct {
+		*column[*time.Time, StroppyRunField]
+	}
+	stroppyRunstatusFieldImpl struct {
+		*column[int32, StroppyRunField]
+	}
+	stroppyRunrunInfoFieldImpl struct {
+		*column[[]byte, StroppyRunField]
+	}
+	stroppyRungrafanaDashboardUrlFieldImpl struct {
+		*column[string, StroppyRunField]
+	}
+)
+
+func (f *stroppyRunidFieldImpl) mustStroppyRunField()                  {}
+func (f *stroppyRuncreatedAtFieldImpl) mustStroppyRunField()           {}
+func (f *stroppyRunupdatedAtFieldImpl) mustStroppyRunField()           {}
+func (f *stroppyRundeletedAtFieldImpl) mustStroppyRunField()           {}
+func (f *stroppyRunstatusFieldImpl) mustStroppyRunField()              {}
+func (f *stroppyRunrunInfoFieldImpl) mustStroppyRunField()             {}
+func (f *stroppyRungrafanaDashboardUrlFieldImpl) mustStroppyRunField() {}
+func (f fieldAliasImpl) mustStroppyRunField()                          {}
 
 type (
 	stroppyStepidFieldImpl struct {
@@ -68,78 +226,18 @@ type (
 	stroppySteprunIdFieldImpl struct {
 		*column[string, StroppyStepField]
 	}
-	stroppyStepstepRunInfoFieldImpl struct {
+	stroppyStepstepInfoFieldImpl struct {
 		*column[[]byte, StroppyStepField]
 	}
 )
 
-func (f *stroppyStepidFieldImpl) mustStroppyStepField()          {}
-func (f *stroppyStepcreatedAtFieldImpl) mustStroppyStepField()   {}
-func (f *stroppyStepupdatedAtFieldImpl) mustStroppyStepField()   {}
-func (f *stroppyStepdeletedAtFieldImpl) mustStroppyStepField()   {}
-func (f *stroppySteprunIdFieldImpl) mustStroppyStepField()       {}
-func (f *stroppyStepstepRunInfoFieldImpl) mustStroppyStepField() {}
-func (f fieldAliasImpl) mustStroppyStepField()                   {}
-
-type (
-	resourceidFieldImpl        struct{ *column[string, ResourceField] }
-	resourcecreatedAtFieldImpl struct {
-		*column[time.Time, ResourceField]
-	}
-	resourceupdatedAtFieldImpl struct {
-		*column[time.Time, ResourceField]
-	}
-	resourcedeletedAtFieldImpl struct {
-		*column[*time.Time, ResourceField]
-	}
-	resourcerefFieldImpl          struct{ *column[[]byte, ResourceField] }
-	resourceresourceDefFieldImpl  struct{ *column[[]byte, ResourceField] }
-	resourceresourceYamlFieldImpl struct{ *column[string, ResourceField] }
-	resourcesyncedFieldImpl       struct{ *column[bool, ResourceField] }
-	resourcereadyFieldImpl        struct{ *column[bool, ResourceField] }
-	resourceexternalIdFieldImpl   struct {
-		*column[*string, ResourceField]
-	}
-	resourceparentResourceIdFieldImpl struct {
-		*column[*string, ResourceField]
-	}
-)
-
-func (f *resourceidFieldImpl) mustResourceField()               {}
-func (f *resourcecreatedAtFieldImpl) mustResourceField()        {}
-func (f *resourceupdatedAtFieldImpl) mustResourceField()        {}
-func (f *resourcedeletedAtFieldImpl) mustResourceField()        {}
-func (f *resourcerefFieldImpl) mustResourceField()              {}
-func (f *resourceresourceDefFieldImpl) mustResourceField()      {}
-func (f *resourceresourceYamlFieldImpl) mustResourceField()     {}
-func (f *resourcesyncedFieldImpl) mustResourceField()           {}
-func (f *resourcereadyFieldImpl) mustResourceField()            {}
-func (f *resourceexternalIdFieldImpl) mustResourceField()       {}
-func (f *resourceparentResourceIdFieldImpl) mustResourceField() {}
-func (f fieldAliasImpl) mustResourceField()                     {}
-
-type (
-	runidFieldImpl                  struct{ *column[string, RunField] }
-	runcreatedAtFieldImpl           struct{ *column[time.Time, RunField] }
-	runupdatedAtFieldImpl           struct{ *column[time.Time, RunField] }
-	rundeletedAtFieldImpl           struct{ *column[*time.Time, RunField] }
-	runstatusFieldImpl              struct{ *column[int32, RunField] }
-	runtargetVmResourceIdFieldImpl  struct{ *column[string, RunField] }
-	runrunnerVmResourceIdFieldImpl  struct{ *column[string, RunField] }
-	runrunInfoFieldImpl             struct{ *column[[]byte, RunField] }
-	rungrafanaDashboardUrlFieldImpl struct{ *column[*string, RunField] }
-)
-
-func (f *runidFieldImpl) mustRunField()                  {}
-func (f *runcreatedAtFieldImpl) mustRunField()           {}
-func (f *runupdatedAtFieldImpl) mustRunField()           {}
-func (f *rundeletedAtFieldImpl) mustRunField()           {}
-func (f *runstatusFieldImpl) mustRunField()              {}
-func (f *runtargetVmResourceIdFieldImpl) mustRunField()  {}
-func (f *runrunnerVmResourceIdFieldImpl) mustRunField()  {}
-func (f *runrunInfoFieldImpl) mustRunField()             {}
-func (f *rungrafanaDashboardUrlFieldImpl) mustRunField() {}
-func (f fieldAliasImpl) mustRunField()                   {}
+func (f *stroppyStepidFieldImpl) mustStroppyStepField()        {}
+func (f *stroppyStepcreatedAtFieldImpl) mustStroppyStepField() {}
+func (f *stroppyStepupdatedAtFieldImpl) mustStroppyStepField() {}
+func (f *stroppyStepdeletedAtFieldImpl) mustStroppyStepField() {}
+func (f *stroppySteprunIdFieldImpl) mustStroppyStepField()     {}
+func (f *stroppyStepstepInfoFieldImpl) mustStroppyStepField()  {}
+func (f fieldAliasImpl) mustStroppyStepField()                 {}
 
 type (
 	UserScanner struct {
@@ -148,18 +246,23 @@ type (
 		UpdatedAt     time.Time
 		DeletedAt     *time.Time
 		Email         string
+		Admin         bool
 		PasswordHash  string
 		RefreshTokens []string
 	}
-	StroppyStepScanner struct {
-		Id          string
-		CreatedAt   time.Time
-		UpdatedAt   time.Time
-		DeletedAt   *time.Time
-		RunId       string
-		StepRunInfo []byte
+	RunRecordScanner struct {
+		Id                string
+		AuthorId          string
+		CreatedAt         time.Time
+		UpdatedAt         time.Time
+		DeletedAt         *time.Time
+		Status            int32
+		Tps               []byte
+		Database          []byte
+		Workload          []byte
+		CloudAutomationId *string
 	}
-	ResourceScanner struct {
+	CloudResourceScanner struct {
 		Id               string
 		CreatedAt        time.Time
 		UpdatedAt        time.Time
@@ -169,19 +272,31 @@ type (
 		ResourceYaml     string
 		Synced           bool
 		Ready            bool
-		ExternalId       *string
+		ExternalId       string
 		ParentResourceId *string
 	}
-	RunScanner struct {
+	CloudAutomationScanner struct {
+		Id                     string
+		DatabaseRootResourceId string
+		WorkloadRootResourceId string
+		StroppyRunId           *string
+	}
+	StroppyRunScanner struct {
 		Id                  string
 		CreatedAt           time.Time
 		UpdatedAt           time.Time
 		DeletedAt           *time.Time
 		Status              int32
-		TargetVmResourceId  string
-		RunnerVmResourceId  string
 		RunInfo             []byte
-		GrafanaDashboardUrl *string
+		GrafanaDashboardUrl string
+	}
+	StroppyStepScanner struct {
+		Id        string
+		CreatedAt time.Time
+		UpdatedAt time.Time
+		DeletedAt *time.Time
+		RunId     string
+		StepInfo  []byte
 	}
 )
 
@@ -195,6 +310,7 @@ func (s *UserScanner) values() []any {
 		s.UpdatedAt,
 		s.DeletedAt,
 		s.Email,
+		s.Admin,
 		s.PasswordHash,
 		s.RefreshTokens,
 	}
@@ -211,6 +327,8 @@ func (s *UserScanner) getTarget(field string) func() any {
 		return func() any { return &s.DeletedAt }
 	case "email":
 		return func() any { return &s.Email }
+	case "admin":
+		return func() any { return &s.Admin }
 	case "password_hash":
 		return func() any { return &s.PasswordHash }
 	case "refresh_tokens":
@@ -241,6 +359,10 @@ func (s *UserScanner) getSetter(field UserField) func() ValueSetter[UserField] {
 		return func() ValueSetter[UserField] {
 			return NewValueSetter[UserField](User.Email, s.Email)
 		}
+	case "admin":
+		return func() ValueSetter[UserField] {
+			return NewValueSetter[UserField](User.Admin, s.Admin)
+		}
 	case "password_hash":
 		return func() ValueSetter[UserField] {
 			return NewValueSetter[UserField](User.PasswordHash, s.PasswordHash)
@@ -265,6 +387,8 @@ func (s *UserScanner) getValue(field UserField) func() any {
 		return func() any { return s.DeletedAt }
 	case "email":
 		return func() any { return s.Email }
+	case "admin":
+		return func() any { return s.Admin }
 	case "password_hash":
 		return func() any { return s.PasswordHash }
 	case "refresh_tokens":
@@ -273,89 +397,125 @@ func (s *UserScanner) getValue(field UserField) func() any {
 		panic("unknown field: " + field.String())
 	}
 }
-func newStroppyStepScanner() *StroppyStepScanner {
-	return &StroppyStepScanner{}
+func newRunRecordScanner() *RunRecordScanner {
+	return &RunRecordScanner{}
 }
-func (s *StroppyStepScanner) values() []any {
+func (s *RunRecordScanner) values() []any {
 	return []any{
 		s.Id,
+		s.AuthorId,
 		s.CreatedAt,
 		s.UpdatedAt,
 		s.DeletedAt,
-		s.RunId,
-		s.StepRunInfo,
+		s.Status,
+		s.Tps,
+		s.Database,
+		s.Workload,
+		s.CloudAutomationId,
 	}
 }
-func (s *StroppyStepScanner) getTarget(field string) func() any {
+func (s *RunRecordScanner) getTarget(field string) func() any {
 	switch field {
 	case "id":
 		return func() any { return &s.Id }
+	case "author_id":
+		return func() any { return &s.AuthorId }
 	case "created_at":
 		return func() any { return &s.CreatedAt }
 	case "updated_at":
 		return func() any { return &s.UpdatedAt }
 	case "deleted_at":
 		return func() any { return &s.DeletedAt }
-	case "run_id":
-		return func() any { return &s.RunId }
-	case "step_run_info":
-		return func() any { return &s.StepRunInfo }
+	case "status":
+		return func() any { return &s.Status }
+	case "tps":
+		return func() any { return &s.Tps }
+	case "database":
+		return func() any { return &s.Database }
+	case "workload":
+		return func() any { return &s.Workload }
+	case "cloud_automation_id":
+		return func() any { return &s.CloudAutomationId }
 	default:
 		panic("unknown field: " + field)
 	}
 }
-func (s *StroppyStepScanner) getSetter(field StroppyStepField) func() ValueSetter[StroppyStepField] {
+func (s *RunRecordScanner) getSetter(field RunRecordField) func() ValueSetter[RunRecordField] {
 	switch field.String() {
 	case "id":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.Id, s.Id)
+		return func() ValueSetter[RunRecordField] {
+			return NewValueSetter[RunRecordField](RunRecord.Id, s.Id)
+		}
+	case "author_id":
+		return func() ValueSetter[RunRecordField] {
+			return NewValueSetter[RunRecordField](RunRecord.AuthorId, s.AuthorId)
 		}
 	case "created_at":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.CreatedAt, s.CreatedAt)
+		return func() ValueSetter[RunRecordField] {
+			return NewValueSetter[RunRecordField](RunRecord.CreatedAt, s.CreatedAt)
 		}
 	case "updated_at":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.UpdatedAt, s.UpdatedAt)
+		return func() ValueSetter[RunRecordField] {
+			return NewValueSetter[RunRecordField](RunRecord.UpdatedAt, s.UpdatedAt)
 		}
 	case "deleted_at":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.DeletedAt, s.DeletedAt)
+		return func() ValueSetter[RunRecordField] {
+			return NewValueSetter[RunRecordField](RunRecord.DeletedAt, s.DeletedAt)
 		}
-	case "run_id":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.RunId, s.RunId)
+	case "status":
+		return func() ValueSetter[RunRecordField] {
+			return NewValueSetter[RunRecordField](RunRecord.Status, s.Status)
 		}
-	case "step_run_info":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.StepRunInfo, s.StepRunInfo)
+	case "tps":
+		return func() ValueSetter[RunRecordField] {
+			return NewValueSetter[RunRecordField](RunRecord.Tps, s.Tps)
+		}
+	case "database":
+		return func() ValueSetter[RunRecordField] {
+			return NewValueSetter[RunRecordField](RunRecord.Database, s.Database)
+		}
+	case "workload":
+		return func() ValueSetter[RunRecordField] {
+			return NewValueSetter[RunRecordField](RunRecord.Workload, s.Workload)
+		}
+	case "cloud_automation_id":
+		return func() ValueSetter[RunRecordField] {
+			return NewValueSetter[RunRecordField](RunRecord.CloudAutomationId, s.CloudAutomationId)
 		}
 	default:
 		panic("unknown field: " + field.String())
 	}
 }
-func (s *StroppyStepScanner) getValue(field StroppyStepField) func() any {
+func (s *RunRecordScanner) getValue(field RunRecordField) func() any {
 	switch field.String() {
 	case "id":
 		return func() any { return s.Id }
+	case "author_id":
+		return func() any { return s.AuthorId }
 	case "created_at":
 		return func() any { return s.CreatedAt }
 	case "updated_at":
 		return func() any { return s.UpdatedAt }
 	case "deleted_at":
 		return func() any { return s.DeletedAt }
-	case "run_id":
-		return func() any { return s.RunId }
-	case "step_run_info":
-		return func() any { return s.StepRunInfo }
+	case "status":
+		return func() any { return s.Status }
+	case "tps":
+		return func() any { return s.Tps }
+	case "database":
+		return func() any { return s.Database }
+	case "workload":
+		return func() any { return s.Workload }
+	case "cloud_automation_id":
+		return func() any { return s.CloudAutomationId }
 	default:
 		panic("unknown field: " + field.String())
 	}
 }
-func newResourceScanner() *ResourceScanner {
-	return &ResourceScanner{}
+func newCloudResourceScanner() *CloudResourceScanner {
+	return &CloudResourceScanner{}
 }
-func (s *ResourceScanner) values() []any {
+func (s *CloudResourceScanner) values() []any {
 	return []any{
 		s.Id,
 		s.CreatedAt,
@@ -370,7 +530,7 @@ func (s *ResourceScanner) values() []any {
 		s.ParentResourceId,
 	}
 }
-func (s *ResourceScanner) getTarget(field string) func() any {
+func (s *CloudResourceScanner) getTarget(field string) func() any {
 	switch field {
 	case "id":
 		return func() any { return &s.Id }
@@ -398,57 +558,57 @@ func (s *ResourceScanner) getTarget(field string) func() any {
 		panic("unknown field: " + field)
 	}
 }
-func (s *ResourceScanner) getSetter(field ResourceField) func() ValueSetter[ResourceField] {
+func (s *CloudResourceScanner) getSetter(field CloudResourceField) func() ValueSetter[CloudResourceField] {
 	switch field.String() {
 	case "id":
-		return func() ValueSetter[ResourceField] {
-			return NewValueSetter[ResourceField](Resource.Id, s.Id)
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.Id, s.Id)
 		}
 	case "created_at":
-		return func() ValueSetter[ResourceField] {
-			return NewValueSetter[ResourceField](Resource.CreatedAt, s.CreatedAt)
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.CreatedAt, s.CreatedAt)
 		}
 	case "updated_at":
-		return func() ValueSetter[ResourceField] {
-			return NewValueSetter[ResourceField](Resource.UpdatedAt, s.UpdatedAt)
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.UpdatedAt, s.UpdatedAt)
 		}
 	case "deleted_at":
-		return func() ValueSetter[ResourceField] {
-			return NewValueSetter[ResourceField](Resource.DeletedAt, s.DeletedAt)
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.DeletedAt, s.DeletedAt)
 		}
 	case "ref":
-		return func() ValueSetter[ResourceField] {
-			return NewValueSetter[ResourceField](Resource.Ref, s.Ref)
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.Ref, s.Ref)
 		}
 	case "resource_def":
-		return func() ValueSetter[ResourceField] {
-			return NewValueSetter[ResourceField](Resource.ResourceDef, s.ResourceDef)
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.ResourceDef, s.ResourceDef)
 		}
 	case "resource_yaml":
-		return func() ValueSetter[ResourceField] {
-			return NewValueSetter[ResourceField](Resource.ResourceYaml, s.ResourceYaml)
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.ResourceYaml, s.ResourceYaml)
 		}
 	case "synced":
-		return func() ValueSetter[ResourceField] {
-			return NewValueSetter[ResourceField](Resource.Synced, s.Synced)
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.Synced, s.Synced)
 		}
 	case "ready":
-		return func() ValueSetter[ResourceField] {
-			return NewValueSetter[ResourceField](Resource.Ready, s.Ready)
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.Ready, s.Ready)
 		}
 	case "external_id":
-		return func() ValueSetter[ResourceField] {
-			return NewValueSetter[ResourceField](Resource.ExternalId, s.ExternalId)
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.ExternalId, s.ExternalId)
 		}
 	case "parent_resource_id":
-		return func() ValueSetter[ResourceField] {
-			return NewValueSetter[ResourceField](Resource.ParentResourceId, s.ParentResourceId)
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.ParentResourceId, s.ParentResourceId)
 		}
 	default:
 		panic("unknown field: " + field.String())
 	}
 }
-func (s *ResourceScanner) getValue(field ResourceField) func() any {
+func (s *CloudResourceScanner) getValue(field CloudResourceField) func() any {
 	switch field.String() {
 	case "id":
 		return func() any { return s.Id }
@@ -476,23 +636,82 @@ func (s *ResourceScanner) getValue(field ResourceField) func() any {
 		panic("unknown field: " + field.String())
 	}
 }
-func newRunScanner() *RunScanner {
-	return &RunScanner{}
+func newCloudAutomationScanner() *CloudAutomationScanner {
+	return &CloudAutomationScanner{}
 }
-func (s *RunScanner) values() []any {
+func (s *CloudAutomationScanner) values() []any {
+	return []any{
+		s.Id,
+		s.DatabaseRootResourceId,
+		s.WorkloadRootResourceId,
+		s.StroppyRunId,
+	}
+}
+func (s *CloudAutomationScanner) getTarget(field string) func() any {
+	switch field {
+	case "id":
+		return func() any { return &s.Id }
+	case "database_root_resource_id":
+		return func() any { return &s.DatabaseRootResourceId }
+	case "workload_root_resource_id":
+		return func() any { return &s.WorkloadRootResourceId }
+	case "stroppy_run_id":
+		return func() any { return &s.StroppyRunId }
+	default:
+		panic("unknown field: " + field)
+	}
+}
+func (s *CloudAutomationScanner) getSetter(field CloudAutomationField) func() ValueSetter[CloudAutomationField] {
+	switch field.String() {
+	case "id":
+		return func() ValueSetter[CloudAutomationField] {
+			return NewValueSetter[CloudAutomationField](CloudAutomation.Id, s.Id)
+		}
+	case "database_root_resource_id":
+		return func() ValueSetter[CloudAutomationField] {
+			return NewValueSetter[CloudAutomationField](CloudAutomation.DatabaseRootResourceId, s.DatabaseRootResourceId)
+		}
+	case "workload_root_resource_id":
+		return func() ValueSetter[CloudAutomationField] {
+			return NewValueSetter[CloudAutomationField](CloudAutomation.WorkloadRootResourceId, s.WorkloadRootResourceId)
+		}
+	case "stroppy_run_id":
+		return func() ValueSetter[CloudAutomationField] {
+			return NewValueSetter[CloudAutomationField](CloudAutomation.StroppyRunId, s.StroppyRunId)
+		}
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func (s *CloudAutomationScanner) getValue(field CloudAutomationField) func() any {
+	switch field.String() {
+	case "id":
+		return func() any { return s.Id }
+	case "database_root_resource_id":
+		return func() any { return s.DatabaseRootResourceId }
+	case "workload_root_resource_id":
+		return func() any { return s.WorkloadRootResourceId }
+	case "stroppy_run_id":
+		return func() any { return s.StroppyRunId }
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func newStroppyRunScanner() *StroppyRunScanner {
+	return &StroppyRunScanner{}
+}
+func (s *StroppyRunScanner) values() []any {
 	return []any{
 		s.Id,
 		s.CreatedAt,
 		s.UpdatedAt,
 		s.DeletedAt,
 		s.Status,
-		s.TargetVmResourceId,
-		s.RunnerVmResourceId,
 		s.RunInfo,
 		s.GrafanaDashboardUrl,
 	}
 }
-func (s *RunScanner) getTarget(field string) func() any {
+func (s *StroppyRunScanner) getTarget(field string) func() any {
 	switch field {
 	case "id":
 		return func() any { return &s.Id }
@@ -504,10 +723,6 @@ func (s *RunScanner) getTarget(field string) func() any {
 		return func() any { return &s.DeletedAt }
 	case "status":
 		return func() any { return &s.Status }
-	case "target_vm_resource_id":
-		return func() any { return &s.TargetVmResourceId }
-	case "runner_vm_resource_id":
-		return func() any { return &s.RunnerVmResourceId }
 	case "run_info":
 		return func() any { return &s.RunInfo }
 	case "grafana_dashboard_url":
@@ -516,49 +731,41 @@ func (s *RunScanner) getTarget(field string) func() any {
 		panic("unknown field: " + field)
 	}
 }
-func (s *RunScanner) getSetter(field RunField) func() ValueSetter[RunField] {
+func (s *StroppyRunScanner) getSetter(field StroppyRunField) func() ValueSetter[StroppyRunField] {
 	switch field.String() {
 	case "id":
-		return func() ValueSetter[RunField] {
-			return NewValueSetter[RunField](Run.Id, s.Id)
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.Id, s.Id)
 		}
 	case "created_at":
-		return func() ValueSetter[RunField] {
-			return NewValueSetter[RunField](Run.CreatedAt, s.CreatedAt)
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.CreatedAt, s.CreatedAt)
 		}
 	case "updated_at":
-		return func() ValueSetter[RunField] {
-			return NewValueSetter[RunField](Run.UpdatedAt, s.UpdatedAt)
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.UpdatedAt, s.UpdatedAt)
 		}
 	case "deleted_at":
-		return func() ValueSetter[RunField] {
-			return NewValueSetter[RunField](Run.DeletedAt, s.DeletedAt)
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.DeletedAt, s.DeletedAt)
 		}
 	case "status":
-		return func() ValueSetter[RunField] {
-			return NewValueSetter[RunField](Run.Status, s.Status)
-		}
-	case "target_vm_resource_id":
-		return func() ValueSetter[RunField] {
-			return NewValueSetter[RunField](Run.TargetVmResourceId, s.TargetVmResourceId)
-		}
-	case "runner_vm_resource_id":
-		return func() ValueSetter[RunField] {
-			return NewValueSetter[RunField](Run.RunnerVmResourceId, s.RunnerVmResourceId)
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.Status, s.Status)
 		}
 	case "run_info":
-		return func() ValueSetter[RunField] {
-			return NewValueSetter[RunField](Run.RunInfo, s.RunInfo)
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.RunInfo, s.RunInfo)
 		}
 	case "grafana_dashboard_url":
-		return func() ValueSetter[RunField] {
-			return NewValueSetter[RunField](Run.GrafanaDashboardUrl, s.GrafanaDashboardUrl)
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.GrafanaDashboardUrl, s.GrafanaDashboardUrl)
 		}
 	default:
 		panic("unknown field: " + field.String())
 	}
 }
-func (s *RunScanner) getValue(field RunField) func() any {
+func (s *StroppyRunScanner) getValue(field StroppyRunField) func() any {
 	switch field.String() {
 	case "id":
 		return func() any { return s.Id }
@@ -570,14 +777,89 @@ func (s *RunScanner) getValue(field RunField) func() any {
 		return func() any { return s.DeletedAt }
 	case "status":
 		return func() any { return s.Status }
-	case "target_vm_resource_id":
-		return func() any { return s.TargetVmResourceId }
-	case "runner_vm_resource_id":
-		return func() any { return s.RunnerVmResourceId }
 	case "run_info":
 		return func() any { return s.RunInfo }
 	case "grafana_dashboard_url":
 		return func() any { return s.GrafanaDashboardUrl }
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func newStroppyStepScanner() *StroppyStepScanner {
+	return &StroppyStepScanner{}
+}
+func (s *StroppyStepScanner) values() []any {
+	return []any{
+		s.Id,
+		s.CreatedAt,
+		s.UpdatedAt,
+		s.DeletedAt,
+		s.RunId,
+		s.StepInfo,
+	}
+}
+func (s *StroppyStepScanner) getTarget(field string) func() any {
+	switch field {
+	case "id":
+		return func() any { return &s.Id }
+	case "created_at":
+		return func() any { return &s.CreatedAt }
+	case "updated_at":
+		return func() any { return &s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return &s.DeletedAt }
+	case "run_id":
+		return func() any { return &s.RunId }
+	case "step_info":
+		return func() any { return &s.StepInfo }
+	default:
+		panic("unknown field: " + field)
+	}
+}
+func (s *StroppyStepScanner) getSetter(field StroppyStepField) func() ValueSetter[StroppyStepField] {
+	switch field.String() {
+	case "id":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.Id, s.Id)
+		}
+	case "created_at":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.CreatedAt, s.CreatedAt)
+		}
+	case "updated_at":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.UpdatedAt, s.UpdatedAt)
+		}
+	case "deleted_at":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.DeletedAt, s.DeletedAt)
+		}
+	case "run_id":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.RunId, s.RunId)
+		}
+	case "step_info":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.StepInfo, s.StepInfo)
+		}
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func (s *StroppyStepScanner) getValue(field StroppyStepField) func() any {
+	switch field.String() {
+	case "id":
+		return func() any { return s.Id }
+	case "created_at":
+		return func() any { return s.CreatedAt }
+	case "updated_at":
+		return func() any { return s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return s.DeletedAt }
+	case "run_id":
+		return func() any { return s.RunId }
+	case "step_info":
+		return func() any { return s.StepInfo }
 	default:
 		panic("unknown field: " + field.String())
 	}
@@ -614,6 +896,11 @@ type (
 			ScalarOperator[string, UserField]
 			LikeOperator[string, UserField]
 		}
+		Admin interface {
+			UserField
+			CommonOperator[bool, UserField]
+			ScalarOperator[bool, UserField]
+		}
 		PasswordHash interface {
 			UserField
 			CommonOperator[string, UserField]
@@ -626,6 +913,191 @@ type (
 			ScalarOperator[[]string, UserField]
 			LikeOperator[[]string, UserField]
 			IsNullOperator[[]string, UserField]
+		}
+	}
+	runRecordTableImpl struct {
+		*table[RunRecordField, *RunRecordScanner]
+		Id interface {
+			RunRecordField
+			CommonOperator[string, RunRecordField]
+			ScalarOperator[string, RunRecordField]
+			LikeOperator[string, RunRecordField]
+		}
+		AuthorId interface {
+			RunRecordField
+			CommonOperator[string, RunRecordField]
+			ScalarOperator[string, RunRecordField]
+			LikeOperator[string, RunRecordField]
+		}
+		CreatedAt interface {
+			RunRecordField
+			CommonOperator[time.Time, RunRecordField]
+			ScalarOperator[time.Time, RunRecordField]
+		}
+		UpdatedAt interface {
+			RunRecordField
+			CommonOperator[time.Time, RunRecordField]
+			ScalarOperator[time.Time, RunRecordField]
+		}
+		DeletedAt interface {
+			RunRecordField
+			CommonOperator[*time.Time, RunRecordField]
+			ScalarOperator[*time.Time, RunRecordField]
+			IsNullOperator[*time.Time, RunRecordField]
+		}
+		Status interface {
+			RunRecordField
+			CommonOperator[int32, RunRecordField]
+			ScalarOperator[int32, RunRecordField]
+		}
+		Tps interface {
+			RunRecordField
+			CommonOperator[[]byte, RunRecordField]
+		}
+		Database interface {
+			RunRecordField
+			CommonOperator[[]byte, RunRecordField]
+		}
+		Workload interface {
+			RunRecordField
+			CommonOperator[[]byte, RunRecordField]
+		}
+		CloudAutomationId interface {
+			RunRecordField
+			CommonOperator[*string, RunRecordField]
+			ScalarOperator[*string, RunRecordField]
+			LikeOperator[*string, RunRecordField]
+			IsNullOperator[*string, RunRecordField]
+		}
+	}
+	cloudResourceTableImpl struct {
+		*table[CloudResourceField, *CloudResourceScanner]
+		Id interface {
+			CloudResourceField
+			CommonOperator[string, CloudResourceField]
+			ScalarOperator[string, CloudResourceField]
+			LikeOperator[string, CloudResourceField]
+		}
+		CreatedAt interface {
+			CloudResourceField
+			CommonOperator[time.Time, CloudResourceField]
+			ScalarOperator[time.Time, CloudResourceField]
+		}
+		UpdatedAt interface {
+			CloudResourceField
+			CommonOperator[time.Time, CloudResourceField]
+			ScalarOperator[time.Time, CloudResourceField]
+		}
+		DeletedAt interface {
+			CloudResourceField
+			CommonOperator[*time.Time, CloudResourceField]
+			ScalarOperator[*time.Time, CloudResourceField]
+			IsNullOperator[*time.Time, CloudResourceField]
+		}
+		Ref interface {
+			CloudResourceField
+			CommonOperator[[]byte, CloudResourceField]
+		}
+		ResourceDef interface {
+			CloudResourceField
+			CommonOperator[[]byte, CloudResourceField]
+		}
+		ResourceYaml interface {
+			CloudResourceField
+			CommonOperator[string, CloudResourceField]
+			ScalarOperator[string, CloudResourceField]
+			LikeOperator[string, CloudResourceField]
+		}
+		Synced interface {
+			CloudResourceField
+			CommonOperator[bool, CloudResourceField]
+			ScalarOperator[bool, CloudResourceField]
+		}
+		Ready interface {
+			CloudResourceField
+			CommonOperator[bool, CloudResourceField]
+			ScalarOperator[bool, CloudResourceField]
+		}
+		ExternalId interface {
+			CloudResourceField
+			CommonOperator[string, CloudResourceField]
+			ScalarOperator[string, CloudResourceField]
+			LikeOperator[string, CloudResourceField]
+		}
+		ParentResourceId interface {
+			CloudResourceField
+			CommonOperator[*string, CloudResourceField]
+			ScalarOperator[*string, CloudResourceField]
+			LikeOperator[*string, CloudResourceField]
+			IsNullOperator[*string, CloudResourceField]
+		}
+	}
+	cloudAutomationTableImpl struct {
+		*table[CloudAutomationField, *CloudAutomationScanner]
+		Id interface {
+			CloudAutomationField
+			CommonOperator[string, CloudAutomationField]
+			ScalarOperator[string, CloudAutomationField]
+			LikeOperator[string, CloudAutomationField]
+		}
+		DatabaseRootResourceId interface {
+			CloudAutomationField
+			CommonOperator[string, CloudAutomationField]
+			ScalarOperator[string, CloudAutomationField]
+			LikeOperator[string, CloudAutomationField]
+		}
+		WorkloadRootResourceId interface {
+			CloudAutomationField
+			CommonOperator[string, CloudAutomationField]
+			ScalarOperator[string, CloudAutomationField]
+			LikeOperator[string, CloudAutomationField]
+		}
+		StroppyRunId interface {
+			CloudAutomationField
+			CommonOperator[*string, CloudAutomationField]
+			ScalarOperator[*string, CloudAutomationField]
+			LikeOperator[*string, CloudAutomationField]
+			IsNullOperator[*string, CloudAutomationField]
+		}
+	}
+	stroppyRunTableImpl struct {
+		*table[StroppyRunField, *StroppyRunScanner]
+		Id interface {
+			StroppyRunField
+			CommonOperator[string, StroppyRunField]
+			ScalarOperator[string, StroppyRunField]
+			LikeOperator[string, StroppyRunField]
+		}
+		CreatedAt interface {
+			StroppyRunField
+			CommonOperator[time.Time, StroppyRunField]
+			ScalarOperator[time.Time, StroppyRunField]
+		}
+		UpdatedAt interface {
+			StroppyRunField
+			CommonOperator[time.Time, StroppyRunField]
+			ScalarOperator[time.Time, StroppyRunField]
+		}
+		DeletedAt interface {
+			StroppyRunField
+			CommonOperator[*time.Time, StroppyRunField]
+			ScalarOperator[*time.Time, StroppyRunField]
+			IsNullOperator[*time.Time, StroppyRunField]
+		}
+		Status interface {
+			StroppyRunField
+			CommonOperator[int32, StroppyRunField]
+			ScalarOperator[int32, StroppyRunField]
+		}
+		RunInfo interface {
+			StroppyRunField
+			CommonOperator[[]byte, StroppyRunField]
+		}
+		GrafanaDashboardUrl interface {
+			StroppyRunField
+			CommonOperator[string, StroppyRunField]
+			ScalarOperator[string, StroppyRunField]
+			LikeOperator[string, StroppyRunField]
 		}
 	}
 	stroppyStepTableImpl struct {
@@ -658,125 +1130,9 @@ type (
 			ScalarOperator[string, StroppyStepField]
 			LikeOperator[string, StroppyStepField]
 		}
-		StepRunInfo interface {
+		StepInfo interface {
 			StroppyStepField
 			CommonOperator[[]byte, StroppyStepField]
-		}
-	}
-	resourceTableImpl struct {
-		*table[ResourceField, *ResourceScanner]
-		Id interface {
-			ResourceField
-			CommonOperator[string, ResourceField]
-			ScalarOperator[string, ResourceField]
-			LikeOperator[string, ResourceField]
-		}
-		CreatedAt interface {
-			ResourceField
-			CommonOperator[time.Time, ResourceField]
-			ScalarOperator[time.Time, ResourceField]
-		}
-		UpdatedAt interface {
-			ResourceField
-			CommonOperator[time.Time, ResourceField]
-			ScalarOperator[time.Time, ResourceField]
-		}
-		DeletedAt interface {
-			ResourceField
-			CommonOperator[*time.Time, ResourceField]
-			ScalarOperator[*time.Time, ResourceField]
-			IsNullOperator[*time.Time, ResourceField]
-		}
-		Ref interface {
-			ResourceField
-			CommonOperator[[]byte, ResourceField]
-		}
-		ResourceDef interface {
-			ResourceField
-			CommonOperator[[]byte, ResourceField]
-		}
-		ResourceYaml interface {
-			ResourceField
-			CommonOperator[string, ResourceField]
-			ScalarOperator[string, ResourceField]
-			LikeOperator[string, ResourceField]
-		}
-		Synced interface {
-			ResourceField
-			CommonOperator[bool, ResourceField]
-			ScalarOperator[bool, ResourceField]
-		}
-		Ready interface {
-			ResourceField
-			CommonOperator[bool, ResourceField]
-			ScalarOperator[bool, ResourceField]
-		}
-		ExternalId interface {
-			ResourceField
-			CommonOperator[*string, ResourceField]
-			ScalarOperator[*string, ResourceField]
-			LikeOperator[*string, ResourceField]
-			IsNullOperator[*string, ResourceField]
-		}
-		ParentResourceId interface {
-			ResourceField
-			CommonOperator[*string, ResourceField]
-			ScalarOperator[*string, ResourceField]
-			LikeOperator[*string, ResourceField]
-			IsNullOperator[*string, ResourceField]
-		}
-	}
-	runTableImpl struct {
-		*table[RunField, *RunScanner]
-		Id interface {
-			RunField
-			CommonOperator[string, RunField]
-			ScalarOperator[string, RunField]
-			LikeOperator[string, RunField]
-		}
-		CreatedAt interface {
-			RunField
-			CommonOperator[time.Time, RunField]
-			ScalarOperator[time.Time, RunField]
-		}
-		UpdatedAt interface {
-			RunField
-			CommonOperator[time.Time, RunField]
-			ScalarOperator[time.Time, RunField]
-		}
-		DeletedAt interface {
-			RunField
-			CommonOperator[*time.Time, RunField]
-			ScalarOperator[*time.Time, RunField]
-			IsNullOperator[*time.Time, RunField]
-		}
-		Status interface {
-			RunField
-			CommonOperator[int32, RunField]
-			ScalarOperator[int32, RunField]
-		}
-		TargetVmResourceId interface {
-			RunField
-			CommonOperator[string, RunField]
-			ScalarOperator[string, RunField]
-			LikeOperator[string, RunField]
-		}
-		RunnerVmResourceId interface {
-			RunField
-			CommonOperator[string, RunField]
-			ScalarOperator[string, RunField]
-			LikeOperator[string, RunField]
-		}
-		RunInfo interface {
-			RunField
-			CommonOperator[[]byte, RunField]
-		}
-		GrafanaDashboardUrl interface {
-			RunField
-			CommonOperator[*string, RunField]
-			ScalarOperator[*string, RunField]
-			LikeOperator[*string, RunField]
-			IsNullOperator[*string, RunField]
 		}
 	}
 )
@@ -787,6 +1143,7 @@ func newUserTableImpl() *userTableImpl {
 	updatedAt := &userupdatedAtFieldImpl{column: newColumn[time.Time, UserField](fieldAliasImpl("updated_at"))}
 	deletedAt := &userdeletedAtFieldImpl{column: newColumn[*time.Time, UserField](fieldAliasImpl("deleted_at"))}
 	email := &useremailFieldImpl{column: newColumn[string, UserField](fieldAliasImpl("email"))}
+	admin := &useradminFieldImpl{column: newColumn[bool, UserField](fieldAliasImpl("admin"))}
 	passwordHash := &userpasswordHashFieldImpl{column: newColumn[string, UserField](fieldAliasImpl("password_hash"))}
 	refreshTokens := &userrefreshTokensFieldImpl{column: newColumn[[]string, UserField](fieldAliasImpl("refresh_tokens"))}
 	return &userTableImpl{
@@ -798,6 +1155,7 @@ func newUserTableImpl() *userTableImpl {
 			updatedAt,
 			deletedAt,
 			email,
+			admin,
 			passwordHash,
 			refreshTokens,
 		),
@@ -806,52 +1164,65 @@ func newUserTableImpl() *userTableImpl {
 		UpdatedAt:     updatedAt,
 		DeletedAt:     deletedAt,
 		Email:         email,
+		Admin:         admin,
 		PasswordHash:  passwordHash,
 		RefreshTokens: refreshTokens,
 	}
 }
-func newStroppyStepTableImpl() *stroppyStepTableImpl {
-	id := &stroppyStepidFieldImpl{column: newColumn[string, StroppyStepField](fieldAliasImpl("id"))}
-	createdAt := &stroppyStepcreatedAtFieldImpl{column: newColumn[time.Time, StroppyStepField](fieldAliasImpl("created_at"))}
-	updatedAt := &stroppyStepupdatedAtFieldImpl{column: newColumn[time.Time, StroppyStepField](fieldAliasImpl("updated_at"))}
-	deletedAt := &stroppyStepdeletedAtFieldImpl{column: newColumn[*time.Time, StroppyStepField](fieldAliasImpl("deleted_at"))}
-	runId := &stroppySteprunIdFieldImpl{column: newColumn[string, StroppyStepField](fieldAliasImpl("run_id"))}
-	stepRunInfo := &stroppyStepstepRunInfoFieldImpl{column: newColumn[[]byte, StroppyStepField](fieldAliasImpl("step_run_info"))}
-	return &stroppyStepTableImpl{
-		table: newTable[StroppyStepField, *StroppyStepScanner](
-			"stroppy_steps",
-			newStroppyStepScanner,
+func newRunRecordTableImpl() *runRecordTableImpl {
+	id := &runRecordidFieldImpl{column: newColumn[string, RunRecordField](fieldAliasImpl("id"))}
+	authorId := &runRecordauthorIdFieldImpl{column: newColumn[string, RunRecordField](fieldAliasImpl("author_id"))}
+	createdAt := &runRecordcreatedAtFieldImpl{column: newColumn[time.Time, RunRecordField](fieldAliasImpl("created_at"))}
+	updatedAt := &runRecordupdatedAtFieldImpl{column: newColumn[time.Time, RunRecordField](fieldAliasImpl("updated_at"))}
+	deletedAt := &runRecorddeletedAtFieldImpl{column: newColumn[*time.Time, RunRecordField](fieldAliasImpl("deleted_at"))}
+	status := &runRecordstatusFieldImpl{column: newColumn[int32, RunRecordField](fieldAliasImpl("status"))}
+	tps := &runRecordtpsFieldImpl{column: newColumn[[]byte, RunRecordField](fieldAliasImpl("tps"))}
+	database := &runRecorddatabaseFieldImpl{column: newColumn[[]byte, RunRecordField](fieldAliasImpl("database"))}
+	workload := &runRecordworkloadFieldImpl{column: newColumn[[]byte, RunRecordField](fieldAliasImpl("workload"))}
+	cloudAutomationId := &runRecordcloudAutomationIdFieldImpl{column: newColumn[*string, RunRecordField](fieldAliasImpl("cloud_automation_id"))}
+	return &runRecordTableImpl{
+		table: newTable[RunRecordField, *RunRecordScanner](
+			"run_records",
+			newRunRecordScanner,
 			id,
+			authorId,
 			createdAt,
 			updatedAt,
 			deletedAt,
-			runId,
-			stepRunInfo,
+			status,
+			tps,
+			database,
+			workload,
+			cloudAutomationId,
 		),
-		Id:          id,
-		CreatedAt:   createdAt,
-		UpdatedAt:   updatedAt,
-		DeletedAt:   deletedAt,
-		RunId:       runId,
-		StepRunInfo: stepRunInfo,
+		Id:                id,
+		AuthorId:          authorId,
+		CreatedAt:         createdAt,
+		UpdatedAt:         updatedAt,
+		DeletedAt:         deletedAt,
+		Status:            status,
+		Tps:               tps,
+		Database:          database,
+		Workload:          workload,
+		CloudAutomationId: cloudAutomationId,
 	}
 }
-func newResourceTableImpl() *resourceTableImpl {
-	id := &resourceidFieldImpl{column: newColumn[string, ResourceField](fieldAliasImpl("id"))}
-	createdAt := &resourcecreatedAtFieldImpl{column: newColumn[time.Time, ResourceField](fieldAliasImpl("created_at"))}
-	updatedAt := &resourceupdatedAtFieldImpl{column: newColumn[time.Time, ResourceField](fieldAliasImpl("updated_at"))}
-	deletedAt := &resourcedeletedAtFieldImpl{column: newColumn[*time.Time, ResourceField](fieldAliasImpl("deleted_at"))}
-	ref := &resourcerefFieldImpl{column: newColumn[[]byte, ResourceField](fieldAliasImpl("ref"))}
-	resourceDef := &resourceresourceDefFieldImpl{column: newColumn[[]byte, ResourceField](fieldAliasImpl("resource_def"))}
-	resourceYaml := &resourceresourceYamlFieldImpl{column: newColumn[string, ResourceField](fieldAliasImpl("resource_yaml"))}
-	synced := &resourcesyncedFieldImpl{column: newColumn[bool, ResourceField](fieldAliasImpl("synced"))}
-	ready := &resourcereadyFieldImpl{column: newColumn[bool, ResourceField](fieldAliasImpl("ready"))}
-	externalId := &resourceexternalIdFieldImpl{column: newColumn[*string, ResourceField](fieldAliasImpl("external_id"))}
-	parentResourceId := &resourceparentResourceIdFieldImpl{column: newColumn[*string, ResourceField](fieldAliasImpl("parent_resource_id"))}
-	return &resourceTableImpl{
-		table: newTable[ResourceField, *ResourceScanner](
-			"resources",
-			newResourceScanner,
+func newCloudResourceTableImpl() *cloudResourceTableImpl {
+	id := &cloudResourceidFieldImpl{column: newColumn[string, CloudResourceField](fieldAliasImpl("id"))}
+	createdAt := &cloudResourcecreatedAtFieldImpl{column: newColumn[time.Time, CloudResourceField](fieldAliasImpl("created_at"))}
+	updatedAt := &cloudResourceupdatedAtFieldImpl{column: newColumn[time.Time, CloudResourceField](fieldAliasImpl("updated_at"))}
+	deletedAt := &cloudResourcedeletedAtFieldImpl{column: newColumn[*time.Time, CloudResourceField](fieldAliasImpl("deleted_at"))}
+	ref := &cloudResourcerefFieldImpl{column: newColumn[[]byte, CloudResourceField](fieldAliasImpl("ref"))}
+	resourceDef := &cloudResourceresourceDefFieldImpl{column: newColumn[[]byte, CloudResourceField](fieldAliasImpl("resource_def"))}
+	resourceYaml := &cloudResourceresourceYamlFieldImpl{column: newColumn[string, CloudResourceField](fieldAliasImpl("resource_yaml"))}
+	synced := &cloudResourcesyncedFieldImpl{column: newColumn[bool, CloudResourceField](fieldAliasImpl("synced"))}
+	ready := &cloudResourcereadyFieldImpl{column: newColumn[bool, CloudResourceField](fieldAliasImpl("ready"))}
+	externalId := &cloudResourceexternalIdFieldImpl{column: newColumn[string, CloudResourceField](fieldAliasImpl("external_id"))}
+	parentResourceId := &cloudResourceparentResourceIdFieldImpl{column: newColumn[*string, CloudResourceField](fieldAliasImpl("parent_resource_id"))}
+	return &cloudResourceTableImpl{
+		table: newTable[CloudResourceField, *CloudResourceScanner](
+			"cloud_resources",
+			newCloudResourceScanner,
 			id,
 			createdAt,
 			updatedAt,
@@ -877,27 +1248,43 @@ func newResourceTableImpl() *resourceTableImpl {
 		ParentResourceId: parentResourceId,
 	}
 }
-func newRunTableImpl() *runTableImpl {
-	id := &runidFieldImpl{column: newColumn[string, RunField](fieldAliasImpl("id"))}
-	createdAt := &runcreatedAtFieldImpl{column: newColumn[time.Time, RunField](fieldAliasImpl("created_at"))}
-	updatedAt := &runupdatedAtFieldImpl{column: newColumn[time.Time, RunField](fieldAliasImpl("updated_at"))}
-	deletedAt := &rundeletedAtFieldImpl{column: newColumn[*time.Time, RunField](fieldAliasImpl("deleted_at"))}
-	status := &runstatusFieldImpl{column: newColumn[int32, RunField](fieldAliasImpl("status"))}
-	targetVmResourceId := &runtargetVmResourceIdFieldImpl{column: newColumn[string, RunField](fieldAliasImpl("target_vm_resource_id"))}
-	runnerVmResourceId := &runrunnerVmResourceIdFieldImpl{column: newColumn[string, RunField](fieldAliasImpl("runner_vm_resource_id"))}
-	runInfo := &runrunInfoFieldImpl{column: newColumn[[]byte, RunField](fieldAliasImpl("run_info"))}
-	grafanaDashboardUrl := &rungrafanaDashboardUrlFieldImpl{column: newColumn[*string, RunField](fieldAliasImpl("grafana_dashboard_url"))}
-	return &runTableImpl{
-		table: newTable[RunField, *RunScanner](
-			"runs",
-			newRunScanner,
+func newCloudAutomationTableImpl() *cloudAutomationTableImpl {
+	id := &cloudAutomationidFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("id"))}
+	databaseRootResourceId := &cloudAutomationdatabaseRootResourceIdFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("database_root_resource_id"))}
+	workloadRootResourceId := &cloudAutomationworkloadRootResourceIdFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("workload_root_resource_id"))}
+	stroppyRunId := &cloudAutomationstroppyRunIdFieldImpl{column: newColumn[*string, CloudAutomationField](fieldAliasImpl("stroppy_run_id"))}
+	return &cloudAutomationTableImpl{
+		table: newTable[CloudAutomationField, *CloudAutomationScanner](
+			"cloud_automations",
+			newCloudAutomationScanner,
+			id,
+			databaseRootResourceId,
+			workloadRootResourceId,
+			stroppyRunId,
+		),
+		Id:                     id,
+		DatabaseRootResourceId: databaseRootResourceId,
+		WorkloadRootResourceId: workloadRootResourceId,
+		StroppyRunId:           stroppyRunId,
+	}
+}
+func newStroppyRunTableImpl() *stroppyRunTableImpl {
+	id := &stroppyRunidFieldImpl{column: newColumn[string, StroppyRunField](fieldAliasImpl("id"))}
+	createdAt := &stroppyRuncreatedAtFieldImpl{column: newColumn[time.Time, StroppyRunField](fieldAliasImpl("created_at"))}
+	updatedAt := &stroppyRunupdatedAtFieldImpl{column: newColumn[time.Time, StroppyRunField](fieldAliasImpl("updated_at"))}
+	deletedAt := &stroppyRundeletedAtFieldImpl{column: newColumn[*time.Time, StroppyRunField](fieldAliasImpl("deleted_at"))}
+	status := &stroppyRunstatusFieldImpl{column: newColumn[int32, StroppyRunField](fieldAliasImpl("status"))}
+	runInfo := &stroppyRunrunInfoFieldImpl{column: newColumn[[]byte, StroppyRunField](fieldAliasImpl("run_info"))}
+	grafanaDashboardUrl := &stroppyRungrafanaDashboardUrlFieldImpl{column: newColumn[string, StroppyRunField](fieldAliasImpl("grafana_dashboard_url"))}
+	return &stroppyRunTableImpl{
+		table: newTable[StroppyRunField, *StroppyRunScanner](
+			"stroppy_runs",
+			newStroppyRunScanner,
 			id,
 			createdAt,
 			updatedAt,
 			deletedAt,
 			status,
-			targetVmResourceId,
-			runnerVmResourceId,
 			runInfo,
 			grafanaDashboardUrl,
 		),
@@ -906,22 +1293,50 @@ func newRunTableImpl() *runTableImpl {
 		UpdatedAt:           updatedAt,
 		DeletedAt:           deletedAt,
 		Status:              status,
-		TargetVmResourceId:  targetVmResourceId,
-		RunnerVmResourceId:  runnerVmResourceId,
 		RunInfo:             runInfo,
 		GrafanaDashboardUrl: grafanaDashboardUrl,
 	}
 }
+func newStroppyStepTableImpl() *stroppyStepTableImpl {
+	id := &stroppyStepidFieldImpl{column: newColumn[string, StroppyStepField](fieldAliasImpl("id"))}
+	createdAt := &stroppyStepcreatedAtFieldImpl{column: newColumn[time.Time, StroppyStepField](fieldAliasImpl("created_at"))}
+	updatedAt := &stroppyStepupdatedAtFieldImpl{column: newColumn[time.Time, StroppyStepField](fieldAliasImpl("updated_at"))}
+	deletedAt := &stroppyStepdeletedAtFieldImpl{column: newColumn[*time.Time, StroppyStepField](fieldAliasImpl("deleted_at"))}
+	runId := &stroppySteprunIdFieldImpl{column: newColumn[string, StroppyStepField](fieldAliasImpl("run_id"))}
+	stepInfo := &stroppyStepstepInfoFieldImpl{column: newColumn[[]byte, StroppyStepField](fieldAliasImpl("step_info"))}
+	return &stroppyStepTableImpl{
+		table: newTable[StroppyStepField, *StroppyStepScanner](
+			"stroppy_steps",
+			newStroppyStepScanner,
+			id,
+			createdAt,
+			updatedAt,
+			deletedAt,
+			runId,
+			stepInfo,
+		),
+		Id:        id,
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
+		DeletedAt: deletedAt,
+		RunId:     runId,
+		StepInfo:  stepInfo,
+	}
+}
 
 type (
-	UserRepository              = ProtoRepository[UserField, *UserScanner, *panel.User]
-	UserRepositoryOption        = ProtoCallOption[UserField, *UserScanner, *panel.User]
-	StroppyStepRepository       = ProtoRepository[StroppyStepField, *StroppyStepScanner, *panel.StroppyStep]
-	StroppyStepRepositoryOption = ProtoCallOption[StroppyStepField, *StroppyStepScanner, *panel.StroppyStep]
-	ResourceRepository          = ProtoRepository[ResourceField, *ResourceScanner, *panel.Resource]
-	ResourceRepositoryOption    = ProtoCallOption[ResourceField, *ResourceScanner, *panel.Resource]
-	RunRepository               = ProtoRepository[RunField, *RunScanner, *panel.Run]
-	RunRepositoryOption         = ProtoCallOption[RunField, *RunScanner, *panel.Run]
+	UserRepository                  = ProtoRepository[UserField, *UserScanner, *panel.User]
+	UserRepositoryOption            = ProtoCallOption[UserField, *UserScanner, *panel.User]
+	RunRecordRepository             = ProtoRepository[RunRecordField, *RunRecordScanner, *panel.RunRecord]
+	RunRecordRepositoryOption       = ProtoCallOption[RunRecordField, *RunRecordScanner, *panel.RunRecord]
+	CloudResourceRepository         = ProtoRepository[CloudResourceField, *CloudResourceScanner, *panel.CloudResource]
+	CloudResourceRepositoryOption   = ProtoCallOption[CloudResourceField, *CloudResourceScanner, *panel.CloudResource]
+	CloudAutomationRepository       = ProtoRepository[CloudAutomationField, *CloudAutomationScanner, *panel.CloudAutomation]
+	CloudAutomationRepositoryOption = ProtoCallOption[CloudAutomationField, *CloudAutomationScanner, *panel.CloudAutomation]
+	StroppyRunRepository            = ProtoRepository[StroppyRunField, *StroppyRunScanner, *panel.StroppyRun]
+	StroppyRunRepositoryOption      = ProtoCallOption[StroppyRunField, *StroppyRunScanner, *panel.StroppyRun]
+	StroppyStepRepository           = ProtoRepository[StroppyStepField, *StroppyStepScanner, *panel.StroppyStep]
+	StroppyStepRepositoryOption     = ProtoCallOption[StroppyStepField, *StroppyStepScanner, *panel.StroppyStep]
 )
 type (
 	upcastUserOptions struct {
@@ -952,6 +1367,7 @@ func UserToScanner(
 		scanner := &UserScanner{
 			Id:    downcastId(entity.Id),
 			Email: entity.Email,
+			Admin: entity.Admin,
 		}
 		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
 		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
@@ -975,6 +1391,7 @@ func ScannerToUser(
 		entity := &panel.User{
 			Id:    upcastId(model.Id),
 			Email: model.Email,
+			Admin: model.Admin,
 		}
 		entity.Timing = &panel.Timing{
 			CreatedAt: TimestampFromTime(model.CreatedAt),
@@ -998,6 +1415,254 @@ func NewUserRepository(
 		defaultOpts...,
 	)
 }
+func RunRecordToScanner(
+	downcastId TypeCaster[*panel.Ulid, string],
+	downcastAuthorId TypeCaster[*panel.Ulid, string],
+	downcastCloudAutomationId TypeCaster[*panel.Ulid, *string],
+) TypeCaster[*panel.RunRecord, *RunRecordScanner] {
+	return func(entity *panel.RunRecord) *RunRecordScanner {
+		if entity == nil {
+			return nil
+		}
+		scanner := &RunRecordScanner{
+			Id:                downcastId(entity.Id),
+			AuthorId:          downcastAuthorId(entity.AuthorId),
+			Status:            EnumToInt32[panel.Status](entity.Status),
+			Tps:               MessageToSliceByte[*panel.Tps](entity.Tps),
+			Database:          MessageToSliceByte[*panel.Database](entity.Database),
+			Workload:          MessageToSliceByte[*panel.Workload](entity.Workload),
+			CloudAutomationId: downcastCloudAutomationId(entity.CloudAutomationId),
+		}
+		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
+		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
+		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
+		return scanner
+	}
+}
+func ScannerToRunRecord(
+	upcastId TypeCaster[string, *panel.Ulid],
+	upcastAuthorId TypeCaster[string, *panel.Ulid],
+	upcastCloudAutomationId TypeCaster[*string, *panel.Ulid],
+) TypeCaster[*RunRecordScanner, *panel.RunRecord] {
+	return func(model *RunRecordScanner) *panel.RunRecord {
+		if model == nil {
+			return nil
+		}
+		entity := &panel.RunRecord{
+			Id:                upcastId(model.Id),
+			AuthorId:          upcastAuthorId(model.AuthorId),
+			Status:            EnumFromInt32[panel.Status](model.Status),
+			Tps:               MessageFromSliceByte[*panel.Tps](model.Tps),
+			Database:          MessageFromSliceByte[*panel.Database](model.Database),
+			Workload:          MessageFromSliceByte[*panel.Workload](model.Workload),
+			CloudAutomationId: upcastCloudAutomationId(model.CloudAutomationId),
+		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
+		}
+
+		return entity
+	}
+}
+func NewRunRecordRepository(
+	dbGetter DbGetter,
+	upcastId TypeCaster[string, *panel.Ulid],
+	downcastId TypeCaster[*panel.Ulid, string],
+	upcastAuthorId TypeCaster[string, *panel.Ulid],
+	downcastAuthorId TypeCaster[*panel.Ulid, string],
+	upcastCloudAutomationId TypeCaster[*string, *panel.Ulid],
+	downcastCloudAutomationId TypeCaster[*panel.Ulid, *string],
+	defaultOpts ...RunRecordRepositoryOption,
+) RunRecordRepository {
+	return newGenericRepository(
+		newGenericScannerRepository(RunRecord.table, dbGetter),
+		RunRecordToScanner(downcastId, downcastAuthorId, downcastCloudAutomationId),
+		ScannerToRunRecord(upcastId, upcastAuthorId, upcastCloudAutomationId),
+		defaultOpts...,
+	)
+}
+func CloudResourceToScanner(
+	downcastId TypeCaster[*panel.Ulid, string],
+	downcastParentResourceId TypeCaster[*panel.Ulid, *string],
+) TypeCaster[*panel.CloudResource, *CloudResourceScanner] {
+	return func(entity *panel.CloudResource) *CloudResourceScanner {
+		if entity == nil {
+			return nil
+		}
+		scanner := &CloudResourceScanner{
+			Id:               downcastId(entity.Id),
+			ParentResourceId: downcastParentResourceId(entity.ParentResourceId),
+		}
+		scanner.Ref = MessageToSliceByte[*crossplane.Ref](entity.GetResource().GetRef())
+		scanner.ResourceDef = MessageToSliceByte[*crossplane.ResourceDef](entity.GetResource().GetResourceDef())
+		scanner.ResourceYaml = entity.GetResource().GetResourceYaml()
+		scanner.Synced = entity.GetResource().GetSynced()
+		scanner.Ready = entity.GetResource().GetReady()
+		scanner.ExternalId = entity.GetResource().GetExternalId()
+		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
+		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
+		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
+		return scanner
+	}
+}
+func ScannerToCloudResource(
+	upcastId TypeCaster[string, *panel.Ulid],
+	upcastParentResourceId TypeCaster[*string, *panel.Ulid],
+) TypeCaster[*CloudResourceScanner, *panel.CloudResource] {
+	return func(model *CloudResourceScanner) *panel.CloudResource {
+		if model == nil {
+			return nil
+		}
+		entity := &panel.CloudResource{
+			Id:               upcastId(model.Id),
+			ParentResourceId: upcastParentResourceId(model.ParentResourceId),
+		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
+		}
+		entity.Resource = &crossplane.ResourceWithStatus{
+			Ref:          MessageFromSliceByte[*crossplane.Ref](model.Ref),
+			ResourceDef:  MessageFromSliceByte[*crossplane.ResourceDef](model.ResourceDef),
+			ResourceYaml: model.ResourceYaml,
+			Synced:       model.Synced,
+			Ready:        model.Ready,
+			ExternalId:   model.ExternalId,
+		}
+
+		return entity
+	}
+}
+func NewCloudResourceRepository(
+	dbGetter DbGetter,
+	upcastId TypeCaster[string, *panel.Ulid],
+	downcastId TypeCaster[*panel.Ulid, string],
+	upcastParentResourceId TypeCaster[*string, *panel.Ulid],
+	downcastParentResourceId TypeCaster[*panel.Ulid, *string],
+	defaultOpts ...CloudResourceRepositoryOption,
+) CloudResourceRepository {
+	return newGenericRepository(
+		newGenericScannerRepository(CloudResource.table, dbGetter),
+		CloudResourceToScanner(downcastId, downcastParentResourceId),
+		ScannerToCloudResource(upcastId, upcastParentResourceId),
+		defaultOpts...,
+	)
+}
+func CloudAutomationToScanner(
+	downcastId TypeCaster[*panel.Ulid, string],
+	downcastDatabaseRootResourceId TypeCaster[*panel.Ulid, string],
+	downcastWorkloadRootResourceId TypeCaster[*panel.Ulid, string],
+	downcastStroppyRunId TypeCaster[*panel.Ulid, *string],
+) TypeCaster[*panel.CloudAutomation, *CloudAutomationScanner] {
+	return func(entity *panel.CloudAutomation) *CloudAutomationScanner {
+		if entity == nil {
+			return nil
+		}
+		scanner := &CloudAutomationScanner{
+			Id:                     downcastId(entity.Id),
+			DatabaseRootResourceId: downcastDatabaseRootResourceId(entity.DatabaseRootResourceId),
+			WorkloadRootResourceId: downcastWorkloadRootResourceId(entity.WorkloadRootResourceId),
+			StroppyRunId:           downcastStroppyRunId(entity.StroppyRunId),
+		}
+		return scanner
+	}
+}
+func ScannerToCloudAutomation(
+	upcastId TypeCaster[string, *panel.Ulid],
+	upcastDatabaseRootResourceId TypeCaster[string, *panel.Ulid],
+	upcastWorkloadRootResourceId TypeCaster[string, *panel.Ulid],
+	upcastStroppyRunId TypeCaster[*string, *panel.Ulid],
+) TypeCaster[*CloudAutomationScanner, *panel.CloudAutomation] {
+	return func(model *CloudAutomationScanner) *panel.CloudAutomation {
+		if model == nil {
+			return nil
+		}
+		entity := &panel.CloudAutomation{
+			Id:                     upcastId(model.Id),
+			DatabaseRootResourceId: upcastDatabaseRootResourceId(model.DatabaseRootResourceId),
+			WorkloadRootResourceId: upcastWorkloadRootResourceId(model.WorkloadRootResourceId),
+			StroppyRunId:           upcastStroppyRunId(model.StroppyRunId),
+		}
+
+		return entity
+	}
+}
+func NewCloudAutomationRepository(
+	dbGetter DbGetter,
+	upcastId TypeCaster[string, *panel.Ulid],
+	downcastId TypeCaster[*panel.Ulid, string],
+	upcastDatabaseRootResourceId TypeCaster[string, *panel.Ulid],
+	downcastDatabaseRootResourceId TypeCaster[*panel.Ulid, string],
+	upcastWorkloadRootResourceId TypeCaster[string, *panel.Ulid],
+	downcastWorkloadRootResourceId TypeCaster[*panel.Ulid, string],
+	upcastStroppyRunId TypeCaster[*string, *panel.Ulid],
+	downcastStroppyRunId TypeCaster[*panel.Ulid, *string],
+	defaultOpts ...CloudAutomationRepositoryOption,
+) CloudAutomationRepository {
+	return newGenericRepository(
+		newGenericScannerRepository(CloudAutomation.table, dbGetter),
+		CloudAutomationToScanner(downcastId, downcastDatabaseRootResourceId, downcastWorkloadRootResourceId, downcastStroppyRunId),
+		ScannerToCloudAutomation(upcastId, upcastDatabaseRootResourceId, upcastWorkloadRootResourceId, upcastStroppyRunId),
+		defaultOpts...,
+	)
+}
+func StroppyRunToScanner(
+	downcastId TypeCaster[*panel.Ulid, string],
+) TypeCaster[*panel.StroppyRun, *StroppyRunScanner] {
+	return func(entity *panel.StroppyRun) *StroppyRunScanner {
+		if entity == nil {
+			return nil
+		}
+		scanner := &StroppyRunScanner{
+			Id:                  downcastId(entity.Id),
+			Status:              EnumToInt32[panel.Status](entity.Status),
+			RunInfo:             entity.RunInfo,
+			GrafanaDashboardUrl: entity.GrafanaDashboardUrl,
+		}
+		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
+		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
+		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
+		return scanner
+	}
+}
+func ScannerToStroppyRun(
+	upcastId TypeCaster[string, *panel.Ulid],
+) TypeCaster[*StroppyRunScanner, *panel.StroppyRun] {
+	return func(model *StroppyRunScanner) *panel.StroppyRun {
+		if model == nil {
+			return nil
+		}
+		entity := &panel.StroppyRun{
+			Id:                  upcastId(model.Id),
+			Status:              EnumFromInt32[panel.Status](model.Status),
+			RunInfo:             model.RunInfo,
+			GrafanaDashboardUrl: model.GrafanaDashboardUrl,
+		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
+		}
+
+		return entity
+	}
+}
+func NewStroppyRunRepository(
+	dbGetter DbGetter,
+	upcastId TypeCaster[string, *panel.Ulid],
+	downcastId TypeCaster[*panel.Ulid, string],
+	defaultOpts ...StroppyRunRepositoryOption,
+) StroppyRunRepository {
+	return newGenericRepository(
+		newGenericScannerRepository(StroppyRun.table, dbGetter),
+		StroppyRunToScanner(downcastId),
+		ScannerToStroppyRun(upcastId),
+		defaultOpts...,
+	)
+}
 func StroppyStepToScanner(
 	downcastId TypeCaster[*panel.Ulid, string],
 	downcastRunId TypeCaster[*panel.Ulid, string],
@@ -1007,9 +1672,9 @@ func StroppyStepToScanner(
 			return nil
 		}
 		scanner := &StroppyStepScanner{
-			Id:          downcastId(entity.Id),
-			RunId:       downcastRunId(entity.RunId),
-			StepRunInfo: entity.StepRunInfo,
+			Id:       downcastId(entity.Id),
+			RunId:    downcastRunId(entity.RunId),
+			StepInfo: entity.StepInfo,
 		}
 		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
 		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
@@ -1026,9 +1691,9 @@ func ScannerToStroppyStep(
 			return nil
 		}
 		entity := &panel.StroppyStep{
-			Id:          upcastId(model.Id),
-			RunId:       upcastRunId(model.RunId),
-			StepRunInfo: model.StepRunInfo,
+			Id:       upcastId(model.Id),
+			RunId:    upcastRunId(model.RunId),
+			StepInfo: model.StepInfo,
 		}
 		entity.Timing = &panel.Timing{
 			CreatedAt: TimestampFromTime(model.CreatedAt),
@@ -1051,140 +1716,6 @@ func NewStroppyStepRepository(
 		newGenericScannerRepository(StroppyStep.table, dbGetter),
 		StroppyStepToScanner(downcastId, downcastRunId),
 		ScannerToStroppyStep(upcastId, upcastRunId),
-		defaultOpts...,
-	)
-}
-func ResourceToScanner(
-	downcastId TypeCaster[*panel.Ulid, string],
-	downcastParentResourceId TypeCaster[*panel.Ulid, *string],
-) TypeCaster[*panel.Resource, *ResourceScanner] {
-	return func(entity *panel.Resource) *ResourceScanner {
-		if entity == nil {
-			return nil
-		}
-		scanner := &ResourceScanner{
-			Id:               downcastId(entity.Id),
-			ParentResourceId: downcastParentResourceId(entity.ParentResourceId),
-		}
-		scanner.Ref = MessageToSliceByte[*crossplane.Ref](entity.GetResource().GetRef())
-		scanner.ResourceDef = MessageToSliceByte[*crossplane.ResourceDef](entity.GetResource().GetResourceDef())
-		scanner.ResourceYaml = entity.GetResource().GetResourceYaml()
-		scanner.Synced = entity.GetResource().GetSynced()
-		scanner.Ready = entity.GetResource().GetReady()
-		scanner.ExternalId = entity.GetResource().GetExternalId()
-		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
-		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
-		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
-		return scanner
-	}
-}
-func ScannerToResource(
-	upcastId TypeCaster[string, *panel.Ulid],
-	upcastParentResourceId TypeCaster[*string, *panel.Ulid],
-) TypeCaster[*ResourceScanner, *panel.Resource] {
-	return func(model *ResourceScanner) *panel.Resource {
-		if model == nil {
-			return nil
-		}
-		entity := &panel.Resource{
-			Id:               upcastId(model.Id),
-			ParentResourceId: upcastParentResourceId(model.ParentResourceId),
-		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
-		}
-		entity.Resource = &crossplane.ResourceWithStatus{
-			Ref:          MessageFromSliceByte[*crossplane.Ref](model.Ref),
-			ResourceDef:  MessageFromSliceByte[*crossplane.ResourceDef](model.ResourceDef),
-			ResourceYaml: model.ResourceYaml,
-			Synced:       model.Synced,
-			Ready:        model.Ready,
-			ExternalId:   model.ExternalId,
-		}
-
-		return entity
-	}
-}
-func NewResourceRepository(
-	dbGetter DbGetter,
-	upcastId TypeCaster[string, *panel.Ulid],
-	downcastId TypeCaster[*panel.Ulid, string],
-	upcastParentResourceId TypeCaster[*string, *panel.Ulid],
-	downcastParentResourceId TypeCaster[*panel.Ulid, *string],
-	defaultOpts ...ResourceRepositoryOption,
-) ResourceRepository {
-	return newGenericRepository(
-		newGenericScannerRepository(Resource.table, dbGetter),
-		ResourceToScanner(downcastId, downcastParentResourceId),
-		ScannerToResource(upcastId, upcastParentResourceId),
-		defaultOpts...,
-	)
-}
-func RunToScanner(
-	downcastId TypeCaster[*panel.Ulid, string],
-	downcastTargetVmResourceId TypeCaster[*panel.Ulid, string],
-	downcastRunnerVmResourceId TypeCaster[*panel.Ulid, string],
-) TypeCaster[*panel.Run, *RunScanner] {
-	return func(entity *panel.Run) *RunScanner {
-		if entity == nil {
-			return nil
-		}
-		scanner := &RunScanner{
-			Id:                  downcastId(entity.Id),
-			Status:              EnumToInt32[panel.Run_Status](entity.Status),
-			TargetVmResourceId:  downcastTargetVmResourceId(entity.TargetVmResourceId),
-			RunnerVmResourceId:  downcastRunnerVmResourceId(entity.RunnerVmResourceId),
-			RunInfo:             entity.RunInfo,
-			GrafanaDashboardUrl: entity.GrafanaDashboardUrl,
-		}
-		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
-		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
-		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
-		return scanner
-	}
-}
-func ScannerToRun(
-	upcastId TypeCaster[string, *panel.Ulid],
-	upcastTargetVmResourceId TypeCaster[string, *panel.Ulid],
-	upcastRunnerVmResourceId TypeCaster[string, *panel.Ulid],
-) TypeCaster[*RunScanner, *panel.Run] {
-	return func(model *RunScanner) *panel.Run {
-		if model == nil {
-			return nil
-		}
-		entity := &panel.Run{
-			Id:                  upcastId(model.Id),
-			Status:              EnumFromInt32[panel.Run_Status](model.Status),
-			TargetVmResourceId:  upcastTargetVmResourceId(model.TargetVmResourceId),
-			RunnerVmResourceId:  upcastRunnerVmResourceId(model.RunnerVmResourceId),
-			RunInfo:             model.RunInfo,
-			GrafanaDashboardUrl: model.GrafanaDashboardUrl,
-		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
-		}
-
-		return entity
-	}
-}
-func NewRunRepository(
-	dbGetter DbGetter,
-	upcastId TypeCaster[string, *panel.Ulid],
-	downcastId TypeCaster[*panel.Ulid, string],
-	upcastTargetVmResourceId TypeCaster[string, *panel.Ulid],
-	downcastTargetVmResourceId TypeCaster[*panel.Ulid, string],
-	upcastRunnerVmResourceId TypeCaster[string, *panel.Ulid],
-	downcastRunnerVmResourceId TypeCaster[*panel.Ulid, string],
-	defaultOpts ...RunRepositoryOption,
-) RunRepository {
-	return newGenericRepository(
-		newGenericScannerRepository(Run.table, dbGetter),
-		RunToScanner(downcastId, downcastTargetVmResourceId, downcastRunnerVmResourceId),
-		ScannerToRun(upcastId, upcastTargetVmResourceId, upcastRunnerVmResourceId),
 		defaultOpts...,
 	)
 }

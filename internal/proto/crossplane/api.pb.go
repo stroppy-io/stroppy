@@ -25,7 +25,8 @@ const (
 type CreateResourceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Resource      *ResourceDef           `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	WaitForSync   bool                   `protobuf:"varint,2,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
+	Ref           *Ref                   `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
+	WaitForSync   bool                   `protobuf:"varint,3,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -63,6 +64,13 @@ func (*CreateResourceRequest) Descriptor() ([]byte, []int) {
 func (x *CreateResourceRequest) GetResource() *ResourceDef {
 	if x != nil {
 		return x.Resource
+	}
+	return nil
+}
+
+func (x *CreateResourceRequest) GetRef() *Ref {
+	if x != nil {
+		return x.Ref
 	}
 	return nil
 }
@@ -172,7 +180,7 @@ func (x *CreateResourcesManyResponse) GetResponses() []*ResourceWithStatus {
 
 type DeleteResourceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Ref           *Ref                   `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	Ref           *ExtRef                `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
 	WaitForSync   bool                   `protobuf:"varint,2,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -208,7 +216,7 @@ func (*DeleteResourceRequest) Descriptor() ([]byte, []int) {
 	return file_crossplane_api_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *DeleteResourceRequest) GetRef() *Ref {
+func (x *DeleteResourceRequest) GetRef() *ExtRef {
 	if x != nil {
 		return x.Ref
 	}
@@ -224,7 +232,7 @@ func (x *DeleteResourceRequest) GetWaitForSync() bool {
 
 type GetResourceStatusRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Ref           *Ref                   `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	Ref           *ExtRef                `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -259,24 +267,83 @@ func (*GetResourceStatusRequest) Descriptor() ([]byte, []int) {
 	return file_crossplane_api_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *GetResourceStatusRequest) GetRef() *Ref {
+func (x *GetResourceStatusRequest) GetRef() *ExtRef {
 	if x != nil {
 		return x.Ref
 	}
 	return nil
 }
 
+type GetResourceStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Synced        bool                   `protobuf:"varint,1,opt,name=synced,proto3" json:"synced,omitempty"`
+	Ready         bool                   `protobuf:"varint,2,opt,name=ready,proto3" json:"ready,omitempty"`
+	ExternalId    string                 `protobuf:"bytes,3,opt,name=external_id,json=externalId,proto3" json:"external_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetResourceStatusResponse) Reset() {
+	*x = GetResourceStatusResponse{}
+	mi := &file_crossplane_api_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetResourceStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetResourceStatusResponse) ProtoMessage() {}
+
+func (x *GetResourceStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_api_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetResourceStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetResourceStatusResponse) Descriptor() ([]byte, []int) {
+	return file_crossplane_api_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetResourceStatusResponse) GetSynced() bool {
+	if x != nil {
+		return x.Synced
+	}
+	return false
+}
+
+func (x *GetResourceStatusResponse) GetReady() bool {
+	if x != nil {
+		return x.Ready
+	}
+	return false
+}
+
+func (x *GetResourceStatusResponse) GetExternalId() string {
+	if x != nil {
+		return x.ExternalId
+	}
+	return ""
+}
+
 type DeleteResourceResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Synced        bool                   `protobuf:"varint,1,opt,name=synced,proto3" json:"synced,omitempty"`
-	Deleted       bool                   `protobuf:"varint,2,opt,name=deleted,proto3" json:"deleted,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DeleteResourceResponse) Reset() {
 	*x = DeleteResourceResponse{}
-	mi := &file_crossplane_api_proto_msgTypes[5]
+	mi := &file_crossplane_api_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -288,7 +355,7 @@ func (x *DeleteResourceResponse) String() string {
 func (*DeleteResourceResponse) ProtoMessage() {}
 
 func (x *DeleteResourceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_api_proto_msgTypes[5]
+	mi := &file_crossplane_api_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -301,7 +368,7 @@ func (x *DeleteResourceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteResourceResponse.ProtoReflect.Descriptor instead.
 func (*DeleteResourceResponse) Descriptor() ([]byte, []int) {
-	return file_crossplane_api_proto_rawDescGZIP(), []int{5}
+	return file_crossplane_api_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DeleteResourceResponse) GetSynced() bool {
@@ -311,11 +378,100 @@ func (x *DeleteResourceResponse) GetSynced() bool {
 	return false
 }
 
-func (x *DeleteResourceResponse) GetDeleted() bool {
+type DeleteResourcesManyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Refs          []*ExtRef              `protobuf:"bytes,1,rep,name=refs,proto3" json:"refs,omitempty"`
+	WaitForSync   bool                   `protobuf:"varint,2,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteResourcesManyRequest) Reset() {
+	*x = DeleteResourcesManyRequest{}
+	mi := &file_crossplane_api_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteResourcesManyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteResourcesManyRequest) ProtoMessage() {}
+
+func (x *DeleteResourcesManyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_api_proto_msgTypes[7]
 	if x != nil {
-		return x.Deleted
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteResourcesManyRequest.ProtoReflect.Descriptor instead.
+func (*DeleteResourcesManyRequest) Descriptor() ([]byte, []int) {
+	return file_crossplane_api_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *DeleteResourcesManyRequest) GetRefs() []*ExtRef {
+	if x != nil {
+		return x.Refs
+	}
+	return nil
+}
+
+func (x *DeleteResourcesManyRequest) GetWaitForSync() bool {
+	if x != nil {
+		return x.WaitForSync
 	}
 	return false
+}
+
+type DeleteResourcesManyResponse struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Responses     []*DeleteResourceResponse `protobuf:"bytes,1,rep,name=responses,proto3" json:"responses,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteResourcesManyResponse) Reset() {
+	*x = DeleteResourcesManyResponse{}
+	mi := &file_crossplane_api_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteResourcesManyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteResourcesManyResponse) ProtoMessage() {}
+
+func (x *DeleteResourcesManyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_api_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteResourcesManyResponse.ProtoReflect.Descriptor instead.
+func (*DeleteResourcesManyResponse) Descriptor() ([]byte, []int) {
+	return file_crossplane_api_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *DeleteResourcesManyResponse) GetResponses() []*DeleteResourceResponse {
+	if x != nil {
+		return x.Responses
+	}
+	return nil
 }
 
 var File_crossplane_api_proto protoreflect.FileDescriptor
@@ -323,29 +479,40 @@ var File_crossplane_api_proto protoreflect.FileDescriptor
 const file_crossplane_api_proto_rawDesc = "" +
 	"\n" +
 	"\x14crossplane/api.proto\x12\n" +
-	"crossplane\x1a\x1bcrossplane/crossplane.proto\x1a\x17validate/validate.proto\"z\n" +
+	"crossplane\x1a\x19crossplane/resource.proto\x1a\x16crossplane/types.proto\x1a\x17validate/validate.proto\"\xa7\x01\n" +
 	"\x15CreateResourceRequest\x12=\n" +
-	"\bresource\x18\x01 \x01(\v2\x17.crossplane.ResourceDefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\bresource\x12\"\n" +
-	"\rwait_for_sync\x18\x02 \x01(\bR\vwaitForSync\"\x81\x01\n" +
+	"\bresource\x18\x01 \x01(\v2\x17.crossplane.ResourceDefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\bresource\x12+\n" +
+	"\x03ref\x18\x02 \x01(\v2\x0f.crossplane.RefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03ref\x12\"\n" +
+	"\rwait_for_sync\x18\x03 \x01(\bR\vwaitForSync\"\x81\x01\n" +
 	"\x1aCreateResourcesManyRequest\x12?\n" +
 	"\tresources\x18\x01 \x03(\v2\x17.crossplane.ResourceDefB\b\xfaB\x05\x92\x01\x02\b\x01R\tresources\x12\"\n" +
 	"\rwait_for_sync\x18\x02 \x01(\bR\vwaitForSync\"e\n" +
 	"\x1bCreateResourcesManyResponse\x12F\n" +
-	"\tresponses\x18\x01 \x03(\v2\x1e.crossplane.ResourceWithStatusB\b\xfaB\x05\x92\x01\x02\b\x01R\tresponses\"h\n" +
-	"\x15DeleteResourceRequest\x12+\n" +
-	"\x03ref\x18\x01 \x01(\v2\x0f.crossplane.RefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03ref\x12\"\n" +
-	"\rwait_for_sync\x18\x02 \x01(\bR\vwaitForSync\"G\n" +
-	"\x18GetResourceStatusRequest\x12+\n" +
-	"\x03ref\x18\x01 \x01(\v2\x0f.crossplane.RefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03ref\"J\n" +
+	"\tresponses\x18\x01 \x03(\v2\x1e.crossplane.ResourceWithStatusB\b\xfaB\x05\x92\x01\x02\b\x01R\tresponses\"k\n" +
+	"\x15DeleteResourceRequest\x12.\n" +
+	"\x03ref\x18\x01 \x01(\v2\x12.crossplane.ExtRefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03ref\x12\"\n" +
+	"\rwait_for_sync\x18\x02 \x01(\bR\vwaitForSync\"J\n" +
+	"\x18GetResourceStatusRequest\x12.\n" +
+	"\x03ref\x18\x01 \x01(\v2\x12.crossplane.ExtRefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03ref\"j\n" +
+	"\x19GetResourceStatusResponse\x12\x16\n" +
+	"\x06synced\x18\x01 \x01(\bR\x06synced\x12\x14\n" +
+	"\x05ready\x18\x02 \x01(\bR\x05ready\x12\x1f\n" +
+	"\vexternal_id\x18\x03 \x01(\tR\n" +
+	"externalId\"0\n" +
 	"\x16DeleteResourceResponse\x12\x16\n" +
-	"\x06synced\x18\x01 \x01(\bR\x06synced\x12\x18\n" +
-	"\adeleted\x18\x02 \x01(\bR\adeleted2\xfd\x02\n" +
+	"\x06synced\x18\x01 \x01(\bR\x06synced\"r\n" +
+	"\x1aDeleteResourcesManyRequest\x120\n" +
+	"\x04refs\x18\x01 \x03(\v2\x12.crossplane.ExtRefB\b\xfaB\x05\x92\x01\x02\b\x01R\x04refs\x12\"\n" +
+	"\rwait_for_sync\x18\x02 \x01(\bR\vwaitForSync\"i\n" +
+	"\x1bDeleteResourcesManyResponse\x12J\n" +
+	"\tresponses\x18\x01 \x03(\v2\".crossplane.DeleteResourceResponseB\b\xfaB\x05\x92\x01\x02\b\x01R\tresponses2\xec\x03\n" +
 	"\n" +
 	"Crossplane\x12S\n" +
 	"\x0eCreateResource\x12!.crossplane.CreateResourceRequest\x1a\x1e.crossplane.ResourceWithStatus\x12f\n" +
-	"\x13CreateResourcesMany\x12&.crossplane.CreateResourcesManyRequest\x1a'.crossplane.CreateResourcesManyResponse\x12Y\n" +
-	"\x11GetResourceStatus\x12$.crossplane.GetResourceStatusRequest\x1a\x1e.crossplane.ResourceWithStatus\x12W\n" +
-	"\x0eDeleteResource\x12!.crossplane.DeleteResourceRequest\x1a\".crossplane.DeleteResourceResponseBEZCgithub.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplaneb\x06proto3"
+	"\x13CreateResourcesMany\x12&.crossplane.CreateResourcesManyRequest\x1a'.crossplane.CreateResourcesManyResponse\x12`\n" +
+	"\x11GetResourceStatus\x12$.crossplane.GetResourceStatusRequest\x1a%.crossplane.GetResourceStatusResponse\x12W\n" +
+	"\x0eDeleteResource\x12!.crossplane.DeleteResourceRequest\x1a\".crossplane.DeleteResourceResponse\x12f\n" +
+	"\x13DeleteResourcesMany\x12&.crossplane.DeleteResourcesManyRequest\x1a'.crossplane.DeleteResourcesManyResponseBEZCgithub.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplaneb\x06proto3"
 
 var (
 	file_crossplane_api_proto_rawDescOnce sync.Once
@@ -359,37 +526,46 @@ func file_crossplane_api_proto_rawDescGZIP() []byte {
 	return file_crossplane_api_proto_rawDescData
 }
 
-var file_crossplane_api_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_crossplane_api_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_crossplane_api_proto_goTypes = []any{
 	(*CreateResourceRequest)(nil),       // 0: crossplane.CreateResourceRequest
 	(*CreateResourcesManyRequest)(nil),  // 1: crossplane.CreateResourcesManyRequest
 	(*CreateResourcesManyResponse)(nil), // 2: crossplane.CreateResourcesManyResponse
 	(*DeleteResourceRequest)(nil),       // 3: crossplane.DeleteResourceRequest
 	(*GetResourceStatusRequest)(nil),    // 4: crossplane.GetResourceStatusRequest
-	(*DeleteResourceResponse)(nil),      // 5: crossplane.DeleteResourceResponse
-	(*ResourceDef)(nil),                 // 6: crossplane.ResourceDef
-	(*ResourceWithStatus)(nil),          // 7: crossplane.ResourceWithStatus
-	(*Ref)(nil),                         // 8: crossplane.Ref
+	(*GetResourceStatusResponse)(nil),   // 5: crossplane.GetResourceStatusResponse
+	(*DeleteResourceResponse)(nil),      // 6: crossplane.DeleteResourceResponse
+	(*DeleteResourcesManyRequest)(nil),  // 7: crossplane.DeleteResourcesManyRequest
+	(*DeleteResourcesManyResponse)(nil), // 8: crossplane.DeleteResourcesManyResponse
+	(*ResourceDef)(nil),                 // 9: crossplane.ResourceDef
+	(*Ref)(nil),                         // 10: crossplane.Ref
+	(*ResourceWithStatus)(nil),          // 11: crossplane.ResourceWithStatus
+	(*ExtRef)(nil),                      // 12: crossplane.ExtRef
 }
 var file_crossplane_api_proto_depIdxs = []int32{
-	6, // 0: crossplane.CreateResourceRequest.resource:type_name -> crossplane.ResourceDef
-	6, // 1: crossplane.CreateResourcesManyRequest.resources:type_name -> crossplane.ResourceDef
-	7, // 2: crossplane.CreateResourcesManyResponse.responses:type_name -> crossplane.ResourceWithStatus
-	8, // 3: crossplane.DeleteResourceRequest.ref:type_name -> crossplane.Ref
-	8, // 4: crossplane.GetResourceStatusRequest.ref:type_name -> crossplane.Ref
-	0, // 5: crossplane.Crossplane.CreateResource:input_type -> crossplane.CreateResourceRequest
-	1, // 6: crossplane.Crossplane.CreateResourcesMany:input_type -> crossplane.CreateResourcesManyRequest
-	4, // 7: crossplane.Crossplane.GetResourceStatus:input_type -> crossplane.GetResourceStatusRequest
-	3, // 8: crossplane.Crossplane.DeleteResource:input_type -> crossplane.DeleteResourceRequest
-	7, // 9: crossplane.Crossplane.CreateResource:output_type -> crossplane.ResourceWithStatus
-	2, // 10: crossplane.Crossplane.CreateResourcesMany:output_type -> crossplane.CreateResourcesManyResponse
-	7, // 11: crossplane.Crossplane.GetResourceStatus:output_type -> crossplane.ResourceWithStatus
-	5, // 12: crossplane.Crossplane.DeleteResource:output_type -> crossplane.DeleteResourceResponse
-	9, // [9:13] is the sub-list for method output_type
-	5, // [5:9] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	9,  // 0: crossplane.CreateResourceRequest.resource:type_name -> crossplane.ResourceDef
+	10, // 1: crossplane.CreateResourceRequest.ref:type_name -> crossplane.Ref
+	9,  // 2: crossplane.CreateResourcesManyRequest.resources:type_name -> crossplane.ResourceDef
+	11, // 3: crossplane.CreateResourcesManyResponse.responses:type_name -> crossplane.ResourceWithStatus
+	12, // 4: crossplane.DeleteResourceRequest.ref:type_name -> crossplane.ExtRef
+	12, // 5: crossplane.GetResourceStatusRequest.ref:type_name -> crossplane.ExtRef
+	12, // 6: crossplane.DeleteResourcesManyRequest.refs:type_name -> crossplane.ExtRef
+	6,  // 7: crossplane.DeleteResourcesManyResponse.responses:type_name -> crossplane.DeleteResourceResponse
+	0,  // 8: crossplane.Crossplane.CreateResource:input_type -> crossplane.CreateResourceRequest
+	1,  // 9: crossplane.Crossplane.CreateResourcesMany:input_type -> crossplane.CreateResourcesManyRequest
+	4,  // 10: crossplane.Crossplane.GetResourceStatus:input_type -> crossplane.GetResourceStatusRequest
+	3,  // 11: crossplane.Crossplane.DeleteResource:input_type -> crossplane.DeleteResourceRequest
+	7,  // 12: crossplane.Crossplane.DeleteResourcesMany:input_type -> crossplane.DeleteResourcesManyRequest
+	11, // 13: crossplane.Crossplane.CreateResource:output_type -> crossplane.ResourceWithStatus
+	2,  // 14: crossplane.Crossplane.CreateResourcesMany:output_type -> crossplane.CreateResourcesManyResponse
+	5,  // 15: crossplane.Crossplane.GetResourceStatus:output_type -> crossplane.GetResourceStatusResponse
+	6,  // 16: crossplane.Crossplane.DeleteResource:output_type -> crossplane.DeleteResourceResponse
+	8,  // 17: crossplane.Crossplane.DeleteResourcesMany:output_type -> crossplane.DeleteResourcesManyResponse
+	13, // [13:18] is the sub-list for method output_type
+	8,  // [8:13] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_crossplane_api_proto_init() }
@@ -397,14 +573,15 @@ func file_crossplane_api_proto_init() {
 	if File_crossplane_api_proto != nil {
 		return
 	}
-	file_crossplane_crossplane_proto_init()
+	file_crossplane_resource_proto_init()
+	file_crossplane_types_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_crossplane_api_proto_rawDesc), len(file_crossplane_api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

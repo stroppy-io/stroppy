@@ -1,6 +1,9 @@
 package httpserv
 
 import (
+	connectcors "connectrpc.com/cors"
+	"github.com/rs/cors"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/api"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/claims"
 	"google.golang.org/grpc"
 	"net"
@@ -9,9 +12,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	connectcors "connectrpc.com/cors"
 	"github.com/go-chi/chi/v5"
-	"github.com/rs/cors"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/probes"
@@ -38,45 +39,46 @@ func NewServer(
 	startupProbe probes.Probe,
 	readyProbe probes.Probe,
 	userTokenProtector TokenProtector,
-	grpcHandler panel.PanelServiceServer,
+	service *api.PanelService,
 ) (*http.Server, error) {
 	connectProtocols := new(http.Protocols)
 	connectProtocols.SetHTTP1(true)
 	connectProtocols.SetHTTP2(true)
 	connectProtocols.SetUnencryptedHTTP2(true)
 	mux := chi.NewMux()
-	mux.Group(func(r chi.Router) {
-		mux.Handle(probes.DefaultLivenessProbePath, probes.NewLivenessProbe(readyProbe))
-		mux.Handle(probes.DefaultReadinessProbePath, probes.NewReadinessProbe(readyProbe))
-		mux.Handle(probes.DefaultStartupProbePath, probes.NewStartupProbe(startupProbe))
-	})
-	mux.Group(func(r chi.Router) {
-		r.Use(cors.New(cors.Options{
-			AllowedOrigins: []string{config.CorsDomain}, // TODO: replace with your domain
-			AllowedMethods: connectcors.AllowedMethods(),
-			AllowedHeaders: connectcors.AllowedHeaders(),
-			ExposedHeaders: connectcors.ExposedHeaders(),
-			MaxAge:         7200, // 2 hours in seconds
-		}).Handler)
-		mux.Handle(addStarToPath(
-			panelconnect.NewPanelServiceHandler(
-				grpcHandler,
-				connect.WithInterceptors(
-					loggerMiddleware(log.Named("connect")),
-					authMiddleware[claims.Claims](
-						protectedGrpcService(
-							userTokenProtector,
-							[]grpc.ServiceDesc{panel.PanelService_ServiceDesc},
-							WithExcluding(panel.PanelService_Login_FullMethodName),
-							WithExcluding(panel.PanelService_Register_FullMethodName),
-							WithExcluding(panel.PanelService_ListTopRuns_FullMethodName),
-						),
-					),
-					recoveryMiddleware(NoRecoveryHandlerFuncContext),
-				),
+	mux.Use(cors.New(cors.Options{
+		AllowedOrigins: []string{config.CorsDomain}, // TODO: replace with your domain
+		AllowedMethods: connectcors.AllowedMethods(),
+		AllowedHeaders: connectcors.AllowedHeaders(),
+		ExposedHeaders: connectcors.ExposedHeaders(),
+		MaxAge:         7200, // 2 hours in seconds
+	}).Handler)
+	mux.Handle(probes.DefaultLivenessProbePath, probes.NewLivenessProbe(readyProbe))
+	mux.Handle(probes.DefaultReadinessProbePath, probes.NewReadinessProbe(readyProbe))
+	mux.Handle(probes.DefaultStartupProbePath, probes.NewStartupProbe(startupProbe))
+	intercept := connect.WithInterceptors(
+		loggerMiddleware(log.Named("connect")),
+		authMiddleware[claims.Claims](
+			protectedGrpcService(
+				userTokenProtector,
+				[]grpc.ServiceDesc{
+					panel.AccountService_ServiceDesc,
+					panel.ResourcesService_ServiceDesc,
+					panel.RunService_ServiceDesc,
+					panel.AutomateService_ServiceDesc,
+				},
+				WithExcluding(panel.AccountService_Login_FullMethodName),
+				WithExcluding(panel.AccountService_Register_FullMethodName),
+				WithExcluding(panel.AccountService_RefreshTokens_FullMethodName),
+				WithExcluding(panel.RunService_ListTopRuns_FullMethodName),
 			),
-		))
-	})
+		),
+		recoveryMiddleware(NoRecoveryHandlerFuncContext),
+	)
+	mux.Handle(addStarToPath(panelconnect.NewAccountServiceHandler(service, intercept)))
+	mux.Handle(addStarToPath(panelconnect.NewAutomateServiceHandler(service, intercept)))
+	mux.Handle(addStarToPath(panelconnect.NewResourcesServiceHandler(service, intercept)))
+	mux.Handle(addStarToPath(panelconnect.NewRunServiceHandler(service, intercept)))
 	httpServer := &http.Server{
 		Addr:         net.JoinHostPort(config.Host, strconv.Itoa(config.Port)),
 		Handler:      mux,

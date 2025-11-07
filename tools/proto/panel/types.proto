@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package panel;
+
+import "google/protobuf/timestamp.proto";
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
+
+message Ulid {
+    message List {
+        repeated Ulid ulids = 1;
+    }
+    string id = 1 [(validate.rules).string.len = 26];
+}
+
+enum NumberFilterOperator {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_EQUAL = 1;
+    TYPE_NOT_EQUAL = 2;
+    TYPE_GREATER_THAN = 3;
+    TYPE_LESS_THAN = 4;
+    TYPE_GREATER_THAN_OR_EQUAL = 5;
+    TYPE_LESS_THAN_OR_EQUAL = 6;
+}
+
+message Timing {
+    google.protobuf.Timestamp created_at = 1;
+    google.protobuf.Timestamp updated_at = 2;
+    optional google.protobuf.Timestamp deleted_at = 3;
+}
+
+message Tps {
+    message Filter {
+        enum Type {
+            TYPE_UNSPECIFIED = 0;
+            TYPE_AVERAGE = 1;
+            TYPE_MAX = 2;
+            TYPE_MIN = 3;
+            TYPE_P95TH = 4;
+            TYPE_P99TH = 5;
+        }
+        Type parameter_type = 1 [(validate.rules).enum.defined_only = true];
+        NumberFilterOperator operator = 3 [(validate.rules).enum.defined_only = true];
+        uint64 value = 2 [(validate.rules).uint64.gt = 0];
+    }
+    uint64 average = 1;
+    uint64 max = 2;
+    uint64 min = 3;
+    uint64 p95th = 4;
+    uint64 p99th = 5;
+}
+
+enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_IDLE = 1;
+    STATUS_RUNNING = 2;
+    STATUS_COMPLETED = 3;
+    STATUS_FAILED = 4;
+    STATUS_CANCELLED = 5;
+}
+
+message MachineInfo {
+    message Filter {
+        enum Type {
+            TYPE_UNSPECIFIED = 0;
+            TYPE_CORES = 1;
+            TYPE_MEMORY = 2;
+            TYPE_DISK = 3;
+        }
+        Type parameter_type = 1 [(validate.rules).enum.defined_only = true];
+        NumberFilterOperator operator = 2 [(validate.rules).enum.defined_only = true];
+        uint64 value = 3 [(validate.rules).uint64.gt = 0];
+    }
+    uint32 cores = 1; // in cores
+    uint32 memory = 2; // in GB
+    uint32 disk = 3; // in GB
+}
+
+message Cluster {
+    bool is_single_machine_mode = 1;
+    repeated MachineInfo machines = 2;
+}
+
+message Script {
+    bytes body = 1;
+    repeated string tags = 2;
+}
+
+message Workload {
+    enum Type {
+        TYPE_UNSPECIFIED = 0;
+        TYPE_TPCC = 1; // now only support TPCC
+    }
+    string name = 1 [(validate.rules).string = {min_len: 3,max_len: 255}];
+    Type workload_type = 2;
+    map<string, string> parameters = 3;
+    optional Script deployment_script_id = 4;
+    Cluster runner_cluster = 5;
+}
+
+message Database {
+    enum Type {
+        TYPE_UNSPECIFIED = 0;
+        TYPE_POSTGRES_ORIOLE = 1; // now only support postgres
+    }
+    string name = 1 [(validate.rules).string = {min_len: 3,max_len: 255}];
+    Type database_type = 2;
+    map<string, string> parameters = 3;
+    optional Script deployment_script_id = 4;
+    Cluster runner_cluster = 5; // database cluster information
+}

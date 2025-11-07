@@ -116,3 +116,4 @@ fabric.properties
 http-client.private.env.json
 /.netrc
 /xexample
+/internal/automate/kubeconfig.yaml

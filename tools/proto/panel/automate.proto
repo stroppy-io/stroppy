@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package panel;
+
+import "crossplane/types.proto";
+import "google/protobuf/empty.proto";
+import "crossplane/resource.proto";
+import "panel/run.proto";
+import "panel/types.proto";
+import "protopgx/pgx.proto";
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
+
+// ----------------------------------------__RESOURCES_SERVICE__--------------------------------------------------------
+
+message CloudResource {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "cloud_resources"
+    };
+    message TreeNode {
+        Ulid id = 1 [(validate.rules).string.len = 26];
+        CloudResource resource = 2 [(sql.sql_field).embedded_message = true];
+        repeated TreeNode children = 3 [(sql.sql_field).embedded_message = true];
+    }
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    crossplane.ResourceWithStatus resource = 3 [
+        (sql.sql_field).embedded_message = true
+    ];
+    optional Ulid parent_resource_id = 4 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+}
+
+service ResourcesService {
+    rpc GetResource (Ulid) returns (CloudResource.TreeNode); // get all resource tree
+}
+
+
+// ----------------------------------------__AUTOMATE_SERVICE__---------------------------------------------------------
+
+message CloudAutomation {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "cloud_automations"
+    };
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Ulid database_root_resource_id = 2 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    Ulid workload_root_resource_id = 3 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    optional Ulid stroppy_run_id = 5 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+}
+
+
+message RunAutomationRequest {
+    Database database = 1 [(sql.sql_field).serialized_message = true];
+    Workload workload = 2 [(sql.sql_field).serialized_message = true];
+    crossplane.SupportedCloud using_cloud_provider = 3 [(validate.rules).enum.const = 1]; // now it's YandexCloud only
+}
+
+service AutomateService {
+    rpc GetAutomation (Ulid) returns (CloudAutomation);
+    rpc RunAutomation (RunAutomationRequest) returns (RunRecord);
+}

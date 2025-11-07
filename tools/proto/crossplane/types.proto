@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package crossplane;
+
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane";
+
+
+message Ref {
+    string namespace = 1 [(validate.rules).string.min_len = 1];
+    string name = 2 [(validate.rules).string.min_len = 1];
+}
+
+message ExtRef {
+    Ref ref = 1 [(validate.rules).message.required = true];
+    string api_version = 2 [(validate.rules).string.min_len = 1];
+    string kind = 3 [(validate.rules).string.min_len = 1];
+}
+
+message Metadata {
+    string name = 1 [(validate.rules).string.min_len = 1];
+    string namespace = 2 [(validate.rules).string.min_len = 1];
+    map<string, string> annotations = 3;
+}
+
+enum SupportedCloud {
+    SUPPORTED_CLOUD_UNSPECIFIED = 0;
+    SUPPORTED_CLOUD_YANDEX = 1;
+}
