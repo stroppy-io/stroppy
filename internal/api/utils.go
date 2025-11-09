@@ -63,6 +63,8 @@ func NewRunRecordRepository(executor sqlexec.Executor) orm.RunRecordRepository {
 		ids.UlidToStr,
 		ids.UlidFromString,
 		ids.UlidToStr,
+		ids.UlidFromStringPtr,
+		ids.UlidToStrPtr,
 	)
 }
 func NewCloudAutomationRepository(executor sqlexec.Executor) orm.CloudAutomationRepository {

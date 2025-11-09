@@ -24,7 +24,7 @@ message YandexCloud {
         }
         string name = 1 [(validate.rules).string.min_len = 1];
         NetworkIdRef network_id_ref = 2 [(validate.rules).message.required = true];
-        repeated string v4_cidr_block = 3 [(validate.rules).string.min_len = 1];
+        repeated string v4_cidr_blocks = 3 [(validate.rules).string.min_len = 1];
     }
     message Vm {
         message Resources {
@@ -38,13 +38,13 @@ message YandexCloud {
             repeated InitializeParams initialize_params = 1 [(validate.rules).repeated.min_items = 1];
         }
         message NetworkInterface {
-            Ref subnet_id_ref = 1 [(validate.rules).message.required = true];
+            OnlyNameRef subnet_id_ref = 1 [(validate.rules).message.required = true];
             bool nat = 2;
         }
         string name = 2 [(validate.rules).string.min_len = 1];
         string platform_id = 3 [(validate.rules).string.const = "standard-v2"];
         string zone = 4 [(validate.rules).string.const = "ru-central1-d"];
-        Resources resources = 5 [(validate.rules).message.required = true];
+        repeated Resources resources = 5 [(validate.rules).message.required = true];
         repeated Disk boot_disk = 6 [(validate.rules).repeated.min_items = 1];
         repeated NetworkInterface network_interface = 7 [(validate.rules).repeated.min_items = 1];
         map<string, string> metadata = 8 [(validate.rules).message.required = true];

@@ -53,11 +53,12 @@ message Tps {
 
 enum Status {
     STATUS_UNSPECIFIED = 0;
+    // status for RunRecord | StroppyRun | StroppyStep
     STATUS_IDLE = 1;
-    STATUS_RUNNING = 2;
-    STATUS_COMPLETED = 3;
+    STATUS_COMPLETED = 2;
+    STATUS_RUNNING = 3;
     STATUS_FAILED = 4;
-    STATUS_CANCELLED = 5;
+    STATUS_CANCELED = 5;
 }
 
 message MachineInfo {

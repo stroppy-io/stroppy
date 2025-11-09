@@ -11,7 +11,8 @@ option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/cr
 message CreateResourceRequest {
     ResourceDef resource = 1 [(validate.rules).message.required = true];
     Ref ref = 2 [(validate.rules).message.required = true];
-    bool wait_for_sync = 3;
+    SupportedCloud supported_cloud = 3 [(validate.rules).enum.defined_only = true];
+    bool wait_for_sync = 5;
 }
 
 message CreateResourcesManyRequest {

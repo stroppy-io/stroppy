@@ -2,18 +2,24 @@ package api
 
 import (
 	"context"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/claims"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
-	"github.com/stroppy-io/stroppy-cloud-panel/tools/sql/migrations"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/automate"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/token"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/claims"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/resource"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/orm"
 	postgres "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
+	"github.com/stroppy-io/stroppy-cloud-panel/tools/sql/migrations"
 )
 
 const (
@@ -21,6 +27,60 @@ const (
 	testPassword       = "Password123@"
 	defaultPostgresUrl = "postgres://postgres:developer@localhost:5432/postgres"
 )
+
+type MockCrossplaneClient struct {
+	resources map[string]*crossplane.ResourceWithStatus
+}
+
+func (m MockCrossplaneClient) CreateResource(ctx context.Context, in *crossplane.CreateResourceRequest, opts ...grpc.CallOption) (*crossplane.ResourceWithStatus, error) {
+	res, ok := m.resources[in.GetResource().GetMetadata().GetName()]
+	if !ok {
+		return nil, fmt.Errorf("resource not found: %s", in.GetResource().GetMetadata().GetName())
+	}
+	return res, nil
+}
+
+func (m MockCrossplaneClient) CreateResourcesMany(ctx context.Context, in *crossplane.CreateResourcesManyRequest, opts ...grpc.CallOption) (*crossplane.CreateResourcesManyResponse, error) {
+	responses := make([]*crossplane.ResourceWithStatus, len(in.GetResources()))
+	for i, res := range in.GetResources() {
+		resp, err := m.CreateResource(ctx, &crossplane.CreateResourceRequest{
+			Resource: res,
+		})
+		if err != nil {
+			return nil, err
+		}
+		responses[i] = resp
+	}
+	return &crossplane.CreateResourcesManyResponse{
+		Responses: responses,
+	}, nil
+}
+
+func (m MockCrossplaneClient) GetResourceStatus(ctx context.Context, in *crossplane.GetResourceStatusRequest, opts ...grpc.CallOption) (*crossplane.GetResourceStatusResponse, error) {
+	return &crossplane.GetResourceStatusResponse{
+		Synced:     true,
+		Ready:      true,
+		ExternalId: "test-id",
+	}, nil
+}
+
+func (m MockCrossplaneClient) DeleteResource(ctx context.Context, in *crossplane.DeleteResourceRequest, opts ...grpc.CallOption) (*crossplane.DeleteResourceResponse, error) {
+	return &crossplane.DeleteResourceResponse{
+		Synced: false,
+	}, nil
+}
+
+func (m MockCrossplaneClient) DeleteResourcesMany(ctx context.Context, in *crossplane.DeleteResourcesManyRequest, opts ...grpc.CallOption) (*crossplane.DeleteResourcesManyResponse, error) {
+	responses := make([]*crossplane.DeleteResourceResponse, len(in.GetRefs()))
+	for i := range in.GetRefs() {
+		responses[i] = &crossplane.DeleteResourceResponse{
+			Synced: false,
+		}
+	}
+	return &crossplane.DeleteResourcesManyResponse{
+		Responses: responses,
+	}, nil
+}
 
 func newDevTestService(t *testing.T) (*PanelService, context.Context, *panel.User) {
 	envUrl, exists := os.LookupEnv("STROPPY_CLOUD_PANEL_DB_URL")
@@ -42,11 +102,24 @@ func newDevTestService(t *testing.T) (*PanelService, context.Context, *panel.Use
 		AccessExpire:  1 * time.Hour,
 		RefreshExpire: 30 * 24 * time.Hour,
 	})
+	k8sConfig := &automate.K8SConfig{
+		KubeconfigPath: "./kubeconfig.yaml",
+		Crossplane: automate.CrossplaneConfig{
+			YandexCloudProviderConfig: resource.YandexCloudProviderConfig{},
+		},
+	}
+
 	service := NewPanelService(
 		logger.Global(),
 		txExecutor,
 		txManager,
 		actor,
+		k8sConfig,
+		&CloudAutomationConfig{
+			AutomationTTL:   4 * time.Hour,
+			CreationTimeout: 15 * time.Minute,
+		},
+		&MockCrossplaneClient{},
 	)
 
 	err = service.usersRepo.Exec(t.Context(), orm.User.Delete())

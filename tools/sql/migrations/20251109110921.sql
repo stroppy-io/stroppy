@@ -1,8 +1,12 @@
 -- Create "cloud_automations" table
 CREATE TABLE "cloud_automations" (
   "id" text NOT NULL,
-  "target_vm_resource_id" text NOT NULL,
-  "runner_vm_resource_id" text NOT NULL,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz NULL,
+  "status" integer NOT NULL DEFAULT 0,
+  "database_root_resource_id" text NOT NULL,
+  "workload_root_resource_id" text NOT NULL,
   "stroppy_run_id" text NULL,
   PRIMARY KEY ("id")
 );
@@ -12,6 +16,7 @@ CREATE TABLE "cloud_resources" (
   "created_at" timestamptz NOT NULL,
   "updated_at" timestamptz NOT NULL,
   "deleted_at" timestamptz NULL,
+  "status" integer NOT NULL DEFAULT 0,
   "ref" jsonb NOT NULL,
   "resource_def" jsonb NOT NULL,
   "resource_yaml" text NOT NULL,
@@ -45,7 +50,7 @@ CREATE TABLE "run_records" (
   "tps" jsonb NOT NULL,
   "database" jsonb NOT NULL,
   "workload" jsonb NOT NULL,
-  "cloud_automation_id" jsonb NULL,
+  "cloud_automation_id" text NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "run_records_author_id_fkey" FOREIGN KEY ("author_id") REFERENCES "users" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
 );

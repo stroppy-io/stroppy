@@ -2,6 +2,7 @@ package application
 
 import (
 	"fmt"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/crossplaneservice"
 	"go.uber.org/zap"
 	"net/http"
 
@@ -59,7 +60,7 @@ func New() (*Application, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CrossplaneApiImpl: %w", err)
 	}
-	crossplaneClient, cancel := NewLocalCrossplaneClient(crossplaneImpl)
+	crossplaneClient, cancel := crossplaneservice.NewLocalCrossplaneClient(crossplaneImpl)
 	if cancel != nil {
 		shutdown.RegisterFn(cancel)
 	}
@@ -69,6 +70,7 @@ func New() (*Application, error) {
 		txManager,
 		tokenActor,
 		&cfg.Service.K8S,
+		&cfg.Service.Automate,
 		crossplaneClient,
 	)
 	server, err := httpserv.NewServer(

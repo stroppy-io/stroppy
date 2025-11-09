@@ -68,6 +68,50 @@ func (SupportedCloud) EnumDescriptor() ([]byte, []int) {
 	return file_crossplane_types_proto_rawDescGZIP(), []int{0}
 }
 
+type OnlyNameRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OnlyNameRef) Reset() {
+	*x = OnlyNameRef{}
+	mi := &file_crossplane_types_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OnlyNameRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OnlyNameRef) ProtoMessage() {}
+
+func (x *OnlyNameRef) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_types_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OnlyNameRef.ProtoReflect.Descriptor instead.
+func (*OnlyNameRef) Descriptor() ([]byte, []int) {
+	return file_crossplane_types_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *OnlyNameRef) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type Ref struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
@@ -78,7 +122,7 @@ type Ref struct {
 
 func (x *Ref) Reset() {
 	*x = Ref{}
-	mi := &file_crossplane_types_proto_msgTypes[0]
+	mi := &file_crossplane_types_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -90,7 +134,7 @@ func (x *Ref) String() string {
 func (*Ref) ProtoMessage() {}
 
 func (x *Ref) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_types_proto_msgTypes[0]
+	mi := &file_crossplane_types_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -103,7 +147,7 @@ func (x *Ref) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ref.ProtoReflect.Descriptor instead.
 func (*Ref) Descriptor() ([]byte, []int) {
-	return file_crossplane_types_proto_rawDescGZIP(), []int{0}
+	return file_crossplane_types_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Ref) GetNamespace() string {
@@ -131,7 +175,7 @@ type ExtRef struct {
 
 func (x *ExtRef) Reset() {
 	*x = ExtRef{}
-	mi := &file_crossplane_types_proto_msgTypes[1]
+	mi := &file_crossplane_types_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -143,7 +187,7 @@ func (x *ExtRef) String() string {
 func (*ExtRef) ProtoMessage() {}
 
 func (x *ExtRef) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_types_proto_msgTypes[1]
+	mi := &file_crossplane_types_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -156,7 +200,7 @@ func (x *ExtRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtRef.ProtoReflect.Descriptor instead.
 func (*ExtRef) Descriptor() ([]byte, []int) {
-	return file_crossplane_types_proto_rawDescGZIP(), []int{1}
+	return file_crossplane_types_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ExtRef) GetRef() *Ref {
@@ -191,7 +235,7 @@ type Metadata struct {
 
 func (x *Metadata) Reset() {
 	*x = Metadata{}
-	mi := &file_crossplane_types_proto_msgTypes[2]
+	mi := &file_crossplane_types_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -203,7 +247,7 @@ func (x *Metadata) String() string {
 func (*Metadata) ProtoMessage() {}
 
 func (x *Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_types_proto_msgTypes[2]
+	mi := &file_crossplane_types_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -216,7 +260,7 @@ func (x *Metadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Metadata.ProtoReflect.Descriptor instead.
 func (*Metadata) Descriptor() ([]byte, []int) {
-	return file_crossplane_types_proto_rawDescGZIP(), []int{2}
+	return file_crossplane_types_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Metadata) GetName() string {
@@ -245,7 +289,9 @@ var File_crossplane_types_proto protoreflect.FileDescriptor
 const file_crossplane_types_proto_rawDesc = "" +
 	"\n" +
 	"\x16crossplane/types.proto\x12\n" +
-	"crossplane\x1a\x17validate/validate.proto\"I\n" +
+	"crossplane\x1a\x17validate/validate.proto\"*\n" +
+	"\vOnlyNameRef\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\"I\n" +
 	"\x03Ref\x12%\n" +
 	"\tnamespace\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\tnamespace\x12\x1b\n" +
 	"\x04name\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\"|\n" +
@@ -278,17 +324,18 @@ func file_crossplane_types_proto_rawDescGZIP() []byte {
 }
 
 var file_crossplane_types_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_crossplane_types_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_crossplane_types_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_crossplane_types_proto_goTypes = []any{
 	(SupportedCloud)(0), // 0: crossplane.SupportedCloud
-	(*Ref)(nil),         // 1: crossplane.Ref
-	(*ExtRef)(nil),      // 2: crossplane.ExtRef
-	(*Metadata)(nil),    // 3: crossplane.Metadata
-	nil,                 // 4: crossplane.Metadata.AnnotationsEntry
+	(*OnlyNameRef)(nil), // 1: crossplane.OnlyNameRef
+	(*Ref)(nil),         // 2: crossplane.Ref
+	(*ExtRef)(nil),      // 3: crossplane.ExtRef
+	(*Metadata)(nil),    // 4: crossplane.Metadata
+	nil,                 // 5: crossplane.Metadata.AnnotationsEntry
 }
 var file_crossplane_types_proto_depIdxs = []int32{
-	1, // 0: crossplane.ExtRef.ref:type_name -> crossplane.Ref
-	4, // 1: crossplane.Metadata.annotations:type_name -> crossplane.Metadata.AnnotationsEntry
+	2, // 0: crossplane.ExtRef.ref:type_name -> crossplane.Ref
+	5, // 1: crossplane.Metadata.annotations:type_name -> crossplane.Metadata.AnnotationsEntry
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
@@ -307,7 +354,7 @@ func file_crossplane_types_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_crossplane_types_proto_rawDesc), len(file_crossplane_types_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

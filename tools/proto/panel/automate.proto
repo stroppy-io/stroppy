@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package panel;
 
+import "crossplane/resource.proto";
 import "crossplane/types.proto";
 import "google/protobuf/empty.proto";
-import "crossplane/resource.proto";
 import "panel/run.proto";
 import "panel/types.proto";
 import "protopgx/pgx.proto";
@@ -12,9 +12,18 @@ import "validate/validate.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
 
+
 // ----------------------------------------__RESOURCES_SERVICE__--------------------------------------------------------
 
 message CloudResource {
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        // status for CloudAutomation
+        STATUS_CREATING = 1;
+        STATUS_WORKING = 2;
+        STATUS_DESTROYING = 3;
+        STATUS_DESTROYED = 4;
+    }
     option (sql.sql_table) = {
         generate: true
         table_name: "cloud_resources"
@@ -31,10 +40,11 @@ message CloudResource {
         }
     ];
     Timing timing = 2 [(sql.sql_field).embedded_message = true];
-    crossplane.ResourceWithStatus resource = 3 [
+    Status status = 3 [(validate.rules).enum.defined_only = true];
+    crossplane.ResourceWithStatus resource = 4 [
         (sql.sql_field).embedded_message = true
     ];
-    optional Ulid parent_resource_id = 4 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    optional Ulid parent_resource_id = 5 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
 }
 
 service ResourcesService {
@@ -55,9 +65,11 @@ message CloudAutomation {
             constraints: {primary_key: true}
         }
     ];
-    Ulid database_root_resource_id = 2 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
-    Ulid workload_root_resource_id = 3 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
-    optional Ulid stroppy_run_id = 5 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    Status status = 3 [(validate.rules).enum.defined_only = true];
+    Ulid database_root_resource_id = 4 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    Ulid workload_root_resource_id = 5 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    optional Ulid stroppy_run_id = 6 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
 }
 
 
@@ -70,4 +82,5 @@ message RunAutomationRequest {
 service AutomateService {
     rpc GetAutomation (Ulid) returns (CloudAutomation);
     rpc RunAutomation (RunAutomationRequest) returns (RunRecord);
+    rpc CancelAutomation (Ulid) returns (google.protobuf.Empty);
 }

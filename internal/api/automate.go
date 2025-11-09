@@ -4,21 +4,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/nodetree"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/uow"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/embed"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/resource"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/timestamps"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
-	"go.uber.org/zap"
+	"strings"
+	"time"
 
 	"connectrpc.com/connect"
+	"github.com/sourcegraph/conc/pool"
+	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/embed"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ids"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/resource"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/timestamps"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/orm"
 	postgres "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 )
+
+type CloudAutomationConfig struct {
+	AutomationTTL   time.Duration `mapstructure:"automation_ttl" default:"4h" required:"true"`
+	CreationTimeout time.Duration `mapstructure:"creation_timeout" default:"15m" required:"true"`
+}
 
 func (p *PanelService) GetAutomation(ctx context.Context, ulid *panel.Ulid) (*panel.CloudAutomation, error) {
 	automation, err := p.cloudAutomationRepo.GetBy(
@@ -31,42 +36,6 @@ func (p *PanelService) GetAutomation(ctx context.Context, ulid *panel.Ulid) (*pa
 	return automation, nil
 }
 
-func (p *PanelService) updateResourceStatus(ctx context.Context, root *panel.CloudResource_TreeNode) error {
-	allNodes, err := nodetree.CollectNodes(root, func(node *panel.CloudResource_TreeNode) bool {
-		return true // Вернуть все узлы
-	})
-	if err != nil {
-		return err
-	}
-	descendants := allNodes[1:]
-	for _, descendant := range descendants {
-		err := p.updateResourceStatus(ctx, descendant)
-		if err != nil {
-			return err
-		}
-		resExtRef := resource.ExtRefFromResourceDef(
-			descendant.GetResource().GetResource().GetRef(),
-			descendant.GetResource().GetResource().GetResourceDef(),
-		)
-		resourceStatus, err := p.crossplaneService.GetResourceStatus(ctx, &crossplane.GetResourceStatusRequest{
-			Ref: resExtRef,
-		})
-		if err != nil {
-			return err
-		}
-		err = p.cloudResourceRepo.Exec(ctx, orm.CloudResource.Update().
-			Set(
-				orm.CloudResource.Synced.Set(resourceStatus.GetSynced()),
-				orm.CloudResource.Ready.Set(resourceStatus.GetReady()),
-				orm.CloudResource.ExternalId.Set(resourceStatus.GetExternalId()),
-			).Where(orm.CloudResource.Id.Eq(descendant.GetId().GetId())))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (p *PanelService) BackgroundCheckAutomationStatus(ctx context.Context) error {
 	p.logger.Info("BackgroundCheckAutomationStatus started")
 	automations, err := p.cloudAutomationRepo.ListBy(ctx, orm.CloudAutomation.SelectAll())
@@ -74,144 +43,114 @@ func (p *PanelService) BackgroundCheckAutomationStatus(ctx context.Context) erro
 		return connect.NewError(connect.CodeInternal, err)
 	}
 	return postgres.WithSerializable(ctx, p.txManager, func(ctx context.Context) error {
+		workPool := pool.New().WithContext(ctx).WithFailFast().WithFirstError()
 		for _, automation := range automations {
-			databaseRes, err := p.GetResource(ctx, automation.DatabaseRootResourceId)
-			if err != nil {
-				p.logger.Error("failed to get database resource", zap.Error(err), zap.String("automation_id", automation.GetId().GetId()))
-				continue
-			}
-			err = p.updateResourceStatus(ctx, databaseRes)
-			if err != nil {
-				return fmt.Errorf("failed to update database resource status: %w", err)
-			}
-			allDatabaseNodes, _ := nodetree.CollectNodes(databaseRes, func(node *panel.CloudResource_TreeNode) bool { return true })
-
-			workloadRes, err := p.GetResource(ctx, automation.WorkloadRootResourceId)
-			if err != nil {
-				p.logger.Error("failed to get workload resource", zap.Error(err), zap.String("automation_id", automation.GetId().GetId()))
-				continue
-			}
-			err = p.updateResourceStatus(ctx, workloadRes)
-			if err != nil {
-				return fmt.Errorf("failed to update workload resource status: %w", err)
-			}
-			allWorkloadNodes, _ := nodetree.CollectNodes(workloadRes, func(node *panel.CloudResource_TreeNode) bool { return true })
-
-			allNodesActive := true
-			for _, node := range append(allDatabaseNodes, allWorkloadNodes...) {
-				if !node.GetResource().GetResource().GetReady() {
-					allNodesActive = false
-					break
+			workPool.Go(func(ctx context.Context) error {
+				if automation.GetTiming().GetCreatedAt().AsTime().Add(p.automateConfig.AutomationTTL).Before(time.Now()) {
+					return p.stopCrossplaneAutomation(ctx, automation, panel.Status_STATUS_FAILED)
 				}
-			}
-			autmationId := automation.GetId().GetId()
-			if allNodesActive {
-				err = p.runRecordRepo.Exec(ctx, orm.RunRecord.Update().
-					Set(orm.RunRecord.Status.Set(int32(panel.Status_STATUS_RUNNING))).
-					Where(orm.RunRecord.CloudAutomationId.Eq(&autmationId)))
-				if err != nil {
-					return fmt.Errorf("failed to update automation status: %w", err)
-				}
-			}
-
-		}
-		return nil
-	})
-}
-
-func (p *PanelService) createCrossplaneResourcesTree(ctx context.Context, resources *panel.CloudResource_TreeNode) error {
-	return uow.With(func(tx *uow.UnitOfWork) error {
-		return nodetree.TraverseTreeBreadthFirst(resources,
-			func(node *panel.CloudResource_TreeNode, depth int) (bool, error) {
-				resExtRef := resource.ExtRefFromResourceDef(
-					node.GetResource().GetResource().GetRef(),
-					node.GetResource().GetResource().GetResourceDef(),
-				)
-				resourceWithStatus, err := p.crossplaneService.CreateResource(ctx,
-					&crossplane.CreateResourceRequest{
-						Resource:    node.GetResource().GetResource().GetResourceDef(),
-						Ref:         resExtRef.GetRef(),
-						WaitForSync: false,
-					},
-				)
-				if err != nil {
-					return false, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to create resource:%s %w", resExtRef.GetKind(), err))
-				}
-				tx.Defer(func() {
-					_, err := p.crossplaneService.DeleteResource(ctx, &crossplane.DeleteResourceRequest{
-						Ref:         resExtRef,
-						WaitForSync: false,
-					})
-					if err != nil {
-						p.logger.Error("failed to delete resource", zap.Error(err), zap.String("kind", resExtRef.GetKind()))
-					}
-				})
-				err = p.cloudResourceRepo.Insert(ctx, &panel.CloudResource{
-					Id:               node.GetId(),
-					Resource:         resourceWithStatus,
-					Timing:           node.GetResource().GetTiming(),
-					ParentResourceId: node.GetResource().GetParentResourceId(),
-				})
-				if err != nil {
-					return false, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to insert resource: %w", err))
-				}
-				return true, nil
+				return p.updateCrossplaneAutomation(ctx, automation)
 			})
+		}
+		return workPool.Wait()
 	})
 }
+
+var (
+	ErrDatabaseRunnerClusterMustHaveExactlyOneMachine = fmt.Errorf("database runner cluster must have exactly one machine")
+	ErrWorkloadRunnerClusterMustHaveExactlyOneMachine = fmt.Errorf("workload runner cluster must have exactly one machine")
+)
 
 func (p *PanelService) RunAutomation(ctx context.Context, request *panel.RunAutomationRequest) (*panel.RunRecord, error) {
+	if len(request.GetDatabase().GetRunnerCluster().GetMachines()) != 1 {
+		return nil, ErrDatabaseRunnerClusterMustHaveExactlyOneMachine
+	}
+	if len(request.GetWorkload().GetRunnerCluster().GetMachines()) != 1 {
+		return nil, ErrWorkloadRunnerClusterMustHaveExactlyOneMachine
+	}
 	user, err := p.getUserFromCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var builder resource.Builder
-	switch request.GetUsingCloudProvider() {
-	case crossplane.SupportedCloud_SUPPORTED_CLOUD_UNSPECIFIED:
-		builder = resource.NewYandexCloudBuilder(&p.k8sConfig.Crossplane.YandexCloudProviderConfig)
-	}
-	if builder == nil {
-		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("unsupported cloud provider"))
+	cloudBuilder, err := resource.DispatchCloudBuilder(request.GetUsingCloudProvider(), &p.k8sConfig.Crossplane)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, err)
 	}
 
 	if request.GetDatabase().GetDatabaseType() != panel.Database_TYPE_POSTGRES_ORIOLE {
-		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("unsupported database type"))
+		return nil, connect.NewError(
+			connect.CodeUnimplemented,
+			errors.New("unsupported database type"),
+		)
 	}
 
 	if request.GetWorkload().GetWorkloadType() != panel.Workload_TYPE_TPCC {
-		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("unsupported workload type"))
+		return nil, connect.NewError(
+			connect.CodeUnimplemented,
+			errors.New("unsupported workload type"),
+		)
 	}
 
 	newAutomationId := ids.NewUlid()
 	dbDeployScript, err := embed.GetOrioleInstallScript()
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to get oriole install script: %w", err))
+		return nil, connect.NewError(
+			connect.CodeInternal,
+			fmt.Errorf("failed to get oriole install script: %w", err),
+		)
 	}
-	databaseResourcesTree, err := builder.NewDatabaseResources(newAutomationId, request.GetDatabase(), dbDeployScript)
+	databaseMachineName := fmt.Sprintf("stroppy-crossplane-database-%s", strings.ToLower(newAutomationId.GetId()))
+	databaseResourcesTree, err := cloudBuilder.NewSingleVmResource(
+		databaseMachineName,
+		request.GetDatabase().GetRunnerCluster().GetMachines()[0],
+		dbDeployScript,
+	)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(
+			connect.CodeInternal,
+			fmt.Errorf("failed to create database spec: %w", err),
+		)
 	}
 	workloadDeployScript, err := embed.GetStroppyInstallScript()
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to get stroppy install script: %w", err))
+		return nil, connect.NewError(
+			connect.CodeInternal,
+			fmt.Errorf("failed to get stroppy install script: %w", err),
+		)
 	}
-	workloadResourcesTree, err := builder.NewWorkloadResources(newAutomationId, request.GetWorkload(), workloadDeployScript)
+	workloadMachineName := fmt.Sprintf("stroppy-crossplane-workload-%s", strings.ToLower(newAutomationId.GetId()))
+	workloadResourcesTree, err := cloudBuilder.NewSingleVmResource(
+		workloadMachineName,
+		request.GetWorkload().GetRunnerCluster().GetMachines()[0],
+		workloadDeployScript,
+	)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(
+			connect.CodeInternal,
+			fmt.Errorf("failed to create database spec: %w", err),
+		)
 	}
 	// TODO: Do not hardcode paths
 	return postgres.WithSerializableRet(ctx, p.txManager,
 		func(ctx context.Context) (*panel.RunRecord, error) {
 			err = p.createCrossplaneResourcesTree(ctx, databaseResourcesTree)
 			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to create database resources: %w", err))
+				return nil, connect.NewError(
+					connect.CodeInternal,
+					fmt.Errorf("failed to create database resources: %w", err),
+				)
 			}
 			err = p.createCrossplaneResourcesTree(ctx, workloadResourcesTree)
 			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to create workload resources: %w", err))
+				return nil, connect.NewError(
+					connect.CodeInternal,
+					fmt.Errorf("failed to create workload resources: %w", err),
+				)
 			}
 			err = p.cloudAutomationRepo.Insert(ctx, &panel.CloudAutomation{
 				Id:                     newAutomationId,
+				Timing:                 timestamps.NewTiming(),
+				Status:                 panel.Status_STATUS_IDLE,
 				DatabaseRootResourceId: databaseResourcesTree.GetId(),
 				WorkloadRootResourceId: workloadResourcesTree.GetId(),
 				StroppyRunId:           nil,
@@ -220,10 +159,17 @@ func (p *PanelService) RunAutomation(ctx context.Context, request *panel.RunAuto
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
 			newRunRecord := &panel.RunRecord{
-				Id:                newAutomationId,
-				AuthorId:          user.GetId(),
-				Timing:            timestamps.NewTiming(),
-				Status:            panel.Status_STATUS_IDLE,
+				Id:       newAutomationId,
+				AuthorId: user.GetId(),
+				Timing:   timestamps.NewTiming(),
+				Status:   panel.Status_STATUS_IDLE,
+				Tps: &panel.Tps{
+					Average: 0,
+					Max:     0,
+					Min:     0,
+					P95Th:   0,
+					P99Th:   0,
+				},
 				Database:          request.GetDatabase(),
 				Workload:          request.GetWorkload(),
 				CloudAutomationId: newAutomationId,
@@ -235,4 +181,14 @@ func (p *PanelService) RunAutomation(ctx context.Context, request *panel.RunAuto
 			return newRunRecord, nil
 		},
 	)
+}
+func (p *PanelService) CancelAutomation(ctx context.Context, ulid *panel.Ulid) (*emptypb.Empty, error) {
+	automation, err := p.GetAutomation(ctx, ulid)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return &emptypb.Empty{}, postgres.WithSerializable(ctx, p.txManager,
+		func(ctx context.Context) error {
+			return p.stopCrossplaneAutomation(ctx, automation, panel.Status_STATUS_CANCELED)
+		})
 }

@@ -19,7 +19,11 @@ import (
 )
 
 type PanelService struct {
-	//*panel.UnimplementedAccountServiceServer
+	*panel.UnimplementedAccountServiceServer
+	*panel.UnimplementedAutomateServiceServer
+	*panel.UnimplementedRunServiceServer
+	*panel.UnimplementedResourcesServiceServer
+
 	logger     *zap.Logger
 	executor   sqlexec.Executor
 	txManager  postgres.TxManager
@@ -36,6 +40,7 @@ type PanelService struct {
 
 	sqlcRepo          sqlc.Querier
 	k8sConfig         *automate.K8SConfig
+	automateConfig    *CloudAutomationConfig
 	crossplaneService crossplane.CrossplaneClient
 }
 
@@ -45,10 +50,15 @@ func NewPanelService(
 	txManager postgres.TxManager,
 	tokenActor *token.Actor,
 	k8sConfig *automate.K8SConfig,
+	automateConfig *CloudAutomationConfig,
 	crossplaneService crossplane.CrossplaneClient,
 ) *PanelService {
 	return &PanelService{
-		logger: logger,
+		UnimplementedAccountServiceServer:   &panel.UnimplementedAccountServiceServer{},
+		UnimplementedAutomateServiceServer:  &panel.UnimplementedAutomateServiceServer{},
+		UnimplementedRunServiceServer:       &panel.UnimplementedRunServiceServer{},
+		UnimplementedResourcesServiceServer: &panel.UnimplementedResourcesServiceServer{},
+		logger:                              logger,
 
 		executor:   executor,
 		txManager:  txManager,
@@ -64,6 +74,7 @@ func NewPanelService(
 		sqlcRepo:            sqlc.New(executor),
 
 		k8sConfig:         k8sConfig,
+		automateConfig:    automateConfig,
 		crossplaneService: crossplaneService,
 	}
 }

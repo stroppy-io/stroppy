@@ -20,10 +20,14 @@ service:
     refresh_expire: "24h"
   background:
     periodic_automate_check_interval: 10s
+    max_automation_ttl: 4h
+  automate:
+    automation_ttl: 4h
+    creation_timeout: 15m
   k8s:
-    kubeconfig_path: "/home/yaroha/devel/arenadata/stroppy-io/stroppy-cloud/monitoring/.kubectl.config.yaml"
+    kubeconfig_path: ".kubectl.config.yaml"
     crossplane:
-      yandex_cloud_provider:
+      yandex_cloud_builder:
         default_network_id: "enp7b429s2br5pja0jci"
         default_subnet_id: "fl85dq0cam3ed6cfg2st"
         default_network_cidr_block: "10.1.0.0/16"

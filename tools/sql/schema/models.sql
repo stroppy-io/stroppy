@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS "cloud_resources" (
 	created_at TIMESTAMPTZ  NOT NULL,
 	updated_at TIMESTAMPTZ  NOT NULL,
 	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
+	status INTEGER  NOT NULL DEFAULT 0,
 	ref JSONB  NOT NULL,
 	resource_def JSONB  NOT NULL,
 	resource_yaml TEXT  NOT NULL,
@@ -35,6 +36,10 @@ CREATE TABLE IF NOT EXISTS "cloud_resources" (
 );
 CREATE TABLE IF NOT EXISTS "cloud_automations" (
 	id TEXT  PRIMARY KEY NOT NULL,
+	created_at TIMESTAMPTZ  NOT NULL,
+	updated_at TIMESTAMPTZ  NOT NULL,
+	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
+	status INTEGER  NOT NULL DEFAULT 0,
 	database_root_resource_id TEXT  NOT NULL,
 	workload_root_resource_id TEXT  NOT NULL,
 	stroppy_run_id TEXT  NULL

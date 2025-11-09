@@ -2,7 +2,10 @@ package resource
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/iancoleman/strcase"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ids"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/timestamps"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 	"strconv"
@@ -19,7 +22,8 @@ type YandexCloudProviderConfig struct {
 }
 
 const (
-	YandexCloudCrossplaneApiVersion = "vpc.yandex-cloud.jet.crossplane.io/v1alpha1"
+	YandexCloudVPCCrossplaneApiVersion     = "vpc.yandex-cloud.jet.crossplane.io/v1alpha1"
+	YandexCloudComputeCrossplaneApiVersion = "compute.yandex-cloud.jet.crossplane.io/v1alpha1"
 )
 
 // yamlKeys
@@ -45,12 +49,12 @@ var (
 	}
 )
 
-type YandexCloudProvider struct {
+type YandexCloudBuilder struct {
 	Config *YandexCloudProviderConfig
 }
 
-func NewYandexCloudProvider(config *YandexCloudProviderConfig) *YandexCloudProvider {
-	return &YandexCloudProvider{Config: config}
+func NewYandexCloudBuilder(config *YandexCloudProviderConfig) *YandexCloudBuilder {
+	return &YandexCloudBuilder{Config: config}
 }
 
 func defaultProviderConfigRef() map[string]string {
@@ -59,9 +63,9 @@ func defaultProviderConfigRef() map[string]string {
 	}
 }
 
-func (y *YandexCloudProvider) NewNetworkDef(networkIdRef *crossplane.Ref) *crossplane.ResourceDef {
+func (y *YandexCloudBuilder) newNetworkDef(networkIdRef *crossplane.Ref) *crossplane.ResourceDef {
 	return &crossplane.ResourceDef{
-		ApiVersion: YandexCloudCrossplaneApiVersion,
+		ApiVersion: YandexCloudVPCCrossplaneApiVersion,
 		Kind:       strcase.ToCamel(crossplane.YandexCloud_NETWORK.String()),
 		Metadata: &crossplane.Metadata{
 			Name:      networkIdRef.GetName(),
@@ -82,12 +86,12 @@ func (y *YandexCloudProvider) NewNetworkDef(networkIdRef *crossplane.Ref) *cross
 	}
 }
 
-func (y *YandexCloudProvider) NewSubnetDef(
+func (y *YandexCloudBuilder) newSubnetDef(
 	networkIdRef *crossplane.Ref,
 	subnetIdRef *crossplane.Ref,
 ) *crossplane.ResourceDef {
 	return &crossplane.ResourceDef{
-		ApiVersion: YandexCloudCrossplaneApiVersion,
+		ApiVersion: YandexCloudVPCCrossplaneApiVersion,
 		Kind:       strcase.ToCamel(crossplane.YandexCloud_SUBNET.String()),
 		Metadata: &crossplane.Metadata{
 			Name:      subnetIdRef.GetName(),
@@ -105,14 +109,14 @@ func (y *YandexCloudProvider) NewSubnetDef(
 					NetworkIdRef: &crossplane.YandexCloud_Subnet_NetworkIdRef{
 						Name: networkIdRef.GetName(),
 					},
-					V4CidrBlock: []string{y.Config.DefaultNetworkCidrBlock},
+					V4CidrBlocks: []string{y.Config.DefaultNetworkCidrBlock},
 				},
 			},
 		},
 	}
 }
 
-func (y *YandexCloudProvider) NewVmDef(
+func (y *YandexCloudBuilder) newVmDef(
 	ref *crossplane.Ref,
 	machineInfo *panel.MachineInfo,
 	subnetIdRef *crossplane.Ref,
@@ -121,7 +125,7 @@ func (y *YandexCloudProvider) NewVmDef(
 ) *crossplane.ResourceDef {
 	scriptBody := strconv.Quote(string(bytes.ReplaceAll(script.GetBody(), []byte("\r\n"), []byte(`\n`))))
 	return &crossplane.ResourceDef{
-		ApiVersion: YandexCloudCrossplaneApiVersion,
+		ApiVersion: YandexCloudComputeCrossplaneApiVersion,
 		Kind:       strcase.ToCamel(crossplane.YandexCloud_INSTANCE.String()),
 		Metadata: &crossplane.Metadata{
 			Name:      ref.GetName(),
@@ -136,9 +140,11 @@ func (y *YandexCloudProvider) NewVmDef(
 					Name:       ref.GetName(),
 					PlatformId: y.Config.DefaultVmPlatformId,
 					Zone:       y.Config.DefaultVmZone,
-					Resources: &crossplane.YandexCloud_Vm_Resources{
-						Cores:  machineInfo.GetCores(),
-						Memory: machineInfo.GetMemory(),
+					Resources: []*crossplane.YandexCloud_Vm_Resources{
+						{
+							Cores:  machineInfo.GetCores(),
+							Memory: machineInfo.GetMemory(),
+						},
 					},
 					// yaml format shit in this block
 					BootDisk: []*crossplane.YandexCloud_Vm_Disk{
@@ -152,8 +158,10 @@ func (y *YandexCloudProvider) NewVmDef(
 					},
 					NetworkInterface: []*crossplane.YandexCloud_Vm_NetworkInterface{
 						{
-							SubnetIdRef: subnetIdRef,
-							Nat:         true,
+							SubnetIdRef: &crossplane.OnlyNameRef{
+								Name: subnetIdRef.GetName(),
+							},
+							Nat: true,
 						},
 					},
 					Metadata: map[string]string{
@@ -164,4 +172,88 @@ func (y *YandexCloudProvider) NewVmDef(
 			},
 		},
 	}
+}
+
+func (y *YandexCloudBuilder) NewSingleVmResource(
+	machineName string,
+	machineInfo *panel.MachineInfo,
+	script *panel.Script,
+) (*panel.CloudResource_TreeNode, error) {
+	saveSecretTo := &crossplane.Ref{
+		Name:      fmt.Sprintf("%s-access-secret", machineName),
+		Namespace: DefaultCrossplaneNamespace,
+	}
+	networkDef := y.newNetworkDef(DefaultYandexStroppyNetworkRef)
+	subnetDef := y.newSubnetDef(DefaultYandexStroppyNetworkRef, DefaultYandexStroppySubNetRef)
+	vmRef := &crossplane.Ref{
+		Name:      machineName,
+		Namespace: DefaultCrossplaneNamespace,
+	}
+	vmDef := y.newVmDef(vmRef, machineInfo, DefaultYandexStroppySubNetRef, saveSecretTo, script)
+
+	vmId := ids.NewUlid()
+	vmYaml, err := MarshalWithReplaceOneOffs(vmDef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal vm def: %w", err)
+	}
+	vmNode := &panel.CloudResource_TreeNode{
+		Id: vmId,
+		Resource: &panel.CloudResource{
+			Id:     vmId,
+			Timing: timestamps.NewTiming(),
+			Resource: &crossplane.ResourceWithStatus{
+				Ref:          vmRef,
+				ResourceDef:  vmDef,
+				ResourceYaml: vmYaml,
+				Synced:       false,
+				Ready:        false,
+				ExternalId:   "",
+			},
+		},
+	}
+
+	subnetId := ids.NewUlid()
+
+	subnetYaml, err := MarshalWithReplaceOneOffs(subnetDef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subnet def: %w", err)
+	}
+	subnetNode := &panel.CloudResource_TreeNode{
+		Id: subnetId,
+		Resource: &panel.CloudResource{
+			Id:     subnetId,
+			Timing: timestamps.NewTiming(),
+			Resource: &crossplane.ResourceWithStatus{
+				Ref:          DefaultYandexStroppySubNetRef,
+				ResourceDef:  subnetDef,
+				ResourceYaml: subnetYaml,
+				Synced:       false,
+				Ready:        false,
+				ExternalId:   "",
+			},
+		},
+		Children: []*panel.CloudResource_TreeNode{vmNode},
+	}
+
+	netId := ids.NewUlid()
+	networkYaml, err := MarshalWithReplaceOneOffs(networkDef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal network def: %w", err)
+	}
+	return &panel.CloudResource_TreeNode{
+		Id: netId,
+		Resource: &panel.CloudResource{
+			Id:     netId,
+			Timing: timestamps.NewTiming(),
+			Resource: &crossplane.ResourceWithStatus{
+				Ref:          DefaultYandexStroppyNetworkRef,
+				ResourceDef:  networkDef,
+				ResourceYaml: networkYaml,
+				Synced:       false,
+				Ready:        false,
+				ExternalId:   "",
+			},
+		},
+		Children: []*panel.CloudResource_TreeNode{subnetNode},
+	}, nil
 }

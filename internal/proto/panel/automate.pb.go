@@ -12,7 +12,7 @@ import (
 	_ "github.com/yaroher/protoc-gen-pgx-orm/protopgx"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	_ "google.golang.org/protobuf/types/known/emptypb"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -25,12 +25,69 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type CloudResource_Status int32
+
+const (
+	CloudResource_STATUS_UNSPECIFIED CloudResource_Status = 0
+	// status for CloudAutomation
+	CloudResource_STATUS_CREATING   CloudResource_Status = 1
+	CloudResource_STATUS_WORKING    CloudResource_Status = 2
+	CloudResource_STATUS_DESTROYING CloudResource_Status = 3
+	CloudResource_STATUS_DESTROYED  CloudResource_Status = 4
+)
+
+// Enum value maps for CloudResource_Status.
+var (
+	CloudResource_Status_name = map[int32]string{
+		0: "STATUS_UNSPECIFIED",
+		1: "STATUS_CREATING",
+		2: "STATUS_WORKING",
+		3: "STATUS_DESTROYING",
+		4: "STATUS_DESTROYED",
+	}
+	CloudResource_Status_value = map[string]int32{
+		"STATUS_UNSPECIFIED": 0,
+		"STATUS_CREATING":    1,
+		"STATUS_WORKING":     2,
+		"STATUS_DESTROYING":  3,
+		"STATUS_DESTROYED":   4,
+	}
+)
+
+func (x CloudResource_Status) Enum() *CloudResource_Status {
+	p := new(CloudResource_Status)
+	*p = x
+	return p
+}
+
+func (x CloudResource_Status) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CloudResource_Status) Descriptor() protoreflect.EnumDescriptor {
+	return file_panel_automate_proto_enumTypes[0].Descriptor()
+}
+
+func (CloudResource_Status) Type() protoreflect.EnumType {
+	return &file_panel_automate_proto_enumTypes[0]
+}
+
+func (x CloudResource_Status) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CloudResource_Status.Descriptor instead.
+func (CloudResource_Status) EnumDescriptor() ([]byte, []int) {
+	return file_panel_automate_proto_rawDescGZIP(), []int{0, 0}
+}
+
 type CloudResource struct {
 	state            protoimpl.MessageState         `protogen:"open.v1"`
 	Id               *Ulid                          `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Timing           *Timing                        `protobuf:"bytes,2,opt,name=timing,proto3" json:"timing,omitempty"`
-	Resource         *crossplane.ResourceWithStatus `protobuf:"bytes,3,opt,name=resource,proto3" json:"resource,omitempty"`
-	ParentResourceId *Ulid                          `protobuf:"bytes,4,opt,name=parent_resource_id,json=parentResourceId,proto3,oneof" json:"parent_resource_id,omitempty"`
+	Status           CloudResource_Status           `protobuf:"varint,3,opt,name=status,proto3,enum=panel.CloudResource_Status" json:"status,omitempty"`
+	Resource         *crossplane.ResourceWithStatus `protobuf:"bytes,4,opt,name=resource,proto3" json:"resource,omitempty"`
+	ParentResourceId *Ulid                          `protobuf:"bytes,5,opt,name=parent_resource_id,json=parentResourceId,proto3,oneof" json:"parent_resource_id,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -79,6 +136,13 @@ func (x *CloudResource) GetTiming() *Timing {
 	return nil
 }
 
+func (x *CloudResource) GetStatus() CloudResource_Status {
+	if x != nil {
+		return x.Status
+	}
+	return CloudResource_STATUS_UNSPECIFIED
+}
+
 func (x *CloudResource) GetResource() *crossplane.ResourceWithStatus {
 	if x != nil {
 		return x.Resource
@@ -96,9 +160,11 @@ func (x *CloudResource) GetParentResourceId() *Ulid {
 type CloudAutomation struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	Id                     *Ulid                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	DatabaseRootResourceId *Ulid                  `protobuf:"bytes,2,opt,name=database_root_resource_id,json=databaseRootResourceId,proto3" json:"database_root_resource_id,omitempty"`
-	WorkloadRootResourceId *Ulid                  `protobuf:"bytes,3,opt,name=workload_root_resource_id,json=workloadRootResourceId,proto3" json:"workload_root_resource_id,omitempty"`
-	StroppyRunId           *Ulid                  `protobuf:"bytes,5,opt,name=stroppy_run_id,json=stroppyRunId,proto3,oneof" json:"stroppy_run_id,omitempty"`
+	Timing                 *Timing                `protobuf:"bytes,2,opt,name=timing,proto3" json:"timing,omitempty"`
+	Status                 Status                 `protobuf:"varint,3,opt,name=status,proto3,enum=panel.Status" json:"status,omitempty"`
+	DatabaseRootResourceId *Ulid                  `protobuf:"bytes,4,opt,name=database_root_resource_id,json=databaseRootResourceId,proto3" json:"database_root_resource_id,omitempty"`
+	WorkloadRootResourceId *Ulid                  `protobuf:"bytes,5,opt,name=workload_root_resource_id,json=workloadRootResourceId,proto3" json:"workload_root_resource_id,omitempty"`
+	StroppyRunId           *Ulid                  `protobuf:"bytes,6,opt,name=stroppy_run_id,json=stroppyRunId,proto3,oneof" json:"stroppy_run_id,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -138,6 +204,20 @@ func (x *CloudAutomation) GetId() *Ulid {
 		return x.Id
 	}
 	return nil
+}
+
+func (x *CloudAutomation) GetTiming() *Timing {
+	if x != nil {
+		return x.Timing
+	}
+	return nil
+}
+
+func (x *CloudAutomation) GetStatus() Status {
+	if x != nil {
+		return x.Status
+	}
+	return Status_STATUS_UNSPECIFIED
 }
 
 func (x *CloudAutomation) GetDatabaseRootResourceId() *Ulid {
@@ -285,34 +365,44 @@ var File_panel_automate_proto protoreflect.FileDescriptor
 
 const file_panel_automate_proto_rawDesc = "" +
 	"\n" +
-	"\x14panel/automate.proto\x12\x05panel\x1a\x16crossplane/types.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x19crossplane/resource.proto\x1a\x0fpanel/run.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xd5\x03\n" +
+	"\x14panel/automate.proto\x12\x05panel\x1a\x19crossplane/resource.proto\x1a\x16crossplane/types.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0fpanel/run.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\x8c\x05\n" +
 	"\rCloudResource\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
-	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12A\n" +
-	"\bresource\x18\x03 \x01(\v2\x1e.crossplane.ResourceWithStatusB\x05\xca>\x02@\x01R\bresource\x12I\n" +
-	"\x12parent_resource_id\x18\x04 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01H\x00R\x10parentResourceId\x88\x01\x01\x1a\xac\x01\n" +
+	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12=\n" +
+	"\x06status\x18\x03 \x01(\x0e2\x1b.panel.CloudResource.StatusB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06status\x12A\n" +
+	"\bresource\x18\x04 \x01(\v2\x1e.crossplane.ResourceWithStatusB\x05\xca>\x02@\x01R\bresource\x12I\n" +
+	"\x12parent_resource_id\x18\x05 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01H\x00R\x10parentResourceId\x88\x01\x01\x1a\xac\x01\n" +
 	"\bTreeNode\x12%\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\b\xfaB\x05r\x03\x98\x01\x1aR\x02id\x127\n" +
 	"\bresource\x18\x02 \x01(\v2\x14.panel.CloudResourceB\x05\xca>\x02@\x01R\bresource\x12@\n" +
-	"\bchildren\x18\x03 \x03(\v2\x1d.panel.CloudResource.TreeNodeB\x05\xca>\x02@\x01R\bchildren:\x16\xca>\x13\b\x01\x12\x0fcloud_resourcesB\x15\n" +
-	"\x13_parent_resource_id\"\xd3\x02\n" +
+	"\bchildren\x18\x03 \x03(\v2\x1d.panel.CloudResource.TreeNodeB\x05\xca>\x02@\x01R\bchildren\"v\n" +
+	"\x06Status\x12\x16\n" +
+	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fSTATUS_CREATING\x10\x01\x12\x12\n" +
+	"\x0eSTATUS_WORKING\x10\x02\x12\x15\n" +
+	"\x11STATUS_DESTROYING\x10\x03\x12\x14\n" +
+	"\x10STATUS_DESTROYED\x10\x04:\x16\xca>\x13\b\x01\x12\x0fcloud_resourcesB\x15\n" +
+	"\x13_parent_resource_id\"\xb2\x03\n" +
 	"\x0fCloudAutomation\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
-	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12Q\n" +
-	"\x19database_root_resource_id\x18\x02 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x16databaseRootResourceId\x12Q\n" +
-	"\x19workload_root_resource_id\x18\x03 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x16workloadRootResourceId\x12A\n" +
-	"\x0estroppy_run_id\x18\x05 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01H\x00R\fstroppyRunId\x88\x01\x01:\x18\xca>\x15\b\x01\x12\x11cloud_automationsB\x11\n" +
+	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
+	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12/\n" +
+	"\x06status\x18\x03 \x01(\x0e2\r.panel.StatusB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06status\x12Q\n" +
+	"\x19database_root_resource_id\x18\x04 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x16databaseRootResourceId\x12Q\n" +
+	"\x19workload_root_resource_id\x18\x05 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x16workloadRootResourceId\x12A\n" +
+	"\x0estroppy_run_id\x18\x06 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01H\x00R\fstroppyRunId\x88\x01\x01:\x18\xca>\x15\b\x01\x12\x11cloud_automationsB\x11\n" +
 	"\x0f_stroppy_run_id\"\xd6\x01\n" +
 	"\x14RunAutomationRequest\x122\n" +
 	"\bdatabase\x18\x01 \x01(\v2\x0f.panel.DatabaseB\x05\xca>\x02H\x01R\bdatabase\x122\n" +
 	"\bworkload\x18\x02 \x01(\v2\x0f.panel.WorkloadB\x05\xca>\x02H\x01R\bworkload\x12V\n" +
 	"\x14using_cloud_provider\x18\x03 \x01(\x0e2\x1a.crossplane.SupportedCloudB\b\xfaB\x05\x82\x01\x02\b\x01R\x12usingCloudProvider2M\n" +
 	"\x10ResourcesService\x129\n" +
-	"\vGetResource\x12\v.panel.Ulid\x1a\x1d.panel.CloudResource.TreeNode2\x87\x01\n" +
+	"\vGetResource\x12\v.panel.Ulid\x1a\x1d.panel.CloudResource.TreeNode2\xc0\x01\n" +
 	"\x0fAutomateService\x124\n" +
 	"\rGetAutomation\x12\v.panel.Ulid\x1a\x16.panel.CloudAutomation\x12>\n" +
-	"\rRunAutomation\x12\x1b.panel.RunAutomationRequest\x1a\x10.panel.RunRecordB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
+	"\rRunAutomation\x12\x1b.panel.RunAutomationRequest\x1a\x10.panel.RunRecord\x127\n" +
+	"\x10CancelAutomation\x12\v.panel.Ulid\x1a\x16.google.protobuf.EmptyB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
 
 var (
 	file_panel_automate_proto_rawDescOnce sync.Once
@@ -326,46 +416,55 @@ func file_panel_automate_proto_rawDescGZIP() []byte {
 	return file_panel_automate_proto_rawDescData
 }
 
+var file_panel_automate_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_panel_automate_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_panel_automate_proto_goTypes = []any{
-	(*CloudResource)(nil),                 // 0: panel.CloudResource
-	(*CloudAutomation)(nil),               // 1: panel.CloudAutomation
-	(*RunAutomationRequest)(nil),          // 2: panel.RunAutomationRequest
-	(*CloudResource_TreeNode)(nil),        // 3: panel.CloudResource.TreeNode
-	(*Ulid)(nil),                          // 4: panel.Ulid
-	(*Timing)(nil),                        // 5: panel.Timing
-	(*crossplane.ResourceWithStatus)(nil), // 6: crossplane.ResourceWithStatus
-	(*Database)(nil),                      // 7: panel.Database
-	(*Workload)(nil),                      // 8: panel.Workload
-	(crossplane.SupportedCloud)(0),        // 9: crossplane.SupportedCloud
-	(*RunRecord)(nil),                     // 10: panel.RunRecord
+	(CloudResource_Status)(0),             // 0: panel.CloudResource.Status
+	(*CloudResource)(nil),                 // 1: panel.CloudResource
+	(*CloudAutomation)(nil),               // 2: panel.CloudAutomation
+	(*RunAutomationRequest)(nil),          // 3: panel.RunAutomationRequest
+	(*CloudResource_TreeNode)(nil),        // 4: panel.CloudResource.TreeNode
+	(*Ulid)(nil),                          // 5: panel.Ulid
+	(*Timing)(nil),                        // 6: panel.Timing
+	(*crossplane.ResourceWithStatus)(nil), // 7: crossplane.ResourceWithStatus
+	(Status)(0),                           // 8: panel.Status
+	(*Database)(nil),                      // 9: panel.Database
+	(*Workload)(nil),                      // 10: panel.Workload
+	(crossplane.SupportedCloud)(0),        // 11: crossplane.SupportedCloud
+	(*RunRecord)(nil),                     // 12: panel.RunRecord
+	(*emptypb.Empty)(nil),                 // 13: google.protobuf.Empty
 }
 var file_panel_automate_proto_depIdxs = []int32{
-	4,  // 0: panel.CloudResource.id:type_name -> panel.Ulid
-	5,  // 1: panel.CloudResource.timing:type_name -> panel.Timing
-	6,  // 2: panel.CloudResource.resource:type_name -> crossplane.ResourceWithStatus
-	4,  // 3: panel.CloudResource.parent_resource_id:type_name -> panel.Ulid
-	4,  // 4: panel.CloudAutomation.id:type_name -> panel.Ulid
-	4,  // 5: panel.CloudAutomation.database_root_resource_id:type_name -> panel.Ulid
-	4,  // 6: panel.CloudAutomation.workload_root_resource_id:type_name -> panel.Ulid
-	4,  // 7: panel.CloudAutomation.stroppy_run_id:type_name -> panel.Ulid
-	7,  // 8: panel.RunAutomationRequest.database:type_name -> panel.Database
-	8,  // 9: panel.RunAutomationRequest.workload:type_name -> panel.Workload
-	9,  // 10: panel.RunAutomationRequest.using_cloud_provider:type_name -> crossplane.SupportedCloud
-	4,  // 11: panel.CloudResource.TreeNode.id:type_name -> panel.Ulid
-	0,  // 12: panel.CloudResource.TreeNode.resource:type_name -> panel.CloudResource
-	3,  // 13: panel.CloudResource.TreeNode.children:type_name -> panel.CloudResource.TreeNode
-	4,  // 14: panel.ResourcesService.GetResource:input_type -> panel.Ulid
-	4,  // 15: panel.AutomateService.GetAutomation:input_type -> panel.Ulid
-	2,  // 16: panel.AutomateService.RunAutomation:input_type -> panel.RunAutomationRequest
-	3,  // 17: panel.ResourcesService.GetResource:output_type -> panel.CloudResource.TreeNode
-	1,  // 18: panel.AutomateService.GetAutomation:output_type -> panel.CloudAutomation
-	10, // 19: panel.AutomateService.RunAutomation:output_type -> panel.RunRecord
-	17, // [17:20] is the sub-list for method output_type
-	14, // [14:17] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	5,  // 0: panel.CloudResource.id:type_name -> panel.Ulid
+	6,  // 1: panel.CloudResource.timing:type_name -> panel.Timing
+	0,  // 2: panel.CloudResource.status:type_name -> panel.CloudResource.Status
+	7,  // 3: panel.CloudResource.resource:type_name -> crossplane.ResourceWithStatus
+	5,  // 4: panel.CloudResource.parent_resource_id:type_name -> panel.Ulid
+	5,  // 5: panel.CloudAutomation.id:type_name -> panel.Ulid
+	6,  // 6: panel.CloudAutomation.timing:type_name -> panel.Timing
+	8,  // 7: panel.CloudAutomation.status:type_name -> panel.Status
+	5,  // 8: panel.CloudAutomation.database_root_resource_id:type_name -> panel.Ulid
+	5,  // 9: panel.CloudAutomation.workload_root_resource_id:type_name -> panel.Ulid
+	5,  // 10: panel.CloudAutomation.stroppy_run_id:type_name -> panel.Ulid
+	9,  // 11: panel.RunAutomationRequest.database:type_name -> panel.Database
+	10, // 12: panel.RunAutomationRequest.workload:type_name -> panel.Workload
+	11, // 13: panel.RunAutomationRequest.using_cloud_provider:type_name -> crossplane.SupportedCloud
+	5,  // 14: panel.CloudResource.TreeNode.id:type_name -> panel.Ulid
+	1,  // 15: panel.CloudResource.TreeNode.resource:type_name -> panel.CloudResource
+	4,  // 16: panel.CloudResource.TreeNode.children:type_name -> panel.CloudResource.TreeNode
+	5,  // 17: panel.ResourcesService.GetResource:input_type -> panel.Ulid
+	5,  // 18: panel.AutomateService.GetAutomation:input_type -> panel.Ulid
+	3,  // 19: panel.AutomateService.RunAutomation:input_type -> panel.RunAutomationRequest
+	5,  // 20: panel.AutomateService.CancelAutomation:input_type -> panel.Ulid
+	4,  // 21: panel.ResourcesService.GetResource:output_type -> panel.CloudResource.TreeNode
+	2,  // 22: panel.AutomateService.GetAutomation:output_type -> panel.CloudAutomation
+	12, // 23: panel.AutomateService.RunAutomation:output_type -> panel.RunRecord
+	13, // 24: panel.AutomateService.CancelAutomation:output_type -> google.protobuf.Empty
+	21, // [21:25] is the sub-list for method output_type
+	17, // [17:21] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_panel_automate_proto_init() }
@@ -382,13 +481,14 @@ func file_panel_automate_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_panel_automate_proto_rawDesc), len(file_panel_automate_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
 		GoTypes:           file_panel_automate_proto_goTypes,
 		DependencyIndexes: file_panel_automate_proto_depIdxs,
+		EnumInfos:         file_panel_automate_proto_enumTypes,
 		MessageInfos:      file_panel_automate_proto_msgTypes,
 	}.Build()
 	File_panel_automate_proto = out.File

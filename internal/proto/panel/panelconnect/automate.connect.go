@@ -9,6 +9,7 @@ import (
 	context "context"
 	errors "errors"
 	panel "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	http "net/http"
 	strings "strings"
 )
@@ -44,6 +45,9 @@ const (
 	// AutomateServiceRunAutomationProcedure is the fully-qualified name of the AutomateService's
 	// RunAutomation RPC.
 	AutomateServiceRunAutomationProcedure = "/panel.AutomateService/RunAutomation"
+	// AutomateServiceCancelAutomationProcedure is the fully-qualified name of the AutomateService's
+	// CancelAutomation RPC.
+	AutomateServiceCancelAutomationProcedure = "/panel.AutomateService/CancelAutomation"
 )
 
 // ResourcesServiceClient is a client for the panel.ResourcesService service.
@@ -124,6 +128,7 @@ func (UnimplementedResourcesServiceHandler) GetResource(context.Context, *panel.
 type AutomateServiceClient interface {
 	GetAutomation(context.Context, *panel.Ulid) (*panel.CloudAutomation, error)
 	RunAutomation(context.Context, *panel.RunAutomationRequest) (*panel.RunRecord, error)
+	CancelAutomation(context.Context, *panel.Ulid) (*emptypb.Empty, error)
 }
 
 // NewAutomateServiceClient constructs a client for the panel.AutomateService service. By default,
@@ -149,13 +154,20 @@ func NewAutomateServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(automateServiceMethods.ByName("RunAutomation")),
 			connect.WithClientOptions(opts...),
 		),
+		cancelAutomation: connect.NewClient[panel.Ulid, emptypb.Empty](
+			httpClient,
+			baseURL+AutomateServiceCancelAutomationProcedure,
+			connect.WithSchema(automateServiceMethods.ByName("CancelAutomation")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // automateServiceClient implements AutomateServiceClient.
 type automateServiceClient struct {
-	getAutomation *connect.Client[panel.Ulid, panel.CloudAutomation]
-	runAutomation *connect.Client[panel.RunAutomationRequest, panel.RunRecord]
+	getAutomation    *connect.Client[panel.Ulid, panel.CloudAutomation]
+	runAutomation    *connect.Client[panel.RunAutomationRequest, panel.RunRecord]
+	cancelAutomation *connect.Client[panel.Ulid, emptypb.Empty]
 }
 
 // GetAutomation calls panel.AutomateService.GetAutomation.
@@ -176,10 +188,20 @@ func (c *automateServiceClient) RunAutomation(ctx context.Context, req *panel.Ru
 	return nil, err
 }
 
+// CancelAutomation calls panel.AutomateService.CancelAutomation.
+func (c *automateServiceClient) CancelAutomation(ctx context.Context, req *panel.Ulid) (*emptypb.Empty, error) {
+	response, err := c.cancelAutomation.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
 // AutomateServiceHandler is an implementation of the panel.AutomateService service.
 type AutomateServiceHandler interface {
 	GetAutomation(context.Context, *panel.Ulid) (*panel.CloudAutomation, error)
 	RunAutomation(context.Context, *panel.RunAutomationRequest) (*panel.RunRecord, error)
+	CancelAutomation(context.Context, *panel.Ulid) (*emptypb.Empty, error)
 }
 
 // NewAutomateServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -201,12 +223,20 @@ func NewAutomateServiceHandler(svc AutomateServiceHandler, opts ...connect.Handl
 		connect.WithSchema(automateServiceMethods.ByName("RunAutomation")),
 		connect.WithHandlerOptions(opts...),
 	)
+	automateServiceCancelAutomationHandler := connect.NewUnaryHandlerSimple(
+		AutomateServiceCancelAutomationProcedure,
+		svc.CancelAutomation,
+		connect.WithSchema(automateServiceMethods.ByName("CancelAutomation")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/panel.AutomateService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AutomateServiceGetAutomationProcedure:
 			automateServiceGetAutomationHandler.ServeHTTP(w, r)
 		case AutomateServiceRunAutomationProcedure:
 			automateServiceRunAutomationHandler.ServeHTTP(w, r)
+		case AutomateServiceCancelAutomationProcedure:
+			automateServiceCancelAutomationHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -222,4 +252,8 @@ func (UnimplementedAutomateServiceHandler) GetAutomation(context.Context, *panel
 
 func (UnimplementedAutomateServiceHandler) RunAutomation(context.Context, *panel.RunAutomationRequest) (*panel.RunRecord, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.AutomateService.RunAutomation is not implemented"))
+}
+
+func (UnimplementedAutomateServiceHandler) CancelAutomation(context.Context, *panel.Ulid) (*emptypb.Empty, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.AutomateService.CancelAutomation is not implemented"))
 }

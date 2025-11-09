@@ -23,12 +23,13 @@ const (
 )
 
 type CreateResourceRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      *ResourceDef           `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	Ref           *Ref                   `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
-	WaitForSync   bool                   `protobuf:"varint,3,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Resource       *ResourceDef           `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	Ref            *Ref                   `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
+	SupportedCloud SupportedCloud         `protobuf:"varint,3,opt,name=supported_cloud,json=supportedCloud,proto3,enum=crossplane.SupportedCloud" json:"supported_cloud,omitempty"`
+	WaitForSync    bool                   `protobuf:"varint,5,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateResourceRequest) Reset() {
@@ -73,6 +74,13 @@ func (x *CreateResourceRequest) GetRef() *Ref {
 		return x.Ref
 	}
 	return nil
+}
+
+func (x *CreateResourceRequest) GetSupportedCloud() SupportedCloud {
+	if x != nil {
+		return x.SupportedCloud
+	}
+	return SupportedCloud_SUPPORTED_CLOUD_UNSPECIFIED
 }
 
 func (x *CreateResourceRequest) GetWaitForSync() bool {
@@ -479,11 +487,12 @@ var File_crossplane_api_proto protoreflect.FileDescriptor
 const file_crossplane_api_proto_rawDesc = "" +
 	"\n" +
 	"\x14crossplane/api.proto\x12\n" +
-	"crossplane\x1a\x19crossplane/resource.proto\x1a\x16crossplane/types.proto\x1a\x17validate/validate.proto\"\xa7\x01\n" +
+	"crossplane\x1a\x19crossplane/resource.proto\x1a\x16crossplane/types.proto\x1a\x17validate/validate.proto\"\xf6\x01\n" +
 	"\x15CreateResourceRequest\x12=\n" +
 	"\bresource\x18\x01 \x01(\v2\x17.crossplane.ResourceDefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\bresource\x12+\n" +
-	"\x03ref\x18\x02 \x01(\v2\x0f.crossplane.RefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03ref\x12\"\n" +
-	"\rwait_for_sync\x18\x03 \x01(\bR\vwaitForSync\"\x81\x01\n" +
+	"\x03ref\x18\x02 \x01(\v2\x0f.crossplane.RefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03ref\x12M\n" +
+	"\x0fsupported_cloud\x18\x03 \x01(\x0e2\x1a.crossplane.SupportedCloudB\b\xfaB\x05\x82\x01\x02\x10\x01R\x0esupportedCloud\x12\"\n" +
+	"\rwait_for_sync\x18\x05 \x01(\bR\vwaitForSync\"\x81\x01\n" +
 	"\x1aCreateResourcesManyRequest\x12?\n" +
 	"\tresources\x18\x01 \x03(\v2\x17.crossplane.ResourceDefB\b\xfaB\x05\x92\x01\x02\b\x01R\tresources\x12\"\n" +
 	"\rwait_for_sync\x18\x02 \x01(\bR\vwaitForSync\"e\n" +
@@ -539,33 +548,35 @@ var file_crossplane_api_proto_goTypes = []any{
 	(*DeleteResourcesManyResponse)(nil), // 8: crossplane.DeleteResourcesManyResponse
 	(*ResourceDef)(nil),                 // 9: crossplane.ResourceDef
 	(*Ref)(nil),                         // 10: crossplane.Ref
-	(*ResourceWithStatus)(nil),          // 11: crossplane.ResourceWithStatus
-	(*ExtRef)(nil),                      // 12: crossplane.ExtRef
+	(SupportedCloud)(0),                 // 11: crossplane.SupportedCloud
+	(*ResourceWithStatus)(nil),          // 12: crossplane.ResourceWithStatus
+	(*ExtRef)(nil),                      // 13: crossplane.ExtRef
 }
 var file_crossplane_api_proto_depIdxs = []int32{
 	9,  // 0: crossplane.CreateResourceRequest.resource:type_name -> crossplane.ResourceDef
 	10, // 1: crossplane.CreateResourceRequest.ref:type_name -> crossplane.Ref
-	9,  // 2: crossplane.CreateResourcesManyRequest.resources:type_name -> crossplane.ResourceDef
-	11, // 3: crossplane.CreateResourcesManyResponse.responses:type_name -> crossplane.ResourceWithStatus
-	12, // 4: crossplane.DeleteResourceRequest.ref:type_name -> crossplane.ExtRef
-	12, // 5: crossplane.GetResourceStatusRequest.ref:type_name -> crossplane.ExtRef
-	12, // 6: crossplane.DeleteResourcesManyRequest.refs:type_name -> crossplane.ExtRef
-	6,  // 7: crossplane.DeleteResourcesManyResponse.responses:type_name -> crossplane.DeleteResourceResponse
-	0,  // 8: crossplane.Crossplane.CreateResource:input_type -> crossplane.CreateResourceRequest
-	1,  // 9: crossplane.Crossplane.CreateResourcesMany:input_type -> crossplane.CreateResourcesManyRequest
-	4,  // 10: crossplane.Crossplane.GetResourceStatus:input_type -> crossplane.GetResourceStatusRequest
-	3,  // 11: crossplane.Crossplane.DeleteResource:input_type -> crossplane.DeleteResourceRequest
-	7,  // 12: crossplane.Crossplane.DeleteResourcesMany:input_type -> crossplane.DeleteResourcesManyRequest
-	11, // 13: crossplane.Crossplane.CreateResource:output_type -> crossplane.ResourceWithStatus
-	2,  // 14: crossplane.Crossplane.CreateResourcesMany:output_type -> crossplane.CreateResourcesManyResponse
-	5,  // 15: crossplane.Crossplane.GetResourceStatus:output_type -> crossplane.GetResourceStatusResponse
-	6,  // 16: crossplane.Crossplane.DeleteResource:output_type -> crossplane.DeleteResourceResponse
-	8,  // 17: crossplane.Crossplane.DeleteResourcesMany:output_type -> crossplane.DeleteResourcesManyResponse
-	13, // [13:18] is the sub-list for method output_type
-	8,  // [8:13] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	11, // 2: crossplane.CreateResourceRequest.supported_cloud:type_name -> crossplane.SupportedCloud
+	9,  // 3: crossplane.CreateResourcesManyRequest.resources:type_name -> crossplane.ResourceDef
+	12, // 4: crossplane.CreateResourcesManyResponse.responses:type_name -> crossplane.ResourceWithStatus
+	13, // 5: crossplane.DeleteResourceRequest.ref:type_name -> crossplane.ExtRef
+	13, // 6: crossplane.GetResourceStatusRequest.ref:type_name -> crossplane.ExtRef
+	13, // 7: crossplane.DeleteResourcesManyRequest.refs:type_name -> crossplane.ExtRef
+	6,  // 8: crossplane.DeleteResourcesManyResponse.responses:type_name -> crossplane.DeleteResourceResponse
+	0,  // 9: crossplane.Crossplane.CreateResource:input_type -> crossplane.CreateResourceRequest
+	1,  // 10: crossplane.Crossplane.CreateResourcesMany:input_type -> crossplane.CreateResourcesManyRequest
+	4,  // 11: crossplane.Crossplane.GetResourceStatus:input_type -> crossplane.GetResourceStatusRequest
+	3,  // 12: crossplane.Crossplane.DeleteResource:input_type -> crossplane.DeleteResourceRequest
+	7,  // 13: crossplane.Crossplane.DeleteResourcesMany:input_type -> crossplane.DeleteResourcesManyRequest
+	12, // 14: crossplane.Crossplane.CreateResource:output_type -> crossplane.ResourceWithStatus
+	2,  // 15: crossplane.Crossplane.CreateResourcesMany:output_type -> crossplane.CreateResourcesManyResponse
+	5,  // 16: crossplane.Crossplane.GetResourceStatus:output_type -> crossplane.GetResourceStatusResponse
+	6,  // 17: crossplane.Crossplane.DeleteResource:output_type -> crossplane.DeleteResourceResponse
+	8,  // 18: crossplane.Crossplane.DeleteResourcesMany:output_type -> crossplane.DeleteResourcesManyResponse
+	14, // [14:19] is the sub-list for method output_type
+	9,  // [9:14] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_crossplane_api_proto_init() }

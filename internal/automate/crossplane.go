@@ -1,10 +1,11 @@
 package automate
 
 import (
+	"connectrpc.com/connect"
 	"context"
 	"fmt"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/resource"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -17,10 +18,14 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/resource"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 )
 
 type CrossplaneApi struct {
 	*crossplane.UnimplementedCrossplaneServer
+
 	dynamicK8S         *dynamic.DynamicClient
 	discovery          *discovery.DiscoveryClient
 	restMapper         *restmapper.DeferredDiscoveryRESTMapper
@@ -146,6 +151,9 @@ func (c *CrossplaneApi) GetResourceStatus(
 	}
 	obj, err := ri.Get(ctx, request.GetRef().GetRef().GetName(), metav1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("resource not found: %w", err))
+		}
 		return nil, fmt.Errorf("failed to get resource: %w", err)
 	}
 	synced := getCondition(obj, syncedCondition)
@@ -182,6 +190,12 @@ func (c *CrossplaneApi) DeleteResource(
 		ri = c.dynamicK8S.Resource(mapping.Resource)
 	}
 	if err := ri.Delete(ctx, request.GetRef().GetRef().GetName(), metav1.DeleteOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			// Resource already deleted or doesn't exist - consider it success
+			return &crossplane.DeleteResourceResponse{
+				Synced: false,
+			}, nil
+		}
 		return nil, fmt.Errorf("failed to delete resource: %w", err)
 	}
 

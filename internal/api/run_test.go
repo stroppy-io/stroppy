@@ -24,7 +24,7 @@ func TestAddRun(t *testing.T) {
 		},
 		Database: &panel.Database{
 			Name:         "test_db",
-			DatabaseType: panel.Database_TYPE_POSTGRES,
+			DatabaseType: panel.Database_TYPE_POSTGRES_ORIOLE,
 			Parameters:   map[string]string{"key": "value"},
 		},
 		Workload: &panel.Workload{
@@ -62,7 +62,7 @@ func TestListTopRuns(t *testing.T) {
 		},
 		Database: &panel.Database{
 			Name:         "test_db",
-			DatabaseType: panel.Database_TYPE_POSTGRES,
+			DatabaseType: panel.Database_TYPE_POSTGRES_ORIOLE,
 			Parameters:   map[string]string{"key": "value"},
 			RunnerCluster: &panel.Cluster{
 				IsSingleMachineMode: true,
@@ -117,7 +117,7 @@ func TestListRuns(t *testing.T) {
 		},
 		Database: &panel.Database{
 			Name:         "test_db_1",
-			DatabaseType: panel.Database_TYPE_POSTGRES,
+			DatabaseType: panel.Database_TYPE_POSTGRES_ORIOLE,
 			Parameters:   map[string]string{"key": "value"},
 			RunnerCluster: &panel.Cluster{
 				IsSingleMachineMode: true,
@@ -163,7 +163,7 @@ func TestListRuns(t *testing.T) {
 		},
 		Database: &panel.Database{
 			Name:         "test_db_2",
-			DatabaseType: panel.Database_TYPE_POSTGRES,
+			DatabaseType: panel.Database_TYPE_POSTGRES_ORIOLE,
 			Parameters:   map[string]string{"key": "value2"},
 			RunnerCluster: &panel.Cluster{
 				IsSingleMachineMode: true,
@@ -271,7 +271,7 @@ func TestListRuns(t *testing.T) {
 
 	// Тест 8: Фильтр по типу базы данных
 	t.Run("filter_by_database_type", func(t *testing.T) {
-		databaseType := panel.Database_TYPE_POSTGRES
+		databaseType := panel.Database_TYPE_POSTGRES_ORIOLE
 		records, err := service.ListRuns(ctx, &panel.ListRunsRequest{
 			DatabaseType: &databaseType,
 		})

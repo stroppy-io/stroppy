@@ -88,11 +88,12 @@ type Status int32
 
 const (
 	Status_STATUS_UNSPECIFIED Status = 0
-	Status_STATUS_IDLE        Status = 1
-	Status_STATUS_RUNNING     Status = 2
-	Status_STATUS_COMPLETED   Status = 3
-	Status_STATUS_FAILED      Status = 4
-	Status_STATUS_CANCELLED   Status = 5
+	// status for RunRecord | StroppyRun | StroppyStep
+	Status_STATUS_IDLE      Status = 1
+	Status_STATUS_COMPLETED Status = 2
+	Status_STATUS_RUNNING   Status = 3
+	Status_STATUS_FAILED    Status = 4
+	Status_STATUS_CANCELED  Status = 5
 )
 
 // Enum value maps for Status.
@@ -100,18 +101,18 @@ var (
 	Status_name = map[int32]string{
 		0: "STATUS_UNSPECIFIED",
 		1: "STATUS_IDLE",
-		2: "STATUS_RUNNING",
-		3: "STATUS_COMPLETED",
+		2: "STATUS_COMPLETED",
+		3: "STATUS_RUNNING",
 		4: "STATUS_FAILED",
-		5: "STATUS_CANCELLED",
+		5: "STATUS_CANCELED",
 	}
 	Status_value = map[string]int32{
 		"STATUS_UNSPECIFIED": 0,
 		"STATUS_IDLE":        1,
-		"STATUS_RUNNING":     2,
-		"STATUS_COMPLETED":   3,
+		"STATUS_COMPLETED":   2,
+		"STATUS_RUNNING":     3,
 		"STATUS_FAILED":      4,
-		"STATUS_CANCELLED":   5,
+		"STATUS_CANCELED":    5,
 	}
 )
 
@@ -1100,14 +1101,14 @@ const file_panel_types_proto_rawDesc = "" +
 	"\x11TYPE_GREATER_THAN\x10\x03\x12\x12\n" +
 	"\x0eTYPE_LESS_THAN\x10\x04\x12\x1e\n" +
 	"\x1aTYPE_GREATER_THAN_OR_EQUAL\x10\x05\x12\x1b\n" +
-	"\x17TYPE_LESS_THAN_OR_EQUAL\x10\x06*\x84\x01\n" +
+	"\x17TYPE_LESS_THAN_OR_EQUAL\x10\x06*\x83\x01\n" +
 	"\x06Status\x12\x16\n" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x0f\n" +
-	"\vSTATUS_IDLE\x10\x01\x12\x12\n" +
-	"\x0eSTATUS_RUNNING\x10\x02\x12\x14\n" +
-	"\x10STATUS_COMPLETED\x10\x03\x12\x11\n" +
-	"\rSTATUS_FAILED\x10\x04\x12\x14\n" +
-	"\x10STATUS_CANCELLED\x10\x05B@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
+	"\vSTATUS_IDLE\x10\x01\x12\x14\n" +
+	"\x10STATUS_COMPLETED\x10\x02\x12\x12\n" +
+	"\x0eSTATUS_RUNNING\x10\x03\x12\x11\n" +
+	"\rSTATUS_FAILED\x10\x04\x12\x13\n" +
+	"\x0fSTATUS_CANCELED\x10\x05B@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
 
 var (
 	file_panel_types_proto_rawDescOnce sync.Once

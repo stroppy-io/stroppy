@@ -1,6 +1,7 @@
 package application
 
 import (
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/api"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/automate"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/token"
@@ -9,11 +10,12 @@ import (
 )
 
 type Service struct {
-	Logger     logger.Config             `mapstructure:"logger"`
-	Auth       token.Config              `mapstructure:"auth"`
-	Server     httpserv.HTTPServerConfig `mapstructure:"server"`
-	K8S        automate.K8SConfig        `mapstructure:"k8s"`
-	Background automate.BackgroundWorker `mapstructure:"background"`
+	Logger     logger.Config                   `mapstructure:"logger"`
+	Auth       token.Config                    `mapstructure:"auth"`
+	Server     httpserv.HTTPServerConfig       `mapstructure:"server"`
+	K8S        automate.K8SConfig              `mapstructure:"k8s"`
+	Background automate.BackgroundWorkerConfig `mapstructure:"background"`
+	Automate   api.CloudAutomationConfig       `mapstructure:"automate"`
 }
 type Infrastructure struct {
 	Postgres postgres.Config `mapstructure:"postgres"`

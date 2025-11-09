@@ -120,6 +120,9 @@ type (
 	cloudResourcedeletedAtFieldImpl struct {
 		*column[*time.Time, CloudResourceField]
 	}
+	cloudResourcestatusFieldImpl struct {
+		*column[int32, CloudResourceField]
+	}
 	cloudResourcerefFieldImpl struct {
 		*column[[]byte, CloudResourceField]
 	}
@@ -147,6 +150,7 @@ func (f *cloudResourceidFieldImpl) mustCloudResourceField()               {}
 func (f *cloudResourcecreatedAtFieldImpl) mustCloudResourceField()        {}
 func (f *cloudResourceupdatedAtFieldImpl) mustCloudResourceField()        {}
 func (f *cloudResourcedeletedAtFieldImpl) mustCloudResourceField()        {}
+func (f *cloudResourcestatusFieldImpl) mustCloudResourceField()           {}
 func (f *cloudResourcerefFieldImpl) mustCloudResourceField()              {}
 func (f *cloudResourceresourceDefFieldImpl) mustCloudResourceField()      {}
 func (f *cloudResourceresourceYamlFieldImpl) mustCloudResourceField()     {}
@@ -160,6 +164,18 @@ type (
 	cloudAutomationidFieldImpl struct {
 		*column[string, CloudAutomationField]
 	}
+	cloudAutomationcreatedAtFieldImpl struct {
+		*column[time.Time, CloudAutomationField]
+	}
+	cloudAutomationupdatedAtFieldImpl struct {
+		*column[time.Time, CloudAutomationField]
+	}
+	cloudAutomationdeletedAtFieldImpl struct {
+		*column[*time.Time, CloudAutomationField]
+	}
+	cloudAutomationstatusFieldImpl struct {
+		*column[int32, CloudAutomationField]
+	}
 	cloudAutomationdatabaseRootResourceIdFieldImpl struct {
 		*column[string, CloudAutomationField]
 	}
@@ -172,6 +188,10 @@ type (
 )
 
 func (f *cloudAutomationidFieldImpl) mustCloudAutomationField()                     {}
+func (f *cloudAutomationcreatedAtFieldImpl) mustCloudAutomationField()              {}
+func (f *cloudAutomationupdatedAtFieldImpl) mustCloudAutomationField()              {}
+func (f *cloudAutomationdeletedAtFieldImpl) mustCloudAutomationField()              {}
+func (f *cloudAutomationstatusFieldImpl) mustCloudAutomationField()                 {}
 func (f *cloudAutomationdatabaseRootResourceIdFieldImpl) mustCloudAutomationField() {}
 func (f *cloudAutomationworkloadRootResourceIdFieldImpl) mustCloudAutomationField() {}
 func (f *cloudAutomationstroppyRunIdFieldImpl) mustCloudAutomationField()           {}
@@ -267,6 +287,7 @@ type (
 		CreatedAt        time.Time
 		UpdatedAt        time.Time
 		DeletedAt        *time.Time
+		Status           int32
 		Ref              []byte
 		ResourceDef      []byte
 		ResourceYaml     string
@@ -277,6 +298,10 @@ type (
 	}
 	CloudAutomationScanner struct {
 		Id                     string
+		CreatedAt              time.Time
+		UpdatedAt              time.Time
+		DeletedAt              *time.Time
+		Status                 int32
 		DatabaseRootResourceId string
 		WorkloadRootResourceId string
 		StroppyRunId           *string
@@ -521,6 +546,7 @@ func (s *CloudResourceScanner) values() []any {
 		s.CreatedAt,
 		s.UpdatedAt,
 		s.DeletedAt,
+		s.Status,
 		s.Ref,
 		s.ResourceDef,
 		s.ResourceYaml,
@@ -540,6 +566,8 @@ func (s *CloudResourceScanner) getTarget(field string) func() any {
 		return func() any { return &s.UpdatedAt }
 	case "deleted_at":
 		return func() any { return &s.DeletedAt }
+	case "status":
+		return func() any { return &s.Status }
 	case "ref":
 		return func() any { return &s.Ref }
 	case "resource_def":
@@ -575,6 +603,10 @@ func (s *CloudResourceScanner) getSetter(field CloudResourceField) func() ValueS
 	case "deleted_at":
 		return func() ValueSetter[CloudResourceField] {
 			return NewValueSetter[CloudResourceField](CloudResource.DeletedAt, s.DeletedAt)
+		}
+	case "status":
+		return func() ValueSetter[CloudResourceField] {
+			return NewValueSetter[CloudResourceField](CloudResource.Status, s.Status)
 		}
 	case "ref":
 		return func() ValueSetter[CloudResourceField] {
@@ -618,6 +650,8 @@ func (s *CloudResourceScanner) getValue(field CloudResourceField) func() any {
 		return func() any { return s.UpdatedAt }
 	case "deleted_at":
 		return func() any { return s.DeletedAt }
+	case "status":
+		return func() any { return s.Status }
 	case "ref":
 		return func() any { return s.Ref }
 	case "resource_def":
@@ -642,6 +676,10 @@ func newCloudAutomationScanner() *CloudAutomationScanner {
 func (s *CloudAutomationScanner) values() []any {
 	return []any{
 		s.Id,
+		s.CreatedAt,
+		s.UpdatedAt,
+		s.DeletedAt,
+		s.Status,
 		s.DatabaseRootResourceId,
 		s.WorkloadRootResourceId,
 		s.StroppyRunId,
@@ -651,6 +689,14 @@ func (s *CloudAutomationScanner) getTarget(field string) func() any {
 	switch field {
 	case "id":
 		return func() any { return &s.Id }
+	case "created_at":
+		return func() any { return &s.CreatedAt }
+	case "updated_at":
+		return func() any { return &s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return &s.DeletedAt }
+	case "status":
+		return func() any { return &s.Status }
 	case "database_root_resource_id":
 		return func() any { return &s.DatabaseRootResourceId }
 	case "workload_root_resource_id":
@@ -666,6 +712,22 @@ func (s *CloudAutomationScanner) getSetter(field CloudAutomationField) func() Va
 	case "id":
 		return func() ValueSetter[CloudAutomationField] {
 			return NewValueSetter[CloudAutomationField](CloudAutomation.Id, s.Id)
+		}
+	case "created_at":
+		return func() ValueSetter[CloudAutomationField] {
+			return NewValueSetter[CloudAutomationField](CloudAutomation.CreatedAt, s.CreatedAt)
+		}
+	case "updated_at":
+		return func() ValueSetter[CloudAutomationField] {
+			return NewValueSetter[CloudAutomationField](CloudAutomation.UpdatedAt, s.UpdatedAt)
+		}
+	case "deleted_at":
+		return func() ValueSetter[CloudAutomationField] {
+			return NewValueSetter[CloudAutomationField](CloudAutomation.DeletedAt, s.DeletedAt)
+		}
+	case "status":
+		return func() ValueSetter[CloudAutomationField] {
+			return NewValueSetter[CloudAutomationField](CloudAutomation.Status, s.Status)
 		}
 	case "database_root_resource_id":
 		return func() ValueSetter[CloudAutomationField] {
@@ -687,6 +749,14 @@ func (s *CloudAutomationScanner) getValue(field CloudAutomationField) func() any
 	switch field.String() {
 	case "id":
 		return func() any { return s.Id }
+	case "created_at":
+		return func() any { return s.CreatedAt }
+	case "updated_at":
+		return func() any { return s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return s.DeletedAt }
+	case "status":
+		return func() any { return s.Status }
 	case "database_root_resource_id":
 		return func() any { return s.DatabaseRootResourceId }
 	case "workload_root_resource_id":
@@ -994,6 +1064,11 @@ type (
 			ScalarOperator[*time.Time, CloudResourceField]
 			IsNullOperator[*time.Time, CloudResourceField]
 		}
+		Status interface {
+			CloudResourceField
+			CommonOperator[int32, CloudResourceField]
+			ScalarOperator[int32, CloudResourceField]
+		}
 		Ref interface {
 			CloudResourceField
 			CommonOperator[[]byte, CloudResourceField]
@@ -1039,6 +1114,27 @@ type (
 			CommonOperator[string, CloudAutomationField]
 			ScalarOperator[string, CloudAutomationField]
 			LikeOperator[string, CloudAutomationField]
+		}
+		CreatedAt interface {
+			CloudAutomationField
+			CommonOperator[time.Time, CloudAutomationField]
+			ScalarOperator[time.Time, CloudAutomationField]
+		}
+		UpdatedAt interface {
+			CloudAutomationField
+			CommonOperator[time.Time, CloudAutomationField]
+			ScalarOperator[time.Time, CloudAutomationField]
+		}
+		DeletedAt interface {
+			CloudAutomationField
+			CommonOperator[*time.Time, CloudAutomationField]
+			ScalarOperator[*time.Time, CloudAutomationField]
+			IsNullOperator[*time.Time, CloudAutomationField]
+		}
+		Status interface {
+			CloudAutomationField
+			CommonOperator[int32, CloudAutomationField]
+			ScalarOperator[int32, CloudAutomationField]
 		}
 		DatabaseRootResourceId interface {
 			CloudAutomationField
@@ -1212,6 +1308,7 @@ func newCloudResourceTableImpl() *cloudResourceTableImpl {
 	createdAt := &cloudResourcecreatedAtFieldImpl{column: newColumn[time.Time, CloudResourceField](fieldAliasImpl("created_at"))}
 	updatedAt := &cloudResourceupdatedAtFieldImpl{column: newColumn[time.Time, CloudResourceField](fieldAliasImpl("updated_at"))}
 	deletedAt := &cloudResourcedeletedAtFieldImpl{column: newColumn[*time.Time, CloudResourceField](fieldAliasImpl("deleted_at"))}
+	status := &cloudResourcestatusFieldImpl{column: newColumn[int32, CloudResourceField](fieldAliasImpl("status"))}
 	ref := &cloudResourcerefFieldImpl{column: newColumn[[]byte, CloudResourceField](fieldAliasImpl("ref"))}
 	resourceDef := &cloudResourceresourceDefFieldImpl{column: newColumn[[]byte, CloudResourceField](fieldAliasImpl("resource_def"))}
 	resourceYaml := &cloudResourceresourceYamlFieldImpl{column: newColumn[string, CloudResourceField](fieldAliasImpl("resource_yaml"))}
@@ -1227,6 +1324,7 @@ func newCloudResourceTableImpl() *cloudResourceTableImpl {
 			createdAt,
 			updatedAt,
 			deletedAt,
+			status,
 			ref,
 			resourceDef,
 			resourceYaml,
@@ -1239,6 +1337,7 @@ func newCloudResourceTableImpl() *cloudResourceTableImpl {
 		CreatedAt:        createdAt,
 		UpdatedAt:        updatedAt,
 		DeletedAt:        deletedAt,
+		Status:           status,
 		Ref:              ref,
 		ResourceDef:      resourceDef,
 		ResourceYaml:     resourceYaml,
@@ -1250,6 +1349,10 @@ func newCloudResourceTableImpl() *cloudResourceTableImpl {
 }
 func newCloudAutomationTableImpl() *cloudAutomationTableImpl {
 	id := &cloudAutomationidFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("id"))}
+	createdAt := &cloudAutomationcreatedAtFieldImpl{column: newColumn[time.Time, CloudAutomationField](fieldAliasImpl("created_at"))}
+	updatedAt := &cloudAutomationupdatedAtFieldImpl{column: newColumn[time.Time, CloudAutomationField](fieldAliasImpl("updated_at"))}
+	deletedAt := &cloudAutomationdeletedAtFieldImpl{column: newColumn[*time.Time, CloudAutomationField](fieldAliasImpl("deleted_at"))}
+	status := &cloudAutomationstatusFieldImpl{column: newColumn[int32, CloudAutomationField](fieldAliasImpl("status"))}
 	databaseRootResourceId := &cloudAutomationdatabaseRootResourceIdFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("database_root_resource_id"))}
 	workloadRootResourceId := &cloudAutomationworkloadRootResourceIdFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("workload_root_resource_id"))}
 	stroppyRunId := &cloudAutomationstroppyRunIdFieldImpl{column: newColumn[*string, CloudAutomationField](fieldAliasImpl("stroppy_run_id"))}
@@ -1258,11 +1361,19 @@ func newCloudAutomationTableImpl() *cloudAutomationTableImpl {
 			"cloud_automations",
 			newCloudAutomationScanner,
 			id,
+			createdAt,
+			updatedAt,
+			deletedAt,
+			status,
 			databaseRootResourceId,
 			workloadRootResourceId,
 			stroppyRunId,
 		),
 		Id:                     id,
+		CreatedAt:              createdAt,
+		UpdatedAt:              updatedAt,
+		DeletedAt:              deletedAt,
+		Status:                 status,
 		DatabaseRootResourceId: databaseRootResourceId,
 		WorkloadRootResourceId: workloadRootResourceId,
 		StroppyRunId:           stroppyRunId,
@@ -1493,6 +1604,7 @@ func CloudResourceToScanner(
 		}
 		scanner := &CloudResourceScanner{
 			Id:               downcastId(entity.Id),
+			Status:           EnumToInt32[panel.CloudResource_Status](entity.Status),
 			ParentResourceId: downcastParentResourceId(entity.ParentResourceId),
 		}
 		scanner.Ref = MessageToSliceByte[*crossplane.Ref](entity.GetResource().GetRef())
@@ -1517,12 +1629,8 @@ func ScannerToCloudResource(
 		}
 		entity := &panel.CloudResource{
 			Id:               upcastId(model.Id),
+			Status:           EnumFromInt32[panel.CloudResource_Status](model.Status),
 			ParentResourceId: upcastParentResourceId(model.ParentResourceId),
-		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
 		}
 		entity.Resource = &crossplane.ResourceWithStatus{
 			Ref:          MessageFromSliceByte[*crossplane.Ref](model.Ref),
@@ -1531,6 +1639,11 @@ func ScannerToCloudResource(
 			Synced:       model.Synced,
 			Ready:        model.Ready,
 			ExternalId:   model.ExternalId,
+		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
 		}
 
 		return entity
@@ -1563,10 +1676,14 @@ func CloudAutomationToScanner(
 		}
 		scanner := &CloudAutomationScanner{
 			Id:                     downcastId(entity.Id),
+			Status:                 EnumToInt32[panel.Status](entity.Status),
 			DatabaseRootResourceId: downcastDatabaseRootResourceId(entity.DatabaseRootResourceId),
 			WorkloadRootResourceId: downcastWorkloadRootResourceId(entity.WorkloadRootResourceId),
 			StroppyRunId:           downcastStroppyRunId(entity.StroppyRunId),
 		}
+		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
+		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
+		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
 		return scanner
 	}
 }
@@ -1582,9 +1699,15 @@ func ScannerToCloudAutomation(
 		}
 		entity := &panel.CloudAutomation{
 			Id:                     upcastId(model.Id),
+			Status:                 EnumFromInt32[panel.Status](model.Status),
 			DatabaseRootResourceId: upcastDatabaseRootResourceId(model.DatabaseRootResourceId),
 			WorkloadRootResourceId: upcastWorkloadRootResourceId(model.WorkloadRootResourceId),
 			StroppyRunId:           upcastStroppyRunId(model.StroppyRunId),
+		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
 		}
 
 		return entity

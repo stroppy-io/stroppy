@@ -117,3 +117,5 @@ http-client.private.env.json
 /.netrc
 /xexample
 /internal/automate/kubeconfig.yaml
+/.kubectl.config.yaml
+/stroppy-cloud-panel-server

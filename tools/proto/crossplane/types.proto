@@ -6,6 +6,9 @@ import "validate/validate.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane";
 
+message OnlyNameRef {
+    string name = 1 [(validate.rules).string.min_len = 1];
+}
 
 message Ref {
     string namespace = 1 [(validate.rules).string.min_len = 1];

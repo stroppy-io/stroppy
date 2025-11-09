@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -109,8 +110,9 @@ var ResourcesService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	AutomateService_GetAutomation_FullMethodName = "/panel.AutomateService/GetAutomation"
-	AutomateService_RunAutomation_FullMethodName = "/panel.AutomateService/RunAutomation"
+	AutomateService_GetAutomation_FullMethodName    = "/panel.AutomateService/GetAutomation"
+	AutomateService_RunAutomation_FullMethodName    = "/panel.AutomateService/RunAutomation"
+	AutomateService_CancelAutomation_FullMethodName = "/panel.AutomateService/CancelAutomation"
 )
 
 // AutomateServiceClient is the client API for AutomateService service.
@@ -119,6 +121,7 @@ const (
 type AutomateServiceClient interface {
 	GetAutomation(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*CloudAutomation, error)
 	RunAutomation(ctx context.Context, in *RunAutomationRequest, opts ...grpc.CallOption) (*RunRecord, error)
+	CancelAutomation(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type automateServiceClient struct {
@@ -147,12 +150,22 @@ func (c *automateServiceClient) RunAutomation(ctx context.Context, in *RunAutoma
 	return out, nil
 }
 
+func (c *automateServiceClient) CancelAutomation(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AutomateService_CancelAutomation_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AutomateServiceServer is the server API for AutomateService service.
 // All implementations must embed UnimplementedAutomateServiceServer
 // for forward compatibility
 type AutomateServiceServer interface {
 	GetAutomation(context.Context, *Ulid) (*CloudAutomation, error)
 	RunAutomation(context.Context, *RunAutomationRequest) (*RunRecord, error)
+	CancelAutomation(context.Context, *Ulid) (*emptypb.Empty, error)
 	mustEmbedUnimplementedAutomateServiceServer()
 }
 
@@ -165,6 +178,9 @@ func (UnimplementedAutomateServiceServer) GetAutomation(context.Context, *Ulid) 
 }
 func (UnimplementedAutomateServiceServer) RunAutomation(context.Context, *RunAutomationRequest) (*RunRecord, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RunAutomation not implemented")
+}
+func (UnimplementedAutomateServiceServer) CancelAutomation(context.Context, *Ulid) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelAutomation not implemented")
 }
 func (UnimplementedAutomateServiceServer) mustEmbedUnimplementedAutomateServiceServer() {}
 
@@ -215,6 +231,24 @@ func _AutomateService_RunAutomation_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AutomateService_CancelAutomation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Ulid)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AutomateServiceServer).CancelAutomation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AutomateService_CancelAutomation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AutomateServiceServer).CancelAutomation(ctx, req.(*Ulid))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AutomateService_ServiceDesc is the grpc.ServiceDesc for AutomateService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -229,6 +263,10 @@ var AutomateService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RunAutomation",
 			Handler:    _AutomateService_RunAutomation_Handler,
+		},
+		{
+			MethodName: "CancelAutomation",
+			Handler:    _AutomateService_CancelAutomation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

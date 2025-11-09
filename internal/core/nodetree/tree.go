@@ -1,6 +1,11 @@
 package nodetree
 
-import "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
+import (
+	"github.com/samber/lo"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/resource"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
+)
 
 // TreeNodeCallback is a callback function for tree node traversal.
 // It receives the current node and its depth in the tree (root is depth 0).
@@ -156,6 +161,33 @@ func CollectNodes(root *panel.CloudResource_TreeNode, predicate func(node *panel
 	})
 
 	return result, err
+}
+
+func IsNodeAndDescendantsReady(node *panel.CloudResource_TreeNode) (bool, error) {
+	nodeDescendants, err := GetDescendants(node)
+	if err != nil {
+		return false, err
+	}
+	return IsNodeReady(node) && lo.CountBy(nodeDescendants, IsNodeReady) == len(nodeDescendants), nil
+}
+
+func IsNodeReady(node *panel.CloudResource_TreeNode) bool {
+	return node.GetResource().GetResource().GetReady() &&
+		node.GetResource().GetResource().GetSynced() &&
+		node.GetResource().GetResource().GetExternalId() != ""
+}
+
+func GetExtNodeRef(node *panel.CloudResource_TreeNode) *crossplane.ExtRef {
+	return resource.ExtRefFromResourceDef(
+		node.GetResource().GetResource().GetRef(),
+		node.GetResource().GetResource().GetResourceDef(),
+	)
+}
+
+func GetDescendants(root *panel.CloudResource_TreeNode) ([]*panel.CloudResource_TreeNode, error) {
+	return CollectNodes(root, func(node *panel.CloudResource_TreeNode) bool {
+		return node.GetId() != root.GetId()
+	})
 }
 
 // CountNodes counts the total number of nodes in the tree.
