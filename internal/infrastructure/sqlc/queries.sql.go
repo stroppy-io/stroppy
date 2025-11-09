@@ -13,17 +13,17 @@ import (
 
 const GetResourceTree = `-- name: GetResourceTree :many
 WITH RECURSIVE tree AS (
-    SELECT id, created_at, updated_at, deleted_at, ref, resource_def, resource_yaml, synced, ready, external_id, parent_resource_id
+    SELECT id, created_at, updated_at, deleted_at, status, ref, resource_def, resource_yaml, synced, ready, external_id, parent_resource_id
     FROM cloud_resources
     WHERE cloud_resources.id = $1
 
     UNION ALL
 
-    SELECT c.id, c.created_at, c.updated_at, c.deleted_at, c.ref, c.resource_def, c.resource_yaml, c.synced, c.ready, c.external_id, c.parent_resource_id
+    SELECT c.id, c.created_at, c.updated_at, c.deleted_at, c.status, c.ref, c.resource_def, c.resource_yaml, c.synced, c.ready, c.external_id, c.parent_resource_id
     FROM cloud_resources c
              INNER JOIN tree t ON c.parent_resource_id = t.id
 )
-SELECT id, created_at, updated_at, deleted_at, ref, resource_def, resource_yaml, synced, ready, external_id, parent_resource_id
+SELECT id, created_at, updated_at, deleted_at, status, ref, resource_def, resource_yaml, synced, ready, external_id, parent_resource_id
 FROM tree
 `
 
@@ -32,6 +32,7 @@ type GetResourceTreeRow struct {
 	CreatedAt        pgtype.Timestamptz `db:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `db:"updated_at"`
 	DeletedAt        pgtype.Timestamptz `db:"deleted_at"`
+	Status           int32              `db:"status"`
 	Ref              []byte             `db:"ref"`
 	ResourceDef      []byte             `db:"resource_def"`
 	ResourceYaml     string             `db:"resource_yaml"`
@@ -55,6 +56,76 @@ func (q *Queries) GetResourceTree(ctx context.Context, id string) ([]*GetResourc
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.Status,
+			&i.Ref,
+			&i.ResourceDef,
+			&i.ResourceYaml,
+			&i.Synced,
+			&i.Ready,
+			&i.ExternalID,
+			&i.ParentResourceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetResourceTreeByStatuses = `-- name: GetResourceTreeByStatuses :many
+WITH RECURSIVE tree AS (
+    SELECT id, created_at, updated_at, deleted_at, status, ref, resource_def, resource_yaml, synced, ready, external_id, parent_resource_id
+    FROM cloud_resources
+    WHERE cloud_resources.id = $1 AND cloud_resources.status = ANY($2::int[])
+
+    UNION ALL
+
+    SELECT c.id, c.created_at, c.updated_at, c.deleted_at, c.status, c.ref, c.resource_def, c.resource_yaml, c.synced, c.ready, c.external_id, c.parent_resource_id
+    FROM cloud_resources c
+             INNER JOIN tree t ON c.parent_resource_id = t.id
+)
+SELECT id, created_at, updated_at, deleted_at, status, ref, resource_def, resource_yaml, synced, ready, external_id, parent_resource_id
+FROM tree
+`
+
+type GetResourceTreeByStatusesParams struct {
+	ID      string  `db:"id"`
+	Column2 []int32 `db:"column_2"`
+}
+
+type GetResourceTreeByStatusesRow struct {
+	ID               string             `db:"id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at"`
+	DeletedAt        pgtype.Timestamptz `db:"deleted_at"`
+	Status           int32              `db:"status"`
+	Ref              []byte             `db:"ref"`
+	ResourceDef      []byte             `db:"resource_def"`
+	ResourceYaml     string             `db:"resource_yaml"`
+	Synced           bool               `db:"synced"`
+	Ready            bool               `db:"ready"`
+	ExternalID       string             `db:"external_id"`
+	ParentResourceID *string            `db:"parent_resource_id"`
+}
+
+func (q *Queries) GetResourceTreeByStatuses(ctx context.Context, arg *GetResourceTreeByStatusesParams) ([]*GetResourceTreeByStatusesRow, error) {
+	rows, err := q.db.Query(ctx, GetResourceTreeByStatuses, arg.ID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetResourceTreeByStatusesRow
+	for rows.Next() {
+		var i GetResourceTreeByStatusesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.Status,
 			&i.Ref,
 			&i.ResourceDef,
 			&i.ResourceYaml,

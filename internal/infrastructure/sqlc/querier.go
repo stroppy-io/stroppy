@@ -10,6 +10,7 @@ import (
 
 type Querier interface {
 	GetResourceTree(ctx context.Context, id string) ([]*GetResourceTreeRow, error)
+	GetResourceTreeByStatuses(ctx context.Context, arg *GetResourceTreeByStatusesParams) ([]*GetResourceTreeByStatusesRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

@@ -9,10 +9,14 @@ import (
 )
 
 type CloudAutomations struct {
-	ID                 string  `db:"id"`
-	TargetVmResourceID string  `db:"target_vm_resource_id"`
-	RunnerVmResourceID string  `db:"runner_vm_resource_id"`
-	StroppyRunID       *string `db:"stroppy_run_id"`
+	ID                     string             `db:"id"`
+	CreatedAt              pgtype.Timestamptz `db:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `db:"updated_at"`
+	DeletedAt              pgtype.Timestamptz `db:"deleted_at"`
+	Status                 int32              `db:"status"`
+	DatabaseRootResourceID string             `db:"database_root_resource_id"`
+	WorkloadRootResourceID string             `db:"workload_root_resource_id"`
+	StroppyRunID           *string            `db:"stroppy_run_id"`
 }
 
 type CloudResources struct {
@@ -20,6 +24,7 @@ type CloudResources struct {
 	CreatedAt        pgtype.Timestamptz `db:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `db:"updated_at"`
 	DeletedAt        pgtype.Timestamptz `db:"deleted_at"`
+	Status           int32              `db:"status"`
 	Ref              []byte             `db:"ref"`
 	ResourceDef      []byte             `db:"resource_def"`
 	ResourceYaml     string             `db:"resource_yaml"`
@@ -39,7 +44,7 @@ type RunRecords struct {
 	Tps               []byte             `db:"tps"`
 	Database          []byte             `db:"database"`
 	Workload          []byte             `db:"workload"`
-	CloudAutomationID []byte             `db:"cloud_automation_id"`
+	CloudAutomationID *string            `db:"cloud_automation_id"`
 }
 
 type StroppyRuns struct {

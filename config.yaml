@@ -23,7 +23,7 @@ service:
     max_automation_ttl: 4h
   automate:
     automation_ttl: 4h
-    creation_timeout: 15m
+    creation_timeout: 5m
   k8s:
     kubeconfig_path: ".kubectl.config.yaml"
     crossplane:

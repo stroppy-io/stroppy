@@ -42,7 +42,7 @@ func (p *PanelService) BackgroundCheckAutomationStatus(ctx context.Context) erro
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, err)
 	}
-	return postgres.WithSerializable(ctx, p.txManager, func(ctx context.Context) error {
+	return postgres.WithReadUncommitted(ctx, p.txManager, func(ctx context.Context) error {
 		workPool := pool.New().WithContext(ctx).WithFailFast().WithFirstError()
 		for _, automation := range automations {
 			workPool.Go(func(ctx context.Context) error {

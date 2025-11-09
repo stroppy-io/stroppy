@@ -3,6 +3,9 @@ package api
 import (
 	"context"
 	"fmt"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"time"
 
 	"connectrpc.com/connect"
@@ -76,7 +79,13 @@ func (p *PanelService) updateResourceStatus(ctx context.Context, root *panel.Clo
 		&crossplane.GetResourceStatusRequest{Ref: nodetree.GetExtNodeRef(root)},
 	)
 	if err != nil {
-		if connect.CodeOf(err) == connect.CodeNotFound {
+		grpcStatus, _ := status.FromError(err)
+		if grpcStatus.Code() == codes.NotFound {
+			p.logger.Debug(
+				"resource not found, setting status to destroyed",
+				zap.String("kind", nodetree.GetExtNodeRef(root).GetKind()),
+				zap.String("name", nodetree.GetExtNodeRef(root).GetRef().GetName()),
+			)
 			return p.cloudResourceRepo.Exec(ctx, orm.CloudResource.Update().
 				Set(orm.CloudResource.Status.Set(int32(panel.CloudResource_STATUS_DESTROYED))).
 				Where(orm.CloudResource.Id.Eq(root.GetId().GetId())))
@@ -93,12 +102,35 @@ func (p *PanelService) updateResourceStatus(ctx context.Context, root *panel.Clo
 	if ready {
 		root.Resource.Status = panel.CloudResource_STATUS_WORKING
 	}
+	if !ready && root.GetResource().GetStatus() == panel.CloudResource_STATUS_CREATING &&
+		root.GetResource().GetTiming().GetCreatedAt().AsTime().Add(p.automateConfig.CreationTimeout).Before(time.Now()) {
+		root.Resource.Status = panel.CloudResource_STATUS_DEGRADED
+		// TODO: need cleanup degraded resources
+	}
 	return p.cloudResourceRepo.Update(ctx, root.GetResource(), orm.CloudResource.Id.Eq(root.GetId().GetId()))
 }
 
 func (p *PanelService) updateCrossplaneAutomation(ctx context.Context, automation *panel.CloudAutomation) error {
-	databaseRootRes, err := p.GetResource(ctx, automation.DatabaseRootResourceId)
+	databaseRootRes, err := p.getResourceTreeByStatus(
+		ctx,
+		automation.DatabaseRootResourceId,
+		[]panel.CloudResource_Status{
+			panel.CloudResource_STATUS_WORKING,
+			panel.CloudResource_STATUS_CREATING,
+			panel.CloudResource_STATUS_DESTROYING,
+			// not need update degraded or destroyed resources
+			//panel.CloudResource_STATUS_DESTROYED ,
+			//panel.CloudResource_STATUS_DEGRADED  ,
+		},
+	)
 	if err != nil {
+		if sqlerr.IsNotFound(err) {
+			p.logger.Debug(
+				"database resource for automation not found, skipping update",
+				zap.String("id", automation.DatabaseRootResourceId.GetId()),
+			)
+			return nil
+		}
 		return fmt.Errorf("failed to get database resource: %w", err)
 	}
 	err = p.updateResourceStatus(ctx, databaseRootRes)
@@ -121,10 +153,13 @@ func (p *PanelService) updateCrossplaneAutomation(ctx context.Context, automatio
 				orm.CloudAutomation.Id.Eq(automation.GetId().GetId()),
 				orm.CloudAutomation.Status.Eq(int32(panel.Status_STATUS_IDLE)),
 			))
-	} else {
+	}
+	if (databaseRootRes.GetResource().GetStatus() == panel.CloudResource_STATUS_CREATING ||
+		workloadRootRes.GetResource().GetStatus() == panel.CloudResource_STATUS_CREATING) &&
+		automation.GetTiming().GetCreatedAt().AsTime().Add(p.automateConfig.CreationTimeout).Before(time.Now()) {
 		if automation.GetTiming().GetCreatedAt().AsTime().Add(p.automateConfig.CreationTimeout).Before(time.Now()) {
 			p.logger.Debug(
-				"automation is timed out, stopping it",
+				"automation creation is timed out, stopping it",
 				zap.String("automation_id", automation.GetId().GetId()),
 				zap.Time("creation_time", automation.GetTiming().GetCreatedAt().AsTime()),
 				zap.Duration("creation_timeout", p.automateConfig.CreationTimeout),

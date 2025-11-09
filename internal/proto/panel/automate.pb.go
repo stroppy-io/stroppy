@@ -34,6 +34,7 @@ const (
 	CloudResource_STATUS_WORKING    CloudResource_Status = 2
 	CloudResource_STATUS_DESTROYING CloudResource_Status = 3
 	CloudResource_STATUS_DESTROYED  CloudResource_Status = 4
+	CloudResource_STATUS_DEGRADED   CloudResource_Status = 5
 )
 
 // Enum value maps for CloudResource_Status.
@@ -44,6 +45,7 @@ var (
 		2: "STATUS_WORKING",
 		3: "STATUS_DESTROYING",
 		4: "STATUS_DESTROYED",
+		5: "STATUS_DEGRADED",
 	}
 	CloudResource_Status_value = map[string]int32{
 		"STATUS_UNSPECIFIED": 0,
@@ -51,6 +53,7 @@ var (
 		"STATUS_WORKING":     2,
 		"STATUS_DESTROYING":  3,
 		"STATUS_DESTROYED":   4,
+		"STATUS_DEGRADED":    5,
 	}
 )
 
@@ -365,7 +368,7 @@ var File_panel_automate_proto protoreflect.FileDescriptor
 
 const file_panel_automate_proto_rawDesc = "" +
 	"\n" +
-	"\x14panel/automate.proto\x12\x05panel\x1a\x19crossplane/resource.proto\x1a\x16crossplane/types.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0fpanel/run.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\x8c\x05\n" +
+	"\x14panel/automate.proto\x12\x05panel\x1a\x19crossplane/resource.proto\x1a\x16crossplane/types.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0fpanel/run.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xa2\x05\n" +
 	"\rCloudResource\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
@@ -376,13 +379,14 @@ const file_panel_automate_proto_rawDesc = "" +
 	"\bTreeNode\x12%\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\b\xfaB\x05r\x03\x98\x01\x1aR\x02id\x127\n" +
 	"\bresource\x18\x02 \x01(\v2\x14.panel.CloudResourceB\x05\xca>\x02@\x01R\bresource\x12@\n" +
-	"\bchildren\x18\x03 \x03(\v2\x1d.panel.CloudResource.TreeNodeB\x05\xca>\x02@\x01R\bchildren\"v\n" +
+	"\bchildren\x18\x03 \x03(\v2\x1d.panel.CloudResource.TreeNodeB\x05\xca>\x02@\x01R\bchildren\"\x8b\x01\n" +
 	"\x06Status\x12\x16\n" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fSTATUS_CREATING\x10\x01\x12\x12\n" +
 	"\x0eSTATUS_WORKING\x10\x02\x12\x15\n" +
 	"\x11STATUS_DESTROYING\x10\x03\x12\x14\n" +
-	"\x10STATUS_DESTROYED\x10\x04:\x16\xca>\x13\b\x01\x12\x0fcloud_resourcesB\x15\n" +
+	"\x10STATUS_DESTROYED\x10\x04\x12\x13\n" +
+	"\x0fSTATUS_DEGRADED\x10\x05:\x16\xca>\x13\b\x01\x12\x0fcloud_resourcesB\x15\n" +
 	"\x13_parent_resource_id\"\xb2\x03\n" +
 	"\x0fCloudAutomation\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +

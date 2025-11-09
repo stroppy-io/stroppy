@@ -192,10 +192,13 @@ func (y *YandexCloudBuilder) NewSingleVmResource(
 	vmDef := y.newVmDef(vmRef, machineInfo, DefaultYandexStroppySubNetRef, saveSecretTo, script)
 
 	vmId := ids.NewUlid()
+	subnetId := ids.NewUlid()
+	networkId := ids.NewUlid()
 	vmYaml, err := MarshalWithReplaceOneOffs(vmDef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal vm def: %w", err)
 	}
+
 	vmNode := &panel.CloudResource_TreeNode{
 		Id: vmId,
 		Resource: &panel.CloudResource{
@@ -209,10 +212,9 @@ func (y *YandexCloudBuilder) NewSingleVmResource(
 				Ready:        false,
 				ExternalId:   "",
 			},
+			ParentResourceId: subnetId,
 		},
 	}
-
-	subnetId := ids.NewUlid()
 
 	subnetYaml, err := MarshalWithReplaceOneOffs(subnetDef)
 	if err != nil {
@@ -231,19 +233,19 @@ func (y *YandexCloudBuilder) NewSingleVmResource(
 				Ready:        false,
 				ExternalId:   "",
 			},
+			ParentResourceId: networkId,
 		},
 		Children: []*panel.CloudResource_TreeNode{vmNode},
 	}
 
-	netId := ids.NewUlid()
 	networkYaml, err := MarshalWithReplaceOneOffs(networkDef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal network def: %w", err)
 	}
 	return &panel.CloudResource_TreeNode{
-		Id: netId,
+		Id: networkId,
 		Resource: &panel.CloudResource{
-			Id:     netId,
+			Id:     networkId,
 			Timing: timestamps.NewTiming(),
 			Resource: &crossplane.ResourceWithStatus{
 				Ref:          DefaultYandexStroppyNetworkRef,

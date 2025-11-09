@@ -23,6 +23,7 @@ message CloudResource {
         STATUS_WORKING = 2;
         STATUS_DESTROYING = 3;
         STATUS_DESTROYED = 4;
+        STATUS_DEGRADED = 5;
     }
     option (sql.sql_table) = {
         generate: true

@@ -1,10 +1,11 @@
 package automate
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"fmt"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -152,7 +153,7 @@ func (c *CrossplaneApi) GetResourceStatus(
 	obj, err := ri.Get(ctx, request.GetRef().GetRef().GetName(), metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("resource not found: %w", err))
+			return nil, status.Errorf(codes.NotFound, "resource not found: %s", request.GetRef().GetKind())
 		}
 		return nil, fmt.Errorf("failed to get resource: %w", err)
 	}

@@ -1632,6 +1632,11 @@ func ScannerToCloudResource(
 			Status:           EnumFromInt32[panel.CloudResource_Status](model.Status),
 			ParentResourceId: upcastParentResourceId(model.ParentResourceId),
 		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
+		}
 		entity.Resource = &crossplane.ResourceWithStatus{
 			Ref:          MessageFromSliceByte[*crossplane.Ref](model.Ref),
 			ResourceDef:  MessageFromSliceByte[*crossplane.ResourceDef](model.ResourceDef),
@@ -1639,11 +1644,6 @@ func ScannerToCloudResource(
 			Synced:       model.Synced,
 			Ready:        model.Ready,
 			ExternalId:   model.ExternalId,
-		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
 		}
 
 		return entity
