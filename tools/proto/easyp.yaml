@@ -45,6 +45,11 @@ generate:
         import_extension: ts
         json_types: true
         valid_types: legacy_required+protovalidate_required
+    - name: connect-query
+      out: ../../web/src/proto
+      opts:
+        target: ts
+        import_extension: ts
 breaking:
   ignore: []
   against_git_ref: master
