@@ -15,6 +15,11 @@ export const register = AccountService.method.register;
 export const login = AccountService.method.login;
 
 /**
+ * @generated from rpc panel.AccountService.GetMe
+ */
+export const getMe = AccountService.method.getMe;
+
+/**
  * @generated from rpc panel.AccountService.RefreshTokens
  */
 export const refreshTokens = AccountService.method.refreshTokens;

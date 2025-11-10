@@ -21,8 +21,12 @@ export interface RunsFilters {
   databaseType?: Database_Type
   workloadName?: string
   databaseName?: string
-  tpsFilter?: NumericFilter<Tps_Filter_Type>
-  machineFilter?: NumericFilter<MachineInfo_Filter_Type>
+  tpsFilters?: Array<NumericFilter<Tps_Filter_Type>>
+  orderByTps?: {
+    parameterType: Tps_Filter_Type
+    descending: boolean
+  }
+  machineFilters?: Array<NumericFilter<MachineInfo_Filter_Type>>
 }
 
 export interface RunSummary {
@@ -36,4 +40,14 @@ export interface RunSummary {
   tpsP95?: number
   createdAt?: Date
   updatedAt?: Date
+  runnerClusterNodes?: number
+  runnerMachineSignature?: string
+  runnerMachineCores?: number
+  runnerMachineMemory?: number
+  runnerMachineDisk?: number
+  databaseClusterNodes?: number
+  databaseMachineSignature?: string
+  databaseMachineCores?: number
+  databaseMachineMemory?: number
+  databaseMachineDisk?: number
 }

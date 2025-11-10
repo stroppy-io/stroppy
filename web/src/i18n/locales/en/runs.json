@@ -54,6 +54,8 @@
       "operator": "Operator",
       "value": "Value",
       "reset": "Reset",
+      "add": "Add condition",
+      "remove": "Remove",
       "metrics": {
         "unspecified": "Metric",
         "average": "Average TPS",
@@ -69,6 +71,8 @@
       "operator": "Operator",
       "value": "Value",
       "reset": "Reset",
+      "add": "Add condition",
+      "remove": "Remove",
       "parameters": {
         "unspecified": "Resource",
         "cores": "CPU cores",
@@ -98,7 +102,11 @@
     "empty": "No runs match the selected filters",
     "loading": "Loading…",
     "loadMore": "Load more",
-    "count": "{{count}} runs displayed"
+    "count": "{{count}} runs displayed",
+    "rowsPerPage": "Rows per page",
+    "page": "Page {{page}}",
+    "previous": "Previous page",
+    "next": "Next page"
   },
   "meta": {
     "unknownDatabase": "Database not specified",
@@ -110,7 +118,8 @@
     "export": "Export",
     "import": "Import",
     "bulkDelete": "Bulk Delete",
-    "bulkExport": "Bulk Export"
+    "bulkExport": "Bulk Export",
+    "clearSelection": "Clear selection"
   },
   "modals": {
     "createRun": {
@@ -215,6 +224,29 @@
     "identicalWorkload": "Identical",
     "differentWorkload": "Different",
     "identicalDeployment": "Identical",
-    "differentDeployment": "Different"
+    "differentDeployment": "Different",
+    "collapse": "Collapse values",
+    "expand": "Expand values",
+    "statusSection": "Status & Types",
+    "cluster": {
+      "title": "Cluster Topology",
+      "runnerNodes": "Runner nodes",
+      "databaseNodes": "Database nodes"
+    },
+    "machine": {
+      "runnerTitle": "Runner machine",
+      "runnerSignature": "Runner machine",
+      "runnerCores": "Runner CPU",
+      "runnerMemory": "Runner memory",
+      "runnerDisk": "Runner disk",
+      "databaseTitle": "Database machine",
+      "databaseSignature": "Database machine",
+      "databaseCores": "Database CPU",
+      "databaseMemory": "Database memory",
+      "databaseDisk": "Database disk"
+    },
+    "metrics": {
+      "title": "Performance metrics"
+    }
   }
 }

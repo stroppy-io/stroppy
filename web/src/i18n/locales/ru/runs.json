@@ -54,6 +54,8 @@
       "operator": "Оператор",
       "value": "Значение",
       "reset": "Сбросить",
+      "add": "Добавить условие",
+      "remove": "Удалить",
       "metrics": {
         "unspecified": "Метрика",
         "average": "Средний TPS",
@@ -69,6 +71,8 @@
       "operator": "Оператор",
       "value": "Значение",
       "reset": "Сбросить",
+      "add": "Добавить условие",
+      "remove": "Удалить",
       "parameters": {
         "unspecified": "Ресурс",
         "cores": "CPU (ядра)",
@@ -98,7 +102,11 @@
     "empty": "Нет запусков, удовлетворяющих фильтрам",
     "loading": "Загрузка...",
     "loadMore": "Загрузить еще",
-    "count": "Показано {{count}} запусков"
+    "count": "Показано {{count}} запусков",
+    "rowsPerPage": "Строк на странице",
+    "page": "Страница {{page}}",
+    "previous": "Предыдущая страница",
+    "next": "Следующая страница"
   },
   "meta": {
     "unknownDatabase": "База не указана",
@@ -110,7 +118,8 @@
     "export": "Экспорт",
     "import": "Импорт",
     "bulkDelete": "Массовое удаление",
-    "bulkExport": "Массовый экспорт"
+    "bulkExport": "Массовый экспорт",
+    "clearSelection": "Очистить выбор"
   },
   "modals": {
     "createRun": {
@@ -215,6 +224,29 @@
     "identicalWorkload": "Идентична",
     "differentWorkload": "Различается",
     "identicalDeployment": "Идентично",
-    "differentDeployment": "Различается"
+    "differentDeployment": "Различается",
+    "collapse": "Свернуть значения",
+    "expand": "Развернуть значения",
+    "cluster": {
+      "runnerNodes": "Узлы раннеров",
+      "databaseNodes": "Узлы БД",
+      "title": "Топология кластера"
+    },
+    "machine": {
+      "runnerSignature": "Конфигурация раннера",
+      "runnerCores": "CPU раннера",
+      "runnerMemory": "Память раннера",
+      "runnerDisk": "Диск раннера",
+      "databaseSignature": "Конфигурация БД",
+      "databaseCores": "CPU БД",
+      "databaseMemory": "Память БД",
+      "databaseDisk": "Диск БД",
+      "runnerTitle": "Машины раннеров",
+      "databaseTitle": "Машины БД"
+    },
+    "statusSection": "Статус и типы",
+    "metrics": {
+      "title": "Показатели производительности"
+    }
   }
 }

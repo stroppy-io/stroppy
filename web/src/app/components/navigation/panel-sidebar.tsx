@@ -1,4 +1,4 @@
-import { Gauge, Layers3, Settings2 } from 'lucide-react'
+import { Gauge, Layers3 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
@@ -22,10 +22,10 @@ export const PanelSidebar = ({ variant = 'desktop', onNavigate }: PanelSidebarPr
 
   return (
     <aside className={cn('flex-col text-sidebar-foreground', containerClasses)}>
-      <div className="mb-6">
+      <NavLink to="/" className="mb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Console</p>
         <p className="text-lg font-semibold text-sidebar-foreground">Stroppy Cloud</p>
-      </div>
+      </NavLink>
 
       <nav className="flex flex-1 flex-col gap-2">
         {panelNavItems.map(({ to, label, icon: Icon }) => (

@@ -6,6 +6,7 @@
     "home": "Home",
     "features": "Features",
     "tops": "Top Runs",
+    "docs": "Documentation",
     "about": "About"
   },
   "settings": {
@@ -23,7 +24,7 @@
   "hero": {
     "kicker": "Stroppy Cloud Panel",
     "title": "Run load tests and orchestrate infrastructure from one console",
-    "description": "Provision environments, launch experiments, and analyze telemetry with a Connect RPC powered frontend.",
+    "description": "Provision environments, launch experiments, and analyze telemetry.",
     "actions": {
       "register": "Create account",
       "openConsole": "Open console"

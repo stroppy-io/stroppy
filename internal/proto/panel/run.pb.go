@@ -125,16 +125,18 @@ func (x *RunRecord) GetCloudAutomationId() *Ulid {
 }
 
 type ListRunsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Limit         *int32                 `protobuf:"varint,1,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
-	Offset        *int32                 `protobuf:"varint,2,opt,name=offset,proto3,oneof" json:"offset,omitempty"`
-	Status        *Status                `protobuf:"varint,3,opt,name=status,proto3,enum=panel.Status,oneof" json:"status,omitempty"`                                        // sort by status
-	TpsFilter     *Tps_Filter            `protobuf:"bytes,4,opt,name=tps_filter,json=tpsFilter,proto3,oneof" json:"tps_filter,omitempty"`                                    // sort by TPS filter
-	MachineFilter *MachineInfo_Filter    `protobuf:"bytes,5,opt,name=machine_filter,json=machineFilter,proto3,oneof" json:"machine_filter,omitempty"`                        // sort by machine filter
-	WorkloadName  *string                `protobuf:"bytes,6,opt,name=workload_name,json=workloadName,proto3,oneof" json:"workload_name,omitempty"`                           // sort by workload name
-	WorkloadType  *Workload_Type         `protobuf:"varint,7,opt,name=workload_type,json=workloadType,proto3,enum=panel.Workload_Type,oneof" json:"workload_type,omitempty"` // sort by workload type
-	DatabaseName  *string                `protobuf:"bytes,8,opt,name=database_name,json=databaseName,proto3,oneof" json:"database_name,omitempty"`                           // sort by database name
-	DatabaseType  *Database_Type         `protobuf:"varint,9,opt,name=database_type,json=databaseType,proto3,enum=panel.Database_Type,oneof" json:"database_type,omitempty"` // sort by database type
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Limit  *int32                 `protobuf:"varint,1,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	Offset *int32                 `protobuf:"varint,2,opt,name=offset,proto3,oneof" json:"offset,omitempty"`
+	// filters
+	OnlyMine      bool                  `protobuf:"varint,10,opt,name=only_mine,json=onlyMine,proto3" json:"only_mine,omitempty"`
+	Status        *Status               `protobuf:"varint,3,opt,name=status,proto3,enum=panel.Status,oneof" json:"status,omitempty"`                                        // sort by status
+	TpsFilter     []*Tps_Filter         `protobuf:"bytes,4,rep,name=tps_filter,json=tpsFilter,proto3" json:"tps_filter,omitempty"`                                          // sort by TPS filter
+	MachineFilter []*MachineInfo_Filter `protobuf:"bytes,5,rep,name=machine_filter,json=machineFilter,proto3" json:"machine_filter,omitempty"`                              // sort by machine filter
+	WorkloadName  *string               `protobuf:"bytes,6,opt,name=workload_name,json=workloadName,proto3,oneof" json:"workload_name,omitempty"`                           // sort by workload name
+	WorkloadType  *Workload_Type        `protobuf:"varint,7,opt,name=workload_type,json=workloadType,proto3,enum=panel.Workload_Type,oneof" json:"workload_type,omitempty"` // sort by workload type
+	DatabaseName  *string               `protobuf:"bytes,8,opt,name=database_name,json=databaseName,proto3,oneof" json:"database_name,omitempty"`                           // sort by database name
+	DatabaseType  *Database_Type        `protobuf:"varint,9,opt,name=database_type,json=databaseType,proto3,enum=panel.Database_Type,oneof" json:"database_type,omitempty"` // sort by database type
 	// order by
 	OrderByTps    *Tps_OrderBy `protobuf:"bytes,20,opt,name=order_by_tps,json=orderByTps,proto3,oneof" json:"order_by_tps,omitempty"` // sort by TPS type filter
 	unknownFields protoimpl.UnknownFields
@@ -185,6 +187,13 @@ func (x *ListRunsRequest) GetOffset() int32 {
 	return 0
 }
 
+func (x *ListRunsRequest) GetOnlyMine() bool {
+	if x != nil {
+		return x.OnlyMine
+	}
+	return false
+}
+
 func (x *ListRunsRequest) GetStatus() Status {
 	if x != nil && x.Status != nil {
 		return *x.Status
@@ -192,14 +201,14 @@ func (x *ListRunsRequest) GetStatus() Status {
 	return Status_STATUS_UNSPECIFIED
 }
 
-func (x *ListRunsRequest) GetTpsFilter() *Tps_Filter {
+func (x *ListRunsRequest) GetTpsFilter() []*Tps_Filter {
 	if x != nil {
 		return x.TpsFilter
 	}
 	return nil
 }
 
-func (x *ListRunsRequest) GetMachineFilter() *MachineInfo_Filter {
+func (x *ListRunsRequest) GetMachineFilter() []*MachineInfo_Filter {
 	if x != nil {
 		return x.MachineFilter
 	}
@@ -303,25 +312,25 @@ const file_panel_run_proto_rawDesc = "" +
 	"\x13cloud_automation_id\x18\t \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01H\x00R\x11cloudAutomationId\x88\x01\x01\x1a2\n" +
 	"\x04List\x12*\n" +
 	"\arecords\x18\x01 \x03(\v2\x10.panel.RunRecordR\arecords:\x12\xca>\x0f\b\x01\x12\vrun_recordsB\x16\n" +
-	"\x14_cloud_automation_id\"\x9d\x05\n" +
+	"\x14_cloud_automation_id\"\x8e\x05\n" +
 	"\x0fListRunsRequest\x12\x19\n" +
 	"\x05limit\x18\x01 \x01(\x05H\x00R\x05limit\x88\x01\x01\x12\x1b\n" +
-	"\x06offset\x18\x02 \x01(\x05H\x01R\x06offset\x88\x01\x01\x12*\n" +
-	"\x06status\x18\x03 \x01(\x0e2\r.panel.StatusH\x02R\x06status\x88\x01\x01\x125\n" +
+	"\x06offset\x18\x02 \x01(\x05H\x01R\x06offset\x88\x01\x01\x12\x1b\n" +
+	"\tonly_mine\x18\n" +
+	" \x01(\bR\bonlyMine\x12*\n" +
+	"\x06status\x18\x03 \x01(\x0e2\r.panel.StatusH\x02R\x06status\x88\x01\x01\x120\n" +
 	"\n" +
-	"tps_filter\x18\x04 \x01(\v2\x11.panel.Tps.FilterH\x03R\ttpsFilter\x88\x01\x01\x12E\n" +
-	"\x0emachine_filter\x18\x05 \x01(\v2\x19.panel.MachineInfo.FilterH\x04R\rmachineFilter\x88\x01\x01\x12(\n" +
-	"\rworkload_name\x18\x06 \x01(\tH\x05R\fworkloadName\x88\x01\x01\x12>\n" +
-	"\rworkload_type\x18\a \x01(\x0e2\x14.panel.Workload.TypeH\x06R\fworkloadType\x88\x01\x01\x12(\n" +
-	"\rdatabase_name\x18\b \x01(\tH\aR\fdatabaseName\x88\x01\x01\x12>\n" +
-	"\rdatabase_type\x18\t \x01(\x0e2\x14.panel.Database.TypeH\bR\fdatabaseType\x88\x01\x01\x129\n" +
-	"\forder_by_tps\x18\x14 \x01(\v2\x12.panel.Tps.OrderByH\tR\n" +
+	"tps_filter\x18\x04 \x03(\v2\x11.panel.Tps.FilterR\ttpsFilter\x12@\n" +
+	"\x0emachine_filter\x18\x05 \x03(\v2\x19.panel.MachineInfo.FilterR\rmachineFilter\x12(\n" +
+	"\rworkload_name\x18\x06 \x01(\tH\x03R\fworkloadName\x88\x01\x01\x12>\n" +
+	"\rworkload_type\x18\a \x01(\x0e2\x14.panel.Workload.TypeH\x04R\fworkloadType\x88\x01\x01\x12(\n" +
+	"\rdatabase_name\x18\b \x01(\tH\x05R\fdatabaseName\x88\x01\x01\x12>\n" +
+	"\rdatabase_type\x18\t \x01(\x0e2\x14.panel.Database.TypeH\x06R\fdatabaseType\x88\x01\x01\x129\n" +
+	"\forder_by_tps\x18\x14 \x01(\v2\x12.panel.Tps.OrderByH\aR\n" +
 	"orderByTps\x88\x01\x01B\b\n" +
 	"\x06_limitB\t\n" +
 	"\a_offsetB\t\n" +
-	"\a_statusB\r\n" +
-	"\v_tps_filterB\x11\n" +
-	"\x0f_machine_filterB\x10\n" +
+	"\a_statusB\x10\n" +
 	"\x0e_workload_nameB\x10\n" +
 	"\x0e_workload_typeB\x10\n" +
 	"\x0e_database_nameB\x10\n" +

@@ -42,6 +42,10 @@ func (p *PanelService) numericOperator(op panel.NumberFilterOperator) string {
 }
 
 func (p *PanelService) ListRuns(ctx context.Context, request *panel.ListRunsRequest) (*panel.RunRecord_List, error) {
+	user, err := p.getUserFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
 	q := orm.RunRecord.SelectAll()
 	if limit := request.GetLimit(); limit != 0 {
 		q = q.Limit(int(limit))
@@ -64,42 +68,44 @@ func (p *PanelService) ListRuns(ctx context.Context, request *panel.ListRunsRequ
 	if request.GetDatabaseType() != panel.Database_TYPE_UNSPECIFIED {
 		q = q.Where(orm.RunRecord.Raw("(database->>'databaseType')::text = ?", request.GetDatabaseType().String()))
 	}
-	if request.GetTpsFilter() != nil {
-
-		switch request.GetTpsFilter().GetParameterType() {
+	if request.GetOnlyMine() {
+		q = q.Where(orm.RunRecord.AuthorId.Eq(user.GetId().GetId()))
+	}
+	for _, filterData := range request.GetTpsFilter() {
+		switch filterData.GetParameterType() {
 		case panel.Tps_Filter_TYPE_UNSPECIFIED:
 			return nil, ErrInvalidTpsFilter
 		case panel.Tps_Filter_TYPE_AVERAGE:
 			q = q.Where(orm.RunRecord.Raw(
-				"(tps->>'average')::numeric "+p.numericOperator(request.GetTpsFilter().GetOperator()),
-				request.GetTpsFilter().GetValue(),
+				"(tps->>'average')::numeric "+p.numericOperator(filterData.GetOperator()),
+				filterData.GetValue(),
 			))
 		case panel.Tps_Filter_TYPE_MAX:
 			q = q.Where(orm.RunRecord.Raw(
-				"(tps->>'max')::numeric "+p.numericOperator(request.GetTpsFilter().GetOperator()),
-				request.GetTpsFilter().GetValue(),
+				"(tps->>'max')::numeric "+p.numericOperator(filterData.GetOperator()),
+				filterData.GetValue(),
 			))
 		case panel.Tps_Filter_TYPE_MIN:
 			q = q.Where(orm.RunRecord.Raw(
-				"(tps->>'min')::numeric "+p.numericOperator(request.GetTpsFilter().GetOperator()),
-				request.GetTpsFilter().GetValue(),
+				"(tps->>'min')::numeric "+p.numericOperator(filterData.GetOperator()),
+				filterData.GetValue(),
 			))
 		case panel.Tps_Filter_TYPE_P95TH:
 			q = q.Where(orm.RunRecord.Raw(
-				"(tps->>'p95th')::numeric "+p.numericOperator(request.GetTpsFilter().GetOperator()),
-				request.GetTpsFilter().GetValue(),
-				request.GetTpsFilter().GetValue(),
+				"(tps->>'p95th')::numeric "+p.numericOperator(filterData.GetOperator()),
+				filterData.GetValue(),
+				filterData.GetValue(),
 			))
 		case panel.Tps_Filter_TYPE_P99TH:
 			q = q.Where(orm.RunRecord.Raw(
-				"(tps->>'p99th')::numeric "+p.numericOperator(request.GetTpsFilter().GetOperator()),
-				request.GetTpsFilter().GetValue(),
+				"(tps->>'p99th')::numeric "+p.numericOperator(filterData.GetOperator()),
+				filterData.GetValue(),
 			))
 		}
 	}
-	if request.GetMachineFilter() != nil {
+	for _, filterData := range request.GetMachineFilter() {
 		filter := func(filterType string, operator panel.NumberFilterOperator) orm.Clause[orm.RunRecordField] {
-			operatorStr := p.numericOperator(request.GetMachineFilter().GetOperator())
+			operatorStr := p.numericOperator(filterData.GetOperator())
 			underWorkload := fmt.Sprintf(
 				"(workload->'runnerCluster'->'%s') ?| array_agg(m.%s) AND (m.%s)::numeric %s ?",
 				filterType, filterType, filterType, operatorStr,
@@ -111,23 +117,23 @@ func (p *PanelService) ListRuns(ctx context.Context, request *panel.ListRunsRequ
 			return orm.RunRecord.Or(
 				orm.RunRecord.ExistsRaw(
 					fmt.Sprintf("SELECT 1 FROM jsonb_array_elements(%s) AS m WHERE %s", "workload->'runnerCluster'", underWorkload),
-					request.GetMachineFilter().GetValue(),
+					filterData.GetValue(),
 				),
 				orm.RunRecord.ExistsRaw(
 					fmt.Sprintf("SELECT 1 FROM jsonb_array_elements(%s) AS m WHERE %s", "database->'runnerCluster'", underDatabase),
-					request.GetMachineFilter().GetValue(),
+					filterData.GetValue(),
 				),
 			)
 		}
-		switch request.GetMachineFilter().GetParameterType() {
+		switch filterData.GetParameterType() {
 		case panel.MachineInfo_Filter_TYPE_UNSPECIFIED:
 			return nil, ErrInvalidMachineFilter
 		case panel.MachineInfo_Filter_TYPE_CORES:
-			q = q.Where(filter("cores", request.GetMachineFilter().GetOperator()))
+			q = q.Where(filter("cores", filterData.GetOperator()))
 		case panel.MachineInfo_Filter_TYPE_MEMORY:
-			q = q.Where(filter("memory", request.GetMachineFilter().GetOperator()))
+			q = q.Where(filter("memory", filterData.GetOperator()))
 		case panel.MachineInfo_Filter_TYPE_DISK:
-			q = q.Where(filter("disk", request.GetMachineFilter().GetOperator()))
+			q = q.Where(filter("disk", filterData.GetOperator()))
 		}
 	}
 	if request.GetOrderByTps() != nil {

@@ -44,9 +44,11 @@ message RunRecord {
 message ListRunsRequest {
     optional int32 limit = 1;
     optional int32 offset = 2;
+    // filters
+    bool only_mine = 10;
     optional Status status = 3; // sort by status
-    optional Tps.Filter tps_filter = 4; // sort by TPS filter
-    optional MachineInfo.Filter machine_filter = 5; // sort by machine filter
+    repeated Tps.Filter tps_filter = 4; // sort by TPS filter
+    repeated MachineInfo.Filter machine_filter = 5; // sort by machine filter
     optional string workload_name = 6; // sort by workload name
     optional Workload.Type workload_type = 7; // sort by workload type
     optional string database_name = 8; // sort by database name

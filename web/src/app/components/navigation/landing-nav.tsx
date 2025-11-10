@@ -13,7 +13,7 @@ export const LandingNav = () => {
   const navLinks = [
     { path: '/#features', label: t('navigation.features') },
     { path: '/#tops', label: t('navigation.tops') },
-    { path: '/docs', label: t('navigation.about') },
+    { path: '/docs', label: t('navigation.docs') },
   ]
 
   return (
@@ -25,7 +25,7 @@ export const LandingNav = () => {
         </Link>
 
         <NavigationMenu className="hidden md:flex">
-          <NavigationMenuList className="gap-1">
+          <NavigationMenuList className="gap-10">
             {navLinks.map((link) => (
               <NavigationMenuItem key={link.path}>
                 <NavigationMenuLink asChild>

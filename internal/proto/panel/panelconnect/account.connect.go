@@ -38,6 +38,8 @@ const (
 	AccountServiceRegisterProcedure = "/panel.AccountService/Register"
 	// AccountServiceLoginProcedure is the fully-qualified name of the AccountService's Login RPC.
 	AccountServiceLoginProcedure = "/panel.AccountService/Login"
+	// AccountServiceGetMeProcedure is the fully-qualified name of the AccountService's GetMe RPC.
+	AccountServiceGetMeProcedure = "/panel.AccountService/GetMe"
 	// AccountServiceRefreshTokensProcedure is the fully-qualified name of the AccountService's
 	// RefreshTokens RPC.
 	AccountServiceRefreshTokensProcedure = "/panel.AccountService/RefreshTokens"
@@ -47,6 +49,7 @@ const (
 type AccountServiceClient interface {
 	Register(context.Context, *panel.RegisterRequest) (*emptypb.Empty, error)
 	Login(context.Context, *panel.LoginRequest) (*panel.LoginResponse, error)
+	GetMe(context.Context, *emptypb.Empty) (*panel.User, error)
 	RefreshTokens(context.Context, *panel.RefreshTokensRequest) (*panel.RefreshTokensResponse, error)
 }
 
@@ -73,6 +76,12 @@ func NewAccountServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(accountServiceMethods.ByName("Login")),
 			connect.WithClientOptions(opts...),
 		),
+		getMe: connect.NewClient[emptypb.Empty, panel.User](
+			httpClient,
+			baseURL+AccountServiceGetMeProcedure,
+			connect.WithSchema(accountServiceMethods.ByName("GetMe")),
+			connect.WithClientOptions(opts...),
+		),
 		refreshTokens: connect.NewClient[panel.RefreshTokensRequest, panel.RefreshTokensResponse](
 			httpClient,
 			baseURL+AccountServiceRefreshTokensProcedure,
@@ -86,6 +95,7 @@ func NewAccountServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 type accountServiceClient struct {
 	register      *connect.Client[panel.RegisterRequest, emptypb.Empty]
 	login         *connect.Client[panel.LoginRequest, panel.LoginResponse]
+	getMe         *connect.Client[emptypb.Empty, panel.User]
 	refreshTokens *connect.Client[panel.RefreshTokensRequest, panel.RefreshTokensResponse]
 }
 
@@ -107,6 +117,15 @@ func (c *accountServiceClient) Login(ctx context.Context, req *panel.LoginReques
 	return nil, err
 }
 
+// GetMe calls panel.AccountService.GetMe.
+func (c *accountServiceClient) GetMe(ctx context.Context, req *emptypb.Empty) (*panel.User, error) {
+	response, err := c.getMe.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
 // RefreshTokens calls panel.AccountService.RefreshTokens.
 func (c *accountServiceClient) RefreshTokens(ctx context.Context, req *panel.RefreshTokensRequest) (*panel.RefreshTokensResponse, error) {
 	response, err := c.refreshTokens.CallUnary(ctx, connect.NewRequest(req))
@@ -120,6 +139,7 @@ func (c *accountServiceClient) RefreshTokens(ctx context.Context, req *panel.Ref
 type AccountServiceHandler interface {
 	Register(context.Context, *panel.RegisterRequest) (*emptypb.Empty, error)
 	Login(context.Context, *panel.LoginRequest) (*panel.LoginResponse, error)
+	GetMe(context.Context, *emptypb.Empty) (*panel.User, error)
 	RefreshTokens(context.Context, *panel.RefreshTokensRequest) (*panel.RefreshTokensResponse, error)
 }
 
@@ -142,6 +162,12 @@ func NewAccountServiceHandler(svc AccountServiceHandler, opts ...connect.Handler
 		connect.WithSchema(accountServiceMethods.ByName("Login")),
 		connect.WithHandlerOptions(opts...),
 	)
+	accountServiceGetMeHandler := connect.NewUnaryHandlerSimple(
+		AccountServiceGetMeProcedure,
+		svc.GetMe,
+		connect.WithSchema(accountServiceMethods.ByName("GetMe")),
+		connect.WithHandlerOptions(opts...),
+	)
 	accountServiceRefreshTokensHandler := connect.NewUnaryHandlerSimple(
 		AccountServiceRefreshTokensProcedure,
 		svc.RefreshTokens,
@@ -154,6 +180,8 @@ func NewAccountServiceHandler(svc AccountServiceHandler, opts ...connect.Handler
 			accountServiceRegisterHandler.ServeHTTP(w, r)
 		case AccountServiceLoginProcedure:
 			accountServiceLoginHandler.ServeHTTP(w, r)
+		case AccountServiceGetMeProcedure:
+			accountServiceGetMeHandler.ServeHTTP(w, r)
 		case AccountServiceRefreshTokensProcedure:
 			accountServiceRefreshTokensHandler.ServeHTTP(w, r)
 		default:
@@ -171,6 +199,10 @@ func (UnimplementedAccountServiceHandler) Register(context.Context, *panel.Regis
 
 func (UnimplementedAccountServiceHandler) Login(context.Context, *panel.LoginRequest) (*panel.LoginResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.AccountService.Login is not implemented"))
+}
+
+func (UnimplementedAccountServiceHandler) GetMe(context.Context, *emptypb.Empty) (*panel.User, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.AccountService.GetMe is not implemented"))
 }
 
 func (UnimplementedAccountServiceHandler) RefreshTokens(context.Context, *panel.RefreshTokensRequest) (*panel.RefreshTokensResponse, error) {

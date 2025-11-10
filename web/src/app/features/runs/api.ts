@@ -6,6 +6,7 @@ import type { ListRunsRequest, RunRecord } from '@/proto/panel/run_pb.ts'
 import { ListRunsRequestSchema } from '@/proto/panel/run_pb.ts'
 import {
   Tps_FilterSchema,
+  Tps_OrderBySchema,
   MachineInfo_FilterSchema,
 } from '@/proto/panel/types_pb.ts'
 import { listRuns, listTopRuns } from '@/proto/panel/run-RunService_connectquery.ts'
@@ -13,18 +14,61 @@ import type { RunSummary, RunsFilters } from './types'
 
 const toNumber = (value?: bigint) => (value !== undefined ? Number(value) : undefined)
 
-const mapRunRecord = (record: RunRecord): RunSummary => ({
-  id: record.id?.id ?? '',
-  status: record.status,
-  workloadName: record.workload?.name ?? '—',
-  workloadType: record.workload?.workloadType,
-  databaseName: record.database?.name ?? record.database?.databaseType?.toString(),
-  databaseType: record.database?.databaseType,
-  tpsAverage: toNumber(record.tps?.average),
-  tpsP95: toNumber(record.tps?.p95th),
-  createdAt: record.timing?.createdAt ? timestampDate(record.timing.createdAt) : undefined,
-  updatedAt: record.timing?.updatedAt ? timestampDate(record.timing.updatedAt) : undefined,
-})
+type ClusterLike = {
+  machines?: Array<{
+    cores?: number
+    memory?: number
+    disk?: number
+  }>
+}
+
+const summarizeCluster = (cluster?: ClusterLike) => {
+  const machines = cluster?.machines ?? []
+  const primary = machines[0]
+  const buildSignature = () => {
+    if (!primary) return undefined
+    const parts = [
+      primary.cores ? `${primary.cores} vCPU` : null,
+      primary.memory ? `${primary.memory} GB RAM` : null,
+      primary.disk ? `${primary.disk} GB SSD` : null,
+    ].filter(Boolean)
+    return parts.length ? parts.join(' · ') : undefined
+  }
+  return {
+    nodes: machines.length || undefined,
+    machineSignature: buildSignature(),
+    machineCores: primary?.cores,
+    machineMemory: primary?.memory,
+    machineDisk: primary?.disk,
+  }
+}
+
+const mapRunRecord = (record: RunRecord): RunSummary => {
+  const runnerClusterMetrics = summarizeCluster(record.workload?.runnerCluster)
+  const databaseClusterMetrics = summarizeCluster(record.database?.runnerCluster)
+  return {
+    id: record.id?.id ?? '',
+    status: record.status,
+    workloadName: record.workload?.name ?? '—',
+    workloadType: record.workload?.workloadType,
+    databaseName: record.database?.name ?? record.database?.databaseType?.toString(),
+    databaseType: record.database?.databaseType,
+    tpsAverage: toNumber(record.tps?.average),
+    tpsP95: toNumber(record.tps?.p95th),
+    createdAt: record.timing?.createdAt ? timestampDate(record.timing.createdAt) : undefined,
+    updatedAt: record.timing?.updatedAt ? timestampDate(record.timing.updatedAt) : undefined,
+    runnerClusterNodes: runnerClusterMetrics.nodes,
+    runnerMachineSignature: runnerClusterMetrics.machineSignature,
+    runnerMachineCores: runnerClusterMetrics.machineCores,
+    runnerMachineMemory: runnerClusterMetrics.machineMemory,
+    runnerMachineDisk: runnerClusterMetrics.machineDisk,
+    databaseClusterNodes: databaseClusterMetrics.nodes,
+    databaseMachineSignature: databaseClusterMetrics.machineSignature,
+    databaseMachineCores: databaseClusterMetrics.machineCores,
+    databaseMachineMemory: databaseClusterMetrics.machineMemory,
+    databaseMachineDisk: databaseClusterMetrics.machineDisk,
+  }
+}
 
 const buildListRunsRequest = (filters: RunsFilters): ListRunsRequest => {
   const offset = Math.max(0, (filters.page - 1) * filters.pageSize)
@@ -48,21 +92,29 @@ const buildListRunsRequest = (filters: RunsFilters): ListRunsRequest => {
   if (filters.databaseName) {
     request.databaseName = filters.databaseName
   }
-  if (filters.tpsFilter) {
-    const { value, parameterType, operator } = filters.tpsFilter
-    request.tpsFilter = create(Tps_FilterSchema, {
-      parameterType,
-      operator,
-      value: BigInt(Math.trunc(value)),
+  if (filters.tpsFilters?.length) {
+    request.tpsFilter = filters.tpsFilters.map(({ value, parameterType, operator }) =>
+      create(Tps_FilterSchema, {
+        parameterType,
+        operator,
+        value: BigInt(Math.trunc(value)),
+      }),
+    )
+  }
+  if (filters.orderByTps) {
+    request.orderByTps = create(Tps_OrderBySchema, {
+      parameterType: filters.orderByTps.parameterType,
+      descending: filters.orderByTps.descending,
     })
   }
-  if (filters.machineFilter) {
-    const { value, parameterType, operator } = filters.machineFilter
-    request.machineFilter = create(MachineInfo_FilterSchema, {
-      parameterType,
-      operator,
-      value: BigInt(Math.trunc(value)),
-    })
+  if (filters.machineFilters?.length) {
+    request.machineFilter = filters.machineFilters.map(({ value, parameterType, operator }) =>
+      create(MachineInfo_FilterSchema, {
+        parameterType,
+        operator,
+        value: BigInt(Math.trunc(value)),
+      }),
+    )
   }
 
   return request

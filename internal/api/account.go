@@ -50,6 +50,17 @@ func (p *PanelService) Register(
 	})
 }
 
+func (p *PanelService) GetMe(
+	ctx context.Context,
+	request *emptypb.Empty,
+) (*panel.User, error) {
+	user, err := p.getUserFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 func (p *PanelService) Login(
 	ctx context.Context,
 	request *panel.LoginRequest,
