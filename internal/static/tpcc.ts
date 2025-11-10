@@ -90,7 +90,7 @@ export const options: Options = {
 stroppy.parseConfig(
   DriverConfig.toBinary(
     DriverConfig.create({
-      url: "postgres://postgres:postgres@localhost:5432",
+      url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
       driverType: 1,
       dbSpecific: {
         fields: [
