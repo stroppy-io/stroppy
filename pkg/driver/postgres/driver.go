@@ -85,6 +85,32 @@ func NewDriver(
 
 	d.txManager = manager.Must(trmpgx.NewDefaultFactory(connPool))
 	d.txExecutor = NewTxExecutor(connPool)
+	d.tableToCopyChannel = cmap.New[chan []any]()
+
+	d.copyFromStarter = func(tableName string, columnNames []string) chan []any {
+		source := make(chan []any)
+
+		go func() {
+			_, err := connPool.CopyFrom(
+				ctx,
+				pgx.Identifier{tableName},
+				columnNames,
+				pgx.CopyFromFunc(func() ([]any, error) {
+					vals, ok := <-source
+					if !ok {
+						return nil, nil
+					}
+
+					return vals, nil
+				}),
+			)
+			if err != nil {
+				d.logger.Error("copy from connection ended with error", zap.Error(err))
+			}
+		}()
+
+		return source
+	}
 
 	return d, nil
 }

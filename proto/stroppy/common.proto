@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package stroppy;
 
-import "gen/validate/validate.proto";
+import "validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
+option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto";
 
 /**
  * OtlpExport contains configuration for exporting metrics via OpenTelemetry
@@ -51,6 +51,14 @@ message Uuid {
 message DateTime {
     /** Timestamp in UTC */
     google.protobuf.Timestamp value = 1;
+}
+
+/**
+ * Ulid represents a universally universally unique lexicographically sortable identifier (ULID).
+ */
+message Ulid {
+    /** String representation of ULID (e.g., "01ANQWJZ000000000000000000") */
+    string value = 1 [(validate.rules).string.len = 26];
 }
 
 /**

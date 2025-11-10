@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package stroppy;
 
-import "common.proto";
-import "gen/validate/validate.proto";
+import "proto/stroppy/common.proto";
+import "validate/validate.proto";
 
-option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
+option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto";
 
 /**
  * IndexDescriptor defines the structure of a database index.
@@ -23,7 +23,7 @@ message IndexDescriptor {
     /** Whether this is a unique index */
     bool unique = 4;
     /** Database-specific index properties */
-    optional Value.Struct db_specific = 5;
+    optional stroppy.Value.Struct db_specific = 5;
 }
 
 /**
@@ -59,7 +59,7 @@ message TableDescriptor {
     /** Table-level constraints */
     optional string constraint = 5;
     /** Database-specific table properties */
-    optional Value.Struct db_specific = 6;
+    optional stroppy.Value.Struct db_specific = 6;
     /** Columns defined in this table */
     repeated ColumnDescriptor columns = 100;
 }
@@ -100,10 +100,10 @@ message QueryParamDescriptor {
      * is "${<param_name>}" */
     optional string replace_regex = 2;
     /** Rule for generating parameter values */
-    Generation.Rule generation_rule = 3
+    stroppy.Generation.Rule generation_rule = 3
         [ (validate.rules).message.required = true ];
     /** Database-specific parameter properties */
-    optional Value.Struct db_specific = 4;
+    optional stroppy.Value.Struct db_specific = 4;
 }
 
 /**
@@ -134,7 +134,7 @@ message QueryDescriptor {
     /** Groups of the parameters */
     repeated QueryParamGroup groups = 4;
     /** Database-specific query properties */
-    optional Value.Struct db_specific = 5;
+    optional stroppy.Value.Struct db_specific = 5;
 }
 
 /**
@@ -164,7 +164,7 @@ message TransactionDescriptor {
         items : {message : {required : true}}
     } ];
     /** Database-specific transaction properties */
-    optional Value.Struct db_specific = 5;
+    optional stroppy.Value.Struct db_specific = 5;
 }
 
 /**

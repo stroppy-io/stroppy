@@ -2,12 +2,12 @@
 // versions:
 // 	protoc-gen-go v1.36.9
 // 	protoc        v6.32.1
-// source: config.proto
+// source: stroppy/config.proto
 
 package proto
 
 import (
-	_ "github.com/stroppy-io/stroppy/pkg/common/proto/gen/validate"
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -52,11 +52,11 @@ func (x DriverConfig_DriverType) String() string {
 }
 
 func (DriverConfig_DriverType) Descriptor() protoreflect.EnumDescriptor {
-	return file_config_proto_enumTypes[0].Descriptor()
+	return file_stroppy_config_proto_enumTypes[0].Descriptor()
 }
 
 func (DriverConfig_DriverType) Type() protoreflect.EnumType {
-	return &file_config_proto_enumTypes[0]
+	return &file_stroppy_config_proto_enumTypes[0]
 }
 
 func (x DriverConfig_DriverType) Number() protoreflect.EnumNumber {
@@ -65,7 +65,7 @@ func (x DriverConfig_DriverType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DriverConfig_DriverType.Descriptor instead.
 func (DriverConfig_DriverType) EnumDescriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{0, 0}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{0, 0}
 }
 
 type LoggerConfig_LogLevel int32
@@ -107,11 +107,11 @@ func (x LoggerConfig_LogLevel) String() string {
 }
 
 func (LoggerConfig_LogLevel) Descriptor() protoreflect.EnumDescriptor {
-	return file_config_proto_enumTypes[1].Descriptor()
+	return file_stroppy_config_proto_enumTypes[1].Descriptor()
 }
 
 func (LoggerConfig_LogLevel) Type() protoreflect.EnumType {
-	return &file_config_proto_enumTypes[1]
+	return &file_stroppy_config_proto_enumTypes[1]
 }
 
 func (x LoggerConfig_LogLevel) Number() protoreflect.EnumNumber {
@@ -120,7 +120,7 @@ func (x LoggerConfig_LogLevel) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use LoggerConfig_LogLevel.Descriptor instead.
 func (LoggerConfig_LogLevel) EnumDescriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{1, 0}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{1, 0}
 }
 
 type LoggerConfig_LogMode int32
@@ -153,11 +153,11 @@ func (x LoggerConfig_LogMode) String() string {
 }
 
 func (LoggerConfig_LogMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_config_proto_enumTypes[2].Descriptor()
+	return file_stroppy_config_proto_enumTypes[2].Descriptor()
 }
 
 func (LoggerConfig_LogMode) Type() protoreflect.EnumType {
-	return &file_config_proto_enumTypes[2]
+	return &file_stroppy_config_proto_enumTypes[2]
 }
 
 func (x LoggerConfig_LogMode) Number() protoreflect.EnumNumber {
@@ -166,7 +166,7 @@ func (x LoggerConfig_LogMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use LoggerConfig_LogMode.Descriptor instead.
 func (LoggerConfig_LogMode) EnumDescriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{1, 1}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{1, 1}
 }
 
 // *
@@ -186,7 +186,7 @@ type DriverConfig struct {
 
 func (x *DriverConfig) Reset() {
 	*x = DriverConfig{}
-	mi := &file_config_proto_msgTypes[0]
+	mi := &file_stroppy_config_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -198,7 +198,7 @@ func (x *DriverConfig) String() string {
 func (*DriverConfig) ProtoMessage() {}
 
 func (x *DriverConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_config_proto_msgTypes[0]
+	mi := &file_stroppy_config_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -211,7 +211,7 @@ func (x *DriverConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DriverConfig.ProtoReflect.Descriptor instead.
 func (*DriverConfig) Descriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{0}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *DriverConfig) GetUrl() string {
@@ -250,7 +250,7 @@ type LoggerConfig struct {
 
 func (x *LoggerConfig) Reset() {
 	*x = LoggerConfig{}
-	mi := &file_config_proto_msgTypes[1]
+	mi := &file_stroppy_config_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -262,7 +262,7 @@ func (x *LoggerConfig) String() string {
 func (*LoggerConfig) ProtoMessage() {}
 
 func (x *LoggerConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_config_proto_msgTypes[1]
+	mi := &file_stroppy_config_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -275,7 +275,7 @@ func (x *LoggerConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoggerConfig.ProtoReflect.Descriptor instead.
 func (*LoggerConfig) Descriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{1}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *LoggerConfig) GetLogLevel() LoggerConfig_LogLevel {
@@ -306,7 +306,7 @@ type ExporterConfig struct {
 
 func (x *ExporterConfig) Reset() {
 	*x = ExporterConfig{}
-	mi := &file_config_proto_msgTypes[2]
+	mi := &file_stroppy_config_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -318,7 +318,7 @@ func (x *ExporterConfig) String() string {
 func (*ExporterConfig) ProtoMessage() {}
 
 func (x *ExporterConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_config_proto_msgTypes[2]
+	mi := &file_stroppy_config_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -331,7 +331,7 @@ func (x *ExporterConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExporterConfig.ProtoReflect.Descriptor instead.
 func (*ExporterConfig) Descriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{2}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ExporterConfig) GetName() string {
@@ -362,7 +362,7 @@ type ExecutorConfig struct {
 
 func (x *ExecutorConfig) Reset() {
 	*x = ExecutorConfig{}
-	mi := &file_config_proto_msgTypes[3]
+	mi := &file_stroppy_config_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -374,7 +374,7 @@ func (x *ExecutorConfig) String() string {
 func (*ExecutorConfig) ProtoMessage() {}
 
 func (x *ExecutorConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_config_proto_msgTypes[3]
+	mi := &file_stroppy_config_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -387,7 +387,7 @@ func (x *ExecutorConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecutorConfig.ProtoReflect.Descriptor instead.
 func (*ExecutorConfig) Descriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{3}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ExecutorConfig) GetName() string {
@@ -422,7 +422,7 @@ type Step struct {
 
 func (x *Step) Reset() {
 	*x = Step{}
-	mi := &file_config_proto_msgTypes[4]
+	mi := &file_stroppy_config_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -434,7 +434,7 @@ func (x *Step) String() string {
 func (*Step) ProtoMessage() {}
 
 func (x *Step) ProtoReflect() protoreflect.Message {
-	mi := &file_config_proto_msgTypes[4]
+	mi := &file_stroppy_config_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -447,7 +447,7 @@ func (x *Step) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Step.ProtoReflect.Descriptor instead.
 func (*Step) Descriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{4}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Step) GetName() string {
@@ -492,7 +492,7 @@ type SideCarConfig struct {
 
 func (x *SideCarConfig) Reset() {
 	*x = SideCarConfig{}
-	mi := &file_config_proto_msgTypes[5]
+	mi := &file_stroppy_config_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -504,7 +504,7 @@ func (x *SideCarConfig) String() string {
 func (*SideCarConfig) ProtoMessage() {}
 
 func (x *SideCarConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_config_proto_msgTypes[5]
+	mi := &file_stroppy_config_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -517,7 +517,7 @@ func (x *SideCarConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SideCarConfig.ProtoReflect.Descriptor instead.
 func (*SideCarConfig) Descriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{5}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SideCarConfig) GetUrl() string {
@@ -544,7 +544,7 @@ type CloudConfig struct {
 
 func (x *CloudConfig) Reset() {
 	*x = CloudConfig{}
-	mi := &file_config_proto_msgTypes[6]
+	mi := &file_stroppy_config_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -556,7 +556,7 @@ func (x *CloudConfig) String() string {
 func (*CloudConfig) ProtoMessage() {}
 
 func (x *CloudConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_config_proto_msgTypes[6]
+	mi := &file_stroppy_config_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -569,7 +569,7 @@ func (x *CloudConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudConfig.ProtoReflect.Descriptor instead.
 func (*CloudConfig) Descriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{6}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{6}
 }
 
 type GlobalConfig struct {
@@ -597,7 +597,7 @@ type GlobalConfig struct {
 
 func (x *GlobalConfig) Reset() {
 	*x = GlobalConfig{}
-	mi := &file_config_proto_msgTypes[7]
+	mi := &file_stroppy_config_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -609,7 +609,7 @@ func (x *GlobalConfig) String() string {
 func (*GlobalConfig) ProtoMessage() {}
 
 func (x *GlobalConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_config_proto_msgTypes[7]
+	mi := &file_stroppy_config_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -622,7 +622,7 @@ func (x *GlobalConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GlobalConfig.ProtoReflect.Descriptor instead.
 func (*GlobalConfig) Descriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{7}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GlobalConfig) GetVersion() string {
@@ -689,7 +689,7 @@ type ConfigFile struct {
 
 func (x *ConfigFile) Reset() {
 	*x = ConfigFile{}
-	mi := &file_config_proto_msgTypes[8]
+	mi := &file_stroppy_config_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -701,7 +701,7 @@ func (x *ConfigFile) String() string {
 func (*ConfigFile) ProtoMessage() {}
 
 func (x *ConfigFile) ProtoReflect() protoreflect.Message {
-	mi := &file_config_proto_msgTypes[8]
+	mi := &file_stroppy_config_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -714,7 +714,7 @@ func (x *ConfigFile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigFile.ProtoReflect.Descriptor instead.
 func (*ConfigFile) Descriptor() ([]byte, []int) {
-	return file_config_proto_rawDescGZIP(), []int{8}
+	return file_stroppy_config_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ConfigFile) GetGlobal() *GlobalConfig {
@@ -759,11 +759,11 @@ func (x *ConfigFile) GetBenchmark() *BenchmarkDescriptor {
 	return nil
 }
 
-var File_config_proto protoreflect.FileDescriptor
+var File_stroppy_config_proto protoreflect.FileDescriptor
 
-const file_config_proto_rawDesc = "" +
+const file_stroppy_config_proto_rawDesc = "" +
 	"\n" +
-	"\fconfig.proto\x12\astroppy\x1a\fcommon.proto\x1a\x10descriptor.proto\x1a\x1bgen/validate/validate.proto\x1a\bk6.proto\"\x89\x02\n" +
+	"\x14stroppy/config.proto\x12\astroppy\x1a\x14stroppy/common.proto\x1a\x18stroppy/descriptor.proto\x1a\x17validate/validate.proto\x1a\x10stroppy/k6.proto\"\x89\x02\n" +
 	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12;\n" +
 	"\vdb_specific\x18\x02 \x01(\v2\x15.stroppy.Value.StructH\x00R\n" +
@@ -822,23 +822,23 @@ const file_config_proto_rawDesc = "" +
 	"\texecutors\x18\x03 \x03(\v2\x17.stroppy.ExecutorConfigR\texecutors\x12#\n" +
 	"\x05steps\x18\x04 \x03(\v2\r.stroppy.StepR\x05steps\x123\n" +
 	"\tside_cars\x18\x05 \x03(\v2\x16.stroppy.SideCarConfigR\bsideCars\x12D\n" +
-	"\tbenchmark\x18\x06 \x01(\v2\x1c.stroppy.BenchmarkDescriptorB\b\xfaB\x05\x8a\x01\x02\x10\x01R\tbenchmarkB.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
+	"\tbenchmark\x18\x06 \x01(\v2\x1c.stroppy.BenchmarkDescriptorB\b\xfaB\x05\x8a\x01\x02\x10\x01R\tbenchmarkB0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
 var (
-	file_config_proto_rawDescOnce sync.Once
-	file_config_proto_rawDescData []byte
+	file_stroppy_config_proto_rawDescOnce sync.Once
+	file_stroppy_config_proto_rawDescData []byte
 )
 
-func file_config_proto_rawDescGZIP() []byte {
-	file_config_proto_rawDescOnce.Do(func() {
-		file_config_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_config_proto_rawDesc), len(file_config_proto_rawDesc)))
+func file_stroppy_config_proto_rawDescGZIP() []byte {
+	file_stroppy_config_proto_rawDescOnce.Do(func() {
+		file_stroppy_config_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_stroppy_config_proto_rawDesc), len(file_stroppy_config_proto_rawDesc)))
 	})
-	return file_config_proto_rawDescData
+	return file_stroppy_config_proto_rawDescData
 }
 
-var file_config_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_config_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
-var file_config_proto_goTypes = []any{
+var file_stroppy_config_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_stroppy_config_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_stroppy_config_proto_goTypes = []any{
 	(DriverConfig_DriverType)(0), // 0: stroppy.DriverConfig.DriverType
 	(LoggerConfig_LogLevel)(0),   // 1: stroppy.LoggerConfig.LogLevel
 	(LoggerConfig_LogMode)(0),    // 2: stroppy.LoggerConfig.LogMode
@@ -857,7 +857,7 @@ var file_config_proto_goTypes = []any{
 	(*K6Options)(nil),            // 15: stroppy.K6Options
 	(*BenchmarkDescriptor)(nil),  // 16: stroppy.BenchmarkDescriptor
 }
-var file_config_proto_depIdxs = []int32{
+var file_stroppy_config_proto_depIdxs = []int32{
 	13, // 0: stroppy.DriverConfig.db_specific:type_name -> stroppy.Value.Struct
 	0,  // 1: stroppy.DriverConfig.driver_type:type_name -> stroppy.DriverConfig.DriverType
 	1,  // 2: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
@@ -881,33 +881,33 @@ var file_config_proto_depIdxs = []int32{
 	0,  // [0:16] is the sub-list for field type_name
 }
 
-func init() { file_config_proto_init() }
-func file_config_proto_init() {
-	if File_config_proto != nil {
+func init() { file_stroppy_config_proto_init() }
+func file_stroppy_config_proto_init() {
+	if File_stroppy_config_proto != nil {
 		return
 	}
-	file_common_proto_init()
-	file_descriptor_proto_init()
-	file_k6_proto_init()
-	file_config_proto_msgTypes[0].OneofWrappers = []any{}
-	file_config_proto_msgTypes[4].OneofWrappers = []any{}
-	file_config_proto_msgTypes[5].OneofWrappers = []any{}
+	file_stroppy_common_proto_init()
+	file_stroppy_descriptor_proto_init()
+	file_stroppy_k6_proto_init()
+	file_stroppy_config_proto_msgTypes[0].OneofWrappers = []any{}
+	file_stroppy_config_proto_msgTypes[4].OneofWrappers = []any{}
+	file_stroppy_config_proto_msgTypes[5].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_config_proto_rawDesc), len(file_config_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_stroppy_config_proto_rawDesc), len(file_stroppy_config_proto_rawDesc)),
 			NumEnums:      3,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_config_proto_goTypes,
-		DependencyIndexes: file_config_proto_depIdxs,
-		EnumInfos:         file_config_proto_enumTypes,
-		MessageInfos:      file_config_proto_msgTypes,
+		GoTypes:           file_stroppy_config_proto_goTypes,
+		DependencyIndexes: file_stroppy_config_proto_depIdxs,
+		EnumInfos:         file_stroppy_config_proto_enumTypes,
+		MessageInfos:      file_stroppy_config_proto_msgTypes,
 	}.Build()
-	File_config_proto = out.File
-	file_config_proto_goTypes = nil
-	file_config_proto_depIdxs = nil
+	File_stroppy_config_proto = out.File
+	file_stroppy_config_proto_goTypes = nil
+	file_stroppy_config_proto_depIdxs = nil
 }

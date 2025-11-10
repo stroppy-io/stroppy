@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.9
 // 	protoc        v6.32.1
-// source: sidecar.proto
+// source: stroppy/sidecar.proto
 
 package proto
 
@@ -21,24 +21,24 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-var File_sidecar_proto protoreflect.FileDescriptor
+var File_stroppy_sidecar_proto protoreflect.FileDescriptor
 
-const file_sidecar_proto_rawDesc = "" +
+const file_stroppy_sidecar_proto_rawDesc = "" +
 	"\n" +
-	"\rsidecar.proto\x12\astroppy\x1a\x1bgoogle/protobuf/empty.proto\x1a\rruntime.proto\x1a\fconfig.proto2\x80\x02\n" +
+	"\x15stroppy/sidecar.proto\x12\astroppy\x1a\x1bgoogle/protobuf/empty.proto\x1a\x15stroppy/runtime.proto\x1a\x14stroppy/config.proto2\x80\x02\n" +
 	"\x0eSidecarService\x12;\n" +
 	"\n" +
 	"Initialize\x12\x15.stroppy.GlobalConfig\x1a\x16.google.protobuf.Empty\x12;\n" +
 	"\vOnStepStart\x12\x14.stroppy.StepContext\x1a\x16.google.protobuf.Empty\x129\n" +
 	"\tOnStepEnd\x12\x14.stroppy.StepContext\x1a\x16.google.protobuf.Empty\x129\n" +
-	"\bTeardown\x12\x15.stroppy.GlobalConfig\x1a\x16.google.protobuf.EmptyB.Z,github.com/stroppy-io/stroppy/pkg/core/protob\x06proto3"
+	"\bTeardown\x12\x15.stroppy.GlobalConfig\x1a\x16.google.protobuf.EmptyB0Z.github.com/stroppy-io/stroppy/pkg/common/protob\x06proto3"
 
-var file_sidecar_proto_goTypes = []any{
+var file_stroppy_sidecar_proto_goTypes = []any{
 	(*GlobalConfig)(nil),  // 0: stroppy.GlobalConfig
 	(*StepContext)(nil),   // 1: stroppy.StepContext
 	(*emptypb.Empty)(nil), // 2: google.protobuf.Empty
 }
-var file_sidecar_proto_depIdxs = []int32{
+var file_stroppy_sidecar_proto_depIdxs = []int32{
 	0, // 0: stroppy.SidecarService.Initialize:input_type -> stroppy.GlobalConfig
 	1, // 1: stroppy.SidecarService.OnStepStart:input_type -> stroppy.StepContext
 	1, // 2: stroppy.SidecarService.OnStepEnd:input_type -> stroppy.StepContext
@@ -54,27 +54,27 @@ var file_sidecar_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_sidecar_proto_init() }
-func file_sidecar_proto_init() {
-	if File_sidecar_proto != nil {
+func init() { file_stroppy_sidecar_proto_init() }
+func file_stroppy_sidecar_proto_init() {
+	if File_stroppy_sidecar_proto != nil {
 		return
 	}
-	file_runtime_proto_init()
-	file_config_proto_init()
+	file_stroppy_runtime_proto_init()
+	file_stroppy_config_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sidecar_proto_rawDesc), len(file_sidecar_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_stroppy_sidecar_proto_rawDesc), len(file_stroppy_sidecar_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   0,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_sidecar_proto_goTypes,
-		DependencyIndexes: file_sidecar_proto_depIdxs,
+		GoTypes:           file_stroppy_sidecar_proto_goTypes,
+		DependencyIndexes: file_stroppy_sidecar_proto_depIdxs,
 	}.Build()
-	File_sidecar_proto = out.File
-	file_sidecar_proto_goTypes = nil
-	file_sidecar_proto_depIdxs = nil
+	File_stroppy_sidecar_proto = out.File
+	file_stroppy_sidecar_proto_goTypes = nil
+	file_stroppy_sidecar_proto_depIdxs = nil
 }

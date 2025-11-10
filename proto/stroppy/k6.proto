@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package stroppy;
 
-import "gen/validate/validate.proto";
+import "validate/validate.proto";
 import "google/protobuf/duration.proto";
 
-option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
+option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto";
 
 /**
  * K6Executor contains configuration for k6 load testing tool integration.

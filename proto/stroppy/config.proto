@@ -2,12 +2,12 @@ syntax = "proto3";
 
 package stroppy;
 
-import "common.proto";
-import "descriptor.proto";
-import "gen/validate/validate.proto";
-import "k6.proto";
+import "proto/stroppy/common.proto";
+import "proto/stroppy/descriptor.proto";
+import "validate/validate.proto";
+import "proto/stroppy/k6.proto";
 
-option go_package = "github.com/stroppy-io/stroppy/pkg/core/proto";
+option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto";
 
 
 /**
@@ -58,7 +58,7 @@ message ExporterConfig {
     /** Name of the OTLP exporter */
     string name = 1 [(validate.rules).string.min_len = 1];
     /** Configuration for the OTLP exporter */
-    OtlpExport otlp_export = 2 [(validate.rules).message.required = true];
+    stroppy.OtlpExport otlp_export = 2 [(validate.rules).message.required = true];
 }
 
 /**
@@ -68,7 +68,7 @@ message ExecutorConfig {
     /** Name of the executor */
     string name = 1 [(validate.rules).string.min_len = 1];
     /** Configuration for the executor */
-    K6Options k6 = 2;
+    stroppy.K6Options k6 = 2;
 }
 
 /**
@@ -77,7 +77,7 @@ message ExecutorConfig {
 message Step {
     /** Name of the step */
     string name = 1 [(validate.rules).string.min_len = 1];
-    /** Name of the step */
+    /** Name of the workload */
     string workload = 2 [(validate.rules).string.min_len = 1];
     /** Name of the executor */
     string executor = 3 [(validate.rules).string.min_len = 1];
@@ -92,7 +92,7 @@ message SideCarConfig {
     /** Url to connect the plugin instance */
     string url = 2 [(validate.rules).string.uri_ref = true];
     /** Additional plugin settings */
-    optional Value.Struct settings = 3;
+    optional stroppy.Value.Struct settings = 3;
 }
 
 
@@ -120,9 +120,9 @@ message GlobalConfig {
     /** Arbitrary metadata, may be passed to result labels and json output */
     map<string, string> metadata = 4;
     /** Database driver configuration */
-    DriverConfig driver = 5 [(validate.rules).message.required = true];
+    stroppy.DriverConfig driver = 5 [(validate.rules).message.required = true];
     /** Logging configuration */
-    LoggerConfig logger = 6;
+    stroppy.LoggerConfig logger = 6;
 }
 
 /**

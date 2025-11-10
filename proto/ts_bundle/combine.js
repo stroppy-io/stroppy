@@ -7,7 +7,7 @@ for (const sourceFile of project.getSourceFiles()) {
     if (!sourceFile.isDeclarationFile()) {
         // Собираем все import'ы
         sourceFile.getImportDeclarations().forEach(imp => {
-            if (imp.getText().includes('from "./')) {
+            if (imp.getText().includes('from "./') || imp.getText().includes('from "../')) {
                 imp.remove();
             }
         });
