@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"connectrpc.com/connect"
+	"context"
 	"github.com/stretchr/testify/require"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
@@ -18,13 +19,17 @@ func newAutomateClient() panelconnect.AutomateServiceClient {
 	return panelconnect.NewAutomateServiceClient(http.DefaultClient, "http://localhost:8080")
 }
 
+func newRunClient() panelconnect.RunServiceClient {
+	return panelconnect.NewRunServiceClient(http.DefaultClient, "http://localhost:8080")
+}
+
 const (
 	testEmail          = "test@example.com"
 	testPassword       = "Password123@"
 	defaultPostgresUrl = "postgres://postgres:developer@localhost:5432/postgres"
 )
 
-func Test_Main(t *testing.T) {
+func registerUser(t *testing.T) context.Context {
 	accountClient := newAccountClient()
 	_, err := accountClient.Register(t.Context(), &panel.RegisterRequest{
 		Email:    testEmail,
@@ -47,7 +52,11 @@ func Test_Main(t *testing.T) {
 
 	ctx, callInfo := connect.NewClientContext(t.Context())
 	callInfo.RequestHeader().Set("Authorization", "Bearer "+resp.AccessToken)
+	return ctx
+}
 
+func Test_Main(t *testing.T) {
+	ctx := registerUser(t)
 	automateClient := newAutomateClient()
 
 	runRecord, err := automateClient.RunAutomation(ctx, &panel.RunAutomationRequest{
@@ -59,9 +68,9 @@ func Test_Main(t *testing.T) {
 				IsSingleMachineMode: true,
 				Machines: []*panel.MachineInfo{
 					{
-						Cores:  4,
-						Memory: 8,
-						Disk:   64,
+						Cores:  2,
+						Memory: 4,
+						Disk:   10,
 					},
 				},
 			},
@@ -73,9 +82,10 @@ func Test_Main(t *testing.T) {
 				IsSingleMachineMode: true,
 				Machines: []*panel.MachineInfo{
 					{
-						Cores:  2,
-						Memory: 4,
-						Disk:   64,
+						Cores:    2,
+						Memory:   4,
+						Disk:     10,
+						PublicIp: true,
 					},
 				},
 			},

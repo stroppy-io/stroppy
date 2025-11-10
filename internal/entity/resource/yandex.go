@@ -1,14 +1,12 @@
 package resource
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/iancoleman/strcase"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ids"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/timestamps"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
-	"strconv"
 )
 
 type YandexCloudProviderConfig struct {
@@ -34,8 +32,9 @@ const (
 
 // dfaultValues
 const (
-	defaultNetworkName = "stroppy-crossplane-net"
-	defaultSubnetName  = "stroppy-crossplane-subnet"
+	defaultNetworkName     = "stroppy-crossplane-net"
+	defaultSubnetName      = "stroppy-crossplane-subnet"
+	defaultCreateVmWithNat = false
 )
 
 var (
@@ -123,7 +122,6 @@ func (y *YandexCloudBuilder) newVmDef(
 	connectCredsRef *crossplane.Ref,
 	script *panel.Script,
 ) *crossplane.ResourceDef {
-	scriptBody := strconv.Quote(string(bytes.ReplaceAll(script.GetBody(), []byte("\r\n"), []byte(`\n`))))
 	return &crossplane.ResourceDef{
 		ApiVersion: YandexCloudComputeCrossplaneApiVersion,
 		Kind:       strcase.ToCamel(crossplane.YandexCloud_INSTANCE.String()),
@@ -151,7 +149,10 @@ func (y *YandexCloudBuilder) newVmDef(
 						{
 							InitializeParams: []*crossplane.YandexCloud_Vm_Disk_InitializeParams{
 								{
-									ImageId: y.Config.DefaultUbuntuImageId,
+									ImageId: stringOrDefault(
+										machineInfo.GetBaseImageId(),
+										y.Config.DefaultUbuntuImageId,
+									),
 								},
 							},
 						},
@@ -161,12 +162,14 @@ func (y *YandexCloudBuilder) newVmDef(
 							SubnetIdRef: &crossplane.OnlyNameRef{
 								Name: subnetIdRef.GetName(),
 							},
-							Nat: true,
+							Nat:       machineInfo.GetPublicIp(),
+							IpAddress: machineInfo.GetStaticInternalIp(),
 						},
 					},
 					Metadata: map[string]string{
 						// TODO: need quotes check
-						"user-data": scriptBody,
+						//"user-data": strings.ReplaceAll(string(script.GetBody()), "\n", "\\n"),
+						"user-data": string(script.GetBody()),
 					},
 				},
 			},

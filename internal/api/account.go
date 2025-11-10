@@ -101,7 +101,9 @@ func (p *PanelService) RefreshTokens(
 ) (*panel.RefreshTokensResponse, error) {
 	return postgres.WithSerializableRet(ctx, p.txManager,
 		func(ctx context.Context) (*panel.RefreshTokensResponse, error) {
-			acc, err := p.usersRepo.ScannerRepository().GetBy(ctx, orm.User.SelectAll().Where(orm.User.Raw("refresh_tokens @> ?", request.RefreshToken)))
+			acc, err := p.usersRepo.ScannerRepository().GetBy(ctx,
+				orm.User.SelectAll().Where(orm.User.Raw("refresh_tokens @> ARRAY[?]", request.RefreshToken)),
+			)
 			if err != nil {
 				if sqlerr.IsNotFound(err) {
 					return nil, connect.NewError(connect.CodeNotFound, errors.New("refresh token not found"))

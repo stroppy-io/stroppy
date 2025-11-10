@@ -47,11 +47,13 @@ func NewServer(
 	connectProtocols.SetUnencryptedHTTP2(true)
 	mux := chi.NewMux()
 	mux.Use(cors.New(cors.Options{
-		AllowedOrigins: []string{config.CorsDomain}, // TODO: replace with your domain
+		//AllowedOrigins: []string{config.CorsDomain}, // TODO: replace with your domain
 		AllowedMethods: connectcors.AllowedMethods(),
-		AllowedHeaders: connectcors.AllowedHeaders(),
+		AllowedHeaders: append(connectcors.AllowedHeaders(), "Authorization"),
 		ExposedHeaders: connectcors.ExposedHeaders(),
 		MaxAge:         7200, // 2 hours in seconds
+		Debug:          log.Level() == zap.DebugLevel,
+		Logger:         newCorsLogger(log.Named("connect-cors")),
 	}).Handler)
 	mux.Handle(probes.DefaultLivenessProbePath, probes.NewLivenessProbe(readyProbe))
 	mux.Handle(probes.DefaultReadinessProbePath, probes.NewReadinessProbe(readyProbe))

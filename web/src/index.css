@@ -1,1126 +1,260 @@
-/* Ant Design стили и сброс отступов */
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
-  transition: background-color 0.3s ease;
-}
-
-#root {
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-}
-
-/* Светлая тема */
-body.light-theme {
-  background-color: #f5f5f5;
-  color: #000000;
-}
-
-/* Тёмная тема */
-body.dark-theme {
-  background-color: #000000;
-  color: #ffffff;
-}
-
-/* Дополнительные стили для улучшения внешнего вида */
-.ant-layout {
-  transition: background-color 0.3s ease;
-}
-
-.ant-layout-sider {
-  transition: background-color 0.3s ease;
-}
-
-.ant-menu {
-  background: transparent !important;
-}
-
-/* Стили для переключателя темы */
-.theme-switch {
-  transition: all 0.3s ease;
-}
-
-/* Анимации для плавных переходов */
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-}
-
-/* Стили для карточек в тёмной теме */
-body.dark-theme .ant-card {
-  background: #141414 !important;
-  border-color: #424242 !important;
-}
-
-body.dark-theme .ant-card-body {
-  background: #141414 !important;
-  color: #ffffff !important;
-}
-
-/* Стили для инпутов в тёмной теме */
-body.dark-theme .ant-input,
-body.dark-theme .ant-input-password,
-body.dark-theme .ant-input-password-input {
-  background: #1f1f1f !important;
-  border-color: #424242 !important;
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-input::placeholder,
-body.dark-theme .ant-input-password::placeholder {
-  color: #a6a6a6 !important;
-}
-
-body.dark-theme .ant-input:focus,
-body.dark-theme .ant-input-password:focus,
-body.dark-theme .ant-input-focused {
-  border-color: #1890ff !important;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
-}
-
-/* Стили для таблиц в тёмной теме */
-body.dark-theme .ant-table {
-  background: #141414 !important;
-  color: #ffffff !important;
-  border: none !important;
-}
-
-body.dark-theme .ant-table-thead > tr > th {
-  background: #1f1f1f !important;
-  border: none !important;
-  border-bottom: 1px solid #424242 !important;
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-table-tbody > tr > td {
-  background: #141414 !important;
-  border: none !important;
-  border-bottom: 1px solid transparent !important;
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-table-tbody > tr:hover > td {
-  background: #262626 !important;
-  border-bottom: 1px solid transparent !important;
-}
-
-body.dark-theme .ant-table-empty .ant-table-tbody > tr > td {
-  background: #141414 !important;
-  border: none !important;
-}
-
-/* Стили для кнопок в тёмной теме */
-body.dark-theme .ant-btn {
-  border-color: #424242 !important;
-}
-
-body.dark-theme .ant-btn:not(.ant-btn-primary) {
-  background: #1f1f1f !important;
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-btn:not(.ant-btn-primary):hover {
-  background: #262626 !important;
-  border-color: #1890ff !important;
-}
-
-/* Стили для статистики в тёмной теме */
-body.dark-theme .ant-statistic {
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-statistic-title {
-  color: #a6a6a6 !important;
-}
-
-body.dark-theme .ant-statistic-content {
-  color: #ffffff !important;
-}
-
-/* Стили для типографии в тёмной теме */
-body.dark-theme .ant-typography {
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-typography-caption {
-  color: #a6a6a6 !important;
-}
-
-/* Стили для дропдаунов в тёмной теме */
-body.dark-theme .ant-dropdown {
-  background: #1f1f1f !important;
-}
-
-body.dark-theme .ant-dropdown-menu {
-  background: #1f1f1f !important;
-  border-color: #424242 !important;
-}
-
-body.dark-theme .ant-dropdown-menu-item {
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-dropdown-menu-item:hover {
-  background: #262626 !important;
-}
-
-/* Стили для форм в тёмной теме */
-body.dark-theme .ant-form-item-label > label {
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-form-item-explain {
-  color: #a6a6a6 !important;
-}
-
-/* Стили для селектов в тёмной теме */
-body.dark-theme .ant-select {
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-select-selector {
-  background: #1f1f1f !important;
-  border-color: #424242 !important;
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-select-selection-placeholder {
-  color: #a6a6a6 !important;
-}
-
-/* Стили для модалок в тёмной теме */
-body.dark-theme .ant-modal-content {
-  background: #141414 !important;
-}
-
-body.dark-theme .ant-modal-header {
-  background: #141414 !important;
-  border-color: #424242 !important;
-}
-
-body.dark-theme .ant-modal-title {
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-modal-body {
-  color: #ffffff !important;
-}
-
-/* Стили для алертов в тёмной теме */
-body.dark-theme .ant-alert {
-  border-color: #424242 !important;
-}
-
-body.dark-theme .ant-alert-error {
-  background: #2a1215 !important;
-  border-color: #58181c !important;
-}
-
-body.dark-theme .ant-alert-success {
-  background: #162312 !important;
-  border-color: #274916 !important;
-}
-
-body.dark-theme .ant-alert-warning {
-  background: #2b2111 !important;
-  border-color: #594214 !important;
-}
-
-body.dark-theme .ant-alert-info {
-  background: #111b26 !important;
-  border-color: #153450 !important;
-}
-
-/* Стили для переключателей в тёмной теме */
-body.dark-theme .ant-switch {
-  background: #424242 !important;
-}
-
-body.dark-theme .ant-switch-checked {
-  background: #1890ff !important;
-}
-
-/* Стили для прогресс-баров в тёмной теме */
-body.dark-theme .ant-progress-bg {
-  background: #1890ff !important;
-}
-
-body.dark-theme .ant-progress-inner {
-  background: #424242 !important;
-}
-
-/* Стили для спиннеров в тёмной теме */
-body.dark-theme .ant-spin-dot-item {
-  background: #1890ff !important;
-}
-
-/* Стили для тегов в тёмной теме */
-body.dark-theme .ant-tag {
-  background: #1f1f1f !important;
-  border-color: #424242 !important;
-  color: #ffffff !important;
-}
-
-/* Стили для пагинации в тёмной теме */
-body.dark-theme .ant-pagination-item {
-  background: #1f1f1f !important;
-  border-color: #424242 !important;
-}
-
-body.dark-theme .ant-pagination-item a {
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-pagination-item-active {
-  background: #1890ff !important;
-  border-color: #1890ff !important;
-}
-
-body.dark-theme .ant-pagination-item-active a {
-  color: #ffffff !important;
-}
-
-/* Стили для layout в тёмной теме */
-body.dark-theme .ant-layout {
-  background: #000000 !important;
-}
-
-body.dark-theme .ant-layout-header {
-  background: #141414 !important;
-  border-bottom: 1px solid #424242 !important;
-}
-
-body.dark-theme .ant-layout-sider {
-  background: #141414 !important;
-}
-
-body.dark-theme .ant-layout-content {
-  background: #000000 !important;
-}
-
-/* Стили для footer в тёмной теме */
-body.dark-theme .ant-layout-footer {
-  background: #141414 !important;
-  color: #a6a6a6 !important;
-  border-top: 1px solid #424242 !important;
-}
-
-/* Стили для пустых состояний в тёмной теме */
-body.dark-theme .ant-empty {
-  color: #a6a6a6 !important;
-}
-
-body.dark-theme .ant-empty-description {
-  color: #a6a6a6 !important;
-}
-
-/* Дополнительные стили для лучшей поддержки темы */
-body.dark-theme .ant-divider {
-  border-color: #424242 !important;
-}
-
-body.dark-theme .ant-tooltip-inner {
-  background: #1f1f1f !important;
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-popover-inner {
-  background: #1f1f1f !important;
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-popover-arrow::before {
-  background: #1f1f1f !important;
-}
-
-/* Стили для скроллбара в тёмной теме */
-body.dark-theme ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-body.dark-theme ::-webkit-scrollbar-track {
-  background: #141414;
-}
-
-body.dark-theme ::-webkit-scrollbar-thumb {
-  background: #424242;
-  border-radius: 4px;
-}
-
-body.dark-theme ::-webkit-scrollbar-thumb:hover {
-  background: #666666;
-}
-
-/* ИСПРАВЛЕНИЕ БЕЛЫХ ГРАНИЦ И ПОЛОС В ТЁМНОЙ ТЕМЕ */
-
-/* Исправляем все псевдоэлементы с границами */
-body.dark-theme *::before,
-body.dark-theme *::after {
-  border-color: #424242 !important;
-}
-
-/* Исправляем таблицы - убираем белые границы */
-body.dark-theme .ant-table-thead > tr > th::before {
-  background-color: #424242 !important;
-}
-
-body.dark-theme .ant-table-cell::before {
-  background-color: #424242 !important;
-}
-
-body.dark-theme .ant-table-container::before,
-body.dark-theme .ant-table-container::after {
-  background-color: #424242 !important;
-}
-
-body.dark-theme .ant-table-border-fix-left,
-body.dark-theme .ant-table-border-fix-right {
-  border-color: #424242 !important;
-}
-
-body.dark-theme .ant-table-thead > tr:not(:last-child) > th[colspan] {
-  border-bottom: 1px solid #424242 !important;
-}
-
-/* Исправляем hover состояния таблиц */
-body.dark-theme .ant-table-tbody > tr.ant-table-row:hover > td,
-body.dark-theme .ant-table-tbody > tr > td.ant-table-cell-row-hover {
-  background: #262626 !important;
-}
-
-body.dark-theme .ant-table-tbody > tr.ant-table-row-selected > td {
-  background: #111b26 !important;
-}
-
-body.dark-theme .ant-table-tbody > tr.ant-table-row-selected:hover > td {
-  background: #153450 !important;
-}
-
-/* Исправляем углы таблиц */
-body.dark-theme .ant-table-container table > thead > tr:first-child th:first-child,
-body.dark-theme .ant-table-container table > thead > tr:first-child td:first-child,
-body.dark-theme .ant-table-container table > tbody > tr:first-child th:first-child,
-body.dark-theme .ant-table-container table > tbody > tr:first-child td:first-child {
-  border-top-left-radius: 6px;
-  border-color: #424242 !important;
-}
-
-body.dark-theme .ant-table-container table > thead > tr:first-child th:last-child,
-body.dark-theme .ant-table-container table > thead > tr:first-child td:last-child,
-body.dark-theme .ant-table-container table > tbody > tr:first-child th:last-child,
-body.dark-theme .ant-table-container table > tbody > tr:first-child td:last-child {
-  border-top-right-radius: 6px;
-  border-color: #424242 !important;
-}
-
-/* Исправляем разделители таблиц */
-body.dark-theme .ant-table-thead > tr > th:not(:last-child):not(.ant-table-selection-column):not(.ant-table-row-expand-icon-cell):not([colspan])::before {
-  display: none !important;
-}
-
-/* Исправляем карточки */
-body.dark-theme .ant-card-head {
-  background: #141414 !important;
-  border-color: #424242 !important;
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-card-head-title {
-  color: #ffffff !important;
-}
-
-/* Исправляем тени для тёмной темы */
-body.dark-theme .ant-card,
-body.dark-theme .ant-modal-content,
-body.dark-theme .ant-dropdown,
-body.dark-theme .ant-tooltip-inner,
-body.dark-theme .ant-popover-inner {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
-}
-
-body.dark-theme .ant-table-wrapper {
-  box-shadow: none !important;
-}
-
-/* Исправляем все элементы форм */
-body.dark-theme .ant-select-selector,
-body.dark-theme .ant-input-group-addon,
-body.dark-theme .ant-picker,
-body.dark-theme .ant-cascader-picker,
-body.dark-theme .ant-mentions,
-body.dark-theme .ant-checkbox-wrapper,
-body.dark-theme .ant-radio-wrapper {
-  border-color: #424242 !important;
-}
-
-/* Исправляем разделители */
-body.dark-theme .ant-divider-horizontal {
-  border-top-color: #424242 !important;
-}
-
-body.dark-theme .ant-divider-vertical {
-  border-left-color: #424242 !important;
-}
-
-/* Исправляем статистику */
-body.dark-theme .ant-statistic-content::before,
-body.dark-theme .ant-statistic-content::after {
-  background-color: #424242 !important;
-}
-
-/* Исправляем пагинацию */
-body.dark-theme .ant-pagination-prev,
-body.dark-theme .ant-pagination-next,
-body.dark-theme .ant-pagination-jump-prev,
-body.dark-theme .ant-pagination-jump-next {
-  border-color: #424242 !important;
-}
-
-body.dark-theme .ant-pagination-prev:hover,
-body.dark-theme .ant-pagination-next:hover {
-  border-color: #1890ff !important;
-}
-
-/* Исправляем кнопки */
-body.dark-theme .ant-btn-default {
-  background: #1f1f1f !important;
-  border-color: #424242 !important;
-  color: #ffffff !important;
-}
-
-body.dark-theme .ant-btn-text {
-  color: #ffffff !important;
-  border: none !important;
-}
-
-/* Исправляем контейнеры таблиц */
-body.dark-theme .ant-table-container {
-  border: none !important;
-}
-
-body.dark-theme .ant-table-wrapper {
-  border: none !important;
-}
-
-body.dark-theme .ant-table-cell {
-  border-left: none !important;
-  border-right: none !important;
-  border-top: none !important;
-}
-
-body.dark-theme .ant-table-row {
-  border: none !important;
-}
-
-/* Убираем границы у всех таблиц в тёмной теме */
-body.dark-theme .ant-table [class*="ant-table"] {
-  border: none !important;
-}
-
-body.dark-theme .ant-table * {
-  border-left: none !important;
-  border-right: none !important;
-  border-top: none !important;
-}
-
-/* Убираем белые линии из всех компонентов Ant Design */
-body.dark-theme .ant-table-thead th,
-body.dark-theme .ant-table-tbody td {
-  border-left: none !important;
-  border-right: none !important;
-  border-top: none !important;
-}
-
-body.dark-theme .ant-table-thead th:not(:last-child):not(.ant-table-selection-column):not(.ant-table-row-expand-icon-cell):not([colspan])::before {
-  display: none !important;
-}
-
-/* Исправляем границы всех элементов */
-body.dark-theme .ant-table,
-body.dark-theme .ant-table-container,
-body.dark-theme .ant-table-content,
-body.dark-theme .ant-table-tbody,
-body.dark-theme .ant-table-thead {
-  border: none !important;
-}
-
-/* Специальные исправления для резистентных белых границ */
-body.dark-theme table,
-body.dark-theme tbody,
-body.dark-theme thead,
-body.dark-theme tr {
-  border: none !important;
-}
-
-body.dark-theme td,
-body.dark-theme th {
-  border-left: none !important;
-  border-right: none !important;
-  border-top: none !important;
-}
-
-/* Убираем белые outline и focus границы */
-body.dark-theme *:focus,
-body.dark-theme *:focus-visible {
-  outline-color: #1890ff !important;
-  border-color: #1890ff !important;
-}
-
-/* Исправляем все возможные белые элементы */
-body.dark-theme * {
-  border-color: #424242 !important;
-}
-
-/* Переопределяем для основных цветов */
-body.dark-theme .ant-btn-primary,
-body.dark-theme .ant-btn-primary:hover,
-body.dark-theme .ant-btn-primary:focus {
-  border-color: #1890ff !important;
-}
-
-/* Исправляем белые тени и блики */
-body.dark-theme * {
-  box-shadow: none !important;
-}
-
-body.dark-theme .ant-card,
-body.dark-theme .ant-modal-content,
-body.dark-theme .ant-dropdown-menu {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
-}
-
-/* ПОЛНОЕ УДАЛЕНИЕ ГРАНИЦ ТАБЛИЦЫ В ТЁМНОЙ ТЕМЕ */
-body.dark-theme .ant-table,
-body.dark-theme .ant-table *,
-body.dark-theme .ant-table-wrapper,
-body.dark-theme .ant-table-container,
-body.dark-theme .ant-table-content,
-body.dark-theme .ant-table-tbody,
-body.dark-theme .ant-table-thead,
-body.dark-theme .ant-table-header,
-body.dark-theme .ant-table-body,
-body.dark-theme .ant-table-row,
-body.dark-theme .ant-table-cell,
-body.dark-theme .ant-table thead,
-body.dark-theme .ant-table tbody,
-body.dark-theme .ant-table tr,
-body.dark-theme .ant-table td,
-body.dark-theme .ant-table th {
-  border: none !important;
-  border-left: none !important;
-  border-right: none !important;
-  border-top: none !important;
-  border-bottom: none !important;
-  border-color: transparent !important;
-  outline: none !important;
-}
-
-/* Убираем псевдоэлементы с границами */
-body.dark-theme .ant-table *::before,
-body.dark-theme .ant-table *::after {
-  border: none !important;
-  background: transparent !important;
-  display: none !important;
-}
-
-/* Убираем все разделители колонок */
-body.dark-theme .ant-table-thead th::before,
-body.dark-theme .ant-table-tbody td::before {
-  display: none !important;
-}
-
-/* Только нижняя граница для заголовков */
-body.dark-theme .ant-table-thead > tr > th {
-  border-bottom: 1px solid #333333 !important;
-}
-
-/* Убираем границы между строками */
-body.dark-theme .ant-table-tbody > tr > td {
-  border-bottom: none !important;
-}
-
-/* Убираем границы при hover */
-body.dark-theme .ant-table-tbody > tr:hover > td {
-  border: none !important;
-}
-
-/* Анимации для кнопки сравнения */
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.7);
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
+@import './app/styles/theme.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-overlay: var(--overlay);
+  --font-sans: Plus Jakarta Sans, sans-serif;
+  --font-mono: IBM Plex Mono, monospace;
+  --font-serif: Lora, serif;
+  --radius: 1.4rem;
+  --tracking-tighter: calc(var(--tracking-normal) - 0.05em);
+  --tracking-tight: calc(var(--tracking-normal) - 0.025em);
+  --tracking-wide: calc(var(--tracking-normal) + 0.025em);
+  --tracking-wider: calc(var(--tracking-normal) + 0.05em);
+  --tracking-widest: calc(var(--tracking-normal) + 0.1em);
+  --tracking-normal: var(--tracking-normal);
+  --shadow-2xl: var(--shadow-2xl);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-md: var(--shadow-md);
+  --shadow: var(--shadow);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-2xs: var(--shadow-2xs);
+  --spacing: var(--spacing);
+  --letter-spacing: var(--letter-spacing);
+  --shadow-offset-y: var(--shadow-offset-y);
+  --shadow-offset-x: var(--shadow-offset-x);
+  --shadow-spread: var(--shadow-spread);
+  --shadow-blur: var(--shadow-blur);
+  --shadow-opacity: var(--shadow-opacity);
+  --color-shadow-color: var(--shadow-color);
+  --color-destructive-foreground: var(--destructive-foreground);
+}
+
+:root {
+  --radius: 1.4rem;
+  --background: oklch(0.9940 0 0);
+  --foreground: oklch(0 0 0);
+  --card: oklch(0.9940 0 0);
+  --card-foreground: oklch(0 0 0);
+  --popover: oklch(0.9911 0 0);
+  --popover-foreground: oklch(0 0 0);
+  --primary: oklch(0.5393 0.2713 286.7462);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.9540 0.0063 255.4755);
+  --secondary-foreground: oklch(0.1344 0 0);
+  --muted: oklch(0.9702 0 0);
+  --muted-foreground: oklch(0.4386 0 0);
+  --accent: oklch(0.9393 0.0288 266.3680);
+  --accent-foreground: oklch(0.5445 0.1903 259.4848);
+  --destructive: oklch(0.6290 0.1902 23.0704);
+  --border: oklch(0.9300 0.0094 286.2156);
+  --input: oklch(0.9401 0 0);
+  --ring: oklch(0 0 0);
+  --chart-1: oklch(0.7459 0.1483 156.4499);
+  --chart-2: oklch(0.5393 0.2713 286.7462);
+  --chart-3: oklch(0.7336 0.1758 50.5517);
+  --chart-4: oklch(0.5828 0.1809 259.7276);
+  --chart-5: oklch(0.5590 0 0);
+  --sidebar: oklch(0.9777 0.0051 247.8763);
+  --sidebar-foreground: oklch(0 0 0);
+  --sidebar-primary: oklch(0 0 0);
+  --sidebar-primary-foreground: oklch(1.0000 0 0);
+  --sidebar-accent: oklch(0.9401 0 0);
+  --sidebar-accent-foreground: oklch(0 0 0);
+  --sidebar-border: oklch(0.9401 0 0);
+  --sidebar-ring: oklch(0 0 0);
+  --overlay: var(--shadow-color);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --font-sans: Plus Jakarta Sans, sans-serif;
+  --font-serif: Lora, serif;
+  --font-mono: IBM Plex Mono, monospace;
+  --shadow-color: hsl(0 0% 0%);
+  --shadow-opacity: 0.16;
+  --shadow-blur: 3px;
+  --shadow-spread: 0px;
+  --shadow-offset-x: 0px;
+  --shadow-offset-y: 2px;
+  --letter-spacing: -0.025em;
+  --spacing: 0.27rem;
+  --shadow-2xs: 0px 2px 3px 0px hsl(0 0% 0% / 0.08);
+  --shadow-xs: 0px 2px 3px 0px hsl(0 0% 0% / 0.08);
+  --shadow-sm: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 1px 2px -1px hsl(0 0% 0% / 0.16);
+  --shadow: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 1px 2px -1px hsl(0 0% 0% / 0.16);
+  --shadow-md: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 2px 4px -1px hsl(0 0% 0% / 0.16);
+  --shadow-lg: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 4px 6px -1px hsl(0 0% 0% / 0.16);
+  --shadow-xl: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 8px 10px -1px hsl(0 0% 0% / 0.16);
+  --shadow-2xl: 0px 2px 3px 0px hsl(0 0% 0% / 0.40);
+  --tracking-normal: -0.025em;
+}
+
+.dark {
+  --background: oklch(0.2223 0.0060 271.1393);
+  --foreground: oklch(0.9551 0 0);
+  --card: oklch(0.2568 0.0076 274.6528);
+  --card-foreground: oklch(0.9551 0 0);
+  --popover: oklch(0.2568 0.0076 274.6528);
+  --popover-foreground: oklch(0.9551 0 0);
+  --primary: oklch(0.6132 0.2294 291.7437);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.2940 0.0130 272.9312);
+  --secondary-foreground: oklch(0.9551 0 0);
+  --muted: oklch(0.2940 0.0130 272.9312);
+  --muted-foreground: oklch(0.7058 0 0);
+  --accent: oklch(0.2795 0.0368 260.0310);
+  --accent-foreground: oklch(0.7857 0.1153 246.6596);
+  --destructive: oklch(0.7106 0.1661 22.2162);
+  --border: oklch(0.3289 0.0092 268.3843);
+  --input: oklch(0.3289 0.0092 268.3843);
+  --ring: oklch(0.6132 0.2294 291.7437);
+  --chart-1: oklch(0.8003 0.1821 151.7110);
+  --chart-2: oklch(0.6132 0.2294 291.7437);
+  --chart-3: oklch(0.8077 0.1035 19.5706);
+  --chart-4: oklch(0.6691 0.1569 260.1063);
+  --chart-5: oklch(0.7058 0 0);
+  --sidebar: oklch(0.2011 0.0039 286.0396);
+  --sidebar-foreground: oklch(0.9551 0 0);
+  --sidebar-primary: oklch(0.6132 0.2294 291.7437);
+  --sidebar-primary-foreground: oklch(1.0000 0 0);
+  --sidebar-accent: oklch(0.2940 0.0130 272.9312);
+  --sidebar-accent-foreground: oklch(0.6132 0.2294 291.7437);
+  --sidebar-border: oklch(0.3289 0.0092 268.3843);
+  --sidebar-ring: oklch(0.6132 0.2294 291.7437);
+  --overlay: var(--shadow-color);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --radius: 1.4rem;
+  --font-sans: Plus Jakarta Sans, sans-serif;
+  --font-serif: Lora, serif;
+  --font-mono: IBM Plex Mono, monospace;
+  --shadow-color: hsl(0 0% 0%);
+  --shadow-opacity: 0.16;
+  --shadow-blur: 3px;
+  --shadow-spread: 0px;
+  --shadow-offset-x: 0px;
+  --shadow-offset-y: 2px;
+  --letter-spacing: -0.025em;
+  --spacing: 0.27rem;
+  --shadow-2xs: 0px 2px 3px 0px hsl(0 0% 0% / 0.08);
+  --shadow-xs: 0px 2px 3px 0px hsl(0 0% 0% / 0.08);
+  --shadow-sm: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 1px 2px -1px hsl(0 0% 0% / 0.16);
+  --shadow: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 1px 2px -1px hsl(0 0% 0% / 0.16);
+  --shadow-md: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 2px 4px -1px hsl(0 0% 0% / 0.16);
+  --shadow-lg: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 4px 6px -1px hsl(0 0% 0% / 0.16);
+  --shadow-xl: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 8px 10px -1px hsl(0 0% 0% / 0.16);
+  --shadow-2xl: 0px 2px 3px 0px hsl(0 0% 0% / 0.40);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-  70% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 10px rgba(82, 196, 26, 0);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(82, 196, 26, 0);
+  body {
+    @apply bg-background text-foreground;
+    letter-spacing: var(--tracking-normal);
   }
 }
 
-/* Дополнительные стили для улучшения UX */
-.compare-button-ready {
-  animation: pulse 2s infinite;
+.markdown-body {
+  color: inherit;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-/* Стили для красивых карточек сравнения */
-.comparison-card-run1 {
-  background: linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%);
-  border: 2px solid #40a9ff;
-}
-
-.comparison-card-run2 {
-  background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
-  border: 2px solid #73d13d;
-}
-
-/* Стили для различающихся полей */
-.field-different {
-  background-color: #fff7e6;
-  border-color: #ffa940;
-  padding: 8px;
-  border-radius: 4px;
-  margin: 2px 0;
-}
-
-.field-same {
-  background-color: #f6ffed;
-  border-color: #b7eb8f;
-  padding: 8px;
-  border-radius: 4px;
-  margin: 2px 0;
-}
-
-/* Стили для плавной прокрутки на лендинг странице */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Обеспечиваем возможность скролла */
-body {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-}
-
-/* Стили для лендинг страницы */
-.landing-page {
-  overflow-x: hidden;
-}
-
-/* Анимации для секций */
-.landing-section {
-  opacity: 0;
-  transform: translateY(30px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
-}
-
-.landing-section.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Стили для кнопки "Наверх" */
-.scroll-to-top-btn {
-  transition: all 0.3s ease;
-}
-
-.scroll-to-top-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(24, 144, 255, 0.4) !important;
-}
-
-/* Стили для sticky header */
-.ant-affix {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 1000 !important;
-}
-
-.ant-layout-header {
-  transition: all 0.3s ease;
-}
-
-/* Улучшенная тень для sticky header */
-.ant-affix .ant-layout-header {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-}
-
-/* Поддержка backdrop-filter */
-@supports (backdrop-filter: blur(10px)) {
-  .ant-layout-header {
-    backdrop-filter: blur(10px);
-  }
-}
-
-/* Fallback для браузеров без поддержки backdrop-filter */
-@supports not (backdrop-filter: blur(10px)) {
-  .ant-layout-header {
-    background: rgba(255, 255, 255, 0.98) !important;
-  }
-}
-
-/* Стили для активной навигации */
-.nav-link-active {
-  color: #1890ff !important;
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
   font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.5rem;
 }
 
-/* Стили для навигационных кнопок */
-.ant-btn-text {
-  transition: all 0.3s ease !important;
+.markdown-body pre {
+  background-color: color-mix(in oklab, var(--muted) 70%, transparent);
+  padding: 1rem;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.85rem;
 }
 
-.ant-btn-text:hover {
-  color: #1890ff !important;
-  background-color: rgba(24, 144, 255, 0.1) !important;
+.markdown-body code {
+  background-color: color-mix(in oklab, var(--muted) 80%, transparent);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
-/* Анимации для карточек */
-.feature-card {
-  transition: all 0.3s ease;
+.markdown-body ul {
+  list-style: disc;
+  margin-left: 1.5rem;
 }
 
-.feature-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+.markdown-body ol {
+  list-style: decimal;
+  margin-left: 1.5rem;
 }
 
-/* Анимации для статистики */
-.stat-item {
-  transition: all 0.3s ease;
-}
-
-.stat-item:hover {
-  transform: scale(1.05);
-}
-
-/* Стили для градиентных фонов */
-.hero-gradient {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-.hero-gradient::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 100%);
-  pointer-events: none;
-}
-
-.cta-gradient {
-  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-.cta-gradient::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 100%);
-  pointer-events: none;
-}
-
-/* Адаптивные стили для мобильных устройств */
-@media (max-width: 768px) {
-  .landing-section {
-    padding: 40px 16px !important;
-  }
-  
-  .hero-gradient h1 {
-    font-size: 2.5rem !important;
-  }
-  
-  .feature-card {
-    margin-bottom: 16px;
-  }
-}
-
-/* Стили для улучшения читаемости */
-.landing-text {
-  line-height: 1.6;
-  color: #666;
-}
-
-.landing-text-white {
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-/* Стили для кнопок с анимацией */
-.animated-button {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.animated-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
+.markdown-body table {
+  border-collapse: collapse;
   width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  transition: left 0.5s;
+  font-size: 0.9rem;
 }
 
-.animated-button:hover::before {
-  left: 100%;
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  padding: 0.5rem;
+  text-align: left;
 }
 
-/* Стили для карточек топов */
-.top-run-card {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: translateY(0);
-}
-
-.top-run-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
-}
-
-.top-run-card:hover .ant-card-body {
-  transform: scale(1.02);
-}
-
-/* Анимация для загрузки */
-@keyframes pulse {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-.loading-pulse {
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-/* Стили для градиентных кнопок */
-.gradient-button {
-  background: linear-gradient(135deg, #1890ff, #40a9ff);
-  border: none;
-  color: white;
-  transition: all 0.3s ease;
-}
-
-.gradient-button:hover {
-  background: linear-gradient(135deg, #40a9ff, #1890ff);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(24, 144, 255, 0.3);
-}
-
-/* Стили для информационных блоков */
-.info-block {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.3s ease;
-}
-
-.info-block:hover {
-  background: rgba(255, 255, 255, 0.95);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-}
-
-/* Анимация появления карточек */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.fade-in-up {
-  animation: fadeInUp 0.6s ease-out;
-}
-
-/* Стили для медалей */
-.medal-gold {
-  background: linear-gradient(135deg, #ffd700, #ffed4e);
-  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
-}
-
-.medal-silver {
-  background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
-  box-shadow: 0 4px 15px rgba(192, 192, 192, 0.4);
-}
-
-.medal-bronze {
-  background: linear-gradient(135deg, #cd7f32, #daa520);
-  box-shadow: 0 4px 15px rgba(205, 127, 50, 0.4);
-}
-
-/* Стили для фиксированного header */
-.fixed-header {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 1000 !important;
-  width: 100% !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.95) !important;
-}
-
-.ant-layout-header {
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.95) !important;
-}
-
-/* Плавная анимация для навигационных кнопок */
-.ant-layout-header .ant-btn {
-  transition: all 0.3s ease;
-}
-
-.ant-layout-header .ant-btn:hover {
-  transform: translateY(-1px);
-}
-
-/* Стили для активной секции в навигации */
-.fixed-header .ant-btn.active-section {
-  color: #1890ff !important;
-  font-weight: 600 !important;
-  border-bottom: 3px solid #1890ff !important;
-  background: rgba(24, 144, 255, 0.15) !important;
-  border-radius: 8px !important;
-  padding: 6px 16px !important;
-  margin: 0 4px !important;
-  transform: translateY(-2px) !important;
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3) !important;
-  border: 1px solid rgba(24, 144, 255, 0.3) !important;
-}
-
-/* Hover эффекты для навигационных кнопок */
-.fixed-header .ant-btn:hover {
-  color: #1890ff !important;
-  background: rgba(24, 144, 255, 0.05) !important;
-  border-radius: 6px !important;
-  transform: translateY(-1px) !important;
-  transition: all 0.3s ease !important;
-}
-
-/* Анимация для активной секции */
-@keyframes activeSectionPulse {
-  0% {
-    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
-  }
-  50% {
-    box-shadow: 0 4px 16px rgba(24, 144, 255, 0.3);
-  }
-  100% {
-    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
-  }
-}
-
-.fixed-header .ant-btn.active-section {
-  animation: activeSectionPulse 2s ease-in-out infinite;
-}
-
-/* Улучшенные стили для кнопок в темной теме */
-.fixed-header .ant-btn {
-  font-weight: 500 !important;
-  border-radius: 6px !important;
-  transition: all 0.3s ease !important;
-}
-
-/* Hover эффекты для всех кнопок в header */
-.fixed-header .ant-btn:hover {
-  transform: translateY(-1px) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
-}
-
-/* Специальные стили для кнопок переключателей */
-.fixed-header .ant-btn[title*="тема"],
-.fixed-header .ant-btn[title*="theme"] {
-  background: rgba(24, 144, 255, 0.1) !important;
-  border: 1px solid rgba(24, 144, 255, 0.2) !important;
-}
-
-.fixed-header .ant-btn[title*="тема"]:hover,
-.fixed-header .ant-btn[title*="theme"]:hover {
-  background: rgba(24, 144, 255, 0.2) !important;
-  border: 1px solid rgba(24, 144, 255, 0.4) !important;
-}
-
-/* Стили для кнопки языка */
-.fixed-header .ant-btn:has(.anticon-translation) {
-  background: rgba(0, 0, 0, 0.05) !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
-}
-
-.fixed-header .ant-btn:has(.anticon-translation):hover {
-  background: rgba(0, 0, 0, 0.1) !important;
-  border: 1px solid rgba(0, 0, 0, 0.2) !important;
-}
-
-/* Стили для кнопки входа */
-.fixed-header .ant-btn:has-text("Войти"),
-.fixed-header .ant-btn:has-text("Login") {
-  background: rgba(0, 0, 0, 0.05) !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
-}
-
-.fixed-header .ant-btn:has-text("Войти"):hover,
-.fixed-header .ant-btn:has-text("Login"):hover {
-  background: rgba(0, 0, 0, 0.1) !important;
-  border: 1px solid rgba(0, 0, 0, 0.2) !important;
-}
-
-/* Стили для страницы документации */
-.documentation-page .ant-layout {
-  background: transparent !important;
-}
-
-.documentation-page .ant-layout-sider {
-  background: transparent !important;
-}
-
-.documentation-page .ant-layout-content {
-  background: transparent !important;
-}
-
-/* Переопределяем глобальные стили для документации */
-.documentation-page .ant-layout {
-  margin-top: 60px !important;
-}
-
-.documentation-page .ant-layout-sider {
-  position: relative !important;
-  z-index: 1 !important;
-}
-
-.documentation-page .ant-layout-content {
-  position: relative !important;
-  z-index: 1 !important;
+.markdown-body blockquote {
+  border-left: 3px solid color-mix(in oklab, var(--border) 85%, transparent);
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--muted-foreground);
 }

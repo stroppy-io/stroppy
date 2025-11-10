@@ -1,0 +1,39 @@
+lint:
+  use:
+    - DEFAULT
+  enum_zero_value_suffix: _NONE
+  service_suffix: API
+  ignore: []
+  except: []
+  allow_comment_ignores: false
+  ignore_only: {}
+deps:
+  - github.com/yaroher/protoc-gen-pgx-orm@v1.0.20
+  - github.com/bufbuild/protoc-gen-validate@v1.2.1
+#  - github.com/stroppy-io/stroppy@926eb8daee3fa81429a6238424ac08be934aa079
+generate:
+  inputs:
+    - directory: panel
+    - directory: crossplane
+    - git_repo:
+        url: github.com/bufbuild/protoc-gen-validate
+        sub_directory: validate
+    - git_repo:
+        url: github.com/yaroher/protoc-gen-pgx-orm
+        sub_directory: protopgx
+  plugins:
+    - name: es
+      out: ../../web/src/proto
+      opts:
+        target: ts
+        import_extension: ts
+        json_types: true
+        valid_types: legacy_required+protovalidate_required
+    - name: connect-query
+      out: ../../web/src/proto
+      opts:
+        target: ts
+        import_extension: ts
+breaking:
+  ignore: []
+  against_git_ref: master

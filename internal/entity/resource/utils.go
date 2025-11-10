@@ -35,3 +35,10 @@ func MarshalWithReplaceOneOffs(def *crossplane.ResourceDef) (string, error) {
 	}
 	return strings.ReplaceAll(string(yaml), replacedSymbol, "forProvider"), nil
 }
+
+func stringOrDefault(s string, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
+}

@@ -9,6 +9,7 @@ import (
 )
 
 type Querier interface {
+	GetAllResourcesIps(ctx context.Context, dollar_1 []int32) ([]string, error)
 	GetResourceTree(ctx context.Context, id string) ([]*GetResourceTreeRow, error)
 	GetResourceTreeByStatuses(ctx context.Context, arg *GetResourceTreeByStatusesParams) ([]*GetResourceTreeByStatusesRow, error)
 }

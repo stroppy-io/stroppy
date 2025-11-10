@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ips"
+	"go.uber.org/zap"
 	"strings"
 	"time"
 
@@ -21,8 +23,10 @@ import (
 )
 
 type CloudAutomationConfig struct {
-	AutomationTTL   time.Duration `mapstructure:"automation_ttl" default:"4h" required:"true"`
-	CreationTimeout time.Duration `mapstructure:"creation_timeout" default:"15m" required:"true"`
+	AutomationTTL        time.Duration `mapstructure:"automation_ttl" default:"4h" validate:"required"`
+	CreationTimeout      time.Duration `mapstructure:"creation_timeout" default:"15m" validate:"required"`
+	OrioleBaseImage      string        `mapstructure:"oriole_base_image" validate:"required"`
+	StroppyTpccBaseImage string        `mapstructure:"stroppy_base_image" validate:"required"`
 }
 
 func (p *PanelService) GetAutomation(ctx context.Context, ulid *panel.Ulid) (*panel.CloudAutomation, error) {
@@ -38,22 +42,26 @@ func (p *PanelService) GetAutomation(ctx context.Context, ulid *panel.Ulid) (*pa
 
 func (p *PanelService) BackgroundCheckAutomationStatus(ctx context.Context) error {
 	p.logger.Info("BackgroundCheckAutomationStatus started")
-	automations, err := p.cloudAutomationRepo.ListBy(ctx, orm.CloudAutomation.SelectAll())
+	automations, err := p.cloudAutomationRepo.ListBy(ctx, orm.CloudAutomation.SelectAll().
+		Where(orm.CloudAutomation.Status.Any(
+			int32(panel.Status_STATUS_RUNNING),
+			int32(panel.Status_STATUS_IDLE),
+		)))
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, err)
 	}
-	return postgres.WithReadUncommitted(ctx, p.txManager, func(ctx context.Context) error {
-		workPool := pool.New().WithContext(ctx).WithFailFast().WithFirstError()
-		for _, automation := range automations {
-			workPool.Go(func(ctx context.Context) error {
+	workPool := pool.New().WithContext(ctx).WithFailFast().WithFirstError()
+	for _, automation := range automations {
+		workPool.Go(func(ctx context.Context) error {
+			return postgres.WithReadUncommitted(ctx, p.txManager, func(ctx context.Context) error {
 				if automation.GetTiming().GetCreatedAt().AsTime().Add(p.automateConfig.AutomationTTL).Before(time.Now()) {
 					return p.stopCrossplaneAutomation(ctx, automation, panel.Status_STATUS_FAILED)
 				}
 				return p.updateCrossplaneAutomation(ctx, automation)
 			})
-		}
-		return workPool.Wait()
-	})
+		})
+	}
+	return workPool.Wait()
 }
 
 var (
@@ -68,15 +76,6 @@ func (p *PanelService) RunAutomation(ctx context.Context, request *panel.RunAuto
 	if len(request.GetWorkload().GetRunnerCluster().GetMachines()) != 1 {
 		return nil, ErrWorkloadRunnerClusterMustHaveExactlyOneMachine
 	}
-	user, err := p.getUserFromCtx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	cloudBuilder, err := resource.DispatchCloudBuilder(request.GetUsingCloudProvider(), &p.k8sConfig.Crossplane)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeUnimplemented, err)
-	}
-
 	if request.GetDatabase().GetDatabaseType() != panel.Database_TYPE_POSTGRES_ORIOLE {
 		return nil, connect.NewError(
 			connect.CodeUnimplemented,
@@ -91,6 +90,50 @@ func (p *PanelService) RunAutomation(ctx context.Context, request *panel.RunAuto
 		)
 	}
 
+	user, err := p.getUserFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	cloudBuilder, err := resource.DispatchCloudBuilder(request.GetUsingCloudProvider(), &p.k8sConfig.Crossplane)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, err)
+	}
+	exsitedIps, err := p.sqlcRepo.GetAllResourcesIps(ctx, []int32{
+		int32(panel.Status_STATUS_RUNNING),
+		int32(panel.Status_STATUS_IDLE),
+	})
+	if err != nil {
+		return nil, connect.NewError(
+			connect.CodeInternal,
+			fmt.Errorf("failed to get running resources ips: %w", err),
+		)
+	}
+	databaseInternalIp, err := ips.FirstFreeYandexIP(
+		p.k8sConfig.Crossplane.YandexCloudBuilderConfig.DefaultNetworkCidrBlock,
+		exsitedIps,
+	)
+	if err != nil {
+		return nil, connect.NewError(
+			connect.CodeInternal,
+			fmt.Errorf("failed to find free ip: %w", err),
+		)
+	}
+	databaseInternalIpStr := databaseInternalIp.String()
+	p.logger.Info("Found free ip for database", zap.String("ip", databaseInternalIpStr))
+	workloadInternalIp, err := ips.FirstFreeYandexIP(
+		p.k8sConfig.Crossplane.YandexCloudBuilderConfig.DefaultNetworkCidrBlock,
+		append(exsitedIps, databaseInternalIpStr),
+	)
+	if err != nil {
+		return nil, connect.NewError(
+			connect.CodeInternal,
+			fmt.Errorf("failed to find free ip: %w", err),
+		)
+	}
+	workloadInternalIpStr := workloadInternalIp.String()
+	p.logger.Info("Found free ip for workload", zap.String("ip", workloadInternalIpStr))
+
 	newAutomationId := ids.NewUlid()
 	dbDeployScript, err := embed.GetOrioleInstallScript()
 	if err != nil {
@@ -100,6 +143,9 @@ func (p *PanelService) RunAutomation(ctx context.Context, request *panel.RunAuto
 		)
 	}
 	databaseMachineName := fmt.Sprintf("stroppy-crossplane-database-%s", strings.ToLower(newAutomationId.GetId()))
+	// TODO: AUTOMATE THIS LATER
+	request.GetDatabase().GetRunnerCluster().GetMachines()[0].BaseImageId = &p.automateConfig.OrioleBaseImage
+	request.GetDatabase().GetRunnerCluster().GetMachines()[0].StaticInternalIp = &databaseInternalIpStr
 	databaseResourcesTree, err := cloudBuilder.NewSingleVmResource(
 		databaseMachineName,
 		request.GetDatabase().GetRunnerCluster().GetMachines()[0],
@@ -118,7 +164,12 @@ func (p *PanelService) RunAutomation(ctx context.Context, request *panel.RunAuto
 			fmt.Errorf("failed to get stroppy install script: %w", err),
 		)
 	}
+	driverUrl := fmt.Sprintf("postgres://st-t-postgres:st-t-postgres-pass@%s:54321/st-t-postgres", databaseInternalIpStr)
+	workloadDeployScript.Body = []byte(strings.ReplaceAll(string(workloadDeployScript.Body), "${DRIVER_URL}", driverUrl))
 	workloadMachineName := fmt.Sprintf("stroppy-crossplane-workload-%s", strings.ToLower(newAutomationId.GetId()))
+	// TODO: AUTOMATE THIS LATER
+	request.GetWorkload().GetRunnerCluster().GetMachines()[0].BaseImageId = &p.automateConfig.StroppyTpccBaseImage
+	request.GetWorkload().GetRunnerCluster().GetMachines()[0].StaticInternalIp = &workloadInternalIpStr
 	workloadResourcesTree, err := cloudBuilder.NewSingleVmResource(
 		workloadMachineName,
 		request.GetWorkload().GetRunnerCluster().GetMachines()[0],

@@ -2,6 +2,8 @@ package httpserv
 
 import (
 	"context"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 	"time"
 
 	"connectrpc.com/connect"
@@ -18,6 +20,7 @@ func loggerMiddleware(logger *zap.Logger) connect.UnaryInterceptorFunc {
 			if err != nil {
 				level = zapcore.ErrorLevel
 			}
+			anyMsg, _ := protojson.Marshal(req.Any().(proto.Message))
 			logger.Log(
 				level,
 				"request served",
@@ -27,7 +30,7 @@ func loggerMiddleware(logger *zap.Logger) connect.UnaryInterceptorFunc {
 				zap.String("protocol", req.Peer().Protocol),
 				zap.String("procedure", req.Spec().Procedure),
 				zap.String("idempotency_level", req.Spec().IdempotencyLevel.String()),
-				zap.Any("schema", req.Spec().Schema),
+				zap.ByteString("anyMsg", anyMsg),
 				zap.String("stream_type", req.Spec().StreamType.String()),
 				zap.Duration("duration", time.Since(start)),
 			)

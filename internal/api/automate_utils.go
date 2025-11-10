@@ -126,10 +126,13 @@ func (p *PanelService) updateCrossplaneAutomation(ctx context.Context, automatio
 	if err != nil {
 		if sqlerr.IsNotFound(err) {
 			p.logger.Debug(
-				"database resource for automation not found, skipping update",
+				"database resource for automation not found, set automation status to failed",
 				zap.String("id", automation.DatabaseRootResourceId.GetId()),
 			)
-			return nil
+			return p.cloudAutomationRepo.Exec(ctx, orm.CloudAutomation.Update().
+				Set(orm.CloudAutomation.Status.Set(int32(panel.Status_STATUS_FAILED))).
+				Where(orm.CloudAutomation.Id.Eq(automation.GetId().GetId())),
+			)
 		}
 		return fmt.Errorf("failed to get database resource: %w", err)
 	}

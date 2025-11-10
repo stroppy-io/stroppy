@@ -60,7 +60,7 @@ submodules: # Загрузка подмодулей
 PROTOCOL_PATH=$(CURDIR)/tools/proto
 .PHONY: protocols
 protocols:
-	cd $(PROTOCOL_PATH) && easyp generate
+	cd $(PROTOCOL_PATH) && easyp generate  && easyp -cfg easyp.ts.yaml generate
 
 .PHONY: tests
 tests: # Запускает юнит тесты с ковереджем

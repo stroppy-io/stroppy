@@ -1,0 +1,220 @@
+{
+  "page": {
+    "title": "Runs",
+    "subtitle": "Manage and monitor test runs"
+  },
+  "status": {
+    "completed": "Completed",
+    "running": "Running",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "pending": "Pending"
+  },
+  "table": {
+    "columns": {
+      "id": "ID",
+      "name": "Name",
+      "status": "Status",
+      "createdAt": "Created",
+      "startedAt": "Started",
+      "completedAt": "Completed",
+      "duration": "Duration",
+      "tps": "TPS",
+      "actions": "Actions"
+    },
+    "actions": {
+      "view": "View",
+      "edit": "Edit",
+      "delete": "Delete",
+      "compare": "Compare",
+      "download": "Download"
+    }
+  },
+  "filters": {
+    "title": "Filters",
+    "search": "Search by name",
+    "status": "Status",
+    "any": "Any",
+    "dateRange": "Date range",
+    "loadType": "Load type",
+    "database": "Database",
+    "deploymentSchema": "Deployment schema",
+    "hardwareConfig": "Hardware config",
+    "tpsRange": "TPS range",
+    "from": "From",
+    "to": "To",
+    "clear": "Clear filters",
+    "apply": "Apply filters",
+    "workloadType": "Workload type",
+    "databaseType": "Database type",
+    "databaseName": "Database name",
+    "tps": {
+      "title": "TPS filter",
+      "metric": "Metric",
+      "operator": "Operator",
+      "value": "Value",
+      "reset": "Reset",
+      "metrics": {
+        "unspecified": "Metric",
+        "average": "Average TPS",
+        "max": "Max TPS",
+        "min": "Min TPS",
+        "p95": "TPS P95",
+        "p99": "TPS P99"
+      }
+    },
+    "machine": {
+      "title": "Resource filter",
+      "metric": "Resource",
+      "operator": "Operator",
+      "value": "Value",
+      "reset": "Reset",
+      "parameters": {
+        "unspecified": "Resource",
+        "cores": "CPU cores",
+        "memory": "Memory (GB)",
+        "disk": "Disk (GB)"
+      }
+    },
+    "workloadTypes": {
+      "unspecified": "Workload type",
+      "tpcc": "TPCC"
+    },
+    "databaseTypes": {
+      "unspecified": "Database type",
+      "postgresOriole": "PostgreSQL (Oriole)"
+    },
+    "operators": {
+      "default": "Operator",
+      "gt": "Greater than",
+      "gte": "Greater or equal",
+      "lt": "Less than",
+      "lte": "Less or equal",
+      "eq": "Equal",
+      "neq": "Not equal"
+    }
+  },
+  "list": {
+    "empty": "No runs match the selected filters",
+    "loading": "Loading…",
+    "loadMore": "Load more",
+    "count": "{{count}} runs displayed"
+  },
+  "meta": {
+    "unknownDatabase": "Database not specified",
+    "unknownDate": "Date unknown"
+  },
+  "actions": {
+    "createRun": "Create Run",
+    "refresh": "Refresh",
+    "export": "Export",
+    "import": "Import",
+    "bulkDelete": "Bulk Delete",
+    "bulkExport": "Bulk Export"
+  },
+  "modals": {
+    "createRun": {
+      "title": "Create New Run",
+      "cancel": "Cancel",
+      "create": "Create"
+    },
+    "editRun": {
+      "title": "Edit Run",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "deleteRun": {
+      "title": "Delete Run",
+      "message": "Are you sure you want to delete this run?",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    },
+    "runDetails": {
+      "title": "Run Details",
+      "close": "Close"
+    },
+    "compareRuns": {
+      "title": "Compare Runs",
+      "selectRuns": "Select runs to compare",
+      "compare": "Compare",
+      "close": "Close"
+    }
+  },
+  "messages": {
+    "runCreated": "Run created successfully",
+    "runUpdated": "Run updated successfully",
+    "runDeleted": "Run deleted successfully",
+    "runsDeleted": "Runs deleted successfully",
+    "runStarted": "Run started",
+    "runStopped": "Run stopped",
+    "runCancelled": "Run cancelled",
+    "errorCreatingRun": "Error creating run",
+    "errorUpdatingRun": "Error updating run",
+    "errorDeletingRun": "Error deleting run",
+    "errorLoadingRuns": "Error loading runs",
+    "noRunsFound": "No runs found",
+    "selectRunsToCompare": "Select runs to compare",
+    "selectExactlyTwoRuns": "Select exactly 2 runs to compare"
+  },
+  "details": {
+    "basicInfo": "Basic Information",
+    "workloadConfig": "Workload Configuration",
+    "databaseConfig": "Database Configuration",
+    "hardwareConfig": "Hardware Configuration",
+    "deploymentConfig": "Deployment Configuration",
+    "nemesisConfig": "Nemesis Configuration",
+    "tpsMetrics": "TPS Metrics",
+    "fullConfig": "Full Configuration",
+    "runId": "Run ID",
+    "runName": "Run Name",
+    "runDescription": "Run Description",
+    "workloadType": "Workload Type",
+    "databaseType": "Database Type",
+    "databaseVersion": "Database Version",
+    "databaseBuild": "Database Build",
+    "hardwareSignature": "Hardware Signature",
+    "deploymentType": "Deployment Type",
+    "deploymentSignature": "Deployment Signature",
+    "nemesisSignature": "Nemesis Signature",
+    "tpsMax": "Max TPS",
+    "tpsMin": "Min TPS",
+    "tpsAverage": "Average TPS",
+    "tps95p": "95th Percentile TPS",
+    "tps99p": "99th Percentile TPS",
+    "runners": "Number of Runners",
+    "testDuration": "Test Duration",
+    "cpuCores": "CPU Cores",
+    "memoryGB": "Memory (GB)",
+    "storageType": "Storage Type",
+    "storageCapacity": "Storage Capacity (GB)",
+    "nodeCount": "Number of Nodes",
+    "notSpecified": "Not specified",
+    "noDescription": "No description",
+    "additionalProperties": "Additional Properties",
+    "noAdditionalProperties": "No additional properties",
+    "deploymentParameters": "Deployment Parameters",
+    "noDeploymentParameters": "No additional parameters",
+    "activeNemeses": "Active Nemeses",
+    "noActiveNemeses": "No active nemeses",
+    "noNemeses": "No nemeses",
+    "tpsMetricsMissing": "TPS metrics missing",
+    "tpsMetricsEmpty": "TPS metrics not filled"
+  },
+  "comparison": {
+    "title": "Run Comparison",
+    "differencesFound": "differences found between runs",
+    "differencesHighlighted": "Different fields are highlighted in orange",
+    "run1": "Run 1",
+    "run2": "Run 2",
+    "totalDifferences": "Total Differences",
+    "hardware": "Hardware",
+    "workload": "Workload",
+    "deployment": "Deployment",
+    "identical": "Identical",
+    "different": "Different",
+    "identicalWorkload": "Identical",
+    "differentWorkload": "Different",
+    "identicalDeployment": "Identical",
+    "differentDeployment": "Different"
+  }
+}

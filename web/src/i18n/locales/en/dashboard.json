@@ -1,0 +1,152 @@
+{
+  "page": {
+    "title": "TOP Runs",
+    "subtitle": "Analysis and ranking of the best test runs"
+  },
+  "metrics": {
+    "active": "Active runs",
+    "today": "Runs today",
+    "avgTps": "Average TPS"
+  },
+  "events": {
+    "title": "Orchestration events",
+    "items": [
+      "Scheduler triggers nightly PostgreSQL profiling",
+      "Crossplane provisioned a new stress-testing cluster in Yandex Cloud",
+      "Latest report generated through Connect RPC"
+    ]
+  },
+  "charts": {
+    "tps": {
+      "title": "TPS dynamics",
+      "subtitle": "Average and p95 throughput for the latest runs",
+      "series": {
+        "average": "Average TPS",
+        "p95": "TPS p95"
+      }
+    },
+    "topRuns": {
+      "title": "Top runs by TPS",
+      "subtitle": "Best experiments by average throughput",
+      "count": "{{count}} runs",
+      "series": {
+        "average": "Average TPS"
+      }
+    }
+  },
+  "latest": {
+    "title": "Latest experiments",
+    "empty": "No run data available",
+    "unknownDatabase": "Database not specified",
+    "unknownDate": "Date unknown"
+  },
+  "topRuns": {
+    "title": "TOP 10 Runs",
+    "found": "Found",
+    "noData": "No data",
+    "noDataDescription": "No runs found matching the selected filters",
+    "rank": {
+      "1": "🥇",
+      "2": "🥈", 
+      "3": "🥉",
+      "default": "#{rank}"
+    }
+  },
+  "filters": {
+    "title": "Filters",
+    "period": "Period:",
+    "status": "Status:",
+    "loadType": "Load Type:",
+    "database": "Database:",
+    "deploymentSchema": "Deployment Schema:",
+    "hardwareConfig": "Hardware Config:",
+    "tpsRange": "TPS Range:",
+    "from": "From",
+    "to": "To",
+    "selectStatus": "Select status",
+    "selectLoadType": "Select load type",
+    "selectDatabase": "Select database",
+    "selectSchema": "Select schema",
+    "selectHardware": "Select configuration"
+  },
+  "actions": {
+    "compare": "Compare",
+    "compareSelected": "Compare selected runs",
+    "selectTwoRuns": "Select exactly 2 runs to compare",
+    "refresh": "Refresh",
+    "clearFilters": "Clear filters",
+    "viewDetails": "View details"
+  },
+  "details": {
+    "title": "Run Details",
+    "basicInfo": "Basic Information",
+    "workloadConfig": "Workload Configuration",
+    "databaseConfig": "Database Configuration",
+    "hardwareConfig": "Hardware Configuration",
+    "deploymentConfig": "Deployment Layout",
+    "nemesisConfig": "Nemesis Configuration",
+    "tpsMetrics": "TPS Metrics",
+    "configSummary": "Configuration Summary",
+    "fullConfig": "Full Configuration",
+    "runId": "Run ID",
+    "runName": "Run Name",
+    "runDescription": "Run Description",
+    "workloadType": "Workload Type",
+    "databaseType": "Database Type",
+    "databaseVersion": "Database Version",
+    "databaseBuild": "Database Build",
+    "hardwareSignature": "Hardware Signature",
+    "deploymentType": "Deployment Type",
+    "deploymentSignature": "Deployment Signature",
+    "nemesisSignature": "Nemesis Signature",
+    "tpsMax": "Max TPS",
+    "tpsMin": "Min TPS",
+    "tpsAverage": "Average TPS",
+    "tps95p": "95th Percentile TPS",
+    "tps99p": "99th Percentile TPS",
+    "runners": "Number of Runners",
+    "testDuration": "Test Duration",
+    "cpuCores": "CPU Cores",
+    "memoryGB": "Memory (GB)",
+    "storageType": "Storage Type",
+    "storageCapacity": "Storage Capacity (GB)",
+    "nodeCount": "Number of Nodes",
+    "notSpecified": "Not specified",
+    "noDescription": "No description",
+    "additionalProperties": "Additional Properties",
+    "noAdditionalProperties": "No additional properties",
+    "deploymentParameters": "Deployment Parameters",
+    "noDeploymentParameters": "No additional parameters",
+    "activeNemeses": "Active Nemeses",
+    "noActiveNemeses": "No active nemeses",
+    "noNemeses": "No nemeses",
+    "tpsMetricsMissing": "TPS metrics missing",
+    "tpsMetricsEmpty": "TPS metrics not filled",
+    "runStatus": "Run Status",
+    "workloadType": "Workload Type",
+    "databaseType": "Database Type",
+    "nodes": "Nodes"
+  },
+  "comparison": {
+    "title": "Run Comparison",
+    "differencesFound": "differences found between runs",
+    "differencesHighlighted": "Different fields are highlighted in orange",
+    "run1": "Run 1",
+    "run2": "Run 2",
+    "totalDifferences": "Total Differences",
+    "hardware": "Hardware",
+    "workload": "Workload",
+    "deployment": "Deployment",
+    "identical": "Identical",
+    "different": "Different",
+    "identicalWorkload": "Identical",
+    "differentWorkload": "Different",
+    "identicalDeployment": "Identical",
+    "differentDeployment": "Different"
+  },
+  "messages": {
+    "selectTwoRuns": "Select exactly 2 runs to compare",
+    "errorLoadingData": "Error loading data",
+    "errorLoadingFilters": "Error loading filter options"
+  }
+}

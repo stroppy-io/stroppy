@@ -40,6 +40,7 @@ message YandexCloud {
         message NetworkInterface {
             OnlyNameRef subnet_id_ref = 1 [(validate.rules).message.required = true];
             bool nat = 2;
+            string ip_address = 3;
         }
         string name = 2 [(validate.rules).string.min_len = 1];
         string platform_id = 3 [(validate.rules).string.const = "standard-v2"];

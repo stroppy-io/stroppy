@@ -1,13 +1,21 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { plugin as markdown } from 'vite-plugin-markdown'
+import tailwindcss from '@tailwindcss/vite'
+import path from 'node:path'
+
+const srcPath = path.resolve(process.cwd(), 'src')
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     react(),
-    markdown()
   ],
+  resolve: {
+    alias: {
+      '@': srcPath,
+    },
+  },
   build: {
     // Настройки для продакшена
     outDir: 'dist',

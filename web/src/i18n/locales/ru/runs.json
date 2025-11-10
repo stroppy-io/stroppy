@@ -1,0 +1,220 @@
+{
+  "page": {
+    "title": "Запуски",
+    "subtitle": "Управление и мониторинг тестовых запусков"
+  },
+  "status": {
+    "completed": "Завершено",
+    "running": "Выполняется",
+    "failed": "Ошибка",
+    "cancelled": "Отменено",
+    "pending": "Ожидание"
+  },
+  "table": {
+    "columns": {
+      "id": "ID",
+      "name": "Название",
+      "status": "Статус",
+      "createdAt": "Создан",
+      "startedAt": "Запущен",
+      "completedAt": "Завершен",
+      "duration": "Длительность",
+      "tps": "TPS",
+      "actions": "Действия"
+    },
+    "actions": {
+      "view": "Просмотр",
+      "edit": "Редактировать",
+      "delete": "Удалить",
+      "compare": "Сравнить",
+      "download": "Скачать"
+    }
+  },
+  "filters": {
+    "title": "Фильтры",
+    "search": "Поиск по названию",
+    "status": "Статус",
+    "any": "Любой",
+    "dateRange": "Период",
+    "loadType": "Тип нагрузки",
+    "database": "База данных",
+    "deploymentSchema": "Схема развертывания",
+    "hardwareConfig": "Конфигурация железа",
+    "tpsRange": "TPS диапазон",
+    "from": "От",
+    "to": "До",
+    "clear": "Очистить фильтры",
+    "apply": "Применить фильтры",
+    "workloadType": "Тип нагрузки",
+    "databaseType": "Тип СУБД",
+    "databaseName": "Название базы данных",
+    "tps": {
+      "title": "Фильтр по TPS",
+      "metric": "Метрика",
+      "operator": "Оператор",
+      "value": "Значение",
+      "reset": "Сбросить",
+      "metrics": {
+        "unspecified": "Метрика",
+        "average": "Средний TPS",
+        "max": "Максимальный TPS",
+        "min": "Минимальный TPS",
+        "p95": "TPS P95",
+        "p99": "TPS P99"
+      }
+    },
+    "machine": {
+      "title": "Фильтр по ресурсам",
+      "metric": "Ресурс",
+      "operator": "Оператор",
+      "value": "Значение",
+      "reset": "Сбросить",
+      "parameters": {
+        "unspecified": "Ресурс",
+        "cores": "CPU (ядра)",
+        "memory": "Память (ГБ)",
+        "disk": "Диск (ГБ)"
+      }
+    },
+    "workloadTypes": {
+      "unspecified": "Тип нагрузки",
+      "tpcc": "TPCC"
+    },
+    "databaseTypes": {
+      "unspecified": "Тип СУБД",
+      "postgresOriole": "PostgreSQL (Oriole)"
+    },
+    "operators": {
+      "default": "Оператор",
+      "gt": "Больше",
+      "gte": "Больше или равно",
+      "lt": "Меньше",
+      "lte": "Меньше или равно",
+      "eq": "Равно",
+      "neq": "Не равно"
+    }
+  },
+  "list": {
+    "empty": "Нет запусков, удовлетворяющих фильтрам",
+    "loading": "Загрузка...",
+    "loadMore": "Загрузить еще",
+    "count": "Показано {{count}} запусков"
+  },
+  "meta": {
+    "unknownDatabase": "База не указана",
+    "unknownDate": "Дата неизвестна"
+  },
+  "actions": {
+    "createRun": "Создать запуск",
+    "refresh": "Обновить",
+    "export": "Экспорт",
+    "import": "Импорт",
+    "bulkDelete": "Массовое удаление",
+    "bulkExport": "Массовый экспорт"
+  },
+  "modals": {
+    "createRun": {
+      "title": "Создание нового запуска",
+      "cancel": "Отмена",
+      "create": "Создать"
+    },
+    "editRun": {
+      "title": "Редактирование запуска",
+      "cancel": "Отмена",
+      "save": "Сохранить"
+    },
+    "deleteRun": {
+      "title": "Удаление запуска",
+      "message": "Вы уверены, что хотите удалить этот запуск?",
+      "confirm": "Удалить",
+      "cancel": "Отмена"
+    },
+    "runDetails": {
+      "title": "Детали запуска",
+      "close": "Закрыть"
+    },
+    "compareRuns": {
+      "title": "Сравнение запусков",
+      "selectRuns": "Выберите запуски для сравнения",
+      "compare": "Сравнить",
+      "close": "Закрыть"
+    }
+  },
+  "messages": {
+    "runCreated": "Запуск создан успешно",
+    "runUpdated": "Запуск обновлен успешно",
+    "runDeleted": "Запуск удален успешно",
+    "runsDeleted": "Запуски удалены успешно",
+    "runStarted": "Запуск начат",
+    "runStopped": "Запуск остановлен",
+    "runCancelled": "Запуск отменен",
+    "errorCreatingRun": "Ошибка при создании запуска",
+    "errorUpdatingRun": "Ошибка при обновлении запуска",
+    "errorDeletingRun": "Ошибка при удалении запуска",
+    "errorLoadingRuns": "Ошибка при загрузке запусков",
+    "noRunsFound": "Запуски не найдены",
+    "selectRunsToCompare": "Выберите запуски для сравнения",
+    "selectExactlyTwoRuns": "Выберите ровно 2 запуска для сравнения"
+  },
+  "details": {
+    "basicInfo": "Основная информация",
+    "workloadConfig": "Конфигурация нагрузки",
+    "databaseConfig": "Конфигурация базы данных",
+    "hardwareConfig": "Конфигурация железа",
+    "deploymentConfig": "Конфигурация развертывания",
+    "nemesisConfig": "Конфигурация немезисов",
+    "tpsMetrics": "TPS Метрики",
+    "fullConfig": "Полная конфигурация",
+    "runId": "ID запуска",
+    "runName": "Название запуска",
+    "runDescription": "Описание запуска",
+    "workloadType": "Тип нагрузки",
+    "databaseType": "Тип СУБД",
+    "databaseVersion": "Версия БД",
+    "databaseBuild": "Сборка БД",
+    "hardwareSignature": "Сигнатура железа",
+    "deploymentType": "Тип развертывания",
+    "deploymentSignature": "Сигнатура развертывания",
+    "nemesisSignature": "Сигнатура немезисов",
+    "tpsMax": "Максимальный TPS",
+    "tpsMin": "Минимальный TPS",
+    "tpsAverage": "Средний TPS",
+    "tps95p": "95-й процентиль TPS",
+    "tps99p": "99-й процентиль TPS",
+    "runners": "Количество раннеров",
+    "testDuration": "Продолжительность теста",
+    "cpuCores": "Ядра CPU",
+    "memoryGB": "Память (GB)",
+    "storageType": "Тип накопителя",
+    "storageCapacity": "Объем накопителя (GB)",
+    "nodeCount": "Количество узлов",
+    "notSpecified": "Не указано",
+    "noDescription": "Нет описания",
+    "additionalProperties": "Дополнительные свойства",
+    "noAdditionalProperties": "Дополнительные свойства отсутствуют",
+    "deploymentParameters": "Параметры развертывания",
+    "noDeploymentParameters": "Дополнительные параметры отсутствуют",
+    "activeNemeses": "Активные немезисы",
+    "noActiveNemeses": "Нет активных немезисов",
+    "noNemeses": "Немезисы отсутствуют",
+    "tpsMetricsMissing": "TPS метрики отсутствуют",
+    "tpsMetricsEmpty": "TPS метрики не заполнены"
+  },
+  "comparison": {
+    "title": "Сравнение запусков",
+    "differencesFound": "Обнаружено различий между запусками",
+    "differencesHighlighted": "Различающиеся поля выделены оранжевым цветом",
+    "run1": "Запуск 1",
+    "run2": "Запуск 2",
+    "totalDifferences": "Всего различий",
+    "hardware": "Железо",
+    "workload": "Нагрузка",
+    "deployment": "Развертывание",
+    "identical": "Идентично",
+    "different": "Различается",
+    "identicalWorkload": "Идентична",
+    "differentWorkload": "Различается",
+    "identicalDeployment": "Идентично",
+    "differentDeployment": "Различается"
+  }
+}

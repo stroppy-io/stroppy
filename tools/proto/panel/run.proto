@@ -51,6 +51,8 @@ message ListRunsRequest {
     optional Workload.Type workload_type = 7; // sort by workload type
     optional string database_name = 8; // sort by database name
     optional Database.Type database_type = 9; // sort by database type
+    // order by
+    optional Tps.OrderBy order_by_tps = 20; // sort by TPS type filter
 }
 
 service RunService {

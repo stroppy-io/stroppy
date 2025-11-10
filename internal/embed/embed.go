@@ -1,7 +1,6 @@
 package embed
 
 import (
-	"bytes"
 	"embed"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 )
@@ -19,9 +18,13 @@ func GetOrioleInstallScript() (*panel.Script, error) {
 	if err != nil {
 		return nil, err
 	}
-	output := bytes.ReplaceAll(content, []byte("\r\n"), []byte(`\n`))
+	//output := bytes.ReplaceAll(content, []byte("\r\n"), []byte(`\n`))
+	//s, err := json.Marshal(content)
+	//if err != nil {
+	//	return nil, err
+	//}
 	return &panel.Script{
-		Body: output,
+		Body: content,
 	}, nil
 }
 
@@ -30,8 +33,8 @@ func GetStroppyInstallScript() (*panel.Script, error) {
 	if err != nil {
 		return nil, err
 	}
-	output := bytes.ReplaceAll(content, []byte("\r\n"), []byte(`\n`))
+	//output := bytes.ReplaceAll(content, []byte("\r\n"), []byte(`\n`))
 	return &panel.Script{
-		Body: output,
+		Body: content,
 	}, nil
 }

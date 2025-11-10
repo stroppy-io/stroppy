@@ -24,6 +24,8 @@ service:
   automate:
     automation_ttl: 4h
     creation_timeout: 5m
+    oriole_base_image: "fd8g05clmsv92nlqmer5"
+    stroppy_base_image: "fd88t05bkvp2e4e7hmgb"
   k8s:
     kubeconfig_path: ".kubectl.config.yaml"
     crossplane:

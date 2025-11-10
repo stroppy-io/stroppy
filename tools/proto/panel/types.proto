@@ -44,6 +44,10 @@ message Tps {
         NumberFilterOperator operator = 3 [(validate.rules).enum.defined_only = true];
         uint64 value = 2 [(validate.rules).uint64.gt = 0];
     }
+    message OrderBy {
+        Filter.Type parameter_type = 1 [(validate.rules).enum.defined_only = true];
+        bool descending = 2;
+    }
     uint64 average = 1;
     uint64 max = 2;
     uint64 min = 3;
@@ -76,6 +80,9 @@ message MachineInfo {
     uint32 cores = 1; // in cores
     uint32 memory = 2; // in GB
     uint32 disk = 3; // in GB
+    optional string base_image_id = 4;
+    optional string static_internal_ip = 5;
+    bool public_ip = 6;
 }
 
 message Cluster {

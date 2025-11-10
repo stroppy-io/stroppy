@@ -8,6 +8,7 @@ import (
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ids"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/orm"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
+	"strings"
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -129,6 +130,22 @@ func (p *PanelService) ListRuns(ctx context.Context, request *panel.ListRunsRequ
 			q = q.Where(filter("disk", request.GetMachineFilter().GetOperator()))
 		}
 	}
+	if request.GetOrderByTps() != nil {
+		postfix := "ASC"
+		if request.GetOrderByTps().GetDescending() {
+			postfix = "DESC"
+		}
+		q = q.OrderByRaw(fmt.Sprintf(
+			"(tps->>'%s') %s",
+			strings.ToLower(
+				strings.ReplaceAll(
+					request.GetOrderByTps().GetParameterType().String(),
+					"TYPE_",
+					"",
+				),
+			),
+			postfix))
+	}
 	records, err := p.runRecordRepo.ListBy(ctx, q)
 	if err != nil {
 		if sqlerr.IsNotFound(err) {
@@ -146,6 +163,7 @@ func (p *PanelService) ListRuns(ctx context.Context, request *panel.ListRunsRequ
 
 func (p *PanelService) ListTopRuns(ctx context.Context, e *emptypb.Empty) (*panel.RunRecord_List, error) {
 	records, err := p.runRecordRepo.ListBy(ctx, orm.RunRecord.SelectAll().
+		Where(orm.RunRecord.Raw("(tps->>'average') IS NOT NULL AND (tps->>'average') <> ''")).
 		OrderByRaw("(tps->'average') DESC").Limit(20),
 	)
 	if err != nil {

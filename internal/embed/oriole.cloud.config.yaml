@@ -1,3 +1,4 @@
+#cloud-config
 datasource:
   Ec2:
     strict_id: false

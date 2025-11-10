@@ -11,6 +11,38 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const GetAllResourcesIps = `-- name: GetAllResourcesIps :many
+SELECT DISTINCT (ni ->> 'ip_address')::TEXT AS ip_address
+FROM cloud_resources
+         CROSS JOIN LATERAL jsonb_array_elements(
+        resource_def -> 'spec' -> 'yandexCloudVm' -> 'networkInterface'
+                            ) AS ni
+WHERE ni ? 'ip_address'
+  AND ni ->> 'ip_address' IS NOT NULL
+  AND ni ->> 'ip_address' <> ''
+AND status = ANY($1::int[])
+`
+
+func (q *Queries) GetAllResourcesIps(ctx context.Context, dollar_1 []int32) ([]string, error) {
+	rows, err := q.db.Query(ctx, GetAllResourcesIps, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var ip_address string
+		if err := rows.Scan(&ip_address); err != nil {
+			return nil, err
+		}
+		items = append(items, ip_address)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetResourceTree = `-- name: GetResourceTree :many
 WITH RECURSIVE tree AS (
     SELECT id, created_at, updated_at, deleted_at, status, ref, resource_def, resource_yaml, synced, ready, external_id, parent_resource_id
