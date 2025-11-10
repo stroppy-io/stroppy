@@ -364,11 +364,12 @@ const file_panel_account_proto_rawDesc = "" +
 	"\x14RefreshTokensRequest\x12#\n" +
 	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\":\n" +
 	"\x15RefreshTokensResponse\x12!\n" +
-	"\faccess_token\x18\x01 \x01(\tR\vaccessToken2\xfa\x01\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken2\xa3\x02\n" +
 	"\x0eAccountService\x12:\n" +
 	"\bRegister\x12\x16.panel.RegisterRequest\x1a\x16.google.protobuf.Empty\x122\n" +
 	"\x05Login\x12\x13.panel.LoginRequest\x1a\x14.panel.LoginResponse\x12,\n" +
-	"\x05GetMe\x12\x16.google.protobuf.Empty\x1a\v.panel.User\x12J\n" +
+	"\x05GetMe\x12\x16.google.protobuf.Empty\x1a\v.panel.User\x12'\n" +
+	"\vGetUserById\x12\v.panel.Ulid\x1a\v.panel.User\x12J\n" +
 	"\rRefreshTokens\x12\x1b.panel.RefreshTokensRequest\x1a\x1c.panel.RefreshTokensResponseB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
 
 var (
@@ -401,13 +402,15 @@ var file_panel_account_proto_depIdxs = []int32{
 	1, // 2: panel.AccountService.Register:input_type -> panel.RegisterRequest
 	2, // 3: panel.AccountService.Login:input_type -> panel.LoginRequest
 	8, // 4: panel.AccountService.GetMe:input_type -> google.protobuf.Empty
-	4, // 5: panel.AccountService.RefreshTokens:input_type -> panel.RefreshTokensRequest
-	8, // 6: panel.AccountService.Register:output_type -> google.protobuf.Empty
-	3, // 7: panel.AccountService.Login:output_type -> panel.LoginResponse
-	0, // 8: panel.AccountService.GetMe:output_type -> panel.User
-	5, // 9: panel.AccountService.RefreshTokens:output_type -> panel.RefreshTokensResponse
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
+	6, // 5: panel.AccountService.GetUserById:input_type -> panel.Ulid
+	4, // 6: panel.AccountService.RefreshTokens:input_type -> panel.RefreshTokensRequest
+	8, // 7: panel.AccountService.Register:output_type -> google.protobuf.Empty
+	3, // 8: panel.AccountService.Login:output_type -> panel.LoginResponse
+	0, // 9: panel.AccountService.GetMe:output_type -> panel.User
+	0, // 10: panel.AccountService.GetUserById:output_type -> panel.User
+	5, // 11: panel.AccountService.RefreshTokens:output_type -> panel.RefreshTokensResponse
+	7, // [7:12] is the sub-list for method output_type
+	2, // [2:7] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
 	2, // [2:2] is the sub-list for extension extendee
 	0, // [0:2] is the sub-list for field type_name

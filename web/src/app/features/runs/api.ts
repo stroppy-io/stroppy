@@ -57,6 +57,7 @@ const mapRunRecord = (record: RunRecord): RunSummary => {
     tpsP95: toNumber(record.tps?.p95th),
     createdAt: record.timing?.createdAt ? timestampDate(record.timing.createdAt) : undefined,
     updatedAt: record.timing?.updatedAt ? timestampDate(record.timing.updatedAt) : undefined,
+    cloudAutomationId: record.cloudAutomationId?.id,
     runnerClusterNodes: runnerClusterMetrics.nodes,
     runnerMachineSignature: runnerClusterMetrics.machineSignature,
     runnerMachineCores: runnerClusterMetrics.machineCores,
@@ -91,6 +92,9 @@ const buildListRunsRequest = (filters: RunsFilters): ListRunsRequest => {
   }
   if (filters.databaseName) {
     request.databaseName = filters.databaseName
+  }
+  if (filters.onlyMine) {
+    request.onlyMine = filters.onlyMine
   }
   if (filters.tpsFilters?.length) {
     request.tpsFilter = filters.tpsFilters.map(({ value, parameterType, operator }) =>

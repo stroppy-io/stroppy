@@ -52,11 +52,25 @@ func (p *PanelService) Register(
 
 func (p *PanelService) GetMe(
 	ctx context.Context,
-	request *emptypb.Empty,
+	_ *emptypb.Empty,
 ) (*panel.User, error) {
 	user, err := p.getUserFromCtx(ctx)
 	if err != nil {
 		return nil, err
+	}
+	return user, nil
+}
+
+func (p *PanelService) GetUserById(
+	ctx context.Context,
+	request *panel.Ulid,
+) (*panel.User, error) {
+	user, err := p.usersRepo.GetBy(ctx, orm.User.SelectAll().Where(orm.User.Id.Eq(request.GetId())))
+	if err != nil {
+		if sqlerr.IsNotFound(err) {
+			return nil, connect.NewError(connect.CodeNotFound, errors.New("user not found"))
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return user, nil
 }

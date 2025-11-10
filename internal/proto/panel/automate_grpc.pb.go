@@ -111,6 +111,7 @@ var ResourcesService_ServiceDesc = grpc.ServiceDesc{
 
 const (
 	AutomateService_GetAutomation_FullMethodName    = "/panel.AutomateService/GetAutomation"
+	AutomateService_ListAutomations_FullMethodName  = "/panel.AutomateService/ListAutomations"
 	AutomateService_RunAutomation_FullMethodName    = "/panel.AutomateService/RunAutomation"
 	AutomateService_CancelAutomation_FullMethodName = "/panel.AutomateService/CancelAutomation"
 )
@@ -120,6 +121,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AutomateServiceClient interface {
 	GetAutomation(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*CloudAutomation, error)
+	ListAutomations(ctx context.Context, in *ListAutomationsRequest, opts ...grpc.CallOption) (*CloudAutomation_List, error)
 	RunAutomation(ctx context.Context, in *RunAutomationRequest, opts ...grpc.CallOption) (*RunRecord, error)
 	CancelAutomation(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
@@ -135,6 +137,15 @@ func NewAutomateServiceClient(cc grpc.ClientConnInterface) AutomateServiceClient
 func (c *automateServiceClient) GetAutomation(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*CloudAutomation, error) {
 	out := new(CloudAutomation)
 	err := c.cc.Invoke(ctx, AutomateService_GetAutomation_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *automateServiceClient) ListAutomations(ctx context.Context, in *ListAutomationsRequest, opts ...grpc.CallOption) (*CloudAutomation_List, error) {
+	out := new(CloudAutomation_List)
+	err := c.cc.Invoke(ctx, AutomateService_ListAutomations_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -164,6 +175,7 @@ func (c *automateServiceClient) CancelAutomation(ctx context.Context, in *Ulid, 
 // for forward compatibility
 type AutomateServiceServer interface {
 	GetAutomation(context.Context, *Ulid) (*CloudAutomation, error)
+	ListAutomations(context.Context, *ListAutomationsRequest) (*CloudAutomation_List, error)
 	RunAutomation(context.Context, *RunAutomationRequest) (*RunRecord, error)
 	CancelAutomation(context.Context, *Ulid) (*emptypb.Empty, error)
 	mustEmbedUnimplementedAutomateServiceServer()
@@ -175,6 +187,9 @@ type UnimplementedAutomateServiceServer struct {
 
 func (UnimplementedAutomateServiceServer) GetAutomation(context.Context, *Ulid) (*CloudAutomation, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAutomation not implemented")
+}
+func (UnimplementedAutomateServiceServer) ListAutomations(context.Context, *ListAutomationsRequest) (*CloudAutomation_List, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListAutomations not implemented")
 }
 func (UnimplementedAutomateServiceServer) RunAutomation(context.Context, *RunAutomationRequest) (*RunRecord, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RunAutomation not implemented")
@@ -209,6 +224,24 @@ func _AutomateService_GetAutomation_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AutomateServiceServer).GetAutomation(ctx, req.(*Ulid))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AutomateService_ListAutomations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAutomationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AutomateServiceServer).ListAutomations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AutomateService_ListAutomations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AutomateServiceServer).ListAutomations(ctx, req.(*ListAutomationsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -259,6 +292,10 @@ var AutomateService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAutomation",
 			Handler:    _AutomateService_GetAutomation_Handler,
+		},
+		{
+			MethodName: "ListAutomations",
+			Handler:    _AutomateService_ListAutomations_Handler,
 		},
 		{
 			MethodName: "RunAutomation",

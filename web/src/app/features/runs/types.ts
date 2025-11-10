@@ -26,6 +26,7 @@ export interface RunsFilters {
     parameterType: Tps_Filter_Type
     descending: boolean
   }
+  onlyMine?: boolean
   machineFilters?: Array<NumericFilter<MachineInfo_Filter_Type>>
 }
 
@@ -40,6 +41,7 @@ export interface RunSummary {
   tpsP95?: number
   createdAt?: Date
   updatedAt?: Date
+  cloudAutomationId?: string
   runnerClusterNodes?: number
   runnerMachineSignature?: string
   runnerMachineCores?: number

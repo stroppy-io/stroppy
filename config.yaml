@@ -20,7 +20,7 @@ service:
     refresh_expire: "24h"
   background:
     periodic_automate_check_interval: 10s
-    max_automation_ttl: 4h
+    max_automation_ttl: 1h
   automate:
     automation_ttl: 4h
     creation_timeout: 5m

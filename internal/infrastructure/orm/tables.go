@@ -6,6 +6,7 @@ import (
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
+	"github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
 )
 
 var (
@@ -176,6 +177,9 @@ type (
 	cloudAutomationstatusFieldImpl struct {
 		*column[int32, CloudAutomationField]
 	}
+	cloudAutomationauthorIdFieldImpl struct {
+		*column[string, CloudAutomationField]
+	}
 	cloudAutomationdatabaseRootResourceIdFieldImpl struct {
 		*column[string, CloudAutomationField]
 	}
@@ -192,6 +196,7 @@ func (f *cloudAutomationcreatedAtFieldImpl) mustCloudAutomationField()          
 func (f *cloudAutomationupdatedAtFieldImpl) mustCloudAutomationField()              {}
 func (f *cloudAutomationdeletedAtFieldImpl) mustCloudAutomationField()              {}
 func (f *cloudAutomationstatusFieldImpl) mustCloudAutomationField()                 {}
+func (f *cloudAutomationauthorIdFieldImpl) mustCloudAutomationField()               {}
 func (f *cloudAutomationdatabaseRootResourceIdFieldImpl) mustCloudAutomationField() {}
 func (f *cloudAutomationworkloadRootResourceIdFieldImpl) mustCloudAutomationField() {}
 func (f *cloudAutomationstroppyRunIdFieldImpl) mustCloudAutomationField()           {}
@@ -302,6 +307,7 @@ type (
 		UpdatedAt              time.Time
 		DeletedAt              *time.Time
 		Status                 int32
+		AuthorId               string
 		DatabaseRootResourceId string
 		WorkloadRootResourceId string
 		StroppyRunId           *string
@@ -680,6 +686,7 @@ func (s *CloudAutomationScanner) values() []any {
 		s.UpdatedAt,
 		s.DeletedAt,
 		s.Status,
+		s.AuthorId,
 		s.DatabaseRootResourceId,
 		s.WorkloadRootResourceId,
 		s.StroppyRunId,
@@ -697,6 +704,8 @@ func (s *CloudAutomationScanner) getTarget(field string) func() any {
 		return func() any { return &s.DeletedAt }
 	case "status":
 		return func() any { return &s.Status }
+	case "author_id":
+		return func() any { return &s.AuthorId }
 	case "database_root_resource_id":
 		return func() any { return &s.DatabaseRootResourceId }
 	case "workload_root_resource_id":
@@ -729,6 +738,10 @@ func (s *CloudAutomationScanner) getSetter(field CloudAutomationField) func() Va
 		return func() ValueSetter[CloudAutomationField] {
 			return NewValueSetter[CloudAutomationField](CloudAutomation.Status, s.Status)
 		}
+	case "author_id":
+		return func() ValueSetter[CloudAutomationField] {
+			return NewValueSetter[CloudAutomationField](CloudAutomation.AuthorId, s.AuthorId)
+		}
 	case "database_root_resource_id":
 		return func() ValueSetter[CloudAutomationField] {
 			return NewValueSetter[CloudAutomationField](CloudAutomation.DatabaseRootResourceId, s.DatabaseRootResourceId)
@@ -757,6 +770,8 @@ func (s *CloudAutomationScanner) getValue(field CloudAutomationField) func() any
 		return func() any { return s.DeletedAt }
 	case "status":
 		return func() any { return s.Status }
+	case "author_id":
+		return func() any { return s.AuthorId }
 	case "database_root_resource_id":
 		return func() any { return s.DatabaseRootResourceId }
 	case "workload_root_resource_id":
@@ -1136,6 +1151,12 @@ type (
 			CommonOperator[int32, CloudAutomationField]
 			ScalarOperator[int32, CloudAutomationField]
 		}
+		AuthorId interface {
+			CloudAutomationField
+			CommonOperator[string, CloudAutomationField]
+			ScalarOperator[string, CloudAutomationField]
+			LikeOperator[string, CloudAutomationField]
+		}
 		DatabaseRootResourceId interface {
 			CloudAutomationField
 			CommonOperator[string, CloudAutomationField]
@@ -1353,6 +1374,7 @@ func newCloudAutomationTableImpl() *cloudAutomationTableImpl {
 	updatedAt := &cloudAutomationupdatedAtFieldImpl{column: newColumn[time.Time, CloudAutomationField](fieldAliasImpl("updated_at"))}
 	deletedAt := &cloudAutomationdeletedAtFieldImpl{column: newColumn[*time.Time, CloudAutomationField](fieldAliasImpl("deleted_at"))}
 	status := &cloudAutomationstatusFieldImpl{column: newColumn[int32, CloudAutomationField](fieldAliasImpl("status"))}
+	authorId := &cloudAutomationauthorIdFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("author_id"))}
 	databaseRootResourceId := &cloudAutomationdatabaseRootResourceIdFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("database_root_resource_id"))}
 	workloadRootResourceId := &cloudAutomationworkloadRootResourceIdFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("workload_root_resource_id"))}
 	stroppyRunId := &cloudAutomationstroppyRunIdFieldImpl{column: newColumn[*string, CloudAutomationField](fieldAliasImpl("stroppy_run_id"))}
@@ -1365,6 +1387,7 @@ func newCloudAutomationTableImpl() *cloudAutomationTableImpl {
 			updatedAt,
 			deletedAt,
 			status,
+			authorId,
 			databaseRootResourceId,
 			workloadRootResourceId,
 			stroppyRunId,
@@ -1374,6 +1397,7 @@ func newCloudAutomationTableImpl() *cloudAutomationTableImpl {
 		UpdatedAt:              updatedAt,
 		DeletedAt:              deletedAt,
 		Status:                 status,
+		AuthorId:               authorId,
 		DatabaseRootResourceId: databaseRootResourceId,
 		WorkloadRootResourceId: workloadRootResourceId,
 		StroppyRunId:           stroppyRunId,
@@ -1666,6 +1690,7 @@ func NewCloudResourceRepository(
 }
 func CloudAutomationToScanner(
 	downcastId TypeCaster[*panel.Ulid, string],
+	downcastAuthorId TypeCaster[*panel.Ulid, string],
 	downcastDatabaseRootResourceId TypeCaster[*panel.Ulid, string],
 	downcastWorkloadRootResourceId TypeCaster[*panel.Ulid, string],
 	downcastStroppyRunId TypeCaster[*panel.Ulid, *string],
@@ -1677,6 +1702,7 @@ func CloudAutomationToScanner(
 		scanner := &CloudAutomationScanner{
 			Id:                     downcastId(entity.Id),
 			Status:                 EnumToInt32[panel.Status](entity.Status),
+			AuthorId:               downcastAuthorId(entity.AuthorId),
 			DatabaseRootResourceId: downcastDatabaseRootResourceId(entity.DatabaseRootResourceId),
 			WorkloadRootResourceId: downcastWorkloadRootResourceId(entity.WorkloadRootResourceId),
 			StroppyRunId:           downcastStroppyRunId(entity.StroppyRunId),
@@ -1689,6 +1715,7 @@ func CloudAutomationToScanner(
 }
 func ScannerToCloudAutomation(
 	upcastId TypeCaster[string, *panel.Ulid],
+	upcastAuthorId TypeCaster[string, *panel.Ulid],
 	upcastDatabaseRootResourceId TypeCaster[string, *panel.Ulid],
 	upcastWorkloadRootResourceId TypeCaster[string, *panel.Ulid],
 	upcastStroppyRunId TypeCaster[*string, *panel.Ulid],
@@ -1700,6 +1727,7 @@ func ScannerToCloudAutomation(
 		entity := &panel.CloudAutomation{
 			Id:                     upcastId(model.Id),
 			Status:                 EnumFromInt32[panel.Status](model.Status),
+			AuthorId:               upcastAuthorId(model.AuthorId),
 			DatabaseRootResourceId: upcastDatabaseRootResourceId(model.DatabaseRootResourceId),
 			WorkloadRootResourceId: upcastWorkloadRootResourceId(model.WorkloadRootResourceId),
 			StroppyRunId:           upcastStroppyRunId(model.StroppyRunId),
@@ -1717,6 +1745,8 @@ func NewCloudAutomationRepository(
 	dbGetter DbGetter,
 	upcastId TypeCaster[string, *panel.Ulid],
 	downcastId TypeCaster[*panel.Ulid, string],
+	upcastAuthorId TypeCaster[string, *panel.Ulid],
+	downcastAuthorId TypeCaster[*panel.Ulid, string],
 	upcastDatabaseRootResourceId TypeCaster[string, *panel.Ulid],
 	downcastDatabaseRootResourceId TypeCaster[*panel.Ulid, string],
 	upcastWorkloadRootResourceId TypeCaster[string, *panel.Ulid],
@@ -1727,8 +1757,8 @@ func NewCloudAutomationRepository(
 ) CloudAutomationRepository {
 	return newGenericRepository(
 		newGenericScannerRepository(CloudAutomation.table, dbGetter),
-		CloudAutomationToScanner(downcastId, downcastDatabaseRootResourceId, downcastWorkloadRootResourceId, downcastStroppyRunId),
-		ScannerToCloudAutomation(upcastId, upcastDatabaseRootResourceId, upcastWorkloadRootResourceId, upcastStroppyRunId),
+		CloudAutomationToScanner(downcastId, downcastAuthorId, downcastDatabaseRootResourceId, downcastWorkloadRootResourceId, downcastStroppyRunId),
+		ScannerToCloudAutomation(upcastId, upcastAuthorId, upcastDatabaseRootResourceId, upcastWorkloadRootResourceId, upcastStroppyRunId),
 		defaultOpts...,
 	)
 }
@@ -1742,7 +1772,7 @@ func StroppyRunToScanner(
 		scanner := &StroppyRunScanner{
 			Id:                  downcastId(entity.Id),
 			Status:              EnumToInt32[panel.Status](entity.Status),
-			RunInfo:             entity.RunInfo,
+			RunInfo:             MessageToSliceByte[*stroppy.StroppyRun](entity.RunInfo),
 			GrafanaDashboardUrl: entity.GrafanaDashboardUrl,
 		}
 		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
@@ -1761,7 +1791,7 @@ func ScannerToStroppyRun(
 		entity := &panel.StroppyRun{
 			Id:                  upcastId(model.Id),
 			Status:              EnumFromInt32[panel.Status](model.Status),
-			RunInfo:             model.RunInfo,
+			RunInfo:             MessageFromSliceByte[*stroppy.StroppyRun](model.RunInfo),
 			GrafanaDashboardUrl: model.GrafanaDashboardUrl,
 		}
 		entity.Timing = &panel.Timing{
@@ -1797,7 +1827,7 @@ func StroppyStepToScanner(
 		scanner := &StroppyStepScanner{
 			Id:       downcastId(entity.Id),
 			RunId:    downcastRunId(entity.RunId),
-			StepInfo: entity.StepInfo,
+			StepInfo: MessageToSliceByte[*stroppy.StroppyStepRun](entity.StepInfo),
 		}
 		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
 		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
@@ -1816,7 +1846,7 @@ func ScannerToStroppyStep(
 		entity := &panel.StroppyStep{
 			Id:       upcastId(model.Id),
 			RunId:    upcastRunId(model.RunId),
-			StepInfo: model.StepInfo,
+			StepInfo: MessageFromSliceByte[*stroppy.StroppyStepRun](model.StepInfo),
 		}
 		entity.Timing = &panel.Timing{
 			CreatedAt: TimestampFromTime(model.CreatedAt),

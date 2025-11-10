@@ -30,6 +30,11 @@ message Timing {
     optional google.protobuf.Timestamp deleted_at = 3;
 }
 
+message OrderByTimestamp {
+    google.protobuf.Timestamp timestamp = 1;
+    bool descending = 2;
+}
+
 message Tps {
     message Filter {
         enum Type {

@@ -201,6 +201,7 @@ func (p *PanelService) RunAutomation(ctx context.Context, request *panel.RunAuto
 			err = p.cloudAutomationRepo.Insert(ctx, &panel.CloudAutomation{
 				Id:                     newAutomationId,
 				Timing:                 timestamps.NewTiming(),
+				AuthorId:               user.GetId(),
 				Status:                 panel.Status_STATUS_IDLE,
 				DatabaseRootResourceId: databaseResourcesTree.GetId(),
 				WorkloadRootResourceId: workloadResourcesTree.GetId(),
@@ -242,4 +243,42 @@ func (p *PanelService) CancelAutomation(ctx context.Context, ulid *panel.Ulid) (
 		func(ctx context.Context) error {
 			return p.stopCrossplaneAutomation(ctx, automation, panel.Status_STATUS_CANCELED)
 		})
+}
+
+func (p *PanelService) ListAutomations(ctx context.Context, request *panel.ListAutomationsRequest) (*panel.CloudAutomation_List, error) {
+	user, err := p.getUserFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	q := orm.CloudAutomation.SelectAll()
+	if limit := request.GetLimit(); limit != 0 {
+		q = q.Limit(int(limit))
+	}
+	if offset := request.GetOffset(); offset != 0 {
+		q = q.Offset(int(offset))
+	}
+	if request.GetOnlyMine() {
+		q = q.Where(orm.CloudAutomation.AuthorId.Eq(user.GetId().GetId()))
+	}
+	if request.OrderByStatus != nil {
+		q = q.OrderByASC(orm.CloudAutomation.Status)
+	}
+	if request.OrderByStatusDescending != nil {
+		q = q.OrderByDESC(orm.CloudAutomation.Status)
+	}
+	if request.OrderByCreatedAt != nil {
+		if request.OrderByCreatedAt.GetDescending() {
+			q = q.OrderByDESC(orm.CloudAutomation.CreatedAt)
+		} else {
+			q = q.OrderByASC(orm.CloudAutomation.CreatedAt)
+		}
+	}
+	automations, err := p.cloudAutomationRepo.ListBy(ctx, q)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return &panel.CloudAutomation_List{
+		Automations: automations,
+	}, nil
 }

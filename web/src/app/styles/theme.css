@@ -1,15 +1,15 @@
 :root {
   font-family: 'Inter', 'JetBrains Mono', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #0f172a;
-  background-color: #f8fafc;
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--background));
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
 [data-theme='dark'] {
-  color: #e2e8f0;
-  background-color: #020617;
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--background));
 }
 
 *,
@@ -28,4 +28,3 @@ body {
 #root {
   min-height: 100vh;
 }
-

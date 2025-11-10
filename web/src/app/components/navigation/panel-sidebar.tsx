@@ -1,4 +1,4 @@
-import { Gauge, Layers3 } from 'lucide-react'
+import { Bot, Gauge, Layers3 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
@@ -6,6 +6,7 @@ export const panelNavItems = [
   { to: '/app/dashboard', label: 'Дашборд', icon: Gauge },
     // TODO
   // { to: '/app/configurator', label: 'Конфигуратор', icon: Settings2 },
+  { to: '/app/automations', label: 'Автоматизации', icon: Bot },
   { to: '/app/runs', label: 'Запуски', icon: Layers3 },
 ]
 

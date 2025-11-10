@@ -40,6 +40,9 @@ const (
 	AccountServiceLoginProcedure = "/panel.AccountService/Login"
 	// AccountServiceGetMeProcedure is the fully-qualified name of the AccountService's GetMe RPC.
 	AccountServiceGetMeProcedure = "/panel.AccountService/GetMe"
+	// AccountServiceGetUserByIdProcedure is the fully-qualified name of the AccountService's
+	// GetUserById RPC.
+	AccountServiceGetUserByIdProcedure = "/panel.AccountService/GetUserById"
 	// AccountServiceRefreshTokensProcedure is the fully-qualified name of the AccountService's
 	// RefreshTokens RPC.
 	AccountServiceRefreshTokensProcedure = "/panel.AccountService/RefreshTokens"
@@ -50,6 +53,7 @@ type AccountServiceClient interface {
 	Register(context.Context, *panel.RegisterRequest) (*emptypb.Empty, error)
 	Login(context.Context, *panel.LoginRequest) (*panel.LoginResponse, error)
 	GetMe(context.Context, *emptypb.Empty) (*panel.User, error)
+	GetUserById(context.Context, *panel.Ulid) (*panel.User, error)
 	RefreshTokens(context.Context, *panel.RefreshTokensRequest) (*panel.RefreshTokensResponse, error)
 }
 
@@ -82,6 +86,12 @@ func NewAccountServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(accountServiceMethods.ByName("GetMe")),
 			connect.WithClientOptions(opts...),
 		),
+		getUserById: connect.NewClient[panel.Ulid, panel.User](
+			httpClient,
+			baseURL+AccountServiceGetUserByIdProcedure,
+			connect.WithSchema(accountServiceMethods.ByName("GetUserById")),
+			connect.WithClientOptions(opts...),
+		),
 		refreshTokens: connect.NewClient[panel.RefreshTokensRequest, panel.RefreshTokensResponse](
 			httpClient,
 			baseURL+AccountServiceRefreshTokensProcedure,
@@ -96,6 +106,7 @@ type accountServiceClient struct {
 	register      *connect.Client[panel.RegisterRequest, emptypb.Empty]
 	login         *connect.Client[panel.LoginRequest, panel.LoginResponse]
 	getMe         *connect.Client[emptypb.Empty, panel.User]
+	getUserById   *connect.Client[panel.Ulid, panel.User]
 	refreshTokens *connect.Client[panel.RefreshTokensRequest, panel.RefreshTokensResponse]
 }
 
@@ -126,6 +137,15 @@ func (c *accountServiceClient) GetMe(ctx context.Context, req *emptypb.Empty) (*
 	return nil, err
 }
 
+// GetUserById calls panel.AccountService.GetUserById.
+func (c *accountServiceClient) GetUserById(ctx context.Context, req *panel.Ulid) (*panel.User, error) {
+	response, err := c.getUserById.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
 // RefreshTokens calls panel.AccountService.RefreshTokens.
 func (c *accountServiceClient) RefreshTokens(ctx context.Context, req *panel.RefreshTokensRequest) (*panel.RefreshTokensResponse, error) {
 	response, err := c.refreshTokens.CallUnary(ctx, connect.NewRequest(req))
@@ -140,6 +160,7 @@ type AccountServiceHandler interface {
 	Register(context.Context, *panel.RegisterRequest) (*emptypb.Empty, error)
 	Login(context.Context, *panel.LoginRequest) (*panel.LoginResponse, error)
 	GetMe(context.Context, *emptypb.Empty) (*panel.User, error)
+	GetUserById(context.Context, *panel.Ulid) (*panel.User, error)
 	RefreshTokens(context.Context, *panel.RefreshTokensRequest) (*panel.RefreshTokensResponse, error)
 }
 
@@ -168,6 +189,12 @@ func NewAccountServiceHandler(svc AccountServiceHandler, opts ...connect.Handler
 		connect.WithSchema(accountServiceMethods.ByName("GetMe")),
 		connect.WithHandlerOptions(opts...),
 	)
+	accountServiceGetUserByIdHandler := connect.NewUnaryHandlerSimple(
+		AccountServiceGetUserByIdProcedure,
+		svc.GetUserById,
+		connect.WithSchema(accountServiceMethods.ByName("GetUserById")),
+		connect.WithHandlerOptions(opts...),
+	)
 	accountServiceRefreshTokensHandler := connect.NewUnaryHandlerSimple(
 		AccountServiceRefreshTokensProcedure,
 		svc.RefreshTokens,
@@ -182,6 +209,8 @@ func NewAccountServiceHandler(svc AccountServiceHandler, opts ...connect.Handler
 			accountServiceLoginHandler.ServeHTTP(w, r)
 		case AccountServiceGetMeProcedure:
 			accountServiceGetMeHandler.ServeHTTP(w, r)
+		case AccountServiceGetUserByIdProcedure:
+			accountServiceGetUserByIdHandler.ServeHTTP(w, r)
 		case AccountServiceRefreshTokensProcedure:
 			accountServiceRefreshTokensHandler.ServeHTTP(w, r)
 		default:
@@ -203,6 +232,10 @@ func (UnimplementedAccountServiceHandler) Login(context.Context, *panel.LoginReq
 
 func (UnimplementedAccountServiceHandler) GetMe(context.Context, *emptypb.Empty) (*panel.User, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.AccountService.GetMe is not implemented"))
+}
+
+func (UnimplementedAccountServiceHandler) GetUserById(context.Context, *panel.Ulid) (*panel.User, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.AccountService.GetUserById is not implemented"))
 }
 
 func (UnimplementedAccountServiceHandler) RefreshTokens(context.Context, *panel.RefreshTokensRequest) (*panel.RefreshTokensResponse, error) {

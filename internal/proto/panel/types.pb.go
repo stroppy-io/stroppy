@@ -198,7 +198,7 @@ func (x Tps_Filter_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Tps_Filter_Type.Descriptor instead.
 func (Tps_Filter_Type) EnumDescriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{2, 0, 0}
+	return file_panel_types_proto_rawDescGZIP(), []int{3, 0, 0}
 }
 
 type MachineInfo_Filter_Type int32
@@ -250,7 +250,7 @@ func (x MachineInfo_Filter_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use MachineInfo_Filter_Type.Descriptor instead.
 func (MachineInfo_Filter_Type) EnumDescriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{3, 0, 0}
+	return file_panel_types_proto_rawDescGZIP(), []int{4, 0, 0}
 }
 
 type Workload_Type int32
@@ -296,7 +296,7 @@ func (x Workload_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Workload_Type.Descriptor instead.
 func (Workload_Type) EnumDescriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{6, 0}
+	return file_panel_types_proto_rawDescGZIP(), []int{7, 0}
 }
 
 type Database_Type int32
@@ -342,7 +342,7 @@ func (x Database_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Database_Type.Descriptor instead.
 func (Database_Type) EnumDescriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{7, 0}
+	return file_panel_types_proto_rawDescGZIP(), []int{8, 0}
 }
 
 type Ulid struct {
@@ -449,6 +449,58 @@ func (x *Timing) GetDeletedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type OrderByTimestamp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Descending    bool                   `protobuf:"varint,2,opt,name=descending,proto3" json:"descending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OrderByTimestamp) Reset() {
+	*x = OrderByTimestamp{}
+	mi := &file_panel_types_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OrderByTimestamp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OrderByTimestamp) ProtoMessage() {}
+
+func (x *OrderByTimestamp) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_types_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OrderByTimestamp.ProtoReflect.Descriptor instead.
+func (*OrderByTimestamp) Descriptor() ([]byte, []int) {
+	return file_panel_types_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *OrderByTimestamp) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
+func (x *OrderByTimestamp) GetDescending() bool {
+	if x != nil {
+		return x.Descending
+	}
+	return false
+}
+
 type Tps struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Average       uint64                 `protobuf:"varint,1,opt,name=average,proto3" json:"average,omitempty"`
@@ -462,7 +514,7 @@ type Tps struct {
 
 func (x *Tps) Reset() {
 	*x = Tps{}
-	mi := &file_panel_types_proto_msgTypes[2]
+	mi := &file_panel_types_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -474,7 +526,7 @@ func (x *Tps) String() string {
 func (*Tps) ProtoMessage() {}
 
 func (x *Tps) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[2]
+	mi := &file_panel_types_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -487,7 +539,7 @@ func (x *Tps) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tps.ProtoReflect.Descriptor instead.
 func (*Tps) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{2}
+	return file_panel_types_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Tps) GetAverage() uint64 {
@@ -539,7 +591,7 @@ type MachineInfo struct {
 
 func (x *MachineInfo) Reset() {
 	*x = MachineInfo{}
-	mi := &file_panel_types_proto_msgTypes[3]
+	mi := &file_panel_types_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -551,7 +603,7 @@ func (x *MachineInfo) String() string {
 func (*MachineInfo) ProtoMessage() {}
 
 func (x *MachineInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[3]
+	mi := &file_panel_types_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +616,7 @@ func (x *MachineInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineInfo.ProtoReflect.Descriptor instead.
 func (*MachineInfo) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{3}
+	return file_panel_types_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *MachineInfo) GetCores() uint32 {
@@ -619,7 +671,7 @@ type Cluster struct {
 
 func (x *Cluster) Reset() {
 	*x = Cluster{}
-	mi := &file_panel_types_proto_msgTypes[4]
+	mi := &file_panel_types_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -631,7 +683,7 @@ func (x *Cluster) String() string {
 func (*Cluster) ProtoMessage() {}
 
 func (x *Cluster) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[4]
+	mi := &file_panel_types_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -644,7 +696,7 @@ func (x *Cluster) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Cluster.ProtoReflect.Descriptor instead.
 func (*Cluster) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{4}
+	return file_panel_types_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Cluster) GetIsSingleMachineMode() bool {
@@ -671,7 +723,7 @@ type Script struct {
 
 func (x *Script) Reset() {
 	*x = Script{}
-	mi := &file_panel_types_proto_msgTypes[5]
+	mi := &file_panel_types_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -683,7 +735,7 @@ func (x *Script) String() string {
 func (*Script) ProtoMessage() {}
 
 func (x *Script) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[5]
+	mi := &file_panel_types_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -696,7 +748,7 @@ func (x *Script) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Script.ProtoReflect.Descriptor instead.
 func (*Script) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{5}
+	return file_panel_types_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Script) GetBody() []byte {
@@ -726,7 +778,7 @@ type Workload struct {
 
 func (x *Workload) Reset() {
 	*x = Workload{}
-	mi := &file_panel_types_proto_msgTypes[6]
+	mi := &file_panel_types_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -738,7 +790,7 @@ func (x *Workload) String() string {
 func (*Workload) ProtoMessage() {}
 
 func (x *Workload) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[6]
+	mi := &file_panel_types_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -751,7 +803,7 @@ func (x *Workload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Workload.ProtoReflect.Descriptor instead.
 func (*Workload) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{6}
+	return file_panel_types_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Workload) GetName() string {
@@ -802,7 +854,7 @@ type Database struct {
 
 func (x *Database) Reset() {
 	*x = Database{}
-	mi := &file_panel_types_proto_msgTypes[7]
+	mi := &file_panel_types_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -814,7 +866,7 @@ func (x *Database) String() string {
 func (*Database) ProtoMessage() {}
 
 func (x *Database) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[7]
+	mi := &file_panel_types_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -827,7 +879,7 @@ func (x *Database) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Database.ProtoReflect.Descriptor instead.
 func (*Database) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{7}
+	return file_panel_types_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Database) GetName() string {
@@ -874,7 +926,7 @@ type Ulid_List struct {
 
 func (x *Ulid_List) Reset() {
 	*x = Ulid_List{}
-	mi := &file_panel_types_proto_msgTypes[8]
+	mi := &file_panel_types_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -886,7 +938,7 @@ func (x *Ulid_List) String() string {
 func (*Ulid_List) ProtoMessage() {}
 
 func (x *Ulid_List) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[8]
+	mi := &file_panel_types_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -920,7 +972,7 @@ type Tps_Filter struct {
 
 func (x *Tps_Filter) Reset() {
 	*x = Tps_Filter{}
-	mi := &file_panel_types_proto_msgTypes[9]
+	mi := &file_panel_types_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -932,7 +984,7 @@ func (x *Tps_Filter) String() string {
 func (*Tps_Filter) ProtoMessage() {}
 
 func (x *Tps_Filter) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[9]
+	mi := &file_panel_types_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -945,7 +997,7 @@ func (x *Tps_Filter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tps_Filter.ProtoReflect.Descriptor instead.
 func (*Tps_Filter) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{2, 0}
+	return file_panel_types_proto_rawDescGZIP(), []int{3, 0}
 }
 
 func (x *Tps_Filter) GetParameterType() Tps_Filter_Type {
@@ -979,7 +1031,7 @@ type Tps_OrderBy struct {
 
 func (x *Tps_OrderBy) Reset() {
 	*x = Tps_OrderBy{}
-	mi := &file_panel_types_proto_msgTypes[10]
+	mi := &file_panel_types_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -991,7 +1043,7 @@ func (x *Tps_OrderBy) String() string {
 func (*Tps_OrderBy) ProtoMessage() {}
 
 func (x *Tps_OrderBy) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[10]
+	mi := &file_panel_types_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1004,7 +1056,7 @@ func (x *Tps_OrderBy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tps_OrderBy.ProtoReflect.Descriptor instead.
 func (*Tps_OrderBy) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{2, 1}
+	return file_panel_types_proto_rawDescGZIP(), []int{3, 1}
 }
 
 func (x *Tps_OrderBy) GetParameterType() Tps_Filter_Type {
@@ -1032,7 +1084,7 @@ type MachineInfo_Filter struct {
 
 func (x *MachineInfo_Filter) Reset() {
 	*x = MachineInfo_Filter{}
-	mi := &file_panel_types_proto_msgTypes[11]
+	mi := &file_panel_types_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1044,7 +1096,7 @@ func (x *MachineInfo_Filter) String() string {
 func (*MachineInfo_Filter) ProtoMessage() {}
 
 func (x *MachineInfo_Filter) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[11]
+	mi := &file_panel_types_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1057,7 +1109,7 @@ func (x *MachineInfo_Filter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineInfo_Filter.ProtoReflect.Descriptor instead.
 func (*MachineInfo_Filter) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{3, 0}
+	return file_panel_types_proto_rawDescGZIP(), []int{4, 0}
 }
 
 func (x *MachineInfo_Filter) GetParameterType() MachineInfo_Filter_Type {
@@ -1097,7 +1149,12 @@ const file_panel_types_proto_rawDesc = "" +
 	"updated_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12>\n" +
 	"\n" +
 	"deleted_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\tdeletedAt\x88\x01\x01B\r\n" +
-	"\v_deleted_at\"\x85\x04\n" +
+	"\v_deleted_at\"l\n" +
+	"\x10OrderByTimestamp\x128\n" +
+	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x1e\n" +
+	"\n" +
+	"descending\x18\x02 \x01(\bR\n" +
+	"descending\"\x85\x04\n" +
 	"\x03Tps\x12\x18\n" +
 	"\aaverage\x18\x01 \x01(\x04R\aaverage\x12\x10\n" +
 	"\x03max\x18\x02 \x01(\x04R\x03max\x12\x10\n" +
@@ -1209,7 +1266,7 @@ func file_panel_types_proto_rawDescGZIP() []byte {
 }
 
 var file_panel_types_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_panel_types_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_panel_types_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_panel_types_proto_goTypes = []any{
 	(NumberFilterOperator)(0),     // 0: panel.NumberFilterOperator
 	(Status)(0),                   // 1: panel.Status
@@ -1219,44 +1276,46 @@ var file_panel_types_proto_goTypes = []any{
 	(Database_Type)(0),            // 5: panel.Database.Type
 	(*Ulid)(nil),                  // 6: panel.Ulid
 	(*Timing)(nil),                // 7: panel.Timing
-	(*Tps)(nil),                   // 8: panel.Tps
-	(*MachineInfo)(nil),           // 9: panel.MachineInfo
-	(*Cluster)(nil),               // 10: panel.Cluster
-	(*Script)(nil),                // 11: panel.Script
-	(*Workload)(nil),              // 12: panel.Workload
-	(*Database)(nil),              // 13: panel.Database
-	(*Ulid_List)(nil),             // 14: panel.Ulid.List
-	(*Tps_Filter)(nil),            // 15: panel.Tps.Filter
-	(*Tps_OrderBy)(nil),           // 16: panel.Tps.OrderBy
-	(*MachineInfo_Filter)(nil),    // 17: panel.MachineInfo.Filter
-	nil,                           // 18: panel.Workload.ParametersEntry
-	nil,                           // 19: panel.Database.ParametersEntry
-	(*timestamppb.Timestamp)(nil), // 20: google.protobuf.Timestamp
+	(*OrderByTimestamp)(nil),      // 8: panel.OrderByTimestamp
+	(*Tps)(nil),                   // 9: panel.Tps
+	(*MachineInfo)(nil),           // 10: panel.MachineInfo
+	(*Cluster)(nil),               // 11: panel.Cluster
+	(*Script)(nil),                // 12: panel.Script
+	(*Workload)(nil),              // 13: panel.Workload
+	(*Database)(nil),              // 14: panel.Database
+	(*Ulid_List)(nil),             // 15: panel.Ulid.List
+	(*Tps_Filter)(nil),            // 16: panel.Tps.Filter
+	(*Tps_OrderBy)(nil),           // 17: panel.Tps.OrderBy
+	(*MachineInfo_Filter)(nil),    // 18: panel.MachineInfo.Filter
+	nil,                           // 19: panel.Workload.ParametersEntry
+	nil,                           // 20: panel.Database.ParametersEntry
+	(*timestamppb.Timestamp)(nil), // 21: google.protobuf.Timestamp
 }
 var file_panel_types_proto_depIdxs = []int32{
-	20, // 0: panel.Timing.created_at:type_name -> google.protobuf.Timestamp
-	20, // 1: panel.Timing.updated_at:type_name -> google.protobuf.Timestamp
-	20, // 2: panel.Timing.deleted_at:type_name -> google.protobuf.Timestamp
-	9,  // 3: panel.Cluster.machines:type_name -> panel.MachineInfo
-	4,  // 4: panel.Workload.workload_type:type_name -> panel.Workload.Type
-	18, // 5: panel.Workload.parameters:type_name -> panel.Workload.ParametersEntry
-	11, // 6: panel.Workload.deployment_script_id:type_name -> panel.Script
-	10, // 7: panel.Workload.runner_cluster:type_name -> panel.Cluster
-	5,  // 8: panel.Database.database_type:type_name -> panel.Database.Type
-	19, // 9: panel.Database.parameters:type_name -> panel.Database.ParametersEntry
-	11, // 10: panel.Database.deployment_script_id:type_name -> panel.Script
-	10, // 11: panel.Database.runner_cluster:type_name -> panel.Cluster
-	6,  // 12: panel.Ulid.List.ulids:type_name -> panel.Ulid
-	2,  // 13: panel.Tps.Filter.parameter_type:type_name -> panel.Tps.Filter.Type
-	0,  // 14: panel.Tps.Filter.operator:type_name -> panel.NumberFilterOperator
-	2,  // 15: panel.Tps.OrderBy.parameter_type:type_name -> panel.Tps.Filter.Type
-	3,  // 16: panel.MachineInfo.Filter.parameter_type:type_name -> panel.MachineInfo.Filter.Type
-	0,  // 17: panel.MachineInfo.Filter.operator:type_name -> panel.NumberFilterOperator
-	18, // [18:18] is the sub-list for method output_type
-	18, // [18:18] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	21, // 0: panel.Timing.created_at:type_name -> google.protobuf.Timestamp
+	21, // 1: panel.Timing.updated_at:type_name -> google.protobuf.Timestamp
+	21, // 2: panel.Timing.deleted_at:type_name -> google.protobuf.Timestamp
+	21, // 3: panel.OrderByTimestamp.timestamp:type_name -> google.protobuf.Timestamp
+	10, // 4: panel.Cluster.machines:type_name -> panel.MachineInfo
+	4,  // 5: panel.Workload.workload_type:type_name -> panel.Workload.Type
+	19, // 6: panel.Workload.parameters:type_name -> panel.Workload.ParametersEntry
+	12, // 7: panel.Workload.deployment_script_id:type_name -> panel.Script
+	11, // 8: panel.Workload.runner_cluster:type_name -> panel.Cluster
+	5,  // 9: panel.Database.database_type:type_name -> panel.Database.Type
+	20, // 10: panel.Database.parameters:type_name -> panel.Database.ParametersEntry
+	12, // 11: panel.Database.deployment_script_id:type_name -> panel.Script
+	11, // 12: panel.Database.runner_cluster:type_name -> panel.Cluster
+	6,  // 13: panel.Ulid.List.ulids:type_name -> panel.Ulid
+	2,  // 14: panel.Tps.Filter.parameter_type:type_name -> panel.Tps.Filter.Type
+	0,  // 15: panel.Tps.Filter.operator:type_name -> panel.NumberFilterOperator
+	2,  // 16: panel.Tps.OrderBy.parameter_type:type_name -> panel.Tps.Filter.Type
+	3,  // 17: panel.MachineInfo.Filter.parameter_type:type_name -> panel.MachineInfo.Filter.Type
+	0,  // 18: panel.MachineInfo.Filter.operator:type_name -> panel.NumberFilterOperator
+	19, // [19:19] is the sub-list for method output_type
+	19, // [19:19] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_panel_types_proto_init() }
@@ -1265,16 +1324,16 @@ func file_panel_types_proto_init() {
 		return
 	}
 	file_panel_types_proto_msgTypes[1].OneofWrappers = []any{}
-	file_panel_types_proto_msgTypes[3].OneofWrappers = []any{}
-	file_panel_types_proto_msgTypes[6].OneofWrappers = []any{}
+	file_panel_types_proto_msgTypes[4].OneofWrappers = []any{}
 	file_panel_types_proto_msgTypes[7].OneofWrappers = []any{}
+	file_panel_types_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_panel_types_proto_rawDesc), len(file_panel_types_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   14,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

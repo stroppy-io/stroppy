@@ -1,15 +1,3 @@
--- Create "cloud_automations" table
-CREATE TABLE "cloud_automations" (
-  "id" text NOT NULL,
-  "created_at" timestamptz NOT NULL,
-  "updated_at" timestamptz NOT NULL,
-  "deleted_at" timestamptz NULL,
-  "status" integer NOT NULL DEFAULT 0,
-  "database_root_resource_id" text NOT NULL,
-  "workload_root_resource_id" text NOT NULL,
-  "stroppy_run_id" text NULL,
-  PRIMARY KEY ("id")
-);
 -- Create "cloud_resources" table
 CREATE TABLE "cloud_resources" (
   "id" text NOT NULL,
@@ -38,6 +26,20 @@ CREATE TABLE "users" (
   "refresh_tokens" text[] NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "users_email_key" UNIQUE ("email")
+);
+-- Create "cloud_automations" table
+CREATE TABLE "cloud_automations" (
+  "id" text NOT NULL,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz NULL,
+  "status" integer NOT NULL DEFAULT 0,
+  "author_id" text NOT NULL,
+  "database_root_resource_id" text NOT NULL,
+  "workload_root_resource_id" text NOT NULL,
+  "stroppy_run_id" text NULL,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "cloud_automations_author_id_fkey" FOREIGN KEY ("author_id") REFERENCES "users" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
 );
 -- Create "run_records" table
 CREATE TABLE "run_records" (

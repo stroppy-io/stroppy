@@ -1,6 +1,5 @@
 import type { HTMLAttributes } from 'react'
 import { createContext, forwardRef, useContext } from 'react'
-import type { TooltipProps } from 'recharts'
 import { cn } from '@/lib/utils'
 
 export type ChartConfig = Record<
@@ -34,7 +33,17 @@ export const ChartContainer = forwardRef<HTMLDivElement, ChartContainerProps>(({
 })
 ChartContainer.displayName = 'ChartContainer'
 
-export interface ChartTooltipContentProps extends TooltipProps<number, string> {
+type TooltipPayload = {
+  color?: string
+  name?: string
+  value?: number
+  dataKey?: string | number
+}
+
+export interface ChartTooltipContentProps {
+  active?: boolean
+  label?: string | number
+  payload?: TooltipPayload[]
   indicator?: 'dot' | 'line'
 }
 
@@ -48,7 +57,7 @@ export const ChartTooltipContent = ({ active, payload, label, indicator = 'dot' 
     <div className="rounded-xl border border-border/80 bg-background/80 px-3 py-2 text-xs shadow-lg backdrop-blur">
       {label ? <p className="mb-1 font-semibold text-foreground">{label}</p> : null}
       <div className="space-y-1">
-        {payload.map((item, index) => {
+        {(payload ?? []).map((item, index) => {
           if (!item) return null
           const color = item.color ?? config[item.name ?? '']?.color ?? 'hsl(var(--foreground))'
           const text = config[item.name ?? '']?.label ?? item.name

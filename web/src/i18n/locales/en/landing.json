@@ -23,8 +23,8 @@
   },
   "hero": {
     "kicker": "Stroppy Cloud Panel",
-    "title": "Run load tests and orchestrate infrastructure from one console",
-    "description": "Provision environments, launch experiments, and analyze telemetry.",
+    "title": "Load-test databases and services on top of k6",
+    "description": "Stroppy blends declarative scenarios, a custom k6 plugin and OpenTelemetry observability so you can plan regressions and compare configurations without hand-crafted environments.",
     "actions": {
       "register": "Create account",
       "openConsole": "Open console"
@@ -48,24 +48,110 @@
       }
     }
   },
-  "features": {
-    "title": "Main Features",
-    "subtitle": "Stroppy provides a complete set of tools for testing database reliability and performance",
-    "cloud": {
-      "title": "Cloud Deployment",
-      "description": "Deployment of a cluster of virtual machines in the selected cloud via Terraform. Supported options are Yandex.Cloud and Oracle.Cloud"
+  "sections": {
+    "overview": {
+      "title": "What is Stroppy",
+      "description": "Stroppy is a load-testing and benchmarking platform for databases and services built on k6. Scenarios are described declaratively, executed via a custom plugin, and metrics are exported to OpenTelemetry.",
+      "note": "Useful for performance regression, capacity planning and comparing configurations."
     },
-    "kubernetes": {
-      "title": "Kubernetes Integration",
-      "description": "Deployment of a Kubernetes cluster inside a running cluster of virtual machines with automatic management"
+    "capabilities": {
+      "title": "Key capabilities",
+      "description": "The Cloud Panel packages Stroppy mechanics and service workflows so you can launch scenarios without manually assembling an environment.",
+      "items": [
+        {
+          "title": "Declarative scenarios",
+          "description": "A single protobuf config (steps, executors, exporters, DB driver) with generated Go and TypeScript models."
+        },
+        {
+          "title": "Execution on k6",
+          "description": "The stroppy-xk6 plugin and ready TS scripts let you run tests without custom builds."
+        },
+        {
+          "title": "Metrics & tracing",
+          "description": "Export to OpenTelemetry (gRPC/HTTP), ready-made Grafana dashboards and a VictoriaMetrics stack."
+        },
+        {
+          "title": "Scenario knowledge base",
+          "description": "TPC-C profiles for PostgreSQL covering load, warmup and steady or ramp workloads."
+        },
+        {
+          "title": "Lifecycle automation",
+          "description": "gRPC sidecars for initialization, step start/stop, teardown and extra checks."
+        },
+        {
+          "title": "Productive CLI",
+          "description": "Step selection, ENV overrides, log levels and a single binary with embedded artifacts."
+        },
+        {
+          "title": "Reproducibility",
+          "description": "Seeded datasets, explicit executor parameters (VUs, rate, max duration) and strict validation."
+        }
+      ]
     },
-    "databases": {
-      "title": "Database Support",
-      "description": "Support for FoundationDB, MongoDB, CockroachDB and PostgreSQL with cluster deployment capabilities"
+    "workflow": {
+      "title": "How it works",
+      "description": "Describe the scenario in protobuf and let the panel orchestrate infrastructure, k6 execution and telemetry publishing.",
+      "steps": [
+        {
+          "title": "1. Describe the experiment",
+          "description": "Configure global parameters, DB driver, metric exporters and the set of steps with executors in a declarative config."
+        },
+        {
+          "title": "2. Run the scenarios",
+          "description": "Stroppy builds the step context, prepares scripts and executes k6 via the embedded binary plugin."
+        },
+        {
+          "title": "3. Collect the signals",
+          "description": "Metrics and traces go to OpenTelemetry, while Grafana and VictoriaMetrics provide dashboards out of the box."
+        }
+      ]
     },
-    "monitoring": {
-      "title": "Monitoring & Analytics",
-      "description": "Integration with Grafana for collecting k8s cluster statistics and virtual machine system metrics"
+    "integrations": {
+      "title": "Integrations & ecosystem",
+      "description": "Use familiar tools and extend the platform via open protocols.",
+      "items": [
+        {
+          "title": "k6/xk6",
+          "description": "The load-testing engine plus the stroppy-xk6 plugin with ready TypeScript scripts."
+        },
+        {
+          "title": "Observability stack",
+          "description": "OpenTelemetry, Grafana and VictoriaMetrics for metrics, logs and alerting."
+        },
+        {
+          "title": "gRPC & Protobuf",
+          "description": "Scenario definitions and sidecar hooks in strict schemas with generated clients."
+        },
+        {
+          "title": "PostgreSQL profiles",
+          "description": "Ready TPC-C cases and a driver that supports load, warmup and comparison flows."
+        }
+      ]
+    },
+    "audience": {
+      "title": "Who benefits",
+      "description": "Stroppy supports performance engineers, database teams and developers who ship performance gates.",
+      "items": [
+        "Performance engineers and SREs running regressions and capacity planning.",
+        "Database teams comparing configurations and tuning clusters.",
+        "Developers wiring load gates into CI/CD."
+      ]
+    },
+    "reasons": {
+      "title": "Why it feels convenient",
+      "items": [
+        "Fast start: one binary, ready scripts and dashboards.",
+        "Transparent configs: strict schema, ENV overrides and validation.",
+        "Extensibility: DB drivers, sidecar services, custom steps and metrics."
+      ]
+    },
+    "bundle": {
+      "title": "Included out of the box",
+      "items": [
+        "The stroppy CLI, stroppy-xk6 plugin and TypeScript scripts.",
+        "TPC-C scenarios for Postgres and a curated profile library.",
+        "OTEL export plus an observability example (Grafana + VictoriaMetrics)."
+      ]
     }
   },
   "stats": {
@@ -97,13 +183,13 @@
     "Running tests on demand from CLI"
   ],
   "cta": {
-    "title": "Ready to Start Testing?",
-    "description": "Join developers who use Stroppy to test the reliability and performance of their databases in real-world conditions.",
-    "getStarted": "Start Free",
-    "existingUser": "Already have an account?"
+    "title": "Ready to run a fair benchmark?",
+    "description": "Spin up an environment, select a TPC-C profile or your own protobuf scenario and compare results against previous runs.",
+    "getStarted": "Create environment",
+    "existingUser": "Already using Stroppy?"
   },
   "footer": {
-    "description": "Stroppy is a framework for testing various databases with support for FoundationDB, MongoDB, CockroachDB and PostgreSQL.",
+    "description": "Stroppy is a platform for database load testing and benchmarking: protobuf scenarios, a custom k6 plugin and a ready observability stack.",
     "links": {
       "title": "Useful Links",
       "documentation": "Documentation",

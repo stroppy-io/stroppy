@@ -76,6 +76,8 @@ func NewCloudAutomationRepository(executor sqlexec.Executor) orm.CloudAutomation
 		ids.UlidToStr,
 		ids.UlidFromString,
 		ids.UlidToStr,
+		ids.UlidFromString,
+		ids.UlidToStr,
 		ids.UlidFromStringPtr,
 		ids.UlidToStrPtr,
 	)

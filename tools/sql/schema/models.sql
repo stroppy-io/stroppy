@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS "cloud_automations" (
 	updated_at TIMESTAMPTZ  NOT NULL,
 	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
 	status INTEGER  NOT NULL DEFAULT 0,
+	author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	database_root_resource_id TEXT  NOT NULL,
 	workload_root_resource_id TEXT  NOT NULL,
 	stroppy_run_id TEXT  NULL

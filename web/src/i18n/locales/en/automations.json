@@ -1,0 +1,86 @@
+{
+  "page": {
+    "title": "Automations",
+    "subtitle": "Monitor Stroppy cloud automations"
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "runAutomation": "Run automation",
+    "backToList": "Back to automations"
+  },
+  "filters": {
+    "onlyMine": "Show only my automations",
+    "onlyMineHint": "Display workflows that were started by you"
+  },
+  "sort": {
+    "field": "Sort by",
+    "direction": "Direction",
+    "fields": {
+      "none": "No sorting",
+      "status": "Status",
+      "createdAt": "Created date"
+    },
+    "directions": {
+      "asc": "Ascending",
+      "desc": "Descending"
+    }
+  },
+  "table": {
+    "columns": {
+      "id": "Automation ID",
+      "status": "Status",
+      "run": "Linked run",
+      "createdAt": "Created",
+      "updatedAt": "Updated"
+    }
+  },
+  "list": {
+    "loading": "Loading automations…",
+    "empty": "No automations found",
+    "rowsPerPage": "Rows per page",
+    "page": "Page {{page}}",
+    "previous": "Previous page",
+    "next": "Next page",
+    "count": "{{count}} automations"
+  },
+  "messages": {
+    "noRun": "Not linked",
+    "unknown": "Unknown"
+  },
+  "form": {
+    "title": "Run new automation",
+    "description": "Configure the database and workload runners before starting the automation.",
+    "sections": {
+      "cloud": "Cloud provider",
+      "database": "Database configuration",
+      "databaseMachine": "Database machine (single node)",
+      "workload": "Workload configuration",
+      "workloadMachine": "Workload machine (single node)"
+    },
+    "fields": {
+      "cloudProvider": "Cloud provider",
+      "databaseName": "Database name",
+      "databaseType": "Database type",
+      "databaseParameters": "Database parameters",
+      "workloadName": "Workload name",
+      "workloadType": "Workload type",
+      "workloadParameters": "Workload parameters",
+      "machineCores": "vCPU cores",
+      "machineMemory": "Memory (GB)",
+      "machineDisk": "Disk (GB)",
+      "machinePublicIp": "Public IP"
+    },
+    "parametersHint": "Use key=value pairs (for example threads=64), one per line. Leave blank to skip.",
+    "cloudProviders": {
+      "yandex": "Yandex Cloud",
+      "unspecified": "Not selected"
+    },
+    "errors": {
+      "invalidParameters": "Use key=value pairs like key=value for {{target}}."
+    },
+    "actions": {
+      "submit": "Start automation",
+      "cancel": "Cancel"
+    }
+  }
+}

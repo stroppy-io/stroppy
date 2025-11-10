@@ -75,5 +75,6 @@ service AccountService {
     rpc Register (RegisterRequest) returns (google.protobuf.Empty);
     rpc Login (LoginRequest) returns (LoginResponse);
     rpc GetMe (google.protobuf.Empty) returns (User);
+    rpc GetUserById (Ulid) returns (User);
     rpc RefreshTokens (RefreshTokensRequest) returns (RefreshTokensResponse);
 }

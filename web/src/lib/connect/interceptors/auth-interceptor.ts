@@ -45,8 +45,7 @@ const tryRefreshAccessToken = async () => {
 }
 
 export const authInterceptor: Interceptor = (next) => async (request) => {
-  const token = getSessionSnapshot().accessToken
-  attachAuthHeader(request.header, token)
+  attachAuthHeader(request.header, getSessionSnapshot().accessToken)
 
   try {
     return await next(request)
@@ -54,12 +53,8 @@ export const authInterceptor: Interceptor = (next) => async (request) => {
     if (error instanceof ConnectError && error.code === Code.Unauthenticated) {
       const refreshed = await tryRefreshAccessToken()
       if (refreshed) {
-        const updatedToken = getSessionSnapshot().accessToken
-        if (updatedToken) {
-          const retryRequest = request.clone()
-          attachAuthHeader(retryRequest.header, updatedToken)
-          return await next(retryRequest)
-        }
+        attachAuthHeader(request.header, getSessionSnapshot().accessToken)
+        return await next(request)
       }
     }
     throw error

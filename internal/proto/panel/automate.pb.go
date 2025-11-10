@@ -165,9 +165,10 @@ type CloudAutomation struct {
 	Id                     *Ulid                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Timing                 *Timing                `protobuf:"bytes,2,opt,name=timing,proto3" json:"timing,omitempty"`
 	Status                 Status                 `protobuf:"varint,3,opt,name=status,proto3,enum=panel.Status" json:"status,omitempty"`
-	DatabaseRootResourceId *Ulid                  `protobuf:"bytes,4,opt,name=database_root_resource_id,json=databaseRootResourceId,proto3" json:"database_root_resource_id,omitempty"`
-	WorkloadRootResourceId *Ulid                  `protobuf:"bytes,5,opt,name=workload_root_resource_id,json=workloadRootResourceId,proto3" json:"workload_root_resource_id,omitempty"`
-	StroppyRunId           *Ulid                  `protobuf:"bytes,6,opt,name=stroppy_run_id,json=stroppyRunId,proto3,oneof" json:"stroppy_run_id,omitempty"`
+	AuthorId               *Ulid                  `protobuf:"bytes,4,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
+	DatabaseRootResourceId *Ulid                  `protobuf:"bytes,5,opt,name=database_root_resource_id,json=databaseRootResourceId,proto3" json:"database_root_resource_id,omitempty"`
+	WorkloadRootResourceId *Ulid                  `protobuf:"bytes,6,opt,name=workload_root_resource_id,json=workloadRootResourceId,proto3" json:"workload_root_resource_id,omitempty"`
+	StroppyRunId           *Ulid                  `protobuf:"bytes,7,opt,name=stroppy_run_id,json=stroppyRunId,proto3,oneof" json:"stroppy_run_id,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -223,6 +224,13 @@ func (x *CloudAutomation) GetStatus() Status {
 	return Status_STATUS_UNSPECIFIED
 }
 
+func (x *CloudAutomation) GetAuthorId() *Ulid {
+	if x != nil {
+		return x.AuthorId
+	}
+	return nil
+}
+
 func (x *CloudAutomation) GetDatabaseRootResourceId() *Ulid {
 	if x != nil {
 		return x.DatabaseRootResourceId
@@ -244,6 +252,91 @@ func (x *CloudAutomation) GetStroppyRunId() *Ulid {
 	return nil
 }
 
+type ListAutomationsRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Limit    *int32                 `protobuf:"varint,1,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	Offset   *int32                 `protobuf:"varint,2,opt,name=offset,proto3,oneof" json:"offset,omitempty"`
+	OnlyMine *bool                  `protobuf:"varint,3,opt,name=only_mine,json=onlyMine,proto3,oneof" json:"only_mine,omitempty"`
+	// order by
+	OrderByStatus           *Status           `protobuf:"varint,4,opt,name=order_by_status,json=orderByStatus,proto3,enum=panel.Status,oneof" json:"order_by_status,omitempty"`
+	OrderByStatusDescending *bool             `protobuf:"varint,5,opt,name=order_by_status_descending,json=orderByStatusDescending,proto3,oneof" json:"order_by_status_descending,omitempty"`
+	OrderByCreatedAt        *OrderByTimestamp `protobuf:"bytes,6,opt,name=order_by_created_at,json=orderByCreatedAt,proto3,oneof" json:"order_by_created_at,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *ListAutomationsRequest) Reset() {
+	*x = ListAutomationsRequest{}
+	mi := &file_panel_automate_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAutomationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAutomationsRequest) ProtoMessage() {}
+
+func (x *ListAutomationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_automate_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAutomationsRequest.ProtoReflect.Descriptor instead.
+func (*ListAutomationsRequest) Descriptor() ([]byte, []int) {
+	return file_panel_automate_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ListAutomationsRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+func (x *ListAutomationsRequest) GetOffset() int32 {
+	if x != nil && x.Offset != nil {
+		return *x.Offset
+	}
+	return 0
+}
+
+func (x *ListAutomationsRequest) GetOnlyMine() bool {
+	if x != nil && x.OnlyMine != nil {
+		return *x.OnlyMine
+	}
+	return false
+}
+
+func (x *ListAutomationsRequest) GetOrderByStatus() Status {
+	if x != nil && x.OrderByStatus != nil {
+		return *x.OrderByStatus
+	}
+	return Status_STATUS_UNSPECIFIED
+}
+
+func (x *ListAutomationsRequest) GetOrderByStatusDescending() bool {
+	if x != nil && x.OrderByStatusDescending != nil {
+		return *x.OrderByStatusDescending
+	}
+	return false
+}
+
+func (x *ListAutomationsRequest) GetOrderByCreatedAt() *OrderByTimestamp {
+	if x != nil {
+		return x.OrderByCreatedAt
+	}
+	return nil
+}
+
 type RunAutomationRequest struct {
 	state              protoimpl.MessageState    `protogen:"open.v1"`
 	Database           *Database                 `protobuf:"bytes,1,opt,name=database,proto3" json:"database,omitempty"`
@@ -255,7 +348,7 @@ type RunAutomationRequest struct {
 
 func (x *RunAutomationRequest) Reset() {
 	*x = RunAutomationRequest{}
-	mi := &file_panel_automate_proto_msgTypes[2]
+	mi := &file_panel_automate_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -267,7 +360,7 @@ func (x *RunAutomationRequest) String() string {
 func (*RunAutomationRequest) ProtoMessage() {}
 
 func (x *RunAutomationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_automate_proto_msgTypes[2]
+	mi := &file_panel_automate_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -280,7 +373,7 @@ func (x *RunAutomationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunAutomationRequest.ProtoReflect.Descriptor instead.
 func (*RunAutomationRequest) Descriptor() ([]byte, []int) {
-	return file_panel_automate_proto_rawDescGZIP(), []int{2}
+	return file_panel_automate_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RunAutomationRequest) GetDatabase() *Database {
@@ -315,7 +408,7 @@ type CloudResource_TreeNode struct {
 
 func (x *CloudResource_TreeNode) Reset() {
 	*x = CloudResource_TreeNode{}
-	mi := &file_panel_automate_proto_msgTypes[3]
+	mi := &file_panel_automate_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -327,7 +420,7 @@ func (x *CloudResource_TreeNode) String() string {
 func (*CloudResource_TreeNode) ProtoMessage() {}
 
 func (x *CloudResource_TreeNode) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_automate_proto_msgTypes[3]
+	mi := &file_panel_automate_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -364,6 +457,50 @@ func (x *CloudResource_TreeNode) GetChildren() []*CloudResource_TreeNode {
 	return nil
 }
 
+type CloudAutomation_List struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Automations   []*CloudAutomation     `protobuf:"bytes,1,rep,name=automations,proto3" json:"automations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloudAutomation_List) Reset() {
+	*x = CloudAutomation_List{}
+	mi := &file_panel_automate_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudAutomation_List) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudAutomation_List) ProtoMessage() {}
+
+func (x *CloudAutomation_List) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_automate_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudAutomation_List.ProtoReflect.Descriptor instead.
+func (*CloudAutomation_List) Descriptor() ([]byte, []int) {
+	return file_panel_automate_proto_rawDescGZIP(), []int{1, 0}
+}
+
+func (x *CloudAutomation_List) GetAutomations() []*CloudAutomation {
+	if x != nil {
+		return x.Automations
+	}
+	return nil
+}
+
 var File_panel_automate_proto protoreflect.FileDescriptor
 
 const file_panel_automate_proto_rawDesc = "" +
@@ -387,24 +524,42 @@ const file_panel_automate_proto_rawDesc = "" +
 	"\x11STATUS_DESTROYING\x10\x03\x12\x14\n" +
 	"\x10STATUS_DESTROYED\x10\x04\x12\x13\n" +
 	"\x0fSTATUS_DEGRADED\x10\x05:\x16\xca>\x13\b\x01\x12\x0fcloud_resourcesB\x15\n" +
-	"\x13_parent_resource_id\"\xb2\x03\n" +
+	"\x13_parent_resource_id\"\xdc\x04\n" +
 	"\x0fCloudAutomation\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
 	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12/\n" +
-	"\x06status\x18\x03 \x01(\x0e2\r.panel.StatusB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06status\x12Q\n" +
-	"\x19database_root_resource_id\x18\x04 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x16databaseRootResourceId\x12Q\n" +
-	"\x19workload_root_resource_id\x18\x05 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x16workloadRootResourceId\x12A\n" +
-	"\x0estroppy_run_id\x18\x06 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01H\x00R\fstroppyRunId\x88\x01\x01:\x18\xca>\x15\b\x01\x12\x11cloud_automationsB\x11\n" +
-	"\x0f_stroppy_run_id\"\xd6\x01\n" +
+	"\x06status\x18\x03 \x01(\x0e2\r.panel.StatusB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06status\x12f\n" +
+	"\tauthor_id\x18\x04 \x01(\v2\v.panel.UlidB<\xca>9\x12\x04\b\x01 \x01\x1a1\"/NOT NULL REFERENCES users(id) ON DELETE CASCADER\bauthorId\x12Q\n" +
+	"\x19database_root_resource_id\x18\x05 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x16databaseRootResourceId\x12Q\n" +
+	"\x19workload_root_resource_id\x18\x06 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x16workloadRootResourceId\x12A\n" +
+	"\x0estroppy_run_id\x18\a \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01H\x00R\fstroppyRunId\x88\x01\x01\x1a@\n" +
+	"\x04List\x128\n" +
+	"\vautomations\x18\x01 \x03(\v2\x16.panel.CloudAutomationR\vautomations:\x18\xca>\x15\b\x01\x12\x11cloud_automationsB\x11\n" +
+	"\x0f_stroppy_run_id\"\xab\x03\n" +
+	"\x16ListAutomationsRequest\x12\x19\n" +
+	"\x05limit\x18\x01 \x01(\x05H\x00R\x05limit\x88\x01\x01\x12\x1b\n" +
+	"\x06offset\x18\x02 \x01(\x05H\x01R\x06offset\x88\x01\x01\x12 \n" +
+	"\tonly_mine\x18\x03 \x01(\bH\x02R\bonlyMine\x88\x01\x01\x12:\n" +
+	"\x0forder_by_status\x18\x04 \x01(\x0e2\r.panel.StatusH\x03R\rorderByStatus\x88\x01\x01\x12@\n" +
+	"\x1aorder_by_status_descending\x18\x05 \x01(\bH\x04R\x17orderByStatusDescending\x88\x01\x01\x12K\n" +
+	"\x13order_by_created_at\x18\x06 \x01(\v2\x17.panel.OrderByTimestampH\x05R\x10orderByCreatedAt\x88\x01\x01B\b\n" +
+	"\x06_limitB\t\n" +
+	"\a_offsetB\f\n" +
+	"\n" +
+	"_only_mineB\x12\n" +
+	"\x10_order_by_statusB\x1d\n" +
+	"\x1b_order_by_status_descendingB\x16\n" +
+	"\x14_order_by_created_at\"\xd6\x01\n" +
 	"\x14RunAutomationRequest\x122\n" +
 	"\bdatabase\x18\x01 \x01(\v2\x0f.panel.DatabaseB\x05\xca>\x02H\x01R\bdatabase\x122\n" +
 	"\bworkload\x18\x02 \x01(\v2\x0f.panel.WorkloadB\x05\xca>\x02H\x01R\bworkload\x12V\n" +
 	"\x14using_cloud_provider\x18\x03 \x01(\x0e2\x1a.crossplane.SupportedCloudB\b\xfaB\x05\x82\x01\x02\b\x01R\x12usingCloudProvider2M\n" +
 	"\x10ResourcesService\x129\n" +
-	"\vGetResource\x12\v.panel.Ulid\x1a\x1d.panel.CloudResource.TreeNode2\xc0\x01\n" +
+	"\vGetResource\x12\v.panel.Ulid\x1a\x1d.panel.CloudResource.TreeNode2\x8f\x02\n" +
 	"\x0fAutomateService\x124\n" +
-	"\rGetAutomation\x12\v.panel.Ulid\x1a\x16.panel.CloudAutomation\x12>\n" +
+	"\rGetAutomation\x12\v.panel.Ulid\x1a\x16.panel.CloudAutomation\x12M\n" +
+	"\x0fListAutomations\x12\x1d.panel.ListAutomationsRequest\x1a\x1b.panel.CloudAutomation.List\x12>\n" +
 	"\rRunAutomation\x12\x1b.panel.RunAutomationRequest\x1a\x10.panel.RunRecord\x127\n" +
 	"\x10CancelAutomation\x12\v.panel.Ulid\x1a\x16.google.protobuf.EmptyB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
 
@@ -421,54 +576,63 @@ func file_panel_automate_proto_rawDescGZIP() []byte {
 }
 
 var file_panel_automate_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_panel_automate_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_panel_automate_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_panel_automate_proto_goTypes = []any{
 	(CloudResource_Status)(0),             // 0: panel.CloudResource.Status
 	(*CloudResource)(nil),                 // 1: panel.CloudResource
 	(*CloudAutomation)(nil),               // 2: panel.CloudAutomation
-	(*RunAutomationRequest)(nil),          // 3: panel.RunAutomationRequest
-	(*CloudResource_TreeNode)(nil),        // 4: panel.CloudResource.TreeNode
-	(*Ulid)(nil),                          // 5: panel.Ulid
-	(*Timing)(nil),                        // 6: panel.Timing
-	(*crossplane.ResourceWithStatus)(nil), // 7: crossplane.ResourceWithStatus
-	(Status)(0),                           // 8: panel.Status
-	(*Database)(nil),                      // 9: panel.Database
-	(*Workload)(nil),                      // 10: panel.Workload
-	(crossplane.SupportedCloud)(0),        // 11: crossplane.SupportedCloud
-	(*RunRecord)(nil),                     // 12: panel.RunRecord
-	(*emptypb.Empty)(nil),                 // 13: google.protobuf.Empty
+	(*ListAutomationsRequest)(nil),        // 3: panel.ListAutomationsRequest
+	(*RunAutomationRequest)(nil),          // 4: panel.RunAutomationRequest
+	(*CloudResource_TreeNode)(nil),        // 5: panel.CloudResource.TreeNode
+	(*CloudAutomation_List)(nil),          // 6: panel.CloudAutomation.List
+	(*Ulid)(nil),                          // 7: panel.Ulid
+	(*Timing)(nil),                        // 8: panel.Timing
+	(*crossplane.ResourceWithStatus)(nil), // 9: crossplane.ResourceWithStatus
+	(Status)(0),                           // 10: panel.Status
+	(*OrderByTimestamp)(nil),              // 11: panel.OrderByTimestamp
+	(*Database)(nil),                      // 12: panel.Database
+	(*Workload)(nil),                      // 13: panel.Workload
+	(crossplane.SupportedCloud)(0),        // 14: crossplane.SupportedCloud
+	(*RunRecord)(nil),                     // 15: panel.RunRecord
+	(*emptypb.Empty)(nil),                 // 16: google.protobuf.Empty
 }
 var file_panel_automate_proto_depIdxs = []int32{
-	5,  // 0: panel.CloudResource.id:type_name -> panel.Ulid
-	6,  // 1: panel.CloudResource.timing:type_name -> panel.Timing
+	7,  // 0: panel.CloudResource.id:type_name -> panel.Ulid
+	8,  // 1: panel.CloudResource.timing:type_name -> panel.Timing
 	0,  // 2: panel.CloudResource.status:type_name -> panel.CloudResource.Status
-	7,  // 3: panel.CloudResource.resource:type_name -> crossplane.ResourceWithStatus
-	5,  // 4: panel.CloudResource.parent_resource_id:type_name -> panel.Ulid
-	5,  // 5: panel.CloudAutomation.id:type_name -> panel.Ulid
-	6,  // 6: panel.CloudAutomation.timing:type_name -> panel.Timing
-	8,  // 7: panel.CloudAutomation.status:type_name -> panel.Status
-	5,  // 8: panel.CloudAutomation.database_root_resource_id:type_name -> panel.Ulid
-	5,  // 9: panel.CloudAutomation.workload_root_resource_id:type_name -> panel.Ulid
-	5,  // 10: panel.CloudAutomation.stroppy_run_id:type_name -> panel.Ulid
-	9,  // 11: panel.RunAutomationRequest.database:type_name -> panel.Database
-	10, // 12: panel.RunAutomationRequest.workload:type_name -> panel.Workload
-	11, // 13: panel.RunAutomationRequest.using_cloud_provider:type_name -> crossplane.SupportedCloud
-	5,  // 14: panel.CloudResource.TreeNode.id:type_name -> panel.Ulid
-	1,  // 15: panel.CloudResource.TreeNode.resource:type_name -> panel.CloudResource
-	4,  // 16: panel.CloudResource.TreeNode.children:type_name -> panel.CloudResource.TreeNode
-	5,  // 17: panel.ResourcesService.GetResource:input_type -> panel.Ulid
-	5,  // 18: panel.AutomateService.GetAutomation:input_type -> panel.Ulid
-	3,  // 19: panel.AutomateService.RunAutomation:input_type -> panel.RunAutomationRequest
-	5,  // 20: panel.AutomateService.CancelAutomation:input_type -> panel.Ulid
-	4,  // 21: panel.ResourcesService.GetResource:output_type -> panel.CloudResource.TreeNode
-	2,  // 22: panel.AutomateService.GetAutomation:output_type -> panel.CloudAutomation
-	12, // 23: panel.AutomateService.RunAutomation:output_type -> panel.RunRecord
-	13, // 24: panel.AutomateService.CancelAutomation:output_type -> google.protobuf.Empty
-	21, // [21:25] is the sub-list for method output_type
-	17, // [17:21] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	9,  // 3: panel.CloudResource.resource:type_name -> crossplane.ResourceWithStatus
+	7,  // 4: panel.CloudResource.parent_resource_id:type_name -> panel.Ulid
+	7,  // 5: panel.CloudAutomation.id:type_name -> panel.Ulid
+	8,  // 6: panel.CloudAutomation.timing:type_name -> panel.Timing
+	10, // 7: panel.CloudAutomation.status:type_name -> panel.Status
+	7,  // 8: panel.CloudAutomation.author_id:type_name -> panel.Ulid
+	7,  // 9: panel.CloudAutomation.database_root_resource_id:type_name -> panel.Ulid
+	7,  // 10: panel.CloudAutomation.workload_root_resource_id:type_name -> panel.Ulid
+	7,  // 11: panel.CloudAutomation.stroppy_run_id:type_name -> panel.Ulid
+	10, // 12: panel.ListAutomationsRequest.order_by_status:type_name -> panel.Status
+	11, // 13: panel.ListAutomationsRequest.order_by_created_at:type_name -> panel.OrderByTimestamp
+	12, // 14: panel.RunAutomationRequest.database:type_name -> panel.Database
+	13, // 15: panel.RunAutomationRequest.workload:type_name -> panel.Workload
+	14, // 16: panel.RunAutomationRequest.using_cloud_provider:type_name -> crossplane.SupportedCloud
+	7,  // 17: panel.CloudResource.TreeNode.id:type_name -> panel.Ulid
+	1,  // 18: panel.CloudResource.TreeNode.resource:type_name -> panel.CloudResource
+	5,  // 19: panel.CloudResource.TreeNode.children:type_name -> panel.CloudResource.TreeNode
+	2,  // 20: panel.CloudAutomation.List.automations:type_name -> panel.CloudAutomation
+	7,  // 21: panel.ResourcesService.GetResource:input_type -> panel.Ulid
+	7,  // 22: panel.AutomateService.GetAutomation:input_type -> panel.Ulid
+	3,  // 23: panel.AutomateService.ListAutomations:input_type -> panel.ListAutomationsRequest
+	4,  // 24: panel.AutomateService.RunAutomation:input_type -> panel.RunAutomationRequest
+	7,  // 25: panel.AutomateService.CancelAutomation:input_type -> panel.Ulid
+	5,  // 26: panel.ResourcesService.GetResource:output_type -> panel.CloudResource.TreeNode
+	2,  // 27: panel.AutomateService.GetAutomation:output_type -> panel.CloudAutomation
+	6,  // 28: panel.AutomateService.ListAutomations:output_type -> panel.CloudAutomation.List
+	15, // 29: panel.AutomateService.RunAutomation:output_type -> panel.RunRecord
+	16, // 30: panel.AutomateService.CancelAutomation:output_type -> google.protobuf.Empty
+	26, // [26:31] is the sub-list for method output_type
+	21, // [21:26] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_panel_automate_proto_init() }
@@ -480,13 +644,14 @@ func file_panel_automate_proto_init() {
 	file_panel_types_proto_init()
 	file_panel_automate_proto_msgTypes[0].OneofWrappers = []any{}
 	file_panel_automate_proto_msgTypes[1].OneofWrappers = []any{}
+	file_panel_automate_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_panel_automate_proto_rawDesc), len(file_panel_automate_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

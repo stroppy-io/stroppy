@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -7,12 +8,11 @@ import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useRunsQuery } from '@/app/features/runs/api'
 import { useTranslation } from '@/i18n/use-translation'
 import { getStatusBadgeVariant, getStatusLabel } from '@/app/features/runs/utils'
-import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
-import {cn, scrollbarCn} from '@/lib/utils'
+import { ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { getDatabaseTypeLabel, getMachineParameterLabel, getNumberOperatorLabel, getTpsMetricLabel, getWorkloadTypeLabel } from '@/app/features/runs/labels'
 import type { NumericFilter, RunsFilters, RunSummary } from '@/app/features/runs/types'
 import {
   Status,
@@ -45,13 +45,6 @@ const ANY_SELECT_VALUE = '__any__'
 const MAX_SELECTED_RUNS = 2
 type SortableColumn = 'id' | 'status' | 'workloadName' | 'databaseName' | 'createdAt' | 'tpsAverage'
 type SortState = { column: SortableColumn; direction: 'asc' | 'desc' } | null
-type ComparisonField = {
-  key: string
-  label: string
-  getRaw: (run: RunSummary) => string | number | undefined
-  format?: (run: RunSummary) => string
-}
-
 interface FilterSelectProps {
   value: string
   onChange: (value: string) => void
@@ -123,73 +116,6 @@ const numberOperatorValues: NumberFilterOperator[] = [
   NumberFilterOperator.TYPE_NOT_EQUAL,
 ]
 
-const getWorkloadTypeLabel = (type: Workload_Type, t: (key: string) => string) => {
-  switch (type) {
-    case Workload_Type.TPCC:
-      return t('filters.workloadTypes.tpcc')
-    default:
-      return t('filters.workloadTypes.unspecified')
-  }
-}
-
-const getDatabaseTypeLabel = (type: Database_Type, t: (key: string) => string) => {
-  switch (type) {
-    case Database_Type.POSTGRES_ORIOLE:
-      return t('filters.databaseTypes.postgresOriole')
-    default:
-      return t('filters.databaseTypes.unspecified')
-  }
-}
-
-const getTpsMetricLabel = (metric: Tps_Filter_Type, t: (key: string) => string) => {
-  switch (metric) {
-    case Tps_Filter_Type.AVERAGE:
-      return t('filters.tps.metrics.average')
-    case Tps_Filter_Type.MAX:
-      return t('filters.tps.metrics.max')
-    case Tps_Filter_Type.MIN:
-      return t('filters.tps.metrics.min')
-    case Tps_Filter_Type.P95TH:
-      return t('filters.tps.metrics.p95')
-    case Tps_Filter_Type.P99TH:
-      return t('filters.tps.metrics.p99')
-    default:
-      return t('filters.tps.metrics.unspecified')
-  }
-}
-
-const getMachineParameterLabel = (param: MachineInfo_Filter_Type, t: (key: string) => string) => {
-  switch (param) {
-    case MachineInfo_Filter_Type.CORES:
-      return t('filters.machine.parameters.cores')
-    case MachineInfo_Filter_Type.MEMORY:
-      return t('filters.machine.parameters.memory')
-    case MachineInfo_Filter_Type.DISK:
-      return t('filters.machine.parameters.disk')
-    default:
-      return t('filters.machine.parameters.unspecified')
-  }
-}
-
-const getNumberOperatorLabel = (operator: NumberFilterOperator, t: (key: string) => string) => {
-  switch (operator) {
-    case NumberFilterOperator.TYPE_GREATER_THAN:
-      return t('filters.operators.gt')
-    case NumberFilterOperator.TYPE_GREATER_THAN_OR_EQUAL:
-      return t('filters.operators.gte')
-    case NumberFilterOperator.TYPE_LESS_THAN:
-      return t('filters.operators.lt')
-    case NumberFilterOperator.TYPE_LESS_THAN_OR_EQUAL:
-      return t('filters.operators.lte')
-    case NumberFilterOperator.TYPE_EQUAL:
-      return t('filters.operators.eq')
-    case NumberFilterOperator.TYPE_NOT_EQUAL:
-      return t('filters.operators.neq')
-    default:
-      return t('filters.operators.default')
-  }
-}
-
 const EMPTY_RUNS: RunSummary[] = []
 
 const getSortValue = (run: RunSummary, column: SortableColumn): string | number | undefined => {
@@ -227,14 +153,8 @@ const compareValues = (valueA?: string | number, valueB?: string | number) => {
   return valueA.toString().localeCompare(valueB.toString(), undefined, { sensitivity: 'base' })
 }
 
-const formatDefaultValue = (value?: string | number | null) => {
-  if (value === undefined || value === null || value === '') {
-    return '—'
-  }
-  return String(value)
-}
-
 export const RunsPage = () => {
+  const navigate = useNavigate()
   const { t } = useTranslation('runs')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -249,11 +169,10 @@ export const RunsPage = () => {
   const [machineFiltersState, setMachineFiltersState] = useState<NumericFilterState<MachineInfo_Filter_Type>[]>([
     createDefaultMachineFilterState(),
   ])
+  const [onlyMine, setOnlyMine] = useState(false)
   const [selectedRuns, setSelectedRuns] = useState<RunSummary[]>([])
   const [compareMessage, setCompareMessage] = useState<string | null>(null)
-  const [isCompareOpen, setCompareOpen] = useState(false)
   const [sort, setSort] = useState<SortState>(null)
-  const [collapsedFields, setCollapsedFields] = useState<Record<string, boolean>>({})
 
   const parsedTpsFilters = useMemo(
     () => tpsFiltersState.map((state) => parseNumericFilter(state)).filter(isDefined),
@@ -285,6 +204,7 @@ export const RunsPage = () => {
       databaseName: debouncedDatabaseSearch || undefined,
       tpsFilters: parsedTpsFilters.length ? parsedTpsFilters : undefined,
       orderByTps,
+      onlyMine: onlyMine || undefined,
       machineFilters: parsedMachineFilters.length ? parsedMachineFilters : undefined,
     }),
     [
@@ -297,6 +217,7 @@ export const RunsPage = () => {
       debouncedDatabaseSearch,
       parsedTpsFilters,
       orderByTps,
+      onlyMine,
       parsedMachineFilters,
     ],
   )
@@ -422,19 +343,13 @@ export const RunsPage = () => {
       return
     }
     setCompareMessage(null)
-    setCompareOpen(true)
+    navigate('/app/runs/compare', { state: { runs: selectedRuns } })
   }
 
   const handleClearSelection = () => {
     setCompareMessage(null)
     setSelectedRuns([])
   }
-
-  const toggleFieldCollapse = (key: string) =>
-    setCollapsedFields((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }))
 
   const statusSelectOptions = useMemo(
     () =>
@@ -490,152 +405,6 @@ export const RunsPage = () => {
     [t],
   )
 
-  const comparisonFieldSections = useMemo(
-    () => [
-      {
-        key: 'status',
-        label: t('comparison.statusSection'),
-        fields: [
-          {
-            key: 'status',
-            label: t('table.columns.status'),
-            getRaw: (run: RunSummary) => run.status,
-            format: (run: RunSummary) => getStatusLabel(run.status, t),
-          },
-          {
-            key: 'workloadType',
-            label: t('filters.workloadType'),
-            getRaw: (run: RunSummary) => run.workloadType ?? -1,
-            format: (run: RunSummary) =>
-              run.workloadType !== undefined ? getWorkloadTypeLabel(run.workloadType, t) : t('filters.workloadTypes.unspecified'),
-          },
-          {
-            key: 'databaseType',
-            label: t('filters.databaseType'),
-            getRaw: (run: RunSummary) => run.databaseType ?? -1,
-            format: (run: RunSummary) =>
-              run.databaseType !== undefined ? getDatabaseTypeLabel(run.databaseType, t) : t('filters.databaseTypes.unspecified'),
-          },
-        ],
-      },
-      {
-        key: 'cluster',
-        label: t('comparison.cluster.title'),
-        fields: [
-          {
-            key: 'runnerClusterNodes',
-            label: t('comparison.cluster.runnerNodes'),
-            getRaw: (run: RunSummary) => run.runnerClusterNodes ?? -1,
-            format: (run: RunSummary) => (run.runnerClusterNodes ? run.runnerClusterNodes.toString() : '—'),
-          },
-          {
-            key: 'databaseClusterNodes',
-            label: t('comparison.cluster.databaseNodes'),
-            getRaw: (run: RunSummary) => run.databaseClusterNodes ?? -1,
-            format: (run: RunSummary) => (run.databaseClusterNodes ? run.databaseClusterNodes.toString() : '—'),
-          },
-        ],
-      },
-      {
-        key: 'runnerMachine',
-        label: t('comparison.machine.runnerTitle'),
-        fields: [
-          {
-            key: 'runnerMachineSignature',
-            label: t('comparison.machine.runnerSignature'),
-            getRaw: (run: RunSummary) => run.runnerMachineSignature ?? '',
-            format: (run: RunSummary) => run.runnerMachineSignature ?? '—',
-          },
-          {
-            key: 'runnerMachineCores',
-            label: t('comparison.machine.runnerCores'),
-            getRaw: (run: RunSummary) => run.runnerMachineCores ?? -1,
-            format: (run: RunSummary) => (run.runnerMachineCores ? `${run.runnerMachineCores} vCPU` : '—'),
-          },
-          {
-            key: 'runnerMachineMemory',
-            label: t('comparison.machine.runnerMemory'),
-            getRaw: (run: RunSummary) => run.runnerMachineMemory ?? -1,
-            format: (run: RunSummary) => (run.runnerMachineMemory ? `${run.runnerMachineMemory} GB` : '—'),
-          },
-          {
-            key: 'runnerMachineDisk',
-            label: t('comparison.machine.runnerDisk'),
-            getRaw: (run: RunSummary) => run.runnerMachineDisk ?? -1,
-            format: (run: RunSummary) => (run.runnerMachineDisk ? `${run.runnerMachineDisk} GB` : '—'),
-          },
-        ],
-      },
-      {
-        key: 'databaseMachine',
-        label: t('comparison.machine.databaseTitle'),
-        fields: [
-          {
-            key: 'databaseMachineSignature',
-            label: t('comparison.machine.databaseSignature'),
-            getRaw: (run: RunSummary) => run.databaseMachineSignature ?? '',
-            format: (run: RunSummary) => run.databaseMachineSignature ?? '—',
-          },
-          {
-            key: 'databaseMachineCores',
-            label: t('comparison.machine.databaseCores'),
-            getRaw: (run: RunSummary) => run.databaseMachineCores ?? -1,
-            format: (run: RunSummary) => (run.databaseMachineCores ? `${run.databaseMachineCores} vCPU` : '—'),
-          },
-          {
-            key: 'databaseMachineMemory',
-            label: t('comparison.machine.databaseMemory'),
-            getRaw: (run: RunSummary) => run.databaseMachineMemory ?? -1,
-            format: (run: RunSummary) => (run.databaseMachineMemory ? `${run.databaseMachineMemory} GB` : '—'),
-          },
-          {
-            key: 'databaseMachineDisk',
-            label: t('comparison.machine.databaseDisk'),
-            getRaw: (run: RunSummary) => run.databaseMachineDisk ?? -1,
-            format: (run: RunSummary) => (run.databaseMachineDisk ? `${run.databaseMachineDisk} GB` : '—'),
-          },
-        ],
-      },
-      {
-        key: 'metrics',
-        label: t('comparison.metrics.title'),
-        fields: [
-          {
-            key: 'tpsAverage',
-            label: t('table.columns.tps'),
-            getRaw: (run: RunSummary) => run.tpsAverage ?? -1,
-            format: (run: RunSummary) => (run.tpsAverage ? `${run.tpsAverage.toLocaleString()} TPS` : '—'),
-          },
-          {
-            key: 'tpsP95',
-            label: t('filters.tps.metrics.p95'),
-            getRaw: (run: RunSummary) => run.tpsP95 ?? -1,
-            format: (run: RunSummary) => (run.tpsP95 ? `${run.tpsP95.toLocaleString()} TPS` : '—'),
-          },
-        ],
-      },
-    ],
-    [t],
-  )
-
-  const comparisonDifferenceCount = useMemo(() => {
-    if (!canCompare || selectedRuns.length < 2) {
-      return 0
-    }
-    const [runA, runB] = selectedRuns
-    if (!runA || !runB) {
-      return 0
-    }
-    return comparisonFieldSections.reduce((sectionCount, section) => {
-      const fieldDiffs = section.fields.reduce((count, field) => {
-        const rawA = field.getRaw(runA)
-        const rawB = field.getRaw(runB)
-        return rawA === rawB ? count : count + 1
-      }, 0)
-      return sectionCount + fieldDiffs
-    }, 0)
-  }, [canCompare, comparisonFieldSections, selectedRuns])
-
   const handleSort = (column: SortableColumn) => {
     setSort((prev) => {
       if (!prev || prev.column !== column) {
@@ -674,6 +443,7 @@ export const RunsPage = () => {
     workloadTypeFilter,
     databaseTypeFilter,
     parsedTpsFilters,
+    onlyMine,
     parsedMachineFilters,
     sort,
   ])
@@ -682,17 +452,16 @@ export const RunsPage = () => {
     setPage(1)
   }, [pageSize])
 
-  useEffect(() => {
-    if (!canCompare) {
-      setCompareOpen(false)
-    }
-  }, [canCompare])
-
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-2">
-        <p className="text-xs uppercase tracking-[0.5em] text-muted-foreground">{t('page.title')}</p>
-        <h1 className="text-3xl font-semibold text-foreground">{t('page.subtitle')}</h1>
+      <header className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.5em] text-muted-foreground">{t('page.title')}</p>
+          <h1 className="text-3xl font-semibold text-foreground">{t('page.subtitle')}</h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => navigate('/app/runs/new')}>{t('actions.createRun')}</Button>
+        </div>
       </header>
 
       <Card className="flex flex-col gap-4 rounded-2xl p-4 shadow-sm">
@@ -716,6 +485,16 @@ export const RunsPage = () => {
               placeholder={t('filters.status')}
               anyLabel={t('filters.any')}
             />
+          </div>
+          <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+            <Checkbox
+              id="onlyMine"
+              checked={onlyMine}
+              onCheckedChange={(checked) => setOnlyMine(checked === true)}
+            />
+            <label htmlFor="onlyMine" className="text-sm text-foreground">
+              {t('filters.onlyMine')}
+            </label>
           </div>
         </div>
 
@@ -892,7 +671,7 @@ export const RunsPage = () => {
                   aria-label={t('comparison.title')}
                   checked={allSelectedOnPage}
                   indeterminate={partiallySelectedOnPage}
-                  onCheckedChange={(checked) => handleSelectAllOnPage(Boolean(checked))}
+                  onCheckedChange={(checked) => handleSelectAllOnPage(checked === true)}
                 />
               </TableHead>
               <TableHead
@@ -979,7 +758,7 @@ export const RunsPage = () => {
                   <Checkbox
                     aria-label={t('modals.compareRuns.selectRuns')}
                     checked={selectedRunIdSet.has(run.id)}
-                    onCheckedChange={(checked) => handleRowSelectionChange(run, Boolean(checked))}
+                    onCheckedChange={(checked) => handleRowSelectionChange(run, checked === true)}
                   />
                 </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">{run.id || '—'}</TableCell>
@@ -987,7 +766,13 @@ export const RunsPage = () => {
                   <Badge variant={getStatusBadgeVariant(run.status)}>{getStatusLabel(run.status, t)}</Badge>
                 </TableCell>
                 <TableCell>
-                  <div className="font-semibold text-foreground">{run.workloadName}</div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/app/runs/${run.id}`, { state: { run } })}
+                    className="font-semibold text-primary transition hover:underline"
+                  >
+                    {run.workloadName}
+                  </button>
                   <p className="text-xs text-muted-foreground">{run.databaseName ?? t('meta.unknownDatabase')}</p>
                 </TableCell>
                 <TableCell className="font-mono text-sm text-foreground/80">
@@ -1046,113 +831,6 @@ export const RunsPage = () => {
         </div>
       </Card>
 
-      <Dialog open={isCompareOpen && canCompare} onOpenChange={setCompareOpen}>
-        <DialogContent className={scrollbarCn("max-h-[90vh] w-[96vw] max-w-5xl overflow-y-auto")}>
-          <DialogHeader>
-            <DialogTitle>{t('comparison.title')}</DialogTitle>
-            <DialogDescription>{t('comparison.differencesHighlighted')}</DialogDescription>
-          </DialogHeader>
-          {canCompare &&
-            selectedRuns.length === 2 &&
-            (() => {
-              const runA = selectedRuns[0]
-              const runB = selectedRuns[1]
-              return (
-                <div className="space-y-6">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-border/80 bg-muted/20 p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{t('comparison.run1')}</p>
-                        <Badge variant="secondary">{getStatusLabel(runA.status, t)}</Badge>
-                      </div>
-                      <p className="mt-2 text-base font-semibold text-foreground">{runA.workloadName ?? '—'}</p>
-                      <p className="text-xs text-muted-foreground">{runA.id}</p>
-                    </div>
-                    <div className="rounded-2xl border border-border/80 bg-muted/20 p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{t('comparison.run2')}</p>
-                        <Badge variant="secondary">{getStatusLabel(runB.status, t)}</Badge>
-                      </div>
-                      <p className="mt-2 text-base font-semibold text-foreground">{runB.workloadName ?? '—'}</p>
-                      <p className="text-xs text-muted-foreground">{runB.id}</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border/80 bg-card/60 p-4">
-                    <Badge variant="outline" className="text-xs">
-                      {t('comparison.totalDifferences')}: {comparisonDifferenceCount}
-                    </Badge>
-                    <p className="text-sm text-muted-foreground">
-                      {comparisonDifferenceCount > 0 ? t('comparison.differencesFound') : t('comparison.identical')}
-                    </p>
-                  </div>
-                  <div className="space-y-6">
-                    {comparisonFieldSections.map((section) => (
-                      <div key={section.key} className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-                            {section.label}
-                          </span>
-                          <div className="h-px flex-1 bg-border/60" />
-                        </div>
-                        {section.fields.map((field) => {
-                      const rawA = field.getRaw(runA)
-                      const rawB = field.getRaw(runB)
-                      const displayA = field.format ? field.format(runA) : formatDefaultValue(rawA)
-                      const displayB = field.format ? field.format(runB) : formatDefaultValue(rawB)
-                      const isDifferent = rawA !== rawB
-                      const isCollapsed = collapsedFields[field.key] ?? false
-                      return (
-                        <div
-                          key={field.key}
-                          className={cn(
-                            'rounded-2xl border border-border/80 bg-card/50 p-4 text-sm shadow-sm',
-                            isDifferent && 'border-primary/70 bg-primary/5 shadow-primary/10',
-                          )}
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">{field.label}</span>
-                            <div className="flex items-center gap-2">
-                              <Badge variant={isDifferent ? 'default' : 'secondary'} className="text-[11px]">
-                                {isDifferent ? t('comparison.different') : t('comparison.identical')}
-                              </Badge>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => toggleFieldCollapse(field.key)}
-                                aria-label={isCollapsed ? t('comparison.expand') : t('comparison.collapse')}
-                              >
-                                <ChevronDown
-                                  className={cn(
-                                    'h-4 w-4 transition-transform',
-                                    isCollapsed ? '-rotate-90' : 'rotate-0',
-                                  )}
-                                />
-                              </Button>
-                            </div>
-                          </div>
-                          <div className={cn('mt-3 grid gap-3 sm:grid-cols-2', isCollapsed && 'hidden')}>
-                            <div className="rounded-xl border border-border/70 bg-background/80 p-3">
-                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{t('comparison.run1')}</p>
-                              <p className="mt-1 text-sm font-medium text-foreground">{displayA}</p>
-                            </div>
-                            <div className="rounded-xl border border-border/70 bg-background/80 p-3">
-                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{t('comparison.run2')}</p>
-                              <p className="mt-1 text-sm font-medium text-foreground">{displayB}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })()}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -16,6 +16,7 @@
       "name": "Название",
       "status": "Статус",
       "createdAt": "Создан",
+      "updatedAt": "Обновлен",
       "startedAt": "Запущен",
       "completedAt": "Завершен",
       "duration": "Длительность",
@@ -33,6 +34,7 @@
   "filters": {
     "title": "Фильтры",
     "search": "Поиск по названию",
+    "workloadName": "Название нагрузки",
     "status": "Статус",
     "any": "Любой",
     "dateRange": "Период",
@@ -48,6 +50,7 @@
     "workloadType": "Тип нагрузки",
     "databaseType": "Тип СУБД",
     "databaseName": "Название базы данных",
+    "onlyMine": "Показывать только мои запуски",
     "tps": {
       "title": "Фильтр по TPS",
       "metric": "Метрика",
@@ -119,7 +122,8 @@
     "import": "Импорт",
     "bulkDelete": "Массовое удаление",
     "bulkExport": "Массовый экспорт",
-    "clearSelection": "Очистить выбор"
+    "clearSelection": "Очистить выбор",
+    "backToList": "Вернуться к списку"
   },
   "modals": {
     "createRun": {
@@ -247,6 +251,31 @@
     "statusSection": "Статус и типы",
     "metrics": {
       "title": "Показатели производительности"
+    }
+  },
+  "automation": {
+    "title": "Автоматизация",
+    "notLinked": "Запуск не привязан к автоматизации",
+    "failed": "Не удалось загрузить данные автоматизации",
+    "loading": "Загружаем данные об автоматизации…",
+    "startedAt": "Автоматизация создана",
+    "updatedAt": "Последнее обновление",
+    "databaseTree": "Ресурсы базы данных",
+    "workloadTree": "Ресурсы нагрузки",
+    "resourceKindUnknown": "Неизвестный ресурс",
+    "resourceId": "ID ресурса: {{id}}",
+    "ready": "Готов",
+    "notReady": "Не готов",
+    "synced": "Синхронизирован",
+    "notSynced": "Не синхронизирован",
+    "noResources": "Ресурсы не найдены",
+    "resourceStatus": {
+      "creating": "Создаётся",
+      "working": "Работает",
+      "destroying": "Удаляется",
+      "destroyed": "Удалён",
+      "degraded": "Деградирован",
+      "unknown": "Статус неизвестен"
     }
   }
 }

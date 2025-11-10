@@ -42,6 +42,9 @@ const (
 	// AutomateServiceGetAutomationProcedure is the fully-qualified name of the AutomateService's
 	// GetAutomation RPC.
 	AutomateServiceGetAutomationProcedure = "/panel.AutomateService/GetAutomation"
+	// AutomateServiceListAutomationsProcedure is the fully-qualified name of the AutomateService's
+	// ListAutomations RPC.
+	AutomateServiceListAutomationsProcedure = "/panel.AutomateService/ListAutomations"
 	// AutomateServiceRunAutomationProcedure is the fully-qualified name of the AutomateService's
 	// RunAutomation RPC.
 	AutomateServiceRunAutomationProcedure = "/panel.AutomateService/RunAutomation"
@@ -127,6 +130,7 @@ func (UnimplementedResourcesServiceHandler) GetResource(context.Context, *panel.
 // AutomateServiceClient is a client for the panel.AutomateService service.
 type AutomateServiceClient interface {
 	GetAutomation(context.Context, *panel.Ulid) (*panel.CloudAutomation, error)
+	ListAutomations(context.Context, *panel.ListAutomationsRequest) (*panel.CloudAutomation_List, error)
 	RunAutomation(context.Context, *panel.RunAutomationRequest) (*panel.RunRecord, error)
 	CancelAutomation(context.Context, *panel.Ulid) (*emptypb.Empty, error)
 }
@@ -148,6 +152,12 @@ func NewAutomateServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(automateServiceMethods.ByName("GetAutomation")),
 			connect.WithClientOptions(opts...),
 		),
+		listAutomations: connect.NewClient[panel.ListAutomationsRequest, panel.CloudAutomation_List](
+			httpClient,
+			baseURL+AutomateServiceListAutomationsProcedure,
+			connect.WithSchema(automateServiceMethods.ByName("ListAutomations")),
+			connect.WithClientOptions(opts...),
+		),
 		runAutomation: connect.NewClient[panel.RunAutomationRequest, panel.RunRecord](
 			httpClient,
 			baseURL+AutomateServiceRunAutomationProcedure,
@@ -166,6 +176,7 @@ func NewAutomateServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 // automateServiceClient implements AutomateServiceClient.
 type automateServiceClient struct {
 	getAutomation    *connect.Client[panel.Ulid, panel.CloudAutomation]
+	listAutomations  *connect.Client[panel.ListAutomationsRequest, panel.CloudAutomation_List]
 	runAutomation    *connect.Client[panel.RunAutomationRequest, panel.RunRecord]
 	cancelAutomation *connect.Client[panel.Ulid, emptypb.Empty]
 }
@@ -173,6 +184,15 @@ type automateServiceClient struct {
 // GetAutomation calls panel.AutomateService.GetAutomation.
 func (c *automateServiceClient) GetAutomation(ctx context.Context, req *panel.Ulid) (*panel.CloudAutomation, error) {
 	response, err := c.getAutomation.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// ListAutomations calls panel.AutomateService.ListAutomations.
+func (c *automateServiceClient) ListAutomations(ctx context.Context, req *panel.ListAutomationsRequest) (*panel.CloudAutomation_List, error) {
+	response, err := c.listAutomations.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
@@ -200,6 +220,7 @@ func (c *automateServiceClient) CancelAutomation(ctx context.Context, req *panel
 // AutomateServiceHandler is an implementation of the panel.AutomateService service.
 type AutomateServiceHandler interface {
 	GetAutomation(context.Context, *panel.Ulid) (*panel.CloudAutomation, error)
+	ListAutomations(context.Context, *panel.ListAutomationsRequest) (*panel.CloudAutomation_List, error)
 	RunAutomation(context.Context, *panel.RunAutomationRequest) (*panel.RunRecord, error)
 	CancelAutomation(context.Context, *panel.Ulid) (*emptypb.Empty, error)
 }
@@ -215,6 +236,12 @@ func NewAutomateServiceHandler(svc AutomateServiceHandler, opts ...connect.Handl
 		AutomateServiceGetAutomationProcedure,
 		svc.GetAutomation,
 		connect.WithSchema(automateServiceMethods.ByName("GetAutomation")),
+		connect.WithHandlerOptions(opts...),
+	)
+	automateServiceListAutomationsHandler := connect.NewUnaryHandlerSimple(
+		AutomateServiceListAutomationsProcedure,
+		svc.ListAutomations,
+		connect.WithSchema(automateServiceMethods.ByName("ListAutomations")),
 		connect.WithHandlerOptions(opts...),
 	)
 	automateServiceRunAutomationHandler := connect.NewUnaryHandlerSimple(
@@ -233,6 +260,8 @@ func NewAutomateServiceHandler(svc AutomateServiceHandler, opts ...connect.Handl
 		switch r.URL.Path {
 		case AutomateServiceGetAutomationProcedure:
 			automateServiceGetAutomationHandler.ServeHTTP(w, r)
+		case AutomateServiceListAutomationsProcedure:
+			automateServiceListAutomationsHandler.ServeHTTP(w, r)
 		case AutomateServiceRunAutomationProcedure:
 			automateServiceRunAutomationHandler.ServeHTTP(w, r)
 		case AutomateServiceCancelAutomationProcedure:
@@ -248,6 +277,10 @@ type UnimplementedAutomateServiceHandler struct{}
 
 func (UnimplementedAutomateServiceHandler) GetAutomation(context.Context, *panel.Ulid) (*panel.CloudAutomation, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.AutomateService.GetAutomation is not implemented"))
+}
+
+func (UnimplementedAutomateServiceHandler) ListAutomations(context.Context, *panel.ListAutomationsRequest) (*panel.CloudAutomation_List, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.AutomateService.ListAutomations is not implemented"))
 }
 
 func (UnimplementedAutomateServiceHandler) RunAutomation(context.Context, *panel.RunAutomationRequest) (*panel.RunRecord, error) {

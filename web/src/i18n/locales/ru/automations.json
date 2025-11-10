@@ -1,0 +1,86 @@
+{
+  "page": {
+    "title": "Автоматизации",
+    "subtitle": "Отслеживайте автоматизацию в Stroppy Cloud"
+  },
+  "actions": {
+    "refresh": "Обновить",
+    "runAutomation": "Запустить автоматизацию",
+    "backToList": "Вернуться к списку"
+  },
+  "filters": {
+    "onlyMine": "Показывать только мои автоматизации",
+    "onlyMineHint": "Отображать только те сценарии, которые запускали вы"
+  },
+  "sort": {
+    "field": "Сортировка",
+    "direction": "Направление",
+    "fields": {
+      "none": "Без сортировки",
+      "status": "По статусу",
+      "createdAt": "По дате создания"
+    },
+    "directions": {
+      "asc": "Возрастание",
+      "desc": "Убывание"
+    }
+  },
+  "table": {
+    "columns": {
+      "id": "ID автоматизации",
+      "status": "Статус",
+      "run": "Связанный запуск",
+      "createdAt": "Создано",
+      "updatedAt": "Обновлено"
+    }
+  },
+  "list": {
+    "loading": "Загружаем автоматизации…",
+    "empty": "Автоматизации не найдены",
+    "rowsPerPage": "Строк на странице",
+    "page": "Страница {{page}}",
+    "previous": "Предыдущая страница",
+    "next": "Следующая страница",
+    "count": "{{count}} автоматизаций"
+  },
+  "messages": {
+    "noRun": "Не привязан",
+    "unknown": "Неизвестно"
+  },
+  "form": {
+    "title": "Новая автоматизация",
+    "description": "Настройте базу данных и нагрузку перед запуском автоматизации.",
+    "sections": {
+      "cloud": "Облачный провайдер",
+      "database": "Конфигурация базы данных",
+      "databaseMachine": "Виртуальная машина базы (один узел)",
+      "workload": "Конфигурация нагрузки",
+      "workloadMachine": "Виртуальная машина нагрузки (один узел)"
+    },
+    "fields": {
+      "cloudProvider": "Провайдер",
+      "databaseName": "Имя базы данных",
+      "databaseType": "Тип базы данных",
+      "databaseParameters": "Параметры базы данных",
+      "workloadName": "Имя нагрузки",
+      "workloadType": "Тип нагрузки",
+      "workloadParameters": "Параметры нагрузки",
+      "machineCores": "vCPU",
+      "machineMemory": "Память (ГБ)",
+      "machineDisk": "Диск (ГБ)",
+      "machinePublicIp": "Публичный IP"
+    },
+    "parametersHint": "Используйте пары ключ=значение (например threads=64), по одной на строку. Оставьте пустым, чтобы пропустить.",
+    "cloudProviders": {
+      "yandex": "Yandex Cloud",
+      "unspecified": "Не выбрано"
+    },
+    "errors": {
+      "invalidParameters": "Используйте пары вида ключ=значение для {{target}}."
+    },
+    "actions": {
+      "submit": "Запустить автоматизацию",
+      "cancel": "Отмена"
+    }
+  }
+}

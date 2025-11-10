@@ -16,6 +16,7 @@
       "name": "Name",
       "status": "Status",
       "createdAt": "Created",
+      "updatedAt": "Updated",
       "startedAt": "Started",
       "completedAt": "Completed",
       "duration": "Duration",
@@ -33,6 +34,7 @@
   "filters": {
     "title": "Filters",
     "search": "Search by name",
+    "workloadName": "Workload name",
     "status": "Status",
     "any": "Any",
     "dateRange": "Date range",
@@ -48,6 +50,7 @@
     "workloadType": "Workload type",
     "databaseType": "Database type",
     "databaseName": "Database name",
+    "onlyMine": "Show only my runs",
     "tps": {
       "title": "TPS filter",
       "metric": "Metric",
@@ -119,7 +122,8 @@
     "import": "Import",
     "bulkDelete": "Bulk Delete",
     "bulkExport": "Bulk Export",
-    "clearSelection": "Clear selection"
+    "clearSelection": "Clear selection",
+    "backToList": "Back to runs"
   },
   "modals": {
     "createRun": {
@@ -247,6 +251,31 @@
     },
     "metrics": {
       "title": "Performance metrics"
+    }
+  },
+  "automation": {
+    "title": "Cloud automation",
+    "notLinked": "This run is not linked to automation",
+    "failed": "Failed to load automation data",
+    "loading": "Loading automation data…",
+    "startedAt": "Automation started",
+    "updatedAt": "Last updated",
+    "databaseTree": "Database resource tree",
+    "workloadTree": "Workload resource tree",
+    "resourceKindUnknown": "Unknown resource",
+    "resourceId": "Resource ID: {{id}}",
+    "ready": "Ready",
+    "notReady": "Not ready",
+    "synced": "Synced",
+    "notSynced": "Not synced",
+    "noResources": "No resources available",
+    "resourceStatus": {
+      "creating": "Creating",
+      "working": "Working",
+      "destroying": "Destroying",
+      "destroyed": "Destroyed",
+      "degraded": "Degraded",
+      "unknown": "Unknown"
     }
   }
 }

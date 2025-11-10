@@ -5,6 +5,7 @@ package panel;
 import "panel/types.proto";
 import "protopgx/pgx.proto";
 import "validate/validate.proto";
+import "proto/stroppy/cloud.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
 
@@ -24,7 +25,7 @@ message StroppyRun {
     ];
     Timing timing = 2 [(sql.sql_field).embedded_message = true];
     Status status = 3 [(validate.rules).enum.defined_only = true];
-    bytes run_info = 4;
+    stroppy.StroppyRun run_info = 4 [(sql.sql_field).serialized_message = true];
     string grafana_dashboard_url = 5 [(sql.sql_field) = {sql_type: {type: TEXT}}];
     repeated StroppyStep steps = 6 [(sql.sql_relation) = {
         one_to_many: {
@@ -52,5 +53,5 @@ message StroppyStep {
             constraints: {constraint: "NOT NULL REFERENCES stroppy_runs(id) ON DELETE CASCADE"}
         }
     ];
-    bytes step_info = 4 [(sql.sql_field).embedded_message = true];
+    stroppy.StroppyStepRun step_info = 4 [(sql.sql_field).serialized_message = true];
 }

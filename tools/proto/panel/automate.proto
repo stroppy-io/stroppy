@@ -60,6 +60,9 @@ message CloudAutomation {
         generate: true
         table_name: "cloud_automations"
     };
+    message List {
+        repeated CloudAutomation automations = 1;
+    }
     Ulid id = 1 [
         (sql.sql_field) = {
             sql_type: {type: TEXT,user_cast: true}
@@ -68,11 +71,28 @@ message CloudAutomation {
     ];
     Timing timing = 2 [(sql.sql_field).embedded_message = true];
     Status status = 3 [(validate.rules).enum.defined_only = true];
-    Ulid database_root_resource_id = 4 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
-    Ulid workload_root_resource_id = 5 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
-    optional Ulid stroppy_run_id = 6 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    Ulid author_id = 4 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {constraint: "NOT NULL REFERENCES users(id) ON DELETE CASCADE"}
+        }
+    ];
+    Ulid database_root_resource_id = 5 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    Ulid workload_root_resource_id = 6 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    optional Ulid stroppy_run_id = 7 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
 }
 
+
+message ListAutomationsRequest {
+    optional int32 limit = 1;
+    optional int32 offset = 2;
+
+    optional bool only_mine = 3;
+    // order by
+    optional Status order_by_status = 4;
+    optional bool order_by_status_descending = 5;
+    optional OrderByTimestamp order_by_created_at = 6;
+}
 
 message RunAutomationRequest {
     Database database = 1 [(sql.sql_field).serialized_message = true];
@@ -82,6 +102,7 @@ message RunAutomationRequest {
 
 service AutomateService {
     rpc GetAutomation (Ulid) returns (CloudAutomation);
+    rpc ListAutomations (ListAutomationsRequest) returns (CloudAutomation.List);
     rpc RunAutomation (RunAutomationRequest) returns (RunRecord);
     rpc CancelAutomation (Ulid) returns (google.protobuf.Empty);
 }

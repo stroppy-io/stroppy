@@ -23,6 +23,7 @@ const (
 	AccountService_Register_FullMethodName      = "/panel.AccountService/Register"
 	AccountService_Login_FullMethodName         = "/panel.AccountService/Login"
 	AccountService_GetMe_FullMethodName         = "/panel.AccountService/GetMe"
+	AccountService_GetUserById_FullMethodName   = "/panel.AccountService/GetUserById"
 	AccountService_RefreshTokens_FullMethodName = "/panel.AccountService/RefreshTokens"
 )
 
@@ -33,6 +34,7 @@ type AccountServiceClient interface {
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
 	GetMe(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*User, error)
+	GetUserById(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*User, error)
 	RefreshTokens(ctx context.Context, in *RefreshTokensRequest, opts ...grpc.CallOption) (*RefreshTokensResponse, error)
 }
 
@@ -71,6 +73,15 @@ func (c *accountServiceClient) GetMe(ctx context.Context, in *emptypb.Empty, opt
 	return out, nil
 }
 
+func (c *accountServiceClient) GetUserById(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*User, error) {
+	out := new(User)
+	err := c.cc.Invoke(ctx, AccountService_GetUserById_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *accountServiceClient) RefreshTokens(ctx context.Context, in *RefreshTokensRequest, opts ...grpc.CallOption) (*RefreshTokensResponse, error) {
 	out := new(RefreshTokensResponse)
 	err := c.cc.Invoke(ctx, AccountService_RefreshTokens_FullMethodName, in, out, opts...)
@@ -87,6 +98,7 @@ type AccountServiceServer interface {
 	Register(context.Context, *RegisterRequest) (*emptypb.Empty, error)
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	GetMe(context.Context, *emptypb.Empty) (*User, error)
+	GetUserById(context.Context, *Ulid) (*User, error)
 	RefreshTokens(context.Context, *RefreshTokensRequest) (*RefreshTokensResponse, error)
 	mustEmbedUnimplementedAccountServiceServer()
 }
@@ -103,6 +115,9 @@ func (UnimplementedAccountServiceServer) Login(context.Context, *LoginRequest) (
 }
 func (UnimplementedAccountServiceServer) GetMe(context.Context, *emptypb.Empty) (*User, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMe not implemented")
+}
+func (UnimplementedAccountServiceServer) GetUserById(context.Context, *Ulid) (*User, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUserById not implemented")
 }
 func (UnimplementedAccountServiceServer) RefreshTokens(context.Context, *RefreshTokensRequest) (*RefreshTokensResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RefreshTokens not implemented")
@@ -174,6 +189,24 @@ func _AccountService_GetMe_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AccountService_GetUserById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Ulid)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountServiceServer).GetUserById(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountService_GetUserById_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountServiceServer).GetUserById(ctx, req.(*Ulid))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AccountService_RefreshTokens_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RefreshTokensRequest)
 	if err := dec(in); err != nil {
@@ -210,6 +243,10 @@ var AccountService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMe",
 			Handler:    _AccountService_GetMe_Handler,
+		},
+		{
+			MethodName: "GetUserById",
+			Handler:    _AccountService_GetUserById_Handler,
 		},
 		{
 			MethodName: "RefreshTokens",
