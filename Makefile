@@ -149,14 +149,19 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 
 .PHONY: .app-deps
 .app-deps: # Install application dependencies in ./bin
-	GOPROXY=$(GOPROXY) go mod tidy
+	GOPROXY=$(GOPROXY) 											go mod tidy
+	GOPROXY=$(GOPROXY) cd cmd/xk6/       && go mod tidy
+	GOPROXY=$(GOPROXY) cd cmd/xk6air/    && go mod tidy
+	GOPROXY=$(GOPROXY) cd cmd/sobek/     && go mod tidy
+	GOPROXY=$(GOPROXY) cd cmd/config2go/ && go mod tidy
+	GOPROXY=$(GOPROXY) cd cmd/inserter/  && go mod tidy
 
 PROTO_BUILD_TARGET_DIR=$(CURDIR)/proto/build
 .PHONY: proto
 proto: .check-bins
 	rm -rf $(CURDIR)/pkg/common/proto/*
 	$(MAKE) .easyp-gen && $(MAKE) .build-proto-ts-sdk
-	cp -r $(PROTO_BUILD_TARGET_DIR)/go/stroppy/* $(CURDIR)/pkg/common/proto/
+# NOTE: easyp generates the code into the right place 'proto/stroppy' by itself
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.ts $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.js $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/docs/proto.md $(CURDIR)/docs
