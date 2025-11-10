@@ -1,6 +1,7 @@
 VERSION=$(shell git describe --tags --always 2>/dev/null || echo "0.0.0")
 LOCAL_BIN:=$(CURDIR)/bin
-PATH:=$(PATH):$(LOCAL_BIN)
+NODE_BIN:=$(CURDIR)/bin/node_bin/bin
+PATH:=$(LOCAL_BIN):$(NODE_BIN):$(PATH)
 GOPROXY:=https://goproxy.io,direct
 BUILD_TARGET_DIR=$(CURDIR)/build
 PROTO_BUILD_TARGET_DIR=$(CURDIR)/proto/build
@@ -27,7 +28,7 @@ help: # Show help in Makefile
 REQUIRED_BINS = git node npm go curl unzip \
 	protoc=$(LOCAL_BIN)/protoc \
 	easyp=$(LOCAL_BIN)/easyp \
-	protoc-gen-ts=$(LOCAL_BIN)/node_bin/bin/protoc-gen-ts \
+	protoc-gen-ts=$(NODE_BIN)/protoc-gen-ts \
 	protoc-gen-go=$(LOCAL_BIN)/protoc-gen-go \
 	protoc-gen-go-grpc=$(LOCAL_BIN)/protoc-gen-go-grpc \
 	protoc-gen-validate=$(LOCAL_BIN)/protoc-gen-validate \
@@ -125,7 +126,7 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 
 .PHONY: .easyp-gen
 .easyp-gen:
-	PATH=$(LOCAL_BIN):$(PATH) $(LOCAL_BIN)/easyp generate
+	$(LOCAL_BIN)/easyp generate
 
 .PHONY: .install-linter
 .install-linter: # Install golangci-lint
@@ -176,8 +177,8 @@ tests: # Run tests with coverage
 	go test -race ./... -coverprofile=coverage.out
 
 K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
-.PHONY: build-xk6
-build-xk6: .check-bins # Build k6 module
+.PHONY: build-k6
+build-k6: .check-bins # Build k6 module
 	mkdir -p $(CURDIR)/build
 	PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
 		--with github.com/stroppy-io/stroppy/cmd/xk6air=./cmd/xk6air/ \
