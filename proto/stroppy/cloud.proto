@@ -8,7 +8,7 @@ import "proto/stroppy/config.proto";
 import "google/protobuf/empty.proto";
 import "proto/stroppy/runtime.proto";
 
-option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto";
+option go_package = "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy";
 
 /**
  * Status represents the status of a stroppy run or step run.

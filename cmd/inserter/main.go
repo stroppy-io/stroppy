@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/stroppy-io/stroppy/pkg/common/proto"
+	"github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"go.uber.org/zap"
 )

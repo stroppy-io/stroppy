@@ -12,7 +12,7 @@ import (
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/internal/config"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"github.com/stroppy-io/stroppy/pkg/common/proto"
+	"github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
 )
 
 const (
@@ -48,7 +48,7 @@ var NewConfigCmd = &cobra.Command{ //nolint: gochecknoglobals
 		if err != nil {
 			return err
 		}
-		var protoConfig *proto.ConfigFile
+		var protoConfig *stroppy.ConfigFile
 		if isTpcc { // TODO: proper --preset tpcc|simple|etc.. option
 			protoConfig = config.NewTPCCConfig(int32(warehouseMax))
 		} else {

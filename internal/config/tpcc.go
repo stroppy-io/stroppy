@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
 )
 
 //nolint:mnd,funlen,lll,maintidx,dupl,gosec // a huge and long magic constant

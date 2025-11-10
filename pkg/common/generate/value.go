@@ -11,7 +11,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/randstr"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
 )
 
 type ValueGenerator interface {

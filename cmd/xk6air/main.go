@@ -5,8 +5,8 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	pb "github.com/stroppy-io/stroppy/pkg/common/proto"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	pb "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
 	"google.golang.org/protobuf/proto"
 
 	"go.k6.io/k6/js/modules"

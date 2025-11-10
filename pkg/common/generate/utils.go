@@ -10,7 +10,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
 )
 
 type (

@@ -3,7 +3,7 @@ package postgres
 import (
 	"strings"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
 )
 
 func (d *Driver) CopyFromQuery(query *stroppy.DriverQuery) error {

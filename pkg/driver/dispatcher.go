@@ -5,7 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
 )
 
