@@ -15,7 +15,7 @@ RUN make .install-xk6
 
 COPY . .
 
-RUN make build-xk6
+RUN make build-k6
 
 FROM alpine:3.22 AS runner
 

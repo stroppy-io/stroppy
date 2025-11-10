@@ -137,7 +137,7 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 .install-xk6:
 	$(info Installing xk6...)
 	mkdir -p $(LOCAL_BIN)
-	GOPROXY=$(GOPROXY) GOBIN=$(LOCAL_BIN) go install go.k6.io/xk6@v1.1.5
+	GOBIN=$(LOCAL_BIN) go install go.k6.io/xk6@v1.1.5
 
 .PHONY: .install-proto-deps
 .install-proto-deps: .install-protoc .install-easyp .install-go-proto-deps .install-node-proto-deps
