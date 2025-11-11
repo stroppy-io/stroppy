@@ -2,12 +2,14 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -17,6 +19,40 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
+
+func waitForDB(lg *zap.Logger, connPool *pgxpool.Pool, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	interval := 1 * time.Second
+	startTime := time.Now()
+
+	for {
+		// Check if timeout exceeded
+		if time.Since(startTime) >= timeout {
+			return fmt.Errorf("database connection timeout after %v", timeout)
+		}
+
+		// Try to ping
+		if err := connPool.Ping(ctx); err == nil {
+			lg.Info("Successfully connected to database")
+			return nil
+		} else {
+			lg.Sugar().Warnf("Database not ready, retrying in %v... (error: %v)", interval, err)
+		}
+
+		// Sleep for current interval
+		select {
+		case <-time.After(interval):
+			// Continue to next retry
+		case <-ctx.Done():
+			return fmt.Errorf("context cancelled: %w", ctx.Err())
+		}
+
+		// Increase interval by 5 seconds for next attempt
+		interval += 5 * time.Second
+	}
+}
 
 // TODO: performance issue by passing via interface?
 type QueryBuilder interface {
@@ -72,6 +108,10 @@ func NewDriver(
 		cfg,
 		d.logger.Named(pool.LoggerName),
 	)
+	if err != nil {
+		return nil, err
+	}
+	err = waitForDB(d.logger, connPool, 5*time.Minute)
 	if err != nil {
 		return nil, err
 	}
