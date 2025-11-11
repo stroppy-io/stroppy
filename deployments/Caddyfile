@@ -12,3 +12,18 @@ panel.stroppy.io {
         }
     }
 }
+
+console.stroppy.io {
+    encode zstd gzip
+    reverse_proxy stroppy-cloud-panel:8080 {
+        header_up *
+        header_down *
+        flush_interval -1
+        transport http {
+            read_timeout 0
+            response_header_timeout 0
+            dial_timeout 10s
+            versions h2c 2 1.1
+        }
+    }
+}
