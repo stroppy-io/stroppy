@@ -13,7 +13,7 @@ panel.stroppy.io {
     }
 }
 
-console.stroppy.io {
+app.stroppy.io {
     encode zstd gzip
     reverse_proxy stroppy-cloud-panel:8080 {
         header_up *
