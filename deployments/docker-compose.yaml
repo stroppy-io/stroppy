@@ -69,6 +69,4 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       - ./Caddyfile:/etc/caddy/Caddyfile
-    networks:
-      - shared
     restart: unless-stopped
