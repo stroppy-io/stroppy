@@ -47,7 +47,7 @@ const buildListRequest = (filters: AutomationsFilters) => {
     limit: filters.pageSize,
     offset,
     onlyMine: filters.onlyMine,
-    orderByStatus: orderByStatusAsc ? Status.UNSPECIFIED : undefined,
+    orderByStatus: orderByStatusAsc ? Status.IDLE : undefined,
     orderByStatusDescending: orderByStatusDesc ? true : undefined,
     orderByCreatedAt: orderByCreatedAtDirection
       ? create(OrderByTimestampSchema, {

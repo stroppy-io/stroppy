@@ -229,7 +229,7 @@ export const RunsCreatePage = () => {
                   <SelectValue placeholder={t('table.columns.status')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {[Status.RUNNING, Status.COMPLETED, Status.FAILED, Status.CANCELED, Status.IDLE].map((status) => (
+                  {[Status.RUNNING, Status.COMPLETED, Status.FAILED, Status.CANCELLED, Status.IDLE].map((status) => (
                     <SelectItem key={status} value={status.toString()}>
                       {getStatusLabel(status, t)}
                     </SelectItem>

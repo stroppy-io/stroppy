@@ -27,6 +27,7 @@ type HTTPServerConfig struct {
 	WriteTimeout time.Duration `mapstructure:"write_timeout" default:"10s"`
 	IdleTimeout  time.Duration `mapstructure:"idle_timeout" default:"120s"`
 	CorsDomain   string        `mapstructure:"cors_domain" default:"*"`
+	StaticDir    string        `mapstructure:"static_dir" default:""`
 }
 
 func addStarToPath(path string, h http.Handler) (string, http.Handler) {
@@ -81,6 +82,9 @@ func NewServer(
 	mux.Handle(addStarToPath(panelconnect.NewAutomateServiceHandler(service, intercept)))
 	mux.Handle(addStarToPath(panelconnect.NewResourcesServiceHandler(service, intercept)))
 	mux.Handle(addStarToPath(panelconnect.NewRunServiceHandler(service, intercept)))
+	if err := registerStaticFrontend(mux, config.StaticDir, log.Named("static")); err != nil {
+		log.Warn("static file handler disabled", zap.String("path", config.StaticDir), zap.Error(err))
+	}
 	httpServer := &http.Server{
 		Addr:         net.JoinHostPort(config.Host, strconv.Itoa(config.Port)),
 		Handler:      mux,

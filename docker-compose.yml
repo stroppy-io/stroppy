@@ -20,7 +20,7 @@ services:
 #  stroppy-cloud-panel:
 #    build:
 #      context: ../..
-#      dockerfile: deployments/docker/Dockerfile
+#      dockerfile: Dockerfile
 #      args:
 #        VITE_API_BASE_URL: /api/v1
 #    container_name: stroppy-cloud-panel

@@ -17,7 +17,7 @@
 └── env*.example             # Образцы переменных окружения
 ```
 
-## Backend (Go 1.21+)
+## Backend (Go 1.24+)
 
 Основная точка входа: `cmd/stroppy-cloud-panel/main.go`.
 
@@ -56,8 +56,8 @@ yarn build      # продакшен сборка в web/dist
 Все Docker/Compose/Helm файлы лежат в `deployments/`.
 
 ```bash
-# Сборка образа (deployments/docker/Dockerfile)
-make docker-build
+# Сборка production-образа (корневой Dockerfile)
+docker build --build-arg VERSION=$(git describe --tags --always) -t stroppy-cloud-panel:latest .
 
 # Продакшен compose-стек
 make docker-up
@@ -69,5 +69,9 @@ make docker-dev
 make docker-stop
 make docker-clean
 ```
+
+HTTP-сервер теперь умеет отдавать собранный frontend. Путь к статике задаётся
+в конфиге `service.server.static_dir` или через переменную окружения
+`SERVICE_SERVER_STATIC_DIR` (Dockerfile пробрасывает `/app/frontend`).
 
 Дополнительная документация по API и примерам запросов находится в `docs/`.

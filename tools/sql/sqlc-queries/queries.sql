@@ -30,12 +30,7 @@ FROM tree;
 
 
 -- name: GetAllResourcesIps :many
-SELECT DISTINCT (ni ->> 'ip_address')::TEXT AS ip_address
-FROM cloud_resources
-         CROSS JOIN LATERAL jsonb_array_elements(
-        resource_def -> 'spec' -> 'yandexCloudVm' -> 'networkInterface'
-                            ) AS ni
-WHERE ni ? 'ip_address'
-  AND ni ->> 'ip_address' IS NOT NULL
-  AND ni ->> 'ip_address' <> ''
-AND status = ANY($1::int[]);
+SELECT DISTINCT (jsonb_array_elements(c.resource_def -> 'spec' -> 'yandexCloudVm' -> 'networkInterface') ->
+                 'ipAddress')::TEXT AS ip_address
+FROM cloud_resources as c
+WHERE status = ANY($1::int[]);

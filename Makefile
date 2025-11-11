@@ -109,7 +109,7 @@ run: build
 
 .PHONY: build_docker
 build_docker: # Сборка докер образа
-	docker build --build-arg VERSION=$(VERSION) --build-arg GITHUB_TOKEN=$(GITHUB_TOKEN) -t stroppy-cloud-panel-server:$(VERSION) -f deployments/docker/Dockerfile .
+	docker build --build-arg VERSION=$(VERSION) -t stroppy-cloud-panel-server:$(VERSION) .
 
 .PHONY: mockery
 mockery: # Создание моков
@@ -196,4 +196,3 @@ restart-infra: stop-infra start-infra  # инфраструктуры
 
 
 # -----------------------------------------------------------------------------
-

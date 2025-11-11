@@ -92,7 +92,7 @@ function parseNumericFilter<TParameter>(state: NumericFilterState<TParameter>): 
 
 const isDefined = <T,>(value: T | undefined): value is T => value !== undefined
 
-const statusOptions: Status[] = [Status.RUNNING, Status.COMPLETED, Status.FAILED, Status.CANCELED, Status.IDLE]
+const statusOptions: Status[] = [Status.RUNNING, Status.COMPLETED, Status.FAILED, Status.CANCELLED, Status.IDLE]
 const workloadTypeValues: Workload_Type[] = [Workload_Type.TPCC]
 const databaseTypeValues: Database_Type[] = [Database_Type.POSTGRES_ORIOLE]
 const tpsMetricValues: Tps_Filter_Type[] = [

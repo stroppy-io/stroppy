@@ -8,7 +8,7 @@ export const getStatusLabel = (status: Status, t: (key: string) => string) => {
       return t('status.running')
     case Status.FAILED:
       return t('status.failed')
-    case Status.CANCELED:
+    case Status.CANCELLED:
       return t('status.cancelled')
     case Status.IDLE:
       return t('status.pending')
