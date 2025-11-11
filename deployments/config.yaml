@@ -1,0 +1,48 @@
+infra:
+  postgres:
+    host: localhost
+    port: 5432
+    username: postgres
+    password: developer
+    database: postgres
+    log_level: info
+
+service:
+  domain: "*"
+  logger:
+    level: info
+    mod: production
+  auth:
+    hmac_secret_key: "your_hmac_secret_key"
+    issuer: "stroppy-cloud-panel"
+    leeway: "30s"
+    access_expire: "2h"
+    refresh_expire: "24h"
+  background:
+    periodic_automate_check_interval: 15s
+    max_automation_ttl: 2h
+  automate:
+    automation_ttl: 4h
+    creation_timeout: 5m
+    oriole_base_image: "fd8g05clmsv92nlqmer5"
+    stroppy_base_image: "fd8rlvda55egnjvtev72"
+    stroppy_cloud_url: "https://panel.stroppy.io"
+    stroppy_docker_version: "v1.2.0-dev10.12"
+  k8s:
+    kubeconfig_path: ".kubectl.config.yaml"
+    crossplane:
+      yandex_cloud_builder:
+        default_network_id: "enp7b429s2br5pja0jci"
+        default_subnet_id: "fl85dq0cam3ed6cfg2st"
+        default_network_cidr_block: "10.1.0.0/16"
+        default_vm_zone: "ru-central1-d"
+        default_vm_platform_id: "standard-v2"
+        default_ubuntu_image_id: "fd82pkek8uu0ejjkh4vn"
+  server:
+    host: 0.0.0.0
+    port: 8080
+    read_timeout: 5s
+    write_timeout: 10s
+    idle_timeout: 120s
+    cors_domain: "*"
+    static_dir: "/app/frontend"

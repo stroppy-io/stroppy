@@ -25,6 +25,5 @@ WORKDIR /app
 COPY --from=backend-builder /out/stroppy-cloud-panel ./stroppy-cloud-panel
 COPY --from=backend-builder /src/config.yaml .
 COPY --from=frontend-builder /src/web/dist ./frontend
-ENV SERVICE_SERVER_STATIC_DIR=/app/frontend
 EXPOSE 8080
 CMD ["./stroppy-cloud-panel"]
