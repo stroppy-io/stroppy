@@ -12,8 +12,3 @@ panel.stroppy.io {
         }
     }
 }
-
-# Редирект с www на основной домен
-www.panel.stroppy.io {
-    redir https://panel.stroppy.io{uri} permanent
-}
