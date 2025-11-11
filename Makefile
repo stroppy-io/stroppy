@@ -113,6 +113,7 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 	mkdir -p $(TMP_BUNDLE_DIR)
 	mkdir -p $(TMP_BUNDLE_DIR)/ts_sdk
 	cp -r $(TS_TARGET_DIR)/google/protobuf/* $(TMP_BUNDLE_DIR)/ts_sdk/
+	cp -r $(TS_TARGET_DIR)/proto/stroppy/* $(TMP_BUNDLE_DIR)/ts_sdk/
 	cp $(TS_BUNDLE_DIR)/combine.js $(TMP_BUNDLE_DIR)/
 	cp $(TS_BUNDLE_DIR)/package.json $(TMP_BUNDLE_DIR)/
 	cp $(TS_BUNDLE_DIR)/tsconfig.json $(TMP_BUNDLE_DIR)/

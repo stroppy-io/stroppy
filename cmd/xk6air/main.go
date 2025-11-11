@@ -65,11 +65,10 @@ func (i *XK6Instance) ParseConfig(configBin []byte) {
 		i.lg.Panic("error unmarshall driver config", zap.Error(err))
 	}
 	i.lg.Sugar().Debugf(drvCfg.Url)
-	drv, err := driver.Dispatch(rootModule.ctx, i.lg, &drvCfg)
+	i.drv, err = driver.Dispatch(rootModule.ctx, i.lg, &drvCfg)
 	if err != nil {
 		i.lg.Panic("can't get driver", zap.Error(err))
 	}
-	i.drv = drv
 
 	onceParseConfig.Do(func() {
 		rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
