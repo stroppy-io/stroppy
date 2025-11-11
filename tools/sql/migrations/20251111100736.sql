@@ -37,7 +37,6 @@ CREATE TABLE "cloud_automations" (
   "author_id" text NOT NULL,
   "database_root_resource_id" text NOT NULL,
   "workload_root_resource_id" text NOT NULL,
-  "stroppy_run_id" text NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "cloud_automations_author_id_fkey" FOREIGN KEY ("author_id") REFERENCES "users" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
 );
@@ -64,6 +63,7 @@ CREATE TABLE "stroppy_runs" (
   "deleted_at" timestamptz NULL,
   "status" integer NOT NULL DEFAULT 0,
   "run_info" jsonb NOT NULL,
+  "cloud_automation_id" text NOT NULL,
   "grafana_dashboard_url" text NOT NULL,
   PRIMARY KEY ("id")
 );
@@ -73,6 +73,7 @@ CREATE TABLE "stroppy_steps" (
   "created_at" timestamptz NOT NULL,
   "updated_at" timestamptz NOT NULL,
   "deleted_at" timestamptz NULL,
+  "status" integer NOT NULL DEFAULT 0,
   "run_id" text NOT NULL,
   "step_info" jsonb NOT NULL,
   PRIMARY KEY ("id"),

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ips"
+	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"go.uber.org/zap"
 	"strings"
 	"time"
@@ -27,6 +28,25 @@ type CloudAutomationConfig struct {
 	CreationTimeout      time.Duration `mapstructure:"creation_timeout" default:"15m" validate:"required"`
 	OrioleBaseImage      string        `mapstructure:"oriole_base_image" validate:"required"`
 	StroppyTpccBaseImage string        `mapstructure:"stroppy_base_image" validate:"required"`
+	StroppyCloudUrl      string        `mapstructure:"stroppy_cloud_url" validate:"required"`
+	StroppyDockerVersion string        `mapstructure:"stroppy_docker_version" validate:"required"`
+}
+
+func (p *PanelService) preloadAutomationStroppyRun(ctx context.Context, automationId *panel.Ulid) (*panel.StroppyRun, error) {
+	stroppyRun, err := p.stroppyRunRepo.GetBy(ctx, orm.StroppyRun.SelectAll().
+		Where(orm.StroppyRun.CloudAutomationId.Eq(automationId.GetId())),
+	)
+	if err != nil {
+		return nil, err
+	}
+	steps, err := p.stroppyStepRepo.ListBy(ctx, orm.StroppyStep.SelectAll().
+		Where(orm.StroppyStep.RunId.Eq(stroppyRun.GetId().GetId())),
+	)
+	if err != nil {
+		return nil, err
+	}
+	stroppyRun.Steps = steps
+	return stroppyRun, nil
 }
 
 func (p *PanelService) GetAutomation(ctx context.Context, ulid *panel.Ulid) (*panel.CloudAutomation, error) {
@@ -37,6 +57,11 @@ func (p *PanelService) GetAutomation(ctx context.Context, ulid *panel.Ulid) (*pa
 	if err != nil {
 		return nil, err
 	}
+	stroppyRun, err := p.preloadAutomationStroppyRun(ctx, ulid)
+	if err != nil {
+		return nil, err
+	}
+	automation.StroppyRun = stroppyRun
 	return automation, nil
 }
 
@@ -134,56 +159,72 @@ func (p *PanelService) RunAutomation(ctx context.Context, request *panel.RunAuto
 	workloadInternalIpStr := workloadInternalIp.String()
 	p.logger.Info("Found free ip for workload", zap.String("ip", workloadInternalIpStr))
 
-	newAutomationId := ids.NewUlid()
-	dbDeployScript, err := embed.GetOrioleInstallScript()
-	if err != nil {
-		return nil, connect.NewError(
-			connect.CodeInternal,
-			fmt.Errorf("failed to get oriole install script: %w", err),
-		)
-	}
-	databaseMachineName := fmt.Sprintf("stroppy-crossplane-database-%s", strings.ToLower(newAutomationId.GetId()))
-	// TODO: AUTOMATE THIS LATER
-	request.GetDatabase().GetRunnerCluster().GetMachines()[0].BaseImageId = &p.automateConfig.OrioleBaseImage
-	request.GetDatabase().GetRunnerCluster().GetMachines()[0].StaticInternalIp = &databaseInternalIpStr
-	databaseResourcesTree, err := cloudBuilder.NewSingleVmResource(
-		databaseMachineName,
-		request.GetDatabase().GetRunnerCluster().GetMachines()[0],
-		dbDeployScript,
-	)
-	if err != nil {
-		return nil, connect.NewError(
-			connect.CodeInternal,
-			fmt.Errorf("failed to create database spec: %w", err),
-		)
-	}
-	workloadDeployScript, err := embed.GetStroppyInstallScript()
-	if err != nil {
-		return nil, connect.NewError(
-			connect.CodeInternal,
-			fmt.Errorf("failed to get stroppy install script: %w", err),
-		)
-	}
-	driverUrl := fmt.Sprintf("postgres://st-t-postgres:st-t-postgres-pass@%s:54321/st-t-postgres", databaseInternalIpStr)
-	workloadDeployScript.Body = []byte(strings.ReplaceAll(string(workloadDeployScript.Body), "${DRIVER_URL}", driverUrl))
-	workloadMachineName := fmt.Sprintf("stroppy-crossplane-workload-%s", strings.ToLower(newAutomationId.GetId()))
-	// TODO: AUTOMATE THIS LATER
-	request.GetWorkload().GetRunnerCluster().GetMachines()[0].BaseImageId = &p.automateConfig.StroppyTpccBaseImage
-	request.GetWorkload().GetRunnerCluster().GetMachines()[0].StaticInternalIp = &workloadInternalIpStr
-	workloadResourcesTree, err := cloudBuilder.NewSingleVmResource(
-		workloadMachineName,
-		request.GetWorkload().GetRunnerCluster().GetMachines()[0],
-		workloadDeployScript,
-	)
-	if err != nil {
-		return nil, connect.NewError(
-			connect.CodeInternal,
-			fmt.Errorf("failed to create database spec: %w", err),
-		)
-	}
 	// TODO: Do not hardcode paths
 	return postgres.WithSerializableRet(ctx, p.txManager,
 		func(ctx context.Context) (*panel.RunRecord, error) {
+			newAutomationId := ids.NewUlid()
+			dbDeployScript, err := embed.GetOrioleInstallScript()
+			if err != nil {
+				return nil, connect.NewError(
+					connect.CodeInternal,
+					fmt.Errorf("failed to get oriole install script: %w", err),
+				)
+			}
+			databaseMachineName := fmt.Sprintf("stroppy-crossplane-database-%s", strings.ToLower(newAutomationId.GetId()))
+			// TODO: AUTOMATE THIS LATER
+			request.GetDatabase().GetRunnerCluster().GetMachines()[0].BaseImageId = &p.automateConfig.OrioleBaseImage
+			request.GetDatabase().GetRunnerCluster().GetMachines()[0].StaticInternalIp = &databaseInternalIpStr
+			databaseResourcesTree, err := cloudBuilder.NewSingleVmResource(
+				databaseMachineName,
+				request.GetDatabase().GetRunnerCluster().GetMachines()[0],
+				dbDeployScript,
+			)
+			if err != nil {
+				return nil, connect.NewError(
+					connect.CodeInternal,
+					fmt.Errorf("failed to create database spec: %w", err),
+				)
+			}
+			workloadDeployScript, err := embed.GetStroppyInstallScript()
+			if err != nil {
+				return nil, connect.NewError(
+					connect.CodeInternal,
+					fmt.Errorf("failed to get stroppy install script: %w", err),
+				)
+			}
+			newRunId := ids.NewUlid()
+			err = p.stroppyRunRepo.Insert(ctx, &panel.StroppyRun{
+				Id:                newRunId,
+				CloudAutomationId: newAutomationId,
+				Status:            stroppy.Status_STATUS_IDLE,
+				RunInfo:           &stroppy.StroppyRun{},
+			})
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+			driverUrl := fmt.Sprintf("postgres://st-t-postgres:st-t-postgres-pass@%s:54321/st-t-postgres", databaseInternalIpStr)
+			workloadDeployScript.Body = []byte(replaceMultipleStrings(string(workloadDeployScript.Body), map[string]string{
+				"${DRIVER_URL}":           driverUrl,
+				"${STROPPY_CLOUD_RUN_ID}": newRunId.GetId(),
+				"${STROPPY_VERSION}":      p.automateConfig.StroppyDockerVersion,
+				"${STROPPY_CLOUD_URL}":    p.automateConfig.StroppyCloudUrl,
+			}))
+			workloadMachineName := fmt.Sprintf("stroppy-crossplane-workload-%s", strings.ToLower(newAutomationId.GetId()))
+			// TODO: AUTOMATE THIS LATER
+			request.GetWorkload().GetRunnerCluster().GetMachines()[0].BaseImageId = &p.automateConfig.StroppyTpccBaseImage
+			request.GetWorkload().GetRunnerCluster().GetMachines()[0].StaticInternalIp = &workloadInternalIpStr
+			workloadResourcesTree, err := cloudBuilder.NewSingleVmResource(
+				workloadMachineName,
+				request.GetWorkload().GetRunnerCluster().GetMachines()[0],
+				workloadDeployScript,
+			)
+			if err != nil {
+				return nil, connect.NewError(
+					connect.CodeInternal,
+					fmt.Errorf("failed to create database spec: %w", err),
+				)
+			}
+
 			err = p.createCrossplaneResourcesTree(ctx, databaseResourcesTree)
 			if err != nil {
 				return nil, connect.NewError(
@@ -205,7 +246,6 @@ func (p *PanelService) RunAutomation(ctx context.Context, request *panel.RunAuto
 				Status:                 panel.Status_STATUS_IDLE,
 				DatabaseRootResourceId: databaseResourcesTree.GetId(),
 				WorkloadRootResourceId: workloadResourcesTree.GetId(),
-				StroppyRunId:           nil,
 			})
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
@@ -241,7 +281,7 @@ func (p *PanelService) CancelAutomation(ctx context.Context, ulid *panel.Ulid) (
 	}
 	return &emptypb.Empty{}, postgres.WithSerializable(ctx, p.txManager,
 		func(ctx context.Context) error {
-			return p.stopCrossplaneAutomation(ctx, automation, panel.Status_STATUS_CANCELED)
+			return p.stopCrossplaneAutomation(ctx, automation, panel.Status_STATUS_CANCELLED)
 		})
 }
 

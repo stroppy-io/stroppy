@@ -53,7 +53,7 @@ func (p *PanelService) ListRuns(ctx context.Context, request *panel.ListRunsRequ
 	if offset := request.GetOffset(); offset != 0 {
 		q = q.Offset(int(offset))
 	}
-	if request.GetStatus() != panel.Status_STATUS_UNSPECIFIED {
+	if request.Status != nil {
 		q = q.Where(orm.RunRecord.Status.Eq(int32(request.GetStatus())))
 	}
 	if request.GetWorkloadName() != "" {

@@ -6,16 +6,16 @@ import (
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
-	"github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 var (
 	User            = newUserTableImpl()
 	RunRecord       = newRunRecordTableImpl()
-	CloudResource   = newCloudResourceTableImpl()
-	CloudAutomation = newCloudAutomationTableImpl()
 	StroppyRun      = newStroppyRunTableImpl()
 	StroppyStep     = newStroppyStepTableImpl()
+	CloudResource   = newCloudResourceTableImpl()
+	CloudAutomation = newCloudAutomationTableImpl()
 )
 
 type (
@@ -27,14 +27,6 @@ type (
 		fieldAlias
 		mustRunRecordField()
 	}
-	CloudResourceField interface {
-		fieldAlias
-		mustCloudResourceField()
-	}
-	CloudAutomationField interface {
-		fieldAlias
-		mustCloudAutomationField()
-	}
 	StroppyRunField interface {
 		fieldAlias
 		mustStroppyRunField()
@@ -42,6 +34,14 @@ type (
 	StroppyStepField interface {
 		fieldAlias
 		mustStroppyStepField()
+	}
+	CloudResourceField interface {
+		fieldAlias
+		mustCloudResourceField()
+	}
+	CloudAutomationField interface {
+		fieldAlias
+		mustCloudAutomationField()
 	}
 )
 type (
@@ -107,6 +107,76 @@ func (f *runRecorddatabaseFieldImpl) mustRunRecordField()          {}
 func (f *runRecordworkloadFieldImpl) mustRunRecordField()          {}
 func (f *runRecordcloudAutomationIdFieldImpl) mustRunRecordField() {}
 func (f fieldAliasImpl) mustRunRecordField()                       {}
+
+type (
+	stroppyRunidFieldImpl struct {
+		*column[string, StroppyRunField]
+	}
+	stroppyRuncreatedAtFieldImpl struct {
+		*column[time.Time, StroppyRunField]
+	}
+	stroppyRunupdatedAtFieldImpl struct {
+		*column[time.Time, StroppyRunField]
+	}
+	stroppyRundeletedAtFieldImpl struct {
+		*column[*time.Time, StroppyRunField]
+	}
+	stroppyRunstatusFieldImpl struct {
+		*column[int32, StroppyRunField]
+	}
+	stroppyRunrunInfoFieldImpl struct {
+		*column[[]byte, StroppyRunField]
+	}
+	stroppyRuncloudAutomationIdFieldImpl struct {
+		*column[string, StroppyRunField]
+	}
+	stroppyRungrafanaDashboardUrlFieldImpl struct {
+		*column[string, StroppyRunField]
+	}
+)
+
+func (f *stroppyRunidFieldImpl) mustStroppyRunField()                  {}
+func (f *stroppyRuncreatedAtFieldImpl) mustStroppyRunField()           {}
+func (f *stroppyRunupdatedAtFieldImpl) mustStroppyRunField()           {}
+func (f *stroppyRundeletedAtFieldImpl) mustStroppyRunField()           {}
+func (f *stroppyRunstatusFieldImpl) mustStroppyRunField()              {}
+func (f *stroppyRunrunInfoFieldImpl) mustStroppyRunField()             {}
+func (f *stroppyRuncloudAutomationIdFieldImpl) mustStroppyRunField()   {}
+func (f *stroppyRungrafanaDashboardUrlFieldImpl) mustStroppyRunField() {}
+func (f fieldAliasImpl) mustStroppyRunField()                          {}
+
+type (
+	stroppyStepidFieldImpl struct {
+		*column[string, StroppyStepField]
+	}
+	stroppyStepcreatedAtFieldImpl struct {
+		*column[time.Time, StroppyStepField]
+	}
+	stroppyStepupdatedAtFieldImpl struct {
+		*column[time.Time, StroppyStepField]
+	}
+	stroppyStepdeletedAtFieldImpl struct {
+		*column[*time.Time, StroppyStepField]
+	}
+	stroppyStepstatusFieldImpl struct {
+		*column[int32, StroppyStepField]
+	}
+	stroppySteprunIdFieldImpl struct {
+		*column[string, StroppyStepField]
+	}
+	stroppyStepstepInfoFieldImpl struct {
+		*column[[]byte, StroppyStepField]
+	}
+)
+
+func (f *stroppyStepidFieldImpl) mustStroppyStepField()        {}
+func (f *stroppyStepcreatedAtFieldImpl) mustStroppyStepField() {}
+func (f *stroppyStepupdatedAtFieldImpl) mustStroppyStepField() {}
+func (f *stroppyStepdeletedAtFieldImpl) mustStroppyStepField() {}
+func (f *stroppyStepstatusFieldImpl) mustStroppyStepField()    {}
+func (f *stroppySteprunIdFieldImpl) mustStroppyStepField()     {}
+func (f *stroppyStepstepInfoFieldImpl) mustStroppyStepField()  {}
+func (f fieldAliasImpl) mustStroppyStepField()                 {}
 
 type (
 	cloudResourceidFieldImpl struct {
@@ -186,9 +256,6 @@ type (
 	cloudAutomationworkloadRootResourceIdFieldImpl struct {
 		*column[string, CloudAutomationField]
 	}
-	cloudAutomationstroppyRunIdFieldImpl struct {
-		*column[*string, CloudAutomationField]
-	}
 )
 
 func (f *cloudAutomationidFieldImpl) mustCloudAutomationField()                     {}
@@ -199,70 +266,7 @@ func (f *cloudAutomationstatusFieldImpl) mustCloudAutomationField()             
 func (f *cloudAutomationauthorIdFieldImpl) mustCloudAutomationField()               {}
 func (f *cloudAutomationdatabaseRootResourceIdFieldImpl) mustCloudAutomationField() {}
 func (f *cloudAutomationworkloadRootResourceIdFieldImpl) mustCloudAutomationField() {}
-func (f *cloudAutomationstroppyRunIdFieldImpl) mustCloudAutomationField()           {}
 func (f fieldAliasImpl) mustCloudAutomationField()                                  {}
-
-type (
-	stroppyRunidFieldImpl struct {
-		*column[string, StroppyRunField]
-	}
-	stroppyRuncreatedAtFieldImpl struct {
-		*column[time.Time, StroppyRunField]
-	}
-	stroppyRunupdatedAtFieldImpl struct {
-		*column[time.Time, StroppyRunField]
-	}
-	stroppyRundeletedAtFieldImpl struct {
-		*column[*time.Time, StroppyRunField]
-	}
-	stroppyRunstatusFieldImpl struct {
-		*column[int32, StroppyRunField]
-	}
-	stroppyRunrunInfoFieldImpl struct {
-		*column[[]byte, StroppyRunField]
-	}
-	stroppyRungrafanaDashboardUrlFieldImpl struct {
-		*column[string, StroppyRunField]
-	}
-)
-
-func (f *stroppyRunidFieldImpl) mustStroppyRunField()                  {}
-func (f *stroppyRuncreatedAtFieldImpl) mustStroppyRunField()           {}
-func (f *stroppyRunupdatedAtFieldImpl) mustStroppyRunField()           {}
-func (f *stroppyRundeletedAtFieldImpl) mustStroppyRunField()           {}
-func (f *stroppyRunstatusFieldImpl) mustStroppyRunField()              {}
-func (f *stroppyRunrunInfoFieldImpl) mustStroppyRunField()             {}
-func (f *stroppyRungrafanaDashboardUrlFieldImpl) mustStroppyRunField() {}
-func (f fieldAliasImpl) mustStroppyRunField()                          {}
-
-type (
-	stroppyStepidFieldImpl struct {
-		*column[string, StroppyStepField]
-	}
-	stroppyStepcreatedAtFieldImpl struct {
-		*column[time.Time, StroppyStepField]
-	}
-	stroppyStepupdatedAtFieldImpl struct {
-		*column[time.Time, StroppyStepField]
-	}
-	stroppyStepdeletedAtFieldImpl struct {
-		*column[*time.Time, StroppyStepField]
-	}
-	stroppySteprunIdFieldImpl struct {
-		*column[string, StroppyStepField]
-	}
-	stroppyStepstepInfoFieldImpl struct {
-		*column[[]byte, StroppyStepField]
-	}
-)
-
-func (f *stroppyStepidFieldImpl) mustStroppyStepField()        {}
-func (f *stroppyStepcreatedAtFieldImpl) mustStroppyStepField() {}
-func (f *stroppyStepupdatedAtFieldImpl) mustStroppyStepField() {}
-func (f *stroppyStepdeletedAtFieldImpl) mustStroppyStepField() {}
-func (f *stroppySteprunIdFieldImpl) mustStroppyStepField()     {}
-func (f *stroppyStepstepInfoFieldImpl) mustStroppyStepField()  {}
-func (f fieldAliasImpl) mustStroppyStepField()                 {}
 
 type (
 	UserScanner struct {
@@ -287,6 +291,25 @@ type (
 		Workload          []byte
 		CloudAutomationId *string
 	}
+	StroppyRunScanner struct {
+		Id                  string
+		CreatedAt           time.Time
+		UpdatedAt           time.Time
+		DeletedAt           *time.Time
+		Status              int32
+		RunInfo             []byte
+		CloudAutomationId   string
+		GrafanaDashboardUrl string
+	}
+	StroppyStepScanner struct {
+		Id        string
+		CreatedAt time.Time
+		UpdatedAt time.Time
+		DeletedAt *time.Time
+		Status    int32
+		RunId     string
+		StepInfo  []byte
+	}
 	CloudResourceScanner struct {
 		Id               string
 		CreatedAt        time.Time
@@ -310,24 +333,6 @@ type (
 		AuthorId               string
 		DatabaseRootResourceId string
 		WorkloadRootResourceId string
-		StroppyRunId           *string
-	}
-	StroppyRunScanner struct {
-		Id                  string
-		CreatedAt           time.Time
-		UpdatedAt           time.Time
-		DeletedAt           *time.Time
-		Status              int32
-		RunInfo             []byte
-		GrafanaDashboardUrl string
-	}
-	StroppyStepScanner struct {
-		Id        string
-		CreatedAt time.Time
-		UpdatedAt time.Time
-		DeletedAt *time.Time
-		RunId     string
-		StepInfo  []byte
 	}
 )
 
@@ -543,6 +548,191 @@ func (s *RunRecordScanner) getValue(field RunRecordField) func() any {
 		panic("unknown field: " + field.String())
 	}
 }
+func newStroppyRunScanner() *StroppyRunScanner {
+	return &StroppyRunScanner{}
+}
+func (s *StroppyRunScanner) values() []any {
+	return []any{
+		s.Id,
+		s.CreatedAt,
+		s.UpdatedAt,
+		s.DeletedAt,
+		s.Status,
+		s.RunInfo,
+		s.CloudAutomationId,
+		s.GrafanaDashboardUrl,
+	}
+}
+func (s *StroppyRunScanner) getTarget(field string) func() any {
+	switch field {
+	case "id":
+		return func() any { return &s.Id }
+	case "created_at":
+		return func() any { return &s.CreatedAt }
+	case "updated_at":
+		return func() any { return &s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return &s.DeletedAt }
+	case "status":
+		return func() any { return &s.Status }
+	case "run_info":
+		return func() any { return &s.RunInfo }
+	case "cloud_automation_id":
+		return func() any { return &s.CloudAutomationId }
+	case "grafana_dashboard_url":
+		return func() any { return &s.GrafanaDashboardUrl }
+	default:
+		panic("unknown field: " + field)
+	}
+}
+func (s *StroppyRunScanner) getSetter(field StroppyRunField) func() ValueSetter[StroppyRunField] {
+	switch field.String() {
+	case "id":
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.Id, s.Id)
+		}
+	case "created_at":
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.CreatedAt, s.CreatedAt)
+		}
+	case "updated_at":
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.UpdatedAt, s.UpdatedAt)
+		}
+	case "deleted_at":
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.DeletedAt, s.DeletedAt)
+		}
+	case "status":
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.Status, s.Status)
+		}
+	case "run_info":
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.RunInfo, s.RunInfo)
+		}
+	case "cloud_automation_id":
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.CloudAutomationId, s.CloudAutomationId)
+		}
+	case "grafana_dashboard_url":
+		return func() ValueSetter[StroppyRunField] {
+			return NewValueSetter[StroppyRunField](StroppyRun.GrafanaDashboardUrl, s.GrafanaDashboardUrl)
+		}
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func (s *StroppyRunScanner) getValue(field StroppyRunField) func() any {
+	switch field.String() {
+	case "id":
+		return func() any { return s.Id }
+	case "created_at":
+		return func() any { return s.CreatedAt }
+	case "updated_at":
+		return func() any { return s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return s.DeletedAt }
+	case "status":
+		return func() any { return s.Status }
+	case "run_info":
+		return func() any { return s.RunInfo }
+	case "cloud_automation_id":
+		return func() any { return s.CloudAutomationId }
+	case "grafana_dashboard_url":
+		return func() any { return s.GrafanaDashboardUrl }
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func newStroppyStepScanner() *StroppyStepScanner {
+	return &StroppyStepScanner{}
+}
+func (s *StroppyStepScanner) values() []any {
+	return []any{
+		s.Id,
+		s.CreatedAt,
+		s.UpdatedAt,
+		s.DeletedAt,
+		s.Status,
+		s.RunId,
+		s.StepInfo,
+	}
+}
+func (s *StroppyStepScanner) getTarget(field string) func() any {
+	switch field {
+	case "id":
+		return func() any { return &s.Id }
+	case "created_at":
+		return func() any { return &s.CreatedAt }
+	case "updated_at":
+		return func() any { return &s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return &s.DeletedAt }
+	case "status":
+		return func() any { return &s.Status }
+	case "run_id":
+		return func() any { return &s.RunId }
+	case "step_info":
+		return func() any { return &s.StepInfo }
+	default:
+		panic("unknown field: " + field)
+	}
+}
+func (s *StroppyStepScanner) getSetter(field StroppyStepField) func() ValueSetter[StroppyStepField] {
+	switch field.String() {
+	case "id":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.Id, s.Id)
+		}
+	case "created_at":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.CreatedAt, s.CreatedAt)
+		}
+	case "updated_at":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.UpdatedAt, s.UpdatedAt)
+		}
+	case "deleted_at":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.DeletedAt, s.DeletedAt)
+		}
+	case "status":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.Status, s.Status)
+		}
+	case "run_id":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.RunId, s.RunId)
+		}
+	case "step_info":
+		return func() ValueSetter[StroppyStepField] {
+			return NewValueSetter[StroppyStepField](StroppyStep.StepInfo, s.StepInfo)
+		}
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func (s *StroppyStepScanner) getValue(field StroppyStepField) func() any {
+	switch field.String() {
+	case "id":
+		return func() any { return s.Id }
+	case "created_at":
+		return func() any { return s.CreatedAt }
+	case "updated_at":
+		return func() any { return s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return s.DeletedAt }
+	case "status":
+		return func() any { return s.Status }
+	case "run_id":
+		return func() any { return s.RunId }
+	case "step_info":
+		return func() any { return s.StepInfo }
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
 func newCloudResourceScanner() *CloudResourceScanner {
 	return &CloudResourceScanner{}
 }
@@ -689,7 +879,6 @@ func (s *CloudAutomationScanner) values() []any {
 		s.AuthorId,
 		s.DatabaseRootResourceId,
 		s.WorkloadRootResourceId,
-		s.StroppyRunId,
 	}
 }
 func (s *CloudAutomationScanner) getTarget(field string) func() any {
@@ -710,8 +899,6 @@ func (s *CloudAutomationScanner) getTarget(field string) func() any {
 		return func() any { return &s.DatabaseRootResourceId }
 	case "workload_root_resource_id":
 		return func() any { return &s.WorkloadRootResourceId }
-	case "stroppy_run_id":
-		return func() any { return &s.StroppyRunId }
 	default:
 		panic("unknown field: " + field)
 	}
@@ -750,10 +937,6 @@ func (s *CloudAutomationScanner) getSetter(field CloudAutomationField) func() Va
 		return func() ValueSetter[CloudAutomationField] {
 			return NewValueSetter[CloudAutomationField](CloudAutomation.WorkloadRootResourceId, s.WorkloadRootResourceId)
 		}
-	case "stroppy_run_id":
-		return func() ValueSetter[CloudAutomationField] {
-			return NewValueSetter[CloudAutomationField](CloudAutomation.StroppyRunId, s.StroppyRunId)
-		}
 	default:
 		panic("unknown field: " + field.String())
 	}
@@ -776,175 +959,6 @@ func (s *CloudAutomationScanner) getValue(field CloudAutomationField) func() any
 		return func() any { return s.DatabaseRootResourceId }
 	case "workload_root_resource_id":
 		return func() any { return s.WorkloadRootResourceId }
-	case "stroppy_run_id":
-		return func() any { return s.StroppyRunId }
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
-func newStroppyRunScanner() *StroppyRunScanner {
-	return &StroppyRunScanner{}
-}
-func (s *StroppyRunScanner) values() []any {
-	return []any{
-		s.Id,
-		s.CreatedAt,
-		s.UpdatedAt,
-		s.DeletedAt,
-		s.Status,
-		s.RunInfo,
-		s.GrafanaDashboardUrl,
-	}
-}
-func (s *StroppyRunScanner) getTarget(field string) func() any {
-	switch field {
-	case "id":
-		return func() any { return &s.Id }
-	case "created_at":
-		return func() any { return &s.CreatedAt }
-	case "updated_at":
-		return func() any { return &s.UpdatedAt }
-	case "deleted_at":
-		return func() any { return &s.DeletedAt }
-	case "status":
-		return func() any { return &s.Status }
-	case "run_info":
-		return func() any { return &s.RunInfo }
-	case "grafana_dashboard_url":
-		return func() any { return &s.GrafanaDashboardUrl }
-	default:
-		panic("unknown field: " + field)
-	}
-}
-func (s *StroppyRunScanner) getSetter(field StroppyRunField) func() ValueSetter[StroppyRunField] {
-	switch field.String() {
-	case "id":
-		return func() ValueSetter[StroppyRunField] {
-			return NewValueSetter[StroppyRunField](StroppyRun.Id, s.Id)
-		}
-	case "created_at":
-		return func() ValueSetter[StroppyRunField] {
-			return NewValueSetter[StroppyRunField](StroppyRun.CreatedAt, s.CreatedAt)
-		}
-	case "updated_at":
-		return func() ValueSetter[StroppyRunField] {
-			return NewValueSetter[StroppyRunField](StroppyRun.UpdatedAt, s.UpdatedAt)
-		}
-	case "deleted_at":
-		return func() ValueSetter[StroppyRunField] {
-			return NewValueSetter[StroppyRunField](StroppyRun.DeletedAt, s.DeletedAt)
-		}
-	case "status":
-		return func() ValueSetter[StroppyRunField] {
-			return NewValueSetter[StroppyRunField](StroppyRun.Status, s.Status)
-		}
-	case "run_info":
-		return func() ValueSetter[StroppyRunField] {
-			return NewValueSetter[StroppyRunField](StroppyRun.RunInfo, s.RunInfo)
-		}
-	case "grafana_dashboard_url":
-		return func() ValueSetter[StroppyRunField] {
-			return NewValueSetter[StroppyRunField](StroppyRun.GrafanaDashboardUrl, s.GrafanaDashboardUrl)
-		}
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
-func (s *StroppyRunScanner) getValue(field StroppyRunField) func() any {
-	switch field.String() {
-	case "id":
-		return func() any { return s.Id }
-	case "created_at":
-		return func() any { return s.CreatedAt }
-	case "updated_at":
-		return func() any { return s.UpdatedAt }
-	case "deleted_at":
-		return func() any { return s.DeletedAt }
-	case "status":
-		return func() any { return s.Status }
-	case "run_info":
-		return func() any { return s.RunInfo }
-	case "grafana_dashboard_url":
-		return func() any { return s.GrafanaDashboardUrl }
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
-func newStroppyStepScanner() *StroppyStepScanner {
-	return &StroppyStepScanner{}
-}
-func (s *StroppyStepScanner) values() []any {
-	return []any{
-		s.Id,
-		s.CreatedAt,
-		s.UpdatedAt,
-		s.DeletedAt,
-		s.RunId,
-		s.StepInfo,
-	}
-}
-func (s *StroppyStepScanner) getTarget(field string) func() any {
-	switch field {
-	case "id":
-		return func() any { return &s.Id }
-	case "created_at":
-		return func() any { return &s.CreatedAt }
-	case "updated_at":
-		return func() any { return &s.UpdatedAt }
-	case "deleted_at":
-		return func() any { return &s.DeletedAt }
-	case "run_id":
-		return func() any { return &s.RunId }
-	case "step_info":
-		return func() any { return &s.StepInfo }
-	default:
-		panic("unknown field: " + field)
-	}
-}
-func (s *StroppyStepScanner) getSetter(field StroppyStepField) func() ValueSetter[StroppyStepField] {
-	switch field.String() {
-	case "id":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.Id, s.Id)
-		}
-	case "created_at":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.CreatedAt, s.CreatedAt)
-		}
-	case "updated_at":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.UpdatedAt, s.UpdatedAt)
-		}
-	case "deleted_at":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.DeletedAt, s.DeletedAt)
-		}
-	case "run_id":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.RunId, s.RunId)
-		}
-	case "step_info":
-		return func() ValueSetter[StroppyStepField] {
-			return NewValueSetter[StroppyStepField](StroppyStep.StepInfo, s.StepInfo)
-		}
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
-func (s *StroppyStepScanner) getValue(field StroppyStepField) func() any {
-	switch field.String() {
-	case "id":
-		return func() any { return s.Id }
-	case "created_at":
-		return func() any { return s.CreatedAt }
-	case "updated_at":
-		return func() any { return s.UpdatedAt }
-	case "deleted_at":
-		return func() any { return s.DeletedAt }
-	case "run_id":
-		return func() any { return s.RunId }
-	case "step_info":
-		return func() any { return s.StepInfo }
 	default:
 		panic("unknown field: " + field.String())
 	}
@@ -1053,6 +1067,92 @@ type (
 			ScalarOperator[*string, RunRecordField]
 			LikeOperator[*string, RunRecordField]
 			IsNullOperator[*string, RunRecordField]
+		}
+	}
+	stroppyRunTableImpl struct {
+		*table[StroppyRunField, *StroppyRunScanner]
+		Id interface {
+			StroppyRunField
+			CommonOperator[string, StroppyRunField]
+			ScalarOperator[string, StroppyRunField]
+			LikeOperator[string, StroppyRunField]
+		}
+		CreatedAt interface {
+			StroppyRunField
+			CommonOperator[time.Time, StroppyRunField]
+			ScalarOperator[time.Time, StroppyRunField]
+		}
+		UpdatedAt interface {
+			StroppyRunField
+			CommonOperator[time.Time, StroppyRunField]
+			ScalarOperator[time.Time, StroppyRunField]
+		}
+		DeletedAt interface {
+			StroppyRunField
+			CommonOperator[*time.Time, StroppyRunField]
+			ScalarOperator[*time.Time, StroppyRunField]
+			IsNullOperator[*time.Time, StroppyRunField]
+		}
+		Status interface {
+			StroppyRunField
+			CommonOperator[int32, StroppyRunField]
+			ScalarOperator[int32, StroppyRunField]
+		}
+		RunInfo interface {
+			StroppyRunField
+			CommonOperator[[]byte, StroppyRunField]
+		}
+		CloudAutomationId interface {
+			StroppyRunField
+			CommonOperator[string, StroppyRunField]
+			ScalarOperator[string, StroppyRunField]
+			LikeOperator[string, StroppyRunField]
+		}
+		GrafanaDashboardUrl interface {
+			StroppyRunField
+			CommonOperator[string, StroppyRunField]
+			ScalarOperator[string, StroppyRunField]
+			LikeOperator[string, StroppyRunField]
+		}
+	}
+	stroppyStepTableImpl struct {
+		*table[StroppyStepField, *StroppyStepScanner]
+		Id interface {
+			StroppyStepField
+			CommonOperator[string, StroppyStepField]
+			ScalarOperator[string, StroppyStepField]
+			LikeOperator[string, StroppyStepField]
+		}
+		CreatedAt interface {
+			StroppyStepField
+			CommonOperator[time.Time, StroppyStepField]
+			ScalarOperator[time.Time, StroppyStepField]
+		}
+		UpdatedAt interface {
+			StroppyStepField
+			CommonOperator[time.Time, StroppyStepField]
+			ScalarOperator[time.Time, StroppyStepField]
+		}
+		DeletedAt interface {
+			StroppyStepField
+			CommonOperator[*time.Time, StroppyStepField]
+			ScalarOperator[*time.Time, StroppyStepField]
+			IsNullOperator[*time.Time, StroppyStepField]
+		}
+		Status interface {
+			StroppyStepField
+			CommonOperator[int32, StroppyStepField]
+			ScalarOperator[int32, StroppyStepField]
+		}
+		RunId interface {
+			StroppyStepField
+			CommonOperator[string, StroppyStepField]
+			ScalarOperator[string, StroppyStepField]
+			LikeOperator[string, StroppyStepField]
+		}
+		StepInfo interface {
+			StroppyStepField
+			CommonOperator[[]byte, StroppyStepField]
 		}
 	}
 	cloudResourceTableImpl struct {
@@ -1169,88 +1269,6 @@ type (
 			ScalarOperator[string, CloudAutomationField]
 			LikeOperator[string, CloudAutomationField]
 		}
-		StroppyRunId interface {
-			CloudAutomationField
-			CommonOperator[*string, CloudAutomationField]
-			ScalarOperator[*string, CloudAutomationField]
-			LikeOperator[*string, CloudAutomationField]
-			IsNullOperator[*string, CloudAutomationField]
-		}
-	}
-	stroppyRunTableImpl struct {
-		*table[StroppyRunField, *StroppyRunScanner]
-		Id interface {
-			StroppyRunField
-			CommonOperator[string, StroppyRunField]
-			ScalarOperator[string, StroppyRunField]
-			LikeOperator[string, StroppyRunField]
-		}
-		CreatedAt interface {
-			StroppyRunField
-			CommonOperator[time.Time, StroppyRunField]
-			ScalarOperator[time.Time, StroppyRunField]
-		}
-		UpdatedAt interface {
-			StroppyRunField
-			CommonOperator[time.Time, StroppyRunField]
-			ScalarOperator[time.Time, StroppyRunField]
-		}
-		DeletedAt interface {
-			StroppyRunField
-			CommonOperator[*time.Time, StroppyRunField]
-			ScalarOperator[*time.Time, StroppyRunField]
-			IsNullOperator[*time.Time, StroppyRunField]
-		}
-		Status interface {
-			StroppyRunField
-			CommonOperator[int32, StroppyRunField]
-			ScalarOperator[int32, StroppyRunField]
-		}
-		RunInfo interface {
-			StroppyRunField
-			CommonOperator[[]byte, StroppyRunField]
-		}
-		GrafanaDashboardUrl interface {
-			StroppyRunField
-			CommonOperator[string, StroppyRunField]
-			ScalarOperator[string, StroppyRunField]
-			LikeOperator[string, StroppyRunField]
-		}
-	}
-	stroppyStepTableImpl struct {
-		*table[StroppyStepField, *StroppyStepScanner]
-		Id interface {
-			StroppyStepField
-			CommonOperator[string, StroppyStepField]
-			ScalarOperator[string, StroppyStepField]
-			LikeOperator[string, StroppyStepField]
-		}
-		CreatedAt interface {
-			StroppyStepField
-			CommonOperator[time.Time, StroppyStepField]
-			ScalarOperator[time.Time, StroppyStepField]
-		}
-		UpdatedAt interface {
-			StroppyStepField
-			CommonOperator[time.Time, StroppyStepField]
-			ScalarOperator[time.Time, StroppyStepField]
-		}
-		DeletedAt interface {
-			StroppyStepField
-			CommonOperator[*time.Time, StroppyStepField]
-			ScalarOperator[*time.Time, StroppyStepField]
-			IsNullOperator[*time.Time, StroppyStepField]
-		}
-		RunId interface {
-			StroppyStepField
-			CommonOperator[string, StroppyStepField]
-			ScalarOperator[string, StroppyStepField]
-			LikeOperator[string, StroppyStepField]
-		}
-		StepInfo interface {
-			StroppyStepField
-			CommonOperator[[]byte, StroppyStepField]
-		}
 	}
 )
 
@@ -1324,6 +1342,67 @@ func newRunRecordTableImpl() *runRecordTableImpl {
 		CloudAutomationId: cloudAutomationId,
 	}
 }
+func newStroppyRunTableImpl() *stroppyRunTableImpl {
+	id := &stroppyRunidFieldImpl{column: newColumn[string, StroppyRunField](fieldAliasImpl("id"))}
+	createdAt := &stroppyRuncreatedAtFieldImpl{column: newColumn[time.Time, StroppyRunField](fieldAliasImpl("created_at"))}
+	updatedAt := &stroppyRunupdatedAtFieldImpl{column: newColumn[time.Time, StroppyRunField](fieldAliasImpl("updated_at"))}
+	deletedAt := &stroppyRundeletedAtFieldImpl{column: newColumn[*time.Time, StroppyRunField](fieldAliasImpl("deleted_at"))}
+	status := &stroppyRunstatusFieldImpl{column: newColumn[int32, StroppyRunField](fieldAliasImpl("status"))}
+	runInfo := &stroppyRunrunInfoFieldImpl{column: newColumn[[]byte, StroppyRunField](fieldAliasImpl("run_info"))}
+	cloudAutomationId := &stroppyRuncloudAutomationIdFieldImpl{column: newColumn[string, StroppyRunField](fieldAliasImpl("cloud_automation_id"))}
+	grafanaDashboardUrl := &stroppyRungrafanaDashboardUrlFieldImpl{column: newColumn[string, StroppyRunField](fieldAliasImpl("grafana_dashboard_url"))}
+	return &stroppyRunTableImpl{
+		table: newTable[StroppyRunField, *StroppyRunScanner](
+			"stroppy_runs",
+			newStroppyRunScanner,
+			id,
+			createdAt,
+			updatedAt,
+			deletedAt,
+			status,
+			runInfo,
+			cloudAutomationId,
+			grafanaDashboardUrl,
+		),
+		Id:                  id,
+		CreatedAt:           createdAt,
+		UpdatedAt:           updatedAt,
+		DeletedAt:           deletedAt,
+		Status:              status,
+		RunInfo:             runInfo,
+		CloudAutomationId:   cloudAutomationId,
+		GrafanaDashboardUrl: grafanaDashboardUrl,
+	}
+}
+func newStroppyStepTableImpl() *stroppyStepTableImpl {
+	id := &stroppyStepidFieldImpl{column: newColumn[string, StroppyStepField](fieldAliasImpl("id"))}
+	createdAt := &stroppyStepcreatedAtFieldImpl{column: newColumn[time.Time, StroppyStepField](fieldAliasImpl("created_at"))}
+	updatedAt := &stroppyStepupdatedAtFieldImpl{column: newColumn[time.Time, StroppyStepField](fieldAliasImpl("updated_at"))}
+	deletedAt := &stroppyStepdeletedAtFieldImpl{column: newColumn[*time.Time, StroppyStepField](fieldAliasImpl("deleted_at"))}
+	status := &stroppyStepstatusFieldImpl{column: newColumn[int32, StroppyStepField](fieldAliasImpl("status"))}
+	runId := &stroppySteprunIdFieldImpl{column: newColumn[string, StroppyStepField](fieldAliasImpl("run_id"))}
+	stepInfo := &stroppyStepstepInfoFieldImpl{column: newColumn[[]byte, StroppyStepField](fieldAliasImpl("step_info"))}
+	return &stroppyStepTableImpl{
+		table: newTable[StroppyStepField, *StroppyStepScanner](
+			"stroppy_steps",
+			newStroppyStepScanner,
+			id,
+			createdAt,
+			updatedAt,
+			deletedAt,
+			status,
+			runId,
+			stepInfo,
+		),
+		Id:        id,
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
+		DeletedAt: deletedAt,
+		Status:    status,
+		RunId:     runId,
+		StepInfo:  stepInfo,
+	}
+}
 func newCloudResourceTableImpl() *cloudResourceTableImpl {
 	id := &cloudResourceidFieldImpl{column: newColumn[string, CloudResourceField](fieldAliasImpl("id"))}
 	createdAt := &cloudResourcecreatedAtFieldImpl{column: newColumn[time.Time, CloudResourceField](fieldAliasImpl("created_at"))}
@@ -1377,7 +1456,6 @@ func newCloudAutomationTableImpl() *cloudAutomationTableImpl {
 	authorId := &cloudAutomationauthorIdFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("author_id"))}
 	databaseRootResourceId := &cloudAutomationdatabaseRootResourceIdFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("database_root_resource_id"))}
 	workloadRootResourceId := &cloudAutomationworkloadRootResourceIdFieldImpl{column: newColumn[string, CloudAutomationField](fieldAliasImpl("workload_root_resource_id"))}
-	stroppyRunId := &cloudAutomationstroppyRunIdFieldImpl{column: newColumn[*string, CloudAutomationField](fieldAliasImpl("stroppy_run_id"))}
 	return &cloudAutomationTableImpl{
 		table: newTable[CloudAutomationField, *CloudAutomationScanner](
 			"cloud_automations",
@@ -1390,7 +1468,6 @@ func newCloudAutomationTableImpl() *cloudAutomationTableImpl {
 			authorId,
 			databaseRootResourceId,
 			workloadRootResourceId,
-			stroppyRunId,
 		),
 		Id:                     id,
 		CreatedAt:              createdAt,
@@ -1400,62 +1477,6 @@ func newCloudAutomationTableImpl() *cloudAutomationTableImpl {
 		AuthorId:               authorId,
 		DatabaseRootResourceId: databaseRootResourceId,
 		WorkloadRootResourceId: workloadRootResourceId,
-		StroppyRunId:           stroppyRunId,
-	}
-}
-func newStroppyRunTableImpl() *stroppyRunTableImpl {
-	id := &stroppyRunidFieldImpl{column: newColumn[string, StroppyRunField](fieldAliasImpl("id"))}
-	createdAt := &stroppyRuncreatedAtFieldImpl{column: newColumn[time.Time, StroppyRunField](fieldAliasImpl("created_at"))}
-	updatedAt := &stroppyRunupdatedAtFieldImpl{column: newColumn[time.Time, StroppyRunField](fieldAliasImpl("updated_at"))}
-	deletedAt := &stroppyRundeletedAtFieldImpl{column: newColumn[*time.Time, StroppyRunField](fieldAliasImpl("deleted_at"))}
-	status := &stroppyRunstatusFieldImpl{column: newColumn[int32, StroppyRunField](fieldAliasImpl("status"))}
-	runInfo := &stroppyRunrunInfoFieldImpl{column: newColumn[[]byte, StroppyRunField](fieldAliasImpl("run_info"))}
-	grafanaDashboardUrl := &stroppyRungrafanaDashboardUrlFieldImpl{column: newColumn[string, StroppyRunField](fieldAliasImpl("grafana_dashboard_url"))}
-	return &stroppyRunTableImpl{
-		table: newTable[StroppyRunField, *StroppyRunScanner](
-			"stroppy_runs",
-			newStroppyRunScanner,
-			id,
-			createdAt,
-			updatedAt,
-			deletedAt,
-			status,
-			runInfo,
-			grafanaDashboardUrl,
-		),
-		Id:                  id,
-		CreatedAt:           createdAt,
-		UpdatedAt:           updatedAt,
-		DeletedAt:           deletedAt,
-		Status:              status,
-		RunInfo:             runInfo,
-		GrafanaDashboardUrl: grafanaDashboardUrl,
-	}
-}
-func newStroppyStepTableImpl() *stroppyStepTableImpl {
-	id := &stroppyStepidFieldImpl{column: newColumn[string, StroppyStepField](fieldAliasImpl("id"))}
-	createdAt := &stroppyStepcreatedAtFieldImpl{column: newColumn[time.Time, StroppyStepField](fieldAliasImpl("created_at"))}
-	updatedAt := &stroppyStepupdatedAtFieldImpl{column: newColumn[time.Time, StroppyStepField](fieldAliasImpl("updated_at"))}
-	deletedAt := &stroppyStepdeletedAtFieldImpl{column: newColumn[*time.Time, StroppyStepField](fieldAliasImpl("deleted_at"))}
-	runId := &stroppySteprunIdFieldImpl{column: newColumn[string, StroppyStepField](fieldAliasImpl("run_id"))}
-	stepInfo := &stroppyStepstepInfoFieldImpl{column: newColumn[[]byte, StroppyStepField](fieldAliasImpl("step_info"))}
-	return &stroppyStepTableImpl{
-		table: newTable[StroppyStepField, *StroppyStepScanner](
-			"stroppy_steps",
-			newStroppyStepScanner,
-			id,
-			createdAt,
-			updatedAt,
-			deletedAt,
-			runId,
-			stepInfo,
-		),
-		Id:        id,
-		CreatedAt: createdAt,
-		UpdatedAt: updatedAt,
-		DeletedAt: deletedAt,
-		RunId:     runId,
-		StepInfo:  stepInfo,
 	}
 }
 
@@ -1464,14 +1485,14 @@ type (
 	UserRepositoryOption            = ProtoCallOption[UserField, *UserScanner, *panel.User]
 	RunRecordRepository             = ProtoRepository[RunRecordField, *RunRecordScanner, *panel.RunRecord]
 	RunRecordRepositoryOption       = ProtoCallOption[RunRecordField, *RunRecordScanner, *panel.RunRecord]
-	CloudResourceRepository         = ProtoRepository[CloudResourceField, *CloudResourceScanner, *panel.CloudResource]
-	CloudResourceRepositoryOption   = ProtoCallOption[CloudResourceField, *CloudResourceScanner, *panel.CloudResource]
-	CloudAutomationRepository       = ProtoRepository[CloudAutomationField, *CloudAutomationScanner, *panel.CloudAutomation]
-	CloudAutomationRepositoryOption = ProtoCallOption[CloudAutomationField, *CloudAutomationScanner, *panel.CloudAutomation]
 	StroppyRunRepository            = ProtoRepository[StroppyRunField, *StroppyRunScanner, *panel.StroppyRun]
 	StroppyRunRepositoryOption      = ProtoCallOption[StroppyRunField, *StroppyRunScanner, *panel.StroppyRun]
 	StroppyStepRepository           = ProtoRepository[StroppyStepField, *StroppyStepScanner, *panel.StroppyStep]
 	StroppyStepRepositoryOption     = ProtoCallOption[StroppyStepField, *StroppyStepScanner, *panel.StroppyStep]
+	CloudResourceRepository         = ProtoRepository[CloudResourceField, *CloudResourceScanner, *panel.CloudResource]
+	CloudResourceRepositoryOption   = ProtoCallOption[CloudResourceField, *CloudResourceScanner, *panel.CloudResource]
+	CloudAutomationRepository       = ProtoRepository[CloudAutomationField, *CloudAutomationScanner, *panel.CloudAutomation]
+	CloudAutomationRepositoryOption = ProtoCallOption[CloudAutomationField, *CloudAutomationScanner, *panel.CloudAutomation]
 )
 type (
 	upcastUserOptions struct {
@@ -1618,6 +1639,124 @@ func NewRunRecordRepository(
 		defaultOpts...,
 	)
 }
+func StroppyRunToScanner(
+	downcastId TypeCaster[*panel.Ulid, string],
+	downcastCloudAutomationId TypeCaster[*panel.Ulid, string],
+) TypeCaster[*panel.StroppyRun, *StroppyRunScanner] {
+	return func(entity *panel.StroppyRun) *StroppyRunScanner {
+		if entity == nil {
+			return nil
+		}
+		scanner := &StroppyRunScanner{
+			Id:                  downcastId(entity.Id),
+			Status:              EnumToInt32[stroppy.Status](entity.Status),
+			RunInfo:             MessageToSliceByte[*stroppy.StroppyRun](entity.RunInfo),
+			CloudAutomationId:   downcastCloudAutomationId(entity.CloudAutomationId),
+			GrafanaDashboardUrl: entity.GrafanaDashboardUrl,
+		}
+		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
+		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
+		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
+		return scanner
+	}
+}
+func ScannerToStroppyRun(
+	upcastId TypeCaster[string, *panel.Ulid],
+	upcastCloudAutomationId TypeCaster[string, *panel.Ulid],
+) TypeCaster[*StroppyRunScanner, *panel.StroppyRun] {
+	return func(model *StroppyRunScanner) *panel.StroppyRun {
+		if model == nil {
+			return nil
+		}
+		entity := &panel.StroppyRun{
+			Id:                  upcastId(model.Id),
+			Status:              EnumFromInt32[stroppy.Status](model.Status),
+			RunInfo:             MessageFromSliceByte[*stroppy.StroppyRun](model.RunInfo),
+			CloudAutomationId:   upcastCloudAutomationId(model.CloudAutomationId),
+			GrafanaDashboardUrl: model.GrafanaDashboardUrl,
+		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
+		}
+
+		return entity
+	}
+}
+func NewStroppyRunRepository(
+	dbGetter DbGetter,
+	upcastId TypeCaster[string, *panel.Ulid],
+	downcastId TypeCaster[*panel.Ulid, string],
+	upcastCloudAutomationId TypeCaster[string, *panel.Ulid],
+	downcastCloudAutomationId TypeCaster[*panel.Ulid, string],
+	defaultOpts ...StroppyRunRepositoryOption,
+) StroppyRunRepository {
+	return newGenericRepository(
+		newGenericScannerRepository(StroppyRun.table, dbGetter),
+		StroppyRunToScanner(downcastId, downcastCloudAutomationId),
+		ScannerToStroppyRun(upcastId, upcastCloudAutomationId),
+		defaultOpts...,
+	)
+}
+func StroppyStepToScanner(
+	downcastId TypeCaster[*panel.Ulid, string],
+	downcastRunId TypeCaster[*panel.Ulid, string],
+) TypeCaster[*panel.StroppyStep, *StroppyStepScanner] {
+	return func(entity *panel.StroppyStep) *StroppyStepScanner {
+		if entity == nil {
+			return nil
+		}
+		scanner := &StroppyStepScanner{
+			Id:       downcastId(entity.Id),
+			Status:   EnumToInt32[stroppy.Status](entity.Status),
+			RunId:    downcastRunId(entity.RunId),
+			StepInfo: MessageToSliceByte[*stroppy.StroppyStepRun](entity.StepInfo),
+		}
+		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
+		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
+		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
+		return scanner
+	}
+}
+func ScannerToStroppyStep(
+	upcastId TypeCaster[string, *panel.Ulid],
+	upcastRunId TypeCaster[string, *panel.Ulid],
+) TypeCaster[*StroppyStepScanner, *panel.StroppyStep] {
+	return func(model *StroppyStepScanner) *panel.StroppyStep {
+		if model == nil {
+			return nil
+		}
+		entity := &panel.StroppyStep{
+			Id:       upcastId(model.Id),
+			Status:   EnumFromInt32[stroppy.Status](model.Status),
+			RunId:    upcastRunId(model.RunId),
+			StepInfo: MessageFromSliceByte[*stroppy.StroppyStepRun](model.StepInfo),
+		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
+		}
+
+		return entity
+	}
+}
+func NewStroppyStepRepository(
+	dbGetter DbGetter,
+	upcastId TypeCaster[string, *panel.Ulid],
+	downcastId TypeCaster[*panel.Ulid, string],
+	upcastRunId TypeCaster[string, *panel.Ulid],
+	downcastRunId TypeCaster[*panel.Ulid, string],
+	defaultOpts ...StroppyStepRepositoryOption,
+) StroppyStepRepository {
+	return newGenericRepository(
+		newGenericScannerRepository(StroppyStep.table, dbGetter),
+		StroppyStepToScanner(downcastId, downcastRunId),
+		ScannerToStroppyStep(upcastId, upcastRunId),
+		defaultOpts...,
+	)
+}
 func CloudResourceToScanner(
 	downcastId TypeCaster[*panel.Ulid, string],
 	downcastParentResourceId TypeCaster[*panel.Ulid, *string],
@@ -1656,11 +1795,6 @@ func ScannerToCloudResource(
 			Status:           EnumFromInt32[panel.CloudResource_Status](model.Status),
 			ParentResourceId: upcastParentResourceId(model.ParentResourceId),
 		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
-		}
 		entity.Resource = &crossplane.ResourceWithStatus{
 			Ref:          MessageFromSliceByte[*crossplane.Ref](model.Ref),
 			ResourceDef:  MessageFromSliceByte[*crossplane.ResourceDef](model.ResourceDef),
@@ -1668,6 +1802,11 @@ func ScannerToCloudResource(
 			Synced:       model.Synced,
 			Ready:        model.Ready,
 			ExternalId:   model.ExternalId,
+		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
 		}
 
 		return entity
@@ -1693,7 +1832,6 @@ func CloudAutomationToScanner(
 	downcastAuthorId TypeCaster[*panel.Ulid, string],
 	downcastDatabaseRootResourceId TypeCaster[*panel.Ulid, string],
 	downcastWorkloadRootResourceId TypeCaster[*panel.Ulid, string],
-	downcastStroppyRunId TypeCaster[*panel.Ulid, *string],
 ) TypeCaster[*panel.CloudAutomation, *CloudAutomationScanner] {
 	return func(entity *panel.CloudAutomation) *CloudAutomationScanner {
 		if entity == nil {
@@ -1705,7 +1843,6 @@ func CloudAutomationToScanner(
 			AuthorId:               downcastAuthorId(entity.AuthorId),
 			DatabaseRootResourceId: downcastDatabaseRootResourceId(entity.DatabaseRootResourceId),
 			WorkloadRootResourceId: downcastWorkloadRootResourceId(entity.WorkloadRootResourceId),
-			StroppyRunId:           downcastStroppyRunId(entity.StroppyRunId),
 		}
 		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
 		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
@@ -1718,7 +1855,6 @@ func ScannerToCloudAutomation(
 	upcastAuthorId TypeCaster[string, *panel.Ulid],
 	upcastDatabaseRootResourceId TypeCaster[string, *panel.Ulid],
 	upcastWorkloadRootResourceId TypeCaster[string, *panel.Ulid],
-	upcastStroppyRunId TypeCaster[*string, *panel.Ulid],
 ) TypeCaster[*CloudAutomationScanner, *panel.CloudAutomation] {
 	return func(model *CloudAutomationScanner) *panel.CloudAutomation {
 		if model == nil {
@@ -1730,7 +1866,6 @@ func ScannerToCloudAutomation(
 			AuthorId:               upcastAuthorId(model.AuthorId),
 			DatabaseRootResourceId: upcastDatabaseRootResourceId(model.DatabaseRootResourceId),
 			WorkloadRootResourceId: upcastWorkloadRootResourceId(model.WorkloadRootResourceId),
-			StroppyRunId:           upcastStroppyRunId(model.StroppyRunId),
 		}
 		entity.Timing = &panel.Timing{
 			CreatedAt: TimestampFromTime(model.CreatedAt),
@@ -1751,124 +1886,12 @@ func NewCloudAutomationRepository(
 	downcastDatabaseRootResourceId TypeCaster[*panel.Ulid, string],
 	upcastWorkloadRootResourceId TypeCaster[string, *panel.Ulid],
 	downcastWorkloadRootResourceId TypeCaster[*panel.Ulid, string],
-	upcastStroppyRunId TypeCaster[*string, *panel.Ulid],
-	downcastStroppyRunId TypeCaster[*panel.Ulid, *string],
 	defaultOpts ...CloudAutomationRepositoryOption,
 ) CloudAutomationRepository {
 	return newGenericRepository(
 		newGenericScannerRepository(CloudAutomation.table, dbGetter),
-		CloudAutomationToScanner(downcastId, downcastAuthorId, downcastDatabaseRootResourceId, downcastWorkloadRootResourceId, downcastStroppyRunId),
-		ScannerToCloudAutomation(upcastId, upcastAuthorId, upcastDatabaseRootResourceId, upcastWorkloadRootResourceId, upcastStroppyRunId),
-		defaultOpts...,
-	)
-}
-func StroppyRunToScanner(
-	downcastId TypeCaster[*panel.Ulid, string],
-) TypeCaster[*panel.StroppyRun, *StroppyRunScanner] {
-	return func(entity *panel.StroppyRun) *StroppyRunScanner {
-		if entity == nil {
-			return nil
-		}
-		scanner := &StroppyRunScanner{
-			Id:                  downcastId(entity.Id),
-			Status:              EnumToInt32[panel.Status](entity.Status),
-			RunInfo:             MessageToSliceByte[*stroppy.StroppyRun](entity.RunInfo),
-			GrafanaDashboardUrl: entity.GrafanaDashboardUrl,
-		}
-		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
-		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
-		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
-		return scanner
-	}
-}
-func ScannerToStroppyRun(
-	upcastId TypeCaster[string, *panel.Ulid],
-) TypeCaster[*StroppyRunScanner, *panel.StroppyRun] {
-	return func(model *StroppyRunScanner) *panel.StroppyRun {
-		if model == nil {
-			return nil
-		}
-		entity := &panel.StroppyRun{
-			Id:                  upcastId(model.Id),
-			Status:              EnumFromInt32[panel.Status](model.Status),
-			RunInfo:             MessageFromSliceByte[*stroppy.StroppyRun](model.RunInfo),
-			GrafanaDashboardUrl: model.GrafanaDashboardUrl,
-		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
-		}
-
-		return entity
-	}
-}
-func NewStroppyRunRepository(
-	dbGetter DbGetter,
-	upcastId TypeCaster[string, *panel.Ulid],
-	downcastId TypeCaster[*panel.Ulid, string],
-	defaultOpts ...StroppyRunRepositoryOption,
-) StroppyRunRepository {
-	return newGenericRepository(
-		newGenericScannerRepository(StroppyRun.table, dbGetter),
-		StroppyRunToScanner(downcastId),
-		ScannerToStroppyRun(upcastId),
-		defaultOpts...,
-	)
-}
-func StroppyStepToScanner(
-	downcastId TypeCaster[*panel.Ulid, string],
-	downcastRunId TypeCaster[*panel.Ulid, string],
-) TypeCaster[*panel.StroppyStep, *StroppyStepScanner] {
-	return func(entity *panel.StroppyStep) *StroppyStepScanner {
-		if entity == nil {
-			return nil
-		}
-		scanner := &StroppyStepScanner{
-			Id:       downcastId(entity.Id),
-			RunId:    downcastRunId(entity.RunId),
-			StepInfo: MessageToSliceByte[*stroppy.StroppyStepRun](entity.StepInfo),
-		}
-		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
-		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
-		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
-		return scanner
-	}
-}
-func ScannerToStroppyStep(
-	upcastId TypeCaster[string, *panel.Ulid],
-	upcastRunId TypeCaster[string, *panel.Ulid],
-) TypeCaster[*StroppyStepScanner, *panel.StroppyStep] {
-	return func(model *StroppyStepScanner) *panel.StroppyStep {
-		if model == nil {
-			return nil
-		}
-		entity := &panel.StroppyStep{
-			Id:       upcastId(model.Id),
-			RunId:    upcastRunId(model.RunId),
-			StepInfo: MessageFromSliceByte[*stroppy.StroppyStepRun](model.StepInfo),
-		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
-		}
-
-		return entity
-	}
-}
-func NewStroppyStepRepository(
-	dbGetter DbGetter,
-	upcastId TypeCaster[string, *panel.Ulid],
-	downcastId TypeCaster[*panel.Ulid, string],
-	upcastRunId TypeCaster[string, *panel.Ulid],
-	downcastRunId TypeCaster[*panel.Ulid, string],
-	defaultOpts ...StroppyStepRepositoryOption,
-) StroppyStepRepository {
-	return newGenericRepository(
-		newGenericScannerRepository(StroppyStep.table, dbGetter),
-		StroppyStepToScanner(downcastId, downcastRunId),
-		ScannerToStroppyStep(upcastId, upcastRunId),
+		CloudAutomationToScanner(downcastId, downcastAuthorId, downcastDatabaseRootResourceId, downcastWorkloadRootResourceId),
+		ScannerToCloudAutomation(upcastId, upcastAuthorId, upcastDatabaseRootResourceId, upcastWorkloadRootResourceId),
 		defaultOpts...,
 	)
 }

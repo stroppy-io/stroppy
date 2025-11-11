@@ -23,7 +23,7 @@ func TestLoadFakeData(t *testing.T) {
 		panel.Status_STATUS_COMPLETED,
 		panel.Status_STATUS_RUNNING,
 		panel.Status_STATUS_FAILED,
-		panel.Status_STATUS_CANCELED,
+		panel.Status_STATUS_CANCELLED,
 	}
 
 	for i := 0; i < numRuns; i++ {

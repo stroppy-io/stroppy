@@ -1,13 +1,10 @@
 package api
 
 import (
+	"connectrpc.com/connect"
 	"context"
 	"errors"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/automate"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
-	"go.uber.org/zap"
-
-	"connectrpc.com/connect"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/token"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/claims"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/orm"
@@ -15,7 +12,9 @@ import (
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlexec"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/sqlc"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
+	"go.uber.org/zap"
 )
 
 type PanelService struct {

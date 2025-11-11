@@ -25,7 +25,9 @@ service:
     automation_ttl: 4h
     creation_timeout: 5m
     oriole_base_image: "fd8g05clmsv92nlqmer5"
-    stroppy_base_image: "fd88t05bkvp2e4e7hmgb"
+    stroppy_base_image: "fd8rlvda55egnjvtev72"
+    stroppy_cloud_url: "https://localhost:8080"
+    stroppy_docker_version: "v1.2.0-dev8.10"
   k8s:
     kubeconfig_path: ".kubectl.config.yaml"
     crossplane:

@@ -93,7 +93,7 @@ func (x *RunRecord) GetStatus() Status {
 	if x != nil {
 		return x.Status
 	}
-	return Status_STATUS_UNSPECIFIED
+	return Status_STATUS_IDLE
 }
 
 func (x *RunRecord) GetTps() *Tps {
@@ -198,7 +198,7 @@ func (x *ListRunsRequest) GetStatus() Status {
 	if x != nil && x.Status != nil {
 		return *x.Status
 	}
-	return Status_STATUS_UNSPECIFIED
+	return Status_STATUS_IDLE
 }
 
 func (x *ListRunsRequest) GetTpsFilter() []*Tps_Filter {

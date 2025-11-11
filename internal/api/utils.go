@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"github.com/jackc/pgx/v5/pgtype"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -27,6 +28,13 @@ func timestamptzToTime(t pgtype.Timestamptz) *time.Time {
 		return nil
 	}
 	return &t.Time
+}
+
+func replaceMultipleStrings(str string, replacements map[string]string) string {
+	for old, news := range replacements {
+		str = strings.ReplaceAll(str, old, news)
+	}
+	return str
 }
 
 func NewUsersRepository(executor sqlexec.Executor) orm.UserRepository {
@@ -78,14 +86,14 @@ func NewCloudAutomationRepository(executor sqlexec.Executor) orm.CloudAutomation
 		ids.UlidToStr,
 		ids.UlidFromString,
 		ids.UlidToStr,
-		ids.UlidFromStringPtr,
-		ids.UlidToStrPtr,
 	)
 }
 
 func NewStroppyRunRepository(executor sqlexec.Executor) orm.StroppyRunRepository {
 	return orm.NewStroppyRunRepository(
 		dbGetter(executor),
+		ids.UlidFromString,
+		ids.UlidToStr,
 		ids.UlidFromString,
 		ids.UlidToStr,
 	)

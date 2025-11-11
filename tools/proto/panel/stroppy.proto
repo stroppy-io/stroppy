@@ -3,9 +3,9 @@ syntax = "proto3";
 package panel;
 
 import "panel/types.proto";
+import "proto/stroppy/cloud.proto";
 import "protopgx/pgx.proto";
 import "validate/validate.proto";
-import "proto/stroppy/cloud.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
 
@@ -24,10 +24,11 @@ message StroppyRun {
         }
     ];
     Timing timing = 2 [(sql.sql_field).embedded_message = true];
-    Status status = 3 [(validate.rules).enum.defined_only = true];
+    stroppy.Status status = 3 [(validate.rules).enum.defined_only = true];
     stroppy.StroppyRun run_info = 4 [(sql.sql_field).serialized_message = true];
-    string grafana_dashboard_url = 5 [(sql.sql_field) = {sql_type: {type: TEXT}}];
-    repeated StroppyStep steps = 6 [(sql.sql_relation) = {
+    Ulid cloud_automation_id = 5 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    string grafana_dashboard_url = 6 [(sql.sql_field) = {sql_type: {type: TEXT}}];
+    repeated StroppyStep steps = 7 [(sql.sql_relation) = {
         one_to_many: {
             ref_name: "run_id"
             on_delete_cascade: true
@@ -41,6 +42,9 @@ message StroppyStep {
         generate: true
         table_name: "stroppy_steps"
     };
+    message List {
+        repeated StroppyStep steps = 1;
+    }
     Ulid id = 1 [
         (sql.sql_field) = {
             sql_type: {type: TEXT,user_cast: true}
@@ -48,10 +52,11 @@ message StroppyStep {
         }
     ];
     Timing timing = 2 [(sql.sql_field).embedded_message = true];
-    Ulid run_id = 3 [
+    stroppy.Status status = 3 [(validate.rules).enum.defined_only = true];
+    Ulid run_id = 4 [
         (sql.sql_field) = {sql_type: {type: TEXT,user_cast: true},
             constraints: {constraint: "NOT NULL REFERENCES stroppy_runs(id) ON DELETE CASCADE"}
         }
     ];
-    stroppy.StroppyStepRun step_info = 4 [(sql.sql_field).serialized_message = true];
+    stroppy.StroppyStepRun step_info = 5 [(sql.sql_field).serialized_message = true];
 }

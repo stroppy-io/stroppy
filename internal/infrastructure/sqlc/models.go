@@ -14,9 +14,9 @@ type CloudAutomations struct {
 	UpdatedAt              pgtype.Timestamptz `db:"updated_at"`
 	DeletedAt              pgtype.Timestamptz `db:"deleted_at"`
 	Status                 int32              `db:"status"`
+	AuthorID               string             `db:"author_id"`
 	DatabaseRootResourceID string             `db:"database_root_resource_id"`
 	WorkloadRootResourceID string             `db:"workload_root_resource_id"`
-	StroppyRunID           *string            `db:"stroppy_run_id"`
 }
 
 type CloudResources struct {
@@ -54,6 +54,7 @@ type StroppyRuns struct {
 	DeletedAt           pgtype.Timestamptz `db:"deleted_at"`
 	Status              int32              `db:"status"`
 	RunInfo             []byte             `db:"run_info"`
+	CloudAutomationID   string             `db:"cloud_automation_id"`
 	GrafanaDashboardUrl string             `db:"grafana_dashboard_url"`
 }
 
@@ -62,6 +63,7 @@ type StroppySteps struct {
 	CreatedAt pgtype.Timestamptz `db:"created_at"`
 	UpdatedAt pgtype.Timestamptz `db:"updated_at"`
 	DeletedAt pgtype.Timestamptz `db:"deleted_at"`
+	Status    int32              `db:"status"`
 	RunID     string             `db:"run_id"`
 	StepInfo  []byte             `db:"step_info"`
 }

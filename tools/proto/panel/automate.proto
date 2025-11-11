@@ -6,6 +6,7 @@ import "crossplane/resource.proto";
 import "crossplane/types.proto";
 import "google/protobuf/empty.proto";
 import "panel/run.proto";
+import "panel/stroppy.proto";
 import "panel/types.proto";
 import "protopgx/pgx.proto";
 import "validate/validate.proto";
@@ -79,9 +80,8 @@ message CloudAutomation {
     ];
     Ulid database_root_resource_id = 5 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
     Ulid workload_root_resource_id = 6 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
-    optional Ulid stroppy_run_id = 7 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    StroppyRun stroppy_run = 7 [(sql.sql_field).skip = true];
 }
-
 
 message ListAutomationsRequest {
     optional int32 limit = 1;

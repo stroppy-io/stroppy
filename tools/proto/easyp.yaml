@@ -10,7 +10,7 @@ lint:
 deps:
   - github.com/yaroher/protoc-gen-pgx-orm@v1.0.20
   - github.com/bufbuild/protoc-gen-validate@v1.2.1
-  - github.com/stroppy-io/stroppy@v2.0.0-dev3
+  - github.com/stroppy-io/stroppy@v1.2.0-dev4
 generate:
   inputs:
     - directory: panel

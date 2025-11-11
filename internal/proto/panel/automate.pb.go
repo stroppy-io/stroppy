@@ -168,7 +168,7 @@ type CloudAutomation struct {
 	AuthorId               *Ulid                  `protobuf:"bytes,4,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
 	DatabaseRootResourceId *Ulid                  `protobuf:"bytes,5,opt,name=database_root_resource_id,json=databaseRootResourceId,proto3" json:"database_root_resource_id,omitempty"`
 	WorkloadRootResourceId *Ulid                  `protobuf:"bytes,6,opt,name=workload_root_resource_id,json=workloadRootResourceId,proto3" json:"workload_root_resource_id,omitempty"`
-	StroppyRunId           *Ulid                  `protobuf:"bytes,7,opt,name=stroppy_run_id,json=stroppyRunId,proto3,oneof" json:"stroppy_run_id,omitempty"`
+	StroppyRun             *StroppyRun            `protobuf:"bytes,7,opt,name=stroppy_run,json=stroppyRun,proto3" json:"stroppy_run,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -221,7 +221,7 @@ func (x *CloudAutomation) GetStatus() Status {
 	if x != nil {
 		return x.Status
 	}
-	return Status_STATUS_UNSPECIFIED
+	return Status_STATUS_IDLE
 }
 
 func (x *CloudAutomation) GetAuthorId() *Ulid {
@@ -245,9 +245,9 @@ func (x *CloudAutomation) GetWorkloadRootResourceId() *Ulid {
 	return nil
 }
 
-func (x *CloudAutomation) GetStroppyRunId() *Ulid {
+func (x *CloudAutomation) GetStroppyRun() *StroppyRun {
 	if x != nil {
-		return x.StroppyRunId
+		return x.StroppyRun
 	}
 	return nil
 }
@@ -320,7 +320,7 @@ func (x *ListAutomationsRequest) GetOrderByStatus() Status {
 	if x != nil && x.OrderByStatus != nil {
 		return *x.OrderByStatus
 	}
-	return Status_STATUS_UNSPECIFIED
+	return Status_STATUS_IDLE
 }
 
 func (x *ListAutomationsRequest) GetOrderByStatusDescending() bool {
@@ -505,7 +505,7 @@ var File_panel_automate_proto protoreflect.FileDescriptor
 
 const file_panel_automate_proto_rawDesc = "" +
 	"\n" +
-	"\x14panel/automate.proto\x12\x05panel\x1a\x19crossplane/resource.proto\x1a\x16crossplane/types.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0fpanel/run.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xa2\x05\n" +
+	"\x14panel/automate.proto\x12\x05panel\x1a\x19crossplane/resource.proto\x1a\x16crossplane/types.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0fpanel/run.proto\x1a\x13panel/stroppy.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xa2\x05\n" +
 	"\rCloudResource\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
@@ -524,7 +524,7 @@ const file_panel_automate_proto_rawDesc = "" +
 	"\x11STATUS_DESTROYING\x10\x03\x12\x14\n" +
 	"\x10STATUS_DESTROYED\x10\x04\x12\x13\n" +
 	"\x0fSTATUS_DEGRADED\x10\x05:\x16\xca>\x13\b\x01\x12\x0fcloud_resourcesB\x15\n" +
-	"\x13_parent_resource_id\"\xdc\x04\n" +
+	"\x13_parent_resource_id\"\xc1\x04\n" +
 	"\x0fCloudAutomation\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
@@ -532,11 +532,11 @@ const file_panel_automate_proto_rawDesc = "" +
 	"\x06status\x18\x03 \x01(\x0e2\r.panel.StatusB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06status\x12f\n" +
 	"\tauthor_id\x18\x04 \x01(\v2\v.panel.UlidB<\xca>9\x12\x04\b\x01 \x01\x1a1\"/NOT NULL REFERENCES users(id) ON DELETE CASCADER\bauthorId\x12Q\n" +
 	"\x19database_root_resource_id\x18\x05 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x16databaseRootResourceId\x12Q\n" +
-	"\x19workload_root_resource_id\x18\x06 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x16workloadRootResourceId\x12A\n" +
-	"\x0estroppy_run_id\x18\a \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01H\x00R\fstroppyRunId\x88\x01\x01\x1a@\n" +
+	"\x19workload_root_resource_id\x18\x06 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x16workloadRootResourceId\x129\n" +
+	"\vstroppy_run\x18\a \x01(\v2\x11.panel.StroppyRunB\x05\xca>\x02\b\x01R\n" +
+	"stroppyRun\x1a@\n" +
 	"\x04List\x128\n" +
-	"\vautomations\x18\x01 \x03(\v2\x16.panel.CloudAutomationR\vautomations:\x18\xca>\x15\b\x01\x12\x11cloud_automationsB\x11\n" +
-	"\x0f_stroppy_run_id\"\xab\x03\n" +
+	"\vautomations\x18\x01 \x03(\v2\x16.panel.CloudAutomationR\vautomations:\x18\xca>\x15\b\x01\x12\x11cloud_automations\"\xab\x03\n" +
 	"\x16ListAutomationsRequest\x12\x19\n" +
 	"\x05limit\x18\x01 \x01(\x05H\x00R\x05limit\x88\x01\x01\x12\x1b\n" +
 	"\x06offset\x18\x02 \x01(\x05H\x01R\x06offset\x88\x01\x01\x12 \n" +
@@ -589,12 +589,13 @@ var file_panel_automate_proto_goTypes = []any{
 	(*Timing)(nil),                        // 8: panel.Timing
 	(*crossplane.ResourceWithStatus)(nil), // 9: crossplane.ResourceWithStatus
 	(Status)(0),                           // 10: panel.Status
-	(*OrderByTimestamp)(nil),              // 11: panel.OrderByTimestamp
-	(*Database)(nil),                      // 12: panel.Database
-	(*Workload)(nil),                      // 13: panel.Workload
-	(crossplane.SupportedCloud)(0),        // 14: crossplane.SupportedCloud
-	(*RunRecord)(nil),                     // 15: panel.RunRecord
-	(*emptypb.Empty)(nil),                 // 16: google.protobuf.Empty
+	(*StroppyRun)(nil),                    // 11: panel.StroppyRun
+	(*OrderByTimestamp)(nil),              // 12: panel.OrderByTimestamp
+	(*Database)(nil),                      // 13: panel.Database
+	(*Workload)(nil),                      // 14: panel.Workload
+	(crossplane.SupportedCloud)(0),        // 15: crossplane.SupportedCloud
+	(*RunRecord)(nil),                     // 16: panel.RunRecord
+	(*emptypb.Empty)(nil),                 // 17: google.protobuf.Empty
 }
 var file_panel_automate_proto_depIdxs = []int32{
 	7,  // 0: panel.CloudResource.id:type_name -> panel.Ulid
@@ -608,12 +609,12 @@ var file_panel_automate_proto_depIdxs = []int32{
 	7,  // 8: panel.CloudAutomation.author_id:type_name -> panel.Ulid
 	7,  // 9: panel.CloudAutomation.database_root_resource_id:type_name -> panel.Ulid
 	7,  // 10: panel.CloudAutomation.workload_root_resource_id:type_name -> panel.Ulid
-	7,  // 11: panel.CloudAutomation.stroppy_run_id:type_name -> panel.Ulid
+	11, // 11: panel.CloudAutomation.stroppy_run:type_name -> panel.StroppyRun
 	10, // 12: panel.ListAutomationsRequest.order_by_status:type_name -> panel.Status
-	11, // 13: panel.ListAutomationsRequest.order_by_created_at:type_name -> panel.OrderByTimestamp
-	12, // 14: panel.RunAutomationRequest.database:type_name -> panel.Database
-	13, // 15: panel.RunAutomationRequest.workload:type_name -> panel.Workload
-	14, // 16: panel.RunAutomationRequest.using_cloud_provider:type_name -> crossplane.SupportedCloud
+	12, // 13: panel.ListAutomationsRequest.order_by_created_at:type_name -> panel.OrderByTimestamp
+	13, // 14: panel.RunAutomationRequest.database:type_name -> panel.Database
+	14, // 15: panel.RunAutomationRequest.workload:type_name -> panel.Workload
+	15, // 16: panel.RunAutomationRequest.using_cloud_provider:type_name -> crossplane.SupportedCloud
 	7,  // 17: panel.CloudResource.TreeNode.id:type_name -> panel.Ulid
 	1,  // 18: panel.CloudResource.TreeNode.resource:type_name -> panel.CloudResource
 	5,  // 19: panel.CloudResource.TreeNode.children:type_name -> panel.CloudResource.TreeNode
@@ -626,8 +627,8 @@ var file_panel_automate_proto_depIdxs = []int32{
 	5,  // 26: panel.ResourcesService.GetResource:output_type -> panel.CloudResource.TreeNode
 	2,  // 27: panel.AutomateService.GetAutomation:output_type -> panel.CloudAutomation
 	6,  // 28: panel.AutomateService.ListAutomations:output_type -> panel.CloudAutomation.List
-	15, // 29: panel.AutomateService.RunAutomation:output_type -> panel.RunRecord
-	16, // 30: panel.AutomateService.CancelAutomation:output_type -> google.protobuf.Empty
+	16, // 29: panel.AutomateService.RunAutomation:output_type -> panel.RunRecord
+	17, // 30: panel.AutomateService.CancelAutomation:output_type -> google.protobuf.Empty
 	26, // [26:31] is the sub-list for method output_type
 	21, // [21:26] is the sub-list for method input_type
 	21, // [21:21] is the sub-list for extension type_name
@@ -641,9 +642,9 @@ func file_panel_automate_proto_init() {
 		return
 	}
 	file_panel_run_proto_init()
+	file_panel_stroppy_proto_init()
 	file_panel_types_proto_init()
 	file_panel_automate_proto_msgTypes[0].OneofWrappers = []any{}
-	file_panel_automate_proto_msgTypes[1].OneofWrappers = []any{}
 	file_panel_automate_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

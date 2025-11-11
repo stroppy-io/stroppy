@@ -8,7 +8,7 @@ package panel
 
 import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
-	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	_ "github.com/yaroher/protoc-gen-pgx-orm/protopgx"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -28,10 +28,11 @@ type StroppyRun struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	Id                  *Ulid                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Timing              *Timing                `protobuf:"bytes,2,opt,name=timing,proto3" json:"timing,omitempty"`
-	Status              Status                 `protobuf:"varint,3,opt,name=status,proto3,enum=panel.Status" json:"status,omitempty"`
+	Status              stroppy.Status         `protobuf:"varint,3,opt,name=status,proto3,enum=stroppy.Status" json:"status,omitempty"`
 	RunInfo             *stroppy.StroppyRun    `protobuf:"bytes,4,opt,name=run_info,json=runInfo,proto3" json:"run_info,omitempty"`
-	GrafanaDashboardUrl string                 `protobuf:"bytes,5,opt,name=grafana_dashboard_url,json=grafanaDashboardUrl,proto3" json:"grafana_dashboard_url,omitempty"`
-	Steps               []*StroppyStep         `protobuf:"bytes,6,rep,name=steps,proto3" json:"steps,omitempty"`
+	CloudAutomationId   *Ulid                  `protobuf:"bytes,5,opt,name=cloud_automation_id,json=cloudAutomationId,proto3" json:"cloud_automation_id,omitempty"`
+	GrafanaDashboardUrl string                 `protobuf:"bytes,6,opt,name=grafana_dashboard_url,json=grafanaDashboardUrl,proto3" json:"grafana_dashboard_url,omitempty"`
+	Steps               []*StroppyStep         `protobuf:"bytes,7,rep,name=steps,proto3" json:"steps,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -80,16 +81,23 @@ func (x *StroppyRun) GetTiming() *Timing {
 	return nil
 }
 
-func (x *StroppyRun) GetStatus() Status {
+func (x *StroppyRun) GetStatus() stroppy.Status {
 	if x != nil {
 		return x.Status
 	}
-	return Status_STATUS_UNSPECIFIED
+	return stroppy.Status(0)
 }
 
 func (x *StroppyRun) GetRunInfo() *stroppy.StroppyRun {
 	if x != nil {
 		return x.RunInfo
+	}
+	return nil
+}
+
+func (x *StroppyRun) GetCloudAutomationId() *Ulid {
+	if x != nil {
+		return x.CloudAutomationId
 	}
 	return nil
 }
@@ -112,8 +120,9 @@ type StroppyStep struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
 	Id            *Ulid                   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Timing        *Timing                 `protobuf:"bytes,2,opt,name=timing,proto3" json:"timing,omitempty"`
-	RunId         *Ulid                   `protobuf:"bytes,3,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	StepInfo      *stroppy.StroppyStepRun `protobuf:"bytes,4,opt,name=step_info,json=stepInfo,proto3" json:"step_info,omitempty"`
+	Status        stroppy.Status          `protobuf:"varint,3,opt,name=status,proto3,enum=stroppy.Status" json:"status,omitempty"`
+	RunId         *Ulid                   `protobuf:"bytes,4,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	StepInfo      *stroppy.StroppyStepRun `protobuf:"bytes,5,opt,name=step_info,json=stepInfo,proto3" json:"step_info,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -160,6 +169,13 @@ func (x *StroppyStep) GetTiming() *Timing {
 		return x.Timing
 	}
 	return nil
+}
+
+func (x *StroppyStep) GetStatus() stroppy.Status {
+	if x != nil {
+		return x.Status
+	}
+	return stroppy.Status(0)
 }
 
 func (x *StroppyStep) GetRunId() *Ulid {
@@ -220,30 +236,78 @@ func (x *StroppyRun_List) GetRuns() []*StroppyRun {
 	return nil
 }
 
+type StroppyStep_List struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Steps         []*StroppyStep         `protobuf:"bytes,1,rep,name=steps,proto3" json:"steps,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StroppyStep_List) Reset() {
+	*x = StroppyStep_List{}
+	mi := &file_panel_stroppy_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StroppyStep_List) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StroppyStep_List) ProtoMessage() {}
+
+func (x *StroppyStep_List) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_stroppy_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StroppyStep_List.ProtoReflect.Descriptor instead.
+func (*StroppyStep_List) Descriptor() ([]byte, []int) {
+	return file_panel_stroppy_proto_rawDescGZIP(), []int{1, 0}
+}
+
+func (x *StroppyStep_List) GetSteps() []*StroppyStep {
+	if x != nil {
+		return x.Steps
+	}
+	return nil
+}
+
 var File_panel_stroppy_proto protoreflect.FileDescriptor
 
 const file_panel_stroppy_proto_rawDesc = "" +
 	"\n" +
-	"\x13panel/stroppy.proto\x12\x05panel\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\x1a\x19proto/stroppy/cloud.proto\"\x8c\x03\n" +
+	"\x13panel/stroppy.proto\x12\x05panel\x1a\x11panel/types.proto\x1a\x19proto/stroppy/cloud.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xd6\x03\n" +
 	"\n" +
 	"StroppyRun\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
-	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12/\n" +
-	"\x06status\x18\x03 \x01(\x0e2\r.panel.StatusB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06status\x125\n" +
-	"\brun_info\x18\x04 \x01(\v2\x13.stroppy.StroppyRunB\x05\xca>\x02H\x01R\arunInfo\x12;\n" +
-	"\x15grafana_dashboard_url\x18\x05 \x01(\tB\a\xca>\x04\x12\x02\b\x01R\x13grafanaDashboardUrl\x12;\n" +
-	"\x05steps\x18\x06 \x03(\v2\x12.panel.StroppyStepB\x11\xd2>\x0e\n" +
+	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x121\n" +
+	"\x06status\x18\x03 \x01(\x0e2\x0f.stroppy.StatusB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06status\x125\n" +
+	"\brun_info\x18\x04 \x01(\v2\x13.stroppy.StroppyRunB\x05\xca>\x02H\x01R\arunInfo\x12F\n" +
+	"\x13cloud_automation_id\x18\x05 \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01R\x11cloudAutomationId\x12;\n" +
+	"\x15grafana_dashboard_url\x18\x06 \x01(\tB\a\xca>\x04\x12\x02\b\x01R\x13grafanaDashboardUrl\x12;\n" +
+	"\x05steps\x18\a \x03(\v2\x12.panel.StroppyStepB\x11\xd2>\x0e\n" +
 	"\f\n" +
 	"\x06run_id\x18\x01 \x01R\x05steps\x1a-\n" +
 	"\x04List\x12%\n" +
-	"\x04runs\x18\x01 \x03(\v2\x11.panel.StroppyRunR\x04runs:\x13\xca>\x10\b\x01\x12\fstroppy_runs\"\xa3\x02\n" +
+	"\x04runs\x18\x01 \x03(\v2\x11.panel.StroppyRunR\x04runs:\x13\xca>\x10\b\x01\x12\fstroppy_runs\"\x88\x03\n" +
 	"\vStroppyStep\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
-	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12g\n" +
-	"\x06run_id\x18\x03 \x01(\v2\v.panel.UlidBC\xca>@\x12\x04\b\x01 \x01\x1a8\"6NOT NULL REFERENCES stroppy_runs(id) ON DELETE CASCADER\x05runId\x12;\n" +
-	"\tstep_info\x18\x04 \x01(\v2\x17.stroppy.StroppyStepRunB\x05\xca>\x02H\x01R\bstepInfo:\x14\xca>\x11\b\x01\x12\rstroppy_stepsB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
+	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x121\n" +
+	"\x06status\x18\x03 \x01(\x0e2\x0f.stroppy.StatusB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06status\x12g\n" +
+	"\x06run_id\x18\x04 \x01(\v2\v.panel.UlidBC\xca>@\x12\x04\b\x01 \x01\x1a8\"6NOT NULL REFERENCES stroppy_runs(id) ON DELETE CASCADER\x05runId\x12;\n" +
+	"\tstep_info\x18\x05 \x01(\v2\x17.stroppy.StroppyStepRunB\x05\xca>\x02H\x01R\bstepInfo\x1a0\n" +
+	"\x04List\x12(\n" +
+	"\x05steps\x18\x01 \x03(\v2\x12.panel.StroppyStepR\x05steps:\x14\xca>\x11\b\x01\x12\rstroppy_stepsB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
 
 var (
 	file_panel_stroppy_proto_rawDescOnce sync.Once
@@ -257,33 +321,37 @@ func file_panel_stroppy_proto_rawDescGZIP() []byte {
 	return file_panel_stroppy_proto_rawDescData
 }
 
-var file_panel_stroppy_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_panel_stroppy_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_panel_stroppy_proto_goTypes = []any{
 	(*StroppyRun)(nil),             // 0: panel.StroppyRun
 	(*StroppyStep)(nil),            // 1: panel.StroppyStep
 	(*StroppyRun_List)(nil),        // 2: panel.StroppyRun.List
-	(*Ulid)(nil),                   // 3: panel.Ulid
-	(*Timing)(nil),                 // 4: panel.Timing
-	(Status)(0),                    // 5: panel.Status
-	(*stroppy.StroppyRun)(nil),     // 6: stroppy.StroppyRun
-	(*stroppy.StroppyStepRun)(nil), // 7: stroppy.StroppyStepRun
+	(*StroppyStep_List)(nil),       // 3: panel.StroppyStep.List
+	(*Ulid)(nil),                   // 4: panel.Ulid
+	(*Timing)(nil),                 // 5: panel.Timing
+	(stroppy.Status)(0),            // 6: stroppy.Status
+	(*stroppy.StroppyRun)(nil),     // 7: stroppy.StroppyRun
+	(*stroppy.StroppyStepRun)(nil), // 8: stroppy.StroppyStepRun
 }
 var file_panel_stroppy_proto_depIdxs = []int32{
-	3,  // 0: panel.StroppyRun.id:type_name -> panel.Ulid
-	4,  // 1: panel.StroppyRun.timing:type_name -> panel.Timing
-	5,  // 2: panel.StroppyRun.status:type_name -> panel.Status
-	6,  // 3: panel.StroppyRun.run_info:type_name -> stroppy.StroppyRun
-	1,  // 4: panel.StroppyRun.steps:type_name -> panel.StroppyStep
-	3,  // 5: panel.StroppyStep.id:type_name -> panel.Ulid
-	4,  // 6: panel.StroppyStep.timing:type_name -> panel.Timing
-	3,  // 7: panel.StroppyStep.run_id:type_name -> panel.Ulid
-	7,  // 8: panel.StroppyStep.step_info:type_name -> stroppy.StroppyStepRun
-	0,  // 9: panel.StroppyRun.List.runs:type_name -> panel.StroppyRun
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	4,  // 0: panel.StroppyRun.id:type_name -> panel.Ulid
+	5,  // 1: panel.StroppyRun.timing:type_name -> panel.Timing
+	6,  // 2: panel.StroppyRun.status:type_name -> stroppy.Status
+	7,  // 3: panel.StroppyRun.run_info:type_name -> stroppy.StroppyRun
+	4,  // 4: panel.StroppyRun.cloud_automation_id:type_name -> panel.Ulid
+	1,  // 5: panel.StroppyRun.steps:type_name -> panel.StroppyStep
+	4,  // 6: panel.StroppyStep.id:type_name -> panel.Ulid
+	5,  // 7: panel.StroppyStep.timing:type_name -> panel.Timing
+	6,  // 8: panel.StroppyStep.status:type_name -> stroppy.Status
+	4,  // 9: panel.StroppyStep.run_id:type_name -> panel.Ulid
+	8,  // 10: panel.StroppyStep.step_info:type_name -> stroppy.StroppyStepRun
+	0,  // 11: panel.StroppyRun.List.runs:type_name -> panel.StroppyRun
+	1,  // 12: panel.StroppyStep.List.steps:type_name -> panel.StroppyStep
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_panel_stroppy_proto_init() }
@@ -298,7 +366,7 @@ func file_panel_stroppy_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_panel_stroppy_proto_rawDesc), len(file_panel_stroppy_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
