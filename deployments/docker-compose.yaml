@@ -49,6 +49,8 @@ services:
       timeout: 5s
       retries: 5
     restart: no
+    ports:
+      - "127.0.0.1:5432:5432"
 
   stroppy-cloud-panel:
     build:
@@ -58,6 +60,9 @@ services:
       CONFIG_PATH: /etc/config/
     volumes:
       - ./config.yaml:/etc/config/config.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   caddy:
     container_name: caddy
