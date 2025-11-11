@@ -83,5 +83,35 @@
       "submit": "Start automation",
       "cancel": "Cancel"
     }
+  },
+  "detail": {
+    "pageTitle": "Automation details",
+    "subtitle": "Automation {{id}}",
+    "sections": {
+      "overview": "Overview"
+    },
+    "fields": {
+      "automationId": "Automation ID",
+      "status": "Status",
+      "author": "Author",
+      "createdAt": "Created at",
+      "updatedAt": "Updated at",
+      "databaseRoot": "Database resource ID",
+      "workloadRoot": "Workload resource ID"
+    },
+    "run": {
+      "title": "Linked run",
+      "viewRun": "Open run",
+      "status": "Run status",
+      "createdAt": "Run created",
+      "updatedAt": "Run updated",
+      "notLinked": "No run linked to this automation",
+      "notLinkedHint": "Start a run from this automation to see benchmark details."
+    },
+    "messages": {
+      "noAutomation": "Automation not found",
+      "failedToLoad": "Failed to load automation data",
+      "unknownUser": "Unknown author"
+    }
   }
 }

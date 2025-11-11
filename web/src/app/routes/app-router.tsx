@@ -13,6 +13,7 @@ import { RunsCreatePage } from '../pages/panel/runs-create-page'
 import { RunsComparePage } from '../pages/panel/runs-compare-page'
 import { AutomationsPage } from '../pages/panel/automations-page'
 import { AutomationsCreatePage } from '../pages/panel/automations-create-page'
+import { AutomationsDetailPage } from '../pages/panel/automations-detail-page'
 import { ProtectedRoute } from './protected-route'
 
 export const AppRouter = () => {
@@ -40,6 +41,7 @@ export const AppRouter = () => {
           <Route path="automations">
             <Route index element={<AutomationsPage />} />
             <Route path="new" element={<AutomationsCreatePage />} />
+            <Route path=":automationId" element={<AutomationsDetailPage />} />
           </Route>
           <Route path="runs" element={<RunsPage />} />
           <Route path="runs/new" element={<RunsCreatePage />} />

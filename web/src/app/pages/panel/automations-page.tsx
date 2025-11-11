@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { useTranslation } from '@/i18n/use-translation'
 import { useAutomationsQuery } from '@/app/features/automations/api'
-import type { SortDirection } from '@/app/features/automations/types'
+import type { AutomationSummary, SortDirection } from '@/app/features/automations/types'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
@@ -64,6 +64,11 @@ export const AutomationsPage = () => {
   const handleViewRun = (runId?: string) => {
     if (!runId) return
     navigate(`/app/runs/${runId}`)
+  }
+
+  const handleViewAutomation = (automation: AutomationSummary) => {
+    if (!automation.id) return
+    navigate(`/app/automations/${automation.id}`, { state: { automation } })
   }
 
   return (
@@ -139,7 +144,19 @@ export const AutomationsPage = () => {
 
               return (
                 <TableRow key={`${automation.id}-${automation.createdAt?.toISOString() ?? ''}`}>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{automation.id || '—'}</TableCell>
+                  <TableCell>
+                    {automation.id ? (
+                      <Button
+                        variant="link"
+                        className="px-0 font-mono text-xs text-primary hover:text-primary/80"
+                        onClick={() => handleViewAutomation(automation)}
+                      >
+                        {automation.id}
+                      </Button>
+                    ) : (
+                      <span className="font-mono text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(automation.status)}>{getStatusLabel(automation.status, tRuns)}</Badge>
                   </TableCell>
