@@ -6,6 +6,7 @@ replace github.com/stroppy-io/stroppy => ../../
 
 require (
 	github.com/grafana/sobek v0.0.0-20251103154147-6b40183f38e5
+	github.com/oklog/ulid/v2 v2.1.1
 	github.com/stroppy-io/stroppy v0.0.0-00010101000000-000000000000
 	go.k6.io/k6 v1.3.0
 	go.uber.org/zap v1.27.0
@@ -13,6 +14,7 @@ require (
 )
 
 require (
+	connectrpc.com/connect v1.19.1 // indirect
 	github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2 v2.0.1 // indirect
 	github.com/avito-tech/go-transaction-manager/trm/v2 v2.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect

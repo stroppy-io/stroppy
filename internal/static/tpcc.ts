@@ -32,6 +32,7 @@ interface Driver {
     insert: BinMsg<InsertDescriptor>,
     count: number,
   ): BinMsg<DriverTransactionStat>;
+  teardown(): any; // error
 }
 const driver: Driver = stroppy;
 
@@ -2680,6 +2681,10 @@ const stockLevelDescriptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
 );
 export function stock_level() {
   RunUnitBin(stockLevelDescriptorBin);
+}
+
+export function teardown() {
+  driver.teardown();
 }
 
 /*

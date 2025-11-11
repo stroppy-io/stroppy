@@ -2,10 +2,15 @@ package xk6
 
 import (
 	"context"
+	"net/http"
+	"os"
+	"sync"
 
 	"github.com/grafana/sobek"
+	"github.com/oklog/ulid/v2"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy/stroppyconnect"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"google.golang.org/protobuf/proto"
 
@@ -15,11 +20,13 @@ import (
 
 // RootModule global object, runs with k6 process
 type RootModule struct {
-	lg *zap.Logger
+	lg          *zap.Logger
+	cloudClient stroppyconnect.CloudStatusServiceClient
+	runULID     ulid.ULID
+	ctx         context.Context
 }
 
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance { //nolint:ireturn
-	vu.Runtime()
 	return NewXK6Instance(vu, vu.Runtime().NewObject())
 }
 
@@ -49,6 +56,7 @@ type XK6Instance struct {
 }
 
 var rootModule *RootModule
+var onceParseConfig sync.Once
 
 func (i *XK6Instance) ParseConfig(configBin []byte) {
 	var drvCfg stroppy.DriverConfig
@@ -56,13 +64,21 @@ func (i *XK6Instance) ParseConfig(configBin []byte) {
 	if err != nil {
 		i.lg.Panic("error unmarshall driver config", zap.Error(err))
 	}
-	processCtx := context.Background()
 	i.lg.Sugar().Debugf(drvCfg.Url)
-	drv, err := driver.Dispatch(processCtx, i.lg, &drvCfg)
+	drv, err := driver.Dispatch(rootModule.ctx, i.lg, &drvCfg)
 	if err != nil {
 		i.lg.Panic("can't get driver", zap.Error(err))
 	}
 	i.drv = drv
+
+	onceParseConfig.Do(func() {
+		rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
+			Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
+			Status: stroppy.Status_STATUS_RUNNING,
+			Config: &stroppy.ConfigFile{Global: &stroppy.GlobalConfig{Driver: &drvCfg}},
+			Cmd:    "",
+		})
+	})
 }
 
 var _ modules.Module = new(RootModule)
@@ -73,8 +89,8 @@ func (i *XK6Instance) RunUnit(unitMsg []byte) (sobek.ArrayBuffer, error) {
 	if err != nil {
 		return sobek.ArrayBuffer{}, err
 	}
-	// TODO: keep global ctx
-	stats, err := i.drv.RunTransaction(context.Background(), &unit)
+
+	stats, err := i.drv.RunTransaction(i.vu.Context(), &unit)
 	if err != nil {
 		return sobek.ArrayBuffer{}, err
 	}
@@ -93,8 +109,7 @@ func (i *XK6Instance) InsertValues(insertMsg []byte, count int64) (sobek.ArrayBu
 		return sobek.ArrayBuffer{}, err
 	}
 
-	// TODO: keep global ctx
-	stats, err := i.drv.InsertValues(context.Background(), &descriptor, count)
+	stats, err := i.drv.InsertValues(i.vu.Context(), &descriptor, count)
 	if err != nil {
 		return sobek.ArrayBuffer{}, err
 	}
@@ -106,6 +121,16 @@ func (i *XK6Instance) InsertValues(insertMsg []byte, count int64) (sobek.ArrayBu
 	return i.vu.Runtime().NewArrayBuffer(statsMsg), nil
 }
 
+func (i *XK6Instance) Teardown() error {
+	rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
+		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
+		Status: stroppy.Status_STATUS_COMPLETED,
+		Config: &stroppy.ConfigFile{},
+		Cmd:    "",
+	})
+	return nil
+}
+
 func init() { //nolint:gochecknoinits // allow for xk6
 	pluginLoggerName := "xk6air"
 	lg := logger.NewFromEnv().
@@ -115,13 +140,28 @@ func init() { //nolint:gochecknoinits // allow for xk6
 			zap.AddStacktrace(zap.FatalLevel),
 		)
 
-	// var cc = stroppyconnect.NewCloudStatusServiceClient(
-	// 	&http.Client{},
-	// 	"",
-	// )
-
-	rootModule = &RootModule{
-		lg: lg,
+	var cloudURL = os.Getenv("STROPPY_CLOUD_URL")
+	var runULIDString = os.Getenv("STROPPY_CLOUD_RUN_ID")
+	runULID, err := ulid.Parse(runULIDString)
+	if err != nil {
+		lg.Sugar().Fatalf("'%s' parse ulid error: %w", runULIDString, err)
 	}
+
+	var cc = stroppyconnect.NewCloudStatusServiceClient(
+		&http.Client{},
+		cloudURL,
+	)
+	rootModule = &RootModule{
+		lg:          lg,
+		cloudClient: cc,
+		runULID:     runULID,
+		ctx:         context.Background(),
+	}
+	cc.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
+		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
+		Status: stroppy.Status_STATUS_IDLE,
+		Config: &stroppy.ConfigFile{},
+		Cmd:    "",
+	})
 	modules.Register("k6/x/stroppy", rootModule)
 }
