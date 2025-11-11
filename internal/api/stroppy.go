@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/encoding/protojson"
 	"time"
 
 	"github.com/samber/lo"
@@ -16,6 +18,10 @@ import (
 func (p *PanelService) NotifyRun(ctx context.Context, stroppyRun *stroppy.StroppyRun) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, postgres.WithReadCommitted(ctx, p.txManager,
 		func(ctx context.Context) error {
+			p.logger.Debug(
+				"Received stroppy run notification",
+				zap.ByteString("run_info", lo.Must(protojson.Marshal(stroppyRun))),
+			)
 			if lo.Contains(
 				[]stroppy.Status{
 					stroppy.Status_STATUS_COMPLETED,

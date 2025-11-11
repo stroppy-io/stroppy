@@ -6,7 +6,25 @@ import { listAutomations } from '@/proto/panel/automate-AutomateService_connectq
 import { ListAutomationsRequestSchema } from '@/proto/panel/automate_pb.ts'
 import { OrderByTimestampSchema, Status } from '@/proto/panel/types_pb.ts'
 import type { CloudAutomation } from '@/proto/panel/automate_pb.ts'
-import type { AutomationSummary, AutomationsFilters } from './types'
+import type { AutomationSummary, AutomationsFilters, AutomationRunSummary } from './types'
+
+const mapStroppyRun = (stroppyRun?: CloudAutomation['stroppyRun']): AutomationRunSummary | undefined => {
+  if (!stroppyRun) {
+    return undefined
+  }
+
+  const createdAt = stroppyRun.timing?.createdAt ? timestampDate(stroppyRun.timing.createdAt) : undefined
+  const updatedAt = stroppyRun.timing?.updatedAt ? timestampDate(stroppyRun.timing.updatedAt) : undefined
+
+  return {
+    id: stroppyRun.id?.id,
+    // panel.Status and stroppy.Status share the same enum values, so we can safely reuse helpers.
+    status: stroppyRun.status as Status,
+    createdAt,
+    updatedAt,
+    grafanaDashboardUrl: stroppyRun.grafanaDashboardUrl || undefined,
+  }
+}
 
 const mapAutomation = (automation: CloudAutomation): AutomationSummary => ({
   id: automation.id?.id ?? '',
@@ -16,7 +34,7 @@ const mapAutomation = (automation: CloudAutomation): AutomationSummary => ({
   authorId: automation.authorId?.id,
   databaseRootResourceId: automation.databaseRootResourceId?.id,
   workloadRootResourceId: automation.workloadRootResourceId?.id,
-  stroppyRunId: automation.stroppyRunId?.id,
+  stroppyRun: mapStroppyRun(automation.stroppyRun),
 })
 
 const buildListRequest = (filters: AutomationsFilters) => {

@@ -10,6 +10,14 @@ export interface AutomationsFilters {
   orderByCreatedAt?: SortDirection
 }
 
+export interface AutomationRunSummary {
+  id?: string
+  status?: Status
+  createdAt?: Date
+  updatedAt?: Date
+  grafanaDashboardUrl?: string
+}
+
 export interface AutomationSummary {
   id: string
   status: Status
@@ -18,5 +26,5 @@ export interface AutomationSummary {
   authorId?: string
   databaseRootResourceId?: string
   workloadRootResourceId?: string
-  stroppyRunId?: string
+  stroppyRun?: AutomationRunSummary
 }

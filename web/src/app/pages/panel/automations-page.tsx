@@ -133,29 +133,47 @@ export const AutomationsPage = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {automations.map((automation) => (
-              <TableRow key={`${automation.id}-${automation.createdAt?.toISOString() ?? ''}`}>
-                <TableCell className="font-mono text-xs text-muted-foreground">{automation.id || '—'}</TableCell>
-                <TableCell>
-                  <Badge variant={getStatusBadgeVariant(automation.status)}>{getStatusLabel(automation.status, tRuns)}</Badge>
-                </TableCell>
-                <TableCell>
-                  {automation.stroppyRunId ? (
-                    <Button variant="link" className="px-0" onClick={() => handleViewRun(automation.stroppyRunId)}>
-                      {automation.stroppyRunId}
-                    </Button>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">{t('messages.noRun')}</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {automation.createdAt ? dayjs(automation.createdAt).format('DD MMM YYYY, HH:mm') : t('messages.unknown')}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {automation.updatedAt ? dayjs(automation.updatedAt).format('DD MMM YYYY, HH:mm') : '—'}
-                </TableCell>
-              </TableRow>
-            ))}
+            {automations.map((automation) => {
+              const runId = automation.stroppyRun?.id
+              const grafanaUrl = automation.stroppyRun?.grafanaDashboardUrl
+
+              return (
+                <TableRow key={`${automation.id}-${automation.createdAt?.toISOString() ?? ''}`}>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{automation.id || '—'}</TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusBadgeVariant(automation.status)}>{getStatusLabel(automation.status, tRuns)}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {runId ? (
+                      <div className="space-y-1">
+                        <Button variant="link" className="px-0" onClick={() => handleViewRun(runId)}>
+                          {runId}
+                        </Button>
+                        {grafanaUrl && (
+                          <Button
+                            asChild
+                            variant="link"
+                            className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            <a href={grafanaUrl} target="_blank" rel="noreferrer">
+                              {t('actions.openGrafana')}
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">{t('messages.noRun')}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {automation.createdAt ? dayjs(automation.createdAt).format('DD MMM YYYY, HH:mm') : t('messages.unknown')}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {automation.updatedAt ? dayjs(automation.updatedAt).format('DD MMM YYYY, HH:mm') : '—'}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
             {isLoading && (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">

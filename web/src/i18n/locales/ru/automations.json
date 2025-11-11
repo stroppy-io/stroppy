@@ -6,7 +6,8 @@
   "actions": {
     "refresh": "Обновить",
     "runAutomation": "Запустить автоматизацию",
-    "backToList": "Вернуться к списку"
+    "backToList": "Вернуться к списку",
+    "openGrafana": "Открыть дашборд Grafana"
   },
   "filters": {
     "onlyMine": "Показывать только мои автоматизации",

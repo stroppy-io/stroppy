@@ -27,7 +27,7 @@ service:
     oriole_base_image: "fd8g05clmsv92nlqmer5"
     stroppy_base_image: "fd8rlvda55egnjvtev72"
     stroppy_cloud_url: "https://localhost:8080"
-    stroppy_docker_version: "v1.2.0-dev8.10"
+    stroppy_docker_version: "v1.2.0-dev9.11"
   k8s:
     kubeconfig_path: ".kubectl.config.yaml"
     crossplane:

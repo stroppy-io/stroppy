@@ -6,7 +6,8 @@
   "actions": {
     "refresh": "Refresh",
     "runAutomation": "Run automation",
-    "backToList": "Back to automations"
+    "backToList": "Back to automations",
+    "openGrafana": "Open Grafana dashboard"
   },
   "filters": {
     "onlyMine": "Show only my automations",
