@@ -119,3 +119,4 @@ http-client.private.env.json
 /internal/automate/kubeconfig.yaml
 /.kubectl.config.yaml
 /stroppy-cloud-panel-server
+/deployments/.kubectl.config.yaml
