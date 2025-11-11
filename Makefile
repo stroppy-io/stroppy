@@ -188,7 +188,7 @@ tests: # Run tests with coverage
 
 K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
 .PHONY: build-k6
-build-k6: .check-bins # Build k6 module
+build-k6: # Build k6 module
 	mkdir -p $(CURDIR)/build
 	GOPROXY=$(GOPROXY) \
 	PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
