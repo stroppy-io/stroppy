@@ -59,7 +59,8 @@ services:
     environment:
       CONFIG_PATH: /etc/config/
     volumes:
-      - ./config.yaml:/etc/config/config.yaml:ro
+      - ./config.yaml:/etc/config/config.yaml:ro\
+      - ./.kubectl.config.yaml:/app/.kubectl.config.yaml:ro
     depends_on:
       postgres:
         condition: service_healthy
