@@ -6,7 +6,7 @@ import "google/protobuf/empty.proto";
 import "proto/stroppy/runtime.proto";
 import "proto/stroppy/config.proto";
 
-option go_package = "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy";
+option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
 
 /**
  * SidecarPlugin defines the gRPC service that sidecar plugins must implement.
@@ -16,18 +16,18 @@ service SidecarService {
      * Initialize is called once before the benchmark starts.
      * Used to initialize resources of SidecarPlugin.
      */
-    rpc Initialize (stroppy.GlobalConfig) returns (google.protobuf.Empty);
+    rpc Initialize(stroppy.GlobalConfig) returns (google.protobuf.Empty);
     /**
      * OnStepStart is called once before each step starts.
      */
-    rpc OnStepStart (stroppy.StepContext) returns (google.protobuf.Empty);
+    rpc OnStepStart(stroppy.StepContext) returns (google.protobuf.Empty);
     /**
      * OnStepEnd is called once after each step ends.
      */
-    rpc OnStepEnd (stroppy.StepContext) returns (google.protobuf.Empty);
+    rpc OnStepEnd(stroppy.StepContext) returns (google.protobuf.Empty);
     /**
      * Teardown is called once after the benchmark ends.
      * Used to clean up resources.
      */
-    rpc Teardown (stroppy.GlobalConfig) returns (google.protobuf.Empty);
+    rpc Teardown(stroppy.GlobalConfig) returns (google.protobuf.Empty);
 }

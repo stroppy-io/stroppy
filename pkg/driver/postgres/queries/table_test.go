@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 func ptr[T any](x T) *T {

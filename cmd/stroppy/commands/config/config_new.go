@@ -12,7 +12,7 @@ import (
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/internal/config"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 const (

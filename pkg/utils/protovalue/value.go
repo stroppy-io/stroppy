@@ -3,7 +3,7 @@ package protovalue
 import (
 	"github.com/shopspring/decimal"
 
-	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 type Null = struct{}

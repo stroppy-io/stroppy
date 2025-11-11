@@ -1,6 +1,6 @@
 module xk6air
 
-go 1.24.0
+go 1.24.3
 
 replace github.com/stroppy-io/stroppy => ../../
 

@@ -7,7 +7,7 @@ import "proto/stroppy/descriptor.proto";
 import "validate/validate.proto";
 import "proto/stroppy/k6.proto";
 
-option go_package = "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy";
+option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
 
 
 /**

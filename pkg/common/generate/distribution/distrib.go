@@ -2,7 +2,7 @@ package distribution
 
 import (
 	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
-	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 type rangesGetter[T constraint.Number] interface {

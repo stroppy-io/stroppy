@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/stroppy-io/stroppy/internal/config"
-	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/utils/protoyaml"
 )
 

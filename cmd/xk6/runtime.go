@@ -4,7 +4,7 @@ import (
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/common/unit_queue"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )

@@ -14,20 +14,20 @@ generate:
     - directory: proto/stroppy
   plugins:
     - name: go
-      out: ./proto/build/go
+      out: ./pkg/common
       opts:
         paths: source_relative
     - name: go-grpc
-      out: ./proto/build/go
+      out: ./pkg/common
       opts:
         paths: source_relative
     - name: validate
-      out: ./proto/build/go
+      out: ./pkg/common
       opts:
         lang: go
         paths: source_relative
     - name: connect-go
-      out: ./proto/build/go
+      out: ./pkg/common
       opts:
         paths: source_relative
         simple: true

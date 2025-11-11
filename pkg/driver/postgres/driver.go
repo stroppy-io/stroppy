@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )

@@ -5,8 +5,8 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
-	pb "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
 	"google.golang.org/protobuf/proto"
 
 	"go.k6.io/k6/js/modules"
@@ -51,7 +51,7 @@ type XK6Instance struct {
 var rootModule *RootModule
 
 func (i *XK6Instance) ParseConfig(configBin []byte) {
-	var drvCfg pb.DriverConfig
+	var drvCfg stroppy.DriverConfig
 	err := proto.Unmarshal(configBin, &drvCfg)
 	if err != nil {
 		i.lg.Panic("error unmarshall driver config", zap.Error(err))
@@ -68,7 +68,7 @@ func (i *XK6Instance) ParseConfig(configBin []byte) {
 var _ modules.Module = new(RootModule)
 
 func (i *XK6Instance) RunUnit(unitMsg []byte) (sobek.ArrayBuffer, error) {
-	var unit pb.UnitDescriptor
+	var unit stroppy.UnitDescriptor
 	err := proto.Unmarshal(unitMsg, &unit)
 	if err != nil {
 		return sobek.ArrayBuffer{}, err
@@ -87,7 +87,7 @@ func (i *XK6Instance) RunUnit(unitMsg []byte) (sobek.ArrayBuffer, error) {
 }
 
 func (i *XK6Instance) InsertValues(insertMsg []byte, count int64) (sobek.ArrayBuffer, error) {
-	var descriptor pb.InsertDescriptor
+	var descriptor stroppy.InsertDescriptor
 	err := proto.Unmarshal(insertMsg, &descriptor)
 	if err != nil {
 		return sobek.ArrayBuffer{}, err
@@ -115,7 +115,13 @@ func init() { //nolint:gochecknoinits // allow for xk6
 			zap.AddStacktrace(zap.FatalLevel),
 		)
 
-	rootModule = new(RootModule)
-	rootModule.lg = lg
+	// var cc = stroppyconnect.NewCloudStatusServiceClient(
+	// 	&http.Client{},
+	// 	"",
+	// )
+
+	rootModule = &RootModule{
+		lg: lg,
+	}
 	modules.Register("k6/x/stroppy", rootModule)
 }

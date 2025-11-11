@@ -169,7 +169,8 @@ Status represents the status of a stroppy run or step run.
 <a name="stroppy-CloudStatusService"></a>
 
 ### CloudStatusService
-CloudStatusService is a service for notifying the cloud status of runs and steps.
+CloudStatusService is a service for notifying the cloud status of runs and
+steps.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|

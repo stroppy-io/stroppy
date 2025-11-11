@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
-	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/common/unit_queue"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"go.k6.io/k6/js/modules"

@@ -8,7 +8,7 @@ import "proto/stroppy/common.proto";
 import "proto/stroppy/config.proto";
 import "proto/stroppy/descriptor.proto";
 
-option go_package = "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy";
+option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
 
 /**
  * StepContext provides contextual information to a benchmark step during

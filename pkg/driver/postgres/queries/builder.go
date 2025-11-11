@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
-	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 var (

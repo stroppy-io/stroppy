@@ -3,7 +3,7 @@ package queries
 import (
 	"testing"
 
-	stroppy "github.com/stroppy-io/stroppy/proto/build/go/proto/stroppy"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 func Test_badInsertSQL(t *testing.T) {
