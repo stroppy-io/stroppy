@@ -3,14 +3,12 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/durationpb"
 
@@ -55,6 +53,7 @@ func waitForDB(lg *zap.Logger, connPool *pgxpool.Pool, timeout time.Duration) er
 }
 
 // TODO: performance issue by passing via interface?
+
 type QueryBuilder interface {
 	Build(
 		ctx context.Context,
@@ -79,9 +78,6 @@ type Driver struct {
 	}
 	txManager  *manager.Manager
 	txExecutor *TxExecutor
-
-	tableToCopyChannel cmap.ConcurrentMap[string, chan []any]
-	copyFromStarter    func(tableName string, paramsNames []string) chan []any
 
 	builder QueryBuilder
 }
@@ -126,32 +122,6 @@ func NewDriver(
 
 	d.txManager = manager.Must(trmpgx.NewDefaultFactory(connPool))
 	d.txExecutor = NewTxExecutor(connPool)
-	d.tableToCopyChannel = cmap.New[chan []any]()
-
-	d.copyFromStarter = func(tableName string, columnNames []string) chan []any {
-		source := make(chan []any)
-
-		go func() {
-			_, err := connPool.CopyFrom(
-				ctx,
-				pgx.Identifier{tableName},
-				columnNames,
-				pgx.CopyFromFunc(func() ([]any, error) {
-					vals, ok := <-source
-					if !ok {
-						return nil, nil
-					}
-
-					return vals, nil
-				}),
-			)
-			if err != nil {
-				d.logger.Error("copy from connection ended with error", zap.Error(err))
-			}
-		}()
-
-		return source
-	}
 
 	return d, nil
 }
@@ -307,69 +277,6 @@ func (d *Driver) insertValuesCopyFrom(
 	}, nil
 }
 
-// streamingCopySource implements pgx.CopyFromSource to generate values on-demand
-// without loading all rows into memory.
-type streamingCopySource struct {
-	driver      *Driver
-	descriptor  *stroppy.InsertDescriptor
-	count       int64
-	current     int64
-	values      []any
-	err         error
-	transaction *stroppy.DriverTransaction
-	unit        *stroppy.UnitDescriptor
-}
-
-func NewStreamingCopySource(
-	d *Driver,
-	descriptor *stroppy.InsertDescriptor,
-	count int64,
-) *streamingCopySource {
-
-	return &streamingCopySource{
-		driver:  d,
-		count:   count,
-		current: 0,
-		values:  make([]any, strings.Count(queries.BadInsertSQL(descriptor), " ")),
-		unit: &stroppy.UnitDescriptor{
-			Type: &stroppy.UnitDescriptor_Insert{
-				Insert: descriptor,
-			},
-		},
-	}
-}
-
-// Next advances to the next row.
-func (s *streamingCopySource) Next() bool {
-	if s.current >= s.count {
-		return false
-	}
-
-	// NOTE: known that ctx not used at query generatin
-	s.transaction, s.err = s.driver.GenerateNextUnit(nil, s.unit)
-	if s.err != nil {
-		return false
-	}
-
-	s.err = s.driver.fillParamsToValues(s.transaction.GetQueries()[0], s.values)
-	if s.err != nil {
-		return false
-	}
-
-	s.current++
-	return true
-}
-
-// Values returns the values for the current row.
-func (s *streamingCopySource) Values() ([]any, error) {
-	return s.values, nil
-}
-
-// Err returns any error that occurred during iteration.
-func (s *streamingCopySource) Err() error {
-	return s.err
-}
-
 func (d *Driver) runTransaction(
 	ctx context.Context,
 	transaction *stroppy.DriverTransaction,
@@ -413,20 +320,9 @@ func (d *Driver) runTransactionInternal(
 
 		start := time.Now()
 
-		switch query.GetMethod() {
-		case stroppy.InsertMethod_PLAIN_QUERY:
-			_, err := executor.Exec(ctx, query.GetRequest(), values...)
-			if err != nil {
-				return nil, err
-			}
-		case stroppy.InsertMethod_COPY_FROM:
-			// NOTE: ignores tx_level and sends a data trought the dedicated connection
-			err := d.CopyFromQuery(query)
-			if err != nil {
-				return nil, err
-			}
-		default:
-			d.logger.Panic("unexpected proto.InsertMethod")
+		_, err = executor.Exec(ctx, query.GetRequest(), values...)
+		if err != nil {
+			return nil, err
 		}
 
 		queries = append(queries, &stroppy.DriverQueryStat{
@@ -457,14 +353,7 @@ func (d *Driver) fillParamsToValues(query *stroppy.DriverQuery, valuesOut []any)
 
 func (d *Driver) Teardown(_ context.Context) error {
 	d.logger.Debug("Driver Teardown Start")
-
-	d.logger.Debug("Driver Teardown Close copy channels")
-	d.CloseCopyChannels()
-
-	d.logger.Debug("Driver Teardown Close pgxpool")
 	d.pgxPool.Close()
-
 	d.logger.Debug("Driver Teardown End")
-
 	return nil
 }
