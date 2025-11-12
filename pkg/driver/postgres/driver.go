@@ -35,7 +35,7 @@ func waitForDB(lg *zap.Logger, connPool *pgxpool.Pool, timeout time.Duration) er
 
 		// Try to ping
 		if err := connPool.Ping(ctx); err == nil {
-			lg.Info("Successfully connected to database")
+			lg.Debug("Successfully connected to database")
 			return nil
 		} else {
 			lg.Sugar().Warnf("Database not ready, retrying in %v... (error: %v)", interval, err)
@@ -111,6 +111,7 @@ func NewDriver(
 	if err != nil {
 		return nil, err
 	}
+	d.logger.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
 	err = waitForDB(d.logger, connPool, 5*time.Minute)
 	if err != nil {
 		return nil, err

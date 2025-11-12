@@ -22,4 +22,4 @@ FROM alpine:3.22 AS runner
 COPY --from=builder /app/build/stroppy-k6 /k6
 COPY --from=builder /app/internal/static/stroppy.pb.js /stroppy.pb.js
 
-CMD [ "/k6", "run", "test.ts" ]
+CMD [ "/k6", "run", "test.ts", "--out", "experimental-opentelemetry" ]

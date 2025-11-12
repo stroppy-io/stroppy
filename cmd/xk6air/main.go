@@ -1,4 +1,4 @@
-package xk6
+package xk6air
 
 import (
 	"context"
@@ -21,7 +21,7 @@ import (
 // RootModule global object, runs with k6 process
 type RootModule struct {
 	lg          *zap.Logger
-	cloudClient stroppyconnect.CloudStatusServiceClient
+	cloudClient *cloudClientWrapper
 	runULID     ulid.ULID
 	ctx         context.Context
 }
@@ -62,12 +62,12 @@ func (i *XK6Instance) ParseConfig(configBin []byte) {
 	var drvCfg stroppy.DriverConfig
 	err := proto.Unmarshal(configBin, &drvCfg)
 	if err != nil {
-		i.lg.Panic("error unmarshall driver config", zap.Error(err))
+		i.lg.Fatal("error unmarshall driver config", zap.Error(err))
 	}
 	i.lg.Sugar().Debugf(drvCfg.Url)
 	i.drv, err = driver.Dispatch(rootModule.ctx, i.lg, &drvCfg)
 	if err != nil {
-		i.lg.Panic("can't get driver", zap.Error(err))
+		i.lg.Fatal("can't get driver", zap.Error(err))
 	}
 
 	onceParseConfig.Do(func() {
@@ -99,6 +99,19 @@ func (i *XK6Instance) RunUnit(unitMsg []byte) (sobek.ArrayBuffer, error) {
 		return sobek.ArrayBuffer{}, err
 	}
 	return i.vu.Runtime().NewArrayBuffer(statsMsg), nil
+}
+
+func (i *XK6Instance) NotifyStep(name string, status int32) {
+	rootModule.cloudClient.NotifyStep(i.vu.Context(), &stroppy.StroppyStepRun{
+		Id:           &stroppy.Ulid{Value: getStepId(name).String()},
+		StroppyRunId: &stroppy.Ulid{Value: rootModule.runULID.String()},
+		Context: &stroppy.StepContext{
+			Step: &stroppy.Step{
+				Name: name,
+			},
+		},
+		Status: stroppy.Status(status),
+	})
 }
 
 func (i *XK6Instance) InsertValues(insertMsg []byte, count int64) (sobek.ArrayBuffer, error) {
@@ -141,6 +154,20 @@ func init() { //nolint:gochecknoinits // allow for xk6
 
 	var cloudURL = os.Getenv("STROPPY_CLOUD_URL")
 	var runULIDString = os.Getenv("STROPPY_CLOUD_RUN_ID")
+
+	// Check if cloud integration is configured
+	if cloudURL == "" || runULIDString == "" {
+		lg.Warn("cloud integration disabled - missing STROPPY_CLOUD_URL or STROPPY_CLOUD_RUN_ID")
+		rootModule = &RootModule{
+			lg:          lg,
+			cloudClient: &cloudClientWrapper{client: &noopCloudClient{}, lg: lg},
+			runULID:     ulid.ULID{},
+			ctx:         context.Background(),
+		}
+		modules.Register("k6/x/stroppy", rootModule)
+		return
+	}
+
 	runULID, err := ulid.Parse(runULIDString)
 	if err != nil {
 		lg.Sugar().Fatalf("'%s' parse ulid error: %w", runULIDString, err)
@@ -150,13 +177,20 @@ func init() { //nolint:gochecknoinits // allow for xk6
 		&http.Client{},
 		cloudURL,
 	)
+
+	wrappedClient := &cloudClientWrapper{
+		client: cc,
+		lg:     lg,
+	}
+
 	rootModule = &RootModule{
 		lg:          lg,
-		cloudClient: cc,
+		cloudClient: wrappedClient,
 		runULID:     runULID,
 		ctx:         context.Background(),
 	}
-	cc.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
+
+	wrappedClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
 		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
 		Status: stroppy.Status_STATUS_IDLE,
 		Config: &stroppy.ConfigFile{},
