@@ -2,13 +2,11 @@ syntax = "proto3";
 
 package panel;
 
-import "google/protobuf/empty.proto";
 import "panel/types.proto";
 import "protopgx/pgx.proto";
 import "validate/validate.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
-
 
 message RunRecord {
     option (sql.sql_table) = {
@@ -17,6 +15,14 @@ message RunRecord {
     };
     message List {
         repeated RunRecord records = 1;
+    }
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        STATUS_PENDING = 1;
+        STATUS_RUNNING = 2;
+        STATUS_COMPLETED = 3;
+        STATUS_FAILED = 4;
+        STATUS_CANCELLED = 5;
     }
     Ulid id = 1 [
         (sql.sql_field) = {
@@ -33,32 +39,30 @@ message RunRecord {
     Timing timing = 3 [(sql.sql_field).embedded_message = true];
     Status status = 4 [(validate.rules).enum.defined_only = true];
     Tps tps = 5 [(sql.sql_field).serialized_message = true];
-    Database database = 6 [(sql.sql_field).serialized_message = true];
-    Workload workload = 8 [(sql.sql_field).serialized_message = true];
-    optional Ulid cloud_automation_id = 9 [(sql.sql_field) = {sql_type: {type: TEXT,user_cast: true}}];
+    Ulid workflow_id = 6 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {constraint: "NOT NULL REFERENCES workflows(id) ON DELETE CASCADE"}
+        }
+    ];
 }
-
-
 // ----------------------------------------__RUN_SERVICE__--------------------------------------------------------------
 
 message ListRunsRequest {
     optional int32 limit = 1;
     optional int32 offset = 2;
-    // filters
     bool only_mine = 10;
-    optional Status status = 3; // sort by status
-    repeated Tps.Filter tps_filter = 4; // sort by TPS filter
-    repeated MachineInfo.Filter machine_filter = 5; // sort by machine filter
-    optional string workload_name = 6; // sort by workload name
-    optional Workload.Type workload_type = 7; // sort by workload type
-    optional string database_name = 8; // sort by database name
-    optional Database.Type database_type = 9; // sort by database type
-    // order by
-    optional Tps.OrderBy order_by_tps = 20; // sort by TPS type filter
+    optional RunRecord.Status status = 3; // sort by status
+    Tags.Filter stroppy_tags = 4;
+    Tags.Filter database_tags = 5;
+}
+
+message ListTopRunsRequest {
 }
 
 service RunService {
     rpc ListRuns (ListRunsRequest) returns (RunRecord.List);
-    rpc ListTopRuns (google.protobuf.Empty) returns (RunRecord.List);
+    rpc ListTopRuns (ListTopRunsRequest) returns (RunRecord.List);
     rpc AddRun (RunRecord) returns (RunRecord);
 }
+

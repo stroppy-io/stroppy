@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package panel;
+
+import "google/protobuf/empty.proto";
+import "panel/types.proto";
+import "protopgx/pgx.proto";
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
+
+message StroppyScriptTemplate {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "stroppy_deployment_templates"
+    };
+    message List {repeated StroppyScriptTemplate templates = 1;}
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    string name = 3 [(validate.rules).string = {min_len: 3,max_len: 255}];
+    Tags tags = 4 [(sql.sql_field).serialized_message = true]; // here is WorkloadType such as Tpcc or another
+    bytes script_body = 5;
+    string stroppy_version = 6 [(validate.rules).string.min_len = 1];
+    Metadata env_data = 7 [(sql.sql_field).serialized_message = true];
+}
+
+message MachineTemplate {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "machine_templates"
+    };
+    message List {
+        repeated MachineTemplate templates = 1;
+    }
+    enum SizeLabel {
+        SIZE_LABEL_UNSPECIFIED = 0;
+        SIZE_LABEL_XS = 1;
+        SIZE_LABEL_S = 2;
+        SIZE_LABEL_M = 3;
+        SIZE_LABEL_L = 4;
+        SIZE_LABEL_XL = 5;
+    }
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    SizeLabel size_label = 3 [(validate.rules).enum.defined_only = true];
+    MachineInfo machine_info = 4 [(sql.sql_field).embedded_message = true];
+}
+
+message DeploymentStrategy {
+    message Scripting {} // TODO: implement machine via scripting
+    message PrebuiltImage {
+        string image_id = 1 [(validate.rules).string.min_len = 1];
+    }
+    string base_image_id = 2 [(validate.rules).string.min_len = 1];
+    bool public_ip = 3;
+    oneof strategy {
+        Scripting scripting = 1; // TODO: implement machine script deployment strategy
+        PrebuiltImage prebuilt_image = 11;
+    }
+}
+
+message MachineDeployment {
+    MachineTemplate machine_template = 1;
+    DeploymentStrategy strategy = 2;
+}
+
+message ClusterDeployment {
+    repeated MachineDeployment deployments = 1 [(validate.rules).repeated.min_items = 1];
+}
+
+message DatabaseDeploymentTemplate {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "database_deployment_templates"
+    };
+    message List {repeated DatabaseDeploymentTemplate templates = 1;}
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    string name = 3 [(validate.rules).string = {min_len: 3,max_len: 255}];
+    Tags tags = 4 [(sql.sql_field).serialized_message = true];
+    ClusterDeployment deployment = 5 [(sql.sql_field).serialized_message = true];
+}
+
+// ----------------------------------------__DEPLOYMENT_SERVICE__--------------------------------------------------------
+
+message ListMachineTemplatesRequest {}
+
+message ListStroppyScriptTemplatesRequest {}
+
+message ListDatabaseDeploymentTemplatesRequest {}
+
+service DeploymentService {
+    rpc ListMachineTemplates (ListMachineTemplatesRequest) returns (MachineTemplate.List);
+    rpc CreateMachineTemplate (MachineTemplate) returns (MachineTemplate);
+    rpc DeleteMachineTemplate (Ulid) returns (MachineTemplate);
+
+    rpc GetMachineTemplateTags (google.protobuf.Empty) returns (Tags);
+    rpc ListStroppyScriptTemplates (ListStroppyScriptTemplatesRequest) returns (StroppyScriptTemplate.List);
+    rpc CreateStroppyScriptTemplate (StroppyScriptTemplate) returns (StroppyScriptTemplate);
+    rpc DeleteStroppyScriptTemplate (Ulid) returns (StroppyScriptTemplate);
+
+    rpc GetDatabaseTemplateTags (google.protobuf.Empty) returns (Tags);
+    rpc ListDatabaseDeploymentTemplates (ListDatabaseDeploymentTemplatesRequest) returns (DatabaseDeploymentTemplate.List);
+    rpc CreateDatabaseDeploymentTemplate (DatabaseDeploymentTemplate) returns (DatabaseDeploymentTemplate);
+    rpc DeleteDatabaseDeploymentTemplate (Ulid) returns (DatabaseDeploymentTemplate);
+
+}

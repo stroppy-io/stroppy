@@ -32,11 +32,31 @@ message ResourceDef {
 }
 
 message ResourceWithStatus {
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        STATUS_CREATING = 1;
+        STATUS_WORKING = 2;
+        STATUS_DESTROYING = 3;
+        STATUS_DESTROYED = 4;
+        STATUS_DEGRADED = 5;
+    }
     Ref ref = 1 [(sql.sql_field).serialized_message = true, (validate.rules).message.required = true];
-    ResourceDef resource_def = 2 [(sql.sql_field).serialized_message = true,(validate.rules).message.required = true];
+    ResourceDef resource_def = 2 [(sql.sql_field).serialized_message = true, (validate.rules).message.required = true];
     string resource_yaml = 3 [(validate.rules).string.min_len = 1];
     bool synced = 4;
     bool ready = 5;
     string external_id = 6;
-//    map<string, string> additional_fields = 8 [(sql.sql_field).serialized_message = true]; // leave here for future use
+}
+
+message ResourceDag {
+    message Node {
+        string id = 1 [(validate.rules).string.min_len = 1];
+        ResourceWithStatus resource_with_status = 2 [(validate.rules).message.required = true];
+    }
+    message Edge {
+        string from = 1 [(validate.rules).string.min_len = 1];
+        string to = 2 [(validate.rules).string.min_len = 1];
+    }
+    repeated Node nodes = 1 [(validate.rules).repeated.min_items = 1];
+    repeated Edge edges = 2 [(validate.rules).repeated.min_items = 1];
 }

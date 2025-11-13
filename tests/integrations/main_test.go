@@ -11,16 +11,21 @@ import (
 	"testing"
 )
 
+const (
+	API_URL = "http://localhost:8080"
+	//API_URL = "https://console.stroppy.io"
+)
+
 func newAccountClient() panelconnect.AccountServiceClient {
-	return panelconnect.NewAccountServiceClient(http.DefaultClient, "http://localhost:8080")
+	return panelconnect.NewAccountServiceClient(http.DefaultClient, API_URL)
 }
 
 func newAutomateClient() panelconnect.AutomateServiceClient {
-	return panelconnect.NewAutomateServiceClient(http.DefaultClient, "http://localhost:8080")
+	return panelconnect.NewAutomateServiceClient(http.DefaultClient, API_URL)
 }
 
 func newRunClient() panelconnect.RunServiceClient {
-	return panelconnect.NewRunServiceClient(http.DefaultClient, "http://localhost:8080")
+	return panelconnect.NewRunServiceClient(http.DefaultClient, API_URL)
 }
 
 const (
