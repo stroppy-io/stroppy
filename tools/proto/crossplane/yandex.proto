@@ -50,4 +50,49 @@ message YandexCloud {
         repeated NetworkInterface network_interface = 7 [(validate.rules).repeated.min_items = 1];
         map<string, string> metadata = 8 [(validate.rules).message.required = true];
     }
+
+    // converted to crossplane k8s yaml
+    message ResourceDef {
+        message Spec {
+            enum DeletionPolicy {
+                DELETION_POLICY_UNSPECIFIED = 0;
+                DELETE = 1;
+                ORPHAN = 2;
+            }
+            Ref write_connection_secret_to_ref = 1 [(validate.rules).message.required = true];
+            string deletion_policy = 2 [(validate.rules).enum.defined_only = true]; // converted from DeletionPolicy
+            map<string, string> provider_config_ref = 3;
+            oneof for_provider {
+                YandexCloud.Vm yandex_cloud_vm = 100 [(validate.rules).message.required = true];
+                YandexCloud.Network yandex_cloud_network = 101 [(validate.rules).message.required = true];
+                YandexCloud.Subnet yandex_cloud_subnet = 102 [(validate.rules).message.required = true];
+            }
+        }
+        string api_version = 2 [(validate.rules).message.required = true];
+        string kind = 1 [(validate.rules).message.required = true];
+        Metadata metadata = 3;
+        Spec spec = 4 [(validate.rules).message.required = true];
+    }
+
+    message VmStrategy {
+        message Scripting {
+            message FileToWrite {
+                string path = 1 [(validate.rules).string.min_len = 1];
+                bytes content = 2 [(validate.rules).bytes.min_len = 1];
+            }
+            string cmd = 1 [(validate.rules).string.min_len = 1];
+            string workdir = 2 [(validate.rules).string.min_len = 1];
+            map<string, string> env = 3;
+            repeated FileToWrite files_to_write = 4 [(validate.rules).repeated.min_items = 1];
+        }
+        message PrebuiltImage {
+            string image_id = 1 [(validate.rules).string.min_len = 1];
+        }
+        string base_image_id = 2 [(validate.rules).string.min_len = 1];
+        bool public_ip = 3;
+        oneof strategy {
+            Scripting scripting = 1;
+            PrebuiltImage prebuilt_image = 11;
+        }
+    }
 }

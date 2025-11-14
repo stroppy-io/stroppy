@@ -2,60 +2,14 @@ syntax = "proto3";
 
 package crossplane;
 
-import "crossplane/resource.proto";
-import "crossplane/types.proto";
-import "validate/validate.proto";
+import "crossplane/deployment.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane";
 
-message CreateResourceRequest {
-    ResourceDef resource = 1 [(validate.rules).message.required = true];
-    Ref ref = 2 [(validate.rules).message.required = true];
-    SupportedCloud supported_cloud = 3 [(validate.rules).enum.defined_only = true];
-    bool wait_for_sync = 5;
-}
-
-message CreateResourcesManyRequest {
-    repeated ResourceDef resources = 1 [(validate.rules).repeated.min_items = 1];
-    bool wait_for_sync = 2;
-}
-
-message CreateResourcesManyResponse {
-    repeated ResourceWithStatus responses = 1 [(validate.rules).repeated.min_items = 1];
-}
-
-message DeleteResourceRequest {
-    ExtRef ref = 1 [(validate.rules).message.required = true];
-    bool wait_for_sync = 2;
-}
-
-message GetResourceStatusRequest {
-    ExtRef ref = 1 [(validate.rules).message.required = true];
-}
-
-message GetResourceStatusResponse {
-    bool synced = 1;
-    bool ready = 2;
-    string external_id = 3;
-}
-
-message DeleteResourceResponse {
-    bool synced = 1;
-}
-
-message DeleteResourcesManyRequest {
-    repeated ExtRef refs = 1 [(validate.rules).repeated.min_items = 1];
-    bool wait_for_sync = 2;
-}
-
-message DeleteResourcesManyResponse {
-    repeated DeleteResourceResponse responses = 1 [(validate.rules).repeated.min_items = 1];
-}
-
 service Crossplane {
-    rpc CreateResource (CreateResourceRequest) returns (ResourceWithStatus);
-    rpc CreateResourcesMany (CreateResourcesManyRequest) returns (CreateResourcesManyResponse);
-    rpc GetResourceStatus (GetResourceStatusRequest) returns (GetResourceStatusResponse);
-    rpc DeleteResource (DeleteResourceRequest) returns (DeleteResourceResponse);
-    rpc DeleteResourcesMany (DeleteResourcesManyRequest) returns (DeleteResourcesManyResponse);
+    rpc CreateDeployment (Deployment) returns (Deployment);
+    rpc GetDeploymentById (google.protobuf.StringValue) returns (Deployment);
+    rpc DeleteDeploymentById (google.protobuf.StringValue) returns (google.protobuf.Empty);
 }

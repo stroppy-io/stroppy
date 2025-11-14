@@ -9,54 +9,36 @@ import "validate/validate.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane";
 
-message ResourceDef {
-    message Spec {
-        enum DeletionPolicy {
-            DELETION_POLICY_UNSPECIFIED = 0;
-            DELETE = 1;
-            ORPHAN = 2;
-        }
-        Ref write_connection_secret_to_ref = 1 [(validate.rules).message.required = true];
-        string deletion_policy = 2 [(validate.rules).enum.defined_only = true]; // converted from DeletionPolicy
-        map<string, string> provider_config_ref = 3;
-        oneof for_provider {
-            YandexCloud.Vm yandex_cloud_vm = 100 [(validate.rules).message.required = true];
-            YandexCloud.Network yandex_cloud_network = 101 [(validate.rules).message.required = true];
-            YandexCloud.Subnet yandex_cloud_subnet = 102 [(validate.rules).message.required = true];
-        }
-    }
-    string api_version = 2 [(validate.rules).message.required = true];
-    string kind = 1 [(validate.rules).message.required = true];
-    Metadata metadata = 3;
-    Spec spec = 4 [(validate.rules).message.required = true];
-}
-
-message ResourceWithStatus {
+message Resource {
     enum Status {
         STATUS_UNSPECIFIED = 0;
         STATUS_CREATING = 1;
-        STATUS_WORKING = 2;
+        STATUS_READY = 2;
         STATUS_DESTROYING = 3;
         STATUS_DESTROYED = 4;
         STATUS_DEGRADED = 5;
     }
-    Ref ref = 1 [(sql.sql_field).serialized_message = true, (validate.rules).message.required = true];
-    ResourceDef resource_def = 2 [(sql.sql_field).serialized_message = true, (validate.rules).message.required = true];
+    ExtRef ref = 1 [(sql.sql_field).serialized_message = true, (validate.rules).message.required = true];
     string resource_yaml = 3 [(validate.rules).string.min_len = 1];
-    bool synced = 4;
-    bool ready = 5;
-    string external_id = 6;
+    Status status = 4 [(validate.rules).enum.defined_only = true];
+    bool synced = 5; // crossplane default statuses
+    bool ready = 6; // crossplane default statuses
+    string external_id = 7; // crossplane default statuses
+    oneof resource_def {
+        YandexCloud.ResourceDef yandex_cloud_resource_def = 100 [(validate.rules).message.required = true];
+    }
 }
 
 message ResourceDag {
     message Node {
         string id = 1 [(validate.rules).string.min_len = 1];
-        ResourceWithStatus resource_with_status = 2 [(validate.rules).message.required = true];
+        Resource resource = 2 [(validate.rules).message.required = true];
     }
     message Edge {
         string from = 1 [(validate.rules).string.min_len = 1];
         string to = 2 [(validate.rules).string.min_len = 1];
     }
-    repeated Node nodes = 1 [(validate.rules).repeated.min_items = 1];
-    repeated Edge edges = 2 [(validate.rules).repeated.min_items = 1];
+    string id = 1 [(validate.rules).string.min_len = 1];
+    repeated Node nodes = 2 [(validate.rules).repeated.min_items = 1];
+    repeated Edge edges = 3 [(validate.rules).repeated.min_items = 1];
 }

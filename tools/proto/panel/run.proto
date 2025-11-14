@@ -2,11 +2,14 @@ syntax = "proto3";
 
 package panel;
 
+import "panel/template.proto";
 import "panel/types.proto";
+import "proto/stroppy/cloud.proto";
 import "protopgx/pgx.proto";
 import "validate/validate.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
+
 
 message RunRecord {
     option (sql.sql_table) = {
@@ -15,14 +18,6 @@ message RunRecord {
     };
     message List {
         repeated RunRecord records = 1;
-    }
-    enum Status {
-        STATUS_UNSPECIFIED = 0;
-        STATUS_PENDING = 1;
-        STATUS_RUNNING = 2;
-        STATUS_COMPLETED = 3;
-        STATUS_FAILED = 4;
-        STATUS_CANCELLED = 5;
     }
     Ulid id = 1 [
         (sql.sql_field) = {
@@ -37,32 +32,71 @@ message RunRecord {
         }
     ];
     Timing timing = 3 [(sql.sql_field).embedded_message = true];
-    Status status = 4 [(validate.rules).enum.defined_only = true];
-    Tps tps = 5 [(sql.sql_field).serialized_message = true];
-    Ulid workflow_id = 6 [
+    stroppy.Status status = 4 [(validate.rules).enum.defined_only = true];
+    stroppy.StroppyRun run_info = 5 [(sql.sql_field).serialized_message = true];
+
+    // stroppy run metrics
+    Tps tps = 6 [(sql.sql_field).serialized_message = true];
+    string grafana_dashboard_url = 7;
+
+    optional Ulid workflow_id = 8 [
         (sql.sql_field) = {
             sql_type: {type: TEXT,user_cast: true}
             constraints: {constraint: "NOT NULL REFERENCES workflows(id) ON DELETE CASCADE"}
         }
     ];
+    // its optional cause stroppy can send RunRecord without deployment anything
+    optional DatabaseInstanceTemplate database_instance_template = 9 [(sql.sql_field).serialized_message = true];
+    optional StroppyInstanceTemplate stroppy_deployment_info = 10 [(sql.sql_field).serialized_message = true];
+
+    repeated RunRecordStep steps = 11 [(sql.sql_relation).one_to_many = {
+        ref_name: "run_id"
+        existed_field: true
+        on_delete_cascade: true
+    }];
 }
+
+message RunRecordStep {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "run_record_steps"
+    };
+    message List {repeated RunRecordStep steps = 1;}
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    Ulid run_id = 3 [
+        (sql.sql_field) = {sql_type: {type: TEXT,user_cast: true},
+            constraints: {constraint: "NOT NULL REFERENCES run_records(id) ON DELETE CASCADE"}
+        }
+    ];
+    stroppy.Status status = 4 [(validate.rules).enum.defined_only = true];
+    stroppy.StroppyStepRun step_info = 5 [(sql.sql_field).serialized_message = true];
+}
+
 // ----------------------------------------__RUN_SERVICE__--------------------------------------------------------------
 
 message ListRunsRequest {
     optional int32 limit = 1;
     optional int32 offset = 2;
     bool only_mine = 10;
-    optional RunRecord.Status status = 3; // sort by status
+    optional stroppy.Status status = 3; // sort by status
     Tags.Filter stroppy_tags = 4;
     Tags.Filter database_tags = 5;
 }
 
-message ListTopRunsRequest {
+message RunStroppyInCloudRequest {
+    DatabaseInstanceTemplate database_instance_template = 1 [(sql.sql_field).serialized_message = true];
+    StroppyInstanceTemplate stroppy_instance_template = 2 [(sql.sql_field).serialized_message = true];
 }
 
 service RunService {
     rpc ListRuns (ListRunsRequest) returns (RunRecord.List);
-    rpc ListTopRuns (ListTopRunsRequest) returns (RunRecord.List);
-    rpc AddRun (RunRecord) returns (RunRecord);
+    rpc ListTopRuns (ListRunsRequest) returns (RunRecord.List);
+    rpc RunStroppyInCloud (RunStroppyInCloudRequest) returns (RunRecord);
 }
 

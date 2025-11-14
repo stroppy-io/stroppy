@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package crossplane;
+
+import "crossplane/resource.proto";
+import "crossplane/types.proto";
+import "crossplane/yandex.proto";
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
+
+message MachineInfo {
+    uint32 cores = 1; // in cores
+    uint32 memory = 2; // in GB
+    uint32 disk = 3; // in GB
+}
+
+message Deployment {
+    message Vm {
+        string internal_ip = 4;
+        bool public_ip = 5;
+        MachineInfo machine_info = 1 [(validate.rules).message.required = true];
+        oneof strategy {
+            YandexCloud.VmStrategy yandex_cloud_vm_strategy = 100;
+        }
+    }
+    message Cluster {
+        repeated Vm vms = 2 [(validate.rules).repeated.min_items = 1];
+    }
+    string id = 1 [(validate.rules).string.min_len = 1];
+    SupportedCloud supported_cloud = 2 [(validate.rules).enum.defined_only = true];
+    ResourceDag resource_dag = 3 [(validate.rules).message.required = true];
+    oneof deployment {
+        Vm vm = 100 [(validate.rules).message.required = true];
+        Cluster cluster = 101 [(validate.rules).message.required = true];
+    }
+}
+

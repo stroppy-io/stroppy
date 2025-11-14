@@ -26,10 +26,14 @@ message Metadata {
 }
 
 message Tags {
-    message Filter {
-        repeated string contains = 1;
+    message Tag {
+        string key = 1 [(validate.rules).string.min_len = 1];
+        string value = 2 [(validate.rules).string.min_len = 1];
     }
-    repeated string tags = 1;
+    message Filter {
+        repeated Tag contains = 1 [(validate.rules).repeated.min_items = 1];
+    }
+    repeated Tag tags = 1 [(validate.rules).repeated.min_items = 1];
 }
 
 message LogRecord {
@@ -80,11 +84,6 @@ message Retry {
     Backoff backoff = 3;
 }
 
-message OrderByTimestamp {
-    google.protobuf.Timestamp timestamp = 1;
-    bool descending = 2;
-}
-
 message Tps {
     message Order {
         string parameter_type = 1 [(validate.rules).enum.defined_only = true];
@@ -96,16 +95,3 @@ message Tps {
     uint64 p95th = 4;
     uint64 p99th = 5;
 }
-
-message MachineInfo {
-    uint32 cores = 1; // in cores
-    uint32 memory = 2; // in GB
-    uint32 disk = 3; // in GB
-    optional string static_internal_ip = 4;
-}
-
-message Cluster {
-    bool is_single_node_mode = 1;
-    repeated MachineInfo machines = 2;
-}
-

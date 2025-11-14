@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package panel;
 
-import "crossplane/resource.proto";
-import "panel/deployment.proto";
+import "crossplane/deployment.proto";
+import "panel/template.proto";
 import "panel/types.proto";
 import "protopgx/pgx.proto";
 import "validate/validate.proto";
@@ -24,22 +24,20 @@ message WorkflowTaskNode {
         WORKFLOW_STATUS_FAILED = 4;
         WORKFLOW_STATUS_CANCELLED = 5;
     }
-    message DeployStroppyTask {
-        StroppyScriptTemplate stroppy_script_template = 1; // input
-        MachineDeployment stroppy_deployment = 2; // input
-        optional crossplane.ResourceDag database_dag = 3; // output
-    }
     message DeployDatabaseTask {
-        ClusterDeployment cluster_deployment = 1;
-        optional crossplane.ResourceDag database_dag = 3; // output
+        DatabaseInstanceTemplate cluster_deployment = 1; // input
+
+        optional crossplane.Deployment deployment = 100; // output
+    }
+    message DeployStroppyTask {
+        StroppyInstanceTemplate stroppy_instance_template = 1; // input
+        crossplane.Deployment database_deployment = 2; // input
+
+        optional crossplane.Deployment deployment = 100; // output
     }
     message CollectRunResults {
         Ulid stroppy_run_id = 1;
     }
-    message CleanupResourceTask {
-        crossplane.ResourceDag database_dag = 1; // only input
-    }
-
     Ulid id = 1 [
         (sql.sql_field) = {
             sql_type: {type: TEXT,user_cast: true}
@@ -54,8 +52,6 @@ message WorkflowTaskNode {
         DeployDatabaseTask deploy_database_task = 101;
         DeployStroppyTask deploy_stroppy_task = 102;
         CollectRunResults collect_run_results = 103;
-        CleanupResourceTask cleanup_database_task = 104;
-        CleanupResourceTask cleanup_stroppy_task = 105;
     }
     Metadata metadata = 6 [(sql.sql_field).serialized_message = true];
 }

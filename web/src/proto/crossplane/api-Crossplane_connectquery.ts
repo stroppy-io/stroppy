@@ -5,26 +5,16 @@
 import { Crossplane } from "./api_pb.ts";
 
 /**
- * @generated from rpc crossplane.Crossplane.CreateResource
+ * @generated from rpc crossplane.Crossplane.CreateDeployment
  */
-export const createResource = Crossplane.method.createResource;
+export const createDeployment = Crossplane.method.createDeployment;
 
 /**
- * @generated from rpc crossplane.Crossplane.CreateResourcesMany
+ * @generated from rpc crossplane.Crossplane.GetDeploymentById
  */
-export const createResourcesMany = Crossplane.method.createResourcesMany;
+export const getDeploymentById = Crossplane.method.getDeploymentById;
 
 /**
- * @generated from rpc crossplane.Crossplane.GetResourceStatus
+ * @generated from rpc crossplane.Crossplane.DeleteDeploymentById
  */
-export const getResourceStatus = Crossplane.method.getResourceStatus;
-
-/**
- * @generated from rpc crossplane.Crossplane.DeleteResource
- */
-export const deleteResource = Crossplane.method.deleteResource;
-
-/**
- * @generated from rpc crossplane.Crossplane.DeleteResourcesMany
- */
-export const deleteResourcesMany = Crossplane.method.deleteResourcesMany;
+export const deleteDeploymentById = Crossplane.method.deleteDeploymentById;

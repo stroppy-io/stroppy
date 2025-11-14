@@ -8,6 +8,36 @@ CREATE TABLE IF NOT EXISTS "users" (
 	password_hash TEXT NOT NULL,
 	refresh_tokens TEXT[]  NULL
 );
+CREATE TABLE IF NOT EXISTS "machine_templates" (
+	id TEXT  PRIMARY KEY NOT NULL,
+	created_at TIMESTAMPTZ  NOT NULL,
+	updated_at TIMESTAMPTZ  NOT NULL,
+	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
+	tags JSONB  NOT NULL,
+	cores INTEGER  NOT NULL DEFAULT 0,
+	memory INTEGER  NOT NULL DEFAULT 0,
+	disk INTEGER  NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS "stroppy_deployment_templates" (
+	id TEXT  PRIMARY KEY NOT NULL,
+	created_at TIMESTAMPTZ  NOT NULL,
+	updated_at TIMESTAMPTZ  NOT NULL,
+	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
+	name TEXT  NOT NULL,
+	tags JSONB  NOT NULL,
+	script_body JSONB  NOT NULL,
+	stroppy_version TEXT  NOT NULL,
+	env_data JSONB  NOT NULL
+);
+CREATE TABLE IF NOT EXISTS "database_deployment_templates" (
+	id TEXT  PRIMARY KEY NOT NULL,
+	created_at TIMESTAMPTZ  NOT NULL,
+	updated_at TIMESTAMPTZ  NOT NULL,
+	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
+	name TEXT  NOT NULL,
+	tags JSONB  NOT NULL,
+	prebuilt_image_id TEXT  NOT NULL
+);
 CREATE TABLE IF NOT EXISTS "run_records" (
 	id TEXT  PRIMARY KEY NOT NULL,
 	author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -15,51 +45,40 @@ CREATE TABLE IF NOT EXISTS "run_records" (
 	updated_at TIMESTAMPTZ  NOT NULL,
 	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
 	status INTEGER  NOT NULL DEFAULT 0,
-	tps JSONB  NOT NULL,
-	database JSONB  NOT NULL,
-	workload JSONB  NOT NULL,
-	cloud_automation_id TEXT  NULL
-);
-CREATE TABLE IF NOT EXISTS "stroppy_runs" (
-	id TEXT  PRIMARY KEY NOT NULL,
-	created_at TIMESTAMPTZ  NOT NULL,
-	updated_at TIMESTAMPTZ  NOT NULL,
-	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
-	status INTEGER  NOT NULL DEFAULT 0,
 	run_info JSONB  NOT NULL,
-	cloud_automation_id TEXT  NOT NULL,
-	grafana_dashboard_url TEXT  NOT NULL
+	tps JSONB  NOT NULL,
+	grafana_dashboard_url TEXT  NOT NULL,
+	workflow_id TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+	database_instance_template JSONB  NULL,
+	stroppy_deployment_info JSONB  NULL
 );
-CREATE TABLE IF NOT EXISTS "stroppy_steps" (
+CREATE TABLE IF NOT EXISTS "run_record_steps" (
 	id TEXT  PRIMARY KEY NOT NULL,
 	created_at TIMESTAMPTZ  NOT NULL,
 	updated_at TIMESTAMPTZ  NOT NULL,
 	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
+	run_id TEXT NOT NULL REFERENCES run_records(id) ON DELETE CASCADE,
 	status INTEGER  NOT NULL DEFAULT 0,
-	run_id TEXT NOT NULL REFERENCES stroppy_runs(id) ON DELETE CASCADE,
 	step_info JSONB  NOT NULL
 );
-CREATE TABLE IF NOT EXISTS "cloud_resources" (
+CREATE TABLE IF NOT EXISTS "workflow_nodes" (
 	id TEXT  PRIMARY KEY NOT NULL,
 	created_at TIMESTAMPTZ  NOT NULL,
 	updated_at TIMESTAMPTZ  NOT NULL,
 	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
-	status INTEGER  NOT NULL DEFAULT 0,
-	ref JSONB  NOT NULL,
-	resource_def JSONB  NOT NULL,
-	resource_yaml TEXT  NOT NULL,
-	synced BOOLEAN  NOT NULL DEFAULT FALSE,
-	ready BOOLEAN  NOT NULL DEFAULT FALSE,
-	external_id TEXT  NOT NULL,
-	parent_resource_id TEXT  NULL
+	attempt INTEGER  NOT NULL DEFAULT 0,
+	metadata JSONB  NOT NULL,
+	workflow_id TEXT REFERENCES workflows (id) ON DELETE CASCADE
 );
-CREATE TABLE IF NOT EXISTS "cloud_automations" (
+CREATE TABLE IF NOT EXISTS "workflow_edges" (
+	id TEXT  PRIMARY KEY NOT NULL,
+	from TEXT NOT NULL REFERENCES workflow_nodes(id) ON DELETE CASCADE,
+	to TEXT NOT NULL REFERENCES workflow_nodes(id) ON DELETE CASCADE,
+	workflow_id TEXT REFERENCES workflows (id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS "workflows" (
 	id TEXT  PRIMARY KEY NOT NULL,
 	created_at TIMESTAMPTZ  NOT NULL,
 	updated_at TIMESTAMPTZ  NOT NULL,
-	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
-	status INTEGER  NOT NULL DEFAULT 0,
-	author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	database_root_resource_id TEXT  NOT NULL,
-	workload_root_resource_id TEXT  NOT NULL
+	deleted_at TIMESTAMPTZ  NULL DEFAULT null
 );

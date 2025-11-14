@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package panel;
+
+import "google/protobuf/empty.proto";
+import "crossplane/deployment.proto";
+import "panel/types.proto";
+import "protopgx/pgx.proto";
+import "validate/validate.proto";
+
+option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
+
+message MachineTemplate {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "machine_templates"
+    };
+    message List {
+        repeated MachineTemplate templates = 1;
+    }
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    Tags tags = 3 [(sql.sql_field).serialized_message = true];
+    crossplane.MachineInfo machine_info = 4 [(sql.sql_field).embedded_message = true];
+}
+
+message StroppyDeploymentTemplate {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "stroppy_deployment_templates"
+    };
+    message List {repeated StroppyDeploymentTemplate templates = 1;}
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    string name = 3 [(validate.rules).string = {min_len: 3,max_len: 255}];
+    // here is WorkloadType such as Tpcc or another
+    Tags tags = 4 [(sql.sql_field).serialized_message = true];
+    bytes script_body = 5;
+    string stroppy_version = 6 [(validate.rules).string.min_len = 1];
+    Metadata env_data = 7 [(sql.sql_field).serialized_message = true];
+}
+
+message StroppyInstanceTemplate {
+    StroppyDeploymentTemplate stroppy_deployment_template = 1;
+    // now support only single node
+    MachineTemplate machine_template = 2;
+}
+
+message DatabaseDeploymentTemplate {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "database_deployment_templates"
+    };
+    message List {repeated DatabaseDeploymentTemplate templates = 1;}
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    string name = 3 [(validate.rules).string = {min_len: 3,max_len: 255}];
+    Tags tags = 4 [(sql.sql_field).serialized_message = true];
+    // now support only prebuilt image in YandexCloud
+    string prebuilt_image_id = 5 [(validate.rules).string.min_len = 1];
+}
+
+message DatabaseInstanceTemplate {
+    DatabaseDeploymentTemplate database_deployment_template = 1;
+    // now support only single node
+    MachineTemplate machine_template = 2;
+}
+
+// ----------------------------------------__TEMPLATE_SERVICE__---------------------------------------------------------
+
+service TemplateService {
+    rpc ListMachineTemplatesTags (google.protobuf.Empty) returns (Tags);
+    rpc ListMachineTemplates (Tags.Filter) returns (MachineTemplate.List);
+    rpc CreateMachineTemplate (MachineTemplate) returns (MachineTemplate);
+    rpc UpdateMachineTemplate (MachineTemplate) returns (MachineTemplate);
+    rpc DeleteMachineTemplate (Ulid) returns (google.protobuf.Empty);
+
+    rpc ListStroppyDeploymentTemplatesTags (google.protobuf.Empty) returns (Tags);
+    rpc ListStroppyDeploymentTemplates (Tags.Filter) returns (StroppyDeploymentTemplate.List);
+    rpc CreateStroppyDeploymentTemplate (StroppyDeploymentTemplate) returns (StroppyDeploymentTemplate);
+    rpc UpdateStroppyDeploymentTemplate (StroppyDeploymentTemplate) returns (StroppyDeploymentTemplate);
+    rpc DeleteStroppyDeploymentTemplate (Ulid) returns (google.protobuf.Empty);
+
+    rpc ListDatabaseDeploymentTemplatesTags (google.protobuf.Empty) returns (Tags);
+    rpc ListDatabaseDeploymentTemplates (Tags.Filter) returns (DatabaseDeploymentTemplate.List);
+    rpc CreateDatabaseDeploymentTemplate (DatabaseDeploymentTemplate) returns (DatabaseDeploymentTemplate);
+    rpc UpdateDatabaseDeploymentTemplate (DatabaseDeploymentTemplate) returns (DatabaseDeploymentTemplate);
+    rpc DeleteDatabaseDeploymentTemplate (Ulid) returns (google.protobuf.Empty);
+}

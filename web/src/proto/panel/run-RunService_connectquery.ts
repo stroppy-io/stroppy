@@ -15,6 +15,6 @@ export const listRuns = RunService.method.listRuns;
 export const listTopRuns = RunService.method.listTopRuns;
 
 /**
- * @generated from rpc panel.RunService.AddRun
+ * @generated from rpc panel.RunService.RunStroppyInCloud
  */
-export const addRun = RunService.method.addRun;
+export const runStroppyInCloud = RunService.method.runStroppyInCloud;
