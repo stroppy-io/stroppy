@@ -4,6 +4,7 @@ go 1.24.3
 
 require (
 	connectrpc.com/connect v1.19.1
+	github.com/DataDog/go-sqllexer v0.1.9
 	github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2 v2.0.1
 	github.com/avito-tech/go-transaction-manager/trm/v2 v2.0.1
 	github.com/envoyproxy/protoc-gen-validate v1.2.1
@@ -17,7 +18,7 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	github.com/sourcegraph/conc v0.3.0
 	github.com/spf13/cobra v1.10.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/thediveo/enumflag v0.10.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.17.0

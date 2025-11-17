@@ -26,7 +26,7 @@ export const options: Options = {
 };
 
 // TPC-B Configuration Constants
-const SCALE_FACTOR = 1;
+const SCALE_FACTOR = 10;
 const BRANCHES = SCALE_FACTOR;
 const TELLERS = 10 * SCALE_FACTOR;
 const ACCOUNTS = 100000 * SCALE_FACTOR;
