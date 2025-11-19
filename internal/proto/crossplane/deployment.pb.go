@@ -4,11 +4,10 @@
 // 	protoc        (unknown)
 // source: crossplane/deployment.proto
 
-package panel
+package crossplane
 
 import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
-	crossplane "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -84,10 +83,10 @@ func (x *MachineInfo) GetDisk() uint32 {
 }
 
 type Deployment struct {
-	state          protoimpl.MessageState    `protogen:"open.v1"`
-	Id             string                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	SupportedCloud crossplane.SupportedCloud `protobuf:"varint,2,opt,name=supported_cloud,json=supportedCloud,proto3,enum=crossplane.SupportedCloud" json:"supported_cloud,omitempty"`
-	ResourceDag    *crossplane.ResourceDag   `protobuf:"bytes,3,opt,name=resource_dag,json=resourceDag,proto3" json:"resource_dag,omitempty"`
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	SupportedCloud SupportedCloud         `protobuf:"varint,2,opt,name=supported_cloud,json=supportedCloud,proto3,enum=crossplane.SupportedCloud" json:"supported_cloud,omitempty"`
+	ResourceDag    *ResourceDag           `protobuf:"bytes,3,opt,name=resource_dag,json=resourceDag,proto3" json:"resource_dag,omitempty"`
 	// Types that are valid to be assigned to Deployment:
 	//
 	//	*Deployment_Vm_
@@ -134,14 +133,14 @@ func (x *Deployment) GetId() string {
 	return ""
 }
 
-func (x *Deployment) GetSupportedCloud() crossplane.SupportedCloud {
+func (x *Deployment) GetSupportedCloud() SupportedCloud {
 	if x != nil {
 		return x.SupportedCloud
 	}
-	return crossplane.SupportedCloud(0)
+	return SupportedCloud_SUPPORTED_CLOUD_UNSPECIFIED
 }
 
-func (x *Deployment) GetResourceDag() *crossplane.ResourceDag {
+func (x *Deployment) GetResourceDag() *ResourceDag {
 	if x != nil {
 		return x.ResourceDag
 	}
@@ -189,22 +188,110 @@ func (*Deployment_Vm_) isDeployment_Deployment() {}
 
 func (*Deployment_Cluster_) isDeployment_Deployment() {}
 
-type Deployment_Vm struct {
+type Deployment_Strategy struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
-	InternalIp  string                 `protobuf:"bytes,4,opt,name=internal_ip,json=internalIp,proto3" json:"internal_ip,omitempty"`
-	PublicIp    bool                   `protobuf:"varint,5,opt,name=public_ip,json=publicIp,proto3" json:"public_ip,omitempty"`
-	MachineInfo *MachineInfo           `protobuf:"bytes,1,opt,name=machine_info,json=machineInfo,proto3" json:"machine_info,omitempty"`
+	BaseImageId string                 `protobuf:"bytes,2,opt,name=base_image_id,json=baseImageId,proto3" json:"base_image_id,omitempty"`
 	// Types that are valid to be assigned to Strategy:
 	//
-	//	*Deployment_Vm_YandexCloudVmStrategy
-	Strategy      isDeployment_Vm_Strategy `protobuf_oneof:"strategy"`
+	//	*Deployment_Strategy_Scripting_
+	//	*Deployment_Strategy_PrebuiltImage_
+	Strategy      isDeployment_Strategy_Strategy `protobuf_oneof:"strategy"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Deployment_Strategy) Reset() {
+	*x = Deployment_Strategy{}
+	mi := &file_crossplane_deployment_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Deployment_Strategy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Deployment_Strategy) ProtoMessage() {}
+
+func (x *Deployment_Strategy) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_deployment_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Deployment_Strategy.ProtoReflect.Descriptor instead.
+func (*Deployment_Strategy) Descriptor() ([]byte, []int) {
+	return file_crossplane_deployment_proto_rawDescGZIP(), []int{1, 0}
+}
+
+func (x *Deployment_Strategy) GetBaseImageId() string {
+	if x != nil {
+		return x.BaseImageId
+	}
+	return ""
+}
+
+func (x *Deployment_Strategy) GetStrategy() isDeployment_Strategy_Strategy {
+	if x != nil {
+		return x.Strategy
+	}
+	return nil
+}
+
+func (x *Deployment_Strategy) GetScripting() *Deployment_Strategy_Scripting {
+	if x != nil {
+		if x, ok := x.Strategy.(*Deployment_Strategy_Scripting_); ok {
+			return x.Scripting
+		}
+	}
+	return nil
+}
+
+func (x *Deployment_Strategy) GetPrebuiltImage() *Deployment_Strategy_PrebuiltImage {
+	if x != nil {
+		if x, ok := x.Strategy.(*Deployment_Strategy_PrebuiltImage_); ok {
+			return x.PrebuiltImage
+		}
+	}
+	return nil
+}
+
+type isDeployment_Strategy_Strategy interface {
+	isDeployment_Strategy_Strategy()
+}
+
+type Deployment_Strategy_Scripting_ struct {
+	Scripting *Deployment_Strategy_Scripting `protobuf:"bytes,1,opt,name=scripting,proto3,oneof"`
+}
+
+type Deployment_Strategy_PrebuiltImage_ struct {
+	PrebuiltImage *Deployment_Strategy_PrebuiltImage `protobuf:"bytes,11,opt,name=prebuilt_image,json=prebuiltImage,proto3,oneof"`
+}
+
+func (*Deployment_Strategy_Scripting_) isDeployment_Strategy_Strategy() {}
+
+func (*Deployment_Strategy_PrebuiltImage_) isDeployment_Strategy_Strategy() {}
+
+type Deployment_Vm struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	InternalIp    string                 `protobuf:"bytes,4,opt,name=internal_ip,json=internalIp,proto3" json:"internal_ip,omitempty"`
+	PublicIp      bool                   `protobuf:"varint,5,opt,name=public_ip,json=publicIp,proto3" json:"public_ip,omitempty"`
+	MachineInfo   *MachineInfo           `protobuf:"bytes,1,opt,name=machine_info,json=machineInfo,proto3" json:"machine_info,omitempty"`
+	Strategy      *Deployment_Strategy   `protobuf:"bytes,2,opt,name=strategy,proto3" json:"strategy,omitempty"`
+	SshUser       *SshUser               `protobuf:"bytes,3,opt,name=ssh_user,json=sshUser,proto3,oneof" json:"ssh_user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Deployment_Vm) Reset() {
 	*x = Deployment_Vm{}
-	mi := &file_crossplane_deployment_proto_msgTypes[2]
+	mi := &file_crossplane_deployment_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -216,7 +303,7 @@ func (x *Deployment_Vm) String() string {
 func (*Deployment_Vm) ProtoMessage() {}
 
 func (x *Deployment_Vm) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_deployment_proto_msgTypes[2]
+	mi := &file_crossplane_deployment_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -229,7 +316,7 @@ func (x *Deployment_Vm) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Deployment_Vm.ProtoReflect.Descriptor instead.
 func (*Deployment_Vm) Descriptor() ([]byte, []int) {
-	return file_crossplane_deployment_proto_rawDescGZIP(), []int{1, 0}
+	return file_crossplane_deployment_proto_rawDescGZIP(), []int{1, 1}
 }
 
 func (x *Deployment_Vm) GetInternalIp() string {
@@ -253,31 +340,19 @@ func (x *Deployment_Vm) GetMachineInfo() *MachineInfo {
 	return nil
 }
 
-func (x *Deployment_Vm) GetStrategy() isDeployment_Vm_Strategy {
+func (x *Deployment_Vm) GetStrategy() *Deployment_Strategy {
 	if x != nil {
 		return x.Strategy
 	}
 	return nil
 }
 
-func (x *Deployment_Vm) GetYandexCloudVmStrategy() *crossplane.YandexCloud_VmStrategy {
+func (x *Deployment_Vm) GetSshUser() *SshUser {
 	if x != nil {
-		if x, ok := x.Strategy.(*Deployment_Vm_YandexCloudVmStrategy); ok {
-			return x.YandexCloudVmStrategy
-		}
+		return x.SshUser
 	}
 	return nil
 }
-
-type isDeployment_Vm_Strategy interface {
-	isDeployment_Vm_Strategy()
-}
-
-type Deployment_Vm_YandexCloudVmStrategy struct {
-	YandexCloudVmStrategy *crossplane.YandexCloud_VmStrategy `protobuf:"bytes,100,opt,name=yandex_cloud_vm_strategy,json=yandexCloudVmStrategy,proto3,oneof"`
-}
-
-func (*Deployment_Vm_YandexCloudVmStrategy) isDeployment_Vm_Strategy() {}
 
 type Deployment_Cluster struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -288,7 +363,7 @@ type Deployment_Cluster struct {
 
 func (x *Deployment_Cluster) Reset() {
 	*x = Deployment_Cluster{}
-	mi := &file_crossplane_deployment_proto_msgTypes[3]
+	mi := &file_crossplane_deployment_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -300,7 +375,7 @@ func (x *Deployment_Cluster) String() string {
 func (*Deployment_Cluster) ProtoMessage() {}
 
 func (x *Deployment_Cluster) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_deployment_proto_msgTypes[3]
+	mi := &file_crossplane_deployment_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -313,7 +388,7 @@ func (x *Deployment_Cluster) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Deployment_Cluster.ProtoReflect.Descriptor instead.
 func (*Deployment_Cluster) Descriptor() ([]byte, []int) {
-	return file_crossplane_deployment_proto_rawDescGZIP(), []int{1, 1}
+	return file_crossplane_deployment_proto_rawDescGZIP(), []int{1, 2}
 }
 
 func (x *Deployment_Cluster) GetVms() []*Deployment_Vm {
@@ -323,35 +398,151 @@ func (x *Deployment_Cluster) GetVms() []*Deployment_Vm {
 	return nil
 }
 
+type Deployment_Strategy_Scripting struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cmd           string                 `protobuf:"bytes,1,opt,name=cmd,proto3" json:"cmd,omitempty"`
+	Workdir       string                 `protobuf:"bytes,2,opt,name=workdir,proto3" json:"workdir,omitempty"`
+	FilesToWrite  []*FsFile              `protobuf:"bytes,4,rep,name=files_to_write,json=filesToWrite,proto3" json:"files_to_write,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Deployment_Strategy_Scripting) Reset() {
+	*x = Deployment_Strategy_Scripting{}
+	mi := &file_crossplane_deployment_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Deployment_Strategy_Scripting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Deployment_Strategy_Scripting) ProtoMessage() {}
+
+func (x *Deployment_Strategy_Scripting) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_deployment_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Deployment_Strategy_Scripting.ProtoReflect.Descriptor instead.
+func (*Deployment_Strategy_Scripting) Descriptor() ([]byte, []int) {
+	return file_crossplane_deployment_proto_rawDescGZIP(), []int{1, 0, 0}
+}
+
+func (x *Deployment_Strategy_Scripting) GetCmd() string {
+	if x != nil {
+		return x.Cmd
+	}
+	return ""
+}
+
+func (x *Deployment_Strategy_Scripting) GetWorkdir() string {
+	if x != nil {
+		return x.Workdir
+	}
+	return ""
+}
+
+func (x *Deployment_Strategy_Scripting) GetFilesToWrite() []*FsFile {
+	if x != nil {
+		return x.FilesToWrite
+	}
+	return nil
+}
+
+type Deployment_Strategy_PrebuiltImage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ImageId       string                 `protobuf:"bytes,1,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Deployment_Strategy_PrebuiltImage) Reset() {
+	*x = Deployment_Strategy_PrebuiltImage{}
+	mi := &file_crossplane_deployment_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Deployment_Strategy_PrebuiltImage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Deployment_Strategy_PrebuiltImage) ProtoMessage() {}
+
+func (x *Deployment_Strategy_PrebuiltImage) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_deployment_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Deployment_Strategy_PrebuiltImage.ProtoReflect.Descriptor instead.
+func (*Deployment_Strategy_PrebuiltImage) Descriptor() ([]byte, []int) {
+	return file_crossplane_deployment_proto_rawDescGZIP(), []int{1, 0, 1}
+}
+
+func (x *Deployment_Strategy_PrebuiltImage) GetImageId() string {
+	if x != nil {
+		return x.ImageId
+	}
+	return ""
+}
+
 var File_crossplane_deployment_proto protoreflect.FileDescriptor
 
 const file_crossplane_deployment_proto_rawDesc = "" +
 	"\n" +
 	"\x1bcrossplane/deployment.proto\x12\n" +
-	"crossplane\x1a\x19crossplane/resource.proto\x1a\x16crossplane/types.proto\x1a\x17crossplane/yandex.proto\x1a\x17validate/validate.proto\"O\n" +
+	"crossplane\x1a\x19crossplane/resource.proto\x1a\x16crossplane/types.proto\x1a\x17validate/validate.proto\"O\n" +
 	"\vMachineInfo\x12\x14\n" +
 	"\x05cores\x18\x01 \x01(\rR\x05cores\x12\x16\n" +
 	"\x06memory\x18\x02 \x01(\rR\x06memory\x12\x12\n" +
-	"\x04disk\x18\x03 \x01(\rR\x04disk\"\xfd\x04\n" +
+	"\x04disk\x18\x03 \x01(\rR\x04disk\"\xc9\b\n" +
 	"\n" +
 	"Deployment\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x02id\x12M\n" +
 	"\x0fsupported_cloud\x18\x02 \x01(\x0e2\x1a.crossplane.SupportedCloudB\b\xfaB\x05\x82\x01\x02\x10\x01R\x0esupportedCloud\x12D\n" +
 	"\fresource_dag\x18\x03 \x01(\v2\x17.crossplane.ResourceDagB\b\xfaB\x05\x8a\x01\x02\x10\x01R\vresourceDag\x125\n" +
 	"\x02vm\x18d \x01(\v2\x19.crossplane.Deployment.VmB\b\xfaB\x05\x8a\x01\x02\x10\x01H\x00R\x02vm\x12D\n" +
-	"\acluster\x18e \x01(\v2\x1e.crossplane.Deployment.ClusterB\b\xfaB\x05\x8a\x01\x02\x10\x01H\x00R\acluster\x1a\xf3\x01\n" +
+	"\acluster\x18e \x01(\v2\x1e.crossplane.Deployment.ClusterB\b\xfaB\x05\x8a\x01\x02\x10\x01H\x00R\acluster\x1a\xab\x03\n" +
+	"\bStrategy\x12+\n" +
+	"\rbase_image_id\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\vbaseImageId\x12I\n" +
+	"\tscripting\x18\x01 \x01(\v2).crossplane.Deployment.Strategy.ScriptingH\x00R\tscripting\x12V\n" +
+	"\x0eprebuilt_image\x18\v \x01(\v2-.crossplane.Deployment.Strategy.PrebuiltImageH\x00R\rprebuiltImage\x1a\x8d\x01\n" +
+	"\tScripting\x12\x19\n" +
+	"\x03cmd\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x03cmd\x12!\n" +
+	"\aworkdir\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\aworkdir\x12B\n" +
+	"\x0efiles_to_write\x18\x04 \x03(\v2\x12.crossplane.FsFileB\b\xfaB\x05\x92\x01\x02\b\x01R\ffilesToWrite\x1a3\n" +
+	"\rPrebuiltImage\x12\"\n" +
+	"\bimage_id\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\aimageIdB\n" +
+	"\n" +
+	"\bstrategy\x1a\x91\x02\n" +
 	"\x02Vm\x12\x1f\n" +
 	"\vinternal_ip\x18\x04 \x01(\tR\n" +
 	"internalIp\x12\x1b\n" +
 	"\tpublic_ip\x18\x05 \x01(\bR\bpublicIp\x12D\n" +
-	"\fmachine_info\x18\x01 \x01(\v2\x17.crossplane.MachineInfoB\b\xfaB\x05\x8a\x01\x02\x10\x01R\vmachineInfo\x12]\n" +
-	"\x18yandex_cloud_vm_strategy\x18d \x01(\v2\".crossplane.YandexCloud.VmStrategyH\x00R\x15yandexCloudVmStrategyB\n" +
-	"\n" +
-	"\bstrategy\x1a@\n" +
+	"\fmachine_info\x18\x01 \x01(\v2\x17.crossplane.MachineInfoB\b\xfaB\x05\x8a\x01\x02\x10\x01R\vmachineInfo\x12E\n" +
+	"\bstrategy\x18\x02 \x01(\v2\x1f.crossplane.Deployment.StrategyB\b\xfaB\x05\x8a\x01\x02\x10\x01R\bstrategy\x123\n" +
+	"\bssh_user\x18\x03 \x01(\v2\x13.crossplane.SshUserH\x00R\asshUser\x88\x01\x01B\v\n" +
+	"\t_ssh_user\x1a@\n" +
 	"\aCluster\x125\n" +
 	"\x03vms\x18\x02 \x03(\v2\x19.crossplane.Deployment.VmB\b\xfaB\x05\x92\x01\x02\b\x01R\x03vmsB\f\n" +
 	"\n" +
-	"deploymentB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
+	"deploymentBEZCgithub.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplaneb\x06proto3"
 
 var (
 	file_crossplane_deployment_proto_rawDescOnce sync.Once
@@ -365,29 +556,37 @@ func file_crossplane_deployment_proto_rawDescGZIP() []byte {
 	return file_crossplane_deployment_proto_rawDescData
 }
 
-var file_crossplane_deployment_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_crossplane_deployment_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_crossplane_deployment_proto_goTypes = []any{
 	(*MachineInfo)(nil),                       // 0: crossplane.MachineInfo
 	(*Deployment)(nil),                        // 1: crossplane.Deployment
-	(*Deployment_Vm)(nil),                     // 2: crossplane.Deployment.Vm
-	(*Deployment_Cluster)(nil),                // 3: crossplane.Deployment.Cluster
-	(crossplane.SupportedCloud)(0),            // 4: crossplane.SupportedCloud
-	(*crossplane.ResourceDag)(nil),            // 5: crossplane.ResourceDag
-	(*crossplane.YandexCloud_VmStrategy)(nil), // 6: crossplane.YandexCloud.VmStrategy
+	(*Deployment_Strategy)(nil),               // 2: crossplane.Deployment.Strategy
+	(*Deployment_Vm)(nil),                     // 3: crossplane.Deployment.Vm
+	(*Deployment_Cluster)(nil),                // 4: crossplane.Deployment.Cluster
+	(*Deployment_Strategy_Scripting)(nil),     // 5: crossplane.Deployment.Strategy.Scripting
+	(*Deployment_Strategy_PrebuiltImage)(nil), // 6: crossplane.Deployment.Strategy.PrebuiltImage
+	(SupportedCloud)(0),                       // 7: crossplane.SupportedCloud
+	(*ResourceDag)(nil),                       // 8: crossplane.ResourceDag
+	(*SshUser)(nil),                           // 9: crossplane.SshUser
+	(*FsFile)(nil),                            // 10: crossplane.FsFile
 }
 var file_crossplane_deployment_proto_depIdxs = []int32{
-	4, // 0: crossplane.Deployment.supported_cloud:type_name -> crossplane.SupportedCloud
-	5, // 1: crossplane.Deployment.resource_dag:type_name -> crossplane.ResourceDag
-	2, // 2: crossplane.Deployment.vm:type_name -> crossplane.Deployment.Vm
-	3, // 3: crossplane.Deployment.cluster:type_name -> crossplane.Deployment.Cluster
-	0, // 4: crossplane.Deployment.Vm.machine_info:type_name -> crossplane.MachineInfo
-	6, // 5: crossplane.Deployment.Vm.yandex_cloud_vm_strategy:type_name -> crossplane.YandexCloud.VmStrategy
-	2, // 6: crossplane.Deployment.Cluster.vms:type_name -> crossplane.Deployment.Vm
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	7,  // 0: crossplane.Deployment.supported_cloud:type_name -> crossplane.SupportedCloud
+	8,  // 1: crossplane.Deployment.resource_dag:type_name -> crossplane.ResourceDag
+	3,  // 2: crossplane.Deployment.vm:type_name -> crossplane.Deployment.Vm
+	4,  // 3: crossplane.Deployment.cluster:type_name -> crossplane.Deployment.Cluster
+	5,  // 4: crossplane.Deployment.Strategy.scripting:type_name -> crossplane.Deployment.Strategy.Scripting
+	6,  // 5: crossplane.Deployment.Strategy.prebuilt_image:type_name -> crossplane.Deployment.Strategy.PrebuiltImage
+	0,  // 6: crossplane.Deployment.Vm.machine_info:type_name -> crossplane.MachineInfo
+	2,  // 7: crossplane.Deployment.Vm.strategy:type_name -> crossplane.Deployment.Strategy
+	9,  // 8: crossplane.Deployment.Vm.ssh_user:type_name -> crossplane.SshUser
+	3,  // 9: crossplane.Deployment.Cluster.vms:type_name -> crossplane.Deployment.Vm
+	10, // 10: crossplane.Deployment.Strategy.Scripting.files_to_write:type_name -> crossplane.FsFile
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_crossplane_deployment_proto_init() }
@@ -395,20 +594,24 @@ func file_crossplane_deployment_proto_init() {
 	if File_crossplane_deployment_proto != nil {
 		return
 	}
+	file_crossplane_resource_proto_init()
+	file_crossplane_types_proto_init()
 	file_crossplane_deployment_proto_msgTypes[1].OneofWrappers = []any{
 		(*Deployment_Vm_)(nil),
 		(*Deployment_Cluster_)(nil),
 	}
 	file_crossplane_deployment_proto_msgTypes[2].OneofWrappers = []any{
-		(*Deployment_Vm_YandexCloudVmStrategy)(nil),
+		(*Deployment_Strategy_Scripting_)(nil),
+		(*Deployment_Strategy_PrebuiltImage_)(nil),
 	}
+	file_crossplane_deployment_proto_msgTypes[3].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_crossplane_deployment_proto_rawDesc), len(file_crossplane_deployment_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

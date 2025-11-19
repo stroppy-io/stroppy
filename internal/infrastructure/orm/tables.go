@@ -7,18 +7,19 @@ import (
 	"github.com/jackc/pgtype"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 var (
-	User                       = newUserTableImpl()
-	MachineTemplate            = newMachineTemplateTableImpl()
-	StroppyDeploymentTemplate  = newStroppyDeploymentTemplateTableImpl()
-	DatabaseDeploymentTemplate = newDatabaseDeploymentTemplateTableImpl()
-	RunRecord                  = newRunRecordTableImpl()
-	RunRecordStep              = newRunRecordStepTableImpl()
-	WorkflowTaskNode           = newWorkflowTaskNodeTableImpl()
-	WorkflowEdge               = newWorkflowEdgeTableImpl()
-	Workflow                   = newWorkflowTableImpl()
+	User          = newUserTableImpl()
+	RefreshTokens = newRefreshTokensTableImpl()
+	Kvinfo        = newKvinfoTableImpl()
+	Template      = newTemplateTableImpl()
+	RunRecord     = newRunRecordTableImpl()
+	RunRecordStep = newRunRecordStepTableImpl()
+	Workflow      = newWorkflowTableImpl()
+	WorkflowTask  = newWorkflowTaskTableImpl()
+	WorkflowEdge  = newWorkflowEdgeTableImpl()
 )
 
 type (
@@ -26,17 +27,17 @@ type (
 		fieldAlias
 		mustUserField()
 	}
-	MachineTemplateField interface {
+	RefreshTokensField interface {
 		fieldAlias
-		mustMachineTemplateField()
+		mustRefreshTokensField()
 	}
-	StroppyDeploymentTemplateField interface {
+	KvinfoField interface {
 		fieldAlias
-		mustStroppyDeploymentTemplateField()
+		mustKvinfoField()
 	}
-	DatabaseDeploymentTemplateField interface {
+	TemplateField interface {
 		fieldAlias
-		mustDatabaseDeploymentTemplateField()
+		mustTemplateField()
 	}
 	RunRecordField interface {
 		fieldAlias
@@ -46,150 +47,110 @@ type (
 		fieldAlias
 		mustRunRecordStepField()
 	}
-	WorkflowTaskNodeField interface {
+	WorkflowField interface {
 		fieldAlias
-		mustWorkflowTaskNodeField()
+		mustWorkflowField()
+	}
+	WorkflowTaskField interface {
+		fieldAlias
+		mustWorkflowTaskField()
 	}
 	WorkflowEdgeField interface {
 		fieldAlias
 		mustWorkflowEdgeField()
 	}
-	WorkflowField interface {
-		fieldAlias
-		mustWorkflowField()
-	}
 )
 type (
-	useridFieldImpl            struct{ *column[string, UserField] }
-	usercreatedAtFieldImpl     struct{ *column[time.Time, UserField] }
-	userupdatedAtFieldImpl     struct{ *column[time.Time, UserField] }
-	userdeletedAtFieldImpl     struct{ *column[*time.Time, UserField] }
-	useremailFieldImpl         struct{ *column[string, UserField] }
-	useradminFieldImpl         struct{ *column[bool, UserField] }
-	userpasswordHashFieldImpl  struct{ *column[string, UserField] }
-	userrefreshTokensFieldImpl struct{ *column[[]string, UserField] }
+	useridFieldImpl           struct{ *column[string, UserField] }
+	usercreatedAtFieldImpl    struct{ *column[time.Time, UserField] }
+	userupdatedAtFieldImpl    struct{ *column[time.Time, UserField] }
+	userdeletedAtFieldImpl    struct{ *column[*time.Time, UserField] }
+	useremailFieldImpl        struct{ *column[string, UserField] }
+	useradminFieldImpl        struct{ *column[bool, UserField] }
+	userpasswordHashFieldImpl struct{ *column[string, UserField] }
 )
 
-func (f *useridFieldImpl) mustUserField()            {}
-func (f *usercreatedAtFieldImpl) mustUserField()     {}
-func (f *userupdatedAtFieldImpl) mustUserField()     {}
-func (f *userdeletedAtFieldImpl) mustUserField()     {}
-func (f *useremailFieldImpl) mustUserField()         {}
-func (f *useradminFieldImpl) mustUserField()         {}
-func (f *userpasswordHashFieldImpl) mustUserField()  {}
-func (f *userrefreshTokensFieldImpl) mustUserField() {}
-func (f fieldAliasImpl) mustUserField()              {}
+func (f *useridFieldImpl) mustUserField()           {}
+func (f *usercreatedAtFieldImpl) mustUserField()    {}
+func (f *userupdatedAtFieldImpl) mustUserField()    {}
+func (f *userdeletedAtFieldImpl) mustUserField()    {}
+func (f *useremailFieldImpl) mustUserField()        {}
+func (f *useradminFieldImpl) mustUserField()        {}
+func (f *userpasswordHashFieldImpl) mustUserField() {}
+func (f fieldAliasImpl) mustUserField()             {}
 
 type (
-	machineTemplateidFieldImpl struct {
-		*column[string, MachineTemplateField]
+	refreshTokensuserIdFieldImpl struct {
+		*column[string, RefreshTokensField]
 	}
-	machineTemplatecreatedAtFieldImpl struct {
-		*column[time.Time, MachineTemplateField]
-	}
-	machineTemplateupdatedAtFieldImpl struct {
-		*column[time.Time, MachineTemplateField]
-	}
-	machineTemplatedeletedAtFieldImpl struct {
-		*column[*time.Time, MachineTemplateField]
-	}
-	machineTemplatetagsFieldImpl struct {
-		*column[[]byte, MachineTemplateField]
-	}
-	machineTemplatecoresFieldImpl struct {
-		*column[int32, MachineTemplateField]
-	}
-	machineTemplatememoryFieldImpl struct {
-		*column[int32, MachineTemplateField]
-	}
-	machineTemplatediskFieldImpl struct {
-		*column[int32, MachineTemplateField]
+	refreshTokenstokenFieldImpl struct {
+		*column[string, RefreshTokensField]
 	}
 )
 
-func (f *machineTemplateidFieldImpl) mustMachineTemplateField()        {}
-func (f *machineTemplatecreatedAtFieldImpl) mustMachineTemplateField() {}
-func (f *machineTemplateupdatedAtFieldImpl) mustMachineTemplateField() {}
-func (f *machineTemplatedeletedAtFieldImpl) mustMachineTemplateField() {}
-func (f *machineTemplatetagsFieldImpl) mustMachineTemplateField()      {}
-func (f *machineTemplatecoresFieldImpl) mustMachineTemplateField()     {}
-func (f *machineTemplatememoryFieldImpl) mustMachineTemplateField()    {}
-func (f *machineTemplatediskFieldImpl) mustMachineTemplateField()      {}
-func (f fieldAliasImpl) mustMachineTemplateField()                     {}
+func (f *refreshTokensuserIdFieldImpl) mustRefreshTokensField() {}
+func (f *refreshTokenstokenFieldImpl) mustRefreshTokensField()  {}
+func (f fieldAliasImpl) mustRefreshTokensField()                {}
 
 type (
-	stroppyDeploymentTemplateidFieldImpl struct {
-		*column[string, StroppyDeploymentTemplateField]
+	kvinfoidFieldImpl        struct{ *column[string, KvinfoField] }
+	kvinfocreatedAtFieldImpl struct {
+		*column[time.Time, KvinfoField]
 	}
-	stroppyDeploymentTemplatecreatedAtFieldImpl struct {
-		*column[time.Time, StroppyDeploymentTemplateField]
+	kvinfoupdatedAtFieldImpl struct {
+		*column[time.Time, KvinfoField]
 	}
-	stroppyDeploymentTemplateupdatedAtFieldImpl struct {
-		*column[time.Time, StroppyDeploymentTemplateField]
+	kvinfodeletedAtFieldImpl struct {
+		*column[*time.Time, KvinfoField]
 	}
-	stroppyDeploymentTemplatedeletedAtFieldImpl struct {
-		*column[*time.Time, StroppyDeploymentTemplateField]
-	}
-	stroppyDeploymentTemplatenameFieldImpl struct {
-		*column[string, StroppyDeploymentTemplateField]
-	}
-	stroppyDeploymentTemplatetagsFieldImpl struct {
-		*column[[]byte, StroppyDeploymentTemplateField]
-	}
-	stroppyDeploymentTemplatescriptBodyFieldImpl struct {
-		*column[[]byte, StroppyDeploymentTemplateField]
-	}
-	stroppyDeploymentTemplatestroppyVersionFieldImpl struct {
-		*column[string, StroppyDeploymentTemplateField]
-	}
-	stroppyDeploymentTemplateenvDataFieldImpl struct {
-		*column[[]byte, StroppyDeploymentTemplateField]
-	}
+	kvinfokeyFieldImpl             struct{ *column[string, KvinfoField] }
+	kvinfodescriptionFieldImpl     struct{ *column[string, KvinfoField] }
+	kvinfodefaultValueFieldImpl    struct{ *column[*string, KvinfoField] }
+	kvinfoisRequiredFieldImpl      struct{ *column[bool, KvinfoField] }
+	kvinfoimmutableFieldImpl       struct{ *column[bool, KvinfoField] }
+	kvinfosystemGeneratedFieldImpl struct{ *column[bool, KvinfoField] }
 )
 
-func (f *stroppyDeploymentTemplateidFieldImpl) mustStroppyDeploymentTemplateField()             {}
-func (f *stroppyDeploymentTemplatecreatedAtFieldImpl) mustStroppyDeploymentTemplateField()      {}
-func (f *stroppyDeploymentTemplateupdatedAtFieldImpl) mustStroppyDeploymentTemplateField()      {}
-func (f *stroppyDeploymentTemplatedeletedAtFieldImpl) mustStroppyDeploymentTemplateField()      {}
-func (f *stroppyDeploymentTemplatenameFieldImpl) mustStroppyDeploymentTemplateField()           {}
-func (f *stroppyDeploymentTemplatetagsFieldImpl) mustStroppyDeploymentTemplateField()           {}
-func (f *stroppyDeploymentTemplatescriptBodyFieldImpl) mustStroppyDeploymentTemplateField()     {}
-func (f *stroppyDeploymentTemplatestroppyVersionFieldImpl) mustStroppyDeploymentTemplateField() {}
-func (f *stroppyDeploymentTemplateenvDataFieldImpl) mustStroppyDeploymentTemplateField()        {}
-func (f fieldAliasImpl) mustStroppyDeploymentTemplateField()                                    {}
+func (f *kvinfoidFieldImpl) mustKvinfoField()              {}
+func (f *kvinfocreatedAtFieldImpl) mustKvinfoField()       {}
+func (f *kvinfoupdatedAtFieldImpl) mustKvinfoField()       {}
+func (f *kvinfodeletedAtFieldImpl) mustKvinfoField()       {}
+func (f *kvinfokeyFieldImpl) mustKvinfoField()             {}
+func (f *kvinfodescriptionFieldImpl) mustKvinfoField()     {}
+func (f *kvinfodefaultValueFieldImpl) mustKvinfoField()    {}
+func (f *kvinfoisRequiredFieldImpl) mustKvinfoField()      {}
+func (f *kvinfoimmutableFieldImpl) mustKvinfoField()       {}
+func (f *kvinfosystemGeneratedFieldImpl) mustKvinfoField() {}
+func (f fieldAliasImpl) mustKvinfoField()                  {}
 
 type (
-	databaseDeploymentTemplateidFieldImpl struct {
-		*column[string, DatabaseDeploymentTemplateField]
+	templateidFieldImpl        struct{ *column[string, TemplateField] }
+	templatecreatedAtFieldImpl struct {
+		*column[time.Time, TemplateField]
 	}
-	databaseDeploymentTemplatecreatedAtFieldImpl struct {
-		*column[time.Time, DatabaseDeploymentTemplateField]
+	templateupdatedAtFieldImpl struct {
+		*column[time.Time, TemplateField]
 	}
-	databaseDeploymentTemplateupdatedAtFieldImpl struct {
-		*column[time.Time, DatabaseDeploymentTemplateField]
+	templatedeletedAtFieldImpl struct {
+		*column[*time.Time, TemplateField]
 	}
-	databaseDeploymentTemplatedeletedAtFieldImpl struct {
-		*column[*time.Time, DatabaseDeploymentTemplateField]
-	}
-	databaseDeploymentTemplatenameFieldImpl struct {
-		*column[string, DatabaseDeploymentTemplateField]
-	}
-	databaseDeploymentTemplatetagsFieldImpl struct {
-		*column[[]byte, DatabaseDeploymentTemplateField]
-	}
-	databaseDeploymentTemplateprebuiltImageIdFieldImpl struct {
-		*column[string, DatabaseDeploymentTemplateField]
+	templatenameFieldImpl      struct{ *column[string, TemplateField] }
+	templateauthorIdFieldImpl  struct{ *column[string, TemplateField] }
+	templateisDefaultFieldImpl struct{ *column[bool, TemplateField] }
+	templatetagsFieldImpl      struct {
+		*column[[]string, TemplateField]
 	}
 )
 
-func (f *databaseDeploymentTemplateidFieldImpl) mustDatabaseDeploymentTemplateField()              {}
-func (f *databaseDeploymentTemplatecreatedAtFieldImpl) mustDatabaseDeploymentTemplateField()       {}
-func (f *databaseDeploymentTemplateupdatedAtFieldImpl) mustDatabaseDeploymentTemplateField()       {}
-func (f *databaseDeploymentTemplatedeletedAtFieldImpl) mustDatabaseDeploymentTemplateField()       {}
-func (f *databaseDeploymentTemplatenameFieldImpl) mustDatabaseDeploymentTemplateField()            {}
-func (f *databaseDeploymentTemplatetagsFieldImpl) mustDatabaseDeploymentTemplateField()            {}
-func (f *databaseDeploymentTemplateprebuiltImageIdFieldImpl) mustDatabaseDeploymentTemplateField() {}
-func (f fieldAliasImpl) mustDatabaseDeploymentTemplateField()                                      {}
+func (f *templateidFieldImpl) mustTemplateField()        {}
+func (f *templatecreatedAtFieldImpl) mustTemplateField() {}
+func (f *templateupdatedAtFieldImpl) mustTemplateField() {}
+func (f *templatedeletedAtFieldImpl) mustTemplateField() {}
+func (f *templatenameFieldImpl) mustTemplateField()      {}
+func (f *templateauthorIdFieldImpl) mustTemplateField()  {}
+func (f *templateisDefaultFieldImpl) mustTemplateField() {}
+func (f *templatetagsFieldImpl) mustTemplateField()      {}
+func (f fieldAliasImpl) mustTemplateField()              {}
 
 type (
 	runRecordidFieldImpl struct {
@@ -220,27 +181,23 @@ type (
 	runRecordworkflowIdFieldImpl struct {
 		*column[*string, RunRecordField]
 	}
-	runRecorddatabaseInstanceTemplateFieldImpl struct {
-		*column[pgtype.JSONB, RunRecordField]
-	}
-	runRecordstroppyDeploymentInfoFieldImpl struct {
+	runRecordcloudRunParamsFieldImpl struct {
 		*column[pgtype.JSONB, RunRecordField]
 	}
 )
 
-func (f *runRecordidFieldImpl) mustRunRecordField()                       {}
-func (f *runRecordauthorIdFieldImpl) mustRunRecordField()                 {}
-func (f *runRecordcreatedAtFieldImpl) mustRunRecordField()                {}
-func (f *runRecordupdatedAtFieldImpl) mustRunRecordField()                {}
-func (f *runRecorddeletedAtFieldImpl) mustRunRecordField()                {}
-func (f *runRecordstatusFieldImpl) mustRunRecordField()                   {}
-func (f *runRecordrunInfoFieldImpl) mustRunRecordField()                  {}
-func (f *runRecordtpsFieldImpl) mustRunRecordField()                      {}
-func (f *runRecordgrafanaDashboardUrlFieldImpl) mustRunRecordField()      {}
-func (f *runRecordworkflowIdFieldImpl) mustRunRecordField()               {}
-func (f *runRecorddatabaseInstanceTemplateFieldImpl) mustRunRecordField() {}
-func (f *runRecordstroppyDeploymentInfoFieldImpl) mustRunRecordField()    {}
-func (f fieldAliasImpl) mustRunRecordField()                              {}
+func (f *runRecordidFieldImpl) mustRunRecordField()                  {}
+func (f *runRecordauthorIdFieldImpl) mustRunRecordField()            {}
+func (f *runRecordcreatedAtFieldImpl) mustRunRecordField()           {}
+func (f *runRecordupdatedAtFieldImpl) mustRunRecordField()           {}
+func (f *runRecorddeletedAtFieldImpl) mustRunRecordField()           {}
+func (f *runRecordstatusFieldImpl) mustRunRecordField()              {}
+func (f *runRecordrunInfoFieldImpl) mustRunRecordField()             {}
+func (f *runRecordtpsFieldImpl) mustRunRecordField()                 {}
+func (f *runRecordgrafanaDashboardUrlFieldImpl) mustRunRecordField() {}
+func (f *runRecordworkflowIdFieldImpl) mustRunRecordField()          {}
+func (f *runRecordcloudRunParamsFieldImpl) mustRunRecordField()      {}
+func (f fieldAliasImpl) mustRunRecordField()                         {}
 
 type (
 	runRecordStepidFieldImpl struct {
@@ -276,60 +233,6 @@ func (f *runRecordStepstepInfoFieldImpl) mustRunRecordStepField()  {}
 func (f fieldAliasImpl) mustRunRecordStepField()                   {}
 
 type (
-	workflowTaskNodeidFieldImpl struct {
-		*column[string, WorkflowTaskNodeField]
-	}
-	workflowTaskNodecreatedAtFieldImpl struct {
-		*column[time.Time, WorkflowTaskNodeField]
-	}
-	workflowTaskNodeupdatedAtFieldImpl struct {
-		*column[time.Time, WorkflowTaskNodeField]
-	}
-	workflowTaskNodedeletedAtFieldImpl struct {
-		*column[*time.Time, WorkflowTaskNodeField]
-	}
-	workflowTaskNodeattemptFieldImpl struct {
-		*column[int32, WorkflowTaskNodeField]
-	}
-	workflowTaskNodemetadataFieldImpl struct {
-		*column[[]byte, WorkflowTaskNodeField]
-	}
-	workflowTaskNodeworkflowIdFieldImpl struct {
-		*column[string, WorkflowTaskNodeField]
-	}
-)
-
-func (f *workflowTaskNodeidFieldImpl) mustWorkflowTaskNodeField()         {}
-func (f *workflowTaskNodecreatedAtFieldImpl) mustWorkflowTaskNodeField()  {}
-func (f *workflowTaskNodeupdatedAtFieldImpl) mustWorkflowTaskNodeField()  {}
-func (f *workflowTaskNodedeletedAtFieldImpl) mustWorkflowTaskNodeField()  {}
-func (f *workflowTaskNodeattemptFieldImpl) mustWorkflowTaskNodeField()    {}
-func (f *workflowTaskNodemetadataFieldImpl) mustWorkflowTaskNodeField()   {}
-func (f *workflowTaskNodeworkflowIdFieldImpl) mustWorkflowTaskNodeField() {}
-func (f fieldAliasImpl) mustWorkflowTaskNodeField()                       {}
-
-type (
-	workflowEdgeidFieldImpl struct {
-		*column[string, WorkflowEdgeField]
-	}
-	workflowEdgefromFieldImpl struct {
-		*column[string, WorkflowEdgeField]
-	}
-	workflowEdgetoFieldImpl struct {
-		*column[string, WorkflowEdgeField]
-	}
-	workflowEdgeworkflowIdFieldImpl struct {
-		*column[string, WorkflowEdgeField]
-	}
-)
-
-func (f *workflowEdgeidFieldImpl) mustWorkflowEdgeField()         {}
-func (f *workflowEdgefromFieldImpl) mustWorkflowEdgeField()       {}
-func (f *workflowEdgetoFieldImpl) mustWorkflowEdgeField()         {}
-func (f *workflowEdgeworkflowIdFieldImpl) mustWorkflowEdgeField() {}
-func (f fieldAliasImpl) mustWorkflowEdgeField()                   {}
-
-type (
 	workflowidFieldImpl        struct{ *column[string, WorkflowField] }
 	workflowcreatedAtFieldImpl struct {
 		*column[time.Time, WorkflowField]
@@ -349,59 +252,135 @@ func (f *workflowdeletedAtFieldImpl) mustWorkflowField() {}
 func (f fieldAliasImpl) mustWorkflowField()              {}
 
 type (
+	workflowTaskidFieldImpl struct {
+		*column[string, WorkflowTaskField]
+	}
+	workflowTaskcreatedAtFieldImpl struct {
+		*column[time.Time, WorkflowTaskField]
+	}
+	workflowTaskupdatedAtFieldImpl struct {
+		*column[time.Time, WorkflowTaskField]
+	}
+	workflowTaskdeletedAtFieldImpl struct {
+		*column[*time.Time, WorkflowTaskField]
+	}
+	workflowTasktaskTypeFieldImpl struct {
+		*column[int32, WorkflowTaskField]
+	}
+	workflowTaskstatusFieldImpl struct {
+		*column[int32, WorkflowTaskField]
+	}
+	workflowTaskworkflowIdFieldImpl struct {
+		*column[string, WorkflowTaskField]
+	}
+	workflowTaskcleanedUpFieldImpl struct {
+		*column[bool, WorkflowTaskField]
+	}
+	workflowTaskonWorkerFieldImpl struct {
+		*column[string, WorkflowTaskField]
+	}
+	workflowTaskretryStateFieldImpl struct {
+		*column[[]byte, WorkflowTaskField]
+	}
+	workflowTasklogsFieldImpl struct {
+		*column[[][]byte, WorkflowTaskField]
+	}
+	workflowTaskretrySettingsFieldImpl struct {
+		*column[[]byte, WorkflowTaskField]
+	}
+	workflowTaskinputFieldImpl struct {
+		*column[[]byte, WorkflowTaskField]
+	}
+	workflowTaskoutputFieldImpl struct {
+		*column[[]byte, WorkflowTaskField]
+	}
+	workflowTaskmetadataFieldImpl struct {
+		*column[[]byte, WorkflowTaskField]
+	}
+)
+
+func (f *workflowTaskidFieldImpl) mustWorkflowTaskField()            {}
+func (f *workflowTaskcreatedAtFieldImpl) mustWorkflowTaskField()     {}
+func (f *workflowTaskupdatedAtFieldImpl) mustWorkflowTaskField()     {}
+func (f *workflowTaskdeletedAtFieldImpl) mustWorkflowTaskField()     {}
+func (f *workflowTasktaskTypeFieldImpl) mustWorkflowTaskField()      {}
+func (f *workflowTaskstatusFieldImpl) mustWorkflowTaskField()        {}
+func (f *workflowTaskworkflowIdFieldImpl) mustWorkflowTaskField()    {}
+func (f *workflowTaskcleanedUpFieldImpl) mustWorkflowTaskField()     {}
+func (f *workflowTaskonWorkerFieldImpl) mustWorkflowTaskField()      {}
+func (f *workflowTaskretryStateFieldImpl) mustWorkflowTaskField()    {}
+func (f *workflowTasklogsFieldImpl) mustWorkflowTaskField()          {}
+func (f *workflowTaskretrySettingsFieldImpl) mustWorkflowTaskField() {}
+func (f *workflowTaskinputFieldImpl) mustWorkflowTaskField()         {}
+func (f *workflowTaskoutputFieldImpl) mustWorkflowTaskField()        {}
+func (f *workflowTaskmetadataFieldImpl) mustWorkflowTaskField()      {}
+func (f fieldAliasImpl) mustWorkflowTaskField()                      {}
+
+type (
+	workflowEdgefromIdFieldImpl struct {
+		*column[string, WorkflowEdgeField]
+	}
+	workflowEdgetoIdFieldImpl struct {
+		*column[string, WorkflowEdgeField]
+	}
+	workflowEdgeworkflowIdFieldImpl struct {
+		*column[string, WorkflowEdgeField]
+	}
+)
+
+func (f *workflowEdgefromIdFieldImpl) mustWorkflowEdgeField()     {}
+func (f *workflowEdgetoIdFieldImpl) mustWorkflowEdgeField()       {}
+func (f *workflowEdgeworkflowIdFieldImpl) mustWorkflowEdgeField() {}
+func (f fieldAliasImpl) mustWorkflowEdgeField()                   {}
+
+type (
 	UserScanner struct {
-		Id            string
-		CreatedAt     time.Time
-		UpdatedAt     time.Time
-		DeletedAt     *time.Time
-		Email         string
-		Admin         bool
-		PasswordHash  string
-		RefreshTokens []string
+		Id           string
+		CreatedAt    time.Time
+		UpdatedAt    time.Time
+		DeletedAt    *time.Time
+		Email        string
+		Admin        bool
+		PasswordHash string
 	}
-	MachineTemplateScanner struct {
-		Id        string
-		CreatedAt time.Time
-		UpdatedAt time.Time
-		DeletedAt *time.Time
-		Tags      []byte
-		Cores     int32
-		Memory    int32
-		Disk      int32
+	RefreshTokensScanner struct {
+		UserId string
+		Token  string
 	}
-	StroppyDeploymentTemplateScanner struct {
-		Id             string
-		CreatedAt      time.Time
-		UpdatedAt      time.Time
-		DeletedAt      *time.Time
-		Name           string
-		Tags           []byte
-		ScriptBody     []byte
-		StroppyVersion string
-		EnvData        []byte
-	}
-	DatabaseDeploymentTemplateScanner struct {
+	KvinfoScanner struct {
 		Id              string
 		CreatedAt       time.Time
 		UpdatedAt       time.Time
 		DeletedAt       *time.Time
-		Name            string
-		Tags            []byte
-		PrebuiltImageId string
+		Key             string
+		Description     string
+		DefaultValue    *string
+		IsRequired      bool
+		Immutable       bool
+		SystemGenerated bool
+	}
+	TemplateScanner struct {
+		Id        string
+		CreatedAt time.Time
+		UpdatedAt time.Time
+		DeletedAt *time.Time
+		Name      string
+		AuthorId  string
+		IsDefault bool
+		Tags      []string
 	}
 	RunRecordScanner struct {
-		Id                       string
-		AuthorId                 string
-		CreatedAt                time.Time
-		UpdatedAt                time.Time
-		DeletedAt                *time.Time
-		Status                   int32
-		RunInfo                  []byte
-		Tps                      []byte
-		GrafanaDashboardUrl      string
-		WorkflowId               *string
-		DatabaseInstanceTemplate pgtype.JSONB
-		StroppyDeploymentInfo    pgtype.JSONB
+		Id                  string
+		AuthorId            string
+		CreatedAt           time.Time
+		UpdatedAt           time.Time
+		DeletedAt           *time.Time
+		Status              int32
+		RunInfo             []byte
+		Tps                 []byte
+		GrafanaDashboardUrl string
+		WorkflowId          *string
+		CloudRunParams      pgtype.JSONB
 	}
 	RunRecordStepScanner struct {
 		Id        string
@@ -412,26 +391,33 @@ type (
 		Status    int32
 		StepInfo  []byte
 	}
-	WorkflowTaskNodeScanner struct {
-		Id         string
-		CreatedAt  time.Time
-		UpdatedAt  time.Time
-		DeletedAt  *time.Time
-		Attempt    int32
-		Metadata   []byte
-		WorkflowId string
-	}
-	WorkflowEdgeScanner struct {
-		Id         string
-		From       string
-		To         string
-		WorkflowId string
-	}
 	WorkflowScanner struct {
 		Id        string
 		CreatedAt time.Time
 		UpdatedAt time.Time
 		DeletedAt *time.Time
+	}
+	WorkflowTaskScanner struct {
+		Id            string
+		CreatedAt     time.Time
+		UpdatedAt     time.Time
+		DeletedAt     *time.Time
+		TaskType      int32
+		Status        int32
+		WorkflowId    string
+		CleanedUp     bool
+		OnWorker      string
+		RetryState    []byte
+		Logs          [][]byte
+		RetrySettings []byte
+		Input         []byte
+		Output        []byte
+		Metadata      []byte
+	}
+	WorkflowEdgeScanner struct {
+		FromId     string
+		ToId       string
+		WorkflowId string
 	}
 )
 
@@ -447,7 +433,6 @@ func (s *UserScanner) values() []any {
 		s.Email,
 		s.Admin,
 		s.PasswordHash,
-		s.RefreshTokens,
 	}
 }
 func (s *UserScanner) getTarget(field string) func() any {
@@ -466,8 +451,6 @@ func (s *UserScanner) getTarget(field string) func() any {
 		return func() any { return &s.Admin }
 	case "password_hash":
 		return func() any { return &s.PasswordHash }
-	case "refresh_tokens":
-		return func() any { return &s.RefreshTokens }
 	default:
 		panic("unknown field: " + field)
 	}
@@ -502,10 +485,6 @@ func (s *UserScanner) getSetter(field UserField) func() ValueSetter[UserField] {
 		return func() ValueSetter[UserField] {
 			return NewValueSetter[UserField](User.PasswordHash, s.PasswordHash)
 		}
-	case "refresh_tokens":
-		return func() ValueSetter[UserField] {
-			return NewValueSetter[UserField](User.RefreshTokens, s.RefreshTokens)
-		}
 	default:
 		panic("unknown field: " + field.String())
 	}
@@ -526,28 +505,71 @@ func (s *UserScanner) getValue(field UserField) func() any {
 		return func() any { return s.Admin }
 	case "password_hash":
 		return func() any { return s.PasswordHash }
-	case "refresh_tokens":
-		return func() any { return s.RefreshTokens }
 	default:
 		panic("unknown field: " + field.String())
 	}
 }
-func newMachineTemplateScanner() *MachineTemplateScanner {
-	return &MachineTemplateScanner{}
+func newRefreshTokensScanner() *RefreshTokensScanner {
+	return &RefreshTokensScanner{}
 }
-func (s *MachineTemplateScanner) values() []any {
+func (s *RefreshTokensScanner) values() []any {
+	return []any{
+		s.UserId,
+		s.Token,
+	}
+}
+func (s *RefreshTokensScanner) getTarget(field string) func() any {
+	switch field {
+	case "user_id":
+		return func() any { return &s.UserId }
+	case "token":
+		return func() any { return &s.Token }
+	default:
+		panic("unknown field: " + field)
+	}
+}
+func (s *RefreshTokensScanner) getSetter(field RefreshTokensField) func() ValueSetter[RefreshTokensField] {
+	switch field.String() {
+	case "user_id":
+		return func() ValueSetter[RefreshTokensField] {
+			return NewValueSetter[RefreshTokensField](RefreshTokens.UserId, s.UserId)
+		}
+	case "token":
+		return func() ValueSetter[RefreshTokensField] {
+			return NewValueSetter[RefreshTokensField](RefreshTokens.Token, s.Token)
+		}
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func (s *RefreshTokensScanner) getValue(field RefreshTokensField) func() any {
+	switch field.String() {
+	case "user_id":
+		return func() any { return s.UserId }
+	case "token":
+		return func() any { return s.Token }
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func newKvinfoScanner() *KvinfoScanner {
+	return &KvinfoScanner{}
+}
+func (s *KvinfoScanner) values() []any {
 	return []any{
 		s.Id,
 		s.CreatedAt,
 		s.UpdatedAt,
 		s.DeletedAt,
-		s.Tags,
-		s.Cores,
-		s.Memory,
-		s.Disk,
+		s.Key,
+		s.Description,
+		s.DefaultValue,
+		s.IsRequired,
+		s.Immutable,
+		s.SystemGenerated,
 	}
 }
-func (s *MachineTemplateScanner) getTarget(field string) func() any {
+func (s *KvinfoScanner) getTarget(field string) func() any {
 	switch field {
 	case "id":
 		return func() any { return &s.Id }
@@ -557,57 +579,69 @@ func (s *MachineTemplateScanner) getTarget(field string) func() any {
 		return func() any { return &s.UpdatedAt }
 	case "deleted_at":
 		return func() any { return &s.DeletedAt }
-	case "tags":
-		return func() any { return &s.Tags }
-	case "cores":
-		return func() any { return &s.Cores }
-	case "memory":
-		return func() any { return &s.Memory }
-	case "disk":
-		return func() any { return &s.Disk }
+	case "key":
+		return func() any { return &s.Key }
+	case "description":
+		return func() any { return &s.Description }
+	case "default_value":
+		return func() any { return &s.DefaultValue }
+	case "is_required":
+		return func() any { return &s.IsRequired }
+	case "immutable":
+		return func() any { return &s.Immutable }
+	case "system_generated":
+		return func() any { return &s.SystemGenerated }
 	default:
 		panic("unknown field: " + field)
 	}
 }
-func (s *MachineTemplateScanner) getSetter(field MachineTemplateField) func() ValueSetter[MachineTemplateField] {
+func (s *KvinfoScanner) getSetter(field KvinfoField) func() ValueSetter[KvinfoField] {
 	switch field.String() {
 	case "id":
-		return func() ValueSetter[MachineTemplateField] {
-			return NewValueSetter[MachineTemplateField](MachineTemplate.Id, s.Id)
+		return func() ValueSetter[KvinfoField] {
+			return NewValueSetter[KvinfoField](Kvinfo.Id, s.Id)
 		}
 	case "created_at":
-		return func() ValueSetter[MachineTemplateField] {
-			return NewValueSetter[MachineTemplateField](MachineTemplate.CreatedAt, s.CreatedAt)
+		return func() ValueSetter[KvinfoField] {
+			return NewValueSetter[KvinfoField](Kvinfo.CreatedAt, s.CreatedAt)
 		}
 	case "updated_at":
-		return func() ValueSetter[MachineTemplateField] {
-			return NewValueSetter[MachineTemplateField](MachineTemplate.UpdatedAt, s.UpdatedAt)
+		return func() ValueSetter[KvinfoField] {
+			return NewValueSetter[KvinfoField](Kvinfo.UpdatedAt, s.UpdatedAt)
 		}
 	case "deleted_at":
-		return func() ValueSetter[MachineTemplateField] {
-			return NewValueSetter[MachineTemplateField](MachineTemplate.DeletedAt, s.DeletedAt)
+		return func() ValueSetter[KvinfoField] {
+			return NewValueSetter[KvinfoField](Kvinfo.DeletedAt, s.DeletedAt)
 		}
-	case "tags":
-		return func() ValueSetter[MachineTemplateField] {
-			return NewValueSetter[MachineTemplateField](MachineTemplate.Tags, s.Tags)
+	case "key":
+		return func() ValueSetter[KvinfoField] {
+			return NewValueSetter[KvinfoField](Kvinfo.Key, s.Key)
 		}
-	case "cores":
-		return func() ValueSetter[MachineTemplateField] {
-			return NewValueSetter[MachineTemplateField](MachineTemplate.Cores, s.Cores)
+	case "description":
+		return func() ValueSetter[KvinfoField] {
+			return NewValueSetter[KvinfoField](Kvinfo.Description, s.Description)
 		}
-	case "memory":
-		return func() ValueSetter[MachineTemplateField] {
-			return NewValueSetter[MachineTemplateField](MachineTemplate.Memory, s.Memory)
+	case "default_value":
+		return func() ValueSetter[KvinfoField] {
+			return NewValueSetter[KvinfoField](Kvinfo.DefaultValue, s.DefaultValue)
 		}
-	case "disk":
-		return func() ValueSetter[MachineTemplateField] {
-			return NewValueSetter[MachineTemplateField](MachineTemplate.Disk, s.Disk)
+	case "is_required":
+		return func() ValueSetter[KvinfoField] {
+			return NewValueSetter[KvinfoField](Kvinfo.IsRequired, s.IsRequired)
+		}
+	case "immutable":
+		return func() ValueSetter[KvinfoField] {
+			return NewValueSetter[KvinfoField](Kvinfo.Immutable, s.Immutable)
+		}
+	case "system_generated":
+		return func() ValueSetter[KvinfoField] {
+			return NewValueSetter[KvinfoField](Kvinfo.SystemGenerated, s.SystemGenerated)
 		}
 	default:
 		panic("unknown field: " + field.String())
 	}
 }
-func (s *MachineTemplateScanner) getValue(field MachineTemplateField) func() any {
+func (s *KvinfoScanner) getValue(field KvinfoField) func() any {
 	switch field.String() {
 	case "id":
 		return func() any { return s.Id }
@@ -617,35 +651,38 @@ func (s *MachineTemplateScanner) getValue(field MachineTemplateField) func() any
 		return func() any { return s.UpdatedAt }
 	case "deleted_at":
 		return func() any { return s.DeletedAt }
-	case "tags":
-		return func() any { return s.Tags }
-	case "cores":
-		return func() any { return s.Cores }
-	case "memory":
-		return func() any { return s.Memory }
-	case "disk":
-		return func() any { return s.Disk }
+	case "key":
+		return func() any { return s.Key }
+	case "description":
+		return func() any { return s.Description }
+	case "default_value":
+		return func() any { return s.DefaultValue }
+	case "is_required":
+		return func() any { return s.IsRequired }
+	case "immutable":
+		return func() any { return s.Immutable }
+	case "system_generated":
+		return func() any { return s.SystemGenerated }
 	default:
 		panic("unknown field: " + field.String())
 	}
 }
-func newStroppyDeploymentTemplateScanner() *StroppyDeploymentTemplateScanner {
-	return &StroppyDeploymentTemplateScanner{}
+func newTemplateScanner() *TemplateScanner {
+	return &TemplateScanner{}
 }
-func (s *StroppyDeploymentTemplateScanner) values() []any {
+func (s *TemplateScanner) values() []any {
 	return []any{
 		s.Id,
 		s.CreatedAt,
 		s.UpdatedAt,
 		s.DeletedAt,
 		s.Name,
+		s.AuthorId,
+		s.IsDefault,
 		s.Tags,
-		s.ScriptBody,
-		s.StroppyVersion,
-		s.EnvData,
 	}
 }
-func (s *StroppyDeploymentTemplateScanner) getTarget(field string) func() any {
+func (s *TemplateScanner) getTarget(field string) func() any {
 	switch field {
 	case "id":
 		return func() any { return &s.Id }
@@ -657,61 +694,55 @@ func (s *StroppyDeploymentTemplateScanner) getTarget(field string) func() any {
 		return func() any { return &s.DeletedAt }
 	case "name":
 		return func() any { return &s.Name }
+	case "author_id":
+		return func() any { return &s.AuthorId }
+	case "is_default":
+		return func() any { return &s.IsDefault }
 	case "tags":
 		return func() any { return &s.Tags }
-	case "script_body":
-		return func() any { return &s.ScriptBody }
-	case "stroppy_version":
-		return func() any { return &s.StroppyVersion }
-	case "env_data":
-		return func() any { return &s.EnvData }
 	default:
 		panic("unknown field: " + field)
 	}
 }
-func (s *StroppyDeploymentTemplateScanner) getSetter(field StroppyDeploymentTemplateField) func() ValueSetter[StroppyDeploymentTemplateField] {
+func (s *TemplateScanner) getSetter(field TemplateField) func() ValueSetter[TemplateField] {
 	switch field.String() {
 	case "id":
-		return func() ValueSetter[StroppyDeploymentTemplateField] {
-			return NewValueSetter[StroppyDeploymentTemplateField](StroppyDeploymentTemplate.Id, s.Id)
+		return func() ValueSetter[TemplateField] {
+			return NewValueSetter[TemplateField](Template.Id, s.Id)
 		}
 	case "created_at":
-		return func() ValueSetter[StroppyDeploymentTemplateField] {
-			return NewValueSetter[StroppyDeploymentTemplateField](StroppyDeploymentTemplate.CreatedAt, s.CreatedAt)
+		return func() ValueSetter[TemplateField] {
+			return NewValueSetter[TemplateField](Template.CreatedAt, s.CreatedAt)
 		}
 	case "updated_at":
-		return func() ValueSetter[StroppyDeploymentTemplateField] {
-			return NewValueSetter[StroppyDeploymentTemplateField](StroppyDeploymentTemplate.UpdatedAt, s.UpdatedAt)
+		return func() ValueSetter[TemplateField] {
+			return NewValueSetter[TemplateField](Template.UpdatedAt, s.UpdatedAt)
 		}
 	case "deleted_at":
-		return func() ValueSetter[StroppyDeploymentTemplateField] {
-			return NewValueSetter[StroppyDeploymentTemplateField](StroppyDeploymentTemplate.DeletedAt, s.DeletedAt)
+		return func() ValueSetter[TemplateField] {
+			return NewValueSetter[TemplateField](Template.DeletedAt, s.DeletedAt)
 		}
 	case "name":
-		return func() ValueSetter[StroppyDeploymentTemplateField] {
-			return NewValueSetter[StroppyDeploymentTemplateField](StroppyDeploymentTemplate.Name, s.Name)
+		return func() ValueSetter[TemplateField] {
+			return NewValueSetter[TemplateField](Template.Name, s.Name)
+		}
+	case "author_id":
+		return func() ValueSetter[TemplateField] {
+			return NewValueSetter[TemplateField](Template.AuthorId, s.AuthorId)
+		}
+	case "is_default":
+		return func() ValueSetter[TemplateField] {
+			return NewValueSetter[TemplateField](Template.IsDefault, s.IsDefault)
 		}
 	case "tags":
-		return func() ValueSetter[StroppyDeploymentTemplateField] {
-			return NewValueSetter[StroppyDeploymentTemplateField](StroppyDeploymentTemplate.Tags, s.Tags)
-		}
-	case "script_body":
-		return func() ValueSetter[StroppyDeploymentTemplateField] {
-			return NewValueSetter[StroppyDeploymentTemplateField](StroppyDeploymentTemplate.ScriptBody, s.ScriptBody)
-		}
-	case "stroppy_version":
-		return func() ValueSetter[StroppyDeploymentTemplateField] {
-			return NewValueSetter[StroppyDeploymentTemplateField](StroppyDeploymentTemplate.StroppyVersion, s.StroppyVersion)
-		}
-	case "env_data":
-		return func() ValueSetter[StroppyDeploymentTemplateField] {
-			return NewValueSetter[StroppyDeploymentTemplateField](StroppyDeploymentTemplate.EnvData, s.EnvData)
+		return func() ValueSetter[TemplateField] {
+			return NewValueSetter[TemplateField](Template.Tags, s.Tags)
 		}
 	default:
 		panic("unknown field: " + field.String())
 	}
 }
-func (s *StroppyDeploymentTemplateScanner) getValue(field StroppyDeploymentTemplateField) func() any {
+func (s *TemplateScanner) getValue(field TemplateField) func() any {
 	switch field.String() {
 	case "id":
 		return func() any { return s.Id }
@@ -723,102 +754,12 @@ func (s *StroppyDeploymentTemplateScanner) getValue(field StroppyDeploymentTempl
 		return func() any { return s.DeletedAt }
 	case "name":
 		return func() any { return s.Name }
+	case "author_id":
+		return func() any { return s.AuthorId }
+	case "is_default":
+		return func() any { return s.IsDefault }
 	case "tags":
 		return func() any { return s.Tags }
-	case "script_body":
-		return func() any { return s.ScriptBody }
-	case "stroppy_version":
-		return func() any { return s.StroppyVersion }
-	case "env_data":
-		return func() any { return s.EnvData }
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
-func newDatabaseDeploymentTemplateScanner() *DatabaseDeploymentTemplateScanner {
-	return &DatabaseDeploymentTemplateScanner{}
-}
-func (s *DatabaseDeploymentTemplateScanner) values() []any {
-	return []any{
-		s.Id,
-		s.CreatedAt,
-		s.UpdatedAt,
-		s.DeletedAt,
-		s.Name,
-		s.Tags,
-		s.PrebuiltImageId,
-	}
-}
-func (s *DatabaseDeploymentTemplateScanner) getTarget(field string) func() any {
-	switch field {
-	case "id":
-		return func() any { return &s.Id }
-	case "created_at":
-		return func() any { return &s.CreatedAt }
-	case "updated_at":
-		return func() any { return &s.UpdatedAt }
-	case "deleted_at":
-		return func() any { return &s.DeletedAt }
-	case "name":
-		return func() any { return &s.Name }
-	case "tags":
-		return func() any { return &s.Tags }
-	case "prebuilt_image_id":
-		return func() any { return &s.PrebuiltImageId }
-	default:
-		panic("unknown field: " + field)
-	}
-}
-func (s *DatabaseDeploymentTemplateScanner) getSetter(field DatabaseDeploymentTemplateField) func() ValueSetter[DatabaseDeploymentTemplateField] {
-	switch field.String() {
-	case "id":
-		return func() ValueSetter[DatabaseDeploymentTemplateField] {
-			return NewValueSetter[DatabaseDeploymentTemplateField](DatabaseDeploymentTemplate.Id, s.Id)
-		}
-	case "created_at":
-		return func() ValueSetter[DatabaseDeploymentTemplateField] {
-			return NewValueSetter[DatabaseDeploymentTemplateField](DatabaseDeploymentTemplate.CreatedAt, s.CreatedAt)
-		}
-	case "updated_at":
-		return func() ValueSetter[DatabaseDeploymentTemplateField] {
-			return NewValueSetter[DatabaseDeploymentTemplateField](DatabaseDeploymentTemplate.UpdatedAt, s.UpdatedAt)
-		}
-	case "deleted_at":
-		return func() ValueSetter[DatabaseDeploymentTemplateField] {
-			return NewValueSetter[DatabaseDeploymentTemplateField](DatabaseDeploymentTemplate.DeletedAt, s.DeletedAt)
-		}
-	case "name":
-		return func() ValueSetter[DatabaseDeploymentTemplateField] {
-			return NewValueSetter[DatabaseDeploymentTemplateField](DatabaseDeploymentTemplate.Name, s.Name)
-		}
-	case "tags":
-		return func() ValueSetter[DatabaseDeploymentTemplateField] {
-			return NewValueSetter[DatabaseDeploymentTemplateField](DatabaseDeploymentTemplate.Tags, s.Tags)
-		}
-	case "prebuilt_image_id":
-		return func() ValueSetter[DatabaseDeploymentTemplateField] {
-			return NewValueSetter[DatabaseDeploymentTemplateField](DatabaseDeploymentTemplate.PrebuiltImageId, s.PrebuiltImageId)
-		}
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
-func (s *DatabaseDeploymentTemplateScanner) getValue(field DatabaseDeploymentTemplateField) func() any {
-	switch field.String() {
-	case "id":
-		return func() any { return s.Id }
-	case "created_at":
-		return func() any { return s.CreatedAt }
-	case "updated_at":
-		return func() any { return s.UpdatedAt }
-	case "deleted_at":
-		return func() any { return s.DeletedAt }
-	case "name":
-		return func() any { return s.Name }
-	case "tags":
-		return func() any { return s.Tags }
-	case "prebuilt_image_id":
-		return func() any { return s.PrebuiltImageId }
 	default:
 		panic("unknown field: " + field.String())
 	}
@@ -838,8 +779,7 @@ func (s *RunRecordScanner) values() []any {
 		s.Tps,
 		s.GrafanaDashboardUrl,
 		s.WorkflowId,
-		s.DatabaseInstanceTemplate,
-		s.StroppyDeploymentInfo,
+		s.CloudRunParams,
 	}
 }
 func (s *RunRecordScanner) getTarget(field string) func() any {
@@ -864,10 +804,8 @@ func (s *RunRecordScanner) getTarget(field string) func() any {
 		return func() any { return &s.GrafanaDashboardUrl }
 	case "workflow_id":
 		return func() any { return &s.WorkflowId }
-	case "database_instance_template":
-		return func() any { return &s.DatabaseInstanceTemplate }
-	case "stroppy_deployment_info":
-		return func() any { return &s.StroppyDeploymentInfo }
+	case "cloud_run_params":
+		return func() any { return &s.CloudRunParams }
 	default:
 		panic("unknown field: " + field)
 	}
@@ -914,13 +852,9 @@ func (s *RunRecordScanner) getSetter(field RunRecordField) func() ValueSetter[Ru
 		return func() ValueSetter[RunRecordField] {
 			return NewValueSetter[RunRecordField](RunRecord.WorkflowId, s.WorkflowId)
 		}
-	case "database_instance_template":
+	case "cloud_run_params":
 		return func() ValueSetter[RunRecordField] {
-			return NewValueSetter[RunRecordField](RunRecord.DatabaseInstanceTemplate, s.DatabaseInstanceTemplate)
-		}
-	case "stroppy_deployment_info":
-		return func() ValueSetter[RunRecordField] {
-			return NewValueSetter[RunRecordField](RunRecord.StroppyDeploymentInfo, s.StroppyDeploymentInfo)
+			return NewValueSetter[RunRecordField](RunRecord.CloudRunParams, s.CloudRunParams)
 		}
 	default:
 		panic("unknown field: " + field.String())
@@ -948,10 +882,8 @@ func (s *RunRecordScanner) getValue(field RunRecordField) func() any {
 		return func() any { return s.GrafanaDashboardUrl }
 	case "workflow_id":
 		return func() any { return s.WorkflowId }
-	case "database_instance_template":
-		return func() any { return s.DatabaseInstanceTemplate }
-	case "stroppy_deployment_info":
-		return func() any { return s.StroppyDeploymentInfo }
+	case "cloud_run_params":
+		return func() any { return s.CloudRunParams }
 	default:
 		panic("unknown field: " + field.String())
 	}
@@ -1044,155 +976,6 @@ func (s *RunRecordStepScanner) getValue(field RunRecordStepField) func() any {
 		panic("unknown field: " + field.String())
 	}
 }
-func newWorkflowTaskNodeScanner() *WorkflowTaskNodeScanner {
-	return &WorkflowTaskNodeScanner{}
-}
-func (s *WorkflowTaskNodeScanner) values() []any {
-	return []any{
-		s.Id,
-		s.CreatedAt,
-		s.UpdatedAt,
-		s.DeletedAt,
-		s.Attempt,
-		s.Metadata,
-		s.WorkflowId,
-	}
-}
-func (s *WorkflowTaskNodeScanner) getTarget(field string) func() any {
-	switch field {
-	case "id":
-		return func() any { return &s.Id }
-	case "created_at":
-		return func() any { return &s.CreatedAt }
-	case "updated_at":
-		return func() any { return &s.UpdatedAt }
-	case "deleted_at":
-		return func() any { return &s.DeletedAt }
-	case "attempt":
-		return func() any { return &s.Attempt }
-	case "metadata":
-		return func() any { return &s.Metadata }
-	case "workflow_id":
-		return func() any { return &s.WorkflowId }
-	default:
-		panic("unknown field: " + field)
-	}
-}
-func (s *WorkflowTaskNodeScanner) getSetter(field WorkflowTaskNodeField) func() ValueSetter[WorkflowTaskNodeField] {
-	switch field.String() {
-	case "id":
-		return func() ValueSetter[WorkflowTaskNodeField] {
-			return NewValueSetter[WorkflowTaskNodeField](WorkflowTaskNode.Id, s.Id)
-		}
-	case "created_at":
-		return func() ValueSetter[WorkflowTaskNodeField] {
-			return NewValueSetter[WorkflowTaskNodeField](WorkflowTaskNode.CreatedAt, s.CreatedAt)
-		}
-	case "updated_at":
-		return func() ValueSetter[WorkflowTaskNodeField] {
-			return NewValueSetter[WorkflowTaskNodeField](WorkflowTaskNode.UpdatedAt, s.UpdatedAt)
-		}
-	case "deleted_at":
-		return func() ValueSetter[WorkflowTaskNodeField] {
-			return NewValueSetter[WorkflowTaskNodeField](WorkflowTaskNode.DeletedAt, s.DeletedAt)
-		}
-	case "attempt":
-		return func() ValueSetter[WorkflowTaskNodeField] {
-			return NewValueSetter[WorkflowTaskNodeField](WorkflowTaskNode.Attempt, s.Attempt)
-		}
-	case "metadata":
-		return func() ValueSetter[WorkflowTaskNodeField] {
-			return NewValueSetter[WorkflowTaskNodeField](WorkflowTaskNode.Metadata, s.Metadata)
-		}
-	case "workflow_id":
-		return func() ValueSetter[WorkflowTaskNodeField] {
-			return NewValueSetter[WorkflowTaskNodeField](WorkflowTaskNode.WorkflowId, s.WorkflowId)
-		}
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
-func (s *WorkflowTaskNodeScanner) getValue(field WorkflowTaskNodeField) func() any {
-	switch field.String() {
-	case "id":
-		return func() any { return s.Id }
-	case "created_at":
-		return func() any { return s.CreatedAt }
-	case "updated_at":
-		return func() any { return s.UpdatedAt }
-	case "deleted_at":
-		return func() any { return s.DeletedAt }
-	case "attempt":
-		return func() any { return s.Attempt }
-	case "metadata":
-		return func() any { return s.Metadata }
-	case "workflow_id":
-		return func() any { return s.WorkflowId }
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
-func newWorkflowEdgeScanner() *WorkflowEdgeScanner {
-	return &WorkflowEdgeScanner{}
-}
-func (s *WorkflowEdgeScanner) values() []any {
-	return []any{
-		s.Id,
-		s.From,
-		s.To,
-		s.WorkflowId,
-	}
-}
-func (s *WorkflowEdgeScanner) getTarget(field string) func() any {
-	switch field {
-	case "id":
-		return func() any { return &s.Id }
-	case "from":
-		return func() any { return &s.From }
-	case "to":
-		return func() any { return &s.To }
-	case "workflow_id":
-		return func() any { return &s.WorkflowId }
-	default:
-		panic("unknown field: " + field)
-	}
-}
-func (s *WorkflowEdgeScanner) getSetter(field WorkflowEdgeField) func() ValueSetter[WorkflowEdgeField] {
-	switch field.String() {
-	case "id":
-		return func() ValueSetter[WorkflowEdgeField] {
-			return NewValueSetter[WorkflowEdgeField](WorkflowEdge.Id, s.Id)
-		}
-	case "from":
-		return func() ValueSetter[WorkflowEdgeField] {
-			return NewValueSetter[WorkflowEdgeField](WorkflowEdge.From, s.From)
-		}
-	case "to":
-		return func() ValueSetter[WorkflowEdgeField] {
-			return NewValueSetter[WorkflowEdgeField](WorkflowEdge.To, s.To)
-		}
-	case "workflow_id":
-		return func() ValueSetter[WorkflowEdgeField] {
-			return NewValueSetter[WorkflowEdgeField](WorkflowEdge.WorkflowId, s.WorkflowId)
-		}
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
-func (s *WorkflowEdgeScanner) getValue(field WorkflowEdgeField) func() any {
-	switch field.String() {
-	case "id":
-		return func() any { return s.Id }
-	case "from":
-		return func() any { return s.From }
-	case "to":
-		return func() any { return s.To }
-	case "workflow_id":
-		return func() any { return s.WorkflowId }
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
 func newWorkflowScanner() *WorkflowScanner {
 	return &WorkflowScanner{}
 }
@@ -1254,6 +1037,218 @@ func (s *WorkflowScanner) getValue(field WorkflowField) func() any {
 		panic("unknown field: " + field.String())
 	}
 }
+func newWorkflowTaskScanner() *WorkflowTaskScanner {
+	return &WorkflowTaskScanner{}
+}
+func (s *WorkflowTaskScanner) values() []any {
+	return []any{
+		s.Id,
+		s.CreatedAt,
+		s.UpdatedAt,
+		s.DeletedAt,
+		s.TaskType,
+		s.Status,
+		s.WorkflowId,
+		s.CleanedUp,
+		s.OnWorker,
+		s.RetryState,
+		s.Logs,
+		s.RetrySettings,
+		s.Input,
+		s.Output,
+		s.Metadata,
+	}
+}
+func (s *WorkflowTaskScanner) getTarget(field string) func() any {
+	switch field {
+	case "id":
+		return func() any { return &s.Id }
+	case "created_at":
+		return func() any { return &s.CreatedAt }
+	case "updated_at":
+		return func() any { return &s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return &s.DeletedAt }
+	case "task_type":
+		return func() any { return &s.TaskType }
+	case "status":
+		return func() any { return &s.Status }
+	case "workflow_id":
+		return func() any { return &s.WorkflowId }
+	case "cleaned_up":
+		return func() any { return &s.CleanedUp }
+	case "on_worker":
+		return func() any { return &s.OnWorker }
+	case "retry_state":
+		return func() any { return &s.RetryState }
+	case "logs":
+		return func() any { return &s.Logs }
+	case "retry_settings":
+		return func() any { return &s.RetrySettings }
+	case "input":
+		return func() any { return &s.Input }
+	case "output":
+		return func() any { return &s.Output }
+	case "metadata":
+		return func() any { return &s.Metadata }
+	default:
+		panic("unknown field: " + field)
+	}
+}
+func (s *WorkflowTaskScanner) getSetter(field WorkflowTaskField) func() ValueSetter[WorkflowTaskField] {
+	switch field.String() {
+	case "id":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.Id, s.Id)
+		}
+	case "created_at":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.CreatedAt, s.CreatedAt)
+		}
+	case "updated_at":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.UpdatedAt, s.UpdatedAt)
+		}
+	case "deleted_at":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.DeletedAt, s.DeletedAt)
+		}
+	case "task_type":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.TaskType, s.TaskType)
+		}
+	case "status":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.Status, s.Status)
+		}
+	case "workflow_id":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.WorkflowId, s.WorkflowId)
+		}
+	case "cleaned_up":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.CleanedUp, s.CleanedUp)
+		}
+	case "on_worker":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.OnWorker, s.OnWorker)
+		}
+	case "retry_state":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.RetryState, s.RetryState)
+		}
+	case "logs":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.Logs, s.Logs)
+		}
+	case "retry_settings":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.RetrySettings, s.RetrySettings)
+		}
+	case "input":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.Input, s.Input)
+		}
+	case "output":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.Output, s.Output)
+		}
+	case "metadata":
+		return func() ValueSetter[WorkflowTaskField] {
+			return NewValueSetter[WorkflowTaskField](WorkflowTask.Metadata, s.Metadata)
+		}
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func (s *WorkflowTaskScanner) getValue(field WorkflowTaskField) func() any {
+	switch field.String() {
+	case "id":
+		return func() any { return s.Id }
+	case "created_at":
+		return func() any { return s.CreatedAt }
+	case "updated_at":
+		return func() any { return s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return s.DeletedAt }
+	case "task_type":
+		return func() any { return s.TaskType }
+	case "status":
+		return func() any { return s.Status }
+	case "workflow_id":
+		return func() any { return s.WorkflowId }
+	case "cleaned_up":
+		return func() any { return s.CleanedUp }
+	case "on_worker":
+		return func() any { return s.OnWorker }
+	case "retry_state":
+		return func() any { return s.RetryState }
+	case "logs":
+		return func() any { return s.Logs }
+	case "retry_settings":
+		return func() any { return s.RetrySettings }
+	case "input":
+		return func() any { return s.Input }
+	case "output":
+		return func() any { return s.Output }
+	case "metadata":
+		return func() any { return s.Metadata }
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func newWorkflowEdgeScanner() *WorkflowEdgeScanner {
+	return &WorkflowEdgeScanner{}
+}
+func (s *WorkflowEdgeScanner) values() []any {
+	return []any{
+		s.FromId,
+		s.ToId,
+		s.WorkflowId,
+	}
+}
+func (s *WorkflowEdgeScanner) getTarget(field string) func() any {
+	switch field {
+	case "from_id":
+		return func() any { return &s.FromId }
+	case "to_id":
+		return func() any { return &s.ToId }
+	case "workflow_id":
+		return func() any { return &s.WorkflowId }
+	default:
+		panic("unknown field: " + field)
+	}
+}
+func (s *WorkflowEdgeScanner) getSetter(field WorkflowEdgeField) func() ValueSetter[WorkflowEdgeField] {
+	switch field.String() {
+	case "from_id":
+		return func() ValueSetter[WorkflowEdgeField] {
+			return NewValueSetter[WorkflowEdgeField](WorkflowEdge.FromId, s.FromId)
+		}
+	case "to_id":
+		return func() ValueSetter[WorkflowEdgeField] {
+			return NewValueSetter[WorkflowEdgeField](WorkflowEdge.ToId, s.ToId)
+		}
+	case "workflow_id":
+		return func() ValueSetter[WorkflowEdgeField] {
+			return NewValueSetter[WorkflowEdgeField](WorkflowEdge.WorkflowId, s.WorkflowId)
+		}
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func (s *WorkflowEdgeScanner) getValue(field WorkflowEdgeField) func() any {
+	switch field.String() {
+	case "from_id":
+		return func() any { return s.FromId }
+	case "to_id":
+		return func() any { return s.ToId }
+	case "workflow_id":
+		return func() any { return s.WorkflowId }
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
 
 type (
 	userTableImpl struct {
@@ -1297,146 +1292,127 @@ type (
 			ScalarOperator[string, UserField]
 			LikeOperator[string, UserField]
 		}
-		RefreshTokens interface {
-			UserField
-			CommonOperator[[]string, UserField]
-			ScalarOperator[[]string, UserField]
-			LikeOperator[[]string, UserField]
-			IsNullOperator[[]string, UserField]
+	}
+	refreshTokensTableImpl struct {
+		*table[RefreshTokensField, *RefreshTokensScanner]
+		UserId interface {
+			RefreshTokensField
+			CommonOperator[string, RefreshTokensField]
+			ScalarOperator[string, RefreshTokensField]
+			LikeOperator[string, RefreshTokensField]
+		}
+		Token interface {
+			RefreshTokensField
+			CommonOperator[string, RefreshTokensField]
+			ScalarOperator[string, RefreshTokensField]
+			LikeOperator[string, RefreshTokensField]
 		}
 	}
-	machineTemplateTableImpl struct {
-		*table[MachineTemplateField, *MachineTemplateScanner]
+	kvinfoTableImpl struct {
+		*table[KvinfoField, *KvinfoScanner]
 		Id interface {
-			MachineTemplateField
-			CommonOperator[string, MachineTemplateField]
-			ScalarOperator[string, MachineTemplateField]
-			LikeOperator[string, MachineTemplateField]
+			KvinfoField
+			CommonOperator[string, KvinfoField]
+			ScalarOperator[string, KvinfoField]
+			LikeOperator[string, KvinfoField]
 		}
 		CreatedAt interface {
-			MachineTemplateField
-			CommonOperator[time.Time, MachineTemplateField]
-			ScalarOperator[time.Time, MachineTemplateField]
+			KvinfoField
+			CommonOperator[time.Time, KvinfoField]
+			ScalarOperator[time.Time, KvinfoField]
 		}
 		UpdatedAt interface {
-			MachineTemplateField
-			CommonOperator[time.Time, MachineTemplateField]
-			ScalarOperator[time.Time, MachineTemplateField]
+			KvinfoField
+			CommonOperator[time.Time, KvinfoField]
+			ScalarOperator[time.Time, KvinfoField]
 		}
 		DeletedAt interface {
-			MachineTemplateField
-			CommonOperator[*time.Time, MachineTemplateField]
-			ScalarOperator[*time.Time, MachineTemplateField]
-			IsNullOperator[*time.Time, MachineTemplateField]
+			KvinfoField
+			CommonOperator[*time.Time, KvinfoField]
+			ScalarOperator[*time.Time, KvinfoField]
+			IsNullOperator[*time.Time, KvinfoField]
 		}
-		Tags interface {
-			MachineTemplateField
-			CommonOperator[[]byte, MachineTemplateField]
+		Key interface {
+			KvinfoField
+			CommonOperator[string, KvinfoField]
+			ScalarOperator[string, KvinfoField]
+			LikeOperator[string, KvinfoField]
 		}
-		Cores interface {
-			MachineTemplateField
-			CommonOperator[int32, MachineTemplateField]
-			ScalarOperator[int32, MachineTemplateField]
+		Description interface {
+			KvinfoField
+			CommonOperator[string, KvinfoField]
+			ScalarOperator[string, KvinfoField]
+			LikeOperator[string, KvinfoField]
 		}
-		Memory interface {
-			MachineTemplateField
-			CommonOperator[int32, MachineTemplateField]
-			ScalarOperator[int32, MachineTemplateField]
+		DefaultValue interface {
+			KvinfoField
+			CommonOperator[*string, KvinfoField]
+			ScalarOperator[*string, KvinfoField]
+			LikeOperator[*string, KvinfoField]
+			IsNullOperator[*string, KvinfoField]
 		}
-		Disk interface {
-			MachineTemplateField
-			CommonOperator[int32, MachineTemplateField]
-			ScalarOperator[int32, MachineTemplateField]
+		IsRequired interface {
+			KvinfoField
+			CommonOperator[bool, KvinfoField]
+			ScalarOperator[bool, KvinfoField]
+		}
+		Immutable interface {
+			KvinfoField
+			CommonOperator[bool, KvinfoField]
+			ScalarOperator[bool, KvinfoField]
+		}
+		SystemGenerated interface {
+			KvinfoField
+			CommonOperator[bool, KvinfoField]
+			ScalarOperator[bool, KvinfoField]
 		}
 	}
-	stroppyDeploymentTemplateTableImpl struct {
-		*table[StroppyDeploymentTemplateField, *StroppyDeploymentTemplateScanner]
+	templateTableImpl struct {
+		*table[TemplateField, *TemplateScanner]
 		Id interface {
-			StroppyDeploymentTemplateField
-			CommonOperator[string, StroppyDeploymentTemplateField]
-			ScalarOperator[string, StroppyDeploymentTemplateField]
-			LikeOperator[string, StroppyDeploymentTemplateField]
+			TemplateField
+			CommonOperator[string, TemplateField]
+			ScalarOperator[string, TemplateField]
+			LikeOperator[string, TemplateField]
 		}
 		CreatedAt interface {
-			StroppyDeploymentTemplateField
-			CommonOperator[time.Time, StroppyDeploymentTemplateField]
-			ScalarOperator[time.Time, StroppyDeploymentTemplateField]
+			TemplateField
+			CommonOperator[time.Time, TemplateField]
+			ScalarOperator[time.Time, TemplateField]
 		}
 		UpdatedAt interface {
-			StroppyDeploymentTemplateField
-			CommonOperator[time.Time, StroppyDeploymentTemplateField]
-			ScalarOperator[time.Time, StroppyDeploymentTemplateField]
+			TemplateField
+			CommonOperator[time.Time, TemplateField]
+			ScalarOperator[time.Time, TemplateField]
 		}
 		DeletedAt interface {
-			StroppyDeploymentTemplateField
-			CommonOperator[*time.Time, StroppyDeploymentTemplateField]
-			ScalarOperator[*time.Time, StroppyDeploymentTemplateField]
-			IsNullOperator[*time.Time, StroppyDeploymentTemplateField]
+			TemplateField
+			CommonOperator[*time.Time, TemplateField]
+			ScalarOperator[*time.Time, TemplateField]
+			IsNullOperator[*time.Time, TemplateField]
 		}
 		Name interface {
-			StroppyDeploymentTemplateField
-			CommonOperator[string, StroppyDeploymentTemplateField]
-			ScalarOperator[string, StroppyDeploymentTemplateField]
-			LikeOperator[string, StroppyDeploymentTemplateField]
+			TemplateField
+			CommonOperator[string, TemplateField]
+			ScalarOperator[string, TemplateField]
+			LikeOperator[string, TemplateField]
+		}
+		AuthorId interface {
+			TemplateField
+			CommonOperator[string, TemplateField]
+			ScalarOperator[string, TemplateField]
+			LikeOperator[string, TemplateField]
+		}
+		IsDefault interface {
+			TemplateField
+			CommonOperator[bool, TemplateField]
+			ScalarOperator[bool, TemplateField]
 		}
 		Tags interface {
-			StroppyDeploymentTemplateField
-			CommonOperator[[]byte, StroppyDeploymentTemplateField]
-		}
-		ScriptBody interface {
-			StroppyDeploymentTemplateField
-			CommonOperator[[]byte, StroppyDeploymentTemplateField]
-		}
-		StroppyVersion interface {
-			StroppyDeploymentTemplateField
-			CommonOperator[string, StroppyDeploymentTemplateField]
-			ScalarOperator[string, StroppyDeploymentTemplateField]
-			LikeOperator[string, StroppyDeploymentTemplateField]
-		}
-		EnvData interface {
-			StroppyDeploymentTemplateField
-			CommonOperator[[]byte, StroppyDeploymentTemplateField]
-		}
-	}
-	databaseDeploymentTemplateTableImpl struct {
-		*table[DatabaseDeploymentTemplateField, *DatabaseDeploymentTemplateScanner]
-		Id interface {
-			DatabaseDeploymentTemplateField
-			CommonOperator[string, DatabaseDeploymentTemplateField]
-			ScalarOperator[string, DatabaseDeploymentTemplateField]
-			LikeOperator[string, DatabaseDeploymentTemplateField]
-		}
-		CreatedAt interface {
-			DatabaseDeploymentTemplateField
-			CommonOperator[time.Time, DatabaseDeploymentTemplateField]
-			ScalarOperator[time.Time, DatabaseDeploymentTemplateField]
-		}
-		UpdatedAt interface {
-			DatabaseDeploymentTemplateField
-			CommonOperator[time.Time, DatabaseDeploymentTemplateField]
-			ScalarOperator[time.Time, DatabaseDeploymentTemplateField]
-		}
-		DeletedAt interface {
-			DatabaseDeploymentTemplateField
-			CommonOperator[*time.Time, DatabaseDeploymentTemplateField]
-			ScalarOperator[*time.Time, DatabaseDeploymentTemplateField]
-			IsNullOperator[*time.Time, DatabaseDeploymentTemplateField]
-		}
-		Name interface {
-			DatabaseDeploymentTemplateField
-			CommonOperator[string, DatabaseDeploymentTemplateField]
-			ScalarOperator[string, DatabaseDeploymentTemplateField]
-			LikeOperator[string, DatabaseDeploymentTemplateField]
-		}
-		Tags interface {
-			DatabaseDeploymentTemplateField
-			CommonOperator[[]byte, DatabaseDeploymentTemplateField]
-		}
-		PrebuiltImageId interface {
-			DatabaseDeploymentTemplateField
-			CommonOperator[string, DatabaseDeploymentTemplateField]
-			ScalarOperator[string, DatabaseDeploymentTemplateField]
-			LikeOperator[string, DatabaseDeploymentTemplateField]
+			TemplateField
+			CommonOperator[[]string, TemplateField]
+			ScalarOperator[[]string, TemplateField]
+			LikeOperator[[]string, TemplateField]
 		}
 	}
 	runRecordTableImpl struct {
@@ -1495,12 +1471,7 @@ type (
 			LikeOperator[*string, RunRecordField]
 			IsNullOperator[*string, RunRecordField]
 		}
-		DatabaseInstanceTemplate interface {
-			RunRecordField
-			CommonOperator[pgtype.JSONB, RunRecordField]
-			IsNullOperator[pgtype.JSONB, RunRecordField]
-		}
-		StroppyDeploymentInfo interface {
+		CloudRunParams interface {
 			RunRecordField
 			CommonOperator[pgtype.JSONB, RunRecordField]
 			IsNullOperator[pgtype.JSONB, RunRecordField]
@@ -1546,73 +1517,6 @@ type (
 			CommonOperator[[]byte, RunRecordStepField]
 		}
 	}
-	workflowTaskNodeTableImpl struct {
-		*table[WorkflowTaskNodeField, *WorkflowTaskNodeScanner]
-		Id interface {
-			WorkflowTaskNodeField
-			CommonOperator[string, WorkflowTaskNodeField]
-			ScalarOperator[string, WorkflowTaskNodeField]
-			LikeOperator[string, WorkflowTaskNodeField]
-		}
-		CreatedAt interface {
-			WorkflowTaskNodeField
-			CommonOperator[time.Time, WorkflowTaskNodeField]
-			ScalarOperator[time.Time, WorkflowTaskNodeField]
-		}
-		UpdatedAt interface {
-			WorkflowTaskNodeField
-			CommonOperator[time.Time, WorkflowTaskNodeField]
-			ScalarOperator[time.Time, WorkflowTaskNodeField]
-		}
-		DeletedAt interface {
-			WorkflowTaskNodeField
-			CommonOperator[*time.Time, WorkflowTaskNodeField]
-			ScalarOperator[*time.Time, WorkflowTaskNodeField]
-			IsNullOperator[*time.Time, WorkflowTaskNodeField]
-		}
-		Attempt interface {
-			WorkflowTaskNodeField
-			CommonOperator[int32, WorkflowTaskNodeField]
-			ScalarOperator[int32, WorkflowTaskNodeField]
-		}
-		Metadata interface {
-			WorkflowTaskNodeField
-			CommonOperator[[]byte, WorkflowTaskNodeField]
-		}
-		WorkflowId interface {
-			WorkflowTaskNodeField
-			CommonOperator[string, WorkflowTaskNodeField]
-			ScalarOperator[string, WorkflowTaskNodeField]
-			LikeOperator[string, WorkflowTaskNodeField]
-		}
-	}
-	workflowEdgeTableImpl struct {
-		*table[WorkflowEdgeField, *WorkflowEdgeScanner]
-		Id interface {
-			WorkflowEdgeField
-			CommonOperator[string, WorkflowEdgeField]
-			ScalarOperator[string, WorkflowEdgeField]
-			LikeOperator[string, WorkflowEdgeField]
-		}
-		From interface {
-			WorkflowEdgeField
-			CommonOperator[string, WorkflowEdgeField]
-			ScalarOperator[string, WorkflowEdgeField]
-			LikeOperator[string, WorkflowEdgeField]
-		}
-		To interface {
-			WorkflowEdgeField
-			CommonOperator[string, WorkflowEdgeField]
-			ScalarOperator[string, WorkflowEdgeField]
-			LikeOperator[string, WorkflowEdgeField]
-		}
-		WorkflowId interface {
-			WorkflowEdgeField
-			CommonOperator[string, WorkflowEdgeField]
-			ScalarOperator[string, WorkflowEdgeField]
-			LikeOperator[string, WorkflowEdgeField]
-		}
-	}
 	workflowTableImpl struct {
 		*table[WorkflowField, *WorkflowScanner]
 		Id interface {
@@ -1638,6 +1542,103 @@ type (
 			IsNullOperator[*time.Time, WorkflowField]
 		}
 	}
+	workflowTaskTableImpl struct {
+		*table[WorkflowTaskField, *WorkflowTaskScanner]
+		Id interface {
+			WorkflowTaskField
+			CommonOperator[string, WorkflowTaskField]
+			ScalarOperator[string, WorkflowTaskField]
+			LikeOperator[string, WorkflowTaskField]
+		}
+		CreatedAt interface {
+			WorkflowTaskField
+			CommonOperator[time.Time, WorkflowTaskField]
+			ScalarOperator[time.Time, WorkflowTaskField]
+		}
+		UpdatedAt interface {
+			WorkflowTaskField
+			CommonOperator[time.Time, WorkflowTaskField]
+			ScalarOperator[time.Time, WorkflowTaskField]
+		}
+		DeletedAt interface {
+			WorkflowTaskField
+			CommonOperator[*time.Time, WorkflowTaskField]
+			ScalarOperator[*time.Time, WorkflowTaskField]
+			IsNullOperator[*time.Time, WorkflowTaskField]
+		}
+		TaskType interface {
+			WorkflowTaskField
+			CommonOperator[int32, WorkflowTaskField]
+			ScalarOperator[int32, WorkflowTaskField]
+		}
+		Status interface {
+			WorkflowTaskField
+			CommonOperator[int32, WorkflowTaskField]
+			ScalarOperator[int32, WorkflowTaskField]
+		}
+		WorkflowId interface {
+			WorkflowTaskField
+			CommonOperator[string, WorkflowTaskField]
+			ScalarOperator[string, WorkflowTaskField]
+			LikeOperator[string, WorkflowTaskField]
+		}
+		CleanedUp interface {
+			WorkflowTaskField
+			CommonOperator[bool, WorkflowTaskField]
+			ScalarOperator[bool, WorkflowTaskField]
+		}
+		OnWorker interface {
+			WorkflowTaskField
+			CommonOperator[string, WorkflowTaskField]
+			ScalarOperator[string, WorkflowTaskField]
+			LikeOperator[string, WorkflowTaskField]
+		}
+		RetryState interface {
+			WorkflowTaskField
+			CommonOperator[[]byte, WorkflowTaskField]
+		}
+		Logs interface {
+			WorkflowTaskField
+			CommonOperator[[][]byte, WorkflowTaskField]
+		}
+		RetrySettings interface {
+			WorkflowTaskField
+			CommonOperator[[]byte, WorkflowTaskField]
+		}
+		Input interface {
+			WorkflowTaskField
+			CommonOperator[[]byte, WorkflowTaskField]
+		}
+		Output interface {
+			WorkflowTaskField
+			CommonOperator[[]byte, WorkflowTaskField]
+		}
+		Metadata interface {
+			WorkflowTaskField
+			CommonOperator[[]byte, WorkflowTaskField]
+		}
+	}
+	workflowEdgeTableImpl struct {
+		*table[WorkflowEdgeField, *WorkflowEdgeScanner]
+		FromId interface {
+			WorkflowEdgeField
+			CommonOperator[string, WorkflowEdgeField]
+			ScalarOperator[string, WorkflowEdgeField]
+			LikeOperator[string, WorkflowEdgeField]
+		}
+		ToId interface {
+			WorkflowEdgeField
+			CommonOperator[string, WorkflowEdgeField]
+			ScalarOperator[string, WorkflowEdgeField]
+			LikeOperator[string, WorkflowEdgeField]
+		}
+		WorkflowId interface {
+			WorkflowEdgeField
+			CommonOperator[string, WorkflowEdgeField]
+			ScalarOperator[string, WorkflowEdgeField]
+			LikeOperator[string, WorkflowEdgeField]
+		}
+	}
 )
 
 func newUserTableImpl() *userTableImpl {
@@ -1648,7 +1649,6 @@ func newUserTableImpl() *userTableImpl {
 	email := &useremailFieldImpl{column: newColumn[string, UserField](fieldAliasImpl("email"))}
 	admin := &useradminFieldImpl{column: newColumn[bool, UserField](fieldAliasImpl("admin"))}
 	passwordHash := &userpasswordHashFieldImpl{column: newColumn[string, UserField](fieldAliasImpl("password_hash"))}
-	refreshTokens := &userrefreshTokensFieldImpl{column: newColumn[[]string, UserField](fieldAliasImpl("refresh_tokens"))}
 	return &userTableImpl{
 		table: newTable[UserField, *UserScanner](
 			"users",
@@ -1660,112 +1660,98 @@ func newUserTableImpl() *userTableImpl {
 			email,
 			admin,
 			passwordHash,
-			refreshTokens,
 		),
-		Id:            id,
-		CreatedAt:     createdAt,
-		UpdatedAt:     updatedAt,
-		DeletedAt:     deletedAt,
-		Email:         email,
-		Admin:         admin,
-		PasswordHash:  passwordHash,
-		RefreshTokens: refreshTokens,
+		Id:           id,
+		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
+		DeletedAt:    deletedAt,
+		Email:        email,
+		Admin:        admin,
+		PasswordHash: passwordHash,
 	}
 }
-func newMachineTemplateTableImpl() *machineTemplateTableImpl {
-	id := &machineTemplateidFieldImpl{column: newColumn[string, MachineTemplateField](fieldAliasImpl("id"))}
-	createdAt := &machineTemplatecreatedAtFieldImpl{column: newColumn[time.Time, MachineTemplateField](fieldAliasImpl("created_at"))}
-	updatedAt := &machineTemplateupdatedAtFieldImpl{column: newColumn[time.Time, MachineTemplateField](fieldAliasImpl("updated_at"))}
-	deletedAt := &machineTemplatedeletedAtFieldImpl{column: newColumn[*time.Time, MachineTemplateField](fieldAliasImpl("deleted_at"))}
-	tags := &machineTemplatetagsFieldImpl{column: newColumn[[]byte, MachineTemplateField](fieldAliasImpl("tags"))}
-	cores := &machineTemplatecoresFieldImpl{column: newColumn[int32, MachineTemplateField](fieldAliasImpl("cores"))}
-	memory := &machineTemplatememoryFieldImpl{column: newColumn[int32, MachineTemplateField](fieldAliasImpl("memory"))}
-	disk := &machineTemplatediskFieldImpl{column: newColumn[int32, MachineTemplateField](fieldAliasImpl("disk"))}
-	return &machineTemplateTableImpl{
-		table: newTable[MachineTemplateField, *MachineTemplateScanner](
-			"machine_templates",
-			newMachineTemplateScanner,
+func newRefreshTokensTableImpl() *refreshTokensTableImpl {
+	userId := &refreshTokensuserIdFieldImpl{column: newColumn[string, RefreshTokensField](fieldAliasImpl("user_id"))}
+	token := &refreshTokenstokenFieldImpl{column: newColumn[string, RefreshTokensField](fieldAliasImpl("token"))}
+	return &refreshTokensTableImpl{
+		table: newTable[RefreshTokensField, *RefreshTokensScanner](
+			"refresh_tokens",
+			newRefreshTokensScanner,
+			userId,
+			token,
+		),
+		UserId: userId,
+		Token:  token,
+	}
+}
+func newKvinfoTableImpl() *kvinfoTableImpl {
+	id := &kvinfoidFieldImpl{column: newColumn[string, KvinfoField](fieldAliasImpl("id"))}
+	createdAt := &kvinfocreatedAtFieldImpl{column: newColumn[time.Time, KvinfoField](fieldAliasImpl("created_at"))}
+	updatedAt := &kvinfoupdatedAtFieldImpl{column: newColumn[time.Time, KvinfoField](fieldAliasImpl("updated_at"))}
+	deletedAt := &kvinfodeletedAtFieldImpl{column: newColumn[*time.Time, KvinfoField](fieldAliasImpl("deleted_at"))}
+	key := &kvinfokeyFieldImpl{column: newColumn[string, KvinfoField](fieldAliasImpl("key"))}
+	description := &kvinfodescriptionFieldImpl{column: newColumn[string, KvinfoField](fieldAliasImpl("description"))}
+	defaultValue := &kvinfodefaultValueFieldImpl{column: newColumn[*string, KvinfoField](fieldAliasImpl("default_value"))}
+	isRequired := &kvinfoisRequiredFieldImpl{column: newColumn[bool, KvinfoField](fieldAliasImpl("is_required"))}
+	immutable := &kvinfoimmutableFieldImpl{column: newColumn[bool, KvinfoField](fieldAliasImpl("immutable"))}
+	systemGenerated := &kvinfosystemGeneratedFieldImpl{column: newColumn[bool, KvinfoField](fieldAliasImpl("system_generated"))}
+	return &kvinfoTableImpl{
+		table: newTable[KvinfoField, *KvinfoScanner](
+			"system_kv_info",
+			newKvinfoScanner,
 			id,
 			createdAt,
 			updatedAt,
 			deletedAt,
-			tags,
-			cores,
-			memory,
-			disk,
-		),
-		Id:        id,
-		CreatedAt: createdAt,
-		UpdatedAt: updatedAt,
-		DeletedAt: deletedAt,
-		Tags:      tags,
-		Cores:     cores,
-		Memory:    memory,
-		Disk:      disk,
-	}
-}
-func newStroppyDeploymentTemplateTableImpl() *stroppyDeploymentTemplateTableImpl {
-	id := &stroppyDeploymentTemplateidFieldImpl{column: newColumn[string, StroppyDeploymentTemplateField](fieldAliasImpl("id"))}
-	createdAt := &stroppyDeploymentTemplatecreatedAtFieldImpl{column: newColumn[time.Time, StroppyDeploymentTemplateField](fieldAliasImpl("created_at"))}
-	updatedAt := &stroppyDeploymentTemplateupdatedAtFieldImpl{column: newColumn[time.Time, StroppyDeploymentTemplateField](fieldAliasImpl("updated_at"))}
-	deletedAt := &stroppyDeploymentTemplatedeletedAtFieldImpl{column: newColumn[*time.Time, StroppyDeploymentTemplateField](fieldAliasImpl("deleted_at"))}
-	name := &stroppyDeploymentTemplatenameFieldImpl{column: newColumn[string, StroppyDeploymentTemplateField](fieldAliasImpl("name"))}
-	tags := &stroppyDeploymentTemplatetagsFieldImpl{column: newColumn[[]byte, StroppyDeploymentTemplateField](fieldAliasImpl("tags"))}
-	scriptBody := &stroppyDeploymentTemplatescriptBodyFieldImpl{column: newColumn[[]byte, StroppyDeploymentTemplateField](fieldAliasImpl("script_body"))}
-	stroppyVersion := &stroppyDeploymentTemplatestroppyVersionFieldImpl{column: newColumn[string, StroppyDeploymentTemplateField](fieldAliasImpl("stroppy_version"))}
-	envData := &stroppyDeploymentTemplateenvDataFieldImpl{column: newColumn[[]byte, StroppyDeploymentTemplateField](fieldAliasImpl("env_data"))}
-	return &stroppyDeploymentTemplateTableImpl{
-		table: newTable[StroppyDeploymentTemplateField, *StroppyDeploymentTemplateScanner](
-			"stroppy_deployment_templates",
-			newStroppyDeploymentTemplateScanner,
-			id,
-			createdAt,
-			updatedAt,
-			deletedAt,
-			name,
-			tags,
-			scriptBody,
-			stroppyVersion,
-			envData,
-		),
-		Id:             id,
-		CreatedAt:      createdAt,
-		UpdatedAt:      updatedAt,
-		DeletedAt:      deletedAt,
-		Name:           name,
-		Tags:           tags,
-		ScriptBody:     scriptBody,
-		StroppyVersion: stroppyVersion,
-		EnvData:        envData,
-	}
-}
-func newDatabaseDeploymentTemplateTableImpl() *databaseDeploymentTemplateTableImpl {
-	id := &databaseDeploymentTemplateidFieldImpl{column: newColumn[string, DatabaseDeploymentTemplateField](fieldAliasImpl("id"))}
-	createdAt := &databaseDeploymentTemplatecreatedAtFieldImpl{column: newColumn[time.Time, DatabaseDeploymentTemplateField](fieldAliasImpl("created_at"))}
-	updatedAt := &databaseDeploymentTemplateupdatedAtFieldImpl{column: newColumn[time.Time, DatabaseDeploymentTemplateField](fieldAliasImpl("updated_at"))}
-	deletedAt := &databaseDeploymentTemplatedeletedAtFieldImpl{column: newColumn[*time.Time, DatabaseDeploymentTemplateField](fieldAliasImpl("deleted_at"))}
-	name := &databaseDeploymentTemplatenameFieldImpl{column: newColumn[string, DatabaseDeploymentTemplateField](fieldAliasImpl("name"))}
-	tags := &databaseDeploymentTemplatetagsFieldImpl{column: newColumn[[]byte, DatabaseDeploymentTemplateField](fieldAliasImpl("tags"))}
-	prebuiltImageId := &databaseDeploymentTemplateprebuiltImageIdFieldImpl{column: newColumn[string, DatabaseDeploymentTemplateField](fieldAliasImpl("prebuilt_image_id"))}
-	return &databaseDeploymentTemplateTableImpl{
-		table: newTable[DatabaseDeploymentTemplateField, *DatabaseDeploymentTemplateScanner](
-			"database_deployment_templates",
-			newDatabaseDeploymentTemplateScanner,
-			id,
-			createdAt,
-			updatedAt,
-			deletedAt,
-			name,
-			tags,
-			prebuiltImageId,
+			key,
+			description,
+			defaultValue,
+			isRequired,
+			immutable,
+			systemGenerated,
 		),
 		Id:              id,
 		CreatedAt:       createdAt,
 		UpdatedAt:       updatedAt,
 		DeletedAt:       deletedAt,
-		Name:            name,
-		Tags:            tags,
-		PrebuiltImageId: prebuiltImageId,
+		Key:             key,
+		Description:     description,
+		DefaultValue:    defaultValue,
+		IsRequired:      isRequired,
+		Immutable:       immutable,
+		SystemGenerated: systemGenerated,
+	}
+}
+func newTemplateTableImpl() *templateTableImpl {
+	id := &templateidFieldImpl{column: newColumn[string, TemplateField](fieldAliasImpl("id"))}
+	createdAt := &templatecreatedAtFieldImpl{column: newColumn[time.Time, TemplateField](fieldAliasImpl("created_at"))}
+	updatedAt := &templateupdatedAtFieldImpl{column: newColumn[time.Time, TemplateField](fieldAliasImpl("updated_at"))}
+	deletedAt := &templatedeletedAtFieldImpl{column: newColumn[*time.Time, TemplateField](fieldAliasImpl("deleted_at"))}
+	name := &templatenameFieldImpl{column: newColumn[string, TemplateField](fieldAliasImpl("name"))}
+	authorId := &templateauthorIdFieldImpl{column: newColumn[string, TemplateField](fieldAliasImpl("author_id"))}
+	isDefault := &templateisDefaultFieldImpl{column: newColumn[bool, TemplateField](fieldAliasImpl("is_default"))}
+	tags := &templatetagsFieldImpl{column: newColumn[[]string, TemplateField](fieldAliasImpl("tags"))}
+	return &templateTableImpl{
+		table: newTable[TemplateField, *TemplateScanner](
+			"templates",
+			newTemplateScanner,
+			id,
+			createdAt,
+			updatedAt,
+			deletedAt,
+			name,
+			authorId,
+			isDefault,
+			tags,
+		),
+		Id:        id,
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
+		DeletedAt: deletedAt,
+		Name:      name,
+		AuthorId:  authorId,
+		IsDefault: isDefault,
+		Tags:      tags,
 	}
 }
 func newRunRecordTableImpl() *runRecordTableImpl {
@@ -1779,8 +1765,7 @@ func newRunRecordTableImpl() *runRecordTableImpl {
 	tps := &runRecordtpsFieldImpl{column: newColumn[[]byte, RunRecordField](fieldAliasImpl("tps"))}
 	grafanaDashboardUrl := &runRecordgrafanaDashboardUrlFieldImpl{column: newColumn[string, RunRecordField](fieldAliasImpl("grafana_dashboard_url"))}
 	workflowId := &runRecordworkflowIdFieldImpl{column: newColumn[*string, RunRecordField](fieldAliasImpl("workflow_id"))}
-	databaseInstanceTemplate := &runRecorddatabaseInstanceTemplateFieldImpl{column: newColumn[pgtype.JSONB, RunRecordField](fieldAliasImpl("database_instance_template"))}
-	stroppyDeploymentInfo := &runRecordstroppyDeploymentInfoFieldImpl{column: newColumn[pgtype.JSONB, RunRecordField](fieldAliasImpl("stroppy_deployment_info"))}
+	cloudRunParams := &runRecordcloudRunParamsFieldImpl{column: newColumn[pgtype.JSONB, RunRecordField](fieldAliasImpl("cloud_run_params"))}
 	return &runRecordTableImpl{
 		table: newTable[RunRecordField, *RunRecordScanner](
 			"run_records",
@@ -1795,21 +1780,19 @@ func newRunRecordTableImpl() *runRecordTableImpl {
 			tps,
 			grafanaDashboardUrl,
 			workflowId,
-			databaseInstanceTemplate,
-			stroppyDeploymentInfo,
+			cloudRunParams,
 		),
-		Id:                       id,
-		AuthorId:                 authorId,
-		CreatedAt:                createdAt,
-		UpdatedAt:                updatedAt,
-		DeletedAt:                deletedAt,
-		Status:                   status,
-		RunInfo:                  runInfo,
-		Tps:                      tps,
-		GrafanaDashboardUrl:      grafanaDashboardUrl,
-		WorkflowId:               workflowId,
-		DatabaseInstanceTemplate: databaseInstanceTemplate,
-		StroppyDeploymentInfo:    stroppyDeploymentInfo,
+		Id:                  id,
+		AuthorId:            authorId,
+		CreatedAt:           createdAt,
+		UpdatedAt:           updatedAt,
+		DeletedAt:           deletedAt,
+		Status:              status,
+		RunInfo:             runInfo,
+		Tps:                 tps,
+		GrafanaDashboardUrl: grafanaDashboardUrl,
+		WorkflowId:          workflowId,
+		CloudRunParams:      cloudRunParams,
 	}
 }
 func newRunRecordStepTableImpl() *runRecordStepTableImpl {
@@ -1841,55 +1824,6 @@ func newRunRecordStepTableImpl() *runRecordStepTableImpl {
 		StepInfo:  stepInfo,
 	}
 }
-func newWorkflowTaskNodeTableImpl() *workflowTaskNodeTableImpl {
-	id := &workflowTaskNodeidFieldImpl{column: newColumn[string, WorkflowTaskNodeField](fieldAliasImpl("id"))}
-	createdAt := &workflowTaskNodecreatedAtFieldImpl{column: newColumn[time.Time, WorkflowTaskNodeField](fieldAliasImpl("created_at"))}
-	updatedAt := &workflowTaskNodeupdatedAtFieldImpl{column: newColumn[time.Time, WorkflowTaskNodeField](fieldAliasImpl("updated_at"))}
-	deletedAt := &workflowTaskNodedeletedAtFieldImpl{column: newColumn[*time.Time, WorkflowTaskNodeField](fieldAliasImpl("deleted_at"))}
-	attempt := &workflowTaskNodeattemptFieldImpl{column: newColumn[int32, WorkflowTaskNodeField](fieldAliasImpl("attempt"))}
-	metadata := &workflowTaskNodemetadataFieldImpl{column: newColumn[[]byte, WorkflowTaskNodeField](fieldAliasImpl("metadata"))}
-	workflowId := &workflowTaskNodeworkflowIdFieldImpl{column: newColumn[string, WorkflowTaskNodeField](fieldAliasImpl("workflow_id"))}
-	return &workflowTaskNodeTableImpl{
-		table: newTable[WorkflowTaskNodeField, *WorkflowTaskNodeScanner](
-			"workflow_nodes",
-			newWorkflowTaskNodeScanner,
-			id,
-			createdAt,
-			updatedAt,
-			deletedAt,
-			attempt,
-			metadata,
-			workflowId,
-		),
-		Id:         id,
-		CreatedAt:  createdAt,
-		UpdatedAt:  updatedAt,
-		DeletedAt:  deletedAt,
-		Attempt:    attempt,
-		Metadata:   metadata,
-		WorkflowId: workflowId,
-	}
-}
-func newWorkflowEdgeTableImpl() *workflowEdgeTableImpl {
-	id := &workflowEdgeidFieldImpl{column: newColumn[string, WorkflowEdgeField](fieldAliasImpl("id"))}
-	from := &workflowEdgefromFieldImpl{column: newColumn[string, WorkflowEdgeField](fieldAliasImpl("from"))}
-	to := &workflowEdgetoFieldImpl{column: newColumn[string, WorkflowEdgeField](fieldAliasImpl("to"))}
-	workflowId := &workflowEdgeworkflowIdFieldImpl{column: newColumn[string, WorkflowEdgeField](fieldAliasImpl("workflow_id"))}
-	return &workflowEdgeTableImpl{
-		table: newTable[WorkflowEdgeField, *WorkflowEdgeScanner](
-			"workflow_edges",
-			newWorkflowEdgeScanner,
-			id,
-			from,
-			to,
-			workflowId,
-		),
-		Id:         id,
-		From:       from,
-		To:         to,
-		WorkflowId: workflowId,
-	}
-}
 func newWorkflowTableImpl() *workflowTableImpl {
 	id := &workflowidFieldImpl{column: newColumn[string, WorkflowField](fieldAliasImpl("id"))}
 	createdAt := &workflowcreatedAtFieldImpl{column: newColumn[time.Time, WorkflowField](fieldAliasImpl("created_at"))}
@@ -1910,31 +1844,100 @@ func newWorkflowTableImpl() *workflowTableImpl {
 		DeletedAt: deletedAt,
 	}
 }
+func newWorkflowTaskTableImpl() *workflowTaskTableImpl {
+	id := &workflowTaskidFieldImpl{column: newColumn[string, WorkflowTaskField](fieldAliasImpl("id"))}
+	createdAt := &workflowTaskcreatedAtFieldImpl{column: newColumn[time.Time, WorkflowTaskField](fieldAliasImpl("created_at"))}
+	updatedAt := &workflowTaskupdatedAtFieldImpl{column: newColumn[time.Time, WorkflowTaskField](fieldAliasImpl("updated_at"))}
+	deletedAt := &workflowTaskdeletedAtFieldImpl{column: newColumn[*time.Time, WorkflowTaskField](fieldAliasImpl("deleted_at"))}
+	taskType := &workflowTasktaskTypeFieldImpl{column: newColumn[int32, WorkflowTaskField](fieldAliasImpl("task_type"))}
+	status := &workflowTaskstatusFieldImpl{column: newColumn[int32, WorkflowTaskField](fieldAliasImpl("status"))}
+	workflowId := &workflowTaskworkflowIdFieldImpl{column: newColumn[string, WorkflowTaskField](fieldAliasImpl("workflow_id"))}
+	cleanedUp := &workflowTaskcleanedUpFieldImpl{column: newColumn[bool, WorkflowTaskField](fieldAliasImpl("cleaned_up"))}
+	onWorker := &workflowTaskonWorkerFieldImpl{column: newColumn[string, WorkflowTaskField](fieldAliasImpl("on_worker"))}
+	retryState := &workflowTaskretryStateFieldImpl{column: newColumn[[]byte, WorkflowTaskField](fieldAliasImpl("retry_state"))}
+	logs := &workflowTasklogsFieldImpl{column: newColumn[[][]byte, WorkflowTaskField](fieldAliasImpl("logs"))}
+	retrySettings := &workflowTaskretrySettingsFieldImpl{column: newColumn[[]byte, WorkflowTaskField](fieldAliasImpl("retry_settings"))}
+	input := &workflowTaskinputFieldImpl{column: newColumn[[]byte, WorkflowTaskField](fieldAliasImpl("input"))}
+	output := &workflowTaskoutputFieldImpl{column: newColumn[[]byte, WorkflowTaskField](fieldAliasImpl("output"))}
+	metadata := &workflowTaskmetadataFieldImpl{column: newColumn[[]byte, WorkflowTaskField](fieldAliasImpl("metadata"))}
+	return &workflowTaskTableImpl{
+		table: newTable[WorkflowTaskField, *WorkflowTaskScanner](
+			"workflow_tasks",
+			newWorkflowTaskScanner,
+			id,
+			createdAt,
+			updatedAt,
+			deletedAt,
+			taskType,
+			status,
+			workflowId,
+			cleanedUp,
+			onWorker,
+			retryState,
+			logs,
+			retrySettings,
+			input,
+			output,
+			metadata,
+		),
+		Id:            id,
+		CreatedAt:     createdAt,
+		UpdatedAt:     updatedAt,
+		DeletedAt:     deletedAt,
+		TaskType:      taskType,
+		Status:        status,
+		WorkflowId:    workflowId,
+		CleanedUp:     cleanedUp,
+		OnWorker:      onWorker,
+		RetryState:    retryState,
+		Logs:          logs,
+		RetrySettings: retrySettings,
+		Input:         input,
+		Output:        output,
+		Metadata:      metadata,
+	}
+}
+func newWorkflowEdgeTableImpl() *workflowEdgeTableImpl {
+	fromId := &workflowEdgefromIdFieldImpl{column: newColumn[string, WorkflowEdgeField](fieldAliasImpl("from_id"))}
+	toId := &workflowEdgetoIdFieldImpl{column: newColumn[string, WorkflowEdgeField](fieldAliasImpl("to_id"))}
+	workflowId := &workflowEdgeworkflowIdFieldImpl{column: newColumn[string, WorkflowEdgeField](fieldAliasImpl("workflow_id"))}
+	return &workflowEdgeTableImpl{
+		table: newTable[WorkflowEdgeField, *WorkflowEdgeScanner](
+			"workflow_edges",
+			newWorkflowEdgeScanner,
+			fromId,
+			toId,
+			workflowId,
+		),
+		FromId:     fromId,
+		ToId:       toId,
+		WorkflowId: workflowId,
+	}
+}
 
 type (
-	UserRepository                             = ProtoRepository[UserField, *UserScanner, *panel.User]
-	UserRepositoryOption                       = ProtoCallOption[UserField, *UserScanner, *panel.User]
-	MachineTemplateRepository                  = ProtoRepository[MachineTemplateField, *MachineTemplateScanner, *panel.MachineTemplate]
-	MachineTemplateRepositoryOption            = ProtoCallOption[MachineTemplateField, *MachineTemplateScanner, *panel.MachineTemplate]
-	StroppyDeploymentTemplateRepository        = ProtoRepository[StroppyDeploymentTemplateField, *StroppyDeploymentTemplateScanner, *panel.StroppyDeploymentTemplate]
-	StroppyDeploymentTemplateRepositoryOption  = ProtoCallOption[StroppyDeploymentTemplateField, *StroppyDeploymentTemplateScanner, *panel.StroppyDeploymentTemplate]
-	DatabaseDeploymentTemplateRepository       = ProtoRepository[DatabaseDeploymentTemplateField, *DatabaseDeploymentTemplateScanner, *panel.DatabaseDeploymentTemplate]
-	DatabaseDeploymentTemplateRepositoryOption = ProtoCallOption[DatabaseDeploymentTemplateField, *DatabaseDeploymentTemplateScanner, *panel.DatabaseDeploymentTemplate]
-	RunRecordRepository                        = ProtoRepository[RunRecordField, *RunRecordScanner, *panel.RunRecord]
-	RunRecordRepositoryOption                  = ProtoCallOption[RunRecordField, *RunRecordScanner, *panel.RunRecord]
-	RunRecordStepRepository                    = ProtoRepository[RunRecordStepField, *RunRecordStepScanner, *panel.RunRecordStep]
-	RunRecordStepRepositoryOption              = ProtoCallOption[RunRecordStepField, *RunRecordStepScanner, *panel.RunRecordStep]
-	WorkflowTaskNodeRepository                 = ProtoRepository[WorkflowTaskNodeField, *WorkflowTaskNodeScanner, *panel.WorkflowTaskNode]
-	WorkflowTaskNodeRepositoryOption           = ProtoCallOption[WorkflowTaskNodeField, *WorkflowTaskNodeScanner, *panel.WorkflowTaskNode]
-	WorkflowEdgeRepository                     = ProtoRepository[WorkflowEdgeField, *WorkflowEdgeScanner, *panel.WorkflowEdge]
-	WorkflowEdgeRepositoryOption               = ProtoCallOption[WorkflowEdgeField, *WorkflowEdgeScanner, *panel.WorkflowEdge]
-	WorkflowRepository                         = ProtoRepository[WorkflowField, *WorkflowScanner, *panel.Workflow]
-	WorkflowRepositoryOption                   = ProtoCallOption[WorkflowField, *WorkflowScanner, *panel.Workflow]
+	UserRepository                = ProtoRepository[UserField, *UserScanner, *panel.User]
+	UserRepositoryOption          = ProtoCallOption[UserField, *UserScanner, *panel.User]
+	RefreshTokensRepository       = ProtoRepository[RefreshTokensField, *RefreshTokensScanner, *panel.RefreshTokens]
+	RefreshTokensRepositoryOption = ProtoCallOption[RefreshTokensField, *RefreshTokensScanner, *panel.RefreshTokens]
+	KvinfoRepository              = ProtoRepository[KvinfoField, *KvinfoScanner, *panel.KVInfo]
+	KvinfoRepositoryOption        = ProtoCallOption[KvinfoField, *KvinfoScanner, *panel.KVInfo]
+	TemplateRepository            = ProtoRepository[TemplateField, *TemplateScanner, *panel.Template]
+	TemplateRepositoryOption      = ProtoCallOption[TemplateField, *TemplateScanner, *panel.Template]
+	RunRecordRepository           = ProtoRepository[RunRecordField, *RunRecordScanner, *panel.RunRecord]
+	RunRecordRepositoryOption     = ProtoCallOption[RunRecordField, *RunRecordScanner, *panel.RunRecord]
+	RunRecordStepRepository       = ProtoRepository[RunRecordStepField, *RunRecordStepScanner, *panel.RunRecordStep]
+	RunRecordStepRepositoryOption = ProtoCallOption[RunRecordStepField, *RunRecordStepScanner, *panel.RunRecordStep]
+	WorkflowRepository            = ProtoRepository[WorkflowField, *WorkflowScanner, *panel.Workflow]
+	WorkflowRepositoryOption      = ProtoCallOption[WorkflowField, *WorkflowScanner, *panel.Workflow]
+	WorkflowTaskRepository        = ProtoRepository[WorkflowTaskField, *WorkflowTaskScanner, *panel.WorkflowTask]
+	WorkflowTaskRepositoryOption  = ProtoCallOption[WorkflowTaskField, *WorkflowTaskScanner, *panel.WorkflowTask]
+	WorkflowEdgeRepository        = ProtoRepository[WorkflowEdgeField, *WorkflowEdgeScanner, *panel.WorkflowEdge]
+	WorkflowEdgeRepositoryOption  = ProtoCallOption[WorkflowEdgeField, *WorkflowEdgeScanner, *panel.WorkflowEdge]
 )
 type (
 	upcastUserOptions struct {
-		PasswordHash  string
-		RefreshTokens []string
+		PasswordHash string
 	}
 	upcastUserOption func(*upcastUserOptions)
 )
@@ -1942,11 +1945,6 @@ type (
 func WithUserPasswordHash(value string) upcastUserOption {
 	return func(options *upcastUserOptions) {
 		options.PasswordHash = value
-	}
-}
-func WithUserRefreshTokens(value []string) upcastUserOption {
-	return func(options *upcastUserOptions) {
-		options.RefreshTokens = value
 	}
 }
 func UserToScanner(
@@ -1970,7 +1968,6 @@ func UserToScanner(
 			opt(options)
 		}
 		scanner.PasswordHash = options.PasswordHash
-		scanner.RefreshTokens = options.RefreshTokens
 		return scanner
 	}
 }
@@ -2008,99 +2005,87 @@ func NewUserRepository(
 		defaultOpts...,
 	)
 }
-func MachineTemplateToScanner(
-	downcastId TypeCaster[*panel.Ulid, string],
-) TypeCaster[*panel.MachineTemplate, *MachineTemplateScanner] {
-	return func(entity *panel.MachineTemplate) *MachineTemplateScanner {
+func RefreshTokensToScanner(
+	downcastUserId TypeCaster[*panel.Ulid, string],
+) TypeCaster[*panel.RefreshTokens, *RefreshTokensScanner] {
+	return func(entity *panel.RefreshTokens) *RefreshTokensScanner {
 		if entity == nil {
 			return nil
 		}
-		scanner := &MachineTemplateScanner{
-			Id:   downcastId(entity.Id),
-			Tags: MessageToSliceByte[*panel.Tags](entity.Tags),
+		scanner := &RefreshTokensScanner{
+			UserId: downcastUserId(entity.UserId),
+			Token:  entity.Token,
 		}
-		scanner.Cores = int32(entity.GetMachineInfo().GetCores())
-		scanner.Memory = int32(entity.GetMachineInfo().GetMemory())
-		scanner.Disk = int32(entity.GetMachineInfo().GetDisk())
-		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
-		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
-		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
 		return scanner
 	}
 }
-func ScannerToMachineTemplate(
-	upcastId TypeCaster[string, *panel.Ulid],
-) TypeCaster[*MachineTemplateScanner, *panel.MachineTemplate] {
-	return func(model *MachineTemplateScanner) *panel.MachineTemplate {
+func ScannerToRefreshTokens(
+	upcastUserId TypeCaster[string, *panel.Ulid],
+) TypeCaster[*RefreshTokensScanner, *panel.RefreshTokens] {
+	return func(model *RefreshTokensScanner) *panel.RefreshTokens {
 		if model == nil {
 			return nil
 		}
-		entity := &panel.MachineTemplate{
-			Id:   upcastId(model.Id),
-			Tags: MessageFromSliceByte[*panel.Tags](model.Tags),
-		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
-		}
-		entity.MachineInfo = &panel.MachineInfo{
-			Cores:  uint32(model.Cores),
-			Memory: uint32(model.Memory),
-			Disk:   uint32(model.Disk),
+		entity := &panel.RefreshTokens{
+			UserId: upcastUserId(model.UserId),
+			Token:  model.Token,
 		}
 
 		return entity
 	}
 }
-func NewMachineTemplateRepository(
+func NewRefreshTokensRepository(
 	dbGetter DbGetter,
-	upcastId TypeCaster[string, *panel.Ulid],
-	downcastId TypeCaster[*panel.Ulid, string],
-	defaultOpts ...MachineTemplateRepositoryOption,
-) MachineTemplateRepository {
+	upcastUserId TypeCaster[string, *panel.Ulid],
+	downcastUserId TypeCaster[*panel.Ulid, string],
+	defaultOpts ...RefreshTokensRepositoryOption,
+) RefreshTokensRepository {
 	return newGenericRepository(
-		newGenericScannerRepository(MachineTemplate.table, dbGetter),
-		MachineTemplateToScanner(downcastId),
-		ScannerToMachineTemplate(upcastId),
+		newGenericScannerRepository(RefreshTokens.table, dbGetter),
+		RefreshTokensToScanner(downcastUserId),
+		ScannerToRefreshTokens(upcastUserId),
 		defaultOpts...,
 	)
 }
-func StroppyDeploymentTemplateToScanner(
+func KVInfoToScanner(
 	downcastId TypeCaster[*panel.Ulid, string],
-) TypeCaster[*panel.StroppyDeploymentTemplate, *StroppyDeploymentTemplateScanner] {
-	return func(entity *panel.StroppyDeploymentTemplate) *StroppyDeploymentTemplateScanner {
+) TypeCaster[*panel.KVInfo, *KvinfoScanner] {
+	return func(entity *panel.KVInfo) *KvinfoScanner {
 		if entity == nil {
 			return nil
 		}
-		scanner := &StroppyDeploymentTemplateScanner{
-			Id:             downcastId(entity.Id),
-			Name:           entity.Name,
-			Tags:           MessageToSliceByte[*panel.Tags](entity.Tags),
-			ScriptBody:     entity.ScriptBody,
-			StroppyVersion: entity.StroppyVersion,
-			EnvData:        MessageToSliceByte[*panel.Metadata](entity.EnvData),
+		scanner := &KvinfoScanner{
+			Id:  downcastId(entity.Id),
+			Key: entity.Key,
 		}
+		scanner.Description = entity.GetInfo().GetDescription()
+		scanner.DefaultValue = entity.GetInfo().GetDefaultValue()
+		scanner.IsRequired = entity.GetInfo().GetIsRequired()
+		scanner.Immutable = entity.GetInfo().GetImmutable()
+		scanner.SystemGenerated = entity.GetInfo().GetSystemGenerated()
 		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
 		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
 		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
 		return scanner
 	}
 }
-func ScannerToStroppyDeploymentTemplate(
+func ScannerToKVInfo(
 	upcastId TypeCaster[string, *panel.Ulid],
-) TypeCaster[*StroppyDeploymentTemplateScanner, *panel.StroppyDeploymentTemplate] {
-	return func(model *StroppyDeploymentTemplateScanner) *panel.StroppyDeploymentTemplate {
+) TypeCaster[*KvinfoScanner, *panel.KVInfo] {
+	return func(model *KvinfoScanner) *panel.KVInfo {
 		if model == nil {
 			return nil
 		}
-		entity := &panel.StroppyDeploymentTemplate{
-			Id:             upcastId(model.Id),
-			Name:           model.Name,
-			Tags:           MessageFromSliceByte[*panel.Tags](model.Tags),
-			ScriptBody:     model.ScriptBody,
-			StroppyVersion: model.StroppyVersion,
-			EnvData:        MessageFromSliceByte[*panel.Metadata](model.EnvData),
+		entity := &panel.KVInfo{
+			Id:  upcastId(model.Id),
+			Key: model.Key,
+		}
+		entity.Info = &panel.KV_Info{
+			Description:     model.Description,
+			DefaultValue:    model.DefaultValue,
+			IsRequired:      model.IsRequired,
+			Immutable:       model.Immutable,
+			SystemGenerated: model.SystemGenerated,
 		}
 		entity.Timing = &panel.Timing{
 			CreatedAt: TimestampFromTime(model.CreatedAt),
@@ -2111,31 +2096,34 @@ func ScannerToStroppyDeploymentTemplate(
 		return entity
 	}
 }
-func NewStroppyDeploymentTemplateRepository(
+func NewKvinfoRepository(
 	dbGetter DbGetter,
 	upcastId TypeCaster[string, *panel.Ulid],
 	downcastId TypeCaster[*panel.Ulid, string],
-	defaultOpts ...StroppyDeploymentTemplateRepositoryOption,
-) StroppyDeploymentTemplateRepository {
+	defaultOpts ...KvinfoRepositoryOption,
+) KvinfoRepository {
 	return newGenericRepository(
-		newGenericScannerRepository(StroppyDeploymentTemplate.table, dbGetter),
-		StroppyDeploymentTemplateToScanner(downcastId),
-		ScannerToStroppyDeploymentTemplate(upcastId),
+		newGenericScannerRepository(Kvinfo.table, dbGetter),
+		KVInfoToScanner(downcastId),
+		ScannerToKVInfo(upcastId),
 		defaultOpts...,
 	)
 }
-func DatabaseDeploymentTemplateToScanner(
+func TemplateToScanner(
 	downcastId TypeCaster[*panel.Ulid, string],
-) TypeCaster[*panel.DatabaseDeploymentTemplate, *DatabaseDeploymentTemplateScanner] {
-	return func(entity *panel.DatabaseDeploymentTemplate) *DatabaseDeploymentTemplateScanner {
+	downcastAuthorId TypeCaster[*panel.Ulid, string],
+	downcastTags TypeCaster[[]*panel.Tag, []string],
+) TypeCaster[*panel.Template, *TemplateScanner] {
+	return func(entity *panel.Template) *TemplateScanner {
 		if entity == nil {
 			return nil
 		}
-		scanner := &DatabaseDeploymentTemplateScanner{
-			Id:              downcastId(entity.Id),
-			Name:            entity.Name,
-			Tags:            MessageToSliceByte[*panel.Tags](entity.Tags),
-			PrebuiltImageId: entity.PrebuiltImageId,
+		scanner := &TemplateScanner{
+			Id:        downcastId(entity.Id),
+			Name:      entity.Name,
+			AuthorId:  downcastAuthorId(entity.AuthorId),
+			IsDefault: entity.IsDefault,
+			Tags:      downcastTags(entity.Tags),
 		}
 		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
 		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
@@ -2143,18 +2131,21 @@ func DatabaseDeploymentTemplateToScanner(
 		return scanner
 	}
 }
-func ScannerToDatabaseDeploymentTemplate(
+func ScannerToTemplate(
 	upcastId TypeCaster[string, *panel.Ulid],
-) TypeCaster[*DatabaseDeploymentTemplateScanner, *panel.DatabaseDeploymentTemplate] {
-	return func(model *DatabaseDeploymentTemplateScanner) *panel.DatabaseDeploymentTemplate {
+	upcastAuthorId TypeCaster[string, *panel.Ulid],
+	upcastTags TypeCaster[[]string, []*panel.Tag],
+) TypeCaster[*TemplateScanner, *panel.Template] {
+	return func(model *TemplateScanner) *panel.Template {
 		if model == nil {
 			return nil
 		}
-		entity := &panel.DatabaseDeploymentTemplate{
-			Id:              upcastId(model.Id),
-			Name:            model.Name,
-			Tags:            MessageFromSliceByte[*panel.Tags](model.Tags),
-			PrebuiltImageId: model.PrebuiltImageId,
+		entity := &panel.Template{
+			Id:        upcastId(model.Id),
+			Name:      model.Name,
+			AuthorId:  upcastAuthorId(model.AuthorId),
+			IsDefault: model.IsDefault,
+			Tags:      upcastTags(model.Tags),
 		}
 		entity.Timing = &panel.Timing{
 			CreatedAt: TimestampFromTime(model.CreatedAt),
@@ -2165,16 +2156,20 @@ func ScannerToDatabaseDeploymentTemplate(
 		return entity
 	}
 }
-func NewDatabaseDeploymentTemplateRepository(
+func NewTemplateRepository(
 	dbGetter DbGetter,
 	upcastId TypeCaster[string, *panel.Ulid],
 	downcastId TypeCaster[*panel.Ulid, string],
-	defaultOpts ...DatabaseDeploymentTemplateRepositoryOption,
-) DatabaseDeploymentTemplateRepository {
+	upcastAuthorId TypeCaster[string, *panel.Ulid],
+	downcastAuthorId TypeCaster[*panel.Ulid, string],
+	upcastTags TypeCaster[[]string, []*panel.Tag],
+	downcastTags TypeCaster[[]*panel.Tag, []string],
+	defaultOpts ...TemplateRepositoryOption,
+) TemplateRepository {
 	return newGenericRepository(
-		newGenericScannerRepository(DatabaseDeploymentTemplate.table, dbGetter),
-		DatabaseDeploymentTemplateToScanner(downcastId),
-		ScannerToDatabaseDeploymentTemplate(upcastId),
+		newGenericScannerRepository(Template.table, dbGetter),
+		TemplateToScanner(downcastId, downcastAuthorId, downcastTags),
+		ScannerToTemplate(upcastId, upcastAuthorId, upcastTags),
 		defaultOpts...,
 	)
 }
@@ -2188,15 +2183,14 @@ func RunRecordToScanner(
 			return nil
 		}
 		scanner := &RunRecordScanner{
-			Id:                       downcastId(entity.Id),
-			AuthorId:                 downcastAuthorId(entity.AuthorId),
-			Status:                   EnumToInt32[stroppy.Status](entity.Status),
-			RunInfo:                  MessageToSliceByte[*stroppy.StroppyRun](entity.RunInfo),
-			Tps:                      MessageToSliceByte[*panel.Tps](entity.Tps),
-			GrafanaDashboardUrl:      entity.GrafanaDashboardUrl,
-			WorkflowId:               downcastWorkflowId(entity.WorkflowId),
-			DatabaseInstanceTemplate: MessageToJsonb[*panel.DatabaseInstanceTemplate](entity.DatabaseInstanceTemplate),
-			StroppyDeploymentInfo:    MessageToJsonb[*panel.StroppyInstanceTemplate](entity.StroppyDeploymentInfo),
+			Id:                  downcastId(entity.Id),
+			AuthorId:            downcastAuthorId(entity.AuthorId),
+			Status:              EnumToInt32[stroppy.Status](entity.Status),
+			RunInfo:             MessageToSliceByte[*stroppy.StroppyRun](entity.RunInfo),
+			Tps:                 MessageToSliceByte[*panel.Tps](entity.Tps),
+			GrafanaDashboardUrl: entity.GrafanaDashboardUrl,
+			WorkflowId:          downcastWorkflowId(entity.WorkflowId),
+			CloudRunParams:      MessageToJsonb[*panel.CloudRunParams](entity.CloudRunParams),
 		}
 		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
 		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
@@ -2214,15 +2208,14 @@ func ScannerToRunRecord(
 			return nil
 		}
 		entity := &panel.RunRecord{
-			Id:                       upcastId(model.Id),
-			AuthorId:                 upcastAuthorId(model.AuthorId),
-			Status:                   EnumFromInt32[stroppy.Status](model.Status),
-			RunInfo:                  MessageFromSliceByte[*stroppy.StroppyRun](model.RunInfo),
-			Tps:                      MessageFromSliceByte[*panel.Tps](model.Tps),
-			GrafanaDashboardUrl:      model.GrafanaDashboardUrl,
-			WorkflowId:               upcastWorkflowId(model.WorkflowId),
-			DatabaseInstanceTemplate: MessageFromJsonb[*panel.DatabaseInstanceTemplate](model.DatabaseInstanceTemplate),
-			StroppyDeploymentInfo:    MessageFromJsonb[*panel.StroppyInstanceTemplate](model.StroppyDeploymentInfo),
+			Id:                  upcastId(model.Id),
+			AuthorId:            upcastAuthorId(model.AuthorId),
+			Status:              EnumFromInt32[stroppy.Status](model.Status),
+			RunInfo:             MessageFromSliceByte[*stroppy.StroppyRun](model.RunInfo),
+			Tps:                 MessageFromSliceByte[*panel.Tps](model.Tps),
+			GrafanaDashboardUrl: model.GrafanaDashboardUrl,
+			WorkflowId:          upcastWorkflowId(model.WorkflowId),
+			CloudRunParams:      MessageFromJsonb[*panel.CloudRunParams](model.CloudRunParams),
 		}
 		entity.Timing = &panel.Timing{
 			CreatedAt: TimestampFromTime(model.CreatedAt),
@@ -2308,156 +2301,6 @@ func NewRunRecordStepRepository(
 		defaultOpts...,
 	)
 }
-
-type (
-	upcastWorkflowTaskNodeOptions struct {
-		WorkflowId string
-	}
-	upcastWorkflowTaskNodeOption func(*upcastWorkflowTaskNodeOptions)
-)
-
-func WithWorkflowTaskNodeWorkflowId(value string) upcastWorkflowTaskNodeOption {
-	return func(options *upcastWorkflowTaskNodeOptions) {
-		options.WorkflowId = value
-	}
-}
-func WorkflowTaskNodeToScanner(
-	downcastId TypeCaster[*panel.Ulid, string],
-	downcastId TypeCaster[*panel.Ulid, string],
-	opts ...upcastWorkflowTaskNodeOption,
-) TypeCaster[*panel.WorkflowTaskNode, *WorkflowTaskNodeScanner] {
-	return func(entity *panel.WorkflowTaskNode) *WorkflowTaskNodeScanner {
-		if entity == nil {
-			return nil
-		}
-		scanner := &WorkflowTaskNodeScanner{
-			Id:       downcastId(entity.Id),
-			Attempt:  int32(entity.Attempt),
-			Metadata: MessageToSliceByte[*panel.Metadata](entity.Metadata),
-		}
-		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
-		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
-		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
-		options := &upcastWorkflowTaskNodeOptions{}
-		for _, opt := range opts {
-			opt(options)
-		}
-		scanner.WorkflowId = options.WorkflowId
-		return scanner
-	}
-}
-func ScannerToWorkflowTaskNode(
-	upcastId TypeCaster[string, *panel.Ulid],
-	upcastId TypeCaster[string, *panel.Ulid],
-) TypeCaster[*WorkflowTaskNodeScanner, *panel.WorkflowTaskNode] {
-	return func(model *WorkflowTaskNodeScanner) *panel.WorkflowTaskNode {
-		if model == nil {
-			return nil
-		}
-		entity := &panel.WorkflowTaskNode{
-			Id:       upcastId(model.Id),
-			Attempt:  uint32(model.Attempt),
-			Metadata: MessageFromSliceByte[*panel.Metadata](model.Metadata),
-		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
-		}
-
-		return entity
-	}
-}
-func NewWorkflowTaskNodeRepository(
-	dbGetter DbGetter,
-	upcastId TypeCaster[string, *panel.Ulid],
-	downcastId TypeCaster[*panel.Ulid, string],
-	upcastId TypeCaster[string, *panel.Ulid],
-	downcastId TypeCaster[*panel.Ulid, string],
-	defaultOpts ...WorkflowTaskNodeRepositoryOption,
-) WorkflowTaskNodeRepository {
-	return newGenericRepository(
-		newGenericScannerRepository(WorkflowTaskNode.table, dbGetter),
-		WorkflowTaskNodeToScanner(downcastId, downcastId),
-		ScannerToWorkflowTaskNode(upcastId, upcastId),
-		defaultOpts...,
-	)
-}
-
-type (
-	upcastWorkflowEdgeOptions struct {
-		WorkflowId string
-	}
-	upcastWorkflowEdgeOption func(*upcastWorkflowEdgeOptions)
-)
-
-func WithWorkflowEdgeWorkflowId(value string) upcastWorkflowEdgeOption {
-	return func(options *upcastWorkflowEdgeOptions) {
-		options.WorkflowId = value
-	}
-}
-func WorkflowEdgeToScanner(
-	downcastId TypeCaster[*panel.Ulid, string],
-	downcastFrom TypeCaster[*panel.Ulid, string],
-	downcastTo TypeCaster[*panel.Ulid, string],
-	downcastId TypeCaster[*panel.Ulid, string],
-	opts ...upcastWorkflowEdgeOption,
-) TypeCaster[*panel.WorkflowEdge, *WorkflowEdgeScanner] {
-	return func(entity *panel.WorkflowEdge) *WorkflowEdgeScanner {
-		if entity == nil {
-			return nil
-		}
-		scanner := &WorkflowEdgeScanner{
-			Id:   downcastId(entity.Id),
-			From: downcastFrom(entity.From),
-			To:   downcastTo(entity.To),
-		}
-		options := &upcastWorkflowEdgeOptions{}
-		for _, opt := range opts {
-			opt(options)
-		}
-		scanner.WorkflowId = options.WorkflowId
-		return scanner
-	}
-}
-func ScannerToWorkflowEdge(
-	upcastId TypeCaster[string, *panel.Ulid],
-	upcastFrom TypeCaster[string, *panel.Ulid],
-	upcastTo TypeCaster[string, *panel.Ulid],
-	upcastId TypeCaster[string, *panel.Ulid],
-) TypeCaster[*WorkflowEdgeScanner, *panel.WorkflowEdge] {
-	return func(model *WorkflowEdgeScanner) *panel.WorkflowEdge {
-		if model == nil {
-			return nil
-		}
-		entity := &panel.WorkflowEdge{
-			Id:   upcastId(model.Id),
-			From: upcastFrom(model.From),
-			To:   upcastTo(model.To),
-		}
-
-		return entity
-	}
-}
-func NewWorkflowEdgeRepository(
-	dbGetter DbGetter,
-	upcastId TypeCaster[string, *panel.Ulid],
-	downcastId TypeCaster[*panel.Ulid, string],
-	upcastFrom TypeCaster[string, *panel.Ulid],
-	downcastFrom TypeCaster[*panel.Ulid, string],
-	upcastTo TypeCaster[string, *panel.Ulid],
-	downcastTo TypeCaster[*panel.Ulid, string],
-	upcastId TypeCaster[string, *panel.Ulid],
-	downcastId TypeCaster[*panel.Ulid, string],
-	defaultOpts ...WorkflowEdgeRepositoryOption,
-) WorkflowEdgeRepository {
-	return newGenericRepository(
-		newGenericScannerRepository(WorkflowEdge.table, dbGetter),
-		WorkflowEdgeToScanner(downcastId, downcastFrom, downcastTo, downcastId),
-		ScannerToWorkflowEdge(upcastId, upcastFrom, upcastTo, upcastId),
-		defaultOpts...,
-	)
-}
 func WorkflowToScanner(
 	downcastId TypeCaster[*panel.Ulid, string],
 ) TypeCaster[*panel.Workflow, *WorkflowScanner] {
@@ -2503,6 +2346,131 @@ func NewWorkflowRepository(
 		newGenericScannerRepository(Workflow.table, dbGetter),
 		WorkflowToScanner(downcastId),
 		ScannerToWorkflow(upcastId),
+		defaultOpts...,
+	)
+}
+func WorkflowTaskToScanner() TypeCaster[*panel.WorkflowTask, *WorkflowTaskScanner] {
+	return func(entity *panel.WorkflowTask) *WorkflowTaskScanner {
+		if entity == nil {
+			return nil
+		}
+		scanner := &WorkflowTaskScanner{
+			Id:            entity.Id,
+			TaskType:      EnumToInt32[panel.WorkflowTask_Type](entity.TaskType),
+			Status:        EnumToInt32[panel.WorkflowTask_Status](entity.Status),
+			WorkflowId:    entity.WorkflowId,
+			CleanedUp:     entity.CleanedUp,
+			OnWorker:      entity.OnWorker,
+			RetryState:    MessageToSliceByte[*panel.Retry_State](entity.RetryState),
+			Logs:          MessageToSliceByteSlice[*panel.LogRecord](entity.Logs),
+			RetrySettings: MessageToSliceByte[*panel.Retry](entity.RetrySettings),
+			Input:         MessageToSliceByte[*anypb.Any](entity.Input),
+			Output:        MessageToSliceByte[*anypb.Any](entity.Output),
+			Metadata:      MessageToSliceByte[*panel.Metadata](entity.Metadata),
+		}
+		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
+		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
+		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
+		return scanner
+	}
+}
+func ScannerToWorkflowTask() TypeCaster[*WorkflowTaskScanner, *panel.WorkflowTask] {
+	return func(model *WorkflowTaskScanner) *panel.WorkflowTask {
+		if model == nil {
+			return nil
+		}
+		entity := &panel.WorkflowTask{
+			Id:            model.Id,
+			TaskType:      EnumFromInt32[panel.WorkflowTask_Type](model.TaskType),
+			Status:        EnumFromInt32[panel.WorkflowTask_Status](model.Status),
+			WorkflowId:    model.WorkflowId,
+			CleanedUp:     model.CleanedUp,
+			OnWorker:      model.OnWorker,
+			RetryState:    MessageFromSliceByte[*panel.Retry_State](model.RetryState),
+			Logs:          MessageFromSliceByteSlice[*panel.LogRecord](model.Logs),
+			RetrySettings: MessageFromSliceByte[*panel.Retry](model.RetrySettings),
+			Input:         MessageFromSliceByte[*anypb.Any](model.Input),
+			Output:        MessageFromSliceByte[*anypb.Any](model.Output),
+			Metadata:      MessageFromSliceByte[*panel.Metadata](model.Metadata),
+		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
+		}
+
+		return entity
+	}
+}
+func NewWorkflowTaskRepository(
+	dbGetter DbGetter,
+	defaultOpts ...WorkflowTaskRepositoryOption,
+) WorkflowTaskRepository {
+	return newGenericRepository(
+		newGenericScannerRepository(WorkflowTask.table, dbGetter),
+		WorkflowTaskToScanner(),
+		ScannerToWorkflowTask(),
+		defaultOpts...,
+	)
+}
+
+type (
+	upcastWorkflowEdgeOptions struct {
+		WorkflowId string
+	}
+	upcastWorkflowEdgeOption func(*upcastWorkflowEdgeOptions)
+)
+
+func WithWorkflowEdgeWorkflowId(value string) upcastWorkflowEdgeOption {
+	return func(options *upcastWorkflowEdgeOptions) {
+		options.WorkflowId = value
+	}
+}
+func WorkflowEdgeToScanner(
+	downcastId TypeCaster[*panel.Ulid, string],
+	opts ...upcastWorkflowEdgeOption,
+) TypeCaster[*panel.WorkflowEdge, *WorkflowEdgeScanner] {
+	return func(entity *panel.WorkflowEdge) *WorkflowEdgeScanner {
+		if entity == nil {
+			return nil
+		}
+		scanner := &WorkflowEdgeScanner{
+			FromId: entity.FromId,
+			ToId:   entity.ToId,
+		}
+		options := &upcastWorkflowEdgeOptions{}
+		for _, opt := range opts {
+			opt(options)
+		}
+		scanner.WorkflowId = options.WorkflowId
+		return scanner
+	}
+}
+func ScannerToWorkflowEdge(
+	upcastId TypeCaster[string, *panel.Ulid],
+) TypeCaster[*WorkflowEdgeScanner, *panel.WorkflowEdge] {
+	return func(model *WorkflowEdgeScanner) *panel.WorkflowEdge {
+		if model == nil {
+			return nil
+		}
+		entity := &panel.WorkflowEdge{
+			FromId: model.FromId,
+			ToId:   model.ToId,
+		}
+
+		return entity
+	}
+}
+func NewWorkflowEdgeRepository(
+	dbGetter DbGetter,
+	upcastId TypeCaster[string, *panel.Ulid],
+	downcastId TypeCaster[*panel.Ulid, string],
+	defaultOpts ...WorkflowEdgeRepositoryOption,
+) WorkflowEdgeRepository {
+	return newGenericRepository(
+		newGenericScannerRepository(WorkflowEdge.table, dbGetter),
+		WorkflowEdgeToScanner(downcastId),
+		ScannerToWorkflowEdge(upcastId),
 		defaultOpts...,
 	)
 }

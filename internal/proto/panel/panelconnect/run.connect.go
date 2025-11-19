@@ -35,8 +35,6 @@ const (
 const (
 	// RunServiceListRunsProcedure is the fully-qualified name of the RunService's ListRuns RPC.
 	RunServiceListRunsProcedure = "/panel.RunService/ListRuns"
-	// RunServiceListTopRunsProcedure is the fully-qualified name of the RunService's ListTopRuns RPC.
-	RunServiceListTopRunsProcedure = "/panel.RunService/ListTopRuns"
 	// RunServiceRunStroppyInCloudProcedure is the fully-qualified name of the RunService's
 	// RunStroppyInCloud RPC.
 	RunServiceRunStroppyInCloudProcedure = "/panel.RunService/RunStroppyInCloud"
@@ -45,8 +43,7 @@ const (
 // RunServiceClient is a client for the panel.RunService service.
 type RunServiceClient interface {
 	ListRuns(context.Context, *panel.ListRunsRequest) (*panel.RunRecord_List, error)
-	ListTopRuns(context.Context, *panel.ListRunsRequest) (*panel.RunRecord_List, error)
-	RunStroppyInCloud(context.Context, *panel.RunStroppyInCloudRequest) (*panel.RunRecord, error)
+	RunStroppyInCloud(context.Context, *panel.CloudRunParams) (*panel.RunRecord, error)
 }
 
 // NewRunServiceClient constructs a client for the panel.RunService service. By default, it uses the
@@ -66,13 +63,7 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceMethods.ByName("ListRuns")),
 			connect.WithClientOptions(opts...),
 		),
-		listTopRuns: connect.NewClient[panel.ListRunsRequest, panel.RunRecord_List](
-			httpClient,
-			baseURL+RunServiceListTopRunsProcedure,
-			connect.WithSchema(runServiceMethods.ByName("ListTopRuns")),
-			connect.WithClientOptions(opts...),
-		),
-		runStroppyInCloud: connect.NewClient[panel.RunStroppyInCloudRequest, panel.RunRecord](
+		runStroppyInCloud: connect.NewClient[panel.CloudRunParams, panel.RunRecord](
 			httpClient,
 			baseURL+RunServiceRunStroppyInCloudProcedure,
 			connect.WithSchema(runServiceMethods.ByName("RunStroppyInCloud")),
@@ -84,8 +75,7 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 // runServiceClient implements RunServiceClient.
 type runServiceClient struct {
 	listRuns          *connect.Client[panel.ListRunsRequest, panel.RunRecord_List]
-	listTopRuns       *connect.Client[panel.ListRunsRequest, panel.RunRecord_List]
-	runStroppyInCloud *connect.Client[panel.RunStroppyInCloudRequest, panel.RunRecord]
+	runStroppyInCloud *connect.Client[panel.CloudRunParams, panel.RunRecord]
 }
 
 // ListRuns calls panel.RunService.ListRuns.
@@ -97,17 +87,8 @@ func (c *runServiceClient) ListRuns(ctx context.Context, req *panel.ListRunsRequ
 	return nil, err
 }
 
-// ListTopRuns calls panel.RunService.ListTopRuns.
-func (c *runServiceClient) ListTopRuns(ctx context.Context, req *panel.ListRunsRequest) (*panel.RunRecord_List, error) {
-	response, err := c.listTopRuns.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
 // RunStroppyInCloud calls panel.RunService.RunStroppyInCloud.
-func (c *runServiceClient) RunStroppyInCloud(ctx context.Context, req *panel.RunStroppyInCloudRequest) (*panel.RunRecord, error) {
+func (c *runServiceClient) RunStroppyInCloud(ctx context.Context, req *panel.CloudRunParams) (*panel.RunRecord, error) {
 	response, err := c.runStroppyInCloud.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
@@ -118,8 +99,7 @@ func (c *runServiceClient) RunStroppyInCloud(ctx context.Context, req *panel.Run
 // RunServiceHandler is an implementation of the panel.RunService service.
 type RunServiceHandler interface {
 	ListRuns(context.Context, *panel.ListRunsRequest) (*panel.RunRecord_List, error)
-	ListTopRuns(context.Context, *panel.ListRunsRequest) (*panel.RunRecord_List, error)
-	RunStroppyInCloud(context.Context, *panel.RunStroppyInCloudRequest) (*panel.RunRecord, error)
+	RunStroppyInCloud(context.Context, *panel.CloudRunParams) (*panel.RunRecord, error)
 }
 
 // NewRunServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -135,12 +115,6 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceMethods.ByName("ListRuns")),
 		connect.WithHandlerOptions(opts...),
 	)
-	runServiceListTopRunsHandler := connect.NewUnaryHandlerSimple(
-		RunServiceListTopRunsProcedure,
-		svc.ListTopRuns,
-		connect.WithSchema(runServiceMethods.ByName("ListTopRuns")),
-		connect.WithHandlerOptions(opts...),
-	)
 	runServiceRunStroppyInCloudHandler := connect.NewUnaryHandlerSimple(
 		RunServiceRunStroppyInCloudProcedure,
 		svc.RunStroppyInCloud,
@@ -151,8 +125,6 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		switch r.URL.Path {
 		case RunServiceListRunsProcedure:
 			runServiceListRunsHandler.ServeHTTP(w, r)
-		case RunServiceListTopRunsProcedure:
-			runServiceListTopRunsHandler.ServeHTTP(w, r)
 		case RunServiceRunStroppyInCloudProcedure:
 			runServiceRunStroppyInCloudHandler.ServeHTTP(w, r)
 		default:
@@ -168,10 +140,6 @@ func (UnimplementedRunServiceHandler) ListRuns(context.Context, *panel.ListRunsR
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.RunService.ListRuns is not implemented"))
 }
 
-func (UnimplementedRunServiceHandler) ListTopRuns(context.Context, *panel.ListRunsRequest) (*panel.RunRecord_List, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.RunService.ListTopRuns is not implemented"))
-}
-
-func (UnimplementedRunServiceHandler) RunStroppyInCloud(context.Context, *panel.RunStroppyInCloudRequest) (*panel.RunRecord, error) {
+func (UnimplementedRunServiceHandler) RunStroppyInCloud(context.Context, *panel.CloudRunParams) (*panel.RunRecord, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.RunService.RunStroppyInCloud is not implemented"))
 }

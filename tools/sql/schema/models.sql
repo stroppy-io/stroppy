@@ -5,38 +5,33 @@ CREATE TABLE IF NOT EXISTS "users" (
 	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
 	email TEXT  UNIQUE NOT NULL,
 	admin BOOLEAN  NOT NULL DEFAULT FALSE,
-	password_hash TEXT NOT NULL,
-	refresh_tokens TEXT[]  NULL
+	password_hash TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS "machine_templates" (
+CREATE TABLE IF NOT EXISTS "refresh_tokens" (
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	token TEXT  NOT NULL
+);
+CREATE TABLE IF NOT EXISTS "system_kv_info" (
 	id TEXT  PRIMARY KEY NOT NULL,
 	created_at TIMESTAMPTZ  NOT NULL,
 	updated_at TIMESTAMPTZ  NOT NULL,
 	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
-	tags JSONB  NOT NULL,
-	cores INTEGER  NOT NULL DEFAULT 0,
-	memory INTEGER  NOT NULL DEFAULT 0,
-	disk INTEGER  NOT NULL DEFAULT 0
+	key TEXT  NOT NULL,
+	description TEXT  NOT NULL,
+	default_value TEXT  NULL DEFAULT null,
+	is_required BOOLEAN  NOT NULL DEFAULT FALSE,
+	immutable BOOLEAN  NOT NULL DEFAULT FALSE,
+	system_generated BOOLEAN  NOT NULL DEFAULT FALSE
 );
-CREATE TABLE IF NOT EXISTS "stroppy_deployment_templates" (
-	id TEXT  PRIMARY KEY NOT NULL,
-	created_at TIMESTAMPTZ  NOT NULL,
-	updated_at TIMESTAMPTZ  NOT NULL,
-	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
-	name TEXT  NOT NULL,
-	tags JSONB  NOT NULL,
-	script_body JSONB  NOT NULL,
-	stroppy_version TEXT  NOT NULL,
-	env_data JSONB  NOT NULL
-);
-CREATE TABLE IF NOT EXISTS "database_deployment_templates" (
+CREATE TABLE IF NOT EXISTS "templates" (
 	id TEXT  PRIMARY KEY NOT NULL,
 	created_at TIMESTAMPTZ  NOT NULL,
 	updated_at TIMESTAMPTZ  NOT NULL,
 	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
 	name TEXT  NOT NULL,
-	tags JSONB  NOT NULL,
-	prebuilt_image_id TEXT  NOT NULL
+	author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	is_default BOOLEAN  NOT NULL DEFAULT FALSE,
+	tags TEXT[]  NOT NULL
 );
 CREATE TABLE IF NOT EXISTS "run_records" (
 	id TEXT  PRIMARY KEY NOT NULL,
@@ -48,9 +43,8 @@ CREATE TABLE IF NOT EXISTS "run_records" (
 	run_info JSONB  NOT NULL,
 	tps JSONB  NOT NULL,
 	grafana_dashboard_url TEXT  NOT NULL,
-	workflow_id TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
-	database_instance_template JSONB  NULL,
-	stroppy_deployment_info JSONB  NULL
+	workflow_id TEXT  NULL,
+	cloud_run_params JSONB  NULL
 );
 CREATE TABLE IF NOT EXISTS "run_record_steps" (
 	id TEXT  PRIMARY KEY NOT NULL,
@@ -61,24 +55,31 @@ CREATE TABLE IF NOT EXISTS "run_record_steps" (
 	status INTEGER  NOT NULL DEFAULT 0,
 	step_info JSONB  NOT NULL
 );
-CREATE TABLE IF NOT EXISTS "workflow_nodes" (
-	id TEXT  PRIMARY KEY NOT NULL,
-	created_at TIMESTAMPTZ  NOT NULL,
-	updated_at TIMESTAMPTZ  NOT NULL,
-	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
-	attempt INTEGER  NOT NULL DEFAULT 0,
-	metadata JSONB  NOT NULL,
-	workflow_id TEXT REFERENCES workflows (id) ON DELETE CASCADE
-);
-CREATE TABLE IF NOT EXISTS "workflow_edges" (
-	id TEXT  PRIMARY KEY NOT NULL,
-	from TEXT NOT NULL REFERENCES workflow_nodes(id) ON DELETE CASCADE,
-	to TEXT NOT NULL REFERENCES workflow_nodes(id) ON DELETE CASCADE,
-	workflow_id TEXT REFERENCES workflows (id) ON DELETE CASCADE
-);
 CREATE TABLE IF NOT EXISTS "workflows" (
 	id TEXT  PRIMARY KEY NOT NULL,
 	created_at TIMESTAMPTZ  NOT NULL,
 	updated_at TIMESTAMPTZ  NOT NULL,
 	deleted_at TIMESTAMPTZ  NULL DEFAULT null
+);
+CREATE TABLE IF NOT EXISTS "workflow_tasks" (
+	id TEXT  PRIMARY KEY NOT NULL,
+	created_at TIMESTAMPTZ  NOT NULL,
+	updated_at TIMESTAMPTZ  NOT NULL,
+	deleted_at TIMESTAMPTZ  NULL DEFAULT null,
+	task_type INTEGER  NOT NULL DEFAULT 0,
+	status INTEGER  NOT NULL DEFAULT 0,
+	workflow_id TEXT  NOT NULL,
+	cleaned_up BOOLEAN  NOT NULL DEFAULT FALSE,
+	on_worker TEXT  NOT NULL,
+	retry_state JSONB  NOT NULL,
+	logs JSONB[]  NOT NULL,
+	retry_settings JSONB  NOT NULL,
+	input JSONB  NOT NULL,
+	output JSONB  NOT NULL,
+	metadata JSONB  NOT NULL
+);
+CREATE TABLE IF NOT EXISTS "workflow_edges" (
+	from_id TEXT NOT NULL REFERENCES workflow_tasks(id) ON DELETE CASCADE,
+	to_id TEXT NOT NULL REFERENCES workflow_tasks(id) ON DELETE CASCADE,
+	workflow_id TEXT REFERENCES workflows (id) ON DELETE CASCADE
 );

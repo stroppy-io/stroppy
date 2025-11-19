@@ -3,84 +3,13 @@ syntax = "proto3";
 package panel;
 
 import "crossplane/deployment.proto";
+import "google/protobuf/any.proto";
+import "panel/run.proto";
 import "panel/template.proto";
 import "panel/types.proto";
 import "protopgx/pgx.proto";
-import "validate/validate.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
-
-
-message WorkflowTaskNode {
-    option (sql.sql_table) = {
-        generate: true
-        table_name: "workflow_nodes"
-    };
-    enum Status {
-        WORKFLOW_STATUS_UNSPECIFIED = 0;
-        WORKFLOW_STATUS_PENDING = 1;
-        WORKFLOW_STATUS_RUNNING = 2;
-        WORKFLOW_STATUS_COMPLETED = 3;
-        WORKFLOW_STATUS_FAILED = 4;
-        WORKFLOW_STATUS_CANCELLED = 5;
-    }
-    message DeployDatabaseTask {
-        DatabaseInstanceTemplate cluster_deployment = 1; // input
-
-        optional crossplane.Deployment deployment = 100; // output
-    }
-    message DeployStroppyTask {
-        StroppyInstanceTemplate stroppy_instance_template = 1; // input
-        crossplane.Deployment database_deployment = 2; // input
-
-        optional crossplane.Deployment deployment = 100; // output
-    }
-    message CollectRunResults {
-        Ulid stroppy_run_id = 1;
-    }
-    Ulid id = 1 [
-        (sql.sql_field) = {
-            sql_type: {type: TEXT,user_cast: true}
-            constraints: {primary_key: true}
-        }
-    ];
-    Timing timing = 2 [(sql.sql_field).embedded_message = true];
-    uint32 attempt = 3 [(validate.rules).uint32.gt = 0];
-    repeated LogRecord logs = 4 [(validate.rules).repeated.min_items = 1];
-    Retry retry_settings = 5;
-    oneof task {
-        DeployDatabaseTask deploy_database_task = 101;
-        DeployStroppyTask deploy_stroppy_task = 102;
-        CollectRunResults collect_run_results = 103;
-    }
-    Metadata metadata = 6 [(sql.sql_field).serialized_message = true];
-}
-
-message WorkflowEdge {
-    option (sql.sql_table) = {
-        generate: true
-        table_name: "workflow_edges"
-    };
-    Ulid id = 1 [
-        (sql.sql_field) = {
-            sql_type: {type: TEXT,user_cast: true}
-            constraints: {primary_key: true}
-        }
-    ];
-    Ulid from = 2 [
-        (sql.sql_field) = {
-            sql_type: {type: TEXT,user_cast: true}
-            constraints: {constraint: "NOT NULL REFERENCES workflow_nodes(id) ON DELETE CASCADE"}
-        }
-    ];
-    Ulid to = 3 [
-        (sql.sql_field) = {
-            sql_type: {type: TEXT,user_cast: true}
-            constraints: {constraint: "NOT NULL REFERENCES workflow_nodes(id) ON DELETE CASCADE"}
-        }
-    ];
-    Metadata metadata = 4;
-}
 
 message Workflow {
     option (sql.sql_table) = {
@@ -94,8 +23,9 @@ message Workflow {
         }
     ];
     Timing timing = 2 [(sql.sql_field).embedded_message = true];
-    repeated WorkflowTaskNode nodes = 3 [(sql.sql_relation).one_to_many = {
+    repeated WorkflowTask tasks = 3 [(sql.sql_relation).one_to_many = {
         ref_name: "workflow_id"
+        existed_field: true
         on_delete_cascade: true
     }];
     repeated WorkflowEdge edges = 4 [(sql.sql_relation).one_to_many = {
@@ -103,6 +33,86 @@ message Workflow {
         on_delete_cascade: true
     }];
 }
+
+
+message WorkflowTask {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "workflow_tasks"
+    };
+    message DeployDatabase {
+        message Input {
+            CloudRunParams.DatabaseInstanceParams database_instance_params = 1; // input
+        }
+        message Output {
+            optional crossplane.Deployment database_deployment = 1; // output
+        }
+    }
+    message DeployStroppy {
+        message Input {
+            Ulid stroppy_run_id = 1; // input
+            CloudRunParams.StroppyInstanceParams stroppy_instance_params = 2; // input
+            crossplane.Deployment database_deployment = 3; // input
+        }
+        message Output {
+            optional crossplane.Deployment stroppy_deployment = 1; // output
+        }
+    }
+    message CollectRunResults {
+        message Input {
+            Ulid stroppy_run_id = 1;
+        }
+        message Output {}
+    }
+    enum Type {
+        TYPE_UNSPECIFIED = 0;
+        TYPE_DEPLOY_DATABASE = 1;
+        TYPE_DEPLOY_STROPPY = 2;
+        TYPE_COLLECT_RUN_RESULTS = 3;
+    }
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        STATUS_PENDING = 1;
+        STATUS_RUNNING = 2;
+        STATUS_RETRYING = 3;
+        STATUS_COMPLETED = 4;
+        STATUS_FAILED = 5;
+        STATUS_CANCELLED = 6;
+    }
+    string id = 1 [(sql.sql_field) = {constraints: {primary_key: true}}];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    Type task_type = 3;
+    Status status = 4;
+    string workflow_id = 5;
+    bool cleaned_up = 6;
+    string on_worker = 7;
+    Retry.State retry_state = 8 [(sql.sql_field).serialized_message = true];
+    repeated LogRecord logs = 9 [(sql.sql_field).serialized_message = true];
+    Retry retry_settings = 10 [(sql.sql_field).serialized_message = true];
+    google.protobuf.Any input = 11 [(sql.sql_field).serialized_message = true];
+    google.protobuf.Any output = 12 [(sql.sql_field).serialized_message = true];
+    Metadata metadata = 13 [(sql.sql_field).serialized_message = true];
+}
+
+message WorkflowEdge {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "workflow_edges"
+    };
+    string from_id = 2 [
+        (sql.sql_field) = {
+            constraints: {constraint: "NOT NULL REFERENCES workflow_tasks(id) ON DELETE CASCADE"}
+        }
+    ];
+    string to_id = 3 [
+        (sql.sql_field) = {
+            constraints: {constraint: "NOT NULL REFERENCES workflow_tasks(id) ON DELETE CASCADE"}
+        }
+    ];
+    Metadata metadata = 4;
+}
+
+
 
 // ----------------------------------------__WORKFLOW_SERVICE__---------------------------------------------------------
 

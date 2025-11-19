@@ -8,6 +8,7 @@ package panel
 
 import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
+	crossplane "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	_ "github.com/yaroher/protoc-gen-pgx-orm/protopgx"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -24,6 +25,59 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type CloudRunParams struct {
+	state                   protoimpl.MessageState                `protogen:"open.v1"`
+	StroppyInstanceTemplate *CloudRunParams_StroppyInstanceParams `protobuf:"bytes,2,opt,name=stroppy_instance_template,json=stroppyInstanceTemplate,proto3" json:"stroppy_instance_template,omitempty"`
+	// if not present, it means that database deployed outside of cloud
+	DatabaseInstanceTemplate *CloudRunParams_DatabaseInstanceParams `protobuf:"bytes,3,opt,name=database_instance_template,json=databaseInstanceTemplate,proto3,oneof" json:"database_instance_template,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *CloudRunParams) Reset() {
+	*x = CloudRunParams{}
+	mi := &file_panel_run_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudRunParams) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudRunParams) ProtoMessage() {}
+
+func (x *CloudRunParams) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_run_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudRunParams.ProtoReflect.Descriptor instead.
+func (*CloudRunParams) Descriptor() ([]byte, []int) {
+	return file_panel_run_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *CloudRunParams) GetStroppyInstanceTemplate() *CloudRunParams_StroppyInstanceParams {
+	if x != nil {
+		return x.StroppyInstanceTemplate
+	}
+	return nil
+}
+
+func (x *CloudRunParams) GetDatabaseInstanceTemplate() *CloudRunParams_DatabaseInstanceParams {
+	if x != nil {
+		return x.DatabaseInstanceTemplate
+	}
+	return nil
+}
+
 type RunRecord struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Id       *Ulid                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -36,16 +90,15 @@ type RunRecord struct {
 	GrafanaDashboardUrl string `protobuf:"bytes,7,opt,name=grafana_dashboard_url,json=grafanaDashboardUrl,proto3" json:"grafana_dashboard_url,omitempty"`
 	WorkflowId          *Ulid  `protobuf:"bytes,8,opt,name=workflow_id,json=workflowId,proto3,oneof" json:"workflow_id,omitempty"`
 	// its optional cause stroppy can send RunRecord without deployment anything
-	DatabaseInstanceTemplate *DatabaseInstanceTemplate `protobuf:"bytes,9,opt,name=database_instance_template,json=databaseInstanceTemplate,proto3,oneof" json:"database_instance_template,omitempty"`
-	StroppyDeploymentInfo    *StroppyInstanceTemplate  `protobuf:"bytes,10,opt,name=stroppy_deployment_info,json=stroppyDeploymentInfo,proto3,oneof" json:"stroppy_deployment_info,omitempty"`
-	Steps                    []*RunRecordStep          `protobuf:"bytes,11,rep,name=steps,proto3" json:"steps,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	CloudRunParams *CloudRunParams  `protobuf:"bytes,9,opt,name=cloud_run_params,json=cloudRunParams,proto3,oneof" json:"cloud_run_params,omitempty"`
+	Steps          []*RunRecordStep `protobuf:"bytes,11,rep,name=steps,proto3" json:"steps,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RunRecord) Reset() {
 	*x = RunRecord{}
-	mi := &file_panel_run_proto_msgTypes[0]
+	mi := &file_panel_run_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -57,7 +110,7 @@ func (x *RunRecord) String() string {
 func (*RunRecord) ProtoMessage() {}
 
 func (x *RunRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_run_proto_msgTypes[0]
+	mi := &file_panel_run_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -70,7 +123,7 @@ func (x *RunRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunRecord.ProtoReflect.Descriptor instead.
 func (*RunRecord) Descriptor() ([]byte, []int) {
-	return file_panel_run_proto_rawDescGZIP(), []int{0}
+	return file_panel_run_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *RunRecord) GetId() *Ulid {
@@ -129,16 +182,9 @@ func (x *RunRecord) GetWorkflowId() *Ulid {
 	return nil
 }
 
-func (x *RunRecord) GetDatabaseInstanceTemplate() *DatabaseInstanceTemplate {
+func (x *RunRecord) GetCloudRunParams() *CloudRunParams {
 	if x != nil {
-		return x.DatabaseInstanceTemplate
-	}
-	return nil
-}
-
-func (x *RunRecord) GetStroppyDeploymentInfo() *StroppyInstanceTemplate {
-	if x != nil {
-		return x.StroppyDeploymentInfo
+		return x.CloudRunParams
 	}
 	return nil
 }
@@ -163,7 +209,7 @@ type RunRecordStep struct {
 
 func (x *RunRecordStep) Reset() {
 	*x = RunRecordStep{}
-	mi := &file_panel_run_proto_msgTypes[1]
+	mi := &file_panel_run_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -175,7 +221,7 @@ func (x *RunRecordStep) String() string {
 func (*RunRecordStep) ProtoMessage() {}
 
 func (x *RunRecordStep) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_run_proto_msgTypes[1]
+	mi := &file_panel_run_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -188,7 +234,7 @@ func (x *RunRecordStep) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunRecordStep.ProtoReflect.Descriptor instead.
 func (*RunRecordStep) Descriptor() ([]byte, []int) {
-	return file_panel_run_proto_rawDescGZIP(), []int{1}
+	return file_panel_run_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RunRecordStep) GetId() *Ulid {
@@ -227,20 +273,23 @@ func (x *RunRecordStep) GetStepInfo() *stroppy.StroppyStepRun {
 }
 
 type ListRunsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Limit         *int32                 `protobuf:"varint,1,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
-	Offset        *int32                 `protobuf:"varint,2,opt,name=offset,proto3,oneof" json:"offset,omitempty"`
-	OnlyMine      bool                   `protobuf:"varint,10,opt,name=only_mine,json=onlyMine,proto3" json:"only_mine,omitempty"`
-	Status        *stroppy.Status        `protobuf:"varint,3,opt,name=status,proto3,enum=stroppy.Status,oneof" json:"status,omitempty"` // sort by status
-	StroppyTags   *Tags_Filter           `protobuf:"bytes,4,opt,name=stroppy_tags,json=stroppyTags,proto3" json:"stroppy_tags,omitempty"`
-	DatabaseTags  *Tags_Filter           `protobuf:"bytes,5,opt,name=database_tags,json=databaseTags,proto3" json:"database_tags,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Limit        *int32                 `protobuf:"varint,1,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	Offset       *int32                 `protobuf:"varint,2,opt,name=offset,proto3,oneof" json:"offset,omitempty"`
+	Id           string                 `protobuf:"bytes,7,opt,name=id,proto3" json:"id,omitempty"`
+	OnlyMine     bool                   `protobuf:"varint,10,opt,name=only_mine,json=onlyMine,proto3" json:"only_mine,omitempty"`
+	Status       *stroppy.Status        `protobuf:"varint,3,opt,name=status,proto3,enum=stroppy.Status,oneof" json:"status,omitempty"` // sort by status
+	StroppyTags  *Tag_List              `protobuf:"bytes,4,opt,name=stroppy_tags,json=stroppyTags,proto3" json:"stroppy_tags,omitempty"`
+	DatabaseTags *Tag_List              `protobuf:"bytes,5,opt,name=database_tags,json=databaseTags,proto3" json:"database_tags,omitempty"`
+	// order
+	TpsOrder      *Tps_Order `protobuf:"bytes,6,opt,name=tps_order,json=tpsOrder,proto3" json:"tps_order,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListRunsRequest) Reset() {
 	*x = ListRunsRequest{}
-	mi := &file_panel_run_proto_msgTypes[2]
+	mi := &file_panel_run_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -252,7 +301,7 @@ func (x *ListRunsRequest) String() string {
 func (*ListRunsRequest) ProtoMessage() {}
 
 func (x *ListRunsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_run_proto_msgTypes[2]
+	mi := &file_panel_run_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -265,7 +314,7 @@ func (x *ListRunsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRunsRequest.ProtoReflect.Descriptor instead.
 func (*ListRunsRequest) Descriptor() ([]byte, []int) {
-	return file_panel_run_proto_rawDescGZIP(), []int{2}
+	return file_panel_run_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ListRunsRequest) GetLimit() int32 {
@@ -282,6 +331,13 @@ func (x *ListRunsRequest) GetOffset() int32 {
 	return 0
 }
 
+func (x *ListRunsRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 func (x *ListRunsRequest) GetOnlyMine() bool {
 	if x != nil {
 		return x.OnlyMine
@@ -296,43 +352,51 @@ func (x *ListRunsRequest) GetStatus() stroppy.Status {
 	return stroppy.Status(0)
 }
 
-func (x *ListRunsRequest) GetStroppyTags() *Tags_Filter {
+func (x *ListRunsRequest) GetStroppyTags() *Tag_List {
 	if x != nil {
 		return x.StroppyTags
 	}
 	return nil
 }
 
-func (x *ListRunsRequest) GetDatabaseTags() *Tags_Filter {
+func (x *ListRunsRequest) GetDatabaseTags() *Tag_List {
 	if x != nil {
 		return x.DatabaseTags
 	}
 	return nil
 }
 
-type RunStroppyInCloudRequest struct {
-	state                    protoimpl.MessageState    `protogen:"open.v1"`
-	DatabaseInstanceTemplate *DatabaseInstanceTemplate `protobuf:"bytes,1,opt,name=database_instance_template,json=databaseInstanceTemplate,proto3" json:"database_instance_template,omitempty"`
-	StroppyInstanceTemplate  *StroppyInstanceTemplate  `protobuf:"bytes,2,opt,name=stroppy_instance_template,json=stroppyInstanceTemplate,proto3" json:"stroppy_instance_template,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+func (x *ListRunsRequest) GetTpsOrder() *Tps_Order {
+	if x != nil {
+		return x.TpsOrder
+	}
+	return nil
 }
 
-func (x *RunStroppyInCloudRequest) Reset() {
-	*x = RunStroppyInCloudRequest{}
-	mi := &file_panel_run_proto_msgTypes[3]
+type CloudRunParams_MachineInstanceParams struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	MachineDeploymentTemplate *Template              `protobuf:"bytes,1,opt,name=machine_deployment_template,json=machineDeploymentTemplate,proto3" json:"machine_deployment_template,omitempty"`
+	SshUser                   *crossplane.SshUser    `protobuf:"bytes,2,opt,name=ssh_user,json=sshUser,proto3" json:"ssh_user,omitempty"`
+	PublicIp                  bool                   `protobuf:"varint,3,opt,name=public_ip,json=publicIp,proto3" json:"public_ip,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *CloudRunParams_MachineInstanceParams) Reset() {
+	*x = CloudRunParams_MachineInstanceParams{}
+	mi := &file_panel_run_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RunStroppyInCloudRequest) String() string {
+func (x *CloudRunParams_MachineInstanceParams) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RunStroppyInCloudRequest) ProtoMessage() {}
+func (*CloudRunParams_MachineInstanceParams) ProtoMessage() {}
 
-func (x *RunStroppyInCloudRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_run_proto_msgTypes[3]
+func (x *CloudRunParams_MachineInstanceParams) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_run_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -343,21 +407,160 @@ func (x *RunStroppyInCloudRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RunStroppyInCloudRequest.ProtoReflect.Descriptor instead.
-func (*RunStroppyInCloudRequest) Descriptor() ([]byte, []int) {
-	return file_panel_run_proto_rawDescGZIP(), []int{3}
+// Deprecated: Use CloudRunParams_MachineInstanceParams.ProtoReflect.Descriptor instead.
+func (*CloudRunParams_MachineInstanceParams) Descriptor() ([]byte, []int) {
+	return file_panel_run_proto_rawDescGZIP(), []int{0, 0}
 }
 
-func (x *RunStroppyInCloudRequest) GetDatabaseInstanceTemplate() *DatabaseInstanceTemplate {
+func (x *CloudRunParams_MachineInstanceParams) GetMachineDeploymentTemplate() *Template {
 	if x != nil {
-		return x.DatabaseInstanceTemplate
+		return x.MachineDeploymentTemplate
 	}
 	return nil
 }
 
-func (x *RunStroppyInCloudRequest) GetStroppyInstanceTemplate() *StroppyInstanceTemplate {
+func (x *CloudRunParams_MachineInstanceParams) GetSshUser() *crossplane.SshUser {
 	if x != nil {
-		return x.StroppyInstanceTemplate
+		return x.SshUser
+	}
+	return nil
+}
+
+func (x *CloudRunParams_MachineInstanceParams) GetPublicIp() bool {
+	if x != nil {
+		return x.PublicIp
+	}
+	return false
+}
+
+type CloudRunParams_StroppyInstanceParams struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// now support only YandexCloud
+	SupportedCloud crossplane.SupportedCloud `protobuf:"varint,1,opt,name=supported_cloud,json=supportedCloud,proto3,enum=crossplane.SupportedCloud" json:"supported_cloud,omitempty"`
+	// now support only single node
+	MachineInstance           *CloudRunParams_MachineInstanceParams `protobuf:"bytes,3,opt,name=machine_instance,json=machineInstance,proto3" json:"machine_instance,omitempty"`
+	StroppyDeploymentTemplate *Template                             `protobuf:"bytes,2,opt,name=stroppy_deployment_template,json=stroppyDeploymentTemplate,proto3" json:"stroppy_deployment_template,omitempty"`
+	OverrideKv                *KV_Map                               `protobuf:"bytes,4,opt,name=override_kv,json=overrideKv,proto3" json:"override_kv,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *CloudRunParams_StroppyInstanceParams) Reset() {
+	*x = CloudRunParams_StroppyInstanceParams{}
+	mi := &file_panel_run_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudRunParams_StroppyInstanceParams) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudRunParams_StroppyInstanceParams) ProtoMessage() {}
+
+func (x *CloudRunParams_StroppyInstanceParams) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_run_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudRunParams_StroppyInstanceParams.ProtoReflect.Descriptor instead.
+func (*CloudRunParams_StroppyInstanceParams) Descriptor() ([]byte, []int) {
+	return file_panel_run_proto_rawDescGZIP(), []int{0, 1}
+}
+
+func (x *CloudRunParams_StroppyInstanceParams) GetSupportedCloud() crossplane.SupportedCloud {
+	if x != nil {
+		return x.SupportedCloud
+	}
+	return crossplane.SupportedCloud(0)
+}
+
+func (x *CloudRunParams_StroppyInstanceParams) GetMachineInstance() *CloudRunParams_MachineInstanceParams {
+	if x != nil {
+		return x.MachineInstance
+	}
+	return nil
+}
+
+func (x *CloudRunParams_StroppyInstanceParams) GetStroppyDeploymentTemplate() *Template {
+	if x != nil {
+		return x.StroppyDeploymentTemplate
+	}
+	return nil
+}
+
+func (x *CloudRunParams_StroppyInstanceParams) GetOverrideKv() *KV_Map {
+	if x != nil {
+		return x.OverrideKv
+	}
+	return nil
+}
+
+type CloudRunParams_DatabaseInstanceParams struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// now support only YandexCloud
+	SupportedCloud crossplane.SupportedCloud `protobuf:"varint,1,opt,name=supported_cloud,json=supportedCloud,proto3,enum=crossplane.SupportedCloud" json:"supported_cloud,omitempty"`
+	// now support only single node
+	DatabaseDeploymentTemplate *Template                             `protobuf:"bytes,2,opt,name=database_deployment_template,json=databaseDeploymentTemplate,proto3" json:"database_deployment_template,omitempty"`
+	MachineInstance            *CloudRunParams_MachineInstanceParams `protobuf:"bytes,3,opt,name=machine_instance,json=machineInstance,proto3" json:"machine_instance,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
+}
+
+func (x *CloudRunParams_DatabaseInstanceParams) Reset() {
+	*x = CloudRunParams_DatabaseInstanceParams{}
+	mi := &file_panel_run_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudRunParams_DatabaseInstanceParams) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudRunParams_DatabaseInstanceParams) ProtoMessage() {}
+
+func (x *CloudRunParams_DatabaseInstanceParams) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_run_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudRunParams_DatabaseInstanceParams.ProtoReflect.Descriptor instead.
+func (*CloudRunParams_DatabaseInstanceParams) Descriptor() ([]byte, []int) {
+	return file_panel_run_proto_rawDescGZIP(), []int{0, 2}
+}
+
+func (x *CloudRunParams_DatabaseInstanceParams) GetSupportedCloud() crossplane.SupportedCloud {
+	if x != nil {
+		return x.SupportedCloud
+	}
+	return crossplane.SupportedCloud(0)
+}
+
+func (x *CloudRunParams_DatabaseInstanceParams) GetDatabaseDeploymentTemplate() *Template {
+	if x != nil {
+		return x.DatabaseDeploymentTemplate
+	}
+	return nil
+}
+
+func (x *CloudRunParams_DatabaseInstanceParams) GetMachineInstance() *CloudRunParams_MachineInstanceParams {
+	if x != nil {
+		return x.MachineInstance
 	}
 	return nil
 }
@@ -371,7 +574,7 @@ type RunRecord_List struct {
 
 func (x *RunRecord_List) Reset() {
 	*x = RunRecord_List{}
-	mi := &file_panel_run_proto_msgTypes[4]
+	mi := &file_panel_run_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -383,7 +586,7 @@ func (x *RunRecord_List) String() string {
 func (*RunRecord_List) ProtoMessage() {}
 
 func (x *RunRecord_List) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_run_proto_msgTypes[4]
+	mi := &file_panel_run_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -396,7 +599,7 @@ func (x *RunRecord_List) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunRecord_List.ProtoReflect.Descriptor instead.
 func (*RunRecord_List) Descriptor() ([]byte, []int) {
-	return file_panel_run_proto_rawDescGZIP(), []int{0, 0}
+	return file_panel_run_proto_rawDescGZIP(), []int{1, 0}
 }
 
 func (x *RunRecord_List) GetRecords() []*RunRecord {
@@ -415,7 +618,7 @@ type RunRecordStep_List struct {
 
 func (x *RunRecordStep_List) Reset() {
 	*x = RunRecordStep_List{}
-	mi := &file_panel_run_proto_msgTypes[5]
+	mi := &file_panel_run_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -427,7 +630,7 @@ func (x *RunRecordStep_List) String() string {
 func (*RunRecordStep_List) ProtoMessage() {}
 
 func (x *RunRecordStep_List) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_run_proto_msgTypes[5]
+	mi := &file_panel_run_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -440,7 +643,7 @@ func (x *RunRecordStep_List) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunRecordStep_List.ProtoReflect.Descriptor instead.
 func (*RunRecordStep_List) Descriptor() ([]byte, []int) {
-	return file_panel_run_proto_rawDescGZIP(), []int{1, 0}
+	return file_panel_run_proto_rawDescGZIP(), []int{2, 0}
 }
 
 func (x *RunRecordStep_List) GetSteps() []*RunRecordStep {
@@ -454,7 +657,25 @@ var File_panel_run_proto protoreflect.FileDescriptor
 
 const file_panel_run_proto_rawDesc = "" +
 	"\n" +
-	"\x0fpanel/run.proto\x12\x05panel\x1a\x14panel/template.proto\x1a\x11panel/types.proto\x1a\x19proto/stroppy/cloud.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xa6\a\n" +
+	"\x0fpanel/run.proto\x12\x05panel\x1a\x16crossplane/types.proto\x1a\x14panel/template.proto\x1a\x11panel/types.proto\x1a\x19proto/stroppy/cloud.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xb4\b\n" +
+	"\x0eCloudRunParams\x12n\n" +
+	"\x19stroppy_instance_template\x18\x02 \x01(\v2+.panel.CloudRunParams.StroppyInstanceParamsB\x05\xca>\x02H\x01R\x17stroppyInstanceTemplate\x12v\n" +
+	"\x1adatabase_instance_template\x18\x03 \x01(\v2,.panel.CloudRunParams.DatabaseInstanceParamsB\x05\xca>\x02H\x01H\x00R\x18databaseInstanceTemplate\x88\x01\x01\x1a\xbc\x01\n" +
+	"\x15MachineInstanceParams\x12O\n" +
+	"\x1bmachine_deployment_template\x18\x01 \x01(\v2\x0f.panel.TemplateR\x19machineDeploymentTemplate\x125\n" +
+	"\bssh_user\x18\x02 \x01(\v2\x13.crossplane.SshUserB\x05\xca>\x02@\x01R\asshUser\x12\x1b\n" +
+	"\tpublic_ip\x18\x03 \x01(\bR\bpublicIp\x1a\xc6\x02\n" +
+	"\x15StroppyInstanceParams\x12M\n" +
+	"\x0fsupported_cloud\x18\x01 \x01(\x0e2\x1a.crossplane.SupportedCloudB\b\xfaB\x05\x82\x01\x02\x10\x01R\x0esupportedCloud\x12V\n" +
+	"\x10machine_instance\x18\x03 \x01(\v2+.panel.CloudRunParams.MachineInstanceParamsR\x0fmachineInstance\x12O\n" +
+	"\x1bstroppy_deployment_template\x18\x02 \x01(\v2\x0f.panel.TemplateR\x19stroppyDeploymentTemplate\x125\n" +
+	"\voverride_kv\x18\x04 \x01(\v2\r.panel.KV.MapB\x05\xca>\x02H\x01R\n" +
+	"overrideKv\x1a\x92\x02\n" +
+	"\x16DatabaseInstanceParams\x12M\n" +
+	"\x0fsupported_cloud\x18\x01 \x01(\x0e2\x1a.crossplane.SupportedCloudB\b\xfaB\x05\x82\x01\x02\x10\x01R\x0esupportedCloud\x12Q\n" +
+	"\x1cdatabase_deployment_template\x18\x02 \x01(\v2\x0f.panel.TemplateR\x1adatabaseDeploymentTemplate\x12V\n" +
+	"\x10machine_instance\x18\x03 \x01(\v2+.panel.CloudRunParams.MachineInstanceParamsR\x0fmachineInstanceB\x1d\n" +
+	"\x1b_database_instance_template\"\xc7\x05\n" +
 	"\tRunRecord\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12f\n" +
@@ -464,20 +685,17 @@ const file_panel_run_proto_rawDesc = "" +
 	"\brun_info\x18\x05 \x01(\v2\x13.stroppy.StroppyRunB\x05\xca>\x02H\x01R\arunInfo\x12#\n" +
 	"\x03tps\x18\x06 \x01(\v2\n" +
 	".panel.TpsB\x05\xca>\x02H\x01R\x03tps\x122\n" +
-	"\x15grafana_dashboard_url\x18\a \x01(\tR\x13grafanaDashboardUrl\x12s\n" +
-	"\vworkflow_id\x18\b \x01(\v2\v.panel.UlidB@\xca>=\x12\x04\b\x01 \x01\x1a5\"3NOT NULL REFERENCES workflows(id) ON DELETE CASCADEH\x00R\n" +
-	"workflowId\x88\x01\x01\x12i\n" +
-	"\x1adatabase_instance_template\x18\t \x01(\v2\x1f.panel.DatabaseInstanceTemplateB\x05\xca>\x02H\x01H\x01R\x18databaseInstanceTemplate\x88\x01\x01\x12b\n" +
-	"\x17stroppy_deployment_info\x18\n" +
-	" \x01(\v2\x1e.panel.StroppyInstanceTemplateB\x05\xca>\x02H\x01H\x02R\x15stroppyDeploymentInfo\x88\x01\x01\x12=\n" +
+	"\x15grafana_dashboard_url\x18\a \x01(\tR\x13grafanaDashboardUrl\x12<\n" +
+	"\vworkflow_id\x18\b \x01(\v2\v.panel.UlidB\t\xca>\x06\x12\x04\b\x01 \x01H\x00R\n" +
+	"workflowId\x88\x01\x01\x12K\n" +
+	"\x10cloud_run_params\x18\t \x01(\v2\x15.panel.CloudRunParamsB\x05\xca>\x02H\x01H\x01R\x0ecloudRunParams\x88\x01\x01\x12=\n" +
 	"\x05steps\x18\v \x03(\v2\x14.panel.RunRecordStepB\x11\xd2>\x0e\n" +
 	"\f\n" +
 	"\x06run_id\x18\x01 \x01R\x05steps\x1a2\n" +
 	"\x04List\x12*\n" +
 	"\arecords\x18\x01 \x03(\v2\x10.panel.RunRecordR\arecords:\x12\xca>\x0f\b\x01\x12\vrun_recordsB\x0e\n" +
-	"\f_workflow_idB\x1d\n" +
-	"\x1b_database_instance_templateB\x1a\n" +
-	"\x18_stroppy_deployment_info\"\x8e\x03\n" +
+	"\f_workflow_idB\x13\n" +
+	"\x11_cloud_run_params\"\x8e\x03\n" +
 	"\rRunRecordStep\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
@@ -486,26 +704,24 @@ const file_panel_run_proto_rawDesc = "" +
 	"\x06status\x18\x04 \x01(\x0e2\x0f.stroppy.StatusB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06status\x12;\n" +
 	"\tstep_info\x18\x05 \x01(\v2\x17.stroppy.StroppyStepRunB\x05\xca>\x02H\x01R\bstepInfo\x1a2\n" +
 	"\x04List\x12*\n" +
-	"\x05steps\x18\x01 \x03(\v2\x14.panel.RunRecordStepR\x05steps:\x17\xca>\x14\b\x01\x12\x10run_record_steps\"\xa4\x02\n" +
+	"\x05steps\x18\x01 \x03(\v2\x14.panel.RunRecordStepR\x05steps:\x17\xca>\x14\b\x01\x12\x10run_record_steps\"\xdd\x02\n" +
 	"\x0fListRunsRequest\x12\x19\n" +
 	"\x05limit\x18\x01 \x01(\x05H\x00R\x05limit\x88\x01\x01\x12\x1b\n" +
-	"\x06offset\x18\x02 \x01(\x05H\x01R\x06offset\x88\x01\x01\x12\x1b\n" +
+	"\x06offset\x18\x02 \x01(\x05H\x01R\x06offset\x88\x01\x01\x12\x0e\n" +
+	"\x02id\x18\a \x01(\tR\x02id\x12\x1b\n" +
 	"\tonly_mine\x18\n" +
 	" \x01(\bR\bonlyMine\x12,\n" +
-	"\x06status\x18\x03 \x01(\x0e2\x0f.stroppy.StatusH\x02R\x06status\x88\x01\x01\x125\n" +
-	"\fstroppy_tags\x18\x04 \x01(\v2\x12.panel.Tags.FilterR\vstroppyTags\x127\n" +
-	"\rdatabase_tags\x18\x05 \x01(\v2\x12.panel.Tags.FilterR\fdatabaseTagsB\b\n" +
+	"\x06status\x18\x03 \x01(\x0e2\x0f.stroppy.StatusH\x02R\x06status\x88\x01\x01\x122\n" +
+	"\fstroppy_tags\x18\x04 \x01(\v2\x0f.panel.Tag.ListR\vstroppyTags\x124\n" +
+	"\rdatabase_tags\x18\x05 \x01(\v2\x0f.panel.Tag.ListR\fdatabaseTags\x12-\n" +
+	"\ttps_order\x18\x06 \x01(\v2\x10.panel.Tps.OrderR\btpsOrderB\b\n" +
 	"\x06_limitB\t\n" +
 	"\a_offsetB\t\n" +
-	"\a_status\"\xe3\x01\n" +
-	"\x18RunStroppyInCloudRequest\x12d\n" +
-	"\x1adatabase_instance_template\x18\x01 \x01(\v2\x1f.panel.DatabaseInstanceTemplateB\x05\xca>\x02H\x01R\x18databaseInstanceTemplate\x12a\n" +
-	"\x19stroppy_instance_template\x18\x02 \x01(\v2\x1e.panel.StroppyInstanceTemplateB\x05\xca>\x02H\x01R\x17stroppyInstanceTemplate2\xcd\x01\n" +
+	"\a_status2\x85\x01\n" +
 	"\n" +
 	"RunService\x129\n" +
 	"\bListRuns\x12\x16.panel.ListRunsRequest\x1a\x15.panel.RunRecord.List\x12<\n" +
-	"\vListTopRuns\x12\x16.panel.ListRunsRequest\x1a\x15.panel.RunRecord.List\x12F\n" +
-	"\x11RunStroppyInCloud\x12\x1f.panel.RunStroppyInCloudRequest\x1a\x10.panel.RunRecordB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
+	"\x11RunStroppyInCloud\x12\x15.panel.CloudRunParams\x1a\x10.panel.RunRecordB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
 
 var (
 	file_panel_run_proto_rawDescOnce sync.Once
@@ -519,58 +735,71 @@ func file_panel_run_proto_rawDescGZIP() []byte {
 	return file_panel_run_proto_rawDescData
 }
 
-var file_panel_run_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_panel_run_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_panel_run_proto_goTypes = []any{
-	(*RunRecord)(nil),                // 0: panel.RunRecord
-	(*RunRecordStep)(nil),            // 1: panel.RunRecordStep
-	(*ListRunsRequest)(nil),          // 2: panel.ListRunsRequest
-	(*RunStroppyInCloudRequest)(nil), // 3: panel.RunStroppyInCloudRequest
-	(*RunRecord_List)(nil),           // 4: panel.RunRecord.List
-	(*RunRecordStep_List)(nil),       // 5: panel.RunRecordStep.List
-	(*Ulid)(nil),                     // 6: panel.Ulid
-	(*Timing)(nil),                   // 7: panel.Timing
-	(stroppy.Status)(0),              // 8: stroppy.Status
-	(*stroppy.StroppyRun)(nil),       // 9: stroppy.StroppyRun
-	(*Tps)(nil),                      // 10: panel.Tps
-	(*DatabaseInstanceTemplate)(nil), // 11: panel.DatabaseInstanceTemplate
-	(*StroppyInstanceTemplate)(nil),  // 12: panel.StroppyInstanceTemplate
-	(*stroppy.StroppyStepRun)(nil),   // 13: stroppy.StroppyStepRun
-	(*Tags_Filter)(nil),              // 14: panel.Tags.Filter
+	(*CloudRunParams)(nil),                        // 0: panel.CloudRunParams
+	(*RunRecord)(nil),                             // 1: panel.RunRecord
+	(*RunRecordStep)(nil),                         // 2: panel.RunRecordStep
+	(*ListRunsRequest)(nil),                       // 3: panel.ListRunsRequest
+	(*CloudRunParams_MachineInstanceParams)(nil),  // 4: panel.CloudRunParams.MachineInstanceParams
+	(*CloudRunParams_StroppyInstanceParams)(nil),  // 5: panel.CloudRunParams.StroppyInstanceParams
+	(*CloudRunParams_DatabaseInstanceParams)(nil), // 6: panel.CloudRunParams.DatabaseInstanceParams
+	(*RunRecord_List)(nil),                        // 7: panel.RunRecord.List
+	(*RunRecordStep_List)(nil),                    // 8: panel.RunRecordStep.List
+	(*Ulid)(nil),                                  // 9: panel.Ulid
+	(*Timing)(nil),                                // 10: panel.Timing
+	(stroppy.Status)(0),                           // 11: stroppy.Status
+	(*stroppy.StroppyRun)(nil),                    // 12: stroppy.StroppyRun
+	(*Tps)(nil),                                   // 13: panel.Tps
+	(*stroppy.StroppyStepRun)(nil),                // 14: stroppy.StroppyStepRun
+	(*Tag_List)(nil),                              // 15: panel.Tag.List
+	(*Tps_Order)(nil),                             // 16: panel.Tps.Order
+	(*Template)(nil),                              // 17: panel.Template
+	(*crossplane.SshUser)(nil),                    // 18: crossplane.SshUser
+	(crossplane.SupportedCloud)(0),                // 19: crossplane.SupportedCloud
+	(*KV_Map)(nil),                                // 20: panel.KV.Map
 }
 var file_panel_run_proto_depIdxs = []int32{
-	6,  // 0: panel.RunRecord.id:type_name -> panel.Ulid
-	6,  // 1: panel.RunRecord.author_id:type_name -> panel.Ulid
-	7,  // 2: panel.RunRecord.timing:type_name -> panel.Timing
-	8,  // 3: panel.RunRecord.status:type_name -> stroppy.Status
-	9,  // 4: panel.RunRecord.run_info:type_name -> stroppy.StroppyRun
-	10, // 5: panel.RunRecord.tps:type_name -> panel.Tps
-	6,  // 6: panel.RunRecord.workflow_id:type_name -> panel.Ulid
-	11, // 7: panel.RunRecord.database_instance_template:type_name -> panel.DatabaseInstanceTemplate
-	12, // 8: panel.RunRecord.stroppy_deployment_info:type_name -> panel.StroppyInstanceTemplate
-	1,  // 9: panel.RunRecord.steps:type_name -> panel.RunRecordStep
-	6,  // 10: panel.RunRecordStep.id:type_name -> panel.Ulid
-	7,  // 11: panel.RunRecordStep.timing:type_name -> panel.Timing
-	6,  // 12: panel.RunRecordStep.run_id:type_name -> panel.Ulid
-	8,  // 13: panel.RunRecordStep.status:type_name -> stroppy.Status
-	13, // 14: panel.RunRecordStep.step_info:type_name -> stroppy.StroppyStepRun
-	8,  // 15: panel.ListRunsRequest.status:type_name -> stroppy.Status
-	14, // 16: panel.ListRunsRequest.stroppy_tags:type_name -> panel.Tags.Filter
-	14, // 17: panel.ListRunsRequest.database_tags:type_name -> panel.Tags.Filter
-	11, // 18: panel.RunStroppyInCloudRequest.database_instance_template:type_name -> panel.DatabaseInstanceTemplate
-	12, // 19: panel.RunStroppyInCloudRequest.stroppy_instance_template:type_name -> panel.StroppyInstanceTemplate
-	0,  // 20: panel.RunRecord.List.records:type_name -> panel.RunRecord
-	1,  // 21: panel.RunRecordStep.List.steps:type_name -> panel.RunRecordStep
-	2,  // 22: panel.RunService.ListRuns:input_type -> panel.ListRunsRequest
-	2,  // 23: panel.RunService.ListTopRuns:input_type -> panel.ListRunsRequest
-	3,  // 24: panel.RunService.RunStroppyInCloud:input_type -> panel.RunStroppyInCloudRequest
-	4,  // 25: panel.RunService.ListRuns:output_type -> panel.RunRecord.List
-	4,  // 26: panel.RunService.ListTopRuns:output_type -> panel.RunRecord.List
-	0,  // 27: panel.RunService.RunStroppyInCloud:output_type -> panel.RunRecord
-	25, // [25:28] is the sub-list for method output_type
-	22, // [22:25] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	5,  // 0: panel.CloudRunParams.stroppy_instance_template:type_name -> panel.CloudRunParams.StroppyInstanceParams
+	6,  // 1: panel.CloudRunParams.database_instance_template:type_name -> panel.CloudRunParams.DatabaseInstanceParams
+	9,  // 2: panel.RunRecord.id:type_name -> panel.Ulid
+	9,  // 3: panel.RunRecord.author_id:type_name -> panel.Ulid
+	10, // 4: panel.RunRecord.timing:type_name -> panel.Timing
+	11, // 5: panel.RunRecord.status:type_name -> stroppy.Status
+	12, // 6: panel.RunRecord.run_info:type_name -> stroppy.StroppyRun
+	13, // 7: panel.RunRecord.tps:type_name -> panel.Tps
+	9,  // 8: panel.RunRecord.workflow_id:type_name -> panel.Ulid
+	0,  // 9: panel.RunRecord.cloud_run_params:type_name -> panel.CloudRunParams
+	2,  // 10: panel.RunRecord.steps:type_name -> panel.RunRecordStep
+	9,  // 11: panel.RunRecordStep.id:type_name -> panel.Ulid
+	10, // 12: panel.RunRecordStep.timing:type_name -> panel.Timing
+	9,  // 13: panel.RunRecordStep.run_id:type_name -> panel.Ulid
+	11, // 14: panel.RunRecordStep.status:type_name -> stroppy.Status
+	14, // 15: panel.RunRecordStep.step_info:type_name -> stroppy.StroppyStepRun
+	11, // 16: panel.ListRunsRequest.status:type_name -> stroppy.Status
+	15, // 17: panel.ListRunsRequest.stroppy_tags:type_name -> panel.Tag.List
+	15, // 18: panel.ListRunsRequest.database_tags:type_name -> panel.Tag.List
+	16, // 19: panel.ListRunsRequest.tps_order:type_name -> panel.Tps.Order
+	17, // 20: panel.CloudRunParams.MachineInstanceParams.machine_deployment_template:type_name -> panel.Template
+	18, // 21: panel.CloudRunParams.MachineInstanceParams.ssh_user:type_name -> crossplane.SshUser
+	19, // 22: panel.CloudRunParams.StroppyInstanceParams.supported_cloud:type_name -> crossplane.SupportedCloud
+	4,  // 23: panel.CloudRunParams.StroppyInstanceParams.machine_instance:type_name -> panel.CloudRunParams.MachineInstanceParams
+	17, // 24: panel.CloudRunParams.StroppyInstanceParams.stroppy_deployment_template:type_name -> panel.Template
+	20, // 25: panel.CloudRunParams.StroppyInstanceParams.override_kv:type_name -> panel.KV.Map
+	19, // 26: panel.CloudRunParams.DatabaseInstanceParams.supported_cloud:type_name -> crossplane.SupportedCloud
+	17, // 27: panel.CloudRunParams.DatabaseInstanceParams.database_deployment_template:type_name -> panel.Template
+	4,  // 28: panel.CloudRunParams.DatabaseInstanceParams.machine_instance:type_name -> panel.CloudRunParams.MachineInstanceParams
+	1,  // 29: panel.RunRecord.List.records:type_name -> panel.RunRecord
+	2,  // 30: panel.RunRecordStep.List.steps:type_name -> panel.RunRecordStep
+	3,  // 31: panel.RunService.ListRuns:input_type -> panel.ListRunsRequest
+	0,  // 32: panel.RunService.RunStroppyInCloud:input_type -> panel.CloudRunParams
+	7,  // 33: panel.RunService.ListRuns:output_type -> panel.RunRecord.List
+	1,  // 34: panel.RunService.RunStroppyInCloud:output_type -> panel.RunRecord
+	33, // [33:35] is the sub-list for method output_type
+	31, // [31:33] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_panel_run_proto_init() }
@@ -581,14 +810,15 @@ func file_panel_run_proto_init() {
 	file_panel_template_proto_init()
 	file_panel_types_proto_init()
 	file_panel_run_proto_msgTypes[0].OneofWrappers = []any{}
-	file_panel_run_proto_msgTypes[2].OneofWrappers = []any{}
+	file_panel_run_proto_msgTypes[1].OneofWrappers = []any{}
+	file_panel_run_proto_msgTypes[3].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_panel_run_proto_rawDesc), len(file_panel_run_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -92,6 +92,58 @@ func (x *User) GetAdmin() bool {
 	return false
 }
 
+type RefreshTokens struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        *Ulid                  `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Token         string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefreshTokens) Reset() {
+	*x = RefreshTokens{}
+	mi := &file_panel_account_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefreshTokens) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefreshTokens) ProtoMessage() {}
+
+func (x *RefreshTokens) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_account_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefreshTokens.ProtoReflect.Descriptor instead.
+func (*RefreshTokens) Descriptor() ([]byte, []int) {
+	return file_panel_account_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *RefreshTokens) GetUserId() *Ulid {
+	if x != nil {
+		return x.UserId
+	}
+	return nil
+}
+
+func (x *RefreshTokens) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
 type RegisterRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
@@ -102,7 +154,7 @@ type RegisterRequest struct {
 
 func (x *RegisterRequest) Reset() {
 	*x = RegisterRequest{}
-	mi := &file_panel_account_proto_msgTypes[1]
+	mi := &file_panel_account_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -114,7 +166,7 @@ func (x *RegisterRequest) String() string {
 func (*RegisterRequest) ProtoMessage() {}
 
 func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_account_proto_msgTypes[1]
+	mi := &file_panel_account_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -127,7 +179,7 @@ func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
 func (*RegisterRequest) Descriptor() ([]byte, []int) {
-	return file_panel_account_proto_rawDescGZIP(), []int{1}
+	return file_panel_account_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RegisterRequest) GetEmail() string {
@@ -154,7 +206,7 @@ type LoginRequest struct {
 
 func (x *LoginRequest) Reset() {
 	*x = LoginRequest{}
-	mi := &file_panel_account_proto_msgTypes[2]
+	mi := &file_panel_account_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -166,7 +218,7 @@ func (x *LoginRequest) String() string {
 func (*LoginRequest) ProtoMessage() {}
 
 func (x *LoginRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_account_proto_msgTypes[2]
+	mi := &file_panel_account_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -179,7 +231,7 @@ func (x *LoginRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginRequest.ProtoReflect.Descriptor instead.
 func (*LoginRequest) Descriptor() ([]byte, []int) {
-	return file_panel_account_proto_rawDescGZIP(), []int{2}
+	return file_panel_account_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *LoginRequest) GetEmail() string {
@@ -206,7 +258,7 @@ type LoginResponse struct {
 
 func (x *LoginResponse) Reset() {
 	*x = LoginResponse{}
-	mi := &file_panel_account_proto_msgTypes[3]
+	mi := &file_panel_account_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -218,7 +270,7 @@ func (x *LoginResponse) String() string {
 func (*LoginResponse) ProtoMessage() {}
 
 func (x *LoginResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_account_proto_msgTypes[3]
+	mi := &file_panel_account_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -231,7 +283,7 @@ func (x *LoginResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginResponse.ProtoReflect.Descriptor instead.
 func (*LoginResponse) Descriptor() ([]byte, []int) {
-	return file_panel_account_proto_rawDescGZIP(), []int{3}
+	return file_panel_account_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *LoginResponse) GetAccessToken() string {
@@ -257,7 +309,7 @@ type RefreshTokensRequest struct {
 
 func (x *RefreshTokensRequest) Reset() {
 	*x = RefreshTokensRequest{}
-	mi := &file_panel_account_proto_msgTypes[4]
+	mi := &file_panel_account_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -269,7 +321,7 @@ func (x *RefreshTokensRequest) String() string {
 func (*RefreshTokensRequest) ProtoMessage() {}
 
 func (x *RefreshTokensRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_account_proto_msgTypes[4]
+	mi := &file_panel_account_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -282,7 +334,7 @@ func (x *RefreshTokensRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshTokensRequest.ProtoReflect.Descriptor instead.
 func (*RefreshTokensRequest) Descriptor() ([]byte, []int) {
-	return file_panel_account_proto_rawDescGZIP(), []int{4}
+	return file_panel_account_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RefreshTokensRequest) GetRefreshToken() string {
@@ -301,7 +353,7 @@ type RefreshTokensResponse struct {
 
 func (x *RefreshTokensResponse) Reset() {
 	*x = RefreshTokensResponse{}
-	mi := &file_panel_account_proto_msgTypes[5]
+	mi := &file_panel_account_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -313,7 +365,7 @@ func (x *RefreshTokensResponse) String() string {
 func (*RefreshTokensResponse) ProtoMessage() {}
 
 func (x *RefreshTokensResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_account_proto_msgTypes[5]
+	mi := &file_panel_account_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -326,7 +378,7 @@ func (x *RefreshTokensResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshTokensResponse.ProtoReflect.Descriptor instead.
 func (*RefreshTokensResponse) Descriptor() ([]byte, []int) {
-	return file_panel_account_proto_rawDescGZIP(), []int{5}
+	return file_panel_account_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RefreshTokensResponse) GetAccessToken() string {
@@ -340,16 +392,18 @@ var File_panel_account_proto protoreflect.FileDescriptor
 
 const file_panel_account_proto_rawDesc = "" +
 	"\n" +
-	"\x13panel/account.proto\x12\x05panel\x1a\x1bgoogle/protobuf/empty.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xf6\x01\n" +
+	"\x13panel/account.proto\x12\x05panel\x1a\x1bgoogle/protobuf/empty.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xda\x01\n" +
 	"\x04User\x122\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\x15\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01\xfaB\x05r\x03\x98\x01\x1aR\x02id\x12,\n" +
 	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12+\n" +
 	"\x05email\x18\x03 \x01(\tB\x15\xca>\b\x12\x02\b\x01\x1a\x02\b\x01\xfaB\ar\x05\x10\x03\x18\xff\x01R\x05email\x12\x14\n" +
-	"\x05admin\x18\x04 \x01(\bR\x05admin:I\xca>F\b\x01\x12\x05users\"\x1f\n" +
+	"\x05admin\x18\x04 \x01(\bR\x05admin:-\xca>*\b\x01\x12\x05users\"\x1f\n" +
 	"\rpassword_hash\x12\x02\b\x01\x1a\n" +
-	"\"\bNOT NULL\"\x1a\n" +
-	"\x0erefresh_tokens\x12\x02\b\x01\xa8\x06\x01\xb0\x06\x01\"[\n" +
+	"\"\bNOT NULL\"\xba\x01\n" +
+	"\rRefreshTokens\x12j\n" +
+	"\auser_id\x18\x01 \x01(\v2\v.panel.UlidBD\xca>9\x12\x04\b\x01 \x01\x1a1\"/NOT NULL REFERENCES users(id) ON DELETE CASCADE\xfaB\x05r\x03\x98\x01\x1aR\x06userId\x12&\n" +
+	"\x05token\x18\x02 \x01(\tB\x10\xca>\x04\x12\x02\b\x01\xfaB\x06r\x04\x10 \x188R\x05token:\x15\xca>\x12\b\x01\x12\x0erefresh_tokens\"[\n" +
 	"\x0fRegisterRequest\x12 \n" +
 	"\x05email\x18\x01 \x01(\tB\n" +
 	"\xfaB\ar\x05\x10\x03\x18\xff\x01R\x05email\x12&\n" +
@@ -384,36 +438,38 @@ func file_panel_account_proto_rawDescGZIP() []byte {
 	return file_panel_account_proto_rawDescData
 }
 
-var file_panel_account_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_panel_account_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_panel_account_proto_goTypes = []any{
 	(*User)(nil),                  // 0: panel.User
-	(*RegisterRequest)(nil),       // 1: panel.RegisterRequest
-	(*LoginRequest)(nil),          // 2: panel.LoginRequest
-	(*LoginResponse)(nil),         // 3: panel.LoginResponse
-	(*RefreshTokensRequest)(nil),  // 4: panel.RefreshTokensRequest
-	(*RefreshTokensResponse)(nil), // 5: panel.RefreshTokensResponse
-	(*Ulid)(nil),                  // 6: panel.Ulid
-	(*Timing)(nil),                // 7: panel.Timing
-	(*emptypb.Empty)(nil),         // 8: google.protobuf.Empty
+	(*RefreshTokens)(nil),         // 1: panel.RefreshTokens
+	(*RegisterRequest)(nil),       // 2: panel.RegisterRequest
+	(*LoginRequest)(nil),          // 3: panel.LoginRequest
+	(*LoginResponse)(nil),         // 4: panel.LoginResponse
+	(*RefreshTokensRequest)(nil),  // 5: panel.RefreshTokensRequest
+	(*RefreshTokensResponse)(nil), // 6: panel.RefreshTokensResponse
+	(*Ulid)(nil),                  // 7: panel.Ulid
+	(*Timing)(nil),                // 8: panel.Timing
+	(*emptypb.Empty)(nil),         // 9: google.protobuf.Empty
 }
 var file_panel_account_proto_depIdxs = []int32{
-	6, // 0: panel.User.id:type_name -> panel.Ulid
-	7, // 1: panel.User.timing:type_name -> panel.Timing
-	1, // 2: panel.AccountService.Register:input_type -> panel.RegisterRequest
-	2, // 3: panel.AccountService.Login:input_type -> panel.LoginRequest
-	8, // 4: panel.AccountService.GetMe:input_type -> google.protobuf.Empty
-	6, // 5: panel.AccountService.GetUserById:input_type -> panel.Ulid
-	4, // 6: panel.AccountService.RefreshTokens:input_type -> panel.RefreshTokensRequest
-	8, // 7: panel.AccountService.Register:output_type -> google.protobuf.Empty
-	3, // 8: panel.AccountService.Login:output_type -> panel.LoginResponse
-	0, // 9: panel.AccountService.GetMe:output_type -> panel.User
-	0, // 10: panel.AccountService.GetUserById:output_type -> panel.User
-	5, // 11: panel.AccountService.RefreshTokens:output_type -> panel.RefreshTokensResponse
-	7, // [7:12] is the sub-list for method output_type
-	2, // [2:7] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	7, // 0: panel.User.id:type_name -> panel.Ulid
+	8, // 1: panel.User.timing:type_name -> panel.Timing
+	7, // 2: panel.RefreshTokens.user_id:type_name -> panel.Ulid
+	2, // 3: panel.AccountService.Register:input_type -> panel.RegisterRequest
+	3, // 4: panel.AccountService.Login:input_type -> panel.LoginRequest
+	9, // 5: panel.AccountService.GetMe:input_type -> google.protobuf.Empty
+	7, // 6: panel.AccountService.GetUserById:input_type -> panel.Ulid
+	5, // 7: panel.AccountService.RefreshTokens:input_type -> panel.RefreshTokensRequest
+	9, // 8: panel.AccountService.Register:output_type -> google.protobuf.Empty
+	4, // 9: panel.AccountService.Login:output_type -> panel.LoginResponse
+	0, // 10: panel.AccountService.GetMe:output_type -> panel.User
+	0, // 11: panel.AccountService.GetUserById:output_type -> panel.User
+	6, // 12: panel.AccountService.RefreshTokens:output_type -> panel.RefreshTokensResponse
+	8, // [8:13] is the sub-list for method output_type
+	3, // [3:8] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_panel_account_proto_init() }
@@ -428,7 +484,7 @@ func file_panel_account_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_panel_account_proto_rawDesc), len(file_panel_account_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

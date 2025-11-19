@@ -19,12 +19,6 @@ message User {
             sql_type: {type: TEXT}
             constraints: {constraint: "NOT NULL"}
         }
-        virtual_fields: {
-            sql_name: "refresh_tokens"
-            sql_type: {type: TEXT}
-            is_nullable: true
-            is_array: true
-        }
     };
     Ulid id = 1 [
         (validate.rules).string.len = 26,
@@ -43,6 +37,23 @@ message User {
         }
     ];
     bool admin = 4;
+}
+
+message RefreshTokens {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "refresh_tokens"
+    };
+    Ulid user_id = 1 [
+        (validate.rules).string.len = 26,
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {constraint: "NOT NULL REFERENCES users(id) ON DELETE CASCADE"}}
+    ];
+    string token = 2 [
+        (validate.rules).string = {min_len: 32,max_len: 56},
+        (sql.sql_field) = {sql_type: {type: TEXT}}
+    ];
 }
 
 //------------------------------------------__ACCOUNT_SERVICE__---------------------------------------------------------

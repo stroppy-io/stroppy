@@ -74,55 +74,6 @@ func (YandexCloud_ResourceKind) EnumDescriptor() ([]byte, []int) {
 	return file_crossplane_yandex_proto_rawDescGZIP(), []int{0, 0}
 }
 
-type YandexCloud_ResourceDef_Spec_DeletionPolicy int32
-
-const (
-	YandexCloud_ResourceDef_Spec_DELETION_POLICY_UNSPECIFIED YandexCloud_ResourceDef_Spec_DeletionPolicy = 0
-	YandexCloud_ResourceDef_Spec_DELETE                      YandexCloud_ResourceDef_Spec_DeletionPolicy = 1
-	YandexCloud_ResourceDef_Spec_ORPHAN                      YandexCloud_ResourceDef_Spec_DeletionPolicy = 2
-)
-
-// Enum value maps for YandexCloud_ResourceDef_Spec_DeletionPolicy.
-var (
-	YandexCloud_ResourceDef_Spec_DeletionPolicy_name = map[int32]string{
-		0: "DELETION_POLICY_UNSPECIFIED",
-		1: "DELETE",
-		2: "ORPHAN",
-	}
-	YandexCloud_ResourceDef_Spec_DeletionPolicy_value = map[string]int32{
-		"DELETION_POLICY_UNSPECIFIED": 0,
-		"DELETE":                      1,
-		"ORPHAN":                      2,
-	}
-)
-
-func (x YandexCloud_ResourceDef_Spec_DeletionPolicy) Enum() *YandexCloud_ResourceDef_Spec_DeletionPolicy {
-	p := new(YandexCloud_ResourceDef_Spec_DeletionPolicy)
-	*p = x
-	return p
-}
-
-func (x YandexCloud_ResourceDef_Spec_DeletionPolicy) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (YandexCloud_ResourceDef_Spec_DeletionPolicy) Descriptor() protoreflect.EnumDescriptor {
-	return file_crossplane_yandex_proto_enumTypes[1].Descriptor()
-}
-
-func (YandexCloud_ResourceDef_Spec_DeletionPolicy) Type() protoreflect.EnumType {
-	return &file_crossplane_yandex_proto_enumTypes[1]
-}
-
-func (x YandexCloud_ResourceDef_Spec_DeletionPolicy) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use YandexCloud_ResourceDef_Spec_DeletionPolicy.Descriptor instead.
-func (YandexCloud_ResourceDef_Spec_DeletionPolicy) EnumDescriptor() ([]byte, []int) {
-	return file_crossplane_yandex_proto_rawDescGZIP(), []int{0, 3, 0, 0}
-}
-
 type YandexCloud struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -356,30 +307,35 @@ func (x *YandexCloud_Vm) GetMetadata() map[string]string {
 }
 
 // converted to crossplane k8s yaml
-type YandexCloud_ResourceDef struct {
-	state         protoimpl.MessageState        `protogen:"open.v1"`
-	ApiVersion    string                        `protobuf:"bytes,2,opt,name=api_version,json=apiVersion,proto3" json:"api_version,omitempty"`
-	Kind          string                        `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
-	Metadata      *Metadata                     `protobuf:"bytes,3,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Spec          *YandexCloud_ResourceDef_Spec `protobuf:"bytes,4,opt,name=spec,proto3" json:"spec,omitempty"`
+type YandexCloud_ResourceDefSpec struct {
+	state                      protoimpl.MessageState   `protogen:"open.v1"`
+	WriteConnectionSecretToRef *Ref                     `protobuf:"bytes,1,opt,name=write_connection_secret_to_ref,json=writeConnectionSecretToRef,proto3" json:"write_connection_secret_to_ref,omitempty"`
+	DeletionPolicy             CrossplaneDeletionPolicy `protobuf:"varint,2,opt,name=deletion_policy,json=deletionPolicy,proto3,enum=crossplane.CrossplaneDeletionPolicy" json:"deletion_policy,omitempty"`
+	ProviderConfigRef          map[string]string        `protobuf:"bytes,3,rep,name=provider_config_ref,json=providerConfigRef,proto3" json:"provider_config_ref,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Types that are valid to be assigned to ForProvider:
+	//
+	//	*YandexCloud_ResourceDefSpec_YandexCloudVm
+	//	*YandexCloud_ResourceDefSpec_YandexCloudNetwork
+	//	*YandexCloud_ResourceDefSpec_YandexCloudSubnet
+	ForProvider   isYandexCloud_ResourceDefSpec_ForProvider `protobuf_oneof:"for_provider"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *YandexCloud_ResourceDef) Reset() {
-	*x = YandexCloud_ResourceDef{}
+func (x *YandexCloud_ResourceDefSpec) Reset() {
+	*x = YandexCloud_ResourceDefSpec{}
 	mi := &file_crossplane_yandex_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *YandexCloud_ResourceDef) String() string {
+func (x *YandexCloud_ResourceDefSpec) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*YandexCloud_ResourceDef) ProtoMessage() {}
+func (*YandexCloud_ResourceDefSpec) ProtoMessage() {}
 
-func (x *YandexCloud_ResourceDef) ProtoReflect() protoreflect.Message {
+func (x *YandexCloud_ResourceDefSpec) ProtoReflect() protoreflect.Message {
 	mi := &file_crossplane_yandex_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -391,136 +347,87 @@ func (x *YandexCloud_ResourceDef) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use YandexCloud_ResourceDef.ProtoReflect.Descriptor instead.
-func (*YandexCloud_ResourceDef) Descriptor() ([]byte, []int) {
+// Deprecated: Use YandexCloud_ResourceDefSpec.ProtoReflect.Descriptor instead.
+func (*YandexCloud_ResourceDefSpec) Descriptor() ([]byte, []int) {
 	return file_crossplane_yandex_proto_rawDescGZIP(), []int{0, 3}
 }
 
-func (x *YandexCloud_ResourceDef) GetApiVersion() string {
+func (x *YandexCloud_ResourceDefSpec) GetWriteConnectionSecretToRef() *Ref {
 	if x != nil {
-		return x.ApiVersion
-	}
-	return ""
-}
-
-func (x *YandexCloud_ResourceDef) GetKind() string {
-	if x != nil {
-		return x.Kind
-	}
-	return ""
-}
-
-func (x *YandexCloud_ResourceDef) GetMetadata() *Metadata {
-	if x != nil {
-		return x.Metadata
+		return x.WriteConnectionSecretToRef
 	}
 	return nil
 }
 
-func (x *YandexCloud_ResourceDef) GetSpec() *YandexCloud_ResourceDef_Spec {
+func (x *YandexCloud_ResourceDefSpec) GetDeletionPolicy() CrossplaneDeletionPolicy {
 	if x != nil {
-		return x.Spec
+		return x.DeletionPolicy
+	}
+	return CrossplaneDeletionPolicy_CROSSPLANE_DELETION_POLICY_UNSPECIFIED
+}
+
+func (x *YandexCloud_ResourceDefSpec) GetProviderConfigRef() map[string]string {
+	if x != nil {
+		return x.ProviderConfigRef
 	}
 	return nil
 }
 
-type YandexCloud_VmStrategy struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	BaseImageId string                 `protobuf:"bytes,2,opt,name=base_image_id,json=baseImageId,proto3" json:"base_image_id,omitempty"`
-	PublicIp    bool                   `protobuf:"varint,3,opt,name=public_ip,json=publicIp,proto3" json:"public_ip,omitempty"`
-	// Types that are valid to be assigned to Strategy:
-	//
-	//	*YandexCloud_VmStrategy_Scripting_
-	//	*YandexCloud_VmStrategy_PrebuiltImage_
-	Strategy      isYandexCloud_VmStrategy_Strategy `protobuf_oneof:"strategy"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *YandexCloud_VmStrategy) Reset() {
-	*x = YandexCloud_VmStrategy{}
-	mi := &file_crossplane_yandex_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *YandexCloud_VmStrategy) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*YandexCloud_VmStrategy) ProtoMessage() {}
-
-func (x *YandexCloud_VmStrategy) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_yandex_proto_msgTypes[5]
+func (x *YandexCloud_ResourceDefSpec) GetForProvider() isYandexCloud_ResourceDefSpec_ForProvider {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use YandexCloud_VmStrategy.ProtoReflect.Descriptor instead.
-func (*YandexCloud_VmStrategy) Descriptor() ([]byte, []int) {
-	return file_crossplane_yandex_proto_rawDescGZIP(), []int{0, 4}
-}
-
-func (x *YandexCloud_VmStrategy) GetBaseImageId() string {
-	if x != nil {
-		return x.BaseImageId
-	}
-	return ""
-}
-
-func (x *YandexCloud_VmStrategy) GetPublicIp() bool {
-	if x != nil {
-		return x.PublicIp
-	}
-	return false
-}
-
-func (x *YandexCloud_VmStrategy) GetStrategy() isYandexCloud_VmStrategy_Strategy {
-	if x != nil {
-		return x.Strategy
+		return x.ForProvider
 	}
 	return nil
 }
 
-func (x *YandexCloud_VmStrategy) GetScripting() *YandexCloud_VmStrategy_Scripting {
+func (x *YandexCloud_ResourceDefSpec) GetYandexCloudVm() *YandexCloud_Vm {
 	if x != nil {
-		if x, ok := x.Strategy.(*YandexCloud_VmStrategy_Scripting_); ok {
-			return x.Scripting
+		if x, ok := x.ForProvider.(*YandexCloud_ResourceDefSpec_YandexCloudVm); ok {
+			return x.YandexCloudVm
 		}
 	}
 	return nil
 }
 
-func (x *YandexCloud_VmStrategy) GetPrebuiltImage() *YandexCloud_VmStrategy_PrebuiltImage {
+func (x *YandexCloud_ResourceDefSpec) GetYandexCloudNetwork() *YandexCloud_Network {
 	if x != nil {
-		if x, ok := x.Strategy.(*YandexCloud_VmStrategy_PrebuiltImage_); ok {
-			return x.PrebuiltImage
+		if x, ok := x.ForProvider.(*YandexCloud_ResourceDefSpec_YandexCloudNetwork); ok {
+			return x.YandexCloudNetwork
 		}
 	}
 	return nil
 }
 
-type isYandexCloud_VmStrategy_Strategy interface {
-	isYandexCloud_VmStrategy_Strategy()
+func (x *YandexCloud_ResourceDefSpec) GetYandexCloudSubnet() *YandexCloud_Subnet {
+	if x != nil {
+		if x, ok := x.ForProvider.(*YandexCloud_ResourceDefSpec_YandexCloudSubnet); ok {
+			return x.YandexCloudSubnet
+		}
+	}
+	return nil
 }
 
-type YandexCloud_VmStrategy_Scripting_ struct {
-	Scripting *YandexCloud_VmStrategy_Scripting `protobuf:"bytes,1,opt,name=scripting,proto3,oneof"`
+type isYandexCloud_ResourceDefSpec_ForProvider interface {
+	isYandexCloud_ResourceDefSpec_ForProvider()
 }
 
-type YandexCloud_VmStrategy_PrebuiltImage_ struct {
-	PrebuiltImage *YandexCloud_VmStrategy_PrebuiltImage `protobuf:"bytes,11,opt,name=prebuilt_image,json=prebuiltImage,proto3,oneof"`
+type YandexCloud_ResourceDefSpec_YandexCloudVm struct {
+	YandexCloudVm *YandexCloud_Vm `protobuf:"bytes,100,opt,name=yandex_cloud_vm,json=yandexCloudVm,proto3,oneof"`
 }
 
-func (*YandexCloud_VmStrategy_Scripting_) isYandexCloud_VmStrategy_Strategy() {}
+type YandexCloud_ResourceDefSpec_YandexCloudNetwork struct {
+	YandexCloudNetwork *YandexCloud_Network `protobuf:"bytes,101,opt,name=yandex_cloud_network,json=yandexCloudNetwork,proto3,oneof"`
+}
 
-func (*YandexCloud_VmStrategy_PrebuiltImage_) isYandexCloud_VmStrategy_Strategy() {}
+type YandexCloud_ResourceDefSpec_YandexCloudSubnet struct {
+	YandexCloudSubnet *YandexCloud_Subnet `protobuf:"bytes,102,opt,name=yandex_cloud_subnet,json=yandexCloudSubnet,proto3,oneof"`
+}
+
+func (*YandexCloud_ResourceDefSpec_YandexCloudVm) isYandexCloud_ResourceDefSpec_ForProvider() {}
+
+func (*YandexCloud_ResourceDefSpec_YandexCloudNetwork) isYandexCloud_ResourceDefSpec_ForProvider() {}
+
+func (*YandexCloud_ResourceDefSpec_YandexCloudSubnet) isYandexCloud_ResourceDefSpec_ForProvider() {}
 
 type YandexCloud_Subnet_NetworkIdRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -531,7 +438,7 @@ type YandexCloud_Subnet_NetworkIdRef struct {
 
 func (x *YandexCloud_Subnet_NetworkIdRef) Reset() {
 	*x = YandexCloud_Subnet_NetworkIdRef{}
-	mi := &file_crossplane_yandex_proto_msgTypes[6]
+	mi := &file_crossplane_yandex_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -543,7 +450,7 @@ func (x *YandexCloud_Subnet_NetworkIdRef) String() string {
 func (*YandexCloud_Subnet_NetworkIdRef) ProtoMessage() {}
 
 func (x *YandexCloud_Subnet_NetworkIdRef) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_yandex_proto_msgTypes[6]
+	mi := &file_crossplane_yandex_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -576,7 +483,7 @@ type YandexCloud_Vm_Resources struct {
 
 func (x *YandexCloud_Vm_Resources) Reset() {
 	*x = YandexCloud_Vm_Resources{}
-	mi := &file_crossplane_yandex_proto_msgTypes[7]
+	mi := &file_crossplane_yandex_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -588,7 +495,7 @@ func (x *YandexCloud_Vm_Resources) String() string {
 func (*YandexCloud_Vm_Resources) ProtoMessage() {}
 
 func (x *YandexCloud_Vm_Resources) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_yandex_proto_msgTypes[7]
+	mi := &file_crossplane_yandex_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -627,7 +534,7 @@ type YandexCloud_Vm_Disk struct {
 
 func (x *YandexCloud_Vm_Disk) Reset() {
 	*x = YandexCloud_Vm_Disk{}
-	mi := &file_crossplane_yandex_proto_msgTypes[8]
+	mi := &file_crossplane_yandex_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -639,7 +546,7 @@ func (x *YandexCloud_Vm_Disk) String() string {
 func (*YandexCloud_Vm_Disk) ProtoMessage() {}
 
 func (x *YandexCloud_Vm_Disk) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_yandex_proto_msgTypes[8]
+	mi := &file_crossplane_yandex_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -673,7 +580,7 @@ type YandexCloud_Vm_NetworkInterface struct {
 
 func (x *YandexCloud_Vm_NetworkInterface) Reset() {
 	*x = YandexCloud_Vm_NetworkInterface{}
-	mi := &file_crossplane_yandex_proto_msgTypes[9]
+	mi := &file_crossplane_yandex_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -685,7 +592,7 @@ func (x *YandexCloud_Vm_NetworkInterface) String() string {
 func (*YandexCloud_Vm_NetworkInterface) ProtoMessage() {}
 
 func (x *YandexCloud_Vm_NetworkInterface) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_yandex_proto_msgTypes[9]
+	mi := &file_crossplane_yandex_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -731,7 +638,7 @@ type YandexCloud_Vm_Disk_InitializeParams struct {
 
 func (x *YandexCloud_Vm_Disk_InitializeParams) Reset() {
 	*x = YandexCloud_Vm_Disk_InitializeParams{}
-	mi := &file_crossplane_yandex_proto_msgTypes[11]
+	mi := &file_crossplane_yandex_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -743,7 +650,7 @@ func (x *YandexCloud_Vm_Disk_InitializeParams) String() string {
 func (*YandexCloud_Vm_Disk_InitializeParams) ProtoMessage() {}
 
 func (x *YandexCloud_Vm_Disk_InitializeParams) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_yandex_proto_msgTypes[11]
+	mi := &file_crossplane_yandex_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -766,299 +673,12 @@ func (x *YandexCloud_Vm_Disk_InitializeParams) GetImageId() string {
 	return ""
 }
 
-type YandexCloud_ResourceDef_Spec struct {
-	state                      protoimpl.MessageState `protogen:"open.v1"`
-	WriteConnectionSecretToRef *Ref                   `protobuf:"bytes,1,opt,name=write_connection_secret_to_ref,json=writeConnectionSecretToRef,proto3" json:"write_connection_secret_to_ref,omitempty"`
-	DeletionPolicy             string                 `protobuf:"bytes,2,opt,name=deletion_policy,json=deletionPolicy,proto3" json:"deletion_policy,omitempty"` // converted from DeletionPolicy
-	ProviderConfigRef          map[string]string      `protobuf:"bytes,3,rep,name=provider_config_ref,json=providerConfigRef,proto3" json:"provider_config_ref,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// Types that are valid to be assigned to ForProvider:
-	//
-	//	*YandexCloud_ResourceDef_Spec_YandexCloudVm
-	//	*YandexCloud_ResourceDef_Spec_YandexCloudNetwork
-	//	*YandexCloud_ResourceDef_Spec_YandexCloudSubnet
-	ForProvider   isYandexCloud_ResourceDef_Spec_ForProvider `protobuf_oneof:"for_provider"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *YandexCloud_ResourceDef_Spec) Reset() {
-	*x = YandexCloud_ResourceDef_Spec{}
-	mi := &file_crossplane_yandex_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *YandexCloud_ResourceDef_Spec) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*YandexCloud_ResourceDef_Spec) ProtoMessage() {}
-
-func (x *YandexCloud_ResourceDef_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_yandex_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use YandexCloud_ResourceDef_Spec.ProtoReflect.Descriptor instead.
-func (*YandexCloud_ResourceDef_Spec) Descriptor() ([]byte, []int) {
-	return file_crossplane_yandex_proto_rawDescGZIP(), []int{0, 3, 0}
-}
-
-func (x *YandexCloud_ResourceDef_Spec) GetWriteConnectionSecretToRef() *Ref {
-	if x != nil {
-		return x.WriteConnectionSecretToRef
-	}
-	return nil
-}
-
-func (x *YandexCloud_ResourceDef_Spec) GetDeletionPolicy() string {
-	if x != nil {
-		return x.DeletionPolicy
-	}
-	return ""
-}
-
-func (x *YandexCloud_ResourceDef_Spec) GetProviderConfigRef() map[string]string {
-	if x != nil {
-		return x.ProviderConfigRef
-	}
-	return nil
-}
-
-func (x *YandexCloud_ResourceDef_Spec) GetForProvider() isYandexCloud_ResourceDef_Spec_ForProvider {
-	if x != nil {
-		return x.ForProvider
-	}
-	return nil
-}
-
-func (x *YandexCloud_ResourceDef_Spec) GetYandexCloudVm() *YandexCloud_Vm {
-	if x != nil {
-		if x, ok := x.ForProvider.(*YandexCloud_ResourceDef_Spec_YandexCloudVm); ok {
-			return x.YandexCloudVm
-		}
-	}
-	return nil
-}
-
-func (x *YandexCloud_ResourceDef_Spec) GetYandexCloudNetwork() *YandexCloud_Network {
-	if x != nil {
-		if x, ok := x.ForProvider.(*YandexCloud_ResourceDef_Spec_YandexCloudNetwork); ok {
-			return x.YandexCloudNetwork
-		}
-	}
-	return nil
-}
-
-func (x *YandexCloud_ResourceDef_Spec) GetYandexCloudSubnet() *YandexCloud_Subnet {
-	if x != nil {
-		if x, ok := x.ForProvider.(*YandexCloud_ResourceDef_Spec_YandexCloudSubnet); ok {
-			return x.YandexCloudSubnet
-		}
-	}
-	return nil
-}
-
-type isYandexCloud_ResourceDef_Spec_ForProvider interface {
-	isYandexCloud_ResourceDef_Spec_ForProvider()
-}
-
-type YandexCloud_ResourceDef_Spec_YandexCloudVm struct {
-	YandexCloudVm *YandexCloud_Vm `protobuf:"bytes,100,opt,name=yandex_cloud_vm,json=yandexCloudVm,proto3,oneof"`
-}
-
-type YandexCloud_ResourceDef_Spec_YandexCloudNetwork struct {
-	YandexCloudNetwork *YandexCloud_Network `protobuf:"bytes,101,opt,name=yandex_cloud_network,json=yandexCloudNetwork,proto3,oneof"`
-}
-
-type YandexCloud_ResourceDef_Spec_YandexCloudSubnet struct {
-	YandexCloudSubnet *YandexCloud_Subnet `protobuf:"bytes,102,opt,name=yandex_cloud_subnet,json=yandexCloudSubnet,proto3,oneof"`
-}
-
-func (*YandexCloud_ResourceDef_Spec_YandexCloudVm) isYandexCloud_ResourceDef_Spec_ForProvider() {}
-
-func (*YandexCloud_ResourceDef_Spec_YandexCloudNetwork) isYandexCloud_ResourceDef_Spec_ForProvider() {
-}
-
-func (*YandexCloud_ResourceDef_Spec_YandexCloudSubnet) isYandexCloud_ResourceDef_Spec_ForProvider() {}
-
-type YandexCloud_VmStrategy_Scripting struct {
-	state         protoimpl.MessageState                          `protogen:"open.v1"`
-	Cmd           string                                          `protobuf:"bytes,1,opt,name=cmd,proto3" json:"cmd,omitempty"`
-	Workdir       string                                          `protobuf:"bytes,2,opt,name=workdir,proto3" json:"workdir,omitempty"`
-	Env           map[string]string                               `protobuf:"bytes,3,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	FilesToWrite  []*YandexCloud_VmStrategy_Scripting_FileToWrite `protobuf:"bytes,4,rep,name=files_to_write,json=filesToWrite,proto3" json:"files_to_write,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *YandexCloud_VmStrategy_Scripting) Reset() {
-	*x = YandexCloud_VmStrategy_Scripting{}
-	mi := &file_crossplane_yandex_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *YandexCloud_VmStrategy_Scripting) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*YandexCloud_VmStrategy_Scripting) ProtoMessage() {}
-
-func (x *YandexCloud_VmStrategy_Scripting) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_yandex_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use YandexCloud_VmStrategy_Scripting.ProtoReflect.Descriptor instead.
-func (*YandexCloud_VmStrategy_Scripting) Descriptor() ([]byte, []int) {
-	return file_crossplane_yandex_proto_rawDescGZIP(), []int{0, 4, 0}
-}
-
-func (x *YandexCloud_VmStrategy_Scripting) GetCmd() string {
-	if x != nil {
-		return x.Cmd
-	}
-	return ""
-}
-
-func (x *YandexCloud_VmStrategy_Scripting) GetWorkdir() string {
-	if x != nil {
-		return x.Workdir
-	}
-	return ""
-}
-
-func (x *YandexCloud_VmStrategy_Scripting) GetEnv() map[string]string {
-	if x != nil {
-		return x.Env
-	}
-	return nil
-}
-
-func (x *YandexCloud_VmStrategy_Scripting) GetFilesToWrite() []*YandexCloud_VmStrategy_Scripting_FileToWrite {
-	if x != nil {
-		return x.FilesToWrite
-	}
-	return nil
-}
-
-type YandexCloud_VmStrategy_PrebuiltImage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ImageId       string                 `protobuf:"bytes,1,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *YandexCloud_VmStrategy_PrebuiltImage) Reset() {
-	*x = YandexCloud_VmStrategy_PrebuiltImage{}
-	mi := &file_crossplane_yandex_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *YandexCloud_VmStrategy_PrebuiltImage) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*YandexCloud_VmStrategy_PrebuiltImage) ProtoMessage() {}
-
-func (x *YandexCloud_VmStrategy_PrebuiltImage) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_yandex_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use YandexCloud_VmStrategy_PrebuiltImage.ProtoReflect.Descriptor instead.
-func (*YandexCloud_VmStrategy_PrebuiltImage) Descriptor() ([]byte, []int) {
-	return file_crossplane_yandex_proto_rawDescGZIP(), []int{0, 4, 1}
-}
-
-func (x *YandexCloud_VmStrategy_PrebuiltImage) GetImageId() string {
-	if x != nil {
-		return x.ImageId
-	}
-	return ""
-}
-
-type YandexCloud_VmStrategy_Scripting_FileToWrite struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	Content       []byte                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *YandexCloud_VmStrategy_Scripting_FileToWrite) Reset() {
-	*x = YandexCloud_VmStrategy_Scripting_FileToWrite{}
-	mi := &file_crossplane_yandex_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *YandexCloud_VmStrategy_Scripting_FileToWrite) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*YandexCloud_VmStrategy_Scripting_FileToWrite) ProtoMessage() {}
-
-func (x *YandexCloud_VmStrategy_Scripting_FileToWrite) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_yandex_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use YandexCloud_VmStrategy_Scripting_FileToWrite.ProtoReflect.Descriptor instead.
-func (*YandexCloud_VmStrategy_Scripting_FileToWrite) Descriptor() ([]byte, []int) {
-	return file_crossplane_yandex_proto_rawDescGZIP(), []int{0, 4, 0, 0}
-}
-
-func (x *YandexCloud_VmStrategy_Scripting_FileToWrite) GetPath() string {
-	if x != nil {
-		return x.Path
-	}
-	return ""
-}
-
-func (x *YandexCloud_VmStrategy_Scripting_FileToWrite) GetContent() []byte {
-	if x != nil {
-		return x.Content
-	}
-	return nil
-}
-
 var File_crossplane_yandex_proto protoreflect.FileDescriptor
 
 const file_crossplane_yandex_proto_rawDesc = "" +
 	"\n" +
 	"\x17crossplane/yandex.proto\x12\n" +
-	"crossplane\x1a\x16crossplane/types.proto\x1a\x17validate/validate.proto\"\xce\x16\n" +
+	"crossplane\x1a\x16crossplane/types.proto\x1a\x17validate/validate.proto\"\x97\x0f\n" +
 	"\vYandexCloud\x1a&\n" +
 	"\aNetwork\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x1a\xde\x01\n" +
@@ -1093,51 +713,18 @@ const file_crossplane_yandex_proto_rawDesc = "" +
 	"ip_address\x18\x03 \x01(\tR\tipAddress\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a\x88\a\n" +
-	"\vResourceDef\x12)\n" +
-	"\vapi_version\x18\x02 \x01(\tB\b\xfaB\x05\x8a\x01\x02\x10\x01R\n" +
-	"apiVersion\x12\x1c\n" +
-	"\x04kind\x18\x01 \x01(\tB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04kind\x120\n" +
-	"\bmetadata\x18\x03 \x01(\v2\x14.crossplane.MetadataR\bmetadata\x12F\n" +
-	"\x04spec\x18\x04 \x01(\v2(.crossplane.YandexCloud.ResourceDef.SpecB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04spec\x1a\xb5\x05\n" +
-	"\x04Spec\x12]\n" +
-	"\x1ewrite_connection_secret_to_ref\x18\x01 \x01(\v2\x0f.crossplane.RefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x1awriteConnectionSecretToRef\x121\n" +
-	"\x0fdeletion_policy\x18\x02 \x01(\tB\b\xfaB\x05\x82\x01\x02\x10\x01R\x0edeletionPolicy\x12o\n" +
-	"\x13provider_config_ref\x18\x03 \x03(\v2?.crossplane.YandexCloud.ResourceDef.Spec.ProviderConfigRefEntryR\x11providerConfigRef\x12N\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a\x9a\x05\n" +
+	"\x0fResourceDefSpec\x12]\n" +
+	"\x1ewrite_connection_secret_to_ref\x18\x01 \x01(\v2\x0f.crossplane.RefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x1awriteConnectionSecretToRef\x12W\n" +
+	"\x0fdeletion_policy\x18\x02 \x01(\x0e2$.crossplane.CrossplaneDeletionPolicyB\b\xfaB\x05\x82\x01\x02\x10\x01R\x0edeletionPolicy\x12n\n" +
+	"\x13provider_config_ref\x18\x03 \x03(\v2>.crossplane.YandexCloud.ResourceDefSpec.ProviderConfigRefEntryR\x11providerConfigRef\x12N\n" +
 	"\x0fyandex_cloud_vm\x18d \x01(\v2\x1a.crossplane.YandexCloud.VmB\b\xfaB\x05\x8a\x01\x02\x10\x01H\x00R\ryandexCloudVm\x12]\n" +
 	"\x14yandex_cloud_network\x18e \x01(\v2\x1f.crossplane.YandexCloud.NetworkB\b\xfaB\x05\x8a\x01\x02\x10\x01H\x00R\x12yandexCloudNetwork\x12Z\n" +
 	"\x13yandex_cloud_subnet\x18f \x01(\v2\x1e.crossplane.YandexCloud.SubnetB\b\xfaB\x05\x8a\x01\x02\x10\x01H\x00R\x11yandexCloudSubnet\x1aD\n" +
 	"\x16ProviderConfigRefEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"I\n" +
-	"\x0eDeletionPolicy\x12\x1f\n" +
-	"\x1bDELETION_POLICY_UNSPECIFIED\x10\x00\x12\n" +
-	"\n" +
-	"\x06DELETE\x10\x01\x12\n" +
-	"\n" +
-	"\x06ORPHAN\x10\x02B\x0e\n" +
-	"\ffor_provider\x1a\xc6\x05\n" +
-	"\n" +
-	"VmStrategy\x12+\n" +
-	"\rbase_image_id\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\vbaseImageId\x12\x1b\n" +
-	"\tpublic_ip\x18\x03 \x01(\bR\bpublicIp\x12L\n" +
-	"\tscripting\x18\x01 \x01(\v2,.crossplane.YandexCloud.VmStrategy.ScriptingH\x00R\tscripting\x12Y\n" +
-	"\x0eprebuilt_image\x18\v \x01(\v20.crossplane.YandexCloud.VmStrategy.PrebuiltImageH\x00R\rprebuiltImage\x1a\x83\x03\n" +
-	"\tScripting\x12\x19\n" +
-	"\x03cmd\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x03cmd\x12!\n" +
-	"\aworkdir\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\aworkdir\x12G\n" +
-	"\x03env\x18\x03 \x03(\v25.crossplane.YandexCloud.VmStrategy.Scripting.EnvEntryR\x03env\x12h\n" +
-	"\x0efiles_to_write\x18\x04 \x03(\v28.crossplane.YandexCloud.VmStrategy.Scripting.FileToWriteB\b\xfaB\x05\x92\x01\x02\b\x01R\ffilesToWrite\x1aM\n" +
-	"\vFileToWrite\x12\x1b\n" +
-	"\x04path\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04path\x12!\n" +
-	"\acontent\x18\x02 \x01(\fB\a\xfaB\x04z\x02\x10\x01R\acontent\x1a6\n" +
-	"\bEnvEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a3\n" +
-	"\rPrebuiltImage\x12\"\n" +
-	"\bimage_id\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\aimageIdB\n" +
-	"\n" +
-	"\bstrategy\"T\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0e\n" +
+	"\ffor_provider\"T\n" +
 	"\fResourceKind\x12\x1d\n" +
 	"\x19RESOURCE_KIND_UNSPECIFIED\x10\x00\x12\f\n" +
 	"\bINSTANCE\x10\x01\x12\v\n" +
@@ -1157,57 +744,45 @@ func file_crossplane_yandex_proto_rawDescGZIP() []byte {
 	return file_crossplane_yandex_proto_rawDescData
 }
 
-var file_crossplane_yandex_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_crossplane_yandex_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_crossplane_yandex_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_crossplane_yandex_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_crossplane_yandex_proto_goTypes = []any{
-	(YandexCloud_ResourceKind)(0),                        // 0: crossplane.YandexCloud.ResourceKind
-	(YandexCloud_ResourceDef_Spec_DeletionPolicy)(0),     // 1: crossplane.YandexCloud.ResourceDef.Spec.DeletionPolicy
-	(*YandexCloud)(nil),                                  // 2: crossplane.YandexCloud
-	(*YandexCloud_Network)(nil),                          // 3: crossplane.YandexCloud.Network
-	(*YandexCloud_Subnet)(nil),                           // 4: crossplane.YandexCloud.Subnet
-	(*YandexCloud_Vm)(nil),                               // 5: crossplane.YandexCloud.Vm
-	(*YandexCloud_ResourceDef)(nil),                      // 6: crossplane.YandexCloud.ResourceDef
-	(*YandexCloud_VmStrategy)(nil),                       // 7: crossplane.YandexCloud.VmStrategy
-	(*YandexCloud_Subnet_NetworkIdRef)(nil),              // 8: crossplane.YandexCloud.Subnet.NetworkIdRef
-	(*YandexCloud_Vm_Resources)(nil),                     // 9: crossplane.YandexCloud.Vm.Resources
-	(*YandexCloud_Vm_Disk)(nil),                          // 10: crossplane.YandexCloud.Vm.Disk
-	(*YandexCloud_Vm_NetworkInterface)(nil),              // 11: crossplane.YandexCloud.Vm.NetworkInterface
-	nil,                                                  // 12: crossplane.YandexCloud.Vm.MetadataEntry
-	(*YandexCloud_Vm_Disk_InitializeParams)(nil),         // 13: crossplane.YandexCloud.Vm.Disk.InitializeParams
-	(*YandexCloud_ResourceDef_Spec)(nil),                 // 14: crossplane.YandexCloud.ResourceDef.Spec
-	nil,                                                  // 15: crossplane.YandexCloud.ResourceDef.Spec.ProviderConfigRefEntry
-	(*YandexCloud_VmStrategy_Scripting)(nil),             // 16: crossplane.YandexCloud.VmStrategy.Scripting
-	(*YandexCloud_VmStrategy_PrebuiltImage)(nil),         // 17: crossplane.YandexCloud.VmStrategy.PrebuiltImage
-	(*YandexCloud_VmStrategy_Scripting_FileToWrite)(nil), // 18: crossplane.YandexCloud.VmStrategy.Scripting.FileToWrite
-	nil,                 // 19: crossplane.YandexCloud.VmStrategy.Scripting.EnvEntry
-	(*Metadata)(nil),    // 20: crossplane.Metadata
-	(*OnlyNameRef)(nil), // 21: crossplane.OnlyNameRef
-	(*Ref)(nil),         // 22: crossplane.Ref
+	(YandexCloud_ResourceKind)(0),                // 0: crossplane.YandexCloud.ResourceKind
+	(*YandexCloud)(nil),                          // 1: crossplane.YandexCloud
+	(*YandexCloud_Network)(nil),                  // 2: crossplane.YandexCloud.Network
+	(*YandexCloud_Subnet)(nil),                   // 3: crossplane.YandexCloud.Subnet
+	(*YandexCloud_Vm)(nil),                       // 4: crossplane.YandexCloud.Vm
+	(*YandexCloud_ResourceDefSpec)(nil),          // 5: crossplane.YandexCloud.ResourceDefSpec
+	(*YandexCloud_Subnet_NetworkIdRef)(nil),      // 6: crossplane.YandexCloud.Subnet.NetworkIdRef
+	(*YandexCloud_Vm_Resources)(nil),             // 7: crossplane.YandexCloud.Vm.Resources
+	(*YandexCloud_Vm_Disk)(nil),                  // 8: crossplane.YandexCloud.Vm.Disk
+	(*YandexCloud_Vm_NetworkInterface)(nil),      // 9: crossplane.YandexCloud.Vm.NetworkInterface
+	nil,                                          // 10: crossplane.YandexCloud.Vm.MetadataEntry
+	(*YandexCloud_Vm_Disk_InitializeParams)(nil), // 11: crossplane.YandexCloud.Vm.Disk.InitializeParams
+	nil,                           // 12: crossplane.YandexCloud.ResourceDefSpec.ProviderConfigRefEntry
+	(*Ref)(nil),                   // 13: crossplane.Ref
+	(CrossplaneDeletionPolicy)(0), // 14: crossplane.CrossplaneDeletionPolicy
+	(*OnlyNameRef)(nil),           // 15: crossplane.OnlyNameRef
 }
 var file_crossplane_yandex_proto_depIdxs = []int32{
-	8,  // 0: crossplane.YandexCloud.Subnet.network_id_ref:type_name -> crossplane.YandexCloud.Subnet.NetworkIdRef
-	9,  // 1: crossplane.YandexCloud.Vm.resources:type_name -> crossplane.YandexCloud.Vm.Resources
-	10, // 2: crossplane.YandexCloud.Vm.boot_disk:type_name -> crossplane.YandexCloud.Vm.Disk
-	11, // 3: crossplane.YandexCloud.Vm.network_interface:type_name -> crossplane.YandexCloud.Vm.NetworkInterface
-	12, // 4: crossplane.YandexCloud.Vm.metadata:type_name -> crossplane.YandexCloud.Vm.MetadataEntry
-	20, // 5: crossplane.YandexCloud.ResourceDef.metadata:type_name -> crossplane.Metadata
-	14, // 6: crossplane.YandexCloud.ResourceDef.spec:type_name -> crossplane.YandexCloud.ResourceDef.Spec
-	16, // 7: crossplane.YandexCloud.VmStrategy.scripting:type_name -> crossplane.YandexCloud.VmStrategy.Scripting
-	17, // 8: crossplane.YandexCloud.VmStrategy.prebuilt_image:type_name -> crossplane.YandexCloud.VmStrategy.PrebuiltImage
-	13, // 9: crossplane.YandexCloud.Vm.Disk.initialize_params:type_name -> crossplane.YandexCloud.Vm.Disk.InitializeParams
-	21, // 10: crossplane.YandexCloud.Vm.NetworkInterface.subnet_id_ref:type_name -> crossplane.OnlyNameRef
-	22, // 11: crossplane.YandexCloud.ResourceDef.Spec.write_connection_secret_to_ref:type_name -> crossplane.Ref
-	15, // 12: crossplane.YandexCloud.ResourceDef.Spec.provider_config_ref:type_name -> crossplane.YandexCloud.ResourceDef.Spec.ProviderConfigRefEntry
-	5,  // 13: crossplane.YandexCloud.ResourceDef.Spec.yandex_cloud_vm:type_name -> crossplane.YandexCloud.Vm
-	3,  // 14: crossplane.YandexCloud.ResourceDef.Spec.yandex_cloud_network:type_name -> crossplane.YandexCloud.Network
-	4,  // 15: crossplane.YandexCloud.ResourceDef.Spec.yandex_cloud_subnet:type_name -> crossplane.YandexCloud.Subnet
-	19, // 16: crossplane.YandexCloud.VmStrategy.Scripting.env:type_name -> crossplane.YandexCloud.VmStrategy.Scripting.EnvEntry
-	18, // 17: crossplane.YandexCloud.VmStrategy.Scripting.files_to_write:type_name -> crossplane.YandexCloud.VmStrategy.Scripting.FileToWrite
-	18, // [18:18] is the sub-list for method output_type
-	18, // [18:18] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	6,  // 0: crossplane.YandexCloud.Subnet.network_id_ref:type_name -> crossplane.YandexCloud.Subnet.NetworkIdRef
+	7,  // 1: crossplane.YandexCloud.Vm.resources:type_name -> crossplane.YandexCloud.Vm.Resources
+	8,  // 2: crossplane.YandexCloud.Vm.boot_disk:type_name -> crossplane.YandexCloud.Vm.Disk
+	9,  // 3: crossplane.YandexCloud.Vm.network_interface:type_name -> crossplane.YandexCloud.Vm.NetworkInterface
+	10, // 4: crossplane.YandexCloud.Vm.metadata:type_name -> crossplane.YandexCloud.Vm.MetadataEntry
+	13, // 5: crossplane.YandexCloud.ResourceDefSpec.write_connection_secret_to_ref:type_name -> crossplane.Ref
+	14, // 6: crossplane.YandexCloud.ResourceDefSpec.deletion_policy:type_name -> crossplane.CrossplaneDeletionPolicy
+	12, // 7: crossplane.YandexCloud.ResourceDefSpec.provider_config_ref:type_name -> crossplane.YandexCloud.ResourceDefSpec.ProviderConfigRefEntry
+	4,  // 8: crossplane.YandexCloud.ResourceDefSpec.yandex_cloud_vm:type_name -> crossplane.YandexCloud.Vm
+	2,  // 9: crossplane.YandexCloud.ResourceDefSpec.yandex_cloud_network:type_name -> crossplane.YandexCloud.Network
+	3,  // 10: crossplane.YandexCloud.ResourceDefSpec.yandex_cloud_subnet:type_name -> crossplane.YandexCloud.Subnet
+	11, // 11: crossplane.YandexCloud.Vm.Disk.initialize_params:type_name -> crossplane.YandexCloud.Vm.Disk.InitializeParams
+	15, // 12: crossplane.YandexCloud.Vm.NetworkInterface.subnet_id_ref:type_name -> crossplane.OnlyNameRef
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_crossplane_yandex_proto_init() }
@@ -1216,22 +791,18 @@ func file_crossplane_yandex_proto_init() {
 		return
 	}
 	file_crossplane_types_proto_init()
-	file_crossplane_yandex_proto_msgTypes[5].OneofWrappers = []any{
-		(*YandexCloud_VmStrategy_Scripting_)(nil),
-		(*YandexCloud_VmStrategy_PrebuiltImage_)(nil),
-	}
-	file_crossplane_yandex_proto_msgTypes[12].OneofWrappers = []any{
-		(*YandexCloud_ResourceDef_Spec_YandexCloudVm)(nil),
-		(*YandexCloud_ResourceDef_Spec_YandexCloudNetwork)(nil),
-		(*YandexCloud_ResourceDef_Spec_YandexCloudSubnet)(nil),
+	file_crossplane_yandex_proto_msgTypes[4].OneofWrappers = []any{
+		(*YandexCloud_ResourceDefSpec_YandexCloudVm)(nil),
+		(*YandexCloud_ResourceDefSpec_YandexCloudNetwork)(nil),
+		(*YandexCloud_ResourceDefSpec_YandexCloudSubnet)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_crossplane_yandex_proto_rawDesc), len(file_crossplane_yandex_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   18,
+			NumEnums:      1,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -8,6 +8,7 @@ package panel
 
 import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
+	crossplane "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 	_ "github.com/yaroher/protoc-gen-pgx-orm/protopgx"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -24,30 +25,30 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type MachineTemplate struct {
+type KVInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *Ulid                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Timing        *Timing                `protobuf:"bytes,2,opt,name=timing,proto3" json:"timing,omitempty"`
-	Tags          *Tags                  `protobuf:"bytes,3,opt,name=tags,proto3" json:"tags,omitempty"`
-	MachineInfo   *MachineInfo           `protobuf:"bytes,4,opt,name=machine_info,json=machineInfo,proto3" json:"machine_info,omitempty"`
+	Key           string                 `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"`
+	Info          *KV_Info               `protobuf:"bytes,5,opt,name=info,proto3" json:"info,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *MachineTemplate) Reset() {
-	*x = MachineTemplate{}
+func (x *KVInfo) Reset() {
+	*x = KVInfo{}
 	mi := &file_panel_template_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *MachineTemplate) String() string {
+func (x *KVInfo) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*MachineTemplate) ProtoMessage() {}
+func (*KVInfo) ProtoMessage() {}
 
-func (x *MachineTemplate) ProtoReflect() protoreflect.Message {
+func (x *KVInfo) ProtoReflect() protoreflect.Message {
 	mi := &file_panel_template_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -59,67 +60,71 @@ func (x *MachineTemplate) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use MachineTemplate.ProtoReflect.Descriptor instead.
-func (*MachineTemplate) Descriptor() ([]byte, []int) {
+// Deprecated: Use KVInfo.ProtoReflect.Descriptor instead.
+func (*KVInfo) Descriptor() ([]byte, []int) {
 	return file_panel_template_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *MachineTemplate) GetId() *Ulid {
+func (x *KVInfo) GetId() *Ulid {
 	if x != nil {
 		return x.Id
 	}
 	return nil
 }
 
-func (x *MachineTemplate) GetTiming() *Timing {
+func (x *KVInfo) GetTiming() *Timing {
 	if x != nil {
 		return x.Timing
 	}
 	return nil
 }
 
-func (x *MachineTemplate) GetTags() *Tags {
+func (x *KVInfo) GetKey() string {
 	if x != nil {
-		return x.Tags
+		return x.Key
+	}
+	return ""
+}
+
+func (x *KVInfo) GetInfo() *KV_Info {
+	if x != nil {
+		return x.Info
 	}
 	return nil
 }
 
-func (x *MachineTemplate) GetMachineInfo() *MachineInfo {
-	if x != nil {
-		return x.MachineInfo
-	}
-	return nil
+type Template struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        *Ulid                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Timing    *Timing                `protobuf:"bytes,2,opt,name=timing,proto3" json:"timing,omitempty"`
+	Name      string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	AuthorId  *Ulid                  `protobuf:"bytes,4,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
+	IsDefault bool                   `protobuf:"varint,5,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
+	Tags      []*Tag                 `protobuf:"bytes,6,rep,name=tags,proto3" json:"tags,omitempty"`
+	// Types that are valid to be assigned to TemplateData:
+	//
+	//	*Template_MachineDeployment_
+	//	*Template_DatabaseDeployment_
+	//	*Template_StroppyDeployment_
+	TemplateData  isTemplate_TemplateData `protobuf_oneof:"template_data"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-type StroppyDeploymentTemplate struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Id     *Ulid                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Timing *Timing                `protobuf:"bytes,2,opt,name=timing,proto3" json:"timing,omitempty"`
-	Name   string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	// here is WorkloadType such as Tpcc or another
-	Tags           *Tags     `protobuf:"bytes,4,opt,name=tags,proto3" json:"tags,omitempty"`
-	ScriptBody     []byte    `protobuf:"bytes,5,opt,name=script_body,json=scriptBody,proto3" json:"script_body,omitempty"`
-	StroppyVersion string    `protobuf:"bytes,6,opt,name=stroppy_version,json=stroppyVersion,proto3" json:"stroppy_version,omitempty"`
-	EnvData        *Metadata `protobuf:"bytes,7,opt,name=env_data,json=envData,proto3" json:"env_data,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *StroppyDeploymentTemplate) Reset() {
-	*x = StroppyDeploymentTemplate{}
+func (x *Template) Reset() {
+	*x = Template{}
 	mi := &file_panel_template_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StroppyDeploymentTemplate) String() string {
+func (x *Template) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StroppyDeploymentTemplate) ProtoMessage() {}
+func (*Template) ProtoMessage() {}
 
-func (x *StroppyDeploymentTemplate) ProtoReflect() protoreflect.Message {
+func (x *Template) ProtoReflect() protoreflect.Message {
 	mi := &file_panel_template_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -131,83 +136,131 @@ func (x *StroppyDeploymentTemplate) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StroppyDeploymentTemplate.ProtoReflect.Descriptor instead.
-func (*StroppyDeploymentTemplate) Descriptor() ([]byte, []int) {
+// Deprecated: Use Template.ProtoReflect.Descriptor instead.
+func (*Template) Descriptor() ([]byte, []int) {
 	return file_panel_template_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *StroppyDeploymentTemplate) GetId() *Ulid {
+func (x *Template) GetId() *Ulid {
 	if x != nil {
 		return x.Id
 	}
 	return nil
 }
 
-func (x *StroppyDeploymentTemplate) GetTiming() *Timing {
+func (x *Template) GetTiming() *Timing {
 	if x != nil {
 		return x.Timing
 	}
 	return nil
 }
 
-func (x *StroppyDeploymentTemplate) GetName() string {
+func (x *Template) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *StroppyDeploymentTemplate) GetTags() *Tags {
+func (x *Template) GetAuthorId() *Ulid {
+	if x != nil {
+		return x.AuthorId
+	}
+	return nil
+}
+
+func (x *Template) GetIsDefault() bool {
+	if x != nil {
+		return x.IsDefault
+	}
+	return false
+}
+
+func (x *Template) GetTags() []*Tag {
 	if x != nil {
 		return x.Tags
 	}
 	return nil
 }
 
-func (x *StroppyDeploymentTemplate) GetScriptBody() []byte {
+func (x *Template) GetTemplateData() isTemplate_TemplateData {
 	if x != nil {
-		return x.ScriptBody
+		return x.TemplateData
 	}
 	return nil
 }
 
-func (x *StroppyDeploymentTemplate) GetStroppyVersion() string {
+func (x *Template) GetMachineDeployment() *Template_MachineDeployment {
 	if x != nil {
-		return x.StroppyVersion
-	}
-	return ""
-}
-
-func (x *StroppyDeploymentTemplate) GetEnvData() *Metadata {
-	if x != nil {
-		return x.EnvData
+		if x, ok := x.TemplateData.(*Template_MachineDeployment_); ok {
+			return x.MachineDeployment
+		}
 	}
 	return nil
 }
 
-type StroppyInstanceTemplate struct {
-	state                     protoimpl.MessageState     `protogen:"open.v1"`
-	StroppyDeploymentTemplate *StroppyDeploymentTemplate `protobuf:"bytes,1,opt,name=stroppy_deployment_template,json=stroppyDeploymentTemplate,proto3" json:"stroppy_deployment_template,omitempty"`
-	// now support only single node
-	MachineTemplate *MachineTemplate `protobuf:"bytes,2,opt,name=machine_template,json=machineTemplate,proto3" json:"machine_template,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+func (x *Template) GetDatabaseDeployment() *Template_DatabaseDeployment {
+	if x != nil {
+		if x, ok := x.TemplateData.(*Template_DatabaseDeployment_); ok {
+			return x.DatabaseDeployment
+		}
+	}
+	return nil
 }
 
-func (x *StroppyInstanceTemplate) Reset() {
-	*x = StroppyInstanceTemplate{}
+func (x *Template) GetStroppyDeployment() *Template_StroppyDeployment {
+	if x != nil {
+		if x, ok := x.TemplateData.(*Template_StroppyDeployment_); ok {
+			return x.StroppyDeployment
+		}
+	}
+	return nil
+}
+
+type isTemplate_TemplateData interface {
+	isTemplate_TemplateData()
+}
+
+type Template_MachineDeployment_ struct {
+	MachineDeployment *Template_MachineDeployment `protobuf:"bytes,101,opt,name=machine_deployment,json=machineDeployment,proto3,oneof"`
+}
+
+type Template_DatabaseDeployment_ struct {
+	DatabaseDeployment *Template_DatabaseDeployment `protobuf:"bytes,102,opt,name=database_deployment,json=databaseDeployment,proto3,oneof"`
+}
+
+type Template_StroppyDeployment_ struct {
+	StroppyDeployment *Template_StroppyDeployment `protobuf:"bytes,103,opt,name=stroppy_deployment,json=stroppyDeployment,proto3,oneof"`
+}
+
+func (*Template_MachineDeployment_) isTemplate_TemplateData() {}
+
+func (*Template_DatabaseDeployment_) isTemplate_TemplateData() {}
+
+func (*Template_StroppyDeployment_) isTemplate_TemplateData() {}
+
+type SearchTemplatesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	TagsList      *Tag_List              `protobuf:"bytes,2,opt,name=tags_list,json=tagsList,proto3" json:"tags_list,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchTemplatesRequest) Reset() {
+	*x = SearchTemplatesRequest{}
 	mi := &file_panel_template_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StroppyInstanceTemplate) String() string {
+func (x *SearchTemplatesRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StroppyInstanceTemplate) ProtoMessage() {}
+func (*SearchTemplatesRequest) ProtoMessage() {}
 
-func (x *StroppyInstanceTemplate) ProtoReflect() protoreflect.Message {
+func (x *SearchTemplatesRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_panel_template_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -219,51 +272,46 @@ func (x *StroppyInstanceTemplate) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StroppyInstanceTemplate.ProtoReflect.Descriptor instead.
-func (*StroppyInstanceTemplate) Descriptor() ([]byte, []int) {
+// Deprecated: Use SearchTemplatesRequest.ProtoReflect.Descriptor instead.
+func (*SearchTemplatesRequest) Descriptor() ([]byte, []int) {
 	return file_panel_template_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *StroppyInstanceTemplate) GetStroppyDeploymentTemplate() *StroppyDeploymentTemplate {
+func (x *SearchTemplatesRequest) GetName() string {
 	if x != nil {
-		return x.StroppyDeploymentTemplate
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SearchTemplatesRequest) GetTagsList() *Tag_List {
+	if x != nil {
+		return x.TagsList
 	}
 	return nil
 }
 
-func (x *StroppyInstanceTemplate) GetMachineTemplate() *MachineTemplate {
-	if x != nil {
-		return x.MachineTemplate
-	}
-	return nil
-}
-
-type DatabaseDeploymentTemplate struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Id     *Ulid                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Timing *Timing                `protobuf:"bytes,2,opt,name=timing,proto3" json:"timing,omitempty"`
-	Name   string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Tags   *Tags                  `protobuf:"bytes,4,opt,name=tags,proto3" json:"tags,omitempty"`
-	// now support only prebuilt image in YandexCloud
-	PrebuiltImageId string `protobuf:"bytes,5,opt,name=prebuilt_image_id,json=prebuiltImageId,proto3" json:"prebuilt_image_id,omitempty"`
+type Template_DatabaseDeployment struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	PrebuiltImageId string                 `protobuf:"bytes,1,opt,name=prebuilt_image_id,json=prebuiltImageId,proto3" json:"prebuilt_image_id,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
 
-func (x *DatabaseDeploymentTemplate) Reset() {
-	*x = DatabaseDeploymentTemplate{}
+func (x *Template_DatabaseDeployment) Reset() {
+	*x = Template_DatabaseDeployment{}
 	mi := &file_panel_template_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DatabaseDeploymentTemplate) String() string {
+func (x *Template_DatabaseDeployment) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DatabaseDeploymentTemplate) ProtoMessage() {}
+func (*Template_DatabaseDeployment) ProtoMessage() {}
 
-func (x *DatabaseDeploymentTemplate) ProtoReflect() protoreflect.Message {
+func (x *Template_DatabaseDeployment) ProtoReflect() protoreflect.Message {
 	mi := &file_panel_template_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -275,69 +323,39 @@ func (x *DatabaseDeploymentTemplate) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DatabaseDeploymentTemplate.ProtoReflect.Descriptor instead.
-func (*DatabaseDeploymentTemplate) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{3}
+// Deprecated: Use Template_DatabaseDeployment.ProtoReflect.Descriptor instead.
+func (*Template_DatabaseDeployment) Descriptor() ([]byte, []int) {
+	return file_panel_template_proto_rawDescGZIP(), []int{1, 0}
 }
 
-func (x *DatabaseDeploymentTemplate) GetId() *Ulid {
-	if x != nil {
-		return x.Id
-	}
-	return nil
-}
-
-func (x *DatabaseDeploymentTemplate) GetTiming() *Timing {
-	if x != nil {
-		return x.Timing
-	}
-	return nil
-}
-
-func (x *DatabaseDeploymentTemplate) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *DatabaseDeploymentTemplate) GetTags() *Tags {
-	if x != nil {
-		return x.Tags
-	}
-	return nil
-}
-
-func (x *DatabaseDeploymentTemplate) GetPrebuiltImageId() string {
+func (x *Template_DatabaseDeployment) GetPrebuiltImageId() string {
 	if x != nil {
 		return x.PrebuiltImageId
 	}
 	return ""
 }
 
-type DatabaseInstanceTemplate struct {
-	state                      protoimpl.MessageState      `protogen:"open.v1"`
-	DatabaseDeploymentTemplate *DatabaseDeploymentTemplate `protobuf:"bytes,1,opt,name=database_deployment_template,json=databaseDeploymentTemplate,proto3" json:"database_deployment_template,omitempty"`
-	// now support only single node
-	MachineTemplate *MachineTemplate `protobuf:"bytes,2,opt,name=machine_template,json=machineTemplate,proto3" json:"machine_template,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+type Template_MachineDeployment struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	MachineInfo   *crossplane.MachineInfo `protobuf:"bytes,2,opt,name=machine_info,json=machineInfo,proto3" json:"machine_info,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DatabaseInstanceTemplate) Reset() {
-	*x = DatabaseInstanceTemplate{}
+func (x *Template_MachineDeployment) Reset() {
+	*x = Template_MachineDeployment{}
 	mi := &file_panel_template_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DatabaseInstanceTemplate) String() string {
+func (x *Template_MachineDeployment) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DatabaseInstanceTemplate) ProtoMessage() {}
+func (*Template_MachineDeployment) ProtoMessage() {}
 
-func (x *DatabaseInstanceTemplate) ProtoReflect() protoreflect.Message {
+func (x *Template_MachineDeployment) ProtoReflect() protoreflect.Message {
 	mi := &file_panel_template_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -349,46 +367,40 @@ func (x *DatabaseInstanceTemplate) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DatabaseInstanceTemplate.ProtoReflect.Descriptor instead.
-func (*DatabaseInstanceTemplate) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{4}
+// Deprecated: Use Template_MachineDeployment.ProtoReflect.Descriptor instead.
+func (*Template_MachineDeployment) Descriptor() ([]byte, []int) {
+	return file_panel_template_proto_rawDescGZIP(), []int{1, 1}
 }
 
-func (x *DatabaseInstanceTemplate) GetDatabaseDeploymentTemplate() *DatabaseDeploymentTemplate {
+func (x *Template_MachineDeployment) GetMachineInfo() *crossplane.MachineInfo {
 	if x != nil {
-		return x.DatabaseDeploymentTemplate
+		return x.MachineInfo
 	}
 	return nil
 }
 
-func (x *DatabaseInstanceTemplate) GetMachineTemplate() *MachineTemplate {
-	if x != nil {
-		return x.MachineTemplate
-	}
-	return nil
-}
-
-type MachineTemplate_List struct {
+type Template_StroppyDeployment struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Templates     []*MachineTemplate     `protobuf:"bytes,1,rep,name=templates,proto3" json:"templates,omitempty"`
+	Files         []*crossplane.FsFile   `protobuf:"bytes,1,rep,name=files,proto3" json:"files,omitempty"`
+	Cmd           *string                `protobuf:"bytes,2,opt,name=cmd,proto3,oneof" json:"cmd,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *MachineTemplate_List) Reset() {
-	*x = MachineTemplate_List{}
+func (x *Template_StroppyDeployment) Reset() {
+	*x = Template_StroppyDeployment{}
 	mi := &file_panel_template_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *MachineTemplate_List) String() string {
+func (x *Template_StroppyDeployment) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*MachineTemplate_List) ProtoMessage() {}
+func (*Template_StroppyDeployment) ProtoMessage() {}
 
-func (x *MachineTemplate_List) ProtoReflect() protoreflect.Message {
+func (x *Template_StroppyDeployment) ProtoReflect() protoreflect.Message {
 	mi := &file_panel_template_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -400,39 +412,46 @@ func (x *MachineTemplate_List) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use MachineTemplate_List.ProtoReflect.Descriptor instead.
-func (*MachineTemplate_List) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{0, 0}
+// Deprecated: Use Template_StroppyDeployment.ProtoReflect.Descriptor instead.
+func (*Template_StroppyDeployment) Descriptor() ([]byte, []int) {
+	return file_panel_template_proto_rawDescGZIP(), []int{1, 2}
 }
 
-func (x *MachineTemplate_List) GetTemplates() []*MachineTemplate {
+func (x *Template_StroppyDeployment) GetFiles() []*crossplane.FsFile {
 	if x != nil {
-		return x.Templates
+		return x.Files
 	}
 	return nil
 }
 
-type StroppyDeploymentTemplate_List struct {
-	state         protoimpl.MessageState       `protogen:"open.v1"`
-	Templates     []*StroppyDeploymentTemplate `protobuf:"bytes,1,rep,name=templates,proto3" json:"templates,omitempty"`
+func (x *Template_StroppyDeployment) GetCmd() string {
+	if x != nil && x.Cmd != nil {
+		return *x.Cmd
+	}
+	return ""
+}
+
+type Template_List struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Templates     []*Template            `protobuf:"bytes,1,rep,name=templates,proto3" json:"templates,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StroppyDeploymentTemplate_List) Reset() {
-	*x = StroppyDeploymentTemplate_List{}
+func (x *Template_List) Reset() {
+	*x = Template_List{}
 	mi := &file_panel_template_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StroppyDeploymentTemplate_List) String() string {
+func (x *Template_List) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StroppyDeploymentTemplate_List) ProtoMessage() {}
+func (*Template_List) ProtoMessage() {}
 
-func (x *StroppyDeploymentTemplate_List) ProtoReflect() protoreflect.Message {
+func (x *Template_List) ProtoReflect() protoreflect.Message {
 	mi := &file_panel_template_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -444,56 +463,12 @@ func (x *StroppyDeploymentTemplate_List) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StroppyDeploymentTemplate_List.ProtoReflect.Descriptor instead.
-func (*StroppyDeploymentTemplate_List) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{1, 0}
+// Deprecated: Use Template_List.ProtoReflect.Descriptor instead.
+func (*Template_List) Descriptor() ([]byte, []int) {
+	return file_panel_template_proto_rawDescGZIP(), []int{1, 3}
 }
 
-func (x *StroppyDeploymentTemplate_List) GetTemplates() []*StroppyDeploymentTemplate {
-	if x != nil {
-		return x.Templates
-	}
-	return nil
-}
-
-type DatabaseDeploymentTemplate_List struct {
-	state         protoimpl.MessageState        `protogen:"open.v1"`
-	Templates     []*DatabaseDeploymentTemplate `protobuf:"bytes,1,rep,name=templates,proto3" json:"templates,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DatabaseDeploymentTemplate_List) Reset() {
-	*x = DatabaseDeploymentTemplate_List{}
-	mi := &file_panel_template_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DatabaseDeploymentTemplate_List) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DatabaseDeploymentTemplate_List) ProtoMessage() {}
-
-func (x *DatabaseDeploymentTemplate_List) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_template_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DatabaseDeploymentTemplate_List.ProtoReflect.Descriptor instead.
-func (*DatabaseDeploymentTemplate_List) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{3, 0}
-}
-
-func (x *DatabaseDeploymentTemplate_List) GetTemplates() []*DatabaseDeploymentTemplate {
+func (x *Template_List) GetTemplates() []*Template {
 	if x != nil {
 		return x.Templates
 	}
@@ -504,60 +479,49 @@ var File_panel_template_proto protoreflect.FileDescriptor
 
 const file_panel_template_proto_rawDesc = "" +
 	"\n" +
-	"\x14panel/template.proto\x12\x05panel\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1bcrossplane/deployment.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xae\x02\n" +
-	"\x0fMachineTemplate\x12*\n" +
+	"\x14panel/template.proto\x12\x05panel\x1a\x1bcrossplane/deployment.proto\x1a\x16crossplane/types.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xbf\x01\n" +
+	"\x06KVInfo\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
-	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12&\n" +
-	"\x04tags\x18\x03 \x01(\v2\v.panel.TagsB\x05\xca>\x02H\x01R\x04tags\x12A\n" +
-	"\fmachine_info\x18\x04 \x01(\v2\x17.crossplane.MachineInfoB\x05\xca>\x02@\x01R\vmachineInfo\x1a<\n" +
-	"\x04List\x124\n" +
-	"\ttemplates\x18\x01 \x03(\v2\x16.panel.MachineTemplateR\ttemplates:\x18\xca>\x15\b\x01\x12\x11machine_templates\"\xb0\x03\n" +
-	"\x19StroppyDeploymentTemplate\x12*\n" +
-	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
-	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
-	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12\x1e\n" +
-	"\x04name\x18\x03 \x01(\tB\n" +
-	"\xfaB\ar\x05\x10\x03\x18\xff\x01R\x04name\x12&\n" +
-	"\x04tags\x18\x04 \x01(\v2\v.panel.TagsB\x05\xca>\x02H\x01R\x04tags\x12\x1f\n" +
-	"\vscript_body\x18\x05 \x01(\fR\n" +
-	"scriptBody\x120\n" +
-	"\x0fstroppy_version\x18\x06 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x0estroppyVersion\x121\n" +
-	"\benv_data\x18\a \x01(\v2\x0f.panel.MetadataB\x05\xca>\x02H\x01R\aenvData\x1aF\n" +
-	"\x04List\x12>\n" +
-	"\ttemplates\x18\x01 \x03(\v2 .panel.StroppyDeploymentTemplateR\ttemplates:#\xca> \b\x01\x12\x1cstroppy_deployment_templates\"\xbe\x01\n" +
-	"\x17StroppyInstanceTemplate\x12`\n" +
-	"\x1bstroppy_deployment_template\x18\x01 \x01(\v2 .panel.StroppyDeploymentTemplateR\x19stroppyDeploymentTemplate\x12A\n" +
-	"\x10machine_template\x18\x02 \x01(\v2\x16.panel.MachineTemplateR\x0fmachineTemplate\"\xe2\x02\n" +
-	"\x1aDatabaseDeploymentTemplate\x12*\n" +
+	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12\x19\n" +
+	"\x03key\x18\x04 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x03key\x12)\n" +
+	"\x04info\x18\x05 \x01(\v2\x0e.panel.KV.InfoB\x05\xca>\x02@\x01R\x04info:\x15\xca>\x12\b\x01\x12\x0esystem_kv_info\"\x99\a\n" +
+	"\bTemplate\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
 	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12\x1e\n" +
 	"\x04name\x18\x03 \x01(\tB\n" +
-	"\xfaB\ar\x05\x10\x03\x18\xff\x01R\x04name\x12&\n" +
-	"\x04tags\x18\x04 \x01(\v2\v.panel.TagsB\x05\xca>\x02H\x01R\x04tags\x123\n" +
-	"\x11prebuilt_image_id\x18\x05 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x0fprebuiltImageId\x1aG\n" +
-	"\x04List\x12?\n" +
-	"\ttemplates\x18\x01 \x03(\v2!.panel.DatabaseDeploymentTemplateR\ttemplates:$\xca>!\b\x01\x12\x1ddatabase_deployment_templates\"\xc2\x01\n" +
-	"\x18DatabaseInstanceTemplate\x12c\n" +
-	"\x1cdatabase_deployment_template\x18\x01 \x01(\v2!.panel.DatabaseDeploymentTemplateR\x1adatabaseDeploymentTemplate\x12A\n" +
-	"\x10machine_template\x18\x02 \x01(\v2\x16.panel.MachineTemplateR\x0fmachineTemplate2\xf1\t\n" +
-	"\x0fTemplateService\x12?\n" +
-	"\x18ListMachineTemplatesTags\x12\x16.google.protobuf.Empty\x1a\v.panel.Tags\x12G\n" +
-	"\x14ListMachineTemplates\x12\x12.panel.Tags.Filter\x1a\x1b.panel.MachineTemplate.List\x12G\n" +
-	"\x15CreateMachineTemplate\x12\x16.panel.MachineTemplate\x1a\x16.panel.MachineTemplate\x12G\n" +
-	"\x15UpdateMachineTemplate\x12\x16.panel.MachineTemplate\x1a\x16.panel.MachineTemplate\x12<\n" +
-	"\x15DeleteMachineTemplate\x12\v.panel.Ulid\x1a\x16.google.protobuf.Empty\x12I\n" +
-	"\"ListStroppyDeploymentTemplatesTags\x12\x16.google.protobuf.Empty\x1a\v.panel.Tags\x12[\n" +
-	"\x1eListStroppyDeploymentTemplates\x12\x12.panel.Tags.Filter\x1a%.panel.StroppyDeploymentTemplate.List\x12e\n" +
-	"\x1fCreateStroppyDeploymentTemplate\x12 .panel.StroppyDeploymentTemplate\x1a .panel.StroppyDeploymentTemplate\x12e\n" +
-	"\x1fUpdateStroppyDeploymentTemplate\x12 .panel.StroppyDeploymentTemplate\x1a .panel.StroppyDeploymentTemplate\x12F\n" +
-	"\x1fDeleteStroppyDeploymentTemplate\x12\v.panel.Ulid\x1a\x16.google.protobuf.Empty\x12J\n" +
-	"#ListDatabaseDeploymentTemplatesTags\x12\x16.google.protobuf.Empty\x1a\v.panel.Tags\x12]\n" +
-	"\x1fListDatabaseDeploymentTemplates\x12\x12.panel.Tags.Filter\x1a&.panel.DatabaseDeploymentTemplate.List\x12h\n" +
-	" CreateDatabaseDeploymentTemplate\x12!.panel.DatabaseDeploymentTemplate\x1a!.panel.DatabaseDeploymentTemplate\x12h\n" +
-	" UpdateDatabaseDeploymentTemplate\x12!.panel.DatabaseDeploymentTemplate\x1a!.panel.DatabaseDeploymentTemplate\x12G\n" +
-	" DeleteDatabaseDeploymentTemplate\x12\v.panel.Ulid\x1a\x16.google.protobuf.EmptyB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
+	"\xfaB\ar\x05\x10\x03\x18\xff\x01R\x04name\x12f\n" +
+	"\tauthor_id\x18\x04 \x01(\v2\v.panel.UlidB<\xca>9\x12\x04\b\x01 \x01\x1a1\"/NOT NULL REFERENCES users(id) ON DELETE CASCADER\bauthorId\x12\x1d\n" +
+	"\n" +
+	"is_default\x18\x05 \x01(\bR\tisDefault\x12)\n" +
+	"\x04tags\x18\x06 \x03(\v2\n" +
+	".panel.TagB\t\xca>\x06\x12\x04\b\x01 \x01R\x04tags\x12R\n" +
+	"\x12machine_deployment\x18e \x01(\v2!.panel.Template.MachineDeploymentH\x00R\x11machineDeployment\x12U\n" +
+	"\x13database_deployment\x18f \x01(\v2\".panel.Template.DatabaseDeploymentH\x00R\x12databaseDeployment\x12R\n" +
+	"\x12stroppy_deployment\x18g \x01(\v2!.panel.Template.StroppyDeploymentH\x00R\x11stroppyDeployment\x1aI\n" +
+	"\x12DatabaseDeployment\x123\n" +
+	"\x11prebuilt_image_id\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x0fprebuiltImageId\x1aV\n" +
+	"\x11MachineDeployment\x12A\n" +
+	"\fmachine_info\x18\x02 \x01(\v2\x17.crossplane.MachineInfoB\x05\xca>\x02@\x01R\vmachineInfo\x1ae\n" +
+	"\x11StroppyDeployment\x12(\n" +
+	"\x05files\x18\x01 \x03(\v2\x12.crossplane.FsFileR\x05files\x12\x1e\n" +
+	"\x03cmd\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01H\x00R\x03cmd\x88\x01\x01B\x06\n" +
+	"\x04_cmd\x1a5\n" +
+	"\x04List\x12-\n" +
+	"\ttemplates\x18\x01 \x03(\v2\x0f.panel.TemplateR\ttemplates:\x10\xca>\r\b\x01\x12\ttemplatesB\x0f\n" +
+	"\rtemplate_data\"c\n" +
+	"\x16SearchTemplatesRequest\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12,\n" +
+	"\ttags_list\x18\x02 \x01(\v2\x0f.panel.Tag.ListR\btagsList2\x91\x03\n" +
+	"\x0fTemplateService\x12<\n" +
+	"\x11ListTemplatesTags\x12\x16.google.protobuf.Empty\x1a\x0f.panel.Tag.List\x12F\n" +
+	"\x0fSearchTemplates\x12\x1d.panel.SearchTemplatesRequest\x1a\x14.panel.Template.List\x12,\n" +
+	"\x0eGetTemplateKvs\x12\v.panel.Ulid\x1a\r.panel.KV.Map\x12+\n" +
+	"\vGetTemplate\x12\v.panel.Ulid\x1a\x0f.panel.Template\x122\n" +
+	"\x0eCreateTemplate\x12\x0f.panel.Template\x1a\x0f.panel.Template\x122\n" +
+	"\x0eUpdateTemplate\x12\x0f.panel.Template\x1a\x0f.panel.Template\x125\n" +
+	"\x0eDeleteTemplate\x12\v.panel.Ulid\x1a\x16.google.protobuf.EmptyB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
 
 var (
 	file_panel_template_proto_rawDescOnce sync.Once
@@ -571,78 +535,59 @@ func file_panel_template_proto_rawDescGZIP() []byte {
 	return file_panel_template_proto_rawDescData
 }
 
-var file_panel_template_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_panel_template_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_panel_template_proto_goTypes = []any{
-	(*MachineTemplate)(nil),                 // 0: panel.MachineTemplate
-	(*StroppyDeploymentTemplate)(nil),       // 1: panel.StroppyDeploymentTemplate
-	(*StroppyInstanceTemplate)(nil),         // 2: panel.StroppyInstanceTemplate
-	(*DatabaseDeploymentTemplate)(nil),      // 3: panel.DatabaseDeploymentTemplate
-	(*DatabaseInstanceTemplate)(nil),        // 4: panel.DatabaseInstanceTemplate
-	(*MachineTemplate_List)(nil),            // 5: panel.MachineTemplate.List
-	(*StroppyDeploymentTemplate_List)(nil),  // 6: panel.StroppyDeploymentTemplate.List
-	(*DatabaseDeploymentTemplate_List)(nil), // 7: panel.DatabaseDeploymentTemplate.List
-	(*Ulid)(nil),                            // 8: panel.Ulid
-	(*Timing)(nil),                          // 9: panel.Timing
-	(*Tags)(nil),                            // 10: panel.Tags
-	(*MachineInfo)(nil),                     // 11: crossplane.MachineInfo
-	(*Metadata)(nil),                        // 12: panel.Metadata
-	(*emptypb.Empty)(nil),                   // 13: google.protobuf.Empty
-	(*Tags_Filter)(nil),                     // 14: panel.Tags.Filter
+	(*KVInfo)(nil),                      // 0: panel.KVInfo
+	(*Template)(nil),                    // 1: panel.Template
+	(*SearchTemplatesRequest)(nil),      // 2: panel.SearchTemplatesRequest
+	(*Template_DatabaseDeployment)(nil), // 3: panel.Template.DatabaseDeployment
+	(*Template_MachineDeployment)(nil),  // 4: panel.Template.MachineDeployment
+	(*Template_StroppyDeployment)(nil),  // 5: panel.Template.StroppyDeployment
+	(*Template_List)(nil),               // 6: panel.Template.List
+	(*Ulid)(nil),                        // 7: panel.Ulid
+	(*Timing)(nil),                      // 8: panel.Timing
+	(*KV_Info)(nil),                     // 9: panel.KV.Info
+	(*Tag)(nil),                         // 10: panel.Tag
+	(*Tag_List)(nil),                    // 11: panel.Tag.List
+	(*crossplane.MachineInfo)(nil),      // 12: crossplane.MachineInfo
+	(*crossplane.FsFile)(nil),           // 13: crossplane.FsFile
+	(*emptypb.Empty)(nil),               // 14: google.protobuf.Empty
+	(*KV_Map)(nil),                      // 15: panel.KV.Map
 }
 var file_panel_template_proto_depIdxs = []int32{
-	8,  // 0: panel.MachineTemplate.id:type_name -> panel.Ulid
-	9,  // 1: panel.MachineTemplate.timing:type_name -> panel.Timing
-	10, // 2: panel.MachineTemplate.tags:type_name -> panel.Tags
-	11, // 3: panel.MachineTemplate.machine_info:type_name -> crossplane.MachineInfo
-	8,  // 4: panel.StroppyDeploymentTemplate.id:type_name -> panel.Ulid
-	9,  // 5: panel.StroppyDeploymentTemplate.timing:type_name -> panel.Timing
-	10, // 6: panel.StroppyDeploymentTemplate.tags:type_name -> panel.Tags
-	12, // 7: panel.StroppyDeploymentTemplate.env_data:type_name -> panel.Metadata
-	1,  // 8: panel.StroppyInstanceTemplate.stroppy_deployment_template:type_name -> panel.StroppyDeploymentTemplate
-	0,  // 9: panel.StroppyInstanceTemplate.machine_template:type_name -> panel.MachineTemplate
-	8,  // 10: panel.DatabaseDeploymentTemplate.id:type_name -> panel.Ulid
-	9,  // 11: panel.DatabaseDeploymentTemplate.timing:type_name -> panel.Timing
-	10, // 12: panel.DatabaseDeploymentTemplate.tags:type_name -> panel.Tags
-	3,  // 13: panel.DatabaseInstanceTemplate.database_deployment_template:type_name -> panel.DatabaseDeploymentTemplate
-	0,  // 14: panel.DatabaseInstanceTemplate.machine_template:type_name -> panel.MachineTemplate
-	0,  // 15: panel.MachineTemplate.List.templates:type_name -> panel.MachineTemplate
-	1,  // 16: panel.StroppyDeploymentTemplate.List.templates:type_name -> panel.StroppyDeploymentTemplate
-	3,  // 17: panel.DatabaseDeploymentTemplate.List.templates:type_name -> panel.DatabaseDeploymentTemplate
-	13, // 18: panel.TemplateService.ListMachineTemplatesTags:input_type -> google.protobuf.Empty
-	14, // 19: panel.TemplateService.ListMachineTemplates:input_type -> panel.Tags.Filter
-	0,  // 20: panel.TemplateService.CreateMachineTemplate:input_type -> panel.MachineTemplate
-	0,  // 21: panel.TemplateService.UpdateMachineTemplate:input_type -> panel.MachineTemplate
-	8,  // 22: panel.TemplateService.DeleteMachineTemplate:input_type -> panel.Ulid
-	13, // 23: panel.TemplateService.ListStroppyDeploymentTemplatesTags:input_type -> google.protobuf.Empty
-	14, // 24: panel.TemplateService.ListStroppyDeploymentTemplates:input_type -> panel.Tags.Filter
-	1,  // 25: panel.TemplateService.CreateStroppyDeploymentTemplate:input_type -> panel.StroppyDeploymentTemplate
-	1,  // 26: panel.TemplateService.UpdateStroppyDeploymentTemplate:input_type -> panel.StroppyDeploymentTemplate
-	8,  // 27: panel.TemplateService.DeleteStroppyDeploymentTemplate:input_type -> panel.Ulid
-	13, // 28: panel.TemplateService.ListDatabaseDeploymentTemplatesTags:input_type -> google.protobuf.Empty
-	14, // 29: panel.TemplateService.ListDatabaseDeploymentTemplates:input_type -> panel.Tags.Filter
-	3,  // 30: panel.TemplateService.CreateDatabaseDeploymentTemplate:input_type -> panel.DatabaseDeploymentTemplate
-	3,  // 31: panel.TemplateService.UpdateDatabaseDeploymentTemplate:input_type -> panel.DatabaseDeploymentTemplate
-	8,  // 32: panel.TemplateService.DeleteDatabaseDeploymentTemplate:input_type -> panel.Ulid
-	10, // 33: panel.TemplateService.ListMachineTemplatesTags:output_type -> panel.Tags
-	5,  // 34: panel.TemplateService.ListMachineTemplates:output_type -> panel.MachineTemplate.List
-	0,  // 35: panel.TemplateService.CreateMachineTemplate:output_type -> panel.MachineTemplate
-	0,  // 36: panel.TemplateService.UpdateMachineTemplate:output_type -> panel.MachineTemplate
-	13, // 37: panel.TemplateService.DeleteMachineTemplate:output_type -> google.protobuf.Empty
-	10, // 38: panel.TemplateService.ListStroppyDeploymentTemplatesTags:output_type -> panel.Tags
-	6,  // 39: panel.TemplateService.ListStroppyDeploymentTemplates:output_type -> panel.StroppyDeploymentTemplate.List
-	1,  // 40: panel.TemplateService.CreateStroppyDeploymentTemplate:output_type -> panel.StroppyDeploymentTemplate
-	1,  // 41: panel.TemplateService.UpdateStroppyDeploymentTemplate:output_type -> panel.StroppyDeploymentTemplate
-	13, // 42: panel.TemplateService.DeleteStroppyDeploymentTemplate:output_type -> google.protobuf.Empty
-	10, // 43: panel.TemplateService.ListDatabaseDeploymentTemplatesTags:output_type -> panel.Tags
-	7,  // 44: panel.TemplateService.ListDatabaseDeploymentTemplates:output_type -> panel.DatabaseDeploymentTemplate.List
-	3,  // 45: panel.TemplateService.CreateDatabaseDeploymentTemplate:output_type -> panel.DatabaseDeploymentTemplate
-	3,  // 46: panel.TemplateService.UpdateDatabaseDeploymentTemplate:output_type -> panel.DatabaseDeploymentTemplate
-	13, // 47: panel.TemplateService.DeleteDatabaseDeploymentTemplate:output_type -> google.protobuf.Empty
-	33, // [33:48] is the sub-list for method output_type
-	18, // [18:33] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	7,  // 0: panel.KVInfo.id:type_name -> panel.Ulid
+	8,  // 1: panel.KVInfo.timing:type_name -> panel.Timing
+	9,  // 2: panel.KVInfo.info:type_name -> panel.KV.Info
+	7,  // 3: panel.Template.id:type_name -> panel.Ulid
+	8,  // 4: panel.Template.timing:type_name -> panel.Timing
+	7,  // 5: panel.Template.author_id:type_name -> panel.Ulid
+	10, // 6: panel.Template.tags:type_name -> panel.Tag
+	4,  // 7: panel.Template.machine_deployment:type_name -> panel.Template.MachineDeployment
+	3,  // 8: panel.Template.database_deployment:type_name -> panel.Template.DatabaseDeployment
+	5,  // 9: panel.Template.stroppy_deployment:type_name -> panel.Template.StroppyDeployment
+	11, // 10: panel.SearchTemplatesRequest.tags_list:type_name -> panel.Tag.List
+	12, // 11: panel.Template.MachineDeployment.machine_info:type_name -> crossplane.MachineInfo
+	13, // 12: panel.Template.StroppyDeployment.files:type_name -> crossplane.FsFile
+	1,  // 13: panel.Template.List.templates:type_name -> panel.Template
+	14, // 14: panel.TemplateService.ListTemplatesTags:input_type -> google.protobuf.Empty
+	2,  // 15: panel.TemplateService.SearchTemplates:input_type -> panel.SearchTemplatesRequest
+	7,  // 16: panel.TemplateService.GetTemplateKvs:input_type -> panel.Ulid
+	7,  // 17: panel.TemplateService.GetTemplate:input_type -> panel.Ulid
+	1,  // 18: panel.TemplateService.CreateTemplate:input_type -> panel.Template
+	1,  // 19: panel.TemplateService.UpdateTemplate:input_type -> panel.Template
+	7,  // 20: panel.TemplateService.DeleteTemplate:input_type -> panel.Ulid
+	11, // 21: panel.TemplateService.ListTemplatesTags:output_type -> panel.Tag.List
+	6,  // 22: panel.TemplateService.SearchTemplates:output_type -> panel.Template.List
+	15, // 23: panel.TemplateService.GetTemplateKvs:output_type -> panel.KV.Map
+	1,  // 24: panel.TemplateService.GetTemplate:output_type -> panel.Template
+	1,  // 25: panel.TemplateService.CreateTemplate:output_type -> panel.Template
+	1,  // 26: panel.TemplateService.UpdateTemplate:output_type -> panel.Template
+	14, // 27: panel.TemplateService.DeleteTemplate:output_type -> google.protobuf.Empty
+	21, // [21:28] is the sub-list for method output_type
+	14, // [14:21] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_panel_template_proto_init() }
@@ -650,15 +595,20 @@ func file_panel_template_proto_init() {
 	if File_panel_template_proto != nil {
 		return
 	}
-	file_crossplane_deployment_proto_init()
 	file_panel_types_proto_init()
+	file_panel_template_proto_msgTypes[1].OneofWrappers = []any{
+		(*Template_MachineDeployment_)(nil),
+		(*Template_DatabaseDeployment_)(nil),
+		(*Template_StroppyDeployment_)(nil),
+	}
+	file_panel_template_proto_msgTypes[5].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_panel_template_proto_rawDesc), len(file_panel_template_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

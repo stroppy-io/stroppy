@@ -8,6 +8,7 @@ require (
 	connectrpc.com/cors v0.1.0
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/avito-tech/go-transaction-manager v1.5.1
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/creasty/defaults v1.8.0
 	github.com/envoyproxy/protoc-gen-validate v1.2.1
 	github.com/exaring/otelpgx v0.9.3

@@ -31,3 +31,19 @@ enum SupportedCloud {
     SUPPORTED_CLOUD_UNSPECIFIED = 0;
     SUPPORTED_CLOUD_YANDEX = 1;
 }
+
+enum CrossplaneDeletionPolicy {
+    CROSSPLANE_DELETION_POLICY_UNSPECIFIED = 0;
+    DELETE = 1;
+    ORPHAN = 2;
+}
+
+message SshUser {
+    string name = 1 [(validate.rules).string.min_len = 1];
+    repeated string ssh_authorized_keys = 2 [(validate.rules).repeated.min_items = 1];
+}
+
+message FsFile {
+    string path = 1 [(validate.rules).string.min_len = 1];
+    bytes content = 2 [(validate.rules).bytes.min_len = 1];
+}

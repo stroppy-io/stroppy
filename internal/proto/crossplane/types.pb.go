@@ -68,6 +68,55 @@ func (SupportedCloud) EnumDescriptor() ([]byte, []int) {
 	return file_crossplane_types_proto_rawDescGZIP(), []int{0}
 }
 
+type CrossplaneDeletionPolicy int32
+
+const (
+	CrossplaneDeletionPolicy_CROSSPLANE_DELETION_POLICY_UNSPECIFIED CrossplaneDeletionPolicy = 0
+	CrossplaneDeletionPolicy_DELETE                                 CrossplaneDeletionPolicy = 1
+	CrossplaneDeletionPolicy_ORPHAN                                 CrossplaneDeletionPolicy = 2
+)
+
+// Enum value maps for CrossplaneDeletionPolicy.
+var (
+	CrossplaneDeletionPolicy_name = map[int32]string{
+		0: "CROSSPLANE_DELETION_POLICY_UNSPECIFIED",
+		1: "DELETE",
+		2: "ORPHAN",
+	}
+	CrossplaneDeletionPolicy_value = map[string]int32{
+		"CROSSPLANE_DELETION_POLICY_UNSPECIFIED": 0,
+		"DELETE":                                 1,
+		"ORPHAN":                                 2,
+	}
+)
+
+func (x CrossplaneDeletionPolicy) Enum() *CrossplaneDeletionPolicy {
+	p := new(CrossplaneDeletionPolicy)
+	*p = x
+	return p
+}
+
+func (x CrossplaneDeletionPolicy) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CrossplaneDeletionPolicy) Descriptor() protoreflect.EnumDescriptor {
+	return file_crossplane_types_proto_enumTypes[1].Descriptor()
+}
+
+func (CrossplaneDeletionPolicy) Type() protoreflect.EnumType {
+	return &file_crossplane_types_proto_enumTypes[1]
+}
+
+func (x CrossplaneDeletionPolicy) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CrossplaneDeletionPolicy.Descriptor instead.
+func (CrossplaneDeletionPolicy) EnumDescriptor() ([]byte, []int) {
+	return file_crossplane_types_proto_rawDescGZIP(), []int{1}
+}
+
 type OnlyNameRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -284,6 +333,110 @@ func (x *Metadata) GetAnnotations() map[string]string {
 	return nil
 }
 
+type SshUser struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	SshAuthorizedKeys []string               `protobuf:"bytes,2,rep,name=ssh_authorized_keys,json=sshAuthorizedKeys,proto3" json:"ssh_authorized_keys,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *SshUser) Reset() {
+	*x = SshUser{}
+	mi := &file_crossplane_types_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SshUser) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SshUser) ProtoMessage() {}
+
+func (x *SshUser) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_types_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SshUser.ProtoReflect.Descriptor instead.
+func (*SshUser) Descriptor() ([]byte, []int) {
+	return file_crossplane_types_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *SshUser) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SshUser) GetSshAuthorizedKeys() []string {
+	if x != nil {
+		return x.SshAuthorizedKeys
+	}
+	return nil
+}
+
+type FsFile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Content       []byte                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FsFile) Reset() {
+	*x = FsFile{}
+	mi := &file_crossplane_types_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FsFile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FsFile) ProtoMessage() {}
+
+func (x *FsFile) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_types_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FsFile.ProtoReflect.Descriptor instead.
+func (*FsFile) Descriptor() ([]byte, []int) {
+	return file_crossplane_types_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *FsFile) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FsFile) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
 var File_crossplane_types_proto protoreflect.FileDescriptor
 
 const file_crossplane_types_proto_rawDesc = "" +
@@ -306,10 +459,22 @@ const file_crossplane_types_proto_rawDesc = "" +
 	"\vannotations\x18\x03 \x03(\v2%.crossplane.Metadata.AnnotationsEntryR\vannotations\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*M\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"`\n" +
+	"\aSshUser\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x128\n" +
+	"\x13ssh_authorized_keys\x18\x02 \x03(\tB\b\xfaB\x05\x92\x01\x02\b\x01R\x11sshAuthorizedKeys\"H\n" +
+	"\x06FsFile\x12\x1b\n" +
+	"\x04path\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04path\x12!\n" +
+	"\acontent\x18\x02 \x01(\fB\a\xfaB\x04z\x02\x10\x01R\acontent*M\n" +
 	"\x0eSupportedCloud\x12\x1f\n" +
 	"\x1bSUPPORTED_CLOUD_UNSPECIFIED\x10\x00\x12\x1a\n" +
-	"\x16SUPPORTED_CLOUD_YANDEX\x10\x01BEZCgithub.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplaneb\x06proto3"
+	"\x16SUPPORTED_CLOUD_YANDEX\x10\x01*^\n" +
+	"\x18CrossplaneDeletionPolicy\x12*\n" +
+	"&CROSSPLANE_DELETION_POLICY_UNSPECIFIED\x10\x00\x12\n" +
+	"\n" +
+	"\x06DELETE\x10\x01\x12\n" +
+	"\n" +
+	"\x06ORPHAN\x10\x02BEZCgithub.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplaneb\x06proto3"
 
 var (
 	file_crossplane_types_proto_rawDescOnce sync.Once
@@ -323,19 +488,22 @@ func file_crossplane_types_proto_rawDescGZIP() []byte {
 	return file_crossplane_types_proto_rawDescData
 }
 
-var file_crossplane_types_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_crossplane_types_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_crossplane_types_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_crossplane_types_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_crossplane_types_proto_goTypes = []any{
-	(SupportedCloud)(0), // 0: crossplane.SupportedCloud
-	(*OnlyNameRef)(nil), // 1: crossplane.OnlyNameRef
-	(*Ref)(nil),         // 2: crossplane.Ref
-	(*ExtRef)(nil),      // 3: crossplane.ExtRef
-	(*Metadata)(nil),    // 4: crossplane.Metadata
-	nil,                 // 5: crossplane.Metadata.AnnotationsEntry
+	(SupportedCloud)(0),           // 0: crossplane.SupportedCloud
+	(CrossplaneDeletionPolicy)(0), // 1: crossplane.CrossplaneDeletionPolicy
+	(*OnlyNameRef)(nil),           // 2: crossplane.OnlyNameRef
+	(*Ref)(nil),                   // 3: crossplane.Ref
+	(*ExtRef)(nil),                // 4: crossplane.ExtRef
+	(*Metadata)(nil),              // 5: crossplane.Metadata
+	(*SshUser)(nil),               // 6: crossplane.SshUser
+	(*FsFile)(nil),                // 7: crossplane.FsFile
+	nil,                           // 8: crossplane.Metadata.AnnotationsEntry
 }
 var file_crossplane_types_proto_depIdxs = []int32{
-	2, // 0: crossplane.ExtRef.ref:type_name -> crossplane.Ref
-	5, // 1: crossplane.Metadata.annotations:type_name -> crossplane.Metadata.AnnotationsEntry
+	3, // 0: crossplane.ExtRef.ref:type_name -> crossplane.Ref
+	8, // 1: crossplane.Metadata.annotations:type_name -> crossplane.Metadata.AnnotationsEntry
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
@@ -353,8 +521,8 @@ func file_crossplane_types_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_crossplane_types_proto_rawDesc), len(file_crossplane_types_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   5,
+			NumEnums:      2,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

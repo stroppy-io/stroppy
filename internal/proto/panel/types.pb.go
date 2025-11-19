@@ -24,59 +24,59 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type LogRecord_Level int32
+type Tps_Order_ParameterType int32
 
 const (
-	LogRecord_LOG_LEVEL_UNSPECIFIED LogRecord_Level = 0
-	LogRecord_LOG_LEVEL_DEBUG       LogRecord_Level = 1
-	LogRecord_LOG_LEVEL_INFO        LogRecord_Level = 2
-	LogRecord_LOG_LEVEL_WARNING     LogRecord_Level = 3
-	LogRecord_LOG_LEVEL_ERROR       LogRecord_Level = 4
+	Tps_Order_TYPE_AVERAGE Tps_Order_ParameterType = 0
+	Tps_Order_TYPE_MAX     Tps_Order_ParameterType = 1
+	Tps_Order_TYPE_MIN     Tps_Order_ParameterType = 2
+	Tps_Order_TYPE_P95TH   Tps_Order_ParameterType = 3
+	Tps_Order_TYPE_P99TH   Tps_Order_ParameterType = 4
 )
 
-// Enum value maps for LogRecord_Level.
+// Enum value maps for Tps_Order_ParameterType.
 var (
-	LogRecord_Level_name = map[int32]string{
-		0: "LOG_LEVEL_UNSPECIFIED",
-		1: "LOG_LEVEL_DEBUG",
-		2: "LOG_LEVEL_INFO",
-		3: "LOG_LEVEL_WARNING",
-		4: "LOG_LEVEL_ERROR",
+	Tps_Order_ParameterType_name = map[int32]string{
+		0: "TYPE_AVERAGE",
+		1: "TYPE_MAX",
+		2: "TYPE_MIN",
+		3: "TYPE_P95TH",
+		4: "TYPE_P99TH",
 	}
-	LogRecord_Level_value = map[string]int32{
-		"LOG_LEVEL_UNSPECIFIED": 0,
-		"LOG_LEVEL_DEBUG":       1,
-		"LOG_LEVEL_INFO":        2,
-		"LOG_LEVEL_WARNING":     3,
-		"LOG_LEVEL_ERROR":       4,
+	Tps_Order_ParameterType_value = map[string]int32{
+		"TYPE_AVERAGE": 0,
+		"TYPE_MAX":     1,
+		"TYPE_MIN":     2,
+		"TYPE_P95TH":   3,
+		"TYPE_P99TH":   4,
 	}
 )
 
-func (x LogRecord_Level) Enum() *LogRecord_Level {
-	p := new(LogRecord_Level)
+func (x Tps_Order_ParameterType) Enum() *Tps_Order_ParameterType {
+	p := new(Tps_Order_ParameterType)
 	*p = x
 	return p
 }
 
-func (x LogRecord_Level) String() string {
+func (x Tps_Order_ParameterType) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (LogRecord_Level) Descriptor() protoreflect.EnumDescriptor {
+func (Tps_Order_ParameterType) Descriptor() protoreflect.EnumDescriptor {
 	return file_panel_types_proto_enumTypes[0].Descriptor()
 }
 
-func (LogRecord_Level) Type() protoreflect.EnumType {
+func (Tps_Order_ParameterType) Type() protoreflect.EnumType {
 	return &file_panel_types_proto_enumTypes[0]
 }
 
-func (x LogRecord_Level) Number() protoreflect.EnumNumber {
+func (x Tps_Order_ParameterType) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use LogRecord_Level.Descriptor instead.
-func (LogRecord_Level) EnumDescriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{4, 0}
+// Deprecated: Use Tps_Order_ParameterType.Descriptor instead.
+func (Tps_Order_ParameterType) EnumDescriptor() ([]byte, []int) {
+	return file_panel_types_proto_rawDescGZIP(), []int{7, 0, 0}
 }
 
 type Ulid struct {
@@ -227,27 +227,29 @@ func (x *Metadata) GetMetadata() map[string]string {
 	return nil
 }
 
-type Tags struct {
+type KV struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Tags          []*Tags_Tag            `protobuf:"bytes,1,rep,name=tags,proto3" json:"tags,omitempty"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	Info          *KV_Info               `protobuf:"bytes,3,opt,name=info,proto3,oneof" json:"info,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Tags) Reset() {
-	*x = Tags{}
+func (x *KV) Reset() {
+	*x = KV{}
 	mi := &file_panel_types_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Tags) String() string {
+func (x *KV) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Tags) ProtoMessage() {}
+func (*KV) ProtoMessage() {}
 
-func (x *Tags) ProtoReflect() protoreflect.Message {
+func (x *KV) ProtoReflect() protoreflect.Message {
 	mi := &file_panel_types_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -259,30 +261,94 @@ func (x *Tags) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Tags.ProtoReflect.Descriptor instead.
-func (*Tags) Descriptor() ([]byte, []int) {
+// Deprecated: Use KV.ProtoReflect.Descriptor instead.
+func (*KV) Descriptor() ([]byte, []int) {
 	return file_panel_types_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *Tags) GetTags() []*Tags_Tag {
+func (x *KV) GetKey() string {
 	if x != nil {
-		return x.Tags
+		return x.Key
+	}
+	return ""
+}
+
+func (x *KV) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *KV) GetInfo() *KV_Info {
+	if x != nil {
+		return x.Info
 	}
 	return nil
 }
 
+type Tag struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Tag) Reset() {
+	*x = Tag{}
+	mi := &file_panel_types_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Tag) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Tag) ProtoMessage() {}
+
+func (x *Tag) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_types_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Tag.ProtoReflect.Descriptor instead.
+func (*Tag) Descriptor() ([]byte, []int) {
+	return file_panel_types_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Tag) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *Tag) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
 type LogRecord struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Level         LogRecord_Level        `protobuf:"varint,1,opt,name=level,proto3,enum=panel.LogRecord_Level" json:"level,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Attributes    map[string]string      `protobuf:"bytes,3,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	LogLine       []byte                 `protobuf:"bytes,1,opt,name=log_line,json=logLine,proto3" json:"log_line,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LogRecord) Reset() {
 	*x = LogRecord{}
-	mi := &file_panel_types_proto_msgTypes[4]
+	mi := &file_panel_types_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -294,7 +360,7 @@ func (x *LogRecord) String() string {
 func (*LogRecord) ProtoMessage() {}
 
 func (x *LogRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[4]
+	mi := &file_panel_types_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -307,26 +373,12 @@ func (x *LogRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogRecord.ProtoReflect.Descriptor instead.
 func (*LogRecord) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{4}
+	return file_panel_types_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *LogRecord) GetLevel() LogRecord_Level {
+func (x *LogRecord) GetLogLine() []byte {
 	if x != nil {
-		return x.Level
-	}
-	return LogRecord_LOG_LEVEL_UNSPECIFIED
-}
-
-func (x *LogRecord) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *LogRecord) GetAttributes() map[string]string {
-	if x != nil {
-		return x.Attributes
+		return x.LogLine
 	}
 	return nil
 }
@@ -341,7 +393,7 @@ type Retry struct {
 
 func (x *Retry) Reset() {
 	*x = Retry{}
-	mi := &file_panel_types_proto_msgTypes[5]
+	mi := &file_panel_types_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -353,7 +405,7 @@ func (x *Retry) String() string {
 func (*Retry) ProtoMessage() {}
 
 func (x *Retry) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[5]
+	mi := &file_panel_types_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -366,7 +418,7 @@ func (x *Retry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Retry.ProtoReflect.Descriptor instead.
 func (*Retry) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{5}
+	return file_panel_types_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Retry) GetMaxAttempts() uint32 {
@@ -396,7 +448,7 @@ type Tps struct {
 
 func (x *Tps) Reset() {
 	*x = Tps{}
-	mi := &file_panel_types_proto_msgTypes[6]
+	mi := &file_panel_types_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -408,7 +460,7 @@ func (x *Tps) String() string {
 func (*Tps) ProtoMessage() {}
 
 func (x *Tps) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[6]
+	mi := &file_panel_types_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -421,7 +473,7 @@ func (x *Tps) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tps.ProtoReflect.Descriptor instead.
 func (*Tps) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{6}
+	return file_panel_types_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Tps) GetAverage() uint64 {
@@ -468,7 +520,7 @@ type Ulid_List struct {
 
 func (x *Ulid_List) Reset() {
 	*x = Ulid_List{}
-	mi := &file_panel_types_proto_msgTypes[7]
+	mi := &file_panel_types_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -480,7 +532,7 @@ func (x *Ulid_List) String() string {
 func (*Ulid_List) ProtoMessage() {}
 
 func (x *Ulid_List) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[7]
+	mi := &file_panel_types_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -503,29 +555,32 @@ func (x *Ulid_List) GetUlids() []*Ulid {
 	return nil
 }
 
-type Tags_Tag struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+type KV_Info struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Description     string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	DefaultValue    *string                `protobuf:"bytes,6,opt,name=default_value,json=defaultValue,proto3,oneof" json:"default_value,omitempty"`
+	IsRequired      bool                   `protobuf:"varint,7,opt,name=is_required,json=isRequired,proto3" json:"is_required,omitempty"`
+	Immutable       bool                   `protobuf:"varint,8,opt,name=immutable,proto3" json:"immutable,omitempty"`
+	SystemGenerated bool                   `protobuf:"varint,9,opt,name=system_generated,json=systemGenerated,proto3" json:"system_generated,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
-func (x *Tags_Tag) Reset() {
-	*x = Tags_Tag{}
-	mi := &file_panel_types_proto_msgTypes[9]
+func (x *KV_Info) Reset() {
+	*x = KV_Info{}
+	mi := &file_panel_types_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Tags_Tag) String() string {
+func (x *KV_Info) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Tags_Tag) ProtoMessage() {}
+func (*KV_Info) ProtoMessage() {}
 
-func (x *Tags_Tag) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[9]
+func (x *KV_Info) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_types_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -536,47 +591,68 @@ func (x *Tags_Tag) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Tags_Tag.ProtoReflect.Descriptor instead.
-func (*Tags_Tag) Descriptor() ([]byte, []int) {
+// Deprecated: Use KV_Info.ProtoReflect.Descriptor instead.
+func (*KV_Info) Descriptor() ([]byte, []int) {
 	return file_panel_types_proto_rawDescGZIP(), []int{3, 0}
 }
 
-func (x *Tags_Tag) GetKey() string {
+func (x *KV_Info) GetDescription() string {
 	if x != nil {
-		return x.Key
+		return x.Description
 	}
 	return ""
 }
 
-func (x *Tags_Tag) GetValue() string {
-	if x != nil {
-		return x.Value
+func (x *KV_Info) GetDefaultValue() string {
+	if x != nil && x.DefaultValue != nil {
+		return *x.DefaultValue
 	}
 	return ""
 }
 
-type Tags_Filter struct {
+func (x *KV_Info) GetIsRequired() bool {
+	if x != nil {
+		return x.IsRequired
+	}
+	return false
+}
+
+func (x *KV_Info) GetImmutable() bool {
+	if x != nil {
+		return x.Immutable
+	}
+	return false
+}
+
+func (x *KV_Info) GetSystemGenerated() bool {
+	if x != nil {
+		return x.SystemGenerated
+	}
+	return false
+}
+
+type KV_Map struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Contains      []*Tags_Tag            `protobuf:"bytes,1,rep,name=contains,proto3" json:"contains,omitempty"`
+	Kvs           []*KV                  `protobuf:"bytes,1,rep,name=kvs,proto3" json:"kvs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Tags_Filter) Reset() {
-	*x = Tags_Filter{}
-	mi := &file_panel_types_proto_msgTypes[10]
+func (x *KV_Map) Reset() {
+	*x = KV_Map{}
+	mi := &file_panel_types_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Tags_Filter) String() string {
+func (x *KV_Map) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Tags_Filter) ProtoMessage() {}
+func (*KV_Map) ProtoMessage() {}
 
-func (x *Tags_Filter) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[10]
+func (x *KV_Map) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_types_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -587,14 +663,58 @@ func (x *Tags_Filter) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Tags_Filter.ProtoReflect.Descriptor instead.
-func (*Tags_Filter) Descriptor() ([]byte, []int) {
+// Deprecated: Use KV_Map.ProtoReflect.Descriptor instead.
+func (*KV_Map) Descriptor() ([]byte, []int) {
 	return file_panel_types_proto_rawDescGZIP(), []int{3, 1}
 }
 
-func (x *Tags_Filter) GetContains() []*Tags_Tag {
+func (x *KV_Map) GetKvs() []*KV {
 	if x != nil {
-		return x.Contains
+		return x.Kvs
+	}
+	return nil
+}
+
+type Tag_List struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tags          []*Tag                 `protobuf:"bytes,1,rep,name=tags,proto3" json:"tags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Tag_List) Reset() {
+	*x = Tag_List{}
+	mi := &file_panel_types_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Tag_List) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Tag_List) ProtoMessage() {}
+
+func (x *Tag_List) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_types_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Tag_List.ProtoReflect.Descriptor instead.
+func (*Tag_List) Descriptor() ([]byte, []int) {
+	return file_panel_types_proto_rawDescGZIP(), []int{4, 0}
+}
+
+func (x *Tag_List) GetTags() []*Tag {
+	if x != nil {
+		return x.Tags
 	}
 	return nil
 }
@@ -612,7 +732,7 @@ type Retry_Backoff struct {
 
 func (x *Retry_Backoff) Reset() {
 	*x = Retry_Backoff{}
-	mi := &file_panel_types_proto_msgTypes[12]
+	mi := &file_panel_types_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -624,7 +744,7 @@ func (x *Retry_Backoff) String() string {
 func (*Retry_Backoff) ProtoMessage() {}
 
 func (x *Retry_Backoff) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[12]
+	mi := &file_panel_types_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -637,7 +757,7 @@ func (x *Retry_Backoff) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Retry_Backoff.ProtoReflect.Descriptor instead.
 func (*Retry_Backoff) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{5, 0}
+	return file_panel_types_proto_rawDescGZIP(), []int{6, 0}
 }
 
 func (x *Retry_Backoff) GetBackoff() isRetry_Backoff_Backoff {
@@ -681,6 +801,66 @@ func (*Retry_Backoff_Constant_) isRetry_Backoff_Backoff() {}
 
 func (*Retry_Backoff_Exponential_) isRetry_Backoff_Backoff() {}
 
+type Retry_State struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	BackoffDuration *durationpb.Duration   `protobuf:"bytes,1,opt,name=backoff_duration,json=backoffDuration,proto3" json:"backoff_duration,omitempty"`
+	BackoffValue    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=backoff_value,json=backoffValue,proto3" json:"backoff_value,omitempty"`
+	Attempt         uint32                 `protobuf:"varint,3,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *Retry_State) Reset() {
+	*x = Retry_State{}
+	mi := &file_panel_types_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Retry_State) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Retry_State) ProtoMessage() {}
+
+func (x *Retry_State) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_types_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Retry_State.ProtoReflect.Descriptor instead.
+func (*Retry_State) Descriptor() ([]byte, []int) {
+	return file_panel_types_proto_rawDescGZIP(), []int{6, 1}
+}
+
+func (x *Retry_State) GetBackoffDuration() *durationpb.Duration {
+	if x != nil {
+		return x.BackoffDuration
+	}
+	return nil
+}
+
+func (x *Retry_State) GetBackoffValue() *timestamppb.Timestamp {
+	if x != nil {
+		return x.BackoffValue
+	}
+	return nil
+}
+
+func (x *Retry_State) GetAttempt() uint32 {
+	if x != nil {
+		return x.Attempt
+	}
+	return 0
+}
+
 // type ConstantBackOff
 // func NewConstantBackOff(d time.Duration) *ConstantBackOff
 type Retry_Backoff_Constant struct {
@@ -692,7 +872,7 @@ type Retry_Backoff_Constant struct {
 
 func (x *Retry_Backoff_Constant) Reset() {
 	*x = Retry_Backoff_Constant{}
-	mi := &file_panel_types_proto_msgTypes[13]
+	mi := &file_panel_types_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -704,7 +884,7 @@ func (x *Retry_Backoff_Constant) String() string {
 func (*Retry_Backoff_Constant) ProtoMessage() {}
 
 func (x *Retry_Backoff_Constant) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[13]
+	mi := &file_panel_types_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -717,7 +897,7 @@ func (x *Retry_Backoff_Constant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Retry_Backoff_Constant.ProtoReflect.Descriptor instead.
 func (*Retry_Backoff_Constant) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{5, 0, 0}
+	return file_panel_types_proto_rawDescGZIP(), []int{6, 0, 0}
 }
 
 func (x *Retry_Backoff_Constant) GetDuration() *durationpb.Duration {
@@ -740,8 +920,8 @@ type Retry_Backoff_Exponential struct {
 	InitialInterval     *durationpb.Duration   `protobuf:"bytes,1,opt,name=initial_interval,json=initialInterval,proto3" json:"initial_interval,omitempty"`
 	MaxElapsedTime      *durationpb.Duration   `protobuf:"bytes,2,opt,name=max_elapsed_time,json=maxElapsedTime,proto3" json:"max_elapsed_time,omitempty"`
 	MaxInterval         *durationpb.Duration   `protobuf:"bytes,3,opt,name=max_interval,json=maxInterval,proto3" json:"max_interval,omitempty"`
-	Multiplier          float32                `protobuf:"fixed32,5,opt,name=multiplier,proto3" json:"multiplier,omitempty"`
-	RandomizationFactor float32                `protobuf:"fixed32,6,opt,name=randomization_factor,json=randomizationFactor,proto3" json:"randomization_factor,omitempty"`
+	Multiplier          float64                `protobuf:"fixed64,5,opt,name=multiplier,proto3" json:"multiplier,omitempty"`
+	RandomizationFactor float64                `protobuf:"fixed64,6,opt,name=randomization_factor,json=randomizationFactor,proto3" json:"randomization_factor,omitempty"`
 	RetryStopDuration   *durationpb.Duration   `protobuf:"bytes,4,opt,name=retry_stop_duration,json=retryStopDuration,proto3" json:"retry_stop_duration,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
@@ -749,7 +929,7 @@ type Retry_Backoff_Exponential struct {
 
 func (x *Retry_Backoff_Exponential) Reset() {
 	*x = Retry_Backoff_Exponential{}
-	mi := &file_panel_types_proto_msgTypes[14]
+	mi := &file_panel_types_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -761,7 +941,7 @@ func (x *Retry_Backoff_Exponential) String() string {
 func (*Retry_Backoff_Exponential) ProtoMessage() {}
 
 func (x *Retry_Backoff_Exponential) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[14]
+	mi := &file_panel_types_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -774,7 +954,7 @@ func (x *Retry_Backoff_Exponential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Retry_Backoff_Exponential.ProtoReflect.Descriptor instead.
 func (*Retry_Backoff_Exponential) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{5, 0, 1}
+	return file_panel_types_proto_rawDescGZIP(), []int{6, 0, 1}
 }
 
 func (x *Retry_Backoff_Exponential) GetInitialInterval() *durationpb.Duration {
@@ -798,14 +978,14 @@ func (x *Retry_Backoff_Exponential) GetMaxInterval() *durationpb.Duration {
 	return nil
 }
 
-func (x *Retry_Backoff_Exponential) GetMultiplier() float32 {
+func (x *Retry_Backoff_Exponential) GetMultiplier() float64 {
 	if x != nil {
 		return x.Multiplier
 	}
 	return 0
 }
 
-func (x *Retry_Backoff_Exponential) GetRandomizationFactor() float32 {
+func (x *Retry_Backoff_Exponential) GetRandomizationFactor() float64 {
 	if x != nil {
 		return x.RandomizationFactor
 	}
@@ -820,16 +1000,16 @@ func (x *Retry_Backoff_Exponential) GetRetryStopDuration() *durationpb.Duration 
 }
 
 type Tps_Order struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ParameterType string                 `protobuf:"bytes,1,opt,name=parameter_type,json=parameterType,proto3" json:"parameter_type,omitempty"`
-	Descending    bool                   `protobuf:"varint,2,opt,name=descending,proto3" json:"descending,omitempty"`
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	ParameterType Tps_Order_ParameterType `protobuf:"varint,1,opt,name=parameter_type,json=parameterType,proto3,enum=panel.Tps_Order_ParameterType" json:"parameter_type,omitempty"`
+	Descending    bool                    `protobuf:"varint,2,opt,name=descending,proto3" json:"descending,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Tps_Order) Reset() {
 	*x = Tps_Order{}
-	mi := &file_panel_types_proto_msgTypes[15]
+	mi := &file_panel_types_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -841,7 +1021,7 @@ func (x *Tps_Order) String() string {
 func (*Tps_Order) ProtoMessage() {}
 
 func (x *Tps_Order) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[15]
+	mi := &file_panel_types_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -854,14 +1034,14 @@ func (x *Tps_Order) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tps_Order.ProtoReflect.Descriptor instead.
 func (*Tps_Order) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{6, 0}
+	return file_panel_types_proto_rawDescGZIP(), []int{7, 0}
 }
 
-func (x *Tps_Order) GetParameterType() string {
+func (x *Tps_Order) GetParameterType() Tps_Order_ParameterType {
 	if x != nil {
 		return x.ParameterType
 	}
-	return ""
+	return Tps_Order_TYPE_AVERAGE
 }
 
 func (x *Tps_Order) GetDescending() bool {
@@ -892,29 +1072,30 @@ const file_panel_types_proto_rawDesc = "" +
 	"\bmetadata\x18\x01 \x03(\v2\x1d.panel.Metadata.MetadataEntryR\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb7\x01\n" +
-	"\x04Tags\x12-\n" +
-	"\x04tags\x18\x01 \x03(\v2\x0f.panel.Tags.TagB\b\xfaB\x05\x92\x01\x02\b\x01R\x04tags\x1a?\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x81\x03\n" +
+	"\x02KV\x12\x19\n" +
+	"\x03key\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x03key\x12\x1d\n" +
+	"\x05value\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x05value\x12'\n" +
+	"\x04info\x18\x03 \x01(\v2\x0e.panel.KV.InfoH\x00R\x04info\x88\x01\x01\x1a\xe0\x01\n" +
+	"\x04Info\x12)\n" +
+	"\vdescription\x18\x05 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\vdescription\x121\n" +
+	"\rdefault_value\x18\x06 \x01(\tB\a\xfaB\x04r\x02\x10\x01H\x00R\fdefaultValue\x88\x01\x01\x12\x1f\n" +
+	"\vis_required\x18\a \x01(\bR\n" +
+	"isRequired\x12\x1c\n" +
+	"\timmutable\x18\b \x01(\bR\timmutable\x12)\n" +
+	"\x10system_generated\x18\t \x01(\bR\x0fsystemGeneratedB\x10\n" +
+	"\x0e_default_value\x1a,\n" +
+	"\x03Map\x12%\n" +
+	"\x03kvs\x18\x01 \x03(\v2\t.panel.KVB\b\xfaB\x05\x92\x01\x02\b\x01R\x03kvsB\a\n" +
+	"\x05_info\"q\n" +
 	"\x03Tag\x12\x19\n" +
 	"\x03key\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x03key\x12\x1d\n" +
-	"\x05value\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x05value\x1a?\n" +
-	"\x06Filter\x125\n" +
-	"\bcontains\x18\x01 \x03(\v2\x0f.panel.Tags.TagB\b\xfaB\x05\x92\x01\x02\b\x01R\bcontains\"\xe0\x02\n" +
-	"\tLogRecord\x126\n" +
-	"\x05level\x18\x01 \x01(\x0e2\x16.panel.LogRecord.LevelB\b\xfaB\x05\x82\x01\x02\x10\x01R\x05level\x12!\n" +
-	"\amessage\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\amessage\x12@\n" +
-	"\n" +
-	"attributes\x18\x03 \x03(\v2 .panel.LogRecord.AttributesEntryR\n" +
-	"attributes\x1a=\n" +
-	"\x0fAttributesEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"w\n" +
-	"\x05Level\x12\x19\n" +
-	"\x15LOG_LEVEL_UNSPECIFIED\x10\x00\x12\x13\n" +
-	"\x0fLOG_LEVEL_DEBUG\x10\x01\x12\x12\n" +
-	"\x0eLOG_LEVEL_INFO\x10\x02\x12\x15\n" +
-	"\x11LOG_LEVEL_WARNING\x10\x03\x12\x13\n" +
-	"\x0fLOG_LEVEL_ERROR\x10\x04\"\x81\x06\n" +
+	"\x05value\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x05value\x1a0\n" +
+	"\x04List\x12(\n" +
+	"\x04tags\x18\x01 \x03(\v2\n" +
+	".panel.TagB\b\xfaB\x05\x92\x01\x02\b\x01R\x04tags\"/\n" +
+	"\tLogRecord\x12\"\n" +
+	"\blog_line\x18\x01 \x01(\fB\a\xfaB\x04z\x02\x10\x01R\alogLine\"\xc9\a\n" +
 	"\x05Retry\x12*\n" +
 	"\fmax_attempts\x18\x02 \x01(\rB\a\xfaB\x04*\x02 \x00R\vmaxAttempts\x12.\n" +
 	"\abackoff\x18\x03 \x01(\v2\x14.panel.Retry.BackoffR\abackoff\x1a\x9b\x05\n" +
@@ -928,26 +1109,38 @@ const file_panel_types_proto_rawDesc = "" +
 	"\x10max_elapsed_time\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\b\xfaB\x05\xaa\x01\x02*\x00R\x0emaxElapsedTime\x12F\n" +
 	"\fmax_interval\x18\x03 \x01(\v2\x19.google.protobuf.DurationB\b\xfaB\x05\xaa\x01\x02*\x00R\vmaxInterval\x12*\n" +
 	"\n" +
-	"multiplier\x18\x05 \x01(\x02B\n" +
+	"multiplier\x18\x05 \x01(\x01B\n" +
 	"\xfaB\a\n" +
 	"\x05%\x00\x00\x00\x00R\n" +
 	"multiplier\x12=\n" +
-	"\x14randomization_factor\x18\x06 \x01(\x02B\n" +
+	"\x14randomization_factor\x18\x06 \x01(\x01B\n" +
 	"\xfaB\a\n" +
 	"\x05%\x00\x00\x00\x00R\x13randomizationFactor\x12S\n" +
 	"\x13retry_stop_duration\x18\x04 \x01(\v2\x19.google.protobuf.DurationB\b\xfaB\x05\xaa\x01\x02*\x00R\x11retryStopDurationB\t\n" +
-	"\abackoff\"\xc9\x01\n" +
+	"\abackoff\x1a\xc5\x01\n" +
+	"\x05State\x12N\n" +
+	"\x10backoff_duration\x18\x01 \x01(\v2\x19.google.protobuf.DurationB\b\xfaB\x05\xaa\x01\x02*\x00R\x0fbackoffDuration\x12I\n" +
+	"\rbackoff_value\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\xfaB\x05\xb2\x01\x02*\x00R\fbackoffValue\x12!\n" +
+	"\aattempt\x18\x03 \x01(\rB\a\xfaB\x04*\x02 \x00R\aattempt\"\xc9\x02\n" +
 	"\x03Tps\x12\x18\n" +
 	"\aaverage\x18\x01 \x01(\x04R\aaverage\x12\x10\n" +
 	"\x03max\x18\x02 \x01(\x04R\x03max\x12\x10\n" +
 	"\x03min\x18\x03 \x01(\x04R\x03min\x12\x14\n" +
 	"\x05p95th\x18\x04 \x01(\x04R\x05p95th\x12\x14\n" +
-	"\x05p99th\x18\x05 \x01(\x04R\x05p99th\x1aX\n" +
-	"\x05Order\x12/\n" +
-	"\x0eparameter_type\x18\x01 \x01(\tB\b\xfaB\x05\x82\x01\x02\x10\x01R\rparameterType\x12\x1e\n" +
+	"\x05p99th\x18\x05 \x01(\x04R\x05p99th\x1a\xd7\x01\n" +
+	"\x05Order\x12O\n" +
+	"\x0eparameter_type\x18\x01 \x01(\x0e2\x1e.panel.Tps.Order.ParameterTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\rparameterType\x12\x1e\n" +
 	"\n" +
 	"descending\x18\x02 \x01(\bR\n" +
-	"descendingB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
+	"descending\"]\n" +
+	"\rParameterType\x12\x10\n" +
+	"\fTYPE_AVERAGE\x10\x00\x12\f\n" +
+	"\bTYPE_MAX\x10\x01\x12\f\n" +
+	"\bTYPE_MIN\x10\x02\x12\x0e\n" +
+	"\n" +
+	"TYPE_P95TH\x10\x03\x12\x0e\n" +
+	"\n" +
+	"TYPE_P99TH\x10\x04B@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
 
 var (
 	file_panel_types_proto_rawDescOnce sync.Once
@@ -962,51 +1155,55 @@ func file_panel_types_proto_rawDescGZIP() []byte {
 }
 
 var file_panel_types_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_panel_types_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_panel_types_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_panel_types_proto_goTypes = []any{
-	(LogRecord_Level)(0),              // 0: panel.LogRecord.Level
+	(Tps_Order_ParameterType)(0),      // 0: panel.Tps.Order.ParameterType
 	(*Ulid)(nil),                      // 1: panel.Ulid
 	(*Timing)(nil),                    // 2: panel.Timing
 	(*Metadata)(nil),                  // 3: panel.Metadata
-	(*Tags)(nil),                      // 4: panel.Tags
-	(*LogRecord)(nil),                 // 5: panel.LogRecord
-	(*Retry)(nil),                     // 6: panel.Retry
-	(*Tps)(nil),                       // 7: panel.Tps
-	(*Ulid_List)(nil),                 // 8: panel.Ulid.List
-	nil,                               // 9: panel.Metadata.MetadataEntry
-	(*Tags_Tag)(nil),                  // 10: panel.Tags.Tag
-	(*Tags_Filter)(nil),               // 11: panel.Tags.Filter
-	nil,                               // 12: panel.LogRecord.AttributesEntry
-	(*Retry_Backoff)(nil),             // 13: panel.Retry.Backoff
-	(*Retry_Backoff_Constant)(nil),    // 14: panel.Retry.Backoff.Constant
-	(*Retry_Backoff_Exponential)(nil), // 15: panel.Retry.Backoff.Exponential
-	(*Tps_Order)(nil),                 // 16: panel.Tps.Order
-	(*timestamppb.Timestamp)(nil),     // 17: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),       // 18: google.protobuf.Duration
+	(*KV)(nil),                        // 4: panel.KV
+	(*Tag)(nil),                       // 5: panel.Tag
+	(*LogRecord)(nil),                 // 6: panel.LogRecord
+	(*Retry)(nil),                     // 7: panel.Retry
+	(*Tps)(nil),                       // 8: panel.Tps
+	(*Ulid_List)(nil),                 // 9: panel.Ulid.List
+	nil,                               // 10: panel.Metadata.MetadataEntry
+	(*KV_Info)(nil),                   // 11: panel.KV.Info
+	(*KV_Map)(nil),                    // 12: panel.KV.Map
+	(*Tag_List)(nil),                  // 13: panel.Tag.List
+	(*Retry_Backoff)(nil),             // 14: panel.Retry.Backoff
+	(*Retry_State)(nil),               // 15: panel.Retry.State
+	(*Retry_Backoff_Constant)(nil),    // 16: panel.Retry.Backoff.Constant
+	(*Retry_Backoff_Exponential)(nil), // 17: panel.Retry.Backoff.Exponential
+	(*Tps_Order)(nil),                 // 18: panel.Tps.Order
+	(*timestamppb.Timestamp)(nil),     // 19: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),       // 20: google.protobuf.Duration
 }
 var file_panel_types_proto_depIdxs = []int32{
-	17, // 0: panel.Timing.created_at:type_name -> google.protobuf.Timestamp
-	17, // 1: panel.Timing.updated_at:type_name -> google.protobuf.Timestamp
-	17, // 2: panel.Timing.deleted_at:type_name -> google.protobuf.Timestamp
-	9,  // 3: panel.Metadata.metadata:type_name -> panel.Metadata.MetadataEntry
-	10, // 4: panel.Tags.tags:type_name -> panel.Tags.Tag
-	0,  // 5: panel.LogRecord.level:type_name -> panel.LogRecord.Level
-	12, // 6: panel.LogRecord.attributes:type_name -> panel.LogRecord.AttributesEntry
-	13, // 7: panel.Retry.backoff:type_name -> panel.Retry.Backoff
-	1,  // 8: panel.Ulid.List.ulids:type_name -> panel.Ulid
-	10, // 9: panel.Tags.Filter.contains:type_name -> panel.Tags.Tag
-	14, // 10: panel.Retry.Backoff.constant:type_name -> panel.Retry.Backoff.Constant
-	15, // 11: panel.Retry.Backoff.exponential:type_name -> panel.Retry.Backoff.Exponential
-	18, // 12: panel.Retry.Backoff.Constant.duration:type_name -> google.protobuf.Duration
-	18, // 13: panel.Retry.Backoff.Exponential.initial_interval:type_name -> google.protobuf.Duration
-	18, // 14: panel.Retry.Backoff.Exponential.max_elapsed_time:type_name -> google.protobuf.Duration
-	18, // 15: panel.Retry.Backoff.Exponential.max_interval:type_name -> google.protobuf.Duration
-	18, // 16: panel.Retry.Backoff.Exponential.retry_stop_duration:type_name -> google.protobuf.Duration
-	17, // [17:17] is the sub-list for method output_type
-	17, // [17:17] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	19, // 0: panel.Timing.created_at:type_name -> google.protobuf.Timestamp
+	19, // 1: panel.Timing.updated_at:type_name -> google.protobuf.Timestamp
+	19, // 2: panel.Timing.deleted_at:type_name -> google.protobuf.Timestamp
+	10, // 3: panel.Metadata.metadata:type_name -> panel.Metadata.MetadataEntry
+	11, // 4: panel.KV.info:type_name -> panel.KV.Info
+	14, // 5: panel.Retry.backoff:type_name -> panel.Retry.Backoff
+	1,  // 6: panel.Ulid.List.ulids:type_name -> panel.Ulid
+	4,  // 7: panel.KV.Map.kvs:type_name -> panel.KV
+	5,  // 8: panel.Tag.List.tags:type_name -> panel.Tag
+	16, // 9: panel.Retry.Backoff.constant:type_name -> panel.Retry.Backoff.Constant
+	17, // 10: panel.Retry.Backoff.exponential:type_name -> panel.Retry.Backoff.Exponential
+	20, // 11: panel.Retry.State.backoff_duration:type_name -> google.protobuf.Duration
+	19, // 12: panel.Retry.State.backoff_value:type_name -> google.protobuf.Timestamp
+	20, // 13: panel.Retry.Backoff.Constant.duration:type_name -> google.protobuf.Duration
+	20, // 14: panel.Retry.Backoff.Exponential.initial_interval:type_name -> google.protobuf.Duration
+	20, // 15: panel.Retry.Backoff.Exponential.max_elapsed_time:type_name -> google.protobuf.Duration
+	20, // 16: panel.Retry.Backoff.Exponential.max_interval:type_name -> google.protobuf.Duration
+	20, // 17: panel.Retry.Backoff.Exponential.retry_stop_duration:type_name -> google.protobuf.Duration
+	0,  // 18: panel.Tps.Order.parameter_type:type_name -> panel.Tps.Order.ParameterType
+	19, // [19:19] is the sub-list for method output_type
+	19, // [19:19] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_panel_types_proto_init() }
@@ -1015,7 +1212,9 @@ func file_panel_types_proto_init() {
 		return
 	}
 	file_panel_types_proto_msgTypes[1].OneofWrappers = []any{}
-	file_panel_types_proto_msgTypes[12].OneofWrappers = []any{
+	file_panel_types_proto_msgTypes[3].OneofWrappers = []any{}
+	file_panel_types_proto_msgTypes[10].OneofWrappers = []any{}
+	file_panel_types_proto_msgTypes[13].OneofWrappers = []any{
 		(*Retry_Backoff_Constant_)(nil),
 		(*Retry_Backoff_Exponential_)(nil),
 	}
@@ -1025,7 +1224,7 @@ func file_panel_types_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_panel_types_proto_rawDesc), len(file_panel_types_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -20,7 +20,6 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	RunService_ListRuns_FullMethodName          = "/panel.RunService/ListRuns"
-	RunService_ListTopRuns_FullMethodName       = "/panel.RunService/ListTopRuns"
 	RunService_RunStroppyInCloud_FullMethodName = "/panel.RunService/RunStroppyInCloud"
 )
 
@@ -29,8 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RunServiceClient interface {
 	ListRuns(ctx context.Context, in *ListRunsRequest, opts ...grpc.CallOption) (*RunRecord_List, error)
-	ListTopRuns(ctx context.Context, in *ListRunsRequest, opts ...grpc.CallOption) (*RunRecord_List, error)
-	RunStroppyInCloud(ctx context.Context, in *RunStroppyInCloudRequest, opts ...grpc.CallOption) (*RunRecord, error)
+	RunStroppyInCloud(ctx context.Context, in *CloudRunParams, opts ...grpc.CallOption) (*RunRecord, error)
 }
 
 type runServiceClient struct {
@@ -51,17 +49,7 @@ func (c *runServiceClient) ListRuns(ctx context.Context, in *ListRunsRequest, op
 	return out, nil
 }
 
-func (c *runServiceClient) ListTopRuns(ctx context.Context, in *ListRunsRequest, opts ...grpc.CallOption) (*RunRecord_List, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RunRecord_List)
-	err := c.cc.Invoke(ctx, RunService_ListTopRuns_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *runServiceClient) RunStroppyInCloud(ctx context.Context, in *RunStroppyInCloudRequest, opts ...grpc.CallOption) (*RunRecord, error) {
+func (c *runServiceClient) RunStroppyInCloud(ctx context.Context, in *CloudRunParams, opts ...grpc.CallOption) (*RunRecord, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RunRecord)
 	err := c.cc.Invoke(ctx, RunService_RunStroppyInCloud_FullMethodName, in, out, cOpts...)
@@ -76,8 +64,7 @@ func (c *runServiceClient) RunStroppyInCloud(ctx context.Context, in *RunStroppy
 // for forward compatibility.
 type RunServiceServer interface {
 	ListRuns(context.Context, *ListRunsRequest) (*RunRecord_List, error)
-	ListTopRuns(context.Context, *ListRunsRequest) (*RunRecord_List, error)
-	RunStroppyInCloud(context.Context, *RunStroppyInCloudRequest) (*RunRecord, error)
+	RunStroppyInCloud(context.Context, *CloudRunParams) (*RunRecord, error)
 	mustEmbedUnimplementedRunServiceServer()
 }
 
@@ -91,10 +78,7 @@ type UnimplementedRunServiceServer struct{}
 func (UnimplementedRunServiceServer) ListRuns(context.Context, *ListRunsRequest) (*RunRecord_List, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListRuns not implemented")
 }
-func (UnimplementedRunServiceServer) ListTopRuns(context.Context, *ListRunsRequest) (*RunRecord_List, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListTopRuns not implemented")
-}
-func (UnimplementedRunServiceServer) RunStroppyInCloud(context.Context, *RunStroppyInCloudRequest) (*RunRecord, error) {
+func (UnimplementedRunServiceServer) RunStroppyInCloud(context.Context, *CloudRunParams) (*RunRecord, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RunStroppyInCloud not implemented")
 }
 func (UnimplementedRunServiceServer) mustEmbedUnimplementedRunServiceServer() {}
@@ -136,26 +120,8 @@ func _RunService_ListRuns_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RunService_ListTopRuns_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListRunsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RunServiceServer).ListTopRuns(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RunService_ListTopRuns_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RunServiceServer).ListTopRuns(ctx, req.(*ListRunsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _RunService_RunStroppyInCloud_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RunStroppyInCloudRequest)
+	in := new(CloudRunParams)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -167,7 +133,7 @@ func _RunService_RunStroppyInCloud_Handler(srv interface{}, ctx context.Context,
 		FullMethod: RunService_RunStroppyInCloud_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RunServiceServer).RunStroppyInCloud(ctx, req.(*RunStroppyInCloudRequest))
+		return srv.(RunServiceServer).RunStroppyInCloud(ctx, req.(*CloudRunParams))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -182,10 +148,6 @@ var RunService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListRuns",
 			Handler:    _RunService_ListRuns_Handler,
-		},
-		{
-			MethodName: "ListTopRuns",
-			Handler:    _RunService_ListTopRuns_Handler,
 		},
 		{
 			MethodName: "RunStroppyInCloud",

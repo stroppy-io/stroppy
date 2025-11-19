@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/api"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/automate"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/build"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/configurator"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
@@ -84,11 +83,11 @@ func New() (*Application, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http server: %w", err)
 	}
-	cancelAutomate, err := automate.NewBackgroundWorker(&cfg.Service.Background, appLogger, service)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create background worker: %w", err)
-	}
-	shutdown.RegisterFn(cancelAutomate)
+	//cancelAutomate, err := automate.NewBackgroundWorker(&cfg.Service.Background, appLogger, service)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to create background worker: %w", err)
+	//}
+	//shutdown.RegisterFn(cancelAutomate)
 
 	return &Application{
 		config: cfg,

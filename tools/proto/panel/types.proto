@@ -25,28 +25,32 @@ message Metadata {
     map<string, string> metadata = 1;
 }
 
-message Tags {
-    message Tag {
-        string key = 1 [(validate.rules).string.min_len = 1];
-        string value = 2 [(validate.rules).string.min_len = 1];
+message KV {
+    message Info {
+        string description = 5 [(validate.rules).string.min_len = 1];
+        optional string default_value = 6 [(validate.rules).string.min_len = 1];
+        bool is_required = 7;
+        bool immutable = 8;
+        bool system_generated = 9;
     }
-    message Filter {
-        repeated Tag contains = 1 [(validate.rules).repeated.min_items = 1];
+    message Map {
+        repeated KV kvs = 1 [(validate.rules).repeated.min_items = 1];
     }
-    repeated Tag tags = 1 [(validate.rules).repeated.min_items = 1];
+    string key = 1 [(validate.rules).string.min_len = 1];
+    string value = 2 [(validate.rules).string.min_len = 1];
+    optional Info info = 3;
+}
+
+message Tag {
+    message List {
+        repeated Tag tags = 1 [(validate.rules).repeated.min_items = 1];
+    }
+    string key = 1 [(validate.rules).string.min_len = 1];
+    string value = 2 [(validate.rules).string.min_len = 1];
 }
 
 message LogRecord {
-    enum Level {
-        LOG_LEVEL_UNSPECIFIED = 0;
-        LOG_LEVEL_DEBUG = 1;
-        LOG_LEVEL_INFO = 2;
-        LOG_LEVEL_WARNING = 3;
-        LOG_LEVEL_ERROR = 4;
-    }
-    Level level = 1 [(validate.rules).enum.defined_only = true];
-    string message = 2 [(validate.rules).string.min_len = 1];
-    map<string, string> attributes = 3;
+    bytes log_line = 1 [(validate.rules).bytes.min_len = 1];
 }
 
 message Retry {
@@ -70,8 +74,8 @@ message Retry {
             google.protobuf.Duration initial_interval = 1 [(validate.rules).duration.gt = {seconds: 0}];
             google.protobuf.Duration max_elapsed_time = 2 [(validate.rules).duration.gt = {seconds: 0}];
             google.protobuf.Duration max_interval = 3 [(validate.rules).duration.gt = {seconds: 0}];
-            float multiplier = 5 [(validate.rules).float.gt = 0];
-            float randomization_factor = 6 [(validate.rules).float.gt = 0];
+            double multiplier = 5 [(validate.rules).float.gt = 0];
+            double randomization_factor = 6 [(validate.rules).float.gt = 0];
             google.protobuf.Duration retry_stop_duration = 4 [(validate.rules).duration.gt = {seconds: 0}];
 
         }
@@ -80,13 +84,25 @@ message Retry {
             Exponential exponential = 2;
         }
     }
+    message State {
+        google.protobuf.Duration backoff_duration = 1 [(validate.rules).duration.gt = {seconds: 0}];
+        google.protobuf.Timestamp backoff_value = 2 [(validate.rules).timestamp.gt = {seconds: 0}];
+        uint32 attempt = 3 [(validate.rules).uint32.gt = 0];
+    }
     uint32 max_attempts = 2 [(validate.rules).uint32.gt = 0];
     Backoff backoff = 3;
 }
 
 message Tps {
     message Order {
-        string parameter_type = 1 [(validate.rules).enum.defined_only = true];
+        enum ParameterType {
+            TYPE_AVERAGE = 0;
+            TYPE_MAX = 1;
+            TYPE_MIN = 2;
+            TYPE_P95TH = 3;
+            TYPE_P99TH = 4;
+        }
+        ParameterType parameter_type = 1 [(validate.rules).enum.defined_only = true];
         bool descending = 2;
     }
     uint64 average = 1;

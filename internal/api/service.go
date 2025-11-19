@@ -1,10 +1,11 @@
 package api
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"errors"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/automate"
+
+	"connectrpc.com/connect"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/api/repositories"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/token"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/claims"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/orm"
@@ -12,35 +13,36 @@ import (
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlexec"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/sqlc"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 	"go.uber.org/zap"
 )
 
+type WorkflowRepository interface {
+	GetWorkflow(ctx context.Context, id *panel.Ulid) (*panel.Workflow, error)
+	CreateWorkflow(ctx context.Context, workflow *panel.Workflow) error
+	MarkWorkflowAsCanceled(ctx context.Context, id *panel.Ulid) (*panel.Workflow, error)
+	//DeleteWorkflow(ctx context.Context, id *panel.Ulid) error
+}
+
 type PanelService struct {
 	*panel.UnimplementedAccountServiceServer
-	*panel.UnimplementedAutomateServiceServer
 	*panel.UnimplementedRunServiceServer
-	*panel.UnimplementedResourcesServiceServer
+	*panel.UnimplementedWorkflowServiceServer
+	*panel.UnimplementedTemplateServiceServer
 
 	logger     *zap.Logger
 	executor   sqlexec.Executor
 	txManager  postgres.TxManager
 	tokenActor *token.Actor
 
-	usersRepo        orm.UserRepository
-	stroppyStepsRepo orm.StroppyStepRepository
-	runRecordRepo    orm.RunRecordRepository
+	usersRepo          orm.UserRepository
+	refreshTokensRepo  orm.RefreshTokensRepository
+	runRecordRepo      orm.RunRecordRepository
+	runRecordStepsRepo orm.RunRecordStepRepository
+	workflowRepo       WorkflowRepository
+	templateRepo       orm.TemplateRepository
 
-	cloudAutomationRepo orm.CloudAutomationRepository
-	cloudResourceRepo   orm.CloudResourceRepository
-	stroppyRunRepo      orm.StroppyRunRepository
-	stroppyStepRepo     orm.StroppyStepRepository
-
-	sqlcRepo          sqlc.Querier
-	k8sConfig         *automate.K8SConfig
-	automateConfig    *CloudAutomationConfig
-	crossplaneService crossplane.CrossplaneClient
+	sqlcRepo sqlc.Querier
 }
 
 func NewPanelService(
@@ -48,33 +50,27 @@ func NewPanelService(
 	executor sqlexec.Executor,
 	txManager postgres.TxManager,
 	tokenActor *token.Actor,
-	k8sConfig *automate.K8SConfig,
-	automateConfig *CloudAutomationConfig,
-	crossplaneService crossplane.CrossplaneClient,
 ) *PanelService {
 	return &PanelService{
-		UnimplementedAccountServiceServer:   &panel.UnimplementedAccountServiceServer{},
-		UnimplementedAutomateServiceServer:  &panel.UnimplementedAutomateServiceServer{},
-		UnimplementedRunServiceServer:       &panel.UnimplementedRunServiceServer{},
-		UnimplementedResourcesServiceServer: &panel.UnimplementedResourcesServiceServer{},
-		logger:                              logger,
+		UnimplementedAccountServiceServer:  &panel.UnimplementedAccountServiceServer{},
+		UnimplementedRunServiceServer:      &panel.UnimplementedRunServiceServer{},
+		UnimplementedWorkflowServiceServer: &panel.UnimplementedWorkflowServiceServer{},
+		UnimplementedTemplateServiceServer: &panel.UnimplementedTemplateServiceServer{},
+
+		logger: logger,
 
 		executor:   executor,
 		txManager:  txManager,
 		tokenActor: tokenActor,
 
-		usersRepo:           NewUsersRepository(executor),
-		stroppyStepsRepo:    NewStroppyStepsRepository(executor),
-		runRecordRepo:       NewRunRecordRepository(executor),
-		cloudAutomationRepo: NewCloudAutomationRepository(executor),
-		cloudResourceRepo:   NewCloudResourceRepository(executor),
-		stroppyRunRepo:      NewStroppyRunRepository(executor),
-		stroppyStepRepo:     NewStroppyStepRepository(executor),
-		sqlcRepo:            sqlc.New(executor),
+		usersRepo:          NewUsersRepository(executor),
+		refreshTokensRepo:  NewRefreshTokensRepository(executor),
+		runRecordRepo:      NewRunRecordRepository(executor),
+		runRecordStepsRepo: NewRunRecordStepRepository(executor),
+		workflowRepo:       repositories.NewWorkflowRepo(executor),
+		templateRepo:       NewTemplateRepository(executor),
 
-		k8sConfig:         k8sConfig,
-		automateConfig:    automateConfig,
-		crossplaneService: crossplaneService,
+		sqlcRepo: sqlc.New(executor),
 	}
 }
 

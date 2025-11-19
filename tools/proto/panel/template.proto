@@ -2,39 +2,47 @@ syntax = "proto3";
 
 package panel;
 
-import "google/protobuf/empty.proto";
 import "crossplane/deployment.proto";
+import "crossplane/types.proto";
+import "google/protobuf/empty.proto";
 import "panel/types.proto";
 import "protopgx/pgx.proto";
 import "validate/validate.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
 
-message MachineTemplate {
+message KVInfo {
     option (sql.sql_table) = {
         generate: true
-        table_name: "machine_templates"
+        table_name: "system_kv_info"
     };
-    message List {
-        repeated MachineTemplate templates = 1;
+    Ulid id = 1 [
+        (sql.sql_field) = {
+            sql_type: {type: TEXT,user_cast: true}
+            constraints: {primary_key: true}
+        }
+    ];
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    string key = 4 [(validate.rules).string.min_len = 1];
+    KV.Info info = 5 [(sql.sql_field).embedded_message = true];
+}
+
+message Template {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "templates"
+    };
+    message DatabaseDeployment {
+        string prebuilt_image_id = 1 [(validate.rules).string.min_len = 1];
     }
-    Ulid id = 1 [
-        (sql.sql_field) = {
-            sql_type: {type: TEXT,user_cast: true}
-            constraints: {primary_key: true}
-        }
-    ];
-    Timing timing = 2 [(sql.sql_field).embedded_message = true];
-    Tags tags = 3 [(sql.sql_field).serialized_message = true];
-    crossplane.MachineInfo machine_info = 4 [(sql.sql_field).embedded_message = true];
-}
-
-message StroppyDeploymentTemplate {
-    option (sql.sql_table) = {
-        generate: true
-        table_name: "stroppy_deployment_templates"
-    };
-    message List {repeated StroppyDeploymentTemplate templates = 1;}
+    message MachineDeployment {
+        crossplane.MachineInfo machine_info = 2 [(sql.sql_field).embedded_message = true];
+    }
+    message StroppyDeployment {
+        repeated crossplane.FsFile files = 1;
+        optional string cmd = 2 [(validate.rules).string.min_len = 1];
+    }
+    message List {repeated Template templates = 1;}
     Ulid id = 1 [
         (sql.sql_field) = {
             sql_type: {type: TEXT,user_cast: true}
@@ -43,62 +51,35 @@ message StroppyDeploymentTemplate {
     ];
     Timing timing = 2 [(sql.sql_field).embedded_message = true];
     string name = 3 [(validate.rules).string = {min_len: 3,max_len: 255}];
-    // here is WorkloadType such as Tpcc or another
-    Tags tags = 4 [(sql.sql_field).serialized_message = true];
-    bytes script_body = 5;
-    string stroppy_version = 6 [(validate.rules).string.min_len = 1];
-    Metadata env_data = 7 [(sql.sql_field).serialized_message = true];
-}
-
-message StroppyInstanceTemplate {
-    StroppyDeploymentTemplate stroppy_deployment_template = 1;
-    // now support only single node
-    MachineTemplate machine_template = 2;
-}
-
-message DatabaseDeploymentTemplate {
-    option (sql.sql_table) = {
-        generate: true
-        table_name: "database_deployment_templates"
-    };
-    message List {repeated DatabaseDeploymentTemplate templates = 1;}
-    Ulid id = 1 [
+    Ulid author_id = 4 [
         (sql.sql_field) = {
             sql_type: {type: TEXT,user_cast: true}
-            constraints: {primary_key: true}
+            constraints: {constraint: "NOT NULL REFERENCES users(id) ON DELETE CASCADE"}
         }
     ];
-    Timing timing = 2 [(sql.sql_field).embedded_message = true];
-    string name = 3 [(validate.rules).string = {min_len: 3,max_len: 255}];
-    Tags tags = 4 [(sql.sql_field).serialized_message = true];
-    // now support only prebuilt image in YandexCloud
-    string prebuilt_image_id = 5 [(validate.rules).string.min_len = 1];
-}
-
-message DatabaseInstanceTemplate {
-    DatabaseDeploymentTemplate database_deployment_template = 1;
-    // now support only single node
-    MachineTemplate machine_template = 2;
+    bool is_default = 5;
+    repeated Tag tags = 6 [(sql.sql_field).sql_type = {type: TEXT,user_cast: true}];
+    oneof template_data {
+        MachineDeployment machine_deployment = 101;
+        DatabaseDeployment database_deployment = 102;
+        StroppyDeployment stroppy_deployment = 103;
+    }
 }
 
 // ----------------------------------------__TEMPLATE_SERVICE__---------------------------------------------------------
 
+message SearchTemplatesRequest {
+    string name = 1 [(validate.rules).string.min_len = 1];
+    Tag.List tags_list = 2;
+}
+
 service TemplateService {
-    rpc ListMachineTemplatesTags (google.protobuf.Empty) returns (Tags);
-    rpc ListMachineTemplates (Tags.Filter) returns (MachineTemplate.List);
-    rpc CreateMachineTemplate (MachineTemplate) returns (MachineTemplate);
-    rpc UpdateMachineTemplate (MachineTemplate) returns (MachineTemplate);
-    rpc DeleteMachineTemplate (Ulid) returns (google.protobuf.Empty);
-
-    rpc ListStroppyDeploymentTemplatesTags (google.protobuf.Empty) returns (Tags);
-    rpc ListStroppyDeploymentTemplates (Tags.Filter) returns (StroppyDeploymentTemplate.List);
-    rpc CreateStroppyDeploymentTemplate (StroppyDeploymentTemplate) returns (StroppyDeploymentTemplate);
-    rpc UpdateStroppyDeploymentTemplate (StroppyDeploymentTemplate) returns (StroppyDeploymentTemplate);
-    rpc DeleteStroppyDeploymentTemplate (Ulid) returns (google.protobuf.Empty);
-
-    rpc ListDatabaseDeploymentTemplatesTags (google.protobuf.Empty) returns (Tags);
-    rpc ListDatabaseDeploymentTemplates (Tags.Filter) returns (DatabaseDeploymentTemplate.List);
-    rpc CreateDatabaseDeploymentTemplate (DatabaseDeploymentTemplate) returns (DatabaseDeploymentTemplate);
-    rpc UpdateDatabaseDeploymentTemplate (DatabaseDeploymentTemplate) returns (DatabaseDeploymentTemplate);
-    rpc DeleteDatabaseDeploymentTemplate (Ulid) returns (google.protobuf.Empty);
+    rpc ListTemplatesTags (google.protobuf.Empty) returns (Tag.List);
+    rpc SearchTemplates (SearchTemplatesRequest) returns (Template.List);
+    rpc GetTemplateKvs (Ulid) returns (KV.Map);
+    rpc GetTemplate (Ulid) returns (Template);
+    // Admins only
+    rpc CreateTemplate (Template) returns (Template);
+    rpc UpdateTemplate (Template) returns (Template);
+    rpc DeleteTemplate (Ulid) returns (google.protobuf.Empty);
 }

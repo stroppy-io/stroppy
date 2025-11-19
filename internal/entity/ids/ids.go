@@ -2,9 +2,10 @@ package ids
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/oklog/ulid/v2"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
-	"strings"
 )
 
 type OIDC = string

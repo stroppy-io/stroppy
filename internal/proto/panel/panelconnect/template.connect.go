@@ -34,70 +34,39 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// TemplateServiceListMachineTemplatesTagsProcedure is the fully-qualified name of the
-	// TemplateService's ListMachineTemplatesTags RPC.
-	TemplateServiceListMachineTemplatesTagsProcedure = "/panel.TemplateService/ListMachineTemplatesTags"
-	// TemplateServiceListMachineTemplatesProcedure is the fully-qualified name of the TemplateService's
-	// ListMachineTemplates RPC.
-	TemplateServiceListMachineTemplatesProcedure = "/panel.TemplateService/ListMachineTemplates"
-	// TemplateServiceCreateMachineTemplateProcedure is the fully-qualified name of the
-	// TemplateService's CreateMachineTemplate RPC.
-	TemplateServiceCreateMachineTemplateProcedure = "/panel.TemplateService/CreateMachineTemplate"
-	// TemplateServiceUpdateMachineTemplateProcedure is the fully-qualified name of the
-	// TemplateService's UpdateMachineTemplate RPC.
-	TemplateServiceUpdateMachineTemplateProcedure = "/panel.TemplateService/UpdateMachineTemplate"
-	// TemplateServiceDeleteMachineTemplateProcedure is the fully-qualified name of the
-	// TemplateService's DeleteMachineTemplate RPC.
-	TemplateServiceDeleteMachineTemplateProcedure = "/panel.TemplateService/DeleteMachineTemplate"
-	// TemplateServiceListStroppyDeploymentTemplatesTagsProcedure is the fully-qualified name of the
-	// TemplateService's ListStroppyDeploymentTemplatesTags RPC.
-	TemplateServiceListStroppyDeploymentTemplatesTagsProcedure = "/panel.TemplateService/ListStroppyDeploymentTemplatesTags"
-	// TemplateServiceListStroppyDeploymentTemplatesProcedure is the fully-qualified name of the
-	// TemplateService's ListStroppyDeploymentTemplates RPC.
-	TemplateServiceListStroppyDeploymentTemplatesProcedure = "/panel.TemplateService/ListStroppyDeploymentTemplates"
-	// TemplateServiceCreateStroppyDeploymentTemplateProcedure is the fully-qualified name of the
-	// TemplateService's CreateStroppyDeploymentTemplate RPC.
-	TemplateServiceCreateStroppyDeploymentTemplateProcedure = "/panel.TemplateService/CreateStroppyDeploymentTemplate"
-	// TemplateServiceUpdateStroppyDeploymentTemplateProcedure is the fully-qualified name of the
-	// TemplateService's UpdateStroppyDeploymentTemplate RPC.
-	TemplateServiceUpdateStroppyDeploymentTemplateProcedure = "/panel.TemplateService/UpdateStroppyDeploymentTemplate"
-	// TemplateServiceDeleteStroppyDeploymentTemplateProcedure is the fully-qualified name of the
-	// TemplateService's DeleteStroppyDeploymentTemplate RPC.
-	TemplateServiceDeleteStroppyDeploymentTemplateProcedure = "/panel.TemplateService/DeleteStroppyDeploymentTemplate"
-	// TemplateServiceListDatabaseDeploymentTemplatesTagsProcedure is the fully-qualified name of the
-	// TemplateService's ListDatabaseDeploymentTemplatesTags RPC.
-	TemplateServiceListDatabaseDeploymentTemplatesTagsProcedure = "/panel.TemplateService/ListDatabaseDeploymentTemplatesTags"
-	// TemplateServiceListDatabaseDeploymentTemplatesProcedure is the fully-qualified name of the
-	// TemplateService's ListDatabaseDeploymentTemplates RPC.
-	TemplateServiceListDatabaseDeploymentTemplatesProcedure = "/panel.TemplateService/ListDatabaseDeploymentTemplates"
-	// TemplateServiceCreateDatabaseDeploymentTemplateProcedure is the fully-qualified name of the
-	// TemplateService's CreateDatabaseDeploymentTemplate RPC.
-	TemplateServiceCreateDatabaseDeploymentTemplateProcedure = "/panel.TemplateService/CreateDatabaseDeploymentTemplate"
-	// TemplateServiceUpdateDatabaseDeploymentTemplateProcedure is the fully-qualified name of the
-	// TemplateService's UpdateDatabaseDeploymentTemplate RPC.
-	TemplateServiceUpdateDatabaseDeploymentTemplateProcedure = "/panel.TemplateService/UpdateDatabaseDeploymentTemplate"
-	// TemplateServiceDeleteDatabaseDeploymentTemplateProcedure is the fully-qualified name of the
-	// TemplateService's DeleteDatabaseDeploymentTemplate RPC.
-	TemplateServiceDeleteDatabaseDeploymentTemplateProcedure = "/panel.TemplateService/DeleteDatabaseDeploymentTemplate"
+	// TemplateServiceListTemplatesTagsProcedure is the fully-qualified name of the TemplateService's
+	// ListTemplatesTags RPC.
+	TemplateServiceListTemplatesTagsProcedure = "/panel.TemplateService/ListTemplatesTags"
+	// TemplateServiceSearchTemplatesProcedure is the fully-qualified name of the TemplateService's
+	// SearchTemplates RPC.
+	TemplateServiceSearchTemplatesProcedure = "/panel.TemplateService/SearchTemplates"
+	// TemplateServiceGetTemplateKvsProcedure is the fully-qualified name of the TemplateService's
+	// GetTemplateKvs RPC.
+	TemplateServiceGetTemplateKvsProcedure = "/panel.TemplateService/GetTemplateKvs"
+	// TemplateServiceGetTemplateProcedure is the fully-qualified name of the TemplateService's
+	// GetTemplate RPC.
+	TemplateServiceGetTemplateProcedure = "/panel.TemplateService/GetTemplate"
+	// TemplateServiceCreateTemplateProcedure is the fully-qualified name of the TemplateService's
+	// CreateTemplate RPC.
+	TemplateServiceCreateTemplateProcedure = "/panel.TemplateService/CreateTemplate"
+	// TemplateServiceUpdateTemplateProcedure is the fully-qualified name of the TemplateService's
+	// UpdateTemplate RPC.
+	TemplateServiceUpdateTemplateProcedure = "/panel.TemplateService/UpdateTemplate"
+	// TemplateServiceDeleteTemplateProcedure is the fully-qualified name of the TemplateService's
+	// DeleteTemplate RPC.
+	TemplateServiceDeleteTemplateProcedure = "/panel.TemplateService/DeleteTemplate"
 )
 
 // TemplateServiceClient is a client for the panel.TemplateService service.
 type TemplateServiceClient interface {
-	ListMachineTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tags, error)
-	ListMachineTemplates(context.Context, *panel.Tags_Filter) (*panel.MachineTemplate_List, error)
-	CreateMachineTemplate(context.Context, *panel.MachineTemplate) (*panel.MachineTemplate, error)
-	UpdateMachineTemplate(context.Context, *panel.MachineTemplate) (*panel.MachineTemplate, error)
-	DeleteMachineTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error)
-	ListStroppyDeploymentTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tags, error)
-	ListStroppyDeploymentTemplates(context.Context, *panel.Tags_Filter) (*panel.StroppyDeploymentTemplate_List, error)
-	CreateStroppyDeploymentTemplate(context.Context, *panel.StroppyDeploymentTemplate) (*panel.StroppyDeploymentTemplate, error)
-	UpdateStroppyDeploymentTemplate(context.Context, *panel.StroppyDeploymentTemplate) (*panel.StroppyDeploymentTemplate, error)
-	DeleteStroppyDeploymentTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error)
-	ListDatabaseDeploymentTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tags, error)
-	ListDatabaseDeploymentTemplates(context.Context, *panel.Tags_Filter) (*panel.DatabaseDeploymentTemplate_List, error)
-	CreateDatabaseDeploymentTemplate(context.Context, *panel.DatabaseDeploymentTemplate) (*panel.DatabaseDeploymentTemplate, error)
-	UpdateDatabaseDeploymentTemplate(context.Context, *panel.DatabaseDeploymentTemplate) (*panel.DatabaseDeploymentTemplate, error)
-	DeleteDatabaseDeploymentTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error)
+	ListTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tag_List, error)
+	SearchTemplates(context.Context, *panel.SearchTemplatesRequest) (*panel.Template_List, error)
+	GetTemplateKvs(context.Context, *panel.Ulid) (*panel.KV_Map, error)
+	GetTemplate(context.Context, *panel.Ulid) (*panel.Template, error)
+	// Admins only
+	CreateTemplate(context.Context, *panel.Template) (*panel.Template, error)
+	UpdateTemplate(context.Context, *panel.Template) (*panel.Template, error)
+	DeleteTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error)
 }
 
 // NewTemplateServiceClient constructs a client for the panel.TemplateService service. By default,
@@ -111,94 +80,46 @@ func NewTemplateServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 	baseURL = strings.TrimRight(baseURL, "/")
 	templateServiceMethods := panel.File_panel_template_proto.Services().ByName("TemplateService").Methods()
 	return &templateServiceClient{
-		listMachineTemplatesTags: connect.NewClient[emptypb.Empty, panel.Tags](
+		listTemplatesTags: connect.NewClient[emptypb.Empty, panel.Tag_List](
 			httpClient,
-			baseURL+TemplateServiceListMachineTemplatesTagsProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("ListMachineTemplatesTags")),
+			baseURL+TemplateServiceListTemplatesTagsProcedure,
+			connect.WithSchema(templateServiceMethods.ByName("ListTemplatesTags")),
 			connect.WithClientOptions(opts...),
 		),
-		listMachineTemplates: connect.NewClient[panel.Tags_Filter, panel.MachineTemplate_List](
+		searchTemplates: connect.NewClient[panel.SearchTemplatesRequest, panel.Template_List](
 			httpClient,
-			baseURL+TemplateServiceListMachineTemplatesProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("ListMachineTemplates")),
+			baseURL+TemplateServiceSearchTemplatesProcedure,
+			connect.WithSchema(templateServiceMethods.ByName("SearchTemplates")),
 			connect.WithClientOptions(opts...),
 		),
-		createMachineTemplate: connect.NewClient[panel.MachineTemplate, panel.MachineTemplate](
+		getTemplateKvs: connect.NewClient[panel.Ulid, panel.KV_Map](
 			httpClient,
-			baseURL+TemplateServiceCreateMachineTemplateProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("CreateMachineTemplate")),
+			baseURL+TemplateServiceGetTemplateKvsProcedure,
+			connect.WithSchema(templateServiceMethods.ByName("GetTemplateKvs")),
 			connect.WithClientOptions(opts...),
 		),
-		updateMachineTemplate: connect.NewClient[panel.MachineTemplate, panel.MachineTemplate](
+		getTemplate: connect.NewClient[panel.Ulid, panel.Template](
 			httpClient,
-			baseURL+TemplateServiceUpdateMachineTemplateProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("UpdateMachineTemplate")),
+			baseURL+TemplateServiceGetTemplateProcedure,
+			connect.WithSchema(templateServiceMethods.ByName("GetTemplate")),
 			connect.WithClientOptions(opts...),
 		),
-		deleteMachineTemplate: connect.NewClient[panel.Ulid, emptypb.Empty](
+		createTemplate: connect.NewClient[panel.Template, panel.Template](
 			httpClient,
-			baseURL+TemplateServiceDeleteMachineTemplateProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("DeleteMachineTemplate")),
+			baseURL+TemplateServiceCreateTemplateProcedure,
+			connect.WithSchema(templateServiceMethods.ByName("CreateTemplate")),
 			connect.WithClientOptions(opts...),
 		),
-		listStroppyDeploymentTemplatesTags: connect.NewClient[emptypb.Empty, panel.Tags](
+		updateTemplate: connect.NewClient[panel.Template, panel.Template](
 			httpClient,
-			baseURL+TemplateServiceListStroppyDeploymentTemplatesTagsProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("ListStroppyDeploymentTemplatesTags")),
+			baseURL+TemplateServiceUpdateTemplateProcedure,
+			connect.WithSchema(templateServiceMethods.ByName("UpdateTemplate")),
 			connect.WithClientOptions(opts...),
 		),
-		listStroppyDeploymentTemplates: connect.NewClient[panel.Tags_Filter, panel.StroppyDeploymentTemplate_List](
+		deleteTemplate: connect.NewClient[panel.Ulid, emptypb.Empty](
 			httpClient,
-			baseURL+TemplateServiceListStroppyDeploymentTemplatesProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("ListStroppyDeploymentTemplates")),
-			connect.WithClientOptions(opts...),
-		),
-		createStroppyDeploymentTemplate: connect.NewClient[panel.StroppyDeploymentTemplate, panel.StroppyDeploymentTemplate](
-			httpClient,
-			baseURL+TemplateServiceCreateStroppyDeploymentTemplateProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("CreateStroppyDeploymentTemplate")),
-			connect.WithClientOptions(opts...),
-		),
-		updateStroppyDeploymentTemplate: connect.NewClient[panel.StroppyDeploymentTemplate, panel.StroppyDeploymentTemplate](
-			httpClient,
-			baseURL+TemplateServiceUpdateStroppyDeploymentTemplateProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("UpdateStroppyDeploymentTemplate")),
-			connect.WithClientOptions(opts...),
-		),
-		deleteStroppyDeploymentTemplate: connect.NewClient[panel.Ulid, emptypb.Empty](
-			httpClient,
-			baseURL+TemplateServiceDeleteStroppyDeploymentTemplateProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("DeleteStroppyDeploymentTemplate")),
-			connect.WithClientOptions(opts...),
-		),
-		listDatabaseDeploymentTemplatesTags: connect.NewClient[emptypb.Empty, panel.Tags](
-			httpClient,
-			baseURL+TemplateServiceListDatabaseDeploymentTemplatesTagsProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("ListDatabaseDeploymentTemplatesTags")),
-			connect.WithClientOptions(opts...),
-		),
-		listDatabaseDeploymentTemplates: connect.NewClient[panel.Tags_Filter, panel.DatabaseDeploymentTemplate_List](
-			httpClient,
-			baseURL+TemplateServiceListDatabaseDeploymentTemplatesProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("ListDatabaseDeploymentTemplates")),
-			connect.WithClientOptions(opts...),
-		),
-		createDatabaseDeploymentTemplate: connect.NewClient[panel.DatabaseDeploymentTemplate, panel.DatabaseDeploymentTemplate](
-			httpClient,
-			baseURL+TemplateServiceCreateDatabaseDeploymentTemplateProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("CreateDatabaseDeploymentTemplate")),
-			connect.WithClientOptions(opts...),
-		),
-		updateDatabaseDeploymentTemplate: connect.NewClient[panel.DatabaseDeploymentTemplate, panel.DatabaseDeploymentTemplate](
-			httpClient,
-			baseURL+TemplateServiceUpdateDatabaseDeploymentTemplateProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("UpdateDatabaseDeploymentTemplate")),
-			connect.WithClientOptions(opts...),
-		),
-		deleteDatabaseDeploymentTemplate: connect.NewClient[panel.Ulid, emptypb.Empty](
-			httpClient,
-			baseURL+TemplateServiceDeleteDatabaseDeploymentTemplateProcedure,
-			connect.WithSchema(templateServiceMethods.ByName("DeleteDatabaseDeploymentTemplate")),
+			baseURL+TemplateServiceDeleteTemplateProcedure,
+			connect.WithSchema(templateServiceMethods.ByName("DeleteTemplate")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -206,154 +127,72 @@ func NewTemplateServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // templateServiceClient implements TemplateServiceClient.
 type templateServiceClient struct {
-	listMachineTemplatesTags            *connect.Client[emptypb.Empty, panel.Tags]
-	listMachineTemplates                *connect.Client[panel.Tags_Filter, panel.MachineTemplate_List]
-	createMachineTemplate               *connect.Client[panel.MachineTemplate, panel.MachineTemplate]
-	updateMachineTemplate               *connect.Client[panel.MachineTemplate, panel.MachineTemplate]
-	deleteMachineTemplate               *connect.Client[panel.Ulid, emptypb.Empty]
-	listStroppyDeploymentTemplatesTags  *connect.Client[emptypb.Empty, panel.Tags]
-	listStroppyDeploymentTemplates      *connect.Client[panel.Tags_Filter, panel.StroppyDeploymentTemplate_List]
-	createStroppyDeploymentTemplate     *connect.Client[panel.StroppyDeploymentTemplate, panel.StroppyDeploymentTemplate]
-	updateStroppyDeploymentTemplate     *connect.Client[panel.StroppyDeploymentTemplate, panel.StroppyDeploymentTemplate]
-	deleteStroppyDeploymentTemplate     *connect.Client[panel.Ulid, emptypb.Empty]
-	listDatabaseDeploymentTemplatesTags *connect.Client[emptypb.Empty, panel.Tags]
-	listDatabaseDeploymentTemplates     *connect.Client[panel.Tags_Filter, panel.DatabaseDeploymentTemplate_List]
-	createDatabaseDeploymentTemplate    *connect.Client[panel.DatabaseDeploymentTemplate, panel.DatabaseDeploymentTemplate]
-	updateDatabaseDeploymentTemplate    *connect.Client[panel.DatabaseDeploymentTemplate, panel.DatabaseDeploymentTemplate]
-	deleteDatabaseDeploymentTemplate    *connect.Client[panel.Ulid, emptypb.Empty]
+	listTemplatesTags *connect.Client[emptypb.Empty, panel.Tag_List]
+	searchTemplates   *connect.Client[panel.SearchTemplatesRequest, panel.Template_List]
+	getTemplateKvs    *connect.Client[panel.Ulid, panel.KV_Map]
+	getTemplate       *connect.Client[panel.Ulid, panel.Template]
+	createTemplate    *connect.Client[panel.Template, panel.Template]
+	updateTemplate    *connect.Client[panel.Template, panel.Template]
+	deleteTemplate    *connect.Client[panel.Ulid, emptypb.Empty]
 }
 
-// ListMachineTemplatesTags calls panel.TemplateService.ListMachineTemplatesTags.
-func (c *templateServiceClient) ListMachineTemplatesTags(ctx context.Context, req *emptypb.Empty) (*panel.Tags, error) {
-	response, err := c.listMachineTemplatesTags.CallUnary(ctx, connect.NewRequest(req))
+// ListTemplatesTags calls panel.TemplateService.ListTemplatesTags.
+func (c *templateServiceClient) ListTemplatesTags(ctx context.Context, req *emptypb.Empty) (*panel.Tag_List, error) {
+	response, err := c.listTemplatesTags.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
 	return nil, err
 }
 
-// ListMachineTemplates calls panel.TemplateService.ListMachineTemplates.
-func (c *templateServiceClient) ListMachineTemplates(ctx context.Context, req *panel.Tags_Filter) (*panel.MachineTemplate_List, error) {
-	response, err := c.listMachineTemplates.CallUnary(ctx, connect.NewRequest(req))
+// SearchTemplates calls panel.TemplateService.SearchTemplates.
+func (c *templateServiceClient) SearchTemplates(ctx context.Context, req *panel.SearchTemplatesRequest) (*panel.Template_List, error) {
+	response, err := c.searchTemplates.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
 	return nil, err
 }
 
-// CreateMachineTemplate calls panel.TemplateService.CreateMachineTemplate.
-func (c *templateServiceClient) CreateMachineTemplate(ctx context.Context, req *panel.MachineTemplate) (*panel.MachineTemplate, error) {
-	response, err := c.createMachineTemplate.CallUnary(ctx, connect.NewRequest(req))
+// GetTemplateKvs calls panel.TemplateService.GetTemplateKvs.
+func (c *templateServiceClient) GetTemplateKvs(ctx context.Context, req *panel.Ulid) (*panel.KV_Map, error) {
+	response, err := c.getTemplateKvs.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
 	return nil, err
 }
 
-// UpdateMachineTemplate calls panel.TemplateService.UpdateMachineTemplate.
-func (c *templateServiceClient) UpdateMachineTemplate(ctx context.Context, req *panel.MachineTemplate) (*panel.MachineTemplate, error) {
-	response, err := c.updateMachineTemplate.CallUnary(ctx, connect.NewRequest(req))
+// GetTemplate calls panel.TemplateService.GetTemplate.
+func (c *templateServiceClient) GetTemplate(ctx context.Context, req *panel.Ulid) (*panel.Template, error) {
+	response, err := c.getTemplate.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
 	return nil, err
 }
 
-// DeleteMachineTemplate calls panel.TemplateService.DeleteMachineTemplate.
-func (c *templateServiceClient) DeleteMachineTemplate(ctx context.Context, req *panel.Ulid) (*emptypb.Empty, error) {
-	response, err := c.deleteMachineTemplate.CallUnary(ctx, connect.NewRequest(req))
+// CreateTemplate calls panel.TemplateService.CreateTemplate.
+func (c *templateServiceClient) CreateTemplate(ctx context.Context, req *panel.Template) (*panel.Template, error) {
+	response, err := c.createTemplate.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
 	return nil, err
 }
 
-// ListStroppyDeploymentTemplatesTags calls
-// panel.TemplateService.ListStroppyDeploymentTemplatesTags.
-func (c *templateServiceClient) ListStroppyDeploymentTemplatesTags(ctx context.Context, req *emptypb.Empty) (*panel.Tags, error) {
-	response, err := c.listStroppyDeploymentTemplatesTags.CallUnary(ctx, connect.NewRequest(req))
+// UpdateTemplate calls panel.TemplateService.UpdateTemplate.
+func (c *templateServiceClient) UpdateTemplate(ctx context.Context, req *panel.Template) (*panel.Template, error) {
+	response, err := c.updateTemplate.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
 	return nil, err
 }
 
-// ListStroppyDeploymentTemplates calls panel.TemplateService.ListStroppyDeploymentTemplates.
-func (c *templateServiceClient) ListStroppyDeploymentTemplates(ctx context.Context, req *panel.Tags_Filter) (*panel.StroppyDeploymentTemplate_List, error) {
-	response, err := c.listStroppyDeploymentTemplates.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// CreateStroppyDeploymentTemplate calls panel.TemplateService.CreateStroppyDeploymentTemplate.
-func (c *templateServiceClient) CreateStroppyDeploymentTemplate(ctx context.Context, req *panel.StroppyDeploymentTemplate) (*panel.StroppyDeploymentTemplate, error) {
-	response, err := c.createStroppyDeploymentTemplate.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// UpdateStroppyDeploymentTemplate calls panel.TemplateService.UpdateStroppyDeploymentTemplate.
-func (c *templateServiceClient) UpdateStroppyDeploymentTemplate(ctx context.Context, req *panel.StroppyDeploymentTemplate) (*panel.StroppyDeploymentTemplate, error) {
-	response, err := c.updateStroppyDeploymentTemplate.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// DeleteStroppyDeploymentTemplate calls panel.TemplateService.DeleteStroppyDeploymentTemplate.
-func (c *templateServiceClient) DeleteStroppyDeploymentTemplate(ctx context.Context, req *panel.Ulid) (*emptypb.Empty, error) {
-	response, err := c.deleteStroppyDeploymentTemplate.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ListDatabaseDeploymentTemplatesTags calls
-// panel.TemplateService.ListDatabaseDeploymentTemplatesTags.
-func (c *templateServiceClient) ListDatabaseDeploymentTemplatesTags(ctx context.Context, req *emptypb.Empty) (*panel.Tags, error) {
-	response, err := c.listDatabaseDeploymentTemplatesTags.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ListDatabaseDeploymentTemplates calls panel.TemplateService.ListDatabaseDeploymentTemplates.
-func (c *templateServiceClient) ListDatabaseDeploymentTemplates(ctx context.Context, req *panel.Tags_Filter) (*panel.DatabaseDeploymentTemplate_List, error) {
-	response, err := c.listDatabaseDeploymentTemplates.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// CreateDatabaseDeploymentTemplate calls panel.TemplateService.CreateDatabaseDeploymentTemplate.
-func (c *templateServiceClient) CreateDatabaseDeploymentTemplate(ctx context.Context, req *panel.DatabaseDeploymentTemplate) (*panel.DatabaseDeploymentTemplate, error) {
-	response, err := c.createDatabaseDeploymentTemplate.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// UpdateDatabaseDeploymentTemplate calls panel.TemplateService.UpdateDatabaseDeploymentTemplate.
-func (c *templateServiceClient) UpdateDatabaseDeploymentTemplate(ctx context.Context, req *panel.DatabaseDeploymentTemplate) (*panel.DatabaseDeploymentTemplate, error) {
-	response, err := c.updateDatabaseDeploymentTemplate.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// DeleteDatabaseDeploymentTemplate calls panel.TemplateService.DeleteDatabaseDeploymentTemplate.
-func (c *templateServiceClient) DeleteDatabaseDeploymentTemplate(ctx context.Context, req *panel.Ulid) (*emptypb.Empty, error) {
-	response, err := c.deleteDatabaseDeploymentTemplate.CallUnary(ctx, connect.NewRequest(req))
+// DeleteTemplate calls panel.TemplateService.DeleteTemplate.
+func (c *templateServiceClient) DeleteTemplate(ctx context.Context, req *panel.Ulid) (*emptypb.Empty, error) {
+	response, err := c.deleteTemplate.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
@@ -362,21 +201,14 @@ func (c *templateServiceClient) DeleteDatabaseDeploymentTemplate(ctx context.Con
 
 // TemplateServiceHandler is an implementation of the panel.TemplateService service.
 type TemplateServiceHandler interface {
-	ListMachineTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tags, error)
-	ListMachineTemplates(context.Context, *panel.Tags_Filter) (*panel.MachineTemplate_List, error)
-	CreateMachineTemplate(context.Context, *panel.MachineTemplate) (*panel.MachineTemplate, error)
-	UpdateMachineTemplate(context.Context, *panel.MachineTemplate) (*panel.MachineTemplate, error)
-	DeleteMachineTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error)
-	ListStroppyDeploymentTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tags, error)
-	ListStroppyDeploymentTemplates(context.Context, *panel.Tags_Filter) (*panel.StroppyDeploymentTemplate_List, error)
-	CreateStroppyDeploymentTemplate(context.Context, *panel.StroppyDeploymentTemplate) (*panel.StroppyDeploymentTemplate, error)
-	UpdateStroppyDeploymentTemplate(context.Context, *panel.StroppyDeploymentTemplate) (*panel.StroppyDeploymentTemplate, error)
-	DeleteStroppyDeploymentTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error)
-	ListDatabaseDeploymentTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tags, error)
-	ListDatabaseDeploymentTemplates(context.Context, *panel.Tags_Filter) (*panel.DatabaseDeploymentTemplate_List, error)
-	CreateDatabaseDeploymentTemplate(context.Context, *panel.DatabaseDeploymentTemplate) (*panel.DatabaseDeploymentTemplate, error)
-	UpdateDatabaseDeploymentTemplate(context.Context, *panel.DatabaseDeploymentTemplate) (*panel.DatabaseDeploymentTemplate, error)
-	DeleteDatabaseDeploymentTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error)
+	ListTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tag_List, error)
+	SearchTemplates(context.Context, *panel.SearchTemplatesRequest) (*panel.Template_List, error)
+	GetTemplateKvs(context.Context, *panel.Ulid) (*panel.KV_Map, error)
+	GetTemplate(context.Context, *panel.Ulid) (*panel.Template, error)
+	// Admins only
+	CreateTemplate(context.Context, *panel.Template) (*panel.Template, error)
+	UpdateTemplate(context.Context, *panel.Template) (*panel.Template, error)
+	DeleteTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error)
 }
 
 // NewTemplateServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -386,128 +218,64 @@ type TemplateServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewTemplateServiceHandler(svc TemplateServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	templateServiceMethods := panel.File_panel_template_proto.Services().ByName("TemplateService").Methods()
-	templateServiceListMachineTemplatesTagsHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceListMachineTemplatesTagsProcedure,
-		svc.ListMachineTemplatesTags,
-		connect.WithSchema(templateServiceMethods.ByName("ListMachineTemplatesTags")),
+	templateServiceListTemplatesTagsHandler := connect.NewUnaryHandlerSimple(
+		TemplateServiceListTemplatesTagsProcedure,
+		svc.ListTemplatesTags,
+		connect.WithSchema(templateServiceMethods.ByName("ListTemplatesTags")),
 		connect.WithHandlerOptions(opts...),
 	)
-	templateServiceListMachineTemplatesHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceListMachineTemplatesProcedure,
-		svc.ListMachineTemplates,
-		connect.WithSchema(templateServiceMethods.ByName("ListMachineTemplates")),
+	templateServiceSearchTemplatesHandler := connect.NewUnaryHandlerSimple(
+		TemplateServiceSearchTemplatesProcedure,
+		svc.SearchTemplates,
+		connect.WithSchema(templateServiceMethods.ByName("SearchTemplates")),
 		connect.WithHandlerOptions(opts...),
 	)
-	templateServiceCreateMachineTemplateHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceCreateMachineTemplateProcedure,
-		svc.CreateMachineTemplate,
-		connect.WithSchema(templateServiceMethods.ByName("CreateMachineTemplate")),
+	templateServiceGetTemplateKvsHandler := connect.NewUnaryHandlerSimple(
+		TemplateServiceGetTemplateKvsProcedure,
+		svc.GetTemplateKvs,
+		connect.WithSchema(templateServiceMethods.ByName("GetTemplateKvs")),
 		connect.WithHandlerOptions(opts...),
 	)
-	templateServiceUpdateMachineTemplateHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceUpdateMachineTemplateProcedure,
-		svc.UpdateMachineTemplate,
-		connect.WithSchema(templateServiceMethods.ByName("UpdateMachineTemplate")),
+	templateServiceGetTemplateHandler := connect.NewUnaryHandlerSimple(
+		TemplateServiceGetTemplateProcedure,
+		svc.GetTemplate,
+		connect.WithSchema(templateServiceMethods.ByName("GetTemplate")),
 		connect.WithHandlerOptions(opts...),
 	)
-	templateServiceDeleteMachineTemplateHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceDeleteMachineTemplateProcedure,
-		svc.DeleteMachineTemplate,
-		connect.WithSchema(templateServiceMethods.ByName("DeleteMachineTemplate")),
+	templateServiceCreateTemplateHandler := connect.NewUnaryHandlerSimple(
+		TemplateServiceCreateTemplateProcedure,
+		svc.CreateTemplate,
+		connect.WithSchema(templateServiceMethods.ByName("CreateTemplate")),
 		connect.WithHandlerOptions(opts...),
 	)
-	templateServiceListStroppyDeploymentTemplatesTagsHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceListStroppyDeploymentTemplatesTagsProcedure,
-		svc.ListStroppyDeploymentTemplatesTags,
-		connect.WithSchema(templateServiceMethods.ByName("ListStroppyDeploymentTemplatesTags")),
+	templateServiceUpdateTemplateHandler := connect.NewUnaryHandlerSimple(
+		TemplateServiceUpdateTemplateProcedure,
+		svc.UpdateTemplate,
+		connect.WithSchema(templateServiceMethods.ByName("UpdateTemplate")),
 		connect.WithHandlerOptions(opts...),
 	)
-	templateServiceListStroppyDeploymentTemplatesHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceListStroppyDeploymentTemplatesProcedure,
-		svc.ListStroppyDeploymentTemplates,
-		connect.WithSchema(templateServiceMethods.ByName("ListStroppyDeploymentTemplates")),
-		connect.WithHandlerOptions(opts...),
-	)
-	templateServiceCreateStroppyDeploymentTemplateHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceCreateStroppyDeploymentTemplateProcedure,
-		svc.CreateStroppyDeploymentTemplate,
-		connect.WithSchema(templateServiceMethods.ByName("CreateStroppyDeploymentTemplate")),
-		connect.WithHandlerOptions(opts...),
-	)
-	templateServiceUpdateStroppyDeploymentTemplateHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceUpdateStroppyDeploymentTemplateProcedure,
-		svc.UpdateStroppyDeploymentTemplate,
-		connect.WithSchema(templateServiceMethods.ByName("UpdateStroppyDeploymentTemplate")),
-		connect.WithHandlerOptions(opts...),
-	)
-	templateServiceDeleteStroppyDeploymentTemplateHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceDeleteStroppyDeploymentTemplateProcedure,
-		svc.DeleteStroppyDeploymentTemplate,
-		connect.WithSchema(templateServiceMethods.ByName("DeleteStroppyDeploymentTemplate")),
-		connect.WithHandlerOptions(opts...),
-	)
-	templateServiceListDatabaseDeploymentTemplatesTagsHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceListDatabaseDeploymentTemplatesTagsProcedure,
-		svc.ListDatabaseDeploymentTemplatesTags,
-		connect.WithSchema(templateServiceMethods.ByName("ListDatabaseDeploymentTemplatesTags")),
-		connect.WithHandlerOptions(opts...),
-	)
-	templateServiceListDatabaseDeploymentTemplatesHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceListDatabaseDeploymentTemplatesProcedure,
-		svc.ListDatabaseDeploymentTemplates,
-		connect.WithSchema(templateServiceMethods.ByName("ListDatabaseDeploymentTemplates")),
-		connect.WithHandlerOptions(opts...),
-	)
-	templateServiceCreateDatabaseDeploymentTemplateHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceCreateDatabaseDeploymentTemplateProcedure,
-		svc.CreateDatabaseDeploymentTemplate,
-		connect.WithSchema(templateServiceMethods.ByName("CreateDatabaseDeploymentTemplate")),
-		connect.WithHandlerOptions(opts...),
-	)
-	templateServiceUpdateDatabaseDeploymentTemplateHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceUpdateDatabaseDeploymentTemplateProcedure,
-		svc.UpdateDatabaseDeploymentTemplate,
-		connect.WithSchema(templateServiceMethods.ByName("UpdateDatabaseDeploymentTemplate")),
-		connect.WithHandlerOptions(opts...),
-	)
-	templateServiceDeleteDatabaseDeploymentTemplateHandler := connect.NewUnaryHandlerSimple(
-		TemplateServiceDeleteDatabaseDeploymentTemplateProcedure,
-		svc.DeleteDatabaseDeploymentTemplate,
-		connect.WithSchema(templateServiceMethods.ByName("DeleteDatabaseDeploymentTemplate")),
+	templateServiceDeleteTemplateHandler := connect.NewUnaryHandlerSimple(
+		TemplateServiceDeleteTemplateProcedure,
+		svc.DeleteTemplate,
+		connect.WithSchema(templateServiceMethods.ByName("DeleteTemplate")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/panel.TemplateService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case TemplateServiceListMachineTemplatesTagsProcedure:
-			templateServiceListMachineTemplatesTagsHandler.ServeHTTP(w, r)
-		case TemplateServiceListMachineTemplatesProcedure:
-			templateServiceListMachineTemplatesHandler.ServeHTTP(w, r)
-		case TemplateServiceCreateMachineTemplateProcedure:
-			templateServiceCreateMachineTemplateHandler.ServeHTTP(w, r)
-		case TemplateServiceUpdateMachineTemplateProcedure:
-			templateServiceUpdateMachineTemplateHandler.ServeHTTP(w, r)
-		case TemplateServiceDeleteMachineTemplateProcedure:
-			templateServiceDeleteMachineTemplateHandler.ServeHTTP(w, r)
-		case TemplateServiceListStroppyDeploymentTemplatesTagsProcedure:
-			templateServiceListStroppyDeploymentTemplatesTagsHandler.ServeHTTP(w, r)
-		case TemplateServiceListStroppyDeploymentTemplatesProcedure:
-			templateServiceListStroppyDeploymentTemplatesHandler.ServeHTTP(w, r)
-		case TemplateServiceCreateStroppyDeploymentTemplateProcedure:
-			templateServiceCreateStroppyDeploymentTemplateHandler.ServeHTTP(w, r)
-		case TemplateServiceUpdateStroppyDeploymentTemplateProcedure:
-			templateServiceUpdateStroppyDeploymentTemplateHandler.ServeHTTP(w, r)
-		case TemplateServiceDeleteStroppyDeploymentTemplateProcedure:
-			templateServiceDeleteStroppyDeploymentTemplateHandler.ServeHTTP(w, r)
-		case TemplateServiceListDatabaseDeploymentTemplatesTagsProcedure:
-			templateServiceListDatabaseDeploymentTemplatesTagsHandler.ServeHTTP(w, r)
-		case TemplateServiceListDatabaseDeploymentTemplatesProcedure:
-			templateServiceListDatabaseDeploymentTemplatesHandler.ServeHTTP(w, r)
-		case TemplateServiceCreateDatabaseDeploymentTemplateProcedure:
-			templateServiceCreateDatabaseDeploymentTemplateHandler.ServeHTTP(w, r)
-		case TemplateServiceUpdateDatabaseDeploymentTemplateProcedure:
-			templateServiceUpdateDatabaseDeploymentTemplateHandler.ServeHTTP(w, r)
-		case TemplateServiceDeleteDatabaseDeploymentTemplateProcedure:
-			templateServiceDeleteDatabaseDeploymentTemplateHandler.ServeHTTP(w, r)
+		case TemplateServiceListTemplatesTagsProcedure:
+			templateServiceListTemplatesTagsHandler.ServeHTTP(w, r)
+		case TemplateServiceSearchTemplatesProcedure:
+			templateServiceSearchTemplatesHandler.ServeHTTP(w, r)
+		case TemplateServiceGetTemplateKvsProcedure:
+			templateServiceGetTemplateKvsHandler.ServeHTTP(w, r)
+		case TemplateServiceGetTemplateProcedure:
+			templateServiceGetTemplateHandler.ServeHTTP(w, r)
+		case TemplateServiceCreateTemplateProcedure:
+			templateServiceCreateTemplateHandler.ServeHTTP(w, r)
+		case TemplateServiceUpdateTemplateProcedure:
+			templateServiceUpdateTemplateHandler.ServeHTTP(w, r)
+		case TemplateServiceDeleteTemplateProcedure:
+			templateServiceDeleteTemplateHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -517,62 +285,30 @@ func NewTemplateServiceHandler(svc TemplateServiceHandler, opts ...connect.Handl
 // UnimplementedTemplateServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedTemplateServiceHandler struct{}
 
-func (UnimplementedTemplateServiceHandler) ListMachineTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tags, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.ListMachineTemplatesTags is not implemented"))
+func (UnimplementedTemplateServiceHandler) ListTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tag_List, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.ListTemplatesTags is not implemented"))
 }
 
-func (UnimplementedTemplateServiceHandler) ListMachineTemplates(context.Context, *panel.Tags_Filter) (*panel.MachineTemplate_List, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.ListMachineTemplates is not implemented"))
+func (UnimplementedTemplateServiceHandler) SearchTemplates(context.Context, *panel.SearchTemplatesRequest) (*panel.Template_List, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.SearchTemplates is not implemented"))
 }
 
-func (UnimplementedTemplateServiceHandler) CreateMachineTemplate(context.Context, *panel.MachineTemplate) (*panel.MachineTemplate, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.CreateMachineTemplate is not implemented"))
+func (UnimplementedTemplateServiceHandler) GetTemplateKvs(context.Context, *panel.Ulid) (*panel.KV_Map, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.GetTemplateKvs is not implemented"))
 }
 
-func (UnimplementedTemplateServiceHandler) UpdateMachineTemplate(context.Context, *panel.MachineTemplate) (*panel.MachineTemplate, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.UpdateMachineTemplate is not implemented"))
+func (UnimplementedTemplateServiceHandler) GetTemplate(context.Context, *panel.Ulid) (*panel.Template, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.GetTemplate is not implemented"))
 }
 
-func (UnimplementedTemplateServiceHandler) DeleteMachineTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.DeleteMachineTemplate is not implemented"))
+func (UnimplementedTemplateServiceHandler) CreateTemplate(context.Context, *panel.Template) (*panel.Template, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.CreateTemplate is not implemented"))
 }
 
-func (UnimplementedTemplateServiceHandler) ListStroppyDeploymentTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tags, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.ListStroppyDeploymentTemplatesTags is not implemented"))
+func (UnimplementedTemplateServiceHandler) UpdateTemplate(context.Context, *panel.Template) (*panel.Template, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.UpdateTemplate is not implemented"))
 }
 
-func (UnimplementedTemplateServiceHandler) ListStroppyDeploymentTemplates(context.Context, *panel.Tags_Filter) (*panel.StroppyDeploymentTemplate_List, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.ListStroppyDeploymentTemplates is not implemented"))
-}
-
-func (UnimplementedTemplateServiceHandler) CreateStroppyDeploymentTemplate(context.Context, *panel.StroppyDeploymentTemplate) (*panel.StroppyDeploymentTemplate, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.CreateStroppyDeploymentTemplate is not implemented"))
-}
-
-func (UnimplementedTemplateServiceHandler) UpdateStroppyDeploymentTemplate(context.Context, *panel.StroppyDeploymentTemplate) (*panel.StroppyDeploymentTemplate, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.UpdateStroppyDeploymentTemplate is not implemented"))
-}
-
-func (UnimplementedTemplateServiceHandler) DeleteStroppyDeploymentTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.DeleteStroppyDeploymentTemplate is not implemented"))
-}
-
-func (UnimplementedTemplateServiceHandler) ListDatabaseDeploymentTemplatesTags(context.Context, *emptypb.Empty) (*panel.Tags, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.ListDatabaseDeploymentTemplatesTags is not implemented"))
-}
-
-func (UnimplementedTemplateServiceHandler) ListDatabaseDeploymentTemplates(context.Context, *panel.Tags_Filter) (*panel.DatabaseDeploymentTemplate_List, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.ListDatabaseDeploymentTemplates is not implemented"))
-}
-
-func (UnimplementedTemplateServiceHandler) CreateDatabaseDeploymentTemplate(context.Context, *panel.DatabaseDeploymentTemplate) (*panel.DatabaseDeploymentTemplate, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.CreateDatabaseDeploymentTemplate is not implemented"))
-}
-
-func (UnimplementedTemplateServiceHandler) UpdateDatabaseDeploymentTemplate(context.Context, *panel.DatabaseDeploymentTemplate) (*panel.DatabaseDeploymentTemplate, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.UpdateDatabaseDeploymentTemplate is not implemented"))
-}
-
-func (UnimplementedTemplateServiceHandler) DeleteDatabaseDeploymentTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.DeleteDatabaseDeploymentTemplate is not implemented"))
+func (UnimplementedTemplateServiceHandler) DeleteTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.DeleteTemplate is not implemented"))
 }

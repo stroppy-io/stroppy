@@ -11,6 +11,7 @@ import (
 	_ "github.com/yaroher/protoc-gen-pgx-orm/protopgx"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -78,28 +79,96 @@ func (x Resource_Status) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Resource_Status.Descriptor instead.
 func (Resource_Status) EnumDescriptor() ([]byte, []int) {
-	return file_crossplane_resource_proto_rawDescGZIP(), []int{0, 0}
+	return file_crossplane_resource_proto_rawDescGZIP(), []int{1, 0}
+}
+
+type ResourceDef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ApiVersion    string                 `protobuf:"bytes,2,opt,name=api_version,json=apiVersion,proto3" json:"api_version,omitempty"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Metadata      *Metadata              `protobuf:"bytes,3,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Spec          *ResourceDef_Spec      `protobuf:"bytes,4,opt,name=spec,proto3" json:"spec,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResourceDef) Reset() {
+	*x = ResourceDef{}
+	mi := &file_crossplane_resource_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceDef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceDef) ProtoMessage() {}
+
+func (x *ResourceDef) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_resource_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceDef.ProtoReflect.Descriptor instead.
+func (*ResourceDef) Descriptor() ([]byte, []int) {
+	return file_crossplane_resource_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ResourceDef) GetApiVersion() string {
+	if x != nil {
+		return x.ApiVersion
+	}
+	return ""
+}
+
+func (x *ResourceDef) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *ResourceDef) GetMetadata() *Metadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ResourceDef) GetSpec() *ResourceDef_Spec {
+	if x != nil {
+		return x.Spec
+	}
+	return nil
 }
 
 type Resource struct {
-	state        protoimpl.MessageState `protogen:"open.v1"`
-	Ref          *ExtRef                `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
-	ResourceYaml string                 `protobuf:"bytes,3,opt,name=resource_yaml,json=resourceYaml,proto3" json:"resource_yaml,omitempty"`
-	Status       Resource_Status        `protobuf:"varint,4,opt,name=status,proto3,enum=crossplane.Resource_Status" json:"status,omitempty"`
-	Synced       bool                   `protobuf:"varint,5,opt,name=synced,proto3" json:"synced,omitempty"`                          // crossplane default statuses
-	Ready        bool                   `protobuf:"varint,6,opt,name=ready,proto3" json:"ready,omitempty"`                            // crossplane default statuses
-	ExternalId   string                 `protobuf:"bytes,7,opt,name=external_id,json=externalId,proto3" json:"external_id,omitempty"` // crossplane default statuses
-	// Types that are valid to be assigned to ResourceDef:
-	//
-	//	*Resource_YandexCloudResourceDef
-	ResourceDef   isResource_ResourceDef `protobuf_oneof:"resource_def"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ref           *ExtRef                `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	DeletedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=deleted_at,json=deletedAt,proto3,oneof" json:"deleted_at,omitempty"`
+	ResourceYaml  string                 `protobuf:"bytes,5,opt,name=resource_yaml,json=resourceYaml,proto3" json:"resource_yaml,omitempty"`
+	Status        Resource_Status        `protobuf:"varint,6,opt,name=status,proto3,enum=crossplane.Resource_Status" json:"status,omitempty"`
+	Synced        bool                   `protobuf:"varint,7,opt,name=synced,proto3" json:"synced,omitempty"`                          // crossplane default statuses
+	Ready         bool                   `protobuf:"varint,8,opt,name=ready,proto3" json:"ready,omitempty"`                            // crossplane default statuses
+	ExternalId    string                 `protobuf:"bytes,9,opt,name=external_id,json=externalId,proto3" json:"external_id,omitempty"` // crossplane default statuses
+	ResourceDef   *ResourceDef           `protobuf:"bytes,10,opt,name=resource_def,json=resourceDef,proto3" json:"resource_def,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Resource) Reset() {
 	*x = Resource{}
-	mi := &file_crossplane_resource_proto_msgTypes[0]
+	mi := &file_crossplane_resource_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -111,7 +180,7 @@ func (x *Resource) String() string {
 func (*Resource) ProtoMessage() {}
 
 func (x *Resource) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_resource_proto_msgTypes[0]
+	mi := &file_crossplane_resource_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -124,12 +193,33 @@ func (x *Resource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Resource.ProtoReflect.Descriptor instead.
 func (*Resource) Descriptor() ([]byte, []int) {
-	return file_crossplane_resource_proto_rawDescGZIP(), []int{0}
+	return file_crossplane_resource_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Resource) GetRef() *ExtRef {
 	if x != nil {
 		return x.Ref
+	}
+	return nil
+}
+
+func (x *Resource) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Resource) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *Resource) GetDeletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DeletedAt
 	}
 	return nil
 }
@@ -169,31 +259,12 @@ func (x *Resource) GetExternalId() string {
 	return ""
 }
 
-func (x *Resource) GetResourceDef() isResource_ResourceDef {
+func (x *Resource) GetResourceDef() *ResourceDef {
 	if x != nil {
 		return x.ResourceDef
 	}
 	return nil
 }
-
-func (x *Resource) GetYandexCloudResourceDef() *YandexCloud_ResourceDef {
-	if x != nil {
-		if x, ok := x.ResourceDef.(*Resource_YandexCloudResourceDef); ok {
-			return x.YandexCloudResourceDef
-		}
-	}
-	return nil
-}
-
-type isResource_ResourceDef interface {
-	isResource_ResourceDef()
-}
-
-type Resource_YandexCloudResourceDef struct {
-	YandexCloudResourceDef *YandexCloud_ResourceDef `protobuf:"bytes,100,opt,name=yandex_cloud_resource_def,json=yandexCloudResourceDef,proto3,oneof"`
-}
-
-func (*Resource_YandexCloudResourceDef) isResource_ResourceDef() {}
 
 type ResourceDag struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -206,7 +277,7 @@ type ResourceDag struct {
 
 func (x *ResourceDag) Reset() {
 	*x = ResourceDag{}
-	mi := &file_crossplane_resource_proto_msgTypes[1]
+	mi := &file_crossplane_resource_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -218,7 +289,7 @@ func (x *ResourceDag) String() string {
 func (*ResourceDag) ProtoMessage() {}
 
 func (x *ResourceDag) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_resource_proto_msgTypes[1]
+	mi := &file_crossplane_resource_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -231,7 +302,7 @@ func (x *ResourceDag) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceDag.ProtoReflect.Descriptor instead.
 func (*ResourceDag) Descriptor() ([]byte, []int) {
-	return file_crossplane_resource_proto_rawDescGZIP(), []int{1}
+	return file_crossplane_resource_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ResourceDag) GetId() string {
@@ -255,6 +326,128 @@ func (x *ResourceDag) GetEdges() []*ResourceDag_Edge {
 	return nil
 }
 
+type ResourceDef_Spec struct {
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	WriteConnectionSecretToRef *Ref                   `protobuf:"bytes,1,opt,name=write_connection_secret_to_ref,json=writeConnectionSecretToRef,proto3" json:"write_connection_secret_to_ref,omitempty"`
+	DeletionPolicy             string                 `protobuf:"bytes,2,opt,name=deletion_policy,json=deletionPolicy,proto3" json:"deletion_policy,omitempty"`
+	ProviderConfigRef          map[string]string      `protobuf:"bytes,3,rep,name=provider_config_ref,json=providerConfigRef,proto3" json:"provider_config_ref,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Types that are valid to be assigned to ForProvider:
+	//
+	//	*ResourceDef_Spec_YandexCloudVm
+	//	*ResourceDef_Spec_YandexCloudNetwork
+	//	*ResourceDef_Spec_YandexCloudSubnet
+	ForProvider   isResourceDef_Spec_ForProvider `protobuf_oneof:"for_provider"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResourceDef_Spec) Reset() {
+	*x = ResourceDef_Spec{}
+	mi := &file_crossplane_resource_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceDef_Spec) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceDef_Spec) ProtoMessage() {}
+
+func (x *ResourceDef_Spec) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_resource_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceDef_Spec.ProtoReflect.Descriptor instead.
+func (*ResourceDef_Spec) Descriptor() ([]byte, []int) {
+	return file_crossplane_resource_proto_rawDescGZIP(), []int{0, 0}
+}
+
+func (x *ResourceDef_Spec) GetWriteConnectionSecretToRef() *Ref {
+	if x != nil {
+		return x.WriteConnectionSecretToRef
+	}
+	return nil
+}
+
+func (x *ResourceDef_Spec) GetDeletionPolicy() string {
+	if x != nil {
+		return x.DeletionPolicy
+	}
+	return ""
+}
+
+func (x *ResourceDef_Spec) GetProviderConfigRef() map[string]string {
+	if x != nil {
+		return x.ProviderConfigRef
+	}
+	return nil
+}
+
+func (x *ResourceDef_Spec) GetForProvider() isResourceDef_Spec_ForProvider {
+	if x != nil {
+		return x.ForProvider
+	}
+	return nil
+}
+
+func (x *ResourceDef_Spec) GetYandexCloudVm() *YandexCloud_Vm {
+	if x != nil {
+		if x, ok := x.ForProvider.(*ResourceDef_Spec_YandexCloudVm); ok {
+			return x.YandexCloudVm
+		}
+	}
+	return nil
+}
+
+func (x *ResourceDef_Spec) GetYandexCloudNetwork() *YandexCloud_Network {
+	if x != nil {
+		if x, ok := x.ForProvider.(*ResourceDef_Spec_YandexCloudNetwork); ok {
+			return x.YandexCloudNetwork
+		}
+	}
+	return nil
+}
+
+func (x *ResourceDef_Spec) GetYandexCloudSubnet() *YandexCloud_Subnet {
+	if x != nil {
+		if x, ok := x.ForProvider.(*ResourceDef_Spec_YandexCloudSubnet); ok {
+			return x.YandexCloudSubnet
+		}
+	}
+	return nil
+}
+
+type isResourceDef_Spec_ForProvider interface {
+	isResourceDef_Spec_ForProvider()
+}
+
+type ResourceDef_Spec_YandexCloudVm struct {
+	YandexCloudVm *YandexCloud_Vm `protobuf:"bytes,100,opt,name=yandex_cloud_vm,json=yandexCloudVm,proto3,oneof"`
+}
+
+type ResourceDef_Spec_YandexCloudNetwork struct {
+	YandexCloudNetwork *YandexCloud_Network `protobuf:"bytes,101,opt,name=yandex_cloud_network,json=yandexCloudNetwork,proto3,oneof"`
+}
+
+type ResourceDef_Spec_YandexCloudSubnet struct {
+	YandexCloudSubnet *YandexCloud_Subnet `protobuf:"bytes,102,opt,name=yandex_cloud_subnet,json=yandexCloudSubnet,proto3,oneof"`
+}
+
+func (*ResourceDef_Spec_YandexCloudVm) isResourceDef_Spec_ForProvider() {}
+
+func (*ResourceDef_Spec_YandexCloudNetwork) isResourceDef_Spec_ForProvider() {}
+
+func (*ResourceDef_Spec_YandexCloudSubnet) isResourceDef_Spec_ForProvider() {}
+
 type ResourceDag_Node struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -265,7 +458,7 @@ type ResourceDag_Node struct {
 
 func (x *ResourceDag_Node) Reset() {
 	*x = ResourceDag_Node{}
-	mi := &file_crossplane_resource_proto_msgTypes[2]
+	mi := &file_crossplane_resource_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -277,7 +470,7 @@ func (x *ResourceDag_Node) String() string {
 func (*ResourceDag_Node) ProtoMessage() {}
 
 func (x *ResourceDag_Node) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_resource_proto_msgTypes[2]
+	mi := &file_crossplane_resource_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -290,7 +483,7 @@ func (x *ResourceDag_Node) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceDag_Node.ProtoReflect.Descriptor instead.
 func (*ResourceDag_Node) Descriptor() ([]byte, []int) {
-	return file_crossplane_resource_proto_rawDescGZIP(), []int{1, 0}
+	return file_crossplane_resource_proto_rawDescGZIP(), []int{2, 0}
 }
 
 func (x *ResourceDag_Node) GetId() string {
@@ -309,15 +502,15 @@ func (x *ResourceDag_Node) GetResource() *Resource {
 
 type ResourceDag_Edge struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	From          string                 `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
-	To            string                 `protobuf:"bytes,2,opt,name=to,proto3" json:"to,omitempty"`
+	FromId        string                 `protobuf:"bytes,1,opt,name=from_id,json=fromId,proto3" json:"from_id,omitempty"`
+	ToId          string                 `protobuf:"bytes,2,opt,name=to_id,json=toId,proto3" json:"to_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ResourceDag_Edge) Reset() {
 	*x = ResourceDag_Edge{}
-	mi := &file_crossplane_resource_proto_msgTypes[3]
+	mi := &file_crossplane_resource_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -329,7 +522,7 @@ func (x *ResourceDag_Edge) String() string {
 func (*ResourceDag_Edge) ProtoMessage() {}
 
 func (x *ResourceDag_Edge) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_resource_proto_msgTypes[3]
+	mi := &file_crossplane_resource_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -342,19 +535,19 @@ func (x *ResourceDag_Edge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceDag_Edge.ProtoReflect.Descriptor instead.
 func (*ResourceDag_Edge) Descriptor() ([]byte, []int) {
-	return file_crossplane_resource_proto_rawDescGZIP(), []int{1, 1}
+	return file_crossplane_resource_proto_rawDescGZIP(), []int{2, 1}
 }
 
-func (x *ResourceDag_Edge) GetFrom() string {
+func (x *ResourceDag_Edge) GetFromId() string {
 	if x != nil {
-		return x.From
+		return x.FromId
 	}
 	return ""
 }
 
-func (x *ResourceDag_Edge) GetTo() string {
+func (x *ResourceDag_Edge) GetToId() string {
 	if x != nil {
-		return x.To
+		return x.ToId
 	}
 	return ""
 }
@@ -364,34 +557,58 @@ var File_crossplane_resource_proto protoreflect.FileDescriptor
 const file_crossplane_resource_proto_rawDesc = "" +
 	"\n" +
 	"\x19crossplane/resource.proto\x12\n" +
-	"crossplane\x1a\x16crossplane/types.proto\x1a\x17crossplane/yandex.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\x83\x04\n" +
+	"crossplane\x1a\x16crossplane/types.proto\x1a\x17crossplane/yandex.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xa4\x06\n" +
+	"\vResourceDef\x12)\n" +
+	"\vapi_version\x18\x02 \x01(\tB\b\xfaB\x05\x8a\x01\x02\x10\x01R\n" +
+	"apiVersion\x12\x1c\n" +
+	"\x04kind\x18\x01 \x01(\tB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04kind\x120\n" +
+	"\bmetadata\x18\x03 \x01(\v2\x14.crossplane.MetadataR\bmetadata\x12:\n" +
+	"\x04spec\x18\x04 \x01(\v2\x1c.crossplane.ResourceDef.SpecB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04spec\x1a\xdd\x04\n" +
+	"\x04Spec\x12]\n" +
+	"\x1ewrite_connection_secret_to_ref\x18\x01 \x01(\v2\x0f.crossplane.RefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x1awriteConnectionSecretToRef\x120\n" +
+	"\x0fdeletion_policy\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x0edeletionPolicy\x12c\n" +
+	"\x13provider_config_ref\x18\x03 \x03(\v23.crossplane.ResourceDef.Spec.ProviderConfigRefEntryR\x11providerConfigRef\x12N\n" +
+	"\x0fyandex_cloud_vm\x18d \x01(\v2\x1a.crossplane.YandexCloud.VmB\b\xfaB\x05\x8a\x01\x02\x10\x01H\x00R\ryandexCloudVm\x12]\n" +
+	"\x14yandex_cloud_network\x18e \x01(\v2\x1f.crossplane.YandexCloud.NetworkB\b\xfaB\x05\x8a\x01\x02\x10\x01H\x00R\x12yandexCloudNetwork\x12Z\n" +
+	"\x13yandex_cloud_subnet\x18f \x01(\v2\x1e.crossplane.YandexCloud.SubnetB\b\xfaB\x05\x8a\x01\x02\x10\x01H\x00R\x11yandexCloudSubnet\x1aD\n" +
+	"\x16ProviderConfigRefEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0e\n" +
+	"\ffor_provider\"\xa6\x05\n" +
 	"\bResource\x123\n" +
-	"\x03ref\x18\x01 \x01(\v2\x12.crossplane.ExtRefB\r\xca>\x02H\x01\xfaB\x05\x8a\x01\x02\x10\x01R\x03ref\x12,\n" +
-	"\rresource_yaml\x18\x03 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\fresourceYaml\x12=\n" +
-	"\x06status\x18\x04 \x01(\x0e2\x1b.crossplane.Resource.StatusB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06status\x12\x16\n" +
-	"\x06synced\x18\x05 \x01(\bR\x06synced\x12\x14\n" +
-	"\x05ready\x18\x06 \x01(\bR\x05ready\x12\x1f\n" +
-	"\vexternal_id\x18\a \x01(\tR\n" +
-	"externalId\x12j\n" +
-	"\x19yandex_cloud_resource_def\x18d \x01(\v2#.crossplane.YandexCloud.ResourceDefB\b\xfaB\x05\x8a\x01\x02\x10\x01H\x00R\x16yandexCloudResourceDef\"\x89\x01\n" +
+	"\x03ref\x18\x01 \x01(\v2\x12.crossplane.ExtRefB\r\xca>\x02H\x01\xfaB\x05\x8a\x01\x02\x10\x01R\x03ref\x12C\n" +
+	"\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\xfaB\x05\x8a\x01\x02\x10\x01R\tcreatedAt\x12C\n" +
+	"\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\b\xfaB\x05\x8a\x01\x02\x10\x01R\tupdatedAt\x12>\n" +
+	"\n" +
+	"deleted_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\tdeletedAt\x88\x01\x01\x12,\n" +
+	"\rresource_yaml\x18\x05 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\fresourceYaml\x12=\n" +
+	"\x06status\x18\x06 \x01(\x0e2\x1b.crossplane.Resource.StatusB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06status\x12\x16\n" +
+	"\x06synced\x18\a \x01(\bR\x06synced\x12\x14\n" +
+	"\x05ready\x18\b \x01(\bR\x05ready\x12\x1f\n" +
+	"\vexternal_id\x18\t \x01(\tR\n" +
+	"externalId\x12D\n" +
+	"\fresource_def\x18\n" +
+	" \x01(\v2\x17.crossplane.ResourceDefB\b\xfaB\x05\x8a\x01\x02\x10\x01R\vresourceDef\"\x89\x01\n" +
 	"\x06Status\x12\x16\n" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fSTATUS_CREATING\x10\x01\x12\x10\n" +
 	"\fSTATUS_READY\x10\x02\x12\x15\n" +
 	"\x11STATUS_DESTROYING\x10\x03\x12\x14\n" +
 	"\x10STATUS_DESTROYED\x10\x04\x12\x13\n" +
-	"\x0fSTATUS_DEGRADED\x10\x05B\x0e\n" +
-	"\fresource_def\"\xbd\x02\n" +
+	"\x0fSTATUS_DEGRADED\x10\x05B\r\n" +
+	"\v_deleted_at\"\xc7\x02\n" +
 	"\vResourceDag\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x02id\x12<\n" +
 	"\x05nodes\x18\x02 \x03(\v2\x1c.crossplane.ResourceDag.NodeB\b\xfaB\x05\x92\x01\x02\b\x01R\x05nodes\x12<\n" +
 	"\x05edges\x18\x03 \x03(\v2\x1c.crossplane.ResourceDag.EdgeB\b\xfaB\x05\x92\x01\x02\b\x01R\x05edges\x1a[\n" +
 	"\x04Node\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x02id\x12:\n" +
-	"\bresource\x18\x02 \x01(\v2\x14.crossplane.ResourceB\b\xfaB\x05\x8a\x01\x02\x10\x01R\bresource\x1a<\n" +
-	"\x04Edge\x12\x1b\n" +
-	"\x04from\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04from\x12\x17\n" +
-	"\x02to\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x02toBEZCgithub.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplaneb\x06proto3"
+	"\bresource\x18\x02 \x01(\v2\x14.crossplane.ResourceB\b\xfaB\x05\x8a\x01\x02\x10\x01R\bresource\x1aF\n" +
+	"\x04Edge\x12 \n" +
+	"\afrom_id\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x06fromId\x12\x1c\n" +
+	"\x05to_id\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04toIdBEZCgithub.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplaneb\x06proto3"
 
 var (
 	file_crossplane_resource_proto_rawDescOnce sync.Once
@@ -406,28 +623,46 @@ func file_crossplane_resource_proto_rawDescGZIP() []byte {
 }
 
 var file_crossplane_resource_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_crossplane_resource_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_crossplane_resource_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_crossplane_resource_proto_goTypes = []any{
-	(Resource_Status)(0),            // 0: crossplane.Resource.Status
-	(*Resource)(nil),                // 1: crossplane.Resource
-	(*ResourceDag)(nil),             // 2: crossplane.ResourceDag
-	(*ResourceDag_Node)(nil),        // 3: crossplane.ResourceDag.Node
-	(*ResourceDag_Edge)(nil),        // 4: crossplane.ResourceDag.Edge
-	(*ExtRef)(nil),                  // 5: crossplane.ExtRef
-	(*YandexCloud_ResourceDef)(nil), // 6: crossplane.YandexCloud.ResourceDef
+	(Resource_Status)(0),          // 0: crossplane.Resource.Status
+	(*ResourceDef)(nil),           // 1: crossplane.ResourceDef
+	(*Resource)(nil),              // 2: crossplane.Resource
+	(*ResourceDag)(nil),           // 3: crossplane.ResourceDag
+	(*ResourceDef_Spec)(nil),      // 4: crossplane.ResourceDef.Spec
+	nil,                           // 5: crossplane.ResourceDef.Spec.ProviderConfigRefEntry
+	(*ResourceDag_Node)(nil),      // 6: crossplane.ResourceDag.Node
+	(*ResourceDag_Edge)(nil),      // 7: crossplane.ResourceDag.Edge
+	(*Metadata)(nil),              // 8: crossplane.Metadata
+	(*ExtRef)(nil),                // 9: crossplane.ExtRef
+	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
+	(*Ref)(nil),                   // 11: crossplane.Ref
+	(*YandexCloud_Vm)(nil),        // 12: crossplane.YandexCloud.Vm
+	(*YandexCloud_Network)(nil),   // 13: crossplane.YandexCloud.Network
+	(*YandexCloud_Subnet)(nil),    // 14: crossplane.YandexCloud.Subnet
 }
 var file_crossplane_resource_proto_depIdxs = []int32{
-	5, // 0: crossplane.Resource.ref:type_name -> crossplane.ExtRef
-	0, // 1: crossplane.Resource.status:type_name -> crossplane.Resource.Status
-	6, // 2: crossplane.Resource.yandex_cloud_resource_def:type_name -> crossplane.YandexCloud.ResourceDef
-	3, // 3: crossplane.ResourceDag.nodes:type_name -> crossplane.ResourceDag.Node
-	4, // 4: crossplane.ResourceDag.edges:type_name -> crossplane.ResourceDag.Edge
-	1, // 5: crossplane.ResourceDag.Node.resource:type_name -> crossplane.Resource
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	8,  // 0: crossplane.ResourceDef.metadata:type_name -> crossplane.Metadata
+	4,  // 1: crossplane.ResourceDef.spec:type_name -> crossplane.ResourceDef.Spec
+	9,  // 2: crossplane.Resource.ref:type_name -> crossplane.ExtRef
+	10, // 3: crossplane.Resource.created_at:type_name -> google.protobuf.Timestamp
+	10, // 4: crossplane.Resource.updated_at:type_name -> google.protobuf.Timestamp
+	10, // 5: crossplane.Resource.deleted_at:type_name -> google.protobuf.Timestamp
+	0,  // 6: crossplane.Resource.status:type_name -> crossplane.Resource.Status
+	1,  // 7: crossplane.Resource.resource_def:type_name -> crossplane.ResourceDef
+	6,  // 8: crossplane.ResourceDag.nodes:type_name -> crossplane.ResourceDag.Node
+	7,  // 9: crossplane.ResourceDag.edges:type_name -> crossplane.ResourceDag.Edge
+	11, // 10: crossplane.ResourceDef.Spec.write_connection_secret_to_ref:type_name -> crossplane.Ref
+	5,  // 11: crossplane.ResourceDef.Spec.provider_config_ref:type_name -> crossplane.ResourceDef.Spec.ProviderConfigRefEntry
+	12, // 12: crossplane.ResourceDef.Spec.yandex_cloud_vm:type_name -> crossplane.YandexCloud.Vm
+	13, // 13: crossplane.ResourceDef.Spec.yandex_cloud_network:type_name -> crossplane.YandexCloud.Network
+	14, // 14: crossplane.ResourceDef.Spec.yandex_cloud_subnet:type_name -> crossplane.YandexCloud.Subnet
+	2,  // 15: crossplane.ResourceDag.Node.resource:type_name -> crossplane.Resource
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_crossplane_resource_proto_init() }
@@ -437,8 +672,11 @@ func file_crossplane_resource_proto_init() {
 	}
 	file_crossplane_types_proto_init()
 	file_crossplane_yandex_proto_init()
-	file_crossplane_resource_proto_msgTypes[0].OneofWrappers = []any{
-		(*Resource_YandexCloudResourceDef)(nil),
+	file_crossplane_resource_proto_msgTypes[1].OneofWrappers = []any{}
+	file_crossplane_resource_proto_msgTypes[3].OneofWrappers = []any{
+		(*ResourceDef_Spec_YandexCloudVm)(nil),
+		(*ResourceDef_Spec_YandexCloudNetwork)(nil),
+		(*ResourceDef_Spec_YandexCloudSubnet)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -446,7 +684,7 @@ func file_crossplane_resource_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_crossplane_resource_proto_rawDesc), len(file_crossplane_resource_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

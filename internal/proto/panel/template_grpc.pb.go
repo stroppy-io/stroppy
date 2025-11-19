@@ -20,42 +20,27 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TemplateService_ListMachineTemplatesTags_FullMethodName            = "/panel.TemplateService/ListMachineTemplatesTags"
-	TemplateService_ListMachineTemplates_FullMethodName                = "/panel.TemplateService/ListMachineTemplates"
-	TemplateService_CreateMachineTemplate_FullMethodName               = "/panel.TemplateService/CreateMachineTemplate"
-	TemplateService_UpdateMachineTemplate_FullMethodName               = "/panel.TemplateService/UpdateMachineTemplate"
-	TemplateService_DeleteMachineTemplate_FullMethodName               = "/panel.TemplateService/DeleteMachineTemplate"
-	TemplateService_ListStroppyDeploymentTemplatesTags_FullMethodName  = "/panel.TemplateService/ListStroppyDeploymentTemplatesTags"
-	TemplateService_ListStroppyDeploymentTemplates_FullMethodName      = "/panel.TemplateService/ListStroppyDeploymentTemplates"
-	TemplateService_CreateStroppyDeploymentTemplate_FullMethodName     = "/panel.TemplateService/CreateStroppyDeploymentTemplate"
-	TemplateService_UpdateStroppyDeploymentTemplate_FullMethodName     = "/panel.TemplateService/UpdateStroppyDeploymentTemplate"
-	TemplateService_DeleteStroppyDeploymentTemplate_FullMethodName     = "/panel.TemplateService/DeleteStroppyDeploymentTemplate"
-	TemplateService_ListDatabaseDeploymentTemplatesTags_FullMethodName = "/panel.TemplateService/ListDatabaseDeploymentTemplatesTags"
-	TemplateService_ListDatabaseDeploymentTemplates_FullMethodName     = "/panel.TemplateService/ListDatabaseDeploymentTemplates"
-	TemplateService_CreateDatabaseDeploymentTemplate_FullMethodName    = "/panel.TemplateService/CreateDatabaseDeploymentTemplate"
-	TemplateService_UpdateDatabaseDeploymentTemplate_FullMethodName    = "/panel.TemplateService/UpdateDatabaseDeploymentTemplate"
-	TemplateService_DeleteDatabaseDeploymentTemplate_FullMethodName    = "/panel.TemplateService/DeleteDatabaseDeploymentTemplate"
+	TemplateService_ListTemplatesTags_FullMethodName = "/panel.TemplateService/ListTemplatesTags"
+	TemplateService_SearchTemplates_FullMethodName   = "/panel.TemplateService/SearchTemplates"
+	TemplateService_GetTemplateKvs_FullMethodName    = "/panel.TemplateService/GetTemplateKvs"
+	TemplateService_GetTemplate_FullMethodName       = "/panel.TemplateService/GetTemplate"
+	TemplateService_CreateTemplate_FullMethodName    = "/panel.TemplateService/CreateTemplate"
+	TemplateService_UpdateTemplate_FullMethodName    = "/panel.TemplateService/UpdateTemplate"
+	TemplateService_DeleteTemplate_FullMethodName    = "/panel.TemplateService/DeleteTemplate"
 )
 
 // TemplateServiceClient is the client API for TemplateService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TemplateServiceClient interface {
-	ListMachineTemplatesTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Tags, error)
-	ListMachineTemplates(ctx context.Context, in *Tags_Filter, opts ...grpc.CallOption) (*MachineTemplate_List, error)
-	CreateMachineTemplate(ctx context.Context, in *MachineTemplate, opts ...grpc.CallOption) (*MachineTemplate, error)
-	UpdateMachineTemplate(ctx context.Context, in *MachineTemplate, opts ...grpc.CallOption) (*MachineTemplate, error)
-	DeleteMachineTemplate(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	ListStroppyDeploymentTemplatesTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Tags, error)
-	ListStroppyDeploymentTemplates(ctx context.Context, in *Tags_Filter, opts ...grpc.CallOption) (*StroppyDeploymentTemplate_List, error)
-	CreateStroppyDeploymentTemplate(ctx context.Context, in *StroppyDeploymentTemplate, opts ...grpc.CallOption) (*StroppyDeploymentTemplate, error)
-	UpdateStroppyDeploymentTemplate(ctx context.Context, in *StroppyDeploymentTemplate, opts ...grpc.CallOption) (*StroppyDeploymentTemplate, error)
-	DeleteStroppyDeploymentTemplate(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	ListDatabaseDeploymentTemplatesTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Tags, error)
-	ListDatabaseDeploymentTemplates(ctx context.Context, in *Tags_Filter, opts ...grpc.CallOption) (*DatabaseDeploymentTemplate_List, error)
-	CreateDatabaseDeploymentTemplate(ctx context.Context, in *DatabaseDeploymentTemplate, opts ...grpc.CallOption) (*DatabaseDeploymentTemplate, error)
-	UpdateDatabaseDeploymentTemplate(ctx context.Context, in *DatabaseDeploymentTemplate, opts ...grpc.CallOption) (*DatabaseDeploymentTemplate, error)
-	DeleteDatabaseDeploymentTemplate(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ListTemplatesTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Tag_List, error)
+	SearchTemplates(ctx context.Context, in *SearchTemplatesRequest, opts ...grpc.CallOption) (*Template_List, error)
+	GetTemplateKvs(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*KV_Map, error)
+	GetTemplate(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*Template, error)
+	// Admins only
+	CreateTemplate(ctx context.Context, in *Template, opts ...grpc.CallOption) (*Template, error)
+	UpdateTemplate(ctx context.Context, in *Template, opts ...grpc.CallOption) (*Template, error)
+	DeleteTemplate(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type templateServiceClient struct {
@@ -66,150 +51,70 @@ func NewTemplateServiceClient(cc grpc.ClientConnInterface) TemplateServiceClient
 	return &templateServiceClient{cc}
 }
 
-func (c *templateServiceClient) ListMachineTemplatesTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Tags, error) {
+func (c *templateServiceClient) ListTemplatesTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Tag_List, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Tags)
-	err := c.cc.Invoke(ctx, TemplateService_ListMachineTemplatesTags_FullMethodName, in, out, cOpts...)
+	out := new(Tag_List)
+	err := c.cc.Invoke(ctx, TemplateService_ListTemplatesTags_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *templateServiceClient) ListMachineTemplates(ctx context.Context, in *Tags_Filter, opts ...grpc.CallOption) (*MachineTemplate_List, error) {
+func (c *templateServiceClient) SearchTemplates(ctx context.Context, in *SearchTemplatesRequest, opts ...grpc.CallOption) (*Template_List, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(MachineTemplate_List)
-	err := c.cc.Invoke(ctx, TemplateService_ListMachineTemplates_FullMethodName, in, out, cOpts...)
+	out := new(Template_List)
+	err := c.cc.Invoke(ctx, TemplateService_SearchTemplates_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *templateServiceClient) CreateMachineTemplate(ctx context.Context, in *MachineTemplate, opts ...grpc.CallOption) (*MachineTemplate, error) {
+func (c *templateServiceClient) GetTemplateKvs(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*KV_Map, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(MachineTemplate)
-	err := c.cc.Invoke(ctx, TemplateService_CreateMachineTemplate_FullMethodName, in, out, cOpts...)
+	out := new(KV_Map)
+	err := c.cc.Invoke(ctx, TemplateService_GetTemplateKvs_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *templateServiceClient) UpdateMachineTemplate(ctx context.Context, in *MachineTemplate, opts ...grpc.CallOption) (*MachineTemplate, error) {
+func (c *templateServiceClient) GetTemplate(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*Template, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(MachineTemplate)
-	err := c.cc.Invoke(ctx, TemplateService_UpdateMachineTemplate_FullMethodName, in, out, cOpts...)
+	out := new(Template)
+	err := c.cc.Invoke(ctx, TemplateService_GetTemplate_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *templateServiceClient) DeleteMachineTemplate(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *templateServiceClient) CreateTemplate(ctx context.Context, in *Template, opts ...grpc.CallOption) (*Template, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Template)
+	err := c.cc.Invoke(ctx, TemplateService_CreateTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *templateServiceClient) UpdateTemplate(ctx context.Context, in *Template, opts ...grpc.CallOption) (*Template, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Template)
+	err := c.cc.Invoke(ctx, TemplateService_UpdateTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *templateServiceClient) DeleteTemplate(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, TemplateService_DeleteMachineTemplate_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *templateServiceClient) ListStroppyDeploymentTemplatesTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Tags, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Tags)
-	err := c.cc.Invoke(ctx, TemplateService_ListStroppyDeploymentTemplatesTags_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *templateServiceClient) ListStroppyDeploymentTemplates(ctx context.Context, in *Tags_Filter, opts ...grpc.CallOption) (*StroppyDeploymentTemplate_List, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StroppyDeploymentTemplate_List)
-	err := c.cc.Invoke(ctx, TemplateService_ListStroppyDeploymentTemplates_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *templateServiceClient) CreateStroppyDeploymentTemplate(ctx context.Context, in *StroppyDeploymentTemplate, opts ...grpc.CallOption) (*StroppyDeploymentTemplate, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StroppyDeploymentTemplate)
-	err := c.cc.Invoke(ctx, TemplateService_CreateStroppyDeploymentTemplate_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *templateServiceClient) UpdateStroppyDeploymentTemplate(ctx context.Context, in *StroppyDeploymentTemplate, opts ...grpc.CallOption) (*StroppyDeploymentTemplate, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StroppyDeploymentTemplate)
-	err := c.cc.Invoke(ctx, TemplateService_UpdateStroppyDeploymentTemplate_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *templateServiceClient) DeleteStroppyDeploymentTemplate(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, TemplateService_DeleteStroppyDeploymentTemplate_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *templateServiceClient) ListDatabaseDeploymentTemplatesTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Tags, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Tags)
-	err := c.cc.Invoke(ctx, TemplateService_ListDatabaseDeploymentTemplatesTags_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *templateServiceClient) ListDatabaseDeploymentTemplates(ctx context.Context, in *Tags_Filter, opts ...grpc.CallOption) (*DatabaseDeploymentTemplate_List, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DatabaseDeploymentTemplate_List)
-	err := c.cc.Invoke(ctx, TemplateService_ListDatabaseDeploymentTemplates_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *templateServiceClient) CreateDatabaseDeploymentTemplate(ctx context.Context, in *DatabaseDeploymentTemplate, opts ...grpc.CallOption) (*DatabaseDeploymentTemplate, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DatabaseDeploymentTemplate)
-	err := c.cc.Invoke(ctx, TemplateService_CreateDatabaseDeploymentTemplate_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *templateServiceClient) UpdateDatabaseDeploymentTemplate(ctx context.Context, in *DatabaseDeploymentTemplate, opts ...grpc.CallOption) (*DatabaseDeploymentTemplate, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DatabaseDeploymentTemplate)
-	err := c.cc.Invoke(ctx, TemplateService_UpdateDatabaseDeploymentTemplate_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *templateServiceClient) DeleteDatabaseDeploymentTemplate(ctx context.Context, in *Ulid, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, TemplateService_DeleteDatabaseDeploymentTemplate_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, TemplateService_DeleteTemplate_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -220,21 +125,14 @@ func (c *templateServiceClient) DeleteDatabaseDeploymentTemplate(ctx context.Con
 // All implementations must embed UnimplementedTemplateServiceServer
 // for forward compatibility.
 type TemplateServiceServer interface {
-	ListMachineTemplatesTags(context.Context, *emptypb.Empty) (*Tags, error)
-	ListMachineTemplates(context.Context, *Tags_Filter) (*MachineTemplate_List, error)
-	CreateMachineTemplate(context.Context, *MachineTemplate) (*MachineTemplate, error)
-	UpdateMachineTemplate(context.Context, *MachineTemplate) (*MachineTemplate, error)
-	DeleteMachineTemplate(context.Context, *Ulid) (*emptypb.Empty, error)
-	ListStroppyDeploymentTemplatesTags(context.Context, *emptypb.Empty) (*Tags, error)
-	ListStroppyDeploymentTemplates(context.Context, *Tags_Filter) (*StroppyDeploymentTemplate_List, error)
-	CreateStroppyDeploymentTemplate(context.Context, *StroppyDeploymentTemplate) (*StroppyDeploymentTemplate, error)
-	UpdateStroppyDeploymentTemplate(context.Context, *StroppyDeploymentTemplate) (*StroppyDeploymentTemplate, error)
-	DeleteStroppyDeploymentTemplate(context.Context, *Ulid) (*emptypb.Empty, error)
-	ListDatabaseDeploymentTemplatesTags(context.Context, *emptypb.Empty) (*Tags, error)
-	ListDatabaseDeploymentTemplates(context.Context, *Tags_Filter) (*DatabaseDeploymentTemplate_List, error)
-	CreateDatabaseDeploymentTemplate(context.Context, *DatabaseDeploymentTemplate) (*DatabaseDeploymentTemplate, error)
-	UpdateDatabaseDeploymentTemplate(context.Context, *DatabaseDeploymentTemplate) (*DatabaseDeploymentTemplate, error)
-	DeleteDatabaseDeploymentTemplate(context.Context, *Ulid) (*emptypb.Empty, error)
+	ListTemplatesTags(context.Context, *emptypb.Empty) (*Tag_List, error)
+	SearchTemplates(context.Context, *SearchTemplatesRequest) (*Template_List, error)
+	GetTemplateKvs(context.Context, *Ulid) (*KV_Map, error)
+	GetTemplate(context.Context, *Ulid) (*Template, error)
+	// Admins only
+	CreateTemplate(context.Context, *Template) (*Template, error)
+	UpdateTemplate(context.Context, *Template) (*Template, error)
+	DeleteTemplate(context.Context, *Ulid) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTemplateServiceServer()
 }
 
@@ -245,50 +143,26 @@ type TemplateServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedTemplateServiceServer struct{}
 
-func (UnimplementedTemplateServiceServer) ListMachineTemplatesTags(context.Context, *emptypb.Empty) (*Tags, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListMachineTemplatesTags not implemented")
+func (UnimplementedTemplateServiceServer) ListTemplatesTags(context.Context, *emptypb.Empty) (*Tag_List, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListTemplatesTags not implemented")
 }
-func (UnimplementedTemplateServiceServer) ListMachineTemplates(context.Context, *Tags_Filter) (*MachineTemplate_List, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListMachineTemplates not implemented")
+func (UnimplementedTemplateServiceServer) SearchTemplates(context.Context, *SearchTemplatesRequest) (*Template_List, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SearchTemplates not implemented")
 }
-func (UnimplementedTemplateServiceServer) CreateMachineTemplate(context.Context, *MachineTemplate) (*MachineTemplate, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateMachineTemplate not implemented")
+func (UnimplementedTemplateServiceServer) GetTemplateKvs(context.Context, *Ulid) (*KV_Map, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTemplateKvs not implemented")
 }
-func (UnimplementedTemplateServiceServer) UpdateMachineTemplate(context.Context, *MachineTemplate) (*MachineTemplate, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateMachineTemplate not implemented")
+func (UnimplementedTemplateServiceServer) GetTemplate(context.Context, *Ulid) (*Template, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTemplate not implemented")
 }
-func (UnimplementedTemplateServiceServer) DeleteMachineTemplate(context.Context, *Ulid) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteMachineTemplate not implemented")
+func (UnimplementedTemplateServiceServer) CreateTemplate(context.Context, *Template) (*Template, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateTemplate not implemented")
 }
-func (UnimplementedTemplateServiceServer) ListStroppyDeploymentTemplatesTags(context.Context, *emptypb.Empty) (*Tags, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListStroppyDeploymentTemplatesTags not implemented")
+func (UnimplementedTemplateServiceServer) UpdateTemplate(context.Context, *Template) (*Template, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateTemplate not implemented")
 }
-func (UnimplementedTemplateServiceServer) ListStroppyDeploymentTemplates(context.Context, *Tags_Filter) (*StroppyDeploymentTemplate_List, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListStroppyDeploymentTemplates not implemented")
-}
-func (UnimplementedTemplateServiceServer) CreateStroppyDeploymentTemplate(context.Context, *StroppyDeploymentTemplate) (*StroppyDeploymentTemplate, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateStroppyDeploymentTemplate not implemented")
-}
-func (UnimplementedTemplateServiceServer) UpdateStroppyDeploymentTemplate(context.Context, *StroppyDeploymentTemplate) (*StroppyDeploymentTemplate, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateStroppyDeploymentTemplate not implemented")
-}
-func (UnimplementedTemplateServiceServer) DeleteStroppyDeploymentTemplate(context.Context, *Ulid) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteStroppyDeploymentTemplate not implemented")
-}
-func (UnimplementedTemplateServiceServer) ListDatabaseDeploymentTemplatesTags(context.Context, *emptypb.Empty) (*Tags, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListDatabaseDeploymentTemplatesTags not implemented")
-}
-func (UnimplementedTemplateServiceServer) ListDatabaseDeploymentTemplates(context.Context, *Tags_Filter) (*DatabaseDeploymentTemplate_List, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListDatabaseDeploymentTemplates not implemented")
-}
-func (UnimplementedTemplateServiceServer) CreateDatabaseDeploymentTemplate(context.Context, *DatabaseDeploymentTemplate) (*DatabaseDeploymentTemplate, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateDatabaseDeploymentTemplate not implemented")
-}
-func (UnimplementedTemplateServiceServer) UpdateDatabaseDeploymentTemplate(context.Context, *DatabaseDeploymentTemplate) (*DatabaseDeploymentTemplate, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateDatabaseDeploymentTemplate not implemented")
-}
-func (UnimplementedTemplateServiceServer) DeleteDatabaseDeploymentTemplate(context.Context, *Ulid) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteDatabaseDeploymentTemplate not implemented")
+func (UnimplementedTemplateServiceServer) DeleteTemplate(context.Context, *Ulid) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteTemplate not implemented")
 }
 func (UnimplementedTemplateServiceServer) mustEmbedUnimplementedTemplateServiceServer() {}
 func (UnimplementedTemplateServiceServer) testEmbeddedByValue()                         {}
@@ -311,272 +185,128 @@ func RegisterTemplateServiceServer(s grpc.ServiceRegistrar, srv TemplateServiceS
 	s.RegisterService(&TemplateService_ServiceDesc, srv)
 }
 
-func _TemplateService_ListMachineTemplatesTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TemplateService_ListTemplatesTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TemplateServiceServer).ListMachineTemplatesTags(ctx, in)
+		return srv.(TemplateServiceServer).ListTemplatesTags(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: TemplateService_ListMachineTemplatesTags_FullMethodName,
+		FullMethod: TemplateService_ListTemplatesTags_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).ListMachineTemplatesTags(ctx, req.(*emptypb.Empty))
+		return srv.(TemplateServiceServer).ListTemplatesTags(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _TemplateService_ListMachineTemplates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Tags_Filter)
+func _TemplateService_SearchTemplates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchTemplatesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TemplateServiceServer).ListMachineTemplates(ctx, in)
+		return srv.(TemplateServiceServer).SearchTemplates(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: TemplateService_ListMachineTemplates_FullMethodName,
+		FullMethod: TemplateService_SearchTemplates_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).ListMachineTemplates(ctx, req.(*Tags_Filter))
+		return srv.(TemplateServiceServer).SearchTemplates(ctx, req.(*SearchTemplatesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _TemplateService_CreateMachineTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(MachineTemplate)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TemplateServiceServer).CreateMachineTemplate(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TemplateService_CreateMachineTemplate_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).CreateMachineTemplate(ctx, req.(*MachineTemplate))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TemplateService_UpdateMachineTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(MachineTemplate)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TemplateServiceServer).UpdateMachineTemplate(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TemplateService_UpdateMachineTemplate_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).UpdateMachineTemplate(ctx, req.(*MachineTemplate))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TemplateService_DeleteMachineTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TemplateService_GetTemplateKvs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Ulid)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TemplateServiceServer).DeleteMachineTemplate(ctx, in)
+		return srv.(TemplateServiceServer).GetTemplateKvs(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: TemplateService_DeleteMachineTemplate_FullMethodName,
+		FullMethod: TemplateService_GetTemplateKvs_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).DeleteMachineTemplate(ctx, req.(*Ulid))
+		return srv.(TemplateServiceServer).GetTemplateKvs(ctx, req.(*Ulid))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _TemplateService_ListStroppyDeploymentTemplatesTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TemplateServiceServer).ListStroppyDeploymentTemplatesTags(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TemplateService_ListStroppyDeploymentTemplatesTags_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).ListStroppyDeploymentTemplatesTags(ctx, req.(*emptypb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TemplateService_ListStroppyDeploymentTemplates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Tags_Filter)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TemplateServiceServer).ListStroppyDeploymentTemplates(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TemplateService_ListStroppyDeploymentTemplates_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).ListStroppyDeploymentTemplates(ctx, req.(*Tags_Filter))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TemplateService_CreateStroppyDeploymentTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StroppyDeploymentTemplate)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TemplateServiceServer).CreateStroppyDeploymentTemplate(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TemplateService_CreateStroppyDeploymentTemplate_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).CreateStroppyDeploymentTemplate(ctx, req.(*StroppyDeploymentTemplate))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TemplateService_UpdateStroppyDeploymentTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StroppyDeploymentTemplate)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TemplateServiceServer).UpdateStroppyDeploymentTemplate(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TemplateService_UpdateStroppyDeploymentTemplate_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).UpdateStroppyDeploymentTemplate(ctx, req.(*StroppyDeploymentTemplate))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TemplateService_DeleteStroppyDeploymentTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TemplateService_GetTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Ulid)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TemplateServiceServer).DeleteStroppyDeploymentTemplate(ctx, in)
+		return srv.(TemplateServiceServer).GetTemplate(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: TemplateService_DeleteStroppyDeploymentTemplate_FullMethodName,
+		FullMethod: TemplateService_GetTemplate_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).DeleteStroppyDeploymentTemplate(ctx, req.(*Ulid))
+		return srv.(TemplateServiceServer).GetTemplate(ctx, req.(*Ulid))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _TemplateService_ListDatabaseDeploymentTemplatesTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+func _TemplateService_CreateTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Template)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TemplateServiceServer).ListDatabaseDeploymentTemplatesTags(ctx, in)
+		return srv.(TemplateServiceServer).CreateTemplate(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: TemplateService_ListDatabaseDeploymentTemplatesTags_FullMethodName,
+		FullMethod: TemplateService_CreateTemplate_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).ListDatabaseDeploymentTemplatesTags(ctx, req.(*emptypb.Empty))
+		return srv.(TemplateServiceServer).CreateTemplate(ctx, req.(*Template))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _TemplateService_ListDatabaseDeploymentTemplates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Tags_Filter)
+func _TemplateService_UpdateTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Template)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TemplateServiceServer).ListDatabaseDeploymentTemplates(ctx, in)
+		return srv.(TemplateServiceServer).UpdateTemplate(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: TemplateService_ListDatabaseDeploymentTemplates_FullMethodName,
+		FullMethod: TemplateService_UpdateTemplate_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).ListDatabaseDeploymentTemplates(ctx, req.(*Tags_Filter))
+		return srv.(TemplateServiceServer).UpdateTemplate(ctx, req.(*Template))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _TemplateService_CreateDatabaseDeploymentTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DatabaseDeploymentTemplate)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TemplateServiceServer).CreateDatabaseDeploymentTemplate(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TemplateService_CreateDatabaseDeploymentTemplate_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).CreateDatabaseDeploymentTemplate(ctx, req.(*DatabaseDeploymentTemplate))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TemplateService_UpdateDatabaseDeploymentTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DatabaseDeploymentTemplate)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TemplateServiceServer).UpdateDatabaseDeploymentTemplate(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TemplateService_UpdateDatabaseDeploymentTemplate_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).UpdateDatabaseDeploymentTemplate(ctx, req.(*DatabaseDeploymentTemplate))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TemplateService_DeleteDatabaseDeploymentTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TemplateService_DeleteTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Ulid)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TemplateServiceServer).DeleteDatabaseDeploymentTemplate(ctx, in)
+		return srv.(TemplateServiceServer).DeleteTemplate(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: TemplateService_DeleteDatabaseDeploymentTemplate_FullMethodName,
+		FullMethod: TemplateService_DeleteTemplate_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TemplateServiceServer).DeleteDatabaseDeploymentTemplate(ctx, req.(*Ulid))
+		return srv.(TemplateServiceServer).DeleteTemplate(ctx, req.(*Ulid))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -589,64 +319,32 @@ var TemplateService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*TemplateServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "ListMachineTemplatesTags",
-			Handler:    _TemplateService_ListMachineTemplatesTags_Handler,
+			MethodName: "ListTemplatesTags",
+			Handler:    _TemplateService_ListTemplatesTags_Handler,
 		},
 		{
-			MethodName: "ListMachineTemplates",
-			Handler:    _TemplateService_ListMachineTemplates_Handler,
+			MethodName: "SearchTemplates",
+			Handler:    _TemplateService_SearchTemplates_Handler,
 		},
 		{
-			MethodName: "CreateMachineTemplate",
-			Handler:    _TemplateService_CreateMachineTemplate_Handler,
+			MethodName: "GetTemplateKvs",
+			Handler:    _TemplateService_GetTemplateKvs_Handler,
 		},
 		{
-			MethodName: "UpdateMachineTemplate",
-			Handler:    _TemplateService_UpdateMachineTemplate_Handler,
+			MethodName: "GetTemplate",
+			Handler:    _TemplateService_GetTemplate_Handler,
 		},
 		{
-			MethodName: "DeleteMachineTemplate",
-			Handler:    _TemplateService_DeleteMachineTemplate_Handler,
+			MethodName: "CreateTemplate",
+			Handler:    _TemplateService_CreateTemplate_Handler,
 		},
 		{
-			MethodName: "ListStroppyDeploymentTemplatesTags",
-			Handler:    _TemplateService_ListStroppyDeploymentTemplatesTags_Handler,
+			MethodName: "UpdateTemplate",
+			Handler:    _TemplateService_UpdateTemplate_Handler,
 		},
 		{
-			MethodName: "ListStroppyDeploymentTemplates",
-			Handler:    _TemplateService_ListStroppyDeploymentTemplates_Handler,
-		},
-		{
-			MethodName: "CreateStroppyDeploymentTemplate",
-			Handler:    _TemplateService_CreateStroppyDeploymentTemplate_Handler,
-		},
-		{
-			MethodName: "UpdateStroppyDeploymentTemplate",
-			Handler:    _TemplateService_UpdateStroppyDeploymentTemplate_Handler,
-		},
-		{
-			MethodName: "DeleteStroppyDeploymentTemplate",
-			Handler:    _TemplateService_DeleteStroppyDeploymentTemplate_Handler,
-		},
-		{
-			MethodName: "ListDatabaseDeploymentTemplatesTags",
-			Handler:    _TemplateService_ListDatabaseDeploymentTemplatesTags_Handler,
-		},
-		{
-			MethodName: "ListDatabaseDeploymentTemplates",
-			Handler:    _TemplateService_ListDatabaseDeploymentTemplates_Handler,
-		},
-		{
-			MethodName: "CreateDatabaseDeploymentTemplate",
-			Handler:    _TemplateService_CreateDatabaseDeploymentTemplate_Handler,
-		},
-		{
-			MethodName: "UpdateDatabaseDeploymentTemplate",
-			Handler:    _TemplateService_UpdateDatabaseDeploymentTemplate_Handler,
-		},
-		{
-			MethodName: "DeleteDatabaseDeploymentTemplate",
-			Handler:    _TemplateService_DeleteDatabaseDeploymentTemplate_Handler,
+			MethodName: "DeleteTemplate",
+			Handler:    _TemplateService_DeleteTemplate_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

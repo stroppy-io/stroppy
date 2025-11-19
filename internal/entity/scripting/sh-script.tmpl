@@ -1,0 +1,10 @@
+{{- /*gotype: github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane.Deployment_Strategy_Scripting*/ -}}
+#!/bin/bash
+cd "{{ .GetWorkdir }}"
+{{- range .GetFilesToWrite }}
+echo "Writing file {{ .GetPath }}"
+echo "{{ base64Encode .GetContent }}" | base64 -d > {{ .GetPath }}
+{{- end }}
+{{- if .Cmd }}
+{{ .Cmd }}
+{{- end }}

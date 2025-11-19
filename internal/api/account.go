@@ -108,7 +108,10 @@ func (p *PanelService) Login(
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
-			err = p.usersRepo.Exec(ctx, orm.User.Update().Set(orm.User.RefreshTokens.Set(append(acc.RefreshTokens, refresh))))
+			err = p.refreshTokensRepo.Insert(ctx, &panel.RefreshTokens{
+				UserId: acc.Id,
+				Token:  refresh,
+			})
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
@@ -126,8 +129,9 @@ func (p *PanelService) RefreshTokens(
 ) (*panel.RefreshTokensResponse, error) {
 	return postgres.WithSerializableRet(ctx, p.txManager,
 		func(ctx context.Context) (*panel.RefreshTokensResponse, error) {
-			acc, err := p.usersRepo.ScannerRepository().GetBy(ctx,
-				orm.User.SelectAll().Where(orm.User.Raw("refresh_tokens @> ARRAY[?]", request.RefreshToken)),
+			refreshToken, err := p.refreshTokensRepo.GetBy(ctx,
+				orm.RefreshTokens.SelectAll().
+					Where(orm.RefreshTokens.Token.Eq(request.RefreshToken)),
 			)
 			if err != nil {
 				if sqlerr.IsNotFound(err) {
@@ -135,17 +139,14 @@ func (p *PanelService) RefreshTokens(
 				}
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
-			removedTokens := make([]string, 0)
-			for _, tk := range acc.RefreshTokens {
-				if tk != request.RefreshToken {
-					removedTokens = append(removedTokens, tk)
-				}
-			}
-			err = p.usersRepo.Exec(
-				ctx,
-				orm.User.Update().Set(orm.User.RefreshTokens.Set(removedTokens)).Where(orm.User.Id.Eq(acc.Id)),
+
+			acc, err := p.usersRepo.ScannerRepository().GetBy(ctx,
+				orm.User.SelectAll().Where(orm.User.Id.Eq(refreshToken.GetUserId().GetId())),
 			)
 			if err != nil {
+				if sqlerr.IsNotFound(err) {
+					return nil, connect.NewError(connect.CodeNotFound, errors.New("refresh token not found"))
+				}
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
 			claim, err := token.AccountToTokenClaims[claims.Claims](&claims.Claims{

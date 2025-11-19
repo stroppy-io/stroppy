@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package panel;
 
+import "crossplane/types.proto";
 import "panel/template.proto";
 import "panel/types.proto";
 import "proto/stroppy/cloud.proto";
@@ -10,6 +11,36 @@ import "validate/validate.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
 
+
+message CloudRunParams {
+    message MachineInstanceParams {
+        Template machine_deployment_template = 1;
+        crossplane.SshUser ssh_user = 2 [(sql.sql_field).embedded_message = true];
+        bool public_ip = 3;
+    }
+    message StroppyInstanceParams {
+        // now support only YandexCloud
+        crossplane.SupportedCloud supported_cloud = 1 [(validate.rules).enum.defined_only = true];
+
+        // now support only single node
+        MachineInstanceParams machine_instance = 3;
+        Template stroppy_deployment_template = 2;
+        KV.Map override_kv = 4 [(sql.sql_field).serialized_message = true];
+    }
+    message DatabaseInstanceParams {
+        // now support only YandexCloud
+        crossplane.SupportedCloud supported_cloud = 1 [(validate.rules).enum.defined_only = true];
+
+        // now support only single node
+        Template database_deployment_template = 2;
+        MachineInstanceParams machine_instance = 3;
+    }
+
+
+    StroppyInstanceParams stroppy_instance_template = 2 [(sql.sql_field).serialized_message = true];
+    // if not present, it means that database deployed outside of cloud
+    optional DatabaseInstanceParams database_instance_template = 3 [(sql.sql_field).serialized_message = true];
+}
 
 message RunRecord {
     option (sql.sql_table) = {
@@ -42,12 +73,10 @@ message RunRecord {
     optional Ulid workflow_id = 8 [
         (sql.sql_field) = {
             sql_type: {type: TEXT,user_cast: true}
-            constraints: {constraint: "NOT NULL REFERENCES workflows(id) ON DELETE CASCADE"}
         }
     ];
     // its optional cause stroppy can send RunRecord without deployment anything
-    optional DatabaseInstanceTemplate database_instance_template = 9 [(sql.sql_field).serialized_message = true];
-    optional StroppyInstanceTemplate stroppy_deployment_info = 10 [(sql.sql_field).serialized_message = true];
+    optional CloudRunParams cloud_run_params = 9 [(sql.sql_field).serialized_message = true];
 
     repeated RunRecordStep steps = 11 [(sql.sql_relation).one_to_many = {
         ref_name: "run_id"
@@ -83,20 +112,17 @@ message RunRecordStep {
 message ListRunsRequest {
     optional int32 limit = 1;
     optional int32 offset = 2;
+    string id = 7;
     bool only_mine = 10;
     optional stroppy.Status status = 3; // sort by status
-    Tags.Filter stroppy_tags = 4;
-    Tags.Filter database_tags = 5;
-}
-
-message RunStroppyInCloudRequest {
-    DatabaseInstanceTemplate database_instance_template = 1 [(sql.sql_field).serialized_message = true];
-    StroppyInstanceTemplate stroppy_instance_template = 2 [(sql.sql_field).serialized_message = true];
+    Tag.List stroppy_tags = 4;
+    Tag.List database_tags = 5;
+    // order
+    Tps.Order tps_order = 6;
 }
 
 service RunService {
     rpc ListRuns (ListRunsRequest) returns (RunRecord.List);
-    rpc ListTopRuns (ListRunsRequest) returns (RunRecord.List);
-    rpc RunStroppyInCloud (RunStroppyInCloudRequest) returns (RunRecord);
+    rpc RunStroppyInCloud (CloudRunParams) returns (RunRecord);
 }
 
