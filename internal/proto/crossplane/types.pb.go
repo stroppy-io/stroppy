@@ -333,6 +333,50 @@ func (x *Metadata) GetAnnotations() map[string]string {
 	return nil
 }
 
+type Ip struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         string                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Ip) Reset() {
+	*x = Ip{}
+	mi := &file_crossplane_types_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Ip) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Ip) ProtoMessage() {}
+
+func (x *Ip) ProtoReflect() protoreflect.Message {
+	mi := &file_crossplane_types_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Ip.ProtoReflect.Descriptor instead.
+func (*Ip) Descriptor() ([]byte, []int) {
+	return file_crossplane_types_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Ip) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
 type SshUser struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -343,7 +387,7 @@ type SshUser struct {
 
 func (x *SshUser) Reset() {
 	*x = SshUser{}
-	mi := &file_crossplane_types_proto_msgTypes[4]
+	mi := &file_crossplane_types_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -355,7 +399,7 @@ func (x *SshUser) String() string {
 func (*SshUser) ProtoMessage() {}
 
 func (x *SshUser) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_types_proto_msgTypes[4]
+	mi := &file_crossplane_types_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -368,7 +412,7 @@ func (x *SshUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SshUser.ProtoReflect.Descriptor instead.
 func (*SshUser) Descriptor() ([]byte, []int) {
-	return file_crossplane_types_proto_rawDescGZIP(), []int{4}
+	return file_crossplane_types_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SshUser) GetName() string {
@@ -395,7 +439,7 @@ type FsFile struct {
 
 func (x *FsFile) Reset() {
 	*x = FsFile{}
-	mi := &file_crossplane_types_proto_msgTypes[5]
+	mi := &file_crossplane_types_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -407,7 +451,7 @@ func (x *FsFile) String() string {
 func (*FsFile) ProtoMessage() {}
 
 func (x *FsFile) ProtoReflect() protoreflect.Message {
-	mi := &file_crossplane_types_proto_msgTypes[5]
+	mi := &file_crossplane_types_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -420,7 +464,7 @@ func (x *FsFile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FsFile.ProtoReflect.Descriptor instead.
 func (*FsFile) Descriptor() ([]byte, []int) {
-	return file_crossplane_types_proto_rawDescGZIP(), []int{5}
+	return file_crossplane_types_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *FsFile) GetPath() string {
@@ -459,7 +503,9 @@ const file_crossplane_types_proto_rawDesc = "" +
 	"\vannotations\x18\x03 \x03(\v2%.crossplane.Metadata.AnnotationsEntryR\vannotations\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"`\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"#\n" +
+	"\x02Ip\x12\x1d\n" +
+	"\x05value\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x05value\"`\n" +
 	"\aSshUser\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x128\n" +
 	"\x13ssh_authorized_keys\x18\x02 \x03(\tB\b\xfaB\x05\x92\x01\x02\b\x01R\x11sshAuthorizedKeys\"H\n" +
@@ -489,7 +535,7 @@ func file_crossplane_types_proto_rawDescGZIP() []byte {
 }
 
 var file_crossplane_types_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_crossplane_types_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_crossplane_types_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_crossplane_types_proto_goTypes = []any{
 	(SupportedCloud)(0),           // 0: crossplane.SupportedCloud
 	(CrossplaneDeletionPolicy)(0), // 1: crossplane.CrossplaneDeletionPolicy
@@ -497,13 +543,14 @@ var file_crossplane_types_proto_goTypes = []any{
 	(*Ref)(nil),                   // 3: crossplane.Ref
 	(*ExtRef)(nil),                // 4: crossplane.ExtRef
 	(*Metadata)(nil),              // 5: crossplane.Metadata
-	(*SshUser)(nil),               // 6: crossplane.SshUser
-	(*FsFile)(nil),                // 7: crossplane.FsFile
-	nil,                           // 8: crossplane.Metadata.AnnotationsEntry
+	(*Ip)(nil),                    // 6: crossplane.Ip
+	(*SshUser)(nil),               // 7: crossplane.SshUser
+	(*FsFile)(nil),                // 8: crossplane.FsFile
+	nil,                           // 9: crossplane.Metadata.AnnotationsEntry
 }
 var file_crossplane_types_proto_depIdxs = []int32{
 	3, // 0: crossplane.ExtRef.ref:type_name -> crossplane.Ref
-	8, // 1: crossplane.Metadata.annotations:type_name -> crossplane.Metadata.AnnotationsEntry
+	9, // 1: crossplane.Metadata.annotations:type_name -> crossplane.Metadata.AnnotationsEntry
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
@@ -522,7 +569,7 @@ func file_crossplane_types_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_crossplane_types_proto_rawDesc), len(file_crossplane_types_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

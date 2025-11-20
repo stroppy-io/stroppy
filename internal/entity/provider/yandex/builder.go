@@ -1,15 +1,22 @@
 package yandex
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/iancoleman/strcase"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/samber/lo"
 
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/defaults"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/ips"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/protoyaml"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/deployment"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ids"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ProviderConfig struct {
@@ -42,10 +49,15 @@ const (
 
 type CloudBuilder struct {
 	Config *ProviderConfig
+	cidr   *net.IPNet
 }
 
 func NewCloudBuilder(config *ProviderConfig) *CloudBuilder {
-	return &CloudBuilder{Config: config}
+	_, cidr, err := net.ParseCIDR(config.DefaultNetworkCidrBlock)
+	if err != nil {
+		panic("yandex.NewCloudBuilder fail parse cidr")
+	}
+	return &CloudBuilder{Config: config, cidr: cidr}
 }
 
 func defaultProviderConfigRef() map[string]string {
@@ -54,10 +66,26 @@ func defaultProviderConfigRef() map[string]string {
 	}
 }
 
+func resourceKindToString(kind crossplane.YandexCloud_ResourceKind) string {
+	return strcase.ToCamel(kind.String())
+}
+
+func (y *CloudBuilder) UsingCidr(_ context.Context) *net.IPNet {
+	return y.cidr
+}
+
+func resourceKindFromString(kind string) crossplane.YandexCloud_ResourceKind {
+	knd, ok := crossplane.YandexCloud_ResourceKind_value[strings.ToUpper(kind)]
+	if !ok {
+		panic(fmt.Sprintf(".resourceKindFromString unknown yandex cloud resource kind: %s", kind))
+	}
+	return crossplane.YandexCloud_ResourceKind(knd)
+}
+
 func (y *CloudBuilder) newNetworkDef(networkIdRef *crossplane.Ref) *crossplane.ResourceDef {
 	return &crossplane.ResourceDef{
 		ApiVersion: CloudVPCCrossplaneApiVersion,
-		Kind:       strcase.ToCamel(crossplane.YandexCloud_NETWORK.String()),
+		Kind:       resourceKindToString(crossplane.YandexCloud_NETWORK),
 		Metadata: &crossplane.Metadata{
 			Name:      networkIdRef.GetName(),
 			Namespace: networkIdRef.GetNamespace(),
@@ -83,7 +111,7 @@ func (y *CloudBuilder) newSubnetDef(
 ) *crossplane.ResourceDef {
 	return &crossplane.ResourceDef{
 		ApiVersion: CloudVPCCrossplaneApiVersion,
-		Kind:       strcase.ToCamel(crossplane.YandexCloud_SUBNET.String()),
+		Kind:       resourceKindToString(crossplane.YandexCloud_SUBNET),
 		Metadata: &crossplane.Metadata{
 			Name:      subnetIdRef.GetName(),
 			Namespace: subnetIdRef.GetNamespace(),
@@ -113,20 +141,21 @@ func (y *CloudBuilder) newVmDef(
 	ref *crossplane.Ref,
 	subnetIdRef *crossplane.Ref,
 	connectCredsRef *crossplane.Ref,
-	deployment *crossplane.Deployment_Vm,
+	vm *crossplane.Deployment_Vm,
+	assignIpAddr *crossplane.Ip,
 ) (*crossplane.ResourceDef, error) {
-	if deployment.GetInternalIp() == "" {
+	if vm.GetInternalIp().GetValue() == "" {
 		return nil, ErrEmptyInternalIp
 	}
-	vmImageId := deployment.GetStrategy().GetPrebuiltImage().GetImageId()
+	vmImageId := vm.GetStrategy().GetPrebuiltImage().GetImageId()
 	var userDataYaml *UserDataYaml
-	switch deployment.GetStrategy().GetStrategy().(type) {
+	switch vm.GetStrategy().GetStrategy().(type) {
 	case *crossplane.Deployment_Strategy_PrebuiltImage_:
-		vmImageId = deployment.GetStrategy().GetPrebuiltImage().GetImageId()
-		userDataYaml = NewUserDataWithEmptyScript(deployment.GetSshUser())
+		vmImageId = vm.GetStrategy().GetPrebuiltImage().GetImageId()
+		userDataYaml = NewUserDataWithEmptyScript(vm.GetSshUser())
 	case *crossplane.Deployment_Strategy_Scripting_:
-		vmImageId = deployment.GetStrategy().GetBaseImageId()
-		userDataYaml = NewUserDataWithScript(deployment.GetSshUser(), deployment.GetStrategy().GetScripting())
+		vmImageId = vm.GetStrategy().GetBaseImageId()
+		userDataYaml = NewUserDataWithScript(vm.GetSshUser(), vm.GetStrategy().GetScripting())
 	}
 	if vmImageId == "" {
 		return nil, fmt.Errorf("vm image id is empty")
@@ -140,7 +169,7 @@ func (y *CloudBuilder) newVmDef(
 
 	return &crossplane.ResourceDef{
 		ApiVersion: CloudComputeCrossplaneApiVersion,
-		Kind:       strcase.ToCamel(crossplane.YandexCloud_INSTANCE.String()),
+		Kind:       resourceKindToString(crossplane.YandexCloud_INSTANCE),
 		Metadata: &crossplane.Metadata{
 			Name:      ref.GetName(),
 			Namespace: ref.GetNamespace(),
@@ -156,8 +185,8 @@ func (y *CloudBuilder) newVmDef(
 					Zone:       y.Config.DefaultVmZone,
 					Resources: []*crossplane.YandexCloud_Vm_Resources{
 						{
-							Cores:  deployment.GetMachineInfo().GetCores(),
-							Memory: deployment.GetMachineInfo().GetMemory(),
+							Cores:  vm.GetMachineInfo().GetCores(),
+							Memory: vm.GetMachineInfo().GetMemory(),
 						},
 					},
 					// yaml format shit in this block
@@ -175,8 +204,8 @@ func (y *CloudBuilder) newVmDef(
 							SubnetIdRef: &crossplane.OnlyNameRef{
 								Name: subnetIdRef.GetName(),
 							},
-							Nat:       deployment.GetPublicIp(),
-							IpAddress: deployment.GetInternalIp(),
+							Nat:       vm.GetPublicIp(),
+							IpAddress: assignIpAddr.GetValue(),
 						},
 					},
 					Metadata: metadata,
@@ -205,10 +234,33 @@ func (y *CloudBuilder) marshalWithReplaceOneOffs(def *crossplane.ResourceDef) (s
 
 func (y *CloudBuilder) BuildVmResourceDag(
 	namespace string,
-	deployment *crossplane.Deployment_Vm,
-) (*crossplane.ResourceDag, error) {
+	commonId *panel.Ulid,
+	vm *crossplane.Deployment_Vm,
+) (*deployment.VmDeploymentDagWithParams, error) {
+	assignedInternalIp := &crossplane.Ip{
+		Value: defaults.StringOrDefault(
+			vm.GetInternalIp().GetValue(),
+			lo.Must(ips.RandomIP(y.cidr)).String(),
+		),
+	}
+	quotas := make([]*crossplane.Quota, 0)
+	addQuota := func(kind crossplane.Quota_Kind) {
+		quotas = append(quotas, &crossplane.Quota{
+			Cloud:   crossplane.SupportedCloud_SUPPORTED_CLOUD_YANDEX,
+			Kind:    kind,
+			Current: 1,
+		})
+	}
 	vmId := ids.NewUlid()
-	machineName := fmt.Sprintf("stroppy-cloud-vm-%s", vmId)
+
+	// __WARNING__
+	// Here we use vmId to generate unique names for vm
+	// commonId used to generate unique names for subnet only
+	// if caller of this function wants, they can set commonId to some other subnet (if they call twice)
+	subnetName := fmt.Sprintf("stroppy-cloud-subnet-%s", strings.ToLower(commonId.String()))
+	machineName := fmt.Sprintf("stroppy-cloud-vm-%s", strings.ToLower(vmId.String()))
+	// __WARNING__
+
 	saveSecretTo := &crossplane.Ref{
 		Name:      fmt.Sprintf("%s-access-secret", machineName),
 		Namespace: namespace,
@@ -218,19 +270,24 @@ func (y *CloudBuilder) BuildVmResourceDag(
 		Namespace: namespace,
 	}
 	subnetRef := &crossplane.Ref{
-		Name:      defaultSubnetName,
+		Name:      subnetName,
 		Namespace: namespace,
 	}
 	networkDef := y.newNetworkDef(networkRef)
+	//addQuota(crossplane.Quota_KIND_NETWORK) // now we use one network for all vms
 	subnetDef := y.newSubnetDef(networkRef, subnetRef)
-
+	addQuota(crossplane.Quota_KIND_SUBNET)
 	vmRef := &crossplane.Ref{
 		Name:      machineName,
 		Namespace: namespace,
 	}
-	vmDef, err := y.newVmDef(vmRef, subnetRef, saveSecretTo, deployment)
+	vmDef, err := y.newVmDef(vmRef, subnetRef, saveSecretTo, vm, assignedInternalIp)
 	if err != nil {
 		return nil, err
+	}
+	addQuota(crossplane.Quota_KIND_VM)
+	if vm.GetPublicIp() {
+		addQuota(crossplane.Quota_KIND_PUBLIC_IP_ADDRESS)
 	}
 
 	subnetId := ids.NewUlid()
@@ -247,7 +304,7 @@ func (y *CloudBuilder) BuildVmResourceDag(
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal network def: %w", err)
 	}
-	return &crossplane.ResourceDag{
+	dag := &crossplane.ResourceDag{
 		Id: ids.NewUlid().String(),
 		Nodes: []*crossplane.ResourceDag_Node{
 			{
@@ -300,5 +357,10 @@ func (y *CloudBuilder) BuildVmResourceDag(
 			{FromId: networkId.String(), ToId: subnetId.String()}, // network -> subnet
 			{FromId: subnetId.String(), ToId: vmId.String()},      // subnet -> vm
 		},
+	}
+	return &deployment.VmDeploymentDagWithParams{
+		Dag:                dag,
+		Quotas:             quotas,
+		AssignedInternalIp: assignedInternalIp,
 	}, nil
 }

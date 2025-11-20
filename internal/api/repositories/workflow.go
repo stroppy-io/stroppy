@@ -132,17 +132,27 @@ func (w *WorkflowRepo) CreateWorkflow(ctx context.Context, workflow *panel.Workf
 func (w *WorkflowRepo) ListActualTasks(
 	ctx context.Context,
 	onWorker string,
-	cleanedUp bool,
+	forCleanup bool,
 	statues []panel.WorkflowTask_Status,
 ) ([]*panel.WorkflowTask, error) {
 	statuesInt32 := lo.Map(statues, func(s panel.WorkflowTask_Status, _ int) int32 {
 		return int32(s)
 	})
-	return w.workflowTaskRepo.ListBy(ctx, orm.WorkflowTask.SelectAll().Where(
+	q := orm.WorkflowTask.SelectAll().Where(
 		orm.WorkflowTask.OnWorker.Eq(onWorker),
-		orm.WorkflowTask.CleanedUp.Eq(cleanedUp),
 		orm.WorkflowTask.Status.Any(statuesInt32...),
-	).ForUpdate())
+	).ForUpdate()
+	if forCleanup {
+		q = q.Where(orm.WorkflowTask.WorkflowId.AnyOf(
+			orm.WorkflowTask.Select(orm.WorkflowTask.WorkflowId).
+				GroupBy(orm.WorkflowTask.WorkflowId).
+				Having(orm.WorkflowTask.Raw(
+					"BOOL_AND(status IN ?)",
+					statues,
+				)),
+		))
+	}
+	return w.workflowTaskRepo.ListBy(ctx, q)
 }
 
 func (w *WorkflowRepo) SetWorkflowTaskOnWorker(

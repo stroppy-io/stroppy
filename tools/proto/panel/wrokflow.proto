@@ -4,12 +4,21 @@ package panel;
 
 import "crossplane/deployment.proto";
 import "google/protobuf/any.proto";
+import "crossplane/types.proto";
 import "panel/run.proto";
-import "panel/template.proto";
 import "panel/types.proto";
 import "protopgx/pgx.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
+
+message QuotaTable {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "quotas"
+        constraints: "UNIQUE(cloud, kind)"
+    };
+    crossplane.Quota quota = 1 [(sql.sql_field).embedded_message = true];
+}
 
 message Workflow {
     option (sql.sql_table) = {
@@ -42,24 +51,34 @@ message WorkflowTask {
     };
     message DeployDatabase {
         message Input {
-            CloudRunParams.DatabaseInstanceParams database_instance_params = 1; // input
+            // Sets in RunService.RunStroppyInCloud
+            Ulid stroppy_run_id = 1;
+            // Sets in RunService.RunStroppyInCloud from user input
+            CloudRunParams.DatabaseInstanceParams database_instance_params = 2;
         }
         message Output {
-            optional crossplane.Deployment database_deployment = 1; // output
+            crossplane.Deployment database_deployment = 2;
+            crossplane.Ip database_assigned_internal_ip = 3;
         }
     }
     message DeployStroppy {
         message Input {
-            Ulid stroppy_run_id = 1; // input
-            CloudRunParams.StroppyInstanceParams stroppy_instance_params = 2; // input
-            crossplane.Deployment database_deployment = 3; // input
+            // NOTE: Sets in RunService.RunStroppyInCloud
+            Ulid stroppy_run_id = 1;
+            // NOTE: Sets in RunService.RunStroppyInCloud from user input
+            CloudRunParams.StroppyInstanceParams stroppy_instance_params = 2;
+
+            // NOTE: this values will be set by DeployDatabase.Output task
+            crossplane.Deployment database_deployment = 3;
+            crossplane.Ip database_assigned_internal_ip = 4;
         }
         message Output {
-            optional crossplane.Deployment stroppy_deployment = 1; // output
+            crossplane.Deployment stroppy_deployment = 2; // output
         }
     }
     message CollectRunResults {
         message Input {
+            // NOTE: Sets in RunService.RunStroppyInCloud
             Ulid stroppy_run_id = 1;
         }
         message Output {}

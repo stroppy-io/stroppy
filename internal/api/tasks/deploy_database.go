@@ -12,15 +12,18 @@ import (
 
 type deployDatabaseTaskState = workflow.TaskState[*panel.WorkflowTask_DeployDatabase_Input, *panel.WorkflowTask_DeployDatabase_Output]
 type DeployDatabaseTaskHandler struct {
+	quotaRepository   QuotaRepository
 	deploymentActor   DeploymentActor
 	deploymentBuilder DeploymentBuilder
 }
 
 func NewDeployDatabaseTaskHandler(
+	quotaRepository QuotaRepository,
 	deploymentActor DeploymentActor,
 	deploymentBuilder DeploymentBuilder,
 ) *DeployDatabaseTaskHandler {
 	return &DeployDatabaseTaskHandler{
+		quotaRepository:   quotaRepository,
 		deploymentActor:   deploymentActor,
 		deploymentBuilder: deploymentBuilder,
 	}
@@ -29,31 +32,56 @@ func (d *DeployDatabaseTaskHandler) Start(
 	ctx context.Context,
 	input *panel.WorkflowTask_DeployDatabase_Input,
 ) (*panel.WorkflowTask_DeployDatabase_Output, error) {
+	if input.GetDatabaseInstanceParams().GetMachineInstance().GetPublicIp() {
+		err := checkQuotaExceeded(ctx, d.quotaRepository, &crossplane.Quota{
+			Cloud:   input.GetDatabaseInstanceParams().GetSupportedCloud(),
+			Kind:    crossplane.Quota_KIND_PUBLIC_IP_ADDRESS,
+			Current: 1,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	instanceParams := input.GetDatabaseInstanceParams()
 	instanceTemplate := instanceParams.GetDatabaseDeploymentTemplate()
 	machineTemplate := instanceTemplate.GetMachineDeployment()
 	deploymentTemplate := instanceTemplate.GetDatabaseDeployment()
-	deployment, err := d.deploymentBuilder.BuildVmDeployment(ctx,
-		instanceParams.GetSupportedCloud(),
-		&crossplane.Deployment_Vm{
-			PublicIp:    false, // NOTE: may be set outside in input
-			InternalIp:  "",    // NOTE: this value will be set by DeploymentBuilder
-			MachineInfo: machineTemplate.GetMachineInfo(),
-			Strategy: &crossplane.Deployment_Strategy{
-				Strategy: &crossplane.Deployment_Strategy_PrebuiltImage_{
-					PrebuiltImage: &crossplane.Deployment_Strategy_PrebuiltImage{
-						ImageId: deploymentTemplate.GetPrebuiltImageId(),
-					},
+	vmDeploymentData := &crossplane.Deployment_Vm{
+		PublicIp:    false,                     // NOTE: may be set outside in input
+		InternalIp:  &crossplane.Ip{Value: ""}, // NOTE: this value will be set by DeploymentBuilder randomly for vm
+		MachineInfo: machineTemplate.GetMachineInfo(),
+		SshUser:     instanceParams.GetMachineInstance().GetSshUser(),
+		Strategy: &crossplane.Deployment_Strategy{
+			Strategy: &crossplane.Deployment_Strategy_PrebuiltImage_{
+				PrebuiltImage: &crossplane.Deployment_Strategy_PrebuiltImage{
+					ImageId: deploymentTemplate.GetPrebuiltImageId(),
 				},
 			},
 		},
+	}
+	vmDeployment, err := d.deploymentBuilder.BuildVmDeployment(ctx,
+		instanceParams.GetSupportedCloud(),
+		input.GetStroppyRunId(),
+		vmDeploymentData,
 	)
-	deployment, err = d.deploymentActor.CreateDeployment(ctx, deployment)
+	if err != nil {
+		return nil, err
+	}
+	err = checkQuotasExceededOrDecrement(ctx, d.quotaRepository,
+		instanceParams.GetSupportedCloud(),
+		vmDeployment.GetUsingQuotas().GetQuotas(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	vmDeployment, err = d.deploymentActor.CreateDeployment(ctx, vmDeployment)
 	if err != nil {
 		return nil, err
 	}
 	return &panel.WorkflowTask_DeployDatabase_Output{
-		DatabaseDeployment: deployment,
+		DatabaseDeployment:         vmDeployment,
+		DatabaseAssignedInternalIp: vmDeploymentData.GetInternalIp(),
 	}, nil
 }
 
@@ -96,8 +124,12 @@ func (d *DeployDatabaseTaskHandler) Cleanup(
 	ctx context.Context,
 	state deployDatabaseTaskState,
 ) (err error) {
-	if state.GetOutput().GetDatabaseDeployment() != nil {
-		return d.deploymentActor.DestroyDeployment(ctx, state.GetOutput().GetDatabaseDeployment())
+	err = d.deploymentActor.DestroyDeployment(ctx, state.GetOutput().GetDatabaseDeployment())
+	if err != nil {
+		return err
 	}
-	return nil
+	return incrementQuotas(ctx, d.quotaRepository,
+		state.GetInput().GetDatabaseInstanceParams().GetSupportedCloud(),
+		state.GetOutput().GetDatabaseDeployment().GetUsingQuotas().GetQuotas(),
+	)
 }

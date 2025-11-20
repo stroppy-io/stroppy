@@ -41,6 +41,11 @@ func (p *PanelService) SearchTemplates(ctx context.Context, req *panel.SearchTem
 }
 
 func (p *PanelService) CreateTemplate(ctx context.Context, template *panel.Template) (*panel.Template, error) {
+	user, err := p.getUserFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	template.AuthorId = user.Id
 	template.Id = ids.NewUlid()
 	return p.templateRepo.InsertRet(ctx, template)
 }

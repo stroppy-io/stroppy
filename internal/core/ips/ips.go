@@ -1,55 +1,14 @@
 package ips
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"net"
 )
 
-func FirstFreeYandexIP(cidr string, usedIPs []string) (net.IP, error) {
-	_, ipNet, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid CIDR: %w", err)
-	}
-
-	// Normalize base
-	base := ipNet.IP.Mask(ipNet.Mask)
-	bcast := lastIP(ipNet)
-
-	// Yandex: first two usable addresses after network (.1 gateway, .2 DNS) are reserved.
-	// So start from base + 3.
-	start := cloneIP(base)
-	for i := 0; i < 3; i++ {
-		incIP(start)
-	}
-
-	// Build used set
-	used := make(map[string]struct{}, len(usedIPs))
-	for _, s := range usedIPs {
-		ip := net.ParseIP(s)
-		if ip == nil {
-			continue
-		}
-		ip = normalizeIPFamily(ip, ipNet.IP)
-		if ipNet.Contains(ip) {
-			used[ip.String()] = struct{}{}
-		}
-	}
-
-	for ip := cloneIP(start); lessOrEqual(ip, bcast); incIP(ip) {
-		if _, taken := used[ip.String()]; !taken {
-			return ip, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no free Yandex IPs in %s", cidr)
-}
-
 // FirstFreeIP returns the first free IP in cidr that is not in usedIPs.
-func FirstFreeIP(cidr string, usedIPs []string) (net.IP, error) {
-	_, ipNet, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid CIDR: %w", err)
-	}
+func FirstFreeIP(ipNet *net.IPNet, usedIPs []string) (net.IP, error) {
 
 	// Build a set of used IPs (string form).
 	used := make(map[string]struct{}, len(usedIPs))
@@ -78,7 +37,7 @@ func FirstFreeIP(cidr string, usedIPs []string) (net.IP, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("no free IPs in %s", cidr)
+	return nil, fmt.Errorf("no free IPs in %s", ipNet.String())
 }
 
 // incIP increments an IP (IPv4 or IPv6) in-place and also returns it.
@@ -117,14 +76,60 @@ func normalizeIPFamily(ip, base net.IP) net.IP {
 	return ip
 }
 
-func lessOrEqual(a, b net.IP) bool {
-	for i := range a {
-		if a[i] < b[i] {
-			return true
-		}
-		if a[i] > b[i] {
-			return false
-		}
+// RandomIP generates a random IP address within the given CIDR range.
+func RandomIP(ipNet *net.IPNet) (net.IP, error) {
+	// Calculate the number of available IPs efficiently
+	ones, bits := ipNet.Mask.Size()
+	if bits == 0 {
+		return nil, fmt.Errorf("invalid network mask")
 	}
-	return true
+
+	// Calculate host bits
+	hostBits := bits - ones
+
+	// Calculate total number of IPs in the range: 2^hostBits
+	totalIPs := new(big.Int).Lsh(big.NewInt(1), uint(hostBits))
+
+	// Exclude network and broadcast addresses (2 IPs)
+	// For /31 and /32 (IPv4) or /127 and /128 (IPv6), handle specially
+	availableIPs := new(big.Int).Sub(totalIPs, big.NewInt(2))
+
+	if availableIPs.Cmp(big.NewInt(0)) <= 0 {
+		return nil, fmt.Errorf("no available IPs in %s", ipNet.String())
+	}
+
+	// Generate random offset
+	randomOffset, err := rand.Int(rand.Reader, availableIPs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random number: %w", err)
+	}
+
+	// Start from network address
+	start := ipNet.IP.Mask(ipNet.Mask)
+
+	// Skip first IP (network address) and add random offset
+	offset := new(big.Int).Add(randomOffset, big.NewInt(1))
+
+	// Apply offset to start IP
+	ip := addBigIntToIP(cloneIP(start), offset)
+
+	return ip, nil
+}
+
+// addBigIntToIP adds a big.Int offset to an IP address
+func addBigIntToIP(ip net.IP, offset *big.Int) net.IP {
+	// Convert IP to big.Int
+	ipInt := new(big.Int).SetBytes(ip)
+
+	// Add offset
+	ipInt.Add(ipInt, offset)
+
+	// Convert back to IP
+	ipBytes := ipInt.Bytes()
+
+	// Ensure correct length (pad with zeros if needed)
+	result := make(net.IP, len(ip))
+	copy(result[len(result)-len(ipBytes):], ipBytes)
+
+	return result
 }

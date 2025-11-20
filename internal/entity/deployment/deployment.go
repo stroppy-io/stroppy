@@ -6,10 +6,21 @@ import (
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ids"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 )
 
+type VmDeploymentDagWithParams struct {
+	Dag                *crossplane.ResourceDag
+	Quotas             []*crossplane.Quota
+	AssignedInternalIp *crossplane.Ip
+}
+
 type dagBuilder interface {
-	BuildVmResourceDag(namespace string, strategy *crossplane.Deployment_Vm) (*crossplane.ResourceDag, error)
+	BuildVmResourceDag(
+		namespace string,
+		commonId *panel.Ulid,
+		vm *crossplane.Deployment_Vm,
+	) (*VmDeploymentDagWithParams, error)
 }
 
 type Builder struct {
@@ -27,25 +38,27 @@ const DefaultCrossplaneNamespace = "crossplane-system"
 var ErrUnsupportedCloud = fmt.Errorf("unsupported cloud")
 
 func (b Builder) BuildVmDeployment(
-	ctx context.Context,
+	_ context.Context,
 	cloud crossplane.SupportedCloud,
+	commonId *panel.Ulid,
 	vm *crossplane.Deployment_Vm,
 ) (*crossplane.Deployment, error) {
 	builder, ok := b.dispatchMap[cloud]
 	if !ok {
 		return nil, ErrUnsupportedCloud
 	}
-	dag, err := builder.BuildVmResourceDag(
-		DefaultCrossplaneNamespace,
-		vm,
-	)
+	dagWithQuotas, err := builder.BuildVmResourceDag(DefaultCrossplaneNamespace, commonId, vm)
 	if err != nil {
 		return nil, err
 	}
+	vm.InternalIp = dagWithQuotas.AssignedInternalIp
 	return &crossplane.Deployment{
 		Id:             ids.NewUlid().String(),
 		SupportedCloud: cloud,
-		ResourceDag:    dag,
+		ResourceDag:    dagWithQuotas.Dag,
+		UsingQuotas: &crossplane.Quota_List{
+			Quotas: dagWithQuotas.Quotas,
+		},
 		Deployment: &crossplane.Deployment_Vm_{
 			Vm: vm,
 		},

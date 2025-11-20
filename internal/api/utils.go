@@ -110,7 +110,15 @@ func NewTemplateRepository(executor sqlexec.Executor) orm.TemplateRepository {
 		dbGetter(executor),
 		ids.UlidFromString,
 		ids.UlidToStr,
+		ids.UlidFromString,
+		ids.UlidToStr,
 		deserializeTags,
 		serializeTags,
+	)
+}
+
+func NewKvTableRepository(executor sqlexec.Executor) orm.KvTableRepository {
+	return orm.NewKvTableRepository(
+		dbGetter(executor),
 	)
 }

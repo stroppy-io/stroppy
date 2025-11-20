@@ -6,7 +6,6 @@ import (
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/api"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/token"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/resource"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/httpserv"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/crossplaneservice"
 	postgres "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql"

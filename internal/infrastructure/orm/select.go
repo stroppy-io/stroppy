@@ -8,15 +8,16 @@ import (
 
 type SelectQuery[F fieldAlias] struct {
 	baseQuery[F]
-	distinct     bool
-	whereClauses []Clause[F]
-	groupBy      []F
-	orderByASC   []F
-	orderByDESC  []F
-	orderByRaw   []string
-	limit        int
-	offset       int
-	forUpdate    bool
+	distinct      bool
+	whereClauses  []Clause[F]
+	groupBy       []F
+	havingClauses []Clause[F]
+	orderByASC    []F
+	orderByDESC   []F
+	orderByRaw    []string
+	limit         int
+	offset        int
+	forUpdate     bool
 }
 
 func (q *SelectQuery[F]) Build() (string, []any) {
@@ -95,6 +96,17 @@ func (q *SelectQuery[F]) build(buf *strings.Builder, ta string, paramIndex *int,
 		}
 	}
 
+	// ---------- HAVING ----------
+	if len(q.havingClauses) > 0 {
+		buf.WriteString(" HAVING ")
+		for i, clause := range q.havingClauses {
+			if i > 0 {
+				buf.WriteString(" AND ")
+			}
+			clause.build(buf, ta, paramIndex, args)
+		}
+	}
+
 	// ---------- ORDER BY ----------
 	if len(q.orderByASC) > 0 || len(q.orderByDESC) > 0 || len(q.orderByRaw) > 0 {
 		buf.WriteString(" ORDER BY ")
@@ -168,6 +180,10 @@ func (q *SelectQuery[F]) Where(clause ...Clause[F]) *SelectQuery[F] {
 }
 func (q *SelectQuery[F]) GroupBy(fields ...F) *SelectQuery[F] {
 	q.groupBy = append(q.groupBy, fields...)
+	return q
+}
+func (q *SelectQuery[F]) Having(clause ...Clause[F]) *SelectQuery[F] {
+	q.havingClauses = append(q.havingClauses, clause...)
 	return q
 }
 func (q *SelectQuery[F]) OrderByASC(fields ...F) *SelectQuery[F] {

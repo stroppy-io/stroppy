@@ -11,7 +11,6 @@ import "validate/validate.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
 
-
 message CloudRunParams {
     message MachineInstanceParams {
         Template machine_deployment_template = 1;
@@ -23,9 +22,9 @@ message CloudRunParams {
         crossplane.SupportedCloud supported_cloud = 1 [(validate.rules).enum.defined_only = true];
 
         // now support only single node
-        MachineInstanceParams machine_instance = 3;
-        Template stroppy_deployment_template = 2;
-        KV.Map override_kv = 4 [(sql.sql_field).serialized_message = true];
+        MachineInstanceParams machine_instance = 2;
+        Template stroppy_deployment_template = 3;
+        KV.Map env_kv = 4 [(sql.sql_field).serialized_message = true];
     }
     message DatabaseInstanceParams {
         // now support only YandexCloud

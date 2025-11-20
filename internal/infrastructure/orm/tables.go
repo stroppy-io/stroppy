@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -13,10 +14,11 @@ import (
 var (
 	User          = newUserTableImpl()
 	RefreshTokens = newRefreshTokensTableImpl()
-	Kvinfo        = newKvinfoTableImpl()
 	Template      = newTemplateTableImpl()
+	KvTable       = newKvTableTableImpl()
 	RunRecord     = newRunRecordTableImpl()
 	RunRecordStep = newRunRecordStepTableImpl()
+	QuotaTable    = newQuotaTableTableImpl()
 	Workflow      = newWorkflowTableImpl()
 	WorkflowTask  = newWorkflowTaskTableImpl()
 	WorkflowEdge  = newWorkflowEdgeTableImpl()
@@ -31,13 +33,13 @@ type (
 		fieldAlias
 		mustRefreshTokensField()
 	}
-	KvinfoField interface {
-		fieldAlias
-		mustKvinfoField()
-	}
 	TemplateField interface {
 		fieldAlias
 		mustTemplateField()
+	}
+	KvTableField interface {
+		fieldAlias
+		mustKvTableField()
 	}
 	RunRecordField interface {
 		fieldAlias
@@ -46,6 +48,10 @@ type (
 	RunRecordStepField interface {
 		fieldAlias
 		mustRunRecordStepField()
+	}
+	QuotaTableField interface {
+		fieldAlias
+		mustQuotaTableField()
 	}
 	WorkflowField interface {
 		fieldAlias
@@ -93,37 +99,6 @@ func (f *refreshTokenstokenFieldImpl) mustRefreshTokensField()  {}
 func (f fieldAliasImpl) mustRefreshTokensField()                {}
 
 type (
-	kvinfoidFieldImpl        struct{ *column[string, KvinfoField] }
-	kvinfocreatedAtFieldImpl struct {
-		*column[time.Time, KvinfoField]
-	}
-	kvinfoupdatedAtFieldImpl struct {
-		*column[time.Time, KvinfoField]
-	}
-	kvinfodeletedAtFieldImpl struct {
-		*column[*time.Time, KvinfoField]
-	}
-	kvinfokeyFieldImpl             struct{ *column[string, KvinfoField] }
-	kvinfodescriptionFieldImpl     struct{ *column[string, KvinfoField] }
-	kvinfodefaultValueFieldImpl    struct{ *column[*string, KvinfoField] }
-	kvinfoisRequiredFieldImpl      struct{ *column[bool, KvinfoField] }
-	kvinfoimmutableFieldImpl       struct{ *column[bool, KvinfoField] }
-	kvinfosystemGeneratedFieldImpl struct{ *column[bool, KvinfoField] }
-)
-
-func (f *kvinfoidFieldImpl) mustKvinfoField()              {}
-func (f *kvinfocreatedAtFieldImpl) mustKvinfoField()       {}
-func (f *kvinfoupdatedAtFieldImpl) mustKvinfoField()       {}
-func (f *kvinfodeletedAtFieldImpl) mustKvinfoField()       {}
-func (f *kvinfokeyFieldImpl) mustKvinfoField()             {}
-func (f *kvinfodescriptionFieldImpl) mustKvinfoField()     {}
-func (f *kvinfodefaultValueFieldImpl) mustKvinfoField()    {}
-func (f *kvinfoisRequiredFieldImpl) mustKvinfoField()      {}
-func (f *kvinfoimmutableFieldImpl) mustKvinfoField()       {}
-func (f *kvinfosystemGeneratedFieldImpl) mustKvinfoField() {}
-func (f fieldAliasImpl) mustKvinfoField()                  {}
-
-type (
 	templateidFieldImpl        struct{ *column[string, TemplateField] }
 	templatecreatedAtFieldImpl struct {
 		*column[time.Time, TemplateField]
@@ -151,6 +126,27 @@ func (f *templateauthorIdFieldImpl) mustTemplateField()  {}
 func (f *templateisDefaultFieldImpl) mustTemplateField() {}
 func (f *templatetagsFieldImpl) mustTemplateField()      {}
 func (f fieldAliasImpl) mustTemplateField()              {}
+
+type (
+	kvTablecreatedAtFieldImpl struct {
+		*column[time.Time, KvTableField]
+	}
+	kvTableupdatedAtFieldImpl struct {
+		*column[time.Time, KvTableField]
+	}
+	kvTabledeletedAtFieldImpl struct {
+		*column[*time.Time, KvTableField]
+	}
+	kvTablekeyFieldImpl  struct{ *column[string, KvTableField] }
+	kvTableinfoFieldImpl struct{ *column[[]byte, KvTableField] }
+)
+
+func (f *kvTablecreatedAtFieldImpl) mustKvTableField() {}
+func (f *kvTableupdatedAtFieldImpl) mustKvTableField() {}
+func (f *kvTabledeletedAtFieldImpl) mustKvTableField() {}
+func (f *kvTablekeyFieldImpl) mustKvTableField()       {}
+func (f *kvTableinfoFieldImpl) mustKvTableField()      {}
+func (f fieldAliasImpl) mustKvTableField()             {}
 
 type (
 	runRecordidFieldImpl struct {
@@ -231,6 +227,27 @@ func (f *runRecordSteprunIdFieldImpl) mustRunRecordStepField()     {}
 func (f *runRecordStepstatusFieldImpl) mustRunRecordStepField()    {}
 func (f *runRecordStepstepInfoFieldImpl) mustRunRecordStepField()  {}
 func (f fieldAliasImpl) mustRunRecordStepField()                   {}
+
+type (
+	quotaTablecloudFieldImpl struct {
+		*column[int32, QuotaTableField]
+	}
+	quotaTablekindFieldImpl struct {
+		*column[int32, QuotaTableField]
+	}
+	quotaTablemaximumFieldImpl struct {
+		*column[int32, QuotaTableField]
+	}
+	quotaTablecurrentFieldImpl struct {
+		*column[int32, QuotaTableField]
+	}
+)
+
+func (f *quotaTablecloudFieldImpl) mustQuotaTableField()   {}
+func (f *quotaTablekindFieldImpl) mustQuotaTableField()    {}
+func (f *quotaTablemaximumFieldImpl) mustQuotaTableField() {}
+func (f *quotaTablecurrentFieldImpl) mustQuotaTableField() {}
+func (f fieldAliasImpl) mustQuotaTableField()              {}
 
 type (
 	workflowidFieldImpl        struct{ *column[string, WorkflowField] }
@@ -347,18 +364,6 @@ type (
 		UserId string
 		Token  string
 	}
-	KvinfoScanner struct {
-		Id              string
-		CreatedAt       time.Time
-		UpdatedAt       time.Time
-		DeletedAt       *time.Time
-		Key             string
-		Description     string
-		DefaultValue    *string
-		IsRequired      bool
-		Immutable       bool
-		SystemGenerated bool
-	}
 	TemplateScanner struct {
 		Id        string
 		CreatedAt time.Time
@@ -368,6 +373,13 @@ type (
 		AuthorId  string
 		IsDefault bool
 		Tags      []string
+	}
+	KvTableScanner struct {
+		CreatedAt time.Time
+		UpdatedAt time.Time
+		DeletedAt *time.Time
+		Key       string
+		Info      []byte
 	}
 	RunRecordScanner struct {
 		Id                  string
@@ -390,6 +402,12 @@ type (
 		RunId     string
 		Status    int32
 		StepInfo  []byte
+	}
+	QuotaTableScanner struct {
+		Cloud   int32
+		Kind    int32
+		Maximum int32
+		Current int32
 	}
 	WorkflowScanner struct {
 		Id        string
@@ -552,121 +570,6 @@ func (s *RefreshTokensScanner) getValue(field RefreshTokensField) func() any {
 		panic("unknown field: " + field.String())
 	}
 }
-func newKvinfoScanner() *KvinfoScanner {
-	return &KvinfoScanner{}
-}
-func (s *KvinfoScanner) values() []any {
-	return []any{
-		s.Id,
-		s.CreatedAt,
-		s.UpdatedAt,
-		s.DeletedAt,
-		s.Key,
-		s.Description,
-		s.DefaultValue,
-		s.IsRequired,
-		s.Immutable,
-		s.SystemGenerated,
-	}
-}
-func (s *KvinfoScanner) getTarget(field string) func() any {
-	switch field {
-	case "id":
-		return func() any { return &s.Id }
-	case "created_at":
-		return func() any { return &s.CreatedAt }
-	case "updated_at":
-		return func() any { return &s.UpdatedAt }
-	case "deleted_at":
-		return func() any { return &s.DeletedAt }
-	case "key":
-		return func() any { return &s.Key }
-	case "description":
-		return func() any { return &s.Description }
-	case "default_value":
-		return func() any { return &s.DefaultValue }
-	case "is_required":
-		return func() any { return &s.IsRequired }
-	case "immutable":
-		return func() any { return &s.Immutable }
-	case "system_generated":
-		return func() any { return &s.SystemGenerated }
-	default:
-		panic("unknown field: " + field)
-	}
-}
-func (s *KvinfoScanner) getSetter(field KvinfoField) func() ValueSetter[KvinfoField] {
-	switch field.String() {
-	case "id":
-		return func() ValueSetter[KvinfoField] {
-			return NewValueSetter[KvinfoField](Kvinfo.Id, s.Id)
-		}
-	case "created_at":
-		return func() ValueSetter[KvinfoField] {
-			return NewValueSetter[KvinfoField](Kvinfo.CreatedAt, s.CreatedAt)
-		}
-	case "updated_at":
-		return func() ValueSetter[KvinfoField] {
-			return NewValueSetter[KvinfoField](Kvinfo.UpdatedAt, s.UpdatedAt)
-		}
-	case "deleted_at":
-		return func() ValueSetter[KvinfoField] {
-			return NewValueSetter[KvinfoField](Kvinfo.DeletedAt, s.DeletedAt)
-		}
-	case "key":
-		return func() ValueSetter[KvinfoField] {
-			return NewValueSetter[KvinfoField](Kvinfo.Key, s.Key)
-		}
-	case "description":
-		return func() ValueSetter[KvinfoField] {
-			return NewValueSetter[KvinfoField](Kvinfo.Description, s.Description)
-		}
-	case "default_value":
-		return func() ValueSetter[KvinfoField] {
-			return NewValueSetter[KvinfoField](Kvinfo.DefaultValue, s.DefaultValue)
-		}
-	case "is_required":
-		return func() ValueSetter[KvinfoField] {
-			return NewValueSetter[KvinfoField](Kvinfo.IsRequired, s.IsRequired)
-		}
-	case "immutable":
-		return func() ValueSetter[KvinfoField] {
-			return NewValueSetter[KvinfoField](Kvinfo.Immutable, s.Immutable)
-		}
-	case "system_generated":
-		return func() ValueSetter[KvinfoField] {
-			return NewValueSetter[KvinfoField](Kvinfo.SystemGenerated, s.SystemGenerated)
-		}
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
-func (s *KvinfoScanner) getValue(field KvinfoField) func() any {
-	switch field.String() {
-	case "id":
-		return func() any { return s.Id }
-	case "created_at":
-		return func() any { return s.CreatedAt }
-	case "updated_at":
-		return func() any { return s.UpdatedAt }
-	case "deleted_at":
-		return func() any { return s.DeletedAt }
-	case "key":
-		return func() any { return s.Key }
-	case "description":
-		return func() any { return s.Description }
-	case "default_value":
-		return func() any { return s.DefaultValue }
-	case "is_required":
-		return func() any { return s.IsRequired }
-	case "immutable":
-		return func() any { return s.Immutable }
-	case "system_generated":
-		return func() any { return s.SystemGenerated }
-	default:
-		panic("unknown field: " + field.String())
-	}
-}
 func newTemplateScanner() *TemplateScanner {
 	return &TemplateScanner{}
 }
@@ -760,6 +663,76 @@ func (s *TemplateScanner) getValue(field TemplateField) func() any {
 		return func() any { return s.IsDefault }
 	case "tags":
 		return func() any { return s.Tags }
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func newKvTableScanner() *KvTableScanner {
+	return &KvTableScanner{}
+}
+func (s *KvTableScanner) values() []any {
+	return []any{
+		s.CreatedAt,
+		s.UpdatedAt,
+		s.DeletedAt,
+		s.Key,
+		s.Info,
+	}
+}
+func (s *KvTableScanner) getTarget(field string) func() any {
+	switch field {
+	case "created_at":
+		return func() any { return &s.CreatedAt }
+	case "updated_at":
+		return func() any { return &s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return &s.DeletedAt }
+	case "key":
+		return func() any { return &s.Key }
+	case "info":
+		return func() any { return &s.Info }
+	default:
+		panic("unknown field: " + field)
+	}
+}
+func (s *KvTableScanner) getSetter(field KvTableField) func() ValueSetter[KvTableField] {
+	switch field.String() {
+	case "created_at":
+		return func() ValueSetter[KvTableField] {
+			return NewValueSetter[KvTableField](KvTable.CreatedAt, s.CreatedAt)
+		}
+	case "updated_at":
+		return func() ValueSetter[KvTableField] {
+			return NewValueSetter[KvTableField](KvTable.UpdatedAt, s.UpdatedAt)
+		}
+	case "deleted_at":
+		return func() ValueSetter[KvTableField] {
+			return NewValueSetter[KvTableField](KvTable.DeletedAt, s.DeletedAt)
+		}
+	case "key":
+		return func() ValueSetter[KvTableField] {
+			return NewValueSetter[KvTableField](KvTable.Key, s.Key)
+		}
+	case "info":
+		return func() ValueSetter[KvTableField] {
+			return NewValueSetter[KvTableField](KvTable.Info, s.Info)
+		}
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func (s *KvTableScanner) getValue(field KvTableField) func() any {
+	switch field.String() {
+	case "created_at":
+		return func() any { return s.CreatedAt }
+	case "updated_at":
+		return func() any { return s.UpdatedAt }
+	case "deleted_at":
+		return func() any { return s.DeletedAt }
+	case "key":
+		return func() any { return s.Key }
+	case "info":
+		return func() any { return s.Info }
 	default:
 		panic("unknown field: " + field.String())
 	}
@@ -972,6 +945,67 @@ func (s *RunRecordStepScanner) getValue(field RunRecordStepField) func() any {
 		return func() any { return s.Status }
 	case "step_info":
 		return func() any { return s.StepInfo }
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func newQuotaTableScanner() *QuotaTableScanner {
+	return &QuotaTableScanner{}
+}
+func (s *QuotaTableScanner) values() []any {
+	return []any{
+		s.Cloud,
+		s.Kind,
+		s.Maximum,
+		s.Current,
+	}
+}
+func (s *QuotaTableScanner) getTarget(field string) func() any {
+	switch field {
+	case "cloud":
+		return func() any { return &s.Cloud }
+	case "kind":
+		return func() any { return &s.Kind }
+	case "maximum":
+		return func() any { return &s.Maximum }
+	case "current":
+		return func() any { return &s.Current }
+	default:
+		panic("unknown field: " + field)
+	}
+}
+func (s *QuotaTableScanner) getSetter(field QuotaTableField) func() ValueSetter[QuotaTableField] {
+	switch field.String() {
+	case "cloud":
+		return func() ValueSetter[QuotaTableField] {
+			return NewValueSetter[QuotaTableField](QuotaTable.Cloud, s.Cloud)
+		}
+	case "kind":
+		return func() ValueSetter[QuotaTableField] {
+			return NewValueSetter[QuotaTableField](QuotaTable.Kind, s.Kind)
+		}
+	case "maximum":
+		return func() ValueSetter[QuotaTableField] {
+			return NewValueSetter[QuotaTableField](QuotaTable.Maximum, s.Maximum)
+		}
+	case "current":
+		return func() ValueSetter[QuotaTableField] {
+			return NewValueSetter[QuotaTableField](QuotaTable.Current, s.Current)
+		}
+	default:
+		panic("unknown field: " + field.String())
+	}
+}
+func (s *QuotaTableScanner) getValue(field QuotaTableField) func() any {
+	switch field.String() {
+	case "cloud":
+		return func() any { return s.Cloud }
+	case "kind":
+		return func() any { return s.Kind }
+	case "maximum":
+		return func() any { return s.Maximum }
+	case "current":
+		return func() any { return s.Current }
 	default:
 		panic("unknown field: " + field.String())
 	}
@@ -1308,65 +1342,6 @@ type (
 			LikeOperator[string, RefreshTokensField]
 		}
 	}
-	kvinfoTableImpl struct {
-		*table[KvinfoField, *KvinfoScanner]
-		Id interface {
-			KvinfoField
-			CommonOperator[string, KvinfoField]
-			ScalarOperator[string, KvinfoField]
-			LikeOperator[string, KvinfoField]
-		}
-		CreatedAt interface {
-			KvinfoField
-			CommonOperator[time.Time, KvinfoField]
-			ScalarOperator[time.Time, KvinfoField]
-		}
-		UpdatedAt interface {
-			KvinfoField
-			CommonOperator[time.Time, KvinfoField]
-			ScalarOperator[time.Time, KvinfoField]
-		}
-		DeletedAt interface {
-			KvinfoField
-			CommonOperator[*time.Time, KvinfoField]
-			ScalarOperator[*time.Time, KvinfoField]
-			IsNullOperator[*time.Time, KvinfoField]
-		}
-		Key interface {
-			KvinfoField
-			CommonOperator[string, KvinfoField]
-			ScalarOperator[string, KvinfoField]
-			LikeOperator[string, KvinfoField]
-		}
-		Description interface {
-			KvinfoField
-			CommonOperator[string, KvinfoField]
-			ScalarOperator[string, KvinfoField]
-			LikeOperator[string, KvinfoField]
-		}
-		DefaultValue interface {
-			KvinfoField
-			CommonOperator[*string, KvinfoField]
-			ScalarOperator[*string, KvinfoField]
-			LikeOperator[*string, KvinfoField]
-			IsNullOperator[*string, KvinfoField]
-		}
-		IsRequired interface {
-			KvinfoField
-			CommonOperator[bool, KvinfoField]
-			ScalarOperator[bool, KvinfoField]
-		}
-		Immutable interface {
-			KvinfoField
-			CommonOperator[bool, KvinfoField]
-			ScalarOperator[bool, KvinfoField]
-		}
-		SystemGenerated interface {
-			KvinfoField
-			CommonOperator[bool, KvinfoField]
-			ScalarOperator[bool, KvinfoField]
-		}
-	}
 	templateTableImpl struct {
 		*table[TemplateField, *TemplateScanner]
 		Id interface {
@@ -1413,6 +1388,35 @@ type (
 			CommonOperator[[]string, TemplateField]
 			ScalarOperator[[]string, TemplateField]
 			LikeOperator[[]string, TemplateField]
+		}
+	}
+	kvTableTableImpl struct {
+		*table[KvTableField, *KvTableScanner]
+		CreatedAt interface {
+			KvTableField
+			CommonOperator[time.Time, KvTableField]
+			ScalarOperator[time.Time, KvTableField]
+		}
+		UpdatedAt interface {
+			KvTableField
+			CommonOperator[time.Time, KvTableField]
+			ScalarOperator[time.Time, KvTableField]
+		}
+		DeletedAt interface {
+			KvTableField
+			CommonOperator[*time.Time, KvTableField]
+			ScalarOperator[*time.Time, KvTableField]
+			IsNullOperator[*time.Time, KvTableField]
+		}
+		Key interface {
+			KvTableField
+			CommonOperator[string, KvTableField]
+			ScalarOperator[string, KvTableField]
+			LikeOperator[string, KvTableField]
+		}
+		Info interface {
+			KvTableField
+			CommonOperator[[]byte, KvTableField]
 		}
 	}
 	runRecordTableImpl struct {
@@ -1515,6 +1519,29 @@ type (
 		StepInfo interface {
 			RunRecordStepField
 			CommonOperator[[]byte, RunRecordStepField]
+		}
+	}
+	quotaTableTableImpl struct {
+		*table[QuotaTableField, *QuotaTableScanner]
+		Cloud interface {
+			QuotaTableField
+			CommonOperator[int32, QuotaTableField]
+			ScalarOperator[int32, QuotaTableField]
+		}
+		Kind interface {
+			QuotaTableField
+			CommonOperator[int32, QuotaTableField]
+			ScalarOperator[int32, QuotaTableField]
+		}
+		Maximum interface {
+			QuotaTableField
+			CommonOperator[int32, QuotaTableField]
+			ScalarOperator[int32, QuotaTableField]
+		}
+		Current interface {
+			QuotaTableField
+			CommonOperator[int32, QuotaTableField]
+			ScalarOperator[int32, QuotaTableField]
 		}
 	}
 	workflowTableImpl struct {
@@ -1684,44 +1711,6 @@ func newRefreshTokensTableImpl() *refreshTokensTableImpl {
 		Token:  token,
 	}
 }
-func newKvinfoTableImpl() *kvinfoTableImpl {
-	id := &kvinfoidFieldImpl{column: newColumn[string, KvinfoField](fieldAliasImpl("id"))}
-	createdAt := &kvinfocreatedAtFieldImpl{column: newColumn[time.Time, KvinfoField](fieldAliasImpl("created_at"))}
-	updatedAt := &kvinfoupdatedAtFieldImpl{column: newColumn[time.Time, KvinfoField](fieldAliasImpl("updated_at"))}
-	deletedAt := &kvinfodeletedAtFieldImpl{column: newColumn[*time.Time, KvinfoField](fieldAliasImpl("deleted_at"))}
-	key := &kvinfokeyFieldImpl{column: newColumn[string, KvinfoField](fieldAliasImpl("key"))}
-	description := &kvinfodescriptionFieldImpl{column: newColumn[string, KvinfoField](fieldAliasImpl("description"))}
-	defaultValue := &kvinfodefaultValueFieldImpl{column: newColumn[*string, KvinfoField](fieldAliasImpl("default_value"))}
-	isRequired := &kvinfoisRequiredFieldImpl{column: newColumn[bool, KvinfoField](fieldAliasImpl("is_required"))}
-	immutable := &kvinfoimmutableFieldImpl{column: newColumn[bool, KvinfoField](fieldAliasImpl("immutable"))}
-	systemGenerated := &kvinfosystemGeneratedFieldImpl{column: newColumn[bool, KvinfoField](fieldAliasImpl("system_generated"))}
-	return &kvinfoTableImpl{
-		table: newTable[KvinfoField, *KvinfoScanner](
-			"system_kv_info",
-			newKvinfoScanner,
-			id,
-			createdAt,
-			updatedAt,
-			deletedAt,
-			key,
-			description,
-			defaultValue,
-			isRequired,
-			immutable,
-			systemGenerated,
-		),
-		Id:              id,
-		CreatedAt:       createdAt,
-		UpdatedAt:       updatedAt,
-		DeletedAt:       deletedAt,
-		Key:             key,
-		Description:     description,
-		DefaultValue:    defaultValue,
-		IsRequired:      isRequired,
-		Immutable:       immutable,
-		SystemGenerated: systemGenerated,
-	}
-}
 func newTemplateTableImpl() *templateTableImpl {
 	id := &templateidFieldImpl{column: newColumn[string, TemplateField](fieldAliasImpl("id"))}
 	createdAt := &templatecreatedAtFieldImpl{column: newColumn[time.Time, TemplateField](fieldAliasImpl("created_at"))}
@@ -1752,6 +1741,29 @@ func newTemplateTableImpl() *templateTableImpl {
 		AuthorId:  authorId,
 		IsDefault: isDefault,
 		Tags:      tags,
+	}
+}
+func newKvTableTableImpl() *kvTableTableImpl {
+	createdAt := &kvTablecreatedAtFieldImpl{column: newColumn[time.Time, KvTableField](fieldAliasImpl("created_at"))}
+	updatedAt := &kvTableupdatedAtFieldImpl{column: newColumn[time.Time, KvTableField](fieldAliasImpl("updated_at"))}
+	deletedAt := &kvTabledeletedAtFieldImpl{column: newColumn[*time.Time, KvTableField](fieldAliasImpl("deleted_at"))}
+	key := &kvTablekeyFieldImpl{column: newColumn[string, KvTableField](fieldAliasImpl("key"))}
+	info := &kvTableinfoFieldImpl{column: newColumn[[]byte, KvTableField](fieldAliasImpl("info"))}
+	return &kvTableTableImpl{
+		table: newTable[KvTableField, *KvTableScanner](
+			"kv_infos",
+			newKvTableScanner,
+			createdAt,
+			updatedAt,
+			deletedAt,
+			key,
+			info,
+		),
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
+		DeletedAt: deletedAt,
+		Key:       key,
+		Info:      info,
 	}
 }
 func newRunRecordTableImpl() *runRecordTableImpl {
@@ -1822,6 +1834,26 @@ func newRunRecordStepTableImpl() *runRecordStepTableImpl {
 		RunId:     runId,
 		Status:    status,
 		StepInfo:  stepInfo,
+	}
+}
+func newQuotaTableTableImpl() *quotaTableTableImpl {
+	cloud := &quotaTablecloudFieldImpl{column: newColumn[int32, QuotaTableField](fieldAliasImpl("cloud"))}
+	kind := &quotaTablekindFieldImpl{column: newColumn[int32, QuotaTableField](fieldAliasImpl("kind"))}
+	maximum := &quotaTablemaximumFieldImpl{column: newColumn[int32, QuotaTableField](fieldAliasImpl("maximum"))}
+	current := &quotaTablecurrentFieldImpl{column: newColumn[int32, QuotaTableField](fieldAliasImpl("current"))}
+	return &quotaTableTableImpl{
+		table: newTable[QuotaTableField, *QuotaTableScanner](
+			"quotas",
+			newQuotaTableScanner,
+			cloud,
+			kind,
+			maximum,
+			current,
+		),
+		Cloud:   cloud,
+		Kind:    kind,
+		Maximum: maximum,
+		Current: current,
 	}
 }
 func newWorkflowTableImpl() *workflowTableImpl {
@@ -1920,14 +1952,16 @@ type (
 	UserRepositoryOption          = ProtoCallOption[UserField, *UserScanner, *panel.User]
 	RefreshTokensRepository       = ProtoRepository[RefreshTokensField, *RefreshTokensScanner, *panel.RefreshTokens]
 	RefreshTokensRepositoryOption = ProtoCallOption[RefreshTokensField, *RefreshTokensScanner, *panel.RefreshTokens]
-	KvinfoRepository              = ProtoRepository[KvinfoField, *KvinfoScanner, *panel.KVInfo]
-	KvinfoRepositoryOption        = ProtoCallOption[KvinfoField, *KvinfoScanner, *panel.KVInfo]
 	TemplateRepository            = ProtoRepository[TemplateField, *TemplateScanner, *panel.Template]
 	TemplateRepositoryOption      = ProtoCallOption[TemplateField, *TemplateScanner, *panel.Template]
+	KvTableRepository             = ProtoRepository[KvTableField, *KvTableScanner, *panel.KvTable]
+	KvTableRepositoryOption       = ProtoCallOption[KvTableField, *KvTableScanner, *panel.KvTable]
 	RunRecordRepository           = ProtoRepository[RunRecordField, *RunRecordScanner, *panel.RunRecord]
 	RunRecordRepositoryOption     = ProtoCallOption[RunRecordField, *RunRecordScanner, *panel.RunRecord]
 	RunRecordStepRepository       = ProtoRepository[RunRecordStepField, *RunRecordStepScanner, *panel.RunRecordStep]
 	RunRecordStepRepositoryOption = ProtoCallOption[RunRecordStepField, *RunRecordStepScanner, *panel.RunRecordStep]
+	QuotaTableRepository          = ProtoRepository[QuotaTableField, *QuotaTableScanner, *panel.QuotaTable]
+	QuotaTableRepositoryOption    = ProtoCallOption[QuotaTableField, *QuotaTableScanner, *panel.QuotaTable]
 	WorkflowRepository            = ProtoRepository[WorkflowField, *WorkflowScanner, *panel.Workflow]
 	WorkflowRepositoryOption      = ProtoCallOption[WorkflowField, *WorkflowScanner, *panel.Workflow]
 	WorkflowTaskRepository        = ProtoRepository[WorkflowTaskField, *WorkflowTaskScanner, *panel.WorkflowTask]
@@ -2047,68 +2081,6 @@ func NewRefreshTokensRepository(
 		defaultOpts...,
 	)
 }
-func KVInfoToScanner(
-	downcastId TypeCaster[*panel.Ulid, string],
-) TypeCaster[*panel.KVInfo, *KvinfoScanner] {
-	return func(entity *panel.KVInfo) *KvinfoScanner {
-		if entity == nil {
-			return nil
-		}
-		scanner := &KvinfoScanner{
-			Id:  downcastId(entity.Id),
-			Key: entity.Key,
-		}
-		scanner.Description = entity.GetInfo().GetDescription()
-		scanner.DefaultValue = entity.GetInfo().GetDefaultValue()
-		scanner.IsRequired = entity.GetInfo().GetIsRequired()
-		scanner.Immutable = entity.GetInfo().GetImmutable()
-		scanner.SystemGenerated = entity.GetInfo().GetSystemGenerated()
-		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
-		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
-		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
-		return scanner
-	}
-}
-func ScannerToKVInfo(
-	upcastId TypeCaster[string, *panel.Ulid],
-) TypeCaster[*KvinfoScanner, *panel.KVInfo] {
-	return func(model *KvinfoScanner) *panel.KVInfo {
-		if model == nil {
-			return nil
-		}
-		entity := &panel.KVInfo{
-			Id:  upcastId(model.Id),
-			Key: model.Key,
-		}
-		entity.Info = &panel.KV_Info{
-			Description:     model.Description,
-			DefaultValue:    model.DefaultValue,
-			IsRequired:      model.IsRequired,
-			Immutable:       model.Immutable,
-			SystemGenerated: model.SystemGenerated,
-		}
-		entity.Timing = &panel.Timing{
-			CreatedAt: TimestampFromTime(model.CreatedAt),
-			UpdatedAt: TimestampFromTime(model.UpdatedAt),
-			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
-		}
-
-		return entity
-	}
-}
-func NewKvinfoRepository(
-	dbGetter DbGetter,
-	upcastId TypeCaster[string, *panel.Ulid],
-	downcastId TypeCaster[*panel.Ulid, string],
-	defaultOpts ...KvinfoRepositoryOption,
-) KvinfoRepository {
-	return newGenericRepository(
-		newGenericScannerRepository(Kvinfo.table, dbGetter),
-		KVInfoToScanner(downcastId),
-		ScannerToKVInfo(upcastId),
-		defaultOpts...,
-	)
-}
 func TemplateToScanner(
 	downcastId TypeCaster[*panel.Ulid, string],
 	downcastAuthorId TypeCaster[*panel.Ulid, string],
@@ -2170,6 +2142,50 @@ func NewTemplateRepository(
 		newGenericScannerRepository(Template.table, dbGetter),
 		TemplateToScanner(downcastId, downcastAuthorId, downcastTags),
 		ScannerToTemplate(upcastId, upcastAuthorId, upcastTags),
+		defaultOpts...,
+	)
+}
+func KvTableToScanner() TypeCaster[*panel.KvTable, *KvTableScanner] {
+	return func(entity *panel.KvTable) *KvTableScanner {
+		if entity == nil {
+			return nil
+		}
+		scanner := &KvTableScanner{
+			Key:  entity.Key,
+			Info: MessageToSliceByte[*panel.KV_Info](entity.Info),
+		}
+		scanner.CreatedAt = TimestampToTime(entity.GetTiming().GetCreatedAt())
+		scanner.UpdatedAt = TimestampToTime(entity.GetTiming().GetUpdatedAt())
+		scanner.DeletedAt = TimestampToPtrTime(entity.GetTiming().GetDeletedAt())
+		return scanner
+	}
+}
+func ScannerToKvTable() TypeCaster[*KvTableScanner, *panel.KvTable] {
+	return func(model *KvTableScanner) *panel.KvTable {
+		if model == nil {
+			return nil
+		}
+		entity := &panel.KvTable{
+			Key:  model.Key,
+			Info: MessageFromSliceByte[*panel.KV_Info](model.Info),
+		}
+		entity.Timing = &panel.Timing{
+			CreatedAt: TimestampFromTime(model.CreatedAt),
+			UpdatedAt: TimestampFromTime(model.UpdatedAt),
+			DeletedAt: TimestampFromPtrTime(model.DeletedAt),
+		}
+
+		return entity
+	}
+}
+func NewKvTableRepository(
+	dbGetter DbGetter,
+	defaultOpts ...KvTableRepositoryOption,
+) KvTableRepository {
+	return newGenericRepository(
+		newGenericScannerRepository(KvTable.table, dbGetter),
+		KvTableToScanner(),
+		ScannerToKvTable(),
 		defaultOpts...,
 	)
 }
@@ -2298,6 +2314,46 @@ func NewRunRecordStepRepository(
 		newGenericScannerRepository(RunRecordStep.table, dbGetter),
 		RunRecordStepToScanner(downcastId, downcastRunId),
 		ScannerToRunRecordStep(upcastId, upcastRunId),
+		defaultOpts...,
+	)
+}
+func QuotaTableToScanner() TypeCaster[*panel.QuotaTable, *QuotaTableScanner] {
+	return func(entity *panel.QuotaTable) *QuotaTableScanner {
+		if entity == nil {
+			return nil
+		}
+		scanner := &QuotaTableScanner{}
+		scanner.Cloud = EnumToInt32[crossplane.SupportedCloud](entity.GetQuota().GetCloud())
+		scanner.Kind = EnumToInt32[crossplane.Quota_Kind](entity.GetQuota().GetKind())
+		scanner.Maximum = int32(entity.GetQuota().GetMaximum())
+		scanner.Current = int32(entity.GetQuota().GetCurrent())
+		return scanner
+	}
+}
+func ScannerToQuotaTable() TypeCaster[*QuotaTableScanner, *panel.QuotaTable] {
+	return func(model *QuotaTableScanner) *panel.QuotaTable {
+		if model == nil {
+			return nil
+		}
+		entity := &panel.QuotaTable{}
+		entity.Quota = &crossplane.Quota{
+			Cloud:   EnumFromInt32[crossplane.SupportedCloud](model.Cloud),
+			Kind:    EnumFromInt32[crossplane.Quota_Kind](model.Kind),
+			Maximum: uint32(model.Maximum),
+			Current: uint32(model.Current),
+		}
+
+		return entity
+	}
+}
+func NewQuotaTableRepository(
+	dbGetter DbGetter,
+	defaultOpts ...QuotaTableRepositoryOption,
+) QuotaTableRepository {
+	return newGenericRepository(
+		newGenericScannerRepository(QuotaTable.table, dbGetter),
+		QuotaTableToScanner(),
+		ScannerToQuotaTable(),
 		defaultOpts...,
 	)
 }

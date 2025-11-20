@@ -438,9 +438,9 @@ type CloudRunParams_StroppyInstanceParams struct {
 	// now support only YandexCloud
 	SupportedCloud crossplane.SupportedCloud `protobuf:"varint,1,opt,name=supported_cloud,json=supportedCloud,proto3,enum=crossplane.SupportedCloud" json:"supported_cloud,omitempty"`
 	// now support only single node
-	MachineInstance           *CloudRunParams_MachineInstanceParams `protobuf:"bytes,3,opt,name=machine_instance,json=machineInstance,proto3" json:"machine_instance,omitempty"`
-	StroppyDeploymentTemplate *Template                             `protobuf:"bytes,2,opt,name=stroppy_deployment_template,json=stroppyDeploymentTemplate,proto3" json:"stroppy_deployment_template,omitempty"`
-	OverrideKv                *KV_Map                               `protobuf:"bytes,4,opt,name=override_kv,json=overrideKv,proto3" json:"override_kv,omitempty"`
+	MachineInstance           *CloudRunParams_MachineInstanceParams `protobuf:"bytes,2,opt,name=machine_instance,json=machineInstance,proto3" json:"machine_instance,omitempty"`
+	StroppyDeploymentTemplate *Template                             `protobuf:"bytes,3,opt,name=stroppy_deployment_template,json=stroppyDeploymentTemplate,proto3" json:"stroppy_deployment_template,omitempty"`
+	EnvKv                     *KV_Map                               `protobuf:"bytes,4,opt,name=env_kv,json=envKv,proto3" json:"env_kv,omitempty"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -496,9 +496,9 @@ func (x *CloudRunParams_StroppyInstanceParams) GetStroppyDeploymentTemplate() *T
 	return nil
 }
 
-func (x *CloudRunParams_StroppyInstanceParams) GetOverrideKv() *KV_Map {
+func (x *CloudRunParams_StroppyInstanceParams) GetEnvKv() *KV_Map {
 	if x != nil {
-		return x.OverrideKv
+		return x.EnvKv
 	}
 	return nil
 }
@@ -657,20 +657,19 @@ var File_panel_run_proto protoreflect.FileDescriptor
 
 const file_panel_run_proto_rawDesc = "" +
 	"\n" +
-	"\x0fpanel/run.proto\x12\x05panel\x1a\x16crossplane/types.proto\x1a\x14panel/template.proto\x1a\x11panel/types.proto\x1a\x19proto/stroppy/cloud.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xb4\b\n" +
+	"\x0fpanel/run.proto\x12\x05panel\x1a\x16crossplane/types.proto\x1a\x14panel/template.proto\x1a\x11panel/types.proto\x1a\x19proto/stroppy/cloud.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xaa\b\n" +
 	"\x0eCloudRunParams\x12n\n" +
 	"\x19stroppy_instance_template\x18\x02 \x01(\v2+.panel.CloudRunParams.StroppyInstanceParamsB\x05\xca>\x02H\x01R\x17stroppyInstanceTemplate\x12v\n" +
 	"\x1adatabase_instance_template\x18\x03 \x01(\v2,.panel.CloudRunParams.DatabaseInstanceParamsB\x05\xca>\x02H\x01H\x00R\x18databaseInstanceTemplate\x88\x01\x01\x1a\xbc\x01\n" +
 	"\x15MachineInstanceParams\x12O\n" +
 	"\x1bmachine_deployment_template\x18\x01 \x01(\v2\x0f.panel.TemplateR\x19machineDeploymentTemplate\x125\n" +
 	"\bssh_user\x18\x02 \x01(\v2\x13.crossplane.SshUserB\x05\xca>\x02@\x01R\asshUser\x12\x1b\n" +
-	"\tpublic_ip\x18\x03 \x01(\bR\bpublicIp\x1a\xc6\x02\n" +
+	"\tpublic_ip\x18\x03 \x01(\bR\bpublicIp\x1a\xbc\x02\n" +
 	"\x15StroppyInstanceParams\x12M\n" +
 	"\x0fsupported_cloud\x18\x01 \x01(\x0e2\x1a.crossplane.SupportedCloudB\b\xfaB\x05\x82\x01\x02\x10\x01R\x0esupportedCloud\x12V\n" +
-	"\x10machine_instance\x18\x03 \x01(\v2+.panel.CloudRunParams.MachineInstanceParamsR\x0fmachineInstance\x12O\n" +
-	"\x1bstroppy_deployment_template\x18\x02 \x01(\v2\x0f.panel.TemplateR\x19stroppyDeploymentTemplate\x125\n" +
-	"\voverride_kv\x18\x04 \x01(\v2\r.panel.KV.MapB\x05\xca>\x02H\x01R\n" +
-	"overrideKv\x1a\x92\x02\n" +
+	"\x10machine_instance\x18\x02 \x01(\v2+.panel.CloudRunParams.MachineInstanceParamsR\x0fmachineInstance\x12O\n" +
+	"\x1bstroppy_deployment_template\x18\x03 \x01(\v2\x0f.panel.TemplateR\x19stroppyDeploymentTemplate\x12+\n" +
+	"\x06env_kv\x18\x04 \x01(\v2\r.panel.KV.MapB\x05\xca>\x02H\x01R\x05envKv\x1a\x92\x02\n" +
 	"\x16DatabaseInstanceParams\x12M\n" +
 	"\x0fsupported_cloud\x18\x01 \x01(\x0e2\x1a.crossplane.SupportedCloudB\b\xfaB\x05\x82\x01\x02\x10\x01R\x0esupportedCloud\x12Q\n" +
 	"\x1cdatabase_deployment_template\x18\x02 \x01(\v2\x0f.panel.TemplateR\x1adatabaseDeploymentTemplate\x12V\n" +
@@ -785,7 +784,7 @@ var file_panel_run_proto_depIdxs = []int32{
 	19, // 22: panel.CloudRunParams.StroppyInstanceParams.supported_cloud:type_name -> crossplane.SupportedCloud
 	4,  // 23: panel.CloudRunParams.StroppyInstanceParams.machine_instance:type_name -> panel.CloudRunParams.MachineInstanceParams
 	17, // 24: panel.CloudRunParams.StroppyInstanceParams.stroppy_deployment_template:type_name -> panel.Template
-	20, // 25: panel.CloudRunParams.StroppyInstanceParams.override_kv:type_name -> panel.KV.Map
+	20, // 25: panel.CloudRunParams.StroppyInstanceParams.env_kv:type_name -> panel.KV.Map
 	19, // 26: panel.CloudRunParams.DatabaseInstanceParams.supported_cloud:type_name -> crossplane.SupportedCloud
 	17, // 27: panel.CloudRunParams.DatabaseInstanceParams.database_deployment_template:type_name -> panel.Template
 	4,  // 28: panel.CloudRunParams.DatabaseInstanceParams.machine_instance:type_name -> panel.CloudRunParams.MachineInstanceParams

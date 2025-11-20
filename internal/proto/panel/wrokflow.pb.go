@@ -73,7 +73,7 @@ func (x WorkflowTask_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WorkflowTask_Type.Descriptor instead.
 func (WorkflowTask_Type) EnumDescriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1, 0}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2, 0}
 }
 
 type WorkflowTask_Status int32
@@ -134,7 +134,51 @@ func (x WorkflowTask_Status) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WorkflowTask_Status.Descriptor instead.
 func (WorkflowTask_Status) EnumDescriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1, 1}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2, 1}
+}
+
+type QuotaTable struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Quota         *crossplane.Quota      `protobuf:"bytes,1,opt,name=quota,proto3" json:"quota,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QuotaTable) Reset() {
+	*x = QuotaTable{}
+	mi := &file_panel_wrokflow_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QuotaTable) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QuotaTable) ProtoMessage() {}
+
+func (x *QuotaTable) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_wrokflow_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QuotaTable.ProtoReflect.Descriptor instead.
+func (*QuotaTable) Descriptor() ([]byte, []int) {
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *QuotaTable) GetQuota() *crossplane.Quota {
+	if x != nil {
+		return x.Quota
+	}
+	return nil
 }
 
 type Workflow struct {
@@ -149,7 +193,7 @@ type Workflow struct {
 
 func (x *Workflow) Reset() {
 	*x = Workflow{}
-	mi := &file_panel_wrokflow_proto_msgTypes[0]
+	mi := &file_panel_wrokflow_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -161,7 +205,7 @@ func (x *Workflow) String() string {
 func (*Workflow) ProtoMessage() {}
 
 func (x *Workflow) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[0]
+	mi := &file_panel_wrokflow_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -174,7 +218,7 @@ func (x *Workflow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Workflow.ProtoReflect.Descriptor instead.
 func (*Workflow) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{0}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Workflow) GetId() *Ulid {
@@ -226,7 +270,7 @@ type WorkflowTask struct {
 
 func (x *WorkflowTask) Reset() {
 	*x = WorkflowTask{}
-	mi := &file_panel_wrokflow_proto_msgTypes[1]
+	mi := &file_panel_wrokflow_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -238,7 +282,7 @@ func (x *WorkflowTask) String() string {
 func (*WorkflowTask) ProtoMessage() {}
 
 func (x *WorkflowTask) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[1]
+	mi := &file_panel_wrokflow_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -251,7 +295,7 @@ func (x *WorkflowTask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowTask.ProtoReflect.Descriptor instead.
 func (*WorkflowTask) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *WorkflowTask) GetId() string {
@@ -356,7 +400,7 @@ type WorkflowEdge struct {
 
 func (x *WorkflowEdge) Reset() {
 	*x = WorkflowEdge{}
-	mi := &file_panel_wrokflow_proto_msgTypes[2]
+	mi := &file_panel_wrokflow_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -368,7 +412,7 @@ func (x *WorkflowEdge) String() string {
 func (*WorkflowEdge) ProtoMessage() {}
 
 func (x *WorkflowEdge) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[2]
+	mi := &file_panel_wrokflow_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -381,7 +425,7 @@ func (x *WorkflowEdge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowEdge.ProtoReflect.Descriptor instead.
 func (*WorkflowEdge) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *WorkflowEdge) GetFromId() string {
@@ -413,7 +457,7 @@ type WorkflowTask_DeployDatabase struct {
 
 func (x *WorkflowTask_DeployDatabase) Reset() {
 	*x = WorkflowTask_DeployDatabase{}
-	mi := &file_panel_wrokflow_proto_msgTypes[3]
+	mi := &file_panel_wrokflow_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -425,7 +469,7 @@ func (x *WorkflowTask_DeployDatabase) String() string {
 func (*WorkflowTask_DeployDatabase) ProtoMessage() {}
 
 func (x *WorkflowTask_DeployDatabase) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[3]
+	mi := &file_panel_wrokflow_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -438,7 +482,7 @@ func (x *WorkflowTask_DeployDatabase) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowTask_DeployDatabase.ProtoReflect.Descriptor instead.
 func (*WorkflowTask_DeployDatabase) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1, 0}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2, 0}
 }
 
 type WorkflowTask_DeployStroppy struct {
@@ -449,7 +493,7 @@ type WorkflowTask_DeployStroppy struct {
 
 func (x *WorkflowTask_DeployStroppy) Reset() {
 	*x = WorkflowTask_DeployStroppy{}
-	mi := &file_panel_wrokflow_proto_msgTypes[4]
+	mi := &file_panel_wrokflow_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -461,7 +505,7 @@ func (x *WorkflowTask_DeployStroppy) String() string {
 func (*WorkflowTask_DeployStroppy) ProtoMessage() {}
 
 func (x *WorkflowTask_DeployStroppy) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[4]
+	mi := &file_panel_wrokflow_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -474,7 +518,7 @@ func (x *WorkflowTask_DeployStroppy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowTask_DeployStroppy.ProtoReflect.Descriptor instead.
 func (*WorkflowTask_DeployStroppy) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1, 1}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2, 1}
 }
 
 type WorkflowTask_CollectRunResults struct {
@@ -485,7 +529,7 @@ type WorkflowTask_CollectRunResults struct {
 
 func (x *WorkflowTask_CollectRunResults) Reset() {
 	*x = WorkflowTask_CollectRunResults{}
-	mi := &file_panel_wrokflow_proto_msgTypes[5]
+	mi := &file_panel_wrokflow_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -497,7 +541,7 @@ func (x *WorkflowTask_CollectRunResults) String() string {
 func (*WorkflowTask_CollectRunResults) ProtoMessage() {}
 
 func (x *WorkflowTask_CollectRunResults) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[5]
+	mi := &file_panel_wrokflow_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -510,19 +554,22 @@ func (x *WorkflowTask_CollectRunResults) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowTask_CollectRunResults.ProtoReflect.Descriptor instead.
 func (*WorkflowTask_CollectRunResults) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1, 2}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2, 2}
 }
 
 type WorkflowTask_DeployDatabase_Input struct {
-	state                  protoimpl.MessageState                 `protogen:"open.v1"`
-	DatabaseInstanceParams *CloudRunParams_DatabaseInstanceParams `protobuf:"bytes,1,opt,name=database_instance_params,json=databaseInstanceParams,proto3" json:"database_instance_params,omitempty"` // input
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Sets in RunService.RunStroppyInCloud
+	StroppyRunId *Ulid `protobuf:"bytes,1,opt,name=stroppy_run_id,json=stroppyRunId,proto3" json:"stroppy_run_id,omitempty"`
+	// Sets in RunService.RunStroppyInCloud from user input
+	DatabaseInstanceParams *CloudRunParams_DatabaseInstanceParams `protobuf:"bytes,2,opt,name=database_instance_params,json=databaseInstanceParams,proto3" json:"database_instance_params,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
 
 func (x *WorkflowTask_DeployDatabase_Input) Reset() {
 	*x = WorkflowTask_DeployDatabase_Input{}
-	mi := &file_panel_wrokflow_proto_msgTypes[6]
+	mi := &file_panel_wrokflow_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -534,7 +581,7 @@ func (x *WorkflowTask_DeployDatabase_Input) String() string {
 func (*WorkflowTask_DeployDatabase_Input) ProtoMessage() {}
 
 func (x *WorkflowTask_DeployDatabase_Input) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[6]
+	mi := &file_panel_wrokflow_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -547,7 +594,14 @@ func (x *WorkflowTask_DeployDatabase_Input) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use WorkflowTask_DeployDatabase_Input.ProtoReflect.Descriptor instead.
 func (*WorkflowTask_DeployDatabase_Input) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1, 0, 0}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2, 0, 0}
+}
+
+func (x *WorkflowTask_DeployDatabase_Input) GetStroppyRunId() *Ulid {
+	if x != nil {
+		return x.StroppyRunId
+	}
+	return nil
 }
 
 func (x *WorkflowTask_DeployDatabase_Input) GetDatabaseInstanceParams() *CloudRunParams_DatabaseInstanceParams {
@@ -558,15 +612,16 @@ func (x *WorkflowTask_DeployDatabase_Input) GetDatabaseInstanceParams() *CloudRu
 }
 
 type WorkflowTask_DeployDatabase_Output struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	DatabaseDeployment *crossplane.Deployment `protobuf:"bytes,1,opt,name=database_deployment,json=databaseDeployment,proto3,oneof" json:"database_deployment,omitempty"` // output
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	DatabaseDeployment         *crossplane.Deployment `protobuf:"bytes,2,opt,name=database_deployment,json=databaseDeployment,proto3" json:"database_deployment,omitempty"`
+	DatabaseAssignedInternalIp *crossplane.Ip         `protobuf:"bytes,3,opt,name=database_assigned_internal_ip,json=databaseAssignedInternalIp,proto3" json:"database_assigned_internal_ip,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *WorkflowTask_DeployDatabase_Output) Reset() {
 	*x = WorkflowTask_DeployDatabase_Output{}
-	mi := &file_panel_wrokflow_proto_msgTypes[7]
+	mi := &file_panel_wrokflow_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -578,7 +633,7 @@ func (x *WorkflowTask_DeployDatabase_Output) String() string {
 func (*WorkflowTask_DeployDatabase_Output) ProtoMessage() {}
 
 func (x *WorkflowTask_DeployDatabase_Output) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[7]
+	mi := &file_panel_wrokflow_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -591,7 +646,7 @@ func (x *WorkflowTask_DeployDatabase_Output) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use WorkflowTask_DeployDatabase_Output.ProtoReflect.Descriptor instead.
 func (*WorkflowTask_DeployDatabase_Output) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1, 0, 1}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2, 0, 1}
 }
 
 func (x *WorkflowTask_DeployDatabase_Output) GetDatabaseDeployment() *crossplane.Deployment {
@@ -601,18 +656,29 @@ func (x *WorkflowTask_DeployDatabase_Output) GetDatabaseDeployment() *crossplane
 	return nil
 }
 
+func (x *WorkflowTask_DeployDatabase_Output) GetDatabaseAssignedInternalIp() *crossplane.Ip {
+	if x != nil {
+		return x.DatabaseAssignedInternalIp
+	}
+	return nil
+}
+
 type WorkflowTask_DeployStroppy_Input struct {
-	state                 protoimpl.MessageState                `protogen:"open.v1"`
-	StroppyRunId          *Ulid                                 `protobuf:"bytes,1,opt,name=stroppy_run_id,json=stroppyRunId,proto3" json:"stroppy_run_id,omitempty"`                            // input
-	StroppyInstanceParams *CloudRunParams_StroppyInstanceParams `protobuf:"bytes,2,opt,name=stroppy_instance_params,json=stroppyInstanceParams,proto3" json:"stroppy_instance_params,omitempty"` // input
-	DatabaseDeployment    *crossplane.Deployment                `protobuf:"bytes,3,opt,name=database_deployment,json=databaseDeployment,proto3" json:"database_deployment,omitempty"`            // input
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// NOTE: Sets in RunService.RunStroppyInCloud
+	StroppyRunId *Ulid `protobuf:"bytes,1,opt,name=stroppy_run_id,json=stroppyRunId,proto3" json:"stroppy_run_id,omitempty"`
+	// NOTE: Sets in RunService.RunStroppyInCloud from user input
+	StroppyInstanceParams *CloudRunParams_StroppyInstanceParams `protobuf:"bytes,2,opt,name=stroppy_instance_params,json=stroppyInstanceParams,proto3" json:"stroppy_instance_params,omitempty"`
+	// NOTE: this values will be set by DeployDatabase.Output task
+	DatabaseDeployment         *crossplane.Deployment `protobuf:"bytes,3,opt,name=database_deployment,json=databaseDeployment,proto3" json:"database_deployment,omitempty"`
+	DatabaseAssignedInternalIp *crossplane.Ip         `protobuf:"bytes,4,opt,name=database_assigned_internal_ip,json=databaseAssignedInternalIp,proto3" json:"database_assigned_internal_ip,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *WorkflowTask_DeployStroppy_Input) Reset() {
 	*x = WorkflowTask_DeployStroppy_Input{}
-	mi := &file_panel_wrokflow_proto_msgTypes[8]
+	mi := &file_panel_wrokflow_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -624,7 +690,7 @@ func (x *WorkflowTask_DeployStroppy_Input) String() string {
 func (*WorkflowTask_DeployStroppy_Input) ProtoMessage() {}
 
 func (x *WorkflowTask_DeployStroppy_Input) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[8]
+	mi := &file_panel_wrokflow_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -637,7 +703,7 @@ func (x *WorkflowTask_DeployStroppy_Input) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowTask_DeployStroppy_Input.ProtoReflect.Descriptor instead.
 func (*WorkflowTask_DeployStroppy_Input) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1, 1, 0}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2, 1, 0}
 }
 
 func (x *WorkflowTask_DeployStroppy_Input) GetStroppyRunId() *Ulid {
@@ -661,16 +727,23 @@ func (x *WorkflowTask_DeployStroppy_Input) GetDatabaseDeployment() *crossplane.D
 	return nil
 }
 
+func (x *WorkflowTask_DeployStroppy_Input) GetDatabaseAssignedInternalIp() *crossplane.Ip {
+	if x != nil {
+		return x.DatabaseAssignedInternalIp
+	}
+	return nil
+}
+
 type WorkflowTask_DeployStroppy_Output struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	StroppyDeployment *crossplane.Deployment `protobuf:"bytes,1,opt,name=stroppy_deployment,json=stroppyDeployment,proto3,oneof" json:"stroppy_deployment,omitempty"` // output
+	StroppyDeployment *crossplane.Deployment `protobuf:"bytes,2,opt,name=stroppy_deployment,json=stroppyDeployment,proto3" json:"stroppy_deployment,omitempty"` // output
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
 
 func (x *WorkflowTask_DeployStroppy_Output) Reset() {
 	*x = WorkflowTask_DeployStroppy_Output{}
-	mi := &file_panel_wrokflow_proto_msgTypes[9]
+	mi := &file_panel_wrokflow_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -682,7 +755,7 @@ func (x *WorkflowTask_DeployStroppy_Output) String() string {
 func (*WorkflowTask_DeployStroppy_Output) ProtoMessage() {}
 
 func (x *WorkflowTask_DeployStroppy_Output) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[9]
+	mi := &file_panel_wrokflow_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -695,7 +768,7 @@ func (x *WorkflowTask_DeployStroppy_Output) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use WorkflowTask_DeployStroppy_Output.ProtoReflect.Descriptor instead.
 func (*WorkflowTask_DeployStroppy_Output) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1, 1, 1}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2, 1, 1}
 }
 
 func (x *WorkflowTask_DeployStroppy_Output) GetStroppyDeployment() *crossplane.Deployment {
@@ -706,15 +779,16 @@ func (x *WorkflowTask_DeployStroppy_Output) GetStroppyDeployment() *crossplane.D
 }
 
 type WorkflowTask_CollectRunResults_Input struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	StroppyRunId  *Ulid                  `protobuf:"bytes,1,opt,name=stroppy_run_id,json=stroppyRunId,proto3" json:"stroppy_run_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// NOTE: Sets in RunService.RunStroppyInCloud
+	StroppyRunId  *Ulid `protobuf:"bytes,1,opt,name=stroppy_run_id,json=stroppyRunId,proto3" json:"stroppy_run_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *WorkflowTask_CollectRunResults_Input) Reset() {
 	*x = WorkflowTask_CollectRunResults_Input{}
-	mi := &file_panel_wrokflow_proto_msgTypes[10]
+	mi := &file_panel_wrokflow_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -726,7 +800,7 @@ func (x *WorkflowTask_CollectRunResults_Input) String() string {
 func (*WorkflowTask_CollectRunResults_Input) ProtoMessage() {}
 
 func (x *WorkflowTask_CollectRunResults_Input) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[10]
+	mi := &file_panel_wrokflow_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -739,7 +813,7 @@ func (x *WorkflowTask_CollectRunResults_Input) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use WorkflowTask_CollectRunResults_Input.ProtoReflect.Descriptor instead.
 func (*WorkflowTask_CollectRunResults_Input) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1, 2, 0}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2, 2, 0}
 }
 
 func (x *WorkflowTask_CollectRunResults_Input) GetStroppyRunId() *Ulid {
@@ -757,7 +831,7 @@ type WorkflowTask_CollectRunResults_Output struct {
 
 func (x *WorkflowTask_CollectRunResults_Output) Reset() {
 	*x = WorkflowTask_CollectRunResults_Output{}
-	mi := &file_panel_wrokflow_proto_msgTypes[11]
+	mi := &file_panel_wrokflow_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -769,7 +843,7 @@ func (x *WorkflowTask_CollectRunResults_Output) String() string {
 func (*WorkflowTask_CollectRunResults_Output) ProtoMessage() {}
 
 func (x *WorkflowTask_CollectRunResults_Output) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_wrokflow_proto_msgTypes[11]
+	mi := &file_panel_wrokflow_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -782,14 +856,17 @@ func (x *WorkflowTask_CollectRunResults_Output) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use WorkflowTask_CollectRunResults_Output.ProtoReflect.Descriptor instead.
 func (*WorkflowTask_CollectRunResults_Output) Descriptor() ([]byte, []int) {
-	return file_panel_wrokflow_proto_rawDescGZIP(), []int{1, 2, 1}
+	return file_panel_wrokflow_proto_rawDescGZIP(), []int{2, 2, 1}
 }
 
 var File_panel_wrokflow_proto protoreflect.FileDescriptor
 
 const file_panel_wrokflow_proto_rawDesc = "" +
 	"\n" +
-	"\x14panel/wrokflow.proto\x12\x05panel\x1a\x1bcrossplane/deployment.proto\x1a\x19google/protobuf/any.proto\x1a\x0fpanel/run.proto\x1a\x14panel/template.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\"\xfa\x01\n" +
+	"\x14panel/wrokflow.proto\x12\x05panel\x1a\x1bcrossplane/deployment.proto\x1a\x19google/protobuf/any.proto\x1a\x16crossplane/types.proto\x1a\x0fpanel/run.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\"`\n" +
+	"\n" +
+	"QuotaTable\x12.\n" +
+	"\x05quota\x18\x01 \x01(\v2\x11.crossplane.QuotaB\x05\xca>\x02@\x01R\x05quota:\"\xca>\x1f\b\x01\x12\x06quotas*\x13UNIQUE(cloud, kind)\"\xfa\x01\n" +
 	"\bWorkflow\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
@@ -799,7 +876,7 @@ const file_panel_wrokflow_proto_rawDesc = "" +
 	"\vworkflow_id\x18\x01 \x01R\x05tasks\x12?\n" +
 	"\x05edges\x18\x04 \x03(\v2\x13.panel.WorkflowEdgeB\x14\xd2>\x11\n" +
 	"\x0f\n" +
-	"\vworkflow_id\x18\x01R\x05edges:\x10\xca>\r\b\x01\x12\tworkflows\"\xbc\f\n" +
+	"\vworkflow_id\x18\x01R\x05edges:\x10\xca>\r\b\x01\x12\tworkflows\"\xde\r\n" +
 	"\fWorkflowTask\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xca>\x04\x1a\x02\x10\x01R\x02id\x12,\n" +
 	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x125\n" +
@@ -817,21 +894,22 @@ const file_panel_wrokflow_proto_rawDesc = "" +
 	" \x01(\v2\f.panel.RetryB\x05\xca>\x02H\x01R\rretrySettings\x121\n" +
 	"\x05input\x18\v \x01(\v2\x14.google.protobuf.AnyB\x05\xca>\x02H\x01R\x05input\x123\n" +
 	"\x06output\x18\f \x01(\v2\x14.google.protobuf.AnyB\x05\xca>\x02H\x01R\x06output\x122\n" +
-	"\bmetadata\x18\r \x01(\v2\x0f.panel.MetadataB\x05\xca>\x02H\x01R\bmetadata\x1a\xf1\x01\n" +
-	"\x0eDeployDatabase\x1ao\n" +
-	"\x05Input\x12f\n" +
-	"\x18database_instance_params\x18\x01 \x01(\v2,.panel.CloudRunParams.DatabaseInstanceParamsR\x16databaseInstanceParams\x1an\n" +
-	"\x06Output\x12L\n" +
-	"\x13database_deployment\x18\x01 \x01(\v2\x16.crossplane.DeploymentH\x00R\x12databaseDeployment\x88\x01\x01B\x16\n" +
-	"\x14_database_deployment\x1a\xe7\x02\n" +
-	"\rDeployStroppy\x1a\xe8\x01\n" +
+	"\bmetadata\x18\r \x01(\v2\x0f.panel.MetadataB\x05\xca>\x02H\x01R\bmetadata\x1a\xdc\x02\n" +
+	"\x0eDeployDatabase\x1a\xa2\x01\n" +
+	"\x05Input\x121\n" +
+	"\x0estroppy_run_id\x18\x01 \x01(\v2\v.panel.UlidR\fstroppyRunId\x12f\n" +
+	"\x18database_instance_params\x18\x02 \x01(\v2,.panel.CloudRunParams.DatabaseInstanceParamsR\x16databaseInstanceParams\x1a\xa4\x01\n" +
+	"\x06Output\x12G\n" +
+	"\x13database_deployment\x18\x02 \x01(\v2\x16.crossplane.DeploymentR\x12databaseDeployment\x12Q\n" +
+	"\x1ddatabase_assigned_internal_ip\x18\x03 \x01(\v2\x0e.crossplane.IpR\x1adatabaseAssignedInternalIp\x1a\x9e\x03\n" +
+	"\rDeployStroppy\x1a\xbb\x02\n" +
 	"\x05Input\x121\n" +
 	"\x0estroppy_run_id\x18\x01 \x01(\v2\v.panel.UlidR\fstroppyRunId\x12c\n" +
 	"\x17stroppy_instance_params\x18\x02 \x01(\v2+.panel.CloudRunParams.StroppyInstanceParamsR\x15stroppyInstanceParams\x12G\n" +
-	"\x13database_deployment\x18\x03 \x01(\v2\x16.crossplane.DeploymentR\x12databaseDeployment\x1ak\n" +
-	"\x06Output\x12J\n" +
-	"\x12stroppy_deployment\x18\x01 \x01(\v2\x16.crossplane.DeploymentH\x00R\x11stroppyDeployment\x88\x01\x01B\x15\n" +
-	"\x13_stroppy_deployment\x1aY\n" +
+	"\x13database_deployment\x18\x03 \x01(\v2\x16.crossplane.DeploymentR\x12databaseDeployment\x12Q\n" +
+	"\x1ddatabase_assigned_internal_ip\x18\x04 \x01(\v2\x0e.crossplane.IpR\x1adatabaseAssignedInternalIp\x1aO\n" +
+	"\x06Output\x12E\n" +
+	"\x12stroppy_deployment\x18\x02 \x01(\v2\x16.crossplane.DeploymentR\x11stroppyDeployment\x1aY\n" +
 	"\x11CollectRunResults\x1a:\n" +
 	"\x05Input\x121\n" +
 	"\x0estroppy_run_id\x18\x01 \x01(\v2\v.panel.UlidR\fstroppyRunId\x1a\b\n" +
@@ -870,64 +948,71 @@ func file_panel_wrokflow_proto_rawDescGZIP() []byte {
 }
 
 var file_panel_wrokflow_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_panel_wrokflow_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_panel_wrokflow_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_panel_wrokflow_proto_goTypes = []any{
 	(WorkflowTask_Type)(0),                        // 0: panel.WorkflowTask.Type
 	(WorkflowTask_Status)(0),                      // 1: panel.WorkflowTask.Status
-	(*Workflow)(nil),                              // 2: panel.Workflow
-	(*WorkflowTask)(nil),                          // 3: panel.WorkflowTask
-	(*WorkflowEdge)(nil),                          // 4: panel.WorkflowEdge
-	(*WorkflowTask_DeployDatabase)(nil),           // 5: panel.WorkflowTask.DeployDatabase
-	(*WorkflowTask_DeployStroppy)(nil),            // 6: panel.WorkflowTask.DeployStroppy
-	(*WorkflowTask_CollectRunResults)(nil),        // 7: panel.WorkflowTask.CollectRunResults
-	(*WorkflowTask_DeployDatabase_Input)(nil),     // 8: panel.WorkflowTask.DeployDatabase.Input
-	(*WorkflowTask_DeployDatabase_Output)(nil),    // 9: panel.WorkflowTask.DeployDatabase.Output
-	(*WorkflowTask_DeployStroppy_Input)(nil),      // 10: panel.WorkflowTask.DeployStroppy.Input
-	(*WorkflowTask_DeployStroppy_Output)(nil),     // 11: panel.WorkflowTask.DeployStroppy.Output
-	(*WorkflowTask_CollectRunResults_Input)(nil),  // 12: panel.WorkflowTask.CollectRunResults.Input
-	(*WorkflowTask_CollectRunResults_Output)(nil), // 13: panel.WorkflowTask.CollectRunResults.Output
-	(*Ulid)(nil),        // 14: panel.Ulid
-	(*Timing)(nil),      // 15: panel.Timing
-	(*Retry_State)(nil), // 16: panel.Retry.State
-	(*LogRecord)(nil),   // 17: panel.LogRecord
-	(*Retry)(nil),       // 18: panel.Retry
-	(*anypb.Any)(nil),   // 19: google.protobuf.Any
-	(*Metadata)(nil),    // 20: panel.Metadata
-	(*CloudRunParams_DatabaseInstanceParams)(nil), // 21: panel.CloudRunParams.DatabaseInstanceParams
-	(*crossplane.Deployment)(nil),                 // 22: crossplane.Deployment
-	(*CloudRunParams_StroppyInstanceParams)(nil),  // 23: panel.CloudRunParams.StroppyInstanceParams
+	(*QuotaTable)(nil),                            // 2: panel.QuotaTable
+	(*Workflow)(nil),                              // 3: panel.Workflow
+	(*WorkflowTask)(nil),                          // 4: panel.WorkflowTask
+	(*WorkflowEdge)(nil),                          // 5: panel.WorkflowEdge
+	(*WorkflowTask_DeployDatabase)(nil),           // 6: panel.WorkflowTask.DeployDatabase
+	(*WorkflowTask_DeployStroppy)(nil),            // 7: panel.WorkflowTask.DeployStroppy
+	(*WorkflowTask_CollectRunResults)(nil),        // 8: panel.WorkflowTask.CollectRunResults
+	(*WorkflowTask_DeployDatabase_Input)(nil),     // 9: panel.WorkflowTask.DeployDatabase.Input
+	(*WorkflowTask_DeployDatabase_Output)(nil),    // 10: panel.WorkflowTask.DeployDatabase.Output
+	(*WorkflowTask_DeployStroppy_Input)(nil),      // 11: panel.WorkflowTask.DeployStroppy.Input
+	(*WorkflowTask_DeployStroppy_Output)(nil),     // 12: panel.WorkflowTask.DeployStroppy.Output
+	(*WorkflowTask_CollectRunResults_Input)(nil),  // 13: panel.WorkflowTask.CollectRunResults.Input
+	(*WorkflowTask_CollectRunResults_Output)(nil), // 14: panel.WorkflowTask.CollectRunResults.Output
+	(*crossplane.Quota)(nil),                      // 15: crossplane.Quota
+	(*Ulid)(nil),                                  // 16: panel.Ulid
+	(*Timing)(nil),                                // 17: panel.Timing
+	(*Retry_State)(nil),                           // 18: panel.Retry.State
+	(*LogRecord)(nil),                             // 19: panel.LogRecord
+	(*Retry)(nil),                                 // 20: panel.Retry
+	(*anypb.Any)(nil),                             // 21: google.protobuf.Any
+	(*Metadata)(nil),                              // 22: panel.Metadata
+	(*CloudRunParams_DatabaseInstanceParams)(nil), // 23: panel.CloudRunParams.DatabaseInstanceParams
+	(*crossplane.Deployment)(nil),                 // 24: crossplane.Deployment
+	(*crossplane.Ip)(nil),                         // 25: crossplane.Ip
+	(*CloudRunParams_StroppyInstanceParams)(nil),  // 26: panel.CloudRunParams.StroppyInstanceParams
 }
 var file_panel_wrokflow_proto_depIdxs = []int32{
-	14, // 0: panel.Workflow.id:type_name -> panel.Ulid
-	15, // 1: panel.Workflow.timing:type_name -> panel.Timing
-	3,  // 2: panel.Workflow.tasks:type_name -> panel.WorkflowTask
-	4,  // 3: panel.Workflow.edges:type_name -> panel.WorkflowEdge
-	15, // 4: panel.WorkflowTask.timing:type_name -> panel.Timing
-	0,  // 5: panel.WorkflowTask.task_type:type_name -> panel.WorkflowTask.Type
-	1,  // 6: panel.WorkflowTask.status:type_name -> panel.WorkflowTask.Status
-	16, // 7: panel.WorkflowTask.retry_state:type_name -> panel.Retry.State
-	17, // 8: panel.WorkflowTask.logs:type_name -> panel.LogRecord
-	18, // 9: panel.WorkflowTask.retry_settings:type_name -> panel.Retry
-	19, // 10: panel.WorkflowTask.input:type_name -> google.protobuf.Any
-	19, // 11: panel.WorkflowTask.output:type_name -> google.protobuf.Any
-	20, // 12: panel.WorkflowTask.metadata:type_name -> panel.Metadata
-	20, // 13: panel.WorkflowEdge.metadata:type_name -> panel.Metadata
-	21, // 14: panel.WorkflowTask.DeployDatabase.Input.database_instance_params:type_name -> panel.CloudRunParams.DatabaseInstanceParams
-	22, // 15: panel.WorkflowTask.DeployDatabase.Output.database_deployment:type_name -> crossplane.Deployment
-	14, // 16: panel.WorkflowTask.DeployStroppy.Input.stroppy_run_id:type_name -> panel.Ulid
-	23, // 17: panel.WorkflowTask.DeployStroppy.Input.stroppy_instance_params:type_name -> panel.CloudRunParams.StroppyInstanceParams
-	22, // 18: panel.WorkflowTask.DeployStroppy.Input.database_deployment:type_name -> crossplane.Deployment
-	22, // 19: panel.WorkflowTask.DeployStroppy.Output.stroppy_deployment:type_name -> crossplane.Deployment
-	14, // 20: panel.WorkflowTask.CollectRunResults.Input.stroppy_run_id:type_name -> panel.Ulid
-	14, // 21: panel.WorkflowService.GetWorkflow:input_type -> panel.Ulid
-	14, // 22: panel.WorkflowService.CancelWorkflow:input_type -> panel.Ulid
-	2,  // 23: panel.WorkflowService.GetWorkflow:output_type -> panel.Workflow
-	2,  // 24: panel.WorkflowService.CancelWorkflow:output_type -> panel.Workflow
-	23, // [23:25] is the sub-list for method output_type
-	21, // [21:23] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	15, // 0: panel.QuotaTable.quota:type_name -> crossplane.Quota
+	16, // 1: panel.Workflow.id:type_name -> panel.Ulid
+	17, // 2: panel.Workflow.timing:type_name -> panel.Timing
+	4,  // 3: panel.Workflow.tasks:type_name -> panel.WorkflowTask
+	5,  // 4: panel.Workflow.edges:type_name -> panel.WorkflowEdge
+	17, // 5: panel.WorkflowTask.timing:type_name -> panel.Timing
+	0,  // 6: panel.WorkflowTask.task_type:type_name -> panel.WorkflowTask.Type
+	1,  // 7: panel.WorkflowTask.status:type_name -> panel.WorkflowTask.Status
+	18, // 8: panel.WorkflowTask.retry_state:type_name -> panel.Retry.State
+	19, // 9: panel.WorkflowTask.logs:type_name -> panel.LogRecord
+	20, // 10: panel.WorkflowTask.retry_settings:type_name -> panel.Retry
+	21, // 11: panel.WorkflowTask.input:type_name -> google.protobuf.Any
+	21, // 12: panel.WorkflowTask.output:type_name -> google.protobuf.Any
+	22, // 13: panel.WorkflowTask.metadata:type_name -> panel.Metadata
+	22, // 14: panel.WorkflowEdge.metadata:type_name -> panel.Metadata
+	16, // 15: panel.WorkflowTask.DeployDatabase.Input.stroppy_run_id:type_name -> panel.Ulid
+	23, // 16: panel.WorkflowTask.DeployDatabase.Input.database_instance_params:type_name -> panel.CloudRunParams.DatabaseInstanceParams
+	24, // 17: panel.WorkflowTask.DeployDatabase.Output.database_deployment:type_name -> crossplane.Deployment
+	25, // 18: panel.WorkflowTask.DeployDatabase.Output.database_assigned_internal_ip:type_name -> crossplane.Ip
+	16, // 19: panel.WorkflowTask.DeployStroppy.Input.stroppy_run_id:type_name -> panel.Ulid
+	26, // 20: panel.WorkflowTask.DeployStroppy.Input.stroppy_instance_params:type_name -> panel.CloudRunParams.StroppyInstanceParams
+	24, // 21: panel.WorkflowTask.DeployStroppy.Input.database_deployment:type_name -> crossplane.Deployment
+	25, // 22: panel.WorkflowTask.DeployStroppy.Input.database_assigned_internal_ip:type_name -> crossplane.Ip
+	24, // 23: panel.WorkflowTask.DeployStroppy.Output.stroppy_deployment:type_name -> crossplane.Deployment
+	16, // 24: panel.WorkflowTask.CollectRunResults.Input.stroppy_run_id:type_name -> panel.Ulid
+	16, // 25: panel.WorkflowService.GetWorkflow:input_type -> panel.Ulid
+	16, // 26: panel.WorkflowService.CancelWorkflow:input_type -> panel.Ulid
+	3,  // 27: panel.WorkflowService.GetWorkflow:output_type -> panel.Workflow
+	3,  // 28: panel.WorkflowService.CancelWorkflow:output_type -> panel.Workflow
+	27, // [27:29] is the sub-list for method output_type
+	25, // [25:27] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_panel_wrokflow_proto_init() }
@@ -936,17 +1021,14 @@ func file_panel_wrokflow_proto_init() {
 		return
 	}
 	file_panel_run_proto_init()
-	file_panel_template_proto_init()
 	file_panel_types_proto_init()
-	file_panel_wrokflow_proto_msgTypes[7].OneofWrappers = []any{}
-	file_panel_wrokflow_proto_msgTypes[9].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_panel_wrokflow_proto_rawDesc), len(file_panel_wrokflow_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

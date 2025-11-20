@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/avito-tech/go-transaction-manager/trm"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
@@ -23,6 +24,14 @@ type mockWorkflowTaskRepository struct {
 
 func (m *mockWorkflowTaskRepository) ListActualTasks(ctx context.Context, onWorker string, cleanedUp bool, statues []panel.WorkflowTask_Status) ([]*panel.WorkflowTask, error) {
 	return lo.Values(m.tasks), nil
+}
+
+func (m *mockWorkflowTaskRepository) SetChildrenTasksAsPending(ctx context.Context, task *panel.WorkflowTask) error {
+	return nil
+}
+
+func (m *mockWorkflowTaskRepository) EnsureWorkflowTaskInput(ctx context.Context, task *panel.WorkflowTask) error {
+	return nil
 }
 
 func (m *mockWorkflowTaskRepository) SetWorkflowTaskOnWorker(ctx context.Context, tasksIds []string, onWorker string) error {
@@ -64,12 +73,22 @@ func (m *mockTaskHandler) Cleanup(ctx context.Context, state deployDatabaseTaskS
 	return nil
 }
 
+type mockTxManager struct{}
+
+func (m mockTxManager) Do(ctx context.Context, f func(ctx context.Context) error) error {
+	return f(ctx)
+}
+
+func (m mockTxManager) DoWithSettings(ctx context.Context, settings trm.Settings, f func(ctx context.Context) error) error {
+	return f(ctx)
+}
+
 func TestTaskProcessor(t *testing.T) {
 	repo := &mockWorkflowTaskRepository{tasks: make(map[string]*panel.WorkflowTask)}
 	processor, err := NewTaskProcessor(
 		&Config{},
 		logger.Global(),
-		nil,
+		mockTxManager{},
 		repo,
 		map[panel.WorkflowTask_Type]TaskWrapperBuilder{
 			panel.WorkflowTask_TYPE_COLLECT_RUN_RESULTS: NewTaskBuilder(&mockTaskHandler{}),
@@ -109,19 +128,23 @@ func TestTaskProcessor(t *testing.T) {
 		Input:     lo.Must(anypb.New(&panel.WorkflowTask_DeployDatabase_Input{})),
 		Output:    lo.Must(anypb.New(&panel.WorkflowTask_DeployDatabase_Output{})),
 	}
-	processor.ProcessTask(context.Background(), task)
+	err = processor.processWorkflowTask(context.Background(), task)
+	require.NoError(t, err)
 	require.NotNil(t, repo.tasks[task.GetId()])
 	require.Equal(t, panel.WorkflowTask_STATUS_RETRYING, task.GetStatus())
-	processor.ProcessTask(context.Background(), task)
+	err = processor.processWorkflowTask(context.Background(), task)
+	require.NoError(t, err)
 	require.NotNil(t, repo.tasks[task.GetId()])
 	require.Equal(t, panel.WorkflowTask_STATUS_RETRYING, task.GetStatus())
-	processor.ProcessTask(context.Background(), task)
+	err = processor.processWorkflowTask(context.Background(), task)
+	require.NoError(t, err)
 	require.NotNil(t, repo.tasks[task.GetId()])
 	output1 := &panel.WorkflowTask_DeployDatabase_Output{}
 	lo.Must0(anypb.UnmarshalTo(task.GetOutput(), output1, proto.UnmarshalOptions{}))
 	require.Equal(t, "test-deployment-id", output1.GetDatabaseDeployment().GetId())
 	require.Equal(t, panel.WorkflowTask_STATUS_RUNNING, task.GetStatus())
-	processor.ProcessTask(context.Background(), task)
+	err = processor.processWorkflowTask(context.Background(), task)
+	require.NoError(t, err)
 	require.NotNil(t, repo.tasks[task.GetId()])
 	require.Equal(t, panel.WorkflowTask_STATUS_COMPLETED, task.GetStatus())
 	output := &panel.WorkflowTask_DeployDatabase_Output{}

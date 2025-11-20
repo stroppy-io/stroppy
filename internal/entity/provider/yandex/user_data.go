@@ -1,6 +1,7 @@
 package yandex
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/defaults"
@@ -32,7 +33,12 @@ type UserDataYaml struct {
 }
 
 func (u *UserDataYaml) Serialize() ([]byte, error) {
-	return yaml.Marshal(u)
+	data, err := yaml.Marshal(u)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: Check
+	return bytes.Replace(data, []byte("\n"), []byte("\\n"), -1), nil
 }
 
 const (

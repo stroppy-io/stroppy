@@ -10,6 +10,7 @@ import (
 	errors "errors"
 	panel "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 	http "net/http"
 	strings "strings"
 )
@@ -24,6 +25,8 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// TemplateServiceName is the fully-qualified name of the TemplateService service.
 	TemplateServiceName = "panel.TemplateService"
+	// KvServiceName is the fully-qualified name of the KvService service.
+	KvServiceName = "panel.KvService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -55,6 +58,14 @@ const (
 	// TemplateServiceDeleteTemplateProcedure is the fully-qualified name of the TemplateService's
 	// DeleteTemplate RPC.
 	TemplateServiceDeleteTemplateProcedure = "/panel.TemplateService/DeleteTemplate"
+	// KvServiceListKvsProcedure is the fully-qualified name of the KvService's ListKvs RPC.
+	KvServiceListKvsProcedure = "/panel.KvService/ListKvs"
+	// KvServicePutKvProcedure is the fully-qualified name of the KvService's PutKv RPC.
+	KvServicePutKvProcedure = "/panel.KvService/PutKv"
+	// KvServiceUpdateKvProcedure is the fully-qualified name of the KvService's UpdateKv RPC.
+	KvServiceUpdateKvProcedure = "/panel.KvService/UpdateKv"
+	// KvServiceDeleteKvProcedure is the fully-qualified name of the KvService's DeleteKv RPC.
+	KvServiceDeleteKvProcedure = "/panel.KvService/DeleteKv"
 )
 
 // TemplateServiceClient is a client for the panel.TemplateService service.
@@ -311,4 +322,168 @@ func (UnimplementedTemplateServiceHandler) UpdateTemplate(context.Context, *pane
 
 func (UnimplementedTemplateServiceHandler) DeleteTemplate(context.Context, *panel.Ulid) (*emptypb.Empty, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.TemplateService.DeleteTemplate is not implemented"))
+}
+
+// KvServiceClient is a client for the panel.KvService service.
+type KvServiceClient interface {
+	ListKvs(context.Context, *emptypb.Empty) (*panel.KV_Map, error)
+	PutKv(context.Context, *panel.KV) (*emptypb.Empty, error)
+	UpdateKv(context.Context, *panel.KV) (*emptypb.Empty, error)
+	DeleteKv(context.Context, *wrapperspb.StringValue) (*emptypb.Empty, error)
+}
+
+// NewKvServiceClient constructs a client for the panel.KvService service. By default, it uses the
+// Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and sends
+// uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or
+// connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewKvServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) KvServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	kvServiceMethods := panel.File_panel_template_proto.Services().ByName("KvService").Methods()
+	return &kvServiceClient{
+		listKvs: connect.NewClient[emptypb.Empty, panel.KV_Map](
+			httpClient,
+			baseURL+KvServiceListKvsProcedure,
+			connect.WithSchema(kvServiceMethods.ByName("ListKvs")),
+			connect.WithClientOptions(opts...),
+		),
+		putKv: connect.NewClient[panel.KV, emptypb.Empty](
+			httpClient,
+			baseURL+KvServicePutKvProcedure,
+			connect.WithSchema(kvServiceMethods.ByName("PutKv")),
+			connect.WithClientOptions(opts...),
+		),
+		updateKv: connect.NewClient[panel.KV, emptypb.Empty](
+			httpClient,
+			baseURL+KvServiceUpdateKvProcedure,
+			connect.WithSchema(kvServiceMethods.ByName("UpdateKv")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteKv: connect.NewClient[wrapperspb.StringValue, emptypb.Empty](
+			httpClient,
+			baseURL+KvServiceDeleteKvProcedure,
+			connect.WithSchema(kvServiceMethods.ByName("DeleteKv")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// kvServiceClient implements KvServiceClient.
+type kvServiceClient struct {
+	listKvs  *connect.Client[emptypb.Empty, panel.KV_Map]
+	putKv    *connect.Client[panel.KV, emptypb.Empty]
+	updateKv *connect.Client[panel.KV, emptypb.Empty]
+	deleteKv *connect.Client[wrapperspb.StringValue, emptypb.Empty]
+}
+
+// ListKvs calls panel.KvService.ListKvs.
+func (c *kvServiceClient) ListKvs(ctx context.Context, req *emptypb.Empty) (*panel.KV_Map, error) {
+	response, err := c.listKvs.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// PutKv calls panel.KvService.PutKv.
+func (c *kvServiceClient) PutKv(ctx context.Context, req *panel.KV) (*emptypb.Empty, error) {
+	response, err := c.putKv.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// UpdateKv calls panel.KvService.UpdateKv.
+func (c *kvServiceClient) UpdateKv(ctx context.Context, req *panel.KV) (*emptypb.Empty, error) {
+	response, err := c.updateKv.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// DeleteKv calls panel.KvService.DeleteKv.
+func (c *kvServiceClient) DeleteKv(ctx context.Context, req *wrapperspb.StringValue) (*emptypb.Empty, error) {
+	response, err := c.deleteKv.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// KvServiceHandler is an implementation of the panel.KvService service.
+type KvServiceHandler interface {
+	ListKvs(context.Context, *emptypb.Empty) (*panel.KV_Map, error)
+	PutKv(context.Context, *panel.KV) (*emptypb.Empty, error)
+	UpdateKv(context.Context, *panel.KV) (*emptypb.Empty, error)
+	DeleteKv(context.Context, *wrapperspb.StringValue) (*emptypb.Empty, error)
+}
+
+// NewKvServiceHandler builds an HTTP handler from the service implementation. It returns the path
+// on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewKvServiceHandler(svc KvServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	kvServiceMethods := panel.File_panel_template_proto.Services().ByName("KvService").Methods()
+	kvServiceListKvsHandler := connect.NewUnaryHandlerSimple(
+		KvServiceListKvsProcedure,
+		svc.ListKvs,
+		connect.WithSchema(kvServiceMethods.ByName("ListKvs")),
+		connect.WithHandlerOptions(opts...),
+	)
+	kvServicePutKvHandler := connect.NewUnaryHandlerSimple(
+		KvServicePutKvProcedure,
+		svc.PutKv,
+		connect.WithSchema(kvServiceMethods.ByName("PutKv")),
+		connect.WithHandlerOptions(opts...),
+	)
+	kvServiceUpdateKvHandler := connect.NewUnaryHandlerSimple(
+		KvServiceUpdateKvProcedure,
+		svc.UpdateKv,
+		connect.WithSchema(kvServiceMethods.ByName("UpdateKv")),
+		connect.WithHandlerOptions(opts...),
+	)
+	kvServiceDeleteKvHandler := connect.NewUnaryHandlerSimple(
+		KvServiceDeleteKvProcedure,
+		svc.DeleteKv,
+		connect.WithSchema(kvServiceMethods.ByName("DeleteKv")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/panel.KvService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case KvServiceListKvsProcedure:
+			kvServiceListKvsHandler.ServeHTTP(w, r)
+		case KvServicePutKvProcedure:
+			kvServicePutKvHandler.ServeHTTP(w, r)
+		case KvServiceUpdateKvProcedure:
+			kvServiceUpdateKvHandler.ServeHTTP(w, r)
+		case KvServiceDeleteKvProcedure:
+			kvServiceDeleteKvHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedKvServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedKvServiceHandler struct{}
+
+func (UnimplementedKvServiceHandler) ListKvs(context.Context, *emptypb.Empty) (*panel.KV_Map, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.KvService.ListKvs is not implemented"))
+}
+
+func (UnimplementedKvServiceHandler) PutKv(context.Context, *panel.KV) (*emptypb.Empty, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.KvService.PutKv is not implemented"))
+}
+
+func (UnimplementedKvServiceHandler) UpdateKv(context.Context, *panel.KV) (*emptypb.Empty, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.KvService.UpdateKv is not implemented"))
+}
+
+func (UnimplementedKvServiceHandler) DeleteKv(context.Context, *wrapperspb.StringValue) (*emptypb.Empty, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("panel.KvService.DeleteKv is not implemented"))
 }

@@ -631,6 +631,50 @@ func (x *KV_Info) GetSystemGenerated() bool {
 	return false
 }
 
+type KV_Keys struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Keys          []string               `protobuf:"bytes,1,rep,name=keys,proto3" json:"keys,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KV_Keys) Reset() {
+	*x = KV_Keys{}
+	mi := &file_panel_types_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KV_Keys) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KV_Keys) ProtoMessage() {}
+
+func (x *KV_Keys) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_types_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KV_Keys.ProtoReflect.Descriptor instead.
+func (*KV_Keys) Descriptor() ([]byte, []int) {
+	return file_panel_types_proto_rawDescGZIP(), []int{3, 1}
+}
+
+func (x *KV_Keys) GetKeys() []string {
+	if x != nil {
+		return x.Keys
+	}
+	return nil
+}
+
 type KV_Map struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Kvs           []*KV                  `protobuf:"bytes,1,rep,name=kvs,proto3" json:"kvs,omitempty"`
@@ -640,7 +684,7 @@ type KV_Map struct {
 
 func (x *KV_Map) Reset() {
 	*x = KV_Map{}
-	mi := &file_panel_types_proto_msgTypes[11]
+	mi := &file_panel_types_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -652,7 +696,7 @@ func (x *KV_Map) String() string {
 func (*KV_Map) ProtoMessage() {}
 
 func (x *KV_Map) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[11]
+	mi := &file_panel_types_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -665,7 +709,7 @@ func (x *KV_Map) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KV_Map.ProtoReflect.Descriptor instead.
 func (*KV_Map) Descriptor() ([]byte, []int) {
-	return file_panel_types_proto_rawDescGZIP(), []int{3, 1}
+	return file_panel_types_proto_rawDescGZIP(), []int{3, 2}
 }
 
 func (x *KV_Map) GetKvs() []*KV {
@@ -684,7 +728,7 @@ type Tag_List struct {
 
 func (x *Tag_List) Reset() {
 	*x = Tag_List{}
-	mi := &file_panel_types_proto_msgTypes[12]
+	mi := &file_panel_types_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -696,7 +740,7 @@ func (x *Tag_List) String() string {
 func (*Tag_List) ProtoMessage() {}
 
 func (x *Tag_List) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[12]
+	mi := &file_panel_types_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -732,7 +776,7 @@ type Retry_Backoff struct {
 
 func (x *Retry_Backoff) Reset() {
 	*x = Retry_Backoff{}
-	mi := &file_panel_types_proto_msgTypes[13]
+	mi := &file_panel_types_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -744,7 +788,7 @@ func (x *Retry_Backoff) String() string {
 func (*Retry_Backoff) ProtoMessage() {}
 
 func (x *Retry_Backoff) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[13]
+	mi := &file_panel_types_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -812,7 +856,7 @@ type Retry_State struct {
 
 func (x *Retry_State) Reset() {
 	*x = Retry_State{}
-	mi := &file_panel_types_proto_msgTypes[14]
+	mi := &file_panel_types_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -824,7 +868,7 @@ func (x *Retry_State) String() string {
 func (*Retry_State) ProtoMessage() {}
 
 func (x *Retry_State) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[14]
+	mi := &file_panel_types_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -872,7 +916,7 @@ type Retry_Backoff_Constant struct {
 
 func (x *Retry_Backoff_Constant) Reset() {
 	*x = Retry_Backoff_Constant{}
-	mi := &file_panel_types_proto_msgTypes[15]
+	mi := &file_panel_types_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -884,7 +928,7 @@ func (x *Retry_Backoff_Constant) String() string {
 func (*Retry_Backoff_Constant) ProtoMessage() {}
 
 func (x *Retry_Backoff_Constant) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[15]
+	mi := &file_panel_types_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -929,7 +973,7 @@ type Retry_Backoff_Exponential struct {
 
 func (x *Retry_Backoff_Exponential) Reset() {
 	*x = Retry_Backoff_Exponential{}
-	mi := &file_panel_types_proto_msgTypes[16]
+	mi := &file_panel_types_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -941,7 +985,7 @@ func (x *Retry_Backoff_Exponential) String() string {
 func (*Retry_Backoff_Exponential) ProtoMessage() {}
 
 func (x *Retry_Backoff_Exponential) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[16]
+	mi := &file_panel_types_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1009,7 +1053,7 @@ type Tps_Order struct {
 
 func (x *Tps_Order) Reset() {
 	*x = Tps_Order{}
-	mi := &file_panel_types_proto_msgTypes[17]
+	mi := &file_panel_types_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1021,7 +1065,7 @@ func (x *Tps_Order) String() string {
 func (*Tps_Order) ProtoMessage() {}
 
 func (x *Tps_Order) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_types_proto_msgTypes[17]
+	mi := &file_panel_types_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1072,7 +1116,7 @@ const file_panel_types_proto_rawDesc = "" +
 	"\bmetadata\x18\x01 \x03(\v2\x1d.panel.Metadata.MetadataEntryR\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x81\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa7\x03\n" +
 	"\x02KV\x12\x19\n" +
 	"\x03key\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x03key\x12\x1d\n" +
 	"\x05value\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x05value\x12'\n" +
@@ -1084,7 +1128,9 @@ const file_panel_types_proto_rawDesc = "" +
 	"isRequired\x12\x1c\n" +
 	"\timmutable\x18\b \x01(\bR\timmutable\x12)\n" +
 	"\x10system_generated\x18\t \x01(\bR\x0fsystemGeneratedB\x10\n" +
-	"\x0e_default_value\x1a,\n" +
+	"\x0e_default_value\x1a$\n" +
+	"\x04Keys\x12\x1c\n" +
+	"\x04keys\x18\x01 \x03(\tB\b\xfaB\x05\x92\x01\x02\b\x01R\x04keys\x1a,\n" +
 	"\x03Map\x12%\n" +
 	"\x03kvs\x18\x01 \x03(\v2\t.panel.KVB\b\xfaB\x05\x92\x01\x02\b\x01R\x03kvsB\a\n" +
 	"\x05_info\"q\n" +
@@ -1155,7 +1201,7 @@ func file_panel_types_proto_rawDescGZIP() []byte {
 }
 
 var file_panel_types_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_panel_types_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_panel_types_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_panel_types_proto_goTypes = []any{
 	(Tps_Order_ParameterType)(0),      // 0: panel.Tps.Order.ParameterType
 	(*Ulid)(nil),                      // 1: panel.Ulid
@@ -1169,35 +1215,36 @@ var file_panel_types_proto_goTypes = []any{
 	(*Ulid_List)(nil),                 // 9: panel.Ulid.List
 	nil,                               // 10: panel.Metadata.MetadataEntry
 	(*KV_Info)(nil),                   // 11: panel.KV.Info
-	(*KV_Map)(nil),                    // 12: panel.KV.Map
-	(*Tag_List)(nil),                  // 13: panel.Tag.List
-	(*Retry_Backoff)(nil),             // 14: panel.Retry.Backoff
-	(*Retry_State)(nil),               // 15: panel.Retry.State
-	(*Retry_Backoff_Constant)(nil),    // 16: panel.Retry.Backoff.Constant
-	(*Retry_Backoff_Exponential)(nil), // 17: panel.Retry.Backoff.Exponential
-	(*Tps_Order)(nil),                 // 18: panel.Tps.Order
-	(*timestamppb.Timestamp)(nil),     // 19: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),       // 20: google.protobuf.Duration
+	(*KV_Keys)(nil),                   // 12: panel.KV.Keys
+	(*KV_Map)(nil),                    // 13: panel.KV.Map
+	(*Tag_List)(nil),                  // 14: panel.Tag.List
+	(*Retry_Backoff)(nil),             // 15: panel.Retry.Backoff
+	(*Retry_State)(nil),               // 16: panel.Retry.State
+	(*Retry_Backoff_Constant)(nil),    // 17: panel.Retry.Backoff.Constant
+	(*Retry_Backoff_Exponential)(nil), // 18: panel.Retry.Backoff.Exponential
+	(*Tps_Order)(nil),                 // 19: panel.Tps.Order
+	(*timestamppb.Timestamp)(nil),     // 20: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),       // 21: google.protobuf.Duration
 }
 var file_panel_types_proto_depIdxs = []int32{
-	19, // 0: panel.Timing.created_at:type_name -> google.protobuf.Timestamp
-	19, // 1: panel.Timing.updated_at:type_name -> google.protobuf.Timestamp
-	19, // 2: panel.Timing.deleted_at:type_name -> google.protobuf.Timestamp
+	20, // 0: panel.Timing.created_at:type_name -> google.protobuf.Timestamp
+	20, // 1: panel.Timing.updated_at:type_name -> google.protobuf.Timestamp
+	20, // 2: panel.Timing.deleted_at:type_name -> google.protobuf.Timestamp
 	10, // 3: panel.Metadata.metadata:type_name -> panel.Metadata.MetadataEntry
 	11, // 4: panel.KV.info:type_name -> panel.KV.Info
-	14, // 5: panel.Retry.backoff:type_name -> panel.Retry.Backoff
+	15, // 5: panel.Retry.backoff:type_name -> panel.Retry.Backoff
 	1,  // 6: panel.Ulid.List.ulids:type_name -> panel.Ulid
 	4,  // 7: panel.KV.Map.kvs:type_name -> panel.KV
 	5,  // 8: panel.Tag.List.tags:type_name -> panel.Tag
-	16, // 9: panel.Retry.Backoff.constant:type_name -> panel.Retry.Backoff.Constant
-	17, // 10: panel.Retry.Backoff.exponential:type_name -> panel.Retry.Backoff.Exponential
-	20, // 11: panel.Retry.State.backoff_duration:type_name -> google.protobuf.Duration
-	19, // 12: panel.Retry.State.backoff_value:type_name -> google.protobuf.Timestamp
-	20, // 13: panel.Retry.Backoff.Constant.duration:type_name -> google.protobuf.Duration
-	20, // 14: panel.Retry.Backoff.Exponential.initial_interval:type_name -> google.protobuf.Duration
-	20, // 15: panel.Retry.Backoff.Exponential.max_elapsed_time:type_name -> google.protobuf.Duration
-	20, // 16: panel.Retry.Backoff.Exponential.max_interval:type_name -> google.protobuf.Duration
-	20, // 17: panel.Retry.Backoff.Exponential.retry_stop_duration:type_name -> google.protobuf.Duration
+	17, // 9: panel.Retry.Backoff.constant:type_name -> panel.Retry.Backoff.Constant
+	18, // 10: panel.Retry.Backoff.exponential:type_name -> panel.Retry.Backoff.Exponential
+	21, // 11: panel.Retry.State.backoff_duration:type_name -> google.protobuf.Duration
+	20, // 12: panel.Retry.State.backoff_value:type_name -> google.protobuf.Timestamp
+	21, // 13: panel.Retry.Backoff.Constant.duration:type_name -> google.protobuf.Duration
+	21, // 14: panel.Retry.Backoff.Exponential.initial_interval:type_name -> google.protobuf.Duration
+	21, // 15: panel.Retry.Backoff.Exponential.max_elapsed_time:type_name -> google.protobuf.Duration
+	21, // 16: panel.Retry.Backoff.Exponential.max_interval:type_name -> google.protobuf.Duration
+	21, // 17: panel.Retry.Backoff.Exponential.retry_stop_duration:type_name -> google.protobuf.Duration
 	0,  // 18: panel.Tps.Order.parameter_type:type_name -> panel.Tps.Order.ParameterType
 	19, // [19:19] is the sub-list for method output_type
 	19, // [19:19] is the sub-list for method input_type
@@ -1214,7 +1261,7 @@ func file_panel_types_proto_init() {
 	file_panel_types_proto_msgTypes[1].OneofWrappers = []any{}
 	file_panel_types_proto_msgTypes[3].OneofWrappers = []any{}
 	file_panel_types_proto_msgTypes[10].OneofWrappers = []any{}
-	file_panel_types_proto_msgTypes[13].OneofWrappers = []any{
+	file_panel_types_proto_msgTypes[14].OneofWrappers = []any{
 		(*Retry_Backoff_Constant_)(nil),
 		(*Retry_Backoff_Exponential_)(nil),
 	}
@@ -1224,7 +1271,7 @@ func file_panel_types_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_panel_types_proto_rawDesc), len(file_panel_types_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   18,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

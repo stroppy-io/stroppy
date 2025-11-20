@@ -32,6 +32,10 @@ enum SupportedCloud {
     SUPPORTED_CLOUD_YANDEX = 1;
 }
 
+message Ip {
+    string value = 1 [(validate.rules).string.min_len = 1];
+}
+
 enum CrossplaneDeletionPolicy {
     CROSSPLANE_DELETION_POLICY_UNSPECIFIED = 0;
     DELETE = 1;

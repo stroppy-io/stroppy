@@ -33,6 +33,9 @@ message KV {
         bool immutable = 8;
         bool system_generated = 9;
     }
+    message Keys {
+        repeated string keys = 1 [(validate.rules).repeated.min_items = 1];
+    }
     message Map {
         repeated KV kvs = 1 [(validate.rules).repeated.min_items = 1];
     }

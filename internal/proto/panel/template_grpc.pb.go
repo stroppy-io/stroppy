@@ -12,6 +12,7 @@ import (
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -345,6 +346,222 @@ var TemplateService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteTemplate",
 			Handler:    _TemplateService_DeleteTemplate_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "panel/template.proto",
+}
+
+const (
+	KvService_ListKvs_FullMethodName  = "/panel.KvService/ListKvs"
+	KvService_PutKv_FullMethodName    = "/panel.KvService/PutKv"
+	KvService_UpdateKv_FullMethodName = "/panel.KvService/UpdateKv"
+	KvService_DeleteKv_FullMethodName = "/panel.KvService/DeleteKv"
+)
+
+// KvServiceClient is the client API for KvService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type KvServiceClient interface {
+	ListKvs(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*KV_Map, error)
+	PutKv(ctx context.Context, in *KV, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	UpdateKv(ctx context.Context, in *KV, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	DeleteKv(ctx context.Context, in *wrapperspb.StringValue, opts ...grpc.CallOption) (*emptypb.Empty, error)
+}
+
+type kvServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewKvServiceClient(cc grpc.ClientConnInterface) KvServiceClient {
+	return &kvServiceClient{cc}
+}
+
+func (c *kvServiceClient) ListKvs(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*KV_Map, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(KV_Map)
+	err := c.cc.Invoke(ctx, KvService_ListKvs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *kvServiceClient) PutKv(ctx context.Context, in *KV, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, KvService_PutKv_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *kvServiceClient) UpdateKv(ctx context.Context, in *KV, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, KvService_UpdateKv_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *kvServiceClient) DeleteKv(ctx context.Context, in *wrapperspb.StringValue, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, KvService_DeleteKv_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// KvServiceServer is the server API for KvService service.
+// All implementations must embed UnimplementedKvServiceServer
+// for forward compatibility.
+type KvServiceServer interface {
+	ListKvs(context.Context, *emptypb.Empty) (*KV_Map, error)
+	PutKv(context.Context, *KV) (*emptypb.Empty, error)
+	UpdateKv(context.Context, *KV) (*emptypb.Empty, error)
+	DeleteKv(context.Context, *wrapperspb.StringValue) (*emptypb.Empty, error)
+	mustEmbedUnimplementedKvServiceServer()
+}
+
+// UnimplementedKvServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedKvServiceServer struct{}
+
+func (UnimplementedKvServiceServer) ListKvs(context.Context, *emptypb.Empty) (*KV_Map, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListKvs not implemented")
+}
+func (UnimplementedKvServiceServer) PutKv(context.Context, *KV) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PutKv not implemented")
+}
+func (UnimplementedKvServiceServer) UpdateKv(context.Context, *KV) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateKv not implemented")
+}
+func (UnimplementedKvServiceServer) DeleteKv(context.Context, *wrapperspb.StringValue) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteKv not implemented")
+}
+func (UnimplementedKvServiceServer) mustEmbedUnimplementedKvServiceServer() {}
+func (UnimplementedKvServiceServer) testEmbeddedByValue()                   {}
+
+// UnsafeKvServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to KvServiceServer will
+// result in compilation errors.
+type UnsafeKvServiceServer interface {
+	mustEmbedUnimplementedKvServiceServer()
+}
+
+func RegisterKvServiceServer(s grpc.ServiceRegistrar, srv KvServiceServer) {
+	// If the following call pancis, it indicates UnimplementedKvServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&KvService_ServiceDesc, srv)
+}
+
+func _KvService_ListKvs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KvServiceServer).ListKvs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KvService_ListKvs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KvServiceServer).ListKvs(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _KvService_PutKv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KV)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KvServiceServer).PutKv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KvService_PutKv_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KvServiceServer).PutKv(ctx, req.(*KV))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _KvService_UpdateKv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KV)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KvServiceServer).UpdateKv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KvService_UpdateKv_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KvServiceServer).UpdateKv(ctx, req.(*KV))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _KvService_DeleteKv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(wrapperspb.StringValue)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KvServiceServer).DeleteKv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KvService_DeleteKv_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KvServiceServer).DeleteKv(ctx, req.(*wrapperspb.StringValue))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// KvService_ServiceDesc is the grpc.ServiceDesc for KvService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var KvService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "panel.KvService",
+	HandlerType: (*KvServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListKvs",
+			Handler:    _KvService_ListKvs_Handler,
+		},
+		{
+			MethodName: "PutKv",
+			Handler:    _KvService_PutKv_Handler,
+		},
+		{
+			MethodName: "UpdateKv",
+			Handler:    _KvService_UpdateKv_Handler,
+		},
+		{
+			MethodName: "DeleteKv",
+			Handler:    _KvService_DeleteKv_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

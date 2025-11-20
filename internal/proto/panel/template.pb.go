@@ -13,6 +13,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -24,74 +25,6 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
-
-type KVInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *Ulid                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Timing        *Timing                `protobuf:"bytes,2,opt,name=timing,proto3" json:"timing,omitempty"`
-	Key           string                 `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"`
-	Info          *KV_Info               `protobuf:"bytes,5,opt,name=info,proto3" json:"info,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *KVInfo) Reset() {
-	*x = KVInfo{}
-	mi := &file_panel_template_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *KVInfo) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*KVInfo) ProtoMessage() {}
-
-func (x *KVInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_template_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use KVInfo.ProtoReflect.Descriptor instead.
-func (*KVInfo) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *KVInfo) GetId() *Ulid {
-	if x != nil {
-		return x.Id
-	}
-	return nil
-}
-
-func (x *KVInfo) GetTiming() *Timing {
-	if x != nil {
-		return x.Timing
-	}
-	return nil
-}
-
-func (x *KVInfo) GetKey() string {
-	if x != nil {
-		return x.Key
-	}
-	return ""
-}
-
-func (x *KVInfo) GetInfo() *KV_Info {
-	if x != nil {
-		return x.Info
-	}
-	return nil
-}
 
 type Template struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
@@ -113,7 +46,7 @@ type Template struct {
 
 func (x *Template) Reset() {
 	*x = Template{}
-	mi := &file_panel_template_proto_msgTypes[1]
+	mi := &file_panel_template_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -125,7 +58,7 @@ func (x *Template) String() string {
 func (*Template) ProtoMessage() {}
 
 func (x *Template) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_template_proto_msgTypes[1]
+	mi := &file_panel_template_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -138,7 +71,7 @@ func (x *Template) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Template.ProtoReflect.Descriptor instead.
 func (*Template) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{1}
+	return file_panel_template_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Template) GetId() *Ulid {
@@ -249,7 +182,7 @@ type SearchTemplatesRequest struct {
 
 func (x *SearchTemplatesRequest) Reset() {
 	*x = SearchTemplatesRequest{}
-	mi := &file_panel_template_proto_msgTypes[2]
+	mi := &file_panel_template_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -261,7 +194,7 @@ func (x *SearchTemplatesRequest) String() string {
 func (*SearchTemplatesRequest) ProtoMessage() {}
 
 func (x *SearchTemplatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_panel_template_proto_msgTypes[2]
+	mi := &file_panel_template_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -274,7 +207,7 @@ func (x *SearchTemplatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchTemplatesRequest.ProtoReflect.Descriptor instead.
 func (*SearchTemplatesRequest) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{2}
+	return file_panel_template_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *SearchTemplatesRequest) GetName() string {
@@ -287,6 +220,66 @@ func (x *SearchTemplatesRequest) GetName() string {
 func (x *SearchTemplatesRequest) GetTagsList() *Tag_List {
 	if x != nil {
 		return x.TagsList
+	}
+	return nil
+}
+
+type KvTable struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Timing        *Timing                `protobuf:"bytes,2,opt,name=timing,proto3" json:"timing,omitempty"`
+	Key           string                 `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"`
+	Info          *KV_Info               `protobuf:"bytes,5,opt,name=info,proto3" json:"info,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KvTable) Reset() {
+	*x = KvTable{}
+	mi := &file_panel_template_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KvTable) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KvTable) ProtoMessage() {}
+
+func (x *KvTable) ProtoReflect() protoreflect.Message {
+	mi := &file_panel_template_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KvTable.ProtoReflect.Descriptor instead.
+func (*KvTable) Descriptor() ([]byte, []int) {
+	return file_panel_template_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *KvTable) GetTiming() *Timing {
+	if x != nil {
+		return x.Timing
+	}
+	return nil
+}
+
+func (x *KvTable) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *KvTable) GetInfo() *KV_Info {
+	if x != nil {
+		return x.Info
 	}
 	return nil
 }
@@ -325,7 +318,7 @@ func (x *Template_DatabaseDeployment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Template_DatabaseDeployment.ProtoReflect.Descriptor instead.
 func (*Template_DatabaseDeployment) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{1, 0}
+	return file_panel_template_proto_rawDescGZIP(), []int{0, 0}
 }
 
 func (x *Template_DatabaseDeployment) GetPrebuiltImageId() string {
@@ -369,7 +362,7 @@ func (x *Template_MachineDeployment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Template_MachineDeployment.ProtoReflect.Descriptor instead.
 func (*Template_MachineDeployment) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{1, 1}
+	return file_panel_template_proto_rawDescGZIP(), []int{0, 1}
 }
 
 func (x *Template_MachineDeployment) GetMachineInfo() *crossplane.MachineInfo {
@@ -414,7 +407,7 @@ func (x *Template_StroppyDeployment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Template_StroppyDeployment.ProtoReflect.Descriptor instead.
 func (*Template_StroppyDeployment) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{1, 2}
+	return file_panel_template_proto_rawDescGZIP(), []int{0, 2}
 }
 
 func (x *Template_StroppyDeployment) GetFiles() []*crossplane.FsFile {
@@ -465,7 +458,7 @@ func (x *Template_List) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Template_List.ProtoReflect.Descriptor instead.
 func (*Template_List) Descriptor() ([]byte, []int) {
-	return file_panel_template_proto_rawDescGZIP(), []int{1, 3}
+	return file_panel_template_proto_rawDescGZIP(), []int{0, 3}
 }
 
 func (x *Template_List) GetTemplates() []*Template {
@@ -479,13 +472,7 @@ var File_panel_template_proto protoreflect.FileDescriptor
 
 const file_panel_template_proto_rawDesc = "" +
 	"\n" +
-	"\x14panel/template.proto\x12\x05panel\x1a\x1bcrossplane/deployment.proto\x1a\x16crossplane/types.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\"\xbf\x01\n" +
-	"\x06KVInfo\x12*\n" +
-	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
-	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
-	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12\x19\n" +
-	"\x03key\x18\x04 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x03key\x12)\n" +
-	"\x04info\x18\x05 \x01(\v2\x0e.panel.KV.InfoB\x05\xca>\x02@\x01R\x04info:\x15\xca>\x12\b\x01\x12\x0esystem_kv_info\"\x99\a\n" +
+	"\x14panel/template.proto\x12\x05panel\x1a\x1bcrossplane/deployment.proto\x1a\x16crossplane/types.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x11panel/types.proto\x1a\x12protopgx/pgx.proto\x1a\x17validate/validate.proto\x1a\x1egoogle/protobuf/wrappers.proto\"\x99\a\n" +
 	"\bTemplate\x12*\n" +
 	"\x02id\x18\x01 \x01(\v2\v.panel.UlidB\r\xca>\n" +
 	"\x12\x04\b\x01 \x01\x1a\x02\x10\x01R\x02id\x12,\n" +
@@ -513,7 +500,11 @@ const file_panel_template_proto_rawDesc = "" +
 	"\rtemplate_data\"c\n" +
 	"\x16SearchTemplatesRequest\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12,\n" +
-	"\ttags_list\x18\x02 \x01(\v2\x0f.panel.Tag.ListR\btagsList2\x91\x03\n" +
+	"\ttags_list\x18\x02 \x01(\v2\x0f.panel.Tag.ListR\btagsList\"\x95\x01\n" +
+	"\aKvTable\x12,\n" +
+	"\x06timing\x18\x02 \x01(\v2\r.panel.TimingB\x05\xca>\x02@\x01R\x06timing\x12 \n" +
+	"\x03key\x18\x04 \x01(\tB\x0e\xca>\x04\x1a\x02\x10\x01\xfaB\x04r\x02\x10\x01R\x03key\x12)\n" +
+	"\x04info\x18\x05 \x01(\v2\x0e.panel.KV.InfoB\x05\xca>\x02H\x01R\x04info:\x0f\xca>\f\b\x01\x12\bkv_infos2\x91\x03\n" +
 	"\x0fTemplateService\x12<\n" +
 	"\x11ListTemplatesTags\x12\x16.google.protobuf.Empty\x1a\x0f.panel.Tag.List\x12F\n" +
 	"\x0fSearchTemplates\x12\x1d.panel.SearchTemplatesRequest\x1a\x14.panel.Template.List\x12,\n" +
@@ -521,7 +512,12 @@ const file_panel_template_proto_rawDesc = "" +
 	"\vGetTemplate\x12\v.panel.Ulid\x1a\x0f.panel.Template\x122\n" +
 	"\x0eCreateTemplate\x12\x0f.panel.Template\x1a\x0f.panel.Template\x122\n" +
 	"\x0eUpdateTemplate\x12\x0f.panel.Template\x1a\x0f.panel.Template\x125\n" +
-	"\x0eDeleteTemplate\x12\v.panel.Ulid\x1a\x16.google.protobuf.EmptyB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
+	"\x0eDeleteTemplate\x12\v.panel.Ulid\x1a\x16.google.protobuf.Empty2\xda\x01\n" +
+	"\tKvService\x120\n" +
+	"\aListKvs\x12\x16.google.protobuf.Empty\x1a\r.panel.KV.Map\x12*\n" +
+	"\x05PutKv\x12\t.panel.KV\x1a\x16.google.protobuf.Empty\x12-\n" +
+	"\bUpdateKv\x12\t.panel.KV\x1a\x16.google.protobuf.Empty\x12@\n" +
+	"\bDeleteKv\x12\x1c.google.protobuf.StringValue\x1a\x16.google.protobuf.EmptyB@Z>github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panelb\x06proto3"
 
 var (
 	file_panel_template_proto_rawDescOnce sync.Once
@@ -537,57 +533,66 @@ func file_panel_template_proto_rawDescGZIP() []byte {
 
 var file_panel_template_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_panel_template_proto_goTypes = []any{
-	(*KVInfo)(nil),                      // 0: panel.KVInfo
-	(*Template)(nil),                    // 1: panel.Template
-	(*SearchTemplatesRequest)(nil),      // 2: panel.SearchTemplatesRequest
+	(*Template)(nil),                    // 0: panel.Template
+	(*SearchTemplatesRequest)(nil),      // 1: panel.SearchTemplatesRequest
+	(*KvTable)(nil),                     // 2: panel.KvTable
 	(*Template_DatabaseDeployment)(nil), // 3: panel.Template.DatabaseDeployment
 	(*Template_MachineDeployment)(nil),  // 4: panel.Template.MachineDeployment
 	(*Template_StroppyDeployment)(nil),  // 5: panel.Template.StroppyDeployment
 	(*Template_List)(nil),               // 6: panel.Template.List
 	(*Ulid)(nil),                        // 7: panel.Ulid
 	(*Timing)(nil),                      // 8: panel.Timing
-	(*KV_Info)(nil),                     // 9: panel.KV.Info
-	(*Tag)(nil),                         // 10: panel.Tag
-	(*Tag_List)(nil),                    // 11: panel.Tag.List
+	(*Tag)(nil),                         // 9: panel.Tag
+	(*Tag_List)(nil),                    // 10: panel.Tag.List
+	(*KV_Info)(nil),                     // 11: panel.KV.Info
 	(*crossplane.MachineInfo)(nil),      // 12: crossplane.MachineInfo
 	(*crossplane.FsFile)(nil),           // 13: crossplane.FsFile
 	(*emptypb.Empty)(nil),               // 14: google.protobuf.Empty
-	(*KV_Map)(nil),                      // 15: panel.KV.Map
+	(*KV)(nil),                          // 15: panel.KV
+	(*wrapperspb.StringValue)(nil),      // 16: google.protobuf.StringValue
+	(*KV_Map)(nil),                      // 17: panel.KV.Map
 }
 var file_panel_template_proto_depIdxs = []int32{
-	7,  // 0: panel.KVInfo.id:type_name -> panel.Ulid
-	8,  // 1: panel.KVInfo.timing:type_name -> panel.Timing
-	9,  // 2: panel.KVInfo.info:type_name -> panel.KV.Info
-	7,  // 3: panel.Template.id:type_name -> panel.Ulid
-	8,  // 4: panel.Template.timing:type_name -> panel.Timing
-	7,  // 5: panel.Template.author_id:type_name -> panel.Ulid
-	10, // 6: panel.Template.tags:type_name -> panel.Tag
-	4,  // 7: panel.Template.machine_deployment:type_name -> panel.Template.MachineDeployment
-	3,  // 8: panel.Template.database_deployment:type_name -> panel.Template.DatabaseDeployment
-	5,  // 9: panel.Template.stroppy_deployment:type_name -> panel.Template.StroppyDeployment
-	11, // 10: panel.SearchTemplatesRequest.tags_list:type_name -> panel.Tag.List
-	12, // 11: panel.Template.MachineDeployment.machine_info:type_name -> crossplane.MachineInfo
-	13, // 12: panel.Template.StroppyDeployment.files:type_name -> crossplane.FsFile
-	1,  // 13: panel.Template.List.templates:type_name -> panel.Template
-	14, // 14: panel.TemplateService.ListTemplatesTags:input_type -> google.protobuf.Empty
-	2,  // 15: panel.TemplateService.SearchTemplates:input_type -> panel.SearchTemplatesRequest
-	7,  // 16: panel.TemplateService.GetTemplateKvs:input_type -> panel.Ulid
-	7,  // 17: panel.TemplateService.GetTemplate:input_type -> panel.Ulid
-	1,  // 18: panel.TemplateService.CreateTemplate:input_type -> panel.Template
-	1,  // 19: panel.TemplateService.UpdateTemplate:input_type -> panel.Template
-	7,  // 20: panel.TemplateService.DeleteTemplate:input_type -> panel.Ulid
-	11, // 21: panel.TemplateService.ListTemplatesTags:output_type -> panel.Tag.List
-	6,  // 22: panel.TemplateService.SearchTemplates:output_type -> panel.Template.List
-	15, // 23: panel.TemplateService.GetTemplateKvs:output_type -> panel.KV.Map
-	1,  // 24: panel.TemplateService.GetTemplate:output_type -> panel.Template
-	1,  // 25: panel.TemplateService.CreateTemplate:output_type -> panel.Template
-	1,  // 26: panel.TemplateService.UpdateTemplate:output_type -> panel.Template
-	14, // 27: panel.TemplateService.DeleteTemplate:output_type -> google.protobuf.Empty
-	21, // [21:28] is the sub-list for method output_type
-	14, // [14:21] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	7,  // 0: panel.Template.id:type_name -> panel.Ulid
+	8,  // 1: panel.Template.timing:type_name -> panel.Timing
+	7,  // 2: panel.Template.author_id:type_name -> panel.Ulid
+	9,  // 3: panel.Template.tags:type_name -> panel.Tag
+	4,  // 4: panel.Template.machine_deployment:type_name -> panel.Template.MachineDeployment
+	3,  // 5: panel.Template.database_deployment:type_name -> panel.Template.DatabaseDeployment
+	5,  // 6: panel.Template.stroppy_deployment:type_name -> panel.Template.StroppyDeployment
+	10, // 7: panel.SearchTemplatesRequest.tags_list:type_name -> panel.Tag.List
+	8,  // 8: panel.KvTable.timing:type_name -> panel.Timing
+	11, // 9: panel.KvTable.info:type_name -> panel.KV.Info
+	12, // 10: panel.Template.MachineDeployment.machine_info:type_name -> crossplane.MachineInfo
+	13, // 11: panel.Template.StroppyDeployment.files:type_name -> crossplane.FsFile
+	0,  // 12: panel.Template.List.templates:type_name -> panel.Template
+	14, // 13: panel.TemplateService.ListTemplatesTags:input_type -> google.protobuf.Empty
+	1,  // 14: panel.TemplateService.SearchTemplates:input_type -> panel.SearchTemplatesRequest
+	7,  // 15: panel.TemplateService.GetTemplateKvs:input_type -> panel.Ulid
+	7,  // 16: panel.TemplateService.GetTemplate:input_type -> panel.Ulid
+	0,  // 17: panel.TemplateService.CreateTemplate:input_type -> panel.Template
+	0,  // 18: panel.TemplateService.UpdateTemplate:input_type -> panel.Template
+	7,  // 19: panel.TemplateService.DeleteTemplate:input_type -> panel.Ulid
+	14, // 20: panel.KvService.ListKvs:input_type -> google.protobuf.Empty
+	15, // 21: panel.KvService.PutKv:input_type -> panel.KV
+	15, // 22: panel.KvService.UpdateKv:input_type -> panel.KV
+	16, // 23: panel.KvService.DeleteKv:input_type -> google.protobuf.StringValue
+	10, // 24: panel.TemplateService.ListTemplatesTags:output_type -> panel.Tag.List
+	6,  // 25: panel.TemplateService.SearchTemplates:output_type -> panel.Template.List
+	17, // 26: panel.TemplateService.GetTemplateKvs:output_type -> panel.KV.Map
+	0,  // 27: panel.TemplateService.GetTemplate:output_type -> panel.Template
+	0,  // 28: panel.TemplateService.CreateTemplate:output_type -> panel.Template
+	0,  // 29: panel.TemplateService.UpdateTemplate:output_type -> panel.Template
+	14, // 30: panel.TemplateService.DeleteTemplate:output_type -> google.protobuf.Empty
+	17, // 31: panel.KvService.ListKvs:output_type -> panel.KV.Map
+	14, // 32: panel.KvService.PutKv:output_type -> google.protobuf.Empty
+	14, // 33: panel.KvService.UpdateKv:output_type -> google.protobuf.Empty
+	14, // 34: panel.KvService.DeleteKv:output_type -> google.protobuf.Empty
+	24, // [24:35] is the sub-list for method output_type
+	13, // [13:24] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_panel_template_proto_init() }
@@ -596,7 +601,7 @@ func file_panel_template_proto_init() {
 		return
 	}
 	file_panel_types_proto_init()
-	file_panel_template_proto_msgTypes[1].OneofWrappers = []any{
+	file_panel_template_proto_msgTypes[0].OneofWrappers = []any{
 		(*Template_MachineDeployment_)(nil),
 		(*Template_DatabaseDeployment_)(nil),
 		(*Template_StroppyDeployment_)(nil),
@@ -610,7 +615,7 @@ func file_panel_template_proto_init() {
 			NumEnums:      0,
 			NumMessages:   7,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_panel_template_proto_goTypes,
 		DependencyIndexes: file_panel_template_proto_depIdxs,

@@ -8,24 +8,11 @@ import "google/protobuf/empty.proto";
 import "panel/types.proto";
 import "protopgx/pgx.proto";
 import "validate/validate.proto";
+import "google/protobuf/wrappers.proto";
 
 option go_package = "github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel";
 
-message KVInfo {
-    option (sql.sql_table) = {
-        generate: true
-        table_name: "system_kv_info"
-    };
-    Ulid id = 1 [
-        (sql.sql_field) = {
-            sql_type: {type: TEXT,user_cast: true}
-            constraints: {primary_key: true}
-        }
-    ];
-    Timing timing = 2 [(sql.sql_field).embedded_message = true];
-    string key = 4 [(validate.rules).string.min_len = 1];
-    KV.Info info = 5 [(sql.sql_field).embedded_message = true];
-}
+// ----------------------------------------__TEMPLATE_SERVICE__---------------------------------------------------------
 
 message Template {
     option (sql.sql_table) = {
@@ -66,8 +53,6 @@ message Template {
     }
 }
 
-// ----------------------------------------__TEMPLATE_SERVICE__---------------------------------------------------------
-
 message SearchTemplatesRequest {
     string name = 1 [(validate.rules).string.min_len = 1];
     Tag.List tags_list = 2;
@@ -76,10 +61,32 @@ message SearchTemplatesRequest {
 service TemplateService {
     rpc ListTemplatesTags (google.protobuf.Empty) returns (Tag.List);
     rpc SearchTemplates (SearchTemplatesRequest) returns (Template.List);
-    rpc GetTemplateKvs (Ulid) returns (KV.Map);
+    rpc GetTemplateKvs (Ulid) returns (KV.Map); // by template id
     rpc GetTemplate (Ulid) returns (Template);
     // Admins only
     rpc CreateTemplate (Template) returns (Template);
     rpc UpdateTemplate (Template) returns (Template);
     rpc DeleteTemplate (Ulid) returns (google.protobuf.Empty);
+}
+
+// ----------------------------------------__KV_SERVICE__---------------------------------------------------------------
+
+message KvTable {
+    option (sql.sql_table) = {
+        generate: true
+        table_name: "kv_infos"
+    };
+    Timing timing = 2 [(sql.sql_field).embedded_message = true];
+    string key = 4 [
+        (validate.rules).string.min_len = 1,
+        (sql.sql_field).constraints = {primary_key: true}
+    ];
+    KV.Info info = 5 [(sql.sql_field).serialized_message = true];
+}
+
+service KvService {
+    rpc ListKvs (google.protobuf.Empty) returns (KV.Map);
+    rpc PutKv (KV) returns (google.protobuf.Empty);
+    rpc UpdateKv (KV) returns (google.protobuf.Empty);
+    rpc DeleteKv (google.protobuf.StringValue) returns (google.protobuf.Empty);
 }

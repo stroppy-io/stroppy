@@ -10,6 +10,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/build"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -31,7 +32,7 @@ type TaskRepository interface {
 	ListActualTasks(
 		ctx context.Context,
 		onWorker string,
-		cleanedUp bool,
+		forCleanup bool,
 		statues []panel.WorkflowTask_Status,
 	) ([]*panel.WorkflowTask, error)
 	SetWorkflowTaskOnWorker(
@@ -131,12 +132,17 @@ func (t *TaskProcessor) processTaskInternal(
 	ctx context.Context,
 	task *panel.WorkflowTask,
 	taskWrapper TaskWrapper,
-) (panel.WorkflowTask_Status, error) {
+) {
 	switch task.GetStatus() {
 	case panel.WorkflowTask_STATUS_PENDING,
 		panel.WorkflowTask_STATUS_RETRYING:
 		err := taskWrapper.Start(ctx)
 		if err != nil {
+			if errors.Is(err, ErrStatusTemproraryFailed) {
+				taskWrapper.TaskLogger().Warn("temporary failed to start task, still pending for retry", zap.Error(err))
+				task.Status = panel.WorkflowTask_STATUS_PENDING
+				return
+			}
 			if t.canRetry(task) {
 				taskWrapper.TaskLogger().Warn(
 					"task failed, retrying",
@@ -145,29 +151,34 @@ func (t *TaskProcessor) processTaskInternal(
 					zap.Duration("backoff_duration", task.GetRetryState().GetBackoffDuration().AsDuration()),
 					zap.Error(err),
 				)
+				task.Status = panel.WorkflowTask_STATUS_RETRYING
 				task.RetryState.Attempt = task.GetRetryState().GetAttempt() + 1
-				return panel.WorkflowTask_STATUS_RETRYING, err
+				return
 			} else {
-				taskWrapper.TaskLogger().Warn("task failed, no more retries")
+				taskWrapper.TaskLogger().Error("task failed, no more retries", zap.Error(err))
 				task.Status = panel.WorkflowTask_STATUS_FAILED
+				return
 			}
 		}
+		task.Status = panel.WorkflowTask_STATUS_RUNNING
 		taskWrapper.TaskLogger().Info("task succeeded started")
-		return panel.WorkflowTask_STATUS_RUNNING, err
+		return
 	case panel.WorkflowTask_STATUS_RUNNING:
 		newStatus, err := taskWrapper.Status(ctx)
 		if err != nil {
 			if errors.Is(err, ErrStatusTemproraryFailed) {
+				task.Status = panel.WorkflowTask_STATUS_RUNNING
 				taskWrapper.TaskLogger().Warn("temporary failed to get task status, retrying")
-				return panel.WorkflowTask_STATUS_RUNNING, err
+				return
 			} else {
+				task.Status = panel.WorkflowTask_STATUS_FAILED
 				taskWrapper.TaskLogger().Error("failed to get task status", zap.Error(err))
-				return panel.WorkflowTask_STATUS_FAILED, err
+				return
 			}
 		}
 		task.Status = newStatus
 		taskWrapper.TaskLogger().Debug("task status ping complete")
-		return newStatus, err
+		return
 	case panel.WorkflowTask_STATUS_FAILED,
 		panel.WorkflowTask_STATUS_CANCELLED,
 		panel.WorkflowTask_STATUS_COMPLETED:
@@ -175,18 +186,17 @@ func (t *TaskProcessor) processTaskInternal(
 			err := taskWrapper.Cleanup(ctx)
 			if err != nil {
 				taskWrapper.TaskLogger().Error("failed to cleanup task", zap.Error(err))
-				return task.GetStatus(), err
+				return
 			}
 			task.CleanedUp = true
-			return task.GetStatus(), nil
 		}
-		return task.GetStatus(), nil
+		return
 	default:
 		panic(fmt.Sprintf("unknown task status: %v", task.GetStatus().String()))
 	}
 }
 
-func (t *TaskProcessor) ProcessTask(ctx context.Context, task *panel.WorkflowTask) error {
+func (t *TaskProcessor) processWorkflowTask(ctx context.Context, task *panel.WorkflowTask) error {
 	return postgres.WithReadCommitted(ctx, t.txManager, func(ctx context.Context) error {
 		taskWrapper, err := t.dispatchTaskWrapper(ctx, task)
 		if err != nil {
@@ -198,15 +208,15 @@ func (t *TaskProcessor) ProcessTask(ctx context.Context, task *panel.WorkflowTas
 			return err
 		}
 		newBackoffState := t.getNewBackoffState(task)
-		task.Timing.UpdatedAt = timestamppb.Now()
-		taskState, err := taskWrapper.State()
+		task.RetryState = newBackoffState
+		t.processTaskInternal(ctx, task, taskWrapper)
+		newTaskState, err := taskWrapper.State()
 		if err != nil {
-			t.logger.Error(".ProcessTask failed to get task state", zap.Error(err))
 			return err
 		}
-		task.Input = taskState.GetInput()
-		task.Output = taskState.GetOutput()
-		task.RetryState = newBackoffState
+		task.Timing.UpdatedAt = timestamppb.Now()
+		task.Input = newTaskState.GetInput()
+		task.Output = newTaskState.GetOutput()
 		task.OnWorker = ""
 		err = t.taskRepo.SaveWorkflowTask(ctx, task)
 		if err != nil {
@@ -229,17 +239,33 @@ const emptyWorkerMarker = ""
 func (t *TaskProcessor) processDbTasks(ctx context.Context) error {
 	tasks, err := postgres.WithReadCommittedRet(ctx, t.txManager,
 		func(ctx context.Context) ([]*panel.WorkflowTask, error) {
-			actualTasks, err := t.taskRepo.ListActualTasks(ctx, emptyWorkerMarker, false, []panel.WorkflowTask_Status{
-				panel.WorkflowTask_STATUS_PENDING,
-				panel.WorkflowTask_STATUS_RETRYING,
-				panel.WorkflowTask_STATUS_RUNNING,
-				panel.WorkflowTask_STATUS_COMPLETED,
-				panel.WorkflowTask_STATUS_FAILED,
-				panel.WorkflowTask_STATUS_CANCELLED,
-			})
-			if err != nil {
+			actualTasks, err := t.taskRepo.ListActualTasks(
+				ctx,
+				emptyWorkerMarker,
+				false,
+				[]panel.WorkflowTask_Status{
+					panel.WorkflowTask_STATUS_PENDING,
+					panel.WorkflowTask_STATUS_RETRYING,
+					panel.WorkflowTask_STATUS_RUNNING,
+				},
+			)
+			if err != nil && !sqlerr.IsNotFound(err) {
 				return nil, err
 			}
+			cleanedUpTasks, err := t.taskRepo.ListActualTasks(
+				ctx,
+				emptyWorkerMarker,
+				true,
+				[]panel.WorkflowTask_Status{
+					panel.WorkflowTask_STATUS_COMPLETED,
+					panel.WorkflowTask_STATUS_FAILED,
+					panel.WorkflowTask_STATUS_CANCELLED,
+				},
+			)
+			if err != nil && !sqlerr.IsNotFound(err) {
+				return nil, err
+			}
+			actualTasks = append(actualTasks, cleanedUpTasks...)
 			err = t.taskRepo.SetWorkflowTaskOnWorker(
 				ctx,
 				lo.Map(actualTasks, func(task *panel.WorkflowTask, _ int) string { return task.GetId() }),
@@ -253,10 +279,10 @@ func (t *TaskProcessor) processDbTasks(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	taskPool := pool.New().WithErrors().WithContext(ctx)
+	taskPool := pool.New().WithContext(ctx)
 	for _, task := range tasks {
 		taskPool.Go(func(ctx context.Context) error {
-			return t.ProcessTask(ctx, task)
+			return t.processWorkflowTask(ctx, task)
 		})
 	}
 	return taskPool.Wait()

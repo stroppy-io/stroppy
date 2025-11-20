@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
+	"go.uber.org/zap"
+
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/api/repositories"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/token"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/claims"
@@ -14,7 +16,6 @@ import (
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlexec"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/sqlc"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
-	"go.uber.org/zap"
 )
 
 type WorkflowRepository interface {
@@ -29,6 +30,7 @@ type PanelService struct {
 	*panel.UnimplementedRunServiceServer
 	*panel.UnimplementedWorkflowServiceServer
 	*panel.UnimplementedTemplateServiceServer
+	*panel.UnimplementedKvServiceServer
 
 	logger     *zap.Logger
 	executor   sqlexec.Executor
@@ -41,8 +43,11 @@ type PanelService struct {
 	runRecordStepsRepo orm.RunRecordStepRepository
 	workflowRepo       WorkflowRepository
 	templateRepo       orm.TemplateRepository
+	kvInfoRepo         orm.KvTableRepository
 
 	sqlcRepo sqlc.Querier
+
+	taskRetryConfig *TaskRetryConfig
 }
 
 func NewPanelService(
@@ -50,12 +55,14 @@ func NewPanelService(
 	executor sqlexec.Executor,
 	txManager postgres.TxManager,
 	tokenActor *token.Actor,
+	taskRetryConfig *TaskRetryConfig,
 ) *PanelService {
 	return &PanelService{
 		UnimplementedAccountServiceServer:  &panel.UnimplementedAccountServiceServer{},
 		UnimplementedRunServiceServer:      &panel.UnimplementedRunServiceServer{},
 		UnimplementedWorkflowServiceServer: &panel.UnimplementedWorkflowServiceServer{},
 		UnimplementedTemplateServiceServer: &panel.UnimplementedTemplateServiceServer{},
+		UnimplementedKvServiceServer:       &panel.UnimplementedKvServiceServer{},
 
 		logger: logger,
 
@@ -69,8 +76,11 @@ func NewPanelService(
 		runRecordStepsRepo: NewRunRecordStepRepository(executor),
 		workflowRepo:       repositories.NewWorkflowRepo(executor),
 		templateRepo:       NewTemplateRepository(executor),
+		kvInfoRepo:         NewKvTableRepository(executor),
 
 		sqlcRepo: sqlc.New(executor),
+
+		taskRetryConfig: taskRetryConfig,
 	}
 }
 
