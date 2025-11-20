@@ -1,9 +1,16 @@
-// import encoding from "k6/x/encoding";
-// globalThis.TextEncoder = encoding.TextEncoder;
-// globalThis.TextDecoder = encoding.TextDecoder;
-// import stroppy from "k6/x/stroppy";
+import encoding from "k6/x/encoding";
 
-// import { Options } from "k6/options";
+if (
+  globalThis.TextEncoder === undefined &&
+  globalThis.TextDecoder === undefined
+) {
+  globalThis.TextEncoder = encoding.TextEncoder;
+  globalThis.TextDecoder = encoding.TextDecoder;
+}
+
+import stroppy from "k6/x/stroppy";
+
+import { Options } from "k6/options";
 import {
   UnitDescriptor,
   DriverTransactionStat,
