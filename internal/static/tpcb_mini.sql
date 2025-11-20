@@ -1,58 +1,56 @@
--- section create_schema
-
--- query
+-- workload create_schema
+-- query create_accounts_table
 CREATE TABLE accounts (
     id INTEGER NOT NULL PRIMARY KEY,
     balance INTEGER
 );
 -- query end
 
--- query
+-- query create_history_table
 CREATE TABLE history (
     account_id INTEGER,
     amount INTEGER,
     created_at TIMESTAMP
 );
 -- query end
--- section end
+-- workload end
 
--- section insert
 
--- query
+-- workload insert
+-- query insert_accounts
 INSERT INTO accounts (id, balance)
 VALUES (1, 1000), (2, 2000);
 -- query end
--- section end
+-- workload end
 
--- section workload
--- transaction
--- query end
 
--- query
+-- workload workload
+-- transaction update_and_log
+-- query update_balance
 UPDATE accounts
 SET balance = balance + 100
 WHERE id = 1;
 -- query end
 
--- query
+-- query select_balance
 SELECT balance
 FROM accounts
 WHERE id = 1;
 -- query end
 
--- query
+-- query insert_history
 INSERT INTO history (account_id, amount, created_at)
 VALUES (1, 100, CURRENT_TIMESTAMP);
 -- query end
 -- transaction end
--- section end
+-- workload end
 
--- section cleanup
--- query
+-- workload cleanup
+-- query drop_history
 DROP TABLE IF EXISTS history CASCADE;
 -- query end
 
--- query
+-- query drop_accounts
 DROP TABLE IF EXISTS accounts CASCADE;
 -- query end
--- section end
+-- workload end

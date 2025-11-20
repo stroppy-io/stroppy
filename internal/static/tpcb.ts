@@ -14,19 +14,19 @@ import {
 } from "./stroppy.pb.js";
 
 export const options: Options = {
-  setupTimeout: "5m",
+  setupTimeout: "5h",
   scenarios: {
     tpcb_transaction: {
       executor: "constant-vus",
       exec: "tpcb_transaction",
       vus: 10,
-      duration: "5m",
+      duration: "1h",
     },
   },
 };
 
 // TPC-B Configuration Constants
-const SCALE_FACTOR = 10;
+const SCALE_FACTOR = 10000;
 const BRANCHES = SCALE_FACTOR;
 const TELLERS = 10 * SCALE_FACTOR;
 const ACCOUNTS = 100000 * SCALE_FACTOR;
@@ -563,17 +563,14 @@ const tpcbTransactionDescriptorBin: BinMsg<UnitDescriptor> =
       oneofKind: "query",
       query: {
         name: "tpcb_transaction",
-        sql: "select tpcb_transaction(${aid}, ${tid}, ${bid}, ${delta});",
+        sql: "select tpcb_transaction(${aid[1:ACCOUNTS]}, ${tid}, ${bid}, ${delta});",
         params: [
           {
             name: "aid",
             generationRule: {
               kind: {
                 oneofKind: "int32Range",
-                int32Range: {
-                  max: ACCOUNTS,
-                  min: 1,
-                },
+                int32Range: { max: ACCOUNTS, min: 1 },
               },
             },
           },
@@ -582,10 +579,7 @@ const tpcbTransactionDescriptorBin: BinMsg<UnitDescriptor> =
             generationRule: {
               kind: {
                 oneofKind: "int32Range",
-                int32Range: {
-                  max: TELLERS,
-                  min: 1,
-                },
+                int32Range: { max: TELLERS, min: 1 },
               },
             },
           },
@@ -594,10 +588,7 @@ const tpcbTransactionDescriptorBin: BinMsg<UnitDescriptor> =
             generationRule: {
               kind: {
                 oneofKind: "int32Range",
-                int32Range: {
-                  max: BRANCHES,
-                  min: 1,
-                },
+                int32Range: { max: BRANCHES, min: 1 },
               },
             },
           },
@@ -606,10 +597,7 @@ const tpcbTransactionDescriptorBin: BinMsg<UnitDescriptor> =
             generationRule: {
               kind: {
                 oneofKind: "int32Range",
-                int32Range: {
-                  max: 5000,
-                  min: -5000,
-                },
+                int32Range: { max: 5000, min: -5000 },
               },
             },
           },
