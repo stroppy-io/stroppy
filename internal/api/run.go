@@ -18,18 +18,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type taskRetryConfig struct {
-	InitialInterval     time.Duration `mapstructure:"initial_interval" default:"10s"`
-	MaxElapsedTime      time.Duration `mapstructure:"max_elapsed_time" default:"300s"`
-	MaxInterval         time.Duration `mapstructure:"max_interval" default:"300s"`
-	Multiplier          float64       `mapstructure:"multiplier" default:"30.0"`
-	RandomizationFactor float64       `mapstructure:"randomization_factor" default:"0.1"`
-	RetryStopDuration   time.Duration `mapstructure:"retry_stop_duration" default:"300s"`
-}
-type TaskRetryConfig struct {
-	TasksRetryConfig map[panel.WorkflowTask_Type]taskRetryConfig `mapstructure:"task_retry_config"`
-}
-
 func (p *PanelService) ListRuns(
 	ctx context.Context,
 	request *panel.ListRunsRequest,
@@ -70,11 +58,15 @@ func (p *PanelService) ListRuns(
 			),
 			postfix))
 	}
-	return p.runRecordRepo.ListBy(ctx, q)
+	runs, err := p.runRecordRepo.ListBy(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	return &panel.RunRecord_List{Records: runs}, nil
 }
 
 func (p *PanelService) newTaskRetrySettings(kind panel.WorkflowTask_Type) *panel.Retry {
-	taskRetryConfig, ok := p.taskRetryConfig.TasksRetryConfig[kind]
+	taskRetryConfig, ok := p.workflowConfig.TaskRetryConfig[kind.String()]
 	if !ok {
 		return &panel.Retry{
 			MaxAttempts: 10,

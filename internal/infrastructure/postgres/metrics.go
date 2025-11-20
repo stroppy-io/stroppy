@@ -8,7 +8,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-const instrumentationName = "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/metrics"
+const instrumentationName = "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/metrics"
 
 func registerMetrics(pool *pgxpool.Pool) {
 	meter := otel.GetMeterProvider().Meter(instrumentationName)

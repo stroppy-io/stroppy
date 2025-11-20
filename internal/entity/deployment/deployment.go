@@ -15,7 +15,7 @@ type VmDeploymentDagWithParams struct {
 	AssignedInternalIp *crossplane.Ip
 }
 
-type dagBuilder interface {
+type DagBuilder interface {
 	BuildVmResourceDag(
 		namespace string,
 		commonId *panel.Ulid,
@@ -24,10 +24,10 @@ type dagBuilder interface {
 }
 
 type Builder struct {
-	dispatchMap map[crossplane.SupportedCloud]dagBuilder
+	dispatchMap map[crossplane.SupportedCloud]DagBuilder
 }
 
-func NewBuilder(dispatchMap map[crossplane.SupportedCloud]dagBuilder) *Builder {
+func NewBuilder(dispatchMap map[crossplane.SupportedCloud]DagBuilder) *Builder {
 	return &Builder{
 		dispatchMap: dispatchMap,
 	}

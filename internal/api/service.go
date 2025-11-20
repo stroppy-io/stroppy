@@ -5,15 +5,16 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/workflow"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/api/repositories"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/token"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/claims"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/orm"
-	postgres "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlexec"
+	postgres "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlerr"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlexec"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/sqlc"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 )
@@ -47,7 +48,7 @@ type PanelService struct {
 
 	sqlcRepo sqlc.Querier
 
-	taskRetryConfig *TaskRetryConfig
+	workflowConfig *workflow.Config
 }
 
 func NewPanelService(
@@ -55,7 +56,7 @@ func NewPanelService(
 	executor sqlexec.Executor,
 	txManager postgres.TxManager,
 	tokenActor *token.Actor,
-	taskRetryConfig *TaskRetryConfig,
+	taskRetryConfig *workflow.Config,
 ) *PanelService {
 	return &PanelService{
 		UnimplementedAccountServiceServer:  &panel.UnimplementedAccountServiceServer{},
@@ -74,13 +75,13 @@ func NewPanelService(
 		refreshTokensRepo:  NewRefreshTokensRepository(executor),
 		runRecordRepo:      NewRunRecordRepository(executor),
 		runRecordStepsRepo: NewRunRecordStepRepository(executor),
-		workflowRepo:       repositories.NewWorkflowRepo(executor),
+		workflowRepo:       repositories.NewWorkflowRepository(executor),
 		templateRepo:       NewTemplateRepository(executor),
 		kvInfoRepo:         NewKvTableRepository(executor),
 
 		sqlcRepo: sqlc.New(executor),
 
-		taskRetryConfig: taskRetryConfig,
+		workflowConfig: taskRetryConfig,
 	}
 }
 

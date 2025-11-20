@@ -15,8 +15,8 @@ import (
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ids"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/timestamps"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/orm"
-	postgres "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
+	postgres "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlerr"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 )
 
@@ -109,7 +109,7 @@ func (p *PanelService) Login(
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
 			err = p.refreshTokensRepo.Insert(ctx, &panel.RefreshTokens{
-				UserId: acc.Id,
+				UserId: &panel.Ulid{Id: acc.Id},
 				Token:  refresh,
 			})
 			if err != nil {

@@ -41,7 +41,6 @@ export interface RunSummary {
   tpsP95?: number
   createdAt?: Date
   updatedAt?: Date
-  cloudAutomationId?: string
   runnerClusterNodes?: number
   runnerMachineSignature?: string
   runnerMachineCores?: number

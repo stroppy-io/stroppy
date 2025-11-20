@@ -1,0 +1,45 @@
+{
+  "page": {
+    "title": "Темплейты",
+    "subtitle": "Готовые профили для развертывания",
+    "adminOnly": "Раздел доступен только администраторам панели."
+  },
+  "filters": {
+    "refresh": "Обновить",
+    "searchLabel": "Поиск по названию",
+    "searchPlaceholder": "Например, ydb-prod или workload-small",
+    "tagsLabel": "Теги",
+    "tagsLoading": "Загружаем теги…",
+    "noTags": "Доступных тегов пока нет",
+    "clearTags": "Сбросить"
+  },
+  "kinds": {
+    "machine": "Инфраструктура",
+    "database": "База данных",
+    "stroppy": "Stroppy",
+    "unknown": "Неизвестно"
+  },
+  "table": {
+    "title": "Каталог темплейтов",
+    "subtitle": "Выберите готовый профиль или используйте его как основу",
+    "total": "{{count}} шт.",
+    "columns": {
+      "name": "Название",
+      "type": "Тип",
+      "details": "Детали",
+      "tags": "Теги",
+      "updatedAt": "Обновлено"
+    },
+    "loading": "Загружаем темплейты…",
+    "empty": "Темплейты с такими фильтрами не найдены"
+  },
+  "badges": {
+    "default": "По умолчанию"
+  },
+  "details": {
+    "databaseImage": "Образ: {{value}}",
+    "stroppyFiles": "{{count}} файлов",
+    "stroppyCmd": "Команда: {{value}}",
+    "none": "—"
+  }
+}

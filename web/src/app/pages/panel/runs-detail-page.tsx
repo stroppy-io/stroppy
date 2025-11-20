@@ -1,19 +1,11 @@
-import { useMemo } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { create } from '@bufbuild/protobuf'
-import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/i18n/use-translation'
 import type { RunSummary } from '@/app/features/runs/types'
 import { getStatusLabel } from '@/app/features/runs/utils'
-import { ResourceTreeSection } from '@/app/components/resource-tree'
-import { useQuery, useTransport } from '@connectrpc/connect-query'
-import { UlidSchema } from '@/proto/panel/types_pb.ts'
-import { getAutomation } from '@/proto/panel/automate-AutomateService_connectquery.ts'
-import { getResource } from '@/proto/panel/automate-ResourcesService_connectquery.ts'
 
 interface RunDetailLocationState {
   run?: RunSummary
@@ -31,7 +23,6 @@ export const RunsDetailPage = () => {
   const navigate = useNavigate()
   const params = useParams()
   const location = useLocation()
-  const transport = useTransport()
   const run = (location.state as RunDetailLocationState | undefined)?.run
 
   if (!run) {
@@ -44,28 +35,6 @@ export const RunsDetailPage = () => {
       </div>
     )
   }
-
-  const automationId = run.cloudAutomationId
-  const automationRequest = useMemo(() => create(UlidSchema, { id: automationId ?? '' }), [automationId])
-  const { data: automation, isLoading: isAutomationLoading } = useQuery(getAutomation, automationRequest, {
-    transport,
-    enabled: Boolean(automationId),
-  })
-
-  const databaseRootId = automation?.databaseRootResourceId?.id
-  const workloadRootId = automation?.workloadRootResourceId?.id
-
-  const databaseRequest = useMemo(() => create(UlidSchema, { id: databaseRootId ?? '' }), [databaseRootId])
-  const workloadRequest = useMemo(() => create(UlidSchema, { id: workloadRootId ?? '' }), [workloadRootId])
-
-  const { data: databaseTree, isLoading: isDatabaseLoading } = useQuery(getResource, databaseRequest, {
-    transport,
-    enabled: Boolean(databaseRootId),
-  })
-  const { data: workloadTree, isLoading: isWorkloadLoading } = useQuery(getResource, workloadRequest, {
-    transport,
-    enabled: Boolean(workloadRootId),
-  })
 
   return (
     <div className="space-y-6">
@@ -129,45 +98,6 @@ export const RunsDetailPage = () => {
         </div>
       </Card>
 
-      <Card className="space-y-4 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">{t('automation.title')}</p>
-            <p className="text-sm text-muted-foreground">
-              {automation?.id?.id ?? automationId ?? t('automation.notLinked')}
-            </p>
-          </div>
-          {automation && (
-            <Badge variant="secondary">{getStatusLabel(automation.status, t)}</Badge>
-          )}
-        </div>
-
-        {!automationId && <p className="text-sm text-muted-foreground">{t('automation.notLinked')}</p>}
-        {automationId && isAutomationLoading && <p className="text-sm text-muted-foreground">{t('automation.loading')}</p>}
-        {automationId && !isAutomationLoading && !automation && (
-          <p className="text-sm text-destructive">{t('automation.failed')}</p>
-        )}
-
-        {automation && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {infoRow(
-              t('automation.startedAt'),
-              automation.timing?.createdAt ? dayjs(timestampDate(automation.timing.createdAt)).format('DD MMM YYYY, HH:mm') : '—',
-            )}
-            {infoRow(
-              t('automation.updatedAt'),
-              automation.timing?.updatedAt ? dayjs(timestampDate(automation.timing.updatedAt)).format('DD MMM YYYY, HH:mm') : '—',
-            )}
-          </div>
-        )}
-
-        {automation && (
-          <div className="space-y-6">
-            <ResourceTreeSection title={t('automation.databaseTree')} tree={databaseTree} isLoading={isDatabaseLoading} t={t} />
-            <ResourceTreeSection title={t('automation.workloadTree')} tree={workloadTree} isLoading={isWorkloadLoading} t={t} />
-          </div>
-        )}
-      </Card>
     </div>
   )
 }

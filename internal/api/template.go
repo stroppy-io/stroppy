@@ -5,6 +5,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ids"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/kv"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/orm"
@@ -29,15 +30,56 @@ func (p *PanelService) ListTemplatesTags(ctx context.Context, _ *emptypb.Empty) 
 
 func (p *PanelService) SearchTemplates(ctx context.Context, req *panel.SearchTemplatesRequest) (*panel.Template_List, error) {
 	templates, err := p.templateRepo.ListBy(ctx,
-		orm.Template.Or(
-			orm.Template.SelectAll().Where(orm.Template.Name.Like("%"+req.Name+"%")),
-			orm.Template.SelectAll().Where(orm.Template.Raw("tags @> ?", serializeTags(req.GetTagsList().GetTags()))),
-		),
-	)
+		orm.Template.SelectAll().Where(
+			orm.Template.Or(
+				orm.Template.Name.Like("%"+req.Name+"%"),
+				orm.Template.Raw("tags @> ?", serializeTags(req.GetTagsList().GetTags())),
+			)))
 	if err != nil {
 		return nil, err
 	}
 	return &panel.Template_List{Templates: templates}, nil
+}
+
+func (p *PanelService) GetTemplateKvs(ctx context.Context, ulid *panel.Ulid) (*panel.KV_Map, error) {
+	template, err := p.templateRepo.GetBy(
+		ctx,
+		orm.Template.
+			Select(orm.Template.Id).
+			Where(orm.Template.Id.Eq(ulid.GetId())),
+	)
+	if err != nil {
+		return nil, err
+	}
+	stroppyDeployment := template.GetStroppyDeployment()
+	if stroppyDeployment == nil {
+		return nil, nil
+	}
+	cmdKvs := kv.ExtractKvValues(stroppyDeployment.GetCmd())
+	filesKvs := make([]string, len(stroppyDeployment.GetFiles()))
+	for _, file := range stroppyDeployment.GetFiles() {
+		filesKvs = append(filesKvs, kv.ExtractKvValues(file.GetContent()).GetKeys()...)
+	}
+	filesKvs = append(filesKvs, cmdKvs.GetKeys()...)
+	kvsInfos, err := p.kvInfoRepo.ListBy(
+		ctx,
+		orm.KvTable.SelectAll().Where(orm.KvTable.Key.In(filesKvs...)),
+	)
+	if err != nil {
+		return nil, err
+	}
+	ret := lo.Map(kvsInfos, func(i *panel.KvTable, _ int) *panel.KV {
+		return &panel.KV{
+			Key:   i.GetKey(),
+			Value: i.GetInfo().GetDefaultValue(),
+			Info:  i.GetInfo(),
+		}
+	})
+	return &panel.KV_Map{Kvs: ret}, nil
+}
+
+func (p *PanelService) GetTemplate(ctx context.Context, ulid *panel.Ulid) (*panel.Template, error) {
+	return p.templateRepo.GetBy(ctx, orm.Template.SelectAll().Where(orm.Template.Id.Eq(ulid.GetId())))
 }
 
 func (p *PanelService) CreateTemplate(ctx context.Context, template *panel.Template) (*panel.Template, error) {

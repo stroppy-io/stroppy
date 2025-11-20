@@ -11,11 +11,11 @@ import (
 	"ariga.io/atlas/sql/migrate"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlbuild"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlcast"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlexec"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlscan"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlbuild"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlcast"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlerr"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlexec"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlscan"
 )
 
 var (

@@ -1,15 +1,16 @@
 package httpserv
 
 import (
+	"net"
+	"net/http"
+	"strconv"
+	"time"
+
 	connectcors "connectrpc.com/cors"
 	"github.com/rs/cors"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/api"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/claims"
 	"google.golang.org/grpc"
-	"net"
-	"net/http"
-	"strconv"
-	"time"
 
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
@@ -66,22 +67,24 @@ func NewServer(
 				userTokenProtector,
 				[]grpc.ServiceDesc{
 					panel.AccountService_ServiceDesc,
-					panel.ResourcesService_ServiceDesc,
 					panel.RunService_ServiceDesc,
-					panel.AutomateService_ServiceDesc,
+					panel.WorkflowService_ServiceDesc,
+					panel.TemplateService_ServiceDesc,
+					panel.KvService_ServiceDesc,
 				},
 				WithExcluding(panel.AccountService_Login_FullMethodName),
 				WithExcluding(panel.AccountService_Register_FullMethodName),
 				WithExcluding(panel.AccountService_RefreshTokens_FullMethodName),
-				WithExcluding(panel.RunService_ListTopRuns_FullMethodName),
+				WithExcluding(panel.RunService_ListRuns_FullMethodName),
 			),
 		),
 		recoveryMiddleware(NoRecoveryHandlerFuncContext),
 	)
 	mux.Handle(addStarToPath(panelconnect.NewAccountServiceHandler(service, intercept)))
-	mux.Handle(addStarToPath(panelconnect.NewAutomateServiceHandler(service, intercept)))
-	mux.Handle(addStarToPath(panelconnect.NewResourcesServiceHandler(service, intercept)))
 	mux.Handle(addStarToPath(panelconnect.NewRunServiceHandler(service, intercept)))
+	mux.Handle(addStarToPath(panelconnect.NewWorkflowServiceHandler(service, intercept)))
+	mux.Handle(addStarToPath(panelconnect.NewTemplateServiceHandler(service, intercept)))
+	mux.Handle(addStarToPath(panelconnect.NewKvServiceHandler(service, intercept)))
 	if err := registerStaticFrontend(mux, config.StaticDir, log.Named("static")); err != nil {
 		log.Warn("static file handler disabled", zap.String("path", config.StaticDir), zap.Error(err))
 	}

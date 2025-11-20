@@ -5,7 +5,7 @@ plugins:
       cmd: ../../bin/sqlc-gen-go-orm
 
 sql:
-  - engine: "postgresql"
+  - engine: "postgres"
     queries: "sqlc-queries"
     schema: "migrations"
     gen:

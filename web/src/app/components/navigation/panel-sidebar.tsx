@@ -1,12 +1,11 @@
-import { Bot, Gauge, Layers3 } from 'lucide-react'
+import { useMemo } from 'react'
+import { Gauge, Layers3, LayoutTemplate } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { useAuth } from '../../contexts/auth-context'
 
-export const panelNavItems = [
+const baseNavItems = [
   { to: '/app/dashboard', label: 'Дашборд', icon: Gauge },
-    // TODO
-  // { to: '/app/configurator', label: 'Конфигуратор', icon: Settings2 },
-  { to: '/app/automations', label: 'Автоматизации', icon: Bot },
   { to: '/app/runs', label: 'Запуски', icon: Layers3 },
 ]
 
@@ -16,6 +15,14 @@ interface PanelSidebarProps {
 }
 
 export const PanelSidebar = ({ variant = 'desktop', onNavigate }: PanelSidebarProps) => {
+  const { user } = useAuth()
+  const navItems = useMemo(() => {
+    if (user?.admin) {
+      return [...baseNavItems, { to: '/app/templates', label: 'Темплейты', icon: LayoutTemplate }]
+    }
+    return baseNavItems
+  }, [user?.admin])
+
   const containerClasses =
     variant === 'desktop'
       ? 'hidden md:flex w-64 border-r border-sidebar-border bg-sidebar px-4 py-6 text-sidebar-foreground backdrop-blur'
@@ -29,7 +36,7 @@ export const PanelSidebar = ({ variant = 'desktop', onNavigate }: PanelSidebarPr
       </NavLink>
 
       <nav className="flex flex-1 flex-col gap-2">
-        {panelNavItems.map(({ to, label, icon: Icon }) => (
+        {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

@@ -14,7 +14,7 @@ import (
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/mfs"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlexec"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlexec"
 )
 
 func AtlasMigrate(pool *pgxpool.Pool, migrations ...fs.FS) error {

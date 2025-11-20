@@ -73,7 +73,7 @@ global:
 
 driver:
   driver_type: DRIVER_TYPE_POSTGRES
-  url: "postgresql://user:password@localhost:5432/testdb"
+  url: "postgres://user:password@localhost:5432/testdb"
   db_specific:
     ssl_mode: "require"
     connection_timeout: "30s"

@@ -38,7 +38,7 @@ services:
       POSTGRES_MULTIPLE_DATABASES: postgres
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: developer
-      PGDATA: "/var/lib/postgresql/data/pgdata"
+      PGDATA: "/var/lib/postgres/data/pgdata"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s

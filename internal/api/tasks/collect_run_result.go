@@ -6,8 +6,9 @@ import (
 	"fmt"
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/workflow"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlerr"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
+	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 type collectRunResultTaskState = workflow.TaskState[*panel.WorkflowTask_CollectRunResults_Input, *panel.WorkflowTask_CollectRunResults_Output]
@@ -37,7 +38,7 @@ func (c *CollectRunResultTaskHandler) Status(
 	runRecord, err := c.stroppyRunRepo.FindRunRecord(ctx, state.GetInput().GetStroppyRunId().GetId())
 	if err != nil {
 		if sqlerr.IsNotFound(err) {
-			return panel.WorkflowTask_STATUS_UNSPECIFIED,
+			return panel.WorkflowTask_STATUS_PENDING,
 				errors.Join(
 					err,
 					workflow.ErrStatusTemproraryFailed,
@@ -46,8 +47,10 @@ func (c *CollectRunResultTaskHandler) Status(
 		}
 		return panel.WorkflowTask_STATUS_FAILED, err
 	}
-	runRecord.GetStatus()
-	return panel.WorkflowTask_STATUS_COMPLETED, nil
+	if runRecord.GetStatus() != stroppy.Status_STATUS_IDLE {
+		return panel.WorkflowTask_STATUS_COMPLETED, nil
+	}
+	return panel.WorkflowTask_STATUS_RUNNING, nil
 }
 
 func (c *CollectRunResultTaskHandler) Cleanup(

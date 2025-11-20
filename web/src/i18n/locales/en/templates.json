@@ -1,0 +1,45 @@
+{
+  "page": {
+    "title": "Templates",
+    "subtitle": "Ready-to-use deployment profiles",
+    "adminOnly": "This section is available to administrators only."
+  },
+  "filters": {
+    "refresh": "Refresh",
+    "searchLabel": "Search by name",
+    "searchPlaceholder": "e.g. ydb-prod or workload-small",
+    "tagsLabel": "Tags",
+    "tagsLoading": "Loading tags…",
+    "noTags": "No tags available yet",
+    "clearTags": "Clear"
+  },
+  "kinds": {
+    "machine": "Infrastructure",
+    "database": "Database",
+    "stroppy": "Stroppy",
+    "unknown": "Unknown"
+  },
+  "table": {
+    "title": "Template catalog",
+    "subtitle": "Pick a ready profile or use it as a base",
+    "total": "{{count}} items",
+    "columns": {
+      "name": "Name",
+      "type": "Type",
+      "details": "Details",
+      "tags": "Tags",
+      "updatedAt": "Updated"
+    },
+    "loading": "Loading templates…",
+    "empty": "No templates match your filters"
+  },
+  "badges": {
+    "default": "Default"
+  },
+  "details": {
+    "databaseImage": "Image: {{value}}",
+    "stroppyFiles": "{{count}} files",
+    "stroppyCmd": "Cmd: {{value}}",
+    "none": "—"
+  }
+}

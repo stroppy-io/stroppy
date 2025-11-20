@@ -10,20 +10,39 @@ import (
 	"github.com/samber/lo"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/build"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlerr"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	postgres "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql"
+	postgres "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 )
 
+type taskRetryConfig struct {
+	InitialInterval     time.Duration `mapstructure:"initial_interval" default:"10s"`
+	MaxElapsedTime      time.Duration `mapstructure:"max_elapsed_time" default:"300s"`
+	MaxInterval         time.Duration `mapstructure:"max_interval" default:"300s"`
+	Multiplier          float64       `mapstructure:"multiplier" default:"30.0"`
+	RandomizationFactor float64       `mapstructure:"randomization_factor" default:"0.1"`
+	RetryStopDuration   time.Duration `mapstructure:"retry_stop_duration" default:"300s"`
+}
+
+func ValidateTaskRetryConfig(mp map[string]taskRetryConfig) error {
+	for kind := range mp {
+		if _, ok := panel.WorkflowTask_Type_value[kind]; !ok {
+			return fmt.Errorf("unknown WorkflowTask_Type: %s", kind)
+		}
+	}
+	return nil
+}
+
 type Config struct {
-	PollInterval    time.Duration `default:"10s" mapstructure:"poll_interval" validate:"required"`
-	TaskLoggerLevel string        `default:"debug" mapstructure:"task_logger_level" validate:"required"`
+	PollInterval    time.Duration              `default:"10s" mapstructure:"poll_interval" validate:"required"`
+	TaskLoggerLevel string                     `default:"debug" mapstructure:"task_logger_level" validate:"required"`
+	TaskRetryConfig map[string]taskRetryConfig `mapstructure:"task_retries" validate:"required"`
 }
 
 type TaskRepository interface {

@@ -2,23 +2,33 @@ package application
 
 import (
 	"fmt"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/crossplaneservice"
-	"go.uber.org/zap"
 	"net/http"
 
+	"go.uber.org/zap"
+
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/api"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/api/repositories"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/api/tasks"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/build"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/configurator"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/logger"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/probes"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/shutdown"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/token"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/deployment"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/provider/yandex"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/workflow"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/httpserv"
-	postgres "github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/crossplaneservice"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/crossplaneservice/k8s"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 )
 
 const (
 	panelServiceNameLoggerName = "panel-service"
+	constantTaskLoggerName     = "task-processor"
 )
 
 type Application struct {
@@ -36,14 +46,16 @@ func New() (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
+	validateCfgErr := cfg.AdditionalValidate()
+	if validateCfgErr != nil {
+		return nil, fmt.Errorf("failed to validate config: %w", validateCfgErr)
+	}
 	appLogger := logger.NewFromConfig(&cfg.Service.Logger)
 	appLogger.Info(
 		"Application initialized",
 		zap.String("service", build.ServiceName),
 		zap.String("version", build.Version),
 	)
-	//s3Client := s3.NewS3Client(&cfg.Infra.S3, logger.NewStructLogger(s3LoggerName))
-	//
 	pgxPool, err := NewDatabasePollWithTx(cfg)
 	if err != nil {
 		return nil, err
@@ -55,22 +67,29 @@ func New() (*Application, error) {
 	tokenActor := token.NewTokenActor(&cfg.Service.Auth)
 	readyProbe := NewReadyProbe(pgxPool)
 
-	crossplaneImpl, err := automate.NewCrossplaneApi(cfg.Service.K8S.KubeconfigPath)
+	k8sActor, err := k8s.NewClient(cfg.Service.K8S.KubeconfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create CrossplaneApiImpl: %w", err)
+		return nil, fmt.Errorf("failed to create K8S client: %w", err)
 	}
-	crossplaneClient, cancel := crossplaneservice.NewLocalCrossplaneClient(crossplaneImpl)
-	if cancel != nil {
-		shutdown.RegisterFn(cancel)
-	}
+	crossplaneClient := crossplaneservice.NewCrossplaneService(k8sActor, cfg.Service.Crossplane.ReconcileInterval)
+
+	runRecordRepo := repositories.NewRunRecordRepository(executor)
+	quotaRepository := repositories.NewQuotaRepository(executor)
+	workflowRepo := repositories.NewWorkflowRepository(executor)
+
+	yandexBuilder := yandex.NewCloudBuilder(&cfg.Service.Cloud.Yandex.Provider)
+	deploymentBuilder := deployment.NewBuilder(
+		map[crossplane.SupportedCloud]deployment.DagBuilder{
+			crossplane.SupportedCloud_SUPPORTED_CLOUD_YANDEX: yandexBuilder,
+		},
+	)
+
 	service := api.NewPanelService(
 		appLogger.Named(panelServiceNameLoggerName),
 		executor,
 		txManager,
 		tokenActor,
-		&cfg.Service.K8S,
-		&cfg.Service.Automate,
-		crossplaneClient,
+		&cfg.Service.Workflow,
 	)
 	server, err := httpserv.NewServer(
 		&cfg.Service.Server,
@@ -83,11 +102,28 @@ func New() (*Application, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http server: %w", err)
 	}
-	//cancelAutomate, err := automate.NewBackgroundWorker(&cfg.Service.Background, appLogger, service)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to create background worker: %w", err)
-	//}
-	//shutdown.RegisterFn(cancelAutomate)
+
+	taskProcessor, err := workflow.NewTaskProcessor(
+		&cfg.Service.Workflow,
+		appLogger.Named(constantTaskLoggerName),
+		txManager,
+		workflowRepo,
+		map[panel.WorkflowTask_Type]workflow.TaskWrapperBuilder{
+			panel.WorkflowTask_TYPE_DEPLOY_DATABASE: workflow.NewTaskBuilder(
+				tasks.NewDeployDatabaseTaskHandler(quotaRepository, crossplaneClient, deploymentBuilder),
+			),
+			panel.WorkflowTask_TYPE_DEPLOY_STROPPY: workflow.NewTaskBuilder(
+				tasks.NewDeployStroppyTaskHandler(quotaRepository, yandexBuilder, crossplaneClient, deploymentBuilder),
+			),
+			panel.WorkflowTask_TYPE_COLLECT_RUN_RESULTS: workflow.NewTaskBuilder(
+				tasks.NewCollectRunResultTaskHandler(runRecordRepo),
+			),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create task processor: %w", err)
+	}
+	shutdown.RegisterFn(taskProcessor.Start())
 
 	return &Application{
 		config: cfg,

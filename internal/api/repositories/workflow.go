@@ -8,8 +8,8 @@ import (
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/protohelp"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ids"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/orm"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlexec"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlerr"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlexec"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 )
 
@@ -19,7 +19,7 @@ type WorkflowRepo struct {
 	workflowTaskRepo orm.WorkflowTaskRepository
 }
 
-func NewWorkflowRepo(
+func NewWorkflowRepository(
 	executor sqlexec.Executor,
 ) *WorkflowRepo {
 	getter := func(ctx context.Context, operation orm.SqlOpType) orm.DB {
@@ -143,14 +143,16 @@ func (w *WorkflowRepo) ListActualTasks(
 		orm.WorkflowTask.Status.Any(statuesInt32...),
 	).ForUpdate()
 	if forCleanup {
-		q = q.Where(orm.WorkflowTask.WorkflowId.AnyOf(
-			orm.WorkflowTask.Select(orm.WorkflowTask.WorkflowId).
-				GroupBy(orm.WorkflowTask.WorkflowId).
-				Having(orm.WorkflowTask.Raw(
-					"BOOL_AND(status IN ?)",
-					statues,
-				)),
-		))
+		q = q.Where(
+			orm.WorkflowTask.CleanedUp.Eq(false),
+			orm.WorkflowTask.WorkflowId.AnyOf(
+				orm.WorkflowTask.Select(orm.WorkflowTask.WorkflowId).
+					GroupBy(orm.WorkflowTask.WorkflowId).
+					Having(orm.WorkflowTask.Raw(
+						"BOOL_AND(status IN ?)",
+						statues,
+					)),
+			))
 	}
 	return w.workflowTaskRepo.ListBy(ctx, q)
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/avito-tech/go-transaction-manager/trm/settings"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlexec"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlexec"
 )
 
 // NewTxFlow creates a new transaction flow with the given pgx pool and options.

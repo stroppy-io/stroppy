@@ -681,7 +681,7 @@ func TestNewUserDataWithScript(t *testing.T) {
 		FilesToWrite: []*crossplane.FsFile{
 			{
 				Path:    "/home/admin/setup.sh",
-				Content: []byte("#!/bin/bash\necho 'Installing packages...'\napt-get update\napt-get install -y postgresql"),
+				Content: []byte("#!/bin/bash\necho 'Installing packages...'\napt-get update\napt-get install -y postgres"),
 			},
 		},
 	}

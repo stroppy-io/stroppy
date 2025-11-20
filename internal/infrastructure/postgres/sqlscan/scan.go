@@ -2,7 +2,7 @@ package sqlscan
 
 import (
 	"github.com/jackc/pgx/v5"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlerr"
 )
 
 type SingleScanner[T any] func(pgx.Rows) (*T, error)

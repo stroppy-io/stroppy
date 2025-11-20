@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"regexp"
 
-	"github.com/samber/lo"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 )
 
@@ -45,25 +44,26 @@ func ExtractKvValues[T strOrBytes](target T) *panel.KV_Keys {
 	return kvMap
 }
 
-func MergeKeysWithExisted(existing []*panel.KvInfo, present *panel.KV_Keys) *panel.KV_Map {
-	ret := &panel.KV_Map{}
-	for _, p := range present.Keys {
-		exists, founded := lo.Find(existing, func(item *panel.KvInfo) bool {
-			return item.Key == p
-		})
-		if founded {
-			ret.Kvs = append(ret.Kvs, &panel.KV{
-				Key:   p,
-				Value: "",
-				Info:  exists.GetInfo(),
-			})
-		} else {
-			ret.Kvs = append(ret.Kvs, &panel.KV{
-				Key:   p,
-				Value: "",
-				Info:  &panel.KV_Info{},
-			})
-		}
-	}
-	return ret
-}
+//
+//func MergeKeysWithExisted(existing []*panel.KvInfo, present *panel.KV_Keys) *panel.KV_Map {
+//	ret := &panel.KV_Map{}
+//	for _, p := range present.Keys {
+//		exists, founded := lo.Find(existing, func(item *panel.KvInfo) bool {
+//			return item.Key == p
+//		})
+//		if founded {
+//			ret.Kvs = append(ret.Kvs, &panel.KV{
+//				Key:   p,
+//				Value: "",
+//				Info:  exists.GetInfo(),
+//			})
+//		} else {
+//			ret.Kvs = append(ret.Kvs, &panel.KV{
+//				Key:   p,
+//				Value: "",
+//				Info:  &panel.KV_Info{},
+//			})
+//		}
+//	}
+//	return ret
+//}

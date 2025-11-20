@@ -12,7 +12,7 @@ import (
 
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/ids"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/orm"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlexec"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlexec"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/panel"
 )
 

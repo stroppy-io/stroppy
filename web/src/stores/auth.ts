@@ -2,6 +2,7 @@ import { map } from 'nanostores'
 import { ConnectError } from '@connectrpc/connect'
 import { accountClient } from '@/lib/connect/clients'
 import { clearSession, setSession, sessionStore } from './session'
+import type { User } from '@/proto/panel/account_pb.ts'
 
 export type AuthStatus = 'idle' | 'loading' | 'checking' | 'authenticated' | 'unauthenticated'
 
@@ -9,6 +10,7 @@ export interface AuthUser {
   id: string
   email: string
   name?: string
+  admin: boolean
   avatarUrl?: string
   roles?: string[]
 }
@@ -77,11 +79,17 @@ const extractErrorMessage = (error: unknown): string => {
   return 'unknown error'
 }
 
-const buildUserFromEmail = (email: string): AuthUser => ({
-  id: email,
-  email,
-  name: email.split('@')[0],
+const buildUserFromResponse = (user: User): AuthUser => ({
+  id: user.id?.id ?? user.email,
+  email: user.email,
+  name: user.email?.split('@')[0],
+  admin: user.admin ?? false,
 })
+
+const fetchCurrentUser = async (): Promise<AuthUser> => {
+  const response = await accountClient.getMe({})
+  return buildUserFromResponse(response)
+}
 
 export const signInWithCredentials = async (payload: CredentialsPayload) => {
   setAuthStatus('loading')
@@ -96,7 +104,8 @@ export const signInWithCredentials = async (payload: CredentialsPayload) => {
       accessToken: response.accessToken,
       refreshToken: response.refreshToken ?? null,
     })
-    setAuthUser(buildUserFromEmail(payload.email))
+    const user = await fetchCurrentUser()
+    setAuthUser(user)
   } catch (error) {
     setAuthError(extractErrorMessage(error))
     clearSession()
@@ -161,9 +170,17 @@ export const checkAuthFromStorage = async () => {
   }
 
   if (session.accessToken) {
-    const existingUser = authStore.get().user ?? buildUserFromEmail('user@stroppy.io')
-    setAuthUser(existingUser)
-    return
+    try {
+      const user = await fetchCurrentUser()
+      setAuthUser(user)
+      return
+    } catch (error) {
+      console.warn('Unable to load current user, signing out', error)
+      setAuthError(extractErrorMessage(error))
+      clearSession()
+      setAuthUser(null)
+      return
+    }
   }
 
   setAuthUser(null)

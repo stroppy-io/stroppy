@@ -10,7 +10,7 @@ services:
       service: postgres-migrations
       file: ./docker-compose.yaml
     volumes:
-      - postgres-dev:/var/lib/postgresql/data
+      - postgres-dev:/var/lib/postgres/data
     ports:
       - "5432:5432"
     environment:

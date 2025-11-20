@@ -8,7 +8,7 @@ import (
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/core/dag"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/quota"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/entity/workflow"
-	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgresql/sqlerr"
+	"github.com/stroppy-io/stroppy-cloud-panel/internal/infrastructure/postgres/sqlerr"
 	"github.com/stroppy-io/stroppy-cloud-panel/internal/proto/crossplane"
 )
 
