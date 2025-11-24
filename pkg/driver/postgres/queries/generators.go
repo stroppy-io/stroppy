@@ -60,6 +60,49 @@ func collectInsertGenerators(
 	return generators, nil
 }
 
+func collectTransactionGenerators(
+	seed uint64,
+	txDescriptor *stroppy.TransactionDescriptor,
+) (Generators, error) {
+	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
+
+	for _, param := range txDescriptor.GetParams() {
+		paramID := NewGeneratorID(
+			txDescriptor.GetName(),
+			param.GetName(),
+		)
+
+		generator, err := generate.NewValueGenerator(
+			seed,
+			param,
+		)
+		if err != nil {
+			return generators, err
+		}
+
+		generators.Set(paramID, generator)
+	}
+
+	for _, group := range txDescriptor.GetGroups() {
+		generator := generate.NewTupleGenerator(
+			seed,
+			out[generate.GenAbleStruct](group.GetParams()),
+		)
+		generators.Set(NewGeneratorID(txDescriptor.GetName(), group.GetName()), generator)
+	}
+
+	for _, query := range txDescriptor.GetQueries() {
+		gens, err := collectQueryGenerators(seed, query)
+		if err != nil {
+			return generators, err
+		}
+
+		generators.MSet(gens.Items())
+	}
+
+	return generators, nil
+}
+
 func collectQueryGenerators(
 	seed uint64,
 	queryDescriptor *stroppy.QueryDescriptor,
@@ -94,46 +137,22 @@ func collectQueryGenerators(
 	return generators, nil
 }
 
-func CollectStepGenerators(
-	runContext *stroppy.StepContext,
-) (Generators, error) { //nolint: gocognit // allow
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-
-	for _, unit := range runContext.GetWorkload().GetUnits() {
-		gens, err := collectUnitGenerators(unit.GetDescriptor_(), runContext.GetConfig().GetSeed())
-		if err != nil {
-			return generators, err
-		}
-
-		generators.MSet(gens.Items())
-	}
-
-	return generators, nil
-}
-
 func collectUnitGenerators(
 	descriptor *stroppy.UnitDescriptor,
 	seed uint64,
 ) (Generators, error) {
 	switch typed := descriptor.GetType().(type) {
-	case *stroppy.UnitDescriptor_Query:
+	case
+		*stroppy.UnitDescriptor_Query:
 		return collectQueryGenerators(seed, typed.Query)
-	case *stroppy.UnitDescriptor_Transaction:
-		generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-
-		for _, query := range typed.Transaction.GetQueries() {
-			gens, err := collectQueryGenerators(seed, query)
-			if err != nil {
-				return generators, err
-			}
-
-			generators.MSet(gens.Items())
-		}
-
-		return generators, nil
-	case *stroppy.UnitDescriptor_Insert:
+	case
+		*stroppy.UnitDescriptor_Insert:
 		return collectInsertGenerators(seed, typed.Insert)
-	case *stroppy.UnitDescriptor_CreateTable: // do nothing
+	case
+		*stroppy.UnitDescriptor_Transaction:
+		return collectTransactionGenerators(seed, typed.Transaction)
+	case
+		*stroppy.UnitDescriptor_CreateTable: // do nothing
 		return cmap.NewStringer[GeneratorID, generate.ValueGenerator](), nil
 	default:
 		panic(fmt.Sprintf("unknown type '%T' of descriptor isUnitDescriptor_Type", descriptor.GetType()))

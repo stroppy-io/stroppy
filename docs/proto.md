@@ -546,7 +546,8 @@ data export.
 <a name="stroppy-Ulid"></a>
 
 ### Ulid
-Ulid represents a universally universally unique lexicographically sortable identifier (ULID).
+Ulid represents a universally universally unique lexicographically sortable
+identifier (ULID).
 
 
 | Field | Type | Label | Description |
@@ -708,7 +709,8 @@ ConfigFile contains the complete configuration for a benchmark run in file.
 
 ### DriverConfig
 DriverConfig contains configuration for connecting to a database driver.
-It includes the driver plugin path, connection URL, and database-specific settings.
+It includes the driver plugin path, connection URL, and database-specific
+settings.
 
 
 | Field | Type | Label | Description |
@@ -768,6 +770,7 @@ OtlpExporterConfig contains named configuration for an OTLP exporter.
 | metadata | [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry) | repeated | Arbitrary metadata, may be passed to result labels and json output |
 | driver | [DriverConfig](#stroppy-DriverConfig) |  | Database driver configuration |
 | logger | [LoggerConfig](#stroppy-LoggerConfig) |  | Logging configuration |
+| exporter | [ExporterConfig](#stroppy-ExporterConfig) |  | Exporter configuration |
 
 
 
@@ -826,7 +829,8 @@ SideCar contains configuration for plugins.
 <a name="stroppy-Step"></a>
 
 ### Step
-StepExecutorMappingConfig contains configuration for mapping steps to executors.
+StepExecutorMappingConfig contains configuration for mapping steps to
+executors.
 
 
 | Field | Type | Label | Description |
@@ -1059,6 +1063,8 @@ execution count.
 | name | [string](#string) |  | Name of the transaction |
 | isolation_level | [TxIsolationLevel](#stroppy-TxIsolationLevel) |  | Transaction isolation level |
 | queries | [QueryDescriptor](#stroppy-QueryDescriptor) | repeated | List of queries to execute in this transaction |
+| params | [QueryParamDescriptor](#stroppy-QueryParamDescriptor) | repeated | Parameters used in the query |
+| groups | [QueryParamGroup](#stroppy-QueryParamGroup) | repeated | Groups of the parameters |
 | db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific transaction properties |
 
 

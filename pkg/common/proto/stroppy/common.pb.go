@@ -357,7 +357,8 @@ func (x *DateTime) GetValue() *timestamppb.Timestamp {
 }
 
 // *
-// Ulid represents a universally universally unique lexicographically sortable identifier (ULID).
+// Ulid represents a universally universally unique lexicographically sortable
+// identifier (ULID).
 type Ulid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * String representation of ULID (e.g., "01ANQWJZ000000000000000000")

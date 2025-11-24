@@ -19,11 +19,17 @@ export const options: Options = {
   setupTimeout: "5m",
   scenarios: {
     workload: {
-      executor: "constant-vus",
+      executor: "shared-iterations",
       exec: "workload",
-      vus: 10,
-      duration: "5m",
+      vus: 1,
+      iterations: 1,
     },
+    // workload: {
+    //   executor: "constant-vus",
+    //   exec: "workload",
+    //   vus: 10,
+    //   duration: "5m",
+    // },
   },
 };
 
@@ -48,6 +54,8 @@ function RunWorkload(wl: WorkloadDescriptor) {
     .filter((d) => d !== undefined)
     .forEach((d) => RunUnit(d));
 }
+
+const MAX_ACCOUNTS = 100000;
 
 // Define workload descriptors
 const workloads: WorkloadDescriptor[] = [
@@ -95,8 +103,29 @@ const workloads: WorkloadDescriptor[] = [
             query: {
               name: "insert_accounts",
               sql: "",
-              params: [],
               groups: [],
+              params: [
+                {
+                  name: "accounts.id",
+                  generationRule: {
+                    unique: true,
+                    kind: {
+                      oneofKind: "int32Range",
+                      int32Range: { min: 1, max: MAX_ACCOUNTS },
+                    },
+                  },
+                },
+                {
+                  name: "accounts.balance",
+                  generationRule: {
+                    unique: false,
+                    kind: {
+                      oneofKind: "int32Range",
+                      int32Range: { min: 1000, max: 10000 },
+                    },
+                  },
+                },
+              ],
             },
           },
         },
@@ -115,23 +144,30 @@ const workloads: WorkloadDescriptor[] = [
               name: "update_and_log",
               isolationLevel: TxIsolationLevel.UNSPECIFIED,
               queries: [
+                { name: "update_balance", sql: "", params: [], groups: [] },
+                { name: "insert_history", sql: "", params: [], groups: [] },
+              ],
+              groups: [],
+              params: [
                 {
-                  name: "update_balance",
-                  sql: "",
-                  params: [],
-                  groups: [],
+                  name: "accounts.id",
+                  generationRule: {
+                    unique: false,
+                    kind: {
+                      oneofKind: "int32Range",
+                      int32Range: { min: 1, max: MAX_ACCOUNTS },
+                    },
+                  },
                 },
                 {
-                  name: "select_balance",
-                  sql: "",
-                  params: [],
-                  groups: [],
-                },
-                {
-                  name: "insert_history",
-                  sql: "",
-                  params: [],
-                  groups: [],
+                  name: "amount",
+                  generationRule: {
+                    unique: false,
+                    kind: {
+                      oneofKind: "int32Range",
+                      int32Range: { min: -1000, max: 1000 },
+                    },
+                  },
                 },
               ],
             },
@@ -148,26 +184,7 @@ const workloads: WorkloadDescriptor[] = [
         descriptor: {
           type: {
             oneofKind: "query",
-            query: {
-              name: "drop_history",
-              sql: "",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "drop_accounts",
-              sql: "",
-              params: [],
-              groups: [],
-            },
+            query: { name: "drop_tables", sql: "", params: [], groups: [] },
           },
         },
       },

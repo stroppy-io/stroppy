@@ -11,8 +11,8 @@ import (
 
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/grafana/sobek"
-	"github.com/grafana/sobek/file"
 	"github.com/grafana/sobek/parser"
+	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 func transpileTypeScript(entry string) (code string, err error) {
@@ -30,7 +30,7 @@ func transpileTypeScript(entry string) (code string, err error) {
 		Write:             false, // keep outputs in-memory
 		LogLevel:          api.LogLevelWarning,
 		AbsWorkingDir:     dirAbs,
-		External:          []string{"k6/x/*", "k6/*", "@protobuf-ts/runtime"},
+		External:          []string{"k6/x/*", "k6/*"},
 		MainFields:        []string{"module", "main"},
 		ResolveExtensions: []string{".ts", ".tsx", ".js", ".mjs", ".json"},
 		Loader: map[string]api.Loader{
@@ -94,13 +94,18 @@ func (_ pass) ParseConfig(config []byte) {
 
 }
 
+func defineConfig(stroppyConfig *stroppy.GlobalConfig) {
+	fmt.Printf("Got a Config: %++v\n", stroppyConfig)
+}
+
 func main() {
 	vm := sobek.New()
 	vm.SetParserOptions(parser.IsModule)
 
 	// Optional: make Go struct/field names more JS-like (lowercase + tags)
 	vm.SetFieldNameMapper(
-		sobek.TagFieldNameMapper("json", true),
+		sobek.UncapFieldNameMapper(),
+		// sobek.TagFieldNameMapper("json", true),
 	)
 
 	var configPath string
@@ -126,73 +131,28 @@ f.subarray(0,c):f.slice(0,c)};E||(r.TextDecoder=x,r.TextEncoder=y)})(globalThis)
 		return
 	}
 
-	// var configBytes []byte
-
-	// configBytes, err = os.ReadFile(configPath)
-	// if err != nil {
-	// 	fmt.Fprintf(os.Stdout, "can't read file: %s\n", err)
-
-	// 	return
-	// }
-
 	js, err := loadOrBuild(configPath)
 
-	// js, _, err := StripTypes(string(configBytes), configPath)
-	// if err != nil {
-	// 	log.Fatalf("build error: %v\n", err)
-	// }
-
 	vm.Set("stroppy", pass{})
-	vm.Set("encoding", pass{})
 
 	os.WriteFile("./test_bundle.js", []byte(js), 0o655)
+
+	vm.Set("defineConfig", defineConfig)
+
 	_, err = vm.RunString(js)
 	if err != nil {
 		log.Fatalf("js run error: %v\n", err)
 	}
-	obj := vm.Get("insert")
-	fn, _ := sobek.AssertFunction(obj)
-	fn(sobek.Undefined())
-}
 
-func StripTypes(src, filename string) (code string, srcMap []byte, err error) {
-	opts := api.TransformOptions{
-		Loader:         api.LoaderTS,
-		Sourcefile:     filename,
-		Target:         api.ESNext,
-		Format:         api.FormatDefault,
-		Sourcemap:      api.SourceMapExternal,
-		SourcesContent: api.SourcesContentInclude,
-		LegalComments:  api.LegalCommentsNone,
-		Platform:       api.PlatformNeutral,
-		LogLevel:       api.LogLevelSilent,
-		Charset:        api.CharsetUTF8,
-	}
-
-	result := api.Transform(src, opts)
-
-	if hasError, err := esbuildCheckError(&result); hasError {
-		return "", nil, err
-	}
-
-	return string(result.Code), result.Map, nil
-}
-
-func esbuildCheckError(result *api.TransformResult) (bool, error) {
-	if len(result.Errors) == 0 {
-		return false, nil
-	}
-
-	msg := result.Errors[0]
-	err := &parser.Error{Message: msg.Text}
-
-	if msg.Location != nil {
-		err.Position = file.Position{
-			Filename: msg.Location.File,
-			Line:     msg.Location.Line,
-			Column:   msg.Location.Column,
-		}
-	}
-
-	return true, err
+	// obj := vm.Get("insert")
+	// fmt.Println(obj.String())
+	// fn, ok := sobek.AssertFunction(obj)
+	// if !ok {
+	// 	log.Fatalf("can't assert function: %v\n", err)
+	// 	return
+	// }
+	// _, err = fn(sobek.Undefined())
+	// if err != nil {
+	// 	log.Fatalf("function call error: %v\n", err)
+	// }
 }

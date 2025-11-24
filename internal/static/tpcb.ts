@@ -563,7 +563,7 @@ const tpcbTransactionDescriptorBin: BinMsg<UnitDescriptor> =
       oneofKind: "query",
       query: {
         name: "tpcb_transaction",
-        sql: "select tpcb_transaction(${aid[1:ACCOUNTS]}, ${tid}, ${bid}, ${delta});",
+        sql: "select tpcb_transaction(${aid}, ${tid}, ${bid}, ${delta});",
         params: [
           {
             name: "aid",

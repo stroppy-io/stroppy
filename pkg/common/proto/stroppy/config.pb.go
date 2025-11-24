@@ -171,7 +171,8 @@ func (LoggerConfig_LogMode) EnumDescriptor() ([]byte, []int) {
 
 // *
 // DriverConfig contains configuration for connecting to a database driver.
-// It includes the driver plugin path, connection URL, and database-specific settings.
+// It includes the driver plugin path, connection URL, and database-specific
+// settings.
 type DriverConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Database connection URL
@@ -405,7 +406,8 @@ func (x *ExecutorConfig) GetK6() *K6Options {
 }
 
 // *
-// StepExecutorMappingConfig contains configuration for mapping steps to executors.
+// StepExecutorMappingConfig contains configuration for mapping steps to
+// executors.
 type Step struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Name of the step
@@ -590,7 +592,9 @@ type GlobalConfig struct {
 	// * Database driver configuration
 	Driver *DriverConfig `protobuf:"bytes,5,opt,name=driver,proto3" json:"driver,omitempty"`
 	// * Logging configuration
-	Logger        *LoggerConfig `protobuf:"bytes,6,opt,name=logger,proto3" json:"logger,omitempty"`
+	Logger *LoggerConfig `protobuf:"bytes,6,opt,name=logger,proto3" json:"logger,omitempty"`
+	// * Exporter configuration
+	Exporter      *ExporterConfig `protobuf:"bytes,7,opt,name=exporter,proto3" json:"exporter,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -667,6 +671,13 @@ func (x *GlobalConfig) GetLogger() *LoggerConfig {
 	return nil
 }
 
+func (x *GlobalConfig) GetExporter() *ExporterConfig {
+	if x != nil {
+		return x.Exporter
+	}
+	return nil
+}
+
 // *
 // ConfigFile contains the complete configuration for a benchmark run in file.
 type ConfigFile struct {
@@ -681,7 +692,8 @@ type ConfigFile struct {
 	Steps []*Step `protobuf:"bytes,4,rep,name=steps,proto3" json:"steps,omitempty"`
 	// * Plugins configuration
 	SideCars []*SideCarConfig `protobuf:"bytes,5,rep,name=side_cars,json=sideCars,proto3" json:"side_cars,omitempty"`
-	// * BenchmarkDescriptor defines a complete benchmark consisting of multiple steps.
+	// * BenchmarkDescriptor defines a complete benchmark consisting of multiple
+	// steps.
 	Benchmark     *BenchmarkDescriptor `protobuf:"bytes,6,opt,name=benchmark,proto3" json:"benchmark,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -804,14 +816,15 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\x03url\x18\x02 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x126\n" +
 	"\bsettings\x18\x03 \x01(\v2\x15.stroppy.Value.StructH\x00R\bsettings\x88\x01\x01B\v\n" +
 	"\t_settings\"\r\n" +
-	"\vCloudConfig\"\xc2\x02\n" +
+	"\vCloudConfig\"\xf7\x02\n" +
 	"\fGlobalConfig\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x1b\n" +
 	"\x04seed\x18\x03 \x01(\x04B\a\xfaB\x042\x02(\x00R\x04seed\x12?\n" +
 	"\bmetadata\x18\x04 \x03(\v2#.stroppy.GlobalConfig.MetadataEntryR\bmetadata\x127\n" +
 	"\x06driver\x18\x05 \x01(\v2\x15.stroppy.DriverConfigB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x06driver\x12-\n" +
-	"\x06logger\x18\x06 \x01(\v2\x15.stroppy.LoggerConfigR\x06logger\x1a;\n" +
+	"\x06logger\x18\x06 \x01(\v2\x15.stroppy.LoggerConfigR\x06logger\x123\n" +
+	"\bexporter\x18\a \x01(\v2\x17.stroppy.ExporterConfigR\bexporter\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc9\x02\n" +
@@ -868,17 +881,18 @@ var file_proto_stroppy_config_proto_depIdxs = []int32{
 	12, // 7: stroppy.GlobalConfig.metadata:type_name -> stroppy.GlobalConfig.MetadataEntry
 	3,  // 8: stroppy.GlobalConfig.driver:type_name -> stroppy.DriverConfig
 	4,  // 9: stroppy.GlobalConfig.logger:type_name -> stroppy.LoggerConfig
-	10, // 10: stroppy.ConfigFile.global:type_name -> stroppy.GlobalConfig
-	5,  // 11: stroppy.ConfigFile.exporters:type_name -> stroppy.ExporterConfig
-	6,  // 12: stroppy.ConfigFile.executors:type_name -> stroppy.ExecutorConfig
-	7,  // 13: stroppy.ConfigFile.steps:type_name -> stroppy.Step
-	8,  // 14: stroppy.ConfigFile.side_cars:type_name -> stroppy.SideCarConfig
-	16, // 15: stroppy.ConfigFile.benchmark:type_name -> stroppy.BenchmarkDescriptor
-	16, // [16:16] is the sub-list for method output_type
-	16, // [16:16] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	5,  // 10: stroppy.GlobalConfig.exporter:type_name -> stroppy.ExporterConfig
+	10, // 11: stroppy.ConfigFile.global:type_name -> stroppy.GlobalConfig
+	5,  // 12: stroppy.ConfigFile.exporters:type_name -> stroppy.ExporterConfig
+	6,  // 13: stroppy.ConfigFile.executors:type_name -> stroppy.ExecutorConfig
+	7,  // 14: stroppy.ConfigFile.steps:type_name -> stroppy.Step
+	8,  // 15: stroppy.ConfigFile.side_cars:type_name -> stroppy.SideCarConfig
+	16, // 16: stroppy.ConfigFile.benchmark:type_name -> stroppy.BenchmarkDescriptor
+	17, // [17:17] is the sub-list for method output_type
+	17, // [17:17] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_config_proto_init() }

@@ -701,8 +701,12 @@ type TransactionDescriptor struct {
 	IsolationLevel TxIsolationLevel `protobuf:"varint,2,opt,name=isolation_level,json=isolationLevel,proto3,enum=stroppy.TxIsolationLevel" json:"isolation_level,omitempty"`
 	// * List of queries to execute in this transaction
 	Queries []*QueryDescriptor `protobuf:"bytes,3,rep,name=queries,proto3" json:"queries,omitempty"`
+	// * Parameters used in the query
+	Params []*QueryParamDescriptor `protobuf:"bytes,4,rep,name=params,proto3" json:"params,omitempty"`
+	// * Groups of the parameters
+	Groups []*QueryParamGroup `protobuf:"bytes,5,rep,name=groups,proto3" json:"groups,omitempty"`
 	// * Database-specific transaction properties
-	DbSpecific    *Value_Struct `protobuf:"bytes,5,opt,name=db_specific,json=dbSpecific,proto3,oneof" json:"db_specific,omitempty"`
+	DbSpecific    *Value_Struct `protobuf:"bytes,6,opt,name=db_specific,json=dbSpecific,proto3,oneof" json:"db_specific,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -754,6 +758,20 @@ func (x *TransactionDescriptor) GetIsolationLevel() TxIsolationLevel {
 func (x *TransactionDescriptor) GetQueries() []*QueryDescriptor {
 	if x != nil {
 		return x.Queries
+	}
+	return nil
+}
+
+func (x *TransactionDescriptor) GetParams() []*QueryParamDescriptor {
+	if x != nil {
+		return x.Params
+	}
+	return nil
+}
+
+func (x *TransactionDescriptor) GetGroups() []*QueryParamGroup {
+	if x != nil {
+		return x.Groups
 	}
 	return nil
 }
@@ -1134,12 +1152,15 @@ const file_proto_stroppy_descriptor_proto_rawDesc = "" +
 	"\x06groups\x18\x04 \x03(\v2\x18.stroppy.QueryParamGroupR\x06groups\x12;\n" +
 	"\vdb_specific\x18\x05 \x01(\v2\x15.stroppy.Value.StructH\x00R\n" +
 	"dbSpecific\x88\x01\x01B\x0e\n" +
-	"\f_db_specific\"\x8a\x02\n" +
+	"\f_db_specific\"\x82\x03\n" +
 	"\x15TransactionDescriptor\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12B\n" +
 	"\x0fisolation_level\x18\x02 \x01(\x0e2\x19.stroppy.TxIsolationLevelR\x0eisolationLevel\x12C\n" +
-	"\aqueries\x18\x03 \x03(\v2\x18.stroppy.QueryDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\aqueries\x12;\n" +
-	"\vdb_specific\x18\x05 \x01(\v2\x15.stroppy.Value.StructH\x00R\n" +
+	"\aqueries\x18\x03 \x03(\v2\x18.stroppy.QueryDescriptorB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\aqueries\x12D\n" +
+	"\x06params\x18\x04 \x03(\v2\x1d.stroppy.QueryParamDescriptorB\r\xfaB\n" +
+	"\x92\x01\a\"\x05\x8a\x01\x02\x10\x01R\x06params\x120\n" +
+	"\x06groups\x18\x05 \x03(\v2\x18.stroppy.QueryParamGroupR\x06groups\x12;\n" +
+	"\vdb_specific\x18\x06 \x01(\v2\x15.stroppy.Value.StructH\x00R\n" +
 	"dbSpecific\x88\x01\x01B\x0e\n" +
 	"\f_db_specific\"\x87\x02\n" +
 	"\x0eUnitDescriptor\x12=\n" +
@@ -1219,19 +1240,21 @@ var file_proto_stroppy_descriptor_proto_depIdxs = []int32{
 	14, // 12: stroppy.QueryDescriptor.db_specific:type_name -> stroppy.Value.Struct
 	1,  // 13: stroppy.TransactionDescriptor.isolation_level:type_name -> stroppy.TxIsolationLevel
 	8,  // 14: stroppy.TransactionDescriptor.queries:type_name -> stroppy.QueryDescriptor
-	14, // 15: stroppy.TransactionDescriptor.db_specific:type_name -> stroppy.Value.Struct
-	4,  // 16: stroppy.UnitDescriptor.create_table:type_name -> stroppy.TableDescriptor
-	5,  // 17: stroppy.UnitDescriptor.insert:type_name -> stroppy.InsertDescriptor
-	8,  // 18: stroppy.UnitDescriptor.query:type_name -> stroppy.QueryDescriptor
-	9,  // 19: stroppy.UnitDescriptor.transaction:type_name -> stroppy.TransactionDescriptor
-	10, // 20: stroppy.WorkloadUnitDescriptor.descriptor:type_name -> stroppy.UnitDescriptor
-	11, // 21: stroppy.WorkloadDescriptor.units:type_name -> stroppy.WorkloadUnitDescriptor
-	12, // 22: stroppy.BenchmarkDescriptor.workloads:type_name -> stroppy.WorkloadDescriptor
-	23, // [23:23] is the sub-list for method output_type
-	23, // [23:23] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	6,  // 15: stroppy.TransactionDescriptor.params:type_name -> stroppy.QueryParamDescriptor
+	7,  // 16: stroppy.TransactionDescriptor.groups:type_name -> stroppy.QueryParamGroup
+	14, // 17: stroppy.TransactionDescriptor.db_specific:type_name -> stroppy.Value.Struct
+	4,  // 18: stroppy.UnitDescriptor.create_table:type_name -> stroppy.TableDescriptor
+	5,  // 19: stroppy.UnitDescriptor.insert:type_name -> stroppy.InsertDescriptor
+	8,  // 20: stroppy.UnitDescriptor.query:type_name -> stroppy.QueryDescriptor
+	9,  // 21: stroppy.UnitDescriptor.transaction:type_name -> stroppy.TransactionDescriptor
+	10, // 22: stroppy.WorkloadUnitDescriptor.descriptor:type_name -> stroppy.UnitDescriptor
+	11, // 23: stroppy.WorkloadDescriptor.units:type_name -> stroppy.WorkloadUnitDescriptor
+	12, // 24: stroppy.BenchmarkDescriptor.workloads:type_name -> stroppy.WorkloadDescriptor
+	25, // [25:25] is the sub-list for method output_type
+	25, // [25:25] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_descriptor_proto_init() }

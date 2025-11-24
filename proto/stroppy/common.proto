@@ -13,35 +13,35 @@ option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
  * data export.
  */
 message OtlpExport {
-    /** gRPC endpoint for OpenTelemetry collector */
-    optional string otlp_grpc_endpoint = 1;
-    /** HTTP endpoint for the OpenTelemetry collector */
-    optional string otlp_http_endpoint = 3;
-    /** HTTP exporter path. Default is '/v1/metrics' */
-    optional string otlp_http_exporter_url_path = 4;
-    /** Disable transport security for the exporter */
-    optional bool otlp_endpoint_insecure = 5;
-    /** Headers for otlp requests e.g. Authorization=... */
-    optional string otlp_headers = 6;
-    /** Prefix to be added to all exported metrics */
-    optional string otlp_metrics_prefix = 2;
+  /** gRPC endpoint for OpenTelemetry collector */
+  optional string otlp_grpc_endpoint = 1;
+  /** HTTP endpoint for the OpenTelemetry collector */
+  optional string otlp_http_endpoint = 3;
+  /** HTTP exporter path. Default is '/v1/metrics' */
+  optional string otlp_http_exporter_url_path = 4;
+  /** Disable transport security for the exporter */
+  optional bool otlp_endpoint_insecure = 5;
+  /** Headers for otlp requests e.g. Authorization=... */
+  optional string otlp_headers = 6;
+  /** Prefix to be added to all exported metrics */
+  optional string otlp_metrics_prefix = 2;
 }
 
 /**
  * Decimal represents an arbitrary-precision decimal number.
  */
 message Decimal {
-    /** String representation of the decimal number */
-    string value = 1 [ (validate.rules).string.min_len = 1 ];
+  /** String representation of the decimal number */
+  string value = 1 [ (validate.rules).string.min_len = 1 ];
 }
 
 /**
  * Uuid represents a universally unique identifier (UUID).
  */
 message Uuid {
-    /** String representation of UUID (e.g.,
-     * "123e4567-e89b-12d3-a456-426614174000") */
-    string value = 1 [ (validate.rules).string.uuid = true ];
+  /** String representation of UUID (e.g.,
+   * "123e4567-e89b-12d3-a456-426614174000") */
+  string value = 1 [ (validate.rules).string.uuid = true ];
 }
 
 /**
@@ -49,16 +49,17 @@ message Uuid {
  * calendar.
  */
 message DateTime {
-    /** Timestamp in UTC */
-    google.protobuf.Timestamp value = 1;
+  /** Timestamp in UTC */
+  google.protobuf.Timestamp value = 1;
 }
 
 /**
- * Ulid represents a universally universally unique lexicographically sortable identifier (ULID).
+ * Ulid represents a universally universally unique lexicographically sortable
+ * identifier (ULID).
  */
 message Ulid {
-    /** String representation of ULID (e.g., "01ANQWJZ000000000000000000") */
-    string value = 1 [(validate.rules).string.len = 26];
+  /** String representation of ULID (e.g., "01ANQWJZ000000000000000000") */
+  string value = 1 [ (validate.rules).string.len = 26 ];
 }
 
 /**
@@ -67,50 +68,50 @@ message Ulid {
  * way.
  */
 message Value {
-    enum NullValue {
-        /** Null value */
-        NULL_VALUE = 0;
-    }
-    message List {
-        /** List of values */
-        repeated Value values = 1;
-    }
-    message Struct {
-        /** Map of field names to values */
-        repeated Value fields = 1;
-    }
-    oneof type {
-        /** Null value */
-        NullValue null = 1;
-        /** 32-bit signed integer */
-        int32 int32 = 2;
-        /** 32-bit unsigned integer */
-        uint32 uint32 = 3;
-        /** 64-bit signed integer */
-        int64 int64 = 4;
-        /** 64-bit unsigned integer */
-        uint64 uint64 = 5;
-        /** 32-bit floating point number */
-        float float = 6;
-        /** 64-bit floating point number */
-        double double = 7;
-        /** UTF-8 encoded string */
-        string string = 8;
-        /** Boolean value */
-        bool bool = 9;
-        /** Arbitrary-precision decimal */
-        Decimal decimal = 10;
-        /** Universally unique identifier */
-        Uuid uuid = 11;
-        /** Date and time */
-        DateTime datetime = 12;
-        /** Nested structure */
-        Struct struct = 13;
-        /** List of values */
-        List list = 14;
-    }
-    /** Field name (used in structs) */
-    string key = 101;
+  enum NullValue {
+    /** Null value */
+    NULL_VALUE = 0;
+  }
+  message List {
+    /** List of values */
+    repeated Value values = 1;
+  }
+  message Struct {
+    /** Map of field names to values */
+    repeated Value fields = 1;
+  }
+  oneof type {
+    /** Null value */
+    NullValue null = 1;
+    /** 32-bit signed integer */
+    int32 int32 = 2;
+    /** 32-bit unsigned integer */
+    uint32 uint32 = 3;
+    /** 64-bit signed integer */
+    int64 int64 = 4;
+    /** 64-bit unsigned integer */
+    uint64 uint64 = 5;
+    /** 32-bit floating point number */
+    float float = 6;
+    /** 64-bit floating point number */
+    double double = 7;
+    /** UTF-8 encoded string */
+    string string = 8;
+    /** Boolean value */
+    bool bool = 9;
+    /** Arbitrary-precision decimal */
+    Decimal decimal = 10;
+    /** Universally unique identifier */
+    Uuid uuid = 11;
+    /** Date and time */
+    DateTime datetime = 12;
+    /** Nested structure */
+    Struct struct = 13;
+    /** List of values */
+    List list = 14;
+  }
+  /** Field name (used in structs) */
+  string key = 101;
 }
 
 /**
@@ -118,224 +119,223 @@ message Value {
  * It provides rules and constraints for generating various types of data.
  */
 message Generation {
-    // UTF-8 character ranges for different languages
-    // Example: {"en": {{65, 90}, {97, 122}}}
-    /**
-     * Alphabet defines character ranges for string generation.
-     */
-    message Alphabet {
-        /** List of character ranges for this alphabet */
-        repeated Generation.Range.UInt32 ranges = 1
-            [ (validate.rules).repeated = {
-                min_items : 1,
-                items : {message : {required : true}}
-            } ];
+  // UTF-8 character ranges for different languages
+  // Example: {"en": {{65, 90}, {97, 122}}}
+  /**
+   * Alphabet defines character ranges for string generation.
+   */
+  message Alphabet {
+    /** List of character ranges for this alphabet */
+    repeated Generation.Range.UInt32 ranges = 1 [ (validate.rules).repeated = {
+      min_items : 1,
+      items : {message : {required : true}}
+    } ];
+  }
+
+  /**
+   * Distribution defines the statistical distribution for value generation.
+   */
+  message Distribution {
+    enum DistributionType {
+      /** Normal (Gaussian) distribution */
+      NORMAL = 0;
+      /** Uniform distribution */
+      UNIFORM = 1;
+      /** Zipfian distribution */
+      ZIPF = 2;
     }
 
-    /**
-     * Distribution defines the statistical distribution for value generation.
-     */
-    message Distribution {
-        enum DistributionType {
-            /** Normal (Gaussian) distribution */
-            NORMAL = 0;
-            /** Uniform distribution */
-            UNIFORM = 1;
-            /** Zipfian distribution */
-            ZIPF = 2;
-        }
+    /** Type of distribution to use */
+    DistributionType type = 1 [ (validate.rules).enum.defined_only = true ];
+    /** Distribution parameter (e.g., standard deviation for normal
+     * distribution) */
+    double screw = 2 [ (validate.rules).double.gte = 0 ];
+  }
 
-        /** Type of distribution to use */
-        DistributionType type = 1 [ (validate.rules).enum.defined_only = true ];
-        /** Distribution parameter (e.g., standard deviation for normal
-         * distribution) */
-        double screw = 2 [ (validate.rules).double.gte = 0 ];
+  /**
+   * Range defines value constraints for generation.
+   */
+  message Range {
+    message Bool { float ratio = 1; }
+    message String {
+      /** Character set to use for generation */
+      optional Alphabet alphabet = 1;
+      optional uint64 min_len = 2;
+      uint64 max_len = 3;
+    }
+    /** Range for string values that can be parsed into other types */
+    message AnyString {
+      /** Minimum value (inclusive) */
+      string min = 1;
+      /** Maximum value (inclusive) */
+      string max = 2;
+    }
+    /** Range for 32-bit floating point numbers */
+    message Float {
+      /** Minimum value (inclusive) */
+      optional float min = 1;
+      /** Maximum value (inclusive) */
+      float max = 2;
+    }
+    /** Range for 64-bit floating point numbers */
+    message Double {
+      /** Minimum value (inclusive) */
+      optional double min = 1;
+      /** Maximum value (inclusive) */
+      double max = 2;
+    }
+    /** Range for 32-bit signed integers */
+    message Int32 {
+      /** Minimum value (inclusive) */
+      optional int32 min = 1;
+      /** Maximum value (inclusive) */
+      int32 max = 2;
+    }
+    /** Range for 64-bit signed integers */
+    message Int64 {
+      /** Minimum value (inclusive) */
+      optional int64 min = 1;
+      /** Maximum value (inclusive) */
+      int64 max = 2;
+    }
+    /** Range for 32-bit unsigned integers */
+    message UInt32 {
+      /** Minimum value (inclusive) */
+      optional uint32 min = 1;
+      /** Maximum value (inclusive) */
+      uint32 max = 2;
+    }
+    /** Range for 64-bit unsigned integers */
+    message UInt64 {
+      /** Minimum value (inclusive) */
+      optional uint64 min = 1;
+      /** Maximum value (inclusive) */
+      uint64 max = 2;
+    }
+    /** Range for decimal numbers */
+    message DecimalRange {
+      oneof type {
+        option (validate.required) = true;
+        /** Float-based range */
+        Float float = 2;
+        /** Double-based range */
+        Double double = 3;
+        /** String-bsed range (supports scientific notation) */
+        AnyString string = 4;
+      }
+    }
+    /** Range for date/time values */
+    message DateTime {
+      /** Protocol Buffers timestamp range */
+      message TimestampPb {
+        /** Minimum timestamp (inclusive) */
+        google.protobuf.Timestamp min = 1;
+        /** Maximum timestamp (inclusive) */
+        google.protobuf.Timestamp max = 2;
+      }
+      /** Unix timestamp range */
+      message TimestampUnix {
+        /** Minimum Unix timestamp (inclusive) */
+        uint32 min = 1;
+        /** Maximum Unix timestamp (inclusive) */
+        uint32 max = 2;
+      }
+      oneof type {
+        option (validate.required) = true;
+        /** String-based range (ISO 8601 format) */
+        AnyString string = 2;
+        /** Protocol Buffers timestamp range */
+        TimestampPb timestamp_pb = 3;
+        /** Unix timestamp range */
+        TimestampUnix timestamp = 4;
+      }
+    }
+  }
+
+  // TODO: Add range rule to limit amount of random value.
+  //       So limit 5 will generate randoms (2, 1, 3, 3, 5) and then stops.
+  // TODO: Add limit continuation politics.
+  //       If generator stopped it can behave differently after it.
+  //       repeat - strart itself from again.
+  //       bounce - start itself in backward direction.
+  //       max - produce max value.
+  //       min - produce min value.
+  //       null - nulls if allowed.
+  // TODO: add control over random repeatability.
+  //       Now every generator with the same params will generate an identical
+  //       sequence. Two gens with (min: 1, max: 10) will generate
+  //       1, 5, 9, 5... parallely as seed is common for every gen. It's do a
+  //       random data with the same gen definitions not so random
+  //       occasionally.
+
+  /**
+   * Rule defines generation rules for a specific data type.
+   */
+  message Rule {
+    /**
+     * Exactly one variant must be set; tooling treats this as mutually
+     * exclusive. Prefer ranges for variability and consts for fixed values.
+     */
+    oneof kind {
+      option (validate.required) = true;
+
+      // Numeric ranges (frequent)
+      /** Signed 32‑bit integer range (inclusive). Example: 1..100 for
+       * IDs. */
+      Range.Int32 int32_range = 1;
+      /** Signed 64‑bit integer range for large counters or timestamps. */
+      Range.Int64 int64_range = 2;
+      /** Unsigned 32‑bit integer range; use for sizes/indices. */
+      Range.UInt32 uint32_range = 3;
+      /** Unsigned 64‑bit integer range; use for large sizes. */
+      Range.UInt64 uint64_range = 4;
+      /** 32‑bit float bounds; beware precision for currency. */
+      Range.Float float_range = 5;
+      /** 64‑bit float bounds for high‑precision numeric data. */
+      Range.Double double_range = 6;
+      /** Arbitrary‑precision decimal bounds for money/ratios. */
+      Range.DecimalRange decimal_range = 7;
+
+      // Non‑numeric ranges
+      /** String constraints (length, alphabet). */
+      Range.String string_range = 8;
+      /** Boolean constraints (e.g., force true/false). */
+      Range.Bool bool_range = 9;
+      /** Date/time window (e.g., not before/after). */
+      Range.DateTime datetime_range = 10;
+
+      // Constants
+      /** Fixed 32‑bit integer value. */
+      int32 int32_const = 11;
+      /** Fixed 64‑bit integer value. */
+      int64 int64_const = 12;
+      /** Fixed unsigned 32‑bit integer value. */
+      uint32 uint32_const = 13;
+      /** Fixed unsigned 64‑bit integer value. */
+      uint64 uint64_const = 14;
+      /** Fixed 32‑bit float value. */
+      float float_const = 15;
+      /** Fixed 64‑bit float value. */
+      double double_const = 16;
+      /** Fixed decimal value. */
+      Decimal decimal_const = 17;
+      /** Fixed string value. */
+      string string_const = 18;
+      /** Fixed boolean value. */
+      bool bool_const = 19;
+      /** Fixed date/time value. */
+      DateTime datetime_const = 20;
     }
 
-    /**
-     * Range defines value constraints for generation.
-     */
-    message Range {
-        message Bool { float ratio = 1; }
-        message String {
-            /** Character set to use for generation */
-            optional Alphabet alphabet = 1;
-            optional uint64 min_len = 2;
-            uint64 max_len = 3;
-        }
-        /** Range for string values that can be parsed into other types */
-        message AnyString {
-            /** Minimum value (inclusive) */
-            string min = 1;
-            /** Maximum value (inclusive) */
-            string max = 2;
-        }
-        /** Range for 32-bit floating point numbers */
-        message Float {
-            /** Minimum value (inclusive) */
-            optional float min = 1;
-            /** Maximum value (inclusive) */
-            float max = 2;
-        }
-        /** Range for 64-bit floating point numbers */
-        message Double {
-            /** Minimum value (inclusive) */
-            optional double min = 1;
-            /** Maximum value (inclusive) */
-            double max = 2;
-        }
-        /** Range for 32-bit signed integers */
-        message Int32 {
-            /** Minimum value (inclusive) */
-            optional int32 min = 1;
-            /** Maximum value (inclusive) */
-            int32 max = 2;
-        }
-        /** Range for 64-bit signed integers */
-        message Int64 {
-            /** Minimum value (inclusive) */
-            optional int64 min = 1;
-            /** Maximum value (inclusive) */
-            int64 max = 2;
-        }
-        /** Range for 32-bit unsigned integers */
-        message UInt32 {
-            /** Minimum value (inclusive) */
-            optional uint32 min = 1;
-            /** Maximum value (inclusive) */
-            uint32 max = 2;
-        }
-        /** Range for 64-bit unsigned integers */
-        message UInt64 {
-            /** Minimum value (inclusive) */
-            optional uint64 min = 1;
-            /** Maximum value (inclusive) */
-            uint64 max = 2;
-        }
-        /** Range for decimal numbers */
-        message DecimalRange {
-            oneof type {
-                option (validate.required) = true;
-                /** Float-based range */
-                Float float = 2;
-                /** Double-based range */
-                Double double = 3;
-                /** String-bsed range (supports scientific notation) */
-                AnyString string = 4;
-            }
-        }
-        /** Range for date/time values */
-        message DateTime {
-            /** Protocol Buffers timestamp range */
-            message TimestampPb {
-                /** Minimum timestamp (inclusive) */
-                google.protobuf.Timestamp min = 1;
-                /** Maximum timestamp (inclusive) */
-                google.protobuf.Timestamp max = 2;
-            }
-            /** Unix timestamp range */
-            message TimestampUnix {
-                /** Minimum Unix timestamp (inclusive) */
-                uint32 min = 1;
-                /** Maximum Unix timestamp (inclusive) */
-                uint32 max = 2;
-            }
-            oneof type {
-                option (validate.required) = true;
-                /** String-based range (ISO 8601 format) */
-                AnyString string = 2;
-                /** Protocol Buffers timestamp range */
-                TimestampPb timestamp_pb = 3;
-                /** Unix timestamp range */
-                TimestampUnix timestamp = 4;
-            }
-        }
-    }
+    /** Shape of randomness; Normal by default */
+    optional Distribution distribution = 30;
 
-    // TODO: Add range rule to limit amount of random value.
-    //       So limit 5 will generate randoms (2, 1, 3, 3, 5) and then stops.
-    // TODO: Add limit continuation politics.
-    //       If generator stopped it can behave differently after it.
-    //       repeat - strart itself from again.
-    //       bounce - start itself in backward direction.
-    //       max - produce max value.
-    //       min - produce min value.
-    //       null - nulls if allowed.
-    // TODO: add control over random repeatability.
-    //       Now every generator with the same params will generate an identical
-    //       sequence. Two gens with (min: 1, max: 10) will generate
-    //       1, 5, 9, 5... parallely as seed is common for every gen. It's do a
-    //       random data with the same gen definitions not so random
-    //       occasionally.
+    /** Percentage of nulls to inject [0..100]; 0 by default*/
+    optional uint32 null_percentage = 31
+        [ (validate.rules).uint32 = {gte : 0, lte : 100} ];
 
-    /**
-     * Rule defines generation rules for a specific data type.
-     */
-    message Rule {
-        /**
-         * Exactly one variant must be set; tooling treats this as mutually
-         * exclusive. Prefer ranges for variability and consts for fixed values.
-         */
-        oneof kind {
-            option (validate.required) = true;
-
-            // Numeric ranges (frequent)
-            /** Signed 32‑bit integer range (inclusive). Example: 1..100 for
-             * IDs. */
-            Range.Int32 int32_range = 1;
-            /** Signed 64‑bit integer range for large counters or timestamps. */
-            Range.Int64 int64_range = 2;
-            /** Unsigned 32‑bit integer range; use for sizes/indices. */
-            Range.UInt32 uint32_range = 3;
-            /** Unsigned 64‑bit integer range; use for large sizes. */
-            Range.UInt64 uint64_range = 4;
-            /** 32‑bit float bounds; beware precision for currency. */
-            Range.Float float_range = 5;
-            /** 64‑bit float bounds for high‑precision numeric data. */
-            Range.Double double_range = 6;
-            /** Arbitrary‑precision decimal bounds for money/ratios. */
-            Range.DecimalRange decimal_range = 7;
-
-            // Non‑numeric ranges
-            /** String constraints (length, alphabet). */
-            Range.String string_range = 8;
-            /** Boolean constraints (e.g., force true/false). */
-            Range.Bool bool_range = 9;
-            /** Date/time window (e.g., not before/after). */
-            Range.DateTime datetime_range = 10;
-
-            // Constants
-            /** Fixed 32‑bit integer value. */
-            int32 int32_const = 11;
-            /** Fixed 64‑bit integer value. */
-            int64 int64_const = 12;
-            /** Fixed unsigned 32‑bit integer value. */
-            uint32 uint32_const = 13;
-            /** Fixed unsigned 64‑bit integer value. */
-            uint64 uint64_const = 14;
-            /** Fixed 32‑bit float value. */
-            float float_const = 15;
-            /** Fixed 64‑bit float value. */
-            double double_const = 16;
-            /** Fixed decimal value. */
-            Decimal decimal_const = 17;
-            /** Fixed string value. */
-            string string_const = 18;
-            /** Fixed boolean value. */
-            bool bool_const = 19;
-            /** Fixed date/time value. */
-            DateTime datetime_const = 20;
-        }
-
-        /** Shape of randomness; Normal by default */
-        optional Distribution distribution = 30;
-
-        /** Percentage of nulls to inject [0..100]; 0 by default*/
-        optional uint32 null_percentage = 31
-            [ (validate.rules).uint32 = {gte : 0, lte : 100} ];
-
-        /** Enforce uniqueness across generated values;
-         * Linear sequence for ranges */
-        optional bool unique = 32;
-    }
+    /** Enforce uniqueness across generated values;
+     * Linear sequence for ranges */
+    optional bool unique = 32;
+  }
 }
