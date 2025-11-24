@@ -5,8 +5,6 @@ import stroppy from "k6/x/stroppy";
 
 import { Options } from "k6/options";
 import {
-  UnitDescriptor,
-  DriverTransactionStat,
   DriverConfig,
   WorkloadDescriptor,
   Status,
@@ -14,46 +12,26 @@ import {
 } from "./stroppy.pb.js";
 
 import { parse_sql, update_with_sql } from "./parse_sql.ts";
+import {
+  Driver,
+  RunWorkload,
+  getWorkload,
+  runWorkloadStep,
+} from "./helpers.ts";
 
 export const options: Options = {
   setupTimeout: "5m",
   scenarios: {
     workload: {
-      executor: "shared-iterations",
+      executor: "constant-vus",
       exec: "workload",
-      vus: 1,
-      iterations: 1,
+      vus: 10,
+      duration: "5m",
     },
-    // workload: {
-    //   executor: "constant-vus",
-    //   exec: "workload",
-    //   vus: 10,
-    //   duration: "5m",
-    // },
   },
 };
 
-// protobuf serialized messages
-type BinMsg<_T extends any> = Uint8Array;
-
-// Sql Driver interface
-interface Driver {
-  runUnit(unit: BinMsg<UnitDescriptor>): BinMsg<DriverTransactionStat>;
-  teardown(): any; // error
-  notifyStep(name: String, status: Status): void;
-}
 const driver: Driver = stroppy;
-
-function RunUnit(unit: UnitDescriptor): void {
-  driver.runUnit(UnitDescriptor.toBinary(unit));
-}
-
-function RunWorkload(wl: WorkloadDescriptor) {
-  wl.units
-    .map((wu) => wu.descriptor)
-    .filter((d) => d !== undefined)
-    .forEach((d) => RunUnit(d));
-}
 
 const MAX_ACCOUNTS = 100000;
 
@@ -226,48 +204,24 @@ stroppy.parseConfig(
   ),
 );
 
-// Helper to find workload by name
-function getWorkload(name: string): WorkloadDescriptor | undefined {
-  return workloads.find((w) => w.name === name);
-}
-
 // Setup function: create schema and load data
 export function setup() {
-  const createSchema = getWorkload("create_schema");
-  if (createSchema) {
-    driver.notifyStep("create_schema", Status.STATUS_RUNNING);
-    RunWorkload(createSchema);
-    driver.notifyStep("create_schema", Status.STATUS_COMPLETED);
-  }
-
-  const insert = getWorkload("insert");
-  if (insert) {
-    driver.notifyStep("insert", Status.STATUS_RUNNING);
-    RunWorkload(insert);
-    driver.notifyStep("insert", Status.STATUS_COMPLETED);
-  }
-
+  runWorkloadStep(driver, workloads, "create_schema");
+  runWorkloadStep(driver, workloads, "insert");
   driver.notifyStep("workload", Status.STATUS_RUNNING);
   return;
 }
 
 // Main workload function
 export function workload() {
-  const wl = getWorkload("workload");
+  const wl = getWorkload(workloads, "workload");
   if (wl) {
-    RunWorkload(wl);
+    RunWorkload(driver, wl);
   }
 }
 
 export function teardown() {
   driver.notifyStep("workload", Status.STATUS_COMPLETED);
-
-  const cleanup = getWorkload("cleanup");
-  if (cleanup) {
-    driver.notifyStep("cleanup", Status.STATUS_RUNNING);
-    RunWorkload(cleanup);
-    driver.notifyStep("cleanup", Status.STATUS_COMPLETED);
-  }
-
+  runWorkloadStep(driver, workloads, "cleanup");
   driver.teardown();
 }
