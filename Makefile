@@ -132,7 +132,7 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 .install-linter: # Install golangci-lint
 	$(info Installing golangci-lint...)
 	mkdir -p $(LOCAL_BIN)
-	GOPROXY=$(GOPROXY) GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.0
+	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.0
 
 .PHONY: .install-xk6
 .install-xk6:
@@ -170,7 +170,7 @@ proto: .check-bins
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.ts $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.js $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/docs/proto.md $(CURDIR)/docs
-	# cp $(PROTO_BUILD_TARGET_DIR)/docs/config.schema.json $(CURDIR)/docs
+# cp $(PROTO_BUILD_TARGET_DIR)/docs/config.schema.json $(CURDIR)/docs
 
 .PHONY: linter
 linter: # Start linter
