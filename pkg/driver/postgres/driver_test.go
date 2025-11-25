@@ -16,9 +16,7 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-var (
-	_ = ptr[int64]
-)
+var _ = ptr[int64]
 
 type testDriver struct {
 	*Driver
@@ -42,6 +40,7 @@ func newTestDriver(mockPool pgxmock.PgxPoolIface) (*testDriver, error) {
 func TestDriver_runTransaction(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	require.NoError(t, err)
+
 	defer mock.Close()
 
 	drv, err := newTestDriver(mock)
@@ -70,6 +69,7 @@ func TestDriver_runTransaction(t *testing.T) {
 func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	require.NoError(t, err)
+
 	defer mock.Close()
 
 	drv, err := newTestDriver(mock)
@@ -99,7 +99,7 @@ func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 	count := int64(3)
 
 	// Expect 3 insert executions
-	for i := int64(0); i < count; i++ {
+	for range count {
 		mock.ExpectExec("insert into test_table").
 			WithArgs(pgxmock.AnyArg()).
 			WillReturnResult(pgxmock.NewResult("INSERT", 1))
@@ -117,6 +117,7 @@ func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 func TestDriver_InsertValuesCopyFrom(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	require.NoError(t, err)
+
 	defer mock.Close()
 
 	drv, err := newTestDriver(mock)
@@ -171,6 +172,7 @@ func TestDriver_InsertValuesCopyFrom(t *testing.T) {
 func TestDriver_InsertValuesCopyFromLargeBatch(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	require.NoError(t, err)
+
 	defer mock.Close()
 
 	drv, err := newTestDriver(mock)

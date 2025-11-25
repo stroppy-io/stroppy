@@ -35,6 +35,7 @@ func newTransaction(
 ) (*stroppy.DriverTransaction, error) {
 	// Generate transaction-level parameter values
 	txGenIDs := genIDsWithPrefix(descriptor.GetName(), descriptor.GetParams(), descriptor.GetGroups())
+
 	txParamValues, err := GenParamValues(txGenIDs, generators)
 	if err != nil {
 		return nil, fmt.Errorf("can't generate tx params for '%s' due to: %w", descriptor.GetName(), err)
@@ -61,7 +62,7 @@ func newTransaction(
 	}, nil
 }
 
-// genIDsWithPrefix generates GeneratorIDs with a specific prefix (transaction name)
+// genIDsWithPrefix generates GeneratorIDs with a specific prefix (transaction name).
 func genIDsWithPrefix(prefix string, params []*stroppy.QueryParamDescriptor, groups []*stroppy.QueryParamGroup) []GeneratorID {
 	genIDs := make([]GeneratorID, 0, len(params)+len(groups))
 	for _, param := range params {

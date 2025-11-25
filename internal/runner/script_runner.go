@@ -48,6 +48,7 @@ func NewScriptRunner(scriptPath string, sqlPath string) (*ScriptRunner, error) {
 	if err != nil {
 		// Config extraction is optional - script might not call defineConfig
 		lg.Warn("Could not extract config from script", zap.Error(err))
+
 		config = &ExtractedConfig{
 			GlobalConfig: &stroppy.GlobalConfig{},
 		}
@@ -135,12 +136,14 @@ func (r *ScriptRunner) copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
+
 	return os.WriteFile(dst, data, common.FileMode)
 }
 
 // copySQLFilesFromScriptDir copies all SQL files from the script's directory.
 func (r *ScriptRunner) copySQLFilesFromScriptDir(tempDir string) error {
 	scriptDir := filepath.Dir(r.scriptPath)
+
 	entries, err := os.ReadDir(scriptDir)
 	if err != nil {
 		return err
@@ -150,14 +153,17 @@ func (r *ScriptRunner) copySQLFilesFromScriptDir(tempDir string) error {
 		if entry.IsDir() {
 			continue
 		}
+
 		if filepath.Ext(entry.Name()) == ".sql" {
 			srcPath := filepath.Join(scriptDir, entry.Name())
+
 			dstPath := path.Join(tempDir, entry.Name())
 			if err := r.copyFile(srcPath, dstPath); err != nil {
 				return err
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -238,10 +244,12 @@ func (r *ScriptRunner) runK6Binary(ctx context.Context, workdir string, args, en
 		if err := binExec.Process.Signal(syscall.SIGTERM); err != nil {
 			r.logger.Error("Error sending SIGTERM to k6", zap.Error(err))
 		}
+
 		time.Sleep(1 * time.Second)
 
 		if binExec.ProcessState == nil || !binExec.ProcessState.Exited() {
 			r.logger.Error("k6 did not terminate gracefully, killing...")
+
 			if err := binExec.Process.Kill(); err != nil {
 				r.logger.Error("Error killing k6", zap.Error(err))
 			}
@@ -256,6 +264,6 @@ func stringOrDefault(value, defaultValue string) string {
 	if value == "" {
 		return defaultValue
 	}
+
 	return value
 }
-

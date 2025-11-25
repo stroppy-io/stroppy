@@ -35,6 +35,7 @@ func Dispatch( //nolint: ireturn // better than return any
 		fallthrough // as good suggestion
 	case stroppy.DriverConfig_DRIVER_TYPE_POSTGRES:
 		drv, err := postgres.NewDriver(ctx, lg, config)
+
 		return drv, err
 	default:
 		lg.Sugar().Panicf("driver type '%s' not dispatchable", drvType.String())

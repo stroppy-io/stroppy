@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"go.uber.org/zap"
+
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 func NewQuery(
@@ -30,6 +31,7 @@ func NewQuery(
 		Queries: []*stroppy.DriverQuery{query},
 	}, nil
 }
+
 func newQuery(
 	generators Generators,
 	descriptor *stroppy.QueryDescriptor,
@@ -37,7 +39,7 @@ func newQuery(
 	return newQueryWithTxParams(generators, descriptor, nil, nil)
 }
 
-// newQueryWithTxParams creates a query with optional transaction-level parameters
+// newQueryWithTxParams creates a query with optional transaction-level parameters.
 func newQueryWithTxParams(
 	generators Generators,
 	descriptor *stroppy.QueryDescriptor,
@@ -58,7 +60,8 @@ func newQueryWithTxParams(
 	combinedParams := make([]*stroppy.QueryParamDescriptor, len(queryParams))
 	copy(combinedParams, queryParams)
 
-	var txParamStartIdx = len(queryParams)
+	txParamStartIdx := len(queryParams)
+
 	for _, txParam := range txParams {
 		if !queryParamNames[txParam.GetName()] {
 			combinedParams = append(combinedParams, txParam)
@@ -70,6 +73,7 @@ func newQueryWithTxParams(
 
 	// Generate values for query params
 	queryGenIDs := genIDs(descriptor)
+
 	queryParamValues, err := GenParamValues(queryGenIDs, generators)
 	if err != nil {
 		return nil, err
@@ -81,6 +85,7 @@ func newQueryWithTxParams(
 
 	// Add tx param values (in same order as combinedParams)
 	txParamIdx := 0
+
 	for i := txParamStartIdx; i < len(combinedParams); i++ {
 		// Find corresponding tx param value
 		txParamName := combinedParams[i].GetName()
@@ -89,9 +94,11 @@ func newQueryWithTxParams(
 				if j < len(txParamValues) {
 					combinedValues = append(combinedValues, txParamValues[j])
 				}
+
 				break
 			}
 		}
+
 		txParamIdx++
 	}
 

@@ -25,7 +25,7 @@ const (
 	ParseSQLFileName    FileName = "parse_sql.ts"
 )
 
-// StaticFiles are copied to temp dir for k6 execution
+// StaticFiles are copied to temp dir for k6 execution.
 var StaticFiles = []FileName{ //nolint: gochecknoglobals
 	ProtoJSFileName,
 	ProtoTSFileName,
@@ -34,7 +34,7 @@ var StaticFiles = []FileName{ //nolint: gochecknoglobals
 	ParseSQLFileName,
 }
 
-// DevStaticFiles are additional files for development environment
+// DevStaticFiles are additional files for development environment.
 var DevStaticFiles = []FileName{ //nolint: gochecknoglobals
 	PackageJSONFileName,
 }

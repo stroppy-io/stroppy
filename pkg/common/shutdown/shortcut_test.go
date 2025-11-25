@@ -34,6 +34,7 @@ func TestGlobalStopper_Wait(t *testing.T) {
 	Register(mock)
 
 	channel := make(chan struct{})
+
 	go func() {
 		close(channel)
 	}()
@@ -48,6 +49,7 @@ func TestGlobalStopper_WaitSignal(t *testing.T) {
 	Register(mock)
 
 	signals := make(chan os.Signal, 1)
+
 	go func() {
 		signals <- os.Interrupt
 	}()

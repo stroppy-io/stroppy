@@ -166,12 +166,14 @@ DROP TABLE IF EXISTS pgbench_branches CASCADE;
 -- END OF TPC-B-LIKE BENCHMARK SCRIPT
 -- ============================================================================
 `
+
 	lexer := sqllexer.New(query)
 	for {
 		token := lexer.Scan()
 		if token.Type == sqllexer.EOF {
 			break
 		}
+
 		fmt.Println(token)
 	}
 }

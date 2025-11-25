@@ -113,6 +113,7 @@ func ExtractConfigFromJS(jsCode string) (*ExtractedConfig, error) {
 
 	// Set up config extraction
 	var extractedConfig *stroppy.GlobalConfig
+
 	configCallback := func(call sobek.FunctionCall) sobek.Value {
 		if len(call.Arguments) == 0 {
 			return sobek.Undefined()
@@ -140,10 +141,12 @@ func ExtractConfigFromJS(jsCode string) (*ExtractedConfig, error) {
 		if err := protojson.Unmarshal([]byte(jsonStr.String()), config); err != nil {
 			// Try alternative parsing - the object might already be in the right format
 			_ = jsonBytes // suppress unused warning
+
 			return sobek.Undefined()
 		}
 
 		extractedConfig = config
+
 		return sobek.Undefined()
 	}
 
@@ -175,6 +178,6 @@ g=q?new t(g):g||[]}for(var f=l="",b=0,c=g.length|0,u=c-32|0,e,d,h=0,p=0,m,k=0,n=
 f.subarray(0,c):f.slice(0,c)};E||(r.TextDecoder=x,r.TextEncoder=y)})(globalThis)`
 
 	_, err := vm.RunString(encodersDef)
+
 	return err
 }
-

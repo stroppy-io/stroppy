@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
+
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
@@ -96,6 +97,7 @@ func interpolateSQL(
 	}
 
 	idx := 0
+
 	for _, param := range params {
 		pattern := param.GetReplaceRegex()
 		if pattern == "" { // fallback to name replace
@@ -107,6 +109,7 @@ func interpolateSQL(
 			re = regexp.MustCompile(pattern)
 			reStorage.Set(pattern, re)
 		}
+
 		if re.MatchString(sql) { // skip index inc if param not present
 			sql = re.ReplaceAllString(sql, fmt.Sprintf(`$$%d`, idx+1))
 			idx++
@@ -116,7 +119,7 @@ func interpolateSQL(
 	return sql
 }
 
-// interpolateSQLWithTracking returns interpolated SQL and indices of params that were actually used
+// interpolateSQLWithTracking returns interpolated SQL and indices of params that were actually used.
 func interpolateSQLWithTracking(
 	sql string,
 	params []*stroppy.QueryParamDescriptor,
@@ -127,7 +130,9 @@ func interpolateSQLWithTracking(
 	}
 
 	var usedIndices []int
+
 	idx := 0
+
 	for i, param := range params {
 		pattern := param.GetReplaceRegex()
 		if pattern == "" { // fallback to name replace
@@ -139,8 +144,10 @@ func interpolateSQLWithTracking(
 			re = regexp.MustCompile(pattern)
 			reStorage.Set(pattern, re)
 		}
+
 		if re.MatchString(sql) {
 			sql = re.ReplaceAllString(sql, fmt.Sprintf(`$$%d`, idx+1))
+
 			usedIndices = append(usedIndices, i)
 			idx++
 		}
@@ -149,22 +156,25 @@ func interpolateSQLWithTracking(
 	return sql, usedIndices
 }
 
-// expandGroupParams expands groups into individual params
+// expandGroupParams expands groups into individual params.
 func expandGroupParams(groups []*stroppy.QueryParamGroup) []*stroppy.QueryParamDescriptor {
 	var params []*stroppy.QueryParamDescriptor
 	for _, group := range groups {
 		params = append(params, group.GetParams()...)
 	}
+
 	return params
 }
 
-// filterUsedParams filters param values based on used indices
+// filterUsedParams filters param values based on used indices.
 func filterUsedParams(allValues []*stroppy.Value, usedIndices []int) []*stroppy.Value {
 	var result []*stroppy.Value
+
 	for _, idx := range usedIndices {
 		if idx < len(allValues) {
 			result = append(result, allValues[idx])
 		}
 	}
+
 	return result
 }

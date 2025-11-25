@@ -111,6 +111,7 @@ func (uq *QueuedGenerator[Seed, Result]) finalizer(ctx context.Context) {
 		for range uq.ch { //nolint: revive // this block empty, but it drains channel
 		}
 	}()
+
 	<-uq.done
 	close(uq.ch)
 }
@@ -155,6 +156,7 @@ func (uq *QueuedGenerator[Seed, Result]) writer(ctx context.Context, seed seedAn
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()

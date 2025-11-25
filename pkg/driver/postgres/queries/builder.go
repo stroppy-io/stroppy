@@ -50,12 +50,15 @@ func (q *QueryBuilder) AddGenerators(unit *stroppy.UnitDescriptor) error {
 	if q.unitNamesSet.Has(name) {
 		return nil
 	}
+
 	gens, err := collectUnitGenerators(unit, q.seed)
 	if err != nil {
 		return fmt.Errorf("add generators for unit :%w", err)
 	}
+
 	q.generators.MSet(gens.Items())
 	q.unitNamesSet.Set(name, struct{}{})
+
 	return nil
 }
 
@@ -65,15 +68,19 @@ func unitName(unit *stroppy.UnitDescriptor) (string, error) {
 	if create := unit.GetCreateTable(); create != nil {
 		return create.GetName(), nil
 	}
+
 	if insert := unit.GetInsert(); insert != nil {
 		return insert.GetName(), nil
 	}
+
 	if query := unit.GetQuery(); query != nil {
 		return query.GetName(), nil
 	}
+
 	if transaction := unit.GetTransaction(); transaction != nil {
 		return transaction.GetName(), nil
 	}
+
 	return "", ErrNoSubtype
 }
 
@@ -93,15 +100,19 @@ func (q *QueryBuilder) internalBuild(
 	if qry := descriptor.GetQuery(); qry != nil {
 		return NewQuery(ctx, lg, q.generators, qry)
 	}
+
 	if tx := descriptor.GetTransaction(); tx != nil {
 		return NewTransaction(ctx, lg, q.generators, tx)
 	}
+
 	if ins := descriptor.GetInsert(); ins != nil {
 		return NewInsertQuery(ctx, lg, q.generators, ins)
 	}
+
 	if ct := descriptor.GetCreateTable(); ct != nil {
 		return NewCreateTable(lg, ct)
 	}
+
 	return nil, ErrUnknownQueryType
 }
 

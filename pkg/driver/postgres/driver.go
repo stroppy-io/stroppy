@@ -34,6 +34,7 @@ func waitForDB(lg *zap.Logger, connPool *pgxpool.Pool, timeout time.Duration) er
 		// Try to ping
 		if err := connPool.Ping(ctx); err == nil {
 			lg.Debug("Successfully connected to database")
+
 			return nil
 		} else {
 			lg.Sugar().Warnf("Database not ready, retrying in %v... (error: %v)", interval, err)
@@ -44,7 +45,7 @@ func waitForDB(lg *zap.Logger, connPool *pgxpool.Pool, timeout time.Duration) er
 		case <-time.After(interval):
 			// Continue to next retry
 		case <-ctx.Done():
-			return fmt.Errorf("context cancelled: %w", ctx.Err())
+			return fmt.Errorf("context canceled: %w", ctx.Err())
 		}
 
 		// Increase interval by 5 seconds for next attempt
@@ -107,7 +108,9 @@ func NewDriver(
 	if err != nil {
 		return nil, err
 	}
+
 	d.logger.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
+
 	err = waitForDB(d.logger, connPool, 5*time.Minute)
 	if err != nil {
 		return nil, err
@@ -134,6 +137,7 @@ func (d *Driver) RunTransaction(
 	if err != nil {
 		return nil, err
 	}
+
 	transaction, err := d.GenerateNextUnit(ctx, unit)
 	if err != nil {
 		return nil, err
@@ -355,5 +359,6 @@ func (d *Driver) Teardown(_ context.Context) error {
 	d.logger.Debug("Driver Teardown Start")
 	d.pgxPool.Close()
 	d.logger.Debug("Driver Teardown End")
+
 	return nil
 }

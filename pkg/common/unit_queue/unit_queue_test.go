@@ -130,7 +130,9 @@ func TestQueuedGenerator_ProportionalDistribution(t *testing.T) {
 		}
 
 		countsMutex.Lock()
+
 		counts[value]++
+
 		countsMutex.Unlock()
 	}
 
@@ -301,6 +303,7 @@ func TestQueuedGenerator_RaceConditions(t *testing.T) {
 
 		go func() {
 			defer wg.Done()
+
 			time.Sleep(5 * time.Millisecond)
 
 			if err := queue.Stop(); err != nil {
@@ -440,6 +443,7 @@ func TestQueuedGenerator_WorkerLimits(t *testing.T) {
 	}
 
 	const workerLimit = 3
+
 	queue := unit_queue.NewQueue(generator, workerLimit, 100)
 	queue.PrepareGenerator(1, 10, 5) // Try to create 10 workers, but limit is 3
 
@@ -602,7 +606,9 @@ func TestQueuedGenerator_ExactProportions(t *testing.T) {
 		}
 
 		countsMutex.Lock()
+
 		counts[value]++
+
 		countsMutex.Unlock()
 	}
 

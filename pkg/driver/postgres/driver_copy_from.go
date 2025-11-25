@@ -25,7 +25,6 @@ func NewStreamingCopySource(
 	descriptor *stroppy.InsertDescriptor,
 	count int64,
 ) *streamingCopySource {
-
 	return &streamingCopySource{
 		driver:  d,
 		count:   count,
@@ -45,7 +44,7 @@ func (s *streamingCopySource) Next() bool {
 		return false
 	}
 
-	// NOTE: known that ctx not used at query generatin
+	// NOTE: known that ctx not used at query generations
 	s.transaction, s.err = s.driver.GenerateNextUnit(nil, s.unit)
 	if s.err != nil {
 		return false
@@ -57,6 +56,7 @@ func (s *streamingCopySource) Next() bool {
 	}
 
 	s.current++
+
 	return true
 }
 

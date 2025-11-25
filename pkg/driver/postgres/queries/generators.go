@@ -142,14 +142,11 @@ func collectUnitGenerators(
 	seed uint64,
 ) (Generators, error) {
 	switch typed := descriptor.GetType().(type) {
-	case
-		*stroppy.UnitDescriptor_Query:
+	case *stroppy.UnitDescriptor_Query:
 		return collectQueryGenerators(seed, typed.Query)
-	case
-		*stroppy.UnitDescriptor_Insert:
+	case *stroppy.UnitDescriptor_Insert:
 		return collectInsertGenerators(seed, typed.Insert)
-	case
-		*stroppy.UnitDescriptor_Transaction:
+	case *stroppy.UnitDescriptor_Transaction:
 		return collectTransactionGenerators(seed, typed.Transaction)
 	case
 		*stroppy.UnitDescriptor_CreateTable: // do nothing

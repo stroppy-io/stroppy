@@ -83,4 +83,3 @@ func CopyFileToPath(targetPath, fileName string, perm os.FileMode) error {
 
 	return nil
 }
-

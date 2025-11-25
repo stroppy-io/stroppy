@@ -49,6 +49,7 @@ func NewTupleGenerator(
 
 		// Recursive function to iterate through all combinations
 		var iterate func(depth int, current []*stroppy.Value) bool
+
 		iterate = func(depth int, current []*stroppy.Value) bool {
 			if depth == len(genInfos) {
 				res := make([]*stroppy.Value, len(current))
