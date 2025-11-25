@@ -120,11 +120,11 @@ func interpolateSQL(
 }
 
 // interpolateSQLWithTracking returns interpolated SQL and indices of params that were actually used.
-func interpolateSQLWithTracking(
+func interpolateSQLWithTracking( //nolint:nonamedreturns // required by gocritic
 	sql string,
 	params []*stroppy.QueryParamDescriptor,
 	groups []*stroppy.QueryParamGroup,
-) (string, []int) {
+) (interpolatedSQL string, usedParamIndices []int) {
 	for _, group := range groups {
 		params = append(params, group.GetParams()...)
 	}

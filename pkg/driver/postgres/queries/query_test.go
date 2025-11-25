@@ -171,7 +171,12 @@ func Test_interpolateSQL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := interpolateSQL(tt.args.descriptor.GetSql(), tt.args.descriptor.GetParams(), tt.args.descriptor.GetGroups()); got != tt.want {
+			got := interpolateSQL(
+				tt.args.descriptor.GetSql(),
+				tt.args.descriptor.GetParams(),
+				tt.args.descriptor.GetGroups(),
+			)
+			if got != tt.want {
 				t.Errorf("interpolateSQL() = %v, want %v", got, tt.want)
 			}
 		})

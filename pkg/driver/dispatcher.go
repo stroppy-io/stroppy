@@ -40,6 +40,6 @@ func Dispatch( //nolint: ireturn // better than return any
 	default:
 		lg.Sugar().Panicf("driver type '%s' not dispatchable", drvType.String())
 
-		return nil, nil
+		return nil, nil //nolint:nilnil // unreachable after panic
 	}
 }

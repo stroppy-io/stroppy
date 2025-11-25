@@ -28,7 +28,7 @@ type ScriptRunner struct {
 }
 
 // NewScriptRunner creates a new ScriptRunner for the given script.
-func NewScriptRunner(scriptPath string, sqlPath string) (*ScriptRunner, error) {
+func NewScriptRunner(scriptPath, sqlPath string) (*ScriptRunner, error) {
 	lg := logger.Global().Named("script_runner").WithOptions(zap.WithCaller(false))
 
 	// Validate script path
@@ -184,7 +184,9 @@ func (r *ScriptRunner) buildEnvVars() []string {
 }
 
 // addOtelExportArgs adds OpenTelemetry exporter arguments and environment variables.
-func (r *ScriptRunner) addOtelExportArgs(args, envs []string) ([]string, []string) {
+//
+//nolint:nonamedreturns // required by gocritic unnamedResult
+func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut []string) {
 	export := r.config.GlobalConfig.GetExporter().GetOtlpExport()
 	if export == nil {
 		return args, envs

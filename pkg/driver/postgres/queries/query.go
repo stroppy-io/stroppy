@@ -64,7 +64,7 @@ func newQueryWithTxParams(
 
 	for _, txParam := range txParams {
 		if !queryParamNames[txParam.GetName()] {
-			combinedParams = append(combinedParams, txParam)
+			combinedParams = append(combinedParams, txParam) //nolint:makezero // intentional append after copy
 		}
 	}
 
@@ -92,7 +92,7 @@ func newQueryWithTxParams(
 		for j, txParam := range txParams {
 			if txParam.GetName() == txParamName {
 				if j < len(txParamValues) {
-					combinedValues = append(combinedValues, txParamValues[j])
+					combinedValues = append(combinedValues, txParamValues[j]) //nolint:makezero // intentional append after copy
 				}
 
 				break

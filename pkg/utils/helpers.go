@@ -1,4 +1,4 @@
-package utils
+package utils //nolint:revive // package name is intentional
 
 func Must[T any](value T, err error) T { //nolint: ireturn // generic
 	if err != nil {

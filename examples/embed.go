@@ -3,10 +3,14 @@ package examples
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"os"
 	"path"
 )
+
+// ErrUnknownPreset is returned when an unknown preset name is requested.
+var ErrUnknownPreset = errors.New("unknown preset")
 
 // Preset represents an available example preset.
 type Preset string
@@ -51,7 +55,7 @@ var Content embed.FS
 func CopyPresetToPath(targetPath string, preset Preset, perm os.FileMode) error {
 	files, ok := PresetFiles[preset]
 	if !ok {
-		return fmt.Errorf("unknown preset: %s", preset)
+		return fmt.Errorf("%w: %s", ErrUnknownPreset, preset)
 	}
 
 	for _, fileName := range files {

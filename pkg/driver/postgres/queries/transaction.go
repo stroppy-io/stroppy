@@ -10,7 +10,7 @@ import (
 )
 
 func NewTransaction(
-	ctx context.Context,
+	_ context.Context,
 	lg *zap.Logger,
 	generators Generators,
 	descriptor *stroppy.TransactionDescriptor,
@@ -45,12 +45,15 @@ func newTransaction(
 	txParams := descriptor.GetParams()
 	txParams = append(txParams, expandGroupParams(descriptor.GetGroups())...)
 
-	var queries []*stroppy.DriverQuery
+	queries := make([]*stroppy.DriverQuery, 0, len(descriptor.GetQueries()))
 
 	for _, queryDesc := range descriptor.GetQueries() {
 		query, err := newQueryWithTxParams(generators, queryDesc, txParams, txParamValues)
 		if err != nil {
-			return nil, fmt.Errorf("can't create query '%s' for tx '%s' due to: %w", queryDesc.GetName(), descriptor.GetName(), err)
+			return nil, fmt.Errorf(
+				"can't create query '%s' for tx '%s' due to: %w",
+				queryDesc.GetName(), descriptor.GetName(), err,
+			)
 		}
 
 		queries = append(queries, query)
@@ -63,7 +66,9 @@ func newTransaction(
 }
 
 // genIDsWithPrefix generates GeneratorIDs with a specific prefix (transaction name).
-func genIDsWithPrefix(prefix string, params []*stroppy.QueryParamDescriptor, groups []*stroppy.QueryParamGroup) []GeneratorID {
+func genIDsWithPrefix(
+	prefix string, params []*stroppy.QueryParamDescriptor, groups []*stroppy.QueryParamGroup,
+) []GeneratorID {
 	genIDs := make([]GeneratorID, 0, len(params)+len(groups))
 	for _, param := range params {
 		genIDs = append(genIDs, NewGeneratorID(prefix, param.GetName()))

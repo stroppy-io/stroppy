@@ -9,6 +9,11 @@ import (
 	"github.com/stroppy-io/stroppy/internal/runner"
 )
 
+const (
+	minArgs = 1 // script.ts is required
+	maxArgs = 2 // sql_file.sql is optional
+)
+
 var Cmd = &cobra.Command{ //nolint: gochecknoglobals
 	Use:   "run <script.ts> [sql_file.sql]",
 	Short: "Run benchmark script with k6",
@@ -21,7 +26,7 @@ Examples:
   stroppy run my_benchmark.ts
   stroppy run execute_sql.ts tpcb.sql
 `,
-	Args: cobra.RangeArgs(1, 2),
+	Args: cobra.RangeArgs(minArgs, maxArgs),
 	RunE: func(_ *cobra.Command, args []string) error {
 		scriptPath := args[0]
 		sqlPath := ""

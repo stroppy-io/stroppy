@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/DataDog/go-sqllexer"
 )
@@ -174,6 +175,6 @@ DROP TABLE IF EXISTS pgbench_branches CASCADE;
 			break
 		}
 
-		fmt.Println(token)
+		fmt.Fprintln(os.Stdout, token)
 	}
 }

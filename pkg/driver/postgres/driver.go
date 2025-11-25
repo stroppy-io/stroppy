@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -18,8 +19,16 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
 
-func waitForDB(lg *zap.Logger, connPool *pgxpool.Pool, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+// ErrDBConnectionTimeout is returned when database connection times out.
+var ErrDBConnectionTimeout = errors.New("database connection timeout")
+
+const (
+	retryIntervalIncrement = 5 * time.Second
+	dbConnectionTimeout    = 5 * time.Minute
+)
+
+func waitForDB(ctx context.Context, lg *zap.Logger, connPool *pgxpool.Pool, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	interval := 1 * time.Second
@@ -28,17 +37,18 @@ func waitForDB(lg *zap.Logger, connPool *pgxpool.Pool, timeout time.Duration) er
 	for {
 		// Check if timeout exceeded
 		if time.Since(startTime) >= timeout {
-			return fmt.Errorf("database connection timeout after %v", timeout)
+			return fmt.Errorf("%w after %v", ErrDBConnectionTimeout, timeout)
 		}
 
 		// Try to ping
-		if err := connPool.Ping(ctx); err == nil {
+		pingErr := connPool.Ping(ctx)
+		if pingErr == nil {
 			lg.Debug("Successfully connected to database")
 
 			return nil
-		} else {
-			lg.Sugar().Warnf("Database not ready, retrying in %v... (error: %v)", interval, err)
 		}
+
+		lg.Sugar().Warnf("Database not ready, retrying in %v... (error: %v)", interval, pingErr)
 
 		// Sleep for current interval
 		select {
@@ -48,8 +58,8 @@ func waitForDB(lg *zap.Logger, connPool *pgxpool.Pool, timeout time.Duration) er
 			return fmt.Errorf("context canceled: %w", ctx.Err())
 		}
 
-		// Increase interval by 5 seconds for next attempt
-		interval += 5 * time.Second
+		// Increase interval for next attempt
+		interval += retryIntervalIncrement
 	}
 }
 
@@ -83,11 +93,12 @@ type Driver struct {
 	builder QueryBuilder
 }
 
+//nolint:nonamedreturns // named returns for defer error handling
 func NewDriver(
 	ctx context.Context,
 	lg *zap.Logger,
 	cfg *stroppy.DriverConfig,
-) (d *Driver, err error) { //nolint: ireturn // allow
+) (d *Driver, err error) {
 	if lg == nil {
 		d = &Driver{
 			logger: logger.NewFromEnv().
@@ -111,7 +122,7 @@ func NewDriver(
 
 	d.logger.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
 
-	err = waitForDB(d.logger, connPool, 5*time.Minute)
+	err = waitForDB(ctx, d.logger, connPool, dbConnectionTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +196,7 @@ func (d *Driver) InsertValues(
 	default:
 		d.logger.Panic("unexpected proto.InsertMethod")
 
-		return nil, nil
+		return nil, nil //nolint:nilnil // unreachable after panic
 	}
 }
 
@@ -265,7 +276,7 @@ func (d *Driver) insertValuesCopyFrom(
 		ctx,
 		pgx.Identifier{descriptor.GetTableName()},
 		cols,
-		NewStreamingCopySource(d, descriptor, count),
+		newStreamingCopySource(d, descriptor, count),
 	)
 	if err != nil {
 		return nil, err
@@ -311,7 +322,7 @@ func (d *Driver) runTransactionInternal(
 	transaction *stroppy.DriverTransaction,
 	executor Executor,
 ) (*stroppy.DriverTransactionStat, error) {
-	queries := make([]*stroppy.DriverQueryStat, 0, len(transaction.GetQueries()))
+	queryStats := make([]*stroppy.DriverQueryStat, 0, len(transaction.GetQueries()))
 	txStart := time.Now()
 
 	for _, query := range transaction.GetQueries() {
@@ -329,7 +340,7 @@ func (d *Driver) runTransactionInternal(
 			return nil, err
 		}
 
-		queries = append(queries, &stroppy.DriverQueryStat{
+		queryStats = append(queryStats, &stroppy.DriverQueryStat{
 			Name:         query.GetName(),
 			ExecDuration: durationpb.New(time.Since(start)),
 		})
@@ -338,7 +349,7 @@ func (d *Driver) runTransactionInternal(
 	return &stroppy.DriverTransactionStat{
 		IsolationLevel: transaction.GetIsolationLevel(),
 		ExecDuration:   durationpb.New(time.Since(txStart)),
-		Queries:        queries,
+		Queries:        queryStats,
 	}, nil
 }
 

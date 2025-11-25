@@ -14,8 +14,14 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
-// ErrNoConfigProvided is returned when script doesn't call defineConfig.
-var ErrNoConfigProvided = errors.New("script did not call defineConfig with GlobalConfig")
+var (
+	// ErrNoConfigProvided is returned when script doesn't call defineConfig.
+	ErrNoConfigProvided = errors.New("script did not call defineConfig with GlobalConfig")
+	// ErrEsbuild is returned when esbuild encounters an error during transpilation.
+	ErrEsbuild = errors.New("esbuild error")
+	// ErrNoEsbuildOutput is returned when esbuild produces no output files.
+	ErrNoEsbuildOutput = errors.New("no output from esbuild")
+)
 
 // ExtractedConfig contains configuration extracted from a TypeScript script.
 type ExtractedConfig struct {
@@ -54,11 +60,11 @@ func TranspileTypeScript(entryPath string) (string, error) {
 	})
 
 	if len(result.Errors) > 0 {
-		return "", fmt.Errorf("esbuild error: %s", result.Errors[0].Text)
+		return "", fmt.Errorf("%w: %s", ErrEsbuild, result.Errors[0].Text)
 	}
 
 	if len(result.OutputFiles) == 0 {
-		return "", errors.New("no output from esbuild")
+		return "", ErrNoEsbuildOutput
 	}
 
 	return string(result.OutputFiles[0].Contents), nil
@@ -125,11 +131,6 @@ func ExtractConfigFromJS(jsCode string) (*ExtractedConfig, error) {
 			return sobek.Undefined()
 		}
 
-		// Convert to JSON and then to protobuf
-		jsonBytes, err := protojson.MarshalOptions{
-			UseProtoNames: true,
-		}.Marshal(&stroppy.GlobalConfig{})
-
 		// Try to marshal the JS object to JSON first
 		jsonStr, err := vm.RunString(fmt.Sprintf("JSON.stringify(%s)", call.Argument(0).String()))
 		if err != nil {
@@ -139,9 +140,6 @@ func ExtractConfigFromJS(jsCode string) (*ExtractedConfig, error) {
 		// Parse JSON to GlobalConfig
 		config := &stroppy.GlobalConfig{}
 		if err := protojson.Unmarshal([]byte(jsonStr.String()), config); err != nil {
-			// Try alternative parsing - the object might already be in the right format
-			_ = jsonBytes // suppress unused warning
-
 			return sobek.Undefined()
 		}
 
@@ -169,6 +167,8 @@ func ExtractConfigFromJS(jsCode string) (*ExtractedConfig, error) {
 }
 
 // injectEncoderPolyfill injects TextEncoder/TextDecoder polyfill into the VM.
+//
+//nolint:lll // this is a polyfill for TextEncoder/TextDecoder
 func injectEncoderPolyfill(vm *sobek.Runtime) error {
 	// Minified TextEncoder/TextDecoder polyfill
 	const encodersDef = `'use strict';(function(r){function x(){}function y(){}var z=String.fromCharCode,v={}.toString,A=v.call(r.SharedArrayBuffer),B=v(),q=r.Uint8Array,t=q||Array,w=q?ArrayBuffer:t,C=w.isView||function(g){return g&&"length"in g},D=v.call(w.prototype);w=y.prototype;var E=r.TextEncoder,a=new (q?Uint16Array:t)(32);x.prototype.decode=function(g){if(!C(g)){var l=v.call(g);if(l!==D&&l!==A&&l!==B)throw TypeError("Failed to execute 'decode' on 'TextDecoder': The provided value is not of type '(ArrayBuffer or ArrayBufferView)'");

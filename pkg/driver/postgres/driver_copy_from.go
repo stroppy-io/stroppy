@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"strings"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -11,7 +12,6 @@ import (
 // without loading all rows into memory.
 type streamingCopySource struct {
 	driver      *Driver
-	descriptor  *stroppy.InsertDescriptor
 	count       int64
 	current     int64
 	values      []any
@@ -20,7 +20,7 @@ type streamingCopySource struct {
 	unit        *stroppy.UnitDescriptor
 }
 
-func NewStreamingCopySource(
+func newStreamingCopySource(
 	d *Driver,
 	descriptor *stroppy.InsertDescriptor,
 	count int64,
@@ -45,7 +45,7 @@ func (s *streamingCopySource) Next() bool {
 	}
 
 	// NOTE: known that ctx not used at query generations
-	s.transaction, s.err = s.driver.GenerateNextUnit(nil, s.unit)
+	s.transaction, s.err = s.driver.GenerateNextUnit(context.TODO(), s.unit)
 	if s.err != nil {
 		return false
 	}

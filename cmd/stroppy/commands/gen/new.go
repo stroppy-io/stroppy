@@ -117,30 +117,15 @@ Examples:
 			zap.String("path", output),
 		)
 
-		// Print usage instructions
-		fmt.Printf(`
-Development environment created at: %s
-
-Files included:
-  - stroppy.pb.ts, stroppy.pb.js  (Protobuf definitions)
-  - helpers.ts, parse_sql.ts      (Helper utilities)
-  - package.json                  (TypeScript types)
-  - stroppy-k6                    (K6 binary)
-  - stroppy                       (Stroppy CLI)
-`, output)
+		// Log usage instructions
+		log.Info("Files included: stroppy.pb.ts, stroppy.pb.js, helpers.ts, parse_sql.ts, package.json, stroppy-k6, stroppy")
 
 		if preset != "" {
-			fmt.Printf("  - %s preset files\n", preset)
+			log.Info("Preset files included", zap.String("preset", preset))
 		}
 
-		fmt.Printf(`
-To run your benchmark:
-  cd %s
-  ./stroppy run <your_script.ts>
-
-For development with TypeScript types:
-  npm install
-`, output)
+		log.Info("To run your benchmark: cd " + output + " && ./stroppy run <your_script.ts>")
+		log.Info("For development with TypeScript types: npm install")
 
 		return nil
 	},
