@@ -6,6 +6,7 @@ import stroppy from "k6/x/stroppy";
 import { Options } from "k6/options";
 import {
   DriverConfig,
+  GlobalConfig,
   WorkloadDescriptor,
   Status,
   TxIsolationLevel,
@@ -175,30 +176,33 @@ const sqlContent = open("tpcb_mini.sql");
 const parsedWorkloads = parse_sql(sqlContent);
 update_with_sql(workloads, parsedWorkloads);
 
-// Init context: each VU gets its own driver with single connection
-stroppy.parseConfig(
-  DriverConfig.toBinary(
-    DriverConfig.create({
-      url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
-      driverType: 1,
-      dbSpecific: {
-        fields: [
-          {
-            type: { oneofKind: "string", string: "error" },
-            key: "trace_log_level",
-          },
-          {
-            type: { oneofKind: "string", string: "5m" },
-            key: "max_conn_lifetime",
-          },
-          {
-            type: { oneofKind: "string", string: "2m" },
-            key: "max_conn_idle_time",
-          },
-          { type: { oneofKind: "int32", int32: 1 }, key: "max_conns" },
-          { type: { oneofKind: "int32", int32: 1 }, key: "min_conns" },
-          { type: { oneofKind: "int32", int32: 1 }, key: "min_idle_conns" },
-        ],
+// Initialize driver with GlobalConfig
+// This is called at the top level to configure the driver
+stroppy.defineConfig(
+  GlobalConfig.toBinary(
+    GlobalConfig.create({
+      driver: {
+        url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
+        driverType: 1,
+        dbSpecific: {
+          fields: [
+            {
+              type: { oneofKind: "string", string: "error" },
+              key: "trace_log_level",
+            },
+            {
+              type: { oneofKind: "string", string: "5m" },
+              key: "max_conn_lifetime",
+            },
+            {
+              type: { oneofKind: "string", string: "2m" },
+              key: "max_conn_idle_time",
+            },
+            { type: { oneofKind: "int32", int32: 1 }, key: "max_conns" },
+            { type: { oneofKind: "int32", int32: 1 }, key: "min_conns" },
+            { type: { oneofKind: "int32", int32: 1 }, key: "min_idle_conns" },
+          ],
+        },
       },
     }),
   ),

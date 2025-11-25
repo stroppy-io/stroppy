@@ -20,19 +20,23 @@ const (
 	PackageJSONFileName FileName = "package.json"
 	ProtoTSFileName     FileName = "stroppy.pb.ts"
 	ProtoJSFileName     FileName = "stroppy.pb.js"
-	K6PluginFileName    FileName = "stroppy-xk6"
-	K6BenchmarkFileName FileName = "benchmark.ts"
+	K6PluginFileName    FileName = "stroppy-k6"
+	HelpersFileName     FileName = "helpers.ts"
+	ParseSQLFileName    FileName = "parse_sql.ts"
 )
 
+// StaticFiles are copied to temp dir for k6 execution
 var StaticFiles = []FileName{ //nolint: gochecknoglobals
 	ProtoJSFileName,
+	ProtoTSFileName,
 	K6PluginFileName,
-	K6BenchmarkFileName,
+	HelpersFileName,
+	ParseSQLFileName,
 }
 
+// DevStaticFiles are additional files for development environment
 var DevStaticFiles = []FileName{ //nolint: gochecknoglobals
 	PackageJSONFileName,
-	ProtoTSFileName,
 }
 
 var Binaries = []FileName{ //nolint: gochecknoglobals
@@ -41,7 +45,8 @@ var Binaries = []FileName{ //nolint: gochecknoglobals
 
 //go:embed package.json
 //go:embed stroppy-k6
-//go:embed benchmark.ts
+//go:embed helpers.ts
+//go:embed parse_sql.ts
 //go:embed *.pb.*
 var Content embed.FS
 

@@ -118,10 +118,39 @@ type XK6Instance struct {
 }
 
 var rootModule *RootModule
-var onceParseConfig sync.Once
+var onceDefineConfig sync.Once
 
-// ParseConfig is supposed to be called once per RootModule at start of the k6-test.
-// Initializes driver with configuration.
+// DefineConfig initializes the driver from GlobalConfig.
+// This is called by scripts using defineConfig(globalConfig) at the top level.
+func (i *XK6Instance) DefineConfig(configBin []byte) {
+	var globalCfg stroppy.GlobalConfig
+	err := proto.Unmarshal(configBin, &globalCfg)
+	if err != nil {
+		i.lg.Fatal("error unmarshalling GlobalConfig", zap.Error(err))
+	}
+
+	drvCfg := globalCfg.GetDriver()
+	if drvCfg == nil {
+		i.lg.Fatal("GlobalConfig.driver is required")
+	}
+
+	i.drv, err = driver.Dispatch(rootModule.ctx, i.lg, drvCfg)
+	if err != nil {
+		i.lg.Fatal("can't initialize driver", zap.Error(err))
+	}
+
+	onceDefineConfig.Do(func() {
+		rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
+			Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
+			Status: stroppy.Status_STATUS_RUNNING,
+			Config: &stroppy.ConfigFile{Global: &globalCfg},
+			Cmd:    "",
+		})
+	})
+}
+
+// ParseConfig is deprecated. Use DefineConfig instead.
+// Kept for backward compatibility with existing scripts.
 func (i *XK6Instance) ParseConfig(configBin []byte) {
 	var drvCfg stroppy.DriverConfig
 	err := proto.Unmarshal(configBin, &drvCfg)
@@ -133,7 +162,7 @@ func (i *XK6Instance) ParseConfig(configBin []byte) {
 		i.lg.Fatal("can't get driver", zap.Error(err))
 	}
 
-	onceParseConfig.Do(func() {
+	onceDefineConfig.Do(func() {
 		rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
 			Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
 			Status: stroppy.Status_STATUS_RUNNING,
