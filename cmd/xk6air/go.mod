@@ -7,6 +7,7 @@ replace github.com/stroppy-io/stroppy => ../../
 require (
 	github.com/grafana/sobek v0.0.0-20251103154147-6b40183f38e5
 	github.com/oklog/ulid/v2 v2.1.1
+	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/stroppy-io/stroppy v0.0.0-00010101000000-000000000000
 	go.k6.io/k6 v1.3.0
 	go.uber.org/zap v1.27.0
@@ -39,7 +40,8 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd // indirect
-	github.com/orcaman/concurrent-map/v2 v2.0.1 // indirect
+	github.com/onsi/ginkgo v1.16.5 // indirect
+	github.com/onsi/gomega v1.38.2 // indirect
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
@@ -64,5 +66,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251014184007-4626949a642f // indirect
 	google.golang.org/grpc v1.76.0 // indirect
 	gopkg.in/guregu/null.v3 v3.3.0 // indirect
-	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 )

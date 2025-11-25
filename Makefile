@@ -150,11 +150,8 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 .PHONY: .app-deps
 .app-deps: # Install application dependencies in ./bin
 	GOPROXY=$(GOPROXY) 											go mod tidy
-	GOPROXY=$(GOPROXY) cd cmd/xk6/       && go mod tidy
 	GOPROXY=$(GOPROXY) cd cmd/xk6air/    && go mod tidy
-	GOPROXY=$(GOPROXY) cd cmd/sobek/     && go mod tidy
 	GOPROXY=$(GOPROXY) cd cmd/config2go/ && go mod tidy
-	GOPROXY=$(GOPROXY) cd cmd/inserter/  && go mod tidy
 
 PROTO_BUILD_TARGET_DIR=$(CURDIR)/proto/build
 .PHONY: proto
