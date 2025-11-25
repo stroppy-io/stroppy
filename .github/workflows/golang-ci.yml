@@ -14,13 +14,15 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.3'
+          go-version: "1.24.3"
 
       - name: Mock files
         run: |
-          echo ".gitkeep" | tee internal/static/stroppy-xk6
+          echo ".gitkeep" | tee internal/static/stroppy-k6
           echo ".gitkeep" | tee internal/static/stroppy.pb.ts
           echo ".gitkeep" | tee internal/static/stroppy.pb.js
+          echo ".gitkeep" | tee internal/static/helpers.ts
+          echo ".gitkeep" | tee internal/static/parse_sql.ts
 
       - name: Install linter dependencies
         run: make .install-linter
