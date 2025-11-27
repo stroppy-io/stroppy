@@ -23,7 +23,7 @@ const (
 )
 
 var Cmd = &cobra.Command{ //nolint: gochecknoglobals
-	Use:   "new",
+	Use:   "gen",
 	Short: "Generate stroppy development environment",
 	Long: fmt.Sprintf(`
 Generate a stroppy development environment with TypeScript support.
@@ -38,9 +38,9 @@ This command creates a working directory with:
 Available presets: %s
 
 Examples:
-  stroppy gen new --workdir ./my-benchmark
-  stroppy gen new --workdir ./my-benchmark --preset tpcc
-  stroppy gen new --workdir ./my-benchmark --preset execute_sql
+  stroppy gen --workdir ./my-benchmark
+  stroppy gen --workdir ./my-benchmark --preset tpcc
+  stroppy gen --workdir ./my-benchmark --preset execute_sql
 `, strings.Join(examples.AvailablePresets(), ", ")),
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		log := logger.Global().WithOptions(zap.WithCaller(false))

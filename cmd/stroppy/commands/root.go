@@ -20,7 +20,7 @@ Tool to generate and run stress tests (e.g benchmarking) for databases.
 
 Usage:
   stroppy run <script.ts>           Run a TypeScript benchmark script
-  stroppy gen new --preset <name>   Generate a development environment
+  stroppy gen --preset <name>   Generate a development environment
 
 For more information see https://github.com/stroppy-io/stroppy`,
 	SilenceUsage: true,
