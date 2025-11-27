@@ -11,6 +11,8 @@ coverage.out
 #
 venv
 *node_modules
+internal/static/package.json
+internal/static/package-lock.json
 # env files
 .env
 # logs
