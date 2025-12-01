@@ -21,6 +21,8 @@ dexample
 config.schema.yaml
 internal/static/stroppy-xk6
 
+dev
+
 .vscode
 # Created by .ignore support plugin (hsz.mobi)
 ### JetBrains templatee

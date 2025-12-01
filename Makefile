@@ -111,21 +111,17 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 	rm -rf $(TMP_BUNDLE_DIR)
 	mkdir -p $(TS_TARGET_DIR)
 	mkdir -p $(TMP_BUNDLE_DIR)
-	mkdir -p $(TMP_BUNDLE_DIR)/ts_sdk
-	cp -r $(TS_TARGET_DIR)/google/protobuf/* $(TMP_BUNDLE_DIR)/ts_sdk/
-	cp -r $(TS_TARGET_DIR)/proto/stroppy/* $(TMP_BUNDLE_DIR)/ts_sdk/
-	cp $(TS_BUNDLE_DIR)/combine.js $(TMP_BUNDLE_DIR)/
+	# Copy the entire directory structure to preserve relative imports
+	cp -r $(TS_TARGET_DIR) $(TMP_BUNDLE_DIR)/ts_source
+	# Copy analyze_ddl source before building
+	cp $(CURDIR)/internal/static/analyze_ddl.ts $(TMP_BUNDLE_DIR)/analyze_ddl_entry.ts
+	cp $(TS_BUNDLE_DIR)/build.js $(TMP_BUNDLE_DIR)/
 	cp $(TS_BUNDLE_DIR)/package.json $(TMP_BUNDLE_DIR)/
-	cp $(TS_BUNDLE_DIR)/tsconfig.json $(TMP_BUNDLE_DIR)/
-	cp $(TS_BUNDLE_DIR)/webpack.config.js $(TMP_BUNDLE_DIR)/
-	cd $(TMP_BUNDLE_DIR) && npm install && node combine.js
-	cd $(TMP_BUNDLE_DIR) && npm run build
+	cd $(TMP_BUNDLE_DIR) && npm install
+	cd $(TMP_BUNDLE_DIR) && node build.js
 	cp $(TMP_BUNDLE_DIR)/stroppy.pb.ts $(TS_TARGET_DIR)/stroppy.pb.ts
 	cp $(TMP_BUNDLE_DIR)/dist/bundle.js $(TS_TARGET_DIR)/stroppy.pb.js
-	# Bundle analyze_ddl.ts with node-sql-parser
-	cp $(CURDIR)/internal/static/analyze_ddl.ts $(TMP_BUNDLE_DIR)/analyze_ddl_entry.ts
-	cp $(TS_BUNDLE_DIR)/webpack.analyze_ddl.config.js $(TMP_BUNDLE_DIR)/
-	cd $(TMP_BUNDLE_DIR) && npx webpack --config webpack.analyze_ddl.config.js
+	# Bundle analyze_ddl.ts with node-sql-parser (handled by build.js)
 	cp $(TMP_BUNDLE_DIR)/dist/analyze_ddl.js $(TS_TARGET_DIR)/analyze_ddl.js
 	rm -rf $(TMP_BUNDLE_DIR)
 
