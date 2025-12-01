@@ -122,6 +122,11 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 	cd $(TMP_BUNDLE_DIR) && npm run build
 	cp $(TMP_BUNDLE_DIR)/stroppy.pb.ts $(TS_TARGET_DIR)/stroppy.pb.ts
 	cp $(TMP_BUNDLE_DIR)/dist/bundle.js $(TS_TARGET_DIR)/stroppy.pb.js
+	# Bundle analyze_ddl.ts with node-sql-parser
+	cp $(CURDIR)/internal/static/analyze_ddl.ts $(TMP_BUNDLE_DIR)/analyze_ddl_entry.ts
+	cp $(TS_BUNDLE_DIR)/webpack.analyze_ddl.config.js $(TMP_BUNDLE_DIR)/
+	cd $(TMP_BUNDLE_DIR) && npx webpack --config webpack.analyze_ddl.config.js
+	cp $(TMP_BUNDLE_DIR)/dist/analyze_ddl.js $(TS_TARGET_DIR)/analyze_ddl.js
 	rm -rf $(TMP_BUNDLE_DIR)
 
 .PHONY: .easyp-gen
@@ -166,6 +171,7 @@ proto: .check-bins
 
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.ts $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.js $(CURDIR)/internal/static/
+	cp $(PROTO_BUILD_TARGET_DIR)/ts/analyze_ddl.js $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/docs/proto.md $(CURDIR)/docs
 # cp $(PROTO_BUILD_TARGET_DIR)/docs/config.schema.json $(CURDIR)/docs
 

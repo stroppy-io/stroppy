@@ -19,6 +19,7 @@ import {
   getWorkload,
   runWorkloadStep,
 } from "./helpers.ts";
+import { params_by_ddl } from "./analyze_ddl.js";
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -176,6 +177,19 @@ const sqlContent = open("tpcb_mini.sql");
 const parsedWorkloads = parse_sql(sqlContent);
 update_with_sql(workloads, parsedWorkloads);
 
+// Apply default generators
+const insertWl = workloads.find((w) => w.name === "insert");
+if (insertWl) {
+  for (const unit of insertWl.units) {
+    if (unit.descriptor?.type.oneofKind === "query") {
+      const query = unit.descriptor.type.query;
+      if (query.name === "insert_accounts") {
+        query.params = params_by_ddl(workloads, "create_schema", "accounts");
+      }
+    }
+  }
+}
+
 // Initialize driver with GlobalConfig
 // This is called at the top level to configure the driver
 stroppy.defineConfig(
@@ -210,6 +224,11 @@ stroppy.defineConfig(
 
 // Setup function: create schema and load data
 export function setup() {
+  try {
+    runWorkloadStep(driver, workloads, "cleanup");
+  } catch (e) {
+    // Ignore cleanup error if tables don't exist
+  }
   runWorkloadStep(driver, workloads, "create_schema");
   runWorkloadStep(driver, workloads, "insert");
   driver.notifyStep("workload", Status.STATUS_RUNNING);

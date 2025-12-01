@@ -4,6 +4,7 @@
     "@protobuf-ts/plugin": "^2.11.0",
     "@protobuf-ts/runtime": "^2.11.0",
     "k6": "^0.0.0",
+    "node-sql-parser": "^5.3.13",
     "ts-morph": "^26.0.0"
   },
   "scripts": {
