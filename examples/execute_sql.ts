@@ -145,11 +145,9 @@ const workloads: WorkloadDescriptor[] = [
 
 // Load and parse SQL file, then update workloads with SQL
 
-if (typeof open !== "undefined") {
-  const sqlContent = open("tpcb_mini.sql");
-  const parsedWorkloads = parse_sql(sqlContent);
-  update_with_sql(workloads, parsedWorkloads);
-}
+const sqlContent = open("tpcb_mini.sql");
+const parsedWorkloads = parse_sql(sqlContent);
+update_with_sql(workloads, parsedWorkloads);
 
 // Apply default generators
 lookup(workloads, "insert", "query", "insert_accounts").params.push(

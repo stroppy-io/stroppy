@@ -115,7 +115,7 @@ func ExtractConfigFromScript(scriptPath string) (*ExtractedConfig, error) {
 		`const $1 = { TextEncoder: globalThis.TextEncoder, TextDecoder: globalThis.TextDecoder };`,
 	)
 
-	return ExtractConfigFromJS(jsCode, nil)
+	return ExtractConfigFromJS(jsCode, func(string) string { return "" })
 }
 
 // ExtractConfigFromJS extracts GlobalConfig from JavaScript code.
