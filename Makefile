@@ -218,3 +218,9 @@ revision: # Recreate git tag with version tag=<semver>
 	git push --delete origin v${tag} || true
 	git tag v$(tag)
 	git push origin v$(tag)
+
+.PHONY: run-execute-sql-test
+run-execute-sql-test:
+	rm -rf dev
+	./build/stroppy gen --workdir dev --preset=execute_sql
+	cd dev && ./stroppy run execute_sql.ts tpcb_mini.sql

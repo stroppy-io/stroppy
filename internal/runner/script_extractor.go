@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/grafana/sobek"
@@ -98,6 +99,15 @@ func ExtractConfigFromScript(scriptPath string) (*ExtractedConfig, error) {
 		return nil, fmt.Errorf("failed to transpile TypeScript: %w", err)
 	}
 
+	// Mock k6/x/encoding import
+	// This is needed because the extraction VM doesn't have the k6/x/encoding module.
+	// We replace the import with a const that exposes the polyfilled TextEncoder/TextDecoder.
+	re := regexp.MustCompile(`import\s+(\w+)\s+from\s+["']k6/x/encoding["'];?`)
+	jsCode = re.ReplaceAllString(
+		jsCode,
+		`const $1 = { TextEncoder: globalThis.TextEncoder, TextDecoder: globalThis.TextDecoder };`,
+	)
+
 	return ExtractConfigFromJS(jsCode)
 }
 
@@ -151,6 +161,23 @@ func ExtractConfigFromJS(jsCode string) (*ExtractedConfig, error) {
 	if err := vm.Set("defineConfig", configCallback); err != nil {
 		return nil, fmt.Errorf("failed to set defineConfig: %w", err)
 	}
+
+	c := vm.NewObject()
+	_ = c.Set(
+		"log",
+		func(sobek.FunctionCall) sobek.Value { return sobek.Undefined() },
+	)
+	_ = c.Set(
+		"warn",
+		func(sobek.FunctionCall) sobek.Value { return sobek.Undefined() },
+	)
+	_ = c.Set(
+		"error",
+		func(sobek.FunctionCall) sobek.Value { return sobek.Undefined() },
+	)
+	_ = vm.Set("console", c)
+
+	_ = vm.Set("__ENV", vm.NewObject())
 
 	// Run the script
 	if _, err := vm.RunString(jsCode); err != nil {
