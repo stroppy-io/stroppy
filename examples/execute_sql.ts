@@ -18,6 +18,7 @@ import {
   RunWorkload,
   getWorkload,
   runWorkloadStep,
+  lookup,
 } from "./helpers.ts";
 import { params_by_ddl } from "./analyze_ddl.js";
 
@@ -35,6 +36,7 @@ export const options: Options = {
 
 const driver: Driver = stroppy;
 
+// TODO: inject such kind of constants to generators system
 const MAX_ACCOUNTS = 100000;
 
 // Define workload descriptors
@@ -84,28 +86,7 @@ const workloads: WorkloadDescriptor[] = [
               name: "insert_accounts",
               sql: "",
               groups: [],
-              params: [
-                {
-                  name: "accounts.id",
-                  generationRule: {
-                    unique: true,
-                    kind: {
-                      oneofKind: "int32Range",
-                      int32Range: { min: 1, max: MAX_ACCOUNTS },
-                    },
-                  },
-                },
-                {
-                  name: "accounts.balance",
-                  generationRule: {
-                    unique: false,
-                    kind: {
-                      oneofKind: "int32Range",
-                      int32Range: { min: 1000, max: 10000 },
-                    },
-                  },
-                },
-              ],
+              params: [],
             },
           },
         },
@@ -129,16 +110,6 @@ const workloads: WorkloadDescriptor[] = [
               ],
               groups: [],
               params: [
-                {
-                  name: "accounts.id",
-                  generationRule: {
-                    unique: false,
-                    kind: {
-                      oneofKind: "int32Range",
-                      int32Range: { min: 1, max: MAX_ACCOUNTS },
-                    },
-                  },
-                },
                 {
                   name: "amount",
                   generationRule: {
@@ -177,18 +148,15 @@ const sqlContent = open("tpcb_mini.sql");
 const parsedWorkloads = parse_sql(sqlContent);
 update_with_sql(workloads, parsedWorkloads);
 
+
 // Apply default generators
-const insertWl = workloads.find((w) => w.name === "insert");
-if (insertWl) {
-  for (const unit of insertWl.units) {
-    if (unit.descriptor?.type.oneofKind === "query") {
-      const query = unit.descriptor.type.query;
-      if (query.name === "insert_accounts") {
-        query.params = params_by_ddl(workloads, "create_schema", "accounts");
-      }
-    }
-  }
-}
+lookup(workloads, "insert", "query", "insert_accounts")
+  .params.push(
+    ...params_by_ddl(workloads, "create_schema", "accounts"));
+
+lookup(workloads, "workload", "transaction", "update_and_log")
+  .params.push(
+    ...params_by_ddl(workloads, "create_schema", "accounts"));
 
 // Initialize driver with GlobalConfig
 // This is called at the top level to configure the driver
