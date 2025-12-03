@@ -17,12 +17,9 @@ import (
 )
 
 var (
-	// ErrNoConfigProvided is returned when script doesn't call defineConfig.
 	ErrNoConfigProvided = errors.New("script did not call defineConfig with GlobalConfig")
-	// ErrEsbuild is returned when esbuild encounters an error during transpilation.
-	ErrEsbuild = errors.New("esbuild error")
-	// ErrNoEsbuildOutput is returned when esbuild produces no output files.
-	ErrNoEsbuildOutput = errors.New("no output from esbuild")
+	ErrEsbuild          = errors.New("esbuild error")
+	ErrNoEsbuildOutput  = errors.New("no output from esbuild")
 )
 
 // ExtractedConfig contains configuration extracted from a TypeScript script.
@@ -47,7 +44,7 @@ func TranspileTypeScript(entryPath string) (string, error) {
 		Target:            api.ES2017,
 		Sourcemap:         api.SourceMapInline,
 		Write:             false, // keep outputs in-memory
-		LogLevel:          api.LogLevelWarning,
+		LogLevel:          api.LogLevelError,
 		AbsWorkingDir:     dirAbs,
 		External:          []string{"k6/x/*", "k6/*"},
 		MainFields:        []string{"module", "main"},
@@ -78,33 +75,32 @@ type stroppyStub struct {
 	defineConfigFunc func(sobek.FunctionCall) sobek.Value
 }
 
-// ParseConfig is a no-op during config extraction.
 func (s stroppyStub) ParseConfig(_ []byte) {}
 
-// RunUnit is a no-op during config extraction.
 func (s stroppyStub) RunUnit(_ []byte) []byte { return nil }
 
-// InsertValues is a no-op during config extraction.
 func (s stroppyStub) InsertValues(_ []byte, _ int64) []byte { return nil }
 
-// NotifyStep is a no-op during config extraction.
 func (s stroppyStub) NotifyStep(_ string, _ int32) {}
 
-// Teardown is a no-op during config extraction.
 func (s stroppyStub) Teardown() error { return nil }
 
 // DefineConfig is called during config extraction and delegates to the callback.
-func (s stroppyStub) DefineConfig(call sobek.FunctionCall) sobek.Value {
+//
+//nolint:ireturn // for sobek
+func (s stroppyStub) DefineConfig(
+	call sobek.FunctionCall,
+) sobek.Value {
 	if s.defineConfigFunc != nil {
 		return s.defineConfigFunc(call)
 	}
+
 	return sobek.Undefined()
 }
 
 // ExtractConfigFromScript extracts GlobalConfig from a TypeScript script.
 // The script should call defineConfig(globalConfig) at the top level.
 func ExtractConfigFromScript(scriptPath string) (*ExtractedConfig, error) {
-	// Transpile TypeScript to JavaScript
 	jsCode, err := TranspileTypeScript(scriptPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transpile TypeScript: %w", err)
@@ -127,13 +123,11 @@ func ExtractConfigFromScript(scriptPath string) (*ExtractedConfig, error) {
 // If provided, it will be called when the script calls open(filename).
 func ExtractConfigFromJS(jsCode string, openMock func(string) string) (*ExtractedConfig, error) {
 	// Stage 1: Create and configure VM
-	vm, err := createVM()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create VM: %w", err)
-	}
+	vm := createVM()
 
 	// Stage 2: Prepare environment (polyfills, mocks, globals)
 	var extractedConfig *stroppy.GlobalConfig
+
 	configExtractor := newConfigExtractor(vm, &extractedConfig)
 
 	if err := prepareVMEnvironment(vm, configExtractor, openMock); err != nil {
@@ -156,11 +150,12 @@ func ExtractConfigFromJS(jsCode string, openMock func(string) string) (*Extracte
 }
 
 // createVM creates and configures a new sobek VM instance.
-func createVM() (*sobek.Runtime, error) {
+func createVM() *sobek.Runtime {
 	vm := sobek.New()
 	vm.SetParserOptions(parser.IsModule)
 	vm.SetFieldNameMapper(sobek.UncapFieldNameMapper())
-	return vm, nil
+
+	return vm
 }
 
 // configExtractor handles extraction of GlobalConfig from JavaScript arguments.
@@ -171,7 +166,10 @@ type configExtractor struct {
 }
 
 // newConfigExtractor creates a new config extractor.
-func newConfigExtractor(vm *sobek.Runtime, extractedConfig **stroppy.GlobalConfig) *configExtractor {
+func newConfigExtractor(
+	vm *sobek.Runtime,
+	extractedConfig **stroppy.GlobalConfig,
+) *configExtractor {
 	return &configExtractor{
 		vm:              vm,
 		extractedConfig: extractedConfig,
@@ -180,7 +178,11 @@ func newConfigExtractor(vm *sobek.Runtime, extractedConfig **stroppy.GlobalConfi
 }
 
 // extract handles the defineConfig callback and extracts the config.
-func (e *configExtractor) extract(call sobek.FunctionCall) sobek.Value {
+//
+//nolint:ireturn // for sobek
+func (e *configExtractor) extract(
+	call sobek.FunctionCall,
+) sobek.Value {
 	if len(call.Arguments) == 0 {
 		return sobek.Undefined()
 	}
@@ -194,17 +196,20 @@ func (e *configExtractor) extract(call sobek.FunctionCall) sobek.Value {
 	if err := e.vm.Set(e.tempVarName, arg); err != nil {
 		return sobek.Undefined()
 	}
+
 	defer func() { _ = e.vm.Set(e.tempVarName, nil) }()
 
 	// Try binary protobuf format first
 	if config := e.extractBinaryConfig(); config != nil {
 		*e.extractedConfig = config
+
 		return sobek.Undefined()
 	}
 
 	// Fall back to JSON format
 	if config := e.extractJSONConfig(); config != nil {
 		*e.extractedConfig = config
+
 		return sobek.Undefined()
 	}
 
@@ -214,7 +219,10 @@ func (e *configExtractor) extract(call sobek.FunctionCall) sobek.Value {
 // extractBinaryConfig attempts to extract config from a Uint8Array (binary protobuf).
 func (e *configExtractor) extractBinaryConfig() *stroppy.GlobalConfig {
 	checkScript := fmt.Sprintf(
-		"(function(arg) { return arg instanceof Uint8Array || (arg && arg.constructor && arg.constructor.name === 'Uint8Array'); })(%s)",
+		`(function(arg) {
+return arg instanceof Uint8Array ||
+(arg && arg.constructor && arg.constructor.name === 'Uint8Array');
+})(%s)`,
 		e.tempVarName,
 	)
 
@@ -230,7 +238,8 @@ func (e *configExtractor) extractBinaryConfig() *stroppy.GlobalConfig {
 	}
 
 	array := arrayVal.Export()
-	arr, ok := array.([]interface{})
+
+	arr, ok := array.([]any)
 	if !ok {
 		return nil
 	}
@@ -278,25 +287,20 @@ func prepareVMEnvironment(
 	configExtractor *configExtractor,
 	openMock func(string) string,
 ) error {
-	// Inject polyfills
 	if err := injectEncoderPolyfill(vm); err != nil {
 		return fmt.Errorf("failed to inject encoder polyfill: %w", err)
 	}
 
-	// Set up config extraction callbacks
 	if err := setupConfigExtraction(vm, configExtractor); err != nil {
 		return fmt.Errorf("failed to setup config extraction: %w", err)
 	}
 
-	// Set up k6 mocks
 	if err := setupK6Mocks(vm, openMock); err != nil {
 		return fmt.Errorf("failed to setup k6 mocks: %w", err)
 	}
 
-	// Set up console mock
 	setupConsoleMock(vm)
 
-	// Set up environment variables
 	if err := vm.Set("__ENV", vm.NewObject()); err != nil {
 		return fmt.Errorf("failed to set __ENV: %w", err)
 	}
@@ -308,13 +312,11 @@ func prepareVMEnvironment(
 func setupConfigExtraction(vm *sobek.Runtime, extractor *configExtractor) error {
 	callback := extractor.extract
 
-	// Set up stroppy stub module
 	stub := stroppyStub{defineConfigFunc: callback}
 	if err := vm.Set("stroppy", stub); err != nil {
 		return err
 	}
 
-	// Set up global defineConfig function
 	if err := vm.Set("defineConfig", callback); err != nil {
 		return err
 	}
@@ -332,8 +334,10 @@ func setupK6Mocks(vm *sobek.Runtime, openMock func(string) string) error {
 		if len(call.Arguments) == 0 {
 			return sobek.Undefined()
 		}
+
 		filename := call.Argument(0).String()
 		content := openMock(filename)
+
 		return vm.ToValue(content)
 	}
 
@@ -358,6 +362,7 @@ func setupConsoleMock(vm *sobek.Runtime) {
 // executeScript runs the JavaScript code in the VM.
 func executeScript(vm *sobek.Runtime, jsCode string) error {
 	_, err := vm.RunString(jsCode)
+
 	return err
 }
 
@@ -365,7 +370,7 @@ func executeScript(vm *sobek.Runtime, jsCode string) error {
 //
 //nolint:lll // this is a polyfill for TextEncoder/TextDecoder
 func injectEncoderPolyfill(vm *sobek.Runtime) error {
-	// Minified TextEncoder/TextDecoder polyfill
+	// Minified TextEncoder/TextDecoder polyfill check: https://github.com/anonyco/FastestSmallestTextEncoderDecoder
 	const encodersDef = `'use strict';(function(r){function x(){}function y(){}var z=String.fromCharCode,v={}.toString,A=v.call(r.SharedArrayBuffer),B=v(),q=r.Uint8Array,t=q||Array,w=q?ArrayBuffer:t,C=w.isView||function(g){return g&&"length"in g},D=v.call(w.prototype);w=y.prototype;var E=r.TextEncoder,a=new (q?Uint16Array:t)(32);x.prototype.decode=function(g){if(!C(g)){var l=v.call(g);if(l!==D&&l!==A&&l!==B)throw TypeError("Failed to execute 'decode' on 'TextDecoder': The provided value is not of type '(ArrayBuffer or ArrayBufferView)'");
 g=q?new t(g):g||[]}for(var f=l="",b=0,c=g.length|0,u=c-32|0,e,d,h=0,p=0,m,k=0,n=-1;b<c;){for(e=b<=u?32:c-b|0;k<e;b=b+1|0,k=k+1|0){d=g[b]&255;switch(d>>4){case 15:m=g[b=b+1|0]&255;if(2!==m>>6||247<d){b=b-1|0;break}h=(d&7)<<6|m&63;p=5;d=256;case 14:m=g[b=b+1|0]&255,h<<=6,h|=(d&15)<<6|m&63,p=2===m>>6?p+4|0:24,d=d+256&768;case 13:case 12:m=g[b=b+1|0]&255,h<<=6,h|=(d&31)<<6|m&63,p=p+7|0,b<c&&2===m>>6&&h>>p&&1114112>h?(d=h,h=h-65536|0,0<=h&&(n=(h>>10)+55296|0,d=(h&1023)+56320|0,31>k?(a[k]=n,k=k+1|0,n=-1):
 (m=n,n=d,d=m))):(d>>=8,b=b-d-1|0,d=65533),h=p=0,e=b<=u?32:c-b|0;default:a[k]=d;continue;case 11:case 10:case 9:case 8:}a[k]=65533}f+=z(a[0],a[1],a[2],a[3],a[4],a[5],a[6],a[7],a[8],a[9],a[10],a[11],a[12],a[13],a[14],a[15],a[16],a[17],a[18],a[19],a[20],a[21],a[22],a[23],a[24],a[25],a[26],a[27],a[28],a[29],a[30],a[31]);32>k&&(f=f.slice(0,k-32|0));if(b<c){if(a[0]=n,k=~n>>>31,n=-1,f.length<l.length)continue}else-1!==n&&(f+=z(n));l+=f;f=""}return l};w.encode=function(g){g=void 0===g?"":""+g;var l=g.length|

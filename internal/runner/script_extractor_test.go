@@ -41,10 +41,12 @@ func bundleScriptForTest(t *testing.T, scriptPath string) string {
 
 	// Copy SQL files if they exist in the script's directory
 	scriptDir := filepath.Dir(scriptPath)
+
 	sqlFiles, err := filepath.Glob(filepath.Join(scriptDir, "*.sql"))
 	if err == nil {
 		for _, sqlFile := range sqlFiles {
 			sqlName := filepath.Base(sqlFile)
+
 			sqlData, err := os.ReadFile(sqlFile)
 			if err == nil {
 				_ = os.WriteFile(filepath.Join(tempDir, sqlName), sqlData, common.FileMode)
@@ -176,6 +178,7 @@ func TestExtractConfigFromJS_WithOpenMock(t *testing.T) {
 		if filename == "test.sql" {
 			return "CREATE TABLE test (id INTEGER);"
 		}
+
 		return ""
 	}
 
@@ -227,6 +230,7 @@ func TestExtractConfigFromScript_ExecuteSQL(t *testing.T) {
 		if filename == "tpcb_mini.sql" {
 			return string(sqlContent)
 		}
+
 		return ""
 	}
 
@@ -239,4 +243,3 @@ func TestExtractConfigFromScript_ExecuteSQL(t *testing.T) {
 	require.Equal(t, stroppy.DriverConfig_DRIVER_TYPE_POSTGRES, config.GlobalConfig.Driver.DriverType)
 	require.NotEmpty(t, config.GlobalConfig.Driver.Url)
 }
-
