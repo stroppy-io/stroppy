@@ -19,12 +19,12 @@ VALUES (${accounts.id}, ${accounts.balance});
 -- query update_balance
 UPDATE accounts
 SET balance = balance + ${amount}
-WHERE id = ${accounts.id};
+WHERE id = ${accounts.id{1:100}};
 -- query end
 
 -- query insert_history
 INSERT INTO history (account_id, amount, created_at)
-VALUES (${accounts.id}, ${amount}, CURRENT_TIMESTAMP);
+VALUES (${accounts.id!{1:50}}, ${amount}, CURRENT_TIMESTAMP);
 -- query end
 -- transaction end
 -- workload end

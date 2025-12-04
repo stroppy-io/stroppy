@@ -21,6 +21,7 @@ import {
   lookup,
 } from "./helpers.ts";
 import { params_by_ddl } from "./analyze_ddl.js";
+import { apply_generators_ranges } from "./apply_generators.ts";
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -157,6 +158,9 @@ lookup(workloads, "insert", "query", "insert_accounts").params.push(
 lookup(workloads, "workload", "transaction", "update_and_log").params.push(
   ...params_by_ddl(workloads, "create_schema", "accounts"),
 );
+
+// Apply generator ranges from SQL syntax
+apply_generators_ranges(workloads);
 
 // Initialize driver with GlobalConfig
 // This is called at the top level to configure the driver

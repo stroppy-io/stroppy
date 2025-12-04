@@ -17,14 +17,15 @@ func (f FileName) String() string {
 }
 
 const (
-	PackageJSONFileName  FileName = "package.json"
-	ProtoTSFileName      FileName = "stroppy.pb.ts"
-	ProtoJSFileName      FileName = "stroppy.pb.js"
-	K6PluginFileName     FileName = "stroppy-k6"
-	HelpersFileName      FileName = "helpers.ts"
-	ParseSQLFileName     FileName = "parse_sql.ts"
-	AnalyzeDDLTSFileName FileName = "analyze_ddl.ts"
-	AnalyzeDDLJSFileName FileName = "analyze_ddl.js"
+	PackageJSONFileName     FileName = "package.json"
+	ProtoTSFileName         FileName = "stroppy.pb.ts"
+	ProtoJSFileName         FileName = "stroppy.pb.js"
+	K6PluginFileName        FileName = "stroppy-k6"
+	ApplyGeneratorsFileName FileName = "apply_generators.ts"
+	HelpersFileName         FileName = "helpers.ts"
+	ParseSQLFileName        FileName = "parse_sql.ts"
+	AnalyzeDDLTSFileName    FileName = "analyze_ddl.ts"
+	AnalyzeDDLJSFileName    FileName = "analyze_ddl.js"
 )
 
 // StaticFiles are copied to temp dir for k6 execution.
@@ -35,6 +36,7 @@ var StaticFiles = []FileName{ //nolint: gochecknoglobals
 	HelpersFileName,
 	ParseSQLFileName,
 	AnalyzeDDLJSFileName,
+	ApplyGeneratorsFileName,
 }
 
 // DevStaticFiles are additional files for development environment.
@@ -53,6 +55,7 @@ var Binaries = []FileName{ //nolint: gochecknoglobals
 //go:embed parse_sql.ts
 //go:embed analyze_ddl.ts
 //go:embed analyze_ddl.js
+//go:embed apply_generators.ts
 //go:embed *.pb.*
 var Content embed.FS
 
