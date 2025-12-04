@@ -224,3 +224,18 @@ run-execute-sql-test:
 	rm -rf dev
 	./build/stroppy gen --workdir dev --preset=execute_sql
 	cd dev && ./stroppy run execute_sql.ts tpcb_mini.sql
+
+.PHONY: ts-setup
+ts-setup: # Setup TypeScript testing environment
+	@echo "Setting up TypeScript testing environment..."
+	cd internal/static && npm install
+	@echo "✓ TypeScript testing environment ready!"
+	@echo "Run 'make ts-test' to run tests or 'make ts-watch' for watch mode"
+
+.PHONY: ts-test
+ts-test: # Run TypeScript unit tests
+	cd internal/static && npm test
+
+.PHONY: ts-watch
+ts-watch: # Watch TypeScript files and run tests automatically
+	cd internal/static && npm run test:watch

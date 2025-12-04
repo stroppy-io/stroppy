@@ -1,5 +1,6 @@
 {
   "name": "stroppy",
+  "type": "module",
   "dependencies": {
     "@protobuf-ts/runtime": "^2.11.1",
     "serialize-javascript": "^7.0.0"
@@ -8,6 +9,14 @@
     "@types/k6": "^1.0.2",
     "@types/node": "^24.9.1",
     "ts-node": "^10.9.2",
-    "tsx": "^4.20.6"
+    "tsx": "^4.20.6",
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.0"
+  },
+  "scripts": {
+    "test": "vitest run --config tests/vitest.config.ts",
+    "test:watch": "vitest --config tests/vitest.config.ts",
+    "test:ui": "vitest --ui --config tests/vitest.config.ts",
+    "typecheck": "tsc --noEmit --project tests/tsconfig.json"
   }
 }

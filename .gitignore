@@ -104,3 +104,6 @@ http-client.private.env.json
 /.netrc
 /xexample
 internal/static/stroppy-k6
+
+internal/static/node_modules
+internal/static/package-lock.json
