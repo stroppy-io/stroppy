@@ -19,10 +19,6 @@ jobs:
       - name: Mock files
         run: |
           echo ".gitkeep" | tee internal/static/stroppy-k6
-          echo ".gitkeep" | tee internal/static/stroppy.pb.ts
-          echo ".gitkeep" | tee internal/static/stroppy.pb.js
-          echo ".gitkeep" | tee internal/static/helpers.ts
-          echo ".gitkeep" | tee internal/static/parse_sql.ts
 
       - name: Install linter dependencies
         run: make .install-linter
