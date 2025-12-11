@@ -3,6 +3,7 @@
   "type": "module",
   "dependencies": {
     "@protobuf-ts/runtime": "^2.11.1",
+    "node-sql-parser": "^5.3.13",
     "serialize-javascript": "^7.0.0"
   },
   "devDependencies": {
