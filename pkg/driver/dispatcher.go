@@ -20,6 +20,7 @@ type Driver interface {
 		count int64,
 	) (*stroppy.DriverTransactionStat, error)
 	Teardown(ctx context.Context) error
+	RunQuery(ctx context.Context, sql string, args map[string]any)
 }
 
 func Dispatch( //nolint: ireturn // better than return any

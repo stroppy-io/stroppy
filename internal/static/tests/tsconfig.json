@@ -11,6 +11,8 @@
     "resolveJsonModule": true,
     "types": ["node", "vitest/globals"],
     "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "rootDir": "..",
     "baseUrl": ".."
   },

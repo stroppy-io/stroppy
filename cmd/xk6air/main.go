@@ -120,9 +120,9 @@ type XK6Instance struct {
 var rootModule *RootModule
 var onceDefineConfig sync.Once
 
-// DefineConfig initializes the driver from GlobalConfig.
+// DefineConfigBin initializes the driver from GlobalConfig.
 // This is called by scripts using defineConfig(globalConfig) at the top level.
-func (i *XK6Instance) DefineConfig(configBin []byte) {
+func (i *XK6Instance) DefineConfigBin(configBin []byte) {
 	var globalCfg stroppy.GlobalConfig
 	err := proto.Unmarshal(configBin, &globalCfg)
 	if err != nil {
@@ -134,6 +134,30 @@ func (i *XK6Instance) DefineConfig(configBin []byte) {
 		i.lg.Fatal("GlobalConfig.driver is required")
 	}
 
+	i.drv, err = driver.Dispatch(rootModule.ctx, i.lg, drvCfg)
+	if err != nil {
+		i.lg.Fatal("can't initialize driver", zap.Error(err))
+	}
+
+	onceDefineConfig.Do(func() {
+		rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
+			Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
+			Status: stroppy.Status_STATUS_RUNNING,
+			Config: &stroppy.ConfigFile{Global: &globalCfg},
+			Cmd:    "",
+		})
+	})
+}
+
+// DefineConfig initializes the driver from GlobalConfig.
+// This is called by scripts using defineConfig(globalConfig) at the top level.
+func (i *XK6Instance) DefineConfig(globalCfg stroppy.GlobalConfig) {
+
+	drvCfg := globalCfg.GetDriver()
+	if drvCfg == nil {
+		i.lg.Fatal("GlobalConfig.driver is required")
+	}
+	var err error
 	i.drv, err = driver.Dispatch(rootModule.ctx, i.lg, drvCfg)
 	if err != nil {
 		i.lg.Fatal("can't initialize driver", zap.Error(err))
@@ -173,6 +197,10 @@ func (i *XK6Instance) ParseConfig(configBin []byte) {
 }
 
 var _ modules.Module = new(RootModule)
+
+func (i *XK6Instance) RunQuery(sql string, args map[string]any) {
+	i.drv.RunQuery(i.vu.Context(), sql, args)
+}
 
 // RunUnit runs a single driver unit: query | transaction | create_table | insert
 func (i *XK6Instance) RunUnit(unitMsg []byte) (sobek.ArrayBuffer, error) {

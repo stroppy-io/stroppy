@@ -27,7 +27,12 @@ const (
 	dbConnectionTimeout    = 5 * time.Minute
 )
 
-func waitForDB(ctx context.Context, lg *zap.Logger, connPool *pgxpool.Pool, timeout time.Duration) error {
+func waitForDB(
+	ctx context.Context,
+	lg *zap.Logger,
+	connPool *pgxpool.Pool,
+	timeout time.Duration,
+) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -138,6 +143,10 @@ func NewDriver(
 	d.txExecutor = NewTxExecutor(connPool)
 
 	return d, nil
+}
+
+func (d *Driver) RunQuery(ctx context.Context, sql string, args map[string]any) {
+	d.pgxPool.Exec(ctx, sql)
 }
 
 func (d *Driver) RunTransaction(

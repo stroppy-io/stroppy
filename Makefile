@@ -219,11 +219,22 @@ revision: # Recreate git tag with version tag=<semver>
 	git tag v$(tag)
 	git push origin v$(tag)
 
+.PHONY: run-simple-test
+run-simple-test:
+	rm -rf dev
+	./build/stroppy gen --workdir dev --preset=simple
+	cd dev && ./stroppy run simple.ts
+
 .PHONY: run-execute-sql-test
 run-execute-sql-test:
 	rm -rf dev
 	./build/stroppy gen --workdir dev --preset=execute_sql
 	cd dev && ./stroppy run execute_sql.ts tpcb_mini.sql
+
+
+##
+## TypeScript Development
+##
 
 .PHONY: ts-setup
 ts-setup: # Setup TypeScript testing environment

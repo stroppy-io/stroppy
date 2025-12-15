@@ -16,6 +16,7 @@ var ErrUnknownPreset = errors.New("unknown preset")
 type Preset string
 
 const (
+	PresetSimple     Preset = "simple"
 	PresetTPCC       Preset = "tpcc"
 	PresetTPCB       Preset = "tpcb"
 	PresetExecuteSQL Preset = "execute_sql"
@@ -23,6 +24,9 @@ const (
 
 // PresetFiles maps preset names to their required files.
 var PresetFiles = map[Preset][]string{ //nolint: gochecknoglobals
+	PresetSimple: {
+		"simple.ts",
+	},
 	PresetTPCC: {
 		"tpcc.ts",
 	},
@@ -42,6 +46,7 @@ var PresetFiles = map[Preset][]string{ //nolint: gochecknoglobals
 // AvailablePresets returns list of available preset names.
 func AvailablePresets() []string {
 	return []string{
+		string(PresetSimple),
 		string(PresetTPCC),
 		string(PresetTPCB),
 		string(PresetExecuteSQL),
