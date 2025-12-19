@@ -20,6 +20,7 @@ const (
 	PresetTPCC       Preset = "tpcc"
 	PresetTPCB       Preset = "tpcb"
 	PresetExecuteSQL Preset = "execute_sql"
+	PresetTPCDS      Preset = "tpcds"
 )
 
 // PresetFiles maps preset names to their required files.
@@ -41,6 +42,19 @@ var PresetFiles = map[Preset][]string{ //nolint: gochecknoglobals
 		"tpcb_mini.sql",
 		"tpcb.sql",
 	},
+	PresetTPCDS: {
+		"tpcds.ts",
+		"tpcds-scale-1.sql",
+		"tpcds-scale-10.sql",
+		"tpcds-scale-100.sql",
+		"tpcds-scale-300.sql",
+		"tpcds-scale-1000.sql",
+		"tpcds-scale-3000.sql",
+		"tpcds-scale-10000.sql",
+		"tpcds-scale-30000.sql",
+		"tpcds-scale-50000.sql",
+		"tpcds-scale-100000.sql",
+	},
 }
 
 // AvailablePresets returns list of available preset names.
@@ -50,6 +64,7 @@ func AvailablePresets() []string {
 		string(PresetTPCC),
 		string(PresetTPCB),
 		string(PresetExecuteSQL),
+		string(PresetTPCDS),
 	}
 }
 
