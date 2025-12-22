@@ -6,35 +6,77 @@ import (
 
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 func NewTransaction(
-	ctx context.Context,
+	_ context.Context,
 	lg *zap.Logger,
 	generators Generators,
 	descriptor *stroppy.TransactionDescriptor,
 ) (*stroppy.DriverTransaction, error) {
 	lg.Debug("build transaction",
-		zap.String("name", descriptor.GetName()))
+		zap.String("name", descriptor.GetName()),
+		zap.Any("params", descriptor.GetParams()),
+		zap.Any("groups", descriptor.GetGroups()),
+	)
 
-	var queries []*stroppy.DriverQuery
+	tx, err := newTransaction(generators, descriptor)
+	if err != nil {
+		return nil, fmt.Errorf("can't create new transaction '%s' due to: %w", descriptor.GetName(), err)
+	}
 
-	for _, query := range descriptor.GetQueries() {
-		q, err := NewQuery(ctx, lg, generators, query)
+	return tx, nil
+}
+
+func newTransaction(
+	generators Generators,
+	descriptor *stroppy.TransactionDescriptor,
+) (*stroppy.DriverTransaction, error) {
+	// Generate transaction-level parameter values
+	txGenIDs := genIDsWithPrefix(descriptor.GetName(), descriptor.GetParams(), descriptor.GetGroups())
+
+	txParamValues, err := GenParamValues(txGenIDs, generators)
+	if err != nil {
+		return nil, fmt.Errorf("can't generate tx params for '%s' due to: %w", descriptor.GetName(), err)
+	}
+
+	// Build transaction param descriptors (expand groups)
+	txParams := descriptor.GetParams()
+	txParams = append(txParams, expandGroupParams(descriptor.GetGroups())...)
+
+	queries := make([]*stroppy.DriverQuery, 0, len(descriptor.GetQueries()))
+
+	for _, queryDesc := range descriptor.GetQueries() {
+		query, err := newQueryWithTxParams(generators, queryDesc, txParams, txParamValues)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"can't create query for tx '%s' due to: %w",
-				descriptor.GetName(),
-				err,
+				"can't create query '%s' for tx '%s' due to: %w",
+				queryDesc.GetName(), descriptor.GetName(), err,
 			)
 		}
 
-		queries = append(queries, q.GetQueries()...)
+		queries = append(queries, query)
 	}
 
 	return &stroppy.DriverTransaction{
 		IsolationLevel: descriptor.GetIsolationLevel(),
 		Queries:        queries,
 	}, nil
+}
+
+// genIDsWithPrefix generates GeneratorIDs with a specific prefix (transaction name).
+func genIDsWithPrefix(
+	prefix string, params []*stroppy.QueryParamDescriptor, groups []*stroppy.QueryParamGroup,
+) []GeneratorID {
+	genIDs := make([]GeneratorID, 0, len(params)+len(groups))
+	for _, param := range params {
+		genIDs = append(genIDs, NewGeneratorID(prefix, param.GetName()))
+	}
+
+	for _, group := range groups {
+		genIDs = append(genIDs, NewGeneratorID(prefix, group.GetName()))
+	}
+
+	return genIDs
 }

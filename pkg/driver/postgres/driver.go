@@ -2,20 +2,73 @@ package postgres
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/jackc/pgx/v5"
-	cmap "github.com/orcaman/concurrent-map/v2"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
+
+// ErrDBConnectionTimeout is returned when database connection times out.
+var ErrDBConnectionTimeout = errors.New("database connection timeout")
+
+const (
+	retryIntervalIncrement = 5 * time.Second
+	dbConnectionTimeout    = 5 * time.Minute
+)
+
+func waitForDB(
+	ctx context.Context,
+	lg *zap.Logger,
+	connPool *pgxpool.Pool,
+	timeout time.Duration,
+) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	interval := 1 * time.Second
+	startTime := time.Now()
+
+	for {
+		// Check if timeout exceeded
+		if time.Since(startTime) >= timeout {
+			return fmt.Errorf("%w after %v", ErrDBConnectionTimeout, timeout)
+		}
+
+		// Try to ping
+		pingErr := connPool.Ping(ctx)
+		if pingErr == nil {
+			lg.Debug("Successfully connected to database")
+
+			return nil
+		}
+
+		lg.Sugar().Warnf("Database not ready, retrying in %v... (error: %v)", interval, pingErr)
+
+		// Sleep for current interval
+		select {
+		case <-time.After(interval):
+			// Continue to next retry
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled: %w", ctx.Err())
+		}
+
+		// Increase interval for next attempt
+		interval += retryIntervalIncrement
+	}
+}
+
+// TODO: performance issue by passing via interface?
 
 type QueryBuilder interface {
 	Build(
@@ -23,6 +76,7 @@ type QueryBuilder interface {
 		logger *zap.Logger,
 		unit *stroppy.UnitDescriptor,
 	) (*stroppy.DriverTransaction, error)
+	AddGenerators(unit *stroppy.UnitDescriptor) error
 	ValueToPgxValue(value *stroppy.Value) (any, error)
 }
 
@@ -41,73 +95,77 @@ type Driver struct {
 	txManager  *manager.Manager
 	txExecutor *TxExecutor
 
-	tableToCopyChannel cmap.ConcurrentMap[string, chan []any]
-	copyFromStarter    func(tableName string, paramsNames []string) chan []any
-
 	builder QueryBuilder
 }
 
-func NewDriver(lg *zap.Logger) *Driver { //nolint: ireturn // allow
+//nolint:nonamedreturns // named returns for defer error handling
+func NewDriver(
+	ctx context.Context,
+	lg *zap.Logger,
+	cfg *stroppy.DriverConfig,
+) (d *Driver, err error) {
 	if lg == nil {
-		return &Driver{
+		d = &Driver{
 			logger: logger.NewFromEnv().
 				Named(pool.DriverLoggerName).
-				WithOptions(zap.AddCallerSkip(1)),
+				WithOptions(zap.AddCallerSkip(0)),
+		}
+	} else {
+		d = &Driver{
+			logger: lg,
 		}
 	}
 
-	return &Driver{
-		logger: lg,
-	}
-}
-
-func (d *Driver) Initialize(ctx context.Context, runContext *stroppy.StepContext) error {
 	connPool, err := pool.NewPool(
 		ctx,
-		runContext.GetConfig().GetDriver(),
+		cfg,
 		d.logger.Named(pool.LoggerName),
 	)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	d.logger.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
+
+	err = waitForDB(ctx, d.logger, connPool, dbConnectionTimeout)
+	if err != nil {
+		return nil, err
 	}
 
 	d.pgxPool = connPool
 
-	d.builder, err = queries.NewQueryBuilder(runContext)
+	d.builder, err = queries.NewQueryBuilder(0) // TODO: seed initialization after driver creation
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	d.txManager = manager.Must(trmpgx.NewDefaultFactory(connPool))
 	d.txExecutor = NewTxExecutor(connPool)
-	d.tableToCopyChannel = cmap.New[chan []any]()
 
-	d.copyFromStarter = func(tableName string, columnNames []string) chan []any {
-		source := make(chan []any)
+	return d, nil
+}
 
-		go func() {
-			_, err := connPool.CopyFrom(
-				ctx,
-				pgx.Identifier{tableName},
-				columnNames,
-				pgx.CopyFromFunc(func() ([]any, error) {
-					vals, ok := <-source
-					if !ok {
-						return nil, nil
-					}
+// RunQuery exucetse sql with args in form :arg
+// TODO: prosecc args
+func (d *Driver) RunQuery(ctx context.Context, sql string, _ map[string]any) {
+	_, _ = d.pgxPool.Exec(ctx, sql)
+}
 
-					return vals, nil
-				}),
-			)
-			if err != nil {
-				d.logger.Error("copy from connection ended with error", zap.Error(err))
-			}
-		}()
-
-		return source
+func (d *Driver) RunTransaction(
+	ctx context.Context,
+	unit *stroppy.UnitDescriptor,
+) (*stroppy.DriverTransactionStat, error) {
+	err := d.builder.AddGenerators(unit)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	transaction, err := d.GenerateNextUnit(ctx, unit)
+	if err != nil {
+		return nil, err
+	}
+
+	return d.runTransaction(ctx, transaction)
 }
 
 func (d *Driver) GenerateNextUnit(
@@ -117,7 +175,135 @@ func (d *Driver) GenerateNextUnit(
 	return d.builder.Build(ctx, d.logger, unit)
 }
 
-func (d *Driver) RunTransaction(
+// InsertValues inserts multiple rows into the database based on the descriptor.
+// It supports two methods:
+// - PLAIN_QUERY: executes individual INSERT statements for each row
+// - COPY_FROM: uses PostgreSQL's COPY protocol for fast bulk insertion
+// The count parameter specifies how many rows to insert.
+func (d *Driver) InsertValues(
+	ctx context.Context,
+	descriptor *stroppy.InsertDescriptor,
+	count int64,
+) (*stroppy.DriverTransactionStat, error) {
+	// Add generators for the descriptor
+	unitDesc := &stroppy.UnitDescriptor{
+		Type: &stroppy.UnitDescriptor_Insert{
+			Insert: descriptor,
+		},
+	}
+
+	err := d.builder.AddGenerators(unitDesc)
+	if err != nil {
+		return nil, err
+	}
+
+	txStart := time.Now()
+
+	switch descriptor.GetMethod() {
+	case stroppy.InsertMethod_PLAIN_QUERY:
+		return d.insertValuesPlainQuery(ctx, descriptor, count, txStart)
+	case stroppy.InsertMethod_COPY_FROM:
+		return d.insertValuesCopyFrom(ctx, descriptor, count, txStart)
+	default:
+		d.logger.Panic("unexpected proto.InsertMethod")
+
+		return nil, nil //nolint:nilnil // unreachable after panic
+	}
+}
+
+// insertValuesPlainQuery executes multiple INSERT statements sequentially.
+// Each row is inserted with a separate pgx.Exec call.
+func (d *Driver) insertValuesPlainQuery(
+	ctx context.Context,
+	descriptor *stroppy.InsertDescriptor,
+	count int64,
+	txStart time.Time,
+) (*stroppy.DriverTransactionStat, error) {
+	queryStart := time.Now()
+
+	// Execute multiple inserts
+	for range count {
+		transaction, err := d.GenerateNextUnit(ctx, &stroppy.UnitDescriptor{
+			Type: &stroppy.UnitDescriptor_Insert{
+				Insert: descriptor,
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if len(transaction.GetQueries()) == 0 {
+			continue
+		}
+
+		query := transaction.GetQueries()[0]
+		values := make([]any, len(query.GetParams()))
+
+		err = d.fillParamsToValues(query, values)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = d.pgxPool.Exec(ctx, query.GetRequest(), values...)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &stroppy.DriverTransactionStat{
+		IsolationLevel: stroppy.TxIsolationLevel_UNSPECIFIED,
+		ExecDuration:   durationpb.New(time.Since(txStart)),
+		Queries: []*stroppy.DriverQueryStat{{
+			Name:         descriptor.GetName(),
+			ExecDuration: durationpb.New(time.Since(queryStart)),
+		}},
+	}, nil
+}
+
+// insertValuesCopyFrom uses PostgreSQL's COPY protocol for fast bulk insertion.
+// It streams values on-demand without loading all rows into memory, making it suitable
+// for very large counts. Values are generated as the COPY protocol requests them.
+func (d *Driver) insertValuesCopyFrom(
+	ctx context.Context,
+	descriptor *stroppy.InsertDescriptor,
+	count int64,
+	txStart time.Time,
+) (*stroppy.DriverTransactionStat, error) {
+	// Get column names
+	cols := make([]string, 0, len(descriptor.GetParams()))
+	for _, p := range descriptor.GetParams() {
+		cols = append(cols, p.GetName())
+	}
+
+	for _, g := range descriptor.GetGroups() {
+		for _, p := range g.GetParams() {
+			cols = append(cols, p.GetName())
+		}
+	}
+
+	queryStart := time.Now()
+
+	_, err := d.pgxPool.CopyFrom(
+		ctx,
+		pgx.Identifier{descriptor.GetTableName()},
+		cols,
+		newStreamingCopySource(d, descriptor, count),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &stroppy.DriverTransactionStat{
+		IsolationLevel: stroppy.TxIsolationLevel_UNSPECIFIED,
+		ExecDuration:   durationpb.New(time.Since(txStart)),
+		Queries: []*stroppy.DriverQueryStat{{
+			Name:         descriptor.GetName(),
+			ExecDuration: durationpb.New(time.Since(queryStart)),
+		}},
+	}, nil
+}
+
+func (d *Driver) runTransaction(
 	ctx context.Context,
 	transaction *stroppy.DriverTransaction,
 ) (*stroppy.DriverTransactionStat, error) {
@@ -147,7 +333,7 @@ func (d *Driver) runTransactionInternal(
 	transaction *stroppy.DriverTransaction,
 	executor Executor,
 ) (*stroppy.DriverTransactionStat, error) {
-	queries := make([]*stroppy.DriverQueryStat, 0, len(transaction.GetQueries()))
+	queryStats := make([]*stroppy.DriverQueryStat, 0, len(transaction.GetQueries()))
 	txStart := time.Now()
 
 	for _, query := range transaction.GetQueries() {
@@ -160,23 +346,12 @@ func (d *Driver) runTransactionInternal(
 
 		start := time.Now()
 
-		switch query.GetMethod() {
-		case stroppy.InsertMethod_PLAIN_QUERY:
-			_, err := executor.Exec(ctx, query.GetRequest(), values...)
-			if err != nil {
-				return nil, err
-			}
-		case stroppy.InsertMethod_COPY_FROM:
-			// NOTE: ignores tx_level and sends a data trought the dedicated connection
-			err := d.CopyFromQuery(query)
-			if err != nil {
-				return nil, err
-			}
-		default:
-			d.logger.Panic("unexpected proto.InsertMethod")
+		_, err = executor.Exec(ctx, query.GetRequest(), values...)
+		if err != nil {
+			return nil, err
 		}
 
-		queries = append(queries, &stroppy.DriverQueryStat{
+		queryStats = append(queryStats, &stroppy.DriverQueryStat{
 			Name:         query.GetName(),
 			ExecDuration: durationpb.New(time.Since(start)),
 		})
@@ -185,7 +360,7 @@ func (d *Driver) runTransactionInternal(
 	return &stroppy.DriverTransactionStat{
 		IsolationLevel: transaction.GetIsolationLevel(),
 		ExecDuration:   durationpb.New(time.Since(txStart)),
-		Queries:        queries,
+		Queries:        queryStats,
 	}, nil
 }
 
@@ -204,13 +379,7 @@ func (d *Driver) fillParamsToValues(query *stroppy.DriverQuery, valuesOut []any)
 
 func (d *Driver) Teardown(_ context.Context) error {
 	d.logger.Debug("Driver Teardown Start")
-
-	d.logger.Debug("Driver Teardown Close copy channels")
-	d.CloseCopyChannels()
-
-	d.logger.Debug("Driver Teardown Close pgxpool")
 	d.pgxPool.Close()
-
 	d.logger.Debug("Driver Teardown End")
 
 	return nil

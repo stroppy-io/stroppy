@@ -11,7 +11,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/randstr"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 type ValueGenerator interface {
@@ -49,6 +49,7 @@ func NewTupleGenerator(
 
 		// Recursive function to iterate through all combinations
 		var iterate func(depth int, current []*stroppy.Value) bool
+
 		iterate = func(depth int, current []*stroppy.Value) bool {
 			if depth == len(genInfos) {
 				res := make([]*stroppy.Value, len(current))

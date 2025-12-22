@@ -6,83 +6,87 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/thediveo/enumflag"
 	"go.uber.org/zap"
 
-	configCmd "github.com/stroppy-io/stroppy/cmd/stroppy/commands/config"
+	"github.com/stroppy-io/stroppy/examples"
 	"github.com/stroppy-io/stroppy/internal/common"
-	"github.com/stroppy-io/stroppy/internal/config"
 	"github.com/stroppy-io/stroppy/internal/static"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 )
 
 const (
-	configNewWorkdirFlagName = "workdir"
-	configNewFormatFlagName  = "format"
-	configNewDevFlagName     = "dev"
+	workdirFlagName = "workdir"
+	presetFlagName  = "preset"
 )
 
 var Cmd = &cobra.Command{ //nolint: gochecknoglobals
-	Use:   "new",
-	Short: "Generate default stroppy workdir",
-	Long: `
-This command generates default stroppy workdir structure include config file,
-k6 script template, ts requirements and Makefile for run.
-`,
+	Use:   "gen",
+	Short: "Generate stroppy development environment",
+	Long: fmt.Sprintf(`
+Generate a stroppy development environment with TypeScript support.
+
+This command creates a working directory with:
+- Proto files (stroppy.pb.js, stroppy.pb.ts)
+- Helper files (helpers.ts, parse_sql.ts)
+- Package.json for TypeScript types
+- K6 binary (stroppy-k6)
+- Optional preset example script
+
+Available presets: %s
+
+Examples:
+  stroppy gen --workdir ./my-benchmark
+  stroppy gen --workdir ./my-benchmark --preset tpcc
+  stroppy gen --workdir ./my-benchmark --preset execute_sql
+`, strings.Join(examples.AvailablePresets(), ", ")),
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		log := logger.Global().WithOptions(zap.WithCaller(false))
-		output, err := cmd.Flags().GetString(configNewWorkdirFlagName)
-		if err != nil {
-			return err
-		}
-		format, err := config.NewFormatFromString(cmd.PersistentFlags().Lookup(configNewFormatFlagName).Value.String())
-		if err != nil {
-			return err
-		}
-		example := config.NewExampleConfig()
 
-		runConfStr, err := configCmd.MarshalConfig(example, format.FormatConfigName(configCmd.DefaultConfigName))
+		output, err := cmd.Flags().GetString(workdirFlagName)
 		if err != nil {
 			return err
 		}
+
+		preset, err := cmd.Flags().GetString(presetFlagName)
+		if err != nil {
+			return err
+		}
+
+		// Create output directory
 		err = os.MkdirAll(output, common.FolderMode)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create output directory: %w", err)
 		}
-		err = os.WriteFile(
-			path.Join(output, format.FormatConfigName(configCmd.DefaultConfigName)),
-			runConfStr,
-			common.FileMode,
+
+		// Copy static files (protobuf, helpers, parse_sql, k6 binary)
+		allFiles := append(static.StaticFiles, static.DevStaticFiles...)
+		err = static.CopyStaticFilesToPath(output, common.FileMode, allFiles...)
+		if err != nil {
+			return fmt.Errorf("failed to copy static files: %w", err)
+		}
+
+		log.Info("Static files copied",
+			zap.String("path", output),
+			zap.Int("files", len(allFiles)),
 		)
-		if err != nil {
-			return err
+
+		// Copy preset if specified
+		if preset != "" {
+			presetType := examples.Preset(preset)
+			err = examples.CopyPresetToPath(output, presetType, common.FileMode)
+			if err != nil {
+				return fmt.Errorf("failed to copy preset: %w", err)
+			}
+			log.Info("Preset copied", zap.String("preset", preset))
 		}
 
-		log.Info("Config generated! Happy benchmarking!", zap.String(
-			"config_path",
-			path.Join(output, format.FormatConfigName(configCmd.DefaultConfigName)),
-		))
-
-		files := static.StaticFiles
-		if cmd.PersistentFlags().Lookup(configNewDevFlagName).Value.String() == "true" {
-			files = append(files, static.DevStaticFiles...)
-		}
-		err = static.CopyStaticFilesToPath(output, common.FileMode, files...)
-		if err != nil {
-			return err
-		}
-
-		err = static.CopyStaticFilesToPath(output, common.FileMode)
-		if err != nil {
-			return err
-		}
-
-		// Copy self to workdir
+		// Copy stroppy binary to workdir
 		execPath, err := os.Executable()
 		if err != nil {
-			return fmt.Errorf("failed to get self binary path: %w", err) //nolint: err113
+			return fmt.Errorf("failed to get self binary path: %w", err)
 		}
 
 		pathToWriteItself := path.Join(output, "stroppy")
@@ -91,52 +95,52 @@ k6 script template, ts requirements and Makefile for run.
 		if err = cmp.Or(errTo, errFrom); err != nil {
 			return err
 		}
-		if absTo == absFrom {
-			return nil // executable already in correct place
+
+		if absTo != absFrom {
+			execBin, err := os.ReadFile(execPath)
+			if err != nil {
+				return fmt.Errorf("failed to read self binary file: %w", err)
+			}
+
+			err = os.WriteFile(pathToWriteItself, execBin, common.FileMode)
+			if err != nil {
+				return fmt.Errorf("failed to write self binary file: %w", err)
+			}
+
+			err = os.Chmod(pathToWriteItself, common.FolderMode)
+			if err != nil {
+				return fmt.Errorf("failed to chmod self binary file: %w", err)
+			}
 		}
 
-		execBin, err := os.ReadFile(execPath)
-		if err != nil {
-			return fmt.Errorf("failed to read self binary file: %w", err) //nolint: err113
+		log.Info("Development environment generated! Happy benchmarking!",
+			zap.String("path", output),
+		)
+
+		// Log usage instructions
+		log.Info("Files included: stroppy.pb.ts, stroppy.pb.js, helpers.ts, parse_sql.ts, package.json, stroppy-k6, stroppy")
+
+		if preset != "" {
+			log.Info("Preset files included", zap.String("preset", preset))
 		}
 
-		err = os.WriteFile(pathToWriteItself, execBin, common.FileMode)
-		if err != nil {
-			return fmt.Errorf("failed to write self binary file: %w", err)
-		}
-
-		err = os.Chmod(pathToWriteItself, common.FolderMode)
-		if err != nil {
-			return fmt.Errorf("failed to chmod self binary file: %w", err)
-		}
+		log.Info("To run your benchmark: cd " + output + " && ./stroppy run <your_script.ts>")
+		log.Info("For development with TypeScript types: npm install")
 
 		return nil
 	},
 }
 
-var configFormatFlag config.Format //nolint: gochecknoglobals // allow in cmd as flag
-
 func init() { //nolint: gochecknoinits // allow in cmd
 	Cmd.PersistentFlags().String(
-		configNewWorkdirFlagName,
-		configCmd.DefaultWorkdirPath,
-		"work directory",
+		workdirFlagName,
+		".",
+		"output directory for development environment",
 	)
 
-	Cmd.PersistentFlags().Var(
-		enumflag.New(
-			&configFormatFlag,
-			configNewFormatFlagName,
-			config.FormatIDs,
-			enumflag.EnumCaseInsensitive,
-		),
-		configNewFormatFlagName,
-		"output config format, json or yaml",
-	)
-
-	Cmd.PersistentFlags().Bool(
-		configNewDevFlagName,
-		false,
-		"generate dev environment, includes package.json, Makefile.dev and ts requirements",
+	Cmd.PersistentFlags().String(
+		presetFlagName,
+		"",
+		fmt.Sprintf("preset example to include (%s)", strings.Join(examples.AvailablePresets(), ", ")),
 	)
 }

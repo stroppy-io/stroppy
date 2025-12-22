@@ -5,7 +5,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	pb "github.com/stroppy-io/stroppy/pkg/common/proto"
+	pb "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 func ptr[T any](x T) *T {

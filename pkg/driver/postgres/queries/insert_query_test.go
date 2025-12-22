@@ -3,7 +3,7 @@ package queries
 import (
 	"testing"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 func Test_badInsertSQL(t *testing.T) {
@@ -34,7 +34,7 @@ func Test_badInsertSQL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := badInsertSQL(tt.args.descriptor); got != tt.want {
+			if got := BadInsertSQL(tt.args.descriptor); got != tt.want {
 				t.Errorf("badInsertSQL() = %v, want %v", got, tt.want)
 			}
 		})

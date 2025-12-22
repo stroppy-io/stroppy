@@ -7,7 +7,7 @@ import (
 	"github.com/avito-tech/go-transaction-manager/trm/v2/settings"
 	"github.com/jackc/pgx/v5"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 func NewSettings(level pgx.TxIsoLevel, opts ...settings.Opt) *trmpgx.Settings {

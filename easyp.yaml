@@ -1,0 +1,57 @@
+lint:
+  use:
+    - DEFAULT
+  enum_zero_value_suffix: _NONE
+  service_suffix: API
+  ignore: []
+  except: []
+  allow_comment_ignores: false
+  ignore_only: {}
+deps:
+  - github.com/bufbuild/protoc-gen-validate@v1.2.1
+generate:
+  inputs:
+    - directory: proto/stroppy
+  plugins:
+    - name: go
+      out: ./pkg/common
+      opts:
+        paths: source_relative
+    - name: go-grpc
+      out: ./pkg/common
+      opts:
+        paths: source_relative
+    - name: validate
+      out: ./pkg/common
+      opts:
+        lang: go
+        paths: source_relative
+    - name: connect-go
+      out: ./pkg/common
+      opts:
+        paths: source_relative
+        simple: true
+    - name: ts
+      out: ./proto/build/ts
+      opts:
+        force_disable_services:
+        force_client_none:
+        force_exclude_all_options:
+        keep_enum_prefix:
+        add_pb_suffix:
+        long_type_string:
+    - name: jsonschema
+      out: ./proto/build/docs
+      opts:
+        entrypoint_message: ConfigFile
+        output_file_suffix: .schema.json
+        int64_as_string: true
+        paths: source_relative
+    - name: doc
+      out: ./proto/build/docs
+      opts:
+        markdown,proto.md:
+
+breaking:
+  ignore: []
+  against_git_ref: master

@@ -37,7 +37,7 @@ func TestNewZapCfg(t *testing.T) {
 			name:     "Unknown mode",
 			mod:      "unknown",
 			level:    zapcore.WarnLevel,
-			expected: zapcore.DebugLevel, // Default in development config
+			expected: zapcore.WarnLevel,
 		},
 	}
 

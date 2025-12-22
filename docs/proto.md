@@ -3,7 +3,7 @@
 
 ## Table of Contents
 
-- [stroppy/cloud.proto](#stroppy_cloud-proto)
+- [proto/stroppy/cloud.proto](#proto_stroppy_cloud-proto)
     - [StroppyRun](#stroppy-StroppyRun)
     - [StroppyStepRun](#stroppy-StroppyStepRun)
   
@@ -11,7 +11,7 @@
   
     - [CloudStatusService](#stroppy-CloudStatusService)
   
-- [stroppy/common.proto](#stroppy_common-proto)
+- [proto/stroppy/common.proto](#proto_stroppy_common-proto)
     - [DateTime](#stroppy-DateTime)
     - [Decimal](#stroppy-Decimal)
     - [Generation](#stroppy-Generation)
@@ -42,7 +42,7 @@
     - [Generation.Distribution.DistributionType](#stroppy-Generation-Distribution-DistributionType)
     - [Value.NullValue](#stroppy-Value-NullValue)
   
-- [stroppy/config.proto](#stroppy_config-proto)
+- [proto/stroppy/config.proto](#proto_stroppy_config-proto)
     - [CloudConfig](#stroppy-CloudConfig)
     - [ConfigFile](#stroppy-ConfigFile)
     - [DriverConfig](#stroppy-DriverConfig)
@@ -58,7 +58,7 @@
     - [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel)
     - [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode)
   
-- [stroppy/descriptor.proto](#stroppy_descriptor-proto)
+- [proto/stroppy/descriptor.proto](#proto_stroppy_descriptor-proto)
     - [BenchmarkDescriptor](#stroppy-BenchmarkDescriptor)
     - [ColumnDescriptor](#stroppy-ColumnDescriptor)
     - [IndexDescriptor](#stroppy-IndexDescriptor)
@@ -75,7 +75,7 @@
     - [InsertMethod](#stroppy-InsertMethod)
     - [TxIsolationLevel](#stroppy-TxIsolationLevel)
   
-- [stroppy/k6.proto](#stroppy_k6-proto)
+- [proto/stroppy/k6.proto](#proto_stroppy_k6-proto)
     - [ConstantArrivalRate](#stroppy-ConstantArrivalRate)
     - [ConstantVUs](#stroppy-ConstantVUs)
     - [K6Options](#stroppy-K6Options)
@@ -87,7 +87,7 @@
     - [RampingVUs.VUStage](#stroppy-RampingVUs-VUStage)
     - [SharedIterations](#stroppy-SharedIterations)
   
-- [stroppy/runtime.proto](#stroppy_runtime-proto)
+- [proto/stroppy/runtime.proto](#proto_stroppy_runtime-proto)
     - [DriverQuery](#stroppy-DriverQuery)
     - [DriverQueryStat](#stroppy-DriverQueryStat)
     - [DriverTransaction](#stroppy-DriverTransaction)
@@ -95,17 +95,17 @@
     - [StepContext](#stroppy-StepContext)
     - [UnitContext](#stroppy-UnitContext)
   
-- [stroppy/sidecar.proto](#stroppy_sidecar-proto)
+- [proto/stroppy/sidecar.proto](#proto_stroppy_sidecar-proto)
     - [SidecarService](#stroppy-SidecarService)
   
 - [Scalar Value Types](#scalar-value-types)
 
 
 
-<a name="stroppy_cloud-proto"></a>
+<a name="proto_stroppy_cloud-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## stroppy/cloud.proto
+## proto/stroppy/cloud.proto
 
 
 
@@ -169,7 +169,8 @@ Status represents the status of a stroppy run or step run.
 <a name="stroppy-CloudStatusService"></a>
 
 ### CloudStatusService
-CloudStatusService is a service for notifying the cloud status of runs and steps.
+CloudStatusService is a service for notifying the cloud status of runs and
+steps.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -180,10 +181,10 @@ CloudStatusService is a service for notifying the cloud status of runs and steps
 
 
 
-<a name="stroppy_common-proto"></a>
+<a name="proto_stroppy_common-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## stroppy/common.proto
+## proto/stroppy/common.proto
 
 
 
@@ -545,7 +546,8 @@ data export.
 <a name="stroppy-Ulid"></a>
 
 ### Ulid
-Ulid represents a universally universally unique lexicographically sortable identifier (ULID).
+Ulid represents a universally universally unique lexicographically sortable
+identifier (ULID).
 
 
 | Field | Type | Label | Description |
@@ -666,10 +668,10 @@ way.
 
 
 
-<a name="stroppy_config-proto"></a>
+<a name="proto_stroppy_config-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## stroppy/config.proto
+## proto/stroppy/config.proto
 
 
 
@@ -707,7 +709,8 @@ ConfigFile contains the complete configuration for a benchmark run in file.
 
 ### DriverConfig
 DriverConfig contains configuration for connecting to a database driver.
-It includes the driver plugin path, connection URL, and database-specific settings.
+It includes the driver plugin path, connection URL, and database-specific
+settings.
 
 
 | Field | Type | Label | Description |
@@ -767,6 +770,7 @@ OtlpExporterConfig contains named configuration for an OTLP exporter.
 | metadata | [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry) | repeated | Arbitrary metadata, may be passed to result labels and json output |
 | driver | [DriverConfig](#stroppy-DriverConfig) |  | Database driver configuration |
 | logger | [LoggerConfig](#stroppy-LoggerConfig) |  | Logging configuration |
+| exporter | [ExporterConfig](#stroppy-ExporterConfig) |  | Exporter configuration |
 
 
 
@@ -825,13 +829,14 @@ SideCar contains configuration for plugins.
 <a name="stroppy-Step"></a>
 
 ### Step
-StepExecutorMappingConfig contains configuration for mapping steps to executors.
+StepExecutorMappingConfig contains configuration for mapping steps to
+executors.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Name of the step |
-| workload | [string](#string) |  | Name of the step |
+| workload | [string](#string) |  | Name of the workload |
 | executor | [string](#string) |  | Name of the executor |
 | exporter | [string](#string) | optional | Name of the exporter |
 
@@ -888,10 +893,10 @@ StepExecutorMappingConfig contains configuration for mapping steps to executors.
 
 
 
-<a name="stroppy_descriptor-proto"></a>
+<a name="proto_stroppy_descriptor-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## stroppy/descriptor.proto
+## proto/stroppy/descriptor.proto
 
 
 
@@ -1058,6 +1063,8 @@ execution count.
 | name | [string](#string) |  | Name of the transaction |
 | isolation_level | [TxIsolationLevel](#stroppy-TxIsolationLevel) |  | Transaction isolation level |
 | queries | [QueryDescriptor](#stroppy-QueryDescriptor) | repeated | List of queries to execute in this transaction |
+| params | [QueryParamDescriptor](#stroppy-QueryParamDescriptor) | repeated | Parameters used in the query |
+| groups | [QueryParamGroup](#stroppy-QueryParamGroup) | repeated | Groups of the parameters |
 | db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific transaction properties |
 
 
@@ -1158,10 +1165,10 @@ transaction.
 
 
 
-<a name="stroppy_k6-proto"></a>
+<a name="proto_stroppy_k6-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## stroppy/k6.proto
+## proto/stroppy/k6.proto
 
 
 
@@ -1364,10 +1371,10 @@ https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/shared-iteration
 
 
 
-<a name="stroppy_runtime-proto"></a>
+<a name="proto_stroppy_runtime-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## stroppy/runtime.proto
+## proto/stroppy/runtime.proto
 
 
 
@@ -1487,10 +1494,10 @@ WorkloadUnitDescriptor.
 
 
 
-<a name="stroppy_sidecar-proto"></a>
+<a name="proto_stroppy_sidecar-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## stroppy/sidecar.proto
+## proto/stroppy/sidecar.proto
 
 
  

@@ -17,21 +17,35 @@ func (f FileName) String() string {
 }
 
 const (
-	PackageJSONFileName FileName = "package.json"
-	ProtoTSFileName     FileName = "stroppy.pb.ts"
-	ProtoJSFileName     FileName = "stroppy.pb.js"
-	K6PluginFileName    FileName = "stroppy-xk6"
-	K6BenchmarkFileName FileName = "benchmark.ts"
+	PackageJSONFileName     FileName = "package.json"
+	ProtoTSFileName         FileName = "stroppy.pb.ts"
+	ProtoJSFileName         FileName = "stroppy.pb.js"
+	K6PluginFileName        FileName = "stroppy-k6"
+	ApplyGeneratorsFileName FileName = "apply_generators.ts"
+	HelpersFileName         FileName = "helpers.ts"
+	ParseSQLFileName        FileName = "parse_sql.ts"
+	ParseSQL2TSFileName     FileName = "parse_sql_2.ts"
+	ParseSQL2JSFileName     FileName = "parse_sql_2.js"
+	AnalyzeDDLTSFileName    FileName = "analyze_ddl.ts"
+	AnalyzeDDLJSFileName    FileName = "analyze_ddl.js"
 )
 
+// StaticFiles are copied to temp dir for k6 execution.
 var StaticFiles = []FileName{ //nolint: gochecknoglobals
 	ProtoJSFileName,
 	K6PluginFileName,
-	K6BenchmarkFileName,
+	HelpersFileName,
+	ParseSQLFileName,
+	ParseSQL2JSFileName,
+	AnalyzeDDLJSFileName,
+	ApplyGeneratorsFileName,
 }
 
+// DevStaticFiles are additional files for development environment.
 var DevStaticFiles = []FileName{ //nolint: gochecknoglobals
 	PackageJSONFileName,
+	AnalyzeDDLTSFileName,
+	ParseSQL2TSFileName,
 	ProtoTSFileName,
 }
 
@@ -40,8 +54,9 @@ var Binaries = []FileName{ //nolint: gochecknoglobals
 }
 
 //go:embed package.json
-//go:embed stroppy-xk6
-//go:embed benchmark.ts
+//go:embed stroppy-k6
+//go:embed *.js
+//go:embed *.ts
 //go:embed *.pb.*
 var Content embed.FS
 
