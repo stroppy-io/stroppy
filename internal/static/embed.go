@@ -24,6 +24,8 @@ const (
 	ApplyGeneratorsFileName FileName = "apply_generators.ts"
 	HelpersFileName         FileName = "helpers.ts"
 	ParseSQLFileName        FileName = "parse_sql.ts"
+	ParseSQL2TSFileName     FileName = "parse_sql_2.ts"
+	ParseSQL2JSFileName     FileName = "parse_sql_2.js"
 	AnalyzeDDLTSFileName    FileName = "analyze_ddl.ts"
 	AnalyzeDDLJSFileName    FileName = "analyze_ddl.js"
 )
@@ -31,10 +33,10 @@ const (
 // StaticFiles are copied to temp dir for k6 execution.
 var StaticFiles = []FileName{ //nolint: gochecknoglobals
 	ProtoJSFileName,
-	ProtoTSFileName,
 	K6PluginFileName,
 	HelpersFileName,
 	ParseSQLFileName,
+	ParseSQL2JSFileName,
 	AnalyzeDDLJSFileName,
 	ApplyGeneratorsFileName,
 }
@@ -43,6 +45,8 @@ var StaticFiles = []FileName{ //nolint: gochecknoglobals
 var DevStaticFiles = []FileName{ //nolint: gochecknoglobals
 	PackageJSONFileName,
 	AnalyzeDDLTSFileName,
+	ParseSQL2TSFileName,
+	ProtoTSFileName,
 }
 
 var Binaries = []FileName{ //nolint: gochecknoglobals
@@ -51,11 +55,8 @@ var Binaries = []FileName{ //nolint: gochecknoglobals
 
 //go:embed package.json
 //go:embed stroppy-k6
-//go:embed helpers.ts
-//go:embed parse_sql.ts
-//go:embed analyze_ddl.ts
-//go:embed analyze_ddl.js
-//go:embed apply_generators.ts
+//go:embed *.js
+//go:embed *.ts
 //go:embed *.pb.*
 var Content embed.FS
 

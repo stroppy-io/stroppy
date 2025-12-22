@@ -111,9 +111,9 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 	rm -rf $(TMP_BUNDLE_DIR)
 	mkdir -p $(TS_TARGET_DIR)
 	mkdir -p $(TMP_BUNDLE_DIR)
-	# Copy the entire directory structure to preserve relative imports
+# Copy the entire directory structure to preserve relative imports
 	cp -r $(TS_TARGET_DIR) $(TMP_BUNDLE_DIR)/ts_source
-	# Copy analyze_ddl source before building
+# Copy analyze_ddl source before building
 	cp $(CURDIR)/internal/static/analyze_ddl.ts $(TMP_BUNDLE_DIR)/analyze_ddl_entry.ts
 	cp $(TS_BUNDLE_DIR)/build.js $(TMP_BUNDLE_DIR)/
 	cp $(TS_BUNDLE_DIR)/package.json $(TMP_BUNDLE_DIR)/
@@ -121,8 +121,10 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 	cd $(TMP_BUNDLE_DIR) && node build.js
 	cp $(TMP_BUNDLE_DIR)/stroppy.pb.ts $(TS_TARGET_DIR)/stroppy.pb.ts
 	cp $(TMP_BUNDLE_DIR)/dist/bundle.js $(TS_TARGET_DIR)/stroppy.pb.js
-	# Bundle analyze_ddl.ts with node-sql-parser (handled by build.js)
+# Bundle analyze_ddl.ts with node-sql-parser (handled by build.js)
 	cp $(TMP_BUNDLE_DIR)/dist/analyze_ddl.js $(TS_TARGET_DIR)/analyze_ddl.js
+# TODO: make single bundle aka stroppy.js or automatically copy all from dist
+	cp $(TMP_BUNDLE_DIR)/dist/parse_sql_2.js $(TS_TARGET_DIR)/parse_sql_2.js
 	rm -rf $(TMP_BUNDLE_DIR)
 
 .PHONY: .easyp-gen
@@ -168,6 +170,7 @@ proto: .check-bins
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.ts $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.js $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/analyze_ddl.js $(CURDIR)/internal/static/
+	cp $(PROTO_BUILD_TARGET_DIR)/ts/parse_sql_2.js $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/docs/proto.md $(CURDIR)/docs
 # cp $(PROTO_BUILD_TARGET_DIR)/docs/config.schema.json $(CURDIR)/docs
 

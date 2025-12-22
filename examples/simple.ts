@@ -80,7 +80,6 @@ export function setup() {
 
 export function workload() {
   driver.runQuery("select 1;", {});
-  driver.runQuery("select :fuck;", { fuck: 96 });
   driver.runQuery("select 13;", {});
 }
 
