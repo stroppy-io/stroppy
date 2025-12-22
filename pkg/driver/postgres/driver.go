@@ -145,8 +145,10 @@ func NewDriver(
 	return d, nil
 }
 
-func (d *Driver) RunQuery(ctx context.Context, sql string, args map[string]any) {
-	d.pgxPool.Exec(ctx, sql)
+// RunQuery exucetse sql with args in form :arg
+// TODO: prosecc args
+func (d *Driver) RunQuery(ctx context.Context, sql string, _ map[string]any) {
+	_, _ = d.pgxPool.Exec(ctx, sql)
 }
 
 func (d *Driver) RunTransaction(
