@@ -226,6 +226,8 @@ func TestExtractConfigFromScript_ExecuteSQL(t *testing.T) {
 	// Bundle the script with all dependencies
 	bundledJS := bundleScriptForTest(t, scriptPath)
 
+	_ = bundledJS
+
 	// Create open mock that returns SQL content
 	sqlContent, err := workloads.Content.ReadFile("execute_sql/tpcb_mini.sql")
 	require.NoError(t, err)
@@ -237,6 +239,7 @@ func TestExtractConfigFromScript_ExecuteSQL(t *testing.T) {
 
 		return ""
 	}
+	_ = openMock
 	// TODO: RNDSTROPPY-57
 	t.Skipf("Following code is broken not due too this task. Fix required with RNDSTROPPY-57")
 
