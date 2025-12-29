@@ -5,7 +5,7 @@ import stroppy from "k6/x/stroppy";
 
 import { Options } from "k6/options";
 import { GlobalConfig, Status } from "./stroppy.pb.js";
-import { parse_sql } from "./parse_sql_2.ts";
+import { parse_sql } from "./parse_sql_2.js";
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -45,7 +45,9 @@ declare const __ENV: Record<string, string | undefined>;
 // Initialize driver with GlobalConfig
 defineConfig({
   driver: {
-    url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
+    url:
+      __ENV.DRIVER_URL ||
+      "postgres://arenadev:arenadev@localhost:5432/postgres?search_path=tpcds,public",
     driverType: 1,
     dbSpecific: {
       fields: [
@@ -75,7 +77,7 @@ defineConfig({
 
 declare function open(path: string): string; // k6 function to get files content
 
-const content: string = open("tpcds-scale-1.sql"); // TODO: push file name trought go cli argument
+const content: string = open("query_0.sql"); // TODO: push file name trought go cli argument
 const parsedQueries = parse_sql(content);
 
 export function setup() {

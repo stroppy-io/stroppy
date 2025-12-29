@@ -226,6 +226,7 @@ func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut 
 }
 
 // runK6Binary executes the k6 binary.
+// TODO: pass sql file name
 func (r *ScriptRunner) runK6Binary(ctx context.Context, workdir string, args, envs []string) error {
 	binaryPath := path.Join(workdir, static.K6PluginFileName.String())
 
