@@ -61,7 +61,6 @@ func CopyPresetToPath(targetPath string, preset Preset, perm os.FileMode) error 
 
 // copyFileToPath copies a single file from examples to the target directory.
 func copyFileToPath(targetPath, preset, fileName string, perm os.FileMode) error {
-
 	file, err := Content.Open(path.Join(preset, fileName))
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", fileName, err)
