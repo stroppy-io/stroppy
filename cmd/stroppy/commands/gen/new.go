@@ -11,10 +11,10 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/examples"
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/internal/static"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/workloads"
 )
 
 const (
@@ -41,7 +41,7 @@ Examples:
   stroppy gen --workdir ./my-benchmark
   stroppy gen --workdir ./my-benchmark --preset tpcc
   stroppy gen --workdir ./my-benchmark --preset execute_sql
-`, strings.Join(examples.AvailablePresets(), ", ")),
+`, strings.Join(workloads.AvailablePresets(), ", ")),
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		log := logger.Global().WithOptions(zap.WithCaller(false))
 
@@ -75,8 +75,8 @@ Examples:
 
 		// Copy preset if specified
 		if preset != "" {
-			presetType := examples.Preset(preset)
-			err = examples.CopyPresetToPath(output, presetType, common.FileMode)
+			presetType := workloads.Preset(preset)
+			err = workloads.CopyPresetToPath(output, presetType, common.FileMode)
 			if err != nil {
 				return fmt.Errorf("failed to copy preset: %w", err)
 			}
@@ -118,7 +118,9 @@ Examples:
 		)
 
 		// Log usage instructions
-		log.Info("Files included: stroppy.pb.ts, stroppy.pb.js, helpers.ts, parse_sql.ts, package.json, stroppy-k6, stroppy")
+		log.Info(
+			"Files included: stroppy.pb.ts, stroppy.pb.js, helpers.ts, parse_sql.ts, package.json, stroppy-k6, stroppy",
+		)
 
 		if preset != "" {
 			log.Info("Preset files included", zap.String("preset", preset))
@@ -141,6 +143,6 @@ func init() { //nolint: gochecknoinits // allow in cmd
 	Cmd.PersistentFlags().String(
 		presetFlagName,
 		"",
-		fmt.Sprintf("preset example to include (%s)", strings.Join(examples.AvailablePresets(), ", ")),
+		fmt.Sprintf("preset example to include (%s)", strings.Join(workloads.AvailablePresets(), ", ")),
 	)
 }

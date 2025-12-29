@@ -151,7 +151,7 @@ func (i *XK6Instance) DefineConfigBin(configBin []byte) {
 
 // DefineConfig initializes the driver from GlobalConfig.
 // This is called by scripts using defineConfig(globalConfig) at the top level.
-func (i *XK6Instance) DefineConfig(globalCfg stroppy.GlobalConfig) {
+func (i *XK6Instance) DefineConfig(globalCfg *stroppy.GlobalConfig) {
 
 	drvCfg := globalCfg.GetDriver()
 	if drvCfg == nil {
@@ -167,7 +167,7 @@ func (i *XK6Instance) DefineConfig(globalCfg stroppy.GlobalConfig) {
 		rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
 			Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
 			Status: stroppy.Status_STATUS_RUNNING,
-			Config: &stroppy.ConfigFile{Global: &globalCfg},
+			Config: &stroppy.ConfigFile{Global: globalCfg},
 			Cmd:    "",
 		})
 	})
