@@ -39,7 +39,6 @@ func AvailablePresets() []string {
 
 // CopyPresetToPath copies preset files to the target directory.
 func CopyPresetToPath(targetPath string, preset Preset, perm os.FileMode) error {
-
 	entries, err := Content.ReadDir(string(preset))
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrUnknownPreset, preset)

@@ -1,5 +1,5 @@
 // Package runner provides functionality to run TypeScript benchmark scripts with k6.
-// TODO: extractor works if helpers (as parse_sql_2) with '.ts' extension, but k6 needs '.js'. it should be consistant.
+// TODO: extractor works if helpers (as parse_sql_2) with '.ts' extension, but k6 needs '.js'. it should be consistent.
 package runner
 
 import (

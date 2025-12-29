@@ -9,10 +9,10 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/stretchr/testify/require"
 
-	"github.com/stroppy-io/stroppy/examples"
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/internal/static"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/workloads"
 )
 
 // bundleScriptForTest bundles a TypeScript script with all dependencies from internal/static.
@@ -107,7 +107,11 @@ defineConfig(config);`
 	require.NotNil(t, config.GlobalConfig)
 	require.NotNil(t, config.GlobalConfig.Driver)
 	require.Equal(t, "postgres://localhost:5432", config.GlobalConfig.Driver.Url)
-	require.Equal(t, stroppy.DriverConfig_DRIVER_TYPE_POSTGRES, config.GlobalConfig.Driver.DriverType)
+	require.Equal(
+		t,
+		stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
+		config.GlobalConfig.Driver.DriverType,
+	)
 }
 
 func TestExtractConfigFromJS_BinaryConfig(t *testing.T) {
@@ -197,7 +201,7 @@ func TestExtractConfigFromScript_ExecuteSQL(t *testing.T) {
 	// Check if file exists, if not try to read from embedded FS
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 		// Try to read from embedded examples
-		scriptData, err := examples.Content.ReadFile("execute_sql.ts")
+		scriptData, err := workloads.Content.ReadFile("execute_sql.ts")
 		require.NoError(t, err)
 
 		// Create temp file
@@ -212,7 +216,7 @@ func TestExtractConfigFromScript_ExecuteSQL(t *testing.T) {
 		require.NoError(t, err)
 
 		// Also copy SQL file
-		sqlData, err := examples.Content.ReadFile("tpcb_mini.sql")
+		sqlData, err := workloads.Content.ReadFile("tpcb_mini.sql")
 		if err == nil {
 			sqlPath := filepath.Join(tempDir, "tpcb_mini.sql")
 			_ = os.WriteFile(sqlPath, sqlData, common.FileMode)
@@ -223,7 +227,7 @@ func TestExtractConfigFromScript_ExecuteSQL(t *testing.T) {
 	bundledJS := bundleScriptForTest(t, scriptPath)
 
 	// Create open mock that returns SQL content
-	sqlContent, err := examples.Content.ReadFile("tpcb_mini.sql")
+	sqlContent, err := workloads.Content.ReadFile("tpcb_mini.sql")
 	require.NoError(t, err)
 
 	openMock := func(filename string) string {
@@ -240,6 +244,10 @@ func TestExtractConfigFromScript_ExecuteSQL(t *testing.T) {
 	require.NotNil(t, config)
 	require.NotNil(t, config.GlobalConfig)
 	require.NotNil(t, config.GlobalConfig.Driver)
-	require.Equal(t, stroppy.DriverConfig_DRIVER_TYPE_POSTGRES, config.GlobalConfig.Driver.DriverType)
+	require.Equal(
+		t,
+		stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
+		config.GlobalConfig.Driver.DriverType,
+	)
 	require.NotEmpty(t, config.GlobalConfig.Driver.Url)
 }
