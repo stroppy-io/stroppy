@@ -5,6 +5,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 )
@@ -60,15 +61,26 @@ func CopyPresetToPath(targetPath string, preset Preset, perm os.FileMode) error 
 
 // copyFileToPath copies a single file from examples to the target directory.
 func copyFileToPath(targetPath, preset, fileName string, perm os.FileMode) error {
-	// TODO: stream to fs to fs instead of copy all than write all
-	data, err := Content.ReadFile(preset + "/" + fileName)
-	if err != nil {
-		return fmt.Errorf("failed to read file %s: %w", fileName, err)
-	}
 
-	err = os.WriteFile(path.Join(targetPath, fileName), data, perm)
+	file, err := Content.Open(path.Join(preset, fileName))
 	if err != nil {
-		return fmt.Errorf("failed to write file %s: %w", fileName, err)
+		return fmt.Errorf("failed to open file %s: %w", fileName, err)
+	}
+	defer file.Close()
+
+	destFile, err := os.OpenFile(
+		path.Join(targetPath, fileName),
+		os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
+		perm,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", fileName, err)
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, file)
+	if err != nil {
+		return fmt.Errorf("failed to copy file %s to %s: %w", fileName, targetPath, err)
 	}
 
 	return nil
