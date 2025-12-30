@@ -30,7 +30,7 @@ export const options: Options = {
       executor: "constant-vus",
       exec: "workload",
       vus: 10,
-      duration: "5m",
+      duration: "1s",
     },
   },
 };
@@ -144,9 +144,10 @@ const workloads: WorkloadDescriptor[] = [
   }),
 ];
 
-// Load and parse SQL file, then update workloads with SQL
+declare const __SQL_FILE: string;
 
-const sqlContent = open("tpcb_mini.sql");
+// Load and parse SQL file, then update workloads with SQL
+const sqlContent = open(__SQL_FILE);
 const parsedWorkloads = parse_sql(sqlContent);
 update_with_sql(workloads, parsedWorkloads);
 
