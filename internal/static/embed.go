@@ -109,3 +109,7 @@ func CopyStaticFilesToPath(targetPath string, perm os.FileMode, files ...FileNam
 
 	return nil
 }
+
+func CopyAllStaticFilesToPath(targetPath string, perm os.FileMode) error {
+	return CopyStaticFilesToPath(targetPath, perm, StaticFiles...)
+}

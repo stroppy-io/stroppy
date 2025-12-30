@@ -77,7 +77,8 @@ defineConfig({
 
 declare function open(path: string): string; // k6 function to get files content
 
-const content: string = open("query_0.sql"); // TODO: push file name trought go cli argument
+declare const __SQL_FILE: string;
+const content: string = open(__SQL_FILE);
 const parsedQueries = parse_sql(content);
 
 export function setup() {

@@ -306,6 +306,10 @@ func prepareVMEnvironment(
 		return fmt.Errorf("failed to set __ENV: %w", err)
 	}
 
+	if err := vm.Set("__SQL_FILE", ""); err != nil {
+		return fmt.Errorf("failed to set __SQL_FILE: %w", err)
+	}
+
 	return nil
 }
 
