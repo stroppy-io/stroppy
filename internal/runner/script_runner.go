@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
@@ -165,7 +166,7 @@ func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut 
 	}
 
 	envs = append(envs,
-		"K6_OTEL_METRIC_PREFIX="+stringOrDefault(export.GetOtlpMetricsPrefix(), "k6_"),
+		"K6_OTEL_METRIC_PREFIX="+cmp.Or(export.GetOtlpMetricsPrefix(), "k6_"),
 		"K6_OTEL_SERVICE_NAME=stroppy",
 	)
 
@@ -187,8 +188,8 @@ func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut 
 		envs = append(envs,
 			"K6_OTEL_EXPORTER_TYPE=http",
 			"K6_OTEL_HTTP_EXPORTER_INSECURE="+insecure,
-			"K6_OTEL_HTTP_EXPORTER_ENDPOINT="+stringOrDefault(export.GetOtlpHttpEndpoint(), "localhost:4318"),
-			"K6_OTEL_HTTP_EXPORTER_URL_PATH="+stringOrDefault(export.GetOtlpHttpExporterUrlPath(), "/v1/metrics"),
+			"K6_OTEL_HTTP_EXPORTER_ENDPOINT="+cmp.Or(export.GetOtlpHttpEndpoint(), "localhost:4318"),
+			"K6_OTEL_HTTP_EXPORTER_URL_PATH="+cmp.Or(export.GetOtlpHttpExporterUrlPath(), "/v1/metrics"),
 		)
 	}
 
@@ -231,13 +232,4 @@ func (r *ScriptRunner) runK6Binary(ctx context.Context, workdir string, args, en
 	})
 
 	return binExec.Wait()
-}
-
-// stringOrDefault returns the value if non-empty, otherwise the default.
-func stringOrDefault(value, defaultValue string) string {
-	if value == "" {
-		return defaultValue
-	}
-
-	return value
 }

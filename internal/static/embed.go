@@ -60,43 +60,20 @@ var Binaries = []FileName{ //nolint: gochecknoglobals
 //go:embed *.pb.*
 var Content embed.FS
 
-func openFile(name FileName) ([]byte, error) {
-	file, err := Content.Open(string(name))
-	if err != nil {
-		return nil, err
-	}
-
-	defer file.Close()
-
-	stat, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	buffer := make([]byte, stat.Size())
-
-	_, err = file.Read(buffer)
-	if err != nil {
-		return nil, err
-	}
-
-	return buffer, nil
-}
-
 func CopyStaticFilesToPath(targetPath string, perm os.FileMode, files ...FileName) error {
 	for _, name := range files {
-		data, err := openFile(name)
+		data, err := Content.ReadFile(string(name))
 		if err != nil {
 			return fmt.Errorf(
 				"failed to open static file name: %s, error: %w",
 				name,
 				err,
-			) //nolint: err113
+			)
 		}
 
 		err = os.WriteFile(path.Join(targetPath, string(name)), data, perm)
 		if err != nil {
-			return fmt.Errorf("failed to write file: %w", err) //nolint: err113
+			return fmt.Errorf("failed to write file: %w", err)
 		}
 
 		if slices.Contains(Binaries, name) {
