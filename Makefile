@@ -192,21 +192,41 @@ K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
 .PHONY: build-k6
 build-k6: # Build k6 module
 	mkdir -p $(CURDIR)/build
+	CGO_ENABLED=0 XK6_RACE_DETECTOR=0 PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
+		--with github.com/stroppy-io/stroppy/cmd/xk6air=./cmd/xk6air/ \
+		--replace github.com/stroppy-io/stroppy=./ \
+		--with github.com/oleiade/xk6-encoding@latest \
+		--output $(K6_OUT_FILE)
+	cp $(K6_OUT_FILE) internal/static/stroppy-k6
+
+.PHONY: build-k6-debug
+build-k6-debug: # Build k6 module
+	mkdir -p $(CURDIR)/build
 	GOPROXY=$(GOPROXY) \
 	PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
 		--with github.com/stroppy-io/stroppy/cmd/xk6air=./cmd/xk6air/ \
 		--replace github.com/stroppy-io/stroppy=./ \
 		--with github.com/oleiade/xk6-encoding@latest \
 		--output $(K6_OUT_FILE)
-	cp $(CURDIR)/build/stroppy-k6 internal/static/stroppy-k6
+	cp $(K6_OUT_FILE) internal/static/stroppy-k6
+
+STROPPY_BIN_NAME=stroppy
+STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
+.PHONY: build-debug
+build-debug: # Build binary stroppy
+	echo $(VERSION)
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+		go build -race -v -o $(STROPPY_OUT_FILE) \
+		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'" \
+		$(CURDIR)/cmd/stroppy
 
 STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 .PHONY: build
 build: # Build binary stroppy
 	echo $(VERSION)
-	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-		go build -race -v -o $(STROPPY_OUT_FILE) \
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+		go build -v -o $(STROPPY_OUT_FILE) \
 		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'" \
 		$(CURDIR)/cmd/stroppy
 
