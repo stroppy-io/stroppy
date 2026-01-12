@@ -30,7 +30,9 @@ type ScriptRunner struct {
 
 // NewScriptRunner creates a new ScriptRunner for the given script.
 func NewScriptRunner(scriptPath, sqlPath string) (*ScriptRunner, error) {
-	lg := logger.Global().Named("script_runner").WithOptions(zap.WithCaller(false))
+	lg := logger.Global().
+		Named("script_runner").
+		WithOptions(zap.WithCaller(false), zap.AddStacktrace(zap.FatalLevel))
 
 	// Validate script path
 	if _, err := os.Stat(scriptPath); err != nil {
