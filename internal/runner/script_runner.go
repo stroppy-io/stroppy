@@ -25,6 +25,7 @@ type ScriptRunner struct {
 	logger     *zap.Logger
 	scriptPath string
 	sqlPath    string // optional SQL file path
+	tempDir    string
 	config     *ExtractedConfig
 }
 
@@ -45,6 +46,14 @@ func NewScriptRunner(scriptPath, sqlPath string) (*ScriptRunner, error) {
 			return nil, fmt.Errorf("SQL file %q not found: %w", sqlPath, err)
 		}
 	}
+
+	// Create temp directory
+	tempDir, err := CreateAndInitTempDir(lg, scriptPath, sqlPath)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating temporary dir: %w", err)
+	}
+
+	scriptPath = filepath.Join(tempDir, filepath.Base(scriptPath))
 
 	// Extract config from script
 	config, err := ExtractConfigFromScript(scriptPath)
@@ -69,47 +78,16 @@ func NewScriptRunner(scriptPath, sqlPath string) (*ScriptRunner, error) {
 		scriptPath: scriptPath,
 		sqlPath:    sqlPath,
 		config:     config,
+		tempDir:    tempDir,
 	}, nil
 }
 
 // Run executes the script with k6.
 func (r *ScriptRunner) Run(ctx context.Context) error {
-	// Create temp directory
-	tempDir, err := os.MkdirTemp(os.TempDir(), "stroppy-k6-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
 
-	r.logger.Info("Working directory", zap.String("path", tempDir))
+	defer os.RemoveAll(r.tempDir)
 
-	// Copy static files to temp directory
-	if err := static.CopyAllStaticFilesToPath(tempDir, common.FileMode); err != nil {
-		return fmt.Errorf("failed to copy static files: %w", err)
-	}
-
-	// Copy user's script to temp directory
 	scriptName := filepath.Base(r.scriptPath)
-	sqlName := filepath.Base(r.sqlPath)
-
-	if r.sqlPath == "" { // copy single ts file
-		if err := copyFile(r.scriptPath, path.Join(tempDir, scriptName)); err != nil {
-			return fmt.Errorf("failed to copy script: %w", err)
-		}
-	} else { // copy ts + sql + add name in variable
-		if err := copyFileWithPrepend(
-			r.scriptPath,
-			path.Join(tempDir, scriptName),
-			fmt.Sprintf(`const __SQL_FILE = %q;`, sqlName),
-		); err != nil {
-			return fmt.Errorf("failed to copy script: %w", err)
-		}
-
-		if err := copyFile(r.sqlPath, path.Join(tempDir, sqlName)); err != nil {
-			return fmt.Errorf("failed to copy SQL file %q: %w", sqlName, err)
-		}
-	}
-
 	args := []string{"run", scriptName}
 
 	envs := r.buildEnvVars()
@@ -120,10 +98,49 @@ func (r *ScriptRunner) Run(ctx context.Context) error {
 
 	r.logger.Debug("Running k6", zap.Strings("args", args))
 
-	return r.runK6Binary(ctx, tempDir, args, envs)
+	return r.runK6Binary(ctx, args, envs)
 }
 
-// copyFile copies a file from src to dst.
+func CreateAndInitTempDir(
+	logger *zap.Logger,
+	scriptPath, sqlPath string,
+) (tempDir string, err error) {
+
+	tempDir, err = os.MkdirTemp(os.TempDir(), "stroppy-k6-")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	logger.Info("Working directory", zap.String("path", tempDir))
+
+	if err := static.CopyAllStaticFilesToPath(tempDir, common.FileMode); err != nil {
+		return "", fmt.Errorf("failed to copy static files: %w", err)
+	}
+
+	// Copy user's script to temp directory
+	scriptName := filepath.Base(scriptPath)
+	sqlName := filepath.Base(sqlPath)
+
+	if sqlPath == "" { // copy single ts file
+		if err := copyFile(scriptPath, path.Join(tempDir, scriptName)); err != nil {
+			return "", fmt.Errorf("failed to copy script: %w", err)
+		}
+	} else { // copy ts + sql + add name in variable
+		if err := copyFileWithPrepend(
+			scriptPath,
+			path.Join(tempDir, scriptName),
+			fmt.Sprintf(`const __SQL_FILE = %q;`, sqlName),
+		); err != nil {
+			return "", fmt.Errorf("failed to copy script: %w", err)
+		}
+
+		if err := copyFile(sqlPath, path.Join(tempDir, sqlName)); err != nil {
+			return "", fmt.Errorf("failed to copy SQL file %q: %w", sqlName, err)
+		}
+	}
+	return tempDir, nil
+}
+
 func copyFile(src, dst string) error {
 	data, err := os.ReadFile(src)
 	if err != nil {
@@ -201,7 +218,8 @@ func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut 
 }
 
 // runK6Binary executes the k6 binary.
-func (r *ScriptRunner) runK6Binary(ctx context.Context, workdir string, args, envs []string) error {
+func (r *ScriptRunner) runK6Binary(ctx context.Context, args, envs []string) error {
+	workdir := r.tempDir
 	binaryPath := path.Join(workdir, static.K6PluginFileName.String())
 
 	binExec := exec.CommandContext(ctx, binaryPath, args...)

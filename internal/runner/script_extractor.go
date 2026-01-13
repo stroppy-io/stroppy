@@ -11,7 +11,6 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/grafana/sobek"
 	"github.com/grafana/sobek/parser"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -73,7 +72,6 @@ func TranspileTypeScript(entryPath string) (string, error) {
 // stroppyStub provides stub implementations for stroppy module functions
 // that are used during config extraction (before k6 runtime).
 type stroppyStub struct {
-	defineConfigFunc func(sobek.FunctionCall) sobek.Value
 }
 
 func (s stroppyStub) ParseConfig(_ []byte) {}
@@ -85,19 +83,6 @@ func (s stroppyStub) InsertValues(_ []byte, _ int64) []byte { return nil }
 func (s stroppyStub) NotifyStep(_ string, _ int32) {}
 
 func (s stroppyStub) Teardown() error { return nil }
-
-// DefineConfig is called during config extraction and delegates to the callback.
-//
-//nolint:ireturn // for sobek
-func (s stroppyStub) DefineConfig(
-	call sobek.FunctionCall,
-) sobek.Value {
-	if s.defineConfigFunc != nil {
-		return s.defineConfigFunc(call)
-	}
-
-	return sobek.Undefined()
-}
 
 // ExtractConfigFromScript extracts GlobalConfig from a TypeScript script.
 // The script should call defineConfig(globalConfig) at the top level.
@@ -127,9 +112,7 @@ func ExtractConfigFromJS(jsCode string, openMock func(string) string) (*Extracte
 	vm := createVM()
 
 	// Stage 2: Prepare environment (polyfills, mocks, globals)
-	var extractedConfig *stroppy.GlobalConfig
-
-	configExtractor := newConfigExtractor(vm, &extractedConfig)
+	configExtractor := newConfigExtractor(vm)
 
 	if err := prepareVMEnvironment(vm, configExtractor, openMock); err != nil {
 		return nil, fmt.Errorf("failed to prepare VM environment: %w", err)
@@ -141,12 +124,12 @@ func ExtractConfigFromJS(jsCode string, openMock func(string) string) (*Extracte
 	}
 
 	// Stage 4: Extract and validate config
-	if extractedConfig == nil {
+	if configExtractor.extractedConfig == nil {
 		return nil, ErrNoConfigProvided
 	}
 
 	return &ExtractedConfig{
-		GlobalConfig: extractedConfig,
+		GlobalConfig: configExtractor.extractedConfig,
 	}, nil
 }
 
@@ -162,124 +145,31 @@ func createVM() *sobek.Runtime {
 // configExtractor handles extraction of GlobalConfig from JavaScript arguments.
 type configExtractor struct {
 	vm              *sobek.Runtime
-	extractedConfig **stroppy.GlobalConfig
+	extractedConfig *stroppy.GlobalConfig
 	tempVarName     string
 }
 
 // newConfigExtractor creates a new config extractor.
 func newConfigExtractor(
 	vm *sobek.Runtime,
-	extractedConfig **stroppy.GlobalConfig,
 ) *configExtractor {
 	return &configExtractor{
 		vm:              vm,
-		extractedConfig: extractedConfig,
-		tempVarName:     "__temp_config_arg__",
+		extractedConfig: &stroppy.GlobalConfig{},
 	}
 }
 
 // extract handles the defineConfig callback and extracts the config.
 //
 //nolint:ireturn // for sobek
-func (e *configExtractor) extract(
-	call sobek.FunctionCall,
-) sobek.Value {
-	if len(call.Arguments) == 0 {
-		return sobek.Undefined()
-	}
+func (e *configExtractor) extract(configBytes []byte) sobek.Value {
 
-	arg := call.Argument(0)
-	if arg == nil {
-		return sobek.Undefined()
-	}
-
-	// Store argument in temporary variable for JavaScript access
-	if err := e.vm.Set(e.tempVarName, arg); err != nil {
-		return sobek.Undefined()
-	}
-
-	defer func() { _ = e.vm.Set(e.tempVarName, nil) }()
-
-	// Try binary protobuf format first
-	if config := e.extractBinaryConfig(); config != nil {
-		*e.extractedConfig = config
-
-		return sobek.Undefined()
-	}
-
-	// Fall back to JSON format
-	if config := e.extractJSONConfig(); config != nil {
-		*e.extractedConfig = config
-
-		return sobek.Undefined()
+	e.extractedConfig = &stroppy.GlobalConfig{}
+	if err := proto.Unmarshal(configBytes, e.extractedConfig); err != nil {
+		return nil
 	}
 
 	return sobek.Undefined()
-}
-
-// extractBinaryConfig attempts to extract config from a Uint8Array (binary protobuf).
-func (e *configExtractor) extractBinaryConfig() *stroppy.GlobalConfig {
-	checkScript := fmt.Sprintf(
-		`(function(arg) {
-return arg instanceof Uint8Array ||
-(arg && arg.constructor && arg.constructor.name === 'Uint8Array');
-})(%s)`,
-		e.tempVarName,
-	)
-
-	isUint8Array, err := e.vm.RunString(checkScript)
-	if err != nil || !isUint8Array.ToBoolean() {
-		return nil
-	}
-
-	// Convert Uint8Array to Go byte slice
-	arrayVal, err := e.vm.RunString("Array.from(" + e.tempVarName + ")")
-	if err != nil {
-		return nil
-	}
-
-	array := arrayVal.Export()
-
-	arr, ok := array.([]any)
-	if !ok {
-		return nil
-	}
-
-	bytes := make([]byte, len(arr))
-	for i, v := range arr {
-		switch b := v.(type) {
-		case int64:
-			bytes[i] = byte(b)
-		case float64:
-			bytes[i] = byte(b)
-		default:
-			return nil
-		}
-	}
-
-	config := &stroppy.GlobalConfig{}
-	if err := proto.Unmarshal(bytes, config); err != nil {
-		return nil
-	}
-
-	return config
-}
-
-// extractJSONConfig attempts to extract config from a JSON object.
-func (e *configExtractor) extractJSONConfig() *stroppy.GlobalConfig {
-	jsonVal, err := e.vm.RunString("JSON.stringify(" + e.tempVarName + ")")
-	if err != nil {
-		return nil
-	}
-
-	jsonBytes := []byte(jsonVal.String())
-	config := &stroppy.GlobalConfig{}
-
-	if err := protojson.Unmarshal(jsonBytes, config); err != nil {
-		return nil
-	}
-
-	return config
 }
 
 // prepareVMEnvironment sets up all mocks, polyfills, and globals needed for script execution.
@@ -315,14 +205,13 @@ func prepareVMEnvironment(
 
 // setupConfigExtraction registers the config extraction callbacks.
 func setupConfigExtraction(vm *sobek.Runtime, extractor *configExtractor) error {
-	callback := extractor.extract
 
-	stub := stroppyStub{defineConfigFunc: callback}
+	stub := stroppyStub{}
 	if err := vm.Set("stroppy", stub); err != nil {
 		return err
 	}
 
-	if err := vm.Set("defineConfig", callback); err != nil {
+	if err := vm.Set("defineConfig", extractor.extract); err != nil {
 		return err
 	}
 
