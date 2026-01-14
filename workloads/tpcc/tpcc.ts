@@ -14,6 +14,21 @@ import {
   Status,
 } from "./stroppy.pb.js";
 
+import { Driver, RunUnitBin, driver, BinMsg, RunWorkload } from "./helpers.ts";
+
+const driver: Driver = stroppy;
+
+declare function defineConfig(config: GlobalConfig): void;
+
+if (typeof globalThis.defineConfig !== "function") {
+  globalThis.defineConfig = driver.defineConfigBin;
+}
+
+declare const __ENV: Record<string, string | undefined>;
+declare const __SQL_FILE: string;
+
+const DURATION = __ENV.DURATION || "5m";
+
 export const options: Options = {
   setupTimeout: "5m",
   scenarios: {
@@ -21,37 +36,37 @@ export const options: Options = {
       executor: "constant-vus",
       exec: "new_order",
       vus: 44,
-      duration: "5m",
+      duration: DURATION,
     },
     payments: {
       executor: "constant-vus",
       exec: "payments",
       vus: 43,
-      duration: "5m",
+      duration: DURATION,
     },
     order_status: {
       executor: "constant-vus",
       exec: "order_status",
       vus: 4,
-      duration: "5m",
+      duration: DURATION,
     },
     delivery: {
       executor: "constant-vus",
       exec: "delivery",
       vus: 4,
-      duration: "5m",
+      duration: DURATION,
     },
     stock_level: {
       executor: "constant-vus",
       exec: "stock_level",
       vus: 4,
-      duration: "5m",
+      duration: DURATION,
     },
   },
 };
 
 // TPCC Configuration Constants
-const WAREHOUSES = 1;
+const WAREHOUSES = +(__ENV.SCALE_FACTOR || __ENV.WAREHOUSES || 1);
 const DISTRICTS_PER_WAREHOUSE = 10;
 const CUSTOMERS_PER_DISTRICT = 3000;
 const ITEMS = 100000;
@@ -62,38 +77,8 @@ const TOTAL_CUSTOMERS =
   WAREHOUSES * DISTRICTS_PER_WAREHOUSE * CUSTOMERS_PER_DISTRICT;
 const TOTAL_STOCK = WAREHOUSES * ITEMS;
 
-// protobuf serialized messages
-type BinMsg<_T extends any> = Uint8Array;
-
-// Sql Driver interface
-interface Driver {
-  runUnit(unit: BinMsg<UnitDescriptor>): BinMsg<DriverTransactionStat>;
-  insertValues(
-    insert: BinMsg<InsertDescriptor>,
-    count: number,
-  ): BinMsg<DriverTransactionStat>;
-  teardown(): any; // error
-  notifyStep(name: String, status: Status): void;
-}
-const driver: Driver = stroppy;
-
-function RunUnit(unit: UnitDescriptor): void {
-  driver.runUnit(UnitDescriptor.toBinary(unit));
-}
-
-function RunUnitBin(unit: BinMsg<UnitDescriptor>): void {
-  driver.runUnit(unit);
-}
-
-function RunWorkload(wl: WorkloadDescriptor) {
-  wl.units
-    .map((wu) => wu.descriptor)
-    .filter((d) => d !== undefined)
-    .forEach((d) => RunUnit(d));
-}
-
 // Initialize driver with GlobalConfig
-stroppy.defineConfig(
+defineConfig(
   GlobalConfig.toBinary(
     GlobalConfig.create({
       driver: {
@@ -127,6 +112,7 @@ export function setup() {
   driver.notifyStep("create_schema", Status.STATUS_RUNNING);
 
   RunWorkload(
+    driver,
     WorkloadDescriptor.create({
       name: "create_schema",
       units: [
@@ -1759,7 +1745,7 @@ const newOrderDesciptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
   }),
 );
 export function new_order() {
-  RunUnitBin(newOrderDesciptorBin);
+  RunUnitBin(driver, newOrderDesciptorBin);
 }
 
 const paymentsDescriptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
@@ -1874,7 +1860,7 @@ const paymentsDescriptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
   }),
 );
 export function payments() {
-  RunUnitBin(paymentsDescriptorBin);
+  RunUnitBin(driver, paymentsDescriptorBin);
 }
 
 const orderStatusDescriptorBin: BinMsg<UnitDescriptor> =
@@ -1953,7 +1939,7 @@ const orderStatusDescriptorBin: BinMsg<UnitDescriptor> =
     }),
   );
 export function order_status() {
-  RunUnitBin(orderStatusDescriptorBin);
+  RunUnitBin(driver, orderStatusDescriptorBin);
 }
 
 const deliveryDescriptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
@@ -1995,7 +1981,7 @@ const deliveryDescriptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
   }),
 );
 export function delivery() {
-  RunUnitBin(deliveryDescriptorBin);
+  RunUnitBin(driver, deliveryDescriptorBin);
 }
 
 const stockLevelDescriptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
@@ -2049,7 +2035,7 @@ const stockLevelDescriptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
   }),
 );
 export function stock_level() {
-  RunUnitBin(stockLevelDescriptorBin);
+  RunUnitBin(driver, stockLevelDescriptorBin);
 }
 
 export function teardown() {

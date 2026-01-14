@@ -1,15 +1,28 @@
 import {
+  GlobalConfig,
   UnitDescriptor,
   WorkloadDescriptor,
   Status,
   DriverTransactionStat,
+  InsertDescriptor,
 } from "./stroppy.pb.js";
 
-// Minimal driver interface for what helpers need
+// protobuf serialized messages
+export type BinMsg<_T extends any> = Uint8Array;
+
+// Driver interface
 export interface Driver {
-  runUnit(unit: Uint8Array): Uint8Array;
+  runUnit(unit: BinMsg<UnitDescriptor>): BinMsg<DriverTransactionStat>;
+  insertValues(
+    insert: BinMsg<InsertDescriptor>,
+    count: number,
+  ): BinMsg<DriverTransactionStat>;
   notifyStep(name: string, status: Status): void;
-  teardown(): any;
+  teardown(): any; // error // TODO: proper error type
+
+  runQuery(sql: string, args: Record<string, any>): void; // TODO: return value, is it posible to make it generic?
+  defineConfig(config: GlobalConfig): void;
+  defineConfigBin(config: BinMsg<GlobalConfig>): void;
 }
 
 // Run a single unit descriptor
@@ -17,6 +30,9 @@ export function RunUnit(driver: Driver, unit: UnitDescriptor): void {
   driver.runUnit(UnitDescriptor.toBinary(unit));
 }
 
+export function RunUnitBin(driver: Driver, unit: BinMsg<UnitDescriptor>): void {
+  driver.runUnit(unit);
+}
 // Run all units in a workload
 export function RunWorkload(driver: Driver, wl: WorkloadDescriptor): void {
   wl.units
@@ -28,7 +44,7 @@ export function RunWorkload(driver: Driver, wl: WorkloadDescriptor): void {
 // Find workload by name
 export function getWorkload(
   workloads: WorkloadDescriptor[],
-  name: string
+  name: string,
 ): WorkloadDescriptor | undefined {
   return workloads.find((w) => w.name === name);
 }
@@ -37,7 +53,7 @@ export function getWorkload(
 export function runWorkloadStep(
   driver: Driver,
   workloads: WorkloadDescriptor[],
-  stepName: string
+  stepName: string,
 ): void {
   const workload = getWorkload(workloads, stepName);
   if (workload) {
@@ -47,7 +63,10 @@ export function runWorkloadStep(
   }
 }
 
-export function lookup(workloads: WorkloadDescriptor[], ...args: string[]): any {
+export function lookup(
+  workloads: WorkloadDescriptor[],
+  ...args: string[]
+): any {
   if (args.length === 0) return workloads;
   const [wlName, kind, unitName, nestedName] = args;
 
@@ -56,10 +75,14 @@ export function lookup(workloads: WorkloadDescriptor[], ...args: string[]): any 
   if (!kind) return wl;
 
   if (kind !== "query" && kind !== "transaction") {
-    throw new Error(`Invalid kind '${kind}'. Must be 'query' or 'transaction'.`);
+    throw new Error(
+      `Invalid kind '${kind}'. Must be 'query' or 'transaction'.`,
+    );
   }
 
-  const units = wl.units.filter((u: any) => u.descriptor?.type.oneofKind === kind);
+  const units = wl.units.filter(
+    (u: any) => u.descriptor?.type.oneofKind === kind,
+  );
   if (!unitName) return units;
 
   const unit = units.find((u: any) => {

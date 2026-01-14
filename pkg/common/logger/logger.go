@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -58,7 +59,8 @@ func newZapCfg(mod LogMod, logLevel zapcore.Level) zap.Config {
 func NewFromConfig(cfg *Config, opts ...zap.Option) *zap.Logger {
 	level, parseErr := zapcore.ParseLevel(cfg.LogLevel)
 	if parseErr != nil {
-		panic(parseErr)
+		levels := getAllLevelsNames()
+		panic(fmt.Errorf("available levels is '%v' error: %w", levels, parseErr))
 	}
 
 	zapCfg := newZapCfg(cfg.LogMod, level)
@@ -71,6 +73,16 @@ func NewFromConfig(cfg *Config, opts ...zap.Option) *zap.Logger {
 	setGlobalLogger(logger)
 
 	return Global()
+}
+
+func getAllLevelsNames() []string {
+	levelsFrom := int(zapcore.DebugLevel)
+	levelsTo := int(zapcore.FatalLevel)
+	levels := make([]string, 0, levelsTo-levelsFrom)
+	for i := levelsFrom; i <= levelsTo; i++ {
+		levels = append(levels, zapcore.Level(i).String())
+	}
+	return levels
 }
 
 const (
