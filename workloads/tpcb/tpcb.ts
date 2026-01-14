@@ -3,16 +3,33 @@ globalThis.TextEncoder = encoding.TextEncoder;
 globalThis.TextDecoder = encoding.TextDecoder;
 import stroppy from "k6/x/stroppy";
 
+import { Driver, RunUnitBin, BinMsg, RunWorkload } from "./helpers.ts";
+
 import { Options } from "k6/options";
 import {
   UnitDescriptor,
-  DriverTransactionStat,
-  DriverConfig,
   GlobalConfig,
   WorkloadDescriptor,
   InsertDescriptor,
   Status,
 } from "./stroppy.pb.js";
+
+const driver: Driver = stroppy;
+
+declare function defineConfig(config: GlobalConfig): void;
+
+if (typeof globalThis.defineConfig !== "function") {
+  globalThis.defineConfig = driver.defineConfigBin;
+}
+
+declare const __ENV: Record<string, string | undefined>;
+declare const __SQL_FILE: string;
+
+// TPC-B Configuration Constants
+const SCALE_FACTOR = +(__ENV.SCALE_FACTOR || 10);
+const BRANCHES = SCALE_FACTOR;
+const TELLERS = 10 * SCALE_FACTOR;
+const ACCOUNTS = 100000 * SCALE_FACTOR;
 
 export const options: Options = {
   setupTimeout: "5h",
@@ -21,49 +38,13 @@ export const options: Options = {
       executor: "constant-vus",
       exec: "tpcb_transaction",
       vus: 10,
-      duration: "1h",
+      duration: __ENV.DURATION || "1h",
     },
   },
 };
 
-// TPC-B Configuration Constants
-const SCALE_FACTOR = 10000;
-const BRANCHES = SCALE_FACTOR;
-const TELLERS = 10 * SCALE_FACTOR;
-const ACCOUNTS = 100000 * SCALE_FACTOR;
-
-// protobuf serialized messages
-type BinMsg<_T extends any> = Uint8Array;
-
-// Sql Driver interface
-interface Driver {
-  runUnit(unit: BinMsg<UnitDescriptor>): BinMsg<DriverTransactionStat>;
-  insertValues(
-    insert: BinMsg<InsertDescriptor>,
-    count: number,
-  ): BinMsg<DriverTransactionStat>;
-  teardown(): any; // error
-  notifyStep(name: String, status: Status): void;
-}
-const driver: Driver = stroppy;
-
-function RunUnit(unit: UnitDescriptor): void {
-  driver.runUnit(UnitDescriptor.toBinary(unit));
-}
-
-function RunUnitBin(unit: BinMsg<UnitDescriptor>): void {
-  driver.runUnit(unit);
-}
-
-function RunWorkload(wl: WorkloadDescriptor) {
-  wl.units
-    .map((wu) => wu.descriptor)
-    .filter((d) => d !== undefined)
-    .forEach((d) => RunUnit(d));
-}
-
 // Initialize driver with GlobalConfig
-stroppy.defineConfig(
+defineConfig(
   GlobalConfig.toBinary(
     GlobalConfig.create({
       driver: {
@@ -346,7 +327,7 @@ $$;
   });
 
   // Run schema creation
-  RunWorkload(workload);
+  RunWorkload(driver, workload);
   driver.notifyStep("create_schema", Status.STATUS_COMPLETED);
 
   driver.notifyStep("load_data", Status.STATUS_RUNNING);
@@ -553,7 +534,7 @@ $$;
       },
     ],
   });
-  RunWorkload(analyzeWorkload);
+  RunWorkload(driver, analyzeWorkload);
 
   driver.notifyStep("workload", Status.STATUS_RUNNING);
   return;
@@ -611,7 +592,7 @@ const tpcbTransactionDescriptorBin: BinMsg<UnitDescriptor> =
   });
 
 export function tpcb_transaction() {
-  RunUnitBin(tpcbTransactionDescriptorBin);
+  RunUnitBin(driver, tpcbTransactionDescriptorBin);
 }
 
 export function teardown() {
