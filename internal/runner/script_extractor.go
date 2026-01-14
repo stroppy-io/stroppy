@@ -71,8 +71,7 @@ func TranspileTypeScript(entryPath string) (string, error) {
 
 // stroppyStub provides stub implementations for stroppy module functions
 // that are used during config extraction (before k6 runtime).
-type stroppyStub struct {
-}
+type stroppyStub struct{}
 
 func (s stroppyStub) ParseConfig(_ []byte) {}
 
@@ -146,7 +145,6 @@ func createVM() *sobek.Runtime {
 type configExtractor struct {
 	vm              *sobek.Runtime
 	extractedConfig *stroppy.GlobalConfig
-	tempVarName     string
 }
 
 // newConfigExtractor creates a new config extractor.
@@ -163,7 +161,6 @@ func newConfigExtractor(
 //
 //nolint:ireturn // for sobek
 func (e *configExtractor) extract(configBytes []byte) sobek.Value {
-
 	e.extractedConfig = &stroppy.GlobalConfig{}
 	if err := proto.Unmarshal(configBytes, e.extractedConfig); err != nil {
 		return nil
@@ -205,7 +202,6 @@ func prepareVMEnvironment(
 
 // setupConfigExtraction registers the config extraction callbacks.
 func setupConfigExtraction(vm *sobek.Runtime, extractor *configExtractor) error {
-
 	stub := stroppyStub{}
 	if err := vm.Set("stroppy", stub); err != nil {
 		return err

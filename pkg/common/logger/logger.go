@@ -78,10 +78,12 @@ func NewFromConfig(cfg *Config, opts ...zap.Option) *zap.Logger {
 func getAllLevelsNames() []string {
 	levelsFrom := int(zapcore.DebugLevel)
 	levelsTo := int(zapcore.FatalLevel)
+
 	levels := make([]string, 0, levelsTo-levelsFrom)
 	for i := levelsFrom; i <= levelsTo; i++ {
-		levels = append(levels, zapcore.Level(i).String())
+		levels = append(levels, zapcore.Level(i).String()) //nolint: gosec // it's safe
 	}
+
 	return levels
 }
 

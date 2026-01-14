@@ -84,7 +84,6 @@ func NewScriptRunner(scriptPath, sqlPath string) (*ScriptRunner, error) {
 
 // Run executes the script with k6.
 func (r *ScriptRunner) Run(ctx context.Context) error {
-
 	defer os.RemoveAll(r.tempDir)
 
 	scriptName := filepath.Base(r.scriptPath)
@@ -101,17 +100,17 @@ func (r *ScriptRunner) Run(ctx context.Context) error {
 	return r.runK6Binary(ctx, args, envs)
 }
 
+//nolint:nonamedreturns // multiple values retuned
 func CreateAndInitTempDir(
-	logger *zap.Logger,
+	lg *zap.Logger,
 	scriptPath, sqlPath string,
 ) (tempDir string, err error) {
-
 	tempDir, err = os.MkdirTemp(os.TempDir(), "stroppy-k6-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	logger.Info("Working directory", zap.String("path", tempDir))
+	lg.Info("Working directory", zap.String("path", tempDir))
 
 	if err := static.CopyAllStaticFilesToPath(tempDir, common.FileMode); err != nil {
 		return "", fmt.Errorf("failed to copy static files: %w", err)
@@ -138,6 +137,7 @@ func CreateAndInitTempDir(
 			return "", fmt.Errorf("failed to copy SQL file %q: %w", sqlName, err)
 		}
 	}
+
 	return tempDir, nil
 }
 
