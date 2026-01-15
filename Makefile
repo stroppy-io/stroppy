@@ -147,8 +147,8 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 .PHONY: .install-proto-deps
 .install-proto-deps: .install-protoc .install-easyp .install-go-proto-deps .install-node-proto-deps
 
-.PHONY: .bin-deps
-.bin-deps: .install-linter .install-xk6 .install-proto-deps # Install binary dependencies in ./bin
+.PHONY: install-bin-deps
+install-bin-deps: .install-linter .install-xk6 .install-proto-deps # Install binary dependencies in ./bin
 	$(info Installing binary dependencies...)
 
 .PHONY: .app-deps
