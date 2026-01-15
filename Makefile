@@ -114,16 +114,17 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 # Copy the entire directory structure to preserve relative imports
 	cp -r $(TS_TARGET_DIR) $(TMP_BUNDLE_DIR)/ts_source
 # Copy analyze_ddl source before building
-	cp $(CURDIR)/internal/static/analyze_ddl.ts $(TMP_BUNDLE_DIR)/analyze_ddl_entry.ts
+	cp $(CURDIR)/internal/static/analyze_ddl.ts $(TMP_BUNDLE_DIR)/analyze_ddl.ts
+	cp $(CURDIR)/internal/static/parse_sql_2.ts $(TMP_BUNDLE_DIR)/parse_sql_2.ts
 	cp $(TS_BUNDLE_DIR)/build.js $(TMP_BUNDLE_DIR)/
 	cp $(TS_BUNDLE_DIR)/package.json $(TMP_BUNDLE_DIR)/
 	cd $(TMP_BUNDLE_DIR) && npm install
 	cd $(TMP_BUNDLE_DIR) && node build.js
 	cp $(TMP_BUNDLE_DIR)/stroppy.pb.ts $(TS_TARGET_DIR)/stroppy.pb.ts
 	cp $(TMP_BUNDLE_DIR)/dist/bundle.js $(TS_TARGET_DIR)/stroppy.pb.js
-# Bundle analyze_ddl.ts with node-sql-parser (handled by build.js)
-	cp $(TMP_BUNDLE_DIR)/dist/analyze_ddl.js $(TS_TARGET_DIR)/analyze_ddl.js
+# Bundle analyze_ddl.ts and parse_sql_2 with node-sql-parser (handled by build.js)
 # TODO: make single bundle aka stroppy.js or automatically copy all from dist
+	cp $(TMP_BUNDLE_DIR)/dist/analyze_ddl.js $(TS_TARGET_DIR)/analyze_ddl.js
 	cp $(TMP_BUNDLE_DIR)/dist/parse_sql_2.js $(TS_TARGET_DIR)/parse_sql_2.js
 	rm -rf $(TMP_BUNDLE_DIR)
 
@@ -231,7 +232,7 @@ build: # Build binary stroppy
 		$(CURDIR)/cmd/stroppy
 
 .PHONY: build-all-linux-x64
-build-all-linux-x64: .bin-deps proto build-k6 build
+build-all-linux-x64: build-k6 build
 
 branch=main
 .PHONY: revision
