@@ -20,25 +20,9 @@ Download the latest release from [GitHub Releases](https://github.com/stroppy-io
 
 Build requirements:
 - Go 1.24.3+
-- Node.js and npm
-- git, curl, unzip
 
 ```
-# Install binary dependencies
-
-make .bin-deps
-
-# Build protocol buffers
-
-make proto
-
-# Build k6 with stroppy extensions
-
-make build-k6
-
-# Build stroppy binary
-
-make build
+make build-all-linux-x64
 ```
 
 The binary will be available at `./build/stroppy`.
@@ -97,6 +81,34 @@ After generating a workspace:
 4. Run with `./stroppy run <test-file>.ts`
 
 Look at  `simple.ts` and `tpcds.ts` first as a reference.
+
+## Contribution
+
+
+### Full Build With Generated Files
+
+Build requirements:
+- Go 1.24.3+
+- Node.js and npm
+- git, curl, unzip
+
+```
+# Install binary dependencies
+
+make install-bin-deps
+
+# Build protocol buffers and ts framework bundle
+
+make proto
+
+# Build k6 with stroppy extensions
+
+make build-k6
+
+# Build stroppy binary
+
+make build
+```
 
 ## License
 

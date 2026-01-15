@@ -88,9 +88,7 @@ async function buildAnalyzeDDL() {
     console.log("Building analyze_ddl...");
 
     await esbuild.build({
-        entryPoints: [
-            path.join(__dirname, "../../../internal/static/analyze_ddl.ts"),
-        ],
+        entryPoints: [path.join(__dirname, "analyze_ddl.ts")],
         bundle: true,
         format: "esm",
         platform: "node",
@@ -109,9 +107,7 @@ async function buildParseSQL2() {
     console.log("Building parse_sql_2...");
 
     await esbuild.build({
-        entryPoints: [
-            path.join(__dirname, "../../../internal/static/parse_sql_2.ts"),
-        ],
+        entryPoints: [path.join(__dirname, "parse_sql_2.ts")],
         bundle: true,
         format: "esm",
         platform: "node",
