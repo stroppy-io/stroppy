@@ -21,6 +21,7 @@ func (d *Driver) RunQuery(ctx context.Context, sql string, args map[string]any) 
 			d.logger.Warn(err.Error(), zap.String("sql", sql))
 		} else {
 			d.logger.Error("arguments processing error", zap.String("sql", sql), zap.Error(err))
+
 			return
 		}
 	}
