@@ -16,8 +16,6 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-var _ = ptr[int64]
-
 type testDriver struct {
 	*Driver
 }

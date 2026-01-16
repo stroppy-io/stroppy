@@ -2,14 +2,11 @@ package postgres
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/durationpb"
 
@@ -18,55 +15,6 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
-
-// ErrDBConnectionTimeout is returned when database connection times out.
-var ErrDBConnectionTimeout = errors.New("database connection timeout")
-
-const (
-	retryIntervalIncrement = 5 * time.Second
-	dbConnectionTimeout    = 5 * time.Minute
-)
-
-func waitForDB(
-	ctx context.Context,
-	lg *zap.Logger,
-	connPool *pgxpool.Pool,
-	timeout time.Duration,
-) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	interval := 1 * time.Second
-	startTime := time.Now()
-
-	for {
-		// Check if timeout exceeded
-		if time.Since(startTime) >= timeout {
-			return fmt.Errorf("%w after %v", ErrDBConnectionTimeout, timeout)
-		}
-
-		// Try to ping
-		pingErr := connPool.Ping(ctx)
-		if pingErr == nil {
-			lg.Debug("Successfully connected to database")
-
-			return nil
-		}
-
-		lg.Sugar().Warnf("Database not ready, retrying in %v... (error: %v)", interval, pingErr)
-
-		// Sleep for current interval
-		select {
-		case <-time.After(interval):
-			// Continue to next retry
-		case <-ctx.Done():
-			return fmt.Errorf("context canceled: %w", ctx.Err())
-		}
-
-		// Increase interval for next attempt
-		interval += retryIntervalIncrement
-	}
-}
 
 // TODO: performance issue by passing via interface?
 
@@ -143,12 +91,6 @@ func NewDriver(
 	d.txExecutor = NewTxExecutor(connPool)
 
 	return d, nil
-}
-
-// RunQuery exucetse sql with args in form :arg
-// TODO: prosecc args
-func (d *Driver) RunQuery(ctx context.Context, sql string, _ map[string]any) {
-	_, _ = d.pgxPool.Exec(ctx, sql)
 }
 
 func (d *Driver) RunTransaction(
