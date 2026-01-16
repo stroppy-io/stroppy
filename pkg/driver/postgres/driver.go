@@ -2,17 +2,11 @@ package postgres
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
 	"time"
 
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/durationpb"
 
@@ -21,55 +15,6 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
-
-// ErrDBConnectionTimeout is returned when database connection times out.
-var ErrDBConnectionTimeout = errors.New("database connection timeout")
-
-const (
-	retryIntervalIncrement = 5 * time.Second
-	dbConnectionTimeout    = 5 * time.Minute
-)
-
-func waitForDB(
-	ctx context.Context,
-	lg *zap.Logger,
-	connPool *pgxpool.Pool,
-	timeout time.Duration,
-) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	interval := 1 * time.Second
-	startTime := time.Now()
-
-	for {
-		// Check if timeout exceeded
-		if time.Since(startTime) >= timeout {
-			return fmt.Errorf("%w after %v", ErrDBConnectionTimeout, timeout)
-		}
-
-		// Try to ping
-		pingErr := connPool.Ping(ctx)
-		if pingErr == nil {
-			lg.Debug("Successfully connected to database")
-
-			return nil
-		}
-
-		lg.Sugar().Warnf("Database not ready, retrying in %v... (error: %v)", interval, pingErr)
-
-		// Sleep for current interval
-		select {
-		case <-time.After(interval):
-			// Continue to next retry
-		case <-ctx.Done():
-			return fmt.Errorf("context canceled: %w", ctx.Err())
-		}
-
-		// Increase interval for next attempt
-		interval += retryIntervalIncrement
-	}
-}
 
 // TODO: performance issue by passing via interface?
 
@@ -146,107 +91,6 @@ func NewDriver(
 	d.txExecutor = NewTxExecutor(connPool)
 
 	return d, nil
-}
-
-// RunQuery exucetse sql with args in form :arg
-// TODO: prosecc args
-func (d *Driver) RunQuery(ctx context.Context, sql string, args map[string]any) {
-	sql, argsArr, _ := processArgs(sql, args)
-	_, _ = d.pgxPool.Exec(ctx, sql, argsArr...)
-}
-
-var (
-	ErrMissedArgument = errors.New("missed arguments present")
-	ErrExtraArgument  = errors.New("extra arguments provided")
-	argsRe            = regexp.MustCompile(`(\s|^)(:[a-zA-Z0-9_]+)(\s|$)`)
-)
-
-// processArgs takse sql which contains ":arg" marks
-// and args map "arg" -> value.
-// It returns sql where all the maks replaced with postgresql placeholders like "$1",
-// and array of any, which contains the arguments in the right order.
-// If sql contains marks that is'n present in args map - there is an error
-// errors.Is(err, ErrMissedArgument) and text contains info about all missed arguments.
-//
-//nolint:nonamedreturns // many returns
-func processArgs(sql string, args map[string]any) (newSQL string, argsArr []any, err error) {
-	var (
-		resultArgs []any
-		missedArgs []string
-	)
-	// Use a map to avoid duplicate entries in the error message
-	seenSuccesToArgNumber := make(map[string]int)
-	seenMissed := make(map[string]bool)
-
-	var sb strings.Builder
-
-	lastIndex := 0
-	paramCounter := 1
-
-	// FindAllStringSubmatchIndex returns a slice of index pairs identifying matches and submatches.
-	// match[0], match[1] -> indices of the full match (including spaces)
-	// match[2], match[3] -> indices of the first submatch (the :arg part)
-	matches := argsRe.FindAllStringSubmatchIndex(sql, -1)
-
-	for _, match := range matches {
-		fullStart, fullEnd := match[0], match[1]
-		argStart, argEnd := match[4], match[5]
-
-		// 1. Append the text of the query that appears before this match
-		sb.WriteString(sql[lastIndex:fullStart])
-
-		// 2. Append the specific whitespace character(s) that appeared before the argument
-		// (e.g., a newline or a specific indentation tab)
-		sb.WriteString(sql[fullStart:argStart])
-
-		// 3. Extract the argument name (remove the leading ':')
-		rawArg := sql[argStart:argEnd] // e.g. ":userId"
-		argName := rawArg[1:]          // e.g. "userId"
-
-		// 4. Look up the argument
-		if val, ok := args[argName]; ok {
-			// Append the Postgres placeholder
-			// Add counter if it's a first occurrence
-			if oldIndex := seenSuccesToArgNumber[argName]; oldIndex == 0 {
-				sb.WriteString("$" + strconv.Itoa(paramCounter))
-				seenSuccesToArgNumber[argName] = paramCounter
-
-				resultArgs = append(resultArgs, val)
-				paramCounter++
-			} else { // reuse old index if argument seen alredy
-				sb.WriteString("$" + strconv.Itoa(oldIndex))
-			}
-		} else {
-			// Track missing arguments
-			if !seenMissed[argName] {
-				missedArgs = append(missedArgs, argName)
-				seenMissed[argName] = true
-			}
-			// In case of error, we technically fail, but for the string construction
-			// we can leave the original placeholder or write an invalid marker.
-			// Here we write the original back to keep the string structure.
-			sb.WriteString(rawArg)
-		}
-
-		// 5. Append the specific whitespace character(s) that appeared after the argument
-		sb.WriteString(sql[argEnd:fullEnd])
-
-		lastIndex = fullEnd
-	}
-
-	// Append any remaining part of the query
-	sb.WriteString(sql[lastIndex:])
-
-	// If there were missing arguments, return the error
-	if len(missedArgs) > 0 {
-		return "", nil, fmt.Errorf("%w: %s", ErrMissedArgument, strings.Join(missedArgs, ", "))
-	}
-
-	if len(resultArgs) < len(args) {
-		return sb.String(), resultArgs, ErrExtraArgument // TODO: describe extras in error message
-	}
-
-	return sb.String(), resultArgs, nil
 }
 
 func (d *Driver) RunTransaction(

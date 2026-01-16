@@ -86,6 +86,8 @@ export function setup() {
 export function workload() {
   driver.runQuery("select 1;", {});
   driver.runQuery("select 13;", {});
+  driver.runQuery("select :a::int + :b::int", { a: 34, b: 35 });
+  driver.runQuery("select 'Hello, ' || :a || '!'", { a: "world" });
 }
 
 export function teardown() {
