@@ -53,20 +53,17 @@ func (w *cloudClientWrapper) NotifyRun(
 	ctx context.Context,
 	run *stroppy.StroppyRun,
 ) (*emptypb.Empty, error) {
-	w.lg.Info("notifying run status",
+	lg := w.lg.With(
 		zap.String("run_id", run.Id.Value),
 		zap.String("status", run.Status.String()),
 	)
 
 	resp, err := w.client.NotifyRun(ctx, run)
 	if err != nil {
-		w.lg.Error("failed to notify run",
-			zap.String("run_id", run.Id.Value),
-			zap.String("status", run.Status.String()),
-			zap.Error(err),
-		)
+		lg.Error("failed to notify cloud on run", zap.Error(err))
 		return nil, err
 	}
+	lg.Info("run status sent to cloud")
 	return resp, nil
 }
 
@@ -74,20 +71,18 @@ func (w *cloudClientWrapper) NotifyStep(
 	ctx context.Context,
 	step *stroppy.StroppyStepRun,
 ) (*emptypb.Empty, error) {
-	w.lg.Info("notifying step status",
-		zap.String("step_id", step.Id.Value),
-		zap.String("status", step.Status.String()),
+	lg := w.lg.With(
+		zap.String("name", step.GetContext().GetStep().GetName()),
+		zap.String("run_id", step.GetStroppyRunId().GetValue()),
+		zap.String("step_id", step.GetId().GetValue()),
+		zap.String("status", step.GetStatus().String()),
 	)
-
 	resp, err := w.client.NotifyStep(ctx, step)
 	if err != nil {
-		w.lg.Error("failed to notify step",
-			zap.String("step_id", step.Id.Value),
-			zap.String("status", step.Status.String()),
-			zap.Error(err),
-		)
+		lg.Error("failed to notify cloud on step", zap.Error(err))
 		return nil, err
 	}
+	lg.Info("step status sent to cloud")
 	return resp, nil
 }
 
