@@ -17,6 +17,7 @@ import (
 type Instance struct {
 	vu modules.VU
 	lg *zap.Logger
+	dw *DriverWrapper
 }
 
 func NewInstance(vu modules.VU) modules.Instance {
@@ -75,15 +76,18 @@ func (i *Instance) NewDriverByConfig(configBin []byte) *DriverWrapper {
 		})
 	})
 
-	return &DriverWrapper{
+	i.dw = &DriverWrapper{
 		vu:  i.vu,
 		lg:  i.lg,
 		drv: drv,
 	}
+	return i.dw
 }
 
 // Teardown mirrors k6 "function teardown()".
 func (i *Instance) Teardown() error {
+	i.dw.drv.Teardown(i.vu.Context())
+
 	rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
 		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
 		Status: stroppy.Status_STATUS_COMPLETED,

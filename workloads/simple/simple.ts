@@ -1,10 +1,14 @@
 import encoding from "k6/x/encoding";
 globalThis.TextEncoder = encoding.TextEncoder;
 globalThis.TextDecoder = encoding.TextDecoder;
-import stroppy from "k6/x/stroppy";
+import { NewDriverByConfig, NotifyStep, Teardown } from "k6/x/stroppy";
 
 import { Options } from "k6/options";
 import { GlobalConfig, Status } from "./stroppy.pb.js";
+
+declare function NewDriverByConfig(configBin: Uint8Array): Driver;
+declare function NotifyStep(name: String, status: Number): void;
+declare function Teardown(): any; // error
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -22,25 +26,12 @@ export const options: Options = {
 // is an interface of stroppy go module
 interface Driver {
   runQuery(sql: string, args: Record<string, any>): void; // TODO: return value, is it posible to make it generic?
-  teardown(): any; // error // TODO: proper error type
-  notifyStep(name: String, status: Status): void;
-  defineConfig(config: GlobalConfig): void;
-  defineConfigBin(config: Uint8Array): void;
-}
-
-const driver: Driver = stroppy;
-
-declare function defineConfig(config: GlobalConfig): void;
-
-if (typeof globalThis.defineConfig !== "function") {
-  globalThis.defineConfig = driver.defineConfigBin;
 }
 
 declare const __ENV: Record<string, string | undefined>;
 declare const __SQL_FILE: string;
 
-// Initialize driver with GlobalConfig
-defineConfig(
+const driver = NewDriverByConfig(
   GlobalConfig.toBinary(
     GlobalConfig.create({
       runId: "",
@@ -75,11 +66,11 @@ defineConfig(
 );
 
 export function setup() {
-  driver.notifyStep("create_schema", Status.STATUS_RUNNING);
-  driver.notifyStep("create_schema", Status.STATUS_COMPLETED);
-  driver.notifyStep("load_data", Status.STATUS_RUNNING);
-  driver.notifyStep("load_data", Status.STATUS_COMPLETED);
-  driver.notifyStep("workload", Status.STATUS_RUNNING);
+  NotifyStep("create_schema", Status.STATUS_RUNNING);
+  NotifyStep("create_schema", Status.STATUS_COMPLETED);
+  NotifyStep("load_data", Status.STATUS_RUNNING);
+  NotifyStep("load_data", Status.STATUS_COMPLETED);
+  NotifyStep("workload", Status.STATUS_RUNNING);
   return;
 }
 
@@ -91,6 +82,6 @@ export function workload() {
 }
 
 export function teardown() {
-  driver.notifyStep("workload", Status.STATUS_COMPLETED);
-  driver.teardown();
+  NotifyStep("workload", Status.STATUS_COMPLETED);
+  Teardown();
 }
