@@ -17,13 +17,16 @@ export interface Driver {
     insert: BinMsg<InsertDescriptor>,
     count: number,
   ): BinMsg<DriverTransactionStat>;
-  notifyStep(name: string, status: Status): void;
-  teardown(): any; // error // TODO: proper error type
 
   runQuery(sql: string, args: Record<string, any>): void; // TODO: return value, is it posible to make it generic?
-  defineConfig(config: GlobalConfig): void;
-  defineConfigBin(config: BinMsg<GlobalConfig>): void;
 }
+
+export declare function NewDriverByConfig(configBin: Uint8Array): Driver;
+export declare function NotifyStep(name: String, status: Number): void;
+export declare function Teardown(): Error;
+
+export declare const __ENV: Record<string, string | undefined>;
+export declare const __SQL_FILE: string;
 
 // Run a single unit descriptor
 export function RunUnit(driver: Driver, unit: UnitDescriptor): void {
@@ -57,9 +60,9 @@ export function runWorkloadStep(
 ): void {
   const workload = getWorkload(workloads, stepName);
   if (workload) {
-    driver.notifyStep(stepName, Status.STATUS_RUNNING);
+    // driver.notifyStep(stepName, Status.STATUS_RUNNING); // TODO: how to fix notify as dependency...
     RunWorkload(driver, workload);
-    driver.notifyStep(stepName, Status.STATUS_COMPLETED);
+    // driver.notifyStep(stepName, Status.STATUS_COMPLETED);
   }
 }
 

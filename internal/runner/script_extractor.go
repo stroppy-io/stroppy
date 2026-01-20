@@ -195,6 +195,10 @@ func prepareVMEnvironment(
 		return fmt.Errorf("failed to set __SQL_FILE: %w", err)
 	}
 
+	if err := vm.Set("NewGeneratorByRuleBin", func() {}); err != nil {
+		return fmt.Errorf("failed to set NewGeneratorByRuleBin: %w", err)
+	}
+
 	return nil
 }
 

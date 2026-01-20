@@ -294,7 +294,7 @@ func NewValueGeneratorByRule(
 	case *stroppy.Generation_Rule_DecimalConst:
 		generator = newConstValueGenerator(decimalPtrToDecimal(rule.GetDecimalConst()), decimalToValue)
 	default:
-		return nil, fmt.Errorf("unknown rule type: %T", rule) //nolint: err113
+		return nil, fmt.Errorf("unknown rule type: %T, %v", rule, rule) //nolint: err113
 	}
 
 	if rule.GetNullPercentage() > 0 {
