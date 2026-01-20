@@ -32,7 +32,7 @@ func (d *Driver) RunQuery(ctx context.Context, sql string, args map[string]any) 
 var (
 	ErrMissedArgument = errors.New("missed arguments present")
 	ErrExtraArgument  = errors.New("extra arguments provided")
-	argsRe            = regexp.MustCompile(`(\s|^)(:[a-zA-Z0-9_]+)(\s|$|;|::)`)
+	argsRe            = regexp.MustCompile(`(\s|^|\()(:[a-zA-Z0-9_]+)(\s|$|;|::|,|\))`)
 )
 
 // processArgs takse sql which contains ":arg" marks

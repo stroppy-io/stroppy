@@ -259,6 +259,12 @@ run-execute-sql-test:
 	cd dev && ./stroppy run execute_sql.ts tpcb_mini.sql
 
 
+.PHONY: run-tpcb-test
+run-tpcb-test:
+	rm -rf dev
+	./build/stroppy gen --workdir dev --preset=tpcb
+	cd dev && ./stroppy run tpcb.ts
+
 ##
 ## TypeScript Development
 ##

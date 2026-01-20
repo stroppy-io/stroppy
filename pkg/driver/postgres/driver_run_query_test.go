@@ -125,6 +125,14 @@ func TestProcessArgs(t *testing.T) {
 			wantArgs: nil,
 			wantErr:  fmt.Errorf("%w: [user_id, user_name]", ErrExtraArgument),
 		},
+		{
+			name:     "comma test",
+			sql:      `INSERT INTO pgbench_branches (bid, bbalance, filler) VALUES (:branch, 0, :filler)`,
+			args:     map[string]any{"branch": 123, "filler": "John"},
+			wantSQL:  `INSERT INTO pgbench_branches (bid, bbalance, filler) VALUES ($1, 0, $2)`,
+			wantArgs: []any{123, "John"},
+			wantErr:  nil,
+		},
 	}
 
 	t.Parallel()
