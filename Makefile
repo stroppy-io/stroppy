@@ -6,14 +6,41 @@ GOPROXY:=https://goproxy.io,direct
 BUILD_TARGET_DIR=$(CURDIR)/build
 PROTO_BUILD_TARGET_DIR=$(CURDIR)/proto/build
 
-OS := linux
+UNAME_S := $(shell uname -s)
 UNAME_M := $(shell uname -m)
+
+ifeq ($(UNAME_S),Darwin)
+  OS := osx
+else ifeq ($(UNAME_S),Linux)
+  OS := linux
+else
+  $(error Unsupported OS: $(UNAME_S))
+endif
+
 ifeq ($(UNAME_M),x86_64)
   ARCH := x86_64
-else ifeq ($(UNAME_M),aarch64)
+else ifeq ($(UNAME_M),arm64)
   ARCH := aarch_64
 else
   $(error Unsupported architecture: $(UNAME_M))
+endif
+
+
+ifeq ($(OS),osx)
+  GOOS := darwin
+else ifeq ($(OS),linux)
+  GOOS := linux
+else
+  $(error Unsupported OS for Go: $(OS))
+endif
+
+
+ifeq ($(ARCH),aarch_64)
+  GOARCH := arm64
+else ifeq ($(ARCH),x86_64)
+  GOARCH := amd64
+else
+  $(error Unsupported architecture for Go: $(ARCH))
 endif
 
 default: help
@@ -33,24 +60,31 @@ REQUIRED_BINS = git node npm go curl unzip \
 	protoc-gen-go-grpc=$(LOCAL_BIN)/protoc-gen-go-grpc \
 	protoc-gen-validate=$(LOCAL_BIN)/protoc-gen-validate \
 	protoc-gen-jsonschema=$(LOCAL_BIN)/protoc-gen-jsonschema \
-	protoc-gen-doc=$(LOCAL_BIN)/protoc-gen-doc
+	protoc-gen-doc=$(LOCAL_BIN)/protoc-gen-doc \
 	xk6=$(LOCAL_BIN)/xk6
 .PHONY: .check-bins
 .check-bins: # Check for required binaries if build locally
 	@echo "Checking for required binaries..."
 	@missing=0; \
 	for bin_spec in $(REQUIRED_BINS); do \
-		bin=$${bin_spec%%=*}; \
-		custom_path=$${bin_spec#*=}; \
-		if [ "$$bin" != "$$custom_path" ]; then \
-			# Check custom path first \
-			if [ -x "$$custom_path" ]; then \
-				echo "✓ $$bin is installed at $$custom_path"; \
-				continue; \
-			fi; \
-		fi; \
-		# Fall back to PATH check \
-		if which $$bin > /dev/null; then \
+		case "$$bin_spec" in \
+			*=*) \
+				bin=$${bin_spec%%=*}; \
+				custom_path=$${bin_spec#*=}; \
+				if [ -x "$$custom_path" ]; then \
+					echo "✓ $$bin is installed at $$custom_path"; \
+					continue; \
+				else \
+					echo "✗ $$bin expected at $$custom_path but not found"; \
+					missing=1; \
+					continue; \
+				fi \
+				;; \
+			*) \
+				bin=$$bin_spec; \
+				;; \
+		esac; \
+		if command -v "$$bin" >/dev/null 2>&1; then \
 			echo "✓ $$bin is installed in PATH"; \
 		else \
 			echo "✗ $$bin is NOT found"; \
@@ -74,7 +108,7 @@ PROTOC_TMP := /tmp/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH)
 	@echo ">>> Installing protoc v$(PROTOC_VERSION) to $(PROTOC_BIN)"
 	@mkdir -p $(LOCAL_BIN)
 	@rm -rf $(PROTOC_TMP) && rm -rf $(PROTOC_ZIP) && rm -rf $(LOCAL_BIN)/include && rm -rf $(LOCAL_BIN)/protoc
-	@echo ">>> Downloading $(PROTOC_URL)"м
+	@echo ">>> Downloading $(PROTOC_URL)"
 	@curl -SL -o $(PROTOC_ZIP) $(PROTOC_URL)
 	@unzip -o -q $(PROTOC_ZIP) -d $(PROTOC_TMP)
 	@mkdir -p $(LOCAL_BIN)/include
@@ -153,7 +187,7 @@ install-bin-deps: .install-linter .install-xk6 .install-proto-deps # Install bin
 
 .PHONY: .app-deps
 .app-deps: # Install application dependencies in ./bin
-	GOPROXY=$(GOPROXY) 											go mod tidy
+	GOPROXY=$(GOPROXY)						go mod tidy
 	GOPROXY=$(GOPROXY) cd cmd/xk6air/    && go mod tidy
 	GOPROXY=$(GOPROXY) cd cmd/config2go/ && go mod tidy
 
@@ -216,7 +250,7 @@ STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 .PHONY: build-debug
 build-debug: # Build binary stroppy
 	echo $(VERSION)
-	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+	CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) \
 		go build -race -v -o $(STROPPY_OUT_FILE) \
 		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'" \
 		$(CURDIR)/cmd/stroppy
@@ -226,7 +260,7 @@ STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 .PHONY: build
 build: # Build binary stroppy
 	echo $(VERSION)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) \
 		go build -v -o $(STROPPY_OUT_FILE) \
 		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'" \
 		$(CURDIR)/cmd/stroppy
