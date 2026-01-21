@@ -6,10 +6,16 @@ import {
   NotifyStep,
   Teardown,
   NewGeneratorByRuleBin,
+  NewGroupGeneratorByRulesBin,
 } from "k6/x/stroppy";
 
 import { Options } from "k6/options";
-import { GlobalConfig, Status, Generation_Rule } from "./stroppy.pb.js";
+import {
+  GlobalConfig,
+  Status,
+  Generation_Rule,
+  QueryParamGroup,
+} from "./stroppy.pb.js";
 
 // Sql Driver interface
 // is an interface of stroppy go module
@@ -27,11 +33,22 @@ declare function NewGeneratorByRuleBin(
   rule: Uint8Array,
 ): Generator;
 
+declare function NewGroupGeneratorByRulesBin(
+  seed: Number,
+  rule: Uint8Array,
+): Generator;
+
 declare const __ENV: Record<string, string | undefined>;
 declare const __SQL_FILE: string;
 
 function NewGeneratorByRule(seed: Number, rule: Generation_Rule): Generator {
   return NewGeneratorByRuleBin(seed, Generation_Rule.toBinary(rule));
+}
+function NewGroupGeneratorByRules(
+  seed: Number,
+  rules: QueryParamGroup,
+): Generator {
+  return NewGroupGeneratorByRulesBin(seed, QueryParamGroup.toBinary(rules));
 }
 
 export const options: Options = {
@@ -94,7 +111,33 @@ const gen = NewGeneratorByRule(
     kind: { oneofKind: "int32Range", int32Range: { min: 0, max: 100 } },
   }),
 );
-console.log("gen is", gen);
+
+const groupGen = NewGroupGeneratorByRules(
+  0,
+  QueryParamGroup.create({
+    name: "Some",
+    params: [
+      {
+        generationRule: Generation_Rule.create({
+          kind: { oneofKind: "int32Range", int32Range: { min: 1, max: 2 } },
+          unique: true,
+        }),
+      },
+      {
+        generationRule: Generation_Rule.create({
+          kind: { oneofKind: "int32Range", int32Range: { min: 1, max: 3 } },
+          unique: true,
+        }),
+      },
+      {
+        generationRule: Generation_Rule.create({
+          kind: { oneofKind: "boolRange", boolRange: { ratio: 1 } },
+          unique: true,
+        }),
+      },
+    ],
+  }),
+);
 
 export function workload() {
   const value = gen.next();
@@ -107,6 +150,11 @@ export function workload() {
 
   driver.runQuery("select :a::int + :b::int", { a: 34, b: 35 });
   driver.runQuery("select 'Hello, ' || :a || '!'", { a: "world" });
+
+  for (let i = 0; i < 12; i++) {
+    const [a, b, c] = groupGen.next();
+    console.log("a", a, "b", b, "c", c);
+  }
 }
 
 export function teardown() {
