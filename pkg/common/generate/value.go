@@ -25,7 +25,7 @@ type GenAbleStruct interface {
 
 var ErrNoGenerators = errors.New("no generators provided")
 
-//nolint:gocognit // it's hard indeed
+//nolint:gocognit,ireturn // it's hard indeed
 func NewTupleGenerator(
 	seed uint64,
 	genInfos []GenAbleStruct,

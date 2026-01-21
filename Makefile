@@ -265,6 +265,12 @@ run-tpcb-test:
 	./build/stroppy gen --workdir dev --preset=tpcb
 	cd dev && ./stroppy run tpcb.ts
 
+.PHONY: run-tpcc-test
+run-tpcc-test:
+	rm -rf dev
+	./build/stroppy gen --workdir dev --preset=tpcc
+	cd dev && ./stroppy run tpcc.ts
+
 ##
 ## TypeScript Development
 ##
