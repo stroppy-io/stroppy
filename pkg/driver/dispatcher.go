@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/driver/picodata"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
 )
 
@@ -36,6 +37,10 @@ func Dispatch( //nolint: ireturn // better than return any
 		fallthrough // as good suggestion
 	case stroppy.DriverConfig_DRIVER_TYPE_POSTGRES:
 		drv, err := postgres.NewDriver(ctx, lg, config)
+
+		return drv, err
+	case stroppy.DriverConfig_DRIVER_TYPE_PICODATA:
+		drv, err := picodata.NewDriver(ctx, lg, config)
 
 		return drv, err
 	default:
