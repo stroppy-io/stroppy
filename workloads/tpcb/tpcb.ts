@@ -1,32 +1,45 @@
 import encoding from "k6/x/encoding";
 globalThis.TextEncoder = encoding.TextEncoder;
 globalThis.TextDecoder = encoding.TextDecoder;
-import stroppy from "k6/x/stroppy";
-
-import { Driver, RunUnitBin, BinMsg, RunWorkload } from "./helpers.ts";
+import {
+  NewDriverByConfig,
+  NotifyStep,
+  Teardown,
+  NewGeneratorByRuleBin,
+} from "k6/x/stroppy";
 
 import { Options } from "k6/options";
 import {
-  UnitDescriptor,
   GlobalConfig,
-  WorkloadDescriptor,
-  InsertDescriptor,
   Status,
+  Generation_Rule,
+  InsertDescriptor,
 } from "./stroppy.pb.js";
 
-const driver: Driver = stroppy;
+declare const __ENV: Record<string, string | undefined>;
 
-declare function defineConfig(config: GlobalConfig): void;
+// Sql Driver interface
+interface Driver {
+  runQuery(sql: string, args: Record<string, any>): void;
+  insertValues(insert: Uint8Array, count: number): void;
+}
+interface Generator {
+  next(): any;
+}
+declare function NewDriverByConfig(configBin: Uint8Array): Driver;
+declare function NotifyStep(name: String, status: Number): void;
+declare function Teardown(): Error;
+declare function NewGeneratorByRuleBin(
+  seed: Number,
+  rule: Uint8Array,
+): Generator;
 
-if (typeof globalThis.defineConfig !== "function") {
-  globalThis.defineConfig = driver.defineConfigBin;
+function NewGeneratorByRule(seed: Number, rule: Generation_Rule): Generator {
+  return NewGeneratorByRuleBin(seed, Generation_Rule.toBinary(rule));
 }
 
-declare const __ENV: Record<string, string | undefined>;
-declare const __SQL_FILE: string;
-
 // TPC-B Configuration Constants
-const SCALE_FACTOR = +(__ENV.SCALE_FACTOR || 10);
+const SCALE_FACTOR = +(__ENV.SCALE_FACTOR || 1);
 const BRANCHES = SCALE_FACTOR;
 const TELLERS = 10 * SCALE_FACTOR;
 const ACCOUNTS = 100000 * SCALE_FACTOR;
@@ -38,13 +51,13 @@ export const options: Options = {
       executor: "constant-vus",
       exec: "tpcb_transaction",
       vus: 10,
-      duration: __ENV.DURATION || "1h",
+      duration: __ENV.DURATION || "1s",
     },
   },
 };
 
 // Initialize driver with GlobalConfig
-defineConfig(
+const driver = NewDriverByConfig(
   GlobalConfig.toBinary(
     GlobalConfig.create({
       driver: {
@@ -74,210 +87,145 @@ defineConfig(
   ),
 );
 
+// Create generators for data loading
+const branchIdGen = NewGeneratorByRule(
+  0,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { min: 1, max: BRANCHES } },
+    unique: true,
+  }),
+);
+
+const tellerIdGen = NewGeneratorByRule(
+  1,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { min: 1, max: TELLERS } },
+    unique: true,
+  }),
+);
+
+const accountIdGen = NewGeneratorByRule(
+  2,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { min: 1, max: ACCOUNTS } },
+    unique: true,
+  }),
+);
+
+const branchForTellerGen = NewGeneratorByRule(
+  3,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { min: 1, max: BRANCHES } },
+  }),
+);
+
+const branchForAccountGen = NewGeneratorByRule(
+  4,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { min: 1, max: BRANCHES } },
+  }),
+);
+
+// Generators for filler strings
+const branchFillerGen = NewGeneratorByRule(
+  9,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "stringRange",
+      stringRange: { minLen: "88", maxLen: "88" },
+    },
+  }),
+);
+
+const tellerFillerGen = NewGeneratorByRule(
+  10,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "stringRange",
+      stringRange: { minLen: "84", maxLen: "84" },
+    },
+  }),
+);
+
+const accountFillerGen = NewGeneratorByRule(
+  11,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "stringRange",
+      stringRange: { minLen: "84", maxLen: "84" },
+    },
+  }),
+);
+
 // Setup function: create schema and load data
 export function setup() {
-  driver.notifyStep("create_schema", Status.STATUS_RUNNING);
+  NotifyStep("create_schema", Status.STATUS_RUNNING);
 
-  const workload = WorkloadDescriptor.create({
-    name: "tpcb_setup",
-    units: [
-      // Drop tables if they exist
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "drop_transaction",
-              sql: "DROP FUNCTION IF EXISTS tpcb_transaction",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "drop_history",
-              sql: "DROP TABLE IF EXISTS pgbench_history CASCADE",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "drop_accounts",
-              sql: "DROP TABLE IF EXISTS pgbench_accounts CASCADE",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "drop_tellers",
-              sql: "DROP TABLE IF EXISTS pgbench_tellers CASCADE",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "drop_branches",
-              sql: "DROP TABLE IF EXISTS pgbench_branches CASCADE",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-      // Create pgbench_branches table
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "createTable",
-            createTable: {
-              name: "pgbench_branches",
-              tableIndexes: [],
-              columns: [
-                { name: "bid", sqlType: "INTEGER", primaryKey: true },
-                { name: "bbalance", sqlType: "INTEGER" },
-                { name: "filler", sqlType: "CHAR(88)" },
-              ],
-              dbSpecific: {
-                fields: [],
-              },
-            },
-          },
-        },
-      },
-      // Create pgbench_tellers table
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "createTable",
-            createTable: {
-              name: "pgbench_tellers",
-              tableIndexes: [],
-              columns: [
-                { name: "tid", sqlType: "INTEGER", primaryKey: true },
-                { name: "bid", sqlType: "INTEGER" },
-                { name: "tbalance", sqlType: "INTEGER" },
-                { name: "filler", sqlType: "CHAR(84)" },
-              ],
-              dbSpecific: {
-                fields: [],
-              },
-            },
-          },
-        },
-      },
-      // Create pgbench_accounts table
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "createTable",
-            createTable: {
-              name: "pgbench_accounts",
-              tableIndexes: [],
-              columns: [
-                { name: "aid", sqlType: "INTEGER", primaryKey: true },
-                { name: "bid", sqlType: "INTEGER" },
-                { name: "abalance", sqlType: "INTEGER" },
-                { name: "filler", sqlType: "CHAR(84)" },
-              ],
-              dbSpecific: {
-                fields: [],
-              },
-            },
-          },
-        },
-      },
-      // Create pgbench_history table
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "createTable",
-            createTable: {
-              name: "pgbench_history",
-              tableIndexes: [],
-              columns: [
-                { name: "tid", sqlType: "INTEGER" },
-                { name: "bid", sqlType: "INTEGER" },
-                { name: "aid", sqlType: "INTEGER" },
-                { name: "delta", sqlType: "INTEGER" },
-                { name: "mtime", sqlType: "TIMESTAMP" },
-                { name: "filler", sqlType: "CHAR(22)" },
-              ],
-              dbSpecific: {
-                fields: [],
-              },
-            },
-          },
-        },
-      },
-      // Create indexes
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "create_accounts_idx",
-              sql: "CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid)",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "create_tellers_idx",
-              sql: "CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid)",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "tpcb_transaction",
-              sql: `CREATE OR REPLACE FUNCTION tpcb_transaction(
+  // Drop tables if they exist
+  driver.runQuery("DROP FUNCTION IF EXISTS tpcb_transaction", {});
+  driver.runQuery("DROP TABLE IF EXISTS pgbench_history CASCADE", {});
+  driver.runQuery("DROP TABLE IF EXISTS pgbench_accounts CASCADE", {});
+  driver.runQuery("DROP TABLE IF EXISTS pgbench_tellers CASCADE", {});
+  driver.runQuery("DROP TABLE IF EXISTS pgbench_branches CASCADE", {});
+
+  // Create pgbench_branches table
+  driver.runQuery(
+    `CREATE TABLE pgbench_branches (
+    bid INTEGER PRIMARY KEY,
+    bbalance INTEGER,
+    filler CHAR(88)
+  )`,
+    {},
+  );
+
+  // Create pgbench_tellers table
+  driver.runQuery(
+    `CREATE TABLE pgbench_tellers (
+    tid INTEGER PRIMARY KEY,
+    bid INTEGER,
+    tbalance INTEGER,
+    filler CHAR(84)
+  )`,
+    {},
+  );
+
+  // Create pgbench_accounts table
+  driver.runQuery(
+    `CREATE TABLE pgbench_accounts (
+    aid INTEGER PRIMARY KEY,
+    bid INTEGER,
+    abalance INTEGER,
+    filler CHAR(84)
+  )`,
+    {},
+  );
+
+  // Create pgbench_history table
+  driver.runQuery(
+    `CREATE TABLE pgbench_history (
+    tid INTEGER,
+    bid INTEGER,
+    aid INTEGER,
+    delta INTEGER,
+    mtime TIMESTAMP,
+    filler CHAR(22)
+  )`,
+    {},
+  );
+
+  // Create indexes
+  driver.runQuery(
+    "CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid)",
+    {},
+  );
+  driver.runQuery(
+    "CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid)",
+    {},
+  );
+
+  // Create tpcb_transaction function
+  driver.runQuery(
+    `CREATE OR REPLACE FUNCTION tpcb_transaction(
     p_aid INTEGER,
     p_tid INTEGER,
     p_bid INTEGER,
@@ -315,287 +263,243 @@ BEGIN
 
     RETURN v_balance;
 END;
-$$;
-`,
-              params: [],
-              groups: [],
+$$;`,
+    {},
+  );
+
+  NotifyStep("create_schema", Status.STATUS_COMPLETED);
+
+  NotifyStep("load_data", Status.STATUS_RUNNING);
+
+  if (true) {
+    // TODO: port inserts to query like api, or just drop proto
+    console.log("Loading branches...");
+    const branchInsert = InsertDescriptor.create({
+      name: "insert_branches",
+      tableName: "pgbench_branches",
+      method: 1,
+      params: [
+        {
+          name: "bid",
+          generationRule: {
+            kind: {
+              oneofKind: "int32Range",
+              int32Range: { max: BRANCHES, min: 1 },
+            },
+            unique: true,
+          },
+        },
+        {
+          name: "bbalance",
+          generationRule: {
+            kind: { oneofKind: "int32Const", int32Const: 0 },
+          },
+        },
+        {
+          name: "filler",
+          generationRule: {
+            kind: {
+              oneofKind: "stringRange",
+              stringRange: {
+                maxLen: "88",
+                minLen: "88",
+              },
             },
           },
         },
-      },
-    ],
-  });
+      ],
+      groups: [],
+    });
+    driver.insertValues(InsertDescriptor.toBinary(branchInsert), BRANCHES);
 
-  // Run schema creation
-  RunWorkload(driver, workload);
-  driver.notifyStep("create_schema", Status.STATUS_COMPLETED);
-
-  driver.notifyStep("load_data", Status.STATUS_RUNNING);
-  // Insert branches
-  console.log("Loading branches...");
-  const branchInsert = InsertDescriptor.create({
-    name: "insert_branches",
-    tableName: "pgbench_branches",
-    method: 1,
-    params: [
-      {
-        name: "bid",
-        generationRule: {
-          kind: {
-            oneofKind: "int32Range",
-            int32Range: { max: BRANCHES, min: 1 },
+    console.log("Loading tellers...");
+    // Insert tellers
+    const tellerInsert = InsertDescriptor.create({
+      name: "insert_tellers",
+      tableName: "pgbench_tellers",
+      method: 1,
+      params: [
+        {
+          name: "tid",
+          generationRule: {
+            kind: {
+              oneofKind: "int32Range",
+              int32Range: { max: TELLERS, min: 1 },
+            },
+            unique: true,
           },
-          unique: true,
         },
-      },
-      {
-        name: "bbalance",
-        generationRule: {
-          kind: { oneofKind: "int32Const", int32Const: 0 },
-        },
-      },
-      {
-        name: "filler",
-        generationRule: {
-          kind: {
-            oneofKind: "stringRange",
-            stringRange: {
-              maxLen: "88",
-              minLen: "88",
+        {
+          name: "bid",
+          generationRule: {
+            kind: {
+              oneofKind: "int32Range",
+              int32Range: { max: BRANCHES, min: 1 },
             },
           },
         },
-      },
-    ],
-    groups: [],
-  });
-  driver.insertValues(InsertDescriptor.toBinary(branchInsert), BRANCHES);
-
-  console.log("Loading tellers...");
-  // Insert tellers
-  const tellerInsert = InsertDescriptor.create({
-    name: "insert_tellers",
-    tableName: "pgbench_tellers",
-    method: 1,
-    params: [
-      {
-        name: "tid",
-        generationRule: {
-          kind: {
-            oneofKind: "int32Range",
-            int32Range: { max: TELLERS, min: 1 },
-          },
-          unique: true,
-        },
-      },
-      {
-        name: "bid",
-        generationRule: {
-          kind: {
-            oneofKind: "int32Range",
-            int32Range: { max: BRANCHES, min: 1 },
+        {
+          name: "tbalance",
+          generationRule: {
+            kind: { oneofKind: "int32Const", int32Const: 0 },
           },
         },
-      },
-      {
-        name: "tbalance",
-        generationRule: {
-          kind: { oneofKind: "int32Const", int32Const: 0 },
-        },
-      },
-      {
-        name: "filler",
-        generationRule: {
-          kind: {
-            oneofKind: "stringRange",
-            stringRange: {
-              maxLen: "84",
-              minLen: "84",
+        {
+          name: "filler",
+          generationRule: {
+            kind: {
+              oneofKind: "stringRange",
+              stringRange: {
+                maxLen: "84",
+                minLen: "84",
+              },
             },
           },
         },
-      },
-    ],
-    groups: [],
-  });
-  driver.insertValues(InsertDescriptor.toBinary(tellerInsert), TELLERS);
+      ],
+      groups: [],
+    });
+    driver.insertValues(InsertDescriptor.toBinary(tellerInsert), TELLERS);
 
-  console.log("Loading accounts...");
-  // Insert accounts
-  const accountInsert = InsertDescriptor.create({
-    name: "insert_accounts",
-    tableName: "pgbench_accounts",
-    method: 1,
-    params: [
-      {
-        name: "aid",
-        generationRule: {
-          kind: {
-            oneofKind: "int32Range",
-            int32Range: { max: ACCOUNTS, min: 1 },
-          },
-          unique: true,
-        },
-      },
-      {
-        name: "bid",
-        generationRule: {
-          kind: {
-            oneofKind: "int32Range",
-            int32Range: { max: BRANCHES, min: 1 },
+    console.log("Loading accounts...");
+    // Insert accounts
+    const accountInsert = InsertDescriptor.create({
+      name: "insert_accounts",
+      tableName: "pgbench_accounts",
+      method: 1,
+      params: [
+        {
+          name: "aid",
+          generationRule: {
+            kind: {
+              oneofKind: "int32Range",
+              int32Range: { max: ACCOUNTS, min: 1 },
+            },
+            unique: true,
           },
         },
-      },
-      {
-        name: "abalance",
-        generationRule: {
-          kind: { oneofKind: "int32Const", int32Const: 0 },
-        },
-      },
-      {
-        name: "filler",
-        generationRule: {
-          kind: {
-            oneofKind: "stringRange",
-            stringRange: {
-              maxLen: "84",
-              minLen: "84",
+        {
+          name: "bid",
+          generationRule: {
+            kind: {
+              oneofKind: "int32Range",
+              int32Range: { max: BRANCHES, min: 1 },
             },
           },
         },
-      },
-    ],
-    groups: [],
-  });
-  driver.insertValues(InsertDescriptor.toBinary(accountInsert), ACCOUNTS);
+        {
+          name: "abalance",
+          generationRule: {
+            kind: { oneofKind: "int32Const", int32Const: 0 },
+          },
+        },
+        {
+          name: "filler",
+          generationRule: {
+            kind: {
+              oneofKind: "stringRange",
+              stringRange: {
+                maxLen: "84",
+                minLen: "84",
+              },
+            },
+          },
+        },
+      ],
+      groups: [],
+    });
+    driver.insertValues(InsertDescriptor.toBinary(accountInsert), ACCOUNTS);
+  } else {
+    // so slow...
+    // Insert branches
+    console.log("Loading branches...");
+    for (let i = 0; i < BRANCHES; i++) {
+      driver.runQuery(
+        "INSERT INTO pgbench_branches (bid, bbalance, filler) VALUES (:branch, 0, :filler)",
+        { branch: branchIdGen.next(), filler: branchFillerGen.next() },
+      );
+    }
+
+    console.log("Loading tellers...");
+    // Insert tellers
+    for (let i = 0; i < TELLERS; i++) {
+      driver.runQuery(
+        "INSERT INTO pgbench_tellers (tid, bid, tbalance, filler) VALUES (:tid, :bid, 0, :filler)",
+        {
+          tid: tellerIdGen.next(),
+          bid: branchForTellerGen.next(),
+          filler: tellerFillerGen.next(),
+        },
+      );
+    }
+
+    console.log("Loading accounts...");
+    // Insert accounts
+    for (let i = 0; i < ACCOUNTS; i++) {
+      driver.runQuery(
+        "INSERT INTO pgbench_accounts (aid, bid, abalance, filler) VALUES (:aid, :bid, 0, :filler)",
+        {
+          aid: accountIdGen.next(),
+          bid: branchForAccountGen.next(),
+          filler: accountFillerGen.next(),
+        },
+      );
+    }
+  }
 
   console.log("Data loading completed!");
-  driver.notifyStep("load_data", Status.STATUS_COMPLETED);
+  NotifyStep("load_data", Status.STATUS_COMPLETED);
 
   // Analyze tables
-  const analyzeWorkload = WorkloadDescriptor.create({
-    name: "analyze_tables",
-    units: [
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "vacuum_analyze_branches",
-              sql: "VACUUM ANALYZE pgbench_branches",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "vacuum_analyze_tellers",
-              sql: "VACUUM ANALYZE pgbench_tellers",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "vacuum_analyze_accounts",
-              sql: "VACUUM ANALYZE pgbench_accounts",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-      {
-        count: "1",
-        descriptor: {
-          type: {
-            oneofKind: "query",
-            query: {
-              name: "vacuum_analyze_history",
-              sql: "VACUUM ANALYZE pgbench_history",
-              params: [],
-              groups: [],
-            },
-          },
-        },
-      },
-    ],
-  });
-  RunWorkload(driver, analyzeWorkload);
+  driver.runQuery("VACUUM ANALYZE pgbench_branches", {});
+  driver.runQuery("VACUUM ANALYZE pgbench_tellers", {});
+  driver.runQuery("VACUUM ANALYZE pgbench_accounts", {});
+  driver.runQuery("VACUUM ANALYZE pgbench_history", {});
 
-  driver.notifyStep("workload", Status.STATUS_RUNNING);
+  NotifyStep("workload", Status.STATUS_RUNNING);
   return;
 }
 
-// TPC-B transaction workload
-const tpcbTransactionDescriptorBin: BinMsg<UnitDescriptor> =
-  UnitDescriptor.toBinary({
-    type: {
-      oneofKind: "query",
-      query: {
-        name: "tpcb_transaction",
-        sql: "select tpcb_transaction(${aid}, ${tid}, ${bid}, ${delta});",
-        params: [
-          {
-            name: "aid",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: { max: ACCOUNTS, min: 1 },
-              },
-            },
-          },
-          {
-            name: "tid",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: { max: TELLERS, min: 1 },
-              },
-            },
-          },
-          {
-            name: "bid",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: { max: BRANCHES, min: 1 },
-              },
-            },
-          },
-          {
-            name: "delta",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: { max: 5000, min: -5000 },
-              },
-            },
-          },
-        ],
-        groups: [],
-      },
-    },
-  });
+// Generators for transaction parameters
+const aidGen = NewGeneratorByRule(
+  5,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { min: 1, max: ACCOUNTS } },
+  }),
+);
 
+const tidGen = NewGeneratorByRule(
+  6,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { min: 1, max: TELLERS } },
+  }),
+);
+
+const bidGen = NewGeneratorByRule(
+  7,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { min: 1, max: BRANCHES } },
+  }),
+);
+
+const deltaGen = NewGeneratorByRule(
+  8,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { min: -5000, max: 5000 } },
+  }),
+);
+
+// TPC-B transaction workload
 export function tpcb_transaction() {
-  RunUnitBin(driver, tpcbTransactionDescriptorBin);
+  driver.runQuery("SELECT tpcb_transaction(:p_aid, :p_tid, :p_bid, :p_delta)", {
+    p_aid: aidGen.next(),
+    p_tid: tidGen.next(),
+    p_bid: bidGen.next(),
+    p_delta: deltaGen.next(),
+  });
 }
 
 export function teardown() {
-  driver.notifyStep("workload", Status.STATUS_COMPLETED);
-  driver.teardown();
+  NotifyStep("workload", Status.STATUS_COMPLETED);
+  Teardown();
 }

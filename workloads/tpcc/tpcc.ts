@@ -1,31 +1,43 @@
 import encoding from "k6/x/encoding";
 globalThis.TextEncoder = encoding.TextEncoder;
 globalThis.TextDecoder = encoding.TextDecoder;
-import stroppy from "k6/x/stroppy";
+import {
+  NewDriverByConfig,
+  NotifyStep,
+  Teardown,
+  NewGeneratorByRuleBin,
+} from "k6/x/stroppy";
 
 import { Options } from "k6/options";
 import {
-  UnitDescriptor,
-  DriverTransactionStat,
-  DriverConfig,
   GlobalConfig,
-  WorkloadDescriptor,
+  Generation_Rule,
   InsertDescriptor,
   Status,
 } from "./stroppy.pb.js";
 
-import { Driver, RunUnitBin, driver, BinMsg, RunWorkload } from "./helpers.ts";
-
-const driver: Driver = stroppy;
-
-declare function defineConfig(config: GlobalConfig): void;
-
-if (typeof globalThis.defineConfig !== "function") {
-  globalThis.defineConfig = driver.defineConfigBin;
+// Sql Driver interface
+interface Driver {
+  runQuery(sql: string, args: Record<string, any>): void;
+  insertValues(insert: Uint8Array, count: number): void;
+}
+interface Generator {
+  next(): any;
 }
 
+declare function NewDriverByConfig(configBin: Uint8Array): Driver;
+declare function NotifyStep(name: String, status: Number): void;
+declare function Teardown(): Error;
+declare function NewGeneratorByRuleBin(
+  seed: Number,
+  rule: Uint8Array,
+): Generator;
+
 declare const __ENV: Record<string, string | undefined>;
-declare const __SQL_FILE: string;
+
+function NewGeneratorByRule(seed: Number, rule: Generation_Rule): Generator {
+  return NewGeneratorByRuleBin(seed, Generation_Rule.toBinary(rule));
+}
 
 const DURATION = __ENV.DURATION || "5m";
 
@@ -78,7 +90,7 @@ const TOTAL_CUSTOMERS =
 const TOTAL_STOCK = WAREHOUSES * ITEMS;
 
 // Initialize driver with GlobalConfig
-defineConfig(
+const driver = NewDriverByConfig(
   GlobalConfig.toBinary(
     GlobalConfig.create({
       driver: {
@@ -109,305 +121,144 @@ defineConfig(
 );
 
 export function setup() {
-  driver.notifyStep("create_schema", Status.STATUS_RUNNING);
+  NotifyStep("create_schema", Status.STATUS_RUNNING);
+  const dropStatements = [
+    "DROP FUNCTION IF EXISTS SLEV",
+    "DROP FUNCTION IF EXISTS OSTAT",
+    "DROP FUNCTION IF EXISTS DELIVERY",
+    "DROP FUNCTION IF EXISTS PAYMENT",
+    "DROP FUNCTION IF EXISTS NEWORD",
+    "DROP FUNCTION IF EXISTS DBMS_RANDOM",
+    "DROP TABLE IF EXISTS order_line CASCADE",
+    "DROP TABLE IF EXISTS new_order CASCADE",
+    "DROP TABLE IF EXISTS orders CASCADE",
+    "DROP TABLE IF EXISTS history CASCADE",
+    "DROP TABLE IF EXISTS stock CASCADE",
+    "DROP TABLE IF EXISTS customer CASCADE",
+    "DROP TABLE IF EXISTS district CASCADE",
+    "DROP TABLE IF EXISTS warehouse CASCADE",
+    "DROP TABLE IF EXISTS item CASCADE",
+  ];
+  dropStatements.forEach((sql) => driver.runQuery(sql, {}));
 
-  RunWorkload(
-    driver,
-    WorkloadDescriptor.create({
-      name: "create_schema",
-      units: [
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "createTable",
-              createTable: {
-                name: "warehouse",
-                tableIndexes: [],
-                columns: [
-                  { name: "w_id", sqlType: "INTEGER", primaryKey: true },
-                  { name: "w_name", sqlType: "VARCHAR(10)" },
-                  { name: "w_street_1", sqlType: "VARCHAR(20)" },
-                  { name: "w_street_2", sqlType: "VARCHAR(20)" },
-                  { name: "w_city", sqlType: "VARCHAR(20)" },
-                  { name: "w_state", sqlType: "CHAR(2)" },
-                  { name: "w_zip", sqlType: "CHAR(9)" },
-                  { name: "w_tax", sqlType: "DECIMAL(4,4)" },
-                  { name: "w_ytd", sqlType: "DECIMAL(12,2)" },
-                ],
-                dbSpecific: {
-                  fields: [],
-                },
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "createTable",
-              createTable: {
-                name: "district",
-                tableIndexes: [],
-                columns: [
-                  { name: "d_id", sqlType: "INTEGER", primaryKey: true },
-                  {
-                    name: "d_w_id",
-                    sqlType: "INTEGER",
-                    primaryKey: true,
-                    constraint: "REFERENCES warehouse(w_id)",
-                  },
-                  { name: "d_name", sqlType: "VARCHAR(10)" },
-                  { name: "d_street_1", sqlType: "VARCHAR(20)" },
-                  { name: "d_street_2", sqlType: "VARCHAR(20)" },
-                  { name: "d_city", sqlType: "VARCHAR(20)" },
-                  { name: "d_state", sqlType: "CHAR(2)" },
-                  { name: "d_zip", sqlType: "CHAR(9)" },
-                  { name: "d_tax", sqlType: "DECIMAL(4,4)" },
-                  { name: "d_ytd", sqlType: "DECIMAL(12,2)" },
-                  { name: "d_next_o_id", sqlType: "INTEGER" },
-                ],
-                dbSpecific: {
-                  fields: [],
-                },
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "createTable",
-              createTable: {
-                name: "customer",
-                tableIndexes: [],
-                columns: [
-                  { name: "c_id", sqlType: "INTEGER", primaryKey: true },
-                  { name: "c_d_id", sqlType: "INTEGER", primaryKey: true },
-                  {
-                    name: "c_w_id",
-                    sqlType: "INTEGER",
-                    primaryKey: true,
-                    constraint: "REFERENCES warehouse(w_id)",
-                  },
-                  { name: "c_first", sqlType: "VARCHAR(16)" },
-                  { name: "c_middle", sqlType: "CHAR(2)" },
-                  { name: "c_last", sqlType: "VARCHAR(16)" },
-                  { name: "c_street_1", sqlType: "VARCHAR(20)" },
-                  { name: "c_street_2", sqlType: "VARCHAR(20)" },
-                  { name: "c_city", sqlType: "VARCHAR(20)" },
-                  { name: "c_state", sqlType: "CHAR(2)" },
-                  { name: "c_zip", sqlType: "CHAR(9)" },
-                  { name: "c_phone", sqlType: "CHAR(16)" },
-                  { name: "c_since", sqlType: "TIMESTAMP" },
-                  { name: "c_credit", sqlType: "CHAR(2)" },
-                  { name: "c_credit_lim", sqlType: "DECIMAL(12,2)" },
-                  { name: "c_discount", sqlType: "DECIMAL(4,4)" },
-                  { name: "c_balance", sqlType: "DECIMAL(12,2)" },
-                  { name: "c_ytd_payment", sqlType: "DECIMAL(12,2)" },
-                  { name: "c_payment_cnt", sqlType: "INTEGER" },
-                  { name: "c_delivery_cnt", sqlType: "INTEGER" },
-                  { name: "c_data", sqlType: "VARCHAR(500)" },
-                ],
-                dbSpecific: {
-                  fields: [],
-                },
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "createTable",
-              createTable: {
-                name: "history",
-                tableIndexes: [],
-                columns: [
-                  { name: "h_c_id", sqlType: "INTEGER" },
-                  { name: "h_c_d_id", sqlType: "INTEGER" },
-                  { name: "h_c_w_id", sqlType: "INTEGER" },
-                  { name: "h_d_id", sqlType: "INTEGER" },
-                  { name: "h_w_id", sqlType: "INTEGER" },
-                  { name: "h_date", sqlType: "TIMESTAMP" },
-                  { name: "h_amount", sqlType: "DECIMAL(6,2)" },
-                  { name: "h_data", sqlType: "VARCHAR(24)" },
-                ],
-                dbSpecific: {
-                  fields: [],
-                },
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "createTable",
-              createTable: {
-                name: "new_order",
-                tableIndexes: [],
-                columns: [
-                  { name: "no_o_id", sqlType: "INTEGER", primaryKey: true },
-                  { name: "no_d_id", sqlType: "INTEGER", primaryKey: true },
-                  {
-                    name: "no_w_id",
-                    sqlType: "INTEGER",
-                    primaryKey: true,
-                    constraint: "REFERENCES warehouse(w_id)",
-                  },
-                ],
-                dbSpecific: {
-                  fields: [],
-                },
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "createTable",
-              createTable: {
-                name: "orders",
-                tableIndexes: [],
-                columns: [
-                  { name: "o_id", sqlType: "INTEGER", primaryKey: true },
-                  { name: "o_d_id", sqlType: "INTEGER", primaryKey: true },
-                  {
-                    name: "o_w_id",
-                    sqlType: "INTEGER",
-                    primaryKey: true,
-                    constraint: "REFERENCES warehouse(w_id)",
-                  },
-                  { name: "o_c_id", sqlType: "INTEGER" },
-                  { name: "o_entry_d", sqlType: "TIMESTAMP" },
-                  { name: "o_carrier_id", sqlType: "INTEGER", nullable: true },
-                  { name: "o_ol_cnt", sqlType: "INTEGER" },
-                  { name: "o_all_local", sqlType: "INTEGER" },
-                ],
-                dbSpecific: {
-                  fields: [],
-                },
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "createTable",
-              createTable: {
-                name: "order_line",
-                tableIndexes: [],
-                columns: [
-                  { name: "ol_o_id", sqlType: "INTEGER", primaryKey: true },
-                  { name: "ol_d_id", sqlType: "INTEGER", primaryKey: true },
-                  {
-                    name: "ol_w_id",
-                    sqlType: "INTEGER",
-                    primaryKey: true,
-                    constraint: "REFERENCES warehouse(w_id)",
-                  },
-                  { name: "ol_number", sqlType: "INTEGER", primaryKey: true },
-                  { name: "ol_i_id", sqlType: "INTEGER" },
-                  { name: "ol_supply_w_id", sqlType: "INTEGER" },
-                  {
-                    name: "ol_delivery_d",
-                    sqlType: "TIMESTAMP",
-                    nullable: true,
-                  },
-                  { name: "ol_quantity", sqlType: "INTEGER" },
-                  { name: "ol_amount", sqlType: "DECIMAL(6,2)" },
-                  { name: "ol_dist_info", sqlType: "CHAR(24)" },
-                ],
-                dbSpecific: {
-                  fields: [],
-                },
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "createTable",
-              createTable: {
-                name: "item",
-                tableIndexes: [],
-                columns: [
-                  { name: "i_id", sqlType: "INTEGER", primaryKey: true },
-                  { name: "i_im_id", sqlType: "INTEGER" },
-                  { name: "i_name", sqlType: "VARCHAR(24)" },
-                  { name: "i_price", sqlType: "DECIMAL(5,2)" },
-                  { name: "i_data", sqlType: "VARCHAR(50)" },
-                ],
-                dbSpecific: {
-                  fields: [],
-                },
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "createTable",
-              createTable: {
-                name: "stock",
-                tableIndexes: [],
-                columns: [
-                  {
-                    name: "s_i_id",
-                    sqlType: "INTEGER",
-                    primaryKey: true,
-                    constraint: "REFERENCES item(i_id)",
-                  },
-                  {
-                    name: "s_w_id",
-                    sqlType: "INTEGER",
-                    primaryKey: true,
-                    constraint: "REFERENCES warehouse(w_id)",
-                  },
-                  { name: "s_quantity", sqlType: "INTEGER" },
-                  { name: "s_dist_01", sqlType: "CHAR(24)" },
-                  { name: "s_dist_02", sqlType: "CHAR(24)" },
-                  { name: "s_dist_03", sqlType: "CHAR(24)" },
-                  { name: "s_dist_04", sqlType: "CHAR(24)" },
-                  { name: "s_dist_05", sqlType: "CHAR(24)" },
-                  { name: "s_dist_06", sqlType: "CHAR(24)" },
-                  { name: "s_dist_07", sqlType: "CHAR(24)" },
-                  { name: "s_dist_08", sqlType: "CHAR(24)" },
-                  { name: "s_dist_09", sqlType: "CHAR(24)" },
-                  { name: "s_dist_10", sqlType: "CHAR(24)" },
-                  { name: "s_ytd", sqlType: "INTEGER" },
-                  { name: "s_order_cnt", sqlType: "INTEGER" },
-                  { name: "s_remote_cnt", sqlType: "INTEGER" },
-                  { name: "s_data", sqlType: "VARCHAR(50)" },
-                ],
-                dbSpecific: {
-                  fields: [],
-                },
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "query",
-              query: {
-                name: "create_dbms_random",
-                sql: `CREATE OR REPLACE FUNCTION DBMS_RANDOM (INTEGER, INTEGER) RETURNS INTEGER AS $$
+  const schemaStatements = [
+    `CREATE TABLE warehouse (
+  w_id INTEGER PRIMARY KEY,
+  w_name VARCHAR(10),
+  w_street_1 VARCHAR(20),
+  w_street_2 VARCHAR(20),
+  w_city VARCHAR(20),
+  w_state CHAR(2),
+  w_zip CHAR(9),
+  w_tax DECIMAL(4,4),
+  w_ytd DECIMAL(12,2)
+)`,
+    `CREATE TABLE district (
+  d_id INTEGER,
+  d_w_id INTEGER REFERENCES warehouse(w_id),
+  d_name VARCHAR(10),
+  d_street_1 VARCHAR(20),
+  d_street_2 VARCHAR(20),
+  d_city VARCHAR(20),
+  d_state CHAR(2),
+  d_zip CHAR(9),
+  d_tax DECIMAL(4,4),
+  d_ytd DECIMAL(12,2),
+  d_next_o_id INTEGER,
+  PRIMARY KEY (d_w_id, d_id)
+)`,
+    `CREATE TABLE customer (
+  c_id INTEGER,
+  c_d_id INTEGER,
+  c_w_id INTEGER REFERENCES warehouse(w_id),
+  c_first VARCHAR(16),
+  c_middle CHAR(2),
+  c_last VARCHAR(16),
+  c_street_1 VARCHAR(20),
+  c_street_2 VARCHAR(20),
+  c_city VARCHAR(20),
+  c_state CHAR(2),
+  c_zip CHAR(9),
+  c_phone CHAR(16),
+  c_since TIMESTAMP,
+  c_credit CHAR(2),
+  c_credit_lim DECIMAL(12,2),
+  c_discount DECIMAL(4,4),
+  c_balance DECIMAL(12,2),
+  c_ytd_payment DECIMAL(12,2),
+  c_payment_cnt INTEGER,
+  c_delivery_cnt INTEGER,
+  c_data VARCHAR(500),
+  PRIMARY KEY (c_w_id, c_d_id, c_id)
+)`,
+    `CREATE TABLE history (
+  h_c_id INTEGER,
+  h_c_d_id INTEGER,
+  h_c_w_id INTEGER,
+  h_d_id INTEGER,
+  h_w_id INTEGER,
+  h_date TIMESTAMP,
+  h_amount DECIMAL(6,2),
+  h_data VARCHAR(24)
+)`,
+    `CREATE TABLE new_order (
+  no_o_id INTEGER,
+  no_d_id INTEGER,
+  no_w_id INTEGER REFERENCES warehouse(w_id),
+  PRIMARY KEY (no_w_id, no_d_id, no_o_id)
+)`,
+    `CREATE TABLE orders (
+  o_id INTEGER,
+  o_d_id INTEGER,
+  o_w_id INTEGER REFERENCES warehouse(w_id),
+  o_c_id INTEGER,
+  o_entry_d TIMESTAMP,
+  o_carrier_id INTEGER,
+  o_ol_cnt INTEGER,
+  o_all_local INTEGER,
+  PRIMARY KEY (o_w_id, o_d_id, o_id)
+)`,
+    `CREATE TABLE order_line (
+  ol_o_id INTEGER,
+  ol_d_id INTEGER,
+  ol_w_id INTEGER REFERENCES warehouse(w_id),
+  ol_number INTEGER,
+  ol_i_id INTEGER,
+  ol_supply_w_id INTEGER,
+  ol_delivery_d TIMESTAMP,
+  ol_quantity INTEGER,
+  ol_amount DECIMAL(6,2),
+  ol_dist_info CHAR(24),
+  PRIMARY KEY (ol_w_id, ol_d_id, ol_o_id, ol_number)
+)`,
+    `CREATE TABLE item (
+  i_id INTEGER PRIMARY KEY,
+  i_im_id INTEGER,
+  i_name VARCHAR(24),
+  i_price DECIMAL(5,2),
+  i_data VARCHAR(50)
+)`,
+    `CREATE TABLE stock (
+  s_i_id INTEGER REFERENCES item(i_id),
+  s_w_id INTEGER REFERENCES warehouse(w_id),
+  s_quantity INTEGER,
+  s_dist_01 CHAR(24),
+  s_dist_02 CHAR(24),
+  s_dist_03 CHAR(24),
+  s_dist_04 CHAR(24),
+  s_dist_05 CHAR(24),
+  s_dist_06 CHAR(24),
+  s_dist_07 CHAR(24),
+  s_dist_08 CHAR(24),
+  s_dist_09 CHAR(24),
+  s_dist_10 CHAR(24),
+  s_ytd INTEGER,
+  s_order_cnt INTEGER,
+  s_remote_cnt INTEGER,
+  s_data VARCHAR(50),
+  PRIMARY KEY (s_w_id, s_i_id)
+)`,
+    `CREATE OR REPLACE FUNCTION DBMS_RANDOM (INTEGER, INTEGER) RETURNS INTEGER AS $$
 DECLARE
   start_int ALIAS FOR $1;
   end_int ALIAS FOR $2;
@@ -416,20 +267,7 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql' STRICT;
 `,
-                params: [],
-                groups: [],
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "query",
-              query: {
-                name: "create_neword_procedure",
-                sql: `CREATE OR REPLACE FUNCTION NEWORD (
+    `CREATE OR REPLACE FUNCTION NEWORD (
   no_w_id INTEGER,
   no_max_w_id INTEGER,
   no_d_id INTEGER,
@@ -509,20 +347,7 @@ EXCEPTION
 END;
 $$ LANGUAGE 'plpgsql';
 `,
-                params: [],
-                groups: [],
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "query",
-              query: {
-                name: "create_payment_procedure",
-                sql: `CREATE OR REPLACE FUNCTION PAYMENT (
+    `CREATE OR REPLACE FUNCTION PAYMENT (
   p_w_id INTEGER,
   p_d_id INTEGER,
   p_c_w_id INTEGER,
@@ -594,20 +419,7 @@ EXCEPTION
 END;
 $$ LANGUAGE 'plpgsql';
 `,
-                params: [],
-                groups: [],
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "query",
-              query: {
-                name: "create_delivery_procedure",
-                sql: `CREATE OR REPLACE FUNCTION DELIVERY (
+    `CREATE OR REPLACE FUNCTION DELIVERY (
   d_w_id INTEGER,
   d_o_carrier_id INTEGER
 ) RETURNS INTEGER AS $$
@@ -680,20 +492,7 @@ EXCEPTION
 END;
 $$ LANGUAGE 'plpgsql';
 `,
-                params: [],
-                groups: [],
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "query",
-              query: {
-                name: "create_ostat_procedure",
-                sql: `CREATE OR REPLACE FUNCTION OSTAT (
+    `CREATE OR REPLACE FUNCTION OSTAT (
   os_w_id INTEGER,
   os_d_id INTEGER,
   os_c_id INTEGER,
@@ -745,20 +544,7 @@ EXCEPTION
 END;
 $$ LANGUAGE 'plpgsql';
 `,
-                params: [],
-                groups: [],
-              },
-            },
-          },
-        },
-        {
-          count: "1",
-          descriptor: {
-            type: {
-              oneofKind: "query",
-              query: {
-                name: "create_slev_procedure",
-                sql: `CREATE OR REPLACE FUNCTION SLEV (
+    `CREATE OR REPLACE FUNCTION SLEV (
   st_w_id INTEGER,
   st_d_id INTEGER,
   threshold INTEGER
@@ -785,18 +571,12 @@ EXCEPTION
 END;
 $$ LANGUAGE 'plpgsql';
 `,
-                params: [],
-                groups: [],
-              },
-            },
-          },
-        },
-      ],
-    }),
-  );
-  driver.notifyStep("create_schema", Status.STATUS_COMPLETED);
+  ];
 
-  driver.notifyStep("load_data", Status.STATUS_RUNNING);
+  schemaStatements.forEach((sql) => driver.runQuery(sql, {}));
+  NotifyStep("create_schema", Status.STATUS_COMPLETED);
+
+  NotifyStep("load_data", Status.STATUS_RUNNING);
   // Load data into tables using InsertValues with COPY_FROM method
   console.log("Loading items...");
   driver.insertValues(
@@ -1662,383 +1442,230 @@ $$ LANGUAGE 'plpgsql';
   );
 
   console.log("Data loading completed!");
-  driver.notifyStep("load_data", Status.STATUS_COMPLETED);
+  NotifyStep("load_data", Status.STATUS_COMPLETED);
 
-  driver.notifyStep("workload", Status.STATUS_RUNNING);
+  NotifyStep("workload", Status.STATUS_RUNNING);
   return;
 }
 
-export function insert() {}
-
-const newOrderDesciptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
-  UnitDescriptor.create({
-    type: {
-      oneofKind: "query",
-      query: {
-        name: "call_neword",
-        sql: "SELECT NEWORD(${w_id}, ${max_w_id}, ${d_id}, ${c_id}, ${ol_cnt}, 0)",
-        params: [
-          {
-            name: "w_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: WAREHOUSES,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "max_w_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: DISTRICTS_PER_WAREHOUSE,
-                  min: DISTRICTS_PER_WAREHOUSE,
-                },
-              },
-            },
-          },
-          {
-            name: "d_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: DISTRICTS_PER_WAREHOUSE,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "c_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: CUSTOMERS_PER_DISTRICT,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "ol_cnt",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: 15,
-                  min: 5,
-                },
-              },
-            },
-          },
-        ],
-        groups: [],
+const newOrderWarehouseGen = NewGeneratorByRule(
+  0,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
+  }),
+);
+const newOrderMaxWarehouseGen = NewGeneratorByRule(
+  1,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "int32Range",
+      int32Range: {
+        max: DISTRICTS_PER_WAREHOUSE,
+        min: DISTRICTS_PER_WAREHOUSE,
       },
     },
+  }),
+);
+const newOrderDistrictGen = NewGeneratorByRule(
+  2,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "int32Range",
+      int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
+    },
+  }),
+);
+const newOrderCustomerGen = NewGeneratorByRule(
+  3,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "int32Range",
+      int32Range: { max: CUSTOMERS_PER_DISTRICT, min: 1 },
+    },
+  }),
+);
+const newOrderOlCntGen = NewGeneratorByRule(
+  4,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { max: 15, min: 5 } },
   }),
 );
 export function new_order() {
-  RunUnitBin(driver, newOrderDesciptorBin);
+  driver.runQuery(
+    "SELECT NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt, 0)",
+    {
+      w_id: newOrderWarehouseGen.next(),
+      max_w_id: newOrderMaxWarehouseGen.next(),
+      d_id: newOrderDistrictGen.next(),
+      c_id: newOrderCustomerGen.next(),
+      ol_cnt: newOrderOlCntGen.next(),
+    },
+  );
 }
 
-const paymentsDescriptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
-  UnitDescriptor.create({
-    type: {
-      oneofKind: "query",
-      query: {
-        name: "payment_procedure",
-        sql: "SELECT PAYMENT(${p_w_id}, ${p_d_id}, ${p_c_w_id}, ${p_c_d_id}, ${p_c_id}, ${byname}, ${h_amount}, ${c_last})",
-        params: [
-          {
-            name: "p_w_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: WAREHOUSES,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "p_d_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: DISTRICTS_PER_WAREHOUSE,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "p_c_w_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: WAREHOUSES,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "p_c_d_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: DISTRICTS_PER_WAREHOUSE,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "p_c_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: CUSTOMERS_PER_DISTRICT,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "byname",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: 0,
-                  min: 0,
-                },
-              },
-            },
-          },
-          {
-            name: "h_amount",
-            generationRule: {
-              kind: {
-                oneofKind: "doubleRange",
-                doubleRange: {
-                  max: 5000,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "c_last",
-            generationRule: {
-              kind: {
-                oneofKind: "stringRange",
-                stringRange: {
-                  maxLen: "16",
-                  minLen: "6",
-                },
-              },
-              unique: true,
-            },
-          },
-        ],
-        groups: [],
-      },
+const paymentWarehouseGen = NewGeneratorByRule(
+  5,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
+  }),
+);
+const paymentDistrictGen = NewGeneratorByRule(
+  6,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "int32Range",
+      int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
     },
   }),
 );
+const paymentCustomerWarehouseGen = NewGeneratorByRule(
+  7,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
+  }),
+);
+const paymentCustomerDistrictGen = NewGeneratorByRule(
+  8,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "int32Range",
+      int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
+    },
+  }),
+);
+const paymentCustomerGen = NewGeneratorByRule(
+  9,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "int32Range",
+      int32Range: { max: CUSTOMERS_PER_DISTRICT, min: 1 },
+    },
+  }),
+);
+const paymentAmountGen = NewGeneratorByRule(
+  10,
+  Generation_Rule.create({
+    kind: { oneofKind: "doubleRange", doubleRange: { max: 5000, min: 1 } },
+  }),
+);
+const paymentCustomerLastGen = NewGeneratorByRule(
+  11,
+  Generation_Rule.create({
+    kind: { oneofKind: "stringRange", stringRange: { maxLen: "16", minLen: "6" } },
+    unique: true,
+  }),
+);
 export function payments() {
-  RunUnitBin(driver, paymentsDescriptorBin);
-}
-
-const orderStatusDescriptorBin: BinMsg<UnitDescriptor> =
-  UnitDescriptor.toBinary(
-    UnitDescriptor.create({
-      type: {
-        oneofKind: "query",
-        query: {
-          name: "order_status_procedure",
-          sql: "SELECT * FROM OSTAT(${os_w_id}, ${os_d_id}, ${os_c_id}, ${byname}, ${os_c_last})",
-          params: [
-            {
-              name: "os_w_id",
-              generationRule: {
-                kind: {
-                  oneofKind: "int32Range",
-                  int32Range: {
-                    max: WAREHOUSES,
-                    min: 1,
-                  },
-                },
-              },
-            },
-            {
-              name: "os_d_id",
-              generationRule: {
-                kind: {
-                  oneofKind: "int32Range",
-                  int32Range: {
-                    max: DISTRICTS_PER_WAREHOUSE,
-                    min: 1,
-                  },
-                },
-              },
-            },
-            {
-              name: "os_c_id",
-              generationRule: {
-                kind: {
-                  oneofKind: "int32Range",
-                  int32Range: {
-                    max: CUSTOMERS_PER_DISTRICT,
-                    min: 1,
-                  },
-                },
-              },
-            },
-            {
-              name: "byname",
-              generationRule: {
-                kind: {
-                  oneofKind: "int32Range",
-                  int32Range: {
-                    max: 0,
-                    min: 0,
-                  },
-                },
-              },
-            },
-            {
-              name: "os_c_last",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "16",
-                    minLen: "8",
-                  },
-                },
-              },
-            },
-          ],
-          groups: [],
-        },
-      },
-    }),
+  driver.runQuery(
+    "SELECT PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last)",
+    {
+      p_w_id: paymentWarehouseGen.next(),
+      p_d_id: paymentDistrictGen.next(),
+      p_c_w_id: paymentCustomerWarehouseGen.next(),
+      p_c_d_id: paymentCustomerDistrictGen.next(),
+      p_c_id: paymentCustomerGen.next(),
+      byname: 0,
+      h_amount: paymentAmountGen.next(),
+      c_last: paymentCustomerLastGen.next(),
+    },
   );
-export function order_status() {
-  RunUnitBin(driver, orderStatusDescriptorBin);
 }
 
-const deliveryDescriptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
-  UnitDescriptor.create({
-    type: {
-      oneofKind: "query",
-      query: {
-        name: "delivery_procedure",
-        sql: "SELECT DELIVERY(${d_w_id}, ${d_o_carrier_id})",
-        params: [
-          {
-            name: "d_w_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: WAREHOUSES,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "d_o_carrier_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: DISTRICTS_PER_WAREHOUSE,
-                  min: 1,
-                },
-              },
-            },
-          },
-        ],
-        groups: [],
-      },
+const orderStatusWarehouseGen = NewGeneratorByRule(
+  12,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
+  }),
+);
+const orderStatusDistrictGen = NewGeneratorByRule(
+  13,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "int32Range",
+      int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
+    },
+  }),
+);
+const orderStatusCustomerGen = NewGeneratorByRule(
+  14,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "int32Range",
+      int32Range: { max: CUSTOMERS_PER_DISTRICT, min: 1 },
+    },
+  }),
+);
+const orderStatusCustomerLastGen = NewGeneratorByRule(
+  15,
+  Generation_Rule.create({
+    kind: { oneofKind: "stringRange", stringRange: { maxLen: "16", minLen: "8" } },
+  }),
+);
+export function order_status() {
+  driver.runQuery(
+    "SELECT * FROM OSTAT(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)",
+    {
+      os_w_id: orderStatusWarehouseGen.next(),
+      os_d_id: orderStatusDistrictGen.next(),
+      os_c_id: orderStatusCustomerGen.next(),
+      byname: 0,
+      os_c_last: orderStatusCustomerLastGen.next(),
+    },
+  );
+}
+
+const deliveryWarehouseGen = NewGeneratorByRule(
+  16,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
+  }),
+);
+const deliveryCarrierGen = NewGeneratorByRule(
+  17,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "int32Range",
+      int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
     },
   }),
 );
 export function delivery() {
-  RunUnitBin(driver, deliveryDescriptorBin);
+  driver.runQuery("SELECT DELIVERY(:d_w_id, :d_o_carrier_id)", {
+    d_w_id: deliveryWarehouseGen.next(),
+    d_o_carrier_id: deliveryCarrierGen.next(),
+  });
 }
 
-const stockLevelDescriptorBin: BinMsg<UnitDescriptor> = UnitDescriptor.toBinary(
-  UnitDescriptor.create({
-    type: {
-      oneofKind: "query",
-      query: {
-        name: "stock_level_transaction",
-        sql: "SELECT SLEV(${st_w_id}, ${st_d_id}, ${threshold})",
-        params: [
-          {
-            name: "st_w_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: WAREHOUSES,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "st_d_id",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: DISTRICTS_PER_WAREHOUSE,
-                  min: 1,
-                },
-              },
-            },
-          },
-          {
-            name: "threshold",
-            generationRule: {
-              kind: {
-                oneofKind: "int32Range",
-                int32Range: {
-                  max: 20,
-                  min: 10,
-                },
-              },
-            },
-          },
-        ],
-        groups: [],
-      },
+const stockLevelWarehouseGen = NewGeneratorByRule(
+  18,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
+  }),
+);
+const stockLevelDistrictGen = NewGeneratorByRule(
+  19,
+  Generation_Rule.create({
+    kind: {
+      oneofKind: "int32Range",
+      int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
     },
   }),
 );
+const stockLevelThresholdGen = NewGeneratorByRule(
+  20,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { max: 20, min: 10 } },
+  }),
+);
 export function stock_level() {
-  RunUnitBin(driver, stockLevelDescriptorBin);
+  driver.runQuery("SELECT SLEV(:st_w_id, :st_d_id, :threshold)", {
+    st_w_id: stockLevelWarehouseGen.next(),
+    st_d_id: stockLevelDistrictGen.next(),
+    threshold: stockLevelThresholdGen.next(),
+  });
 }
 
 export function teardown() {
-  driver.notifyStep("workload", Status.STATUS_COMPLETED);
-  driver.teardown();
+  NotifyStep("workload", Status.STATUS_COMPLETED);
+  Teardown();
 }

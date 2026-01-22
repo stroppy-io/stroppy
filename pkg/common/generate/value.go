@@ -25,13 +25,13 @@ type GenAbleStruct interface {
 
 var ErrNoGenerators = errors.New("no generators provided")
 
-//nolint:gocognit // it's hard indeed
+//nolint:gocognit,ireturn // it's hard indeed
 func NewTupleGenerator(
 	seed uint64,
 	genInfos []GenAbleStruct,
-) valueGeneratorFn { //nolint:revive // revive is annoying to use
+) ValueGenerator { //nolint:revive // revive is annoying to use
 	if len(genInfos) == 0 {
-		return func() (*stroppy.Value, error) { return nil, ErrNoGenerators }
+		return valueGeneratorFn(func() (*stroppy.Value, error) { return nil, ErrNoGenerators })
 	}
 
 	// Result type to send both value and error through channel
@@ -99,7 +99,7 @@ func NewTupleGenerator(
 	}()
 
 	// Return function that reads from channel
-	return func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (*stroppy.Value, error) {
 		res, ok := <-resultCh
 		if !ok {
 			// Channel closed, no more values
@@ -113,7 +113,7 @@ func NewTupleGenerator(
 		return &stroppy.Value{
 			Type: &stroppy.Value_List_{List: &stroppy.Value_List{Values: res.vals}},
 		}, nil
-	}
+	})
 }
 
 func NewValueGenerator( //nolint: ireturn // need as lib part
@@ -294,7 +294,7 @@ func NewValueGeneratorByRule(
 	case *stroppy.Generation_Rule_DecimalConst:
 		generator = newConstValueGenerator(decimalPtrToDecimal(rule.GetDecimalConst()), decimalToValue)
 	default:
-		return nil, fmt.Errorf("unknown rule type: %T", rule) //nolint: err113
+		return nil, fmt.Errorf("unknown rule type: %T, %v", rule, rule) //nolint: err113
 	}
 
 	if rule.GetNullPercentage() > 0 {

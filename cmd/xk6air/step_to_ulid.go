@@ -5,13 +5,13 @@ import (
 	cmap "github.com/orcaman/concurrent-map/v2"
 )
 
-var stepNameToId cmap.ConcurrentMap[string, ulid.ULID] = cmap.New[ulid.ULID]()
+var stepNameToID cmap.ConcurrentMap[string, ulid.ULID] = cmap.New[ulid.ULID]()
 
-func getStepId(name string) ulid.ULID {
-	id, ok := stepNameToId.Get(name)
+func getStepID(name string) ulid.ULID {
+	id, ok := stepNameToID.Get(name)
 	if !ok {
 		id = ulid.Make()
-		stepNameToId.Set(name, id)
+		stepNameToID.Set(name, id)
 	}
 	return id
 }

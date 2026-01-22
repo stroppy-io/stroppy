@@ -22,8 +22,8 @@ func (g GeneratorID) String() string {
 	return string(g)
 }
 
-// should be [T ~R], but it's not allowed by syntax.
-func out[R any, T any](xs []T) []R {
+// Out type params should be [T ~R], but it's not allowed by syntax.
+func Out[R any, T any](xs []T) []R {
 	res := make([]R, 0, len(xs))
 	for _, x := range xs {
 		res = append(res, any(x).(R)) //nolint:errcheck,forcetypeassert // allow panic
@@ -52,7 +52,7 @@ func collectInsertGenerators(
 	for _, group := range descriptor.GetGroups() {
 		generator := generate.NewTupleGenerator(
 			seed,
-			out[generate.GenAbleStruct](group.GetParams()),
+			Out[generate.GenAbleStruct](group.GetParams()),
 		)
 		generators.Set(NewGeneratorID(descriptor.GetName(), group.GetName()), generator)
 	}
@@ -86,7 +86,7 @@ func collectTransactionGenerators(
 	for _, group := range txDescriptor.GetGroups() {
 		generator := generate.NewTupleGenerator(
 			seed,
-			out[generate.GenAbleStruct](group.GetParams()),
+			Out[generate.GenAbleStruct](group.GetParams()),
 		)
 		generators.Set(NewGeneratorID(txDescriptor.GetName(), group.GetName()), generator)
 	}
@@ -129,7 +129,7 @@ func collectQueryGenerators(
 	for _, group := range queryDescriptor.GetGroups() {
 		generator := generate.NewTupleGenerator(
 			seed,
-			out[generate.GenAbleStruct](group.GetParams()),
+			Out[generate.GenAbleStruct](group.GetParams()),
 		)
 		generators.Set(NewGeneratorID(queryDescriptor.GetName(), group.GetName()), generator)
 	}

@@ -1,10 +1,55 @@
 import encoding from "k6/x/encoding";
 globalThis.TextEncoder = encoding.TextEncoder;
 globalThis.TextDecoder = encoding.TextDecoder;
-import stroppy from "k6/x/stroppy";
+import {
+  NewDriverByConfig,
+  NotifyStep,
+  Teardown,
+  NewGeneratorByRuleBin,
+  NewGroupGeneratorByRulesBin,
+} from "k6/x/stroppy";
 
 import { Options } from "k6/options";
-import { GlobalConfig, Status } from "./stroppy.pb.js";
+import {
+  GlobalConfig,
+  Status,
+  Generation_Rule,
+  QueryParamGroup,
+} from "./stroppy.pb.js";
+
+// Sql Driver interface
+// is an interface of stroppy go module
+interface Driver {
+  runQuery(sql: string, args: Record<string, any>): void; // TODO: return value, is it posible to make it generic?
+}
+interface Generator {
+  next(): any;
+}
+declare function NewDriverByConfig(configBin: Uint8Array): Driver;
+declare function NotifyStep(name: String, status: Number): void;
+declare function Teardown(): Error;
+declare function NewGeneratorByRuleBin(
+  seed: Number,
+  rule: Uint8Array,
+): Generator;
+
+declare function NewGroupGeneratorByRulesBin(
+  seed: Number,
+  rule: Uint8Array,
+): Generator;
+
+declare const __ENV: Record<string, string | undefined>;
+declare const __SQL_FILE: string;
+
+function NewGeneratorByRule(seed: Number, rule: Generation_Rule): Generator {
+  return NewGeneratorByRuleBin(seed, Generation_Rule.toBinary(rule));
+}
+function NewGroupGeneratorByRules(
+  seed: Number,
+  rules: QueryParamGroup,
+): Generator {
+  return NewGroupGeneratorByRulesBin(seed, QueryParamGroup.toBinary(rules));
+}
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -18,29 +63,7 @@ export const options: Options = {
   },
 };
 
-// Sql Driver interface
-// is an interface of stroppy go module
-interface Driver {
-  runQuery(sql: string, args: Record<string, any>): void; // TODO: return value, is it posible to make it generic?
-  teardown(): any; // error // TODO: proper error type
-  notifyStep(name: String, status: Status): void;
-  defineConfig(config: GlobalConfig): void;
-  defineConfigBin(config: Uint8Array): void;
-}
-
-const driver: Driver = stroppy;
-
-declare function defineConfig(config: GlobalConfig): void;
-
-if (typeof globalThis.defineConfig !== "function") {
-  globalThis.defineConfig = driver.defineConfigBin;
-}
-
-declare const __ENV: Record<string, string | undefined>;
-declare const __SQL_FILE: string;
-
-// Initialize driver with GlobalConfig
-defineConfig(
+const driver = NewDriverByConfig(
   GlobalConfig.toBinary(
     GlobalConfig.create({
       runId: "",
@@ -75,22 +98,66 @@ defineConfig(
 );
 
 export function setup() {
-  driver.notifyStep("create_schema", Status.STATUS_RUNNING);
-  driver.notifyStep("create_schema", Status.STATUS_COMPLETED);
-  driver.notifyStep("load_data", Status.STATUS_RUNNING);
-  driver.notifyStep("load_data", Status.STATUS_COMPLETED);
-  driver.notifyStep("workload", Status.STATUS_RUNNING);
+  NotifyStep("create_schema", Status.STATUS_RUNNING);
+  NotifyStep("create_schema", Status.STATUS_COMPLETED);
+  NotifyStep("load_data", Status.STATUS_RUNNING);
+  NotifyStep("load_data", Status.STATUS_COMPLETED);
+  NotifyStep("workload", Status.STATUS_RUNNING);
   return;
 }
+const gen = NewGeneratorByRule(
+  0,
+  Generation_Rule.create({
+    kind: { oneofKind: "int32Range", int32Range: { min: 0, max: 100 } },
+  }),
+);
+
+const groupGen = NewGroupGeneratorByRules(
+  0,
+  QueryParamGroup.create({
+    name: "Some",
+    params: [
+      {
+        generationRule: Generation_Rule.create({
+          kind: { oneofKind: "int32Range", int32Range: { min: 1, max: 2 } },
+          unique: true,
+        }),
+      },
+      {
+        generationRule: Generation_Rule.create({
+          kind: { oneofKind: "int32Range", int32Range: { min: 1, max: 3 } },
+          unique: true,
+        }),
+      },
+      {
+        generationRule: Generation_Rule.create({
+          kind: { oneofKind: "boolRange", boolRange: { ratio: 1 } },
+          unique: true,
+        }),
+      },
+    ],
+  }),
+);
 
 export function workload() {
+  const value = gen.next();
+  console.log("value is", value);
   driver.runQuery("select 1;", {});
-  driver.runQuery("select 13;", {});
+  driver.runQuery("select 90000 + :value + :second;", {
+    value,
+    second: gen.next(),
+  });
+
   driver.runQuery("select :a::int + :b::int", { a: 34, b: 35 });
   driver.runQuery("select 'Hello, ' || :a || '!'", { a: "world" });
+
+  for (let i = 0; i < 12; i++) {
+    const [a, b, c] = groupGen.next();
+    console.log("a", a, "b", b, "c", c);
+  }
 }
 
 export function teardown() {
-  driver.notifyStep("workload", Status.STATUS_COMPLETED);
-  driver.teardown();
+  NotifyStep("workload", Status.STATUS_COMPLETED);
+  Teardown();
 }

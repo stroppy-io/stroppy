@@ -73,13 +73,11 @@ func TranspileTypeScript(entryPath string) (string, error) {
 // that are used during config extraction (before k6 runtime).
 type stroppyStub struct{}
 
-func (s stroppyStub) ParseConfig(_ []byte) {}
+func (s stroppyStub) RunQuery(_ []byte) []byte { return nil }
 
 func (s stroppyStub) RunUnit(_ []byte) []byte { return nil }
 
 func (s stroppyStub) InsertValues(_ []byte, _ int64) []byte { return nil }
-
-func (s stroppyStub) NotifyStep(_ string, _ int32) {}
 
 func (s stroppyStub) Teardown() error { return nil }
 
@@ -197,6 +195,10 @@ func prepareVMEnvironment(
 		return fmt.Errorf("failed to set __SQL_FILE: %w", err)
 	}
 
+	if err := vm.Set("NewGeneratorByRuleBin", func() {}); err != nil {
+		return fmt.Errorf("failed to set NewGeneratorByRuleBin: %w", err)
+	}
+
 	return nil
 }
 
@@ -207,7 +209,7 @@ func setupConfigExtraction(vm *sobek.Runtime, extractor *configExtractor) error 
 		return err
 	}
 
-	if err := vm.Set("defineConfig", extractor.extract); err != nil {
+	if err := vm.Set("NewDriverByConfig", extractor.extract); err != nil {
 		return err
 	}
 
