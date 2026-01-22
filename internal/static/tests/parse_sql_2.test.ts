@@ -1,8 +1,44 @@
-import { describe, it, expect } from 'vitest';
-import { parse_sql, ParsedQuery } from '../parse_sql_2.ts';
+import { describe, it, expect } from "vitest";
+import {
+  parse_sql,
+  parse_sql_with_groups,
+  ParsedQuery,
+} from "../parse_sql_2.ts";
 
-describe('parse_sql', () => {
-  it('should parse a single query with name and SQL', () => {
+describe("parse_sql_with_groups", () => {
+  it("should parse groups of queries", () => {
+    const sqlContent = `--+ group one
+--= some query
+Select 1;
+--= some other
+Select 2;
+--+ group two
+--+ group three
+-- its empty`;
+    const result = parse_sql_with_groups(sqlContent);
+    expect(result).toEqual({
+      "group one": [
+        {
+          name: "some query",
+          params: [],
+          sql: "Select 1;",
+          type: "Other",
+        },
+        {
+          name: "some other",
+          params: [],
+          sql: "Select 2;",
+          type: "Other",
+        },
+      ],
+      "group three": [],
+      "group two": [],
+    });
+  });
+});
+
+describe("parse_sql", () => {
+  it("should parse a single query with name and SQL", () => {
     const sqlContent = `--= create_table
 CREATE TABLE users (
   id INTEGER PRIMARY KEY,
@@ -12,15 +48,15 @@ CREATE TABLE users (
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'create_table',
-        sql: '\nCREATE TABLE users (\n  id INTEGER PRIMARY KEY,\n  name TEXT\n);',
+        name: "create_table",
+        sql: "CREATE TABLE users (\n  id INTEGER PRIMARY KEY,\n  name TEXT\n);",
         params: [],
-        type: 'CreateTable',
+        type: "CreateTable",
       },
     ]);
   });
 
-  it('should parse multiple queries', () => {
+  it("should parse multiple queries", () => {
     const sqlContent = `--= create_table
 CREATE TABLE users (
   id INTEGER PRIMARY KEY
@@ -35,27 +71,27 @@ SELECT * FROM users;`;
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'create_table',
-        sql: '\nCREATE TABLE users (\n  id INTEGER PRIMARY KEY\n);\n',
+        name: "create_table",
+        sql: "CREATE TABLE users (\n  id INTEGER PRIMARY KEY\n);",
         params: [],
-        type: 'CreateTable',
+        type: "CreateTable",
       },
       {
-        name: 'insert_data',
-        sql: "\nINSERT INTO users (id, name) VALUES (1, 'Alice');\n",
+        name: "insert_data",
+        sql: "INSERT INTO users (id, name) VALUES (1, 'Alice');",
         params: [],
-        type: 'Insert',
+        type: "Insert",
       },
       {
-        name: 'select_data',
-        sql: '\nSELECT * FROM users;',
+        name: "select_data",
+        sql: "SELECT * FROM users;",
         params: [],
-        type: 'Other',
+        type: "Other",
       },
     ]);
   });
 
-  it('should skip comment lines starting with --', () => {
+  it("should skip comment lines starting with --", () => {
     const sqlContent = `--= create_table
 -- This is a comment
 CREATE TABLE users (
@@ -69,26 +105,26 @@ INSERT INTO users VALUES (1);`;
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'create_table',
-        sql: '\nCREATE TABLE users (\n  id INTEGER PRIMARY KEY\n);',
+        name: "create_table",
+        sql: "CREATE TABLE users (\n  id INTEGER PRIMARY KEY\n);",
         params: [],
-        type: 'CreateTable',
+        type: "CreateTable",
       },
       {
-        name: 'insert_data',
-        sql: '\nINSERT INTO users VALUES (1);',
+        name: "insert_data",
+        sql: "INSERT INTO users VALUES (1);",
         params: [],
-        type: 'Insert',
+        type: "Insert",
       },
     ]);
   });
 
-  it('should handle empty SQL content', () => {
-    const result = parse_sql('');
+  it("should handle empty SQL content", () => {
+    const result = parse_sql("");
     expect(result).toEqual([]);
   });
 
-  it('should handle SQL content with only comments', () => {
+  it("should handle SQL content with only comments", () => {
     const sqlContent = `-- This is just a comment
 -- Another comment`;
 
@@ -96,7 +132,7 @@ INSERT INTO users VALUES (1);`;
     expect(result).toEqual([]);
   });
 
-  it('should handle query name without SQL', () => {
+  it("should handle query name without SQL", () => {
     const sqlContent = `--= empty_query
 --= another_query
 SELECT 1;`;
@@ -104,15 +140,21 @@ SELECT 1;`;
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'another_query',
-        sql: '\nSELECT 1;',
+        name: "empty_query",
+        sql: "",
         params: [],
-        type: 'Other',
+        type: "Invalid",
+      },
+      {
+        name: "another_query",
+        sql: "SELECT 1;",
+        params: [],
+        type: "Other",
       },
     ]);
   });
 
-  it('should handle multiline SQL statements', () => {
+  it("should handle multiline SQL statements", () => {
     const sqlContent = `--= complex_query
 SELECT 
   u.id,
@@ -126,30 +168,30 @@ HAVING COUNT(o.id) > 5;`;
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'complex_query',
-        sql: '\nSELECT \n  u.id,\n  u.name,\n  COUNT(o.id) as order_count\nFROM users u\nLEFT JOIN orders o ON u.id = o.user_id\nGROUP BY u.id, u.name\nHAVING COUNT(o.id) > 5;',
+        name: "complex_query",
+        sql: "SELECT\n  u.id,\n  u.name,\n  COUNT(o.id) as order_count\nFROM users u\nLEFT JOIN orders o ON u.id = o.user_id\nGROUP BY u.id, u.name\nHAVING COUNT(o.id) > 5;",
         params: [],
-        type: 'Other',
+        type: "Other",
       },
     ]);
   });
 
-  it('should handle query name with trailing spaces', () => {
+  it("should handle query name with trailing spaces", () => {
     const sqlContent = `--= query_name   
 SELECT 1;`;
 
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'query_name   ',
-        sql: '\nSELECT 1;',
+        name: "query_name",
+        sql: "SELECT 1;",
         params: [],
-        type: 'Other',
+        type: "Other",
       },
     ]);
   });
 
-  it('should handle empty lines in SQL', () => {
+  it("should handle empty lines in SQL", () => {
     const sqlContent = `--= create_table
 CREATE TABLE users (
   id INTEGER PRIMARY KEY
@@ -162,21 +204,21 @@ INSERT INTO users VALUES (1);`;
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'create_table',
-        sql: '\nCREATE TABLE users (\n  id INTEGER PRIMARY KEY\n);\n\n',
+        name: "create_table",
+        sql: "CREATE TABLE users (\n  id INTEGER PRIMARY KEY\n);",
         params: [],
-        type: 'CreateTable',
+        type: "CreateTable",
       },
       {
-        name: 'insert_data',
-        sql: '\nINSERT INTO users VALUES (1);',
+        name: "insert_data",
+        sql: "INSERT INTO users VALUES (1);",
         params: [],
-        type: 'Insert',
+        type: "Insert",
       },
     ]);
   });
 
-  it('should extract parameters from SQL queries', () => {
+  it("should extract parameters from SQL queries", () => {
     const sqlContent = `--= insert_with_params
 INSERT INTO users (id, name, email) VALUES (:id, :name, :email);
 
@@ -186,93 +228,92 @@ SELECT * FROM users WHERE id = :id AND status = :status;`;
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'insert_with_params',
-        sql: '\nINSERT INTO users (id, name, email) VALUES (:id, :name, :email);\n',
-        params: ['id', 'name', 'email'],
-        type: 'Insert',
+        name: "insert_with_params",
+        sql: "INSERT INTO users (id, name, email) VALUES (:id, :name, :email);",
+        params: ["id", "name", "email"],
+        type: "Insert",
       },
       {
-        name: 'select_with_params',
-        sql: '\nSELECT * FROM users WHERE id = :id AND status = :status;',
-        params: ['id', 'status'],
-        type: 'Other',
+        name: "select_with_params",
+        sql: "SELECT * FROM users WHERE id = :id AND status = :status;",
+        params: ["id", "status"],
+        type: "Other",
       },
     ]);
   });
 
-  it('should handle duplicate parameters (only include once)', () => {
+  it("should handle duplicate parameters (only include once)", () => {
     const sqlContent = `--= query_with_duplicates
 SELECT * FROM users WHERE id = :id OR parent_id = :id;`;
 
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'query_with_duplicates',
-        sql: '\nSELECT * FROM users WHERE id = :id OR parent_id = :id;',
-        params: ['id'],
-        type: 'Other',
+        name: "query_with_duplicates",
+        sql: "SELECT * FROM users WHERE id = :id OR parent_id = :id;",
+        params: ["id"],
+        type: "Other",
       },
     ]);
   });
 
-  it('should handle parameters at end of line', () => {
+  it("should handle parameters at end of line", () => {
     const sqlContent = `--= query_end_param
 SELECT * FROM users WHERE id = :id`;
 
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'query_end_param',
-        sql: '\nSELECT * FROM users WHERE id = :id',
-        params: ['id'],
-        type: 'Other',
+        name: "query_end_param",
+        sql: "SELECT * FROM users WHERE id = :id",
+        params: ["id"],
+        type: "Other",
       },
     ]);
   });
 
-  it('should handle parameters with underscores', () => {
+  it("should handle parameters with underscores", () => {
     const sqlContent = `--= query_underscore
 SELECT * FROM users WHERE user_id = :user_id AND account_name = :account_name;`;
 
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'query_underscore',
-        sql: '\nSELECT * FROM users WHERE user_id = :user_id AND account_name = :account_name;',
-        params: ['user_id', 'account_name'],
-        type: 'Other',
+        name: "query_underscore",
+        sql: "SELECT * FROM users WHERE user_id = :user_id AND account_name = :account_name;",
+        params: ["user_id", "account_name"],
+        type: "Other",
       },
     ]);
   });
 
-  it('should detect invalid SQL', () => {
+  it("should detect invalid SQL", () => {
     const sqlContent = `--= invalid_query
 SELECT * FROM WHERE id = 1;`;
 
     const result = parse_sql(sqlContent);
     expect(result).toEqual([
       {
-        name: 'invalid_query',
-        sql: '\nSELECT * FROM WHERE id = 1;',
+        name: "invalid_query",
+        sql: "SELECT * FROM WHERE id = 1;",
         params: [],
-        type: 'Invalid',
+        type: "Invalid",
       },
     ]);
   });
 
-  it('should accept database option', () => {
+  it("should accept database option", () => {
     const sqlContent = `--= create_table
 CREATE TABLE users (id INTEGER PRIMARY KEY);`;
 
-    const result = parse_sql(sqlContent, { database: 'PostgreSQL' });
+    const result = parse_sql(sqlContent, { database: "PostgreSQL" });
     expect(result).toEqual([
       {
-        name: 'create_table',
-        sql: '\nCREATE TABLE users (id INTEGER PRIMARY KEY);',
+        name: "create_table",
+        sql: "CREATE TABLE users (id INTEGER PRIMARY KEY);",
         params: [],
-        type: 'CreateTable',
+        type: "CreateTable",
       },
     ]);
   });
 });
-

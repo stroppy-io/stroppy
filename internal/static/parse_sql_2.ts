@@ -1,4 +1,5 @@
 import { Parser } from "node-sql-parser";
+import { parse } from "path";
 
 type QueryType = "CreateTable" | "Insert" | "Other" | "Invalid";
 
@@ -27,32 +28,69 @@ export interface ParsedQuery {
   type: QueryType;
   params: string[];
 }
+const GroupNamePrefix = "--+ ";
 
-export function parse_sql(
+export function parse_sql_with_groups(
   sqlContent: string,
   options: ParseOptions = {},
+): Record<string, ParsedQuery[]> {
+  let lines = sqlContent.split("\n");
+  let groups: Record<string, ParsedQuery[]> = {};
+  let group: string[] = [];
+  let name: string = "";
+  for (let line of lines) {
+    let trimmed = line.trim();
+    if (trimmed.startsWith(GroupNamePrefix)) {
+      let parsed_group = parse_sql(group, options);
+      if (name == "" && parsed_group.length === 0) {
+        name = trimmed.replace(GroupNamePrefix, "");
+        continue;
+      }
+      groups[name] = parsed_group;
+      name = trimmed.replace(GroupNamePrefix, "");
+      group = [];
+    } else {
+      group.push(line);
+    }
+  }
+  let parsed_group = parse_sql(group, options);
+  if (name == "" && parsed_group.length === 0) {
+    return groups;
+  }
+  groups[name] = parsed_group;
+  return groups;
+}
+
+const QueryNamePrefix = "--= ";
+const CommentLinePrefix = "--";
+
+export function parse_sql(
+  sqlContent: string | string[],
+  options: ParseOptions = {},
 ): ParsedQuery[] {
-  const lines = sqlContent.split("\n");
+  const lines = Array.isArray(sqlContent) ? sqlContent : sqlContent.split("\n");
   const parser = new Parser();
 
   let queries: ParsedQuery[] = [];
 
   let name: string | null = null;
-  let sql: string | null = null;
+  let sql: string[] = [];
 
   for (let line of lines) {
-    if (line.startsWith("--= ")) {
-      addQuery(queries, name, sql, parser, options);
-      name = line.replace("--= ", "");
-      sql = null;
-    } else if (line.startsWith("--")) {
+    line = line.trimEnd();
+    let trimmedStart = line.trimStart();
+    if (trimmedStart.startsWith(QueryNamePrefix)) {
+      addQuery(queries, name, sql.join("\n").trim(), parser, options);
+      name = line.replace(QueryNamePrefix, "");
+      sql.length = 0;
+    } else if (trimmedStart.startsWith(CommentLinePrefix)) {
       continue; // skip comments
     } else {
-      sql = (sql || "") + "\n" + line;
+      sql.push(line);
     }
   }
   // Add the last query if there is one
-  addQuery(queries, name, sql, parser, options);
+  addQuery(queries, name, sql.join("\n").trim(), parser, options);
   return queries;
 }
 

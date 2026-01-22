@@ -15,8 +15,10 @@ import {
   Generation_Rule,
   InsertDescriptor,
 } from "./stroppy.pb.js";
+import { parse_sql_with_groups } from "./parse_sql_2.js";
 
 declare const __ENV: Record<string, string | undefined>;
+declare const __SQL_FILE: string;
 
 // Sql Driver interface
 interface Driver {
@@ -86,6 +88,8 @@ const driver = NewDriverByConfig(
     }),
   ),
 );
+
+const sections = parse_sql_with_groups(open(__SQL_FILE));
 
 // Create generators for data loading
 const branchIdGen = NewGeneratorByRule(
@@ -162,109 +166,13 @@ export function setup() {
   NotifyStep("create_schema", Status.STATUS_RUNNING);
 
   // Drop tables if they exist
-  driver.runQuery("DROP FUNCTION IF EXISTS tpcb_transaction", {});
-  driver.runQuery("DROP TABLE IF EXISTS pgbench_history CASCADE", {});
-  driver.runQuery("DROP TABLE IF EXISTS pgbench_accounts CASCADE", {});
-  driver.runQuery("DROP TABLE IF EXISTS pgbench_tellers CASCADE", {});
-  driver.runQuery("DROP TABLE IF EXISTS pgbench_branches CASCADE", {});
+  sections["section cleanup"].forEach((query) =>
+    driver.runQuery(query.sql, {}),
+  );
 
   // Create pgbench_branches table
-  driver.runQuery(
-    `CREATE TABLE pgbench_branches (
-    bid INTEGER PRIMARY KEY,
-    bbalance INTEGER,
-    filler CHAR(88)
-  )`,
-    {},
-  );
-
-  // Create pgbench_tellers table
-  driver.runQuery(
-    `CREATE TABLE pgbench_tellers (
-    tid INTEGER PRIMARY KEY,
-    bid INTEGER,
-    tbalance INTEGER,
-    filler CHAR(84)
-  )`,
-    {},
-  );
-
-  // Create pgbench_accounts table
-  driver.runQuery(
-    `CREATE TABLE pgbench_accounts (
-    aid INTEGER PRIMARY KEY,
-    bid INTEGER,
-    abalance INTEGER,
-    filler CHAR(84)
-  )`,
-    {},
-  );
-
-  // Create pgbench_history table
-  driver.runQuery(
-    `CREATE TABLE pgbench_history (
-    tid INTEGER,
-    bid INTEGER,
-    aid INTEGER,
-    delta INTEGER,
-    mtime TIMESTAMP,
-    filler CHAR(22)
-  )`,
-    {},
-  );
-
-  // Create indexes
-  driver.runQuery(
-    "CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid)",
-    {},
-  );
-  driver.runQuery(
-    "CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid)",
-    {},
-  );
-
-  // Create tpcb_transaction function
-  driver.runQuery(
-    `CREATE OR REPLACE FUNCTION tpcb_transaction(
-    p_aid INTEGER,
-    p_tid INTEGER,
-    p_bid INTEGER,
-    p_delta INTEGER
-)
-RETURNS INTEGER
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    v_balance INTEGER;
-BEGIN
-    -- Update account balance
-    UPDATE pgbench_accounts
-    SET abalance = abalance + p_delta
-    WHERE pgbench_accounts.aid = p_aid;
-
-    -- Get the updated account balance
-    SELECT pgbench_accounts.abalance INTO v_balance
-    FROM pgbench_accounts
-    WHERE pgbench_accounts.aid = p_aid;
-
-    -- Update teller balance
-    UPDATE pgbench_tellers
-    SET tbalance = tbalance + p_delta
-    WHERE pgbench_tellers.tid = p_tid;
-
-    -- Update branch balance
-    UPDATE pgbench_branches
-    SET bbalance = bbalance + p_delta
-    WHERE pgbench_branches.bid = p_bid;
-
-    -- Insert history record
-    INSERT INTO pgbench_history (tid, bid, aid, delta, mtime, filler)
-    VALUES (p_tid, p_bid, p_aid, p_delta, CURRENT_TIMESTAMP, 'tpcb_tx');
-
-    RETURN v_balance;
-END;
-$$;`,
-    {},
+  sections["section create_schema"].forEach((query) =>
+    driver.runQuery(query.sql, {}),
   );
 
   NotifyStep("create_schema", Status.STATUS_COMPLETED);
@@ -451,10 +359,9 @@ $$;`,
   NotifyStep("load_data", Status.STATUS_COMPLETED);
 
   // Analyze tables
-  driver.runQuery("VACUUM ANALYZE pgbench_branches", {});
-  driver.runQuery("VACUUM ANALYZE pgbench_tellers", {});
-  driver.runQuery("VACUUM ANALYZE pgbench_accounts", {});
-  driver.runQuery("VACUUM ANALYZE pgbench_history", {});
+  sections["section analyze"].forEach((query) =>
+    driver.runQuery(query.sql, {}),
+  );
 
   NotifyStep("workload", Status.STATUS_RUNNING);
   return;

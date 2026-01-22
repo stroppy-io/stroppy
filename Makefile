@@ -297,13 +297,13 @@ run-execute-sql-test:
 run-tpcb-test:
 	rm -rf dev
 	./build/stroppy gen --workdir dev --preset=tpcb
-	cd dev && ./stroppy run tpcb.ts
+	cd dev && ./stroppy run tpcb.ts tpcb.sql
 
 .PHONY: run-tpcc-test
 run-tpcc-test:
 	rm -rf dev
 	./build/stroppy gen --workdir dev --preset=tpcc
-	cd dev && ./stroppy run tpcc.ts
+	cd dev && ./stroppy run tpcc.ts tpcc.sql
 
 ##
 ## TypeScript Development
