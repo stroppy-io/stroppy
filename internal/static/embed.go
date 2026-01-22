@@ -28,6 +28,8 @@ const (
 	ParseSQL2JSFileName     FileName = "parse_sql_2.js"
 	AnalyzeDDLTSFileName    FileName = "analyze_ddl.ts"
 	AnalyzeDDLJSFileName    FileName = "analyze_ddl.js"
+	StroppyDTSFileName      FileName = "stroppy.d.ts"
+	TSConfigFileName        FileName = "tsconfig.json"
 )
 
 // StaticFiles are copied to temp dir for k6 execution.
@@ -39,6 +41,7 @@ var StaticFiles = []FileName{ //nolint: gochecknoglobals
 	ParseSQL2JSFileName,
 	AnalyzeDDLJSFileName,
 	ApplyGeneratorsFileName,
+	StroppyDTSFileName,
 }
 
 // DevStaticFiles are additional files for development environment.
@@ -47,6 +50,7 @@ var DevStaticFiles = []FileName{ //nolint: gochecknoglobals
 	AnalyzeDDLTSFileName,
 	ParseSQL2TSFileName,
 	ProtoTSFileName,
+	TSConfigFileName,
 }
 
 var Binaries = []FileName{ //nolint: gochecknoglobals
@@ -57,7 +61,9 @@ var Binaries = []FileName{ //nolint: gochecknoglobals
 //go:embed stroppy-k6
 //go:embed *.js
 //go:embed *.ts
+//go:embed *.d.ts
 //go:embed *.pb.*
+//go:embed tsconfig.json
 var Content embed.FS
 
 func CopyStaticFilesToPath(targetPath string, perm os.FileMode, files ...FileName) error {

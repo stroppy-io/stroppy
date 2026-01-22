@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "dom"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": [],
+    "noEmit": true,
+    "skipLibCheck": true,
+    "paths": {
+      "./helpers.ts": ["../internal/static/helpers.ts"],
+      "./stroppy.d.ts": ["../internal/static/stroppy.d.ts"],
+      "./stroppy.pb.js": ["../internal/static/stroppy.pb.js"]
+    }
+  },
+  "include": ["**/*.ts", "../internal/static/stroppy.d.ts"]
+}

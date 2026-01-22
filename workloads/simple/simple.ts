@@ -16,40 +16,7 @@ import {
   Generation_Rule,
   QueryParamGroup,
 } from "./stroppy.pb.js";
-
-// Sql Driver interface
-// is an interface of stroppy go module
-interface Driver {
-  runQuery(sql: string, args: Record<string, any>): void; // TODO: return value, is it posible to make it generic?
-}
-interface Generator {
-  next(): any;
-}
-declare function NewDriverByConfig(configBin: Uint8Array): Driver;
-declare function NotifyStep(name: String, status: Number): void;
-declare function Teardown(): Error;
-declare function NewGeneratorByRuleBin(
-  seed: Number,
-  rule: Uint8Array,
-): Generator;
-
-declare function NewGroupGeneratorByRulesBin(
-  seed: Number,
-  rule: Uint8Array,
-): Generator;
-
-declare const __ENV: Record<string, string | undefined>;
-declare const __SQL_FILE: string;
-
-function NewGeneratorByRule(seed: Number, rule: Generation_Rule): Generator {
-  return NewGeneratorByRuleBin(seed, Generation_Rule.toBinary(rule));
-}
-function NewGroupGeneratorByRules(
-  seed: Number,
-  rules: QueryParamGroup,
-): Generator {
-  return NewGroupGeneratorByRulesBin(seed, QueryParamGroup.toBinary(rules));
-}
+import { NewGeneratorByRule, NewGroupGeneratorByRules } from "./helpers.ts";
 
 export const options: Options = {
   setupTimeout: "5m",

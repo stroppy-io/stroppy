@@ -1,3 +1,5 @@
+/// <reference path="./stroppy.d.ts" />
+
 import {
   GlobalConfig,
   UnitDescriptor,
@@ -5,28 +7,46 @@ import {
   Status,
   DriverTransactionStat,
   InsertDescriptor,
+  Generation_Rule,
+  QueryParamGroup,
 } from "./stroppy.pb.js";
+import type { Driver, Generator, BinMsg } from "./stroppy.d.ts";
 
-// protobuf serialized messages
-export type BinMsg<_T extends any> = Uint8Array;
+// Re-export BinMsg for convenience
+export type { BinMsg } from "./stroppy.d.ts";
 
-// Driver interface
-export interface Driver {
-  runUnit(unit: BinMsg<UnitDescriptor>): BinMsg<DriverTransactionStat>;
-  insertValues(
-    insert: BinMsg<InsertDescriptor>,
-    count: number,
-  ): BinMsg<DriverTransactionStat>;
+import {
+  NewGeneratorByRuleBin,
+  NewGroupGeneratorByRulesBin,
+} from "k6/x/stroppy";
 
-  runQuery(sql: string, args: Record<string, any>): void; // TODO: return value, is it posible to make it generic?
+// Re-export types from stroppy.d.ts for convenience
+export type { Driver, Generator } from "./stroppy.d.ts";
+
+// Functions are available from k6 module at runtime (declared in stroppy.d.ts for types)
+declare function NewGeneratorByRuleBin(
+  seed: Number,
+  rule: Uint8Array,
+): Generator;
+declare function NewGroupGeneratorByRulesBin(
+  seed: Number,
+  rule: Uint8Array,
+): Generator;
+
+// Generator wrapper functions - provide convenient protobuf-based API
+export function NewGeneratorByRule(
+  seed: Number,
+  rule: Generation_Rule,
+): Generator {
+  return NewGeneratorByRuleBin(seed, Generation_Rule.toBinary(rule));
 }
 
-export declare function NewDriverByConfig(configBin: Uint8Array): Driver;
-export declare function NotifyStep(name: String, status: Number): void;
-export declare function Teardown(): Error;
-
-export declare const __ENV: Record<string, string | undefined>;
-export declare const __SQL_FILE: string;
+export function NewGroupGeneratorByRules(
+  seed: Number,
+  rules: QueryParamGroup,
+): Generator {
+  return NewGroupGeneratorByRulesBin(seed, QueryParamGroup.toBinary(rules));
+}
 
 // Run a single unit descriptor
 export function RunUnit(driver: Driver, unit: UnitDescriptor): void {
