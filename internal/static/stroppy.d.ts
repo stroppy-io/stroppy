@@ -2,9 +2,12 @@
 // These declarations provide TypeScript/LSP support for the k6 module API
 
 import type {
+  GlobalConfig,
   UnitDescriptor,
   DriverTransactionStat,
   InsertDescriptor,
+  Generation_Rule,
+  QueryParamGroup,
 } from "./stroppy.pb.js";
 
 declare module "k6/x/stroppy" {
@@ -18,7 +21,7 @@ declare module "k6/x/stroppy" {
       insert: BinMsg<InsertDescriptor>,
       count: number,
     ): BinMsg<DriverTransactionStat>;
-    runQuery(sql: string, args: Record<string, any>): void; // TODO: return value, is it posible to make it generic?
+    runQuery(sql: string, args: Record<string, any>): Error;
   }
 
   // Generator interface - provides data generation
@@ -27,15 +30,17 @@ declare module "k6/x/stroppy" {
   }
 
   // k6 module functions provided by Go module
-  export declare function NewDriverByConfig(configBin: BinMsg<any>): Driver;
   export declare function NotifyStep(name: String, status: Number): void;
   export declare function Teardown(): Error;
+  export declare function NewDriverByConfigBin(
+    configBin: BinMsg<GlobalConfig>,
+  ): Driver;
   export declare function NewGeneratorByRuleBin(
     seed: Number,
-    rule: BinMsg<any>,
+    rule: BinMsg<Generation_Rule>,
   ): Generator;
   export declare function NewGroupGeneratorByRulesBin(
     seed: Number,
-    rule: BinMsg<any>,
+    rule: BinMsg<QueryParamGroup>,
   ): Generator;
 }
