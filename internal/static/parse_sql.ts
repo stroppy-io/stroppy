@@ -1,10 +1,4 @@
-import {
-  WorkloadDescriptor,
-  QueryDescriptor,
-  TransactionDescriptor,
-  UnitDescriptor,
-  TxIsolationLevel,
-} from "./stroppy.pb.js";
+import { WorkloadDescriptor } from "./stroppy.pb.js";
 
 // Parsed structure for intermediate representation
 interface ParsedQuery {
