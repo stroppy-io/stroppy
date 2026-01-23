@@ -5,7 +5,6 @@ DROP FUNCTION IF EXISTS SLEV, OSTAT, DELIVERY, PAYMENT, NEWORD, DBMS_RANDOM;
 DROP TABLE IF EXISTS order_line, new_order, orders, history, stock, customer, district, warehouse, item CASCADE;
 
 --+ create_schema
-
 --= query
 CREATE TABLE warehouse (
   w_id INTEGER PRIMARY KEY,

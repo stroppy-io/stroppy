@@ -18,30 +18,6 @@ import {
 
 import { parse_sql_with_groups } from "./parse_sql_2.js";
 
-// Sql Driver interface
-interface Driver {
-  runQuery(sql: string, args: Record<string, any>): void;
-  insertValues(insert: Uint8Array, count: number): void;
-}
-interface Generator {
-  next(): any;
-}
-
-declare function NewDriverByConfig(configBin: Uint8Array): Driver;
-declare function NotifyStep(name: String, status: Number): void;
-declare function Teardown(): Error;
-declare function NewGeneratorByRuleBin(
-  seed: Number,
-  rule: Uint8Array,
-): Generator;
-
-declare const __ENV: Record<string, string | undefined>;
-declare const __SQL_FILE: string;
-
-function NewGeneratorByRule(seed: Number, rule: Generation_Rule): Generator {
-  return NewGeneratorByRuleBin(seed, Generation_Rule.toBinary(rule));
-}
-
 const DURATION = __ENV.DURATION || "5m";
 
 export const options: Options = {

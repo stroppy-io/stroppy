@@ -20,6 +20,10 @@ import {
   NewGroupGeneratorByRulesBin,
 } from "k6/x/stroppy";
 
+// k6 environment variables
+export declare const __ENV: Record<string, string | undefined>;
+export declare const __SQL_FILE: string;
+
 // Re-export types from stroppy.d.ts for convenience
 export type { Driver, Generator } from "./stroppy.d.ts";
 

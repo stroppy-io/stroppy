@@ -29,6 +29,7 @@ const (
 	AnalyzeDDLTSFileName    FileName = "analyze_ddl.ts"
 	AnalyzeDDLJSFileName    FileName = "analyze_ddl.js"
 	StroppyDTSFileName      FileName = "stroppy.d.ts"
+	K6DTSFileName           FileName = "k6.d.ts"
 	TSConfigFileName        FileName = "tsconfig.json"
 )
 
@@ -42,6 +43,7 @@ var StaticFiles = []FileName{ //nolint: gochecknoglobals
 	AnalyzeDDLJSFileName,
 	ApplyGeneratorsFileName,
 	StroppyDTSFileName,
+	K6DTSFileName,
 }
 
 // DevStaticFiles are additional files for development environment.
