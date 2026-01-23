@@ -30,7 +30,7 @@ jobs:
 
       - name: Mock files
         run: |
-          echo ".gitkeep" | tee internal/static/stroppy-xk6
+          echo ".gitkeep" | tee internal/static/stroppy-k6
 
       - name: Install linter dependencies
         run: make .install-linter

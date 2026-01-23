@@ -262,8 +262,8 @@ build: # Build binary stroppy
 		-ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'" \
 		$(CURDIR)/cmd/stroppy
 
-.PHONY: build-all-linux-x64
-build-all-linux-x64: build-k6 build
+.PHONY: build-all
+build-all: build-k6 build
 
 branch=main
 .PHONY: revision
