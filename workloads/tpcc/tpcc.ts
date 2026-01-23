@@ -7,7 +7,7 @@ import { NotifyStep, Teardown } from "k6/x/stroppy";
 
 import { Status, InsertDescriptor } from "./stroppy.pb.js";
 import { NewDriverByConfig, NewGeneratorByRule } from "./helpers.ts";
-import { parse_sql_with_groups } from "./parse_sql_2.js";
+import { parse_sql_with_groups } from "./parse_sql.js";
 
 const DURATION = __ENV.DURATION || "5m";
 

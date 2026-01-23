@@ -84,49 +84,29 @@ async function buildProtobufSDK() {
     console.log("✓ Protobuf SDK built successfully");
 }
 
-async function buildAnalyzeDDL() {
-    console.log("Building analyze_ddl...");
+async function buildParseSQL() {
+    console.log("Building parse_sql...");
 
     await esbuild.build({
-        entryPoints: [path.join(__dirname, "analyze_ddl.ts")],
+        entryPoints: [path.join(__dirname, "parse_sql.ts")],
         bundle: true,
         format: "esm",
         platform: "node",
         target: "es2020",
-        outfile: path.join(__dirname, "dist", "analyze_ddl.js"),
+        outfile: path.join(__dirname, "dist", "parse_sql.js"),
         external: ["k6", "k6/*", "./stroppy.pb.js"],
         minify: isMinify,
         sourcemap: false,
         mainFields: ["module", "main"],
     });
 
-    console.log("✓ analyze_ddl built successfully");
-}
-
-async function buildParseSQL2() {
-    console.log("Building parse_sql_2...");
-
-    await esbuild.build({
-        entryPoints: [path.join(__dirname, "parse_sql_2.ts")],
-        bundle: true,
-        format: "esm",
-        platform: "node",
-        target: "es2020",
-        outfile: path.join(__dirname, "dist", "parse_sql_2.js"),
-        external: ["k6", "k6/*", "./stroppy.pb.js"],
-        minify: isMinify,
-        sourcemap: false,
-        mainFields: ["module", "main"],
-    });
-
-    console.log("✓ parse_sql_2 built successfully");
+    console.log("✓ parse_sql built successfully");
 }
 
 async function main() {
     fs.mkdirSync(path.join(__dirname, "dist"), { recursive: true });
     await buildProtobufSDK();
-    await buildAnalyzeDDL();
-    await buildParseSQL2();
+    await buildParseSQL();
     console.log("\n✓ All bundles built successfully!");
 }
 
