@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  parse_sql,
-  parse_sql_with_groups,
-  ParsedQuery,
-} from "../parse_sql_2.ts";
+import { parse_sql, parse_sql_with_groups } from "../parse_sql.ts";
 
 describe("parse_sql_with_groups", () => {
   it("should parse groups of queries", () => {
