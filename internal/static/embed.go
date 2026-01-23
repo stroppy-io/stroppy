@@ -17,17 +17,16 @@ func (f FileName) String() string {
 }
 
 const (
-	PackageJSONFileName     FileName = "package.json"
-	ProtoTSFileName         FileName = "stroppy.pb.ts"
-	ProtoJSFileName         FileName = "stroppy.pb.js"
-	K6PluginFileName        FileName = "stroppy-k6"
-	ApplyGeneratorsFileName FileName = "apply_generators.ts"
-	HelpersFileName         FileName = "helpers.ts"
-	ParseSQLFileName        FileName = "parse_sql.ts"
-	ParseSQL2TSFileName     FileName = "parse_sql_2.ts"
-	ParseSQL2JSFileName     FileName = "parse_sql_2.js"
-	AnalyzeDDLTSFileName    FileName = "analyze_ddl.ts"
-	AnalyzeDDLJSFileName    FileName = "analyze_ddl.js"
+	PackageJSONFileName FileName = "package.json"
+	ProtoTSFileName     FileName = "stroppy.pb.ts"
+	ProtoJSFileName     FileName = "stroppy.pb.js"
+	K6PluginFileName    FileName = "stroppy-k6"
+	HelpersFileName     FileName = "helpers.ts"
+	ParseSQLTSFileName  FileName = "parse_sql.ts"
+	ParseSQLJSFileName  FileName = "parse_sql.js"
+	StroppyDTSFileName  FileName = "stroppy.d.ts"
+	K6DTSFileName       FileName = "k6.d.ts"
+	TSConfigFileName    FileName = "tsconfig.json"
 )
 
 // StaticFiles are copied to temp dir for k6 execution.
@@ -35,18 +34,17 @@ var StaticFiles = []FileName{ //nolint: gochecknoglobals
 	ProtoJSFileName,
 	K6PluginFileName,
 	HelpersFileName,
-	ParseSQLFileName,
-	ParseSQL2JSFileName,
-	AnalyzeDDLJSFileName,
-	ApplyGeneratorsFileName,
+	ParseSQLJSFileName,
+	StroppyDTSFileName,
+	K6DTSFileName,
 }
 
 // DevStaticFiles are additional files for development environment.
 var DevStaticFiles = []FileName{ //nolint: gochecknoglobals
 	PackageJSONFileName,
-	AnalyzeDDLTSFileName,
-	ParseSQL2TSFileName,
+	ParseSQLTSFileName,
 	ProtoTSFileName,
+	TSConfigFileName,
 }
 
 var Binaries = []FileName{ //nolint: gochecknoglobals
@@ -57,7 +55,9 @@ var Binaries = []FileName{ //nolint: gochecknoglobals
 //go:embed stroppy-k6
 //go:embed *.js
 //go:embed *.ts
+//go:embed *.d.ts
 //go:embed *.pb.*
+//go:embed tsconfig.json
 var Content embed.FS
 
 func CopyStaticFilesToPath(targetPath string, perm os.FileMode, files ...FileName) error {

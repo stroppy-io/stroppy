@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "__$comment1": "from https://github.com/grafana/k6-template-typescript/blob/main/tsconfig.json",
+    "target": "es5",
+    "moduleResolution": "node",
+    "module": "commonjs",
+    "noEmit": true,
+    "allowJs": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "k6/x/stroppy": ["./stroppy.d.ts"]
+    }
+  },
+  "include": ["*.js", "*.ts", "*.d.ts"]
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "__$comment1": "from https://github.com/grafana/k6-template-typescript/blob/main/tsconfig.json",
+    "target": "es5",
+    "moduleResolution": "bundler",
+    "module": "commonjs",
+    "noEmit": true,
+    "allowJs": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "typeRoots": [
+      "../internal/static/node_modules/@types",
+      "../internal/static/"
+    ],
+    "rootDirs": [".", "../internal/static/"],
+    "paths": {
+      "k6/x/stroppy": ["../internal/static/stroppy.d.ts"]
+    }
+  }
+}

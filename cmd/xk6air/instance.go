@@ -43,7 +43,7 @@ func (i *Instance) Exports() modules.Exports {
 		Default: i,
 		Named: map[string]any{
 			"NotifyStep":                  rootModule.NotifyStep,
-			"NewDriverByConfig":           i.NewDriverByConfig,
+			"NewDriverByConfigBin":        i.NewDriverByConfigBin,
 			"Teardown":                    i.Teardown,
 			"NewGeneratorByRuleBin":       NewGeneratorByRuleBin,
 			"NewGroupGeneratorByRulesBin": NewGroupGeneratorByRulesBin,
@@ -55,7 +55,7 @@ var onceDefineConfig sync.Once
 
 // NewDriverByConfig initializes the driver from GlobalConfig.
 // This is called by scripts using defineConfig(globalConfig) at the top level.
-func (i *Instance) NewDriverByConfig(configBin []byte) *DriverWrapper {
+func (i *Instance) NewDriverByConfigBin(configBin []byte) *DriverWrapper {
 	var globalCfg stroppy.GlobalConfig
 	err := proto.Unmarshal(configBin, &globalCfg)
 	if err != nil {

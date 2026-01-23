@@ -148,18 +148,16 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 # Copy the entire directory structure to preserve relative imports
 	cp -r $(TS_TARGET_DIR) $(TMP_BUNDLE_DIR)/ts_source
 # Copy analyze_ddl source before building
-	cp $(CURDIR)/internal/static/analyze_ddl.ts $(TMP_BUNDLE_DIR)/analyze_ddl.ts
-	cp $(CURDIR)/internal/static/parse_sql_2.ts $(TMP_BUNDLE_DIR)/parse_sql_2.ts
+	cp $(CURDIR)/internal/static/parse_sql.ts $(TMP_BUNDLE_DIR)/parse_sql.ts
 	cp $(TS_BUNDLE_DIR)/build.js $(TMP_BUNDLE_DIR)/
 	cp $(TS_BUNDLE_DIR)/package.json $(TMP_BUNDLE_DIR)/
 	cd $(TMP_BUNDLE_DIR) && npm install
 	cd $(TMP_BUNDLE_DIR) && node build.js
 	cp $(TMP_BUNDLE_DIR)/stroppy.pb.ts $(TS_TARGET_DIR)/stroppy.pb.ts
 	cp $(TMP_BUNDLE_DIR)/dist/bundle.js $(TS_TARGET_DIR)/stroppy.pb.js
-# Bundle analyze_ddl.ts and parse_sql_2 with node-sql-parser (handled by build.js)
+# Bundle parse_sql with node-sql-parser (handled by build.js)
 # TODO: make single bundle aka stroppy.js or automatically copy all from dist
-	cp $(TMP_BUNDLE_DIR)/dist/analyze_ddl.js $(TS_TARGET_DIR)/analyze_ddl.js
-	cp $(TMP_BUNDLE_DIR)/dist/parse_sql_2.js $(TS_TARGET_DIR)/parse_sql_2.js
+	cp $(TMP_BUNDLE_DIR)/dist/parse_sql.js $(TS_TARGET_DIR)/parse_sql.js
 	rm -rf $(TMP_BUNDLE_DIR)
 
 .PHONY: .easyp-gen
@@ -204,8 +202,7 @@ proto: .check-bins
 
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.ts $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.js $(CURDIR)/internal/static/
-	cp $(PROTO_BUILD_TARGET_DIR)/ts/analyze_ddl.js $(CURDIR)/internal/static/
-	cp $(PROTO_BUILD_TARGET_DIR)/ts/parse_sql_2.js $(CURDIR)/internal/static/
+	cp $(PROTO_BUILD_TARGET_DIR)/ts/parse_sql.js $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/docs/proto.md $(CURDIR)/docs
 # cp $(PROTO_BUILD_TARGET_DIR)/docs/config.schema.json $(CURDIR)/docs
 
@@ -286,24 +283,24 @@ run-simple-test:
 	./build/stroppy gen --workdir dev --preset=simple
 	cd dev && ./stroppy run simple.ts
 
-.PHONY: run-execute-sql-test
-run-execute-sql-test:
-	rm -rf dev
-	./build/stroppy gen --workdir dev --preset=execute_sql
-	cd dev && ./stroppy run execute_sql.ts tpcb_mini.sql
-
 
 .PHONY: run-tpcb-test
 run-tpcb-test:
 	rm -rf dev
 	./build/stroppy gen --workdir dev --preset=tpcb
-	cd dev && ./stroppy run tpcb.ts
+	cd dev && ./stroppy run tpcb.ts tpcb.sql
 
 .PHONY: run-tpcc-test
 run-tpcc-test:
 	rm -rf dev
 	./build/stroppy gen --workdir dev --preset=tpcc
-	cd dev && ./stroppy run tpcc.ts
+	cd dev && ./stroppy run tpcc.ts tpcc.sql
+
+.PHONY: run-tpcds-test
+run-tpcds-test:
+	rm -rf dev
+	./build/stroppy gen --workdir dev --preset=tpcds
+	cd dev && ./stroppy run tpcds.ts tpcds-scale-1.sql
 
 ##
 ## TypeScript Development
