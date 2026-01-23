@@ -16,7 +16,11 @@
     "noFallthroughCasesInSwitch": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "k6/x/stroppy": ["./stroppy.d.ts"]
+    }
   },
   "include": ["*.js", "*.ts", "*.d.ts"]
 }

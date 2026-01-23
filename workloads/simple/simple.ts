@@ -2,14 +2,8 @@ import { Options } from "k6/options";
 import encoding from "k6/x/encoding";
 globalThis.TextEncoder = encoding.TextEncoder;
 globalThis.TextDecoder = encoding.TextDecoder;
-import {
-  NewDriverByConfig,
-  NotifyStep,
-  Teardown,
-  NewGeneratorByRuleBin,
-  NewGroupGeneratorByRulesBin,
-  __SQL_FILE,
-} from "k6/x/stroppy";
+
+import { NewDriverByConfig, NotifyStep, Teardown } from "k6/x/stroppy";
 
 import {
   GlobalConfig,

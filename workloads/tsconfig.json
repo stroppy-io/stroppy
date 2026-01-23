@@ -18,11 +18,13 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
-
+    "typeRoots": [
+      "../internal/static/node_modules/@types",
+      "../internal/static/"
+    ],
+    "rootDirs": [".", "../internal/static/"],
     "paths": {
       "k6/x/stroppy": ["../internal/static/stroppy.d.ts"]
     }
-  },
-  "include": ["./**/*", "../internal/static/**/*"]
+  }
 }
