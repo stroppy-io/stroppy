@@ -85,7 +85,7 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
-          make build-xk6
+          make build-k6
           mkdir -p "${{ steps.names.outputs.outdir }}"
           go build -trimpath -ldflags "-s -w ${LDFLAGS}" \
             -o "${{ steps.names.outputs.outdir }}/${{ steps.names.outputs.bin }}" \

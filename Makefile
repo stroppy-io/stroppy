@@ -9,6 +9,7 @@ PROTO_BUILD_TARGET_DIR=$(CURDIR)/proto/build
 UNAME_S := $(shell uname -s)
 UNAME_M := $(shell uname -m)
 
+# Detect system info
 ifeq ($(UNAME_S),Darwin)
   OS := osx
 else ifeq ($(UNAME_S),Linux)
@@ -25,22 +26,26 @@ else
   $(error Unsupported architecture: $(UNAME_M))
 endif
 
-
-ifeq ($(OS),osx)
-  GOOS := darwin
-else ifeq ($(OS),linux)
-  GOOS := linux
-else
-  $(error Unsupported OS for Go: $(OS))
+# Set GOOS only if not already set
+ifndef GOOS
+  ifeq ($(OS),osx)
+    GOOS := darwin
+  else ifeq ($(OS),linux)
+    GOOS := linux
+  else
+    $(error Unsupported OS for Go: $(OS))
+  endif
 endif
 
-
-ifeq ($(ARCH),aarch_64)
-  GOARCH := arm64
-else ifeq ($(ARCH),x86_64)
-  GOARCH := amd64
-else
-  $(error Unsupported architecture for Go: $(ARCH))
+# Set GOARCH only if not already set
+ifndef GOARCH
+  ifeq ($(ARCH),aarch_64)
+    GOARCH := arm64
+  else ifeq ($(ARCH),x86_64)
+    GOARCH := amd64
+  else
+    $(error Unsupported architecture for Go: $(ARCH))
+  endif
 endif
 
 default: help
