@@ -5,13 +5,14 @@ globalThis.TextDecoder = encoding.TextDecoder;
 
 import { NotifyStep, Teardown } from "k6/x/stroppy";
 
-import { Status, InsertDescriptor } from "./stroppy.pb.js";
+import { Status, InsertMethod } from "./stroppy.pb.js";
 import {
   NewDriverByConfig,
   NewGeneratorByRule as NewGenByRule,
   AB,
   G,
   paramsG,
+  InsertValues,
 } from "./helpers.ts";
 import { parse_sql_with_groups } from "./parse_sql.js";
 
@@ -77,60 +78,46 @@ export function setup() {
 
   NotifyStep("load_data", Status.STATUS_RUNNING);
   console.log("Loading branches...");
-  driver.insertValues(
-    InsertDescriptor.toBinary(
-      InsertDescriptor.create({
-        name: "insert_branches",
-        tableName: "pgbench_branches",
-        method: 1,
-        params: paramsG({
-          bid: G.int32Seq(1, BRANCHES),
-          bbalance: G.int32Const(0),
-          filler: G.str(88, AB.en),
-        }),
-        groups: [],
-      }),
-    ),
-    BRANCHES,
-  );
+
+  InsertValues(driver, BRANCHES, {
+    name: "insert_branches",
+    tableName: "pgbench_branches",
+    method: InsertMethod.COPY_FROM,
+    params: paramsG({
+      bid: G.int32Seq(1, BRANCHES),
+      bbalance: G.int32Const(0),
+      filler: G.str(88, AB.en),
+    }),
+    groups: [],
+  });
 
   console.log("Loading tellers...");
-  driver.insertValues(
-    InsertDescriptor.toBinary(
-      InsertDescriptor.create({
-        name: "insert_tellers",
-        tableName: "pgbench_tellers",
-        method: 1,
-        params: paramsG({
-          tid: G.int32Seq(1, TELLERS),
-          bid: G.int32(1, BRANCHES),
-          tbalance: G.int32Const(0),
-          filler: G.str(84, AB.en),
-        }),
-        groups: [],
-      }),
-    ),
-    TELLERS,
-  );
+  InsertValues(driver, TELLERS, {
+    name: "insert_tellers",
+    tableName: "pgbench_tellers",
+    method: InsertMethod.COPY_FROM,
+    params: paramsG({
+      tid: G.int32Seq(1, TELLERS),
+      bid: G.int32(1, BRANCHES),
+      tbalance: G.int32Const(0),
+      filler: G.str(84, AB.en),
+    }),
+    groups: [],
+  });
 
   console.log("Loading accounts...");
-  driver.insertValues(
-    InsertDescriptor.toBinary(
-      InsertDescriptor.create({
-        name: "insert_accounts",
-        tableName: "pgbench_accounts",
-        method: 1,
-        params: paramsG({
-          aid: G.int32Seq(1, ACCOUNTS),
-          bid: G.int32(1, BRANCHES),
-          abalance: G.int32Const(0),
-          filler: G.str(84, AB.en),
-        }),
-        groups: [],
-      }),
-    ),
-    ACCOUNTS,
-  );
+  InsertValues(driver, ACCOUNTS, {
+    name: "insert_accounts",
+    tableName: "pgbench_accounts",
+    method: InsertMethod.COPY_FROM,
+    params: paramsG({
+      aid: G.int32Seq(1, ACCOUNTS),
+      bid: G.int32(1, BRANCHES),
+      abalance: G.int32Const(0),
+      filler: G.str(84, AB.en),
+    }),
+    groups: [],
+  });
   console.log("Data loading completed!");
   NotifyStep("load_data", Status.STATUS_COMPLETED);
 

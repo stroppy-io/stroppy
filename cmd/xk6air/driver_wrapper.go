@@ -1,7 +1,6 @@
 package xk6air
 
 import (
-	"github.com/grafana/sobek"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"go.k6.io/k6/js/modules"
@@ -19,22 +18,26 @@ func (d *DriverWrapper) RunQuery(sql string, args map[string]any) {
 	d.drv.RunQuery(d.vu.Context(), sql, args)
 }
 
-// InsertValues starts bulk insert blocking operation on driver.
-func (d *DriverWrapper) InsertValues(insertMsg []byte, count int64) (sobek.ArrayBuffer, error) {
+// InsertValuesBin starts bulk insert blocking operation on driver.
+func (d *DriverWrapper) InsertValuesBin(
+	insertMsg []byte,
+	count int64,
+) error {
 	var descriptor stroppy.InsertDescriptor
 	err := proto.Unmarshal(insertMsg, &descriptor)
 	if err != nil {
-		return sobek.ArrayBuffer{}, err
+		return err
 	}
 
-	stats, err := d.drv.InsertValues(d.vu.Context(), &descriptor, count)
+	_, err = d.drv.InsertValues(d.vu.Context(), &descriptor, count)
 	if err != nil {
-		return sobek.ArrayBuffer{}, err
+		return err
 	}
 
-	statsMsg, err := proto.Marshal(stats)
-	if err != nil {
-		return sobek.ArrayBuffer{}, err
-	}
-	return d.vu.Runtime().NewArrayBuffer(statsMsg), nil
+	// can't binary unconvert stats on ts side
+	// statsMsg, err := proto.Marshal(stats)
+	// if err != nil {
+	// 	return err
+	// }
+	return nil
 }

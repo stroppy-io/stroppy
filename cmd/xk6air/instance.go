@@ -53,7 +53,7 @@ func (i *Instance) Exports() modules.Exports {
 
 var onceDefineConfig sync.Once
 
-// NewDriverByConfig initializes the driver from GlobalConfig.
+// NewDriverByConfigBin initializes the driver from GlobalConfig.
 // This is called by scripts using defineConfig(globalConfig) at the top level.
 func (i *Instance) NewDriverByConfigBin(configBin []byte) *DriverWrapper {
 	var globalCfg stroppy.GlobalConfig

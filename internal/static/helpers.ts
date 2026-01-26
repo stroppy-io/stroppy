@@ -3,14 +3,31 @@ import {
   QueryParamGroup,
   GlobalConfig,
   QueryParamDescriptor,
+  DriverTransactionStat,
+  InsertDescriptor,
 } from "./stroppy.pb.js";
-import type { Generator, Driver } from "./stroppy.d.ts";
 
 import {
   NewDriverByConfigBin,
   NewGeneratorByRuleBin,
   NewGroupGeneratorByRulesBin,
+  Driver,
+  Generator,
 } from "k6/x/stroppy";
+
+export function InsertValues(
+  driver: Driver,
+  count: number,
+  insert: Partial<InsertDescriptor>,
+): void {
+  const err = driver.insertValuesBin(
+    InsertDescriptor.toBinary(InsertDescriptor.create(insert)),
+    count,
+  );
+  if (err) {
+    throw err;
+  }
+}
 
 export function NewDriverByConfig(config: Partial<GlobalConfig>): Driver {
   return NewDriverByConfigBin(

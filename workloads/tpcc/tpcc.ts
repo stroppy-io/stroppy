@@ -5,13 +5,14 @@ globalThis.TextDecoder = encoding.TextDecoder;
 
 import { NotifyStep, Teardown } from "k6/x/stroppy";
 
-import { Status, InsertDescriptor } from "./stroppy.pb.js";
+import { Status, InsertMethod } from "./stroppy.pb.js";
 import {
   NewDriverByConfig,
   NewGeneratorByRule as NewGenByRule,
   AB,
   G,
   paramsG,
+  InsertValues,
 } from "./helpers.ts";
 import { parse_sql_with_groups } from "./parse_sql.js";
 
@@ -101,162 +102,136 @@ export function setup() {
   NotifyStep("load_data", Status.STATUS_RUNNING);
   // Load data into tables using InsertValues with COPY_FROM method
   console.log("Loading items...");
-  {
-    driver.insertValues(
-      InsertDescriptor.toBinary(
-        InsertDescriptor.create({
-          name: "load_items",
-          tableName: "item",
-          method: 1,
-          params: paramsG({
-            i_id: G.int32Seq(1, ITEMS),
-            i_im_id: G.int32Seq(1, ITEMS), // WHY: not unique originaly
-            i_name: G.strRange(14, 24, AB.enSpc),
-            i_price: G.float(1, 100),
-            i_data: G.strRange(26, 50, AB.enSpc),
-          }),
-          groups: [],
-        }),
-      ),
-      ITEMS,
-    );
+  InsertValues(driver, ITEMS, {
+    name: "load_items",
+    tableName: "item",
+    method: InsertMethod.COPY_FROM,
+    params: paramsG({
+      i_id: G.int32Seq(1, ITEMS),
+      i_im_id: G.int32Seq(1, ITEMS), // WHY: not unique originaly
+      i_name: G.strRange(14, 24, AB.enSpc),
+      i_price: G.float(1, 100),
+      i_data: G.strRange(26, 50, AB.enSpc),
+    }),
+    groups: [],
+  });
 
-    console.log("Loading warehouses...");
-    driver.insertValues(
-      InsertDescriptor.toBinary(
-        InsertDescriptor.create({
-          name: "load_warehouses",
-          tableName: "warehouse",
-          method: 1,
-          params: paramsG({
-            w_id: G.int32Seq(1, WAREHOUSES),
-            w_name: G.strRange(6, 10, AB.en),
-            w_street_1: G.strRange(10, 20, AB.en),
-            w_street_2: G.strRange(10, 20, AB.en),
-            w_city: G.strRange(10, 20, AB.en),
-            w_state: G.str(2, AB.en),
-            w_zip: G.str(9, AB.num),
-            w_tax: G.float(0, 0.2),
-            w_ytd: G.floatConst(300000),
-          }),
-          groups: [],
-        }),
-      ),
-      WAREHOUSES,
-    );
+  console.log("Loading warehouses...");
+  InsertValues(driver, WAREHOUSES, {
+    name: "load_warehouses",
+    tableName: "warehouse",
+    method: InsertMethod.COPY_FROM,
+    params: paramsG({
+      w_id: G.int32Seq(1, WAREHOUSES),
+      w_name: G.strRange(6, 10, AB.en),
+      w_street_1: G.strRange(10, 20, AB.en),
+      w_street_2: G.strRange(10, 20, AB.en),
+      w_city: G.strRange(10, 20, AB.en),
+      w_state: G.str(2, AB.en),
+      w_zip: G.str(9, AB.num),
+      w_tax: G.float(0, 0.2),
+      w_ytd: G.floatConst(300000),
+    }),
+    groups: [],
+  });
 
-    console.log("Loading districts...");
-    driver.insertValues(
-      InsertDescriptor.toBinary(
-        InsertDescriptor.create({
-          name: "load_districts",
-          tableName: "district",
-          method: 1,
-          params: paramsG({
-            d_name: G.strRange(6, 10, AB.en),
-            d_street_1: G.strRange(10, 20, AB.enSpc),
-            d_street_2: G.strRange(10, 20, AB.enSpc),
-            d_city: G.strRange(10, 20, AB.enSpc),
-            d_state: G.str(2, AB.enUpper),
-            d_zip: G.str(9, AB.num),
-            d_tax: G.float(0, 0.2),
-            d_ytd: G.floatConst(30000),
-            d_next_o_id: G.int32Const(3001),
-          }),
-          groups: [
-            {
-              name: "district_pk",
-              params: paramsG({
-                d_w_id: G.int32Seq(1, WAREHOUSES),
-                d_id: G.int32Seq(1, DISTRICTS_PER_WAREHOUSE),
-              }),
-            },
-          ],
+  console.log("Loading districts...");
+  InsertValues(driver, TOTAL_DISTRICTS, {
+    name: "load_districts",
+    tableName: "district",
+    method: InsertMethod.COPY_FROM,
+    params: paramsG({
+      d_name: G.strRange(6, 10, AB.en),
+      d_street_1: G.strRange(10, 20, AB.enSpc),
+      d_street_2: G.strRange(10, 20, AB.enSpc),
+      d_city: G.strRange(10, 20, AB.enSpc),
+      d_state: G.str(2, AB.enUpper),
+      d_zip: G.str(9, AB.num),
+      d_tax: G.float(0, 0.2),
+      d_ytd: G.floatConst(30000),
+      d_next_o_id: G.int32Const(3001),
+    }),
+    groups: [
+      {
+        name: "district_pk",
+        params: paramsG({
+          d_w_id: G.int32Seq(1, WAREHOUSES),
+          d_id: G.int32Seq(1, DISTRICTS_PER_WAREHOUSE),
         }),
-      ),
-      TOTAL_DISTRICTS,
-    );
+      },
+    ],
+  });
 
-    console.log("Loading customers...");
-    driver.insertValues(
-      InsertDescriptor.toBinary(
-        InsertDescriptor.create({
-          name: "load_customers",
-          tableName: "customer",
-          method: 1,
-          params: paramsG({
-            c_first: G.strRange(8, 16, AB.en),
-            c_middle: G.str(2, AB.enUpper),
-            c_last: G.strSeq(6, 16, AB.en),
-            c_street_1: G.strRange(10, 20, AB.enNumSpc),
-            c_street_2: G.strRange(10, 20, AB.enNumSpc),
-            c_city: G.strRange(10, 20, AB.enSpc),
-            c_state: G.str(2, AB.enUpper),
-            c_zip: G.str(9, AB.num),
-            c_phone: G.str(16, AB.num),
-            c_since: G.datetimeConst(new Date()),
-            c_credit: G.strConst("GC"), // TODO: "GC" | "BC" (good/bad credit), and 10% should be "BC"
-            c_credit_lim: G.floatConst(50000),
-            c_discount: G.float(0, 0.5),
-            c_balance: G.floatConst(-10),
-            c_ytd_payment: G.floatConst(10),
-            c_payment_cnt: G.int32Const(1),
-            c_delivery_cnt: G.int32Const(0),
-            c_data: G.strRange(300, 500, AB.enNumSpc),
-          }),
-          groups: [
-            {
-              name: "customer_pk",
-              params: paramsG({
-                c_d_id: G.int32Seq(1, DISTRICTS_PER_WAREHOUSE),
-                c_w_id: G.int32Seq(1, WAREHOUSES),
-                c_id: G.int32Seq(1, CUSTOMERS_PER_DISTRICT),
-              }),
-            },
-          ],
+  console.log("Loading customers...");
+  InsertValues(driver, TOTAL_CUSTOMERS, {
+    name: "load_customers",
+    tableName: "customer",
+    method: InsertMethod.COPY_FROM,
+    params: paramsG({
+      c_first: G.strRange(8, 16, AB.en),
+      c_middle: G.str(2, AB.enUpper),
+      c_last: G.strSeq(6, 16, AB.en),
+      c_street_1: G.strRange(10, 20, AB.enNumSpc),
+      c_street_2: G.strRange(10, 20, AB.enNumSpc),
+      c_city: G.strRange(10, 20, AB.enSpc),
+      c_state: G.str(2, AB.enUpper),
+      c_zip: G.str(9, AB.num),
+      c_phone: G.str(16, AB.num),
+      c_since: G.datetimeConst(new Date()),
+      c_credit: G.strConst("GC"), // TODO: "GC" | "BC" (good/bad credit), and 10% should be "BC"
+      c_credit_lim: G.floatConst(50000),
+      c_discount: G.float(0, 0.5),
+      c_balance: G.floatConst(-10),
+      c_ytd_payment: G.floatConst(10),
+      c_payment_cnt: G.int32Const(1),
+      c_delivery_cnt: G.int32Const(0),
+      c_data: G.strRange(300, 500, AB.enNumSpc),
+    }),
+    groups: [
+      {
+        name: "customer_pk",
+        params: paramsG({
+          c_d_id: G.int32Seq(1, DISTRICTS_PER_WAREHOUSE),
+          c_w_id: G.int32Seq(1, WAREHOUSES),
+          c_id: G.int32Seq(1, CUSTOMERS_PER_DISTRICT),
         }),
-      ),
-      TOTAL_CUSTOMERS,
-    );
+      },
+    ],
+  });
 
-    console.log("Loading stock...");
-    driver.insertValues(
-      InsertDescriptor.toBinary(
-        InsertDescriptor.create({
-          name: "load_stock",
-          tableName: "stock",
-          method: 1,
-          params: paramsG({
-            s_quantity: G.int32(10, 100),
-            s_dist_01: G.str(24, AB.enNum),
-            s_dist_02: G.str(24, AB.enNum),
-            s_dist_03: G.str(24, AB.enNum),
-            s_dist_04: G.str(24, AB.enNum),
-            s_dist_05: G.str(24, AB.enNum),
-            s_dist_06: G.str(24, AB.enNum),
-            s_dist_07: G.str(24, AB.enNum),
-            s_dist_08: G.str(24, AB.enNum),
-            s_dist_09: G.str(24, AB.enNum),
-            s_dist_10: G.str(24, AB.enNum),
-            s_ytd: G.int32Const(0),
-            s_order_cnt: G.int32Const(0),
-            s_remote_cnt: G.int32Const(0),
-            s_data: G.strRange(26, 50, AB.enNumSpc),
-          }),
-          groups: [
-            {
-              name: "stock_pk",
-              params: paramsG({
-                s_i_id: G.int32Seq(1, ITEMS),
-                s_w_id: G.int32Seq(1, WAREHOUSES),
-              }),
-            },
-          ],
+  console.log("Loading stock...");
+  InsertValues(driver, TOTAL_STOCK, {
+    name: "load_stock",
+    tableName: "stock",
+    method: InsertMethod.COPY_FROM,
+    params: paramsG({
+      s_quantity: G.int32(10, 100),
+      s_dist_01: G.str(24, AB.enNum),
+      s_dist_02: G.str(24, AB.enNum),
+      s_dist_03: G.str(24, AB.enNum),
+      s_dist_04: G.str(24, AB.enNum),
+      s_dist_05: G.str(24, AB.enNum),
+      s_dist_06: G.str(24, AB.enNum),
+      s_dist_07: G.str(24, AB.enNum),
+      s_dist_08: G.str(24, AB.enNum),
+      s_dist_09: G.str(24, AB.enNum),
+      s_dist_10: G.str(24, AB.enNum),
+      s_ytd: G.int32Const(0),
+      s_order_cnt: G.int32Const(0),
+      s_remote_cnt: G.int32Const(0),
+      s_data: G.strRange(26, 50, AB.enNumSpc),
+    }),
+    groups: [
+      {
+        name: "stock_pk",
+        params: paramsG({
+          s_i_id: G.int32Seq(1, ITEMS),
+          s_w_id: G.int32Seq(1, WAREHOUSES),
         }),
-      ),
-      TOTAL_STOCK,
-    );
-  }
+      },
+    ],
+  });
+
   console.log("Data loading completed!");
   NotifyStep("load_data", Status.STATUS_COMPLETED);
 

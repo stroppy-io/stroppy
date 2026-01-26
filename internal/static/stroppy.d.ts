@@ -12,15 +12,11 @@ import type {
 
 declare module "k6/x/stroppy" {
   // protobuf serialized messages - type-safe wrapper around Uint8Array
-  export type BinMsg<_T extends any> = Uint8Array;
+  export type BinMsg<_T extends any> = Uint8Array<ArrayBufferLike>;
 
   // Driver interface - provides database operations
   export interface Driver {
-    runUnit(unit: BinMsg<UnitDescriptor>): BinMsg<DriverTransactionStat>;
-    insertValues(
-      insert: BinMsg<InsertDescriptor>,
-      count: number,
-    ): BinMsg<DriverTransactionStat>;
+    insertValuesBin(insert: BinMsg<InsertDescriptor>, count: number): Error;
     runQuery(sql: string, args: Record<string, any>): Error;
   }
 
