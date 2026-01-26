@@ -75,7 +75,6 @@ func (i *Instance) NewDriverByConfigBin(configBin []byte) *DriverWrapper {
 		rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
 			Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
 			Status: stroppy.Status_STATUS_RUNNING,
-			Config: &stroppy.ConfigFile{Global: &globalCfg},
 			Cmd:    "",
 		})
 	})
@@ -95,7 +94,6 @@ func (i *Instance) Teardown() error {
 	rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
 		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
 		Status: stroppy.Status_STATUS_COMPLETED,
-		Config: &stroppy.ConfigFile{},
 		Cmd:    "",
 	})
 	return nil

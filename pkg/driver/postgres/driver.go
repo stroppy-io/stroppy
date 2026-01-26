@@ -2,13 +2,11 @@ package postgres
 
 import (
 	"context"
-	"time"
 
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -22,9 +20,9 @@ type QueryBuilder interface {
 	Build(
 		ctx context.Context,
 		logger *zap.Logger,
-		unit *stroppy.UnitDescriptor,
+		insert *stroppy.InsertDescriptor,
 	) (*stroppy.DriverTransaction, error)
-	AddGenerators(unit *stroppy.UnitDescriptor) error
+	AddGenerators(insert *stroppy.InsertDescriptor) error
 	ValueToPgxValue(value *stroppy.Value) (any, error)
 }
 
@@ -93,89 +91,11 @@ func NewDriver(
 	return d, nil
 }
 
-func (d *Driver) RunTransaction(
-	ctx context.Context,
-	unit *stroppy.UnitDescriptor,
-) (*stroppy.DriverTransactionStat, error) {
-	err := d.builder.AddGenerators(unit)
-	if err != nil {
-		return nil, err
-	}
-
-	transaction, err := d.GenerateNextUnit(ctx, unit)
-	if err != nil {
-		return nil, err
-	}
-
-	return d.runTransaction(ctx, transaction)
-}
-
 func (d *Driver) GenerateNextUnit(
 	ctx context.Context,
-	unit *stroppy.UnitDescriptor,
+	insert *stroppy.InsertDescriptor,
 ) (*stroppy.DriverTransaction, error) {
-	return d.builder.Build(ctx, d.logger, unit)
-}
-
-func (d *Driver) runTransaction(
-	ctx context.Context,
-	transaction *stroppy.DriverTransaction,
-) (*stroppy.DriverTransactionStat, error) {
-	var (
-		stat *stroppy.DriverTransactionStat
-		err  error
-	)
-
-	if transaction.GetIsolationLevel() == stroppy.TxIsolationLevel_UNSPECIFIED {
-		stat, err = d.runTransactionInternal(ctx, transaction, d.pgxPool)
-
-		return stat, err
-	}
-
-	return stat, d.txManager.DoWithSettings(
-		ctx,
-		NewStroppyIsolationSettings(transaction),
-		func(ctx context.Context) error {
-			stat, err = d.runTransactionInternal(ctx, transaction, d.txExecutor)
-
-			return err
-		})
-}
-
-func (d *Driver) runTransactionInternal(
-	ctx context.Context,
-	transaction *stroppy.DriverTransaction,
-	executor Executor,
-) (*stroppy.DriverTransactionStat, error) {
-	queryStats := make([]*stroppy.DriverQueryStat, 0, len(transaction.GetQueries()))
-	txStart := time.Now()
-
-	for _, query := range transaction.GetQueries() {
-		values := make([]any, len(query.GetParams()))
-
-		err := d.fillParamsToValues(query, values)
-		if err != nil {
-			return nil, err
-		}
-
-		start := time.Now()
-
-		_, err = executor.Exec(ctx, query.GetRequest(), values...)
-		if err != nil {
-			return nil, err
-		}
-
-		queryStats = append(queryStats, &stroppy.DriverQueryStat{
-			Name:         query.GetName(),
-			ExecDuration: durationpb.New(time.Since(start)),
-		})
-	}
-
-	return &stroppy.DriverTransactionStat{
-		IsolationLevel: transaction.GetIsolationLevel(),
-		ExecDuration:   durationpb.New(time.Since(txStart)),
-		Queries:        queryStats,
-	}, nil
+	return d.builder.Build(ctx, d.logger, insert)
 }
 
 func (d *Driver) fillParamsToValues(query *stroppy.DriverQuery, valuesOut []any) error {

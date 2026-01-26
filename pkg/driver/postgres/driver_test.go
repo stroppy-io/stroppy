@@ -35,35 +35,6 @@ func newTestDriver(mockPool pgxmock.PgxPoolIface) (*testDriver, error) {
 	}, nil
 }
 
-func TestDriver_runTransaction(t *testing.T) {
-	mock, err := pgxmock.NewPool()
-	require.NoError(t, err)
-
-	defer mock.Close()
-
-	drv, err := newTestDriver(mock)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-	query := &stroppy.DriverTransaction{
-		Queries: []*stroppy.DriverQuery{
-			{
-				Name:    "test_query",
-				Request: "SELECT 1",
-				Params:  nil,
-			},
-		},
-	}
-
-	mock.ExpectExec("SELECT 1").WillReturnResult(pgxmock.NewResult("SELECT", 1))
-
-	stats, err := drv.runTransaction(ctx, query)
-	require.NoError(t, err)
-	require.NotEmpty(t, stats)
-
-	require.NoError(t, mock.ExpectationsWereMet())
-}
-
 func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	require.NoError(t, err)

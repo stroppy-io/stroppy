@@ -349,231 +349,6 @@ func (x *ExporterConfig) GetOtlpExport() *OtlpExport {
 	return nil
 }
 
-// *
-// ExecutorConfig contains configuration for an executor.
-type ExecutorConfig struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Name of the executor
-	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// * Configuration for the executor
-	K6            *K6Options `protobuf:"bytes,2,opt,name=k6,proto3" json:"k6,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ExecutorConfig) Reset() {
-	*x = ExecutorConfig{}
-	mi := &file_proto_stroppy_config_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ExecutorConfig) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ExecutorConfig) ProtoMessage() {}
-
-func (x *ExecutorConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_config_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ExecutorConfig.ProtoReflect.Descriptor instead.
-func (*ExecutorConfig) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *ExecutorConfig) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *ExecutorConfig) GetK6() *K6Options {
-	if x != nil {
-		return x.K6
-	}
-	return nil
-}
-
-// *
-// StepExecutorMappingConfig contains configuration for mapping steps to
-// executors.
-type Step struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Name of the step
-	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// * Name of the workload
-	Workload string `protobuf:"bytes,2,opt,name=workload,proto3" json:"workload,omitempty"`
-	// * Name of the executor
-	Executor string `protobuf:"bytes,3,opt,name=executor,proto3" json:"executor,omitempty"`
-	// * Name of the exporter
-	Exporter      *string `protobuf:"bytes,4,opt,name=exporter,proto3,oneof" json:"exporter,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Step) Reset() {
-	*x = Step{}
-	mi := &file_proto_stroppy_config_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Step) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Step) ProtoMessage() {}
-
-func (x *Step) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_config_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Step.ProtoReflect.Descriptor instead.
-func (*Step) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *Step) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *Step) GetWorkload() string {
-	if x != nil {
-		return x.Workload
-	}
-	return ""
-}
-
-func (x *Step) GetExecutor() string {
-	if x != nil {
-		return x.Executor
-	}
-	return ""
-}
-
-func (x *Step) GetExporter() string {
-	if x != nil && x.Exporter != nil {
-		return *x.Exporter
-	}
-	return ""
-}
-
-// *
-// SideCar contains configuration for plugins.
-type SideCarConfig struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Url to connect the plugin instance
-	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
-	// * Additional plugin settings
-	Settings      *Value_Struct `protobuf:"bytes,3,opt,name=settings,proto3,oneof" json:"settings,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SideCarConfig) Reset() {
-	*x = SideCarConfig{}
-	mi := &file_proto_stroppy_config_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SideCarConfig) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SideCarConfig) ProtoMessage() {}
-
-func (x *SideCarConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_config_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SideCarConfig.ProtoReflect.Descriptor instead.
-func (*SideCarConfig) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *SideCarConfig) GetUrl() string {
-	if x != nil {
-		return x.Url
-	}
-	return ""
-}
-
-func (x *SideCarConfig) GetSettings() *Value_Struct {
-	if x != nil {
-		return x.Settings
-	}
-	return nil
-}
-
-// *
-// CloudConfig contains configuration for stroppy cloud backend.
-type CloudConfig struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CloudConfig) Reset() {
-	*x = CloudConfig{}
-	mi := &file_proto_stroppy_config_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CloudConfig) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CloudConfig) ProtoMessage() {}
-
-func (x *CloudConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_config_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CloudConfig.ProtoReflect.Descriptor instead.
-func (*CloudConfig) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{6}
-}
-
 type GlobalConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// *
@@ -601,7 +376,7 @@ type GlobalConfig struct {
 
 func (x *GlobalConfig) Reset() {
 	*x = GlobalConfig{}
-	mi := &file_proto_stroppy_config_proto_msgTypes[7]
+	mi := &file_proto_stroppy_config_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -613,7 +388,7 @@ func (x *GlobalConfig) String() string {
 func (*GlobalConfig) ProtoMessage() {}
 
 func (x *GlobalConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_config_proto_msgTypes[7]
+	mi := &file_proto_stroppy_config_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -626,7 +401,7 @@ func (x *GlobalConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GlobalConfig.ProtoReflect.Descriptor instead.
 func (*GlobalConfig) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{7}
+	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GlobalConfig) GetVersion() string {
@@ -678,104 +453,11 @@ func (x *GlobalConfig) GetExporter() *ExporterConfig {
 	return nil
 }
 
-// *
-// ConfigFile contains the complete configuration for a benchmark run in file.
-type ConfigFile struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Global configuration
-	Global *GlobalConfig `protobuf:"bytes,1,opt,name=global,proto3" json:"global,omitempty"`
-	// * Exporters configuration
-	Exporters []*ExporterConfig `protobuf:"bytes,2,rep,name=exporters,proto3" json:"exporters,omitempty"`
-	// * Executors configuration
-	Executors []*ExecutorConfig `protobuf:"bytes,3,rep,name=executors,proto3" json:"executors,omitempty"`
-	// * Step to executor mapping configuration
-	Steps []*Step `protobuf:"bytes,4,rep,name=steps,proto3" json:"steps,omitempty"`
-	// * Plugins configuration
-	SideCars []*SideCarConfig `protobuf:"bytes,5,rep,name=side_cars,json=sideCars,proto3" json:"side_cars,omitempty"`
-	// * BenchmarkDescriptor defines a complete benchmark consisting of multiple
-	// steps.
-	Benchmark     *BenchmarkDescriptor `protobuf:"bytes,6,opt,name=benchmark,proto3" json:"benchmark,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ConfigFile) Reset() {
-	*x = ConfigFile{}
-	mi := &file_proto_stroppy_config_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ConfigFile) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ConfigFile) ProtoMessage() {}
-
-func (x *ConfigFile) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_config_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ConfigFile.ProtoReflect.Descriptor instead.
-func (*ConfigFile) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *ConfigFile) GetGlobal() *GlobalConfig {
-	if x != nil {
-		return x.Global
-	}
-	return nil
-}
-
-func (x *ConfigFile) GetExporters() []*ExporterConfig {
-	if x != nil {
-		return x.Exporters
-	}
-	return nil
-}
-
-func (x *ConfigFile) GetExecutors() []*ExecutorConfig {
-	if x != nil {
-		return x.Executors
-	}
-	return nil
-}
-
-func (x *ConfigFile) GetSteps() []*Step {
-	if x != nil {
-		return x.Steps
-	}
-	return nil
-}
-
-func (x *ConfigFile) GetSideCars() []*SideCarConfig {
-	if x != nil {
-		return x.SideCars
-	}
-	return nil
-}
-
-func (x *ConfigFile) GetBenchmark() *BenchmarkDescriptor {
-	if x != nil {
-		return x.Benchmark
-	}
-	return nil
-}
-
 var File_proto_stroppy_config_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x1eproto/stroppy/descriptor.proto\x1a\x17validate/validate.proto\x1a\x16proto/stroppy/k6.proto\"\x89\x02\n" +
+	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x1eproto/stroppy/descriptor.proto\x1a\x17validate/validate.proto\"\x89\x02\n" +
 	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12;\n" +
 	"\vdb_specific\x18\x02 \x01(\v2\x15.stroppy.Value.StructH\x00R\n" +
@@ -802,21 +484,7 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\x0eExporterConfig\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12>\n" +
 	"\votlp_export\x18\x02 \x01(\v2\x13.stroppy.OtlpExportB\b\xfaB\x05\x8a\x01\x02\x10\x01R\n" +
-	"otlpExport\"Q\n" +
-	"\x0eExecutorConfig\x12\x1b\n" +
-	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12\"\n" +
-	"\x02k6\x18\x02 \x01(\v2\x12.stroppy.K6OptionsR\x02k6\"\x9b\x01\n" +
-	"\x04Step\x12\x1b\n" +
-	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12#\n" +
-	"\bworkload\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\bworkload\x12#\n" +
-	"\bexecutor\x18\x03 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\bexecutor\x12\x1f\n" +
-	"\bexporter\x18\x04 \x01(\tH\x00R\bexporter\x88\x01\x01B\v\n" +
-	"\t_exporter\"p\n" +
-	"\rSideCarConfig\x12\x1a\n" +
-	"\x03url\x18\x02 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x126\n" +
-	"\bsettings\x18\x03 \x01(\v2\x15.stroppy.Value.StructH\x00R\bsettings\x88\x01\x01B\v\n" +
-	"\t_settings\"\r\n" +
-	"\vCloudConfig\"\xf7\x02\n" +
+	"otlpExport\"\xf7\x02\n" +
 	"\fGlobalConfig\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x1b\n" +
@@ -827,15 +495,7 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\bexporter\x18\a \x01(\v2\x17.stroppy.ExporterConfigR\bexporter\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc9\x02\n" +
-	"\n" +
-	"ConfigFile\x12-\n" +
-	"\x06global\x18\x01 \x01(\v2\x15.stroppy.GlobalConfigR\x06global\x125\n" +
-	"\texporters\x18\x02 \x03(\v2\x17.stroppy.ExporterConfigR\texporters\x125\n" +
-	"\texecutors\x18\x03 \x03(\v2\x17.stroppy.ExecutorConfigR\texecutors\x12#\n" +
-	"\x05steps\x18\x04 \x03(\v2\r.stroppy.StepR\x05steps\x123\n" +
-	"\tside_cars\x18\x05 \x03(\v2\x16.stroppy.SideCarConfigR\bsideCars\x12D\n" +
-	"\tbenchmark\x18\x06 \x01(\v2\x1c.stroppy.BenchmarkDescriptorB\b\xfaB\x05\x8a\x01\x02\x10\x01R\tbenchmarkB8Z6github.com/stroppy-io/stroppy/pkg/common/proto/stroppyb\x06proto3"
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B8Z6github.com/stroppy-io/stroppy/pkg/common/proto/stroppyb\x06proto3"
 
 var (
 	file_proto_stroppy_config_proto_rawDescOnce sync.Once
@@ -850,7 +510,7 @@ func file_proto_stroppy_config_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_stroppy_config_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_proto_stroppy_config_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_proto_stroppy_config_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_proto_stroppy_config_proto_goTypes = []any{
 	(DriverConfig_DriverType)(0), // 0: stroppy.DriverConfig.DriverType
 	(LoggerConfig_LogLevel)(0),   // 1: stroppy.LoggerConfig.LogLevel
@@ -858,41 +518,26 @@ var file_proto_stroppy_config_proto_goTypes = []any{
 	(*DriverConfig)(nil),         // 3: stroppy.DriverConfig
 	(*LoggerConfig)(nil),         // 4: stroppy.LoggerConfig
 	(*ExporterConfig)(nil),       // 5: stroppy.ExporterConfig
-	(*ExecutorConfig)(nil),       // 6: stroppy.ExecutorConfig
-	(*Step)(nil),                 // 7: stroppy.Step
-	(*SideCarConfig)(nil),        // 8: stroppy.SideCarConfig
-	(*CloudConfig)(nil),          // 9: stroppy.CloudConfig
-	(*GlobalConfig)(nil),         // 10: stroppy.GlobalConfig
-	(*ConfigFile)(nil),           // 11: stroppy.ConfigFile
-	nil,                          // 12: stroppy.GlobalConfig.MetadataEntry
-	(*Value_Struct)(nil),         // 13: stroppy.Value.Struct
-	(*OtlpExport)(nil),           // 14: stroppy.OtlpExport
-	(*K6Options)(nil),            // 15: stroppy.K6Options
-	(*BenchmarkDescriptor)(nil),  // 16: stroppy.BenchmarkDescriptor
+	(*GlobalConfig)(nil),         // 6: stroppy.GlobalConfig
+	nil,                          // 7: stroppy.GlobalConfig.MetadataEntry
+	(*Value_Struct)(nil),         // 8: stroppy.Value.Struct
+	(*OtlpExport)(nil),           // 9: stroppy.OtlpExport
 }
 var file_proto_stroppy_config_proto_depIdxs = []int32{
-	13, // 0: stroppy.DriverConfig.db_specific:type_name -> stroppy.Value.Struct
-	0,  // 1: stroppy.DriverConfig.driver_type:type_name -> stroppy.DriverConfig.DriverType
-	1,  // 2: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
-	2,  // 3: stroppy.LoggerConfig.log_mode:type_name -> stroppy.LoggerConfig.LogMode
-	14, // 4: stroppy.ExporterConfig.otlp_export:type_name -> stroppy.OtlpExport
-	15, // 5: stroppy.ExecutorConfig.k6:type_name -> stroppy.K6Options
-	13, // 6: stroppy.SideCarConfig.settings:type_name -> stroppy.Value.Struct
-	12, // 7: stroppy.GlobalConfig.metadata:type_name -> stroppy.GlobalConfig.MetadataEntry
-	3,  // 8: stroppy.GlobalConfig.driver:type_name -> stroppy.DriverConfig
-	4,  // 9: stroppy.GlobalConfig.logger:type_name -> stroppy.LoggerConfig
-	5,  // 10: stroppy.GlobalConfig.exporter:type_name -> stroppy.ExporterConfig
-	10, // 11: stroppy.ConfigFile.global:type_name -> stroppy.GlobalConfig
-	5,  // 12: stroppy.ConfigFile.exporters:type_name -> stroppy.ExporterConfig
-	6,  // 13: stroppy.ConfigFile.executors:type_name -> stroppy.ExecutorConfig
-	7,  // 14: stroppy.ConfigFile.steps:type_name -> stroppy.Step
-	8,  // 15: stroppy.ConfigFile.side_cars:type_name -> stroppy.SideCarConfig
-	16, // 16: stroppy.ConfigFile.benchmark:type_name -> stroppy.BenchmarkDescriptor
-	17, // [17:17] is the sub-list for method output_type
-	17, // [17:17] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	8, // 0: stroppy.DriverConfig.db_specific:type_name -> stroppy.Value.Struct
+	0, // 1: stroppy.DriverConfig.driver_type:type_name -> stroppy.DriverConfig.DriverType
+	1, // 2: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
+	2, // 3: stroppy.LoggerConfig.log_mode:type_name -> stroppy.LoggerConfig.LogMode
+	9, // 4: stroppy.ExporterConfig.otlp_export:type_name -> stroppy.OtlpExport
+	7, // 5: stroppy.GlobalConfig.metadata:type_name -> stroppy.GlobalConfig.MetadataEntry
+	3, // 6: stroppy.GlobalConfig.driver:type_name -> stroppy.DriverConfig
+	4, // 7: stroppy.GlobalConfig.logger:type_name -> stroppy.LoggerConfig
+	5, // 8: stroppy.GlobalConfig.exporter:type_name -> stroppy.ExporterConfig
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_config_proto_init() }
@@ -902,17 +547,14 @@ func file_proto_stroppy_config_proto_init() {
 	}
 	file_proto_stroppy_common_proto_init()
 	file_proto_stroppy_descriptor_proto_init()
-	file_proto_stroppy_k6_proto_init()
 	file_proto_stroppy_config_proto_msgTypes[0].OneofWrappers = []any{}
-	file_proto_stroppy_config_proto_msgTypes[4].OneofWrappers = []any{}
-	file_proto_stroppy_config_proto_msgTypes[5].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_config_proto_rawDesc), len(file_proto_stroppy_config_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   10,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

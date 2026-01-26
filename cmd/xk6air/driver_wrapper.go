@@ -19,26 +19,6 @@ func (d *DriverWrapper) RunQuery(sql string, args map[string]any) {
 	d.drv.RunQuery(d.vu.Context(), sql, args)
 }
 
-// RunUnit runs a single driver unit: query | transaction | create_table | insert
-func (d *DriverWrapper) RunUnit(unitMsg []byte) (sobek.ArrayBuffer, error) {
-	var unit stroppy.UnitDescriptor
-	err := proto.Unmarshal(unitMsg, &unit)
-	if err != nil {
-		return sobek.ArrayBuffer{}, err
-	}
-
-	stats, err := d.drv.RunTransaction(d.vu.Context(), &unit)
-	if err != nil {
-		return sobek.ArrayBuffer{}, err
-	}
-
-	statsMsg, err := proto.Marshal(stats)
-	if err != nil {
-		return sobek.ArrayBuffer{}, err
-	}
-	return d.vu.Runtime().NewArrayBuffer(statsMsg), nil
-}
-
 // InsertValues starts bulk insert blocking operation on driver.
 func (d *DriverWrapper) InsertValues(insertMsg []byte, count int64) (sobek.ArrayBuffer, error) {
 	var descriptor stroppy.InsertDescriptor

@@ -5,7 +5,6 @@ package stroppy;
 import "proto/stroppy/common.proto";
 import "proto/stroppy/descriptor.proto";
 import "validate/validate.proto";
-import "proto/stroppy/k6.proto";
 
 option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
 
@@ -62,47 +61,6 @@ message ExporterConfig {
       [ (validate.rules).message.required = true ];
 }
 
-/**
- * ExecutorConfig contains configuration for an executor.
- */
-message ExecutorConfig {
-  /** Name of the executor */
-  string name = 1 [ (validate.rules).string.min_len = 1 ];
-  /** Configuration for the executor */
-  stroppy.K6Options k6 = 2;
-}
-
-/**
- * StepExecutorMappingConfig contains configuration for mapping steps to
- * executors.
- */
-message Step {
-  /** Name of the step */
-  string name = 1 [ (validate.rules).string.min_len = 1 ];
-  /** Name of the workload */
-  string workload = 2 [ (validate.rules).string.min_len = 1 ];
-  /** Name of the executor */
-  string executor = 3 [ (validate.rules).string.min_len = 1 ];
-  /** Name of the exporter */
-  optional string exporter = 4;
-}
-
-/**
- * SideCar contains configuration for plugins.
- */
-message SideCarConfig {
-  /** Url to connect the plugin instance */
-  string url = 2 [ (validate.rules).string.uri_ref = true ];
-  /** Additional plugin settings */
-  optional stroppy.Value.Struct settings = 3;
-}
-
-// TODO: use it later
-/**
- * CloudConfig contains configuration for stroppy cloud backend.
- */
-message CloudConfig {}
-
 message GlobalConfig {
   /**
    * Version of the configuration format e.g. proto files version.
@@ -125,24 +83,4 @@ message GlobalConfig {
   stroppy.LoggerConfig logger = 6;
   /** Exporter configuration */
   stroppy.ExporterConfig exporter = 7;
-}
-
-/**
- * ConfigFile contains the complete configuration for a benchmark run in file.
- */
-message ConfigFile {
-  /** Global configuration */
-  GlobalConfig global = 1;
-  /** Exporters configuration */
-  repeated ExporterConfig exporters = 2;
-  /** Executors configuration */
-  repeated ExecutorConfig executors = 3;
-  /** Step to executor mapping configuration */
-  repeated Step steps = 4;
-  /** Plugins configuration */
-  repeated SideCarConfig side_cars = 5;
-  /** BenchmarkDescriptor defines a complete benchmark consisting of multiple
-   * steps. */
-  BenchmarkDescriptor benchmark = 6
-      [ (validate.rules).message.required = true ];
 }

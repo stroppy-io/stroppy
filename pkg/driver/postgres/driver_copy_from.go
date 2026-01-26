@@ -17,7 +17,7 @@ type streamingCopySource struct {
 	values      []any
 	err         error
 	transaction *stroppy.DriverTransaction
-	unit        *stroppy.UnitDescriptor
+	unit        *stroppy.InsertDescriptor
 }
 
 func newStreamingCopySource(
@@ -30,11 +30,7 @@ func newStreamingCopySource(
 		count:   count,
 		current: 0,
 		values:  make([]any, strings.Count(queries.BadInsertSQL(descriptor), " ")),
-		unit: &stroppy.UnitDescriptor{
-			Type: &stroppy.UnitDescriptor_Insert{
-				Insert: descriptor,
-			},
-		},
+		unit:    descriptor,
 	}
 }
 

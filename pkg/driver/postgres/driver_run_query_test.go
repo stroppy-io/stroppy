@@ -120,10 +120,10 @@ func TestProcessArgs(t *testing.T) {
 		{
 			name:     "no match due to missing spaces",
 			sql:      `SELECT * FROM users WHERE id=:user_id AND name=:user_name`,
-			args:     map[string]any{"user_id": 123, "user_name": "John"},
+			args:     map[string]any{"user_id": 123},
 			wantSQL:  `SELECT * FROM users WHERE id=:user_id AND name=:user_name`,
 			wantArgs: nil,
-			wantErr:  fmt.Errorf("%w: [user_id, user_name]", ErrExtraArgument),
+			wantErr:  fmt.Errorf("%w: [user_id]", ErrExtraArgument),
 		},
 		{
 			name:     "comma test",

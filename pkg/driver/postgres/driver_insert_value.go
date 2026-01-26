@@ -21,11 +21,7 @@ func (d *Driver) InsertValues(
 	count int64,
 ) (*stroppy.DriverTransactionStat, error) {
 	// Add generators for the descriptor
-	unitDesc := &stroppy.UnitDescriptor{
-		Type: &stroppy.UnitDescriptor_Insert{
-			Insert: descriptor,
-		},
-	}
+	unitDesc := descriptor
 
 	err := d.builder.AddGenerators(unitDesc)
 	if err != nil {
@@ -58,11 +54,7 @@ func (d *Driver) insertValuesPlainQuery(
 
 	// Execute multiple inserts
 	for range count {
-		transaction, err := d.GenerateNextUnit(ctx, &stroppy.UnitDescriptor{
-			Type: &stroppy.UnitDescriptor_Insert{
-				Insert: descriptor,
-			},
-		})
+		transaction, err := d.GenerateNextUnit(ctx, descriptor)
 		if err != nil {
 			return nil, err
 		}

@@ -23,147 +23,6 @@ const (
 )
 
 // *
-// StepContext provides contextual information to a benchmark step during
-// execution. It contains the run context and the step descriptor.
-type StepContext struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Global configuration of the benchmark and its steps
-	Config *GlobalConfig `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
-	// * Current step
-	Step *Step `protobuf:"bytes,2,opt,name=step,proto3" json:"step,omitempty"`
-	// * Executor configuration
-	Executor *ExecutorConfig `protobuf:"bytes,3,opt,name=executor,proto3" json:"executor,omitempty"`
-	// * Exporter configuration
-	Exporter *ExporterConfig `protobuf:"bytes,4,opt,name=exporter,proto3,oneof" json:"exporter,omitempty"`
-	// * Current workload descriptor
-	Workload      *WorkloadDescriptor `protobuf:"bytes,5,opt,name=workload,proto3" json:"workload,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *StepContext) Reset() {
-	*x = StepContext{}
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *StepContext) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*StepContext) ProtoMessage() {}
-
-func (x *StepContext) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use StepContext.ProtoReflect.Descriptor instead.
-func (*StepContext) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_runtime_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *StepContext) GetConfig() *GlobalConfig {
-	if x != nil {
-		return x.Config
-	}
-	return nil
-}
-
-func (x *StepContext) GetStep() *Step {
-	if x != nil {
-		return x.Step
-	}
-	return nil
-}
-
-func (x *StepContext) GetExecutor() *ExecutorConfig {
-	if x != nil {
-		return x.Executor
-	}
-	return nil
-}
-
-func (x *StepContext) GetExporter() *ExporterConfig {
-	if x != nil {
-		return x.Exporter
-	}
-	return nil
-}
-
-func (x *StepContext) GetWorkload() *WorkloadDescriptor {
-	if x != nil {
-		return x.Workload
-	}
-	return nil
-}
-
-// *
-// UnitBuildContext provides the context needed to build a unit from a
-// WorkloadUnitDescriptor.
-type UnitContext struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Step context
-	StepContext *StepContext `protobuf:"bytes,1,opt,name=step_context,json=stepContext,proto3" json:"step_context,omitempty"`
-	// * Current unit descriptor
-	UnitDescriptor *WorkloadUnitDescriptor `protobuf:"bytes,2,opt,name=unit_descriptor,json=unitDescriptor,proto3" json:"unit_descriptor,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *UnitContext) Reset() {
-	*x = UnitContext{}
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UnitContext) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UnitContext) ProtoMessage() {}
-
-func (x *UnitContext) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UnitContext.ProtoReflect.Descriptor instead.
-func (*UnitContext) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_runtime_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *UnitContext) GetStepContext() *StepContext {
-	if x != nil {
-		return x.StepContext
-	}
-	return nil
-}
-
-func (x *UnitContext) GetUnitDescriptor() *WorkloadUnitDescriptor {
-	if x != nil {
-		return x.UnitDescriptor
-	}
-	return nil
-}
-
-// *
 // DriverQuery represents a query that can be executed by a database driver.
 type DriverQuery struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -181,7 +40,7 @@ type DriverQuery struct {
 
 func (x *DriverQuery) Reset() {
 	*x = DriverQuery{}
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[2]
+	mi := &file_proto_stroppy_runtime_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -193,7 +52,7 @@ func (x *DriverQuery) String() string {
 func (*DriverQuery) ProtoMessage() {}
 
 func (x *DriverQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[2]
+	mi := &file_proto_stroppy_runtime_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -206,7 +65,7 @@ func (x *DriverQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DriverQuery.ProtoReflect.Descriptor instead.
 func (*DriverQuery) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_runtime_proto_rawDescGZIP(), []int{2}
+	return file_proto_stroppy_runtime_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *DriverQuery) GetName() string {
@@ -252,7 +111,7 @@ type DriverTransaction struct {
 
 func (x *DriverTransaction) Reset() {
 	*x = DriverTransaction{}
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[3]
+	mi := &file_proto_stroppy_runtime_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -264,7 +123,7 @@ func (x *DriverTransaction) String() string {
 func (*DriverTransaction) ProtoMessage() {}
 
 func (x *DriverTransaction) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[3]
+	mi := &file_proto_stroppy_runtime_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -277,7 +136,7 @@ func (x *DriverTransaction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DriverTransaction.ProtoReflect.Descriptor instead.
 func (*DriverTransaction) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_runtime_proto_rawDescGZIP(), []int{3}
+	return file_proto_stroppy_runtime_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *DriverTransaction) GetQueries() []*DriverQuery {
@@ -307,7 +166,7 @@ type DriverQueryStat struct {
 
 func (x *DriverQueryStat) Reset() {
 	*x = DriverQueryStat{}
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[4]
+	mi := &file_proto_stroppy_runtime_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -319,7 +178,7 @@ func (x *DriverQueryStat) String() string {
 func (*DriverQueryStat) ProtoMessage() {}
 
 func (x *DriverQueryStat) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[4]
+	mi := &file_proto_stroppy_runtime_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -332,7 +191,7 @@ func (x *DriverQueryStat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DriverQueryStat.ProtoReflect.Descriptor instead.
 func (*DriverQueryStat) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_runtime_proto_rawDescGZIP(), []int{4}
+	return file_proto_stroppy_runtime_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *DriverQueryStat) GetName() string {
@@ -363,7 +222,7 @@ type DriverTransactionStat struct {
 
 func (x *DriverTransactionStat) Reset() {
 	*x = DriverTransactionStat{}
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[5]
+	mi := &file_proto_stroppy_runtime_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -375,7 +234,7 @@ func (x *DriverTransactionStat) String() string {
 func (*DriverTransactionStat) ProtoMessage() {}
 
 func (x *DriverTransactionStat) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_runtime_proto_msgTypes[5]
+	mi := &file_proto_stroppy_runtime_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -388,7 +247,7 @@ func (x *DriverTransactionStat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DriverTransactionStat.ProtoReflect.Descriptor instead.
 func (*DriverTransactionStat) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_runtime_proto_rawDescGZIP(), []int{5}
+	return file_proto_stroppy_runtime_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *DriverTransactionStat) GetQueries() []*DriverQueryStat {
@@ -416,17 +275,7 @@ var File_proto_stroppy_runtime_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_runtime_proto_rawDesc = "" +
 	"\n" +
-	"\x1bproto/stroppy/runtime.proto\x12\astroppy\x1a\x1egoogle/protobuf/duration.proto\x1a\x1aproto/stroppy/common.proto\x1a\x1aproto/stroppy/config.proto\x1a\x1eproto/stroppy/descriptor.proto\"\x94\x02\n" +
-	"\vStepContext\x12-\n" +
-	"\x06config\x18\x01 \x01(\v2\x15.stroppy.GlobalConfigR\x06config\x12!\n" +
-	"\x04step\x18\x02 \x01(\v2\r.stroppy.StepR\x04step\x123\n" +
-	"\bexecutor\x18\x03 \x01(\v2\x17.stroppy.ExecutorConfigR\bexecutor\x128\n" +
-	"\bexporter\x18\x04 \x01(\v2\x17.stroppy.ExporterConfigH\x00R\bexporter\x88\x01\x01\x127\n" +
-	"\bworkload\x18\x05 \x01(\v2\x1b.stroppy.WorkloadDescriptorR\bworkloadB\v\n" +
-	"\t_exporter\"\x90\x01\n" +
-	"\vUnitContext\x127\n" +
-	"\fstep_context\x18\x01 \x01(\v2\x14.stroppy.StepContextR\vstepContext\x12H\n" +
-	"\x0funit_descriptor\x18\x02 \x01(\v2\x1f.stroppy.WorkloadUnitDescriptorR\x0eunitDescriptor\"\xa2\x01\n" +
+	"\x1bproto/stroppy/runtime.proto\x12\astroppy\x1a\x1egoogle/protobuf/duration.proto\x1a\x1aproto/stroppy/common.proto\x1a\x1aproto/stroppy/config.proto\x1a\x1eproto/stroppy/descriptor.proto\"\xa2\x01\n" +
 	"\vDriverQuery\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\arequest\x18\x02 \x01(\tR\arequest\x12&\n" +
@@ -456,46 +305,31 @@ func file_proto_stroppy_runtime_proto_rawDescGZIP() []byte {
 	return file_proto_stroppy_runtime_proto_rawDescData
 }
 
-var file_proto_stroppy_runtime_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_proto_stroppy_runtime_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_proto_stroppy_runtime_proto_goTypes = []any{
-	(*StepContext)(nil),            // 0: stroppy.StepContext
-	(*UnitContext)(nil),            // 1: stroppy.UnitContext
-	(*DriverQuery)(nil),            // 2: stroppy.DriverQuery
-	(*DriverTransaction)(nil),      // 3: stroppy.DriverTransaction
-	(*DriverQueryStat)(nil),        // 4: stroppy.DriverQueryStat
-	(*DriverTransactionStat)(nil),  // 5: stroppy.DriverTransactionStat
-	(*GlobalConfig)(nil),           // 6: stroppy.GlobalConfig
-	(*Step)(nil),                   // 7: stroppy.Step
-	(*ExecutorConfig)(nil),         // 8: stroppy.ExecutorConfig
-	(*ExporterConfig)(nil),         // 9: stroppy.ExporterConfig
-	(*WorkloadDescriptor)(nil),     // 10: stroppy.WorkloadDescriptor
-	(*WorkloadUnitDescriptor)(nil), // 11: stroppy.WorkloadUnitDescriptor
-	(*Value)(nil),                  // 12: stroppy.Value
-	(InsertMethod)(0),              // 13: stroppy.InsertMethod
-	(TxIsolationLevel)(0),          // 14: stroppy.TxIsolationLevel
-	(*durationpb.Duration)(nil),    // 15: google.protobuf.Duration
+	(*DriverQuery)(nil),           // 0: stroppy.DriverQuery
+	(*DriverTransaction)(nil),     // 1: stroppy.DriverTransaction
+	(*DriverQueryStat)(nil),       // 2: stroppy.DriverQueryStat
+	(*DriverTransactionStat)(nil), // 3: stroppy.DriverTransactionStat
+	(*Value)(nil),                 // 4: stroppy.Value
+	(InsertMethod)(0),             // 5: stroppy.InsertMethod
+	(TxIsolationLevel)(0),         // 6: stroppy.TxIsolationLevel
+	(*durationpb.Duration)(nil),   // 7: google.protobuf.Duration
 }
 var file_proto_stroppy_runtime_proto_depIdxs = []int32{
-	6,  // 0: stroppy.StepContext.config:type_name -> stroppy.GlobalConfig
-	7,  // 1: stroppy.StepContext.step:type_name -> stroppy.Step
-	8,  // 2: stroppy.StepContext.executor:type_name -> stroppy.ExecutorConfig
-	9,  // 3: stroppy.StepContext.exporter:type_name -> stroppy.ExporterConfig
-	10, // 4: stroppy.StepContext.workload:type_name -> stroppy.WorkloadDescriptor
-	0,  // 5: stroppy.UnitContext.step_context:type_name -> stroppy.StepContext
-	11, // 6: stroppy.UnitContext.unit_descriptor:type_name -> stroppy.WorkloadUnitDescriptor
-	12, // 7: stroppy.DriverQuery.params:type_name -> stroppy.Value
-	13, // 8: stroppy.DriverQuery.method:type_name -> stroppy.InsertMethod
-	2,  // 9: stroppy.DriverTransaction.queries:type_name -> stroppy.DriverQuery
-	14, // 10: stroppy.DriverTransaction.isolation_level:type_name -> stroppy.TxIsolationLevel
-	15, // 11: stroppy.DriverQueryStat.exec_duration:type_name -> google.protobuf.Duration
-	4,  // 12: stroppy.DriverTransactionStat.queries:type_name -> stroppy.DriverQueryStat
-	15, // 13: stroppy.DriverTransactionStat.exec_duration:type_name -> google.protobuf.Duration
-	14, // 14: stroppy.DriverTransactionStat.isolation_level:type_name -> stroppy.TxIsolationLevel
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	4, // 0: stroppy.DriverQuery.params:type_name -> stroppy.Value
+	5, // 1: stroppy.DriverQuery.method:type_name -> stroppy.InsertMethod
+	0, // 2: stroppy.DriverTransaction.queries:type_name -> stroppy.DriverQuery
+	6, // 3: stroppy.DriverTransaction.isolation_level:type_name -> stroppy.TxIsolationLevel
+	7, // 4: stroppy.DriverQueryStat.exec_duration:type_name -> google.protobuf.Duration
+	2, // 5: stroppy.DriverTransactionStat.queries:type_name -> stroppy.DriverQueryStat
+	7, // 6: stroppy.DriverTransactionStat.exec_duration:type_name -> google.protobuf.Duration
+	6, // 7: stroppy.DriverTransactionStat.isolation_level:type_name -> stroppy.TxIsolationLevel
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_runtime_proto_init() }
@@ -507,14 +341,13 @@ func file_proto_stroppy_runtime_proto_init() {
 	file_proto_stroppy_config_proto_init()
 	file_proto_stroppy_descriptor_proto_init()
 	file_proto_stroppy_runtime_proto_msgTypes[0].OneofWrappers = []any{}
-	file_proto_stroppy_runtime_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_runtime_proto_rawDesc), len(file_proto_stroppy_runtime_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

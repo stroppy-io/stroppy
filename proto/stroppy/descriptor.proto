@@ -8,63 +8,6 @@ import "validate/validate.proto";
 option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
 
 /**
- * IndexDescriptor defines the structure of a database index.
- */
-message IndexDescriptor {
-  /** Name of the index */
-  string name = 1 [ (validate.rules).string.min_len = 1 ];
-  /** List of column names that are part of this index */
-  repeated string columns = 2 [ (validate.rules).repeated = {
-    unique : true,
-    items : {message : {required : true}}
-  } ];
-  /** Type of index (e.g., BTREE, HASH, etc.) */
-  string type = 3;
-  /** Whether this is a unique index */
-  bool unique = 4;
-  /** Database-specific index properties */
-  optional stroppy.Value.Struct db_specific = 5;
-}
-
-/**
- * ColumnDescriptor defines the structure of a database column.
- */
-message ColumnDescriptor {
-  /** Name of the column */
-  string name = 1 [ (validate.rules).string.min_len = 1 ];
-  /** SQL data type of the column */
-  string sql_type = 2 [ (validate.rules).string.min_len = 1 ];
-  /** Whether the column can be NULL */
-  optional bool nullable = 3;
-  /**
-   * Whether the column is part of the primary key.
-   * Multiple primary keys creates composite primary key.
-   */
-  optional bool primary_key = 4;
-  /** Whether the column has a UNIQUE constraint */
-  optional bool unique = 5;
-  /** SQL constraint definition for the column in free form */
-  optional string constraint = 6;
-}
-
-/**
- * TableDescriptor defines the structure of a database table.
- */
-message TableDescriptor {
-  /** Name of the table */
-  string name = 1 [ (validate.rules).string.min_len = 1 ];
-  /** List of indexes defined on this table */
-  repeated IndexDescriptor table_indexes = 3
-      [ (validate.rules).repeated = {items : {message : {required : true}}} ];
-  /** Table-level constraints */
-  optional string constraint = 5;
-  /** Database-specific table properties */
-  optional stroppy.Value.Struct db_specific = 6;
-  /** Columns defined in this table */
-  repeated ColumnDescriptor columns = 100;
-}
-
-/**
  * InsertDescription defines data to fill database.
  */
 message InsertDescriptor {
@@ -120,24 +63,6 @@ message QueryParamGroup {
 }
 
 /**
- * QueryDescriptor defines a database query with its parameters and execution
- * count.
- */
-message QueryDescriptor {
-  /** Name of the query */
-  string name = 1 [ (validate.rules).string.min_len = 1 ];
-  /** SQL query text */
-  string sql = 2 [ (validate.rules).string.min_len = 1 ];
-  /** Parameters used in the query */
-  repeated QueryParamDescriptor params = 3
-      [ (validate.rules).repeated = {items : {message : {required : true}}} ];
-  /** Groups of the parameters */
-  repeated QueryParamGroup groups = 4;
-  /** Database-specific query properties */
-  optional stroppy.Value.Struct db_specific = 5;
-}
-
-/**
  * TransactionIsolationLevel defines the isolation level for a database
  * transaction.
  */
@@ -147,87 +72,4 @@ enum TxIsolationLevel {
   READ_COMMITTED = 2;
   REPEATABLE_READ = 3;
   SERIALIZABLE = 4;
-}
-
-/**
- * TransactionDescriptor defines a database transaction with its queries and
- * execution count.
- */
-message TransactionDescriptor {
-  /** Name of the transaction */
-  string name = 1 [ (validate.rules).string.min_len = 1 ];
-  /** Transaction isolation level */
-  TxIsolationLevel isolation_level = 2;
-  /** List of queries to execute in this transaction */
-  repeated QueryDescriptor queries = 3 [ (validate.rules).repeated = {
-    min_items : 1,
-    items : {message : {required : true}}
-  } ];
-  /** Parameters used in the query */
-  repeated QueryParamDescriptor params = 4
-      [ (validate.rules).repeated = {items : {message : {required : true}}} ];
-  /** Groups of the parameters */
-  repeated QueryParamGroup groups = 5;
-  /** Database-specific transaction properties */
-  optional stroppy.Value.Struct db_specific = 6;
-}
-
-/**
- * UnitDescriptor represents a single workload.
- * It can be a table creation operation, a query execution operation, or a
- * transaction execution operation.
- */
-message UnitDescriptor {
-  oneof type {
-    option (validate.required) = true;
-    /** Table creation operation */
-    TableDescriptor create_table = 1;
-    /** Data insertion operation */
-    InsertDescriptor insert = 5;
-    /** Query execution operation */
-    QueryDescriptor query = 2;
-    /** Transaction execution operation */
-    TransactionDescriptor transaction = 4;
-  };
-}
-
-/**
- * WorkloadUnitDescriptor represents a single unit of work.
- * It can be a table creation operation, a query execution operation, or a
- * transaction execution operation.
- */
-message WorkloadUnitDescriptor {
-  UnitDescriptor descriptor = 6;
-  /** Number of times to execute this unit */
-  uint64 count = 5 [ (validate.rules).uint64.gt = 0 ];
-}
-
-/**
- * WorkloadDescriptor represents a logical step in a benchmark.
- * It contains a list of operations to perform in this step.
- */
-message WorkloadDescriptor {
-  /** Name of the step */
-  string name = 1 [ (validate.rules).string.min_len = 1 ];
-  /** Whether to execute all operations in this workload asynchronously */
-  optional bool async = 2;
-  /** List of operations to perform in this step */
-  repeated WorkloadUnitDescriptor units = 3 [ (validate.rules).repeated = {
-    min_items : 1,
-    items : {message : {required : true}}
-  } ];
-}
-
-/**
- * BenchmarkDescriptor defines a complete benchmark consisting of multiple
- * steps.
- */
-message BenchmarkDescriptor {
-  /** Name of the benchmark */
-  string name = 1 [ (validate.rules).string.min_len = 1 ];
-  /** List of steps to execute in the benchmark */
-  repeated WorkloadDescriptor workloads = 100 [ (validate.rules).repeated = {
-    min_items : 1,
-    items : {message : {required : true}}
-  } ];
 }

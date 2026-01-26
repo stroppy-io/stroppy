@@ -192,7 +192,6 @@ install-bin-deps: .install-linter .install-xk6 .install-proto-deps # Install bin
 .app-deps: # Install application dependencies in ./bin
 	GOPROXY=$(GOPROXY)						go mod tidy
 	GOPROXY=$(GOPROXY) cd cmd/xk6air/    && go mod tidy
-	GOPROXY=$(GOPROXY) cd cmd/config2go/ && go mod tidy
 
 PROTO_BUILD_TARGET_DIR=$(CURDIR)/proto/build
 .PHONY: proto
