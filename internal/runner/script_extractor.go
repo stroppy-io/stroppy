@@ -199,6 +199,10 @@ func prepareVMEnvironment(
 		return fmt.Errorf("failed to set NewGeneratorByRuleBin: %w", err)
 	}
 
+	if err := vm.Set("NewDriverByConfigBin", func() {}); err != nil {
+		return fmt.Errorf("failed to set NewDriverByConfigBin: %w", err)
+	}
+
 	return nil
 }
 
