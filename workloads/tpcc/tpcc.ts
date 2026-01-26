@@ -6,11 +6,16 @@ globalThis.TextDecoder = encoding.TextDecoder;
 import { NotifyStep, Teardown } from "k6/x/stroppy";
 
 import { Status, InsertDescriptor } from "./stroppy.pb.js";
-import { NewDriverByConfig, NewGeneratorByRule } from "./helpers.ts";
+import {
+  NewDriverByConfig,
+  NewGeneratorByRule as NewGenByRule,
+  AB,
+  G,
+  paramsG,
+} from "./helpers.ts";
 import { parse_sql_with_groups } from "./parse_sql.js";
 
 const DURATION = __ENV.DURATION || "5m";
-
 export const options: Options = {
   setupTimeout: "5m",
   scenarios: {
@@ -46,7 +51,6 @@ export const options: Options = {
     },
   },
 };
-
 // TPCC Configuration Constants
 const WAREHOUSES = +(__ENV.SCALE_FACTOR || __ENV.WAREHOUSES || 1);
 const DISTRICTS_PER_WAREHOUSE = 10;
@@ -104,74 +108,13 @@ export function setup() {
           name: "load_items",
           tableName: "item",
           method: 1,
-          params: [
-            {
-              name: "i_id",
-              generationRule: {
-                kind: {
-                  oneofKind: "int32Range",
-                  int32Range: { max: ITEMS, min: 1 },
-                },
-                unique: true,
-              },
-            },
-            {
-              name: "i_im_id",
-              generationRule: {
-                kind: {
-                  oneofKind: "int32Range",
-                  int32Range: { max: ITEMS, min: 1 },
-                },
-              },
-            },
-            {
-              name: "i_name",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "24",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 33, min: 32 },
-                      ],
-                    },
-                    minLen: "14",
-                  },
-                },
-              },
-            },
-            {
-              name: "i_price",
-              generationRule: {
-                kind: {
-                  oneofKind: "floatRange",
-                  floatRange: { max: 100, min: 1 },
-                },
-              },
-            },
-            {
-              name: "i_data",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "50",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 33, min: 32 },
-                      ],
-                    },
-                    minLen: "26",
-                  },
-                },
-              },
-            },
-          ],
+          params: paramsG({
+            i_id: G.int32Seq(1, ITEMS),
+            i_im_id: G.int32Seq(1, ITEMS), // WHY: not unique originaly
+            i_name: G.strRange(14, 24, AB.enSpc),
+            i_price: G.float(1, 100),
+            i_data: G.strRange(26, 50, AB.enSpc),
+          }),
           groups: [],
         }),
       ),
@@ -185,88 +128,17 @@ export function setup() {
           name: "load_warehouses",
           tableName: "warehouse",
           method: 1,
-          params: [
-            {
-              name: "w_id",
-              generationRule: {
-                kind: {
-                  oneofKind: "int32Range",
-                  int32Range: { max: WAREHOUSES, min: 1 },
-                },
-                unique: true,
-              },
-            },
-            {
-              name: "w_name",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: { maxLen: "10", minLen: "6" },
-                },
-              },
-            },
-            {
-              name: "w_street_1",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: { maxLen: "20", minLen: "10" },
-                },
-              },
-            },
-            {
-              name: "w_street_2",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: { maxLen: "20", minLen: "10" },
-                },
-              },
-            },
-            {
-              name: "w_city",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: { maxLen: "20", minLen: "10" },
-                },
-              },
-            },
-            {
-              name: "w_state",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: { maxLen: "2", minLen: "2" },
-                },
-              },
-            },
-            {
-              name: "w_zip",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "9",
-                    alphabet: { ranges: [{ max: 57, min: 48 }] },
-                    minLen: "9",
-                  },
-                },
-              },
-            },
-            {
-              name: "w_tax",
-              generationRule: {
-                kind: { oneofKind: "floatRange", floatRange: { max: 0.2 } },
-              },
-            },
-            {
-              name: "w_ytd",
-              generationRule: {
-                kind: { oneofKind: "floatConst", floatConst: 300000 },
-              },
-            },
-          ],
+          params: paramsG({
+            w_id: G.int32Seq(1, WAREHOUSES),
+            w_name: G.strRange(6, 10, AB.en),
+            w_street_1: G.strRange(10, 20, AB.en),
+            w_street_2: G.strRange(10, 20, AB.en),
+            w_city: G.strRange(10, 20, AB.en),
+            w_state: G.str(2, AB.en),
+            w_zip: G.str(9, AB.num),
+            w_tax: G.float(0, 0.2),
+            w_ytd: G.floatConst(300000),
+          }),
           groups: [],
         }),
       ),
@@ -280,152 +152,24 @@ export function setup() {
           name: "load_districts",
           tableName: "district",
           method: 1,
-          params: [
-            {
-              name: "d_name",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "10",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                      ],
-                    },
-                    minLen: "6",
-                  },
-                },
-              },
-            },
-            {
-              name: "d_street_1",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "20",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 33, min: 32 },
-                      ],
-                    },
-                    minLen: "10",
-                  },
-                },
-              },
-            },
-            {
-              name: "d_street_2",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "20",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 33, min: 32 },
-                      ],
-                    },
-                    minLen: "10",
-                  },
-                },
-              },
-            },
-            {
-              name: "d_city",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "20",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 33, min: 32 },
-                      ],
-                    },
-                    minLen: "10",
-                  },
-                },
-              },
-            },
-            {
-              name: "d_state",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "2",
-                    alphabet: { ranges: [{ max: 90, min: 65 }] },
-                    minLen: "2",
-                  },
-                },
-              },
-            },
-            {
-              name: "d_zip",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "9",
-                    alphabet: { ranges: [{ max: 57, min: 48 }] },
-                    minLen: "9",
-                  },
-                },
-              },
-            },
-            {
-              name: "d_tax",
-              generationRule: {
-                kind: { oneofKind: "floatRange", floatRange: { max: 0.2 } },
-              },
-            },
-            {
-              name: "d_ytd",
-              generationRule: {
-                kind: { oneofKind: "floatConst", floatConst: 30000 },
-              },
-            },
-            {
-              name: "d_next_o_id",
-              generationRule: {
-                kind: { oneofKind: "int32Const", int32Const: 3001 },
-              },
-            },
-          ],
+          params: paramsG({
+            d_name: G.strRange(6, 10, AB.en),
+            d_street_1: G.strRange(10, 20, AB.enSpc),
+            d_street_2: G.strRange(10, 20, AB.enSpc),
+            d_city: G.strRange(10, 20, AB.enSpc),
+            d_state: G.str(2, AB.enUpper),
+            d_zip: G.str(9, AB.num),
+            d_tax: G.float(0, 0.2),
+            d_ytd: G.floatConst(30000),
+            d_next_o_id: G.int32Const(3001),
+          }),
           groups: [
             {
               name: "district_pk",
-              params: [
-                {
-                  name: "d_w_id",
-                  generationRule: {
-                    kind: {
-                      oneofKind: "int32Range",
-                      int32Range: { max: WAREHOUSES, min: 1 },
-                    },
-                    unique: true,
-                  },
-                },
-                {
-                  name: "d_id",
-                  generationRule: {
-                    kind: {
-                      oneofKind: "int32Range",
-                      int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
-                    },
-                    unique: true,
-                  },
-                },
-              ],
+              params: paramsG({
+                d_w_id: G.int32Seq(1, WAREHOUSES),
+                d_id: G.int32Seq(1, DISTRICTS_PER_WAREHOUSE),
+              }),
             },
           ],
         }),
@@ -440,241 +184,34 @@ export function setup() {
           name: "load_customers",
           tableName: "customer",
           method: 1,
-          params: [
-            {
-              name: "c_first",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "16",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                      ],
-                    },
-                    minLen: "8",
-                  },
-                },
-              },
-            },
-            {
-              name: "c_middle",
-              generationRule: {
-                kind: { oneofKind: "stringConst", stringConst: "OE" },
-              },
-            },
-            {
-              name: "c_last",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: { maxLen: "16", minLen: "6" },
-                },
-                unique: true,
-              },
-            },
-            {
-              name: "c_street_1",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "20",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                        { max: 33, min: 32 },
-                      ],
-                    },
-                    minLen: "10",
-                  },
-                },
-              },
-            },
-            {
-              name: "c_street_2",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "20",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                        { max: 33, min: 32 },
-                      ],
-                    },
-                    minLen: "10",
-                  },
-                },
-              },
-            },
-            {
-              name: "c_city",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "20",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 33, min: 32 },
-                      ],
-                    },
-                    minLen: "10",
-                  },
-                },
-              },
-            },
-            {
-              name: "c_state",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "2",
-                    alphabet: { ranges: [{ max: 90, min: 65 }] },
-                    minLen: "2",
-                  },
-                },
-              },
-            },
-            {
-              name: "c_zip",
-              generationRule: {
-                kind: { oneofKind: "stringConst", stringConst: "123456789" },
-              },
-            },
-            {
-              name: "c_phone",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "16",
-                    alphabet: { ranges: [{ max: 57, min: 48 }] },
-                    minLen: "16",
-                  },
-                },
-              },
-            },
-            {
-              name: "c_since",
-              generationRule: {
-                kind: {
-                  oneofKind: "datetimeConst",
-                  datetimeConst: {
-                    value: { seconds: "1761545738", nanos: 810290275 },
-                  },
-                },
-              },
-            },
-            {
-              name: "c_credit",
-              generationRule: {
-                kind: { oneofKind: "stringConst", stringConst: "GC" },
-              },
-            },
-            {
-              name: "c_credit_lim",
-              generationRule: {
-                kind: { oneofKind: "floatConst", floatConst: 50000 },
-              },
-            },
-            {
-              name: "c_discount",
-              generationRule: {
-                kind: { oneofKind: "floatRange", floatRange: { max: 0.5 } },
-              },
-            },
-            {
-              name: "c_balance",
-              generationRule: {
-                kind: { oneofKind: "floatConst", floatConst: -10 },
-              },
-            },
-            {
-              name: "c_ytd_payment",
-              generationRule: {
-                kind: { oneofKind: "floatConst", floatConst: 10 },
-              },
-            },
-            {
-              name: "c_payment_cnt",
-              generationRule: {
-                kind: { oneofKind: "int32Const", int32Const: 1 },
-              },
-            },
-            {
-              name: "c_delivery_cnt",
-              generationRule: {
-                kind: { oneofKind: "int32Const", int32Const: 0 },
-              },
-            },
-            {
-              name: "c_data",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "500",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                        { max: 33, min: 32 },
-                      ],
-                    },
-                    minLen: "300",
-                  },
-                },
-              },
-            },
-          ],
+          params: paramsG({
+            c_first: G.strRange(8, 16, AB.en),
+            c_middle: G.str(2, AB.enUpper),
+            c_last: G.strSeq(6, 16, AB.en),
+            c_street_1: G.strRange(10, 20, AB.enNumSpc),
+            c_street_2: G.strRange(10, 20, AB.enNumSpc),
+            c_city: G.strRange(10, 20, AB.enSpc),
+            c_state: G.str(2, AB.enUpper),
+            c_zip: G.str(9, AB.num),
+            c_phone: G.str(16, AB.num),
+            c_since: G.datetimeConst(new Date()),
+            c_credit: G.strConst("GC"), // TODO: "GC" | "BC" (good/bad credit), and 10% should be "BC"
+            c_credit_lim: G.floatConst(50000),
+            c_discount: G.float(0, 0.5),
+            c_balance: G.floatConst(-10),
+            c_ytd_payment: G.floatConst(10),
+            c_payment_cnt: G.int32Const(1),
+            c_delivery_cnt: G.int32Const(0),
+            c_data: G.strRange(300, 500, AB.enNumSpc),
+          }),
           groups: [
             {
               name: "customer_pk",
-              params: [
-                {
-                  name: "c_d_id",
-                  generationRule: {
-                    kind: {
-                      oneofKind: "int32Range",
-                      int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
-                    },
-                    unique: true,
-                  },
-                },
-                {
-                  name: "c_w_id",
-                  generationRule: {
-                    kind: {
-                      oneofKind: "int32Range",
-                      int32Range: { max: WAREHOUSES, min: 1 },
-                    },
-                    unique: true,
-                  },
-                },
-                {
-                  name: "c_id",
-                  generationRule: {
-                    kind: {
-                      oneofKind: "int32Range",
-                      int32Range: { max: CUSTOMERS_PER_DISTRICT, min: 1 },
-                    },
-                    unique: true,
-                  },
-                },
-              ],
+              params: paramsG({
+                c_d_id: G.int32Seq(1, DISTRICTS_PER_WAREHOUSE),
+                c_w_id: G.int32Seq(1, WAREHOUSES),
+                c_id: G.int32Seq(1, CUSTOMERS_PER_DISTRICT),
+              }),
             },
           ],
         }),
@@ -689,270 +226,30 @@ export function setup() {
           name: "load_stock",
           tableName: "stock",
           method: 1,
-          params: [
-            {
-              name: "s_quantity",
-              generationRule: {
-                kind: {
-                  oneofKind: "int32Range",
-                  int32Range: { max: 100, min: 10 },
-                },
-              },
-            },
-            {
-              name: "s_dist_01",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "24",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                      ],
-                    },
-                    minLen: "24",
-                  },
-                },
-              },
-            },
-            {
-              name: "s_dist_02",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "24",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                      ],
-                    },
-                    minLen: "24",
-                  },
-                },
-              },
-            },
-            {
-              name: "s_dist_03",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "24",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                      ],
-                    },
-                    minLen: "24",
-                  },
-                },
-              },
-            },
-            {
-              name: "s_dist_04",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "24",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                      ],
-                    },
-                    minLen: "24",
-                  },
-                },
-              },
-            },
-            {
-              name: "s_dist_05",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "24",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                      ],
-                    },
-                    minLen: "24",
-                  },
-                },
-              },
-            },
-            {
-              name: "s_dist_06",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "24",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                      ],
-                    },
-                    minLen: "24",
-                  },
-                },
-              },
-            },
-            {
-              name: "s_dist_07",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "24",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                      ],
-                    },
-                    minLen: "24",
-                  },
-                },
-              },
-            },
-            {
-              name: "s_dist_08",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "24",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                      ],
-                    },
-                    minLen: "24",
-                  },
-                },
-              },
-            },
-            {
-              name: "s_dist_09",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "24",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                      ],
-                    },
-                    minLen: "24",
-                  },
-                },
-              },
-            },
-            {
-              name: "s_dist_10",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "24",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                      ],
-                    },
-                    minLen: "24",
-                  },
-                },
-              },
-            },
-            {
-              name: "s_ytd",
-              generationRule: {
-                kind: { oneofKind: "int32Const", int32Const: 0 },
-              },
-            },
-            {
-              name: "s_order_cnt",
-              generationRule: {
-                kind: { oneofKind: "int32Const", int32Const: 0 },
-              },
-            },
-            {
-              name: "s_remote_cnt",
-              generationRule: {
-                kind: { oneofKind: "int32Const", int32Const: 0 },
-              },
-            },
-            {
-              name: "s_data",
-              generationRule: {
-                kind: {
-                  oneofKind: "stringRange",
-                  stringRange: {
-                    maxLen: "50",
-                    alphabet: {
-                      ranges: [
-                        { max: 90, min: 65 },
-                        { max: 122, min: 97 },
-                        { max: 57, min: 48 },
-                        { max: 33, min: 32 },
-                      ],
-                    },
-                    minLen: "26",
-                  },
-                },
-              },
-            },
-          ],
+          params: paramsG({
+            s_quantity: G.int32(10, 100),
+            s_dist_01: G.str(24, AB.enNum),
+            s_dist_02: G.str(24, AB.enNum),
+            s_dist_03: G.str(24, AB.enNum),
+            s_dist_04: G.str(24, AB.enNum),
+            s_dist_05: G.str(24, AB.enNum),
+            s_dist_06: G.str(24, AB.enNum),
+            s_dist_07: G.str(24, AB.enNum),
+            s_dist_08: G.str(24, AB.enNum),
+            s_dist_09: G.str(24, AB.enNum),
+            s_dist_10: G.str(24, AB.enNum),
+            s_ytd: G.int32Const(0),
+            s_order_cnt: G.int32Const(0),
+            s_remote_cnt: G.int32Const(0),
+            s_data: G.strRange(26, 50, AB.enNumSpc),
+          }),
           groups: [
             {
               name: "stock_pk",
-              params: [
-                {
-                  name: "s_i_id",
-                  generationRule: {
-                    kind: {
-                      oneofKind: "int32Range",
-                      int32Range: { max: ITEMS, min: 1 },
-                    },
-                    unique: true,
-                  },
-                },
-                {
-                  name: "s_w_id",
-                  generationRule: {
-                    kind: {
-                      oneofKind: "int32Range",
-                      int32Range: { max: WAREHOUSES, min: 1 },
-                    },
-                    unique: true,
-                  },
-                },
-              ],
+              params: paramsG({
+                s_i_id: G.int32Seq(1, ITEMS),
+                s_w_id: G.int32Seq(1, WAREHOUSES),
+              }),
             },
           ],
         }),
@@ -967,33 +264,14 @@ export function setup() {
   return;
 }
 
-const newOrderWarehouseGen = NewGeneratorByRule(0, {
-  kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
-});
-const newOrderMaxWarehouseGen = NewGeneratorByRule(1, {
-  kind: {
-    oneofKind: "int32Range",
-    int32Range: {
-      max: DISTRICTS_PER_WAREHOUSE,
-      min: DISTRICTS_PER_WAREHOUSE,
-    },
-  },
-});
-const newOrderDistrictGen = NewGeneratorByRule(2, {
-  kind: {
-    oneofKind: "int32Range",
-    int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
-  },
-});
-const newOrderCustomerGen = NewGeneratorByRule(3, {
-  kind: {
-    oneofKind: "int32Range",
-    int32Range: { max: CUSTOMERS_PER_DISTRICT, min: 1 },
-  },
-});
-const newOrderOlCntGen = NewGeneratorByRule(4, {
-  kind: { oneofKind: "int32Range", int32Range: { max: 15, min: 5 } },
-});
+const newOrderWarehouseGen = NewGenByRule(0, G.int32(1, WAREHOUSES));
+const newOrderMaxWarehouseGen = NewGenByRule(1, G.int32Const(WAREHOUSES));
+const newOrderDistrictGen = NewGenByRule(
+  2,
+  G.int32(1, DISTRICTS_PER_WAREHOUSE),
+);
+const newOrderCustomerGen = NewGenByRule(3, G.int32(1, CUSTOMERS_PER_DISTRICT));
+const newOrderOlCntGen = NewGenByRule(4, G.int32(5, 15));
 export function new_order() {
   driver.runQuery("SELECT NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt, 0)", {
     w_id: newOrderWarehouseGen.next(),
@@ -1004,40 +282,16 @@ export function new_order() {
   });
 }
 
-const paymentWarehouseGen = NewGeneratorByRule(5, {
-  kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
-});
-const paymentDistrictGen = NewGeneratorByRule(6, {
-  kind: {
-    oneofKind: "int32Range",
-    int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
-  },
-});
-const paymentCustomerWarehouseGen = NewGeneratorByRule(7, {
-  kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
-});
-const paymentCustomerDistrictGen = NewGeneratorByRule(8, {
-  kind: {
-    oneofKind: "int32Range",
-    int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
-  },
-});
-const paymentCustomerGen = NewGeneratorByRule(9, {
-  kind: {
-    oneofKind: "int32Range",
-    int32Range: { max: CUSTOMERS_PER_DISTRICT, min: 1 },
-  },
-});
-const paymentAmountGen = NewGeneratorByRule(10, {
-  kind: { oneofKind: "doubleRange", doubleRange: { max: 5000, min: 1 } },
-});
-const paymentCustomerLastGen = NewGeneratorByRule(11, {
-  kind: {
-    oneofKind: "stringRange",
-    stringRange: { maxLen: "16", minLen: "6" },
-  },
-  unique: true,
-});
+const paymentWarehouseGen = NewGenByRule(5, G.int32(1, WAREHOUSES));
+const paymentDistrictGen = NewGenByRule(6, G.int32(1, DISTRICTS_PER_WAREHOUSE));
+const paymentCustomerWarehouseGen = NewGenByRule(7, G.int32(1, WAREHOUSES));
+const paymentCustomerDistrictGen = NewGenByRule(
+  8,
+  G.int32(1, DISTRICTS_PER_WAREHOUSE),
+);
+const paymentCustomerGen = NewGenByRule(9, G.int32(1, CUSTOMERS_PER_DISTRICT));
+const paymentAmountGen = NewGenByRule(10, G.double(1, 5000));
+const paymentCustomerLastGen = NewGenByRule(11, G.strSeq(6, 16, AB.en));
 export function payments() {
   driver.runQuery(
     "SELECT PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last)",
@@ -1054,27 +308,16 @@ export function payments() {
   );
 }
 
-const orderStatusWarehouseGen = NewGeneratorByRule(12, {
-  kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
-});
-const orderStatusDistrictGen = NewGeneratorByRule(13, {
-  kind: {
-    oneofKind: "int32Range",
-    int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
-  },
-});
-const orderStatusCustomerGen = NewGeneratorByRule(14, {
-  kind: {
-    oneofKind: "int32Range",
-    int32Range: { max: CUSTOMERS_PER_DISTRICT, min: 1 },
-  },
-});
-const orderStatusCustomerLastGen = NewGeneratorByRule(15, {
-  kind: {
-    oneofKind: "stringRange",
-    stringRange: { maxLen: "16", minLen: "8" },
-  },
-});
+const orderStatusWarehouseGen = NewGenByRule(12, G.int32(1, WAREHOUSES));
+const orderStatusDistrictGen = NewGenByRule(
+  13,
+  G.int32(1, DISTRICTS_PER_WAREHOUSE),
+);
+const orderStatusCustomerGen = NewGenByRule(
+  14,
+  G.int32(1, CUSTOMERS_PER_DISTRICT),
+);
+const orderStatusCustomerLastGen = NewGenByRule(15, G.strRange(8, 16, AB.en));
 export function order_status() {
   driver.runQuery(
     "SELECT * FROM OSTAT(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)",
@@ -1088,15 +331,11 @@ export function order_status() {
   );
 }
 
-const deliveryWarehouseGen = NewGeneratorByRule(16, {
-  kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
-});
-const deliveryCarrierGen = NewGeneratorByRule(17, {
-  kind: {
-    oneofKind: "int32Range",
-    int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
-  },
-});
+const deliveryWarehouseGen = NewGenByRule(16, G.int32(1, WAREHOUSES));
+const deliveryCarrierGen = NewGenByRule(
+  17,
+  G.int32(1, DISTRICTS_PER_WAREHOUSE),
+);
 export function delivery() {
   driver.runQuery("SELECT DELIVERY(:d_w_id, :d_o_carrier_id)", {
     d_w_id: deliveryWarehouseGen.next(),
@@ -1104,18 +343,12 @@ export function delivery() {
   });
 }
 
-const stockLevelWarehouseGen = NewGeneratorByRule(18, {
-  kind: { oneofKind: "int32Range", int32Range: { max: WAREHOUSES, min: 1 } },
-});
-const stockLevelDistrictGen = NewGeneratorByRule(19, {
-  kind: {
-    oneofKind: "int32Range",
-    int32Range: { max: DISTRICTS_PER_WAREHOUSE, min: 1 },
-  },
-});
-const stockLevelThresholdGen = NewGeneratorByRule(20, {
-  kind: { oneofKind: "int32Range", int32Range: { max: 20, min: 10 } },
-});
+const stockLevelWarehouseGen = NewGenByRule(18, G.int32(1, WAREHOUSES));
+const stockLevelDistrictGen = NewGenByRule(
+  19,
+  G.int32(1, DISTRICTS_PER_WAREHOUSE),
+);
+const stockLevelThresholdGen = NewGenByRule(20, G.int32(10, 20));
 export function stock_level() {
   driver.runQuery("SELECT SLEV(:st_w_id, :st_d_id, :threshold)", {
     st_w_id: stockLevelWarehouseGen.next(),
