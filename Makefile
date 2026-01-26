@@ -188,8 +188,8 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 install-bin-deps: .install-linter .install-xk6 .install-proto-deps # Install binary dependencies in ./bin
 	$(info Installing binary dependencies...)
 
-.PHONY: .app-deps
-.app-deps: # Install application dependencies in ./bin
+.PHONY: app-deps
+app-deps: # Install application dependencies in ./bin
 	GOPROXY=$(GOPROXY)						go mod tidy
 	GOPROXY=$(GOPROXY) cd cmd/xk6air/    && go mod tidy
 
