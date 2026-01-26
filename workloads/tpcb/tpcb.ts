@@ -21,6 +21,7 @@ const BRANCHES = SCALE_FACTOR;
 const TELLERS = 10 * SCALE_FACTOR;
 const ACCOUNTS = 100000 * SCALE_FACTOR;
 
+// K6 options
 export const options: Options = {
   setupTimeout: "5h",
   scenarios: {
@@ -65,21 +66,16 @@ const sections = parse_sql_with_groups(open(__SQL_FILE));
 // Setup function: create schema and load data
 export function setup() {
   NotifyStep("create_schema", Status.STATUS_RUNNING);
-
-  // Drop tables if they exist
   sections["section cleanup"].forEach((query) =>
     driver.runQuery(query.sql, {}),
   );
 
-  // Create pgbench_branches table
   sections["section create_schema"].forEach((query) =>
     driver.runQuery(query.sql, {}),
   );
-
   NotifyStep("create_schema", Status.STATUS_COMPLETED);
 
   NotifyStep("load_data", Status.STATUS_RUNNING);
-
   console.log("Loading branches...");
   driver.insertValues(
     InsertDescriptor.toBinary(
@@ -135,11 +131,9 @@ export function setup() {
     ),
     ACCOUNTS,
   );
-
   console.log("Data loading completed!");
   NotifyStep("load_data", Status.STATUS_COMPLETED);
 
-  // Analyze tables
   sections["section analyze"].forEach((query) =>
     driver.runQuery(query.sql, {}),
   );

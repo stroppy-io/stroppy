@@ -163,6 +163,13 @@ export const G = {
       },
     },
   }),
+
+  // ratio of true values
+  // unique = true => sequence [false, true]
+  bool: (ratio: number, unique = false): Generation_Rule => ({
+    kind: { oneofKind: "boolRange", boolRange: { ratio } },
+    unique: unique,
+  }),
 };
 
 // Helper to convert params object to array
