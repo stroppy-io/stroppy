@@ -8,8 +8,11 @@ import { NotifyStep, Teardown } from "k6/x/stroppy";
 import { Status } from "./stroppy.pb.js";
 import {
   NewDriverByConfig,
-  NewGeneratorByRule,
-  NewGroupGeneratorByRules,
+  NewGeneratorByRule as NewGenByRule,
+  NewGroupGeneratorByRules as NewGroupGenByRules,
+  AB,
+  G,
+  paramsG,
 } from "./helpers.ts";
 
 export const options: Options = {
@@ -62,47 +65,39 @@ export function setup() {
   NotifyStep("workload", Status.STATUS_RUNNING);
   return;
 }
-const gen = NewGeneratorByRule(0, {
+
+// Raw generator defenition with Generation_Rule
+const gen = NewGenByRule(0, {
   kind: { oneofKind: "int32Range", int32Range: { min: 0, max: 100 } },
 });
 
-const groupGen = NewGroupGeneratorByRules(0, {
-  params: [
-    {
-      name: "",
-      generationRule: {
-        kind: { oneofKind: "int32Range", int32Range: { min: 1, max: 2 } },
-        unique: true,
-      },
-    },
-    {
-      name: "",
-      generationRule: {
-        kind: { oneofKind: "int32Range", int32Range: { min: 1, max: 3 } },
-        unique: true,
-      },
-    },
-    {
-      name: "",
-      generationRule: {
-        kind: { oneofKind: "boolRange", boolRange: { ratio: 1 } },
-        unique: true,
-      },
-    },
-  ],
+// The generator of strings of length = 10, made using the English alphabet
+const gen2 = NewGenByRule(1, G.str(10, AB.en));
+
+// Group of generators, run and check logs to find out the pattern
+const groupGen = NewGroupGenByRules(2, {
+  params: paramsG({
+    some: G.int32Seq(1, 2),
+    second: G.int32Seq(1, 3),
+    bool: G.bool(1, true),
+  }),
 });
 
 export function workload() {
   const value = gen.next();
   console.log("value is", value);
+
+  // driver can run query
   driver.runQuery("select 1;", {});
+
+  // and it uses :arg syntax to get arguments
   driver.runQuery("select 90000 + :value + :second;", {
     value,
     second: gen.next(),
   });
 
   driver.runQuery("select :a::int + :b::int", { a: 34, b: 35 });
-  driver.runQuery("select 'Hello, ' || :a || '!'", { a: "world" });
+  driver.runQuery("select 'Hello, ' || :a || '!'", { a: gen2.next() });
 
   for (let i = 0; i < 12; i++) {
     const [a, b, c] = groupGen.next();
