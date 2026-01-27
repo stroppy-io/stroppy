@@ -64,7 +64,6 @@ REQUIRED_BINS = git node npm go curl unzip \
 	protoc-gen-go=$(LOCAL_BIN)/protoc-gen-go \
 	protoc-gen-go-grpc=$(LOCAL_BIN)/protoc-gen-go-grpc \
 	protoc-gen-validate=$(LOCAL_BIN)/protoc-gen-validate \
-	protoc-gen-jsonschema=$(LOCAL_BIN)/protoc-gen-jsonschema \
 	protoc-gen-doc=$(LOCAL_BIN)/protoc-gen-doc \
 	xk6=$(LOCAL_BIN)/xk6
 .PHONY: .check-bins
@@ -135,7 +134,6 @@ PROTOC_TMP := /tmp/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH)
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/envoyproxy/protoc-gen-validate@v1.2.1
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.19.1
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@v1.5.1
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/pubg/protoc-gen-jsonschema@v0.8.0
 
 .PHONY: .install-node-proto-deps
 .install-node-proto-deps:
@@ -208,7 +206,6 @@ proto: .check-bins
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.js $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/parse_sql.js $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/docs/proto.md $(CURDIR)/docs
-# cp $(PROTO_BUILD_TARGET_DIR)/docs/config.schema.json $(CURDIR)/docs
 
 .PHONY: linter
 linter: # Start linter

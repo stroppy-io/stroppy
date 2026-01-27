@@ -22,7 +22,14 @@
       "../internal/static/node_modules/@types",
       "../internal/static/"
     ],
-    "rootDirs": [".", "../internal/static/"],
+    "rootDirs": [
+      ".",
+      "../internal/static/",
+      "./simple/",
+      "./tpcb/",
+      "./tpcc/",
+      "./tpcds/"
+    ],
     "paths": {
       "k6/x/stroppy": ["../internal/static/stroppy.d.ts"]
     }
