@@ -39,7 +39,7 @@ func collectInsertGenerators(
 	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
 
 	for _, param := range descriptor.GetParams() {
-		paramID := NewGeneratorID(descriptor.GetName(), param.GetName())
+		paramID := NewGeneratorID(descriptor.GetTableName(), param.GetName())
 
 		generator, err := generate.NewValueGenerator(seed, param)
 		if err != nil {
@@ -54,7 +54,7 @@ func collectInsertGenerators(
 			seed,
 			Out[generate.GenAbleStruct](group.GetParams()),
 		)
-		generators.Set(NewGeneratorID(descriptor.GetName(), group.GetName()), generator)
+		generators.Set(NewGeneratorID(descriptor.GetTableName(), group.GetName()), generator)
 	}
 
 	return generators, nil

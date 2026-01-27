@@ -11,8 +11,7 @@ option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
  * InsertDescription defines data to fill database.
  */
 message InsertDescriptor {
-  /** Name of the Insert query */
-  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  int32 count = 1 [ (validate.rules).int32.gt = 0 ];
   /** Which table to insert the values */
   string table_name = 2 [ (validate.rules).string.min_len = 1 ];
   /** Allows to use a percise method of data insertion */

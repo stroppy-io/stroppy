@@ -131,8 +131,7 @@ func (TxIsolationLevel) EnumDescriptor() ([]byte, []int) {
 // InsertDescription defines data to fill database.
 type InsertDescriptor struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Name of the Insert query
-	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Count int32                  `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
 	// * Which table to insert the values
 	TableName string `protobuf:"bytes,2,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
 	// * Allows to use a percise method of data insertion
@@ -177,11 +176,11 @@ func (*InsertDescriptor) Descriptor() ([]byte, []int) {
 	return file_proto_stroppy_descriptor_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *InsertDescriptor) GetName() string {
+func (x *InsertDescriptor) GetCount() int32 {
 	if x != nil {
-		return x.Name
+		return x.Count
 	}
-	return ""
+	return 0
 }
 
 func (x *InsertDescriptor) GetTableName() string {
@@ -350,9 +349,9 @@ var File_proto_stroppy_descriptor_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_descriptor_proto_rawDesc = "" +
 	"\n" +
-	"\x1eproto/stroppy/descriptor.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\x8e\x02\n" +
-	"\x10InsertDescriptor\x12\x1b\n" +
-	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12&\n" +
+	"\x1eproto/stroppy/descriptor.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\x90\x02\n" +
+	"\x10InsertDescriptor\x12\x1d\n" +
+	"\x05count\x18\x01 \x01(\x05B\a\xfaB\x04\x1a\x02 \x00R\x05count\x12&\n" +
 	"\n" +
 	"table_name\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\ttableName\x122\n" +
 	"\x06method\x18\x03 \x01(\x0e2\x15.stroppy.InsertMethodH\x00R\x06method\x88\x01\x01\x12D\n" +

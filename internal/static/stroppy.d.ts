@@ -16,7 +16,7 @@ declare module "k6/x/stroppy" {
 
   // Driver interface - provides database operations
   export interface Driver {
-    insertValuesBin(insert: BinMsg<InsertDescriptor>, count: number): Error;
+    insertValuesBin(insert: BinMsg<InsertDescriptor>): Error;
     runQuery(sql: string, args: Record<string, any>): Error;
   }
 

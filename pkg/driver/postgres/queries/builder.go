@@ -39,7 +39,7 @@ func NewQueryBuilder(seed uint64) (*QueryBuilder, error) {
 }
 
 func (q *QueryBuilder) AddGenerators(insert *stroppy.InsertDescriptor) error {
-	name := insert.GetName()
+	name := insert.GetTableName()
 	// Lock to ensure thread-safe check-and-add operation for unit generators
 	q.mutex.Lock()
 	defer q.mutex.Unlock()

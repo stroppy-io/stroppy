@@ -13,7 +13,6 @@ type Driver interface {
 	InsertValues(
 		ctx context.Context,
 		unit *stroppy.InsertDescriptor,
-		count int64,
 	) (*stroppy.DriverTransactionStat, error)
 	RunQuery(
 		ctx context.Context,

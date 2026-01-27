@@ -20,7 +20,6 @@ func Test_badInsertSQL(t *testing.T) {
 			name: "COPY FROM",
 			args: args{
 				descriptor: &stroppy.InsertDescriptor{
-					Name:      "simple_name",
 					TableName: "simple_table",
 					Method:    stroppy.InsertMethod_COPY_FROM.Enum(),
 					Params:    []*stroppy.QueryParamDescriptor{{Name: "a"}, {Name: "b"}},
@@ -55,7 +54,6 @@ func Test_insertSQL(t *testing.T) {
 			name: "plain queries",
 			args: args{
 				descriptor: &stroppy.InsertDescriptor{
-					Name:      "simple_name",
 					TableName: "simple_table",
 					Method:    stroppy.InsertMethod_PLAIN_QUERY.Enum(),
 					Params:    []*stroppy.QueryParamDescriptor{{Name: "a"}, {Name: "b"}},

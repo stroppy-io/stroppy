@@ -11,7 +11,6 @@ import {
   NewGeneratorByRule as NewGenByRule,
   AB,
   G,
-  paramsG,
   InsertValues,
 } from "./helpers.ts";
 import { parse_sql_with_groups } from "./parse_sql.js";
@@ -102,109 +101,103 @@ export function setup() {
   NotifyStep("load_data", Status.STATUS_RUNNING);
   // Load data into tables using InsertValues with COPY_FROM method
   console.log("Loading items...");
-  InsertValues(driver, ITEMS, {
-    name: "load_items",
+  InsertValues(driver, {
+    count: ITEMS,
     tableName: "item",
     method: InsertMethod.COPY_FROM,
-    params: paramsG({
+    params: G.params({
       i_id: G.int32Seq(1, ITEMS),
       i_im_id: G.int32Seq(1, ITEMS), // WHY: not unique originaly
-      i_name: G.strRange(14, 24, AB.enSpc),
+      i_name: G.str(14, 24, AB.enSpc),
       i_price: G.float(1, 100),
-      i_data: G.strRange(26, 50, AB.enSpc),
+      i_data: G.str(26, 50, AB.enSpc),
     }),
     groups: [],
   });
 
   console.log("Loading warehouses...");
-  InsertValues(driver, WAREHOUSES, {
-    name: "load_warehouses",
+  InsertValues(driver, {
+    count: WAREHOUSES,
     tableName: "warehouse",
     method: InsertMethod.COPY_FROM,
-    params: paramsG({
+    params: G.params({
       w_id: G.int32Seq(1, WAREHOUSES),
-      w_name: G.strRange(6, 10, AB.en),
-      w_street_1: G.strRange(10, 20, AB.en),
-      w_street_2: G.strRange(10, 20, AB.en),
-      w_city: G.strRange(10, 20, AB.en),
-      w_state: G.str(2, AB.en),
+      w_name: G.str(6, 10),
+      w_street_1: G.str(10, 20),
+      w_street_2: G.str(10, 20),
+      w_city: G.str(10, 20),
+      w_state: G.str(2),
       w_zip: G.str(9, AB.num),
       w_tax: G.float(0, 0.2),
-      w_ytd: G.floatConst(300000),
+      w_ytd: G.float(300000),
     }),
     groups: [],
   });
 
   console.log("Loading districts...");
-  InsertValues(driver, TOTAL_DISTRICTS, {
-    name: "load_districts",
+  InsertValues(driver, {
+    count: TOTAL_DISTRICTS,
     tableName: "district",
     method: InsertMethod.COPY_FROM,
-    params: paramsG({
-      d_name: G.strRange(6, 10, AB.en),
-      d_street_1: G.strRange(10, 20, AB.enSpc),
-      d_street_2: G.strRange(10, 20, AB.enSpc),
-      d_city: G.strRange(10, 20, AB.enSpc),
+    params: G.params({
+      d_name: G.str(6, 10),
+      d_street_1: G.str(10, 20, AB.enSpc),
+      d_street_2: G.str(10, 20, AB.enSpc),
+      d_city: G.str(10, 20, AB.enSpc),
       d_state: G.str(2, AB.enUpper),
       d_zip: G.str(9, AB.num),
       d_tax: G.float(0, 0.2),
-      d_ytd: G.floatConst(30000),
-      d_next_o_id: G.int32Const(3001),
+      d_ytd: G.float(30000),
+      d_next_o_id: G.int32(3001),
     }),
-    groups: [
-      {
-        name: "district_pk",
-        params: paramsG({
-          d_w_id: G.int32Seq(1, WAREHOUSES),
-          d_id: G.int32Seq(1, DISTRICTS_PER_WAREHOUSE),
-        }),
-      },
-    ],
+    groups: G.groups({
+      district_pk: G.params({
+        d_w_id: G.int32Seq(1, WAREHOUSES),
+        d_id: G.int32Seq(1, DISTRICTS_PER_WAREHOUSE),
+      }),
+    }),
   });
 
   console.log("Loading customers...");
-  InsertValues(driver, TOTAL_CUSTOMERS, {
-    name: "load_customers",
+  InsertValues(driver, {
+    count: TOTAL_CUSTOMERS,
     tableName: "customer",
     method: InsertMethod.COPY_FROM,
-    params: paramsG({
-      c_first: G.strRange(8, 16, AB.en),
+    params: G.params({
+      c_first: G.str(8, 16),
       c_middle: G.str(2, AB.enUpper),
-      c_last: G.strSeq(6, 16, AB.en),
-      c_street_1: G.strRange(10, 20, AB.enNumSpc),
-      c_street_2: G.strRange(10, 20, AB.enNumSpc),
-      c_city: G.strRange(10, 20, AB.enSpc),
+      c_last: G.strSeq(6, 16),
+      c_street_1: G.str(10, 20, AB.enNumSpc),
+      c_street_2: G.str(10, 20, AB.enNumSpc),
+      c_city: G.str(10, 20, AB.enSpc),
       c_state: G.str(2, AB.enUpper),
       c_zip: G.str(9, AB.num),
       c_phone: G.str(16, AB.num),
       c_since: G.datetimeConst(new Date()),
-      c_credit: G.strConst("GC"), // TODO: "GC" | "BC" (good/bad credit), and 10% should be "BC"
-      c_credit_lim: G.floatConst(50000),
+      c_credit: G.str("GC"), // TODO: "GC" | "BC" (good/bad credit), and 10% should be "BC"
+      c_credit_lim: G.float(50000),
       c_discount: G.float(0, 0.5),
-      c_balance: G.floatConst(-10),
-      c_ytd_payment: G.floatConst(10),
-      c_payment_cnt: G.int32Const(1),
-      c_delivery_cnt: G.int32Const(0),
-      c_data: G.strRange(300, 500, AB.enNumSpc),
+      c_balance: G.float(-10),
+      c_ytd_payment: G.float(10),
+      c_payment_cnt: G.int32(1),
+      c_delivery_cnt: G.int32(0),
+      c_data: G.str(300, 500, AB.enNumSpc),
     }),
-    groups: [
-      {
-        name: "customer_pk",
-        params: paramsG({
-          c_d_id: G.int32Seq(1, DISTRICTS_PER_WAREHOUSE),
-          c_w_id: G.int32Seq(1, WAREHOUSES),
-          c_id: G.int32Seq(1, CUSTOMERS_PER_DISTRICT),
-        }),
-      },
-    ],
+    groups: G.groups({
+      customer_pk: G.params({
+        c_d_id: G.int32Seq(1, DISTRICTS_PER_WAREHOUSE),
+        c_w_id: G.int32Seq(1, WAREHOUSES),
+        c_id: G.int32Seq(1, CUSTOMERS_PER_DISTRICT),
+      }),
+    }),
   });
 
   console.log("Loading stock...");
-  InsertValues(driver, TOTAL_STOCK, {
-    name: "load_stock",
+  InsertValues(driver, {
+    count: TOTAL_STOCK,
     tableName: "stock",
     method: InsertMethod.COPY_FROM,
-    params: paramsG({
+    params: G.params({
       s_quantity: G.int32(10, 100),
       s_dist_01: G.str(24, AB.enNum),
       s_dist_02: G.str(24, AB.enNum),
@@ -216,20 +209,17 @@ export function setup() {
       s_dist_08: G.str(24, AB.enNum),
       s_dist_09: G.str(24, AB.enNum),
       s_dist_10: G.str(24, AB.enNum),
-      s_ytd: G.int32Const(0),
-      s_order_cnt: G.int32Const(0),
-      s_remote_cnt: G.int32Const(0),
-      s_data: G.strRange(26, 50, AB.enNumSpc),
+      s_ytd: G.int32(0),
+      s_order_cnt: G.int32(0),
+      s_remote_cnt: G.int32(0),
+      s_data: G.str(26, 50, AB.enNumSpc),
     }),
-    groups: [
-      {
-        name: "stock_pk",
-        params: paramsG({
-          s_i_id: G.int32Seq(1, ITEMS),
-          s_w_id: G.int32Seq(1, WAREHOUSES),
-        }),
-      },
-    ],
+    groups: G.groups({
+      stock_pk: G.params({
+        s_i_id: G.int32Seq(1, ITEMS),
+        s_w_id: G.int32Seq(1, WAREHOUSES),
+      }),
+    }),
   });
 
   console.log("Data loading completed!");
@@ -240,7 +230,7 @@ export function setup() {
 }
 
 const newOrderWarehouseGen = NewGenByRule(0, G.int32(1, WAREHOUSES));
-const newOrderMaxWarehouseGen = NewGenByRule(1, G.int32Const(WAREHOUSES));
+const newOrderMaxWarehouseGen = NewGenByRule(1, G.int32(WAREHOUSES));
 const newOrderDistrictGen = NewGenByRule(
   2,
   G.int32(1, DISTRICTS_PER_WAREHOUSE),
@@ -266,7 +256,7 @@ const paymentCustomerDistrictGen = NewGenByRule(
 );
 const paymentCustomerGen = NewGenByRule(9, G.int32(1, CUSTOMERS_PER_DISTRICT));
 const paymentAmountGen = NewGenByRule(10, G.double(1, 5000));
-const paymentCustomerLastGen = NewGenByRule(11, G.strSeq(6, 16, AB.en));
+const paymentCustomerLastGen = NewGenByRule(11, G.strSeq(6, 16));
 export function payments() {
   driver.runQuery(
     "SELECT PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last)",
@@ -292,7 +282,7 @@ const orderStatusCustomerGen = NewGenByRule(
   14,
   G.int32(1, CUSTOMERS_PER_DISTRICT),
 );
-const orderStatusCustomerLastGen = NewGenByRule(15, G.strRange(8, 16, AB.en));
+const orderStatusCustomerLastGen = NewGenByRule(15, G.str(8, 16));
 export function order_status() {
   driver.runQuery(
     "SELECT * FROM OSTAT(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)",

@@ -57,10 +57,10 @@ func (m *InsertDescriptor) validate(all bool) error {
 
 	var errors []error
 
-	if utf8.RuneCountInString(m.GetName()) < 1 {
+	if m.GetCount() <= 0 {
 		err := InsertDescriptorValidationError{
-			field:  "Name",
-			reason: "value length must be at least 1 runes",
+			field:  "Count",
+			reason: "value must be greater than 0",
 		}
 		if !all {
 			return err

@@ -11,7 +11,6 @@ import {
   NewGeneratorByRule as NewGenByRule,
   AB,
   G,
-  paramsG,
   InsertValues,
 } from "./helpers.ts";
 import { parse_sql_with_groups } from "./parse_sql.js";
@@ -79,41 +78,39 @@ export function setup() {
   NotifyStep("load_data", Status.STATUS_RUNNING);
   console.log("Loading branches...");
 
-  InsertValues(driver, BRANCHES, {
-    name: "insert_branches",
+  InsertValues(driver, {
+    count: BRANCHES,
     tableName: "pgbench_branches",
     method: InsertMethod.COPY_FROM,
-    params: paramsG({
+    params: G.params({
       bid: G.int32Seq(1, BRANCHES),
-      bbalance: G.int32Const(0),
+      bbalance: G.int32(0),
       filler: G.str(88, AB.en),
     }),
-    groups: [],
   });
 
   console.log("Loading tellers...");
-  InsertValues(driver, TELLERS, {
-    name: "insert_tellers",
+  InsertValues(driver, {
+    count: TELLERS,
     tableName: "pgbench_tellers",
     method: InsertMethod.COPY_FROM,
-    params: paramsG({
+    params: G.params({
       tid: G.int32Seq(1, TELLERS),
       bid: G.int32(1, BRANCHES),
-      tbalance: G.int32Const(0),
+      tbalance: G.int32(0),
       filler: G.str(84, AB.en),
     }),
-    groups: [],
   });
 
   console.log("Loading accounts...");
-  InsertValues(driver, ACCOUNTS, {
-    name: "insert_accounts",
+  InsertValues(driver, {
+    count: ACCOUNTS,
     tableName: "pgbench_accounts",
     method: InsertMethod.COPY_FROM,
-    params: paramsG({
+    params: G.params({
       aid: G.int32Seq(1, ACCOUNTS),
       bid: G.int32(1, BRANCHES),
-      abalance: G.int32Const(0),
+      abalance: G.int32(0),
       filler: G.str(84, AB.en),
     }),
     groups: [],
