@@ -63,7 +63,6 @@ export function setup() {
 
 export function workload() {
   parsedQueries.forEach((query) => {
-    // TODO: add statistics and etc
     console.log(`tpc-ds-like: ${query.name}`);
     driver.runQuery(query.sql, {});
   });

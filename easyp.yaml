@@ -40,13 +40,6 @@ generate:
         keep_enum_prefix:
         add_pb_suffix:
         long_type_string:
-    - name: jsonschema
-      out: ./proto/build/docs
-      opts:
-        entrypoint_message: ConfigFile
-        output_file_suffix: .schema.json
-        int64_as_string: true
-        paths: source_relative
     - name: doc
       out: ./proto/build/docs
       opts:

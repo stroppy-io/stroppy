@@ -137,44 +137,15 @@ func (m *StroppyStepRun) validate(all bool) error {
 		}
 	}
 
-	if m.GetContext() == nil {
+	if utf8.RuneCountInString(m.GetName()) < 1 {
 		err := StroppyStepRunValidationError{
-			field:  "Context",
-			reason: "value is required",
+			field:  "Name",
+			reason: "value length must be at least 1 runes",
 		}
 		if !all {
 			return err
 		}
 		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetContext()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, StroppyStepRunValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, StroppyStepRunValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetContext()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return StroppyStepRunValidationError{
-				field:  "Context",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
 	}
 
 	if _, ok := Status_name[int32(m.GetStatus())]; !ok {
@@ -337,46 +308,6 @@ func (m *StroppyRun) validate(all bool) error {
 			return err
 		}
 		errors = append(errors, err)
-	}
-
-	if m.GetConfig() == nil {
-		err := StroppyRunValidationError{
-			field:  "Config",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetConfig()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, StroppyRunValidationError{
-					field:  "Config",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, StroppyRunValidationError{
-					field:  "Config",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetConfig()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return StroppyRunValidationError{
-				field:  "Config",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
 	}
 
 	if utf8.RuneCountInString(m.GetCmd()) < 1 {

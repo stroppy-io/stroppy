@@ -56,7 +56,7 @@ func (r *RootModule) NotifyStep(name string, status int32) {
 	r.cloudClient.NotifyStep(r.ctx, &stroppy.StroppyStepRun{
 		Id:           &stroppy.Ulid{Value: getStepID(name).String()},
 		StroppyRunId: &stroppy.Ulid{Value: r.runULID.String()},
-		Context:      &stroppy.StepContext{Step: &stroppy.Step{Name: name}},
 		Status:       stroppy.Status(status),
+		Name:         name,
 	})
 }

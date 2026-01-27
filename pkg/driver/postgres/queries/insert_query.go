@@ -38,7 +38,7 @@ func NewInsertQuery(
 
 	return &stroppy.DriverTransaction{
 		Queries: []*stroppy.DriverQuery{{
-			Name:    descriptor.GetName(),
+			Name:    descriptor.GetTableName(),
 			Request: resSQL,
 			Params:  params,
 			Method:  &method,
@@ -98,11 +98,11 @@ func insertSQL(descriptor *stroppy.InsertDescriptor) string {
 func InsertGenIDs(descriptor *stroppy.InsertDescriptor) []GeneratorID {
 	genIDs := make([]GeneratorID, 0, len(descriptor.GetParams())+len(descriptor.GetGroups()))
 	for _, param := range descriptor.GetParams() {
-		genIDs = append(genIDs, NewGeneratorID(descriptor.GetName(), param.GetName()))
+		genIDs = append(genIDs, NewGeneratorID(descriptor.GetTableName(), param.GetName()))
 	}
 
 	for _, group := range descriptor.GetGroups() {
-		genIDs = append(genIDs, NewGeneratorID(descriptor.GetName(), group.GetName()))
+		genIDs = append(genIDs, NewGeneratorID(descriptor.GetTableName(), group.GetName()))
 	}
 
 	return genIDs

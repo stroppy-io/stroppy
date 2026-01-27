@@ -35,7 +35,6 @@ func NewCloudClient(lg *zap.Logger) (ulid.ULID, stroppyconnect.CloudStatusServic
 	wrappedClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
 		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
 		Status: stroppy.Status_STATUS_IDLE,
-		Config: &stroppy.ConfigFile{},
 		Cmd:    "",
 	})
 	return runULID, wrappedClient
@@ -72,7 +71,7 @@ func (w *cloudClientWrapper) NotifyStep(
 	step *stroppy.StroppyStepRun,
 ) (*emptypb.Empty, error) {
 	lg := w.lg.With(
-		zap.String("name", step.GetContext().GetStep().GetName()),
+		zap.String("name", step.GetName()),
 		zap.String("run_id", step.GetStroppyRunId().GetValue()),
 		zap.String("step_id", step.GetId().GetValue()),
 		zap.String("status", step.GetStatus().String()),

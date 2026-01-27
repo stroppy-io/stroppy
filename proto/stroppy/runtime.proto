@@ -11,34 +11,6 @@ import "proto/stroppy/descriptor.proto";
 option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
 
 /**
- * StepContext provides contextual information to a benchmark step during
- * execution. It contains the run context and the step descriptor.
- */
-message StepContext {
-    /** Global configuration of the benchmark and its steps */
-    GlobalConfig config = 1;
-    /** Current step */
-    Step step = 2;
-    /** Executor configuration */
-    ExecutorConfig executor = 3;
-    /** Exporter configuration */
-    optional ExporterConfig exporter = 4;
-    /** Current workload descriptor */
-    WorkloadDescriptor workload = 5;
-}
-
-/**
- * UnitBuildContext provides the context needed to build a unit from a
- * WorkloadUnitDescriptor.
- */
-message UnitContext {
-    /** Step context */
-    StepContext step_context = 1;
-    /** Current unit descriptor */
-    WorkloadUnitDescriptor unit_descriptor = 2;
-}
-
-/**
  * DriverQuery represents a query that can be executed by a database driver.
  */
 message DriverQuery {
@@ -68,8 +40,8 @@ message DriverTransaction {
  * exec_duration includes the network round-trip and exection on dbms.
  */
 message DriverQueryStat {
-    string name = 1;
-    google.protobuf.Duration exec_duration = 2;
+  string name = 1;
+  google.protobuf.Duration exec_duration = 2;
 }
 
 /**
@@ -77,7 +49,7 @@ message DriverQueryStat {
  * exec_duration includes the network round-trip and exection on dbms.
  */
 message DriverTransactionStat {
-    repeated DriverQueryStat queries = 1;
-    google.protobuf.Duration exec_duration = 2;
-    TxIsolationLevel isolation_level = 3;
+  repeated DriverQueryStat queries = 1;
+  google.protobuf.Duration exec_duration = 2;
+  TxIsolationLevel isolation_level = 3;
 }

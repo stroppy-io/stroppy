@@ -1,14 +1,12 @@
 package queries
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
@@ -43,180 +41,6 @@ func TestNewQueryBuilder_EmptyContext(t *testing.T) {
 	}
 	require.NotNil(t, builder)
 	require.NotNil(t, builder.generators)
-}
-
-// TODO: repair tests after config changes
-func TestQueryBuilder_Build_Success(t *testing.T) {
-	descriptor := &stroppy.QueryDescriptor{
-		Name: "q1",
-		Sql:  "SELECT * FROM t WHERE id=${id}",
-		Params: []*stroppy.QueryParamDescriptor{
-			{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-				Kind: &stroppy.Generation_Rule_Int32Const{
-					Int32Const: 10,
-				},
-			}},
-		},
-	}
-	wrk := &stroppy.WorkloadDescriptor{
-		Name: "test",
-		Units: []*stroppy.WorkloadUnitDescriptor{
-			{
-				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Query{
-					Query: descriptor,
-				}},
-			},
-		},
-	}
-	buildContext := &stroppy.StepContext{
-		Config: &stroppy.GlobalConfig{
-			Seed: 42,
-		},
-		Workload: wrk,
-	}
-
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	paramID := NewGeneratorID("q1", "id")
-	generator, err := generate.NewValueGenerator(42, descriptor.GetParams()[0])
-	require.NoError(t, err)
-	generators.Set(paramID, generator)
-
-	builder := &QueryBuilder{
-		generators: generators,
-	}
-
-	unitBuildContext := &stroppy.UnitContext{
-		StepContext:    buildContext,
-		UnitDescriptor: wrk.GetUnits()[0],
-	}
-
-	ctx := context.Background()
-	lg := zap.NewNop()
-
-	transactionList, err := builder.Build(
-		ctx,
-		lg,
-		unitBuildContext.GetUnitDescriptor().GetDescriptor_(),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, transactionList)
-	require.Len(t, transactionList.Queries, 1)
-	require.Equal(t, int32(10), transactionList.Queries[0].Params[0].GetInt32())
-}
-
-func TestQueryBuilder_Build_CreateTable(t *testing.T) {
-	createTableDescriptor := &stroppy.TableDescriptor{
-		Name: "test_table",
-		Columns: []*stroppy.ColumnDescriptor{
-			{Name: "id", SqlType: "INTEGER"},
-			{Name: "name", SqlType: "VARCHAR(255)"},
-		},
-	}
-	wrk := &stroppy.WorkloadDescriptor{
-		Name: "test",
-		Units: []*stroppy.WorkloadUnitDescriptor{
-			{
-				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_CreateTable{
-					CreateTable: createTableDescriptor,
-				}},
-			},
-		},
-	}
-	buildContext := &stroppy.StepContext{
-		Config: &stroppy.GlobalConfig{
-			Seed: 42,
-		},
-		Workload: wrk,
-	}
-
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-
-	builder := &QueryBuilder{
-		generators: generators,
-	}
-
-	unitBuildContext := &stroppy.UnitContext{
-		StepContext:    buildContext,
-		UnitDescriptor: wrk.GetUnits()[0],
-	}
-
-	ctx := context.Background()
-	lg := zap.NewNop()
-
-	transactionList, err := builder.Build(
-		ctx,
-		lg,
-		unitBuildContext.GetUnitDescriptor().GetDescriptor_(),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, transactionList)
-	require.Len(t, transactionList.Queries, 1)
-	require.Contains(t, transactionList.Queries[0].Request, "CREATE TABLE")
-}
-
-func TestQueryBuilder_Build_Transaction(t *testing.T) {
-	transactionDescriptor := &stroppy.TransactionDescriptor{
-		Name: "t1",
-		Queries: []*stroppy.QueryDescriptor{
-			{
-				Name: "q1",
-				Sql:  "SELECT * FROM t WHERE id=${id}",
-				Params: []*stroppy.QueryParamDescriptor{
-					{Name: "id", GenerationRule: &stroppy.Generation_Rule{
-						Kind: &stroppy.Generation_Rule_Int32Const{
-							Int32Const: 10,
-						},
-					}},
-				},
-			},
-		},
-	}
-	wrk := &stroppy.WorkloadDescriptor{
-		Units: []*stroppy.WorkloadUnitDescriptor{
-			{
-				Descriptor_: &stroppy.UnitDescriptor{Type: &stroppy.UnitDescriptor_Transaction{
-					Transaction: transactionDescriptor,
-				}},
-			},
-		},
-	}
-	buildContext := &stroppy.StepContext{
-		Config: &stroppy.GlobalConfig{
-			Seed: 42,
-		},
-		Workload: wrk,
-	}
-
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	paramID := NewGeneratorID("q1", "id")
-	generator, err := generate.NewValueGenerator(
-		42,
-		transactionDescriptor.GetQueries()[0].GetParams()[0],
-	)
-	require.NoError(t, err)
-	generators.Set(paramID, generator)
-
-	builder := &QueryBuilder{
-		generators: generators,
-	}
-
-	unitBuildContext := &stroppy.UnitContext{
-		StepContext:    buildContext,
-		UnitDescriptor: wrk.GetUnits()[0],
-	}
-
-	ctx := context.Background()
-	lg := zap.NewNop()
-
-	transactionList, err := builder.Build(
-		ctx,
-		lg,
-		unitBuildContext.GetUnitDescriptor().GetDescriptor_(),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, transactionList)
-	require.Len(t, transactionList.Queries, 1)
-	require.Equal(t, int32(10), transactionList.Queries[0].Params[0].GetInt32())
 }
 
 func TestValueToPgxValue_AllTypes(t *testing.T) {

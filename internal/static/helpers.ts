@@ -3,14 +3,28 @@ import {
   QueryParamGroup,
   GlobalConfig,
   QueryParamDescriptor,
+  InsertDescriptor,
 } from "./stroppy.pb.js";
-import type { Generator, Driver } from "./stroppy.d.ts";
 
 import {
   NewDriverByConfigBin,
   NewGeneratorByRuleBin,
   NewGroupGeneratorByRulesBin,
+  Driver,
+  Generator,
 } from "k6/x/stroppy";
+
+export function InsertValues(
+  driver: Driver,
+  insert: Partial<InsertDescriptor>,
+): void {
+  const err = driver.insertValuesBin(
+    InsertDescriptor.toBinary(InsertDescriptor.create(insert)),
+  );
+  if (err) {
+    throw err;
+  }
+}
 
 export function NewDriverByConfig(config: Partial<GlobalConfig>): Driver {
   return NewDriverByConfigBin(
@@ -56,6 +70,8 @@ export const AB = {
     { min: 48, max: 57 },
   ] as const,
 
+  num: [{ min: 48, max: 57 }] as const,
+
   enUpper: [{ min: 65, max: 90 }] as const,
 
   enSpc: [
@@ -76,107 +92,156 @@ export const AB = {
 // Generator builders
 // ============================================================================
 
-export const G = {
+// Define the interface with overloads
+interface GHelper {
+  // Overloaded str function
+  str(val: string): Generation_Rule;
+  str(len: number, alphabet?: Alphabet): Generation_Rule;
+  str(minLen: number, maxLen: number, alphabet?: Alphabet): Generation_Rule;
+
   // String generators
-  str: (len: number, alphabet = AB.en): Generation_Rule => ({
-    kind: {
-      oneofKind: "stringRange",
-      stringRange: {
-        minLen: len.toString(),
-        maxLen: len.toString(),
-        alphabet: { ranges: alphabet },
-      },
-    },
-  }),
-
-  strRange: (
-    minLen: number,
-    maxLen: number,
-    alphabet = AB.en,
-  ): Generation_Rule => ({
-    kind: {
-      oneofKind: "stringRange",
-      stringRange: {
-        minLen: minLen.toString(),
-        maxLen: maxLen.toString(),
-        alphabet: { ranges: alphabet },
-      },
-    },
-  }),
-
-  strSeq: (
-    minLen: number,
-    maxLen: number,
-    alphabet = AB.en,
-  ): Generation_Rule => ({
-    kind: {
-      oneofKind: "stringRange",
-      stringRange: {
-        minLen: minLen.toString(),
-        maxLen: maxLen.toString(),
-        alphabet: { ranges: alphabet },
-      },
-    },
-    unique: true,
-  }),
-
-  strConst: (val: string): Generation_Rule => ({
-    kind: { oneofKind: "stringConst", stringConst: val },
-  }),
+  strSeq(len: number, alphabet?: Alphabet): Generation_Rule;
+  strSeq(minLen: number, maxLen: number, alphabet?: Alphabet): Generation_Rule;
 
   // Integer generators
-  int32: (min: number, max: number): Generation_Rule => ({
-    kind: { oneofKind: "int32Range", int32Range: { min, max } },
-  }),
-
-  int32Seq: (min: number, max: number): Generation_Rule => ({
-    kind: { oneofKind: "int32Range", int32Range: { min, max } },
-    unique: true,
-  }),
-
-  int32Const: (val: number): Generation_Rule => ({
-    kind: { oneofKind: "int32Const", int32Const: val },
-  }),
+  int32(val: number): Generation_Rule;
+  int32(min: number, max: number): Generation_Rule;
+  int32Seq: (min: number, max: number) => Generation_Rule;
 
   // Float/Double generators
-  float: (min: number, max: number): Generation_Rule => ({
-    kind: { oneofKind: "floatRange", floatRange: { min, max } },
-  }),
+  float(val: number): Generation_Rule;
+  float(min: number, max: number): Generation_Rule;
 
-  floatConst: (val: number): Generation_Rule => ({
-    kind: { oneofKind: "floatConst", floatConst: val },
-  }),
-
-  double: (min: number, max: number): Generation_Rule => ({
-    kind: { oneofKind: "doubleRange", doubleRange: { min, max } },
-  }),
+  double(val: number): Generation_Rule;
+  double(min: number, max: number): Generation_Rule;
 
   // Datetime generator
-  datetimeConst: (val: Date): Generation_Rule => ({
-    kind: {
-      oneofKind: "datetimeConst",
-      datetimeConst: {
-        value: {
-          seconds: val.getSeconds().toString(),
-          nanos: (val.getMilliseconds() % 1000) * 1000000,
+  datetimeConst: (val: Date) => Generation_Rule;
+
+  // Boolean generator
+  bool: (ratio: number, unique?: boolean) => Generation_Rule;
+
+  // Helpers
+  params: (params: Record<string, Generation_Rule>) => QueryParamDescriptor[];
+  groups: (groups: Record<string, QueryParamDescriptor[]>) => QueryParamGroup[];
+}
+
+export const G: GHelper = {
+  str(
+    valOrMin: string | number,
+    alphabetOrMax?: Alphabet | number,
+    alphabet: Alphabet = AB.en,
+  ): Generation_Rule {
+    if (typeof valOrMin === "string") {
+      return { kind: { oneofKind: "stringConst", stringConst: valOrMin } };
+    }
+
+    const isRange = typeof alphabetOrMax === "number";
+    const minLen = valOrMin;
+    const maxLen = isRange ? alphabetOrMax : valOrMin;
+    const alph = isRange ? alphabet : (alphabetOrMax ?? AB.en);
+
+    return {
+      kind: {
+        oneofKind: "stringRange",
+        stringRange: {
+          minLen: minLen.toString(),
+          maxLen: maxLen.toString(),
+          alphabet: { ranges: alph },
         },
       },
-    },
-  }),
+    };
+  },
+
+  strSeq(
+    lenOrMin: number,
+    alphabetOrMax?: Alphabet | number,
+    alphabet: Alphabet = AB.en,
+  ): Generation_Rule {
+    const isRange = typeof alphabetOrMax === "number";
+    const minLen = lenOrMin;
+    const maxLen = isRange ? alphabetOrMax : lenOrMin;
+    const alph = isRange ? alphabet : (alphabetOrMax ?? AB.en);
+
+    return {
+      kind: {
+        oneofKind: "stringRange",
+        stringRange: {
+          minLen: minLen.toString(),
+          maxLen: maxLen.toString(),
+          alphabet: { ranges: alph },
+        },
+      },
+      unique: true,
+    };
+  },
+
+  int32(valOrMin: number, max?: number): Generation_Rule {
+    if (max === undefined) {
+      return { kind: { oneofKind: "int32Const", int32Const: valOrMin } };
+    }
+    return {
+      kind: { oneofKind: "int32Range", int32Range: { min: valOrMin, max } },
+    };
+  },
+
+  int32Seq(min: number, max: number): Generation_Rule {
+    return {
+      kind: { oneofKind: "int32Range", int32Range: { min, max } },
+      unique: true,
+    };
+  },
+
+  float(valOrMin: number, max?: number): Generation_Rule {
+    if (max === undefined) {
+      return { kind: { oneofKind: "floatConst", floatConst: valOrMin } };
+    }
+    return {
+      kind: { oneofKind: "floatRange", floatRange: { min: valOrMin, max } },
+    };
+  },
+
+  double(valOrMin: number, max?: number): Generation_Rule {
+    if (max === undefined) {
+      return { kind: { oneofKind: "doubleConst", doubleConst: valOrMin } };
+    }
+    return {
+      kind: { oneofKind: "doubleRange", doubleRange: { min: valOrMin, max } },
+    };
+  },
+
+  datetimeConst(val: Date): Generation_Rule {
+    return {
+      kind: {
+        oneofKind: "datetimeConst",
+        datetimeConst: {
+          value: {
+            seconds: val.getSeconds().toString(),
+            nanos: (val.getMilliseconds() % 1000) * 1000000,
+          },
+        },
+      },
+    };
+  },
 
   // ratio of true values
   // unique = true => sequence [false, true]
-  bool: (ratio: number, unique = false): Generation_Rule => ({
-    kind: { oneofKind: "boolRange", boolRange: { ratio } },
-    unique: unique,
-  }),
-};
+  bool(ratio: number, unique = false): Generation_Rule {
+    return {
+      kind: { oneofKind: "boolRange", boolRange: { ratio } },
+      unique: unique,
+    };
+  },
 
-// Helper to convert params object to array
-export const paramsG = (
-  params: Record<string, Generation_Rule>,
-): QueryParamDescriptor[] => {
-  return Object.entries(params).map(([name, generationRule]) =>
-    QueryParamDescriptor.create({ name, generationRule }),
-  );
+  params(params: Record<string, Generation_Rule>): QueryParamDescriptor[] {
+    return Object.entries(params).map(([name, generationRule]) =>
+      QueryParamDescriptor.create({ name, generationRule }),
+    );
+  },
+
+  groups(groups: Record<string, QueryParamDescriptor[]>): QueryParamGroup[] {
+    return Object.entries(groups).map(([name, params]) =>
+      QueryParamGroup.create({ name, params }),
+    );
+  },
 };

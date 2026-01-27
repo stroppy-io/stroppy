@@ -35,35 +35,6 @@ func newTestDriver(mockPool pgxmock.PgxPoolIface) (*testDriver, error) {
 	}, nil
 }
 
-func TestDriver_runTransaction(t *testing.T) {
-	mock, err := pgxmock.NewPool()
-	require.NoError(t, err)
-
-	defer mock.Close()
-
-	drv, err := newTestDriver(mock)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-	query := &stroppy.DriverTransaction{
-		Queries: []*stroppy.DriverQuery{
-			{
-				Name:    "test_query",
-				Request: "SELECT 1",
-				Params:  nil,
-			},
-		},
-	}
-
-	mock.ExpectExec("SELECT 1").WillReturnResult(pgxmock.NewResult("SELECT", 1))
-
-	stats, err := drv.runTransaction(ctx, query)
-	require.NoError(t, err)
-	require.NotEmpty(t, stats)
-
-	require.NoError(t, mock.ExpectationsWereMet())
-}
-
 func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	require.NoError(t, err)
@@ -75,7 +46,7 @@ func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 
 	ctx := context.Background()
 	descriptor := &stroppy.InsertDescriptor{
-		Name:      "test_insert",
+		Count:     3,
 		TableName: "test_table",
 		Method:    stroppy.InsertMethod_PLAIN_QUERY.Enum(),
 		Params: []*stroppy.QueryParamDescriptor{
@@ -94,20 +65,18 @@ func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 		},
 	}
 
-	count := int64(3)
-
 	// Expect 3 insert executions
-	for range count {
+	for range descriptor.GetCount() {
 		mock.ExpectExec("insert into test_table").
 			WithArgs(pgxmock.AnyArg()).
 			WillReturnResult(pgxmock.NewResult("INSERT", 1))
 	}
 
-	stats, err := drv.InsertValues(ctx, descriptor, count)
+	stats, err := drv.InsertValues(ctx, descriptor)
 	require.NoError(t, err)
 	require.NotNil(t, stats)
 	require.Len(t, stats.Queries, 1)
-	require.Equal(t, "test_insert", stats.Queries[0].Name)
+	require.Equal(t, "test_table", stats.Queries[0].Name)
 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
@@ -123,7 +92,7 @@ func TestDriver_InsertValuesCopyFrom(t *testing.T) {
 
 	ctx := context.Background()
 	descriptor := &stroppy.InsertDescriptor{
-		Name:      "test_insert_copy",
+		Count:     5,
 		TableName: "test_table",
 		Method:    stroppy.InsertMethod_COPY_FROM.Enum(),
 		Params: []*stroppy.QueryParamDescriptor{
@@ -150,19 +119,17 @@ func TestDriver_InsertValuesCopyFrom(t *testing.T) {
 		},
 	}
 
-	count := int64(5)
-
 	// Expect one CopyFrom call with 5 rows
 	mock.ExpectCopyFrom(
 		[]string{"test_table"},
 		[]string{"id", "name"},
-	).WillReturnResult(count)
+	).WillReturnResult(int64(descriptor.GetCount()))
 
-	stats, err := drv.InsertValues(ctx, descriptor, count)
+	stats, err := drv.InsertValues(ctx, descriptor)
 	require.NoError(t, err)
 	require.NotNil(t, stats)
 	require.Len(t, stats.Queries, 1)
-	require.Equal(t, "test_insert_copy", stats.Queries[0].Name)
+	require.Equal(t, "test_table", stats.Queries[0].Name)
 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
@@ -178,7 +145,7 @@ func TestDriver_InsertValuesCopyFromLargeBatch(t *testing.T) {
 
 	ctx := context.Background()
 	descriptor := &stroppy.InsertDescriptor{
-		Name:      "test_insert_large",
+		Count:     10000,
 		TableName: "test_table",
 		Method:    stroppy.InsertMethod_COPY_FROM.Enum(),
 		Params: []*stroppy.QueryParamDescriptor{
@@ -208,19 +175,17 @@ func TestDriver_InsertValuesCopyFromLargeBatch(t *testing.T) {
 		},
 	}
 
-	count := int64(10000)
-
 	// Expect one CopyFrom call with 10000 rows - demonstrates streaming without memory issues
 	mock.ExpectCopyFrom(
 		[]string{"test_table"},
 		[]string{"id", "value"},
-	).WillReturnResult(count)
+	).WillReturnResult(int64(descriptor.Count))
 
-	stats, err := drv.InsertValues(ctx, descriptor, count)
+	stats, err := drv.InsertValues(ctx, descriptor)
 	require.NoError(t, err)
 	require.NotNil(t, stats)
 	require.Len(t, stats.Queries, 1)
-	require.Equal(t, "test_insert_large", stats.Queries[0].Name)
+	require.Equal(t, "test_table", stats.Queries[0].Name)
 
 	require.NoError(t, mock.ExpectationsWereMet())
 }

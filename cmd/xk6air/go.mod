@@ -5,7 +5,6 @@ go 1.24.3
 replace github.com/stroppy-io/stroppy => ../../
 
 require (
-	github.com/grafana/sobek v0.0.0-20251103154147-6b40183f38e5
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/stroppy-io/stroppy v0.0.0-00010101000000-000000000000
@@ -29,6 +28,7 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/grafana/sobek v0.0.0-20251103154147-6b40183f38e5 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

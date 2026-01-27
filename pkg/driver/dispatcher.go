@@ -10,17 +10,16 @@ import (
 )
 
 type Driver interface {
-	RunTransaction(
-		ctx context.Context,
-		unit *stroppy.UnitDescriptor,
-	) (*stroppy.DriverTransactionStat, error)
 	InsertValues(
 		ctx context.Context,
 		unit *stroppy.InsertDescriptor,
-		count int64,
 	) (*stroppy.DriverTransactionStat, error)
+	RunQuery(
+		ctx context.Context,
+		sql string,
+		args map[string]any,
+	) (*stroppy.DriverQueryStat, error)
 	Teardown(ctx context.Context) error
-	RunQuery(ctx context.Context, sql string, args map[string]any)
 }
 
 func Dispatch( //nolint: ireturn // better than return any
