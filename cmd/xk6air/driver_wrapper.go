@@ -29,7 +29,7 @@ func (d *DriverWrapper) InsertValuesBin(
 		return err
 	}
 
-	_, err = d.drv.InsertValues(d.vu.Context(), &descriptor, count)
+	_, err = d.drv.InsertValues(d.vu.Context(), &descriptor)
 	if err != nil {
 		return err
 	}

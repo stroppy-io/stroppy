@@ -4,6 +4,8 @@ import {
   GlobalConfig,
   QueryParamDescriptor,
   InsertDescriptor,
+  InsertMethod,
+  Status,
 } from "./stroppy.pb.js";
 
 import {
@@ -12,18 +14,58 @@ import {
   NewGroupGeneratorByRulesBin,
   Driver,
   Generator,
+  NotifyStep,
 } from "k6/x/stroppy";
 
-export function InsertValues(
+interface InsertDescriptorX {
+  method: InsertMethod;
+  params?: Record<string, Generation_Rule>;
+  groups?: Record<string, Record<string, Generation_Rule>>;
+}
+
+export function Insert(driver: Driver, insert: Partial<InsertDescriptor>): void;
+
+export function Insert(
   driver: Driver,
-  insert: Partial<InsertDescriptor>,
-): void {
+  tableName: string,
+  count: number,
+  insert: InsertDescriptorX,
+): void;
+
+export function Insert(
+  driver: Driver,
+  insertOrTableName: string | Partial<InsertDescriptor>,
+  count?: number,
+  insert?: InsertDescriptorX,
+) {
+  const isName = typeof insertOrTableName === "string";
+  const descriptor = isName
+    ? {
+        tableName: insertOrTableName,
+        method: insert?.method,
+        params: G.params(insert?.params ?? {}),
+        groups: G.groups(insert?.groups ?? {}),
+        count,
+      }
+    : insertOrTableName;
+  console.log(
+    `Insertion into '${descriptor.tableName}' of ${descriptor.count} values starting...`,
+  );
   const err = driver.insertValuesBin(
-    InsertDescriptor.toBinary(InsertDescriptor.create(insert)),
+    InsertDescriptor.toBinary(InsertDescriptor.create(descriptor)),
   );
   if (err) {
     throw err;
   }
+  console.log(`Insertion into '${descriptor.tableName}' ended`);
+}
+
+export function Step(name: string, block: () => void): void {
+  NotifyStep(name, Status.STATUS_RUNNING);
+  console.log(`Start of '${name}' block`);
+  block();
+  console.log(`End of '${name}' block`);
+  NotifyStep(name, Status.STATUS_COMPLETED);
 }
 
 export function NewDriverByConfig(config: Partial<GlobalConfig>): Driver {
@@ -32,7 +74,7 @@ export function NewDriverByConfig(config: Partial<GlobalConfig>): Driver {
   );
 }
 // Generator wrapper functions - provide convenient protobuf-based API
-export function NewGeneratorByRule(
+export function NewGen(
   seed: Number,
   rule: Partial<Generation_Rule>,
 ): Generator {
@@ -42,7 +84,7 @@ export function NewGeneratorByRule(
   );
 }
 
-export function NewGroupGeneratorByRules(
+export function NewGroupGen(
   seed: Number,
   rules: Partial<QueryParamGroup>,
 ): Generator {
@@ -123,7 +165,9 @@ interface GHelper {
 
   // Helpers
   params: (params: Record<string, Generation_Rule>) => QueryParamDescriptor[];
-  groups: (groups: Record<string, QueryParamDescriptor[]>) => QueryParamGroup[];
+  groups: (
+    groups: Record<string, Record<string, Generation_Rule>>,
+  ) => QueryParamGroup[];
 }
 
 export const G: GHelper = {
@@ -233,15 +277,21 @@ export const G: GHelper = {
     };
   },
 
-  params(params: Record<string, Generation_Rule>): QueryParamDescriptor[] {
-    return Object.entries(params).map(([name, generationRule]) =>
-      QueryParamDescriptor.create({ name, generationRule }),
-    );
-  },
+  params: params_internal,
 
-  groups(groups: Record<string, QueryParamDescriptor[]>): QueryParamGroup[] {
+  groups(
+    groups: Record<string, Record<string, Generation_Rule>>,
+  ): QueryParamGroup[] {
     return Object.entries(groups).map(([name, params]) =>
-      QueryParamGroup.create({ name, params }),
+      QueryParamGroup.create({ name, params: params_internal(params) }),
     );
   },
 };
+
+function params_internal(
+  params: Record<string, Generation_Rule>,
+): QueryParamDescriptor[] {
+  return Object.entries(params).map(([name, generationRule]) =>
+    QueryParamDescriptor.create({ name, generationRule }),
+  );
+}

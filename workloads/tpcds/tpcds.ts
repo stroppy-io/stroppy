@@ -5,7 +5,7 @@ globalThis.TextDecoder = encoding.TextDecoder;
 
 import { NotifyStep, Teardown } from "k6/x/stroppy";
 
-import { Status } from "./stroppy.pb.js";
+import { DriverConfig_DriverType, Status } from "./stroppy.pb.js";
 import { NewDriverByConfig } from "./helpers.ts";
 import { parse_sql } from "./parse_sql.js";
 
@@ -25,7 +25,7 @@ export const options: Options = {
 const driver = NewDriverByConfig({
   driver: {
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
-    driverType: 1,
+    driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
     dbSpecific: {
       fields: [
         {
@@ -51,8 +51,6 @@ const driver = NewDriverByConfig({
   seed: "0",
   metadata: {},
 });
-
-declare function open(path: string): string; // k6 function to get files content
 
 const parsedQueries = parse_sql(open(__SQL_FILE));
 

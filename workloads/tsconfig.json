@@ -33,5 +33,6 @@
     "paths": {
       "k6/x/stroppy": ["../internal/static/stroppy.d.ts"]
     }
-  }
+  },
+  "typeAcquisition": { "include": ["../internal/static/k6.d.ts"] }
 }

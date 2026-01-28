@@ -5,15 +5,8 @@ globalThis.TextDecoder = encoding.TextDecoder;
 
 import { NotifyStep, Teardown } from "k6/x/stroppy";
 
-import { Status } from "./stroppy.pb.js";
-import {
-  NewDriverByConfig,
-  NewGeneratorByRule as NewGenByRule,
-  NewGroupGeneratorByRules as NewGroupGenByRules,
-  AB,
-  G,
-  paramsG,
-} from "./helpers.ts";
+import { DriverConfig_DriverType, Status } from "./stroppy.pb.js";
+import { NewDriverByConfig, NewGen, NewGroupGen, AB, G } from "./helpers.ts";
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -34,7 +27,7 @@ const driver = NewDriverByConfig({
   metadata: {},
   driver: {
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
-    driverType: 1,
+    driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
     dbSpecific: {
       fields: [
         {
@@ -58,25 +51,21 @@ const driver = NewDriverByConfig({
 });
 
 export function setup() {
-  NotifyStep("create_schema", Status.STATUS_RUNNING);
-  NotifyStep("create_schema", Status.STATUS_COMPLETED);
-  NotifyStep("load_data", Status.STATUS_RUNNING);
-  NotifyStep("load_data", Status.STATUS_COMPLETED);
   NotifyStep("workload", Status.STATUS_RUNNING);
   return;
 }
 
 // Raw generator defenition with Generation_Rule
-const gen = NewGenByRule(0, {
+const gen = NewGen(0, {
   kind: { oneofKind: "int32Range", int32Range: { min: 0, max: 100 } },
 });
 
 // The generator of strings of length = 10, made using the English alphabet
-const gen2 = NewGenByRule(1, G.str(10, AB.en));
+const gen2 = NewGen(1, G.str(10, AB.en));
 
 // Group of generators, run and check logs to find out the pattern
-const groupGen = NewGroupGenByRules(2, {
-  params: paramsG({
+const groupGen = NewGroupGen(2, {
+  params: G.params({
     some: G.int32Seq(1, 2),
     second: G.int32Seq(1, 3),
     bool: G.bool(1, true),

@@ -5,14 +5,8 @@ globalThis.TextDecoder = encoding.TextDecoder;
 
 import { NotifyStep, Teardown } from "k6/x/stroppy";
 
-import { Status, InsertMethod } from "./stroppy.pb.js";
-import {
-  NewDriverByConfig,
-  NewGeneratorByRule as NewGenByRule,
-  AB,
-  G,
-  InsertValues,
-} from "./helpers.ts";
+import { Status, InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
+import { NewDriverByConfig, NewGen, AB, G, Insert, Step } from "./helpers.ts";
 import { parse_sql_with_groups } from "./parse_sql.js";
 
 // TPC-B Configuration Constants
@@ -29,7 +23,7 @@ export const options: Options = {
       executor: "constant-vus",
       exec: "tpcb_transaction",
       vus: 10,
-      duration: __ENV.DURATION || "1s",
+      duration: __ENV.DURATION || "1h",
     },
   },
 };
@@ -38,7 +32,7 @@ export const options: Options = {
 const driver = NewDriverByConfig({
   driver: {
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
-    driverType: 1,
+    driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
     dbSpecific: {
       fields: [
         {
@@ -65,72 +59,60 @@ const sections = parse_sql_with_groups(open(__SQL_FILE));
 
 // Setup function: create schema and load data
 export function setup() {
-  NotifyStep("create_schema", Status.STATUS_RUNNING);
-  sections["section cleanup"].forEach((query) =>
-    driver.runQuery(query.sql, {}),
-  );
+  Step("create_schema", () => {
+    sections["section cleanup"].forEach((query) =>
+      driver.runQuery(query.sql, {}),
+    );
 
-  sections["section create_schema"].forEach((query) =>
-    driver.runQuery(query.sql, {}),
-  );
-  NotifyStep("create_schema", Status.STATUS_COMPLETED);
-
-  NotifyStep("load_data", Status.STATUS_RUNNING);
-  console.log("Loading branches...");
-
-  InsertValues(driver, {
-    count: BRANCHES,
-    tableName: "pgbench_branches",
-    method: InsertMethod.COPY_FROM,
-    params: G.params({
-      bid: G.int32Seq(1, BRANCHES),
-      bbalance: G.int32(0),
-      filler: G.str(88, AB.en),
-    }),
+    sections["section create_schema"].forEach((query) =>
+      driver.runQuery(query.sql, {}),
+    );
   });
 
-  console.log("Loading tellers...");
-  InsertValues(driver, {
-    count: TELLERS,
-    tableName: "pgbench_tellers",
-    method: InsertMethod.COPY_FROM,
-    params: G.params({
-      tid: G.int32Seq(1, TELLERS),
-      bid: G.int32(1, BRANCHES),
-      tbalance: G.int32(0),
-      filler: G.str(84, AB.en),
-    }),
-  });
+  Step("load_data", () => {
+    Insert(driver, "pgbench_branches", BRANCHES, {
+      method: InsertMethod.COPY_FROM,
+      params: {
+        bid: G.int32Seq(1, BRANCHES),
+        bbalance: G.int32(0),
+        filler: G.str(88, AB.en),
+      },
+    });
 
-  console.log("Loading accounts...");
-  InsertValues(driver, {
-    count: ACCOUNTS,
-    tableName: "pgbench_accounts",
-    method: InsertMethod.COPY_FROM,
-    params: G.params({
-      aid: G.int32Seq(1, ACCOUNTS),
-      bid: G.int32(1, BRANCHES),
-      abalance: G.int32(0),
-      filler: G.str(84, AB.en),
-    }),
-    groups: [],
-  });
-  console.log("Data loading completed!");
-  NotifyStep("load_data", Status.STATUS_COMPLETED);
+    Insert(driver, "pgbench_tellers", TELLERS, {
+      method: InsertMethod.COPY_FROM,
+      params: {
+        tid: G.int32Seq(1, TELLERS),
+        bid: G.int32(1, BRANCHES),
+        tbalance: G.int32(0),
+        filler: G.str(84, AB.en),
+      },
+    });
 
-  sections["section analyze"].forEach((query) =>
-    driver.runQuery(query.sql, {}),
-  );
+    Insert(driver, "pgbench_accounts", ACCOUNTS, {
+      method: InsertMethod.COPY_FROM,
+      params: {
+        aid: G.int32Seq(1, ACCOUNTS),
+        bid: G.int32(1, BRANCHES),
+        abalance: G.int32(0),
+        filler: G.str(84, AB.en),
+      },
+    });
+
+    sections["section analyze"].forEach((query) =>
+      driver.runQuery(query.sql, {}),
+    );
+  });
 
   NotifyStep("workload", Status.STATUS_RUNNING);
   return;
 }
 
 // Generators for transaction parameters
-const aidGen = NewGenByRule(5, G.int32(1, ACCOUNTS));
-const tidGen = NewGenByRule(6, G.int32(1, TELLERS));
-const bidGen = NewGenByRule(7, G.int32(1, BRANCHES));
-const deltaGen = NewGenByRule(8, G.int32(-5000, 5000));
+const aidGen = NewGen(5, G.int32(1, ACCOUNTS));
+const tidGen = NewGen(6, G.int32(1, TELLERS));
+const bidGen = NewGen(7, G.int32(1, BRANCHES));
+const deltaGen = NewGen(8, G.int32(-5000, 5000));
 
 // TPC-B transaction workload
 export function tpcb_transaction() {
