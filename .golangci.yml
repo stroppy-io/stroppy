@@ -69,7 +69,6 @@ linters:
     - nlreturn
     - noctx
     - nolintlint
-    - nonamedreturns
     - nosprintfhostport
     - paralleltest
     - perfsprint

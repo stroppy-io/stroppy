@@ -40,7 +40,8 @@ func (d *Driver) RunQuery(
 var (
 	ErrMissedArgument = errors.New("missed arguments present")
 	ErrExtraArgument  = errors.New("extra arguments provided")
-	argsRe            = regexp.MustCompile(`(\s|^|\()(:[a-zA-Z0-9_]+)(\s|$|;|::|,|\))`)
+	// TODO: syncronize with re from TS parse_sql.ts
+	argsRe = regexp.MustCompile(`(\s|^|\()(:[a-zA-Z0-9_]+)(\s|$|;|::|,|\))`)
 )
 
 // processArgs takse sql which contains ":arg" marks
@@ -49,8 +50,6 @@ var (
 // and array of any, which contains the arguments in the right order.
 // If sql contains marks that is'n present in args map - there is an error
 // errors.Is(err, ErrMissedArgument) and text contains info about all missed arguments.
-//
-//nolint:nonamedreturns // many returns
 func processArgs(sql string, args map[string]any) (newSQL string, argsArr []any, err error) {
 	var (
 		resultArgs []any

@@ -1,7 +1,6 @@
 package queries
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -11,40 +10,27 @@ import (
 )
 
 func NewInsertQuery(
-	_ context.Context,
 	lg *zap.Logger,
 	generators Generators,
 	descriptor *stroppy.InsertDescriptor,
-) (*stroppy.DriverTransaction, error) {
+) (sql string, values []any, err error) {
 	genIDs := InsertGenIDs(descriptor)
 
-	params, err := GenParamValues(genIDs, generators)
+	values, err = GenParamValues(genIDs, generators)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-
-	var resSQL string
 
 	switch descriptor.GetMethod() {
 	case stroppy.InsertMethod_COPY_FROM:
-		resSQL = BadInsertSQL(descriptor)
+		sql = BadInsertSQL(descriptor)
 	case stroppy.InsertMethod_PLAIN_QUERY:
-		resSQL = insertSQL(descriptor)
+		sql = insertSQL(descriptor)
 	default:
 		lg.Panic("unexpected proto.InsertMethod")
 	}
 
-	method := descriptor.GetMethod()
-
-	return &stroppy.DriverTransaction{
-		Queries: []*stroppy.DriverQuery{{
-			Name:    descriptor.GetTableName(),
-			Request: resSQL,
-			Params:  params,
-			Method:  &method,
-		}},
-		IsolationLevel: 0,
-	}, nil
+	return sql, values, nil
 }
 
 func BadInsertSQL(descriptor *stroppy.InsertDescriptor) string {
@@ -98,11 +84,11 @@ func insertSQL(descriptor *stroppy.InsertDescriptor) string {
 func InsertGenIDs(descriptor *stroppy.InsertDescriptor) []GeneratorID {
 	genIDs := make([]GeneratorID, 0, len(descriptor.GetParams())+len(descriptor.GetGroups()))
 	for _, param := range descriptor.GetParams() {
-		genIDs = append(genIDs, NewGeneratorID(descriptor.GetTableName(), param.GetName()))
+		genIDs = append(genIDs, GeneratorID(param.GetName()))
 	}
 
 	for _, group := range descriptor.GetGroups() {
-		genIDs = append(genIDs, NewGeneratorID(descriptor.GetTableName(), group.GetName()))
+		genIDs = append(genIDs, GeneratorID(group.GetName()))
 	}
 
 	return genIDs

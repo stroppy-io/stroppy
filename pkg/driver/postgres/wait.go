@@ -13,9 +13,10 @@ import (
 // ErrDBConnectionTimeout is returned when database connection times out.
 var ErrDBConnectionTimeout = errors.New("database connection timeout")
 
+// TODO: make configurable
 const (
-	retryIntervalIncrement = 5 * time.Second
-	dbConnectionTimeout    = 5 * time.Minute
+	retryIntervalIncrement = time.Second
+	dbConnectionTimeout    = 5 * time.Second
 )
 
 func waitForDB(

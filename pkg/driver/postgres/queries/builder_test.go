@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -14,8 +13,8 @@ import (
 )
 
 func TestNewQueryBuilder_Success(t *testing.T) {
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	paramID := NewGeneratorID("q1", "id")
+	generators := make(Generators)
+	paramID := GeneratorID("id")
 	generator, err := generate.NewValueGenerator(42, &stroppy.QueryParamDescriptor{
 		Name: "id",
 		GenerationRule: &stroppy.Generation_Rule{
@@ -25,7 +24,8 @@ func TestNewQueryBuilder_Success(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	generators.Set(paramID, generator)
+
+	generators[paramID] = generator
 
 	builder := &QueryBuilder{
 		generators: generators,
@@ -35,7 +35,7 @@ func TestNewQueryBuilder_Success(t *testing.T) {
 }
 
 func TestNewQueryBuilder_EmptyContext(t *testing.T) {
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
+	generators := make(Generators)
 	builder := &QueryBuilder{
 		generators: generators,
 	}
@@ -74,11 +74,7 @@ func TestValueToPgxValue_AllTypes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-			builder := &QueryBuilder{
-				generators: generators,
-			}
-			_, err := builder.ValueToPgxValue(tt.val)
+			_, err := ValueToPgxValue(tt.val)
 			require.NoError(t, err)
 		})
 	}
@@ -87,22 +83,14 @@ func TestValueToPgxValue_AllTypes(t *testing.T) {
 func TestValueToPgxValue_Unsupported(t *testing.T) {
 	val := &stroppy.Value{Type: &stroppy.Value_Struct_{Struct: &stroppy.Value_Struct{}}}
 
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	builder := &QueryBuilder{
-		generators: generators,
-	}
-	_, err := builder.ValueToPgxValue(val)
+	_, err := ValueToPgxValue(val)
 	require.Error(t, err)
 }
 
 func TestValueToPgxValue_DecimalNil(t *testing.T) {
 	val := &stroppy.Value{Type: &stroppy.Value_Decimal{Decimal: nil}}
 
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	builder := &QueryBuilder{
-		generators: generators,
-	}
-	result, err := builder.ValueToPgxValue(val)
+	result, err := ValueToPgxValue(val)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 }
@@ -110,52 +98,39 @@ func TestValueToPgxValue_DecimalNil(t *testing.T) {
 func TestValueToPgxValue_DecimalInvalid(t *testing.T) {
 	val := &stroppy.Value{Type: &stroppy.Value_Decimal{Decimal: &stroppy.Decimal{Value: "invalid"}}}
 
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	builder := &QueryBuilder{
-		generators: generators,
-	}
-	_, err := builder.ValueToPgxValue(val)
+	_, err := ValueToPgxValue(val)
 	require.Error(t, err)
 }
 
 func TestValueToPgxValue_UuidInvalid(t *testing.T) {
 	val := &stroppy.Value{Type: &stroppy.Value_Uuid{Uuid: &stroppy.Uuid{Value: "invalid-uuid"}}}
 
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	builder := &QueryBuilder{
-		generators: generators,
-	}
-	_, err := builder.ValueToPgxValue(val)
+	_, err := ValueToPgxValue(val)
 	require.Error(t, err)
 }
 
 func TestValueToPgxValue_ReturnValues(t *testing.T) {
-	generators := cmap.NewStringer[GeneratorID, generate.ValueGenerator]()
-	builder := &QueryBuilder{
-		generators: generators,
-	}
-
 	// Тест для int32
 	int32Val := &stroppy.Value{Type: &stroppy.Value_Int32{Int32: 42}}
-	result, err := builder.ValueToPgxValue(int32Val)
+	result, err := ValueToPgxValue(int32Val)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
 	// Тест для string
 	stringVal := &stroppy.Value{Type: &stroppy.Value_String_{String_: "test"}}
-	result, err = builder.ValueToPgxValue(stringVal)
+	result, err = ValueToPgxValue(stringVal)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
 	// Тест для bool
 	boolVal := &stroppy.Value{Type: &stroppy.Value_Bool{Bool: true}}
-	result, err = builder.ValueToPgxValue(boolVal)
+	result, err = ValueToPgxValue(boolVal)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
 	// Тест для null
 	nullVal := &stroppy.Value{Type: &stroppy.Value_Null{}}
-	result, err = builder.ValueToPgxValue(nullVal)
+	result, err = ValueToPgxValue(nullVal)
 	require.NoError(t, err)
 	require.Nil(t, result)
 }
