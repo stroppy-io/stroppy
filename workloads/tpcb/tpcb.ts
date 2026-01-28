@@ -6,14 +6,7 @@ globalThis.TextDecoder = encoding.TextDecoder;
 import { NotifyStep, Teardown } from "k6/x/stroppy";
 
 import { Status, InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
-import {
-  NewDriverByConfig,
-  NewGeneratorByRule as NewGenByRule,
-  AB,
-  G,
-  InsertValues,
-  StepBlock,
-} from "./helpers.ts";
+import { NewDriverByConfig, NewGen, AB, G, Insert, Step } from "./helpers.ts";
 import { parse_sql_with_groups } from "./parse_sql.js";
 
 // TPC-B Configuration Constants
@@ -66,7 +59,7 @@ const sections = parse_sql_with_groups(open(__SQL_FILE));
 
 // Setup function: create schema and load data
 export function setup() {
-  StepBlock("create_schema", () => {
+  Step("create_schema", () => {
     sections["section cleanup"].forEach((query) =>
       driver.runQuery(query.sql, {}),
     );
@@ -76,8 +69,8 @@ export function setup() {
     );
   });
 
-  StepBlock("load_data", () => {
-    InsertValues(driver, "pgbench_branches", BRANCHES, {
+  Step("load_data", () => {
+    Insert(driver, "pgbench_branches", BRANCHES, {
       method: InsertMethod.COPY_FROM,
       params: {
         bid: G.int32Seq(1, BRANCHES),
@@ -86,7 +79,7 @@ export function setup() {
       },
     });
 
-    InsertValues(driver, "pgbench_tellers", TELLERS, {
+    Insert(driver, "pgbench_tellers", TELLERS, {
       method: InsertMethod.COPY_FROM,
       params: {
         tid: G.int32Seq(1, TELLERS),
@@ -96,7 +89,7 @@ export function setup() {
       },
     });
 
-    InsertValues(driver, "pgbench_accounts", ACCOUNTS, {
+    Insert(driver, "pgbench_accounts", ACCOUNTS, {
       method: InsertMethod.COPY_FROM,
       params: {
         aid: G.int32Seq(1, ACCOUNTS),
@@ -116,10 +109,10 @@ export function setup() {
 }
 
 // Generators for transaction parameters
-const aidGen = NewGenByRule(5, G.int32(1, ACCOUNTS));
-const tidGen = NewGenByRule(6, G.int32(1, TELLERS));
-const bidGen = NewGenByRule(7, G.int32(1, BRANCHES));
-const deltaGen = NewGenByRule(8, G.int32(-5000, 5000));
+const aidGen = NewGen(5, G.int32(1, ACCOUNTS));
+const tidGen = NewGen(6, G.int32(1, TELLERS));
+const bidGen = NewGen(7, G.int32(1, BRANCHES));
+const deltaGen = NewGen(8, G.int32(-5000, 5000));
 
 // TPC-B transaction workload
 export function tpcb_transaction() {
