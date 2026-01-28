@@ -5,7 +5,7 @@ globalThis.TextDecoder = encoding.TextDecoder;
 
 import { NotifyStep, Teardown } from "k6/x/stroppy";
 
-import { Status } from "./stroppy.pb.js";
+import { DriverConfig_DriverType, Status } from "./stroppy.pb.js";
 import {
   NewDriverByConfig,
   NewGeneratorByRule as NewGenByRule,
@@ -34,7 +34,7 @@ const driver = NewDriverByConfig({
   metadata: {},
   driver: {
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
-    driverType: 1,
+    driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
     dbSpecific: {
       fields: [
         {
@@ -58,10 +58,6 @@ const driver = NewDriverByConfig({
 });
 
 export function setup() {
-  NotifyStep("create_schema", Status.STATUS_RUNNING);
-  NotifyStep("create_schema", Status.STATUS_COMPLETED);
-  NotifyStep("load_data", Status.STATUS_RUNNING);
-  NotifyStep("load_data", Status.STATUS_COMPLETED);
   NotifyStep("workload", Status.STATUS_RUNNING);
   return;
 }

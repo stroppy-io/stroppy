@@ -284,18 +284,17 @@ run-simple-test:
 	./build/stroppy gen --workdir dev --preset=simple
 	cd dev && ./stroppy run simple.ts
 
-
 .PHONY: run-tpcb-test
 run-tpcb-test:
 	rm -rf dev
 	./build/stroppy gen --workdir dev --preset=tpcb
-	cd dev && ./stroppy run tpcb.ts tpcb.sql
+	cd dev && DURATION="1s" SCALE_FACTOR=1 ./stroppy run tpcb.ts tpcb.sql
 
 .PHONY: run-tpcc-test
 run-tpcc-test:
 	rm -rf dev
 	./build/stroppy gen --workdir dev --preset=tpcc
-	cd dev && ./stroppy run tpcc.ts tpcc.sql
+	cd dev && DURATION="1s" SCALE_FACTOR=1 ./stroppy run tpcc.ts tpcc.sql
 
 .PHONY: run-tpcds-test
 run-tpcds-test:

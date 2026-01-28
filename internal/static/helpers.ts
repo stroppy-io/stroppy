@@ -4,6 +4,8 @@ import {
   GlobalConfig,
   QueryParamDescriptor,
   InsertDescriptor,
+  InsertMethod,
+  Status,
 } from "./stroppy.pb.js";
 
 import {
@@ -12,18 +14,61 @@ import {
   NewGroupGeneratorByRulesBin,
   Driver,
   Generator,
+  NotifyStep,
 } from "k6/x/stroppy";
+
+interface InsertDescriptorX {
+  method: InsertMethod;
+  params?: Record<string, Generation_Rule>;
+  groups?: Record<string, QueryParamDescriptor[]>;
+}
 
 export function InsertValues(
   driver: Driver,
   insert: Partial<InsertDescriptor>,
-): void {
+): void;
+
+export function InsertValues(
+  driver: Driver,
+  tableName: string,
+  count: number,
+  insert: InsertDescriptorX,
+): void;
+
+export function InsertValues(
+  driver: Driver,
+  insertOrTableName: string | Partial<InsertDescriptor>,
+  count?: number,
+  insert?: InsertDescriptorX,
+) {
+  const isName = typeof insertOrTableName === "string";
+  const descriptor = isName
+    ? {
+        tableName: insertOrTableName,
+        method: insert?.method,
+        params: G.params(insert?.params ?? {}),
+        groups: G.groups(insert?.groups ?? {}),
+        count,
+      }
+    : insertOrTableName;
+  console.log(
+    `Insertion into '${descriptor.tableName}' of ${descriptor.count} values starting...`,
+  );
   const err = driver.insertValuesBin(
-    InsertDescriptor.toBinary(InsertDescriptor.create(insert)),
+    InsertDescriptor.toBinary(InsertDescriptor.create(descriptor)),
   );
   if (err) {
     throw err;
   }
+  console.log(`Insertion into '${descriptor.tableName}' ended`);
+}
+
+export function StepBlock(name: string, block: () => void): void {
+  NotifyStep(name, Status.STATUS_RUNNING);
+  console.log(`Start of '${name}' block`);
+  block();
+  console.log(`End of '${name}' block`);
+  NotifyStep(name, Status.STATUS_COMPLETED);
 }
 
 export function NewDriverByConfig(config: Partial<GlobalConfig>): Driver {
