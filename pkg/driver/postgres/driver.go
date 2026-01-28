@@ -34,7 +34,6 @@ type Driver struct {
 	pgxPool Executor
 }
 
-//nolint:nonamedreturns // named returns for defer error handling
 func NewDriver(
 	ctx context.Context,
 	lg *zap.Logger,
@@ -71,10 +70,6 @@ func NewDriver(
 	}
 
 	d.pgxPool = connPool
-
-	if err != nil {
-		return nil, err
-	}
 
 	return d, nil
 }

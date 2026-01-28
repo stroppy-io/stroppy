@@ -82,14 +82,12 @@ func overrideWithDBSpecific(
 	cfg *pgxpool.Config,
 	cfgMap map[string]any,
 ) (*pgxpool.Config, error) {
-	logLevel, ok := cfgMap[traceLogLevelKey]
-	if !ok {
-		logLevel = "error"
+	logLevel := "error"
+	if overrideLevel, ok := cfgMap[traceLogLevelKey]; ok {
+		logLevel = overrideLevel.(string) //nolint:errcheck,forcetypeassert // allow panic
 	}
 
-	lvl, err := zapcore.ParseLevel( //nolint: forcetypeassert // allow panic
-		logLevel.(string), //nolint: errcheck // allow panic
-	)
+	lvl, err := zapcore.ParseLevel(logLevel)
 	if err != nil {
 		return nil, err
 	}
@@ -104,8 +102,8 @@ func overrideWithDBSpecific(
 	cfg.ConnConfig.Tracer = multitracer.New(loggerTracer)
 
 	if maxConnLifetime, ok := cfgMap[maxConnLifetimeKey]; ok {
-		d, err := time.ParseDuration( //nolint: forcetypeassert // allow panic
-			maxConnLifetime.(string), //nolint: errcheck // allow panic
+		d, err := time.ParseDuration( //nolint:forcetypeassert // allow panic
+			maxConnLifetime.(string), //nolint:errcheck // allow panic
 		)
 		if err != nil {
 			return nil, err
@@ -115,8 +113,8 @@ func overrideWithDBSpecific(
 	}
 
 	if maxConnIdleTime, ok := cfgMap[maxConnIdleTimeKey]; ok {
-		d, err := time.ParseDuration( //nolint: forcetypeassert // allow panic
-			maxConnIdleTime.(string), //nolint: errcheck // allow panic
+		d, err := time.ParseDuration( //nolint:forcetypeassert // allow panic
+			maxConnIdleTime.(string), //nolint:errcheck // allow panic
 		)
 		if err != nil {
 			return nil, err
@@ -126,18 +124,18 @@ func overrideWithDBSpecific(
 	}
 
 	if maxConns, ok := cfgMap[maxConnsKey]; ok {
-		cfg.MaxConns = maxConns.(int32) //nolint: errcheck,forcetypeassert // allow panic
+		cfg.MaxConns = maxConns.(int32) //nolint:errcheck,forcetypeassert // allow panic
 	}
 
 	if minConns, ok := cfgMap[minConnsKey]; ok {
-		cfg.MinConns = minConns.(int32) //nolint: errcheck,forcetypeassert // allow panic
+		cfg.MinConns = minConns.(int32) //nolint:errcheck,forcetypeassert // allow panic
 	}
 
 	if minIdleConns, ok := cfgMap[minIdleConnsKey]; ok {
-		cfg.MinIdleConns = minIdleConns.(int32) //nolint: errcheck,forcetypeassert // allow panic
+		cfg.MinIdleConns = minIdleConns.(int32) //nolint:errcheck,forcetypeassert // allow panic
 	}
 
-	if err = parsePgxOptimizations(cfgMap, cfg); err != nil {
+	if err := parsePgxOptimizations(cfgMap, cfg); err != nil {
 		return nil, err
 	}
 
@@ -176,10 +174,6 @@ func defaultPool(url string) (*pgxpool.Config, error) {
 		cfg.MaxConnIdleTime = 0 // Never close idle connections
 	}
 
-	if !strings.Contains(url, "pool_health_check_period") {
-		cfg.HealthCheckPeriod = 5 * time.Minute // Less frequent
-	}
-
 	return cfg, nil
 }
 
@@ -190,7 +184,7 @@ func parsePgxOptimizations(cfgMap map[string]any, cfg *pgxpool.Config) error {
 	)
 
 	if rawAny, exists := cfgMap[defaultQueryExecModeKey]; exists {
-		rawStr := rawAny.(string) //nolint: errcheck,forcetypeassert // allow panic
+		rawStr := rawAny.(string) //nolint:errcheck,forcetypeassert // allow panic
 
 		defaultQueryExecMode, err = parseDefaultQueryExecMode(rawStr)
 		if err != nil {
@@ -212,7 +206,7 @@ func parsePgxOptimizations(cfgMap map[string]any, cfg *pgxpool.Config) error {
 			return ErrDescriptionCacheCapacityMissUse
 		}
 
-		descriptionCacheCapacity := rawAny.(int32) //nolint: errcheck,forcetypeassert // allow panic
+		descriptionCacheCapacity := rawAny.(int32) //nolint:errcheck,forcetypeassert // allow panic
 		cfg.ConnConfig.DescriptionCacheCapacity = int(descriptionCacheCapacity)
 	}
 
@@ -221,7 +215,7 @@ func parsePgxOptimizations(cfgMap map[string]any, cfg *pgxpool.Config) error {
 			return ErrStatementCacheCapacityMissUse
 		}
 
-		statementCacheCapacity := rawAny.(int32) //nolint: errcheck,forcetypeassert // allow panic
+		statementCacheCapacity := rawAny.(int32) //nolint:errcheck,forcetypeassert // allow panic
 		cfg.ConnConfig.StatementCacheCapacity = int(statementCacheCapacity)
 	}
 

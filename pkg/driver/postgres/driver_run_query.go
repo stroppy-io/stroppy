@@ -50,8 +50,6 @@ var (
 // and array of any, which contains the arguments in the right order.
 // If sql contains marks that is'n present in args map - there is an error
 // errors.Is(err, ErrMissedArgument) and text contains info about all missed arguments.
-//
-//nolint:nonamedreturns // many returns
 func processArgs(sql string, args map[string]any) (newSQL string, argsArr []any, err error) {
 	var (
 		resultArgs []any

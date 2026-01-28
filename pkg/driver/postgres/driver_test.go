@@ -19,13 +19,13 @@ type testDriver struct {
 	*Driver
 }
 
-func newTestDriver(mockPool pgxmock.PgxPoolIface) (*testDriver, error) {
+func newTestDriver(mockPool pgxmock.PgxPoolIface) *testDriver {
 	return &testDriver{
 		Driver: &Driver{
 			logger:  logger.Global(),
 			pgxPool: mockPool,
 		},
-	}, nil
+	}
 }
 
 func TestDriver_InsertValuesPlainQuery(t *testing.T) {
@@ -34,8 +34,7 @@ func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 
 	defer mock.Close()
 
-	drv, err := newTestDriver(mock)
-	require.NoError(t, err)
+	drv := newTestDriver(mock)
 
 	ctx := context.Background()
 	descriptor := &stroppy.InsertDescriptor{
@@ -80,8 +79,7 @@ func TestDriver_InsertValuesCopyFrom(t *testing.T) {
 
 	defer mock.Close()
 
-	drv, err := newTestDriver(mock)
-	require.NoError(t, err)
+	drv := newTestDriver(mock)
 
 	ctx := context.Background()
 	descriptor := &stroppy.InsertDescriptor{
@@ -133,8 +131,7 @@ func TestDriver_InsertValuesCopyFromLargeBatch(t *testing.T) {
 
 	defer mock.Close()
 
-	drv, err := newTestDriver(mock)
-	require.NoError(t, err)
+	drv := newTestDriver(mock)
 
 	ctx := context.Background()
 	descriptor := &stroppy.InsertDescriptor{

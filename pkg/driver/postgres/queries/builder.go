@@ -41,7 +41,7 @@ func NewQueryBuilder(
 	}, nil
 }
 
-func (q *QueryBuilder) Build() (string, []any, error) {
+func (q *QueryBuilder) Build() (sql string, values []any, err error) {
 	return NewInsertQuery(q.lg, q.generators, q.insert)
 }
 

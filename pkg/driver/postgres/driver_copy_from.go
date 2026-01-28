@@ -11,14 +11,12 @@ import (
 // streamingCopySource implements pgx.CopyFromSource to generate values on-demand
 // without loading all rows into memory.
 type streamingCopySource struct {
-	driver      *Driver
-	count       int64
-	current     int64
-	values      []any
-	err         error
-	transaction *stroppy.DriverTransaction
-	unit        *stroppy.InsertDescriptor
-	builder     QueryBuilder
+	driver  *Driver
+	count   int64
+	current int64
+	values  []any
+	err     error
+	builder QueryBuilder
 }
 
 func newStreamingCopySource(
@@ -35,7 +33,6 @@ func newStreamingCopySource(
 		count:   int64(descriptor.GetCount()),
 		current: 0,
 		values:  make([]any, strings.Count(queries.BadInsertSQL(descriptor), " ")),
-		unit:    descriptor,
 		builder: builder,
 	}, nil
 }
