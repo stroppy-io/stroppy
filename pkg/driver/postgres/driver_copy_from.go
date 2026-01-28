@@ -45,11 +45,14 @@ func (s *streamingCopySource) Next() bool {
 	if s.current >= s.count {
 		return false
 	}
+
 	_, s.values, s.err = s.builder.Build()
 	if s.err != nil {
 		return false
 	}
+
 	s.current++
+
 	return true
 }
 

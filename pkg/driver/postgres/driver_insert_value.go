@@ -21,7 +21,6 @@ func (d *Driver) InsertValues(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,
 ) (*stroppy.DriverTransactionStat, error) {
-
 	txStart := time.Now()
 
 	switch descriptor.GetMethod() {
@@ -99,6 +98,7 @@ func (d *Driver) insertValuesCopyFrom(
 	if err != nil {
 		return nil, fmt.Errorf("can't create copy source: %w", err)
 	}
+
 	_, err = d.pgxPool.CopyFrom(ctx, pgx.Identifier{descriptor.GetTableName()}, cols, stream)
 	if err != nil {
 		return nil, err

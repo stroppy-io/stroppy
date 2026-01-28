@@ -146,6 +146,7 @@ func overrideWithDBSpecific(
 
 		return nil
 	}
+
 	return cfg, nil
 }
 
@@ -178,6 +179,7 @@ func defaultPool(url string) (*pgxpool.Config, error) {
 	if !strings.Contains(url, "pool_health_check_period") {
 		cfg.HealthCheckPeriod = 5 * time.Minute // Less frequent
 	}
+
 	return cfg, nil
 }
 

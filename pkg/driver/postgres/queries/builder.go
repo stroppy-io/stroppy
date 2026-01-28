@@ -33,6 +33,7 @@ func NewQueryBuilder(
 	if err != nil {
 		return nil, fmt.Errorf("add generators for unit :%w", err)
 	}
+
 	return &QueryBuilder{
 		generators: gens,
 		lg:         lg,
