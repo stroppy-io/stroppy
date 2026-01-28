@@ -221,11 +221,5 @@ func NewPool(
 		return nil, err
 	}
 
-	err = pool.Ping(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("can't ping db, "+
-			"probably connectivity or connection string issue: %w", err)
-	}
-
 	return pool, nil
 }

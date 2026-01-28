@@ -40,7 +40,8 @@ func (d *Driver) RunQuery(
 var (
 	ErrMissedArgument = errors.New("missed arguments present")
 	ErrExtraArgument  = errors.New("extra arguments provided")
-	argsRe            = regexp.MustCompile(`(\s|^|\()(:[a-zA-Z0-9_]+)(\s|$|;|::|,|\))`)
+	// TODO: syncronize with re from TS parse_sql.ts
+	argsRe = regexp.MustCompile(`(\s|^|\()(:[a-zA-Z0-9_]+)(\s|$|;|::|,|\))`)
 )
 
 // processArgs takse sql which contains ":arg" marks

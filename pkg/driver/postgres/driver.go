@@ -63,6 +63,8 @@ func NewDriver(
 
 	d.logger.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
 
+	// TODO: make waiting optional
+	// TODO: think to float this waiting to the level of driver dispatching or k6-module
 	err = waitForDB(ctx, d.logger, connPool, dbConnectionTimeout)
 	if err != nil {
 		return nil, err
