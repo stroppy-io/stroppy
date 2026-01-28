@@ -226,9 +226,10 @@ K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
 build-k6: # Build k6 module
 	mkdir -p $(CURDIR)/build
 	CGO_ENABLED=0 XK6_RACE_DETECTOR=0 PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
+		--k6-version v1.5.0 \
 		--with github.com/stroppy-io/stroppy/cmd/xk6air=./cmd/xk6air/ \
 		--replace github.com/stroppy-io/stroppy=./ \
-		--with github.com/oleiade/xk6-encoding@latest \
+		--with github.com/oleiade/xk6-encoding@v0.0.0-20251120082946-fbe7a8cbb88e \
 		--output $(K6_OUT_FILE)
 	cp $(K6_OUT_FILE) internal/static/stroppy-k6
 
@@ -237,9 +238,10 @@ build-k6-debug: # Build k6 module
 	mkdir -p $(CURDIR)/build
 	GOPROXY=$(GOPROXY) \
 	PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
+		--k6-version v1.5.0 \
 		--with github.com/stroppy-io/stroppy/cmd/xk6air=./cmd/xk6air/ \
 		--replace github.com/stroppy-io/stroppy=./ \
-		--with github.com/oleiade/xk6-encoding@latest \
+		--with github.com/oleiade/xk6-encoding@v0.0.0-20251120082946-fbe7a8cbb88e \
 		--output $(K6_OUT_FILE)
 	cp $(K6_OUT_FILE) internal/static/stroppy-k6
 

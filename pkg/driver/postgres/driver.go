@@ -10,19 +10,12 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
-	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
 
 // TODO: performance issue by passing via interface?
 
 type QueryBuilder interface {
-	Build(
-		ctx context.Context,
-		logger *zap.Logger,
-		insert *stroppy.InsertDescriptor,
-	) (*stroppy.DriverTransaction, error)
-	AddGenerators(insert *stroppy.InsertDescriptor) error
-	ValueToPgxValue(value *stroppy.Value) (any, error)
+	Build() (string, []any, error)
 }
 
 type Executor interface {
@@ -39,7 +32,6 @@ type Executor interface {
 type Driver struct {
 	logger  *zap.Logger
 	pgxPool Executor
-	builder QueryBuilder
 }
 
 //nolint:nonamedreturns // named returns for defer error handling
@@ -78,32 +70,11 @@ func NewDriver(
 
 	d.pgxPool = connPool
 
-	d.builder, err = queries.NewQueryBuilder(0) // TODO: seed initialization after driver creation
 	if err != nil {
 		return nil, err
 	}
 
 	return d, nil
-}
-
-func (d *Driver) GenerateNextUnit(
-	ctx context.Context,
-	insert *stroppy.InsertDescriptor,
-) (*stroppy.DriverTransaction, error) {
-	return d.builder.Build(ctx, d.logger, insert)
-}
-
-func (d *Driver) fillParamsToValues(query *stroppy.DriverQuery, valuesOut []any) error {
-	for i, v := range query.GetParams() {
-		val, err := d.builder.ValueToPgxValue(v)
-		if err != nil {
-			return err
-		}
-
-		valuesOut[i] = val
-	}
-
-	return nil
 }
 
 func (d *Driver) Teardown(_ context.Context) error {
