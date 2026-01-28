@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
@@ -63,14 +64,27 @@ func parseConfig(
 		return nil, err
 	}
 
-	cfg, err := pgxpool.ParseConfig(config.GetUrl())
+	cfg, err := defaultPool(config.GetUrl())
 	if err != nil {
 		return nil, err
 	}
 
+	cfg, err = overrideWithDBSpecific(logger, cfg, cfgMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+func overrideWithDBSpecific(
+	logger *zap.Logger,
+	cfg *pgxpool.Config,
+	cfgMap map[string]any,
+) (*pgxpool.Config, error) {
 	logLevel, ok := cfgMap[traceLogLevelKey]
 	if !ok {
-		logLevel = "info"
+		logLevel = "error"
 	}
 
 	lvl, err := zapcore.ParseLevel( //nolint: forcetypeassert // allow panic
@@ -89,8 +103,7 @@ func parseConfig(
 
 	cfg.ConnConfig.Tracer = multitracer.New(loggerTracer)
 
-	maxConnLifetime, ok := cfgMap[maxConnLifetimeKey]
-	if ok {
+	if maxConnLifetime, ok := cfgMap[maxConnLifetimeKey]; ok {
 		d, err := time.ParseDuration( //nolint: forcetypeassert // allow panic
 			maxConnLifetime.(string), //nolint: errcheck // allow panic
 		)
@@ -101,8 +114,7 @@ func parseConfig(
 		cfg.MaxConnLifetime = d
 	}
 
-	maxConnIdleTime, ok := cfgMap[maxConnIdleTimeKey]
-	if ok {
+	if maxConnIdleTime, ok := cfgMap[maxConnIdleTimeKey]; ok {
 		d, err := time.ParseDuration( //nolint: forcetypeassert // allow panic
 			maxConnIdleTime.(string), //nolint: errcheck // allow panic
 		)
@@ -113,23 +125,19 @@ func parseConfig(
 		cfg.MaxConnIdleTime = d
 	}
 
-	maxConns, ok := cfgMap[maxConnsKey]
-	if ok {
+	if maxConns, ok := cfgMap[maxConnsKey]; ok {
 		cfg.MaxConns = maxConns.(int32) //nolint: errcheck,forcetypeassert // allow panic
 	}
 
-	minConns, ok := cfgMap[minConnsKey]
-	if ok {
+	if minConns, ok := cfgMap[minConnsKey]; ok {
 		cfg.MinConns = minConns.(int32) //nolint: errcheck,forcetypeassert // allow panic
 	}
 
-	minIdleConns, ok := cfgMap[minIdleConnsKey]
-	if ok {
+	if minIdleConns, ok := cfgMap[minIdleConnsKey]; ok {
 		cfg.MinIdleConns = minIdleConns.(int32) //nolint: errcheck,forcetypeassert // allow panic
 	}
 
-	err = parsePgxOptimizations(cfgMap, cfg)
-	if err != nil {
+	if err = parsePgxOptimizations(cfgMap, cfg); err != nil {
 		return nil, err
 	}
 
@@ -138,7 +146,38 @@ func parseConfig(
 
 		return nil
 	}
+	return cfg, nil
+}
 
+func defaultPool(url string) (*pgxpool.Config, error) {
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, err
+	}
+
+	url = strings.ToLower(url)
+
+	// Single stable connection, unless URL specified it
+	if !strings.Contains(url, "pool_max_conns") {
+		cfg.MaxConns = 1
+	}
+
+	if !strings.Contains(url, "pool_min_conns") {
+		cfg.MinConns = 0
+	}
+
+	// Disable connection lifetime limits
+	if !strings.Contains(url, "pool_max_conn_lifetime") {
+		cfg.MaxConnLifetime = 0 // Unlimited
+	}
+
+	if !strings.Contains(url, "pool_max_conn_idle_time") {
+		cfg.MaxConnIdleTime = 0 // Never close idle connections
+	}
+
+	if !strings.Contains(url, "pool_health_check_period") {
+		cfg.HealthCheckPeriod = 5 * time.Minute // Less frequent
+	}
 	return cfg, nil
 }
 

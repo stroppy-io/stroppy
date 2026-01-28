@@ -34,23 +34,7 @@ const driver = NewDriverByConfig({
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
     driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
     dbSpecific: {
-      fields: [
-        {
-          type: { oneofKind: "string", string: "error" },
-          key: "trace_log_level",
-        },
-        {
-          type: { oneofKind: "string", string: "5m" },
-          key: "max_conn_lifetime",
-        },
-        {
-          type: { oneofKind: "string", string: "2m" },
-          key: "max_conn_idle_time",
-        },
-        { type: { oneofKind: "int32", int32: 1 }, key: "max_conns" },
-        { type: { oneofKind: "int32", int32: 1 }, key: "min_conns" },
-        { type: { oneofKind: "int32", int32: 1 }, key: "min_idle_conns" },
-      ],
+      fields: [],
     },
   },
 });
