@@ -6,13 +6,7 @@ globalThis.TextDecoder = encoding.TextDecoder;
 import { NotifyStep, Teardown } from "k6/x/stroppy";
 
 import { DriverConfig_DriverType, Status } from "./stroppy.pb.js";
-import {
-  NewDriverByConfig,
-  NewGen,
-  NewGroupGen as NewGroupGen,
-  AB,
-  G,
-} from "./helpers.ts";
+import { NewDriverByConfig, NewGen, NewGroupGen, AB, G } from "./helpers.ts";
 
 export const options: Options = {
   setupTimeout: "5m",
