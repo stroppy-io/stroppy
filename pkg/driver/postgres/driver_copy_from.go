@@ -1,7 +1,7 @@
 package postgres
 
 import (
-	"context"
+	"fmt"
 	"strings"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -11,26 +11,30 @@ import (
 // streamingCopySource implements pgx.CopyFromSource to generate values on-demand
 // without loading all rows into memory.
 type streamingCopySource struct {
-	driver      *Driver
-	count       int64
-	current     int64
-	values      []any
-	err         error
-	transaction *stroppy.DriverTransaction
-	unit        *stroppy.InsertDescriptor
+	driver  *Driver
+	count   int64
+	current int64
+	values  []any
+	err     error
+	builder QueryBuilder
 }
 
 func newStreamingCopySource(
 	d *Driver,
 	descriptor *stroppy.InsertDescriptor,
-) *streamingCopySource {
+) (*streamingCopySource, error) {
+	builder, err := queries.NewQueryBuilder(d.logger, 0, descriptor)
+	if err != nil {
+		return nil, fmt.Errorf("can't create query builder due to: %w", err)
+	}
+
 	return &streamingCopySource{
 		driver:  d,
 		count:   int64(descriptor.GetCount()),
 		current: 0,
 		values:  make([]any, strings.Count(queries.BadInsertSQL(descriptor), " ")),
-		unit:    descriptor,
-	}
+		builder: builder,
+	}, nil
 }
 
 // Next advances to the next row.
@@ -39,13 +43,7 @@ func (s *streamingCopySource) Next() bool {
 		return false
 	}
 
-	// NOTE: known that ctx not used at query generations
-	s.transaction, s.err = s.driver.GenerateNextUnit(context.TODO(), s.unit)
-	if s.err != nil {
-		return false
-	}
-
-	s.err = s.driver.fillParamsToValues(s.transaction.GetQueries()[0], s.values)
+	_, s.values, s.err = s.builder.Build()
 	if s.err != nil {
 		return false
 	}

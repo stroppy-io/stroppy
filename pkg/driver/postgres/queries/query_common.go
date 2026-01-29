@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
@@ -13,14 +14,19 @@ var (
 	ErrNilProtoValue    = errors.New("nil proto value type for parameter")
 )
 
+type (
+	GeneratorID string
+	Generators  = map[GeneratorID]generate.ValueGenerator
+)
+
 func GenParamValues(
 	genIDs []GeneratorID,
 	generators Generators,
-) ([]*stroppy.Value, error) {
+) ([]any, error) {
 	var paramsValues []*stroppy.Value
 
 	for _, genID := range genIDs {
-		gen, ok := generators.Get(genID)
+		gen, ok := generators[genID]
 
 		if !ok {
 			return nil, fmt.Errorf("%w: '%s'", ErrNoParamGen, genID)
@@ -59,5 +65,16 @@ func GenParamValues(
 		}
 	}
 
-	return paramsValues, nil
+	var (
+		plainValues = make([]any, len(paramsValues))
+		err         error
+	)
+	for i := range paramsValues {
+		plainValues[i], err = ValueToPgxValue(paramsValues[i])
+		if err != nil {
+			return nil, fmt.Errorf("can't convert [%d] = %v, due to: %w", i, paramsValues, err)
+		}
+	}
+
+	return plainValues, nil
 }

@@ -9,7 +9,7 @@ import (
 type Null = struct{}
 
 func listValueToSlice(value *stroppy.Value_List) ([]any, error) {
-	result := make([]any, 0)
+	result := make([]any, 0, len(value.GetValues()))
 
 	for _, v := range value.GetValues() {
 		res, err := valueToAny(v)
@@ -64,7 +64,7 @@ func valueToAny(value *stroppy.Value) (any, error) {
 }
 
 func ValueStructToMap(value *stroppy.Value_Struct) (map[string]any, error) {
-	result := make(map[string]any)
+	result := make(map[string]any, len(value.GetFields()))
 
 	for _, filedValue := range value.GetFields() {
 		val, err := valueToAny(filedValue)

@@ -2,12 +2,14 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
 
 // InsertValues inserts multiple rows into the database based on the descriptor.
@@ -19,14 +21,6 @@ func (d *Driver) InsertValues(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,
 ) (*stroppy.DriverTransactionStat, error) {
-	// Add generators for the descriptor
-	unitDesc := descriptor
-
-	err := d.builder.AddGenerators(unitDesc)
-	if err != nil {
-		return nil, err
-	}
-
 	txStart := time.Now()
 
 	switch descriptor.GetMethod() {
@@ -50,28 +44,21 @@ func (d *Driver) insertValuesPlainQuery(
 ) (*stroppy.DriverTransactionStat, error) {
 	queryStart := time.Now()
 
+	gen, err := queries.NewQueryBuilder(d.logger, 0, descriptor)
+	if err != nil {
+		return nil, fmt.Errorf("can't create query builder: %w", err)
+	}
+
 	// Execute multiple inserts
 	for range descriptor.GetCount() {
-		transaction, err := d.GenerateNextUnit(ctx, descriptor)
+		query, values, err := gen.Build()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("can't build query due to: %w", err)
 		}
 
-		if len(transaction.GetQueries()) == 0 {
-			continue
-		}
-
-		query := transaction.GetQueries()[0]
-		values := make([]any, len(query.GetParams()))
-
-		err = d.fillParamsToValues(query, values)
+		_, err = d.pgxPool.Exec(ctx, query, values...)
 		if err != nil {
-			return nil, err
-		}
-
-		_, err = d.pgxPool.Exec(ctx, query.GetRequest(), values...)
-		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error to execute query due to: %w", err)
 		}
 	}
 
@@ -107,12 +94,12 @@ func (d *Driver) insertValuesCopyFrom(
 
 	queryStart := time.Now()
 
-	_, err := d.pgxPool.CopyFrom(
-		ctx,
-		pgx.Identifier{descriptor.GetTableName()},
-		cols,
-		newStreamingCopySource(d, descriptor),
-	)
+	stream, err := newStreamingCopySource(d, descriptor)
+	if err != nil {
+		return nil, fmt.Errorf("can't create copy source: %w", err)
+	}
+
+	_, err = d.pgxPool.CopyFrom(ctx, pgx.Identifier{descriptor.GetTableName()}, cols, stream)
 	if err != nil {
 		return nil, err
 	}

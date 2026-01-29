@@ -100,7 +100,6 @@ func (r *ScriptRunner) Run(ctx context.Context) error {
 	return r.runK6Binary(ctx, args, envs)
 }
 
-//nolint:nonamedreturns // multiple values retuned
 func CreateAndInitTempDir(
 	lg *zap.Logger,
 	scriptPath, sqlPath string,
@@ -176,8 +175,6 @@ func (r *ScriptRunner) buildEnvVars() []string {
 }
 
 // addOtelExportArgs adds OpenTelemetry exporter arguments and environment variables.
-//
-//nolint:nonamedreturns // required by gocritic unnamedResult
 func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut []string) {
 	export := r.config.GlobalConfig.GetExporter().GetOtlpExport()
 	if export == nil {

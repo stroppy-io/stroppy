@@ -3,48 +3,37 @@ package postgres
 import (
 	"context"
 
-	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
-	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
-	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
 
 // TODO: performance issue by passing via interface?
 
 type QueryBuilder interface {
-	Build(
+	Build() (string, []any, error)
+}
+
+type Executor interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	CopyFrom(
 		ctx context.Context,
-		logger *zap.Logger,
-		insert *stroppy.InsertDescriptor,
-	) (*stroppy.DriverTransaction, error)
-	AddGenerators(insert *stroppy.InsertDescriptor) error
-	ValueToPgxValue(value *stroppy.Value) (any, error)
+		tableName pgx.Identifier,
+		columnNames []string,
+		rowSrc pgx.CopyFromSource,
+	) (int64, error)
+	Close()
 }
 
 type Driver struct {
 	logger  *zap.Logger
-	pgxPool interface {
-		Executor
-		Close()
-		CopyFrom(
-			ctx context.Context,
-			tableName pgx.Identifier,
-			columnNames []string,
-			rowSrc pgx.CopyFromSource,
-		) (int64, error)
-	}
-	txManager  *manager.Manager
-	txExecutor *TxExecutor
-
-	builder QueryBuilder
+	pgxPool Executor
 }
 
-//nolint:nonamedreturns // named returns for defer error handling
 func NewDriver(
 	ctx context.Context,
 	lg *zap.Logger,
@@ -73,6 +62,8 @@ func NewDriver(
 
 	d.logger.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
 
+	// TODO: make waiting optional
+	// TODO: think to float this waiting to the level of driver dispatching or k6-module
 	err = waitForDB(ctx, d.logger, connPool, dbConnectionTimeout)
 	if err != nil {
 		return nil, err
@@ -80,35 +71,7 @@ func NewDriver(
 
 	d.pgxPool = connPool
 
-	d.builder, err = queries.NewQueryBuilder(0) // TODO: seed initialization after driver creation
-	if err != nil {
-		return nil, err
-	}
-
-	d.txManager = manager.Must(trmpgx.NewDefaultFactory(connPool))
-	d.txExecutor = NewTxExecutor(connPool)
-
 	return d, nil
-}
-
-func (d *Driver) GenerateNextUnit(
-	ctx context.Context,
-	insert *stroppy.InsertDescriptor,
-) (*stroppy.DriverTransaction, error) {
-	return d.builder.Build(ctx, d.logger, insert)
-}
-
-func (d *Driver) fillParamsToValues(query *stroppy.DriverQuery, valuesOut []any) error {
-	for i, v := range query.GetParams() {
-		val, err := d.builder.ValueToPgxValue(v)
-		if err != nil {
-			return err
-		}
-
-		valuesOut[i] = val
-	}
-
-	return nil
 }
 
 func (d *Driver) Teardown(_ context.Context) error {

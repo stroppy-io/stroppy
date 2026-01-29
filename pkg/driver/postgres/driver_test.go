@@ -9,7 +9,6 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 )
 
 func ptr[T any](v T) *T {
@@ -20,19 +19,13 @@ type testDriver struct {
 	*Driver
 }
 
-func newTestDriver(mockPool pgxmock.PgxPoolIface) (*testDriver, error) {
-	builder, err := queries.NewQueryBuilder(0)
-	if err != nil {
-		return nil, err
-	}
-
+func newTestDriver(mockPool pgxmock.PgxPoolIface) *testDriver {
 	return &testDriver{
 		Driver: &Driver{
 			logger:  logger.Global(),
 			pgxPool: mockPool,
-			builder: builder,
 		},
-	}, nil
+	}
 }
 
 func TestDriver_InsertValuesPlainQuery(t *testing.T) {
@@ -41,8 +34,7 @@ func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 
 	defer mock.Close()
 
-	drv, err := newTestDriver(mock)
-	require.NoError(t, err)
+	drv := newTestDriver(mock)
 
 	ctx := context.Background()
 	descriptor := &stroppy.InsertDescriptor{
@@ -87,8 +79,7 @@ func TestDriver_InsertValuesCopyFrom(t *testing.T) {
 
 	defer mock.Close()
 
-	drv, err := newTestDriver(mock)
-	require.NoError(t, err)
+	drv := newTestDriver(mock)
 
 	ctx := context.Background()
 	descriptor := &stroppy.InsertDescriptor{
@@ -140,8 +131,7 @@ func TestDriver_InsertValuesCopyFromLargeBatch(t *testing.T) {
 
 	defer mock.Close()
 
-	drv, err := newTestDriver(mock)
-	require.NoError(t, err)
+	drv := newTestDriver(mock)
 
 	ctx := context.Background()
 	descriptor := &stroppy.InsertDescriptor{
