@@ -14,10 +14,6 @@ import (
 
 // TODO: performance issue by passing via interface?
 
-type QueryBuilder interface {
-	Build() (string, []any, error)
-}
-
 type Executor interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	CopyFrom(

@@ -22,6 +22,8 @@ type QueryBuilder struct {
 	generators Generators
 	lg         *zap.Logger
 	insert     *stroppy.InsertDescriptor
+	cols       []string
+	sql        string
 }
 
 func NewQueryBuilder(
@@ -38,17 +40,23 @@ func NewQueryBuilder(
 		generators: gens,
 		lg:         lg,
 		insert:     insert,
+		sql:        InsertSQL(insert),
+		cols:       InsertColumns(insert),
 	}, nil
 }
 
-func (q *QueryBuilder) Build() (sql string, values []any, err error) {
-	return NewInsertQuery(q.lg, q.generators, q.insert)
+func (q *QueryBuilder) Build(valuesOut []any) (err error) {
+	return NewInsertValues(q.generators, q.insert, valuesOut)
 }
+func (q *QueryBuilder) SQL() string       { return q.sql }
+func (q *QueryBuilder) Columns() []string { return q.cols }
+func (q *QueryBuilder) Count() int32      { return q.insert.GetCount() }
+func (q *QueryBuilder) TableName() string { return q.insert.GetTableName() }
 
-func ValueToPgxValue(value *stroppy.Value) (any, error) {
+func ValueToAny(value *stroppy.Value) (any, error) {
 	switch typed := value.GetType().(type) {
 	case *stroppy.Value_Null:
-		return nil, nil //nolint: nilnil               // allow to set nil in db
+		return nil, nil //nolint:nilnil // allow to set nil in db
 	case *stroppy.Value_Int32:
 		return typed.Int32, nil
 	case *stroppy.Value_Uint32:

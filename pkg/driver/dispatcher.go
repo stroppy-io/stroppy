@@ -7,18 +7,12 @@ import (
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
+	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
 type Driver interface {
-	InsertValues(
-		ctx context.Context,
-		unit *stroppy.InsertDescriptor,
-	) (*stroppy.DriverTransactionStat, error)
-	RunQuery(
-		ctx context.Context,
-		sql string,
-		args map[string]any,
-	) (*stroppy.DriverQueryStat, error)
+	InsertValues(ctx context.Context, unit *stroppy.InsertDescriptor) (*stats.Query, error)
+	RunQuery(ctx context.Context, sql string, args map[string]any) (*stats.Query, error)
 	Teardown(ctx context.Context) error
 }
 

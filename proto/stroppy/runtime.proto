@@ -14,14 +14,12 @@ option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
  * DriverQuery represents a query that can be executed by a database driver.
  */
 message DriverQuery {
-    /** Name of the query */
-    string name = 1;
-    /** Request of the query */
-    string request = 2;
-    /** Parameters of the query */
-    repeated Value params = 3;
-    /** If alternate insertion method required */
-    optional InsertMethod method = 4;
+  /** Request of the query */
+  string request = 1;
+  /** Parameters of the query */
+  repeated Value params = 2;
+  /** If alternate insertion method required */
+  optional InsertMethod method = 3;
 }
 
 /**
@@ -29,10 +27,10 @@ message DriverQuery {
  * driver.
  */
 message DriverTransaction {
-    /** Queries of the transaction */
-    repeated DriverQuery queries = 1;
-    /** Isolation level of the transaction */
-    TxIsolationLevel isolation_level = 2;
+  /** Queries of the transaction */
+  repeated DriverQuery queries = 1;
+  /** Isolation level of the transaction */
+  TxIsolationLevel isolation_level = 2;
 }
 
 /**

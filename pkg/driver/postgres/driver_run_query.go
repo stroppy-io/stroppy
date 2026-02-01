@@ -9,10 +9,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
 // RunQuery exucetse sql with args in form :arg.
@@ -20,7 +21,7 @@ func (d *Driver) RunQuery(
 	ctx context.Context,
 	sql string,
 	args map[string]any,
-) (*stroppy.DriverQueryStat, error) {
+) (*stats.Query, error) {
 	processedSQL, argsArr, err := processArgs(sql, args)
 	if err != nil {
 		if errors.Is(err, ErrExtraArgument) {
@@ -32,9 +33,15 @@ func (d *Driver) RunQuery(
 		}
 	}
 
-	_, _ = d.pgxPool.Exec(ctx, processedSQL, argsArr...)
+	start := time.Now()
+	_, err = d.pgxPool.Exec(ctx, processedSQL, argsArr...)
+	elapsed := time.Since(start)
 
-	return &stroppy.DriverQueryStat{}, nil
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute sql: %w", err)
+	}
+
+	return &stats.Query{Elapsed: elapsed}, nil
 }
 
 var (

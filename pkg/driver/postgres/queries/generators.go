@@ -22,7 +22,7 @@ func collectInsertGenerators(
 	generators := make(Generators)
 
 	for _, param := range descriptor.GetParams() {
-		paramID := GeneratorID(param.GetName())
+		paramID := param.GetName()
 
 		generator, err := generate.NewValueGenerator(seed, param)
 		if err != nil {
@@ -37,7 +37,7 @@ func collectInsertGenerators(
 			seed,
 			Out[generate.GenAbleStruct](group.GetParams()),
 		)
-		generators[GeneratorID(group.GetName())] = generator
+		generators[group.GetName()] = generator
 	}
 
 	return generators, nil

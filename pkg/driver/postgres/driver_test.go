@@ -67,8 +67,6 @@ func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 	stats, err := drv.InsertValues(ctx, descriptor)
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	require.Len(t, stats.Queries, 1)
-	require.Equal(t, "test_table", stats.Queries[0].Name)
 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
@@ -119,8 +117,6 @@ func TestDriver_InsertValuesCopyFrom(t *testing.T) {
 	stats, err := drv.InsertValues(ctx, descriptor)
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	require.Len(t, stats.Queries, 1)
-	require.Equal(t, "test_table", stats.Queries[0].Name)
 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
@@ -174,8 +170,6 @@ func TestDriver_InsertValuesCopyFromLargeBatch(t *testing.T) {
 	stats, err := drv.InsertValues(ctx, descriptor)
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	require.Len(t, stats.Queries, 1)
-	require.Equal(t, "test_table", stats.Queries[0].Name)
 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
