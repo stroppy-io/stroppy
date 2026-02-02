@@ -27,6 +27,7 @@ type DriverConfig_DriverType int32
 const (
 	DriverConfig_DRIVER_TYPE_UNSPECIFIED DriverConfig_DriverType = 0
 	DriverConfig_DRIVER_TYPE_POSTGRES    DriverConfig_DriverType = 1
+	DriverConfig_DRIVER_TYPE_PICODATA    DriverConfig_DriverType = 2
 )
 
 // Enum value maps for DriverConfig_DriverType.
@@ -34,10 +35,12 @@ var (
 	DriverConfig_DriverType_name = map[int32]string{
 		0: "DRIVER_TYPE_UNSPECIFIED",
 		1: "DRIVER_TYPE_POSTGRES",
+		2: "DRIVER_TYPE_PICODATA",
 	}
 	DriverConfig_DriverType_value = map[string]int32{
 		"DRIVER_TYPE_UNSPECIFIED": 0,
 		"DRIVER_TYPE_POSTGRES":    1,
+		"DRIVER_TYPE_PICODATA":    2,
 	}
 )
 
@@ -457,17 +460,18 @@ var File_proto_stroppy_config_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x1eproto/stroppy/descriptor.proto\x1a\x17validate/validate.proto\"\x89\x02\n" +
+	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x1eproto/stroppy/descriptor.proto\x1a\x17validate/validate.proto\"\xa3\x02\n" +
 	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12;\n" +
 	"\vdb_specific\x18\x02 \x01(\v2\x15.stroppy.Value.StructH\x00R\n" +
 	"dbSpecific\x88\x01\x01\x12K\n" +
 	"\vdriver_type\x18\x03 \x01(\x0e2 .stroppy.DriverConfig.DriverTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
-	"driverType\"C\n" +
+	"driverType\"]\n" +
 	"\n" +
 	"DriverType\x12\x1b\n" +
 	"\x17DRIVER_TYPE_UNSPECIFIED\x10\x00\x12\x18\n" +
-	"\x14DRIVER_TYPE_POSTGRES\x10\x01B\x0e\n" +
+	"\x14DRIVER_TYPE_POSTGRES\x10\x01\x12\x18\n" +
+	"\x14DRIVER_TYPE_PICODATA\x10\x02B\x0e\n" +
 	"\f_db_specific\"\xca\x02\n" +
 	"\fLoggerConfig\x12E\n" +
 	"\tlog_level\x18\x01 \x01(\x0e2\x1e.stroppy.LoggerConfig.LogLevelB\b\xfaB\x05\x82\x01\x02\x10\x01R\blogLevel\x12B\n" +

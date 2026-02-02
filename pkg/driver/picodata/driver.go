@@ -37,9 +37,9 @@ type QueryBuilder interface {
 	Build(
 		ctx context.Context,
 		logger *zap.Logger,
-		unit *stroppy.UnitDescriptor,
+		insert *stroppy.InsertDescriptor,
 	) (*stroppy.DriverTransaction, error)
-	AddGenerators(unit *stroppy.UnitDescriptor) error
+	AddGenerators(insert *stroppy.InsertDescriptor) error
 	ValueToPgxValue(value *stroppy.Value) (any, error)
 }
 
@@ -72,7 +72,7 @@ func NewDriver(
 
 	d.logger.Debug("Connecting to Picodata...", zap.String("url", cfg.GetUrl()))
 
-	conn, err := picodata.New(ctx, cfg.GetUrl())
+	conn, err := picodata.New(ctx, cfg.GetUrl(), picodata.WithDisableTopologyManaging(), picodata.WithMaxConnPerInstance(99))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Picodata: %w", err)
 	}
@@ -105,9 +105,9 @@ func (d *Driver) Teardown(_ context.Context) error {
 
 func (d *Driver) GenerateNextUnit(
 	ctx context.Context,
-	unit *stroppy.UnitDescriptor,
+	insert *stroppy.InsertDescriptor,
 ) (*stroppy.DriverTransaction, error) {
-	return d.builder.Build(ctx, d.logger, unit)
+	return d.builder.Build(ctx, d.logger, insert)
 }
 
 func (d *Driver) fillParamsToValues(query *stroppy.DriverQuery, valuesOut []any) error {

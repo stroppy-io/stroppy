@@ -20,14 +20,9 @@ var ErrCopyFromUnsupported = errors.New("CopyFrom is not supported in Picodata y
 func (d *Driver) InsertValues(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,
-	count int64,
 ) (*stroppy.DriverTransactionStat, error) {
 	// Add generators for the descriptor
-	unitDesc := &stroppy.UnitDescriptor{
-		Type: &stroppy.UnitDescriptor_Insert{
-			Insert: descriptor,
-		},
-	}
+	unitDesc := descriptor
 
 	err := d.builder.AddGenerators(unitDesc)
 	if err != nil {
@@ -38,9 +33,9 @@ func (d *Driver) InsertValues(
 
 	switch descriptor.GetMethod() {
 	case stroppy.InsertMethod_PLAIN_QUERY:
-		return d.insertValuesPlainQuery(ctx, descriptor, count, txStart)
+		return d.insertValuesPlainQuery(ctx, descriptor, txStart)
 	case stroppy.InsertMethod_COPY_FROM:
-		return d.insertValuesCopyFrom(ctx, descriptor, count, txStart)
+		return d.insertValuesCopyFrom(ctx, descriptor, txStart)
 	default:
 		d.logger.Panic("unexpected proto.InsertMethod")
 
@@ -53,18 +48,13 @@ func (d *Driver) InsertValues(
 func (d *Driver) insertValuesPlainQuery(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,
-	count int64,
 	txStart time.Time,
 ) (*stroppy.DriverTransactionStat, error) {
 	queryStart := time.Now()
 
 	// Execute multiple inserts
-	for range count {
-		transaction, err := d.GenerateNextUnit(ctx, &stroppy.UnitDescriptor{
-			Type: &stroppy.UnitDescriptor_Insert{
-				Insert: descriptor,
-			},
-		})
+	for range descriptor.GetCount() {
+		transaction, err := d.GenerateNextUnit(ctx, descriptor)
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +81,7 @@ func (d *Driver) insertValuesPlainQuery(
 		IsolationLevel: stroppy.TxIsolationLevel_UNSPECIFIED,
 		ExecDuration:   durationpb.New(time.Since(txStart)),
 		Queries: []*stroppy.DriverQueryStat{{
-			Name:         descriptor.GetName(),
+			Name:         descriptor.GetTableName(),
 			ExecDuration: durationpb.New(time.Since(queryStart)),
 		}},
 	}, nil
@@ -100,7 +90,6 @@ func (d *Driver) insertValuesPlainQuery(
 func (d *Driver) insertValuesCopyFrom(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,
-	count int64,
 	txStart time.Time,
 ) (*stroppy.DriverTransactionStat, error) {
 	return nil, ErrCopyFromUnsupported

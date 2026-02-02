@@ -10,11 +10,13 @@ import (
 	"strconv"
 	"strings"
 
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"go.uber.org/zap"
 )
 
 // RunQuery exucetse sql with args in form :arg.
-func (d *Driver) RunQuery(ctx context.Context, sql string, args map[string]any) {
+
+func (d *Driver) RunQuery(ctx context.Context, sql string, args map[string]any) (*stroppy.DriverQueryStat, error) {
 	processedSQL, argsArr, err := processArgs(sql, args)
 	if err != nil {
 		if errors.Is(err, ErrExtraArgument) {
@@ -22,11 +24,13 @@ func (d *Driver) RunQuery(ctx context.Context, sql string, args map[string]any) 
 		} else {
 			d.logger.Error("arguments processing error", zap.String("sql", sql), zap.Error(err))
 
-			return
+			return nil, fmt.Errorf("arguments processing error: %w", err)
 		}
 	}
 
 	_, _ = d.pool.Exec(ctx, processedSQL, argsArr...)
+
+	return &stroppy.DriverQueryStat{}, nil
 }
 
 var (
