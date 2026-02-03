@@ -21,6 +21,10 @@ type Instance struct {
 	dw *DriverWrapper
 }
 
+// NewInstance creates new instance of module.
+//
+// NOTE: at this time vu.State() is nil.
+// It's init phase, and only preInitEnv is accessible.
 func NewInstance(vu modules.VU) modules.Instance {
 	// Create per-VU logger to avoid log level conflicts
 	VUID := uint64(0)
@@ -55,6 +59,9 @@ var onceDefineConfig sync.Once
 
 // NewDriverByConfigBin initializes the driver from GlobalConfig.
 // This is called by scripts using defineConfig(globalConfig) at the top level.
+//
+// NOTE: this function commonly called at init phase of k6 lifecycle.
+// i.vu.State() is nil
 func (i *Instance) NewDriverByConfigBin(configBin []byte) *DriverWrapper {
 	var globalCfg stroppy.GlobalConfig
 	err := proto.Unmarshal(configBin, &globalCfg)

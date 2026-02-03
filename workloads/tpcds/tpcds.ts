@@ -6,7 +6,7 @@ globalThis.TextDecoder = encoding.TextDecoder;
 import { NotifyStep, Teardown } from "k6/x/stroppy";
 
 import { DriverConfig_DriverType, Status } from "./stroppy.pb.js";
-import { NewDriverByConfig } from "./helpers.ts";
+import { DriverX } from "./helpers.ts";
 import { parse_sql } from "./parse_sql.js";
 
 export const options: Options = {
@@ -22,7 +22,7 @@ export const options: Options = {
 };
 
 // Initialize driver with GlobalConfig
-const driver = NewDriverByConfig({
+const driver = DriverX.fromConfig({
   driver: {
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
     driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
@@ -46,7 +46,7 @@ export function setup() {
 export function workload() {
   parsedQueries.forEach((query) => {
     console.log(`tpc-ds-like: ${query.name}`);
-    driver.runQuery(query.sql, {});
+    driver.runQuery(query, {});
   });
 }
 

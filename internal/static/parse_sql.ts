@@ -1,7 +1,6 @@
 import { Parser } from "node-sql-parser";
-import { parse } from "path";
 
-type QueryType = "CreateTable" | "Insert" | "Other" | "Invalid";
+type QueryType = "CreateTable" | "Insert" | "Select" | "Other" | "Invalid";
 
 // Options for SQL parsing
 export interface ParseOptions {
@@ -133,7 +132,7 @@ function determineQueryType(
       return "Invalid";
     }
 
-    const astType = astNode.type as string;
+    const astType = astNode.type;
 
     // Map node-sql-parser types to our QueryType
     if (astType === "create" && "keyword" in astNode) {
@@ -145,6 +144,10 @@ function determineQueryType(
 
     if (astType === "insert") {
       return "Insert";
+    }
+
+    if (astType === "select") {
+      return "Select";
     }
 
     return "Other";

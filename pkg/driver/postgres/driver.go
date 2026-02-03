@@ -2,9 +2,11 @@ package postgres
 
 import (
 	"context"
+	"net"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
@@ -22,6 +24,8 @@ type Executor interface {
 		columnNames []string,
 		rowSrc pgx.CopyFromSource,
 	) (int64, error)
+
+	Config() *pgxpool.Config
 	Close()
 }
 
@@ -68,6 +72,19 @@ func NewDriver(
 	d.pgxPool = connPool
 
 	return d, nil
+}
+
+func (d *Driver) UpdateDialler(
+	ctx context.Context,
+	dialFunc func(ctx context.Context, network, addr string) (net.Conn, error),
+) (err error) {
+	cfg := d.pgxPool.Config()
+	cfg.ConnConfig.DialFunc = dialFunc
+
+	d.pgxPool.Close()
+	d.pgxPool, err = pgxpool.NewWithConfig(ctx, cfg)
+
+	return err
 }
 
 func (d *Driver) Teardown(_ context.Context) error {

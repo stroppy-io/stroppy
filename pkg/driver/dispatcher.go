@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"net"
 
 	"go.uber.org/zap"
 
@@ -14,6 +15,11 @@ type Driver interface {
 	InsertValues(ctx context.Context, unit *stroppy.InsertDescriptor) (*stats.Query, error)
 	RunQuery(ctx context.Context, sql string, args map[string]any) (*stats.Query, error)
 	Teardown(ctx context.Context) error
+
+	UpdateDialler(
+		ctx context.Context,
+		dialFunc func(ctx context.Context, network, addr string) (net.Conn, error),
+	) (err error)
 }
 
 func Dispatch( //nolint: ireturn // better than return any

@@ -1,6 +1,9 @@
 package xk6air
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"go.k6.io/k6/js/modules"
@@ -9,35 +12,42 @@ import (
 )
 
 type DriverWrapper struct {
-	vu  modules.VU
-	lg  *zap.Logger
-	drv driver.Driver
+	vu                modules.VU
+	lg                *zap.Logger
+	drv               driver.Driver
+	onceUpdateDialler sync.Once
 }
 
-func (d *DriverWrapper) RunQuery(sql string, args map[string]any) {
-	d.drv.RunQuery(d.vu.Context(), sql, args)
+func (d *DriverWrapper) RunQuery(sql string, args map[string]any) any {
+	d.onceUpdateDialler.Do(
+		func() { d.drv.UpdateDialler(d.vu.Context(), d.vu.State().Dialer.DialContext) },
+	)
+
+	stats, err := d.drv.RunQuery(d.vu.Context(), sql, args)
+	if err != nil {
+		return fmt.Errorf("error while executing sql query: %w", err)
+	}
+	return stats
 }
 
 // InsertValuesBin starts bulk insert blocking operation on driver.
 func (d *DriverWrapper) InsertValuesBin(
 	insertMsg []byte,
 	count int64,
-) error {
+) any {
+	d.onceUpdateDialler.Do(
+		func() { d.drv.UpdateDialler(d.vu.Context(), d.vu.State().Dialer.DialContext) },
+	)
 	var descriptor stroppy.InsertDescriptor
 	err := proto.Unmarshal(insertMsg, &descriptor)
 	if err != nil {
 		return err
 	}
 
-	_, err = d.drv.InsertValues(d.vu.Context(), &descriptor)
+	stats, err := d.drv.InsertValues(d.vu.Context(), &descriptor)
 	if err != nil {
 		return err
 	}
 
-	// can't binary unconvert stats on ts side
-	// statsMsg, err := proto.Marshal(stats)
-	// if err != nil {
-	// 	return err
-	// }
-	return nil
+	return stats
 }

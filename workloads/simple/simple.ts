@@ -6,7 +6,7 @@ globalThis.TextDecoder = encoding.TextDecoder;
 import { NotifyStep, Teardown } from "k6/x/stroppy";
 
 import { DriverConfig_DriverType, Status } from "./stroppy.pb.js";
-import { NewDriverByConfig, NewGen, NewGroupGen, AB, G } from "./helpers.ts";
+import { DriverX, NewGen, NewGroupGen, AB, R, S } from "./helpers.ts";
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -20,7 +20,7 @@ export const options: Options = {
   },
 };
 
-const driver = NewDriverByConfig({
+const driver: DriverX = DriverX.fromConfig({
   runId: "",
   seed: "0",
   version: "",
@@ -45,14 +45,14 @@ const gen = NewGen(0, {
 });
 
 // The generator of strings of length = 10, made using the English alphabet
-const gen2 = NewGen(1, G.str(10, AB.en));
+const gen2 = NewGen(1, R.str(10, AB.en));
 
 // Group of generators, run and check logs to find out the pattern
 const groupGen = NewGroupGen(2, {
-  params: G.params({
-    some: G.int32Seq(1, 2),
-    second: G.int32Seq(1, 3),
-    bool: G.bool(1, true),
+  params: R.params({
+    some: S.int32(1, 2),
+    second: S.int32(1, 3),
+    bool: R.bool(1, true),
   }),
 });
 
