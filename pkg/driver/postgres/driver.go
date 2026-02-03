@@ -14,8 +14,6 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 )
 
-// TODO: performance issue by passing via interface?
-
 type Executor interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	CopyFrom(
