@@ -2,7 +2,7 @@ package shutdown
 
 import "os"
 
-var globalShutdown = New() //nolint:gochecknoglobals // used for main app
+var globalShutdown = New()
 
 // Global returns the global shutdown manager.
 //

@@ -14,7 +14,7 @@ const (
 	maxArgs = 2 // sql_file.sql is optional
 )
 
-var Cmd = &cobra.Command{ //nolint: gochecknoglobals
+var Cmd = &cobra.Command{
 	Use:   "run <script.ts> [sql_file.sql]",
 	Short: "Run benchmark script with k6",
 	Long: `Run a TypeScript benchmark script with k6.

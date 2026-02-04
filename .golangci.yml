@@ -36,8 +36,6 @@ linters:
     - forcetypeassert
     - funlen
     - gocheckcompilerdirectives
-    - gochecknoglobals
-    - gochecknoinits
     - gochecksumtype
     - gocognit
     - goconst
@@ -150,7 +148,6 @@ linters:
         - gocognit
         - lll
         - mnd
-        - gochecknoglobals
         - err113
         - ireturn
       allow-unused: true
@@ -226,7 +223,6 @@ linters:
           - wrapcheck
         path: _test\.go
       - linters:
-          - gochecknoglobals
           - unused
         path: bind.go
       - linters:

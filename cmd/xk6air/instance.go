@@ -7,6 +7,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	_ "github.com/stroppy-io/stroppy/pkg/driver/postgres"
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"

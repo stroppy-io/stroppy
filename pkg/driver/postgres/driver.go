@@ -2,7 +2,7 @@ package postgres
 
 import (
 	"context"
-	"net"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -11,8 +11,18 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 )
+
+func init() {
+	driver.RegisterDriver(
+		stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
+		func(ctx context.Context, lg *zap.Logger, config *stroppy.DriverConfig) (driver.Driver, error) {
+			return NewDriver(ctx, lg, config)
+		},
+	)
+}
 
 type Executor interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
@@ -31,6 +41,8 @@ type Driver struct {
 	logger  *zap.Logger
 	pgxPool Executor
 }
+
+var _ driver.Driver = new(Driver)
 
 func NewDriver(
 	ctx context.Context,
@@ -72,17 +84,20 @@ func NewDriver(
 	return d, nil
 }
 
-func (d *Driver) UpdateDialler(
-	ctx context.Context,
-	dialFunc func(ctx context.Context, network, addr string) (net.Conn, error),
-) (err error) {
-	cfg := d.pgxPool.Config()
-	cfg.ConnConfig.DialFunc = dialFunc
+func (d *Driver) Configure(ctx context.Context, opts driver.Options) (err error) {
+	if opts.DialFunc != nil {
+		cfg := d.pgxPool.Config()
+		cfg.ConnConfig.DialFunc = opts.DialFunc
 
-	d.pgxPool.Close()
-	d.pgxPool, err = pgxpool.NewWithConfig(ctx, cfg)
+		d.pgxPool.Close()
 
-	return err
+		d.pgxPool, err = pgxpool.NewWithConfig(ctx, cfg)
+		if err != nil {
+			return fmt.Errorf("can't start reconfigured pgxpool: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (d *Driver) Teardown(_ context.Context) error {

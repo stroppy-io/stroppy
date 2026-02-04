@@ -22,9 +22,9 @@ type Config struct {
 	LogLevel string `default:"info"       mapstructure:"level" validate:"oneof=debug info warn error"`
 }
 
-var globalLogger = atomic.Pointer[zap.Logger]{} //nolint:gochecknoglobals // global logger needed for all app.
+var globalLogger = atomic.Pointer[zap.Logger]{}
 
-func init() { //nolint: gochecknoinits // allow
+func init() {
 	setGlobalLogger(newDefault())
 }
 

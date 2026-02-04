@@ -84,7 +84,7 @@ func overrideWithDBSpecific(
 ) (*pgxpool.Config, error) {
 	logLevel := "error"
 	if overrideLevel, ok := cfgMap[traceLogLevelKey]; ok {
-		logLevel = overrideLevel.(string) //nolint:errcheck,forcetypeassert // allow panic
+		logLevel, _ = overrideLevel.(string)
 	}
 
 	lvl, err := zapcore.ParseLevel(logLevel)
@@ -124,15 +124,15 @@ func overrideWithDBSpecific(
 	}
 
 	if maxConns, ok := cfgMap[maxConnsKey]; ok {
-		cfg.MaxConns = maxConns.(int32) //nolint:errcheck,forcetypeassert // allow panic
+		cfg.MaxConns, _ = maxConns.(int32)
 	}
 
 	if minConns, ok := cfgMap[minConnsKey]; ok {
-		cfg.MinConns = minConns.(int32) //nolint:errcheck,forcetypeassert // allow panic
+		cfg.MinConns, _ = minConns.(int32)
 	}
 
 	if minIdleConns, ok := cfgMap[minIdleConnsKey]; ok {
-		cfg.MinIdleConns = minIdleConns.(int32) //nolint:errcheck,forcetypeassert // allow panic
+		cfg.MinIdleConns, _ = minIdleConns.(int32)
 	}
 
 	if err := parsePgxOptimizations(cfgMap, cfg); err != nil {
@@ -184,7 +184,7 @@ func parsePgxOptimizations(cfgMap map[string]any, cfg *pgxpool.Config) error {
 	)
 
 	if rawAny, exists := cfgMap[defaultQueryExecModeKey]; exists {
-		rawStr := rawAny.(string) //nolint:errcheck,forcetypeassert // allow panic
+		rawStr, _ := rawAny.(string)
 
 		defaultQueryExecMode, err = parseDefaultQueryExecMode(rawStr)
 		if err != nil {
@@ -206,7 +206,7 @@ func parsePgxOptimizations(cfgMap map[string]any, cfg *pgxpool.Config) error {
 			return ErrDescriptionCacheCapacityMissUse
 		}
 
-		descriptionCacheCapacity := rawAny.(int32) //nolint:errcheck,forcetypeassert // allow panic
+		descriptionCacheCapacity, _ := rawAny.(int32)
 		cfg.ConnConfig.DescriptionCacheCapacity = int(descriptionCacheCapacity)
 	}
 
@@ -215,7 +215,7 @@ func parsePgxOptimizations(cfgMap map[string]any, cfg *pgxpool.Config) error {
 			return ErrStatementCacheCapacityMissUse
 		}
 
-		statementCacheCapacity := rawAny.(int32) //nolint:errcheck,forcetypeassert // allow panic
+		statementCacheCapacity, _ := rawAny.(int32)
 		cfg.ConnConfig.StatementCacheCapacity = int(statementCacheCapacity)
 	}
 

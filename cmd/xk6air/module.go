@@ -20,7 +20,7 @@ var rootModule *RootModule
 var _ modules.Module = new(RootModule)
 
 // rootModule initialization.
-func init() { //nolint:gochecknoinits // allow for xk6
+func init() {
 	lg := logger.
 		NewFromEnv().
 		Named("k6-module").
