@@ -72,7 +72,7 @@ func NewDriver(
 
 	d.logger.Debug("Connecting to Picodata...", zap.String("url", cfg.GetUrl()))
 
-	conn, err := picodata.New(ctx, cfg.GetUrl(), picodata.WithDisableTopologyManaging(), picodata.WithMaxConnPerInstance(99))
+	conn, err := picodata.New(ctx, cfg.GetUrl(), picodata.WithDisableTopologyManaging(), picodata.WithMaxConnPerInstance(20))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Picodata: %w", err)
 	}

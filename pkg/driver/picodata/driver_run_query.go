@@ -28,7 +28,10 @@ func (d *Driver) RunQuery(ctx context.Context, sql string, args map[string]any) 
 		}
 	}
 
-	_, _ = d.pool.Exec(ctx, processedSQL, argsArr...)
+	_, err = d.pool.Exec(ctx, processedSQL, argsArr...)
+	if err != nil {
+		d.logger.Error("error sending query to db ", zap.Error(err))
+	}
 
 	return &stroppy.DriverQueryStat{}, nil
 }
