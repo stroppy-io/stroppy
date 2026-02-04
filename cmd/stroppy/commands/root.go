@@ -12,7 +12,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 )
 
-var rootCmd = &cobra.Command{ //nolint: gochecknoglobals
+var rootCmd = &cobra.Command{
 	Use:   "stroppy",
 	Short: "Tool to generate and run stress tests (e.g benchmarking) for databases",
 	Long: `
@@ -26,7 +26,7 @@ For more information see https://github.com/stroppy-io/stroppy`,
 	SilenceUsage: true,
 }
 
-var versionCmd = &cobra.Command{ //nolint: gochecknoglobals
+var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print versions of stroppy components",
 	Long:  ``,
@@ -42,7 +42,7 @@ func Execute() {
 	}
 }
 
-func init() { //nolint: gochecknoinits // allow in cmd
+func init() {
 	cobra.EnableCommandSorting = false
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)

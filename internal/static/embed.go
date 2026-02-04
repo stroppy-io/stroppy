@@ -30,7 +30,7 @@ const (
 )
 
 // StaticFiles are copied to temp dir for k6 execution.
-var StaticFiles = []FileName{ //nolint: gochecknoglobals
+var StaticFiles = []FileName{
 	ProtoJSFileName,
 	K6PluginFileName,
 	HelpersFileName,
@@ -40,14 +40,14 @@ var StaticFiles = []FileName{ //nolint: gochecknoglobals
 }
 
 // DevStaticFiles are additional files for development environment.
-var DevStaticFiles = []FileName{ //nolint: gochecknoglobals
+var DevStaticFiles = []FileName{
 	PackageJSONFileName,
 	ParseSQLTSFileName,
 	ProtoTSFileName,
 	TSConfigFileName,
 }
 
-var Binaries = []FileName{ //nolint: gochecknoglobals
+var Binaries = []FileName{
 	K6PluginFileName,
 }
 

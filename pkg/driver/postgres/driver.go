@@ -2,20 +2,26 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 )
 
-// TODO: performance issue by passing via interface?
-
-type QueryBuilder interface {
-	Build() (string, []any, error)
+func init() {
+	driver.RegisterDriver(
+		stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
+		func(ctx context.Context, lg *zap.Logger, config *stroppy.DriverConfig) (driver.Driver, error) {
+			return NewDriver(ctx, lg, config)
+		},
+	)
 }
 
 type Executor interface {
@@ -26,6 +32,8 @@ type Executor interface {
 		columnNames []string,
 		rowSrc pgx.CopyFromSource,
 	) (int64, error)
+
+	Config() *pgxpool.Config
 	Close()
 }
 
@@ -33,6 +41,8 @@ type Driver struct {
 	logger  *zap.Logger
 	pgxPool Executor
 }
+
+var _ driver.Driver = new(Driver)
 
 func NewDriver(
 	ctx context.Context,
@@ -72,6 +82,22 @@ func NewDriver(
 	d.pgxPool = connPool
 
 	return d, nil
+}
+
+func (d *Driver) Configure(ctx context.Context, opts driver.Options) (err error) {
+	if opts.DialFunc != nil {
+		cfg := d.pgxPool.Config()
+		cfg.ConnConfig.DialFunc = opts.DialFunc
+
+		d.pgxPool.Close()
+
+		d.pgxPool, err = pgxpool.NewWithConfig(ctx, cfg)
+		if err != nil {
+			return fmt.Errorf("can't start reconfigured pgxpool: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (d *Driver) Teardown(_ context.Context) error {

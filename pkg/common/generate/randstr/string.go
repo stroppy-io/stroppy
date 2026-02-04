@@ -12,7 +12,7 @@ func (sg *StringGenerator) Next() string {
 	return sg.cutter.Cut()
 }
 
-var DefaultEnglishAlphabet = [][2]int32{{65, 90}, {97, 122}} //nolint: gochecknoglobals
+var DefaultEnglishAlphabet = [][2]int32{{65, 90}, {97, 122}}
 
 func NewStringGenerator(
 	seed uint64,

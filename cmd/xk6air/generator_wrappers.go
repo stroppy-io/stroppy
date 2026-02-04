@@ -49,6 +49,7 @@ func (g *GeneratorWrapper) Next() any {
 	v, _ := g.generator.Next()
 	return UnwrapValue(v)
 }
+
 func UnwrapValue(v *stroppy.Value) any {
 	var result any
 	switch t := v.GetType().(type) {

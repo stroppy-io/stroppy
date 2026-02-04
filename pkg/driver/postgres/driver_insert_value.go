@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"google.golang.org/protobuf/types/known/durationpb"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
+	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
 // InsertValues inserts multiple rows into the database based on the descriptor.
@@ -20,14 +20,17 @@ import (
 func (d *Driver) InsertValues(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,
-) (*stroppy.DriverTransactionStat, error) {
-	txStart := time.Now()
+) (*stats.Query, error) {
+	builder, err := queries.NewQueryBuilder(d.logger, 0, descriptor)
+	if err != nil {
+		return nil, fmt.Errorf("can't create query builder: %w", err)
+	}
 
 	switch descriptor.GetMethod() {
 	case stroppy.InsertMethod_PLAIN_QUERY:
-		return d.insertValuesPlainQuery(ctx, descriptor, txStart)
+		return d.insertValuesPlainQuery(ctx, builder)
 	case stroppy.InsertMethod_COPY_FROM:
-		return d.insertValuesCopyFrom(ctx, descriptor, txStart)
+		return d.insertValuesCopyFrom(ctx, builder)
 	default:
 		d.logger.Panic("unexpected proto.InsertMethod")
 
@@ -39,37 +42,25 @@ func (d *Driver) InsertValues(
 // Each row is inserted with a separate pgx.Exec call.
 func (d *Driver) insertValuesPlainQuery(
 	ctx context.Context,
-	descriptor *stroppy.InsertDescriptor,
-	txStart time.Time,
-) (*stroppy.DriverTransactionStat, error) {
-	queryStart := time.Now()
+	builder *queries.QueryBuilder,
+) (*stats.Query, error) {
+	start := time.Now()
 
-	gen, err := queries.NewQueryBuilder(d.logger, 0, descriptor)
-	if err != nil {
-		return nil, fmt.Errorf("can't create query builder: %w", err)
-	}
+	values := make([]any, len(builder.Columns()))
+	query := builder.SQL()
 
 	// Execute multiple inserts
-	for range descriptor.GetCount() {
-		query, values, err := gen.Build()
-		if err != nil {
+	for range builder.Count() {
+		if err := builder.Build(values); err != nil {
 			return nil, fmt.Errorf("can't build query due to: %w", err)
 		}
 
-		_, err = d.pgxPool.Exec(ctx, query, values...)
-		if err != nil {
+		if _, err := d.pgxPool.Exec(ctx, query, values...); err != nil {
 			return nil, fmt.Errorf("error to execute query due to: %w", err)
 		}
 	}
 
-	return &stroppy.DriverTransactionStat{
-		IsolationLevel: stroppy.TxIsolationLevel_UNSPECIFIED,
-		ExecDuration:   durationpb.New(time.Since(txStart)),
-		Queries: []*stroppy.DriverQueryStat{{
-			Name:         descriptor.GetTableName(),
-			ExecDuration: durationpb.New(time.Since(queryStart)),
-		}},
-	}, nil
+	return &stats.Query{Elapsed: time.Since(start)}, nil
 }
 
 // insertValuesCopyFrom uses PostgreSQL's COPY protocol for fast bulk insertion.
@@ -77,39 +68,15 @@ func (d *Driver) insertValuesPlainQuery(
 // for very large counts. Values are generated as the COPY protocol requests them.
 func (d *Driver) insertValuesCopyFrom(
 	ctx context.Context,
-	descriptor *stroppy.InsertDescriptor,
-	txStart time.Time,
-) (*stroppy.DriverTransactionStat, error) {
-	// Get column names
-	cols := make([]string, 0, len(descriptor.GetParams()))
-	for _, p := range descriptor.GetParams() {
-		cols = append(cols, p.GetName())
-	}
+	builder *queries.QueryBuilder,
+) (*stats.Query, error) {
+	cols := builder.Columns()
+	stream := newStreamingCopySource(builder)
+	start := time.Now()
 
-	for _, g := range descriptor.GetGroups() {
-		for _, p := range g.GetParams() {
-			cols = append(cols, p.GetName())
-		}
-	}
-
-	queryStart := time.Now()
-
-	stream, err := newStreamingCopySource(d, descriptor)
-	if err != nil {
-		return nil, fmt.Errorf("can't create copy source: %w", err)
-	}
-
-	_, err = d.pgxPool.CopyFrom(ctx, pgx.Identifier{descriptor.GetTableName()}, cols, stream)
-	if err != nil {
+	if _, err := d.pgxPool.CopyFrom(ctx, pgx.Identifier{builder.TableName()}, cols, stream); err != nil {
 		return nil, err
 	}
 
-	return &stroppy.DriverTransactionStat{
-		IsolationLevel: stroppy.TxIsolationLevel_UNSPECIFIED,
-		ExecDuration:   durationpb.New(time.Since(txStart)),
-		Queries: []*stroppy.DriverQueryStat{{
-			Name:         descriptor.GetTableName(),
-			ExecDuration: durationpb.New(time.Since(queryStart)),
-		}},
-	}, nil
+	return &stats.Query{Elapsed: time.Since(start)}, nil
 }

@@ -12,29 +12,31 @@ var (
 	ErrNoParamGen       = errors.New("no generator for parameter")
 	ErrUnknownParamType = errors.New("unknown parameter value type")
 	ErrNilProtoValue    = errors.New("nil proto value type for parameter")
+	ErrWrongLength      = errors.New("len(valuesOut) != len(paramsValues)")
 )
 
 type (
-	GeneratorID string
+	GeneratorID = string
 	Generators  = map[GeneratorID]generate.ValueGenerator
 )
 
 func GenParamValues(
 	genIDs []GeneratorID,
 	generators Generators,
-) ([]any, error) {
+	valuesOut []any,
+) error {
 	var paramsValues []*stroppy.Value
 
 	for _, genID := range genIDs {
 		gen, ok := generators[genID]
 
 		if !ok {
-			return nil, fmt.Errorf("%w: '%s'", ErrNoParamGen, genID)
+			return fmt.Errorf("%w: '%s'", ErrNoParamGen, genID)
 		}
 
 		protoValue, err := gen.Next()
 		if err != nil {
-			return nil, fmt.Errorf(
+			return fmt.Errorf(
 				"failed to generate value for parameter '%s': %w",
 				genID,
 				err,
@@ -43,7 +45,7 @@ func GenParamValues(
 
 		switch actual := protoValue.GetType().(type) {
 		case nil:
-			return nil, fmt.Errorf("%w: %s", ErrNilProtoValue, genID)
+			return fmt.Errorf("%w: %s", ErrNilProtoValue, genID)
 		case *stroppy.Value_List_:
 			paramsValues = append(paramsValues, actual.List.GetValues()...)
 		case *stroppy.Value_Bool,
@@ -61,20 +63,21 @@ func GenParamValues(
 			*stroppy.Value_Uuid:
 			paramsValues = append(paramsValues, protoValue)
 		default:
-			return nil, fmt.Errorf("%w: '%T': value is '%v'", ErrUnknownParamType, actual, actual)
+			return fmt.Errorf("%w: '%T': value is '%v'", ErrUnknownParamType, actual, actual)
 		}
 	}
 
-	var (
-		plainValues = make([]any, len(paramsValues))
-		err         error
-	)
+	if len(valuesOut) != len(paramsValues) {
+		return fmt.Errorf("%d != %d: %w", len(valuesOut), len(paramsValues), ErrWrongLength)
+	}
+
+	var err error
 	for i := range paramsValues {
-		plainValues[i], err = ValueToPgxValue(paramsValues[i])
+		valuesOut[i], err = ValueToAny(paramsValues[i])
 		if err != nil {
-			return nil, fmt.Errorf("can't convert [%d] = %v, due to: %w", i, paramsValues, err)
+			return fmt.Errorf("can't convert [%d] = %v, due to: %w", i, paramsValues, err)
 		}
 	}
 
-	return plainValues, nil
+	return nil
 }

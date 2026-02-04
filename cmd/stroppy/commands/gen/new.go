@@ -22,7 +22,7 @@ const (
 	presetFlagName  = "preset"
 )
 
-var Cmd = &cobra.Command{ //nolint: gochecknoglobals
+var Cmd = &cobra.Command{
 	Use:   "gen",
 	Short: "Generate stroppy development environment",
 	Long: fmt.Sprintf(`
@@ -133,7 +133,7 @@ Examples:
 	},
 }
 
-func init() { //nolint: gochecknoinits // allow in cmd
+func init() {
 	Cmd.PersistentFlags().String(
 		workdirFlagName,
 		".",

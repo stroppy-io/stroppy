@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	nonStrict = protojson.UnmarshalOptions{DiscardUnknown: true}  //nolint: gochecknoglobals
-	strict    = protojson.UnmarshalOptions{DiscardUnknown: false} //nolint: gochecknoglobals
+	nonStrict = protojson.UnmarshalOptions{DiscardUnknown: true}
+	strict    = protojson.UnmarshalOptions{DiscardUnknown: false}
 )
 
 // Marshal writes the given proto.Message in YAML format.

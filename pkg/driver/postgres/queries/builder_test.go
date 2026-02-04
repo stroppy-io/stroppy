@@ -74,7 +74,7 @@ func TestValueToPgxValue_AllTypes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ValueToPgxValue(tt.val)
+			_, err := ValueToAny(tt.val)
 			require.NoError(t, err)
 		})
 	}
@@ -83,14 +83,14 @@ func TestValueToPgxValue_AllTypes(t *testing.T) {
 func TestValueToPgxValue_Unsupported(t *testing.T) {
 	val := &stroppy.Value{Type: &stroppy.Value_Struct_{Struct: &stroppy.Value_Struct{}}}
 
-	_, err := ValueToPgxValue(val)
+	_, err := ValueToAny(val)
 	require.Error(t, err)
 }
 
 func TestValueToPgxValue_DecimalNil(t *testing.T) {
 	val := &stroppy.Value{Type: &stroppy.Value_Decimal{Decimal: nil}}
 
-	result, err := ValueToPgxValue(val)
+	result, err := ValueToAny(val)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 }
@@ -98,39 +98,39 @@ func TestValueToPgxValue_DecimalNil(t *testing.T) {
 func TestValueToPgxValue_DecimalInvalid(t *testing.T) {
 	val := &stroppy.Value{Type: &stroppy.Value_Decimal{Decimal: &stroppy.Decimal{Value: "invalid"}}}
 
-	_, err := ValueToPgxValue(val)
+	_, err := ValueToAny(val)
 	require.Error(t, err)
 }
 
 func TestValueToPgxValue_UuidInvalid(t *testing.T) {
 	val := &stroppy.Value{Type: &stroppy.Value_Uuid{Uuid: &stroppy.Uuid{Value: "invalid-uuid"}}}
 
-	_, err := ValueToPgxValue(val)
+	_, err := ValueToAny(val)
 	require.Error(t, err)
 }
 
 func TestValueToPgxValue_ReturnValues(t *testing.T) {
 	// Тест для int32
 	int32Val := &stroppy.Value{Type: &stroppy.Value_Int32{Int32: 42}}
-	result, err := ValueToPgxValue(int32Val)
+	result, err := ValueToAny(int32Val)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
 	// Тест для string
 	stringVal := &stroppy.Value{Type: &stroppy.Value_String_{String_: "test"}}
-	result, err = ValueToPgxValue(stringVal)
+	result, err = ValueToAny(stringVal)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
 	// Тест для bool
 	boolVal := &stroppy.Value{Type: &stroppy.Value_Bool{Bool: true}}
-	result, err = ValueToPgxValue(boolVal)
+	result, err = ValueToAny(boolVal)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
 	// Тест для null
 	nullVal := &stroppy.Value{Type: &stroppy.Value_Null{}}
-	result, err = ValueToPgxValue(nullVal)
+	result, err = ValueToAny(nullVal)
 	require.NoError(t, err)
 	require.Nil(t, result)
 }
