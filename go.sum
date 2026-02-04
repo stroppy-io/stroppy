@@ -71,6 +71,10 @@ github.com/pashagolub/pgxmock/v2 v2.12.0 h1:IVRmQtVFNCoq7NOZ+PdfvB6fwnLJmEuWDhnc
 github.com/pashagolub/pgxmock/v2 v2.12.0/go.mod h1:D3YslkN/nJ4+umVqWmbwfSXugJIjPMChkGBG47OJpNw=
 github.com/pashagolub/pgxmock/v4 v4.8.0 h1:RBtNUZXNG/ZwyOT7sJdSEx9RlAw19sgVPlnmEdlpT08=
 github.com/pashagolub/pgxmock/v4 v4.8.0/go.mod h1:9L57pC193h2aKRHVyiiE817avasIPZnPwPlw3JczWvM=
+github.com/picodata/picodata-go v1.0.0 h1:7YLJNOF+7dGIj7YC4k+N09lWC9kzfEhI7Ei8N7U84z0=
+github.com/picodata/picodata-go v1.0.0/go.mod h1:XjBlGTF19NiuPX1+2XhyXZOQoh79nPH4y6JnP+MUHlE=
+github.com/picodata/picodata-go v1.1.0 h1:vP6uUEG9O6d7RcYqe1Af5tR6pNsUjZV3AOyoRvjITU4=
+github.com/picodata/picodata-go v1.1.0/go.mod h1:XjBlGTF19NiuPX1+2XhyXZOQoh79nPH4y6JnP+MUHlE=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
