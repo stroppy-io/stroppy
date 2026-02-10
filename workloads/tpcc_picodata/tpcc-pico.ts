@@ -122,8 +122,8 @@ export function setup() {
     throw new Error("Driver not initialized");
   }
   NotifyStep("create_schema", Status.STATUS_RUNNING);
-  sections["drop_schema"].forEach((query) => driver.runQuery(query.sql, {}));
-  sections["create_schema"].forEach((query) => driver.runQuery(query.sql, {}));
+  sections["drop_schema"].forEach((query) => driver!.runQuery(query.sql, {}));
+  sections["create_schema"].forEach((query) => driver!.runQuery(query.sql, {}));
   NotifyStep("create_schema", Status.STATUS_COMPLETED);
 
   NotifyStep("load_data", Status.STATUS_RUNNING);
@@ -275,12 +275,14 @@ export function new_order() {
   const c_id = newOrderCustomerGen.next();
   const ol_cnt = newOrderOlCntGen.next();
 
+
+  // TODO (BUG): TMP table not found
   // Get customer and warehouse info
-  driver!.runQuery(getQuery("neword_get_customer_warehouse"), {
-    w_id,
-    d_id,
-    c_id,
-  });
+  // driver!.runQuery(getQuery("neword_get_customer_warehouse"), {
+  //   w_id,
+  //   d_id,
+  //   c_id,
+  // });
 
   // Get district info and next order ID
   const districtResult = driver!.runQuery(getQuery("neword_get_district"), {
@@ -297,18 +299,21 @@ export function new_order() {
   const entry_d = newOrderEntryDateGen.next();
 
   // // Insert order
+  // TODO: Duplicate key exists
   driver!.runQuery(getQuery("neword_insert_order"), {
     o_id,
     d_id,
     w_id,
     c_id,
-    entry_d,
     ol_cnt,
     all_local: 1,
   });
 
   // Insert new order
-  // driver!.runQuery(getQuery("neword_insert_new_order"), { o_id, d_id, w_id });
+  // TODO: Duplicate key exists in unique index \\\"1029_pkey\\\" in space \\\"new_order\\\" with 
+  // old tuple - [3001, 6, 1, 1824] 
+  // new tuple - [3001, 6, 1, 1824]\",
+  driver!.runQuery(getQuery("neword_insert_new_order"), { o_id, d_id, w_id });
 
   // Process order lines
   for (let ol_number = 1; ol_number <= ol_cnt; ol_number++) {
@@ -342,17 +347,20 @@ export function new_order() {
 
     // Insert order line
     const ol_amount = ol_quantity * i_price;
-    // driver!.runQuery(getQuery("neword_insert_order_line"), {
-    //   o_id,
-    //   d_id,
-    //   w_id,
-    //   ol_number,
-    //   i_id,
-    //   supply_w_id,
-    //   quantity: ol_quantity,
-    //   amount: ol_amount,
-    //   dist_info: s_dist,
-    // });
+    // TODO: Duplicate key exists in unique index \\\"1031_pkey\\\" in space \\\"order_line\\\" 
+    // with old tuple - [3001, 3, 1, 5, 2379, 25105, 1, null, 5, 50, \\\"0IcK0pEnSSSyR280ruY0l7ox\\\"] and 
+    // new tuple - [3001, 3, 1, 5, 2379, 25105, 1, null, 5, 50, xxxxxxxxxxx]
+    driver!.runQuery(getQuery("neword_insert_order_line"), {
+      o_id,
+      d_id,
+      w_id,
+      ol_number,
+      i_id,
+      supply_w_id,
+      quantity: ol_quantity,
+      amount: ol_amount,
+      dist_info: s_dist,
+    });
   }
 }
 
@@ -367,57 +375,60 @@ const paymentDateGen = NewGenByRule(16, G.datetimeConst(new Date()));
 const paymentDataGen = NewGenByRule(17, G.str(12, 24, AB.enSpc));
 
 export function payments() {
-  const w_id = paymentWarehouseGen.next();
-  const d_id = paymentDistrictGen.next();
-  const c_w_id = paymentCustomerWarehouseGen.next();
-  const c_d_id = paymentCustomerDistrictGen.next();
-  const c_id = paymentCustomerGen.next();
-  const amount = paymentAmountGen.next();
+  const h_w_id = paymentWarehouseGen.next();
+  const h_d_id = paymentDistrictGen.next();
+  const h_c_w_id = paymentCustomerWarehouseGen.next() + Math.random() * 100;
+  const h_c_d_id = Math.random() * 100;
+  const h_c_id = Math.random() * 100;
+  const h_amount = paymentAmountGen.next();
 
   // Update warehouse YTD
-  driver!.runQuery(getQuery("payment_update_warehouse"), { amount, w_id });
+  driver!.runQuery(getQuery("payment_update_warehouse"), { h_amount, h_w_id });
 
   // Get warehouse info
-  const warehouseResult = driver!.runQuery(getQuery("payment_get_warehouse"), { w_id });
+  const warehouseResult = driver!.runQuery(getQuery("payment_get_warehouse"), { h_w_id });
   const warehouseRows = getRows(warehouseResult);
-  const w_name = warehouseRows[0]?.[0] || "";
+  // const w_name = warehouseRows[0]?.[0] || "";
+  const w_name = "";
 
-  // Update district YTD
-  driver!.runQuery(getQuery("payment_update_district"), { amount, w_id, d_id });
+  // // Update district YTD
+  driver!.runQuery(getQuery("payment_update_district"), { h_amount, h_w_id, h_d_id });
 
   // Get district info
-  const payDistrictResult = driver!.runQuery(getQuery("payment_get_district"), { w_id, d_id });
-  const payDistrictRows = getRows(payDistrictResult);
-  const d_name = payDistrictRows[0]?.[0] || "";
+  const payDistrictResult = driver!.runQuery(getQuery("payment_get_district"), { h_w_id, h_d_id });
+  // const payDistrictRows = getRows(payDistrictResult);
+  // const d_name = payDistrictRows[0]?.[0] || "";
+  const d_name = "";
 
   // Get customer by ID (simplified - not using byname lookup)
   driver!.runQuery(getQuery("payment_get_customer_by_id"), {
-    w_id: c_w_id,
-    d_id: c_d_id,
-    c_id,
+    h_w_id: h_c_w_id,
+    d_id: h_c_d_id,
+    h_c_id,
   });
 
   // Update customer
   driver!.runQuery(getQuery("payment_update_customer"), {
-    amount,
-    w_id: c_w_id,
-    d_id: c_d_id,
-    c_id,
+    h_amount,
+    w_id: h_c_w_id,
+    d_id: h_c_d_id,
+    h_c_id,
   });
 
   // Insert history
-  const h_date = paymentDateGen.next();
   const h_data = w_name && d_name ? `${w_name}    ${d_name}` : paymentDataGen.next();
-  // driver!.runQuery(getQuery("payment_insert_history"), {
-  //   c_d_id,
-  //   c_w_id,
-  //   c_id,
-  //   d_id,
-  //   w_id,
-  //   h_date,
-  //   amount,
-  //   h_data,
-  // });
+  // TODO: Duplicate key exists
+  // [1626, 772, 51, 36, 5, 1, 2026-02-09T19:24:51.759100+0300, 2500.8426686648672, \\\"RJooX K    Q  Ia\\\"] 
+  // [1626, 772, 62, 35, 7, 1, 2026-02-09T19:24:53.374796+0300, 2074.144565052724, \\\"LP  vPCnc   dLXl  l\\\"]\"
+  driver!.runQuery(getQuery("payment_insert_history"), {
+    h_c_id,
+    h_c_d_id,
+    h_c_w_id,
+    h_d_id,
+    h_w_id,
+    h_amount,
+    h_data,
+  });
 }
 
 // Order Status Transaction
@@ -468,7 +479,7 @@ export function delivery() {
     const newOrderRows = getRows(newOrderResult);
     const o_id = newOrderRows[0]?.[0];
 
-    if (!o_id) continue;
+    // if (!o_id) continue;
 
     // Delete new order
     driver!.runQuery(getQuery("delivery_delete_new_order"), { o_id, d_id, w_id });
@@ -539,13 +550,13 @@ export function stock_level() {
   const min_o_id = next_o_id - 20;
 
   // Count low stock items
-  // driver!.runQuery(getQuery("slev_stock_count"), {
-  //   w_id,
-  //   d_id,
-  //   next_o_id,
-  //   min_o_id,
-  //   threshold,
-  // });
+  driver!.runQuery(getQuery("slev_stock_count"), {
+    w_id,
+    d_id,
+    next_o_id,
+    min_o_id,
+    threshold,
+  });
 }
 
 export function teardown() {

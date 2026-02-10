@@ -1,6 +1,22 @@
 --+ drop_schema
---= drop tables
-DROP TABLE order_line;DROP TABLE new_order;DROP TABLE orders;DROP TABLE history;DROP TABLE stock;DROP TABLE customer;DROP TABLE district;DROP TABLE warehouse;DROP TABLE item;
+--= query
+DROP TABLE IF EXISTS order_line;
+--= query
+DROP TABLE IF EXISTS new_order;
+--= query
+DROP TABLE IF EXISTS orders;
+--= query
+DROP TABLE IF EXISTS history;
+--= query
+DROP TABLE IF EXISTS stock;
+--= query
+DROP TABLE IF EXISTS customer;
+--= query
+DROP TABLE IF EXISTS district;
+--= query
+DROP TABLE IF EXISTS warehouse;
+--= query
+DROP TABLE IF EXISTS item;
 
 --+ create_schema
 --= query
@@ -126,22 +142,22 @@ CREATE TABLE stock (
   s_order_cnt INTEGER,
   s_remote_cnt INTEGER,
   s_data TEXT,
-  PRIMARY KEY (s_w_id, s_i_id)
+  PRIMARY KEY (s_i_id, s_w_id)
 )
 
 --+ workload
 --= neword_get_customer_warehouse
-SELECT c_discount, c_last, c_credit, w_tax
-FROM customer
-JOIN warehouse ON warehouse.w_id = customer.c_w_id
-WHERE customer.c_w_id = :w_id AND customer.c_d_id = :d_id AND customer.c_id = :c_id
+SELECT c.c_discount, c.c_last, c.c_credit, w.w_tax
+FROM customer c
+JOIN warehouse w ON w.w_id = c.c_w_id
+WHERE c.c_w_id = :w_id AND c.c_d_id = :d_id AND c.c_id = :c_id
 --= neword_get_district
 SELECT d_next_o_id, d_tax FROM district WHERE d_id = :d_id AND d_w_id = :w_id
 --= neword_update_district
 UPDATE district SET d_next_o_id = d_next_o_id + 1 WHERE d_id = :d_id AND d_w_id = :w_id
 --= neword_insert_order
 INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
-VALUES (:o_id, :d_id, :w_id, :c_id, :entry_d, :ol_cnt, :all_local)
+VALUES (:o_id, :d_id, :w_id, :c_id, current_timestamp, :ol_cnt, :all_local)
 --= neword_insert_new_order
 INSERT INTO new_order (no_o_id, no_d_id, no_w_id) VALUES (:o_id, :d_id, :w_id)
 --= neword_get_item
@@ -179,8 +195,8 @@ WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 UPDATE customer SET c_balance = c_balance - :amount, c_ytd_payment = c_ytd_payment + :amount, c_payment_cnt = c_payment_cnt + 1, c_data = :c_data
 WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 --= payment_insert_history
-INSERT INTO history (h_c_d_id, h_c_w_id, h_c_id, h_d_id, h_w_id, h_date, h_amount, h_data)
-VALUES (:c_d_id, :c_w_id, :c_id, :d_id, :w_id, :h_date, :amount, :h_data)
+INSERT INTO history (h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data)
+VALUES (:h_c_id, :h_c_d_id, :h_c_w_id, :h_d_id, :h_w_id, current_timestamp, :h_amount, :h_data)
 
 --= ostat_count_customer_by_name
 SELECT count(c_id) FROM customer WHERE c_last = :c_last AND c_d_id = :d_id AND c_w_id = :w_id
@@ -211,6 +227,17 @@ UPDATE customer SET c_balance = c_balance + :amount, c_delivery_cnt = c_delivery
 --= slev_get_district
 SELECT d_next_o_id FROM district WHERE d_w_id = :w_id AND d_id = :d_id
 --= slev_stock_count
-SELECT COUNT(DISTINCT s_i_id) FROM order_line, stock
-WHERE ol_w_id = :w_id AND ol_d_id = :d_id AND ol_o_id < :next_o_id AND ol_o_id >= :min_o_id
-  AND s_w_id = :w_id AND s_i_id = ol_i_id AND s_quantity < :threshold
+WITH cte1 AS (
+  SELECT DISTINCT ol_i_id
+  FROM order_line
+  WHERE ol_w_id = :w_id 
+    AND ol_d_id = :d_id 
+    AND ol_o_id >= :min_o_id 
+    AND ol_o_id < :next_o_id
+)
+SELECT COUNT(*)
+FROM cte1
+JOIN stock 
+  ON s_i_id = ol_i_id 
+  AND s_w_id = :w_id
+WHERE s_quantity < :threshold
