@@ -18,7 +18,7 @@ func NewCloudClient(lg *zap.Logger) (ulid.ULID, stroppyconnect.CloudStatusServic
 
 	// Check if cloud integration is configured
 	if cloudURL == "" || runULIDString == "" {
-		lg.Warn("cloud integration disabled - missing STROPPY_CLOUD_URL or STROPPY_CLOUD_RUN_ID")
+		lg.Debug("cloud integration disabled - missing STROPPY_CLOUD_URL or STROPPY_CLOUD_RUN_ID")
 		return ulid.ULID{}, &noopCloudClient{}
 	}
 	runULID, err := ulid.Parse(runULIDString)

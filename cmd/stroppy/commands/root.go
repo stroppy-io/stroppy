@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"go.k6.io/k6/cmd/state"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/gen"
@@ -40,6 +41,15 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func Root() *cobra.Command {
+	return rootCmd
+}
+
+func K6Subcommand(gs *state.GlobalState) *cobra.Command {
+	inteceptInteruptSignals(gs)
+	return rootCmd
 }
 
 func init() {

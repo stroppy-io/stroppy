@@ -226,7 +226,7 @@ K6_OUT_FILE=$(CURDIR)/build/stroppy-k6
 build-k6: # Build k6 module
 	mkdir -p $(CURDIR)/build
 	CGO_ENABLED=0 XK6_RACE_DETECTOR=0 PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
-		--k6-version v1.5.0 \
+		--k6-version v1.6.0 \
 		--with github.com/stroppy-io/stroppy/cmd/xk6air=./cmd/xk6air/ \
 		--replace github.com/stroppy-io/stroppy=./ \
 		--with github.com/oleiade/xk6-encoding@v0.0.0-20251120082946-fbe7a8cbb88e \
@@ -238,7 +238,7 @@ build-k6-debug: # Build k6 module
 	mkdir -p $(CURDIR)/build
 	GOPROXY=$(GOPROXY) \
 	PATH=$(LOCAL_BIN)/xk6:$(PATH) xk6 build --verbose \
-		--k6-version v1.5.0 \
+		--k6-version v1.6.0 \
 		--with github.com/stroppy-io/stroppy/cmd/xk6air=./cmd/xk6air/ \
 		--replace github.com/stroppy-io/stroppy=./ \
 		--with github.com/oleiade/xk6-encoding@v0.0.0-20251120082946-fbe7a8cbb88e \
@@ -295,8 +295,8 @@ run-tpcb-test:
 .PHONY: run-tpcc-test
 run-tpcc-test:
 	rm -rf dev
-	./build/stroppy gen --workdir dev --preset=tpcc
-	cd dev && DURATION="1s" SCALE_FACTOR=1 ./stroppy run tpcc.ts tpcc.sql
+	./build/stroppy-k6 x stroppy gen --workdir dev --preset=tpcc
+	cd dev && DURATION="1s" SCALE_FACTOR=1 ./stroppy-k6 x stroppy run tpcc.ts tpcc.sql
 
 .PHONY: run-tpcds-test
 run-tpcds-test:

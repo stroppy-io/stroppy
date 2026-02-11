@@ -89,7 +89,7 @@ Examples:
 			return fmt.Errorf("failed to get self binary path: %w", err)
 		}
 
-		pathToWriteItself := path.Join(output, "stroppy")
+		pathToWriteItself := path.Join(output, filepath.Base(execPath))
 		absTo, errTo := filepath.Abs(filepath.Clean(pathToWriteItself))
 		absFrom, errFrom := filepath.Abs(filepath.Clean(execPath))
 		if err = cmp.Or(errTo, errFrom); err != nil {

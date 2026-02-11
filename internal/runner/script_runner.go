@@ -5,19 +5,17 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
-	"syscall"
-	"time"
+	"strings"
 
+	k6cmd "go.k6.io/k6/cmd"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/internal/static"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/common/shutdown"
 )
 
 // ScriptRunner runs TypeScript benchmark scripts with k6.
@@ -196,7 +194,7 @@ func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut 
 	}
 
 	if export.GetOtlpGrpcEndpoint() != "" {
-		envs = append(envs,
+		envs = append(envs, // grpc is default http_exporter_type
 			"K6_OTEL_GRPC_EXPORTER_INSECURE="+insecure,
 			"K6_OTEL_GRPC_EXPORTER_ENDPOINT="+export.GetOtlpGrpcEndpoint(),
 		)
@@ -209,44 +207,57 @@ func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut 
 		)
 	}
 
-	args = append(args, "--out", "experimental-opentelemetry")
+	args = append(args, "--out", "opentelemetry")
 
 	return args, envs
 }
 
 // runK6Binary executes the k6 binary.
-func (r *ScriptRunner) runK6Binary(ctx context.Context, args, envs []string) error {
-	workdir := r.tempDir
-	binaryPath := path.Join(workdir, static.K6PluginFileName.String())
-
-	binExec := exec.CommandContext(ctx, binaryPath, args...)
-	binExec.Env = envs
-	binExec.Dir = workdir
-	binExec.Stdout = os.Stdout
-	binExec.Stderr = os.Stderr
-
-	if err := binExec.Start(); err != nil {
-		return fmt.Errorf("failed to start k6: %w", err)
+func (r *ScriptRunner) runK6Binary(
+	_ context.Context,
+	args, envs []string,
+) error {
+	// dump state
+	argsBefore := os.Args
+	envsBefore := os.Environ()
+	dirBefore, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working dir: %w", err)
 	}
 
-	r.logger.Debug("Started k6", zap.String("cmd", binExec.String()))
+	// set new state
+	if err := SetEnvs(envs); err != nil {
+		return fmt.Errorf("failed to set eniroments for k6: %w", err)
+	}
+	if err := os.Chdir(r.tempDir); err != nil {
+		return fmt.Errorf("failed cd to temporary %q: %w", r.tempDir, err)
+	}
+	os.Args = append([]string{"k6"}, args...)
 
-	// Register shutdown handler
-	shutdown.RegisterFn(func() {
-		if err := binExec.Process.Signal(syscall.SIGTERM); err != nil {
-			r.logger.Error("Error sending SIGTERM to k6", zap.Error(err))
+	// run the test
+	k6cmd.Execute()
+
+	// restore state
+	os.Clearenv()
+	if err := SetEnvs(envsBefore); err != nil {
+		return fmt.Errorf("failed to restore eniroments: %w", err)
+	}
+	if err := os.Chdir(dirBefore); err != nil {
+		return fmt.Errorf("failed cd origin %q: %w", dirBefore, err)
+	}
+	os.Args = argsBefore
+	return nil
+}
+
+func SetEnvs(envs []string) error {
+	for _, env := range envs {
+		kv := strings.SplitN(env, "=", 2)
+		if _, present := os.LookupEnv(kv[0]); present {
+			continue // do not override user envs
 		}
-
-		time.Sleep(1 * time.Second)
-
-		if binExec.ProcessState == nil || !binExec.ProcessState.Exited() {
-			r.logger.Error("k6 did not terminate gracefully, killing...")
-
-			if err := binExec.Process.Kill(); err != nil {
-				r.logger.Error("Error killing k6", zap.Error(err))
-			}
+		if err := os.Setenv(kv[0], kv[1]); err != nil {
+			return fmt.Errorf("failed to setenv '%s=%s': %w", kv[0], kv[1], err)
 		}
-	})
-
-	return binExec.Wait()
+	}
+	return nil
 }
