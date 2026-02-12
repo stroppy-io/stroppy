@@ -21,7 +21,7 @@ Download the latest release from [GitHub Releases](https://github.com/stroppy-io
 Pull the pre-built Docker image:
 
 ```bash
-docker pull stroppy-io/stroppy:latest
+docker pull ghcr.io/stroppy-io/stroppy:latest
 ```
 
 Or build from source:
@@ -35,7 +35,7 @@ docker build -t stroppy .
 Build requirements:
 - Go 1.24.3+
 
-```
+```bash
 make build
 ```
 
@@ -45,7 +45,7 @@ The binary will be available at `./build/stroppy`.
 
 ### Generate Test Workspace
 
-```
+```bash
 # Generate workspace with preset
 
 stroppy gen --workdir mytest --preset=simple
@@ -68,21 +68,17 @@ This creates a new directory with:
 
 ### Install Dependencies
 
-```
+```bash
 cd mytest
 npm install
 ```
 
 ### Run Tests
 
-```
-# Run simple test
+```bash
+# Run simple test (on local postgres by default)
 
-./stroppy run simple.ts
-
-# Run SQL execution test
-
-./stroppy run execute_sql.ts tpcb_mini.sql
+./stroppy run workloads/simple/simple.ts
 ```
 
 ## Developing Test Scripts
@@ -98,7 +94,30 @@ Look at  `simple.ts` and `tpcds.ts` first as a reference.
 
 ## Docker Usage
 
-### Quick Start
+### Using Built-in Workloads
+
+```bash
+# Pull the image
+docker pull ghcr.io/stroppy-io/stroppy:latest
+
+# Run image directly
+# Access to localhost    | Image                    | command args to stroppy
+docker run --network host ghcr.io/stroppy-io/stroppy run /workloads/simple/simple.ts
+
+# or add the tag to image
+docker tag ghcr.io/stroppy-io/stroppy stroppy
+
+# and simply call by tag ---v 
+docker run --network host stroppy run /workloads/simple/simple.ts
+
+# use custom url
+docker run -e DRIVER_URL="postgres://user:password@host:5432/dbname" \
+  stroppy run /workloads/tpcb/tpcb.ts /workloads/tpcb/tpcb.sql
+```
+
+Available workloads: `simple`, `tpcb`, `tpcc`, `tpcds`
+
+### Create Persistent Workdir
 
 ```bash
 # Generate workspace
@@ -108,15 +127,6 @@ cd mytest
 # Run test
 docker run -v $(pwd):/workspace stroppy run simple.ts
 ```
-
-### Using Built-in Workloads
-
-```bash
-docker run -e DRIVER_URL="postgres://user:password@host:5432/dbname" \
-  stroppy run /workloads/tpcb/tpcb.ts /workloads/tpcb/tpcb.sql
-```
-
-Available workloads: `simple`, `tpcb`, `tpcc`, `tpcds`
 
 ## Advanced Usage
 
@@ -153,7 +163,7 @@ Build requirements:
 - Node.js and npm
 - git, curl, unzip
 
-```
+```bash
 # Install binary dependencies
 
 make install-bin-deps
@@ -161,10 +171,6 @@ make install-bin-deps
 # Build protocol buffers and ts framework bundle
 
 make proto
-
-# Build k6 with stroppy extensions
-
-make build-k6
 
 # Build stroppy binary
 

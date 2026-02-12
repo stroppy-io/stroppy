@@ -235,9 +235,6 @@ K6_COMMON_FLAGS := --verbose \
 		--with github.com/oleiade/xk6-encoding@v0.0.0-20251120082946-fbe7a8cbb88e \
 		--output $(K6_OUT_FILE)
 
-# Use xk6 from the local bin if present, use one from path if not
-build-k6 build-k6-debug: PATH := $(LOCAL_BIN)/xk6:$(PATH)
-
 build-k6: # Build k6 module
 	@mkdir -p $(CURDIR)/build
 
