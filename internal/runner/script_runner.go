@@ -235,7 +235,7 @@ func (r *ScriptRunner) runK6Binary(
 	os.Args = append([]string{"k6"}, args...)
 
 	// run the test
-	k6cmd.Execute()
+	k6cmd.Execute() // TODO: add exit code processing
 
 	// restore state
 	os.Clearenv()
