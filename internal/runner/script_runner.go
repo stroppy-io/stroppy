@@ -220,18 +220,21 @@ func (r *ScriptRunner) runK6Binary(
 	// dump state
 	argsBefore := os.Args
 	envsBefore := os.Environ()
+
 	dirBefore, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get working dir: %w", err)
 	}
 
 	// set new state
-	if err := SetEnvs(envs); err != nil {
+	if err := setEnvs(envs); err != nil {
 		return fmt.Errorf("failed to set eniroments for k6: %w", err)
 	}
+
 	if err := os.Chdir(r.tempDir); err != nil {
 		return fmt.Errorf("failed cd to temporary %q: %w", r.tempDir, err)
 	}
+
 	os.Args = append([]string{"k6"}, args...)
 
 	// run the test
@@ -239,25 +242,37 @@ func (r *ScriptRunner) runK6Binary(
 
 	// restore state
 	os.Clearenv()
-	if err := SetEnvs(envsBefore); err != nil {
+
+	if err := setEnvs(envsBefore); err != nil {
 		return fmt.Errorf("failed to restore eniroments: %w", err)
 	}
+
 	if err := os.Chdir(dirBefore); err != nil {
 		return fmt.Errorf("failed cd origin %q: %w", dirBefore, err)
 	}
+
 	os.Args = argsBefore
+
 	return nil
 }
 
-func SetEnvs(envs []string) error {
+// setEnvs set environment variables in [os.Environ] compatible format.
+// If env already exists then do nothig.
+func setEnvs(envs []string) error {
 	for _, env := range envs {
-		kv := strings.SplitN(env, "=", 2)
-		if _, present := os.LookupEnv(kv[0]); present {
+		const keyPlusValue = 2
+
+		kv := strings.SplitN(env, "=", keyPlusValue)
+
+		key, value := kv[0], kv[1]
+		if _, present := os.LookupEnv(key); present {
 			continue // do not override user envs
 		}
-		if err := os.Setenv(kv[0], kv[1]); err != nil {
-			return fmt.Errorf("failed to setenv '%s=%s': %w", kv[0], kv[1], err)
+
+		if err := os.Setenv(key, value); err != nil {
+			return fmt.Errorf("failed to setenv '%s=%s': %w", key, value, err)
 		}
 	}
+
 	return nil
 }

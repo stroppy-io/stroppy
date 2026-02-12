@@ -51,6 +51,7 @@ func Root() *cobra.Command {
 func K6Subcommand(gs *state.GlobalState) *cobra.Command {
 	// TODO: add gs.OSExit code processing, get it to script_runner
 	inteceptInteruptSignals(gs)
+
 	return rootCmd
 }
 

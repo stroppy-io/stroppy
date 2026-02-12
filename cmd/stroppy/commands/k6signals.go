@@ -14,9 +14,10 @@ import (
 func inteceptInteruptSignals(gs *state.GlobalState) {
 	var caught sync.Map // map[chan<- os.Signal]chan struct{}
 
-	gs.SignalNotify = func(c chan<- os.Signal, signals ...os.Signal) {
+	gs.SignalNotify = func(sigChan chan<- os.Signal, signals ...os.Signal) {
 		if !slices.Contains(signals, os.Interrupt) {
-			signal.Notify(c, signals...) // do as is
+			signal.Notify(sigChan, signals...) // do as is
+
 			return
 		}
 
@@ -24,30 +25,42 @@ func inteceptInteruptSignals(gs *state.GlobalState) {
 		rest := slices.DeleteFunc(slices.Clone(signals),
 			func(s os.Signal) bool { return s == os.Interrupt })
 		if len(rest) > 0 {
-			signal.Notify(c, rest...)
+			signal.Notify(sigChan, rest...)
 		}
 
 		// check if this channel is already handled
-		if _, loaded := caught.Load(c); loaded {
+		if _, loaded := caught.Load(sigChan); loaded {
 			return
 		}
 
 		stopper := make(chan struct{}, 1)
-		caught.Store(c, stopper)
-		go doubleConfirmationSigInt(c, stopper)
+		caught.Store(sigChan, stopper)
+
+		go doubleConfirmationSigInt(sigChan, stopper)
 	}
 
-	gs.SignalStop = func(c chan<- os.Signal) {
-		if val, ok := caught.LoadAndDelete(c); ok {
-			val.(chan struct{}) <- struct{}{} // doubleConfirmation will stop its channel by itself
-			return
+	gs.SignalStop = func(sigChan chan<- os.Signal) {
+		if val, yes := caught.LoadAndDelete(sigChan); yes {
+			if stopper, ok := val.(chan struct{}); ok {
+				stopper <- struct{}{} // doubleConfirmation will stop its channel by itself
+
+				return
+			}
+
+			panic("caught sync.Map stored type corrupted")
 		}
-		signal.Stop(c)
+
+		signal.Stop(sigChan)
 	}
 }
 
-func doubleConfirmationSigInt(c chan<- os.Signal, stopper chan struct{}) {
-	sigWaiter := make(chan os.Signal, 2)
+func doubleConfirmationSigInt(sigChan chan<- os.Signal, stopper chan struct{}) {
+	const (
+		nonBlockingBufferSize = 2
+		confirmationWindow    = 5 * time.Second
+	)
+
+	sigWaiter := make(chan os.Signal, nonBlockingBufferSize)
 	signal.Notify(sigWaiter, os.Interrupt)
 
 	var confirmTimer *time.Timer
@@ -59,19 +72,24 @@ loop:
 			if confirmTimer != nil { // have timer -> second signal within 5s
 				fmt.Fprintf(os.Stdout, "\nReceived second interrupt, stopping...\n")
 				signal.Stop(sigWaiter)
-				signal.Notify(c, os.Interrupt) // restore direct signal delivery to k6
-				c <- sig                       // forward the confirming signal
+				signal.Notify(sigChan, os.Interrupt) // restore direct signal delivery to k6
+
+				sigChan <- sig // forward the confirming signal
+
 				break loop
 			}
 
 			// first signal -> set timer, ask user to confirm
 			fmt.Fprintf(os.Stdout, "\nInterrupt received. Press Ctrl+C again within 5s to stop.\n")
-			confirmTimer = time.AfterFunc(5*time.Second, func() {
+
+			confirmTimer = time.AfterFunc(confirmationWindow, func() {
 				confirmTimer = nil
+
 				fmt.Fprintf(os.Stdout, "\nConfirmation window expired. Test continues.\n")
 			})
 		case <-stopper: // release goroutine
 			signal.Stop(sigWaiter)
+
 			break loop
 		}
 	}
