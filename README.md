@@ -16,13 +16,27 @@ Database stress testing CLI tool powered by k6 workload engine.
 
 Download the latest release from [GitHub Releases](https://github.com/stroppy-io/stroppy/releases).
 
+### Docker
+
+Pull the pre-built Docker image:
+
+```bash
+docker pull stroppy-io/stroppy:latest
+```
+
+Or build from source:
+
+```bash
+docker build -t stroppy .
+```
+
 ### Build from Source
 
 Build requirements:
 - Go 1.24.3+
 
 ```
-make build-all-linux-x64
+make build
 ```
 
 The binary will be available at `./build/stroppy`.
@@ -81,6 +95,53 @@ After generating a workspace:
 4. Run with `./stroppy run <test-file>.ts`
 
 Look at  `simple.ts` and `tpcds.ts` first as a reference.
+
+## Docker Usage
+
+### Quick Start
+
+```bash
+# Generate workspace
+docker run -v $(pwd):/workspace stroppy gen --workdir mytest --preset=simple
+cd mytest
+
+# Run test
+docker run -v $(pwd):/workspace stroppy run simple.ts
+```
+
+### Using Built-in Workloads
+
+```bash
+docker run -e DRIVER_URL="postgres://user:password@host:5432/dbname" \
+  stroppy run /workloads/tpcb/tpcb.ts /workloads/tpcb/tpcb.sql
+```
+
+Available workloads: `simple`, `tpcb`, `tpcc`, `tpcds`
+
+## Advanced Usage
+
+### Using as k6 Extension
+
+Stroppy is built as a k6 extension. If you're familiar with k6, you can use the k6 binary directly to access all k6 features:
+
+```bash
+# Build both k6 and stroppy binaries
+make build
+
+# Access k6 CLI features
+./build/k6 --help
+
+# Use k6 binary directly with all k6 options
+./build/k6 run --vus 10 --duration 30s test.ts
+
+# Use k6 output options (JSON, InfluxDB, etc.)
+./build/k6 run --out json=results.json test.ts
+
+# All the stroppy commands accessible as extension
+./build/k6 x stroppy run workloads/simple/simple.ts
+```
+
+The stroppy extensions are available via `k6/x/stroppy` module in your test scripts, giving you full access to both k6 and stroppy capabilities.
 
 ## Contribution
 

@@ -28,10 +28,6 @@ jobs:
         with:
           go-version: "1.24.3"
 
-      - name: Mock files
-        run: |
-          echo ".gitkeep" | tee internal/static/stroppy-k6
-
       - name: Install linter dependencies
         run: make .install-linter
 
@@ -75,8 +71,7 @@ jobs:
       - name: Install xk6 (k6 builder)
         shell: bash
         run: |
-          go install go.k6.io/xk6@latest
-          xk6 --version
+          make .install-xk6
 
       - name: Build
         env:
@@ -84,12 +79,11 @@ jobs:
           XK6_RACE_DETECTOR: "0"
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
+          VERSION: ${{ github.ref_name }}
         run: |
-          make build-k6
+          make build
           mkdir -p "${{ steps.names.outputs.outdir }}"
-          go build -trimpath -ldflags "-s -w ${LDFLAGS}" \
-            -o "${{ steps.names.outputs.outdir }}/${{ steps.names.outputs.bin }}" \
-            "${BUILD_PATH}"
+          cp build/stroppy "${{ steps.names.outputs.outdir }}/${{ steps.names.outputs.bin }}"
 
       #  [ -f ../README.md ] && EXTRAS+=("../README.md")
       #  [ -f ../LICENSE ] && EXTRAS+=("../LICENSE")

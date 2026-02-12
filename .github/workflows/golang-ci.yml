@@ -16,10 +16,6 @@ jobs:
         with:
           go-version: "1.24.3"
 
-      - name: Mock files
-        run: |
-          echo ".gitkeep" | tee internal/static/stroppy-k6
-
       - name: Install linter dependencies
         run: make .install-linter
 
