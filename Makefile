@@ -296,7 +296,7 @@ run-tpcb-test: .rm-dev
 
 run-tpcc-test: .rm-dev
 	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcc
-	cd $(WORKDIR) && DURATION="1s" SCALE_FACTOR=1 ./stroppy x stroppy run tpcc.ts tpcc.sql
+	cd $(WORKDIR) && DURATION="1s" SCALE_FACTOR=1 ./stroppy run tpcc.ts tpcc.sql
 
 run-tpcds-test: .rm-dev
 	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcds

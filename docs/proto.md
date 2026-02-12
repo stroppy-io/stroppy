@@ -895,7 +895,6 @@ DriverQuery represents a query that can be executed by a database driver.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | Name of the query |
 | request | [string](#string) |  | Request of the query |
 | params | [Value](#stroppy-Value) | repeated | Parameters of the query |
 | method | [InsertMethod](#stroppy-InsertMethod) | optional | If alternate insertion method required |

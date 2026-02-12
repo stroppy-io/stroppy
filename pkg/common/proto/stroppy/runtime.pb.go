@@ -26,14 +26,12 @@ const (
 // DriverQuery represents a query that can be executed by a database driver.
 type DriverQuery struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Name of the query
-	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// * Request of the query
-	Request string `protobuf:"bytes,2,opt,name=request,proto3" json:"request,omitempty"`
+	Request string `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
 	// * Parameters of the query
-	Params []*Value `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty"`
+	Params []*Value `protobuf:"bytes,2,rep,name=params,proto3" json:"params,omitempty"`
 	// * If alternate insertion method required
-	Method        *InsertMethod `protobuf:"varint,4,opt,name=method,proto3,enum=stroppy.InsertMethod,oneof" json:"method,omitempty"`
+	Method        *InsertMethod `protobuf:"varint,3,opt,name=method,proto3,enum=stroppy.InsertMethod,oneof" json:"method,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -66,13 +64,6 @@ func (x *DriverQuery) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DriverQuery.ProtoReflect.Descriptor instead.
 func (*DriverQuery) Descriptor() ([]byte, []int) {
 	return file_proto_stroppy_runtime_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *DriverQuery) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
 }
 
 func (x *DriverQuery) GetRequest() string {
@@ -275,12 +266,11 @@ var File_proto_stroppy_runtime_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_runtime_proto_rawDesc = "" +
 	"\n" +
-	"\x1bproto/stroppy/runtime.proto\x12\astroppy\x1a\x1egoogle/protobuf/duration.proto\x1a\x1aproto/stroppy/common.proto\x1a\x1aproto/stroppy/config.proto\x1a\x1eproto/stroppy/descriptor.proto\"\xa2\x01\n" +
-	"\vDriverQuery\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
-	"\arequest\x18\x02 \x01(\tR\arequest\x12&\n" +
-	"\x06params\x18\x03 \x03(\v2\x0e.stroppy.ValueR\x06params\x122\n" +
-	"\x06method\x18\x04 \x01(\x0e2\x15.stroppy.InsertMethodH\x00R\x06method\x88\x01\x01B\t\n" +
+	"\x1bproto/stroppy/runtime.proto\x12\astroppy\x1a\x1egoogle/protobuf/duration.proto\x1a\x1aproto/stroppy/common.proto\x1a\x1aproto/stroppy/config.proto\x1a\x1eproto/stroppy/descriptor.proto\"\x8e\x01\n" +
+	"\vDriverQuery\x12\x18\n" +
+	"\arequest\x18\x01 \x01(\tR\arequest\x12&\n" +
+	"\x06params\x18\x02 \x03(\v2\x0e.stroppy.ValueR\x06params\x122\n" +
+	"\x06method\x18\x03 \x01(\x0e2\x15.stroppy.InsertMethodH\x00R\x06method\x88\x01\x01B\t\n" +
 	"\a_method\"\x87\x01\n" +
 	"\x11DriverTransaction\x12.\n" +
 	"\aqueries\x18\x01 \x03(\v2\x14.stroppy.DriverQueryR\aqueries\x12B\n" +
