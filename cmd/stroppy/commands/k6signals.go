@@ -6,7 +6,6 @@ import (
 	"os/signal"
 	"slices"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"go.k6.io/k6/cmd/state"
@@ -64,13 +63,13 @@ func doubleConfirmationSigInt(sigChan chan<- os.Signal, stopper chan struct{}) {
 	sigWaiter := make(chan os.Signal, nonBlockingBufferSize)
 	signal.Notify(sigWaiter, os.Interrupt)
 
-	var confirmTimer atomic.Pointer[time.Timer]
+	var confirmTimer <-chan time.Time
 
 loop:
 	for {
 		select {
 		case sig := <-sigWaiter:
-			if confirmTimer.Load() != nil { // have timer -> second signal within 5s
+			if confirmTimer != nil { // have timer -> second signal within 5s
 				fmt.Fprintf(os.Stdout, "\nReceived second interrupt, stopping...\n")
 				signal.Stop(sigWaiter)
 				signal.Notify(sigChan, os.Interrupt) // restore direct signal delivery to k6
@@ -83,14 +82,12 @@ loop:
 			// first signal -> set timer, ask user to confirm
 			fmt.Fprintf(os.Stdout, "\nInterrupt received. Press Ctrl+C again within 5s to stop.\n")
 
-			var t *time.Timer
+			confirmTimer = time.After(confirmationWindow)
 
-			t = time.AfterFunc(confirmationWindow, func() {
-				_ = confirmTimer.CompareAndSwap(t, nil)
+		case <-confirmTimer:
+			fmt.Fprintf(os.Stdout, "\nConfirmation window expired. Test continues.\n")
 
-				fmt.Fprintf(os.Stdout, "\nConfirmation window expired. Test continues.\n")
-			})
-			confirmTimer.Store(t)
+			confirmTimer = nil
 		case <-stopper: // release goroutine
 			signal.Stop(sigWaiter)
 
