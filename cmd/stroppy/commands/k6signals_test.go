@@ -20,6 +20,7 @@ func TestDoubleConfirmation_TimerExpiry(t *testing.T) {
 	stopper := make(chan struct{}, 1)
 
 	go doubleConfirmationSigInt(sigChan, stopper)
+
 	time.Sleep(50 * time.Millisecond)
 
 	// send signal to start the timer
@@ -31,6 +32,7 @@ func TestDoubleConfirmation_TimerExpiry(t *testing.T) {
 	sendInt(t)
 
 	time.Sleep(100 * time.Millisecond)
+
 	stopper <- struct{}{}
 }
 
@@ -39,6 +41,7 @@ func TestDoubleConfirmation_SuccessExit(t *testing.T) {
 	stopper := make(chan struct{}, 1)
 
 	go doubleConfirmationSigInt(sigChan, stopper)
+
 	time.Sleep(50 * time.Millisecond)
 
 	// send signal to start the timer
@@ -50,10 +53,11 @@ func TestDoubleConfirmation_SuccessExit(t *testing.T) {
 	sendInt(t)
 
 	time.Sleep(100 * time.Millisecond)
+
 	stopper <- struct{}{}
 }
 
-func TestInterceptMiddleware(t *testing.T) {
+func TestInterceptMiddleware(_ *testing.T) {
 	gs := &state.GlobalState{}
 	inteceptInteruptSignals(gs)
 
