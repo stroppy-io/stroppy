@@ -76,6 +76,7 @@ export class DriverX {
     if (results instanceof Error) {
       insertErrRateMetric.add(1, tags);
     } else {
+      insertErrRateMetric.add(0, tags);
       insertMetric.add(results.elapsed.milliseconds(), tags);
     }
 

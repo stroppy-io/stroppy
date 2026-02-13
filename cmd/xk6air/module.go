@@ -8,11 +8,13 @@ import (
 	"context"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/stroppy-io/stroppy/cmd/stroppy/commands"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy/stroppyconnect"
 
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/subcommand"
 	"go.uber.org/zap"
 )
 
@@ -34,6 +36,8 @@ func init() {
 	rootModule.runULID, rootModule.cloudClient = NewCloudClient(lg)
 
 	modules.Register("k6/x/stroppy", rootModule)
+
+	subcommand.RegisterExtension("stroppy", commands.K6Subcommand)
 }
 
 // RootModule global object for all the VU instances.

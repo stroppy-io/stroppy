@@ -2,8 +2,10 @@ package commands
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"go.k6.io/k6/cmd/state"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/gen"
@@ -15,15 +17,6 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "stroppy",
 	Short: "Tool to generate and run stress tests (e.g benchmarking) for databases",
-	Long: `
-Tool to generate and run stress tests (e.g benchmarking) for databases.
-
-Usage:
-  stroppy run <script.ts>           Run a TypeScript benchmark script
-  stroppy gen --preset <name>   Generate a development environment
-
-For more information see https://github.com/stroppy-io/stroppy`,
-	SilenceUsage: true,
 }
 
 var versionCmd = &cobra.Command{
@@ -42,12 +35,38 @@ func Execute() {
 	}
 }
 
+func Root() *cobra.Command {
+	return rootCmd
+}
+
+func K6Subcommand(gs *state.GlobalState) *cobra.Command {
+	// TODO: add gs.OSExit code processing, get it to script_runner
+	inteceptInteruptSignals(gs)
+
+	return rootCmd
+}
+
 func init() {
+	// Skip "k6 x stroppy" prefix if binary file already named as "stroppy"
+	if filepath.Base(os.Args[0]) == "stroppy" {
+		os.Args = append([]string{"k6", "x", "stroppy"}, os.Args[1:]...)
+		// [cobra.Command] help message should think that stroppy rootCmd have no parent
+		oldUsageFunc := rootCmd.UsageFunc()
+		rootCmd.SetUsageFunc(func(c *cobra.Command) error {
+			parent := rootCmd.Parent()
+			parent.RemoveCommand(rootCmd)
+
+			err := oldUsageFunc(c)
+
+			parent.AddCommand(rootCmd)
+
+			return err
+		})
+	}
+
 	cobra.EnableCommandSorting = false
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)
 
-	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(run.Cmd)
-	rootCmd.AddCommand(gen.Cmd)
+	rootCmd.AddCommand(versionCmd, run.Cmd, gen.Cmd)
 }
