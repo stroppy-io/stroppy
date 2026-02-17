@@ -33,6 +33,7 @@ const driver = DriverX.fromConfig({
   driver: {
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
     driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
+    connectionType: { is: {oneofKind:"sharedPool", sharedPool: {sharedConnections: 10}}},
     dbSpecific: {
       fields: [],
     },

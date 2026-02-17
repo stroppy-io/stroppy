@@ -30,13 +30,19 @@ type DriverWrapper struct {
 // https://github.com/grafana/k6/issues?q=is%3Aopen+is%3Aissue+label%3Anew-http
 // https://github.com/grafana/k6/issues/2293
 func (d *DriverWrapper) configure() {
-	d.configureOnce.Do(
-		func() {
-			d.drv.Configure(d.vu.Context(), driver.Options{
+	if rootModule.sharedDrv != nil {
+		rootModule.once.Do(func() {
+			rootModule.sharedDrv.Configure(rootModule.ctx, driver.Options{
 				DialFunc: d.vu.State().Dialer.DialContext,
 			})
-		},
-	)
+		})
+		return
+	}
+	d.configureOnce.Do(func() {
+		d.drv.Configure(d.vu.Context(), driver.Options{
+			DialFunc: d.vu.State().Dialer.DialContext,
+		})
+	})
 }
 
 func (d *DriverWrapper) RunQuery(sql string, args map[string]any) any {

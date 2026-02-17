@@ -33,6 +33,7 @@ type Executor interface {
 		rowSrc pgx.CopyFromSource,
 	) (int64, error)
 
+	Ping(ctx context.Context) error
 	Config() *pgxpool.Config
 	Close()
 }
@@ -49,23 +50,16 @@ func NewDriver(
 	lg *zap.Logger,
 	cfg *stroppy.DriverConfig,
 ) (d *Driver, err error) {
+
+	d = &Driver{logger: lg}
+
 	if lg == nil {
-		d = &Driver{
-			logger: logger.NewFromEnv().
-				Named(pool.DriverLoggerName).
-				WithOptions(zap.AddCallerSkip(0)),
-		}
-	} else {
-		d = &Driver{
-			logger: lg,
-		}
+		d.logger = logger.NewFromEnv().
+			Named(pool.DriverLoggerName).
+			WithOptions(zap.AddCallerSkip(0))
 	}
 
-	connPool, err := pool.NewPool(
-		ctx,
-		cfg,
-		d.logger.Named(pool.LoggerName),
-	)
+	d.pgxPool, err = pool.NewPool(ctx, cfg, d.logger.Named(pool.LoggerName))
 	if err != nil {
 		return nil, err
 	}
@@ -74,12 +68,10 @@ func NewDriver(
 
 	// TODO: make waiting optional
 	// TODO: think to float this waiting to the level of driver dispatching or k6-module
-	err = waitForDB(ctx, d.logger, connPool, dbConnectionTimeout)
+	err = waitForDB(ctx, d.logger, d.pgxPool, dbConnectionTimeout)
 	if err != nil {
 		return nil, err
 	}
-
-	d.pgxPool = connPool
 
 	return d, nil
 }

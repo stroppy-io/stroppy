@@ -5,6 +5,7 @@ package stroppy;
 import "proto/stroppy/common.proto";
 import "proto/stroppy/descriptor.proto";
 import "validate/validate.proto";
+import "google/protobuf/empty.proto";
 
 option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
 
@@ -26,6 +27,19 @@ message DriverConfig {
 
   /** Name/Type of chosen driver */
   DriverType driver_type = 3 [ (validate.rules).enum.defined_only = true ];
+
+  message ConnectionType {
+    // If shared_connections not set use drivers pool default.
+    message Pool { int32 shared_connections = 1; }
+
+    oneof is {
+      google.protobuf.Empty single_conn_per_vu = 1;
+      Pool shared_pool = 2;
+    }
+  }
+
+  // Shared connection pool vs own connection for each VU.
+  ConnectionType connection_type = 4;
 }
 
 /**
