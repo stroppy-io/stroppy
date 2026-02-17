@@ -121,6 +121,7 @@ func CreateAndInitTempDir(
 	if err := copyFile(scriptPath, path.Join(tempDir, scriptName)); err != nil {
 		return "", fmt.Errorf("failed to copy script: %w", err)
 	}
+
 	if sqlPath != "" {
 		if err := copyFile(sqlPath, path.Join(tempDir, sqlName)); err != nil {
 			return "", fmt.Errorf("failed to copy SQL file %q: %w", sqlName, err)

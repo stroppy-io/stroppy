@@ -50,7 +50,6 @@ func NewDriver(
 	lg *zap.Logger,
 	cfg *stroppy.DriverConfig,
 ) (d *Driver, err error) {
-
 	d = &Driver{logger: lg}
 
 	if lg == nil {

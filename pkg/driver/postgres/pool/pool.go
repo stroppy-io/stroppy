@@ -64,35 +64,18 @@ func parseConfig(
 		return nil, err
 	}
 
-	var cfg *pgxpool.Config
-	if config.GetConnectionType().GetSingleConnPerVu() != nil {
-		cfg, err = defaultSingleConnConfig(config.GetUrl())
-		if err != nil {
-			return nil, err
-		}
-	} else if shared := config.GetConnectionType().GetSharedPool(); shared != nil {
-		cfg, err = defaultConfig(config.GetUrl())
-		if err != nil {
-			return nil, err
-		}
-		if shared.GetSharedConnections() != 0 {
-			cfg.MaxConns = shared.SharedConnections
-			cfg.MinConns = shared.SharedConnections
-		} else {
-			logger.Info("shared_connections set to default by pgx", zap.Int32("shared_connections", cfg.MaxConns))
-		}
-	} else {
-		cfg, err = defaultConfig(config.GetUrl())
-		if err != nil {
-			return nil, err
-		}
+	cfg, err := buildConnectionConfig(config, logger)
+	if err != nil {
+		return nil, err
 	}
 
 	// Disable connection lifetime limits
 	// NOTE: unfortunately "MaxConnLifetime = 0" != "no lifetime limits".
 	// "MaxConnLifetime = 0" == spam with expired connections.
 	if !strings.Contains(config.GetUrl(), "pool_max_conn_lifetime") {
-		cfg.MaxConnLifetime = 24 * time.Hour // Nearly never
+		const oneDay = 24 * time.Hour
+
+		cfg.MaxConnLifetime = oneDay // Nearly never
 	}
 
 	err = overrideWithDBSpecific(cfg, cfgMap)
@@ -122,6 +105,41 @@ func parseConfig(
 
 		return nil
 	}
+
+	return cfg, nil
+}
+
+func buildConnectionConfig(
+	config *stroppy.DriverConfig,
+	logger *zap.Logger,
+) (*pgxpool.Config, error) {
+	connType := config.GetConnectionType()
+
+	if connType.GetSingleConnPerVu() != nil {
+		return defaultSingleConnConfig(config.GetUrl())
+	}
+
+	cfg, err := defaultConfig(config.GetUrl())
+	if err != nil {
+		return nil, err
+	}
+
+	shared := connType.GetSharedPool()
+	if shared == nil {
+		return cfg, nil
+	}
+
+	if shared.GetSharedConnections() != 0 {
+		cfg.MaxConns = shared.GetSharedConnections()
+		cfg.MinConns = shared.GetSharedConnections()
+
+		return cfg, nil
+	}
+
+	logger.Info(
+		"shared_connections set to default by pgx",
+		zap.Int32("shared_connections", cfg.MaxConns),
+	)
 
 	return cfg, nil
 }
@@ -176,6 +194,7 @@ func defaultConfig(url string) (*pgxpool.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return cfg, nil
 }
 
