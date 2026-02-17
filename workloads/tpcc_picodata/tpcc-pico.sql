@@ -73,7 +73,8 @@ CREATE TABLE customer (
 )
 --= query
 CREATE TABLE history (
-  h_c_id INTEGER PRIMARY KEY,
+  h_date_id DATETIME PRIMARY KEY,
+  h_c_id INTEGER,
   h_c_d_id INTEGER,
   h_c_w_id INTEGER,
   h_d_id INTEGER,
@@ -84,13 +85,15 @@ CREATE TABLE history (
 )
 --= query
 CREATE TABLE new_order (
+  date_id DATETIME,
   no_o_id INTEGER,
   no_d_id INTEGER,
   no_w_id INTEGER,
-  PRIMARY KEY (no_w_id, no_d_id, no_o_id)
+  PRIMARY KEY (no_w_id, no_d_id, no_o_id, date_id)
 )
 --= query
 CREATE TABLE orders (
+  date_id DATETIME,
   o_id INTEGER,
   o_d_id INTEGER,
   o_w_id INTEGER,
@@ -99,7 +102,7 @@ CREATE TABLE orders (
   o_carrier_id INTEGER,
   o_ol_cnt INTEGER,
   o_all_local INTEGER,
-  PRIMARY KEY (o_w_id, o_d_id, o_id)
+  PRIMARY KEY (o_w_id, o_d_id, o_id, date_id)
 )
 --= query
 CREATE TABLE order_line (
@@ -156,10 +159,10 @@ SELECT d_next_o_id, d_tax FROM district WHERE d_id = :d_id AND d_w_id = :w_id
 --= neword_update_district
 UPDATE district SET d_next_o_id = d_next_o_id + 1 WHERE d_id = :d_id AND d_w_id = :w_id
 --= neword_insert_order
-INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
-VALUES (:o_id, :d_id, :w_id, :c_id, current_timestamp, :ol_cnt, :all_local)
+INSERT INTO orders (date_id, o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
+VALUES (current_timestamp, :o_id, :d_id, :w_id, :c_id, current_timestamp, :ol_cnt, :all_local)
 --= neword_insert_new_order
-INSERT INTO new_order (no_o_id, no_d_id, no_w_id) VALUES (:o_id, :d_id, :w_id)
+INSERT INTO new_order (no_o_id, no_d_id, no_w_id, date_id) VALUES (:o_id, :d_id, :w_id, current_timestamp)
 --= neword_get_item
 SELECT i_price, i_name, i_data FROM item WHERE i_id = :i_id
 --= neword_get_stock
@@ -195,8 +198,8 @@ WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 UPDATE customer SET c_balance = c_balance - :amount, c_ytd_payment = c_ytd_payment + :amount, c_payment_cnt = c_payment_cnt + 1, c_data = :c_data
 WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 --= payment_insert_history
-INSERT INTO history (h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data)
-VALUES (:h_c_id, :h_c_d_id, :h_c_w_id, :h_d_id, :h_w_id, current_timestamp, :h_amount, :h_data)
+INSERT INTO history (h_date_id, h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data)
+VALUES (current_timestamp, :h_c_id, :h_c_d_id, :h_c_w_id, :h_d_id, :h_w_id, current_timestamp, :h_amount, :h_data)
 
 --= ostat_count_customer_by_name
 SELECT count(c_id) FROM customer WHERE c_last = :c_last AND c_d_id = :d_id AND c_w_id = :w_id
@@ -218,7 +221,7 @@ SELECT o_c_id FROM orders WHERE o_id = :o_id AND o_d_id = :d_id AND o_w_id = :w_
 --= delivery_update_order
 UPDATE orders SET o_carrier_id = :carrier_id WHERE o_id = :o_id AND o_d_id = :d_id AND o_w_id = :w_id
 --= delivery_update_order_line
-UPDATE order_line SET ol_delivery_d = :delivery_d WHERE ol_o_id = :o_id AND ol_d_id = :d_id AND ol_w_id = :w_id
+UPDATE order_line SET ol_delivery_d = current_timestamp WHERE ol_o_id = :o_id AND ol_d_id = :d_id AND ol_w_id = :w_id
 --= delivery_get_order_line_amount
 SELECT SUM(ol_amount) FROM order_line WHERE ol_o_id = :o_id AND ol_d_id = :d_id AND ol_w_id = :w_id
 --= delivery_update_customer
