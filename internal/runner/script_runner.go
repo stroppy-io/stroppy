@@ -117,19 +117,11 @@ func CreateAndInitTempDir(
 	scriptName := filepath.Base(scriptPath)
 	sqlName := filepath.Base(sqlPath)
 
-	if sqlPath == "" { // copy single ts file
-		if err := copyFile(scriptPath, path.Join(tempDir, scriptName)); err != nil {
-			return "", fmt.Errorf("failed to copy script: %w", err)
-		}
-	} else { // copy ts + sql + add name in variable
-		if err := copyFileWithPrepend(
-			scriptPath,
-			path.Join(tempDir, scriptName),
-			fmt.Sprintf(`const __SQL_FILE = %q;`, sqlName),
-		); err != nil {
-			return "", fmt.Errorf("failed to copy script: %w", err)
-		}
-
+	// copy single ts file
+	if err := copyFile(scriptPath, path.Join(tempDir, scriptName)); err != nil {
+		return "", fmt.Errorf("failed to copy script: %w", err)
+	}
+	if sqlPath != "" {
 		if err := copyFile(sqlPath, path.Join(tempDir, sqlName)); err != nil {
 			return "", fmt.Errorf("failed to copy SQL file %q: %w", sqlName, err)
 		}
@@ -147,15 +139,6 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, data, common.FileMode)
 }
 
-func copyFileWithPrepend(src, dst, prepend string) error {
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(dst, append([]byte(prepend), data...), common.FileMode)
-}
-
 // buildEnvVars builds environment variables for k6 execution.
 func (r *ScriptRunner) buildEnvVars() []string {
 	envs := os.Environ() // inherit parent environment
@@ -167,6 +150,10 @@ func (r *ScriptRunner) buildEnvVars() []string {
 			logger.ModeFromProtoConfig(r.config.GlobalConfig.GetLogger().GetLogMode()),
 		)
 		envs = append(envs, loggerEnvs...)
+	}
+
+	if r.sqlPath != "" {
+		envs = append(envs, "SQL_FILE="+path.Join(r.tempDir, filepath.Base(r.sqlPath)))
 	}
 
 	return envs

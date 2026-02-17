@@ -17,14 +17,17 @@ func (f FileName) String() string {
 }
 
 const (
+	StroppyDTSFileName FileName = "stroppy.d.ts"
+
+	HelpersFileName FileName = "helpers.ts"
+
+	ParseSQLTSFileName FileName = "parse_sql.ts"
+	ParseSQLJSFileName FileName = "parse_sql.js"
+
+	ProtoTSFileName FileName = "stroppy.pb.ts"
+	ProtoJSFileName FileName = "stroppy.pb.js"
+
 	PackageJSONFileName FileName = "package.json"
-	ProtoTSFileName     FileName = "stroppy.pb.ts"
-	ProtoJSFileName     FileName = "stroppy.pb.js"
-	HelpersFileName     FileName = "helpers.ts"
-	ParseSQLTSFileName  FileName = "parse_sql.ts"
-	ParseSQLJSFileName  FileName = "parse_sql.js"
-	StroppyDTSFileName  FileName = "stroppy.d.ts"
-	K6DTSFileName       FileName = "k6.d.ts"
 	TSConfigFileName    FileName = "tsconfig.json"
 )
 
@@ -34,7 +37,6 @@ var StaticFiles = []FileName{
 	HelpersFileName,
 	ParseSQLJSFileName,
 	StroppyDTSFileName,
-	K6DTSFileName,
 }
 
 // DevStaticFiles are additional files for development environment.

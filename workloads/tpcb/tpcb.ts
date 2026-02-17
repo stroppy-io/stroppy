@@ -40,7 +40,7 @@ const driver = DriverX.fromConfig({
   },
 });
 
-const sections = parse_sql_with_groups(open(__SQL_FILE));
+const sections = parse_sql_with_groups(open(__ENV.SQL_FILE));
 
 // Setup function: create schema and load data
 export function setup() {

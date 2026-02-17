@@ -36,7 +36,7 @@ const driver = DriverX.fromConfig({
   metadata: {},
 });
 
-const parsedQueries = parse_sql(open(__SQL_FILE));
+const parsedQueries = parse_sql(open(__ENV.SQL_FILE));
 
 export function setup() {
   NotifyStep("workload", Status.STATUS_RUNNING);

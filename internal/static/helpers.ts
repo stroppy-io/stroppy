@@ -15,6 +15,7 @@ import {
   Generator,
   NotifyStep,
   Driver,
+  QueryStats,
 } from "k6/x/stroppy";
 
 import { Counter, Rate, Trend } from "k6/metrics";
@@ -31,6 +32,10 @@ const insertErrRateMetric = new Rate("insert_error_rate");
 const runQueryMetric = new Trend("run_query_duration", true);
 const runQueryCounterMetric = new Counter("run_query_count");
 const runQueryErrRateMetric = new Rate("run_query_error_rate");
+
+function isQueryStats(obj: any): obj is QueryStats {
+  return typeof obj.elapsed !== "undefined"
+}
 
 export class DriverX {
   private driver: Driver;
@@ -73,11 +78,11 @@ export class DriverX {
     );
 
     const tags = { table_name: descriptor.tableName ?? "unknown" };
-    if (results instanceof Error) {
-      insertErrRateMetric.add(1, tags);
-    } else {
+    if (isQueryStats(results)) {
       insertErrRateMetric.add(0, tags);
       insertMetric.add(results.elapsed.milliseconds(), tags);
+    } else {
+      insertErrRateMetric.add(1, tags);
     }
 
     console.log(`Insertion into '${descriptor.tableName}' ended`);
@@ -96,12 +101,12 @@ export class DriverX {
       ? undefined
       : { name: sqlOrQuery.name, type: sqlOrQuery.type };
 
-    if (result instanceof Error) {
-      runQueryErrRateMetric.add(1, tags);
-    } else {
+    if (isQueryStats(result)) {
       runQueryMetric.add(result.elapsed.milliseconds(), tags);
       runQueryErrRateMetric.add(0, tags);
       runQueryCounterMetric.add(1, tags);
+    } else {
+      runQueryErrRateMetric.add(1, tags);
     }
   }
 
@@ -116,6 +121,7 @@ export function NewDriverByConfig(config: Partial<GlobalConfig>): Driver {
     GlobalConfig.toBinary(GlobalConfig.create(config)),
   );
 }
+
 
 export function Step(name: string, block: () => void): void {
   NotifyStep(name, Status.STATUS_RUNNING);

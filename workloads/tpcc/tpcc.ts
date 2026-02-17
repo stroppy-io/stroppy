@@ -68,7 +68,7 @@ const driver = DriverX.fromConfig({
   },
 });
 
-const sections = parse_sql_with_groups(open(__SQL_FILE));
+const sections = parse_sql_with_groups(open(__ENV.SQL_FILE));
 
 export function setup() {
   Step("create_schema", () => {
