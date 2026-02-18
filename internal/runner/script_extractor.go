@@ -195,10 +195,6 @@ func prepareVMEnvironment(
 		return fmt.Errorf("failed to set NewGeneratorByRuleBin: %w", err)
 	}
 
-	if err := vm.Set("NewDriverByConfigBin", func() {}); err != nil {
-		return fmt.Errorf("failed to set NewDriverByConfigBin: %w", err)
-	}
-
 	if err := vm.Set("Trend", newDummyWithNoopConstructor(vm)); err != nil {
 		return fmt.Errorf("failed to set Trend: %w", err)
 	}
@@ -232,7 +228,7 @@ func setupConfigExtraction(vm *sobek.Runtime, extractor *configExtractor) error 
 		return err
 	}
 
-	if err := vm.Set("NewDriverByConfig", extractor.extract); err != nil {
+	if err := vm.Set("NewDriverByConfigBin", extractor.extract); err != nil {
 		return err
 	}
 

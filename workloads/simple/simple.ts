@@ -21,10 +21,6 @@ export const options: Options = {
 };
 
 const driver: DriverX = DriverX.fromConfig({
-  runId: "",
-  seed: "0",
-  version: "",
-  metadata: {},
   driver: {
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
     driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
@@ -32,6 +28,14 @@ const driver: DriverX = DriverX.fromConfig({
       fields: [],
     },
   },
+  // Add OpenTelemety metrics
+  // exporter: {
+  //   name: "",
+  //   otlpExport: {
+  //     otlpGrpcEndpoint: "localhost:4317",
+  //     otlpEndpointInsecure: true,
+  //   }
+  // },
 });
 
 export function setup() {

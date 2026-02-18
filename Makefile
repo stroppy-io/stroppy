@@ -287,9 +287,9 @@ run-simple-test: .rm-dev
 	./build/stroppy gen --workdir $(WORKDIR) --preset=simple
 	cd $(WORKDIR) && ./stroppy run simple.ts
 
-run-tpcb-test: .rm-dev
-	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcb
-	cd $(WORKDIR) && DURATION="1s" SCALE_FACTOR=1 ./stroppy run tpcb.ts tpcb.sql
+run-tpcb-test:
+	LOG_LEVEL=DEBUG DURATION="1s" SCALE_FACTOR=1 \
+		./build/stroppy run workloads/tpcb/tpcb.ts workloads/tpcb/tpcb.sql
 
 run-tpcc-test: .rm-dev
 	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcc

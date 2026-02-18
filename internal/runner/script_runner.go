@@ -26,7 +26,7 @@ type ScriptRunner struct {
 	sqlPath    string // optional SQL file path
 	tempDir    string
 	config     *ExtractedConfig
-	k6RunArgs  []string
+	k6RunArgs  []string // pass args directly to 'k6 run <k6RunArgs>'
 }
 
 // NewScriptRunner creates a new ScriptRunner for the given script.
@@ -66,6 +66,8 @@ func NewScriptRunner(scriptPath, sqlPath string, k6RunArgs []string) (*ScriptRun
 		}
 	}
 
+	lg.Debug("Got config extracted", zap.Any("config", config))
+
 	// Update logger with config if available
 	if config.GlobalConfig.GetLogger() != nil {
 		lg = logger.NewFromProtoConfig(config.GlobalConfig.GetLogger()).
@@ -91,9 +93,7 @@ func (r *ScriptRunner) Run(ctx context.Context) error {
 
 	envs := r.buildEnvVars()
 
-	if r.config.GlobalConfig.GetExporter().GetOtlpExport() != nil {
-		args, envs = r.addOtelExportArgs(args, envs)
-	}
+	args, envs = r.addOtelExportArgs(args, envs)
 
 	return r.runK6(ctx, args, envs)
 }
@@ -164,8 +164,12 @@ func (r *ScriptRunner) buildEnvVars() []string {
 func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut []string) {
 	export := r.config.GlobalConfig.GetExporter().GetOtlpExport()
 	if export == nil {
+		r.logger.Debug("Have no OTEL configuration")
+
 		return args, envs
 	}
+
+	r.logger.Debug("Got the OTEL configuration", zap.Any("config", export))
 
 	envs = append(envs,
 		"K6_OTEL_METRIC_PREFIX="+cmp.Or(export.GetOtlpMetricsPrefix(), "k6_"),
@@ -182,7 +186,7 @@ func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut 
 	}
 
 	if export.GetOtlpGrpcEndpoint() != "" {
-		envs = append(envs, // grpc is default http_exporter_type
+		envs = append(envs, // grpc is the default http_exporter_type
 			"K6_OTEL_GRPC_EXPORTER_INSECURE="+insecure,
 			"K6_OTEL_GRPC_EXPORTER_ENDPOINT="+export.GetOtlpGrpcEndpoint(),
 		)
