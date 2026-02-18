@@ -6,12 +6,15 @@ package xk6air
 
 import (
 	"context"
+	"errors"
+	"sync"
 
 	"github.com/oklog/ulid/v2"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy/stroppyconnect"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/subcommand"
@@ -29,8 +32,9 @@ func init() {
 		WithOptions(zap.AddStacktrace(zap.FatalLevel))
 
 	rootModule = &RootModule{
-		lg:  lg,
-		ctx: context.Background(),
+		lg:         lg,
+		ctx:        context.Background(),
+		vuTeardown: make(map[*Instance]func() error),
 	}
 
 	rootModule.runULID, rootModule.cloudClient = NewCloudClient(lg)
@@ -46,6 +50,12 @@ type RootModule struct {
 	cloudClient stroppyconnect.CloudStatusServiceClient
 	runULID     ulid.ULID
 	ctx         context.Context
+
+	sharedDrv driver.Driver
+	once      sync.Once
+
+	vuMutex    sync.Mutex
+	vuTeardown map[*Instance]func() error
 }
 
 // NewModuleInstance factory method for Instances.
@@ -63,4 +73,29 @@ func (r *RootModule) NotifyStep(name string, status int32) {
 		Status:       stroppy.Status(status),
 		Name:         name,
 	})
+}
+
+func (r *RootModule) addVuTeardown(instance *Instance) {
+	r.vuMutex.Lock()
+	r.vuTeardown[instance] = instance.Teardown
+	r.vuMutex.Unlock()
+}
+
+func (r *RootModule) Teardown() error {
+
+	var err error
+	r.vuMutex.Lock()
+	for _, teardown := range r.vuTeardown {
+		err = errors.Join(err, teardown())
+	}
+	r.vuMutex.Unlock()
+
+	r.sharedDrv.Teardown(r.ctx)
+
+	_, errCloud := r.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
+		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
+		Status: stroppy.Status_STATUS_COMPLETED,
+		Cmd:    "",
+	})
+	return errors.Join(err, errCloud)
 }

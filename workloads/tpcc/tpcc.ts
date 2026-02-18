@@ -61,13 +61,14 @@ const driver = DriverX.fromConfig({
   driver: {
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
     driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
+    connectionType: { is: {oneofKind:"sharedPool", sharedPool: {sharedConnections: 100}}},
     dbSpecific: {
       fields: [],
     },
   },
 });
 
-const sections = parse_sql_with_groups(open(__SQL_FILE));
+const sections = parse_sql_with_groups(open(__ENV.SQL_FILE));
 
 export function setup() {
   Step("create_schema", () => {

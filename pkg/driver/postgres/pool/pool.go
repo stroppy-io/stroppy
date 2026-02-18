@@ -41,14 +41,14 @@ const (
 var (
 	ErrUnsupportedParam                = errors.New("unsupported parameter")
 	ErrDescriptionCacheCapacityMissUse = fmt.Errorf(
-		`"%s" is valid only with "%s" set to "%s"`,
+		"%q is valid only with %q set to %q",
 		descriptionCacheCapacityKey,
 		defaultQueryExecModeKey,
 		pgx.QueryExecModeCacheDescribe.String(),
 	)
 
 	ErrStatementCacheCapacityMissUse = fmt.Errorf(
-		`"%s" is valid only with "%s" set to "%s"`,
+		"%q is valid only with %q set to %q",
 		statementCacheCapacityKey,
 		defaultQueryExecModeKey,
 		pgx.QueryExecModeCacheStatement.String(),
@@ -64,24 +64,25 @@ func parseConfig(
 		return nil, err
 	}
 
-	cfg, err := defaultPool(config.GetUrl())
+	cfg, err := buildConnectionConfig(config, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, err = overrideWithDBSpecific(logger, cfg, cfgMap)
+	// Disable connection lifetime limits
+	// NOTE: unfortunately "MaxConnLifetime = 0" != "no lifetime limits".
+	// "MaxConnLifetime = 0" == spam with expired connections.
+	if !strings.Contains(config.GetUrl(), "pool_max_conn_lifetime") {
+		const oneDay = 24 * time.Hour
+
+		cfg.MaxConnLifetime = oneDay // Nearly never
+	}
+
+	err = overrideWithDBSpecific(cfg, cfgMap)
 	if err != nil {
 		return nil, err
 	}
 
-	return cfg, nil
-}
-
-func overrideWithDBSpecific(
-	logger *zap.Logger,
-	cfg *pgxpool.Config,
-	cfgMap map[string]any,
-) (*pgxpool.Config, error) {
 	logLevel := "error"
 	if overrideLevel, ok := cfgMap[traceLogLevelKey]; ok {
 		logLevel, _ = overrideLevel.(string)
@@ -92,21 +93,67 @@ func overrideWithDBSpecific(
 		return nil, err
 	}
 
-	loggerTracer, err := newLoggerTracer(logger.WithOptions(
-		zap.AddCallerSkip(1),
-		zap.IncreaseLevel(lvl)))
+	loggerTracer, err := newLoggerTracer(
+		logger.WithOptions(zap.AddCallerSkip(1), zap.IncreaseLevel(lvl)))
 	if err != nil {
 		return nil, err
 	}
 
 	cfg.ConnConfig.Tracer = multitracer.New(loggerTracer)
+	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
+		pgxdecimal.Register(conn.TypeMap())
 
+		return nil
+	}
+
+	return cfg, nil
+}
+
+func buildConnectionConfig(
+	config *stroppy.DriverConfig,
+	logger *zap.Logger,
+) (*pgxpool.Config, error) {
+	connType := config.GetConnectionType()
+
+	if connType.GetSingleConnPerVu() != nil {
+		return defaultSingleConnConfig(config.GetUrl())
+	}
+
+	cfg, err := defaultConfig(config.GetUrl())
+	if err != nil {
+		return nil, err
+	}
+
+	shared := connType.GetSharedPool()
+	if shared == nil {
+		return cfg, nil
+	}
+
+	if shared.GetSharedConnections() != 0 {
+		cfg.MaxConns = shared.GetSharedConnections()
+		cfg.MinConns = shared.GetSharedConnections()
+
+		return cfg, nil
+	}
+
+	logger.Info(
+		"shared_connections set to default by pgx",
+		zap.Int32("shared_connections", cfg.MaxConns),
+	)
+
+	return cfg, nil
+}
+
+func overrideWithDBSpecific(
+	cfg *pgxpool.Config,
+	cfgMap map[string]any,
+) error {
 	if maxConnLifetime, ok := cfgMap[maxConnLifetimeKey]; ok {
 		d, err := time.ParseDuration( //nolint:forcetypeassert // allow panic
 			maxConnLifetime.(string), //nolint:errcheck // allow panic
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		cfg.MaxConnLifetime = d
@@ -117,7 +164,7 @@ func overrideWithDBSpecific(
 			maxConnIdleTime.(string), //nolint:errcheck // allow panic
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		cfg.MaxConnIdleTime = d
@@ -136,19 +183,22 @@ func overrideWithDBSpecific(
 	}
 
 	if err := parsePgxOptimizations(cfgMap, cfg); err != nil {
-		return nil, err
+		return err
 	}
 
-	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
-		pgxdecimal.Register(conn.TypeMap())
+	return nil
+}
 
-		return nil
+func defaultConfig(url string) (*pgxpool.Config, error) {
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, err
 	}
 
 	return cfg, nil
 }
 
-func defaultPool(url string) (*pgxpool.Config, error) {
+func defaultSingleConnConfig(url string) (*pgxpool.Config, error) {
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		return nil, err
@@ -162,16 +212,7 @@ func defaultPool(url string) (*pgxpool.Config, error) {
 	}
 
 	if !strings.Contains(url, "pool_min_conns") {
-		cfg.MinConns = 0
-	}
-
-	// Disable connection lifetime limits
-	if !strings.Contains(url, "pool_max_conn_lifetime") {
-		cfg.MaxConnLifetime = 0 // Unlimited
-	}
-
-	if !strings.Contains(url, "pool_max_conn_idle_time") {
-		cfg.MaxConnIdleTime = 0 // Never close idle connections
+		cfg.MinConns = 1
 	}
 
 	return cfg, nil

@@ -191,10 +191,6 @@ func prepareVMEnvironment(
 		return fmt.Errorf("failed to set __ENV: %w", err)
 	}
 
-	if err := vm.Set("__SQL_FILE", ""); err != nil {
-		return fmt.Errorf("failed to set __SQL_FILE: %w", err)
-	}
-
 	if err := vm.Set("NewGeneratorByRuleBin", func() {}); err != nil {
 		return fmt.Errorf("failed to set NewGeneratorByRuleBin: %w", err)
 	}
@@ -203,7 +199,30 @@ func prepareVMEnvironment(
 		return fmt.Errorf("failed to set NewDriverByConfigBin: %w", err)
 	}
 
+	if err := vm.Set("Trend", newDummyWithNoopConstructor(vm)); err != nil {
+		return fmt.Errorf("failed to set Trend: %w", err)
+	}
+
+	if err := vm.Set("Rate", newDummyWithNoopConstructor(vm)); err != nil {
+		return fmt.Errorf("failed to set Rate: %w", err)
+	}
+
+	if err := vm.Set("Counter", newDummyWithNoopConstructor(vm)); err != nil {
+		return fmt.Errorf("failed to set Counter: %w", err)
+	}
+
 	return nil
+}
+
+func newDummyWithNoopConstructor(rt *sobek.Runtime) *sobek.Object {
+	src := `
+  function MyDummy() {}
+  MyDummy.prototype.constructor = MyDummy;
+  MyDummy;
+`
+	val, _ := rt.RunString(src)
+
+	return val.ToObject(rt)
 }
 
 // setupConfigExtraction registers the config extraction callbacks.

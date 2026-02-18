@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
 )
@@ -15,7 +16,7 @@ const (
 )
 
 var Cmd = &cobra.Command{
-	Use:   "run <script.ts> [sql_file.sql]",
+	Use:   "run <script.ts> [sql_file.sql] [-- <k6 run direct args>]",
 	Short: "Run benchmark script with k6",
 	Long: `Run a TypeScript benchmark script with k6.
 
@@ -34,7 +35,13 @@ Examples:
 			sqlPath = args[1]
 		}
 
-		r, err := runner.NewScriptRunner(scriptPath, sqlPath)
+		var afterDash []string
+		if dashIdx := pflag.CommandLine.ArgsLenAtDash(); dashIdx != -1 {
+			// Everything after --
+			afterDash = pflag.Args()[dashIdx:]
+		}
+
+		r, err := runner.NewScriptRunner(scriptPath, sqlPath, afterDash)
 		if err != nil {
 			return fmt.Errorf("failed to create runner: %w", err)
 		}

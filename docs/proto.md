@@ -44,6 +44,8 @@
   
 - [proto/stroppy/config.proto](#proto_stroppy_config-proto)
     - [DriverConfig](#stroppy-DriverConfig)
+    - [DriverConfig.ConnectionType](#stroppy-DriverConfig-ConnectionType)
+    - [DriverConfig.ConnectionType.Pool](#stroppy-DriverConfig-ConnectionType-Pool)
     - [ExporterConfig](#stroppy-ExporterConfig)
     - [GlobalConfig](#stroppy-GlobalConfig)
     - [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry)
@@ -656,6 +658,38 @@ settings.
 | url | [string](#string) |  | Database connection URL |
 | db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific configuration options |
 | driver_type | [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType) |  | Name/Type of chosen driver |
+| connection_type | [DriverConfig.ConnectionType](#stroppy-DriverConfig-ConnectionType) |  | Shared connection pool vs own connection for each VU. |
+
+
+
+
+
+
+<a name="stroppy-DriverConfig-ConnectionType"></a>
+
+### DriverConfig.ConnectionType
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| single_conn_per_vu | [google.protobuf.Empty](#google-protobuf-Empty) |  |  |
+| shared_pool | [DriverConfig.ConnectionType.Pool](#stroppy-DriverConfig-ConnectionType-Pool) |  |  |
+
+
+
+
+
+
+<a name="stroppy-DriverConfig-ConnectionType-Pool"></a>
+
+### DriverConfig.ConnectionType.Pool
+If shared_connections not set use drivers pool default.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| shared_connections | [int32](#int32) |  |  |
 
 
 

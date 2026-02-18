@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	k6cmd "go.k6.io/k6/cmd"
@@ -25,10 +26,11 @@ type ScriptRunner struct {
 	sqlPath    string // optional SQL file path
 	tempDir    string
 	config     *ExtractedConfig
+	k6RunArgs  []string
 }
 
 // NewScriptRunner creates a new ScriptRunner for the given script.
-func NewScriptRunner(scriptPath, sqlPath string) (*ScriptRunner, error) {
+func NewScriptRunner(scriptPath, sqlPath string, k6RunArgs []string) (*ScriptRunner, error) {
 	lg := logger.Global().
 		Named("script_runner").
 		WithOptions(zap.WithCaller(false), zap.AddStacktrace(zap.FatalLevel))
@@ -77,6 +79,7 @@ func NewScriptRunner(scriptPath, sqlPath string) (*ScriptRunner, error) {
 		sqlPath:    sqlPath,
 		config:     config,
 		tempDir:    tempDir,
+		k6RunArgs:  k6RunArgs,
 	}, nil
 }
 
@@ -84,8 +87,7 @@ func NewScriptRunner(scriptPath, sqlPath string) (*ScriptRunner, error) {
 func (r *ScriptRunner) Run(ctx context.Context) error {
 	defer os.RemoveAll(r.tempDir)
 
-	scriptName := filepath.Base(r.scriptPath)
-	args := []string{"run", scriptName}
+	args := []string{}
 
 	envs := r.buildEnvVars()
 
@@ -93,9 +95,7 @@ func (r *ScriptRunner) Run(ctx context.Context) error {
 		args, envs = r.addOtelExportArgs(args, envs)
 	}
 
-	r.logger.Debug("Running k6", zap.Strings("args", args))
-
-	return r.runK6Binary(ctx, args, envs)
+	return r.runK6(ctx, args, envs)
 }
 
 func CreateAndInitTempDir(
@@ -117,19 +117,12 @@ func CreateAndInitTempDir(
 	scriptName := filepath.Base(scriptPath)
 	sqlName := filepath.Base(sqlPath)
 
-	if sqlPath == "" { // copy single ts file
-		if err := copyFile(scriptPath, path.Join(tempDir, scriptName)); err != nil {
-			return "", fmt.Errorf("failed to copy script: %w", err)
-		}
-	} else { // copy ts + sql + add name in variable
-		if err := copyFileWithPrepend(
-			scriptPath,
-			path.Join(tempDir, scriptName),
-			fmt.Sprintf(`const __SQL_FILE = %q;`, sqlName),
-		); err != nil {
-			return "", fmt.Errorf("failed to copy script: %w", err)
-		}
+	// copy single ts file
+	if err := copyFile(scriptPath, path.Join(tempDir, scriptName)); err != nil {
+		return "", fmt.Errorf("failed to copy script: %w", err)
+	}
 
+	if sqlPath != "" {
 		if err := copyFile(sqlPath, path.Join(tempDir, sqlName)); err != nil {
 			return "", fmt.Errorf("failed to copy SQL file %q: %w", sqlName, err)
 		}
@@ -147,15 +140,6 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, data, common.FileMode)
 }
 
-func copyFileWithPrepend(src, dst, prepend string) error {
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(dst, append([]byte(prepend), data...), common.FileMode)
-}
-
 // buildEnvVars builds environment variables for k6 execution.
 func (r *ScriptRunner) buildEnvVars() []string {
 	envs := os.Environ() // inherit parent environment
@@ -167,6 +151,10 @@ func (r *ScriptRunner) buildEnvVars() []string {
 			logger.ModeFromProtoConfig(r.config.GlobalConfig.GetLogger().GetLogMode()),
 		)
 		envs = append(envs, loggerEnvs...)
+	}
+
+	if r.sqlPath != "" {
+		envs = append(envs, "SQL_FILE="+path.Join(r.tempDir, filepath.Base(r.sqlPath)))
 	}
 
 	return envs
@@ -212,11 +200,12 @@ func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut 
 	return args, envs
 }
 
-// runK6Binary executes the k6 binary.
-func (r *ScriptRunner) runK6Binary(
+// runK6 executes the k6.
+func (r *ScriptRunner) runK6(
 	_ context.Context,
 	args, envs []string,
 ) error {
+	scriptName := filepath.Base(r.scriptPath)
 	// dump state
 	argsBefore := os.Args
 	envsBefore := os.Environ()
@@ -235,7 +224,9 @@ func (r *ScriptRunner) runK6Binary(
 		return fmt.Errorf("failed cd to temporary %q: %w", r.tempDir, err)
 	}
 
-	os.Args = append([]string{"k6"}, args...)
+	os.Args = slices.Concat([]string{"k6", "run", scriptName}, r.k6RunArgs, args)
+
+	r.logger.Debug("Running k6", zap.Strings("args", os.Args))
 
 	// run the test
 	k6cmd.Execute() // TODO: add exit code processing

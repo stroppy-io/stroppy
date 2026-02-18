@@ -32,7 +32,7 @@ func NewInstance(vu modules.VU) modules.Instance {
 	if state := vu.State(); state != nil {
 		VUID = state.VUID
 	}
-	return &Instance{
+	i := &Instance{
 		vu: vu,
 		lg: logger.
 			NewFromEnv().
@@ -40,6 +40,8 @@ func NewInstance(vu modules.VU) modules.Instance {
 			With(zap.Uint64("VUID", uint64(VUID))).
 			WithOptions(zap.AddStacktrace(zap.FatalLevel)),
 	}
+	rootModule.addVuTeardown(i)
+	return i
 }
 
 func (i *Instance) Exports() modules.Exports {
@@ -49,14 +51,14 @@ func (i *Instance) Exports() modules.Exports {
 		Named: map[string]any{
 			"NotifyStep":                  rootModule.NotifyStep,
 			"NewDriverByConfigBin":        i.NewDriverByConfigBin,
-			"Teardown":                    i.Teardown,
+			"Teardown":                    rootModule.Teardown,
 			"NewGeneratorByRuleBin":       NewGeneratorByRuleBin,
 			"NewGroupGeneratorByRulesBin": NewGroupGeneratorByRulesBin,
 		},
 	}
 }
 
-var onceDefineConfig sync.Once
+var onceGetConfig sync.Once
 
 // NewDriverByConfigBin initializes the driver from GlobalConfig.
 // This is called by scripts using defineConfig(globalConfig) at the top level.
@@ -65,8 +67,7 @@ var onceDefineConfig sync.Once
 // i.vu.State() is nil
 func (i *Instance) NewDriverByConfigBin(configBin []byte) *DriverWrapper {
 	var globalCfg stroppy.GlobalConfig
-	err := proto.Unmarshal(configBin, &globalCfg)
-	if err != nil {
+	if err := proto.Unmarshal(configBin, &globalCfg); err != nil {
 		i.lg.Fatal("error unmarshalling GlobalConfig", zap.Error(err))
 	}
 	drvCfg := globalCfg.GetDriver()
@@ -74,18 +75,15 @@ func (i *Instance) NewDriverByConfigBin(configBin []byte) *DriverWrapper {
 		i.lg.Fatal("GlobalConfig.driver is required")
 	}
 
-	drv, err := driver.Dispatch(rootModule.ctx, i.lg, drvCfg)
-	if err != nil {
-		i.lg.Fatal("can't initialize driver", zap.Error(err))
-	}
-
-	onceDefineConfig.Do(func() {
+	onceGetConfig.Do(func() {
 		rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
 			Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
 			Status: stroppy.Status_STATUS_RUNNING,
 			Cmd:    "",
 		})
 	})
+
+	drv := i.getOrCreateDriver(&globalCfg)
 
 	i.dw = &DriverWrapper{
 		vu:  i.vu,
@@ -95,14 +93,39 @@ func (i *Instance) NewDriverByConfigBin(configBin []byte) *DriverWrapper {
 	return i.dw
 }
 
+func (i *Instance) getOrCreateDriver(cfg *stroppy.GlobalConfig) (drv driver.Driver) {
+	var err error
+	if cfg.GetDriver().GetConnectionType().GetSingleConnPerVu() != nil {
+		if drv, err = driver.Dispatch(rootModule.ctx, i.lg, cfg.GetDriver()); err != nil {
+			i.lg.Fatal("can't initialize driver", zap.Error(err))
+		}
+		return drv
+	}
+
+	if rootModule.sharedDrv != nil {
+		return rootModule.sharedDrv
+	}
+
+	if cfg.GetDriver().GetConnectionType() == nil {
+		// NOTE: unfortunately we have no good suggestion on which amount of connections we may use.
+		// Nice idea to use i.State().Options.VUs, but it's not available at pre-init state.
+		cfg.GetDriver().ConnectionType = &stroppy.DriverConfig_ConnectionType{
+			Is: &stroppy.DriverConfig_ConnectionType_SharedPool{},
+		}
+	}
+
+	rootModule.sharedDrv, err = driver.Dispatch(rootModule.ctx, i.lg, cfg.GetDriver())
+	if err != nil {
+		i.lg.Fatal("can't initialize shared driver", zap.Error(err))
+	}
+	return rootModule.sharedDrv
+}
+
 // Teardown mirrors k6 "function teardown()".
 func (i *Instance) Teardown() error {
-	i.dw.drv.Teardown(i.vu.Context())
+	if rootModule.sharedDrv == nil {
+		i.dw.drv.Teardown(i.vu.Context())
+	}
 
-	rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
-		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
-		Status: stroppy.Status_STATUS_COMPLETED,
-		Cmd:    "",
-	})
 	return nil
 }
