@@ -250,8 +250,6 @@ func TestExtractConfigFromScript_ExecuteSQL(t *testing.T) {
 		return ""
 	}
 	_ = openMock
-	// TODO: RNDSTROPPY-57
-	t.Skipf("Following code is broken not due too this task. Fix required with RNDSTROPPY-57")
 
 	// Extract config from bundled code
 	config, err := ExtractConfigFromJS(bundledJS, openMock)

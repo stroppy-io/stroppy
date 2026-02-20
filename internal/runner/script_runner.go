@@ -75,6 +75,8 @@ func NewScriptRunner(scriptPath, sqlPath string, k6RunArgs []string) (*ScriptRun
 			WithOptions(zap.WithCaller(false))
 	}
 
+	lg.Debug("Got k6 args", zap.Strings("k6Args", k6RunArgs))
+
 	return &ScriptRunner{
 		logger:     lg,
 		scriptPath: scriptPath,
@@ -186,13 +188,14 @@ func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut 
 	}
 
 	if export.GetOtlpGrpcEndpoint() != "" {
-		envs = append(envs, // grpc is the default http_exporter_type
+		envs = append(envs,
+			"K6_OTEL_EXPORTER_PROTOCOL=grpc",
 			"K6_OTEL_GRPC_EXPORTER_INSECURE="+insecure,
 			"K6_OTEL_GRPC_EXPORTER_ENDPOINT="+export.GetOtlpGrpcEndpoint(),
 		)
 	} else {
 		envs = append(envs,
-			"K6_OTEL_EXPORTER_TYPE=http",
+			"K6_OTEL_EXPORTER_PROTOCOL=http/protobuf",
 			"K6_OTEL_HTTP_EXPORTER_INSECURE="+insecure,
 			"K6_OTEL_HTTP_EXPORTER_ENDPOINT="+cmp.Or(export.GetOtlpHttpEndpoint(), "localhost:4318"),
 			"K6_OTEL_HTTP_EXPORTER_URL_PATH="+cmp.Or(export.GetOtlpHttpExporterUrlPath(), "/v1/metrics"),

@@ -3,9 +3,9 @@ package run
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
 )
@@ -22,6 +22,7 @@ Examples:
   stroppy run my_benchmark.ts
   stroppy run execute_sql.ts tpcb.sql
 `,
+	DisableFlagParsing: true,
 	RunE: func(_ *cobra.Command, args []string) error {
 		scriptPath := args[0]
 		sqlPath := ""
@@ -30,9 +31,9 @@ Examples:
 		}
 
 		var afterDash []string
-		if dashIdx := pflag.CommandLine.ArgsLenAtDash(); dashIdx != -1 {
+		if dashIdx := slices.Index(args, "--"); dashIdx != -1 {
 			// Everything after --
-			afterDash = pflag.Args()[dashIdx:]
+			afterDash = args[dashIdx+1:]
 		}
 
 		r, err := runner.NewScriptRunner(scriptPath, sqlPath, afterDash)
