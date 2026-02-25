@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -50,7 +51,9 @@ var versionCmd = &cobra.Command{
 		if versionJSON {
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
-			_ = enc.Encode(versions)
+			if err := enc.Encode(versions); err != nil {
+				log.Fatal(err)
+			}
 		} else {
 			// Fixed order for readable output.
 			for _, kv := range []struct{ k, v string }{
@@ -59,7 +62,7 @@ var versionCmd = &cobra.Command{
 				{"pgx", versions["pgx"]},
 			} {
 				if kv.v != "" {
-					fmt.Printf("%-8s %s\n", kv.k, kv.v)
+					fmt.Fprintf(os.Stdout, "%-8s %s\n", kv.k, kv.v)
 				}
 			}
 		}
