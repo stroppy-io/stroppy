@@ -1,18 +1,19 @@
 package commands
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
-	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/gen"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/probe"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
 	"github.com/stroppy-io/stroppy/internal/version"
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
 )
 
 var rootCmd = &cobra.Command{
@@ -20,11 +21,48 @@ var rootCmd = &cobra.Command{
 	Short: "Tool to generate and run stress tests (e.g benchmarking) for databases",
 }
 
+// versionJSON controls whether `stroppy version` outputs machine-readable JSON.
+// When more component versions are added (k6, drivers, etc.), --json gives
+// programmatic consumers a stable format to parse instead of scraping text lines.
+var versionJSON bool
+
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print versions of stroppy components",
 	Run: func(_ *cobra.Command, _ []string) {
-		logger.Info("Stroppy version", zap.String("version", version.Version))
+		versions := map[string]string{
+			"stroppy": version.Version,
+		}
+
+		// Pull dependency versions from the compiled binary's module info.
+		// These stay in sync with go.mod automatically — no hardcoding.
+		if info, ok := debug.ReadBuildInfo(); ok {
+			for _, dep := range info.Deps {
+				switch dep.Path {
+				case "go.k6.io/k6":
+					versions["k6"] = dep.Version
+				case "github.com/jackc/pgx/v5":
+					versions["pgx"] = dep.Version
+				}
+			}
+		}
+
+		if versionJSON {
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			_ = enc.Encode(versions)
+		} else {
+			// Fixed order for readable output.
+			for _, kv := range []struct{ k, v string }{
+				{"stroppy", versions["stroppy"]},
+				{"k6", versions["k6"]},
+				{"pgx", versions["pgx"]},
+			} {
+				if kv.v != "" {
+					fmt.Printf("%-8s %s\n", kv.k, kv.v)
+				}
+			}
+		}
 	},
 }
 
@@ -71,5 +109,6 @@ func init() {
 
 	rootCmd.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)
 
+	versionCmd.Flags().BoolVar(&versionJSON, "json", false, "output versions as JSON")
 	rootCmd.AddCommand(versionCmd, run.Cmd, gen.Cmd, probe.Cmd)
 }
