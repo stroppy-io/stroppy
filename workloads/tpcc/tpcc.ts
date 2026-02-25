@@ -5,42 +5,44 @@ import { NewGen, AB, R, Step, DriverX, S } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 const DURATION = __ENV.DURATION || "1h";
+const VUS_SCALE = +(__ENV.VUS_SCALE || 1);
 export const options: Options = {
   setupTimeout: "5m",
   scenarios: {
     new_order: {
       executor: "constant-vus",
       exec: "new_order",
-      vus: 44,
+      vus: Math.max(1, Math.round(44 * VUS_SCALE)),
       duration: DURATION,
     },
     payments: {
       executor: "constant-vus",
       exec: "payments",
-      vus: 43,
+      vus: Math.max(1, Math.round(43 * VUS_SCALE)),
       duration: DURATION,
     },
     order_status: {
       executor: "constant-vus",
       exec: "order_status",
-      vus: 4,
+      vus: Math.max(1, Math.round(4 * VUS_SCALE)),
       duration: DURATION,
     },
     delivery: {
       executor: "constant-vus",
       exec: "delivery",
-      vus: 4,
+      vus: Math.max(1, Math.round(4 * VUS_SCALE)),
       duration: DURATION,
     },
     stock_level: {
       executor: "constant-vus",
       exec: "stock_level",
-      vus: 4,
+      vus: Math.max(1, Math.round(4 * VUS_SCALE)),
       duration: DURATION,
     },
   },
 };
 // TPCC Configuration Constants
+const POOL_SIZE = +(__ENV.POOL_SIZE || 100);
 const WAREHOUSES = +(__ENV.SCALE_FACTOR || __ENV.WAREHOUSES || 1);
 const DISTRICTS_PER_WAREHOUSE = 10;
 const CUSTOMERS_PER_DISTRICT = 3000;
@@ -56,7 +58,7 @@ const driver = DriverX.fromConfig({
   driver: {
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
     driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-    connectionType: { is: {oneofKind:"sharedPool", sharedPool: {sharedConnections: 100}}},
+    connectionType: { is: {oneofKind:"sharedPool", sharedPool: {sharedConnections: POOL_SIZE}}},
     dbSpecific: {
       fields: [],
     },
