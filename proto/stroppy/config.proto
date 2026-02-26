@@ -23,6 +23,7 @@ message DriverConfig {
   enum DriverType {
     DRIVER_TYPE_UNSPECIFIED = 0;
     DRIVER_TYPE_POSTGRES = 1;
+    DRIVER_TYPE_PICODATA = 2;
   }
 
   /** Name/Type of chosen driver */

@@ -11,6 +11,7 @@ require (
 	github.com/jackc/pgx-shopspring-decimal v0.0.0-20220624020537-1d36b5a1853e
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/pashagolub/pgxmock/v4 v4.8.0
+	github.com/picodata/picodata-go v1.1.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.11.1
