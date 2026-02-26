@@ -7,6 +7,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/mysql"
+	_ "github.com/stroppy-io/stroppy/pkg/driver/picodata"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/postgres"
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"

@@ -21,6 +21,7 @@ message DriverConfig {
     DRIVER_TYPE_UNSPECIFIED = 0;
     DRIVER_TYPE_POSTGRES = 1;
     DRIVER_TYPE_MYSQL = 2;
+    DRIVER_TYPE_PICODATA = 3;
   }
 
   /** Name/Type of chosen driver */
@@ -72,7 +73,8 @@ message DriverConfig {
   }
 
   /** How to handle errors in query/insert operations.
-   *  SILENT: record metric only. LOG: record metric + console.log. THROW: rethrow. */
+   *  SILENT: record metric only. LOG: record metric + console.log. THROW:
+   * rethrow. */
   ErrorMode error_mode = 3;
 
   /** Driver-specific configuration, exactly one must match driver_type */
