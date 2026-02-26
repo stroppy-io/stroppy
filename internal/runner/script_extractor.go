@@ -1,4 +1,3 @@
-// Package runner provides functionality to run TypeScript benchmark scripts with k6.
 package runner
 
 import (
@@ -21,12 +20,16 @@ var (
 	ErrNoEsbuildOutput  = errors.New("no output from esbuild")
 )
 
-// ExtractedConfig contains configuration extracted from a TypeScript script.
-type ExtractedConfig struct {
+// Probeprint contains configuration and other metainformation extracted from a TypeScript script.
+type Probeprint struct {
 	GlobalConfig *stroppy.GlobalConfig
+	Steps        []string
+	SQLSections  []string
+	Envs         []string
 }
 
 // TranspileTypeScript transpiles TypeScript to JavaScript using esbuild.
+// TODO: make and reuse, if possible, code -> code version (without path)
 func TranspileTypeScript(entryPath string) (string, error) {
 	entryAbs, err := filepath.Abs(entryPath)
 	if err != nil {
@@ -68,26 +71,24 @@ func TranspileTypeScript(entryPath string) (string, error) {
 	return string(result.OutputFiles[0].Contents), nil
 }
 
-// stroppyStub provides stub implementations for stroppy module functions
-// that are used during config extraction (before k6 runtime).
-type stroppyStub struct{}
+func ProbeScript(scriptPath string) (*Probeprint, error) {
 
-func (s stroppyStub) RunQuery(_ []byte) []byte { return nil }
-
-func (s stroppyStub) RunUnit(_ []byte) []byte { return nil }
-
-func (s stroppyStub) InsertValues(_ []byte, _ int64) []byte { return nil }
-
-func (s stroppyStub) Teardown() error { return nil }
-
-// ExtractConfigFromScript extracts GlobalConfig from a TypeScript script.
-// The script should call defineConfig(globalConfig) at the top level.
-func ExtractConfigFromScript(scriptPath string) (*ExtractedConfig, error) {
 	jsCode, err := TranspileTypeScript(scriptPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transpile TypeScript: %w", err)
 	}
 
+	vm := createVM()
+
+	probeprint, err := ProbeJSTest(vm, jsCode)
+	if err != nil {
+		return nil, err // TODO: wrap
+	}
+
+	return probeprint, nil
+}
+
+func ProbeJSTest(vm *sobek.Runtime, jsCode string) (*Probeprint, error) {
 	// Mock k6/x/encoding import
 	// This is needed because the extraction VM doesn't have the k6/x/encoding module.
 	// We replace the import with a const that exposes the polyfilled TextEncoder/TextDecoder.
@@ -97,36 +98,16 @@ func ExtractConfigFromScript(scriptPath string) (*ExtractedConfig, error) {
 		`const $1 = { TextEncoder: globalThis.TextEncoder, TextDecoder: globalThis.TextDecoder };`,
 	)
 
-	return ExtractConfigFromJS(jsCode, func(string) string { return "" })
-}
-
-// ExtractConfigFromJS extracts GlobalConfig from JavaScript code.
-// openMock is an optional function that mocks the k6 open() function.
-// If provided, it will be called when the script calls open(filename).
-func ExtractConfigFromJS(jsCode string, openMock func(string) string) (*ExtractedConfig, error) {
-	// Stage 1: Create and configure VM
-	vm := createVM()
-
-	// Stage 2: Prepare environment (polyfills, mocks, globals)
-	configExtractor := newConfigExtractor(vm)
-
-	if err := prepareVMEnvironment(vm, configExtractor, openMock); err != nil {
+	probeprint := &Probeprint{}
+	if err := prepareVMEnvironment(vm, probeprint); err != nil {
 		return nil, fmt.Errorf("failed to prepare VM environment: %w", err)
 	}
 
 	// Stage 3: Execute the script
-	if err := executeScript(vm, jsCode); err != nil {
+	if _, err := vm.RunString(jsCode); err != nil {
 		return nil, fmt.Errorf("failed to execute script: %w", err)
 	}
-
-	// Stage 4: Extract and validate config
-	if configExtractor.extractedConfig == nil {
-		return nil, ErrNoConfigProvided
-	}
-
-	return &ExtractedConfig{
-		GlobalConfig: configExtractor.extractedConfig,
-	}, nil
+	return probeprint, nil
 }
 
 // createVM creates and configures a new sobek VM instance.
@@ -138,78 +119,91 @@ func createVM() *sobek.Runtime {
 	return vm
 }
 
-// configExtractor handles extraction of GlobalConfig from JavaScript arguments.
-type configExtractor struct {
-	vm              *sobek.Runtime
-	extractedConfig *stroppy.GlobalConfig
-}
-
-// newConfigExtractor creates a new config extractor.
-func newConfigExtractor(
-	vm *sobek.Runtime,
-) *configExtractor {
-	return &configExtractor{
-		vm:              vm,
-		extractedConfig: &stroppy.GlobalConfig{},
-	}
-}
-
-// extract handles the defineConfig callback and extracts the config.
-//
-//nolint:ireturn // for sobek
-func (e *configExtractor) extract(configBytes []byte) sobek.Value {
-	e.extractedConfig = &stroppy.GlobalConfig{}
-	if err := proto.Unmarshal(configBytes, e.extractedConfig); err != nil {
-		return nil
-	}
-
-	return sobek.Undefined()
-}
-
 // prepareVMEnvironment sets up all mocks, polyfills, and globals needed for script execution.
-func prepareVMEnvironment(
-	vm *sobek.Runtime,
-	configExtractor *configExtractor,
-	openMock func(string) string,
-) error {
+func prepareVMEnvironment(vm *sobek.Runtime, probeprint *Probeprint) error {
 	if err := injectEncoderPolyfill(vm); err != nil {
 		return fmt.Errorf("failed to inject encoder polyfill: %w", err)
 	}
 
-	if err := setupConfigExtraction(vm, configExtractor); err != nil {
-		return fmt.Errorf("failed to setup config extraction: %w", err)
+	extract := func(configBytes []byte) sobek.Value {
+		probeprint.GlobalConfig = &stroppy.GlobalConfig{}
+		if err := proto.Unmarshal(configBytes, probeprint.GlobalConfig); err != nil {
+			return nil
+		}
+		return sobek.Undefined()
 	}
 
-	if err := setupK6Mocks(vm, openMock); err != nil {
-		return fmt.Errorf("failed to setup k6 mocks: %w", err)
+	values := []struct {
+		name  string
+		value any
+	}{
+		{"NewDriverByConfigBin", extract},
+		{"open", func(string) string { return "" }},
+		{"console", consoleMock(vm)},
+		{"__ENV", spyProxyObject(vm, vm.NewObject(), &probeprint.Envs)},
+		{"Step", stepSpy(&probeprint.Steps)},
+		{"parse_sql_with_groups", parseGroupsSpy(vm, &probeprint.SQLSections)},
+		{"NewGeneratorByRuleBin", func() {}},
+		{"Trend", dummyWithNoopConstructor(vm)},
+		{"Rate", dummyWithNoopConstructor(vm)},
+		{"Counter", dummyWithNoopConstructor(vm)},
 	}
 
-	setupConsoleMock(vm)
-
-	if err := vm.Set("__ENV", vm.NewObject()); err != nil {
-		return fmt.Errorf("failed to set __ENV: %w", err)
-	}
-
-	if err := vm.Set("NewGeneratorByRuleBin", func() {}); err != nil {
-		return fmt.Errorf("failed to set NewGeneratorByRuleBin: %w", err)
-	}
-
-	if err := vm.Set("Trend", newDummyWithNoopConstructor(vm)); err != nil {
-		return fmt.Errorf("failed to set Trend: %w", err)
-	}
-
-	if err := vm.Set("Rate", newDummyWithNoopConstructor(vm)); err != nil {
-		return fmt.Errorf("failed to set Rate: %w", err)
-	}
-
-	if err := vm.Set("Counter", newDummyWithNoopConstructor(vm)); err != nil {
-		return fmt.Errorf("failed to set Counter: %w", err)
+	for _, kv := range values {
+		if err := vm.Set(kv.name, kv.value); err != nil {
+			return fmt.Errorf("failed to set %q for runtime: %w", kv.name, err)
+		}
 	}
 
 	return nil
 }
 
-func newDummyWithNoopConstructor(rt *sobek.Runtime) *sobek.Object {
+func parseGroupsSpy(vm *sobek.Runtime, accessedProps *[]string) func(_ string, _ any) any {
+	return func(_ string, _ any) any {
+		gpoupsMock := vm.NewObject()
+		proxy := vm.NewProxy(
+			gpoupsMock,
+			&sobek.ProxyTrapConfig{
+				Get: func(
+					target *sobek.Object, property string, receiver sobek.Value,
+				) (value sobek.Value) {
+					*accessedProps = append(*accessedProps, property)
+					return sobek.Undefined()
+				},
+				GetSym: func(
+					target *sobek.Object, property *sobek.Symbol, receiver sobek.Value,
+				) (value sobek.Value) {
+					*accessedProps = append(*accessedProps, property.String())
+					return sobek.Undefined()
+				},
+			},
+		)
+		return proxy
+	}
+}
+
+func stepSpy(steps *[]string) func(name string, lambda any) {
+	return func(name string, _ any) {
+		*steps = append(*steps, name)
+	}
+}
+
+func spyProxyObject(vm *sobek.Runtime, obj *sobek.Object, accesedProperties *[]string) sobek.Proxy {
+	proxy := vm.NewProxy(
+		obj,
+		&sobek.ProxyTrapConfig{
+			Get: func(
+				target *sobek.Object, property string, receiver sobek.Value,
+			) (value sobek.Value) {
+				*accesedProperties = append(*accesedProperties, property)
+				return sobek.Undefined()
+			},
+		},
+	)
+	return proxy
+}
+
+func dummyWithNoopConstructor(rt *sobek.Runtime) *sobek.Object {
 	src := `
   function MyDummy() {}
   MyDummy.prototype.constructor = MyDummy;
@@ -220,60 +214,15 @@ func newDummyWithNoopConstructor(rt *sobek.Runtime) *sobek.Object {
 	return val.ToObject(rt)
 }
 
-// setupConfigExtraction registers the config extraction callbacks.
-func setupConfigExtraction(vm *sobek.Runtime, extractor *configExtractor) error {
-	stub := stroppyStub{}
-	if err := vm.Set("stroppy", stub); err != nil {
-		return err
-	}
-
-	if err := vm.Set("NewDriverByConfigBin", extractor.extract); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// setupK6Mocks sets up mocks for k6-specific functions.
-func setupK6Mocks(vm *sobek.Runtime, openMock func(string) string) error {
-	if openMock == nil {
-		return nil
-	}
-
-	openFunc := func(call sobek.FunctionCall) sobek.Value {
-		if len(call.Arguments) == 0 {
-			return sobek.Undefined()
-		}
-
-		filename := call.Argument(0).String()
-		content := openMock(filename)
-
-		return vm.ToValue(content)
-	}
-
-	if err := vm.Set("open", openFunc); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // setupConsoleMock sets up a no-op console object.
-func setupConsoleMock(vm *sobek.Runtime) {
+func consoleMock(vm *sobek.Runtime) sobek.Value {
 	console := vm.NewObject()
 	noOp := func(sobek.FunctionCall) sobek.Value { return sobek.Undefined() }
 
 	_ = console.Set("log", noOp)
 	_ = console.Set("warn", noOp)
 	_ = console.Set("error", noOp)
-	_ = vm.Set("console", console)
-}
-
-// executeScript runs the JavaScript code in the VM.
-func executeScript(vm *sobek.Runtime, jsCode string) error {
-	_, err := vm.RunString(jsCode)
-
-	return err
+	return console
 }
 
 // injectEncoderPolyfill injects TextEncoder/TextDecoder polyfill into the VM.
