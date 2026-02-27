@@ -1,82 +1,38 @@
 package runner
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"io"
 	"path/filepath"
 	"regexp"
-	"strings"
+	"slices"
 
 	"github.com/evanw/esbuild/pkg/api"
-	"github.com/grafana/sobek"
+	js "github.com/grafana/sobek"
 	"github.com/grafana/sobek/parser"
+	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/executor"
 	"google.golang.org/protobuf/proto"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+
+	_ "embed"
 )
 
 var (
 	ErrNoConfigProvided = errors.New("script did not call defineConfig with GlobalConfig")
-	ErrEsbuild          = errors.New("esbuild error")
-	ErrNoEsbuildOutput  = errors.New("no output from esbuild")
+
+	ErrEsbuild         = errors.New("esbuild error")
+	ErrNoEsbuildOutput = errors.New("no output from esbuild")
+
+	ErrJSFuncNotDefined = errors.New("function not defined or not exported")
+	ErrNotAJSFunc       = errors.New("found, but is not a function")
+	ErrCallJSFunc       = errors.New("failed to call js function")
 )
-
-// Probeprint contains configuration and other metainformation extracted from a TypeScript script.
-type Probeprint struct {
-	GlobalConfig *stroppy.GlobalConfig `json:"global_config"`
-	SQLSections  []string              `json:"sql_sections"`
-	Envs         []string              `json:"envs"`
-
-	// Is not exported because is broken now.
-	// TODO: we need to exclude "Step" imported from "./helpers.ts" to allow mock to work.
-	steps []string // `json:"steps"`
-}
-
-func (p *Probeprint) Explain() string {
-	sb := &strings.Builder{}
-
-	// Global Config
-	sb.WriteString("Global Config:\n")
-	if p.GlobalConfig != nil {
-		configJSON, _ := json.MarshalIndent(p.GlobalConfig, "", "  ")
-		sb.WriteString(string(configJSON))
-		sb.WriteString("\n\n")
-	} else {
-		sb.WriteString("  (no config)\n\n")
-	}
-
-	// SQL Sections
-	sb.WriteString("SQL Sections:\n")
-	if len(p.SQLSections) > 0 {
-		for _, section := range p.SQLSections {
-			fmt.Fprintf(sb, "--+%s\n", section)
-		}
-	} else {
-		sb.WriteString("  (no sections)\n")
-	}
-	sb.WriteString("\n")
-
-	// Environment Variables
-	sb.WriteString("Environment Variables:\n")
-	if len(p.Envs) > 0 {
-		for _, env := range p.Envs {
-			parts := strings.SplitN(env, "=", 2)
-			varName := parts[0]
-			currentVal := os.Getenv(varName)
-			if currentVal == "" {
-				fmt.Fprintf(sb, "  %s=\"\"\n", varName)
-			} else {
-				fmt.Fprintf(sb, "  %s=%s\n", varName, currentVal)
-			}
-		}
-	} else {
-		sb.WriteString("  (no environment variables)\n")
-	}
-
-	return sb.String()
-}
 
 // TranspileTypeScript transpiles TypeScript to JavaScript using esbuild.
 // TODO: make and reuse, if possible, code -> code version (without path)
@@ -127,7 +83,6 @@ func TranspileTypeScript(entryPath string) (string, error) {
 // TODO: Drop the workdir requirement.
 // Refactor the transpilation to put workdir scripts at the transpilation phase directly to a user script.
 func ProbeScript(scriptPath string) (*Probeprint, error) {
-
 	jsCode, err := TranspileTypeScript(scriptPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transpile TypeScript: %w", err)
@@ -145,7 +100,7 @@ func ProbeScript(scriptPath string) (*Probeprint, error) {
 
 var reEncodingObjectImport = regexp.MustCompile(`import\s+(\w+)\s+from\s+["']k6/x/encoding["'];?`)
 
-func ProbeJSTest(vm *sobek.Runtime, jsCode string) (*Probeprint, error) {
+func ProbeJSTest(vm *js.Runtime, jsCode string) (*Probeprint, error) {
 	// Mock k6/x/encoding import
 	// This is needed because the extraction VM doesn't have the k6/x/encoding module.
 	// We replace the import with a const that exposes the polyfilled TextEncoder/TextDecoder.
@@ -167,100 +122,118 @@ func ProbeJSTest(vm *sobek.Runtime, jsCode string) (*Probeprint, error) {
 		return nil, fmt.Errorf("failed to run k6 functions: %w", err)
 	}
 
+	options, err := unwrapOptions(vm.Get("options"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get options: %w", err)
+	}
+
+	probeprint.Options = &options
+
 	return probeprint, nil
 }
 
-func runK6Handles(vm *sobek.Runtime) error {
-	if setup := vm.Get("setup"); setup != nil { // defined
-		if fn, ok := sobek.AssertFunction(setup); ok {
-			if _, err := fn(sobek.Undefined()); err != nil { // we need just exec it
-				return fmt.Errorf("failed to call setup() function: %w", err)
+func execJSFunc(vm *js.Runtime, funcName string, required bool) error {
+	//nolint: nestif // un-nested is uglier
+	if fnValue := vm.Get(funcName); fnValue != nil { // defined
+		if fn, ok := js.AssertFunction(fnValue); ok {
+			if _, err := fn(js.Undefined()); err != nil { // we need just exec it
+				return fmt.Errorf(`%w: '%s()': %w`, ErrCallJSFunc, funcName, err)
 			}
+		} else if required {
+			return fmt.Errorf(`'%s()' %w`, funcName, ErrNotAJSFunc)
 		}
-	}
-
-	options := vm.Get("options")
-	if options != nil {
-		// TODO: handle custom "exec" functions properly, as k6 do
-	} else { // user test is only "default" function
-
-		defaultV := vm.Get("setup")
-		if defaultV == nil { // defined
-			return errors.New("test function not defined nor default or custom in options.scenarios[_].exec")
-		}
-
-		defaultFn, ok := sobek.AssertFunction(defaultV)
-		if !ok {
-			return errors.New("default is not a function and no custom function defined in options.scenarios[_].exec")
-		}
-
-		if _, err := defaultFn(sobek.Undefined()); err != nil { // we need just exec it
-			return fmt.Errorf("failed to call default() function: %w", err)
-		}
-	}
-
-	if teardown := vm.Get("teardown"); teardown != nil { // defined
-		if fn, ok := sobek.AssertFunction(teardown); ok {
-			if _, err := fn(sobek.Undefined()); err != nil { // we need just exec it
-				return fmt.Errorf("failed to call teardown() function: %w", err)
-			}
-		}
+	} else if required {
+		return fmt.Errorf(`'%s()' %w`, funcName, ErrJSFuncNotDefined)
 	}
 
 	return nil
 }
 
+func runK6Handles(vm *js.Runtime) error {
+	if err := execJSFunc(vm, "setup", false); err != nil {
+		return err
+	}
+
+	options, err := unwrapOptions(vm.Get("options"))
+	if err != nil {
+		return err
+	}
+
+	scenarios := options.Scenarios.GetSortedConfigs()
+
+	executed := map[string]bool{}
+	for _, s := range scenarios {
+		if execFuncName := s.GetExec(); !executed[execFuncName] {
+			if err := execJSFunc(vm, execFuncName, true); err != nil {
+				return err
+			}
+
+			executed[execFuncName] = true
+		}
+	}
+
+	if err := execJSFunc(vm, "teardown", false); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func unwrapOptions(optionsValue js.Value) (lib.Options, error) {
+	var options lib.Options
+
+	data, err := json.MarshalIndent(optionsValue.Export(), "", "  ")
+	if err != nil {
+		return lib.Options{}, fmt.Errorf("error parsing script options: %w", err)
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+
+	if err = dec.Decode(&options); err != nil {
+		return lib.Options{}, fmt.Errorf("error while unmarshalling options: %w", err)
+	}
+
+	noopLogger := logrus.New()
+	noopLogger.SetOutput(io.Discard)
+
+	// Populate options as k6 do, so we execute exact functions as k6 do.
+	// It adds default scenario if no other present, default "exec"s and etc.
+	// NOTE: Unfortunately there is no exported k6 function
+	// to make "consolidated" options (with cli args, envs, and config file).
+	options, err = executor.DeriveScenariosFromShortcuts(options, noopLogger)
+	if err != nil {
+		return lib.Options{}, fmt.Errorf("failed to process k6 options: %w", err)
+	}
+
+	return options, nil
+}
+
 // createVM creates and configures a new sobek VM instance.
-func createVM() *sobek.Runtime {
-	vm := sobek.New()
+func createVM() *js.Runtime {
+	vm := js.New()
 	vm.SetParserOptions(parser.IsModule)
-	vm.SetFieldNameMapper(sobek.UncapFieldNameMapper())
+	vm.SetFieldNameMapper(js.UncapFieldNameMapper())
 
 	return vm
 }
 
 type driverStub struct{}
 
-func (d *driverStub) RunQuery(sql string, args map[string]any) any      { return nil }
-func (d *driverStub) InsertValuesBin(insertMsg []byte, count int64) any { return nil }
+func (*driverStub) RunQuery(string, map[string]any) any { return nil }
+func (*driverStub) InsertValuesBin([]byte, int64) any   { return nil }
 
-// prepareVMEnvironment sets up all mocks, polyfills, and globals needed for script execution.
-func prepareVMEnvironment(vm *sobek.Runtime, probeprint *Probeprint) error {
-	if err := injectEncoderPolyfill(vm); err != nil {
-		return fmt.Errorf("failed to inject encoder polyfill: %w", err)
-	}
+type genStub struct{}
 
-	extract := func(configBytes []byte) any {
-		probeprint.GlobalConfig = &stroppy.GlobalConfig{}
-		if err := proto.Unmarshal(configBytes, probeprint.GlobalConfig); err != nil {
-			return nil
-		}
-		return &driverStub{}
-	}
+func (*genStub) Next() any { return nil }
 
-	values := []struct {
-		name  string
-		value any
-	}{
-		{"NewDriverByConfigBin", extract},
-		{"open", func(string) string { return "" }},
-		{"NotifyStep", func(any, any) {}},
-		{ // TODO: research. Some esbuild name resolution artefact, probably
-			"NotifyStep2",
-			func(any, any) {},
-		},
-		{"Teardown", func(any) {}},
-		{"console", consoleMock(vm)},
-		{"__ENV", spyProxyObject(vm, vm.NewObject(), &probeprint.Envs)},
-		{"Step", stepSpy(&probeprint.steps)},
-		{"parse_sql_with_groups", parseGroupsSpy(vm, &probeprint.SQLSections)},
-		{"NewGeneratorByRuleBin", func() {}},
-		{"Trend", dummyWithNoopConstructor(vm)},
-		{"Rate", dummyWithNoopConstructor(vm)},
-		{"Counter", dummyWithNoopConstructor(vm)},
-	}
+type Mocks []struct {
+	name  string
+	value any
+}
 
-	for _, kv := range values {
+func (m Mocks) Set(vm *js.Runtime) error {
+	for _, kv := range m {
 		if err := vm.Set(kv.name, kv.value); err != nil {
 			return fmt.Errorf("failed to set %q for runtime: %w", kv.name, err)
 		}
@@ -269,61 +242,126 @@ func prepareVMEnvironment(vm *sobek.Runtime, probeprint *Probeprint) error {
 	return nil
 }
 
-func parseGroupsSpy(vm *sobek.Runtime, accessedProps *[]string) func(_ string, _ any) any {
+// prepareVMEnvironment sets up all mocks, polyfills, and globals needed for script execution.
+func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
+	if err := injectEncoderPolyfill(vm); err != nil {
+		return fmt.Errorf("failed to inject encoder polyfill: %w", err)
+	}
+
+	extract := func(configBytes []byte) any {
+		probeprint.GlobalConfig = &stroppy.GlobalConfig{}
+		if err := proto.Unmarshal(configBytes, probeprint.GlobalConfig); err != nil {
+			return err
+		}
+
+		if err := (Mocks{
+			// imports from helpers.ts
+			{"Step", stepSpy(&probeprint.Steps)},
+		}.Set(vm)); err != nil {
+			return err
+		}
+
+		return &driverStub{}
+	}
+
+	if err := (Mocks{
+		// k6 mocks
+		{"__ENV", spyProxyObject(vm, vm.NewObject(), &probeprint.Envs)},
+		{"open", func(string) string { return "" }},
+		{"console", consoleMock(vm)},
+		// k6/metrics
+		{"Trend", dummyWithNoopConstructor(vm)},
+		{"Rate", dummyWithNoopConstructor(vm)},
+		{"Counter", dummyWithNoopConstructor(vm)},
+		// TODO: what if user will use other default modules and their functions?
+
+		// k6/x/stroppy defines
+		{"NewDriverByConfigBin", extract},
+		{"NewGeneratorByRuleBin", func() any { return &genStub{} }},
+		{"Teardown", func(any) {}},
+		{"NotifyStep", notifyStepSpy(&probeprint.Steps)},
+		// TODO: research. Some esbuild name resolution artifact, probably
+		{"NotifyStep2", notifyStepSpy(&probeprint.Steps)},
+
+		{"parse_sql_with_groups", parseGroupsSpy(vm, &probeprint.SQLSections)},
+	}.Set(vm)); err != nil {
+		return fmt.Errorf("error while applying mocks to runtime: %w", err)
+	}
+
+	return nil
+}
+
+func notifyStepSpy(steps *[]string) func(string, any) {
+	return func(s string, a any) {
+		if !slices.Contains(*steps, s) {
+			*steps = append(*steps, s)
+		}
+	}
+}
+
+func parseGroupsSpy(vm *js.Runtime, accessedProps *[]string) func(_ string, _ any) any {
 	return func(_ string, _ any) any {
 		groupsMock := vm.NewObject()
 		proxy := vm.NewProxy(
 			groupsMock,
-			&sobek.ProxyTrapConfig{
+			&js.ProxyTrapConfig{
 				Get: func(
-					target *sobek.Object, property string, receiver sobek.Value,
-				) (value sobek.Value) {
+					_ *js.Object, property string, _ js.Value,
+				) (value js.Value) {
 					*accessedProps = append(*accessedProps, property)
+
 					return vm.NewArray()
 				},
 				GetSym: func(
-					target *sobek.Object, property *sobek.Symbol, receiver sobek.Value,
-				) (value sobek.Value) {
+					_ *js.Object, property *js.Symbol, _ js.Value,
+				) (value js.Value) {
 					*accessedProps = append(*accessedProps, property.String())
+
 					return vm.NewArray()
 				},
 			},
 		)
+
 		return proxy
 	}
 }
 
-// type foreachable struct{}
-
-// func (_ *foreachable) ForEach(_ any)
-
-func stepSpy(steps *[]string) func(name string, lambda sobek.Callable) any {
-	return func(name string, lambda sobek.Callable) any {
+func stepSpy(steps *[]string) func(name string, lambda js.Callable) any {
+	return func(name string, lambda js.Callable) any {
 		*steps = append(*steps, name)
+
 		if lambda != nil {
-			v, _ := lambda(sobek.Undefined())
+			v, _ := lambda(js.Undefined())
+
 			return v
 		}
+
 		return nil
 	}
 }
 
-func spyProxyObject(vm *sobek.Runtime, obj *sobek.Object, accesedProperties *[]string) sobek.Proxy {
+func spyProxyObject(
+	vm *js.Runtime,
+	obj *js.Object,
+	accessedProperties *[]string,
+) js.Proxy {
 	proxy := vm.NewProxy(
 		obj,
-		&sobek.ProxyTrapConfig{
+		&js.ProxyTrapConfig{
 			Get: func(
-				target *sobek.Object, property string, receiver sobek.Value,
-			) (value sobek.Value) {
-				*accesedProperties = append(*accesedProperties, property)
-				return sobek.Undefined()
+				_ *js.Object, property string, _ js.Value,
+			) (value js.Value) {
+				*accessedProperties = append(*accessedProperties, property)
+
+				return js.Undefined()
 			},
 		},
 	)
+
 	return proxy
 }
 
-func dummyWithNoopConstructor(rt *sobek.Runtime) *sobek.Object {
+func dummyWithNoopConstructor(rt *js.Runtime) *js.Object {
 	src := `
   function MyDummy() {}
   MyDummy.prototype.constructor = MyDummy;
@@ -335,28 +373,24 @@ func dummyWithNoopConstructor(rt *sobek.Runtime) *sobek.Object {
 }
 
 // setupConsoleMock sets up a no-op console object.
-func consoleMock(vm *sobek.Runtime) sobek.Value {
+func consoleMock(vm *js.Runtime) *js.Object {
 	console := vm.NewObject()
-	noOp := func(sobek.FunctionCall) sobek.Value { return sobek.Undefined() }
+	noOp := func(js.FunctionCall) js.Value { return js.Undefined() }
 
 	_ = console.Set("log", noOp)
 	_ = console.Set("warn", noOp)
 	_ = console.Set("error", noOp)
+
 	return console
 }
 
-// injectEncoderPolyfill injects TextEncoder/TextDecoder polyfill into the VM.
-//
-//nolint:lll // this is a polyfill for TextEncoder/TextDecoder
-func injectEncoderPolyfill(vm *sobek.Runtime) error {
-	// Minified TextEncoder/TextDecoder polyfill check: https://github.com/anonyco/FastestSmallestTextEncoderDecoder
-	const encodersDef = `'use strict';(function(r){function x(){}function y(){}var z=String.fromCharCode,v={}.toString,A=v.call(r.SharedArrayBuffer),B=v(),q=r.Uint8Array,t=q||Array,w=q?ArrayBuffer:t,C=w.isView||function(g){return g&&"length"in g},D=v.call(w.prototype);w=y.prototype;var E=r.TextEncoder,a=new (q?Uint16Array:t)(32);x.prototype.decode=function(g){if(!C(g)){var l=v.call(g);if(l!==D&&l!==A&&l!==B)throw TypeError("Failed to execute 'decode' on 'TextDecoder': The provided value is not of type '(ArrayBuffer or ArrayBufferView)'");
-g=q?new t(g):g||[]}for(var f=l="",b=0,c=g.length|0,u=c-32|0,e,d,h=0,p=0,m,k=0,n=-1;b<c;){for(e=b<=u?32:c-b|0;k<e;b=b+1|0,k=k+1|0){d=g[b]&255;switch(d>>4){case 15:m=g[b=b+1|0]&255;if(2!==m>>6||247<d){b=b-1|0;break}h=(d&7)<<6|m&63;p=5;d=256;case 14:m=g[b=b+1|0]&255,h<<=6,h|=(d&15)<<6|m&63,p=2===m>>6?p+4|0:24,d=d+256&768;case 13:case 12:m=g[b=b+1|0]&255,h<<=6,h|=(d&31)<<6|m&63,p=p+7|0,b<c&&2===m>>6&&h>>p&&1114112>h?(d=h,h=h-65536|0,0<=h&&(n=(h>>10)+55296|0,d=(h&1023)+56320|0,31>k?(a[k]=n,k=k+1|0,n=-1):
-(m=n,n=d,d=m))):(d>>=8,b=b-d-1|0,d=65533),h=p=0,e=b<=u?32:c-b|0;default:a[k]=d;continue;case 11:case 10:case 9:case 8:}a[k]=65533}f+=z(a[0],a[1],a[2],a[3],a[4],a[5],a[6],a[7],a[8],a[9],a[10],a[11],a[12],a[13],a[14],a[15],a[16],a[17],a[18],a[19],a[20],a[21],a[22],a[23],a[24],a[25],a[26],a[27],a[28],a[29],a[30],a[31]);32>k&&(f=f.slice(0,k-32|0));if(b<c){if(a[0]=n,k=~n>>>31,n=-1,f.length<l.length)continue}else-1!==n&&(f+=z(n));l+=f;f=""}return l};w.encode=function(g){g=void 0===g?"":""+g;var l=g.length|
-0,f=new t((l<<1)+8|0),b,c=0,u=!q;for(b=0;b<l;b=b+1|0,c=c+1|0){var e=g.charCodeAt(b)|0;if(127>=e)f[c]=e;else{if(2047>=e)f[c]=192|e>>6;else{a:{if(55296<=e)if(56319>=e){var d=g.charCodeAt(b=b+1|0)|0;if(56320<=d&&57343>=d){e=(e<<10)+d-56613888|0;if(65535<e){f[c]=240|e>>18;f[c=c+1|0]=128|e>>12&63;f[c=c+1|0]=128|e>>6&63;f[c=c+1|0]=128|e&63;continue}break a}e=65533}else 57343>=e&&(e=65533);!u&&b<<1<c&&b<<1<(c-7|0)&&(u=!0,d=new t(3*l),d.set(f),f=d)}f[c]=224|e>>12;f[c=c+1|0]=128|e>>6&63}f[c=c+1|0]=128|e&63}}return q?
-f.subarray(0,c):f.slice(0,c)};E||(r.TextDecoder=x,r.TextEncoder=y)})(globalThis)`
+//go:embed encodersPolyfill.js
+var encodersDefPolyfill string
 
-	_, err := vm.RunString(encodersDef)
+// injectEncoderPolyfill injects TextEncoder/TextDecoder polyfill into the VM.
+func injectEncoderPolyfill(vm *js.Runtime) error {
+	// Minified TextEncoder/TextDecoder polyfill check: https://github.com/anonyco/FastestSmallestTextEncoderDecoder
+	_, err := vm.RunString(encodersDefPolyfill)
 
 	return err
 }

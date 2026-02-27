@@ -168,11 +168,11 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 .easyp-gen:
 	$(LOCAL_BIN)/easyp generate
 
-.PHONY: .install-linter
-.install-linter: # Install golangci-lint
+.PHONY: install-linter
+install-linter: # Install golangci-lint
 	$(info Installing golangci-lint...)
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.0
+	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.10.1
 
 .PHONY: .install-xk6
 .install-xk6:
@@ -184,7 +184,7 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 .install-proto-deps: .install-protoc .install-easyp .install-go-proto-deps .install-node-proto-deps
 
 .PHONY: install-bin-deps
-install-bin-deps: .install-linter .install-xk6 .install-proto-deps # Install binary dependencies in ./bin
+install-bin-deps: install-linter .install-xk6 .install-proto-deps # Install binary dependencies in ./bin
 	$(info Installing binary dependencies...)
 
 .PHONY: app-deps

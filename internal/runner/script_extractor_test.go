@@ -9,6 +9,7 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
+
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/internal/static"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -45,7 +46,6 @@ Step("my great step", ()=>{ return "wow" });
 }
 
 func Test_parseGroupsSpy(t *testing.T) {
-
 	vm := createVM()
 	accessedProps := []string{}
 

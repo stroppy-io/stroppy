@@ -92,9 +92,15 @@ linters:
     - usestdlibvars
     - varnamelen
     - wastedassign
-    - whitespace
     - wsl_v5
   settings:
+    revive:
+      rules:
+        - name: var-naming
+          arguments:
+            - []
+            - []
+            - - skip-package-name-collision-with-go-std: true
     cyclop:
       max-complexity: 20
       package-average: 0
