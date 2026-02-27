@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/gen"
+	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/probe"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
 	"github.com/stroppy-io/stroppy/internal/version"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
@@ -68,5 +69,5 @@ func init() {
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)
 
-	rootCmd.AddCommand(versionCmd, run.Cmd, gen.Cmd)
+	rootCmd.AddCommand(versionCmd, run.Cmd, gen.Cmd, probe.Cmd)
 }

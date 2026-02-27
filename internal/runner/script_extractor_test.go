@@ -35,12 +35,13 @@ func Test_stepSpy(t *testing.T) {
 	vm := createVM()
 	steps := []string{}
 	require.NoError(t, vm.Set("Step", stepSpy(&steps)))
-	_, err := vm.RunString(`
-Step("my great step", ()=>{});
+	v, err := vm.RunString(`
 Step("other step", undefined);
+Step("my great step", ()=>{ return "wow" });
 `)
 	require.NoError(t, err)
-	require.Equal(t, []string{"my great step", "other step"}, steps)
+	require.Equal(t, "wow", v.ToString().String())
+	require.Equal(t, []string{"other step", "my great step"}, steps)
 }
 
 func Test_parseGroupsSpy(t *testing.T) {

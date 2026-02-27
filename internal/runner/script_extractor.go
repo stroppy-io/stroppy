@@ -1,10 +1,13 @@
 package runner
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/grafana/sobek"
@@ -22,10 +25,57 @@ var (
 
 // Probeprint contains configuration and other metainformation extracted from a TypeScript script.
 type Probeprint struct {
-	GlobalConfig *stroppy.GlobalConfig
-	Steps        []string
-	SQLSections  []string
-	Envs         []string
+	GlobalConfig *stroppy.GlobalConfig `json:"global_config"`
+	SQLSections  []string              `json:"sql_sections"`
+	Envs         []string              `json:"envs"`
+
+	// Is not exported because is broken now.
+	// TODO: we need to exclude "Step" imported from "./helpers.ts" to allow mock to work.
+	steps []string // `json:"steps"`
+}
+
+func (p *Probeprint) Explain() string {
+	sb := &strings.Builder{}
+
+	// Global Config
+	sb.WriteString("Global Config:\n")
+	if p.GlobalConfig != nil {
+		configJSON, _ := json.MarshalIndent(p.GlobalConfig, "", "  ")
+		sb.WriteString(string(configJSON))
+		sb.WriteString("\n\n")
+	} else {
+		sb.WriteString("  (no config)\n\n")
+	}
+
+	// SQL Sections
+	sb.WriteString("SQL Sections:\n")
+	if len(p.SQLSections) > 0 {
+		for _, section := range p.SQLSections {
+			fmt.Fprintf(sb, "--+%s\n", section)
+		}
+	} else {
+		sb.WriteString("  (no sections)\n")
+	}
+	sb.WriteString("\n")
+
+	// Environment Variables
+	sb.WriteString("Environment Variables:\n")
+	if len(p.Envs) > 0 {
+		for _, env := range p.Envs {
+			parts := strings.SplitN(env, "=", 2)
+			varName := parts[0]
+			currentVal := os.Getenv(varName)
+			if currentVal == "" {
+				fmt.Fprintf(sb, "  %s=\"\"\n", varName)
+			} else {
+				fmt.Fprintf(sb, "  %s=%s\n", varName, currentVal)
+			}
+		}
+	} else {
+		sb.WriteString("  (no environment variables)\n")
+	}
+
+	return sb.String()
 }
 
 // TranspileTypeScript transpiles TypeScript to JavaScript using esbuild.
@@ -48,7 +98,7 @@ func TranspileTypeScript(entryPath string) (string, error) {
 		Write:             false, // keep outputs in-memory
 		LogLevel:          api.LogLevelError,
 		AbsWorkingDir:     dirAbs,
-		External:          []string{"k6/x/*", "k6/*"},
+		External:          []string{"k6/x/*", "k6/*", "./parse_sql.js"},
 		MainFields:        []string{"module", "main"},
 		ResolveExtensions: []string{".ts", ".tsx", ".js", ".mjs", ".json"},
 		Loader: map[string]api.Loader{
@@ -71,6 +121,11 @@ func TranspileTypeScript(entryPath string) (string, error) {
 	return string(result.OutputFiles[0].Contents), nil
 }
 
+// ProbeScript runs the script at the scriptPath in a mocked k6+stroppy runtime.
+// Required to probe in a full stroppy workdir with all the scripts.
+//
+// TODO: Drop the workdir requirement.
+// Refactor the transpilation to put workdir scripts at the transpilation phase directly to a user script.
 func ProbeScript(scriptPath string) (*Probeprint, error) {
 
 	jsCode, err := TranspileTypeScript(scriptPath)
@@ -88,12 +143,13 @@ func ProbeScript(scriptPath string) (*Probeprint, error) {
 	return probeprint, nil
 }
 
+var reEncodingObjectImport = regexp.MustCompile(`import\s+(\w+)\s+from\s+["']k6/x/encoding["'];?`)
+
 func ProbeJSTest(vm *sobek.Runtime, jsCode string) (*Probeprint, error) {
 	// Mock k6/x/encoding import
 	// This is needed because the extraction VM doesn't have the k6/x/encoding module.
 	// We replace the import with a const that exposes the polyfilled TextEncoder/TextDecoder.
-	re := regexp.MustCompile(`import\s+(\w+)\s+from\s+["']k6/x/encoding["'];?`)
-	jsCode = re.ReplaceAllString(
+	jsCode = reEncodingObjectImport.ReplaceAllString(
 		jsCode,
 		`const $1 = { TextEncoder: globalThis.TextEncoder, TextDecoder: globalThis.TextDecoder };`,
 	)
@@ -103,11 +159,55 @@ func ProbeJSTest(vm *sobek.Runtime, jsCode string) (*Probeprint, error) {
 		return nil, fmt.Errorf("failed to prepare VM environment: %w", err)
 	}
 
-	// Stage 3: Execute the script
 	if _, err := vm.RunString(jsCode); err != nil {
 		return nil, fmt.Errorf("failed to execute script: %w", err)
 	}
+
+	if err := runK6Handles(vm); err != nil {
+		return nil, fmt.Errorf("failed to run k6 functions: %w", err)
+	}
+
 	return probeprint, nil
+}
+
+func runK6Handles(vm *sobek.Runtime) error {
+	if setup := vm.Get("setup"); setup != nil { // defined
+		if fn, ok := sobek.AssertFunction(setup); ok {
+			if _, err := fn(sobek.Undefined()); err != nil { // we need just exec it
+				return fmt.Errorf("failed to call setup() function: %w", err)
+			}
+		}
+	}
+
+	options := vm.Get("options")
+	if options != nil {
+		// TODO: handle custom "exec" functions properly, as k6 do
+	} else { // user test is only "default" function
+
+		defaultV := vm.Get("setup")
+		if defaultV == nil { // defined
+			return errors.New("test function not defined nor default or custom in options.scenarios[_].exec")
+		}
+
+		defaultFn, ok := sobek.AssertFunction(defaultV)
+		if !ok {
+			return errors.New("default is not a function and no custom function defined in options.scenarios[_].exec")
+		}
+
+		if _, err := defaultFn(sobek.Undefined()); err != nil { // we need just exec it
+			return fmt.Errorf("failed to call default() function: %w", err)
+		}
+	}
+
+	if teardown := vm.Get("teardown"); teardown != nil { // defined
+		if fn, ok := sobek.AssertFunction(teardown); ok {
+			if _, err := fn(sobek.Undefined()); err != nil { // we need just exec it
+				return fmt.Errorf("failed to call teardown() function: %w", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // createVM creates and configures a new sobek VM instance.
@@ -119,18 +219,23 @@ func createVM() *sobek.Runtime {
 	return vm
 }
 
+type driverStub struct{}
+
+func (d *driverStub) RunQuery(sql string, args map[string]any) any      { return nil }
+func (d *driverStub) InsertValuesBin(insertMsg []byte, count int64) any { return nil }
+
 // prepareVMEnvironment sets up all mocks, polyfills, and globals needed for script execution.
 func prepareVMEnvironment(vm *sobek.Runtime, probeprint *Probeprint) error {
 	if err := injectEncoderPolyfill(vm); err != nil {
 		return fmt.Errorf("failed to inject encoder polyfill: %w", err)
 	}
 
-	extract := func(configBytes []byte) sobek.Value {
+	extract := func(configBytes []byte) any {
 		probeprint.GlobalConfig = &stroppy.GlobalConfig{}
 		if err := proto.Unmarshal(configBytes, probeprint.GlobalConfig); err != nil {
 			return nil
 		}
-		return sobek.Undefined()
+		return &driverStub{}
 	}
 
 	values := []struct {
@@ -139,9 +244,15 @@ func prepareVMEnvironment(vm *sobek.Runtime, probeprint *Probeprint) error {
 	}{
 		{"NewDriverByConfigBin", extract},
 		{"open", func(string) string { return "" }},
+		{"NotifyStep", func(any, any) {}},
+		{ // TODO: research. Some esbuild name resolution artefact, probably
+			"NotifyStep2",
+			func(any, any) {},
+		},
+		{"Teardown", func(any) {}},
 		{"console", consoleMock(vm)},
 		{"__ENV", spyProxyObject(vm, vm.NewObject(), &probeprint.Envs)},
-		{"Step", stepSpy(&probeprint.Steps)},
+		{"Step", stepSpy(&probeprint.steps)},
 		{"parse_sql_with_groups", parseGroupsSpy(vm, &probeprint.SQLSections)},
 		{"NewGeneratorByRuleBin", func() {}},
 		{"Trend", dummyWithNoopConstructor(vm)},
@@ -160,21 +271,21 @@ func prepareVMEnvironment(vm *sobek.Runtime, probeprint *Probeprint) error {
 
 func parseGroupsSpy(vm *sobek.Runtime, accessedProps *[]string) func(_ string, _ any) any {
 	return func(_ string, _ any) any {
-		gpoupsMock := vm.NewObject()
+		groupsMock := vm.NewObject()
 		proxy := vm.NewProxy(
-			gpoupsMock,
+			groupsMock,
 			&sobek.ProxyTrapConfig{
 				Get: func(
 					target *sobek.Object, property string, receiver sobek.Value,
 				) (value sobek.Value) {
 					*accessedProps = append(*accessedProps, property)
-					return sobek.Undefined()
+					return vm.NewArray()
 				},
 				GetSym: func(
 					target *sobek.Object, property *sobek.Symbol, receiver sobek.Value,
 				) (value sobek.Value) {
 					*accessedProps = append(*accessedProps, property.String())
-					return sobek.Undefined()
+					return vm.NewArray()
 				},
 			},
 		)
@@ -182,9 +293,18 @@ func parseGroupsSpy(vm *sobek.Runtime, accessedProps *[]string) func(_ string, _
 	}
 }
 
-func stepSpy(steps *[]string) func(name string, lambda any) {
-	return func(name string, _ any) {
+// type foreachable struct{}
+
+// func (_ *foreachable) ForEach(_ any)
+
+func stepSpy(steps *[]string) func(name string, lambda sobek.Callable) any {
+	return func(name string, lambda sobek.Callable) any {
 		*steps = append(*steps, name)
+		if lambda != nil {
+			v, _ := lambda(sobek.Undefined())
+			return v
+		}
+		return nil
 	}
 }
 

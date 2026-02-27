@@ -78,6 +78,7 @@ export class DriverX {
     );
 
     const tags = { table_name: descriptor.tableName ?? "unknown" };
+    if (!results) return 
     if (isQueryStats(results)) {
       insertErrRateMetric.add(0, tags);
       insertMetric.add(results.elapsed.milliseconds(), tags);
@@ -101,6 +102,7 @@ export class DriverX {
       ? undefined
       : { name: sqlOrQuery.name, type: sqlOrQuery.type };
 
+    if (!result) return 
     if (isQueryStats(result)) {
       runQueryMetric.add(result.elapsed.milliseconds(), tags);
       runQueryErrRateMetric.add(0, tags);
