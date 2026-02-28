@@ -1,3 +1,4 @@
+// Package probe contains command to get metainformation about test.
 package probe
 
 import (
@@ -5,15 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/pkg/probe"
 )
 
 const (
@@ -28,13 +27,10 @@ const (
 )
 
 var (
-	formats           = []string{humanFormat, jsonFormat}
-	formatsWithCommas = strings.Join(formats, ", ")
-)
-
-var (
-	ErrUnsoportedFomat = errors.New("unsupported format")
-	Cmd                = func() *cobra.Command {
+	formats             = []string{humanFormat, jsonFormat}
+	formatsWithCommas   = strings.Join(formats, ", ")
+	ErrUnsoportedFormat = errors.New("unsupported format")
+	Cmd                 = func() *cobra.Command {
 		cmd := &cobra.Command{
 			Use: "probe",
 			// TODO: auto detect tests with magic test.ts name.
@@ -55,27 +51,21 @@ var (
 						"%q, available (%s): %w",
 						formatFlagValue,
 						formatsWithCommas,
-						ErrUnsoportedFomat,
+						ErrUnsoportedFormat,
 					)
 				}
 
-				lg := logger.Global()
-				if formatFlagValue == jsonFormat {
-					lg = zap.NewNop()
+				var (
+					probeprint *runner.Probeprint
+					err        error
+				)
+
+				if localFlagValue {
+					probeprint, err = runner.ProbeScript(scriptPath)
+				} else {
+					probeprint, err = probe.ScriptInTmp(scriptPath, sqlPath)
 				}
 
-				// TODO: get rid of tempDir. See transpilation process...
-				if !localFlagValue {
-					tempDir, err := runner.CreateAndInitTempDir(lg, scriptPath, sqlPath)
-					if err != nil {
-						return fmt.Errorf("error while creating temporary dir: %w", err)
-					}
-					defer os.RemoveAll(tempDir)
-
-					scriptPath = filepath.Join(tempDir, filepath.Base(scriptPath))
-				}
-
-				probeprint, err := runner.ProbeScript(scriptPath)
 				if err != nil {
 					return fmt.Errorf("error while probbing %q: %w", scriptPath, err)
 				}
@@ -97,17 +87,12 @@ var (
 		}
 
 		cmd.Flags().
-			StringP(
-				formatFlag, string(formatFlag[0]), humanFormat,
-				fmt.Sprintf("(%s)", formatsWithCommas),
-			)
+			StringP(formatFlag, string(formatFlag[0]), humanFormat,
+				fmt.Sprintf("(%s)", formatsWithCommas))
+
 		cmd.Flags().
-			BoolP(
-				localFlag,
-				string(localFlag[0]),
-				false,
-				"prevent tmp dir creation (use local dependencies in test working directory)",
-			)
+			BoolP(localFlag, string(localFlag[0]), false,
+				"prevent tmp dir creation (use local dependencies in test working directory)")
 
 		return cmd
 	}()

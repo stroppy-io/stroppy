@@ -1,25 +1,25 @@
---+ section cleanup
---= query
+--+ cleanup
+--=
 DROP TABLE IF EXISTS pgbench_history CASCADE;
---= query
+--=
 DROP TABLE IF EXISTS pgbench_accounts CASCADE;
---= query
+--=
 DROP TABLE IF EXISTS pgbench_tellers CASCADE;
---= query
+--=
 DROP TABLE IF EXISTS pgbench_branches CASCADE;
---= query
+--=
 DROP FUNCTION IF EXISTS tpcb_transaction;
 
 
---+ section create_schema
---= query
+--+ create_schema
+--=
 CREATE TABLE pgbench_branches (
     bid INTEGER NOT NULL PRIMARY KEY,
     bbalance INTEGER,
     filler CHAR(88)
 );
 
---= query
+--=
 CREATE TABLE pgbench_tellers (
     tid INTEGER NOT NULL PRIMARY KEY,
     bid INTEGER,
@@ -27,7 +27,7 @@ CREATE TABLE pgbench_tellers (
     filler CHAR(84)
 );
 
---= query
+--=
 CREATE TABLE pgbench_accounts (
     aid INTEGER NOT NULL PRIMARY KEY,
     bid INTEGER,
@@ -35,7 +35,7 @@ CREATE TABLE pgbench_accounts (
     filler CHAR(84)
 );
 
---= query
+--=
 CREATE TABLE pgbench_history (
     tid INTEGER,
     bid INTEGER,
@@ -44,12 +44,12 @@ CREATE TABLE pgbench_history (
     mtime TIMESTAMP,
     filler CHAR(22)
 );
---= query
+--=
 CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid);
---= query
+--=
 CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid);
 
---= query 
+--=
 CREATE OR REPLACE FUNCTION tpcb_transaction(
     p_aid INTEGER,
     p_tid INTEGER,
@@ -90,41 +90,16 @@ BEGIN
 END;
 $$;
 
---+ section analyze
---= query
+--+ analyze
+--=
 VACUUM ANALYZE pgbench_branches;
---= query
+--=
 VACUUM ANALYZE pgbench_tellers;
---= query
+--=
 VACUUM ANALYZE pgbench_accounts;
---= query
+--=
 VACUUM ANALYZE pgbench_history;
 
---+ section insert
---= query
-INSERT INTO pgbench_branches (bid, bbalance, filler)
-SELECT
-    generate_series(1, 1), -- scale factor
-    0,
-    REPEAT('x', 88);
-
---= query
-INSERT INTO pgbench_tellers (tid, bid, tbalance, filler)
-SELECT
-    generate_series(1, 10), -- 10 * scale factor
-    ((generate_series(1, 10) - 1) / 10) + 1,
-    0,
-    REPEAT('x', 84);
-
---= query
-INSERT INTO pgbench_accounts (aid, bid, abalance, filler)
-SELECT
-    generate_series(1, 100000), -- 100000 * scale factor
-    ((generate_series(1, 100000) - 1) / 100000) + 1,
-    0,
-    REPEAT('x', 84);
-
---+ section workload
---= query
+--+ workload
+--= tpcb_transaction
 SELECT tpcb_transaction(:p_aid, :p_tid, :p_bid, :p_delta)
-

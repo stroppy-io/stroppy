@@ -3,6 +3,7 @@ package probe
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"go.uber.org/zap"
 
@@ -25,5 +26,5 @@ func ScriptInTmp(scriptPath, sqlPath string) (*runner.Probeprint, error) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	return runner.ProbeScript(scriptPath)
+	return runner.ProbeScript(filepath.Join(tempDir, filepath.Base(scriptPath)))
 }

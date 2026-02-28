@@ -7,7 +7,7 @@ import { NotifyStep, Teardown } from "k6/x/stroppy";
 
 import { Status, InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
 import { NewGen, AB, R, Step, DriverX, S } from "./helpers.ts";
-import { parse_sql_with_groups } from "./parse_sql.js";
+import { parse_sql_with_sections } from "./parse_sql.js";
 
 const DURATION = __ENV.DURATION || "1h";
 export const options: Options = {
@@ -68,12 +68,12 @@ const driver = DriverX.fromConfig({
   },
 });
 
-const sections = parse_sql_with_groups(open(__ENV.SQL_FILE));
+const sql = parse_sql_with_sections(open(__ENV.SQL_FILE));
 
 export function setup() {
   Step("create_schema", () => {
-    sections["drop_schema"].forEach((query) => driver.runQuery(query, {}));
-    sections["create_schema"].forEach((query) => driver.runQuery(query, {}));
+    sql("drop_schema").forEach((query) => driver.runQuery(query, {}));
+    sql("create_schema").forEach((query) => driver.runQuery(query, {}));
   });
 
   Step("load_data", () => {
@@ -193,8 +193,9 @@ const newOrderMaxWarehouseGen = NewGen(1, R.int32(WAREHOUSES));
 const newOrderDistrictGen = NewGen(2, R.int32(1, DISTRICTS_PER_WAREHOUSE));
 const newOrderCustomerGen = NewGen(3, R.int32(1, CUSTOMERS_PER_DISTRICT));
 const newOrderOlCntGen = NewGen(4, R.int32(5, 15));
+
 export function new_order() {
-  driver.runQuery("SELECT NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt, 0)", {
+  driver.runQuery(sql("workload", "new_order")!, {
     w_id: newOrderWarehouseGen.next(),
     max_w_id: newOrderMaxWarehouseGen.next(),
     d_id: newOrderDistrictGen.next(),
@@ -213,10 +214,9 @@ const paymentCustomerDistrictGen = NewGen(
 const paymentCustomerGen = NewGen(9, R.int32(1, CUSTOMERS_PER_DISTRICT));
 const paymentAmountGen = NewGen(10, R.double(1, 5000));
 const paymentCustomerLastGen = NewGen(11, S.str(6, 16));
+
 export function payments() {
-  driver.runQuery(
-    "SELECT PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last)",
-    {
+  driver.runQuery(sql("workload", "payment")!, {
       p_w_id: paymentWarehouseGen.next(),
       p_d_id: paymentDistrictGen.next(),
       p_c_w_id: paymentCustomerWarehouseGen.next(),
@@ -233,10 +233,9 @@ const orderStatusWarehouseGen = NewGen(12, R.int32(1, WAREHOUSES));
 const orderStatusDistrictGen = NewGen(13, R.int32(1, DISTRICTS_PER_WAREHOUSE));
 const orderStatusCustomerGen = NewGen(14, R.int32(1, CUSTOMERS_PER_DISTRICT));
 const orderStatusCustomerLastGen = NewGen(15, R.str(8, 16));
+
 export function order_status() {
-  driver.runQuery(
-    "SELECT * FROM OSTAT(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)",
-    {
+  driver.runQuery(sql("workload", "order_status")!, {
       os_w_id: orderStatusWarehouseGen.next(),
       os_d_id: orderStatusDistrictGen.next(),
       os_c_id: orderStatusCustomerGen.next(),
@@ -248,8 +247,9 @@ export function order_status() {
 
 const deliveryWarehouseGen = NewGen(16, R.int32(1, WAREHOUSES));
 const deliveryCarrierGen = NewGen(17, R.int32(1, DISTRICTS_PER_WAREHOUSE));
+
 export function delivery() {
-  driver.runQuery("SELECT DELIVERY(:d_w_id, :d_o_carrier_id)", {
+  driver.runQuery(sql("workload", "delivery")!, {
     d_w_id: deliveryWarehouseGen.next(),
     d_o_carrier_id: deliveryCarrierGen.next(),
   });
@@ -258,8 +258,9 @@ export function delivery() {
 const stockLevelWarehouseGen = NewGen(18, R.int32(1, WAREHOUSES));
 const stockLevelDistrictGen = NewGen(19, R.int32(1, DISTRICTS_PER_WAREHOUSE));
 const stockLevelThresholdGen = NewGen(20, R.int32(10, 20));
+
 export function stock_level() {
-  driver.runQuery("SELECT SLEV(:st_w_id, :st_d_id, :threshold)", {
+  driver.runQuery(sql("workload", "stock_level")!, {
     st_w_id: stockLevelWarehouseGen.next(),
     st_d_id: stockLevelDistrictGen.next(),
     threshold: stockLevelThresholdGen.next(),

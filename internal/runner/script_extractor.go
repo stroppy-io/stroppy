@@ -283,7 +283,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		// TODO: research. Some esbuild name resolution artifact, probably
 		{"NotifyStep2", notifyStepSpy(&probeprint.Steps)},
 
-		{"parse_sql_with_groups", parseGroupsSpy(vm, &probeprint.SQLSections)},
+		{"parse_sql_with_sections", parseSectionsSpy(&probeprint.SQLSections)},
 	}.Set(vm)); err != nil {
 		return fmt.Errorf("error while applying mocks to runtime: %w", err)
 	}
@@ -299,30 +299,48 @@ func notifyStepSpy(steps *[]string) func(string, any) {
 	}
 }
 
-func parseGroupsSpy(vm *js.Runtime, accessedProps *[]string) func(_ string, _ any) any {
-	return func(_ string, _ any) any {
-		groupsMock := vm.NewObject()
-		proxy := vm.NewProxy(
-			groupsMock,
-			&js.ProxyTrapConfig{
-				Get: func(
-					_ *js.Object, property string, _ js.Value,
-				) (value js.Value) {
-					*accessedProps = append(*accessedProps, property)
+type ParsedQuery struct {
+	Name   string
+	SQL    string
+	Type   string
+	Params []string
+}
 
-					return vm.NewArray()
-				},
-				GetSym: func(
-					_ *js.Object, property *js.Symbol, _ js.Value,
-				) (value js.Value) {
-					*accessedProps = append(*accessedProps, property.String())
+func parseSectionsSpy(
+	sections *[]SQLSection,
+) func(string, any) func(*string, *string) any {
+	return func(string, any) func(*string, *string) any {
+		return func(sectionName *string, queryName *string) any {
+			if sectionName != nil && *sectionName != "" {
+				var section *SQLSection
 
-					return vm.NewArray()
-				},
-			},
-		)
+				i := slices.IndexFunc(*sections,
+					func(s SQLSection) bool { return s.Name == *sectionName },
+				)
+				if i == -1 {
+					*sections = append(*sections, SQLSection{Name: *sectionName})
+					i = len(*sections) - 1
+				}
 
-		return proxy
+				section = &(*sections)[i]
+
+				queries := &section.Queries
+				if queryName != nil && *queryName != "" {
+					j := slices.IndexFunc(*queries,
+						func(s SQLQuery) bool { return s.Name == *queryName },
+					)
+					if j == -1 {
+						*queries = append(*queries, SQLQuery{Name: *queryName})
+					}
+
+					return ParsedQuery{}
+				}
+
+				return []ParsedQuery{}
+			}
+
+			return nil // TODO: proxy object
+		}
 	}
 }
 

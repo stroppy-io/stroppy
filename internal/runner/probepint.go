@@ -14,13 +14,23 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
+type SQLQuery struct {
+	Name string `json:"name"`
+	Text string `json:"text"`
+}
+
+type SQLSection struct {
+	Name    string     `json:"name"`
+	Queries []SQLQuery `json:"queries"`
+}
+
 type Subprobe struct {
 	// Options is k6 export const options = { ... }
 	Options *lib.Options `json:"options"`
 
 	// Not nil if the test uses the parse_sql_with_groups function and accessing its groups/sections.
 	// Like this sections["create_schema"]...
-	SQLSections []string `json:"sql_sections"`
+	SQLSections []SQLSection `json:"sql_sections"`
 
 	// Envs is environment variables which test checks while execution.
 	// It's a list of envs names (not K=V, just K)
@@ -110,7 +120,11 @@ func (p *Probeprint) Explain() string { //nolint: gocognit // just fine
 
 	if len(p.SQLSections) > 0 {
 		for _, section := range p.SQLSections {
-			fmt.Fprintf(sb, "--+ %s\n", section)
+			fmt.Fprintf(sb, "--+ %s\n", section.Name)
+
+			for _, query := range section.Queries {
+				fmt.Fprintf(sb, "--= %s\n", query.Name)
+			}
 		}
 	} else {
 		sb.WriteString("  (no sections)\n")

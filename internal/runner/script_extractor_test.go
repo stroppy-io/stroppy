@@ -47,24 +47,22 @@ Step("my great step", ()=>{ return "wow" });
 
 func Test_parseGroupsSpy(t *testing.T) {
 	vm := createVM()
-	accessedProps := []string{}
+	accessedProps := []SQLSection{}
 
-	require.NoError(t, vm.Set("parse_sql_with_groups", parseGroupsSpy(vm, &accessedProps)))
+	require.NoError(t, vm.Set("parse_sql_with_groups", parseSectionsSpy(&accessedProps)))
 
 	_, err := vm.RunString(`
 const groups = parse_sql_with_groups("", null);
-groups["some group directly"];
+groups("some group directly");
 const group_name = "my dynamic name"
-groups[group_name];
-groups.my_simple_name_as_property;
+groups(group_name);
 `)
 	require.NoError(t, err)
 	require.Equal(
 		t,
-		[]string{
-			"some group directly",
-			"my dynamic name",
-			"my_simple_name_as_property",
+		[]SQLSection{
+			{Name: "some group directly"},
+			{Name: "my dynamic name"},
 		},
 		accessedProps,
 	)
