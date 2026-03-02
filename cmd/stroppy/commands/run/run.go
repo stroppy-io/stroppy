@@ -25,6 +25,7 @@ Examples:
 	DisableFlagParsing: true,
 	RunE: func(_ *cobra.Command, args []string) error {
 		scriptPath := args[0]
+
 		sqlPath := ""
 		if len(args) > 1 {
 			sqlPath = args[1]

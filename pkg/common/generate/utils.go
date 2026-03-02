@@ -196,7 +196,7 @@ func decimalPtrToDecimal(decimalPtr *stroppy.Decimal) decimal.Decimal {
 }
 
 func alphabetToChars(alphabet *stroppy.Generation_Alphabet) [][2]int32 {
-	ranges := make([][2]int32, 0)
+	ranges := make([][2]int32, 0, len(alphabet.GetRanges()))
 	for _, rg := range alphabet.GetRanges() {
 		ranges = append(
 			ranges,

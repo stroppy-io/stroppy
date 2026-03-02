@@ -36,7 +36,7 @@ const driver = DriverX.fromConfig({
   metadata: {},
 });
 
-const parsedQueries = parse_sql(open(__ENV.SQL_FILE));
+const queries = parse_sql(open(__ENV.SQL_FILE));
 
 export function setup() {
   NotifyStep("workload", Status.STATUS_RUNNING);
@@ -44,7 +44,7 @@ export function setup() {
 }
 
 export function workload() {
-  parsedQueries.forEach((query) => {
+  queries().forEach((query) => {
     console.log(`tpc-ds-like: ${query.name}`);
     driver.runQuery(query, {});
   });

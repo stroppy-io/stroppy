@@ -7,7 +7,7 @@ import { NotifyStep, Teardown } from "k6/x/stroppy";
 
 import { Status, InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
 import { DriverX, NewGen, AB, R, Step, S } from "./helpers.ts";
-import { parse_sql_with_groups } from "./parse_sql.js";
+import { parse_sql_with_sections } from "./parse_sql.js";
 
 // TPC-B Configuration Constants
 const SCALE_FACTOR = +(__ENV.SCALE_FACTOR || 1);
@@ -40,16 +40,13 @@ const driver = DriverX.fromConfig({
   },
 });
 
-const sections = parse_sql_with_groups(open(__ENV.SQL_FILE));
+const sql = parse_sql_with_sections(open(__ENV.SQL_FILE));
 
 // Setup function: create schema and load data
 export function setup() {
   Step("create_schema", () => {
-    sections["section cleanup"].forEach((query) => driver.runQuery(query, {}));
-
-    sections["section create_schema"].forEach((query) =>
-      driver.runQuery(query, {}),
-    );
+    sql("cleanup").forEach((query) => driver.runQuery(query, {}));
+    sql("create_schema").forEach((query) => driver.runQuery(query, {}));
   });
 
   Step("load_data", () => {
@@ -82,7 +79,7 @@ export function setup() {
       },
     });
 
-    sections["section analyze"].forEach((query) => driver.runQuery(query, {}));
+    sql("analyze").forEach((query) => driver.runQuery(query, {}));
   });
 
   NotifyStep("workload", Status.STATUS_RUNNING);
@@ -97,7 +94,7 @@ const deltaGen = NewGen(8, R.int32(-5000, 5000));
 
 // TPC-B transaction workload
 export function tpcb_transaction() {
-  driver.runQuery("SELECT tpcb_transaction(:p_aid, :p_tid, :p_bid, :p_delta)", {
+  driver.runQuery(sql("workload", "tpcb_transaction")!, {
     p_aid: aidGen.next(),
     p_tid: tidGen.next(),
     p_bid: bidGen.next(),

@@ -25,7 +25,7 @@ type ScriptRunner struct {
 	scriptPath string
 	sqlPath    string // optional SQL file path
 	tempDir    string
-	config     *ExtractedConfig
+	config     *Probeprint
 	k6RunArgs  []string // pass args directly to 'k6 run <k6RunArgs>'
 }
 
@@ -56,12 +56,12 @@ func NewScriptRunner(scriptPath, sqlPath string, k6RunArgs []string) (*ScriptRun
 	scriptPath = filepath.Join(tempDir, filepath.Base(scriptPath))
 
 	// Extract config from script
-	config, err := ExtractConfigFromScript(scriptPath)
+	config, err := ProbeScript(scriptPath)
 	if err != nil {
 		// Config extraction is optional - script might not call defineConfig
 		lg.Warn("Could not extract config from script", zap.Error(err))
 
-		config = &ExtractedConfig{
+		config = &Probeprint{
 			GlobalConfig: &stroppy.GlobalConfig{},
 		}
 	}
@@ -89,6 +89,8 @@ func NewScriptRunner(scriptPath, sqlPath string, k6RunArgs []string) (*ScriptRun
 
 // Run executes the script with k6.
 func (r *ScriptRunner) Run(ctx context.Context) error {
+	// For now it is oneshot run.
+	// TODO: multi-run scripts
 	defer os.RemoveAll(r.tempDir)
 
 	args := []string{}

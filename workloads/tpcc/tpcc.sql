@@ -5,7 +5,7 @@ DROP FUNCTION IF EXISTS SLEV, OSTAT, DELIVERY, PAYMENT, NEWORD, DBMS_RANDOM;
 DROP TABLE IF EXISTS order_line, new_order, orders, history, stock, customer, district, warehouse, item CASCADE;
 
 --+ create_schema
---= query
+--= warehouse
 CREATE TABLE warehouse (
   w_id INTEGER PRIMARY KEY,
   w_name VARCHAR(10),
@@ -17,7 +17,7 @@ CREATE TABLE warehouse (
   w_tax DECIMAL(4,4),
   w_ytd DECIMAL(12,2)
 )
---= query
+--= district
 CREATE TABLE district (
   d_id INTEGER,
   d_w_id INTEGER REFERENCES warehouse(w_id),
@@ -32,7 +32,7 @@ CREATE TABLE district (
   d_next_o_id INTEGER,
   PRIMARY KEY (d_w_id, d_id)
 )
---= query
+--= customer
 CREATE TABLE customer (
   c_id INTEGER,
   c_d_id INTEGER,
@@ -57,7 +57,7 @@ CREATE TABLE customer (
   c_data VARCHAR(500),
   PRIMARY KEY (c_w_id, c_d_id, c_id)
 )
---= query
+--= history
 CREATE TABLE history (
   h_c_id INTEGER,
   h_c_d_id INTEGER,
@@ -68,14 +68,14 @@ CREATE TABLE history (
   h_amount DECIMAL(6,2),
   h_data VARCHAR(24)
 )
---= query
+--= new_order
 CREATE TABLE new_order (
   no_o_id INTEGER,
   no_d_id INTEGER,
   no_w_id INTEGER REFERENCES warehouse(w_id),
   PRIMARY KEY (no_w_id, no_d_id, no_o_id)
 )
---= query
+--= orders
 CREATE TABLE orders (
   o_id INTEGER,
   o_d_id INTEGER,
@@ -87,7 +87,7 @@ CREATE TABLE orders (
   o_all_local INTEGER,
   PRIMARY KEY (o_w_id, o_d_id, o_id)
 )
---= query
+--= order_line
 CREATE TABLE order_line (
   ol_o_id INTEGER,
   ol_d_id INTEGER,
@@ -101,7 +101,7 @@ CREATE TABLE order_line (
   ol_dist_info CHAR(24),
   PRIMARY KEY (ol_w_id, ol_d_id, ol_o_id, ol_number)
 )
---= query
+--= item
 CREATE TABLE item (
   i_id INTEGER PRIMARY KEY,
   i_im_id INTEGER,
@@ -109,7 +109,7 @@ CREATE TABLE item (
   i_price DECIMAL(5,2),
   i_data VARCHAR(50)
 )
---= query
+--= stock
 CREATE TABLE stock (
   s_i_id INTEGER REFERENCES item(i_id),
   s_w_id INTEGER REFERENCES warehouse(w_id),
@@ -131,7 +131,7 @@ CREATE TABLE stock (
   PRIMARY KEY (s_w_id, s_i_id)
 )
 
---= query
+--= dbms_random
 CREATE OR REPLACE FUNCTION DBMS_RANDOM (INTEGER, INTEGER) RETURNS INTEGER AS $$
 DECLARE
   start_int ALIAS FOR $1;
@@ -141,7 +141,7 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql' STRICT;
 
---= query
+--= neword
 CREATE OR REPLACE FUNCTION NEWORD (
   no_w_id INTEGER,
   no_max_w_id INTEGER,
@@ -222,7 +222,7 @@ EXCEPTION
 END;
 $$ LANGUAGE 'plpgsql';
 
---= query
+--= payment
 CREATE OR REPLACE FUNCTION PAYMENT (
   p_w_id INTEGER,
   p_d_id INTEGER,
@@ -295,7 +295,7 @@ EXCEPTION
 END;
 $$ LANGUAGE 'plpgsql';
 
---= query
+--= delivery
 CREATE OR REPLACE FUNCTION DELIVERY (
   d_w_id INTEGER,
   d_o_carrier_id INTEGER
@@ -369,7 +369,7 @@ EXCEPTION
 END;
 $$ LANGUAGE 'plpgsql';
 
---= query
+--= ostat
 CREATE OR REPLACE FUNCTION OSTAT (
   os_w_id INTEGER,
   os_d_id INTEGER,
@@ -422,7 +422,7 @@ EXCEPTION
 END;
 $$ LANGUAGE 'plpgsql';
 
---= query
+--= slev
 CREATE OR REPLACE FUNCTION SLEV (
   st_w_id INTEGER,
   st_d_id INTEGER,
@@ -451,13 +451,13 @@ END;
 $$ LANGUAGE 'plpgsql';
 
 --+ workload
---= query
+--= new_order
 SELECT NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt, 0)
---= query
+--= payment
 SELECT PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last)
---= query
+--= order_status
 SELECT * FROM OSTAT(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)
---= query
-SELECT DELIVERY(:d_w_id, :d_o_carrier_id);
---= query
-SELECT SLEV(:st_w_id, :st_d_id, :threshold);
+--= delivery
+SELECT DELIVERY(:d_w_id, :d_o_carrier_id)
+--= stock_level
+SELECT SLEV(:st_w_id, :st_d_id, :threshold)

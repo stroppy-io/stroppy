@@ -63,6 +63,7 @@ Examples:
 
 		// Copy static files (protobuf, helpers, parse_sql, k6 binary)
 		allFiles := append(static.StaticFiles, static.DevStaticFiles...)
+
 		err = static.CopyStaticFilesToPath(output, common.FileMode, allFiles...)
 		if err != nil {
 			return fmt.Errorf("failed to copy static files: %w", err)
@@ -76,10 +77,12 @@ Examples:
 		// Copy preset if specified
 		if preset != "" {
 			presetType := workloads.Preset(preset)
+
 			err = workloads.CopyPresetToPath(output, presetType, common.FileMode)
 			if err != nil {
 				return fmt.Errorf("failed to copy preset: %w", err)
 			}
+
 			log.Info("Preset copied", zap.String("preset", preset))
 		}
 
@@ -91,6 +94,7 @@ Examples:
 
 		pathToWriteItself := path.Join(output, filepath.Base(execPath))
 		absTo, errTo := filepath.Abs(filepath.Clean(pathToWriteItself))
+
 		absFrom, errFrom := filepath.Abs(filepath.Clean(execPath))
 		if err = cmp.Or(errTo, errFrom); err != nil {
 			return err

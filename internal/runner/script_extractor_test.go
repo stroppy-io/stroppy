@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/evanw/esbuild/pkg/api"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stroppy-io/stroppy/internal/common"
@@ -14,6 +15,58 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/workloads"
 )
+
+func Test_spyProxyObject(t *testing.T) {
+	vm := createVM()
+	accessedProps := []string{}
+	proxy := spyProxyObject(vm, vm.NewObject(), &accessedProps)
+
+	require.NoError(t, vm.Set("__ENV", proxy))
+
+	_, err := vm.RunString(`
+__ENV.some;
+__ENV.other;
+__ENV.__some_secret || "secret";
+`)
+	require.NoError(t, err)
+	require.Equal(t, []string{"some", "other", "__some_secret"}, accessedProps)
+}
+
+func Test_stepSpy(t *testing.T) {
+	vm := createVM()
+	steps := []string{}
+	require.NoError(t, vm.Set("Step", stepSpy(&steps)))
+	v, err := vm.RunString(`
+Step("other step", undefined);
+Step("my great step", ()=>{ return "wow" });
+`)
+	require.NoError(t, err)
+	require.Equal(t, "wow", v.ToString().String())
+	require.Equal(t, []string{"other step", "my great step"}, steps)
+}
+
+func Test_parseGroupsSpy(t *testing.T) {
+	vm := createVM()
+	accessedProps := []SQLSection{}
+
+	require.NoError(t, vm.Set("parse_sql_with_groups", parseSectionsSpy(&accessedProps)))
+
+	_, err := vm.RunString(`
+const groups = parse_sql_with_groups("", null);
+groups("some group directly");
+const group_name = "my dynamic name"
+groups(group_name);
+`)
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		[]SQLSection{
+			{Name: "some group directly"},
+			{Name: "my dynamic name"},
+		},
+		accessedProps,
+	)
+}
 
 // bundleScriptForTest bundles a TypeScript script with all dependencies from internal/static.
 // It creates a temp directory, copies static files, and uses esbuild to bundle everything.
@@ -103,7 +156,7 @@ func TestExtractConfigFromJS_SimpleConfig(t *testing.T) {
 };
 defineConfig(config);`
 
-	config, err := ExtractConfigFromJS(jsCode, nil)
+	config, err := ProbeJSTest(sobek.New(), jsCode)
 	require.NoError(t, err)
 	require.NotNil(t, config)
 	require.NotNil(t, config.GlobalConfig)
@@ -130,7 +183,7 @@ func TestExtractConfigFromJS_BinaryConfig(t *testing.T) {
 		defineConfig(config);
 	`
 
-	config, err := ExtractConfigFromJS(jsCode, nil)
+	config, err := ProbeJSTest(sobek.New(), jsCode)
 	require.NoError(t, err)
 	require.NotNil(t, config)
 	require.NotNil(t, config.GlobalConfig)
@@ -145,7 +198,7 @@ func TestExtractConfigFromJS_NoConfig(t *testing.T) {
 		const x = 42;
 	`
 
-	config, err := ExtractConfigFromJS(jsCode, nil)
+	config, err := ProbeJSTest(sobek.New(), jsCode)
 	require.Error(t, err)
 	require.Nil(t, config)
 	require.Equal(t, ErrNoConfigProvided, err)
@@ -160,7 +213,7 @@ func TestExtractConfigFromJS_InvalidConfig(t *testing.T) {
 	`
 
 	// This should still work but the config might be empty or partially filled
-	config, err := ExtractConfigFromJS(jsCode, nil)
+	config, err := ProbeJSTest(sobek.New(), jsCode)
 	// The extractor might succeed but with empty config, or it might fail
 	// Let's check what actually happens
 	if err != nil {
@@ -187,7 +240,7 @@ func TestExtractConfigFromJS_WithOpenMock(t *testing.T) {
 		defineConfig(config);
 	`
 
-	openMock := func(filename string) string {
+	_ = func(filename string) string {
 		if filename == "test.sql" {
 			return "CREATE TABLE test (id INTEGER);"
 		}
@@ -195,7 +248,8 @@ func TestExtractConfigFromJS_WithOpenMock(t *testing.T) {
 		return ""
 	}
 
-	config, err := ExtractConfigFromJS(jsCode, openMock)
+	config, err := ProbeJSTest(sobek.New(), jsCode)
+
 	require.NoError(t, err)
 	require.NotNil(t, config)
 	require.NotNil(t, config.GlobalConfig)
@@ -252,7 +306,7 @@ func TestExtractConfigFromScript_ExecuteSQL(t *testing.T) {
 	_ = openMock
 
 	// Extract config from bundled code
-	config, err := ExtractConfigFromJS(bundledJS, openMock)
+	config, err := ProbeJSTest(sobek.New(), bundledJS)
 	require.NoError(t, err, "should extract config from execute_sql.ts")
 	require.NotNil(t, config)
 	require.NotNil(t, config.GlobalConfig)
