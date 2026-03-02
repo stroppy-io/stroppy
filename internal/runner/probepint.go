@@ -73,10 +73,13 @@ func (p *Probeprint) MarshalJSON() ([]byte, error) {
 }
 
 // Explain - human-readable message for users.
+// TODO: Explain(parts (config|options|sql|envs)) feature flags (bit-flags) format.
 func (p *Probeprint) Explain() string { //nolint: gocognit // just fine
 	sb := &strings.Builder{}
 
-	sb.WriteString("Global Config:\n")
+	sb.WriteString("Use 'probe --help' to get details about sections\n\n")
+
+	sb.WriteString("# Stroppy Config:\n")
 
 	if p.GlobalConfig != nil {
 		configJSON, err := protojson.MarshalOptions{
@@ -96,7 +99,7 @@ func (p *Probeprint) Explain() string { //nolint: gocognit // just fine
 		sb.WriteString("  (no config)\n\n")
 	}
 
-	sb.WriteString("K6 Options:\n")
+	sb.WriteString("# K6 Options:\n")
 
 	if p.Options != nil {
 		optionsJSON, err := json.MarshalIndent(p.Options, "", "  ")
@@ -116,23 +119,23 @@ func (p *Probeprint) Explain() string { //nolint: gocognit // just fine
 		sb.WriteString("  (no options)\n\n")
 	}
 
-	sb.WriteString("SQL Sections:\n")
+	sb.WriteString("# SQL File Structure:\n")
 
 	if len(p.SQLSections) > 0 {
 		for _, section := range p.SQLSections {
-			fmt.Fprintf(sb, "--+ %s\n", section.Name)
+			fmt.Fprintf(sb, "  --+ %s\n", section.Name)
 
 			for _, query := range section.Queries {
-				fmt.Fprintf(sb, "--= %s\n", query.Name)
+				fmt.Fprintf(sb, "  --= %s\n", query.Name)
 			}
 		}
 	} else {
-		sb.WriteString("  (no sections)\n")
+		sb.WriteString("  (no sql requirements)\n")
 	}
 
 	sb.WriteString("\n")
 
-	sb.WriteString("Steps:\n")
+	sb.WriteString("# Steps\n")
 
 	if len(p.Steps) > 0 {
 		for _, step := range p.Steps {
@@ -144,7 +147,7 @@ func (p *Probeprint) Explain() string { //nolint: gocognit // just fine
 
 	sb.WriteString("\n")
 
-	sb.WriteString("Environment Variables:\n")
+	sb.WriteString("# Environment Variables:\n")
 
 	if len(p.Envs) > 0 {
 		for _, envName := range p.Envs {
