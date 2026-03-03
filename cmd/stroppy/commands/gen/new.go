@@ -96,6 +96,7 @@ Examples:
 			}
 
 			pathToWriteItself := path.Join(output, filepath.Base(execPath))
+			pathToK6Symlink := path.Join(output, "k6")
 			absTo, errTo := filepath.Abs(filepath.Clean(pathToWriteItself))
 
 			absFrom, errFrom := filepath.Abs(filepath.Clean(execPath))
@@ -117,6 +118,11 @@ Examples:
 				err = os.Chmod(pathToWriteItself, common.FolderMode)
 				if err != nil {
 					return fmt.Errorf("failed to chmod self binary file: %w", err)
+				}
+
+				err = os.Symlink(filepath.Base(execPath), pathToK6Symlink)
+				if err != nil {
+					return fmt.Errorf("failed to symlink k6 to self binary file: %w", err)
 				}
 			}
 

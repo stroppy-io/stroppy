@@ -3,6 +3,7 @@ package runner
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -27,6 +28,7 @@ type ScriptRunner struct {
 	tempDir    string
 	config     *Probeprint
 	k6RunArgs  []string // pass args directly to 'k6 run <k6RunArgs>'
+	filesInTmp []string
 }
 
 // NewScriptRunner creates a new ScriptRunner for the given script.
@@ -48,7 +50,7 @@ func NewScriptRunner(scriptPath, sqlPath string, k6RunArgs []string) (*ScriptRun
 	}
 
 	// Create temp directory
-	tempDir, err := CreateAndInitTempDir(lg, scriptPath, sqlPath)
+	tempDir, tmpFiles, err := CreateAndInitTempDir(lg, scriptPath, sqlPath)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating temporary dir: %w", err)
 	}
@@ -84,6 +86,7 @@ func NewScriptRunner(scriptPath, sqlPath string, k6RunArgs []string) (*ScriptRun
 		config:     config,
 		tempDir:    tempDir,
 		k6RunArgs:  k6RunArgs,
+		filesInTmp: tmpFiles,
 	}, nil
 }
 
@@ -105,17 +108,19 @@ func (r *ScriptRunner) Run(ctx context.Context) error {
 func CreateAndInitTempDir(
 	lg *zap.Logger,
 	scriptPath, sqlPath string,
-) (tempDir string, err error) {
+) (tempDir string, filenames []string, err error) {
 	tempDir, err = os.MkdirTemp(os.TempDir(), "stroppy-k6-")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp directory: %w", err)
+		return "", nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
 	lg.Info("Working directory", zap.String("path", tempDir))
 
 	if err := static.CopyAllStaticFilesToPath(tempDir, common.FileMode); err != nil {
-		return "", fmt.Errorf("failed to copy static files: %w", err)
+		return "", nil, fmt.Errorf("failed to copy static files: %w", err)
 	}
+
+	filenames = append(filenames, common.OutStr(static.StaticFiles)...)
 
 	// Copy user's script to temp directory
 	scriptName := filepath.Base(scriptPath)
@@ -123,16 +128,20 @@ func CreateAndInitTempDir(
 
 	// copy single ts file
 	if err := copyFile(scriptPath, path.Join(tempDir, scriptName)); err != nil {
-		return "", fmt.Errorf("failed to copy script: %w", err)
+		return "", nil, fmt.Errorf("failed to copy script: %w", err)
 	}
+
+	filenames = append(filenames, scriptName)
 
 	if sqlPath != "" {
 		if err := copyFile(sqlPath, path.Join(tempDir, sqlName)); err != nil {
-			return "", fmt.Errorf("failed to copy SQL file %q: %w", sqlName, err)
+			return "", nil, fmt.Errorf("failed to copy SQL file %q: %w", sqlName, err)
 		}
+
+		filenames = append(filenames, sqlName)
 	}
 
-	return tempDir, nil
+	return tempDir, filenames, nil
 }
 
 func copyFile(src, dst string) error {
@@ -142,6 +151,54 @@ func copyFile(src, dst string) error {
 	}
 
 	return os.WriteFile(dst, data, common.FileMode)
+}
+
+var ErrNotADir = errors.New("is not a directory")
+
+func copyFiles(srcDir, dstDir string, excludeNames []string) (copied []string, err error) {
+	srcInfo, err := os.Stat(srcDir)
+	if err != nil {
+		return nil, err
+	}
+
+	if !srcInfo.IsDir() {
+		return nil, fmt.Errorf("%s: %w", srcDir, ErrNotADir)
+	}
+
+	dstInfo, err := os.Stat(dstDir)
+	if err != nil {
+		return nil, err
+	}
+
+	if !dstInfo.IsDir() {
+		return nil, fmt.Errorf("%s: %w", dstDir, ErrNotADir)
+	}
+
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue // Skip all directories
+		}
+
+		if slices.Contains(excludeNames, entry.Name()) {
+			continue
+		}
+
+		srcPath := filepath.Join(srcDir, entry.Name())
+		dstPath := filepath.Join(dstDir, entry.Name())
+
+		if err := copyFile(srcPath, dstPath); err != nil {
+			return copied, err
+		}
+
+		copied = append(copied, entry.Name())
+	}
+
+	return copied, nil
 }
 
 // buildEnvVars builds environment variables for k6 execution.
@@ -233,12 +290,21 @@ func (r *ScriptRunner) runK6(
 		return fmt.Errorf("failed cd to temporary %q: %w", r.tempDir, err)
 	}
 
-	os.Args = slices.Concat([]string{"k6", "run", scriptName}, r.k6RunArgs, args)
+	os.Args = slices.Concat([]string{"k6", "run"}, r.k6RunArgs, args, []string{scriptName})
 
 	r.logger.Debug("Running k6", zap.Strings("args", os.Args))
 
 	// run the test
 	k6cmd.Execute() // TODO: add exit code processing
+
+	copied, err := copyFiles(r.tempDir, dirBefore, r.filesInTmp)
+	r.logger.Debug(
+		"Files copied back to user dir",
+		zap.String("from", r.tempDir),
+		zap.String("to", dirBefore),
+		zap.Strings("copied", copied),
+		zap.Error(err),
+	)
 
 	// restore state
 	os.Clearenv()

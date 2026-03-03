@@ -1,19 +1,10 @@
 package queries
 
 import (
+	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
-
-// Out type params should be [T ~R], but it's not allowed by syntax.
-func Out[R any, T any](xs []T) []R {
-	res := make([]R, 0, len(xs))
-	for _, x := range xs {
-		res = append(res, any(x).(R)) //nolint:errcheck,forcetypeassert // allow panic
-	}
-
-	return res
-}
 
 func collectInsertGenerators(
 	seed uint64,
@@ -35,7 +26,7 @@ func collectInsertGenerators(
 	for _, group := range descriptor.GetGroups() {
 		generator := generate.NewTupleGenerator(
 			seed,
-			Out[generate.GenAbleStruct](group.GetParams()),
+			common.Out[generate.GenAbleStruct](group.GetParams()),
 		)
 		generators[group.GetName()] = generator
 	}
