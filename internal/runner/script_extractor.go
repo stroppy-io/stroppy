@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/evanw/esbuild/pkg/api"
 	js "github.com/grafana/sobek"
@@ -47,9 +48,9 @@ func TranspileTypeScript(entryPath string) (string, error) {
 	result := api.Build(api.BuildOptions{
 		EntryPoints:       []string{entryAbs},
 		Bundle:            true,
-		Platform:          api.PlatformNode,
-		Format:            api.FormatESModule,
-		Target:            api.ES2017,
+		Platform:          api.PlatformNeutral,
+		Format:            api.FormatDefault,
+		Target:            api.ES2019,
 		Sourcemap:         api.SourceMapInline,
 		Write:             false, // keep outputs in-memory
 		LogLevel:          api.LogLevelError,
@@ -115,7 +116,7 @@ func ProbeJSTest(vm *js.Runtime, jsCode string) (*Probeprint, error) {
 	}
 
 	if _, err := vm.RunString(jsCode); err != nil {
-		return nil, fmt.Errorf("failed to execute script: %w", err)
+		return nil, fmt.Errorf("failed to probe script: %w", err)
 	}
 
 	if err := runK6Handles(vm); err != nil {
@@ -133,6 +134,17 @@ func ProbeJSTest(vm *js.Runtime, jsCode string) (*Probeprint, error) {
 }
 
 func execJSFunc(vm *js.Runtime, funcName string, required bool) error {
+	// esbuild produces default function with name <test_file_name>_default.
+	if funcName == "default" {
+		names := vm.GlobalObject().GetOwnPropertyNames()
+
+		idx := slices.IndexFunc(names,
+			func(name string) bool { return strings.Contains(name, "default") })
+		if idx != -1 {
+			funcName = names[idx]
+		}
+	}
+
 	//nolint: nestif // un-nested is uglier
 	if fnValue := vm.Get(funcName); fnValue != nil { // defined
 		if fn, ok := js.AssertFunction(fnValue); ok {
@@ -256,7 +268,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 
 		if err := (Mocks{
 			// imports from helpers.ts
-			{"Step", stepSpy(&probeprint.Steps)},
+			{"Step", stepSpy(vm, &probeprint.Steps)},
 		}.Set(vm)); err != nil {
 			return err
 		}
@@ -284,6 +296,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		{"NotifyStep2", notifyStepSpy(&probeprint.Steps)},
 
 		{"parse_sql_with_sections", parseSectionsSpy(&probeprint.SQLSections)},
+		{"parse_sql", parseSpy(&probeprint.SQLSections)},
 	}.Set(vm)); err != nil {
 		return fmt.Errorf("error while applying mocks to runtime: %w", err)
 	}
@@ -344,8 +357,35 @@ func parseSectionsSpy(
 	}
 }
 
-func stepSpy(steps *[]string) func(name string, lambda js.Callable) any {
-	return func(name string, lambda js.Callable) any {
+func parseSpy(
+	sections *[]SQLSection,
+) func(string, any) func(*string) any {
+	return func(string, any) func(*string) any {
+		return func(queryName *string) any {
+			*sections = append(*sections, SQLSection{Name: ""})
+			i := len(*sections) - 1
+
+			section := &(*sections)[i]
+
+			queries := &section.Queries
+			if queryName != nil && *queryName != "" {
+				j := slices.IndexFunc(*queries,
+					func(s SQLQuery) bool { return s.Name == *queryName },
+				)
+				if j == -1 {
+					*queries = append(*queries, SQLQuery{Name: *queryName})
+				}
+
+				return ParsedQuery{}
+			}
+
+			return []ParsedQuery{}
+		}
+	}
+}
+
+func stepSpy(vm *js.Runtime, steps *[]string) *js.Object {
+	fn := func(name string, lambda js.Callable) any {
 		*steps = append(*steps, name)
 
 		if lambda != nil {
@@ -356,6 +396,11 @@ func stepSpy(steps *[]string) func(name string, lambda js.Callable) any {
 
 		return nil
 	}
+	fnObj := vm.ToValue(fn).ToObject(vm)
+	_ = fnObj.Set("begin", notifyStepSpy(steps))
+	_ = fnObj.Set("end", notifyStepSpy(steps))
+
+	return fnObj
 }
 
 func spyProxyObject(

@@ -7,7 +7,7 @@ replace github.com/stroppy-io/stroppy => ../../
 require (
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/orcaman/concurrent-map/v2 v2.0.1
-	github.com/stroppy-io/stroppy v1.0.2
+	github.com/stroppy-io/stroppy v0.0.0 // TODO: change to proper version v2.x.x and update packages to .../stroppy/v2...
 	go.k6.io/k6 v1.6.0
 	go.uber.org/zap v1.27.1
 	google.golang.org/protobuf v1.36.11

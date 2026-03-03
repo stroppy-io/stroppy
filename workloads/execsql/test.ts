@@ -4,48 +4,28 @@ import { DriverConfig_DriverType } from "./stroppy.pb.js";
 import { DriverX, Step } from "./helpers.ts";
 import { parse_sql } from "./parse_sql.js";
 
-export const options: Options = {
-  setupTimeout: "5m",
-  scenarios: {
-    workload: {
-      executor: "shared-iterations",
-      exec: "workload",
-      vus: 1,
-      iterations: 1,
-    },
-  },
-};
+export const options: Options = {};
 
-// Initialize driver with GlobalConfig
 const driver = DriverX.fromConfig({
   driver: {
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
     driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-    dbSpecific: {
-      fields: [],
-    },
   },
-  version: "",
-  runId: "",
-  seed: "0",
-  metadata: {},
 });
 
 const queries = parse_sql(open(__ENV.SQL_FILE));
 
-export function setup() {
+export function setup (): void {
   Step.begin("workload");
-  return;
 }
 
-export function workload() {
+export default function (): void {
   queries().forEach((query) => {
-    console.log(`tpc-ds-like: ${query.name}`);
     driver.runQuery(query, {});
   });
 }
 
-export function teardown() {
+export function teardown (): void {
   Step.end("workload");
   Teardown();
 }

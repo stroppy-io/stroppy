@@ -21,6 +21,10 @@ import {
 import { Counter, Rate, Trend } from "k6/metrics";
 import { ParsedQuery } from "./parse_sql.js";
 
+import encoding from "k6/x/encoding";
+globalThis.TextEncoder = encoding.TextEncoder;
+globalThis.TextDecoder = encoding.TextDecoder;
+
 interface InsertDescriptorX {
   method: InsertMethod;
   params?: Record<string, Generation_Rule>;
@@ -124,14 +128,23 @@ export function NewDriverByConfig(config: Partial<GlobalConfig>): Driver {
   );
 }
 
-
-export function Step(name: string, block: () => void): void {
-  NotifyStep(name, Status.STATUS_RUNNING);
-  console.log(`Start of '${name}' block`);
-  block();
-  console.log(`End of '${name}' block`);
-  NotifyStep(name, Status.STATUS_COMPLETED);
-}
+export const Step = Object.assign(
+  (name: string, step: () => void): void => {
+    Step.begin(name);
+    step();
+    Step.end(name);
+  },
+  {
+    begin: (name: string): void => {
+      NotifyStep(name, Status.STATUS_RUNNING);
+      console.log(`Start of '${name}' step`);
+    },
+    end: (name: string): void => {
+      console.log(`End of '${name}' step`);
+      NotifyStep(name, Status.STATUS_COMPLETED);
+    },
+  }
+);
 
 // Generator wrapper functions - provide convenient protobuf-based API
 export function NewGen(

@@ -123,7 +123,11 @@ func (p *Probeprint) Explain() string { //nolint: gocognit // just fine
 
 	if len(p.SQLSections) > 0 {
 		for _, section := range p.SQLSections {
-			fmt.Fprintf(sb, "  --+ %s\n", section.Name)
+			if section.Name != "" {
+				fmt.Fprintf(sb, "  --+ %s\n", section.Name)
+			} else {
+				sb.WriteString("  (queries without named section)\n")
+			}
 
 			for _, query := range section.Queries {
 				fmt.Fprintf(sb, "  --= %s\n", query.Name)
