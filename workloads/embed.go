@@ -17,8 +17,8 @@ const (
 	PresetSimple     Preset = "simple"
 	PresetTPCC       Preset = "tpcc"
 	PresetTPCB       Preset = "tpcb"
-	PresetExecuteSQL Preset = "execute_sql"
 	PresetTPCDS      Preset = "tpcds"
+	PresetExecuteSQL Preset = "execsql"
 )
 
 // ErrUnknownPreset is returned when an unknown preset name is requested.

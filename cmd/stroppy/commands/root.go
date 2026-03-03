@@ -23,7 +23,6 @@ var rootCmd = &cobra.Command{
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print versions of stroppy components",
-	Long:  ``,
 	Run: func(_ *cobra.Command, _ []string) {
 		logger.Info("Stroppy version", zap.String("version", version.Version))
 	},
@@ -43,6 +42,7 @@ func Root() *cobra.Command {
 func K6Subcommand(gs *state.GlobalState) *cobra.Command {
 	// TODO: add gs.OSExit code processing, get it to script_runner
 	inteceptInteruptSignals(gs)
+	gs.OSExit = func(i int) {} // TODO: proper handling/logging of exit code
 
 	return rootCmd
 }
@@ -51,6 +51,7 @@ func init() {
 	// Skip "k6 x stroppy" prefix if binary file already named as "stroppy"
 	if filepath.Base(os.Args[0]) == "stroppy" {
 		os.Args = append([]string{"k6", "x", "stroppy"}, os.Args[1:]...)
+
 		// [cobra.Command] help message should think that stroppy rootCmd have no parent
 		oldUsageFunc := rootCmd.UsageFunc()
 		rootCmd.SetUsageFunc(func(c *cobra.Command) error {
@@ -67,6 +68,7 @@ func init() {
 
 	cobra.EnableCommandSorting = false
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
+
 	rootCmd.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)
 
 	rootCmd.AddCommand(versionCmd, run.Cmd, gen.Cmd, probe.Cmd)

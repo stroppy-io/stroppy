@@ -1,11 +1,6 @@
 import { Options } from "k6/options";
-import encoding from "k6/x/encoding";
-globalThis.TextEncoder = encoding.TextEncoder;
-globalThis.TextDecoder = encoding.TextDecoder;
-
-import { NotifyStep, Teardown } from "k6/x/stroppy";
-
-import { Status, InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
+import { Teardown } from "k6/x/stroppy";
+import { InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
 import { DriverX, NewGen, AB, R, Step, S } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
@@ -82,7 +77,7 @@ export function setup() {
     sql("analyze").forEach((query) => driver.runQuery(query, {}));
   });
 
-  NotifyStep("workload", Status.STATUS_RUNNING);
+  Step.begin("workload");
   return;
 }
 
@@ -103,6 +98,6 @@ export function tpcb_transaction() {
 }
 
 export function teardown() {
-  NotifyStep("workload", Status.STATUS_COMPLETED);
+  Step.end("workload");
   Teardown();
 }

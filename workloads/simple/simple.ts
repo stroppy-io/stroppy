@@ -1,12 +1,7 @@
 import { Options } from "k6/options";
-import encoding from "k6/x/encoding";
-globalThis.TextEncoder = encoding.TextEncoder;
-globalThis.TextDecoder = encoding.TextDecoder;
-
-import { NotifyStep, Teardown } from "k6/x/stroppy";
-
-import { DriverConfig_DriverType, Status } from "./stroppy.pb.js";
-import { DriverX, NewGen, NewGroupGen, AB, R, S } from "./helpers.ts";
+import { Teardown } from "k6/x/stroppy";
+import { DriverConfig_DriverType } from "./stroppy.pb.js";
+import { DriverX, NewGen, NewGroupGen, AB, R, S, Step } from "./helpers.ts";
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -39,7 +34,11 @@ const driver: DriverX = DriverX.fromConfig({
 });
 
 export function setup() {
-  NotifyStep("workload", Status.STATUS_RUNNING);
+  Step("example", () => {
+    // You can structure test into steps with Step function.
+  })
+  // Also you can use Step.begin and Step.end functions to define step.
+  Step.begin("workload");
   return;
 }
 
@@ -83,6 +82,6 @@ export function workload() {
 }
 
 export function teardown() {
-  NotifyStep("workload", Status.STATUS_COMPLETED);
+  Step.end("workload");
   Teardown();
 }

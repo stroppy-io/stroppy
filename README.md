@@ -50,9 +50,9 @@ The binary will be available at `./build/stroppy`.
 
 stroppy gen --workdir mytest --preset=simple
 
-# Or for execute_sql preset
+# Or for execsql preset
 
-stroppy gen --workdir mytest --preset=execute_sql
+stroppy gen --workdir mytest --preset=execsql
 
 # Check available presets
 
@@ -79,6 +79,15 @@ npm install
 # Run simple test (on local postgres by default)
 
 ./stroppy run workloads/simple/simple.ts
+```
+
+### Probe Tests
+
+To get more info about tests use probe.
+```bash
+./stroppy probe workloads/tpcc/tpcc.ts
+
+./stroppy probe --help # to get more info
 ```
 
 ## Developing Test Scripts

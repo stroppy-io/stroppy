@@ -32,7 +32,8 @@ var (
 	ErrUnsoportedFormat = errors.New("unsupported format")
 	Cmd                 = func() *cobra.Command {
 		cmd := &cobra.Command{
-			Use: "probe",
+			Use:   "probe",
+			Short: "Get test introspection, config, options, sql, steps, envs",
 			Long: `Command allows you to get information about a test script without running it.
 Probing performs a first-line check of the test for workability, exposing common
 issues. It also provides introspection into the test configuration and

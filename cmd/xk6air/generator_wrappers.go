@@ -1,9 +1,9 @@
 package xk6air
 
 import (
+	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -32,7 +32,7 @@ func NewGroupGeneratorByRulesBin(seed uint64, rulesBytes []byte) any {
 	}
 	gen := generate.NewTupleGenerator(
 		seed,
-		queries.Out[generate.GenAbleStruct](rules.GetParams()),
+		common.Out[generate.GenAbleStruct](rules.GetParams()),
 	)
 	return GeneratorWrapper{
 		generator: gen,
