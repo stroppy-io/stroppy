@@ -2,6 +2,7 @@ package run
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -10,34 +11,64 @@ import (
 	"github.com/stroppy-io/stroppy/internal/runner"
 )
 
-var Cmd = &cobra.Command{
-	Use:   "run <script.ts> [sql_file.sql] [-- <k6 run direct args>]",
-	Short: "Run benchmark script with k6",
-	Long: `Run a TypeScript benchmark script with k6.
+var errNoScript = errors.New("script argument is required")
 
-The script should call defineConfig(globalConfig) to configure the driver and exporter.
-Optionally, a SQL file can be provided as the second argument for scripts that use SQL parsing.
+var Cmd = &cobra.Command{
+	Use:   "run <script> [sql_file] [-- <k6 run direct args>]",
+	Short: "Run benchmark script with k6",
+	Long: `Run a benchmark with k6. The extension determines the mode:
+
+  no extension → preset    stroppy run tpcc
+  .ts          → script    stroppy run bench.ts
+  .sql         → SQL file  stroppy run queries.sql
+  "..."        → inline    stroppy run "select 1"
+
+Files are searched in: current directory → ~/.stroppy/ → built-in workloads.
+SQL files are auto-derived from the preset/script name unless specified explicitly.
 
 Examples:
-  stroppy run my_benchmark.ts
-  stroppy run execute_sql.ts tpcb.sql
+  stroppy run tpcc                              # built-in TPC-C preset
+  stroppy run tpcc -- --duration 5m             # preset with k6 args
+  stroppy run tpcds tpcds-scale-100             # preset with explicit SQL variant
+  stroppy run simple                            # preset without SQL
+  stroppy run my_benchmark.ts                   # custom test script
+  stroppy run ./benchmarks/custom.ts data.sql   # explicit paths
+  stroppy run queries.sql                       # execute a SQL file
+  stroppy run "select 1"                        # execute inline SQL
 `,
 	DisableFlagParsing: true,
 	RunE: func(_ *cobra.Command, args []string) error {
-		scriptPath := args[0]
-
-		sqlPath := ""
-		if len(args) > 1 {
-			sqlPath = args[1]
+		if len(args) == 0 {
+			return errNoScript
 		}
 
-		var afterDash []string
+		// Split args at "--" first, before indexing positional args.
+		var (
+			positional []string
+			afterDash  []string
+		)
+
 		if dashIdx := slices.Index(args, "--"); dashIdx != -1 {
-			// Everything after --
+			positional = args[:dashIdx]
 			afterDash = args[dashIdx+1:]
+		} else {
+			positional = args
 		}
 
-		r, err := runner.NewScriptRunner(scriptPath, sqlPath, afterDash)
+		scriptArg := positional[0]
+
+		sqlArg := ""
+		if len(positional) > 1 {
+			sqlArg = positional[1]
+		}
+
+		// Resolve files through search path.
+		input, err := runner.ResolveInput(scriptArg, sqlArg)
+		if err != nil {
+			return fmt.Errorf("failed to resolve input: %w", err)
+		}
+
+		r, err := runner.NewScriptRunner(input, afterDash)
 		if err != nil {
 			return fmt.Errorf("failed to create runner: %w", err)
 		}

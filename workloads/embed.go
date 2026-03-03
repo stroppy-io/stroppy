@@ -59,6 +59,12 @@ func CopyPresetToPath(targetPath string, preset Preset, perm os.FileMode) error 
 	return nil
 }
 
+// ReadPresetFile reads a single file from an embedded preset.
+// presetName is the preset directory (e.g., "tpcc"), fileName is the file within it (e.g., "tpcc.ts").
+func ReadPresetFile(presetName, fileName string) ([]byte, error) {
+	return Content.ReadFile(path.Join(presetName, fileName))
+}
+
 // copyFileToPath copies a single file from examples to the target directory.
 func copyFileToPath(targetPath, preset, fileName string, perm os.FileMode) error {
 	file, err := Content.Open(path.Join(preset, fileName))

@@ -51,6 +51,7 @@ var versionCmd = &cobra.Command{
 		if versionJSON {
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
+
 			if err := enc.Encode(versions); err != nil {
 				log.Fatal(err)
 			}
