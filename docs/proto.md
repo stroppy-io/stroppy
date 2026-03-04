@@ -482,7 +482,7 @@ Rule defines generation rules for a specific data type.
 | string_const | [string](#string) |  | Fixed string value. |
 | bool_const | [bool](#bool) |  | Fixed boolean value. |
 | datetime_const | [DateTime](#stroppy-DateTime) |  | Fixed date/time value. |
-| distribution | [Generation.Distribution](#stroppy-Generation-Distribution) | optional | Shape of randomness; Normal by default |
+| distribution | [Generation.Distribution](#stroppy-Generation-Distribution) | optional | Shape of randomness; Normal by default; Only for numbers |
 | null_percentage | [uint32](#uint32) | optional | Percentage of nulls to inject [0..100]; 0 by default |
 | unique | [bool](#bool) | optional | Enforce uniqueness across generated values; Linear sequence for ranges |
 

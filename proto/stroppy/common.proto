@@ -327,7 +327,7 @@ message Generation {
       DateTime datetime_const = 20;
     }
 
-    /** Shape of randomness; Normal by default */
+    /** Shape of randomness; Normal by default; Only for numbers */
     optional Distribution distribution = 30;
 
     /** Percentage of nulls to inject [0..100]; 0 by default*/

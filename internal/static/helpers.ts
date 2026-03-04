@@ -1,12 +1,7 @@
-import {
-  Generation_Rule,
-  QueryParamGroup,
-  GlobalConfig,
-  QueryParamDescriptor,
-  InsertDescriptor,
-  InsertMethod,
-  Status,
-} from "./stroppy.pb.js";
+import { Counter, Rate, Trend } from "k6/metrics";
+import encoding from "k6/x/encoding";
+globalThis.TextEncoder = encoding.TextEncoder;
+globalThis.TextDecoder = encoding.TextDecoder;
 
 import {
   NewDriverByConfigBin,
@@ -17,13 +12,19 @@ import {
   Driver,
   QueryStats,
 } from "k6/x/stroppy";
-
-import { Counter, Rate, Trend } from "k6/metrics";
+import {
+  Generation_Rule,
+  Generation_Distribution,
+  Generation_Distribution_DistributionType,
+  QueryParamGroup,
+  GlobalConfig,
+  QueryParamDescriptor,
+  InsertDescriptor,
+  InsertMethod,
+  Status,
+} from "./stroppy.pb.js";
 import { ParsedQuery } from "./parse_sql.js";
 
-import encoding from "k6/x/encoding";
-globalThis.TextEncoder = encoding.TextEncoder;
-globalThis.TextDecoder = encoding.TextDecoder;
 
 interface InsertDescriptorX {
   method: InsertMethod;
@@ -168,6 +169,32 @@ export function NewGroupGen(
 }
 
 // ============================================================================
+// Distribution
+// ============================================================================
+
+export type Distribution =
+  | { kind: "normal"; screw?: number }
+  | { kind: "uniform" }
+  | { kind: "zipf"; screw: number };
+
+export const Dist = {
+  normal: (screw = 0): Distribution => ({ kind: "normal", screw }),
+  uniform: (): Distribution => ({ kind: "uniform" }),
+  zipf: (screw: number): Distribution => ({ kind: "zipf", screw }),
+};
+
+function toProtoDistribution(d: Distribution): Generation_Distribution {
+  switch (d.kind) {
+    case "normal":
+      return { type: Generation_Distribution_DistributionType.NORMAL, screw: d.screw ?? 0 };
+    case "uniform":
+      return { type: Generation_Distribution_DistributionType.UNIFORM, screw: 0 };
+    case "zipf":
+      return { type: Generation_Distribution_DistributionType.ZIPF, screw: d.screw };
+  }
+}
+
+// ============================================================================
 // Alphabets
 // ============================================================================
 
@@ -216,14 +243,14 @@ interface RandomRangeGenerators {
 
   // Integer generators
   int32(val: number): Generation_Rule;
-  int32(min: number, max: number): Generation_Rule;
+  int32(min: number, max: number, distribution?: Distribution): Generation_Rule;
 
   // Float/Double generators
   float(val: number): Generation_Rule;
-  float(min: number, max: number): Generation_Rule;
+  float(min: number, max: number, distribution?: Distribution): Generation_Rule;
 
   double(val: number): Generation_Rule;
-  double(min: number, max: number): Generation_Rule;
+  double(min: number, max: number, distribution?: Distribution): Generation_Rule;
 
   // Datetime generator
   datetimeConst: (val: Date) => Generation_Rule;
@@ -265,30 +292,33 @@ export const R: RandomRangeGenerators = {
     };
   },
 
-  int32(valOrMin: number, max?: number): Generation_Rule {
+  int32(valOrMin: number, max?: number, distribution?: Distribution): Generation_Rule {
     if (max === undefined) {
       return { kind: { oneofKind: "int32Const", int32Const: valOrMin } };
     }
     return {
       kind: { oneofKind: "int32Range", int32Range: { min: valOrMin, max } },
+      distribution: distribution && toProtoDistribution(distribution),
     };
   },
 
-  float(valOrMin: number, max?: number): Generation_Rule {
+  float(valOrMin: number, max?: number, distribution?: Distribution): Generation_Rule {
     if (max === undefined) {
       return { kind: { oneofKind: "floatConst", floatConst: valOrMin } };
     }
     return {
       kind: { oneofKind: "floatRange", floatRange: { min: valOrMin, max } },
+      distribution: distribution && toProtoDistribution(distribution),
     };
   },
 
-  double(valOrMin: number, max?: number): Generation_Rule {
+  double(valOrMin: number, max?: number, distribution?: Distribution): Generation_Rule {
     if (max === undefined) {
       return { kind: { oneofKind: "doubleConst", doubleConst: valOrMin } };
     }
     return {
       kind: { oneofKind: "doubleRange", doubleRange: { min: valOrMin, max } },
+      distribution: distribution && toProtoDistribution(distribution),
     };
   },
 

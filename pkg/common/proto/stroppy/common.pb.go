@@ -1007,7 +1007,7 @@ type Generation_Rule struct {
 	//	*Generation_Rule_BoolConst
 	//	*Generation_Rule_DatetimeConst
 	Kind isGeneration_Rule_Kind `protobuf_oneof:"kind"`
-	// * Shape of randomness; Normal by default
+	// * Shape of randomness; Normal by default; Only for numbers
 	Distribution *Generation_Distribution `protobuf:"bytes,30,opt,name=distribution,proto3,oneof" json:"distribution,omitempty"`
 	// * Percentage of nulls to inject [0..100]; 0 by default
 	NullPercentage *uint32 `protobuf:"varint,31,opt,name=null_percentage,json=nullPercentage,proto3,oneof" json:"null_percentage,omitempty"`
