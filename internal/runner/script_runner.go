@@ -24,38 +24,38 @@ import (
 type ScriptRunner struct {
 	logger     *zap.Logger
 	scriptPath string
-	sqlPath    string // optional SQL file path
+	sqlName    string // basename of SQL file in temp dir (empty if no SQL)
 	tempDir    string
 	config     *Probeprint
 	k6RunArgs  []string // pass args directly to 'k6 run <k6RunArgs>'
 	filesInTmp []string
 }
 
-// NewScriptRunner creates a new ScriptRunner for the given script.
-func NewScriptRunner(scriptPath, sqlPath string, k6RunArgs []string) (*ScriptRunner, error) {
+// NewScriptRunner creates a new ScriptRunner for the given resolved input.
+func NewScriptRunner(input *ResolvedInput, k6RunArgs []string) (*ScriptRunner, error) {
 	lg := logger.Global().
 		Named("script_runner").
 		WithOptions(zap.WithCaller(false), zap.AddStacktrace(zap.FatalLevel))
 
-	// Validate script path
-	if _, err := os.Stat(scriptPath); err != nil {
-		return nil, fmt.Errorf("script file not found: %w", err)
-	}
+	lg.Info("Resolved script",
+		zap.String("name", input.Script.Name),
+		zap.String("source", input.Script.Source.String()),
+	)
 
-	// Validate SQL path if provided
-	if sqlPath != "" {
-		if _, err := os.Stat(sqlPath); err != nil {
-			return nil, fmt.Errorf("SQL file %q not found: %w", sqlPath, err)
-		}
+	if input.SQL != nil {
+		lg.Info("Resolved SQL",
+			zap.String("name", input.SQL.Name),
+			zap.String("source", input.SQL.Source.String()),
+		)
 	}
 
 	// Create temp directory
-	tempDir, tmpFiles, err := CreateAndInitTempDir(lg, scriptPath, sqlPath)
+	tempDir, tmpFiles, err := CreateAndInitTempDir(lg, input)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating temporary dir: %w", err)
 	}
 
-	scriptPath = filepath.Join(tempDir, filepath.Base(scriptPath))
+	scriptPath := filepath.Join(tempDir, input.Script.Name)
 
 	// Extract config from script
 	config, err := ProbeScript(scriptPath)
@@ -79,10 +79,15 @@ func NewScriptRunner(scriptPath, sqlPath string, k6RunArgs []string) (*ScriptRun
 
 	lg.Debug("Got k6 args", zap.Strings("k6Args", k6RunArgs))
 
+	sqlName := ""
+	if input.SQL != nil {
+		sqlName = input.SQL.Name
+	}
+
 	return &ScriptRunner{
 		logger:     lg,
 		scriptPath: scriptPath,
-		sqlPath:    sqlPath,
+		sqlName:    sqlName,
 		config:     config,
 		tempDir:    tempDir,
 		k6RunArgs:  k6RunArgs,
@@ -107,7 +112,7 @@ func (r *ScriptRunner) Run(ctx context.Context) error {
 
 func CreateAndInitTempDir(
 	lg *zap.Logger,
-	scriptPath, sqlPath string,
+	input *ResolvedInput,
 ) (tempDir string, filenames []string, err error) {
 	tempDir, err = os.MkdirTemp(os.TempDir(), "stroppy-k6-")
 	if err != nil {
@@ -122,26 +127,33 @@ func CreateAndInitTempDir(
 
 	filenames = append(filenames, common.OutStr(static.StaticFiles)...)
 
-	// Copy user's script to temp directory
-	scriptName := filepath.Base(scriptPath)
-	sqlName := filepath.Base(sqlPath)
-
-	// copy single ts file
-	if err := copyFile(scriptPath, path.Join(tempDir, scriptName)); err != nil {
+	// Copy script to temp directory
+	if err := writeResolvedFile(input.Script, tempDir); err != nil {
 		return "", nil, fmt.Errorf("failed to copy script: %w", err)
 	}
 
-	filenames = append(filenames, scriptName)
+	filenames = append(filenames, input.Script.Name)
 
-	if sqlPath != "" {
-		if err := copyFile(sqlPath, path.Join(tempDir, sqlName)); err != nil {
-			return "", nil, fmt.Errorf("failed to copy SQL file %q: %w", sqlName, err)
+	// Copy SQL to temp directory if present
+	if input.SQL != nil {
+		if err := writeResolvedFile(*input.SQL, tempDir); err != nil {
+			return "", nil, fmt.Errorf("failed to copy SQL file %q: %w", input.SQL.Name, err)
 		}
 
-		filenames = append(filenames, sqlName)
+		filenames = append(filenames, input.SQL.Name)
 	}
 
 	return tempDir, filenames, nil
+}
+
+// writeResolvedFile writes a ResolvedFile to the target directory.
+func writeResolvedFile(rf ResolvedFile, targetDir string) error {
+	dest := filepath.Join(targetDir, rf.Name)
+	if rf.Content != nil {
+		return os.WriteFile(dest, rf.Content, common.FileMode)
+	}
+
+	return copyFile(rf.Path, dest)
 }
 
 func copyFile(src, dst string) error {
@@ -214,8 +226,8 @@ func (r *ScriptRunner) buildEnvVars() []string {
 		envs = append(envs, loggerEnvs...)
 	}
 
-	if r.sqlPath != "" {
-		envs = append(envs, "SQL_FILE="+path.Join(r.tempDir, filepath.Base(r.sqlPath)))
+	if r.sqlName != "" {
+		envs = append(envs, "SQL_FILE="+path.Join(r.tempDir, r.sqlName))
 	}
 
 	return envs

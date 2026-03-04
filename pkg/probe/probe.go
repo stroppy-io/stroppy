@@ -20,11 +20,16 @@ func Script(scriptPath string) (*runner.Probeprint, error) {
 // ScriptInTmp works as [Script], but don't requires working directory.
 // sqlPath might be empty "".
 func ScriptInTmp(scriptPath, sqlPath string) (*runner.Probeprint, error) {
-	tempDir, _, err := runner.CreateAndInitTempDir(zap.NewNop(), scriptPath, sqlPath)
+	input, err := runner.ResolveInput(scriptPath, sqlPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve input: %w", err)
+	}
+
+	tempDir, _, err := runner.CreateAndInitTempDir(zap.NewNop(), input)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating temporary dir: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
 
-	return runner.ProbeScript(filepath.Join(tempDir, filepath.Base(scriptPath)))
+	return runner.ProbeScript(filepath.Join(tempDir, input.Script.Name))
 }

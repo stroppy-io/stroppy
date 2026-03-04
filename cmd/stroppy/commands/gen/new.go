@@ -43,7 +43,7 @@ Available presets: %s
 Examples:
   stroppy gen --workdir ./my-benchmark
   stroppy gen --workdir ./my-benchmark --preset tpcc
-  stroppy gen --workdir ./my-benchmark --preset execsql
+  stroppy gen --workdir ./my-benchmark --preset execute_sql
 `, availablePresetsStr),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			log := logger.Global().WithOptions(zap.WithCaller(false))

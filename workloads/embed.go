@@ -18,7 +18,7 @@ const (
 	PresetTPCC       Preset = "tpcc"
 	PresetTPCB       Preset = "tpcb"
 	PresetTPCDS      Preset = "tpcds"
-	PresetExecuteSQL Preset = "execsql"
+	PresetExecuteSQL Preset = "execute_sql"
 )
 
 // ErrUnknownPreset is returned when an unknown preset name is requested.
@@ -57,6 +57,12 @@ func CopyPresetToPath(targetPath string, preset Preset, perm os.FileMode) error 
 	}
 
 	return nil
+}
+
+// ReadPresetFile reads a single file from an embedded preset.
+// presetName is the preset directory (e.g., "tpcc"), fileName is the file within it (e.g., "tpcc.ts").
+func ReadPresetFile(presetName, fileName string) ([]byte, error) {
+	return Content.ReadFile(path.Join(presetName, fileName))
 }
 
 // copyFileToPath copies a single file from examples to the target directory.
