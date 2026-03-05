@@ -406,15 +406,19 @@ func newUUIDSequentialGenerator(
 	one := big.NewInt(1)
 
 	return valueGeneratorFn(func() (*stroppy.Value, error) {
-		if current.Cmp(end) > 0 {
-			return nil, nil //nolint:nilnil // ok
-		}
-
 		b := current.Bytes()
 
 		var uid [16]byte
 
 		copy(uid[16-len(b):], b) // right-align into big-endian 128-bit
+
+		if current.Cmp(end) > 0 {
+			// at the end should return same value, this semantic used by [NewTupleGenerator]
+			// silly, but works for now
+			return &stroppy.Value{
+				Type: &stroppy.Value_Uuid{Uuid: &stroppy.Uuid{Value: uuid.UUID(uid).String()}},
+			}, nil
+		}
 
 		current.Add(current, one)
 
