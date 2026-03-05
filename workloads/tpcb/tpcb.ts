@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
 import { InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
-import { DriverX, AB, R, Step, S } from "./helpers.ts";
+import { DriverX, AB, C, R, Step, S } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 // TPC-B Configuration Constants
@@ -49,7 +49,7 @@ export function setup() {
       method: InsertMethod.COPY_FROM,
       params: {
         bid: S.int32(1, BRANCHES),
-        bbalance: R.int32(0),
+        bbalance: C.int32(0),
         filler: R.str(88, AB.en),
       },
     });
@@ -59,7 +59,7 @@ export function setup() {
       params: {
         tid: S.int32(1, TELLERS),
         bid: R.int32(1, BRANCHES),
-        tbalance: R.int32(0),
+        tbalance: C.int32(0),
         filler: R.str(84, AB.en),
       },
     });
@@ -69,7 +69,7 @@ export function setup() {
       params: {
         aid: S.int32(1, ACCOUNTS),
         bid: R.int32(1, BRANCHES),
-        abalance: R.int32(0),
+        abalance: C.int32(0),
         filler: R.str(84, AB.en),
       },
     });

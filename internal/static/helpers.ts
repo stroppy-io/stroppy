@@ -7,7 +7,6 @@ import {
   NewDriverByConfigBin,
   NewGeneratorByRuleBin,
   NewGroupGeneratorByRulesBin,
-  Generator,
   NotifyStep,
   Driver,
   QueryStats,
@@ -46,6 +45,12 @@ export type Rule = Generation_Rule & {
   /** Create a Generator from this rule. seed: 0 = random, >0 = fixed.
    *  Falls back to the module-wide seed set via setSeed() if omitted. */
   gen(seed?: number): ReturnType<typeof NewGeneratorByRuleBin>;
+};
+
+export type GroupRule = QueryParamDescriptor[] & {
+  /** Create a Generator from this group. seed: 0 = random, >0 = fixed.
+   *  Falls back to the module-wide seed set via setSeed() if omitted. */
+  gen(seed?: number): ReturnType<typeof NewGroupGeneratorByRulesBin>;
 };
 
 function rule(r: Generation_Rule): Rule {
@@ -104,7 +109,7 @@ export class DriverX {
           tableName: insertOrTableName,
           method: insert?.method,
           seed: insert?.seed ?? _seed,
-          params: R.params(insert?.params ?? {}),
+          params: R.group(insert?.params ?? {}),
           groups: R.groups(insert?.groups ?? {}),
           count,
         }
@@ -183,27 +188,6 @@ export const Step = Object.assign(
   }
 );
 
-// Generator wrapper functions - provide convenient protobuf-based API
-export function NewGen(
-  seed: number,
-  rule: Partial<Generation_Rule>,
-): Generator {
-  return NewGeneratorByRuleBin(
-    seed,
-    Generation_Rule.toBinary(Generation_Rule.create(rule)),
-  );
-}
-
-export function NewGroupGen(
-  rules: Partial<QueryParamGroup>,
-  seed?: number,
-): Generator {
-  return NewGroupGeneratorByRulesBin(
-    seed ?? _seed,
-    QueryParamGroup.toBinary(QueryParamGroup.create(rules)),
-  );
-}
-
 // ============================================================================
 // Distribution
 // ============================================================================
@@ -275,70 +259,111 @@ export const AB = {
 // ============================================================================
 
 // Define the interface with overloads
+interface ConstGenerators {
+  str: (val: string) => Rule;
+  int32: (val: number) => Rule;
+  int64: (val: string | number) => Rule;
+  uint32: (val: number) => Rule;
+  uint64: (val: string | number) => Rule;
+  float: (val: number) => Rule;
+  double: (val: number) => Rule;
+  decimal: (val: string) => Rule;
+  datetime: (val: Date) => Rule;
+  bool: (val: boolean) => Rule;
+  uuid: (val: string) => Rule;
+}
+
 interface RandomRangeGenerators {
   // String
-  str(val: string): Rule;
   str(len: number, alphabet?: Alphabet): Rule;
   str(minLen: number, maxLen: number, alphabet?: Alphabet): Rule;
 
   // Signed integers
-  int32(val: number): Rule;
   int32(min: number, max: number, distribution?: Distribution): Rule;
-
-  int64(val: string | number): Rule;
   int64(min: string | number, max: string | number, distribution?: Distribution): Rule;
 
   // Unsigned integers
-  uint32(val: number): Rule;
   uint32(min: number, max: number, distribution?: Distribution): Rule;
-
-  uint64(val: string | number): Rule;
   uint64(min: string | number, max: string | number, distribution?: Distribution): Rule;
 
   // Floating point
-  float(val: number): Rule;
   float(min: number, max: number, distribution?: Distribution): Rule;
-
-  double(val: number): Rule;
   double(min: number, max: number, distribution?: Distribution): Rule;
 
   // Decimal (arbitrary precision)
-  decimal(val: string): Rule;
   decimal(min: number, max: number, distribution?: Distribution): Rule;
 
   // Datetime
-  datetimeConst: (val: Date) => Rule;
   datetime(min: Date, max: Date, distribution?: Distribution): Rule;
 
   // Boolean
   bool: (ratio: number, unique?: boolean) => Rule;
-  boolConst: (val: boolean) => Rule;
 
   // UUID
   uuid: () => Rule;
   uuidSeeded: () => Rule;
-  uuidConst: (val: string) => Rule;
 
   // Helpers
-  params: (params: Record<string, Generation_Rule>) => QueryParamDescriptor[];
+  group: (params: Record<string, Generation_Rule>) => GroupRule;
   groups: (
     groups: Record<string, Record<string, Generation_Rule>>,
   ) => QueryParamGroup[];
 }
 
+export const C: ConstGenerators = {
+  str: (val: string): Rule =>
+    rule({ kind: { oneofKind: "stringConst", stringConst: val } }),
+
+  int32: (val: number): Rule =>
+    rule({ kind: { oneofKind: "int32Const", int32Const: val } }),
+
+  int64: (val: string | number): Rule =>
+    rule({ kind: { oneofKind: "int64Const", int64Const: String(val) } }),
+
+  uint32: (val: number): Rule =>
+    rule({ kind: { oneofKind: "uint32Const", uint32Const: val } }),
+
+  uint64: (val: string | number): Rule =>
+    rule({ kind: { oneofKind: "uint64Const", uint64Const: String(val) } }),
+
+  float: (val: number): Rule =>
+    rule({ kind: { oneofKind: "floatConst", floatConst: val } }),
+
+  double: (val: number): Rule =>
+    rule({ kind: { oneofKind: "doubleConst", doubleConst: val } }),
+
+  decimal: (val: string): Rule =>
+    rule({ kind: { oneofKind: "decimalConst", decimalConst: { value: val } } }),
+
+  datetime: (val: Date): Rule =>
+    rule({
+      kind: {
+        oneofKind: "datetimeConst",
+        datetimeConst: {
+          value: {
+            seconds: val.getSeconds().toString(),
+            nanos: (val.getMilliseconds() % 1000) * 1000000,
+          },
+        },
+      },
+    }),
+
+  bool: (val: boolean): Rule =>
+    rule({ kind: { oneofKind: "boolConst", boolConst: val } }),
+
+  uuid: (val: string): Rule =>
+    rule({ kind: { oneofKind: "uuidConst", uuidConst: { value: val } } }),
+};
+
 export const R: RandomRangeGenerators = {
   str(
-    valOrMin: string | number,
+    lenOrMin: number,
     alphabetOrMax?: Alphabet | number,
     alphabet: Alphabet = AB.en,
   ): Rule {
-    if (typeof valOrMin === "string") {
-      return rule({ kind: { oneofKind: "stringConst", stringConst: valOrMin } });
-    }
-
     const isRange = typeof alphabetOrMax === "number";
-    const minLen = valOrMin;
-    const maxLen = isRange ? alphabetOrMax : valOrMin;
+    const minLen = lenOrMin;
+    const maxLen = isRange ? alphabetOrMax : lenOrMin;
     const alph = isRange ? alphabet : (alphabetOrMax ?? AB.en);
 
     return rule({
@@ -353,74 +378,53 @@ export const R: RandomRangeGenerators = {
     });
   },
 
-  int32(valOrMin: number, max?: number, distribution?: Distribution): Rule {
-    if (max === undefined) {
-      return rule({ kind: { oneofKind: "int32Const", int32Const: valOrMin } });
-    }
+  int32(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
-      kind: { oneofKind: "int32Range", int32Range: { min: valOrMin, max } },
+      kind: { oneofKind: "int32Range", int32Range: { min, max } },
       distribution: distribution && toProtoDistribution(distribution),
     });
   },
 
-  float(valOrMin: number, max?: number, distribution?: Distribution): Rule {
-    if (max === undefined) {
-      return rule({ kind: { oneofKind: "floatConst", floatConst: valOrMin } });
-    }
+  int64(min: string | number, max: string | number, distribution?: Distribution): Rule {
     return rule({
-      kind: { oneofKind: "floatRange", floatRange: { min: valOrMin, max } },
+      kind: { oneofKind: "int64Range", int64Range: { min: String(min), max: String(max) } },
       distribution: distribution && toProtoDistribution(distribution),
     });
   },
 
-  double(valOrMin: number, max?: number, distribution?: Distribution): Rule {
-    if (max === undefined) {
-      return rule({ kind: { oneofKind: "doubleConst", doubleConst: valOrMin } });
-    }
+  uint32(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
-      kind: { oneofKind: "doubleRange", doubleRange: { min: valOrMin, max } },
+      kind: { oneofKind: "uint32Range", uint32Range: { min, max } },
       distribution: distribution && toProtoDistribution(distribution),
     });
   },
 
-  int64(valOrMin: string | number, max?: string | number, distribution?: Distribution): Rule {
-    if (max === undefined) {
-      return rule({ kind: { oneofKind: "int64Const", int64Const: String(valOrMin) } });
-    }
+  uint64(min: string | number, max: string | number, distribution?: Distribution): Rule {
     return rule({
-      kind: { oneofKind: "int64Range", int64Range: { min: String(valOrMin), max: String(max) } },
+      kind: { oneofKind: "uint64Range", uint64Range: { min: String(min), max: String(max) } },
       distribution: distribution && toProtoDistribution(distribution),
     });
   },
 
-  uint32(valOrMin: number, max?: number, distribution?: Distribution): Rule {
-    if (max === undefined) {
-      return rule({ kind: { oneofKind: "uint32Const", uint32Const: valOrMin } });
-    }
+  float(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
-      kind: { oneofKind: "uint32Range", uint32Range: { min: valOrMin, max } },
+      kind: { oneofKind: "floatRange", floatRange: { min, max } },
       distribution: distribution && toProtoDistribution(distribution),
     });
   },
 
-  uint64(valOrMin: string | number, max?: string | number, distribution?: Distribution): Rule {
-    if (max === undefined) {
-      return rule({ kind: { oneofKind: "uint64Const", uint64Const: String(valOrMin) } });
-    }
+  double(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
-      kind: { oneofKind: "uint64Range", uint64Range: { min: String(valOrMin), max: String(max) } },
+      kind: { oneofKind: "doubleRange", doubleRange: { min, max } },
       distribution: distribution && toProtoDistribution(distribution),
     });
   },
 
-  decimal(valOrMin: string | number, max?: number, distribution?: Distribution): Rule {
-    if (max === undefined) {
-      return rule({ kind: { oneofKind: "decimalConst", decimalConst: { value: String(valOrMin) } } });
-    }
+  decimal(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
       kind: {
         oneofKind: "decimalRange",
-        decimalRange: { type: { oneofKind: "double", double: { min: valOrMin as number, max } } },
+        decimalRange: { type: { oneofKind: "double", double: { min, max } } },
       },
       distribution: distribution && toProtoDistribution(distribution),
     });
@@ -444,24 +448,6 @@ export const R: RandomRangeGenerators = {
     });
   },
 
-  boolConst(val: boolean): Rule {
-    return rule({ kind: { oneofKind: "boolConst", boolConst: val } });
-  },
-
-  datetimeConst(val: Date): Rule {
-    return rule({
-      kind: {
-        oneofKind: "datetimeConst",
-        datetimeConst: {
-          value: {
-            seconds: val.getSeconds().toString(),
-            nanos: (val.getMilliseconds() % 1000) * 1000000,
-          },
-        },
-      },
-    });
-  },
-
   // ratio of true values; unique = true => sequence [false, true]
   bool(ratio: number, unique = false): Rule {
     return rule({
@@ -478,17 +464,13 @@ export const R: RandomRangeGenerators = {
     return rule({ kind: { oneofKind: "uuidSeeded", uuidSeeded: true } });
   },
 
-  uuidConst(val: string): Rule {
-    return rule({ kind: { oneofKind: "uuidConst", uuidConst: { value: val } } });
-  },
-
-  params: params_internal,
+  group: group_internal,
 
   groups(
     groups: Record<string, Record<string, Generation_Rule>>,
   ): QueryParamGroup[] {
     return Object.entries(groups).map(([name, params]) =>
-      QueryParamGroup.create({ name, params: params_internal(params) }),
+      QueryParamGroup.create({ name, params: group_internal(params) }),
     );
   },
 };
@@ -576,10 +558,20 @@ export const S: SequenceGenerators = {
   },
 };
 
-function params_internal(
+function group_internal(
   params: Record<string, Generation_Rule>,
-): QueryParamDescriptor[] {
-  return Object.entries(params).map(([name, generationRule]) =>
+): GroupRule {
+  const descriptors = Object.entries(params).map(([name, generationRule]) =>
     QueryParamDescriptor.create({ name, generationRule }),
   );
+  return Object.assign(descriptors, {
+    gen(seed?: number): ReturnType<typeof NewGroupGeneratorByRulesBin> {
+      return NewGroupGeneratorByRulesBin(
+        seed ?? _seed,
+        QueryParamGroup.toBinary(
+          QueryParamGroup.create({ name: "", params: descriptors }),
+        ),
+      );
+    },
+  }) as GroupRule;
 }

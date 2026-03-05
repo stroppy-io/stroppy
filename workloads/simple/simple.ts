@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
 import { DriverConfig_DriverType } from "./stroppy.pb.js";
-import { DriverX, NewGroupGen, AB, R, S, Step, setSeed } from "./helpers.ts";
+import { DriverX, AB, R, S, Step, setSeed } from "./helpers.ts";
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -58,13 +58,11 @@ const seqGen = S.int32(1, 10).gen();
 
 // Group generator: cartesian-product of dependent params.
 // Useful for composite keys — see logs for the pattern.
-const groupGen = NewGroupGen({
-  params: R.params({
+const groupGen = R.group({
     some: S.int32(1, 2),
     second: S.int32(1, 3),
     bool: R.bool(1, true),
-  }),
-});
+  }).gen(5)
 
 export function workload() {
   // driver uses :arg syntax for query parameters
