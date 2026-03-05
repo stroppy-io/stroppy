@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
 import { InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
-import { DriverX, NewGen, AB, R, Step, S } from "./helpers.ts";
+import { DriverX, AB, R, Step, S } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 // TPC-B Configuration Constants
@@ -82,10 +82,10 @@ export function setup() {
 }
 
 // Generators for transaction parameters
-const aidGen = NewGen(5, R.int32(1, ACCOUNTS));
-const tidGen = NewGen(6, R.int32(1, TELLERS));
-const bidGen = NewGen(7, R.int32(1, BRANCHES));
-const deltaGen = NewGen(8, R.int32(-5000, 5000));
+const aidGen = R.int32(1, ACCOUNTS).gen();
+const tidGen = R.int32(1, TELLERS).gen();
+const bidGen = R.int32(1, BRANCHES).gen();
+const deltaGen = R.int32(-5000, 5000).gen();
 
 // TPC-B transaction workload
 export function tpcb_transaction() {

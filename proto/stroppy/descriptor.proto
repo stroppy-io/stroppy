@@ -16,6 +16,8 @@ message InsertDescriptor {
   string table_name = 2 [ (validate.rules).string.min_len = 1 ];
   /** Allows to use a percise method of data insertion */
   optional InsertMethod method = 3;
+  /** Seed for data generation. 0 = random, >0 = fixed (reproducible). */
+  uint64 seed = 6;
   /**
    * Parameters used in the insert.
    * Names threated as db columns names, regexp is ignored.

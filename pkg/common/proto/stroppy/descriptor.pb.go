@@ -136,6 +136,8 @@ type InsertDescriptor struct {
 	TableName string `protobuf:"bytes,2,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
 	// * Allows to use a percise method of data insertion
 	Method *InsertMethod `protobuf:"varint,3,opt,name=method,proto3,enum=stroppy.InsertMethod,oneof" json:"method,omitempty"`
+	// * Seed for data generation. 0 = random, >0 = fixed (reproducible).
+	Seed uint64 `protobuf:"varint,6,opt,name=seed,proto3" json:"seed,omitempty"`
 	// *
 	// Parameters used in the insert.
 	// Names threated as db columns names, regexp is ignored.
@@ -195,6 +197,13 @@ func (x *InsertDescriptor) GetMethod() InsertMethod {
 		return *x.Method
 	}
 	return InsertMethod_PLAIN_QUERY
+}
+
+func (x *InsertDescriptor) GetSeed() uint64 {
+	if x != nil {
+		return x.Seed
+	}
+	return 0
 }
 
 func (x *InsertDescriptor) GetParams() []*QueryParamDescriptor {
@@ -349,12 +358,13 @@ var File_proto_stroppy_descriptor_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_descriptor_proto_rawDesc = "" +
 	"\n" +
-	"\x1eproto/stroppy/descriptor.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\x90\x02\n" +
+	"\x1eproto/stroppy/descriptor.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\xa4\x02\n" +
 	"\x10InsertDescriptor\x12\x1d\n" +
 	"\x05count\x18\x01 \x01(\x05B\a\xfaB\x04\x1a\x02 \x00R\x05count\x12&\n" +
 	"\n" +
 	"table_name\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\ttableName\x122\n" +
-	"\x06method\x18\x03 \x01(\x0e2\x15.stroppy.InsertMethodH\x00R\x06method\x88\x01\x01\x12D\n" +
+	"\x06method\x18\x03 \x01(\x0e2\x15.stroppy.InsertMethodH\x00R\x06method\x88\x01\x01\x12\x12\n" +
+	"\x04seed\x18\x06 \x01(\x04R\x04seed\x12D\n" +
 	"\x06params\x18\x04 \x03(\v2\x1d.stroppy.QueryParamDescriptorB\r\xfaB\n" +
 	"\x92\x01\a\"\x05\x8a\x01\x02\x10\x01R\x06params\x120\n" +
 	"\x06groups\x18\x05 \x03(\v2\x18.stroppy.QueryParamGroupR\x06groupsB\t\n" +

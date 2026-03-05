@@ -853,6 +853,7 @@ InsertDescription defines data to fill database.
 | count | [int32](#int32) |  |  |
 | table_name | [string](#string) |  | Which table to insert the values |
 | method | [InsertMethod](#stroppy-InsertMethod) | optional | Allows to use a percise method of data insertion |
+| seed | [uint64](#uint64) |  | Seed for data generation. 0 = random, &gt;0 = fixed (reproducible). |
 | params | [QueryParamDescriptor](#stroppy-QueryParamDescriptor) | repeated | Parameters used in the insert. Names threated as db columns names, regexp is ignored. |
 | groups | [QueryParamGroup](#stroppy-QueryParamGroup) | repeated | Groups of the columns |
 

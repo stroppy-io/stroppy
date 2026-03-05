@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
 import { InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
-import { NewGen, AB, R, Step, DriverX, S } from "./helpers.ts";
+import { AB, R, Step, DriverX, S } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 const DURATION = __ENV.DURATION || "1h";
@@ -185,11 +185,11 @@ export function setup() {
   return;
 }
 
-const newOrderWarehouseGen = NewGen(0, R.int32(1, WAREHOUSES));
-const newOrderMaxWarehouseGen = NewGen(1, R.int32(WAREHOUSES));
-const newOrderDistrictGen = NewGen(2, R.int32(1, DISTRICTS_PER_WAREHOUSE));
-const newOrderCustomerGen = NewGen(3, R.int32(1, CUSTOMERS_PER_DISTRICT));
-const newOrderOlCntGen = NewGen(4, R.int32(5, 15));
+const newOrderWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const newOrderMaxWarehouseGen = R.int32(WAREHOUSES).gen();
+const newOrderDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const newOrderCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const newOrderOlCntGen = R.int32(5, 15).gen();
 
 export function new_order() {
   driver.runQuery(sql("workload", "new_order")!, {
@@ -201,16 +201,13 @@ export function new_order() {
   });
 }
 
-const paymentWarehouseGen = NewGen(5, R.int32(1, WAREHOUSES));
-const paymentDistrictGen = NewGen(6, R.int32(1, DISTRICTS_PER_WAREHOUSE));
-const paymentCustomerWarehouseGen = NewGen(7, R.int32(1, WAREHOUSES));
-const paymentCustomerDistrictGen = NewGen(
-  8,
-  R.int32(1, DISTRICTS_PER_WAREHOUSE),
-);
-const paymentCustomerGen = NewGen(9, R.int32(1, CUSTOMERS_PER_DISTRICT));
-const paymentAmountGen = NewGen(10, R.double(1, 5000));
-const paymentCustomerLastGen = NewGen(11, S.str(6, 16));
+const paymentWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const paymentDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const paymentCustomerWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const paymentCustomerDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const paymentCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const paymentAmountGen = R.double(1, 5000).gen();
+const paymentCustomerLastGen = S.str(6, 16).gen();
 
 export function payments() {
   driver.runQuery(sql("workload", "payment")!, {
@@ -226,10 +223,10 @@ export function payments() {
   );
 }
 
-const orderStatusWarehouseGen = NewGen(12, R.int32(1, WAREHOUSES));
-const orderStatusDistrictGen = NewGen(13, R.int32(1, DISTRICTS_PER_WAREHOUSE));
-const orderStatusCustomerGen = NewGen(14, R.int32(1, CUSTOMERS_PER_DISTRICT));
-const orderStatusCustomerLastGen = NewGen(15, R.str(8, 16));
+const orderStatusWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const orderStatusDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const orderStatusCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const orderStatusCustomerLastGen = R.str(8, 16).gen();
 
 export function order_status() {
   driver.runQuery(sql("workload", "order_status")!, {
@@ -242,8 +239,8 @@ export function order_status() {
   );
 }
 
-const deliveryWarehouseGen = NewGen(16, R.int32(1, WAREHOUSES));
-const deliveryCarrierGen = NewGen(17, R.int32(1, DISTRICTS_PER_WAREHOUSE));
+const deliveryWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const deliveryCarrierGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 
 export function delivery() {
   driver.runQuery(sql("workload", "delivery")!, {
@@ -252,9 +249,9 @@ export function delivery() {
   });
 }
 
-const stockLevelWarehouseGen = NewGen(18, R.int32(1, WAREHOUSES));
-const stockLevelDistrictGen = NewGen(19, R.int32(1, DISTRICTS_PER_WAREHOUSE));
-const stockLevelThresholdGen = NewGen(20, R.int32(10, 20));
+const stockLevelWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const stockLevelDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const stockLevelThresholdGen = R.int32(10, 20).gen();
 
 export function stock_level() {
   driver.runQuery(sql("workload", "stock_level")!, {
