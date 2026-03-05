@@ -381,11 +381,14 @@ func newUUIDSeededGenerator(seed uint64) ValueGenerator { //nolint: ireturn // n
 	})
 }
 
-func newUUIDSequentialGenerator(r *stroppy.Generation_Range_UuidSeq) (ValueGenerator, error) { //nolint: ireturn // need from lib
+//nolint:ireturn // need from lib
+func newUUIDSequentialGenerator(
+	uuidSeqRange *stroppy.Generation_Range_UuidSeq,
+) (ValueGenerator, error) {
 	var startBytes [16]byte // nil UUID by default
 
-	if min := r.GetMin(); min != nil {
-		uid, err := uuid.Parse(min.GetValue())
+	if minUUID := uuidSeqRange.GetMin(); minUUID != nil {
+		uid, err := uuid.Parse(minUUID.GetValue())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse min uuid: %w", err)
 		}
@@ -393,7 +396,7 @@ func newUUIDSequentialGenerator(r *stroppy.Generation_Range_UuidSeq) (ValueGener
 		startBytes = uid
 	}
 
-	maxUID, err := uuid.Parse(r.GetMax().GetValue())
+	maxUID, err := uuid.Parse(uuidSeqRange.GetMax().GetValue())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse max uuid: %w", err)
 	}
@@ -404,7 +407,7 @@ func newUUIDSequentialGenerator(r *stroppy.Generation_Range_UuidSeq) (ValueGener
 
 	return valueGeneratorFn(func() (*stroppy.Value, error) {
 		if current.Cmp(end) > 0 {
-			return nil, nil
+			return nil, nil //nolint:nilnil // ok
 		}
 
 		b := current.Bytes()
