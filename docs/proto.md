@@ -31,6 +31,7 @@
     - [Generation.Range.String](#stroppy-Generation-Range-String)
     - [Generation.Range.UInt32](#stroppy-Generation-Range-UInt32)
     - [Generation.Range.UInt64](#stroppy-Generation-Range-UInt64)
+    - [Generation.Range.UuidSeq](#stroppy-Generation-Range-UuidSeq)
     - [Generation.Rule](#stroppy-Generation-Rule)
     - [OtlpExport](#stroppy-OtlpExport)
     - [Ulid](#stroppy-Ulid)
@@ -454,6 +455,22 @@ Range for 64-bit unsigned integers
 
 
 
+<a name="stroppy-Generation-Range-UuidSeq"></a>
+
+### Generation.Range.UuidSeq
+Sequential UUID range, counting from min to max.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min | [Uuid](#stroppy-Uuid) | optional | Start UUID (inclusive); defaults to 00000000-0000-0000-0000-000000000000 if not set |
+| max | [Uuid](#stroppy-Uuid) |  | End UUID (inclusive) |
+
+
+
+
+
+
 <a name="stroppy-Generation-Rule"></a>
 
 ### Generation.Rule
@@ -482,6 +499,10 @@ Rule defines generation rules for a specific data type.
 | string_const | [string](#string) |  | Fixed string value. |
 | bool_const | [bool](#bool) |  | Fixed boolean value. |
 | datetime_const | [DateTime](#stroppy-DateTime) |  | Fixed date/time value. |
+| uuid_random | [bool](#bool) |  | Random UUID value (v4). Seed is ignored. |
+| uuid_const | [Uuid](#stroppy-Uuid) |  | Fixed UUID value. |
+| uuid_seeded | [bool](#bool) |  | Random UUID value (v4) reproducible by seed. |
+| uuid_seq | [Generation.Range.UuidSeq](#stroppy-Generation-Range-UuidSeq) |  | Sequential UUIDs from min to max (00000...1 → 00000...N). |
 | distribution | [Generation.Distribution](#stroppy-Generation-Distribution) | optional | Shape of randomness; Normal by default; Only for numbers |
 | null_percentage | [uint32](#uint32) | optional | Percentage of nulls to inject [0..100]; 0 by default |
 | unique | [bool](#bool) | optional | Enforce uniqueness across generated values; Linear sequence for ranges |

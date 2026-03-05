@@ -20,7 +20,7 @@ Stroppy is a **k6 extension** (`k6/x/stroppy`) that adds database-specific capab
 | k6 module | `cmd/xk6air/` | Registers `k6/x/stroppy` module, manages per-VU driver/generator instances |
 | Driver interface | `pkg/driver/dispatcher.go` | Registry pattern: `RegisterDriver()` + `Dispatch()` |
 | PostgreSQL driver | `pkg/driver/postgres/` | pgxpool-based, supports PLAIN_QUERY and COPY_FROM insertion |
-| Data generators | `pkg/common/generate/` | Uniform, Normal, Zipfian distributions; int/float/string/uuid/bool/datetime |
+| Data generators | `pkg/common/generate/` | Uniform, Normal, Zipfian distributions; int/float/string/uuid/bool/datetime/decimal |
 | TypeScript framework | `internal/static/` | `helpers.ts` (R/S/AB/DriverX), `parse_sql.ts`, generated type bindings |
 | Script runner | `internal/runner/` | esbuild transpilation, config extraction via Sobek, k6 process management |
 | Schema definitions | `proto/stroppy/` | config, descriptor, common, runtime, cloud schemas |
@@ -52,10 +52,23 @@ Drivers register themselves via `init()` using `driver.RegisterDriver()`. The di
   - `--= query_name` names individual queries within sections
 - `parse_sql_with_groups()` returns `Record<string, ParsedQuery[]>`
 
+### UUID Generator Variants
+
+Four variants available via `Generation.Rule.kind` in the proto:
+
+| Proto field | Behavior |
+|---|---|
+| `uuid_random = true` | Truly random v4 UUID; seed ignored |
+| `uuid_seeded = true` | Deterministic v4 UUID sequence; same seed → same sequence (ChaCha8 PRNG) |
+| `uuid_seq { max: "..." }` | Sequential counter encoded as UUID; `min` defaults to nil UUID (`00000...0`) |
+| `uuid_const { value: "..." }` | Fixed UUID repeated on every call |
+
+Generator factory entry point: `NewValueGeneratorByRule` in `pkg/common/generate/value.go`.
+
 ### Build System
 
 - `make build` - Builds k6 with xk6air extension via xk6
-- `make proto` - Generates Go, TypeScript, gRPC, docs from proto files
+- `make proto` - Generates Go, TypeScript, gRPC, docs from proto files; **wipes `pkg/common/proto/*` before regenerating** — never hand-edit generated files
 - `make install-bin-deps` - Installs protoc plugins, xk6, esbuild, etc.
 - Go 1.24.3+, Node.js required for full build
 

@@ -22,6 +22,7 @@ import {
   InsertDescriptor,
   InsertMethod,
   Status,
+  Timestamp,
 } from "./stroppy.pb.js";
 import { ParsedQuery } from "./parse_sql.js";
 
@@ -183,6 +184,10 @@ export const Dist = {
   zipf: (screw: number): Distribution => ({ kind: "zipf", screw }),
 };
 
+function dateToTimestamp(d: Date): Timestamp {
+  return { seconds: Math.floor(d.getTime() / 1000).toString(), nanos: 0 };
+}
+
 function toProtoDistribution(d: Distribution): Generation_Distribution {
   switch (d.kind) {
     case "normal":
@@ -236,27 +241,48 @@ export const AB = {
 
 // Define the interface with overloads
 interface RandomRangeGenerators {
-  // Overloaded str function
+  // String
   str(val: string): Generation_Rule;
   str(len: number, alphabet?: Alphabet): Generation_Rule;
   str(minLen: number, maxLen: number, alphabet?: Alphabet): Generation_Rule;
 
-  // Integer generators
+  // Signed integers
   int32(val: number): Generation_Rule;
   int32(min: number, max: number, distribution?: Distribution): Generation_Rule;
 
-  // Float/Double generators
+  int64(val: string | number): Generation_Rule;
+  int64(min: string | number, max: string | number, distribution?: Distribution): Generation_Rule;
+
+  // Unsigned integers
+  uint32(val: number): Generation_Rule;
+  uint32(min: number, max: number, distribution?: Distribution): Generation_Rule;
+
+  uint64(val: string | number): Generation_Rule;
+  uint64(min: string | number, max: string | number, distribution?: Distribution): Generation_Rule;
+
+  // Floating point
   float(val: number): Generation_Rule;
   float(min: number, max: number, distribution?: Distribution): Generation_Rule;
 
   double(val: number): Generation_Rule;
   double(min: number, max: number, distribution?: Distribution): Generation_Rule;
 
-  // Datetime generator
-  datetimeConst: (val: Date) => Generation_Rule;
+  // Decimal (arbitrary precision)
+  decimal(val: string): Generation_Rule;
+  decimal(min: number, max: number, distribution?: Distribution): Generation_Rule;
 
-  // Boolean generator
+  // Datetime
+  datetimeConst: (val: Date) => Generation_Rule;
+  datetime(min: Date, max: Date, distribution?: Distribution): Generation_Rule;
+
+  // Boolean
   bool: (ratio: number, unique?: boolean) => Generation_Rule;
+  boolConst: (val: boolean) => Generation_Rule;
+
+  // UUID
+  uuid: () => Generation_Rule;
+  uuidSeeded: () => Generation_Rule;
+  uuidConst: (val: string) => Generation_Rule;
 
   // Helpers
   params: (params: Record<string, Generation_Rule>) => QueryParamDescriptor[];
@@ -322,6 +348,71 @@ export const R: RandomRangeGenerators = {
     };
   },
 
+  int64(valOrMin: string | number, max?: string | number, distribution?: Distribution): Generation_Rule {
+    if (max === undefined) {
+      return { kind: { oneofKind: "int64Const", int64Const: String(valOrMin) } };
+    }
+    return {
+      kind: { oneofKind: "int64Range", int64Range: { min: String(valOrMin), max: String(max) } },
+      distribution: distribution && toProtoDistribution(distribution),
+    };
+  },
+
+  uint32(valOrMin: number, max?: number, distribution?: Distribution): Generation_Rule {
+    if (max === undefined) {
+      return { kind: { oneofKind: "uint32Const", uint32Const: valOrMin } };
+    }
+    return {
+      kind: { oneofKind: "uint32Range", uint32Range: { min: valOrMin, max } },
+      distribution: distribution && toProtoDistribution(distribution),
+    };
+  },
+
+  uint64(valOrMin: string | number, max?: string | number, distribution?: Distribution): Generation_Rule {
+    if (max === undefined) {
+      return { kind: { oneofKind: "uint64Const", uint64Const: String(valOrMin) } };
+    }
+    return {
+      kind: { oneofKind: "uint64Range", uint64Range: { min: String(valOrMin), max: String(max) } },
+      distribution: distribution && toProtoDistribution(distribution),
+    };
+  },
+
+  decimal(valOrMin: string | number, max?: number, distribution?: Distribution): Generation_Rule {
+    if (max === undefined) {
+      return { kind: { oneofKind: "decimalConst", decimalConst: { value: String(valOrMin) } } };
+    }
+    return {
+      kind: {
+        oneofKind: "decimalRange",
+        decimalRange: { type: { oneofKind: "double", double: { min: valOrMin as number, max } } },
+      },
+      distribution: distribution && toProtoDistribution(distribution),
+    };
+  },
+
+  datetime(min: Date, max: Date, distribution?: Distribution): Generation_Rule {
+    return {
+      kind: {
+        oneofKind: "datetimeRange",
+        datetimeRange: {
+          type: {
+            oneofKind: "timestampPb",
+            timestampPb: {
+              min: dateToTimestamp(min),
+              max: dateToTimestamp(max),
+            },
+          },
+        },
+      },
+      distribution: distribution && toProtoDistribution(distribution),
+    };
+  },
+
+  boolConst(val: boolean): Generation_Rule {
+    return { kind: { oneofKind: "boolConst", boolConst: val } };
+  },
+
   datetimeConst(val: Date): Generation_Rule {
     return {
       kind: {
@@ -345,6 +436,18 @@ export const R: RandomRangeGenerators = {
     };
   },
 
+  uuid(): Generation_Rule {
+    return { kind: { oneofKind: "uuidRandom", uuidRandom: true } };
+  },
+
+  uuidSeeded(): Generation_Rule {
+    return { kind: { oneofKind: "uuidSeeded", uuidSeeded: true } };
+  },
+
+  uuidConst(val: string): Generation_Rule {
+    return { kind: { oneofKind: "uuidConst", uuidConst: { value: val } } };
+  },
+
   params: params_internal,
 
   groups(
@@ -362,6 +465,14 @@ interface SequenceGenerators {
   str(minLen: number, maxLen: number, alphabet?: Alphabet): Generation_Rule;
 
   int32: (min: number, max: number) => Generation_Rule;
+  int64: (min: string | number, max: string | number) => Generation_Rule;
+  uint32: (min: number, max: number) => Generation_Rule;
+  uint64: (min: string | number, max: string | number) => Generation_Rule;
+
+  // Sequential UUID: counts from min up to max (inclusive).
+  // min defaults to 00000000-0000-0000-0000-000000000000 if omitted.
+  uuid(max: string): Generation_Rule;
+  uuid(min: string, max: string): Generation_Rule;
 }
 
 export const S: SequenceGenerators = {
@@ -392,6 +503,41 @@ export const S: SequenceGenerators = {
     return {
       kind: { oneofKind: "int32Range", int32Range: { min, max } },
       unique: true,
+    };
+  },
+
+  int64(min: string | number, max: string | number): Generation_Rule {
+    return {
+      kind: { oneofKind: "int64Range", int64Range: { min: String(min), max: String(max) } },
+      unique: true,
+    };
+  },
+
+  uint32(min: number, max: number): Generation_Rule {
+    return {
+      kind: { oneofKind: "uint32Range", uint32Range: { min, max } },
+      unique: true,
+    };
+  },
+
+  uint64(min: string | number, max: string | number): Generation_Rule {
+    return {
+      kind: { oneofKind: "uint64Range", uint64Range: { min: String(min), max: String(max) } },
+      unique: true,
+    };
+  },
+
+  uuid(minOrMax: string, max?: string): Generation_Rule {
+    const resolvedMin = max !== undefined ? minOrMax : undefined;
+    const resolvedMax = max !== undefined ? max : minOrMax;
+    return {
+      kind: {
+        oneofKind: "uuidSeq",
+        uuidSeq: {
+          max: { value: resolvedMax },
+          ...(resolvedMin !== undefined ? { min: { value: resolvedMin } } : {}),
+        },
+      },
     };
   },
 };
