@@ -260,47 +260,64 @@ export const AB = {
 
 // Define the interface with overloads
 interface ConstGenerators {
+  /** Fixed string value. */
   str: (val: string) => Rule;
+  /** Fixed 32-bit signed integer value. */
   int32: (val: number) => Rule;
-  int64: (val: string | number) => Rule;
+  /** Fixed 64-bit signed integer value (proto: int64 → string). */
+  int64: (val: string | number | bigint) => Rule;
+  /** Fixed 32-bit unsigned integer value. */
   uint32: (val: number) => Rule;
-  uint64: (val: string | number) => Rule;
+  /** Fixed 64-bit unsigned integer value (proto: uint64 → string). */
+  uint64: (val: string | number | bigint) => Rule;
+  /** Fixed 32-bit float value; beware precision for currency. */
   float: (val: number) => Rule;
+  /** Fixed 64-bit float value. */
   double: (val: number) => Rule;
+  /** Fixed arbitrary-precision decimal value. */
   decimal: (val: string) => Rule;
+  /** Fixed date/time value. */
   datetime: (val: Date) => Rule;
+  /** Fixed boolean value. */
   bool: (val: boolean) => Rule;
+  /** Fixed UUID value. */
   uuid: (val: string) => Rule;
 }
 
 interface RandomRangeGenerators {
-  // String
+  /** String constraints (length, alphabet). Proto: min_len/max_len are uint64. */
   str(len: number, alphabet?: Alphabet): Rule;
   str(minLen: number, maxLen: number, alphabet?: Alphabet): Rule;
 
-  // Signed integers
+  /** Signed 32-bit integer range (inclusive). */
   int32(min: number, max: number, distribution?: Distribution): Rule;
-  int64(min: string | number, max: string | number, distribution?: Distribution): Rule;
+  /** Signed 64-bit integer range (inclusive). Proto: int64 → string. */
+  int64(min: string | number | bigint, max: string | number | bigint, distribution?: Distribution): Rule;
 
-  // Unsigned integers
+  /** Unsigned 32-bit integer range; use for sizes/indices. */
   uint32(min: number, max: number, distribution?: Distribution): Rule;
-  uint64(min: string | number, max: string | number, distribution?: Distribution): Rule;
+  /** Unsigned 64-bit integer range (inclusive). Proto: uint64 → string. */
+  uint64(min: string | number | bigint, max: string | number | bigint, distribution?: Distribution): Rule;
 
-  // Floating point
+  /** 32-bit float range (inclusive); beware precision for currency. */
   float(min: number, max: number, distribution?: Distribution): Rule;
+  /** 64-bit float range (inclusive) for high-precision numeric data. */
   double(min: number, max: number, distribution?: Distribution): Rule;
 
-  // Decimal (arbitrary precision)
+  /** Arbitrary-precision decimal range via double bounds. */
   decimal(min: number, max: number, distribution?: Distribution): Rule;
+  /** Arbitrary-precision decimal range via string bounds (scientific notation OK). */
+  decimal(min: string, max: string, distribution?: Distribution): Rule;
 
-  // Datetime
+  /** Date/time range (inclusive). */
   datetime(min: Date, max: Date, distribution?: Distribution): Rule;
 
-  // Boolean
+  /** Boolean with given ratio of true values; unique = true → sequence [false, true]. */
   bool: (ratio: number, unique?: boolean) => Rule;
 
-  // UUID
+  /** Random UUID v4. Seed is ignored. */
   uuid: () => Rule;
+  /** Random UUID v4, reproducible by seed. */
   uuidSeeded: () => Rule;
 
   // Helpers
@@ -317,13 +334,13 @@ export const C: ConstGenerators = {
   int32: (val: number): Rule =>
     rule({ kind: { oneofKind: "int32Const", int32Const: val } }),
 
-  int64: (val: string | number): Rule =>
+  int64: (val: string | number | bigint): Rule =>
     rule({ kind: { oneofKind: "int64Const", int64Const: String(val) } }),
 
   uint32: (val: number): Rule =>
     rule({ kind: { oneofKind: "uint32Const", uint32Const: val } }),
 
-  uint64: (val: string | number): Rule =>
+  uint64: (val: string | number | bigint): Rule =>
     rule({ kind: { oneofKind: "uint64Const", uint64Const: String(val) } }),
 
   float: (val: number): Rule =>
@@ -339,12 +356,7 @@ export const C: ConstGenerators = {
     rule({
       kind: {
         oneofKind: "datetimeConst",
-        datetimeConst: {
-          value: {
-            seconds: val.getSeconds().toString(),
-            nanos: (val.getMilliseconds() % 1000) * 1000000,
-          },
-        },
+        datetimeConst: { value: dateToTimestamp(val) },
       },
     }),
 
@@ -385,7 +397,7 @@ export const R: RandomRangeGenerators = {
     });
   },
 
-  int64(min: string | number, max: string | number, distribution?: Distribution): Rule {
+  int64(min: string | number | bigint, max: string | number | bigint, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "int64Range", int64Range: { min: String(min), max: String(max) } },
       distribution: distribution && toProtoDistribution(distribution),
@@ -399,7 +411,7 @@ export const R: RandomRangeGenerators = {
     });
   },
 
-  uint64(min: string | number, max: string | number, distribution?: Distribution): Rule {
+  uint64(min: string | number | bigint, max: string | number | bigint, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "uint64Range", uint64Range: { min: String(min), max: String(max) } },
       distribution: distribution && toProtoDistribution(distribution),
@@ -420,11 +432,16 @@ export const R: RandomRangeGenerators = {
     });
   },
 
-  decimal(min: number, max: number, distribution?: Distribution): Rule {
+  decimal(min: number | string, max: number | string, distribution?: Distribution): Rule {
+    const isStr = typeof min === "string";
     return rule({
       kind: {
         oneofKind: "decimalRange",
-        decimalRange: { type: { oneofKind: "double", double: { min, max } } },
+        decimalRange: {
+          type: isStr
+            ? { oneofKind: "string", string: { min: min as string, max: max as string } }
+            : { oneofKind: "double", double: { min: min as number, max: max as number } },
+        },
       },
       distribution: distribution && toProtoDistribution(distribution),
     });
@@ -476,17 +493,21 @@ export const R: RandomRangeGenerators = {
 };
 
 interface SequenceGenerators {
-  // String generators
+  /** Unique string sequence (length, alphabet). */
   str(len: number, alphabet?: Alphabet): Rule;
   str(minLen: number, maxLen: number, alphabet?: Alphabet): Rule;
 
+  /** Sequential 32-bit signed integer from min to max. */
   int32: (min: number, max: number) => Rule;
-  int64: (min: string | number, max: string | number) => Rule;
+  /** Sequential 64-bit signed integer from min to max. Proto: int64 → string. */
+  int64: (min: string | number | bigint, max: string | number | bigint) => Rule;
+  /** Sequential 32-bit unsigned integer from min to max. */
   uint32: (min: number, max: number) => Rule;
-  uint64: (min: string | number, max: string | number) => Rule;
+  /** Sequential 64-bit unsigned integer from min to max. Proto: uint64 → string. */
+  uint64: (min: string | number | bigint, max: string | number | bigint) => Rule;
 
-  // Sequential UUID: counts from min up to max (inclusive).
-  // min defaults to 00000000-0000-0000-0000-000000000000 if omitted.
+  /** Sequential UUIDs from min to max (inclusive).
+   *  min defaults to 00000000-0000-0000-0000-000000000000 if omitted. */
   uuid(max: string): Rule;
   uuid(min: string, max: string): Rule;
 }
@@ -522,7 +543,7 @@ export const S: SequenceGenerators = {
     });
   },
 
-  int64(min: string | number, max: string | number): Rule {
+  int64(min: string | number | bigint, max: string | number | bigint): Rule {
     return rule({
       kind: { oneofKind: "int64Range", int64Range: { min: String(min), max: String(max) } },
       unique: true,
@@ -536,7 +557,7 @@ export const S: SequenceGenerators = {
     });
   },
 
-  uint64(min: string | number, max: string | number): Rule {
+  uint64(min: string | number | bigint, max: string | number | bigint): Rule {
     return rule({
       kind: { oneofKind: "uint64Range", uint64Range: { min: String(min), max: String(max) } },
       unique: true,
