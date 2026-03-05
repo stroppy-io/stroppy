@@ -232,26 +232,27 @@ func createVM() *js.Runtime {
 	return vm
 }
 
+// for [xk6air.DriverWrapper].
 type driverStub struct{}
 
-func (*driverStub) RunQuery(string, map[string]any) *driver.QueryResult {
+func (*driverStub) RunQuery(string, map[string]any) (*driver.QueryResult, error) {
 	return &driver.QueryResult{
 		Stats: &stats.Query{},
 		Rows:  &rowsStub{},
-	}
+	}, nil
 }
 
-func (*driverStub) InsertValuesBin([]byte, int64) *stats.Query {
-	return &stats.Query{}
+func (*driverStub) InsertValuesBin([]byte, int64) (*stats.Query, error) {
+	return &stats.Query{}, nil
 }
 
 // rowsStub implements driver.Rows for the probe VM.
 type rowsStub struct{}
 
-func (*rowsStub) Columns() []string   { return nil }
+func (*rowsStub) Columns() []string   { return []string{} }
 func (*rowsStub) Next() bool          { return false }
 func (*rowsStub) Values() []any       { return nil }
-func (*rowsStub) ReadAll(int) [][]any { return nil }
+func (*rowsStub) ReadAll(int) [][]any { return [][]any{} }
 func (*rowsStub) Err() error          { return nil }
 func (*rowsStub) Close() error        { return nil }
 
