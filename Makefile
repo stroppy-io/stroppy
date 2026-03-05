@@ -276,7 +276,7 @@ revision: # Recreate git tag with version tag=<semver>
 ## Local K6 fast tests
 ##
 
-.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcds-test .rm-dev
+.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcds-test run-sqlapi-test .rm-dev
 
 WORKDIR=dev
 
@@ -298,6 +298,9 @@ run-tpcc-test: .rm-dev
 run-tpcds-test: .rm-dev
 	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcds
 	cd $(WORKDIR) && ./stroppy run tpcds.ts tpcds-scale-1.sql
+
+run-sqlapi-test: # Run SQL API integration tests
+	./build/stroppy run workloads/tests/sqlapi_test.ts
 
 ##
 ## TypeScript Development

@@ -29,7 +29,8 @@
       "./tpcb/",
       "./tpcc/",
       "./tpcds/"
-      "./execsql/"
+      "./execute_sql/",
+      "./tests/"
     ],
     "paths": {
       "k6/x/stroppy": ["../internal/static/stroppy.d.ts"]

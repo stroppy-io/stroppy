@@ -13,15 +13,16 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
-// RunQuery exucetse sql with args in form :arg.
+// RunQuery executes sql with args in form :arg and returns rows cursor.
 func (d *Driver) RunQuery(
 	ctx context.Context,
 	sql string,
 	args map[string]any,
-) (*stats.Query, error) {
+) (*driver.QueryResult, error) {
 	processedSQL, argsArr, err := processArgs(sql, args)
 	if err != nil {
 		if errors.Is(err, ErrExtraArgument) {
@@ -34,14 +35,17 @@ func (d *Driver) RunQuery(
 	}
 
 	start := time.Now()
-	_, err = d.pgxPool.Exec(ctx, processedSQL, argsArr...)
+	pgxRows, err := d.pgxPool.Query(ctx, processedSQL, argsArr...)
 	elapsed := time.Since(start)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute sql: %w", err)
 	}
 
-	return &stats.Query{Elapsed: elapsed}, nil
+	return &driver.QueryResult{
+		Stats: &stats.Query{Elapsed: elapsed},
+		Rows:  newRows(pgxRows),
+	}, nil
 }
 
 var (

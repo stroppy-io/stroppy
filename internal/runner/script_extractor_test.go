@@ -16,43 +16,6 @@ import (
 	"github.com/stroppy-io/stroppy/workloads"
 )
 
-func Test_defaultFunctionExport(t *testing.T) {
-	vm := createVM()
-	vm.RunString(` export default function () {} `)
-	global := vm.GlobalObject()
-	t.Log(global.GetOwnPropertyNames())
-
-	fn := vm.Get("default")
-	t.Log(fn)
-	fnFunc, ok := js.AssertFunction(fn)
-	t.Log(fnFunc, ok)
-}
-
-func Test_defaultFunctionTranspilation(t *testing.T) {
-	vm := createVM()
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "test_file_name.ts")
-	os.WriteFile(
-		filePath,
-		[]byte(` export default function (): void {} `),
-		common.FileMode,
-	)
-
-	jsCode, err := TranspileTypeScript(filePath)
-
-	t.Log(jsCode, err)
-
-	vm.RunString(jsCode)
-
-	global := vm.GlobalObject()
-	t.Log(global.GetOwnPropertyNames())
-
-	fn := vm.Get("test_file_name_default")
-	t.Log(fn)
-	fnFunc, ok := js.AssertFunction(fn)
-	t.Log(fnFunc, ok)
-}
-
 func Test_spyProxyObject(t *testing.T) {
 	vm := createVM()
 	accessedProps := []string{}

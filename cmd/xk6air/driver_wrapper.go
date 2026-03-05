@@ -6,6 +6,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -45,28 +46,28 @@ func (d *DriverWrapper) configure() {
 	})
 }
 
-func (d *DriverWrapper) RunQuery(sql string, args map[string]any) any {
+func (d *DriverWrapper) RunQuery(sql string, args map[string]any) (*driver.QueryResult, error) {
 	d.configure()
-	stats, err := d.drv.RunQuery(d.vu.Context(), sql, args)
+	result, err := d.drv.RunQuery(d.vu.Context(), sql, args)
 	if err != nil {
-		return fmt.Errorf("error while executing sql query: %w", err)
+		return nil, fmt.Errorf("error while executing sql query: %w", err)
 	}
-	return stats
+	return result, nil
 }
 
 // InsertValuesBin starts bulk insert blocking operation on driver.
-func (d *DriverWrapper) InsertValuesBin(insertMsg []byte, count int64) any {
+func (d *DriverWrapper) InsertValuesBin(insertMsg []byte, count int64) (*stats.Query, error) {
 	d.configure()
 	var descriptor stroppy.InsertDescriptor
 	err := proto.Unmarshal(insertMsg, &descriptor)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("error while unmarshalling insert descriptor: %w", err)
 	}
 
-	stats, err := d.drv.InsertValues(d.vu.Context(), &descriptor)
+	result, err := d.drv.InsertValues(d.vu.Context(), &descriptor)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("error while executing insert: %w", err)
 	}
 
-	return stats
+	return result, nil
 }
