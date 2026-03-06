@@ -46,6 +46,8 @@ declare module "k6/x/stroppy" {
     insertValuesBin(insert: BinMsg<InsertDescriptor>): QueryStats;
     /** @throws {Error} on query execution or argument processing error */
     runQuery(sql: string, args: Record<string, any>): QueryResult;
+    /* Per VU setup. Runs lambda once at first iteration and never after it.  */
+    setup(lambda: () => void);
   }
 
   // Generator interface - provides data generation
