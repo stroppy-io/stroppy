@@ -90,7 +90,9 @@ func (r *RootModule) Teardown() error {
 	}
 	r.vuMutex.Unlock()
 
-	r.sharedDrv.Teardown(r.ctx)
+	if r.sharedDrv != nil {
+		r.sharedDrv.Teardown(r.ctx)
+	}
 
 	_, errCloud := r.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
 		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
