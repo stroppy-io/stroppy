@@ -223,7 +223,7 @@ export class DriverX implements QueryAPI {
       ? {
           tableName: insertOrTableName,
           method: insert?.method ? insertMethodMap[insert.method] : undefined,
-          seed: insert?.seed ?? _seed,
+          seed: String(insert?.seed ?? _seed),
           params: R.group(insert?.params ?? {}),
           groups: R.groups(insert?.groups ?? {}),
           count,
