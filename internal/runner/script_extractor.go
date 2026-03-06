@@ -260,6 +260,16 @@ type genStub struct{}
 
 func (*genStub) Next() any { return nil }
 
+type pickerStub struct{}
+
+//nolint:ireturn // sobek
+func (g *pickerStub) Pick(a []js.Value) (js.Value, error) { return a[0], nil }
+
+//nolint:ireturn // sobek
+func (g *pickerStub) PickWeighted(a []js.Value, _ []float64) (js.Value, error) { return a[0], nil }
+
+func newPickerStub(seed uint64) *pickerStub { return &pickerStub{} }
+
 type Mocks []struct {
 	name  string
 	value any
@@ -315,6 +325,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		{"NotifyStep", notifyStepSpy(&probeprint.Steps)},
 		// TODO: research. Some esbuild name resolution artifact, probably
 		{"NotifyStep2", notifyStepSpy(&probeprint.Steps)},
+		{"NewPicker", newPickerStub},
 
 		{"parse_sql_with_sections", parseSectionsSpy(&probeprint.SQLSections)},
 		{"parse_sql", parseSpy(&probeprint.SQLSections)},

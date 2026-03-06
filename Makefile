@@ -276,7 +276,7 @@ revision: # Recreate git tag with version tag=<semver>
 ## Local K6 fast tests
 ##
 
-.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcds-test run-sqlapi-test .rm-dev
+.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcc-pick-test run-tpcds-test run-sqlapi-test .rm-dev
 
 WORKDIR=dev
 
@@ -294,6 +294,10 @@ run-tpcb-test:
 run-tpcc-test: .rm-dev
 	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcc
 	cd $(WORKDIR) && DURATION="1s" SCALE_FACTOR=1 ./stroppy run tpcc.ts tpcc.sql
+
+run-tpcc-pick-test: .rm-dev
+	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcc
+	cd $(WORKDIR) && SCALE_FACTOR=1 ./stroppy run tpcc-pick.ts tpcc.sql -- --duration "1s"
 
 run-tpcds-test: .rm-dev
 	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcds

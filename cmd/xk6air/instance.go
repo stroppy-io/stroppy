@@ -54,6 +54,7 @@ func (i *Instance) Exports() modules.Exports {
 			"Teardown":                    rootModule.Teardown,
 			"NewGeneratorByRuleBin":       NewGeneratorByRuleBin,
 			"NewGroupGeneratorByRulesBin": NewGroupGeneratorByRulesBin,
+			"NewPicker":                   NewPicker,
 		},
 	}
 }
