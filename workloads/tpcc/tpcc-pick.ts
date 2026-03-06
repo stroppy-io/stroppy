@@ -1,47 +1,12 @@
 import { Options } from "k6/options";
-import { Teardown } from "k6/x/stroppy";
+import { Teardown, NewPicker } from "k6/x/stroppy";
 import { DriverConfig_DriverType } from "./stroppy.pb.js";
 import { AB, C, R, Step, DriverX, S, ENV } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
+
 const SQL_FILE = ENV("SQL_FILE", "./tpcc.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
-const DURATION = ENV("DURATION", "1h", "Test duration");
-const VUS_SCALE = ENV("VUS_SCALE", 1, "VU scaling factor");
-export const options: Options = {
-  setupTimeout: "5m",
-  scenarios: {
-    new_order: {
-      executor: "constant-vus",
-      exec: "new_order",
-      vus: Math.max(1, Math.round(44 * VUS_SCALE)),
-      duration: DURATION,
-    },
-    payments: {
-      executor: "constant-vus",
-      exec: "payments",
-      vus: Math.max(1, Math.round(43 * VUS_SCALE)),
-      duration: DURATION,
-    },
-    order_status: {
-      executor: "constant-vus",
-      exec: "order_status",
-      vus: Math.max(1, Math.round(4 * VUS_SCALE)),
-      duration: DURATION,
-    },
-    delivery: {
-      executor: "constant-vus",
-      exec: "delivery",
-      vus: Math.max(1, Math.round(4 * VUS_SCALE)),
-      duration: DURATION,
-    },
-    stock_level: {
-      executor: "constant-vus",
-      exec: "stock_level",
-      vus: Math.max(1, Math.round(4 * VUS_SCALE)),
-      duration: DURATION,
-    },
-  },
-};
+
 // TPCC Configuration Constants
 const POOL_SIZE = ENV("POOL_SIZE", 100, "Connection pool size");
 const WAREHOUSES = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
@@ -53,6 +18,10 @@ const TOTAL_DISTRICTS = WAREHOUSES * DISTRICTS_PER_WAREHOUSE;
 const TOTAL_CUSTOMERS =
   WAREHOUSES * DISTRICTS_PER_WAREHOUSE * CUSTOMERS_PER_DISTRICT;
 const TOTAL_STOCK = WAREHOUSES * ITEMS;
+
+export const options: Options = {
+  setupTimeout:  String(WAREHOUSES * 5) + "m", // 5 min for every 1 in scale
+};
 
 // Initialize driver with GlobalConfig
 const driver = DriverX.fromConfig({
@@ -195,7 +164,7 @@ const newOrderDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 const newOrderCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
 const newOrderOlCntGen = R.int32(5, 15).gen();
 
-export function new_order() {
+function new_order() {
   driver.runQuery(sql("workload", "new_order")!, {
     w_id: newOrderWarehouseGen.next(),
     max_w_id: newOrderMaxWarehouseGen.next(),
@@ -213,7 +182,7 @@ const paymentCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
 const paymentAmountGen = R.double(1, 5000).gen();
 const paymentCustomerLastGen = S.str(6, 16).gen();
 
-export function payments() {
+function payments() {
   driver.runQuery(sql("workload", "payment")!, {
       p_w_id: paymentWarehouseGen.next(),
       p_d_id: paymentDistrictGen.next(),
@@ -232,7 +201,7 @@ const orderStatusDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 const orderStatusCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
 const orderStatusCustomerLastGen = R.str(8, 16).gen();
 
-export function order_status() {
+function order_status() {
   driver.runQuery(sql("workload", "order_status")!, {
       os_w_id: orderStatusWarehouseGen.next(),
       os_d_id: orderStatusDistrictGen.next(),
@@ -246,7 +215,7 @@ export function order_status() {
 const deliveryWarehouseGen = R.int32(1, WAREHOUSES).gen();
 const deliveryCarrierGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 
-export function delivery() {
+function delivery() {
   driver.runQuery(sql("workload", "delivery")!, {
     d_w_id: deliveryWarehouseGen.next(),
     d_o_carrier_id: deliveryCarrierGen.next(),
@@ -257,12 +226,20 @@ const stockLevelWarehouseGen = R.int32(1, WAREHOUSES).gen();
 const stockLevelDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 const stockLevelThresholdGen = R.int32(10, 20).gen();
 
-export function stock_level() {
+function stock_level() {
   driver.runQuery(sql("workload", "stock_level")!, {
     st_w_id: stockLevelWarehouseGen.next(),
     st_d_id: stockLevelDistrictGen.next(),
     threshold: stockLevelThresholdGen.next(),
   });
+}
+
+const picker = NewPicker(0)
+export default function (): void {
+  const workload = picker.pickWeighted(
+    [new_order, payments, order_status, delivery, stock_level],
+    [44,        43,       4,            4,        4]) as () => void;
+  workload()
 }
 
 export function teardown() {

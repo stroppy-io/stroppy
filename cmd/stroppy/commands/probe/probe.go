@@ -22,6 +22,12 @@ const (
 	localFlag  = "local"
 	formatFlag = "output"
 
+	configFlag  = "config"
+	optionsFlag = "options"
+	sqlFlag     = "sql"
+	stepsFlag   = "steps"
+	envsFlag    = "envs"
+
 	humanFormat = "human"
 	jsonFormat  = "json"
 )
@@ -104,9 +110,11 @@ stroppy envs). Current environment values are also shown if found.
 					return fmt.Errorf("error while probbing %q: %w", scriptPath, err)
 				}
 
+				sections := buildSections(cmd)
+
 				switch formatFlagValue {
 				case humanFormat:
-					fmt.Fprintf(os.Stdout, "\n%s\n", probeprint.Explain())
+					fmt.Fprintf(os.Stdout, "\n%s\n", probeprint.Explain(sections))
 				case jsonFormat:
 					bytes, err := json.Marshal(probeprint)
 					if err != nil {
@@ -128,6 +136,41 @@ stroppy envs). Current environment values are also shown if found.
 			BoolP(localFlag, string(localFlag[0]), false,
 				"prevent tmp dir creation (use local dependencies in test working directory)")
 
+		cmd.Flags().Bool(configFlag, false, "show only stroppy config section")
+		cmd.Flags().Bool(optionsFlag, false, "show only k6 options section")
+		cmd.Flags().Bool(sqlFlag, false, "show only sql file structure section")
+		cmd.Flags().Bool(stepsFlag, false, "show only steps section")
+		cmd.Flags().Bool(envsFlag, false, "show only environment variables section")
+
 		return cmd
 	}()
 )
+
+// buildSections maps bool flags to ExplainSection bitmask.
+// If no section flags are set, all sections are included.
+func buildSections(cmd *cobra.Command) runner.ExplainSection {
+	flagMap := []struct {
+		name    string
+		section runner.ExplainSection
+	}{
+		{configFlag, runner.ExplainConfig},
+		{optionsFlag, runner.ExplainOptions},
+		{sqlFlag, runner.ExplainSQL},
+		{stepsFlag, runner.ExplainSteps},
+		{envsFlag, runner.ExplainEnvs},
+	}
+
+	var sections runner.ExplainSection
+
+	for _, f := range flagMap {
+		if v, _ := cmd.Flags().GetBool(f.name); v {
+			sections |= f.section
+		}
+	}
+
+	if sections == 0 {
+		return runner.ExplainAll
+	}
+
+	return sections
+}

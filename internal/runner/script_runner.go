@@ -29,10 +29,12 @@ type ScriptRunner struct {
 	config     *Probeprint
 	k6RunArgs  []string // pass args directly to 'k6 run <k6RunArgs>'
 	filesInTmp []string
+	steps      []string // --steps: only run these steps
+	noSteps    []string // --no-steps: skip these steps
 }
 
 // NewScriptRunner creates a new ScriptRunner for the given resolved input.
-func NewScriptRunner(input *ResolvedInput, k6RunArgs []string) (*ScriptRunner, error) {
+func NewScriptRunner(input *ResolvedInput, k6RunArgs, steps, noSteps []string) (*ScriptRunner, error) {
 	lg := logger.Global().
 		Named("script_runner").
 		WithOptions(zap.WithCaller(false), zap.AddStacktrace(zap.FatalLevel))
@@ -70,6 +72,15 @@ func NewScriptRunner(input *ResolvedInput, k6RunArgs []string) (*ScriptRunner, e
 
 	lg.Debug("Got config extracted", zap.Any("config", config))
 
+	// Validate --steps / --no-steps against probed steps.
+	if err := validateStepNames(config.Steps, steps, "--steps"); err != nil {
+		return nil, err
+	}
+
+	if err := validateStepNames(config.Steps, noSteps, "--no-steps"); err != nil {
+		return nil, err
+	}
+
 	// Update logger with config if available
 	if config.GlobalConfig.GetLogger() != nil {
 		lg = logger.NewFromProtoConfig(config.GlobalConfig.GetLogger()).
@@ -92,6 +103,8 @@ func NewScriptRunner(input *ResolvedInput, k6RunArgs []string) (*ScriptRunner, e
 		tempDir:    tempDir,
 		k6RunArgs:  k6RunArgs,
 		filesInTmp: tmpFiles,
+		steps:      steps,
+		noSteps:    noSteps,
 	}, nil
 }
 
@@ -165,7 +178,11 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, data, common.FileMode)
 }
 
-var ErrNotADir = errors.New("is not a directory")
+var (
+	ErrNotADir      = errors.New("is not a directory")
+	errNoSteps      = errors.New("script has no steps")
+	errUnknownSteps = errors.New("unknown steps")
+)
 
 func copyFiles(srcDir, dstDir string, excludeNames []string) (copied []string, err error) {
 	srcInfo, err := os.Stat(srcDir)
@@ -230,7 +247,45 @@ func (r *ScriptRunner) buildEnvVars() []string {
 		envs = append(envs, "SQL_FILE="+path.Join(r.tempDir, r.sqlName))
 	}
 
+	if len(r.steps) > 0 {
+		envs = append(envs, "STROPPY_STEPS="+strings.Join(r.steps, ","))
+	}
+
+	if len(r.noSteps) > 0 {
+		envs = append(envs, "STROPPY_NO_STEPS="+strings.Join(r.noSteps, ","))
+	}
+
 	return envs
+}
+
+// validateStepNames checks that all names exist in the probed steps.
+func validateStepNames(probed, requested []string, flag string) error {
+	if len(requested) == 0 {
+		return nil
+	}
+
+	if len(probed) == 0 {
+		return fmt.Errorf("%s %v: %w", flag, requested, errNoSteps)
+	}
+
+	known := make(map[string]struct{}, len(probed))
+	for _, s := range probed {
+		known[s] = struct{}{}
+	}
+
+	var unknown []string
+
+	for _, s := range requested {
+		if _, ok := known[s]; !ok {
+			unknown = append(unknown, s)
+		}
+	}
+
+	if len(unknown) > 0 {
+		return fmt.Errorf("%s %v (available: %v): %w", flag, unknown, probed, errUnknownSteps)
+	}
+
+	return nil
 }
 
 // addOtelExportArgs adds OpenTelemetry exporter arguments and environment variables.

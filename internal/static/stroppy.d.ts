@@ -54,17 +54,29 @@ declare module "k6/x/stroppy" {
   }
 
   // k6 module functions provided by Go module
-  export declare function NotifyStep(name: String, status: Number): void;
+  export declare function NotifyStep(name: String, status: number): void;
   export declare function Teardown(): Error;
   export declare function NewDriverByConfigBin(
     configBin: BinMsg<GlobalConfig>,
   ): Driver;
   export declare function NewGeneratorByRuleBin(
-    seed: Number,
+    seed: number,
     rule: BinMsg<Generation_Rule>,
   ): Generator;
   export declare function NewGroupGeneratorByRulesBin(
-    seed: Number,
+    seed: number,
     rule: BinMsg<QueryParamGroup>,
   ): Generator;
+
+  export interface Picker {
+    pick(array: any[]): any;
+    pickWeighted(array: any[], weights: number[]): any;
+  }
+  export declare function NewPicker(seed: number): Picker;
+
+  export declare function DeclareEnv(
+    names: string[],
+    default_: string,
+    description: string,
+  ): void;
 }

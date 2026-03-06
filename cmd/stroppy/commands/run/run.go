@@ -5,16 +5,21 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
 )
 
-var errNoScript = errors.New("script argument is required")
+var (
+	errNoScript          = errors.New("script argument is required")
+	errFlagRequiresValue = errors.New("flag requires a value")
+	errStepsMutExclusive = errors.New("--steps and --no-steps are mutually exclusive")
+)
 
 var Cmd = &cobra.Command{
-	Use:   "run <script> [sql_file] [-- <k6 run direct args>]",
+	Use:   "run <script> [sql_file] [--steps step1,step2] [--no-steps step1,step2] [-- <k6 run direct args>]",
 	Short: "Run benchmark script with k6",
 	Long: `Run a benchmark with k6. The extension determines the mode:
 
@@ -35,6 +40,8 @@ Examples:
   stroppy run ./benchmarks/custom.ts data.sql   # explicit paths
   stroppy run queries.sql                       # execute a SQL file
   stroppy run "select 1"                        # execute inline SQL
+  stroppy run tpcc --steps create_schema,load   # only run specified steps
+  stroppy run tpcc --no-steps load              # run all steps except specified
 `,
 	DisableFlagParsing: true,
 	RunE: func(_ *cobra.Command, args []string) error {
@@ -55,11 +62,48 @@ Examples:
 			positional = args
 		}
 
-		scriptArg := positional[0]
+		// Extract --steps and --no-steps flags from positional args.
+		var (
+			scriptArg string
+			sqlArg    string
+			steps     []string
+			noSteps   []string
+		)
 
-		sqlArg := ""
-		if len(positional) > 1 {
-			sqlArg = positional[1]
+		for i := 0; i < len(positional); i++ {
+			arg := positional[i]
+
+			switch {
+			case arg == "--steps" || arg == "--no-steps":
+				if i+1 >= len(positional) {
+					return fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
+				}
+
+				i++
+
+				vals := strings.Split(positional[i], ",")
+				if arg == "--steps" {
+					steps = append(steps, vals...)
+				} else {
+					noSteps = append(noSteps, vals...)
+				}
+
+			case strings.HasPrefix(arg, "--steps="):
+				steps = append(steps, strings.Split(strings.TrimPrefix(arg, "--steps="), ",")...)
+
+			case strings.HasPrefix(arg, "--no-steps="):
+				noSteps = append(noSteps, strings.Split(strings.TrimPrefix(arg, "--no-steps="), ",")...)
+
+			case scriptArg == "":
+				scriptArg = arg
+
+			default:
+				sqlArg = arg
+			}
+		}
+
+		if len(steps) > 0 && len(noSteps) > 0 {
+			return errStepsMutExclusive
 		}
 
 		// Resolve files through search path.
@@ -68,7 +112,7 @@ Examples:
 			return fmt.Errorf("failed to resolve input: %w", err)
 		}
 
-		r, err := runner.NewScriptRunner(input, afterDash)
+		r, err := runner.NewScriptRunner(input, afterDash, steps, noSteps)
 		if err != nil {
 			return fmt.Errorf("failed to create runner: %w", err)
 		}
