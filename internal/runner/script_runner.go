@@ -255,6 +255,12 @@ func (r *ScriptRunner) buildEnvVars() []string {
 		envs = append(envs, "STROPPY_NO_STEPS="+strings.Join(r.noSteps, ","))
 	}
 
+	if len(r.config.QueryNames) > 0 {
+		names := slices.Clone(r.config.QueryNames)
+		slices.Sort(names)
+		envs = append(envs, "STROPPY_QUERY_NAMES="+strings.Join(names, ","))
+	}
+
 	return envs
 }
 

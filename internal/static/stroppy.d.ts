@@ -45,7 +45,7 @@ declare module "k6/x/stroppy" {
     /** @throws {Error} on insert failure or protobuf unmarshal error */
     insertValuesBin(insert: BinMsg<InsertDescriptor>): QueryStats;
     /** @throws {Error} on query execution or argument processing error */
-    runQuery(sql: string, args: Record<string, any>): QueryResult;
+    runQuery(sql: string, args: Record<string, any>, queryName?: string): QueryResult;
   }
 
   // Generator interface - provides data generation

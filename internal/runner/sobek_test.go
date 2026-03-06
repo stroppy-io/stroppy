@@ -89,11 +89,12 @@ func Test_defaultFunctionTranspilation(t *testing.T) {
 func Test_driverStubRunQuery(t *testing.T) {
 	vm := createVM()
 
-	stub := &driverStub{}
+	var names []string
+	stub := &driverStub{queriedNames: &names}
 	require.NoError(t, vm.Set("driver", stub))
 
 	val, err := vm.RunString(`
-		const result = driver.runQuery("SELECT 1", {});
+		const result = driver.runQuery("SELECT 1", {}, "my_query");
 		JSON.stringify({
 			hasResult: result !== undefined && result !== null,
 			hasRows:   result.rows !== undefined,
@@ -102,6 +103,25 @@ func Test_driverStubRunQuery(t *testing.T) {
 	`)
 	require.NoError(t, err)
 	require.Equal(t, `{"hasResult":true,"hasRows":true,"hasStats":true}`, val.String())
+	require.Equal(t, []string{"my_query"}, names)
+}
+
+// Test that driverStub deduplicates query names.
+func Test_driverStubRunQueryDedup(t *testing.T) {
+	vm := createVM()
+
+	var names []string
+	stub := &driverStub{queriedNames: &names}
+	require.NoError(t, vm.Set("driver", stub))
+
+	_, err := vm.RunString(`
+		driver.runQuery("SELECT 1", {}, "q1");
+		driver.runQuery("SELECT 2", {}, "q1");
+		driver.runQuery("SELECT 3", {}, "q2");
+		driver.runQuery("SELECT 4", {}, "");
+	`)
+	require.NoError(t, err)
+	require.Equal(t, []string{"q1", "q2"}, names)
 }
 
 // Test that rowsStub methods are callable from JS.

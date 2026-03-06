@@ -101,6 +101,24 @@ const runQueryMetric = new Trend("run_query_duration", true);
 const runQueryCounterMetric = new Counter("run_query_count");
 const runQueryErrRateMetric = new Rate("run_query_error_rate");
 
+// Per-query metrics created at init time from query names discovered during probe.
+// STROPPY_QUERY_NAMES is set by the stroppy runner before k6 starts.
+const _perQueryNames: string[] = ((__ENV["STROPPY_QUERY_NAMES"] as string) || "")
+  .split(",")
+  .filter(Boolean);
+
+function _sanitizeMetricName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9]/g, "_");
+}
+
+const _perQueryDuration: Record<string, Trend> = {};
+const _perQueryErrRate: Record<string, Rate> = {};
+for (const _qName of _perQueryNames) {
+  const _safe = _sanitizeMetricName(_qName);
+  _perQueryDuration[_qName] = new Trend(`run_query_${_safe}_duration`, true);
+  _perQueryErrRate[_qName] = new Rate(`run_query_${_safe}_error_rate`);
+}
+
 export interface TaggedQuery {
   sql: string | ParsedQuery;
   tags?: Record<string, string>;
@@ -265,14 +283,22 @@ export class DriverX implements QueryAPI {
 
   runQuery(sql: SqlArg, args?: Record<string, any>): void {
     const resolved = resolveSqlArg(sql);
+    const queryName = resolved.tags?.name;
     try {
-      const result = this.driver.runQuery(resolved.sql, args ?? {});
+      const result = this.driver.runQuery(resolved.sql, args ?? {}, queryName ?? "");
       runQueryMetric.add(result.stats.elapsed.milliseconds(), resolved.tags);
       runQueryErrRateMetric.add(0, resolved.tags);
       runQueryCounterMetric.add(1, resolved.tags);
+      if (queryName && queryName in _perQueryDuration) {
+        _perQueryDuration[queryName].add(result.stats.elapsed.milliseconds());
+        _perQueryErrRate[queryName].add(0);
+      }
       result.rows.close();
     } catch {
       runQueryErrRateMetric.add(1, resolved.tags);
+      if (queryName && queryName in _perQueryErrRate) {
+        _perQueryErrRate[queryName].add(1);
+      }
     }
   }
 

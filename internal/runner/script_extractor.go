@@ -233,9 +233,28 @@ func createVM() *js.Runtime {
 }
 
 // for [xk6air.DriverWrapper].
-type driverStub struct{}
+type driverStub struct {
+	// queriedNames collects unique named queries seen during probe (pointer to Subprobe.QueryNames).
+	queriedNames *[]string
+}
 
-func (*driverStub) RunQuery(string, map[string]any) (*driver.QueryResult, error) {
+// RunQuery accepts an optional third argument — the query name — passed from helpers.ts.
+// The real DriverWrapper.RunQuery only has two params; sobek drops the extra arg there.
+func (d *driverStub) RunQuery(_ string, _ map[string]any, name string) (*driver.QueryResult, error) {
+	if name != "" && d.queriedNames != nil {
+		seen := false
+		for _, n := range *d.queriedNames {
+			if n == name {
+				seen = true
+				break
+			}
+		}
+
+		if !seen {
+			*d.queriedNames = append(*d.queriedNames, name)
+		}
+	}
+
 	return &driver.QueryResult{
 		Stats: &stats.Query{},
 		Rows:  &rowsStub{},
@@ -304,7 +323,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 			return err
 		}
 
-		return &driverStub{}
+		return &driverStub{queriedNames: &probeprint.QueryNames}
 	}
 
 	if err := (Mocks{

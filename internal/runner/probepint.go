@@ -47,6 +47,10 @@ type Subprobe struct {
 
 	// Steps is which ones registered with 'Step("", ()=>{})' function.
 	Steps []string `json:"steps"`
+
+	// QueryNames is deduplicated list of named queries passed to driver.runQuery() during probe,
+	// in the order they were first encountered.
+	QueryNames []string `json:"query_names"`
 }
 
 // Probeprint contains configuration and other metainformation extracted from a TypeScript script.
