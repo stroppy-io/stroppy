@@ -7,15 +7,8 @@ import { parse_sql } from "./parse_sql.js";
 const SQL_FILE = ENV("SQL_FILE", "", "Path to SQL file (automatically set if .sql file provided as argument)");
 
 export const options: Options = {
-  setupTimeout: "5m",
-  scenarios: {
-    workload: {
-      executor: "shared-iterations",
-      exec: "workload",
-      vus: 1,
-      iterations: 1,
-    },
-  },
+  vus: 1,
+  iterations: 1,
 };
 
 // Initialize driver with GlobalConfig
@@ -23,14 +16,7 @@ const driver = DriverX.fromConfig({
   driver: {
     url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
     driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-    dbSpecific: {
-      fields: [],
-    },
   },
-  version: "",
-  runId: "",
-  seed: "0",
-  metadata: {},
 });
 
 const queries = parse_sql(open(SQL_FILE));
@@ -40,7 +26,7 @@ export function setup() {
   return;
 }
 
-export function workload() {
+export default function (): void {
   queries().forEach((query) => {
     console.log(`tpc-ds-like: ${query.name}`);
     driver.runQuery(query, {});

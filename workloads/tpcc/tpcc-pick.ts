@@ -5,7 +5,7 @@ import { AB, C, R, Step, DriverX, S, ENV } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 
-const SQL_FILE = ENV("SQL_FILE", "", "Path to SQL file (automatically set if .sql file provided as argument)");
+const SQL_FILE = ENV("SQL_FILE", "./tpcc.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
 
 // TPCC Configuration Constants
 const POOL_SIZE = ENV("POOL_SIZE", 100, "Connection pool size");
@@ -38,8 +38,11 @@ const driver = DriverX.fromConfig({
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
 export function setup() {
-  Step("create_schema", () => {
+  Step("drop_schema", () => {
     sql("drop_schema").forEach((query) => driver.runQuery(query, {}));
+  })
+
+  Step("create_schema", () => {
     sql("create_schema").forEach((query) => driver.runQuery(query, {}));
   });
 

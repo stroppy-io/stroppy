@@ -4,7 +4,7 @@ import { DriverConfig_DriverType } from "./stroppy.pb.js";
 import { AB, C, R, Step, DriverX, S, ENV } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
-const SQL_FILE = ENV("SQL_FILE", "", "Path to SQL file (automatically set if .sql file provided as argument)");
+const SQL_FILE = ENV("SQL_FILE", "./tpcc.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
 const DURATION = ENV("DURATION", "1h", "Test duration");
 const VUS_SCALE = ENV("VUS_SCALE", 1, "VU scaling factor");
 export const options: Options = {
@@ -69,8 +69,11 @@ const driver = DriverX.fromConfig({
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
 export function setup() {
-  Step("create_schema", () => {
+  Step("drop_schema", () => {
     sql("drop_schema").forEach((query) => driver.runQuery(query, {}));
+  })
+
+  Step("create_schema", () => {
     sql("create_schema").forEach((query) => driver.runQuery(query, {}));
   });
 

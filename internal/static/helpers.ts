@@ -30,15 +30,17 @@ import { ParsedQuery } from "./parse_sql.js";
 
 declare const __ENV: Record<string, string>;
 
-export function ENV<T extends string | number>(env: string | string[], default_?: T, description?: string): T {
+export function ENV(env: string | string[], default_?: string, description?: string): string;
+export function ENV(env: string | string[], default_?: number, description?: string): number;
+export function ENV(env: string | string[], default_?: string | number, description?: string): string | number {
   const names = Array.isArray(env) ? env : [env];
   DeclareEnv(names, String(default_ ?? ""), description ?? "");
   const asNum = typeof default_ === "number";
   for (const name of names) {
     const val = __ENV[name];
-    if (val !== undefined && val !== "") return (asNum ? Number(val) : val) as T;
+    if (val !== undefined && val !== "") return asNum ? Number(val) : val;
   }
-  return default_ as T;
+  return default_ as string | number;
 }
 
 // ============================================================================
@@ -285,8 +287,30 @@ export function NewDriverByConfig(config: Partial<GlobalConfig>): Driver {
   );
 }
 
+const _stepFilter: Set<string> | null = (() => {
+  const only = ENV("STROPPY_STEPS", "", "comma-separated list of steps to run (allowlist), same as --steps");
+  if (only) return new Set(only.split(","));
+  return null;
+})();
+
+const _stepSkip: Set<string> | null = (() => {
+  const skip = ENV("STROPPY_NO_STEPS", "", "comma-separated list of steps to skip (blocklist), same as --no-steps");
+  if (skip) return new Set(skip.split(","));
+  return null;
+})();
+
+function isStepEnabled(name: string): boolean {
+  if (_stepFilter) return _stepFilter.has(name);
+  if (_stepSkip) return !_stepSkip.has(name);
+  return true;
+}
+
 export const Step = Object.assign(
   (name: string, step: () => void): void => {
+    if (!isStepEnabled(name)) {
+      console.log(`Skipping step '${name}'`);
+      return;
+    }
     Step.begin(name);
     step();
     Step.end(name);
