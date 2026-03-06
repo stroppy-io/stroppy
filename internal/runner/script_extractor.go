@@ -246,6 +246,8 @@ func (*driverStub) InsertValuesBin([]byte, int64) (*stats.Query, error) {
 	return &stats.Query{}, nil
 }
 
+func (*driverStub) Setup(func()) {}
+
 // rowsStub implements driver.Rows for the probe VM.
 type rowsStub struct{}
 

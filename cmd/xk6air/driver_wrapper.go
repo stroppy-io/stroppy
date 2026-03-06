@@ -17,7 +17,9 @@ type DriverWrapper struct {
 	lg  *zap.Logger
 	drv driver.Driver
 
-	configureOnce sync.Once
+	configureOnce    sync.Once
+	setupOnce        sync.Once
+	configLoggerOnce sync.Once
 }
 
 // This is a custom "VU setup" hook.
@@ -31,19 +33,33 @@ type DriverWrapper struct {
 // https://github.com/grafana/k6/issues?q=is%3Aopen+is%3Aissue+label%3Anew-http
 // https://github.com/grafana/k6/issues/2293
 func (d *DriverWrapper) configure() {
+	d.configLoggerOnce.Do(func() {
+		if d.vu.State() != nil {
+			d.lg = d.lg.With(zap.Uint64("VUID", d.vu.State().VUID))
+		}
+	})
+
 	if rootModule.sharedDrv != nil {
 		rootModule.once.Do(func() {
 			rootModule.sharedDrv.Configure(rootModule.ctx, driver.Options{
 				DialFunc: d.vu.State().Dialer.DialContext,
+				Logger:   d.lg,
 			})
 		})
 		return
 	}
+
 	d.configureOnce.Do(func() {
 		d.drv.Configure(d.vu.Context(), driver.Options{
 			DialFunc: d.vu.State().Dialer.DialContext,
+			Logger:   d.lg,
 		})
 	})
+}
+
+func (d *DriverWrapper) Setup(lambda func()) {
+	d.configure()
+	d.setupOnce.Do(lambda)
 }
 
 func (d *DriverWrapper) RunQuery(sql string, args map[string]any) (*driver.QueryResult, error) {

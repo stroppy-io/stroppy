@@ -25,6 +25,8 @@ const (
 	DriverLoggerName = "postgres-driver"
 )
 
+var LogLevel zapcore.Level
+
 const (
 	traceLogLevelKey   = "trace_log_level"
 	maxConnLifetimeKey = "max_conn_lifetime"
@@ -83,18 +85,18 @@ func parseConfig(
 		return nil, err
 	}
 
-	logLevel := "error"
+	var logLevelStr = "error"
 	if overrideLevel, ok := cfgMap[traceLogLevelKey]; ok {
-		logLevel, _ = overrideLevel.(string)
+		logLevelStr, _ = overrideLevel.(string)
 	}
 
-	lvl, err := zapcore.ParseLevel(logLevel)
+	LogLevel, err = zapcore.ParseLevel(logLevelStr)
 	if err != nil {
 		return nil, err
 	}
 
-	loggerTracer, err := newLoggerTracer(
-		logger.WithOptions(zap.AddCallerSkip(1), zap.IncreaseLevel(lvl)))
+	loggerTracer, err := NewLoggerTracer(
+		logger.WithOptions(zap.AddCallerSkip(1), zap.IncreaseLevel(LogLevel)))
 	if err != nil {
 		return nil, err
 	}

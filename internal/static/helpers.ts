@@ -202,6 +202,8 @@ export class DriverX implements QueryAPI {
   private driver: Driver;
   private q: QueryAPI;
 
+  setup: (lambda: () => void) => void;
+
   exec!: QueryAPI["exec"];
   queryRows!: QueryAPI["queryRows"];
   queryRow!: QueryAPI["queryRow"];
@@ -210,6 +212,7 @@ export class DriverX implements QueryAPI {
 
   constructor(driver: Driver) {
     this.driver = driver;
+    this.setup = driver.setup;
     this.q = createQueryAPI((sql, args) => driver.runQuery(sql, args));
     this.exec = this.q.exec;
     this.queryRows = this.q.queryRows;

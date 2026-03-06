@@ -28,16 +28,11 @@ type Instance struct {
 // It's init phase, and only preInitEnv is accessible.
 func NewInstance(vu modules.VU) modules.Instance {
 	// Create per-VU logger to avoid log level conflicts
-	VUID := uint64(0)
-	if state := vu.State(); state != nil {
-		VUID = state.VUID
-	}
 	i := &Instance{
 		vu: vu,
 		lg: logger.
 			NewFromEnv().
 			Named("k6-vu").
-			With(zap.Uint64("VUID", uint64(VUID))).
 			WithOptions(zap.AddStacktrace(zap.FatalLevel)),
 	}
 	rootModule.addVuTeardown(i)

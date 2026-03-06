@@ -12,7 +12,12 @@ type pgxExtLogger struct {
 	logger *zap.Logger
 }
 
-func (pl *pgxExtLogger) Log(_ context.Context, level tracelog.LogLevel, msg string, data map[string]interface{}) {
+func (pl *pgxExtLogger) Log(
+	_ context.Context,
+	level tracelog.LogLevel,
+	msg string,
+	data map[string]interface{},
+) {
 	fields := make([]zapcore.Field, len(data))
 	i := 0
 
@@ -23,7 +28,9 @@ func (pl *pgxExtLogger) Log(_ context.Context, level tracelog.LogLevel, msg stri
 
 	switch level {
 	case tracelog.LogLevelTrace:
-		pl.logger.Debug(msg, append(fields, zap.Stringer("PGX_LOG_LEVEL", level))...) //nolint: makezero // allow
+		pl.logger.Debug(
+			msg,
+			append(fields, zap.Stringer("PGX_LOG_LEVEL", level))...) //nolint: makezero // allow
 	case tracelog.LogLevelDebug:
 		pl.logger.Debug(msg, fields...)
 	case tracelog.LogLevelInfo:
@@ -41,7 +48,7 @@ func (pl *pgxExtLogger) Log(_ context.Context, level tracelog.LogLevel, msg stri
 	}
 }
 
-func newLoggerTracer(logger *zap.Logger) (*tracelog.TraceLog, error) {
+func NewLoggerTracer(logger *zap.Logger) (*tracelog.TraceLog, error) {
 	levl, err := tracelog.LogLevelFromString(logger.Level().String())
 	if err != nil {
 		return nil, err

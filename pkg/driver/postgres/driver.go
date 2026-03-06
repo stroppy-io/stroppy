@@ -77,16 +77,22 @@ func NewDriver(
 }
 
 func (d *Driver) Configure(ctx context.Context, opts driver.Options) (err error) {
+	cfg := d.pgxPool.Config()
 	if opts.DialFunc != nil {
-		cfg := d.pgxPool.Config()
 		cfg.ConnConfig.DialFunc = opts.DialFunc
-
-		d.pgxPool.Close()
-
-		d.pgxPool, err = pgxpool.NewWithConfig(ctx, cfg)
+	}
+	if opts.Logger != nil {
+		cfg.ConnConfig.Tracer, err = pool.NewLoggerTracer(
+			opts.Logger.Named(pool.LoggerName).WithOptions(zap.IncreaseLevel(pool.LogLevel)),
+		)
 		if err != nil {
-			return fmt.Errorf("can't start reconfigured pgxpool: %w", err)
+			return fmt.Errorf("failed to create logger tracer: %w", err)
 		}
+	}
+	d.pgxPool.Close()
+	d.pgxPool, err = pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("can't start reconfigured pgxpool: %w", err)
 	}
 
 	return nil
