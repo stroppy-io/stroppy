@@ -326,6 +326,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		// TODO: research. Some esbuild name resolution artifact, probably
 		{"NotifyStep2", notifyStepSpy(&probeprint.Steps)},
 		{"NewPicker", newPickerStub},
+		{"DeclareEnv", declareEnvSpy(&probeprint.EnvDeclarations)},
 
 		{"parse_sql_with_sections", parseSectionsSpy(&probeprint.SQLSections)},
 		{"parse_sql", parseSpy(&probeprint.SQLSections)},
@@ -334,6 +335,16 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 	}
 
 	return nil
+}
+
+func declareEnvSpy(decls *[]EnvDeclaration) func([]string, string, string) {
+	return func(names []string, default_ string, description string) {
+		*decls = append(*decls, EnvDeclaration{
+			Names:       names,
+			Default:     default_,
+			Description: description,
+		})
+	}
 }
 
 func notifyStepSpy(steps *[]string) func(string, any) {

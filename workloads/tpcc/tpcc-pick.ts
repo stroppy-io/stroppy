@@ -1,13 +1,15 @@
 import { Options } from "k6/options";
 import { Teardown, NewPicker } from "k6/x/stroppy";
 import { DriverConfig_DriverType } from "./stroppy.pb.js";
-import { AB, C, R, Step, DriverX, S } from "./helpers.ts";
+import { AB, C, R, Step, DriverX, S, ENV } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 
+const SQL_FILE = ENV("SQL_FILE", "", "Path to SQL file (automatically set if .sql file provided as argument)");
+
 // TPCC Configuration Constants
-const POOL_SIZE = +(__ENV.POOL_SIZE || 100);
-const WAREHOUSES = +(__ENV.SCALE_FACTOR || __ENV.WAREHOUSES || 1);
+const POOL_SIZE = ENV("POOL_SIZE", 100, "Connection pool size");
+const WAREHOUSES = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
 const DISTRICTS_PER_WAREHOUSE = 10;
 const CUSTOMERS_PER_DISTRICT = 3000;
 const ITEMS = 100000;
@@ -24,7 +26,7 @@ export const options: Options = {
 // Initialize driver with GlobalConfig
 const driver = DriverX.fromConfig({
   driver: {
-    url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
+    url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
     driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
     connectionType: { is: {oneofKind:"sharedPool", sharedPool: {sharedConnections: POOL_SIZE}}},
     dbSpecific: {
@@ -33,7 +35,7 @@ const driver = DriverX.fromConfig({
   },
 });
 
-const sql = parse_sql_with_sections(open(__ENV.SQL_FILE));
+const sql = parse_sql_with_sections(open(SQL_FILE));
 
 export function setup() {
   Step("create_schema", () => {

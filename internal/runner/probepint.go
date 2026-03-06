@@ -24,6 +24,13 @@ type SQLSection struct {
 	Queries []SQLQuery `json:"queries"`
 }
 
+// EnvDeclaration captures metadata from ENV() calls in user scripts.
+type EnvDeclaration struct {
+	Names       []string `json:"names"`
+	Default     string   `json:"default,omitempty"`
+	Description string   `json:"description,omitempty"`
+}
+
 type Subprobe struct {
 	// Options is k6 export const options = { ... }
 	Options *lib.Options `json:"options"`
@@ -32,9 +39,11 @@ type Subprobe struct {
 	// Like this sections["create_schema"]...
 	SQLSections []SQLSection `json:"sql_sections"`
 
-	// Envs is environment variables which test checks while execution.
-	// It's a list of envs names (not K=V, just K)
+	// Envs is environment variables accessed via __ENV directly (legacy).
 	Envs []string `json:"envs"`
+
+	// EnvDeclarations is environment variables declared via ENV() with metadata.
+	EnvDeclarations []EnvDeclaration `json:"env_declarations"`
 
 	// Steps is which ones registered with 'Step("", ()=>{})' function.
 	Steps []string `json:"steps"`
@@ -153,16 +162,62 @@ func (p *Probeprint) Explain() string { //nolint: gocognit // just fine
 
 	sb.WriteString("# Environment Variables:\n")
 
-	if len(p.Envs) > 0 {
-		for _, envName := range p.Envs {
-			currentVal := os.Getenv(envName)
-			if currentVal == "" {
-				fmt.Fprintf(sb, "  %s=\"\"\n", envName)
-			} else {
-				fmt.Fprintf(sb, "  %s=%s\n", envName, currentVal)
+	if len(p.EnvDeclarations) > 0 {
+		for _, decl := range p.EnvDeclarations {
+			names := strings.Join(decl.Names, " | ")
+			currentVal := ""
+
+			for _, name := range decl.Names {
+				if v := os.Getenv(name); v != "" {
+					currentVal = v
+
+					break
+				}
 			}
+
+			if currentVal != "" {
+				fmt.Fprintf(sb, "  %s=%s", names, currentVal)
+			} else if decl.Default != "" {
+				fmt.Fprintf(sb, "  %s=\"\" (default: %s)", names, decl.Default)
+			} else {
+				fmt.Fprintf(sb, "  %s=\"\"", names)
+			}
+
+			if decl.Description != "" {
+				fmt.Fprintf(sb, "  # %s", decl.Description)
+			}
+
+			sb.WriteString("\n")
 		}
-	} else {
+	}
+
+	// Plain __ENV access (not via ENV())
+	declared := map[string]bool{}
+
+	for _, decl := range p.EnvDeclarations {
+		for _, name := range decl.Names {
+			declared[name] = true
+		}
+	}
+
+	hasPlain := false
+
+	for _, envName := range p.Envs {
+		if declared[envName] {
+			continue
+		}
+
+		currentVal := os.Getenv(envName)
+		if currentVal == "" {
+			fmt.Fprintf(sb, "  %s=\"\"\n", envName)
+		} else {
+			fmt.Fprintf(sb, "  %s=%s\n", envName, currentVal)
+		}
+
+		hasPlain = true
+	}
+
+	if len(p.EnvDeclarations) == 0 && !hasPlain {
 		sb.WriteString("  (no environment variables)\n")
 	}
 

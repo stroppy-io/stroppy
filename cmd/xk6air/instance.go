@@ -55,6 +55,7 @@ func (i *Instance) Exports() modules.Exports {
 			"NewGeneratorByRuleBin":       NewGeneratorByRuleBin,
 			"NewGroupGeneratorByRulesBin": NewGroupGeneratorByRulesBin,
 			"NewPicker":                   NewPicker,
+			"DeclareEnv":                  func([]string, string, string) {},
 		},
 	}
 }

@@ -73,4 +73,10 @@ declare module "k6/x/stroppy" {
     pickWeighted(array: any[], weights: number[]): any;
   }
   export declare function NewPicker(seed: number): Picker;
+
+  export declare function DeclareEnv(
+    names: string[],
+    default_: string,
+    description: string,
+  ): void;
 }

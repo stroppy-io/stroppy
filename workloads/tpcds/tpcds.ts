@@ -1,8 +1,10 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
 import { DriverConfig_DriverType } from "./stroppy.pb.js";
-import { DriverX, Step } from "./helpers.ts";
+import { DriverX, Step, ENV } from "./helpers.ts";
 import { parse_sql } from "./parse_sql.js";
+
+const SQL_FILE = ENV("SQL_FILE", "", "Path to SQL file (automatically set if .sql file provided as argument)");
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -19,7 +21,7 @@ export const options: Options = {
 // Initialize driver with GlobalConfig
 const driver = DriverX.fromConfig({
   driver: {
-    url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
+    url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
     driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
     dbSpecific: {
       fields: [],
@@ -31,7 +33,7 @@ const driver = DriverX.fromConfig({
   metadata: {},
 });
 
-const queries = parse_sql(open(__ENV.SQL_FILE));
+const queries = parse_sql(open(SQL_FILE));
 
 export function setup() {
   Step.begin("workload");

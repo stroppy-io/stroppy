@@ -47,6 +47,9 @@ Drivers register themselves via `init()` using `driver.RegisterDriver()`. The di
 - `DriverX` - Typed driver wrapper with metrics tracking; `DriverX.fromConfig()`, `.insert()`, `.runQuery()`
 - `InsertMethodName` - `"plain_query" | "copy_from"` — friendly string type for `DriverX.insert()` method option
 - `Step()` - Named execution blocks with cloud notification; also `Step.begin()` / `Step.end()`
+- `ENV()` - Typed environment variable accessor replacing raw `__ENV`; supports aliases, defaults, descriptions. Metadata captured by probe for `Explain` output
+- `NewPicker(seed)` - Weighted random selection from arrays; `picker.pick(items)` for uniform, `picker.pickWeighted(items, weights)` for weighted selection
+
 
 ### SQL Syntax
 

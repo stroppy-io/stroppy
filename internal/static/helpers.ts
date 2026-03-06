@@ -8,6 +8,7 @@ import {
   NewGeneratorByRuleBin,
   NewGroupGeneratorByRulesBin,
   NotifyStep,
+  DeclareEnv,
   Driver,
   QueryStats,
   QueryResult,
@@ -27,6 +28,18 @@ import {
 
 import { ParsedQuery } from "./parse_sql.js";
 
+declare const __ENV: Record<string, string>;
+
+export function ENV<T extends string | number>(env: string | string[], default_?: T, description?: string): T {
+  const names = Array.isArray(env) ? env : [env];
+  DeclareEnv(names, String(default_ ?? ""), description ?? "");
+  const asNum = typeof default_ === "number";
+  for (const name of names) {
+    const val = __ENV[name];
+    if (val !== undefined && val !== "") return (asNum ? Number(val) : val) as T;
+  }
+  return default_ as T;
+}
 
 // ============================================================================
 // Module-wide seed (0 = random, >0 = fixed). Inherited by .gen() and insert().
