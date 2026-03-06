@@ -20,7 +20,7 @@ Stroppy is a **k6 extension** (`k6/x/stroppy`) that adds database-specific capab
 | k6 module | `cmd/xk6air/` | Registers `k6/x/stroppy` module, manages per-VU driver/generator instances |
 | Driver interface | `pkg/driver/dispatcher.go` | Registry pattern: `RegisterDriver()` + `Dispatch()` |
 | PostgreSQL driver | `pkg/driver/postgres/` | pgxpool-based, supports PLAIN_QUERY and COPY_FROM insertion |
-| Data generators | `pkg/common/generate/` | Uniform, Normal, Zipfian distributions; int/float/string/uuid/bool/datetime |
+| Data generators | `pkg/common/generate/` | Uniform, Normal, Zipfian distributions; int/float/string/uuid/bool/datetime/decimal |
 | TypeScript framework | `internal/static/` | `helpers.ts` (R/S/AB/DriverX), `parse_sql.ts`, generated type bindings |
 | Script runner | `internal/runner/` | esbuild transpilation, config extraction via Sobek, k6 process management |
 | Schema definitions | `proto/stroppy/` | config, descriptor, common, runtime, cloud schemas |
@@ -37,12 +37,16 @@ Drivers register themselves via `init()` using `driver.RegisterDriver()`. The di
 
 ### TypeScript API (helpers.ts)
 
-- `R` - Random generators: `R.str()`, `R.int32()`, `R.float()`, `R.double()`, `R.bool()`, `R.datetimeConst()`
-- `S` - Sequence (unique) generators: `S.str()`, `S.int32()`
+- `C` - Const generators: `C.str()`, `C.int32()`, `C.int64()`, `C.uint32()`, `C.uint64()`, `C.float()`, `C.double()`, `C.decimal()`, `C.datetime()`, `C.bool()`, `C.uuid()`
+- `R` - Random/range generators: `R.str()`, `R.int32()`, `R.int64()`, `R.uint32()`, `R.uint64()`, `R.float()`, `R.double()`, `R.decimal()`, `R.datetime()`, `R.bool()`, `R.uuid()`, `R.uuidSeeded()`, `R.group()`, `R.groups()`
+- `S` - Sequence (unique) generators: `S.str()`, `S.int32()`, `S.int64()`, `S.uint32()`, `S.uint64()`, `S.uuid()`
 - `AB` - Alphabets: `en`, `enNum`, `num`, `enUpper`, `enSpc`, `enNumSpc`
-- `DriverX` - Typed driver wrapper with metrics tracking
-- `Step()` - Named execution blocks with cloud notification
-- `NewGen()` / `NewGroupGen()` - Low-level generator creation
+- `Dist` - Distribution helpers: `Dist.normal()`, `Dist.uniform()`, `Dist.zipf()`
+- `setSeed()` - Set module-wide default seed (0 = random, >0 = fixed)
+- `Rule` / `GroupRule` - Generation rules with `.gen(seed?)` method to create generators
+- `DriverX` - Typed driver wrapper with metrics tracking; `DriverX.fromConfig()`, `.insert()`, `.runQuery()`
+- `InsertMethodName` - `"plain_query" | "copy_from"` — friendly string type for `DriverX.insert()` method option
+- `Step()` - Named execution blocks with cloud notification; also `Step.begin()` / `Step.end()`
 
 ### SQL Syntax
 
@@ -52,10 +56,23 @@ Drivers register themselves via `init()` using `driver.RegisterDriver()`. The di
   - `--= query_name` names individual queries within sections
 - `parse_sql_with_groups()` returns `Record<string, ParsedQuery[]>`
 
+### UUID Generator Variants
+
+Four variants available via `Generation.Rule.kind` in the proto:
+
+| Proto field | Behavior |
+|---|---|
+| `uuid_random = true` | Truly random v4 UUID; seed ignored |
+| `uuid_seeded = true` | Deterministic v4 UUID sequence; same seed → same sequence (ChaCha8 PRNG) |
+| `uuid_seq { max: "..." }` | Sequential counter encoded as UUID; `min` defaults to nil UUID (`00000...0`) |
+| `uuid_const { value: "..." }` | Fixed UUID repeated on every call |
+
+Generator factory entry point: `NewValueGeneratorByRule` in `pkg/common/generate/value.go`.
+
 ### Build System
 
 - `make build` - Builds k6 with xk6air extension via xk6
-- `make proto` - Generates Go, TypeScript, gRPC, docs from proto files
+- `make proto` - Generates Go, TypeScript, gRPC, docs from proto files; **wipes `pkg/common/proto/*` before regenerating** — never hand-edit generated files
 - `make install-bin-deps` - Installs protoc plugins, xk6, esbuild, etc.
 - Go 1.24.3+, Node.js required for full build
 

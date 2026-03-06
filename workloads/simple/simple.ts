@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
 import { DriverConfig_DriverType } from "./stroppy.pb.js";
-import { DriverX, NewGen, NewGroupGen, AB, R, S, Step } from "./helpers.ts";
+import { DriverX, AB, R, S, Step, setSeed } from "./helpers.ts";
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -15,6 +15,7 @@ export const options: Options = {
   },
 };
 
+
 const driver: DriverX = DriverX.fromConfig({
   driver: {
     url: __ENV.DRIVER_URL || "postgres://postgres:postgres@localhost:5432",
@@ -23,6 +24,8 @@ const driver: DriverX = DriverX.fromConfig({
       fields: [],
     },
   },
+  seed: "42", // sets global default seed, set 0 or delete it to make every seed random.
+
   // Add OpenTelemety metrics
   // exporter: {
   //   name: "",
@@ -33,6 +36,8 @@ const driver: DriverX = DriverX.fromConfig({
   // },
 });
 
+setSeed(42); // same as config
+
 export function setup() {
   Step("example", () => {
     // You can structure test into steps with Step function.
@@ -42,42 +47,46 @@ export function setup() {
   return;
 }
 
-// Raw generator defenition with Generation_Rule
-const gen = NewGen(0, {
-  kind: { oneofKind: "int32Range", int32Range: { min: 0, max: 100 } },
-});
+// No seed → uses module-wide default (0 if not set) → random each run.
+const genRandom = R.int32(0, 100).gen();
 
-// The generator of strings of length = 10, made using the English alphabet
-const gen2 = NewGen(1, R.str(10, AB.en));
+// Explicit seed → always produces the same sequence regardless of global seed.
+const genFixed = R.str(10, AB.en).gen(111);
 
-// Group of generators, run and check logs to find out the pattern
-const groupGen = NewGroupGen(2, {
-  params: R.params({
+// Sequence generator: produces 1, 2, 3, ... exhausting after max.
+const seqGen = S.int32(1, 10).gen();
+
+// Group generator: cartesian-product of dependent params.
+// Useful for composite keys — see logs for the pattern.
+const groupGen = R.group({
     some: S.int32(1, 2),
     second: S.int32(1, 3),
     bool: R.bool(1, true),
-  }),
-});
+  }).gen(5)
 
 export function workload() {
-  const value = gen.next();
-  console.log("value is", value);
-
-  // driver can run query
+  // driver uses :arg syntax for query parameters
   driver.runQuery("select 1;", {});
 
-  // and it uses :arg syntax to get arguments
+  const value = genRandom.next();
+  console.log("random value:", value);
   driver.runQuery("select 90000 + :value + :second;", {
     value,
-    second: gen.next(),
+    second: genRandom.next(),
   });
 
   driver.runQuery("select :a::int + :b::int", { a: 34, b: 35 });
-  driver.runQuery("select 'Hello, ' || :a || '!'", { a: gen2.next() });
+
+  const str = genFixed.next();
+  console.log("fixed-seed string (same every run):", str);
+  driver.runQuery("select 'Hello, ' || :a || '!'", { a: str });
+
+
+  console.log("sequence (exhausts after 10):", seqGen.next());
 
   for (let i = 0; i < 12; i++) {
     const [a, b, c] = groupGen.next();
-    console.log("a", a, "b", b, "c", c);
+    console.log("group cartesian product — a:", a, "b:", b, "c:", c);
   }
 }
 

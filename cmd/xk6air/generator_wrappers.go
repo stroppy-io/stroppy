@@ -8,36 +8,34 @@ import (
 )
 
 func NewGeneratorByRuleBin(seed uint64, ruleBytes []byte) any {
+	seed = generate.ResolveSeed(seed)
+
 	var rule stroppy.Generation_Rule
 	err := proto.Unmarshal(ruleBytes, &rule)
 	if err != nil {
 		return err // TODO: wrap errors
 	}
+
 	gen, err := generate.NewValueGeneratorByRule(seed, &rule)
 	if err != nil {
 		return err
-	} else {
-		return GeneratorWrapper{
-			generator: gen,
-			seed:      seed,
-		}
 	}
+
+	return GeneratorWrapper{generator: gen, seed: seed}
 }
 
 func NewGroupGeneratorByRulesBin(seed uint64, rulesBytes []byte) any {
+	seed = generate.ResolveSeed(seed)
+
 	var rules stroppy.QueryParamGroup
 	err := proto.Unmarshal(rulesBytes, &rules)
 	if err != nil {
 		return err // TODO: wrap errors
 	}
-	gen := generate.NewTupleGenerator(
-		seed,
-		common.Out[generate.GenAbleStruct](rules.GetParams()),
-	)
-	return GeneratorWrapper{
-		generator: gen,
-		seed:      seed,
-	}
+
+	gen := generate.NewTupleGenerator(seed, common.Out[generate.GenAbleStruct](rules.GetParams()))
+
+	return GeneratorWrapper{generator: gen, seed: seed}
 }
 
 type GeneratorWrapper struct {

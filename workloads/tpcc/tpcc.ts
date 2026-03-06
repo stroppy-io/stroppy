@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
-import { NewGen, AB, R, Step, DriverX, S } from "./helpers.ts";
+import { DriverConfig_DriverType } from "./stroppy.pb.js";
+import { AB, C, R, Step, DriverX, S } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 const DURATION = __ENV.DURATION || "1h";
@@ -76,7 +76,7 @@ export function setup() {
   Step("load_data", () => {
     // Load data into tables using InsertValues with COPY_FROM method
     driver.insert("item", ITEMS, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         i_id: S.int32(1, ITEMS),
         i_im_id: S.int32(1, ITEMS), // WHY: not unique originaly
@@ -87,7 +87,7 @@ export function setup() {
     });
 
     driver.insert("warehouse", WAREHOUSES, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         w_id: S.int32(1, WAREHOUSES),
         w_name: R.str(6, 10),
@@ -97,12 +97,12 @@ export function setup() {
         w_state: R.str(2),
         w_zip: R.str(9, AB.num),
         w_tax: R.float(0, 0.2),
-        w_ytd: R.float(300000),
+        w_ytd: C.float(300000),
       },
     });
 
     driver.insert("district", TOTAL_DISTRICTS, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         d_name: R.str(6, 10),
         d_street_1: R.str(10, 20, AB.enSpc),
@@ -111,8 +111,8 @@ export function setup() {
         d_state: R.str(2, AB.enUpper),
         d_zip: R.str(9, AB.num),
         d_tax: R.float(0, 0.2),
-        d_ytd: R.float(30000),
-        d_next_o_id: R.int32(3001),
+        d_ytd: C.float(30000),
+        d_next_o_id: C.int32(3001),
       },
       groups: {
         district_pk: {
@@ -123,7 +123,7 @@ export function setup() {
     });
 
     driver.insert("customer", TOTAL_CUSTOMERS, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         c_first: R.str(8, 16),
         c_middle: R.str(2, AB.enUpper),
@@ -134,14 +134,14 @@ export function setup() {
         c_state: R.str(2, AB.enUpper),
         c_zip: R.str(9, AB.num),
         c_phone: R.str(16, AB.num),
-        c_since: R.datetimeConst(new Date()),
-        c_credit: R.str("GC"), // TODO: "GC" | "BC" (good/bad credit), and 10% should be "BC"
-        c_credit_lim: R.float(50000),
+        c_since: C.datetime(new Date()),
+        c_credit: C.str("GC"), // TODO: "GC" | "BC" (good/bad credit), and 10% should be "BC"
+        c_credit_lim: C.float(50000),
         c_discount: R.float(0, 0.5),
-        c_balance: R.float(-10),
-        c_ytd_payment: R.float(10),
-        c_payment_cnt: R.int32(1),
-        c_delivery_cnt: R.int32(0),
+        c_balance: C.float(-10),
+        c_ytd_payment: C.float(10),
+        c_payment_cnt: C.int32(1),
+        c_delivery_cnt: C.int32(0),
         c_data: R.str(300, 500, AB.enNumSpc),
       },
       groups: {
@@ -154,7 +154,7 @@ export function setup() {
     });
 
     driver.insert("stock", TOTAL_STOCK, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         s_quantity: R.int32(10, 100),
         s_dist_01: R.str(24, AB.enNum),
@@ -167,9 +167,9 @@ export function setup() {
         s_dist_08: R.str(24, AB.enNum),
         s_dist_09: R.str(24, AB.enNum),
         s_dist_10: R.str(24, AB.enNum),
-        s_ytd: R.int32(0),
-        s_order_cnt: R.int32(0),
-        s_remote_cnt: R.int32(0),
+        s_ytd: C.int32(0),
+        s_order_cnt: C.int32(0),
+        s_remote_cnt: C.int32(0),
         s_data: R.str(26, 50, AB.enNumSpc),
       },
       groups: {
@@ -185,11 +185,11 @@ export function setup() {
   return;
 }
 
-const newOrderWarehouseGen = NewGen(0, R.int32(1, WAREHOUSES));
-const newOrderMaxWarehouseGen = NewGen(1, R.int32(WAREHOUSES));
-const newOrderDistrictGen = NewGen(2, R.int32(1, DISTRICTS_PER_WAREHOUSE));
-const newOrderCustomerGen = NewGen(3, R.int32(1, CUSTOMERS_PER_DISTRICT));
-const newOrderOlCntGen = NewGen(4, R.int32(5, 15));
+const newOrderWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const newOrderMaxWarehouseGen = C.int32(WAREHOUSES).gen();
+const newOrderDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const newOrderCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const newOrderOlCntGen = R.int32(5, 15).gen();
 
 export function new_order() {
   driver.runQuery(sql("workload", "new_order")!, {
@@ -201,16 +201,13 @@ export function new_order() {
   });
 }
 
-const paymentWarehouseGen = NewGen(5, R.int32(1, WAREHOUSES));
-const paymentDistrictGen = NewGen(6, R.int32(1, DISTRICTS_PER_WAREHOUSE));
-const paymentCustomerWarehouseGen = NewGen(7, R.int32(1, WAREHOUSES));
-const paymentCustomerDistrictGen = NewGen(
-  8,
-  R.int32(1, DISTRICTS_PER_WAREHOUSE),
-);
-const paymentCustomerGen = NewGen(9, R.int32(1, CUSTOMERS_PER_DISTRICT));
-const paymentAmountGen = NewGen(10, R.double(1, 5000));
-const paymentCustomerLastGen = NewGen(11, S.str(6, 16));
+const paymentWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const paymentDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const paymentCustomerWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const paymentCustomerDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const paymentCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const paymentAmountGen = R.double(1, 5000).gen();
+const paymentCustomerLastGen = S.str(6, 16).gen();
 
 export function payments() {
   driver.runQuery(sql("workload", "payment")!, {
@@ -226,10 +223,10 @@ export function payments() {
   );
 }
 
-const orderStatusWarehouseGen = NewGen(12, R.int32(1, WAREHOUSES));
-const orderStatusDistrictGen = NewGen(13, R.int32(1, DISTRICTS_PER_WAREHOUSE));
-const orderStatusCustomerGen = NewGen(14, R.int32(1, CUSTOMERS_PER_DISTRICT));
-const orderStatusCustomerLastGen = NewGen(15, R.str(8, 16));
+const orderStatusWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const orderStatusDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const orderStatusCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const orderStatusCustomerLastGen = R.str(8, 16).gen();
 
 export function order_status() {
   driver.runQuery(sql("workload", "order_status")!, {
@@ -242,8 +239,8 @@ export function order_status() {
   );
 }
 
-const deliveryWarehouseGen = NewGen(16, R.int32(1, WAREHOUSES));
-const deliveryCarrierGen = NewGen(17, R.int32(1, DISTRICTS_PER_WAREHOUSE));
+const deliveryWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const deliveryCarrierGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 
 export function delivery() {
   driver.runQuery(sql("workload", "delivery")!, {
@@ -252,9 +249,9 @@ export function delivery() {
   });
 }
 
-const stockLevelWarehouseGen = NewGen(18, R.int32(1, WAREHOUSES));
-const stockLevelDistrictGen = NewGen(19, R.int32(1, DISTRICTS_PER_WAREHOUSE));
-const stockLevelThresholdGen = NewGen(20, R.int32(10, 20));
+const stockLevelWarehouseGen = R.int32(1, WAREHOUSES).gen();
+const stockLevelDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const stockLevelThresholdGen = R.int32(10, 20).gen();
 
 export function stock_level() {
   driver.runQuery(sql("workload", "stock_level")!, {

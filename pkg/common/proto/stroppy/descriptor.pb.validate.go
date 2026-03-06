@@ -79,6 +79,8 @@ func (m *InsertDescriptor) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for Seed
+
 	for idx, item := range m.GetParams() {
 		_, _ = idx, item
 

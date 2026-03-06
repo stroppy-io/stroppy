@@ -224,6 +224,13 @@ message Generation {
         AnyString string = 4;
       }
     }
+    /** Sequential UUID range, counting from min to max. */
+    message UuidSeq {
+      /** Start UUID (inclusive); defaults to 00000000-0000-0000-0000-000000000000 if not set */
+      optional Uuid min = 1;
+      /** End UUID (inclusive) */
+      Uuid max = 2;
+    }
     /** Range for date/time values */
     message DateTime {
       /** Protocol Buffers timestamp range */
@@ -325,9 +332,19 @@ message Generation {
       bool bool_const = 19;
       /** Fixed date/time value. */
       DateTime datetime_const = 20;
+
+      // UUID
+      /** Random UUID value (v4). Seed is ignored. */
+      bool uuid_random = 21;
+      /** Fixed UUID value. */
+      Uuid uuid_const = 22;
+      /** Random UUID value (v4) reproducible by seed. */
+      bool uuid_seeded = 23;
+      /** Sequential UUIDs from min to max (00000...1 → 00000...N). */
+      Range.UuidSeq uuid_seq = 24;
     }
 
-    /** Shape of randomness; Normal by default */
+    /** Shape of randomness; Normal by default; Only for numbers */
     optional Distribution distribution = 30;
 
     /** Percentage of nulls to inject [0..100]; 0 by default*/

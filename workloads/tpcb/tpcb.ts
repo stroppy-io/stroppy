@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
-import { DriverX, NewGen, AB, R, Step, S } from "./helpers.ts";
+import { DriverConfig_DriverType } from "./stroppy.pb.js";
+import { DriverX, AB, C, R, Step, S } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 // TPC-B Configuration Constants
@@ -46,30 +46,30 @@ export function setup() {
 
   Step("load_data", () => {
     driver.insert("pgbench_branches", BRANCHES, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         bid: S.int32(1, BRANCHES),
-        bbalance: R.int32(0),
+        bbalance: C.int32(0),
         filler: R.str(88, AB.en),
       },
     });
 
     driver.insert("pgbench_tellers", TELLERS, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         tid: S.int32(1, TELLERS),
         bid: R.int32(1, BRANCHES),
-        tbalance: R.int32(0),
+        tbalance: C.int32(0),
         filler: R.str(84, AB.en),
       },
     });
 
     driver.insert("pgbench_accounts", ACCOUNTS, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         aid: S.int32(1, ACCOUNTS),
         bid: R.int32(1, BRANCHES),
-        abalance: R.int32(0),
+        abalance: C.int32(0),
         filler: R.str(84, AB.en),
       },
     });
@@ -82,10 +82,10 @@ export function setup() {
 }
 
 // Generators for transaction parameters
-const aidGen = NewGen(5, R.int32(1, ACCOUNTS));
-const tidGen = NewGen(6, R.int32(1, TELLERS));
-const bidGen = NewGen(7, R.int32(1, BRANCHES));
-const deltaGen = NewGen(8, R.int32(-5000, 5000));
+const aidGen = R.int32(1, ACCOUNTS).gen();
+const tidGen = R.int32(1, TELLERS).gen();
+const bidGen = R.int32(1, BRANCHES).gen();
+const deltaGen = R.int32(-5000, 5000).gen();
 
 // TPC-B transaction workload
 export function tpcb_transaction() {

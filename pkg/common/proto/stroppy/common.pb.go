@@ -1006,8 +1006,12 @@ type Generation_Rule struct {
 	//	*Generation_Rule_StringConst
 	//	*Generation_Rule_BoolConst
 	//	*Generation_Rule_DatetimeConst
+	//	*Generation_Rule_UuidRandom
+	//	*Generation_Rule_UuidConst
+	//	*Generation_Rule_UuidSeeded
+	//	*Generation_Rule_UuidSeq
 	Kind isGeneration_Rule_Kind `protobuf_oneof:"kind"`
-	// * Shape of randomness; Normal by default
+	// * Shape of randomness; Normal by default; Only for numbers
 	Distribution *Generation_Distribution `protobuf:"bytes,30,opt,name=distribution,proto3,oneof" json:"distribution,omitempty"`
 	// * Percentage of nulls to inject [0..100]; 0 by default
 	NullPercentage *uint32 `protobuf:"varint,31,opt,name=null_percentage,json=nullPercentage,proto3,oneof" json:"null_percentage,omitempty"`
@@ -1235,6 +1239,42 @@ func (x *Generation_Rule) GetDatetimeConst() *DateTime {
 	return nil
 }
 
+func (x *Generation_Rule) GetUuidRandom() bool {
+	if x != nil {
+		if x, ok := x.Kind.(*Generation_Rule_UuidRandom); ok {
+			return x.UuidRandom
+		}
+	}
+	return false
+}
+
+func (x *Generation_Rule) GetUuidConst() *Uuid {
+	if x != nil {
+		if x, ok := x.Kind.(*Generation_Rule_UuidConst); ok {
+			return x.UuidConst
+		}
+	}
+	return nil
+}
+
+func (x *Generation_Rule) GetUuidSeeded() bool {
+	if x != nil {
+		if x, ok := x.Kind.(*Generation_Rule_UuidSeeded); ok {
+			return x.UuidSeeded
+		}
+	}
+	return false
+}
+
+func (x *Generation_Rule) GetUuidSeq() *Generation_Range_UuidSeq {
+	if x != nil {
+		if x, ok := x.Kind.(*Generation_Rule_UuidSeq); ok {
+			return x.UuidSeq
+		}
+	}
+	return nil
+}
+
 func (x *Generation_Rule) GetDistribution() *Generation_Distribution {
 	if x != nil {
 		return x.Distribution
@@ -1361,6 +1401,26 @@ type Generation_Rule_DatetimeConst struct {
 	DatetimeConst *DateTime `protobuf:"bytes,20,opt,name=datetime_const,json=datetimeConst,proto3,oneof"`
 }
 
+type Generation_Rule_UuidRandom struct {
+	// * Random UUID value (v4). Seed is ignored.
+	UuidRandom bool `protobuf:"varint,21,opt,name=uuid_random,json=uuidRandom,proto3,oneof"`
+}
+
+type Generation_Rule_UuidConst struct {
+	// * Fixed UUID value.
+	UuidConst *Uuid `protobuf:"bytes,22,opt,name=uuid_const,json=uuidConst,proto3,oneof"`
+}
+
+type Generation_Rule_UuidSeeded struct {
+	// * Random UUID value (v4) reproducible by seed.
+	UuidSeeded bool `protobuf:"varint,23,opt,name=uuid_seeded,json=uuidSeeded,proto3,oneof"`
+}
+
+type Generation_Rule_UuidSeq struct {
+	// * Sequential UUIDs from min to max (00000...1 → 00000...N).
+	UuidSeq *Generation_Range_UuidSeq `protobuf:"bytes,24,opt,name=uuid_seq,json=uuidSeq,proto3,oneof"`
+}
+
 func (*Generation_Rule_Int32Range) isGeneration_Rule_Kind() {}
 
 func (*Generation_Rule_Int64Range) isGeneration_Rule_Kind() {}
@@ -1400,6 +1460,14 @@ func (*Generation_Rule_StringConst) isGeneration_Rule_Kind() {}
 func (*Generation_Rule_BoolConst) isGeneration_Rule_Kind() {}
 
 func (*Generation_Rule_DatetimeConst) isGeneration_Rule_Kind() {}
+
+func (*Generation_Rule_UuidRandom) isGeneration_Rule_Kind() {}
+
+func (*Generation_Rule_UuidConst) isGeneration_Rule_Kind() {}
+
+func (*Generation_Rule_UuidSeeded) isGeneration_Rule_Kind() {}
+
+func (*Generation_Rule_UuidSeq) isGeneration_Rule_Kind() {}
 
 type Generation_Range_Bool struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1993,6 +2061,61 @@ func (*Generation_Range_DecimalRange_Double) isGeneration_Range_DecimalRange_Typ
 
 func (*Generation_Range_DecimalRange_String_) isGeneration_Range_DecimalRange_Type() {}
 
+// * Sequential UUID range, counting from min to max.
+type Generation_Range_UuidSeq struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// * Start UUID (inclusive); defaults to 00000000-0000-0000-0000-000000000000 if not set
+	Min *Uuid `protobuf:"bytes,1,opt,name=min,proto3,oneof" json:"min,omitempty"`
+	// * End UUID (inclusive)
+	Max           *Uuid `protobuf:"bytes,2,opt,name=max,proto3" json:"max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Generation_Range_UuidSeq) Reset() {
+	*x = Generation_Range_UuidSeq{}
+	mi := &file_proto_stroppy_common_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Generation_Range_UuidSeq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Generation_Range_UuidSeq) ProtoMessage() {}
+
+func (x *Generation_Range_UuidSeq) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_common_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Generation_Range_UuidSeq.ProtoReflect.Descriptor instead.
+func (*Generation_Range_UuidSeq) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 10}
+}
+
+func (x *Generation_Range_UuidSeq) GetMin() *Uuid {
+	if x != nil {
+		return x.Min
+	}
+	return nil
+}
+
+func (x *Generation_Range_UuidSeq) GetMax() *Uuid {
+	if x != nil {
+		return x.Max
+	}
+	return nil
+}
+
 // * Range for date/time values
 type Generation_Range_DateTime struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -2008,7 +2131,7 @@ type Generation_Range_DateTime struct {
 
 func (x *Generation_Range_DateTime) Reset() {
 	*x = Generation_Range_DateTime{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[23]
+	mi := &file_proto_stroppy_common_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2020,7 +2143,7 @@ func (x *Generation_Range_DateTime) String() string {
 func (*Generation_Range_DateTime) ProtoMessage() {}
 
 func (x *Generation_Range_DateTime) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[23]
+	mi := &file_proto_stroppy_common_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2033,7 +2156,7 @@ func (x *Generation_Range_DateTime) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_DateTime.ProtoReflect.Descriptor instead.
 func (*Generation_Range_DateTime) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 10}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 11}
 }
 
 func (x *Generation_Range_DateTime) GetType() isGeneration_Range_DateTime_Type {
@@ -2108,7 +2231,7 @@ type Generation_Range_DateTime_TimestampPb struct {
 
 func (x *Generation_Range_DateTime_TimestampPb) Reset() {
 	*x = Generation_Range_DateTime_TimestampPb{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[24]
+	mi := &file_proto_stroppy_common_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2120,7 +2243,7 @@ func (x *Generation_Range_DateTime_TimestampPb) String() string {
 func (*Generation_Range_DateTime_TimestampPb) ProtoMessage() {}
 
 func (x *Generation_Range_DateTime_TimestampPb) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[24]
+	mi := &file_proto_stroppy_common_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2133,7 +2256,7 @@ func (x *Generation_Range_DateTime_TimestampPb) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use Generation_Range_DateTime_TimestampPb.ProtoReflect.Descriptor instead.
 func (*Generation_Range_DateTime_TimestampPb) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 10, 0}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 11, 0}
 }
 
 func (x *Generation_Range_DateTime_TimestampPb) GetMin() *timestamppb.Timestamp {
@@ -2163,7 +2286,7 @@ type Generation_Range_DateTime_TimestampUnix struct {
 
 func (x *Generation_Range_DateTime_TimestampUnix) Reset() {
 	*x = Generation_Range_DateTime_TimestampUnix{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[25]
+	mi := &file_proto_stroppy_common_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2175,7 +2298,7 @@ func (x *Generation_Range_DateTime_TimestampUnix) String() string {
 func (*Generation_Range_DateTime_TimestampUnix) ProtoMessage() {}
 
 func (x *Generation_Range_DateTime_TimestampUnix) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[25]
+	mi := &file_proto_stroppy_common_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2188,7 +2311,7 @@ func (x *Generation_Range_DateTime_TimestampUnix) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use Generation_Range_DateTime_TimestampUnix.ProtoReflect.Descriptor instead.
 func (*Generation_Range_DateTime_TimestampUnix) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 10, 1}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 11, 1}
 }
 
 func (x *Generation_Range_DateTime_TimestampUnix) GetMin() uint32 {
@@ -2256,7 +2379,7 @@ const file_proto_stroppy_common_proto_rawDesc = "" +
 	"\tNullValue\x12\x0e\n" +
 	"\n" +
 	"NULL_VALUE\x10\x00B\x06\n" +
-	"\x04type\"\xa5\x16\n" +
+	"\x04type\"\xb5\x18\n" +
 	"\n" +
 	"Generation\x1aU\n" +
 	"\bAlphabet\x12I\n" +
@@ -2268,7 +2391,8 @@ const file_proto_stroppy_common_proto_rawDesc = "" +
 	"\n" +
 	"\x06NORMAL\x10\x00\x12\v\n" +
 	"\aUNIFORM\x10\x01\x12\b\n" +
-	"\x04ZIPF\x10\x02\x1a\xc1\t\n" +
+	"\x04ZIPF\x10\x02\x1a\x9b\n" +
+	"\n" +
 	"\x05Range\x1a\x1c\n" +
 	"\x04Bool\x12\x14\n" +
 	"\x05ratio\x18\x01 \x01(\x02R\x05ratio\x1a\x97\x01\n" +
@@ -2310,7 +2434,11 @@ const file_proto_stroppy_common_proto_rawDesc = "" +
 	"\x05float\x18\x02 \x01(\v2\x1f.stroppy.Generation.Range.FloatH\x00R\x05float\x12:\n" +
 	"\x06double\x18\x03 \x01(\v2 .stroppy.Generation.Range.DoubleH\x00R\x06double\x12=\n" +
 	"\x06string\x18\x04 \x01(\v2#.stroppy.Generation.Range.AnyStringH\x00R\x06stringB\v\n" +
-	"\x04type\x12\x03\xf8B\x01\x1a\x9d\x03\n" +
+	"\x04type\x12\x03\xf8B\x01\x1aX\n" +
+	"\aUuidSeq\x12$\n" +
+	"\x03min\x18\x01 \x01(\v2\r.stroppy.UuidH\x00R\x03min\x88\x01\x01\x12\x1f\n" +
+	"\x03max\x18\x02 \x01(\v2\r.stroppy.UuidR\x03maxB\x06\n" +
+	"\x04_min\x1a\x9d\x03\n" +
 	"\bDateTime\x12=\n" +
 	"\x06string\x18\x02 \x01(\v2#.stroppy.Generation.Range.AnyStringH\x00R\x06string\x12S\n" +
 	"\ftimestamp_pb\x18\x03 \x01(\v2..stroppy.Generation.Range.DateTime.TimestampPbH\x00R\vtimestampPb\x12P\n" +
@@ -2321,8 +2449,7 @@ const file_proto_stroppy_common_proto_rawDesc = "" +
 	"\rTimestampUnix\x12\x10\n" +
 	"\x03min\x18\x01 \x01(\rR\x03min\x12\x10\n" +
 	"\x03max\x18\x02 \x01(\rR\x03maxB\v\n" +
-	"\x04type\x12\x03\xf8B\x01\x1a\xbc\n" +
-	"\n" +
+	"\x04type\x12\x03\xf8B\x01\x1a\xf2\v\n" +
 	"\x04Rule\x12B\n" +
 	"\vint32_range\x18\x01 \x01(\v2\x1f.stroppy.Generation.Range.Int32H\x00R\n" +
 	"int32Range\x12B\n" +
@@ -2352,7 +2479,14 @@ const file_proto_stroppy_common_proto_rawDesc = "" +
 	"\fstring_const\x18\x12 \x01(\tH\x00R\vstringConst\x12\x1f\n" +
 	"\n" +
 	"bool_const\x18\x13 \x01(\bH\x00R\tboolConst\x12:\n" +
-	"\x0edatetime_const\x18\x14 \x01(\v2\x11.stroppy.DateTimeH\x00R\rdatetimeConst\x12I\n" +
+	"\x0edatetime_const\x18\x14 \x01(\v2\x11.stroppy.DateTimeH\x00R\rdatetimeConst\x12!\n" +
+	"\vuuid_random\x18\x15 \x01(\bH\x00R\n" +
+	"uuidRandom\x12.\n" +
+	"\n" +
+	"uuid_const\x18\x16 \x01(\v2\r.stroppy.UuidH\x00R\tuuidConst\x12!\n" +
+	"\vuuid_seeded\x18\x17 \x01(\bH\x00R\n" +
+	"uuidSeeded\x12>\n" +
+	"\buuid_seq\x18\x18 \x01(\v2!.stroppy.Generation.Range.UuidSeqH\x00R\auuidSeq\x12I\n" +
 	"\fdistribution\x18\x1e \x01(\v2 .stroppy.Generation.DistributionH\x01R\fdistribution\x88\x01\x01\x127\n" +
 	"\x0fnull_percentage\x18\x1f \x01(\rB\t\xfaB\x06*\x04\x18d(\x00H\x02R\x0enullPercentage\x88\x01\x01\x12\x1b\n" +
 	"\x06unique\x18  \x01(\bH\x03R\x06unique\x88\x01\x01B\v\n" +
@@ -2374,7 +2508,7 @@ func file_proto_stroppy_common_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_stroppy_common_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_proto_stroppy_common_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_proto_stroppy_common_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_proto_stroppy_common_proto_goTypes = []any{
 	(Value_NullValue)(0),                            // 0: stroppy.Value.NullValue
 	(Generation_Distribution_DistributionType)(0),   // 1: stroppy.Generation.Distribution.DistributionType
@@ -2401,13 +2535,14 @@ var file_proto_stroppy_common_proto_goTypes = []any{
 	(*Generation_Range_UInt32)(nil),                 // 22: stroppy.Generation.Range.UInt32
 	(*Generation_Range_UInt64)(nil),                 // 23: stroppy.Generation.Range.UInt64
 	(*Generation_Range_DecimalRange)(nil),           // 24: stroppy.Generation.Range.DecimalRange
-	(*Generation_Range_DateTime)(nil),               // 25: stroppy.Generation.Range.DateTime
-	(*Generation_Range_DateTime_TimestampPb)(nil),   // 26: stroppy.Generation.Range.DateTime.TimestampPb
-	(*Generation_Range_DateTime_TimestampUnix)(nil), // 27: stroppy.Generation.Range.DateTime.TimestampUnix
-	(*timestamppb.Timestamp)(nil),                   // 28: google.protobuf.Timestamp
+	(*Generation_Range_UuidSeq)(nil),                // 25: stroppy.Generation.Range.UuidSeq
+	(*Generation_Range_DateTime)(nil),               // 26: stroppy.Generation.Range.DateTime
+	(*Generation_Range_DateTime_TimestampPb)(nil),   // 27: stroppy.Generation.Range.DateTime.TimestampPb
+	(*Generation_Range_DateTime_TimestampUnix)(nil), // 28: stroppy.Generation.Range.DateTime.TimestampUnix
+	(*timestamppb.Timestamp)(nil),                   // 29: google.protobuf.Timestamp
 }
 var file_proto_stroppy_common_proto_depIdxs = []int32{
-	28, // 0: stroppy.DateTime.value:type_name -> google.protobuf.Timestamp
+	29, // 0: stroppy.DateTime.value:type_name -> google.protobuf.Timestamp
 	0,  // 1: stroppy.Value.null:type_name -> stroppy.Value.NullValue
 	3,  // 2: stroppy.Value.decimal:type_name -> stroppy.Decimal
 	4,  // 3: stroppy.Value.uuid:type_name -> stroppy.Uuid
@@ -2427,24 +2562,28 @@ var file_proto_stroppy_common_proto_depIdxs = []int32{
 	24, // 17: stroppy.Generation.Rule.decimal_range:type_name -> stroppy.Generation.Range.DecimalRange
 	16, // 18: stroppy.Generation.Rule.string_range:type_name -> stroppy.Generation.Range.String
 	15, // 19: stroppy.Generation.Rule.bool_range:type_name -> stroppy.Generation.Range.Bool
-	25, // 20: stroppy.Generation.Rule.datetime_range:type_name -> stroppy.Generation.Range.DateTime
+	26, // 20: stroppy.Generation.Rule.datetime_range:type_name -> stroppy.Generation.Range.DateTime
 	3,  // 21: stroppy.Generation.Rule.decimal_const:type_name -> stroppy.Decimal
 	5,  // 22: stroppy.Generation.Rule.datetime_const:type_name -> stroppy.DateTime
-	12, // 23: stroppy.Generation.Rule.distribution:type_name -> stroppy.Generation.Distribution
-	11, // 24: stroppy.Generation.Range.String.alphabet:type_name -> stroppy.Generation.Alphabet
-	18, // 25: stroppy.Generation.Range.DecimalRange.float:type_name -> stroppy.Generation.Range.Float
-	19, // 26: stroppy.Generation.Range.DecimalRange.double:type_name -> stroppy.Generation.Range.Double
-	17, // 27: stroppy.Generation.Range.DecimalRange.string:type_name -> stroppy.Generation.Range.AnyString
-	17, // 28: stroppy.Generation.Range.DateTime.string:type_name -> stroppy.Generation.Range.AnyString
-	26, // 29: stroppy.Generation.Range.DateTime.timestamp_pb:type_name -> stroppy.Generation.Range.DateTime.TimestampPb
-	27, // 30: stroppy.Generation.Range.DateTime.timestamp:type_name -> stroppy.Generation.Range.DateTime.TimestampUnix
-	28, // 31: stroppy.Generation.Range.DateTime.TimestampPb.min:type_name -> google.protobuf.Timestamp
-	28, // 32: stroppy.Generation.Range.DateTime.TimestampPb.max:type_name -> google.protobuf.Timestamp
-	33, // [33:33] is the sub-list for method output_type
-	33, // [33:33] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	4,  // 23: stroppy.Generation.Rule.uuid_const:type_name -> stroppy.Uuid
+	25, // 24: stroppy.Generation.Rule.uuid_seq:type_name -> stroppy.Generation.Range.UuidSeq
+	12, // 25: stroppy.Generation.Rule.distribution:type_name -> stroppy.Generation.Distribution
+	11, // 26: stroppy.Generation.Range.String.alphabet:type_name -> stroppy.Generation.Alphabet
+	18, // 27: stroppy.Generation.Range.DecimalRange.float:type_name -> stroppy.Generation.Range.Float
+	19, // 28: stroppy.Generation.Range.DecimalRange.double:type_name -> stroppy.Generation.Range.Double
+	17, // 29: stroppy.Generation.Range.DecimalRange.string:type_name -> stroppy.Generation.Range.AnyString
+	4,  // 30: stroppy.Generation.Range.UuidSeq.min:type_name -> stroppy.Uuid
+	4,  // 31: stroppy.Generation.Range.UuidSeq.max:type_name -> stroppy.Uuid
+	17, // 32: stroppy.Generation.Range.DateTime.string:type_name -> stroppy.Generation.Range.AnyString
+	27, // 33: stroppy.Generation.Range.DateTime.timestamp_pb:type_name -> stroppy.Generation.Range.DateTime.TimestampPb
+	28, // 34: stroppy.Generation.Range.DateTime.timestamp:type_name -> stroppy.Generation.Range.DateTime.TimestampUnix
+	29, // 35: stroppy.Generation.Range.DateTime.TimestampPb.min:type_name -> google.protobuf.Timestamp
+	29, // 36: stroppy.Generation.Range.DateTime.TimestampPb.max:type_name -> google.protobuf.Timestamp
+	37, // [37:37] is the sub-list for method output_type
+	37, // [37:37] is the sub-list for method input_type
+	37, // [37:37] is the sub-list for extension type_name
+	37, // [37:37] is the sub-list for extension extendee
+	0,  // [0:37] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_common_proto_init() }
@@ -2490,6 +2629,10 @@ func file_proto_stroppy_common_proto_init() {
 		(*Generation_Rule_StringConst)(nil),
 		(*Generation_Rule_BoolConst)(nil),
 		(*Generation_Rule_DatetimeConst)(nil),
+		(*Generation_Rule_UuidRandom)(nil),
+		(*Generation_Rule_UuidConst)(nil),
+		(*Generation_Rule_UuidSeeded)(nil),
+		(*Generation_Rule_UuidSeq)(nil),
 	}
 	file_proto_stroppy_common_proto_msgTypes[14].OneofWrappers = []any{}
 	file_proto_stroppy_common_proto_msgTypes[16].OneofWrappers = []any{}
@@ -2503,7 +2646,8 @@ func file_proto_stroppy_common_proto_init() {
 		(*Generation_Range_DecimalRange_Double)(nil),
 		(*Generation_Range_DecimalRange_String_)(nil),
 	}
-	file_proto_stroppy_common_proto_msgTypes[23].OneofWrappers = []any{
+	file_proto_stroppy_common_proto_msgTypes[23].OneofWrappers = []any{}
+	file_proto_stroppy_common_proto_msgTypes[24].OneofWrappers = []any{
 		(*Generation_Range_DateTime_String_)(nil),
 		(*Generation_Range_DateTime_TimestampPb_)(nil),
 		(*Generation_Range_DateTime_Timestamp)(nil),
@@ -2514,7 +2658,7 @@ func file_proto_stroppy_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_common_proto_rawDesc), len(file_proto_stroppy_common_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   26,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

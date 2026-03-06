@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
@@ -21,7 +22,7 @@ func (d *Driver) InsertValues(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,
 ) (*stats.Query, error) {
-	builder, err := queries.NewQueryBuilder(d.logger, 0, descriptor)
+	builder, err := queries.NewQueryBuilder(d.logger, generate.ResolveSeed(descriptor.GetSeed()), descriptor)
 	if err != nil {
 		return nil, fmt.Errorf("can't create query builder: %w", err)
 	}

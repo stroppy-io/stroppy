@@ -2423,6 +2423,116 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 		}
 
+	case *Generation_Rule_UuidRandom:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+		// no validation rules for UuidRandom
+	case *Generation_Rule_UuidConst:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+
+		if all {
+			switch v := interface{}(m.GetUuidConst()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "UuidConst",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "UuidConst",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetUuidConst()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return Generation_RuleValidationError{
+					field:  "UuidConst",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Generation_Rule_UuidSeeded:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+		// no validation rules for UuidSeeded
+	case *Generation_Rule_UuidSeq:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+
+		if all {
+			switch v := interface{}(m.GetUuidSeq()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "UuidSeq",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "UuidSeq",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetUuidSeq()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return Generation_RuleValidationError{
+					field:  "UuidSeq",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -3810,6 +3920,170 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = Generation_Range_DecimalRangeValidationError{}
+
+// Validate checks the field values on Generation_Range_UuidSeq with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *Generation_Range_UuidSeq) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Generation_Range_UuidSeq with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// Generation_Range_UuidSeqMultiError, or nil if none found.
+func (m *Generation_Range_UuidSeq) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Generation_Range_UuidSeq) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetMax()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, Generation_Range_UuidSeqValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, Generation_Range_UuidSeqValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMax()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return Generation_Range_UuidSeqValidationError{
+				field:  "Max",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.Min != nil {
+
+		if all {
+			switch v := interface{}(m.GetMin()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, Generation_Range_UuidSeqValidationError{
+						field:  "Min",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, Generation_Range_UuidSeqValidationError{
+						field:  "Min",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetMin()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return Generation_Range_UuidSeqValidationError{
+					field:  "Min",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return Generation_Range_UuidSeqMultiError(errors)
+	}
+
+	return nil
+}
+
+// Generation_Range_UuidSeqMultiError is an error wrapping multiple validation
+// errors returned by Generation_Range_UuidSeq.ValidateAll() if the designated
+// constraints aren't met.
+type Generation_Range_UuidSeqMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m Generation_Range_UuidSeqMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m Generation_Range_UuidSeqMultiError) AllErrors() []error { return m }
+
+// Generation_Range_UuidSeqValidationError is the validation error returned by
+// Generation_Range_UuidSeq.Validate if the designated constraints aren't met.
+type Generation_Range_UuidSeqValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e Generation_Range_UuidSeqValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e Generation_Range_UuidSeqValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e Generation_Range_UuidSeqValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e Generation_Range_UuidSeqValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e Generation_Range_UuidSeqValidationError) ErrorName() string {
+	return "Generation_Range_UuidSeqValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e Generation_Range_UuidSeqValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGeneration_Range_UuidSeq.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = Generation_Range_UuidSeqValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = Generation_Range_UuidSeqValidationError{}
 
 // Validate checks the field values on Generation_Range_DateTime with the rules
 // defined in the proto definition for this message. If any rules are
