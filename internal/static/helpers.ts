@@ -64,8 +64,15 @@ function rule(r: Generation_Rule): Rule {
   });
 }
 
+export type InsertMethodName = "plain_query" | "copy_from";
+
+const insertMethodMap: Record<InsertMethodName, InsertMethod> = {
+  plain_query: InsertMethod.PLAIN_QUERY,
+  copy_from: InsertMethod.COPY_FROM,
+};
+
 interface InsertDescriptorX {
-  method?: InsertMethod;
+  method?: InsertMethodName;
   seed?: number;
   params?: Record<string, Generation_Rule>;
   groups?: Record<string, Record<string, Generation_Rule>>;
@@ -107,7 +114,7 @@ export class DriverX {
     const descriptor = isName
       ? {
           tableName: insertOrTableName,
-          method: insert?.method,
+          method: insert?.method ? insertMethodMap[insert.method] : undefined,
           seed: insert?.seed ?? _seed,
           params: R.group(insert?.params ?? {}),
           groups: R.groups(insert?.groups ?? {}),

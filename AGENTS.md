@@ -37,12 +37,16 @@ Drivers register themselves via `init()` using `driver.RegisterDriver()`. The di
 
 ### TypeScript API (helpers.ts)
 
-- `R` - Random generators: `R.str()`, `R.int32()`, `R.float()`, `R.double()`, `R.bool()`, `R.datetimeConst()`
-- `S` - Sequence (unique) generators: `S.str()`, `S.int32()`
+- `C` - Const generators: `C.str()`, `C.int32()`, `C.int64()`, `C.uint32()`, `C.uint64()`, `C.float()`, `C.double()`, `C.decimal()`, `C.datetime()`, `C.bool()`, `C.uuid()`
+- `R` - Random/range generators: `R.str()`, `R.int32()`, `R.int64()`, `R.uint32()`, `R.uint64()`, `R.float()`, `R.double()`, `R.decimal()`, `R.datetime()`, `R.bool()`, `R.uuid()`, `R.uuidSeeded()`, `R.group()`, `R.groups()`
+- `S` - Sequence (unique) generators: `S.str()`, `S.int32()`, `S.int64()`, `S.uint32()`, `S.uint64()`, `S.uuid()`
 - `AB` - Alphabets: `en`, `enNum`, `num`, `enUpper`, `enSpc`, `enNumSpc`
-- `DriverX` - Typed driver wrapper with metrics tracking
-- `Step()` - Named execution blocks with cloud notification
-- `NewGen()` / `NewGroupGen()` - Low-level generator creation
+- `Dist` - Distribution helpers: `Dist.normal()`, `Dist.uniform()`, `Dist.zipf()`
+- `setSeed()` - Set module-wide default seed (0 = random, >0 = fixed)
+- `Rule` / `GroupRule` - Generation rules with `.gen(seed?)` method to create generators
+- `DriverX` - Typed driver wrapper with metrics tracking; `DriverX.fromConfig()`, `.insert()`, `.runQuery()`
+- `InsertMethodName` - `"plain_query" | "copy_from"` — friendly string type for `DriverX.insert()` method option
+- `Step()` - Named execution blocks with cloud notification; also `Step.begin()` / `Step.end()`
 
 ### SQL Syntax
 

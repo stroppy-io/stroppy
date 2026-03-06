@@ -1,6 +1,6 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { InsertMethod, DriverConfig_DriverType } from "./stroppy.pb.js";
+import { DriverConfig_DriverType } from "./stroppy.pb.js";
 import { AB, C, R, Step, DriverX, S } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
@@ -76,7 +76,7 @@ export function setup() {
   Step("load_data", () => {
     // Load data into tables using InsertValues with COPY_FROM method
     driver.insert("item", ITEMS, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         i_id: S.int32(1, ITEMS),
         i_im_id: S.int32(1, ITEMS), // WHY: not unique originaly
@@ -87,7 +87,7 @@ export function setup() {
     });
 
     driver.insert("warehouse", WAREHOUSES, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         w_id: S.int32(1, WAREHOUSES),
         w_name: R.str(6, 10),
@@ -102,7 +102,7 @@ export function setup() {
     });
 
     driver.insert("district", TOTAL_DISTRICTS, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         d_name: R.str(6, 10),
         d_street_1: R.str(10, 20, AB.enSpc),
@@ -123,7 +123,7 @@ export function setup() {
     });
 
     driver.insert("customer", TOTAL_CUSTOMERS, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         c_first: R.str(8, 16),
         c_middle: R.str(2, AB.enUpper),
@@ -154,7 +154,7 @@ export function setup() {
     });
 
     driver.insert("stock", TOTAL_STOCK, {
-      method: InsertMethod.COPY_FROM,
+      method: "copy_from",
       params: {
         s_quantity: R.int32(10, 100),
         s_dist_01: R.str(24, AB.enNum),
