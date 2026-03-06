@@ -10,6 +10,7 @@ import {
   NotifyStep,
   Driver,
   QueryStats,
+  QueryResult,
 } from "k6/x/stroppy";
 import {
   Generation_Rule,
@@ -23,6 +24,7 @@ import {
   Status,
   Timestamp,
 } from "./stroppy.pb.js";
+
 import { ParsedQuery } from "./parse_sql.js";
 
 
@@ -84,15 +86,121 @@ const runQueryMetric = new Trend("run_query_duration", true);
 const runQueryCounterMetric = new Counter("run_query_count");
 const runQueryErrRateMetric = new Rate("run_query_error_rate");
 
-function isQueryStats(obj: any): obj is QueryStats {
-  return typeof obj.elapsed !== "undefined"
+export interface TaggedQuery {
+  sql: string | ParsedQuery;
+  tags?: Record<string, string>;
 }
 
-export class DriverX {
+export type SqlArg = string | ParsedQuery | TaggedQuery;
+
+function resolveSqlArg(arg: SqlArg): {
+  sql: string;
+  tags: Record<string, string> | undefined;
+} {
+  // Plain SQL string
+  if (typeof arg === "string") return { sql: arg, tags: undefined };
+
+    // TaggedQuery
+  if ("sql" in arg && (typeof arg.sql === "string" || "name" in arg.sql)) {
+    const inner = arg as TaggedQuery;
+    const parsed =
+      typeof inner.sql === "string" ? inner.sql : (inner.sql as ParsedQuery);
+    const baseTags =
+      typeof parsed === "string"
+        ? undefined
+        : { name: parsed.name, type: parsed.type };
+    return {
+      sql: typeof parsed === "string" ? parsed : parsed.sql,
+      tags: inner.tags ? { ...baseTags, ...inner.tags } : baseTags,
+    };
+  }
+
+  // ParsedQuery
+  const pq = arg as ParsedQuery;
+  return { sql: pq.sql, tags: { name: pq.name, type: pq.type } };
+}
+
+// Sugar interface for convenient query patterns.
+// Reusable across DriverX, future Tx, etc.
+// All methods accept a raw SQL string, a ParsedQuery, or a TaggedQuery.
+// All methods throw on query execution error.
+export interface QueryAPI {
+  exec(sql: SqlArg, args?: Record<string, any>): QueryStats;
+  queryRows(sql: SqlArg, args?: Record<string, any>, limit?: number): any[][];
+  queryRow(sql: SqlArg, args?: Record<string, any>): any[] | undefined;
+  queryValue<T = any>(sql: SqlArg, args?: Record<string, any>): T | undefined;
+  queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult;
+}
+
+type RunQueryFn = (sql: string, args: Record<string, any>) => QueryResult;
+
+function createQueryAPI(runQuery: RunQueryFn): QueryAPI {
+  return {
+    exec(sql: SqlArg, args?: Record<string, any>): QueryStats {
+      const { sql: s } = resolveSqlArg(sql);
+      const result = runQuery(s, args ?? {});
+      result.rows.close();
+      return result.stats;
+    },
+
+    queryRows(
+      sql: SqlArg,
+      args?: Record<string, any>,
+      limit?: number,
+    ): any[][] {
+      const { sql: s } = resolveSqlArg(sql);
+      const result = runQuery(s, args ?? {});
+      return result.rows.readAll(limit ?? 0);
+    },
+
+    queryRow(sql: SqlArg, args?: Record<string, any>): any[] | undefined {
+      const { sql: s } = resolveSqlArg(sql);
+      const result = runQuery(s, args ?? {});
+      const row = result.rows.next() ? result.rows.values() : undefined;
+      result.rows.close();
+      return row;
+    },
+
+    queryValue<T = any>(
+      sql: SqlArg,
+      args?: Record<string, any>,
+    ): T | undefined {
+      const { sql: s } = resolveSqlArg(sql);
+      const result = runQuery(s, args ?? {});
+      if (!result.rows.next()) {
+        result.rows.close();
+        return undefined;
+      }
+      const vals = result.rows.values();
+      result.rows.close();
+      return vals?.length ? (vals[0] as T) : undefined;
+    },
+
+    queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult {
+      const { sql: s } = resolveSqlArg(sql);
+      return runQuery(s, args ?? {});
+    },
+  };
+}
+
+export class DriverX implements QueryAPI {
   private driver: Driver;
+  private q: QueryAPI;
+
+  exec!: QueryAPI["exec"];
+  queryRows!: QueryAPI["queryRows"];
+  queryRow!: QueryAPI["queryRow"];
+  queryValue!: QueryAPI["queryValue"];
+  queryCursor!: QueryAPI["queryCursor"];
 
   constructor(driver: Driver) {
     this.driver = driver;
+    this.q = createQueryAPI((sql, args) => driver.runQuery(sql, args));
+    this.exec = this.q.exec;
+    this.queryRows = this.q.queryRows;
+    this.queryRow = this.q.queryRow;
+    this.queryValue = this.q.queryValue;
+    this.queryCursor = this.q.queryCursor;
   }
 
   static fromConfig(config: Partial<GlobalConfig>): DriverX {
@@ -115,7 +223,7 @@ export class DriverX {
       ? {
           tableName: insertOrTableName,
           method: insert?.method ? insertMethodMap[insert.method] : undefined,
-          seed: insert?.seed ?? _seed,
+          seed: String(insert?.seed ?? _seed),
           params: R.group(insert?.params ?? {}),
           groups: R.groups(insert?.groups ?? {}),
           count,
@@ -126,46 +234,33 @@ export class DriverX {
       `Insertion into '${descriptor.tableName}' of ${descriptor.count} values starting...`,
     );
 
-    const results = this.driver.insertValuesBin(
-      InsertDescriptor.toBinary(InsertDescriptor.create(descriptor)),
-    );
-
-    const tags = { table_name: descriptor.tableName ?? "unknown" };
-    if (!results) return 
-    if (isQueryStats(results)) {
-      insertErrRateMetric.add(0, tags);
-      insertMetric.add(results.elapsed.milliseconds(), tags);
-    } else {
-      insertErrRateMetric.add(1, tags);
+    const metricTags = { table_name: descriptor.tableName ?? "unknown" };
+    try {
+      const stats = this.driver.insertValuesBin(
+        InsertDescriptor.toBinary(InsertDescriptor.create(descriptor)),
+      );
+      insertErrRateMetric.add(0, metricTags);
+      insertMetric.add(stats.elapsed.milliseconds(), metricTags);
+    } catch {
+      insertErrRateMetric.add(1, metricTags);
     }
 
     console.log(`Insertion into '${descriptor.tableName}' ended`);
   }
 
-  runQuery(sql: string, args: Record<string, any>): void;
-  runQuery(query: ParsedQuery, args: Record<string, any>): void;
-  runQuery(sqlOrQuery: string | ParsedQuery, args: Record<string, any>): void {
-    const isSql = typeof sqlOrQuery === "string";
-    const result = this.driver.runQuery(
-      isSql ? sqlOrQuery : sqlOrQuery.sql,
-      args,
-    );
-
-    const tags = isSql
-      ? undefined
-      : { name: sqlOrQuery.name, type: sqlOrQuery.type };
-
-    if (!result) return 
-    if (isQueryStats(result)) {
-      runQueryMetric.add(result.elapsed.milliseconds(), tags);
-      runQueryErrRateMetric.add(0, tags);
-      runQueryCounterMetric.add(1, tags);
-    } else {
-      runQueryErrRateMetric.add(1, tags);
+  runQuery(sql: SqlArg, args?: Record<string, any>): void {
+    const resolved = resolveSqlArg(sql);
+    try {
+      const result = this.driver.runQuery(resolved.sql, args ?? {});
+      runQueryMetric.add(result.stats.elapsed.milliseconds(), resolved.tags);
+      runQueryErrRateMetric.add(0, resolved.tags);
+      runQueryCounterMetric.add(1, resolved.tags);
+      result.rows.close();
+    } catch {
+      runQueryErrRateMetric.add(1, resolved.tags);
     }
   }
 
-  // Expose the underlying driver if needed for advanced usage
   getDriver(): Driver {
     return this.driver;
   }

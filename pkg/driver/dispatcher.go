@@ -18,9 +18,25 @@ type (
 		DialFunc func(ctx context.Context, network, addr string) (net.Conn, error)
 	}
 
+	// Rows provides cursor-style iteration over query result rows.
+	// Automatically closes when Next() returns false (exhaustion or error).
+	Rows interface {
+		Columns() []string
+		Next() bool
+		Values() []any
+		ReadAll(limit int) [][]any
+		Err() error
+		Close() error
+	}
+
+	QueryResult struct {
+		Stats *stats.Query
+		Rows  Rows
+	}
+
 	Driver interface {
 		InsertValues(ctx context.Context, unit *stroppy.InsertDescriptor) (*stats.Query, error)
-		RunQuery(ctx context.Context, sql string, args map[string]any) (*stats.Query, error)
+		RunQuery(ctx context.Context, sql string, args map[string]any) (*QueryResult, error)
 		Teardown(ctx context.Context) error
 		Configure(ctx context.Context, opts Options) error
 	}

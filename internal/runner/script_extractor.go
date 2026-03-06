@@ -20,6 +20,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 
 	_ "embed"
 )
@@ -230,10 +232,29 @@ func createVM() *js.Runtime {
 	return vm
 }
 
+// for [xk6air.DriverWrapper].
 type driverStub struct{}
 
-func (*driverStub) RunQuery(string, map[string]any) any { return nil }
-func (*driverStub) InsertValuesBin([]byte, int64) any   { return nil }
+func (*driverStub) RunQuery(string, map[string]any) (*driver.QueryResult, error) {
+	return &driver.QueryResult{
+		Stats: &stats.Query{},
+		Rows:  &rowsStub{},
+	}, nil
+}
+
+func (*driverStub) InsertValuesBin([]byte, int64) (*stats.Query, error) {
+	return &stats.Query{}, nil
+}
+
+// rowsStub implements driver.Rows for the probe VM.
+type rowsStub struct{}
+
+func (*rowsStub) Columns() []string   { return []string{} }
+func (*rowsStub) Next() bool          { return false }
+func (*rowsStub) Values() []any       { return nil }
+func (*rowsStub) ReadAll(int) [][]any { return [][]any{} }
+func (*rowsStub) Err() error          { return nil }
+func (*rowsStub) Close() error        { return nil }
 
 type genStub struct{}
 
@@ -282,9 +303,9 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		{"open", func(string) string { return "" }},
 		{"console", consoleMock(vm)},
 		// k6/metrics
-		{"Trend", dummyWithNoopConstructor(vm)},
-		{"Rate", dummyWithNoopConstructor(vm)},
-		{"Counter", dummyWithNoopConstructor(vm)},
+		{"Trend", metricsDummy(vm)},
+		{"Rate", metricsDummy(vm)},
+		{"Counter", metricsDummy(vm)},
 		// TODO: what if user will use other default modules and their functions?
 
 		// k6/x/stroppy defines
@@ -424,11 +445,12 @@ func spyProxyObject(
 	return proxy
 }
 
-func dummyWithNoopConstructor(rt *js.Runtime) *js.Object {
+func metricsDummy(rt *js.Runtime) *js.Object {
 	src := `
-  function MyDummy() {}
-  MyDummy.prototype.constructor = MyDummy;
-  MyDummy;
+	function MyDummy() {}
+	MyDummy.prototype.constructor = MyDummy;
+	MyDummy.prototype.add = function() {};
+	MyDummy;
 `
 	val, _ := rt.RunString(src)
 

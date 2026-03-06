@@ -69,6 +69,14 @@ Four variants available via `Generation.Rule.kind` in the proto:
 
 Generator factory entry point: `NewValueGeneratorByRule` in `pkg/common/generate/value.go`.
 
+### Go Exploration
+
+- Use `go doc` to quickly inspect interfaces, structs, and function signatures. Examples:
+  - `go doc github.com/jackc/pgx/v5.Rows` — show the pgx Rows interface
+  - `go doc github.com/pashagolub/pgxmock/v4 NewPool` — show pgxmock constructor
+  - `go doc ./pkg/driver Rows` — show a local interface
+- Prefer `go doc` over searching source files for type/interface definitions — it's faster and gives clean output.
+
 ### Build System
 
 - `make build` - Builds k6 with xk6air extension via xk6

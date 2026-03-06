@@ -23,10 +23,29 @@ declare module "k6/x/stroppy" {
     elapsed: GoDuration;
   }
 
-  // Driver interface - provides database operations
+  // Cursor-style row iteration over query results.
+  // Auto-closes when next() returns false.
+  export interface Rows {
+    columns(): string[];
+    next(): boolean;
+    values(): any[];
+    readAll(limit: number): any[][];
+    err(): Error | null;
+    close(): Error | null;
+  }
+
+  export interface QueryResult {
+    stats: QueryStats;
+    rows: Rows;
+  }
+
+  // Driver interface - provides database operations.
+  // All methods throw on error (Go errors become JS exceptions via sobek).
   export interface Driver {
-    insertValuesBin(insert: BinMsg<InsertDescriptor>): Error | QueryStats;
-    runQuery(sql: string, args: Record<string, any>): Error | QueryStats;
+    /** @throws {Error} on insert failure or protobuf unmarshal error */
+    insertValuesBin(insert: BinMsg<InsertDescriptor>): QueryStats;
+    /** @throws {Error} on query execution or argument processing error */
+    runQuery(sql: string, args: Record<string, any>): QueryResult;
   }
 
   // Generator interface - provides data generation

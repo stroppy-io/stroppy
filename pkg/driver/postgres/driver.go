@@ -26,6 +26,7 @@ func init() {
 
 type Executor interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	CopyFrom(
 		ctx context.Context,
 		tableName pgx.Identifier,
