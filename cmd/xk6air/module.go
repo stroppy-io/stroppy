@@ -32,9 +32,10 @@ func init() {
 		WithOptions(zap.AddStacktrace(zap.FatalLevel))
 
 	rootModule = &RootModule{
-		lg:         lg,
-		ctx:        context.Background(),
-		vuTeardown: make(map[*Instance]func() error),
+		lg:               lg,
+		ctx:              context.Background(),
+		instanceTeardown: make(map[*Instance]func() error),
+		sharedDrivers:    make(map[uint64]*sharedDriverEntry),
 	}
 
 	rootModule.runULID, rootModule.cloudClient = NewCloudClient(lg)
@@ -44,6 +45,12 @@ func init() {
 	subcommand.RegisterExtension("stroppy", commands.K6Subcommand)
 }
 
+// sharedDriverEntry holds a shared driver and its once guard for reconfiguration.
+type sharedDriverEntry struct {
+	drv          driver.Driver
+	reconfigOnce sync.Once
+}
+
 // RootModule global object for all the VU instances.
 type RootModule struct {
 	lg          *zap.Logger
@@ -51,11 +58,11 @@ type RootModule struct {
 	runULID     ulid.ULID
 	ctx         context.Context
 
-	sharedDrv driver.Driver
-	once      sync.Once
+	sharedMu      sync.Mutex
+	sharedDrivers map[uint64]*sharedDriverEntry
 
-	vuMutex    sync.Mutex
-	vuTeardown map[*Instance]func() error
+	instanceMu       sync.Mutex
+	instanceTeardown map[*Instance]func() error
 }
 
 // NewModuleInstance factory method for Instances.
@@ -76,23 +83,64 @@ func (r *RootModule) NotifyStep(name string, status int32) {
 }
 
 func (r *RootModule) addVuTeardown(instance *Instance) {
-	r.vuMutex.Lock()
-	r.vuTeardown[instance] = instance.Teardown
-	r.vuMutex.Unlock()
+	r.instanceMu.Lock()
+	r.instanceTeardown[instance] = instance.Teardown
+	r.instanceMu.Unlock()
+}
+
+// getOrCreateSharedDriver returns a shared driver for the given index.
+// If the driver doesn't exist yet, it creates one (without DialFunc since VU state is nil).
+func (r *RootModule) getOrCreateSharedDriver(
+	index uint64,
+	lg *zap.Logger,
+	cfg *stroppy.DriverConfig,
+) driver.Driver {
+	r.sharedMu.Lock()
+	defer r.sharedMu.Unlock()
+
+	if entry, ok := r.sharedDrivers[index]; ok {
+		return entry.drv
+	}
+
+	// Create driver without DialFunc (init phase, VU state is nil)
+	drv, err := driver.Dispatch(r.ctx, driver.Options{
+		Config: cfg,
+		Logger: lg,
+	})
+	if err != nil {
+		lg.Fatal("can't initialize shared driver", zap.Error(err))
+	}
+
+	r.sharedDrivers[index] = &sharedDriverEntry{drv: drv}
+	return drv
+}
+
+// isSharedDriver checks if the given driver is one of the shared drivers.
+func (r *RootModule) isSharedDriver(drv driver.Driver) bool {
+	r.sharedMu.Lock()
+	defer r.sharedMu.Unlock()
+
+	for _, entry := range r.sharedDrivers {
+		if entry.drv == drv {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *RootModule) Teardown() error {
-
 	var err error
-	r.vuMutex.Lock()
-	for _, teardown := range r.vuTeardown {
+	r.instanceMu.Lock()
+	for _, teardown := range r.instanceTeardown {
 		err = errors.Join(err, teardown())
 	}
-	r.vuMutex.Unlock()
+	r.instanceMu.Unlock()
 
-	if r.sharedDrv != nil {
-		r.sharedDrv.Teardown(r.ctx)
+	r.sharedMu.Lock()
+	for _, entry := range r.sharedDrivers {
+		entry.drv.Teardown(r.ctx)
 	}
+	r.sharedMu.Unlock()
 
 	_, errCloud := r.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
 		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},

@@ -10,7 +10,6 @@ import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -172,18 +171,20 @@ func (LoggerConfig_LogMode) EnumDescriptor() ([]byte, []int) {
 
 // *
 // DriverConfig contains configuration for connecting to a database driver.
-// It includes the driver plugin path, connection URL, and database-specific
-// settings.
+// Driver is created as an empty shell via DriverX.create() and configured
+// via driver.setup(config) at runtime. Sharing semantics are determined
+// by the k6 lifecycle stage: init phase = shared, iteration = per-VU.
 type DriverConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// * Database connection URL
 	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
-	// * Database-specific configuration options
-	DbSpecific *Value_Struct `protobuf:"bytes,2,opt,name=db_specific,json=dbSpecific,proto3,oneof" json:"db_specific,omitempty"`
 	// * Name/Type of chosen driver
-	DriverType DriverConfig_DriverType `protobuf:"varint,3,opt,name=driver_type,json=driverType,proto3,enum=stroppy.DriverConfig_DriverType" json:"driver_type,omitempty"`
-	// Shared connection pool vs own connection for each VU.
-	ConnectionType *DriverConfig_ConnectionType `protobuf:"bytes,4,opt,name=connection_type,json=connectionType,proto3" json:"connection_type,omitempty"`
+	DriverType DriverConfig_DriverType `protobuf:"varint,2,opt,name=driver_type,json=driverType,proto3,enum=stroppy.DriverConfig_DriverType" json:"driver_type,omitempty"`
+	// * Driver-specific configuration, exactly one must match driver_type
+	// Types that are valid to be assigned to DriverSpecific:
+	//
+	//	*DriverConfig_Postgres
+	DriverSpecific isDriverConfig_DriverSpecific `protobuf_oneof:"driver_specific"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -225,13 +226,6 @@ func (x *DriverConfig) GetUrl() string {
 	return ""
 }
 
-func (x *DriverConfig) GetDbSpecific() *Value_Struct {
-	if x != nil {
-		return x.DbSpecific
-	}
-	return nil
-}
-
 func (x *DriverConfig) GetDriverType() DriverConfig_DriverType {
 	if x != nil {
 		return x.DriverType
@@ -239,12 +233,31 @@ func (x *DriverConfig) GetDriverType() DriverConfig_DriverType {
 	return DriverConfig_DRIVER_TYPE_UNSPECIFIED
 }
 
-func (x *DriverConfig) GetConnectionType() *DriverConfig_ConnectionType {
+func (x *DriverConfig) GetDriverSpecific() isDriverConfig_DriverSpecific {
 	if x != nil {
-		return x.ConnectionType
+		return x.DriverSpecific
 	}
 	return nil
 }
+
+func (x *DriverConfig) GetPostgres() *DriverConfig_PostgresConfig {
+	if x != nil {
+		if x, ok := x.DriverSpecific.(*DriverConfig_Postgres); ok {
+			return x.Postgres
+		}
+	}
+	return nil
+}
+
+type isDriverConfig_DriverSpecific interface {
+	isDriverConfig_DriverSpecific()
+}
+
+type DriverConfig_Postgres struct {
+	Postgres *DriverConfig_PostgresConfig `protobuf:"bytes,10,opt,name=postgres,proto3,oneof"`
+}
+
+func (*DriverConfig_Postgres) isDriverConfig_DriverSpecific() {}
 
 // *
 // LoggerConfig contains configuration for the logging system.
@@ -374,12 +387,10 @@ type GlobalConfig struct {
 	Seed uint64 `protobuf:"varint,3,opt,name=seed,proto3" json:"seed,omitempty"`
 	// * Arbitrary metadata, may be passed to result labels and json output
 	Metadata map[string]string `protobuf:"bytes,4,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// * Database driver configuration
-	Driver *DriverConfig `protobuf:"bytes,5,opt,name=driver,proto3" json:"driver,omitempty"`
 	// * Logging configuration
-	Logger *LoggerConfig `protobuf:"bytes,6,opt,name=logger,proto3" json:"logger,omitempty"`
+	Logger *LoggerConfig `protobuf:"bytes,5,opt,name=logger,proto3" json:"logger,omitempty"`
 	// * Exporter configuration
-	Exporter      *ExporterConfig `protobuf:"bytes,7,opt,name=exporter,proto3" json:"exporter,omitempty"`
+	Exporter      *ExporterConfig `protobuf:"bytes,6,opt,name=exporter,proto3" json:"exporter,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -442,13 +453,6 @@ func (x *GlobalConfig) GetMetadata() map[string]string {
 	return nil
 }
 
-func (x *GlobalConfig) GetDriver() *DriverConfig {
-	if x != nil {
-		return x.Driver
-	}
-	return nil
-}
-
 func (x *GlobalConfig) GetLogger() *LoggerConfig {
 	if x != nil {
 		return x.Logger
@@ -463,31 +467,46 @@ func (x *GlobalConfig) GetExporter() *ExporterConfig {
 	return nil
 }
 
-type DriverConfig_ConnectionType struct {
+// * PostgreSQL-specific pool and connection configuration
+type DriverConfig_PostgresConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Types that are valid to be assigned to Is:
-	//
-	//	*DriverConfig_ConnectionType_SingleConnPerVu
-	//	*DriverConfig_ConnectionType_SharedPool
-	Is            isDriverConfig_ConnectionType_Is `protobuf_oneof:"is"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// * pgx trace log level: debug, info, warn, error
+	TraceLogLevel *string `protobuf:"bytes,1,opt,name=trace_log_level,json=traceLogLevel,proto3,oneof" json:"trace_log_level,omitempty"`
+	// * Max connection lifetime (Go duration string, e.g. "1h")
+	MaxConnLifetime *string `protobuf:"bytes,2,opt,name=max_conn_lifetime,json=maxConnLifetime,proto3,oneof" json:"max_conn_lifetime,omitempty"`
+	// * Max connection idle time (Go duration string, e.g. "10m")
+	MaxConnIdleTime *string `protobuf:"bytes,3,opt,name=max_conn_idle_time,json=maxConnIdleTime,proto3,oneof" json:"max_conn_idle_time,omitempty"`
+	// * Maximum number of connections in the pool
+	MaxConns *int32 `protobuf:"varint,4,opt,name=max_conns,json=maxConns,proto3,oneof" json:"max_conns,omitempty"`
+	// * Minimum number of connections in the pool
+	MinConns *int32 `protobuf:"varint,5,opt,name=min_conns,json=minConns,proto3,oneof" json:"min_conns,omitempty"`
+	// * Minimum number of idle connections
+	MinIdleConns *int32 `protobuf:"varint,6,opt,name=min_idle_conns,json=minIdleConns,proto3,oneof" json:"min_idle_conns,omitempty"`
+	// * Query execution mode: exec, cache_statement, cache_describe,
+	// describe_exec, simple_protocol
+	DefaultQueryExecMode *string `protobuf:"bytes,7,opt,name=default_query_exec_mode,json=defaultQueryExecMode,proto3,oneof" json:"default_query_exec_mode,omitempty"`
+	// * Description cache capacity (only with cache_describe mode)
+	DescriptionCacheCapacity *int32 `protobuf:"varint,8,opt,name=description_cache_capacity,json=descriptionCacheCapacity,proto3,oneof" json:"description_cache_capacity,omitempty"`
+	// * Statement cache capacity (only with cache_statement mode)
+	StatementCacheCapacity *int32 `protobuf:"varint,9,opt,name=statement_cache_capacity,json=statementCacheCapacity,proto3,oneof" json:"statement_cache_capacity,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
-func (x *DriverConfig_ConnectionType) Reset() {
-	*x = DriverConfig_ConnectionType{}
+func (x *DriverConfig_PostgresConfig) Reset() {
+	*x = DriverConfig_PostgresConfig{}
 	mi := &file_proto_stroppy_config_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DriverConfig_ConnectionType) String() string {
+func (x *DriverConfig_PostgresConfig) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DriverConfig_ConnectionType) ProtoMessage() {}
+func (*DriverConfig_PostgresConfig) ProtoMessage() {}
 
-func (x *DriverConfig_ConnectionType) ProtoReflect() protoreflect.Message {
+func (x *DriverConfig_PostgresConfig) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_stroppy_config_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -499,93 +518,70 @@ func (x *DriverConfig_ConnectionType) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DriverConfig_ConnectionType.ProtoReflect.Descriptor instead.
-func (*DriverConfig_ConnectionType) Descriptor() ([]byte, []int) {
+// Deprecated: Use DriverConfig_PostgresConfig.ProtoReflect.Descriptor instead.
+func (*DriverConfig_PostgresConfig) Descriptor() ([]byte, []int) {
 	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{0, 0}
 }
 
-func (x *DriverConfig_ConnectionType) GetIs() isDriverConfig_ConnectionType_Is {
-	if x != nil {
-		return x.Is
+func (x *DriverConfig_PostgresConfig) GetTraceLogLevel() string {
+	if x != nil && x.TraceLogLevel != nil {
+		return *x.TraceLogLevel
 	}
-	return nil
+	return ""
 }
 
-func (x *DriverConfig_ConnectionType) GetSingleConnPerVu() *emptypb.Empty {
-	if x != nil {
-		if x, ok := x.Is.(*DriverConfig_ConnectionType_SingleConnPerVu); ok {
-			return x.SingleConnPerVu
-		}
+func (x *DriverConfig_PostgresConfig) GetMaxConnLifetime() string {
+	if x != nil && x.MaxConnLifetime != nil {
+		return *x.MaxConnLifetime
 	}
-	return nil
+	return ""
 }
 
-func (x *DriverConfig_ConnectionType) GetSharedPool() *DriverConfig_ConnectionType_Pool {
-	if x != nil {
-		if x, ok := x.Is.(*DriverConfig_ConnectionType_SharedPool); ok {
-			return x.SharedPool
-		}
+func (x *DriverConfig_PostgresConfig) GetMaxConnIdleTime() string {
+	if x != nil && x.MaxConnIdleTime != nil {
+		return *x.MaxConnIdleTime
 	}
-	return nil
+	return ""
 }
 
-type isDriverConfig_ConnectionType_Is interface {
-	isDriverConfig_ConnectionType_Is()
-}
-
-type DriverConfig_ConnectionType_SingleConnPerVu struct {
-	SingleConnPerVu *emptypb.Empty `protobuf:"bytes,1,opt,name=single_conn_per_vu,json=singleConnPerVu,proto3,oneof"`
-}
-
-type DriverConfig_ConnectionType_SharedPool struct {
-	SharedPool *DriverConfig_ConnectionType_Pool `protobuf:"bytes,2,opt,name=shared_pool,json=sharedPool,proto3,oneof"`
-}
-
-func (*DriverConfig_ConnectionType_SingleConnPerVu) isDriverConfig_ConnectionType_Is() {}
-
-func (*DriverConfig_ConnectionType_SharedPool) isDriverConfig_ConnectionType_Is() {}
-
-// If shared_connections not set use drivers pool default.
-type DriverConfig_ConnectionType_Pool struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	SharedConnections int32                  `protobuf:"varint,1,opt,name=shared_connections,json=sharedConnections,proto3" json:"shared_connections,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *DriverConfig_ConnectionType_Pool) Reset() {
-	*x = DriverConfig_ConnectionType_Pool{}
-	mi := &file_proto_stroppy_config_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DriverConfig_ConnectionType_Pool) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DriverConfig_ConnectionType_Pool) ProtoMessage() {}
-
-func (x *DriverConfig_ConnectionType_Pool) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_config_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
+func (x *DriverConfig_PostgresConfig) GetMaxConns() int32 {
+	if x != nil && x.MaxConns != nil {
+		return *x.MaxConns
 	}
-	return mi.MessageOf(x)
+	return 0
 }
 
-// Deprecated: Use DriverConfig_ConnectionType_Pool.ProtoReflect.Descriptor instead.
-func (*DriverConfig_ConnectionType_Pool) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{0, 0, 0}
+func (x *DriverConfig_PostgresConfig) GetMinConns() int32 {
+	if x != nil && x.MinConns != nil {
+		return *x.MinConns
+	}
+	return 0
 }
 
-func (x *DriverConfig_ConnectionType_Pool) GetSharedConnections() int32 {
-	if x != nil {
-		return x.SharedConnections
+func (x *DriverConfig_PostgresConfig) GetMinIdleConns() int32 {
+	if x != nil && x.MinIdleConns != nil {
+		return *x.MinIdleConns
+	}
+	return 0
+}
+
+func (x *DriverConfig_PostgresConfig) GetDefaultQueryExecMode() string {
+	if x != nil && x.DefaultQueryExecMode != nil {
+		return *x.DefaultQueryExecMode
+	}
+	return ""
+}
+
+func (x *DriverConfig_PostgresConfig) GetDescriptionCacheCapacity() int32 {
+	if x != nil && x.DescriptionCacheCapacity != nil {
+		return *x.DescriptionCacheCapacity
+	}
+	return 0
+}
+
+func (x *DriverConfig_PostgresConfig) GetStatementCacheCapacity() int32 {
+	if x != nil && x.StatementCacheCapacity != nil {
+		return *x.StatementCacheCapacity
 	}
 	return 0
 }
@@ -594,26 +590,39 @@ var File_proto_stroppy_config_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x1eproto/stroppy/descriptor.proto\x1a\x17validate/validate.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xbd\x04\n" +
+	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x1eproto/stroppy/descriptor.proto\x1a\x17validate/validate.proto\"\xab\a\n" +
 	"\fDriverConfig\x12\x1a\n" +
-	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12;\n" +
-	"\vdb_specific\x18\x02 \x01(\v2\x15.stroppy.Value.StructH\x00R\n" +
-	"dbSpecific\x88\x01\x01\x12K\n" +
-	"\vdriver_type\x18\x03 \x01(\x0e2 .stroppy.DriverConfig.DriverTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
-	"driverType\x12M\n" +
-	"\x0fconnection_type\x18\x04 \x01(\v2$.stroppy.DriverConfig.ConnectionTypeR\x0econnectionType\x1a\xe2\x01\n" +
-	"\x0eConnectionType\x12E\n" +
-	"\x12single_conn_per_vu\x18\x01 \x01(\v2\x16.google.protobuf.EmptyH\x00R\x0fsingleConnPerVu\x12L\n" +
-	"\vshared_pool\x18\x02 \x01(\v2).stroppy.DriverConfig.ConnectionType.PoolH\x00R\n" +
-	"sharedPool\x1a5\n" +
-	"\x04Pool\x12-\n" +
-	"\x12shared_connections\x18\x01 \x01(\x05R\x11sharedConnectionsB\x04\n" +
-	"\x02is\"C\n" +
+	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12K\n" +
+	"\vdriver_type\x18\x02 \x01(\x0e2 .stroppy.DriverConfig.DriverTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
+	"driverType\x12B\n" +
+	"\bpostgres\x18\n" +
+	" \x01(\v2$.stroppy.DriverConfig.PostgresConfigH\x00R\bpostgres\x1a\x95\x05\n" +
+	"\x0ePostgresConfig\x12+\n" +
+	"\x0ftrace_log_level\x18\x01 \x01(\tH\x00R\rtraceLogLevel\x88\x01\x01\x12/\n" +
+	"\x11max_conn_lifetime\x18\x02 \x01(\tH\x01R\x0fmaxConnLifetime\x88\x01\x01\x120\n" +
+	"\x12max_conn_idle_time\x18\x03 \x01(\tH\x02R\x0fmaxConnIdleTime\x88\x01\x01\x12 \n" +
+	"\tmax_conns\x18\x04 \x01(\x05H\x03R\bmaxConns\x88\x01\x01\x12 \n" +
+	"\tmin_conns\x18\x05 \x01(\x05H\x04R\bminConns\x88\x01\x01\x12)\n" +
+	"\x0emin_idle_conns\x18\x06 \x01(\x05H\x05R\fminIdleConns\x88\x01\x01\x12:\n" +
+	"\x17default_query_exec_mode\x18\a \x01(\tH\x06R\x14defaultQueryExecMode\x88\x01\x01\x12A\n" +
+	"\x1adescription_cache_capacity\x18\b \x01(\x05H\aR\x18descriptionCacheCapacity\x88\x01\x01\x12=\n" +
+	"\x18statement_cache_capacity\x18\t \x01(\x05H\bR\x16statementCacheCapacity\x88\x01\x01B\x12\n" +
+	"\x10_trace_log_levelB\x14\n" +
+	"\x12_max_conn_lifetimeB\x15\n" +
+	"\x13_max_conn_idle_timeB\f\n" +
+	"\n" +
+	"_max_connsB\f\n" +
+	"\n" +
+	"_min_connsB\x11\n" +
+	"\x0f_min_idle_connsB\x1a\n" +
+	"\x18_default_query_exec_modeB\x1d\n" +
+	"\x1b_description_cache_capacityB\x1b\n" +
+	"\x19_statement_cache_capacity\"C\n" +
 	"\n" +
 	"DriverType\x12\x1b\n" +
 	"\x17DRIVER_TYPE_UNSPECIFIED\x10\x00\x12\x18\n" +
-	"\x14DRIVER_TYPE_POSTGRES\x10\x01B\x0e\n" +
-	"\f_db_specific\"\xca\x02\n" +
+	"\x14DRIVER_TYPE_POSTGRES\x10\x01B\x11\n" +
+	"\x0fdriver_specific\"\xca\x02\n" +
 	"\fLoggerConfig\x12E\n" +
 	"\tlog_level\x18\x01 \x01(\x0e2\x1e.stroppy.LoggerConfig.LogLevelB\b\xfaB\x05\x82\x01\x02\x10\x01R\blogLevel\x12B\n" +
 	"\blog_mode\x18\x02 \x01(\x0e2\x1d.stroppy.LoggerConfig.LogModeB\b\xfaB\x05\x82\x01\x02\x10\x01R\alogMode\"q\n" +
@@ -629,15 +638,14 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\x0eExporterConfig\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12>\n" +
 	"\votlp_export\x18\x02 \x01(\v2\x13.stroppy.OtlpExportB\b\xfaB\x05\x8a\x01\x02\x10\x01R\n" +
-	"otlpExport\"\xf7\x02\n" +
+	"otlpExport\"\xbe\x02\n" +
 	"\fGlobalConfig\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x1b\n" +
 	"\x04seed\x18\x03 \x01(\x04B\a\xfaB\x042\x02(\x00R\x04seed\x12?\n" +
-	"\bmetadata\x18\x04 \x03(\v2#.stroppy.GlobalConfig.MetadataEntryR\bmetadata\x127\n" +
-	"\x06driver\x18\x05 \x01(\v2\x15.stroppy.DriverConfigB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x06driver\x12-\n" +
-	"\x06logger\x18\x06 \x01(\v2\x15.stroppy.LoggerConfigR\x06logger\x123\n" +
-	"\bexporter\x18\a \x01(\v2\x17.stroppy.ExporterConfigR\bexporter\x1a;\n" +
+	"\bmetadata\x18\x04 \x03(\v2#.stroppy.GlobalConfig.MetadataEntryR\bmetadata\x12-\n" +
+	"\x06logger\x18\x05 \x01(\v2\x15.stroppy.LoggerConfigR\x06logger\x123\n" +
+	"\bexporter\x18\x06 \x01(\v2\x17.stroppy.ExporterConfigR\bexporter\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B8Z6github.com/stroppy-io/stroppy/pkg/common/proto/stroppyb\x06proto3"
@@ -655,40 +663,33 @@ func file_proto_stroppy_config_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_stroppy_config_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_proto_stroppy_config_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_proto_stroppy_config_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_proto_stroppy_config_proto_goTypes = []any{
-	(DriverConfig_DriverType)(0),             // 0: stroppy.DriverConfig.DriverType
-	(LoggerConfig_LogLevel)(0),               // 1: stroppy.LoggerConfig.LogLevel
-	(LoggerConfig_LogMode)(0),                // 2: stroppy.LoggerConfig.LogMode
-	(*DriverConfig)(nil),                     // 3: stroppy.DriverConfig
-	(*LoggerConfig)(nil),                     // 4: stroppy.LoggerConfig
-	(*ExporterConfig)(nil),                   // 5: stroppy.ExporterConfig
-	(*GlobalConfig)(nil),                     // 6: stroppy.GlobalConfig
-	(*DriverConfig_ConnectionType)(nil),      // 7: stroppy.DriverConfig.ConnectionType
-	(*DriverConfig_ConnectionType_Pool)(nil), // 8: stroppy.DriverConfig.ConnectionType.Pool
-	nil,                                      // 9: stroppy.GlobalConfig.MetadataEntry
-	(*Value_Struct)(nil),                     // 10: stroppy.Value.Struct
-	(*OtlpExport)(nil),                       // 11: stroppy.OtlpExport
-	(*emptypb.Empty)(nil),                    // 12: google.protobuf.Empty
+	(DriverConfig_DriverType)(0),        // 0: stroppy.DriverConfig.DriverType
+	(LoggerConfig_LogLevel)(0),          // 1: stroppy.LoggerConfig.LogLevel
+	(LoggerConfig_LogMode)(0),           // 2: stroppy.LoggerConfig.LogMode
+	(*DriverConfig)(nil),                // 3: stroppy.DriverConfig
+	(*LoggerConfig)(nil),                // 4: stroppy.LoggerConfig
+	(*ExporterConfig)(nil),              // 5: stroppy.ExporterConfig
+	(*GlobalConfig)(nil),                // 6: stroppy.GlobalConfig
+	(*DriverConfig_PostgresConfig)(nil), // 7: stroppy.DriverConfig.PostgresConfig
+	nil,                                 // 8: stroppy.GlobalConfig.MetadataEntry
+	(*OtlpExport)(nil),                  // 9: stroppy.OtlpExport
 }
 var file_proto_stroppy_config_proto_depIdxs = []int32{
-	10, // 0: stroppy.DriverConfig.db_specific:type_name -> stroppy.Value.Struct
-	0,  // 1: stroppy.DriverConfig.driver_type:type_name -> stroppy.DriverConfig.DriverType
-	7,  // 2: stroppy.DriverConfig.connection_type:type_name -> stroppy.DriverConfig.ConnectionType
-	1,  // 3: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
-	2,  // 4: stroppy.LoggerConfig.log_mode:type_name -> stroppy.LoggerConfig.LogMode
-	11, // 5: stroppy.ExporterConfig.otlp_export:type_name -> stroppy.OtlpExport
-	9,  // 6: stroppy.GlobalConfig.metadata:type_name -> stroppy.GlobalConfig.MetadataEntry
-	3,  // 7: stroppy.GlobalConfig.driver:type_name -> stroppy.DriverConfig
-	4,  // 8: stroppy.GlobalConfig.logger:type_name -> stroppy.LoggerConfig
-	5,  // 9: stroppy.GlobalConfig.exporter:type_name -> stroppy.ExporterConfig
-	12, // 10: stroppy.DriverConfig.ConnectionType.single_conn_per_vu:type_name -> google.protobuf.Empty
-	8,  // 11: stroppy.DriverConfig.ConnectionType.shared_pool:type_name -> stroppy.DriverConfig.ConnectionType.Pool
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	0, // 0: stroppy.DriverConfig.driver_type:type_name -> stroppy.DriverConfig.DriverType
+	7, // 1: stroppy.DriverConfig.postgres:type_name -> stroppy.DriverConfig.PostgresConfig
+	1, // 2: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
+	2, // 3: stroppy.LoggerConfig.log_mode:type_name -> stroppy.LoggerConfig.LogMode
+	9, // 4: stroppy.ExporterConfig.otlp_export:type_name -> stroppy.OtlpExport
+	8, // 5: stroppy.GlobalConfig.metadata:type_name -> stroppy.GlobalConfig.MetadataEntry
+	4, // 6: stroppy.GlobalConfig.logger:type_name -> stroppy.LoggerConfig
+	5, // 7: stroppy.GlobalConfig.exporter:type_name -> stroppy.ExporterConfig
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_config_proto_init() }
@@ -698,18 +699,17 @@ func file_proto_stroppy_config_proto_init() {
 	}
 	file_proto_stroppy_common_proto_init()
 	file_proto_stroppy_descriptor_proto_init()
-	file_proto_stroppy_config_proto_msgTypes[0].OneofWrappers = []any{}
-	file_proto_stroppy_config_proto_msgTypes[4].OneofWrappers = []any{
-		(*DriverConfig_ConnectionType_SingleConnPerVu)(nil),
-		(*DriverConfig_ConnectionType_SharedPool)(nil),
+	file_proto_stroppy_config_proto_msgTypes[0].OneofWrappers = []any{
+		(*DriverConfig_Postgres)(nil),
 	}
+	file_proto_stroppy_config_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_config_proto_rawDesc), len(file_proto_stroppy_config_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   7,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

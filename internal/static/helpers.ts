@@ -4,7 +4,7 @@ globalThis.TextEncoder = encoding.TextEncoder;
 globalThis.TextDecoder = encoding.TextDecoder;
 
 import {
-  NewDriverByConfigBin,
+  NewDriver,
   NewGeneratorByRuleBin,
   NewGroupGeneratorByRulesBin,
   NotifyStep,
@@ -18,7 +18,7 @@ import {
   Generation_Distribution,
   Generation_Distribution_DistributionType,
   QueryParamGroup,
-  GlobalConfig,
+  DriverConfig,
   QueryParamDescriptor,
   InsertDescriptor,
   InsertMethod,
@@ -202,17 +202,14 @@ export class DriverX implements QueryAPI {
   private driver: Driver;
   private q: QueryAPI;
 
-  setup: (lambda: () => void) => void;
-
   exec!: QueryAPI["exec"];
   queryRows!: QueryAPI["queryRows"];
   queryRow!: QueryAPI["queryRow"];
   queryValue!: QueryAPI["queryValue"];
   queryCursor!: QueryAPI["queryCursor"];
 
-  constructor(driver: Driver) {
+  private constructor(driver: Driver) {
     this.driver = driver;
-    this.setup = driver.setup;
     this.q = createQueryAPI((sql, args) => driver.runQuery(sql, args));
     this.exec = this.q.exec;
     this.queryRows = this.q.queryRows;
@@ -221,12 +218,21 @@ export class DriverX implements QueryAPI {
     this.queryCursor = this.q.queryCursor;
   }
 
-  static fromConfig(config: Partial<GlobalConfig>): DriverX {
-    if (config.seed) setSeed(Number(config.seed));
-    const driver = NewDriverByConfigBin(
-      GlobalConfig.toBinary(GlobalConfig.create(config)),
+  /** Create an empty driver shell. Call setup() to configure it. */
+  static create(): DriverX {
+    return new DriverX(NewDriver());
+  }
+
+  /** Configure the driver. Safe to call every iteration (runs once).
+   *  If called at init phase: creates a shared driver.
+   *  If called at iteration/setup phase: creates a per-VU driver.
+   *  Optional callback runs after the driver is ready (e.g. per-VU schema setup). */
+  setup(config: Partial<DriverConfig>, callback?: (d: DriverX) => void): DriverX {
+    this.driver.setup(
+      DriverConfig.toBinary(DriverConfig.create(config)),
+      callback ? () => callback(this) : undefined,
     );
-    return new DriverX(driver);
+    return this;
   }
 
   insert(insert: Partial<InsertDescriptor>): void;
@@ -284,11 +290,6 @@ export class DriverX implements QueryAPI {
   }
 }
 
-export function NewDriverByConfig(config: Partial<GlobalConfig>): Driver {
-  return NewDriverByConfigBin(
-    GlobalConfig.toBinary(GlobalConfig.create(config)),
-  );
-}
 
 const _stepFilter: Set<string> | null = (() => {
   const only = ENV("STROPPY_STEPS", "", "comma-separated list of steps to run (allowlist), same as --steps");

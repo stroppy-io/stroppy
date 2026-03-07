@@ -7,13 +7,10 @@ import (
 	"testing"
 
 	"github.com/evanw/esbuild/pkg/api"
-	js "github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/internal/static"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/workloads"
 )
 
 func Test_spyProxyObject(t *testing.T) {
@@ -147,174 +144,27 @@ func bundleScriptForTest(t *testing.T, scriptPath string) string {
 
 func TestExtractConfigFromJS_SimpleConfig(t *testing.T) {
 	t.SkipNow()
-
-	jsCode := `const config = {
-	driver: {
-		url: "postgres://localhost:5432",
-		driverType: 1
-	}
-};
-defineConfig(config);`
-
-	config, err := ProbeJSTest(js.New(), jsCode)
-	require.NoError(t, err)
-	require.NotNil(t, config)
-	require.NotNil(t, config.GlobalConfig)
-	require.NotNil(t, config.GlobalConfig.Driver)
-	require.Equal(t, "postgres://localhost:5432", config.GlobalConfig.Driver.Url)
-	require.Equal(
-		t,
-		stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
-		config.GlobalConfig.Driver.DriverType,
-	)
+	// These tests used the old defineConfig/NewDriverByConfigBin API.
+	// With the new DriverX.create().setup() pattern, driver config
+	// is no longer extracted at probe time via GlobalConfig.
 }
 
 func TestExtractConfigFromJS_BinaryConfig(t *testing.T) {
 	t.SkipNow()
-	// Test with a config object (binary protobuf handling will be tested
-	// in the comprehensive test with real execute_sql.ts which uses toBinary())
-	jsCode := `
-		const config = {
-			driver: {
-				url: "postgres://test:5432",
-				driverType: 1
-			}
-		};
-		defineConfig(config);
-	`
-
-	config, err := ProbeJSTest(js.New(), jsCode)
-	require.NoError(t, err)
-	require.NotNil(t, config)
-	require.NotNil(t, config.GlobalConfig)
-	require.Equal(t, "postgres://test:5432", config.GlobalConfig.Driver.Url)
 }
 
 func TestExtractConfigFromJS_NoConfig(t *testing.T) {
 	t.SkipNow()
-
-	jsCode := `
-		// Script that doesn't call defineConfig
-		const x = 42;
-	`
-
-	config, err := ProbeJSTest(js.New(), jsCode)
-	require.Error(t, err)
-	require.Nil(t, config)
-	require.Equal(t, ErrNoConfigProvided, err)
 }
 
 func TestExtractConfigFromJS_InvalidConfig(t *testing.T) {
 	t.SkipNow()
-
-	jsCode := `
-		// Script with invalid config
-		defineConfig({ invalid: "config" });
-	`
-
-	// This should still work but the config might be empty or partially filled
-	config, err := ProbeJSTest(js.New(), jsCode)
-	// The extractor might succeed but with empty config, or it might fail
-	// Let's check what actually happens
-	if err != nil {
-		require.Equal(t, ErrNoConfigProvided, err)
-	} else {
-		require.NotNil(t, config)
-	}
 }
 
 func TestExtractConfigFromJS_WithOpenMock(t *testing.T) {
 	t.SkipNow()
-
-	jsCode := `
-		if (typeof open !== "undefined") {
-			const content = open("test.sql");
-			// Use content somehow
-		}
-		const config = {
-			driver: {
-				url: "postgres://localhost:5432",
-				driverType: 1
-			}
-		};
-		defineConfig(config);
-	`
-
-	_ = func(filename string) string {
-		if filename == "test.sql" {
-			return "CREATE TABLE test (id INTEGER);"
-		}
-
-		return ""
-	}
-
-	config, err := ProbeJSTest(js.New(), jsCode)
-
-	require.NoError(t, err)
-	require.NotNil(t, config)
-	require.NotNil(t, config.GlobalConfig)
 }
 
 func TestExtractConfigFromScript_ExecuteSQL(t *testing.T) {
 	t.SkipNow()
-	// Get the path to execute_sql.ts
-	// We need to find it in the examples directory
-	examplesDir := "examples"
-	scriptPath := filepath.Join(examplesDir, "execute_sql.ts")
-
-	// Check if file exists, if not try to read from embedded FS
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-		// Try to read from embedded examples
-		scriptData, err := workloads.Content.ReadFile("execute_sql/execute_sql.ts")
-		require.NoError(t, err)
-
-		// Create temp file
-		tempDir, err := os.MkdirTemp("", "stroppy-test-")
-		require.NoError(t, err)
-		t.Cleanup(func() {
-			_ = os.RemoveAll(tempDir)
-		})
-
-		scriptPath = filepath.Join(tempDir, "execute_sql.ts")
-		err = os.WriteFile(scriptPath, scriptData, common.FileMode)
-		require.NoError(t, err)
-
-		// Also copy SQL file
-		sqlData, err := workloads.Content.ReadFile("execute_sql/tpcb_mini.sql")
-		if err == nil {
-			sqlPath := filepath.Join(tempDir, "tpcb_mini.sql")
-			_ = os.WriteFile(sqlPath, sqlData, common.FileMode)
-		}
-	}
-
-	// Bundle the script with all dependencies
-	bundledJS := bundleScriptForTest(t, scriptPath)
-
-	_ = bundledJS
-
-	// Create open mock that returns SQL content
-	sqlContent, err := workloads.Content.ReadFile("execute_sql/tpcb_mini.sql")
-	require.NoError(t, err)
-
-	openMock := func(filename string) string {
-		if filename == "tpcb_mini.sql" {
-			return string(sqlContent)
-		}
-
-		return ""
-	}
-	_ = openMock
-
-	// Extract config from bundled code
-	config, err := ProbeJSTest(js.New(), bundledJS)
-	require.NoError(t, err, "should extract config from execute_sql.ts")
-	require.NotNil(t, config)
-	require.NotNil(t, config.GlobalConfig)
-	require.NotNil(t, config.GlobalConfig.Driver)
-	require.Equal(
-		t,
-		stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
-		config.GlobalConfig.Driver.DriverType,
-	)
-	require.NotEmpty(t, config.GlobalConfig.Driver.Url)
 }

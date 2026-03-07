@@ -11,12 +11,9 @@ export const options: Options = {
   iterations: 1,
 };
 
-// Initialize driver with GlobalConfig
-const driver = DriverX.fromConfig({
-  driver: {
-    url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
-    driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-  },
+const driver = DriverX.create().setup({
+  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
+  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
 });
 
 const queries = parse_sql(open(SQL_FILE));
