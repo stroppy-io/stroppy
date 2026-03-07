@@ -9,14 +9,9 @@ const SQL_FILE = ENV("SQL_FILE", "", "Path to SQL file (automatically set if .sq
 
 export const options: Options = {};
 
-const driver = DriverX.fromConfig({
-  driver: {
-    url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
-    driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-    dbSpecific: {
-      fields: [],
-    },
-  },
+const driver = DriverX.create().setup({
+  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
+  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
 });
 
 const parsedQueries = parse_sql(open(SQL_FILE));

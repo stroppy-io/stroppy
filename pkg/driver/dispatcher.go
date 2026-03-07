@@ -16,6 +16,8 @@ type (
 	Options struct {
 		// Allows to pass k6 DialFunc to driver for proper network metrics.
 		DialFunc func(ctx context.Context, network, addr string) (net.Conn, error)
+		Logger   *zap.Logger
+		Config   *stroppy.DriverConfig
 	}
 
 	// Rows provides cursor-style iteration over query result rows.
@@ -38,14 +40,9 @@ type (
 		InsertValues(ctx context.Context, unit *stroppy.InsertDescriptor) (*stats.Query, error)
 		RunQuery(ctx context.Context, sql string, args map[string]any) (*QueryResult, error)
 		Teardown(ctx context.Context) error
-		Configure(ctx context.Context, opts Options) error
 	}
 
-	driverConstructor = func(
-		ctx context.Context,
-		lg *zap.Logger,
-		config *stroppy.DriverConfig,
-	) (Driver, error)
+	driverConstructor = func(ctx context.Context, opts Options) (Driver, error)
 )
 
 var ErrNoRegisteredDriver = errors.New("no registered driver")
@@ -61,12 +58,11 @@ func RegisterDriver(
 
 func Dispatch( //nolint: ireturn // better than return any
 	ctx context.Context,
-	lg *zap.Logger,
-	config *stroppy.DriverConfig,
+	opts Options,
 ) (Driver, error) {
-	drvType := config.GetDriverType()
+	drvType := opts.Config.GetDriverType()
 	if constructor, ok := registry[drvType]; ok {
-		return constructor(ctx, lg, config)
+		return constructor(ctx, opts)
 	}
 
 	return nil, fmt.Errorf("driver type '%s': %w", drvType.String(), ErrNoRegisteredDriver)

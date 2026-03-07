@@ -17,9 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
-	"google.golang.org/protobuf/proto"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 
@@ -27,8 +25,6 @@ import (
 )
 
 var (
-	ErrNoConfigProvided = errors.New("script did not call defineConfig with GlobalConfig")
-
 	ErrEsbuild         = errors.New("esbuild error")
 	ErrNoEsbuildOutput = errors.New("no output from esbuild")
 
@@ -246,6 +242,8 @@ func (*driverStub) InsertValuesBin([]byte, int64) (*stats.Query, error) {
 	return &stats.Query{}, nil
 }
 
+func (*driverStub) Setup([]byte, func()) {}
+
 // rowsStub implements driver.Rows for the probe VM.
 type rowsStub struct{}
 
@@ -291,12 +289,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		return fmt.Errorf("failed to inject encoder polyfill: %w", err)
 	}
 
-	extract := func(configBytes []byte) any {
-		probeprint.GlobalConfig = &stroppy.GlobalConfig{}
-		if err := proto.Unmarshal(configBytes, probeprint.GlobalConfig); err != nil {
-			return err
-		}
-
+	newDriverStub := func() any {
 		if err := (Mocks{
 			// imports from helpers.ts
 			{"Step", stepSpy(vm, &probeprint.Steps)},
@@ -319,7 +312,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		// TODO: what if user will use other default modules and their functions?
 
 		// k6/x/stroppy defines
-		{"NewDriverByConfigBin", extract},
+		{"NewDriver", newDriverStub},
 		{"NewGeneratorByRuleBin", func() any { return &genStub{} }},
 		{"Teardown", func(any) {}},
 		{"NotifyStep", notifyStepSpy(&probeprint.Steps)},
@@ -327,6 +320,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		{"NotifyStep2", notifyStepSpy(&probeprint.Steps)},
 		{"NewPicker", newPickerStub},
 		{"DeclareEnv", declareEnvSpy(&probeprint.EnvDeclarations)},
+		{"Once", func(x any) any { return x }},
 
 		{"parse_sql_with_sections", parseSectionsSpy(&probeprint.SQLSections)},
 		{"parse_sql", parseSpy(&probeprint.SQLSections)},

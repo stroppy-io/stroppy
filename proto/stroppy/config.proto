@@ -5,20 +5,18 @@ package stroppy;
 import "proto/stroppy/common.proto";
 import "proto/stroppy/descriptor.proto";
 import "validate/validate.proto";
-import "google/protobuf/empty.proto";
 
 option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
 
 /**
  * DriverConfig contains configuration for connecting to a database driver.
- * It includes the driver plugin path, connection URL, and database-specific
- * settings.
+ * Driver is created as an empty shell via DriverX.create() and configured
+ * via driver.setup(config) at runtime. Sharing semantics are determined
+ * by the k6 lifecycle stage: init phase = shared, iteration = per-VU.
  */
 message DriverConfig {
   /** Database connection URL */
   string url = 1 [ (validate.rules).string.uri_ref = true ];
-  /** Database-specific configuration options */
-  optional Value.Struct db_specific = 2;
 
   enum DriverType {
     DRIVER_TYPE_UNSPECIFIED = 0;
@@ -26,20 +24,33 @@ message DriverConfig {
   }
 
   /** Name/Type of chosen driver */
-  DriverType driver_type = 3 [ (validate.rules).enum.defined_only = true ];
+  DriverType driver_type = 2 [ (validate.rules).enum.defined_only = true ];
 
-  message ConnectionType {
-    // If shared_connections not set use drivers pool default.
-    message Pool { int32 shared_connections = 1; }
-
-    oneof is {
-      google.protobuf.Empty single_conn_per_vu = 1;
-      Pool shared_pool = 2;
-    }
+  /** PostgreSQL-specific pool and connection configuration */
+  message PostgresConfig {
+    /** pgx trace log level: debug, info, warn, error */
+    optional string trace_log_level = 1;
+    /** Max connection lifetime (Go duration string, e.g. "1h") */
+    optional string max_conn_lifetime = 2;
+    /** Max connection idle time (Go duration string, e.g. "10m") */
+    optional string max_conn_idle_time = 3;
+    /** Maximum number of connections in the pool */
+    optional int32 max_conns = 4;
+    /** Minimum number of connections in the pool */
+    optional int32 min_conns = 5;
+    /** Minimum number of idle connections */
+    optional int32 min_idle_conns = 6;
+    /** Query execution mode: exec, cache_statement, cache_describe,
+     * describe_exec, simple_protocol */
+    optional string default_query_exec_mode = 7;
+    /** Description cache capacity (only with cache_describe mode) */
+    optional int32 description_cache_capacity = 8;
+    /** Statement cache capacity (only with cache_statement mode) */
+    optional int32 statement_cache_capacity = 9;
   }
 
-  // Shared connection pool vs own connection for each VU.
-  ConnectionType connection_type = 4;
+  /** Driver-specific configuration, exactly one must match driver_type */
+  oneof driver_specific { PostgresConfig postgres = 10; }
 }
 
 /**
@@ -91,10 +102,8 @@ message GlobalConfig {
   uint64 seed = 3 [ (validate.rules).uint64.gte = 0 ];
   /** Arbitrary metadata, may be passed to result labels and json output */
   map<string, string> metadata = 4;
-  /** Database driver configuration */
-  stroppy.DriverConfig driver = 5 [ (validate.rules).message.required = true ];
   /** Logging configuration */
-  stroppy.LoggerConfig logger = 6;
+  stroppy.LoggerConfig logger = 5;
   /** Exporter configuration */
-  stroppy.ExporterConfig exporter = 7;
+  stroppy.ExporterConfig exporter = 6;
 }
