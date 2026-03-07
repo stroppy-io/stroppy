@@ -296,6 +296,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		}.Set(vm)); err != nil {
 			return err
 		}
+
 		return &driverStub{}
 	}
 

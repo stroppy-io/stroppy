@@ -2,6 +2,7 @@ package pool
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -21,7 +22,10 @@ const (
 	DriverLoggerName = "postgres-driver"
 )
 
-var ErrUnsupportedParam = fmt.Errorf("unsupported parameter")
+var (
+	ErrUnsupportedParam        = errors.New("unsupported parameter")
+	ErrInvalidExecModeForParam = errors.New("parameter is valid only with specific default_query_exec_mode")
+)
 
 func NewPool(
 	ctx context.Context,
@@ -86,6 +90,7 @@ func parseConfig(
 	cfg.ConnConfig.Tracer = loggerTracer
 	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
+
 		return nil
 	}
 
@@ -97,6 +102,7 @@ func mustParseLevel(s string) zap.AtomicLevel {
 	if err != nil {
 		return zap.NewAtomicLevelAt(zap.ErrorLevel)
 	}
+
 	return lvl
 }
 
@@ -106,6 +112,7 @@ func applyPostgresConfig(cfg *pgxpool.Config, pg *stroppy.DriverConfig_PostgresC
 		if err != nil {
 			return err
 		}
+
 		cfg.MaxConnLifetime = d
 	}
 
@@ -114,6 +121,7 @@ func applyPostgresConfig(cfg *pgxpool.Config, pg *stroppy.DriverConfig_PostgresC
 		if err != nil {
 			return err
 		}
+
 		cfg.MaxConnIdleTime = d
 	}
 
@@ -146,27 +154,32 @@ func parsePgxOptimizations(pg *stroppy.DriverConfig_PostgresConfig, cfg *pgxpool
 	if err != nil {
 		return err
 	}
+
 	cfg.ConnConfig.DefaultQueryExecMode = mode
 
 	if v := pg.GetDescriptionCacheCapacity(); v != 0 {
 		if mode != pgx.QueryExecModeCacheDescribe {
 			return fmt.Errorf(
-				"%q is valid only with default_query_exec_mode set to %q",
+				"%q is valid only with default_query_exec_mode set to %q: %w",
 				"description_cache_capacity",
 				pgx.QueryExecModeCacheDescribe.String(),
+				ErrInvalidExecModeForParam,
 			)
 		}
+
 		cfg.ConnConfig.DescriptionCacheCapacity = int(v)
 	}
 
 	if v := pg.GetStatementCacheCapacity(); v != 0 {
 		if mode != pgx.QueryExecModeCacheStatement {
 			return fmt.Errorf(
-				"%q is valid only with default_query_exec_mode set to %q",
+				"%q is valid only with default_query_exec_mode set to %q: %w",
 				"statement_cache_capacity",
 				pgx.QueryExecModeCacheStatement.String(),
+				ErrInvalidExecModeForParam,
 			)
 		}
+
 		cfg.ConnConfig.StatementCacheCapacity = int(v)
 	}
 

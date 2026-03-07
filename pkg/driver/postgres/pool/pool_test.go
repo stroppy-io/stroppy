@@ -10,18 +10,22 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
+func ptr[T any](x T) *T {
+	return &x
+}
+
 func TestParseConfig_Success(t *testing.T) {
 	t.Run("allConfigured", func(t *testing.T) {
 		params := &stroppy.DriverConfig{
 			Url: "postgres://user:pass@localhost:5432/db",
 			DriverSpecific: &stroppy.DriverConfig_Postgres{
 				Postgres: &stroppy.DriverConfig_PostgresConfig{
-					MaxConnLifetime: "1h",
-					MaxConnIdleTime: "10m",
-					MaxConns:        10,
-					MinConns:        1,
-					MinIdleConns:    2,
-					TraceLogLevel:   "info",
+					MaxConnLifetime: ptr("1h"),
+					MaxConnIdleTime: ptr("10m"),
+					MaxConns:        ptr[int32](10),
+					MinConns:        ptr[int32](1),
+					MinIdleConns:    ptr[int32](2),
+					TraceLogLevel:   ptr("info"),
 				},
 			},
 		}
@@ -40,8 +44,8 @@ func TestParseConfig_Success(t *testing.T) {
 			Url: "postgres://user:pass@localhost:5432/db",
 			DriverSpecific: &stroppy.DriverConfig_Postgres{
 				Postgres: &stroppy.DriverConfig_PostgresConfig{
-					DefaultQueryExecMode:  "cache_statement",
-					StatementCacheCapacity: 1000,
+					DefaultQueryExecMode:   ptr("cache_statement"),
+					StatementCacheCapacity: ptr[int32](1000),
 				},
 			},
 		}
@@ -56,7 +60,7 @@ func TestNewDriverConfig_InvalidDuration(t *testing.T) {
 		Url: "postgres://user:pass@localhost:5432/db",
 		DriverSpecific: &stroppy.DriverConfig_Postgres{
 			Postgres: &stroppy.DriverConfig_PostgresConfig{
-				MaxConnLifetime: "notaduration",
+				MaxConnLifetime: ptr("notaduration"),
 			},
 		},
 	}
