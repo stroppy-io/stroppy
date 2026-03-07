@@ -59,6 +59,7 @@ func NewDriver(
 	d = &Driver{logger: lg}
 
 	cfg := opts.Config
+
 	d.pgxPool, err = pool.NewPool(ctx, cfg, d.logger.Named(pool.LoggerName))
 	if err != nil {
 		return nil, err
@@ -68,7 +69,9 @@ func NewDriver(
 	if opts.DialFunc != nil {
 		poolCfg := d.pgxPool.Config()
 		poolCfg.ConnConfig.DialFunc = opts.DialFunc
+
 		d.pgxPool.Close()
+
 		d.pgxPool, err = pgxpool.NewWithConfig(ctx, poolCfg)
 		if err != nil {
 			return nil, err
