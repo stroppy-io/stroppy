@@ -17,15 +17,13 @@ export const options: Options = {
   setupTimeout: String(SCALE_FACTOR) + "m" ,
 };
 
-// Initialize driver with GlobalConfig
-const driver = DriverX.fromConfig({
-  driver: {
-    url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
-    driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-    connectionType: { is: {oneofKind:"sharedPool", sharedPool: {sharedConnections: 10}}},
-    dbSpecific: {
-      fields: [],
-    },
+// Initialize driver — shared (created at init phase)
+const driver = DriverX.create().setup({
+  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
+  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
+  driverSpecific: {
+    oneofKind: "postgres",
+    postgres: { }, // all by default
   },
 });
 

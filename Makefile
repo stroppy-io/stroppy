@@ -1,7 +1,7 @@
 LOCAL_BIN:=$(CURDIR)/bin
 NODE_BIN:=$(CURDIR)/bin/node_bin/bin
 PATH:=$(LOCAL_BIN):$(NODE_BIN):$(PATH)
-GOPROXY:=https://goproxy.io,direct
+GOPROXY:=direct
 BUILD_TARGET_DIR=$(CURDIR)/build
 PROTO_BUILD_TARGET_DIR=$(CURDIR)/proto/build
 

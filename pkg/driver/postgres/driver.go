@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -18,8 +17,8 @@ import (
 func init() {
 	driver.RegisterDriver(
 		stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
-		func(ctx context.Context, lg *zap.Logger, config *stroppy.DriverConfig) (driver.Driver, error) {
-			return NewDriver(ctx, lg, config)
+		func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
+			return NewDriver(ctx, opts)
 		},
 	)
 }
@@ -48,54 +47,43 @@ var _ driver.Driver = new(Driver)
 
 func NewDriver(
 	ctx context.Context,
-	lg *zap.Logger,
-	cfg *stroppy.DriverConfig,
+	opts driver.Options,
 ) (d *Driver, err error) {
-	d = &Driver{logger: lg}
-
+	lg := opts.Logger
 	if lg == nil {
-		d.logger = logger.NewFromEnv().
+		lg = logger.NewFromEnv().
 			Named(pool.DriverLoggerName).
 			WithOptions(zap.AddCallerSkip(0))
 	}
 
+	d = &Driver{logger: lg}
+
+	cfg := opts.Config
 	d.pgxPool, err = pool.NewPool(ctx, cfg, d.logger.Named(pool.LoggerName))
 	if err != nil {
 		return nil, err
 	}
 
+	// Apply DialFunc if provided (for k6 network metrics)
+	if opts.DialFunc != nil {
+		poolCfg := d.pgxPool.Config()
+		poolCfg.ConnConfig.DialFunc = opts.DialFunc
+		d.pgxPool.Close()
+		d.pgxPool, err = pgxpool.NewWithConfig(ctx, poolCfg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	d.logger.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
 
 	// TODO: make waiting optional
-	// TODO: think to float this waiting to the level of driver dispatching or k6-module
 	err = waitForDB(ctx, d.logger, d.pgxPool, dbConnectionTimeout)
 	if err != nil {
 		return nil, err
 	}
 
 	return d, nil
-}
-
-func (d *Driver) Configure(ctx context.Context, opts driver.Options) (err error) {
-	cfg := d.pgxPool.Config()
-	if opts.DialFunc != nil {
-		cfg.ConnConfig.DialFunc = opts.DialFunc
-	}
-	if opts.Logger != nil {
-		cfg.ConnConfig.Tracer, err = pool.NewLoggerTracer(
-			opts.Logger.Named(pool.LoggerName).WithOptions(zap.IncreaseLevel(pool.LogLevel)),
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create logger tracer: %w", err)
-		}
-	}
-	d.pgxPool.Close()
-	d.pgxPool, err = pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		return fmt.Errorf("can't start reconfigured pgxpool: %w", err)
-	}
-
-	return nil
 }
 
 func (d *Driver) Teardown(_ context.Context) error {

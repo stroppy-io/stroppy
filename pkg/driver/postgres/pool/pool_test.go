@@ -14,14 +14,14 @@ func TestParseConfig_Success(t *testing.T) {
 	t.Run("allConfigured", func(t *testing.T) {
 		params := &stroppy.DriverConfig{
 			Url: "postgres://user:pass@localhost:5432/db",
-			DbSpecific: &stroppy.Value_Struct{
-				Fields: []*stroppy.Value{
-					{Type: &stroppy.Value_String_{String_: "1h"}, Key: "max_conn_lifetime"},
-					{Type: &stroppy.Value_String_{String_: "10m"}, Key: "max_conn_idle_time"},
-					{Type: &stroppy.Value_Int32{Int32: 10}, Key: "max_conns"},
-					{Type: &stroppy.Value_Int32{Int32: 1}, Key: "min_conns"},
-					{Type: &stroppy.Value_Int32{Int32: 2}, Key: "min_idle_conns"},
-					{Type: &stroppy.Value_String_{String_: "info"}, Key: "trace_log_level"},
+			DriverSpecific: &stroppy.DriverConfig_Postgres{
+				Postgres: &stroppy.DriverConfig_PostgresConfig{
+					MaxConnLifetime: "1h",
+					MaxConnIdleTime: "10m",
+					MaxConns:        10,
+					MinConns:        1,
+					MinIdleConns:    2,
+					TraceLogLevel:   "info",
 				},
 			},
 		}
@@ -38,10 +38,10 @@ func TestParseConfig_Success(t *testing.T) {
 	t.Run("statementCache", func(t *testing.T) {
 		params := &stroppy.DriverConfig{
 			Url: "postgres://user:pass@localhost:5432/db",
-			DbSpecific: &stroppy.Value_Struct{
-				Fields: []*stroppy.Value{
-					{Type: &stroppy.Value_String_{String_: "cache_statement"}, Key: "default_query_exec_mode"},
-					{Type: &stroppy.Value_Int32{Int32: 1000}, Key: "statement_cache_capacity"},
+			DriverSpecific: &stroppy.DriverConfig_Postgres{
+				Postgres: &stroppy.DriverConfig_PostgresConfig{
+					DefaultQueryExecMode:  "cache_statement",
+					StatementCacheCapacity: 1000,
 				},
 			},
 		}
@@ -54,9 +54,9 @@ func TestParseConfig_Success(t *testing.T) {
 func TestNewDriverConfig_InvalidDuration(t *testing.T) {
 	params := &stroppy.DriverConfig{
 		Url: "postgres://user:pass@localhost:5432/db",
-		DbSpecific: &stroppy.Value_Struct{
-			Fields: []*stroppy.Value{
-				{Type: &stroppy.Value_String_{String_: "notaduration"}, Key: "max_conn_lifetime"},
+		DriverSpecific: &stroppy.DriverConfig_Postgres{
+			Postgres: &stroppy.DriverConfig_PostgresConfig{
+				MaxConnLifetime: "notaduration",
 			},
 		},
 	}

@@ -9,14 +9,9 @@ export const options: Options = {
   vus: 1,
 };
 
-const driver = DriverX.fromConfig({
-  driver: {
-    url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
-    driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-    dbSpecific: {
-      fields: [],
-    },
-  },
+const driver = DriverX.create().setup({
+  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
+  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
 });
 
 function assert(condition: boolean, msg: string) {

@@ -12,58 +12,67 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// DriverWrapper is the per-VU driver handle exposed to JS.
+// Created empty via NewDriver(), configured via Setup().
 type DriverWrapper struct {
-	vu  modules.VU
-	lg  *zap.Logger
-	drv driver.Driver
+	vu modules.VU
+	lg *zap.Logger
 
-	configureOnce    sync.Once
-	setupOnce        sync.Once
-	configLoggerOnce sync.Once
+	drv       driver.Driver
+	setupOnce sync.Once
+
+	// driverIndex is the deterministic index of this driver within the VU's init.
+	// Used to coordinate shared drivers across VUs.
+	driverIndex uint64
 }
 
-// This is a custom "VU setup" hook.
+// Setup configures the driver. Guarded by once.Do — safe to call every iteration.
 //
-// NOTE: k6 have no option to make per VU setup code execution by itself.
-// Check https://github.com/grafana/k6/issues/785
-// https://github.com/grafana/k6/issues/1638
+// Sharing semantics are determined by the k6 lifecycle stage:
+//   - vu.State() == nil (init phase): shared driver, stored on rootModule
+//   - vu.State() != nil (iteration/setup phase): per-VU driver, created immediately
 //
-// Unfortunatly it's impossible to pass DialFunc at [Instance.NewDriverByConfigBin]
-// because there is nil [modules.VU.State]. It may be fixed in the feature:
-// https://github.com/grafana/k6/issues?q=is%3Aopen+is%3Aissue+label%3Anew-http
-// https://github.com/grafana/k6/issues/2293
-func (d *DriverWrapper) configure() {
-	d.configLoggerOnce.Do(func() {
-		if d.vu.State() != nil {
-			d.lg = d.lg.With(zap.Uint64("VUID", d.vu.State().VUID))
+// The optional lambda runs after the driver is ready (useful for per-VU schema setup).
+func (d *DriverWrapper) Setup(configBin []byte, lambda func()) {
+	d.setupOnce.Do(func() {
+		var cfg stroppy.DriverConfig
+		if err := proto.Unmarshal(configBin, &cfg); err != nil {
+			d.lg.Fatal("error unmarshalling DriverConfig", zap.Error(err))
+		}
+
+		if d.vu.State() == nil {
+			// Init phase: shared driver
+			d.drv = rootModule.getOrCreateSharedDriver(d.driverIndex, d.lg, &cfg)
+		} else {
+			// Iteration/setup phase: per-VU driver
+			lg := d.lg.With(zap.Uint64("VUID", d.vu.State().VUID))
+			drv, err := driver.Dispatch(d.vu.Context(), driver.Options{
+				Config:   &cfg,
+				Logger:   lg,
+				DialFunc: d.vu.State().Dialer.DialContext,
+			})
+			if err != nil {
+				d.lg.Fatal("can't initialize per-VU driver", zap.Error(err))
+			}
+			d.drv = drv
+			d.lg = lg
+		}
+
+		if lambda != nil {
+			lambda()
 		}
 	})
-
-	if rootModule.sharedDrv != nil {
-		rootModule.once.Do(func() {
-			rootModule.sharedDrv.Configure(rootModule.ctx, driver.Options{
-				DialFunc: d.vu.State().Dialer.DialContext,
-				Logger:   d.lg,
-			})
-		})
-		return
-	}
-
-	d.configureOnce.Do(func() {
-		d.drv.Configure(d.vu.Context(), driver.Options{
-			DialFunc: d.vu.State().Dialer.DialContext,
-			Logger:   d.lg,
-		})
-	})
 }
 
-func (d *DriverWrapper) Setup(lambda func()) {
-	d.configure()
-	d.setupOnce.Do(lambda)
+// ensureReady reconfigures a shared driver with DialFunc once VU state becomes available.
+func (d *DriverWrapper) ensureReady() {
+	if d.drv == nil {
+		d.lg.Fatal("driver not configured: call setup() before using the driver")
+	}
 }
 
 func (d *DriverWrapper) RunQuery(sql string, args map[string]any) (*driver.QueryResult, error) {
-	d.configure()
+	d.ensureReady()
 	result, err := d.drv.RunQuery(d.vu.Context(), sql, args)
 	if err != nil {
 		return nil, fmt.Errorf("error while executing sql query: %w", err)
@@ -73,7 +82,7 @@ func (d *DriverWrapper) RunQuery(sql string, args map[string]any) (*driver.Query
 
 // InsertValuesBin starts bulk insert blocking operation on driver.
 func (d *DriverWrapper) InsertValuesBin(insertMsg []byte, count int64) (*stats.Query, error) {
-	d.configure()
+	d.ensureReady()
 	var descriptor stroppy.InsertDescriptor
 	err := proto.Unmarshal(insertMsg, &descriptor)
 	if err != nil {
