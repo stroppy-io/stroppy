@@ -1,8 +1,9 @@
 package xk6air
 
 import (
-	"sync/atomic"
+	"sync"
 
+	"github.com/grafana/sobek"
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/postgres"
@@ -19,7 +20,7 @@ type Instance struct {
 
 	// driverCounter tracks the Nth NewDriver() call within this VU's init.
 	// Used to coordinate shared drivers across VUs (deterministic ordering).
-	driverCounter atomic.Uint64
+	driverCounter uint64
 
 	// drivers tracks all DriverWrappers created by this instance for teardown.
 	drivers []*DriverWrapper
@@ -51,17 +52,20 @@ func (i *Instance) Exports() modules.Exports {
 			"NewGroupGeneratorByRulesBin": NewGroupGeneratorByRulesBin,
 			"NewPicker":                   NewPicker,
 			"DeclareEnv":                  func([]string, string, string) {},
+			"Once":                        i.Once,
 		},
 	}
 }
 
 // NewDriver creates an empty DriverWrapper shell.
-// The driver is not connected — call Setup() to configure it.
+// The driver is not connected — call Setup() to store config,
+// then the driver is lazily dispatched on first use.
 //
 // The driverCounter ensures deterministic ordering across VUs
 // so shared drivers can be coordinated.
 func (i *Instance) NewDriver() *DriverWrapper {
-	idx := i.driverCounter.Add(1) - 1
+	idx := i.driverCounter
+	i.driverCounter++
 
 	dw := &DriverWrapper{
 		vu:          i.vu,
@@ -72,15 +76,38 @@ func (i *Instance) NewDriver() *DriverWrapper {
 	return dw
 }
 
+// Once wraps a function so it executes only once per VU.
+// Call Once() during init to capture the sync.Once, then call the
+// returned function during iterations — it will only fire on the first call.
+// Accepts any function signature, returns a function with the same signature
+// that caches and returns the result of the first invocation.
+func (i *Instance) Once(call sobek.FunctionCall) sobek.Value {
+	rt := i.vu.Runtime()
+	fn, ok := sobek.AssertFunction(call.Argument(0))
+	if !ok {
+		panic(rt.NewTypeError("Once() requires a function argument"))
+	}
+
+	var once sync.Once
+	var result sobek.Value
+	var callErr error
+
+	return rt.ToValue(func(innerCall sobek.FunctionCall) sobek.Value {
+		once.Do(func() {
+			result, callErr = fn(sobek.Undefined(), innerCall.Arguments...)
+		})
+		if callErr != nil {
+			panic(callErr)
+		}
+		return result
+	})
+}
+
 // Teardown mirrors k6 "function teardown()".
 func (i *Instance) Teardown() error {
 	for _, dw := range i.drivers {
-		if dw.drv != nil {
-			// Only teardown per-VU drivers (non-shared).
-			// Shared drivers are torn down by RootModule.Teardown.
-			if !rootModule.isSharedDriver(dw.drv) {
-				dw.drv.Teardown(i.vu.Context())
-			}
+		if dw.drv != nil && !dw.shared {
+			dw.drv.Teardown(i.vu.Context())
 		}
 	}
 	return nil

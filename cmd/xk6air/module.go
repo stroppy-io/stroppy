@@ -35,7 +35,7 @@ func init() {
 		lg:               lg,
 		ctx:              context.Background(),
 		instanceTeardown: make(map[*Instance]func() error),
-		sharedDrivers:    make(map[uint64]*sharedDriverEntry),
+		sharedSlots:      make(map[uint64]*sharedDriverSlot),
 	}
 
 	rootModule.runULID, rootModule.cloudClient = NewCloudClient(lg)
@@ -45,10 +45,11 @@ func init() {
 	subcommand.RegisterExtension("stroppy", commands.K6Subcommand)
 }
 
-// sharedDriverEntry holds a shared driver and its once guard for reconfiguration.
-type sharedDriverEntry struct {
-	drv          driver.Driver
-	reconfigOnce sync.Once
+// sharedDriverSlot holds lazy-init state for a shared driver.
+// The sync.Once ensures only the first VU to reach iteration phase creates the driver.
+type sharedDriverSlot struct {
+	once sync.Once
+	drv  driver.Driver
 }
 
 // RootModule global object for all the VU instances.
@@ -58,8 +59,8 @@ type RootModule struct {
 	runULID     ulid.ULID
 	ctx         context.Context
 
-	sharedMu      sync.Mutex
-	sharedDrivers map[uint64]*sharedDriverEntry
+	sharedMu    sync.Mutex
+	sharedSlots map[uint64]*sharedDriverSlot
 
 	instanceMu       sync.Mutex
 	instanceTeardown map[*Instance]func() error
@@ -88,44 +89,34 @@ func (r *RootModule) addVuTeardown(instance *Instance) {
 	r.instanceMu.Unlock()
 }
 
-// getOrCreateSharedDriver returns a shared driver for the given index.
-// If the driver doesn't exist yet, it creates one (without DialFunc since VU state is nil).
-func (r *RootModule) getOrCreateSharedDriver(
+// initSharedDriver lazily creates a shared driver on the first VU to call it.
+// The VU provides DialFunc from its State(), ensuring the shared driver has network access.
+func (r *RootModule) initSharedDriver(
 	index uint64,
-	lg *zap.Logger,
+	vu modules.VU,
 	cfg *stroppy.DriverConfig,
 ) driver.Driver {
 	r.sharedMu.Lock()
-	defer r.sharedMu.Unlock()
-
-	if entry, ok := r.sharedDrivers[index]; ok {
-		return entry.drv
+	slot, ok := r.sharedSlots[index]
+	if !ok {
+		slot = &sharedDriverSlot{}
+		r.sharedSlots[index] = slot
 	}
+	r.sharedMu.Unlock()
 
-	// Create driver without DialFunc (init phase, VU state is nil)
-	drv, err := driver.Dispatch(r.ctx, driver.Options{
-		Config: cfg,
-		Logger: lg,
-	})
-	if err != nil {
-		lg.Fatal("can't initialize shared driver", zap.Error(err))
-	}
-
-	r.sharedDrivers[index] = &sharedDriverEntry{drv: drv}
-	return drv
-}
-
-// isSharedDriver checks if the given driver is one of the shared drivers.
-func (r *RootModule) isSharedDriver(drv driver.Driver) bool {
-	r.sharedMu.Lock()
-	defer r.sharedMu.Unlock()
-
-	for _, entry := range r.sharedDrivers {
-		if entry.drv == drv {
-			return true
+	slot.once.Do(func() {
+		drv, err := driver.Dispatch(vu.Context(), driver.Options{
+			Config:   cfg,
+			Logger:   r.lg,
+			DialFunc: vu.State().Dialer.DialContext,
+		})
+		if err != nil {
+			r.lg.Fatal("can't initialize shared driver", zap.Error(err))
 		}
-	}
-	return false
+		slot.drv = drv
+	})
+
+	return slot.drv
 }
 
 func (r *RootModule) Teardown() error {
@@ -137,8 +128,10 @@ func (r *RootModule) Teardown() error {
 	r.instanceMu.Unlock()
 
 	r.sharedMu.Lock()
-	for _, entry := range r.sharedDrivers {
-		entry.drv.Teardown(r.ctx)
+	for _, slot := range r.sharedSlots {
+		if slot.drv != nil {
+			slot.drv.Teardown(r.ctx)
+		}
 	}
 	r.sharedMu.Unlock()
 

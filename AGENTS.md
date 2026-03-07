@@ -82,7 +82,8 @@ Generator factory entry point: `NewValueGeneratorByRule` in `pkg/common/generate
 
 ### Build System
 
-- `make build` - Builds k6 with xk6air extension via xk6
+- `make build` - Builds k6 with xk6air extension via xk6. **Use this instead of `go build`.**
+- `make tests` - Runs all tests with race detector and coverage
 - `make proto` - Generates Go, TypeScript, gRPC, docs from proto files; **wipes `pkg/common/proto/*` before regenerating** — never hand-edit generated files
 - `make install-bin-deps` - Installs protoc plugins, xk6, esbuild, etc.
 - Go 1.24.3+, Node.js required for full build
