@@ -39,11 +39,11 @@ const sql = parse_sql_with_sections(open(SQL_FILE));
 
 export function setup() {
   Step("drop_schema", () => {
-    sql("drop_schema").forEach((query) => driver.runQuery(query, {}));
+    sql("drop_schema").forEach((query) => driver.exec(query, {}));
   })
 
   Step("create_schema", () => {
-    sql("create_schema").forEach((query) => driver.runQuery(query, {}));
+    sql("create_schema").forEach((query) => driver.exec(query, {}));
   });
 
   Step("load_data", () => {
@@ -165,7 +165,7 @@ const newOrderCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
 const newOrderOlCntGen = R.int32(5, 15).gen();
 
 function new_order() {
-  driver.runQuery(sql("workload", "new_order")!, {
+  driver.exec(sql("workload", "new_order")!, {
     w_id: newOrderWarehouseGen.next(),
     max_w_id: newOrderMaxWarehouseGen.next(),
     d_id: newOrderDistrictGen.next(),
@@ -183,7 +183,7 @@ const paymentAmountGen = R.double(1, 5000).gen();
 const paymentCustomerLastGen = S.str(6, 16).gen();
 
 function payments() {
-  driver.runQuery(sql("workload", "payment")!, {
+  driver.exec(sql("workload", "payment")!, {
       p_w_id: paymentWarehouseGen.next(),
       p_d_id: paymentDistrictGen.next(),
       p_c_w_id: paymentCustomerWarehouseGen.next(),
@@ -202,7 +202,7 @@ const orderStatusCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
 const orderStatusCustomerLastGen = R.str(8, 16).gen();
 
 function order_status() {
-  driver.runQuery(sql("workload", "order_status")!, {
+  driver.exec(sql("workload", "order_status")!, {
       os_w_id: orderStatusWarehouseGen.next(),
       os_d_id: orderStatusDistrictGen.next(),
       os_c_id: orderStatusCustomerGen.next(),
@@ -216,7 +216,7 @@ const deliveryWarehouseGen = R.int32(1, WAREHOUSES).gen();
 const deliveryCarrierGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 
 function delivery() {
-  driver.runQuery(sql("workload", "delivery")!, {
+  driver.exec(sql("workload", "delivery")!, {
     d_w_id: deliveryWarehouseGen.next(),
     d_o_carrier_id: deliveryCarrierGen.next(),
   });
@@ -227,7 +227,7 @@ const stockLevelDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 const stockLevelThresholdGen = R.int32(10, 20).gen();
 
 function stock_level() {
-  driver.runQuery(sql("workload", "stock_level")!, {
+  driver.exec(sql("workload", "stock_level")!, {
     st_w_id: stockLevelWarehouseGen.next(),
     st_d_id: stockLevelDistrictGen.next(),
     threshold: stockLevelThresholdGen.next(),

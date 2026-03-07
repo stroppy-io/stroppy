@@ -23,7 +23,7 @@ const parsedQueries = parse_sql(open(SQL_FILE));
 
 export default function () {
   parsedQueries().forEach((query) => {
-    driver.runQuery(query, {});
+    driver.exec(query, {});
   });
 }
 

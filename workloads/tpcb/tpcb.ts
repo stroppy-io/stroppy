@@ -34,11 +34,11 @@ const sql = parse_sql_with_sections(open(SQL_FILE));
 // Setup function: create schema and load data
 export function setup() {
   Step("cleanup", () => {
-    sql("cleanup").forEach((query) => driver.runQuery(query, {}));
+    sql("cleanup").forEach((query) => driver.exec(query, {}));
   })
 
   Step("create_schema", () => {
-    sql("create_schema").forEach((query) => driver.runQuery(query, {}));
+    sql("create_schema").forEach((query) => driver.exec(query, {}));
   });
 
   Step("load_data", () => {
@@ -71,7 +71,7 @@ export function setup() {
       },
     });
 
-    sql("analyze").forEach((query) => driver.runQuery(query, {}));
+    sql("analyze").forEach((query) => driver.exec(query, {}));
   });
 
   Step.begin("workload");
@@ -86,7 +86,7 @@ const deltaGen = R.int32(-5000, 5000).gen();
 
 // TPC-B transaction workload
 export default function (): void {
-  driver.runQuery(sql("workload", "tpcb_transaction")!, {
+  driver.exec(sql("workload", "tpcb_transaction")!, {
     p_aid: aidGen.next(),
     p_tid: tidGen.next(),
     p_bid: bidGen.next(),

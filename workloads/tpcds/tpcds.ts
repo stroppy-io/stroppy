@@ -29,7 +29,7 @@ export function setup() {
 export default function (): void {
   queries().forEach((query) => {
     console.log(`tpc-ds-like: ${query.name}`);
-    driver.runQuery(query, {});
+    driver.exec(query, {});
   });
 }
 

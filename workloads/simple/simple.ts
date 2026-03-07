@@ -66,20 +66,21 @@ const groupGen = R.group({
 
 export function workload() {
   // driver uses :arg syntax for query parameters
-  driver.runQuery("select 1;", {});
+  driver.exec("select 1;", {});
 
   const value = genRandom.next();
   console.log("random value:", value);
-  driver.runQuery("select 90000 + :value + :second;", {
+  driver.exec("select 90000 + :value + :second;", {
     value,
     second: genRandom.next(),
   });
 
-  driver.runQuery("select :a::int + :b::int", { a: 34, b: 35 });
+  console.log("value is:",
+    driver.queryValue("select :a::int + :b::int", { a: 34, b: 35 }));
 
   const str = genFixed.next();
   console.log("fixed-seed string (same every run):", str);
-  driver.runQuery("select 'Hello, ' || :a || '!'", { a: str });
+  driver.exec("select 'Hello, ' || :a || '!'", { a: str });
 
 
   console.log("sequence (exhausts after 10):", seqGen.next());
