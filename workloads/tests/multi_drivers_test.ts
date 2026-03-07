@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
 import { DriverConfig_DriverType } from "./stroppy.pb.js";
-import { DriverX, ENV } from "./helpers.ts";
+import { DriverX, ENV, once } from "./helpers.ts";
 import exec from "k6/execution";
 
 const DRIVER_URL = ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL");
@@ -47,15 +47,15 @@ export function setup() {
   )`);
 }
 
+const vuSetup = once((i: number) => { return i+1;});
+
 export default function () {
   const vid = exec.vu.idInTest;
   const it = exec.vu.iterationInScenario;
 
   // Setup per-VU driver with a VU-specific application_name.
-  // once.Do inside setup() ensures only the first call's config is used.
-  vuDriver.setup(pgConfig("mdt_vu_" + vid, 1), () => {
-    vuSetupLambdaCalls++;
-  });
+  vuDriver.setup(pgConfig("mdt_vu_" + vid, 1));
+  vuSetupLambdaCalls = vuSetup(vuSetupLambdaCalls);
 
   // ---- Test 1: all three drivers can query ----
   assert(sharedDriver.queryValue<number>("SELECT 1") === 1, "shared driver query");

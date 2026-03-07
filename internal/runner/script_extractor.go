@@ -320,6 +320,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		{"NotifyStep2", notifyStepSpy(&probeprint.Steps)},
 		{"NewPicker", newPickerStub},
 		{"DeclareEnv", declareEnvSpy(&probeprint.EnvDeclarations)},
+		{"Once", func(x any) any { return x }},
 
 		{"parse_sql_with_sections", parseSectionsSpy(&probeprint.SQLSections)},
 		{"parse_sql", parseSpy(&probeprint.SQLSections)},

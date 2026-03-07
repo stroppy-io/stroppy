@@ -9,6 +9,7 @@ import {
   NewGroupGeneratorByRulesBin,
   NotifyStep,
   DeclareEnv,
+  Once,
   Driver,
   QueryStats,
   QueryResult,
@@ -223,14 +224,13 @@ export class DriverX implements QueryAPI {
     return new DriverX(NewDriver());
   }
 
-  /** Configure the driver. Safe to call every iteration (runs once).
-   *  If called at init phase: creates a shared driver.
-   *  If called at iteration/setup phase: creates a per-VU driver.
-   *  Optional callback runs after the driver is ready (e.g. per-VU schema setup). */
-  setup(config: Partial<DriverConfig>, callback?: (d: DriverX) => void): DriverX {
+  /** Store driver configuration. Safe to call every iteration (runs once).
+   *  If called at init phase: marks driver as shared.
+   *  If called at iteration/setup phase: marks driver as per-VU.
+   *  The driver is lazily dispatched on first use (ensuring DialFunc is available). */
+  setup(config: Partial<DriverConfig>): DriverX {
     this.driver.setup(
       DriverConfig.toBinary(DriverConfig.create(config)),
-      callback ? () => callback(this) : undefined,
     );
     return this;
   }
@@ -739,3 +739,8 @@ function group_internal(
     },
   }) as GroupRule;
 }
+
+/** Wrap a function so it executes only once per VU.
+ *  Call once() during init to capture the guard, then invoke the
+ *  returned function during iterations — it only fires on the first call. */
+export const once = Once;

@@ -47,11 +47,10 @@ declare module "k6/x/stroppy" {
     insertValuesBin(insert: BinMsg<InsertDescriptor>): QueryStats;
     /** @throws {Error} on query execution or argument processing error */
     runQuery(sql: string, args: Record<string, any>): QueryResult;
-    /** Configure the driver. Runs once (guarded by sync.Once).
-     *  If called at init phase (VU state nil): creates shared driver.
-     *  If called at iteration phase: creates per-VU driver.
-     *  Optional lambda runs after driver is ready. */
-    setup(configBin: BinMsg<DriverConfig>, lambda?: () => void): void;
+    /** Store driver configuration. The driver is lazily dispatched on first use.
+     *  If called at init phase (VU state nil): marks driver as shared.
+     *  If called at iteration phase: marks driver as per-VU. */
+    setup(configBin: BinMsg<DriverConfig>): void;
   }
 
   // Generator interface - provides data generation
@@ -83,4 +82,9 @@ declare module "k6/x/stroppy" {
     default_: string,
     description: string,
   ): void;
+
+  /** Wrap a function so it executes only once per VU.
+   *  Call Once() during init, then invoke the returned function during iterations.
+   *  The wrapped function caches and returns the result of the first invocation. */
+  export declare function Once<F extends (...args: any[]) => any>(fn: F): F;
 }
