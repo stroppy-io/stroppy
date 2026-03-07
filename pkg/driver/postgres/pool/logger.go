@@ -48,7 +48,7 @@ func (pl *pgxExtLogger) Log(
 	}
 }
 
-func NewLoggerTracer(logger *zap.Logger) (*tracelog.TraceLog, error) {
+func newLoggerTracer(logger *zap.Logger) (*tracelog.TraceLog, error) {
 	levl, err := tracelog.LogLevelFromString(logger.Level().String())
 	if err != nil {
 		return nil, err

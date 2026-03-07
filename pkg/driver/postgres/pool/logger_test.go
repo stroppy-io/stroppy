@@ -13,7 +13,7 @@ import (
 
 func TestNewLoggerTracer(t *testing.T) {
 	log := logger.Global()
-	tracer, err := NewLoggerTracer(log)
+	tracer, err := newLoggerTracer(log)
 	require.NoError(t, err)
 	require.NotNil(t, tracer)
 }

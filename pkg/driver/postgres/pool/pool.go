@@ -24,7 +24,9 @@ const (
 
 var (
 	ErrUnsupportedParam        = errors.New("unsupported parameter")
-	ErrInvalidExecModeForParam = errors.New("parameter is valid only with specific default_query_exec_mode")
+	ErrInvalidExecModeForParam = errors.New(
+		"parameter is valid only with specific default_query_exec_mode",
+	)
 )
 
 func NewPool(
@@ -70,18 +72,12 @@ func parseConfig(
 		}
 	}
 
-	// NOTE: Testing purpose default query execution mode is "exec".
-	// Stroppy aim is to test database performance, not the driver.
-	if cfg.ConnConfig.DefaultQueryExecMode == 0 {
-		cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
-	}
-
 	logLevel := "error"
 	if pg != nil && pg.GetTraceLogLevel() != "" {
 		logLevel = pg.GetTraceLogLevel()
 	}
 
-	loggerTracer, err := NewLoggerTracer(
+	loggerTracer, err := newLoggerTracer(
 		logger.WithOptions(zap.AddCallerSkip(1), zap.IncreaseLevel(mustParseLevel(logLevel))))
 	if err != nil {
 		return nil, err
@@ -146,7 +142,11 @@ func applyPostgresConfig(cfg *pgxpool.Config, pg *stroppy.DriverConfig_PostgresC
 
 func parsePgxOptimizations(pg *stroppy.DriverConfig_PostgresConfig, cfg *pgxpool.Config) error {
 	modeStr := pg.GetDefaultQueryExecMode()
-	if modeStr == "" {
+	if modeStr == "" { // set by default
+		// NOTE: Testing purpose default query execution mode is "exec".
+		// Stroppy aim is to test database performance, not the driver.
+		cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+
 		return nil
 	}
 
@@ -198,7 +198,8 @@ func parseDefaultQueryExecMode(modeStr string) (pgx.QueryExecMode, error) {
 		return mode, nil
 	}
 
-	return 0, fmt.Errorf(`"%s" invalid for "default_query_exec_mode" key; supported values are %v: %w`,
+	return 0, fmt.Errorf(
+		`"%s" invalid for "default_query_exec_mode" key; supported values are %v: %w`,
 		modeStr,
 		slices.Collect(maps.Keys(optMap)),
 		ErrUnsupportedParam,

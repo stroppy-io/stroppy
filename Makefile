@@ -303,8 +303,9 @@ run-tpcds-test: .rm-dev
 	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcds
 	cd $(WORKDIR) && ./stroppy run tpcds.ts tpcds-scale-1.sql
 
-run-sqlapi-test: # Run SQL API integration tests
-	./build/stroppy run workloads/tests/sqlapi_test.ts
+run-k6-tests: # Run SQL API integration tests
+	-./build/stroppy run workloads/tests/sqlapi_test.ts
+	-./build/stroppy run workloads/tests/multi_drivers_test.ts
 
 ##
 ## TypeScript Development
