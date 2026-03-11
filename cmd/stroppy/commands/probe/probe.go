@@ -40,7 +40,7 @@ var (
 	Cmd                 = func() *cobra.Command {
 		cmd := &cobra.Command{
 			Use:   "probe",
-			Short: "Get test introspection, config, options, sql, steps, envs",
+			Short: "Get test introspection, config, options, sql, steps, envs, drivers",
 			Long: `Command allows you to get information about a test script without running it.
 Probing performs a first-line check of the test for workability, exposing common
 issues. It also provides introspection into the test configuration and
