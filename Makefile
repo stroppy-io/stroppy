@@ -1,7 +1,7 @@
 LOCAL_BIN:=$(CURDIR)/bin
 NODE_BIN:=$(CURDIR)/bin/node_bin/bin
 PATH:=$(LOCAL_BIN):$(NODE_BIN):$(PATH)
-GOPROXY:=https://goproxy.io,direct
+GOPROXY:=direct
 BUILD_TARGET_DIR=$(CURDIR)/build
 PROTO_BUILD_TARGET_DIR=$(CURDIR)/proto/build
 
@@ -303,8 +303,9 @@ run-tpcds-test: .rm-dev
 	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcds
 	cd $(WORKDIR) && ./stroppy run tpcds.ts tpcds-scale-1.sql
 
-run-sqlapi-test: # Run SQL API integration tests
-	./build/stroppy run workloads/tests/sqlapi_test.ts
+run-k6-tests: # Run SQL API integration tests
+	-./build/stroppy run workloads/tests/sqlapi_test.ts
+	-./build/stroppy run workloads/tests/multi_drivers_test.ts
 
 ##
 ## TypeScript Development

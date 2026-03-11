@@ -1,14 +1,14 @@
 import { Options } from "k6/options";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { DriverConfig_DriverType } from "./stroppy.pb.js";
+import { DriverConfig, DriverConfig_DriverType } from "./stroppy.pb.js";
 import { AB, C, R, Step, DriverX, S, ENV } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 
 const SQL_FILE = ENV("SQL_FILE", "./tpcc.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
+const POOL_SIZE = ENV("POOL_SIZE", 100, "Connection pool size");
 
 // TPCC Configuration Constants
-const POOL_SIZE = ENV("POOL_SIZE", 100, "Connection pool size");
 const WAREHOUSES = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
 const DISTRICTS_PER_WAREHOUSE = 10;
 const CUSTOMERS_PER_DISTRICT = 3000;
@@ -23,17 +23,16 @@ export const options: Options = {
   setupTimeout:  String(WAREHOUSES * 5) + "m", // 5 min for every 1 in scale
 };
 
-// Initialize driver with GlobalConfig
-const driver = DriverX.fromConfig({
-  driver: {
-    url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
-    driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-    connectionType: { is: {oneofKind:"sharedPool", sharedPool: {sharedConnections: POOL_SIZE}}},
-    dbSpecific: {
-      fields: [],
-    },
+const driverConfig: DriverConfig = {
+  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
+  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
+  driverSpecific: {
+    oneofKind: "postgres" as const,
+    postgres: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
   },
-});
+};
+
+const driver = DriverX.create().setup(driverConfig);
 
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
@@ -47,12 +46,11 @@ export function setup() {
   });
 
   Step("load_data", () => {
-    // Load data into tables using InsertValues with COPY_FROM method
     driver.insert("item", ITEMS, {
       method: "copy_from",
       params: {
         i_id: S.int32(1, ITEMS),
-        i_im_id: S.int32(1, ITEMS), // WHY: not unique originaly
+        i_im_id: S.int32(1, ITEMS),
         i_name: R.str(14, 24, AB.enSpc),
         i_price: R.float(1, 100),
         i_data: R.str(26, 50, AB.enSpc),
@@ -108,7 +106,7 @@ export function setup() {
         c_zip: R.str(9, AB.num),
         c_phone: R.str(16, AB.num),
         c_since: C.datetime(new Date()),
-        c_credit: C.str("GC"), // TODO: "GC" | "BC" (good/bad credit), and 10% should be "BC"
+        c_credit: C.str("GC"),
         c_credit_lim: C.float(50000),
         c_discount: R.float(0, 0.5),
         c_balance: C.float(-10),
@@ -155,7 +153,6 @@ export function setup() {
   });
 
   Step.begin("workload");
-  return;
 }
 
 const newOrderWarehouseGen = R.int32(1, WAREHOUSES).gen();
@@ -243,6 +240,6 @@ export default function (): void {
 }
 
 export function teardown() {
-  Step.begin("workload");
+  Step.end("workload");
   Teardown();
 }

@@ -80,43 +80,25 @@ func (m *DriverConfig) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if all {
-		switch v := interface{}(m.GetConnectionType()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, DriverConfigValidationError{
-					field:  "ConnectionType",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
+	switch v := m.DriverSpecific.(type) {
+	case *DriverConfig_Postgres:
+		if v == nil {
+			err := DriverConfigValidationError{
+				field:  "DriverSpecific",
+				reason: "oneof value cannot be a typed-nil",
 			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, DriverConfigValidationError{
-					field:  "ConnectionType",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
+			if !all {
+				return err
 			}
+			errors = append(errors, err)
 		}
-	} else if v, ok := interface{}(m.GetConnectionType()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return DriverConfigValidationError{
-				field:  "ConnectionType",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if m.DbSpecific != nil {
 
 		if all {
-			switch v := interface{}(m.GetDbSpecific()).(type) {
+			switch v := interface{}(m.GetPostgres()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, DriverConfigValidationError{
-						field:  "DbSpecific",
+						field:  "Postgres",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -124,22 +106,24 @@ func (m *DriverConfig) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, DriverConfigValidationError{
-						field:  "DbSpecific",
+						field:  "Postgres",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetDbSpecific()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetPostgres()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return DriverConfigValidationError{
-					field:  "DbSpecific",
+					field:  "Postgres",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -530,46 +514,6 @@ func (m *GlobalConfig) validate(all bool) error {
 
 	// no validation rules for Metadata
 
-	if m.GetDriver() == nil {
-		err := GlobalConfigValidationError{
-			field:  "Driver",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetDriver()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, GlobalConfigValidationError{
-					field:  "Driver",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, GlobalConfigValidationError{
-					field:  "Driver",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetDriver()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return GlobalConfigValidationError{
-				field:  "Driver",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
 	if all {
 		switch v := interface{}(m.GetLogger()).(type) {
 		case interface{ ValidateAll() error }:
@@ -705,129 +649,78 @@ var _ interface {
 	ErrorName() string
 } = GlobalConfigValidationError{}
 
-// Validate checks the field values on DriverConfig_ConnectionType with the
+// Validate checks the field values on DriverConfig_PostgresConfig with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *DriverConfig_ConnectionType) Validate() error {
+func (m *DriverConfig_PostgresConfig) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on DriverConfig_ConnectionType with the
+// ValidateAll checks the field values on DriverConfig_PostgresConfig with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// DriverConfig_ConnectionTypeMultiError, or nil if none found.
-func (m *DriverConfig_ConnectionType) ValidateAll() error {
+// DriverConfig_PostgresConfigMultiError, or nil if none found.
+func (m *DriverConfig_PostgresConfig) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *DriverConfig_ConnectionType) validate(all bool) error {
+func (m *DriverConfig_PostgresConfig) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	switch v := m.Is.(type) {
-	case *DriverConfig_ConnectionType_SingleConnPerVu:
-		if v == nil {
-			err := DriverConfig_ConnectionTypeValidationError{
-				field:  "Is",
-				reason: "oneof value cannot be a typed-nil",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		}
+	if m.TraceLogLevel != nil {
+		// no validation rules for TraceLogLevel
+	}
 
-		if all {
-			switch v := interface{}(m.GetSingleConnPerVu()).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, DriverConfig_ConnectionTypeValidationError{
-						field:  "SingleConnPerVu",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, DriverConfig_ConnectionTypeValidationError{
-						field:  "SingleConnPerVu",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(m.GetSingleConnPerVu()).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return DriverConfig_ConnectionTypeValidationError{
-					field:  "SingleConnPerVu",
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
-		}
+	if m.MaxConnLifetime != nil {
+		// no validation rules for MaxConnLifetime
+	}
 
-	case *DriverConfig_ConnectionType_SharedPool:
-		if v == nil {
-			err := DriverConfig_ConnectionTypeValidationError{
-				field:  "Is",
-				reason: "oneof value cannot be a typed-nil",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		}
+	if m.MaxConnIdleTime != nil {
+		// no validation rules for MaxConnIdleTime
+	}
 
-		if all {
-			switch v := interface{}(m.GetSharedPool()).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, DriverConfig_ConnectionTypeValidationError{
-						field:  "SharedPool",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, DriverConfig_ConnectionTypeValidationError{
-						field:  "SharedPool",
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(m.GetSharedPool()).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return DriverConfig_ConnectionTypeValidationError{
-					field:  "SharedPool",
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
-		}
+	if m.MaxConns != nil {
+		// no validation rules for MaxConns
+	}
 
-	default:
-		_ = v // ensures v is used
+	if m.MinConns != nil {
+		// no validation rules for MinConns
+	}
+
+	if m.MinIdleConns != nil {
+		// no validation rules for MinIdleConns
+	}
+
+	if m.DefaultQueryExecMode != nil {
+		// no validation rules for DefaultQueryExecMode
+	}
+
+	if m.DescriptionCacheCapacity != nil {
+		// no validation rules for DescriptionCacheCapacity
+	}
+
+	if m.StatementCacheCapacity != nil {
+		// no validation rules for StatementCacheCapacity
 	}
 
 	if len(errors) > 0 {
-		return DriverConfig_ConnectionTypeMultiError(errors)
+		return DriverConfig_PostgresConfigMultiError(errors)
 	}
 
 	return nil
 }
 
-// DriverConfig_ConnectionTypeMultiError is an error wrapping multiple
-// validation errors returned by DriverConfig_ConnectionType.ValidateAll() if
+// DriverConfig_PostgresConfigMultiError is an error wrapping multiple
+// validation errors returned by DriverConfig_PostgresConfig.ValidateAll() if
 // the designated constraints aren't met.
-type DriverConfig_ConnectionTypeMultiError []error
+type DriverConfig_PostgresConfigMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m DriverConfig_ConnectionTypeMultiError) Error() string {
+func (m DriverConfig_PostgresConfigMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -836,12 +729,12 @@ func (m DriverConfig_ConnectionTypeMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m DriverConfig_ConnectionTypeMultiError) AllErrors() []error { return m }
+func (m DriverConfig_PostgresConfigMultiError) AllErrors() []error { return m }
 
-// DriverConfig_ConnectionTypeValidationError is the validation error returned
-// by DriverConfig_ConnectionType.Validate if the designated constraints
+// DriverConfig_PostgresConfigValidationError is the validation error returned
+// by DriverConfig_PostgresConfig.Validate if the designated constraints
 // aren't met.
-type DriverConfig_ConnectionTypeValidationError struct {
+type DriverConfig_PostgresConfigValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -849,24 +742,24 @@ type DriverConfig_ConnectionTypeValidationError struct {
 }
 
 // Field function returns field value.
-func (e DriverConfig_ConnectionTypeValidationError) Field() string { return e.field }
+func (e DriverConfig_PostgresConfigValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e DriverConfig_ConnectionTypeValidationError) Reason() string { return e.reason }
+func (e DriverConfig_PostgresConfigValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e DriverConfig_ConnectionTypeValidationError) Cause() error { return e.cause }
+func (e DriverConfig_PostgresConfigValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e DriverConfig_ConnectionTypeValidationError) Key() bool { return e.key }
+func (e DriverConfig_PostgresConfigValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e DriverConfig_ConnectionTypeValidationError) ErrorName() string {
-	return "DriverConfig_ConnectionTypeValidationError"
+func (e DriverConfig_PostgresConfigValidationError) ErrorName() string {
+	return "DriverConfig_PostgresConfigValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e DriverConfig_ConnectionTypeValidationError) Error() string {
+func (e DriverConfig_PostgresConfigValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -878,14 +771,14 @@ func (e DriverConfig_ConnectionTypeValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sDriverConfig_ConnectionType.%s: %s%s",
+		"invalid %sDriverConfig_PostgresConfig.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = DriverConfig_ConnectionTypeValidationError{}
+var _ error = DriverConfig_PostgresConfigValidationError{}
 
 var _ interface {
 	Field() string
@@ -893,111 +786,4 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = DriverConfig_ConnectionTypeValidationError{}
-
-// Validate checks the field values on DriverConfig_ConnectionType_Pool with
-// the rules defined in the proto definition for this message. If any rules
-// are violated, the first error encountered is returned, or nil if there are
-// no violations.
-func (m *DriverConfig_ConnectionType_Pool) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on DriverConfig_ConnectionType_Pool with
-// the rules defined in the proto definition for this message. If any rules
-// are violated, the result is a list of violation errors wrapped in
-// DriverConfig_ConnectionType_PoolMultiError, or nil if none found.
-func (m *DriverConfig_ConnectionType_Pool) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *DriverConfig_ConnectionType_Pool) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	// no validation rules for SharedConnections
-
-	if len(errors) > 0 {
-		return DriverConfig_ConnectionType_PoolMultiError(errors)
-	}
-
-	return nil
-}
-
-// DriverConfig_ConnectionType_PoolMultiError is an error wrapping multiple
-// validation errors returned by
-// DriverConfig_ConnectionType_Pool.ValidateAll() if the designated
-// constraints aren't met.
-type DriverConfig_ConnectionType_PoolMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m DriverConfig_ConnectionType_PoolMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m DriverConfig_ConnectionType_PoolMultiError) AllErrors() []error { return m }
-
-// DriverConfig_ConnectionType_PoolValidationError is the validation error
-// returned by DriverConfig_ConnectionType_Pool.Validate if the designated
-// constraints aren't met.
-type DriverConfig_ConnectionType_PoolValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e DriverConfig_ConnectionType_PoolValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e DriverConfig_ConnectionType_PoolValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e DriverConfig_ConnectionType_PoolValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e DriverConfig_ConnectionType_PoolValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e DriverConfig_ConnectionType_PoolValidationError) ErrorName() string {
-	return "DriverConfig_ConnectionType_PoolValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e DriverConfig_ConnectionType_PoolValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sDriverConfig_ConnectionType_Pool.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = DriverConfig_ConnectionType_PoolValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = DriverConfig_ConnectionType_PoolValidationError{}
+} = DriverConfig_PostgresConfigValidationError{}

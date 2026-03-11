@@ -15,28 +15,12 @@ export const options: Options = {
   },
 };
 
-
-const driver: DriverX = DriverX.fromConfig({
-  driver: {
-    url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
-    driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-    dbSpecific: {
-      fields: [],
-    },
-  },
-  seed: "42", // sets global default seed, set 0 or delete it to make every seed random.
-
-  // Add OpenTelemety metrics
-  // exporter: {
-  //   name: "",
-  //   otlpExport: {
-  //     otlpGrpcEndpoint: "localhost:4317",
-  //     otlpEndpointInsecure: true,
-  //   }
-  // },
+const driver = DriverX.create().setup({
+  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
+  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
 });
 
-setSeed(42); // same as config
+setSeed(42);
 
 export function setup() {
   Step("example", () => {

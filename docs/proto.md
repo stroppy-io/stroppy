@@ -45,8 +45,7 @@
   
 - [proto/stroppy/config.proto](#proto_stroppy_config-proto)
     - [DriverConfig](#stroppy-DriverConfig)
-    - [DriverConfig.ConnectionType](#stroppy-DriverConfig-ConnectionType)
-    - [DriverConfig.ConnectionType.Pool](#stroppy-DriverConfig-ConnectionType-Pool)
+    - [DriverConfig.PostgresConfig](#stroppy-DriverConfig-PostgresConfig)
     - [ExporterConfig](#stroppy-ExporterConfig)
     - [GlobalConfig](#stroppy-GlobalConfig)
     - [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry)
@@ -670,47 +669,39 @@ way.
 
 ### DriverConfig
 DriverConfig contains configuration for connecting to a database driver.
-It includes the driver plugin path, connection URL, and database-specific
-settings.
+Driver is created as an empty shell via DriverX.create() and configured
+via driver.setup(config) at runtime. Sharing semantics are determined
+by the k6 lifecycle stage: init phase = shared, iteration = per-VU.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | url | [string](#string) |  | Database connection URL |
-| db_specific | [Value.Struct](#stroppy-Value-Struct) | optional | Database-specific configuration options |
 | driver_type | [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType) |  | Name/Type of chosen driver |
-| connection_type | [DriverConfig.ConnectionType](#stroppy-DriverConfig-ConnectionType) |  | Shared connection pool vs own connection for each VU. |
+| postgres | [DriverConfig.PostgresConfig](#stroppy-DriverConfig-PostgresConfig) |  |  |
 
 
 
 
 
 
-<a name="stroppy-DriverConfig-ConnectionType"></a>
+<a name="stroppy-DriverConfig-PostgresConfig"></a>
 
-### DriverConfig.ConnectionType
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| single_conn_per_vu | [google.protobuf.Empty](#google-protobuf-Empty) |  |  |
-| shared_pool | [DriverConfig.ConnectionType.Pool](#stroppy-DriverConfig-ConnectionType-Pool) |  |  |
-
-
-
-
-
-
-<a name="stroppy-DriverConfig-ConnectionType-Pool"></a>
-
-### DriverConfig.ConnectionType.Pool
-If shared_connections not set use drivers pool default.
+### DriverConfig.PostgresConfig
+PostgreSQL-specific pool and connection configuration
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| shared_connections | [int32](#int32) |  |  |
+| trace_log_level | [string](#string) | optional | pgx trace log level: debug, info, warn, error |
+| max_conn_lifetime | [string](#string) | optional | Max connection lifetime (Go duration string, e.g. &#34;1h&#34;) |
+| max_conn_idle_time | [string](#string) | optional | Max connection idle time (Go duration string, e.g. &#34;10m&#34;) |
+| max_conns | [int32](#int32) | optional | Maximum number of connections in the pool |
+| min_conns | [int32](#int32) | optional | Minimum number of connections in the pool |
+| min_idle_conns | [int32](#int32) | optional | Minimum number of idle connections |
+| default_query_exec_mode | [string](#string) | optional | Query execution mode: exec, cache_statement, cache_describe, describe_exec, simple_protocol |
+| description_cache_capacity | [int32](#int32) | optional | Description cache capacity (only with cache_describe mode) |
+| statement_cache_capacity | [int32](#int32) | optional | Statement cache capacity (only with cache_statement mode) |
 
 
 
@@ -745,7 +736,6 @@ OtlpExporterConfig contains named configuration for an OTLP exporter.
 | run_id | [string](#string) |  | Run identifier for reproducible test runs or debugging If set to &#34;generate()&#34; stroppy eval ulid for run_id |
 | seed | [uint64](#uint64) |  | Random seed for reproducible test runs |
 | metadata | [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry) | repeated | Arbitrary metadata, may be passed to result labels and json output |
-| driver | [DriverConfig](#stroppy-DriverConfig) |  | Database driver configuration |
 | logger | [LoggerConfig](#stroppy-LoggerConfig) |  | Logging configuration |
 | exporter | [ExporterConfig](#stroppy-ExporterConfig) |  | Exporter configuration |
 

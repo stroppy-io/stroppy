@@ -6,6 +6,7 @@ import type {
   UnitDescriptor,
   DriverTransactionStat,
   InsertDescriptor,
+  DriverConfig,
   Generation_Rule,
   QueryParamGroup,
   DateTime,
@@ -46,6 +47,10 @@ declare module "k6/x/stroppy" {
     insertValuesBin(insert: BinMsg<InsertDescriptor>): QueryStats;
     /** @throws {Error} on query execution or argument processing error */
     runQuery(sql: string, args: Record<string, any>): QueryResult;
+    /** Store driver configuration. The driver is lazily dispatched on first use.
+     *  If called at init phase (VU state nil): marks driver as shared.
+     *  If called at iteration phase: marks driver as per-VU. */
+    setup(configBin: BinMsg<DriverConfig>): void;
   }
 
   // Generator interface - provides data generation
@@ -56,9 +61,7 @@ declare module "k6/x/stroppy" {
   // k6 module functions provided by Go module
   export declare function NotifyStep(name: String, status: number): void;
   export declare function Teardown(): Error;
-  export declare function NewDriverByConfigBin(
-    configBin: BinMsg<GlobalConfig>,
-  ): Driver;
+  export declare function NewDriver(): Driver;
   export declare function NewGeneratorByRuleBin(
     seed: number,
     rule: BinMsg<Generation_Rule>,
@@ -79,4 +82,9 @@ declare module "k6/x/stroppy" {
     default_: string,
     description: string,
   ): void;
+
+  /** Wrap a function so it executes only once per VU.
+   *  Call Once() during init, then invoke the returned function during iterations.
+   *  The wrapped function caches and returns the result of the first invocation. */
+  export declare function Once<F extends (...args: any[]) => any>(fn: F): F;
 }

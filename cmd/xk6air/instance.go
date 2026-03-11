@@ -3,14 +3,12 @@ package xk6air
 import (
 	"sync"
 
+	"github.com/grafana/sobek"
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/driver"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/postgres"
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 // Instance - module instance.
@@ -19,7 +17,13 @@ import (
 type Instance struct {
 	vu modules.VU
 	lg *zap.Logger
-	dw *DriverWrapper
+
+	// driverCounter tracks the Nth NewDriver() call within this VU's init.
+	// Used to coordinate shared drivers across VUs (deterministic ordering).
+	driverCounter uint64
+
+	// drivers tracks all DriverWrappers created by this instance for teardown.
+	drivers []*DriverWrapper
 }
 
 // NewInstance creates new instance of module.
@@ -27,17 +31,9 @@ type Instance struct {
 // NOTE: at this time vu.State() is nil.
 // It's init phase, and only preInitEnv is accessible.
 func NewInstance(vu modules.VU) modules.Instance {
-	// Create per-VU logger to avoid log level conflicts
-	VUID := uint64(0)
-	if state := vu.State(); state != nil {
-		VUID = state.VUID
-	}
 	i := &Instance{
 		vu: vu,
-		lg: logger.
-			NewFromEnv().
-			Named("k6-vu").
-			With(zap.Uint64("VUID", uint64(VUID))).
+		lg: rootModule.lg.Named("k6-vu").
 			WithOptions(zap.AddStacktrace(zap.FatalLevel)),
 	}
 	rootModule.addVuTeardown(i)
@@ -50,84 +46,69 @@ func (i *Instance) Exports() modules.Exports {
 		Default: i,
 		Named: map[string]any{
 			"NotifyStep":                  rootModule.NotifyStep,
-			"NewDriverByConfigBin":        i.NewDriverByConfigBin,
+			"NewDriver":                   i.NewDriver,
 			"Teardown":                    rootModule.Teardown,
 			"NewGeneratorByRuleBin":       NewGeneratorByRuleBin,
 			"NewGroupGeneratorByRulesBin": NewGroupGeneratorByRulesBin,
 			"NewPicker":                   NewPicker,
 			"DeclareEnv":                  func([]string, string, string) {},
+			"Once":                        i.Once,
 		},
 	}
 }
 
-var onceGetConfig sync.Once
-
-// NewDriverByConfigBin initializes the driver from GlobalConfig.
-// This is called by scripts using defineConfig(globalConfig) at the top level.
+// NewDriver creates an empty DriverWrapper shell.
+// The driver is not connected — call Setup() to store config,
+// then the driver is lazily dispatched on first use.
 //
-// NOTE: this function commonly called at init phase of k6 lifecycle.
-// i.vu.State() is nil
-func (i *Instance) NewDriverByConfigBin(configBin []byte) *DriverWrapper {
-	var globalCfg stroppy.GlobalConfig
-	if err := proto.Unmarshal(configBin, &globalCfg); err != nil {
-		i.lg.Fatal("error unmarshalling GlobalConfig", zap.Error(err))
-	}
-	drvCfg := globalCfg.GetDriver()
-	if drvCfg == nil {
-		i.lg.Fatal("GlobalConfig.driver is required")
-	}
+// The driverCounter ensures deterministic ordering across VUs
+// so shared drivers can be coordinated.
+func (i *Instance) NewDriver() *DriverWrapper {
+	idx := i.driverCounter
+	i.driverCounter++
 
-	onceGetConfig.Do(func() {
-		rootModule.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
-			Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
-			Status: stroppy.Status_STATUS_RUNNING,
-			Cmd:    "",
-		})
-	})
-
-	drv := i.getOrCreateDriver(&globalCfg)
-
-	i.dw = &DriverWrapper{
-		vu:  i.vu,
-		lg:  i.lg,
-		drv: drv,
+	dw := &DriverWrapper{
+		vu:          i.vu,
+		lg:          i.lg,
+		driverIndex: idx,
 	}
-	return i.dw
+	i.drivers = append(i.drivers, dw)
+	return dw
 }
 
-func (i *Instance) getOrCreateDriver(cfg *stroppy.GlobalConfig) (drv driver.Driver) {
-	var err error
-	if cfg.GetDriver().GetConnectionType().GetSingleConnPerVu() != nil {
-		if drv, err = driver.Dispatch(rootModule.ctx, i.lg, cfg.GetDriver()); err != nil {
-			i.lg.Fatal("can't initialize driver", zap.Error(err))
+// Once wraps a function so it executes only once per VU.
+// Call Once() during init to capture the sync.Once, then call the
+// returned function during iterations — it will only fire on the first call.
+// Accepts any function signature, returns a function with the same signature
+// that caches and returns the result of the first invocation.
+func (i *Instance) Once(call sobek.FunctionCall) sobek.Value {
+	rt := i.vu.Runtime()
+	fn, ok := sobek.AssertFunction(call.Argument(0))
+	if !ok {
+		panic(rt.NewTypeError("Once() requires a function argument"))
+	}
+
+	var once sync.Once
+	var result sobek.Value
+	var callErr error
+
+	return rt.ToValue(func(innerCall sobek.FunctionCall) sobek.Value {
+		once.Do(func() {
+			result, callErr = fn(sobek.Undefined(), innerCall.Arguments...)
+		})
+		if callErr != nil {
+			panic(callErr)
 		}
-		return drv
-	}
-
-	if rootModule.sharedDrv != nil {
-		return rootModule.sharedDrv
-	}
-
-	if cfg.GetDriver().GetConnectionType() == nil {
-		// NOTE: unfortunately we have no good suggestion on which amount of connections we may use.
-		// Nice idea to use i.State().Options.VUs, but it's not available at pre-init state.
-		cfg.GetDriver().ConnectionType = &stroppy.DriverConfig_ConnectionType{
-			Is: &stroppy.DriverConfig_ConnectionType_SharedPool{},
-		}
-	}
-
-	rootModule.sharedDrv, err = driver.Dispatch(rootModule.ctx, i.lg, cfg.GetDriver())
-	if err != nil {
-		i.lg.Fatal("can't initialize shared driver", zap.Error(err))
-	}
-	return rootModule.sharedDrv
+		return result
+	})
 }
 
 // Teardown mirrors k6 "function teardown()".
 func (i *Instance) Teardown() error {
-	if rootModule.sharedDrv == nil {
-		i.dw.drv.Teardown(i.vu.Context())
+	for _, dw := range i.drivers {
+		if dw.drv != nil && !dw.shared {
+			dw.drv.Teardown(i.vu.Context())
+		}
 	}
-
 	return nil
 }

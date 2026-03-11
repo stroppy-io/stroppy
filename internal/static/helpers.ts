@@ -4,11 +4,12 @@ globalThis.TextEncoder = encoding.TextEncoder;
 globalThis.TextDecoder = encoding.TextDecoder;
 
 import {
-  NewDriverByConfigBin,
+  NewDriver,
   NewGeneratorByRuleBin,
   NewGroupGeneratorByRulesBin,
   NotifyStep,
   DeclareEnv,
+  Once,
   Driver,
   QueryStats,
   QueryResult,
@@ -18,7 +19,7 @@ import {
   Generation_Distribution,
   Generation_Distribution_DistributionType,
   QueryParamGroup,
-  GlobalConfig,
+  DriverConfig,
   QueryParamDescriptor,
   InsertDescriptor,
   InsertMethod,
@@ -208,7 +209,7 @@ export class DriverX implements QueryAPI {
   queryValue!: QueryAPI["queryValue"];
   queryCursor!: QueryAPI["queryCursor"];
 
-  constructor(driver: Driver) {
+  private constructor(driver: Driver) {
     this.driver = driver;
     this.q = createQueryAPI((sql, args) => driver.runQuery(sql, args));
     this.exec = this.q.exec;
@@ -218,12 +219,20 @@ export class DriverX implements QueryAPI {
     this.queryCursor = this.q.queryCursor;
   }
 
-  static fromConfig(config: Partial<GlobalConfig>): DriverX {
-    if (config.seed) setSeed(Number(config.seed));
-    const driver = NewDriverByConfigBin(
-      GlobalConfig.toBinary(GlobalConfig.create(config)),
+  /** Create an empty driver shell. Call setup() to configure it. */
+  static create(): DriverX {
+    return new DriverX(NewDriver());
+  }
+
+  /** Store driver configuration. Safe to call every iteration (runs once).
+   *  If called at init phase: marks driver as shared.
+   *  If called at iteration/setup phase: marks driver as per-VU.
+   *  The driver is lazily dispatched on first use (ensuring DialFunc is available). */
+  setup(config: Partial<DriverConfig>): DriverX {
+    this.driver.setup(
+      DriverConfig.toBinary(DriverConfig.create(config)),
     );
-    return new DriverX(driver);
+    return this;
   }
 
   insert(insert: Partial<InsertDescriptor>): void;
@@ -281,11 +290,6 @@ export class DriverX implements QueryAPI {
   }
 }
 
-export function NewDriverByConfig(config: Partial<GlobalConfig>): Driver {
-  return NewDriverByConfigBin(
-    GlobalConfig.toBinary(GlobalConfig.create(config)),
-  );
-}
 
 const _stepFilter: Set<string> | null = (() => {
   const only = ENV("STROPPY_STEPS", "", "comma-separated list of steps to run (allowlist), same as --steps");
@@ -735,3 +739,8 @@ function group_internal(
     },
   }) as GroupRule;
 }
+
+/** Wrap a function so it executes only once per VU.
+ *  Call once() during init to capture the guard, then invoke the
+ *  returned function during iterations — it only fires on the first call. */
+export const once = Once;

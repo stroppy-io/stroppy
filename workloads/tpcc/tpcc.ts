@@ -54,15 +54,13 @@ const TOTAL_CUSTOMERS =
   WAREHOUSES * DISTRICTS_PER_WAREHOUSE * CUSTOMERS_PER_DISTRICT;
 const TOTAL_STOCK = WAREHOUSES * ITEMS;
 
-// Initialize driver with GlobalConfig
-const driver = DriverX.fromConfig({
-  driver: {
-    url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
-    driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-    connectionType: { is: {oneofKind:"sharedPool", sharedPool: {sharedConnections: POOL_SIZE}}},
-    dbSpecific: {
-      fields: [],
-    },
+// Initialize driver — shared (created at init phase)
+const driver = DriverX.create().setup({
+  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
+  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
+  driverSpecific: {
+    oneofKind: "postgres",
+    postgres: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
   },
 });
 
