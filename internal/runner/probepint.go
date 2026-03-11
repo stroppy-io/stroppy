@@ -47,6 +47,10 @@ type Subprobe struct {
 
 	// Steps is which ones registered with 'Step("", ()=>{})' function.
 	Steps []string `json:"steps"`
+
+	// Drivers is configuration passed to each DriverX.create().setup({...}) call.
+	// Serialized via protojson in Probeprint.MarshalJSON.
+	Drivers []*stroppy.DriverConfig `json:"-"`
 }
 
 // Probeprint contains configuration and other metainformation extracted from a TypeScript script.
@@ -76,7 +80,28 @@ func (p *Probeprint) MarshalJSON() ([]byte, error) {
 		return nil, fmt.Errorf("failed marshaling Probeprint.Subprobe: %w", err)
 	}
 
-	_, _ = buff.Write(subprobeJSON[1:])
+	// subprobeJSON is "{...}", strip trailing "}" to append drivers
+	_, _ = buff.Write(subprobeJSON[1 : len(subprobeJSON)-1])
+
+	// append drivers via protojson
+	opts := protojson.MarshalOptions{}
+
+	_, _ = buff.WriteString(`,"drivers":[`)
+
+	for i, dc := range p.Drivers {
+		if i > 0 {
+			_, _ = buff.WriteString(",")
+		}
+
+		driverJSON, err := opts.Marshal(dc)
+		if err != nil {
+			return nil, fmt.Errorf("failed marshaling DriverConfig: %w", err)
+		}
+
+		_, _ = buff.Write(driverJSON)
+	}
+
+	_, _ = buff.WriteString("]}")
 
 	return buff.Bytes(), nil
 }
@@ -90,8 +115,9 @@ const (
 	ExplainSQL
 	ExplainSteps
 	ExplainEnvs
+	ExplainDrivers
 
-	ExplainAll ExplainSection = ExplainConfig | ExplainOptions | ExplainSQL | ExplainSteps | ExplainEnvs
+	ExplainAll ExplainSection = ExplainConfig | ExplainOptions | ExplainSQL | ExplainSteps | ExplainEnvs | ExplainDrivers
 )
 
 // Explain returns a human-readable message for users.
@@ -119,6 +145,10 @@ func (p *Probeprint) Explain(sections ExplainSection) string {
 
 	if sections&ExplainEnvs != 0 {
 		p.explainEnvs(sb)
+	}
+
+	if sections&ExplainDrivers != 0 {
+		p.explainDrivers(sb)
 	}
 
 	return sb.String()
@@ -246,6 +276,36 @@ func lookupEnv(names []string) string {
 	}
 
 	return ""
+}
+
+func (p *Probeprint) explainDrivers(sb *strings.Builder) {
+	sb.WriteString("# Drivers:\n")
+
+	if len(p.Drivers) == 0 {
+		sb.WriteString("  (no drivers)\n\n")
+
+		return
+	}
+
+	opts := protojson.MarshalOptions{
+		Multiline:    true,
+		AllowPartial: true,
+		Indent:       "  ",
+	}
+
+	for i, dc := range p.Drivers {
+		if len(p.Drivers) > 1 {
+			fmt.Fprintf(sb, "  ## Driver %d:\n", i+1)
+		}
+
+		driverJSON, err := opts.Marshal(dc)
+		if err != nil {
+			panic(err)
+		}
+
+		sb.Write(driverJSON)
+		sb.WriteString("\n\n")
+	}
 }
 
 // explainPlainEnvs writes env vars accessed via __ENV directly (not via ENV()).

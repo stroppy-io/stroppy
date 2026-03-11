@@ -17,7 +17,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
+	"google.golang.org/protobuf/proto"
 
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 
@@ -229,7 +231,9 @@ func createVM() *js.Runtime {
 }
 
 // for [xk6air.DriverWrapper].
-type driverStub struct{}
+type driverStub struct {
+	drivers *[]*stroppy.DriverConfig
+}
 
 func (*driverStub) RunQuery(string, map[string]any) (*driver.QueryResult, error) {
 	return &driver.QueryResult{
@@ -242,7 +246,12 @@ func (*driverStub) InsertValuesBin([]byte, int64) (*stats.Query, error) {
 	return &stats.Query{}, nil
 }
 
-func (*driverStub) Setup([]byte, func()) {}
+func (d *driverStub) Setup(configBytes []byte, _ func()) {
+	dc := &stroppy.DriverConfig{}
+	if err := proto.Unmarshal(configBytes, dc); err == nil {
+		*d.drivers = append(*d.drivers, dc)
+	}
+}
 
 // rowsStub implements driver.Rows for the probe VM.
 type rowsStub struct{}
@@ -297,7 +306,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 			return err
 		}
 
-		return &driverStub{}
+		return &driverStub{drivers: &probeprint.Drivers}
 	}
 
 	if err := (Mocks{

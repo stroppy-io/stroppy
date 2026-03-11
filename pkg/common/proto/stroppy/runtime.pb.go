@@ -266,7 +266,7 @@ var File_proto_stroppy_runtime_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_runtime_proto_rawDesc = "" +
 	"\n" +
-	"\x1bproto/stroppy/runtime.proto\x12\astroppy\x1a\x1egoogle/protobuf/duration.proto\x1a\x1aproto/stroppy/common.proto\x1a\x1aproto/stroppy/config.proto\x1a\x1eproto/stroppy/descriptor.proto\"\x8e\x01\n" +
+	"\x1bproto/stroppy/runtime.proto\x12\astroppy\x1a\x1egoogle/protobuf/duration.proto\x1a\x1aproto/stroppy/common.proto\x1a\x1eproto/stroppy/descriptor.proto\"\x8e\x01\n" +
 	"\vDriverQuery\x12\x18\n" +
 	"\arequest\x18\x01 \x01(\tR\arequest\x12&\n" +
 	"\x06params\x18\x02 \x03(\v2\x0e.stroppy.ValueR\x06params\x122\n" +
@@ -328,7 +328,6 @@ func file_proto_stroppy_runtime_proto_init() {
 		return
 	}
 	file_proto_stroppy_common_proto_init()
-	file_proto_stroppy_config_proto_init()
 	file_proto_stroppy_descriptor_proto_init()
 	file_proto_stroppy_runtime_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
