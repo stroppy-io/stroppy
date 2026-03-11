@@ -27,6 +27,7 @@ const (
 	sqlFlag     = "sql"
 	stepsFlag   = "steps"
 	envsFlag    = "envs"
+	driversFlag = "drivers"
 
 	humanFormat = "human"
 	jsonFormat  = "json"
@@ -72,6 +73,10 @@ name"); StepEnd("step name");' pair.
 '# Environment Variables' shows which env vars are used specifically within this
 test. Only envs used as '__ENV.<env_name>' are shown here (no k6 options or
 stroppy envs). Current environment values are also shown if found.
+
+'# Drivers' shows the driver configuration(s) passed to DriverX.create().setup({...}).
+It includes the driver type, connection URL, and driver-specific settings
+(e.g. PostgreSQL pool configuration).
 `,
 			// TODO: auto detect tests with magic test.ts name.
 			// Or do "probe" of this dir, go trough all ts files, show all sql, or like this.
@@ -141,6 +146,7 @@ stroppy envs). Current environment values are also shown if found.
 		cmd.Flags().Bool(sqlFlag, false, "show only sql file structure section")
 		cmd.Flags().Bool(stepsFlag, false, "show only steps section")
 		cmd.Flags().Bool(envsFlag, false, "show only environment variables section")
+		cmd.Flags().Bool(driversFlag, false, "show only drivers section")
 
 		return cmd
 	}()
@@ -158,6 +164,7 @@ func buildSections(cmd *cobra.Command) runner.ExplainSection {
 		{sqlFlag, runner.ExplainSQL},
 		{stepsFlag, runner.ExplainSteps},
 		{envsFlag, runner.ExplainEnvs},
+		{driversFlag, runner.ExplainDrivers},
 	}
 
 	var sections runner.ExplainSection

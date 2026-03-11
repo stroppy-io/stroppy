@@ -37,17 +37,12 @@ const (
 	// CloudStatusServiceNotifyRunProcedure is the fully-qualified name of the CloudStatusService's
 	// NotifyRun RPC.
 	CloudStatusServiceNotifyRunProcedure = "/stroppy.CloudStatusService/NotifyRun"
-	// CloudStatusServiceNotifyStepProcedure is the fully-qualified name of the CloudStatusService's
-	// NotifyStep RPC.
-	CloudStatusServiceNotifyStepProcedure = "/stroppy.CloudStatusService/NotifyStep"
 )
 
 // CloudStatusServiceClient is a client for the stroppy.CloudStatusService service.
 type CloudStatusServiceClient interface {
 	// * Notifies the cloud status of a benchmark run
 	NotifyRun(context.Context, *stroppy.StroppyRun) (*emptypb.Empty, error)
-	// * Notifies the cloud status of a benchmark step
-	NotifyStep(context.Context, *stroppy.StroppyStepRun) (*emptypb.Empty, error)
 }
 
 // NewCloudStatusServiceClient constructs a client for the stroppy.CloudStatusService service. By
@@ -67,19 +62,12 @@ func NewCloudStatusServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithSchema(cloudStatusServiceMethods.ByName("NotifyRun")),
 			connect.WithClientOptions(opts...),
 		),
-		notifyStep: connect.NewClient[stroppy.StroppyStepRun, emptypb.Empty](
-			httpClient,
-			baseURL+CloudStatusServiceNotifyStepProcedure,
-			connect.WithSchema(cloudStatusServiceMethods.ByName("NotifyStep")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
 // cloudStatusServiceClient implements CloudStatusServiceClient.
 type cloudStatusServiceClient struct {
-	notifyRun  *connect.Client[stroppy.StroppyRun, emptypb.Empty]
-	notifyStep *connect.Client[stroppy.StroppyStepRun, emptypb.Empty]
+	notifyRun *connect.Client[stroppy.StroppyRun, emptypb.Empty]
 }
 
 // NotifyRun calls stroppy.CloudStatusService.NotifyRun.
@@ -91,21 +79,10 @@ func (c *cloudStatusServiceClient) NotifyRun(ctx context.Context, req *stroppy.S
 	return nil, err
 }
 
-// NotifyStep calls stroppy.CloudStatusService.NotifyStep.
-func (c *cloudStatusServiceClient) NotifyStep(ctx context.Context, req *stroppy.StroppyStepRun) (*emptypb.Empty, error) {
-	response, err := c.notifyStep.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
 // CloudStatusServiceHandler is an implementation of the stroppy.CloudStatusService service.
 type CloudStatusServiceHandler interface {
 	// * Notifies the cloud status of a benchmark run
 	NotifyRun(context.Context, *stroppy.StroppyRun) (*emptypb.Empty, error)
-	// * Notifies the cloud status of a benchmark step
-	NotifyStep(context.Context, *stroppy.StroppyStepRun) (*emptypb.Empty, error)
 }
 
 // NewCloudStatusServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -121,18 +98,10 @@ func NewCloudStatusServiceHandler(svc CloudStatusServiceHandler, opts ...connect
 		connect.WithSchema(cloudStatusServiceMethods.ByName("NotifyRun")),
 		connect.WithHandlerOptions(opts...),
 	)
-	cloudStatusServiceNotifyStepHandler := connect.NewUnaryHandlerSimple(
-		CloudStatusServiceNotifyStepProcedure,
-		svc.NotifyStep,
-		connect.WithSchema(cloudStatusServiceMethods.ByName("NotifyStep")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/stroppy.CloudStatusService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CloudStatusServiceNotifyRunProcedure:
 			cloudStatusServiceNotifyRunHandler.ServeHTTP(w, r)
-		case CloudStatusServiceNotifyStepProcedure:
-			cloudStatusServiceNotifyStepHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -144,8 +113,4 @@ type UnimplementedCloudStatusServiceHandler struct{}
 
 func (UnimplementedCloudStatusServiceHandler) NotifyRun(context.Context, *stroppy.StroppyRun) (*emptypb.Empty, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("stroppy.CloudStatusService.NotifyRun is not implemented"))
-}
-
-func (UnimplementedCloudStatusServiceHandler) NotifyStep(context.Context, *stroppy.StroppyStepRun) (*emptypb.Empty, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("stroppy.CloudStatusService.NotifyStep is not implemented"))
 }

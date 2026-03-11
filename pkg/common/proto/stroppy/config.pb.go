@@ -590,7 +590,7 @@ var File_proto_stroppy_config_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x1eproto/stroppy/descriptor.proto\x1a\x17validate/validate.proto\"\xab\a\n" +
+	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\xab\a\n" +
 	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12K\n" +
 	"\vdriver_type\x18\x02 \x01(\x0e2 .stroppy.DriverConfig.DriverTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
@@ -698,7 +698,6 @@ func file_proto_stroppy_config_proto_init() {
 		return
 	}
 	file_proto_stroppy_common_proto_init()
-	file_proto_stroppy_descriptor_proto_init()
 	file_proto_stroppy_config_proto_msgTypes[0].OneofWrappers = []any{
 		(*DriverConfig_Postgres)(nil),
 	}

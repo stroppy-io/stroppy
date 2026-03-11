@@ -33,8 +33,8 @@ func NewCloudClient(lg *zap.Logger) (ulid.ULID, stroppyconnect.CloudStatusServic
 
 	wrappedClient := &cloudClientWrapper{client: plainClient, lg: lg}
 	wrappedClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
-		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
-		Status: stroppy.Status_STATUS_IDLE,
+		Id:     rootModule.runULID.String(),
+		Status: stroppy.StroppyRun_STATUS_IDLE,
 		Cmd:    "",
 	})
 	return runULID, wrappedClient
@@ -53,8 +53,8 @@ func (w *cloudClientWrapper) NotifyRun(
 	run *stroppy.StroppyRun,
 ) (*emptypb.Empty, error) {
 	lg := w.lg.With(
-		zap.String("run_id", run.Id.Value),
-		zap.String("status", run.Status.String()),
+		zap.String("run_id", run.GetId()),
+		zap.String("status", run.GetStatus().String()),
 	)
 
 	resp, err := w.client.NotifyRun(ctx, run)
@@ -66,25 +66,6 @@ func (w *cloudClientWrapper) NotifyRun(
 	return resp, nil
 }
 
-func (w *cloudClientWrapper) NotifyStep(
-	ctx context.Context,
-	step *stroppy.StroppyStepRun,
-) (*emptypb.Empty, error) {
-	lg := w.lg.With(
-		zap.String("name", step.GetName()),
-		zap.String("run_id", step.GetStroppyRunId().GetValue()),
-		zap.String("step_id", step.GetId().GetValue()),
-		zap.String("status", step.GetStatus().String()),
-	)
-	resp, err := w.client.NotifyStep(ctx, step)
-	if err != nil {
-		lg.Error("failed to notify cloud on step", zap.Error(err))
-		return nil, err
-	}
-	lg.Info("step status sent to cloud")
-	return resp, nil
-}
-
 // noopCloudClient is a no-op implementation of the cloud client interface
 type noopCloudClient struct{}
 
@@ -93,13 +74,6 @@ var _ stroppyconnect.CloudStatusServiceClient = (*noopCloudClient)(nil)
 func (n *noopCloudClient) NotifyRun(
 	ctx context.Context,
 	run *stroppy.StroppyRun,
-) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, nil
-}
-
-func (n *noopCloudClient) NotifyStep(
-	ctx context.Context,
-	step *stroppy.StroppyStepRun,
 ) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, nil
 }

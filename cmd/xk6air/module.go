@@ -36,6 +36,7 @@ func init() {
 		ctx:              context.Background(),
 		instanceTeardown: make(map[*Instance]func() error),
 		sharedSlots:      make(map[uint64]*sharedDriverSlot),
+		steps:            make(map[string]stroppy.StroppyRun_Status),
 	}
 
 	rootModule.runULID, rootModule.cloudClient = NewCloudClient(lg)
@@ -64,6 +65,9 @@ type RootModule struct {
 
 	instanceMu       sync.Mutex
 	instanceTeardown map[*Instance]func() error
+
+	stepsMu sync.Mutex
+	steps   map[string]stroppy.StroppyRun_Status
 }
 
 // NewModuleInstance factory method for Instances.
@@ -74,12 +78,21 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance { //nolin
 
 // NotifyStep allows user to notify cloud-stroppy about test specific steps.
 // Commonly to separate schema_init | insert | workload | cleanup stages.
+// Accumulates step statuses and always sends the full snapshot.
 func (r *RootModule) NotifyStep(name string, status int32) {
-	r.cloudClient.NotifyStep(r.ctx, &stroppy.StroppyStepRun{
-		Id:           &stroppy.Ulid{Value: getStepID(name).String()},
-		StroppyRunId: &stroppy.Ulid{Value: r.runULID.String()},
-		Status:       stroppy.Status(status),
-		Name:         name,
+	r.stepsMu.Lock()
+	r.steps[name] = stroppy.StroppyRun_Status(status)
+	snapshot := make(map[string]stroppy.StroppyRun_Status, len(r.steps))
+	for k, v := range r.steps {
+		snapshot[k] = v
+	}
+	r.stepsMu.Unlock()
+
+	r.cloudClient.NotifyRun(r.ctx, &stroppy.StroppyRun{
+		Id:     r.runULID.String(),
+		Status: stroppy.StroppyRun_STATUS_RUNNING,
+		Cmd:    "",
+		Steps:  snapshot,
 	})
 }
 
@@ -135,10 +148,18 @@ func (r *RootModule) Teardown() error {
 	}
 	r.sharedMu.Unlock()
 
+	r.stepsMu.Lock()
+	snapshot := make(map[string]stroppy.StroppyRun_Status, len(r.steps))
+	for k, v := range r.steps {
+		snapshot[k] = v
+	}
+	r.stepsMu.Unlock()
+
 	_, errCloud := r.cloudClient.NotifyRun(rootModule.ctx, &stroppy.StroppyRun{
-		Id:     &stroppy.Ulid{Value: rootModule.runULID.String()},
-		Status: stroppy.Status_STATUS_COMPLETED,
+		Id:     rootModule.runULID.String(),
+		Status: stroppy.StroppyRun_STATUS_COMPLETED,
 		Cmd:    "",
+		Steps:  snapshot,
 	})
 	return errors.Join(err, errCloud)
 }

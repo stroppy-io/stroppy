@@ -20,8 +20,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CloudStatusService_NotifyRun_FullMethodName  = "/stroppy.CloudStatusService/NotifyRun"
-	CloudStatusService_NotifyStep_FullMethodName = "/stroppy.CloudStatusService/NotifyStep"
+	CloudStatusService_NotifyRun_FullMethodName = "/stroppy.CloudStatusService/NotifyRun"
 )
 
 // CloudStatusServiceClient is the client API for CloudStatusService service.
@@ -34,8 +33,6 @@ const (
 type CloudStatusServiceClient interface {
 	// * Notifies the cloud status of a benchmark run
 	NotifyRun(ctx context.Context, in *StroppyRun, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// * Notifies the cloud status of a benchmark step
-	NotifyStep(ctx context.Context, in *StroppyStepRun, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type cloudStatusServiceClient struct {
@@ -56,16 +53,6 @@ func (c *cloudStatusServiceClient) NotifyRun(ctx context.Context, in *StroppyRun
 	return out, nil
 }
 
-func (c *cloudStatusServiceClient) NotifyStep(ctx context.Context, in *StroppyStepRun, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, CloudStatusService_NotifyStep_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // CloudStatusServiceServer is the server API for CloudStatusService service.
 // All implementations must embed UnimplementedCloudStatusServiceServer
 // for forward compatibility.
@@ -76,8 +63,6 @@ func (c *cloudStatusServiceClient) NotifyStep(ctx context.Context, in *StroppySt
 type CloudStatusServiceServer interface {
 	// * Notifies the cloud status of a benchmark run
 	NotifyRun(context.Context, *StroppyRun) (*emptypb.Empty, error)
-	// * Notifies the cloud status of a benchmark step
-	NotifyStep(context.Context, *StroppyStepRun) (*emptypb.Empty, error)
 	mustEmbedUnimplementedCloudStatusServiceServer()
 }
 
@@ -90,9 +75,6 @@ type UnimplementedCloudStatusServiceServer struct{}
 
 func (UnimplementedCloudStatusServiceServer) NotifyRun(context.Context, *StroppyRun) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NotifyRun not implemented")
-}
-func (UnimplementedCloudStatusServiceServer) NotifyStep(context.Context, *StroppyStepRun) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NotifyStep not implemented")
 }
 func (UnimplementedCloudStatusServiceServer) mustEmbedUnimplementedCloudStatusServiceServer() {}
 func (UnimplementedCloudStatusServiceServer) testEmbeddedByValue()                            {}
@@ -133,24 +115,6 @@ func _CloudStatusService_NotifyRun_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _CloudStatusService_NotifyStep_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StroppyStepRun)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CloudStatusServiceServer).NotifyStep(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: CloudStatusService_NotifyStep_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CloudStatusServiceServer).NotifyStep(ctx, req.(*StroppyStepRun))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // CloudStatusService_ServiceDesc is the grpc.ServiceDesc for CloudStatusService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -161,10 +125,6 @@ var CloudStatusService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "NotifyRun",
 			Handler:    _CloudStatusService_NotifyRun_Handler,
-		},
-		{
-			MethodName: "NotifyStep",
-			Handler:    _CloudStatusService_NotifyStep_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

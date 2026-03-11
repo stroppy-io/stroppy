@@ -64,7 +64,7 @@ func (x Value_NullValue) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Value_NullValue.Descriptor instead.
 func (Value_NullValue) EnumDescriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 0}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{4, 0}
 }
 
 type Generation_Distribution_DistributionType int32
@@ -116,7 +116,7 @@ func (x Generation_Distribution_DistributionType) Number() protoreflect.EnumNumb
 
 // Deprecated: Use Generation_Distribution_DistributionType.Descriptor instead.
 func (Generation_Distribution_DistributionType) EnumDescriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 1, 0}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 1, 0}
 }
 
 // *
@@ -357,54 +357,6 @@ func (x *DateTime) GetValue() *timestamppb.Timestamp {
 }
 
 // *
-// Ulid represents a universally universally unique lexicographically sortable
-// identifier (ULID).
-type Ulid struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// * String representation of ULID (e.g., "01ANQWJZ000000000000000000")
-	Value         string `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Ulid) Reset() {
-	*x = Ulid{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Ulid) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Ulid) ProtoMessage() {}
-
-func (x *Ulid) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Ulid.ProtoReflect.Descriptor instead.
-func (*Ulid) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *Ulid) GetValue() string {
-	if x != nil {
-		return x.Value
-	}
-	return ""
-}
-
-// *
 // Value is a variant type that can represent different types of values.
 // It's used to represent values that can be of multiple types in a type-safe
 // way.
@@ -435,7 +387,7 @@ type Value struct {
 
 func (x *Value) Reset() {
 	*x = Value{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[5]
+	mi := &file_proto_stroppy_common_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -447,7 +399,7 @@ func (x *Value) String() string {
 func (*Value) ProtoMessage() {}
 
 func (x *Value) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[5]
+	mi := &file_proto_stroppy_common_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -460,7 +412,7 @@ func (x *Value) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Value.ProtoReflect.Descriptor instead.
 func (*Value) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Value) GetType() isValue_Type {
@@ -716,7 +668,7 @@ type Generation struct {
 
 func (x *Generation) Reset() {
 	*x = Generation{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[6]
+	mi := &file_proto_stroppy_common_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -728,7 +680,7 @@ func (x *Generation) String() string {
 func (*Generation) ProtoMessage() {}
 
 func (x *Generation) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[6]
+	mi := &file_proto_stroppy_common_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -741,7 +693,7 @@ func (x *Generation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation.ProtoReflect.Descriptor instead.
 func (*Generation) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5}
 }
 
 type Value_List struct {
@@ -754,7 +706,7 @@ type Value_List struct {
 
 func (x *Value_List) Reset() {
 	*x = Value_List{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[7]
+	mi := &file_proto_stroppy_common_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -766,7 +718,7 @@ func (x *Value_List) String() string {
 func (*Value_List) ProtoMessage() {}
 
 func (x *Value_List) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[7]
+	mi := &file_proto_stroppy_common_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -779,7 +731,7 @@ func (x *Value_List) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Value_List.ProtoReflect.Descriptor instead.
 func (*Value_List) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 0}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{4, 0}
 }
 
 func (x *Value_List) GetValues() []*Value {
@@ -799,7 +751,7 @@ type Value_Struct struct {
 
 func (x *Value_Struct) Reset() {
 	*x = Value_Struct{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[8]
+	mi := &file_proto_stroppy_common_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -811,7 +763,7 @@ func (x *Value_Struct) String() string {
 func (*Value_Struct) ProtoMessage() {}
 
 func (x *Value_Struct) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[8]
+	mi := &file_proto_stroppy_common_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -824,7 +776,7 @@ func (x *Value_Struct) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Value_Struct.ProtoReflect.Descriptor instead.
 func (*Value_Struct) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 1}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{4, 1}
 }
 
 func (x *Value_Struct) GetFields() []*Value {
@@ -846,7 +798,7 @@ type Generation_Alphabet struct {
 
 func (x *Generation_Alphabet) Reset() {
 	*x = Generation_Alphabet{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[9]
+	mi := &file_proto_stroppy_common_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -858,7 +810,7 @@ func (x *Generation_Alphabet) String() string {
 func (*Generation_Alphabet) ProtoMessage() {}
 
 func (x *Generation_Alphabet) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[9]
+	mi := &file_proto_stroppy_common_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -871,7 +823,7 @@ func (x *Generation_Alphabet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Alphabet.ProtoReflect.Descriptor instead.
 func (*Generation_Alphabet) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 0}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 0}
 }
 
 func (x *Generation_Alphabet) GetRanges() []*Generation_Range_UInt32 {
@@ -896,7 +848,7 @@ type Generation_Distribution struct {
 
 func (x *Generation_Distribution) Reset() {
 	*x = Generation_Distribution{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[10]
+	mi := &file_proto_stroppy_common_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -908,7 +860,7 @@ func (x *Generation_Distribution) String() string {
 func (*Generation_Distribution) ProtoMessage() {}
 
 func (x *Generation_Distribution) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[10]
+	mi := &file_proto_stroppy_common_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -921,7 +873,7 @@ func (x *Generation_Distribution) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Distribution.ProtoReflect.Descriptor instead.
 func (*Generation_Distribution) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 1}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 1}
 }
 
 func (x *Generation_Distribution) GetType() Generation_Distribution_DistributionType {
@@ -948,7 +900,7 @@ type Generation_Range struct {
 
 func (x *Generation_Range) Reset() {
 	*x = Generation_Range{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[11]
+	mi := &file_proto_stroppy_common_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -960,7 +912,7 @@ func (x *Generation_Range) String() string {
 func (*Generation_Range) ProtoMessage() {}
 
 func (x *Generation_Range) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[11]
+	mi := &file_proto_stroppy_common_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -973,7 +925,7 @@ func (x *Generation_Range) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range.ProtoReflect.Descriptor instead.
 func (*Generation_Range) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2}
 }
 
 // *
@@ -1024,7 +976,7 @@ type Generation_Rule struct {
 
 func (x *Generation_Rule) Reset() {
 	*x = Generation_Rule{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[12]
+	mi := &file_proto_stroppy_common_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1036,7 +988,7 @@ func (x *Generation_Rule) String() string {
 func (*Generation_Rule) ProtoMessage() {}
 
 func (x *Generation_Rule) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[12]
+	mi := &file_proto_stroppy_common_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1049,7 +1001,7 @@ func (x *Generation_Rule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Rule.ProtoReflect.Descriptor instead.
 func (*Generation_Rule) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 3}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 3}
 }
 
 func (x *Generation_Rule) GetKind() isGeneration_Rule_Kind {
@@ -1478,7 +1430,7 @@ type Generation_Range_Bool struct {
 
 func (x *Generation_Range_Bool) Reset() {
 	*x = Generation_Range_Bool{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[13]
+	mi := &file_proto_stroppy_common_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1490,7 +1442,7 @@ func (x *Generation_Range_Bool) String() string {
 func (*Generation_Range_Bool) ProtoMessage() {}
 
 func (x *Generation_Range_Bool) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[13]
+	mi := &file_proto_stroppy_common_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1503,7 +1455,7 @@ func (x *Generation_Range_Bool) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_Bool.ProtoReflect.Descriptor instead.
 func (*Generation_Range_Bool) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 0}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 0}
 }
 
 func (x *Generation_Range_Bool) GetRatio() float32 {
@@ -1525,7 +1477,7 @@ type Generation_Range_String struct {
 
 func (x *Generation_Range_String) Reset() {
 	*x = Generation_Range_String{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[14]
+	mi := &file_proto_stroppy_common_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1537,7 +1489,7 @@ func (x *Generation_Range_String) String() string {
 func (*Generation_Range_String) ProtoMessage() {}
 
 func (x *Generation_Range_String) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[14]
+	mi := &file_proto_stroppy_common_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1550,7 +1502,7 @@ func (x *Generation_Range_String) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_String.ProtoReflect.Descriptor instead.
 func (*Generation_Range_String) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 1}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 1}
 }
 
 func (x *Generation_Range_String) GetAlphabet() *Generation_Alphabet {
@@ -1587,7 +1539,7 @@ type Generation_Range_AnyString struct {
 
 func (x *Generation_Range_AnyString) Reset() {
 	*x = Generation_Range_AnyString{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[15]
+	mi := &file_proto_stroppy_common_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1599,7 +1551,7 @@ func (x *Generation_Range_AnyString) String() string {
 func (*Generation_Range_AnyString) ProtoMessage() {}
 
 func (x *Generation_Range_AnyString) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[15]
+	mi := &file_proto_stroppy_common_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1612,7 +1564,7 @@ func (x *Generation_Range_AnyString) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_AnyString.ProtoReflect.Descriptor instead.
 func (*Generation_Range_AnyString) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 2}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 2}
 }
 
 func (x *Generation_Range_AnyString) GetMin() string {
@@ -1642,7 +1594,7 @@ type Generation_Range_Float struct {
 
 func (x *Generation_Range_Float) Reset() {
 	*x = Generation_Range_Float{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[16]
+	mi := &file_proto_stroppy_common_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1654,7 +1606,7 @@ func (x *Generation_Range_Float) String() string {
 func (*Generation_Range_Float) ProtoMessage() {}
 
 func (x *Generation_Range_Float) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[16]
+	mi := &file_proto_stroppy_common_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1667,7 +1619,7 @@ func (x *Generation_Range_Float) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_Float.ProtoReflect.Descriptor instead.
 func (*Generation_Range_Float) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 3}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 3}
 }
 
 func (x *Generation_Range_Float) GetMin() float32 {
@@ -1697,7 +1649,7 @@ type Generation_Range_Double struct {
 
 func (x *Generation_Range_Double) Reset() {
 	*x = Generation_Range_Double{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[17]
+	mi := &file_proto_stroppy_common_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1709,7 +1661,7 @@ func (x *Generation_Range_Double) String() string {
 func (*Generation_Range_Double) ProtoMessage() {}
 
 func (x *Generation_Range_Double) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[17]
+	mi := &file_proto_stroppy_common_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1722,7 +1674,7 @@ func (x *Generation_Range_Double) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_Double.ProtoReflect.Descriptor instead.
 func (*Generation_Range_Double) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 4}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 4}
 }
 
 func (x *Generation_Range_Double) GetMin() float64 {
@@ -1752,7 +1704,7 @@ type Generation_Range_Int32 struct {
 
 func (x *Generation_Range_Int32) Reset() {
 	*x = Generation_Range_Int32{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[18]
+	mi := &file_proto_stroppy_common_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1764,7 +1716,7 @@ func (x *Generation_Range_Int32) String() string {
 func (*Generation_Range_Int32) ProtoMessage() {}
 
 func (x *Generation_Range_Int32) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[18]
+	mi := &file_proto_stroppy_common_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1777,7 +1729,7 @@ func (x *Generation_Range_Int32) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_Int32.ProtoReflect.Descriptor instead.
 func (*Generation_Range_Int32) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 5}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 5}
 }
 
 func (x *Generation_Range_Int32) GetMin() int32 {
@@ -1807,7 +1759,7 @@ type Generation_Range_Int64 struct {
 
 func (x *Generation_Range_Int64) Reset() {
 	*x = Generation_Range_Int64{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[19]
+	mi := &file_proto_stroppy_common_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1819,7 +1771,7 @@ func (x *Generation_Range_Int64) String() string {
 func (*Generation_Range_Int64) ProtoMessage() {}
 
 func (x *Generation_Range_Int64) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[19]
+	mi := &file_proto_stroppy_common_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1832,7 +1784,7 @@ func (x *Generation_Range_Int64) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_Int64.ProtoReflect.Descriptor instead.
 func (*Generation_Range_Int64) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 6}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 6}
 }
 
 func (x *Generation_Range_Int64) GetMin() int64 {
@@ -1862,7 +1814,7 @@ type Generation_Range_UInt32 struct {
 
 func (x *Generation_Range_UInt32) Reset() {
 	*x = Generation_Range_UInt32{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[20]
+	mi := &file_proto_stroppy_common_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1874,7 +1826,7 @@ func (x *Generation_Range_UInt32) String() string {
 func (*Generation_Range_UInt32) ProtoMessage() {}
 
 func (x *Generation_Range_UInt32) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[20]
+	mi := &file_proto_stroppy_common_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1887,7 +1839,7 @@ func (x *Generation_Range_UInt32) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_UInt32.ProtoReflect.Descriptor instead.
 func (*Generation_Range_UInt32) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 7}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 7}
 }
 
 func (x *Generation_Range_UInt32) GetMin() uint32 {
@@ -1917,7 +1869,7 @@ type Generation_Range_UInt64 struct {
 
 func (x *Generation_Range_UInt64) Reset() {
 	*x = Generation_Range_UInt64{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[21]
+	mi := &file_proto_stroppy_common_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1929,7 +1881,7 @@ func (x *Generation_Range_UInt64) String() string {
 func (*Generation_Range_UInt64) ProtoMessage() {}
 
 func (x *Generation_Range_UInt64) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[21]
+	mi := &file_proto_stroppy_common_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1942,7 +1894,7 @@ func (x *Generation_Range_UInt64) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_UInt64.ProtoReflect.Descriptor instead.
 func (*Generation_Range_UInt64) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 8}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 8}
 }
 
 func (x *Generation_Range_UInt64) GetMin() uint64 {
@@ -1974,7 +1926,7 @@ type Generation_Range_DecimalRange struct {
 
 func (x *Generation_Range_DecimalRange) Reset() {
 	*x = Generation_Range_DecimalRange{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[22]
+	mi := &file_proto_stroppy_common_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1986,7 +1938,7 @@ func (x *Generation_Range_DecimalRange) String() string {
 func (*Generation_Range_DecimalRange) ProtoMessage() {}
 
 func (x *Generation_Range_DecimalRange) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[22]
+	mi := &file_proto_stroppy_common_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1999,7 +1951,7 @@ func (x *Generation_Range_DecimalRange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_DecimalRange.ProtoReflect.Descriptor instead.
 func (*Generation_Range_DecimalRange) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 9}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 9}
 }
 
 func (x *Generation_Range_DecimalRange) GetType() isGeneration_Range_DecimalRange_Type {
@@ -2074,7 +2026,7 @@ type Generation_Range_UuidSeq struct {
 
 func (x *Generation_Range_UuidSeq) Reset() {
 	*x = Generation_Range_UuidSeq{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[23]
+	mi := &file_proto_stroppy_common_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2086,7 +2038,7 @@ func (x *Generation_Range_UuidSeq) String() string {
 func (*Generation_Range_UuidSeq) ProtoMessage() {}
 
 func (x *Generation_Range_UuidSeq) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[23]
+	mi := &file_proto_stroppy_common_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2099,7 +2051,7 @@ func (x *Generation_Range_UuidSeq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_UuidSeq.ProtoReflect.Descriptor instead.
 func (*Generation_Range_UuidSeq) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 10}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 10}
 }
 
 func (x *Generation_Range_UuidSeq) GetMin() *Uuid {
@@ -2131,7 +2083,7 @@ type Generation_Range_DateTime struct {
 
 func (x *Generation_Range_DateTime) Reset() {
 	*x = Generation_Range_DateTime{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[24]
+	mi := &file_proto_stroppy_common_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2143,7 +2095,7 @@ func (x *Generation_Range_DateTime) String() string {
 func (*Generation_Range_DateTime) ProtoMessage() {}
 
 func (x *Generation_Range_DateTime) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[24]
+	mi := &file_proto_stroppy_common_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2156,7 +2108,7 @@ func (x *Generation_Range_DateTime) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Generation_Range_DateTime.ProtoReflect.Descriptor instead.
 func (*Generation_Range_DateTime) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 11}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 11}
 }
 
 func (x *Generation_Range_DateTime) GetType() isGeneration_Range_DateTime_Type {
@@ -2231,7 +2183,7 @@ type Generation_Range_DateTime_TimestampPb struct {
 
 func (x *Generation_Range_DateTime_TimestampPb) Reset() {
 	*x = Generation_Range_DateTime_TimestampPb{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[25]
+	mi := &file_proto_stroppy_common_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2243,7 +2195,7 @@ func (x *Generation_Range_DateTime_TimestampPb) String() string {
 func (*Generation_Range_DateTime_TimestampPb) ProtoMessage() {}
 
 func (x *Generation_Range_DateTime_TimestampPb) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[25]
+	mi := &file_proto_stroppy_common_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2256,7 +2208,7 @@ func (x *Generation_Range_DateTime_TimestampPb) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use Generation_Range_DateTime_TimestampPb.ProtoReflect.Descriptor instead.
 func (*Generation_Range_DateTime_TimestampPb) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 11, 0}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 11, 0}
 }
 
 func (x *Generation_Range_DateTime_TimestampPb) GetMin() *timestamppb.Timestamp {
@@ -2286,7 +2238,7 @@ type Generation_Range_DateTime_TimestampUnix struct {
 
 func (x *Generation_Range_DateTime_TimestampUnix) Reset() {
 	*x = Generation_Range_DateTime_TimestampUnix{}
-	mi := &file_proto_stroppy_common_proto_msgTypes[26]
+	mi := &file_proto_stroppy_common_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2298,7 +2250,7 @@ func (x *Generation_Range_DateTime_TimestampUnix) String() string {
 func (*Generation_Range_DateTime_TimestampUnix) ProtoMessage() {}
 
 func (x *Generation_Range_DateTime_TimestampUnix) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_common_proto_msgTypes[26]
+	mi := &file_proto_stroppy_common_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2311,7 +2263,7 @@ func (x *Generation_Range_DateTime_TimestampUnix) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use Generation_Range_DateTime_TimestampUnix.ProtoReflect.Descriptor instead.
 func (*Generation_Range_DateTime_TimestampUnix) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{6, 2, 11, 1}
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 2, 11, 1}
 }
 
 func (x *Generation_Range_DateTime_TimestampUnix) GetMin() uint32 {
@@ -2352,9 +2304,7 @@ const file_proto_stroppy_common_proto_rawDesc = "" +
 	"\x04Uuid\x12\x1e\n" +
 	"\x05value\x18\x01 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01R\x05value\"<\n" +
 	"\bDateTime\x120\n" +
-	"\x05value\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x05value\"&\n" +
-	"\x04Ulid\x12\x1e\n" +
-	"\x05value\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x98\x01\x1aR\x05value\"\xf6\x04\n" +
+	"\x05value\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x05value\"\xf6\x04\n" +
 	"\x05Value\x12.\n" +
 	"\x04null\x18\x01 \x01(\x0e2\x18.stroppy.Value.NullValueH\x00R\x04null\x12\x16\n" +
 	"\x05int32\x18\x02 \x01(\x05H\x00R\x05int32\x12\x18\n" +
@@ -2508,7 +2458,7 @@ func file_proto_stroppy_common_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_stroppy_common_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_proto_stroppy_common_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
+var file_proto_stroppy_common_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_proto_stroppy_common_proto_goTypes = []any{
 	(Value_NullValue)(0),                            // 0: stroppy.Value.NullValue
 	(Generation_Distribution_DistributionType)(0),   // 1: stroppy.Generation.Distribution.DistributionType
@@ -2516,69 +2466,68 @@ var file_proto_stroppy_common_proto_goTypes = []any{
 	(*Decimal)(nil),                                 // 3: stroppy.Decimal
 	(*Uuid)(nil),                                    // 4: stroppy.Uuid
 	(*DateTime)(nil),                                // 5: stroppy.DateTime
-	(*Ulid)(nil),                                    // 6: stroppy.Ulid
-	(*Value)(nil),                                   // 7: stroppy.Value
-	(*Generation)(nil),                              // 8: stroppy.Generation
-	(*Value_List)(nil),                              // 9: stroppy.Value.List
-	(*Value_Struct)(nil),                            // 10: stroppy.Value.Struct
-	(*Generation_Alphabet)(nil),                     // 11: stroppy.Generation.Alphabet
-	(*Generation_Distribution)(nil),                 // 12: stroppy.Generation.Distribution
-	(*Generation_Range)(nil),                        // 13: stroppy.Generation.Range
-	(*Generation_Rule)(nil),                         // 14: stroppy.Generation.Rule
-	(*Generation_Range_Bool)(nil),                   // 15: stroppy.Generation.Range.Bool
-	(*Generation_Range_String)(nil),                 // 16: stroppy.Generation.Range.String
-	(*Generation_Range_AnyString)(nil),              // 17: stroppy.Generation.Range.AnyString
-	(*Generation_Range_Float)(nil),                  // 18: stroppy.Generation.Range.Float
-	(*Generation_Range_Double)(nil),                 // 19: stroppy.Generation.Range.Double
-	(*Generation_Range_Int32)(nil),                  // 20: stroppy.Generation.Range.Int32
-	(*Generation_Range_Int64)(nil),                  // 21: stroppy.Generation.Range.Int64
-	(*Generation_Range_UInt32)(nil),                 // 22: stroppy.Generation.Range.UInt32
-	(*Generation_Range_UInt64)(nil),                 // 23: stroppy.Generation.Range.UInt64
-	(*Generation_Range_DecimalRange)(nil),           // 24: stroppy.Generation.Range.DecimalRange
-	(*Generation_Range_UuidSeq)(nil),                // 25: stroppy.Generation.Range.UuidSeq
-	(*Generation_Range_DateTime)(nil),               // 26: stroppy.Generation.Range.DateTime
-	(*Generation_Range_DateTime_TimestampPb)(nil),   // 27: stroppy.Generation.Range.DateTime.TimestampPb
-	(*Generation_Range_DateTime_TimestampUnix)(nil), // 28: stroppy.Generation.Range.DateTime.TimestampUnix
-	(*timestamppb.Timestamp)(nil),                   // 29: google.protobuf.Timestamp
+	(*Value)(nil),                                   // 6: stroppy.Value
+	(*Generation)(nil),                              // 7: stroppy.Generation
+	(*Value_List)(nil),                              // 8: stroppy.Value.List
+	(*Value_Struct)(nil),                            // 9: stroppy.Value.Struct
+	(*Generation_Alphabet)(nil),                     // 10: stroppy.Generation.Alphabet
+	(*Generation_Distribution)(nil),                 // 11: stroppy.Generation.Distribution
+	(*Generation_Range)(nil),                        // 12: stroppy.Generation.Range
+	(*Generation_Rule)(nil),                         // 13: stroppy.Generation.Rule
+	(*Generation_Range_Bool)(nil),                   // 14: stroppy.Generation.Range.Bool
+	(*Generation_Range_String)(nil),                 // 15: stroppy.Generation.Range.String
+	(*Generation_Range_AnyString)(nil),              // 16: stroppy.Generation.Range.AnyString
+	(*Generation_Range_Float)(nil),                  // 17: stroppy.Generation.Range.Float
+	(*Generation_Range_Double)(nil),                 // 18: stroppy.Generation.Range.Double
+	(*Generation_Range_Int32)(nil),                  // 19: stroppy.Generation.Range.Int32
+	(*Generation_Range_Int64)(nil),                  // 20: stroppy.Generation.Range.Int64
+	(*Generation_Range_UInt32)(nil),                 // 21: stroppy.Generation.Range.UInt32
+	(*Generation_Range_UInt64)(nil),                 // 22: stroppy.Generation.Range.UInt64
+	(*Generation_Range_DecimalRange)(nil),           // 23: stroppy.Generation.Range.DecimalRange
+	(*Generation_Range_UuidSeq)(nil),                // 24: stroppy.Generation.Range.UuidSeq
+	(*Generation_Range_DateTime)(nil),               // 25: stroppy.Generation.Range.DateTime
+	(*Generation_Range_DateTime_TimestampPb)(nil),   // 26: stroppy.Generation.Range.DateTime.TimestampPb
+	(*Generation_Range_DateTime_TimestampUnix)(nil), // 27: stroppy.Generation.Range.DateTime.TimestampUnix
+	(*timestamppb.Timestamp)(nil),                   // 28: google.protobuf.Timestamp
 }
 var file_proto_stroppy_common_proto_depIdxs = []int32{
-	29, // 0: stroppy.DateTime.value:type_name -> google.protobuf.Timestamp
+	28, // 0: stroppy.DateTime.value:type_name -> google.protobuf.Timestamp
 	0,  // 1: stroppy.Value.null:type_name -> stroppy.Value.NullValue
 	3,  // 2: stroppy.Value.decimal:type_name -> stroppy.Decimal
 	4,  // 3: stroppy.Value.uuid:type_name -> stroppy.Uuid
 	5,  // 4: stroppy.Value.datetime:type_name -> stroppy.DateTime
-	10, // 5: stroppy.Value.struct:type_name -> stroppy.Value.Struct
-	9,  // 6: stroppy.Value.list:type_name -> stroppy.Value.List
-	7,  // 7: stroppy.Value.List.values:type_name -> stroppy.Value
-	7,  // 8: stroppy.Value.Struct.fields:type_name -> stroppy.Value
-	22, // 9: stroppy.Generation.Alphabet.ranges:type_name -> stroppy.Generation.Range.UInt32
+	9,  // 5: stroppy.Value.struct:type_name -> stroppy.Value.Struct
+	8,  // 6: stroppy.Value.list:type_name -> stroppy.Value.List
+	6,  // 7: stroppy.Value.List.values:type_name -> stroppy.Value
+	6,  // 8: stroppy.Value.Struct.fields:type_name -> stroppy.Value
+	21, // 9: stroppy.Generation.Alphabet.ranges:type_name -> stroppy.Generation.Range.UInt32
 	1,  // 10: stroppy.Generation.Distribution.type:type_name -> stroppy.Generation.Distribution.DistributionType
-	20, // 11: stroppy.Generation.Rule.int32_range:type_name -> stroppy.Generation.Range.Int32
-	21, // 12: stroppy.Generation.Rule.int64_range:type_name -> stroppy.Generation.Range.Int64
-	22, // 13: stroppy.Generation.Rule.uint32_range:type_name -> stroppy.Generation.Range.UInt32
-	23, // 14: stroppy.Generation.Rule.uint64_range:type_name -> stroppy.Generation.Range.UInt64
-	18, // 15: stroppy.Generation.Rule.float_range:type_name -> stroppy.Generation.Range.Float
-	19, // 16: stroppy.Generation.Rule.double_range:type_name -> stroppy.Generation.Range.Double
-	24, // 17: stroppy.Generation.Rule.decimal_range:type_name -> stroppy.Generation.Range.DecimalRange
-	16, // 18: stroppy.Generation.Rule.string_range:type_name -> stroppy.Generation.Range.String
-	15, // 19: stroppy.Generation.Rule.bool_range:type_name -> stroppy.Generation.Range.Bool
-	26, // 20: stroppy.Generation.Rule.datetime_range:type_name -> stroppy.Generation.Range.DateTime
+	19, // 11: stroppy.Generation.Rule.int32_range:type_name -> stroppy.Generation.Range.Int32
+	20, // 12: stroppy.Generation.Rule.int64_range:type_name -> stroppy.Generation.Range.Int64
+	21, // 13: stroppy.Generation.Rule.uint32_range:type_name -> stroppy.Generation.Range.UInt32
+	22, // 14: stroppy.Generation.Rule.uint64_range:type_name -> stroppy.Generation.Range.UInt64
+	17, // 15: stroppy.Generation.Rule.float_range:type_name -> stroppy.Generation.Range.Float
+	18, // 16: stroppy.Generation.Rule.double_range:type_name -> stroppy.Generation.Range.Double
+	23, // 17: stroppy.Generation.Rule.decimal_range:type_name -> stroppy.Generation.Range.DecimalRange
+	15, // 18: stroppy.Generation.Rule.string_range:type_name -> stroppy.Generation.Range.String
+	14, // 19: stroppy.Generation.Rule.bool_range:type_name -> stroppy.Generation.Range.Bool
+	25, // 20: stroppy.Generation.Rule.datetime_range:type_name -> stroppy.Generation.Range.DateTime
 	3,  // 21: stroppy.Generation.Rule.decimal_const:type_name -> stroppy.Decimal
 	5,  // 22: stroppy.Generation.Rule.datetime_const:type_name -> stroppy.DateTime
 	4,  // 23: stroppy.Generation.Rule.uuid_const:type_name -> stroppy.Uuid
-	25, // 24: stroppy.Generation.Rule.uuid_seq:type_name -> stroppy.Generation.Range.UuidSeq
-	12, // 25: stroppy.Generation.Rule.distribution:type_name -> stroppy.Generation.Distribution
-	11, // 26: stroppy.Generation.Range.String.alphabet:type_name -> stroppy.Generation.Alphabet
-	18, // 27: stroppy.Generation.Range.DecimalRange.float:type_name -> stroppy.Generation.Range.Float
-	19, // 28: stroppy.Generation.Range.DecimalRange.double:type_name -> stroppy.Generation.Range.Double
-	17, // 29: stroppy.Generation.Range.DecimalRange.string:type_name -> stroppy.Generation.Range.AnyString
+	24, // 24: stroppy.Generation.Rule.uuid_seq:type_name -> stroppy.Generation.Range.UuidSeq
+	11, // 25: stroppy.Generation.Rule.distribution:type_name -> stroppy.Generation.Distribution
+	10, // 26: stroppy.Generation.Range.String.alphabet:type_name -> stroppy.Generation.Alphabet
+	17, // 27: stroppy.Generation.Range.DecimalRange.float:type_name -> stroppy.Generation.Range.Float
+	18, // 28: stroppy.Generation.Range.DecimalRange.double:type_name -> stroppy.Generation.Range.Double
+	16, // 29: stroppy.Generation.Range.DecimalRange.string:type_name -> stroppy.Generation.Range.AnyString
 	4,  // 30: stroppy.Generation.Range.UuidSeq.min:type_name -> stroppy.Uuid
 	4,  // 31: stroppy.Generation.Range.UuidSeq.max:type_name -> stroppy.Uuid
-	17, // 32: stroppy.Generation.Range.DateTime.string:type_name -> stroppy.Generation.Range.AnyString
-	27, // 33: stroppy.Generation.Range.DateTime.timestamp_pb:type_name -> stroppy.Generation.Range.DateTime.TimestampPb
-	28, // 34: stroppy.Generation.Range.DateTime.timestamp:type_name -> stroppy.Generation.Range.DateTime.TimestampUnix
-	29, // 35: stroppy.Generation.Range.DateTime.TimestampPb.min:type_name -> google.protobuf.Timestamp
-	29, // 36: stroppy.Generation.Range.DateTime.TimestampPb.max:type_name -> google.protobuf.Timestamp
+	16, // 32: stroppy.Generation.Range.DateTime.string:type_name -> stroppy.Generation.Range.AnyString
+	26, // 33: stroppy.Generation.Range.DateTime.timestamp_pb:type_name -> stroppy.Generation.Range.DateTime.TimestampPb
+	27, // 34: stroppy.Generation.Range.DateTime.timestamp:type_name -> stroppy.Generation.Range.DateTime.TimestampUnix
+	28, // 35: stroppy.Generation.Range.DateTime.TimestampPb.min:type_name -> google.protobuf.Timestamp
+	28, // 36: stroppy.Generation.Range.DateTime.TimestampPb.max:type_name -> google.protobuf.Timestamp
 	37, // [37:37] is the sub-list for method output_type
 	37, // [37:37] is the sub-list for method input_type
 	37, // [37:37] is the sub-list for extension type_name
@@ -2592,7 +2541,7 @@ func file_proto_stroppy_common_proto_init() {
 		return
 	}
 	file_proto_stroppy_common_proto_msgTypes[0].OneofWrappers = []any{}
-	file_proto_stroppy_common_proto_msgTypes[5].OneofWrappers = []any{
+	file_proto_stroppy_common_proto_msgTypes[4].OneofWrappers = []any{
 		(*Value_Null)(nil),
 		(*Value_Int32)(nil),
 		(*Value_Uint32)(nil),
@@ -2608,7 +2557,7 @@ func file_proto_stroppy_common_proto_init() {
 		(*Value_Struct_)(nil),
 		(*Value_List_)(nil),
 	}
-	file_proto_stroppy_common_proto_msgTypes[12].OneofWrappers = []any{
+	file_proto_stroppy_common_proto_msgTypes[11].OneofWrappers = []any{
 		(*Generation_Rule_Int32Range)(nil),
 		(*Generation_Rule_Int64Range)(nil),
 		(*Generation_Rule_Uint32Range)(nil),
@@ -2634,20 +2583,20 @@ func file_proto_stroppy_common_proto_init() {
 		(*Generation_Rule_UuidSeeded)(nil),
 		(*Generation_Rule_UuidSeq)(nil),
 	}
-	file_proto_stroppy_common_proto_msgTypes[14].OneofWrappers = []any{}
+	file_proto_stroppy_common_proto_msgTypes[13].OneofWrappers = []any{}
+	file_proto_stroppy_common_proto_msgTypes[15].OneofWrappers = []any{}
 	file_proto_stroppy_common_proto_msgTypes[16].OneofWrappers = []any{}
 	file_proto_stroppy_common_proto_msgTypes[17].OneofWrappers = []any{}
 	file_proto_stroppy_common_proto_msgTypes[18].OneofWrappers = []any{}
 	file_proto_stroppy_common_proto_msgTypes[19].OneofWrappers = []any{}
 	file_proto_stroppy_common_proto_msgTypes[20].OneofWrappers = []any{}
-	file_proto_stroppy_common_proto_msgTypes[21].OneofWrappers = []any{}
-	file_proto_stroppy_common_proto_msgTypes[22].OneofWrappers = []any{
+	file_proto_stroppy_common_proto_msgTypes[21].OneofWrappers = []any{
 		(*Generation_Range_DecimalRange_Float)(nil),
 		(*Generation_Range_DecimalRange_Double)(nil),
 		(*Generation_Range_DecimalRange_String_)(nil),
 	}
-	file_proto_stroppy_common_proto_msgTypes[23].OneofWrappers = []any{}
-	file_proto_stroppy_common_proto_msgTypes[24].OneofWrappers = []any{
+	file_proto_stroppy_common_proto_msgTypes[22].OneofWrappers = []any{}
+	file_proto_stroppy_common_proto_msgTypes[23].OneofWrappers = []any{
 		(*Generation_Range_DateTime_String_)(nil),
 		(*Generation_Range_DateTime_TimestampPb_)(nil),
 		(*Generation_Range_DateTime_Timestamp)(nil),
@@ -2658,7 +2607,7 @@ func file_proto_stroppy_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_common_proto_rawDesc), len(file_proto_stroppy_common_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   27,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
