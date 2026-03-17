@@ -8,26 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIsShortName(t *testing.T) {
-	tests := []struct {
-		arg  string
-		want bool
-	}{
-		{"tpcc", true},
-		{"simple", true},
-		{"tpcc.ts", false},
-		{"tpcc.sql", false},
-		{"./tpcc.ts", false},
-		{"workloads/tpcc/tpcc.ts", false},
-		{"path/to/file", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.arg, func(t *testing.T) {
-			require.Equal(t, tt.want, isShortName(tt.arg))
-		})
-	}
-}
-
 func TestDeriveNames(t *testing.T) {
 	tests := []struct {
 		arg        string
@@ -42,7 +22,7 @@ func TestDeriveNames(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.arg, func(t *testing.T) {
-			preset, script := deriveNames(tt.arg)
+			preset, script := deriveNames(tt.arg, ".ts")
 			require.Equal(t, tt.wantPreset, preset)
 			require.Equal(t, tt.wantScript, script)
 		})
