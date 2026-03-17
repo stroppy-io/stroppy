@@ -45,6 +45,7 @@
 - [proto/stroppy/config.proto](#proto_stroppy_config-proto)
     - [DriverConfig](#stroppy-DriverConfig)
     - [DriverConfig.PostgresConfig](#stroppy-DriverConfig-PostgresConfig)
+    - [DriverConfig.SqlConfig](#stroppy-DriverConfig-SqlConfig)
     - [ExporterConfig](#stroppy-ExporterConfig)
     - [GlobalConfig](#stroppy-GlobalConfig)
     - [GlobalConfig.MetadataEntry](#stroppy-GlobalConfig-MetadataEntry)
@@ -660,6 +661,7 @@ by the k6 lifecycle stage: init phase = shared, iteration = per-VU.
 | url | [string](#string) |  | Database connection URL |
 | driver_type | [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType) |  | Name/Type of chosen driver |
 | postgres | [DriverConfig.PostgresConfig](#stroppy-DriverConfig-PostgresConfig) |  |  |
+| sql | [DriverConfig.SqlConfig](#stroppy-DriverConfig-SqlConfig) |  |  |
 
 
 
@@ -683,6 +685,25 @@ PostgreSQL-specific pool and connection configuration
 | default_query_exec_mode | [string](#string) | optional | Query execution mode: exec, cache_statement, cache_describe, describe_exec, simple_protocol |
 | description_cache_capacity | [int32](#int32) | optional | Description cache capacity (only with cache_describe mode) |
 | statement_cache_capacity | [int32](#int32) | optional | Statement cache capacity (only with cache_statement mode) |
+
+
+
+
+
+
+<a name="stroppy-DriverConfig-SqlConfig"></a>
+
+### DriverConfig.SqlConfig
+Generic database/sql pool settings for SQL-based drivers
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| max_open_conns | [int32](#int32) | optional | Maximum number of open connections |
+| max_idle_conns | [int32](#int32) | optional | Maximum number of idle connections |
+| conn_max_lifetime | [string](#string) | optional | Maximum connection lifetime (Go duration string, e.g. &#34;1h&#34;) |
+| conn_max_idle_time | [string](#string) | optional | Maximum idle connection time (Go duration string, e.g. &#34;10m&#34;) |
+| bulk_size | [int32](#int32) | optional | Rows per bulk INSERT statement |
 
 
 
@@ -769,6 +790,7 @@ It controls log levels and output formatting.
 | ---- | ------ | ----------- |
 | DRIVER_TYPE_UNSPECIFIED | 0 |  |
 | DRIVER_TYPE_POSTGRES | 1 |  |
+| DRIVER_TYPE_MYSQL | 2 |  |
 
 
 
@@ -881,6 +903,7 @@ Data insertion method
 | ---- | ------ | ----------- |
 | PLAIN_QUERY | 0 |  |
 | COPY_FROM | 1 |  |
+| PLAIN_BULK | 2 |  |
 
 
 

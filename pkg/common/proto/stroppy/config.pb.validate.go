@@ -122,6 +122,47 @@ func (m *DriverConfig) validate(all bool) error {
 			}
 		}
 
+	case *DriverConfig_Sql:
+		if v == nil {
+			err := DriverConfigValidationError{
+				field:  "DriverSpecific",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetSql()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, DriverConfigValidationError{
+						field:  "Sql",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, DriverConfigValidationError{
+						field:  "Sql",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSql()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return DriverConfigValidationError{
+					field:  "Sql",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -787,3 +828,125 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = DriverConfig_PostgresConfigValidationError{}
+
+// Validate checks the field values on DriverConfig_SqlConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *DriverConfig_SqlConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DriverConfig_SqlConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// DriverConfig_SqlConfigMultiError, or nil if none found.
+func (m *DriverConfig_SqlConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DriverConfig_SqlConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.MaxOpenConns != nil {
+		// no validation rules for MaxOpenConns
+	}
+
+	if m.MaxIdleConns != nil {
+		// no validation rules for MaxIdleConns
+	}
+
+	if m.ConnMaxLifetime != nil {
+		// no validation rules for ConnMaxLifetime
+	}
+
+	if m.ConnMaxIdleTime != nil {
+		// no validation rules for ConnMaxIdleTime
+	}
+
+	if m.BulkSize != nil {
+		// no validation rules for BulkSize
+	}
+
+	if len(errors) > 0 {
+		return DriverConfig_SqlConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// DriverConfig_SqlConfigMultiError is an error wrapping multiple validation
+// errors returned by DriverConfig_SqlConfig.ValidateAll() if the designated
+// constraints aren't met.
+type DriverConfig_SqlConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DriverConfig_SqlConfigMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DriverConfig_SqlConfigMultiError) AllErrors() []error { return m }
+
+// DriverConfig_SqlConfigValidationError is the validation error returned by
+// DriverConfig_SqlConfig.Validate if the designated constraints aren't met.
+type DriverConfig_SqlConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DriverConfig_SqlConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DriverConfig_SqlConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DriverConfig_SqlConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DriverConfig_SqlConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DriverConfig_SqlConfigValidationError) ErrorName() string {
+	return "DriverConfig_SqlConfigValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e DriverConfig_SqlConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDriverConfig_SqlConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DriverConfig_SqlConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DriverConfig_SqlConfigValidationError{}

@@ -1,0 +1,22 @@
+package queries
+
+import (
+	"github.com/stroppy-io/stroppy/pkg/common/generate"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+)
+
+type (
+	GeneratorID = string
+	Generators  = map[GeneratorID]generate.ValueGenerator
+)
+
+// Dialect abstracts database-specific SQL differences for database/sql drivers.
+type Dialect interface {
+	// Placeholder returns the SQL placeholder for the given 0-based parameter index.
+	// For PostgreSQL: "$1", "$2", ...
+	// For MySQL: "?", "?", ...
+	Placeholder(index int) string
+
+	// ValueToAny converts a proto Value to a Go type suitable for the target database.
+	ValueToAny(v *stroppy.Value) (any, error)
+}

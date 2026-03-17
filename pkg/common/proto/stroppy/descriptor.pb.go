@@ -28,6 +28,7 @@ type InsertMethod int32
 const (
 	InsertMethod_PLAIN_QUERY InsertMethod = 0
 	InsertMethod_COPY_FROM   InsertMethod = 1
+	InsertMethod_PLAIN_BULK  InsertMethod = 2
 )
 
 // Enum value maps for InsertMethod.
@@ -35,10 +36,12 @@ var (
 	InsertMethod_name = map[int32]string{
 		0: "PLAIN_QUERY",
 		1: "COPY_FROM",
+		2: "PLAIN_BULK",
 	}
 	InsertMethod_value = map[string]int32{
 		"PLAIN_QUERY": 0,
 		"COPY_FROM":   1,
+		"PLAIN_BULK":  2,
 	}
 )
 
@@ -379,10 +382,12 @@ const file_proto_stroppy_descriptor_proto_rawDesc = "" +
 	"\f_db_specific\"\\\n" +
 	"\x0fQueryParamGroup\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x125\n" +
-	"\x06params\x18\x02 \x03(\v2\x1d.stroppy.QueryParamDescriptorR\x06params*.\n" +
+	"\x06params\x18\x02 \x03(\v2\x1d.stroppy.QueryParamDescriptorR\x06params*>\n" +
 	"\fInsertMethod\x12\x0f\n" +
 	"\vPLAIN_QUERY\x10\x00\x12\r\n" +
-	"\tCOPY_FROM\x10\x01*t\n" +
+	"\tCOPY_FROM\x10\x01\x12\x0e\n" +
+	"\n" +
+	"PLAIN_BULK\x10\x02*t\n" +
 	"\x10TxIsolationLevel\x12\x0f\n" +
 	"\vUNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10READ_UNCOMMITTED\x10\x01\x12\x12\n" +

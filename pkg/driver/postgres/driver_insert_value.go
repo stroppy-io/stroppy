@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
+
+var ErrUnsupportedInsertMethod = errors.New("unsupported insert method for postgres driver")
 
 // InsertValues inserts multiple rows into the database based on the descriptor.
 // It supports two methods:
@@ -32,6 +35,8 @@ func (d *Driver) InsertValues(
 		return d.insertValuesPlainQuery(ctx, builder)
 	case stroppy.InsertMethod_COPY_FROM:
 		return d.insertValuesCopyFrom(ctx, builder)
+	case stroppy.InsertMethod_PLAIN_BULK:
+		return nil, fmt.Errorf("%w: PLAIN_BULK", ErrUnsupportedInsertMethod)
 	default:
 		d.logger.Panic("unexpected proto.InsertMethod")
 

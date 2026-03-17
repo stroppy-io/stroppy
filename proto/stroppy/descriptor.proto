@@ -32,6 +32,7 @@ message InsertDescriptor {
 enum InsertMethod {
   PLAIN_QUERY = 0;
   COPY_FROM = 1;
+  PLAIN_BULK = 2;
 }
 
 /**
