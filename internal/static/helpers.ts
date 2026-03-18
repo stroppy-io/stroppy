@@ -150,11 +150,24 @@ export interface QueryAPI {
 
 type RunQueryFn = (sql: string, args: Record<string, any>) => QueryResult;
 
-function createQueryAPI(runQuery: RunQueryFn): QueryAPI {
+function createQueryAPI(rawRunQuery: RunQueryFn): QueryAPI {
+  function run(sql: SqlArg, args: Record<string, any>): QueryResult {
+    const { sql: s, tags } = resolveSqlArg(sql);
+    try {
+      const result = rawRunQuery(s, args);
+      runQueryMetric.add(result.stats.elapsed.milliseconds(), tags);
+      runQueryErrRateMetric.add(0, tags);
+      runQueryCounterMetric.add(1, tags);
+      return result;
+    } catch (e) {
+      runQueryErrRateMetric.add(1, tags);
+      throw e;
+    }
+  }
+
   return {
     exec(sql: SqlArg, args?: Record<string, any>): QueryStats {
-      const { sql: s } = resolveSqlArg(sql);
-      const result = runQuery(s, args ?? {});
+      const result = run(sql, args ?? {});
       result.rows.close();
       return result.stats;
     },
@@ -164,14 +177,11 @@ function createQueryAPI(runQuery: RunQueryFn): QueryAPI {
       args?: Record<string, any>,
       limit?: number,
     ): any[][] {
-      const { sql: s } = resolveSqlArg(sql);
-      const result = runQuery(s, args ?? {});
-      return result.rows.readAll(limit ?? 0);
+      return run(sql, args ?? {}).rows.readAll(limit ?? 0);
     },
 
     queryRow(sql: SqlArg, args?: Record<string, any>): any[] | undefined {
-      const { sql: s } = resolveSqlArg(sql);
-      const result = runQuery(s, args ?? {});
+      const result = run(sql, args ?? {});
       const row = result.rows.next() ? result.rows.values() : undefined;
       result.rows.close();
       return row;
@@ -181,8 +191,7 @@ function createQueryAPI(runQuery: RunQueryFn): QueryAPI {
       sql: SqlArg,
       args?: Record<string, any>,
     ): T | undefined {
-      const { sql: s } = resolveSqlArg(sql);
-      const result = runQuery(s, args ?? {});
+      const result = run(sql, args ?? {});
       if (!result.rows.next()) {
         result.rows.close();
         return undefined;
@@ -193,8 +202,7 @@ function createQueryAPI(runQuery: RunQueryFn): QueryAPI {
     },
 
     queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult {
-      const { sql: s } = resolveSqlArg(sql);
-      return runQuery(s, args ?? {});
+      return run(sql, args ?? {});
     },
   };
 }
@@ -270,19 +278,6 @@ export class DriverX implements QueryAPI {
     }
 
     console.log(`Insertion into '${descriptor.tableName}' ended`);
-  }
-
-  runQuery(sql: SqlArg, args?: Record<string, any>): void {
-    const resolved = resolveSqlArg(sql);
-    try {
-      const result = this.driver.runQuery(resolved.sql, args ?? {});
-      runQueryMetric.add(result.stats.elapsed.milliseconds(), resolved.tags);
-      runQueryErrRateMetric.add(0, resolved.tags);
-      runQueryCounterMetric.add(1, resolved.tags);
-      result.rows.close();
-    } catch {
-      runQueryErrRateMetric.add(1, resolved.tags);
-    }
   }
 
   getDriver(): Driver {

@@ -105,10 +105,6 @@ export default function () {
     `queryCursor: expected [10,20,30], got [${values}]`);
   console.log(`queryCursor: [${values}] OK`);
 
-  // -- runQuery: legacy method with metrics, should not throw --
-  driver.runQuery("SELECT 1");
-  console.log("runQuery: OK");
-
   // -- tags: TaggedQuery syntax --
   const taggedStats = driver.exec({
     sql: "SELECT 1",
