@@ -23,7 +23,7 @@ import {
   QueryParamDescriptor,
   InsertDescriptor,
   InsertMethod,
-  Status,
+  StroppyRun_Status,
   Timestamp,
 } from "./stroppy.pb.js";
 
@@ -316,12 +316,12 @@ export const Step = Object.assign(
   },
   {
     begin: (name: string): void => {
-      NotifyStep(name, Status.STATUS_RUNNING);
+      NotifyStep(name, StroppyRun_Status.STATUS_RUNNING);
       console.log(`Start of '${name}' step`);
     },
     end: (name: string): void => {
       console.log(`End of '${name}' step`);
-      NotifyStep(name, Status.STATUS_COMPLETED);
+      NotifyStep(name, StroppyRun_Status.STATUS_COMPLETED);
     },
   }
 );
