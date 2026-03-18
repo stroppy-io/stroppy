@@ -1,6 +1,9 @@
 
 # Stroppy
 
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/2mSSrkBkHm)
+[![Docs](https://img.shields.io/badge/docs-stroppy--io.github.io-blue)](https://stroppy-io.github.io)
+
 Database stress testing CLI tool powered by k6 workload engine.
 
 ## Features
