@@ -148,9 +148,10 @@ func resolveSQL(sqlArg, preset string) (*ResolvedFile, error) {
 		return resolveFile(ensureSuffix(sqlArg, ".sql"), preset, true)
 	case preset != "":
 		sql, _ := resolveFile(preset+".sql", preset, false)
+
 		return sql, nil
 	default:
-		return nil, nil //nolint:nilnil
+		return nil, nil //nolint:nilnil // it's ok to not find the sql
 	}
 }
 

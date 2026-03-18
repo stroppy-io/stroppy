@@ -83,7 +83,6 @@ func prepareConnector(
 	dialFunc func(ctx context.Context, network, addr string) (net.Conn, error),
 	lg *zap.Logger,
 ) (godriver.Connector, error) {
-
 	mysqlCfg, err := gomysql.ParseDSN(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse mysql DSN: %w", err)
@@ -92,6 +91,7 @@ func prepareConnector(
 	if dialFunc != nil {
 		mysqlCfg.DialFunc = dialFunc
 	}
+
 	if lg != nil {
 		mysqlCfg.Logger = &zapMySQLLogger{z: lg}
 	}
