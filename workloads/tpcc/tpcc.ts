@@ -7,8 +7,21 @@ import { parse_sql_with_sections } from "./parse_sql.js";
 const SQL_FILE = ENV("SQL_FILE", "./tpcc.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
 const DURATION = ENV("DURATION", "1h", "Test duration");
 const VUS_SCALE = ENV("VUS_SCALE", 1, "VU scaling factor");
+
+// TPCC Configuration Constants
+const POOL_SIZE = ENV("POOL_SIZE", 100, "Connection pool size");
+const WAREHOUSES = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
+const DISTRICTS_PER_WAREHOUSE = 10;
+const CUSTOMERS_PER_DISTRICT = 3000;
+const ITEMS = 100000;
+
+const TOTAL_DISTRICTS = WAREHOUSES * DISTRICTS_PER_WAREHOUSE;
+const TOTAL_CUSTOMERS =
+  WAREHOUSES * DISTRICTS_PER_WAREHOUSE * CUSTOMERS_PER_DISTRICT;
+const TOTAL_STOCK = WAREHOUSES * ITEMS;
+
 export const options: Options = {
-  setupTimeout: "5m",
+  setupTimeout:  String(WAREHOUSES * 5) + "m", // 5 min for every 1 in scale
   scenarios: {
     new_order: {
       executor: "constant-vus",
@@ -42,17 +55,6 @@ export const options: Options = {
     },
   },
 };
-// TPCC Configuration Constants
-const POOL_SIZE = ENV("POOL_SIZE", 100, "Connection pool size");
-const WAREHOUSES = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
-const DISTRICTS_PER_WAREHOUSE = 10;
-const CUSTOMERS_PER_DISTRICT = 3000;
-const ITEMS = 100000;
-
-const TOTAL_DISTRICTS = WAREHOUSES * DISTRICTS_PER_WAREHOUSE;
-const TOTAL_CUSTOMERS =
-  WAREHOUSES * DISTRICTS_PER_WAREHOUSE * CUSTOMERS_PER_DISTRICT;
-const TOTAL_STOCK = WAREHOUSES * ITEMS;
 
 // Initialize driver — shared (created at init phase)
 const driver = DriverX.create().setup({
