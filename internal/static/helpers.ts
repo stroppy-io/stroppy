@@ -24,6 +24,9 @@ import {
   InsertDescriptor,
   InsertMethod,
   DriverConfig_ErrorMode,
+  DriverConfig_DriverType,
+  DriverConfig_PostgresConfig,
+  DriverConfig_SqlConfig,
   StroppyRun_Status,
   Timestamp,
 } from "./stroppy.pb.js";
@@ -97,6 +100,13 @@ const errorModeMap: Record<ErrorModeName, DriverConfig_ErrorMode> = {
   silent: DriverConfig_ErrorMode.ERROR_MODE_SILENT,
   log: DriverConfig_ErrorMode.ERROR_MODE_LOG,
   throw: DriverConfig_ErrorMode.ERROR_MODE_THROW,
+};
+
+export type DriverTypeName = "postgres" | "mysql";
+
+const driverTypeMap: Record<DriverTypeName, DriverConfig_DriverType> = {
+  postgres: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
+  mysql: DriverConfig_DriverType.DRIVER_TYPE_MYSQL,
 };
 
 const _envErrorMode = ENV("STROPPY_ERROR_MODE", "", "error handling mode: silent, log, throw") as ErrorModeName | "";
@@ -234,7 +244,12 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
   };
 }
 
-export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode"> & { errorMode?: ErrorModeName }
+export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode" | "driverType" | "driverSpecific"> & {
+  errorMode?: ErrorModeName;
+  driverType?: DriverTypeName;
+  postgres?: Partial<DriverConfig_PostgresConfig>;
+  sql?: Partial<DriverConfig_SqlConfig>;
+}
 
 export class DriverX implements QueryAPI {
   private driver: Driver;
@@ -276,10 +291,18 @@ export class DriverX implements QueryAPI {
     } else if (config.errorMode) {
       this._errorMode = config.errorMode;
     }
-    // Convert string errorMode to proto enum for the binary config
+    // Convert DriverSetup to proto DriverConfig
+    const { postgres, sql, ...rest } = config;
+    const driverSpecific: DriverConfig["driverSpecific"] = postgres
+      ? { oneofKind: "postgres", postgres: DriverConfig_PostgresConfig.create(postgres) }
+      : sql
+        ? { oneofKind: "sql", sql: DriverConfig_SqlConfig.create(sql) }
+        : { oneofKind: undefined };
     const protoConfig: Partial<DriverConfig> = {
-      ...config,
+      ...rest,
       errorMode: config.errorMode ? errorModeMap[config.errorMode] : undefined,
+      driverType: config.driverType ? driverTypeMap[config.driverType] : undefined,
+      driverSpecific,
     };
     this.driver.setup(
       DriverConfig.toBinary(DriverConfig.create(protoConfig)),

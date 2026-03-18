@@ -1,6 +1,5 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { DriverConfig_DriverType } from "./stroppy.pb.js";
 import { AB, C, R, Step, DriverX, S, ENV } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
@@ -59,11 +58,8 @@ export const options: Options = {
 // Initialize driver — shared (created at init phase)
 const driver = DriverX.create().setup({
   url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
-  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-  driverSpecific: {
-    oneofKind: "postgres",
-    postgres: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
-  },
+  driverType: "postgres",
+  postgres: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
 });
 
 const sql = parse_sql_with_sections(open(SQL_FILE));

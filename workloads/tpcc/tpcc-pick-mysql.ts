@@ -1,6 +1,5 @@
 import { Options } from "k6/options";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { DriverConfig_DriverType } from "./stroppy.pb.js";
 import { AB, C, R, Step, DriverX, S, ENV, DriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
@@ -25,11 +24,8 @@ export const options: Options = {
 
 const driverConfig: DriverSetup = {
   url: ENV("DRIVER_URL", "myuser:mypassword@tcp(localhost:3306)/mydb?charset=utf8mb4&parseTime=True&loc=Local", "Database connection URL"),
-  driverType: DriverConfig_DriverType.DRIVER_TYPE_MYSQL,
-  driverSpecific: {
-    oneofKind: "sql" as const,
-    sql: {maxOpenConns: POOL_SIZE, maxIdleConns: POOL_SIZE}
-  },
+  driverType: "mysql",
+  sql: { maxOpenConns: POOL_SIZE, maxIdleConns: POOL_SIZE },
 };
 
 const driver = DriverX.create().setup(driverConfig);

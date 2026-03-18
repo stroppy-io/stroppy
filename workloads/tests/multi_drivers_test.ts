@@ -1,6 +1,5 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { DriverConfig_DriverType } from "./stroppy.pb.js";
 import { DriverX, ENV, once } from "./helpers.ts";
 import exec from "k6/execution";
 
@@ -18,11 +17,8 @@ function assert(condition: boolean, msg: string) {
 
 const pgConfig = (appName: string, poolSize: number) => ({
   url: DRIVER_URL + "?application_name=" + appName,
-  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-  driverSpecific: {
-    oneofKind: "postgres" as const,
-    postgres: { maxConns: poolSize, minConns: poolSize },
-  },
+  driverType: "postgres" as const,
+  postgres: { maxConns: poolSize, minConns: poolSize },
 });
 
 // ---- Shared driver: created at init phase (vu.State() == nil) ----

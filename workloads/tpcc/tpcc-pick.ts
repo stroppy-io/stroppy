@@ -1,6 +1,5 @@
 import { Options } from "k6/options";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { DriverConfig_DriverType } from "./stroppy.pb.js";
 import { AB, C, R, Step, DriverX, S, ENV, DriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
@@ -25,11 +24,8 @@ export const options: Options = {
 
 const driverConfig: DriverSetup = {
   url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
-  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-  driverSpecific: {
-    oneofKind: "postgres" as const,
-    postgres: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
-  },
+  driverType: "postgres",
+  postgres: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
 };
 
 const driver = DriverX.create().setup(driverConfig);
