@@ -52,6 +52,7 @@
     - [LoggerConfig](#stroppy-LoggerConfig)
   
     - [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType)
+    - [DriverConfig.ErrorMode](#stroppy-DriverConfig-ErrorMode)
     - [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel)
     - [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode)
   
@@ -660,6 +661,7 @@ by the k6 lifecycle stage: init phase = shared, iteration = per-VU.
 | ----- | ---- | ----- | ----------- |
 | url | [string](#string) |  | Database connection URL |
 | driver_type | [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType) |  | Name/Type of chosen driver |
+| error_mode | [DriverConfig.ErrorMode](#stroppy-DriverConfig-ErrorMode) |  | How to handle errors in query/insert operations. SILENT: record metric only. LOG: record metric &#43; console.log. THROW: rethrow. |
 | postgres | [DriverConfig.PostgresConfig](#stroppy-DriverConfig-PostgresConfig) |  |  |
 | sql | [DriverConfig.SqlConfig](#stroppy-DriverConfig-SqlConfig) |  |  |
 
@@ -791,6 +793,20 @@ It controls log levels and output formatting.
 | DRIVER_TYPE_UNSPECIFIED | 0 |  |
 | DRIVER_TYPE_POSTGRES | 1 |  |
 | DRIVER_TYPE_MYSQL | 2 |  |
+
+
+
+<a name="stroppy-DriverConfig-ErrorMode"></a>
+
+### DriverConfig.ErrorMode
+Error handling mode for query and insert operations
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| ERROR_MODE_UNSPECIFIED | 0 |  |
+| ERROR_MODE_SILENT | 1 |  |
+| ERROR_MODE_LOG | 2 |  |
+| ERROR_MODE_THROW | 3 |  |
 
 
 

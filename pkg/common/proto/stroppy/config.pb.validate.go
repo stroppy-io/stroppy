@@ -80,6 +80,8 @@ func (m *DriverConfig) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for ErrorMode
+
 	switch v := m.DriverSpecific.(type) {
 	case *DriverConfig_Postgres:
 		if v == nil {

@@ -71,6 +71,59 @@ func (DriverConfig_DriverType) EnumDescriptor() ([]byte, []int) {
 	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{0, 0}
 }
 
+// * Error handling mode for query and insert operations
+type DriverConfig_ErrorMode int32
+
+const (
+	DriverConfig_ERROR_MODE_UNSPECIFIED DriverConfig_ErrorMode = 0
+	DriverConfig_ERROR_MODE_SILENT      DriverConfig_ErrorMode = 1
+	DriverConfig_ERROR_MODE_LOG         DriverConfig_ErrorMode = 2
+	DriverConfig_ERROR_MODE_THROW       DriverConfig_ErrorMode = 3
+)
+
+// Enum value maps for DriverConfig_ErrorMode.
+var (
+	DriverConfig_ErrorMode_name = map[int32]string{
+		0: "ERROR_MODE_UNSPECIFIED",
+		1: "ERROR_MODE_SILENT",
+		2: "ERROR_MODE_LOG",
+		3: "ERROR_MODE_THROW",
+	}
+	DriverConfig_ErrorMode_value = map[string]int32{
+		"ERROR_MODE_UNSPECIFIED": 0,
+		"ERROR_MODE_SILENT":      1,
+		"ERROR_MODE_LOG":         2,
+		"ERROR_MODE_THROW":       3,
+	}
+)
+
+func (x DriverConfig_ErrorMode) Enum() *DriverConfig_ErrorMode {
+	p := new(DriverConfig_ErrorMode)
+	*p = x
+	return p
+}
+
+func (x DriverConfig_ErrorMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DriverConfig_ErrorMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_stroppy_config_proto_enumTypes[1].Descriptor()
+}
+
+func (DriverConfig_ErrorMode) Type() protoreflect.EnumType {
+	return &file_proto_stroppy_config_proto_enumTypes[1]
+}
+
+func (x DriverConfig_ErrorMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DriverConfig_ErrorMode.Descriptor instead.
+func (DriverConfig_ErrorMode) EnumDescriptor() ([]byte, []int) {
+	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{0, 1}
+}
+
 type LoggerConfig_LogLevel int32
 
 const (
@@ -110,11 +163,11 @@ func (x LoggerConfig_LogLevel) String() string {
 }
 
 func (LoggerConfig_LogLevel) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_stroppy_config_proto_enumTypes[1].Descriptor()
+	return file_proto_stroppy_config_proto_enumTypes[2].Descriptor()
 }
 
 func (LoggerConfig_LogLevel) Type() protoreflect.EnumType {
-	return &file_proto_stroppy_config_proto_enumTypes[1]
+	return &file_proto_stroppy_config_proto_enumTypes[2]
 }
 
 func (x LoggerConfig_LogLevel) Number() protoreflect.EnumNumber {
@@ -156,11 +209,11 @@ func (x LoggerConfig_LogMode) String() string {
 }
 
 func (LoggerConfig_LogMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_stroppy_config_proto_enumTypes[2].Descriptor()
+	return file_proto_stroppy_config_proto_enumTypes[3].Descriptor()
 }
 
 func (LoggerConfig_LogMode) Type() protoreflect.EnumType {
-	return &file_proto_stroppy_config_proto_enumTypes[2]
+	return &file_proto_stroppy_config_proto_enumTypes[3]
 }
 
 func (x LoggerConfig_LogMode) Number() protoreflect.EnumNumber {
@@ -183,6 +236,9 @@ type DriverConfig struct {
 	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
 	// * Name/Type of chosen driver
 	DriverType DriverConfig_DriverType `protobuf:"varint,2,opt,name=driver_type,json=driverType,proto3,enum=stroppy.DriverConfig_DriverType" json:"driver_type,omitempty"`
+	//   - How to handle errors in query/insert operations.
+	//     SILENT: record metric only. LOG: record metric + console.log. THROW: rethrow.
+	ErrorMode DriverConfig_ErrorMode `protobuf:"varint,3,opt,name=error_mode,json=errorMode,proto3,enum=stroppy.DriverConfig_ErrorMode" json:"error_mode,omitempty"`
 	// * Driver-specific configuration, exactly one must match driver_type
 	// Types that are valid to be assigned to DriverSpecific:
 	//
@@ -235,6 +291,13 @@ func (x *DriverConfig) GetDriverType() DriverConfig_DriverType {
 		return x.DriverType
 	}
 	return DriverConfig_DRIVER_TYPE_UNSPECIFIED
+}
+
+func (x *DriverConfig) GetErrorMode() DriverConfig_ErrorMode {
+	if x != nil {
+		return x.ErrorMode
+	}
+	return DriverConfig_ERROR_MODE_UNSPECIFIED
 }
 
 func (x *DriverConfig) GetDriverSpecific() isDriverConfig_DriverSpecific {
@@ -691,12 +754,13 @@ var File_proto_stroppy_config_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\xc1\n" +
-	"\n" +
+	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\xeb\v\n" +
 	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12K\n" +
 	"\vdriver_type\x18\x02 \x01(\x0e2 .stroppy.DriverConfig.DriverTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
-	"driverType\x12B\n" +
+	"driverType\x12>\n" +
+	"\n" +
+	"error_mode\x18\x03 \x01(\x0e2\x1f.stroppy.DriverConfig.ErrorModeR\terrorMode\x12B\n" +
 	"\bpostgres\x18\n" +
 	" \x01(\v2$.stroppy.DriverConfig.PostgresConfigH\x00R\bpostgres\x123\n" +
 	"\x03sql\x18\v \x01(\v2\x1f.stroppy.DriverConfig.SqlConfigH\x00R\x03sql\x1a\x95\x05\n" +
@@ -737,7 +801,12 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"DriverType\x12\x1b\n" +
 	"\x17DRIVER_TYPE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14DRIVER_TYPE_POSTGRES\x10\x01\x12\x15\n" +
-	"\x11DRIVER_TYPE_MYSQL\x10\x02B\x11\n" +
+	"\x11DRIVER_TYPE_MYSQL\x10\x02\"h\n" +
+	"\tErrorMode\x12\x1a\n" +
+	"\x16ERROR_MODE_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11ERROR_MODE_SILENT\x10\x01\x12\x12\n" +
+	"\x0eERROR_MODE_LOG\x10\x02\x12\x14\n" +
+	"\x10ERROR_MODE_THROW\x10\x03B\x11\n" +
 	"\x0fdriver_specific\"\xca\x02\n" +
 	"\fLoggerConfig\x12E\n" +
 	"\tlog_level\x18\x01 \x01(\x0e2\x1e.stroppy.LoggerConfig.LogLevelB\b\xfaB\x05\x82\x01\x02\x10\x01R\blogLevel\x12B\n" +
@@ -778,36 +847,38 @@ func file_proto_stroppy_config_proto_rawDescGZIP() []byte {
 	return file_proto_stroppy_config_proto_rawDescData
 }
 
-var file_proto_stroppy_config_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_proto_stroppy_config_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
 var file_proto_stroppy_config_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_proto_stroppy_config_proto_goTypes = []any{
 	(DriverConfig_DriverType)(0),        // 0: stroppy.DriverConfig.DriverType
-	(LoggerConfig_LogLevel)(0),          // 1: stroppy.LoggerConfig.LogLevel
-	(LoggerConfig_LogMode)(0),           // 2: stroppy.LoggerConfig.LogMode
-	(*DriverConfig)(nil),                // 3: stroppy.DriverConfig
-	(*LoggerConfig)(nil),                // 4: stroppy.LoggerConfig
-	(*ExporterConfig)(nil),              // 5: stroppy.ExporterConfig
-	(*GlobalConfig)(nil),                // 6: stroppy.GlobalConfig
-	(*DriverConfig_PostgresConfig)(nil), // 7: stroppy.DriverConfig.PostgresConfig
-	(*DriverConfig_SqlConfig)(nil),      // 8: stroppy.DriverConfig.SqlConfig
-	nil,                                 // 9: stroppy.GlobalConfig.MetadataEntry
-	(*OtlpExport)(nil),                  // 10: stroppy.OtlpExport
+	(DriverConfig_ErrorMode)(0),         // 1: stroppy.DriverConfig.ErrorMode
+	(LoggerConfig_LogLevel)(0),          // 2: stroppy.LoggerConfig.LogLevel
+	(LoggerConfig_LogMode)(0),           // 3: stroppy.LoggerConfig.LogMode
+	(*DriverConfig)(nil),                // 4: stroppy.DriverConfig
+	(*LoggerConfig)(nil),                // 5: stroppy.LoggerConfig
+	(*ExporterConfig)(nil),              // 6: stroppy.ExporterConfig
+	(*GlobalConfig)(nil),                // 7: stroppy.GlobalConfig
+	(*DriverConfig_PostgresConfig)(nil), // 8: stroppy.DriverConfig.PostgresConfig
+	(*DriverConfig_SqlConfig)(nil),      // 9: stroppy.DriverConfig.SqlConfig
+	nil,                                 // 10: stroppy.GlobalConfig.MetadataEntry
+	(*OtlpExport)(nil),                  // 11: stroppy.OtlpExport
 }
 var file_proto_stroppy_config_proto_depIdxs = []int32{
 	0,  // 0: stroppy.DriverConfig.driver_type:type_name -> stroppy.DriverConfig.DriverType
-	7,  // 1: stroppy.DriverConfig.postgres:type_name -> stroppy.DriverConfig.PostgresConfig
-	8,  // 2: stroppy.DriverConfig.sql:type_name -> stroppy.DriverConfig.SqlConfig
-	1,  // 3: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
-	2,  // 4: stroppy.LoggerConfig.log_mode:type_name -> stroppy.LoggerConfig.LogMode
-	10, // 5: stroppy.ExporterConfig.otlp_export:type_name -> stroppy.OtlpExport
-	9,  // 6: stroppy.GlobalConfig.metadata:type_name -> stroppy.GlobalConfig.MetadataEntry
-	4,  // 7: stroppy.GlobalConfig.logger:type_name -> stroppy.LoggerConfig
-	5,  // 8: stroppy.GlobalConfig.exporter:type_name -> stroppy.ExporterConfig
-	9,  // [9:9] is the sub-list for method output_type
-	9,  // [9:9] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	1,  // 1: stroppy.DriverConfig.error_mode:type_name -> stroppy.DriverConfig.ErrorMode
+	8,  // 2: stroppy.DriverConfig.postgres:type_name -> stroppy.DriverConfig.PostgresConfig
+	9,  // 3: stroppy.DriverConfig.sql:type_name -> stroppy.DriverConfig.SqlConfig
+	2,  // 4: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
+	3,  // 5: stroppy.LoggerConfig.log_mode:type_name -> stroppy.LoggerConfig.LogMode
+	11, // 6: stroppy.ExporterConfig.otlp_export:type_name -> stroppy.OtlpExport
+	10, // 7: stroppy.GlobalConfig.metadata:type_name -> stroppy.GlobalConfig.MetadataEntry
+	5,  // 8: stroppy.GlobalConfig.logger:type_name -> stroppy.LoggerConfig
+	6,  // 9: stroppy.GlobalConfig.exporter:type_name -> stroppy.ExporterConfig
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_config_proto_init() }
@@ -827,7 +898,7 @@ func file_proto_stroppy_config_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_config_proto_rawDesc), len(file_proto_stroppy_config_proto_rawDesc)),
-			NumEnums:      3,
+			NumEnums:      4,
 			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,

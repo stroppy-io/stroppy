@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { DriverConfig, DriverConfig_DriverType } from "./stroppy.pb.js";
-import { AB, C, R, Step, DriverX, S, ENV } from "./helpers.ts";
+import { DriverConfig_DriverType } from "./stroppy.pb.js";
+import { AB, C, R, Step, DriverX, S, ENV, DriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 
@@ -23,7 +23,7 @@ export const options: Options = {
   setupTimeout:  String(WAREHOUSES * 5) + "m", // 5 min for every 1 in scale
 };
 
-const driverConfig: DriverConfig = {
+const driverConfig: DriverSetup = {
   url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
   driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
   driverSpecific: {

@@ -63,6 +63,18 @@ message DriverConfig {
     optional int32 bulk_size = 5;
   }
 
+  /** Error handling mode for query and insert operations */
+  enum ErrorMode {
+    ERROR_MODE_UNSPECIFIED = 0;
+    ERROR_MODE_SILENT = 1;
+    ERROR_MODE_LOG = 2;
+    ERROR_MODE_THROW = 3;
+  }
+
+  /** How to handle errors in query/insert operations.
+   *  SILENT: record metric only. LOG: record metric + console.log. THROW: rethrow. */
+  ErrorMode error_mode = 3;
+
   /** Driver-specific configuration, exactly one must match driver_type */
   oneof driver_specific {
     PostgresConfig postgres = 10;
