@@ -59,7 +59,7 @@ func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 
 	// Expect 3 insert executions
 	for range descriptor.GetCount() {
-		mock.ExpectExec("insert into test_table").
+		mock.ExpectExec("INSERT INTO test_table").
 			WithArgs(pgxmock.AnyArg()).
 			WillReturnResult(pgxmock.NewResult("INSERT", 1))
 	}
