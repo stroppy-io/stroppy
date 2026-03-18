@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	godriver "database/sql/driver"
 	"errors"
 	"fmt"
 	"net"
@@ -40,8 +41,6 @@ type Driver struct {
 
 var _ driver.Driver = (*Driver)(nil)
 
-const dialerName = "stroppy"
-
 func NewDriver(
 	ctx context.Context,
 	opts driver.Options,
@@ -53,15 +52,12 @@ func NewDriver(
 
 	cfg := opts.Config
 
-	dsn, err := prepareDSN(cfg.GetUrl(), opts.DialFunc)
+	connector, err := prepareConnector(cfg.GetUrl(), opts.DialFunc, lg)
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open mysql connection: %w", err)
-	}
+	db := sql.OpenDB(connector)
 
 	sqlCfg := cfg.GetSql()
 	applySQLConfig(db, sqlCfg)
@@ -82,24 +78,30 @@ func NewDriver(
 	}, nil
 }
 
-func prepareDSN(
+func prepareConnector(
 	dsn string,
 	dialFunc func(ctx context.Context, network, addr string) (net.Conn, error),
-) (string, error) {
-	if dialFunc == nil {
-		return dsn, nil
-	}
+	lg *zap.Logger,
+) (godriver.Connector, error) {
 
 	mysqlCfg, err := gomysql.ParseDSN(dsn)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse mysql DSN: %w", err)
+		return nil, fmt.Errorf("failed to parse mysql DSN: %w", err)
 	}
 
-	mysqlCfg.DialFunc = dialFunc
+	if dialFunc != nil {
+		mysqlCfg.DialFunc = dialFunc
+	}
+	if lg != nil {
+		mysqlCfg.Logger = &zapMySQLLogger{z: lg}
+	}
 
-	mysqlCfg.Net = dialerName
+	connector, err := gomysql.NewConnector(mysqlCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mysql connector: %w", err)
+	}
 
-	return mysqlCfg.FormatDSN(), nil
+	return connector, nil
 }
 
 func applySQLConfig(db *sql.DB, sqlCfg *stroppy.DriverConfig_SqlConfig) {
@@ -186,4 +188,10 @@ func (d *Driver) Teardown(ctx context.Context) error {
 	d.logger.Debug("Driver Teardown End")
 
 	return err
+}
+
+type zapMySQLLogger struct{ z *zap.Logger }
+
+func (l *zapMySQLLogger) Print(v ...any) {
+	l.z.Error("mysql", zap.String("msg", fmt.Sprint(v...)))
 }

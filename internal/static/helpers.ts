@@ -82,10 +82,11 @@ function rule(r: Generation_Rule): Rule {
   });
 }
 
-export type InsertMethodName = "plain_query" | "copy_from";
+export type InsertMethodName = "plain_query" | "plain_bulk" | "copy_from";
 
 const insertMethodMap: Record<InsertMethodName, InsertMethod> = {
   plain_query: InsertMethod.PLAIN_QUERY,
+  plain_bulk: InsertMethod.PLAIN_BULK,
   copy_from: InsertMethod.COPY_FROM,
 };
 

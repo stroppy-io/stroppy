@@ -35,7 +35,7 @@ func NewInstance(vu modules.VU) modules.Instance {
 	i := &Instance{
 		vu: vu,
 		lg: rootModule.lg.Named("k6-vu").
-			WithOptions(zap.AddStacktrace(zap.FatalLevel)),
+			WithOptions(),
 	}
 	rootModule.addVuTeardown(i)
 	return i

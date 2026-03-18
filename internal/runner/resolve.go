@@ -55,7 +55,7 @@ type ResolvedInput struct {
 	SQL    *ResolvedFile // nil if no SQL file needed
 }
 
-const executeSQLPreset = "execute_sql"
+const executeSQLFile = "execute_sql/execute_sql.ts"
 
 // ResolveInput resolves the first positional argument into a script + optional SQL.
 // The extension determines the mode:
@@ -81,7 +81,7 @@ func ResolveInput(scriptArg, sqlArg string) (*ResolvedInput, error) {
 
 // resolveInlineSQL handles inline SQL passed directly as the argument.
 func resolveInlineSQL(sql string) (*ResolvedInput, error) {
-	script, err := resolveFile(executeSQLPreset, "execute_sql.ts", true)
+	script, err := resolveFile(executeSQLFile, true)
 	if err != nil {
 		return nil, fmt.Errorf("built-in execute_sql script not found: %w", err)
 	}
@@ -101,18 +101,14 @@ func resolveInlineSQL(sql string) (*ResolvedInput, error) {
 
 // resolveSQLFileMode handles when the first arg is a .sql file.
 func resolveSQLFileMode(sqlArg string) (*ResolvedInput, error) {
-	script, err := resolveFile(executeSQLPreset, "execute_sql.ts", true)
+	script, err := resolveFile(executeSQLFile, true)
 	if err != nil {
 		return nil, fmt.Errorf("built-in execute_sql script not found: %w", err)
 	}
 
-	// Resolve the SQL file through search path.
-	sqlFileName := filepath.Base(sqlArg)
-	presetName := strings.TrimSuffix(sqlFileName, ".sql")
-
 	var sql *ResolvedFile
 
-	sql, err = resolveFile(presetName, sqlFileName, true)
+	sql, err = resolveFile(sqlArg, true)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrSQLNotFound, sqlArg)
 	}
@@ -122,7 +118,7 @@ func resolveSQLFileMode(sqlArg string) (*ResolvedInput, error) {
 
 // resolveScriptMode handles the standard script resolution path.
 func resolveScriptMode(scriptArg, sqlArg string) (*ResolvedInput, error) {
-	presetName, scriptFileName := deriveNames(scriptArg, ".ts")
+	presetName, _ := deriveNames(scriptArg, ".ts")
 
 	var (
 		script *ResolvedFile
@@ -130,7 +126,7 @@ func resolveScriptMode(scriptArg, sqlArg string) (*ResolvedInput, error) {
 		err    error
 	)
 
-	if script, err = resolveFile(presetName, scriptFileName, true); err != nil {
+	if script, err = resolveFile(scriptArg, true); err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrScriptNotFound, scriptArg)
 	}
 
@@ -138,15 +134,12 @@ func resolveScriptMode(scriptArg, sqlArg string) (*ResolvedInput, error) {
 	if sqlArg == "" { // Perhaps the test does not need the .sql file
 		// Auto-derive SQL from script name.
 		candidateSQL := presetName + ".sql"
-		sql, _ = resolveFile(presetName, candidateSQL, false)
+		sql, _ = resolveFile(filepath.Join(presetName, candidateSQL), false)
 
 		return &ResolvedInput{Script: *script, SQL: sql}, nil
 	}
 
-	// Explicit SQL arg — resolve through search path.
-	_, sqlFileName := deriveNames(sqlArg, ".sql")
-
-	if sql, err = resolveFile(presetName, sqlFileName, true); err != nil {
+	if sql, err = resolveFile(sqlArg, true); err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrSQLNotFound, sqlArg)
 	}
 
@@ -155,37 +148,42 @@ func resolveScriptMode(scriptArg, sqlArg string) (*ResolvedInput, error) {
 
 // resolveFile searches for a file through the default search path:
 // cwd → ~/.stroppy/ → embedded workloads.
-func resolveFile(presetName, fileName string, required bool) (*ResolvedFile, error) {
-	return resolveFileInDirs(searchPathDirs(), presetName, fileName, required)
-}
+func resolveFile(filePath string, required bool) (*ResolvedFile, error) {
+	fileName := filepath.Base(filePath)
 
-// resolveFileInDirs searches for a file in the given directories, then embedded workloads.
-func resolveFileInDirs(
-	dirs []string,
-	presetName, fileName string,
-	required bool,
-) (*ResolvedFile, error) {
-	// Search filesystem directories.
-	for i, dir := range dirs {
-		candidate := filepath.Join(dir, fileName)
-		if _, err := os.Stat(candidate); err == nil {
-			abs, _ := filepath.Abs(candidate)
+	if _, err := os.Stat(filePath); err == nil {
+		abs, _ := filepath.Abs(filePath)
 
-			source := SourceCwd
-			if i > 0 {
-				source = SourceUserDir
-			}
+		return &ResolvedFile{
+			Name:   fileName,
+			Path:   abs,
+			Source: SourceCwd,
+		}, nil
+	}
+
+	if home, err := os.UserHomeDir(); err == nil {
+		fromStroppyDir := filepath.Join(home, ".stroppy", filePath)
+		if info, err := os.Stat(fromStroppyDir); err == nil && !info.IsDir() {
+			abs, _ := filepath.Abs(fromStroppyDir)
 
 			return &ResolvedFile{
 				Name:   fileName,
 				Path:   abs,
-				Source: source,
+				Source: SourceUserDir,
 			}, nil
 		}
 	}
 
+	if file, err := workloads.Content.ReadFile(filePath); err == nil {
+		return &ResolvedFile{
+			Name:    fileName,
+			Content: file,
+			Source:  SourceEmbedded,
+		}, nil
+	}
+
 	// Search embedded workloads.
-	if data, err := workloads.ReadPresetFile(presetName, fileName); err == nil {
+	if data, err := workloads.ReadPresetFile(filepath.Base(filePath), filePath); err == nil {
 		return &ResolvedFile{
 			Name:    fileName,
 			Content: data,
@@ -194,24 +192,10 @@ func resolveFileInDirs(
 	}
 
 	if required {
-		return nil, fmt.Errorf("%w: %s", ErrFileNotFound, fileName)
+		return nil, fmt.Errorf("%w: %s", ErrFileNotFound, filePath)
 	}
 
 	return nil, nil //nolint:nilnil // nil,nil signals "not found, not required"
-}
-
-// searchPathDirs returns filesystem directories to search, in order.
-func searchPathDirs() []string {
-	dirs := []string{"."}
-
-	if home, err := os.UserHomeDir(); err == nil {
-		stroppyDir := filepath.Join(home, ".stroppy")
-		if info, err := os.Stat(stroppyDir); err == nil && info.IsDir() {
-			dirs = append(dirs, stroppyDir)
-		}
-	}
-
-	return dirs
 }
 
 // deriveNames extracts the preset name and script filename from an argument.
