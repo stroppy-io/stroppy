@@ -8,23 +8,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeriveNames(t *testing.T) {
+func TestInferPreset(t *testing.T) {
 	tests := []struct {
 		arg        string
 		wantPreset string
-		wantScript string
 	}{
-		{"tpcc", "tpcc", "tpcc.ts"},
-		{"simple", "simple", "simple.ts"},
-		{"tpcc.ts", "tpcc", "tpcc.ts"},
-		{"./foo/tpcc.ts", "tpcc", "tpcc.ts"},
-		{"workloads/tpcc/tpcc.ts", "tpcc", "tpcc.ts"},
+		{"tpcc", "tpcc"},
+		{"simple", "simple"},
+		{"tpcc.ts", "tpcc"},
+		{"tpcc.sql", "tpcc"},
+		{"tpcc/tpcc-pick.ts", "tpcc"},
+		{"tpcc/mysql.sql", "tpcc"},
+		{"./mybench.ts", ""},
+		{"/abs/path/bench.ts", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.arg, func(t *testing.T) {
-			preset, script := deriveNames(tt.arg, ".ts")
-			require.Equal(t, tt.wantPreset, preset)
-			require.Equal(t, tt.wantScript, script)
+			require.Equal(t, tt.wantPreset, inferPreset(tt.arg))
 		})
 	}
 }
@@ -175,8 +175,9 @@ func TestResolveInput_UserDir(t *testing.T) {
 	err = os.WriteFile(filepath.Join(stroppyDir, "custom.ts"), []byte("// user custom"), 0o644)
 	require.NoError(t, err)
 
-	// Test resolveFile directly with a custom search path.
-	rf, err := resolveFileInDirs([]string{".", stroppyDir}, "custom", "custom.ts", true)
+	t.Setenv("HOME", homeDir)
+
+	rf, err := resolveFile("custom.ts", "", true)
 	require.NoError(t, err)
 	require.Equal(t, "custom.ts", rf.Name)
 	require.Equal(t, SourceUserDir, rf.Source)

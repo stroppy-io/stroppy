@@ -81,7 +81,7 @@ func ResolveInput(scriptArg, sqlArg string) (*ResolvedInput, error) {
 
 // resolveInlineSQL handles inline SQL passed directly as the argument.
 func resolveInlineSQL(sql string) (*ResolvedInput, error) {
-	script, err := resolveFile(executeSQLFile, true)
+	script, err := resolveFile(executeSQLFile, "", true)
 	if err != nil {
 		return nil, fmt.Errorf("built-in execute_sql script not found: %w", err)
 	}
@@ -101,14 +101,14 @@ func resolveInlineSQL(sql string) (*ResolvedInput, error) {
 
 // resolveSQLFileMode handles when the first arg is a .sql file.
 func resolveSQLFileMode(sqlArg string) (*ResolvedInput, error) {
-	script, err := resolveFile(executeSQLFile, true)
+	script, err := resolveFile(executeSQLFile, "", true)
 	if err != nil {
 		return nil, fmt.Errorf("built-in execute_sql script not found: %w", err)
 	}
 
-	var sql *ResolvedFile
+	preset := inferPreset(sqlArg)
 
-	sql, err = resolveFile(sqlArg, true)
+	sql, err := resolveFile(sqlArg, preset, true)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrSQLNotFound, sqlArg)
 	}
@@ -118,40 +118,59 @@ func resolveSQLFileMode(sqlArg string) (*ResolvedInput, error) {
 
 // resolveScriptMode handles the standard script resolution path.
 func resolveScriptMode(scriptArg, sqlArg string) (*ResolvedInput, error) {
-	presetName, _ := deriveNames(scriptArg, ".ts")
+	// Preset from script arg first, fall back to sql arg.
+	preset := inferPreset(scriptArg)
+	if preset == "" && sqlArg != "" {
+		preset = inferPreset(sqlArg)
+	}
 
-	var (
-		script *ResolvedFile
-		sql    *ResolvedFile
-		err    error
-	)
-
-	if script, err = resolveFile(scriptArg, true); err != nil {
+	script, err := resolveFile(ensureSuffix(scriptArg, ".ts"), preset, true)
+	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrScriptNotFound, scriptArg)
 	}
 
-	// Resolve SQL.
-	if sqlArg == "" { // Perhaps the test does not need the .sql file
-		// Auto-derive SQL from script name.
-		candidateSQL := presetName + ".sql"
-		sql, _ = resolveFile(filepath.Join(presetName, candidateSQL), false)
-
-		return &ResolvedInput{Script: *script, SQL: sql}, nil
-	}
-
-	if sql, err = resolveFile(sqlArg, true); err != nil {
+	// SQL is optional — some presets don't need it, users may bake SQL into the test.
+	sql, err := resolveSQL(sqlArg, preset)
+	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrSQLNotFound, sqlArg)
 	}
 
 	return &ResolvedInput{Script: *script, SQL: sql}, nil
 }
 
+// resolveSQL resolves the SQL file:
+//   - explicit arg → required
+//   - no arg + preset → auto-derive (optional)
+//   - no arg + no preset → no SQL
+func resolveSQL(sqlArg, preset string) (*ResolvedFile, error) {
+	switch {
+	case sqlArg != "":
+		return resolveFile(ensureSuffix(sqlArg, ".sql"), preset, true)
+	case preset != "":
+		sql, _ := resolveFile(preset+".sql", preset, false)
+		return sql, nil
+	default:
+		return nil, nil //nolint:nilnil
+	}
+}
+
+func ensureSuffix(s, suffix string) string {
+	if strings.HasSuffix(s, suffix) {
+		return s
+	}
+
+	return s + suffix
+}
+
 // resolveFile searches for a file through the default search path:
-// cwd → ~/.stroppy/ → embedded workloads.
-func resolveFile(filePath string, required bool) (*ResolvedFile, error) {
+// cwd → ~/.stroppy/ → embedded (direct) → embedded (preset/).
+// The preset parameter adds an extra search stage: if non-empty,
+// tries preset/fileName in embedded workloads.
+func resolveFile(filePath, preset string, required bool) (*ResolvedFile, error) {
 	fileName := filepath.Base(filePath)
 
-	if _, err := os.Stat(filePath); err == nil {
+	// 1. Current working directory.
+	if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
 		abs, _ := filepath.Abs(filePath)
 
 		return &ResolvedFile{
@@ -161,6 +180,7 @@ func resolveFile(filePath string, required bool) (*ResolvedFile, error) {
 		}, nil
 	}
 
+	// 2. User config directory: ~/.stroppy/
 	if home, err := os.UserHomeDir(); err == nil {
 		fromStroppyDir := filepath.Join(home, ".stroppy", filePath)
 		if info, err := os.Stat(fromStroppyDir); err == nil && !info.IsDir() {
@@ -174,6 +194,7 @@ func resolveFile(filePath string, required bool) (*ResolvedFile, error) {
 		}
 	}
 
+	// 3. Embedded workloads: direct path match.
 	if file, err := workloads.Content.ReadFile(filePath); err == nil {
 		return &ResolvedFile{
 			Name:    fileName,
@@ -182,13 +203,16 @@ func resolveFile(filePath string, required bool) (*ResolvedFile, error) {
 		}, nil
 	}
 
-	// Search embedded workloads.
-	if data, err := workloads.ReadPresetFile(filepath.Base(filePath), filePath); err == nil {
-		return &ResolvedFile{
-			Name:    fileName,
-			Content: data,
-			Source:  SourceEmbedded,
-		}, nil
+	// 4. Embedded workloads: preset/fileName.
+	if preset != "" {
+		candidate := filepath.Join(preset, fileName)
+		if file, err := workloads.Content.ReadFile(candidate); err == nil {
+			return &ResolvedFile{
+				Name:    fileName,
+				Content: file,
+				Source:  SourceEmbedded,
+			}, nil
+		}
 	}
 
 	if required {
@@ -198,15 +222,22 @@ func resolveFile(filePath string, required bool) (*ResolvedFile, error) {
 	return nil, nil //nolint:nilnil // nil,nil signals "not found, not required"
 }
 
-// deriveNames extracts the preset name and script filename from an argument.
-// "tpcc" → ("tpcc", "tpcc.ts")
-// "tpcc.ts" → ("tpcc", "tpcc.ts")
-// "./foo/tpcc.ts" → ("tpcc", "tpcc.ts").
-func deriveNames(arg, suffix string) (presetName, scriptFileName string) {
+// inferPreset determines the preset name from a user argument.
+// Bare names and preset-relative paths yield a preset; explicit
+// relative (./) or absolute (/) paths yield no preset.
+func inferPreset(arg string) string {
+	// Explicit relative or absolute path → no preset context.
+	if strings.HasPrefix(arg, "./") || strings.HasPrefix(arg, "/") {
+		return ""
+	}
+
+	// Has directory component → use it: "tpcc/pick.ts" → "tpcc".
+	if dir := filepath.Dir(arg); dir != "." {
+		return dir
+	}
+
+	// Bare name: "tpcc" → "tpcc", "tpcc.ts" → "tpcc".
 	base := filepath.Base(arg)
 
-	presetName = strings.TrimSuffix(base, suffix)
-	scriptFileName = presetName + suffix
-
-	return presetName, scriptFileName
+	return strings.TrimSuffix(strings.TrimSuffix(base, ".ts"), ".sql")
 }
