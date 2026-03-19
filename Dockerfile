@@ -13,7 +13,7 @@ COPY Makefile ./
 
 RUN go mod download
 
-RUN make .install-xk6
+RUN make install-xk6
 
 # Copy source code
 COPY . .

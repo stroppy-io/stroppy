@@ -174,8 +174,8 @@ install-linter: # Install golangci-lint
 	mkdir -p $(LOCAL_BIN)
 	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.10.1
 
-.PHONY: .install-xk6
-.install-xk6:
+.PHONY: install-xk6
+install-xk6:
 	$(info Installing xk6...)
 	mkdir -p $(LOCAL_BIN)
 	GOBIN=$(LOCAL_BIN) go install go.k6.io/xk6@v1.1.5
@@ -184,7 +184,7 @@ install-linter: # Install golangci-lint
 .install-proto-deps: .install-protoc .install-easyp .install-go-proto-deps .install-node-proto-deps
 
 .PHONY: install-bin-deps
-install-bin-deps: install-linter .install-xk6 .install-proto-deps # Install binary dependencies in ./bin
+install-bin-deps: install-linter install-xk6 .install-proto-deps # Install binary dependencies in ./bin
 	$(info Installing binary dependencies...)
 
 .PHONY: app-deps
@@ -276,14 +276,12 @@ revision: # Recreate git tag with version tag=<semver>
 ## Local K6 fast tests
 ##
 
-.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcc-pick-test run-tpcds-test run-k6-tests .rm-dev
+.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcc-pick-test run-tpcc-mysql-test run-tpcds-test run-k6-tests
 
 WORKDIR=dev
 
-.rm-dev:
+run-simple-test:
 	rm -rf $(WORKDIR)
-
-run-simple-test: .rm-dev
 	./build/stroppy gen --workdir $(WORKDIR) --preset=simple
 	cd $(WORKDIR) && ./stroppy run simple.ts
 
@@ -291,21 +289,22 @@ run-tpcb-test:
 	LOG_LEVEL=DEBUG DURATION="1s" SCALE_FACTOR=1 \
 		./build/stroppy run workloads/tpcb/tpcb.ts workloads/tpcb/tpcb.sql
 
-run-tpcc-test: .rm-dev
-	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcc
-	cd $(WORKDIR) && DURATION="1s" SCALE_FACTOR=1 ./stroppy run tpcc.ts tpcc.sql
+run-tpcc-test:
+	DURATION="1s" SCALE_FACTOR=1 ./build/stroppy run tpcc.ts tpcc.sql
 
-run-tpcc-pick-test: .rm-dev
-	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcc
-	cd $(WORKDIR) && SCALE_FACTOR=1 ./stroppy run tpcc-pick.ts tpcc.sql -- --duration "1s"
+run-tpcc-mysql-test:
+	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
+	DURATION="1s" SCALE_FACTOR=1 ./build/stroppy run tpcc/pick-mysql mysql -- -q
 
-run-tpcds-test: .rm-dev
-	./build/stroppy gen --workdir $(WORKDIR) --preset=tpcds
-	cd $(WORKDIR) && ./stroppy run tpcds.ts tpcds-scale-1.sql
+run-tpcc-pick-test:
+	SCALE_FACTOR=1 ./build/stroppy run tpcc/pick.ts tpcc -- --duration "1s"
+
+run-tpcds-test:
+	./build/stroppy run tpcds tpcds-scale-1.sql
 
 run-k6-tests: # Run SQL API integration tests
-	-./build/stroppy run workloads/tests/sqlapi_test.ts
-	-./build/stroppy run workloads/tests/multi_drivers_test.ts
+	-./build/stroppy run tests/sqlapi_test.ts -- -q
+	-./build/stroppy run tests/multi_drivers_test.ts -- -q
 
 ##
 ## TypeScript Development

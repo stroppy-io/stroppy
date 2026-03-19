@@ -71,7 +71,7 @@ jobs:
       - name: Install xk6 (k6 builder)
         shell: bash
         run: |
-          make .install-xk6
+          make install-xk6
 
       - name: Build
         env:
