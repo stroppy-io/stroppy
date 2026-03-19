@@ -4,7 +4,7 @@ import { AB, C, R, Step, DriverX, S, ENV, DriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 
-const SQL_FILE = ENV("SQL_FILE", "./tpcc.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
+const SQL_FILE = ENV("SQL_FILE", "./mysql.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
 const POOL_SIZE = ENV("POOL_SIZE", 100, "Connection pool size");
 
 // TPCC Configuration Constants

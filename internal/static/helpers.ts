@@ -167,7 +167,7 @@ export interface QueryAPI {
   queryRows(sql: SqlArg, args?: Record<string, any>, limit?: number): any[][];
   queryRow(sql: SqlArg, args?: Record<string, any>): any[] | undefined;
   queryValue<T = any>(sql: SqlArg, args?: Record<string, any>): T | undefined;
-  queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult;
+  queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult | undefined;
 }
 
 type RunQueryFn = (sql: string, args: Record<string, any>) => QueryResult;
@@ -237,8 +237,9 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
       return vals?.length ? (vals[0] as T) : undefined;
     },
 
-    queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult {
+    queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult | undefined {
       const result = run(sql, args ?? {});
+      if (!result) return undefined;
       return result as QueryResult;
     },
   };
