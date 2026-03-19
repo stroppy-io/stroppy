@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,10 @@ func (m *mockPool) Exec(_ context.Context, sql string, args ...any) (pgconn.Comm
 	}{SQL: sql, Args: args})
 
 	return pgconn.NewCommandTag(""), m.execErr
+}
+
+func (m *mockPool) Query(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
+	return nil, nil //nolint:nilnil // mock
 }
 
 func (m *mockPool) Close()                  {}

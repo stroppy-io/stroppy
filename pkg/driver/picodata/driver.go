@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/picodata/picodata-go"
@@ -17,8 +18,8 @@ import (
 func init() {
 	driver.RegisterDriver(
 		stroppy.DriverConfig_DRIVER_TYPE_PICODATA,
-		func(ctx context.Context, lg *zap.Logger, config *stroppy.DriverConfig) (driver.Driver, error) {
-			return NewDriver(ctx, lg, config)
+		func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
+			return NewDriver(ctx, opts)
 		},
 	)
 }
@@ -29,6 +30,7 @@ const (
 
 type Executor interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	Close()
 	Config() *pgxpool.Config
 }
@@ -40,30 +42,24 @@ type Driver struct {
 }
 
 // NewDriver creates a new Picodata driver instance.
-//
-//nolint:nonamedreturns // named returns for defer error handling
 func NewDriver(
 	ctx context.Context,
-	lg *zap.Logger,
-	cfg *stroppy.DriverConfig,
+	opts driver.Options,
 ) (d *Driver, err error) {
+	lg := opts.Logger
 	if lg == nil {
-		d = &Driver{
-			logger: logger.NewFromEnv().
-				Named(LoggerName).
-				WithOptions(zap.AddCallerSkip(0)),
-		}
-	} else {
-		d = &Driver{
-			logger: lg,
-		}
+		lg = logger.NewFromEnv().
+			Named(LoggerName).
+			WithOptions(zap.AddCallerSkip(0))
 	}
+
+	d = &Driver{logger: lg}
+
+	cfg := opts.Config
 
 	d.logger.Debug("Connecting to Picodata...", zap.String("url", cfg.GetUrl()))
 
-	const (
-		maxConnPerInstance = 20
-	)
+	const maxConnPerInstance = 20
 
 	conn, err := picodata.New(
 		ctx,
@@ -73,6 +69,18 @@ func NewDriver(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Picodata: %w", err)
+	}
+
+	if opts.DialFunc != nil {
+		poolCfg := conn.Config()
+		poolCfg.ConnConfig.DialFunc = opts.DialFunc
+
+		conn.Close()
+
+		conn, err = picodata.NewWithConfig(ctx, poolCfg)
+		if err != nil {
+			return nil, fmt.Errorf("can't start reconfigured picodataPool: %w", err)
+		}
 	}
 
 	d.picoPool = conn
@@ -91,24 +99,6 @@ func (d *Driver) Teardown(_ context.Context) error {
 	}
 
 	d.logger.Debug("Driver Teardown End")
-
-	return nil
-}
-
-func (d *Driver) Configure(ctx context.Context, opts driver.Options) (err error) {
-	if opts.DialFunc != nil {
-		cfg := d.picoPool.Config()
-		cfg.ConnConfig.DialFunc = opts.DialFunc
-
-		d.picoPool.Close()
-
-		newPool, err := picodata.NewWithConfig(ctx, cfg)
-		if err != nil {
-			return fmt.Errorf("can't start reconfigured picodataPool: %w", err)
-		}
-
-		d.picoPool = newPool
-	}
 
 	return nil
 }
