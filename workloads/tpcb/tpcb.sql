@@ -49,6 +49,7 @@ CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid);
 --=
 CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid);
 
+--+ create_procedures
 --=
 CREATE OR REPLACE FUNCTION tpcb_transaction(
     p_aid INTEGER,

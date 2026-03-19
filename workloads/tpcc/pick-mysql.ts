@@ -25,7 +25,7 @@ export const options: Options = {
 const driverConfig: DriverSetup = {
   url: ENV("DRIVER_URL", "myuser:mypassword@tcp(localhost:3306)/mydb?charset=utf8mb4&parseTime=True&loc=Local", "Database connection URL"),
   driverType: "mysql",
-  sql: { maxOpenConns: POOL_SIZE, maxIdleConns: POOL_SIZE },
+  sql: {maxOpenConns: POOL_SIZE, maxIdleConns: POOL_SIZE}
 };
 
 const driver = DriverX.create().setup(driverConfig);
@@ -39,6 +39,10 @@ export function setup() {
 
   Step("create_schema", () => {
     sql("create_schema").forEach((query) => driver.exec(query, {}));
+  });
+
+  Step("create_procedures", () => {
+    sql("create_procedures").forEach((query) => driver.exec(query, {}));
   });
 
   Step("load_data", () => {

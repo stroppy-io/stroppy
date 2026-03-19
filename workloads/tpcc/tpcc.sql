@@ -131,6 +131,7 @@ CREATE TABLE stock (
   PRIMARY KEY (s_w_id, s_i_id)
 )
 
+--+ create_procedures
 --= dbms_random
 CREATE OR REPLACE FUNCTION DBMS_RANDOM (INTEGER, INTEGER) RETURNS INTEGER AS $$
 DECLARE

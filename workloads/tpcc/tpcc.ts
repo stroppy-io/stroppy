@@ -73,6 +73,10 @@ export function setup() {
     sql("create_schema").forEach((query) => driver.exec(query, {}));
   });
 
+  Step("create_procedures", () => {
+    sql("create_procedures").forEach((query) => driver.exec(query, {}));
+  });
+
   Step("load_data", () => {
     // Load data into tables using InsertValues with COPY_FROM method
     driver.insert("item", ITEMS, {

@@ -147,6 +147,7 @@ CREATE TABLE stock (
   PRIMARY KEY (s_w_id, s_i_id)
 ) ENGINE = InnoDB
 
+--+ create_procedures
 --= neword
 CREATE PROCEDURE NEWORD (
   no_w_id       INTEGER,

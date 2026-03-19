@@ -41,6 +41,10 @@ export function setup() {
     sql("create_schema").forEach((query) => driver.exec(query, {}));
   });
 
+  Step("create_procedures", () => {
+    sql("create_procedures").forEach((query) => driver.exec(query, {}));
+  });
+
   Step("load_data", () => {
     driver.insert("item", ITEMS, {
       method: "copy_from",
