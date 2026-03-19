@@ -6,6 +6,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	_ "github.com/stroppy-io/stroppy/pkg/driver/mysql"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/postgres"
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"
@@ -34,7 +35,7 @@ func NewInstance(vu modules.VU) modules.Instance {
 	i := &Instance{
 		vu: vu,
 		lg: rootModule.lg.Named("k6-vu").
-			WithOptions(zap.AddStacktrace(zap.FatalLevel)),
+			WithOptions(),
 	}
 	rootModule.addVuTeardown(i)
 	return i

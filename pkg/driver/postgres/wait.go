@@ -1,23 +1,15 @@
-// TODO: make "common" drivers functions
 package postgres
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 )
 
-// ErrDBConnectionTimeout is returned when database connection times out.
-var ErrDBConnectionTimeout = errors.New("database connection timeout")
-
-// TODO: make configurable
-const (
-	retryIntervalIncrement = time.Second
-	dbConnectionTimeout    = 5 * time.Second
-)
+const dbConnectionTimeout = 5 * time.Second
 
 func waitForDB(
 	ctx context.Context,
@@ -27,37 +19,5 @@ func waitForDB(
 	},
 	timeout time.Duration,
 ) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	interval := 1 * time.Second
-	startTime := time.Now()
-
-	for {
-		// Check if timeout exceeded
-		if time.Since(startTime) >= timeout {
-			return fmt.Errorf("%w after %v", ErrDBConnectionTimeout, timeout)
-		}
-
-		// Try to ping
-		pingErr := pingable.Ping(ctx)
-		if pingErr == nil {
-			lg.Debug("Successfully connected to database")
-
-			return nil
-		}
-
-		lg.Sugar().Warnf("Database not ready, retrying in %v... (error: %v)", interval, pingErr)
-
-		// Sleep for current interval
-		select {
-		case <-time.After(interval):
-			// Continue to next retry
-		case <-ctx.Done():
-			return fmt.Errorf("context canceled: %w", ctx.Err())
-		}
-
-		// Increase interval for next attempt
-		interval += retryIntervalIncrement
-	}
+	return sqldriver.WaitForDB(ctx, lg, pingable, timeout)
 }

@@ -1,6 +1,5 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { DriverConfig_DriverType } from "./stroppy.pb.js";
 import { DriverX, Step, ENV } from "./helpers.ts";
 import { parse_sql } from "./parse_sql.js";
 
@@ -13,7 +12,7 @@ export const options: Options = {
 
 const driver = DriverX.create().setup({
   url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
-  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
+  driverType: "postgres",
 });
 
 const queries = parse_sql(open(SQL_FILE));

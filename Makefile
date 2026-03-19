@@ -276,7 +276,7 @@ revision: # Recreate git tag with version tag=<semver>
 ## Local K6 fast tests
 ##
 
-.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcc-pick-test run-tpcds-test run-sqlapi-test .rm-dev
+.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcc-pick-test run-tpcds-test run-k6-tests .rm-dev
 
 WORKDIR=dev
 

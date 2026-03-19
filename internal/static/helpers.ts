@@ -23,6 +23,10 @@ import {
   QueryParamDescriptor,
   InsertDescriptor,
   InsertMethod,
+  DriverConfig_ErrorMode,
+  DriverConfig_DriverType,
+  DriverConfig_PostgresConfig,
+  DriverConfig_SqlConfig,
   StroppyRun_Status,
   Timestamp,
 } from "./stroppy.pb.js";
@@ -82,12 +86,30 @@ function rule(r: Generation_Rule): Rule {
   });
 }
 
-export type InsertMethodName = "plain_query" | "copy_from";
+export type InsertMethodName = "plain_query" | "plain_bulk" | "copy_from";
 
 const insertMethodMap: Record<InsertMethodName, InsertMethod> = {
   plain_query: InsertMethod.PLAIN_QUERY,
+  plain_bulk: InsertMethod.PLAIN_BULK,
   copy_from: InsertMethod.COPY_FROM,
 };
+
+export type ErrorModeName = "silent" | "log" | "throw";
+
+const errorModeMap: Record<ErrorModeName, DriverConfig_ErrorMode> = {
+  silent: DriverConfig_ErrorMode.ERROR_MODE_SILENT,
+  log: DriverConfig_ErrorMode.ERROR_MODE_LOG,
+  throw: DriverConfig_ErrorMode.ERROR_MODE_THROW,
+};
+
+export type DriverTypeName = "postgres" | "mysql";
+
+const driverTypeMap: Record<DriverTypeName, DriverConfig_DriverType> = {
+  postgres: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
+  mysql: DriverConfig_DriverType.DRIVER_TYPE_MYSQL,
+};
+
+const _envErrorMode = ENV("STROPPY_ERROR_MODE", "", "error handling mode: silent, log, throw") as ErrorModeName | "";
 
 interface InsertDescriptorX {
   method?: InsertMethodName;
@@ -145,13 +167,21 @@ export interface QueryAPI {
   queryRows(sql: SqlArg, args?: Record<string, any>, limit?: number): any[][];
   queryRow(sql: SqlArg, args?: Record<string, any>): any[] | undefined;
   queryValue<T = any>(sql: SqlArg, args?: Record<string, any>): T | undefined;
-  queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult;
+  queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult | undefined;
 }
 
 type RunQueryFn = (sql: string, args: Record<string, any>) => QueryResult;
 
-function createQueryAPI(rawRunQuery: RunQueryFn): QueryAPI {
-  function run(sql: SqlArg, args: Record<string, any>): QueryResult {
+function handleError(mode: ErrorModeName, e: unknown, tags?: Record<string, string>): void {
+  if (mode === "log") {
+    console.error(`[stroppy] query error${tags ? ` [${Object.values(tags).join(",")}]` : ""}: ${e}`);
+  } else if (mode === "throw") {
+    throw e;
+  }
+}
+
+function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeName): QueryAPI {
+  function run(sql: SqlArg, args: Record<string, any>): QueryResult | undefined {
     const { sql: s, tags } = resolveSqlArg(sql);
     try {
       const result = rawRunQuery(s, args);
@@ -161,13 +191,15 @@ function createQueryAPI(rawRunQuery: RunQueryFn): QueryAPI {
       return result;
     } catch (e) {
       runQueryErrRateMetric.add(1, tags);
-      throw e;
+      handleError(getErrorMode(), e, tags);
+      return undefined;
     }
   }
 
   return {
     exec(sql: SqlArg, args?: Record<string, any>): QueryStats {
       const result = run(sql, args ?? {});
+      if (!result) return undefined as unknown as QueryStats;
       result.rows.close();
       return result.stats;
     },
@@ -177,11 +209,14 @@ function createQueryAPI(rawRunQuery: RunQueryFn): QueryAPI {
       args?: Record<string, any>,
       limit?: number,
     ): any[][] {
-      return run(sql, args ?? {}).rows.readAll(limit ?? 0);
+      const result = run(sql, args ?? {});
+      if (!result) return [];
+      return result.rows.readAll(limit ?? 0);
     },
 
     queryRow(sql: SqlArg, args?: Record<string, any>): any[] | undefined {
       const result = run(sql, args ?? {});
+      if (!result) return undefined;
       const row = result.rows.next() ? result.rows.values() : undefined;
       result.rows.close();
       return row;
@@ -192,6 +227,7 @@ function createQueryAPI(rawRunQuery: RunQueryFn): QueryAPI {
       args?: Record<string, any>,
     ): T | undefined {
       const result = run(sql, args ?? {});
+      if (!result) return undefined;
       if (!result.rows.next()) {
         result.rows.close();
         return undefined;
@@ -201,15 +237,25 @@ function createQueryAPI(rawRunQuery: RunQueryFn): QueryAPI {
       return vals?.length ? (vals[0] as T) : undefined;
     },
 
-    queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult {
-      return run(sql, args ?? {});
+    queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult | undefined {
+      const result = run(sql, args ?? {});
+      if (!result) return undefined;
+      return result as QueryResult;
     },
   };
+}
+
+export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode" | "driverType" | "driverSpecific"> & {
+  errorMode?: ErrorModeName;
+  driverType?: DriverTypeName;
+  postgres?: Partial<DriverConfig_PostgresConfig>;
+  sql?: Partial<DriverConfig_SqlConfig>;
 }
 
 export class DriverX implements QueryAPI {
   private driver: Driver;
   private q: QueryAPI;
+  private _errorMode: ErrorModeName = "log";
 
   exec!: QueryAPI["exec"];
   queryRows!: QueryAPI["queryRows"];
@@ -219,7 +265,10 @@ export class DriverX implements QueryAPI {
 
   private constructor(driver: Driver) {
     this.driver = driver;
-    this.q = createQueryAPI((sql, args) => driver.runQuery(sql, args));
+    this.q = createQueryAPI(
+      (sql, args) => driver.runQuery(sql, args),
+      () => this._errorMode,
+    );
     this.exec = this.q.exec;
     this.queryRows = this.q.queryRows;
     this.queryRow = this.q.queryRow;
@@ -236,9 +285,28 @@ export class DriverX implements QueryAPI {
    *  If called at init phase: marks driver as shared.
    *  If called at iteration/setup phase: marks driver as per-VU.
    *  The driver is lazily dispatched on first use (ensuring DialFunc is available). */
-  setup(config: Partial<DriverConfig>): DriverX {
+  setup(config: DriverSetup): DriverX {
+    // Resolve error mode. Precedence: ENV > config > default ("log")
+    if (_envErrorMode) {
+      this._errorMode = _envErrorMode;
+    } else if (config.errorMode) {
+      this._errorMode = config.errorMode;
+    }
+    // Convert DriverSetup to proto DriverConfig
+    const { postgres, sql, ...rest } = config;
+    const driverSpecific: DriverConfig["driverSpecific"] = postgres
+      ? { oneofKind: "postgres", postgres: DriverConfig_PostgresConfig.create(postgres) }
+      : sql
+        ? { oneofKind: "sql", sql: DriverConfig_SqlConfig.create(sql) }
+        : { oneofKind: undefined };
+    const protoConfig: Partial<DriverConfig> = {
+      ...rest,
+      errorMode: config.errorMode ? errorModeMap[config.errorMode] : undefined,
+      driverType: config.driverType ? driverTypeMap[config.driverType] : undefined,
+      driverSpecific,
+    };
     this.driver.setup(
-      DriverConfig.toBinary(DriverConfig.create(config)),
+      DriverConfig.toBinary(DriverConfig.create(protoConfig)),
     );
     return this;
   }
@@ -273,8 +341,9 @@ export class DriverX implements QueryAPI {
       );
       insertErrRateMetric.add(0, metricTags);
       insertMetric.add(stats.elapsed.milliseconds(), metricTags);
-    } catch {
+    } catch (e) {
       insertErrRateMetric.add(1, metricTags);
+      handleError(this._errorMode, e, metricTags);
     }
 
     console.log(`Insertion into '${descriptor.tableName}' ended`);

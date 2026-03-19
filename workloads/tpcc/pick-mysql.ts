@@ -1,11 +1,10 @@
 import { Options } from "k6/options";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { DriverConfig, DriverConfig_DriverType } from "./stroppy.pb.js";
-import { AB, C, R, Step, DriverX, S, ENV } from "./helpers.ts";
+import { AB, C, R, Step, DriverX, S, ENV, DriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 
-const SQL_FILE = ENV("SQL_FILE", "./tpcc.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
+const SQL_FILE = ENV("SQL_FILE", "./mysql.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
 const POOL_SIZE = ENV("POOL_SIZE", 100, "Connection pool size");
 
 // TPCC Configuration Constants
@@ -23,13 +22,10 @@ export const options: Options = {
   setupTimeout:  String(WAREHOUSES * 5) + "m", // 5 min for every 1 in scale
 };
 
-const driverConfig: DriverConfig = {
-  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
-  driverType: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
-  driverSpecific: {
-    oneofKind: "postgres" as const,
-    postgres: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
-  },
+const driverConfig: DriverSetup = {
+  url: ENV("DRIVER_URL", "myuser:mypassword@tcp(localhost:3306)/mydb?charset=utf8mb4&parseTime=True&loc=Local", "Database connection URL"),
+  driverType: "mysql",
+  sql: {maxOpenConns: POOL_SIZE, maxIdleConns: POOL_SIZE}
 };
 
 const driver = DriverX.create().setup(driverConfig);
@@ -45,9 +41,13 @@ export function setup() {
     sql("create_schema").forEach((query) => driver.exec(query, {}));
   });
 
+  Step("create_procedures", () => {
+    sql("create_procedures").forEach((query) => driver.exec(query, {}));
+  });
+
   Step("load_data", () => {
     driver.insert("item", ITEMS, {
-      method: "copy_from",
+      method: "plain_bulk",
       params: {
         i_id: S.int32(1, ITEMS),
         i_im_id: S.int32(1, ITEMS),
@@ -58,7 +58,7 @@ export function setup() {
     });
 
     driver.insert("warehouse", WAREHOUSES, {
-      method: "copy_from",
+      method: "plain_bulk",
       params: {
         w_id: S.int32(1, WAREHOUSES),
         w_name: R.str(6, 10),
@@ -73,7 +73,7 @@ export function setup() {
     });
 
     driver.insert("district", TOTAL_DISTRICTS, {
-      method: "copy_from",
+      method: "plain_bulk",
       params: {
         d_name: R.str(6, 10),
         d_street_1: R.str(10, 20, AB.enSpc),
@@ -94,7 +94,7 @@ export function setup() {
     });
 
     driver.insert("customer", TOTAL_CUSTOMERS, {
-      method: "copy_from",
+      method: "plain_bulk",
       params: {
         c_first: R.str(8, 16),
         c_middle: R.str(2, AB.enUpper),
@@ -125,7 +125,7 @@ export function setup() {
     });
 
     driver.insert("stock", TOTAL_STOCK, {
-      method: "copy_from",
+      method: "plain_bulk",
       params: {
         s_quantity: R.int32(10, 100),
         s_dist_01: R.str(24, AB.enNum),

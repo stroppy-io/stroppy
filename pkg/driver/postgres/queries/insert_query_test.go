@@ -28,7 +28,7 @@ func Test_insertSQL(t *testing.T) {
 					},
 				},
 			},
-			want: "insert into simple_table (a, b, c, d) values ($1, $2, $3, $4)",
+			want: "INSERT INTO simple_table (a, b, c, d) VALUES ($1, $2, $3, $4)",
 		},
 	}
 	for _, tt := range tests {
