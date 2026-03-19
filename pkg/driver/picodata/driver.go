@@ -13,6 +13,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 )
 
 func init() {
@@ -61,9 +62,13 @@ func NewDriver(
 
 	const maxConnPerInstance = 20
 
-	conn, err := picodata.New(
-		ctx,
-		cfg.GetUrl(),
+	parsedConfig, err := pool.ParseConfig(cfg, d.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	conn, err := picodata.NewWithConfig(ctx,
+		parsedConfig,
 		picodata.WithDisableTopologyManaging(),
 		picodata.WithMaxConnPerInstance(maxConnPerInstance),
 	)
@@ -77,7 +82,10 @@ func NewDriver(
 
 		conn.Close()
 
-		conn, err = picodata.NewWithConfig(ctx, poolCfg)
+		conn, err = picodata.NewWithConfig(ctx, poolCfg,
+			picodata.WithDisableTopologyManaging(),
+			picodata.WithMaxConnPerInstance(maxConnPerInstance),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("can't start reconfigured picodataPool: %w", err)
 		}

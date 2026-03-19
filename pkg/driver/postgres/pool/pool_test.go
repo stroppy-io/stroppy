@@ -29,7 +29,7 @@ func TestParseConfig_Success(t *testing.T) {
 				},
 			},
 		}
-		cfg, err := parseConfig(params, logger.Global())
+		cfg, err := ParseConfig(params, logger.Global())
 		require.NoError(t, err)
 		require.Equal(t, "postgres://user:pass@localhost:5432/db", cfg.ConnString())
 		require.Equal(t, int32(10), cfg.MaxConns)
@@ -49,7 +49,7 @@ func TestParseConfig_Success(t *testing.T) {
 				},
 			},
 		}
-		cfg, err := parseConfig(params, logger.Global())
+		cfg, err := ParseConfig(params, logger.Global())
 		require.NoError(t, err)
 		require.Equal(t, 1000, cfg.ConnConfig.StatementCacheCapacity)
 	})
@@ -64,6 +64,6 @@ func TestNewDriverConfig_InvalidDuration(t *testing.T) {
 			},
 		},
 	}
-	_, err := parseConfig(params, logger.Global())
+	_, err := ParseConfig(params, logger.Global())
 	require.Error(t, err)
 }

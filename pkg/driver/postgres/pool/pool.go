@@ -34,7 +34,7 @@ func NewPool(
 	config *stroppy.DriverConfig,
 	logger *zap.Logger,
 ) (*pgxpool.Pool, error) {
-	parsedConfig, err := parseConfig(config, logger)
+	parsedConfig, err := ParseConfig(config, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func NewPool(
 	return pool, nil
 }
 
-func parseConfig(
+func ParseConfig(
 	config *stroppy.DriverConfig,
 	logger *zap.Logger,
 ) (*pgxpool.Config, error) {

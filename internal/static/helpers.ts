@@ -102,11 +102,12 @@ const errorModeMap: Record<ErrorModeName, DriverConfig_ErrorMode> = {
   throw: DriverConfig_ErrorMode.ERROR_MODE_THROW,
 };
 
-export type DriverTypeName = "postgres" | "mysql";
+export type DriverTypeName = "postgres" | "mysql" | "picodata";
 
 const driverTypeMap: Record<DriverTypeName, DriverConfig_DriverType> = {
   postgres: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
   mysql: DriverConfig_DriverType.DRIVER_TYPE_MYSQL,
+  picodata: DriverConfig_DriverType.DRIVER_TYPE_PICODATA,
 };
 
 const _envErrorMode = ENV("STROPPY_ERROR_MODE", "", "error handling mode: silent, log, throw") as ErrorModeName | "";
