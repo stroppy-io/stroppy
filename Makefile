@@ -310,13 +310,16 @@ run-k6-tests: # Run SQL API integration tests
 ## TypeScript Development
 ##
 
-.PHONY: ts-setup ts-test ts-watch
+.PHONY: ts-setup ts-test ts-watch ts-typecheck
 
 ts-setup: # Setup TypeScript testing environment
 	@echo "Setting up TypeScript testing environment..."
 	cd internal/static && npm install
 	@echo "✓ TypeScript testing environment ready!"
 	@echo "Run 'make ts-test' to run tests or 'make ts-watch' for watch mode"
+
+ts-typecheck: # Typecheck TypeScript framework code (helpers.ts, parse_sql.ts, stroppy.d.ts)
+	cd internal/static && npx tsc --noEmit
 
 ts-test: # Run TypeScript unit tests
 	cd internal/static && npm test

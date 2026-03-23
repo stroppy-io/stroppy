@@ -59,7 +59,10 @@ async function buildProtobufSDK() {
     });
 
     // Generate combined TypeScript for IDE support
+    // @ts-nocheck: generated code has stripped imports that tsc can't resolve (PbLong, JsonWriteOptions, etc.)
+    // The file is used for IDE type inference, not direct compilation.
     const combinedTS = [
+        "// @ts-nocheck",
         "// Combined TypeScript definitions for stroppy protobuf",
         "// @generated",
         "",
