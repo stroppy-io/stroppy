@@ -18,6 +18,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.24.3"
+          cache: true
 
       - name: Install linter dependencies
         run: make install-linter
@@ -47,3 +48,7 @@ jobs:
 
       - name: Run TS tests
         run: make ts-test
+
+  integration:
+    needs: [golang-ci, typescript-ci]
+    uses: ./.github/workflows/integration.yml

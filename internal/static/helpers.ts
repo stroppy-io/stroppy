@@ -110,7 +110,7 @@ const driverTypeMap: Record<DriverTypeName, DriverConfig_DriverType> = {
   picodata: DriverConfig_DriverType.DRIVER_TYPE_PICODATA,
 };
 
-const _envErrorMode = ENV("STROPPY_ERROR_MODE", "", "error handling mode: silent, log, throw") as ErrorModeName | "";
+const _envErrorMode = ENV("STROPPY_ERROR_MODE", "log", "error handling mode: silent, log, throw") as ErrorModeName;
 
 interface InsertDescriptorX {
   method?: InsertMethodName;
