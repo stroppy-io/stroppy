@@ -179,7 +179,7 @@ func (d *Driver) RunQuery(
 	sqlStr string,
 	args map[string]any,
 ) (*driver.QueryResult, error) {
-	return sqldriver.RunQuery(ctx, d.db, d.dialect, d.logger, sqlStr, args)
+	return sqldriver.RunQuery(ctx, d.db, sqldriver.NewRows, d.dialect, d.logger, sqlStr, args)
 }
 
 func (d *Driver) Teardown(ctx context.Context) error {

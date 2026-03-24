@@ -14,7 +14,7 @@ type Rows struct {
 	closed  bool
 }
 
-func NewRows(sqlRows *sql.Rows) *Rows {
+func NewRows(sqlRows *sql.Rows) driver.Rows {
 	cols, _ := sqlRows.Columns()
 
 	return &Rows{sqlRows: sqlRows, cols: cols}

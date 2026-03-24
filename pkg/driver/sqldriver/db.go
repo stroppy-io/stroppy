@@ -7,18 +7,18 @@ import (
 )
 
 // QueryContext is accepted by RunQuery.
-type QueryContext interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+type QueryContext[R any] interface {
+	QueryContext(ctx context.Context, query string, args ...any) (R, error)
 }
 
 // ExecContext is accepted by InsertPlainQuery and InsertPlainBulk.
-type ExecContext interface {
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+type ExecContext[T any] interface {
+	ExecContext(ctx context.Context, query string, args ...any) (T, error)
 }
 
 // Compile-time checks: *sql.DB conforms to every thin interface.
 var (
-	_ QueryContext = (*sql.DB)(nil)
-	_ ExecContext  = (*sql.DB)(nil)
-	_ io.Closer    = (*sql.DB)(nil)
+	_ QueryContext[*sql.Rows] = (*sql.DB)(nil)
+	_ ExecContext[sql.Result] = (*sql.DB)(nil)
+	_ io.Closer               = (*sql.DB)(nil)
 )

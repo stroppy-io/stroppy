@@ -4,7 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	pgqueries "github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
+	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 )
+
+var pgxDialect = pgqueries.PgxDialect{}
 
 func TestProcessArgs(t *testing.T) {
 	tests := []struct {
@@ -83,7 +88,7 @@ func TestProcessArgs(t *testing.T) {
 			args:     map[string]any{},
 			wantSQL:  "",
 			wantArgs: nil,
-			wantErr:  fmt.Errorf("%w: [user_id]", ErrMissedArgument),
+			wantErr:  fmt.Errorf("%w: [user_id]", sqldriver.ErrMissedArgument),
 		},
 		{
 			name:     "multiple missing arguments",
@@ -91,10 +96,10 @@ func TestProcessArgs(t *testing.T) {
 			args:     map[string]any{"user_id": 123},
 			wantSQL:  "",
 			wantArgs: nil,
-			wantErr:  fmt.Errorf("%w: [user_name, age]", ErrMissedArgument),
+			wantErr:  fmt.Errorf("%w: [user_name, age]", sqldriver.ErrMissedArgument),
 		},
 		{
-			name:     "duplicate arguments",
+			name:     "duplicate arguments (dedup)",
 			sql:      "SELECT * FROM users WHERE id = :user_id AND backup_id = :user_id ",
 			args:     map[string]any{"user_id": 123},
 			wantSQL:  "SELECT * FROM users WHERE id = $1 AND backup_id = $1 ",
@@ -123,7 +128,7 @@ func TestProcessArgs(t *testing.T) {
 			args:     map[string]any{"user_id": 123},
 			wantSQL:  `SELECT * FROM users WHERE id=:user_id AND name=:user_name`,
 			wantArgs: nil,
-			wantErr:  fmt.Errorf("%w: [user_id]", ErrExtraArgument),
+			wantErr:  fmt.Errorf("%w: [user_id]", sqldriver.ErrExtraArgument),
 		},
 		{
 			name:     "comma test",
@@ -141,20 +146,20 @@ func TestProcessArgs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			gotSQL, gotArgs, gotErr := processArgs(tt.sql, tt.args)
+			gotSQL, gotArgs, gotErr := sqldriver.ProcessArgs(pgxDialect, tt.sql, tt.args)
 
 			// Check SQL output
 			if gotSQL != tt.wantSQL {
-				t.Errorf("processArgs() SQL = %q, want %q", gotSQL, tt.wantSQL)
+				t.Errorf("ProcessArgs() SQL = %q, want %q", gotSQL, tt.wantSQL)
 			}
 
 			// Check args slice
 			if len(gotArgs) != len(tt.wantArgs) {
-				t.Errorf("processArgs() args len = %d, want %d", len(gotArgs), len(tt.wantArgs))
+				t.Errorf("ProcessArgs() args len = %d, want %d", len(gotArgs), len(tt.wantArgs))
 			} else {
 				for i, v := range gotArgs {
 					if v != tt.wantArgs[i] {
-						t.Errorf("processArgs() args[%d] = %v, want %v", i, v, tt.wantArgs[i])
+						t.Errorf("ProcessArgs() args[%d] = %v, want %v", i, v, tt.wantArgs[i])
 					}
 				}
 			}
@@ -162,14 +167,14 @@ func TestProcessArgs(t *testing.T) {
 			// Check error
 			if tt.wantErr != nil {
 				if gotErr == nil {
-					t.Errorf("processArgs() error = nil, want %v", tt.wantErr)
+					t.Errorf("ProcessArgs() error = nil, want %v", tt.wantErr)
 
 					return
 				}
 
-				if !errors.Is(gotErr, ErrMissedArgument) && !errors.Is(gotErr, ErrExtraArgument) {
+				if !errors.Is(gotErr, sqldriver.ErrMissedArgument) && !errors.Is(gotErr, sqldriver.ErrExtraArgument) {
 					t.Errorf(
-						"processArgs() error type mismatch, got %v, want ErrMissedArgument or ErrExtraArgument",
+						"ProcessArgs() error type mismatch, got %v, want ErrMissedArgument or ErrExtraArgument",
 						gotErr,
 					)
 
@@ -178,13 +183,13 @@ func TestProcessArgs(t *testing.T) {
 				// Additional check for error message content
 				if gotErr.Error() != tt.wantErr.Error() {
 					t.Errorf(
-						"processArgs() error message = %q, want %q",
+						"ProcessArgs() error message = %q, want %q",
 						gotErr.Error(),
 						tt.wantErr.Error(),
 					)
 				}
 			} else if gotErr != nil {
-				t.Errorf("processArgs() error = %v, want nil", gotErr)
+				t.Errorf("ProcessArgs() error = %v, want nil", gotErr)
 			}
 		})
 	}

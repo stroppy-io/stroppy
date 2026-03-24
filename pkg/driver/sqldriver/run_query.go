@@ -25,9 +25,10 @@ var (
 )
 
 // RunQuery executes sql with named :arg placeholders and returns rows cursor.
-func RunQuery(
+func RunQuery[R any](
 	ctx context.Context,
-	db QueryContext,
+	db QueryContext[R],
+	wrapRows func(R) driver.Rows,
 	dialect queries.Dialect,
 	lg *zap.Logger,
 	sqlStr string,
@@ -45,7 +46,7 @@ func RunQuery(
 	}
 
 	start := time.Now()
-	sqlRows, err := db.QueryContext(ctx, processedSQL, argsArr...)
+	rawRows, err := db.QueryContext(ctx, processedSQL, argsArr...)
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -54,13 +55,15 @@ func RunQuery(
 
 	return &driver.QueryResult{
 		Stats: &stats.Query{Elapsed: elapsed},
-		Rows:  NewRows(sqlRows),
+		Rows:  wrapRows(rawRows),
 	}, nil
 }
 
 // ProcessArgs takes sql which contains ":arg" marks and args map "arg" -> value.
 // It returns sql where all marks are replaced with dialect-specific placeholders,
 // and an array of any containing the arguments in the right order.
+// When dialect.Deduplicate() is true, repeated named parameters share a single
+// positional placeholder (e.g. pgx's $1 back-references).
 func ProcessArgs(
 	dialect queries.Dialect, sqlStr string, args map[string]any,
 ) (newSQL string, argsArr []any, err error) {
@@ -69,7 +72,8 @@ func ProcessArgs(
 		missedArgs []string
 	)
 
-	seenArgs := make(map[string]bool)
+	dedup := dialect.Deduplicate()
+	seenArgs := make(map[string]int) // argName → assigned paramCounter (for dedup reuse & extra-arg detection)
 	seenMissed := make(map[string]bool)
 
 	var sb strings.Builder
@@ -90,13 +94,21 @@ func ProcessArgs(
 		argName := rawArg[1:]
 
 		if val, ok := args[argName]; ok {
-			// No dedup: each placeholder gets its own value (required for ?-style).
-			sb.WriteString(dialect.Placeholder(paramCounter))
-
-			seenArgs[argName] = true
-
-			resultArgs = append(resultArgs, val)
-			paramCounter++
+			if dedup {
+				if idx, seen := seenArgs[argName]; seen {
+					sb.WriteString(dialect.Placeholder(idx))
+				} else {
+					sb.WriteString(dialect.Placeholder(paramCounter))
+					seenArgs[argName] = paramCounter
+					resultArgs = append(resultArgs, val)
+					paramCounter++
+				}
+			} else {
+				sb.WriteString(dialect.Placeholder(paramCounter))
+				seenArgs[argName] = paramCounter
+				resultArgs = append(resultArgs, val)
+				paramCounter++
+			}
 		} else {
 			if !seenMissed[argName] {
 				missedArgs = append(missedArgs, argName)

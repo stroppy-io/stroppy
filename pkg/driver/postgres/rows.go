@@ -10,22 +10,22 @@ var _ driver.Rows = (*rows)(nil)
 
 type rows struct {
 	pgxRows pgx.Rows
+	cols    []string
 	closed  bool
 }
 
-func newRows(pgxRows pgx.Rows) *rows {
-	return &rows{pgxRows: pgxRows}
-}
-
-func (r *rows) Columns() []string {
-	fds := r.pgxRows.FieldDescriptions()
+func newRows(pgxRows pgx.Rows) driver.Rows {
+	fds := pgxRows.FieldDescriptions()
 
 	cols := make([]string, len(fds))
 	for i, fd := range fds {
 		cols[i] = fd.Name
 	}
+	return &rows{pgxRows: pgxRows, cols: cols}
+}
 
-	return cols
+func (r *rows) Columns() []string {
+	return r.cols
 }
 
 func (r *rows) Next() bool {

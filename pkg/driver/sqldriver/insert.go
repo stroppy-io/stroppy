@@ -9,10 +9,10 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
-// InsertPlainQuery executes one INSERT per row, similar to postgres PLAIN_QUERY.
-func InsertPlainQuery(
+// InsertPlainQuery executes one INSERT per row.
+func InsertPlainQuery[T any](
 	ctx context.Context,
-	db ExecContext,
+	db ExecContext[T],
 	builder *queries.QueryBuilder,
 ) (*stats.Query, error) {
 	start := time.Now()
@@ -35,9 +35,9 @@ func InsertPlainQuery(
 
 // InsertPlainBulk executes batched bulk INSERT statements.
 // Each batch inserts up to bulkSize rows using multi-row VALUES syntax.
-func InsertPlainBulk(
+func InsertPlainBulk[T any](
 	ctx context.Context,
-	db ExecContext,
+	db ExecContext[T],
 	builder *queries.QueryBuilder,
 	bulkSize int,
 ) (*stats.Query, error) {
