@@ -169,6 +169,10 @@ func (m *DriverConfig) validate(all bool) error {
 		_ = v // ensures v is used
 	}
 
+	if m.BulkSize != nil {
+		// no validation rules for BulkSize
+	}
+
 	if len(errors) > 0 {
 		return DriverConfigMultiError(errors)
 	}
@@ -867,10 +871,6 @@ func (m *DriverConfig_SqlConfig) validate(all bool) error {
 
 	if m.ConnMaxIdleTime != nil {
 		// no validation rules for ConnMaxIdleTime
-	}
-
-	if m.BulkSize != nil {
-		// no validation rules for BulkSize
 	}
 
 	if len(errors) > 0 {

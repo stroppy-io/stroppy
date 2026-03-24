@@ -56,7 +56,7 @@ func RegisterDriver(
 	registry[driverType] = constructor
 }
 
-func Dispatch( //nolint: ireturn // better than return any
+func Dispatch(
 	ctx context.Context,
 	opts Options,
 ) (Driver, error) {

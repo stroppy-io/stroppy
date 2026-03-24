@@ -72,7 +72,7 @@ type RootModule struct {
 
 // NewModuleInstance factory method for Instances.
 // One instance creates per VU.
-func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance { //nolint:ireturn
+func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	return NewInstance(vu)
 }
 

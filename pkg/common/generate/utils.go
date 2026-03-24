@@ -27,7 +27,7 @@ func (f valueGeneratorFn) Next() (*stroppy.Value, error) {
 
 const Persent100 = 100
 
-func wrapNilQuota( //nolint: ireturn // need from lib
+func wrapNilQuota(
 	gen ValueGenerator,
 	nullPercent uint32,
 ) ValueGenerator {
@@ -42,7 +42,6 @@ func wrapNilQuota( //nolint: ireturn // need from lib
 	})
 }
 
-//nolint:ireturn // need it
 func newConstValueGenerator[T primitive.Primitive](
 	constant T,
 	transformer valueTransformer[T],
@@ -52,7 +51,6 @@ func newConstValueGenerator[T primitive.Primitive](
 	})
 }
 
-//nolint:ireturn // need it
 func newRangeGenerator[T primitive.Primitive](
 	distribution primitiveGenerator[T],
 	transformer valueTransformer[T],
@@ -71,11 +69,11 @@ func newRangeWrapper[T constraint.Number](minVal, maxVal T) *rangeWrapper[T] {
 	return &rangeWrapper[T]{min: minVal, max: maxVal}
 }
 
-func (r rangeWrapper[T]) GetMin() T { //nolint: ireturn // generic
+func (r rangeWrapper[T]) GetMin() T {
 	return r.min
 }
 
-func (r rangeWrapper[T]) GetMax() T { //nolint: ireturn // generic
+func (r rangeWrapper[T]) GetMax() T {
 	return r.max
 }
 

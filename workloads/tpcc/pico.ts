@@ -61,6 +61,7 @@ export const options: Options = {
 const driver = DriverX.create().setup({
   url: ENV("DRIVER_URL", "postgres://admin:T0psecret@localhost:1331", "Database connection URL"),
   driverType: "picodata",
+  defaultInsertMethod: "plain_bulk",
   postgres: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
 });
 
@@ -78,7 +79,6 @@ export function setup() {
   Step("load_data", () => {
     console.log("Loading item table...");
     driver.insert("item", ITEMS, {
-      method: "plain_query",
       params: {
         i_id: S.int32(1, ITEMS),
         i_im_id: S.int32(1, ITEMS),
@@ -90,7 +90,6 @@ export function setup() {
 
     console.log("Loading warehouse table...");
     driver.insert("warehouse", WAREHOUSES, {
-      method: "plain_query",
       params: {
         w_id: S.int32(1, WAREHOUSES),
         w_name: R.str(6, 10),
@@ -106,7 +105,6 @@ export function setup() {
 
     console.log("Loading district table...");
     driver.insert("district", TOTAL_DISTRICTS, {
-      method: "plain_query",
       params: {
         d_name: R.str(6, 10),
         d_street_1: R.str(10, 20, AB.enSpc),
@@ -128,7 +126,6 @@ export function setup() {
 
     console.log("Loading customer table...");
     driver.insert("customer", TOTAL_CUSTOMERS, {
-      method: "plain_query",
       params: {
         c_first: R.str(8, 16),
         c_middle: R.str(2, AB.enUpper),
@@ -160,7 +157,6 @@ export function setup() {
 
     console.log("Loading stock table...");
     driver.insert("stock", TOTAL_STOCK, {
-      method: "plain_query",
       params: {
         s_quantity: R.int32(10, 100),
         s_dist_01: R.str(24, AB.enNum),

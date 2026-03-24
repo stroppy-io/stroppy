@@ -1,7 +1,7 @@
 package postgres
 
 import (
-	"github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
+	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 )
 
 // streamingCopySource implements pgx.CopyFromSource to generate values on-demand

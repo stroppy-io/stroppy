@@ -19,4 +19,10 @@ type Dialect interface {
 
 	// ValueToAny converts a proto Value to a Go type suitable for the target database.
 	ValueToAny(v *stroppy.Value) (any, error)
+
+	// Deduplicate reports whether repeated named parameters should share
+	// a single positional placeholder and a single value in the args slice.
+	// PostgreSQL's wire protocol supports $1 back-references, so pgx returns true.
+	// database/sql drivers (MySQL, etc.) require one value per placeholder, so they return false.
+	Deduplicate() bool
 }

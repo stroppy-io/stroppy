@@ -239,6 +239,8 @@ type DriverConfig struct {
 	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
 	// * Name/Type of chosen driver
 	DriverType DriverConfig_DriverType `protobuf:"varint,2,opt,name=driver_type,json=driverType,proto3,enum=stroppy.DriverConfig_DriverType" json:"driver_type,omitempty"`
+	// * Rows per bulk INSERT statement (default: 500)
+	BulkSize *int32 `protobuf:"varint,4,opt,name=bulk_size,json=bulkSize,proto3,oneof" json:"bulk_size,omitempty"`
 	//   - How to handle errors in query/insert operations.
 	//     SILENT: record metric only. LOG: record metric + console.log. THROW:
 	//
@@ -296,6 +298,13 @@ func (x *DriverConfig) GetDriverType() DriverConfig_DriverType {
 		return x.DriverType
 	}
 	return DriverConfig_DRIVER_TYPE_UNSPECIFIED
+}
+
+func (x *DriverConfig) GetBulkSize() int32 {
+	if x != nil && x.BulkSize != nil {
+		return *x.BulkSize
+	}
+	return 0
 }
 
 func (x *DriverConfig) GetErrorMode() DriverConfig_ErrorMode {
@@ -684,10 +693,8 @@ type DriverConfig_SqlConfig struct {
 	ConnMaxLifetime *string `protobuf:"bytes,3,opt,name=conn_max_lifetime,json=connMaxLifetime,proto3,oneof" json:"conn_max_lifetime,omitempty"`
 	// * Maximum idle connection time (Go duration string, e.g. "10m")
 	ConnMaxIdleTime *string `protobuf:"bytes,4,opt,name=conn_max_idle_time,json=connMaxIdleTime,proto3,oneof" json:"conn_max_idle_time,omitempty"`
-	// * Rows per bulk INSERT statement
-	BulkSize      *int32 `protobuf:"varint,5,opt,name=bulk_size,json=bulkSize,proto3,oneof" json:"bulk_size,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *DriverConfig_SqlConfig) Reset() {
@@ -748,13 +755,6 @@ func (x *DriverConfig_SqlConfig) GetConnMaxIdleTime() string {
 	return ""
 }
 
-func (x *DriverConfig_SqlConfig) GetBulkSize() int32 {
-	if x != nil && x.BulkSize != nil {
-		return *x.BulkSize
-	}
-	return 0
-}
-
 var File_proto_stroppy_config_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_config_proto_rawDesc = "" +
@@ -763,7 +763,8 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12K\n" +
 	"\vdriver_type\x18\x02 \x01(\x0e2 .stroppy.DriverConfig.DriverTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
-	"driverType\x12>\n" +
+	"driverType\x12 \n" +
+	"\tbulk_size\x18\x04 \x01(\x05H\x01R\bbulkSize\x88\x01\x01\x12>\n" +
 	"\n" +
 	"error_mode\x18\x03 \x01(\x0e2\x1f.stroppy.DriverConfig.ErrorModeR\terrorMode\x12B\n" +
 	"\bpostgres\x18\n" +
@@ -789,19 +790,16 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\x0f_min_idle_connsB\x1a\n" +
 	"\x18_default_query_exec_modeB\x1d\n" +
 	"\x1b_description_cache_capacityB\x1b\n" +
-	"\x19_statement_cache_capacity\x1a\xc7\x02\n" +
+	"\x19_statement_cache_capacity\x1a\x97\x02\n" +
 	"\tSqlConfig\x12)\n" +
 	"\x0emax_open_conns\x18\x01 \x01(\x05H\x00R\fmaxOpenConns\x88\x01\x01\x12)\n" +
 	"\x0emax_idle_conns\x18\x02 \x01(\x05H\x01R\fmaxIdleConns\x88\x01\x01\x12/\n" +
 	"\x11conn_max_lifetime\x18\x03 \x01(\tH\x02R\x0fconnMaxLifetime\x88\x01\x01\x120\n" +
-	"\x12conn_max_idle_time\x18\x04 \x01(\tH\x03R\x0fconnMaxIdleTime\x88\x01\x01\x12 \n" +
-	"\tbulk_size\x18\x05 \x01(\x05H\x04R\bbulkSize\x88\x01\x01B\x11\n" +
+	"\x12conn_max_idle_time\x18\x04 \x01(\tH\x03R\x0fconnMaxIdleTime\x88\x01\x01B\x11\n" +
 	"\x0f_max_open_connsB\x11\n" +
 	"\x0f_max_idle_connsB\x14\n" +
 	"\x12_conn_max_lifetimeB\x15\n" +
-	"\x13_conn_max_idle_timeB\f\n" +
-	"\n" +
-	"_bulk_size\"t\n" +
+	"\x13_conn_max_idle_time\"t\n" +
 	"\n" +
 	"DriverType\x12\x1b\n" +
 	"\x17DRIVER_TYPE_UNSPECIFIED\x10\x00\x12\x18\n" +
@@ -813,7 +811,9 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\x11ERROR_MODE_SILENT\x10\x01\x12\x12\n" +
 	"\x0eERROR_MODE_LOG\x10\x02\x12\x14\n" +
 	"\x10ERROR_MODE_THROW\x10\x03B\x11\n" +
-	"\x0fdriver_specific\"\xca\x02\n" +
+	"\x0fdriver_specificB\f\n" +
+	"\n" +
+	"_bulk_size\"\xca\x02\n" +
 	"\fLoggerConfig\x12E\n" +
 	"\tlog_level\x18\x01 \x01(\x0e2\x1e.stroppy.LoggerConfig.LogLevelB\b\xfaB\x05\x82\x01\x02\x10\x01R\blogLevel\x12B\n" +
 	"\blog_mode\x18\x02 \x01(\x0e2\x1d.stroppy.LoggerConfig.LogModeB\b\xfaB\x05\x82\x01\x02\x10\x01R\alogMode\"q\n" +

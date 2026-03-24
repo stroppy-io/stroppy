@@ -11,6 +11,7 @@ import (
 
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
@@ -29,11 +30,27 @@ var (
 	)
 )
 
+type PoolX struct {
+	*pgxpool.Pool
+}
+
+func (p *PoolX) ExecContext(
+	ctx context.Context,
+	sql string,
+	args ...any,
+) (pgconn.CommandTag, error) {
+	return p.Exec(ctx, sql, args...)
+}
+
+func (p *PoolX) QueryContext(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	return p.Query(ctx, sql, args...)
+}
+
 func NewPool(
 	ctx context.Context,
 	config *stroppy.DriverConfig,
 	logger *zap.Logger,
-) (*pgxpool.Pool, error) {
+) (*PoolX, error) {
 	parsedConfig, err := ParseConfig(config, logger)
 	if err != nil {
 		return nil, err
@@ -44,7 +61,13 @@ func NewPool(
 		return nil, err
 	}
 
-	return pool, nil
+	return &PoolX{pool}, nil
+}
+
+func NewWithConfig(ctx context.Context, config *pgxpool.Config) (*PoolX, error) {
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+
+	return &PoolX{pool}, err
 }
 
 func ParseConfig(

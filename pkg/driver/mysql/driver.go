@@ -33,10 +33,11 @@ func init() {
 }
 
 type Driver struct {
-	db      *sql.DB
-	dialect queries.Dialect
-	logger  *zap.Logger
-	sqlCfg  *stroppy.DriverConfig_SqlConfig
+	db       *sql.DB
+	dialect  queries.Dialect
+	logger   *zap.Logger
+	sqlCfg   *stroppy.DriverConfig_SqlConfig
+	bulkSize int
 }
 
 var _ driver.Driver = (*Driver)(nil)
@@ -70,11 +71,19 @@ func NewDriver(
 		return nil, err
 	}
 
+	const defaultBulkSize = 500
+
+	bulkSize := defaultBulkSize
+	if cfg.BulkSize != nil {
+		bulkSize = int(cfg.GetBulkSize())
+	}
+
 	return &Driver{
-		db:      db,
-		dialect: mysqlDialect{},
-		logger:  lg,
-		sqlCfg:  sqlCfg,
+		db:       db,
+		dialect:  mysqlDialect{},
+		logger:   lg,
+		sqlCfg:   sqlCfg,
+		bulkSize: bulkSize,
 	}, nil
 }
 
@@ -157,12 +166,7 @@ func (d *Driver) InsertValues(
 	case stroppy.InsertMethod_PLAIN_QUERY:
 		return sqldriver.InsertPlainQuery(ctx, d.db, builder)
 	case stroppy.InsertMethod_PLAIN_BULK:
-		bulkSize := 1000
-		if d.sqlCfg != nil && d.sqlCfg.BulkSize != nil {
-			bulkSize = int(d.sqlCfg.GetBulkSize())
-		}
-
-		return sqldriver.InsertPlainBulk(ctx, d.db, builder, bulkSize)
+		return sqldriver.InsertPlainBulk(ctx, d.db, builder, d.bulkSize)
 	case stroppy.InsertMethod_COPY_FROM:
 		return nil, fmt.Errorf("%w: COPY_FROM", ErrUnsupportedInsertMethod)
 	default:
@@ -179,7 +183,7 @@ func (d *Driver) RunQuery(
 	sqlStr string,
 	args map[string]any,
 ) (*driver.QueryResult, error) {
-	return sqldriver.RunQuery(ctx, d.db, d.dialect, d.logger, sqlStr, args)
+	return sqldriver.RunQuery(ctx, d.db, sqldriver.NewRows, d.dialect, d.logger, sqlStr, args)
 }
 
 func (d *Driver) Teardown(ctx context.Context) error {

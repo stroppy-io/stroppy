@@ -29,7 +29,7 @@ type GenAbleStruct interface {
 
 var ErrNoGenerators = errors.New("no generators provided")
 
-//nolint:gocognit,ireturn // it's hard indeed
+//nolint:gocognit // it's hard indeed
 func NewTupleGenerator(
 	seed uint64,
 	genInfos []GenAbleStruct,
@@ -120,7 +120,7 @@ func NewTupleGenerator(
 	})
 }
 
-func NewValueGenerator( //nolint: ireturn // need as lib part
+func NewValueGenerator(
 	seed uint64,
 	genInfo GenAbleStruct,
 ) (ValueGenerator, error) {
@@ -136,7 +136,7 @@ func NewValueGenerator( //nolint: ireturn // need as lib part
 	return gen, nil
 }
 
-//nolint:funlen,cyclop,ireturn // need from lib
+//nolint:funlen,cyclop // need from lib
 func NewValueGeneratorByRule(
 	seed uint64,
 	rule *stroppy.Generation_Rule,
@@ -312,7 +312,7 @@ func NewValueGeneratorByRule(
 	return generator, nil
 }
 
-func newDateTimeGenerator( //nolint: ireturn // need from lib
+func newDateTimeGenerator(
 	distributeParams *stroppy.Generation_Distribution,
 	seed uint64,
 	ranges *stroppy.Generation_Range_DateTime,
@@ -363,7 +363,7 @@ func newDateTimeGenerator( //nolint: ireturn // need from lib
 	), nil
 }
 
-func newUUIDSeededGenerator(seed uint64) ValueGenerator { //nolint: ireturn // need from lib
+func newUUIDSeededGenerator(seed uint64) ValueGenerator {
 	var byteSlice [32]byte
 
 	binary.LittleEndian.PutUint64(byteSlice[:8], seed)
@@ -381,7 +381,6 @@ func newUUIDSeededGenerator(seed uint64) ValueGenerator { //nolint: ireturn // n
 	})
 }
 
-//nolint:ireturn // need from lib
 func newUUIDSequentialGenerator(
 	uuidSeqRange *stroppy.Generation_Range_UuidSeq,
 ) (ValueGenerator, error) {
@@ -428,7 +427,7 @@ func newUUIDSequentialGenerator(
 	}), nil
 }
 
-func newUUIDGenerator(constant *stroppy.Uuid) ValueGenerator { //nolint: ireturn // need from lib
+func newUUIDGenerator(constant *stroppy.Uuid) ValueGenerator {
 	if constant != nil {
 		return valueGeneratorFn(func() (*stroppy.Value, error) {
 			return &stroppy.Value{
@@ -453,7 +452,7 @@ func newUUIDGenerator(constant *stroppy.Uuid) ValueGenerator { //nolint: ireturn
 	})
 }
 
-func newDecimalGenerator( //nolint: ireturn // need from lib
+func newDecimalGenerator(
 	distributeParams *stroppy.Generation_Distribution,
 	seed uint64,
 	ranges *stroppy.Generation_Range_DecimalRange,

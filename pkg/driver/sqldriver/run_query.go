@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -25,9 +24,10 @@ var (
 )
 
 // RunQuery executes sql with named :arg placeholders and returns rows cursor.
-func RunQuery(
+func RunQuery[R any](
 	ctx context.Context,
-	db QueryContext,
+	db QueryContext[R],
+	wrapRows func(R) driver.Rows,
 	dialect queries.Dialect,
 	lg *zap.Logger,
 	sqlStr string,
@@ -45,7 +45,7 @@ func RunQuery(
 	}
 
 	start := time.Now()
-	sqlRows, err := db.QueryContext(ctx, processedSQL, argsArr...)
+	rawRows, err := db.QueryContext(ctx, processedSQL, argsArr...)
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -54,13 +54,15 @@ func RunQuery(
 
 	return &driver.QueryResult{
 		Stats: &stats.Query{Elapsed: elapsed},
-		Rows:  NewRows(sqlRows),
+		Rows:  wrapRows(rawRows),
 	}, nil
 }
 
 // ProcessArgs takes sql which contains ":arg" marks and args map "arg" -> value.
 // It returns sql where all marks are replaced with dialect-specific placeholders,
 // and an array of any containing the arguments in the right order.
+// When dialect.Deduplicate() is true, repeated named parameters share a single
+// positional placeholder (e.g. pgx's $1 back-references).
 func ProcessArgs(
 	dialect queries.Dialect, sqlStr string, args map[string]any,
 ) (newSQL string, argsArr []any, err error) {
@@ -69,59 +71,72 @@ func ProcessArgs(
 		missedArgs []string
 	)
 
-	seenArgs := make(map[string]bool)
-	seenMissed := make(map[string]bool)
+	dedup := dialect.Deduplicate()
+	seenArgs := make(map[string]int) // argName → assigned paramCounter (for dedup reuse & extra-arg detection)
 
 	var sb strings.Builder
 
 	lastIndex := 0
 	paramCounter := 0
 
+	// match[0:1] covers the full regex match including surrounding whitespace/punctuation;
+	// match[4:5] is capture group 2 — the ":argName" token itself.
 	matches := argsRe.FindAllStringSubmatchIndex(sqlStr, -1)
 
 	for _, match := range matches {
-		fullStart, fullEnd := match[0], match[1]
+		fullEnd := match[1]
 		argStart, argEnd := match[4], match[5]
 
-		sb.WriteString(sqlStr[lastIndex:fullStart])
-		sb.WriteString(sqlStr[fullStart:argStart])
+		rawArg := sqlStr[argStart:argEnd] // e.g. ":id"
+		argName := rawArg[1:]             // strip leading ":"
 
-		rawArg := sqlStr[argStart:argEnd]
-		argName := rawArg[1:]
+		// copy everything before the ":arg" token (including any leading punctuation inside the match)
+		sb.WriteString(sqlStr[lastIndex:argStart])
 
 		if val, ok := args[argName]; ok {
-			// No dedup: each placeholder gets its own value (required for ?-style).
-			sb.WriteString(dialect.Placeholder(paramCounter))
+			idx, seen := seenArgs[argName]
+			if dedup && seen {
+				// reuse the placeholder index assigned on the first occurrence
+				sb.WriteString(dialect.Placeholder(idx))
+			} else {
+				// first occurrence: assign the next positional placeholder
+				sb.WriteString(dialect.Placeholder(paramCounter))
+				seenArgs[argName] = paramCounter
 
-			seenArgs[argName] = true
-
-			resultArgs = append(resultArgs, val)
-			paramCounter++
+				resultArgs = append(resultArgs, val)
+				paramCounter++
+			}
 		} else {
-			if !seenMissed[argName] {
+			// arg referenced in SQL but not supplied — keep the raw token and report it
+			if !slices.Contains(missedArgs, argName) {
 				missedArgs = append(missedArgs, argName)
-				seenMissed[argName] = true
 			}
 
 			sb.WriteString(rawArg)
 		}
 
+		// copy trailing punctuation that belongs to the full match (e.g. closing paren, comma)
 		sb.WriteString(sqlStr[argEnd:fullEnd])
 
 		lastIndex = fullEnd
 	}
 
+	// copy the remainder of the SQL after the last match
 	sb.WriteString(sqlStr[lastIndex:])
 
 	if len(missedArgs) > 0 {
 		return "", nil, fmt.Errorf("%w: [%s]", ErrMissedArgument, strings.Join(missedArgs, ", "))
 	}
 
+	// args supplied by the caller but never referenced in the SQL
 	if len(seenArgs) < len(args) {
-		diff := sliceDifference(
-			slices.Collect(maps.Keys(seenArgs)),
-			slices.Collect(maps.Keys(args)),
-		)
+		var diff []string
+
+		for k := range args {
+			if _, ok := seenArgs[k]; !ok {
+				diff = append(diff, k)
+			}
+		}
 
 		return sb.String(), resultArgs, fmt.Errorf(
 			"%w: [%s]",
@@ -131,16 +146,4 @@ func ProcessArgs(
 	}
 
 	return sb.String(), resultArgs, nil
-}
-
-func sliceDifference[T comparable](subset, full []T) []T {
-	var diff []T
-
-	for _, v := range full {
-		if !slices.Contains(subset, v) {
-			diff = append(diff, v)
-		}
-	}
-
-	return diff
 }

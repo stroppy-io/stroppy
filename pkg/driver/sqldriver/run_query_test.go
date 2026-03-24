@@ -17,6 +17,7 @@ func (testDialect) Placeholder(_ int) string { return "?" }
 func (testDialect) ValueToAny(_ *stroppy.Value) (any, error) {
 	return nil, nil //nolint:nilnil // test stub
 }
+func (testDialect) Deduplicate() bool { return false }
 
 func TestProcessArgs(t *testing.T) {
 	dialect := testDialect{}

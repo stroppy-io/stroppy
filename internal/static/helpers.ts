@@ -249,6 +249,7 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
 export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode" | "driverType" | "driverSpecific"> & {
   errorMode?: ErrorModeName;
   driverType?: DriverTypeName;
+  defaultInsertMethod?: InsertMethodName;
   postgres?: Partial<DriverConfig_PostgresConfig>;
   sql?: Partial<DriverConfig_SqlConfig>;
 }
@@ -257,6 +258,7 @@ export class DriverX implements QueryAPI {
   private driver: Driver;
   private q: QueryAPI;
   private _errorMode: ErrorModeName = "log";
+  private _defaultInsertMethod: InsertMethodName = "plain_bulk";
 
   exec!: QueryAPI["exec"];
   queryRows!: QueryAPI["queryRows"];
@@ -293,8 +295,12 @@ export class DriverX implements QueryAPI {
     } else if (config.errorMode) {
       this._errorMode = config.errorMode;
     }
+    // Resolve default insert method
+    if (config.defaultInsertMethod) {
+      this._defaultInsertMethod = config.defaultInsertMethod;
+    }
     // Convert DriverSetup to proto DriverConfig
-    const { postgres, sql, ...rest } = config;
+    const { postgres, sql, defaultInsertMethod: _dim, ...rest } = config;
     const driverSpecific: DriverConfig["driverSpecific"] = postgres
       ? { oneofKind: "postgres", postgres: DriverConfig_PostgresConfig.create(postgres) }
       : sql
@@ -323,7 +329,7 @@ export class DriverX implements QueryAPI {
     const descriptor = isName
       ? {
           tableName: insertOrTableName,
-          method: insert?.method ? insertMethodMap[insert.method] : undefined,
+          method: insertMethodMap[insert?.method ?? this._defaultInsertMethod],
           seed: String(insert?.seed ?? _seed),
           params: R.group(insert?.params ?? {}),
           groups: R.groups(insert?.groups ?? {}),

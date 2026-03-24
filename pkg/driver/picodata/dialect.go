@@ -1,4 +1,4 @@
-package queries
+package picodata
 
 import (
 	"errors"
@@ -8,51 +8,30 @@ import (
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
-	"go.uber.org/zap"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	sqlqueries "github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 )
 
-var (
-	ErrUnsupportedType  = errors.New("unsupported value type")
-	ErrUnknownQueryType = errors.New("unknown query type")
-)
+var _ sqlqueries.Dialect = PicoDialect{}
 
-type QueryBuilder struct {
-	generators Generators
-	lg         *zap.Logger
-	insert     *stroppy.InsertDescriptor
-	cols       []string
-	sql        string
+// ErrUnsupportedType is returned when a proto Value has an unrecognized type.
+var ErrUnsupportedType = errors.New("unsupported value type")
+
+// PicoDialect implements sqlqueries.Dialect for Picodata via pgx.
+type PicoDialect struct{}
+
+func (PicoDialect) Placeholder(index int) string {
+	return fmt.Sprintf("$%d", index+1)
 }
 
-func NewQueryBuilder(
-	lg *zap.Logger,
-	seed uint64,
-	insert *stroppy.InsertDescriptor,
-) (*QueryBuilder, error) {
-	gens, err := collectInsertGenerators(seed, insert)
-	if err != nil {
-		return nil, fmt.Errorf("add generators for unit :%w", err)
-	}
-
-	return &QueryBuilder{
-		generators: gens,
-		lg:         lg,
-		insert:     insert,
-		sql:        InsertSQL(insert),
-		cols:       InsertColumns(insert),
-	}, nil
+func (PicoDialect) ValueToAny(value *stroppy.Value) (any, error) {
+	return ValueToAny(value)
 }
 
-func (q *QueryBuilder) Build(valuesOut []any) (err error) {
-	return NewInsertValues(q.generators, q.insert, valuesOut)
-}
-func (q *QueryBuilder) SQL() string       { return q.sql }
-func (q *QueryBuilder) Columns() []string { return q.cols }
-func (q *QueryBuilder) Count() int32      { return q.insert.GetCount() }
-func (q *QueryBuilder) TableName() string { return q.insert.GetTableName() }
+func (PicoDialect) Deduplicate() bool { return true }
 
+// ValueToAny converts a proto Value to a Go type suitable for pgx.
 func ValueToAny(value *stroppy.Value) (any, error) {
 	switch typed := value.GetType().(type) {
 	case *stroppy.Value_Null:

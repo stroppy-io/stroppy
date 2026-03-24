@@ -661,6 +661,7 @@ by the k6 lifecycle stage: init phase = shared, iteration = per-VU.
 | ----- | ---- | ----- | ----------- |
 | url | [string](#string) |  | Database connection URL |
 | driver_type | [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType) |  | Name/Type of chosen driver |
+| bulk_size | [int32](#int32) | optional | Rows per bulk INSERT statement (default: 500) |
 | error_mode | [DriverConfig.ErrorMode](#stroppy-DriverConfig-ErrorMode) |  | How to handle errors in query/insert operations. SILENT: record metric only. LOG: record metric &#43; console.log. THROW: rethrow. |
 | postgres | [DriverConfig.PostgresConfig](#stroppy-DriverConfig-PostgresConfig) |  |  |
 | sql | [DriverConfig.SqlConfig](#stroppy-DriverConfig-SqlConfig) |  |  |
@@ -705,7 +706,6 @@ Generic database/sql pool settings for SQL-based drivers
 | max_idle_conns | [int32](#int32) | optional | Maximum number of idle connections |
 | conn_max_lifetime | [string](#string) | optional | Maximum connection lifetime (Go duration string, e.g. &#34;1h&#34;) |
 | conn_max_idle_time | [string](#string) | optional | Maximum idle connection time (Go duration string, e.g. &#34;10m&#34;) |
-| bulk_size | [int32](#int32) | optional | Rows per bulk INSERT statement |
 
 
 

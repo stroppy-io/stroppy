@@ -195,6 +195,7 @@ app-deps: # Install application dependencies in ./bin
 .PHONY: proto
 proto: .check-bins
 	rm -rf $(CURDIR)/pkg/common/proto/*
+	rm -rf $(PROTO_BUILD_TARGET_DIR)/ts
 	mkdir -p $(PROTO_BUILD_TARGET_DIR)/ts/stroppy
 	mkdir -p $(PROTO_BUILD_TARGET_DIR)/docs
 	mkdir -p $(PROTO_BUILD_TARGET_DIR)/go
