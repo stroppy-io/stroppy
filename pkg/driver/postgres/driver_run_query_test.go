@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"testing"
 
-	pgqueries "github.com/stroppy-io/stroppy/pkg/driver/postgres/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 )
 
-var pgxDialect = pgqueries.PgxDialect{}
+var pgxDialect = PgxDialect{}
 
 func TestProcessArgs(t *testing.T) {
 	tests := []struct {
@@ -172,7 +171,8 @@ func TestProcessArgs(t *testing.T) {
 					return
 				}
 
-				if !errors.Is(gotErr, sqldriver.ErrMissedArgument) && !errors.Is(gotErr, sqldriver.ErrExtraArgument) {
+				if !errors.Is(gotErr, sqldriver.ErrMissedArgument) &&
+					!errors.Is(gotErr, sqldriver.ErrExtraArgument) {
 					t.Errorf(
 						"ProcessArgs() error type mismatch, got %v, want ErrMissedArgument or ErrExtraArgument",
 						gotErr,

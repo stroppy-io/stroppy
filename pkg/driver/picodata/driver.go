@@ -2,6 +2,7 @@ package picodata
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,11 +12,15 @@ import (
 	"github.com/picodata/picodata-go"
 	"go.uber.org/zap"
 
+	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
+	sqlqueries "github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
+	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
 const (
@@ -148,4 +153,56 @@ func (d *Driver) Teardown(_ context.Context) error {
 	d.logger.Debug("Driver Teardown End")
 
 	return nil
+}
+
+// RunQuery executes sql with named :arg placeholders and returns rows cursor.
+func (d *Driver) RunQuery(
+	ctx context.Context,
+	sql string,
+	args map[string]any,
+) (*driver.QueryResult, error) {
+	return sqldriver.RunQuery(
+		ctx,
+		d.pool,
+		postgres.NewRows,
+		PicoDialect{},
+		d.logger,
+		sql,
+		args,
+	)
+}
+
+var ErrCopyFromUnsupported = errors.New("CopyFrom is not supported in Picodata yet")
+
+// InsertValues inserts multiple rows into the database based on the descriptor.
+// It supports two methods:
+// - PLAIN_QUERY: executes individual INSERT statements for each row
+// - PLAIN_BULK: executes batched bulk INSERT statements using multi-row VALUES syntax
+// - COPY_FROM: unsupported.
+func (d *Driver) InsertValues(
+	ctx context.Context,
+	descriptor *stroppy.InsertDescriptor,
+) (*stats.Query, error) {
+	builder, err := sqlqueries.NewQueryBuilder(
+		d.logger,
+		PicoDialect{},
+		generate.ResolveSeed(descriptor.GetSeed()),
+		descriptor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("can't create query builder: %w", err)
+	}
+
+	switch descriptor.GetMethod() {
+	case stroppy.InsertMethod_PLAIN_QUERY:
+		return sqldriver.InsertPlainQuery(ctx, d.pool, builder)
+	case stroppy.InsertMethod_PLAIN_BULK:
+		return sqldriver.InsertPlainBulk(ctx, d.pool, builder, d.bulkSize)
+	case stroppy.InsertMethod_COPY_FROM:
+		return nil, ErrCopyFromUnsupported
+	default:
+		d.logger.Panic("unexpected proto.InsertMethod")
+
+		return nil, nil //nolint:nilnil // unreachable after panic
+	}
 }

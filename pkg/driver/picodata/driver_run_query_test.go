@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"testing"
 
-	picoqeries "github.com/stroppy-io/stroppy/pkg/driver/picodata/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 )
 
-var picoDialect = picoqeries.PicoDialect{}
+var picoDialect = PicoDialect{}
 
 func TestProcessArgs(t *testing.T) {
 	tests := []struct {
@@ -172,7 +171,8 @@ func TestProcessArgs(t *testing.T) {
 					return
 				}
 
-				if !errors.Is(gotErr, sqldriver.ErrMissedArgument) && !errors.Is(gotErr, sqldriver.ErrExtraArgument) {
+				if !errors.Is(gotErr, sqldriver.ErrMissedArgument) &&
+					!errors.Is(gotErr, sqldriver.ErrExtraArgument) {
 					t.Errorf(
 						"ProcessArgs() error type mismatch, got %v, want ErrMissedArgument or ErrExtraArgument",
 						gotErr,

@@ -6,15 +6,15 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
-var _ driver.Rows = (*rows)(nil)
+var _ driver.Rows = (*Rows)(nil)
 
-type rows struct {
+type Rows struct {
 	pgxRows pgx.Rows
 	cols    []string
 	closed  bool
 }
 
-func newRows(pgxRows pgx.Rows) driver.Rows {
+func NewRows(pgxRows pgx.Rows) driver.Rows {
 	fds := pgxRows.FieldDescriptions()
 
 	cols := make([]string, len(fds))
@@ -22,14 +22,14 @@ func newRows(pgxRows pgx.Rows) driver.Rows {
 		cols[i] = fd.Name
 	}
 
-	return &rows{pgxRows: pgxRows, cols: cols}
+	return &Rows{pgxRows: pgxRows, cols: cols}
 }
 
-func (r *rows) Columns() []string {
+func (r *Rows) Columns() []string {
 	return r.cols
 }
 
-func (r *rows) Next() bool {
+func (r *Rows) Next() bool {
 	if r.closed {
 		return false
 	}
@@ -43,7 +43,7 @@ func (r *rows) Next() bool {
 	return hasNext
 }
 
-func (r *rows) Values() []any {
+func (r *Rows) Values() []any {
 	vals, err := r.pgxRows.Values()
 	if err != nil {
 		return nil
@@ -54,7 +54,7 @@ func (r *rows) Values() []any {
 
 // ReadAll reads up to limit rows and closes the cursor.
 // limit <= 0 means no limit.
-func (r *rows) ReadAll(limit int) [][]any {
+func (r *Rows) ReadAll(limit int) [][]any {
 	var result [][]any
 	for r.Next() {
 		if limit > 0 && len(result) >= limit {
@@ -69,11 +69,11 @@ func (r *rows) ReadAll(limit int) [][]any {
 	return result
 }
 
-func (r *rows) Err() error {
+func (r *Rows) Err() error {
 	return r.pgxRows.Err()
 }
 
-func (r *rows) Close() error {
+func (r *Rows) Close() error {
 	if !r.closed {
 		r.closed = true
 		r.pgxRows.Close()
