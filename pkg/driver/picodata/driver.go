@@ -3,6 +3,7 @@ package picodata
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -14,6 +15,12 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
+	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
+)
+
+const (
+	LoggerName           = "picodata-driver"
+	dbConnectionTimeout  = 5 * time.Second
 )
 
 func init() {
@@ -25,21 +32,37 @@ func init() {
 	)
 }
 
-const (
-	LoggerName = "picodata-driver"
-)
-
 type Executor interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	ExecContext(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryContext(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Ping(ctx context.Context) error
 	Close()
 	Config() *pgxpool.Config
 }
 
+// PoolX wraps *picodata.Pool and adds ExecContext/QueryContext to satisfy Executor.
+type PoolX struct {
+	*picodata.Pool
+}
+
+func (p *PoolX) ExecContext(
+	ctx context.Context,
+	sql string,
+	args ...any,
+) (pgconn.CommandTag, error) {
+	return p.Exec(ctx, sql, args...)
+}
+
+func (p *PoolX) QueryContext(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	return p.Query(ctx, sql, args...)
+}
+
 // Driver implements the driver.Driver interface for Picodata DB.
 type Driver struct {
-	logger   *zap.Logger
-	picoPool Executor
+	logger *zap.Logger
+	pool   Executor
 }
 
 // NewDriver creates a new Picodata driver instance.
@@ -91,7 +114,13 @@ func NewDriver(
 		}
 	}
 
-	d.picoPool = conn
+	d.pool = &PoolX{conn}
+
+	d.logger.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
+
+	if err = sqldriver.WaitForDB(ctx, d.logger, d.pool, dbConnectionTimeout); err != nil {
+		return nil, err
+	}
 
 	d.logger.Debug("Successfully connected to Picodata")
 
@@ -102,8 +131,8 @@ func NewDriver(
 func (d *Driver) Teardown(_ context.Context) error {
 	d.logger.Debug("Driver Teardown Start")
 
-	if d.picoPool != nil {
-		d.picoPool.Close()
+	if d.pool != nil {
+		d.pool.Close()
 	}
 
 	d.logger.Debug("Driver Teardown End")
