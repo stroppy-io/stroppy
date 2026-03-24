@@ -61,8 +61,9 @@ func (p *PoolX) QueryContext(ctx context.Context, sql string, args ...any) (pgx.
 
 // Driver implements the driver.Driver interface for Picodata DB.
 type Driver struct {
-	logger *zap.Logger
-	pool   Executor
+	logger   *zap.Logger
+	pool     Executor
+	bulkSize int
 }
 
 // NewDriver creates a new Picodata driver instance.
@@ -77,9 +78,18 @@ func NewDriver(
 			WithOptions(zap.AddCallerSkip(0))
 	}
 
-	d = &Driver{logger: lg}
+	const defaultBulkSize = 500
 
 	cfg := opts.Config
+
+	d = &Driver{
+		logger:   lg,
+		bulkSize: defaultBulkSize,
+	}
+
+	if cfg.BulkSize != nil {
+		d.bulkSize = int(cfg.GetBulkSize())
+	}
 
 	d.logger.Debug("Connecting to Picodata...", zap.String("url", cfg.GetUrl()))
 

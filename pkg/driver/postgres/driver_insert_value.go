@@ -41,7 +41,7 @@ func (d *Driver) InsertValues(
 	case stroppy.InsertMethod_PLAIN_QUERY:
 		return sqldriver.InsertPlainQuery(ctx, d.pool, builder)
 	case stroppy.InsertMethod_PLAIN_BULK:
-		return sqldriver.InsertPlainBulk(ctx, d.pool, builder, 500)
+		return sqldriver.InsertPlainBulk(ctx, d.pool, builder, d.bulkSize)
 	case stroppy.InsertMethod_COPY_FROM:
 		return d.insertValuesCopyFrom(ctx, builder)
 	default:

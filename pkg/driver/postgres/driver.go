@@ -45,8 +45,9 @@ type Executor interface {
 }
 
 type Driver struct {
-	logger *zap.Logger
-	pool   Executor
+	logger    *zap.Logger
+	pool      Executor
+	bulkSize  int
 }
 
 var _ driver.Driver = new(Driver)
@@ -62,9 +63,18 @@ func NewDriver(
 			WithOptions(zap.AddCallerSkip(0))
 	}
 
-	d = &Driver{logger: lg}
+	const defaultBulkSize = 500
+
+	d = &Driver{
+		logger:   lg,
+		bulkSize: defaultBulkSize,
+	}
 
 	cfg := opts.Config
+
+	if cfg.BulkSize != nil {
+		d.bulkSize = int(cfg.GetBulkSize())
+	}
 
 	d.pool, err = pool.NewPool(ctx, cfg, d.logger.Named(pool.LoggerName))
 	if err != nil {
