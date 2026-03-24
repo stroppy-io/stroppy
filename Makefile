@@ -286,8 +286,8 @@ run-simple-test:
 	cd $(WORKDIR) && ./stroppy run simple.ts
 
 run-tpcb-test:
-	LOG_LEVEL=DEBUG DURATION="1s" SCALE_FACTOR=1 \
-		./build/stroppy run workloads/tpcb/tpcb.ts workloads/tpcb/tpcb.sql
+	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
+		./build/stroppy run tpcb
 
 run-tpcc-test:
 	DURATION="1s" SCALE_FACTOR=1 ./build/stroppy run tpcc.ts tpcc.sql
@@ -303,20 +303,27 @@ run-tpcds-test:
 	./build/stroppy run tpcds tpcds-scale-1.sql
 
 run-k6-tests: # Run SQL API integration tests
-	-./build/stroppy run tests/sqlapi_test.ts -- -q
-	-./build/stroppy run tests/multi_drivers_test.ts -- -q
+# rc - return code
+# This allows to run all the test and to exit with the nonzero code if any failed
+	@rc=0;                                                      \
+	./build/stroppy run tests/sqlapi_test -- -q        || rc=1; \
+	./build/stroppy run tests/multi_drivers_test -- -q || rc=1; \
+	exit $$rc
 
 ##
 ## TypeScript Development
 ##
 
-.PHONY: ts-setup ts-test ts-watch
+.PHONY: ts-setup ts-test ts-watch ts-typecheck
 
 ts-setup: # Setup TypeScript testing environment
 	@echo "Setting up TypeScript testing environment..."
 	cd internal/static && npm install
 	@echo "✓ TypeScript testing environment ready!"
 	@echo "Run 'make ts-test' to run tests or 'make ts-watch' for watch mode"
+
+ts-typecheck: # Typecheck TypeScript framework code (helpers.ts, parse_sql.ts, stroppy.d.ts)
+	cd internal/static && npx tsc --noEmit
 
 ts-test: # Run TypeScript unit tests
 	cd internal/static && npm test

@@ -18,6 +18,7 @@
     "test": "vitest run --config tests/vitest.config.ts",
     "test:watch": "vitest --config tests/vitest.config.ts",
     "test:ui": "vitest --ui --config tests/vitest.config.ts",
-    "typecheck": "tsc --noEmit --project tests/tsconfig.json"
+    "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --noEmit --project tests/tsconfig.json"
   }
 }

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Combined TypeScript definitions for stroppy protobuf
 
 // @generated

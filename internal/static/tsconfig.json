@@ -1,7 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "__$comment1": "from https://github.com/grafana/k6-template-typescript/blob/main/tsconfig.json",
     "target": "es2019",
     "moduleResolution": "node",
     "module": "commonjs",
@@ -19,7 +18,8 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "k6/x/stroppy": ["./stroppy.d.ts"]
+      "k6/x/stroppy": ["./stroppy.d.ts"],
+      "k6/x/encoding": ["./encoding.d.ts"]
     }
   },
   "include": ["*.js", "*.ts", "*.d.ts"]
