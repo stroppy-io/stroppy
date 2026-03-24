@@ -662,7 +662,7 @@ by the k6 lifecycle stage: init phase = shared, iteration = per-VU.
 | url | [string](#string) |  | Database connection URL |
 | driver_type | [DriverConfig.DriverType](#stroppy-DriverConfig-DriverType) |  | Name/Type of chosen driver |
 | bulk_size | [int32](#int32) | optional | Rows per bulk INSERT statement (default: 500) |
-| error_mode | [DriverConfig.ErrorMode](#stroppy-DriverConfig-ErrorMode) |  | How to handle errors in query/insert operations. SILENT: record metric only. LOG: record metric &#43; console.log. THROW: rethrow. |
+| error_mode | [DriverConfig.ErrorMode](#stroppy-DriverConfig-ErrorMode) |  | How to handle errors in query/insert operations. SILENT: record metric only. LOG: record metric &#43; console.log. THROW: rethrow. FAIL: mark test for k6 as failed, continue execution, return code 110. ABORT: immediately stop test with k6 test.abort, return code 108 |
 | postgres | [DriverConfig.PostgresConfig](#stroppy-DriverConfig-PostgresConfig) |  |  |
 | sql | [DriverConfig.SqlConfig](#stroppy-DriverConfig-SqlConfig) |  |  |
 
@@ -808,6 +808,8 @@ Error handling mode for query and insert operations
 | ERROR_MODE_SILENT | 1 |  |
 | ERROR_MODE_LOG | 2 |  |
 | ERROR_MODE_THROW | 3 |  |
+| ERROR_MODE_FAIL | 4 |  |
+| ERROR_MODE_ABORT | 5 |  |
 
 
 
