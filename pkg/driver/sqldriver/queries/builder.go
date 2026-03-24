@@ -48,6 +48,6 @@ func (q *QueryBuilder) SQL() string                       { return q.sql }
 func (q *QueryBuilder) Columns() []string                 { return q.cols }
 func (q *QueryBuilder) Count() int32                      { return q.insert.GetCount() }
 func (q *QueryBuilder) TableName() string                 { return q.insert.GetTableName() }
-func (q *QueryBuilder) Dialect() Dialect                  { return q.dialect } //nolint:ireturn // needed by callers
+func (q *QueryBuilder) Dialect() Dialect                  { return q.dialect }
 func (q *QueryBuilder) Insert() *stroppy.InsertDescriptor { return q.insert }
 func (q *QueryBuilder) Generators() Generators            { return q.generators }

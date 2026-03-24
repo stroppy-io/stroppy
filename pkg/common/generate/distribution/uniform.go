@@ -26,7 +26,7 @@ func NewUniformDistribution[T constraint.Number](
 	}
 }
 
-func (ug *UniformDistribution[T]) Next() T { //nolint: ireturn // generic
+func (ug *UniformDistribution[T]) Next() T {
 	result := math.Max(
 		ug.ranges[0],
 		math.Min(

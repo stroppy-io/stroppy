@@ -66,6 +66,7 @@ func NewPool(
 
 func NewWithConfig(ctx context.Context, config *pgxpool.Config) (*PoolX, error) {
 	pool, err := pgxpool.NewWithConfig(ctx, config)
+
 	return &PoolX{pool}, err
 }
 

@@ -51,7 +51,6 @@ linters:
     - inamedparam
     - interfacebloat
     - intrange
-    - ireturn
     - lll
     - loggercheck
     - maintidx
@@ -155,7 +154,6 @@ linters:
         - lll
         - mnd
         - err113
-        - ireturn
       allow-unused: true
     paralleltest:
       ignore-missing: true
@@ -222,7 +220,6 @@ linters:
           - goconst
           - gocritic
           - gosec
-          - ireturn
           - noctx
           - protogetter
           - varnamelen

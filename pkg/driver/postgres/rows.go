@@ -21,6 +21,7 @@ func newRows(pgxRows pgx.Rows) driver.Rows {
 	for i, fd := range fds {
 		cols[i] = fd.Name
 	}
+
 	return &rows{pgxRows: pgxRows, cols: cols}
 }
 

@@ -22,7 +22,7 @@ var ErrUnsupportedInsertMethod = errors.New("unsupported insert method for postg
 // It supports three methods:
 // - PLAIN_QUERY: executes individual INSERT statements for each row
 // - PLAIN_BULK: executes batched bulk INSERT statements using multi-row VALUES syntax
-// - COPY_FROM: uses PostgreSQL's COPY protocol for fast bulk insertion
+// - COPY_FROM: uses PostgreSQL's COPY protocol for fast bulk insertion.
 func (d *Driver) InsertValues(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,

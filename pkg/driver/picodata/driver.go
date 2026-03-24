@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	LoggerName           = "picodata-driver"
-	dbConnectionTimeout  = 5 * time.Second
+	LoggerName          = "picodata-driver"
+	dbConnectionTimeout = 5 * time.Second
 )
 
 func init() {
@@ -128,7 +128,7 @@ func NewDriver(
 
 	d.logger.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
 
-	if err = sqldriver.WaitForDB(ctx, d.logger, d.pool, dbConnectionTimeout); err != nil {
+	if err := sqldriver.WaitForDB(ctx, d.logger, d.pool, dbConnectionTimeout); err != nil {
 		return nil, err
 	}
 

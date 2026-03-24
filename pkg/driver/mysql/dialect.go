@@ -14,7 +14,7 @@ var ErrUnsupportedType = errors.New("unsupported value type")
 type mysqlDialect struct{}
 
 func (mysqlDialect) Placeholder(_ int) string { return "?" }
-func (mysqlDialect) Deduplicate() bool            { return false }
+func (mysqlDialect) Deduplicate() bool        { return false }
 
 func (mysqlDialect) ValueToAny(value *stroppy.Value) (any, error) {
 	switch typed := value.GetType().(type) {

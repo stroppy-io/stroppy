@@ -30,6 +30,6 @@ func NewZipfDistribution[T constraint.Number](
 	}
 }
 
-func (zd *ZipfDistribution[T]) Next() T { //nolint: ireturn // generic
+func (zd *ZipfDistribution[T]) Next() T {
 	return T(uint64(zd.ranges[0]) + zd.prng.Uint64()%uint64(zd.ranges[1]-zd.ranges[0]+1))
 }

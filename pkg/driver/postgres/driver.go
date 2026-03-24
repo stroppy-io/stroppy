@@ -45,9 +45,9 @@ type Executor interface {
 }
 
 type Driver struct {
-	logger    *zap.Logger
-	pool      Executor
-	bulkSize  int
+	logger   *zap.Logger
+	pool     Executor
+	bulkSize int
 }
 
 var _ driver.Driver = new(Driver)

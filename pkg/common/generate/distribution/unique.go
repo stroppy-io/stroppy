@@ -21,7 +21,7 @@ func NewUniqueDistribution[T constraint.Number](ranges [2]T) *UniqueNumberGenera
 	}
 }
 
-func (ug *UniqueNumberGenerator[T]) Next() T { //nolint: ireturn // generic
+func (ug *UniqueNumberGenerator[T]) Next() T {
 	cr := ug.current.Load()
 	crVal := *cr
 

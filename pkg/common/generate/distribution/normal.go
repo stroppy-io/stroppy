@@ -32,7 +32,7 @@ func NewNormalDistribution[T constraint.Number](
 	}
 }
 
-func (ng *NormalDistribution[T]) Next() T { //nolint: ireturn // generic
+func (ng *NormalDistribution[T]) Next() T {
 	value := ng.prng.NormFloat64()*ng.stddev + ng.mean
 
 	result := math.Max(

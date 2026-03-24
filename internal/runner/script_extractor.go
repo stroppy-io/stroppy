@@ -269,10 +269,8 @@ func (*genStub) Next() any { return nil }
 
 type pickerStub struct{}
 
-//nolint:ireturn // sobek
 func (g *pickerStub) Pick(a []js.Value) (js.Value, error) { return a[0], nil }
 
-//nolint:ireturn // sobek
 func (g *pickerStub) PickWeighted(a []js.Value, _ []float64) (js.Value, error) { return a[0], nil }
 
 func newPickerStub(seed uint64) *pickerStub { return &pickerStub{} }

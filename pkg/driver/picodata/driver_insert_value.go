@@ -19,7 +19,7 @@ var ErrCopyFromUnsupported = errors.New("CopyFrom is not supported in Picodata y
 // It supports two methods:
 // - PLAIN_QUERY: executes individual INSERT statements for each row
 // - PLAIN_BULK: executes batched bulk INSERT statements using multi-row VALUES syntax
-// - COPY_FROM: unsupported
+// - COPY_FROM: unsupported.
 func (d *Driver) InsertValues(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,

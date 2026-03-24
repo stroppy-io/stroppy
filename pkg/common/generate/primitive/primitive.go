@@ -38,6 +38,6 @@ func NewNoTransformGenerator[T constraint.Number](generator distribution.Distrib
 	}
 }
 
-func (g Generator[D, T]) Next() T { //nolint: ireturn // generic
+func (g Generator[D, T]) Next() T {
 	return g.transform(g.generator.Next())
 }

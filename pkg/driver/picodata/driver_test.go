@@ -48,9 +48,9 @@ func (m *mockPool) QueryContext(_ context.Context, _ string, _ ...any) (pgx.Rows
 	return nil, nil //nolint:nilnil // mock
 }
 
-func (m *mockPool) Ping(_ context.Context) error        { return nil }
-func (m *mockPool) Close()                              {}
-func (m *mockPool) Config() *pgxpool.Config             { return nil }
+func (m *mockPool) Ping(_ context.Context) error { return nil }
+func (m *mockPool) Close()                       {}
+func (m *mockPool) Config() *pgxpool.Config      { return nil }
 
 func newTestDriver(pool Executor) *Driver {
 	return &Driver{
