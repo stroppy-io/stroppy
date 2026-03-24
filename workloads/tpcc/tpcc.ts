@@ -59,6 +59,7 @@ export const options: Options = {
 const driver = DriverX.create().setup({
   url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
   driverType: "postgres",
+  defaultInsertMethod: "copy_from",
   postgres: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
 });
 
@@ -80,7 +81,6 @@ export function setup() {
   Step("load_data", () => {
     // Load data into tables using InsertValues with COPY_FROM method
     driver.insert("item", ITEMS, {
-      method: "copy_from",
       params: {
         i_id: S.int32(1, ITEMS),
         i_im_id: S.int32(1, ITEMS), // WHY: not unique originaly
@@ -91,7 +91,6 @@ export function setup() {
     });
 
     driver.insert("warehouse", WAREHOUSES, {
-      method: "copy_from",
       params: {
         w_id: S.int32(1, WAREHOUSES),
         w_name: R.str(6, 10),
@@ -106,7 +105,6 @@ export function setup() {
     });
 
     driver.insert("district", TOTAL_DISTRICTS, {
-      method: "copy_from",
       params: {
         d_name: R.str(6, 10),
         d_street_1: R.str(10, 20, AB.enSpc),
@@ -127,7 +125,6 @@ export function setup() {
     });
 
     driver.insert("customer", TOTAL_CUSTOMERS, {
-      method: "copy_from",
       params: {
         c_first: R.str(8, 16),
         c_middle: R.str(2, AB.enUpper),
@@ -158,7 +155,6 @@ export function setup() {
     });
 
     driver.insert("stock", TOTAL_STOCK, {
-      method: "copy_from",
       params: {
         s_quantity: R.int32(10, 100),
         s_dist_01: R.str(24, AB.enNum),

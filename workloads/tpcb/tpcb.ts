@@ -20,6 +20,7 @@ export const options: Options = {
 const driver = DriverX.create().setup({
   url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
   driverType: "postgres",
+  defaultInsertMethod: "copy_from",
   postgres: {},
 });
 
@@ -41,7 +42,6 @@ export function setup() {
 
   Step("load_data", () => {
     driver.insert("pgbench_branches", BRANCHES, {
-      method: "copy_from",
       params: {
         bid: S.int32(1, BRANCHES),
         bbalance: C.int32(0),
@@ -50,7 +50,6 @@ export function setup() {
     });
 
     driver.insert("pgbench_tellers", TELLERS, {
-      method: "copy_from",
       params: {
         tid: S.int32(1, TELLERS),
         bid: R.int32(1, BRANCHES),
@@ -60,7 +59,6 @@ export function setup() {
     });
 
     driver.insert("pgbench_accounts", ACCOUNTS, {
-      method: "copy_from",
       params: {
         aid: S.int32(1, ACCOUNTS),
         bid: R.int32(1, BRANCHES),

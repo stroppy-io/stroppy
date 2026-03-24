@@ -25,6 +25,7 @@ export const options: Options = {
 const driverConfig: DriverSetup = {
   url: ENV("DRIVER_URL", "myuser:mypassword@tcp(localhost:3306)/mydb?charset=utf8mb4&parseTime=True&loc=Local", "Database connection URL"),
   driverType: "mysql",
+  defaultInsertMethod: "plain_bulk",
   sql: {maxOpenConns: POOL_SIZE, maxIdleConns: POOL_SIZE}
 };
 
@@ -47,7 +48,6 @@ export function setup() {
 
   Step("load_data", () => {
     driver.insert("item", ITEMS, {
-      method: "plain_bulk",
       params: {
         i_id: S.int32(1, ITEMS),
         i_im_id: S.int32(1, ITEMS),
@@ -58,7 +58,6 @@ export function setup() {
     });
 
     driver.insert("warehouse", WAREHOUSES, {
-      method: "plain_bulk",
       params: {
         w_id: S.int32(1, WAREHOUSES),
         w_name: R.str(6, 10),
@@ -73,7 +72,6 @@ export function setup() {
     });
 
     driver.insert("district", TOTAL_DISTRICTS, {
-      method: "plain_bulk",
       params: {
         d_name: R.str(6, 10),
         d_street_1: R.str(10, 20, AB.enSpc),
@@ -94,7 +92,6 @@ export function setup() {
     });
 
     driver.insert("customer", TOTAL_CUSTOMERS, {
-      method: "plain_bulk",
       params: {
         c_first: R.str(8, 16),
         c_middle: R.str(2, AB.enUpper),
@@ -125,7 +122,6 @@ export function setup() {
     });
 
     driver.insert("stock", TOTAL_STOCK, {
-      method: "plain_bulk",
       params: {
         s_quantity: R.int32(10, 100),
         s_dist_01: R.str(24, AB.enNum),
