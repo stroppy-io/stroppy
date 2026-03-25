@@ -1,4 +1,5 @@
 import { Counter, Rate, Trend } from "k6/metrics";
+import { test } from "k6/execution"
 import encoding from "k6/x/encoding";
 globalThis.TextEncoder = encoding.TextEncoder;
 globalThis.TextDecoder = encoding.TextDecoder;
@@ -94,12 +95,14 @@ const insertMethodMap: Record<InsertMethodName, InsertMethod> = {
   copy_from: InsertMethod.COPY_FROM,
 };
 
-export type ErrorModeName = "silent" | "log" | "throw";
+export type ErrorModeName = "silent" | "log" | "throw" | "fail" | "abort";
 
 const errorModeMap: Record<ErrorModeName, DriverConfig_ErrorMode> = {
   silent: DriverConfig_ErrorMode.ERROR_MODE_SILENT,
   log: DriverConfig_ErrorMode.ERROR_MODE_LOG,
   throw: DriverConfig_ErrorMode.ERROR_MODE_THROW,
+  fail: DriverConfig_ErrorMode.ERROR_MODE_FAIL,
+  abort: DriverConfig_ErrorMode.ERROR_MODE_ABORT,
 };
 
 export type DriverTypeName = "postgres" | "mysql" | "picodata";
@@ -110,7 +113,9 @@ const driverTypeMap: Record<DriverTypeName, DriverConfig_DriverType> = {
   picodata: DriverConfig_DriverType.DRIVER_TYPE_PICODATA,
 };
 
-const _envErrorMode = ENV("STROPPY_ERROR_MODE", "log", "error handling mode: silent, log, throw") as ErrorModeName;
+const _envErrorMode = ENV("STROPPY_ERROR_MODE", undefined, 
+"(default: by config, else 'log') error handling mode: silent, log, throw, fail, abort",
+) as ErrorModeName | undefined;
 
 interface InsertDescriptorX {
   method?: InsertMethodName;
@@ -174,10 +179,15 @@ export interface QueryAPI {
 type RunQueryFn = (sql: string, args: Record<string, any>) => QueryResult;
 
 function handleError(mode: ErrorModeName, e: unknown, tags?: Record<string, string>): void {
-  if (mode === "log") {
+  if (mode !== "silent") {
     console.error(`[stroppy] query error${tags ? ` [${Object.values(tags).join(",")}]` : ""}: ${e}`);
-  } else if (mode === "throw") {
+  } 
+  if (mode === "throw") {
     throw e;
+  } else if (mode === "fail") {
+    test.fail(`failed due to sql error: ${e}`)
+  } else if (mode === "abort") {
+    test.abort(`aborted due to sql error: ${e}`)
   }
 }
 
