@@ -82,7 +82,9 @@ func (d *DriverWrapper) RunQuery(sql string, args map[string]any) (*driver.Query
 // InsertValuesBin starts bulk insert blocking operation on driver.
 func (d *DriverWrapper) InsertValuesBin(insertMsg []byte, count int64) (*stats.Query, error) {
 	d.ensureReady()
+
 	var descriptor stroppy.InsertDescriptor
+
 	err := proto.Unmarshal(insertMsg, &descriptor)
 	if err != nil {
 		return nil, fmt.Errorf("error while unmarshalling insert descriptor: %w", err)
@@ -94,4 +96,62 @@ func (d *DriverWrapper) InsertValuesBin(insertMsg []byte, count int64) (*stats.Q
 	}
 
 	return result, nil
+}
+
+// Begin starts a new transaction with the given isolation level.
+// isolationLevel maps to proto TxIsolationLevel int32 values.
+func (d *DriverWrapper) Begin(isolationLevel int32) (*TxWrapper, error) {
+	d.ensureReady()
+
+	level := stroppy.TxIsolationLevel(isolationLevel)
+
+	// NONE mode: no actual transaction, delegate to driver.RunQuery
+	if level == stroppy.TxIsolationLevel_NONE {
+		return &TxWrapper{tx: nil, drv: d, vu: d.vu}, nil
+	}
+
+	tx, err := d.drv.Begin(d.vu.Context(), level)
+	if err != nil {
+		return nil, fmt.Errorf("error starting transaction: %w", err)
+	}
+
+	return &TxWrapper{tx: tx, drv: d, vu: d.vu}, nil
+}
+
+// TxWrapper wraps a driver.Tx for JS exposure.
+// For NONE mode, tx is nil and queries delegate to the parent driver.
+type TxWrapper struct {
+	tx  driver.Tx
+	drv *DriverWrapper
+	vu  modules.VU
+}
+
+func (t *TxWrapper) RunQuery(sql string, args map[string]any) (*driver.QueryResult, error) {
+	if t.tx == nil {
+		// NONE mode: delegate to driver
+		return t.drv.RunQuery(sql, args)
+	}
+
+	result, err := t.tx.RunQuery(t.vu.Context(), sql, args)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query in transaction: %w", err)
+	}
+
+	return result, nil
+}
+
+func (t *TxWrapper) Commit() error {
+	if t.tx == nil {
+		return nil
+	}
+
+	return t.tx.Commit(t.vu.Context())
+}
+
+func (t *TxWrapper) Rollback() error {
+	if t.tx == nil {
+		return nil
+	}
+
+	return t.tx.Rollback(t.vu.Context())
 }

@@ -11,6 +11,7 @@ import {
   DeclareEnv,
   Once,
   Driver,
+  Tx,
   QueryStats,
   QueryResult,
 } from "k6/x/stroppy";
@@ -29,6 +30,7 @@ import {
   DriverConfig_SqlConfig,
   StroppyRun_Status,
   Timestamp,
+  TxIsolationLevel,
 } from "./stroppy.pb.js";
 
 import { ParsedQuery } from "./parse_sql.js";
@@ -119,11 +121,35 @@ interface InsertDescriptorX {
   groups?: Record<string, Record<string, Generation_Rule>>;
 }
 
+export type TxIsolationName =
+  | "read_uncommitted"
+  | "read_committed"
+  | "repeatable_read"
+  | "serializable"
+  | "db_default"
+  | "conn"
+  | "none";
+
+const txIsolationMap: Record<TxIsolationName, TxIsolationLevel> = {
+  db_default: TxIsolationLevel.UNSPECIFIED,
+  read_uncommitted: TxIsolationLevel.READ_UNCOMMITTED,
+  read_committed: TxIsolationLevel.READ_COMMITTED,
+  repeatable_read: TxIsolationLevel.REPEATABLE_READ,
+  serializable: TxIsolationLevel.SERIALIZABLE,
+  conn: TxIsolationLevel.CONNECTION_ONLY,
+  none: TxIsolationLevel.NONE,
+};
+
 const insertMetric = new Trend("insert_duration", true);
 const insertErrRateMetric = new Rate("insert_error_rate");
 const runQueryMetric = new Trend("run_query_duration", true);
 const runQueryCounterMetric = new Counter("run_query_count");
 const runQueryErrRateMetric = new Rate("run_query_error_rate");
+const txTotalDurationMetric = new Trend("tx_total_duration", true);
+const txCleanDurationMetric = new Trend("tx_clean_duration", true);
+const txCommitRateMetric = new Rate("tx_commit_rate");
+const txErrRateMetric = new Rate("tx_error_rate");
+const txQueriesPerTxMetric = new Trend("tx_queries_per_tx", false);
 
 export interface TaggedQuery {
   sql: string | ParsedQuery;
@@ -246,10 +272,74 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
   };
 }
 
+export class TxX implements QueryAPI {
+  private tx: Tx;
+  private q: QueryAPI;
+  readonly isolation: TxIsolationName;
+  readonly name: string | undefined;
+  private _startTime: number;
+  private _cleanDuration: number = 0;
+  private _queryCount: number = 0;
+
+  exec!: QueryAPI["exec"];
+  queryRows!: QueryAPI["queryRows"];
+  queryRow!: QueryAPI["queryRow"];
+  queryValue!: QueryAPI["queryValue"];
+  queryCursor!: QueryAPI["queryCursor"];
+
+  constructor(tx: Tx, isolation: TxIsolationName, getErrorMode: () => ErrorModeName, name?: string) {
+    this.tx = tx;
+    this.isolation = isolation;
+    this.name = name;
+    this._startTime = Date.now();
+    this.q = createQueryAPI(
+      (sql, args) => {
+        this._queryCount++; 
+        const res = tx.runQuery(sql, args);
+        this._cleanDuration += res.stats.elapsed.milliseconds();
+        return res;
+      },
+      getErrorMode,
+    );
+    this.exec = this.q.exec;
+    this.queryRows = this.q.queryRows;
+    this.queryRow = this.q.queryRow;
+    this.queryValue = this.q.queryValue;
+    this.queryCursor = this.q.queryCursor;
+  }
+
+  private _tags(action: "commit" | "rollback"): Record<string, string> {
+    const tags: Record<string, string> = { action };
+    if (this.name) tags.name = this.name;
+    return tags;
+  }
+
+  commit(): void {
+    const elapsed = Date.now() - this._startTime;
+    this.tx.commit();
+    const tags = this._tags("commit");
+    txTotalDurationMetric.add(elapsed, tags);
+    txCleanDurationMetric.add(this._cleanDuration, tags);
+    txCommitRateMetric.add(1, tags);
+    txQueriesPerTxMetric.add(this._queryCount, tags);
+  }
+
+  rollback(): void {
+    const elapsed = Date.now() - this._startTime;
+    const tags = this._tags("rollback");
+    txTotalDurationMetric.add(elapsed, tags);
+    txCleanDurationMetric.add(this._cleanDuration, tags);
+    txCommitRateMetric.add(0, tags);
+    txQueriesPerTxMetric.add(this._queryCount, tags);
+    this.tx.rollback();
+  }
+}
+
 export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode" | "driverType" | "driverSpecific"> & {
   errorMode?: ErrorModeName;
   driverType?: DriverTypeName;
   defaultInsertMethod?: InsertMethodName;
+  defaultTxIsolation?: TxIsolationName;
   postgres?: Partial<DriverConfig_PostgresConfig>;
   sql?: Partial<DriverConfig_SqlConfig>;
 }
@@ -259,6 +349,7 @@ export class DriverX implements QueryAPI {
   private q: QueryAPI;
   private _errorMode: ErrorModeName = "log";
   private _defaultInsertMethod: InsertMethodName = "plain_bulk";
+  private _defaultTxIsolation: TxIsolationName = "db_default";
 
   exec!: QueryAPI["exec"];
   queryRows!: QueryAPI["queryRows"];
@@ -299,8 +390,12 @@ export class DriverX implements QueryAPI {
     if (config.defaultInsertMethod) {
       this._defaultInsertMethod = config.defaultInsertMethod;
     }
+    // Resolve default tx isolation
+    if (config.defaultTxIsolation) {
+      this._defaultTxIsolation = config.defaultTxIsolation;
+    }
     // Convert DriverSetup to proto DriverConfig
-    const { postgres, sql, defaultInsertMethod: _dim, ...rest } = config;
+    const { postgres, sql, defaultInsertMethod: _dim, defaultTxIsolation: _dti, ...rest } = config;
     const driverSpecific: DriverConfig["driverSpecific"] = postgres
       ? { oneofKind: "postgres", postgres: DriverConfig_PostgresConfig.create(postgres) }
       : sql
@@ -354,6 +449,39 @@ export class DriverX implements QueryAPI {
     }
 
     console.log(`Insertion into '${descriptor.tableName}' ended`);
+  }
+
+  /** Start a transaction manually. Call tx.commit() or tx.rollback() when done. */
+  begin(options?: { isolation?: TxIsolationName; name?: string }): TxX {
+    const level = options?.isolation ?? this._defaultTxIsolation;
+    const tx = this.driver.begin(txIsolationMap[level]);
+    return new TxX(tx, level, () => this._errorMode, options?.name);
+  }
+
+  /** Execute a callback within a transaction. Auto-commits on success, auto-rollbacks on error. */
+  beginTx(fn: (tx: TxX) => void): void;
+  beginTx(options: { isolation?: TxIsolationName; name?: string }, 
+    fn: (tx: TxX) => void): void;
+
+  beginTx(
+    optionsOrFn: { isolation?: TxIsolationName; name?: string } | ((tx: TxX) => void), 
+    maybeFn?: (tx: TxX) => void): void {
+
+    const isOptions = typeof optionsOrFn === "object";
+    const options = isOptions ? optionsOrFn : undefined;
+    const fn = isOptions ? maybeFn! : optionsOrFn;
+
+    const tx = this.begin(options);
+    const errTags = tx.name ? { name: tx.name } : undefined;
+    try {
+      fn(tx);
+      tx.commit();
+      txErrRateMetric.add(0, errTags);
+    } catch (e) {
+      txErrRateMetric.add(1, errTags);
+      try { tx.rollback(); } catch (_) { /* ignore rollback error */ }
+      throw e;
+    }
   }
 
   getDriver(): Driver {

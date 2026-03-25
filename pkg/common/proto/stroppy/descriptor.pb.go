@@ -83,6 +83,10 @@ const (
 	TxIsolationLevel_READ_COMMITTED   TxIsolationLevel = 2
 	TxIsolationLevel_REPEATABLE_READ  TxIsolationLevel = 3
 	TxIsolationLevel_SERIALIZABLE     TxIsolationLevel = 4
+	// * Pinned connection without BEGIN/COMMIT. For databases without transaction support.
+	TxIsolationLevel_CONNECTION_ONLY TxIsolationLevel = 5
+	// * No transaction or connection pinning. Queries go through the driver pool directly.
+	TxIsolationLevel_NONE TxIsolationLevel = 6
 )
 
 // Enum value maps for TxIsolationLevel.
@@ -93,6 +97,8 @@ var (
 		2: "READ_COMMITTED",
 		3: "REPEATABLE_READ",
 		4: "SERIALIZABLE",
+		5: "CONNECTION_ONLY",
+		6: "NONE",
 	}
 	TxIsolationLevel_value = map[string]int32{
 		"UNSPECIFIED":      0,
@@ -100,6 +106,8 @@ var (
 		"READ_COMMITTED":   2,
 		"REPEATABLE_READ":  3,
 		"SERIALIZABLE":     4,
+		"CONNECTION_ONLY":  5,
+		"NONE":             6,
 	}
 )
 
@@ -387,13 +395,15 @@ const file_proto_stroppy_descriptor_proto_rawDesc = "" +
 	"\vPLAIN_QUERY\x10\x00\x12\r\n" +
 	"\tCOPY_FROM\x10\x01\x12\x0e\n" +
 	"\n" +
-	"PLAIN_BULK\x10\x02*t\n" +
+	"PLAIN_BULK\x10\x02*\x93\x01\n" +
 	"\x10TxIsolationLevel\x12\x0f\n" +
 	"\vUNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10READ_UNCOMMITTED\x10\x01\x12\x12\n" +
 	"\x0eREAD_COMMITTED\x10\x02\x12\x13\n" +
 	"\x0fREPEATABLE_READ\x10\x03\x12\x10\n" +
-	"\fSERIALIZABLE\x10\x04B8Z6github.com/stroppy-io/stroppy/pkg/common/proto/stroppyb\x06proto3"
+	"\fSERIALIZABLE\x10\x04\x12\x13\n" +
+	"\x0fCONNECTION_ONLY\x10\x05\x12\b\n" +
+	"\x04NONE\x10\x06B8Z6github.com/stroppy-io/stroppy/pkg/common/proto/stroppyb\x06proto3"
 
 var (
 	file_proto_stroppy_descriptor_proto_rawDescOnce sync.Once

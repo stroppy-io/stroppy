@@ -937,6 +937,8 @@ transaction.
 | READ_COMMITTED | 2 |  |
 | REPEATABLE_READ | 3 |  |
 | SERIALIZABLE | 4 |  |
+| CONNECTION_ONLY | 5 | Pinned connection without BEGIN/COMMIT. For databases without transaction support. |
+| NONE | 6 | No transaction or connection pinning. Queries go through the driver pool directly. |
 
 
  

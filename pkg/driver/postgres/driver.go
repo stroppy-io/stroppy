@@ -43,6 +43,7 @@ type Executor interface {
 		rowSrc pgx.CopyFromSource,
 	) (int64, error)
 	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
+	Acquire(ctx context.Context) (*pgxpool.Conn, error)
 
 	Ping(ctx context.Context) error
 	Config() *pgxpool.Config
@@ -111,6 +112,15 @@ func NewDriver(
 }
 
 func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (driver.Tx, error) {
+	if isolation == stroppy.TxIsolationLevel_CONNECTION_ONLY {
+		conn, err := d.pool.Acquire(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return newConnOnlyTx(conn, d), nil
+	}
+
 	pgxTx, err := d.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: toTxIsoLevel(isolation)})
 	if err != nil {
 		return nil, err

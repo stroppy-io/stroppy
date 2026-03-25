@@ -74,4 +74,8 @@ enum TxIsolationLevel {
   READ_COMMITTED = 2;
   REPEATABLE_READ = 3;
   SERIALIZABLE = 4;
+  /** Pinned connection without BEGIN/COMMIT. For databases without transaction support. */
+  CONNECTION_ONLY = 5;
+  /** No transaction or connection pinning. Queries go through the driver pool directly. */
+  NONE = 6;
 }

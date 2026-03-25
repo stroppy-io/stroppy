@@ -309,6 +309,7 @@ run-k6-tests: # Run SQL API integration tests
 	@rc=0;                                                      \
 	./build/stroppy run tests/sqlapi_test -- -q        || rc=1; \
 	./build/stroppy run tests/multi_drivers_test -- -q || rc=1; \
+	./build/stroppy run tests/transaction_test -- -q   || rc=1; \
 	exit $$rc
 
 ##
