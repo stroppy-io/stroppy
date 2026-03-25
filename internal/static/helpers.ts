@@ -50,43 +50,6 @@ export function ENV(env: string | string[], default_?: string | number, descript
   return default_ as string | number;
 }
 
-// ============================================================================
-// Module-wide seed (0 = random, >0 = fixed). Inherited by .gen() and insert().
-// ============================================================================
-
-let _seed = 0;
-
-/** Set the module-wide default seed. 0 = random on every use, >0 = fixed. */
-export function setSeed(s: number): void {
-  _seed = s;
-}
-
-// ============================================================================
-// Rule — Generation_Rule enriched with .gen()
-// ============================================================================
-
-export type Rule = Generation_Rule & {
-  /** Create a Generator from this rule. seed: 0 = random, >0 = fixed.
-   *  Falls back to the module-wide seed set via setSeed() if omitted. */
-  gen(seed?: number): ReturnType<typeof NewGeneratorByRuleBin>;
-};
-
-export type GroupRule = QueryParamDescriptor[] & {
-  /** Create a Generator from this group. seed: 0 = random, >0 = fixed.
-   *  Falls back to the module-wide seed set via setSeed() if omitted. */
-  gen(seed?: number): ReturnType<typeof NewGroupGeneratorByRulesBin>;
-};
-
-function rule(r: Generation_Rule): Rule {
-  return Object.assign(r, {
-    gen(seed?: number): ReturnType<typeof NewGeneratorByRuleBin> {
-      return NewGeneratorByRuleBin(
-        seed ?? _seed,
-        Generation_Rule.toBinary(Generation_Rule.create(r)),
-      );
-    },
-  });
-}
 
 export type InsertMethodName = "plain_query" | "plain_bulk" | "copy_from";
 
@@ -207,7 +170,7 @@ function handleError(mode: ErrorModeName, e: unknown, tags?: Record<string, stri
   }
 }
 
-function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeName): QueryAPI {
+function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeName, isTx = false): QueryAPI {
   function run(sql: SqlArg, args: Record<string, any>): QueryResult | undefined {
     const { sql: s, tags } = resolveSqlArg(sql);
     try {
@@ -218,6 +181,7 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
       return result;
     } catch (e) {
       runQueryErrRateMetric.add(1, tags);
+      if (isTx) { throw e }
       handleError(getErrorMode(), e, tags);
       return undefined;
     }
@@ -288,29 +252,32 @@ export class TxX implements QueryAPI {
   queryCursor!: QueryAPI["queryCursor"];
 
   constructor(tx: Tx, isolation: TxIsolationName, getErrorMode: () => ErrorModeName, name?: string) {
-    this.tx = tx;
-    this.isolation = isolation;
-    this.name = name;
+    this.tx         = tx;
+    this.isolation  = isolation;
+    this.name       = name;
     this._startTime = Date.now();
     this.q = createQueryAPI(
       (sql, args) => {
         this._queryCount++; 
-        const res = tx.runQuery(sql, args);
+        const res = tx.runQuery(sql, { ...args, ...this._tags() });
         this._cleanDuration += res.stats.elapsed.milliseconds();
         return res;
       },
       getErrorMode,
+      true,
     );
-    this.exec = this.q.exec;
-    this.queryRows = this.q.queryRows;
-    this.queryRow = this.q.queryRow;
-    this.queryValue = this.q.queryValue;
+    this.exec        = this.q.exec;
+    this.queryRows   = this.q.queryRows;
+    this.queryRow    = this.q.queryRow;
+    this.queryValue  = this.q.queryValue;
     this.queryCursor = this.q.queryCursor;
   }
 
-  private _tags(action: "commit" | "rollback"): Record<string, string> {
-    const tags: Record<string, string> = { action };
-    if (this.name) tags.name = this.name;
+  private _tags(action?: "commit" | "rollback"): Record<string, string> {
+    const tags: Record<string, string> = {};
+    if (action)         tags.tx_action    = action;
+    if (this.name)      tags.tx_name      = this.name;
+    if (this.isolation) tags.tx_isolation = this.isolation;
     return tags;
   }
 
@@ -529,6 +496,44 @@ export const Step = Object.assign(
     },
   }
 );
+
+// ============================================================================
+// Module-wide seed (0 = random, >0 = fixed). Inherited by .gen() and insert().
+// ============================================================================
+
+let _seed = 0;
+
+/** Set the module-wide default seed. 0 = random on every use, >0 = fixed. */
+export function setSeed(s: number): void {
+  _seed = s;
+}
+
+// ============================================================================
+// Rule — Generation_Rule enriched with .gen()
+// ============================================================================
+
+export type Rule = Generation_Rule & {
+  /** Create a Generator from this rule. seed: 0 = random, >0 = fixed.
+   *  Falls back to the module-wide seed set via setSeed() if omitted. */
+  gen(seed?: number): ReturnType<typeof NewGeneratorByRuleBin>;
+};
+
+export type GroupRule = QueryParamDescriptor[] & {
+  /** Create a Generator from this group. seed: 0 = random, >0 = fixed.
+   *  Falls back to the module-wide seed set via setSeed() if omitted. */
+  gen(seed?: number): ReturnType<typeof NewGroupGeneratorByRulesBin>;
+};
+
+function rule(r: Generation_Rule): Rule {
+  return Object.assign(r, {
+    gen(seed?: number): ReturnType<typeof NewGeneratorByRuleBin> {
+      return NewGeneratorByRuleBin(
+        seed ?? _seed,
+        Generation_Rule.toBinary(Generation_Rule.create(r)),
+      );
+    },
+  });
+}
 
 // ============================================================================
 // Distribution
