@@ -34,7 +34,10 @@ type ScriptRunner struct {
 }
 
 // NewScriptRunner creates a new ScriptRunner for the given resolved input.
-func NewScriptRunner(input *ResolvedInput, k6RunArgs, steps, noSteps []string) (*ScriptRunner, error) {
+func NewScriptRunner(
+	input *ResolvedInput,
+	k6RunArgs, steps, noSteps []string,
+) (*ScriptRunner, error) {
 	lg := logger.Global().
 		Named("script_runner").
 		WithOptions(zap.WithCaller(false), zap.AddStacktrace(zap.FatalLevel))
@@ -337,7 +340,7 @@ func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut 
 func (r *ScriptRunner) runK6(
 	_ context.Context,
 	args, envs []string,
-) error {
+) (err error) {
 	scriptName := filepath.Base(r.scriptPath)
 	// dump state
 	argsBefore := os.Args
@@ -362,7 +365,9 @@ func (r *ScriptRunner) runK6(
 	r.logger.Debug("Running k6", zap.Strings("args", os.Args))
 
 	// run the test
-	k6cmd.Execute() // TODO: add exit code processing
+	k6cmd.Execute()
+
+	defer func() { err = errors.Join(err, exitCodeToError()) }()
 
 	copied, err := copyFiles(r.tempDir, dirBefore, r.filesInTmp)
 	r.logger.Debug(
@@ -376,11 +381,11 @@ func (r *ScriptRunner) runK6(
 	// restore state
 	os.Clearenv()
 
-	if err := setEnvs(envsBefore); err != nil {
+	if err = setEnvs(envsBefore); err != nil {
 		return fmt.Errorf("failed to restore eniroments: %w", err)
 	}
 
-	if err := os.Chdir(dirBefore); err != nil {
+	if err = os.Chdir(dirBefore); err != nil {
 		return fmt.Errorf("failed cd origin %q: %w", dirBefore, err)
 	}
 

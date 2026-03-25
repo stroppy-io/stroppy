@@ -14,6 +14,7 @@ import (
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/gen"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/probe"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
+	"github.com/stroppy-io/stroppy/internal/runner"
 	"github.com/stroppy-io/stroppy/internal/version"
 )
 
@@ -82,9 +83,8 @@ func Root() *cobra.Command {
 }
 
 func K6Subcommand(gs *state.GlobalState) *cobra.Command {
-	// TODO: add gs.OSExit code processing, get it to script_runner
 	inteceptInteruptSignals(gs)
-	gs.OSExit = func(i int) {} // TODO: proper handling/logging of exit code
+	gs.OSExit = runner.OSExit // handles exit code
 
 	return rootCmd
 }

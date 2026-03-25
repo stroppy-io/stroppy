@@ -71,11 +71,16 @@ message DriverConfig {
     ERROR_MODE_SILENT = 1;
     ERROR_MODE_LOG = 2;
     ERROR_MODE_THROW = 3;
+    ERROR_MODE_FAIL = 4;
+    ERROR_MODE_ABORT = 5;
   }
 
   /** How to handle errors in query/insert operations.
-   *  SILENT: record metric only. LOG: record metric + console.log. THROW:
-   * rethrow. */
+   *  SILENT: record metric only.
+   *  LOG: record metric + console.log.
+   *  THROW: rethrow.
+   *  FAIL: mark test for k6 as failed, continue execution, return code 110.
+   *  ABORT: immediately stop test with k6 test.abort, return code 108 */
   ErrorMode error_mode = 3;
 
   /** Driver-specific configuration, exactly one must match driver_type */

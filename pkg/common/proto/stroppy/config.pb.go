@@ -82,6 +82,8 @@ const (
 	DriverConfig_ERROR_MODE_SILENT      DriverConfig_ErrorMode = 1
 	DriverConfig_ERROR_MODE_LOG         DriverConfig_ErrorMode = 2
 	DriverConfig_ERROR_MODE_THROW       DriverConfig_ErrorMode = 3
+	DriverConfig_ERROR_MODE_FAIL        DriverConfig_ErrorMode = 4
+	DriverConfig_ERROR_MODE_ABORT       DriverConfig_ErrorMode = 5
 )
 
 // Enum value maps for DriverConfig_ErrorMode.
@@ -91,12 +93,16 @@ var (
 		1: "ERROR_MODE_SILENT",
 		2: "ERROR_MODE_LOG",
 		3: "ERROR_MODE_THROW",
+		4: "ERROR_MODE_FAIL",
+		5: "ERROR_MODE_ABORT",
 	}
 	DriverConfig_ErrorMode_value = map[string]int32{
 		"ERROR_MODE_UNSPECIFIED": 0,
 		"ERROR_MODE_SILENT":      1,
 		"ERROR_MODE_LOG":         2,
 		"ERROR_MODE_THROW":       3,
+		"ERROR_MODE_FAIL":        4,
+		"ERROR_MODE_ABORT":       5,
 	}
 )
 
@@ -242,9 +248,11 @@ type DriverConfig struct {
 	// * Rows per bulk INSERT statement (default: 500)
 	BulkSize *int32 `protobuf:"varint,4,opt,name=bulk_size,json=bulkSize,proto3,oneof" json:"bulk_size,omitempty"`
 	//   - How to handle errors in query/insert operations.
-	//     SILENT: record metric only. LOG: record metric + console.log. THROW:
-	//
-	// rethrow.
+	//     SILENT: record metric only.
+	//     LOG: record metric + console.log.
+	//     THROW: rethrow.
+	//     FAIL: mark test for k6 as failed, continue execution, return code 110.
+	//     ABORT: immediately stop test with k6 test.abort, return code 108
 	ErrorMode DriverConfig_ErrorMode `protobuf:"varint,3,opt,name=error_mode,json=errorMode,proto3,enum=stroppy.DriverConfig_ErrorMode" json:"error_mode,omitempty"`
 	// * Driver-specific configuration, exactly one must match driver_type
 	// Types that are valid to be assigned to DriverSpecific:
@@ -759,7 +767,7 @@ var File_proto_stroppy_config_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\x85\f\n" +
+	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\xb1\f\n" +
 	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12K\n" +
 	"\vdriver_type\x18\x02 \x01(\x0e2 .stroppy.DriverConfig.DriverTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
@@ -805,12 +813,14 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\x17DRIVER_TYPE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14DRIVER_TYPE_POSTGRES\x10\x01\x12\x15\n" +
 	"\x11DRIVER_TYPE_MYSQL\x10\x02\x12\x18\n" +
-	"\x14DRIVER_TYPE_PICODATA\x10\x03\"h\n" +
+	"\x14DRIVER_TYPE_PICODATA\x10\x03\"\x93\x01\n" +
 	"\tErrorMode\x12\x1a\n" +
 	"\x16ERROR_MODE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11ERROR_MODE_SILENT\x10\x01\x12\x12\n" +
 	"\x0eERROR_MODE_LOG\x10\x02\x12\x14\n" +
-	"\x10ERROR_MODE_THROW\x10\x03B\x11\n" +
+	"\x10ERROR_MODE_THROW\x10\x03\x12\x13\n" +
+	"\x0fERROR_MODE_FAIL\x10\x04\x12\x14\n" +
+	"\x10ERROR_MODE_ABORT\x10\x05B\x11\n" +
 	"\x0fdriver_specificB\f\n" +
 	"\n" +
 	"_bulk_size\"\xca\x02\n" +

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 
@@ -30,10 +31,12 @@ var Cmd = &cobra.Command{
 
 Files are searched in: current directory → ~/.stroppy/ → built-in workloads.
 SQL files are auto-derived from the preset/script name unless specified explicitly.
-
-Examples:
+`,
+	DisableFlagParsing: true,
+	SilenceErrors:      false,
+	Example: `
   stroppy run tpcc                              # built-in TPC-C preset
-  stroppy run tpcc -- --duration 5m             # preset with k6 args
+  stroppy run tpcb -- --duration 5m             # preset with k6 args
   stroppy run tpcds tpcds-scale-100             # preset with explicit SQL variant
   stroppy run simple                            # preset without SQL
   stroppy run my_benchmark.ts                   # custom test script
@@ -43,10 +46,13 @@ Examples:
   stroppy run tpcc --steps create_schema,load   # only run specified steps
   stroppy run tpcc --no-steps load              # run all steps except specified
 `,
-	DisableFlagParsing: true,
-	RunE: func(_ *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return errNoScript
+		}
+
+		if args[0] == "--help" || args[0] == "-h" {
+			return cmd.Help()
 		}
 
 		// Split args at "--" first, before indexing positional args.
@@ -92,7 +98,9 @@ Examples:
 				steps = append(steps, strings.Split(strings.TrimPrefix(arg, "--steps="), ",")...)
 
 			case strings.HasPrefix(arg, "--no-steps="):
-				noSteps = append(noSteps, strings.Split(strings.TrimPrefix(arg, "--no-steps="), ",")...)
+				noSteps = append(
+					noSteps,
+					strings.Split(strings.TrimPrefix(arg, "--no-steps="), ",")...)
 
 			case scriptArg == "":
 				scriptArg = arg
@@ -118,6 +126,12 @@ Examples:
 		}
 
 		err = r.Run(context.Background())
+
+		var exitErr *runner.ExitError
+		if errors.As(err, &exitErr) {
+			os.Exit(exitErr.Code)
+		}
+
 		if err != nil {
 			return fmt.Errorf("failed to run benchmark: %w", err)
 		}

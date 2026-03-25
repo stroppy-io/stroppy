@@ -8371,8 +8371,11 @@ export interface DriverConfig {
     bulkSize?: number;
     /**
      * * How to handle errors in query/insert operations.
-     *  SILENT: record metric only. LOG: record metric + console.log. THROW:
-     * rethrow.
+     *  SILENT: record metric only.
+     *  LOG: record metric + console.log.
+     *  THROW: rethrow.
+     *  FAIL: mark test for k6 as failed, continue execution, return code 110.
+     *  ABORT: immediately stop test with k6 test.abort, return code 108
      *
      * @generated from protobuf field: stroppy.DriverConfig.ErrorMode error_mode = 3
      */
@@ -8533,7 +8536,15 @@ export enum DriverConfig_ErrorMode {
     /**
      * @generated from protobuf enum value: ERROR_MODE_THROW = 3;
      */
-    ERROR_MODE_THROW = 3
+    ERROR_MODE_THROW = 3,
+    /**
+     * @generated from protobuf enum value: ERROR_MODE_FAIL = 4;
+     */
+    ERROR_MODE_FAIL = 4,
+    /**
+     * @generated from protobuf enum value: ERROR_MODE_ABORT = 5;
+     */
+    ERROR_MODE_ABORT = 5
 }
 /**
  * *
