@@ -118,7 +118,7 @@ func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) 
 			return nil, err
 		}
 
-		return newConnOnlyTx(conn, d), nil
+		return NewConnOnlyTx(conn, d.logger), nil
 	}
 
 	pgxTx, err := d.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: toTxIsoLevel(isolation)})

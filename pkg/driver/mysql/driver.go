@@ -155,7 +155,7 @@ func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) 
 			return nil, err
 		}
 
-		return &connOnlyTx{conn: conn, dialect: d.dialect, logger: d.logger}, nil
+		return sqldriver.NewConnOnlyTx(conn, sqldriver.NewRows, d.dialect, d.logger, conn.Close), nil
 	}
 
 	sqlTx, err := d.db.BeginTx(ctx, &sql.TxOptions{Isolation: sqldriver.IsolationToSQL(isolation)})
@@ -170,43 +170,6 @@ func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) 
 		d.dialect,
 		d.logger,
 	), nil
-}
-
-// connOnlyTx wraps a *sql.Conn as a driver.Tx without starting a SQL transaction.
-// Commit/Rollback close the connection.
-type connOnlyTx struct {
-	conn    *sql.Conn
-	dialect queries.Dialect
-	logger  *zap.Logger
-	done    bool
-}
-
-func (t *connOnlyTx) RunQuery(ctx context.Context, sqlStr string, args map[string]any) (*driver.QueryResult, error) {
-	return sqldriver.RunQuery(ctx, t.conn, sqldriver.NewRows, t.dialect, t.logger, sqlStr, args)
-}
-
-func (t *connOnlyTx) Commit(_ context.Context) error {
-	if !t.done {
-		t.done = true
-
-		return t.conn.Close()
-	}
-
-	return nil
-}
-
-func (t *connOnlyTx) Rollback(_ context.Context) error {
-	if !t.done {
-		t.done = true
-
-		return t.conn.Close()
-	}
-
-	return nil
-}
-
-func (t *connOnlyTx) Isolation() stroppy.TxIsolationLevel {
-	return stroppy.TxIsolationLevel_CONNECTION_ONLY
 }
 
 func (d *Driver) InsertValues(

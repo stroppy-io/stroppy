@@ -44,8 +44,12 @@ func NewTx[R any](
 	}
 }
 
-func (t *Tx[R]) RunQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
-	return RunQuery(ctx, t.conn, t.wrapRows, t.dialect, t.logger, sql, args)
+func (t *Tx[R]) RunQuery(
+	ctx context.Context,
+	sqlStr string,
+	args map[string]any,
+) (*driver.QueryResult, error) {
+	return RunQuery(ctx, t.conn, t.wrapRows, t.dialect, t.logger, sqlStr, args)
 }
 
 func (t *Tx[R]) Commit(ctx context.Context) error {
@@ -67,6 +71,65 @@ type SQLTxAdapter struct{ *sql.Tx }
 
 func (a *SQLTxAdapter) Commit(_ context.Context) error   { return a.Tx.Commit() }
 func (a *SQLTxAdapter) Rollback(_ context.Context) error { return a.Tx.Rollback() }
+
+// ConnOnlyTx wraps a bare connection (no SQL transaction) as a driver.Tx.
+// Commit and Rollback both call close to release the connection.
+type ConnOnlyTx[R any] struct {
+	conn      QueryContext[R]
+	wrapRows  func(R) driver.Rows
+	dialect   queries.Dialect
+	logger    *zap.Logger
+	closeFunc func() error
+	done      bool
+}
+
+func NewConnOnlyTx[R any](
+	conn QueryContext[R],
+	wrapRows func(R) driver.Rows,
+	dialect queries.Dialect,
+	logger *zap.Logger,
+	closeFunc func() error,
+) *ConnOnlyTx[R] {
+	return &ConnOnlyTx[R]{
+		conn:      conn,
+		wrapRows:  wrapRows,
+		dialect:   dialect,
+		logger:    logger,
+		closeFunc: closeFunc,
+	}
+}
+
+func (t *ConnOnlyTx[R]) RunQuery(
+	ctx context.Context,
+	sqlStr string,
+	args map[string]any,
+) (*driver.QueryResult, error) {
+	return RunQuery(ctx, t.conn, t.wrapRows, t.dialect, t.logger, sqlStr, args)
+}
+
+func (t *ConnOnlyTx[R]) Commit(_ context.Context) error {
+	if !t.done {
+		t.done = true
+
+		return t.closeFunc()
+	}
+
+	return nil
+}
+
+func (t *ConnOnlyTx[R]) Rollback(_ context.Context) error {
+	if !t.done {
+		t.done = true
+
+		return t.closeFunc()
+	}
+
+	return nil
+}
+
+func (t *ConnOnlyTx[R]) Isolation() stroppy.TxIsolationLevel {
+	return stroppy.TxIsolationLevel_CONNECTION_ONLY
+}
 
 // IsolationToSQL maps stroppy isolation level to database/sql isolation level.
 func IsolationToSQL(level stroppy.TxIsolationLevel) sql.IsolationLevel {

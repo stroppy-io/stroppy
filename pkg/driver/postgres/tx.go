@@ -5,9 +5,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 )
 
@@ -16,7 +16,11 @@ import (
 // the QueryContext method expected by sqldriver.RunQuery.
 type pgxTxAdapter struct{ pgx.Tx }
 
-func (a *pgxTxAdapter) QueryContext(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+func (a *pgxTxAdapter) QueryContext(
+	ctx context.Context,
+	sql string,
+	args ...any,
+) (pgx.Rows, error) {
 	return a.Query(ctx, sql, args...)
 }
 
@@ -45,49 +49,27 @@ func newTx(pgxTx pgx.Tx, isolation stroppy.TxIsolationLevel, d *Driver) *sqldriv
 	)
 }
 
-// connOnlyTx wraps an acquired pgxpool.Conn as a driver.Tx.
-// No SQL transaction is started. Commit/Rollback release the connection.
-type connOnlyTx struct {
-	conn *pgxpool.Conn
-	d    *Driver
-	done bool
-}
-
-var _ driver.Tx = (*connOnlyTx)(nil)
-
-func newConnOnlyTx(conn *pgxpool.Conn, d *Driver) *connOnlyTx {
-	return &connOnlyTx{conn: conn, d: d}
-}
-
 // pgxConnAdapter adapts *pgxpool.Conn to sqldriver.QueryContext[pgx.Rows].
 type pgxConnAdapter struct{ conn *pgxpool.Conn }
 
-func (a *pgxConnAdapter) QueryContext(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+func (a *pgxConnAdapter) QueryContext(
+	ctx context.Context,
+	sql string,
+	args ...any,
+) (pgx.Rows, error) {
 	return a.conn.Query(ctx, sql, args...)
 }
 
-func (t *connOnlyTx) RunQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
-	return sqldriver.RunQuery(ctx, &pgxConnAdapter{t.conn}, NewRows, PgxDialect{}, t.d.logger, sql, args)
-}
+func NewConnOnlyTx(conn *pgxpool.Conn, lg *zap.Logger) *sqldriver.ConnOnlyTx[pgx.Rows] {
+	return sqldriver.NewConnOnlyTx(
+		&pgxConnAdapter{conn},
+		NewRows,
+		PgxDialect{},
+		lg,
+		func() error {
+			conn.Release()
 
-func (t *connOnlyTx) Commit(_ context.Context) error {
-	if !t.done {
-		t.done = true
-		t.conn.Release()
-	}
-
-	return nil
-}
-
-func (t *connOnlyTx) Rollback(_ context.Context) error {
-	if !t.done {
-		t.done = true
-		t.conn.Release()
-	}
-
-	return nil
-}
-
-func (t *connOnlyTx) Isolation() stroppy.TxIsolationLevel {
-	return stroppy.TxIsolationLevel_CONNECTION_ONLY
+			return nil
+		},
+	)
 }
