@@ -172,7 +172,14 @@ func (d *Driver) RunQuery(
 	)
 }
 
-var ErrCopyFromUnsupported = errors.New("CopyFrom is not supported in Picodata yet")
+var (
+	ErrCopyFromUnsupported    = errors.New("CopyFrom is not supported in Picodata yet")
+	ErrTransactionsUnsupported = errors.New("transactions are not supported in Picodata yet")
+)
+
+func (d *Driver) Begin(_ context.Context, _ stroppy.TxIsolationLevel) (driver.Tx, error) {
+	return nil, ErrTransactionsUnsupported
+}
 
 // InsertValues inserts multiple rows into the database based on the descriptor.
 // It supports two methods:

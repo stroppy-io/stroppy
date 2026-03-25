@@ -148,6 +148,21 @@ func (p *dbPinger) Ping(ctx context.Context) error {
 	return p.db.PingContext(ctx)
 }
 
+func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (driver.Tx, error) {
+	sqlTx, err := d.db.BeginTx(ctx, &sql.TxOptions{Isolation: sqldriver.IsolationToSQL(isolation)})
+	if err != nil {
+		return nil, err
+	}
+
+	return sqldriver.NewTx(
+		&sqldriver.SQLTxAdapter{Tx: sqlTx},
+		sqldriver.NewRows,
+		isolation,
+		d.dialect,
+		d.logger,
+	), nil
+}
+
 func (d *Driver) InsertValues(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,
