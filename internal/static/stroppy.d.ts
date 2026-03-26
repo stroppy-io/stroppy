@@ -40,6 +40,17 @@ declare module "k6/x/stroppy" {
     rows: Rows;
   }
 
+  // Transaction interface - provides query execution within a transaction.
+  // All methods throw on error (Go errors become JS exceptions via sobek).
+  export interface Tx {
+    /** @throws {Error} on query execution error */
+    runQuery(sql: string, args: Record<string, any>): QueryResult;
+    /** @throws {Error} on commit failure */
+    commit(): void;
+    /** @throws {Error} on rollback failure */
+    rollback(): void;
+  }
+
   // Driver interface - provides database operations.
   // All methods throw on error (Go errors become JS exceptions via sobek).
   export interface Driver {
@@ -47,6 +58,9 @@ declare module "k6/x/stroppy" {
     insertValuesBin(insert: BinMsg<InsertDescriptor>): QueryStats;
     /** @throws {Error} on query execution or argument processing error */
     runQuery(sql: string, args: Record<string, any>): QueryResult;
+    /** Start a transaction with the given isolation level (proto TxIsolationLevel enum value).
+     *  @throws {Error} if the driver does not support the requested isolation level */
+    begin(isolationLevel: number): Tx;
     /** Store driver configuration. The driver is lazily dispatched on first use.
      *  If called at init phase (VU state nil): marks driver as shared.
      *  If called at iteration phase: marks driver as per-VU. */

@@ -36,9 +36,17 @@ type (
 		Rows  Rows
 	}
 
+	Tx interface {
+		RunQuery(ctx context.Context, sql string, args map[string]any) (*QueryResult, error)
+		Commit(ctx context.Context) error
+		Rollback(ctx context.Context) error
+		Isolation() stroppy.TxIsolationLevel
+	}
+
 	Driver interface {
 		InsertValues(ctx context.Context, unit *stroppy.InsertDescriptor) (*stats.Query, error)
 		RunQuery(ctx context.Context, sql string, args map[string]any) (*QueryResult, error)
+		Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (Tx, error)
 		Teardown(ctx context.Context) error
 	}
 

@@ -253,6 +253,23 @@ func (d *driverStub) Setup(configBytes []byte, _ func()) {
 	}
 }
 
+func (*driverStub) Begin(int32) (*txStub, error) {
+	return &txStub{}, nil
+}
+
+// txStub implements a no-op transaction for the probe VM.
+type txStub struct{}
+
+func (t *txStub) RunQuery(string, map[string]any) (*driver.QueryResult, error) {
+	return &driver.QueryResult{
+		Stats: &stats.Query{},
+		Rows:  &rowsStub{},
+	}, nil
+}
+
+func (*txStub) Commit() error   { return nil }
+func (*txStub) Rollback() error { return nil }
+
 // rowsStub implements driver.Rows for the probe VM.
 type rowsStub struct{}
 

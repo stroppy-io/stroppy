@@ -9304,7 +9304,19 @@ export enum TxIsolationLevel {
     /**
      * @generated from protobuf enum value: SERIALIZABLE = 4;
      */
-    SERIALIZABLE = 4
+    SERIALIZABLE = 4,
+    /**
+     * * Pinned connection without BEGIN/COMMIT. For databases without transaction support.
+     *
+     * @generated from protobuf enum value: CONNECTION_ONLY = 5;
+     */
+    CONNECTION_ONLY = 5,
+    /**
+     * * No transaction or connection pinning. Queries go through the driver pool directly.
+     *
+     * @generated from protobuf enum value: NONE = 6;
+     */
+    NONE = 6
 }
 // @generated message type with reflection information, may provide speed optimized methods
 class InsertDescriptor$Type extends MessageType<InsertDescriptor> {
