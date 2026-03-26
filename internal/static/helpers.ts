@@ -375,6 +375,10 @@ function resolvePoolConfig(config: DriverSetup): {
  * @param defaults Script-defined default configuration
  */
 export function declareDriverSetup(index: number, defaults: DriverSetup): DriverSetup {
+  // Notify probe spy if present (set by Go VM during probe)
+  if (typeof DeclareDriverSetup !== 'undefined') {
+    DeclareDriverSetup(index, defaults);
+  }
   const envKey = `STROPPY_DRIVER_${index}`;
   const raw = __ENV[envKey];
   if (!raw || raw === "") return defaults;

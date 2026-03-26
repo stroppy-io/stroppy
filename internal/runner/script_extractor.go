@@ -344,6 +344,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		{"NotifyStep2", notifyStepSpy(&probeprint.Steps)},
 		{"NewPicker", newPickerStub},
 		{"DeclareEnv", declareEnvSpy(&probeprint.EnvDeclarations)},
+		{"DeclareDriverSetup", declareDriverSetupSpy(&probeprint.DriverSetups)},
 		{"Once", func(x any) any { return x }},
 
 		{"parse_sql_with_sections", parseSectionsSpy(&probeprint.SQLSections)},
@@ -361,6 +362,15 @@ func declareEnvSpy(decls *[]EnvDeclaration) func([]string, string, string) {
 			Names:       names,
 			Default:     default_,
 			Description: description,
+		})
+	}
+}
+
+func declareDriverSetupSpy(setups *[]DriverSetupDecl) func(int, map[string]any) {
+	return func(index int, defaults map[string]any) {
+		*setups = append(*setups, DriverSetupDecl{
+			Index:    index,
+			Defaults: defaults,
 		})
 	}
 }

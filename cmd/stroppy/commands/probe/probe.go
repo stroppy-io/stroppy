@@ -77,6 +77,8 @@ stroppy envs). Current environment values are also shown if found.
 '# Drivers' shows the driver configuration(s) passed to DriverX.create().setup({...}).
 It includes the driver type, connection URL, and driver-specific settings
 (e.g. PostgreSQL pool configuration).
+
+See 'stroppy help drivers' for driver presets and options.
 `,
 			// TODO: auto detect tests with magic test.ts name.
 			// Or do "probe" of this dir, go trough all ts files, show all sql, or like this.
