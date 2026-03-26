@@ -17,7 +17,7 @@ ENV() FUNCTION
     import { ENV } from "./helpers.js";
 
     const WAREHOUSES = ENV("WAREHOUSES", 1, "Number of warehouses");
-    const DB_URL     = ENV("DRIVER_URL", "postgres://localhost:5432", "Database URL");
+    const DURATION   = ENV("DURATION", "5m", "Test duration");
 
   Signature:
 
@@ -33,6 +33,8 @@ ENV() FUNCTION
     default                     Value used when no name resolves to a non-empty
                                 string. May be a string or number — the return
                                 type matches the default type.
+                                Use ENV.auto when the script resolves the value
+                                itself (see AUTO-RESOLVED DEFAULTS below).
     description                 Human-readable description shown by probe.
 
   Examples:
@@ -45,6 +47,9 @@ ENV() FUNCTION
 
     // Aliases: SCALE_FACTOR or WAREHOUSES, first non-empty wins
     const WAREHOUSES = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
+
+    // Auto-resolved: script picks the value itself when not overridden
+    const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file") || "./default.sql";
 
 SETTING VALUES
 
@@ -67,6 +72,23 @@ DEFAULTS
   default value provided in the call. The script behaves as if that value
   was set in the environment.
 
+AUTO-RESOLVED DEFAULTS (ENV.auto)
+
+  Some variables are auto-resolved by the script at runtime — for example,
+  a SQL file chosen based on the active driver type. These use ENV.auto as
+  the default:
+
+    const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file path")
+      || ({ postgres: "./pg.sql", mysql: "./mysql.sql" }[driverConfig.driverType!]
+          ?? "./pg.sql");
+
+  When the default is ENV.auto:
+    - If the user sets the variable, that value is used.
+    - If the user does not set it, ENV() returns undefined and the
+      script's fallback expression (||) takes over.
+    - Probe shows (default: <auto>) so users know the value is handled
+      automatically and does not need to be provided.
+
 PROBE INTEGRATION
 
   Use probe to inspect all env vars a script declares before running it:
@@ -78,7 +100,7 @@ PROBE INTEGRATION
     # Environment Variables:
       SCALE_FACTOR | WAREHOUSES=50         # currently set via env
       DURATION="" (default: 1h)            # not set; default shown
-      DRIVER_URL=""                        # not set, no default
+      SQL_FILE="" (default: <auto>)        # auto-resolved by script
 
   Variables declared via ENV() display their aliases, default, and
   description. Variables accessed via __ENV directly (legacy) are also

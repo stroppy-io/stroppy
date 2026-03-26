@@ -38,18 +38,24 @@ import { ParsedQuery } from "./parse_sql.js";
 
 declare const __ENV: Record<string, string>;
 
+type AutoDefault = "<auto>";
+
+export function ENV(env: string | string[], default_: AutoDefault, description?: string): string | undefined;
 export function ENV(env: string | string[], default_?: string, description?: string): string;
 export function ENV(env: string | string[], default_?: number, description?: string): number;
-export function ENV(env: string | string[], default_?: string | number, description?: string): string | number {
+export function ENV(env: string | string[], default_?: string | number, description?: string): string | number | undefined {
   const names = Array.isArray(env) ? env : [env];
-  DeclareEnv(names, String(default_ ?? ""), description ?? "");
+  const isAuto = default_ === ENV.auto;
+  DeclareEnv(names, isAuto ? "<auto>" : String(default_ ?? ""), description ?? "");
   const asNum = typeof default_ === "number";
   for (const name of names) {
     const val = __ENV[name];
     if (val !== undefined && val !== "") return asNum ? Number(val) : val;
   }
+  if (isAuto) return undefined;
   return default_ as string | number;
 }
+ENV.auto = "<auto>" as AutoDefault;
 
 
 export type InsertMethodName = "plain_query" | "plain_bulk" | "copy_from";

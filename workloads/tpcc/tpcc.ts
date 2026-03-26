@@ -65,7 +65,7 @@ const driverConfig = declareDriverSetup(0, {
 const driver = DriverX.create().setup(driverConfig);
 
 // SQL file: user-specified via CLI takes priority, otherwise auto-select by driver type
-const SQL_FILE = ENV("SQL_FILE", "", "Path to SQL file (automatically set if .sql file provided as argument)")
+const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file path (auto-resolved by driver type if omitted)")
   || ({
     postgres: "./pg.sql",
     mysql:    "./mysql.sql",

@@ -255,6 +255,8 @@ func (p *Probeprint) explainEnvs(sb *strings.Builder) {
 	if len(p.EnvDeclarations) == 0 && !hasPlain {
 		sb.WriteString("  (no environment variables)\n")
 	}
+
+	sb.WriteString("\n")
 }
 
 func explainEnvDecl(sb *strings.Builder, decl EnvDeclaration) {

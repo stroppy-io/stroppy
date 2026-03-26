@@ -3,7 +3,8 @@ import { Teardown } from "k6/x/stroppy";
 import { DriverX, AB, C, R, Step, S, ENV, declareDriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
-const SQL_FILE = ENV("SQL_FILE", "./tpcb.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
+const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file path (defaults to ./ansi.sql)")
+  || "./ansi.sql";
 
 // TPC-B Configuration Constants
 const SCALE_FACTOR = ENV(["SCALE_FACTOR", "BRANCHES"], 1, "TPC-B scale factor");
@@ -13,7 +14,7 @@ const ACCOUNTS = 100000 * SCALE_FACTOR;
 
 // K6 options
 export const options: Options = {
-  setupTimeout: String(SCALE_FACTOR) + "m" ,
+  setupTimeout: String(SCALE_FACTOR) + "m",
 };
 
 // Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql/pico)
@@ -27,18 +28,13 @@ const driver = DriverX.create().setup(driverConfig);
 
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
-// Setup function: create schema and load data
 export function setup() {
   Step("cleanup", () => {
     sql("cleanup").forEach((query) => driver.exec(query, {}));
-  })
+  });
 
   Step("create_schema", () => {
     sql("create_schema").forEach((query) => driver.exec(query, {}));
-  });
-
-  Step("create_procedures", () => {
-    sql("create_procedures").forEach((query) => driver.exec(query, {}));
   });
 
   Step("load_data", () => {
@@ -67,8 +63,6 @@ export function setup() {
         filler: R.str(84, AB.en),
       },
     });
-
-    sql("analyze").forEach((query) => driver.exec(query, {}));
   });
 
   Step.begin("workload");
@@ -81,13 +75,19 @@ const tidGen = R.int32(1, TELLERS).gen();
 const bidGen = R.int32(1, BRANCHES).gen();
 const deltaGen = R.int32(-5000, 5000).gen();
 
-// TPC-B transaction workload
+// TPC-B transaction workload (flat — no stored procedures, uses explicit tx)
 export default function (): void {
-  driver.exec(sql("workload", "tpcb_transaction")!, {
-    p_aid: aidGen.next(),
-    p_tid: tidGen.next(),
-    p_bid: bidGen.next(),
-    p_delta: deltaGen.next(),
+  const aid = aidGen.next();
+  const tid = tidGen.next();
+  const bid = bidGen.next();
+  const delta = deltaGen.next();
+
+  driver.beginTx((tx) => {
+    tx.exec(sql("workload", "update_account")!, { aid, delta });
+    tx.exec(sql("workload", "get_balance")!, { aid });
+    tx.exec(sql("workload", "update_teller")!, { tid, delta });
+    tx.exec(sql("workload", "update_branch")!, { bid, delta });
+    tx.exec(sql("workload", "insert_history")!, { tid, bid, aid, delta });
   });
 }
 

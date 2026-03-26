@@ -1,17 +1,19 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
 
-import { DriverX, ENV } from "./helpers.ts";
+import { DriverX, ENV, declareDriverSetup } from "./helpers.ts";
 import { parse_sql } from "./parse_sql.js";
 
 const SQL_FILE = ENV("SQL_FILE", "", "Path to SQL file (automatically set if .sql file provided as argument)");
 
 export const options: Options = {};
 
-const driver = DriverX.create().setup({
-  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
+const driverConfig = declareDriverSetup(0, {
+  url: "postgres://postgres:postgres@localhost:5432",
   driverType: "postgres",
 });
+
+const driver = DriverX.create().setup(driverConfig);
 
 const parsedQueries = parse_sql(open(SQL_FILE));
 

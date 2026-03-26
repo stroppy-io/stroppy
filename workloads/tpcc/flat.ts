@@ -66,7 +66,7 @@ const driverConfig = declareDriverSetup(0, {
 const driver = DriverX.create().setup(driverConfig);
 
 // Flat mode uses ansi.sql by default (no stored procedures)
-const SQL_FILE = ENV("SQL_FILE", "", "Path to SQL file (automatically set if .sql file provided as argument)")
+const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file path (defaults to ./ansi.sql)")
   || "./ansi.sql";
 
 const sql = parse_sql_with_sections(open(SQL_FILE));
