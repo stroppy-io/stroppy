@@ -14,14 +14,18 @@ import (
 	"github.com/stroppy-io/stroppy/internal/runner"
 )
 
+const consumedPairFlag = 2 // number of tokens consumed for a two-token flag (e.g. "-d pg")
+
 var (
 	errNoScript          = errors.New("script argument is required")
 	errFlagRequiresValue = errors.New("flag requires a value")
 	errStepsMutExclusive = errors.New("--steps and --no-steps are mutually exclusive")
+	errBadKeyValue       = errors.New("expected key=value format")
 )
 
 var Cmd = &cobra.Command{
-	Use:   "run <script> [sql_file] [--steps step1,step2] [--no-steps step1,step2] [-d driver] [-D key=value] [-- <k6 run direct args>]",
+	Use: "run <script> [sql_file] [-d driver] [-D key=value] " +
+		"[--steps step1,step2] [-- k6-args...]",
 	Short: "Run benchmark script with k6",
 	Long: `Run a benchmark with k6. The extension determines the mode:
 
@@ -118,7 +122,7 @@ type runArgs struct {
 	steps         []string
 	noSteps       []string
 	afterDash     []string
-	driverPresets map[int]string   // driver index → preset name
+	driverPresets map[int]string      // driver index → preset name
 	driverOpts    map[int][][2]string // driver index → list of [key, value] pairs
 }
 
@@ -137,63 +141,32 @@ func parseRunArgs(args []string) (runArgs, error) {
 	}
 
 	for i := 0; i < len(positional); i++ {
-		arg := positional[i]
+		consumed, err := parseStepsFlag(positional, i, &parsed)
+		if err != nil {
+			return runArgs{}, err
+		}
 
-		switch {
-		case arg == "--steps" || arg == "--no-steps":
-			if i+1 >= len(positional) {
-				return runArgs{}, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
-			}
+		if consumed > 0 {
+			i += consumed - 1
 
-			i++
+			continue
+		}
 
-			vals := strings.Split(positional[i], ",")
-			if arg == "--steps" {
-				parsed.steps = append(parsed.steps, vals...)
-			} else {
-				parsed.noSteps = append(parsed.noSteps, vals...)
-			}
+		consumed, err = parseDriverFlags(positional, i, &parsed)
+		if err != nil {
+			return runArgs{}, err
+		}
 
-		case strings.HasPrefix(arg, "--steps="):
-			parsed.steps = append(parsed.steps, strings.Split(strings.TrimPrefix(arg, "--steps="), ",")...)
+		if consumed > 0 {
+			i += consumed - 1
 
-		case strings.HasPrefix(arg, "--no-steps="):
-			parsed.noSteps = append(
-				parsed.noSteps,
-				strings.Split(strings.TrimPrefix(arg, "--no-steps="), ",")...)
+			continue
+		}
 
-		default:
-			if idx, value, consumed, err := parseDriverFlag(positional, i); err != nil {
-				return runArgs{}, err
-			} else if consumed > 0 {
-				if parsed.driverPresets == nil {
-					parsed.driverPresets = make(map[int]string)
-				}
-
-				parsed.driverPresets[idx] = value
-				i += consumed - 1
-
-				break
-			}
-
-			if idx, key, value, consumed, err := parseDriverOptFlag(positional, i); err != nil {
-				return runArgs{}, err
-			} else if consumed > 0 {
-				if parsed.driverOpts == nil {
-					parsed.driverOpts = make(map[int][][2]string)
-				}
-
-				parsed.driverOpts[idx] = append(parsed.driverOpts[idx], [2]string{key, value})
-				i += consumed - 1
-
-				break
-			}
-
-			if parsed.scriptArg == "" {
-				parsed.scriptArg = arg
-			} else {
-				parsed.sqlArg = arg
-			}
+		if parsed.scriptArg == "" {
+			parsed.scriptArg = positional[i]
+		} else {
+			parsed.sqlArg = positional[i]
 		}
 	}
 
@@ -204,13 +177,79 @@ func parseRunArgs(args []string) (runArgs, error) {
 	return parsed, nil
 }
 
+// parseStepsFlag handles --steps and --no-steps in both space and equals forms.
+// Returns the number of tokens consumed (0 if the arg is not a steps flag).
+func parseStepsFlag(args []string, i int, parsed *runArgs) (int, error) {
+	arg := args[i]
+
+	switch {
+	case arg == "--steps" || arg == "--no-steps":
+		if i+1 >= len(args) {
+			return 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
+		}
+
+		vals := strings.Split(args[i+1], ",")
+		if arg == "--steps" {
+			parsed.steps = append(parsed.steps, vals...)
+		} else {
+			parsed.noSteps = append(parsed.noSteps, vals...)
+		}
+
+		return consumedPairFlag, nil
+
+	case strings.HasPrefix(arg, "--steps="):
+		parsed.steps = append(parsed.steps, strings.Split(strings.TrimPrefix(arg, "--steps="), ",")...)
+
+		return 1, nil
+
+	case strings.HasPrefix(arg, "--no-steps="):
+		parsed.noSteps = append(parsed.noSteps, strings.Split(strings.TrimPrefix(arg, "--no-steps="), ",")...)
+
+		return 1, nil
+	}
+
+	return 0, nil
+}
+
+// parseDriverFlags handles -d/-D/--driver/--driver-opt flags at position i.
+// Returns the number of tokens consumed (0 if the arg is not a driver flag).
+func parseDriverFlags(args []string, i int, parsed *runArgs) (int, error) {
+	if idx, value, consumed, err := parseDriverFlag(args, i); err != nil {
+		return 0, err
+	} else if consumed > 0 {
+		if parsed.driverPresets == nil {
+			parsed.driverPresets = make(map[int]string)
+		}
+
+		parsed.driverPresets[idx] = value
+
+		return consumed, nil
+	}
+
+	if idx, key, value, consumed, err := parseDriverOptFlag(args, i); err != nil {
+		return 0, err
+	} else if consumed > 0 {
+		if parsed.driverOpts == nil {
+			parsed.driverOpts = make(map[int][][2]string)
+		}
+
+		parsed.driverOpts[idx] = append(parsed.driverOpts[idx], [2]string{key, value})
+
+		return consumed, nil
+	}
+
+	return 0, nil
+}
+
 // parseFlagNextArg is a shared helper for two-token flags: it checks the current
 // arg against a set of prefixes (short and long), and if matched returns the
 // driver index and the next token as the value.
 //
 // Returns (driverIndex, nextValue, consumed, error).
 // consumed == 0 means no match.
-func parseFlagNextArg(args []string, i int, shortPrefix, longPrefix string) (int, string, int, error) {
+func parseFlagNextArg(
+	args []string, i int, shortPrefix, longPrefix string,
+) (driverIndex int, value string, consumed int, err error) {
 	arg := args[i]
 
 	for _, prefix := range []string{shortPrefix, longPrefix} {
@@ -219,7 +258,7 @@ func parseFlagNextArg(args []string, i int, shortPrefix, longPrefix string) (int
 				return 0, "", 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
 			}
 
-			return idx, args[i+1], 2, nil
+			return idx, args[i+1], consumedPairFlag, nil
 		}
 	}
 
@@ -262,16 +301,22 @@ func parseIndexedInfixFlag(arg, prefix, suffix string) (int, bool) {
 // parseDriverFlag tries to parse -d, -d1, --driver, --driver1 at position i.
 // Returns (driverIndex, presetName, tokensConsumed, error).
 // tokensConsumed == 0 means this arg is not a driver flag.
-func parseDriverFlag(args []string, i int) (int, string, int, error) {
-	if idx, value, consumed, err := parseFlagNextArg(args, i, "-d", "--driver"); err != nil {
+func parseDriverFlag(args []string, i int) (driverIndex int, presetName string, consumed int, err error) {
+	driverIndex, presetName, consumed, err = parseFlagNextArg(args, i, "-d", "--driver")
+	if err != nil {
 		return 0, "", 0, err
-	} else if consumed > 0 {
-		return idx, value, consumed, nil
+	}
+
+	if consumed > 0 {
+		return driverIndex, presetName, consumed, nil
 	}
 
 	// --driver=value / --driver1=value
-	if idx, value, ok := parseLongFlagWithEquals(args[i], "--driver"); ok {
-		return idx, value, 1, nil
+	var ok bool
+
+	driverIndex, presetName, ok = parseLongFlagWithEquals(args[i], "--driver")
+	if ok {
+		return driverIndex, presetName, 1, nil
 	}
 
 	return 0, "", 0, nil
@@ -279,7 +324,7 @@ func parseDriverFlag(args []string, i int) (int, string, int, error) {
 
 // parseDriverOptFlag tries to parse -D, -D1, --driver-opt, --driver1-opt at position i.
 // Returns (driverIndex, key, value, tokensConsumed, error).
-func parseDriverOptFlag(args []string, i int) (int, string, string, int, error) {
+func parseDriverOptFlag(args []string, i int) (driverIndex int, key, value string, consumed int, err error) {
 	arg := args[i]
 
 	// -D / -D0 / -D1 (short form, two tokens)
@@ -288,12 +333,12 @@ func parseDriverOptFlag(args []string, i int) (int, string, string, int, error) 
 			return 0, "", "", 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
 		}
 
-		key, value, err := splitKeyValue(args[i+1])
+		key, value, err = splitKeyValue(args[i+1])
 		if err != nil {
 			return 0, "", "", 0, fmt.Errorf("%s %s: %w", arg, args[i+1], err)
 		}
 
-		return idx, key, value, 2, nil
+		return idx, key, value, consumedPairFlag, nil
 	}
 
 	// --driver-opt / --driver1-opt / --driver0-opt (long form, two tokens)
@@ -302,18 +347,18 @@ func parseDriverOptFlag(args []string, i int) (int, string, string, int, error) 
 			return 0, "", "", 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
 		}
 
-		key, value, err := splitKeyValue(args[i+1])
+		key, value, err = splitKeyValue(args[i+1])
 		if err != nil {
 			return 0, "", "", 0, fmt.Errorf("%s %s: %w", arg, args[i+1], err)
 		}
 
-		return idx, key, value, 2, nil
+		return idx, key, value, consumedPairFlag, nil
 	}
 
 	// -D=key=value / -D1=key=value / --driver-opt=key=value / --driver1-opt=key=value
 	for _, prefix := range []string{"-D", "--driver-opt"} {
 		if idx, rest, ok := parseLongFlagWithEquals(arg, prefix); ok {
-			key, value, err := splitKeyValue(rest)
+			key, value, err = splitKeyValue(rest)
 			if err != nil {
 				return 0, "", "", 0, fmt.Errorf("%s: %w", arg, err)
 			}
@@ -327,7 +372,7 @@ func parseDriverOptFlag(args []string, i int) (int, string, string, int, error) 
 		eqStart := strings.Index(arg[len("--driver"):], "-opt=")
 		rest := arg[len("--driver")+eqStart+len("-opt="):]
 
-		key, value, err := splitKeyValue(rest)
+		key, value, err = splitKeyValue(rest)
 		if err != nil {
 			return 0, "", "", 0, fmt.Errorf("%s: %w", arg, err)
 		}
@@ -395,7 +440,7 @@ func parseShortFlag(arg, prefix string) (int, bool) {
 
 // parseLongFlagWithEquals checks if arg matches "prefix=value" or "prefix<N>=value".
 // Returns (driverIndex, value, matched).
-func parseLongFlagWithEquals(arg, prefix string) (int, string, bool) {
+func parseLongFlagWithEquals(arg, prefix string) (driverIndex int, value string, matched bool) {
 	if !strings.HasPrefix(arg, prefix) {
 		return 0, "", false
 	}
@@ -422,13 +467,13 @@ func parseLongFlagWithEquals(arg, prefix string) (int, string, bool) {
 }
 
 // splitKeyValue splits "key=value" into (key, value).
-func splitKeyValue(s string) (string, string, error) {
-	k, v, ok := strings.Cut(s, "=")
+func splitKeyValue(s string) (key, val string, err error) {
+	key, val, ok := strings.Cut(s, "=")
 	if !ok {
-		return "", "", fmt.Errorf("expected key=value format, got %q", s)
+		return "", "", fmt.Errorf("%w, got %q", errBadKeyValue, s)
 	}
 
-	return k, v, nil
+	return key, val, nil
 }
 
 // applyDriverPreset loads a preset or parses raw JSON and sets it on the config map.

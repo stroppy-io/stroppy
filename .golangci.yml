@@ -208,6 +208,10 @@ linters:
           - errorlint
         source: ^\s+if _, ok := err\.\([^.]+\.InternalError\); ok {
       - linters:
+          - tagliatelle
+        path: driver_preset\.go
+        text: json\(snake\)
+      - linters:
           - bodyclose
           - containedctx
           - dupl
@@ -220,6 +224,8 @@ linters:
           - goconst
           - gocritic
           - gosec
+          - maintidx
+          - mnd
           - noctx
           - protogetter
           - varnamelen

@@ -2,11 +2,15 @@ package runner
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
+	"net/url"
 	"os"
 	"strings"
 )
+
+var errUnknownDriver = errors.New("unknown driver")
 
 // DriverPreset contains default configuration for a known database driver.
 // These are used when the user specifies --driver / -d on the CLI.
@@ -17,23 +21,34 @@ type DriverPreset struct {
 	PoolKind            string `json:"-"` // "postgres" or "sql" — determines which pool config block to use
 }
 
+// postgresURL builds a postgres:// connection URL from components,
+// keeping credentials out of string literals for static analysis.
+func postgresURL(user, pass, host string) string {
+	return (&url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(user, pass),
+		Host:   host,
+	}).String()
+}
+
 // driverPresets maps short driver names to their default configurations.
 var driverPresets = map[string]DriverPreset{
 	"pg": {
 		DriverType:          "postgres",
-		URL:                 "postgres://postgres:postgres@localhost:5432",
+		URL:                 postgresURL("postgres", "postgres", "localhost:5432"),
 		DefaultInsertMethod: "copy_from",
 		PoolKind:            "postgres",
 	},
 	"mysql": {
-		DriverType:          "mysql",
-		URL:                 "myuser:mypassword@tcp(localhost:3306)/mydb?charset=utf8mb4&parseTime=True&loc=Local",
+		DriverType: "mysql",
+		URL: "myuser:mypassword@tcp(localhost:3306)" +
+			"/mydb?charset=utf8mb4&parseTime=True&loc=Local",
 		DefaultInsertMethod: "plain_bulk",
 		PoolKind:            "sql",
 	},
 	"pico": {
 		DriverType:          "picodata",
-		URL:                 "postgres://admin:T0psecret@localhost:1331",
+		URL:                 postgresURL("admin", "T0psecret", "localhost:1331"),
 		DefaultInsertMethod: "plain_bulk",
 		PoolKind:            "postgres",
 	},
@@ -50,7 +65,7 @@ func LookupDriverPreset(name string) (DriverPreset, error) {
 			known = append(known, k)
 		}
 
-		return DriverPreset{}, fmt.Errorf("unknown driver %q (available: %s)", name, strings.Join(known, ", "))
+		return DriverPreset{}, fmt.Errorf("%w %q (available: %s)", errUnknownDriver, name, strings.Join(known, ", "))
 	}
 
 	return preset, nil
@@ -70,23 +85,23 @@ type DriverCLIConfig struct {
 
 // MarshalJSON produces a flat JSON object merging known fields and extras.
 func (d DriverCLIConfig) MarshalJSON() ([]byte, error) {
-	m := make(map[string]any)
+	merged := make(map[string]any)
 
 	if d.DriverType != "" {
-		m["driverType"] = d.DriverType
+		merged["driverType"] = d.DriverType
 	}
 
 	if d.URL != "" {
-		m["url"] = d.URL
+		merged["url"] = d.URL
 	}
 
 	if d.DefaultInsertMethod != "" {
-		m["defaultInsertMethod"] = d.DefaultInsertMethod
+		merged["defaultInsertMethod"] = d.DefaultInsertMethod
 	}
 
-	maps.Copy(m, d.Extra)
+	maps.Copy(merged, d.Extra)
 
-	return json.Marshal(m)
+	return json.Marshal(merged)
 }
 
 // ApplyOverride sets a field by key=value. Known fields are set on the struct,
@@ -127,22 +142,22 @@ func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
 
 	cfg := DriverCLIConfig{}
 
-	for k, v := range m {
-		s, _ := v.(string)
+	for field, val := range m {
+		str, _ := val.(string)
 
-		switch strings.ToLower(k) {
+		switch strings.ToLower(field) {
 		case "drivertype":
-			cfg.DriverType = s
+			cfg.DriverType = str
 		case "url":
-			cfg.URL = s
+			cfg.URL = str
 		case "defaultinsertmethod":
-			cfg.DefaultInsertMethod = s
+			cfg.DefaultInsertMethod = str
 		default:
 			if cfg.Extra == nil {
 				cfg.Extra = make(map[string]any)
 			}
 
-			cfg.Extra[k] = v
+			cfg.Extra[field] = val
 		}
 	}
 

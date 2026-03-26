@@ -19,16 +19,19 @@ DRIVER PRESETS (-d / --driver)
   Available presets:
 
     pg       driverType=postgres
-             url=postgres://postgres:postgres@localhost:5432
+             url=postgres://postgres@localhost:5432
              defaultInsertMethod=copy_from
 
     mysql    driverType=mysql
-             url=myuser:mypassword@tcp(localhost:3306)/mydb?charset=utf8mb4&parseTime=True&loc=Local
+             url=myuser@tcp(localhost:3306)/mydb
              defaultInsertMethod=plain_bulk
 
     pico     driverType=picodata
-             url=postgres://admin:T0psecret@localhost:1331
+             url=postgres://admin@localhost:1331
              defaultInsertMethod=plain_bulk
+
+  Each preset includes default credentials for local development.
+  Use -D url=... to override the connection URL.
 
   Use -d (driver 0) or -d1, -d2, ... for additional drivers:
 

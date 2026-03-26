@@ -112,7 +112,7 @@ MULTI-DIALECT PATTERN
 
 parse_sql vs parse_sql_with_sections
 
-  parse_sql_with_sections   Returns a two-level lookup: section then query.
+  Returns a two-level lookup: section then query.
                             Use this when your file has --+ section markers.
                             This is the standard choice for workloads.
 
@@ -161,7 +161,6 @@ SEE ALSO
 
   stroppy help probe
   stroppy help drivers
-  stroppy probe --help
-`,
+  stroppy probe`,
 	})
 }

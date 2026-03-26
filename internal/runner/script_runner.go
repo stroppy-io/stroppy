@@ -30,9 +30,9 @@ type ScriptRunner struct {
 	config        *Probeprint
 	k6RunArgs     []string // pass args directly to 'k6 run <k6RunArgs>'
 	filesInTmp    []string
-	steps         []string          // --steps: only run these steps
-	noSteps       []string          // --no-steps: skip these steps
-	driverConfigs DriverCLIConfigs  // --driver/-D: CLI driver configurations
+	steps         []string         // --steps: only run these steps
+	noSteps       []string         // --no-steps: skip these steps
+	driverConfigs DriverCLIConfigs // --driver/-D: CLI driver configurations
 }
 
 // NewScriptRunner creates a new ScriptRunner for the given resolved input.

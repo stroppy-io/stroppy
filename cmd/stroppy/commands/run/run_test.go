@@ -1,6 +1,7 @@
 package run
 
 import (
+	"errors"
 	"os"
 	"testing"
 
@@ -272,12 +273,12 @@ func TestParseRunArgs(t *testing.T) {
 			wantAfterDash: []string{"--duration", "5m"},
 		},
 		{
-			name:       "script + sql + two drivers + driver opt",
-			args:       []string{"tpcc", "tpcc-scale-100", "-d", "pg", "-d1", "mysql", "-D1", "url=mysql://prod"},
-			wantScript: "tpcc",
-			wantSQL:    "tpcc-scale-100",
+			name:        "script + sql + two drivers + driver opt",
+			args:        []string{"tpcc", "tpcc-scale-100", "-d", "pg", "-d1", "mysql", "-D1", "url=mysql://prod"},
+			wantScript:  "tpcc",
+			wantSQL:     "tpcc-scale-100",
 			wantPresets: map[int]string{0: "pg", 1: "mysql"},
-			wantOpts:   map[int][][2]string{1: {{"url", "mysql://prod"}}},
+			wantOpts:    map[int][][2]string{1: {{"url", "mysql://prod"}}},
 		},
 		{
 			name:       "driver opt without preset",
@@ -292,9 +293,9 @@ func TestParseRunArgs(t *testing.T) {
 			wantPresets: map[int]string{0: `{"url":"postgres://prod:5432","driverType":"postgres"}`},
 		},
 		{
-			name:       "--driver=JSON equals form",
-			args:       []string{"tpcc", `--driver={"driverType":"mysql"}`},
-			wantScript: "tpcc",
+			name:        "--driver=JSON equals form",
+			args:        []string{"tpcc", `--driver={"driverType":"mysql"}`},
+			wantScript:  "tpcc",
 			wantPresets: map[int]string{0: `{"driverType":"mysql"}`},
 		},
 	}
@@ -306,14 +307,14 @@ func TestParseRunArgs(t *testing.T) {
 			// parseRunArgs doesn't handle the empty-args case (RunE does before calling it).
 			// For the errNoScript test we invoke RunE's guard condition directly.
 			if len(tt.args) == 0 {
-				if tt.wantErr != errNoScript {
+				if !errors.Is(tt.wantErr, errNoScript) {
 					t.Fatalf("unexpected zero-args test without errNoScript expectation")
 				}
 
 				// Simulate what RunE does.
 				if len(tt.args) == 0 {
 					err := errNoScript
-					if err != tt.wantErr {
+					if !errors.Is(err, tt.wantErr) {
 						t.Fatalf("got %v, want %v", err, tt.wantErr)
 					}
 				}
@@ -324,7 +325,7 @@ func TestParseRunArgs(t *testing.T) {
 			got, err := parseRunArgs(tt.args)
 
 			if tt.wantErr != nil {
-				if err != tt.wantErr {
+				if !errors.Is(err, tt.wantErr) {
 					t.Fatalf("got error %v, want %v", err, tt.wantErr)
 				}
 
@@ -434,6 +435,7 @@ func TestApplyDriverPresetJSON(t *testing.T) {
 	t.Parallel()
 
 	configs := runner.DriverCLIConfigs{}
+
 	err := applyDriverPreset(configs, 0, `{"url":"postgres://prod:5432","driverType":"postgres","errorMode":"throw"}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -457,6 +459,7 @@ func TestApplyDriverPresetInvalidJSON(t *testing.T) {
 	t.Parallel()
 
 	configs := runner.DriverCLIConfigs{}
+
 	err := applyDriverPreset(configs, 0, `{broken`)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")

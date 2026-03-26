@@ -2,12 +2,15 @@
 package help
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 )
+
+var errUnknownTopic = errors.New("unknown help topic")
 
 // Topic is a help topic with a name, short description, and long content.
 type Topic struct {
@@ -34,6 +37,7 @@ var Cmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			printTopicList()
+
 			return nil
 		}
 
@@ -41,20 +45,24 @@ var Cmd = &cobra.Command{
 		for _, t := range topics {
 			if t.Name == name {
 				fmt.Fprint(os.Stdout, t.Long)
+
 				return nil
 			}
 		}
 
 		fmt.Fprintf(os.Stderr, "stroppy help: unknown topic %q\n\n", args[0])
 		printTopicList()
-		return fmt.Errorf("unknown help topic: %s", args[0])
+
+		return fmt.Errorf("%w: %s", errUnknownTopic, args[0])
 	},
 }
 
 func printTopicList() {
 	fmt.Fprint(os.Stdout, "Available help topics:\n\n")
+
 	for _, t := range topics {
 		fmt.Fprintf(os.Stdout, "  %-20s %s\n", t.Name, t.Short)
 	}
+
 	fmt.Fprint(os.Stdout, "\nUse 'stroppy help <topic>' for details.\n")
 }
