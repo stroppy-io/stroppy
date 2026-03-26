@@ -32,6 +32,7 @@ var Cmd = &cobra.Command{
 
 Files are searched in: current directory → ~/.stroppy/ → built-in workloads.
 SQL files are auto-derived from the preset/script name unless specified explicitly.
+See 'stroppy help resolution' for details on how files are found.
 
 Driver flags:
   -d, --driver NAME       Use a driver preset (pg, mysql, pico)

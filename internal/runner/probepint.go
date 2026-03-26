@@ -134,7 +134,7 @@ const (
 func (p *Probeprint) Explain(sections ExplainSection) string {
 	sb := &strings.Builder{}
 
-	sb.WriteString("Use 'probe --help' to get details about sections\n\n")
+	sb.WriteString("Use 'stroppy help probe' to get details about sections\n\n")
 
 	if sections&ExplainConfig != 0 {
 		p.explainConfig(sb)
