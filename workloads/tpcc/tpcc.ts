@@ -1,9 +1,8 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { AB, C, R, Step, DriverX, S, ENV } from "./helpers.ts";
+import { AB, C, R, Step, DriverX, S, ENV, declareDriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
-const SQL_FILE = ENV("SQL_FILE", "./tpcc.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
 const DURATION = ENV("DURATION", "1h", "Test duration");
 const VUS_SCALE = ENV("VUS_SCALE", 1, "VU scaling factor");
 
@@ -55,13 +54,23 @@ export const options: Options = {
   },
 };
 
-// Initialize driver — shared (created at init phase)
-const driver = DriverX.create().setup({
-  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
+// Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql/pico)
+const driverConfig = declareDriverSetup(0, {
+  url: "postgres://postgres:postgres@localhost:5432",
   driverType: "postgres",
   defaultInsertMethod: "copy_from",
-  postgres: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
+  pool: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
 });
+
+const driver = DriverX.create().setup(driverConfig);
+
+// SQL file: user-specified via CLI takes priority, otherwise auto-select by driver type
+const SQL_FILE = ENV("SQL_FILE", "", "Path to SQL file (automatically set if .sql file provided as argument)")
+  || ({
+    postgres: "./pg.sql",
+    mysql:    "./mysql.sql",
+    picodata: "./ansi.sql",
+  }[driverConfig.driverType!] ?? "./pg.sql");
 
 const sql = parse_sql_with_sections(open(SQL_FILE));
 

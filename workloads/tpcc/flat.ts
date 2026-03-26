@@ -1,10 +1,8 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { DriverConfig_DriverType } from "./stroppy.pb.js";
-import { AB, C, R, Step, DriverX, S, ENV } from "./helpers.ts";
+import { AB, C, R, Step, DriverX, S, ENV, declareDriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
-const SQL_FILE = ENV("SQL_FILE", "./pico.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
 const DURATION = ENV("DURATION", "5m", "Test duration");
 const VUS_SCALE = ENV("VUS_SCALE", 1, "VU scaling factor");
 
@@ -57,13 +55,19 @@ export const options: Options = {
   },
 };
 
-// Initialize driver — shared (created at init phase)
-const driver = DriverX.create().setup({
-  url: ENV("DRIVER_URL", "postgres://admin:T0psecret@localhost:1331", "Database connection URL"),
+// Driver config: defaults for picodata, overridable via CLI
+const driverConfig = declareDriverSetup(0, {
+  url: "postgres://admin:T0psecret@localhost:1331",
   driverType: "picodata",
   defaultInsertMethod: "plain_bulk",
-  postgres: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
+  pool: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
 });
+
+const driver = DriverX.create().setup(driverConfig);
+
+// Flat mode uses ansi.sql by default (no stored procedures)
+const SQL_FILE = ENV("SQL_FILE", "", "Path to SQL file (automatically set if .sql file provided as argument)")
+  || "./ansi.sql";
 
 const sql = parse_sql_with_sections(open(SQL_FILE));
 

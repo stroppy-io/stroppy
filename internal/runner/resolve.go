@@ -53,6 +53,7 @@ type ResolvedFile struct {
 type ResolvedInput struct {
 	Script ResolvedFile
 	SQL    *ResolvedFile // nil if no SQL file needed
+	Preset string        // preset name (e.g. "tpcc"), empty for explicit paths
 }
 
 const executeSQLFile = "execute_sql/execute_sql.ts"
@@ -135,7 +136,7 @@ func resolveScriptMode(scriptArg, sqlArg string) (*ResolvedInput, error) {
 		return nil, fmt.Errorf("%w: %s", ErrSQLNotFound, sqlArg)
 	}
 
-	return &ResolvedInput{Script: *script, SQL: sql}, nil
+	return &ResolvedInput{Script: *script, SQL: sql, Preset: preset}, nil
 }
 
 // resolveSQL resolves the SQL file:
