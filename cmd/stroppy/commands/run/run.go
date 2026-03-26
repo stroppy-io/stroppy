@@ -431,9 +431,21 @@ func splitKeyValue(s string) (string, string, error) {
 	return k, v, nil
 }
 
-// applyDriverPreset loads a preset and sets it on the config map.
-func applyDriverPreset(configs runner.DriverCLIConfigs, idx int, presetName string) error {
-	preset, err := runner.LookupDriverPreset(presetName)
+// applyDriverPreset loads a preset or parses raw JSON and sets it on the config map.
+// If the value starts with '{', it's treated as a JSON driver config; otherwise as a preset name.
+func applyDriverPreset(configs runner.DriverCLIConfigs, idx int, value string) error {
+	if strings.HasPrefix(value, "{") {
+		cfg, err := runner.NewDriverCLIConfigFromJSON(value)
+		if err != nil {
+			return err
+		}
+
+		configs[idx] = &cfg
+
+		return nil
+	}
+
+	preset, err := runner.LookupDriverPreset(value)
 	if err != nil {
 		return err
 	}

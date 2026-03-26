@@ -35,6 +35,12 @@ DRIVER PRESETS (-d / --driver)
     stroppy run tpcc -d pg                # driver 0 = pg preset
     stroppy run tpcc -d pg -d1 mysql      # driver 0 = pg, driver 1 = mysql
 
+  Instead of a preset name, -d also accepts a raw JSON string:
+
+    stroppy run tpcc -d '{"url":"postgres://prod:5432","driverType":"postgres"}'
+
+  This is useful when no preset matches or you need to set many fields at once.
+
 DRIVER OPTIONS (-D / --driver-opt)
 
   Override individual fields for a driver. Applies on top of a preset (if
@@ -67,6 +73,9 @@ HOW IT WORKS
      STROPPY_DRIVER_0, STROPPY_DRIVER_1, ... environment variables before
      the k6 process starts.
 
+     If STROPPY_DRIVER_N is already set in the environment, the CLI-composed
+     value is skipped — user-set env takes precedence over CLI flags.
+
   2. Inside the TypeScript script, call declareDriverSetup(index, defaults)
      to declare the driver at the given index. CLI overrides are merged on
      top of the defaults provided to that call.
@@ -93,6 +102,12 @@ EXAMPLES
 
   # Pool tuning
   stroppy run tpcc -d pg -D pool.maxConns=20 -D pool.maxConnLifetime=30m
+
+  # Full JSON config instead of preset
+  stroppy run tpcc -d '{"url":"postgres://prod:5432","driverType":"postgres","errorMode":"throw"}'
+
+  # Pre-set env takes precedence over CLI flags
+  STROPPY_DRIVER_0='{"url":"postgres://staging:5432"}' stroppy run tpcc -d pg
 
   # Inspect script driver defaults
   stroppy probe tpcc.ts --drivers

@@ -1,7 +1,10 @@
 package run
 
 import (
+	"os"
 	"testing"
+
+	"github.com/stroppy-io/stroppy/internal/runner"
 )
 
 func TestParseRunArgs(t *testing.T) {
@@ -282,6 +285,18 @@ func TestParseRunArgs(t *testing.T) {
 			wantScript: "tpcc",
 			wantOpts:   map[int][][2]string{0: {{"url", "postgres://custom:5432"}}},
 		},
+		{
+			name:        "-d with JSON string",
+			args:        []string{"tpcc", "-d", `{"url":"postgres://prod:5432","driverType":"postgres"}`},
+			wantScript:  "tpcc",
+			wantPresets: map[int]string{0: `{"url":"postgres://prod:5432","driverType":"postgres"}`},
+		},
+		{
+			name:       "--driver=JSON equals form",
+			args:       []string{"tpcc", `--driver={"driverType":"mysql"}`},
+			wantScript: "tpcc",
+			wantPresets: map[int]string{0: `{"driverType":"mysql"}`},
+		},
 	}
 
 	for _, tt := range tests {
@@ -413,6 +428,76 @@ func presetMapsEqual(a, b map[int]string) bool {
 	}
 
 	return true
+}
+
+func TestApplyDriverPresetJSON(t *testing.T) {
+	t.Parallel()
+
+	configs := runner.DriverCLIConfigs{}
+	err := applyDriverPreset(configs, 0, `{"url":"postgres://prod:5432","driverType":"postgres","errorMode":"throw"}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg := configs[0]
+	if cfg.URL != "postgres://prod:5432" {
+		t.Errorf("URL: got %q, want %q", cfg.URL, "postgres://prod:5432")
+	}
+
+	if cfg.DriverType != "postgres" {
+		t.Errorf("DriverType: got %q, want %q", cfg.DriverType, "postgres")
+	}
+
+	if cfg.Extra["errorMode"] != "throw" {
+		t.Errorf("Extra[errorMode]: got %v, want %q", cfg.Extra["errorMode"], "throw")
+	}
+}
+
+func TestApplyDriverPresetInvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	configs := runner.DriverCLIConfigs{}
+	err := applyDriverPreset(configs, 0, `{broken`)
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+func TestToEnvVarsRespectsExistingEnv(t *testing.T) {
+	t.Setenv("STROPPY_DRIVER_0", `{"url":"from-env"}`)
+
+	configs := runner.DriverCLIConfigs{
+		0: &runner.DriverCLIConfig{URL: "from-cli"},
+	}
+
+	envs, err := configs.ToEnvVars()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, env := range envs {
+		if len(env) > 16 && env[:16] == "STROPPY_DRIVER_0" {
+			t.Fatalf("ToEnvVars should not override existing STROPPY_DRIVER_0, got: %s", env)
+		}
+	}
+}
+
+func TestToEnvVarsSetsWhenNotInEnv(t *testing.T) {
+	// Ensure STROPPY_DRIVER_0 is not set.
+	os.Unsetenv("STROPPY_DRIVER_0")
+
+	configs := runner.DriverCLIConfigs{
+		0: &runner.DriverCLIConfig{URL: "from-cli"},
+	}
+
+	envs, err := configs.ToEnvVars()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(envs) == 0 {
+		t.Fatal("expected STROPPY_DRIVER_0 to be set")
+	}
 }
 
 func driverOptMapsEqual(a, b map[int][][2]string) bool {

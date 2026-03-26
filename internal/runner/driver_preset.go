@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"os"
 	"strings"
 )
 
@@ -116,20 +117,60 @@ func NewDriverCLIConfigFromPreset(p DriverPreset) DriverCLIConfig {
 	}
 }
 
+// NewDriverCLIConfigFromJSON creates a DriverCLIConfig from a raw JSON string.
+// Known fields are extracted into the struct, everything else goes into Extra.
+func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
+	var m map[string]any
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return DriverCLIConfig{}, fmt.Errorf("invalid driver JSON: %w", err)
+	}
+
+	cfg := DriverCLIConfig{}
+
+	for k, v := range m {
+		s, _ := v.(string)
+
+		switch strings.ToLower(k) {
+		case "drivertype":
+			cfg.DriverType = s
+		case "url":
+			cfg.URL = s
+		case "defaultinsertmethod":
+			cfg.DefaultInsertMethod = s
+		default:
+			if cfg.Extra == nil {
+				cfg.Extra = make(map[string]any)
+			}
+
+			cfg.Extra[k] = v
+		}
+	}
+
+	return cfg, nil
+}
+
 // DriverCLIConfigs holds parsed driver configurations indexed by driver number.
 type DriverCLIConfigs map[int]*DriverCLIConfig
 
 // ToEnvVars serializes all driver configs to STROPPY_DRIVER_N=<json> pairs.
+// If a STROPPY_DRIVER_N env var is already set in the process environment,
+// the CLI-composed value is skipped — user-set env takes precedence.
 func (configs DriverCLIConfigs) ToEnvVars() ([]string, error) {
 	envs := make([]string, 0, len(configs))
 
 	for idx, cfg := range configs {
+		envKey := fmt.Sprintf("STROPPY_DRIVER_%d", idx)
+
+		if _, ok := os.LookupEnv(envKey); ok {
+			continue
+		}
+
 		data, err := json.Marshal(cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize driver %d config: %w", idx, err)
 		}
 
-		envs = append(envs, fmt.Sprintf("STROPPY_DRIVER_%d=%s", idx, string(data)))
+		envs = append(envs, envKey+"="+string(data))
 	}
 
 	return envs, nil
