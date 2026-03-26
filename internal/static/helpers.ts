@@ -374,6 +374,9 @@ function resolvePoolConfig(config: DriverSetup): {
   };
 }
 
+// For Go probe spy function
+declare function DeclareDriverSetup(index: number, defaults: DriverSetup): DriverSetup;
+
 /**
  * Declare a driver setup with defaults, optionally overridden by CLI via STROPPY_DRIVER_N env.
  * Returns the merged DriverSetup — the caller decides when to instantiate DriverX.
