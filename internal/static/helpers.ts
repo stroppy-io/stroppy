@@ -130,45 +130,45 @@ export interface TaggedQuery {
   tags?: Record<string, string>;
 }
 
-export type SqlArg = string | ParsedQuery | TaggedQuery;
+export type SqlQuery = string | ParsedQuery | TaggedQuery;
 
-function resolveSqlArg(arg: SqlArg): {
+function resolveSqlQuery(arg: SqlQuery): {
   sql: string;
   tags: Record<string, string> | undefined;
 } {
   // Plain SQL string
   if (typeof arg === "string") return { sql: arg, tags: undefined };
 
-    // TaggedQuery
-  if ("sql" in arg && (typeof arg.sql === "string" || "name" in arg.sql)) {
-    const inner = arg as TaggedQuery;
-    const parsed =
-      typeof inner.sql === "string" ? inner.sql : (inner.sql as ParsedQuery);
-    const baseTags =
-      typeof parsed === "string"
-        ? undefined
-        : { name: parsed.name, type: parsed.type };
-    return {
-      sql: typeof parsed === "string" ? parsed : parsed.sql,
-      tags: inner.tags ? { ...baseTags, ...inner.tags } : baseTags,
-    };
+  // ParsedQuery (has name, type, params — check before TaggedQuery since both have "sql")
+  if ("params" in arg) {
+    const pq = arg as ParsedQuery;
+    return { sql: pq.sql, tags: { name: pq.name, type: pq.type } };
   }
 
-  // ParsedQuery
-  const pq = arg as ParsedQuery;
-  return { sql: pq.sql, tags: { name: pq.name, type: pq.type } };
+  // TaggedQuery
+  const inner = arg as TaggedQuery;
+  const parsed =
+    typeof inner.sql === "string" ? inner.sql : (inner.sql as ParsedQuery);
+  const baseTags =
+    typeof parsed === "string"
+      ? undefined
+      : { name: parsed.name, type: parsed.type };
+  return {
+    sql: typeof parsed === "string" ? parsed : parsed.sql,
+    tags: inner.tags ? { ...baseTags, ...inner.tags } : baseTags,
+  };
 }
 
 // Sugar interface for convenient query patterns.
-// Reusable across DriverX, future Tx, etc.
+// Reusable across DriverX, TxX.
 // All methods accept a raw SQL string, a ParsedQuery, or a TaggedQuery.
 // All methods throw on query execution error.
 export interface QueryAPI {
-  exec(sql: SqlArg, args?: Record<string, any>): QueryStats;
-  queryRows(sql: SqlArg, args?: Record<string, any>, limit?: number): any[][];
-  queryRow(sql: SqlArg, args?: Record<string, any>): any[] | undefined;
-  queryValue<T = any>(sql: SqlArg, args?: Record<string, any>): T | undefined;
-  queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult | undefined;
+  exec(sql: SqlQuery, args?: Record<string, any>): QueryStats;
+  queryRows(sql: SqlQuery, args?: Record<string, any>, limit?: number): any[][];
+  queryRow(sql: SqlQuery, args?: Record<string, any>): any[] | undefined;
+  queryValue<T = any>(sql: SqlQuery, args?: Record<string, any>): T | undefined;
+  queryCursor(sql: SqlQuery, args?: Record<string, any>): QueryResult | undefined;
 }
 
 type RunQueryFn = (sql: string, args: Record<string, any>) => QueryResult;
@@ -187,8 +187,8 @@ function handleError(mode: ErrorModeName, e: unknown, tags?: Record<string, stri
 }
 
 function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeName, isTx = false): QueryAPI {
-  function run(sql: SqlArg, args: Record<string, any>): QueryResult | undefined {
-    const { sql: s, tags } = resolveSqlArg(sql);
+  function run(sql: SqlQuery, args: Record<string, any>): QueryResult | undefined {
+    const { sql: s, tags } = resolveSqlQuery(sql);
     try {
       const result = rawRunQuery(s, args);
       runQueryMetric.add(result.stats.elapsed.milliseconds(), tags);
@@ -204,7 +204,7 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
   }
 
   return {
-    exec(sql: SqlArg, args?: Record<string, any>): QueryStats {
+    exec(sql: SqlQuery, args?: Record<string, any>): QueryStats {
       const result = run(sql, args ?? {});
       if (!result) return undefined as unknown as QueryStats;
       result.rows.close();
@@ -212,7 +212,7 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
     },
 
     queryRows(
-      sql: SqlArg,
+      sql: SqlQuery,
       args?: Record<string, any>,
       limit?: number,
     ): any[][] {
@@ -221,7 +221,7 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
       return result.rows.readAll(limit ?? 0);
     },
 
-    queryRow(sql: SqlArg, args?: Record<string, any>): any[] | undefined {
+    queryRow(sql: SqlQuery, args?: Record<string, any>): any[] | undefined {
       const result = run(sql, args ?? {});
       if (!result) return undefined;
       const row = result.rows.next() ? result.rows.values() : undefined;
@@ -230,7 +230,7 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
     },
 
     queryValue<T = any>(
-      sql: SqlArg,
+      sql: SqlQuery,
       args?: Record<string, any>,
     ): T | undefined {
       const result = run(sql, args ?? {});
@@ -244,7 +244,7 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
       return vals?.length ? (vals[0] as T) : undefined;
     },
 
-    queryCursor(sql: SqlArg, args?: Record<string, any>): QueryResult | undefined {
+    queryCursor(sql: SqlQuery, args?: Record<string, any>): QueryResult | undefined {
       const result = run(sql, args ?? {});
       if (!result) return undefined;
       return result as QueryResult;
@@ -275,7 +275,7 @@ export class TxX implements QueryAPI {
     this.q = createQueryAPI(
       (sql, args) => {
         this._queryCount++; 
-        const res = tx.runQuery(sql, { ...args, ...this._tags() });
+        const res = tx.runQuery(sql, args);
         this._cleanDuration += res.stats.elapsed.milliseconds();
         return res;
       },

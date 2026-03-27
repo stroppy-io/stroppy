@@ -230,10 +230,11 @@ STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 K6_OUT_FILE=$(CURDIR)/build/k6
 K6_COMMON_FLAGS := --verbose \
-		--k6-version v1.6.0 \
+		--k6-version v1.7.0 \
 		--with github.com/stroppy-io/stroppy/cmd/xk6air=./cmd/xk6air/ \
 		--replace github.com/stroppy-io/stroppy=./ \
 		--with github.com/oleiade/xk6-encoding@v0.0.0-20251120082946-fbe7a8cbb88e \
+		--with github.com/grafana/xk6-dashboard@v0.8.1 \
 		--output $(K6_OUT_FILE)
 
 build-k6: # Build k6 module
