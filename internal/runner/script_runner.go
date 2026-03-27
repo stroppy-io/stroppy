@@ -18,25 +18,28 @@ import (
 	"github.com/stroppy-io/stroppy/internal/static"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/workloads"
 )
 
 // ScriptRunner runs TypeScript benchmark scripts with k6.
 type ScriptRunner struct {
-	logger     *zap.Logger
-	scriptPath string
-	sqlName    string // basename of SQL file in temp dir (empty if no SQL)
-	tempDir    string
-	config     *Probeprint
-	k6RunArgs  []string // pass args directly to 'k6 run <k6RunArgs>'
-	filesInTmp []string
-	steps      []string // --steps: only run these steps
-	noSteps    []string // --no-steps: skip these steps
+	logger        *zap.Logger
+	scriptPath    string
+	sqlName       string // basename of SQL file in temp dir (empty if no SQL)
+	tempDir       string
+	config        *Probeprint
+	k6RunArgs     []string // pass args directly to 'k6 run <k6RunArgs>'
+	filesInTmp    []string
+	steps         []string         // --steps: only run these steps
+	noSteps       []string         // --no-steps: skip these steps
+	driverConfigs DriverCLIConfigs // --driver/-D: CLI driver configurations
 }
 
 // NewScriptRunner creates a new ScriptRunner for the given resolved input.
 func NewScriptRunner(
 	input *ResolvedInput,
 	k6RunArgs, steps, noSteps []string,
+	driverConfigs DriverCLIConfigs,
 ) (*ScriptRunner, error) {
 	lg := logger.Global().
 		Named("script_runner").
@@ -99,15 +102,16 @@ func NewScriptRunner(
 	}
 
 	return &ScriptRunner{
-		logger:     lg,
-		scriptPath: scriptPath,
-		sqlName:    sqlName,
-		config:     config,
-		tempDir:    tempDir,
-		k6RunArgs:  k6RunArgs,
-		filesInTmp: tmpFiles,
-		steps:      steps,
-		noSteps:    noSteps,
+		logger:        lg,
+		scriptPath:    scriptPath,
+		sqlName:       sqlName,
+		config:        config,
+		tempDir:       tempDir,
+		k6RunArgs:     k6RunArgs,
+		filesInTmp:    tmpFiles,
+		steps:         steps,
+		noSteps:       noSteps,
+		driverConfigs: driverConfigs,
 	}, nil
 }
 
@@ -119,7 +123,10 @@ func (r *ScriptRunner) Run(ctx context.Context) error {
 
 	args := []string{}
 
-	envs := r.buildEnvVars()
+	envs, err := r.buildEnvVars()
+	if err != nil {
+		return fmt.Errorf("failed to build env vars: %w", err)
+	}
 
 	args, envs = r.addOtelExportArgs(args, envs)
 
@@ -157,6 +164,16 @@ func CreateAndInitTempDir(
 		}
 
 		filenames = append(filenames, input.SQL.Name)
+	}
+
+	// Copy all SQL files from the preset directory so TS can pick by driver type.
+	if input.Preset != "" {
+		copied, err := copyPresetSQLFiles(input.Preset, tempDir)
+		if err != nil {
+			lg.Debug("Could not copy preset SQL files", zap.Error(err))
+		} else {
+			filenames = append(filenames, copied...)
+		}
 	}
 
 	return tempDir, filenames, nil
@@ -234,8 +251,18 @@ func copyFiles(srcDir, dstDir string, excludeNames []string) (copied []string, e
 }
 
 // buildEnvVars builds environment variables for k6 execution.
-func (r *ScriptRunner) buildEnvVars() []string {
+func (r *ScriptRunner) buildEnvVars() ([]string, error) {
 	envs := os.Environ() // inherit parent environment
+
+	// Add driver configurations from CLI (STROPPY_DRIVER_0, STROPPY_DRIVER_1, ...)
+	if len(r.driverConfigs) > 0 {
+		driverEnvs, err := r.driverConfigs.ToEnvVars()
+		if err != nil {
+			return nil, err
+		}
+
+		envs = append(envs, driverEnvs...)
+	}
 
 	// Add logger configuration
 	if r.config.GlobalConfig.GetLogger() != nil {
@@ -258,7 +285,7 @@ func (r *ScriptRunner) buildEnvVars() []string {
 		envs = append(envs, "STROPPY_NO_STEPS="+strings.Join(r.noSteps, ","))
 	}
 
-	return envs
+	return envs, nil
 }
 
 // validateStepNames checks that all names exist in the probed steps.
@@ -392,6 +419,41 @@ func (r *ScriptRunner) runK6(
 	os.Args = argsBefore
 
 	return nil
+}
+
+// copyPresetSQLFiles copies all .sql files from an embedded preset directory to targetDir.
+// Files that already exist in targetDir are skipped.
+func copyPresetSQLFiles(preset, targetDir string) ([]string, error) {
+	entries, err := workloads.Content.ReadDir(preset)
+	if err != nil {
+		return nil, err
+	}
+
+	var copied []string
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+
+		dest := filepath.Join(targetDir, entry.Name())
+		if _, err := os.Stat(dest); err == nil {
+			continue // already copied (e.g. the user-specified SQL file)
+		}
+
+		data, err := workloads.Content.ReadFile(filepath.Join(preset, entry.Name()))
+		if err != nil {
+			return copied, err
+		}
+
+		if err := os.WriteFile(dest, data, common.FileMode); err != nil {
+			return copied, err
+		}
+
+		copied = append(copied, entry.Name())
+	}
+
+	return copied, nil
 }
 
 // setEnvs set environment variables in [os.Environ] compatible format.

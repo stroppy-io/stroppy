@@ -43,10 +43,9 @@ func TestResolveInput_EmbeddedPreset(t *testing.T) {
 	require.Equal(t, SourceEmbedded, input.Script.Source)
 	require.NotNil(t, input.Script.Content)
 
-	require.NotNil(t, input.SQL)
-	require.Equal(t, "tpcc.sql", input.SQL.Name)
-	require.Equal(t, SourceEmbedded, input.SQL.Source)
-	require.NotNil(t, input.SQL.Content)
+	// SQL is no longer auto-derived for tpcc — the TS picks the right SQL by driver type.
+	// The preset SQL files are copied to the temp dir by the runner.
+	require.Equal(t, "tpcc", input.Preset)
 }
 
 func TestResolveInput_SimpleNoSQL(t *testing.T) {
@@ -117,9 +116,9 @@ func TestResolveInput_FilenameInCwd(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, SourceCwd, input.Script.Source)
-	// SQL auto-derives to tpcc.sql from embedded.
-	require.NotNil(t, input.SQL)
-	require.Equal(t, SourceEmbedded, input.SQL.Source)
+	// SQL no longer auto-derives (tpcc.sql was renamed to pg.sql).
+	// The TS picks the right SQL by driver type at runtime.
+	require.Equal(t, "tpcc", input.Preset)
 }
 
 func TestResolveInput_ExplicitSQL(t *testing.T) {

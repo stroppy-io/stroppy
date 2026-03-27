@@ -1,6 +1,6 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { DriverX, AB, R, S, Step, setSeed, ENV } from "./helpers.ts";
+import { DriverX, AB, R, S, Step, setSeed, ENV, declareDriverSetup } from "./helpers.ts";
 
 export const options: Options = {
   setupTimeout: "5m",
@@ -14,10 +14,12 @@ export const options: Options = {
   },
 };
 
-const driver = DriverX.create().setup({
-  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
+const driverConfig = declareDriverSetup(0, {
+  url: "postgres://postgres:postgres@localhost:5432",
   driverType: "postgres",
 });
+
+const driver = DriverX.create().setup(driverConfig);
 
 setSeed(42);
 

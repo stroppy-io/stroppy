@@ -38,18 +38,24 @@ import { ParsedQuery } from "./parse_sql.js";
 
 declare const __ENV: Record<string, string>;
 
+type AutoDefault = "<auto>";
+
+export function ENV(env: string | string[], default_: AutoDefault, description?: string): string | undefined;
 export function ENV(env: string | string[], default_?: string, description?: string): string;
 export function ENV(env: string | string[], default_?: number, description?: string): number;
-export function ENV(env: string | string[], default_?: string | number, description?: string): string | number {
+export function ENV(env: string | string[], default_?: string | number, description?: string): string | number | undefined {
   const names = Array.isArray(env) ? env : [env];
-  DeclareEnv(names, String(default_ ?? ""), description ?? "");
+  const isAuto = default_ === ENV.auto;
+  DeclareEnv(names, isAuto ? "<auto>" : String(default_ ?? ""), description ?? "");
   const asNum = typeof default_ === "number";
   for (const name of names) {
     const val = __ENV[name];
     if (val !== undefined && val !== "") return asNum ? Number(val) : val;
   }
+  if (isAuto) return undefined;
   return default_ as string | number;
 }
+ENV.auto = "<auto>" as AutoDefault;
 
 
 export type InsertMethodName = "plain_query" | "plain_bulk" | "copy_from";
@@ -312,13 +318,98 @@ export class TxX implements QueryAPI {
   }
 }
 
+/** Unified pool configuration sugar. Mapped to postgres:{} or sql:{} by driverType. */
+export interface PoolConfig {
+  maxConns?: number;
+  minConns?: number;
+  maxConnLifetime?: string;
+  maxConnIdleTime?: string;
+}
+
 export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode" | "driverType" | "driverSpecific"> & {
   errorMode?: ErrorModeName;
   driverType?: DriverTypeName;
   defaultInsertMethod?: InsertMethodName;
   defaultTxIsolation?: TxIsolationName;
+  /** Unified pool config — mapped to postgres:{} or sql:{} based on driverType. */
+  pool?: PoolConfig;
+  /** PostgreSQL-specific pool config (takes priority over pool if set). */
+  postgres?: Partial<DriverConfig_PostgresConfig>;
+  /** Generic SQL pool config (takes priority over pool if set). */
+  sql?: Partial<DriverConfig_SqlConfig>;
+}
+
+/** Resolve pool sugar into the appropriate driver-specific config. */
+function resolvePoolConfig(config: DriverSetup): {
   postgres?: Partial<DriverConfig_PostgresConfig>;
   sql?: Partial<DriverConfig_SqlConfig>;
+} {
+  // Explicit postgres/sql takes priority over pool sugar.
+  if (config.postgres) return { postgres: config.postgres };
+  if (config.sql) return { sql: config.sql };
+  if (!config.pool) return {};
+
+  const p = config.pool;
+  const driverType = config.driverType ?? "postgres";
+
+  if (driverType === "mysql") {
+    return {
+      sql: {
+        maxOpenConns: p.maxConns,
+        maxIdleConns: p.minConns,
+        connMaxLifetime: p.maxConnLifetime,
+        connMaxIdleTime: p.maxConnIdleTime,
+      },
+    };
+  }
+
+  // postgres, picodata, and anything else default to postgres pool config
+  return {
+    postgres: {
+      maxConns: p.maxConns,
+      minConns: p.minConns,
+      maxConnLifetime: p.maxConnLifetime,
+      maxConnIdleTime: p.maxConnIdleTime,
+    },
+  };
+}
+
+// For Go probe spy function
+declare function DeclareDriverSetup(index: number, defaults: DriverSetup): DriverSetup;
+
+/**
+ * Declare a driver setup with defaults, optionally overridden by CLI via STROPPY_DRIVER_N env.
+ * Returns the merged DriverSetup — the caller decides when to instantiate DriverX.
+ * @param index Driver index (0 for first/only driver, 1 for second, etc.)
+ * @param defaults Script-defined default configuration
+ */
+export function declareDriverSetup(index: number, defaults: DriverSetup): DriverSetup {
+  // Notify probe spy if present (set by Go VM during probe)
+  if (typeof DeclareDriverSetup !== 'undefined') {
+    DeclareDriverSetup(index, defaults);
+  }
+  const envKey = `STROPPY_DRIVER_${index}`;
+  const raw = __ENV[envKey];
+  if (!raw || raw === "") return defaults;
+
+  try {
+    const cli = JSON.parse(raw) as Partial<DriverSetup>;
+    // Deep merge: CLI fields override defaults, but only if actually set.
+    const merged: DriverSetup = { ...defaults };
+  if (cli.driverType          !== undefined) merged.driverType          = cli.driverType          as DriverTypeName;
+  if (cli.url                 !== undefined) merged.url                 = cli.url;
+  if (cli.defaultInsertMethod !== undefined) merged.defaultInsertMethod = cli.defaultInsertMethod as InsertMethodName;
+  if (cli.defaultTxIsolation  !== undefined) merged.defaultTxIsolation  = cli.defaultTxIsolation  as TxIsolationName;
+  if (cli.errorMode           !== undefined) merged.errorMode           = cli.errorMode           as ErrorModeName;
+  if (cli.pool                !== undefined) merged.pool                = cli.pool;
+  if (cli.postgres            !== undefined) merged.postgres            = cli.postgres;
+  if (cli.sql                 !== undefined) merged.sql                 = cli.sql;
+    if ((cli as any).bulkSize !== undefined) merged.bulkSize = (cli as any).bulkSize;
+    return merged;
+  } catch (e) {
+    console.error(`[stroppy] failed to parse ${envKey}: ${e}`);
+    return defaults;
+  }
 }
 
 export class DriverX implements QueryAPI {
@@ -372,7 +463,10 @@ export class DriverX implements QueryAPI {
       this._defaultTxIsolation = config.defaultTxIsolation;
     }
     // Convert DriverSetup to proto DriverConfig
-    const { postgres, sql, defaultInsertMethod: _dim, defaultTxIsolation: _dti, ...rest } = config;
+    const resolved = resolvePoolConfig(config);
+    const { postgres: _pg, sql: _sql, pool: _pool, defaultInsertMethod: _dim, defaultTxIsolation: _dti, ...rest } = config;
+    const postgres = resolved.postgres;
+    const sql = resolved.sql;
     const driverSpecific: DriverConfig["driverSpecific"] = postgres
       ? { oneofKind: "postgres", postgres: DriverConfig_PostgresConfig.create(postgres) }
       : sql

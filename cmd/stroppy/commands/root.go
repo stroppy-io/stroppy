@@ -12,6 +12,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/gen"
+	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/help"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/probe"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
 	"github.com/stroppy-io/stroppy/internal/runner"
@@ -114,5 +115,5 @@ func init() {
 	rootCmd.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)
 
 	versionCmd.Flags().BoolVar(&versionJSON, "json", false, "output versions as JSON")
-	rootCmd.AddCommand(versionCmd, run.Cmd, gen.Cmd, probe.Cmd)
+	rootCmd.AddCommand(versionCmd, run.Cmd, gen.Cmd, probe.Cmd, help.Cmd)
 }

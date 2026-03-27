@@ -41,42 +41,12 @@ var (
 		cmd := &cobra.Command{
 			Use:   "probe",
 			Short: "Get test introspection, config, options, sql, steps, envs, drivers",
-			Long: `Command allows you to get information about a test script without running it.
-Probing performs a first-line check of the test for workability, exposing common
-issues. It also provides introspection into the test configuration and
-structure.
+			Long: `Probe runs a test script in a mocked environment to extract metadata
+without executing the actual benchmark. Shows configuration, k6 options,
+SQL structure, steps, environment variables, and driver setup.
 
-Description of -o human readable format sections provided below.
-
-'# Stroppy Config' section shows the configuration passed to the stroppy module
-via the 'DriverX.fromConfig(...)' function call. The configuration is presented
-in protojson format. The config schema is defined in
-'proto/stroppy/config.proto'.
-
-'# K6 Options' follows the structure from 'k6/lib/options.go' and
-'@types/k6/options/index.d.ts'. It shows the options object defined in the
-script as
-"import { Options } from 'k6/options';
-export const options: Options = {...};"
-
-'# SQL File Structure' section represents the SQL file required by the probed
-test. Without these defined sections and queries, the test will fail.
-Sections start with '--+ <SectionName>'.
-Queries within sections are named '--= <QueryName>'.
-You can copy-paste this text directly into an SQL file and write your queries to
-match the test.
-
-'# Steps' is logical separation of the test into steps. They are defined in the
-test as 'Step("step name", ()=> {/*step code*/})' or using 'StepBegin("step
-name"); StepEnd("step name");' pair.
-
-'# Environment Variables' shows which env vars are used specifically within this
-test. Only envs used as '__ENV.<env_name>' are shown here (no k6 options or
-stroppy envs). Current environment values are also shown if found.
-
-'# Drivers' shows the driver configuration(s) passed to DriverX.create().setup({...}).
-It includes the driver type, connection URL, and driver-specific settings
-(e.g. PostgreSQL pool configuration).
+Use section flags (--config, --options, --sql, --steps, --envs, --drivers)
+to filter output. See 'stroppy help probe' for section descriptions.
 `,
 			// TODO: auto detect tests with magic test.ts name.
 			// Or do "probe" of this dir, go trough all ts files, show all sql, or like this.

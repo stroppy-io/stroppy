@@ -31,6 +31,12 @@ type EnvDeclaration struct {
 	Description string   `json:"description,omitempty"`
 }
 
+// DriverSetupDecl captures a declareDriverSetup(index, defaults) call from the script.
+type DriverSetupDecl struct {
+	Index    int            `json:"index"`
+	Defaults map[string]any `json:"defaults"`
+}
+
 type Subprobe struct {
 	// Options is k6 export const options = { ... }
 	Options *lib.Options `json:"options"`
@@ -51,6 +57,9 @@ type Subprobe struct {
 	// Drivers is configuration passed to each DriverX.create().setup({...}) call.
 	// Serialized via protojson in Probeprint.MarshalJSON.
 	Drivers []*stroppy.DriverConfig `json:"-"`
+
+	// DriverSetups captures declareDriverSetup() calls — human-readable driver defaults from the script.
+	DriverSetups []DriverSetupDecl `json:"driver_setups"`
 }
 
 // Probeprint contains configuration and other metainformation extracted from a TypeScript script.
@@ -125,7 +134,7 @@ const (
 func (p *Probeprint) Explain(sections ExplainSection) string {
 	sb := &strings.Builder{}
 
-	sb.WriteString("Use 'probe --help' to get details about sections\n\n")
+	sb.WriteString("Use 'stroppy help probe' to get details about sections\n\n")
 
 	if sections&ExplainConfig != 0 {
 		p.explainConfig(sb)
@@ -246,6 +255,8 @@ func (p *Probeprint) explainEnvs(sb *strings.Builder) {
 	if len(p.EnvDeclarations) == 0 && !hasPlain {
 		sb.WriteString("  (no environment variables)\n")
 	}
+
+	sb.WriteString("\n")
 }
 
 func explainEnvDecl(sb *strings.Builder, decl EnvDeclaration) {
@@ -281,29 +292,24 @@ func lookupEnv(names []string) string {
 func (p *Probeprint) explainDrivers(sb *strings.Builder) {
 	sb.WriteString("# Drivers:\n")
 
-	if len(p.Drivers) == 0 {
+	if len(p.DriverSetups) == 0 {
 		sb.WriteString("  (no drivers)\n\n")
 
 		return
 	}
 
-	opts := protojson.MarshalOptions{
-		Multiline:    true,
-		AllowPartial: true,
-		Indent:       "  ",
-	}
-
-	for i, dc := range p.Drivers {
-		if len(p.Drivers) > 1 {
-			fmt.Fprintf(sb, "  ## Driver %d:\n", i+1)
+	for _, ds := range p.DriverSetups {
+		if len(p.DriverSetups) > 1 {
+			fmt.Fprintf(sb, "  ## Driver %d:\n", ds.Index)
 		}
 
-		driverJSON, err := opts.Marshal(dc)
+		data, err := json.MarshalIndent(ds.Defaults, "  ", "  ")
 		if err != nil {
 			panic(err)
 		}
 
-		sb.Write(driverJSON)
+		sb.WriteString("  ")
+		sb.Write(data)
 		sb.WriteString("\n\n")
 	}
 }

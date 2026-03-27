@@ -1,9 +1,8 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { DriverX, ENV, once } from "./helpers.ts";
+import { DriverX, once, declareDriverSetup } from "./helpers.ts";
 import exec from "k6/execution";
 
-const DRIVER_URL = ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL");
 const VUS = 3;
 
 export const options: Options = {
@@ -15,17 +14,21 @@ function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(`ASSERT FAILED: ${msg}`);
 }
 
-const pgConfig = (appName: string, poolSize: number) => ({
-  url: DRIVER_URL + "?application_name=" + appName,
-  driverType: "postgres" as const,
-  postgres: { maxConns: poolSize, minConns: poolSize },
-});
-
 // ---- Shared driver: created at init phase (vu.State() == nil) ----
-const sharedDriver = DriverX.create().setup(pgConfig("mdt_shared", 2));
+const sharedConfig = declareDriverSetup(0, {
+  url: "postgres://postgres:postgres@localhost:5432?application_name=mdt_shared",
+  driverType: "postgres",
+  pool: { maxConns: 2, minConns: 2 },
+});
+const sharedDriver = DriverX.create().setup(sharedConfig);
 
 // ---- Second shared driver: proves multiple shared drivers coexist ----
-const sharedDriver2 = DriverX.create().setup(pgConfig("mdt_shared2", 1));
+const sharedConfig2 = declareDriverSetup(1, {
+  url: "postgres://postgres:postgres@localhost:5432?application_name=mdt_shared2",
+  driverType: "postgres",
+  pool: { maxConns: 1, minConns: 1 },
+});
+const sharedDriver2 = DriverX.create().setup(sharedConfig2);
 
 // ---- Per-VU driver: created empty at init, setup inside default() ----
 const vuDriver = DriverX.create();
@@ -50,7 +53,11 @@ export default function () {
   const it = exec.vu.iterationInScenario;
 
   // Setup per-VU driver with a VU-specific application_name.
-  vuDriver.setup(pgConfig("mdt_vu_" + vid, 1));
+  vuDriver.setup({
+    url: "postgres://postgres:postgres@localhost:5432?application_name=mdt_vu_" + vid,
+    driverType: "postgres",
+    pool: { maxConns: 1, minConns: 1 },
+  });
   vuSetupLambdaCalls = vuSetup(vuSetupLambdaCalls);
 
   // ---- Test 1: all three drivers can query ----

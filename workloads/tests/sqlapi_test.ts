@@ -1,17 +1,19 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
 
-import { DriverX, ENV } from "./helpers.ts";
+import { DriverX, declareDriverSetup } from "./helpers.ts";
 
 export const options: Options = {
   iterations: 1,
   vus: 1,
 };
 
-const driver = DriverX.create().setup({
-  url: ENV("DRIVER_URL", "postgres://postgres:postgres@localhost:5432", "Database connection URL"),
+const driverConfig = declareDriverSetup(0, {
+  url: "postgres://postgres:postgres@localhost:5432",
   driverType: "postgres",
 });
+
+const driver = DriverX.create().setup(driverConfig);
 
 function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(`ASSERT FAILED: ${msg}`);
