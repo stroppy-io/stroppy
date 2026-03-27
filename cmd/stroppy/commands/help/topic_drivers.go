@@ -31,6 +31,10 @@ DRIVER PRESETS (-d / --driver)
              url=postgres://admin:T0psecret@localhost:1331
              defaultInsertMethod=plain_bulk
 
+    ydb      driverType=ydb
+             url=grpc://localhost:2136/local
+             defaultInsertMethod=plain_bulk
+
   Each preset includes default credentials for local development.
   Use -D url=... to override the connection URL.
 
@@ -56,7 +60,7 @@ DRIVER OPTIONS (-D / --driver-opt)
   Available option keys:
 
     url                    string    Database connection URL
-    driverType             string    postgres | mysql | picodata
+    driverType             string    postgres | mysql | picodata | ydb
     defaultInsertMethod    string    plain_query | copy_from | plain_bulk
     defaultTxIsolation     string    read_uncommitted | read_committed |
                                      repeatable_read | serializable |

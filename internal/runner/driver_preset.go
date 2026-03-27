@@ -52,6 +52,12 @@ var driverPresets = map[string]DriverPreset{
 		DefaultInsertMethod: "plain_bulk",
 		PoolKind:            "postgres",
 	},
+	"ydb": {
+		DriverType:          "ydb",
+		URL:                 "grpc://localhost:2136/local",
+		DefaultInsertMethod: "plain_bulk",
+		PoolKind:            "sql",
+	},
 }
 
 // LookupDriverPreset returns a preset by short name, or an error if not found.

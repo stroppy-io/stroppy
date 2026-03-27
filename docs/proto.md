@@ -794,6 +794,7 @@ It controls log levels and output formatting.
 | DRIVER_TYPE_POSTGRES | 1 |  |
 | DRIVER_TYPE_MYSQL | 2 |  |
 | DRIVER_TYPE_PICODATA | 3 |  |
+| DRIVER_TYPE_YDB | 4 |  |
 
 
 

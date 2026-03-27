@@ -3,8 +3,17 @@ import { Teardown } from "k6/x/stroppy";
 import { DriverX, AB, C, R, Step, S, ENV, declareDriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
-const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file path (defaults to ./ansi.sql)")
-  || "./ansi.sql";
+// Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql/pico/ydb)
+const driverConfig = declareDriverSetup(0, {
+  url: "postgres://postgres:postgres@localhost:5432",
+  driverType: "postgres",
+  defaultInsertMethod: "copy_from",
+});
+
+const _sqlByDriver: Record<string, string> = { ydb: "./ydb.sql" };
+const SQL_FILE = _sqlByDriver[driverConfig.driverType!]
+  ?? ENV("SQL_FILE", ENV.auto, "SQL file path (defaults to ./ansi.sql)")
+  ?? "./ansi.sql";
 
 // TPC-B Configuration Constants
 const SCALE_FACTOR = ENV(["SCALE_FACTOR", "BRANCHES"], 1, "TPC-B scale factor");
@@ -16,13 +25,6 @@ const ACCOUNTS = 100000 * SCALE_FACTOR;
 export const options: Options = {
   setupTimeout: String(SCALE_FACTOR) + "m",
 };
-
-// Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql/pico)
-const driverConfig = declareDriverSetup(0, {
-  url: "postgres://postgres:postgres@localhost:5432",
-  driverType: "postgres",
-  defaultInsertMethod: "copy_from",
-});
 
 const driver = DriverX.create().setup(driverConfig);
 
