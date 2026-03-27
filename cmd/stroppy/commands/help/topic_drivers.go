@@ -1,5 +1,6 @@
 package help
 
+//nolint:gosec // help text contains example default credentials for local development
 func init() {
 	Register(Topic{
 		Name:  "drivers",
@@ -19,15 +20,15 @@ DRIVER PRESETS (-d / --driver)
   Available presets:
 
     pg       driverType=postgres
-             url=postgres://postgres@localhost:5432
+             url=postgres://postgres:postgres@localhost:5432
              defaultInsertMethod=copy_from
 
     mysql    driverType=mysql
-             url=myuser@tcp(localhost:3306)/mydb
+             url=myuser:mypassword@tcp(localhost:3306)/mydb
              defaultInsertMethod=plain_bulk
 
     pico     driverType=picodata
-             url=postgres://admin@localhost:1331
+             url=postgres://admin:T0psecret@localhost:1331
              defaultInsertMethod=plain_bulk
 
   Each preset includes default credentials for local development.

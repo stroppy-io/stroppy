@@ -284,6 +284,10 @@ type genStub struct{}
 
 func (*genStub) Next() any { return nil }
 
+type groupGenStub struct{}
+
+func (*groupGenStub) Next() any { return []any{} }
+
 type pickerStub struct{}
 
 func (g *pickerStub) Pick(a []js.Value) (js.Value, error) { return a[0], nil }
@@ -338,6 +342,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		// k6/x/stroppy defines
 		{"NewDriver", newDriverStub},
 		{"NewGeneratorByRuleBin", func() any { return &genStub{} }},
+		{"NewGroupGeneratorByRulesBin", func() any { return &groupGenStub{} }},
 		{"Teardown", func(any) {}},
 		{"NotifyStep", notifyStepSpy(&probeprint.Steps)},
 		// TODO: research. Some esbuild name resolution artifact, probably
