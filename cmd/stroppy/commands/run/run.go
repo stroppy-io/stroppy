@@ -25,7 +25,7 @@ var (
 
 var Cmd = &cobra.Command{
 	Use: "run <script> [sql_file] [-d driver] [-D key=value] " +
-		"[--steps step1,step2] [-- k6-args...]",
+		"[-e KEY=VALUE] [--steps step1,step2] [-- k6-args...]",
 	Short: "Run benchmark script with k6",
 	Long: `Run a benchmark with k6. The extension determines the mode:
 
@@ -37,6 +37,10 @@ var Cmd = &cobra.Command{
 Files are searched in: current directory → ~/.stroppy/ → built-in workloads.
 SQL files are auto-derived from the preset/script name unless specified explicitly.
 See 'stroppy help resolution' for details on how files are found.
+
+Environment flags:
+  -e, --env KEY=VALUE     Set env var for the script (lowercase auto-uppercased)
+                          Real env takes precedence over -e values.
 
 Driver flags:
   -d, --driver NAME       Use a driver preset (pg, mysql, pico)
@@ -60,6 +64,8 @@ Driver flags:
   stroppy run tpcc -d pg                        # use PostgreSQL driver preset
   stroppy run tpcc -d pg -D url=postgres://prod:5432  # preset with URL override
   stroppy run tpcc -d pg -d1 mysql              # two drivers: pg + mysql
+  stroppy run tpcc -e pool_size=200             # set POOL_SIZE env for the script
+  stroppy run tpcc -e FOO=bar -e BAZ=qux        # multiple env overrides
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
@@ -71,6 +77,12 @@ Driver flags:
 		}
 
 		parsed, err := parseRunArgs(args)
+		if err != nil {
+			return err
+		}
+
+		// Resolve -e overrides (uppercase keys, validate format).
+		envOverrides, err := runner.ResolveEnvOverrides(parsed.envArgs)
 		if err != nil {
 			return err
 		}
@@ -95,7 +107,7 @@ Driver flags:
 			return fmt.Errorf("failed to resolve input: %w", err)
 		}
 
-		r, err := runner.NewScriptRunner(input, parsed.afterDash, parsed.steps, parsed.noSteps, driverConfigs)
+		r, err := runner.NewScriptRunner(input, parsed.afterDash, parsed.steps, parsed.noSteps, driverConfigs, envOverrides)
 		if err != nil {
 			return fmt.Errorf("failed to create runner: %w", err)
 		}
@@ -122,6 +134,7 @@ type runArgs struct {
 	steps         []string
 	noSteps       []string
 	afterDash     []string
+	envArgs       []string            // -e KEY=VALUE raw pairs
 	driverPresets map[int]string      // driver index → preset name
 	driverOpts    map[int][][2]string // driver index → list of [key, value] pairs
 }
@@ -142,6 +155,17 @@ func parseRunArgs(args []string) (runArgs, error) {
 
 	for i := 0; i < len(positional); i++ {
 		consumed, err := parseStepsFlag(positional, i, &parsed)
+		if err != nil {
+			return runArgs{}, err
+		}
+
+		if consumed > 0 {
+			i += consumed - 1
+
+			continue
+		}
+
+		consumed, err = parseEnvFlag(positional, i, &parsed)
 		if err != nil {
 			return runArgs{}, err
 		}
@@ -204,6 +228,35 @@ func parseStepsFlag(args []string, i int, parsed *runArgs) (int, error) {
 
 	case strings.HasPrefix(arg, "--no-steps="):
 		parsed.noSteps = append(parsed.noSteps, strings.Split(strings.TrimPrefix(arg, "--no-steps="), ",")...)
+
+		return 1, nil
+	}
+
+	return 0, nil
+}
+
+// parseEnvFlag handles -e and --env flags in both space and equals forms.
+// Returns the number of tokens consumed (0 if the arg is not an env flag).
+func parseEnvFlag(args []string, i int, parsed *runArgs) (int, error) {
+	arg := args[i]
+
+	switch {
+	case arg == "-e" || arg == "--env":
+		if i+1 >= len(args) {
+			return 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
+		}
+
+		parsed.envArgs = append(parsed.envArgs, args[i+1])
+
+		return consumedPairFlag, nil
+
+	case strings.HasPrefix(arg, "-e="):
+		parsed.envArgs = append(parsed.envArgs, strings.TrimPrefix(arg, "-e="))
+
+		return 1, nil
+
+	case strings.HasPrefix(arg, "--env="):
+		parsed.envArgs = append(parsed.envArgs, strings.TrimPrefix(arg, "--env="))
 
 		return 1, nil
 	}

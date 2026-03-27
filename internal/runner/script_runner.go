@@ -30,9 +30,10 @@ type ScriptRunner struct {
 	config        *Probeprint
 	k6RunArgs     []string // pass args directly to 'k6 run <k6RunArgs>'
 	filesInTmp    []string
-	steps         []string         // --steps: only run these steps
-	noSteps       []string         // --no-steps: skip these steps
-	driverConfigs DriverCLIConfigs // --driver/-D: CLI driver configurations
+	steps         []string          // --steps: only run these steps
+	noSteps       []string          // --no-steps: skip these steps
+	driverConfigs DriverCLIConfigs  // --driver/-D: CLI driver configurations
+	envOverrides  map[string]string // -e KEY=VALUE: user env overrides (uppercased keys)
 }
 
 // NewScriptRunner creates a new ScriptRunner for the given resolved input.
@@ -40,6 +41,7 @@ func NewScriptRunner(
 	input *ResolvedInput,
 	k6RunArgs, steps, noSteps []string,
 	driverConfigs DriverCLIConfigs,
+	envOverrides map[string]string,
 ) (*ScriptRunner, error) {
 	lg := logger.Global().
 		Named("script_runner").
@@ -112,6 +114,7 @@ func NewScriptRunner(
 		steps:         steps,
 		noSteps:       noSteps,
 		driverConfigs: driverConfigs,
+		envOverrides:  envOverrides,
 	}, nil
 }
 
@@ -251,8 +254,14 @@ func copyFiles(srcDir, dstDir string, excludeNames []string) (copied []string, e
 }
 
 // buildEnvVars builds environment variables for k6 execution.
+// Precedence (highest to lowest): real env > -e overrides > driver > defaults.
 func (r *ScriptRunner) buildEnvVars() ([]string, error) {
 	envs := os.Environ() // inherit parent environment
+
+	// Add -e overrides (real env already present in envs takes precedence via setEnvs skip-if-present).
+	if len(r.envOverrides) > 0 {
+		envs = append(envs, BuildEnvLookup(r.envOverrides)...)
+	}
 
 	// Add driver configurations from CLI (STROPPY_DRIVER_0, STROPPY_DRIVER_1, ...)
 	if len(r.driverConfigs) > 0 {
