@@ -52,7 +52,9 @@ func NewDriver(
 
 	cfg := opts.Config
 
-	nativeDB, err := ydbsdk.Open(ctx, cfg.GetUrl())
+	connOpts := buildConnectionOptions(lg, cfg)
+
+	nativeDB, err := ydbsdk.Open(ctx, cfg.GetUrl(), connOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open ydb connection: %w", err)
 	}
@@ -97,6 +99,33 @@ func NewDriver(
 		sqlCfg:   sqlCfg,
 		bulkSize: bulkSize,
 	}, nil
+}
+
+func buildConnectionOptions(lg *zap.Logger, cfg *stroppy.DriverConfig) []ydbsdk.Option {
+	var opts []ydbsdk.Option
+
+	if f := cfg.GetCaCertFile(); f != "" {
+		lg.Debug("Using CA certificate", zap.String("file", f))
+		opts = append(opts, ydbsdk.WithCertificatesFromFile(f))
+	}
+
+	if cfg.GetTlsInsecureSkipVerify() {
+		lg.Warn("TLS certificate verification disabled (insecure)")
+
+		opts = append(opts, ydbsdk.WithTLSSInsecureSkipVerify())
+	}
+
+	switch {
+	case cfg.GetAuthToken() != "":
+		lg.Debug("Using token authentication")
+
+		opts = append(opts, ydbsdk.WithAccessTokenCredentials(cfg.GetAuthToken()))
+	case cfg.GetAuthUser() != "":
+		lg.Debug("Using static credentials", zap.String("user", cfg.GetAuthUser()))
+		opts = append(opts, ydbsdk.WithStaticCredentials(cfg.GetAuthUser(), cfg.GetAuthPassword()))
+	}
+
+	return opts
 }
 
 func applySQLConfig(db *sql.DB, sqlCfg *stroppy.DriverConfig_SqlConfig) {

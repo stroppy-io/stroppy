@@ -7,8 +7,15 @@ import (
 	"maps"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 )
+
+// pathFields lists Extra keys that contain file paths and must be
+// resolved to absolute paths before the working directory changes.
+var pathFields = map[string]bool{
+	"cacertfile": true,
+}
 
 var errUnknownDriver = errors.New("unknown driver")
 
@@ -125,6 +132,12 @@ func (d *DriverCLIConfig) ApplyOverride(key, value string) {
 			d.Extra = make(map[string]any)
 		}
 
+		if pathFields[strings.ToLower(key)] {
+			if abs, err := filepath.Abs(value); err == nil {
+				value = abs
+			}
+		}
+
 		d.Extra[key] = value
 	}
 }
@@ -161,6 +174,14 @@ func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
 		default:
 			if cfg.Extra == nil {
 				cfg.Extra = make(map[string]any)
+			}
+
+			if pathFields[strings.ToLower(field)] {
+				if s, ok := val.(string); ok {
+					if abs, err := filepath.Abs(s); err == nil {
+						val = abs
+					}
+				}
 			}
 
 			cfg.Extra[field] = val

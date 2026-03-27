@@ -665,6 +665,11 @@ by the k6 lifecycle stage: init phase = shared, iteration = per-VU.
 | error_mode | [DriverConfig.ErrorMode](#stroppy-DriverConfig-ErrorMode) |  | How to handle errors in query/insert operations. SILENT: record metric only. LOG: record metric &#43; console.log. THROW: rethrow. FAIL: mark test for k6 as failed, continue execution, return code 110. ABORT: immediately stop test with k6 test.abort, return code 108 |
 | postgres | [DriverConfig.PostgresConfig](#stroppy-DriverConfig-PostgresConfig) |  |  |
 | sql | [DriverConfig.SqlConfig](#stroppy-DriverConfig-SqlConfig) |  |  |
+| ca_cert_file | [string](#string) | optional | Path to CA certificate PEM file for TLS connections |
+| auth_token | [string](#string) | optional | Authentication token (e.g., IAM token, API key) |
+| auth_user | [string](#string) | optional | Username for static credentials auth |
+| auth_password | [string](#string) | optional | Password for static credentials auth |
+| tls_insecure_skip_verify | [bool](#bool) | optional | Skip TLS certificate verification (insecure, testing only) |
 
 
 

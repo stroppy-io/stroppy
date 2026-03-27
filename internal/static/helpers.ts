@@ -406,6 +406,11 @@ export function declareDriverSetup(index: number, defaults: DriverSetup): Driver
   if (cli.postgres            !== undefined) merged.postgres            = cli.postgres;
   if (cli.sql                 !== undefined) merged.sql                 = cli.sql;
     if ((cli as any).bulkSize !== undefined) merged.bulkSize = (cli as any).bulkSize;
+  if (cli.caCertFile           !== undefined) merged.caCertFile           = cli.caCertFile;
+  if (cli.authToken            !== undefined) merged.authToken            = cli.authToken;
+  if (cli.authUser             !== undefined) merged.authUser             = cli.authUser;
+  if (cli.authPassword         !== undefined) merged.authPassword         = cli.authPassword;
+  if (cli.tlsInsecureSkipVerify !== undefined) merged.tlsInsecureSkipVerify = cli.tlsInsecureSkipVerify;
     return merged;
   } catch (e) {
     console.error(`[stroppy] failed to parse ${envKey}: ${e}`);
