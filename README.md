@@ -11,6 +11,7 @@ Database stress testing CLI tool powered by k6 workload engine.
 - Built-in TPC-B, TPC-C, TPC-DS like workload tests
 - Custom test scenarios support via TypeScript
 - PostgreSQL, MySQL, Picodata drivers (more DBMSs coming soon)
+- Transaction support with configurable isolation levels
 - k6-based load generation engine
 
 ## Installation
@@ -42,10 +43,10 @@ The binary will be available at `./build/stroppy`.
 
 ## Quick Start
 
-Set the target database via `DRIVER_URL` environment variable (defaults to a local PostgreSQL instance):
+Configure the target database via driver flags (defaults to a local PostgreSQL instance):
 
 ```bash
-export DRIVER_URL="postgres://user:password@host:5432/dbname"
+stroppy run tpcc -d pg -D url=postgres://user:password@host:5432/dbname
 ```
 
 ### Run Tests
@@ -67,11 +68,11 @@ stroppy run tpcc/tpcc.ts tpcc.sql
 stroppy run tpcc/tpcc.ts tpcc/tpcc.sql
 ```
 
-Some workloads have variants. The `pick` variant uses weighted random transaction selection instead of simulating all users at full load:
+Some workloads have variants. The `pick` variant uses weighted random transaction selection instead of simulating all users at full load. The `flat` variant runs a flat list of queries without k6 scenarios:
 
 ```bash
 stroppy run tpcc/pick
-stroppy run tpcc/pick-mysql mysql
+stroppy run tpcb/flat
 ```
 
 And you can mix builtin tests with your own scripts or SQL files:
@@ -81,24 +82,27 @@ stroppy run tpcb ./my-experimental.sql
 stroppy run ./my-tpcb.ts tpcb.sql
 ```
 
-### Presets Tree
+Use `-d` to select a driver preset and `-D` to override driver options:
+
+```bash
+stroppy run tpcc -d pg
+stroppy run tpcc -d mysql -D url=mysql://root:pass@localhost:3306/bench
+stroppy run tpcc -d pg -d1 mysql              # two drivers
 ```
-├─ execute_sql
-│  └─ execute_sql.ts
-│  simple
-│  └─ simple.ts
-│  tests
-│  └─ multi_drivers_test.ts sqlapi_test.ts
-│  tpcb
-│  └─ tpcb.sql tpcb.ts
-├─ tpcc
-│  ├─ tpcc.ts pick-mysql.ts pico.ts 
-│  ├─ pick.ts mysql.sql     pico.sql
-│  └─ tpcc.sql
-└─ tpcds
-    ├─ tpcds-scale-(1/10/100/300/1000/3000/10000/30000/50000/100000).sql
-    └─ tpcds.ts
- ```
+
+Pass environment variables to the script with `-e` (keys are auto-uppercased):
+
+```bash
+stroppy run tpcc -e pool_size=200
+stroppy run tpcc -d pg -e scale_factor=2
+```
+
+Use `stroppy help` to explore available topics:
+
+```bash
+stroppy help drivers
+stroppy help resolution
+```
 
 ### Probe Tests
 
@@ -108,7 +112,26 @@ Probe inspects a workload and prints its configuration and SQL schema without ru
 stroppy probe tpcc
 stroppy probe workloads/tpcc/tpcc.ts
 
-stroppy probe --help
+stroppy help probe
+```
+
+### Presets Tree
+```
+├─ execute_sql
+│  └─ execute_sql.ts
+├─ simple
+│  └─ simple.ts
+├─ tests
+│  └─ multi_drivers_test.ts sqlapi_test.ts transaction_test.ts
+├─ tpcb
+│  ├─ tpcb.ts flat.ts
+│  └─ tpcb.sql ansi.sql
+├─ tpcc
+│  ├─ tpcc.ts pick.ts flat.ts
+│  └─ tpcc.sql pg.sql mysql.sql ansi.sql
+└─ tpcds
+   ├─ tpcds-scale-(1/10/100/300/1000/3000/10000/30000/50000/100000).sql
+   └─ tpcds.ts
 ```
 
 ### Generate Test Workspace
@@ -151,10 +174,10 @@ Look at `simple.ts` and `tpcb.ts` first as a reference.
 
 ### Using Built-in Workloads
 
-Run directly (--network host to reach localhost databases)
+Run directly (--network host to reach localhost databases):
 
 ```bash
-docker run --network host ghcr.io/stroppy-io/stroppy run /workloads/simple/simple.ts
+docker run --network host ghcr.io/stroppy-io/stroppy run simple
 ```
 
 > Add the tag to image:
@@ -163,8 +186,8 @@ docker run --network host ghcr.io/stroppy-io/stroppy run /workloads/simple/simpl
 > ```
 
 ```bash
-docker run -e DRIVER_URL="postgres://user:password@host:5432/dbname" \
-  stroppy run /workloads/tpcb/tpcb.ts /workloads/tpcb/tpcb.sql
+docker run --network host stroppy run tpcb \
+  -d pg -D url=postgres://user:password@host:5432/dbname
 ```
 
 Available workloads: `simple`, `tpcb`, `tpcc`, `tpcds`
