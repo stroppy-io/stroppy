@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -137,6 +138,8 @@ func ProcessArgs(
 				diff = append(diff, k)
 			}
 		}
+
+		sort.Strings(diff)
 
 		return sb.String(), resultArgs, fmt.Errorf(
 			"%w: [%s]",
