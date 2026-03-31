@@ -31,6 +31,10 @@ DRIVER PRESETS (-d / --driver)
              url=postgres://admin:T0psecret@localhost:1331
              defaultInsertMethod=plain_bulk
 
+    ydb      driverType=ydb
+             url=grpc://localhost:2136/local
+             defaultInsertMethod=plain_bulk
+
   Each preset includes default credentials for local development.
   Use -D url=... to override the connection URL.
 
@@ -56,7 +60,7 @@ DRIVER OPTIONS (-D / --driver-opt)
   Available option keys:
 
     url                    string    Database connection URL
-    driverType             string    postgres | mysql | picodata
+    driverType             string    postgres | mysql | picodata | ydb
     defaultInsertMethod    string    plain_query | copy_from | plain_bulk
     defaultTxIsolation     string    read_uncommitted | read_committed |
                                      repeatable_read | serializable |
@@ -67,6 +71,18 @@ DRIVER OPTIONS (-D / --driver-opt)
     pool.minConns          int       Minimum pool connections
     pool.maxConnLifetime   duration  Max connection lifetime  (e.g. "1h")
     pool.maxConnIdleTime   duration  Max idle connection time (e.g. "10m")
+
+  TLS / Authentication options:
+
+    caCertFile             string    Path to CA certificate PEM file
+    authToken              string    Authentication token (e.g., IAM token)
+    authUser               string    Username for static credentials auth
+    authPassword           string    Password for static credentials auth
+    tlsInsecureSkipVerify  bool      Skip TLS cert verification (testing only)
+
+  Note: TLS is enabled automatically when the URL uses a secure scheme
+  (e.g. grpcs:// for YDB). The options above are only needed when the
+  server uses a private CA or requires authentication.
 
   Note: pool.* options are sugar — they map to the driver-specific pool
   config (pgx pool or sql pool) based on driverType.
@@ -109,6 +125,14 @@ EXAMPLES
 
   # Full JSON config instead of preset
   stroppy run tpcc -d '{"url":"postgres://prod:5432","driverType":"postgres","errorMode":"throw"}'
+
+  # YDB with TLS and token auth (managed YDB)
+  stroppy run tpcc -d ydb -D url=grpcs://host:2135/db \
+    -D caCertFile=./certs/ca.pem -D authToken=t1.xxx...
+
+  # YDB with static credentials
+  stroppy run tpcc -d ydb -D url=grpcs://host:2135/db \
+    -D authUser=admin -D authPassword=secret
 
   # Pre-set env takes precedence over CLI flags
   STROPPY_DRIVER_0='{"url":"postgres://staging:5432"}' stroppy run tpcc -d pg

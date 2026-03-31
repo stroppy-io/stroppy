@@ -22,6 +22,7 @@ message DriverConfig {
     DRIVER_TYPE_POSTGRES = 1;
     DRIVER_TYPE_MYSQL = 2;
     DRIVER_TYPE_PICODATA = 3;
+    DRIVER_TYPE_YDB = 4;
   }
 
   /** Name/Type of chosen driver */
@@ -88,6 +89,17 @@ message DriverConfig {
     PostgresConfig postgres = 10;
     SqlConfig sql = 11;
   }
+
+  /** Path to CA certificate PEM file for TLS connections */
+  optional string ca_cert_file = 20;
+  /** Authentication token (e.g., IAM token, API key) */
+  optional string auth_token = 21;
+  /** Username for static credentials auth */
+  optional string auth_user = 22;
+  /** Password for static credentials auth */
+  optional string auth_password = 23;
+  /** Skip TLS certificate verification (insecure, testing only) */
+  optional bool tls_insecure_skip_verify = 24;
 }
 
 /**

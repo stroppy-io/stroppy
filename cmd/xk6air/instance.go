@@ -9,6 +9,7 @@ import (
 	_ "github.com/stroppy-io/stroppy/pkg/driver/mysql"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/picodata"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/postgres"
+	_ "github.com/stroppy-io/stroppy/pkg/driver/ydb"
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"
 )

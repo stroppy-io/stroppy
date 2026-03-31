@@ -173,6 +173,26 @@ func (m *DriverConfig) validate(all bool) error {
 		// no validation rules for BulkSize
 	}
 
+	if m.CaCertFile != nil {
+		// no validation rules for CaCertFile
+	}
+
+	if m.AuthToken != nil {
+		// no validation rules for AuthToken
+	}
+
+	if m.AuthUser != nil {
+		// no validation rules for AuthUser
+	}
+
+	if m.AuthPassword != nil {
+		// no validation rules for AuthPassword
+	}
+
+	if m.TlsInsecureSkipVerify != nil {
+		// no validation rules for TlsInsecureSkipVerify
+	}
+
 	if len(errors) > 0 {
 		return DriverConfigMultiError(errors)
 	}

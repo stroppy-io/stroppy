@@ -29,6 +29,7 @@ const (
 	DriverConfig_DRIVER_TYPE_POSTGRES    DriverConfig_DriverType = 1
 	DriverConfig_DRIVER_TYPE_MYSQL       DriverConfig_DriverType = 2
 	DriverConfig_DRIVER_TYPE_PICODATA    DriverConfig_DriverType = 3
+	DriverConfig_DRIVER_TYPE_YDB         DriverConfig_DriverType = 4
 )
 
 // Enum value maps for DriverConfig_DriverType.
@@ -38,12 +39,14 @@ var (
 		1: "DRIVER_TYPE_POSTGRES",
 		2: "DRIVER_TYPE_MYSQL",
 		3: "DRIVER_TYPE_PICODATA",
+		4: "DRIVER_TYPE_YDB",
 	}
 	DriverConfig_DriverType_value = map[string]int32{
 		"DRIVER_TYPE_UNSPECIFIED": 0,
 		"DRIVER_TYPE_POSTGRES":    1,
 		"DRIVER_TYPE_MYSQL":       2,
 		"DRIVER_TYPE_PICODATA":    3,
+		"DRIVER_TYPE_YDB":         4,
 	}
 )
 
@@ -260,8 +263,18 @@ type DriverConfig struct {
 	//	*DriverConfig_Postgres
 	//	*DriverConfig_Sql
 	DriverSpecific isDriverConfig_DriverSpecific `protobuf_oneof:"driver_specific"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// * Path to CA certificate PEM file for TLS connections
+	CaCertFile *string `protobuf:"bytes,20,opt,name=ca_cert_file,json=caCertFile,proto3,oneof" json:"ca_cert_file,omitempty"`
+	// * Authentication token (e.g., IAM token, API key)
+	AuthToken *string `protobuf:"bytes,21,opt,name=auth_token,json=authToken,proto3,oneof" json:"auth_token,omitempty"`
+	// * Username for static credentials auth
+	AuthUser *string `protobuf:"bytes,22,opt,name=auth_user,json=authUser,proto3,oneof" json:"auth_user,omitempty"`
+	// * Password for static credentials auth
+	AuthPassword *string `protobuf:"bytes,23,opt,name=auth_password,json=authPassword,proto3,oneof" json:"auth_password,omitempty"`
+	// * Skip TLS certificate verification (insecure, testing only)
+	TlsInsecureSkipVerify *bool `protobuf:"varint,24,opt,name=tls_insecure_skip_verify,json=tlsInsecureSkipVerify,proto3,oneof" json:"tls_insecure_skip_verify,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *DriverConfig) Reset() {
@@ -345,6 +358,41 @@ func (x *DriverConfig) GetSql() *DriverConfig_SqlConfig {
 		}
 	}
 	return nil
+}
+
+func (x *DriverConfig) GetCaCertFile() string {
+	if x != nil && x.CaCertFile != nil {
+		return *x.CaCertFile
+	}
+	return ""
+}
+
+func (x *DriverConfig) GetAuthToken() string {
+	if x != nil && x.AuthToken != nil {
+		return *x.AuthToken
+	}
+	return ""
+}
+
+func (x *DriverConfig) GetAuthUser() string {
+	if x != nil && x.AuthUser != nil {
+		return *x.AuthUser
+	}
+	return ""
+}
+
+func (x *DriverConfig) GetAuthPassword() string {
+	if x != nil && x.AuthPassword != nil {
+		return *x.AuthPassword
+	}
+	return ""
+}
+
+func (x *DriverConfig) GetTlsInsecureSkipVerify() bool {
+	if x != nil && x.TlsInsecureSkipVerify != nil {
+		return *x.TlsInsecureSkipVerify
+	}
+	return false
 }
 
 type isDriverConfig_DriverSpecific interface {
@@ -767,7 +815,7 @@ var File_proto_stroppy_config_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\xb1\f\n" +
+	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\xf9\x0e\n" +
 	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12K\n" +
 	"\vdriver_type\x18\x02 \x01(\x0e2 .stroppy.DriverConfig.DriverTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
@@ -777,7 +825,14 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"error_mode\x18\x03 \x01(\x0e2\x1f.stroppy.DriverConfig.ErrorModeR\terrorMode\x12B\n" +
 	"\bpostgres\x18\n" +
 	" \x01(\v2$.stroppy.DriverConfig.PostgresConfigH\x00R\bpostgres\x123\n" +
-	"\x03sql\x18\v \x01(\v2\x1f.stroppy.DriverConfig.SqlConfigH\x00R\x03sql\x1a\x95\x05\n" +
+	"\x03sql\x18\v \x01(\v2\x1f.stroppy.DriverConfig.SqlConfigH\x00R\x03sql\x12%\n" +
+	"\fca_cert_file\x18\x14 \x01(\tH\x02R\n" +
+	"caCertFile\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"auth_token\x18\x15 \x01(\tH\x03R\tauthToken\x88\x01\x01\x12 \n" +
+	"\tauth_user\x18\x16 \x01(\tH\x04R\bauthUser\x88\x01\x01\x12(\n" +
+	"\rauth_password\x18\x17 \x01(\tH\x05R\fauthPassword\x88\x01\x01\x12<\n" +
+	"\x18tls_insecure_skip_verify\x18\x18 \x01(\bH\x06R\x15tlsInsecureSkipVerify\x88\x01\x01\x1a\x95\x05\n" +
 	"\x0ePostgresConfig\x12+\n" +
 	"\x0ftrace_log_level\x18\x01 \x01(\tH\x00R\rtraceLogLevel\x88\x01\x01\x12/\n" +
 	"\x11max_conn_lifetime\x18\x02 \x01(\tH\x01R\x0fmaxConnLifetime\x88\x01\x01\x120\n" +
@@ -807,13 +862,14 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\x0f_max_open_connsB\x11\n" +
 	"\x0f_max_idle_connsB\x14\n" +
 	"\x12_conn_max_lifetimeB\x15\n" +
-	"\x13_conn_max_idle_time\"t\n" +
+	"\x13_conn_max_idle_time\"\x89\x01\n" +
 	"\n" +
 	"DriverType\x12\x1b\n" +
 	"\x17DRIVER_TYPE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14DRIVER_TYPE_POSTGRES\x10\x01\x12\x15\n" +
 	"\x11DRIVER_TYPE_MYSQL\x10\x02\x12\x18\n" +
-	"\x14DRIVER_TYPE_PICODATA\x10\x03\"\x93\x01\n" +
+	"\x14DRIVER_TYPE_PICODATA\x10\x03\x12\x13\n" +
+	"\x0fDRIVER_TYPE_YDB\x10\x04\"\x93\x01\n" +
 	"\tErrorMode\x12\x1a\n" +
 	"\x16ERROR_MODE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11ERROR_MODE_SILENT\x10\x01\x12\x12\n" +
@@ -823,7 +879,13 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\x10ERROR_MODE_ABORT\x10\x05B\x11\n" +
 	"\x0fdriver_specificB\f\n" +
 	"\n" +
-	"_bulk_size\"\xca\x02\n" +
+	"_bulk_sizeB\x0f\n" +
+	"\r_ca_cert_fileB\r\n" +
+	"\v_auth_tokenB\f\n" +
+	"\n" +
+	"_auth_userB\x10\n" +
+	"\x0e_auth_passwordB\x1b\n" +
+	"\x19_tls_insecure_skip_verify\"\xca\x02\n" +
 	"\fLoggerConfig\x12E\n" +
 	"\tlog_level\x18\x01 \x01(\x0e2\x1e.stroppy.LoggerConfig.LogLevelB\b\xfaB\x05\x82\x01\x02\x10\x01R\blogLevel\x12B\n" +
 	"\blog_mode\x18\x02 \x01(\x0e2\x1d.stroppy.LoggerConfig.LogModeB\b\xfaB\x05\x82\x01\x02\x10\x01R\alogMode\"q\n" +

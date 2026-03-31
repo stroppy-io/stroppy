@@ -1,18 +1,16 @@
-package mysql
+package ydb
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"database/sql"
-	godriver "database/sql/driver"
 	"errors"
 	"fmt"
 	"net"
-	"os"
 
-	gomysql "github.com/go-sql-driver/mysql"
+	ydbsdk "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
@@ -23,11 +21,11 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
-var ErrUnsupportedInsertMethod = errors.New("unsupported insert method for mysql driver")
+var ErrUnsupportedInsertMethod = errors.New("unsupported insert method for ydb driver")
 
 func init() {
 	driver.RegisterDriver(
-		stroppy.DriverConfig_DRIVER_TYPE_MYSQL,
+		stroppy.DriverConfig_DRIVER_TYPE_YDB,
 		func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
 			return NewDriver(ctx, opts)
 		},
@@ -36,6 +34,7 @@ func init() {
 
 type Driver struct {
 	db       *sql.DB
+	nativeDB *ydbsdk.Driver
 	dialect  queries.Dialect
 	logger   *zap.Logger
 	sqlCfg   *stroppy.DriverConfig_SqlConfig
@@ -50,14 +49,27 @@ func NewDriver(
 ) (*Driver, error) {
 	lg := opts.Logger
 	if lg == nil {
-		lg = logger.NewFromEnv().Named("mysql")
+		lg = logger.NewFromEnv().Named("ydb")
 	}
 
 	cfg := opts.Config
 
-	connector, err := prepareConnector(cfg, opts.DialFunc, lg)
+	connOpts := buildConnectionOptions(lg, cfg, opts.DialFunc)
+
+	nativeDB, err := ydbsdk.Open(ctx, cfg.GetUrl(), connOpts...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open ydb connection: %w", err)
+	}
+
+	connector, err := ydbsdk.Connector(nativeDB,
+		ydbsdk.WithQueryService(true),
+		ydbsdk.WithAutoDeclare(),
+		ydbsdk.WithPositionalArgs(),
+	)
+	if err != nil {
+		nativeDB.Close(ctx)
+
+		return nil, fmt.Errorf("failed to create ydb connector: %w", err)
 	}
 
 	db := sql.OpenDB(connector)
@@ -65,6 +77,7 @@ func NewDriver(
 	sqlCfg := cfg.GetSql()
 	if err = sqldriver.ApplySQLConfig(db, sqlCfg); err != nil {
 		db.Close()
+		nativeDB.Close(ctx)
 
 		return nil, fmt.Errorf("failed to apply SQL config: %w", err)
 	}
@@ -73,6 +86,7 @@ func NewDriver(
 
 	if err = sqldriver.WaitForDB(ctx, lg, &sqldriver.DBPinger{DB: db}, 0); err != nil {
 		db.Close()
+		nativeDB.Close(ctx)
 
 		return nil, err
 	}
@@ -86,108 +100,53 @@ func NewDriver(
 
 	return &Driver{
 		db:       db,
-		dialect:  mysqlDialect{},
+		nativeDB: nativeDB,
+		dialect:  ydbDialect{},
 		logger:   lg,
 		sqlCfg:   sqlCfg,
 		bulkSize: bulkSize,
 	}, nil
 }
 
-func prepareConnector(
-	driverCfg *stroppy.DriverConfig,
-	dialFunc func(ctx context.Context, network, addr string) (net.Conn, error),
+func buildConnectionOptions(
 	lg *zap.Logger,
-) (godriver.Connector, error) {
-	mysqlCfg, err := gomysql.ParseDSN(driverCfg.GetUrl())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse mysql DSN: %w", err)
-	}
-
-	applySecurityOverrides(lg, mysqlCfg, driverCfg)
+	cfg *stroppy.DriverConfig,
+	dialFunc func(ctx context.Context, network, addr string) (net.Conn, error),
+) []ydbsdk.Option {
+	var opts []ydbsdk.Option
 
 	if dialFunc != nil {
-		mysqlCfg.DialFunc = dialFunc
+		opts = append(opts, ydbsdk.With(
+			config.WithGrpcOptions(grpc.WithContextDialer(
+				func(ctx context.Context, addr string) (net.Conn, error) {
+					return dialFunc(ctx, "tcp", addr)
+				},
+			)),
+		))
 	}
 
-	if lg != nil {
-		mysqlCfg.Logger = &zapMySQLLogger{z: lg}
+	if f := cfg.GetCaCertFile(); f != "" {
+		lg.Debug("Using CA certificate", zap.String("file", f))
+		opts = append(opts, ydbsdk.WithCertificatesFromFile(f))
 	}
 
-	connector, err := gomysql.NewConnector(mysqlCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create mysql connector: %w", err)
-	}
-
-	return connector, nil
-}
-
-// applySecurityOverrides applies proto-level security fields to the mysql
-// config. DSN-derived values take precedence: overrides are applied only
-// when the DSN did not already set the corresponding field.
-func applySecurityOverrides(
-	lg *zap.Logger,
-	mysqlCfg *gomysql.Config,
-	driverCfg *stroppy.DriverConfig,
-) {
-	// auth_user / auth_password — override only when DSN had no user.
-	if u := driverCfg.GetAuthUser(); u != "" && mysqlCfg.User == "" {
-		lg.Debug("Using auth_user from proto config", zap.String("user", u))
-
-		mysqlCfg.User = u
-		mysqlCfg.Passwd = driverCfg.GetAuthPassword()
-	}
-
-	// TLS overrides — only when DSN did not configure TLS
-	// (TLSConfig == "" and TLS == nil means no TLS from DSN).
-	caCert := driverCfg.GetCaCertFile()
-	skipVerify := driverCfg.GetTlsInsecureSkipVerify()
-
-	if caCert == "" && !skipVerify {
-		return
-	}
-
-	if mysqlCfg.TLSConfig != "" || mysqlCfg.TLS != nil {
-		lg.Debug("TLS already configured via DSN, skipping proto TLS overrides")
-
-		return
-	}
-
-	host, _, err := net.SplitHostPort(mysqlCfg.Addr)
-	if err != nil {
-		host = mysqlCfg.Addr
-	}
-
-	tlsCfg := &tls.Config{
-		ServerName: host,
-	}
-
-	if skipVerify {
+	if cfg.GetTlsInsecureSkipVerify() {
 		lg.Warn("TLS certificate verification disabled (insecure)")
 
-		tlsCfg.InsecureSkipVerify = true
+		opts = append(opts, ydbsdk.WithTLSSInsecureSkipVerify())
 	}
 
-	if caCert != "" {
-		lg.Debug("Using CA certificate", zap.String("file", caCert))
+	switch {
+	case cfg.GetAuthToken() != "":
+		lg.Debug("Using token authentication")
 
-		pem, err := os.ReadFile(caCert)
-		if err != nil {
-			lg.Error("Failed to read CA certificate file", zap.Error(err))
-
-			return
-		}
-
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(pem) {
-			lg.Error("CA certificate file contains no valid certificates", zap.String("file", caCert))
-
-			return
-		}
-
-		tlsCfg.RootCAs = pool
+		opts = append(opts, ydbsdk.WithAccessTokenCredentials(cfg.GetAuthToken()))
+	case cfg.GetAuthUser() != "":
+		lg.Debug("Using static credentials", zap.String("user", cfg.GetAuthUser()))
+		opts = append(opts, ydbsdk.WithStaticCredentials(cfg.GetAuthUser(), cfg.GetAuthPassword()))
 	}
 
-	mysqlCfg.TLS = tlsCfg
+	return opts
 }
 
 func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (driver.Tx, error) {
@@ -255,13 +214,12 @@ func (d *Driver) RunQuery(
 func (d *Driver) Teardown(ctx context.Context) error {
 	d.logger.Debug("Driver Teardown Start")
 	err := sqldriver.Teardown(ctx, d.db)
+
+	if d.nativeDB != nil {
+		err = errors.Join(err, d.nativeDB.Close(ctx))
+	}
+
 	d.logger.Debug("Driver Teardown End")
 
 	return err
-}
-
-type zapMySQLLogger struct{ z *zap.Logger }
-
-func (l *zapMySQLLogger) Print(v ...any) {
-	l.z.Error("mysql", zap.String("msg", fmt.Sprint(v...)))
 }
