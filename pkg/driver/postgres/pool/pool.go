@@ -2,9 +2,12 @@ package pool
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -99,6 +102,8 @@ func ParseConfig(
 	if pg != nil && pg.GetTraceLogLevel() != "" {
 		logLevel = pg.GetTraceLogLevel()
 	}
+
+	applySecurityOverrides(logger, cfg.ConnConfig, config)
 
 	loggerTracer, err := newLoggerTracer(
 		logger.WithOptions(zap.AddCallerSkip(1), zap.IncreaseLevel(mustParseLevel(logLevel))))
@@ -227,4 +232,68 @@ func parseDefaultQueryExecMode(modeStr string) (pgx.QueryExecMode, error) {
 		slices.Collect(maps.Keys(optMap)),
 		ErrUnsupportedParam,
 	)
+}
+
+// applySecurityOverrides applies proto-level security fields to the pgx
+// connection config. DSN-derived values take precedence: overrides are
+// applied only when the DSN did not already set the corresponding field.
+func applySecurityOverrides(
+	lg *zap.Logger,
+	connCfg *pgx.ConnConfig,
+	driverCfg *stroppy.DriverConfig,
+) {
+	// auth_user / auth_password — override only when DSN had no user.
+	if u := driverCfg.GetAuthUser(); u != "" && connCfg.User == "" {
+		lg.Debug("Using auth_user from proto config", zap.String("user", u))
+
+		connCfg.User = u
+		connCfg.Password = driverCfg.GetAuthPassword()
+	}
+
+	// TLS overrides — only when DSN did not configure TLS (sslmode=disable
+	// or absent → TLSConfig == nil).
+	caCert := driverCfg.GetCaCertFile()
+	skipVerify := driverCfg.GetTlsInsecureSkipVerify()
+
+	if caCert == "" && !skipVerify {
+		return
+	}
+
+	if connCfg.TLSConfig != nil {
+		lg.Debug("TLS already configured via DSN, skipping proto TLS overrides")
+
+		return
+	}
+
+	tlsCfg := &tls.Config{
+		ServerName: connCfg.Host,
+	}
+
+	if skipVerify {
+		lg.Warn("TLS certificate verification disabled (insecure)")
+
+		tlsCfg.InsecureSkipVerify = true
+	}
+
+	if caCert != "" {
+		lg.Debug("Using CA certificate", zap.String("file", caCert))
+
+		pem, err := os.ReadFile(caCert)
+		if err != nil {
+			lg.Error("Failed to read CA certificate file", zap.Error(err))
+
+			return
+		}
+
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			lg.Error("CA certificate file contains no valid certificates", zap.String("file", caCert))
+
+			return
+		}
+
+		tlsCfg.RootCAs = pool
+	}
+
+	connCfg.TLSConfig = tlsCfg
 }
