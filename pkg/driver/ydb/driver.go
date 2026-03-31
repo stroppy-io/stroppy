@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
+	"net"
 
 	ydbsdk "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
@@ -52,7 +54,7 @@ func NewDriver(
 
 	cfg := opts.Config
 
-	connOpts := buildConnectionOptions(lg, cfg)
+	connOpts := buildConnectionOptions(lg, cfg, opts.DialFunc)
 
 	nativeDB, err := ydbsdk.Open(ctx, cfg.GetUrl(), connOpts...)
 	if err != nil {
@@ -73,11 +75,16 @@ func NewDriver(
 	db := sql.OpenDB(connector)
 
 	sqlCfg := cfg.GetSql()
-	applySQLConfig(db, sqlCfg)
+	if err = sqldriver.ApplySQLConfig(db, sqlCfg); err != nil {
+		db.Close()
+		nativeDB.Close(ctx)
+
+		return nil, fmt.Errorf("failed to apply SQL config: %w", err)
+	}
 
 	lg.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
 
-	if err = sqldriver.WaitForDB(ctx, lg, &dbPinger{db: db}, 0); err != nil {
+	if err = sqldriver.WaitForDB(ctx, lg, &sqldriver.DBPinger{DB: db}, 0); err != nil {
 		db.Close()
 		nativeDB.Close(ctx)
 
@@ -101,8 +108,22 @@ func NewDriver(
 	}, nil
 }
 
-func buildConnectionOptions(lg *zap.Logger, cfg *stroppy.DriverConfig) []ydbsdk.Option {
+func buildConnectionOptions(
+	lg *zap.Logger,
+	cfg *stroppy.DriverConfig,
+	dialFunc func(ctx context.Context, network, addr string) (net.Conn, error),
+) []ydbsdk.Option {
 	var opts []ydbsdk.Option
+
+	if dialFunc != nil {
+		opts = append(opts, ydbsdk.With(
+			config.WithGrpcOptions(grpc.WithContextDialer(
+				func(ctx context.Context, addr string) (net.Conn, error) {
+					return dialFunc(ctx, "tcp", addr)
+				},
+			)),
+		))
+	}
 
 	if f := cfg.GetCaCertFile(); f != "" {
 		lg.Debug("Using CA certificate", zap.String("file", f))
@@ -126,40 +147,6 @@ func buildConnectionOptions(lg *zap.Logger, cfg *stroppy.DriverConfig) []ydbsdk.
 	}
 
 	return opts
-}
-
-func applySQLConfig(db *sql.DB, sqlCfg *stroppy.DriverConfig_SqlConfig) {
-	if sqlCfg == nil {
-		return
-	}
-
-	if sqlCfg.MaxOpenConns != nil {
-		db.SetMaxOpenConns(int(sqlCfg.GetMaxOpenConns()))
-	}
-
-	if sqlCfg.MaxIdleConns != nil {
-		db.SetMaxIdleConns(int(sqlCfg.GetMaxIdleConns()))
-	}
-
-	if sqlCfg.ConnMaxLifetime != nil {
-		if d, err := time.ParseDuration(sqlCfg.GetConnMaxLifetime()); err == nil {
-			db.SetConnMaxLifetime(d)
-		}
-	}
-
-	if sqlCfg.ConnMaxIdleTime != nil {
-		if d, err := time.ParseDuration(sqlCfg.GetConnMaxIdleTime()); err == nil {
-			db.SetConnMaxIdleTime(d)
-		}
-	}
-}
-
-type dbPinger struct {
-	db *sql.DB
-}
-
-func (p *dbPinger) Ping(ctx context.Context) error {
-	return p.db.PingContext(ctx)
 }
 
 func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (driver.Tx, error) {
@@ -229,7 +216,7 @@ func (d *Driver) Teardown(ctx context.Context) error {
 	err := sqldriver.Teardown(ctx, d.db)
 
 	if d.nativeDB != nil {
-		d.nativeDB.Close(ctx)
+		err = errors.Join(err, d.nativeDB.Close(ctx))
 	}
 
 	d.logger.Debug("Driver Teardown End")

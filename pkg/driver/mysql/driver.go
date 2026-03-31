@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"time"
 
 	gomysql "github.com/go-sql-driver/mysql"
 	"go.uber.org/zap"
@@ -64,11 +63,15 @@ func NewDriver(
 	db := sql.OpenDB(connector)
 
 	sqlCfg := cfg.GetSql()
-	applySQLConfig(db, sqlCfg)
+	if err = sqldriver.ApplySQLConfig(db, sqlCfg); err != nil {
+		db.Close()
+
+		return nil, fmt.Errorf("failed to apply SQL config: %w", err)
+	}
 
 	lg.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
 
-	if err = sqldriver.WaitForDB(ctx, lg, &dbPinger{db: db}, 0); err != nil {
+	if err = sqldriver.WaitForDB(ctx, lg, &sqldriver.DBPinger{DB: db}, 0); err != nil {
 		db.Close()
 
 		return nil, err
@@ -149,8 +152,13 @@ func applySecurityOverrides(
 		return
 	}
 
+	host, _, err := net.SplitHostPort(mysqlCfg.Addr)
+	if err != nil {
+		host = mysqlCfg.Addr
+	}
+
 	tlsCfg := &tls.Config{
-		ServerName: mysqlCfg.Addr,
+		ServerName: host,
 	}
 
 	if skipVerify {
@@ -180,41 +188,6 @@ func applySecurityOverrides(
 	}
 
 	mysqlCfg.TLS = tlsCfg
-}
-
-func applySQLConfig(db *sql.DB, sqlCfg *stroppy.DriverConfig_SqlConfig) {
-	if sqlCfg == nil {
-		return
-	}
-
-	if sqlCfg.MaxOpenConns != nil {
-		db.SetMaxOpenConns(int(sqlCfg.GetMaxOpenConns()))
-	}
-
-	if sqlCfg.MaxIdleConns != nil {
-		db.SetMaxIdleConns(int(sqlCfg.GetMaxIdleConns()))
-	}
-
-	if sqlCfg.ConnMaxLifetime != nil {
-		if d, err := time.ParseDuration(sqlCfg.GetConnMaxLifetime()); err == nil {
-			db.SetConnMaxLifetime(d)
-		}
-	}
-
-	if sqlCfg.ConnMaxIdleTime != nil {
-		if d, err := time.ParseDuration(sqlCfg.GetConnMaxIdleTime()); err == nil {
-			db.SetConnMaxIdleTime(d)
-		}
-	}
-}
-
-// dbPinger adapts *sql.DB to the Ping interface expected by WaitForDB.
-type dbPinger struct {
-	db *sql.DB
-}
-
-func (p *dbPinger) Ping(ctx context.Context) error {
-	return p.db.PingContext(ctx)
 }
 
 func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (driver.Tx, error) {
