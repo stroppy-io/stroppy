@@ -76,13 +76,14 @@ const errorModeMap: Record<ErrorModeName, DriverConfig_ErrorMode> = {
   abort: DriverConfig_ErrorMode.ERROR_MODE_ABORT,
 };
 
-export type DriverTypeName = "postgres" | "mysql" | "picodata" | "ydb";
+export type DriverTypeName = "postgres" | "mysql" | "picodata" | "ydb" | "noop";
 
 const driverTypeMap: Record<DriverTypeName, DriverConfig_DriverType> = {
   postgres: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
   mysql: DriverConfig_DriverType.DRIVER_TYPE_MYSQL,
   picodata: DriverConfig_DriverType.DRIVER_TYPE_PICODATA,
   ydb: DriverConfig_DriverType.DRIVER_TYPE_YDB,
+  noop: DriverConfig_DriverType.DRIVER_TYPE_NOOP,
 };
 
 const _envErrorMode = ENV("STROPPY_ERROR_MODE", undefined, 
@@ -352,6 +353,10 @@ function resolvePoolConfig(config: DriverSetup): {
 
   const p = config.pool;
   const driverType = config.driverType ?? "postgres";
+
+  if (driverType === "noop") {
+    return {};
+  }
 
   if (driverType === "mysql" || driverType === "ydb") {
     return {

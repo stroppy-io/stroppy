@@ -800,6 +800,7 @@ It controls log levels and output formatting.
 | DRIVER_TYPE_MYSQL | 2 |  |
 | DRIVER_TYPE_PICODATA | 3 |  |
 | DRIVER_TYPE_YDB | 4 |  |
+| DRIVER_TYPE_NOOP | 5 |  |
 
 
 
