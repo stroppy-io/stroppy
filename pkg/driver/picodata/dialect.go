@@ -21,8 +21,19 @@ var ErrUnsupportedType = errors.New("unsupported value type")
 // PicoDialect implements sqlqueries.Dialect for Picodata via pgx.
 type PicoDialect struct{}
 
+var picoPlaceholderCache []string
+
 func (PicoDialect) Placeholder(index int) string {
-	return fmt.Sprintf("$%d", index+1)
+	if index < len(picoPlaceholderCache) {
+		return picoPlaceholderCache[index]
+	}
+
+	// Extend slice to fit the new index
+	for i := len(picoPlaceholderCache); i <= index; i++ {
+		picoPlaceholderCache = append(picoPlaceholderCache, fmt.Sprintf("$%d", i+1))
+	}
+
+	return picoPlaceholderCache[index]
 }
 
 func (PicoDialect) Convert(val any) (any, error) {

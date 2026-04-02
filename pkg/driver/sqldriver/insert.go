@@ -48,6 +48,8 @@ func InsertPlainBulk[T any](
 	dialect := builder.Dialect()
 	insert := builder.Insert()
 	generators := builder.Generators()
+	genIDs := queries.InsertGenIDs(insert)
+	row := make([]any, colCount)
 
 	for offset := 0; offset < totalRows; offset += bulkSize {
 		batchRows := bulkSize
@@ -57,9 +59,6 @@ func InsertPlainBulk[T any](
 
 		query := queries.BulkInsertSQL(dialect, insert, batchRows)
 		allValues := make([]any, 0, batchRows*colCount)
-
-		genIDs := queries.InsertGenIDs(insert)
-		row := make([]any, colCount)
 
 		for range batchRows {
 			if err := queries.GenParamValues(dialect, genIDs, generators, row); err != nil {

@@ -21,8 +21,19 @@ var ErrUnsupportedType = errors.New("unsupported value type")
 // PgxDialect implements sqlqueries.Dialect for PostgreSQL via pgx.
 type PgxDialect struct{}
 
+var pgxPlaceholderCache []string
+
 func (PgxDialect) Placeholder(index int) string {
-	return fmt.Sprintf("$%d", index+1)
+	if index < len(pgxPlaceholderCache) {
+		return pgxPlaceholderCache[index]
+	}
+
+	// Extend slice to fit the new index
+	for i := len(pgxPlaceholderCache); i <= index; i++ {
+		pgxPlaceholderCache = append(pgxPlaceholderCache, fmt.Sprintf("$%d", i+1))
+	}
+
+	return pgxPlaceholderCache[index]
 }
 
 func (PgxDialect) Convert(val any) (any, error) {
