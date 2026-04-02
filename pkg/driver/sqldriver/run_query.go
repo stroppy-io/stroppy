@@ -8,6 +8,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -23,6 +25,91 @@ var (
 	// TODO: synchronize with re from TS parse_sql.ts
 	argsRe = regexp.MustCompile(`(\s|^|\()(:[a-zA-Z0-9_]+)(\s|$|;|::|,|\))`)
 )
+
+// parsedQuery is the dialect-specific, value-independent decomposition of a SQL template.
+// It is computed once per unique (dialect, sqlStr) pair and reused across all calls.
+type parsedQuery struct {
+	processedSQL   string
+	argOrder       []string            // positional slot → arg name; may repeat when dedup=false
+	referencedArgs map[string]struct{} // unique set of arg names for extra-arg detection
+}
+
+// sqlCache stores *parsedQuery values keyed by cacheKey(dialect, sqlStr).
+// sync.Map is used because the load-test workload is read-heavy after warmup.
+var (
+	sqlCache     sync.Map
+	sqlCacheSize atomic.Int32
+)
+
+const sqlCacheMaxSize = 1000
+
+// lookupOrParse returns the cached parsedQuery for the given (dialect, sql) pair,
+// parsing and caching it on the first call. New entries are rejected once the
+// cache reaches sqlCacheMaxSize to guard against unbounded growth from
+// dynamically constructed SQL strings.
+func lookupOrParse(dialect queries.Dialect, sqlStr string) *parsedQuery {
+	key := dialect.Placeholder(0) + "|" + sqlStr
+
+	if v, ok := sqlCache.Load(key); ok {
+		return v.(*parsedQuery)
+	}
+
+	pq := parseQueryTemplate(dialect, sqlStr)
+
+	if sqlCacheSize.Load() < sqlCacheMaxSize {
+		if _, loaded := sqlCache.LoadOrStore(key, pq); !loaded {
+			sqlCacheSize.Add(1)
+		}
+	}
+
+	return pq
+}
+
+// parseQueryTemplate runs the expensive parse phase: regex + string building.
+// The result is dialect-specific but value-independent and safe to cache.
+func parseQueryTemplate(dialect queries.Dialect, sqlStr string) *parsedQuery {
+	dedup := dialect.Deduplicate()
+	seenArgs := make(map[string]int) // argName → first paramCounter assigned
+	referencedArgs := make(map[string]struct{})
+
+	var argOrder []string
+
+	var sb strings.Builder
+
+	lastIndex := 0
+	paramCounter := 0
+
+	for _, match := range argsRe.FindAllStringSubmatchIndex(sqlStr, -1) {
+		fullEnd := match[1]
+		argStart, argEnd := match[4], match[5]
+
+		argName := sqlStr[argStart+1 : argEnd] // strip leading ":"
+
+		sb.WriteString(sqlStr[lastIndex:argStart])
+
+		idx, seen := seenArgs[argName]
+		if dedup && seen {
+			sb.WriteString(dialect.Placeholder(idx))
+		} else {
+			sb.WriteString(dialect.Placeholder(paramCounter))
+			seenArgs[argName] = paramCounter
+			argOrder = append(argOrder, argName)
+			paramCounter++
+		}
+
+		referencedArgs[argName] = struct{}{}
+		sb.WriteString(sqlStr[argEnd:fullEnd])
+		lastIndex = fullEnd
+	}
+
+	sb.WriteString(sqlStr[lastIndex:])
+
+	return &parsedQuery{
+		processedSQL:   sb.String(),
+		argOrder:       argOrder,
+		referencedArgs: referencedArgs,
+	}
+}
 
 // RunQuery executes sql with named :arg placeholders and returns rows cursor.
 func RunQuery[R any](
@@ -64,89 +151,52 @@ func RunQuery[R any](
 // and an array of any containing the arguments in the right order.
 // When dialect.Deduplicate() is true, repeated named parameters share a single
 // positional placeholder (e.g. pgx's $1 back-references).
+//
+// The regex + string-building parse phase is cached per (dialect, sqlStr) pair
+// so that repeated calls with the same template pay only a map lookup.
 func ProcessArgs(
 	dialect queries.Dialect, sqlStr string, args map[string]any,
 ) (newSQL string, argsArr []any, err error) {
-	var (
-		resultArgs []any
-		missedArgs []string
-	)
+	pq := lookupOrParse(dialect, sqlStr)
 
-	dedup := dialect.Deduplicate()
-	seenArgs := make(map[string]int) // argName → assigned paramCounter (for dedup reuse & extra-arg detection)
-
-	var sb strings.Builder
-
-	lastIndex := 0
-	paramCounter := 0
-
-	// match[0:1] covers the full regex match including surrounding whitespace/punctuation;
-	// match[4:5] is capture group 2 — the ":argName" token itself.
-	matches := argsRe.FindAllStringSubmatchIndex(sqlStr, -1)
-
-	for _, match := range matches {
-		fullEnd := match[1]
-		argStart, argEnd := match[4], match[5]
-
-		rawArg := sqlStr[argStart:argEnd] // e.g. ":id"
-		argName := rawArg[1:]             // strip leading ":"
-
-		// copy everything before the ":arg" token (including any leading punctuation inside the match)
-		sb.WriteString(sqlStr[lastIndex:argStart])
-
-		if val, ok := args[argName]; ok {
-			idx, seen := seenArgs[argName]
-			if dedup && seen {
-				// reuse the placeholder index assigned on the first occurrence
-				sb.WriteString(dialect.Placeholder(idx))
-			} else {
-				// first occurrence: assign the next positional placeholder
-				sb.WriteString(dialect.Placeholder(paramCounter))
-				seenArgs[argName] = paramCounter
-
-				resultArgs = append(resultArgs, val)
-				paramCounter++
-			}
-		} else {
-			// arg referenced in SQL but not supplied — keep the raw token and report it
-			if !slices.Contains(missedArgs, argName) {
-				missedArgs = append(missedArgs, argName)
-			}
-
-			sb.WriteString(rawArg)
-		}
-
-		// copy trailing punctuation that belongs to the full match (e.g. closing paren, comma)
-		sb.WriteString(sqlStr[argEnd:fullEnd])
-
-		lastIndex = fullEnd
+	// fill phase: build argsArr from args using cached argOrder
+	var argsSlice []any
+	if len(pq.argOrder) > 0 {
+		argsSlice = make([]any, len(pq.argOrder))
 	}
 
-	// copy the remainder of the SQL after the last match
-	sb.WriteString(sqlStr[lastIndex:])
+	var missedArgs []string
+
+	for i, name := range pq.argOrder {
+		if val, ok := args[name]; ok {
+			argsSlice[i] = val
+		} else if !slices.Contains(missedArgs, name) {
+			missedArgs = append(missedArgs, name)
+		}
+	}
 
 	if len(missedArgs) > 0 {
 		return "", nil, fmt.Errorf("%w: [%s]", ErrMissedArgument, strings.Join(missedArgs, ", "))
 	}
 
 	// args supplied by the caller but never referenced in the SQL
-	if len(seenArgs) < len(args) {
+	if len(args) > len(pq.referencedArgs) {
 		var diff []string
 
 		for k := range args {
-			if _, ok := seenArgs[k]; !ok {
+			if _, ok := pq.referencedArgs[k]; !ok {
 				diff = append(diff, k)
 			}
 		}
 
 		sort.Strings(diff)
 
-		return sb.String(), resultArgs, fmt.Errorf(
+		return pq.processedSQL, argsSlice, fmt.Errorf(
 			"%w: [%s]",
 			ErrExtraArgument,
 			strings.Join(diff, ", "),
 		)
 	}
 
-	return sb.String(), resultArgs, nil
+	return pq.processedSQL, argsSlice, nil
 }
