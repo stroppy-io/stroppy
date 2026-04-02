@@ -29,6 +29,8 @@ func (mysqlDialect) Convert(val any) (any, error) {
 		return v, nil
 	case decimal.Decimal:
 		return v.String(), nil
+	case *decimal.Decimal:
+		return v.String(), nil
 	default:
 		return v, nil
 	}

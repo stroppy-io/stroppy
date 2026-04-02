@@ -1,7 +1,10 @@
 package xk6air
 
 import (
+	"time"
+
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -52,6 +55,12 @@ func (g *GeneratorWrapper) Next() any {
 func toJSValue(v any) any {
 	switch typed := v.(type) {
 	case uuid.UUID:
+		return typed.String()
+	case *string:
+		return *typed
+	case *time.Time:
+		return *typed
+	case *decimal.Decimal:
 		return typed.String()
 	case []any:
 		results := make([]any, len(typed))

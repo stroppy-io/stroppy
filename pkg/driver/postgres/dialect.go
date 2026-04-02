@@ -33,8 +33,12 @@ func (PgxDialect) Convert(val any) (any, error) {
 		return &pgtype.UUID{Valid: true, Bytes: v}, nil
 	case time.Time:
 		return &pgtype.Timestamptz{Valid: true, Time: v}, nil
+	case *time.Time:
+		return &pgtype.Timestamptz{Valid: true, Time: *v}, nil
 	case decimal.Decimal:
 		return pgxdecimal.Decimal(v), nil
+	case *decimal.Decimal:
+		return pgxdecimal.Decimal(*v), nil
 	default:
 		return v, nil
 	}

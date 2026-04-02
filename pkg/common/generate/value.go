@@ -67,8 +67,11 @@ func NewTupleGenerator(
 		return nil
 	}
 
+	// Pre-allocate once; safe to reuse because GenParamValues iterates and drains
+	// the slice immediately before the next Next() call overwrites it.
+	vals := make([]any, count)
+
 	emit := func() []any {
-		vals := make([]any, count)
 		for i, s := range state {
 			vals[i] = s.val
 		}
@@ -237,7 +240,7 @@ func NewValueGeneratorByRule(
 		generator = newConstValueGenerator(boolToUint8(rule.GetBoolConst()), uint8ToBoolValue)
 	case *stroppy.Generation_Rule_StringRange:
 		strRange := rule.GetStringRange()
-		generator = newRangeGenerator(
+		generator = newSlottedRangeGenerator(
 			randstr.NewStringGenerator(
 				seed,
 				distribution.NewDistributionGenerator[uint64](
@@ -250,10 +253,9 @@ func NewValueGeneratorByRule(
 				alphabetToChars(strRange.GetAlphabet()),
 				strRange.GetMaxLen(),
 			),
-			stringToValue,
 		)
 	case *stroppy.Generation_Rule_StringConst:
-		generator = newConstValueGenerator(rule.GetStringConst(), stringToValue)
+		generator = newSlottedConstGenerator(rule.GetStringConst())
 	case *stroppy.Generation_Rule_DatetimeRange:
 		var err error
 
@@ -267,7 +269,7 @@ func NewValueGeneratorByRule(
 			return nil, err
 		}
 	case *stroppy.Generation_Rule_DatetimeConst:
-		generator = newConstValueGenerator(dateTimePtrToTime(rule.GetDatetimeConst()), dateTimeToValue)
+		generator = newSlottedConstGenerator(dateTimePtrToTime(rule.GetDatetimeConst()))
 	case *stroppy.Generation_Rule_UuidRandom:
 		generator = newUUIDGenerator(nil)
 	case *stroppy.Generation_Rule_UuidConst:
@@ -294,7 +296,7 @@ func NewValueGeneratorByRule(
 			return nil, err
 		}
 	case *stroppy.Generation_Rule_DecimalConst:
-		generator = newConstValueGenerator(decimalPtrToDecimal(rule.GetDecimalConst()), decimalToValue)
+		generator = newSlottedConstGenerator(decimalPtrToDecimal(rule.GetDecimalConst()))
 	default:
 		return nil, fmt.Errorf("unknown rule type: %T, %v", rule, rule) //nolint: err113
 	}
@@ -340,7 +342,7 @@ func newDateTimeGenerator(
 	btu := intRange[1].Unix()
 	diff := btu - atu
 
-	return newRangeGenerator(
+	return newSlottedRangeGenerator(
 		primitive.NewGenerator(
 			distribution.NewDistributionGenerator[int64](
 				distributeParams,
@@ -353,7 +355,6 @@ func newDateTimeGenerator(
 				return time.Unix(d+atu, 0)
 			},
 		),
-		dateTimeToValue,
 	), nil
 }
 
@@ -468,7 +469,7 @@ func newDecimalGenerator(
 		decRanges[1] = maxDec
 	}
 
-	return newRangeGenerator(
+	return newSlottedRangeGenerator(
 		primitive.NewGenerator(
 			distribution.NewDistributionGenerator[float64](
 				distributeParams,
@@ -479,6 +480,5 @@ func newDecimalGenerator(
 			),
 			decimal.NewFromFloat,
 		),
-		decimalToValue,
 	), nil
 }
