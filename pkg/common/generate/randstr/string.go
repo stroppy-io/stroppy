@@ -4,11 +4,11 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 )
 
-type StringGenerator struct {
-	cutter Cutter
+type StringGenerator[T Tape] struct {
+	cutter WordCutter[T]
 }
 
-func (sg *StringGenerator) Next() string {
+func (sg *StringGenerator[T]) Next() string {
 	return sg.cutter.Cut()
 }
 
@@ -19,12 +19,12 @@ func NewStringGenerator(
 	lenDist distribution.Distribution[uint64],
 	chars [][2]int32,
 	wordLength uint64,
-) *StringGenerator {
+) *StringGenerator[*CharTape] {
 	if len(chars) == 0 {
 		chars = DefaultEnglishAlphabet
 	}
 
-	return &StringGenerator{
+	return &StringGenerator[*CharTape]{
 		cutter: NewWordCutter(lenDist, wordLength, NewCharTape(seed, chars)),
 	}
 }

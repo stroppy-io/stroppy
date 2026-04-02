@@ -87,8 +87,8 @@ func TestWordCutter_Cut(t *testing.T) {
 		t.Errorf("expected 'abc', got %q", word)
 	}
 
-	if wc.sb.Len() != 0 {
-		t.Error("string builder should be reset after cut")
+	if len(wc.buf) != 0 {
+		t.Error("buf should be reset after cut")
 	}
 }
 
