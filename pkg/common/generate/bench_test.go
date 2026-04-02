@@ -15,10 +15,12 @@ func BenchmarkGenerator_Int32(b *testing.B) {
 			Int32Range: &pb.Generation_Range_Int32{Max: 1_000_000},
 		},
 	})
+
 	b.ReportAllocs()
 	b.ResetTimer()
+
 	for b.Loop() {
-		gen.Next() //nolint:errcheck
+		_, _ = gen.Next()
 	}
 }
 
@@ -28,10 +30,12 @@ func BenchmarkGenerator_Float32(b *testing.B) {
 			FloatRange: &pb.Generation_Range_Float{Max: 1_000_000},
 		},
 	})
+
 	b.ReportAllocs()
 	b.ResetTimer()
+
 	for b.Loop() {
-		gen.Next() //nolint:errcheck
+		_, _ = gen.Next()
 	}
 }
 
@@ -41,10 +45,12 @@ func BenchmarkGenerator_Int64(b *testing.B) {
 			Int64Range: &pb.Generation_Range_Int64{Max: 1_000_000},
 		},
 	})
+
 	b.ReportAllocs()
 	b.ResetTimer()
+
 	for b.Loop() {
-		gen.Next() //nolint:errcheck
+		_, _ = gen.Next()
 	}
 }
 
@@ -54,10 +60,12 @@ func BenchmarkGenerator_String(b *testing.B) {
 			StringRange: &pb.Generation_Range_String{MaxLen: 20},
 		},
 	})
+
 	b.ReportAllocs()
 	b.ResetTimer()
+
 	for b.Loop() {
-		gen.Next() //nolint:errcheck
+		_, _ = gen.Next()
 	}
 }
 
@@ -74,10 +82,12 @@ func BenchmarkGenerator_DateTime(b *testing.B) {
 			},
 		},
 	})
+
 	b.ReportAllocs()
 	b.ResetTimer()
+
 	for b.Loop() {
-		gen.Next() //nolint:errcheck
+		_, _ = gen.Next()
 	}
 }
 
@@ -91,9 +101,11 @@ func BenchmarkGenerator_Decimal(b *testing.B) {
 			},
 		},
 	})
+
 	b.ReportAllocs()
 	b.ResetTimer()
+
 	for b.Loop() {
-		gen.Next() //nolint:errcheck
+		_, _ = gen.Next()
 	}
 }

@@ -64,15 +64,18 @@ func newRangeGenerator[T primitive.Primitive](
 // of how large T is. Callers must not hold the pointer past the next Next() call.
 func newSlottedRangeGenerator[T any, G interface{ Next() T }](gen G) ValueGenerator {
 	var slot T
+
 	return valueGeneratorFn(func() (any, error) {
 		slot = gen.Next()
+
 		return &slot, nil
 	})
 }
 
-// newSlottedConstGenerator is the constant analogue of newSlottedRangeGenerator.
+// newSlottedConstGenerator is the constant analog of newSlottedRangeGenerator.
 func newSlottedConstGenerator[T any](constant T) ValueGenerator {
 	slot := constant
+
 	return valueGeneratorFn(func() (any, error) {
 		return &slot, nil
 	})
@@ -101,13 +104,13 @@ func (r rangeWrapper[T]) GetMax() T {
 // Go uses convT32 for sub-word scalars, which calls mallocgc(4, ...) on every interface boxing.
 // Casting to float64/int64/uint64 (word-sized) stores the value directly in the interface data
 // word without allocation. Dialects accept the wider type via pgx's implicit narrowing.
-func float32ToValue(f float32) (any, error)         { return float64(f), nil }
-func float64ToValue(f float64) (any, error)         { return f, nil }
-func uint8ToBoolValue(b uint8) (any, error)         { return b == 1, nil }
-func uint32ToValue(i uint32) (any, error)           { return uint64(i), nil }
-func uint64ToValue(i uint64) (any, error)           { return i, nil }
-func int32ToValue(i int32) (any, error)             { return int64(i), nil }
-func int64ToValue(i int64) (any, error)             { return i, nil }
+func float32ToValue(f float32) (any, error) { return float64(f), nil }
+func float64ToValue(f float64) (any, error) { return f, nil }
+func uint8ToBoolValue(b uint8) (any, error) { return b == 1, nil }
+func uint32ToValue(i uint32) (any, error)   { return uint64(i), nil }
+func uint64ToValue(i uint64) (any, error)   { return i, nil }
+func int32ToValue(i int32) (any, error)     { return int64(i), nil }
+func int64ToValue(i int64) (any, error)     { return i, nil }
 
 func boolToUint8(boolean bool) uint8 {
 	val := uint8(0)

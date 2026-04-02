@@ -13,7 +13,11 @@ type WordCutter[T Tape] struct {
 	buf                 []byte
 }
 
-func NewWordCutter[T Tape](wordLengthGenerator distribution.Distribution[uint64], wordLength uint64, charGenerator T) WordCutter[T] {
+func NewWordCutter[T Tape](
+	wordLengthGenerator distribution.Distribution[uint64],
+	wordLength uint64,
+	charGenerator T,
+) WordCutter[T] {
 	return WordCutter[T]{
 		wordLengthGenerator: wordLengthGenerator,
 		charGenerator:       charGenerator,

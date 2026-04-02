@@ -21,7 +21,7 @@ func BenchmarkProcessArgs(b *testing.B) {
 	dialect := testDialect{}
 
 	// warm up cache on first call
-	_, _, _ = ProcessArgs(dialect, benchSQL, benchArgs)
+	_, _, _ = ProcessArgs(dialect, benchSQL, benchArgs) //nolint:dogsled // all return values discarded intentionally
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -33,7 +33,7 @@ func BenchmarkProcessArgs(b *testing.B) {
 
 func BenchmarkProcessArgs_Parallel(b *testing.B) {
 	dialect := testDialect{}
-	_, _, _ = ProcessArgs(dialect, benchSQL, benchArgs)
+	_, _, _ = ProcessArgs(dialect, benchSQL, benchArgs) //nolint:dogsled // all return values discarded intentionally
 
 	b.ReportAllocs()
 	b.ResetTimer()

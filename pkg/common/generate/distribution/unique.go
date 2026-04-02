@@ -18,10 +18,10 @@ func NewUniqueDistribution[T constraint.Number](ranges [2]T) *UniqueNumberGenera
 }
 
 func (ug *UniqueNumberGenerator[T]) Next() T {
-	max := uint64(ug.ranges[1] - ug.ranges[0])
+	rangeMax := uint64(ug.ranges[1] - ug.ranges[0])
 	offset := ug.counter.Add(1) - 1
 
-	if offset > max {
+	if offset > rangeMax {
 		return ug.ranges[1]
 	}
 

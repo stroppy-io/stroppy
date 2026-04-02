@@ -37,7 +37,7 @@ func (PgxDialect) Placeholder(index int) string {
 }
 
 func (PgxDialect) Convert(val any) (any, error) {
-	switch v := val.(type) {
+	switch v := val.(type) { //nolint:varnamelen // switch type assertion idiom
 	case nil:
 		return nil, nil //nolint:nilnil // allow to set nil in db
 	case uuid.UUID:

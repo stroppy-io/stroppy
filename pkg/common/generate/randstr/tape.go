@@ -6,6 +6,8 @@ import (
 	r "math/rand/v2"
 )
 
+const maxByteCodePoint = 256
+
 type Tape interface {
 	Next() rune
 }
@@ -47,14 +49,14 @@ func NewCharTape(seed uint64, chars [][2]int32) *CharTape {
 
 	for _, rng := range chars {
 		total += int(rng[1] - rng[0])
-		if rng[1] > 256 {
+		if rng[1] > maxByteCodePoint {
 			isByte = false
 		}
 	}
 
 	pow2 := nextPow2(total)
-	mask := uint64(pow2 - 1)
-	bitsPerSel := uint(bits.Len(uint(pow2) - 1)) // log2(pow2); 0 when pow2==1
+	mask := uint64(pow2 - 1)                     //nolint:gosec // pow2 is always a positive power of two, no overflow
+	bitsPerSel := uint(bits.Len(uint(pow2) - 1)) //nolint:gosec // pow2 is always a positive power of two, no overflow
 
 	ct := &CharTape{
 		generator:  r.New(r.NewPCG(seed, seed)), //nolint:gosec // allow
@@ -88,22 +90,22 @@ func (t *CharTape) Next() rune {
 	return t.tableR[idx]
 }
 
-// nextPow2 returns the smallest power of two ≥ n (minimum 1).
-func nextPow2(n int) int {
-	if n <= 1 {
+// nextPow2 returns the smallest power of two ≥ size (minimum 1).
+func nextPow2(size int) int {
+	if size <= 1 {
 		return 1
 	}
 
-	n--
-	n |= n >> 1
-	n |= n >> 2
-	n |= n >> 4
-	n |= n >> 8
-	n |= n >> 16
-	n |= n >> 32
-	n++
+	size--
+	size |= size >> 1
+	size |= size >> 2  //nolint:mnd // standard bit-smearing sequence for next power of two
+	size |= size >> 4  //nolint:mnd // standard bit-smearing sequence for next power of two
+	size |= size >> 8  //nolint:mnd // standard bit-smearing sequence for next power of two
+	size |= size >> 16 //nolint:mnd // standard bit-smearing sequence for next power of two
+	size |= size >> 32 //nolint:mnd // standard bit-smearing sequence for next power of two
+	size++
 
-	return n
+	return size
 }
 
 func buildByteTable(chars [][2]int32, alphabetSize, tableSize int) []byte {
@@ -129,7 +131,7 @@ func buildRuneTable(chars [][2]int32, alphabetSize, tableSize int) []rune {
 
 	for _, rng := range chars {
 		for c := rng[0]; c < rng[1]; c++ {
-			alphabet = append(alphabet, rune(c))
+			alphabet = append(alphabet, c)
 		}
 	}
 

@@ -17,7 +17,7 @@ type naiveCharTape struct {
 
 func newNaiveCharTape(seed uint64, chars [][2]int32) *naiveCharTape {
 	return &naiveCharTape{
-		generator: r.New(r.NewPCG(seed, seed)), //nolint:gosec
+		generator: r.New(r.NewPCG(seed, seed)), //nolint:gosec // test seed, weak randomness acceptable
 		chars:     chars,
 	}
 }
@@ -30,7 +30,7 @@ func (t *naiveCharTape) Next() rune {
 	return t.generator.Int32N(maxVal-minVal) + minVal
 }
 
-// TestCharTape_SimilarityToNaive checks that the optimised CharTape produces
+// TestCharTape_SimilarityToNaive checks that the optimized CharTape produces
 // characters only from the correct alphabet and that its frequency distribution
 // stays within documented bounds compared to the naive reference.
 //
@@ -142,7 +142,7 @@ func buildAlphabetSet(chars [][2]int32) map[rune]struct{} {
 
 	for _, rng := range chars {
 		for c := rng[0]; c < rng[1]; c++ {
-			m[rune(c)] = struct{}{}
+			m[c] = struct{}{}
 		}
 	}
 

@@ -20,7 +20,7 @@ func (ydbDialect) Placeholder(_ int) string { return "?" }
 func (ydbDialect) Deduplicate() bool        { return false }
 
 func (ydbDialect) Convert(val any) (any, error) {
-	switch v := val.(type) {
+	switch v := val.(type) { //nolint:varnamelen // switch type assertion idiom
 	case nil:
 		return nil, nil //nolint:nilnil // allow to set nil in db
 	case uuid.UUID:

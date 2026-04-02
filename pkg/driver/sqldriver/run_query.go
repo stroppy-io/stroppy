@@ -51,7 +51,7 @@ func lookupOrParse(dialect queries.Dialect, sqlStr string) *parsedQuery {
 	key := dialect.Placeholder(0) + "|" + sqlStr
 
 	if v, ok := sqlCache.Load(key); ok {
-		return v.(*parsedQuery)
+		return v.(*parsedQuery) //nolint:errcheck,forcetypeassert // map stores only *parsedQuery values
 	}
 
 	pq := parseQueryTemplate(dialect, sqlStr)
@@ -98,6 +98,7 @@ func parseQueryTemplate(dialect queries.Dialect, sqlStr string) *parsedQuery {
 		}
 
 		referencedArgs[argName] = struct{}{}
+
 		sb.WriteString(sqlStr[argEnd:fullEnd])
 		lastIndex = fullEnd
 	}
