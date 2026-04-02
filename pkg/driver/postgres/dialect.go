@@ -3,6 +3,7 @@ package postgres
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,14 +22,32 @@ var ErrUnsupportedType = errors.New("unsupported value type")
 // PgxDialect implements sqlqueries.Dialect for PostgreSQL via pgx.
 type PgxDialect struct{}
 
-var pgxPlaceholderCache []string
+var (
+	pgxPlaceholderCache []string
+	pgxPlaceholderMu    sync.RWMutex
+)
 
 func (PgxDialect) Placeholder(index int) string {
+	pgxPlaceholderMu.RLock()
+
+	if index < len(pgxPlaceholderCache) {
+		s := pgxPlaceholderCache[index]
+
+		pgxPlaceholderMu.RUnlock()
+
+		return s
+	}
+
+	pgxPlaceholderMu.RUnlock()
+
+	pgxPlaceholderMu.Lock()
+	defer pgxPlaceholderMu.Unlock()
+
+	// Re-check after acquiring write lock.
 	if index < len(pgxPlaceholderCache) {
 		return pgxPlaceholderCache[index]
 	}
 
-	// Extend slice to fit the new index
 	for i := len(pgxPlaceholderCache); i <= index; i++ {
 		pgxPlaceholderCache = append(pgxPlaceholderCache, fmt.Sprintf("$%d", i+1))
 	}

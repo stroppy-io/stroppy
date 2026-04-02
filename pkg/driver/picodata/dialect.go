@@ -3,6 +3,7 @@ package picodata
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,14 +22,32 @@ var ErrUnsupportedType = errors.New("unsupported value type")
 // PicoDialect implements sqlqueries.Dialect for Picodata via pgx.
 type PicoDialect struct{}
 
-var picoPlaceholderCache []string
+var (
+	picoPlaceholderCache []string
+	picoPlaceholderMu    sync.RWMutex
+)
 
 func (PicoDialect) Placeholder(index int) string {
+	picoPlaceholderMu.RLock()
+
+	if index < len(picoPlaceholderCache) {
+		s := picoPlaceholderCache[index]
+
+		picoPlaceholderMu.RUnlock()
+
+		return s
+	}
+
+	picoPlaceholderMu.RUnlock()
+
+	picoPlaceholderMu.Lock()
+	defer picoPlaceholderMu.Unlock()
+
+	// Re-check after acquiring write lock.
 	if index < len(picoPlaceholderCache) {
 		return picoPlaceholderCache[index]
 	}
 
-	// Extend slice to fit the new index
 	for i := len(picoPlaceholderCache); i <= index; i++ {
 		picoPlaceholderCache = append(picoPlaceholderCache, fmt.Sprintf("$%d", i+1))
 	}
