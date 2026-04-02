@@ -38,85 +38,81 @@ func NewTupleGenerator(
 		return valueGeneratorFn(func() (*stroppy.Value, error) { return nil, ErrNoGenerators })
 	}
 
-	// Result type to send both value and error through channel
-	type result struct {
-		vals []*stroppy.Value
-		err  error
+	n := len(genInfos)
+
+	type depthState struct {
+		gen ValueGenerator
+		val *stroppy.Value
 	}
 
-	// Create buffered channel for results
-	resultCh := make(chan result, 1)
+	state := make([]depthState, n)
+	started := false
+	done := false
 
-	// Start goroutine to generate cartesian product
-	go func() {
-		defer close(resultCh)
-
-		// Recursive function to iterate through all combinations
-		var iterate func(depth int, current []*stroppy.Value) bool
-
-		iterate = func(depth int, current []*stroppy.Value) bool {
-			if depth == len(genInfos) {
-				res := make([]*stroppy.Value, len(current))
-				copy(res, current)
-
-				resultCh <- result{vals: res, err: nil}
-
-				return true
-			}
-
-			gen, err := NewValueGenerator(seed, genInfos[depth])
+	resetFrom := func(from int) error {
+		for d := from; d < n; d++ {
+			gen, err := NewValueGenerator(seed, genInfos[d])
 			if err != nil {
-				resultCh <- result{vals: nil, err: err}
-
-				return false
+				return err
 			}
 
 			val, err := gen.Next()
 			if err != nil {
-				resultCh <- result{vals: nil, err: err}
-
-				return false
+				return err
 			}
 
-			for {
-				current[depth] = val
-				if !iterate(depth+1, current) {
-					return false
-				}
-
-				newVal, err := gen.Next()
-				if err != nil {
-					resultCh <- result{vals: nil, err: err}
-
-					return false
-				}
-
-				if proto.Equal(val, newVal) {
-					return true
-				}
-
-				val = newVal
-			}
+			state[d] = depthState{gen, val}
 		}
 
-		iterate(0, make([]*stroppy.Value, len(genInfos)))
-	}()
+		return nil
+	}
 
-	// Return function that reads from channel
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
-		res, ok := <-resultCh
-		if !ok {
-			// Channel closed, no more values
-			return nil, nil
-		}
-
-		if res.err != nil {
-			return nil, res.err
+	emit := func() *stroppy.Value {
+		vals := make([]*stroppy.Value, n)
+		for i, s := range state {
+			vals[i] = s.val
 		}
 
 		return &stroppy.Value{
-			Type: &stroppy.Value_List_{List: &stroppy.Value_List{Values: res.vals}},
-		}, nil
+			Type: &stroppy.Value_List_{List: &stroppy.Value_List{Values: vals}},
+		}
+	}
+
+	return valueGeneratorFn(func() (*stroppy.Value, error) {
+		if done {
+			return nil, nil
+		}
+
+		if !started {
+			started = true
+
+			if err := resetFrom(0); err != nil {
+				return nil, err
+			}
+
+			return emit(), nil
+		}
+
+		for depth := n - 1; depth >= 0; depth-- {
+			newVal, err := state[depth].gen.Next()
+			if err != nil {
+				return nil, err
+			}
+
+			if !proto.Equal(newVal, state[depth].val) {
+				state[depth].val = newVal
+
+				if err := resetFrom(depth + 1); err != nil {
+					return nil, err
+				}
+
+				return emit(), nil
+			}
+		}
+
+		done = true
+
+		return nil, nil
 	})
 }
 

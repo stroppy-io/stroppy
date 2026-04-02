@@ -8,30 +8,22 @@ import (
 
 type UniqueNumberGenerator[T constraint.Number] struct {
 	ranges  [2]T
-	current *atomic.Pointer[T]
+	counter atomic.Uint64
 }
 
 func NewUniqueDistribution[T constraint.Number](ranges [2]T) *UniqueNumberGenerator[T] {
-	ptr := atomic.Pointer[T]{}
-	ptr.Store(&ranges[0])
-
 	return &UniqueNumberGenerator[T]{
-		ranges:  ranges,
-		current: &ptr,
+		ranges: ranges,
 	}
 }
 
 func (ug *UniqueNumberGenerator[T]) Next() T {
-	cr := ug.current.Load()
-	crVal := *cr
+	max := uint64(ug.ranges[1] - ug.ranges[0])
+	offset := ug.counter.Add(1) - 1
 
-	if crVal >= ug.ranges[1] {
+	if offset > max {
 		return ug.ranges[1]
 	}
 
-	newVal := crVal + 1
-
-	ug.current.CompareAndSwap(cr, &newVal)
-
-	return crVal
+	return ug.ranges[0] + T(offset)
 }

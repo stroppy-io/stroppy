@@ -1,6 +1,7 @@
 package distribution
 
 import (
+	"sync"
 	"testing"
 )
 
@@ -78,4 +79,36 @@ func TestUniqueNumberGenerator_Int64(t *testing.T) {
 			t.Errorf("Expected %d, got %d", exp, got)
 		}
 	}
+}
+
+func TestUniqueNumberGenerator_Concurrent(t *testing.T) {
+	const (
+		n          = 1024
+		goroutines = 32
+		perG       = n / goroutines
+	)
+
+	gen := NewUniqueDistribution[int64]([2]int64{0, n - 1})
+
+	var (
+		seen sync.Map
+		wg   sync.WaitGroup
+	)
+
+	wg.Add(goroutines)
+
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+
+			for range perG {
+				v := gen.Next()
+				if _, dup := seen.LoadOrStore(v, struct{}{}); dup {
+					t.Errorf("duplicate value: %d", v)
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
 }
