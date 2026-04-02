@@ -2,7 +2,6 @@ package queries
 
 import (
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 type (
@@ -17,8 +16,8 @@ type Dialect interface {
 	// For MySQL: "?", "?", ...
 	Placeholder(index int) string
 
-	// ValueToAny converts a proto Value to a Go type suitable for the target database.
-	ValueToAny(v *stroppy.Value) (any, error)
+	// Convert converts a native Go value to a Go type suitable for the target database.
+	Convert(v any) (any, error)
 
 	// Deduplicate reports whether repeated named parameters should share
 	// a single positional placeholder and a single value in the args slice.

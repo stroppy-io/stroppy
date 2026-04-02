@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand/v2"
+	"reflect"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
@@ -19,7 +19,7 @@ import (
 )
 
 type ValueGenerator interface {
-	Next() (*stroppy.Value, error)
+	Next() (any, error)
 }
 
 type GenAbleStruct interface {
@@ -35,23 +35,23 @@ func NewTupleGenerator(
 	genInfos []GenAbleStruct,
 ) ValueGenerator { //nolint:revive // revive is annoying to use
 	if len(genInfos) == 0 {
-		return valueGeneratorFn(func() (*stroppy.Value, error) { return nil, ErrNoGenerators })
+		return valueGeneratorFn(func() (any, error) { return nil, ErrNoGenerators })
 	}
 
-	n := len(genInfos)
+	count := len(genInfos)
 
 	type depthState struct {
 		gen ValueGenerator
-		val *stroppy.Value
+		val any
 	}
 
-	state := make([]depthState, n)
+	state := make([]depthState, count)
 	started := false
 	done := false
 
 	resetFrom := func(from int) error {
-		for d := from; d < n; d++ {
-			gen, err := NewValueGenerator(seed, genInfos[d])
+		for idx := from; idx < count; idx++ {
+			gen, err := NewValueGenerator(seed, genInfos[idx])
 			if err != nil {
 				return err
 			}
@@ -61,24 +61,22 @@ func NewTupleGenerator(
 				return err
 			}
 
-			state[d] = depthState{gen, val}
+			state[idx] = depthState{gen, val}
 		}
 
 		return nil
 	}
 
-	emit := func() *stroppy.Value {
-		vals := make([]*stroppy.Value, n)
+	emit := func() []any {
+		vals := make([]any, count)
 		for i, s := range state {
 			vals[i] = s.val
 		}
 
-		return &stroppy.Value{
-			Type: &stroppy.Value_List_{List: &stroppy.Value_List{Values: vals}},
-		}
+		return vals
 	}
 
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		if done {
 			return nil, nil
 		}
@@ -93,13 +91,13 @@ func NewTupleGenerator(
 			return emit(), nil
 		}
 
-		for depth := n - 1; depth >= 0; depth-- {
+		for depth := count - 1; depth >= 0; depth-- {
 			newVal, err := state[depth].gen.Next()
 			if err != nil {
 				return nil, err
 			}
 
-			if !proto.Equal(newVal, state[depth].val) {
+			if !reflect.DeepEqual(newVal, state[depth].val) {
 				state[depth].val = newVal
 
 				if err := resetFrom(depth + 1); err != nil {
@@ -365,15 +363,13 @@ func newUUIDSeededGenerator(seed uint64) ValueGenerator {
 	binary.LittleEndian.PutUint64(byteSlice[:8], seed)
 	prng := rand.NewChaCha8(byteSlice)
 
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		uid, err := uuid.NewRandomFromReader(prng)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate seeded uuid: %w", err)
 		}
 
-		return &stroppy.Value{
-			Type: &stroppy.Value_Uuid{Uuid: &stroppy.Uuid{Value: uid.String()}},
-		}, nil
+		return uid, nil
 	})
 }
 
@@ -400,7 +396,7 @@ func newUUIDSequentialGenerator(
 	end := new(big.Int).SetBytes(maxUID[:])
 	one := big.NewInt(1)
 
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		b := current.Bytes()
 
 		var uid [16]byte
@@ -410,41 +406,35 @@ func newUUIDSequentialGenerator(
 		if current.Cmp(end) > 0 {
 			// at the end should return same value, this semantic used by [NewTupleGenerator]
 			// silly, but works for now
-			return &stroppy.Value{
-				Type: &stroppy.Value_Uuid{Uuid: &stroppy.Uuid{Value: uuid.UUID(uid).String()}},
-			}, nil
+			return uuid.UUID(uid), nil
 		}
 
 		current.Add(current, one)
 
-		return &stroppy.Value{
-			Type: &stroppy.Value_Uuid{Uuid: &stroppy.Uuid{Value: uuid.UUID(uid).String()}},
-		}, nil
+		return uuid.UUID(uid), nil
 	}), nil
 }
 
 func newUUIDGenerator(constant *stroppy.Uuid) ValueGenerator {
 	if constant != nil {
-		return valueGeneratorFn(func() (*stroppy.Value, error) {
-			return &stroppy.Value{
-				Type: &stroppy.Value_Uuid{
-					Uuid: &stroppy.Uuid{Value: constant.GetValue()},
-				},
-			}, nil
+		uid, err := uuid.Parse(constant.GetValue())
+
+		return valueGeneratorFn(func() (any, error) {
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse const uuid: %w", err)
+			}
+
+			return uid, nil
 		})
 	}
 
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		uid, err := uuid.NewRandom()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate uuid: %w", err)
 		}
 
-		return &stroppy.Value{
-			Type: &stroppy.Value_Uuid{
-				Uuid: &stroppy.Uuid{Value: uid.String()},
-			},
-		}, nil
+		return uid, nil
 	})
 }
 

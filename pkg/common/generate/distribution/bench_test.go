@@ -4,6 +4,7 @@ import "testing"
 
 func BenchmarkUniformDistribution_Next_Float(b *testing.B) {
 	ud := NewUniformDistribution(42, [2]float64{0, 1_000_000}, false, 0)
+
 	b.ReportAllocs()
 	b.ResetTimer()
 
@@ -14,6 +15,7 @@ func BenchmarkUniformDistribution_Next_Float(b *testing.B) {
 
 func BenchmarkUniformDistribution_Next_Round(b *testing.B) {
 	ud := NewUniformDistribution(42, [2]int64{0, 1_000_000}, true, 0)
+
 	b.ReportAllocs()
 	b.ResetTimer()
 
@@ -24,6 +26,7 @@ func BenchmarkUniformDistribution_Next_Round(b *testing.B) {
 
 func BenchmarkUniqueNumberGenerator_Next(b *testing.B) {
 	gen := NewUniqueDistribution[int64]([2]int64{0, 1 << 50})
+
 	b.ReportAllocs()
 	b.ResetTimer()
 
@@ -34,6 +37,7 @@ func BenchmarkUniqueNumberGenerator_Next(b *testing.B) {
 
 func BenchmarkUniqueNumberGenerator_Next_Parallel(b *testing.B) {
 	gen := NewUniqueDistribution[int64]([2]int64{0, 1 << 60})
+
 	b.ReportAllocs()
 	b.ResetTimer()
 

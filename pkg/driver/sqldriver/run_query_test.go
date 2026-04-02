@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 )
 
@@ -14,8 +13,8 @@ var _ queries.Dialect = testDialect{}
 type testDialect struct{}
 
 func (testDialect) Placeholder(_ int) string { return "?" }
-func (testDialect) ValueToAny(_ *stroppy.Value) (any, error) {
-	return nil, nil //nolint:nilnil // test stub
+func (testDialect) Convert(v any) (any, error) {
+	return v, nil //nolint:nilnil // test stub
 }
 func (testDialect) Deduplicate() bool { return false }
 

@@ -1,6 +1,7 @@
 package xk6air
 
 import (
+	"github.com/google/uuid"
 	"github.com/stroppy-io/stroppy/internal/common"
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -45,46 +46,21 @@ type GeneratorWrapper struct {
 
 func (g *GeneratorWrapper) Next() any {
 	v, _ := g.generator.Next()
-	return UnwrapValue(v)
+	return toJSValue(v)
 }
 
-func UnwrapValue(v *stroppy.Value) any {
-	var result any
-	switch t := v.GetType().(type) {
-	case *stroppy.Value_Bool:
-		result = t.Bool
-	case *stroppy.Value_Datetime:
-		result = t.Datetime
-	case *stroppy.Value_Decimal:
-		result = t.Decimal
-	case *stroppy.Value_Double:
-		result = t.Double
-	case *stroppy.Value_Float:
-		result = t.Float
-	case *stroppy.Value_Int32:
-		result = t.Int32
-	case *stroppy.Value_Int64:
-		result = t.Int64
-	case *stroppy.Value_List_:
-		results := make([]any, 0, len(t.List.GetValues()))
-		for _, vv := range t.List.GetValues() {
-			results = append(results, UnwrapValue(vv))
+func toJSValue(v any) any {
+	switch typed := v.(type) {
+	case uuid.UUID:
+		return typed.String()
+	case []any:
+		results := make([]any, len(typed))
+		for i, vv := range typed {
+			results[i] = toJSValue(vv)
 		}
-		result = results
-	case *stroppy.Value_Null:
-		result = t.Null
-	case *stroppy.Value_String_:
-		result = t.String_
-	case *stroppy.Value_Struct_:
-		result = t.Struct
-	case *stroppy.Value_Uint32:
-		result = t.Uint32
-	case *stroppy.Value_Uint64:
-		result = t.Uint64
-	case *stroppy.Value_Uuid:
-		result = t.Uuid
+
+		return results
 	default:
-		panic("unexpected stroppy.isValue_Type")
+		return v
 	}
-	return result
 }

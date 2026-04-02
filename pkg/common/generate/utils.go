@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
@@ -17,11 +16,11 @@ type (
 	primitiveGenerator[T primitive.Primitive] interface {
 		Next() T
 	}
-	valueGeneratorFn                        func() (*stroppy.Value, error)
-	valueTransformer[T primitive.Primitive] func(T) (*stroppy.Value, error)
+	valueGeneratorFn                        func() (any, error)
+	valueTransformer[T primitive.Primitive] func(T) (any, error)
 )
 
-func (f valueGeneratorFn) Next() (*stroppy.Value, error) {
+func (f valueGeneratorFn) Next() (any, error) {
 	return f()
 }
 
@@ -33,9 +32,9 @@ func wrapNilQuota(
 ) ValueGenerator {
 	percent := float64(nullPercent) / Persent100
 
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		if rand.Float64() < percent { //nolint:gosec // performance in priority here (against crypto/rand)
-			return &stroppy.Value{Type: &stroppy.Value_Null{Null: stroppy.Value_NULL_VALUE}}, nil
+			return nil, nil
 		}
 
 		return gen.Next()
@@ -46,7 +45,7 @@ func newConstValueGenerator[T primitive.Primitive](
 	constant T,
 	transformer valueTransformer[T],
 ) ValueGenerator {
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		return transformer(constant)
 	})
 }
@@ -55,7 +54,7 @@ func newRangeGenerator[T primitive.Primitive](
 	distribution primitiveGenerator[T],
 	transformer valueTransformer[T],
 ) ValueGenerator {
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		return transformer(distribution.Next())
 	})
 }
@@ -79,89 +78,16 @@ func (r rangeWrapper[T]) GetMax() T {
 
 // Values conversion ---------------------------------------------------------------------------------------------------
 
-func float32ToValue(f float32) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Float{
-			Float: f,
-		},
-	}, nil
-}
-
-func float64ToValue(f float64) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Double{
-			Double: f,
-		},
-	}, nil
-}
-
-func uint8ToBoolValue(b uint8) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Bool{
-			Bool: b == 1,
-		},
-	}, nil
-}
-
-func uint32ToValue(i uint32) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Uint32{
-			Uint32: i,
-		},
-	}, nil
-}
-
-func uint64ToValue(i uint64) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Uint64{
-			Uint64: i,
-		},
-	}, nil
-}
-
-func int32ToValue(i int32) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Int32{
-			Int32: i,
-		},
-	}, nil
-}
-
-func int64ToValue(i int64) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Int64{
-			Int64: i,
-		},
-	}, nil
-}
-
-func stringToValue(s string) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_String_{
-			String_: s,
-		},
-	}, nil
-}
-
-func decimalToValue(d decimal.Decimal) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Decimal{
-			Decimal: &stroppy.Decimal{
-				Value: d.String(),
-			},
-		},
-	}, nil
-}
-
-func dateTimeToValue(t time.Time) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Datetime{
-			Datetime: &stroppy.DateTime{
-				Value: timestamppb.New(t),
-			},
-		},
-	}, nil
-}
+func float32ToValue(f float32) (any, error)         { return f, nil }
+func float64ToValue(f float64) (any, error)         { return f, nil }
+func uint8ToBoolValue(b uint8) (any, error)         { return b == 1, nil }
+func uint32ToValue(i uint32) (any, error)           { return i, nil }
+func uint64ToValue(i uint64) (any, error)           { return i, nil }
+func int32ToValue(i int32) (any, error)             { return i, nil }
+func int64ToValue(i int64) (any, error)             { return i, nil }
+func stringToValue(s string) (any, error)           { return s, nil }
+func decimalToValue(d decimal.Decimal) (any, error) { return d, nil }
+func dateTimeToValue(t time.Time) (any, error)      { return t, nil }
 
 func boolToUint8(boolean bool) uint8 {
 	val := uint8(0)
