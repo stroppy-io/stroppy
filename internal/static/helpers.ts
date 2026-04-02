@@ -525,12 +525,12 @@ export class DriverX implements QueryAPI {
       );
       insertErrRateMetric.add(0, metricTags);
       insertMetric.add(stats.elapsed.milliseconds(), metricTags);
+      console.log(`Insertion into '${descriptor.tableName}' ended in ${stats.elapsed.string()}`);
     } catch (e) {
       insertErrRateMetric.add(1, metricTags);
       handleError(this._errorMode, e, metricTags);
     }
 
-    console.log(`Insertion into '${descriptor.tableName}' ended`);
   }
 
   /** Start a transaction manually. Call tx.commit() or tx.rollback() when done. */
