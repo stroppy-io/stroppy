@@ -76,13 +76,14 @@ const errorModeMap: Record<ErrorModeName, DriverConfig_ErrorMode> = {
   abort: DriverConfig_ErrorMode.ERROR_MODE_ABORT,
 };
 
-export type DriverTypeName = "postgres" | "mysql" | "picodata" | "ydb";
+export type DriverTypeName = "postgres" | "mysql" | "picodata" | "ydb" | "noop";
 
 const driverTypeMap: Record<DriverTypeName, DriverConfig_DriverType> = {
   postgres: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
   mysql: DriverConfig_DriverType.DRIVER_TYPE_MYSQL,
   picodata: DriverConfig_DriverType.DRIVER_TYPE_PICODATA,
   ydb: DriverConfig_DriverType.DRIVER_TYPE_YDB,
+  noop: DriverConfig_DriverType.DRIVER_TYPE_NOOP,
 };
 
 const _envErrorMode = ENV("STROPPY_ERROR_MODE", undefined, 
@@ -353,6 +354,10 @@ function resolvePoolConfig(config: DriverSetup): {
   const p = config.pool;
   const driverType = config.driverType ?? "postgres";
 
+  if (driverType === "noop") {
+    return {};
+  }
+
   if (driverType === "mysql" || driverType === "ydb") {
     return {
       sql: {
@@ -520,12 +525,12 @@ export class DriverX implements QueryAPI {
       );
       insertErrRateMetric.add(0, metricTags);
       insertMetric.add(stats.elapsed.milliseconds(), metricTags);
+      console.log(`Insertion into '${descriptor.tableName}' ended in ${stats.elapsed.string()}`);
     } catch (e) {
       insertErrRateMetric.add(1, metricTags);
       handleError(this._errorMode, e, metricTags);
     }
 
-    console.log(`Insertion into '${descriptor.tableName}' ended`);
   }
 
   /** Start a transaction manually. Call tx.commit() or tx.rollback() when done. */

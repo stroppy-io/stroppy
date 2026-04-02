@@ -35,6 +35,11 @@ DRIVER PRESETS (-d / --driver)
              url=grpc://localhost:2136/local
              defaultInsertMethod=plain_bulk
 
+    noop     driverType=noop
+             url=noop://localhost
+             defaultInsertMethod=plain_bulk
+             (sink driver — no I/O, for benchmarking stroppy's own overhead)
+
   Each preset includes default credentials for local development.
   Use -D url=... to override the connection URL.
 

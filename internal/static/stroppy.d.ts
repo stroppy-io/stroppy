@@ -18,6 +18,7 @@ declare module "k6/x/stroppy" {
 
   export interface GoDuration {
     milliseconds(): number;
+    string(): string;
   }
 
   export interface QueryStats {

@@ -65,6 +65,12 @@ var driverPresets = map[string]DriverPreset{
 		DefaultInsertMethod: "plain_bulk",
 		PoolKind:            "sql",
 	},
+	"noop": {
+		DriverType:          "noop",
+		URL:                 "noop://localhost",
+		DefaultInsertMethod: "plain_bulk",
+		PoolKind:            "",
+	},
 }
 
 // LookupDriverPreset returns a preset by short name, or an error if not found.
