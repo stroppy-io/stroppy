@@ -3,75 +3,65 @@ package queries
 import (
 	"errors"
 	"fmt"
-
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 var (
-	ErrNoParamGen       = errors.New("no generator for parameter")
-	ErrUnknownParamType = errors.New("unknown parameter value type")
-	ErrNilProtoValue    = errors.New("nil proto value type for parameter")
-	ErrWrongLength      = errors.New("len(valuesOut) != len(paramsValues)")
+	ErrNoParamGen  = errors.New("no generator for parameter")
+	ErrWrongLength = errors.New("len(valuesOut) != len(paramsValues)")
 )
 
+//nolint:gocognit // inherently complex: handles both scalar and list generator output
 func GenParamValues(
 	dialect Dialect,
 	genIDs []GeneratorID,
 	generators Generators,
 	valuesOut []any,
 ) error {
-	var paramsValues []*stroppy.Value
+	idx := 0
 
 	for _, genID := range genIDs {
 		gen, ok := generators[genID]
-
 		if !ok {
 			return fmt.Errorf("%w: '%s'", ErrNoParamGen, genID)
 		}
 
-		protoValue, err := gen.Next()
+		val, err := gen.Next()
 		if err != nil {
-			return fmt.Errorf(
-				"failed to generate value for parameter '%s': %w",
-				genID,
-				err,
-			)
+			return fmt.Errorf("failed to generate value for parameter '%s': %w", genID, err)
 		}
 
-		switch actual := protoValue.GetType().(type) {
-		case nil:
-			return fmt.Errorf("%w: %s", ErrNilProtoValue, genID)
-		case *stroppy.Value_List_:
-			paramsValues = append(paramsValues, actual.List.GetValues()...)
-		case *stroppy.Value_Bool,
-			*stroppy.Value_Datetime,
-			*stroppy.Value_Decimal,
-			*stroppy.Value_Double,
-			*stroppy.Value_Float,
-			*stroppy.Value_Int32,
-			*stroppy.Value_Int64,
-			*stroppy.Value_Null,
-			*stroppy.Value_String_,
-			*stroppy.Value_Struct_,
-			*stroppy.Value_Uint32,
-			*stroppy.Value_Uint64,
-			*stroppy.Value_Uuid:
-			paramsValues = append(paramsValues, protoValue)
+		switch actual := val.(type) {
+		case []any:
+			for _, v := range actual {
+				if idx >= len(valuesOut) {
+					return fmt.Errorf("%w", ErrWrongLength)
+				}
+
+				converted, err := dialect.Convert(v)
+				if err != nil {
+					return fmt.Errorf("can't convert [%d]: %w", idx, err)
+				}
+
+				valuesOut[idx] = converted
+				idx++
+			}
 		default:
-			return fmt.Errorf("%w: '%T': value is '%v'", ErrUnknownParamType, actual, actual)
+			if idx >= len(valuesOut) {
+				return fmt.Errorf("%w", ErrWrongLength)
+			}
+
+			converted, err := dialect.Convert(val)
+			if err != nil {
+				return fmt.Errorf("can't convert [%d] = %v: %w", idx, val, err)
+			}
+
+			valuesOut[idx] = converted
+			idx++
 		}
 	}
 
-	if len(valuesOut) != len(paramsValues) {
-		return fmt.Errorf("%d != %d: %w", len(valuesOut), len(paramsValues), ErrWrongLength)
-	}
-
-	var err error
-	for i := range paramsValues {
-		valuesOut[i], err = dialect.ValueToAny(paramsValues[i])
-		if err != nil {
-			return fmt.Errorf("can't convert [%d] = %v, due to: %w", i, paramsValues, err)
-		}
+	if idx != len(valuesOut) {
+		return fmt.Errorf("%d != %d: %w", idx, len(valuesOut), ErrWrongLength)
 	}
 
 	return nil

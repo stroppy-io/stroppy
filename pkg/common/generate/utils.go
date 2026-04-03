@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate/constraint"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
@@ -17,11 +16,11 @@ type (
 	primitiveGenerator[T primitive.Primitive] interface {
 		Next() T
 	}
-	valueGeneratorFn                        func() (*stroppy.Value, error)
-	valueTransformer[T primitive.Primitive] func(T) (*stroppy.Value, error)
+	valueGeneratorFn                        func() (any, error)
+	valueTransformer[T primitive.Primitive] func(T) (any, error)
 )
 
-func (f valueGeneratorFn) Next() (*stroppy.Value, error) {
+func (f valueGeneratorFn) Next() (any, error) {
 	return f()
 }
 
@@ -33,9 +32,9 @@ func wrapNilQuota(
 ) ValueGenerator {
 	percent := float64(nullPercent) / Persent100
 
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		if rand.Float64() < percent { //nolint:gosec // performance in priority here (against crypto/rand)
-			return &stroppy.Value{Type: &stroppy.Value_Null{Null: stroppy.Value_NULL_VALUE}}, nil
+			return nil, nil
 		}
 
 		return gen.Next()
@@ -46,7 +45,7 @@ func newConstValueGenerator[T primitive.Primitive](
 	constant T,
 	transformer valueTransformer[T],
 ) ValueGenerator {
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		return transformer(constant)
 	})
 }
@@ -55,8 +54,30 @@ func newRangeGenerator[T primitive.Primitive](
 	distribution primitiveGenerator[T],
 	transformer valueTransformer[T],
 ) ValueGenerator {
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		return transformer(distribution.Next())
+	})
+}
+
+// newSlottedRangeGenerator stores the value in a closure-owned slot and returns
+// a pointer to it. *T is pointer-sized → zero-alloc interface boxing, regardless
+// of how large T is. Callers must not hold the pointer past the next Next() call.
+func newSlottedRangeGenerator[T any, G interface{ Next() T }](gen G) ValueGenerator {
+	var slot T
+
+	return valueGeneratorFn(func() (any, error) {
+		slot = gen.Next()
+
+		return &slot, nil
+	})
+}
+
+// newSlottedConstGenerator is the constant analog of newSlottedRangeGenerator.
+func newSlottedConstGenerator[T any](constant T) ValueGenerator {
+	slot := constant
+
+	return valueGeneratorFn(func() (any, error) {
+		return &slot, nil
 	})
 }
 
@@ -79,89 +100,17 @@ func (r rangeWrapper[T]) GetMax() T {
 
 // Values conversion ---------------------------------------------------------------------------------------------------
 
-func float32ToValue(f float32) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Float{
-			Float: f,
-		},
-	}, nil
-}
-
-func float64ToValue(f float64) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Double{
-			Double: f,
-		},
-	}, nil
-}
-
-func uint8ToBoolValue(b uint8) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Bool{
-			Bool: b == 1,
-		},
-	}, nil
-}
-
-func uint32ToValue(i uint32) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Uint32{
-			Uint32: i,
-		},
-	}, nil
-}
-
-func uint64ToValue(i uint64) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Uint64{
-			Uint64: i,
-		},
-	}, nil
-}
-
-func int32ToValue(i int32) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Int32{
-			Int32: i,
-		},
-	}, nil
-}
-
-func int64ToValue(i int64) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Int64{
-			Int64: i,
-		},
-	}, nil
-}
-
-func stringToValue(s string) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_String_{
-			String_: s,
-		},
-	}, nil
-}
-
-func decimalToValue(d decimal.Decimal) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Decimal{
-			Decimal: &stroppy.Decimal{
-				Value: d.String(),
-			},
-		},
-	}, nil
-}
-
-func dateTimeToValue(t time.Time) (*stroppy.Value, error) {
-	return &stroppy.Value{
-		Type: &stroppy.Value_Datetime{
-			Datetime: &stroppy.DateTime{
-				Value: timestamppb.New(t),
-			},
-		},
-	}, nil
-}
+// float32 and int32/uint32 are 4 bytes — smaller than the 8-byte pointer word on 64-bit Go.
+// Go uses convT32 for sub-word scalars, which calls mallocgc(4, ...) on every interface boxing.
+// Casting to float64/int64/uint64 (word-sized) stores the value directly in the interface data
+// word without allocation. Dialects accept the wider type via pgx's implicit narrowing.
+func float32ToValue(f float32) (any, error) { return float64(f), nil }
+func float64ToValue(f float64) (any, error) { return f, nil }
+func uint8ToBoolValue(b uint8) (any, error) { return b == 1, nil }
+func uint32ToValue(i uint32) (any, error)   { return uint64(i), nil }
+func uint64ToValue(i uint64) (any, error)   { return i, nil }
+func int32ToValue(i int32) (any, error)     { return int64(i), nil }
+func int64ToValue(i int64) (any, error)     { return i, nil }
 
 func boolToUint8(boolean bool) uint8 {
 	val := uint8(0)

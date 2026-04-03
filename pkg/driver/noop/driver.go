@@ -158,6 +158,6 @@ var _ queries.Dialect = noopDialect{}
 func (noopDialect) Placeholder(_ int) string { return "?" }
 func (noopDialect) Deduplicate() bool        { return false }
 
-func (noopDialect) ValueToAny(_ *stroppy.Value) (any, error) {
+func (noopDialect) Convert(_ any) (any, error) {
 	return nil, nil //nolint:nilnil // noop: generated values are intentionally discarded
 }

@@ -1,38 +1,42 @@
 package randstr
 
 import (
-	"strings"
+	"unicode/utf8"
+	"unsafe"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 )
 
-type Cutter interface {
-	Cut() string
-}
-
-type WordCutter struct {
+type WordCutter[T Tape] struct {
 	wordLengthGenerator distribution.Distribution[uint64]
-	charGenerator       Tape
-	sb                  strings.Builder
+	charGenerator       T
+	buf                 []byte
 }
 
-func NewWordCutter(wordLengthGenerator distribution.Distribution[uint64], _ uint64, charGenerator Tape) *WordCutter {
-	return &WordCutter{
+func NewWordCutter[T Tape](
+	wordLengthGenerator distribution.Distribution[uint64],
+	wordLength uint64,
+	charGenerator T,
+) WordCutter[T] {
+	return WordCutter[T]{
 		wordLengthGenerator: wordLengthGenerator,
 		charGenerator:       charGenerator,
-		sb:                  strings.Builder{},
+		buf:                 make([]byte, 0, wordLength*utf8.UTFMax),
 	}
 }
 
-func (c *WordCutter) Cut() string {
+// Cut generates the next random string. The returned string shares the
+// underlying buffer with the WordCutter and is valid only until the next
+// call to Cut.
+func (c *WordCutter[T]) Cut() string {
 	wordLength := c.wordLengthGenerator.Next()
-	c.sb.Grow(int(wordLength)) //nolint: gosec // allow
 
 	for range wordLength {
-		c.sb.WriteRune(c.charGenerator.Next())
+		c.buf = utf8.AppendRune(c.buf, c.charGenerator.Next())
 	}
 
-	defer c.sb.Reset()
+	s := unsafe.String(unsafe.SliceData(c.buf), len(c.buf))
+	c.buf = c.buf[:0]
 
-	return c.sb.String()
+	return s
 }

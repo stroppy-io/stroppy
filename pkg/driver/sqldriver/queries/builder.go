@@ -15,6 +15,7 @@ type QueryBuilder struct {
 	insert     *stroppy.InsertDescriptor
 	cols       []string
 	sql        string
+	genIDs     []GeneratorID
 }
 
 func NewQueryBuilder(
@@ -35,13 +36,12 @@ func NewQueryBuilder(
 		insert:     insert,
 		sql:        InsertSQL(dialect, insert),
 		cols:       InsertColumns(insert),
+		genIDs:     InsertGenIDs(insert),
 	}, nil
 }
 
 func (q *QueryBuilder) Build(valuesOut []any) error {
-	genIDs := InsertGenIDs(q.insert)
-
-	return GenParamValues(q.dialect, genIDs, q.generators, valuesOut)
+	return GenParamValues(q.dialect, q.genIDs, q.generators, valuesOut)
 }
 
 func (q *QueryBuilder) SQL() string                       { return q.sql }

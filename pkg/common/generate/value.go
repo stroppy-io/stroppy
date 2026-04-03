@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand/v2"
+	"reflect"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate/distribution"
 	"github.com/stroppy-io/stroppy/pkg/common/generate/primitive"
@@ -19,7 +19,7 @@ import (
 )
 
 type ValueGenerator interface {
-	Next() (*stroppy.Value, error)
+	Next() (any, error)
 }
 
 type GenAbleStruct interface {
@@ -35,88 +35,85 @@ func NewTupleGenerator(
 	genInfos []GenAbleStruct,
 ) ValueGenerator { //nolint:revive // revive is annoying to use
 	if len(genInfos) == 0 {
-		return valueGeneratorFn(func() (*stroppy.Value, error) { return nil, ErrNoGenerators })
+		return valueGeneratorFn(func() (any, error) { return nil, ErrNoGenerators })
 	}
 
-	// Result type to send both value and error through channel
-	type result struct {
-		vals []*stroppy.Value
-		err  error
+	count := len(genInfos)
+
+	type depthState struct {
+		gen ValueGenerator
+		val any
 	}
 
-	// Create buffered channel for results
-	resultCh := make(chan result, 1)
+	state := make([]depthState, count)
+	started := false
+	done := false
 
-	// Start goroutine to generate cartesian product
-	go func() {
-		defer close(resultCh)
-
-		// Recursive function to iterate through all combinations
-		var iterate func(depth int, current []*stroppy.Value) bool
-
-		iterate = func(depth int, current []*stroppy.Value) bool {
-			if depth == len(genInfos) {
-				res := make([]*stroppy.Value, len(current))
-				copy(res, current)
-
-				resultCh <- result{vals: res, err: nil}
-
-				return true
-			}
-
-			gen, err := NewValueGenerator(seed, genInfos[depth])
+	resetFrom := func(from int) error {
+		for idx := from; idx < count; idx++ {
+			gen, err := NewValueGenerator(seed, genInfos[idx])
 			if err != nil {
-				resultCh <- result{vals: nil, err: err}
-
-				return false
+				return err
 			}
 
 			val, err := gen.Next()
 			if err != nil {
-				resultCh <- result{vals: nil, err: err}
-
-				return false
+				return err
 			}
 
-			for {
-				current[depth] = val
-				if !iterate(depth+1, current) {
-					return false
-				}
-
-				newVal, err := gen.Next()
-				if err != nil {
-					resultCh <- result{vals: nil, err: err}
-
-					return false
-				}
-
-				if proto.Equal(val, newVal) {
-					return true
-				}
-
-				val = newVal
-			}
+			state[idx] = depthState{gen, val}
 		}
 
-		iterate(0, make([]*stroppy.Value, len(genInfos)))
-	}()
+		return nil
+	}
 
-	// Return function that reads from channel
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
-		res, ok := <-resultCh
-		if !ok {
-			// Channel closed, no more values
+	// Pre-allocate once; safe to reuse because GenParamValues iterates and drains
+	// the slice immediately before the next Next() call overwrites it.
+	vals := make([]any, count)
+
+	emit := func() []any {
+		for i, s := range state {
+			vals[i] = s.val
+		}
+
+		return vals
+	}
+
+	return valueGeneratorFn(func() (any, error) {
+		if done {
 			return nil, nil
 		}
 
-		if res.err != nil {
-			return nil, res.err
+		if !started {
+			started = true
+
+			if err := resetFrom(0); err != nil {
+				return nil, err
+			}
+
+			return emit(), nil
 		}
 
-		return &stroppy.Value{
-			Type: &stroppy.Value_List_{List: &stroppy.Value_List{Values: res.vals}},
-		}, nil
+		for depth := count - 1; depth >= 0; depth-- {
+			newVal, err := state[depth].gen.Next()
+			if err != nil {
+				return nil, err
+			}
+
+			if !reflect.DeepEqual(newVal, state[depth].val) {
+				state[depth].val = newVal
+
+				if err := resetFrom(depth + 1); err != nil {
+					return nil, err
+				}
+
+				return emit(), nil
+			}
+		}
+
+		done = true
+
+		return nil, nil
 	})
 }
 
@@ -243,7 +240,7 @@ func NewValueGeneratorByRule(
 		generator = newConstValueGenerator(boolToUint8(rule.GetBoolConst()), uint8ToBoolValue)
 	case *stroppy.Generation_Rule_StringRange:
 		strRange := rule.GetStringRange()
-		generator = newRangeGenerator(
+		generator = newSlottedRangeGenerator(
 			randstr.NewStringGenerator(
 				seed,
 				distribution.NewDistributionGenerator[uint64](
@@ -256,10 +253,9 @@ func NewValueGeneratorByRule(
 				alphabetToChars(strRange.GetAlphabet()),
 				strRange.GetMaxLen(),
 			),
-			stringToValue,
 		)
 	case *stroppy.Generation_Rule_StringConst:
-		generator = newConstValueGenerator(rule.GetStringConst(), stringToValue)
+		generator = newSlottedConstGenerator(rule.GetStringConst())
 	case *stroppy.Generation_Rule_DatetimeRange:
 		var err error
 
@@ -273,7 +269,7 @@ func NewValueGeneratorByRule(
 			return nil, err
 		}
 	case *stroppy.Generation_Rule_DatetimeConst:
-		generator = newConstValueGenerator(dateTimePtrToTime(rule.GetDatetimeConst()), dateTimeToValue)
+		generator = newSlottedConstGenerator(dateTimePtrToTime(rule.GetDatetimeConst()))
 	case *stroppy.Generation_Rule_UuidRandom:
 		generator = newUUIDGenerator(nil)
 	case *stroppy.Generation_Rule_UuidConst:
@@ -300,7 +296,7 @@ func NewValueGeneratorByRule(
 			return nil, err
 		}
 	case *stroppy.Generation_Rule_DecimalConst:
-		generator = newConstValueGenerator(decimalPtrToDecimal(rule.GetDecimalConst()), decimalToValue)
+		generator = newSlottedConstGenerator(decimalPtrToDecimal(rule.GetDecimalConst()))
 	default:
 		return nil, fmt.Errorf("unknown rule type: %T, %v", rule, rule) //nolint: err113
 	}
@@ -346,7 +342,7 @@ func newDateTimeGenerator(
 	btu := intRange[1].Unix()
 	diff := btu - atu
 
-	return newRangeGenerator(
+	return newSlottedRangeGenerator(
 		primitive.NewGenerator(
 			distribution.NewDistributionGenerator[int64](
 				distributeParams,
@@ -359,7 +355,6 @@ func newDateTimeGenerator(
 				return time.Unix(d+atu, 0)
 			},
 		),
-		dateTimeToValue,
 	), nil
 }
 
@@ -369,15 +364,13 @@ func newUUIDSeededGenerator(seed uint64) ValueGenerator {
 	binary.LittleEndian.PutUint64(byteSlice[:8], seed)
 	prng := rand.NewChaCha8(byteSlice)
 
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		uid, err := uuid.NewRandomFromReader(prng)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate seeded uuid: %w", err)
 		}
 
-		return &stroppy.Value{
-			Type: &stroppy.Value_Uuid{Uuid: &stroppy.Uuid{Value: uid.String()}},
-		}, nil
+		return uid, nil
 	})
 }
 
@@ -404,7 +397,7 @@ func newUUIDSequentialGenerator(
 	end := new(big.Int).SetBytes(maxUID[:])
 	one := big.NewInt(1)
 
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		b := current.Bytes()
 
 		var uid [16]byte
@@ -414,41 +407,35 @@ func newUUIDSequentialGenerator(
 		if current.Cmp(end) > 0 {
 			// at the end should return same value, this semantic used by [NewTupleGenerator]
 			// silly, but works for now
-			return &stroppy.Value{
-				Type: &stroppy.Value_Uuid{Uuid: &stroppy.Uuid{Value: uuid.UUID(uid).String()}},
-			}, nil
+			return uuid.UUID(uid), nil
 		}
 
 		current.Add(current, one)
 
-		return &stroppy.Value{
-			Type: &stroppy.Value_Uuid{Uuid: &stroppy.Uuid{Value: uuid.UUID(uid).String()}},
-		}, nil
+		return uuid.UUID(uid), nil
 	}), nil
 }
 
 func newUUIDGenerator(constant *stroppy.Uuid) ValueGenerator {
 	if constant != nil {
-		return valueGeneratorFn(func() (*stroppy.Value, error) {
-			return &stroppy.Value{
-				Type: &stroppy.Value_Uuid{
-					Uuid: &stroppy.Uuid{Value: constant.GetValue()},
-				},
-			}, nil
+		uid, err := uuid.Parse(constant.GetValue())
+
+		return valueGeneratorFn(func() (any, error) {
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse const uuid: %w", err)
+			}
+
+			return uid, nil
 		})
 	}
 
-	return valueGeneratorFn(func() (*stroppy.Value, error) {
+	return valueGeneratorFn(func() (any, error) {
 		uid, err := uuid.NewRandom()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate uuid: %w", err)
 		}
 
-		return &stroppy.Value{
-			Type: &stroppy.Value_Uuid{
-				Uuid: &stroppy.Uuid{Value: uid.String()},
-			},
-		}, nil
+		return uid, nil
 	})
 }
 
@@ -482,7 +469,7 @@ func newDecimalGenerator(
 		decRanges[1] = maxDec
 	}
 
-	return newRangeGenerator(
+	return newSlottedRangeGenerator(
 		primitive.NewGenerator(
 			distribution.NewDistributionGenerator[float64](
 				distributeParams,
@@ -493,6 +480,5 @@ func newDecimalGenerator(
 			),
 			decimal.NewFromFloat,
 		),
-		decimalToValue,
 	), nil
 }

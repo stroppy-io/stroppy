@@ -27,17 +27,17 @@ func NewUniformDistribution[T constraint.Number](
 }
 
 func (ug *UniformDistribution[T]) Next() T {
-	result := math.Max(
+	if ug.round {
+		span := uint64(ug.ranges[1] - ug.ranges[0])
+
+		return T(ug.ranges[0]) + T(ug.prng.Uint64N(span+1))
+	}
+
+	return T(math.Max(
 		ug.ranges[0],
 		math.Min(
 			ug.ranges[0]+ug.prng.Float64()*(ug.ranges[1]-ug.ranges[0]),
 			ug.ranges[1],
 		),
-	)
-
-	if ug.round {
-		result = math.Round(result)
-	}
-
-	return T(result)
+	))
 }

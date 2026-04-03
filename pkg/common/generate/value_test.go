@@ -3,8 +3,6 @@ package generate
 import (
 	"testing"
 
-	"google.golang.org/protobuf/proto"
-
 	pb "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
@@ -22,7 +20,7 @@ func TestNewTupleGenerator(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want [][]*pb.Value
+		want [][]any
 	}{
 		{
 			name: "simple",
@@ -51,37 +49,19 @@ func TestNewTupleGenerator(t *testing.T) {
 					},
 				},
 			}},
-			want: [][]*pb.Value{
-				{
-					{Type: &pb.Value_Int64{Int64: 1}},
-					{Type: &pb.Value_Int64{Int64: 10}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 1}},
-					{Type: &pb.Value_Int64{Int64: 11}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 1}},
-					{Type: &pb.Value_Int64{Int64: 12}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 2}},
-					{Type: &pb.Value_Int64{Int64: 10}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 2}},
-					{Type: &pb.Value_Int64{Int64: 11}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 2}},
-					{Type: &pb.Value_Int64{Int64: 12}},
-				},
+			want: [][]any{
+				{int64(1), int64(10)},
+				{int64(1), int64(11)},
+				{int64(1), int64(12)},
+				{int64(2), int64(10)},
+				{int64(2), int64(11)},
+				{int64(2), int64(12)},
 			},
 		},
 		{
 			name: "empty_genInfos",
 			args: args{seed: 1, genInfos: []GenAbleStruct{}},
-			want: [][]*pb.Value{},
+			want: [][]any{},
 		},
 		{
 			name: "single_parameter",
@@ -98,10 +78,10 @@ func TestNewTupleGenerator(t *testing.T) {
 					},
 				},
 			}},
-			want: [][]*pb.Value{
-				{{Type: &pb.Value_Int64{Int64: 5}}},
-				{{Type: &pb.Value_Int64{Int64: 6}}},
-				{{Type: &pb.Value_Int64{Int64: 7}}},
+			want: [][]any{
+				{int64(5)},
+				{int64(6)},
+				{int64(7)},
 			},
 		},
 		{
@@ -131,15 +111,9 @@ func TestNewTupleGenerator(t *testing.T) {
 					},
 				},
 			}},
-			want: [][]*pb.Value{
-				{
-					{Type: &pb.Value_Int64{Int64: 42}},
-					{Type: &pb.Value_Int64{Int64: 1}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 42}},
-					{Type: &pb.Value_Int64{Int64: 2}},
-				},
+			want: [][]any{
+				{int64(42), int64(1)},
+				{int64(42), int64(2)},
 			},
 		},
 		{
@@ -180,47 +154,15 @@ func TestNewTupleGenerator(t *testing.T) {
 					},
 				},
 			}},
-			want: [][]*pb.Value{
-				{
-					{Type: &pb.Value_Int64{Int64: 1}},
-					{Type: &pb.Value_Int64{Int64: 10}},
-					{Type: &pb.Value_Int64{Int64: 100}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 1}},
-					{Type: &pb.Value_Int64{Int64: 10}},
-					{Type: &pb.Value_Int64{Int64: 101}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 1}},
-					{Type: &pb.Value_Int64{Int64: 11}},
-					{Type: &pb.Value_Int64{Int64: 100}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 1}},
-					{Type: &pb.Value_Int64{Int64: 11}},
-					{Type: &pb.Value_Int64{Int64: 101}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 2}},
-					{Type: &pb.Value_Int64{Int64: 10}},
-					{Type: &pb.Value_Int64{Int64: 100}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 2}},
-					{Type: &pb.Value_Int64{Int64: 10}},
-					{Type: &pb.Value_Int64{Int64: 101}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 2}},
-					{Type: &pb.Value_Int64{Int64: 11}},
-					{Type: &pb.Value_Int64{Int64: 100}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 2}},
-					{Type: &pb.Value_Int64{Int64: 11}},
-					{Type: &pb.Value_Int64{Int64: 101}},
-				},
+			want: [][]any{
+				{int64(1), int64(10), int64(100)},
+				{int64(1), int64(10), int64(101)},
+				{int64(1), int64(11), int64(100)},
+				{int64(1), int64(11), int64(101)},
+				{int64(2), int64(10), int64(100)},
+				{int64(2), int64(10), int64(101)},
+				{int64(2), int64(11), int64(100)},
+				{int64(2), int64(11), int64(101)},
 			},
 		},
 		{
@@ -249,43 +191,16 @@ func TestNewTupleGenerator(t *testing.T) {
 					},
 				},
 			}},
-			want: [][]*pb.Value{
-				{
-					{Type: &pb.Value_Int64{Int64: -2}},
-					{Type: &pb.Value_Int64{Int64: -1}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: -2}},
-					{Type: &pb.Value_Int64{Int64: 0}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: -2}},
-					{Type: &pb.Value_Int64{Int64: 1}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: -1}},
-					{Type: &pb.Value_Int64{Int64: -1}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: -1}},
-					{Type: &pb.Value_Int64{Int64: 0}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: -1}},
-					{Type: &pb.Value_Int64{Int64: 1}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 0}},
-					{Type: &pb.Value_Int64{Int64: -1}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 0}},
-					{Type: &pb.Value_Int64{Int64: 0}},
-				},
-				{
-					{Type: &pb.Value_Int64{Int64: 0}},
-					{Type: &pb.Value_Int64{Int64: 1}},
-				},
+			want: [][]any{
+				{int64(-2), int64(-1)},
+				{int64(-2), int64(0)},
+				{int64(-2), int64(1)},
+				{int64(-1), int64(-1)},
+				{int64(-1), int64(0)},
+				{int64(-1), int64(1)},
+				{int64(0), int64(-1)},
+				{int64(0), int64(0)},
+				{int64(0), int64(1)},
 			},
 		},
 		{
@@ -314,11 +229,8 @@ func TestNewTupleGenerator(t *testing.T) {
 					},
 				},
 			}},
-			want: [][]*pb.Value{
-				{
-					{Type: &pb.Value_Int64{Int64: 7}},
-					{Type: &pb.Value_Int64{Int64: 9}},
-				},
+			want: [][]any{
+				{int64(7), int64(9)},
 			},
 		},
 	}
@@ -327,18 +239,28 @@ func TestNewTupleGenerator(t *testing.T) {
 			gen := NewTupleGenerator(tt.args.seed, tt.args.genInfos)
 
 			for i, pair := range tt.want {
-				wrapped := &pb.Value{Type: &pb.Value_List_{List: &pb.Value_List{Values: pair}}}
-
 				got, err := gen.Next()
 				if err != nil {
 					t.Errorf("generator returned error: %s", err)
 				}
 
-				if !proto.Equal(
-					got,
-					wrapped,
-				) {
-					t.Errorf("i=%d) NewTupleGenerator().Next() = %v, want %v", i, got, wrapped)
+				gotSlice, ok := got.([]any)
+				if !ok {
+					t.Errorf("i=%d) expected []any, got %T", i, got)
+
+					continue
+				}
+
+				if len(gotSlice) != len(pair) {
+					t.Errorf("i=%d) len mismatch: got %d, want %d", i, len(gotSlice), len(pair))
+
+					continue
+				}
+
+				for j, exp := range pair {
+					if gotSlice[j] != exp {
+						t.Errorf("i=%d j=%d) got %v (%T), want %v (%T)", i, j, gotSlice[j], gotSlice[j], exp, exp)
+					}
 				}
 			}
 		})
