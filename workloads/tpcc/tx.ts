@@ -4,8 +4,6 @@ import { AB, C, R, Step, DriverX, S, ENV, TxIsolationName, declareDriverSetup } 
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 // TPC-C Configuration Constants
-const DURATION    = ENV("DURATION", "1m", "Test duration");
-const VUS_SCALE   = ENV("VUS_SCALE", 1, "VUs scale factor (multiplied with base 100)");
 const POOL_SIZE   = ENV("POOL_SIZE", 100, "Connection pool size");
 const WAREHOUSES  = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
 
@@ -17,16 +15,9 @@ const TOTAL_DISTRICTS = WAREHOUSES * DISTRICTS_PER_WAREHOUSE;
 const TOTAL_CUSTOMERS = WAREHOUSES * DISTRICTS_PER_WAREHOUSE * CUSTOMERS_PER_DISTRICT;
 const TOTAL_STOCK     = WAREHOUSES * ITEMS;
 
-// K6 options — single picker scenario, weighted dispatch inside default()
+// K6 options — weighted dispatch inside default(), VUs/duration set via CLI or k6 defaults.
 export const options: Options = {
   setupTimeout: String(WAREHOUSES * 5) + "m",
-  scenarios: {
-    tpcc: {
-      executor: "constant-vus",
-      vus: Math.max(1, Math.floor(100 * VUS_SCALE)),
-      duration: DURATION,
-    },
-  },
 };
 
 // Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql/pico/ydb)

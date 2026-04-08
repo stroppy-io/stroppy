@@ -297,7 +297,7 @@ revision: # Recreate git tag with version tag=<semver>
 ## Local K6 fast tests
 ##
 
-.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcc-pick-test run-tpcc-mysql-test run-tpcds-test run-k6-tests
+.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcc-mysql-test run-tpcds-test run-k6-tests
 
 WORKDIR=dev
 
@@ -308,17 +308,15 @@ run-simple-test:
 
 run-tpcb-test:
 	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
-		./build/stroppy run tpcb
+		./build/stroppy run tpcb/procs.ts
 
 run-tpcc-test:
-	DURATION="1s" SCALE_FACTOR=1 ./build/stroppy run tpcc.ts tpcc.sql
+	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
+		./build/stroppy run tpcc/procs.ts
 
 run-tpcc-mysql-test:
 	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
-	DURATION="1s" SCALE_FACTOR=1 ./build/stroppy run tpcc/pick-mysql mysql -- -q
-
-run-tpcc-pick-test:
-	SCALE_FACTOR=1 ./build/stroppy run tpcc/pick.ts tpcc -- --duration "1s"
+		./build/stroppy run tpcc/procs.ts -d mysql -- -q
 
 run-tpcds-test:
 	./build/stroppy run tpcds tpcds-scale-1.sql

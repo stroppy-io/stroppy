@@ -7,24 +7,15 @@ declare const __VU: number;
 
 // TPC-B Configuration Constants
 const SCALE_FACTOR = ENV(["SCALE_FACTOR", "BRANCHES"], 1, "TPC-B scale factor");
-const DURATION    = ENV("DURATION", "1m", "Test duration");
-const VUS_SCALE   = ENV("VUS_SCALE", 1, "VUs scale factor (multiplied with base 50)");
 const POOL_SIZE   = ENV("POOL_SIZE", 50, "Connection pool size");
 
 const BRANCHES = SCALE_FACTOR;
 const TELLERS  = 10 * SCALE_FACTOR;
 const ACCOUNTS = 100000 * SCALE_FACTOR;
 
-// K6 options
+// K6 options — VUs/duration set via CLI or k6 defaults.
 export const options: Options = {
   setupTimeout: String(SCALE_FACTOR) + "m",
-  scenarios: {
-    tpcb: {
-      executor: "constant-vus",
-      vus: Math.max(1, Math.floor(50 * VUS_SCALE)),
-      duration: DURATION,
-    },
-  },
 };
 
 // Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql/pico/ydb)
