@@ -16,6 +16,7 @@ func TestParseRunArgs(t *testing.T) {
 		args          []string
 		wantScript    string
 		wantSQL       string
+		wantFile      string
 		wantSteps     []string
 		wantNoSteps   []string
 		wantAfterDash []string
@@ -55,6 +56,31 @@ func TestParseRunArgs(t *testing.T) {
 			name:    "empty args returns errNoScript",
 			args:    []string{},
 			wantErr: errNoScript,
+		},
+
+		// ── -f / --file ────────────────────────────────────────────────────
+		{
+			name:       "-f flag",
+			args:       []string{"-f", "myconfig.json", "tpcc"},
+			wantScript: "tpcc",
+			wantFile:   "myconfig.json",
+		},
+		{
+			name:       "--file= form",
+			args:       []string{"--file=prod.json", "tpcc"},
+			wantScript: "tpcc",
+			wantFile:   "prod.json",
+		},
+		{
+			name:       "-f=path form",
+			args:       []string{"-f=cfg.json", "tpcc"},
+			wantScript: "tpcc",
+			wantFile:   "cfg.json",
+		},
+		{
+			name:     "-f without script is allowed (script may come from file)",
+			args:     []string{"-f", "myconfig.json"},
+			wantFile: "myconfig.json",
 		},
 
 		// ── --steps / --no-steps ───────────────────────────────────────────
@@ -354,6 +380,10 @@ func TestParseRunArgs(t *testing.T) {
 
 			if got.sqlArg != tt.wantSQL {
 				t.Errorf("sqlArg: got %q, want %q", got.sqlArg, tt.wantSQL)
+			}
+
+			if got.fileArg != tt.wantFile {
+				t.Errorf("fileArg: got %q, want %q", got.fileArg, tt.wantFile)
 			}
 
 			if !stringSliceEqual(got.steps, tt.wantSteps) {

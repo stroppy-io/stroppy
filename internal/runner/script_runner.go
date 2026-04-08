@@ -30,18 +30,21 @@ type ScriptRunner struct {
 	config        *Probeprint
 	k6RunArgs     []string // pass args directly to 'k6 run <k6RunArgs>'
 	filesInTmp    []string
-	steps         []string          // --steps: only run these steps
-	noSteps       []string          // --no-steps: skip these steps
-	driverConfigs DriverCLIConfigs  // --driver/-D: CLI driver configurations
-	envOverrides  map[string]string // -e KEY=VALUE: user env overrides (uppercased keys)
+	steps         []string           // --steps: only run these steps
+	noSteps       []string           // --no-steps: skip these steps
+	driverConfigs DriverCLIConfigs   // --driver/-D: CLI driver configurations
+	envOverrides  map[string]string  // -e KEY=VALUE: user env overrides (uppercased keys)
+	fileConfig    *stroppy.RunConfig // from -f / auto-discovered stroppy-config.json
 }
 
 // NewScriptRunner creates a new ScriptRunner for the given resolved input.
+// fileConfig may be nil (no -f flag and no auto-discovered stroppy-config.json).
 func NewScriptRunner(
 	input *ResolvedInput,
 	k6RunArgs, steps, noSteps []string,
 	driverConfigs DriverCLIConfigs,
 	envOverrides map[string]string,
+	fileConfig *stroppy.RunConfig,
 ) (*ScriptRunner, error) {
 	lg := logger.Global().
 		Named("script_runner").
@@ -89,9 +92,14 @@ func NewScriptRunner(
 		return nil, err
 	}
 
-	// Update logger with config if available
-	if config.GlobalConfig.GetLogger() != nil {
-		lg = logger.NewFromProtoConfig(config.GlobalConfig.GetLogger()).
+	// Update logger with config if available — prefer file config over probed script config.
+	loggerCfg := config.GlobalConfig.GetLogger()
+	if fileConfig.GetGlobal().GetLogger() != nil {
+		loggerCfg = fileConfig.GetGlobal().GetLogger()
+	}
+
+	if loggerCfg != nil {
+		lg = logger.NewFromProtoConfig(loggerCfg).
 			Named("script_runner").
 			WithOptions(zap.WithCaller(false))
 	}
@@ -115,6 +123,7 @@ func NewScriptRunner(
 		noSteps:       noSteps,
 		driverConfigs: driverConfigs,
 		envOverrides:  envOverrides,
+		fileConfig:    fileConfig,
 	}, nil
 }
 
@@ -123,6 +132,13 @@ func (r *ScriptRunner) Run(ctx context.Context) error {
 	// For now it is oneshot run.
 	// TODO: multi-run scripts
 	defer os.RemoveAll(r.tempDir)
+
+	r.logger.Info("Starting benchmark",
+		zap.String("script", filepath.Base(r.scriptPath)),
+		zap.Strings("steps", r.steps),
+		zap.Strings("no_steps", r.noSteps),
+		zap.Bool("config_file", r.fileConfig != nil),
+	)
 
 	args := []string{}
 
@@ -254,13 +270,29 @@ func copyFiles(srcDir, dstDir string, excludeNames []string) (copied []string, e
 }
 
 // buildEnvVars builds environment variables for k6 execution.
-// Precedence (highest to lowest): real env > -e overrides > driver > defaults.
+// Precedence (highest to lowest):
+// real env > -e overrides > file env > file drivers > CLI drivers > logger/OTEL > sql/steps.
 func (r *ScriptRunner) buildEnvVars() ([]string, error) {
 	envs := os.Environ() // inherit parent environment
 
-	// Add -e overrides (real env already present in envs takes precedence via setEnvs skip-if-present).
+	// Add -e overrides (real env takes precedence; warns on override).
 	if len(r.envOverrides) > 0 {
-		envs = append(envs, BuildEnvLookup(r.envOverrides)...)
+		envs = append(envs, BuildEnvLookup(r.envOverrides, true)...)
+	}
+
+	// Config file env overrides (real env takes precedence; silent skip).
+	if r.fileConfig != nil && len(r.fileConfig.GetEnv()) > 0 {
+		envs = append(envs, BuildFileEnvLookup(r.fileConfig.GetEnv())...)
+	}
+
+	// File driver configs (skipped if real env or CLI already covers the index).
+	if r.fileConfig != nil && len(r.fileConfig.GetDrivers()) > 0 {
+		fileDriverEnvs, err := fileDriverRunConfigsToEnvVars(r.fileConfig.GetDrivers(), r.driverConfigs)
+		if err != nil {
+			return nil, err
+		}
+
+		envs = append(envs, fileDriverEnvs...)
 	}
 
 	// Add driver configurations from CLI (STROPPY_DRIVER_0, STROPPY_DRIVER_1, ...)
@@ -273,11 +305,16 @@ func (r *ScriptRunner) buildEnvVars() ([]string, error) {
 		envs = append(envs, driverEnvs...)
 	}
 
-	// Add logger configuration
-	if r.config.GlobalConfig.GetLogger() != nil {
+	// Logger configuration — prefer file config over probed script config.
+	loggerCfg := r.config.GlobalConfig.GetLogger()
+	if r.fileConfig.GetGlobal().GetLogger() != nil {
+		loggerCfg = r.fileConfig.GetGlobal().GetLogger()
+	}
+
+	if loggerCfg != nil {
 		loggerEnvs := logger.PrepareLoggerEnvs(
-			logger.LevelFromProtoConfig(r.config.GlobalConfig.GetLogger().GetLogLevel()),
-			logger.ModeFromProtoConfig(r.config.GlobalConfig.GetLogger().GetLogMode()),
+			logger.LevelFromProtoConfig(loggerCfg.GetLogLevel()),
+			logger.ModeFromProtoConfig(loggerCfg.GetLogMode()),
 		)
 		envs = append(envs, loggerEnvs...)
 	}
@@ -329,7 +366,13 @@ func validateStepNames(probed, requested []string, flag string) error {
 
 // addOtelExportArgs adds OpenTelemetry exporter arguments and environment variables.
 func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut []string) {
-	export := r.config.GlobalConfig.GetExporter().GetOtlpExport()
+	var export *stroppy.OtlpExport
+	if r.fileConfig.GetGlobal().GetExporter().GetOtlpExport() != nil {
+		export = r.fileConfig.GetGlobal().GetExporter().GetOtlpExport()
+	} else {
+		export = r.config.GlobalConfig.GetExporter().GetOtlpExport()
+	}
+
 	if export == nil {
 		r.logger.Debug("Have no OTEL configuration")
 
@@ -387,6 +430,18 @@ func (r *ScriptRunner) runK6(
 		return fmt.Errorf("failed to get working dir: %w", err)
 	}
 
+	// Resolve k6 --config path from file config (must be absolute for temp dir context).
+	var extraK6Args []string
+
+	if r.fileConfig.GetK6Config() != "" {
+		absK6Config, err := filepath.Abs(r.fileConfig.GetK6Config())
+		if err != nil {
+			return fmt.Errorf("resolving k6_config path: %w", err)
+		}
+
+		extraK6Args = append(extraK6Args, "--config", absK6Config)
+	}
+
 	// set new state
 	if err := setEnvs(envs); err != nil {
 		return fmt.Errorf("failed to set eniroments for k6: %w", err)
@@ -396,9 +451,15 @@ func (r *ScriptRunner) runK6(
 		return fmt.Errorf("failed cd to temporary %q: %w", r.tempDir, err)
 	}
 
-	os.Args = slices.Concat([]string{"k6", "run"}, r.k6RunArgs, args, []string{scriptName})
+	os.Args = slices.Concat(
+		[]string{"k6", "run"},
+		extraK6Args,
+		r.k6RunArgs,
+		args,
+		[]string{scriptName},
+	)
 
-	r.logger.Debug("Running k6", zap.Strings("args", os.Args))
+	r.logger.Info("Running k6", zap.Strings("args", os.Args))
 
 	// run the test
 	k6cmd.Execute()

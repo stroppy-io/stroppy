@@ -66,6 +66,7 @@ REQUIRED_BINS = git node npm go curl unzip \
 	protoc-gen-go-grpc=$(LOCAL_BIN)/protoc-gen-go-grpc \
 	protoc-gen-validate=$(LOCAL_BIN)/protoc-gen-validate \
 	protoc-gen-doc=$(LOCAL_BIN)/protoc-gen-doc \
+	protoc-gen-jsonschema=$(LOCAL_BIN)/protoc-gen-jsonschema \
 	xk6=$(LOCAL_BIN)/xk6
 .PHONY: .check-bins
 .check-bins: # Check for required binaries if build locally
@@ -103,6 +104,8 @@ REQUIRED_BINS = git node npm go curl unzip \
 		echo "All required binaries are available"; \
 	fi
 
+VALIDATE_PROTO_PATH := $(HOME)/.easyp/mod/github.com/bufbuild/protoc-gen-validate/v1.2.1
+
 PROTOC_VERSION ?= 32.1
 PROTOC_BIN := $(LOCAL_BIN)/protoc
 PROTOC_URL := https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH).zip
@@ -135,6 +138,7 @@ PROTOC_TMP := /tmp/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH)
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/envoyproxy/protoc-gen-validate@v1.2.1
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.19.1
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@v1.5.1
+	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/pubg/protoc-gen-jsonschema@v0.8.0
 
 .PHONY: .install-node-proto-deps
 .install-node-proto-deps:
@@ -207,6 +211,21 @@ proto: .check-bins
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.js $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/ts/parse_sql.js $(CURDIR)/internal/static/
 	cp $(PROTO_BUILD_TARGET_DIR)/docs/proto.md $(CURDIR)/docs
+	$(MAKE) jsonschema
+
+.PHONY: jsonschema
+jsonschema: # Generate JSON Schema for RunConfig (IDE autocomplete for stroppy-config.json)
+	mkdir -p $(PROTO_BUILD_TARGET_DIR)/jsonschema
+	$(PROTOC_BIN) \
+		-I . \
+		-I $(LOCAL_BIN)/include \
+		-I $(VALIDATE_PROTO_PATH) \
+		--plugin=protoc-gen-jsonschema=$(LOCAL_BIN)/protoc-gen-jsonschema \
+		--jsonschema_out=$(PROTO_BUILD_TARGET_DIR)/jsonschema \
+		--jsonschema_opt=pretty_json_output=true,entrypoint_message=RunConfig \
+		proto/stroppy/run.proto
+	mkdir -p $(CURDIR)/docs/jsonschema
+	cp $(PROTO_BUILD_TARGET_DIR)/jsonschema/proto/stroppy/run.schema.json $(CURDIR)/docs/jsonschema/run.schema.json
 
 .PHONY: linter linter_fix tests
 

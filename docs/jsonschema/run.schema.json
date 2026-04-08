@@ -1,0 +1,1248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/.stroppy.RunConfig",
+  "$defs": {
+    ".stroppy.DriverRunConfig": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "pool"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "pool"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "bulkSize"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "bulkSize"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "caCertFile"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "caCertFile"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "authToken"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "authToken"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "authUser"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "authUser"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "authPassword"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "authPassword"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "tlsInsecureSkipVerify"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "tlsInsecureSkipVerify"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "driverType": {
+          "$ref": "#/$defs/.stroppy.DriverRunConfig.driver_type"
+        },
+        "url": {
+          "$ref": "#/$defs/.stroppy.DriverRunConfig.url"
+        },
+        "defaultInsertMethod": {
+          "$ref": "#/$defs/.stroppy.DriverRunConfig.default_insert_method"
+        },
+        "pool": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.pool"
+            }
+          ]
+        },
+        "errorMode": {
+          "$ref": "#/$defs/.stroppy.DriverRunConfig.error_mode"
+        },
+        "bulkSize": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.bulk_size"
+            }
+          ]
+        },
+        "caCertFile": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.ca_cert_file"
+            }
+          ]
+        },
+        "authToken": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.auth_token"
+            }
+          ]
+        },
+        "authUser": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.auth_user"
+            }
+          ]
+        },
+        "authPassword": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.auth_password"
+            }
+          ]
+        },
+        "tlsInsecureSkipVerify": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.tls_insecure_skip_verify"
+            }
+          ]
+        },
+        "defaultTxIsolation": {
+          "$ref": "#/$defs/.stroppy.DriverRunConfig.default_tx_isolation"
+        }
+      },
+      "type": "object",
+      "required": [
+        "driverType",
+        "url",
+        "defaultInsertMethod",
+        "errorMode",
+        "defaultTxIsolation"
+      ],
+      "description": "*\n DriverRunConfig is the user-facing driver configuration for the stroppy config file.\n It mirrors the TypeScript DriverSetup interface so that protojson serialization\n (camelCase field names, string values) is directly readable by declareDriverSetup()\n in the TypeScript layer via the STROPPY_DRIVER_N environment variable.\n\n This is intentionally separate from DriverConfig (the runtime binary proto for TS-\u003eGo dispatch)."
+    },
+    ".stroppy.DriverRunConfig.PoolConfig": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "maxConns"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "maxConns"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "minConns"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "minConns"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "minIdleConns"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "minIdleConns"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "maxConnLifetime"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "maxConnLifetime"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "maxConnIdleTime"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "maxConnIdleTime"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "traceLogLevel"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "traceLogLevel"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "defaultQueryExecMode"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "defaultQueryExecMode"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "descriptionCacheCapacity"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "descriptionCacheCapacity"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "statementCacheCapacity"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "statementCacheCapacity"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "maxOpenConns"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "maxOpenConns"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "maxIdleConns"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "maxIdleConns"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "connMaxLifetime"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "connMaxLifetime"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "connMaxIdleTime"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "connMaxIdleTime"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "maxConns": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.max_conns"
+            }
+          ]
+        },
+        "minConns": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.min_conns"
+            }
+          ]
+        },
+        "minIdleConns": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.min_idle_conns"
+            }
+          ]
+        },
+        "maxConnLifetime": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.max_conn_lifetime"
+            }
+          ]
+        },
+        "maxConnIdleTime": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.max_conn_idle_time"
+            }
+          ]
+        },
+        "traceLogLevel": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.trace_log_level"
+            }
+          ]
+        },
+        "defaultQueryExecMode": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.default_query_exec_mode"
+            }
+          ]
+        },
+        "descriptionCacheCapacity": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.description_cache_capacity"
+            }
+          ]
+        },
+        "statementCacheCapacity": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.statement_cache_capacity"
+            }
+          ]
+        },
+        "maxOpenConns": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.max_open_conns"
+            }
+          ]
+        },
+        "maxIdleConns": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.max_idle_conns"
+            }
+          ]
+        },
+        "connMaxLifetime": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.conn_max_lifetime"
+            }
+          ]
+        },
+        "connMaxIdleTime": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.conn_max_idle_time"
+            }
+          ]
+        }
+      },
+      "type": "object",
+      "description": "*\n Pool configuration. Sugar field that maps to PostgresConfig or SqlConfig\n in the TypeScript layer based on driver_type.\n Matches TS DriverSetup.pool (PoolConfig)."
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.conn_max_idle_time": {
+      "type": "string"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.conn_max_lifetime": {
+      "type": "string"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.default_query_exec_mode": {
+      "type": "string"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.description_cache_capacity": {
+      "type": "integer"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.max_conn_idle_time": {
+      "type": "string"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.max_conn_lifetime": {
+      "type": "string"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.max_conns": {
+      "type": "integer",
+      "description": "pgx / postgres pool fields"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.max_idle_conns": {
+      "type": "integer"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.max_open_conns": {
+      "type": "integer",
+      "description": "database/sql pool fields (mysql, ydb)"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.min_conns": {
+      "type": "integer"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.min_idle_conns": {
+      "type": "integer"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.statement_cache_capacity": {
+      "type": "integer"
+    },
+    ".stroppy.DriverRunConfig.PoolConfig.trace_log_level": {
+      "type": "string"
+    },
+    ".stroppy.DriverRunConfig.auth_password": {
+      "type": "string",
+      "description": "* Password for static credentials. Matches TS DriverSetup.authPassword."
+    },
+    ".stroppy.DriverRunConfig.auth_token": {
+      "type": "string",
+      "description": "* Authentication token (e.g. IAM token). Matches TS DriverSetup.authToken."
+    },
+    ".stroppy.DriverRunConfig.auth_user": {
+      "type": "string",
+      "description": "* Username for static credentials. Matches TS DriverSetup.authUser."
+    },
+    ".stroppy.DriverRunConfig.bulk_size": {
+      "type": "integer",
+      "description": "* Rows per bulk INSERT statement. Matches TS DriverSetup.bulkSize."
+    },
+    ".stroppy.DriverRunConfig.ca_cert_file": {
+      "type": "string",
+      "description": "* Path to CA certificate PEM file. Matches TS DriverSetup.caCertFile."
+    },
+    ".stroppy.DriverRunConfig.default_insert_method": {
+      "type": "string",
+      "description": "*\n Default insert method. One of: \"copy_from\", \"plain_bulk\", \"plain_query\".\n Matches TS DriverSetup.defaultInsertMethod."
+    },
+    ".stroppy.DriverRunConfig.default_tx_isolation": {
+      "type": "string",
+      "description": "*\n Default transaction isolation level.\n One of: \"read_uncommitted\", \"read_committed\", \"repeatable_read\", \"serializable\".\n Matches TS DriverSetup.defaultTxIsolation."
+    },
+    ".stroppy.DriverRunConfig.driver_type": {
+      "type": "string",
+      "description": "*\n Driver type. One of: \"postgres\", \"mysql\", \"picodata\", \"ydb\", \"noop\".\n Matches TS DriverSetup.driverType (string union, not proto enum)."
+    },
+    ".stroppy.DriverRunConfig.error_mode": {
+      "type": "string",
+      "description": "*\n Error handling mode. One of: \"silent\", \"log\", \"throw\", \"fail\", \"abort\".\n Matches TS DriverSetup.errorMode."
+    },
+    ".stroppy.DriverRunConfig.pool": {
+      "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig"
+    },
+    ".stroppy.DriverRunConfig.tls_insecure_skip_verify": {
+      "type": "boolean",
+      "description": "* Skip TLS certificate verification. Matches TS DriverSetup.tlsInsecureSkipVerify."
+    },
+    ".stroppy.DriverRunConfig.url": {
+      "type": "string",
+      "description": "* Database connection URL"
+    },
+    ".stroppy.ExporterConfig": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/.stroppy.ExporterConfig.name"
+        },
+        "otlpExport": {
+          "$ref": "#/$defs/.stroppy.ExporterConfig.otlp_export"
+        }
+      },
+      "type": "object",
+      "required": [
+        "name",
+        "otlpExport"
+      ],
+      "description": "*\n OtlpExporterConfig contains named configuration for an OTLP exporter."
+    },
+    ".stroppy.ExporterConfig.name": {
+      "type": "string",
+      "description": "* Name of the OTLP exporter"
+    },
+    ".stroppy.ExporterConfig.otlp_export": {
+      "$ref": "#/$defs/.stroppy.OtlpExport",
+      "description": "* Configuration for the OTLP exporter"
+    },
+    ".stroppy.GlobalConfig": {
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.version"
+        },
+        "runId": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.run_id"
+        },
+        "seed": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.seed"
+        },
+        "metadata": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.metadata"
+        },
+        "logger": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.logger"
+        },
+        "exporter": {
+          "$ref": "#/$defs/.stroppy.GlobalConfig.exporter"
+        }
+      },
+      "type": "object",
+      "required": [
+        "version",
+        "runId",
+        "seed",
+        "logger",
+        "exporter"
+      ]
+    },
+    ".stroppy.GlobalConfig.exporter": {
+      "$ref": "#/$defs/.stroppy.ExporterConfig",
+      "description": "* Exporter configuration"
+    },
+    ".stroppy.GlobalConfig.logger": {
+      "$ref": "#/$defs/.stroppy.LoggerConfig",
+      "description": "* Logging configuration"
+    },
+    ".stroppy.GlobalConfig.metadata": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object",
+      "description": "* Arbitrary metadata, may be passed to result labels and json output"
+    },
+    ".stroppy.GlobalConfig.run_id": {
+      "type": "string",
+      "description": "*\n Run identifier for reproducible test runs or debugging\n If set to \"generate()\" stroppy eval ulid for run_id"
+    },
+    ".stroppy.GlobalConfig.seed": {
+      "type": "integer",
+      "description": "* Random seed for reproducible test runs"
+    },
+    ".stroppy.GlobalConfig.version": {
+      "type": "string",
+      "description": "*\n Version of the configuration format e.g. proto files version.\n This is used for backward compatibility of configs\n and will be set automatically from binary run if not present."
+    },
+    ".stroppy.LoggerConfig": {
+      "properties": {
+        "logLevel": {
+          "$ref": "#/$defs/.stroppy.LoggerConfig.log_level"
+        },
+        "logMode": {
+          "$ref": "#/$defs/.stroppy.LoggerConfig.log_mode"
+        }
+      },
+      "type": "object",
+      "required": [
+        "logLevel",
+        "logMode"
+      ],
+      "description": "*\n LoggerConfig contains configuration for the logging system.\n It controls log levels and output formatting."
+    },
+    ".stroppy.LoggerConfig.LogLevel": {
+      "type": "string",
+      "enum": [
+        "LOG_LEVEL_DEBUG",
+        "LOG_LEVEL_INFO",
+        "LOG_LEVEL_WARN",
+        "LOG_LEVEL_ERROR",
+        "LOG_LEVEL_FATAL"
+      ]
+    },
+    ".stroppy.LoggerConfig.LogMode": {
+      "type": "string",
+      "enum": [
+        "LOG_MODE_DEVELOPMENT",
+        "LOG_MODE_PRODUCTION"
+      ]
+    },
+    ".stroppy.LoggerConfig.log_level": {
+      "$ref": "#/$defs/.stroppy.LoggerConfig.LogLevel",
+      "description": "* Minimum log level to output"
+    },
+    ".stroppy.LoggerConfig.log_mode": {
+      "$ref": "#/$defs/.stroppy.LoggerConfig.LogMode",
+      "description": "* Logging mode (development or production)"
+    },
+    ".stroppy.OtlpExport": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "otlpGrpcEndpoint"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "otlpGrpcEndpoint"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "otlpHttpEndpoint"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "otlpHttpEndpoint"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "otlpHttpExporterUrlPath"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "otlpHttpExporterUrlPath"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "otlpEndpointInsecure"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "otlpEndpointInsecure"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "otlpHeaders"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "otlpHeaders"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "otlpMetricsPrefix"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "otlpMetricsPrefix"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "otlpGrpcEndpoint": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_grpc_endpoint"
+            }
+          ]
+        },
+        "otlpHttpEndpoint": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_http_endpoint"
+            }
+          ]
+        },
+        "otlpHttpExporterUrlPath": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_http_exporter_url_path"
+            }
+          ]
+        },
+        "otlpEndpointInsecure": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_endpoint_insecure"
+            }
+          ]
+        },
+        "otlpHeaders": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_headers"
+            }
+          ]
+        },
+        "otlpMetricsPrefix": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_metrics_prefix"
+            }
+          ]
+        }
+      },
+      "type": "object",
+      "description": "*\n OtlpExport contains configuration for exporting metrics via OpenTelemetry\n Protocol (OTLP). It specifies the endpoint and metrics prefix for telemetry\n data export."
+    },
+    ".stroppy.OtlpExport.otlp_endpoint_insecure": {
+      "type": "boolean",
+      "description": "* Disable transport security for the exporter"
+    },
+    ".stroppy.OtlpExport.otlp_grpc_endpoint": {
+      "type": "string",
+      "description": "* gRPC endpoint for OpenTelemetry collector"
+    },
+    ".stroppy.OtlpExport.otlp_headers": {
+      "type": "string",
+      "description": "* Headers for otlp requests e.g. Authorization=..."
+    },
+    ".stroppy.OtlpExport.otlp_http_endpoint": {
+      "type": "string",
+      "description": "* HTTP endpoint for the OpenTelemetry collector"
+    },
+    ".stroppy.OtlpExport.otlp_http_exporter_url_path": {
+      "type": "string",
+      "description": "* HTTP exporter path. Default is '/v1/metrics'"
+    },
+    ".stroppy.OtlpExport.otlp_metrics_prefix": {
+      "type": "string",
+      "description": "* Prefix to be added to all exported metrics"
+    },
+    ".stroppy.RunConfig": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "script"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "script"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "sql"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "sql"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "k6Config"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "k6Config"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/.stroppy.RunConfig.version"
+        },
+        "script": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.RunConfig.script"
+            }
+          ]
+        },
+        "sql": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.RunConfig.sql"
+            }
+          ]
+        },
+        "global": {
+          "$ref": "#/$defs/.stroppy.RunConfig.global"
+        },
+        "drivers": {
+          "$ref": "#/$defs/.stroppy.RunConfig.drivers"
+        },
+        "env": {
+          "$ref": "#/$defs/.stroppy.RunConfig.env"
+        },
+        "steps": {
+          "$ref": "#/$defs/.stroppy.RunConfig.steps"
+        },
+        "noSteps": {
+          "$ref": "#/$defs/.stroppy.RunConfig.no_steps"
+        },
+        "k6Args": {
+          "$ref": "#/$defs/.stroppy.RunConfig.k6_args"
+        },
+        "k6Config": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.RunConfig.k6_config"
+            }
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "version",
+        "global"
+      ],
+      "description": "*\n RunConfig is the top-level stroppy config file schema.\n\n Default file: ./stroppy-config.json (auto-discovered by stroppy run and stroppy probe).\n Override with -f/--file flag.\n\n Precedence (highest to lowest):\n   real env \u003e -e flags \u003e this file \u003e -d/-D presets \u003e script defaults\n\n Example (stroppy-config.json):\n   {\n     \"version\": \"1\",\n     \"script\": \"tpcc\",\n     \"global\": {\n       \"logger\": { \"logLevel\": \"LOG_LEVEL_INFO\" }\n     },\n     \"drivers\": {\n       \"0\": { \"driverType\": \"postgres\", \"url\": \"postgres://user:pass@db:5432/bench\",\n               \"pool\": { \"maxConns\": 200 } }\n     },\n     \"env\": { \"DURATION\": \"30m\", \"VUS_SCALE\": \"0.5\", \"WAREHOUSES\": \"10\" },\n     \"k6Args\": [\"--vus\", \"10\"]\n   }"
+    },
+    ".stroppy.RunConfig.drivers": {
+      "additionalProperties": {
+        "$ref": "#/$defs/.stroppy.DriverRunConfig"
+      },
+      "type": "object",
+      "description": "*\n Driver configurations indexed by driver number (0-based string key in JSON).\n Equivalent to -d/-D CLI flags but type-safe and with full pool config support.\n CLI -d/-D takes precedence over entries here."
+    },
+    ".stroppy.RunConfig.env": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object",
+      "description": "*\n Environment variable overrides for the k6 script.\n Equivalent to -e KEY=VALUE. All keys are uppercased on load.\n Precedence: real env \u003e -e flags \u003e this map \u003e script ENV() defaults."
+    },
+    ".stroppy.RunConfig.global": {
+      "$ref": "#/$defs/.stroppy.GlobalConfig",
+      "description": "*\n Global stroppy settings: logger level/mode, OTEL exporter, seed, run_id, metadata.\n These activate the previously-dead GlobalConfig plumbing."
+    },
+    ".stroppy.RunConfig.k6_args": {
+      "items": {
+        "type": "string",
+        "description": "*\n Additional raw args passed directly to \"k6 run\".\n Placed before CLI -- args, so CLI args can override (last-wins for most k6 flags).\n Example: [\"--vus\", \"10\", \"--duration\", \"30m\"]"
+      },
+      "type": "array",
+      "description": "*\n Additional raw args passed directly to \"k6 run\".\n Placed before CLI -- args, so CLI args can override (last-wins for most k6 flags).\n Example: [\"--vus\", \"10\", \"--duration\", \"30m\"]"
+    },
+    ".stroppy.RunConfig.k6_config": {
+      "type": "string",
+      "description": "*\n Optional path to a k6 native config JSON file.\n If set, \"--config \u003cpath\u003e\" is prepended to k6 run args.\n Useful for setting scenarios, thresholds, or other options not available via CLI flags."
+    },
+    ".stroppy.RunConfig.no_steps": {
+      "items": {
+        "type": "string",
+        "description": "*\n Step blocklist. Equivalent to --no-steps.\n CLI --no-steps takes precedence; this is used only when --no-steps is absent."
+      },
+      "type": "array",
+      "description": "*\n Step blocklist. Equivalent to --no-steps.\n CLI --no-steps takes precedence; this is used only when --no-steps is absent."
+    },
+    ".stroppy.RunConfig.script": {
+      "type": "string",
+      "description": "*\n Script to run: preset name (e.g. \"tpcc\"), .ts path, .sql path, or inline SQL.\n If omitted, the first CLI positional argument is used."
+    },
+    ".stroppy.RunConfig.sql": {
+      "type": "string",
+      "description": "*\n SQL file: path or name. If omitted, auto-resolved from script/preset."
+    },
+    ".stroppy.RunConfig.steps": {
+      "items": {
+        "type": "string",
+        "description": "*\n Step allowlist. Equivalent to --steps.\n CLI --steps takes precedence; this is used only when --steps is absent."
+      },
+      "type": "array",
+      "description": "*\n Step allowlist. Equivalent to --steps.\n CLI --steps takes precedence; this is used only when --steps is absent."
+    },
+    ".stroppy.RunConfig.version": {
+      "type": "string",
+      "description": "* Config file format version. Currently \"1\"."
+    }
+  },
+  "type": "object"
+}

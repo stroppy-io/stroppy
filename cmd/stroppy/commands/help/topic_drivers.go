@@ -149,6 +149,7 @@ SEE ALSO
 
   stroppy run --help
   stroppy probe --help
+  stroppy help config-file   (file-based driver config with full pool/TLS support)
 `,
 	})
 }

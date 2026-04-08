@@ -97,6 +97,18 @@ OUTPUT FORMATS (-o)
             Example keys: global_config, options, sql_sections, steps,
             envs, env_declarations, driver_setups, drivers.
 
+CONFIG FILE (-f)
+
+  Pass -f to load a config file when probing. The Config section then shows
+  the file's global settings (logger, OTEL exporter) instead of the empty
+  default. The effective script and SQL are also resolved from the file when
+  not provided as positional arguments:
+
+    stroppy probe -f stroppy-config.json          # script from file
+    stroppy probe -f stroppy-config.json tpcc     # script overrides file
+
+  See 'stroppy help config-file' for the config file format.
+
 --local FLAG
 
   By default, probe copies the script into a temporary directory and resolves

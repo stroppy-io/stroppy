@@ -64,6 +64,13 @@
     - [InsertMethod](#stroppy-InsertMethod)
     - [TxIsolationLevel](#stroppy-TxIsolationLevel)
   
+- [proto/stroppy/run.proto](#proto_stroppy_run-proto)
+    - [DriverRunConfig](#stroppy-DriverRunConfig)
+    - [DriverRunConfig.PoolConfig](#stroppy-DriverRunConfig-PoolConfig)
+    - [RunConfig](#stroppy-RunConfig)
+    - [RunConfig.DriversEntry](#stroppy-RunConfig-DriversEntry)
+    - [RunConfig.EnvEntry](#stroppy-RunConfig-EnvEntry)
+  
 - [proto/stroppy/runtime.proto](#proto_stroppy_runtime-proto)
     - [DriverQuery](#stroppy-DriverQuery)
     - [DriverQueryStat](#stroppy-DriverQueryStat)
@@ -949,6 +956,159 @@ transaction.
 | CONNECTION_ONLY | 5 | Pinned connection without BEGIN/COMMIT. For databases without transaction support. |
 | NONE | 6 | No transaction or connection pinning. Queries go through the driver pool directly. |
 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="proto_stroppy_run-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## proto/stroppy/run.proto
+
+
+
+<a name="stroppy-DriverRunConfig"></a>
+
+### DriverRunConfig
+DriverRunConfig is the user-facing driver configuration for the stroppy config file.
+It mirrors the TypeScript DriverSetup interface so that protojson serialization
+(camelCase field names, string values) is directly readable by declareDriverSetup()
+in the TypeScript layer via the STROPPY_DRIVER_N environment variable.
+
+This is intentionally separate from DriverConfig (the runtime binary proto for TS-&gt;Go dispatch).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| driver_type | [string](#string) |  | Driver type. One of: &#34;postgres&#34;, &#34;mysql&#34;, &#34;picodata&#34;, &#34;ydb&#34;, &#34;noop&#34;. Matches TS DriverSetup.driverType (string union, not proto enum). |
+| url | [string](#string) |  | Database connection URL |
+| default_insert_method | [string](#string) |  | Default insert method. One of: &#34;copy_from&#34;, &#34;plain_bulk&#34;, &#34;plain_query&#34;. Matches TS DriverSetup.defaultInsertMethod. |
+| pool | [DriverRunConfig.PoolConfig](#stroppy-DriverRunConfig-PoolConfig) | optional |  |
+| error_mode | [string](#string) |  | Error handling mode. One of: &#34;silent&#34;, &#34;log&#34;, &#34;throw&#34;, &#34;fail&#34;, &#34;abort&#34;. Matches TS DriverSetup.errorMode. |
+| bulk_size | [int32](#int32) | optional | Rows per bulk INSERT statement. Matches TS DriverSetup.bulkSize. |
+| ca_cert_file | [string](#string) | optional | Path to CA certificate PEM file. Matches TS DriverSetup.caCertFile. |
+| auth_token | [string](#string) | optional | Authentication token (e.g. IAM token). Matches TS DriverSetup.authToken. |
+| auth_user | [string](#string) | optional | Username for static credentials. Matches TS DriverSetup.authUser. |
+| auth_password | [string](#string) | optional | Password for static credentials. Matches TS DriverSetup.authPassword. |
+| tls_insecure_skip_verify | [bool](#bool) | optional | Skip TLS certificate verification. Matches TS DriverSetup.tlsInsecureSkipVerify. |
+| default_tx_isolation | [string](#string) |  | Default transaction isolation level. One of: &#34;read_uncommitted&#34;, &#34;read_committed&#34;, &#34;repeatable_read&#34;, &#34;serializable&#34;. Matches TS DriverSetup.defaultTxIsolation. |
+
+
+
+
+
+
+<a name="stroppy-DriverRunConfig-PoolConfig"></a>
+
+### DriverRunConfig.PoolConfig
+Pool configuration. Sugar field that maps to PostgresConfig or SqlConfig
+in the TypeScript layer based on driver_type.
+Matches TS DriverSetup.pool (PoolConfig).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| max_conns | [int32](#int32) | optional | pgx / postgres pool fields |
+| min_conns | [int32](#int32) | optional |  |
+| min_idle_conns | [int32](#int32) | optional |  |
+| max_conn_lifetime | [string](#string) | optional |  |
+| max_conn_idle_time | [string](#string) | optional |  |
+| trace_log_level | [string](#string) | optional |  |
+| default_query_exec_mode | [string](#string) | optional |  |
+| description_cache_capacity | [int32](#int32) | optional |  |
+| statement_cache_capacity | [int32](#int32) | optional |  |
+| max_open_conns | [int32](#int32) | optional | database/sql pool fields (mysql, ydb) |
+| max_idle_conns | [int32](#int32) | optional |  |
+| conn_max_lifetime | [string](#string) | optional |  |
+| conn_max_idle_time | [string](#string) | optional |  |
+
+
+
+
+
+
+<a name="stroppy-RunConfig"></a>
+
+### RunConfig
+RunConfig is the top-level stroppy config file schema.
+
+Default file: ./stroppy-config.json (auto-discovered by stroppy run and stroppy probe).
+Override with -f/--file flag.
+
+Precedence (highest to lowest):
+  real env &gt; -e flags &gt; this file &gt; -d/-D presets &gt; script defaults
+
+Example (stroppy-config.json):
+  {
+    &#34;version&#34;: &#34;1&#34;,
+    &#34;script&#34;: &#34;tpcc&#34;,
+    &#34;global&#34;: {
+      &#34;logger&#34;: { &#34;logLevel&#34;: &#34;LOG_LEVEL_INFO&#34; }
+    },
+    &#34;drivers&#34;: {
+      &#34;0&#34;: { &#34;driverType&#34;: &#34;postgres&#34;, &#34;url&#34;: &#34;postgres://user:pass@db:5432/bench&#34;,
+              &#34;pool&#34;: { &#34;maxConns&#34;: 200 } }
+    },
+    &#34;env&#34;: { &#34;DURATION&#34;: &#34;30m&#34;, &#34;VUS_SCALE&#34;: &#34;0.5&#34;, &#34;WAREHOUSES&#34;: &#34;10&#34; },
+    &#34;k6Args&#34;: [&#34;--vus&#34;, &#34;10&#34;]
+  }
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| version | [string](#string) |  | Config file format version. Currently &#34;1&#34;. |
+| script | [string](#string) | optional | Script to run: preset name (e.g. &#34;tpcc&#34;), .ts path, .sql path, or inline SQL. If omitted, the first CLI positional argument is used. |
+| sql | [string](#string) | optional | SQL file: path or name. If omitted, auto-resolved from script/preset. |
+| global | [GlobalConfig](#stroppy-GlobalConfig) |  | Global stroppy settings: logger level/mode, OTEL exporter, seed, run_id, metadata. These activate the previously-dead GlobalConfig plumbing. |
+| drivers | [RunConfig.DriversEntry](#stroppy-RunConfig-DriversEntry) | repeated | Driver configurations indexed by driver number (0-based string key in JSON). Equivalent to -d/-D CLI flags but type-safe and with full pool config support. CLI -d/-D takes precedence over entries here. |
+| env | [RunConfig.EnvEntry](#stroppy-RunConfig-EnvEntry) | repeated | Environment variable overrides for the k6 script. Equivalent to -e KEY=VALUE. All keys are uppercased on load. Precedence: real env &gt; -e flags &gt; this map &gt; script ENV() defaults. |
+| steps | [string](#string) | repeated | Step allowlist. Equivalent to --steps. CLI --steps takes precedence; this is used only when --steps is absent. |
+| no_steps | [string](#string) | repeated | Step blocklist. Equivalent to --no-steps. CLI --no-steps takes precedence; this is used only when --no-steps is absent. |
+| k6_args | [string](#string) | repeated | Additional raw args passed directly to &#34;k6 run&#34;. Placed before CLI -- args, so CLI args can override (last-wins for most k6 flags). Example: [&#34;--vus&#34;, &#34;10&#34;, &#34;--duration&#34;, &#34;30m&#34;] |
+| k6_config | [string](#string) | optional | Optional path to a k6 native config JSON file. If set, &#34;--config &lt;path&gt;&#34; is prepended to k6 run args. Useful for setting scenarios, thresholds, or other options not available via CLI flags. |
+
+
+
+
+
+
+<a name="stroppy-RunConfig-DriversEntry"></a>
+
+### RunConfig.DriversEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [uint32](#uint32) |  |  |
+| value | [DriverRunConfig](#stroppy-DriverRunConfig) |  |  |
+
+
+
+
+
+
+<a name="stroppy-RunConfig-EnvEntry"></a>
+
+### RunConfig.EnvEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+ 
 
  
 

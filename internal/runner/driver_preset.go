@@ -9,6 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 // pathFields lists Extra keys that contain file paths and must be
@@ -204,12 +210,15 @@ type DriverCLIConfigs map[int]*DriverCLIConfig
 // If a STROPPY_DRIVER_N env var is already set in the process environment,
 // the CLI-composed value is skipped — user-set env takes precedence.
 func (configs DriverCLIConfigs) ToEnvVars() ([]string, error) {
+	lg := logger.Global().Named("driver_preset")
 	envs := make([]string, 0, len(configs))
 
 	for idx, cfg := range configs {
 		envKey := fmt.Sprintf("STROPPY_DRIVER_%d", idx)
 
 		if _, ok := os.LookupEnv(envKey); ok {
+			lg.Debug("CLI driver skipped: real env takes precedence", zap.String("key", envKey))
+
 			continue
 		}
 
@@ -217,6 +226,56 @@ func (configs DriverCLIConfigs) ToEnvVars() ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize driver %d config: %w", idx, err)
 		}
+
+		lg.Debug("Applying CLI driver config", zap.Int("index", idx), zap.String("type", cfg.DriverType))
+
+		envs = append(envs, envKey+"="+string(data))
+	}
+
+	return envs, nil
+}
+
+// fileDriverRunConfigsToEnvVars serializes config-file driver configs to
+// STROPPY_DRIVER_N env vars. Only emits vars for driver indices that are
+// absent from both the real environment and cliConfigs (CLI -d/-D flags).
+//
+// protojson produces camelCase field names matching the TypeScript DriverSetup
+// interface consumed by declareDriverSetup() in helpers.ts.
+func fileDriverRunConfigsToEnvVars(
+	fileDrivers map[uint32]*stroppy.DriverRunConfig,
+	cliConfigs DriverCLIConfigs,
+) ([]string, error) {
+	if len(fileDrivers) == 0 {
+		return nil, nil
+	}
+
+	lg := logger.Global().Named("driver_preset")
+	envs := make([]string, 0, len(fileDrivers))
+
+	for idx, drCfg := range fileDrivers {
+		envKey := fmt.Sprintf("STROPPY_DRIVER_%d", idx)
+
+		if _, ok := os.LookupEnv(envKey); ok {
+			lg.Debug("Config file driver skipped: real env takes precedence", zap.String("key", envKey))
+
+			continue
+		}
+
+		if _, ok := cliConfigs[int(idx)]; ok {
+			lg.Debug("Config file driver skipped: CLI -d/-D takes precedence", zap.Uint32("index", idx))
+
+			continue
+		}
+
+		data, err := (protojson.MarshalOptions{EmitUnpopulated: false}).Marshal(drCfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize file driver %d config: %w", idx, err)
+		}
+
+		lg.Debug("Applying config file driver",
+			zap.Uint32("index", idx),
+			zap.String("type", drCfg.GetDriverType()),
+		)
 
 		envs = append(envs, envKey+"="+string(data))
 	}
