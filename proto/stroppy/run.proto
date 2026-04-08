@@ -1,0 +1,174 @@
+syntax = "proto3";
+
+package stroppy;
+
+import "proto/stroppy/config.proto";
+
+option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
+
+/**
+ * DriverRunConfig is the user-facing driver configuration for the stroppy config file.
+ * It mirrors the TypeScript DriverSetup interface so that protojson serialization
+ * (camelCase field names, string values) is directly readable by declareDriverSetup()
+ * in the TypeScript layer via the STROPPY_DRIVER_N environment variable.
+ *
+ * This is intentionally separate from DriverConfig (the runtime binary proto for TS->Go dispatch).
+ */
+message DriverRunConfig {
+  /**
+   * Driver type. One of: "postgres", "mysql", "picodata", "ydb", "noop".
+   * Matches TS DriverSetup.driverType (string union, not proto enum).
+   */
+  string driver_type = 1;
+
+  /** Database connection URL */
+  string url = 2;
+
+  /**
+   * Default insert method. One of: "copy_from", "plain_bulk", "plain_query".
+   * Matches TS DriverSetup.defaultInsertMethod.
+   */
+  string default_insert_method = 3;
+
+  /**
+   * Pool configuration. Sugar field that maps to PostgresConfig or SqlConfig
+   * in the TypeScript layer based on driver_type.
+   * Matches TS DriverSetup.pool (PoolConfig).
+   */
+  message PoolConfig {
+    // pgx / postgres pool fields
+    optional int32 max_conns = 1;
+    optional int32 min_conns = 2;
+    optional int32 min_idle_conns = 3;
+    optional string max_conn_lifetime = 4;
+    optional string max_conn_idle_time = 5;
+    optional string trace_log_level = 6;
+    optional string default_query_exec_mode = 7;
+    optional int32 description_cache_capacity = 8;
+    optional int32 statement_cache_capacity = 9;
+    // database/sql pool fields (mysql, ydb)
+    optional int32 max_open_conns = 10;
+    optional int32 max_idle_conns = 11;
+    optional string conn_max_lifetime = 12;
+    optional string conn_max_idle_time = 13;
+  }
+
+  optional PoolConfig pool = 4;
+
+  /**
+   * Error handling mode. One of: "silent", "log", "throw", "fail", "abort".
+   * Matches TS DriverSetup.errorMode.
+   */
+  string error_mode = 5;
+
+  /** Rows per bulk INSERT statement. Matches TS DriverSetup.bulkSize. */
+  optional int32 bulk_size = 6;
+
+  /** Path to CA certificate PEM file. Matches TS DriverSetup.caCertFile. */
+  optional string ca_cert_file = 7;
+
+  /** Authentication token (e.g. IAM token). Matches TS DriverSetup.authToken. */
+  optional string auth_token = 8;
+
+  /** Username for static credentials. Matches TS DriverSetup.authUser. */
+  optional string auth_user = 9;
+
+  /** Password for static credentials. Matches TS DriverSetup.authPassword. */
+  optional string auth_password = 10;
+
+  /** Skip TLS certificate verification. Matches TS DriverSetup.tlsInsecureSkipVerify. */
+  optional bool tls_insecure_skip_verify = 11;
+
+  /**
+   * Default transaction isolation level.
+   * One of: "read_uncommitted", "read_committed", "repeatable_read", "serializable".
+   * Matches TS DriverSetup.defaultTxIsolation.
+   */
+  string default_tx_isolation = 12;
+}
+
+/**
+ * RunConfig is the top-level stroppy config file schema.
+ *
+ * Default file: ./stroppy-config.json (auto-discovered by stroppy run and stroppy probe).
+ * Override with -f/--file flag.
+ *
+ * Precedence (highest to lowest):
+ *   real env > -e flags > this file > -d/-D presets > script defaults
+ *
+ * Example (stroppy-config.json):
+ *   {
+ *     "version": "1",
+ *     "script": "tpcc",
+ *     "global": {
+ *       "logger": { "logLevel": "LOG_LEVEL_INFO" }
+ *     },
+ *     "drivers": {
+ *       "0": { "driverType": "postgres", "url": "postgres://user:pass@db:5432/bench",
+ *               "pool": { "maxConns": 200 } }
+ *     },
+ *     "env": { "DURATION": "30m", "VUS_SCALE": "0.5", "WAREHOUSES": "10" },
+ *     "k6Args": ["--vus", "10"]
+ *   }
+ */
+message RunConfig {
+  /** Config file format version. Currently "1". */
+  string version = 1;
+
+  /**
+   * Script to run: preset name (e.g. "tpcc"), .ts path, .sql path, or inline SQL.
+   * If omitted, the first CLI positional argument is used.
+   */
+  optional string script = 2;
+
+  /**
+   * SQL file: path or name. If omitted, auto-resolved from script/preset.
+   */
+  optional string sql = 3;
+
+  /**
+   * Global stroppy settings: logger level/mode, OTEL exporter, seed, run_id, metadata.
+   * These activate the previously-dead GlobalConfig plumbing.
+   */
+  GlobalConfig global = 4;
+
+  /**
+   * Driver configurations indexed by driver number (0-based string key in JSON).
+   * Equivalent to -d/-D CLI flags but type-safe and with full pool config support.
+   * CLI -d/-D takes precedence over entries here.
+   */
+  map<uint32, DriverRunConfig> drivers = 5;
+
+  /**
+   * Environment variable overrides for the k6 script.
+   * Equivalent to -e KEY=VALUE. All keys are uppercased on load.
+   * Precedence: real env > -e flags > this map > script ENV() defaults.
+   */
+  map<string, string> env = 6;
+
+  /**
+   * Step allowlist. Equivalent to --steps.
+   * CLI --steps takes precedence; this is used only when --steps is absent.
+   */
+  repeated string steps = 7;
+
+  /**
+   * Step blocklist. Equivalent to --no-steps.
+   * CLI --no-steps takes precedence; this is used only when --no-steps is absent.
+   */
+  repeated string no_steps = 8;
+
+  /**
+   * Additional raw args passed directly to "k6 run".
+   * Placed before CLI -- args, so CLI args can override (last-wins for most k6 flags).
+   * Example: ["--vus", "10", "--duration", "30m"]
+   */
+  repeated string k6_args = 9;
+
+  /**
+   * Optional path to a k6 native config JSON file.
+   * If set, "--config <path>" is prepended to k6 run args.
+   * Useful for setting scenarios, thresholds, or other options not available via CLI flags.
+   */
+  optional string k6_config = 10;
+}

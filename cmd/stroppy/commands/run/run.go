@@ -10,8 +10,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
 )
 
 const consumedPairFlag = 2 // number of tokens consumed for a two-token flag (e.g. "-d pg")
@@ -24,7 +26,7 @@ var (
 )
 
 var Cmd = &cobra.Command{
-	Use: "run <script> [sql_file] [-d driver] [-D key=value] " +
+	Use: "run [<script>] [sql_file] [-f config.json] [-d driver] [-D key=value] " +
 		"[-e KEY=VALUE] [--steps step1,step2] [-- k6-args...]",
 	Short: "Run benchmark script with k6",
 	Long: `Run a benchmark with k6. The extension determines the mode:
@@ -47,6 +49,11 @@ Driver flags:
   -D, --driver-opt K=V    Override a driver field (url, driverType, etc.)
 
   See 'stroppy help drivers' for all options and presets.
+
+Config file flags:
+  -f, --file PATH         Load config from file (default: ./stroppy-config.json if exists)
+                          Config file values are lower precedence than -e/-d/-D flags.
+                          See 'stroppy help config-file' for details.
 `,
 	DisableFlagParsing: true,
 	SilenceErrors:      false,
@@ -68,17 +75,56 @@ Driver flags:
   stroppy run tpcc -e FOO=bar -e BAZ=qux        # multiple env overrides
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return errNoScript
-		}
-
-		if args[0] == "--help" || args[0] == "-h" {
+		if len(args) > 0 && (args[0] == "--help" || args[0] == "-h") {
 			return cmd.Help()
 		}
 
 		parsed, err := parseRunArgs(args)
 		if err != nil {
 			return err
+		}
+
+		// Load config file if -f is specified or stroppy-config.json exists.
+		fileConfig, _, err := runner.LoadRunConfig(parsed.fileArg)
+		if err != nil {
+			return fmt.Errorf("failed to load config file: %w", err)
+		}
+
+		// Apply effective values: CLI overrides config file.
+		scriptArg := runner.EffectiveScript(parsed.scriptArg, fileConfig)
+		sqlArg := runner.EffectiveSQL(parsed.sqlArg, fileConfig)
+		steps := runner.EffectiveSteps(parsed.steps, fileConfig)
+		noSteps := runner.EffectiveNoSteps(parsed.noSteps, fileConfig)
+		k6RunArgs := runner.EffectiveK6Args(parsed.afterDash, fileConfig)
+
+		if scriptArg == "" {
+			return errNoScript
+		}
+
+		// Log override decisions when both CLI and file config are present.
+		if fileConfig != nil {
+			lg := logger.Global().Named("run")
+
+			if parsed.scriptArg != "" && fileConfig.GetScript() != "" {
+				lg.Debug("CLI script overrides config file",
+					zap.String("cli", parsed.scriptArg),
+					zap.String("file", fileConfig.GetScript()),
+				)
+			}
+
+			if len(parsed.steps) > 0 && len(fileConfig.GetSteps()) > 0 {
+				lg.Debug("CLI --steps overrides config file steps",
+					zap.Strings("cli", parsed.steps),
+					zap.Strings("file", fileConfig.GetSteps()),
+				)
+			}
+
+			if len(parsed.afterDash) > 0 && len(fileConfig.GetK6Args()) > 0 {
+				lg.Debug("CLI k6 args merged with config file k6_args",
+					zap.Strings("file", fileConfig.GetK6Args()),
+					zap.Strings("cli", parsed.afterDash),
+				)
+			}
 		}
 
 		// Resolve -e overrides (uppercase keys, validate format).
@@ -102,17 +148,25 @@ Driver flags:
 		}
 
 		// Resolve files through search path.
-		input, err := runner.ResolveInput(parsed.scriptArg, parsed.sqlArg)
+		input, err := runner.ResolveInput(scriptArg, sqlArg)
 		if err != nil {
 			return fmt.Errorf("failed to resolve input: %w", err)
 		}
 
-		r, err := runner.NewScriptRunner(input, parsed.afterDash, parsed.steps, parsed.noSteps, driverConfigs, envOverrides)
+		scriptRunner, err := runner.NewScriptRunner(
+			input,
+			k6RunArgs,
+			steps,
+			noSteps,
+			driverConfigs,
+			envOverrides,
+			fileConfig,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create runner: %w", err)
 		}
 
-		err = r.Run(context.Background())
+		err = scriptRunner.Run(context.Background())
 
 		var exitErr *runner.ExitError
 		if errors.As(err, &exitErr) {
@@ -131,6 +185,7 @@ Driver flags:
 type runArgs struct {
 	scriptArg     string
 	sqlArg        string
+	fileArg       string // -f/--file: path to stroppy config file
 	steps         []string
 	noSteps       []string
 	afterDash     []string
@@ -138,6 +193,10 @@ type runArgs struct {
 	driverPresets map[int]string      // driver index → preset name
 	driverOpts    map[int][][2]string // driver index → list of [key, value] pairs
 }
+
+// flagParser is a function that attempts to parse a flag at position i.
+// Returns the number of tokens consumed, or 0 if the arg is not this flag.
+type flagParser func(args []string, i int, parsed *runArgs) (int, error)
 
 // parseRunArgs parses the raw CLI args (after cobra hands them to RunE) and
 // returns the structured result without performing any file or preset resolution.
@@ -153,30 +212,15 @@ func parseRunArgs(args []string) (runArgs, error) {
 		positional = args
 	}
 
+	parsers := []flagParser{
+		parseStepsFlag,
+		parseFileFlag,
+		parseEnvFlag,
+		parseDriverFlags,
+	}
+
 	for i := 0; i < len(positional); i++ {
-		consumed, err := parseStepsFlag(positional, i, &parsed)
-		if err != nil {
-			return runArgs{}, err
-		}
-
-		if consumed > 0 {
-			i += consumed - 1
-
-			continue
-		}
-
-		consumed, err = parseEnvFlag(positional, i, &parsed)
-		if err != nil {
-			return runArgs{}, err
-		}
-
-		if consumed > 0 {
-			i += consumed - 1
-
-			continue
-		}
-
-		consumed, err = parseDriverFlags(positional, i, &parsed)
+		consumed, err := dispatchFlag(parsers, positional, i, &parsed)
 		if err != nil {
 			return runArgs{}, err
 		}
@@ -199,6 +243,23 @@ func parseRunArgs(args []string) (runArgs, error) {
 	}
 
 	return parsed, nil
+}
+
+// dispatchFlag tries each parser in order until one consumes the arg at
+// positional[i]. Returns tokens consumed (0 if no parser matched).
+func dispatchFlag(parsers []flagParser, positional []string, i int, parsed *runArgs) (int, error) {
+	for _, p := range parsers {
+		consumed, err := p(positional, i, parsed)
+		if err != nil {
+			return 0, err
+		}
+
+		if consumed > 0 {
+			return consumed, nil
+		}
+	}
+
+	return 0, nil
 }
 
 // parseStepsFlag handles --steps and --no-steps in both space and equals forms.
@@ -228,6 +289,35 @@ func parseStepsFlag(args []string, i int, parsed *runArgs) (int, error) {
 
 	case strings.HasPrefix(arg, "--no-steps="):
 		parsed.noSteps = append(parsed.noSteps, strings.Split(strings.TrimPrefix(arg, "--no-steps="), ",")...)
+
+		return 1, nil
+	}
+
+	return 0, nil
+}
+
+// parseFileFlag handles -f and --file flags.
+// Returns the number of tokens consumed (0 if the arg is not a file flag).
+func parseFileFlag(args []string, i int, parsed *runArgs) (int, error) {
+	arg := args[i]
+
+	switch {
+	case arg == "-f" || arg == "--file":
+		if i+1 >= len(args) {
+			return 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
+		}
+
+		parsed.fileArg = args[i+1]
+
+		return consumedPairFlag, nil
+
+	case strings.HasPrefix(arg, "-f="):
+		parsed.fileArg = strings.TrimPrefix(arg, "-f=")
+
+		return 1, nil
+
+	case strings.HasPrefix(arg, "--file="):
+		parsed.fileArg = strings.TrimPrefix(arg, "--file=")
 
 		return 1, nil
 	}

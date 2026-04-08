@@ -21,6 +21,7 @@ const (
 
 	localFlag  = "local"
 	formatFlag = "output"
+	fileFlag   = "file"
 
 	configFlag  = "config"
 	optionsFlag = "options"
@@ -37,6 +38,7 @@ var (
 	formats             = []string{humanFormat, jsonFormat}
 	formatsWithCommas   = strings.Join(formats, ", ")
 	ErrUnsoportedFormat = errors.New("unsupported format")
+	errNoScript         = errors.New("script argument is required (pass positional or set 'script' in config file)")
 	Cmd                 = func() *cobra.Command {
 		cmd := &cobra.Command{
 			Use:   "probe",
@@ -50,15 +52,37 @@ to filter output. See 'stroppy help probe' for section descriptions.
 `,
 			// TODO: auto detect tests with magic test.ts name.
 			// Or do "probe" of this dir, go trough all ts files, show all sql, or like this.
-			Args: cobra.RangeArgs(minArgs, maxArgs),
+			Args: cobra.RangeArgs(0, maxArgs),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				scriptPath := args[minArgs-1]
-				sqlPath := ""
 				localFlagValue, _ := cmd.Flags().GetBool(localFlag)
 				formatFlagValue := cmd.Flag(formatFlag).Value.String()
+				fileFlagValue := cmd.Flag(fileFlag).Value.String()
+
+				// Load config file if -f is specified or stroppy-config.json exists.
+				fileConfig, _, err := runner.LoadRunConfig(fileFlagValue)
+				if err != nil {
+					return fmt.Errorf("failed to load config file: %w", err)
+				}
+
+				// Determine script and SQL paths: CLI args override file config.
+				var (
+					scriptPath string
+					sqlPath    string
+				)
+
+				if len(args) >= minArgs {
+					scriptPath = args[minArgs-1]
+				}
 
 				if len(args) == maxArgs {
 					sqlPath = args[maxArgs-1]
+				}
+
+				scriptPath = runner.EffectiveScript(scriptPath, fileConfig)
+				sqlPath = runner.EffectiveSQL(sqlPath, fileConfig)
+
+				if scriptPath == "" {
+					return errNoScript
 				}
 
 				if !slices.Contains(formats, formatFlagValue) {
@@ -70,10 +94,7 @@ to filter output. See 'stroppy help probe' for section descriptions.
 					)
 				}
 
-				var (
-					probeprint *runner.Probeprint
-					err        error
-				)
+				var probeprint *runner.Probeprint
 
 				if localFlagValue {
 					probeprint, err = runner.ProbeScript(scriptPath)
@@ -83,6 +104,10 @@ to filter output. See 'stroppy help probe' for section descriptions.
 
 				if err != nil {
 					return fmt.Errorf("error while probbing %q: %w", scriptPath, err)
+				}
+
+				if fileConfig != nil {
+					probeprint.FileConfig = fileConfig
 				}
 
 				sections := buildSections(cmd)
@@ -110,6 +135,10 @@ to filter output. See 'stroppy help probe' for section descriptions.
 		cmd.Flags().
 			BoolP(localFlag, string(localFlag[0]), false,
 				"prevent tmp dir creation (use local dependencies in test working directory)")
+
+		cmd.Flags().
+			StringP(fileFlag, string(fileFlag[0]), "",
+				"load config from file (default: ./stroppy-config.json if present)")
 
 		cmd.Flags().Bool(configFlag, false, "show only stroppy config section")
 		cmd.Flags().Bool(optionsFlag, false, "show only k6 options section")

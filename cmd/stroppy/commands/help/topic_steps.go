@@ -74,6 +74,7 @@ SEE ALSO
   stroppy run --help
   stroppy probe --help
   stroppy help probe
+  stroppy help config-file   (steps and no_steps can be set in config file)
 `,
 	})
 }

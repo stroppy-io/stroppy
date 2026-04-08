@@ -67,6 +67,9 @@ type Probeprint struct {
 	// GlobalConfig is config passed to driver(s) while test.
 	GlobalConfig *stroppy.GlobalConfig `json:"global_config"`
 
+	// FileConfig is the user config file loaded via -f/--file; not serialized.
+	FileConfig *stroppy.RunConfig `json:"-"`
+
 	Subprobe
 }
 
@@ -166,14 +169,26 @@ func (p *Probeprint) Explain(sections ExplainSection) string {
 func (p *Probeprint) explainConfig(sb *strings.Builder) {
 	sb.WriteString("# Stroppy Config:\n")
 
-	if p.GlobalConfig != nil {
+	gc := p.GlobalConfig
+
+	source := ""
+
+	if p.FileConfig.GetGlobal() != nil && !isEmptyGlobalConfig(p.FileConfig.GetGlobal()) {
+		gc = p.FileConfig.GetGlobal()
+		source = " (from config file)"
+	}
+
+	if gc != nil {
+		if source != "" {
+			sb.WriteString(source)
+			sb.WriteString("\n")
+		}
+
 		configJSON, err := protojson.MarshalOptions{
 			Multiline:    true,
 			AllowPartial: true,
 			Indent:       "  ",
-		}.Marshal(
-			p.GlobalConfig,
-		)
+		}.Marshal(gc)
 		if err != nil {
 			panic(err)
 		}
@@ -183,6 +198,12 @@ func (p *Probeprint) explainConfig(sb *strings.Builder) {
 	} else {
 		sb.WriteString("  (no config)\n\n")
 	}
+}
+
+// isEmptyGlobalConfig reports whether gc has no meaningful fields set.
+func isEmptyGlobalConfig(gc *stroppy.GlobalConfig) bool {
+	return gc == nil || (gc.GetLogger() == nil && gc.GetExporter() == nil &&
+		gc.GetRunId() == "" && gc.GetSeed() == 0 && len(gc.GetMetadata()) == 0)
 }
 
 func (p *Probeprint) explainOptions(sb *strings.Builder) {
@@ -254,6 +275,14 @@ func (p *Probeprint) explainEnvs(sb *strings.Builder) {
 
 	if len(p.EnvDeclarations) == 0 && !hasPlain {
 		sb.WriteString("  (no environment variables)\n")
+	}
+
+	if p.FileConfig != nil && len(p.FileConfig.GetEnv()) > 0 {
+		sb.WriteString("\n  # From config file (-f):\n")
+
+		for k, v := range p.FileConfig.GetEnv() {
+			fmt.Fprintf(sb, "  %s=%s\n", k, v)
+		}
 	}
 
 	sb.WriteString("\n")

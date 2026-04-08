@@ -132,10 +132,37 @@ EXAMPLES
   # Pass via k6 -e after the separator
   stroppy run tpcc -- -e WAREHOUSES=20 -e POOL_SIZE=50
 
+CONFIG FILE ALTERNATIVE
+
+  Instead of repeating -e flags on every run, collect env overrides in a
+  config file under the "env" key:
+
+    {
+      "env": {
+        "DURATION": "30m",
+        "WAREHOUSES": "10",
+        "POOL_SIZE": "200"
+      }
+    }
+
+  Precedence: real env > -e flags > config file env > script defaults.
+  See 'stroppy help config-file' for the full format and precedence rules.
+
+DEBUG: TRACING ENV RESOLUTION
+
+  To see which env vars are applied and where they came from:
+
+    LOG_LEVEL=debug stroppy run <script>
+
+  The env_override logger emits a debug line whenever the real environment
+  takes precedence over a -e flag or config file env entry, identifying the
+  key that was skipped.
+
 SEE ALSO
 
   stroppy probe --help
   stroppy help drivers
+  stroppy help config-file
 `,
 	})
 }
