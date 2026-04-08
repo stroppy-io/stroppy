@@ -3,35 +3,63 @@ import { Teardown } from "k6/x/stroppy";
 import { DriverX, AB, C, R, Step, S, ENV, declareDriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
-const SQL_FILE = ENV("SQL_FILE", "./tpcb.sql", "Path to SQL file (automatically set if .sql file provided as argument)");
+declare const __VU: number;
 
 // TPC-B Configuration Constants
 const SCALE_FACTOR = ENV(["SCALE_FACTOR", "BRANCHES"], 1, "TPC-B scale factor");
+const DURATION    = ENV("DURATION", "1m", "Test duration");
+const VUS_SCALE   = ENV("VUS_SCALE", 1, "VUs scale factor (multiplied with base 50)");
+const POOL_SIZE   = ENV("POOL_SIZE", 50, "Connection pool size");
+
 const BRANCHES = SCALE_FACTOR;
-const TELLERS = 10 * SCALE_FACTOR;
+const TELLERS  = 10 * SCALE_FACTOR;
 const ACCOUNTS = 100000 * SCALE_FACTOR;
 
 // K6 options
 export const options: Options = {
-  setupTimeout: String(SCALE_FACTOR) + "m" ,
+  setupTimeout: String(SCALE_FACTOR) + "m",
+  scenarios: {
+    tpcb: {
+      executor: "constant-vus",
+      vus: Math.max(1, Math.floor(50 * VUS_SCALE)),
+      duration: DURATION,
+    },
+  },
 };
 
-// Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql/pico)
+// Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql)
 const driverConfig = declareDriverSetup(0, {
   url: "postgres://postgres:postgres@localhost:5432",
   driverType: "postgres",
   defaultInsertMethod: "copy_from",
+  pool: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
 });
+
+// procs.ts targets pg + mysql only — picodata and ydb have no stored procedures.
+if (driverConfig.driverType === "picodata" || driverConfig.driverType === "ydb") {
+  throw new Error(
+    `tpcb/procs.ts only supports postgres and mysql (got driverType=${driverConfig.driverType}). ` +
+    `Use tpcb/tx.ts for picodata/ydb.`,
+  );
+}
+
+const _sqlByDriver: Record<string, string> = {
+  postgres: "./pg.sql",
+  mysql:    "./mysql.sql",
+};
+const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file path (defaults per driverType)")
+  ?? _sqlByDriver[driverConfig.driverType!]
+  ?? "./pg.sql";
 
 const driver = DriverX.create().setup(driverConfig);
 
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
-// Setup function: create schema and load data
+// Setup function: drop, create schema + procs, load data
 export function setup() {
-  Step("cleanup", () => {
-    sql("cleanup").forEach((query) => driver.exec(query, {}));
-  })
+  Step("drop_schema", () => {
+    sql("drop_schema").forEach((query) => driver.exec(query, {}));
+  });
 
   Step("create_schema", () => {
     sql("create_schema").forEach((query) => driver.exec(query, {}));
@@ -67,8 +95,6 @@ export function setup() {
         filler: R.str(84, AB.en),
       },
     });
-
-    sql("analyze").forEach((query) => driver.exec(query, {}));
   });
 
   Step.begin("workload");
@@ -76,18 +102,23 @@ export function setup() {
 }
 
 // Generators for transaction parameters
-const aidGen = R.int32(1, ACCOUNTS).gen();
-const tidGen = R.int32(1, TELLERS).gen();
-const bidGen = R.int32(1, BRANCHES).gen();
+const aidGen   = R.int32(1, ACCOUNTS).gen();
+const tidGen   = R.int32(1, TELLERS).gen();
+const bidGen   = R.int32(1, BRANCHES).gen();
 const deltaGen = R.int32(-5000, 5000).gen();
 
-// TPC-B transaction workload
+// Per-VU monotonic counter for history PK (uniform across all dialects).
+let hcounter = (typeof __VU === "number" ? __VU : 1) * 1_000_000_000;
+const nextHid = () => ++hcounter;
+
+// TPC-B transaction workload — single stored proc call per iteration.
 export default function (): void {
-  driver.exec(sql("workload", "tpcb_transaction")!, {
+  driver.exec(sql("workload_procs", "tpcb_transaction")!, {
     p_aid: aidGen.next(),
     p_tid: tidGen.next(),
     p_bid: bidGen.next(),
     p_delta: deltaGen.next(),
+    p_hid: nextHid(),
   });
 }
 

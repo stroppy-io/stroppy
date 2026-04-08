@@ -51,6 +51,16 @@ func (r *Rows) Values() []any {
 		return nil
 	}
 
+	// Normalize []byte → string. Go's database/sql returns CHAR/VARCHAR/TEXT
+	// as []byte for some drivers (notably go-sql-driver/mysql) when scanning
+	// into *any, while lib/pq returns string. Callers — especially JS via
+	// xk6air — expect plain strings for text columns, so we unify here.
+	for i, v := range values {
+		if b, ok := v.([]byte); ok {
+			values[i] = string(b)
+		}
+	}
+
 	return values
 }
 
