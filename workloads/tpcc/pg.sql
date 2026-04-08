@@ -59,6 +59,7 @@ CREATE TABLE customer (
 )
 --= history
 CREATE TABLE history (
+  h_id BIGINT NOT NULL PRIMARY KEY,
   h_c_id INTEGER,
   h_c_d_id INTEGER,
   h_c_w_id INTEGER,
@@ -132,94 +133,105 @@ CREATE TABLE stock (
 )
 
 --+ create_procedures
---= dbms_random
-CREATE OR REPLACE FUNCTION DBMS_RANDOM (INTEGER, INTEGER) RETURNS INTEGER AS $$
-DECLARE
-  start_int ALIAS FOR $1;
-  end_int ALIAS FOR $2;
-BEGIN
-  RETURN trunc(random() * (end_int-start_int + 1) + start_int);
-END;
-$$ LANGUAGE 'plpgsql' STRICT;
-
 --= neword
 CREATE OR REPLACE FUNCTION NEWORD (
   no_w_id INTEGER,
   no_max_w_id INTEGER,
   no_d_id INTEGER,
   no_c_id INTEGER,
-  no_o_ol_cnt INTEGER,
-  no_d_next_o_id INTEGER
-) RETURNS NUMERIC AS $$
+  no_o_ol_cnt INTEGER
+) RETURNS INTEGER AS $$
 DECLARE
   no_c_discount NUMERIC;
   no_c_last VARCHAR;
   no_c_credit VARCHAR;
   no_d_tax NUMERIC;
   no_w_tax NUMERIC;
-  no_s_quantity NUMERIC;
-  no_o_all_local SMALLINT;
-  rbk SMALLINT;
-  item_id_array INT[];
-  supply_wid_array INT[];
-  quantity_array SMALLINT[];
-  order_line_array SMALLINT[];
-  stock_dist_array CHAR(24)[];
-  s_quantity_array SMALLINT[];
-  price_array NUMERIC(5,2)[];
-  amount_array NUMERIC(5,2)[];
+  no_d_next_o_id INTEGER;
+  no_o_all_local INTEGER;
+  v_i_id INTEGER;
+  v_supply_w_id INTEGER;
+  v_quantity INTEGER;
+  v_s_quantity INTEGER;
+  v_i_price NUMERIC;
+  v_i_name VARCHAR;
+  v_i_data VARCHAR;
+  v_s_data VARCHAR;
+  v_dist_info CHAR(24);
+  v_amount NUMERIC;
+  loop_counter INTEGER;
 BEGIN
   no_o_all_local := 1;
-  SELECT c_discount, c_last, c_credit, w_tax
-  INTO no_c_discount, no_c_last, no_c_credit, no_w_tax
-  FROM customer, warehouse
-  WHERE warehouse.w_id = no_w_id AND customer.c_w_id = no_w_id
-    AND customer.c_d_id = no_d_id AND customer.c_id = no_c_id;
 
-  --#2.4.1.4
-  rbk := round(DBMS_RANDOM(1,100));
+  SELECT c_discount, c_last, c_credit
+    INTO no_c_discount, no_c_last, no_c_credit
+  FROM customer
+  WHERE c_w_id = no_w_id AND c_d_id = no_d_id AND c_id = no_c_id;
 
-  --#2.4.1.5
-  FOR loop_counter IN 1 .. no_o_ol_cnt
-  LOOP
-    IF ((loop_counter = no_o_ol_cnt) AND (rbk = 1))
-    THEN
-      item_id_array[loop_counter] := 100001;
-    ELSE
-      item_id_array[loop_counter] := round(DBMS_RANDOM(1,100000));
-    END IF;
-
-    --#2.4.1.5.2
-    IF ( round(DBMS_RANDOM(1,100)) > 1 )
-    THEN
-      supply_wid_array[loop_counter] := no_w_id;
-    ELSE
-      no_o_all_local := 0;
-      supply_wid_array[loop_counter] := 1 + MOD(CAST (no_w_id + round(DBMS_RANDOM(0,no_max_w_id-1)) AS INT), no_max_w_id);
-    END IF;
-
-    --#2.4.1.5.3
-    quantity_array[loop_counter] := round(DBMS_RANDOM(1,10));
-    order_line_array[loop_counter] := loop_counter;
-  END LOOP;
+  SELECT w_tax INTO no_w_tax FROM warehouse WHERE w_id = no_w_id;
 
   UPDATE district SET d_next_o_id = d_next_o_id + 1
   WHERE d_id = no_d_id AND d_w_id = no_w_id
   RETURNING d_next_o_id - 1, d_tax INTO no_d_next_o_id, no_d_tax;
 
-  INSERT INTO ORDERS (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
+  INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
   VALUES (no_d_next_o_id, no_d_id, no_w_id, no_c_id, current_timestamp, no_o_ol_cnt, no_o_all_local);
 
-  INSERT INTO NEW_ORDER (no_o_id, no_d_id, no_w_id)
+  INSERT INTO new_order (no_o_id, no_d_id, no_w_id)
   VALUES (no_d_next_o_id, no_d_id, no_w_id);
 
-  -- Stock and order line processing (simplified for brevity)
-  -- Full implementation would include district-specific s_dist processing
+  FOR loop_counter IN 1 .. no_o_ol_cnt
+  LOOP
+    v_i_id := 1 + (floor(random() * 100000))::INTEGER;
+    v_supply_w_id := no_w_id;
+    v_quantity := 1 + (floor(random() * 10))::INTEGER;
+
+    SELECT i_price, i_name, i_data INTO v_i_price, v_i_name, v_i_data
+    FROM item WHERE i_id = v_i_id;
+
+    IF NOT FOUND THEN
+      CONTINUE;
+    END IF;
+
+    SELECT s_quantity, s_data,
+      CASE no_d_id
+        WHEN 1 THEN s_dist_01
+        WHEN 2 THEN s_dist_02
+        WHEN 3 THEN s_dist_03
+        WHEN 4 THEN s_dist_04
+        WHEN 5 THEN s_dist_05
+        WHEN 6 THEN s_dist_06
+        WHEN 7 THEN s_dist_07
+        WHEN 8 THEN s_dist_08
+        WHEN 9 THEN s_dist_09
+        WHEN 10 THEN s_dist_10
+      END
+    INTO v_s_quantity, v_s_data, v_dist_info
+    FROM stock
+    WHERE s_i_id = v_i_id AND s_w_id = v_supply_w_id;
+
+    IF v_s_quantity - v_quantity >= 10 THEN
+      v_s_quantity := v_s_quantity - v_quantity;
+    ELSE
+      v_s_quantity := v_s_quantity - v_quantity + 91;
+    END IF;
+
+    UPDATE stock
+      SET s_quantity = v_s_quantity,
+          s_ytd = s_ytd + v_quantity,
+          s_order_cnt = s_order_cnt + 1,
+          s_remote_cnt = s_remote_cnt + 0
+    WHERE s_i_id = v_i_id AND s_w_id = v_supply_w_id;
+
+    v_amount := v_quantity * v_i_price;
+
+    INSERT INTO order_line
+      (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info)
+    VALUES
+      (no_d_next_o_id, no_d_id, no_w_id, loop_counter, v_i_id, v_supply_w_id, v_quantity, v_amount, v_dist_info);
+  END LOOP;
 
   RETURN no_d_next_o_id;
-EXCEPTION
-  WHEN serialization_failure OR deadlock_detected OR no_data_found
-  THEN ROLLBACK; RETURN -1;
 END;
 $$ LANGUAGE 'plpgsql';
 
@@ -232,7 +244,8 @@ CREATE OR REPLACE FUNCTION PAYMENT (
   p_c_id_in INTEGER,
   byname INTEGER,
   p_h_amount NUMERIC,
-  p_c_last_in VARCHAR
+  p_c_last_in VARCHAR,
+  p_h_id BIGINT
 ) RETURNS INTEGER AS $$
 DECLARE
   p_c_balance NUMERIC(12, 2);
@@ -241,8 +254,8 @@ DECLARE
   p_c_id INTEGER;
   p_w_name VARCHAR(11);
   p_d_name VARCHAR(11);
-  name_count SMALLINT;
-  h_data VARCHAR(30);
+  name_count INTEGER;
+  h_data_val VARCHAR(30);
 BEGIN
   p_c_id := p_c_id_in;
   p_c_last := p_c_last_in;
@@ -257,19 +270,19 @@ BEGIN
   WHERE d_w_id = p_w_id AND d_id = p_d_id
   RETURNING d_name INTO p_d_name;
 
-  IF ( byname = 1 )
-  THEN
+  IF ( byname = 1 ) THEN
     SELECT count(c_last) INTO name_count
     FROM customer
     WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id;
 
-    -- Get middle customer (simplified)
-    SELECT c_id, c_balance, c_credit
-    INTO p_c_id, p_c_balance, p_c_credit
-    FROM customer
-    WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id
-    ORDER BY c_first
-    LIMIT 1 OFFSET (name_count / 2);
+    IF name_count > 0 THEN
+      SELECT c_id, c_balance, c_credit
+      INTO p_c_id, p_c_balance, p_c_credit
+      FROM customer
+      WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id
+      ORDER BY c_first
+      LIMIT 1 OFFSET (name_count / 2);
+    END IF;
   ELSE
     SELECT c_balance, c_credit
     INTO p_c_balance, p_c_credit
@@ -277,22 +290,18 @@ BEGIN
     WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
   END IF;
 
-  h_data := p_w_name || ' ' || p_d_name;
+  h_data_val := COALESCE(p_w_name,'') || ' ' || COALESCE(p_d_name,'');
 
-  -- Update customer balance
   UPDATE customer
   SET c_balance = c_balance - p_h_amount,
       c_ytd_payment = c_ytd_payment + p_h_amount,
       c_payment_cnt = c_payment_cnt + 1
   WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
 
-  INSERT INTO history (h_c_d_id, h_c_w_id, h_c_id, h_d_id, h_w_id, h_date, h_amount, h_data)
-  VALUES (p_c_d_id, p_c_w_id, p_c_id, p_d_id, p_w_id, current_timestamp, p_h_amount, h_data);
+  INSERT INTO history (h_id, h_c_d_id, h_c_w_id, h_c_id, h_d_id, h_w_id, h_date, h_amount, h_data)
+  VALUES (p_h_id, p_c_d_id, p_c_w_id, p_c_id, p_d_id, p_w_id, current_timestamp, p_h_amount, h_data_val);
 
   RETURN p_c_id;
-EXCEPTION
-  WHEN serialization_failure OR deadlock_detected OR no_data_found
-  THEN ROLLBACK; RETURN -1;
 END;
 $$ LANGUAGE 'plpgsql';
 
@@ -302,71 +311,46 @@ CREATE OR REPLACE FUNCTION DELIVERY (
   d_o_carrier_id INTEGER
 ) RETURNS INTEGER AS $$
 DECLARE
-  loop_counter SMALLINT;
-  d_id_in_array SMALLINT[] := ARRAY[1,2,3,4,5,6,7,8,9,10];
-  d_id_array SMALLINT[];
-  o_id_array INT[];
-  c_id_array INT[];
-  sum_amounts NUMERIC[];
+  v_d_id INTEGER;
+  v_no_o_id INTEGER;
+  v_c_id INTEGER;
+  v_ol_total NUMERIC;
 BEGIN
-  -- Delete from new_order and get order IDs
-  WITH new_order_delete AS (
-    DELETE FROM new_order as del_new_order
-    USING UNNEST(d_id_in_array) AS d_ids
-    WHERE no_d_id = d_ids
-      AND no_w_id = d_w_id
-      AND del_new_order.no_o_id = (
-        select min(select_new_order.no_o_id)
-        from new_order as select_new_order
-        where no_d_id = d_ids and no_w_id = d_w_id
-      )
-    RETURNING del_new_order.no_o_id, del_new_order.no_d_id
-  )
-  SELECT array_agg(no_o_id), array_agg(no_d_id)
-  FROM new_order_delete
-  INTO o_id_array, d_id_array;
+  FOR v_d_id IN 1 .. 10 LOOP
+    SELECT min(no_o_id) INTO v_no_o_id
+    FROM new_order
+    WHERE no_d_id = v_d_id AND no_w_id = d_w_id;
 
-  -- Update orders with carrier
-  UPDATE orders
-  SET o_carrier_id = d_o_carrier_id
-  FROM UNNEST(o_id_array, d_id_array) AS ids(o_id, d_id)
-  WHERE orders.o_id = ids.o_id
-    AND o_d_id = ids.d_id
-    AND o_w_id = d_w_id;
+    IF v_no_o_id IS NULL THEN
+      CONTINUE;
+    END IF;
 
-  -- Update order lines and get amounts
-  WITH order_line_update AS (
+    DELETE FROM new_order
+    WHERE no_o_id = v_no_o_id AND no_d_id = v_d_id AND no_w_id = d_w_id;
+
+    SELECT o_c_id INTO v_c_id
+    FROM orders
+    WHERE o_id = v_no_o_id AND o_d_id = v_d_id AND o_w_id = d_w_id;
+
+    UPDATE orders
+    SET o_carrier_id = d_o_carrier_id
+    WHERE o_id = v_no_o_id AND o_d_id = v_d_id AND o_w_id = d_w_id;
+
     UPDATE order_line
     SET ol_delivery_d = current_timestamp
-    FROM UNNEST(o_id_array, d_id_array) AS ids(o_id, d_id)
-    WHERE ol_o_id = ids.o_id
-      AND ol_d_id = ids.d_id
-      AND ol_w_id = d_w_id
-    RETURNING ol_d_id, ol_o_id, ol_amount
-  )
-  SELECT array_agg(ol_d_id), array_agg(c_id), array_agg(sum_amount)
-  FROM (
-    SELECT ol_d_id,
-           (SELECT DISTINCT o_c_id FROM orders WHERE o_id = ol_o_id AND o_d_id = ol_d_id AND o_w_id = d_w_id) AS c_id,
-           sum(ol_amount) AS sum_amount
-    FROM order_line_update
-    GROUP BY ol_d_id, ol_o_id
-  ) AS inner_sum
-  INTO d_id_array, c_id_array, sum_amounts;
+    WHERE ol_o_id = v_no_o_id AND ol_d_id = v_d_id AND ol_w_id = d_w_id;
 
-  -- Update customer balances
-  UPDATE customer
-  SET c_balance = COALESCE(c_balance,0) + ids_and_sums.sum_amounts,
-      c_delivery_cnt = c_delivery_cnt + 1
-  FROM UNNEST(d_id_array, c_id_array, sum_amounts) AS ids_and_sums(d_id, c_id, sum_amounts)
-  WHERE customer.c_id = ids_and_sums.c_id
-    AND c_d_id = ids_and_sums.d_id
-    AND c_w_id = d_w_id;
+    SELECT COALESCE(SUM(ol_amount), 0) INTO v_ol_total
+    FROM order_line
+    WHERE ol_o_id = v_no_o_id AND ol_d_id = v_d_id AND ol_w_id = d_w_id;
+
+    UPDATE customer
+    SET c_balance = c_balance + v_ol_total,
+        c_delivery_cnt = c_delivery_cnt + 1
+    WHERE c_id = v_c_id AND c_d_id = v_d_id AND c_w_id = d_w_id;
+  END LOOP;
 
   RETURN 1;
-EXCEPTION
-  WHEN serialization_failure OR deadlock_detected OR no_data_found
-  THEN ROLLBACK; RETURN -1;
 END;
 $$ LANGUAGE 'plpgsql';
 
@@ -377,49 +361,47 @@ CREATE OR REPLACE FUNCTION OSTAT (
   os_c_id INTEGER,
   byname INTEGER,
   os_c_last VARCHAR
-) RETURNS TABLE(customer_info TEXT, order_info TEXT) AS $$
+) RETURNS INTEGER AS $$
 DECLARE
   namecnt INTEGER;
-  os_c_balance NUMERIC;
-  os_c_first VARCHAR;
-  os_c_middle VARCHAR;
-  os_o_id INTEGER;
-  os_entdate TIMESTAMP;
-  os_o_carrier_id INTEGER;
+  v_c_id INTEGER;
+  v_c_balance NUMERIC;
+  v_c_first VARCHAR;
+  v_c_middle VARCHAR;
+  v_o_id INTEGER;
+  v_entdate TIMESTAMP;
+  v_o_carrier_id INTEGER;
 BEGIN
-  IF ( byname = 1 )
-  THEN
+  v_c_id := os_c_id;
+
+  IF ( byname = 1 ) THEN
     SELECT count(c_id) INTO namecnt
     FROM customer
     WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id;
 
-    SELECT c_balance, c_first, c_middle, c_id
-    INTO os_c_balance, os_c_first, os_c_middle, os_c_id
-    FROM customer
-    WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id
-    ORDER BY c_first
-    LIMIT 1 OFFSET ((namecnt + 1) / 2);
+    IF namecnt > 0 THEN
+      SELECT c_balance, c_first, c_middle, c_id
+      INTO v_c_balance, v_c_first, v_c_middle, v_c_id
+      FROM customer
+      WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id
+      ORDER BY c_first
+      LIMIT 1 OFFSET ((namecnt + 1) / 2);
+    END IF;
   ELSE
-    SELECT c_balance, c_first, c_middle, c_last
-    INTO os_c_balance, os_c_first, os_c_middle, os_c_last
+    SELECT c_balance, c_first, c_middle
+    INTO v_c_balance, v_c_first, v_c_middle
     FROM customer
-    WHERE c_id = os_c_id AND c_d_id = os_d_id AND c_w_id = os_w_id;
+    WHERE c_id = v_c_id AND c_d_id = os_d_id AND c_w_id = os_w_id;
   END IF;
 
   SELECT o_id, o_carrier_id, o_entry_d
-  INTO os_o_id, os_o_carrier_id, os_entdate
+  INTO v_o_id, v_o_carrier_id, v_entdate
   FROM orders
-  WHERE o_d_id = os_d_id AND o_w_id = os_w_id AND o_c_id = os_c_id
+  WHERE o_d_id = os_d_id AND o_w_id = os_w_id AND o_c_id = v_c_id
   ORDER BY o_id DESC
   LIMIT 1;
 
-  RETURN QUERY SELECT
-    CAST(os_c_id || '|' || os_c_first || '|' || os_c_middle || '|' || os_c_balance AS TEXT) as customer_info,
-    CAST(os_o_id || '|' || os_o_carrier_id || '|' || os_entdate AS TEXT) as order_info;
-
-EXCEPTION
-  WHEN serialization_failure OR deadlock_detected OR no_data_found
-  THEN RETURN;
+  RETURN COALESCE(v_o_id, 0);
 END;
 $$ LANGUAGE 'plpgsql';
 
@@ -431,34 +413,126 @@ CREATE OR REPLACE FUNCTION SLEV (
 ) RETURNS INTEGER AS $$
 DECLARE
   stock_count INTEGER;
+  v_next_o_id INTEGER;
 BEGIN
-  SELECT COUNT(DISTINCT (s_i_id)) INTO stock_count
-  FROM order_line, stock, district
+  SELECT d_next_o_id INTO v_next_o_id
+  FROM district
+  WHERE d_w_id = st_w_id AND d_id = st_d_id;
+
+  SELECT COUNT(DISTINCT s_i_id) INTO stock_count
+  FROM order_line, stock
   WHERE ol_w_id = st_w_id
     AND ol_d_id = st_d_id
-    AND d_w_id = st_w_id
-    AND d_id = st_d_id
-    AND (ol_o_id < d_next_o_id)
-    AND ol_o_id >= (d_next_o_id - 20)
+    AND ol_o_id < v_next_o_id
+    AND ol_o_id >= (v_next_o_id - 20)
     AND s_w_id = st_w_id
     AND s_i_id = ol_i_id
     AND s_quantity < threshold;
 
-  RETURN stock_count;
-EXCEPTION
-  WHEN serialization_failure OR deadlock_detected OR no_data_found
-  THEN RETURN -1;
+  RETURN COALESCE(stock_count, 0);
 END;
 $$ LANGUAGE 'plpgsql';
 
---+ workload
+--+ workload_procs
 --= new_order
-SELECT NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt, 0)
+SELECT NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt)
 --= payment
-SELECT PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last)
+SELECT PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last, :p_h_id)
 --= order_status
-SELECT * FROM OSTAT(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)
+SELECT OSTAT(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)
 --= delivery
 SELECT DELIVERY(:d_w_id, :d_o_carrier_id)
 --= stock_level
 SELECT SLEV(:st_w_id, :st_d_id, :threshold)
+
+--+ workload_tx_new_order
+--= get_customer
+SELECT c_discount, c_last, c_credit FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= get_warehouse
+SELECT w_tax FROM warehouse WHERE w_id = :w_id
+--= get_district
+SELECT d_next_o_id, d_tax FROM district WHERE d_id = :d_id AND d_w_id = :w_id
+--= update_district
+UPDATE district SET d_next_o_id = d_next_o_id + 1 WHERE d_id = :d_id AND d_w_id = :w_id
+--= insert_order
+INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
+VALUES (:o_id, :d_id, :w_id, :c_id, current_timestamp, :ol_cnt, :all_local)
+--= insert_new_order
+INSERT INTO new_order (no_o_id, no_d_id, no_w_id) VALUES (:o_id, :d_id, :w_id)
+--= get_item
+SELECT i_price, i_name, i_data FROM item WHERE i_id = :i_id
+--= get_stock
+SELECT s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10
+FROM stock WHERE s_i_id = :i_id AND s_w_id = :w_id
+--= update_stock
+UPDATE stock SET s_quantity = :quantity, s_ytd = s_ytd + :ol_quantity, s_order_cnt = s_order_cnt + 1, s_remote_cnt = s_remote_cnt + :remote_cnt
+WHERE s_i_id = :i_id AND s_w_id = :w_id
+--= insert_order_line
+INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info)
+VALUES (:o_id, :d_id, :w_id, :ol_number, :i_id, :supply_w_id, :quantity, :amount, :dist_info)
+
+--+ workload_tx_payment
+--= update_warehouse
+UPDATE warehouse SET w_ytd = w_ytd + :amount WHERE w_id = :w_id
+--= get_warehouse
+SELECT w_name, w_street_1, w_street_2, w_city, w_state, w_zip FROM warehouse WHERE w_id = :w_id
+--= update_district
+UPDATE district SET d_ytd = d_ytd + :amount WHERE d_w_id = :w_id AND d_id = :d_id
+--= get_district
+SELECT d_name, d_street_1, d_street_2, d_city, d_state, d_zip FROM district WHERE d_w_id = :w_id AND d_id = :d_id
+--= get_customer_by_id
+SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since
+FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= update_customer
+UPDATE customer SET c_balance = c_balance - :amount, c_ytd_payment = c_ytd_payment + :amount, c_payment_cnt = c_payment_cnt + 1
+WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= insert_history
+INSERT INTO history (h_id, h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data)
+VALUES (:h_id, :h_c_id, :h_c_d_id, :h_c_w_id, :h_d_id, :h_w_id, current_timestamp, :h_amount, :h_data)
+
+--+ workload_tx_order_status
+--= get_customer_by_id
+SELECT c_balance, c_first, c_middle, c_last FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+--= get_last_order
+SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_d_id = :d_id AND o_w_id = :w_id AND o_c_id = :c_id ORDER BY o_id DESC LIMIT 1
+--= get_order_lines
+SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d FROM order_line WHERE ol_o_id = :o_id AND ol_d_id = :d_id AND ol_w_id = :w_id
+
+--+ workload_tx_delivery
+--= get_min_new_order
+SELECT min(no_o_id) FROM new_order WHERE no_d_id = :d_id AND no_w_id = :w_id
+--= delete_new_order
+DELETE FROM new_order WHERE no_o_id = :o_id AND no_d_id = :d_id AND no_w_id = :w_id
+--= get_order
+SELECT o_c_id FROM orders WHERE o_id = :o_id AND o_d_id = :d_id AND o_w_id = :w_id
+--= update_order
+UPDATE orders SET o_carrier_id = :carrier_id WHERE o_id = :o_id AND o_d_id = :d_id AND o_w_id = :w_id
+--= update_order_line
+UPDATE order_line SET ol_delivery_d = current_timestamp WHERE ol_o_id = :o_id AND ol_d_id = :d_id AND ol_w_id = :w_id
+--= get_order_line_amount
+SELECT SUM(ol_amount) FROM order_line WHERE ol_o_id = :o_id AND ol_d_id = :d_id AND ol_w_id = :w_id
+--= update_customer
+UPDATE customer SET c_balance = c_balance + :amount, c_delivery_cnt = c_delivery_cnt + 1 WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+
+--+ workload_tx_stock_level
+--= get_district
+SELECT d_next_o_id FROM district WHERE d_w_id = :w_id AND d_id = :d_id
+--= get_window_items
+-- Step 1 of stock_level: collect distinct item ids from the last-20-orders
+-- window. The same two-step shape runs against all four dialects — the
+-- single-query JOIN form trips picodata's sbroad planner intermittently,
+-- and a uniform script is worth the extra query here (stock_level is 4%
+-- of the mix).
+SELECT DISTINCT ol_i_id FROM order_line
+WHERE ol_w_id = :w_id
+  AND ol_d_id = :d_id
+  AND ol_o_id >= :min_o_id
+  AND ol_o_id < :next_o_id
+--= stock_count_in
+-- Step 2: count low-stock items. The {ids} placeholder is replaced in
+-- TypeScript with an integer list built from step 1's result — stroppy's
+-- :name substitution doesn't touch IN list contents.
+SELECT COUNT(*) FROM stock
+WHERE s_w_id = :w_id
+  AND s_quantity < :threshold
+  AND s_i_id IN ({ids})

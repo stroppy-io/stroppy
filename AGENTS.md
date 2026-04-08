@@ -24,7 +24,7 @@ Stroppy is a **k6 extension** (`k6/x/stroppy`) that adds database-specific capab
 | TypeScript framework | `internal/static/` | `helpers.ts` (R/S/AB/DriverX), `parse_sql.ts`, generated type bindings |
 | Script runner | `internal/runner/` | esbuild transpilation, config extraction via Sobek, k6 process management |
 | Schema definitions | `proto/stroppy/` | config, descriptor, common, runtime, cloud schemas |
-| Built-in workloads | `workloads/` | simple, tpcb, tpcc, tpcds presets |
+| Built-in workloads | `workloads/` | simple, tpcb, tpcc, tpcds presets; tpcb/tpcc each have `procs.ts` (pg/mysql stored procs) and `tx.ts` (raw transactions, any DB) |
 
 ### Driver System
 

@@ -1,487 +1,542 @@
 --+ drop_schema
---= set options
+--= set_foreign_keys
 SET FOREIGN_KEY_CHECKS = 0
---= drop neword
+--= drop_neword
 DROP PROCEDURE IF EXISTS NEWORD
---= drop payment
+--= drop_payment
 DROP PROCEDURE IF EXISTS PAYMENT
---= drop delivery
+--= drop_delivery
 DROP PROCEDURE IF EXISTS DELIVERY
---= drop ostat
+--= drop_ostat
 DROP PROCEDURE IF EXISTS OSTAT
---= drop slev
+--= drop_slev
 DROP PROCEDURE IF EXISTS SLEV
---= drop tables
-DROP TABLE IF EXISTS order_line, new_order, orders, history, stock, customer, district, warehouse, item
+--= drop_order_line
+DROP TABLE IF EXISTS order_line
+--= drop_new_order
+DROP TABLE IF EXISTS new_order
+--= drop_orders
+DROP TABLE IF EXISTS orders
+--= drop_history
+DROP TABLE IF EXISTS history
+--= drop_stock
+DROP TABLE IF EXISTS stock
+--= drop_customer
+DROP TABLE IF EXISTS customer
+--= drop_district
+DROP TABLE IF EXISTS district
+--= drop_warehouse
+DROP TABLE IF EXISTS warehouse
+--= drop_item
+DROP TABLE IF EXISTS item
 
 --+ create_schema
---= set options
-SET FOREIGN_KEY_CHECKS = 0
 --= warehouse
 CREATE TABLE warehouse (
-  w_id       INTEGER      NOT NULL,
-  w_name     VARCHAR(10),
+  w_id INT NOT NULL PRIMARY KEY,
+  w_name VARCHAR(10),
   w_street_1 VARCHAR(20),
   w_street_2 VARCHAR(20),
-  w_city     VARCHAR(20),
-  w_state    CHAR(2),
-  w_zip      CHAR(9),
-  w_tax      DECIMAL(4,4),
-  w_ytd      DECIMAL(12,2),
-  PRIMARY KEY (w_id)
-) ENGINE = InnoDB
+  w_city VARCHAR(20),
+  w_state CHAR(2),
+  w_zip CHAR(9),
+  w_tax DECIMAL(4,4),
+  w_ytd DECIMAL(12,2)
+) ENGINE=InnoDB
 --= district
 CREATE TABLE district (
-  d_id         INTEGER  NOT NULL,
-  d_w_id       INTEGER  NOT NULL,
-  d_name       VARCHAR(10),
-  d_street_1   VARCHAR(20),
-  d_street_2   VARCHAR(20),
-  d_city       VARCHAR(20),
-  d_state      CHAR(2),
-  d_zip        CHAR(9),
-  d_tax        DECIMAL(4,4),
-  d_ytd        DECIMAL(12,2),
-  d_next_o_id  INTEGER,
+  d_id INT NOT NULL,
+  d_w_id INT NOT NULL,
+  d_name VARCHAR(10),
+  d_street_1 VARCHAR(20),
+  d_street_2 VARCHAR(20),
+  d_city VARCHAR(20),
+  d_state CHAR(2),
+  d_zip CHAR(9),
+  d_tax DECIMAL(4,4),
+  d_ytd DECIMAL(12,2),
+  d_next_o_id INT,
   PRIMARY KEY (d_w_id, d_id)
-) ENGINE = InnoDB
+) ENGINE=InnoDB
 --= customer
 CREATE TABLE customer (
-  c_id           INTEGER  NOT NULL,
-  c_d_id         INTEGER  NOT NULL,
-  c_w_id         INTEGER  NOT NULL,
-  c_first        VARCHAR(16),
-  c_middle       CHAR(2),
-  c_last         VARCHAR(16),
-  c_street_1     VARCHAR(20),
-  c_street_2     VARCHAR(20),
-  c_city         VARCHAR(20),
-  c_state        CHAR(2),
-  c_zip          CHAR(9),
-  c_phone        CHAR(16),
-  c_since        DATETIME,
-  c_credit       CHAR(2),
-  c_credit_lim   DECIMAL(12,2),
-  c_discount     DECIMAL(4,4),
-  c_balance      DECIMAL(12,2),
-  c_ytd_payment  DECIMAL(12,2),
-  c_payment_cnt  INTEGER,
-  c_delivery_cnt INTEGER,
-  c_data         VARCHAR(500),
-  PRIMARY KEY (c_w_id, c_d_id, c_id),
-  KEY c_w_id (c_w_id, c_d_id, c_last, c_first)
-) ENGINE = InnoDB
+  c_id INT NOT NULL,
+  c_d_id INT NOT NULL,
+  c_w_id INT NOT NULL,
+  c_first VARCHAR(16),
+  c_middle CHAR(2),
+  c_last VARCHAR(16),
+  c_street_1 VARCHAR(20),
+  c_street_2 VARCHAR(20),
+  c_city VARCHAR(20),
+  c_state CHAR(2),
+  c_zip CHAR(9),
+  c_phone CHAR(16),
+  c_since DATETIME,
+  c_credit CHAR(2),
+  c_credit_lim DECIMAL(12,2),
+  c_discount DECIMAL(4,4),
+  c_balance DECIMAL(12,2),
+  c_ytd_payment DECIMAL(12,2),
+  c_payment_cnt INT,
+  c_delivery_cnt INT,
+  c_data VARCHAR(500),
+  PRIMARY KEY (c_w_id, c_d_id, c_id)
+) ENGINE=InnoDB
 --= history
 CREATE TABLE history (
-  h_c_id   INTEGER,
-  h_c_d_id INTEGER,
-  h_c_w_id INTEGER,
-  h_d_id   INTEGER,
-  h_w_id   INTEGER,
-  h_date   DATETIME,
+  h_id BIGINT NOT NULL PRIMARY KEY,
+  h_c_id INT,
+  h_c_d_id INT,
+  h_c_w_id INT,
+  h_d_id INT,
+  h_w_id INT,
+  h_date DATETIME,
   h_amount DECIMAL(6,2),
-  h_data   VARCHAR(24)
-) ENGINE = InnoDB
+  h_data VARCHAR(24)
+) ENGINE=InnoDB
 --= new_order
 CREATE TABLE new_order (
-  no_o_id INTEGER  NOT NULL,
-  no_d_id INTEGER  NOT NULL,
-  no_w_id INTEGER  NOT NULL,
+  no_o_id INT NOT NULL,
+  no_d_id INT NOT NULL,
+  no_w_id INT NOT NULL,
   PRIMARY KEY (no_w_id, no_d_id, no_o_id)
-) ENGINE = InnoDB
+) ENGINE=InnoDB
 --= orders
 CREATE TABLE orders (
-  o_id         INTEGER  NOT NULL,
-  o_d_id       INTEGER  NOT NULL,
-  o_w_id       INTEGER  NOT NULL,
-  o_c_id       INTEGER,
-  o_entry_d    DATETIME,
-  o_carrier_id INTEGER,
-  o_ol_cnt     INTEGER,
-  o_all_local  INTEGER,
-  PRIMARY KEY (o_w_id, o_d_id, o_id),
-  KEY o_w_id (o_w_id, o_d_id, o_c_id, o_id)
-) ENGINE = InnoDB
+  o_id INT NOT NULL,
+  o_d_id INT NOT NULL,
+  o_w_id INT NOT NULL,
+  o_c_id INT,
+  o_entry_d DATETIME,
+  o_carrier_id INT,
+  o_ol_cnt INT,
+  o_all_local INT,
+  PRIMARY KEY (o_w_id, o_d_id, o_id)
+) ENGINE=InnoDB
 --= order_line
 CREATE TABLE order_line (
-  ol_o_id        INTEGER  NOT NULL,
-  ol_d_id        INTEGER  NOT NULL,
-  ol_w_id        INTEGER  NOT NULL,
-  ol_number      INTEGER  NOT NULL,
-  ol_i_id        INTEGER,
-  ol_supply_w_id INTEGER,
-  ol_delivery_d  DATETIME,
-  ol_quantity    INTEGER,
-  ol_amount      DECIMAL(6,2),
-  ol_dist_info   CHAR(24),
+  ol_o_id INT NOT NULL,
+  ol_d_id INT NOT NULL,
+  ol_w_id INT NOT NULL,
+  ol_number INT NOT NULL,
+  ol_i_id INT,
+  ol_supply_w_id INT,
+  ol_delivery_d DATETIME,
+  ol_quantity INT,
+  ol_amount DECIMAL(6,2),
+  ol_dist_info CHAR(24),
   PRIMARY KEY (ol_w_id, ol_d_id, ol_o_id, ol_number)
-) ENGINE = InnoDB
+) ENGINE=InnoDB
 --= item
 CREATE TABLE item (
-  i_id    INTEGER  NOT NULL,
-  i_im_id INTEGER,
-  i_name  VARCHAR(24),
+  i_id INT NOT NULL PRIMARY KEY,
+  i_im_id INT,
+  i_name VARCHAR(24),
   i_price DECIMAL(5,2),
-  i_data  VARCHAR(50),
-  PRIMARY KEY (i_id)
-) ENGINE = InnoDB
+  i_data VARCHAR(50)
+) ENGINE=InnoDB
 --= stock
 CREATE TABLE stock (
-  s_i_id       INTEGER  NOT NULL,
-  s_w_id       INTEGER  NOT NULL,
-  s_quantity   INTEGER,
-  s_dist_01    CHAR(24),
-  s_dist_02    CHAR(24),
-  s_dist_03    CHAR(24),
-  s_dist_04    CHAR(24),
-  s_dist_05    CHAR(24),
-  s_dist_06    CHAR(24),
-  s_dist_07    CHAR(24),
-  s_dist_08    CHAR(24),
-  s_dist_09    CHAR(24),
-  s_dist_10    CHAR(24),
-  s_ytd        INTEGER,
-  s_order_cnt  INTEGER,
-  s_remote_cnt INTEGER,
-  s_data       VARCHAR(50),
+  s_i_id INT NOT NULL,
+  s_w_id INT NOT NULL,
+  s_quantity INT,
+  s_dist_01 CHAR(24),
+  s_dist_02 CHAR(24),
+  s_dist_03 CHAR(24),
+  s_dist_04 CHAR(24),
+  s_dist_05 CHAR(24),
+  s_dist_06 CHAR(24),
+  s_dist_07 CHAR(24),
+  s_dist_08 CHAR(24),
+  s_dist_09 CHAR(24),
+  s_dist_10 CHAR(24),
+  s_ytd INT,
+  s_order_cnt INT,
+  s_remote_cnt INT,
+  s_data VARCHAR(50),
   PRIMARY KEY (s_w_id, s_i_id)
-) ENGINE = InnoDB
+) ENGINE=InnoDB
 
 --+ create_procedures
 --= neword
-CREATE PROCEDURE NEWORD (
-  no_w_id       INTEGER,
-  no_max_w_id   INTEGER,
-  no_d_id       INTEGER,
-  no_c_id       INTEGER,
-  no_o_ol_cnt   INTEGER,
-  OUT no_c_discount   DECIMAL(4,4),
-  OUT no_c_last       VARCHAR(16),
-  OUT no_c_credit     VARCHAR(2),
-  OUT no_d_tax        DECIMAL(4,4),
-  OUT no_w_tax        DECIMAL(4,4),
-  OUT no_d_next_o_id  INTEGER,
-  IN  ts              DATETIME
+CREATE PROCEDURE NEWORD(
+  IN no_w_id INT,
+  IN no_max_w_id INT,
+  IN no_d_id INT,
+  IN no_c_id INT,
+  IN no_o_ol_cnt INT
 )
 BEGIN
-  DECLARE no_ol_supply_w_id INTEGER;
-  DECLARE no_ol_i_id        INTEGER;
-  DECLARE no_ol_quantity    INTEGER;
-  DECLARE no_o_all_local    INTEGER;
-  DECLARE no_i_name         VARCHAR(24);
-  DECLARE no_i_price        DECIMAL(5,2);
-  DECLARE no_i_data         VARCHAR(50);
-  DECLARE no_s_quantity     INTEGER;
-  DECLARE no_ol_amount      DECIMAL(6,2);
-  DECLARE no_s_dist_01      CHAR(24);
-  DECLARE no_s_dist_02      CHAR(24);
-  DECLARE no_s_dist_03      CHAR(24);
-  DECLARE no_s_dist_04      CHAR(24);
-  DECLARE no_s_dist_05      CHAR(24);
-  DECLARE no_s_dist_06      CHAR(24);
-  DECLARE no_s_dist_07      CHAR(24);
-  DECLARE no_s_dist_08      CHAR(24);
-  DECLARE no_s_dist_09      CHAR(24);
-  DECLARE no_s_dist_10      CHAR(24);
-  DECLARE no_ol_dist_info   CHAR(24);
-  DECLARE no_s_data         VARCHAR(50);
-  DECLARE rbk               INTEGER;
-  DECLARE loop_counter      INTEGER;
-  DECLARE `Constraint Violation` CONDITION FOR SQLSTATE '23000';
-  DECLARE EXIT HANDLER FOR `Constraint Violation` ROLLBACK;
-  DECLARE EXIT HANDLER FOR NOT FOUND ROLLBACK;
+  DECLARE no_c_discount DECIMAL(4,4);
+  DECLARE no_c_last VARCHAR(16);
+  DECLARE no_c_credit CHAR(2);
+  DECLARE no_d_tax DECIMAL(4,4);
+  DECLARE no_w_tax DECIMAL(4,4);
+  DECLARE no_d_next_o_id INT;
+  DECLARE no_o_all_local INT;
+  DECLARE v_i_id INT;
+  DECLARE v_supply_w_id INT;
+  DECLARE v_quantity INT;
+  DECLARE v_s_quantity INT;
+  DECLARE v_i_price DECIMAL(5,2);
+  DECLARE v_i_name VARCHAR(24);
+  DECLARE v_i_data VARCHAR(50);
+  DECLARE v_s_data VARCHAR(50);
+  DECLARE v_dist_info CHAR(24);
+  DECLARE v_amount DECIMAL(12,2);
+  DECLARE loop_counter INT;
+  DECLARE item_not_found INT DEFAULT 0;
+  DECLARE CONTINUE HANDLER FOR NOT FOUND SET item_not_found = 1;
 
   SET no_o_all_local = 1;
-  SELECT c_discount, c_last, c_credit, w_tax
-  INTO no_c_discount, no_c_last, no_c_credit, no_w_tax
-  FROM customer, warehouse
-  WHERE warehouse.w_id = no_w_id AND customer.c_w_id = no_w_id
-    AND customer.c_d_id = no_d_id AND customer.c_id = no_c_id;
 
-  START TRANSACTION;
+  SELECT c_discount, c_last, c_credit
+    INTO no_c_discount, no_c_last, no_c_credit
+  FROM customer
+  WHERE c_w_id = no_w_id AND c_d_id = no_d_id AND c_id = no_c_id;
+
+  SELECT w_tax INTO no_w_tax FROM warehouse WHERE w_id = no_w_id;
+
   SELECT d_next_o_id, d_tax INTO no_d_next_o_id, no_d_tax
-  FROM district WHERE d_id = no_d_id AND d_w_id = no_w_id FOR UPDATE;
+  FROM district WHERE d_id = no_d_id AND d_w_id = no_w_id;
+
   UPDATE district SET d_next_o_id = d_next_o_id + 1
   WHERE d_id = no_d_id AND d_w_id = no_w_id;
 
-  SET rbk = FLOOR(1 + (RAND() * 99));
-  SET loop_counter = 1;
-  WHILE loop_counter <= no_o_ol_cnt DO
-    IF ((loop_counter = no_o_ol_cnt) AND (rbk = 1)) THEN
-      SET no_ol_i_id = 100001;
-    ELSE
-      SET no_ol_i_id = FLOOR(1 + (RAND() * 100000));
-    END IF;
-    IF (FLOOR(1 + (RAND() * 100)) > 1) THEN
-      SET no_ol_supply_w_id = no_w_id;
-    ELSE
-      SET no_ol_supply_w_id = no_w_id;
-      SET no_o_all_local = 0;
-      WHILE ((no_ol_supply_w_id = no_w_id) AND (no_max_w_id != 1)) DO
-        SET no_ol_supply_w_id = FLOOR(1 + (RAND() * no_max_w_id));
-      END WHILE;
-    END IF;
-    SET no_ol_quantity = FLOOR(1 + (RAND() * 10));
-    SELECT i_price, i_name, i_data INTO no_i_price, no_i_name, no_i_data
-    FROM item WHERE i_id = no_ol_i_id;
-    SELECT s_quantity, s_data,
-           s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05,
-           s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10
-    INTO no_s_quantity, no_s_data,
-         no_s_dist_01, no_s_dist_02, no_s_dist_03, no_s_dist_04, no_s_dist_05,
-         no_s_dist_06, no_s_dist_07, no_s_dist_08, no_s_dist_09, no_s_dist_10
-    FROM stock WHERE s_i_id = no_ol_i_id AND s_w_id = no_ol_supply_w_id;
-    IF (no_s_quantity > no_ol_quantity) THEN
-      SET no_s_quantity = no_s_quantity - no_ol_quantity;
-    ELSE
-      SET no_s_quantity = no_s_quantity - no_ol_quantity + 91;
-    END IF;
-    UPDATE stock SET s_quantity = no_s_quantity
-    WHERE s_i_id = no_ol_i_id AND s_w_id = no_ol_supply_w_id;
-    SET no_ol_amount = no_ol_quantity * no_i_price * (1 + no_w_tax + no_d_tax) * (1 - no_c_discount);
-    CASE no_d_id
-      WHEN 1  THEN SET no_ol_dist_info = no_s_dist_01;
-      WHEN 2  THEN SET no_ol_dist_info = no_s_dist_02;
-      WHEN 3  THEN SET no_ol_dist_info = no_s_dist_03;
-      WHEN 4  THEN SET no_ol_dist_info = no_s_dist_04;
-      WHEN 5  THEN SET no_ol_dist_info = no_s_dist_05;
-      WHEN 6  THEN SET no_ol_dist_info = no_s_dist_06;
-      WHEN 7  THEN SET no_ol_dist_info = no_s_dist_07;
-      WHEN 8  THEN SET no_ol_dist_info = no_s_dist_08;
-      WHEN 9  THEN SET no_ol_dist_info = no_s_dist_09;
-      WHEN 10 THEN SET no_ol_dist_info = no_s_dist_10;
-    END CASE;
-    INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info)
-    VALUES (no_d_next_o_id, no_d_id, no_w_id, loop_counter, no_ol_i_id, no_ol_supply_w_id, no_ol_quantity, no_ol_amount, no_ol_dist_info);
-    SET loop_counter = loop_counter + 1;
-  END WHILE;
   INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
-  VALUES (no_d_next_o_id, no_d_id, no_w_id, no_c_id, ts, no_o_ol_cnt, no_o_all_local);
+  VALUES (no_d_next_o_id, no_d_id, no_w_id, no_c_id, NOW(), no_o_ol_cnt, no_o_all_local);
+
   INSERT INTO new_order (no_o_id, no_d_id, no_w_id)
   VALUES (no_d_next_o_id, no_d_id, no_w_id);
-  COMMIT;
-END
-
---= payment
-CREATE PROCEDURE PAYMENT (
-  p_w_id      INTEGER,
-  p_d_id      INTEGER,
-  p_c_w_id    INTEGER,
-  p_c_d_id    INTEGER,
-  p_c_id_in   INTEGER,
-  byname      INTEGER,
-  p_h_amount  DECIMAL(6,2),
-  p_c_last_in VARCHAR(16),
-  IN ts       DATETIME
-)
-BEGIN
-  DECLARE p_c_id       INTEGER;
-  DECLARE p_c_last     VARCHAR(16);
-  DECLARE namecnt      INTEGER;
-  DECLARE p_w_name     VARCHAR(11);
-  DECLARE p_d_name     VARCHAR(11);
-  DECLARE h_data       VARCHAR(30);
-  DECLARE p_c_credit   CHAR(2);
-  DECLARE p_c_balance  DECIMAL(12,2);
-  DECLARE p_c_data     VARCHAR(500);
-  DECLARE p_c_new_data VARCHAR(500);
-  DECLARE loop_counter INTEGER;
-  DECLARE done         INT DEFAULT 0;
-  DECLARE `Constraint Violation` CONDITION FOR SQLSTATE '23000';
-  DECLARE c_byname CURSOR FOR
-    SELECT c_id FROM customer
-    WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id
-    ORDER BY c_first;
-  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
-  DECLARE EXIT HANDLER FOR `Constraint Violation` ROLLBACK;
-
-  SET p_c_id   = p_c_id_in;
-  SET p_c_last = p_c_last_in;
-
-  START TRANSACTION;
-  UPDATE warehouse SET w_ytd = w_ytd + p_h_amount WHERE w_id = p_w_id;
-  SELECT w_name INTO p_w_name FROM warehouse WHERE w_id = p_w_id;
-  UPDATE district SET d_ytd = d_ytd + p_h_amount WHERE d_w_id = p_w_id AND d_id = p_d_id;
-  SELECT d_name INTO p_d_name FROM district WHERE d_w_id = p_w_id AND d_id = p_d_id;
-
-  IF (byname = 1) THEN
-    SELECT COUNT(c_id) INTO namecnt FROM customer
-    WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id;
-    IF (MOD(namecnt, 2) = 1) THEN
-      SET namecnt = namecnt + 1;
-    END IF;
-    OPEN c_byname;
-    SET loop_counter = 0;
-    WHILE loop_counter <= (namecnt / 2) DO
-      FETCH c_byname INTO p_c_id;
-      SET loop_counter = loop_counter + 1;
-    END WHILE;
-    CLOSE c_byname;
-  END IF;
-
-  SELECT c_balance, c_credit INTO p_c_balance, p_c_credit
-  FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
-
-  SET p_c_balance = p_c_balance + p_h_amount;
-  IF p_c_credit = 'BC' THEN
-    SELECT c_data INTO p_c_data
-    FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
-    SET h_data = CONCAT(p_w_name, ' ', p_d_name);
-    SET p_c_new_data = CONCAT(
-      CAST(p_c_id AS CHAR), ' ', CAST(p_c_d_id AS CHAR), ' ', CAST(p_c_w_id AS CHAR), ' ',
-      CAST(p_d_id AS CHAR), ' ', CAST(p_w_id AS CHAR), ' ',
-      CAST(FORMAT(p_h_amount, 2) AS CHAR), CAST(ts AS CHAR), h_data);
-    SET p_c_new_data = SUBSTR(CONCAT(p_c_new_data, p_c_data), 1, 500 - LENGTH(p_c_new_data));
-    UPDATE customer
-    SET c_balance = p_c_balance, c_data = p_c_new_data,
-        c_ytd_payment = c_ytd_payment + p_h_amount, c_payment_cnt = c_payment_cnt + 1
-    WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
-  ELSE
-    UPDATE customer
-    SET c_balance = p_c_balance,
-        c_ytd_payment = c_ytd_payment + p_h_amount, c_payment_cnt = c_payment_cnt + 1
-    WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
-  END IF;
-
-  SET h_data = CONCAT(p_w_name, ' ', p_d_name);
-  INSERT INTO history (h_c_d_id, h_c_w_id, h_c_id, h_d_id, h_w_id, h_date, h_amount, h_data)
-  VALUES (p_c_d_id, p_c_w_id, p_c_id, p_d_id, p_w_id, ts, p_h_amount, h_data);
-  COMMIT;
-END
-
---= delivery
-CREATE PROCEDURE DELIVERY (
-  d_w_id         INTEGER,
-  d_o_carrier_id INTEGER,
-  IN ts          DATETIME
-)
-BEGIN
-  DECLARE d_no_o_id    INTEGER;
-  DECLARE d_d_id       INTEGER;
-  DECLARE d_c_id       INTEGER;
-  DECLARE d_ol_total   DECIMAL(6,2);
-  DECLARE loop_counter INTEGER;
-  DECLARE `Constraint Violation` CONDITION FOR SQLSTATE '23000';
-  DECLARE EXIT HANDLER FOR `Constraint Violation` ROLLBACK;
 
   SET loop_counter = 1;
-  START TRANSACTION;
-  WHILE loop_counter <= 10 DO
-    SET d_d_id = loop_counter;
-    SELECT no_o_id INTO d_no_o_id FROM new_order
-    WHERE no_w_id = d_w_id AND no_d_id = d_d_id
-    ORDER BY no_o_id LIMIT 1;
-    DELETE FROM new_order
-    WHERE no_w_id = d_w_id AND no_d_id = d_d_id AND no_o_id = d_no_o_id;
-    SELECT o_c_id INTO d_c_id FROM orders
-    WHERE o_id = d_no_o_id AND o_d_id = d_d_id AND o_w_id = d_w_id;
-    UPDATE orders SET o_carrier_id = d_o_carrier_id
-    WHERE o_id = d_no_o_id AND o_d_id = d_d_id AND o_w_id = d_w_id;
-    UPDATE order_line SET ol_delivery_d = ts
-    WHERE ol_o_id = d_no_o_id AND ol_d_id = d_d_id AND ol_w_id = d_w_id;
-    SELECT SUM(ol_amount) INTO d_ol_total FROM order_line
-    WHERE ol_o_id = d_no_o_id AND ol_d_id = d_d_id AND ol_w_id = d_w_id;
-    UPDATE customer
-    SET c_balance = c_balance + d_ol_total, c_delivery_cnt = c_delivery_cnt + 1
-    WHERE c_id = d_c_id AND c_d_id = d_d_id AND c_w_id = d_w_id;
+  WHILE loop_counter <= no_o_ol_cnt DO
+    SET v_i_id = 1 + FLOOR(RAND() * 100000);
+    SET v_supply_w_id = no_w_id;
+    SET v_quantity = 1 + FLOOR(RAND() * 10);
+    SET item_not_found = 0;
+
+    SELECT i_price, i_name, i_data INTO v_i_price, v_i_name, v_i_data
+    FROM item WHERE i_id = v_i_id;
+
+    IF item_not_found = 0 THEN
+      SELECT s_quantity, s_data,
+        CASE no_d_id
+          WHEN 1 THEN s_dist_01
+          WHEN 2 THEN s_dist_02
+          WHEN 3 THEN s_dist_03
+          WHEN 4 THEN s_dist_04
+          WHEN 5 THEN s_dist_05
+          WHEN 6 THEN s_dist_06
+          WHEN 7 THEN s_dist_07
+          WHEN 8 THEN s_dist_08
+          WHEN 9 THEN s_dist_09
+          WHEN 10 THEN s_dist_10
+        END
+      INTO v_s_quantity, v_s_data, v_dist_info
+      FROM stock
+      WHERE s_i_id = v_i_id AND s_w_id = v_supply_w_id;
+
+      IF v_s_quantity - v_quantity >= 10 THEN
+        SET v_s_quantity = v_s_quantity - v_quantity;
+      ELSE
+        SET v_s_quantity = v_s_quantity - v_quantity + 91;
+      END IF;
+
+      UPDATE stock
+        SET s_quantity = v_s_quantity,
+            s_ytd = s_ytd + v_quantity,
+            s_order_cnt = s_order_cnt + 1,
+            s_remote_cnt = s_remote_cnt + 0
+      WHERE s_i_id = v_i_id AND s_w_id = v_supply_w_id;
+
+      SET v_amount = v_quantity * v_i_price;
+
+      INSERT INTO order_line
+        (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info)
+      VALUES
+        (no_d_next_o_id, no_d_id, no_w_id, loop_counter, v_i_id, v_supply_w_id, v_quantity, v_amount, v_dist_info);
+    END IF;
+
     SET loop_counter = loop_counter + 1;
   END WHILE;
-  COMMIT;
 END
-
---= ostat
-CREATE PROCEDURE OSTAT (
-  os_w_id             INTEGER,
-  os_d_id             INTEGER,
-  os_c_id             INTEGER,
-  byname              INTEGER,
-  os_c_last           VARCHAR(16),
-  OUT os_c_first      VARCHAR(16),
-  OUT os_c_middle     CHAR(2),
-  OUT os_c_balance    DECIMAL(12,2),
-  OUT os_o_id         INTEGER,
-  OUT os_entdate      DATETIME,
-  OUT os_o_carrier_id INTEGER
+--= payment
+CREATE PROCEDURE PAYMENT(
+  IN p_w_id INT,
+  IN p_d_id INT,
+  IN p_c_w_id INT,
+  IN p_c_d_id INT,
+  IN p_c_id_in INT,
+  IN byname INT,
+  IN p_h_amount DECIMAL(6,2),
+  IN p_c_last_in VARCHAR(16),
+  IN p_h_id BIGINT
 )
 BEGIN
-  DECLARE namecnt      INTEGER;
-  DECLARE done         INT DEFAULT 0;
-  DECLARE loop_counter INTEGER;
-  DECLARE local_c_last VARCHAR(16);
-  DECLARE local_c_id   INTEGER;
-  DECLARE `Constraint Violation` CONDITION FOR SQLSTATE '23000';
-  DECLARE c_name CURSOR FOR
-    SELECT c_balance, c_first, c_middle, c_id FROM customer
-    WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id
-    ORDER BY c_first;
-  DECLARE EXIT HANDLER FOR `Constraint Violation` ROLLBACK;
-  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+  DECLARE p_c_balance DECIMAL(12,2);
+  DECLARE p_c_credit CHAR(2);
+  DECLARE p_c_last VARCHAR(16);
+  DECLARE p_c_id INT;
+  DECLARE p_w_name VARCHAR(10);
+  DECLARE p_d_name VARCHAR(10);
+  DECLARE name_count INT;
+  DECLARE h_data_val VARCHAR(30);
 
-  SET local_c_id = os_c_id;
-  START TRANSACTION;
-  IF (byname = 1) THEN
-    SELECT COUNT(c_id) INTO namecnt FROM customer
-    WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id;
-    IF (MOD(namecnt, 2) = 1) THEN
-      SET namecnt = namecnt + 1;
+  SET p_c_id = p_c_id_in;
+  SET p_c_last = p_c_last_in;
+
+  UPDATE warehouse SET w_ytd = w_ytd + p_h_amount WHERE w_id = p_w_id;
+  SELECT w_name INTO p_w_name FROM warehouse WHERE w_id = p_w_id;
+
+  UPDATE district SET d_ytd = d_ytd + p_h_amount
+  WHERE d_w_id = p_w_id AND d_id = p_d_id;
+  SELECT d_name INTO p_d_name FROM district
+  WHERE d_w_id = p_w_id AND d_id = p_d_id;
+
+  IF byname = 1 THEN
+    SELECT COUNT(c_last) INTO name_count
+    FROM customer
+    WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id;
+
+    IF name_count > 0 THEN
+      SELECT c_id, c_balance, c_credit
+      INTO p_c_id, p_c_balance, p_c_credit
+      FROM customer
+      WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id
+      ORDER BY c_first
+      LIMIT 1 OFFSET 0;
     END IF;
-    OPEN c_name;
-    SET loop_counter = 0;
-    WHILE loop_counter <= (namecnt / 2) DO
-      FETCH c_name INTO os_c_balance, os_c_first, os_c_middle, local_c_id;
-      SET loop_counter = loop_counter + 1;
-    END WHILE;
-    CLOSE c_name;
   ELSE
-    SELECT c_balance, c_first, c_middle, c_last
-    INTO os_c_balance, os_c_first, os_c_middle, local_c_last
-    FROM customer WHERE c_id = local_c_id AND c_d_id = os_d_id AND c_w_id = os_w_id;
+    SELECT c_balance, c_credit
+    INTO p_c_balance, p_c_credit
+    FROM customer
+    WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
   END IF;
 
-  SET done = 0;
-  SELECT o_id, o_carrier_id, o_entry_d
-  INTO os_o_id, os_o_carrier_id, os_entdate
-  FROM (
-    SELECT o_id, o_carrier_id, o_entry_d FROM orders
-    WHERE o_d_id = os_d_id AND o_w_id = os_w_id AND o_c_id = local_c_id
-    ORDER BY o_id DESC
-  ) AS sb LIMIT 1;
-  COMMIT;
-END
+  SET h_data_val = CONCAT(COALESCE(p_w_name, ''), ' ', COALESCE(p_d_name, ''));
 
---= slev
-CREATE PROCEDURE SLEV (
-  st_w_id   INTEGER,
-  st_d_id   INTEGER,
-  threshold INTEGER,
-  OUT stock_count INTEGER
+  UPDATE customer
+  SET c_balance = c_balance - p_h_amount,
+      c_ytd_payment = c_ytd_payment + p_h_amount,
+      c_payment_cnt = c_payment_cnt + 1
+  WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
+
+  INSERT INTO history (h_id, h_c_d_id, h_c_w_id, h_c_id, h_d_id, h_w_id, h_date, h_amount, h_data)
+  VALUES (p_h_id, p_c_d_id, p_c_w_id, p_c_id, p_d_id, p_w_id, NOW(), p_h_amount, h_data_val);
+END
+--= delivery
+CREATE PROCEDURE DELIVERY(
+  IN d_w_id INT,
+  IN d_o_carrier_id INT
 )
 BEGIN
-  DECLARE st_o_id INTEGER;
-  DECLARE `Constraint Violation` CONDITION FOR SQLSTATE '23000';
-  DECLARE EXIT HANDLER FOR `Constraint Violation` ROLLBACK;
-  DECLARE EXIT HANDLER FOR NOT FOUND ROLLBACK;
+  DECLARE v_d_id INT;
+  DECLARE v_no_o_id INT;
+  DECLARE v_c_id INT;
+  DECLARE v_ol_total DECIMAL(12,2);
 
-  START TRANSACTION;
-  SELECT d_next_o_id INTO st_o_id FROM district
+  SET v_d_id = 1;
+  WHILE v_d_id <= 10 DO
+    SET v_no_o_id = NULL;
+    SELECT MIN(no_o_id) INTO v_no_o_id
+    FROM new_order
+    WHERE no_d_id = v_d_id AND no_w_id = d_w_id;
+
+    IF v_no_o_id IS NOT NULL THEN
+      DELETE FROM new_order
+      WHERE no_o_id = v_no_o_id AND no_d_id = v_d_id AND no_w_id = d_w_id;
+
+      SELECT o_c_id INTO v_c_id
+      FROM orders
+      WHERE o_id = v_no_o_id AND o_d_id = v_d_id AND o_w_id = d_w_id;
+
+      UPDATE orders SET o_carrier_id = d_o_carrier_id
+      WHERE o_id = v_no_o_id AND o_d_id = v_d_id AND o_w_id = d_w_id;
+
+      UPDATE order_line SET ol_delivery_d = NOW()
+      WHERE ol_o_id = v_no_o_id AND ol_d_id = v_d_id AND ol_w_id = d_w_id;
+
+      SELECT COALESCE(SUM(ol_amount), 0) INTO v_ol_total
+      FROM order_line
+      WHERE ol_o_id = v_no_o_id AND ol_d_id = v_d_id AND ol_w_id = d_w_id;
+
+      UPDATE customer
+      SET c_balance = c_balance + v_ol_total,
+          c_delivery_cnt = c_delivery_cnt + 1
+      WHERE c_id = v_c_id AND c_d_id = v_d_id AND c_w_id = d_w_id;
+    END IF;
+
+    SET v_d_id = v_d_id + 1;
+  END WHILE;
+END
+--= ostat
+CREATE PROCEDURE OSTAT(
+  IN os_w_id INT,
+  IN os_d_id INT,
+  IN os_c_id INT,
+  IN byname INT,
+  IN os_c_last VARCHAR(16)
+)
+BEGIN
+  DECLARE namecnt INT;
+  DECLARE v_c_id INT;
+  DECLARE v_c_balance DECIMAL(12,2);
+  DECLARE v_c_first VARCHAR(16);
+  DECLARE v_c_middle CHAR(2);
+  DECLARE v_o_id INT;
+  DECLARE v_entdate DATETIME;
+  DECLARE v_o_carrier_id INT;
+
+  SET v_c_id = os_c_id;
+
+  IF byname = 1 THEN
+    SELECT COUNT(c_id) INTO namecnt
+    FROM customer
+    WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id;
+
+    IF namecnt > 0 THEN
+      SELECT c_balance, c_first, c_middle, c_id
+      INTO v_c_balance, v_c_first, v_c_middle, v_c_id
+      FROM customer
+      WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id
+      ORDER BY c_first
+      LIMIT 1 OFFSET 0;
+    END IF;
+  ELSE
+    SELECT c_balance, c_first, c_middle
+    INTO v_c_balance, v_c_first, v_c_middle
+    FROM customer
+    WHERE c_id = v_c_id AND c_d_id = os_d_id AND c_w_id = os_w_id;
+  END IF;
+
+  SELECT o_id, o_carrier_id, o_entry_d
+  INTO v_o_id, v_o_carrier_id, v_entdate
+  FROM orders
+  WHERE o_d_id = os_d_id AND o_w_id = os_w_id AND o_c_id = v_c_id
+  ORDER BY o_id DESC
+  LIMIT 1;
+END
+--= slev
+CREATE PROCEDURE SLEV(
+  IN st_w_id INT,
+  IN st_d_id INT,
+  IN threshold INT
+)
+BEGIN
+  DECLARE v_next_o_id INT;
+  DECLARE stock_count INT;
+
+  SELECT d_next_o_id INTO v_next_o_id
+  FROM district
   WHERE d_w_id = st_w_id AND d_id = st_d_id;
+
   SELECT COUNT(DISTINCT s_i_id) INTO stock_count
   FROM order_line, stock
-  WHERE ol_w_id = st_w_id AND ol_d_id = st_d_id
-    AND ol_o_id < st_o_id AND ol_o_id >= (st_o_id - 20)
-    AND s_w_id = st_w_id AND s_i_id = ol_i_id
+  WHERE ol_w_id = st_w_id
+    AND ol_d_id = st_d_id
+    AND ol_o_id < v_next_o_id
+    AND ol_o_id >= (v_next_o_id - 20)
+    AND s_w_id = st_w_id
+    AND s_i_id = ol_i_id
     AND s_quantity < threshold;
-  COMMIT;
 END
 
---+ workload
+--+ workload_procs
 --= new_order
-CALL NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt, @no_c_discount, @no_c_last, @no_c_credit, @no_d_tax, @no_w_tax, @no_d_next_o_id, NOW())
+CALL NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt)
 --= payment
-CALL PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last, NOW())
+CALL PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last, :p_h_id)
 --= order_status
-CALL OSTAT(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last, @os_c_first, @os_c_middle, @os_c_balance, @os_o_id, @os_entdate, @os_o_carrier_id)
+CALL OSTAT(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)
 --= delivery
-CALL DELIVERY(:d_w_id, :d_o_carrier_id, NOW())
+CALL DELIVERY(:d_w_id, :d_o_carrier_id)
 --= stock_level
-CALL SLEV(:st_w_id, :st_d_id, :threshold, @stock_count)
+CALL SLEV(:st_w_id, :st_d_id, :threshold)
+
+--+ workload_tx_new_order
+--= get_customer
+SELECT c_discount, c_last, c_credit FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= get_warehouse
+SELECT w_tax FROM warehouse WHERE w_id = :w_id
+--= get_district
+SELECT d_next_o_id, d_tax FROM district WHERE d_id = :d_id AND d_w_id = :w_id
+--= update_district
+UPDATE district SET d_next_o_id = d_next_o_id + 1 WHERE d_id = :d_id AND d_w_id = :w_id
+--= insert_order
+INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
+VALUES (:o_id, :d_id, :w_id, :c_id, NOW(), :ol_cnt, :all_local)
+--= insert_new_order
+INSERT INTO new_order (no_o_id, no_d_id, no_w_id) VALUES (:o_id, :d_id, :w_id)
+--= get_item
+SELECT i_price, i_name, i_data FROM item WHERE i_id = :i_id
+--= get_stock
+SELECT s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10
+FROM stock WHERE s_i_id = :i_id AND s_w_id = :w_id
+--= update_stock
+UPDATE stock SET s_quantity = :quantity, s_ytd = s_ytd + :ol_quantity, s_order_cnt = s_order_cnt + 1, s_remote_cnt = s_remote_cnt + :remote_cnt
+WHERE s_i_id = :i_id AND s_w_id = :w_id
+--= insert_order_line
+INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info)
+VALUES (:o_id, :d_id, :w_id, :ol_number, :i_id, :supply_w_id, :quantity, :amount, :dist_info)
+
+--+ workload_tx_payment
+--= update_warehouse
+UPDATE warehouse SET w_ytd = w_ytd + :amount WHERE w_id = :w_id
+--= get_warehouse
+SELECT w_name, w_street_1, w_street_2, w_city, w_state, w_zip FROM warehouse WHERE w_id = :w_id
+--= update_district
+UPDATE district SET d_ytd = d_ytd + :amount WHERE d_w_id = :w_id AND d_id = :d_id
+--= get_district
+SELECT d_name, d_street_1, d_street_2, d_city, d_state, d_zip FROM district WHERE d_w_id = :w_id AND d_id = :d_id
+--= get_customer_by_id
+SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since
+FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= update_customer
+UPDATE customer SET c_balance = c_balance - :amount, c_ytd_payment = c_ytd_payment + :amount, c_payment_cnt = c_payment_cnt + 1
+WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= insert_history
+INSERT INTO history (h_id, h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data)
+VALUES (:h_id, :h_c_id, :h_c_d_id, :h_c_w_id, :h_d_id, :h_w_id, NOW(), :h_amount, :h_data)
+
+--+ workload_tx_order_status
+--= get_customer_by_id
+SELECT c_balance, c_first, c_middle, c_last FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+--= get_last_order
+SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_d_id = :d_id AND o_w_id = :w_id AND o_c_id = :c_id ORDER BY o_id DESC LIMIT 1
+--= get_order_lines
+SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d FROM order_line WHERE ol_o_id = :o_id AND ol_d_id = :d_id AND ol_w_id = :w_id
+
+--+ workload_tx_delivery
+--= get_min_new_order
+SELECT MIN(no_o_id) FROM new_order WHERE no_d_id = :d_id AND no_w_id = :w_id
+--= delete_new_order
+DELETE FROM new_order WHERE no_o_id = :o_id AND no_d_id = :d_id AND no_w_id = :w_id
+--= get_order
+SELECT o_c_id FROM orders WHERE o_id = :o_id AND o_d_id = :d_id AND o_w_id = :w_id
+--= update_order
+UPDATE orders SET o_carrier_id = :carrier_id WHERE o_id = :o_id AND o_d_id = :d_id AND o_w_id = :w_id
+--= update_order_line
+UPDATE order_line SET ol_delivery_d = NOW() WHERE ol_o_id = :o_id AND ol_d_id = :d_id AND ol_w_id = :w_id
+--= get_order_line_amount
+SELECT SUM(ol_amount) FROM order_line WHERE ol_o_id = :o_id AND ol_d_id = :d_id AND ol_w_id = :w_id
+--= update_customer
+UPDATE customer SET c_balance = c_balance + :amount, c_delivery_cnt = c_delivery_cnt + 1 WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+
+--+ workload_tx_stock_level
+--= get_district
+SELECT d_next_o_id FROM district WHERE d_w_id = :w_id AND d_id = :d_id
+--= get_window_items
+-- Two-step stock_level scan — see pg.sql for the rationale. Same shape on
+-- every dialect so the TypeScript has no driver-specific branches.
+SELECT DISTINCT ol_i_id FROM order_line
+WHERE ol_w_id = :w_id
+  AND ol_d_id = :d_id
+  AND ol_o_id >= :min_o_id
+  AND ol_o_id < :next_o_id
+--= stock_count_in
+SELECT COUNT(*) FROM stock
+WHERE s_w_id = :w_id
+  AND s_quantity < :threshold
+  AND s_i_id IN ({ids})

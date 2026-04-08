@@ -30,22 +30,18 @@ func TestInferPreset(t *testing.T) {
 }
 
 func TestResolveInput_EmbeddedPreset(t *testing.T) {
-	// Run from a temp dir that has no tpcc files.
 	tmp := t.TempDir()
 
 	restoreDir := chdir(t, tmp)
 	defer restoreDir()
 
-	input, err := ResolveInput("tpcc", "")
+	input, err := ResolveInput("simple", "")
 	require.NoError(t, err)
 
-	require.Equal(t, "tpcc.ts", input.Script.Name)
+	require.Equal(t, "simple.ts", input.Script.Name)
 	require.Equal(t, SourceEmbedded, input.Script.Source)
 	require.NotNil(t, input.Script.Content)
-
-	// SQL is no longer auto-derived for tpcc — the TS picks the right SQL by driver type.
-	// The preset SQL files are copied to the temp dir by the runner.
-	require.Equal(t, "tpcc", input.Preset)
+	require.Equal(t, "simple", input.Preset)
 }
 
 func TestResolveInput_SimpleNoSQL(t *testing.T) {
@@ -72,11 +68,12 @@ func TestResolveInput_LocalSQLOverride(t *testing.T) {
 	err := os.WriteFile(filepath.Join(tmp, "tpcc.sql"), []byte("-- custom"), 0o644)
 	require.NoError(t, err)
 
-	input, err := ResolveInput("tpcc", "")
+	input, err := ResolveInput("tpcc/procs.ts", "")
 	require.NoError(t, err)
 
 	// Script should come from embedded.
 	require.Equal(t, SourceEmbedded, input.Script.Source)
+	require.Equal(t, "procs.ts", input.Script.Name)
 	// SQL should come from cwd.
 	require.NotNil(t, input.SQL)
 	require.Equal(t, SourceCwd, input.SQL.Source)

@@ -104,7 +104,7 @@ MULTI-DIALECT PATTERN
 
   You can also supply a specific file at the command line:
 
-    stroppy run workloads/tpcc/tpcc.ts workloads/tpcc/mysql.sql
+    stroppy run workloads/tpcc/procs workloads/tpcc/mysql.sql
 
   When a .sql file is passed as a positional argument it is forwarded to
   the script as the SQL_FILE environment variable, which takes priority
@@ -124,7 +124,7 @@ PROBE INTEGRATION
   Use stroppy probe to inspect what sections and queries a script expects
   from its SQL file before writing one from scratch:
 
-    stroppy probe workloads/tpcc/tpcc.ts --sql
+    stroppy probe workloads/tpcc/procs --sql
 
   The output shows the skeleton the script expects:
 
@@ -142,20 +142,21 @@ PROBE INTEGRATION
 
 EXAMPLES
 
-  # Use the default driver-selected SQL file
-  stroppy run workloads/tpcc/tpcc.ts -d pg
+  # Use the default driver-selected SQL file (.ts extension optional)
+  stroppy run workloads/tpcc/procs -d pg
+  stroppy run workloads/tpcc/procs.ts -d pg
 
   # Pass an explicit SQL file as positional argument
-  stroppy run workloads/tpcc/tpcc.ts workloads/tpcc/mysql.sql -d mysql
+  stroppy run workloads/tpcc/procs workloads/tpcc/mysql.sql -d mysql
 
-  # Override the SQL file via environment variable
-  stroppy run workloads/tpcc/tpcc.ts -d pico -e SQL_FILE=./my_pico.sql
+  # Override the SQL file via environment variable (tx — universal, works with pico/ydb)
+  stroppy run workloads/tpcc/tx.ts -d pico -e SQL_FILE=./my_pico.sql
 
   # Show the SQL structure a script expects
-  stroppy probe workloads/tpcc/tpcc.ts --sql
+  stroppy probe workloads/tpcc/procs --sql
 
   # Show SQL structure and steps together
-  stroppy probe workloads/tpcc/tpcc.ts --sql --steps
+  stroppy probe workloads/tpcc/procs.ts --sql --steps
 
 SEE ALSO
 

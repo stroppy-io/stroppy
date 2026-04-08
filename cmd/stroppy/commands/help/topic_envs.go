@@ -56,15 +56,15 @@ SETTING VALUES
   Export variables in your shell before running:
 
     export WAREHOUSES=50
-    stroppy run tpcc
+    stroppy run tpcc/procs
 
   Or set them inline for a single run:
 
-    WAREHOUSES=50 DURATION=10m stroppy run tpcc
+    WAREHOUSES=50 stroppy run tpcc/tx
 
   Alternatively, pass them through k6's -e flag after the k6 separator:
 
-    stroppy run tpcc -- -e WAREHOUSES=50 -e DURATION=10m
+    stroppy run tpcc/procs -- -e WAREHOUSES=20 -e POOL_SIZE=50
 
 DEFAULTS
 
@@ -119,18 +119,19 @@ PLAIN __ENV ACCESS (LEGACY)
 
 EXAMPLES
 
-  # Run with custom scale factor
+  # Run with custom scale factor (procs — pg/mysql stored procedures)
   export SCALE_FACTOR=10
-  stroppy run tpcc
+  stroppy run tpcc/procs
 
-  # Override duration inline
-  DURATION=30m stroppy run tpcc/flat.ts
+  # Run with custom scale factor (tx — universal, works with any DB)
+  SCALE_FACTOR=10 stroppy run tpcc/tx
 
-  # Inspect what env vars tpcc.ts uses
-  stroppy probe workloads/tpcc/tpcc.ts --envs
+  # Inspect what env vars a script uses
+  stroppy probe tpcc/procs --envs
+  stroppy probe tpcc/tx.ts --envs
 
   # Pass via k6 -e after the separator
-  stroppy run tpcc -- -e WAREHOUSES=20 -e POOL_SIZE=50
+  stroppy run tpcc/procs -- -e WAREHOUSES=20 -e POOL_SIZE=50
 
 CONFIG FILE ALTERNATIVE
 
@@ -139,7 +140,6 @@ CONFIG FILE ALTERNATIVE
 
     {
       "env": {
-        "DURATION": "30m",
         "WAREHOUSES": "10",
         "POOL_SIZE": "200"
       }

@@ -13,8 +13,8 @@ Use -f/--file to specify a different path.
 
   stroppy run                         # uses ./stroppy-config.json if present
   stroppy run -f prod.json            # explicit config file
-  stroppy run -f prod.json tpcc       # config file + override script
-  stroppy probe -f prod.json tpcc     # probe with effective config
+  stroppy run -f prod.json tpcc/procs     # config file + override script
+  stroppy probe -f prod.json tpcc/tx      # probe with effective config
 
 Precedence (highest to lowest):
   real environment variables
@@ -27,7 +27,7 @@ Precedence (highest to lowest):
 Example stroppy-config.json:
   {
     "version": "1",
-    "script": "tpcc",
+    "script": "tpcc/procs",
     "global": {
       "logger": { "logLevel": "LOG_LEVEL_INFO" },
       "exporter": {
@@ -42,11 +42,10 @@ Example stroppy-config.json:
       }
     },
     "env": {
-      "DURATION": "30m",
-      "VUS_SCALE": "0.5",
-      "WAREHOUSES": "10"
+      "WAREHOUSES": "10",
+      "POOL_SIZE": "200"
     },
-    "k6Args": ["--vus", "10"]
+    "k6Args": ["--vus", "10", "--duration", "30m"]
   }
 
 Driver types: postgres, mysql, picodata, ydb, noop
@@ -77,7 +76,7 @@ DEBUG LOGGING
 
   To trace exactly how each parameter is resolved, enable debug output:
 
-    LOG_LEVEL=debug stroppy run tpcc -f stroppy-config.json
+    LOG_LEVEL=debug stroppy run tpcc/procs -f stroppy-config.json
 
   At DEBUG level each override decision is logged with source and value:
 

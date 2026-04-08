@@ -46,7 +46,7 @@ The binary will be available at `./build/stroppy`.
 Configure the target database via driver flags (defaults to a local PostgreSQL instance):
 
 ```bash
-stroppy run tpcc -d pg -D url=postgres://user:password@host:5432/dbname
+stroppy run tpcc/procs -d pg -D url=postgres://user:password@host:5432/dbname
 ```
 
 ### Run Tests
@@ -58,43 +58,40 @@ You can run a test from the local directory.
 ```
 
 Many tests are embedded in stroppy. The first argument is a `.ts` workload, the optional second is a `.sql` schema file. Extensions may be omitted.
-A few examples of how you can run the same test.
+
+TPC-B and TPC-C each ship two scripts:
+- `procs` — uses stored procedures; supports **PostgreSQL and MySQL**
+- `tx` — uses raw transactions; works with **any DB** (PostgreSQL, MySQL, Picodata, YDB)
 
 ```bash
-stroppy run tpcc
-stroppy run tpcc/tpcc
-stroppy run tpcc/tpcc.ts
-stroppy run tpcc/tpcc.ts tpcc.sql
-stroppy run tpcc/tpcc.ts tpcc/tpcc.sql
-```
-
-Some workloads have variants. The `pick` variant uses weighted random transaction selection instead of simulating all users at full load. The `flat` variant runs a flat list of queries without k6 scenarios:
-
-```bash
-stroppy run tpcc/pick
-stroppy run tpcb/flat
+stroppy run tpcc/procs        # TPC-C, stored procedures (pg/mysql)
+stroppy run tpcc/procs.ts     # same, explicit extension
+stroppy run tpcc/tx           # TPC-C, raw transactions (any DB)
+stroppy run tpcb/procs        # TPC-B, stored procedures (pg/mysql)
+stroppy run tpcb/tx           # TPC-B, raw transactions (any DB)
 ```
 
 And you can mix builtin tests with your own scripts or SQL files:
 
 ```bash
-stroppy run tpcb ./my-experimental.sql
-stroppy run ./my-tpcb.ts tpcb.sql
+stroppy run tpcb/procs ./my-experimental.sql
+stroppy run ./my-tpcb.ts tpcb/pg.sql
 ```
 
 Use `-d` to select a driver preset and `-D` to override driver options:
 
 ```bash
-stroppy run tpcc -d pg
-stroppy run tpcc -d mysql -D url=mysql://root:pass@localhost:3306/bench
-stroppy run tpcc -d pg -d1 mysql              # two drivers
+stroppy run tpcc/procs -d pg
+stroppy run tpcc/procs -d mysql -D url=mysql://root:pass@localhost:3306/bench
+stroppy run tpcc/tx -d pico                   # picodata: use tx variant
+stroppy run tpcc/procs -d pg -d1 mysql        # two drivers
 ```
 
 Pass environment variables to the script with `-e` (keys are auto-uppercased):
 
 ```bash
-stroppy run tpcc -e pool_size=200
-stroppy run tpcc -d pg -e scale_factor=2
+stroppy run tpcc/procs -e pool_size=200
+stroppy run tpcc/procs -d pg -e scale_factor=2
 ```
 
 Use `stroppy help` to explore available topics:
@@ -109,8 +106,8 @@ stroppy help resolution
 Probe inspects a workload and prints its configuration and SQL schema without running it.
 
 ```bash
-stroppy probe tpcc
-stroppy probe workloads/tpcc/tpcc.ts
+stroppy probe tpcc/procs
+stroppy probe tpcc/tx.ts
 
 stroppy help probe
 ```
@@ -124,11 +121,13 @@ stroppy help probe
 ├─ tests
 │  └─ multi_drivers_test.ts sqlapi_test.ts transaction_test.ts
 ├─ tpcb
-│  ├─ tpcb.ts flat.ts
-│  └─ tpcb.sql ansi.sql
+│  ├─ procs.ts            (stored procedures — pg/mysql)
+│  ├─ tx.ts               (raw transactions  — any DB)
+│  └─ pg.sql mysql.sql pico.sql ydb.sql
 ├─ tpcc
-│  ├─ tpcc.ts pick.ts flat.ts
-│  └─ tpcc.sql pg.sql mysql.sql ansi.sql
+│  ├─ procs.ts            (stored procedures — pg/mysql)
+│  ├─ tx.ts               (raw transactions  — any DB)
+│  └─ pg.sql mysql.sql pico.sql ydb.sql
 └─ tpcds
    ├─ tpcds-scale-(1/10/100/300/1000/3000/10000/30000/50000/100000).sql
    └─ tpcds.ts
@@ -168,7 +167,7 @@ After generating a workspace:
 3. Use k6 APIs for test scenarios
 4. Run with `./stroppy run <test-file>.ts`
 
-Look at `simple.ts` and `tpcb.ts` first as a reference.
+Look at `simple.ts` and `tpcb/procs.ts` first as a reference.
 
 ## Docker Usage
 
@@ -186,7 +185,7 @@ docker run --network host ghcr.io/stroppy-io/stroppy run simple
 > ```
 
 ```bash
-docker run --network host stroppy run tpcb \
+docker run --network host stroppy run tpcb/procs \
   -d pg -D url=postgres://user:password@host:5432/dbname
 ```
 

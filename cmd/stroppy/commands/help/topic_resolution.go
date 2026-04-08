@@ -57,7 +57,7 @@ SQL AUTO-DERIVATION
   locate a SQL file automatically:
 
   - The preset name is derived from the argument (e.g. "tpcc" from "tpcc",
-    "tpcc.ts", or "tpcc/pick.ts").
+    "tpcc.ts", or "tpcc/procs.ts").
   - stroppy then looks for <preset>.sql through the full search path.
   - If no SQL file is found, the run proceeds without one — some scripts
     embed their SQL directly or do not use SQL at all.
@@ -72,7 +72,9 @@ PRESET INFERENCE
     tpcc             → preset "tpcc"
     tpcc.ts          → preset "tpcc"   (extension stripped)
     tpcc.sql         → preset "tpcc"   (extension stripped)
-    tpcc/pick.ts     → preset "tpcc"   (directory component used)
+    tpcc/procs       → preset "tpcc"   (directory component used)
+    tpcc/procs.ts    → preset "tpcc"   (directory component used)
+    tpcc/tx          → preset "tpcc"   (directory component used)
     ./mybench.ts     → no preset       (explicit relative path)
     /abs/path/b.ts   → no preset       (absolute path)
 
@@ -94,7 +96,9 @@ SECOND POSITIONAL ARGUMENT
 EXAMPLES
 
   # Preset: script from embedded workloads, SQL auto-derived
-  stroppy run tpcc
+  stroppy run simple
+  stroppy run tpcc/procs     # pg/mysql (stored procedures)
+  stroppy run tpcc/tx        # any DB   (raw transactions)
 
   # Preset with explicit SQL variant
   stroppy run tpcds tpcds-scale-100
@@ -113,7 +117,7 @@ EXAMPLES
 
   # Override embedded tpcc SQL with a local copy
   # (place tpcc.sql in cwd; script still comes from embedded)
-  stroppy run tpcc
+  stroppy run tpcc/procs
 
 SEE ALSO
 

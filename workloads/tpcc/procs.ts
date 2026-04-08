@@ -3,24 +3,24 @@ import { Teardown, NewPicker } from "k6/x/stroppy";
 import { AB, C, R, Step, DriverX, S, ENV, declareDriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
-const POOL_SIZE = ENV("POOL_SIZE", 100, "Connection pool size");
+// TPC-C Configuration Constants
+const POOL_SIZE   = ENV("POOL_SIZE", 100, "Connection pool size");
+const WAREHOUSES  = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
 
-// TPCC Configuration Constants
-const WAREHOUSES = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
 const DISTRICTS_PER_WAREHOUSE = 10;
-const CUSTOMERS_PER_DISTRICT = 3000;
+const CUSTOMERS_PER_DISTRICT  = 3000;
 const ITEMS = 100000;
 
 const TOTAL_DISTRICTS = WAREHOUSES * DISTRICTS_PER_WAREHOUSE;
-const TOTAL_CUSTOMERS =
-  WAREHOUSES * DISTRICTS_PER_WAREHOUSE * CUSTOMERS_PER_DISTRICT;
-const TOTAL_STOCK = WAREHOUSES * ITEMS;
+const TOTAL_CUSTOMERS = WAREHOUSES * DISTRICTS_PER_WAREHOUSE * CUSTOMERS_PER_DISTRICT;
+const TOTAL_STOCK     = WAREHOUSES * ITEMS;
 
+// K6 options — weighted dispatch inside default(), VUs/duration set via CLI or k6 defaults.
 export const options: Options = {
-  setupTimeout:  String(WAREHOUSES * 5) + "m", // 5 min for every 1 in scale
+  setupTimeout: String(WAREHOUSES * 5) + "m",
 };
 
-// Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql/pico)
+// Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql)
 const driverConfig = declareDriverSetup(0, {
   url: "postgres://postgres:postgres@localhost:5432",
   driverType: "postgres",
@@ -28,22 +28,38 @@ const driverConfig = declareDriverSetup(0, {
   pool: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
 });
 
+// procs.ts targets pg + mysql only — picodata and ydb have no stored procedures.
+if (driverConfig.driverType === "picodata" || driverConfig.driverType === "ydb") {
+  throw new Error(
+    `tpcc/procs.ts only supports postgres and mysql (got driverType=${driverConfig.driverType}). ` +
+    `Use tpcc/tx.ts for picodata/ydb.`,
+  );
+}
+
+const _sqlByDriver: Record<string, string> = {
+  postgres: "./pg.sql",
+  mysql:    "./mysql.sql",
+};
+const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file path (defaults per driverType)")
+  ?? _sqlByDriver[driverConfig.driverType!]
+  ?? "./pg.sql";
+
 const driver = DriverX.create().setup(driverConfig);
 
-// SQL file: user-specified via CLI takes priority, otherwise auto-select by driver type
-const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file path (auto-resolved by driver type if omitted)")
-  || ({
-    postgres: "./pg.sql",
-    mysql:    "./mysql.sql",
-    picodata: "./ansi.sql",
-  }[driverConfig.driverType!] ?? "./pg.sql");
-
 const sql = parse_sql_with_sections(open(SQL_FILE));
+
+// Per-VU monotonic counter for h_id. History table has a PRIMARY KEY on h_id
+// across all dialects (for uniformity with tx.ts and picodata/ydb schemas).
+// High offset (__VU * 10M) keeps VUs disjoint.
+declare const __VU: number;
+const _vu = (typeof __VU === "number" && __VU > 0) ? __VU : 1;
+let hid_counter = _vu * 10_000_000;
+const nextHid = (): number => ++hid_counter;
 
 export function setup() {
   Step("drop_schema", () => {
     sql("drop_schema").forEach((query) => driver.exec(query, {}));
-  })
+  });
 
   Step("create_schema", () => {
     sql("create_schema").forEach((query) => driver.exec(query, {}));
@@ -158,14 +174,18 @@ export function setup() {
   Step.begin("workload");
 }
 
-const newOrderWarehouseGen = R.int32(1, WAREHOUSES).gen();
+// =====================================================================
+// Per-tx parameter generators (kept module-level for cheap reuse)
+// =====================================================================
+
+const newOrderWarehouseGen    = R.int32(1, WAREHOUSES).gen();
 const newOrderMaxWarehouseGen = C.int32(WAREHOUSES).gen();
-const newOrderDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const newOrderCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
-const newOrderOlCntGen = R.int32(5, 15).gen();
+const newOrderDistrictGen     = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const newOrderCustomerGen     = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const newOrderOlCntGen        = R.int32(5, 15).gen();
 
 function new_order() {
-  driver.exec(sql("workload", "new_order")!, {
+  driver.exec(sql("workload_procs", "new_order")!, {
     w_id: newOrderWarehouseGen.next(),
     max_w_id: newOrderMaxWarehouseGen.next(),
     d_id: newOrderDistrictGen.next(),
@@ -174,72 +194,76 @@ function new_order() {
   });
 }
 
-const paymentWarehouseGen = R.int32(1, WAREHOUSES).gen();
-const paymentDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const paymentWarehouseGen         = R.int32(1, WAREHOUSES).gen();
+const paymentDistrictGen          = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 const paymentCustomerWarehouseGen = R.int32(1, WAREHOUSES).gen();
-const paymentCustomerDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const paymentCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
-const paymentAmountGen = R.double(1, 5000).gen();
-const paymentCustomerLastGen = S.str(6, 16).gen();
+const paymentCustomerDistrictGen  = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const paymentCustomerGen          = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const paymentAmountGen            = R.double(1, 5000).gen();
+const paymentCustomerLastGen      = S.str(6, 16).gen();
 
-function payments() {
-  driver.exec(sql("workload", "payment")!, {
-      p_w_id: paymentWarehouseGen.next(),
-      p_d_id: paymentDistrictGen.next(),
-      p_c_w_id: paymentCustomerWarehouseGen.next(),
-      p_c_d_id: paymentCustomerDistrictGen.next(),
-      p_c_id: paymentCustomerGen.next(),
-      byname: 0,
-      h_amount: paymentAmountGen.next(),
-      c_last: paymentCustomerLastGen.next(),
-    },
-  );
+function payment() {
+  driver.exec(sql("workload_procs", "payment")!, {
+    p_w_id: paymentWarehouseGen.next(),
+    p_d_id: paymentDistrictGen.next(),
+    p_c_w_id: paymentCustomerWarehouseGen.next(),
+    p_c_d_id: paymentCustomerDistrictGen.next(),
+    p_c_id: paymentCustomerGen.next(),
+    byname: 0,
+    h_amount: paymentAmountGen.next(),
+    c_last: paymentCustomerLastGen.next(),
+    p_h_id: nextHid(),
+  });
 }
 
-const orderStatusWarehouseGen = R.int32(1, WAREHOUSES).gen();
-const orderStatusDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const orderStatusCustomerGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const orderStatusWarehouseGen    = R.int32(1, WAREHOUSES).gen();
+const orderStatusDistrictGen     = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const orderStatusCustomerGen     = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
 const orderStatusCustomerLastGen = R.str(8, 16).gen();
 
 function order_status() {
-  driver.exec(sql("workload", "order_status")!, {
-      os_w_id: orderStatusWarehouseGen.next(),
-      os_d_id: orderStatusDistrictGen.next(),
-      os_c_id: orderStatusCustomerGen.next(),
-      byname: 0,
-      os_c_last: orderStatusCustomerLastGen.next(),
-    },
-  );
+  driver.exec(sql("workload_procs", "order_status")!, {
+    os_w_id: orderStatusWarehouseGen.next(),
+    os_d_id: orderStatusDistrictGen.next(),
+    os_c_id: orderStatusCustomerGen.next(),
+    byname: 0,
+    os_c_last: orderStatusCustomerLastGen.next(),
+  });
 }
 
 const deliveryWarehouseGen = R.int32(1, WAREHOUSES).gen();
-const deliveryCarrierGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const deliveryCarrierGen   = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 
 function delivery() {
-  driver.exec(sql("workload", "delivery")!, {
+  driver.exec(sql("workload_procs", "delivery")!, {
     d_w_id: deliveryWarehouseGen.next(),
     d_o_carrier_id: deliveryCarrierGen.next(),
   });
 }
 
 const stockLevelWarehouseGen = R.int32(1, WAREHOUSES).gen();
-const stockLevelDistrictGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const stockLevelDistrictGen  = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 const stockLevelThresholdGen = R.int32(10, 20).gen();
 
 function stock_level() {
-  driver.exec(sql("workload", "stock_level")!, {
+  driver.exec(sql("workload_procs", "stock_level")!, {
     st_w_id: stockLevelWarehouseGen.next(),
     st_d_id: stockLevelDistrictGen.next(),
     threshold: stockLevelThresholdGen.next(),
   });
 }
 
-const picker = NewPicker(0)
+// =====================================================================
+// Weighted dispatch — TPC-C standard mix: 45/43/4/4/4 (sums to 100)
+// =====================================================================
+const picker = NewPicker(0);
+
 export default function (): void {
   const workload = picker.pickWeighted(
-    [new_order, payments, order_status, delivery, stock_level],
-    [44,        43,       4,            4,        4]) as () => void;
-  workload()
+    [new_order, payment, order_status, delivery, stock_level],
+    [45,        43,      4,            4,        4],
+  ) as () => void;
+  workload();
 }
 
 export function teardown() {
