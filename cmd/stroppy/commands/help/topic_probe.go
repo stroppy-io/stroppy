@@ -84,7 +84,7 @@ SECTION FILTER FLAGS
     --drivers    Show only the Drivers section
 
   Multiple flags can be combined:
-    stroppy probe tpcc.ts --sql --steps
+    stroppy probe tpcc/procs.ts --sql --steps
 
 OUTPUT FORMATS (-o)
 
@@ -105,7 +105,7 @@ CONFIG FILE (-f)
   not provided as positional arguments:
 
     stroppy probe -f stroppy-config.json          # script from file
-    stroppy probe -f stroppy-config.json tpcc     # script overrides file
+    stroppy probe -f stroppy-config.json tpcc/procs     # script overrides file
 
   See 'stroppy help config-file' for the config file format.
 
@@ -120,26 +120,27 @@ CONFIG FILE (-f)
 
 EXAMPLES
 
-  # Probe all sections (default)
-  stroppy probe workloads/tpcc/tpcc.ts
+  # Probe all sections (default); .ts extension is optional
+  stroppy probe workloads/tpcc/procs
+  stroppy probe workloads/tpcc/procs.ts
 
   # Probe with an explicit SQL file
-  stroppy probe workloads/tpcc/tpcc.ts workloads/tpcc/pg.sql
+  stroppy probe workloads/tpcc/procs workloads/tpcc/pg.sql
 
   # Show only SQL structure
-  stroppy probe workloads/tpcc/tpcc.ts --sql
+  stroppy probe workloads/tpcc/procs --sql
 
   # Show SQL structure and steps together
-  stroppy probe workloads/tpcc/tpcc.ts --sql --steps
+  stroppy probe workloads/tpcc/procs.ts --sql --steps
 
   # Show driver defaults
-  stroppy probe workloads/tpcc/tpcc.ts --drivers
+  stroppy probe workloads/tpcc/procs --drivers
 
   # Machine-readable JSON output
-  stroppy probe workloads/tpcc/tpcc.ts -o json
+  stroppy probe workloads/tpcc/procs -o json
 
   # Probe using local imports (no tmp dir)
-  stroppy probe workloads/tpcc/tpcc.ts --local
+  stroppy probe workloads/tpcc/procs.ts --local
 
 SEE ALSO
 

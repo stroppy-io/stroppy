@@ -45,12 +45,12 @@ DRIVER PRESETS (-d / --driver)
 
   Use -d (driver 0) or -d1, -d2, ... for additional drivers:
 
-    stroppy run tpcc -d pg                # driver 0 = pg preset
-    stroppy run tpcc -d pg -d1 mysql      # driver 0 = pg, driver 1 = mysql
+    stroppy run tpcc/procs -d pg                # driver 0 = pg preset
+    stroppy run tpcc/procs -d pg -d1 mysql      # driver 0 = pg, driver 1 = mysql
 
   Instead of a preset name, -d also accepts a raw JSON string:
 
-    stroppy run tpcc -d '{"url":"postgres://prod:5432","driverType":"postgres"}'
+    stroppy run tpcc/procs -d '{"url":"postgres://prod:5432","driverType":"postgres"}'
 
   This is useful when no preset matches or you need to set many fields at once.
 
@@ -113,37 +113,37 @@ HOW IT WORKS
 
 EXAMPLES
 
-  # PostgreSQL preset
-  stroppy run tpcc -d pg
+  # PostgreSQL preset (procs — stored procedures, pg/mysql only)
+  stroppy run tpcc/procs -d pg
 
   # Preset with URL override
-  stroppy run tpcc -d pg -D url=postgres://prod-host:5432/mydb
+  stroppy run tpcc/procs.ts -d pg -D url=postgres://prod-host:5432/mydb
 
   # Two drivers: PostgreSQL and MySQL
-  stroppy run tpcc -d pg -d1 mysql
+  stroppy run tpcc/procs -d pg -d1 mysql
 
   # Override a field without specifying a preset
-  stroppy run tpcc -D errorMode=throw
+  stroppy run tpcc/procs -D errorMode=throw
 
   # Pool tuning
-  stroppy run tpcc -d pg -D pool.maxConns=20 -D pool.maxConnLifetime=30m
+  stroppy run tpcc/procs.ts -d pg -D pool.maxConns=20 -D pool.maxConnLifetime=30m
 
   # Full JSON config instead of preset
-  stroppy run tpcc -d '{"url":"postgres://prod:5432","driverType":"postgres","errorMode":"throw"}'
+  stroppy run tpcc/procs -d '{"url":"postgres://prod:5432","driverType":"postgres","errorMode":"throw"}'
 
-  # YDB with TLS and token auth (managed YDB)
-  stroppy run tpcc -d ydb -D url=grpcs://host:2135/db \
+  # YDB with TLS and token auth (tx — raw transactions, works with any DB)
+  stroppy run tpcc/tx -d ydb -D url=grpcs://host:2135/db \
     -D caCertFile=./certs/ca.pem -D authToken=t1.xxx...
 
   # YDB with static credentials
-  stroppy run tpcc -d ydb -D url=grpcs://host:2135/db \
+  stroppy run tpcc/tx.ts -d ydb -D url=grpcs://host:2135/db \
     -D authUser=admin -D authPassword=secret
 
   # Pre-set env takes precedence over CLI flags
-  STROPPY_DRIVER_0='{"url":"postgres://staging:5432"}' stroppy run tpcc -d pg
+  STROPPY_DRIVER_0='{"url":"postgres://staging:5432"}' stroppy run tpcc/procs -d pg
 
   # Inspect script driver defaults
-  stroppy probe tpcc.ts --drivers
+  stroppy probe tpcc/procs --drivers
 
 SEE ALSO
 
