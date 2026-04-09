@@ -1,25 +1,59 @@
 import { Options } from "k6/options";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { Counter, AB, C, R, Step, DriverX, S, ENV, Dist, TxIsolationName, declareDriverSetup } from "./helpers.ts";
+import { Counter, Trend, AB, C, R, Step, DriverX, S, ENV, Dist, TxIsolationName, declareDriverSetup, retry, isSerializationError } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 // Post-run compliance counters for TPC-C auditing. See TPCC_COMPILANCE_REPORT.md
 // §1.11 — these expose the observed rates of spec-mandated percentages so an
 // operator can verify compliance without instrumenting the DB side.
-const tpccNewOrderTotal    = new Counter("tpcc_new_order_total");
-const tpccRollbackDecided  = new Counter("tpcc_rollback_decided");
-const tpccRollbackDone     = new Counter("tpcc_rollback_done");
-const tpccRemoteLineTotal  = new Counter("tpcc_remote_line_total");
-const tpccRemoteLineRem    = new Counter("tpcc_remote_line_remote");
-const tpccPaymentTotal     = new Counter("tpcc_payment_total");
-const tpccPaymentRemote    = new Counter("tpcc_payment_remote");
-const tpccOrderStatusTotal = new Counter("tpcc_order_status_total");
-const tpccDeliveryTotal    = new Counter("tpcc_delivery_total");
-const tpccStockLevelTotal  = new Counter("tpcc_stock_level_total");
+const tpccNewOrderTotal       = new Counter("tpcc_new_order_total");
+const tpccRollbackDecided     = new Counter("tpcc_rollback_decided");
+const tpccRollbackDone        = new Counter("tpcc_rollback_done");
+const tpccRemoteLineTotal     = new Counter("tpcc_remote_line_total");
+const tpccRemoteLineRem       = new Counter("tpcc_remote_line_remote");
+const tpccPaymentTotal        = new Counter("tpcc_payment_total");
+const tpccPaymentRemote       = new Counter("tpcc_payment_remote");
+// §1.6: 60% of Payment / Order-Status transactions must look up the
+// customer by last name instead of by c_id. These counters expose the
+// observed by-name rate so an operator can verify that the 60% roll
+// actually reaches the DB (and wasn't lost to an early-return path).
+const tpccPaymentByname       = new Counter("tpcc_payment_byname");
+// §1.8: 10% of customers carry c_credit='BC' and Payment must compute
+// the 500-char c_data log for them (c_id, c_d_id, c_w_id, d_id, w_id,
+// h_amount, '|', old_c_data). This counter exposes the observed rate
+// so an operator can verify it tracks the population ratio.
+const tpccPaymentBc           = new Counter("tpcc_payment_bc");
+const tpccOrderStatusTotal    = new Counter("tpcc_order_status_total");
+const tpccOrderStatusByname   = new Counter("tpcc_order_status_byname");
+const tpccDeliveryTotal       = new Counter("tpcc_delivery_total");
+const tpccStockLevelTotal     = new Counter("tpcc_stock_level_total");
+// T2.3: count serialization-failure retries. PG REPEATABLE READ uses
+// snapshot isolation, so concurrent updates to the same row abort with
+// SQLSTATE 40001. The retry() helper catches those, sleeps zero, and tries
+// again — incrementing this counter each time so an operator can see how
+// often retries are firing without grepping logs. Spec §5.2.5 still caps
+// total tx_error_rate at 1%; with retries the un-retryable tail is what
+// counts against that budget.
+const tpccRetryAttempts       = new Counter("tpcc_retry_attempts");
+
+// T3.2: per-transaction response-time Trends. Spec §5.2.5.4 sets 90p
+// ceilings (NO/P/OS 5s, SL 20s, D 80s). The `true` second arg marks
+// these as time trends so k6 formats values in ms/s and the threshold
+// parser accepts "p(90)<5000" millisecond literals. Same metric names
+// as procs.ts so post-run analysis is variant-agnostic.
+const tpccNewOrderDuration    = new Trend("tpcc_new_order_duration", true);
+const tpccPaymentDuration     = new Trend("tpcc_payment_duration", true);
+const tpccOrderStatusDuration = new Trend("tpcc_order_status_duration", true);
+const tpccDeliveryDuration    = new Trend("tpcc_delivery_duration", true);
+const tpccStockLevelDuration  = new Trend("tpcc_stock_level_duration", true);
 
 // TPC-C Configuration Constants
 const POOL_SIZE   = ENV("POOL_SIZE", 100, "Connection pool size");
 const WAREHOUSES  = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
+// T2.3: how many attempts the retry helper makes before giving up on a
+// serialization failure. 3 = original try + 2 retries; immediate, no sleep.
+// Override via -e RETRY_ATTEMPTS=N for benchmarking the isolation tradeoff.
+const RETRY_ATTEMPTS = ENV("RETRY_ATTEMPTS", 3, "Max attempts for serialization-failure retries (1 = no retry)");
 
 const DISTRICTS_PER_WAREHOUSE = 10;
 const CUSTOMERS_PER_DISTRICT  = 3000;
@@ -42,6 +76,15 @@ const C_LAST_DICT: string[] = Array.from({ length: 1000 }, (_, i) => {
   return TPCC_SYLLABLES[d0] + TPCC_SYLLABLES[d1] + TPCC_SYLLABLES[d2];
 });
 
+// Runtime NURand(255, 0, 999) picker used by the by-name branch of
+// Payment and Order-Status (§2.5.1.2 / §2.6.1.2). Module-scoped so the
+// NURand C constant is chosen once for the whole run — mirrors how the
+// existing nurand1023 / nurand8191 pickers are scoped. Indexes into
+// C_LAST_DICT to produce a c_last that's guaranteed to hit populated
+// rows (the first 1000 c_ids per district are a straight walk of this
+// same dictionary — see §4.3.2.3 / Phase 4 load).
+const nurand255Gen = R.int32(0, 999, Dist.nurand(255, "run")).gen();
+
 // Load-phase customer split: first 1000 per district use sequential C_LAST
 // syllables; remaining 2000 use NURand(255,0,999). Expressed as two
 // driver.insert calls because the rule differs only in c_last + c_id range.
@@ -49,8 +92,19 @@ const CUSTOMERS_FIRST_1000 = 1000;
 const CUSTOMERS_REST       = CUSTOMERS_PER_DISTRICT - CUSTOMERS_FIRST_1000; // 2000
 
 // K6 options — weighted dispatch inside default(), VUs/duration set via CLI or k6 defaults.
+// T3.2: k6 thresholds on the per-tx Trend metrics auto-fail the run if any
+// p90 breaches the spec §5.2.5.4 ceiling. Using the stock threshold syntax
+// so k6 marks the run failed and the summary line shows a PASS/FAIL marker
+// next to each metric — no manual assertion needed on top of handleSummary.
 export const options: Options = {
   setupTimeout: String(WAREHOUSES * 5) + "m",
+  thresholds: {
+    "tpcc_new_order_duration":    ["p(90)<5000"],
+    "tpcc_payment_duration":      ["p(90)<5000"],
+    "tpcc_order_status_duration": ["p(90)<5000"],
+    "tpcc_stock_level_duration":  ["p(90)<20000"],
+    "tpcc_delivery_duration":     ["p(90)<80000"],
+  },
 };
 
 // Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql/pico/ydb)
@@ -117,6 +171,21 @@ function pickRemoteWh(): number {
   if (_remoteWhGen === null) return HOME_W_ID;
   const alt = _remoteWhGen.next() as number;
   return alt >= HOME_W_ID ? alt + 1 : alt;
+}
+
+// T2.3: thin wrapper that wires the module-wide retry budget and counter
+// into every transaction body. Each retry counts ONCE in tpccRetryAttempts
+// regardless of where in the body the abort fired. The wrapper preserves
+// the spec §2.4.2.3 New-Order rollback sentinel — `isSerializationError`
+// short-circuits on `tpcc_rollback:` so the rollback path always escapes
+// the loop on the first attempt.
+function tpccRetry<T>(fn: () => T): T {
+  return retry(
+    RETRY_ATTEMPTS,
+    isSerializationError,
+    fn,
+    () => { tpccRetryAttempts.add(1); },
+  );
 }
 
 export function setup() {
@@ -222,7 +291,7 @@ export function setup() {
       params: {
         c_first: R.str(8, 16),
         c_middle: C.str("OE"),
-        c_last: R.dict(C_LAST_DICT, R.int32(0, 999, Dist.nurand(255))),
+        c_last: R.dict(C_LAST_DICT, R.int32(0, 999, Dist.nurand(255, "load"))),
         c_street_1: R.str(10, 20, AB.enNumSpc),
         c_street_2: R.str(10, 20, AB.enNumSpc),
         c_city: R.str(10, 20, AB.enSpc),
@@ -546,9 +615,9 @@ export function setup() {
 //               for each line: get item, get stock, update stock, insert OL.
 // =====================================================================
 const newordDIdGen      = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const newordCIdGen      = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023)).gen();
+const newordCIdGen      = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023, "run")).gen();
 const newordOOlCntGen   = R.int32(5, 15).gen();
-const newordItemIdGen   = R.int32(1, ITEMS, Dist.nurand(8191)).gen();
+const newordItemIdGen   = R.int32(1, ITEMS, Dist.nurand(8191, "run")).gen();
 const newordQuantityGen = R.int32(1, 10).gen();
 // Use int32(1, 100) + threshold compare rather than bool(0.01) so that the
 // seeded stream is deterministic and matches what the report compliance
@@ -558,6 +627,7 @@ const newordRollbackGen   = R.int32(1, 100).gen();  // <=1 ⇒ force rollback vi
 
 function new_order() {
   tpccNewOrderTotal.add(1);
+  const t0 = Date.now();
 
   const w_id   = HOME_W_ID;
   const d_id   = newordDIdGen.next() as number;
@@ -608,78 +678,104 @@ function new_order() {
     line_i_id[ol_cnt - 1] = ITEMS + 1;
   }
 
-  const tx = driver.begin({ isolation: TX_ISOLATION });
+  // T2.3: wrap the tx body in tpccRetry so PG snapshot-isolation aborts
+  // (SQLSTATE 40001) replay against a fresh snapshot. Pre-tx random picks
+  // (line ids, force_rollback decision, counters) stay OUTSIDE the loop —
+  // a retry replays the SAME logical transaction, not a different one. The
+  // spec §2.4.2.3 rollback sentinel is filtered out by isSerializationError
+  // (its `tpcc_rollback:` prefix short-circuits the regex), so the rollback
+  // path always escapes the retry loop on the first attempt as before.
   try {
-    // Read customer discount / credit and warehouse tax (real round-trip).
-    tx.queryRow(sql("workload_tx_new_order", "get_customer")!, { c_id, d_id, w_id });
-    tx.queryRow(sql("workload_tx_new_order", "get_warehouse")!, { w_id });
+    tpccRetry(() => {
+      const tx = driver.begin({ isolation: TX_ISOLATION });
+      try {
+        // Read customer discount / credit and warehouse tax (real round-trip).
+        tx.queryRow(sql("workload_tx_new_order", "get_customer")!, { c_id, d_id, w_id });
+        tx.queryRow(sql("workload_tx_new_order", "get_warehouse")!, { w_id });
 
-    // Read district next_o_id + tax → use as o_id, then bump d_next_o_id.
-    const distRow = tx.queryRow(sql("workload_tx_new_order", "get_district")!, { d_id, w_id });
-    if (!distRow) {
-      throw new Error(`new_order: district (${w_id},${d_id}) not found`);
-    }
-    const o_id = Number(distRow[0]);
-    tx.exec(sql("workload_tx_new_order", "update_district")!, { d_id, w_id });
+        // Read district next_o_id + tax → use as o_id, then bump d_next_o_id.
+        const distRow = tx.queryRow(sql("workload_tx_new_order", "get_district")!, { d_id, w_id });
+        if (!distRow) {
+          throw new Error(`new_order: district (${w_id},${d_id}) not found`);
+        }
+        const o_id = Number(distRow[0]);
+        tx.exec(sql("workload_tx_new_order", "update_district")!, { d_id, w_id });
 
-    tx.exec(sql("workload_tx_new_order", "insert_order")!, {
-      o_id, d_id, w_id, c_id, ol_cnt, all_local,
-    });
-    tx.exec(sql("workload_tx_new_order", "insert_new_order")!, { o_id, d_id, w_id });
+        tx.exec(sql("workload_tx_new_order", "insert_order")!, {
+          o_id, d_id, w_id, c_id, ol_cnt, all_local,
+        });
+        tx.exec(sql("workload_tx_new_order", "insert_new_order")!, { o_id, d_id, w_id });
 
-    for (let ol_number = 1; ol_number <= ol_cnt; ol_number++) {
-      const i_id        = line_i_id[ol_number - 1];
-      const ol_quantity = line_qty[ol_number - 1];
-      const supply_w_id = line_supply[ol_number - 1];
+        for (let ol_number = 1; ol_number <= ol_cnt; ol_number++) {
+          const i_id        = line_i_id[ol_number - 1];
+          const ol_quantity = line_qty[ol_number - 1];
+          const supply_w_id = line_supply[ol_number - 1];
 
-      // Spec §2.4.2.2: read item price/name.
-      const itemRow = tx.queryRow(sql("workload_tx_new_order", "get_item")!, { i_id });
-      if (!itemRow) {
-        // Spec §2.4.2.3 forced rollback: abandon the transaction on a bogus
-        // i_id. This is the documented rollback trigger, not an error.
-        tpccRollbackDone.add(1);
-        throw new Error("tpcc_rollback:item_not_found");
+          // Spec §2.4.2.2: read item price/name.
+          const itemRow = tx.queryRow(sql("workload_tx_new_order", "get_item")!, { i_id });
+          if (!itemRow) {
+            // Spec §2.4.2.3 forced rollback: abandon the transaction on a bogus
+            // i_id. This is the documented rollback trigger, not an error.
+            // tpccRollbackDone is incremented INSIDE the retry callback because
+            // a retried-then-still-rollback path should still count as one
+            // rollback, not N. (In practice the rollback sentinel never races
+            // with a 40001 — the bogus i_id throws before any update — but
+            // keep the bookkeeping consistent.)
+            tpccRollbackDone.add(1);
+            throw new Error("tpcc_rollback:item_not_found");
+          }
+          const i_price = Number(itemRow[0]);
+
+          // Spec §2.4.2.3: read stock quantity + s_dist_NN, compute new stock.
+          // get_stock columns: [0]=s_quantity, [1]=s_data, [2..11]=s_dist_01..s_dist_10.
+          // The spec requires s_dist_NN where NN matches the order's d_id, so index
+          // into the row at (d_id + 1): d_id=1 → col 2 (s_dist_01), d_id=10 → col 11.
+          // w_id in the query MUST be supply_w_id (§2.4.2.2) — stock is per-warehouse.
+          const stockRow = tx.queryRow(sql("workload_tx_new_order", "get_stock")!, {
+            i_id, w_id: supply_w_id,
+          });
+          if (!stockRow) continue;
+          const s_quantity_old = Number(stockRow[0]);
+          const dist_info      = String(stockRow[d_id + 1] ?? "");
+          const new_quantity   =
+            s_quantity_old - ol_quantity >= 10
+              ? s_quantity_old - ol_quantity
+              : s_quantity_old - ol_quantity + 91;
+
+          // Spec §2.4.2.2: s_remote_cnt is incremented iff supply_w_id != w_id.
+          const remote_cnt = supply_w_id !== w_id ? 1 : 0;
+
+          tx.exec(sql("workload_tx_new_order", "update_stock")!, {
+            quantity: new_quantity, ol_quantity, remote_cnt, i_id, w_id: supply_w_id,
+          });
+
+          const amount = Math.round(ol_quantity * i_price * 100) / 100;
+
+          tx.exec(sql("workload_tx_new_order", "insert_order_line")!, {
+            o_id, d_id, w_id, ol_number, i_id, supply_w_id,
+            quantity: ol_quantity, amount, dist_info,
+          });
+        }
+
+        tx.commit();
+      } catch (e) {
+        // Always roll back the failed attempt. If this is a retryable
+        // serialization error, tpccRetry catches it next and starts a fresh
+        // tx; if it's the §2.4.2.3 rollback sentinel, we swallow it after
+        // the rollback so the retry helper sees a successful return.
+        try { tx.rollback(); } catch (_) { /* ignore */ }
+        const msg = (e as Error)?.message ?? String(e);
+        if (msg.startsWith("tpcc_rollback:")) {
+          return; // spec-mandated rollback — counts as success, no retry
+        }
+        throw e;
       }
-      const i_price = Number(itemRow[0]);
-
-      // Spec §2.4.2.3: read stock quantity + s_dist_NN, compute new stock.
-      // get_stock columns: [0]=s_quantity, [1]=s_data, [2..11]=s_dist_01..s_dist_10.
-      // The spec requires s_dist_NN where NN matches the order's d_id, so index
-      // into the row at (d_id + 1): d_id=1 → col 2 (s_dist_01), d_id=10 → col 11.
-      // w_id in the query MUST be supply_w_id (§2.4.2.2) — stock is per-warehouse.
-      const stockRow = tx.queryRow(sql("workload_tx_new_order", "get_stock")!, {
-        i_id, w_id: supply_w_id,
-      });
-      if (!stockRow) continue;
-      const s_quantity_old = Number(stockRow[0]);
-      const dist_info      = String(stockRow[d_id + 1] ?? "");
-      const new_quantity   =
-        s_quantity_old - ol_quantity >= 10
-          ? s_quantity_old - ol_quantity
-          : s_quantity_old - ol_quantity + 91;
-
-      // Spec §2.4.2.2: s_remote_cnt is incremented iff supply_w_id != w_id.
-      const remote_cnt = supply_w_id !== w_id ? 1 : 0;
-
-      tx.exec(sql("workload_tx_new_order", "update_stock")!, {
-        quantity: new_quantity, ol_quantity, remote_cnt, i_id, w_id: supply_w_id,
-      });
-
-      const amount = Math.round(ol_quantity * i_price * 100) / 100;
-
-      tx.exec(sql("workload_tx_new_order", "insert_order_line")!, {
-        o_id, d_id, w_id, ol_number, i_id, supply_w_id,
-        quantity: ol_quantity, amount, dist_info,
-      });
-    }
-
-    tx.commit();
-  } catch (e) {
-    tx.rollback();
-    // Swallow the spec-mandated rollback sentinel; re-throw real errors so
-    // k6 reports them as tx_error_rate.
-    const msg = (e as Error)?.message ?? String(e);
-    if (!msg.startsWith("tpcc_rollback:")) throw e;
+    });
+  } finally {
+    // T3.2: record total user-visible elapsed (including retries) into the
+    // p90 trend. Recorded in finally so error tails still feed the metric
+    // and can flag slow-query regressions, matching the prior behaviour.
+    tpccNewOrderDuration.add(Date.now() - t0);
   }
   // Reference remote_line_cnt to satisfy noUnusedLocals; useful for future
   // post-run audit of §2.4.1.4 compliance.
@@ -693,23 +789,26 @@ function new_order() {
 //   - §2.5.1.2: 85% home customer, 15% remote. For remote, c_w_id is
 //               picked uniformly from the OTHER warehouses; c_d_id is
 //               picked uniformly in [1, 10] (independent of d_id).
-//   - §2.5.1.2: c_id ~ NURand(1023, 1, 3000). (By-name lookup is §1.6,
-//               Tier B — deferred.)
+//   - §2.5.1.2: 60% of lookups use (c_w_id, c_d_id, c_last), 40% by c_id.
+//               c_last picked via NURand(255, 0, 999) into C_LAST_DICT;
+//               c_id drawn via NURand(1023, 1, 3000).
 // =====================================================================
 const paymentDIdGen     = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 const paymentCDIdGen    = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const paymentCIdGen     = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023)).gen();
+const paymentCIdGen     = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023, "run")).gen();
 const paymentHAmountGen = R.double(1, 5000).gen();
 const paymentHDataGen   = R.str(12, 24, AB.enSpc).gen();
 // 15% remote. <=15 on a uniform [1,100] gives 15% exactly.
 const paymentRemoteGen  = R.int32(1, 100).gen();
+// 60% by-name. <=60 on a uniform [1,100].
+const paymentBynameGen  = R.int32(1, 100).gen();
 
 function payment() {
   tpccPaymentTotal.add(1);
+  const t0 = Date.now();
 
   const w_id   = HOME_W_ID;
   const d_id   = paymentDIdGen.next() as number;
-  const c_id   = paymentCIdGen.next() as number;
   const amount = paymentHAmountGen.next();
   const h_data = paymentHDataGen.next();
   const h_id   = nextHid();
@@ -722,36 +821,120 @@ function payment() {
   const c_w_id = is_remote ? pickRemoteWh() : w_id;
   const c_d_id = is_remote ? (paymentCDIdGen.next() as number) : d_id;
 
-  driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
-    tx.exec(sql("workload_tx_payment", "update_warehouse")!, { w_id, amount });
-    // Spec §2.5.2.2: read w_name for history.h_data.
-    const whRow = tx.queryRow(sql("workload_tx_payment", "get_warehouse")!, { w_id });
-    if (!whRow) throw new Error(`payment: warehouse ${w_id} not found`);
-    const w_name = String(whRow[0] ?? "");
+  // Spec §2.5.1.2: 60% by-name, 40% by-id. The by-name c_last is drawn
+  // from C_LAST_DICT via NURand(255, 0, 999), matching the load phase
+  // (§4.3.2.3) so lookups hit the populated syllable strings.
+  const is_byname = (paymentBynameGen.next() as number) <= 60;
+  const c_last_pick = is_byname ? C_LAST_DICT[nurand255Gen.next() as number] : "";
+  // Keep the by-id stream deterministic even when the roll chooses
+  // by-name — drain the generator so a mid-run roll switch doesn't
+  // shift subsequent c_ids.
+  const c_id_pick = paymentCIdGen.next() as number;
 
-    tx.exec(sql("workload_tx_payment", "update_district")!, { w_id, d_id, amount });
-    // Spec §2.5.2.2: read d_name for history.h_data.
-    const distRow = tx.queryRow(sql("workload_tx_payment", "get_district")!, { w_id, d_id });
-    if (!distRow) throw new Error(`payment: district (${w_id},${d_id}) not found`);
-    const d_name = String(distRow[0] ?? "");
+  // T2.3: capture BC-credit branch in a closure-scoped flag so the counter
+  // can be incremented exactly ONCE outside the retry loop, regardless of
+  // how many serialization-failure retries fired. tpccPaymentByname /
+  // tpccPaymentRemote are already incremented outside (they depend only
+  // on the pre-tx random rolls), so they're safe.
+  let payment_was_bc = false;
+  try {
+    tpccRetry(() => {
+      payment_was_bc = false; // reset across attempts so the final attempt's branch wins
+      driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
+        tx.exec(sql("workload_tx_payment", "update_warehouse")!, { w_id, amount });
+        // Spec §2.5.2.2: read w_name for history.h_data.
+        const whRow = tx.queryRow(sql("workload_tx_payment", "get_warehouse")!, { w_id });
+        if (!whRow) throw new Error(`payment: warehouse ${w_id} not found`);
+        const w_name = String(whRow[0] ?? "");
 
-    // Spec §2.5.2.2: read customer balance / credit.
-    const custRow = tx.queryRow(sql("workload_tx_payment", "get_customer_by_id")!, {
-      w_id: c_w_id, d_id: c_d_id, c_id,
+        tx.exec(sql("workload_tx_payment", "update_district")!, { w_id, d_id, amount });
+        // Spec §2.5.2.2: read d_name for history.h_data.
+        const distRow = tx.queryRow(sql("workload_tx_payment", "get_district")!, { w_id, d_id });
+        if (!distRow) throw new Error(`payment: district (${w_id},${d_id}) not found`);
+        const d_name = String(distRow[0] ?? "");
+
+        // Spec §2.5.2.2: read customer balance / credit. Either by c_id
+        // (40%) or by c_last (60%) — the by-name branch takes two queries
+        // (count + median SELECT) while the by-id branch is one. Both
+        // SELECTs also return c_credit (2-char) and c_data (up to 500
+        // chars) for the §1.8 BC-credit append path below.
+        let c_id: number;
+        let c_credit: string;
+        let c_data_old: string;
+        if (is_byname) {
+          const cntRaw = tx.queryValue(
+            sql("workload_tx_payment", "count_customers_by_name")!,
+            { w_id: c_w_id, d_id: c_d_id, c_last: c_last_pick },
+          );
+          const nameCount = Number(cntRaw ?? 0);
+          if (nameCount === 0) {
+            // No rows for the rolled c_last — treat like any customer-miss
+            // (should never happen once §4.3.2.3 load is verified, but stay
+            // defensive so a loader regression surfaces as a failed tx, not
+            // a silent no-op).
+            throw new Error(`payment: no customers match c_last='${c_last_pick}' in (${c_w_id},${c_d_id})`);
+          }
+          const offset = Math.floor((nameCount - 1) / 2);
+          const nameRow = tx.queryRow(
+            sql("workload_tx_payment", "get_customer_by_name")!,
+            { w_id: c_w_id, d_id: c_d_id, c_last: c_last_pick, offset },
+          );
+          if (!nameRow) {
+            throw new Error(`payment: by-name SELECT returned no row for c_last='${c_last_pick}'`);
+          }
+          // Column order (see pg/mysql/pico/ydb sql):
+          // [c_id, c_first, c_middle, c_last, c_street_1, c_street_2,
+          //  c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim,
+          //  c_discount, c_balance, c_since, c_data]
+          c_id = Number(nameRow[0]);
+          c_credit = String(nameRow[10] ?? "").trim();
+          c_data_old = String(nameRow[15] ?? "");
+        } else {
+          c_id = c_id_pick;
+          const custRow = tx.queryRow(sql("workload_tx_payment", "get_customer_by_id")!, {
+            w_id: c_w_id, d_id: c_d_id, c_id,
+          });
+          if (!custRow) throw new Error(`payment: customer ${c_id} not found`);
+          // Column order (see pg/mysql/pico/ydb sql):
+          // [c_first, c_middle, c_last, c_street_1, c_street_2, c_city,
+          //  c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount,
+          //  c_balance, c_since, c_data]
+          c_credit = String(custRow[9] ?? "").trim();
+          c_data_old = String(custRow[14] ?? "");
+        }
+
+        // Spec §2.5.2.2: if c_credit = 'BC', the Payment tx must prepend
+        // the current transaction's identifying tuple to c_data and
+        // truncate to 500 chars; GC customers (90%) keep c_data untouched.
+        // We build the prefix client-side (plain JS string concat) and let
+        // the SQL SUBSTR clamp — this sidesteps per-dialect '||' vs
+        // CONCAT() differences.
+        if (c_credit === "BC") {
+          const amountStr = (amount as number).toFixed(2);
+          const c_data_new = `${c_id} ${c_d_id} ${c_w_id} ${d_id} ${w_id} ${amountStr}|${c_data_old}`;
+          tx.exec(sql("workload_tx_payment", "update_customer_bc")!, {
+            w_id: c_w_id, d_id: c_d_id, c_id, amount, c_data_new,
+          });
+          payment_was_bc = true;
+        } else {
+          tx.exec(sql("workload_tx_payment", "update_customer")!, {
+            w_id: c_w_id, d_id: c_d_id, c_id, amount,
+          });
+        }
+
+        // Spec §2.5.2.2: h_data = w_name + "    " + d_name, truncated to 24.
+        const h_data_full = (w_name + "    " + d_name).slice(0, 24) || h_data;
+        tx.exec(sql("workload_tx_payment", "insert_history")!, {
+          h_id, h_c_id: c_id, h_c_d_id: c_d_id, h_c_w_id: c_w_id,
+          h_d_id: d_id, h_w_id: w_id, h_amount: amount, h_data: h_data_full,
+        });
+      });
     });
-    if (!custRow) throw new Error(`payment: customer ${c_id} not found`);
-
-    tx.exec(sql("workload_tx_payment", "update_customer")!, {
-      w_id: c_w_id, d_id: c_d_id, c_id, amount,
-    });
-
-    // Spec §2.5.2.2: h_data = w_name + "    " + d_name, truncated to 24.
-    const h_data_full = (w_name + "    " + d_name).slice(0, 24) || h_data;
-    tx.exec(sql("workload_tx_payment", "insert_history")!, {
-      h_id, h_c_id: c_id, h_c_d_id: c_d_id, h_c_w_id: c_w_id,
-      h_d_id: d_id, h_w_id: w_id, h_amount: amount, h_data: h_data_full,
-    });
-  });
+    if (is_byname) tpccPaymentByname.add(1);
+    if (payment_was_bc) tpccPaymentBc.add(1);
+  } finally {
+    tpccPaymentDuration.add(Date.now() - t0);
+  }
 }
 
 // =====================================================================
@@ -760,34 +943,76 @@ function payment() {
 // The o_id for get_order_lines must come from the last-order SELECT, not
 // from a random counter.
 //   - §2.6.1.1: w_id is the terminal's fixed home warehouse.
-//   - §2.6.1.2: c_id ~ NURand(1023, 1, 3000). (By-name lookup is §1.6,
-//               Tier B — deferred.)
+//   - §2.6.1.2: 60% by-name / 40% by-id. c_id ~ NURand(1023, 1, 3000);
+//               c_last via NURand(255, 0, 999) into C_LAST_DICT.
 // =====================================================================
-const ostatDIdGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const ostatCIdGen = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023)).gen();
+const ostatDIdGen    = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
+const ostatCIdGen    = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023, "run")).gen();
+const ostatBynameGen = R.int32(1, 100).gen();
 
 function order_status() {
   tpccOrderStatusTotal.add(1);
+  const t0 = Date.now();
   const w_id = HOME_W_ID;
   const d_id = ostatDIdGen.next() as number;
-  const c_id = ostatCIdGen.next() as number;
+  // Drain both generators regardless of the by-name roll to keep the
+  // per-VU random stream alignment stable run-over-run.
+  const c_id_pick = ostatCIdGen.next() as number;
+  const is_byname = (ostatBynameGen.next() as number) <= 60;
+  const c_last_pick = is_byname ? C_LAST_DICT[nurand255Gen.next() as number] : "";
 
-  driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
-    const custRow = tx.queryRow(
-      sql("workload_tx_order_status", "get_customer_by_id")!, { c_id, d_id, w_id },
-    );
-    if (!custRow) return;
+  // T2.3: tpccOrderStatusByname depends only on the pre-tx is_byname roll
+  // (the `return` paths inside the tx happen because the customer has no
+  // matching row, not because the by-name decision changes), so move the
+  // counter increment outside the retry — and only fire it if the inner
+  // body actually completed the by-name SELECT successfully. Capture that
+  // via a closure flag because the inner body has multiple early-returns.
+  let order_status_byname_observed = false;
+  try {
+    tpccRetry(() => {
+      order_status_byname_observed = false;
+      driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
+        let c_id: number;
+        if (is_byname) {
+          const cntRaw = tx.queryValue(
+            sql("workload_tx_order_status", "count_customers_by_name")!,
+            { w_id, d_id, c_last: c_last_pick },
+          );
+          const nameCount = Number(cntRaw ?? 0);
+          if (nameCount === 0) return;  // nothing to report — same shape as by-id miss
+          const offset = Math.floor((nameCount - 1) / 2);
+          const nameRow = tx.queryRow(
+            sql("workload_tx_order_status", "get_customer_by_name")!,
+            { w_id, d_id, c_last: c_last_pick, offset },
+          );
+          if (!nameRow) return;
+          // By-name SELECT returns [c_balance, c_first, c_middle, c_last, c_id]
+          // — c_id is the last column.
+          c_id = Number(nameRow[nameRow.length - 1]);
+          order_status_byname_observed = true;
+        } else {
+          c_id = c_id_pick;
+          const custRow = tx.queryRow(
+            sql("workload_tx_order_status", "get_customer_by_id")!, { c_id, d_id, w_id },
+          );
+          if (!custRow) return;
+        }
 
-    // Spec §2.6.2.2: find the customer's most-recent order.
-    const lastRow = tx.queryRow(
-      sql("workload_tx_order_status", "get_last_order")!, { d_id, w_id, c_id },
-    );
-    if (!lastRow) return;  // customer has no orders yet
-    const o_id = Number(lastRow[0]);
+        // Spec §2.6.2.2: find the customer's most-recent order.
+        const lastRow = tx.queryRow(
+          sql("workload_tx_order_status", "get_last_order")!, { d_id, w_id, c_id },
+        );
+        if (!lastRow) return;  // customer has no orders yet
+        const o_id = Number(lastRow[0]);
 
-    // Spec §2.6.2.2: read order lines for that order.
-    tx.queryRows(sql("workload_tx_order_status", "get_order_lines")!, { o_id, d_id, w_id });
-  });
+        // Spec §2.6.2.2: read order lines for that order.
+        tx.queryRows(sql("workload_tx_order_status", "get_order_lines")!, { o_id, d_id, w_id });
+      });
+    });
+    if (order_status_byname_observed) tpccOrderStatusByname.add(1);
+  } finally {
+    tpccOrderStatusDuration.add(Date.now() - t0);
+  }
 }
 
 // =====================================================================
@@ -802,40 +1027,53 @@ const deliveryOCarrierIdGen = R.int32(1, 10).gen();
 
 function delivery() {
   tpccDeliveryTotal.add(1);
+  const t0 = Date.now();
   const w_id       = HOME_W_ID;
   const carrier_id = deliveryOCarrierIdGen.next();
 
-  driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
-    for (let d_id = 1; d_id <= DISTRICTS_PER_WAREHOUSE; d_id++) {
-      const minRow = tx.queryRow(
-        sql("workload_tx_delivery", "get_min_new_order")!, { d_id, w_id },
-      );
-      if (!minRow || minRow[0] === null || minRow[0] === undefined) {
-        continue;  // nothing to deliver in this district
-      }
-      const o_id = Number(minRow[0]);
+  // T2.3: Delivery is much larger than NO/P (10 districts × ~6 statements
+  // each), so a 40001 retry compounds the round-trip cost. Spec §5.2.5.4
+  // gives Delivery an 80s p90 ceiling — plenty of headroom — and 40001
+  // remains rare here in practice (Delivery's MIN(no_o_id) + DELETE pattern
+  // doesn't hot-row with concurrent NO bumps). Use the same retry budget
+  // anyway so the fail mode is uniform across tx types.
+  try {
+    tpccRetry(() => {
+      driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
+        for (let d_id = 1; d_id <= DISTRICTS_PER_WAREHOUSE; d_id++) {
+          const minRow = tx.queryRow(
+            sql("workload_tx_delivery", "get_min_new_order")!, { d_id, w_id },
+          );
+          if (!minRow || minRow[0] === null || minRow[0] === undefined) {
+            continue;  // nothing to deliver in this district
+          }
+          const o_id = Number(minRow[0]);
 
-      tx.exec(sql("workload_tx_delivery", "delete_new_order")!, { o_id, d_id, w_id });
+          tx.exec(sql("workload_tx_delivery", "delete_new_order")!, { o_id, d_id, w_id });
 
-      const orderRow = tx.queryRow(
-        sql("workload_tx_delivery", "get_order")!, { o_id, d_id, w_id },
-      );
-      if (!orderRow) continue;
-      const c_id = Number(orderRow[0]);
+          const orderRow = tx.queryRow(
+            sql("workload_tx_delivery", "get_order")!, { o_id, d_id, w_id },
+          );
+          if (!orderRow) continue;
+          const c_id = Number(orderRow[0]);
 
-      tx.exec(sql("workload_tx_delivery", "update_order")!, { carrier_id, o_id, d_id, w_id });
-      tx.exec(sql("workload_tx_delivery", "update_order_line")!, { o_id, d_id, w_id });
+          tx.exec(sql("workload_tx_delivery", "update_order")!, { carrier_id, o_id, d_id, w_id });
+          tx.exec(sql("workload_tx_delivery", "update_order_line")!, { o_id, d_id, w_id });
 
-      const sumRow = tx.queryRow(
-        sql("workload_tx_delivery", "get_order_line_amount")!, { o_id, d_id, w_id },
-      );
-      const ol_total = sumRow && sumRow[0] !== null ? Number(sumRow[0]) : 0;
+          const sumRow = tx.queryRow(
+            sql("workload_tx_delivery", "get_order_line_amount")!, { o_id, d_id, w_id },
+          );
+          const ol_total = sumRow && sumRow[0] !== null ? Number(sumRow[0]) : 0;
 
-      tx.exec(sql("workload_tx_delivery", "update_customer")!, {
-        amount: ol_total, c_id, d_id, w_id,
+          tx.exec(sql("workload_tx_delivery", "update_customer")!, {
+            amount: ol_total, c_id, d_id, w_id,
+          });
+        }
       });
-    }
-  });
+    });
+  } finally {
+    tpccDeliveryDuration.add(Date.now() - t0);
+  }
 }
 
 // =====================================================================
@@ -854,39 +1092,48 @@ const slevThresholdGen = R.int32(10, 20).gen();
 
 function stock_level() {
   tpccStockLevelTotal.add(1);
+  const t0 = Date.now();
   const w_id      = HOME_W_ID;
   const d_id      = slevDIdGen.next();
   const threshold = slevThresholdGen.next();
 
-  driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
-    const next_o_id = tx.queryValue<number>(
-      sql("workload_tx_stock_level", "get_district")!, { w_id, d_id },
-    );
-    if (next_o_id === undefined) return;
+  // T2.3: Stock-Level is read-only and rarely 40001s, but the retry wrap
+  // is cheap and keeps the dispatch shape uniform across all five tx types.
+  try {
+    tpccRetry(() => {
+      driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
+        const next_o_id = tx.queryValue<number>(
+          sql("workload_tx_stock_level", "get_district")!, { w_id, d_id },
+        );
+        if (next_o_id === undefined) return;
 
-    // Two-step scan. The obvious single-query JOIN/subquery form trips
-    // picodata's sbroad planner intermittently ("Temporary SQL table
-    // TMP_... not found"), so we collect the window's distinct item ids
-    // first and count low-stock rows against an inline IN list.
-    const olRows = tx.queryRows(
-      sql("workload_tx_stock_level", "get_window_items")!,
-      { w_id, d_id, min_o_id: next_o_id - 20, next_o_id },
-    );
-    if (olRows.length === 0) return;
+        // Two-step scan. The obvious single-query JOIN/subquery form trips
+        // picodata's sbroad planner intermittently ("Temporary SQL table
+        // TMP_... not found"), so we collect the window's distinct item ids
+        // first and count low-stock rows against an inline IN list.
+        const olRows = tx.queryRows(
+          sql("workload_tx_stock_level", "get_window_items")!,
+          { w_id, d_id, min_o_id: next_o_id - 20, next_o_id },
+        );
+        if (olRows.length === 0) return;
 
-    const ids: number[] = [];
-    for (let i = 0; i < olRows.length; i++) {
-      const v = Number(olRows[i][0]);
-      if (Number.isFinite(v)) ids.push(v);
-    }
-    if (ids.length === 0) return;
+        const ids: number[] = [];
+        for (let i = 0; i < olRows.length; i++) {
+          const v = Number(olRows[i][0]);
+          if (Number.isFinite(v)) ids.push(v);
+        }
+        if (ids.length === 0) return;
 
-    // Inline the integer list; stroppy's :name substitution leaves IN list
-    // contents alone and the ids come from a trusted SELECT, not user input.
-    const template = sql("workload_tx_stock_level", "stock_count_in")!;
-    const rendered = template.sql.replace("{ids}", ids.join(","));
-    tx.queryValue<number>(rendered, { w_id, threshold });
-  });
+        // Inline the integer list; stroppy's :name substitution leaves IN list
+        // contents alone and the ids come from a trusted SELECT, not user input.
+        const template = sql("workload_tx_stock_level", "stock_count_in")!;
+        const rendered = template.sql.replace("{ids}", ids.join(","));
+        tx.queryValue<number>(rendered, { w_id, threshold });
+      });
+    });
+  } finally {
+    tpccStockLevelDuration.add(Date.now() - t0);
+  }
 }
 
 // =====================================================================
@@ -911,7 +1158,14 @@ export function teardown() {
 // handleSummary — TPC-C §1.11 post-run transaction mix + compliance rates.
 // Overrides the default k6 end-of-test summary. Prints observed percentages
 // alongside spec bounds so operators can verify compliance without
-// instrumenting the DB. Rates are informational — no hard assertion.
+// instrumenting the DB.
+//
+// T3.1: hard assertion on spec §5.2.3 minimum mix (NO 45 / P 43 / OS 4 /
+// D 4 / SL 4). Throws on any violation so k6 reports the run failed.
+// Gated on total >= 100 to avoid spurious failures on short smoke runs.
+// T3.2: per-tx p90 ceilings are enforced via k6 `thresholds` on the Trend
+// metrics (see `options.thresholds` above). handleSummary additionally
+// prints the observed p90s for operator visibility.
 // =====================================================================
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function handleSummary(data: any): Record<string, string> {
@@ -919,6 +1173,14 @@ export function handleSummary(data: any): Record<string, string> {
   const cnt = (name: string): number => Number(m[name]?.values?.count ?? 0);
   const pct = (num: number, den: number): string =>
     den > 0 ? ((num / den) * 100).toFixed(2) + "%" : "n/a";
+  const p90 = (name: string): number | undefined => {
+    const v = m[name]?.values?.["p(90)"];
+    return typeof v === "number" ? v : undefined;
+  };
+  const p90Str = (name: string): string => {
+    const v = p90(name);
+    return typeof v === "number" ? v.toFixed(0) + " ms" : "n/a";
+  };
 
   const no  = cnt("tpcc_new_order_total");
   const pay = cnt("tpcc_payment_total");
@@ -931,12 +1193,16 @@ export function handleSummary(data: any): Record<string, string> {
   const rlTot  = cnt("tpcc_remote_line_total");
   const rlRem  = cnt("tpcc_remote_line_remote");
   const payRem = cnt("tpcc_payment_remote");
+  const payBN  = cnt("tpcc_payment_byname");
+  const payBC  = cnt("tpcc_payment_bc");
+  const osBN   = cnt("tpcc_order_status_byname");
+  const retries = cnt("tpcc_retry_attempts");
 
   const iters = cnt("iterations");
   const dur   = m.iteration_duration?.values?.avg;
   const durStr = typeof dur === "number" ? dur.toFixed(2) + " ms" : "n/a";
 
-  const lines = [
+  const lines: string[] = [
     "",
     "===== TPC-C transaction mix (observed vs spec §5.2.3) =====",
     `  new_order    : ${pct(no, tot).padStart(7)}  (spec 45%, min 45%)`,
@@ -948,7 +1214,23 @@ export function handleSummary(data: any): Record<string, string> {
     "===== TPC-C compliance rates =====",
     `  rollback rate          : ${pct(rbDone, no).padStart(7)}  (spec ~1% of new_order, §2.4.1.4)`,
     `  payment remote         : ${pct(payRem, pay).padStart(7)}  (spec  15% of payment,  §2.5.1.2)`,
+    `  payment by-name        : ${pct(payBN, pay).padStart(7)}  (spec  60% of payment,  §2.5.1.2)`,
+    `  payment BC credit      : ${pct(payBC, pay).padStart(7)}  (spec  10% of payment,  §2.5.2.2)`,
+    `  order_status by-name   : ${pct(osBN, os).padStart(7)}  (spec  60% of order_status, §2.6.1.2)`,
     `  new_order remote lines : ${pct(rlRem, rlTot).padStart(7)}  (spec  ~1% of lines,  §2.4.1.5)`,
+    // T2.3: serialization-retry stats. Numerator is retry attempts, not
+    // distinct retried txs (each tx may retry up to RETRY_ATTEMPTS-1 times).
+    // A non-zero value indicates contention is firing 40001 / deadlock and
+    // the helper is reclaiming throughput before it counts against
+    // tx_error_rate (spec §5.2.5 1% cap).
+    `  serialization retries  : ${String(retries).padStart(7)}  (T2.3 retry helper, spec §5.2.5 / §4.1)`,
+    "",
+    "===== TPC-C per-tx p90 response time (§5.2.5.4) =====",
+    `  new_order    p90 : ${p90Str("tpcc_new_order_duration").padStart(10)}  (ceiling  5000 ms)`,
+    `  payment      p90 : ${p90Str("tpcc_payment_duration").padStart(10)}  (ceiling  5000 ms)`,
+    `  order_status p90 : ${p90Str("tpcc_order_status_duration").padStart(10)}  (ceiling  5000 ms)`,
+    `  stock_level  p90 : ${p90Str("tpcc_stock_level_duration").padStart(10)}  (ceiling 20000 ms)`,
+    `  delivery     p90 : ${p90Str("tpcc_delivery_duration").padStart(10)}  (ceiling 80000 ms)`,
     "",
     "===== k6 rollups =====",
     `  iterations : ${iters}`,
@@ -957,6 +1239,57 @@ export function handleSummary(data: any): Record<string, string> {
     "",
   ];
 
-  return { stdout: lines.join("\n") };
+  // T3.1: hard assertion on §5.2.3 minimum mix. Gate on total >= 100 so
+  // smoke tests with tiny samples don't trip the check on normal
+  // statistical swing. A 1-percentage-point tolerance is applied below
+  // the hard floor because the weighted picker's expected value for the
+  // 4%-class types sits exactly AT the floor — natural Bernoulli variance
+  // puts the observed share below 4% roughly half the time even when the
+  // picker is configured correctly. A 1pp tolerance catches real
+  // regressions (e.g., a bug that drops NO to 30%) without being
+  // sample-size sensitive. The p90 ceilings are handled by the k6
+  // thresholds declared in `options.thresholds` above — k6 marks the run
+  // as failed and prints a FAIL marker in the summary automatically.
+  const MIX_TOLERANCE_PP = 1.0;
+  const violations: string[] = [];
+  if (tot >= 100) {
+    const check = (label: string, got: number, floor: number) => {
+      const share = tot > 0 ? (got / tot) * 100 : 0;
+      const threshold = floor - MIX_TOLERANCE_PP;
+      if (share < threshold) {
+        violations.push(
+          `  ${label.padEnd(13)}: ${share.toFixed(2)}% < ${threshold.toFixed(1)}% ` +
+          `(spec §5.2.3 floor ${floor}% with ${MIX_TOLERANCE_PP}pp tolerance)`,
+        );
+      }
+    };
+    check("new_order",    no,  45);
+    check("payment",      pay, 43);
+    check("order_status", os,  4);
+    check("delivery",     dl,  4);
+    check("stock_level",  sl,  4);
+  } else {
+    lines.push(
+      `(T3.1: skipping mix floor assertion — total ${tot} < 100, insufficient sample)`,
+      "",
+    );
+  }
+
+  const out: Record<string, string> = { stdout: lines.join("\n") };
+
+  if (violations.length > 0) {
+    const msg = [
+      "",
+      "===== TPC-C §5.2.3 mix floor VIOLATIONS =====",
+      ...violations,
+      "",
+    ].join("\n");
+    out.stdout += msg;
+    throw new Error(
+      `TPC-C mix floor violated (${violations.length} tx type(s) below §5.2.3 minimum)`,
+    );
+  }
+
+  return out;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */

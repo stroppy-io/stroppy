@@ -132,6 +132,65 @@ func (Generation_Distribution_DistributionType) EnumDescriptor() ([]byte, []int)
 }
 
 // *
+// For NURAND only: distinguishes C-Load vs C-Run generator instances per
+// TPC-C §2.1.6.1 / §5.3. The Go side derives C_load and C_run from the
+// same seed such that |C_run - C_load| falls within the spec's required
+// delta window for the active A value (255 / 1023 / 8191). Ignored by
+// other distribution types. Default UNSPECIFIED is treated as LOAD for
+// back-compat with callers that don't care about the phase.
+type Generation_Distribution_NURandPhase int32
+
+const (
+	// * Treated as LOAD for back-compat.
+	Generation_Distribution_NURAND_PHASE_UNSPECIFIED Generation_Distribution_NURandPhase = 0
+	// * C-Load generator: used during data population.
+	Generation_Distribution_NURAND_PHASE_LOAD Generation_Distribution_NURandPhase = 1
+	// * C-Run generator: used during measurement workload.
+	Generation_Distribution_NURAND_PHASE_RUN Generation_Distribution_NURandPhase = 2
+)
+
+// Enum value maps for Generation_Distribution_NURandPhase.
+var (
+	Generation_Distribution_NURandPhase_name = map[int32]string{
+		0: "NURAND_PHASE_UNSPECIFIED",
+		1: "NURAND_PHASE_LOAD",
+		2: "NURAND_PHASE_RUN",
+	}
+	Generation_Distribution_NURandPhase_value = map[string]int32{
+		"NURAND_PHASE_UNSPECIFIED": 0,
+		"NURAND_PHASE_LOAD":        1,
+		"NURAND_PHASE_RUN":         2,
+	}
+)
+
+func (x Generation_Distribution_NURandPhase) Enum() *Generation_Distribution_NURandPhase {
+	p := new(Generation_Distribution_NURandPhase)
+	*p = x
+	return p
+}
+
+func (x Generation_Distribution_NURandPhase) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Generation_Distribution_NURandPhase) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_stroppy_common_proto_enumTypes[2].Descriptor()
+}
+
+func (Generation_Distribution_NURandPhase) Type() protoreflect.EnumType {
+	return &file_proto_stroppy_common_proto_enumTypes[2]
+}
+
+func (x Generation_Distribution_NURandPhase) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Generation_Distribution_NURandPhase.Descriptor instead.
+func (Generation_Distribution_NURandPhase) EnumDescriptor() ([]byte, []int) {
+	return file_proto_stroppy_common_proto_rawDescGZIP(), []int{5, 1, 1}
+}
+
+// *
 // OtlpExport contains configuration for exporting metrics via OpenTelemetry
 // Protocol (OTLP). It specifies the endpoint and metrics prefix for telemetry
 // data export.
@@ -853,7 +912,10 @@ type Generation_Distribution struct {
 	Type Generation_Distribution_DistributionType `protobuf:"varint,1,opt,name=type,proto3,enum=stroppy.Generation_Distribution_DistributionType" json:"type,omitempty"`
 	// * Distribution parameter (e.g., standard deviation for normal
 	// distribution, `A` for NURAND)
-	Screw         float64 `protobuf:"fixed64,2,opt,name=screw,proto3" json:"screw,omitempty"`
+	Screw float64 `protobuf:"fixed64,2,opt,name=screw,proto3" json:"screw,omitempty"`
+	//   - For NURAND: which phase this generator is for (C-Load or C-Run).
+	//     Used by §2.1.6.1 / §5.3 audit rule on |C_run - C_load|.
+	NurandPhase   Generation_Distribution_NURandPhase `protobuf:"varint,3,opt,name=nurand_phase,json=nurandPhase,proto3,enum=stroppy.Generation_Distribution_NURandPhase" json:"nurand_phase,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -900,6 +962,13 @@ func (x *Generation_Distribution) GetScrew() float64 {
 		return x.Screw
 	}
 	return 0
+}
+
+func (x *Generation_Distribution) GetNurandPhase() Generation_Distribution_NURandPhase {
+	if x != nil {
+		return x.NurandPhase
+	}
+	return Generation_Distribution_NURAND_PHASE_UNSPECIFIED
 }
 
 // *
@@ -2659,21 +2728,26 @@ const file_proto_stroppy_common_proto_rawDesc = "" +
 	"\tNullValue\x12\x0e\n" +
 	"\n" +
 	"NULL_VALUE\x10\x00B\x06\n" +
-	"\x04type\"\xfe\x1e\n" +
+	"\x04type\"\xb3 \n" +
 	"\n" +
 	"Generation\x1aU\n" +
 	"\bAlphabet\x12I\n" +
-	"\x06ranges\x18\x01 \x03(\v2 .stroppy.Generation.Range.UInt32B\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\x06ranges\x1a\xc8\x01\n" +
+	"\x06ranges\x18\x01 \x03(\v2 .stroppy.Generation.Range.UInt32B\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\x06ranges\x1a\xfd\x02\n" +
 	"\fDistribution\x12O\n" +
 	"\x04type\x18\x01 \x01(\x0e21.stroppy.Generation.Distribution.DistributionTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\x04type\x12$\n" +
-	"\x05screw\x18\x02 \x01(\x01B\x0e\xfaB\v\x12\t)\x00\x00\x00\x00\x00\x00\x00\x00R\x05screw\"A\n" +
+	"\x05screw\x18\x02 \x01(\x01B\x0e\xfaB\v\x12\t)\x00\x00\x00\x00\x00\x00\x00\x00R\x05screw\x12Y\n" +
+	"\fnurand_phase\x18\x03 \x01(\x0e2,.stroppy.Generation.Distribution.NURandPhaseB\b\xfaB\x05\x82\x01\x02\x10\x01R\vnurandPhase\"A\n" +
 	"\x10DistributionType\x12\n" +
 	"\n" +
 	"\x06NORMAL\x10\x00\x12\v\n" +
 	"\aUNIFORM\x10\x01\x12\b\n" +
 	"\x04ZIPF\x10\x02\x12\n" +
 	"\n" +
-	"\x06NURAND\x10\x03\x1a\xc8\x01\n" +
+	"\x06NURAND\x10\x03\"X\n" +
+	"\vNURandPhase\x12\x1c\n" +
+	"\x18NURAND_PHASE_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11NURAND_PHASE_LOAD\x10\x01\x12\x14\n" +
+	"\x10NURAND_PHASE_RUN\x10\x02\x1a\xc8\x01\n" +
 	"\x0eWeightedChoice\x12N\n" +
 	"\x05items\x18\x01 \x03(\v2'.stroppy.Generation.WeightedChoice.ItemB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x8a\x01\x02\x10\x01R\x05items\x1af\n" +
 	"\x04Item\x126\n" +
@@ -2808,93 +2882,95 @@ func file_proto_stroppy_common_proto_rawDescGZIP() []byte {
 	return file_proto_stroppy_common_proto_rawDescData
 }
 
-var file_proto_stroppy_common_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_proto_stroppy_common_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_proto_stroppy_common_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_proto_stroppy_common_proto_goTypes = []any{
 	(Value_NullValue)(0),                            // 0: stroppy.Value.NullValue
 	(Generation_Distribution_DistributionType)(0),   // 1: stroppy.Generation.Distribution.DistributionType
-	(*OtlpExport)(nil),                              // 2: stroppy.OtlpExport
-	(*Decimal)(nil),                                 // 3: stroppy.Decimal
-	(*Uuid)(nil),                                    // 4: stroppy.Uuid
-	(*DateTime)(nil),                                // 5: stroppy.DateTime
-	(*Value)(nil),                                   // 6: stroppy.Value
-	(*Generation)(nil),                              // 7: stroppy.Generation
-	(*Value_List)(nil),                              // 8: stroppy.Value.List
-	(*Value_Struct)(nil),                            // 9: stroppy.Value.Struct
-	(*Generation_Alphabet)(nil),                     // 10: stroppy.Generation.Alphabet
-	(*Generation_Distribution)(nil),                 // 11: stroppy.Generation.Distribution
-	(*Generation_WeightedChoice)(nil),               // 12: stroppy.Generation.WeightedChoice
-	(*Generation_StringDictionary)(nil),             // 13: stroppy.Generation.StringDictionary
-	(*Generation_StringLiteralInject)(nil),          // 14: stroppy.Generation.StringLiteralInject
-	(*Generation_Range)(nil),                        // 15: stroppy.Generation.Range
-	(*Generation_Rule)(nil),                         // 16: stroppy.Generation.Rule
-	(*Generation_WeightedChoice_Item)(nil),          // 17: stroppy.Generation.WeightedChoice.Item
-	(*Generation_Range_Bool)(nil),                   // 18: stroppy.Generation.Range.Bool
-	(*Generation_Range_String)(nil),                 // 19: stroppy.Generation.Range.String
-	(*Generation_Range_AnyString)(nil),              // 20: stroppy.Generation.Range.AnyString
-	(*Generation_Range_Float)(nil),                  // 21: stroppy.Generation.Range.Float
-	(*Generation_Range_Double)(nil),                 // 22: stroppy.Generation.Range.Double
-	(*Generation_Range_Int32)(nil),                  // 23: stroppy.Generation.Range.Int32
-	(*Generation_Range_Int64)(nil),                  // 24: stroppy.Generation.Range.Int64
-	(*Generation_Range_UInt32)(nil),                 // 25: stroppy.Generation.Range.UInt32
-	(*Generation_Range_UInt64)(nil),                 // 26: stroppy.Generation.Range.UInt64
-	(*Generation_Range_DecimalRange)(nil),           // 27: stroppy.Generation.Range.DecimalRange
-	(*Generation_Range_UuidSeq)(nil),                // 28: stroppy.Generation.Range.UuidSeq
-	(*Generation_Range_DateTime)(nil),               // 29: stroppy.Generation.Range.DateTime
-	(*Generation_Range_DateTime_TimestampPb)(nil),   // 30: stroppy.Generation.Range.DateTime.TimestampPb
-	(*Generation_Range_DateTime_TimestampUnix)(nil), // 31: stroppy.Generation.Range.DateTime.TimestampUnix
-	(*timestamppb.Timestamp)(nil),                   // 32: google.protobuf.Timestamp
+	(Generation_Distribution_NURandPhase)(0),        // 2: stroppy.Generation.Distribution.NURandPhase
+	(*OtlpExport)(nil),                              // 3: stroppy.OtlpExport
+	(*Decimal)(nil),                                 // 4: stroppy.Decimal
+	(*Uuid)(nil),                                    // 5: stroppy.Uuid
+	(*DateTime)(nil),                                // 6: stroppy.DateTime
+	(*Value)(nil),                                   // 7: stroppy.Value
+	(*Generation)(nil),                              // 8: stroppy.Generation
+	(*Value_List)(nil),                              // 9: stroppy.Value.List
+	(*Value_Struct)(nil),                            // 10: stroppy.Value.Struct
+	(*Generation_Alphabet)(nil),                     // 11: stroppy.Generation.Alphabet
+	(*Generation_Distribution)(nil),                 // 12: stroppy.Generation.Distribution
+	(*Generation_WeightedChoice)(nil),               // 13: stroppy.Generation.WeightedChoice
+	(*Generation_StringDictionary)(nil),             // 14: stroppy.Generation.StringDictionary
+	(*Generation_StringLiteralInject)(nil),          // 15: stroppy.Generation.StringLiteralInject
+	(*Generation_Range)(nil),                        // 16: stroppy.Generation.Range
+	(*Generation_Rule)(nil),                         // 17: stroppy.Generation.Rule
+	(*Generation_WeightedChoice_Item)(nil),          // 18: stroppy.Generation.WeightedChoice.Item
+	(*Generation_Range_Bool)(nil),                   // 19: stroppy.Generation.Range.Bool
+	(*Generation_Range_String)(nil),                 // 20: stroppy.Generation.Range.String
+	(*Generation_Range_AnyString)(nil),              // 21: stroppy.Generation.Range.AnyString
+	(*Generation_Range_Float)(nil),                  // 22: stroppy.Generation.Range.Float
+	(*Generation_Range_Double)(nil),                 // 23: stroppy.Generation.Range.Double
+	(*Generation_Range_Int32)(nil),                  // 24: stroppy.Generation.Range.Int32
+	(*Generation_Range_Int64)(nil),                  // 25: stroppy.Generation.Range.Int64
+	(*Generation_Range_UInt32)(nil),                 // 26: stroppy.Generation.Range.UInt32
+	(*Generation_Range_UInt64)(nil),                 // 27: stroppy.Generation.Range.UInt64
+	(*Generation_Range_DecimalRange)(nil),           // 28: stroppy.Generation.Range.DecimalRange
+	(*Generation_Range_UuidSeq)(nil),                // 29: stroppy.Generation.Range.UuidSeq
+	(*Generation_Range_DateTime)(nil),               // 30: stroppy.Generation.Range.DateTime
+	(*Generation_Range_DateTime_TimestampPb)(nil),   // 31: stroppy.Generation.Range.DateTime.TimestampPb
+	(*Generation_Range_DateTime_TimestampUnix)(nil), // 32: stroppy.Generation.Range.DateTime.TimestampUnix
+	(*timestamppb.Timestamp)(nil),                   // 33: google.protobuf.Timestamp
 }
 var file_proto_stroppy_common_proto_depIdxs = []int32{
-	32, // 0: stroppy.DateTime.value:type_name -> google.protobuf.Timestamp
+	33, // 0: stroppy.DateTime.value:type_name -> google.protobuf.Timestamp
 	0,  // 1: stroppy.Value.null:type_name -> stroppy.Value.NullValue
-	3,  // 2: stroppy.Value.decimal:type_name -> stroppy.Decimal
-	4,  // 3: stroppy.Value.uuid:type_name -> stroppy.Uuid
-	5,  // 4: stroppy.Value.datetime:type_name -> stroppy.DateTime
-	9,  // 5: stroppy.Value.struct:type_name -> stroppy.Value.Struct
-	8,  // 6: stroppy.Value.list:type_name -> stroppy.Value.List
-	6,  // 7: stroppy.Value.List.values:type_name -> stroppy.Value
-	6,  // 8: stroppy.Value.Struct.fields:type_name -> stroppy.Value
-	25, // 9: stroppy.Generation.Alphabet.ranges:type_name -> stroppy.Generation.Range.UInt32
+	4,  // 2: stroppy.Value.decimal:type_name -> stroppy.Decimal
+	5,  // 3: stroppy.Value.uuid:type_name -> stroppy.Uuid
+	6,  // 4: stroppy.Value.datetime:type_name -> stroppy.DateTime
+	10, // 5: stroppy.Value.struct:type_name -> stroppy.Value.Struct
+	9,  // 6: stroppy.Value.list:type_name -> stroppy.Value.List
+	7,  // 7: stroppy.Value.List.values:type_name -> stroppy.Value
+	7,  // 8: stroppy.Value.Struct.fields:type_name -> stroppy.Value
+	26, // 9: stroppy.Generation.Alphabet.ranges:type_name -> stroppy.Generation.Range.UInt32
 	1,  // 10: stroppy.Generation.Distribution.type:type_name -> stroppy.Generation.Distribution.DistributionType
-	17, // 11: stroppy.Generation.WeightedChoice.items:type_name -> stroppy.Generation.WeightedChoice.Item
-	16, // 12: stroppy.Generation.StringDictionary.index:type_name -> stroppy.Generation.Rule
-	10, // 13: stroppy.Generation.StringLiteralInject.alphabet:type_name -> stroppy.Generation.Alphabet
-	23, // 14: stroppy.Generation.Rule.int32_range:type_name -> stroppy.Generation.Range.Int32
-	24, // 15: stroppy.Generation.Rule.int64_range:type_name -> stroppy.Generation.Range.Int64
-	25, // 16: stroppy.Generation.Rule.uint32_range:type_name -> stroppy.Generation.Range.UInt32
-	26, // 17: stroppy.Generation.Rule.uint64_range:type_name -> stroppy.Generation.Range.UInt64
-	21, // 18: stroppy.Generation.Rule.float_range:type_name -> stroppy.Generation.Range.Float
-	22, // 19: stroppy.Generation.Rule.double_range:type_name -> stroppy.Generation.Range.Double
-	27, // 20: stroppy.Generation.Rule.decimal_range:type_name -> stroppy.Generation.Range.DecimalRange
-	19, // 21: stroppy.Generation.Rule.string_range:type_name -> stroppy.Generation.Range.String
-	18, // 22: stroppy.Generation.Rule.bool_range:type_name -> stroppy.Generation.Range.Bool
-	29, // 23: stroppy.Generation.Rule.datetime_range:type_name -> stroppy.Generation.Range.DateTime
-	3,  // 24: stroppy.Generation.Rule.decimal_const:type_name -> stroppy.Decimal
-	5,  // 25: stroppy.Generation.Rule.datetime_const:type_name -> stroppy.DateTime
-	4,  // 26: stroppy.Generation.Rule.uuid_const:type_name -> stroppy.Uuid
-	28, // 27: stroppy.Generation.Rule.uuid_seq:type_name -> stroppy.Generation.Range.UuidSeq
-	12, // 28: stroppy.Generation.Rule.weighted_choice:type_name -> stroppy.Generation.WeightedChoice
-	13, // 29: stroppy.Generation.Rule.string_dictionary:type_name -> stroppy.Generation.StringDictionary
-	14, // 30: stroppy.Generation.Rule.string_literal_inject:type_name -> stroppy.Generation.StringLiteralInject
-	11, // 31: stroppy.Generation.Rule.distribution:type_name -> stroppy.Generation.Distribution
-	16, // 32: stroppy.Generation.WeightedChoice.Item.rule:type_name -> stroppy.Generation.Rule
-	10, // 33: stroppy.Generation.Range.String.alphabet:type_name -> stroppy.Generation.Alphabet
-	21, // 34: stroppy.Generation.Range.DecimalRange.float:type_name -> stroppy.Generation.Range.Float
-	22, // 35: stroppy.Generation.Range.DecimalRange.double:type_name -> stroppy.Generation.Range.Double
-	20, // 36: stroppy.Generation.Range.DecimalRange.string:type_name -> stroppy.Generation.Range.AnyString
-	4,  // 37: stroppy.Generation.Range.UuidSeq.min:type_name -> stroppy.Uuid
-	4,  // 38: stroppy.Generation.Range.UuidSeq.max:type_name -> stroppy.Uuid
-	20, // 39: stroppy.Generation.Range.DateTime.string:type_name -> stroppy.Generation.Range.AnyString
-	30, // 40: stroppy.Generation.Range.DateTime.timestamp_pb:type_name -> stroppy.Generation.Range.DateTime.TimestampPb
-	31, // 41: stroppy.Generation.Range.DateTime.timestamp:type_name -> stroppy.Generation.Range.DateTime.TimestampUnix
-	32, // 42: stroppy.Generation.Range.DateTime.TimestampPb.min:type_name -> google.protobuf.Timestamp
-	32, // 43: stroppy.Generation.Range.DateTime.TimestampPb.max:type_name -> google.protobuf.Timestamp
-	44, // [44:44] is the sub-list for method output_type
-	44, // [44:44] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	2,  // 11: stroppy.Generation.Distribution.nurand_phase:type_name -> stroppy.Generation.Distribution.NURandPhase
+	18, // 12: stroppy.Generation.WeightedChoice.items:type_name -> stroppy.Generation.WeightedChoice.Item
+	17, // 13: stroppy.Generation.StringDictionary.index:type_name -> stroppy.Generation.Rule
+	11, // 14: stroppy.Generation.StringLiteralInject.alphabet:type_name -> stroppy.Generation.Alphabet
+	24, // 15: stroppy.Generation.Rule.int32_range:type_name -> stroppy.Generation.Range.Int32
+	25, // 16: stroppy.Generation.Rule.int64_range:type_name -> stroppy.Generation.Range.Int64
+	26, // 17: stroppy.Generation.Rule.uint32_range:type_name -> stroppy.Generation.Range.UInt32
+	27, // 18: stroppy.Generation.Rule.uint64_range:type_name -> stroppy.Generation.Range.UInt64
+	22, // 19: stroppy.Generation.Rule.float_range:type_name -> stroppy.Generation.Range.Float
+	23, // 20: stroppy.Generation.Rule.double_range:type_name -> stroppy.Generation.Range.Double
+	28, // 21: stroppy.Generation.Rule.decimal_range:type_name -> stroppy.Generation.Range.DecimalRange
+	20, // 22: stroppy.Generation.Rule.string_range:type_name -> stroppy.Generation.Range.String
+	19, // 23: stroppy.Generation.Rule.bool_range:type_name -> stroppy.Generation.Range.Bool
+	30, // 24: stroppy.Generation.Rule.datetime_range:type_name -> stroppy.Generation.Range.DateTime
+	4,  // 25: stroppy.Generation.Rule.decimal_const:type_name -> stroppy.Decimal
+	6,  // 26: stroppy.Generation.Rule.datetime_const:type_name -> stroppy.DateTime
+	5,  // 27: stroppy.Generation.Rule.uuid_const:type_name -> stroppy.Uuid
+	29, // 28: stroppy.Generation.Rule.uuid_seq:type_name -> stroppy.Generation.Range.UuidSeq
+	13, // 29: stroppy.Generation.Rule.weighted_choice:type_name -> stroppy.Generation.WeightedChoice
+	14, // 30: stroppy.Generation.Rule.string_dictionary:type_name -> stroppy.Generation.StringDictionary
+	15, // 31: stroppy.Generation.Rule.string_literal_inject:type_name -> stroppy.Generation.StringLiteralInject
+	12, // 32: stroppy.Generation.Rule.distribution:type_name -> stroppy.Generation.Distribution
+	17, // 33: stroppy.Generation.WeightedChoice.Item.rule:type_name -> stroppy.Generation.Rule
+	11, // 34: stroppy.Generation.Range.String.alphabet:type_name -> stroppy.Generation.Alphabet
+	22, // 35: stroppy.Generation.Range.DecimalRange.float:type_name -> stroppy.Generation.Range.Float
+	23, // 36: stroppy.Generation.Range.DecimalRange.double:type_name -> stroppy.Generation.Range.Double
+	21, // 37: stroppy.Generation.Range.DecimalRange.string:type_name -> stroppy.Generation.Range.AnyString
+	5,  // 38: stroppy.Generation.Range.UuidSeq.min:type_name -> stroppy.Uuid
+	5,  // 39: stroppy.Generation.Range.UuidSeq.max:type_name -> stroppy.Uuid
+	21, // 40: stroppy.Generation.Range.DateTime.string:type_name -> stroppy.Generation.Range.AnyString
+	31, // 41: stroppy.Generation.Range.DateTime.timestamp_pb:type_name -> stroppy.Generation.Range.DateTime.TimestampPb
+	32, // 42: stroppy.Generation.Range.DateTime.timestamp:type_name -> stroppy.Generation.Range.DateTime.TimestampUnix
+	33, // 43: stroppy.Generation.Range.DateTime.TimestampPb.min:type_name -> google.protobuf.Timestamp
+	33, // 44: stroppy.Generation.Range.DateTime.TimestampPb.max:type_name -> google.protobuf.Timestamp
+	45, // [45:45] is the sub-list for method output_type
+	45, // [45:45] is the sub-list for method input_type
+	45, // [45:45] is the sub-list for extension type_name
+	45, // [45:45] is the sub-list for extension extendee
+	0,  // [0:45] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_common_proto_init() }
@@ -2973,7 +3049,7 @@ func file_proto_stroppy_common_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_common_proto_rawDesc), len(file_proto_stroppy_common_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      3,
 			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   0,

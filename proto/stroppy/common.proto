@@ -145,11 +145,32 @@ message Generation {
       NURAND = 3;
     }
 
+    /**
+     * For NURAND only: distinguishes C-Load vs C-Run generator instances per
+     * TPC-C §2.1.6.1 / §5.3. The Go side derives C_load and C_run from the
+     * same seed such that |C_run - C_load| falls within the spec's required
+     * delta window for the active A value (255 / 1023 / 8191). Ignored by
+     * other distribution types. Default UNSPECIFIED is treated as LOAD for
+     * back-compat with callers that don't care about the phase.
+     */
+    enum NURandPhase {
+      /** Treated as LOAD for back-compat. */
+      NURAND_PHASE_UNSPECIFIED = 0;
+      /** C-Load generator: used during data population. */
+      NURAND_PHASE_LOAD = 1;
+      /** C-Run generator: used during measurement workload. */
+      NURAND_PHASE_RUN = 2;
+    }
+
     /** Type of distribution to use */
     DistributionType type = 1 [ (validate.rules).enum.defined_only = true ];
     /** Distribution parameter (e.g., standard deviation for normal
      * distribution, `A` for NURAND) */
     double screw = 2 [ (validate.rules).double.gte = 0 ];
+    /** For NURAND: which phase this generator is for (C-Load or C-Run).
+     *  Used by §2.1.6.1 / §5.3 audit rule on |C_run - C_load|. */
+    NURandPhase nurand_phase = 3
+        [ (validate.rules).enum.defined_only = true ];
   }
 
   /**

@@ -199,8 +199,15 @@ BEGIN
 
   SELECT w_tax INTO no_w_tax FROM warehouse WHERE w_id = no_w_id;
 
+  /* T2.1: FOR UPDATE to serialize the read-then-increment under
+     READ COMMITTED / REPEATABLE READ — InnoDB takes a record lock on
+     the district row, blocking concurrent NEWORD VUs until commit, so
+     the subsequent INSERT INTO new_order (no_d_next_o_id, ...) can't
+     collide on (w_id, d_id, o_id) PK. Previously observed ~0.1% error
+     rate on Duplicate entry 'W-D-O' for key 'new_order.PRIMARY'. */
   SELECT d_next_o_id, d_tax INTO no_d_next_o_id, no_d_tax
-  FROM district WHERE d_id = no_d_id AND d_w_id = no_w_id;
+  FROM district WHERE d_id = no_d_id AND d_w_id = no_w_id
+  FOR UPDATE;
 
   UPDATE district SET d_next_o_id = d_next_o_id + 1
   WHERE d_id = no_d_id AND d_w_id = no_w_id;
@@ -347,10 +354,28 @@ BEGIN
   /* TPC-C 2.5.2.2: h_data = W_NAME || '    ' || D_NAME (4 spaces). */
   SET h_data_val = CONCAT(COALESCE(p_w_name, ''), '    ', COALESCE(p_d_name, ''));
 
+  /* TPC-C 2.5.2.2: BC-credit customers get a 500-char c_data log
+     prepended with the current Payment's identifying tuple; GC
+     customers keep their c_data untouched. MySQL dialect: use
+     CONCAT (no '||' string operator by default) and CAST(... AS CHAR)
+     for numeric-to-text. DECIMAL(6,2)→CHAR preserves the two-decimal
+     form natively, unlike FORMAT() which adds locale thousand
+     separators. */
   UPDATE customer
   SET c_balance = c_balance - p_h_amount,
       c_ytd_payment = c_ytd_payment + p_h_amount,
-      c_payment_cnt = c_payment_cnt + 1
+      c_payment_cnt = c_payment_cnt + 1,
+      c_data = CASE
+        WHEN c_credit = 'BC' THEN SUBSTR(
+          CONCAT(
+            CAST(c_id AS CHAR), ' ', CAST(c_d_id AS CHAR), ' ', CAST(c_w_id AS CHAR),
+            ' ', CAST(p_d_id AS CHAR), ' ', CAST(p_w_id AS CHAR),
+            ' ', CAST(p_h_amount AS CHAR), '|', COALESCE(c_data, '')
+          ),
+          1, 500
+        )
+        ELSE c_data
+      END
   WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
 
   INSERT INTO history (h_id, h_c_d_id, h_c_w_id, h_c_id, h_d_id, h_w_id, h_date, h_amount, h_data)
@@ -495,7 +520,13 @@ SELECT c_discount, c_last, c_credit FROM customer WHERE c_w_id = :w_id AND c_d_i
 --= get_warehouse
 SELECT w_tax FROM warehouse WHERE w_id = :w_id
 --= get_district
-SELECT d_next_o_id, d_tax FROM district WHERE d_id = :d_id AND d_w_id = :w_id
+/* T2.1: FOR UPDATE serializes the read-then-increment of d_next_o_id under
+   InnoDB. Without it, REPEATABLE READ does a consistent (snapshot) read so
+   two concurrent NEWORD VUs can read the same d_next_o_id, both compute the
+   same o_id, and both INSERT INTO orders fail with Duplicate entry on the
+   PK. The lock is released on commit/rollback. Mirrors the proc-body fix
+   in NEWORD (workload_procs section above) for the inline-SQL variant. */
+SELECT d_next_o_id, d_tax FROM district WHERE d_id = :d_id AND d_w_id = :w_id FOR UPDATE
 --= update_district
 UPDATE district SET d_next_o_id = d_next_o_id + 1 WHERE d_id = :d_id AND d_w_id = :w_id
 --= insert_order
@@ -525,18 +556,53 @@ UPDATE district SET d_ytd = d_ytd + :amount WHERE d_w_id = :w_id AND d_id = :d_i
 --= get_district
 SELECT d_name, d_street_1, d_street_2, d_city, d_state, d_zip FROM district WHERE d_w_id = :w_id AND d_id = :d_id
 --= get_customer_by_id
-SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since
+/* Trailing c_data is needed for the §2.5.2.2 BC-credit append path. */
+SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
 FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= count_customers_by_name
+/* TPC-C 2.5.1.2: 60% of Payment lookups are by (w_id, d_id, c_last). */
+SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+--= get_customer_by_name
+/* TPC-C 2.5.2.2: pick row ceil(n/2) ordered by c_first — zero-indexed
+   OFFSET is (n - 1) / 2, computed client-side and passed in.
+   MySQL accepts LIMIT/OFFSET with protocol parameters inside a
+   prepared statement; a named-colon token works here (it errors
+   only on literal non-integer expressions).
+   Trailing c_data supports the BC-credit append path (§1.8). */
+SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
+FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+ORDER BY c_first
+LIMIT 1 OFFSET :offset
 --= update_customer
 UPDATE customer SET c_balance = c_balance - :amount, c_ytd_payment = c_ytd_payment + :amount, c_payment_cnt = c_payment_cnt + 1
 WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= update_customer_bc
+/* TPC-C 2.5.2.2: BC-credit path. c_data_new is built client-side
+   (c_id c_d_id c_w_id d_id w_id h_amount|old_c_data); SUBSTR clamps
+   to 500 chars. MySQL SUBSTR is 1-indexed, same as pg/pico/ydb. */
+UPDATE customer
+   SET c_balance     = c_balance - :amount,
+       c_ytd_payment = c_ytd_payment + :amount,
+       c_payment_cnt = c_payment_cnt + 1,
+       c_data        = SUBSTR(:c_data_new, 1, 500)
+ WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 --= insert_history
 INSERT INTO history (h_id, h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data)
 VALUES (:h_id, :h_c_id, :h_c_d_id, :h_c_w_id, :h_d_id, :h_w_id, NOW(), :h_amount, :h_data)
 
 --+ workload_tx_order_status
 --= get_customer_by_id
-SELECT c_balance, c_first, c_middle, c_last FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+--= count_customers_by_name
+/* TPC-C 2.6.1.2: 60% of Order-Status lookups are by (w_id, d_id, c_last). */
+SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+--= get_customer_by_name
+/* TPC-C 2.6.2.2: pick row ceil(n/2) ordered by c_first — zero-indexed
+   OFFSET is (n - 1) / 2, computed client-side. */
+SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer
+WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+ORDER BY c_first
+LIMIT 1 OFFSET :offset
 --= get_last_order
 SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_d_id = :d_id AND o_w_id = :w_id AND o_c_id = :c_id ORDER BY o_id DESC LIMIT 1
 --= get_order_lines

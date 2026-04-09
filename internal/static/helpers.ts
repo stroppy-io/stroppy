@@ -21,6 +21,7 @@ import {
   Generation_Rule,
   Generation_Distribution,
   Generation_Distribution_DistributionType,
+  Generation_Distribution_NURandPhase,
   QueryParamGroup,
   DriverConfig,
   QueryParamDescriptor,
@@ -659,7 +660,7 @@ export type Distribution =
   | { kind: "normal"; screw?: number }
   | { kind: "uniform" }
   | { kind: "zipf"; screw: number }
-  | { kind: "nurand"; a: number };
+  | { kind: "nurand"; a: number; phase?: "load" | "run" };
 
 export const Dist = {
   normal: (screw = 0): Distribution => ({ kind: "normal", screw }),
@@ -671,8 +672,19 @@ export const Dist = {
    * `C` is derived once from the seed per generator, so reproducibility with
    * a fixed seed is preserved. Integers only — use with `R.int32`/`R.int64`.
    * Typical A: 255 (C_LAST), 1023 (C_ID), 8191 (OL_I_ID).
+   *
+   * The `phase` parameter selects C-Load vs C-Run per §2.1.6.1 / §5.3 —
+   * the Go side derives both C_load and C_run from the same seed so the
+   * |C_run − C_load| delta falls within the spec's mandated audit window
+   * for the active A (255 / 1023 / 8191). Default is "load" which matches
+   * what a data-population generator wants; runtime workload pickers must
+   * pass "run" explicitly.
    */
-  nurand: (a: number): Distribution => ({ kind: "nurand", a }),
+  nurand: (a: number, phase: "load" | "run" = "load"): Distribution => ({
+    kind: "nurand",
+    a,
+    phase,
+  }),
 };
 
 function dateToTimestamp(d: Date): Timestamp {
@@ -682,14 +694,34 @@ function dateToTimestamp(d: Date): Timestamp {
 function toProtoDistribution(d: Distribution): Generation_Distribution {
   switch (d.kind) {
     case "normal":
-      return { type: Generation_Distribution_DistributionType.NORMAL, screw: d.screw ?? 0 };
+      return {
+        type: Generation_Distribution_DistributionType.NORMAL,
+        screw: d.screw ?? 0,
+        nurandPhase: Generation_Distribution_NURandPhase.NURAND_PHASE_UNSPECIFIED,
+      };
     case "uniform":
-      return { type: Generation_Distribution_DistributionType.UNIFORM, screw: 0 };
+      return {
+        type: Generation_Distribution_DistributionType.UNIFORM,
+        screw: 0,
+        nurandPhase: Generation_Distribution_NURandPhase.NURAND_PHASE_UNSPECIFIED,
+      };
     case "zipf":
-      return { type: Generation_Distribution_DistributionType.ZIPF, screw: d.screw };
+      return {
+        type: Generation_Distribution_DistributionType.ZIPF,
+        screw: d.screw,
+        nurandPhase: Generation_Distribution_NURandPhase.NURAND_PHASE_UNSPECIFIED,
+      };
     case "nurand":
-      // NURand carries `A` in the `screw` field; the Go side decodes it.
-      return { type: Generation_Distribution_DistributionType.NURAND, screw: d.a };
+      // NURand carries `A` in the `screw` field; the Go side decodes it
+      // and uses `nurandPhase` to select C-Load vs C-Run per §2.1.6.1.
+      return {
+        type: Generation_Distribution_DistributionType.NURAND,
+        screw: d.a,
+        nurandPhase:
+          d.phase === "run"
+            ? Generation_Distribution_NURandPhase.NURAND_PHASE_RUN
+            : Generation_Distribution_NURandPhase.NURAND_PHASE_LOAD,
+      };
     default: {
       const _exhaustive: never = d;
       throw new Error(`unknown distribution kind: ${String(_exhaustive)}`);
@@ -706,6 +738,7 @@ function toProtoDistribution(d: Distribution): Generation_Distribution {
 const DEFAULT_UNIFORM: Generation_Distribution = {
   type: Generation_Distribution_DistributionType.UNIFORM,
   screw: 0,
+  nurandPhase: Generation_Distribution_NURandPhase.NURAND_PHASE_UNSPECIFIED,
 };
 function distOrDefault(d?: Distribution): Generation_Distribution {
   return d ? toProtoDistribution(d) : DEFAULT_UNIFORM;
@@ -1218,3 +1251,82 @@ function group_internal(
  *  Call once() during init to capture the guard, then invoke the
  *  returned function during iterations — it only fires on the first call. */
 export const once = Once;
+
+// ============================================================================
+// T2.3: SQLSTATE 40001 / deadlock retry helper
+// ============================================================================
+//
+// PG REPEATABLE READ uses snapshot isolation, so concurrent updates to the
+// same row abort with SQLSTATE 40001 ("could not serialize access due to
+// concurrent update"). MySQL's row-locking equivalent is "Deadlock found
+// when trying to get lock" (Error 1213, SQLSTATE 40001). The TPC-C spec
+// §5.2.5 caps the total error rate at 1%, so we retry these aborts a few
+// times before letting them bubble up to k6's tx_error_rate.
+//
+// Audit (2026-04-09) of pkg/driver/{postgres,mysql,sqldriver,...}: the
+// stroppy Go layer wraps every driver error with `fmt.Errorf("...: %w",
+// err)` (see sqldriver/run_query.go and cmd/xk6air/driver_wrapper.go). Both
+// pgx's pgconn.PgError.Error() and go-sql-driver's mysql.MySQLError.Error()
+// stringify to formats that include enough textual signal:
+//
+//   pg:    "ERROR: could not serialize access due to concurrent update (SQLSTATE 40001)"
+//   pg:    "ERROR: deadlock detected (SQLSTATE 40P01)"
+//   mysql: "Error 1213 (40001): Deadlock found when trying to get lock; ..."
+//
+// So no Go-side classification is needed — the JS catch sees the wrapped
+// message via `e.message` and a regex match is enough.
+//
+// IMPORTANT: this MUST return false for the spec §2.4.2.3 New-Order rollback
+// sentinel ("tpcc_rollback:item_not_found"). On PG that path is raised via
+// `RAISE EXCEPTION` (SQLSTATE P0001) and on MySQL via `SIGNAL SQLSTATE
+// '45000'`, neither of which match the serialization patterns below — but we
+// add an explicit early-out so a future regex tweak can't accidentally trip
+// the rollback path.
+
+/** Check if an error is a transient serialization failure or deadlock that
+ *  should be retried. Matches both PostgreSQL and MySQL error texts.
+ *  Explicitly excludes the TPC-C `tpcc_rollback:` sentinel so the spec
+ *  §2.4.2.3 New-Order rollback path is never retried. */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const isSerializationError = (e: any): boolean => {
+  const msg = String(e?.message ?? e);
+  // Defensive: never retry the spec-mandated rollback sentinel.
+  if (msg.indexOf("tpcc_rollback:") >= 0) return false;
+  return /SQLSTATE 40001/i.test(msg)
+      || /could not serialize access/i.test(msg)
+      || /SQLSTATE 40P01/i.test(msg)
+      || /deadlock detected/i.test(msg)        // pg
+      || /Deadlock found/i.test(msg)           // mysql
+      || /Error 1213/i.test(msg);              // mysql numeric
+};
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/** Run `fn`, retrying up to `maxAttempts - 1` times when `isRetryable(e)`
+ *  returns true. The optional `onRetry` callback fires once per retry,
+ *  before re-invoking `fn`, and receives the upcoming attempt number
+ *  (2-based) plus the caught error. No backoff: serialization retries are
+ *  immediate by design — sleeping inside a tx body would just deepen the
+ *  contention window. Use the callback to bump a counter so operators can
+ *  observe how often retries fire. */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const retry = <T>(
+  maxAttempts: number,
+  isRetryable: (e: any) => boolean,
+  fn: () => T,
+  onRetry?: (attempt: number, e: any) => void,
+): T => {
+  let lastErr: any;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return fn();
+    } catch (e) {
+      lastErr = e;
+      if (!isRetryable(e) || attempt === maxAttempts) {
+        throw e;
+      }
+      if (onRetry) onRetry(attempt + 1, e);
+    }
+  }
+  throw lastErr; // unreachable — last iteration always throws or returns
+};
+/* eslint-enable @typescript-eslint/no-explicit-any */

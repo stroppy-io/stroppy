@@ -44,6 +44,7 @@
     - [Value.Struct](#stroppy-Value-Struct)
   
     - [Generation.Distribution.DistributionType](#stroppy-Generation-Distribution-DistributionType)
+    - [Generation.Distribution.NURandPhase](#stroppy-Generation-Distribution-NURandPhase)
     - [Value.NullValue](#stroppy-Value-NullValue)
   
 - [proto/stroppy/config.proto](#proto_stroppy_config-proto)
@@ -238,6 +239,7 @@ Distribution defines the statistical distribution for value generation.
 | ----- | ---- | ----- | ----------- |
 | type | [Generation.Distribution.DistributionType](#stroppy-Generation-Distribution-DistributionType) |  | Type of distribution to use |
 | screw | [double](#double) |  | Distribution parameter (e.g., standard deviation for normal distribution, `A` for NURAND) |
+| nurand_phase | [Generation.Distribution.NURandPhase](#stroppy-Generation-Distribution-NURandPhase) |  | For NURAND: which phase this generator is for (C-Load or C-Run). Used by §2.1.6.1 / §5.3 audit rule on |C_run - C_load|. |
 
 
 
@@ -722,6 +724,24 @@ way.
 | UNIFORM | 1 | Uniform distribution |
 | ZIPF | 2 | Zipfian distribution |
 | NURAND | 3 | TPC-C NURand(A, x, y) non-uniform distribution per spec §2.1.6: ((rand(0,A) | rand(x,y)) &#43; C) % (y - x &#43; 1) &#43; x where `|` is bitwise OR and `C` is a per-generator constant derived from the seed. The `A` parameter is carried via the `screw` field (typical TPC-C values: 255 for C_LAST, 1023 for C_ID, 8191 for OL_I_ID). Integers only — `round` must be true. |
+
+
+
+<a name="stroppy-Generation-Distribution-NURandPhase"></a>
+
+### Generation.Distribution.NURandPhase
+For NURAND only: distinguishes C-Load vs C-Run generator instances per
+TPC-C §2.1.6.1 / §5.3. The Go side derives C_load and C_run from the
+same seed such that |C_run - C_load| falls within the spec&#39;s required
+delta window for the active A value (255 / 1023 / 8191). Ignored by
+other distribution types. Default UNSPECIFIED is treated as LOAD for
+back-compat with callers that don&#39;t care about the phase.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| NURAND_PHASE_UNSPECIFIED | 0 | Treated as LOAD for back-compat. |
+| NURAND_PHASE_LOAD | 1 | C-Load generator: used during data population. |
+| NURAND_PHASE_RUN | 2 | C-Run generator: used during measurement workload. |
 
 
 

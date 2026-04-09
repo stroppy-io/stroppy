@@ -1501,6 +1501,17 @@ func (m *Generation_Distribution) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	if _, ok := Generation_Distribution_NURandPhase_name[int32(m.GetNurandPhase())]; !ok {
+		err := Generation_DistributionValidationError{
+			field:  "NurandPhase",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	if len(errors) > 0 {
 		return Generation_DistributionMultiError(errors)
 	}

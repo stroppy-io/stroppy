@@ -51,6 +51,7 @@ func NewDistributionGenerator[T constraint.Number](
 			[2]T{ranges.GetMin(), ranges.GetMax()},
 			round,
 			distributeParams.GetScrew(),
+			distributeParams.GetNurandPhase(),
 		)
 	default:
 		return NewUniformDistribution[T](
