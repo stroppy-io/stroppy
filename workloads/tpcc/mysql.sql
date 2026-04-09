@@ -165,7 +165,8 @@ CREATE PROCEDURE NEWORD(
   IN no_max_w_id INT,
   IN no_d_id INT,
   IN no_c_id INT,
-  IN no_o_ol_cnt INT
+  IN no_o_ol_cnt INT,
+  IN no_force_rollback BOOLEAN
 )
 BEGIN
   DECLARE no_c_discount DECIMAL(4,4);
@@ -210,6 +211,12 @@ BEGIN
   SET loop_counter = 1;
   WHILE loop_counter <= no_o_ol_cnt DO
     SET v_i_id = 1 + FLOOR(RAND() * 100000);
+    /* TPC-C 2.4.1.4 forced-rollback sentinel: override the LAST line's i_id
+       to a value guaranteed to miss the item table, forcing the SIGNAL path
+       below. Driven by client-side 1% roll. */
+    IF no_force_rollback AND loop_counter = no_o_ol_cnt THEN
+      SET v_i_id = 100001;
+    END IF;
     /* TPC-C 2.4.1.5: ~1% of order lines pick a remote supply warehouse
        (uniform over {1..no_max_w_id} \ {no_w_id}) when multiple warehouses exist. */
     IF no_max_w_id > 1 AND FLOOR(RAND() * 100) = 0 THEN
@@ -226,6 +233,13 @@ BEGIN
 
     SELECT i_price, i_name, i_data INTO v_i_price, v_i_name, v_i_data
     FROM item WHERE i_id = v_i_id;
+
+    /* TPC-C 2.4.2.3: on the sentinel-forced last line, raise so the client
+       gets a recognizable error and can count the rollback. Non-forced misses
+       remain silent (legacy behavior). */
+    IF item_not_found = 1 AND no_force_rollback AND loop_counter = no_o_ol_cnt THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'tpcc_rollback:item_not_found';
+    END IF;
 
     IF item_not_found = 0 THEN
       SELECT s_quantity, s_data,
@@ -293,6 +307,7 @@ BEGIN
   DECLARE p_w_name VARCHAR(10);
   DECLARE p_d_name VARCHAR(10);
   DECLARE name_count INT;
+  DECLARE v_offset INT;
   DECLARE h_data_val VARCHAR(30);
 
   SET p_c_id = p_c_id_in;
@@ -312,12 +327,15 @@ BEGIN
     WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id;
 
     IF name_count > 0 THEN
+      /* TPC-C 2.5.2.2: pick row ceil(n/2). For 0-indexed OFFSET this is (n-1)/2.
+         MySQL LIMIT/OFFSET only accepts literals or local variables. */
+      SET v_offset = (name_count - 1) DIV 2;
       SELECT c_id, c_balance, c_credit
       INTO p_c_id, p_c_balance, p_c_credit
       FROM customer
       WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id
       ORDER BY c_first
-      LIMIT 1 OFFSET 0;
+      LIMIT 1 OFFSET v_offset;
     END IF;
   ELSE
     SELECT c_balance, c_credit
@@ -326,7 +344,8 @@ BEGIN
     WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
   END IF;
 
-  SET h_data_val = CONCAT(COALESCE(p_w_name, ''), ' ', COALESCE(p_d_name, ''));
+  /* TPC-C 2.5.2.2: h_data = W_NAME || '    ' || D_NAME (4 spaces). */
+  SET h_data_val = CONCAT(COALESCE(p_w_name, ''), '    ', COALESCE(p_d_name, ''));
 
   UPDATE customer
   SET c_balance = c_balance - p_h_amount,
@@ -392,6 +411,7 @@ CREATE PROCEDURE OSTAT(
 )
 BEGIN
   DECLARE namecnt INT;
+  DECLARE v_offset INT;
   DECLARE v_c_id INT;
   DECLARE v_c_balance DECIMAL(12,2);
   DECLARE v_c_first VARCHAR(16);
@@ -408,12 +428,15 @@ BEGIN
     WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id;
 
     IF namecnt > 0 THEN
+      /* TPC-C 2.6.2.2: pick row ceil(n/2). For 0-indexed OFFSET this is (n-1)/2.
+         MySQL LIMIT/OFFSET only accepts literals or local variables. */
+      SET v_offset = (namecnt - 1) DIV 2;
       SELECT c_balance, c_first, c_middle, c_id
       INTO v_c_balance, v_c_first, v_c_middle, v_c_id
       FROM customer
       WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id
       ORDER BY c_first
-      LIMIT 1 OFFSET 0;
+      LIMIT 1 OFFSET v_offset;
     END IF;
   ELSE
     SELECT c_balance, c_first, c_middle
@@ -456,7 +479,7 @@ END
 
 --+ workload_procs
 --= new_order
-CALL NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt)
+CALL NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt, :force_rollback)
 --= payment
 CALL PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last, :p_h_id)
 --= order_status

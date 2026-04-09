@@ -6,13 +6,16 @@ import { parse_sql_with_sections } from "./parse_sql.js";
 // Post-run compliance counters for TPC-C auditing. See TPCC_COMPILANCE_REPORT.md
 // §1.11 — these expose the observed rates of spec-mandated percentages so an
 // operator can verify compliance without instrumenting the DB side.
-const tpccNewOrderTotal   = new Counter("tpcc_new_order_total");
-const tpccRollbackDecided = new Counter("tpcc_rollback_decided");
-const tpccRollbackDone    = new Counter("tpcc_rollback_done");
-const tpccRemoteLineTotal = new Counter("tpcc_remote_line_total");
-const tpccRemoteLineRem   = new Counter("tpcc_remote_line_remote");
-const tpccPaymentTotal    = new Counter("tpcc_payment_total");
-const tpccPaymentRemote   = new Counter("tpcc_payment_remote");
+const tpccNewOrderTotal    = new Counter("tpcc_new_order_total");
+const tpccRollbackDecided  = new Counter("tpcc_rollback_decided");
+const tpccRollbackDone     = new Counter("tpcc_rollback_done");
+const tpccRemoteLineTotal  = new Counter("tpcc_remote_line_total");
+const tpccRemoteLineRem    = new Counter("tpcc_remote_line_remote");
+const tpccPaymentTotal     = new Counter("tpcc_payment_total");
+const tpccPaymentRemote    = new Counter("tpcc_payment_remote");
+const tpccOrderStatusTotal = new Counter("tpcc_order_status_total");
+const tpccDeliveryTotal    = new Counter("tpcc_delivery_total");
+const tpccStockLevelTotal  = new Counter("tpcc_stock_level_total");
 
 // TPC-C Configuration Constants
 const POOL_SIZE   = ENV("POOL_SIZE", 100, "Connection pool size");
@@ -49,10 +52,15 @@ const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file path (defaults per driverTy
   ?? _sqlByDriver[driverConfig.driverType!]
   ?? "./pg.sql";
 
-// Per-driver isolation default. picodata MUST be "none" — picodata.Begin always errors.
+// Per-driver isolation default. TPC-C §3.4.0.1 Table 3-1 requires Level 3
+// (phantom protection) for NO/P/D and Level 2 for OS. PG's REPEATABLE READ =
+// snapshot isolation (phantom-protected); MySQL InnoDB's REPEATABLE READ uses
+// next-key locking (phantom-protected). Both satisfy the spec.
+// picodata MUST be "none" — picodata.Begin always errors.
+// ydb default `serializable` is above spec and compliant.
 const _isoByDriver: Record<string, TxIsolationName> = {
-  postgres: "read_committed",
-  mysql:    "read_committed",
+  postgres: "repeatable_read",
+  mysql:    "repeatable_read",
   picodata: "none",
   ydb:      "serializable",
 };
@@ -149,7 +157,8 @@ export function setup() {
     driver.insert("customer", TOTAL_CUSTOMERS, {
       params: {
         c_first: R.str(8, 16),
-        c_middle: R.str(2, AB.enUpper),
+        // Spec §4.3.3.1: C_MIDDLE is the fixed constant "OE".
+        c_middle: C.str("OE"),
         c_last: S.str(6, 16),
         c_street_1: R.str(10, 20, AB.enNumSpc),
         c_street_2: R.str(10, 20, AB.enNumSpc),
@@ -442,6 +451,7 @@ const ostatDIdGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 const ostatCIdGen = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023)).gen();
 
 function order_status() {
+  tpccOrderStatusTotal.add(1);
   const w_id = HOME_W_ID;
   const d_id = ostatDIdGen.next() as number;
   const c_id = ostatCIdGen.next() as number;
@@ -475,6 +485,7 @@ function order_status() {
 const deliveryOCarrierIdGen = R.int32(1, 10).gen();
 
 function delivery() {
+  tpccDeliveryTotal.add(1);
   const w_id       = HOME_W_ID;
   const carrier_id = deliveryOCarrierIdGen.next();
 
@@ -526,6 +537,7 @@ const slevDIdGen       = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 const slevThresholdGen = R.int32(10, 20).gen();
 
 function stock_level() {
+  tpccStockLevelTotal.add(1);
   const w_id      = HOME_W_ID;
   const d_id      = slevDIdGen.next();
   const threshold = slevThresholdGen.next();
@@ -578,3 +590,57 @@ export function teardown() {
   Step.end("workload");
   Teardown();
 }
+
+// =====================================================================
+// handleSummary — TPC-C §1.11 post-run transaction mix + compliance rates.
+// Overrides the default k6 end-of-test summary. Prints observed percentages
+// alongside spec bounds so operators can verify compliance without
+// instrumenting the DB. Rates are informational — no hard assertion.
+// =====================================================================
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export function handleSummary(data: any): Record<string, string> {
+  const m = data.metrics ?? {};
+  const cnt = (name: string): number => Number(m[name]?.values?.count ?? 0);
+  const pct = (num: number, den: number): string =>
+    den > 0 ? ((num / den) * 100).toFixed(2) + "%" : "n/a";
+
+  const no  = cnt("tpcc_new_order_total");
+  const pay = cnt("tpcc_payment_total");
+  const os  = cnt("tpcc_order_status_total");
+  const dl  = cnt("tpcc_delivery_total");
+  const sl  = cnt("tpcc_stock_level_total");
+  const tot = no + pay + os + dl + sl;
+
+  const rbDone = cnt("tpcc_rollback_done");
+  const rlTot  = cnt("tpcc_remote_line_total");
+  const rlRem  = cnt("tpcc_remote_line_remote");
+  const payRem = cnt("tpcc_payment_remote");
+
+  const iters = cnt("iterations");
+  const dur   = m.iteration_duration?.values?.avg;
+  const durStr = typeof dur === "number" ? dur.toFixed(2) + " ms" : "n/a";
+
+  const lines = [
+    "",
+    "===== TPC-C transaction mix (observed vs spec §5.2.3) =====",
+    `  new_order    : ${pct(no, tot).padStart(7)}  (spec 45%, min 45%)`,
+    `  payment      : ${pct(pay, tot).padStart(7)}  (spec 43%, min 43%)`,
+    `  order_status : ${pct(os, tot).padStart(7)}  (spec  4%, min  4%)`,
+    `  delivery     : ${pct(dl, tot).padStart(7)}  (spec  4%, min  4%)`,
+    `  stock_level  : ${pct(sl, tot).padStart(7)}  (spec  4%, min  4%)`,
+    "",
+    "===== TPC-C compliance rates =====",
+    `  rollback rate          : ${pct(rbDone, no).padStart(7)}  (spec ~1% of new_order, §2.4.1.4)`,
+    `  payment remote         : ${pct(payRem, pay).padStart(7)}  (spec  15% of payment,  §2.5.1.2)`,
+    `  new_order remote lines : ${pct(rlRem, rlTot).padStart(7)}  (spec  ~1% of lines,  §2.4.1.5)`,
+    "",
+    "===== k6 rollups =====",
+    `  iterations : ${iters}`,
+    `  avg iter duration : ${durStr}`,
+    `  total tpcc txs : ${tot}`,
+    "",
+  ];
+
+  return { stdout: lines.join("\n") };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */

@@ -139,7 +139,8 @@ CREATE OR REPLACE FUNCTION NEWORD (
   no_max_w_id INTEGER,
   no_d_id INTEGER,
   no_c_id INTEGER,
-  no_o_ol_cnt INTEGER
+  no_o_ol_cnt INTEGER,
+  no_force_rollback BOOLEAN DEFAULT FALSE
 ) RETURNS INTEGER AS $$
 DECLARE
   no_c_discount NUMERIC;
@@ -180,6 +181,13 @@ BEGIN
   FOR loop_counter IN 1 .. no_o_ol_cnt
   LOOP
     v_i_id := 1 + (floor(random() * 100000))::INTEGER;
+    /* TPC-C 2.4.2.3: 1% of NEWORD must roll back via a bogus last-line i_id.
+       The client samples the 1% decision and sets no_force_rollback = TRUE;
+       on the last iteration we substitute a sentinel (100000 + 1) that is
+       guaranteed NOT FOUND in item, which RAISEs below. */
+    IF no_force_rollback AND loop_counter = no_o_ol_cnt THEN
+      v_i_id := 100001;
+    END IF;
     /* TPC-C 2.4.1.5: ~1% of order lines pick a remote supply warehouse
        (uniform over {1..no_max_w_id} \ {no_w_id}) when multiple warehouses exist. */
     IF no_max_w_id > 1 AND floor(random() * 100)::INTEGER = 0 THEN
@@ -197,6 +205,11 @@ BEGIN
     FROM item WHERE i_id = v_i_id;
 
     IF NOT FOUND THEN
+      /* Spec §2.4.2.3 rollback path: if this was the forced-rollback line,
+         raise so the tx aborts; otherwise skip (original behaviour). */
+      IF no_force_rollback AND loop_counter = no_o_ol_cnt THEN
+        RAISE EXCEPTION 'tpcc_rollback:item_not_found';
+      END IF;
       CONTINUE;
     END IF;
 
@@ -292,7 +305,8 @@ BEGIN
       FROM customer
       WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id
       ORDER BY c_first
-      LIMIT 1 OFFSET (name_count / 2);
+      /* TPC-C 2.5.2.2: pick row ceil(n/2). For 0-indexed OFFSET this is (n-1)/2. */
+      LIMIT 1 OFFSET ((name_count - 1) / 2);
     END IF;
   ELSE
     SELECT c_balance, c_credit
@@ -301,7 +315,8 @@ BEGIN
     WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
   END IF;
 
-  h_data_val := COALESCE(p_w_name,'') || ' ' || COALESCE(p_d_name,'');
+  /* TPC-C 2.5.2.2: h_data = W_NAME || '    ' || D_NAME (4 spaces). */
+  h_data_val := COALESCE(p_w_name,'') || '    ' || COALESCE(p_d_name,'');
 
   UPDATE customer
   SET c_balance = c_balance - p_h_amount,
@@ -396,7 +411,8 @@ BEGIN
       FROM customer
       WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id
       ORDER BY c_first
-      LIMIT 1 OFFSET ((namecnt + 1) / 2);
+      /* TPC-C 2.6.2.2: pick row ceil(n/2). For 0-indexed OFFSET this is (n-1)/2. */
+      LIMIT 1 OFFSET ((namecnt - 1) / 2);
     END IF;
   ELSE
     SELECT c_balance, c_first, c_middle
@@ -446,7 +462,7 @@ $$ LANGUAGE 'plpgsql';
 
 --+ workload_procs
 --= new_order
-SELECT NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt)
+SELECT NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt, :force_rollback)
 --= payment
 SELECT PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last, :p_h_id)
 --= order_status
