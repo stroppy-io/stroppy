@@ -202,8 +202,8 @@ func (x *DriverRunConfig) GetDefaultTxIsolation() string {
 //	    "0": { "driverType": "postgres", "url": "postgres://user:pass@db:5432/bench",
 //	            "pool": { "maxConns": 200 } }
 //	  },
-//	  "env": { "DURATION": "30m", "VUS_SCALE": "0.5", "WAREHOUSES": "10" },
-//	  "k6Args": ["--vus", "10"]
+//	  "env": { "WAREHOUSES": "10" },
+//	  "k6Args": ["--vus", "10", "--duration", "30m"]
 //	}
 type RunConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
