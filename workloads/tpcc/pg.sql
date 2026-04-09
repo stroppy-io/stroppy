@@ -174,16 +174,23 @@ BEGIN
   WHERE d_id = no_d_id AND d_w_id = no_w_id
   RETURNING d_next_o_id - 1, d_tax INTO no_d_next_o_id, no_d_tax;
 
-  INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
-  VALUES (no_d_next_o_id, no_d_id, no_w_id, no_c_id, current_timestamp, no_o_ol_cnt, no_o_all_local);
-
   INSERT INTO new_order (no_o_id, no_d_id, no_w_id)
   VALUES (no_d_next_o_id, no_d_id, no_w_id);
 
   FOR loop_counter IN 1 .. no_o_ol_cnt
   LOOP
     v_i_id := 1 + (floor(random() * 100000))::INTEGER;
-    v_supply_w_id := no_w_id;
+    /* TPC-C 2.4.1.5: ~1% of order lines pick a remote supply warehouse
+       (uniform over {1..no_max_w_id} \ {no_w_id}) when multiple warehouses exist. */
+    IF no_max_w_id > 1 AND floor(random() * 100)::INTEGER = 0 THEN
+      v_supply_w_id := 1 + (floor(random() * (no_max_w_id - 1)))::INTEGER;
+      IF v_supply_w_id >= no_w_id THEN
+        v_supply_w_id := v_supply_w_id + 1;
+      END IF;
+      no_o_all_local := 0;
+    ELSE
+      v_supply_w_id := no_w_id;
+    END IF;
     v_quantity := 1 + (floor(random() * 10))::INTEGER;
 
     SELECT i_price, i_name, i_data INTO v_i_price, v_i_name, v_i_data
@@ -220,7 +227,7 @@ BEGIN
       SET s_quantity = v_s_quantity,
           s_ytd = s_ytd + v_quantity,
           s_order_cnt = s_order_cnt + 1,
-          s_remote_cnt = s_remote_cnt + 0
+          s_remote_cnt = s_remote_cnt + CASE WHEN v_supply_w_id <> no_w_id THEN 1 ELSE 0 END
     WHERE s_i_id = v_i_id AND s_w_id = v_supply_w_id;
 
     v_amount := v_quantity * v_i_price;
@@ -230,6 +237,10 @@ BEGIN
     VALUES
       (no_d_next_o_id, no_d_id, no_w_id, loop_counter, v_i_id, v_supply_w_id, v_quantity, v_amount, v_dist_info);
   END LOOP;
+
+  /* Insert orders after the loop so o_all_local reflects the actual remote flag. */
+  INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
+  VALUES (no_d_next_o_id, no_d_id, no_w_id, no_c_id, current_timestamp, no_o_ol_cnt, no_o_all_local);
 
   RETURN no_d_next_o_id;
 END;

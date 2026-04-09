@@ -45,6 +45,13 @@ func NewDistributionGenerator[T constraint.Number](
 			round,
 			distributeParams.GetScrew(),
 		)
+	case stroppy.Generation_Distribution_NURAND:
+		return NewNURandDistribution[T](
+			seed,
+			[2]T{ranges.GetMin(), ranges.GetMax()},
+			round,
+			distributeParams.GetScrew(),
+		)
 	default:
 		return NewUniformDistribution[T](
 			seed,

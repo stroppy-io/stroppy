@@ -5974,7 +5974,7 @@ export interface Generation_Distribution {
     type: Generation_Distribution_DistributionType;
     /**
      * * Distribution parameter (e.g., standard deviation for normal
-     * distribution)
+     * distribution, `A` for NURAND)
      *
      * @generated from protobuf field: double screw = 2
      */
@@ -6001,7 +6001,55 @@ export enum Generation_Distribution_DistributionType {
      *
      * @generated from protobuf enum value: ZIPF = 2;
      */
-    ZIPF = 2
+    ZIPF = 2,
+    /**
+     * *
+     * TPC-C NURand(A, x, y) non-uniform distribution per spec §2.1.6:
+     *   ((rand(0,A) | rand(x,y)) + C) % (y - x + 1) + x
+     * where `|` is bitwise OR and `C` is a per-generator constant derived
+     * from the seed. The `A` parameter is carried via the `screw` field
+     * (typical TPC-C values: 255 for C_LAST, 1023 for C_ID, 8191 for OL_I_ID).
+     * Integers only — `round` must be true.
+     *
+     * @generated from protobuf enum value: NURAND = 3;
+     */
+    NURAND = 3
+}
+/**
+ * *
+ * WeightedChoice picks one of N sub-rules with given weights per Next() call.
+ * Useful for mixing categorical values (e.g., TPC-C C_CREDIT = 10% "BC" /
+ * 90% "GC") without coupling two independent generators at the call site.
+ *
+ * Weights are relative; they don't have to sum to 1.0 or 100. An item with
+ * weight 0 is unreachable. At least one item is required.
+ *
+ * @generated from protobuf message stroppy.Generation.WeightedChoice
+ */
+export interface Generation_WeightedChoice {
+    /**
+     * * Candidate sub-rules with their weights. At least one required.
+     *
+     * @generated from protobuf field: repeated stroppy.Generation.WeightedChoice.Item items = 1
+     */
+    items: Generation_WeightedChoice_Item[];
+}
+/**
+ * @generated from protobuf message stroppy.Generation.WeightedChoice.Item
+ */
+export interface Generation_WeightedChoice_Item {
+    /**
+     * * Sub-rule to dispatch to when this item is chosen.
+     *
+     * @generated from protobuf field: stroppy.Generation.Rule rule = 1
+     */
+    rule?: Generation_Rule;
+    /**
+     * * Relative weight; must be > 0 to be reachable.
+     *
+     * @generated from protobuf field: double weight = 2
+     */
+    weight: number;
 }
 /**
  * *
@@ -6534,6 +6582,16 @@ export interface Generation_Rule {
          * @generated from protobuf field: stroppy.Generation.Range.UuidSeq uuid_seq = 24
          */
         uuidSeq: Generation_Range_UuidSeq;
+    } | {
+        oneofKind: "weightedChoice";
+        // Meta
+
+        /**
+         * * Weighted choice over N sub-rules (e.g., GC/BC string mix).
+         *
+         * @generated from protobuf field: stroppy.Generation.WeightedChoice weighted_choice = 25
+         */
+        weightedChoice: Generation_WeightedChoice;
     } | {
         oneofKind: undefined;
     };
@@ -7200,6 +7258,107 @@ class Generation_Distribution$Type extends MessageType<Generation_Distribution> 
  * @generated MessageType for protobuf message stroppy.Generation.Distribution
  */
 export const Generation_Distribution = new Generation_Distribution$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class Generation_WeightedChoice$Type extends MessageType<Generation_WeightedChoice> {
+    constructor() {
+        super("stroppy.Generation.WeightedChoice", [
+            { no: 1, name: "items", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Generation_WeightedChoice_Item }
+        ]);
+    }
+    create(value?: PartialMessage<Generation_WeightedChoice>): Generation_WeightedChoice {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.items = [];
+        if (value !== undefined)
+            reflectionMergePartial<Generation_WeightedChoice>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_WeightedChoice): Generation_WeightedChoice {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* repeated stroppy.Generation.WeightedChoice.Item items */ 1:
+                    message.items.push(Generation_WeightedChoice_Item.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: Generation_WeightedChoice, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* repeated stroppy.Generation.WeightedChoice.Item items = 1; */
+        for (let i = 0; i < message.items.length; i++)
+            Generation_WeightedChoice_Item.internalBinaryWrite(message.items[i], writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.Generation.WeightedChoice
+ */
+export const Generation_WeightedChoice = new Generation_WeightedChoice$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class Generation_WeightedChoice_Item$Type extends MessageType<Generation_WeightedChoice_Item> {
+    constructor() {
+        super("stroppy.Generation.WeightedChoice.Item", [
+            { no: 1, name: "rule", kind: "message", T: () => Generation_Rule },
+            { no: 2, name: "weight", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ }
+        ]);
+    }
+    create(value?: PartialMessage<Generation_WeightedChoice_Item>): Generation_WeightedChoice_Item {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.weight = 0;
+        if (value !== undefined)
+            reflectionMergePartial<Generation_WeightedChoice_Item>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Generation_WeightedChoice_Item): Generation_WeightedChoice_Item {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* stroppy.Generation.Rule rule */ 1:
+                    message.rule = Generation_Rule.internalBinaryRead(reader, reader.uint32(), options, message.rule);
+                    break;
+                case /* double weight */ 2:
+                    message.weight = reader.double();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: Generation_WeightedChoice_Item, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* stroppy.Generation.Rule rule = 1; */
+        if (message.rule)
+            Generation_Rule.internalBinaryWrite(message.rule, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* double weight = 2; */
+        if (message.weight !== 0)
+            writer.tag(2, WireType.Bit64).double(message.weight);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.Generation.WeightedChoice.Item
+ */
+export const Generation_WeightedChoice_Item = new Generation_WeightedChoice_Item$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class Generation_Range$Type extends MessageType<Generation_Range> {
     constructor() {
@@ -8054,6 +8213,7 @@ class Generation_Rule$Type extends MessageType<Generation_Rule> {
             { no: 22, name: "uuid_const", kind: "message", oneof: "kind", T: () => Uuid },
             { no: 23, name: "uuid_seeded", kind: "scalar", oneof: "kind", T: 8 /*ScalarType.BOOL*/ },
             { no: 24, name: "uuid_seq", kind: "message", oneof: "kind", T: () => Generation_Range_UuidSeq },
+            { no: 25, name: "weighted_choice", kind: "message", oneof: "kind", T: () => Generation_WeightedChoice },
             { no: 30, name: "distribution", kind: "message", T: () => Generation_Distribution },
             { no: 31, name: "null_percentage", kind: "scalar", opt: true, T: 13 /*ScalarType.UINT32*/ },
             { no: 32, name: "unique", kind: "scalar", opt: true, T: 8 /*ScalarType.BOOL*/ }
@@ -8215,6 +8375,12 @@ class Generation_Rule$Type extends MessageType<Generation_Rule> {
                         uuidSeq: Generation_Range_UuidSeq.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).uuidSeq)
                     };
                     break;
+                case /* stroppy.Generation.WeightedChoice weighted_choice */ 25:
+                    message.kind = {
+                        oneofKind: "weightedChoice",
+                        weightedChoice: Generation_WeightedChoice.internalBinaryRead(reader, reader.uint32(), options, (message.kind as any).weightedChoice)
+                    };
+                    break;
                 case /* optional stroppy.Generation.Distribution distribution */ 30:
                     message.distribution = Generation_Distribution.internalBinaryRead(reader, reader.uint32(), options, message.distribution);
                     break;
@@ -8308,6 +8474,9 @@ class Generation_Rule$Type extends MessageType<Generation_Rule> {
         /* stroppy.Generation.Range.UuidSeq uuid_seq = 24; */
         if (message.kind.oneofKind === "uuidSeq")
             Generation_Range_UuidSeq.internalBinaryWrite(message.kind.uuidSeq, writer.tag(24, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.Generation.WeightedChoice weighted_choice = 25; */
+        if (message.kind.oneofKind === "weightedChoice")
+            Generation_WeightedChoice.internalBinaryWrite(message.kind.weightedChoice, writer.tag(25, WireType.LengthDelimited).fork(), options).join();
         /* optional stroppy.Generation.Distribution distribution = 30; */
         if (message.distribution)
             Generation_Distribution.internalBinaryWrite(message.distribution, writer.tag(30, WireType.LengthDelimited).fork(), options).join();

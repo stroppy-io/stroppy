@@ -1,7 +1,18 @@
 import { Options } from "k6/options";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { AB, C, R, Step, DriverX, S, ENV, TxIsolationName, declareDriverSetup } from "./helpers.ts";
+import { Counter, AB, C, R, Step, DriverX, S, ENV, Dist, TxIsolationName, declareDriverSetup } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
+
+// Post-run compliance counters for TPC-C auditing. See TPCC_COMPILANCE_REPORT.md
+// §1.11 — these expose the observed rates of spec-mandated percentages so an
+// operator can verify compliance without instrumenting the DB side.
+const tpccNewOrderTotal   = new Counter("tpcc_new_order_total");
+const tpccRollbackDecided = new Counter("tpcc_rollback_decided");
+const tpccRollbackDone    = new Counter("tpcc_rollback_done");
+const tpccRemoteLineTotal = new Counter("tpcc_remote_line_total");
+const tpccRemoteLineRem   = new Counter("tpcc_remote_line_remote");
+const tpccPaymentTotal    = new Counter("tpcc_payment_total");
+const tpccPaymentRemote   = new Counter("tpcc_payment_remote");
 
 // TPC-C Configuration Constants
 const POOL_SIZE   = ENV("POOL_SIZE", 100, "Connection pool size");
@@ -63,6 +74,23 @@ declare const __VU: number;
 const _vu = (typeof __VU === "number" && __VU > 0) ? __VU : 1;
 let hid_counter = _vu * 10_000_000;
 const nextHid = (): number => ++hid_counter;
+
+// Spec §5.2.2 / Clause 4.2: each VU ("terminal") is bound to a single home
+// warehouse for the run. This is what drives the 1%/15% remote-access
+// minimums in new_order/payment. Scaling beyond WAREHOUSES VUs wraps.
+const HOME_W_ID = 1 + ((_vu - 1) % WAREHOUSES);
+
+// Pick a uniformly-random OTHER warehouse in [1, WAREHOUSES] \ {HOME_W_ID}.
+// Callers must guard with WAREHOUSES > 1; with a single warehouse there is
+// no valid remote target and the caller must fall back to HOME_W_ID.
+const _remoteWhGen = WAREHOUSES > 1
+  ? R.int32(1, WAREHOUSES - 1).gen()
+  : null;
+function pickRemoteWh(): number {
+  if (_remoteWhGen === null) return HOME_W_ID;
+  const alt = _remoteWhGen.next() as number;
+  return alt >= HOME_W_ID ? alt + 1 : alt;
+}
 
 export function setup() {
   Step("drop_schema", () => {
@@ -130,7 +158,11 @@ export function setup() {
         c_zip: R.str(9, AB.num),
         c_phone: R.str(16, AB.num),
         c_since: C.datetime(new Date()),
-        c_credit: C.str("GC"),
+        // Spec §4.3.3.1: 10% of customers are "BC" (bad credit), 90% "GC".
+        c_credit: R.weighted([
+          { rule: C.str("GC"), weight: 90 },
+          { rule: C.str("BC"), weight: 10 },
+        ]),
         c_credit_lim: C.float(50000),
         c_discount: R.float(0, 0.5),
         c_balance: C.float(-10),
@@ -180,24 +212,79 @@ export function setup() {
 
 // =====================================================================
 // NEW_ORDER (45% of mix)
-// Spec §2.4: read d_next_o_id → use as o_id → increment district →
-//            per line: read item price & stock, compute new stock,
-//            update stock, insert order_line.
+// Spec §2.4:
+//   - §2.4.1.1: w_id is the terminal's fixed home warehouse (HOME_W_ID).
+//   - §2.4.1.4: 99% of lines are local (supply_w_id = w_id); 1% are remote.
+//   - §2.4.1.5: c_id ~ NURand(1023, 1, 3000); ol_i_id ~ NURand(8191, 1, 100000).
+//   - §2.4.2.3: 1% of transactions end in rollback via a bogus last-line i_id.
+//   - §2.4.2.2: read customer/warehouse/district → increment d_next_o_id →
+//               for each line: get item, get stock, update stock, insert OL.
 // =====================================================================
-const newordWIdGen      = R.int32(1, WAREHOUSES).gen();
 const newordDIdGen      = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const newordCIdGen      = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const newordCIdGen      = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023)).gen();
 const newordOOlCntGen   = R.int32(5, 15).gen();
-const newordItemIdGen   = R.int32(1, ITEMS).gen();
+const newordItemIdGen   = R.int32(1, ITEMS, Dist.nurand(8191)).gen();
 const newordQuantityGen = R.int32(1, 10).gen();
+// Use int32(1, 100) + threshold compare rather than bool(0.01) so that the
+// seeded stream is deterministic and matches what the report compliance
+// checker expects (1% rollback, 1% remote).
+const newordRemoteLineGen = R.int32(1, 100).gen();  // <=1 ⇒ remote supply warehouse
+const newordRollbackGen   = R.int32(1, 100).gen();  // <=1 ⇒ force rollback via bogus i_id
 
 function new_order() {
-  const w_id   = newordWIdGen.next();
-  const d_id   = newordDIdGen.next();
-  const c_id   = newordCIdGen.next();
-  const ol_cnt = newordOOlCntGen.next();
+  tpccNewOrderTotal.add(1);
 
-  driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
+  const w_id   = HOME_W_ID;
+  const d_id   = newordDIdGen.next() as number;
+  const c_id   = newordCIdGen.next() as number;
+  const ol_cnt = newordOOlCntGen.next() as number;
+
+  // Pre-materialise per-line item ids, quantities, and supply warehouses so
+  // all_local is known before we insert the order header. Spec §2.4.1.5:
+  // each ol_i_id is drawn independently via NURand; §2.4.1.4: each line has
+  // an independent 1% chance of being remote.
+  const line_i_id:     number[] = new Array(ol_cnt);
+  const line_qty:      number[] = new Array(ol_cnt);
+  const line_supply:   number[] = new Array(ol_cnt);
+  let   all_local = 1;
+  let   remote_line_cnt = 0;
+
+  for (let i = 0; i < ol_cnt; i++) {
+    line_i_id[i] = newordItemIdGen.next() as number;
+    line_qty[i]  = newordQuantityGen.next() as number;
+    tpccRemoteLineTotal.add(1);
+    const is_remote = WAREHOUSES > 1 && (newordRemoteLineGen.next() as number) <= 1;
+    if (is_remote) {
+      tpccRemoteLineRem.add(1);
+      line_supply[i] = pickRemoteWh();
+      all_local = 0;
+      remote_line_cnt++;
+    } else {
+      line_supply[i] = w_id;
+    }
+  }
+
+  // Spec §2.4.2.3: 1% of new_order transactions should be rolled back by
+  // submitting an unknown item id on the LAST line. We signal via a sentinel
+  // value (ITEMS + 1) and detect it inside the loop to throw a rollback
+  // sentinel error. We use driver.begin()/commit()/rollback() directly so the
+  // forced-rollback path doesn't inflate tx_error_rate — the user-driven
+  // rollback is spec-mandated "success" behaviour.
+  //
+  // Isolation "none" (picodata) short-circuits Begin/Commit/Rollback to
+  // no-ops, so throwing mid-loop would leave partial inserts behind. Drain
+  // the decision generator to keep its stream aligned across drivers, but
+  // skip the actual sentinel in NONE mode — the tx would have committed
+  // anyway and the compliance numbers are reported via tpcc_rollback_*.
+  const rollback_roll = (newordRollbackGen.next() as number) <= 1;
+  const force_rollback = rollback_roll && TX_ISOLATION !== "none";
+  if (force_rollback) {
+    tpccRollbackDecided.add(1);
+    line_i_id[ol_cnt - 1] = ITEMS + 1;
+  }
+
+  const tx = driver.begin({ isolation: TX_ISOLATION });
+  try {
     // Read customer discount / credit and warehouse tax (real round-trip).
     tx.queryRow(sql("workload_tx_new_order", "get_customer")!, { c_id, d_id, w_id });
     tx.queryRow(sql("workload_tx_new_order", "get_warehouse")!, { w_id });
@@ -211,21 +298,22 @@ function new_order() {
     tx.exec(sql("workload_tx_new_order", "update_district")!, { d_id, w_id });
 
     tx.exec(sql("workload_tx_new_order", "insert_order")!, {
-      o_id, d_id, w_id, c_id, ol_cnt, all_local: 1,
+      o_id, d_id, w_id, c_id, ol_cnt, all_local,
     });
     tx.exec(sql("workload_tx_new_order", "insert_new_order")!, { o_id, d_id, w_id });
 
     for (let ol_number = 1; ol_number <= ol_cnt; ol_number++) {
-      const i_id        = newordItemIdGen.next();
-      const ol_quantity = newordQuantityGen.next();
+      const i_id        = line_i_id[ol_number - 1];
+      const ol_quantity = line_qty[ol_number - 1];
+      const supply_w_id = line_supply[ol_number - 1];
 
       // Spec §2.4.2.2: read item price/name.
       const itemRow = tx.queryRow(sql("workload_tx_new_order", "get_item")!, { i_id });
       if (!itemRow) {
-        // Spec §2.4.2.3: 1% of new_order tx trigger a rollback via unknown i_id.
-        // Seeded item ids are 1..ITEMS so this is unreachable on a clean load;
-        // treat it as a best-effort skip to tolerate concurrent deletes.
-        continue;
+        // Spec §2.4.2.3 forced rollback: abandon the transaction on a bogus
+        // i_id. This is the documented rollback trigger, not an error.
+        tpccRollbackDone.add(1);
+        throw new Error("tpcc_rollback:item_not_found");
       }
       const i_price = Number(itemRow[0]);
 
@@ -233,7 +321,10 @@ function new_order() {
       // get_stock columns: [0]=s_quantity, [1]=s_data, [2..11]=s_dist_01..s_dist_10.
       // The spec requires s_dist_NN where NN matches the order's d_id, so index
       // into the row at (d_id + 1): d_id=1 → col 2 (s_dist_01), d_id=10 → col 11.
-      const stockRow = tx.queryRow(sql("workload_tx_new_order", "get_stock")!, { i_id, w_id });
+      // w_id in the query MUST be supply_w_id (§2.4.2.2) — stock is per-warehouse.
+      const stockRow = tx.queryRow(sql("workload_tx_new_order", "get_stock")!, {
+        i_id, w_id: supply_w_id,
+      });
       if (!stockRow) continue;
       const s_quantity_old = Number(stockRow[0]);
       const dist_info      = String(stockRow[d_id + 1] ?? "");
@@ -242,40 +333,69 @@ function new_order() {
           ? s_quantity_old - ol_quantity
           : s_quantity_old - ol_quantity + 91;
 
+      // Spec §2.4.2.2: s_remote_cnt is incremented iff supply_w_id != w_id.
+      const remote_cnt = supply_w_id !== w_id ? 1 : 0;
+
       tx.exec(sql("workload_tx_new_order", "update_stock")!, {
-        quantity: new_quantity, ol_quantity, remote_cnt: 0, i_id, w_id,
+        quantity: new_quantity, ol_quantity, remote_cnt, i_id, w_id: supply_w_id,
       });
 
       const amount = Math.round(ol_quantity * i_price * 100) / 100;
 
       tx.exec(sql("workload_tx_new_order", "insert_order_line")!, {
-        o_id, d_id, w_id, ol_number, i_id, supply_w_id: w_id,
+        o_id, d_id, w_id, ol_number, i_id, supply_w_id,
         quantity: ol_quantity, amount, dist_info,
       });
     }
-  });
+
+    tx.commit();
+  } catch (e) {
+    tx.rollback();
+    // Swallow the spec-mandated rollback sentinel; re-throw real errors so
+    // k6 reports them as tx_error_rate.
+    const msg = (e as Error)?.message ?? String(e);
+    if (!msg.startsWith("tpcc_rollback:")) throw e;
+  }
+  // Reference remote_line_cnt to satisfy noUnusedLocals; useful for future
+  // post-run audit of §2.4.1.4 compliance.
+  void remote_line_cnt;
 }
 
 // =====================================================================
 // PAYMENT (43% of mix)
+// Spec §2.5:
+//   - §2.5.1.1: w_id is the terminal's fixed home warehouse (HOME_W_ID).
+//   - §2.5.1.2: 85% home customer, 15% remote. For remote, c_w_id is
+//               picked uniformly from the OTHER warehouses; c_d_id is
+//               picked uniformly in [1, 10] (independent of d_id).
+//   - §2.5.1.2: c_id ~ NURand(1023, 1, 3000). (By-name lookup is §1.6,
+//               Tier B — deferred.)
 // =====================================================================
-const paymentWIdGen     = R.int32(1, WAREHOUSES).gen();
 const paymentDIdGen     = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const paymentCWIdGen    = R.int32(1, WAREHOUSES).gen();
 const paymentCDIdGen    = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const paymentCIdGen     = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const paymentCIdGen     = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023)).gen();
 const paymentHAmountGen = R.double(1, 5000).gen();
 const paymentHDataGen   = R.str(12, 24, AB.enSpc).gen();
+// 15% remote. <=15 on a uniform [1,100] gives 15% exactly.
+const paymentRemoteGen  = R.int32(1, 100).gen();
 
 function payment() {
-  const w_id   = paymentWIdGen.next();
-  const d_id   = paymentDIdGen.next();
-  const c_w_id = paymentCWIdGen.next();
-  const c_d_id = paymentCDIdGen.next();
-  const c_id   = paymentCIdGen.next();
+  tpccPaymentTotal.add(1);
+
+  const w_id   = HOME_W_ID;
+  const d_id   = paymentDIdGen.next() as number;
+  const c_id   = paymentCIdGen.next() as number;
   const amount = paymentHAmountGen.next();
   const h_data = paymentHDataGen.next();
   const h_id   = nextHid();
+
+  // Spec §2.5.1.2: 85% home (c_w_id = w_id, c_d_id = d_id), 15% remote
+  // (c_w_id ≠ w_id, c_d_id uniform over [1,10]). With a single warehouse
+  // the remote clause degenerates to home.
+  const is_remote = WAREHOUSES > 1 && (paymentRemoteGen.next() as number) <= 15;
+  if (is_remote) tpccPaymentRemote.add(1);
+  const c_w_id = is_remote ? pickRemoteWh() : w_id;
+  const c_d_id = is_remote ? (paymentCDIdGen.next() as number) : d_id;
 
   driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
     tx.exec(sql("workload_tx_payment", "update_warehouse")!, { w_id, amount });
@@ -314,15 +434,17 @@ function payment() {
 // Spec §2.6: read customer → read their last order → read that order's lines.
 // The o_id for get_order_lines must come from the last-order SELECT, not
 // from a random counter.
+//   - §2.6.1.1: w_id is the terminal's fixed home warehouse.
+//   - §2.6.1.2: c_id ~ NURand(1023, 1, 3000). (By-name lookup is §1.6,
+//               Tier B — deferred.)
 // =====================================================================
-const ostatWIdGen = R.int32(1, WAREHOUSES).gen();
 const ostatDIdGen = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const ostatCIdGen = R.int32(1, CUSTOMERS_PER_DISTRICT).gen();
+const ostatCIdGen = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023)).gen();
 
 function order_status() {
-  const w_id = ostatWIdGen.next();
-  const d_id = ostatDIdGen.next();
-  const c_id = ostatCIdGen.next();
+  const w_id = HOME_W_ID;
+  const d_id = ostatDIdGen.next() as number;
+  const c_id = ostatCIdGen.next() as number;
 
   driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
     const custRow = tx.queryRow(
@@ -348,12 +470,12 @@ function order_status() {
 // row → read orders.o_c_id for the order → update carrier → update
 // ol_delivery_d → sum ol_amount → update customer balance by that sum.
 // Every ID and amount used below comes from a real SELECT inside the tx.
+//   - §2.7.1.1: w_id is the terminal's fixed home warehouse.
 // =====================================================================
-const deliveryWIdGen        = R.int32(1, WAREHOUSES).gen();
 const deliveryOCarrierIdGen = R.int32(1, 10).gen();
 
 function delivery() {
-  const w_id       = deliveryWIdGen.next();
+  const w_id       = HOME_W_ID;
   const carrier_id = deliveryOCarrierIdGen.next();
 
   driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
@@ -395,13 +517,16 @@ function delivery() {
 // in the last 20 orders of that district whose stock is below threshold.
 // The scan window's upper bound comes from the district SELECT, not a
 // random number.
+//   - §2.8.1.1: w_id is the terminal's fixed home warehouse; d_id is
+//               uniform over the 10 districts. (The spec actually pins
+//               d_id per terminal too, but uniform is closer to the
+//               populated-clients case.)
 // =====================================================================
-const slevWIdGen       = R.int32(1, WAREHOUSES).gen();
 const slevDIdGen       = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
 const slevThresholdGen = R.int32(10, 20).gen();
 
 function stock_level() {
-  const w_id      = slevWIdGen.next();
+  const w_id      = HOME_W_ID;
   const d_id      = slevDIdGen.next();
   const threshold = slevThresholdGen.next();
 

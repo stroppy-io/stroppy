@@ -134,13 +134,44 @@ message Generation {
       UNIFORM = 1;
       /** Zipfian distribution */
       ZIPF = 2;
+      /**
+       * TPC-C NURand(A, x, y) non-uniform distribution per spec §2.1.6:
+       *   ((rand(0,A) | rand(x,y)) + C) % (y - x + 1) + x
+       * where `|` is bitwise OR and `C` is a per-generator constant derived
+       * from the seed. The `A` parameter is carried via the `screw` field
+       * (typical TPC-C values: 255 for C_LAST, 1023 for C_ID, 8191 for OL_I_ID).
+       * Integers only — `round` must be true.
+       */
+      NURAND = 3;
     }
 
     /** Type of distribution to use */
     DistributionType type = 1 [ (validate.rules).enum.defined_only = true ];
     /** Distribution parameter (e.g., standard deviation for normal
-     * distribution) */
+     * distribution, `A` for NURAND) */
     double screw = 2 [ (validate.rules).double.gte = 0 ];
+  }
+
+  /**
+   * WeightedChoice picks one of N sub-rules with given weights per Next() call.
+   * Useful for mixing categorical values (e.g., TPC-C C_CREDIT = 10% "BC" /
+   * 90% "GC") without coupling two independent generators at the call site.
+   *
+   * Weights are relative; they don't have to sum to 1.0 or 100. An item with
+   * weight 0 is unreachable. At least one item is required.
+   */
+  message WeightedChoice {
+    message Item {
+      /** Sub-rule to dispatch to when this item is chosen. */
+      Rule rule = 1 [ (validate.rules).message.required = true ];
+      /** Relative weight; must be > 0 to be reachable. */
+      double weight = 2 [ (validate.rules).double.gte = 0 ];
+    }
+    /** Candidate sub-rules with their weights. At least one required. */
+    repeated Item items = 1 [ (validate.rules).repeated = {
+      min_items : 1,
+      items : {message : {required : true}}
+    } ];
   }
 
   /**
@@ -333,6 +364,10 @@ message Generation {
       bool uuid_seeded = 23;
       /** Sequential UUIDs from min to max (00000...1 → 00000...N). */
       Range.UuidSeq uuid_seq = 24;
+
+      // Meta
+      /** Weighted choice over N sub-rules (e.g., GC/BC string mix). */
+      WeightedChoice weighted_choice = 25;
     }
 
     /** Shape of randomness; Normal by default; Only for numbers */

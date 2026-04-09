@@ -33,6 +33,8 @@
     - [Generation.Range.UInt64](#stroppy-Generation-Range-UInt64)
     - [Generation.Range.UuidSeq](#stroppy-Generation-Range-UuidSeq)
     - [Generation.Rule](#stroppy-Generation-Rule)
+    - [Generation.WeightedChoice](#stroppy-Generation-WeightedChoice)
+    - [Generation.WeightedChoice.Item](#stroppy-Generation-WeightedChoice-Item)
     - [OtlpExport](#stroppy-OtlpExport)
     - [Uuid](#stroppy-Uuid)
     - [Value](#stroppy-Value)
@@ -233,7 +235,7 @@ Distribution defines the statistical distribution for value generation.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | type | [Generation.Distribution.DistributionType](#stroppy-Generation-Distribution-DistributionType) |  | Type of distribution to use |
-| screw | [double](#double) |  | Distribution parameter (e.g., standard deviation for normal distribution) |
+| screw | [double](#double) |  | Distribution parameter (e.g., standard deviation for normal distribution, `A` for NURAND) |
 
 
 
@@ -508,9 +510,46 @@ Rule defines generation rules for a specific data type.
 | uuid_const | [Uuid](#stroppy-Uuid) |  | Fixed UUID value. |
 | uuid_seeded | [bool](#bool) |  | Random UUID value (v4) reproducible by seed. |
 | uuid_seq | [Generation.Range.UuidSeq](#stroppy-Generation-Range-UuidSeq) |  | Sequential UUIDs from min to max (00000...1 → 00000...N). |
+| weighted_choice | [Generation.WeightedChoice](#stroppy-Generation-WeightedChoice) |  | Weighted choice over N sub-rules (e.g., GC/BC string mix). |
 | distribution | [Generation.Distribution](#stroppy-Generation-Distribution) | optional | Shape of randomness; Normal by default; Only for numbers |
 | null_percentage | [uint32](#uint32) | optional | Percentage of nulls to inject [0..100]; 0 by default |
 | unique | [bool](#bool) | optional | Enforce uniqueness across generated values; Linear sequence for ranges |
+
+
+
+
+
+
+<a name="stroppy-Generation-WeightedChoice"></a>
+
+### Generation.WeightedChoice
+WeightedChoice picks one of N sub-rules with given weights per Next() call.
+Useful for mixing categorical values (e.g., TPC-C C_CREDIT = 10% &#34;BC&#34; /
+90% &#34;GC&#34;) without coupling two independent generators at the call site.
+
+Weights are relative; they don&#39;t have to sum to 1.0 or 100. An item with
+weight 0 is unreachable. At least one item is required.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| items | [Generation.WeightedChoice.Item](#stroppy-Generation-WeightedChoice-Item) | repeated | Candidate sub-rules with their weights. At least one required. |
+
+
+
+
+
+
+<a name="stroppy-Generation-WeightedChoice-Item"></a>
+
+### Generation.WeightedChoice.Item
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| rule | [Generation.Rule](#stroppy-Generation-Rule) |  | Sub-rule to dispatch to when this item is chosen. |
+| weight | [double](#double) |  | Relative weight; must be &gt; 0 to be reachable. |
 
 
 
@@ -627,6 +666,7 @@ way.
 | NORMAL | 0 | Normal (Gaussian) distribution |
 | UNIFORM | 1 | Uniform distribution |
 | ZIPF | 2 | Zipfian distribution |
+| NURAND | 3 | TPC-C NURand(A, x, y) non-uniform distribution per spec §2.1.6: ((rand(0,A) | rand(x,y)) &#43; C) % (y - x &#43; 1) &#43; x where `|` is bitwise OR and `C` is a per-generator constant derived from the seed. The `A` parameter is carried via the `screw` field (typical TPC-C values: 255 for C_LAST, 1023 for C_ID, 8191 for OL_I_ID). Integers only — `round` must be true. |
 
 
 

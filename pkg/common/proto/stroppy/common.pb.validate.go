@@ -1581,6 +1581,164 @@ var _ interface {
 	ErrorName() string
 } = Generation_DistributionValidationError{}
 
+// Validate checks the field values on Generation_WeightedChoice with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *Generation_WeightedChoice) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Generation_WeightedChoice with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// Generation_WeightedChoiceMultiError, or nil if none found.
+func (m *Generation_WeightedChoice) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Generation_WeightedChoice) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetItems()) < 1 {
+		err := Generation_WeightedChoiceValidationError{
+			field:  "Items",
+			reason: "value must contain at least 1 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetItems() {
+		_, _ = idx, item
+
+		if item == nil {
+			err := Generation_WeightedChoiceValidationError{
+				field:  fmt.Sprintf("Items[%v]", idx),
+				reason: "value is required",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, Generation_WeightedChoiceValidationError{
+						field:  fmt.Sprintf("Items[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, Generation_WeightedChoiceValidationError{
+						field:  fmt.Sprintf("Items[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return Generation_WeightedChoiceValidationError{
+					field:  fmt.Sprintf("Items[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return Generation_WeightedChoiceMultiError(errors)
+	}
+
+	return nil
+}
+
+// Generation_WeightedChoiceMultiError is an error wrapping multiple validation
+// errors returned by Generation_WeightedChoice.ValidateAll() if the
+// designated constraints aren't met.
+type Generation_WeightedChoiceMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m Generation_WeightedChoiceMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m Generation_WeightedChoiceMultiError) AllErrors() []error { return m }
+
+// Generation_WeightedChoiceValidationError is the validation error returned by
+// Generation_WeightedChoice.Validate if the designated constraints aren't met.
+type Generation_WeightedChoiceValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e Generation_WeightedChoiceValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e Generation_WeightedChoiceValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e Generation_WeightedChoiceValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e Generation_WeightedChoiceValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e Generation_WeightedChoiceValidationError) ErrorName() string {
+	return "Generation_WeightedChoiceValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e Generation_WeightedChoiceValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGeneration_WeightedChoice.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = Generation_WeightedChoiceValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = Generation_WeightedChoiceValidationError{}
+
 // Validate checks the field values on Generation_Range with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
@@ -2423,6 +2581,48 @@ func (m *Generation_Rule) validate(all bool) error {
 			}
 		}
 
+	case *Generation_Rule_WeightedChoice:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+
+		if all {
+			switch v := interface{}(m.GetWeightedChoice()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "WeightedChoice",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "WeightedChoice",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetWeightedChoice()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return Generation_RuleValidationError{
+					field:  "WeightedChoice",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -2566,6 +2766,160 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = Generation_RuleValidationError{}
+
+// Validate checks the field values on Generation_WeightedChoice_Item with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *Generation_WeightedChoice_Item) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Generation_WeightedChoice_Item with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// Generation_WeightedChoice_ItemMultiError, or nil if none found.
+func (m *Generation_WeightedChoice_Item) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Generation_WeightedChoice_Item) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetRule() == nil {
+		err := Generation_WeightedChoice_ItemValidationError{
+			field:  "Rule",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetRule()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, Generation_WeightedChoice_ItemValidationError{
+					field:  "Rule",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, Generation_WeightedChoice_ItemValidationError{
+					field:  "Rule",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRule()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return Generation_WeightedChoice_ItemValidationError{
+				field:  "Rule",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetWeight() < 0 {
+		err := Generation_WeightedChoice_ItemValidationError{
+			field:  "Weight",
+			reason: "value must be greater than or equal to 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return Generation_WeightedChoice_ItemMultiError(errors)
+	}
+
+	return nil
+}
+
+// Generation_WeightedChoice_ItemMultiError is an error wrapping multiple
+// validation errors returned by Generation_WeightedChoice_Item.ValidateAll()
+// if the designated constraints aren't met.
+type Generation_WeightedChoice_ItemMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m Generation_WeightedChoice_ItemMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m Generation_WeightedChoice_ItemMultiError) AllErrors() []error { return m }
+
+// Generation_WeightedChoice_ItemValidationError is the validation error
+// returned by Generation_WeightedChoice_Item.Validate if the designated
+// constraints aren't met.
+type Generation_WeightedChoice_ItemValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e Generation_WeightedChoice_ItemValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e Generation_WeightedChoice_ItemValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e Generation_WeightedChoice_ItemValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e Generation_WeightedChoice_ItemValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e Generation_WeightedChoice_ItemValidationError) ErrorName() string {
+	return "Generation_WeightedChoice_ItemValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e Generation_WeightedChoice_ItemValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGeneration_WeightedChoice_Item.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = Generation_WeightedChoice_ItemValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = Generation_WeightedChoice_ItemValidationError{}
 
 // Validate checks the field values on Generation_Range_Bool with the rules
 // defined in the proto definition for this message. If any rules are

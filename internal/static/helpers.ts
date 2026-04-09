@@ -1,4 +1,5 @@
 import { Counter, Rate, Trend } from "k6/metrics";
+export { Counter, Rate, Trend };
 import { test } from "k6/execution"
 import encoding from "k6/x/encoding";
 globalThis.TextEncoder = encoding.TextEncoder;
@@ -657,12 +658,21 @@ function rule(r: Generation_Rule): Rule {
 export type Distribution =
   | { kind: "normal"; screw?: number }
   | { kind: "uniform" }
-  | { kind: "zipf"; screw: number };
+  | { kind: "zipf"; screw: number }
+  | { kind: "nurand"; a: number };
 
 export const Dist = {
   normal: (screw = 0): Distribution => ({ kind: "normal", screw }),
   uniform: (): Distribution => ({ kind: "uniform" }),
   zipf: (screw: number): Distribution => ({ kind: "zipf", screw }),
+  /**
+   * TPC-C NURand(A, x, y) non-uniform distribution per spec §2.1.6:
+   *   ((rand(0,A) | rand(x,y)) + C) % (y - x + 1) + x
+   * `C` is derived once from the seed per generator, so reproducibility with
+   * a fixed seed is preserved. Integers only — use with `R.int32`/`R.int64`.
+   * Typical A: 255 (C_LAST), 1023 (C_ID), 8191 (OL_I_ID).
+   */
+  nurand: (a: number): Distribution => ({ kind: "nurand", a }),
 };
 
 function dateToTimestamp(d: Date): Timestamp {
@@ -677,7 +687,28 @@ function toProtoDistribution(d: Distribution): Generation_Distribution {
       return { type: Generation_Distribution_DistributionType.UNIFORM, screw: 0 };
     case "zipf":
       return { type: Generation_Distribution_DistributionType.ZIPF, screw: d.screw };
+    case "nurand":
+      // NURand carries `A` in the `screw` field; the Go side decodes it.
+      return { type: Generation_Distribution_DistributionType.NURAND, screw: d.a };
+    default: {
+      const _exhaustive: never = d;
+      throw new Error(`unknown distribution kind: ${String(_exhaustive)}`);
+    }
   }
+}
+
+// Explicit UNIFORM default. If the `distribution` argument is omitted on a
+// range generator, we MUST serialise an explicit UNIFORM marker — otherwise
+// the proto falls back to enum value 0 which is NORMAL, and every
+// "random uniform" call would silently become a bell curve centred on
+// (min+max)/2. This bit the TPC-C rollback/remote percentages hard until
+// found; keep the default explicit.
+const DEFAULT_UNIFORM: Generation_Distribution = {
+  type: Generation_Distribution_DistributionType.UNIFORM,
+  screw: 0,
+};
+function distOrDefault(d?: Distribution): Generation_Distribution {
+  return d ? toProtoDistribution(d) : DEFAULT_UNIFORM;
 }
 
 // ============================================================================
@@ -782,6 +813,24 @@ interface RandomRangeGenerators {
   /** Random UUID v4, reproducible by seed. */
   uuidSeeded: () => Rule;
 
+  /**
+   * Weighted pick over N sub-rules. Each call to the resulting generator
+   * picks one item proportional to its weight and emits its value.
+   * Useful for categorical mixes like TPC-C C_CREDIT (10% "BC" / 90% "GC")
+   * or I_DATA (10% containing "ORIGINAL") without coupling two independent
+   * generators at the call site.
+   *
+   * Weights are relative — they don't have to sum to 1 or 100. Items with
+   * weight 0 are unreachable.
+   *
+   * @example
+   *   R.weighted([
+   *     { rule: C.str("GC"), weight: 90 },
+   *     { rule: C.str("BC"), weight: 10 },
+   *   ])
+   */
+  weighted: (items: Array<{ rule: Rule; weight: number }>) => Rule;
+
   // Helpers
   group: (params: Record<string, Generation_Rule>) => GroupRule;
   groups: (
@@ -855,42 +904,42 @@ export const R: RandomRangeGenerators = {
   int32(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "int32Range", int32Range: { min, max } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
   int64(min: string | number | bigint, max: string | number | bigint, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "int64Range", int64Range: { min: String(min), max: String(max) } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
   uint32(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "uint32Range", uint32Range: { min, max } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
   uint64(min: string | number | bigint, max: string | number | bigint, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "uint64Range", uint64Range: { min: String(min), max: String(max) } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
   float(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "floatRange", floatRange: { min, max } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
   double(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "doubleRange", doubleRange: { min, max } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
@@ -905,7 +954,7 @@ export const R: RandomRangeGenerators = {
             : { oneofKind: "double", double: { min: min as number, max: max as number } },
         },
       },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
@@ -923,7 +972,7 @@ export const R: RandomRangeGenerators = {
           },
         },
       },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
@@ -941,6 +990,23 @@ export const R: RandomRangeGenerators = {
 
   uuidSeeded(): Rule {
     return rule({ kind: { oneofKind: "uuidSeeded", uuidSeeded: true } });
+  },
+
+  weighted(items: Array<{ rule: Rule; weight: number }>): Rule {
+    if (items.length === 0) {
+      throw new Error("R.weighted: items must be non-empty");
+    }
+    return rule({
+      kind: {
+        oneofKind: "weightedChoice",
+        weightedChoice: {
+          items: items.map((it) => ({
+            rule: Generation_Rule.create(it.rule),
+            weight: it.weight,
+          })),
+        },
+      },
+    });
   },
 
   group: group_internal,
