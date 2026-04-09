@@ -111,19 +111,29 @@ func Test_rowsStubMethods(t *testing.T) {
 	stub := &driverStub{}
 	require.NoError(t, vm.Set("driver", stub))
 
+	// rowsStub pretends there is a single fake row (containing one zero) so
+	// probe-time workload bodies can execute past their null-row defensive
+	// checks. Next() therefore returns true once before becoming false, and
+	// ReadAll returns exactly that one row.
 	val, err := vm.RunString(`
 		const r = driver.runQuery("SELECT 1", {});
 		const rows = r.rows;
-		const nextResult = rows.next();
+		const nextOnce  = rows.next();
+		const nextAgain = rows.next();
 		rows.close();
-		const allRows = rows.readAll(0);
+		const all = driver.runQuery("SELECT 1", {}).rows.readAll(0);
 		JSON.stringify({
-			next: nextResult,
-			readAll: allRows,
+			nextOnce:  nextOnce,
+			nextAgain: nextAgain,
+			readAll:   all,
 		});
 	`)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"next":false,"readAll":[]}`, val.String())
+	require.JSONEq(
+		t,
+		`{"nextOnce":true,"nextAgain":false,"readAll":[[0]]}`,
+		val.String(),
+	)
 }
 
 // Test that driverStub.InsertValuesBin returns stats with elapsed field.

@@ -270,31 +270,75 @@ func (t *txStub) RunQuery(string, map[string]any) (*driver.QueryResult, error) {
 func (*txStub) Commit() error   { return nil }
 func (*txStub) Rollback() error { return nil }
 
-// rowsStub implements driver.Rows for the probe VM.
-type rowsStub struct{}
+// rowsStub implements driver.Rows for the probe VM. It pretends there is
+// exactly one row containing a single zero, so queryRow/queryValue never
+// return undefined and the workload body can execute past its null-row
+// defensive checks (e.g. `if (!distRow) throw ...`).
+type rowsStub struct {
+	consumed bool
+}
 
-func (*rowsStub) Columns() []string   { return []string{} }
-func (*rowsStub) Next() bool          { return false }
-func (*rowsStub) Values() []any       { return nil }
-func (*rowsStub) ReadAll(int) [][]any { return [][]any{} }
+func (*rowsStub) Columns() []string { return []string{} }
+func (r *rowsStub) Next() bool {
+	if r.consumed {
+		return false
+	}
+
+	r.consumed = true
+
+	return true
+}
+func (*rowsStub) Values() []any       { return []any{int64(0)} }
+func (*rowsStub) ReadAll(int) [][]any { return [][]any{{int64(0)}} }
 func (*rowsStub) Err() error          { return nil }
 func (*rowsStub) Close() error        { return nil }
 
 type genStub struct{}
 
-func (*genStub) Next() any { return nil }
+// Next returns a non-nil numeric value so TS loops like
+// `for (i=1; i<=ol_cnt; i++)` actually iterate at least once, giving the
+// probe a chance to register SQL queries that live inside those loops.
+func (*genStub) Next() any { return int64(1) }
 
 type groupGenStub struct{}
 
 func (*groupGenStub) Next() any { return []any{} }
 
-type pickerStub struct{}
+// pickerStub executes ALL supplied workload candidates (ignoring weights and
+// errors) so that every function's SQL sections get registered, not only the
+// first one. It then returns a JS no-op so the caller's `workload()` invocation
+// is a harmless second call.
+type pickerStub struct {
+	vm *js.Runtime
+}
 
-func (g *pickerStub) Pick(a []js.Value) (js.Value, error) { return a[0], nil }
+func (g *pickerStub) callAll(a []js.Value) {
+	for _, v := range a {
+		if fn, ok := js.AssertFunction(v); ok {
+			_, _ = fn(js.Undefined()) //nolint:errcheck // probe-side, swallow workload throws
+		}
+	}
+}
 
-func (g *pickerStub) PickWeighted(a []js.Value, _ []float64) (js.Value, error) { return a[0], nil }
+func (g *pickerStub) noop() js.Value {
+	return g.vm.ToValue(func() {})
+}
 
-func newPickerStub(seed uint64) *pickerStub { return &pickerStub{} }
+func (g *pickerStub) Pick(a []js.Value) (js.Value, error) {
+	g.callAll(a)
+
+	return g.noop(), nil
+}
+
+func (g *pickerStub) PickWeighted(a []js.Value, _ []float64) (js.Value, error) {
+	g.callAll(a)
+
+	return g.noop(), nil
+}
+
+func newPickerStubFactory(vm *js.Runtime) func(uint64) *pickerStub {
+	return func(uint64) *pickerStub { return &pickerStub{vm: vm} }
+}
 
 type Mocks []struct {
 	name  string
@@ -347,7 +391,7 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		{"NotifyStep", notifyStepSpy(&probeprint.Steps)},
 		// TODO: research. Some esbuild name resolution artifact, probably
 		{"NotifyStep2", notifyStepSpy(&probeprint.Steps)},
-		{"NewPicker", newPickerStub},
+		{"NewPicker", newPickerStubFactory(vm)},
 		{"DeclareEnv", declareEnvSpy(&probeprint.EnvDeclarations)},
 		{"DeclareDriverSetup", declareDriverSetupSpy(&probeprint.DriverSetups)},
 		{"Once", func(x any) any { return x }},
