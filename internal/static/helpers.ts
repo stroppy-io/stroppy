@@ -831,6 +831,50 @@ interface RandomRangeGenerators {
    */
   weighted: (items: Array<{ rule: Rule; weight: number }>) => Rule;
 
+  /**
+   * Pick a string from a fixed list of candidate values. Used for TPC-C
+   * C_LAST population (§4.3.2.3) where 1000 precomputed syllable strings
+   * need to be traversed deterministically.
+   *
+   * Two modes:
+   * - No `index` rule: an internal counter cycles through `values`,
+   *   producing values[0], values[1], ..., values[n-1], values[0], ...
+   *   on successive Next() calls. Useful for sequential traversal with
+   *   period = len(values).
+   * - With `index` rule: the sub-rule (must produce integers) drives
+   *   each pick; out-of-range indices are wrapped modulo len(values).
+   *   Useful for NURand or other non-uniform index distributions.
+   *
+   * @example
+   *   // Sequential cycling through C_LAST syllable dictionary:
+   *   R.dict(C_LAST_DICT)
+   *
+   *   // NURand-driven pick from the same dictionary:
+   *   R.dict(C_LAST_DICT, R.int32(0, 999, Dist.nurand(255)))
+   */
+  dict: (values: string[], index?: Rule) => Rule;
+
+  /**
+   * Generate a random string of length in [minLen, maxLen], injecting
+   * the given `literal` substring at a random position in `injectPct`%
+   * of rows. Used for TPC-C I_DATA / S_DATA population (§4.3.3.1), where
+   * 10% of the item/stock rows must contain the literal "ORIGINAL".
+   *
+   * Non-literal characters are drawn from `alphabet` (defaults to
+   * alphanumeric plus space). `minLen` is clamped up to `literal.length`
+   * when smaller to guarantee the literal fits.
+   *
+   * @example
+   *   R.strWithLiteral("ORIGINAL", 10, 26, 50, AB.enNumSpc)
+   */
+  strWithLiteral: (
+    literal: string,
+    injectPct: number,
+    minLen: number,
+    maxLen: number,
+    alphabet?: Alphabet,
+  ) => Rule;
+
   // Helpers
   group: (params: Record<string, Generation_Rule>) => GroupRule;
   groups: (
@@ -1004,6 +1048,51 @@ export const R: RandomRangeGenerators = {
             rule: Generation_Rule.create(it.rule),
             weight: it.weight,
           })),
+        },
+      },
+    });
+  },
+
+  dict(values: string[], index?: Rule): Rule {
+    if (values.length === 0) {
+      throw new Error("R.dict: values must be non-empty");
+    }
+    return rule({
+      kind: {
+        oneofKind: "stringDictionary",
+        stringDictionary: {
+          values,
+          index: index ? Generation_Rule.create(index) : undefined,
+        },
+      },
+    });
+  },
+
+  strWithLiteral(
+    literal: string,
+    injectPct: number,
+    minLen: number,
+    maxLen: number,
+    alphabet: Alphabet = AB.enNumSpc,
+  ): Rule {
+    if (literal.length === 0) {
+      throw new Error("R.strWithLiteral: literal must be non-empty");
+    }
+    if (injectPct < 0 || injectPct > 100) {
+      throw new Error(`R.strWithLiteral: injectPct must be in [0..100], got ${injectPct}`);
+    }
+    if (maxLen < minLen) {
+      throw new Error(`R.strWithLiteral: maxLen (${maxLen}) < minLen (${minLen})`);
+    }
+    return rule({
+      kind: {
+        oneofKind: "stringLiteralInject",
+        stringLiteralInject: {
+          literal,
+          injectPercentage: injectPct,
+          minLen: minLen.toString(),
+          maxLen: maxLen.toString(),
+          alphabet: { ranges: alphabet },
         },
       },
     });

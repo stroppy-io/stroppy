@@ -175,6 +175,52 @@ message Generation {
   }
 
   /**
+   * StringDictionary picks a string from a fixed list by index. Used for
+   * TPC-C C_LAST (§4.3.2.3) — the 1000-entry syllable dictionary that
+   * indexes sequentially for the first 1000 customers per district and
+   * via NURand(255,0,999) for the remaining 2000.
+   *
+   * If `index` is set, the sub-rule produces integer indices on each Next();
+   * values are wrapped modulo len(values). If `index` is omitted, an internal
+   * monotonic counter cycles through `values` on each Next() call — useful
+   * for deterministic sequential traversal with no extra generator setup.
+   */
+  message StringDictionary {
+    /** Candidate values. At least one required. */
+    repeated string values = 1 [ (validate.rules).repeated.min_items = 1 ];
+    /** Optional index source. If omitted, an internal counter cycles
+     *  through values on each Next(). If set, must produce integer values;
+     *  out-of-range indices are wrapped modulo len(values). */
+    optional Rule index = 2;
+  }
+
+  /**
+   * StringLiteralInject generates a random string that contains a fixed
+   * literal substring in `inject_percentage` of rows. Used for TPC-C
+   * I_DATA / S_DATA (§4.3.3.1) — 10% of rows must contain the literal
+   * "ORIGINAL" at a random position within the total string length.
+   *
+   * On each Next(): draws a length in [min_len, max_len]; with probability
+   * inject_percentage/100 places `literal` at a random offset and fills the
+   * remaining positions with random characters from `alphabet`; otherwise
+   * generates a plain random string of the chosen length.
+   */
+  message StringLiteralInject {
+    /** The literal substring to inject (e.g., "ORIGINAL"). Must be non-empty. */
+    string literal = 1 [ (validate.rules).string.min_len = 1 ];
+    /** Percentage of rows where the literal is injected [0..100]. */
+    uint32 inject_percentage = 2
+        [ (validate.rules).uint32 = {gte : 0, lte : 100} ];
+    /** Minimum total string length (must be >= len(literal)). */
+    uint64 min_len = 3;
+    /** Maximum total string length (inclusive; must be >= min_len). */
+    uint64 max_len = 4 [ (validate.rules).uint64.gt = 0 ];
+    /** Alphabet for non-literal characters. If omitted, falls back to the
+     *  default English alphabet used by Range.String. */
+    optional Alphabet alphabet = 5;
+  }
+
+  /**
    * Range defines value constraints for generation.
    */
   message Range {
@@ -368,6 +414,13 @@ message Generation {
       // Meta
       /** Weighted choice over N sub-rules (e.g., GC/BC string mix). */
       WeightedChoice weighted_choice = 25;
+      /** Pick a string from a fixed list by sub-rule index or cycling
+       *  counter (TPC-C C_LAST §4.3.2.3 syllable dictionary). */
+      StringDictionary string_dictionary = 26;
+      /** Random string with a literal substring injected at a random
+       *  position in a percentage of rows (TPC-C I_DATA / S_DATA
+       *  §4.3.3.1 "ORIGINAL" marker). */
+      StringLiteralInject string_literal_inject = 27;
     }
 
     /** Shape of randomness; Normal by default; Only for numbers */

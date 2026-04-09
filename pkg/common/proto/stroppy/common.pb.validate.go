@@ -1739,6 +1739,324 @@ var _ interface {
 	ErrorName() string
 } = Generation_WeightedChoiceValidationError{}
 
+// Validate checks the field values on Generation_StringDictionary with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *Generation_StringDictionary) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Generation_StringDictionary with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// Generation_StringDictionaryMultiError, or nil if none found.
+func (m *Generation_StringDictionary) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Generation_StringDictionary) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetValues()) < 1 {
+		err := Generation_StringDictionaryValidationError{
+			field:  "Values",
+			reason: "value must contain at least 1 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.Index != nil {
+
+		if all {
+			switch v := interface{}(m.GetIndex()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, Generation_StringDictionaryValidationError{
+						field:  "Index",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, Generation_StringDictionaryValidationError{
+						field:  "Index",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetIndex()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return Generation_StringDictionaryValidationError{
+					field:  "Index",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return Generation_StringDictionaryMultiError(errors)
+	}
+
+	return nil
+}
+
+// Generation_StringDictionaryMultiError is an error wrapping multiple
+// validation errors returned by Generation_StringDictionary.ValidateAll() if
+// the designated constraints aren't met.
+type Generation_StringDictionaryMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m Generation_StringDictionaryMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m Generation_StringDictionaryMultiError) AllErrors() []error { return m }
+
+// Generation_StringDictionaryValidationError is the validation error returned
+// by Generation_StringDictionary.Validate if the designated constraints
+// aren't met.
+type Generation_StringDictionaryValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e Generation_StringDictionaryValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e Generation_StringDictionaryValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e Generation_StringDictionaryValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e Generation_StringDictionaryValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e Generation_StringDictionaryValidationError) ErrorName() string {
+	return "Generation_StringDictionaryValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e Generation_StringDictionaryValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGeneration_StringDictionary.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = Generation_StringDictionaryValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = Generation_StringDictionaryValidationError{}
+
+// Validate checks the field values on Generation_StringLiteralInject with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *Generation_StringLiteralInject) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Generation_StringLiteralInject with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// Generation_StringLiteralInjectMultiError, or nil if none found.
+func (m *Generation_StringLiteralInject) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Generation_StringLiteralInject) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetLiteral()) < 1 {
+		err := Generation_StringLiteralInjectValidationError{
+			field:  "Literal",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if val := m.GetInjectPercentage(); val < 0 || val > 100 {
+		err := Generation_StringLiteralInjectValidationError{
+			field:  "InjectPercentage",
+			reason: "value must be inside range [0, 100]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for MinLen
+
+	if m.GetMaxLen() <= 0 {
+		err := Generation_StringLiteralInjectValidationError{
+			field:  "MaxLen",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.Alphabet != nil {
+
+		if all {
+			switch v := interface{}(m.GetAlphabet()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, Generation_StringLiteralInjectValidationError{
+						field:  "Alphabet",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, Generation_StringLiteralInjectValidationError{
+						field:  "Alphabet",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetAlphabet()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return Generation_StringLiteralInjectValidationError{
+					field:  "Alphabet",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return Generation_StringLiteralInjectMultiError(errors)
+	}
+
+	return nil
+}
+
+// Generation_StringLiteralInjectMultiError is an error wrapping multiple
+// validation errors returned by Generation_StringLiteralInject.ValidateAll()
+// if the designated constraints aren't met.
+type Generation_StringLiteralInjectMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m Generation_StringLiteralInjectMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m Generation_StringLiteralInjectMultiError) AllErrors() []error { return m }
+
+// Generation_StringLiteralInjectValidationError is the validation error
+// returned by Generation_StringLiteralInject.Validate if the designated
+// constraints aren't met.
+type Generation_StringLiteralInjectValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e Generation_StringLiteralInjectValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e Generation_StringLiteralInjectValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e Generation_StringLiteralInjectValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e Generation_StringLiteralInjectValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e Generation_StringLiteralInjectValidationError) ErrorName() string {
+	return "Generation_StringLiteralInjectValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e Generation_StringLiteralInjectValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGeneration_StringLiteralInject.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = Generation_StringLiteralInjectValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = Generation_StringLiteralInjectValidationError{}
+
 // Validate checks the field values on Generation_Range with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
@@ -2617,6 +2935,90 @@ func (m *Generation_Rule) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return Generation_RuleValidationError{
 					field:  "WeightedChoice",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Generation_Rule_StringDictionary:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+
+		if all {
+			switch v := interface{}(m.GetStringDictionary()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "StringDictionary",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "StringDictionary",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetStringDictionary()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return Generation_RuleValidationError{
+					field:  "StringDictionary",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Generation_Rule_StringLiteralInject:
+		if v == nil {
+			err := Generation_RuleValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+
+		if all {
+			switch v := interface{}(m.GetStringLiteralInject()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "StringLiteralInject",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, Generation_RuleValidationError{
+						field:  "StringLiteralInject",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetStringLiteralInject()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return Generation_RuleValidationError{
+					field:  "StringLiteralInject",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

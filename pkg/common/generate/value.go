@@ -304,6 +304,20 @@ func NewValueGeneratorByRule(
 		if err != nil {
 			return nil, err
 		}
+	case *stroppy.Generation_Rule_StringDictionary:
+		var err error
+
+		generator, err = newStringDictionaryGenerator(seed, rule.GetStringDictionary())
+		if err != nil {
+			return nil, err
+		}
+	case *stroppy.Generation_Rule_StringLiteralInject:
+		var err error
+
+		generator, err = newStringLiteralInjectGenerator(seed, rule.GetStringLiteralInject())
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("unknown rule type: %T, %v", rule, rule) //nolint: err113
 	}

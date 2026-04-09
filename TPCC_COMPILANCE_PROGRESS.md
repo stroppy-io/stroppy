@@ -123,24 +123,127 @@ Tier B items that don't need new generator infrastructure.
   remote rate, and (tx.ts only) new_order remote-line rate. Informational
   only — no hard assertions.
 
+## Phase 4 — `tx.ts` data-load correctness + population validation
+
+This phase lands the **generator-side infrastructure** the Phase 0–3 deferred
+items were waiting on, and uses it to make `tpcc/tx.ts` population fully
+spec-compliant. `procs.ts` backfill is deferred to a follow-up.
+
+### Generator primitives
+
+Both new rule kinds mirror the recursive pattern of `weighted_choice`
+(sub-rule → `NewValueGeneratorByRule` → seed reuse).
+
+- [x] **Proto:** `Generation.StringDictionary` message + `string_dictionary`
+  case in `Generation.Rule.kind` oneof (tag 26). Optional sub-rule `index`;
+  when omitted an internal monotonic counter cycles through `values`.
+- [x] **Proto:** `Generation.StringLiteralInject` message + `string_literal_inject`
+  case (tag 27). Random string with a literal substring injected at a random
+  position in `inject_percentage`% of rows. Reuses the existing `Alphabet`
+  message for non-literal bytes.
+- [x] **Go:** `pkg/common/generate/dictionary.go` —
+  `newStringDictionaryGenerator` with cycling-counter + sub-rule-driven index
+  paths. Helper `toInt64` normalises any integer-kind sub-rule output
+  (including `*int32`/`*int64` from slotted range generators) to `int64` for
+  modulo indexing (safe for negatives).
+- [x] **Go:** `pkg/common/generate/inject.go` —
+  `newStringLiteralInjectGenerator` with alphabet flattening via
+  `flattenAlphabetBytes`. Uses `math/rand/v2` PCG seeded from the parent
+  generator seed. `min_len` is auto-clamped to `len(literal)`.
+- [x] **Go:** wired both new cases into the big `NewValueGeneratorByRule`
+  switch in `pkg/common/generate/value.go` next to `weighted_choice`.
+- [x] **TS helpers:** `R.dict(values, index?)` and
+  `R.strWithLiteral(literal, injectPct, minLen, maxLen, alphabet?)` in
+  `internal/static/helpers.ts` (AB defaults preserved).
+- [x] `make proto && make linter_fix && make build` green.
+
+### `tx.ts` population (data load)
+
+- [x] **§4.3.3.1 I_DATA 10% "ORIGINAL"** — ITEM rows now use
+  `R.strWithLiteral("ORIGINAL", 10, 26, 50, AB.enSpc)`.
+- [x] **§4.3.3.1 S_DATA 10% "ORIGINAL"** — STOCK rows use
+  `R.strWithLiteral("ORIGINAL", 10, 26, 50, AB.enNumSpc)`.
+- [x] **§4.3.2.3 C_LAST syllable table** — `TPCC_SYLLABLES` + 1000-entry
+  precomputed `C_LAST_DICT` at the top of `tx.ts`. CUSTOMER insert split
+  into two batches:
+  - **Batch 1** (c_id 1..1000 per district): `c_last: R.dict(C_LAST_DICT)`
+    with no explicit index → internal counter cycles every 1000 rows. The
+    tuple generator's innermost axis is `c_id` (1..1000), so the counter
+    period aligns exactly with each (w, d) district's 1000-row slice. Spot-
+    checked on pg SCALE=2: `c_id=1 → BARBARBAR`, `c_id=372 → PRICALLYOUGHT`,
+    `c_id=1000 → EINGEINGEING`. All 1000 dict values appear exactly once
+    per district in batch 1.
+  - **Batch 2** (c_id 1001..3000 per district): `c_last: R.dict(C_LAST_DICT,
+    R.int32(0, 999, Dist.nurand(255)))` — spec-mandated NURand(255,0,999)
+    drives the index.
+- [x] **ORDER / ORDER_LINE / NEW_ORDER population** — new
+  `Step("load_orders", ...)` between `load_data` and `validate_population`.
+  All inserts stay Go-native via `driver.insert` for bulk-load throughput.
+  Structure:
+  - **ORDERS batch 1** (o_id 1..2100 = delivered): `o_carrier_id` set,
+    `o_entry_d` set, `o_ol_cnt` = 10, `o_all_local` = 1. Single bulk
+    `driver.insert` covering all (w, d).
+  - **ORDERS batch 2** (o_id 2101..3000 = undelivered): identical except
+    `o_carrier_id` column **omitted** → DB default NULL (column is nullable
+    in all 4 dialect schemas).
+  - **ORDER_LINE**: 2 × `WAREHOUSES` bulk inserts inside a JS `for w in 1..W`
+    loop so `ol_w_id = ol_supply_w_id = C.int32(w)` can be expressed as a
+    pair of per-call constants (the cartesian tuple generator can't emit
+    two sequential fields constrained to equal values in one insert).
+    Split per warehouse into delivered/undelivered like ORDERS; undelivered
+    sub-batch omits `ol_delivery_d` → NULL.
+  - **NEW_ORDER**: single bulk insert over the undelivered range
+    (o_id 2101..3000). All rows present; undelivered set per §4.3.3.1.
+  - **Documented spec deviations** (both noted inline):
+    1. `O_OL_CNT` fixed at 10 instead of uniform [5,15]. Mean is identical
+       (10), CC4 is automatically satisfied because the per-order line count
+       matches exactly. Avoids needing a cross-field dependent generator.
+    2. `O_C_ID` picked uniformly at random from [1, 3000] instead of a
+       random permutation of that range. With the current generator model
+       the permutation guarantee would require row-context state. Effect:
+       customer→order mapping is ~Poisson(1) instead of exactly 1 — the BC
+       credit / delivery paths don't care, and order_status by c_id still
+       finds orders.
+
+### `Step("validate_population", ...)`
+
+New read-only assertion step between `load_orders` and
+`Step.begin("workload")`. Uses `driver.queryValue` for every check; throws on
+any failure so a broken loader halts `setup()` before the Tier B work can run
+on bad data.
+
+- [x] **§4.3.4 cardinalities (8 checks):** ITEM, WAREHOUSE, DISTRICT,
+  CUSTOMER, STOCK, ORDERS, NEW_ORDER, ORDER_LINE.
+- [x] **§3.3.2 CC1** sum(W_YTD) = sum(D_YTD) (global form, sufficient for
+  initial state).
+- [x] **§3.3.2 CC2a** D_NEXT_O_ID − 1 = max(O_ID) per district.
+- [x] **§3.3.2 CC2b** max(O_ID) = max(NO_O_ID) per district.
+- [x] **§3.3.2 CC3** new_order contiguous range per district
+  (max−min+1 = count).
+- [x] **§3.3.2 CC4** sum(O_OL_CNT) = count(order_line).
+- [x] **§4.3.3.1 distribution checks (5..15%):** I_DATA `%ORIGINAL%`,
+  S_DATA `%ORIGINAL%`, C_CREDIT `=BC`.
+- [x] **Fixed-value sanity:** C_MIDDLE='OE' everywhere, W_YTD=300000
+  everywhere, D_NEXT_O_ID=3001 everywhere.
+- [x] **Smoke test:** `./build/stroppy run tpcc/tx --driver pg
+  -e SCALE_FACTOR=2 -e DURATION=30s -e VUS_SCALE=0.01` — all 19 checks
+  report `✓`, setup completes in ~6s, workload proceeds without error.
+  NULL invariants spot-checked post-run (o_carrier_id/ol_delivery_d set
+  iff o_id<2101; avg order_line rows per order = 10 exactly).
+
 ## Deferred to later sessions
 
-These three items are interlocked and should land as one batch so the
-measurement picture stays consistent. Each needs either a new Go-side proto
-rule (string concat, string dictionary) or a large declarative rewrite.
-
-- **§1.6** by-name customer lookup (60% of Payment/Order-Status) — needs
-  client-side C_LAST syllable helper, new SQL sections `get_customer_by_name`
-  in all 4 dialects (OFFSET formula already fixed in Phase 3), `byname` flip
-  from hardcoded 0 to 60% in procs.ts, and new `tpccPaymentByname` /
+- **procs.ts Phase 4 parity** — same population fixes + validate_population
+  step. Small session, drops in after Phase 4.
+- **§1.6** by-name customer lookup (60% of Payment/Order-Status). Now
+  **unblocked** by deterministic C_LAST population — the by-name SELECT will
+  actually hit rows. Still needs new SQL sections `get_customer_by_name` in
+  all 4 dialects (OFFSET formula already fixed in Phase 3), `byname` flip
+  from hardcoded 0 to 60% in tx.ts / procs.ts, and new `tpccPaymentByname` /
   `tpccOrderStatusByname` counters.
-- **§1.8** BC credit `C_DATA` append in PAYMENT flow. Depends on §1.6 so
-  by-name lookups hit rows, and needs `c_credit` returned from the by-id/by-name
+- **§1.8** BC credit `C_DATA` append in PAYMENT. Depends on §1.6 so by-name
+  lookups hit rows, and needs `c_credit` returned from the by-id/by-name
   SELECT back to the client (tx.ts) or a CASE WHEN inside the PAYMENT proc
   UPDATE (procs.ts).
-- **§1.9 rest**:
-  - C_LAST syllable generator for population — needs either (a) a new Go
-    proto rule `TpccLastName` / generic `StringDictionary`, or (b) a 1000-entry
-    `R.weighted` of precomputed strings (functional but ugly).
-  - 10% `"ORIGINAL"` in `I_DATA` / `S_DATA` — needs a `StringConcat` rule, or
-    a huge `R.weighted` of templates as a workaround.
+- **§2.1.6.1 NURand C-Load vs C-Run delta** — audit-grade, requires explicit
+  load vs run NURand configuration. Deferred.

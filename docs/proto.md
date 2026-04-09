@@ -33,6 +33,8 @@
     - [Generation.Range.UInt64](#stroppy-Generation-Range-UInt64)
     - [Generation.Range.UuidSeq](#stroppy-Generation-Range-UuidSeq)
     - [Generation.Rule](#stroppy-Generation-Rule)
+    - [Generation.StringDictionary](#stroppy-Generation-StringDictionary)
+    - [Generation.StringLiteralInject](#stroppy-Generation-StringLiteralInject)
     - [Generation.WeightedChoice](#stroppy-Generation-WeightedChoice)
     - [Generation.WeightedChoice.Item](#stroppy-Generation-WeightedChoice-Item)
     - [OtlpExport](#stroppy-OtlpExport)
@@ -511,9 +513,62 @@ Rule defines generation rules for a specific data type.
 | uuid_seeded | [bool](#bool) |  | Random UUID value (v4) reproducible by seed. |
 | uuid_seq | [Generation.Range.UuidSeq](#stroppy-Generation-Range-UuidSeq) |  | Sequential UUIDs from min to max (00000...1 → 00000...N). |
 | weighted_choice | [Generation.WeightedChoice](#stroppy-Generation-WeightedChoice) |  | Weighted choice over N sub-rules (e.g., GC/BC string mix). |
+| string_dictionary | [Generation.StringDictionary](#stroppy-Generation-StringDictionary) |  | Pick a string from a fixed list by sub-rule index or cycling counter (TPC-C C_LAST §4.3.2.3 syllable dictionary). |
+| string_literal_inject | [Generation.StringLiteralInject](#stroppy-Generation-StringLiteralInject) |  | Random string with a literal substring injected at a random position in a percentage of rows (TPC-C I_DATA / S_DATA §4.3.3.1 &#34;ORIGINAL&#34; marker). |
 | distribution | [Generation.Distribution](#stroppy-Generation-Distribution) | optional | Shape of randomness; Normal by default; Only for numbers |
 | null_percentage | [uint32](#uint32) | optional | Percentage of nulls to inject [0..100]; 0 by default |
 | unique | [bool](#bool) | optional | Enforce uniqueness across generated values; Linear sequence for ranges |
+
+
+
+
+
+
+<a name="stroppy-Generation-StringDictionary"></a>
+
+### Generation.StringDictionary
+StringDictionary picks a string from a fixed list by index. Used for
+TPC-C C_LAST (§4.3.2.3) — the 1000-entry syllable dictionary that
+indexes sequentially for the first 1000 customers per district and
+via NURand(255,0,999) for the remaining 2000.
+
+If `index` is set, the sub-rule produces integer indices on each Next();
+values are wrapped modulo len(values). If `index` is omitted, an internal
+monotonic counter cycles through `values` on each Next() call — useful
+for deterministic sequential traversal with no extra generator setup.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| values | [string](#string) | repeated | Candidate values. At least one required. |
+| index | [Generation.Rule](#stroppy-Generation-Rule) | optional | Optional index source. If omitted, an internal counter cycles through values on each Next(). If set, must produce integer values; out-of-range indices are wrapped modulo len(values). |
+
+
+
+
+
+
+<a name="stroppy-Generation-StringLiteralInject"></a>
+
+### Generation.StringLiteralInject
+StringLiteralInject generates a random string that contains a fixed
+literal substring in `inject_percentage` of rows. Used for TPC-C
+I_DATA / S_DATA (§4.3.3.1) — 10% of rows must contain the literal
+&#34;ORIGINAL&#34; at a random position within the total string length.
+
+On each Next(): draws a length in [min_len, max_len]; with probability
+inject_percentage/100 places `literal` at a random offset and fills the
+remaining positions with random characters from `alphabet`; otherwise
+generates a plain random string of the chosen length.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| literal | [string](#string) |  | The literal substring to inject (e.g., &#34;ORIGINAL&#34;). Must be non-empty. |
+| inject_percentage | [uint32](#uint32) |  | Percentage of rows where the literal is injected [0..100]. |
+| min_len | [uint64](#uint64) |  | Minimum total string length (must be &gt;= len(literal)). |
+| max_len | [uint64](#uint64) |  | Maximum total string length (inclusive; must be &gt;= min_len). |
+| alphabet | [Generation.Alphabet](#stroppy-Generation-Alphabet) | optional | Alphabet for non-literal characters. If omitted, falls back to the default English alphabet used by Range.String. |
 
 
 
