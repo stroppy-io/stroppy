@@ -174,6 +174,11 @@ WHERE s_i_id = :i_id AND s_w_id = :w_id
 --= insert_order_line
 INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info)
 VALUES (:o_id, :d_id, :w_id, :ol_number, :i_id, :supply_w_id, :quantity, :amount, :dist_info)
+--= get_items_batch
+SELECT i_id, i_price, i_name, i_data FROM item WHERE i_id IN ({item_ids})
+--= get_stocks_batch
+SELECT s_i_id, s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10
+FROM stock WHERE s_w_id = :w_id AND s_i_id IN ({item_ids})
 
 --+ workload_tx_payment
 --= update_warehouse
@@ -185,18 +190,53 @@ UPDATE district SET d_ytd = d_ytd + :amount WHERE d_w_id = :w_id AND d_id = :d_i
 --= get_district
 SELECT d_name, d_street_1, d_street_2, d_city, d_state, d_zip FROM district WHERE d_w_id = :w_id AND d_id = :d_id
 --= get_customer_by_id
-SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since
+-- Trailing c_data is needed for the §2.5.2.2 BC-credit append path.
+SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
 FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= count_customers_by_name
+-- TPC-C 2.5.1.2: 60% of Payment lookups are by (w_id, d_id, c_last).
+-- Single-table SELECT — safe for sbroad (no cross-shard motion).
+-- Using -- comments (not /* */) because sbroad's parser rejects block
+-- comments at the head of a statement; parse_sql strips -- lines from
+-- query bodies before the query reaches picodata.
+SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+--= get_customer_by_name
+-- TPC-C 2.5.2.2: pick row ceil(n/2) ordered by c_first.
+-- picodata/sbroad rejects OFFSET in SELECT ("expected EOI or DqlOption"),
+-- so we fetch all matching rows and pick the median in tx.ts (IS_PICODATA
+-- branch). Trailing c_data supports the BC-credit append path (§1.8).
+SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
+FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+ORDER BY c_first
 --= update_customer
 UPDATE customer SET c_balance = c_balance - :amount, c_ytd_payment = c_ytd_payment + :amount, c_payment_cnt = c_payment_cnt + 1
 WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= update_customer_bc
+-- TPC-C 2.5.2.2: BC-credit path. c_data_new is built client-side
+-- (c_id c_d_id c_w_id d_id w_id h_amount|old_c_data); SUBSTR clamps
+-- to 500 chars. Picodata/sbroad accepts SUBSTR(expr, 1, 500).
+UPDATE customer
+   SET c_balance     = c_balance - :amount,
+       c_ytd_payment = c_ytd_payment + :amount,
+       c_payment_cnt = c_payment_cnt + 1,
+       c_data        = SUBSTR(:c_data_new, 1, 500)
+ WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 --= insert_history
 INSERT INTO history (h_id, h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data)
 VALUES (:h_id, :h_c_id, :h_c_d_id, :h_c_w_id, :h_d_id, :h_w_id, LOCALTIMESTAMP, :h_amount, :h_data)
 
 --+ workload_tx_order_status
 --= get_customer_by_id
-SELECT c_balance, c_first, c_middle, c_last FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+--= count_customers_by_name
+-- TPC-C 2.6.1.2: 60% of Order-Status lookups are by (w_id, d_id, c_last).
+SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+--= get_customer_by_name
+-- TPC-C 2.6.2.2: pick row ceil(n/2) ordered by c_first.
+-- picodata/sbroad rejects OFFSET; fetch all rows and pick in tx.ts.
+SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer
+WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+ORDER BY c_first
 --= get_last_order
 SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_d_id = :d_id AND o_w_id = :w_id AND o_c_id = :c_id ORDER BY o_id DESC LIMIT 1
 --= get_order_lines

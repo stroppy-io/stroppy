@@ -33,6 +33,10 @@
     - [Generation.Range.UInt64](#stroppy-Generation-Range-UInt64)
     - [Generation.Range.UuidSeq](#stroppy-Generation-Range-UuidSeq)
     - [Generation.Rule](#stroppy-Generation-Rule)
+    - [Generation.StringDictionary](#stroppy-Generation-StringDictionary)
+    - [Generation.StringLiteralInject](#stroppy-Generation-StringLiteralInject)
+    - [Generation.WeightedChoice](#stroppy-Generation-WeightedChoice)
+    - [Generation.WeightedChoice.Item](#stroppy-Generation-WeightedChoice-Item)
     - [OtlpExport](#stroppy-OtlpExport)
     - [Uuid](#stroppy-Uuid)
     - [Value](#stroppy-Value)
@@ -40,6 +44,7 @@
     - [Value.Struct](#stroppy-Value-Struct)
   
     - [Generation.Distribution.DistributionType](#stroppy-Generation-Distribution-DistributionType)
+    - [Generation.Distribution.NURandPhase](#stroppy-Generation-Distribution-NURandPhase)
     - [Value.NullValue](#stroppy-Value-NullValue)
   
 - [proto/stroppy/config.proto](#proto_stroppy_config-proto)
@@ -233,7 +238,8 @@ Distribution defines the statistical distribution for value generation.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | type | [Generation.Distribution.DistributionType](#stroppy-Generation-Distribution-DistributionType) |  | Type of distribution to use |
-| screw | [double](#double) |  | Distribution parameter (e.g., standard deviation for normal distribution) |
+| screw | [double](#double) |  | Distribution parameter (e.g., standard deviation for normal distribution, `A` for NURAND) |
+| nurand_phase | [Generation.Distribution.NURandPhase](#stroppy-Generation-Distribution-NURandPhase) |  | For NURAND: which phase this generator is for (C-Load or C-Run). Used by §2.1.6.1 / §5.3 audit rule on |C_run - C_load|. |
 
 
 
@@ -508,9 +514,99 @@ Rule defines generation rules for a specific data type.
 | uuid_const | [Uuid](#stroppy-Uuid) |  | Fixed UUID value. |
 | uuid_seeded | [bool](#bool) |  | Random UUID value (v4) reproducible by seed. |
 | uuid_seq | [Generation.Range.UuidSeq](#stroppy-Generation-Range-UuidSeq) |  | Sequential UUIDs from min to max (00000...1 → 00000...N). |
+| weighted_choice | [Generation.WeightedChoice](#stroppy-Generation-WeightedChoice) |  | Weighted choice over N sub-rules (e.g., GC/BC string mix). |
+| string_dictionary | [Generation.StringDictionary](#stroppy-Generation-StringDictionary) |  | Pick a string from a fixed list by sub-rule index or cycling counter (TPC-C C_LAST §4.3.2.3 syllable dictionary). |
+| string_literal_inject | [Generation.StringLiteralInject](#stroppy-Generation-StringLiteralInject) |  | Random string with a literal substring injected at a random position in a percentage of rows (TPC-C I_DATA / S_DATA §4.3.3.1 &#34;ORIGINAL&#34; marker). |
 | distribution | [Generation.Distribution](#stroppy-Generation-Distribution) | optional | Shape of randomness; Normal by default; Only for numbers |
 | null_percentage | [uint32](#uint32) | optional | Percentage of nulls to inject [0..100]; 0 by default |
 | unique | [bool](#bool) | optional | Enforce uniqueness across generated values; Linear sequence for ranges |
+
+
+
+
+
+
+<a name="stroppy-Generation-StringDictionary"></a>
+
+### Generation.StringDictionary
+StringDictionary picks a string from a fixed list by index. Used for
+TPC-C C_LAST (§4.3.2.3) — the 1000-entry syllable dictionary that
+indexes sequentially for the first 1000 customers per district and
+via NURand(255,0,999) for the remaining 2000.
+
+If `index` is set, the sub-rule produces integer indices on each Next();
+values are wrapped modulo len(values). If `index` is omitted, an internal
+monotonic counter cycles through `values` on each Next() call — useful
+for deterministic sequential traversal with no extra generator setup.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| values | [string](#string) | repeated | Candidate values. At least one required. |
+| index | [Generation.Rule](#stroppy-Generation-Rule) | optional | Optional index source. If omitted, an internal counter cycles through values on each Next(). If set, must produce integer values; out-of-range indices are wrapped modulo len(values). |
+
+
+
+
+
+
+<a name="stroppy-Generation-StringLiteralInject"></a>
+
+### Generation.StringLiteralInject
+StringLiteralInject generates a random string that contains a fixed
+literal substring in `inject_percentage` of rows. Used for TPC-C
+I_DATA / S_DATA (§4.3.3.1) — 10% of rows must contain the literal
+&#34;ORIGINAL&#34; at a random position within the total string length.
+
+On each Next(): draws a length in [min_len, max_len]; with probability
+inject_percentage/100 places `literal` at a random offset and fills the
+remaining positions with random characters from `alphabet`; otherwise
+generates a plain random string of the chosen length.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| literal | [string](#string) |  | The literal substring to inject (e.g., &#34;ORIGINAL&#34;). Must be non-empty. |
+| inject_percentage | [uint32](#uint32) |  | Percentage of rows where the literal is injected [0..100]. |
+| min_len | [uint64](#uint64) |  | Minimum total string length (must be &gt;= len(literal)). |
+| max_len | [uint64](#uint64) |  | Maximum total string length (inclusive; must be &gt;= min_len). |
+| alphabet | [Generation.Alphabet](#stroppy-Generation-Alphabet) | optional | Alphabet for non-literal characters. If omitted, falls back to the default English alphabet used by Range.String. |
+
+
+
+
+
+
+<a name="stroppy-Generation-WeightedChoice"></a>
+
+### Generation.WeightedChoice
+WeightedChoice picks one of N sub-rules with given weights per Next() call.
+Useful for mixing categorical values (e.g., TPC-C C_CREDIT = 10% &#34;BC&#34; /
+90% &#34;GC&#34;) without coupling two independent generators at the call site.
+
+Weights are relative; they don&#39;t have to sum to 1.0 or 100. An item with
+weight 0 is unreachable. At least one item is required.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| items | [Generation.WeightedChoice.Item](#stroppy-Generation-WeightedChoice-Item) | repeated | Candidate sub-rules with their weights. At least one required. |
+
+
+
+
+
+
+<a name="stroppy-Generation-WeightedChoice-Item"></a>
+
+### Generation.WeightedChoice.Item
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| rule | [Generation.Rule](#stroppy-Generation-Rule) |  | Sub-rule to dispatch to when this item is chosen. |
+| weight | [double](#double) |  | Relative weight; must be &gt; 0 to be reachable. |
 
 
 
@@ -627,6 +723,25 @@ way.
 | NORMAL | 0 | Normal (Gaussian) distribution |
 | UNIFORM | 1 | Uniform distribution |
 | ZIPF | 2 | Zipfian distribution |
+| NURAND | 3 | TPC-C NURand(A, x, y) non-uniform distribution per spec §2.1.6: ((rand(0,A) | rand(x,y)) &#43; C) % (y - x &#43; 1) &#43; x where `|` is bitwise OR and `C` is a per-generator constant derived from the seed. The `A` parameter is carried via the `screw` field (typical TPC-C values: 255 for C_LAST, 1023 for C_ID, 8191 for OL_I_ID). Integers only — `round` must be true. |
+
+
+
+<a name="stroppy-Generation-Distribution-NURandPhase"></a>
+
+### Generation.Distribution.NURandPhase
+For NURAND only: distinguishes C-Load vs C-Run generator instances per
+TPC-C §2.1.6.1 / §5.3. The Go side derives C_load and C_run from the
+same seed such that |C_run - C_load| falls within the spec&#39;s required
+delta window for the active A value (255 / 1023 / 8191). Ignored by
+other distribution types. Default UNSPECIFIED is treated as LOAD for
+back-compat with callers that don&#39;t care about the phase.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| NURAND_PHASE_UNSPECIFIED | 0 | Treated as LOAD for back-compat. |
+| NURAND_PHASE_LOAD | 1 | C-Load generator: used during data population. |
+| NURAND_PHASE_RUN | 2 | C-Run generator: used during measurement workload. |
 
 
 
@@ -1054,8 +1169,8 @@ Example (stroppy-config.json):
       &#34;0&#34;: { &#34;driverType&#34;: &#34;postgres&#34;, &#34;url&#34;: &#34;postgres://user:pass@db:5432/bench&#34;,
               &#34;pool&#34;: { &#34;maxConns&#34;: 200 } }
     },
-    &#34;env&#34;: { &#34;DURATION&#34;: &#34;30m&#34;, &#34;VUS_SCALE&#34;: &#34;0.5&#34;, &#34;WAREHOUSES&#34;: &#34;10&#34; },
-    &#34;k6Args&#34;: [&#34;--vus&#34;, &#34;10&#34;]
+    &#34;env&#34;: { &#34;WAREHOUSES&#34;: &#34;10&#34; },
+    &#34;k6Args&#34;: [&#34;--vus&#34;, &#34;10&#34;, &#34;--duration&#34;, &#34;30m&#34;]
   }
 
 

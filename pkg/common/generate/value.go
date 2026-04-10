@@ -133,7 +133,7 @@ func NewValueGenerator(
 	return gen, nil
 }
 
-//nolint:funlen,cyclop // need from lib
+//nolint:funlen,cyclop,gocyclo // giant switch dispatch over rule kinds — complexity grows with every new proto kind
 func NewValueGeneratorByRule(
 	seed uint64,
 	rule *stroppy.Generation_Rule,
@@ -297,6 +297,27 @@ func NewValueGeneratorByRule(
 		}
 	case *stroppy.Generation_Rule_DecimalConst:
 		generator = newSlottedConstGenerator(decimalPtrToDecimal(rule.GetDecimalConst()))
+	case *stroppy.Generation_Rule_WeightedChoice:
+		var err error
+
+		generator, err = newWeightedChoiceGenerator(seed, rule.GetWeightedChoice())
+		if err != nil {
+			return nil, err
+		}
+	case *stroppy.Generation_Rule_StringDictionary:
+		var err error
+
+		generator, err = newStringDictionaryGenerator(seed, rule.GetStringDictionary())
+		if err != nil {
+			return nil, err
+		}
+	case *stroppy.Generation_Rule_StringLiteralInject:
+		var err error
+
+		generator, err = newStringLiteralInjectGenerator(seed, rule.GetStringLiteralInject())
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("unknown rule type: %T, %v", rule, rule) //nolint: err113
 	}
@@ -481,4 +502,66 @@ func newDecimalGenerator(
 			decimal.NewFromFloat,
 		),
 	), nil
+}
+
+// newWeightedChoiceGenerator builds a generator that picks from one of N
+// sub-rules on each Next() call proportional to each item's weight. Sub-rule
+// construction reuses NewValueGeneratorByRule, so any rule kind is valid
+// (including nested WeightedChoice). Seed is shared with the root generator
+// so reproducibility carries through.
+//
+// Zero-weight items are kept but never reached. If all weights are zero,
+// every Next() returns the first item's value (behaves like a fixed pick).
+func newWeightedChoiceGenerator(
+	seed uint64,
+	choice *stroppy.Generation_WeightedChoice,
+) (ValueGenerator, error) {
+	items := choice.GetItems()
+	if len(items) == 0 {
+		return nil, ErrNoGenerators
+	}
+
+	subGens := make([]ValueGenerator, len(items))
+	cumulative := make([]float64, len(items))
+
+	total := 0.0
+
+	for i, item := range items {
+		sub, err := NewValueGeneratorByRule(seed, item.GetRule())
+		if err != nil {
+			return nil, fmt.Errorf("weighted_choice item %d: %w", i, err)
+		}
+
+		subGens[i] = sub
+
+		weight := item.GetWeight()
+		if weight < 0 {
+			weight = 0
+		}
+
+		total += weight
+		cumulative[i] = total
+	}
+
+	prng := rand.New(rand.NewPCG(seed, seed)) //nolint: gosec // benchmark PRNG
+
+	// Zero-total case: always pick the first item (degenerate but well-defined).
+	if total == 0 {
+		first := subGens[0]
+
+		return valueGeneratorFn(func() (any, error) {
+			return first.Next()
+		}), nil
+	}
+
+	return valueGeneratorFn(func() (any, error) {
+		r := prng.Float64() * total
+		for i, c := range cumulative {
+			if r < c {
+				return subGens[i].Next()
+			}
+		}
+
+		return subGens[len(subGens)-1].Next()
+	}), nil
 }

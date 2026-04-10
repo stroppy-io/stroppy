@@ -1183,7 +1183,7 @@
         "version",
         "global"
       ],
-      "description": "*\n RunConfig is the top-level stroppy config file schema.\n\n Default file: ./stroppy-config.json (auto-discovered by stroppy run and stroppy probe).\n Override with -f/--file flag.\n\n Precedence (highest to lowest):\n   real env \u003e -e flags \u003e this file \u003e -d/-D presets \u003e script defaults\n\n Example (stroppy-config.json):\n   {\n     \"version\": \"1\",\n     \"script\": \"tpcc\",\n     \"global\": {\n       \"logger\": { \"logLevel\": \"LOG_LEVEL_INFO\" }\n     },\n     \"drivers\": {\n       \"0\": { \"driverType\": \"postgres\", \"url\": \"postgres://user:pass@db:5432/bench\",\n               \"pool\": { \"maxConns\": 200 } }\n     },\n     \"env\": { \"DURATION\": \"30m\", \"VUS_SCALE\": \"0.5\", \"WAREHOUSES\": \"10\" },\n     \"k6Args\": [\"--vus\", \"10\"]\n   }"
+      "description": "*\n RunConfig is the top-level stroppy config file schema.\n\n Default file: ./stroppy-config.json (auto-discovered by stroppy run and stroppy probe).\n Override with -f/--file flag.\n\n Precedence (highest to lowest):\n   real env \u003e -e flags \u003e this file \u003e -d/-D presets \u003e script defaults\n\n Example (stroppy-config.json):\n   {\n     \"version\": \"1\",\n     \"script\": \"tpcc\",\n     \"global\": {\n       \"logger\": { \"logLevel\": \"LOG_LEVEL_INFO\" }\n     },\n     \"drivers\": {\n       \"0\": { \"driverType\": \"postgres\", \"url\": \"postgres://user:pass@db:5432/bench\",\n               \"pool\": { \"maxConns\": 200 } }\n     },\n     \"env\": { \"WAREHOUSES\": \"10\" },\n     \"k6Args\": [\"--vus\", \"10\", \"--duration\", \"30m\"]\n   }"
     },
     ".stroppy.RunConfig.drivers": {
       "additionalProperties": {

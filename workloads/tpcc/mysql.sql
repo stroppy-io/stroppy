@@ -165,7 +165,8 @@ CREATE PROCEDURE NEWORD(
   IN no_max_w_id INT,
   IN no_d_id INT,
   IN no_c_id INT,
-  IN no_o_ol_cnt INT
+  IN no_o_ol_cnt INT,
+  IN no_force_rollback BOOLEAN
 )
 BEGIN
   DECLARE no_c_discount DECIMAL(4,4);
@@ -198,14 +199,18 @@ BEGIN
 
   SELECT w_tax INTO no_w_tax FROM warehouse WHERE w_id = no_w_id;
 
+  /* T2.1: FOR UPDATE to serialize the read-then-increment under
+     READ COMMITTED / REPEATABLE READ — InnoDB takes a record lock on
+     the district row, blocking concurrent NEWORD VUs until commit, so
+     the subsequent INSERT INTO new_order (no_d_next_o_id, ...) can't
+     collide on (w_id, d_id, o_id) PK. Previously observed ~0.1% error
+     rate on Duplicate entry 'W-D-O' for key 'new_order.PRIMARY'. */
   SELECT d_next_o_id, d_tax INTO no_d_next_o_id, no_d_tax
-  FROM district WHERE d_id = no_d_id AND d_w_id = no_w_id;
+  FROM district WHERE d_id = no_d_id AND d_w_id = no_w_id
+  FOR UPDATE;
 
   UPDATE district SET d_next_o_id = d_next_o_id + 1
   WHERE d_id = no_d_id AND d_w_id = no_w_id;
-
-  INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
-  VALUES (no_d_next_o_id, no_d_id, no_w_id, no_c_id, NOW(), no_o_ol_cnt, no_o_all_local);
 
   INSERT INTO new_order (no_o_id, no_d_id, no_w_id)
   VALUES (no_d_next_o_id, no_d_id, no_w_id);
@@ -213,12 +218,35 @@ BEGIN
   SET loop_counter = 1;
   WHILE loop_counter <= no_o_ol_cnt DO
     SET v_i_id = 1 + FLOOR(RAND() * 100000);
-    SET v_supply_w_id = no_w_id;
+    /* TPC-C 2.4.1.4 forced-rollback sentinel: override the LAST line's i_id
+       to a value guaranteed to miss the item table, forcing the SIGNAL path
+       below. Driven by client-side 1% roll. */
+    IF no_force_rollback AND loop_counter = no_o_ol_cnt THEN
+      SET v_i_id = 100001;
+    END IF;
+    /* TPC-C 2.4.1.5: ~1% of order lines pick a remote supply warehouse
+       (uniform over {1..no_max_w_id} \ {no_w_id}) when multiple warehouses exist. */
+    IF no_max_w_id > 1 AND FLOOR(RAND() * 100) = 0 THEN
+      SET v_supply_w_id = 1 + FLOOR(RAND() * (no_max_w_id - 1));
+      IF v_supply_w_id >= no_w_id THEN
+        SET v_supply_w_id = v_supply_w_id + 1;
+      END IF;
+      SET no_o_all_local = 0;
+    ELSE
+      SET v_supply_w_id = no_w_id;
+    END IF;
     SET v_quantity = 1 + FLOOR(RAND() * 10);
     SET item_not_found = 0;
 
     SELECT i_price, i_name, i_data INTO v_i_price, v_i_name, v_i_data
     FROM item WHERE i_id = v_i_id;
+
+    /* TPC-C 2.4.2.3: on the sentinel-forced last line, raise so the client
+       gets a recognizable error and can count the rollback. Non-forced misses
+       remain silent (legacy behavior). */
+    IF item_not_found = 1 AND no_force_rollback AND loop_counter = no_o_ol_cnt THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'tpcc_rollback:item_not_found';
+    END IF;
 
     IF item_not_found = 0 THEN
       SELECT s_quantity, s_data,
@@ -248,7 +276,7 @@ BEGIN
         SET s_quantity = v_s_quantity,
             s_ytd = s_ytd + v_quantity,
             s_order_cnt = s_order_cnt + 1,
-            s_remote_cnt = s_remote_cnt + 0
+            s_remote_cnt = s_remote_cnt + CASE WHEN v_supply_w_id <> no_w_id THEN 1 ELSE 0 END
       WHERE s_i_id = v_i_id AND s_w_id = v_supply_w_id;
 
       SET v_amount = v_quantity * v_i_price;
@@ -261,6 +289,10 @@ BEGIN
 
     SET loop_counter = loop_counter + 1;
   END WHILE;
+
+  /* Insert orders after the loop so o_all_local reflects the actual remote flag. */
+  INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
+  VALUES (no_d_next_o_id, no_d_id, no_w_id, no_c_id, NOW(), no_o_ol_cnt, no_o_all_local);
 END
 --= payment
 CREATE PROCEDURE PAYMENT(
@@ -282,6 +314,7 @@ BEGIN
   DECLARE p_w_name VARCHAR(10);
   DECLARE p_d_name VARCHAR(10);
   DECLARE name_count INT;
+  DECLARE v_offset INT;
   DECLARE h_data_val VARCHAR(30);
 
   SET p_c_id = p_c_id_in;
@@ -301,12 +334,15 @@ BEGIN
     WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id;
 
     IF name_count > 0 THEN
+      /* TPC-C 2.5.2.2: pick row ceil(n/2). For 0-indexed OFFSET this is (n-1)/2.
+         MySQL LIMIT/OFFSET only accepts literals or local variables. */
+      SET v_offset = (name_count - 1) DIV 2;
       SELECT c_id, c_balance, c_credit
       INTO p_c_id, p_c_balance, p_c_credit
       FROM customer
       WHERE c_last = p_c_last AND c_d_id = p_c_d_id AND c_w_id = p_c_w_id
       ORDER BY c_first
-      LIMIT 1 OFFSET 0;
+      LIMIT 1 OFFSET v_offset;
     END IF;
   ELSE
     SELECT c_balance, c_credit
@@ -315,12 +351,31 @@ BEGIN
     WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
   END IF;
 
-  SET h_data_val = CONCAT(COALESCE(p_w_name, ''), ' ', COALESCE(p_d_name, ''));
+  /* TPC-C 2.5.2.2: h_data = W_NAME || '    ' || D_NAME (4 spaces). */
+  SET h_data_val = CONCAT(COALESCE(p_w_name, ''), '    ', COALESCE(p_d_name, ''));
 
+  /* TPC-C 2.5.2.2: BC-credit customers get a 500-char c_data log
+     prepended with the current Payment's identifying tuple; GC
+     customers keep their c_data untouched. MySQL dialect: use
+     CONCAT (no '||' string operator by default) and CAST(... AS CHAR)
+     for numeric-to-text. DECIMAL(6,2)→CHAR preserves the two-decimal
+     form natively, unlike FORMAT() which adds locale thousand
+     separators. */
   UPDATE customer
   SET c_balance = c_balance - p_h_amount,
       c_ytd_payment = c_ytd_payment + p_h_amount,
-      c_payment_cnt = c_payment_cnt + 1
+      c_payment_cnt = c_payment_cnt + 1,
+      c_data = CASE
+        WHEN c_credit = 'BC' THEN SUBSTR(
+          CONCAT(
+            CAST(c_id AS CHAR), ' ', CAST(c_d_id AS CHAR), ' ', CAST(c_w_id AS CHAR),
+            ' ', CAST(p_d_id AS CHAR), ' ', CAST(p_w_id AS CHAR),
+            ' ', CAST(p_h_amount AS CHAR), '|', COALESCE(c_data, '')
+          ),
+          1, 500
+        )
+        ELSE c_data
+      END
   WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
 
   INSERT INTO history (h_id, h_c_d_id, h_c_w_id, h_c_id, h_d_id, h_w_id, h_date, h_amount, h_data)
@@ -381,6 +436,7 @@ CREATE PROCEDURE OSTAT(
 )
 BEGIN
   DECLARE namecnt INT;
+  DECLARE v_offset INT;
   DECLARE v_c_id INT;
   DECLARE v_c_balance DECIMAL(12,2);
   DECLARE v_c_first VARCHAR(16);
@@ -397,12 +453,15 @@ BEGIN
     WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id;
 
     IF namecnt > 0 THEN
+      /* TPC-C 2.6.2.2: pick row ceil(n/2). For 0-indexed OFFSET this is (n-1)/2.
+         MySQL LIMIT/OFFSET only accepts literals or local variables. */
+      SET v_offset = (namecnt - 1) DIV 2;
       SELECT c_balance, c_first, c_middle, c_id
       INTO v_c_balance, v_c_first, v_c_middle, v_c_id
       FROM customer
       WHERE c_last = os_c_last AND c_d_id = os_d_id AND c_w_id = os_w_id
       ORDER BY c_first
-      LIMIT 1 OFFSET 0;
+      LIMIT 1 OFFSET v_offset;
     END IF;
   ELSE
     SELECT c_balance, c_first, c_middle
@@ -445,7 +504,7 @@ END
 
 --+ workload_procs
 --= new_order
-CALL NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt)
+CALL NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt, :force_rollback)
 --= payment
 CALL PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last, :p_h_id)
 --= order_status
@@ -461,7 +520,13 @@ SELECT c_discount, c_last, c_credit FROM customer WHERE c_w_id = :w_id AND c_d_i
 --= get_warehouse
 SELECT w_tax FROM warehouse WHERE w_id = :w_id
 --= get_district
-SELECT d_next_o_id, d_tax FROM district WHERE d_id = :d_id AND d_w_id = :w_id
+/* T2.1: FOR UPDATE serializes the read-then-increment of d_next_o_id under
+   InnoDB. Without it, REPEATABLE READ does a consistent (snapshot) read so
+   two concurrent NEWORD VUs can read the same d_next_o_id, both compute the
+   same o_id, and both INSERT INTO orders fail with Duplicate entry on the
+   PK. The lock is released on commit/rollback. Mirrors the proc-body fix
+   in NEWORD (workload_procs section above) for the inline-SQL variant. */
+SELECT d_next_o_id, d_tax FROM district WHERE d_id = :d_id AND d_w_id = :w_id FOR UPDATE
 --= update_district
 UPDATE district SET d_next_o_id = d_next_o_id + 1 WHERE d_id = :d_id AND d_w_id = :w_id
 --= insert_order
@@ -480,6 +545,11 @@ WHERE s_i_id = :i_id AND s_w_id = :w_id
 --= insert_order_line
 INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info)
 VALUES (:o_id, :d_id, :w_id, :ol_number, :i_id, :supply_w_id, :quantity, :amount, :dist_info)
+--= get_items_batch
+SELECT i_id, i_price, i_name, i_data FROM item WHERE i_id IN ({item_ids})
+--= get_stocks_batch
+SELECT s_i_id, s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10
+FROM stock WHERE s_w_id = :w_id AND s_i_id IN ({item_ids})
 
 --+ workload_tx_payment
 --= update_warehouse
@@ -491,18 +561,53 @@ UPDATE district SET d_ytd = d_ytd + :amount WHERE d_w_id = :w_id AND d_id = :d_i
 --= get_district
 SELECT d_name, d_street_1, d_street_2, d_city, d_state, d_zip FROM district WHERE d_w_id = :w_id AND d_id = :d_id
 --= get_customer_by_id
-SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since
+/* Trailing c_data is needed for the §2.5.2.2 BC-credit append path. */
+SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
 FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= count_customers_by_name
+/* TPC-C 2.5.1.2: 60% of Payment lookups are by (w_id, d_id, c_last). */
+SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+--= get_customer_by_name
+/* TPC-C 2.5.2.2: pick row ceil(n/2) ordered by c_first — zero-indexed
+   OFFSET is (n - 1) / 2, computed client-side and passed in.
+   MySQL accepts LIMIT/OFFSET with protocol parameters inside a
+   prepared statement; a named-colon token works here (it errors
+   only on literal non-integer expressions).
+   Trailing c_data supports the BC-credit append path (§1.8). */
+SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
+FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+ORDER BY c_first
+LIMIT 1 OFFSET :offset
 --= update_customer
 UPDATE customer SET c_balance = c_balance - :amount, c_ytd_payment = c_ytd_payment + :amount, c_payment_cnt = c_payment_cnt + 1
 WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= update_customer_bc
+/* TPC-C 2.5.2.2: BC-credit path. c_data_new is built client-side
+   (c_id c_d_id c_w_id d_id w_id h_amount|old_c_data); SUBSTR clamps
+   to 500 chars. MySQL SUBSTR is 1-indexed, same as pg/pico/ydb. */
+UPDATE customer
+   SET c_balance     = c_balance - :amount,
+       c_ytd_payment = c_ytd_payment + :amount,
+       c_payment_cnt = c_payment_cnt + 1,
+       c_data        = SUBSTR(:c_data_new, 1, 500)
+ WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 --= insert_history
 INSERT INTO history (h_id, h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data)
 VALUES (:h_id, :h_c_id, :h_c_d_id, :h_c_w_id, :h_d_id, :h_w_id, NOW(), :h_amount, :h_data)
 
 --+ workload_tx_order_status
 --= get_customer_by_id
-SELECT c_balance, c_first, c_middle, c_last FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+--= count_customers_by_name
+/* TPC-C 2.6.1.2: 60% of Order-Status lookups are by (w_id, d_id, c_last). */
+SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+--= get_customer_by_name
+/* TPC-C 2.6.2.2: pick row ceil(n/2) ordered by c_first — zero-indexed
+   OFFSET is (n - 1) / 2, computed client-side. */
+SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer
+WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+ORDER BY c_first
+LIMIT 1 OFFSET :offset
 --= get_last_order
 SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_d_id = :d_id AND o_w_id = :w_id AND o_c_id = :c_id ORDER BY o_id DESC LIMIT 1
 --= get_order_lines

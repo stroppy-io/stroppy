@@ -1,4 +1,5 @@
 import { Counter, Rate, Trend } from "k6/metrics";
+export { Counter, Rate, Trend };
 import { test } from "k6/execution"
 import encoding from "k6/x/encoding";
 globalThis.TextEncoder = encoding.TextEncoder;
@@ -20,6 +21,7 @@ import {
   Generation_Rule,
   Generation_Distribution,
   Generation_Distribution_DistributionType,
+  Generation_Distribution_NURandPhase,
   QueryParamGroup,
   DriverConfig,
   QueryParamDescriptor,
@@ -193,7 +195,9 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
     const { sql: s, tags } = resolveSqlQuery(sql);
     try {
       const result = rawRunQuery(s, args);
-      runQueryMetric.add(result.stats.elapsed.milliseconds(), tags);
+      // .seconds() returns a float — multiply by 1000 for sub-ms precision.
+      // .milliseconds() truncates to int64 and reports 0 for sub-ms queries.
+      runQueryMetric.add(result.stats.elapsed.seconds() * 1000, tags);
       runQueryErrRateMetric.add(0, tags);
       runQueryCounterMetric.add(1, tags);
       return result;
@@ -278,7 +282,7 @@ export class TxX implements QueryAPI {
       (sql, args) => {
         this._queryCount++; 
         const res = tx.runQuery(sql, args);
-        this._cleanDuration += res.stats.elapsed.milliseconds();
+        this._cleanDuration += res.stats.elapsed.seconds() * 1000;
         return res;
       },
       getErrorMode,
@@ -524,7 +528,7 @@ export class DriverX implements QueryAPI {
         InsertDescriptor.toBinary(InsertDescriptor.create(descriptor)),
       );
       insertErrRateMetric.add(0, metricTags);
-      insertMetric.add(stats.elapsed.milliseconds(), metricTags);
+      insertMetric.add(stats.elapsed.seconds() * 1000, metricTags);
       console.log(`Insertion into '${descriptor.tableName}' ended in ${stats.elapsed.string()}`);
     } catch (e) {
       insertErrRateMetric.add(1, metricTags);
@@ -657,12 +661,32 @@ function rule(r: Generation_Rule): Rule {
 export type Distribution =
   | { kind: "normal"; screw?: number }
   | { kind: "uniform" }
-  | { kind: "zipf"; screw: number };
+  | { kind: "zipf"; screw: number }
+  | { kind: "nurand"; a: number; phase?: "load" | "run" };
 
 export const Dist = {
   normal: (screw = 0): Distribution => ({ kind: "normal", screw }),
   uniform: (): Distribution => ({ kind: "uniform" }),
   zipf: (screw: number): Distribution => ({ kind: "zipf", screw }),
+  /**
+   * TPC-C NURand(A, x, y) non-uniform distribution per spec §2.1.6:
+   *   ((rand(0,A) | rand(x,y)) + C) % (y - x + 1) + x
+   * `C` is derived once from the seed per generator, so reproducibility with
+   * a fixed seed is preserved. Integers only — use with `R.int32`/`R.int64`.
+   * Typical A: 255 (C_LAST), 1023 (C_ID), 8191 (OL_I_ID).
+   *
+   * The `phase` parameter selects C-Load vs C-Run per §2.1.6.1 / §5.3 —
+   * the Go side derives both C_load and C_run from the same seed so the
+   * |C_run − C_load| delta falls within the spec's mandated audit window
+   * for the active A (255 / 1023 / 8191). Default is "load" which matches
+   * what a data-population generator wants; runtime workload pickers must
+   * pass "run" explicitly.
+   */
+  nurand: (a: number, phase: "load" | "run" = "load"): Distribution => ({
+    kind: "nurand",
+    a,
+    phase,
+  }),
 };
 
 function dateToTimestamp(d: Date): Timestamp {
@@ -672,12 +696,54 @@ function dateToTimestamp(d: Date): Timestamp {
 function toProtoDistribution(d: Distribution): Generation_Distribution {
   switch (d.kind) {
     case "normal":
-      return { type: Generation_Distribution_DistributionType.NORMAL, screw: d.screw ?? 0 };
+      return {
+        type: Generation_Distribution_DistributionType.NORMAL,
+        screw: d.screw ?? 0,
+        nurandPhase: Generation_Distribution_NURandPhase.NURAND_PHASE_UNSPECIFIED,
+      };
     case "uniform":
-      return { type: Generation_Distribution_DistributionType.UNIFORM, screw: 0 };
+      return {
+        type: Generation_Distribution_DistributionType.UNIFORM,
+        screw: 0,
+        nurandPhase: Generation_Distribution_NURandPhase.NURAND_PHASE_UNSPECIFIED,
+      };
     case "zipf":
-      return { type: Generation_Distribution_DistributionType.ZIPF, screw: d.screw };
+      return {
+        type: Generation_Distribution_DistributionType.ZIPF,
+        screw: d.screw,
+        nurandPhase: Generation_Distribution_NURandPhase.NURAND_PHASE_UNSPECIFIED,
+      };
+    case "nurand":
+      // NURand carries `A` in the `screw` field; the Go side decodes it
+      // and uses `nurandPhase` to select C-Load vs C-Run per §2.1.6.1.
+      return {
+        type: Generation_Distribution_DistributionType.NURAND,
+        screw: d.a,
+        nurandPhase:
+          d.phase === "run"
+            ? Generation_Distribution_NURandPhase.NURAND_PHASE_RUN
+            : Generation_Distribution_NURandPhase.NURAND_PHASE_LOAD,
+      };
+    default: {
+      const _exhaustive: never = d;
+      throw new Error(`unknown distribution kind: ${String(_exhaustive)}`);
+    }
   }
+}
+
+// Explicit UNIFORM default. If the `distribution` argument is omitted on a
+// range generator, we MUST serialise an explicit UNIFORM marker — otherwise
+// the proto falls back to enum value 0 which is NORMAL, and every
+// "random uniform" call would silently become a bell curve centred on
+// (min+max)/2. This bit the TPC-C rollback/remote percentages hard until
+// found; keep the default explicit.
+const DEFAULT_UNIFORM: Generation_Distribution = {
+  type: Generation_Distribution_DistributionType.UNIFORM,
+  screw: 0,
+  nurandPhase: Generation_Distribution_NURandPhase.NURAND_PHASE_UNSPECIFIED,
+};
+function distOrDefault(d?: Distribution): Generation_Distribution {
+  return d ? toProtoDistribution(d) : DEFAULT_UNIFORM;
 }
 
 // ============================================================================
@@ -782,6 +848,68 @@ interface RandomRangeGenerators {
   /** Random UUID v4, reproducible by seed. */
   uuidSeeded: () => Rule;
 
+  /**
+   * Weighted pick over N sub-rules. Each call to the resulting generator
+   * picks one item proportional to its weight and emits its value.
+   * Useful for categorical mixes like TPC-C C_CREDIT (10% "BC" / 90% "GC")
+   * or I_DATA (10% containing "ORIGINAL") without coupling two independent
+   * generators at the call site.
+   *
+   * Weights are relative — they don't have to sum to 1 or 100. Items with
+   * weight 0 are unreachable.
+   *
+   * @example
+   *   R.weighted([
+   *     { rule: C.str("GC"), weight: 90 },
+   *     { rule: C.str("BC"), weight: 10 },
+   *   ])
+   */
+  weighted: (items: Array<{ rule: Rule; weight: number }>) => Rule;
+
+  /**
+   * Pick a string from a fixed list of candidate values. Used for TPC-C
+   * C_LAST population (§4.3.2.3) where 1000 precomputed syllable strings
+   * need to be traversed deterministically.
+   *
+   * Two modes:
+   * - No `index` rule: an internal counter cycles through `values`,
+   *   producing values[0], values[1], ..., values[n-1], values[0], ...
+   *   on successive Next() calls. Useful for sequential traversal with
+   *   period = len(values).
+   * - With `index` rule: the sub-rule (must produce integers) drives
+   *   each pick; out-of-range indices are wrapped modulo len(values).
+   *   Useful for NURand or other non-uniform index distributions.
+   *
+   * @example
+   *   // Sequential cycling through C_LAST syllable dictionary:
+   *   R.dict(C_LAST_DICT)
+   *
+   *   // NURand-driven pick from the same dictionary:
+   *   R.dict(C_LAST_DICT, R.int32(0, 999, Dist.nurand(255)))
+   */
+  dict: (values: string[], index?: Rule) => Rule;
+
+  /**
+   * Generate a random string of length in [minLen, maxLen], injecting
+   * the given `literal` substring at a random position in `injectPct`%
+   * of rows. Used for TPC-C I_DATA / S_DATA population (§4.3.3.1), where
+   * 10% of the item/stock rows must contain the literal "ORIGINAL".
+   *
+   * Non-literal characters are drawn from `alphabet` (defaults to
+   * alphanumeric plus space). `minLen` is clamped up to `literal.length`
+   * when smaller to guarantee the literal fits.
+   *
+   * @example
+   *   R.strWithLiteral("ORIGINAL", 10, 26, 50, AB.enNumSpc)
+   */
+  strWithLiteral: (
+    literal: string,
+    injectPct: number,
+    minLen: number,
+    maxLen: number,
+    alphabet?: Alphabet,
+  ) => Rule;
+
   // Helpers
   group: (params: Record<string, Generation_Rule>) => GroupRule;
   groups: (
@@ -855,42 +983,42 @@ export const R: RandomRangeGenerators = {
   int32(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "int32Range", int32Range: { min, max } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
   int64(min: string | number | bigint, max: string | number | bigint, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "int64Range", int64Range: { min: String(min), max: String(max) } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
   uint32(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "uint32Range", uint32Range: { min, max } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
   uint64(min: string | number | bigint, max: string | number | bigint, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "uint64Range", uint64Range: { min: String(min), max: String(max) } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
   float(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "floatRange", floatRange: { min, max } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
   double(min: number, max: number, distribution?: Distribution): Rule {
     return rule({
       kind: { oneofKind: "doubleRange", doubleRange: { min, max } },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
@@ -905,7 +1033,7 @@ export const R: RandomRangeGenerators = {
             : { oneofKind: "double", double: { min: min as number, max: max as number } },
         },
       },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
@@ -923,7 +1051,7 @@ export const R: RandomRangeGenerators = {
           },
         },
       },
-      distribution: distribution && toProtoDistribution(distribution),
+      distribution: distOrDefault(distribution),
     });
   },
 
@@ -941,6 +1069,68 @@ export const R: RandomRangeGenerators = {
 
   uuidSeeded(): Rule {
     return rule({ kind: { oneofKind: "uuidSeeded", uuidSeeded: true } });
+  },
+
+  weighted(items: Array<{ rule: Rule; weight: number }>): Rule {
+    if (items.length === 0) {
+      throw new Error("R.weighted: items must be non-empty");
+    }
+    return rule({
+      kind: {
+        oneofKind: "weightedChoice",
+        weightedChoice: {
+          items: items.map((it) => ({
+            rule: Generation_Rule.create(it.rule),
+            weight: it.weight,
+          })),
+        },
+      },
+    });
+  },
+
+  dict(values: string[], index?: Rule): Rule {
+    if (values.length === 0) {
+      throw new Error("R.dict: values must be non-empty");
+    }
+    return rule({
+      kind: {
+        oneofKind: "stringDictionary",
+        stringDictionary: {
+          values,
+          index: index ? Generation_Rule.create(index) : undefined,
+        },
+      },
+    });
+  },
+
+  strWithLiteral(
+    literal: string,
+    injectPct: number,
+    minLen: number,
+    maxLen: number,
+    alphabet: Alphabet = AB.enNumSpc,
+  ): Rule {
+    if (literal.length === 0) {
+      throw new Error("R.strWithLiteral: literal must be non-empty");
+    }
+    if (injectPct < 0 || injectPct > 100) {
+      throw new Error(`R.strWithLiteral: injectPct must be in [0..100], got ${injectPct}`);
+    }
+    if (maxLen < minLen) {
+      throw new Error(`R.strWithLiteral: maxLen (${maxLen}) < minLen (${minLen})`);
+    }
+    return rule({
+      kind: {
+        oneofKind: "stringLiteralInject",
+        stringLiteralInject: {
+          literal,
+          injectPercentage: injectPct,
+          minLen: minLen.toString(),
+          maxLen: maxLen.toString(),
+          alphabet: { ranges: alphabet },
+        },
+      },
+    });
   },
 
   group: group_internal,
@@ -1063,3 +1253,82 @@ function group_internal(
  *  Call once() during init to capture the guard, then invoke the
  *  returned function during iterations — it only fires on the first call. */
 export const once = Once;
+
+// ============================================================================
+// T2.3: SQLSTATE 40001 / deadlock retry helper
+// ============================================================================
+//
+// PG REPEATABLE READ uses snapshot isolation, so concurrent updates to the
+// same row abort with SQLSTATE 40001 ("could not serialize access due to
+// concurrent update"). MySQL's row-locking equivalent is "Deadlock found
+// when trying to get lock" (Error 1213, SQLSTATE 40001). The TPC-C spec
+// §5.2.5 caps the total error rate at 1%, so we retry these aborts a few
+// times before letting them bubble up to k6's tx_error_rate.
+//
+// Audit (2026-04-09) of pkg/driver/{postgres,mysql,sqldriver,...}: the
+// stroppy Go layer wraps every driver error with `fmt.Errorf("...: %w",
+// err)` (see sqldriver/run_query.go and cmd/xk6air/driver_wrapper.go). Both
+// pgx's pgconn.PgError.Error() and go-sql-driver's mysql.MySQLError.Error()
+// stringify to formats that include enough textual signal:
+//
+//   pg:    "ERROR: could not serialize access due to concurrent update (SQLSTATE 40001)"
+//   pg:    "ERROR: deadlock detected (SQLSTATE 40P01)"
+//   mysql: "Error 1213 (40001): Deadlock found when trying to get lock; ..."
+//
+// So no Go-side classification is needed — the JS catch sees the wrapped
+// message via `e.message` and a regex match is enough.
+//
+// IMPORTANT: this MUST return false for the spec §2.4.2.3 New-Order rollback
+// sentinel ("tpcc_rollback:item_not_found"). On PG that path is raised via
+// `RAISE EXCEPTION` (SQLSTATE P0001) and on MySQL via `SIGNAL SQLSTATE
+// '45000'`, neither of which match the serialization patterns below — but we
+// add an explicit early-out so a future regex tweak can't accidentally trip
+// the rollback path.
+
+/** Check if an error is a transient serialization failure or deadlock that
+ *  should be retried. Matches both PostgreSQL and MySQL error texts.
+ *  Explicitly excludes the TPC-C `tpcc_rollback:` sentinel so the spec
+ *  §2.4.2.3 New-Order rollback path is never retried. */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const isSerializationError = (e: any): boolean => {
+  const msg = String(e?.message ?? e);
+  // Defensive: never retry the spec-mandated rollback sentinel.
+  if (msg.indexOf("tpcc_rollback:") >= 0) return false;
+  return /SQLSTATE 40001/i.test(msg)
+      || /could not serialize access/i.test(msg)
+      || /SQLSTATE 40P01/i.test(msg)
+      || /deadlock detected/i.test(msg)        // pg
+      || /Deadlock found/i.test(msg)           // mysql
+      || /Error 1213/i.test(msg);              // mysql numeric
+};
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/** Run `fn`, retrying up to `maxAttempts - 1` times when `isRetryable(e)`
+ *  returns true. The optional `onRetry` callback fires once per retry,
+ *  before re-invoking `fn`, and receives the upcoming attempt number
+ *  (2-based) plus the caught error. No backoff: serialization retries are
+ *  immediate by design — sleeping inside a tx body would just deepen the
+ *  contention window. Use the callback to bump a counter so operators can
+ *  observe how often retries fire. */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const retry = <T>(
+  maxAttempts: number,
+  isRetryable: (e: any) => boolean,
+  fn: () => T,
+  onRetry?: (attempt: number, e: any) => void,
+): T => {
+  let lastErr: any;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return fn();
+    } catch (e) {
+      lastErr = e;
+      if (!isRetryable(e) || attempt === maxAttempts) {
+        throw e;
+      }
+      if (onRetry) onRetry(attempt + 1, e);
+    }
+  }
+  throw lastErr; // unreachable — last iteration always throws or returns
+};
+/* eslint-enable @typescript-eslint/no-explicit-any */

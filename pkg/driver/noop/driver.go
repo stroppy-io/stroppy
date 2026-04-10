@@ -105,7 +105,7 @@ func (d *Driver) Teardown(_ context.Context) error {
 	return nil
 }
 
-// wrapRows converts a noopResult into an empty driver.Rows cursor.
+// wrapRows converts a noopResult into a one-row stub cursor (see rows).
 func wrapRows(_ noopResult) driver.Rows { return &rows{} }
 
 // ── noopConn ────────────────────────────────────────────────────────────────
@@ -134,16 +134,38 @@ func (c *noopConn) Commit(_ context.Context) error   { return nil }
 func (c *noopConn) Rollback(_ context.Context) error { return nil }
 
 // ── rows ─────────────────────────────────────────────────────────────────────
-// Empty cursor returned by wrapRows — always exhausted.
+// One-row stub cursor returned by wrapRows. Mirrors the probe-time rowsStub
+// in internal/runner/script_extractor.go: pretends exactly one row containing
+// a single int64(1) exists so workload bodies with defensive null-row checks
+// (e.g. `if (!distRow) throw ...`) and counting guards (e.g. payment's
+// `if (nameCount === 0) throw ...`) can execute past them. Using 1 rather
+// than 0 is deliberate — a zero COUNT(*) return would trip the by-name
+// payment/order-status throws. Downstream numeric reads (`Number(row[N])`)
+// see 1 for column 0 and NaN for higher indices, which stays non-throwing
+// in JS; string reads (`String(row[N] ?? "")`) see "1" for column 0 and ""
+// elsewhere. Good enough to exercise the full stroppy → driver → JS roundtrip
+// without any real I/O, which is the whole point of the noop driver.
 
-type rows struct{}
+type rows struct {
+	consumed bool
+}
 
 var _ driver.Rows = (*rows)(nil)
 
-func (r *rows) Columns() []string     { return nil }
-func (r *rows) Next() bool            { return false }
-func (r *rows) Values() []any         { return nil }
-func (r *rows) ReadAll(_ int) [][]any { return nil }
+func (r *rows) Columns() []string { return []string{} }
+
+func (r *rows) Next() bool {
+	if r.consumed {
+		return false
+	}
+
+	r.consumed = true
+
+	return true
+}
+
+func (r *rows) Values() []any         { return []any{int64(1)} }
+func (r *rows) ReadAll(_ int) [][]any { return [][]any{{int64(1)}} }
 func (r *rows) Err() error            { return nil }
 func (r *rows) Close() error          { return nil }
 

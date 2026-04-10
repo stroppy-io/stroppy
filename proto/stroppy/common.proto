@@ -134,13 +134,111 @@ message Generation {
       UNIFORM = 1;
       /** Zipfian distribution */
       ZIPF = 2;
+      /**
+       * TPC-C NURand(A, x, y) non-uniform distribution per spec §2.1.6:
+       *   ((rand(0,A) | rand(x,y)) + C) % (y - x + 1) + x
+       * where `|` is bitwise OR and `C` is a per-generator constant derived
+       * from the seed. The `A` parameter is carried via the `screw` field
+       * (typical TPC-C values: 255 for C_LAST, 1023 for C_ID, 8191 for OL_I_ID).
+       * Integers only — `round` must be true.
+       */
+      NURAND = 3;
+    }
+
+    /**
+     * For NURAND only: distinguishes C-Load vs C-Run generator instances per
+     * TPC-C §2.1.6.1 / §5.3. The Go side derives C_load and C_run from the
+     * same seed such that |C_run - C_load| falls within the spec's required
+     * delta window for the active A value (255 / 1023 / 8191). Ignored by
+     * other distribution types. Default UNSPECIFIED is treated as LOAD for
+     * back-compat with callers that don't care about the phase.
+     */
+    enum NURandPhase {
+      /** Treated as LOAD for back-compat. */
+      NURAND_PHASE_UNSPECIFIED = 0;
+      /** C-Load generator: used during data population. */
+      NURAND_PHASE_LOAD = 1;
+      /** C-Run generator: used during measurement workload. */
+      NURAND_PHASE_RUN = 2;
     }
 
     /** Type of distribution to use */
     DistributionType type = 1 [ (validate.rules).enum.defined_only = true ];
     /** Distribution parameter (e.g., standard deviation for normal
-     * distribution) */
+     * distribution, `A` for NURAND) */
     double screw = 2 [ (validate.rules).double.gte = 0 ];
+    /** For NURAND: which phase this generator is for (C-Load or C-Run).
+     *  Used by §2.1.6.1 / §5.3 audit rule on |C_run - C_load|. */
+    NURandPhase nurand_phase = 3
+        [ (validate.rules).enum.defined_only = true ];
+  }
+
+  /**
+   * WeightedChoice picks one of N sub-rules with given weights per Next() call.
+   * Useful for mixing categorical values (e.g., TPC-C C_CREDIT = 10% "BC" /
+   * 90% "GC") without coupling two independent generators at the call site.
+   *
+   * Weights are relative; they don't have to sum to 1.0 or 100. An item with
+   * weight 0 is unreachable. At least one item is required.
+   */
+  message WeightedChoice {
+    message Item {
+      /** Sub-rule to dispatch to when this item is chosen. */
+      Rule rule = 1 [ (validate.rules).message.required = true ];
+      /** Relative weight; must be > 0 to be reachable. */
+      double weight = 2 [ (validate.rules).double.gte = 0 ];
+    }
+    /** Candidate sub-rules with their weights. At least one required. */
+    repeated Item items = 1 [ (validate.rules).repeated = {
+      min_items : 1,
+      items : {message : {required : true}}
+    } ];
+  }
+
+  /**
+   * StringDictionary picks a string from a fixed list by index. Used for
+   * TPC-C C_LAST (§4.3.2.3) — the 1000-entry syllable dictionary that
+   * indexes sequentially for the first 1000 customers per district and
+   * via NURand(255,0,999) for the remaining 2000.
+   *
+   * If `index` is set, the sub-rule produces integer indices on each Next();
+   * values are wrapped modulo len(values). If `index` is omitted, an internal
+   * monotonic counter cycles through `values` on each Next() call — useful
+   * for deterministic sequential traversal with no extra generator setup.
+   */
+  message StringDictionary {
+    /** Candidate values. At least one required. */
+    repeated string values = 1 [ (validate.rules).repeated.min_items = 1 ];
+    /** Optional index source. If omitted, an internal counter cycles
+     *  through values on each Next(). If set, must produce integer values;
+     *  out-of-range indices are wrapped modulo len(values). */
+    optional Rule index = 2;
+  }
+
+  /**
+   * StringLiteralInject generates a random string that contains a fixed
+   * literal substring in `inject_percentage` of rows. Used for TPC-C
+   * I_DATA / S_DATA (§4.3.3.1) — 10% of rows must contain the literal
+   * "ORIGINAL" at a random position within the total string length.
+   *
+   * On each Next(): draws a length in [min_len, max_len]; with probability
+   * inject_percentage/100 places `literal` at a random offset and fills the
+   * remaining positions with random characters from `alphabet`; otherwise
+   * generates a plain random string of the chosen length.
+   */
+  message StringLiteralInject {
+    /** The literal substring to inject (e.g., "ORIGINAL"). Must be non-empty. */
+    string literal = 1 [ (validate.rules).string.min_len = 1 ];
+    /** Percentage of rows where the literal is injected [0..100]. */
+    uint32 inject_percentage = 2
+        [ (validate.rules).uint32 = {gte : 0, lte : 100} ];
+    /** Minimum total string length (must be >= len(literal)). */
+    uint64 min_len = 3;
+    /** Maximum total string length (inclusive; must be >= min_len). */
+    uint64 max_len = 4 [ (validate.rules).uint64.gt = 0 ];
+    /** Alphabet for non-literal characters. If omitted, falls back to the
+     *  default English alphabet used by Range.String. */
+    optional Alphabet alphabet = 5;
   }
 
   /**
@@ -333,6 +431,17 @@ message Generation {
       bool uuid_seeded = 23;
       /** Sequential UUIDs from min to max (00000...1 → 00000...N). */
       Range.UuidSeq uuid_seq = 24;
+
+      // Meta
+      /** Weighted choice over N sub-rules (e.g., GC/BC string mix). */
+      WeightedChoice weighted_choice = 25;
+      /** Pick a string from a fixed list by sub-rule index or cycling
+       *  counter (TPC-C C_LAST §4.3.2.3 syllable dictionary). */
+      StringDictionary string_dictionary = 26;
+      /** Random string with a literal substring injected at a random
+       *  position in a percentage of rows (TPC-C I_DATA / S_DATA
+       *  §4.3.3.1 "ORIGINAL" marker). */
+      StringLiteralInject string_literal_inject = 27;
     }
 
     /** Shape of randomness; Normal by default; Only for numbers */

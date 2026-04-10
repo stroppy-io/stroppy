@@ -174,29 +174,75 @@ WHERE s_i_id = :i_id AND s_w_id = :w_id
 --= insert_order_line
 UPSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info)
 VALUES (:o_id, :d_id, :w_id, :ol_number, :i_id, :supply_w_id, :quantity, :amount, :dist_info)
+--= get_items_batch
+SELECT i_id, i_price, i_name, i_data FROM item WHERE i_id IN ({item_ids})
+--= get_stocks_batch
+SELECT s_i_id, s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10
+FROM stock WHERE s_w_id = :w_id AND s_i_id IN ({item_ids})
 
 --+ workload_tx_payment
 --= update_warehouse
 UPDATE warehouse SET w_ytd = w_ytd + :amount WHERE w_id = :w_id
 --= get_warehouse
 SELECT w_name, w_street_1, w_street_2, w_city, w_state, w_zip FROM warehouse WHERE w_id = :w_id
+--= update_get_warehouse
+UPDATE warehouse SET w_ytd = w_ytd + :amount WHERE w_id = :w_id
+RETURNING w_name, w_street_1, w_street_2, w_city, w_state, w_zip
 --= update_district
 UPDATE district SET d_ytd = d_ytd + :amount WHERE d_w_id = :w_id AND d_id = :d_id
 --= get_district
 SELECT d_name, d_street_1, d_street_2, d_city, d_state, d_zip FROM district WHERE d_w_id = :w_id AND d_id = :d_id
+--= update_get_district
+UPDATE district SET d_ytd = d_ytd + :amount WHERE d_w_id = :w_id AND d_id = :d_id
+RETURNING d_name, d_street_1, d_street_2, d_city, d_state, d_zip
 --= get_customer_by_id
-SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since
+/* Trailing c_data is needed for the §2.5.2.2 BC-credit append path. */
+SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
 FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= count_customers_by_name
+/* TPC-C 2.5.1.2: 60% of Payment lookups are by (w_id, d_id, c_last). */
+SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+--= get_customer_by_name
+/* TPC-C 2.5.2.2: pick row ceil(n/2) ordered by c_first — zero-indexed
+   OFFSET is (n - 1) / 2, computed client-side and passed in.
+   Trailing c_data supports the BC-credit append path (§1.8).
+   Note: YDB OFFSET requires Uint64; JS Number arrives as Int64 via
+   AutoDeclare, so wrap in CAST to satisfy the type checker. */
+SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
+FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+ORDER BY c_first
+LIMIT 1 OFFSET CAST(:offset AS Uint64)
 --= update_customer
 UPDATE customer SET c_balance = c_balance - :amount, c_ytd_payment = c_ytd_payment + :amount, c_payment_cnt = c_payment_cnt + 1
 WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
+--= update_customer_bc
+/* TPC-C 2.5.2.2: BC-credit path. c_data_new is built AND clamped to
+   500 chars on the JS side, so this UPDATE just assigns it raw —
+   sidesteps YDB's Substring(String) vs Utf8 type mismatch. */
+UPDATE customer
+   SET c_balance     = c_balance - :amount,
+       c_ytd_payment = c_ytd_payment + :amount,
+       c_payment_cnt = c_payment_cnt + 1,
+       c_data        = :c_data_new
+ WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 --= insert_history
 UPSERT INTO history (h_id, h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data)
 VALUES (:h_id, :h_c_id, :h_c_d_id, :h_c_w_id, :h_d_id, :h_w_id, CurrentUtcTimestamp(), :h_amount, :h_data)
 
 --+ workload_tx_order_status
 --= get_customer_by_id
-SELECT c_balance, c_first, c_middle, c_last FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
+--= count_customers_by_name
+/* TPC-C 2.6.1.2: 60% of Order-Status lookups are by (w_id, d_id, c_last). */
+SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+--= get_customer_by_name
+/* TPC-C 2.6.2.2: pick row ceil(n/2) ordered by c_first — zero-indexed
+   OFFSET is (n - 1) / 2, computed client-side.
+   Note: YDB OFFSET requires Uint64; CAST forces the type. */
+SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer
+WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+ORDER BY c_first
+LIMIT 1 OFFSET CAST(:offset AS Uint64)
 --= get_last_order
 SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_d_id = :d_id AND o_w_id = :w_id AND o_c_id = :c_id ORDER BY o_id DESC LIMIT 1
 --= get_order_lines

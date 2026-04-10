@@ -10,7 +10,7 @@ Database stress testing CLI tool powered by k6 workload engine.
 
 - Built-in TPC-B, TPC-C, TPC-DS like workload tests
 - Custom test scenarios support via TypeScript
-- PostgreSQL, MySQL, Picodata drivers (more DBMSs coming soon)
+- PostgreSQL, MySQL, YDB, Picodata drivers (more DBMSs coming soon)
 - Transaction support with configurable isolation levels
 - k6-based load generation engine
 

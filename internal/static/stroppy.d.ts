@@ -17,7 +17,14 @@ declare module "k6/x/stroppy" {
   export type BinMsg<_T extends any> = Uint8Array<ArrayBufferLike>;
 
   export interface GoDuration {
+    /** Truncated to int64 milliseconds — sub-ms durations report as 0. */
     milliseconds(): number;
+    /** Float seconds — multiply by 1000 for float-precision ms. */
+    seconds(): number;
+    /** Truncated to int64 microseconds. */
+    microseconds(): number;
+    /** Truncated to int64 nanoseconds. */
+    nanoseconds(): number;
     string(): string;
   }
 
