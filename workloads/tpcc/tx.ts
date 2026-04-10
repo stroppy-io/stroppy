@@ -1358,16 +1358,19 @@ const picker = NewPicker(0);
 
 // §5.2.1/§5.2.5: each VU iteration is: keying time → tx → think time.
 // Pacing is opt-in (PACING=true); default off for raw throughput runs.
-const _txFuncs = [new_order, payment, order_status, delivery, stock_level];
-const _txNames = ["new_order", "payment", "order_status", "delivery", "stock_level"];
+const _txNameByFn = new Map<Function, string>([
+  [new_order, "new_order"], [payment, "payment"], [order_status, "order_status"],
+  [delivery, "delivery"], [stock_level, "stock_level"],
+]);
 export default function (): void {
-  const idx = Math.floor(picker.pickWeighted(
-    [0, 1, 2, 3, 4],
+  const workload = picker.pickWeighted(
+    [new_order, payment, order_status, delivery, stock_level],
     [45, 43, 4, 4, 4],
-  ) as number);
-  keyingTime(_txNames[idx]);
-  _txFuncs[idx]();
-  thinkTime(_txNames[idx]);
+  ) as () => void;
+  const txName = _txNameByFn.get(workload) ?? "new_order";
+  keyingTime(txName);
+  workload();
+  thinkTime(txName);
 }
 
 export function teardown() {

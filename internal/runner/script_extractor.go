@@ -55,7 +55,7 @@ func TranspileTypeScript(entryPath string) (string, error) {
 		Write:             false, // keep outputs in-memory
 		LogLevel:          api.LogLevelError,
 		AbsWorkingDir:     dirAbs,
-		External:          []string{"k6/x/*", "k6/*", "./parse_sql.js"},
+		External:          []string{"k6", "k6/x/*", "k6/*", "./parse_sql.js"},
 		MainFields:        []string{"module", "main"},
 		ResolveExtensions: []string{".ts", ".tsx", ".js", ".mjs", ".json"},
 		Loader: map[string]api.Loader{
@@ -101,6 +101,12 @@ func ProbeScript(scriptPath string) (*Probeprint, error) {
 
 var reEncodingObjectImport = regexp.MustCompile(`import\s+(\w+)\s+from\s+["']k6/x/encoding["'];?`)
 
+// reK6BareImport matches `import { sleep, ... } from "k6"` — the bare "k6"
+// module (as opposed to "k6/options", "k6/metrics" etc. which are handled by
+// esbuild's k6/* external pattern). The probe VM doesn't resolve modules, so
+// we replace the import with a no-op stub object.
+var reK6BareImport = regexp.MustCompile(`import\s*\{([^}]+)\}\s*from\s*["']k6["'];?`)
+
 func ProbeJSTest(vm *js.Runtime, jsCode string) (*Probeprint, error) {
 	// Mock k6/x/encoding import
 	// This is needed because the extraction VM doesn't have the k6/x/encoding module.
@@ -109,6 +115,27 @@ func ProbeJSTest(vm *js.Runtime, jsCode string) (*Probeprint, error) {
 		jsCode,
 		`const $1 = { TextEncoder: globalThis.TextEncoder, TextDecoder: globalThis.TextDecoder };`,
 	)
+
+	// Mock bare "k6" import (sleep, check, etc.) — stub all names as no-ops.
+	jsCode = reK6BareImport.ReplaceAllStringFunc(jsCode, func(match string) string {
+		sub := reK6BareImport.FindStringSubmatch(match)
+		if len(sub) < 2 {
+			return match
+		}
+		var names []string
+		for _, n := range strings.Split(sub[1], ",") {
+			if n = strings.TrimSpace(n); n != "" {
+				names = append(names, n)
+			}
+		}
+		// var _k6 = {sleep:function(){}, ...}; var sleep = _k6.sleep; ...
+		var stubs, assigns []string
+		for _, n := range names {
+			stubs = append(stubs, n+":function(){}")
+			assigns = append(assigns, "var "+n+" = _k6."+n+";")
+		}
+		return "var _k6 = {" + strings.Join(stubs, ",") + "}; " + strings.Join(assigns, " ")
+	})
 
 	probeprint := &Probeprint{}
 	if err := prepareVMEnvironment(vm, probeprint); err != nil {
