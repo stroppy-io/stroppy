@@ -119,11 +119,13 @@ func ProbeJSTest(vm *js.Runtime, jsCode string) (*Probeprint, error) {
 	// Mock bare "k6" import (sleep, check, etc.) — stub all names as no-ops.
 	jsCode = reK6BareImport.ReplaceAllStringFunc(jsCode, func(match string) string {
 		sub := reK6BareImport.FindStringSubmatch(match)
-		if len(sub) < 2 {
+		if len(sub) < 2 { //nolint:mnd
 			return match
 		}
+
 		var names []string
-		for _, n := range strings.Split(sub[1], ",") {
+
+		for n := range strings.SplitSeq(sub[1], ",") {
 			if n = strings.TrimSpace(n); n != "" {
 				names = append(names, n)
 			}
@@ -134,6 +136,7 @@ func ProbeJSTest(vm *js.Runtime, jsCode string) (*Probeprint, error) {
 			stubs = append(stubs, n+":function(){}")
 			assigns = append(assigns, "var "+n+" = _k6."+n+";")
 		}
+
 		return "var _k6 = {" + strings.Join(stubs, ",") + "}; " + strings.Join(assigns, " ")
 	})
 

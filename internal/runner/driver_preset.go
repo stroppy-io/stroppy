@@ -29,17 +29,20 @@ var errUnknownDriver = errors.New("unknown driver")
 // inferType converts a CLI string value to its most specific Go type
 // so that JSON serialization emits a number/bool instead of a quoted string.
 // This is required because protobuf (TS side) rejects "20" for int32 fields.
-func inferType(s string) any {
-	if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+func inferType(value string) any {
+	if i, err := strconv.ParseInt(value, 10, 64); err == nil {
 		return i
 	}
-	if f, err := strconv.ParseFloat(s, 64); err == nil {
+
+	if f, err := strconv.ParseFloat(value, 64); err == nil {
 		return f
 	}
-	if b, err := strconv.ParseBool(s); err == nil {
+
+	if b, err := strconv.ParseBool(value); err == nil {
 		return b
 	}
-	return s
+
+	return value
 }
 
 // DriverPreset contains default configuration for a known database driver.
