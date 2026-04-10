@@ -185,28 +185,31 @@ UPDATE district SET d_ytd = d_ytd + :amount WHERE d_w_id = :w_id AND d_id = :d_i
 --= get_district
 SELECT d_name, d_street_1, d_street_2, d_city, d_state, d_zip FROM district WHERE d_w_id = :w_id AND d_id = :d_id
 --= get_customer_by_id
-/* Trailing c_data is needed for the §2.5.2.2 BC-credit append path. */
+-- Trailing c_data is needed for the §2.5.2.2 BC-credit append path.
 SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
 FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 --= count_customers_by_name
-/* TPC-C 2.5.1.2: 60% of Payment lookups are by (w_id, d_id, c_last).
-   Single-table SELECT — safe for sbroad (no cross-shard motion). */
+-- TPC-C 2.5.1.2: 60% of Payment lookups are by (w_id, d_id, c_last).
+-- Single-table SELECT — safe for sbroad (no cross-shard motion).
+-- Using -- comments (not /* */) because sbroad's parser rejects block
+-- comments at the head of a statement; parse_sql strips -- lines from
+-- query bodies before the query reaches picodata.
 SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 --= get_customer_by_name
-/* TPC-C 2.5.2.2: pick row ceil(n/2) ordered by c_first — zero-indexed
-   OFFSET is (n - 1) / 2, computed client-side and passed in.
-   Trailing c_data supports the BC-credit append path (§1.8). */
+-- TPC-C 2.5.2.2: pick row ceil(n/2) ordered by c_first.
+-- picodata/sbroad rejects OFFSET in SELECT ("expected EOI or DqlOption"),
+-- so we fetch all matching rows and pick the median in tx.ts (IS_PICODATA
+-- branch). Trailing c_data supports the BC-credit append path (§1.8).
 SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
 FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 ORDER BY c_first
-LIMIT 1 OFFSET :offset
 --= update_customer
 UPDATE customer SET c_balance = c_balance - :amount, c_ytd_payment = c_ytd_payment + :amount, c_payment_cnt = c_payment_cnt + 1
 WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 --= update_customer_bc
-/* TPC-C 2.5.2.2: BC-credit path. c_data_new is built client-side
-   (c_id c_d_id c_w_id d_id w_id h_amount|old_c_data); SUBSTR clamps
-   to 500 chars. Picodata/sbroad accepts SUBSTR(expr, 1, 500). */
+-- TPC-C 2.5.2.2: BC-credit path. c_data_new is built client-side
+-- (c_id c_d_id c_w_id d_id w_id h_amount|old_c_data); SUBSTR clamps
+-- to 500 chars. Picodata/sbroad accepts SUBSTR(expr, 1, 500).
 UPDATE customer
    SET c_balance     = c_balance - :amount,
        c_ytd_payment = c_ytd_payment + :amount,
@@ -221,15 +224,14 @@ VALUES (:h_id, :h_c_id, :h_c_d_id, :h_c_w_id, :h_d_id, :h_w_id, LOCALTIMESTAMP, 
 --= get_customer_by_id
 SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
 --= count_customers_by_name
-/* TPC-C 2.6.1.2: 60% of Order-Status lookups are by (w_id, d_id, c_last). */
+-- TPC-C 2.6.1.2: 60% of Order-Status lookups are by (w_id, d_id, c_last).
 SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 --= get_customer_by_name
-/* TPC-C 2.6.2.2: pick row ceil(n/2) ordered by c_first — zero-indexed
-   OFFSET is (n - 1) / 2, computed client-side. */
+-- TPC-C 2.6.2.2: pick row ceil(n/2) ordered by c_first.
+-- picodata/sbroad rejects OFFSET; fetch all rows and pick in tx.ts.
 SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer
 WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 ORDER BY c_first
-LIMIT 1 OFFSET :offset
 --= get_last_order
 SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_d_id = :d_id AND o_w_id = :w_id AND o_c_id = :c_id ORDER BY o_id DESC LIMIT 1
 --= get_order_lines

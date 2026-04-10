@@ -149,6 +149,12 @@ const TX_ISOLATION = (
 
 const driver = DriverX.create().setup(driverConfig);
 
+// picodata/sbroad doesn't support SELECT ... OFFSET, so the by-name
+// customer median pick (Payment §2.5.2.2, Order-Status §2.6.2.2) has to
+// fetch all matching rows and index client-side. The other dialects keep
+// the efficient `LIMIT 1 OFFSET :offset` SQL path.
+const IS_PICODATA = driverConfig.driverType === "picodata";
+
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
 // Per-VU monotonic counter for h_id only. history has no natural PK in the
@@ -494,6 +500,17 @@ export function setup() {
   // queries — supported on all 4 dialects — and compute the comparisons
   // in JS. Portable, no dialect branching, slightly more round trips at
   // setup time (acceptable: validate_population runs once).
+  //
+  // Picodata note: the full-scan aggregations here (MAX/MIN/COUNT GROUP BY
+  // on orders/new_order, SUM(o_ol_cnt), and especially the §4.3.3.1
+  // `LIKE '%ORIGINAL%'` scans over item/stock) blow past sbroad's default
+  // `sql_vdbe_opcode_max = 45000` opcode budget at scale_factor ≥ 2. The
+  // stroppy-playground docker-compose ships a `picodata-init` sidecar that
+  // raises the limit to 100_000_000 cluster-wide, which is enough for any
+  // scale factor we run locally. If you're running a perf benchmark and
+  // don't care about population validation, consider skipping this step
+  // entirely (e.g. gate on an env flag) — the bump is only needed *because*
+  // of validate_population; hot-path tx queries all stay well under 45k.
   Step("validate_population", () => {
     const TOTAL_ORDERS     = TOTAL_CUSTOMERS;                          // 30000 * W
     const TOTAL_NEW_ORDER  = TOTAL_DISTRICTS * 900;                    // 9000 * W
@@ -965,10 +982,21 @@ function payment() {
             throw new Error(`payment: no customers match c_last='${c_last_pick}' in (${c_w_id},${c_d_id})`);
           }
           const offset = Math.floor((nameCount - 1) / 2);
-          const nameRow = tx.queryRow(
-            sql("workload_tx_payment", "get_customer_by_name")!,
-            { w_id: c_w_id, d_id: c_d_id, c_last: c_last_pick, offset },
-          );
+          let nameRow: any[] | undefined;
+          if (IS_PICODATA) {
+            // picodata/sbroad rejects OFFSET — fetch all matching rows and
+            // pick the median client-side. Group size is tiny (~3 on avg).
+            const allRows = tx.queryRows(
+              sql("workload_tx_payment", "get_customer_by_name")!,
+              { w_id: c_w_id, d_id: c_d_id, c_last: c_last_pick },
+            );
+            nameRow = allRows[offset];
+          } else {
+            nameRow = tx.queryRow(
+              sql("workload_tx_payment", "get_customer_by_name")!,
+              { w_id: c_w_id, d_id: c_d_id, c_last: c_last_pick, offset },
+            );
+          }
           if (!nameRow) {
             throw new Error(`payment: by-name SELECT returned no row for c_last='${c_last_pick}'`);
           }
@@ -1071,10 +1099,20 @@ function order_status() {
           const nameCount = Number(cntRaw ?? 0);
           if (nameCount === 0) return;  // nothing to report — same shape as by-id miss
           const offset = Math.floor((nameCount - 1) / 2);
-          const nameRow = tx.queryRow(
-            sql("workload_tx_order_status", "get_customer_by_name")!,
-            { w_id, d_id, c_last: c_last_pick, offset },
-          );
+          let nameRow: any[] | undefined;
+          if (IS_PICODATA) {
+            // picodata/sbroad rejects OFFSET — fetch all, pick median.
+            const allRows = tx.queryRows(
+              sql("workload_tx_order_status", "get_customer_by_name")!,
+              { w_id, d_id, c_last: c_last_pick },
+            );
+            nameRow = allRows[offset];
+          } else {
+            nameRow = tx.queryRow(
+              sql("workload_tx_order_status", "get_customer_by_name")!,
+              { w_id, d_id, c_last: c_last_pick, offset },
+            );
+          }
           if (!nameRow) return;
           // By-name SELECT returns [c_balance, c_first, c_middle, c_last, c_id]
           // — c_id is the last column.
