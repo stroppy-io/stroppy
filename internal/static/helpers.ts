@@ -195,7 +195,9 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
     const { sql: s, tags } = resolveSqlQuery(sql);
     try {
       const result = rawRunQuery(s, args);
-      runQueryMetric.add(result.stats.elapsed.milliseconds(), tags);
+      // .seconds() returns a float — multiply by 1000 for sub-ms precision.
+      // .milliseconds() truncates to int64 and reports 0 for sub-ms queries.
+      runQueryMetric.add(result.stats.elapsed.seconds() * 1000, tags);
       runQueryErrRateMetric.add(0, tags);
       runQueryCounterMetric.add(1, tags);
       return result;
@@ -280,7 +282,7 @@ export class TxX implements QueryAPI {
       (sql, args) => {
         this._queryCount++; 
         const res = tx.runQuery(sql, args);
-        this._cleanDuration += res.stats.elapsed.milliseconds();
+        this._cleanDuration += res.stats.elapsed.seconds() * 1000;
         return res;
       },
       getErrorMode,
@@ -526,7 +528,7 @@ export class DriverX implements QueryAPI {
         InsertDescriptor.toBinary(InsertDescriptor.create(descriptor)),
       );
       insertErrRateMetric.add(0, metricTags);
-      insertMetric.add(stats.elapsed.milliseconds(), metricTags);
+      insertMetric.add(stats.elapsed.seconds() * 1000, metricTags);
       console.log(`Insertion into '${descriptor.tableName}' ended in ${stats.elapsed.string()}`);
     } catch (e) {
       insertErrRateMetric.add(1, metricTags);
