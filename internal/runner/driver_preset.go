@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
@@ -24,6 +25,22 @@ var pathFields = map[string]bool{
 }
 
 var errUnknownDriver = errors.New("unknown driver")
+
+// inferType converts a CLI string value to its most specific Go type
+// so that JSON serialization emits a number/bool instead of a quoted string.
+// This is required because protobuf (TS side) rejects "20" for int32 fields.
+func inferType(s string) any {
+	if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+		return i
+	}
+	if f, err := strconv.ParseFloat(s, 64); err == nil {
+		return f
+	}
+	if b, err := strconv.ParseBool(s); err == nil {
+		return b
+	}
+	return s
+}
 
 // DriverPreset contains default configuration for a known database driver.
 // These are used when the user specifies --driver / -d on the CLI.
@@ -150,7 +167,7 @@ func (d *DriverCLIConfig) ApplyOverride(key, value string) {
 			}
 		}
 
-		d.Extra[key] = value
+		d.Extra[key] = inferType(value)
 	}
 }
 
