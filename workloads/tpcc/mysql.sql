@@ -545,6 +545,11 @@ WHERE s_i_id = :i_id AND s_w_id = :w_id
 --= insert_order_line
 INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info)
 VALUES (:o_id, :d_id, :w_id, :ol_number, :i_id, :supply_w_id, :quantity, :amount, :dist_info)
+--= get_items_batch
+SELECT i_id, i_price, i_name, i_data FROM item WHERE i_id IN ({item_ids})
+--= get_stocks_batch
+SELECT s_i_id, s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10
+FROM stock WHERE s_w_id = :w_id AND s_i_id IN ({item_ids})
 
 --+ workload_tx_payment
 --= update_warehouse

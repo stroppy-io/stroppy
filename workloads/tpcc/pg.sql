@@ -544,16 +544,35 @@ WHERE s_i_id = :i_id AND s_w_id = :w_id
 --= insert_order_line
 INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info)
 VALUES (:o_id, :d_id, :w_id, :ol_number, :i_id, :supply_w_id, :quantity, :amount, :dist_info)
+--= get_items_batch
+/* Batch-read items by IN list. {item_ids} is replaced client-side with a
+   comma-separated integer list built from the order's line_i_id array. */
+SELECT i_id, i_price, i_name, i_data FROM item WHERE i_id IN ({item_ids})
+--= get_stocks_batch
+/* Batch-read stocks for a single supply warehouse. {item_ids} is the same
+   interpolation as get_items_batch. Caller issues one query per distinct
+   supply_w_id (typically 1 — only ~1% of lines are remote). */
+SELECT s_i_id, s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10
+FROM stock WHERE s_w_id = :w_id AND s_i_id IN ({item_ids})
 
 --+ workload_tx_payment
 --= update_warehouse
 UPDATE warehouse SET w_ytd = w_ytd + :amount WHERE w_id = :w_id
 --= get_warehouse
 SELECT w_name, w_street_1, w_street_2, w_city, w_state, w_zip FROM warehouse WHERE w_id = :w_id
+--= update_get_warehouse
+/* Layer 1: merge UPDATE + SELECT into one round-trip via RETURNING.
+   Column order matches get_warehouse so tx.ts indexing is unchanged. */
+UPDATE warehouse SET w_ytd = w_ytd + :amount WHERE w_id = :w_id
+RETURNING w_name, w_street_1, w_street_2, w_city, w_state, w_zip
 --= update_district
 UPDATE district SET d_ytd = d_ytd + :amount WHERE d_w_id = :w_id AND d_id = :d_id
 --= get_district
 SELECT d_name, d_street_1, d_street_2, d_city, d_state, d_zip FROM district WHERE d_w_id = :w_id AND d_id = :d_id
+--= update_get_district
+/* Layer 1: merge UPDATE + SELECT into one round-trip via RETURNING. */
+UPDATE district SET d_ytd = d_ytd + :amount WHERE d_w_id = :w_id AND d_id = :d_id
+RETURNING d_name, d_street_1, d_street_2, d_city, d_state, d_zip
 --= get_customer_by_id
 /* Trailing c_data is needed for the §2.5.2.2 BC-credit append path;
    the GC path ignores it. */

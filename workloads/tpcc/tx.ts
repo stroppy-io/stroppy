@@ -154,6 +154,9 @@ const driver = DriverX.create().setup(driverConfig);
 // fetch all matching rows and index client-side. The other dialects keep
 // the efficient `LIMIT 1 OFFSET :offset` SQL path.
 const IS_PICODATA = driverConfig.driverType === "picodata";
+// pg and ydb support UPDATE...RETURNING — merge UPDATE + SELECT into one
+// round-trip in payment() for warehouse/district YTD updates.
+const HAS_RETURNING = driverConfig.driverType === "postgres" || driverConfig.driverType === "ydb";
 
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
@@ -813,43 +816,83 @@ function new_order() {
         });
         tx.exec(sql("workload_tx_new_order", "insert_new_order")!, { o_id, d_id, w_id });
 
+        // Layer 2: batch-read items and stocks to cut ~18 round-trips per
+        // new_order (10 item reads + 10 stock reads → 1 + ~1 batch reads).
+        // Per-line stock UPDATEs and OL INSERTs remain individual queries.
+
+        // --- batch item read ---
+        // Deduplicate item IDs; NURand can produce duplicates across lines.
+        const uniqueItemIds = [...new Set(line_i_id)];
+        const itemTemplate = sql("workload_tx_new_order", "get_items_batch")!;
+        const itemQuery = itemTemplate.sql.replace("{item_ids}", uniqueItemIds.join(","));
+        const itemRows = tx.queryRows(itemQuery, {});
+        // Index by i_id. Batch result columns: [0]=i_id, [1]=i_price, [2]=i_name, [3]=i_data.
+        const itemMap = new Map<number, any[]>();
+        for (const row of itemRows) {
+          itemMap.set(Number(row[0]), row);
+        }
+
+        // Spec §2.4.2.3 rollback check: if force_rollback is set, the
+        // last line's i_id (ITEMS+1) won't appear in itemMap.
+        if (force_rollback && !itemMap.has(line_i_id[ol_cnt - 1])) {
+          tpccRollbackDone.add(1);
+          throw new Error("tpcc_rollback:item_not_found");
+        }
+
+        // --- batch stock read ---
+        // Group item IDs by supply warehouse. Typically one group (home
+        // warehouse); ~1% of lines pick a remote warehouse.
+        const stockByWh = new Map<number, Set<number>>();
+        for (let i = 0; i < ol_cnt; i++) {
+          if (!itemMap.has(line_i_id[i])) continue;
+          const sw = line_supply[i];
+          let s = stockByWh.get(sw);
+          if (!s) { s = new Set(); stockByWh.set(sw, s); }
+          s.add(line_i_id[i]);
+        }
+        // Key: "supply_w_id/i_id". Batch result columns:
+        // [0]=s_i_id, [1]=s_quantity, [2]=s_data, [3..12]=s_dist_01..s_dist_10.
+        const stockMap = new Map<string, any[]>();
+        const stockTemplate = sql("workload_tx_new_order", "get_stocks_batch")!;
+        for (const [sw, iids] of stockByWh) {
+          const q = stockTemplate.sql.replace("{item_ids}", [...iids].join(","));
+          const rows = tx.queryRows(q, { w_id: sw });
+          for (const row of rows) {
+            stockMap.set(`${sw}/${Number(row[0])}`, row);
+          }
+        }
+
+        // --- per-line: update stock + insert order_line ---
         for (let ol_number = 1; ol_number <= ol_cnt; ol_number++) {
           const i_id        = line_i_id[ol_number - 1];
           const ol_quantity = line_qty[ol_number - 1];
           const supply_w_id = line_supply[ol_number - 1];
 
-          // Spec §2.4.2.2: read item price/name.
-          const itemRow = tx.queryRow(sql("workload_tx_new_order", "get_item")!, { i_id });
+          const itemRow = itemMap.get(i_id);
           if (!itemRow) {
-            // Spec §2.4.2.3 forced rollback: abandon the transaction on a bogus
-            // i_id. This is the documented rollback trigger, not an error.
-            // tpccRollbackDone is incremented INSIDE the retry callback because
-            // a retried-then-still-rollback path should still count as one
-            // rollback, not N. (In practice the rollback sentinel never races
-            // with a 40001 — the bogus i_id throws before any update — but
-            // keep the bookkeeping consistent.)
+            // Should only happen for the rollback sentinel (caught above).
             tpccRollbackDone.add(1);
             throw new Error("tpcc_rollback:item_not_found");
           }
-          const i_price = Number(itemRow[0]);
+          // Batch columns: [0]=i_id, [1]=i_price, [2]=i_name, [3]=i_data.
+          const i_price = Number(itemRow[1]);
 
-          // Spec §2.4.2.3: read stock quantity + s_dist_NN, compute new stock.
-          // get_stock columns: [0]=s_quantity, [1]=s_data, [2..11]=s_dist_01..s_dist_10.
-          // The spec requires s_dist_NN where NN matches the order's d_id, so index
-          // into the row at (d_id + 1): d_id=1 → col 2 (s_dist_01), d_id=10 → col 11.
-          // w_id in the query MUST be supply_w_id (§2.4.2.2) — stock is per-warehouse.
-          const stockRow = tx.queryRow(sql("workload_tx_new_order", "get_stock")!, {
-            i_id, w_id: supply_w_id,
-          });
+          const stockKey = `${supply_w_id}/${i_id}`;
+          const stockRow = stockMap.get(stockKey);
           if (!stockRow) continue;
-          const s_quantity_old = Number(stockRow[0]);
-          const dist_info      = String(stockRow[d_id + 1] ?? "");
+          // Batch columns: [0]=s_i_id, [1]=s_quantity, ...
+          // s_dist_NN: d_id=1 → col 3 (s_dist_01), d_id=10 → col 12.
+          const s_quantity_old = Number(stockRow[1]);
+          const dist_info      = String(stockRow[d_id + 2] ?? "");
           const new_quantity   =
             s_quantity_old - ol_quantity >= 10
               ? s_quantity_old - ol_quantity
               : s_quantity_old - ol_quantity + 91;
 
-          // Spec §2.4.2.2: s_remote_cnt is incremented iff supply_w_id != w_id.
+          // Update cached s_quantity so duplicate (supply_w_id, i_id) pairs
+          // across order lines see the post-update value, not the stale one.
+          stockRow[1] = new_quantity;
+
           const remote_cnt = supply_w_id !== w_id ? 1 : 0;
 
           tx.exec(sql("workload_tx_new_order", "update_stock")!, {
@@ -948,17 +991,31 @@ function payment() {
     tpccRetry(() => {
       payment_was_bc = false; // reset across attempts so the final attempt's branch wins
       driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
-        tx.exec(sql("workload_tx_payment", "update_warehouse")!, { w_id, amount });
-        // Spec §2.5.2.2: read w_name for history.h_data.
-        const whRow = tx.queryRow(sql("workload_tx_payment", "get_warehouse")!, { w_id });
-        if (!whRow) throw new Error(`payment: warehouse ${w_id} not found`);
-        const w_name = String(whRow[0] ?? "");
+        // Layer 1: pg/ydb merge UPDATE + SELECT into a single
+        // UPDATE...RETURNING round-trip; mysql/pico keep the two-query path.
+        let w_name: string;
+        if (HAS_RETURNING) {
+          const whRow = tx.queryRow(sql("workload_tx_payment", "update_get_warehouse")!, { w_id, amount });
+          if (!whRow) throw new Error(`payment: warehouse ${w_id} not found`);
+          w_name = String(whRow[0] ?? "");
+        } else {
+          tx.exec(sql("workload_tx_payment", "update_warehouse")!, { w_id, amount });
+          const whRow = tx.queryRow(sql("workload_tx_payment", "get_warehouse")!, { w_id });
+          if (!whRow) throw new Error(`payment: warehouse ${w_id} not found`);
+          w_name = String(whRow[0] ?? "");
+        }
 
-        tx.exec(sql("workload_tx_payment", "update_district")!, { w_id, d_id, amount });
-        // Spec §2.5.2.2: read d_name for history.h_data.
-        const distRow = tx.queryRow(sql("workload_tx_payment", "get_district")!, { w_id, d_id });
-        if (!distRow) throw new Error(`payment: district (${w_id},${d_id}) not found`);
-        const d_name = String(distRow[0] ?? "");
+        let d_name: string;
+        if (HAS_RETURNING) {
+          const distRow = tx.queryRow(sql("workload_tx_payment", "update_get_district")!, { w_id, d_id, amount });
+          if (!distRow) throw new Error(`payment: district (${w_id},${d_id}) not found`);
+          d_name = String(distRow[0] ?? "");
+        } else {
+          tx.exec(sql("workload_tx_payment", "update_district")!, { w_id, d_id, amount });
+          const distRow = tx.queryRow(sql("workload_tx_payment", "get_district")!, { w_id, d_id });
+          if (!distRow) throw new Error(`payment: district (${w_id},${d_id}) not found`);
+          d_name = String(distRow[0] ?? "");
+        }
 
         // Spec §2.5.2.2: read customer balance / credit. Either by c_id
         // (40%) or by c_last (60%) — the by-name branch takes two queries
