@@ -1,4 +1,5 @@
 import { Options } from "k6/options";
+import { sleep } from "k6";
 import { Teardown, NewPicker } from "k6/x/stroppy";
 import { Counter, Trend, AB, C, R, Step, DriverX, S, ENV, Dist, TxIsolationName, declareDriverSetup, retry, isSerializationError } from "./helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
@@ -54,6 +55,35 @@ const WAREHOUSES  = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses
 // serialization failure. 3 = original try + 2 retries; immediate, no sleep.
 // Override via -e RETRY_ATTEMPTS=N for benchmarking the isolation tradeoff.
 const RETRY_ATTEMPTS = ENV("RETRY_ATTEMPTS", 3, "Max attempts for serialization-failure retries (1 = no retry)");
+
+// TPC-C §5.2.5 pacing: keying time (constant, before tx) + think time
+// (negative exponential, after tx) simulate real terminal operator behaviour.
+// Disabled by default for raw throughput benchmarking; enable with
+// -e PACING=true for spec-compliant pacing.
+const PACING = ENV("PACING", "false", "Enable keying + think time delays (§5.2.5)") === "true";
+
+// §5.2.5.2 minimum keying times (seconds), §5.2.5.7 Table.
+const KEYING_TIME: Record<string, number> = {
+  new_order: 18, payment: 3, order_status: 2, delivery: 2, stock_level: 2,
+};
+// §5.2.5.4 / §5.2.5.7: mean think time (seconds) for neg-exp distribution.
+const THINK_TIME_MEAN: Record<string, number> = {
+  new_order: 12, payment: 12, order_status: 10, delivery: 5, stock_level: 5,
+};
+
+// §5.2.5.4: T_t = -log(r) * μ, truncated at 10μ.
+function thinkTime(txName: string): void {
+  if (!PACING) return;
+  const mu = THINK_TIME_MEAN[txName];
+  let t = -Math.log(Math.random()) * mu;
+  if (t > 10 * mu) t = 10 * mu;
+  sleep(t);
+}
+
+function keyingTime(txName: string): void {
+  if (!PACING) return;
+  sleep(KEYING_TIME[txName]);
+}
 
 const DISTRICTS_PER_WAREHOUSE = 10;
 const CUSTOMERS_PER_DISTRICT  = 3000;
@@ -1326,12 +1356,18 @@ function stock_level() {
 // =====================================================================
 const picker = NewPicker(0);
 
+// §5.2.1/§5.2.5: each VU iteration is: keying time → tx → think time.
+// Pacing is opt-in (PACING=true); default off for raw throughput runs.
+const _txFuncs = [new_order, payment, order_status, delivery, stock_level];
+const _txNames = ["new_order", "payment", "order_status", "delivery", "stock_level"];
 export default function (): void {
-  const workload = picker.pickWeighted(
-    [new_order, payment, order_status, delivery, stock_level],
-    [45,        43,      4,            4,        4],
-  ) as () => void;
-  workload();
+  const idx = Math.floor(picker.pickWeighted(
+    [0, 1, 2, 3, 4],
+    [45, 43, 4, 4, 4],
+  ) as number);
+  keyingTime(_txNames[idx]);
+  _txFuncs[idx]();
+  thinkTime(_txNames[idx]);
 }
 
 export function teardown() {
