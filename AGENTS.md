@@ -1,116 +1,206 @@
-# Stroppy - Project Context
+# Stroppy — Agent Context
 
-Database stress testing CLI tool powered by k6 workload engine. Apache 2.0 licensed.
+Database stress testing CLI powered by k6. Apache 2.0.
 
-## Architecture Overview
+## Binary Layout
 
-Stroppy is a **k6 extension** (`k6/x/stroppy`) that adds database-specific capabilities to k6's load testing engine. Test scripts are written in TypeScript, transpiled via esbuild, and executed inside k6's Sobek JavaScript runtime.
+- `./build/stroppy` — main binary (built by `make build`)
+- `./build/k6` — k6 with stroppy extension embedded
+- Both produced by the same `make build` target
 
-### Binary Layout
+## Build & Lint
 
-- `stroppy` CLI wraps k6 with convenience commands (`gen`, `run`, `version`)
-- `k6` binary is also built with the stroppy extension embedded
-- Users can use either `stroppy run <script.ts>` or `./build/k6 run <script.ts>`
+```
+make build          # ALWAYS use this — never go build ./...
+make linter_fix     # run first, auto-fixes formatting
+make linter         # read-only check after linter_fix
+make tests          # all tests with race detector and coverage
+make proto          # regenerate Go/TS/docs from .proto; wipes pkg/common/proto/* — never hand-edit generated files
+make ts-test        # TypeScript unit tests
+make ts-typecheck   # typecheck helpers.ts / parse_sql.ts / stroppy.d.ts
+```
 
-### Core Components
+**Embedded FS rebuild rule:** `workloads/` is `//go:embed *` — if you pass a workload by short name (`tpcc/tx`, `tpcb/procs`), the binary serves from its embedded snapshot. Edits to `workloads/` on disk have **no effect** until `make build` reruns.
 
-| Component | Path | Purpose |
-|-----------|------|---------|
-| CLI commands | `cmd/stroppy/commands/` | `gen`, `run`, `version` subcommands via cobra |
-| k6 module | `cmd/xk6air/` | Registers `k6/x/stroppy` module, manages per-VU driver/generator instances |
-| Driver interface | `pkg/driver/dispatcher.go` | Registry pattern: `RegisterDriver()` + `Dispatch()` |
-| PostgreSQL driver | `pkg/driver/postgres/` | pgxpool-based, supports PLAIN_QUERY and COPY_FROM insertion |
-| Data generators | `pkg/common/generate/` | Uniform, Normal, Zipfian distributions; int/float/string/uuid/bool/datetime/decimal |
-| TypeScript framework | `internal/static/` | `helpers.ts` (R/S/AB/DriverX), `parse_sql.ts`, generated type bindings |
-| Script runner | `internal/runner/` | esbuild transpilation, config extraction via Sobek, k6 process management |
-| Schema definitions | `proto/stroppy/` | config, descriptor, common, runtime, cloud schemas |
-| Built-in workloads | `workloads/` | simple, tpcb, tpcc, tpcds presets; tpcb/tpcc each have `procs.ts` (pg/mysql stored procs) and `tx.ts` (raw transactions, any DB) |
+**Local path bypass:** If you pass an explicit local path (`./workloads/tpcc/tx.ts`, `./workloads/tpcc/pg.sql`), the runner resolves from cwd **first** — no rebuild needed. Use this during the edit-run loop:
+```bash
+./build/stroppy run ./workloads/tpcc/tx.ts ./workloads/tpcc/pg.sql -d pg -D url=postgres://...
+```
 
-### Driver System
+Resolution order: **cwd → `~/.stroppy/` → embedded**.
 
-Drivers register themselves via `init()` using `driver.RegisterDriver()`. The dispatcher looks up the constructor by `DriverConfig_DriverType` enum. To add a new driver:
+## Directory Map
 
-1. Create package under `pkg/driver/<name>/`
-2. Implement `driver.Driver` interface (InsertValues, RunQuery, Teardown, Configure)
-3. Call `driver.RegisterDriver()` in `init()`
-4. Import the package in `cmd/xk6air/module.go` for side-effect registration
+| Path | Role |
+|------|------|
+| `cmd/stroppy/commands/` | cobra CLI subcommands: gen, run, probe, version |
+| `cmd/xk6air/` | k6 extension entry; registers `k6/x/stroppy`, manages per-VU instances |
+| `pkg/driver/dispatcher.go` | driver registry: `RegisterDriver()` + `Dispatch()` |
+| `pkg/driver/{postgres,mysql,picodata,ydb,noop}/` | driver implementations |
+| `pkg/driver/sqldriver/` | shared sql.DB-backed base (mysql, ydb use this) |
+| `pkg/common/generate/` | data generators (uniform/normal/zipfian; int/float/string/uuid/bool/datetime/decimal) |
+| `internal/static/` | `helpers.ts`, `parse_sql.ts`, generated TS type bindings |
+| `internal/runner/` | esbuild transpilation, config extraction via Sobek, k6 process management |
+| `proto/stroppy/` | protobuf schemas (config, descriptor, common, runtime) |
+| `workloads/` | embedded workloads: simple, tpcb, tpcc, tpcds, execute_sql |
 
-### TypeScript API (helpers.ts)
+## Drivers
 
-- `C` - Const generators: `C.str()`, `C.int32()`, `C.int64()`, `C.uint32()`, `C.uint64()`, `C.float()`, `C.double()`, `C.decimal()`, `C.datetime()`, `C.bool()`, `C.uuid()`
-- `R` - Random/range generators: `R.str()`, `R.int32()`, `R.int64()`, `R.uint32()`, `R.uint64()`, `R.float()`, `R.double()`, `R.decimal()`, `R.datetime()`, `R.bool()`, `R.uuid()`, `R.uuidSeeded()`, `R.group()`, `R.groups()`
-- `S` - Sequence (unique) generators: `S.str()`, `S.int32()`, `S.int64()`, `S.uint32()`, `S.uint64()`, `S.uuid()`
-- `AB` - Alphabets: `en`, `enNum`, `num`, `enUpper`, `enSpc`, `enNumSpc`
-- `Dist` - Distribution helpers: `Dist.normal()`, `Dist.uniform()`, `Dist.zipf()`
-- `setSeed()` - Set module-wide default seed (0 = random, >0 = fixed)
-- `Rule` / `GroupRule` - Generation rules with `.gen(seed?)` method to create generators
-- `DriverX` - Typed driver wrapper with metrics tracking; `DriverX.fromConfig()`, `.insert()`, `.runQuery()`
-- `InsertMethodName` - `"plain_query" | "copy_from"` — friendly string type for `DriverX.insert()` method option
-- `Step()` - Named execution blocks with cloud notification; also `Step.begin()` / `Step.end()`
-- `ENV()` - Typed environment variable accessor replacing raw `__ENV`; supports aliases, defaults, descriptions. Metadata captured by probe for `Explain` output
-- `NewPicker(seed)` - Weighted random selection from arrays; `picker.pick(items)` for uniform, `picker.pickWeighted(items, weights)` for weighted selection
+| Preset | Type enum | Notes |
+|--------|-----------|-------|
+| `pg` | DRIVER_TYPE_PG | pgxpool-based; supports plain_query, plain_bulk, copy_from |
+| `mysql` | DRIVER_TYPE_MYSQL | sql.DB-backed via sqldriver |
+| `pico` | DRIVER_TYPE_PICODATA | sql.DB-backed; `Begin()` always errors — use isolation `"none"` |
+| `ydb` | DRIVER_TYPE_YDB | sql.DB-backed |
+| `noop` | DRIVER_TYPE_NOOP = 5 | discards all I/O; benchmarks stroppy overhead (~65-70K iter/s) |
 
+Add driver: package under `pkg/driver/<name>/`, implement `driver.Driver`, call `RegisterDriver()` in `init()`, import in `cmd/xk6air/module.go`.
 
-### SQL Syntax
+## CLI Usage
 
-- Query parameters use `:paramName` syntax, converted to PostgreSQL `$1, $2...` placeholders
-- SQL files support structured parsing:
-  - `--+ section_name` groups SQL statements into sections
-  - `--= query_name` names individual queries within sections
-- `parse_sql_with_groups()` returns `Record<string, ParsedQuery[]>`
+```bash
+./build/stroppy run <workload> [sql-override] [flags] [-- k6-args]
+```
 
-### UUID Generator Variants
+**Positional:**
+- 1st: workload — bare name (`tpcc`), preset-relative path (`tpcc/tx`), `.ts` file, `.sql` file, or inline SQL string
+- 2nd (optional): SQL file override (e.g. `tpcc/pico`, `./workloads/tpcc/pico.sql`)
 
-Four variants available via `Generation.Rule.kind` in the proto:
+**Driver flags:**
+- `-d <preset>` — driver preset: `pg`, `mysql`, `pico`, `ydb`, `noop`
+- `-d '{"url":"...","bulkSize":20}'` — raw JSON driver config
+- `-D key=value` — override driver field (url, driverType, defaultInsertMethod, bulkSize, pool.*, tls.*); multiple `-D` accumulate
+- `-d1 <preset>`, `-D1 key=value` — same for second driver index (multi-driver workloads)
 
-| Proto field | Behavior |
-|---|---|
-| `uuid_random = true` | Truly random v4 UUID; seed ignored |
-| `uuid_seeded = true` | Deterministic v4 UUID sequence; same seed → same sequence (ChaCha8 PRNG) |
-| `uuid_seq { max: "..." }` | Sequential counter encoded as UUID; `min` defaults to nil UUID (`00000...0`) |
-| `uuid_const { value: "..." }` | Fixed UUID repeated on every call |
+**Script env flags:**
+- `-e KEY=VALUE` — set script ENV() value (uppercased); takes precedence over config file and script defaults
 
-Generator factory entry point: `NewValueGeneratorByRule` in `pkg/common/generate/value.go`.
+**Step control:**
+- `--steps step1,step2` — run only listed steps
+- `--no-steps step1` — run all steps except listed
+- Mutually exclusive
 
-### Go Exploration
+**Config file:**
+- Default: `stroppy-config.json` in cwd (auto-loaded if present)
+- `-f prod.json` — explicit path
+- Precedence (highest→lowest): real env > `-e` > config `env` > `-d/-D` > config `drivers` > script defaults
 
-- Use `go doc` to quickly inspect interfaces, structs, and function signatures. Examples:
-  - `go doc github.com/jackc/pgx/v5.Rows` — show the pgx Rows interface
-  - `go doc github.com/pashagolub/pgxmock/v4 NewPool` — show pgxmock constructor
-  - `go doc ./pkg/driver Rows` — show a local interface
-- Prefer `go doc` over searching source files for type/interface definitions — it's faster and gives clean output.
+**k6 passthrough:**
+- `-- <k6-args>` after separator, passed directly to k6
 
-### Build System
+**Examples:**
+```bash
+# TPC-C with postgres
+./build/stroppy run tpcc -d pg -D url=postgres://... -- --vus 10 --duration 60s
 
-- `make build` - Builds k6 with xk6air extension via xk6. **Use this instead of `go build`.**
-- `make tests` - Runs all tests with race detector and coverage
-- `make proto` - Generates Go, TypeScript, gRPC, docs from proto files; **wipes `pkg/common/proto/*` before regenerating** — never hand-edit generated files
-- `make install-bin-deps` - Installs protoc plugins, xk6, esbuild, etc.
-- Go 1.24.3+, Node.js required for full build
+# TPC-C with picodata, local SQL file (no rebuild needed)
+./build/stroppy run ./workloads/tpcc/tx.ts ./workloads/tpcc/pico.sql -d pico -D url=http://...
 
-### Key Dependencies
+# TPC-B
+./build/stroppy run tpcb -d pg -D url=postgres://... -- --duration 30s
 
-- go.k6.io/k6 v1.6.0 (load testing engine)
-- github.com/jackc/pgx/v5 (PostgreSQL driver)
-- github.com/grafana/sobek (JavaScript engine for config extraction)
-- github.com/spf13/cobra (CLI framework)
-- connectrpc.com/connect (gRPC)
-- OpenTelemetry SDKs (metrics export)
+# Noop overhead benchmark
+./build/stroppy run simple -d noop -- --vus 4 --duration 10s
 
-### K6 Integration
+# Probe: inspect script ENV declarations and SQL sections
+./build/stroppy probe tpcc/tx
+```
 
-- k6 web dashboard: `K6_WEB_DASHBOARD=true` enables real-time dashboard
-- HTML report export: `K6_WEB_DASHBOARD_EXPORT=report.html`
-- All k6 CLI flags pass through after `--` separator: `stroppy run script.ts -- --vus 10 --duration 30s`
-- k6 scenarios, thresholds, and metrics all work natively
+## Workload Structure
 
-### Docker
+Per-dialect SQL files: `pg.sql`, `mysql.sql`, `pico.sql`, `ydb.sql` under `workloads/{tpcb,tpcc}/`.
 
-- Image: `ghcr.io/stroppy-io/stroppy:latest`
-- Built-in workloads available at `/workloads/` inside container
-- `DRIVER_URL` env var for database connection
-- `--network host` for localhost database access
+Section layout (must be identical across dialects):
+```sql
+--+ drop_schema           -- all dialects
+--+ create_schema         -- all dialects
+--+ create_procedures     -- pg.sql, mysql.sql ONLY
+--+ workload_procs        -- pg.sql, mysql.sql ONLY (named query per tx, calls stored proc)
+  --= new_order
+  --= payment
+--+ workload_tx_<txname>  -- all dialects, one per transaction type
+  --= step1
+  --= step2
+```
 
-### Documentation Site
+Two TS variants per workload:
+- `procs.ts` — calls stored procs via `workload_procs` section; pg + mysql only; throws at load time on pico/ydb
+- `tx.ts` — runs ordered DML steps inside `driver.beginTx()`; all 4 DBs; has `export default function` and `export const options`
 
-Docusaurus-based docs live in the GitHub Pages site at `stroppy-io.github.io`.
+Both `tx.ts` files export a `default` function — `-- --vus N --duration Xs` works for both tpcc and tpcb.
+
+Isolation by driver in `tx.ts`:
+- postgres → `read_committed`
+- mysql → `read_committed`
+- picodata → `"none"` (**not** `"conn"` — `Begin()` always errors)
+- ydb → `serializable`
+- Override: `-e TX_ISOLATION=...`
+
+Full isolation type names: `read_uncommitted`, `read_committed`, `repeatable_read`, `serializable`, `db_default`, `conn`, `none`
+
+## TypeScript API (helpers.ts)
+
+- `C` — const generators: `C.str()`, `C.int32/64()`, `C.uint32/64()`, `C.float/double()`, `C.decimal()`, `C.datetime()`, `C.bool()`, `C.uuid()`
+- `R` — random generators (same types + `R.uuidSeeded()`, `R.group()`, `R.groups()`)
+- `S` — sequence (unique) generators: `S.str()`, `S.int32/64()`, `S.uint32/64()`, `S.uuid()`
+- `AB` — alphabets: `en`, `enNum`, `num`, `enUpper`, `enSpc`, `enNumSpc`
+- `Dist` — distributions: `Dist.normal()`, `Dist.uniform()`, `Dist.zipf()`
+- `setSeed(n)` — module-wide seed (0 = random, >0 = fixed)
+- `DriverX` — typed driver wrapper with metrics; `DriverX.fromConfig()`, `.insert()`, `.runQuery()`, `.begin()`, `.beginTx()`
+- `TxX` — transaction wrapper; full query API: `exec`, `queryRow`, `queryValue<T>`, `queryRows`, `queryCursor`
+- `declareDriverSetup(index, defaults)` — reads CLI driver config, merges over TS defaults; returns `DriverSetup`
+- `ENV(name, default?)` — typed env accessor; metadata captured by probe
+- `Step(name, fn)` — named execution block with cloud notification
+- `NewPicker(seed)` — weighted random selection; `.pick(items)`, `.pickWeighted(items, weights)`
+- `InsertMethodName` — `"plain_query" | "plain_bulk" | "copy_from"`
+- `ErrorModeName` — `"silent" | "log" | "throw" | "fail" | "abort"`
+- `DriverTypeName` — `"postgres" | "mysql" | "picodata" | "ydb" | "noop"`
+- `retry<T>(fn, maxAttempts, isRetryable, onRetry?)` — retry helper
+- `isSerializationError(e)` — detects SQLSTATE 40001 / deadlock for retry decisions
+- `once` — run-once guard utility
+
+`TxX` query methods return real values — always use `tx.queryRow()`/`tx.queryValue<T>()` to thread values within a transaction. Synthetic per-VU counters are only justified for PKs with no DB-side value (e.g. synthetic `h_id` on history table for picodata/ydb).
+
+## SQL Syntax Rules
+
+- Query parameters: `:paramName` — converted to `$1, $2...` (PostgreSQL), `?` (MySQL)
+- `--+ section_name` — groups statements into sections
+- `--= query_name` — names individual queries within a section
+- `parse_sql_with_groups()` → `Record<string, ParsedQuery[]>`
+- **`--` comment lines inside query bodies are stripped by `parse_sql.ts`** before reaching DB. Use `/* */` block comments inside procedure bodies — except on picodata (see below).
+
+## Picodata-Specific Limits
+
+1. **No `/* */` block comments** at statement head — sbroad parser rejects them. Use `-- ` line comments (stripped by parse_sql before sending).
+2. **No `OFFSET` in SELECT** — sbroad doesn't support `LIMIT n OFFSET m`. Branch in ts via `IS_PICODATA`: picodata path uses `queryRows` + `rows[offset]`.
+3. **`sql_vdbe_opcode_max` default (45000) too low** for full-scan aggregations. Before tpcc validate_population: `ALTER SYSTEM SET sql_vdbe_opcode_max = 100000000;`
+4. **Sharded joins intermittently fail** with `Temporary SQL table TMP_... not found`. Split into two round-trips: fetch key set, then query with inline `IN (...)` list. See `workloads/tpcc/pico.sql` `get_window_items` + `stock_count_in` pattern.
+
+## sqldriver Rows Normalization
+
+`pkg/driver/sqldriver/rows.go` `Values()` converts `[]byte` → `string` for all columns. Normalizes MySQL's CHAR/VARCHAR scan. If adding a new sql.DB-based driver that returns text as non-string, extend this normalization rather than working around it in workloads.
+
+## Go Exploration
+
+```bash
+go doc github.com/jackc/pgx/v5.Rows        # pgx Rows interface
+go doc github.com/pashagolub/pgxmock/v4 NewPool
+go doc ./pkg/driver Rows                    # local interface
+```
+
+Prefer `go doc` over grepping source for type/interface definitions. Never read `*.pb.go` — read `.proto` source instead.
+
+## Key Dependencies
+
+- `go.k6.io/k6 v1.7.0` — load testing engine
+- `github.com/jackc/pgx/v5` — PostgreSQL driver
+- `github.com/grafana/sobek` — JavaScript engine
+- `github.com/spf13/cobra` — CLI
+- `connectrpc.com/connect` — gRPC
+- OpenTelemetry SDKs — metrics export
+
+## K6 Passthrough
+
+- `K6_WEB_DASHBOARD=true` — real-time dashboard
+- `K6_WEB_DASHBOARD_EXPORT=report.html` — HTML report
+- All k6 CLI flags work after `--` separator
