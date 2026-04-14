@@ -192,8 +192,8 @@ func (d *Driver) InsertValues(
 		return sqldriver.InsertPlainQuery(ctx, d.db, builder)
 	case stroppy.InsertMethod_PLAIN_BULK:
 		return sqldriver.InsertPlainBulk(ctx, d.db, builder, d.bulkSize)
-	case stroppy.InsertMethod_COPY_FROM:
-		return nil, fmt.Errorf("%w: COPY_FROM", ErrUnsupportedInsertMethod)
+	case stroppy.InsertMethod_NATIVE:
+		return d.insertValuesNative(ctx, builder)
 	default:
 		return nil, fmt.Errorf(
 			"%w: %s",

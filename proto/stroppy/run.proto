@@ -25,7 +25,7 @@ message DriverRunConfig {
   string url = 2;
 
   /**
-   * Default insert method. One of: "copy_from", "plain_bulk", "plain_query".
+   * Default insert method. One of: "native", "plain_bulk", "plain_query".
    * Matches TS DriverSetup.defaultInsertMethod.
    */
   string default_insert_method = 3;

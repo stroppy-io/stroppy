@@ -37,7 +37,7 @@ type DriverRunConfig struct {
 	// * Database connection URL
 	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
 	// *
-	// Default insert method. One of: "copy_from", "plain_bulk", "plain_query".
+	// Default insert method. One of: "native", "plain_bulk", "plain_query".
 	// Matches TS DriverSetup.defaultInsertMethod.
 	DefaultInsertMethod string                      `protobuf:"bytes,3,opt,name=default_insert_method,json=defaultInsertMethod,proto3" json:"default_insert_method,omitempty"`
 	Pool                *DriverRunConfig_PoolConfig `protobuf:"bytes,4,opt,name=pool,proto3,oneof" json:"pool,omitempty"`
