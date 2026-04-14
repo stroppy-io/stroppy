@@ -50,7 +50,7 @@ Example stroppy-config.json:
 
 Driver types: postgres, mysql, picodata, ydb, noop
 Error modes:  silent, log, throw, fail, abort
-Insert methods: copy_from, plain_bulk, plain_query
+Insert methods: native, plain_bulk, plain_query
 
 PRECEDENCE (highest to lowest)
 

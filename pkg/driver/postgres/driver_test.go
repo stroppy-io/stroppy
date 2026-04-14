@@ -90,7 +90,7 @@ func TestDriver_InsertValuesPlainQuery(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestDriver_InsertValuesCopyFrom(t *testing.T) {
+func TestDriver_InsertValuesNative(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	require.NoError(t, err)
 
@@ -102,7 +102,7 @@ func TestDriver_InsertValuesCopyFrom(t *testing.T) {
 	descriptor := &stroppy.InsertDescriptor{
 		Count:     5,
 		TableName: "test_table",
-		Method:    stroppy.InsertMethod_COPY_FROM.Enum(),
+		Method:    stroppy.InsertMethod_NATIVE.Enum(),
 		Params: []*stroppy.QueryParamDescriptor{
 			{
 				Name: "id",
@@ -140,7 +140,7 @@ func TestDriver_InsertValuesCopyFrom(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestDriver_InsertValuesCopyFromLargeBatch(t *testing.T) {
+func TestDriver_InsertValuesNativeLargeBatch(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	require.NoError(t, err)
 
@@ -152,7 +152,7 @@ func TestDriver_InsertValuesCopyFromLargeBatch(t *testing.T) {
 	descriptor := &stroppy.InsertDescriptor{
 		Count:     10000,
 		TableName: "test_table",
-		Method:    stroppy.InsertMethod_COPY_FROM.Enum(),
+		Method:    stroppy.InsertMethod_NATIVE.Enum(),
 		Params: []*stroppy.QueryParamDescriptor{
 			{
 				Name: "id",

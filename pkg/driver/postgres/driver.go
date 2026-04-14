@@ -150,7 +150,7 @@ func (d *Driver) RunQuery(
 // It supports three methods:
 // - PLAIN_QUERY: executes individual INSERT statements for each row
 // - PLAIN_BULK: executes batched bulk INSERT statements using multi-row VALUES syntax
-// - COPY_FROM: uses PostgreSQL's COPY protocol for fast bulk insertion.
+// - NATIVE: uses PostgreSQL's COPY protocol for fast bulk insertion.
 func (d *Driver) InsertValues(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,
@@ -170,8 +170,8 @@ func (d *Driver) InsertValues(
 		return sqldriver.InsertPlainQuery(ctx, d.pool, builder)
 	case stroppy.InsertMethod_PLAIN_BULK:
 		return sqldriver.InsertPlainBulk(ctx, d.pool, builder, d.bulkSize)
-	case stroppy.InsertMethod_COPY_FROM:
-		return d.insertValuesCopyFrom(ctx, builder)
+	case stroppy.InsertMethod_NATIVE:
+		return d.insertValuesNative(ctx, builder)
 	default:
 		d.logger.Panic("unexpected proto.InsertMethod")
 
@@ -179,9 +179,9 @@ func (d *Driver) InsertValues(
 	}
 }
 
-// insertValuesCopyFrom uses PostgreSQL's COPY protocol for fast bulk insertion.
+// insertValuesNative uses PostgreSQL's COPY protocol for fast bulk insertion.
 // It streams values on-demand without loading all rows into memory.
-func (d *Driver) insertValuesCopyFrom(
+func (d *Driver) insertValuesNative(
 	ctx context.Context,
 	builder *sqlqueries.QueryBuilder,
 ) (*stats.Query, error) {

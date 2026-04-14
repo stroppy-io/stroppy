@@ -173,7 +173,7 @@ func (d *Driver) RunQuery(
 }
 
 var (
-	ErrCopyFromUnsupported     = errors.New("CopyFrom is not supported in Picodata yet")
+	ErrNativeUnsupported       = errors.New("NATIVE insert is not supported in Picodata yet")
 	ErrTransactionsUnsupported = errors.New("transactions are not supported in Picodata yet")
 )
 
@@ -185,7 +185,7 @@ func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) 
 // It supports two methods:
 // - PLAIN_QUERY: executes individual INSERT statements for each row
 // - PLAIN_BULK: executes batched bulk INSERT statements using multi-row VALUES syntax
-// - COPY_FROM: unsupported.
+// - NATIVE: unsupported.
 func (d *Driver) InsertValues(
 	ctx context.Context,
 	descriptor *stroppy.InsertDescriptor,
@@ -205,8 +205,8 @@ func (d *Driver) InsertValues(
 		return sqldriver.InsertPlainQuery(ctx, d.pool, builder)
 	case stroppy.InsertMethod_PLAIN_BULK:
 		return sqldriver.InsertPlainBulk(ctx, d.pool, builder, d.bulkSize)
-	case stroppy.InsertMethod_COPY_FROM:
-		return nil, ErrCopyFromUnsupported
+	case stroppy.InsertMethod_NATIVE:
+		return nil, ErrNativeUnsupported
 	default:
 		d.logger.Panic("unexpected proto.InsertMethod")
 

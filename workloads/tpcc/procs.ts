@@ -112,7 +112,7 @@ export const options: Options = {
 const driverConfig = declareDriverSetup(0, {
   url: "postgres://postgres:postgres@localhost:5432",
   driverType: "postgres",
-  defaultInsertMethod: "copy_from",
+  defaultInsertMethod: "native",
   errorMode: "throw",
   pool: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
 });

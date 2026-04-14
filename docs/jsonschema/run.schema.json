@@ -703,7 +703,7 @@
     },
     ".stroppy.DriverRunConfig.default_insert_method": {
       "type": "string",
-      "description": "*\n Default insert method. One of: \"copy_from\", \"plain_bulk\", \"plain_query\".\n Matches TS DriverSetup.defaultInsertMethod."
+      "description": "*\n Default insert method. One of: \"native\", \"plain_bulk\", \"plain_query\".\n Matches TS DriverSetup.defaultInsertMethod."
     },
     ".stroppy.DriverRunConfig.default_tx_isolation": {
       "type": "string",

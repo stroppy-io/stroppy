@@ -1050,7 +1050,7 @@ Data insertion method
 | Name | Number | Description |
 | ---- | ------ | ----------- |
 | PLAIN_QUERY | 0 |  |
-| COPY_FROM | 1 |  |
+| NATIVE | 1 |  |
 | PLAIN_BULK | 2 |  |
 
 
@@ -1102,7 +1102,7 @@ This is intentionally separate from DriverConfig (the runtime binary proto for T
 | ----- | ---- | ----- | ----------- |
 | driver_type | [string](#string) |  | Driver type. One of: &#34;postgres&#34;, &#34;mysql&#34;, &#34;picodata&#34;, &#34;ydb&#34;, &#34;noop&#34;. Matches TS DriverSetup.driverType (string union, not proto enum). |
 | url | [string](#string) |  | Database connection URL |
-| default_insert_method | [string](#string) |  | Default insert method. One of: &#34;copy_from&#34;, &#34;plain_bulk&#34;, &#34;plain_query&#34;. Matches TS DriverSetup.defaultInsertMethod. |
+| default_insert_method | [string](#string) |  | Default insert method. One of: &#34;native&#34;, &#34;plain_bulk&#34;, &#34;plain_query&#34;. Matches TS DriverSetup.defaultInsertMethod. |
 | pool | [DriverRunConfig.PoolConfig](#stroppy-DriverRunConfig-PoolConfig) | optional |  |
 | error_mode | [string](#string) |  | Error handling mode. One of: &#34;silent&#34;, &#34;log&#34;, &#34;throw&#34;, &#34;fail&#34;, &#34;abort&#34;. Matches TS DriverSetup.errorMode. |
 | bulk_size | [int32](#int32) | optional | Rows per bulk INSERT statement. Matches TS DriverSetup.bulkSize. |

@@ -60,12 +60,12 @@ export function ENV(env: string | string[], default_?: string | number, descript
 ENV.auto = "<auto>" as AutoDefault;
 
 
-export type InsertMethodName = "plain_query" | "plain_bulk" | "copy_from";
+export type InsertMethodName = "plain_query" | "plain_bulk" | "native";
 
 const insertMethodMap: Record<InsertMethodName, InsertMethod> = {
   plain_query: InsertMethod.PLAIN_QUERY,
   plain_bulk: InsertMethod.PLAIN_BULK,
-  copy_from: InsertMethod.COPY_FROM,
+  native: InsertMethod.NATIVE,
 };
 
 export type ErrorModeName = "silent" | "log" | "throw" | "fail" | "abort";

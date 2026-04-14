@@ -69,7 +69,7 @@ var driverPresets = map[string]DriverPreset{
 	"pg": {
 		DriverType:          "postgres",
 		URL:                 postgresURL("postgres", "postgres", "localhost:5432"),
-		DefaultInsertMethod: "copy_from",
+		DefaultInsertMethod: "native",
 		PoolKind:            "postgres",
 	},
 	"mysql": {
@@ -88,7 +88,7 @@ var driverPresets = map[string]DriverPreset{
 	"ydb": {
 		DriverType:          "ydb",
 		URL:                 "grpc://localhost:2136/local",
-		DefaultInsertMethod: "plain_bulk",
+		DefaultInsertMethod: "native",
 		PoolKind:            "sql",
 	},
 	"noop": {

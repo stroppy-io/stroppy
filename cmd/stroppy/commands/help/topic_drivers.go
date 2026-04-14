@@ -21,7 +21,7 @@ DRIVER PRESETS (-d / --driver)
 
     pg       driverType=postgres
              url=postgres://postgres:postgres@localhost:5432
-             defaultInsertMethod=copy_from
+             defaultInsertMethod=native
 
     mysql    driverType=mysql
              url=myuser:mypassword@tcp(localhost:3306)/mydb
@@ -33,7 +33,7 @@ DRIVER PRESETS (-d / --driver)
 
     ydb      driverType=ydb
              url=grpc://localhost:2136/local
-             defaultInsertMethod=plain_bulk
+             defaultInsertMethod=native
 
     noop     driverType=noop
              url=noop://localhost
@@ -66,7 +66,7 @@ DRIVER OPTIONS (-D / --driver-opt)
 
     url                    string    Database connection URL
     driverType             string    postgres | mysql | picodata | ydb
-    defaultInsertMethod    string    plain_query | copy_from | plain_bulk
+    defaultInsertMethod    string    plain_query | native | plain_bulk
     defaultTxIsolation     string    read_uncommitted | read_committed |
                                      repeatable_read | serializable |
                                      connection_only | none

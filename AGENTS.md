@@ -48,7 +48,7 @@ Resolution order: **cwd → `~/.stroppy/` → embedded**.
 
 | Preset | Type enum | Notes |
 |--------|-----------|-------|
-| `pg` | DRIVER_TYPE_PG | pgxpool-based; supports plain_query, plain_bulk, copy_from |
+| `pg` | DRIVER_TYPE_PG | pgxpool-based; supports plain_query, plain_bulk, native (COPY) |
 | `mysql` | DRIVER_TYPE_MYSQL | sql.DB-backed via sqldriver |
 | `pico` | DRIVER_TYPE_PICODATA | sql.DB-backed; `Begin()` always errors — use isolation `"none"` |
 | `ydb` | DRIVER_TYPE_YDB | sql.DB-backed |
@@ -152,7 +152,7 @@ Full isolation type names: `read_uncommitted`, `read_committed`, `repeatable_rea
 - `ENV(name, default?)` — typed env accessor; metadata captured by probe
 - `Step(name, fn)` — named execution block with cloud notification
 - `NewPicker(seed)` — weighted random selection; `.pick(items)`, `.pickWeighted(items, weights)`
-- `InsertMethodName` — `"plain_query" | "plain_bulk" | "copy_from"`
+- `InsertMethodName` — `"plain_query" | "plain_bulk" | "native"` (pg→COPY, ydb→BulkUpsert)
 - `ErrorModeName` — `"silent" | "log" | "throw" | "fail" | "abort"`
 - `DriverTypeName` — `"postgres" | "mysql" | "picodata" | "ydb" | "noop"`
 - `retry<T>(fn, maxAttempts, isRetryable, onRetry?)` — retry helper
