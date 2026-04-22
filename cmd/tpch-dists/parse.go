@@ -143,7 +143,7 @@ func (st *streamState) handleEnd(line string, lineNum int) error {
 		return fmt.Errorf("%w: tpch-dists: line %d: END with no matching BEGIN", errParse, lineNum)
 	}
 
-	// Upstream dists.dss has a typo at line 734 (`auxillaries` vs
+	// Upstream dists.dss has a typo at line 734 (`auxiliaries` vs
 	// `auxiallaries`). Tolerate END-vs-BEGIN name mismatches; the BEGIN
 	// name wins (distributions are keyed by declared name).
 	_ = strings.TrimSpace(line[len("end "):])

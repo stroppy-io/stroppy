@@ -18,6 +18,7 @@ const (
 	PresetTPCC       Preset = "tpcc"
 	PresetTPCB       Preset = "tpcb"
 	PresetTPCDS      Preset = "tpcds"
+	PresetTPCH       Preset = "tpch"
 	PresetExecuteSQL Preset = "execute_sql"
 )
 
@@ -35,6 +36,7 @@ func AvailablePresets() []string {
 		string(PresetTPCB),
 		string(PresetExecuteSQL),
 		string(PresetTPCDS),
+		string(PresetTPCH),
 	}
 }
 

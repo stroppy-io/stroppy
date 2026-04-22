@@ -28,7 +28,8 @@
       "./simple/",
       "./tpcb/",
       "./tpcc/",
-      "./tpcds/"
+      "./tpcds/",
+      "./tpch/",
       "./execute_sql/",
       "./tests/"
     ],
