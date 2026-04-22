@@ -14,7 +14,7 @@ func TestRegistryPopulated(t *testing.T) {
 	names := stdlib.Names()
 	require.NotEmpty(t, names, "stdlib registry must be non-empty at package init")
 
-	// Spec catalog (plan §5.6): 10 entries. Deviation is a source-level
+	// Spec catalog (plan §5.6): 12 entries. Deviation is a source-level
 	// review event, so this test breaks loudly when the set changes.
 	want := []string{
 		"std.format",
@@ -27,6 +27,8 @@ func TestRegistryPopulated(t *testing.T) {
 		"std.substr",
 		"std.len",
 		"std.toString",
+		"std.parseInt",
+		"std.parseFloat",
 	}
 	require.ElementsMatch(t, want, names)
 }

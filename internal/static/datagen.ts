@@ -207,6 +207,20 @@ export const Expr = {
     throw new Error(`datagen: Expr.lit: unsupported type ${typeof x}`);
   },
 
+  /**
+   * Typed double literal — always emits the `double` oneof arm, even when
+   * `x` is integer-valued. Workloads use this for currency / decimal
+   * placeholders where the target column is a floating-point type (e.g.
+   * YDB's `Double`), and `Expr.lit(0.0)` would otherwise collapse to
+   * int64 because `Number.isInteger(0.0)` is true in JS.
+   */
+  litFloat(x: number): PbExpr {
+    if (typeof x !== "number" || !Number.isFinite(x)) {
+      throw new Error(`datagen: Expr.litFloat: expected finite number, got ${x}`);
+    }
+    return exprLit({ value: { oneofKind: "double", double: x } });
+  },
+
   /** Reference another attribute in the current scope. */
   col(name: string): PbExpr {
     if (!name) throw new Error("datagen: Expr.col requires a name");
@@ -333,6 +347,24 @@ export const std = {
   /** Format any scalar as a string. */
   toString(x: PbExpr): PbExpr {
     return call("std.toString", [x]);
+  },
+
+  /**
+   * Parse a base-10 integer out of a string scalar. Bridges numeric
+   * columns held in string-typed dict rows (dstparse emits all
+   * `DictRow.values` as strings on the wire).
+   */
+  parseInt(x: PbExpr): PbExpr {
+    return call("std.parseInt", [x]);
+  },
+
+  /**
+   * Parse a 64-bit float out of a string scalar. Bridges numeric columns
+   * held in string-typed dict rows (dstparse emits all `DictRow.values`
+   * as strings on the wire).
+   */
+  parseFloat(x: PbExpr): PbExpr {
+    return call("std.parseFloat", [x]);
   },
 };
 
@@ -574,6 +606,24 @@ export const Attr = {
       column: column ?? "",
     };
     return { kind: { oneofKind: "dictAt", dictAt: da } };
+  },
+
+  /**
+   * Dict row read coerced to int64 via `std.parseInt`. Shortcut for
+   * numeric dict columns that arrive as strings on the wire (dstparse
+   * emits all `DictRow.values` as strings).
+   */
+  dictAtInt(dict: DictRef, index: PbExpr, column?: string): PbExpr {
+    return std.parseInt(Attr.dictAt(dict, index, column));
+  },
+
+  /**
+   * Dict row read coerced to float64 via `std.parseFloat`. Shortcut for
+   * numeric dict columns that arrive as strings on the wire (dstparse
+   * emits all `DictRow.values` as strings).
+   */
+  dictAtFloat(dict: DictRef, index: PbExpr, column?: string): PbExpr {
+    return std.parseFloat(Attr.dictAt(dict, index, column));
   },
 
   /**

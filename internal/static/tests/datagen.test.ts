@@ -149,6 +149,32 @@ describe("Expr.lit oneof dispatch", () => {
     }
   });
 
+  it("Expr.litFloat emits double even for integer-valued input", () => {
+    const e = Expr.litFloat(100);
+    if (e.kind.oneofKind !== "lit") throw new Error("not a lit");
+    expect(e.kind.lit.value.oneofKind).toBe("double");
+    if (e.kind.lit.value.oneofKind === "double") {
+      expect(e.kind.lit.value.double).toBe(100);
+    }
+
+    // Contrast: Expr.lit(100) collapses to int64 per the docstring.
+    const asInt = Expr.lit(100);
+    if (asInt.kind.oneofKind !== "lit") throw new Error("not a lit");
+    expect(asInt.kind.lit.value.oneofKind).toBe("int64");
+
+    // Fractional numbers also land in the double arm.
+    const frac = Expr.litFloat(2.5);
+    if (frac.kind.oneofKind === "lit" && frac.kind.lit.value.oneofKind === "double") {
+      expect(frac.kind.lit.value.double).toBe(2.5);
+    } else {
+      throw new Error("expected double arm for fractional litFloat");
+    }
+
+    // Non-finite and non-number inputs are rejected.
+    expect(() => Expr.litFloat(Number.NaN)).toThrow();
+    expect(() => Expr.litFloat(Number.POSITIVE_INFINITY)).toThrow();
+  });
+
   it("routes string, boolean, date", () => {
     const s = Expr.lit("hi");
     if (s.kind.oneofKind === "lit" && s.kind.lit.value.oneofKind === "string") {
