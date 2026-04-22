@@ -34,14 +34,30 @@ async function buildProtobufSDK() {
         path.join(tsSourceDir, "google", "protobuf"),
     );
 
-    // Create entry file that re-exports everything
+    // Create entry file that re-exports everything. `export * from` silently
+    // drops names declared by more than one source module, so each known
+    // collision is resolved after the star re-exports by naming the winner
+    // explicitly. Today the only collision is `InsertMethod` (legacy
+    // `stroppy.InsertMethod` from descriptor_pb vs new
+    // `stroppy.datagen.InsertMethod` from datagen_pb); the canonical datagen
+    // enum keeps the short name and the legacy one is exposed via the alias
+    // `LegacyInsertMethod` for the old InsertDescriptor path.
     const entryPath = path.join(__dirname, "_entry.ts");
-    const entryContent = stroppyFiles
-        .map(
-            (file) =>
-                `export * from './${path.relative(__dirname, file).replace(/\\/g, "/").replace(/\.ts$/, "")}';`,
-        )
-        .join("\n");
+    const rel = (file) =>
+        "./" + path.relative(__dirname, file).replace(/\\/g, "/").replace(/\.ts$/, "");
+    const starLines = stroppyFiles.map((file) => `export * from '${rel(file)}';`);
+    const datagenFile = stroppyFiles.find((f) => rel(f).endsWith("/datagen_pb"));
+    const descriptorFile = stroppyFiles.find((f) => rel(f).endsWith("/descriptor_pb"));
+    const explicitLines = [];
+    if (datagenFile) {
+        explicitLines.push(`export { InsertMethod } from '${rel(datagenFile)}';`);
+    }
+    if (descriptorFile) {
+        explicitLines.push(
+            `export { InsertMethod as LegacyInsertMethod } from '${rel(descriptorFile)}';`,
+        );
+    }
+    const entryContent = [...starLines, ...explicitLines].join("\n");
     fs.writeFileSync(entryPath, entryContent);
 
     // Bundle to JS
@@ -61,6 +77,11 @@ async function buildProtobufSDK() {
     // Generate combined TypeScript for IDE support
     // @ts-nocheck: generated code has stripped imports that tsc can't resolve (PbLong, JsonWriteOptions, etc.)
     // The file is used for IDE type inference, not direct compilation.
+    //
+    // Colliding names across the concatenated `_pb.ts` bodies (e.g. legacy
+    // `stroppy.InsertMethod` vs new `stroppy.datagen.InsertMethod`) must
+    // match the aliases defined in the runtime bundle entry above so that
+    // tsc sees the same export surface as esbuild produces.
     const combinedTS = [
         "// @ts-nocheck",
         "// Combined TypeScript definitions for stroppy protobuf",
@@ -79,6 +100,16 @@ async function buildProtobufSDK() {
                 return content;
             })
             .filter(Boolean),
+        "",
+        "// Collision aliases: the concatenated bodies above redeclare a few",
+        "// names; expose the legacy copy under a distinct identifier so",
+        "// callers that need it stay explicit. Values mirror descriptor.proto",
+        "// exactly (legacy ordering).",
+        "export enum LegacyInsertMethod {",
+        "    PLAIN_QUERY = 0,",
+        "    NATIVE = 1,",
+        "    PLAIN_BULK = 2,",
+        "}",
     ].join("\n\n");
 
     fs.writeFileSync(path.join(__dirname, "stroppy.pb.ts"), combinedTS);

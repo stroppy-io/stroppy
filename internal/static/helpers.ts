@@ -26,7 +26,11 @@ import {
   DriverConfig,
   QueryParamDescriptor,
   InsertDescriptor,
-  InsertMethod,
+  // The concatenated stroppy.pb.ts redeclares `InsertMethod` (legacy
+  // `stroppy.InsertMethod` vs new `stroppy.datagen.InsertMethod`); the
+  // legacy enum is re-exported from the bundle as `LegacyInsertMethod`
+  // and drives the legacy InsertDescriptor path below.
+  LegacyInsertMethod,
   InsertSpec as DatagenInsertSpec,
   DriverConfig_ErrorMode,
   DriverConfig_DriverType,
@@ -63,10 +67,10 @@ ENV.auto = "<auto>" as AutoDefault;
 
 export type InsertMethodName = "plain_query" | "plain_bulk" | "native";
 
-const insertMethodMap: Record<InsertMethodName, InsertMethod> = {
-  plain_query: InsertMethod.PLAIN_QUERY,
-  plain_bulk: InsertMethod.PLAIN_BULK,
-  native: InsertMethod.NATIVE,
+const insertMethodMap: Record<InsertMethodName, LegacyInsertMethod> = {
+  plain_query: LegacyInsertMethod.PLAIN_QUERY,
+  plain_bulk: LegacyInsertMethod.PLAIN_BULK,
+  native: LegacyInsertMethod.NATIVE,
 };
 
 export type ErrorModeName = "silent" | "log" | "throw" | "fail" | "abort";
@@ -525,8 +529,14 @@ export class DriverX implements QueryAPI {
 
     const metricTags = { table_name: descriptor.tableName ?? "unknown" };
     try {
+      // `LegacyInsertMethod` and the `InsertMethod` symbol visible through
+      // the concatenated stroppy.pb.ts are structurally identical numeric
+      // enums; the cast here keeps tsc happy while the runtime bundle
+      // routes the legacy InsertDescriptor path correctly.
       const stats = this.driver.insertValuesBin(
-        InsertDescriptor.toBinary(InsertDescriptor.create(descriptor)),
+        InsertDescriptor.toBinary(
+          InsertDescriptor.create(descriptor as Partial<InsertDescriptor>),
+        ),
       );
       insertErrRateMetric.add(0, metricTags);
       insertMetric.add(stats.elapsed.seconds() * 1000, metricTags);
