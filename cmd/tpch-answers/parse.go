@@ -132,11 +132,10 @@ func findHeader(lines []lineRec) (int, error) {
 		}
 	}
 
+	// Single-column answers (e.g. q14's promo_revenue scalar) have no
+	// pipes; the first non-noise line is the header, the second the row.
 	if headerIdx < 0 {
-		return 0, fmt.Errorf(
-			"%w: line %d: cannot identify header (no pipe-separated line found)",
-			errParse, lines[0].num,
-		)
+		return 0, nil
 	}
 
 	wantPipes := strings.Count(lines[headerIdx].text, "|")
