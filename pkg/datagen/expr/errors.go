@@ -40,3 +40,7 @@ var ErrBadDraw = errors.New("expr: bad stream draw")
 // ErrBadChoose is returned by Choose when no branch is declared, when a
 // branch weight is non-positive, or when the cumulative weight is zero.
 var ErrBadChoose = errors.New("expr: bad choose")
+
+// ErrBadCohort is returned by cohort_draw / cohort_live nodes that lack
+// a schedule name or carry an unusable bucket_key expression.
+var ErrBadCohort = errors.New("expr: bad cohort reference")

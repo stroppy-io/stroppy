@@ -59,6 +59,11 @@ func walkExpr(expr *dgproto.Expr, seen map[string]struct{}, out *[]string) {
 		for _, branch := range expr.GetChoose().GetBranches() {
 			walkExpr(branch.GetExpr(), seen, out)
 		}
+	case *dgproto.Expr_CohortDraw:
+		walkExpr(expr.GetCohortDraw().GetSlot(), seen, out)
+		walkExpr(expr.GetCohortDraw().GetBucketKey(), seen, out)
+	case *dgproto.Expr_CohortLive:
+		walkExpr(expr.GetCohortLive().GetBucketKey(), seen, out)
 	case *dgproto.Expr_RowIndex, *dgproto.Expr_Lit, *dgproto.Expr_BlockRef, nil:
 		// Leaves with no Expr children.
 	}

@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"strconv"
 
+	"github.com/stroppy-io/stroppy/pkg/datagen/cohort"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/expr"
 	"github.com/stroppy-io/stroppy/pkg/datagen/lookup"
@@ -24,6 +25,13 @@ type evalContext struct {
 	scratch  map[string]any
 	dicts    map[string]*dgproto.Dict
 	registry *lookup.LookupRegistry
+	cohorts  *cohort.Registry
+
+	// cohortBucketKeys holds each schedule's default bucket_key Expr so
+	// CohortDraw / CohortLive arms that omit a per-arm override can
+	// still resolve one. Keys missing from the map indicate the
+	// schedule has no default; the arm must carry its own bucket_key.
+	cohortBucketKeys map[string]*dgproto.Expr
 
 	// blocks is the cache of resolved BlockSlot values for the current
 	// outer entity. It is refreshed at every outer-boundary transition
@@ -175,4 +183,35 @@ func (c *evalContext) Draw(streamID uint32, attrPath string, rowIdx int64) *rand
 // attr is active (e.g. a test harness that bypasses Runtime).
 func (c *evalContext) AttrPath() string {
 	return c.attrPath
+}
+
+// CohortDraw forwards to the runtime's cohort registry. A flat spec
+// that declares no cohorts reports ErrBadCohort.
+func (c *evalContext) CohortDraw(name string, bucketKey, slot int64) (int64, error) {
+	if c.cohorts == nil {
+		return 0, fmt.Errorf("%w: no cohort registry", expr.ErrBadCohort)
+	}
+
+	return c.cohorts.Draw(name, bucketKey, slot)
+}
+
+// CohortLive forwards to the runtime's cohort registry. A flat spec
+// that declares no cohorts reports ErrBadCohort.
+func (c *evalContext) CohortLive(name string, bucketKey int64) (bool, error) {
+	if c.cohorts == nil {
+		return false, fmt.Errorf("%w: no cohort registry", expr.ErrBadCohort)
+	}
+
+	return c.cohorts.Live(name, bucketKey)
+}
+
+// CohortBucketKey returns the default bucket_key Expr declared on the
+// named schedule. Absent schedules and schedules without a default
+// return nil; callers fall back to the per-arm bucket_key.
+func (c *evalContext) CohortBucketKey(name string) *dgproto.Expr {
+	if c.cohortBucketKeys == nil {
+		return nil
+	}
+
+	return c.cohortBucketKeys[name]
 }

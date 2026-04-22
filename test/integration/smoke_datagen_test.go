@@ -588,3 +588,184 @@ func TestDatagenSmokeDeterminism(t *testing.T) {
 		}
 	}
 }
+
+// cohortSmokeColumns lists the emit order for the cohort smoke table.
+var cohortSmokeColumns = []string{"id", "bucket", "alive", "member0", "member1"}
+
+// cohortSmokeSpec drives a 20-row flat spec that draws from a named
+// cohort schedule at every row. The schedule picks 5 of 10 entity IDs
+// per bucket, with active_every=2 marking odd buckets dead, no
+// persistence. bucket = row_index / 5 groups rows into four buckets;
+// per-row the spec emits:
+//   - id       : 1-based row counter
+//   - bucket   : row_index / 5
+//   - alive    : cohort_live(hot, bucket)   (bool → 1/0 via std.ifBool)
+//   - member0  : cohort_draw(hot, 0, bucket)
+//   - member1  : cohort_draw(hot, 1, bucket)
+func cohortSmokeSpec(size int64) *dgproto.InsertSpec {
+	bucketExpr := binOpOf(dgproto.BinOp_DIV, rowIndexOf(), litOf(int64(5)))
+
+	attrs := []*dgproto.Attr{
+		attrOf("id", binOpOf(dgproto.BinOp_ADD, rowIndexOf(), litOf(int64(1)))),
+		attrOf("bucket", bucketExpr),
+		attrOf("alive", ifOf(
+			&dgproto.Expr{Kind: &dgproto.Expr_CohortLive{CohortLive: &dgproto.CohortLive{
+				Name: "hot", BucketKey: colOf("bucket"),
+			}}},
+			litOf(int64(1)),
+			litOf(int64(0)),
+		)),
+		attrOf("member0", &dgproto.Expr{Kind: &dgproto.Expr_CohortDraw{
+			CohortDraw: &dgproto.CohortDraw{
+				Name: "hot", Slot: litOf(int64(0)), BucketKey: colOf("bucket"),
+			},
+		}}),
+		attrOf("member1", &dgproto.Expr{Kind: &dgproto.Expr_CohortDraw{
+			CohortDraw: &dgproto.CohortDraw{
+				Name: "hot", Slot: litOf(int64(1)), BucketKey: colOf("bucket"),
+			},
+		}}),
+	}
+
+	return &dgproto.InsertSpec{
+		Table: "smoke_cohort",
+		Seed:  0xC0FFEE42,
+		Source: &dgproto.RelSource{
+			Population:  &dgproto.Population{Name: "smoke_cohort", Size: size},
+			Attrs:       attrs,
+			ColumnOrder: cohortSmokeColumns,
+			Cohorts: []*dgproto.Cohort{{
+				Name:        "hot",
+				CohortSize:  5,
+				EntityMin:   0,
+				EntityMax:   9,
+				ActiveEvery: 2,
+			}},
+		},
+	}
+}
+
+// createCohortSmokeTable (re)creates the cohort smoke table.
+func createCohortSmokeTable(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+
+	const ddl = `CREATE TABLE smoke_cohort (
+		id int8 PRIMARY KEY,
+		bucket int8,
+		alive int8,
+		member0 int8,
+		member1 int8
+	)`
+	if _, err := pool.Exec(context.Background(), ddl); err != nil {
+		t.Fatalf("create smoke_cohort: %v", err)
+	}
+}
+
+// copyCohortRows inserts rows into smoke_cohort via COPY.
+func copyCohortRows(t *testing.T, pool *pgxpool.Pool, rows [][]any) int64 {
+	t.Helper()
+
+	n, err := pool.CopyFrom(
+		context.Background(),
+		pgx.Identifier{"smoke_cohort"},
+		cohortSmokeColumns,
+		pgx.CopyFromRows(rows),
+	)
+	if err != nil {
+		t.Fatalf("CopyFrom smoke_cohort: %v", err)
+	}
+
+	return n
+}
+
+// TestDatagenSmokeWithCohort proves cohort_draw / cohort_live wire
+// through the Stage-D3 pipeline. At size=20 the spec yields four
+// buckets (0..3); buckets 0 and 2 are active (every=2), 1 and 3 are
+// dead. Two rows in the same active bucket must see identical
+// member0/member1 entity IDs.
+func TestDatagenSmokeWithCohort(t *testing.T) {
+	const size = int64(20)
+
+	pool := NewTmpfsPG(t)
+	ResetSchema(t, pool)
+	createCohortSmokeTable(t, pool)
+
+	rt, err := runtime.NewRuntime(cohortSmokeSpec(size))
+	if err != nil {
+		t.Fatalf("NewRuntime: %v", err)
+	}
+
+	rows := drainRuntime(t, rt)
+	if int64(len(rows)) != size {
+		t.Fatalf("runtime emitted %d rows, want %d", len(rows), size)
+	}
+
+	if got := copyCohortRows(t, pool, rows); got != size {
+		t.Fatalf("CopyFrom inserted %d rows, want %d", got, size)
+	}
+
+	ctx := context.Background()
+
+	// Four distinct buckets.
+	var distinctBuckets int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(DISTINCT bucket) FROM smoke_cohort`).Scan(&distinctBuckets); err != nil {
+		t.Fatalf("distinct buckets: %v", err)
+	}
+	if distinctBuckets != 4 {
+		t.Fatalf("bucket count = %d, want 4", distinctBuckets)
+	}
+
+	// alive=1 for buckets 0 and 2 only; 10 rows total.
+	var aliveCount int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM smoke_cohort WHERE alive = 1`).Scan(&aliveCount); err != nil {
+		t.Fatalf("alive count: %v", err)
+	}
+	if aliveCount != 10 {
+		t.Fatalf("alive count = %d, want 10", aliveCount)
+	}
+
+	// Within an active bucket, member0 and member1 are constant.
+	var distinctMember0, distinctMember1 int64
+	if err := pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM (
+			SELECT bucket FROM smoke_cohort GROUP BY bucket HAVING COUNT(DISTINCT member0) = 1
+		) x`).Scan(&distinctMember0); err != nil {
+		t.Fatalf("per-bucket member0 check: %v", err)
+	}
+	if distinctMember0 != 4 {
+		t.Fatalf("buckets with stable member0 = %d, want 4", distinctMember0)
+	}
+
+	if err := pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM (
+			SELECT bucket FROM smoke_cohort GROUP BY bucket HAVING COUNT(DISTINCT member1) = 1
+		) x`).Scan(&distinctMember1); err != nil {
+		t.Fatalf("per-bucket member1 check: %v", err)
+	}
+	if distinctMember1 != 4 {
+		t.Fatalf("buckets with stable member1 = %d, want 4", distinctMember1)
+	}
+
+	// member0 != member1 within any bucket (no duplicates in a cohort).
+	var collisions int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM smoke_cohort WHERE member0 = member1`).Scan(&collisions); err != nil {
+		t.Fatalf("collision check: %v", err)
+	}
+	if collisions != 0 {
+		t.Fatalf("found %d rows where member0 = member1, want 0", collisions)
+	}
+
+	// All members in [0, 9].
+	var outOfRange int64
+	if err := pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM smoke_cohort
+		 WHERE member0 < 0 OR member0 > 9 OR member1 < 0 OR member1 > 9`).Scan(&outOfRange); err != nil {
+		t.Fatalf("range check: %v", err)
+	}
+	if outOfRange != 0 {
+		t.Fatalf("found %d rows outside [0, 9], want 0", outOfRange)
+	}
+}

@@ -8,8 +8,12 @@ import (
 )
 
 // Context carries the runtime bindings that an Expr tree reaches for
-// during evaluation. Implementations are supplied by the runtime (B6) and
-// by tests; the evaluator never constructs one itself.
+// during evaluation. Implementations are supplied by the runtime (B6)
+// and by tests; the evaluator never constructs one itself.
+// One method per Expr-arm dispatch target; splitting loses the
+// single-point substitution property the runtime relies on.
+//
+//nolint:interfacebloat // see doc comment above.
 type Context interface {
 	// LookupCol returns the value of a previously-evaluated column in the
 	// current row scratch, or ErrUnknownCol if the column is not set.
@@ -57,6 +61,22 @@ type Context interface {
 	// into the per-draw seed; implementations empty-string out when no
 	// attr is active (e.g. a test harness).
 	AttrPath() string
+
+	// CohortDraw returns the entity ID at position `slot` in the named
+	// cohort schedule's bucket identified by bucketKey. Implementations
+	// that host no Cohort registry return ErrBadCohort.
+	CohortDraw(name string, bucketKey, slot int64) (int64, error)
+
+	// CohortLive reports whether the named cohort's bucket identified
+	// by bucketKey is active. Implementations that host no Cohort
+	// registry return ErrBadCohort.
+	CohortLive(name string, bucketKey int64) (bool, error)
+
+	// CohortBucketKey returns the default bucket_key Expr declared on
+	// the named cohort schedule, or nil when either the schedule does
+	// not exist or no default bucket_key is configured. Callers use the
+	// default only when the per-arm bucket_key override is absent.
+	CohortBucketKey(name string) *dgproto.Expr
 }
 
 // evalLookup resolves a Lookup arm: it evaluates the entity-index
@@ -110,6 +130,10 @@ func Eval(ctx Context, expr *dgproto.Expr) (any, error) {
 		return evalStreamDraw(ctx, expr.GetStreamDraw())
 	case *dgproto.Expr_Choose:
 		return evalChoose(ctx, expr.GetChoose())
+	case *dgproto.Expr_CohortDraw:
+		return evalCohortDraw(ctx, expr.GetCohortDraw())
+	case *dgproto.Expr_CohortLive:
+		return evalCohortLive(ctx, expr.GetCohortLive())
 	default:
 		return nil, fmt.Errorf("%w: %T", ErrBadExpr, kind)
 	}

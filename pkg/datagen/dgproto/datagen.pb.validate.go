@@ -758,6 +758,40 @@ func (m *RelSource) validate(all bool) error {
 
 	// no validation rules for Iter
 
+	for idx, item := range m.GetCohorts() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, RelSourceValidationError{
+						field:  fmt.Sprintf("Cohorts[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, RelSourceValidationError{
+						field:  fmt.Sprintf("Cohorts[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return RelSourceValidationError{
+					field:  fmt.Sprintf("Cohorts[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	for idx, item := range m.GetLookupPops() {
 		_, _ = idx, item
 
@@ -1760,6 +1794,90 @@ func (m *Expr) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return ExprValidationError{
 					field:  "Choose",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Expr_CohortDraw:
+		if v == nil {
+			err := ExprValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+
+		if all {
+			switch v := interface{}(m.GetCohortDraw()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ExprValidationError{
+						field:  "CohortDraw",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ExprValidationError{
+						field:  "CohortDraw",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetCohortDraw()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ExprValidationError{
+					field:  "CohortDraw",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Expr_CohortLive:
+		if v == nil {
+			err := ExprValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+
+		if all {
+			switch v := interface{}(m.GetCohortLive()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ExprValidationError{
+						field:  "CohortLive",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ExprValidationError{
+						field:  "CohortLive",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetCohortLive()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ExprValidationError{
+					field:  "CohortLive",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
@@ -7767,3 +7885,527 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ChooseBranchValidationError{}
+
+// Validate checks the field values on Cohort with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Cohort) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Cohort with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in CohortMultiError, or nil if none found.
+func (m *Cohort) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Cohort) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetName()) < 1 {
+		err := CohortValidationError{
+			field:  "Name",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetCohortSize() <= 0 {
+		err := CohortValidationError{
+			field:  "CohortSize",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetEntityMin() < 0 {
+		err := CohortValidationError{
+			field:  "EntityMin",
+			reason: "value must be greater than or equal to 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetEntityMax() < 0 {
+		err := CohortValidationError{
+			field:  "EntityMax",
+			reason: "value must be greater than or equal to 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetBucketKey()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CohortValidationError{
+					field:  "BucketKey",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CohortValidationError{
+					field:  "BucketKey",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetBucketKey()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CohortValidationError{
+				field:  "BucketKey",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetActiveEvery() < 0 {
+		err := CohortValidationError{
+			field:  "ActiveEvery",
+			reason: "value must be greater than or equal to 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetPersistenceMod() < 0 {
+		err := CohortValidationError{
+			field:  "PersistenceMod",
+			reason: "value must be greater than or equal to 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if val := m.GetPersistenceRatio(); val < 0 || val > 1 {
+		err := CohortValidationError{
+			field:  "PersistenceRatio",
+			reason: "value must be inside range [0, 1]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for SeedSalt
+
+	if len(errors) > 0 {
+		return CohortMultiError(errors)
+	}
+
+	return nil
+}
+
+// CohortMultiError is an error wrapping multiple validation errors returned by
+// Cohort.ValidateAll() if the designated constraints aren't met.
+type CohortMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CohortMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CohortMultiError) AllErrors() []error { return m }
+
+// CohortValidationError is the validation error returned by Cohort.Validate if
+// the designated constraints aren't met.
+type CohortValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CohortValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CohortValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CohortValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CohortValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CohortValidationError) ErrorName() string { return "CohortValidationError" }
+
+// Error satisfies the builtin error interface
+func (e CohortValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCohort.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CohortValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CohortValidationError{}
+
+// Validate checks the field values on CohortDraw with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *CohortDraw) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CohortDraw with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in CohortDrawMultiError, or
+// nil if none found.
+func (m *CohortDraw) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CohortDraw) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetName()) < 1 {
+		err := CohortDrawValidationError{
+			field:  "Name",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetSlot() == nil {
+		err := CohortDrawValidationError{
+			field:  "Slot",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetSlot()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CohortDrawValidationError{
+					field:  "Slot",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CohortDrawValidationError{
+					field:  "Slot",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSlot()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CohortDrawValidationError{
+				field:  "Slot",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetBucketKey()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CohortDrawValidationError{
+					field:  "BucketKey",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CohortDrawValidationError{
+					field:  "BucketKey",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetBucketKey()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CohortDrawValidationError{
+				field:  "BucketKey",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CohortDrawMultiError(errors)
+	}
+
+	return nil
+}
+
+// CohortDrawMultiError is an error wrapping multiple validation errors
+// returned by CohortDraw.ValidateAll() if the designated constraints aren't met.
+type CohortDrawMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CohortDrawMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CohortDrawMultiError) AllErrors() []error { return m }
+
+// CohortDrawValidationError is the validation error returned by
+// CohortDraw.Validate if the designated constraints aren't met.
+type CohortDrawValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CohortDrawValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CohortDrawValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CohortDrawValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CohortDrawValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CohortDrawValidationError) ErrorName() string { return "CohortDrawValidationError" }
+
+// Error satisfies the builtin error interface
+func (e CohortDrawValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCohortDraw.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CohortDrawValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CohortDrawValidationError{}
+
+// Validate checks the field values on CohortLive with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *CohortLive) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CohortLive with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in CohortLiveMultiError, or
+// nil if none found.
+func (m *CohortLive) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CohortLive) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetName()) < 1 {
+		err := CohortLiveValidationError{
+			field:  "Name",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetBucketKey()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CohortLiveValidationError{
+					field:  "BucketKey",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CohortLiveValidationError{
+					field:  "BucketKey",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetBucketKey()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CohortLiveValidationError{
+				field:  "BucketKey",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CohortLiveMultiError(errors)
+	}
+
+	return nil
+}
+
+// CohortLiveMultiError is an error wrapping multiple validation errors
+// returned by CohortLive.ValidateAll() if the designated constraints aren't met.
+type CohortLiveMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CohortLiveMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CohortLiveMultiError) AllErrors() []error { return m }
+
+// CohortLiveValidationError is the validation error returned by
+// CohortLive.Validate if the designated constraints aren't met.
+type CohortLiveValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CohortLiveValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CohortLiveValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CohortLiveValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CohortLiveValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CohortLiveValidationError) ErrorName() string { return "CohortLiveValidationError" }
+
+// Error satisfies the builtin error interface
+func (e CohortLiveValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCohortLive.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CohortLiveValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CohortLiveValidationError{}

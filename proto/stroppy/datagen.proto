@@ -75,6 +75,8 @@ message RelSource {
   // Name of the relationship in relationships that drives iteration for this
   // source. Empty when the source iterates its own population directly.
   string iter = 5;
+  // Named cohort schedules selecting entity slots per bucket key.
+  repeated Cohort cohorts = 6;
   // Sibling populations referenced via Lookup but never iterated.
   repeated LookupPop lookup_pops = 7;
 }
@@ -136,6 +138,10 @@ message Expr {
     // Weighted random pick among Expr branches; only the selected
     // branch evaluates.
     Choose choose = 11;
+    // Entity-id draw from a named cohort schedule at a computed slot.
+    CohortDraw cohort_draw = 12;
+    // Boolean reporting whether the named cohort's bucket is active.
+    CohortLive cohort_live = 13;
   }
 }
 
@@ -550,4 +556,57 @@ message ChooseBranch {
   int64 weight = 1 [ (validate.rules).int64.gt = 0 ];
   // Expression evaluated only when this branch is selected.
   Expr expr = 2 [ (validate.rules).message.required = true ];
+}
+
+// Cohort is a named schedule that picks cohort_size entity IDs from
+// the inclusive range [entity_min, entity_max] per bucket key. The
+// schedule is stateless: repeated draws for the same (name, bucket_key,
+// slot) triple return the same entity ID across runs and workers.
+message Cohort {
+  // Stable identifier referenced by CohortDraw.name and CohortLive.name.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Number of entities drawn per active bucket; must be <= span + 1.
+  int64 cohort_size = 2 [ (validate.rules).int64.gt = 0 ];
+  // Inclusive lower bound on the entity ID range drawn from.
+  int64 entity_min = 3 [ (validate.rules).int64.gte = 0 ];
+  // Inclusive upper bound on the entity ID range drawn from.
+  int64 entity_max = 4 [ (validate.rules).int64.gte = 0 ];
+  // Default bucket-key expression; may be overridden at each call site.
+  Expr bucket_key = 5;
+  // Every N-th bucket is active. 0 or 1 means every bucket is active.
+  int64 active_every = 6 [ (validate.rules).int64.gte = 0 ];
+  // Modulus used to collapse bucket keys when seeding the persistent
+  // slice. 0 disables persistence regardless of persistence_ratio.
+  int64 persistence_mod = 7 [ (validate.rules).int64.gte = 0 ];
+  // Fraction of cohort_size seeded by (bucket_key mod persistence_mod);
+  // the remainder is seeded by bucket_key directly. 0 disables
+  // persistence regardless of persistence_mod.
+  float persistence_ratio = 8 [ (validate.rules).float = {gte : 0, lte : 1} ];
+  // Per-cohort salt providing independence across schedules that share
+  // the same entity range.
+  uint64 seed_salt = 9;
+}
+
+// CohortDraw reads the entity ID at position `slot` in the named
+// cohort's schedule for the bucket key yielded by bucket_key (falling
+// back to the Cohort's default bucket_key when unset).
+message CohortDraw {
+  // Cohort schedule name; must match an entry in RelSource.cohorts.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Slot index within the cohort; must be in [0, cohort_size).
+  Expr slot = 2 [ (validate.rules).message.required = true ];
+  // Bucket-key override; when unset the Cohort's default bucket_key
+  // is used.
+  Expr bucket_key = 3;
+}
+
+// CohortLive reports whether the bucket named by bucket_key (or the
+// Cohort's default bucket_key when unset) is active in the named
+// cohort's schedule.
+message CohortLive {
+  // Cohort schedule name; must match an entry in RelSource.cohorts.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Bucket-key override; when unset the Cohort's default bucket_key
+  // is used.
+  Expr bucket_key = 2;
 }

@@ -511,6 +511,8 @@ type RelSource struct {
 	// Name of the relationship in relationships that drives iteration for this
 	// source. Empty when the source iterates its own population directly.
 	Iter string `protobuf:"bytes,5,opt,name=iter,proto3" json:"iter,omitempty"`
+	// Named cohort schedules selecting entity slots per bucket key.
+	Cohorts []*Cohort `protobuf:"bytes,6,rep,name=cohorts,proto3" json:"cohorts,omitempty"`
 	// Sibling populations referenced via Lookup but never iterated.
 	LookupPops    []*LookupPop `protobuf:"bytes,7,rep,name=lookup_pops,json=lookupPops,proto3" json:"lookup_pops,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -580,6 +582,13 @@ func (x *RelSource) GetIter() string {
 		return x.Iter
 	}
 	return ""
+}
+
+func (x *RelSource) GetCohorts() []*Cohort {
+	if x != nil {
+		return x.Cohorts
+	}
+	return nil
 }
 
 func (x *RelSource) GetLookupPops() []*LookupPop {
@@ -790,6 +799,8 @@ type Expr struct {
 	//	*Expr_Lookup
 	//	*Expr_StreamDraw
 	//	*Expr_Choose
+	//	*Expr_CohortDraw
+	//	*Expr_CohortLive
 	Kind          isExpr_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -931,6 +942,24 @@ func (x *Expr) GetChoose() *Choose {
 	return nil
 }
 
+func (x *Expr) GetCohortDraw() *CohortDraw {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_CohortDraw); ok {
+			return x.CohortDraw
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetCohortLive() *CohortLive {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_CohortLive); ok {
+			return x.CohortLive
+		}
+	}
+	return nil
+}
+
 type isExpr_Kind interface {
 	isExpr_Kind()
 }
@@ -991,6 +1020,16 @@ type Expr_Choose struct {
 	Choose *Choose `protobuf:"bytes,11,opt,name=choose,proto3,oneof"`
 }
 
+type Expr_CohortDraw struct {
+	// Entity-id draw from a named cohort schedule at a computed slot.
+	CohortDraw *CohortDraw `protobuf:"bytes,12,opt,name=cohort_draw,json=cohortDraw,proto3,oneof"`
+}
+
+type Expr_CohortLive struct {
+	// Boolean reporting whether the named cohort's bucket is active.
+	CohortLive *CohortLive `protobuf:"bytes,13,opt,name=cohort_live,json=cohortLive,proto3,oneof"`
+}
+
 func (*Expr_Col) isExpr_Kind() {}
 
 func (*Expr_RowIndex) isExpr_Kind() {}
@@ -1012,6 +1051,10 @@ func (*Expr_Lookup) isExpr_Kind() {}
 func (*Expr_StreamDraw) isExpr_Kind() {}
 
 func (*Expr_Choose) isExpr_Kind() {}
+
+func (*Expr_CohortDraw) isExpr_Kind() {}
+
+func (*Expr_CohortLive) isExpr_Kind() {}
 
 // ColRef refers to another attribute in the same RelSource by name.
 type ColRef struct {
@@ -3456,6 +3499,256 @@ func (x *ChooseBranch) GetExpr() *Expr {
 	return nil
 }
 
+// Cohort is a named schedule that picks cohort_size entity IDs from
+// the inclusive range [entity_min, entity_max] per bucket key. The
+// schedule is stateless: repeated draws for the same (name, bucket_key,
+// slot) triple return the same entity ID across runs and workers.
+type Cohort struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Stable identifier referenced by CohortDraw.name and CohortLive.name.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Number of entities drawn per active bucket; must be <= span + 1.
+	CohortSize int64 `protobuf:"varint,2,opt,name=cohort_size,json=cohortSize,proto3" json:"cohort_size,omitempty"`
+	// Inclusive lower bound on the entity ID range drawn from.
+	EntityMin int64 `protobuf:"varint,3,opt,name=entity_min,json=entityMin,proto3" json:"entity_min,omitempty"`
+	// Inclusive upper bound on the entity ID range drawn from.
+	EntityMax int64 `protobuf:"varint,4,opt,name=entity_max,json=entityMax,proto3" json:"entity_max,omitempty"`
+	// Default bucket-key expression; may be overridden at each call site.
+	BucketKey *Expr `protobuf:"bytes,5,opt,name=bucket_key,json=bucketKey,proto3" json:"bucket_key,omitempty"`
+	// Every N-th bucket is active. 0 or 1 means every bucket is active.
+	ActiveEvery int64 `protobuf:"varint,6,opt,name=active_every,json=activeEvery,proto3" json:"active_every,omitempty"`
+	// Modulus used to collapse bucket keys when seeding the persistent
+	// slice. 0 disables persistence regardless of persistence_ratio.
+	PersistenceMod int64 `protobuf:"varint,7,opt,name=persistence_mod,json=persistenceMod,proto3" json:"persistence_mod,omitempty"`
+	// Fraction of cohort_size seeded by (bucket_key mod persistence_mod);
+	// the remainder is seeded by bucket_key directly. 0 disables
+	// persistence regardless of persistence_mod.
+	PersistenceRatio float32 `protobuf:"fixed32,8,opt,name=persistence_ratio,json=persistenceRatio,proto3" json:"persistence_ratio,omitempty"`
+	// Per-cohort salt providing independence across schedules that share
+	// the same entity range.
+	SeedSalt      uint64 `protobuf:"varint,9,opt,name=seed_salt,json=seedSalt,proto3" json:"seed_salt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Cohort) Reset() {
+	*x = Cohort{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Cohort) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Cohort) ProtoMessage() {}
+
+func (x *Cohort) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Cohort.ProtoReflect.Descriptor instead.
+func (*Cohort) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *Cohort) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Cohort) GetCohortSize() int64 {
+	if x != nil {
+		return x.CohortSize
+	}
+	return 0
+}
+
+func (x *Cohort) GetEntityMin() int64 {
+	if x != nil {
+		return x.EntityMin
+	}
+	return 0
+}
+
+func (x *Cohort) GetEntityMax() int64 {
+	if x != nil {
+		return x.EntityMax
+	}
+	return 0
+}
+
+func (x *Cohort) GetBucketKey() *Expr {
+	if x != nil {
+		return x.BucketKey
+	}
+	return nil
+}
+
+func (x *Cohort) GetActiveEvery() int64 {
+	if x != nil {
+		return x.ActiveEvery
+	}
+	return 0
+}
+
+func (x *Cohort) GetPersistenceMod() int64 {
+	if x != nil {
+		return x.PersistenceMod
+	}
+	return 0
+}
+
+func (x *Cohort) GetPersistenceRatio() float32 {
+	if x != nil {
+		return x.PersistenceRatio
+	}
+	return 0
+}
+
+func (x *Cohort) GetSeedSalt() uint64 {
+	if x != nil {
+		return x.SeedSalt
+	}
+	return 0
+}
+
+// CohortDraw reads the entity ID at position `slot` in the named
+// cohort's schedule for the bucket key yielded by bucket_key (falling
+// back to the Cohort's default bucket_key when unset).
+type CohortDraw struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Cohort schedule name; must match an entry in RelSource.cohorts.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Slot index within the cohort; must be in [0, cohort_size).
+	Slot *Expr `protobuf:"bytes,2,opt,name=slot,proto3" json:"slot,omitempty"`
+	// Bucket-key override; when unset the Cohort's default bucket_key
+	// is used.
+	BucketKey     *Expr `protobuf:"bytes,3,opt,name=bucket_key,json=bucketKey,proto3" json:"bucket_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CohortDraw) Reset() {
+	*x = CohortDraw{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CohortDraw) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CohortDraw) ProtoMessage() {}
+
+func (x *CohortDraw) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CohortDraw.ProtoReflect.Descriptor instead.
+func (*CohortDraw) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *CohortDraw) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CohortDraw) GetSlot() *Expr {
+	if x != nil {
+		return x.Slot
+	}
+	return nil
+}
+
+func (x *CohortDraw) GetBucketKey() *Expr {
+	if x != nil {
+		return x.BucketKey
+	}
+	return nil
+}
+
+// CohortLive reports whether the bucket named by bucket_key (or the
+// Cohort's default bucket_key when unset) is active in the named
+// cohort's schedule.
+type CohortLive struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Cohort schedule name; must match an entry in RelSource.cohorts.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Bucket-key override; when unset the Cohort's default bucket_key
+	// is used.
+	BucketKey     *Expr `protobuf:"bytes,2,opt,name=bucket_key,json=bucketKey,proto3" json:"bucket_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CohortLive) Reset() {
+	*x = CohortLive{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CohortLive) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CohortLive) ProtoMessage() {}
+
+func (x *CohortLive) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CohortLive.ProtoReflect.Descriptor instead.
+func (*CohortLive) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *CohortLive) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CohortLive) GetBucketKey() *Expr {
+	if x != nil {
+		return x.BucketKey
+	}
+	return nil
+}
+
 var File_proto_stroppy_datagen_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_datagen_proto_rawDesc = "" +
@@ -3482,7 +3775,7 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x04rows\x18\x03 \x03(\v2\x18.stroppy.datagen.DictRowR\x04rows\";\n" +
 	"\aDictRow\x12\x16\n" +
 	"\x06values\x18\x01 \x03(\tR\x06values\x12\x18\n" +
-	"\aweights\x18\x02 \x03(\x03R\aweights\"\xcc\x02\n" +
+	"\aweights\x18\x02 \x03(\x03R\aweights\"\xff\x02\n" +
 	"\tRelSource\x12E\n" +
 	"\n" +
 	"population\x18\x01 \x01(\v2\x1b.stroppy.datagen.PopulationB\b\xfaB\x05\x8a\x01\x02\x10\x01R\n" +
@@ -3490,7 +3783,8 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x05attrs\x18\x02 \x03(\v2\x15.stroppy.datagen.AttrB\b\xfaB\x05\x92\x01\x02\b\x01R\x05attrs\x12+\n" +
 	"\fcolumn_order\x18\x03 \x03(\tB\b\xfaB\x05\x92\x01\x02\b\x01R\vcolumnOrder\x12C\n" +
 	"\rrelationships\x18\x04 \x03(\v2\x1d.stroppy.datagen.RelationshipR\rrelationships\x12\x12\n" +
-	"\x04iter\x18\x05 \x01(\tR\x04iter\x12;\n" +
+	"\x04iter\x18\x05 \x01(\tR\x04iter\x121\n" +
+	"\acohorts\x18\x06 \x03(\v2\x17.stroppy.datagen.CohortR\acohorts\x12;\n" +
 	"\vlookup_pops\x18\a \x03(\v2\x1a.stroppy.datagen.LookupPopR\n" +
 	"lookupPops\"Z\n" +
 	"\n" +
@@ -3506,7 +3800,7 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x04rate\x18\x01 \x01(\x02B\x0f\xfaB\f\n" +
 	"\n" +
 	"\x1d\x00\x00\x80?-\x00\x00\x00\x00R\x04rate\x12\x1b\n" +
-	"\tseed_salt\x18\x02 \x01(\x04R\bseedSalt\"\xc2\x04\n" +
+	"\tseed_salt\x18\x02 \x01(\x04R\bseedSalt\"\xc2\x05\n" +
 	"\x04Expr\x12+\n" +
 	"\x03col\x18\x01 \x01(\v2\x17.stroppy.datagen.ColRefH\x00R\x03col\x128\n" +
 	"\trow_index\x18\x02 \x01(\v2\x19.stroppy.datagen.RowIndexH\x00R\browIndex\x12,\n" +
@@ -3520,7 +3814,11 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\vstream_draw\x18\n" +
 	" \x01(\v2\x1b.stroppy.datagen.StreamDrawH\x00R\n" +
 	"streamDraw\x121\n" +
-	"\x06choose\x18\v \x01(\v2\x17.stroppy.datagen.ChooseH\x00R\x06chooseB\v\n" +
+	"\x06choose\x18\v \x01(\v2\x17.stroppy.datagen.ChooseH\x00R\x06choose\x12>\n" +
+	"\vcohort_draw\x18\f \x01(\v2\x1b.stroppy.datagen.CohortDrawH\x00R\n" +
+	"cohortDraw\x12>\n" +
+	"\vcohort_live\x18\r \x01(\v2\x1b.stroppy.datagen.CohortLiveH\x00R\n" +
+	"cohortLiveB\v\n" +
 	"\x04kind\x12\x03\xf8B\x01\"%\n" +
 	"\x06ColRef\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\"\x83\x01\n" +
@@ -3701,7 +3999,34 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\bbranches\x18\x02 \x03(\v2\x1d.stroppy.datagen.ChooseBranchB\b\xfaB\x05\x92\x01\x02\b\x01R\bbranches\"d\n" +
 	"\fChooseBranch\x12\x1f\n" +
 	"\x06weight\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\x06weight\x123\n" +
-	"\x04expr\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04expr*;\n" +
+	"\x04expr\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04expr\"\x8e\x03\n" +
+	"\x06Cohort\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12(\n" +
+	"\vcohort_size\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\n" +
+	"cohortSize\x12&\n" +
+	"\n" +
+	"entity_min\x18\x03 \x01(\x03B\a\xfaB\x04\"\x02(\x00R\tentityMin\x12&\n" +
+	"\n" +
+	"entity_max\x18\x04 \x01(\x03B\a\xfaB\x04\"\x02(\x00R\tentityMax\x124\n" +
+	"\n" +
+	"bucket_key\x18\x05 \x01(\v2\x15.stroppy.datagen.ExprR\tbucketKey\x12*\n" +
+	"\factive_every\x18\x06 \x01(\x03B\a\xfaB\x04\"\x02(\x00R\vactiveEvery\x120\n" +
+	"\x0fpersistence_mod\x18\a \x01(\x03B\a\xfaB\x04\"\x02(\x00R\x0epersistenceMod\x12<\n" +
+	"\x11persistence_ratio\x18\b \x01(\x02B\x0f\xfaB\f\n" +
+	"\n" +
+	"\x1d\x00\x00\x80?-\x00\x00\x00\x00R\x10persistenceRatio\x12\x1b\n" +
+	"\tseed_salt\x18\t \x01(\x04R\bseedSalt\"\x94\x01\n" +
+	"\n" +
+	"CohortDraw\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x123\n" +
+	"\x04slot\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04slot\x124\n" +
+	"\n" +
+	"bucket_key\x18\x03 \x01(\v2\x15.stroppy.datagen.ExprR\tbucketKey\"_\n" +
+	"\n" +
+	"CohortLive\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x124\n" +
+	"\n" +
+	"bucket_key\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprR\tbucketKey*;\n" +
 	"\fInsertMethod\x12\x0f\n" +
 	"\vPLAIN_QUERY\x10\x00\x12\x0e\n" +
 	"\n" +
@@ -3722,7 +4047,7 @@ func file_proto_stroppy_datagen_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_stroppy_datagen_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_proto_stroppy_datagen_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
+var file_proto_stroppy_datagen_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
 var file_proto_stroppy_datagen_proto_goTypes = []any{
 	(InsertMethod)(0),             // 0: stroppy.datagen.InsertMethod
 	(RowIndex_Kind)(0),            // 1: stroppy.datagen.RowIndex.Kind
@@ -3772,90 +4097,100 @@ var file_proto_stroppy_datagen_proto_goTypes = []any{
 	(*DrawPhrase)(nil),            // 45: stroppy.datagen.DrawPhrase
 	(*Choose)(nil),                // 46: stroppy.datagen.Choose
 	(*ChooseBranch)(nil),          // 47: stroppy.datagen.ChooseBranch
-	nil,                           // 48: stroppy.datagen.InsertSpec.DictsEntry
-	(*timestamppb.Timestamp)(nil), // 49: google.protobuf.Timestamp
+	(*Cohort)(nil),                // 48: stroppy.datagen.Cohort
+	(*CohortDraw)(nil),            // 49: stroppy.datagen.CohortDraw
+	(*CohortLive)(nil),            // 50: stroppy.datagen.CohortLive
+	nil,                           // 51: stroppy.datagen.InsertSpec.DictsEntry
+	(*timestamppb.Timestamp)(nil), // 52: google.protobuf.Timestamp
 }
 var file_proto_stroppy_datagen_proto_depIdxs = []int32{
 	0,  // 0: stroppy.datagen.InsertSpec.method:type_name -> stroppy.datagen.InsertMethod
 	4,  // 1: stroppy.datagen.InsertSpec.parallelism:type_name -> stroppy.datagen.Parallelism
 	7,  // 2: stroppy.datagen.InsertSpec.source:type_name -> stroppy.datagen.RelSource
-	48, // 3: stroppy.datagen.InsertSpec.dicts:type_name -> stroppy.datagen.InsertSpec.DictsEntry
+	51, // 3: stroppy.datagen.InsertSpec.dicts:type_name -> stroppy.datagen.InsertSpec.DictsEntry
 	6,  // 4: stroppy.datagen.Dict.rows:type_name -> stroppy.datagen.DictRow
 	8,  // 5: stroppy.datagen.RelSource.population:type_name -> stroppy.datagen.Population
 	9,  // 6: stroppy.datagen.RelSource.attrs:type_name -> stroppy.datagen.Attr
 	19, // 7: stroppy.datagen.RelSource.relationships:type_name -> stroppy.datagen.Relationship
-	31, // 8: stroppy.datagen.RelSource.lookup_pops:type_name -> stroppy.datagen.LookupPop
-	11, // 9: stroppy.datagen.Attr.expr:type_name -> stroppy.datagen.Expr
-	10, // 10: stroppy.datagen.Attr.null:type_name -> stroppy.datagen.Null
-	12, // 11: stroppy.datagen.Expr.col:type_name -> stroppy.datagen.ColRef
-	13, // 12: stroppy.datagen.Expr.row_index:type_name -> stroppy.datagen.RowIndex
-	14, // 13: stroppy.datagen.Expr.lit:type_name -> stroppy.datagen.Literal
-	15, // 14: stroppy.datagen.Expr.bin_op:type_name -> stroppy.datagen.BinOp
-	16, // 15: stroppy.datagen.Expr.call:type_name -> stroppy.datagen.Call
-	17, // 16: stroppy.datagen.Expr.if_:type_name -> stroppy.datagen.If
-	18, // 17: stroppy.datagen.Expr.dict_at:type_name -> stroppy.datagen.DictAt
-	29, // 18: stroppy.datagen.Expr.block_ref:type_name -> stroppy.datagen.BlockRef
-	30, // 19: stroppy.datagen.Expr.lookup:type_name -> stroppy.datagen.Lookup
-	32, // 20: stroppy.datagen.Expr.stream_draw:type_name -> stroppy.datagen.StreamDraw
-	46, // 21: stroppy.datagen.Expr.choose:type_name -> stroppy.datagen.Choose
-	1,  // 22: stroppy.datagen.RowIndex.kind:type_name -> stroppy.datagen.RowIndex.Kind
-	49, // 23: stroppy.datagen.Literal.timestamp:type_name -> google.protobuf.Timestamp
-	2,  // 24: stroppy.datagen.BinOp.op:type_name -> stroppy.datagen.BinOp.Op
-	11, // 25: stroppy.datagen.BinOp.a:type_name -> stroppy.datagen.Expr
-	11, // 26: stroppy.datagen.BinOp.b:type_name -> stroppy.datagen.Expr
-	11, // 27: stroppy.datagen.Call.args:type_name -> stroppy.datagen.Expr
-	11, // 28: stroppy.datagen.If.cond:type_name -> stroppy.datagen.Expr
-	11, // 29: stroppy.datagen.If.then:type_name -> stroppy.datagen.Expr
-	11, // 30: stroppy.datagen.If.else_:type_name -> stroppy.datagen.Expr
-	11, // 31: stroppy.datagen.DictAt.index:type_name -> stroppy.datagen.Expr
-	20, // 32: stroppy.datagen.Relationship.sides:type_name -> stroppy.datagen.Side
-	21, // 33: stroppy.datagen.Side.degree:type_name -> stroppy.datagen.Degree
-	24, // 34: stroppy.datagen.Side.strategy:type_name -> stroppy.datagen.Strategy
-	28, // 35: stroppy.datagen.Side.block_slots:type_name -> stroppy.datagen.BlockSlot
-	22, // 36: stroppy.datagen.Degree.fixed:type_name -> stroppy.datagen.DegreeFixed
-	23, // 37: stroppy.datagen.Degree.uniform:type_name -> stroppy.datagen.DegreeUniform
-	25, // 38: stroppy.datagen.Strategy.hash:type_name -> stroppy.datagen.StrategyHash
-	26, // 39: stroppy.datagen.Strategy.sequential:type_name -> stroppy.datagen.StrategySequential
-	27, // 40: stroppy.datagen.Strategy.equitable:type_name -> stroppy.datagen.StrategyEquitable
-	11, // 41: stroppy.datagen.BlockSlot.expr:type_name -> stroppy.datagen.Expr
-	11, // 42: stroppy.datagen.Lookup.entity_index:type_name -> stroppy.datagen.Expr
-	8,  // 43: stroppy.datagen.LookupPop.population:type_name -> stroppy.datagen.Population
-	9,  // 44: stroppy.datagen.LookupPop.attrs:type_name -> stroppy.datagen.Attr
-	33, // 45: stroppy.datagen.StreamDraw.int_uniform:type_name -> stroppy.datagen.DrawIntUniform
-	34, // 46: stroppy.datagen.StreamDraw.float_uniform:type_name -> stroppy.datagen.DrawFloatUniform
-	35, // 47: stroppy.datagen.StreamDraw.normal:type_name -> stroppy.datagen.DrawNormal
-	36, // 48: stroppy.datagen.StreamDraw.zipf:type_name -> stroppy.datagen.DrawZipf
-	37, // 49: stroppy.datagen.StreamDraw.nurand:type_name -> stroppy.datagen.DrawNURand
-	38, // 50: stroppy.datagen.StreamDraw.bernoulli:type_name -> stroppy.datagen.DrawBernoulli
-	39, // 51: stroppy.datagen.StreamDraw.dict:type_name -> stroppy.datagen.DrawDict
-	40, // 52: stroppy.datagen.StreamDraw.joint:type_name -> stroppy.datagen.DrawJoint
-	41, // 53: stroppy.datagen.StreamDraw.date:type_name -> stroppy.datagen.DrawDate
-	42, // 54: stroppy.datagen.StreamDraw.decimal:type_name -> stroppy.datagen.DrawDecimal
-	43, // 55: stroppy.datagen.StreamDraw.ascii:type_name -> stroppy.datagen.DrawAscii
-	45, // 56: stroppy.datagen.StreamDraw.phrase:type_name -> stroppy.datagen.DrawPhrase
-	11, // 57: stroppy.datagen.DrawIntUniform.min:type_name -> stroppy.datagen.Expr
-	11, // 58: stroppy.datagen.DrawIntUniform.max:type_name -> stroppy.datagen.Expr
-	11, // 59: stroppy.datagen.DrawFloatUniform.min:type_name -> stroppy.datagen.Expr
-	11, // 60: stroppy.datagen.DrawFloatUniform.max:type_name -> stroppy.datagen.Expr
-	11, // 61: stroppy.datagen.DrawNormal.min:type_name -> stroppy.datagen.Expr
-	11, // 62: stroppy.datagen.DrawNormal.max:type_name -> stroppy.datagen.Expr
-	11, // 63: stroppy.datagen.DrawZipf.min:type_name -> stroppy.datagen.Expr
-	11, // 64: stroppy.datagen.DrawZipf.max:type_name -> stroppy.datagen.Expr
-	11, // 65: stroppy.datagen.DrawDecimal.min:type_name -> stroppy.datagen.Expr
-	11, // 66: stroppy.datagen.DrawDecimal.max:type_name -> stroppy.datagen.Expr
-	11, // 67: stroppy.datagen.DrawAscii.min_len:type_name -> stroppy.datagen.Expr
-	11, // 68: stroppy.datagen.DrawAscii.max_len:type_name -> stroppy.datagen.Expr
-	44, // 69: stroppy.datagen.DrawAscii.alphabet:type_name -> stroppy.datagen.AsciiRange
-	11, // 70: stroppy.datagen.DrawPhrase.min_words:type_name -> stroppy.datagen.Expr
-	11, // 71: stroppy.datagen.DrawPhrase.max_words:type_name -> stroppy.datagen.Expr
-	47, // 72: stroppy.datagen.Choose.branches:type_name -> stroppy.datagen.ChooseBranch
-	11, // 73: stroppy.datagen.ChooseBranch.expr:type_name -> stroppy.datagen.Expr
-	5,  // 74: stroppy.datagen.InsertSpec.DictsEntry.value:type_name -> stroppy.datagen.Dict
-	75, // [75:75] is the sub-list for method output_type
-	75, // [75:75] is the sub-list for method input_type
-	75, // [75:75] is the sub-list for extension type_name
-	75, // [75:75] is the sub-list for extension extendee
-	0,  // [0:75] is the sub-list for field type_name
+	48, // 8: stroppy.datagen.RelSource.cohorts:type_name -> stroppy.datagen.Cohort
+	31, // 9: stroppy.datagen.RelSource.lookup_pops:type_name -> stroppy.datagen.LookupPop
+	11, // 10: stroppy.datagen.Attr.expr:type_name -> stroppy.datagen.Expr
+	10, // 11: stroppy.datagen.Attr.null:type_name -> stroppy.datagen.Null
+	12, // 12: stroppy.datagen.Expr.col:type_name -> stroppy.datagen.ColRef
+	13, // 13: stroppy.datagen.Expr.row_index:type_name -> stroppy.datagen.RowIndex
+	14, // 14: stroppy.datagen.Expr.lit:type_name -> stroppy.datagen.Literal
+	15, // 15: stroppy.datagen.Expr.bin_op:type_name -> stroppy.datagen.BinOp
+	16, // 16: stroppy.datagen.Expr.call:type_name -> stroppy.datagen.Call
+	17, // 17: stroppy.datagen.Expr.if_:type_name -> stroppy.datagen.If
+	18, // 18: stroppy.datagen.Expr.dict_at:type_name -> stroppy.datagen.DictAt
+	29, // 19: stroppy.datagen.Expr.block_ref:type_name -> stroppy.datagen.BlockRef
+	30, // 20: stroppy.datagen.Expr.lookup:type_name -> stroppy.datagen.Lookup
+	32, // 21: stroppy.datagen.Expr.stream_draw:type_name -> stroppy.datagen.StreamDraw
+	46, // 22: stroppy.datagen.Expr.choose:type_name -> stroppy.datagen.Choose
+	49, // 23: stroppy.datagen.Expr.cohort_draw:type_name -> stroppy.datagen.CohortDraw
+	50, // 24: stroppy.datagen.Expr.cohort_live:type_name -> stroppy.datagen.CohortLive
+	1,  // 25: stroppy.datagen.RowIndex.kind:type_name -> stroppy.datagen.RowIndex.Kind
+	52, // 26: stroppy.datagen.Literal.timestamp:type_name -> google.protobuf.Timestamp
+	2,  // 27: stroppy.datagen.BinOp.op:type_name -> stroppy.datagen.BinOp.Op
+	11, // 28: stroppy.datagen.BinOp.a:type_name -> stroppy.datagen.Expr
+	11, // 29: stroppy.datagen.BinOp.b:type_name -> stroppy.datagen.Expr
+	11, // 30: stroppy.datagen.Call.args:type_name -> stroppy.datagen.Expr
+	11, // 31: stroppy.datagen.If.cond:type_name -> stroppy.datagen.Expr
+	11, // 32: stroppy.datagen.If.then:type_name -> stroppy.datagen.Expr
+	11, // 33: stroppy.datagen.If.else_:type_name -> stroppy.datagen.Expr
+	11, // 34: stroppy.datagen.DictAt.index:type_name -> stroppy.datagen.Expr
+	20, // 35: stroppy.datagen.Relationship.sides:type_name -> stroppy.datagen.Side
+	21, // 36: stroppy.datagen.Side.degree:type_name -> stroppy.datagen.Degree
+	24, // 37: stroppy.datagen.Side.strategy:type_name -> stroppy.datagen.Strategy
+	28, // 38: stroppy.datagen.Side.block_slots:type_name -> stroppy.datagen.BlockSlot
+	22, // 39: stroppy.datagen.Degree.fixed:type_name -> stroppy.datagen.DegreeFixed
+	23, // 40: stroppy.datagen.Degree.uniform:type_name -> stroppy.datagen.DegreeUniform
+	25, // 41: stroppy.datagen.Strategy.hash:type_name -> stroppy.datagen.StrategyHash
+	26, // 42: stroppy.datagen.Strategy.sequential:type_name -> stroppy.datagen.StrategySequential
+	27, // 43: stroppy.datagen.Strategy.equitable:type_name -> stroppy.datagen.StrategyEquitable
+	11, // 44: stroppy.datagen.BlockSlot.expr:type_name -> stroppy.datagen.Expr
+	11, // 45: stroppy.datagen.Lookup.entity_index:type_name -> stroppy.datagen.Expr
+	8,  // 46: stroppy.datagen.LookupPop.population:type_name -> stroppy.datagen.Population
+	9,  // 47: stroppy.datagen.LookupPop.attrs:type_name -> stroppy.datagen.Attr
+	33, // 48: stroppy.datagen.StreamDraw.int_uniform:type_name -> stroppy.datagen.DrawIntUniform
+	34, // 49: stroppy.datagen.StreamDraw.float_uniform:type_name -> stroppy.datagen.DrawFloatUniform
+	35, // 50: stroppy.datagen.StreamDraw.normal:type_name -> stroppy.datagen.DrawNormal
+	36, // 51: stroppy.datagen.StreamDraw.zipf:type_name -> stroppy.datagen.DrawZipf
+	37, // 52: stroppy.datagen.StreamDraw.nurand:type_name -> stroppy.datagen.DrawNURand
+	38, // 53: stroppy.datagen.StreamDraw.bernoulli:type_name -> stroppy.datagen.DrawBernoulli
+	39, // 54: stroppy.datagen.StreamDraw.dict:type_name -> stroppy.datagen.DrawDict
+	40, // 55: stroppy.datagen.StreamDraw.joint:type_name -> stroppy.datagen.DrawJoint
+	41, // 56: stroppy.datagen.StreamDraw.date:type_name -> stroppy.datagen.DrawDate
+	42, // 57: stroppy.datagen.StreamDraw.decimal:type_name -> stroppy.datagen.DrawDecimal
+	43, // 58: stroppy.datagen.StreamDraw.ascii:type_name -> stroppy.datagen.DrawAscii
+	45, // 59: stroppy.datagen.StreamDraw.phrase:type_name -> stroppy.datagen.DrawPhrase
+	11, // 60: stroppy.datagen.DrawIntUniform.min:type_name -> stroppy.datagen.Expr
+	11, // 61: stroppy.datagen.DrawIntUniform.max:type_name -> stroppy.datagen.Expr
+	11, // 62: stroppy.datagen.DrawFloatUniform.min:type_name -> stroppy.datagen.Expr
+	11, // 63: stroppy.datagen.DrawFloatUniform.max:type_name -> stroppy.datagen.Expr
+	11, // 64: stroppy.datagen.DrawNormal.min:type_name -> stroppy.datagen.Expr
+	11, // 65: stroppy.datagen.DrawNormal.max:type_name -> stroppy.datagen.Expr
+	11, // 66: stroppy.datagen.DrawZipf.min:type_name -> stroppy.datagen.Expr
+	11, // 67: stroppy.datagen.DrawZipf.max:type_name -> stroppy.datagen.Expr
+	11, // 68: stroppy.datagen.DrawDecimal.min:type_name -> stroppy.datagen.Expr
+	11, // 69: stroppy.datagen.DrawDecimal.max:type_name -> stroppy.datagen.Expr
+	11, // 70: stroppy.datagen.DrawAscii.min_len:type_name -> stroppy.datagen.Expr
+	11, // 71: stroppy.datagen.DrawAscii.max_len:type_name -> stroppy.datagen.Expr
+	44, // 72: stroppy.datagen.DrawAscii.alphabet:type_name -> stroppy.datagen.AsciiRange
+	11, // 73: stroppy.datagen.DrawPhrase.min_words:type_name -> stroppy.datagen.Expr
+	11, // 74: stroppy.datagen.DrawPhrase.max_words:type_name -> stroppy.datagen.Expr
+	47, // 75: stroppy.datagen.Choose.branches:type_name -> stroppy.datagen.ChooseBranch
+	11, // 76: stroppy.datagen.ChooseBranch.expr:type_name -> stroppy.datagen.Expr
+	11, // 77: stroppy.datagen.Cohort.bucket_key:type_name -> stroppy.datagen.Expr
+	11, // 78: stroppy.datagen.CohortDraw.slot:type_name -> stroppy.datagen.Expr
+	11, // 79: stroppy.datagen.CohortDraw.bucket_key:type_name -> stroppy.datagen.Expr
+	11, // 80: stroppy.datagen.CohortLive.bucket_key:type_name -> stroppy.datagen.Expr
+	5,  // 81: stroppy.datagen.InsertSpec.DictsEntry.value:type_name -> stroppy.datagen.Dict
+	82, // [82:82] is the sub-list for method output_type
+	82, // [82:82] is the sub-list for method input_type
+	82, // [82:82] is the sub-list for extension type_name
+	82, // [82:82] is the sub-list for extension extendee
+	0,  // [0:82] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_datagen_proto_init() }
@@ -3875,6 +4210,8 @@ func file_proto_stroppy_datagen_proto_init() {
 		(*Expr_Lookup)(nil),
 		(*Expr_StreamDraw)(nil),
 		(*Expr_Choose)(nil),
+		(*Expr_CohortDraw)(nil),
+		(*Expr_CohortLive)(nil),
 	}
 	file_proto_stroppy_datagen_proto_msgTypes[11].OneofWrappers = []any{
 		(*Literal_Int64)(nil),
@@ -3913,7 +4250,7 @@ func file_proto_stroppy_datagen_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_datagen_proto_rawDesc), len(file_proto_stroppy_datagen_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   46,
+			NumMessages:   49,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

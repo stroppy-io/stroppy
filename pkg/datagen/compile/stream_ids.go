@@ -68,6 +68,11 @@ func assignStreamIDsExpr(expr *dgproto.Expr, counter *uint32) {
 		for _, branch := range kind.Choose.GetBranches() {
 			assignStreamIDsExpr(branch.GetExpr(), counter)
 		}
+	case *dgproto.Expr_CohortDraw:
+		assignStreamIDsExpr(kind.CohortDraw.GetSlot(), counter)
+		assignStreamIDsExpr(kind.CohortDraw.GetBucketKey(), counter)
+	case *dgproto.Expr_CohortLive:
+		assignStreamIDsExpr(kind.CohortLive.GetBucketKey(), counter)
 	}
 }
 

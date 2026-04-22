@@ -70,6 +70,9 @@
     - [Call](#stroppy-datagen-Call)
     - [Choose](#stroppy-datagen-Choose)
     - [ChooseBranch](#stroppy-datagen-ChooseBranch)
+    - [Cohort](#stroppy-datagen-Cohort)
+    - [CohortDraw](#stroppy-datagen-CohortDraw)
+    - [CohortLive](#stroppy-datagen-CohortLive)
     - [ColRef](#stroppy-datagen-ColRef)
     - [Degree](#stroppy-datagen-Degree)
     - [DegreeFixed](#stroppy-datagen-DegreeFixed)
@@ -1167,6 +1170,69 @@ ChooseBranch is one weighted alternative within a Choose.
 
 
 
+<a name="stroppy-datagen-Cohort"></a>
+
+### Cohort
+Cohort is a named schedule that picks cohort_size entity IDs from
+the inclusive range [entity_min, entity_max] per bucket key. The
+schedule is stateless: repeated draws for the same (name, bucket_key,
+slot) triple return the same entity ID across runs and workers.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Stable identifier referenced by CohortDraw.name and CohortLive.name. |
+| cohort_size | [int64](#int64) |  | Number of entities drawn per active bucket; must be &lt;= span &#43; 1. |
+| entity_min | [int64](#int64) |  | Inclusive lower bound on the entity ID range drawn from. |
+| entity_max | [int64](#int64) |  | Inclusive upper bound on the entity ID range drawn from. |
+| bucket_key | [Expr](#stroppy-datagen-Expr) |  | Default bucket-key expression; may be overridden at each call site. |
+| active_every | [int64](#int64) |  | Every N-th bucket is active. 0 or 1 means every bucket is active. |
+| persistence_mod | [int64](#int64) |  | Modulus used to collapse bucket keys when seeding the persistent slice. 0 disables persistence regardless of persistence_ratio. |
+| persistence_ratio | [float](#float) |  | Fraction of cohort_size seeded by (bucket_key mod persistence_mod); the remainder is seeded by bucket_key directly. 0 disables persistence regardless of persistence_mod. |
+| seed_salt | [uint64](#uint64) |  | Per-cohort salt providing independence across schedules that share the same entity range. |
+
+
+
+
+
+
+<a name="stroppy-datagen-CohortDraw"></a>
+
+### CohortDraw
+CohortDraw reads the entity ID at position `slot` in the named
+cohort&#39;s schedule for the bucket key yielded by bucket_key (falling
+back to the Cohort&#39;s default bucket_key when unset).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Cohort schedule name; must match an entry in RelSource.cohorts. |
+| slot | [Expr](#stroppy-datagen-Expr) |  | Slot index within the cohort; must be in [0, cohort_size). |
+| bucket_key | [Expr](#stroppy-datagen-Expr) |  | Bucket-key override; when unset the Cohort&#39;s default bucket_key is used. |
+
+
+
+
+
+
+<a name="stroppy-datagen-CohortLive"></a>
+
+### CohortLive
+CohortLive reports whether the bucket named by bucket_key (or the
+Cohort&#39;s default bucket_key when unset) is active in the named
+cohort&#39;s schedule.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Cohort schedule name; must match an entry in RelSource.cohorts. |
+| bucket_key | [Expr](#stroppy-datagen-Expr) |  | Bucket-key override; when unset the Cohort&#39;s default bucket_key is used. |
+
+
+
+
+
+
 <a name="stroppy-datagen-ColRef"></a>
 
 ### ColRef
@@ -1506,6 +1572,8 @@ Expr is the closed grammar for attribute value generation.
 | lookup | [Lookup](#stroppy-datagen-Lookup) |  | Cross-population column read. |
 | stream_draw | [StreamDraw](#stroppy-datagen-StreamDraw) |  | Seeded PRNG draw from a closed distribution catalog. |
 | choose | [Choose](#stroppy-datagen-Choose) |  | Weighted random pick among Expr branches; only the selected branch evaluates. |
+| cohort_draw | [CohortDraw](#stroppy-datagen-CohortDraw) |  | Entity-id draw from a named cohort schedule at a computed slot. |
+| cohort_live | [CohortLive](#stroppy-datagen-CohortLive) |  | Boolean reporting whether the named cohort&#39;s bucket is active. |
 
 
 
@@ -1681,6 +1749,7 @@ RelSource is the relational descriptor for the rows a spec emits.
 | column_order | [string](#string) | repeated | Column order used when rendering rows for the driver. |
 | relationships | [Relationship](#stroppy-datagen-Relationship) | repeated | Cross-population relationships this source participates in. |
 | iter | [string](#string) |  | Name of the relationship in relationships that drives iteration for this source. Empty when the source iterates its own population directly. |
+| cohorts | [Cohort](#stroppy-datagen-Cohort) | repeated | Named cohort schedules selecting entity slots per bucket key. |
 | lookup_pops | [LookupPop](#stroppy-datagen-LookupPop) | repeated | Sibling populations referenced via Lookup but never iterated. |
 
 

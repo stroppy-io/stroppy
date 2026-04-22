@@ -14,28 +14,34 @@ import (
 
 // fakeCtx is a Context stub for unit tests. Fields are set per test.
 type fakeCtx struct {
-	cols      map[string]any
-	rowIndex  map[dgproto.RowIndex_Kind]int64
-	dicts     map[string]*dgproto.Dict
-	calls     map[string]func(args []any) (any, error)
-	blocks    map[string]any
-	lookups   map[string]func(pop, attr string, idx int64) (any, error)
-	rootSeed  uint64
-	attrPath  string
-	colLookup int
-	callCount int
-	drawCount int
+	cols         map[string]any
+	rowIndex     map[dgproto.RowIndex_Kind]int64
+	dicts        map[string]*dgproto.Dict
+	calls        map[string]func(args []any) (any, error)
+	blocks       map[string]any
+	lookups      map[string]func(pop, attr string, idx int64) (any, error)
+	cohortDraws  map[string]func(bucketKey, slot int64) (int64, error)
+	cohortLives  map[string]func(bucketKey int64) (bool, error)
+	cohortBucket map[string]*dgproto.Expr
+	rootSeed     uint64
+	attrPath     string
+	colLookup    int
+	callCount    int
+	drawCount    int
 }
 
 func newFakeCtx() *fakeCtx {
 	return &fakeCtx{
-		cols:     map[string]any{},
-		rowIndex: map[dgproto.RowIndex_Kind]int64{},
-		dicts:    map[string]*dgproto.Dict{},
-		calls:    map[string]func(args []any) (any, error){},
-		blocks:   map[string]any{},
-		lookups:  map[string]func(pop, attr string, idx int64) (any, error){},
-		attrPath: "test",
+		cols:         map[string]any{},
+		rowIndex:     map[dgproto.RowIndex_Kind]int64{},
+		dicts:        map[string]*dgproto.Dict{},
+		calls:        map[string]func(args []any) (any, error){},
+		blocks:       map[string]any{},
+		lookups:      map[string]func(pop, attr string, idx int64) (any, error){},
+		cohortDraws:  map[string]func(bucketKey, slot int64) (int64, error){},
+		cohortLives:  map[string]func(bucketKey int64) (bool, error){},
+		cohortBucket: map[string]*dgproto.Expr{},
+		attrPath:     "test",
 	}
 }
 
@@ -107,6 +113,28 @@ func (f *fakeCtx) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Ran
 
 func (f *fakeCtx) AttrPath() string {
 	return f.attrPath
+}
+
+func (f *fakeCtx) CohortDraw(name string, bucketKey, slot int64) (int64, error) {
+	fn, ok := f.cohortDraws[name]
+	if !ok {
+		return 0, ErrBadCohort
+	}
+
+	return fn(bucketKey, slot)
+}
+
+func (f *fakeCtx) CohortLive(name string, bucketKey int64) (bool, error) {
+	fn, ok := f.cohortLives[name]
+	if !ok {
+		return false, ErrBadCohort
+	}
+
+	return fn(bucketKey)
+}
+
+func (f *fakeCtx) CohortBucketKey(name string) *dgproto.Expr {
+	return f.cohortBucket[name]
 }
 
 // litInt builds an Expr wrapping an int64 literal.

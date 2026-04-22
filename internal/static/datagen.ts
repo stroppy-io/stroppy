@@ -15,6 +15,7 @@ import {
   BlockRef as PbBlockRef,
   BlockSlot as PbBlockSlot,
   Call as PbCall,
+  Cohort as PbCohort,
   Degree as PbDegree,
   DictRow as PbDictRow,
   Dict as PbDict,
@@ -501,6 +502,8 @@ export interface RelTableOpts {
   iter?: string;
   /** Pure sibling populations readable via `Attr.lookup`. */
   lookupPops?: PbLookupPop[];
+  /** Named cohort schedules readable via `Attr.cohortDraw` / `Attr.cohortLive`. */
+  cohorts?: PbCohort[];
 }
 
 /**
@@ -531,6 +534,7 @@ function relTable(name: string, opts: RelTableOpts): PbInsertSpec {
     columnOrder,
     relationships: opts.relationships ? [...opts.relationships] : [],
     iter: opts.iter ?? "",
+    cohorts: opts.cohorts ? [...opts.cohorts] : [],
     lookupPops: opts.lookupPops ? [...opts.lookupPops] : [],
   };
 

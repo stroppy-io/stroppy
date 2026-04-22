@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/stroppy-io/stroppy/pkg/datagen/cohort"
 	"github.com/stroppy-io/stroppy/pkg/datagen/compile"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/expr"
@@ -68,12 +69,19 @@ func NewRuntime(spec *dgproto.InsertSpec) (*Runtime, error) {
 
 	registry.SetRootSeed(spec.GetSeed())
 
+	cohorts, err := cohort.New(source.GetCohorts(), spec.GetSeed(), 0)
+	if err != nil {
+		return nil, fmt.Errorf("runtime: compile cohorts: %w", err)
+	}
+
 	ctx := &evalContext{
-		scratch:  make(map[string]any, len(dag.Order)),
-		dicts:    spec.GetDicts(),
-		registry: registry,
-		iterPop:  source.GetPopulation().GetName(),
-		rootSeed: spec.GetSeed(),
+		scratch:          make(map[string]any, len(dag.Order)),
+		dicts:            spec.GetDicts(),
+		registry:         registry,
+		cohorts:          cohorts,
+		cohortBucketKeys: cohortDefaultKeys(source.GetCohorts()),
+		iterPop:          source.GetPopulation().GetName(),
+		rootSeed:         spec.GetSeed(),
 	}
 
 	runtime := &Runtime{
@@ -165,12 +173,35 @@ func (r *Runtime) Clone() *Runtime {
 		size:    r.size,
 		row:     0,
 		ctx: &evalContext{
-			scratch:  make(map[string]any, len(r.dag.Order)),
-			dicts:    r.ctx.dicts,
-			rootSeed: r.ctx.rootSeed,
-			iterPop:  r.ctx.iterPop,
+			scratch:          make(map[string]any, len(r.dag.Order)),
+			dicts:            r.ctx.dicts,
+			rootSeed:         r.ctx.rootSeed,
+			iterPop:          r.ctx.iterPop,
+			cohorts:          r.ctx.cohorts,
+			cohortBucketKeys: r.ctx.cohortBucketKeys,
 		},
 	}
+}
+
+// cohortDefaultKeys builds the schedule-name → default-bucket_key map
+// consulted by evalContext.CohortBucketKey. Schedules with a nil
+// bucket_key are omitted; the per-arm override is required for those.
+func cohortDefaultKeys(cohorts []*dgproto.Cohort) map[string]*dgproto.Expr {
+	if len(cohorts) == 0 {
+		return nil
+	}
+
+	out := make(map[string]*dgproto.Expr, len(cohorts))
+
+	for _, c := range cohorts {
+		if c == nil || c.GetBucketKey() == nil {
+			continue
+		}
+
+		out[c.GetName()] = c.GetBucketKey()
+	}
+
+	return out
 }
 
 // SeekRow sets the next row index to emit. Valid inputs are in

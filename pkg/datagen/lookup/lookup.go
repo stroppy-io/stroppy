@@ -410,3 +410,24 @@ func (c *popCtx) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand
 func (c *popCtx) AttrPath() string {
 	return c.attrPath
 }
+
+// CohortDraw is undefined in LookupPop scope: pure sibling populations
+// do not reach into cohort schedules. Callers that need cohort draws
+// must express them on the owning RelSource, not on a lookup target.
+func (c *popCtx) CohortDraw(name string, _, _ int64) (int64, error) {
+	return 0, fmt.Errorf("%w: cohort %q not available in LookupPop scope",
+		expr.ErrBadCohort, name)
+}
+
+// CohortLive is undefined in LookupPop scope for the same reason as
+// CohortDraw.
+func (c *popCtx) CohortLive(name string, _ int64) (bool, error) {
+	return false, fmt.Errorf("%w: cohort %q not available in LookupPop scope",
+		expr.ErrBadCohort, name)
+}
+
+// CohortBucketKey returns nil in LookupPop scope; the caller will then
+// surface a BadCohort error when the arm has no per-arm bucket_key.
+func (c *popCtx) CohortBucketKey(string) *dgproto.Expr {
+	return nil
+}
