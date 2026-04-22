@@ -66,6 +66,27 @@ func (r *Runtime) Columns() []string {
 	return r.columns
 }
 
+// Clone returns an independent Runtime that shares the compiled DAG,
+// column metadata, and dict map with the receiver but owns a fresh
+// scratch buffer and row counter. The shared fields are read-only after
+// NewRuntime, so clones are safe to run concurrently without locks.
+//
+// A cloned Runtime starts at row 0; call SeekRow to position it at a
+// chunk boundary before iterating.
+func (r *Runtime) Clone() *Runtime {
+	return &Runtime{
+		dag:     r.dag,
+		columns: r.columns,
+		emit:    r.emit,
+		size:    r.size,
+		row:     0,
+		ctx: &evalContext{
+			scratch: make(map[string]any, len(r.dag.Order)),
+			dicts:   r.ctx.dicts,
+		},
+	}
+}
+
 // SeekRow sets the next row index to emit. Valid inputs are in
 // `[0, Population.Size]`; seeking to Size leaves the Runtime at EOF.
 // SeekRow is O(1) because every Expr is a pure function of the row index —
