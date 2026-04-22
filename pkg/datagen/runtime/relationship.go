@@ -298,6 +298,8 @@ func (rt *Runtime) nextRelationship() ([]any, error) {
 			continue
 		}
 
+		rt.ctx.attrPath = name
+
 		value, err := expr.Eval(rt.ctx, attr.GetExpr())
 		if err != nil {
 			return nil, fmt.Errorf("runtime: attr %q at (e=%d,i=%d): %w",

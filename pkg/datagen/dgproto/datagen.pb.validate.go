@@ -1682,6 +1682,90 @@ func (m *Expr) validate(all bool) error {
 			}
 		}
 
+	case *Expr_StreamDraw:
+		if v == nil {
+			err := ExprValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+
+		if all {
+			switch v := interface{}(m.GetStreamDraw()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ExprValidationError{
+						field:  "StreamDraw",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ExprValidationError{
+						field:  "StreamDraw",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetStreamDraw()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ExprValidationError{
+					field:  "StreamDraw",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Expr_Choose:
+		if v == nil {
+			err := ExprValidationError{
+				field:  "Kind",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofKindPresent = true
+
+		if all {
+			switch v := interface{}(m.GetChoose()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ExprValidationError{
+						field:  "Choose",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ExprValidationError{
+						field:  "Choose",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetChoose()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ExprValidationError{
+					field:  "Choose",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -4787,3 +4871,2899 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = LookupPopValidationError{}
+
+// Validate checks the field values on StreamDraw with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *StreamDraw) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StreamDraw with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in StreamDrawMultiError, or
+// nil if none found.
+func (m *StreamDraw) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StreamDraw) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for StreamId
+
+	oneofDrawPresent := false
+	switch v := m.Draw.(type) {
+	case *StreamDraw_IntUniform:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetIntUniform()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "IntUniform",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "IntUniform",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetIntUniform()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "IntUniform",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *StreamDraw_FloatUniform:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetFloatUniform()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "FloatUniform",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "FloatUniform",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetFloatUniform()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "FloatUniform",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *StreamDraw_Normal:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetNormal()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Normal",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Normal",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetNormal()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "Normal",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *StreamDraw_Zipf:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetZipf()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Zipf",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Zipf",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetZipf()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "Zipf",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *StreamDraw_Nurand:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetNurand()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Nurand",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Nurand",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetNurand()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "Nurand",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *StreamDraw_Bernoulli:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetBernoulli()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Bernoulli",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Bernoulli",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetBernoulli()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "Bernoulli",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *StreamDraw_Dict:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetDict()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Dict",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Dict",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetDict()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "Dict",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *StreamDraw_Joint:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetJoint()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Joint",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Joint",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetJoint()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "Joint",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *StreamDraw_Date:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetDate()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Date",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Date",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetDate()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "Date",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *StreamDraw_Decimal:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetDecimal()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Decimal",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Decimal",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetDecimal()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "Decimal",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *StreamDraw_Ascii:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetAscii()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Ascii",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Ascii",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetAscii()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "Ascii",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *StreamDraw_Phrase:
+		if v == nil {
+			err := StreamDrawValidationError{
+				field:  "Draw",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofDrawPresent = true
+
+		if all {
+			switch v := interface{}(m.GetPhrase()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Phrase",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StreamDrawValidationError{
+						field:  "Phrase",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetPhrase()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StreamDrawValidationError{
+					field:  "Phrase",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+	if !oneofDrawPresent {
+		err := StreamDrawValidationError{
+			field:  "Draw",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return StreamDrawMultiError(errors)
+	}
+
+	return nil
+}
+
+// StreamDrawMultiError is an error wrapping multiple validation errors
+// returned by StreamDraw.ValidateAll() if the designated constraints aren't met.
+type StreamDrawMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StreamDrawMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StreamDrawMultiError) AllErrors() []error { return m }
+
+// StreamDrawValidationError is the validation error returned by
+// StreamDraw.Validate if the designated constraints aren't met.
+type StreamDrawValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StreamDrawValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StreamDrawValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StreamDrawValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StreamDrawValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StreamDrawValidationError) ErrorName() string { return "StreamDrawValidationError" }
+
+// Error satisfies the builtin error interface
+func (e StreamDrawValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStreamDraw.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StreamDrawValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StreamDrawValidationError{}
+
+// Validate checks the field values on DrawIntUniform with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DrawIntUniform) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawIntUniform with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DrawIntUniformMultiError,
+// or nil if none found.
+func (m *DrawIntUniform) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawIntUniform) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetMin() == nil {
+		err := DrawIntUniformValidationError{
+			field:  "Min",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMin()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawIntUniformValidationError{
+					field:  "Min",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawIntUniformValidationError{
+					field:  "Min",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMin()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawIntUniformValidationError{
+				field:  "Min",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetMax() == nil {
+		err := DrawIntUniformValidationError{
+			field:  "Max",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMax()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawIntUniformValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawIntUniformValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMax()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawIntUniformValidationError{
+				field:  "Max",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return DrawIntUniformMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawIntUniformMultiError is an error wrapping multiple validation errors
+// returned by DrawIntUniform.ValidateAll() if the designated constraints
+// aren't met.
+type DrawIntUniformMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawIntUniformMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawIntUniformMultiError) AllErrors() []error { return m }
+
+// DrawIntUniformValidationError is the validation error returned by
+// DrawIntUniform.Validate if the designated constraints aren't met.
+type DrawIntUniformValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawIntUniformValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawIntUniformValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawIntUniformValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawIntUniformValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawIntUniformValidationError) ErrorName() string { return "DrawIntUniformValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawIntUniformValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawIntUniform.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawIntUniformValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawIntUniformValidationError{}
+
+// Validate checks the field values on DrawFloatUniform with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *DrawFloatUniform) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawFloatUniform with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// DrawFloatUniformMultiError, or nil if none found.
+func (m *DrawFloatUniform) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawFloatUniform) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetMin() == nil {
+		err := DrawFloatUniformValidationError{
+			field:  "Min",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMin()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawFloatUniformValidationError{
+					field:  "Min",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawFloatUniformValidationError{
+					field:  "Min",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMin()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawFloatUniformValidationError{
+				field:  "Min",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetMax() == nil {
+		err := DrawFloatUniformValidationError{
+			field:  "Max",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMax()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawFloatUniformValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawFloatUniformValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMax()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawFloatUniformValidationError{
+				field:  "Max",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return DrawFloatUniformMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawFloatUniformMultiError is an error wrapping multiple validation errors
+// returned by DrawFloatUniform.ValidateAll() if the designated constraints
+// aren't met.
+type DrawFloatUniformMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawFloatUniformMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawFloatUniformMultiError) AllErrors() []error { return m }
+
+// DrawFloatUniformValidationError is the validation error returned by
+// DrawFloatUniform.Validate if the designated constraints aren't met.
+type DrawFloatUniformValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawFloatUniformValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawFloatUniformValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawFloatUniformValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawFloatUniformValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawFloatUniformValidationError) ErrorName() string { return "DrawFloatUniformValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawFloatUniformValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawFloatUniform.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawFloatUniformValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawFloatUniformValidationError{}
+
+// Validate checks the field values on DrawNormal with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DrawNormal) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawNormal with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DrawNormalMultiError, or
+// nil if none found.
+func (m *DrawNormal) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawNormal) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetMin() == nil {
+		err := DrawNormalValidationError{
+			field:  "Min",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMin()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawNormalValidationError{
+					field:  "Min",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawNormalValidationError{
+					field:  "Min",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMin()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawNormalValidationError{
+				field:  "Min",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetMax() == nil {
+		err := DrawNormalValidationError{
+			field:  "Max",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMax()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawNormalValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawNormalValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMax()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawNormalValidationError{
+				field:  "Max",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for Screw
+
+	if len(errors) > 0 {
+		return DrawNormalMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawNormalMultiError is an error wrapping multiple validation errors
+// returned by DrawNormal.ValidateAll() if the designated constraints aren't met.
+type DrawNormalMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawNormalMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawNormalMultiError) AllErrors() []error { return m }
+
+// DrawNormalValidationError is the validation error returned by
+// DrawNormal.Validate if the designated constraints aren't met.
+type DrawNormalValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawNormalValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawNormalValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawNormalValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawNormalValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawNormalValidationError) ErrorName() string { return "DrawNormalValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawNormalValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawNormal.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawNormalValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawNormalValidationError{}
+
+// Validate checks the field values on DrawZipf with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DrawZipf) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawZipf with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DrawZipfMultiError, or nil
+// if none found.
+func (m *DrawZipf) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawZipf) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetMin() == nil {
+		err := DrawZipfValidationError{
+			field:  "Min",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMin()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawZipfValidationError{
+					field:  "Min",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawZipfValidationError{
+					field:  "Min",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMin()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawZipfValidationError{
+				field:  "Min",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetMax() == nil {
+		err := DrawZipfValidationError{
+			field:  "Max",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMax()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawZipfValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawZipfValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMax()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawZipfValidationError{
+				field:  "Max",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for Exponent
+
+	if len(errors) > 0 {
+		return DrawZipfMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawZipfMultiError is an error wrapping multiple validation errors returned
+// by DrawZipf.ValidateAll() if the designated constraints aren't met.
+type DrawZipfMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawZipfMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawZipfMultiError) AllErrors() []error { return m }
+
+// DrawZipfValidationError is the validation error returned by
+// DrawZipf.Validate if the designated constraints aren't met.
+type DrawZipfValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawZipfValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawZipfValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawZipfValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawZipfValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawZipfValidationError) ErrorName() string { return "DrawZipfValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawZipfValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawZipf.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawZipfValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawZipfValidationError{}
+
+// Validate checks the field values on DrawNURand with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DrawNURand) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawNURand with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DrawNURandMultiError, or
+// nil if none found.
+func (m *DrawNURand) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawNURand) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for A
+
+	// no validation rules for X
+
+	// no validation rules for Y
+
+	// no validation rules for CSalt
+
+	if len(errors) > 0 {
+		return DrawNURandMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawNURandMultiError is an error wrapping multiple validation errors
+// returned by DrawNURand.ValidateAll() if the designated constraints aren't met.
+type DrawNURandMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawNURandMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawNURandMultiError) AllErrors() []error { return m }
+
+// DrawNURandValidationError is the validation error returned by
+// DrawNURand.Validate if the designated constraints aren't met.
+type DrawNURandValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawNURandValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawNURandValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawNURandValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawNURandValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawNURandValidationError) ErrorName() string { return "DrawNURandValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawNURandValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawNURand.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawNURandValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawNURandValidationError{}
+
+// Validate checks the field values on DrawBernoulli with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DrawBernoulli) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawBernoulli with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DrawBernoulliMultiError, or
+// nil if none found.
+func (m *DrawBernoulli) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawBernoulli) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if val := m.GetP(); val < 0 || val > 1 {
+		err := DrawBernoulliValidationError{
+			field:  "P",
+			reason: "value must be inside range [0, 1]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return DrawBernoulliMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawBernoulliMultiError is an error wrapping multiple validation errors
+// returned by DrawBernoulli.ValidateAll() if the designated constraints
+// aren't met.
+type DrawBernoulliMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawBernoulliMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawBernoulliMultiError) AllErrors() []error { return m }
+
+// DrawBernoulliValidationError is the validation error returned by
+// DrawBernoulli.Validate if the designated constraints aren't met.
+type DrawBernoulliValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawBernoulliValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawBernoulliValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawBernoulliValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawBernoulliValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawBernoulliValidationError) ErrorName() string { return "DrawBernoulliValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawBernoulliValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawBernoulli.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawBernoulliValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawBernoulliValidationError{}
+
+// Validate checks the field values on DrawDict with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DrawDict) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawDict with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DrawDictMultiError, or nil
+// if none found.
+func (m *DrawDict) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawDict) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetDictKey()) < 1 {
+		err := DrawDictValidationError{
+			field:  "DictKey",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for WeightSet
+
+	if len(errors) > 0 {
+		return DrawDictMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawDictMultiError is an error wrapping multiple validation errors returned
+// by DrawDict.ValidateAll() if the designated constraints aren't met.
+type DrawDictMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawDictMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawDictMultiError) AllErrors() []error { return m }
+
+// DrawDictValidationError is the validation error returned by
+// DrawDict.Validate if the designated constraints aren't met.
+type DrawDictValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawDictValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawDictValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawDictValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawDictValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawDictValidationError) ErrorName() string { return "DrawDictValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawDictValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawDict.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawDictValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawDictValidationError{}
+
+// Validate checks the field values on DrawJoint with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DrawJoint) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawJoint with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DrawJointMultiError, or nil
+// if none found.
+func (m *DrawJoint) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawJoint) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetDictKey()) < 1 {
+		err := DrawJointValidationError{
+			field:  "DictKey",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetColumn()) < 1 {
+		err := DrawJointValidationError{
+			field:  "Column",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for TupleScope
+
+	// no validation rules for WeightSet
+
+	if len(errors) > 0 {
+		return DrawJointMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawJointMultiError is an error wrapping multiple validation errors returned
+// by DrawJoint.ValidateAll() if the designated constraints aren't met.
+type DrawJointMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawJointMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawJointMultiError) AllErrors() []error { return m }
+
+// DrawJointValidationError is the validation error returned by
+// DrawJoint.Validate if the designated constraints aren't met.
+type DrawJointValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawJointValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawJointValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawJointValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawJointValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawJointValidationError) ErrorName() string { return "DrawJointValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawJointValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawJoint.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawJointValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawJointValidationError{}
+
+// Validate checks the field values on DrawDate with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DrawDate) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawDate with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DrawDateMultiError, or nil
+// if none found.
+func (m *DrawDate) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawDate) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for MinDaysEpoch
+
+	// no validation rules for MaxDaysEpoch
+
+	if len(errors) > 0 {
+		return DrawDateMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawDateMultiError is an error wrapping multiple validation errors returned
+// by DrawDate.ValidateAll() if the designated constraints aren't met.
+type DrawDateMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawDateMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawDateMultiError) AllErrors() []error { return m }
+
+// DrawDateValidationError is the validation error returned by
+// DrawDate.Validate if the designated constraints aren't met.
+type DrawDateValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawDateValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawDateValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawDateValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawDateValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawDateValidationError) ErrorName() string { return "DrawDateValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawDateValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawDate.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawDateValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawDateValidationError{}
+
+// Validate checks the field values on DrawDecimal with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DrawDecimal) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawDecimal with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DrawDecimalMultiError, or
+// nil if none found.
+func (m *DrawDecimal) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawDecimal) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetMin() == nil {
+		err := DrawDecimalValidationError{
+			field:  "Min",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMin()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawDecimalValidationError{
+					field:  "Min",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawDecimalValidationError{
+					field:  "Min",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMin()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawDecimalValidationError{
+				field:  "Min",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetMax() == nil {
+		err := DrawDecimalValidationError{
+			field:  "Max",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMax()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawDecimalValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawDecimalValidationError{
+					field:  "Max",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMax()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawDecimalValidationError{
+				field:  "Max",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for Scale
+
+	if len(errors) > 0 {
+		return DrawDecimalMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawDecimalMultiError is an error wrapping multiple validation errors
+// returned by DrawDecimal.ValidateAll() if the designated constraints aren't met.
+type DrawDecimalMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawDecimalMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawDecimalMultiError) AllErrors() []error { return m }
+
+// DrawDecimalValidationError is the validation error returned by
+// DrawDecimal.Validate if the designated constraints aren't met.
+type DrawDecimalValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawDecimalValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawDecimalValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawDecimalValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawDecimalValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawDecimalValidationError) ErrorName() string { return "DrawDecimalValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawDecimalValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawDecimal.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawDecimalValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawDecimalValidationError{}
+
+// Validate checks the field values on DrawAscii with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DrawAscii) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawAscii with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DrawAsciiMultiError, or nil
+// if none found.
+func (m *DrawAscii) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawAscii) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetMinLen() == nil {
+		err := DrawAsciiValidationError{
+			field:  "MinLen",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMinLen()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawAsciiValidationError{
+					field:  "MinLen",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawAsciiValidationError{
+					field:  "MinLen",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMinLen()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawAsciiValidationError{
+				field:  "MinLen",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetMaxLen() == nil {
+		err := DrawAsciiValidationError{
+			field:  "MaxLen",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMaxLen()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawAsciiValidationError{
+					field:  "MaxLen",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawAsciiValidationError{
+					field:  "MaxLen",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMaxLen()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawAsciiValidationError{
+				field:  "MaxLen",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(m.GetAlphabet()) < 1 {
+		err := DrawAsciiValidationError{
+			field:  "Alphabet",
+			reason: "value must contain at least 1 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetAlphabet() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, DrawAsciiValidationError{
+						field:  fmt.Sprintf("Alphabet[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, DrawAsciiValidationError{
+						field:  fmt.Sprintf("Alphabet[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return DrawAsciiValidationError{
+					field:  fmt.Sprintf("Alphabet[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return DrawAsciiMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawAsciiMultiError is an error wrapping multiple validation errors returned
+// by DrawAscii.ValidateAll() if the designated constraints aren't met.
+type DrawAsciiMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawAsciiMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawAsciiMultiError) AllErrors() []error { return m }
+
+// DrawAsciiValidationError is the validation error returned by
+// DrawAscii.Validate if the designated constraints aren't met.
+type DrawAsciiValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawAsciiValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawAsciiValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawAsciiValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawAsciiValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawAsciiValidationError) ErrorName() string { return "DrawAsciiValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawAsciiValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawAscii.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawAsciiValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawAsciiValidationError{}
+
+// Validate checks the field values on AsciiRange with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *AsciiRange) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AsciiRange with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in AsciiRangeMultiError, or
+// nil if none found.
+func (m *AsciiRange) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AsciiRange) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Min
+
+	// no validation rules for Max
+
+	if len(errors) > 0 {
+		return AsciiRangeMultiError(errors)
+	}
+
+	return nil
+}
+
+// AsciiRangeMultiError is an error wrapping multiple validation errors
+// returned by AsciiRange.ValidateAll() if the designated constraints aren't met.
+type AsciiRangeMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AsciiRangeMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AsciiRangeMultiError) AllErrors() []error { return m }
+
+// AsciiRangeValidationError is the validation error returned by
+// AsciiRange.Validate if the designated constraints aren't met.
+type AsciiRangeValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AsciiRangeValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AsciiRangeValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AsciiRangeValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AsciiRangeValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AsciiRangeValidationError) ErrorName() string { return "AsciiRangeValidationError" }
+
+// Error satisfies the builtin error interface
+func (e AsciiRangeValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAsciiRange.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AsciiRangeValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AsciiRangeValidationError{}
+
+// Validate checks the field values on DrawPhrase with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DrawPhrase) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DrawPhrase with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DrawPhraseMultiError, or
+// nil if none found.
+func (m *DrawPhrase) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DrawPhrase) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetVocabKey()) < 1 {
+		err := DrawPhraseValidationError{
+			field:  "VocabKey",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetMinWords() == nil {
+		err := DrawPhraseValidationError{
+			field:  "MinWords",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMinWords()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawPhraseValidationError{
+					field:  "MinWords",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawPhraseValidationError{
+					field:  "MinWords",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMinWords()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawPhraseValidationError{
+				field:  "MinWords",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetMaxWords() == nil {
+		err := DrawPhraseValidationError{
+			field:  "MaxWords",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetMaxWords()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DrawPhraseValidationError{
+					field:  "MaxWords",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DrawPhraseValidationError{
+					field:  "MaxWords",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMaxWords()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DrawPhraseValidationError{
+				field:  "MaxWords",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for Separator
+
+	if len(errors) > 0 {
+		return DrawPhraseMultiError(errors)
+	}
+
+	return nil
+}
+
+// DrawPhraseMultiError is an error wrapping multiple validation errors
+// returned by DrawPhrase.ValidateAll() if the designated constraints aren't met.
+type DrawPhraseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DrawPhraseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DrawPhraseMultiError) AllErrors() []error { return m }
+
+// DrawPhraseValidationError is the validation error returned by
+// DrawPhrase.Validate if the designated constraints aren't met.
+type DrawPhraseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DrawPhraseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DrawPhraseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DrawPhraseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DrawPhraseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DrawPhraseValidationError) ErrorName() string { return "DrawPhraseValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DrawPhraseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDrawPhrase.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DrawPhraseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DrawPhraseValidationError{}
+
+// Validate checks the field values on Choose with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Choose) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Choose with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in ChooseMultiError, or nil if none found.
+func (m *Choose) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Choose) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for StreamId
+
+	if len(m.GetBranches()) < 1 {
+		err := ChooseValidationError{
+			field:  "Branches",
+			reason: "value must contain at least 1 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetBranches() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ChooseValidationError{
+						field:  fmt.Sprintf("Branches[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ChooseValidationError{
+						field:  fmt.Sprintf("Branches[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ChooseValidationError{
+					field:  fmt.Sprintf("Branches[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return ChooseMultiError(errors)
+	}
+
+	return nil
+}
+
+// ChooseMultiError is an error wrapping multiple validation errors returned by
+// Choose.ValidateAll() if the designated constraints aren't met.
+type ChooseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ChooseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ChooseMultiError) AllErrors() []error { return m }
+
+// ChooseValidationError is the validation error returned by Choose.Validate if
+// the designated constraints aren't met.
+type ChooseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ChooseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ChooseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ChooseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ChooseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ChooseValidationError) ErrorName() string { return "ChooseValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ChooseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sChoose.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ChooseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ChooseValidationError{}
+
+// Validate checks the field values on ChooseBranch with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *ChooseBranch) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ChooseBranch with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in ChooseBranchMultiError, or
+// nil if none found.
+func (m *ChooseBranch) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ChooseBranch) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetWeight() <= 0 {
+		err := ChooseBranchValidationError{
+			field:  "Weight",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetExpr() == nil {
+		err := ChooseBranchValidationError{
+			field:  "Expr",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetExpr()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ChooseBranchValidationError{
+					field:  "Expr",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ChooseBranchValidationError{
+					field:  "Expr",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetExpr()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ChooseBranchValidationError{
+				field:  "Expr",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return ChooseBranchMultiError(errors)
+	}
+
+	return nil
+}
+
+// ChooseBranchMultiError is an error wrapping multiple validation errors
+// returned by ChooseBranch.ValidateAll() if the designated constraints aren't met.
+type ChooseBranchMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ChooseBranchMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ChooseBranchMultiError) AllErrors() []error { return m }
+
+// ChooseBranchValidationError is the validation error returned by
+// ChooseBranch.Validate if the designated constraints aren't met.
+type ChooseBranchValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ChooseBranchValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ChooseBranchValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ChooseBranchValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ChooseBranchValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ChooseBranchValidationError) ErrorName() string { return "ChooseBranchValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ChooseBranchValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sChooseBranch.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ChooseBranchValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ChooseBranchValidationError{}

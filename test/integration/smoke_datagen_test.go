@@ -367,6 +367,169 @@ func sortRowsByID(rows [][]any) {
 	})
 }
 
+// streamDrawAttr wraps a named attr whose Expr is a StreamDraw with the
+// given arm (a generated StreamDraw_* wrapper value). stream_id is left
+// zero — compile.AssignStreamIDs fills it in during Runtime construction.
+func streamDrawAttr(name string, draw any) *dgproto.Attr {
+	sd := &dgproto.StreamDraw{}
+
+	switch v := draw.(type) {
+	case *dgproto.StreamDraw_IntUniform:
+		sd.Draw = v
+	case *dgproto.StreamDraw_Bernoulli:
+		sd.Draw = v
+	default:
+		panic(fmt.Sprintf("unsupported draw arm: %T", draw))
+	}
+
+	return &dgproto.Attr{Name: name, Expr: &dgproto.Expr{
+		Kind: &dgproto.Expr_StreamDraw{StreamDraw: sd},
+	}}
+}
+
+// chooseAttr wraps a named attr whose Expr is a Choose over the given
+// branches. stream_id is filled during compile.
+func chooseAttr(name string, branches ...*dgproto.ChooseBranch) *dgproto.Attr {
+	return &dgproto.Attr{Name: name, Expr: &dgproto.Expr{
+		Kind: &dgproto.Expr_Choose{Choose: &dgproto.Choose{Branches: branches}},
+	}}
+}
+
+// drawSmokeColumns mirrors smokeColumns for the StreamDraw smoke spec.
+var drawSmokeColumns = []string{"id", "rand_int", "flag", "bucket"}
+
+// drawSmokeSpec exercises one StreamDraw arm (IntUniform), one Bernoulli
+// for good measure, and one Choose returning an int64 bucket id.
+func drawSmokeSpec(size int64) *dgproto.InsertSpec {
+	attrs := []*dgproto.Attr{
+		attrOf("id", binOpOf(dgproto.BinOp_ADD, rowIndexOf(), litOf(int64(1)))),
+		streamDrawAttr("rand_int", &dgproto.StreamDraw_IntUniform{
+			IntUniform: &dgproto.DrawIntUniform{
+				Min: litOf(int64(0)), Max: litOf(int64(99)),
+			},
+		}),
+		streamDrawAttr("flag", &dgproto.StreamDraw_Bernoulli{
+			Bernoulli: &dgproto.DrawBernoulli{P: 0.3},
+		}),
+		chooseAttr("bucket",
+			&dgproto.ChooseBranch{Weight: 1, Expr: litOf(int64(1))},
+			&dgproto.ChooseBranch{Weight: 9, Expr: litOf(int64(9))},
+		),
+	}
+
+	return &dgproto.InsertSpec{
+		Table: "smoke_draw",
+		Seed:  0xA1B2C3D4,
+		Source: &dgproto.RelSource{
+			Population:  &dgproto.Population{Name: "smoke_draw", Size: size},
+			Attrs:       attrs,
+			ColumnOrder: drawSmokeColumns,
+		},
+	}
+}
+
+// createDrawSmokeTable (re)creates the smoke_draw target table.
+func createDrawSmokeTable(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+
+	const ddl = `CREATE TABLE smoke_draw (
+		id int8 PRIMARY KEY,
+		rand_int int8,
+		flag int8,
+		bucket int8
+	)`
+	if _, err := pool.Exec(context.Background(), ddl); err != nil {
+		t.Fatalf("create smoke_draw: %v", err)
+	}
+}
+
+// copyDrawRows inserts rows into smoke_draw via COPY.
+func copyDrawRows(t *testing.T, pool *pgxpool.Pool, rows [][]any) int64 {
+	t.Helper()
+
+	n, err := pool.CopyFrom(
+		context.Background(),
+		pgx.Identifier{"smoke_draw"},
+		drawSmokeColumns,
+		pgx.CopyFromRows(rows),
+	)
+	if err != nil {
+		t.Fatalf("CopyFrom smoke_draw: %v", err)
+	}
+	return n
+}
+
+// TestDatagenSmokeWithStreamDraw loads a small batch through the
+// StreamDraw + Choose primitives and verifies the wire-through survives
+// determinism (same spec twice ⇒ identical rows), range bounds, and
+// weighted choice produces the expected split distribution.
+func TestDatagenSmokeWithStreamDraw(t *testing.T) {
+	const size = int64(5000)
+
+	pool := NewTmpfsPG(t)
+	ResetSchema(t, pool)
+	createDrawSmokeTable(t, pool)
+
+	specA := drawSmokeSpec(size)
+	specB := drawSmokeSpec(size)
+
+	rtA, err := runtime.NewRuntime(specA)
+	if err != nil {
+		t.Fatalf("NewRuntime A: %v", err)
+	}
+	rtB, err := runtime.NewRuntime(specB)
+	if err != nil {
+		t.Fatalf("NewRuntime B: %v", err)
+	}
+
+	rowsA := drainRuntime(t, rtA)
+	rowsB := drainRuntime(t, rtB)
+	if !reflect.DeepEqual(rowsA, rowsB) {
+		t.Fatalf("draw spec is non-deterministic")
+	}
+
+	if got := copyDrawRows(t, pool, rowsA); got != size {
+		t.Fatalf("CopyFrom inserted %d, want %d", got, size)
+	}
+
+	ctx := context.Background()
+
+	var minRand, maxRand int64
+	if err := pool.QueryRow(ctx,
+		`SELECT MIN(rand_int), MAX(rand_int) FROM smoke_draw`).Scan(&minRand, &maxRand); err != nil {
+		t.Fatalf("rand_int range: %v", err)
+	}
+	if minRand < 0 || maxRand > 99 {
+		t.Fatalf("rand_int range [%d,%d] exceeds [0,99]", minRand, maxRand)
+	}
+
+	var flagHits int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM smoke_draw WHERE flag = 1`).Scan(&flagHits); err != nil {
+		t.Fatalf("flag hits: %v", err)
+	}
+	// p=0.3 over 5000 rows ⇒ ~1500; allow ±7% of N.
+	const flagLo, flagHi = int64(1150), int64(1850)
+	if flagHits < flagLo || flagHits > flagHi {
+		t.Fatalf("flag hits %d not in [%d, %d]", flagHits, flagLo, flagHi)
+	}
+
+	var bucket1, bucket9 int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FILTER (WHERE bucket = 1),
+		        COUNT(*) FILTER (WHERE bucket = 9) FROM smoke_draw`,
+	).Scan(&bucket1, &bucket9); err != nil {
+		t.Fatalf("bucket counts: %v", err)
+	}
+	// Weights 1:9 ⇒ ~10%/90%; allow ±5% absolute.
+	if bucket1+bucket9 != size {
+		t.Fatalf("bucket sum %d != size %d", bucket1+bucket9, size)
+	}
+	if bucket1 < 250 || bucket1 > 750 {
+		t.Fatalf("bucket=1 count %d not near 500", bucket1)
+	}
+}
+
 // TestDatagenSmokeDeterminism checks that the pipeline is a pure
 // function of the spec. Two fresh Runtimes emit identical rows; parallel
 // loads at different worker counts land the same row multiset in

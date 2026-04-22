@@ -31,3 +31,12 @@ var ErrTypeMismatch = errors.New("expr: type mismatch")
 // ErrUnknownCall is returned by Context.Call when the named function is
 // not registered with the stdlib dispatcher.
 var ErrUnknownCall = errors.New("expr: unknown call")
+
+// ErrBadDraw is returned by StreamDraw when the draw descriptor is nil,
+// carries no arm, or violates its per-arm contract (empty alphabet,
+// min > max, unknown column in a joint dict, etc.).
+var ErrBadDraw = errors.New("expr: bad stream draw")
+
+// ErrBadChoose is returned by Choose when no branch is declared, when a
+// branch weight is non-positive, or when the cumulative weight is zero.
+var ErrBadChoose = errors.New("expr: bad choose")

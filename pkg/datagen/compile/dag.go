@@ -43,6 +43,14 @@ func Build(attrs []*dgproto.Attr) (*DAG, error) {
 		index[a.GetName()] = i
 	}
 
+	// Assign StreamDraw / Choose IDs after topological ordering so that
+	// numbering reflects evaluation order rather than raw declaration
+	// order. Build mutates the input attrs; callers hand over ownership
+	// at compile time.
+	if err := AssignStreamIDs(order); err != nil {
+		return nil, err
+	}
+
 	return &DAG{Order: order, Index: index}, nil
 }
 

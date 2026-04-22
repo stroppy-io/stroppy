@@ -2,6 +2,7 @@ package expr
 
 import (
 	"fmt"
+	"math/rand/v2"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 )
@@ -36,6 +37,26 @@ type Context interface {
 	// to the iter-side scratch for same-population reads or to the
 	// LookupPop registry for sibling reads.
 	Lookup(popName, attrName string, entityIdx int64) (any, error)
+
+	// Draw returns a fresh PRNG seeded deterministically from the
+	// implementation's root seed combined with attrPath, streamID, and
+	// rowIdx. The Expr evaluator calls this once per StreamDraw /
+	// Choose node to obtain a local *rand.Rand.
+	//
+	// Derivation convention:
+	//   seed.Derive(rootSeed, attrPath, "s"+strconv.FormatUint(streamID),
+	//                strconv.FormatInt(rowIdx, 10))
+	// Keeping streamID and rowIdx in the path (rather than XORing into
+	// the root) lets two attrs with different attr_paths produce
+	// independent streams even when streamIDs collide and makes the
+	// seed composition visible in seed.Derive's single formula.
+	Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand
+
+	// AttrPath returns the path string identifying the attr currently
+	// being evaluated. Used by StreamDraw / Choose to mix attr identity
+	// into the per-draw seed; implementations empty-string out when no
+	// attr is active (e.g. a test harness).
+	AttrPath() string
 }
 
 // evalLookup resolves a Lookup arm: it evaluates the entity-index
@@ -85,6 +106,10 @@ func Eval(ctx Context, expr *dgproto.Expr) (any, error) {
 		return ctx.BlockSlot(expr.GetBlockRef().GetSlot())
 	case *dgproto.Expr_Lookup:
 		return evalLookup(ctx, expr.GetLookup())
+	case *dgproto.Expr_StreamDraw:
+		return evalStreamDraw(ctx, expr.GetStreamDraw())
+	case *dgproto.Expr_Choose:
+		return evalChoose(ctx, expr.GetChoose())
 	default:
 		return nil, fmt.Errorf("%w: %T", ErrBadExpr, kind)
 	}

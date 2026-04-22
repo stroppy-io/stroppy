@@ -2,11 +2,14 @@ package expr
 
 import (
 	"errors"
+	"math/rand/v2"
+	"strconv"
 	"testing"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
 )
 
 // fakeCtx is a Context stub for unit tests. Fields are set per test.
@@ -17,8 +20,11 @@ type fakeCtx struct {
 	calls     map[string]func(args []any) (any, error)
 	blocks    map[string]any
 	lookups   map[string]func(pop, attr string, idx int64) (any, error)
+	rootSeed  uint64
+	attrPath  string
 	colLookup int
 	callCount int
+	drawCount int
 }
 
 func newFakeCtx() *fakeCtx {
@@ -29,6 +35,7 @@ func newFakeCtx() *fakeCtx {
 		calls:    map[string]func(args []any) (any, error){},
 		blocks:   map[string]any{},
 		lookups:  map[string]func(pop, attr string, idx int64) (any, error){},
+		attrPath: "test",
 	}
 }
 
@@ -83,6 +90,23 @@ func (f *fakeCtx) Lookup(pop, attr string, idx int64) (any, error) {
 	}
 
 	return fn(pop, attr, idx)
+}
+
+func (f *fakeCtx) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand {
+	f.drawCount++
+
+	key := seed.Derive(
+		f.rootSeed,
+		attrPath,
+		"s"+strconv.FormatUint(uint64(streamID), 10),
+		strconv.FormatInt(rowIdx, 10),
+	)
+
+	return seed.PRNG(key)
+}
+
+func (f *fakeCtx) AttrPath() string {
+	return f.attrPath
 }
 
 // litInt builds an Expr wrapping an int64 literal.

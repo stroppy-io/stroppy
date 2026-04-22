@@ -131,6 +131,11 @@ message Expr {
     BlockRef block_ref = 8;
     // Cross-population column read.
     Lookup lookup = 9;
+    // Seeded PRNG draw from a closed distribution catalog.
+    StreamDraw stream_draw = 10;
+    // Weighted random pick among Expr branches; only the selected
+    // branch evaluates.
+    Choose choose = 11;
   }
 }
 
@@ -352,4 +357,197 @@ message LookupPop {
   repeated Attr attrs = 2;
   // Column order for the population; parallels RelSource.column_order.
   repeated string column_order = 3;
+}
+
+// StreamDraw carries every randomness-producing arm. stream_id is
+// assigned at compile time so that identical specs produce identical
+// streams across runs without any pointer-keyed memoization.
+message StreamDraw {
+  // Compile-time assigned identifier unique within an InsertSpec. The
+  // per-row PRNG is seeded from (root_seed, attr_path, stream_id,
+  // row_index); stream_id keeps multiple draws within one attr
+  // independent.
+  uint32 stream_id = 1;
+  oneof draw {
+    option (validate.required) = true;
+    // Uniform integer draw over [min, max] inclusive.
+    DrawIntUniform int_uniform = 10;
+    // Uniform float draw over [min, max).
+    DrawFloatUniform float_uniform = 11;
+    // Truncated normal draw clamped to [min, max].
+    DrawNormal normal = 12;
+    // Zipfian power-law draw over [min, max].
+    DrawZipf zipf = 13;
+    // TPC-C §2.1.6 non-uniform random draw.
+    DrawNURand nurand = 14;
+    // Bernoulli {0, 1} draw with probability p of 1.
+    DrawBernoulli bernoulli = 15;
+    // Weighted or uniform pick from a Dict.
+    DrawDict dict = 16;
+    // Joint tuple draw from a multi-column Dict.
+    DrawJoint joint = 17;
+    // Uniform date draw over an epoch-day range.
+    DrawDate date = 18;
+    // Uniform decimal draw rounded to a fixed scale.
+    DrawDecimal decimal = 19;
+    // Random ASCII string drawn from an alphabet.
+    DrawAscii ascii = 20;
+    // Space-joined word sequence drawn from a vocabulary Dict.
+    DrawPhrase phrase = 21;
+  }
+}
+
+// DrawIntUniform draws an integer uniformly from [min, max] inclusive.
+message DrawIntUniform {
+  // Inclusive lower bound; evaluates to int64.
+  Expr min = 1 [ (validate.rules).message.required = true ];
+  // Inclusive upper bound; evaluates to int64 and must be >= min.
+  Expr max = 2 [ (validate.rules).message.required = true ];
+}
+
+// DrawFloatUniform draws a float uniformly from [min, max).
+message DrawFloatUniform {
+  // Inclusive lower bound; evaluates to float64.
+  Expr min = 1 [ (validate.rules).message.required = true ];
+  // Exclusive upper bound; evaluates to float64 and must be > min.
+  Expr max = 2 [ (validate.rules).message.required = true ];
+}
+
+// DrawNormal draws from a truncated normal clamped to [min, max].
+// Mean is (min+max)/2 and stddev is (max-min)/(2*screw). screw=0 falls
+// back to the default of 3.0.
+message DrawNormal {
+  // Inclusive lower clamp; evaluates to float64.
+  Expr min = 1 [ (validate.rules).message.required = true ];
+  // Inclusive upper clamp; evaluates to float64.
+  Expr max = 2 [ (validate.rules).message.required = true ];
+  // Screw factor; controls spread. 0 means default 3.0.
+  float screw = 3;
+}
+
+// DrawZipf draws from a Zipfian distribution over [min, max].
+message DrawZipf {
+  // Inclusive lower bound; evaluates to int64.
+  Expr min = 1 [ (validate.rules).message.required = true ];
+  // Inclusive upper bound; evaluates to int64.
+  Expr max = 2 [ (validate.rules).message.required = true ];
+  // Skew exponent; 0 means default 1.0.
+  double exponent = 3;
+}
+
+// DrawNURand realizes the TPC-C §2.1.6 NURand(A, x, y) formula.
+message DrawNURand {
+  // Bitmask upper bound; TPC-C spec names A.
+  int64 a = 1;
+  // Inclusive lower bound on the output range.
+  int64 x = 2;
+  // Inclusive upper bound on the output range.
+  int64 y = 3;
+  // Salt from which the per-stream constant C is derived.
+  uint64 c_salt = 4;
+}
+
+// DrawBernoulli draws a {0, 1} int64 with probability p of 1.
+message DrawBernoulli {
+  // Probability of a 1 outcome; must be in [0, 1].
+  float p = 1 [ (validate.rules).float = {gte : 0, lte : 1} ];
+}
+
+// DrawDict draws a row from a scalar Dict, optionally weighted.
+message DrawDict {
+  // Opaque dict key matching an entry in InsertSpec.dicts.
+  string dict_key = 1 [ (validate.rules).string.min_len = 1 ];
+  // Weight profile to use; empty selects the default (or uniform if
+  // the dict carries no weights).
+  string weight_set = 2;
+}
+
+// DrawJoint draws a tuple from a multi-column Dict and returns one
+// column of the chosen tuple.
+message DrawJoint {
+  // Opaque dict key matching an entry in InsertSpec.dicts.
+  string dict_key = 1 [ (validate.rules).string.min_len = 1 ];
+  // Column name whose value is returned.
+  string column = 2 [ (validate.rules).string.min_len = 1 ];
+  // Tuple-scoping identifier reserved for sharing one draw across
+  // several columns; D1 treats each DrawJoint as independent.
+  uint32 tuple_scope = 3;
+  // Weight profile to use; empty selects the default (or uniform).
+  string weight_set = 4;
+}
+
+// DrawDate draws a date uniformly from an epoch-day range. Both bounds
+// are counted in days since 1970-01-01 UTC.
+message DrawDate {
+  // Inclusive lower bound in days since the epoch.
+  int64 min_days_epoch = 1;
+  // Inclusive upper bound in days since the epoch.
+  int64 max_days_epoch = 2;
+}
+
+// DrawDecimal draws a float64 uniformly from [min, max] and rounds the
+// result to `scale` fractional digits.
+message DrawDecimal {
+  // Inclusive lower bound; evaluates to float64.
+  Expr min = 1 [ (validate.rules).message.required = true ];
+  // Inclusive upper bound; evaluates to float64.
+  Expr max = 2 [ (validate.rules).message.required = true ];
+  // Number of fractional digits to retain.
+  uint32 scale = 3;
+}
+
+// DrawAscii constructs a string from `alphabet` with a uniformly-drawn
+// length in [min_len, max_len].
+message DrawAscii {
+  // Inclusive lower length bound; evaluates to int64 and must be >= 0.
+  Expr min_len = 1 [ (validate.rules).message.required = true ];
+  // Inclusive upper length bound; evaluates to int64 and must be >=
+  // min_len.
+  Expr max_len = 2 [ (validate.rules).message.required = true ];
+  // Codepoint ranges sampled uniformly by width.
+  repeated AsciiRange alphabet = 3
+      [ (validate.rules).repeated = {min_items : 1} ];
+}
+
+// AsciiRange is one contiguous [min, max] codepoint range sampled by
+// DrawAscii.
+message AsciiRange {
+  // Inclusive lower codepoint.
+  uint32 min = 1;
+  // Inclusive upper codepoint; must be >= min.
+  uint32 max = 2;
+}
+
+// DrawPhrase concatenates `n` words drawn uniformly from a vocabulary
+// Dict, separated by `separator`.
+message DrawPhrase {
+  // Opaque dict key matching an entry in InsertSpec.dicts.
+  string vocab_key = 1 [ (validate.rules).string.min_len = 1 ];
+  // Inclusive lower word-count bound; evaluates to int64 and must be
+  // >= 1.
+  Expr min_words = 2 [ (validate.rules).message.required = true ];
+  // Inclusive upper word-count bound; evaluates to int64 and must be
+  // >= min_words.
+  Expr max_words = 3 [ (validate.rules).message.required = true ];
+  // Separator joining drawn words; empty means no separator.
+  string separator = 4;
+}
+
+// Choose picks one of several Expr branches at random with probability
+// proportional to branch weight. Only the selected branch evaluates.
+message Choose {
+  // Compile-time assigned identifier unique within an InsertSpec; used
+  // to seed the selection draw alongside attr_path and row_index.
+  uint32 stream_id = 1;
+  // Candidate branches; at least one required, all weights positive.
+  repeated ChooseBranch branches = 2
+      [ (validate.rules).repeated = {min_items : 1} ];
+}
+
+// ChooseBranch is one weighted alternative within a Choose.
+message ChooseBranch {
+  // Positive relative weight; larger weight raises selection probability.
+  int64 weight = 1 [ (validate.rules).int64.gt = 0 ];
+  // Expression evaluated only when this branch is selected.
+  Expr expr = 2 [ (validate.rules).message.required = true ];
 }

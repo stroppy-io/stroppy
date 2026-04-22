@@ -11,12 +11,14 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"strconv"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/compile"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/expr"
+	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
 	"github.com/stroppy-io/stroppy/pkg/datagen/stdlib"
 )
 
@@ -83,6 +85,7 @@ type LookupRegistry struct {
 	pops     map[string]*pop
 	dicts    map[string]*dgproto.Dict
 	inFlight map[string]struct{}
+	rootSeed uint64
 }
 
 // NewLookupRegistry compiles the given LookupPops and returns a ready
@@ -119,6 +122,14 @@ func NewLookupRegistry(
 	}
 
 	return reg, nil
+}
+
+// SetRootSeed installs the InsertSpec seed so the registry can forward
+// it to the Draw(...) hook that LookupPop attrs reach for when they
+// contain StreamDraw nodes. The runtime calls this once at Runtime
+// construction, before any row is emitted.
+func (r *LookupRegistry) SetRootSeed(rootSeed uint64) {
+	r.rootSeed = rootSeed
 }
 
 // Has reports whether the registry hosts the named population.
@@ -192,10 +203,17 @@ func (r *LookupRegistry) rowAt(population *pop, idx int64) (map[string]any, erro
 // returns the attr-name → value map.
 func (r *LookupRegistry) evalRow(population *pop, idx int64) (map[string]any, error) {
 	scratch := make(map[string]any, len(population.dag.Order))
-	ctx := &popCtx{reg: r, scratch: scratch, entityIdx: idx, dicts: r.dicts}
+	ctx := &popCtx{
+		reg:       r,
+		scratch:   scratch,
+		entityIdx: idx,
+		dicts:     r.dicts,
+		popName:   population.name,
+	}
 
 	for _, attr := range population.dag.Order {
 		name := attr.GetName()
+		ctx.attrPath = population.name + "/" + name
 
 		value, err := expr.Eval(ctx, attr.GetExpr())
 		if err != nil {
@@ -324,6 +342,8 @@ type popCtx struct {
 	scratch   map[string]any
 	entityIdx int64
 	dicts     map[string]*dgproto.Dict
+	popName   string
+	attrPath  string
 }
 
 // LookupCol resolves a ColRef within the LookupPop's own scratch.
@@ -368,4 +388,25 @@ func (c *popCtx) BlockSlot(slot string) (any, error) {
 // Lookup resolves transitively through the same registry.
 func (c *popCtx) Lookup(popName, attrName string, entityIdx int64) (any, error) {
 	return c.reg.Get(popName, attrName, entityIdx)
+}
+
+// Draw returns a PRNG for StreamDraw / Choose nodes inside a LookupPop
+// attr. It uses the registry's rootSeed and the same Derive formula as
+// the flat runtime, ensuring that a LookupPop attr that itself carries
+// a random draw is still seekable.
+func (c *popCtx) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand {
+	key := seed.Derive(
+		c.reg.rootSeed,
+		attrPath,
+		"s"+strconv.FormatUint(uint64(streamID), 10),
+		strconv.FormatInt(rowIdx, 10),
+	)
+
+	return seed.PRNG(key)
+}
+
+// AttrPath returns the pop-qualified attr path currently under
+// evaluation.
+func (c *popCtx) AttrPath() string {
+	return c.attrPath
 }

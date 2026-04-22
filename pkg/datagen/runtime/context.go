@@ -2,10 +2,13 @@ package runtime
 
 import (
 	"fmt"
+	"math/rand/v2"
+	"strconv"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/expr"
 	"github.com/stroppy-io/stroppy/pkg/datagen/lookup"
+	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
 	"github.com/stroppy-io/stroppy/pkg/datagen/stdlib"
 )
 
@@ -49,6 +52,15 @@ type evalContext struct {
 	// inRelationship switches RowIndex resolution between flat and
 	// relationship semantics.
 	inRelationship bool
+
+	// rootSeed is the InsertSpec's seed; Draw composes it with attrPath,
+	// streamID, and rowIdx through seed.Derive.
+	rootSeed uint64
+
+	// attrPath names the attr currently being evaluated. Runtime sets
+	// this before calling into expr.Eval so StreamDraw / Choose mix
+	// the attr identity into the per-draw seed.
+	attrPath string
 }
 
 // LookupCol resolves a ColRef by consulting the current row's scratch
@@ -142,4 +154,25 @@ func (c *evalContext) Lookup(popName, attrName string, entityIdx int64) (any, er
 	}
 
 	return c.registry.Get(popName, attrName, entityIdx)
+}
+
+// Draw returns a PRNG seeded deterministically from (rootSeed,
+// attrPath, streamID, rowIdx) via seed.Derive. The stream_id is
+// serialized with an "s" prefix so the hash input for a same-row
+// draw never collides with an attrPath that happens to be numeric.
+func (c *evalContext) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand {
+	key := seed.Derive(
+		c.rootSeed,
+		attrPath,
+		"s"+strconv.FormatUint(uint64(streamID), 10),
+		strconv.FormatInt(rowIdx, 10),
+	)
+
+	return seed.PRNG(key)
+}
+
+// AttrPath returns the attr currently being evaluated. Empty when no
+// attr is active (e.g. a test harness that bypasses Runtime).
+func (c *evalContext) AttrPath() string {
+	return c.attrPath
 }

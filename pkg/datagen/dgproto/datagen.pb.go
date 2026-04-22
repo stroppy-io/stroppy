@@ -788,6 +788,8 @@ type Expr struct {
 	//	*Expr_DictAt
 	//	*Expr_BlockRef
 	//	*Expr_Lookup
+	//	*Expr_StreamDraw
+	//	*Expr_Choose
 	Kind          isExpr_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -911,6 +913,24 @@ func (x *Expr) GetLookup() *Lookup {
 	return nil
 }
 
+func (x *Expr) GetStreamDraw() *StreamDraw {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_StreamDraw); ok {
+			return x.StreamDraw
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetChoose() *Choose {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_Choose); ok {
+			return x.Choose
+		}
+	}
+	return nil
+}
+
 type isExpr_Kind interface {
 	isExpr_Kind()
 }
@@ -960,6 +980,17 @@ type Expr_Lookup struct {
 	Lookup *Lookup `protobuf:"bytes,9,opt,name=lookup,proto3,oneof"`
 }
 
+type Expr_StreamDraw struct {
+	// Seeded PRNG draw from a closed distribution catalog.
+	StreamDraw *StreamDraw `protobuf:"bytes,10,opt,name=stream_draw,json=streamDraw,proto3,oneof"`
+}
+
+type Expr_Choose struct {
+	// Weighted random pick among Expr branches; only the selected
+	// branch evaluates.
+	Choose *Choose `protobuf:"bytes,11,opt,name=choose,proto3,oneof"`
+}
+
 func (*Expr_Col) isExpr_Kind() {}
 
 func (*Expr_RowIndex) isExpr_Kind() {}
@@ -977,6 +1008,10 @@ func (*Expr_DictAt) isExpr_Kind() {}
 func (*Expr_BlockRef) isExpr_Kind() {}
 
 func (*Expr_Lookup) isExpr_Kind() {}
+
+func (*Expr_StreamDraw) isExpr_Kind() {}
+
+func (*Expr_Choose) isExpr_Kind() {}
 
 // ColRef refers to another attribute in the same RelSource by name.
 type ColRef struct {
@@ -2231,6 +2266,1196 @@ func (x *LookupPop) GetColumnOrder() []string {
 	return nil
 }
 
+// StreamDraw carries every randomness-producing arm. stream_id is
+// assigned at compile time so that identical specs produce identical
+// streams across runs without any pointer-keyed memoization.
+type StreamDraw struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Compile-time assigned identifier unique within an InsertSpec. The
+	// per-row PRNG is seeded from (root_seed, attr_path, stream_id,
+	// row_index); stream_id keeps multiple draws within one attr
+	// independent.
+	StreamId uint32 `protobuf:"varint,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
+	// Types that are valid to be assigned to Draw:
+	//
+	//	*StreamDraw_IntUniform
+	//	*StreamDraw_FloatUniform
+	//	*StreamDraw_Normal
+	//	*StreamDraw_Zipf
+	//	*StreamDraw_Nurand
+	//	*StreamDraw_Bernoulli
+	//	*StreamDraw_Dict
+	//	*StreamDraw_Joint
+	//	*StreamDraw_Date
+	//	*StreamDraw_Decimal
+	//	*StreamDraw_Ascii
+	//	*StreamDraw_Phrase
+	Draw          isStreamDraw_Draw `protobuf_oneof:"draw"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamDraw) Reset() {
+	*x = StreamDraw{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamDraw) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamDraw) ProtoMessage() {}
+
+func (x *StreamDraw) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamDraw.ProtoReflect.Descriptor instead.
+func (*StreamDraw) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *StreamDraw) GetStreamId() uint32 {
+	if x != nil {
+		return x.StreamId
+	}
+	return 0
+}
+
+func (x *StreamDraw) GetDraw() isStreamDraw_Draw {
+	if x != nil {
+		return x.Draw
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetIntUniform() *DrawIntUniform {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_IntUniform); ok {
+			return x.IntUniform
+		}
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetFloatUniform() *DrawFloatUniform {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_FloatUniform); ok {
+			return x.FloatUniform
+		}
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetNormal() *DrawNormal {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_Normal); ok {
+			return x.Normal
+		}
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetZipf() *DrawZipf {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_Zipf); ok {
+			return x.Zipf
+		}
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetNurand() *DrawNURand {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_Nurand); ok {
+			return x.Nurand
+		}
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetBernoulli() *DrawBernoulli {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_Bernoulli); ok {
+			return x.Bernoulli
+		}
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetDict() *DrawDict {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_Dict); ok {
+			return x.Dict
+		}
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetJoint() *DrawJoint {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_Joint); ok {
+			return x.Joint
+		}
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetDate() *DrawDate {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_Date); ok {
+			return x.Date
+		}
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetDecimal() *DrawDecimal {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_Decimal); ok {
+			return x.Decimal
+		}
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetAscii() *DrawAscii {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_Ascii); ok {
+			return x.Ascii
+		}
+	}
+	return nil
+}
+
+func (x *StreamDraw) GetPhrase() *DrawPhrase {
+	if x != nil {
+		if x, ok := x.Draw.(*StreamDraw_Phrase); ok {
+			return x.Phrase
+		}
+	}
+	return nil
+}
+
+type isStreamDraw_Draw interface {
+	isStreamDraw_Draw()
+}
+
+type StreamDraw_IntUniform struct {
+	// Uniform integer draw over [min, max] inclusive.
+	IntUniform *DrawIntUniform `protobuf:"bytes,10,opt,name=int_uniform,json=intUniform,proto3,oneof"`
+}
+
+type StreamDraw_FloatUniform struct {
+	// Uniform float draw over [min, max).
+	FloatUniform *DrawFloatUniform `protobuf:"bytes,11,opt,name=float_uniform,json=floatUniform,proto3,oneof"`
+}
+
+type StreamDraw_Normal struct {
+	// Truncated normal draw clamped to [min, max].
+	Normal *DrawNormal `protobuf:"bytes,12,opt,name=normal,proto3,oneof"`
+}
+
+type StreamDraw_Zipf struct {
+	// Zipfian power-law draw over [min, max].
+	Zipf *DrawZipf `protobuf:"bytes,13,opt,name=zipf,proto3,oneof"`
+}
+
+type StreamDraw_Nurand struct {
+	// TPC-C §2.1.6 non-uniform random draw.
+	Nurand *DrawNURand `protobuf:"bytes,14,opt,name=nurand,proto3,oneof"`
+}
+
+type StreamDraw_Bernoulli struct {
+	// Bernoulli {0, 1} draw with probability p of 1.
+	Bernoulli *DrawBernoulli `protobuf:"bytes,15,opt,name=bernoulli,proto3,oneof"`
+}
+
+type StreamDraw_Dict struct {
+	// Weighted or uniform pick from a Dict.
+	Dict *DrawDict `protobuf:"bytes,16,opt,name=dict,proto3,oneof"`
+}
+
+type StreamDraw_Joint struct {
+	// Joint tuple draw from a multi-column Dict.
+	Joint *DrawJoint `protobuf:"bytes,17,opt,name=joint,proto3,oneof"`
+}
+
+type StreamDraw_Date struct {
+	// Uniform date draw over an epoch-day range.
+	Date *DrawDate `protobuf:"bytes,18,opt,name=date,proto3,oneof"`
+}
+
+type StreamDraw_Decimal struct {
+	// Uniform decimal draw rounded to a fixed scale.
+	Decimal *DrawDecimal `protobuf:"bytes,19,opt,name=decimal,proto3,oneof"`
+}
+
+type StreamDraw_Ascii struct {
+	// Random ASCII string drawn from an alphabet.
+	Ascii *DrawAscii `protobuf:"bytes,20,opt,name=ascii,proto3,oneof"`
+}
+
+type StreamDraw_Phrase struct {
+	// Space-joined word sequence drawn from a vocabulary Dict.
+	Phrase *DrawPhrase `protobuf:"bytes,21,opt,name=phrase,proto3,oneof"`
+}
+
+func (*StreamDraw_IntUniform) isStreamDraw_Draw() {}
+
+func (*StreamDraw_FloatUniform) isStreamDraw_Draw() {}
+
+func (*StreamDraw_Normal) isStreamDraw_Draw() {}
+
+func (*StreamDraw_Zipf) isStreamDraw_Draw() {}
+
+func (*StreamDraw_Nurand) isStreamDraw_Draw() {}
+
+func (*StreamDraw_Bernoulli) isStreamDraw_Draw() {}
+
+func (*StreamDraw_Dict) isStreamDraw_Draw() {}
+
+func (*StreamDraw_Joint) isStreamDraw_Draw() {}
+
+func (*StreamDraw_Date) isStreamDraw_Draw() {}
+
+func (*StreamDraw_Decimal) isStreamDraw_Draw() {}
+
+func (*StreamDraw_Ascii) isStreamDraw_Draw() {}
+
+func (*StreamDraw_Phrase) isStreamDraw_Draw() {}
+
+// DrawIntUniform draws an integer uniformly from [min, max] inclusive.
+type DrawIntUniform struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inclusive lower bound; evaluates to int64.
+	Min *Expr `protobuf:"bytes,1,opt,name=min,proto3" json:"min,omitempty"`
+	// Inclusive upper bound; evaluates to int64 and must be >= min.
+	Max           *Expr `protobuf:"bytes,2,opt,name=max,proto3" json:"max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawIntUniform) Reset() {
+	*x = DrawIntUniform{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawIntUniform) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawIntUniform) ProtoMessage() {}
+
+func (x *DrawIntUniform) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawIntUniform.ProtoReflect.Descriptor instead.
+func (*DrawIntUniform) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *DrawIntUniform) GetMin() *Expr {
+	if x != nil {
+		return x.Min
+	}
+	return nil
+}
+
+func (x *DrawIntUniform) GetMax() *Expr {
+	if x != nil {
+		return x.Max
+	}
+	return nil
+}
+
+// DrawFloatUniform draws a float uniformly from [min, max).
+type DrawFloatUniform struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inclusive lower bound; evaluates to float64.
+	Min *Expr `protobuf:"bytes,1,opt,name=min,proto3" json:"min,omitempty"`
+	// Exclusive upper bound; evaluates to float64 and must be > min.
+	Max           *Expr `protobuf:"bytes,2,opt,name=max,proto3" json:"max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawFloatUniform) Reset() {
+	*x = DrawFloatUniform{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawFloatUniform) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawFloatUniform) ProtoMessage() {}
+
+func (x *DrawFloatUniform) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawFloatUniform.ProtoReflect.Descriptor instead.
+func (*DrawFloatUniform) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *DrawFloatUniform) GetMin() *Expr {
+	if x != nil {
+		return x.Min
+	}
+	return nil
+}
+
+func (x *DrawFloatUniform) GetMax() *Expr {
+	if x != nil {
+		return x.Max
+	}
+	return nil
+}
+
+// DrawNormal draws from a truncated normal clamped to [min, max].
+// Mean is (min+max)/2 and stddev is (max-min)/(2*screw). screw=0 falls
+// back to the default of 3.0.
+type DrawNormal struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inclusive lower clamp; evaluates to float64.
+	Min *Expr `protobuf:"bytes,1,opt,name=min,proto3" json:"min,omitempty"`
+	// Inclusive upper clamp; evaluates to float64.
+	Max *Expr `protobuf:"bytes,2,opt,name=max,proto3" json:"max,omitempty"`
+	// Screw factor; controls spread. 0 means default 3.0.
+	Screw         float32 `protobuf:"fixed32,3,opt,name=screw,proto3" json:"screw,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawNormal) Reset() {
+	*x = DrawNormal{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawNormal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawNormal) ProtoMessage() {}
+
+func (x *DrawNormal) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawNormal.ProtoReflect.Descriptor instead.
+func (*DrawNormal) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *DrawNormal) GetMin() *Expr {
+	if x != nil {
+		return x.Min
+	}
+	return nil
+}
+
+func (x *DrawNormal) GetMax() *Expr {
+	if x != nil {
+		return x.Max
+	}
+	return nil
+}
+
+func (x *DrawNormal) GetScrew() float32 {
+	if x != nil {
+		return x.Screw
+	}
+	return 0
+}
+
+// DrawZipf draws from a Zipfian distribution over [min, max].
+type DrawZipf struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inclusive lower bound; evaluates to int64.
+	Min *Expr `protobuf:"bytes,1,opt,name=min,proto3" json:"min,omitempty"`
+	// Inclusive upper bound; evaluates to int64.
+	Max *Expr `protobuf:"bytes,2,opt,name=max,proto3" json:"max,omitempty"`
+	// Skew exponent; 0 means default 1.0.
+	Exponent      float64 `protobuf:"fixed64,3,opt,name=exponent,proto3" json:"exponent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawZipf) Reset() {
+	*x = DrawZipf{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawZipf) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawZipf) ProtoMessage() {}
+
+func (x *DrawZipf) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawZipf.ProtoReflect.Descriptor instead.
+func (*DrawZipf) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *DrawZipf) GetMin() *Expr {
+	if x != nil {
+		return x.Min
+	}
+	return nil
+}
+
+func (x *DrawZipf) GetMax() *Expr {
+	if x != nil {
+		return x.Max
+	}
+	return nil
+}
+
+func (x *DrawZipf) GetExponent() float64 {
+	if x != nil {
+		return x.Exponent
+	}
+	return 0
+}
+
+// DrawNURand realizes the TPC-C §2.1.6 NURand(A, x, y) formula.
+type DrawNURand struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Bitmask upper bound; TPC-C spec names A.
+	A int64 `protobuf:"varint,1,opt,name=a,proto3" json:"a,omitempty"`
+	// Inclusive lower bound on the output range.
+	X int64 `protobuf:"varint,2,opt,name=x,proto3" json:"x,omitempty"`
+	// Inclusive upper bound on the output range.
+	Y int64 `protobuf:"varint,3,opt,name=y,proto3" json:"y,omitempty"`
+	// Salt from which the per-stream constant C is derived.
+	CSalt         uint64 `protobuf:"varint,4,opt,name=c_salt,json=cSalt,proto3" json:"c_salt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawNURand) Reset() {
+	*x = DrawNURand{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawNURand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawNURand) ProtoMessage() {}
+
+func (x *DrawNURand) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawNURand.ProtoReflect.Descriptor instead.
+func (*DrawNURand) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *DrawNURand) GetA() int64 {
+	if x != nil {
+		return x.A
+	}
+	return 0
+}
+
+func (x *DrawNURand) GetX() int64 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *DrawNURand) GetY() int64 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *DrawNURand) GetCSalt() uint64 {
+	if x != nil {
+		return x.CSalt
+	}
+	return 0
+}
+
+// DrawBernoulli draws a {0, 1} int64 with probability p of 1.
+type DrawBernoulli struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Probability of a 1 outcome; must be in [0, 1].
+	P             float32 `protobuf:"fixed32,1,opt,name=p,proto3" json:"p,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawBernoulli) Reset() {
+	*x = DrawBernoulli{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawBernoulli) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawBernoulli) ProtoMessage() {}
+
+func (x *DrawBernoulli) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawBernoulli.ProtoReflect.Descriptor instead.
+func (*DrawBernoulli) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *DrawBernoulli) GetP() float32 {
+	if x != nil {
+		return x.P
+	}
+	return 0
+}
+
+// DrawDict draws a row from a scalar Dict, optionally weighted.
+type DrawDict struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Opaque dict key matching an entry in InsertSpec.dicts.
+	DictKey string `protobuf:"bytes,1,opt,name=dict_key,json=dictKey,proto3" json:"dict_key,omitempty"`
+	// Weight profile to use; empty selects the default (or uniform if
+	// the dict carries no weights).
+	WeightSet     string `protobuf:"bytes,2,opt,name=weight_set,json=weightSet,proto3" json:"weight_set,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawDict) Reset() {
+	*x = DrawDict{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawDict) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawDict) ProtoMessage() {}
+
+func (x *DrawDict) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawDict.ProtoReflect.Descriptor instead.
+func (*DrawDict) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *DrawDict) GetDictKey() string {
+	if x != nil {
+		return x.DictKey
+	}
+	return ""
+}
+
+func (x *DrawDict) GetWeightSet() string {
+	if x != nil {
+		return x.WeightSet
+	}
+	return ""
+}
+
+// DrawJoint draws a tuple from a multi-column Dict and returns one
+// column of the chosen tuple.
+type DrawJoint struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Opaque dict key matching an entry in InsertSpec.dicts.
+	DictKey string `protobuf:"bytes,1,opt,name=dict_key,json=dictKey,proto3" json:"dict_key,omitempty"`
+	// Column name whose value is returned.
+	Column string `protobuf:"bytes,2,opt,name=column,proto3" json:"column,omitempty"`
+	// Tuple-scoping identifier reserved for sharing one draw across
+	// several columns; D1 treats each DrawJoint as independent.
+	TupleScope uint32 `protobuf:"varint,3,opt,name=tuple_scope,json=tupleScope,proto3" json:"tuple_scope,omitempty"`
+	// Weight profile to use; empty selects the default (or uniform).
+	WeightSet     string `protobuf:"bytes,4,opt,name=weight_set,json=weightSet,proto3" json:"weight_set,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawJoint) Reset() {
+	*x = DrawJoint{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawJoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawJoint) ProtoMessage() {}
+
+func (x *DrawJoint) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawJoint.ProtoReflect.Descriptor instead.
+func (*DrawJoint) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *DrawJoint) GetDictKey() string {
+	if x != nil {
+		return x.DictKey
+	}
+	return ""
+}
+
+func (x *DrawJoint) GetColumn() string {
+	if x != nil {
+		return x.Column
+	}
+	return ""
+}
+
+func (x *DrawJoint) GetTupleScope() uint32 {
+	if x != nil {
+		return x.TupleScope
+	}
+	return 0
+}
+
+func (x *DrawJoint) GetWeightSet() string {
+	if x != nil {
+		return x.WeightSet
+	}
+	return ""
+}
+
+// DrawDate draws a date uniformly from an epoch-day range. Both bounds
+// are counted in days since 1970-01-01 UTC.
+type DrawDate struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inclusive lower bound in days since the epoch.
+	MinDaysEpoch int64 `protobuf:"varint,1,opt,name=min_days_epoch,json=minDaysEpoch,proto3" json:"min_days_epoch,omitempty"`
+	// Inclusive upper bound in days since the epoch.
+	MaxDaysEpoch  int64 `protobuf:"varint,2,opt,name=max_days_epoch,json=maxDaysEpoch,proto3" json:"max_days_epoch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawDate) Reset() {
+	*x = DrawDate{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawDate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawDate) ProtoMessage() {}
+
+func (x *DrawDate) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawDate.ProtoReflect.Descriptor instead.
+func (*DrawDate) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *DrawDate) GetMinDaysEpoch() int64 {
+	if x != nil {
+		return x.MinDaysEpoch
+	}
+	return 0
+}
+
+func (x *DrawDate) GetMaxDaysEpoch() int64 {
+	if x != nil {
+		return x.MaxDaysEpoch
+	}
+	return 0
+}
+
+// DrawDecimal draws a float64 uniformly from [min, max] and rounds the
+// result to `scale` fractional digits.
+type DrawDecimal struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inclusive lower bound; evaluates to float64.
+	Min *Expr `protobuf:"bytes,1,opt,name=min,proto3" json:"min,omitempty"`
+	// Inclusive upper bound; evaluates to float64.
+	Max *Expr `protobuf:"bytes,2,opt,name=max,proto3" json:"max,omitempty"`
+	// Number of fractional digits to retain.
+	Scale         uint32 `protobuf:"varint,3,opt,name=scale,proto3" json:"scale,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawDecimal) Reset() {
+	*x = DrawDecimal{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawDecimal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawDecimal) ProtoMessage() {}
+
+func (x *DrawDecimal) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawDecimal.ProtoReflect.Descriptor instead.
+func (*DrawDecimal) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *DrawDecimal) GetMin() *Expr {
+	if x != nil {
+		return x.Min
+	}
+	return nil
+}
+
+func (x *DrawDecimal) GetMax() *Expr {
+	if x != nil {
+		return x.Max
+	}
+	return nil
+}
+
+func (x *DrawDecimal) GetScale() uint32 {
+	if x != nil {
+		return x.Scale
+	}
+	return 0
+}
+
+// DrawAscii constructs a string from `alphabet` with a uniformly-drawn
+// length in [min_len, max_len].
+type DrawAscii struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inclusive lower length bound; evaluates to int64 and must be >= 0.
+	MinLen *Expr `protobuf:"bytes,1,opt,name=min_len,json=minLen,proto3" json:"min_len,omitempty"`
+	// Inclusive upper length bound; evaluates to int64 and must be >=
+	// min_len.
+	MaxLen *Expr `protobuf:"bytes,2,opt,name=max_len,json=maxLen,proto3" json:"max_len,omitempty"`
+	// Codepoint ranges sampled uniformly by width.
+	Alphabet      []*AsciiRange `protobuf:"bytes,3,rep,name=alphabet,proto3" json:"alphabet,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawAscii) Reset() {
+	*x = DrawAscii{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawAscii) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawAscii) ProtoMessage() {}
+
+func (x *DrawAscii) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawAscii.ProtoReflect.Descriptor instead.
+func (*DrawAscii) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *DrawAscii) GetMinLen() *Expr {
+	if x != nil {
+		return x.MinLen
+	}
+	return nil
+}
+
+func (x *DrawAscii) GetMaxLen() *Expr {
+	if x != nil {
+		return x.MaxLen
+	}
+	return nil
+}
+
+func (x *DrawAscii) GetAlphabet() []*AsciiRange {
+	if x != nil {
+		return x.Alphabet
+	}
+	return nil
+}
+
+// AsciiRange is one contiguous [min, max] codepoint range sampled by
+// DrawAscii.
+type AsciiRange struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inclusive lower codepoint.
+	Min uint32 `protobuf:"varint,1,opt,name=min,proto3" json:"min,omitempty"`
+	// Inclusive upper codepoint; must be >= min.
+	Max           uint32 `protobuf:"varint,2,opt,name=max,proto3" json:"max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AsciiRange) Reset() {
+	*x = AsciiRange{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AsciiRange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AsciiRange) ProtoMessage() {}
+
+func (x *AsciiRange) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AsciiRange.ProtoReflect.Descriptor instead.
+func (*AsciiRange) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *AsciiRange) GetMin() uint32 {
+	if x != nil {
+		return x.Min
+	}
+	return 0
+}
+
+func (x *AsciiRange) GetMax() uint32 {
+	if x != nil {
+		return x.Max
+	}
+	return 0
+}
+
+// DrawPhrase concatenates `n` words drawn uniformly from a vocabulary
+// Dict, separated by `separator`.
+type DrawPhrase struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Opaque dict key matching an entry in InsertSpec.dicts.
+	VocabKey string `protobuf:"bytes,1,opt,name=vocab_key,json=vocabKey,proto3" json:"vocab_key,omitempty"`
+	// Inclusive lower word-count bound; evaluates to int64 and must be
+	// >= 1.
+	MinWords *Expr `protobuf:"bytes,2,opt,name=min_words,json=minWords,proto3" json:"min_words,omitempty"`
+	// Inclusive upper word-count bound; evaluates to int64 and must be
+	// >= min_words.
+	MaxWords *Expr `protobuf:"bytes,3,opt,name=max_words,json=maxWords,proto3" json:"max_words,omitempty"`
+	// Separator joining drawn words; empty means no separator.
+	Separator     string `protobuf:"bytes,4,opt,name=separator,proto3" json:"separator,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawPhrase) Reset() {
+	*x = DrawPhrase{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawPhrase) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawPhrase) ProtoMessage() {}
+
+func (x *DrawPhrase) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawPhrase.ProtoReflect.Descriptor instead.
+func (*DrawPhrase) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *DrawPhrase) GetVocabKey() string {
+	if x != nil {
+		return x.VocabKey
+	}
+	return ""
+}
+
+func (x *DrawPhrase) GetMinWords() *Expr {
+	if x != nil {
+		return x.MinWords
+	}
+	return nil
+}
+
+func (x *DrawPhrase) GetMaxWords() *Expr {
+	if x != nil {
+		return x.MaxWords
+	}
+	return nil
+}
+
+func (x *DrawPhrase) GetSeparator() string {
+	if x != nil {
+		return x.Separator
+	}
+	return ""
+}
+
+// Choose picks one of several Expr branches at random with probability
+// proportional to branch weight. Only the selected branch evaluates.
+type Choose struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Compile-time assigned identifier unique within an InsertSpec; used
+	// to seed the selection draw alongside attr_path and row_index.
+	StreamId uint32 `protobuf:"varint,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
+	// Candidate branches; at least one required, all weights positive.
+	Branches      []*ChooseBranch `protobuf:"bytes,2,rep,name=branches,proto3" json:"branches,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Choose) Reset() {
+	*x = Choose{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Choose) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Choose) ProtoMessage() {}
+
+func (x *Choose) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Choose.ProtoReflect.Descriptor instead.
+func (*Choose) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *Choose) GetStreamId() uint32 {
+	if x != nil {
+		return x.StreamId
+	}
+	return 0
+}
+
+func (x *Choose) GetBranches() []*ChooseBranch {
+	if x != nil {
+		return x.Branches
+	}
+	return nil
+}
+
+// ChooseBranch is one weighted alternative within a Choose.
+type ChooseBranch struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Positive relative weight; larger weight raises selection probability.
+	Weight int64 `protobuf:"varint,1,opt,name=weight,proto3" json:"weight,omitempty"`
+	// Expression evaluated only when this branch is selected.
+	Expr          *Expr `protobuf:"bytes,2,opt,name=expr,proto3" json:"expr,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChooseBranch) Reset() {
+	*x = ChooseBranch{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChooseBranch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChooseBranch) ProtoMessage() {}
+
+func (x *ChooseBranch) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChooseBranch.ProtoReflect.Descriptor instead.
+func (*ChooseBranch) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *ChooseBranch) GetWeight() int64 {
+	if x != nil {
+		return x.Weight
+	}
+	return 0
+}
+
+func (x *ChooseBranch) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
 var File_proto_stroppy_datagen_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_datagen_proto_rawDesc = "" +
@@ -2281,7 +3506,7 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x04rate\x18\x01 \x01(\x02B\x0f\xfaB\f\n" +
 	"\n" +
 	"\x1d\x00\x00\x80?-\x00\x00\x00\x00R\x04rate\x12\x1b\n" +
-	"\tseed_salt\x18\x02 \x01(\x04R\bseedSalt\"\xcf\x03\n" +
+	"\tseed_salt\x18\x02 \x01(\x04R\bseedSalt\"\xc2\x04\n" +
 	"\x04Expr\x12+\n" +
 	"\x03col\x18\x01 \x01(\v2\x17.stroppy.datagen.ColRefH\x00R\x03col\x128\n" +
 	"\trow_index\x18\x02 \x01(\v2\x19.stroppy.datagen.RowIndexH\x00R\browIndex\x12,\n" +
@@ -2291,7 +3516,11 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x03if_\x18\x06 \x01(\v2\x13.stroppy.datagen.IfH\x00R\x02if\x122\n" +
 	"\adict_at\x18\a \x01(\v2\x17.stroppy.datagen.DictAtH\x00R\x06dictAt\x128\n" +
 	"\tblock_ref\x18\b \x01(\v2\x19.stroppy.datagen.BlockRefH\x00R\bblockRef\x121\n" +
-	"\x06lookup\x18\t \x01(\v2\x17.stroppy.datagen.LookupH\x00R\x06lookupB\v\n" +
+	"\x06lookup\x18\t \x01(\v2\x17.stroppy.datagen.LookupH\x00R\x06lookup\x12>\n" +
+	"\vstream_draw\x18\n" +
+	" \x01(\v2\x1b.stroppy.datagen.StreamDrawH\x00R\n" +
+	"streamDraw\x121\n" +
+	"\x06choose\x18\v \x01(\v2\x17.stroppy.datagen.ChooseH\x00R\x06chooseB\v\n" +
 	"\x04kind\x12\x03\xf8B\x01\"%\n" +
 	"\x06ColRef\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\"\x83\x01\n" +
@@ -2391,7 +3620,88 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"population\x18\x01 \x01(\v2\x1b.stroppy.datagen.PopulationR\n" +
 	"population\x12+\n" +
 	"\x05attrs\x18\x02 \x03(\v2\x15.stroppy.datagen.AttrR\x05attrs\x12!\n" +
-	"\fcolumn_order\x18\x03 \x03(\tR\vcolumnOrder*;\n" +
+	"\fcolumn_order\x18\x03 \x03(\tR\vcolumnOrder\"\xde\x05\n" +
+	"\n" +
+	"StreamDraw\x12\x1b\n" +
+	"\tstream_id\x18\x01 \x01(\rR\bstreamId\x12B\n" +
+	"\vint_uniform\x18\n" +
+	" \x01(\v2\x1f.stroppy.datagen.DrawIntUniformH\x00R\n" +
+	"intUniform\x12H\n" +
+	"\rfloat_uniform\x18\v \x01(\v2!.stroppy.datagen.DrawFloatUniformH\x00R\ffloatUniform\x125\n" +
+	"\x06normal\x18\f \x01(\v2\x1b.stroppy.datagen.DrawNormalH\x00R\x06normal\x12/\n" +
+	"\x04zipf\x18\r \x01(\v2\x19.stroppy.datagen.DrawZipfH\x00R\x04zipf\x125\n" +
+	"\x06nurand\x18\x0e \x01(\v2\x1b.stroppy.datagen.DrawNURandH\x00R\x06nurand\x12>\n" +
+	"\tbernoulli\x18\x0f \x01(\v2\x1e.stroppy.datagen.DrawBernoulliH\x00R\tbernoulli\x12/\n" +
+	"\x04dict\x18\x10 \x01(\v2\x19.stroppy.datagen.DrawDictH\x00R\x04dict\x122\n" +
+	"\x05joint\x18\x11 \x01(\v2\x1a.stroppy.datagen.DrawJointH\x00R\x05joint\x12/\n" +
+	"\x04date\x18\x12 \x01(\v2\x19.stroppy.datagen.DrawDateH\x00R\x04date\x128\n" +
+	"\adecimal\x18\x13 \x01(\v2\x1c.stroppy.datagen.DrawDecimalH\x00R\adecimal\x122\n" +
+	"\x05ascii\x18\x14 \x01(\v2\x1a.stroppy.datagen.DrawAsciiH\x00R\x05ascii\x125\n" +
+	"\x06phrase\x18\x15 \x01(\v2\x1b.stroppy.datagen.DrawPhraseH\x00R\x06phraseB\v\n" +
+	"\x04draw\x12\x03\xf8B\x01\"v\n" +
+	"\x0eDrawIntUniform\x121\n" +
+	"\x03min\x18\x01 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03min\x121\n" +
+	"\x03max\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03max\"x\n" +
+	"\x10DrawFloatUniform\x121\n" +
+	"\x03min\x18\x01 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03min\x121\n" +
+	"\x03max\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03max\"\x88\x01\n" +
+	"\n" +
+	"DrawNormal\x121\n" +
+	"\x03min\x18\x01 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03min\x121\n" +
+	"\x03max\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03max\x12\x14\n" +
+	"\x05screw\x18\x03 \x01(\x02R\x05screw\"\x8c\x01\n" +
+	"\bDrawZipf\x121\n" +
+	"\x03min\x18\x01 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03min\x121\n" +
+	"\x03max\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03max\x12\x1a\n" +
+	"\bexponent\x18\x03 \x01(\x01R\bexponent\"M\n" +
+	"\n" +
+	"DrawNURand\x12\f\n" +
+	"\x01a\x18\x01 \x01(\x03R\x01a\x12\f\n" +
+	"\x01x\x18\x02 \x01(\x03R\x01x\x12\f\n" +
+	"\x01y\x18\x03 \x01(\x03R\x01y\x12\x15\n" +
+	"\x06c_salt\x18\x04 \x01(\x04R\x05cSalt\".\n" +
+	"\rDrawBernoulli\x12\x1d\n" +
+	"\x01p\x18\x01 \x01(\x02B\x0f\xfaB\f\n" +
+	"\n" +
+	"\x1d\x00\x00\x80?-\x00\x00\x00\x00R\x01p\"M\n" +
+	"\bDrawDict\x12\"\n" +
+	"\bdict_key\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\adictKey\x12\x1d\n" +
+	"\n" +
+	"weight_set\x18\x02 \x01(\tR\tweightSet\"\x90\x01\n" +
+	"\tDrawJoint\x12\"\n" +
+	"\bdict_key\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\adictKey\x12\x1f\n" +
+	"\x06column\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x06column\x12\x1f\n" +
+	"\vtuple_scope\x18\x03 \x01(\rR\n" +
+	"tupleScope\x12\x1d\n" +
+	"\n" +
+	"weight_set\x18\x04 \x01(\tR\tweightSet\"V\n" +
+	"\bDrawDate\x12$\n" +
+	"\x0emin_days_epoch\x18\x01 \x01(\x03R\fminDaysEpoch\x12$\n" +
+	"\x0emax_days_epoch\x18\x02 \x01(\x03R\fmaxDaysEpoch\"\x89\x01\n" +
+	"\vDrawDecimal\x121\n" +
+	"\x03min\x18\x01 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03min\x121\n" +
+	"\x03max\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x03max\x12\x14\n" +
+	"\x05scale\x18\x03 \x01(\rR\x05scale\"\xc2\x01\n" +
+	"\tDrawAscii\x128\n" +
+	"\amin_len\x18\x01 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x06minLen\x128\n" +
+	"\amax_len\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x06maxLen\x12A\n" +
+	"\balphabet\x18\x03 \x03(\v2\x1b.stroppy.datagen.AsciiRangeB\b\xfaB\x05\x92\x01\x02\b\x01R\balphabet\"0\n" +
+	"\n" +
+	"AsciiRange\x12\x10\n" +
+	"\x03min\x18\x01 \x01(\rR\x03min\x12\x10\n" +
+	"\x03max\x18\x02 \x01(\rR\x03max\"\xcc\x01\n" +
+	"\n" +
+	"DrawPhrase\x12$\n" +
+	"\tvocab_key\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\bvocabKey\x12<\n" +
+	"\tmin_words\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\bminWords\x12<\n" +
+	"\tmax_words\x18\x03 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\bmaxWords\x12\x1c\n" +
+	"\tseparator\x18\x04 \x01(\tR\tseparator\"j\n" +
+	"\x06Choose\x12\x1b\n" +
+	"\tstream_id\x18\x01 \x01(\rR\bstreamId\x12C\n" +
+	"\bbranches\x18\x02 \x03(\v2\x1d.stroppy.datagen.ChooseBranchB\b\xfaB\x05\x92\x01\x02\b\x01R\bbranches\"d\n" +
+	"\fChooseBranch\x12\x1f\n" +
+	"\x06weight\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\x06weight\x123\n" +
+	"\x04expr\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04expr*;\n" +
 	"\fInsertMethod\x12\x0f\n" +
 	"\vPLAIN_QUERY\x10\x00\x12\x0e\n" +
 	"\n" +
@@ -2412,7 +3722,7 @@ func file_proto_stroppy_datagen_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_stroppy_datagen_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_proto_stroppy_datagen_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_proto_stroppy_datagen_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_proto_stroppy_datagen_proto_goTypes = []any{
 	(InsertMethod)(0),             // 0: stroppy.datagen.InsertMethod
 	(RowIndex_Kind)(0),            // 1: stroppy.datagen.RowIndex.Kind
@@ -2446,14 +3756,30 @@ var file_proto_stroppy_datagen_proto_goTypes = []any{
 	(*BlockRef)(nil),              // 29: stroppy.datagen.BlockRef
 	(*Lookup)(nil),                // 30: stroppy.datagen.Lookup
 	(*LookupPop)(nil),             // 31: stroppy.datagen.LookupPop
-	nil,                           // 32: stroppy.datagen.InsertSpec.DictsEntry
-	(*timestamppb.Timestamp)(nil), // 33: google.protobuf.Timestamp
+	(*StreamDraw)(nil),            // 32: stroppy.datagen.StreamDraw
+	(*DrawIntUniform)(nil),        // 33: stroppy.datagen.DrawIntUniform
+	(*DrawFloatUniform)(nil),      // 34: stroppy.datagen.DrawFloatUniform
+	(*DrawNormal)(nil),            // 35: stroppy.datagen.DrawNormal
+	(*DrawZipf)(nil),              // 36: stroppy.datagen.DrawZipf
+	(*DrawNURand)(nil),            // 37: stroppy.datagen.DrawNURand
+	(*DrawBernoulli)(nil),         // 38: stroppy.datagen.DrawBernoulli
+	(*DrawDict)(nil),              // 39: stroppy.datagen.DrawDict
+	(*DrawJoint)(nil),             // 40: stroppy.datagen.DrawJoint
+	(*DrawDate)(nil),              // 41: stroppy.datagen.DrawDate
+	(*DrawDecimal)(nil),           // 42: stroppy.datagen.DrawDecimal
+	(*DrawAscii)(nil),             // 43: stroppy.datagen.DrawAscii
+	(*AsciiRange)(nil),            // 44: stroppy.datagen.AsciiRange
+	(*DrawPhrase)(nil),            // 45: stroppy.datagen.DrawPhrase
+	(*Choose)(nil),                // 46: stroppy.datagen.Choose
+	(*ChooseBranch)(nil),          // 47: stroppy.datagen.ChooseBranch
+	nil,                           // 48: stroppy.datagen.InsertSpec.DictsEntry
+	(*timestamppb.Timestamp)(nil), // 49: google.protobuf.Timestamp
 }
 var file_proto_stroppy_datagen_proto_depIdxs = []int32{
 	0,  // 0: stroppy.datagen.InsertSpec.method:type_name -> stroppy.datagen.InsertMethod
 	4,  // 1: stroppy.datagen.InsertSpec.parallelism:type_name -> stroppy.datagen.Parallelism
 	7,  // 2: stroppy.datagen.InsertSpec.source:type_name -> stroppy.datagen.RelSource
-	32, // 3: stroppy.datagen.InsertSpec.dicts:type_name -> stroppy.datagen.InsertSpec.DictsEntry
+	48, // 3: stroppy.datagen.InsertSpec.dicts:type_name -> stroppy.datagen.InsertSpec.DictsEntry
 	6,  // 4: stroppy.datagen.Dict.rows:type_name -> stroppy.datagen.DictRow
 	8,  // 5: stroppy.datagen.RelSource.population:type_name -> stroppy.datagen.Population
 	9,  // 6: stroppy.datagen.RelSource.attrs:type_name -> stroppy.datagen.Attr
@@ -2470,35 +3796,66 @@ var file_proto_stroppy_datagen_proto_depIdxs = []int32{
 	18, // 17: stroppy.datagen.Expr.dict_at:type_name -> stroppy.datagen.DictAt
 	29, // 18: stroppy.datagen.Expr.block_ref:type_name -> stroppy.datagen.BlockRef
 	30, // 19: stroppy.datagen.Expr.lookup:type_name -> stroppy.datagen.Lookup
-	1,  // 20: stroppy.datagen.RowIndex.kind:type_name -> stroppy.datagen.RowIndex.Kind
-	33, // 21: stroppy.datagen.Literal.timestamp:type_name -> google.protobuf.Timestamp
-	2,  // 22: stroppy.datagen.BinOp.op:type_name -> stroppy.datagen.BinOp.Op
-	11, // 23: stroppy.datagen.BinOp.a:type_name -> stroppy.datagen.Expr
-	11, // 24: stroppy.datagen.BinOp.b:type_name -> stroppy.datagen.Expr
-	11, // 25: stroppy.datagen.Call.args:type_name -> stroppy.datagen.Expr
-	11, // 26: stroppy.datagen.If.cond:type_name -> stroppy.datagen.Expr
-	11, // 27: stroppy.datagen.If.then:type_name -> stroppy.datagen.Expr
-	11, // 28: stroppy.datagen.If.else_:type_name -> stroppy.datagen.Expr
-	11, // 29: stroppy.datagen.DictAt.index:type_name -> stroppy.datagen.Expr
-	20, // 30: stroppy.datagen.Relationship.sides:type_name -> stroppy.datagen.Side
-	21, // 31: stroppy.datagen.Side.degree:type_name -> stroppy.datagen.Degree
-	24, // 32: stroppy.datagen.Side.strategy:type_name -> stroppy.datagen.Strategy
-	28, // 33: stroppy.datagen.Side.block_slots:type_name -> stroppy.datagen.BlockSlot
-	22, // 34: stroppy.datagen.Degree.fixed:type_name -> stroppy.datagen.DegreeFixed
-	23, // 35: stroppy.datagen.Degree.uniform:type_name -> stroppy.datagen.DegreeUniform
-	25, // 36: stroppy.datagen.Strategy.hash:type_name -> stroppy.datagen.StrategyHash
-	26, // 37: stroppy.datagen.Strategy.sequential:type_name -> stroppy.datagen.StrategySequential
-	27, // 38: stroppy.datagen.Strategy.equitable:type_name -> stroppy.datagen.StrategyEquitable
-	11, // 39: stroppy.datagen.BlockSlot.expr:type_name -> stroppy.datagen.Expr
-	11, // 40: stroppy.datagen.Lookup.entity_index:type_name -> stroppy.datagen.Expr
-	8,  // 41: stroppy.datagen.LookupPop.population:type_name -> stroppy.datagen.Population
-	9,  // 42: stroppy.datagen.LookupPop.attrs:type_name -> stroppy.datagen.Attr
-	5,  // 43: stroppy.datagen.InsertSpec.DictsEntry.value:type_name -> stroppy.datagen.Dict
-	44, // [44:44] is the sub-list for method output_type
-	44, // [44:44] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	32, // 20: stroppy.datagen.Expr.stream_draw:type_name -> stroppy.datagen.StreamDraw
+	46, // 21: stroppy.datagen.Expr.choose:type_name -> stroppy.datagen.Choose
+	1,  // 22: stroppy.datagen.RowIndex.kind:type_name -> stroppy.datagen.RowIndex.Kind
+	49, // 23: stroppy.datagen.Literal.timestamp:type_name -> google.protobuf.Timestamp
+	2,  // 24: stroppy.datagen.BinOp.op:type_name -> stroppy.datagen.BinOp.Op
+	11, // 25: stroppy.datagen.BinOp.a:type_name -> stroppy.datagen.Expr
+	11, // 26: stroppy.datagen.BinOp.b:type_name -> stroppy.datagen.Expr
+	11, // 27: stroppy.datagen.Call.args:type_name -> stroppy.datagen.Expr
+	11, // 28: stroppy.datagen.If.cond:type_name -> stroppy.datagen.Expr
+	11, // 29: stroppy.datagen.If.then:type_name -> stroppy.datagen.Expr
+	11, // 30: stroppy.datagen.If.else_:type_name -> stroppy.datagen.Expr
+	11, // 31: stroppy.datagen.DictAt.index:type_name -> stroppy.datagen.Expr
+	20, // 32: stroppy.datagen.Relationship.sides:type_name -> stroppy.datagen.Side
+	21, // 33: stroppy.datagen.Side.degree:type_name -> stroppy.datagen.Degree
+	24, // 34: stroppy.datagen.Side.strategy:type_name -> stroppy.datagen.Strategy
+	28, // 35: stroppy.datagen.Side.block_slots:type_name -> stroppy.datagen.BlockSlot
+	22, // 36: stroppy.datagen.Degree.fixed:type_name -> stroppy.datagen.DegreeFixed
+	23, // 37: stroppy.datagen.Degree.uniform:type_name -> stroppy.datagen.DegreeUniform
+	25, // 38: stroppy.datagen.Strategy.hash:type_name -> stroppy.datagen.StrategyHash
+	26, // 39: stroppy.datagen.Strategy.sequential:type_name -> stroppy.datagen.StrategySequential
+	27, // 40: stroppy.datagen.Strategy.equitable:type_name -> stroppy.datagen.StrategyEquitable
+	11, // 41: stroppy.datagen.BlockSlot.expr:type_name -> stroppy.datagen.Expr
+	11, // 42: stroppy.datagen.Lookup.entity_index:type_name -> stroppy.datagen.Expr
+	8,  // 43: stroppy.datagen.LookupPop.population:type_name -> stroppy.datagen.Population
+	9,  // 44: stroppy.datagen.LookupPop.attrs:type_name -> stroppy.datagen.Attr
+	33, // 45: stroppy.datagen.StreamDraw.int_uniform:type_name -> stroppy.datagen.DrawIntUniform
+	34, // 46: stroppy.datagen.StreamDraw.float_uniform:type_name -> stroppy.datagen.DrawFloatUniform
+	35, // 47: stroppy.datagen.StreamDraw.normal:type_name -> stroppy.datagen.DrawNormal
+	36, // 48: stroppy.datagen.StreamDraw.zipf:type_name -> stroppy.datagen.DrawZipf
+	37, // 49: stroppy.datagen.StreamDraw.nurand:type_name -> stroppy.datagen.DrawNURand
+	38, // 50: stroppy.datagen.StreamDraw.bernoulli:type_name -> stroppy.datagen.DrawBernoulli
+	39, // 51: stroppy.datagen.StreamDraw.dict:type_name -> stroppy.datagen.DrawDict
+	40, // 52: stroppy.datagen.StreamDraw.joint:type_name -> stroppy.datagen.DrawJoint
+	41, // 53: stroppy.datagen.StreamDraw.date:type_name -> stroppy.datagen.DrawDate
+	42, // 54: stroppy.datagen.StreamDraw.decimal:type_name -> stroppy.datagen.DrawDecimal
+	43, // 55: stroppy.datagen.StreamDraw.ascii:type_name -> stroppy.datagen.DrawAscii
+	45, // 56: stroppy.datagen.StreamDraw.phrase:type_name -> stroppy.datagen.DrawPhrase
+	11, // 57: stroppy.datagen.DrawIntUniform.min:type_name -> stroppy.datagen.Expr
+	11, // 58: stroppy.datagen.DrawIntUniform.max:type_name -> stroppy.datagen.Expr
+	11, // 59: stroppy.datagen.DrawFloatUniform.min:type_name -> stroppy.datagen.Expr
+	11, // 60: stroppy.datagen.DrawFloatUniform.max:type_name -> stroppy.datagen.Expr
+	11, // 61: stroppy.datagen.DrawNormal.min:type_name -> stroppy.datagen.Expr
+	11, // 62: stroppy.datagen.DrawNormal.max:type_name -> stroppy.datagen.Expr
+	11, // 63: stroppy.datagen.DrawZipf.min:type_name -> stroppy.datagen.Expr
+	11, // 64: stroppy.datagen.DrawZipf.max:type_name -> stroppy.datagen.Expr
+	11, // 65: stroppy.datagen.DrawDecimal.min:type_name -> stroppy.datagen.Expr
+	11, // 66: stroppy.datagen.DrawDecimal.max:type_name -> stroppy.datagen.Expr
+	11, // 67: stroppy.datagen.DrawAscii.min_len:type_name -> stroppy.datagen.Expr
+	11, // 68: stroppy.datagen.DrawAscii.max_len:type_name -> stroppy.datagen.Expr
+	44, // 69: stroppy.datagen.DrawAscii.alphabet:type_name -> stroppy.datagen.AsciiRange
+	11, // 70: stroppy.datagen.DrawPhrase.min_words:type_name -> stroppy.datagen.Expr
+	11, // 71: stroppy.datagen.DrawPhrase.max_words:type_name -> stroppy.datagen.Expr
+	47, // 72: stroppy.datagen.Choose.branches:type_name -> stroppy.datagen.ChooseBranch
+	11, // 73: stroppy.datagen.ChooseBranch.expr:type_name -> stroppy.datagen.Expr
+	5,  // 74: stroppy.datagen.InsertSpec.DictsEntry.value:type_name -> stroppy.datagen.Dict
+	75, // [75:75] is the sub-list for method output_type
+	75, // [75:75] is the sub-list for method input_type
+	75, // [75:75] is the sub-list for extension type_name
+	75, // [75:75] is the sub-list for extension extendee
+	0,  // [0:75] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_datagen_proto_init() }
@@ -2516,6 +3873,8 @@ func file_proto_stroppy_datagen_proto_init() {
 		(*Expr_DictAt)(nil),
 		(*Expr_BlockRef)(nil),
 		(*Expr_Lookup)(nil),
+		(*Expr_StreamDraw)(nil),
+		(*Expr_Choose)(nil),
 	}
 	file_proto_stroppy_datagen_proto_msgTypes[11].OneofWrappers = []any{
 		(*Literal_Int64)(nil),
@@ -2534,13 +3893,27 @@ func file_proto_stroppy_datagen_proto_init() {
 		(*Strategy_Sequential)(nil),
 		(*Strategy_Equitable)(nil),
 	}
+	file_proto_stroppy_datagen_proto_msgTypes[29].OneofWrappers = []any{
+		(*StreamDraw_IntUniform)(nil),
+		(*StreamDraw_FloatUniform)(nil),
+		(*StreamDraw_Normal)(nil),
+		(*StreamDraw_Zipf)(nil),
+		(*StreamDraw_Nurand)(nil),
+		(*StreamDraw_Bernoulli)(nil),
+		(*StreamDraw_Dict)(nil),
+		(*StreamDraw_Joint)(nil),
+		(*StreamDraw_Date)(nil),
+		(*StreamDraw_Decimal)(nil),
+		(*StreamDraw_Ascii)(nil),
+		(*StreamDraw_Phrase)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_datagen_proto_rawDesc), len(file_proto_stroppy_datagen_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   30,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

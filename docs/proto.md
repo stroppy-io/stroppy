@@ -62,11 +62,14 @@
     - [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode)
   
 - [proto/stroppy/datagen.proto](#proto_stroppy_datagen-proto)
+    - [AsciiRange](#stroppy-datagen-AsciiRange)
     - [Attr](#stroppy-datagen-Attr)
     - [BinOp](#stroppy-datagen-BinOp)
     - [BlockRef](#stroppy-datagen-BlockRef)
     - [BlockSlot](#stroppy-datagen-BlockSlot)
     - [Call](#stroppy-datagen-Call)
+    - [Choose](#stroppy-datagen-Choose)
+    - [ChooseBranch](#stroppy-datagen-ChooseBranch)
     - [ColRef](#stroppy-datagen-ColRef)
     - [Degree](#stroppy-datagen-Degree)
     - [DegreeFixed](#stroppy-datagen-DegreeFixed)
@@ -74,6 +77,18 @@
     - [Dict](#stroppy-datagen-Dict)
     - [DictAt](#stroppy-datagen-DictAt)
     - [DictRow](#stroppy-datagen-DictRow)
+    - [DrawAscii](#stroppy-datagen-DrawAscii)
+    - [DrawBernoulli](#stroppy-datagen-DrawBernoulli)
+    - [DrawDate](#stroppy-datagen-DrawDate)
+    - [DrawDecimal](#stroppy-datagen-DrawDecimal)
+    - [DrawDict](#stroppy-datagen-DrawDict)
+    - [DrawFloatUniform](#stroppy-datagen-DrawFloatUniform)
+    - [DrawIntUniform](#stroppy-datagen-DrawIntUniform)
+    - [DrawJoint](#stroppy-datagen-DrawJoint)
+    - [DrawNURand](#stroppy-datagen-DrawNURand)
+    - [DrawNormal](#stroppy-datagen-DrawNormal)
+    - [DrawPhrase](#stroppy-datagen-DrawPhrase)
+    - [DrawZipf](#stroppy-datagen-DrawZipf)
     - [Expr](#stroppy-datagen-Expr)
     - [If](#stroppy-datagen-If)
     - [InsertSpec](#stroppy-datagen-InsertSpec)
@@ -92,6 +107,7 @@
     - [StrategyEquitable](#stroppy-datagen-StrategyEquitable)
     - [StrategyHash](#stroppy-datagen-StrategyHash)
     - [StrategySequential](#stroppy-datagen-StrategySequential)
+    - [StreamDraw](#stroppy-datagen-StreamDraw)
   
     - [BinOp.Op](#stroppy-datagen-BinOp-Op)
     - [InsertMethod](#stroppy-datagen-InsertMethod)
@@ -1019,6 +1035,23 @@ Error handling mode for query and insert operations
 
 
 
+<a name="stroppy-datagen-AsciiRange"></a>
+
+### AsciiRange
+AsciiRange is one contiguous [min, max] codepoint range sampled by
+DrawAscii.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min | [uint32](#uint32) |  | Inclusive lower codepoint. |
+| max | [uint32](#uint32) |  | Inclusive upper codepoint; must be &gt;= min. |
+
+
+
+
+
+
 <a name="stroppy-datagen-Attr"></a>
 
 ### Attr
@@ -1095,6 +1128,39 @@ Call invokes a stdlib function registered in pkg/datagen/stdlib.
 | ----- | ---- | ----- | ----------- |
 | func | [string](#string) |  | Registered function name, e.g. &#34;std.format&#34; or &#34;std.days_to_date&#34;. |
 | args | [Expr](#stroppy-datagen-Expr) | repeated | Positional arguments to the function. |
+
+
+
+
+
+
+<a name="stroppy-datagen-Choose"></a>
+
+### Choose
+Choose picks one of several Expr branches at random with probability
+proportional to branch weight. Only the selected branch evaluates.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| stream_id | [uint32](#uint32) |  | Compile-time assigned identifier unique within an InsertSpec; used to seed the selection draw alongside attr_path and row_index. |
+| branches | [ChooseBranch](#stroppy-datagen-ChooseBranch) | repeated | Candidate branches; at least one required, all weights positive. |
+
+
+
+
+
+
+<a name="stroppy-datagen-ChooseBranch"></a>
+
+### ChooseBranch
+ChooseBranch is one weighted alternative within a Choose.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| weight | [int64](#int64) |  | Positive relative weight; larger weight raises selection probability. |
+| expr | [Expr](#stroppy-datagen-Expr) |  | Expression evaluated only when this branch is selected. |
 
 
 
@@ -1213,6 +1279,214 @@ DictRow is one tuple of values plus optional parallel weights.
 
 
 
+<a name="stroppy-datagen-DrawAscii"></a>
+
+### DrawAscii
+DrawAscii constructs a string from `alphabet` with a uniformly-drawn
+length in [min_len, max_len].
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min_len | [Expr](#stroppy-datagen-Expr) |  | Inclusive lower length bound; evaluates to int64 and must be &gt;= 0. |
+| max_len | [Expr](#stroppy-datagen-Expr) |  | Inclusive upper length bound; evaluates to int64 and must be &gt;= min_len. |
+| alphabet | [AsciiRange](#stroppy-datagen-AsciiRange) | repeated | Codepoint ranges sampled uniformly by width. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawBernoulli"></a>
+
+### DrawBernoulli
+DrawBernoulli draws a {0, 1} int64 with probability p of 1.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| p | [float](#float) |  | Probability of a 1 outcome; must be in [0, 1]. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawDate"></a>
+
+### DrawDate
+DrawDate draws a date uniformly from an epoch-day range. Both bounds
+are counted in days since 1970-01-01 UTC.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min_days_epoch | [int64](#int64) |  | Inclusive lower bound in days since the epoch. |
+| max_days_epoch | [int64](#int64) |  | Inclusive upper bound in days since the epoch. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawDecimal"></a>
+
+### DrawDecimal
+DrawDecimal draws a float64 uniformly from [min, max] and rounds the
+result to `scale` fractional digits.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min | [Expr](#stroppy-datagen-Expr) |  | Inclusive lower bound; evaluates to float64. |
+| max | [Expr](#stroppy-datagen-Expr) |  | Inclusive upper bound; evaluates to float64. |
+| scale | [uint32](#uint32) |  | Number of fractional digits to retain. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawDict"></a>
+
+### DrawDict
+DrawDict draws a row from a scalar Dict, optionally weighted.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| dict_key | [string](#string) |  | Opaque dict key matching an entry in InsertSpec.dicts. |
+| weight_set | [string](#string) |  | Weight profile to use; empty selects the default (or uniform if the dict carries no weights). |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawFloatUniform"></a>
+
+### DrawFloatUniform
+DrawFloatUniform draws a float uniformly from [min, max).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min | [Expr](#stroppy-datagen-Expr) |  | Inclusive lower bound; evaluates to float64. |
+| max | [Expr](#stroppy-datagen-Expr) |  | Exclusive upper bound; evaluates to float64 and must be &gt; min. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawIntUniform"></a>
+
+### DrawIntUniform
+DrawIntUniform draws an integer uniformly from [min, max] inclusive.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min | [Expr](#stroppy-datagen-Expr) |  | Inclusive lower bound; evaluates to int64. |
+| max | [Expr](#stroppy-datagen-Expr) |  | Inclusive upper bound; evaluates to int64 and must be &gt;= min. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawJoint"></a>
+
+### DrawJoint
+DrawJoint draws a tuple from a multi-column Dict and returns one
+column of the chosen tuple.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| dict_key | [string](#string) |  | Opaque dict key matching an entry in InsertSpec.dicts. |
+| column | [string](#string) |  | Column name whose value is returned. |
+| tuple_scope | [uint32](#uint32) |  | Tuple-scoping identifier reserved for sharing one draw across several columns; D1 treats each DrawJoint as independent. |
+| weight_set | [string](#string) |  | Weight profile to use; empty selects the default (or uniform). |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawNURand"></a>
+
+### DrawNURand
+DrawNURand realizes the TPC-C §2.1.6 NURand(A, x, y) formula.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| a | [int64](#int64) |  | Bitmask upper bound; TPC-C spec names A. |
+| x | [int64](#int64) |  | Inclusive lower bound on the output range. |
+| y | [int64](#int64) |  | Inclusive upper bound on the output range. |
+| c_salt | [uint64](#uint64) |  | Salt from which the per-stream constant C is derived. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawNormal"></a>
+
+### DrawNormal
+DrawNormal draws from a truncated normal clamped to [min, max].
+Mean is (min&#43;max)/2 and stddev is (max-min)/(2*screw). screw=0 falls
+back to the default of 3.0.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min | [Expr](#stroppy-datagen-Expr) |  | Inclusive lower clamp; evaluates to float64. |
+| max | [Expr](#stroppy-datagen-Expr) |  | Inclusive upper clamp; evaluates to float64. |
+| screw | [float](#float) |  | Screw factor; controls spread. 0 means default 3.0. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawPhrase"></a>
+
+### DrawPhrase
+DrawPhrase concatenates `n` words drawn uniformly from a vocabulary
+Dict, separated by `separator`.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| vocab_key | [string](#string) |  | Opaque dict key matching an entry in InsertSpec.dicts. |
+| min_words | [Expr](#stroppy-datagen-Expr) |  | Inclusive lower word-count bound; evaluates to int64 and must be &gt;= 1. |
+| max_words | [Expr](#stroppy-datagen-Expr) |  | Inclusive upper word-count bound; evaluates to int64 and must be &gt;= min_words. |
+| separator | [string](#string) |  | Separator joining drawn words; empty means no separator. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawZipf"></a>
+
+### DrawZipf
+DrawZipf draws from a Zipfian distribution over [min, max].
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min | [Expr](#stroppy-datagen-Expr) |  | Inclusive lower bound; evaluates to int64. |
+| max | [Expr](#stroppy-datagen-Expr) |  | Inclusive upper bound; evaluates to int64. |
+| exponent | [double](#double) |  | Skew exponent; 0 means default 1.0. |
+
+
+
+
+
+
 <a name="stroppy-datagen-Expr"></a>
 
 ### Expr
@@ -1230,6 +1504,8 @@ Expr is the closed grammar for attribute value generation.
 | dict_at | [DictAt](#stroppy-datagen-DictAt) |  | Row lookup into a Dict carried by the owning InsertSpec. |
 | block_ref | [BlockRef](#stroppy-datagen-BlockRef) |  | Named block-slot value from the enclosing Side. |
 | lookup | [Lookup](#stroppy-datagen-Lookup) |  | Cross-population column read. |
+| stream_draw | [StreamDraw](#stroppy-datagen-StreamDraw) |  | Seeded PRNG draw from a closed distribution catalog. |
+| choose | [Choose](#stroppy-datagen-Choose) |  | Weighted random pick among Expr branches; only the selected branch evaluates. |
 
 
 
@@ -1502,6 +1778,35 @@ StrategyHash pairs entities by hashing the outer index.
 
 ### StrategySequential
 StrategySequential walks inner entities in order.
+
+
+
+
+
+
+<a name="stroppy-datagen-StreamDraw"></a>
+
+### StreamDraw
+StreamDraw carries every randomness-producing arm. stream_id is
+assigned at compile time so that identical specs produce identical
+streams across runs without any pointer-keyed memoization.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| stream_id | [uint32](#uint32) |  | Compile-time assigned identifier unique within an InsertSpec. The per-row PRNG is seeded from (root_seed, attr_path, stream_id, row_index); stream_id keeps multiple draws within one attr independent. |
+| int_uniform | [DrawIntUniform](#stroppy-datagen-DrawIntUniform) |  | Uniform integer draw over [min, max] inclusive. |
+| float_uniform | [DrawFloatUniform](#stroppy-datagen-DrawFloatUniform) |  | Uniform float draw over [min, max). |
+| normal | [DrawNormal](#stroppy-datagen-DrawNormal) |  | Truncated normal draw clamped to [min, max]. |
+| zipf | [DrawZipf](#stroppy-datagen-DrawZipf) |  | Zipfian power-law draw over [min, max]. |
+| nurand | [DrawNURand](#stroppy-datagen-DrawNURand) |  | TPC-C §2.1.6 non-uniform random draw. |
+| bernoulli | [DrawBernoulli](#stroppy-datagen-DrawBernoulli) |  | Bernoulli {0, 1} draw with probability p of 1. |
+| dict | [DrawDict](#stroppy-datagen-DrawDict) |  | Weighted or uniform pick from a Dict. |
+| joint | [DrawJoint](#stroppy-datagen-DrawJoint) |  | Joint tuple draw from a multi-column Dict. |
+| date | [DrawDate](#stroppy-datagen-DrawDate) |  | Uniform date draw over an epoch-day range. |
+| decimal | [DrawDecimal](#stroppy-datagen-DrawDecimal) |  | Uniform decimal draw rounded to a fixed scale. |
+| ascii | [DrawAscii](#stroppy-datagen-DrawAscii) |  | Random ASCII string drawn from an alphabet. |
+| phrase | [DrawPhrase](#stroppy-datagen-DrawPhrase) |  | Space-joined word sequence drawn from a vocabulary Dict. |
 
 
 

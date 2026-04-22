@@ -66,11 +66,14 @@ func NewRuntime(spec *dgproto.InsertSpec) (*Runtime, error) {
 		return nil, fmt.Errorf("runtime: compile LookupPops: %w", err)
 	}
 
+	registry.SetRootSeed(spec.GetSeed())
+
 	ctx := &evalContext{
 		scratch:  make(map[string]any, len(dag.Order)),
 		dicts:    spec.GetDicts(),
 		registry: registry,
 		iterPop:  source.GetPopulation().GetName(),
+		rootSeed: spec.GetSeed(),
 	}
 
 	runtime := &Runtime{
@@ -162,8 +165,10 @@ func (r *Runtime) Clone() *Runtime {
 		size:    r.size,
 		row:     0,
 		ctx: &evalContext{
-			scratch: make(map[string]any, len(r.dag.Order)),
-			dicts:   r.ctx.dicts,
+			scratch:  make(map[string]any, len(r.dag.Order)),
+			dicts:    r.ctx.dicts,
+			rootSeed: r.ctx.rootSeed,
+			iterPop:  r.ctx.iterPop,
 		},
 	}
 }
@@ -221,6 +226,8 @@ func (r *Runtime) nextFlat() ([]any, error) {
 
 			continue
 		}
+
+		r.ctx.attrPath = name
 
 		value, err := expr.Eval(r.ctx, attrNode.GetExpr())
 		if err != nil {

@@ -51,7 +51,50 @@ func walkExpr(expr *dgproto.Expr, seen map[string]struct{}, out *[]string) {
 		walkExpr(ifExpr.GetElse_(), seen, out)
 	case *dgproto.Expr_DictAt:
 		walkExpr(expr.GetDictAt().GetIndex(), seen, out)
-	case *dgproto.Expr_RowIndex, *dgproto.Expr_Lit, nil:
+	case *dgproto.Expr_Lookup:
+		walkExpr(expr.GetLookup().GetEntityIndex(), seen, out)
+	case *dgproto.Expr_StreamDraw:
+		walkStreamDraw(expr.GetStreamDraw(), seen, out)
+	case *dgproto.Expr_Choose:
+		for _, branch := range expr.GetChoose().GetBranches() {
+			walkExpr(branch.GetExpr(), seen, out)
+		}
+	case *dgproto.Expr_RowIndex, *dgproto.Expr_Lit, *dgproto.Expr_BlockRef, nil:
 		// Leaves with no Expr children.
+	}
+}
+
+// walkStreamDraw descends into the Expr-bearing arms of a StreamDraw so
+// that ColRefs inside draw bounds contribute to the dependency graph.
+func walkStreamDraw(node *dgproto.StreamDraw, seen map[string]struct{}, out *[]string) {
+	if node == nil {
+		return
+	}
+
+	switch arm := node.GetDraw().(type) {
+	case *dgproto.StreamDraw_IntUniform:
+		walkExpr(arm.IntUniform.GetMin(), seen, out)
+		walkExpr(arm.IntUniform.GetMax(), seen, out)
+	case *dgproto.StreamDraw_FloatUniform:
+		walkExpr(arm.FloatUniform.GetMin(), seen, out)
+		walkExpr(arm.FloatUniform.GetMax(), seen, out)
+	case *dgproto.StreamDraw_Normal:
+		walkExpr(arm.Normal.GetMin(), seen, out)
+		walkExpr(arm.Normal.GetMax(), seen, out)
+	case *dgproto.StreamDraw_Zipf:
+		walkExpr(arm.Zipf.GetMin(), seen, out)
+		walkExpr(arm.Zipf.GetMax(), seen, out)
+	case *dgproto.StreamDraw_Decimal:
+		walkExpr(arm.Decimal.GetMin(), seen, out)
+		walkExpr(arm.Decimal.GetMax(), seen, out)
+	case *dgproto.StreamDraw_Ascii:
+		walkExpr(arm.Ascii.GetMinLen(), seen, out)
+		walkExpr(arm.Ascii.GetMaxLen(), seen, out)
+	case *dgproto.StreamDraw_Phrase:
+		walkExpr(arm.Phrase.GetMinWords(), seen, out)
+		walkExpr(arm.Phrase.GetMaxWords(), seen, out)
+	default:
+		// Remaining arms (Nurand, Bernoulli, Dict, Joint, Date) carry no
+		// Expr subfields.
 	}
 }
