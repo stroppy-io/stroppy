@@ -160,11 +160,21 @@ const driverConfig = declareDriverSetup(0, {
 
 const _sqlByDriver: Record<string, string> = {
   postgres: "./pg.sql",
+  mysql:    "./mysql.sql",
+  picodata: "./pico.sql",
+  ydb:      "./ydb.sql",
 };
 const SQL_FILE =
   ENV("SQL_FILE", ENV.auto, "SQL file path (defaults per driverType)") ??
   _sqlByDriver[driverConfig.driverType!] ??
   "./pg.sql";
+
+// YDB declares currency columns as `Double` — unlike pg/mysql/pico which
+// accept int64 into DECIMAL. Framework emits float64 from Draw.decimal,
+// but Expr.lit(0.0) collapses to int64 on the wire (Number.isInteger(0.0)
+// is true in JS). litDouble() (below) forces the Double oneofKind so the
+// zero-init placeholder for o_totalprice serializes as Double on YDB;
+// pg/mysql/pico accept it identically into their DECIMAL/NUMERIC columns.
 
 const _isoByDriver: Record<string, TxIsolationName> = {
   postgres: "read_committed",
@@ -214,7 +224,26 @@ const nationRegionKeys: readonly number[] = [
 if (nationRegionKeys.length !== N_NATION) {
   throw new Error(`tpch: nationRegionKeys length ${nationRegionKeys.length} != ${N_NATION}`);
 }
-const nationRegionDict = Dict.values(nationRegionKeys);
+
+/**
+ * Nation → region key as an integer expression. Folded into a nested
+ * `Expr.if` chain over rowIndex so the output column type is int64,
+ * not string (Dict.values stringifies all entries, which YDB's BulkUpsert
+ * rejects for an Int64 column). pg/mysql/pico accept either shape —
+ * keeping one path minimizes divergence between dialects.
+ */
+function nationRegionKeyExpr(rowIndex: ReturnType<typeof Attr.rowIndex>) {
+  // Build a right-folded `if (rowIndex == 0) → k0 else if (rowIndex == 1) → k1 ...`.
+  let expr = Expr.lit(nationRegionKeys[nationRegionKeys.length - 1]);
+  for (let i = nationRegionKeys.length - 2; i >= 0; i--) {
+    expr = Expr.if(
+      Expr.eq(rowIndex, Expr.lit(i)),
+      Expr.lit(nationRegionKeys[i]),
+      expr,
+    );
+  }
+  return expr;
+}
 const mktSegmentDict = scalarDictFromJson("msegmnt");
 const orderPriorityDict = scalarDictFromJson("o_oprio");
 const containerDict = scalarDictFromJson("p_cntr");
@@ -238,6 +267,16 @@ const tpchText = makeTpchText(tpchGrammarDicts);
 /** Zero-padded 9-digit id — "%09d" — used by Supplier# / Customer# names. */
 function fmt9(id: ReturnType<typeof Attr.rowId>) {
   return std.format(Expr.lit("%09d"), id);
+}
+
+// Currency literal helper: forces a numeric constant onto the wire as
+// `double`. Mirrors the tpcc workload's fix — `Expr.lit(0.0)` collapses
+// to int64 because `Number.isInteger(0.0)` is true in JS, which trips
+// the YDB driver on `Double` columns. Other dialects (pg/mysql/pico)
+// tolerate int64 into their DECIMAL/NUMERIC columns.
+type PbExprLit = ReturnType<typeof Expr.lit>;
+function litDouble(x: number): PbExprLit {
+  return { kind: { oneofKind: "lit", lit: { value: { oneofKind: "double", double: x } } } } as PbExprLit;
 }
 
 // --------------------------------------------------------------------------
@@ -265,7 +304,7 @@ function nationSpec() {
     attrs: {
       n_nationkey: Attr.rowIndex(),
       n_name: Attr.dictAt(nationsNameDict, Attr.rowIndex()),
-      n_regionkey: Attr.dictAt(nationRegionDict, Attr.rowIndex()),
+      n_regionkey: nationRegionKeyExpr(Attr.rowIndex()),
       n_comment: tpchText(31, 114),
     },
   });
@@ -397,7 +436,9 @@ function ordersSpec() {
       //   o_totalprice = Σ l_extendedprice × (1 + l_tax) × (1 - l_discount)
       // across matching lineitems (spec §4.2.3). Can't be computed at
       // orders-emit time because it depends on not-yet-generated lines.
-      o_totalprice: Expr.lit(0.0),
+      // litDouble keeps YDB's Double wire happy; pg/mysql/pico accept it
+      // identically into their DECIMAL/NUMERIC columns.
+      o_totalprice: litDouble(0.0),
       // Deterministic per-row orderdate (hash(rowIndex) mod 2557); same
       // formula is exposed via the lineitem orders LookupPop so
       // lineitem's derived dates reference the exact stored value.
@@ -528,6 +569,35 @@ function lineitemSpec() {
 // Query parameter defaults — TPC-H §2.4 pinned values.
 // --------------------------------------------------------------------------
 
+// YDB / picodata lack `date + interval 'N month/year'` as an expression;
+// we shift the anchor dates client-side and pass :date_NN alongside :date
+// on those dialects. pg/mysql compute the shift inside the query (pg via
+// `:date::date + interval '3 months'`, mysql via `DATE_ADD(:date, INTERVAL
+// 3 MONTH)`). See pico.sql / ydb.sql for the placeholders consumed per q.
+const NEEDS_END_DATES =
+  driverConfig.driverType === "picodata" || driverConfig.driverType === "ydb";
+
+function shiftDate(iso: string, days: number, months: number, years: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCFullYear(d.getUTCFullYear() + years);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Merge `{date_1m, date_3m, date_1y}` derived from `date` when NEEDS_END_DATES. */
+function withEndDates(p: Record<string, unknown>): Record<string, unknown> {
+  if (!NEEDS_END_DATES) return p;
+  const d = p.date;
+  if (typeof d !== "string") return p;
+  return {
+    ...p,
+    date_1m: shiftDate(d, 0, 1, 0),
+    date_3m: shiftDate(d, 0, 3, 0),
+    date_1y: shiftDate(d, 0, 0, 1),
+  };
+}
+
 const queryParams: Record<string, Record<string, unknown>> = {
   q1: { delta: 90 },
   q2: { size: 15, type: "BRASS", region: "EUROPE" },
@@ -561,13 +631,20 @@ const queryParams: Record<string, Record<string, unknown>> = {
 // k6 lifecycle
 // --------------------------------------------------------------------------
 
+/** Run every parsed query in `section`; noop if the section is missing. */
+function runSection(section: string): void {
+  const queries = sql(section);
+  if (!queries) return;
+  queries.forEach((q) => driver.exec(q, {}));
+}
+
 export function setup(): void {
   Step("drop_schema", () => {
-    sql("drop_schema").forEach((q) => driver.exec(q, {}));
+    runSection("drop_schema");
   });
 
   Step("create_schema", () => {
-    sql("create_schema").forEach((q) => driver.exec(q, {}));
+    runSection("create_schema");
   });
 
   Step("populate", () => {
@@ -581,20 +658,22 @@ export function setup(): void {
     driver.insertSpec(lineitemSpec());
   });
 
+  // pg-only: flip UNLOGGED → LOGGED and ANALYZE. Other dialects ship the
+  // section empty (or missing), so runSection just noops.
   Step("set_logged", () => {
-    sql("set_logged").forEach((q) => driver.exec(q, {}));
+    runSection("set_logged");
   });
 
   Step("create_indexes", () => {
-    sql("create_indexes").forEach((q) => driver.exec(q, {}));
+    runSection("create_indexes");
   });
 
   // Spec §4.2.3: o_totalprice = Σ l_extendedprice × (1+l_tax) × (1-l_discount)
   // over lineitems. We fill it post-load since it depends on yet-to-be
   // generated lines at orders-emit time. Runs after create_indexes so
-  // the correlated subquery uses idx_lineitem_orderkey.
+  // the correlated subquery can use idx_lineitem_orderkey (pg/mysql/pico).
   Step("finalize_totals", () => {
-    sql("finalize_totals").forEach((q) => driver.exec(q, {}));
+    runSection("finalize_totals");
   });
 
   Step("queries", () => {
@@ -607,9 +686,10 @@ export function setup(): void {
         console.log(`[tpch] ${name}: skipped (no body in SQL file)`);
         continue;
       }
+      const params = withEndDates(queryParams[name] ?? {});
       const t0 = Date.now();
       try {
-        driver.queryRows(body, queryParams[name] ?? {});
+        driver.queryRows(body, params);
         console.log(`[tpch] ${name}: ok in ${Date.now() - t0}ms`);
       } catch (e) {
         console.log(`[tpch] ${name}: error ${(e as Error)?.message ?? e}`);
@@ -621,6 +701,12 @@ export function setup(): void {
     if (Math.abs(SCALE_FACTOR - 1) > 1e-9) {
       console.log(
         `[tpch_validate] skipped: answers_sf1 is SF=1 only, current SCALE_FACTOR=${SCALE_FACTOR}`,
+      );
+      return;
+    }
+    if (driverConfig.driverType !== "postgres") {
+      console.log(
+        `[tpch_validate] skipped: answers_sf1 generated against postgres only; driverType=${driverConfig.driverType}`,
       );
       return;
     }

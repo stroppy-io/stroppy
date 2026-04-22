@@ -136,7 +136,13 @@ export function tpchRetailPrice(partkey: Expression): Expression {
   const term1 = Expr.mod(Expr.div(partkey, Expr.lit(10)), Expr.lit(20001));
   const term2 = Expr.mul(Expr.lit(100), Expr.mod(partkey, Expr.lit(1000)));
   const numerator = Expr.add(Expr.add(Expr.lit(90000), term1), term2);
-  return Expr.div(numerator, Expr.lit(100.0));
+  // Force float output: `Expr.lit(100.0)` collapses to int64 in the TS
+  // wrapper because `Number.isInteger(100.0)` is true in JS. YDB's Double
+  // column rejects int64 on bulk upsert, and pg DECIMAL auto-casts either
+  // way. Inline the `double` oneof to keep the result float regardless
+  // of the JS literal shape.
+  const hundredDouble = { kind: { oneofKind: "lit", lit: { value: { oneofKind: "double", double: 100.0 } } } } as unknown as Expression;
+  return Expr.div(numerator, hundredDouble);
 }
 
 /**

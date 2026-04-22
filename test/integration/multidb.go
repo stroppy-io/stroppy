@@ -102,6 +102,9 @@ func NewMySQL(t *testing.T) *sql.DB {
 // NewPicodata connects to the harness's picodata pgwire listener (port 1331)
 // and returns a pgx pool. Use ResetPico for schema cleanup — picodata does
 // not support DROP SCHEMA.
+//
+// pgxpool.Ping sends `-- ping` which sbroad rejects at parse time; we
+// probe liveness with `SELECT 1` on a one-off connection instead.
 func NewPicodata(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	skipIfRequested(t)
@@ -113,9 +116,10 @@ func NewPicodata(t *testing.T) *pgxpool.Pool {
 	if err != nil {
 		t.Fatalf("pgxpool.New(picodata, %q): %v", url, err)
 	}
-	if err := pool.Ping(ctx); err != nil {
+	var one int
+	if err := pool.QueryRow(ctx, "SELECT 1").Scan(&one); err != nil {
 		pool.Close()
-		t.Fatalf("picodata.Ping: %v (is `make tmpfs-all-up` running?)", err)
+		t.Fatalf("picodata probe: %v (is `make tmpfs-all-up` running?)", err)
 	}
 	t.Cleanup(pool.Close)
 	return pool
