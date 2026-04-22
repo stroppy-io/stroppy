@@ -854,7 +854,7 @@ function new_order() {
         // Deduplicate item IDs; NURand can produce duplicates across lines.
         const uniqueItemIds = [...new Set(line_i_id)];
         const itemTemplate = sql("workload_tx_new_order", "get_items_batch")!;
-        const itemQuery = itemTemplate.sql.replace("{item_ids}", uniqueItemIds.join(","));
+        const itemQuery = itemTemplate.sql.replace(/\{item_ids\}/g, uniqueItemIds.join(","));
         const itemRows = tx.queryRows(itemQuery, {});
         // Index by i_id. Batch result columns: [0]=i_id, [1]=i_price, [2]=i_name, [3]=i_data.
         const itemMap = new Map<number, any[]>();
@@ -885,7 +885,7 @@ function new_order() {
         const stockMap = new Map<string, any[]>();
         const stockTemplate = sql("workload_tx_new_order", "get_stocks_batch")!;
         for (const [sw, iids] of stockByWh) {
-          const q = stockTemplate.sql.replace("{item_ids}", [...iids].join(","));
+          const q = stockTemplate.sql.replace(/\{item_ids\}/g, [...iids].join(","));
           const rows = tx.queryRows(q, { w_id: sw });
           for (const row of rows) {
             stockMap.set(`${sw}/${Number(row[0])}`, row);
