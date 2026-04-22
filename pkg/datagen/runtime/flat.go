@@ -23,15 +23,43 @@ import (
 type Runtime struct {
 	dag     *compile.DAG
 	columns []string
-	emit    []int
+	emit    []emitSlot
 	size    int64
 	row     int64
 	ctx     *evalContext
 
 	// rel is non-nil when the RelSource declares a Relationship. In
-	// that mode `size` is `outerSize × innerDegree` and Next advances
-	// through the nested iteration.
+	// that mode `size` is the per-entity count summed over all outer
+	// entities and Next advances through the nested iteration.
 	rel *relRuntime
+
+	// scd2 is non-nil when RelSource.scd2 is set. It carries the
+	// precomputed start/end pairs and the boundary row index.
+	scd2 *scd2State
+}
+
+// emitKind distinguishes a regular DAG-attr column from a column whose
+// value is injected by a runtime mechanism (currently only SCD-2).
+type emitKind uint8
+
+const (
+	// emitAttr sources the column value from the scratch map at the
+	// position recorded in emitSlot.ref.
+	emitAttr emitKind = iota
+	// emitSCD2Start sources the column value from scd2State.startValue,
+	// chosen by the current row's boundary test.
+	emitSCD2Start
+	// emitSCD2End sources the column value from scd2State.endValue.
+	emitSCD2End
+)
+
+// emitSlot pairs a column position with the source that supplies its
+// value for each emitted row. Regular attrs reference the DAG position;
+// SCD-2 columns reference the runtime's scd2State.
+type emitSlot struct {
+	kind emitKind
+	// ref is the DAG index when kind == emitAttr; unused otherwise.
+	ref int
 }
 
 // NewRuntime validates an InsertSpec and returns a Runtime ready to
@@ -54,7 +82,7 @@ func NewRuntime(spec *dgproto.InsertSpec) (*Runtime, error) {
 		return nil, fmt.Errorf("runtime: compile attrs: %w", err)
 	}
 
-	emit, err := resolveColumnOrder(source.GetColumnOrder(), dag)
+	emit, err := resolveColumnOrder(source.GetColumnOrder(), dag, source.GetScd2())
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +121,13 @@ func NewRuntime(spec *dgproto.InsertSpec) (*Runtime, error) {
 	}
 
 	if len(source.GetRelationships()) > 0 {
-		if err := runtime.installRelationship(source, registry); err != nil {
+		if err := runtime.installRelationship(source, registry, spec.GetSeed()); err != nil {
+			return nil, err
+		}
+	}
+
+	if source.GetScd2() != nil {
+		if err := runtime.installSCD2(source); err != nil {
 			return nil, err
 		}
 	}
@@ -107,8 +141,9 @@ func NewRuntime(spec *dgproto.InsertSpec) (*Runtime, error) {
 func (r *Runtime) installRelationship(
 	source *dgproto.RelSource,
 	registry *lookup.LookupRegistry,
+	rootSeed uint64,
 ) error {
-	plan, err := validateRelationship(source, r.dag, r.columns, r.emit, registry)
+	plan, err := validateRelationship(source, r.dag, r.columns, registry, rootSeed)
 	if err != nil {
 		return err
 	}
@@ -150,37 +185,63 @@ func (r *Runtime) Columns() []string {
 }
 
 // Clone returns an independent Runtime that shares the compiled DAG,
-// column metadata, and dict map with the receiver but owns a fresh
-// scratch buffer and row counter. The shared fields are read-only after
-// NewRuntime, so clones are safe to run concurrently without locks.
+// column metadata, dict map, cohort registry, and (for relationship
+// runtimes) the immutable cumulativeRows profile with the receiver,
+// but owns a fresh scratch buffer, row counter, and block caches. The
+// shared fields are read-only after NewRuntime, so clones are safe to
+// run concurrently without locks.
 //
 // A cloned Runtime starts at row 0; call SeekRow to position it at a
 // chunk boundary before iterating.
-//
-// Clone is only valid for flat runtimes; a relationship-bearing
-// Runtime shares mutable caches (block caches, Lookup LRUs) that do
-// not round-trip through Clone. Callers that need a fresh
-// relationship Runtime should call NewRuntime again on the spec.
 func (r *Runtime) Clone() *Runtime {
-	if r.rel != nil {
-		panic("runtime: Clone() unsupported on relationship runtime")
-	}
-
-	return &Runtime{
+	clone := &Runtime{
 		dag:     r.dag,
 		columns: r.columns,
 		emit:    r.emit,
 		size:    r.size,
 		row:     0,
+		scd2:    r.scd2,
 		ctx: &evalContext{
 			scratch:          make(map[string]any, len(r.dag.Order)),
 			dicts:            r.ctx.dicts,
+			registry:         r.ctx.registry,
 			rootSeed:         r.ctx.rootSeed,
 			iterPop:          r.ctx.iterPop,
 			cohorts:          r.ctx.cohorts,
 			cohortBucketKeys: r.ctx.cohortBucketKeys,
+			inRelationship:   r.ctx.inRelationship,
+			outerPop:         r.ctx.outerPop,
 		},
 	}
+
+	if r.rel != nil {
+		// Share the immutable relRuntime fields (compile DAG, degree
+		// resolver, cumulativeRows) but mint fresh, per-worker block
+		// caches so the outer/inner entity checkpoints stay independent.
+		relClone := *r.rel
+
+		outerEval := func(_ string, e *dgproto.Expr) (any, error) {
+			return expr.Eval(clone.ctx, e)
+		}
+
+		relClone.outerBlocks = &blockCache{
+			sideName: r.rel.outerBlocks.sideName,
+			slots:    r.rel.outerBlocks.slots,
+			values:   make(map[string]any, len(r.rel.outerBlocks.slots)),
+			eval:     outerEval,
+		}
+		relClone.innerBlocks = &blockCache{
+			sideName: r.rel.innerBlocks.sideName,
+			slots:    r.rel.innerBlocks.slots,
+			values:   make(map[string]any, len(r.rel.innerBlocks.slots)),
+			eval:     outerEval,
+		}
+
+		clone.rel = &relClone
+		clone.ctx.blocks = relClone.outerBlocks
+	}
+
+	return clone
 }
 
 // cohortDefaultKeys builds the schedule-name → default-bucket_key map
@@ -268,14 +329,31 @@ func (r *Runtime) nextFlat() ([]any, error) {
 		r.ctx.scratch[name] = value
 	}
 
-	out := make([]any, len(r.emit))
-	for i, idx := range r.emit {
-		out[i] = r.ctx.scratch[r.dag.Order[idx].GetName()]
-	}
+	out := r.assembleRow(r.row)
 
 	r.row++
 
 	return out, nil
+}
+
+// assembleRow builds the output row for the given global row index,
+// consulting the DAG scratch for emitAttr slots and the SCD2 state for
+// emitSCD2Start / emitSCD2End slots.
+func (r *Runtime) assembleRow(rowIdx int64) []any {
+	out := make([]any, len(r.emit))
+
+	for i, slot := range r.emit {
+		switch slot.kind {
+		case emitAttr:
+			out[i] = r.ctx.scratch[r.dag.Order[slot.ref].GetName()]
+		case emitSCD2Start:
+			out[i] = r.scd2.startFor(rowIdx)
+		case emitSCD2End:
+			out[i] = r.scd2.endFor(rowIdx)
+		}
+	}
+
+	return out
 }
 
 // validateSpec enforces the minimal preconditions for the flat runtime:
@@ -308,19 +386,103 @@ func validateSpec(spec *dgproto.InsertSpec) (*dgproto.RelSource, int64, error) {
 	return source, size, nil
 }
 
-// resolveColumnOrder returns the DAG positions of the attrs named in
-// column_order, rejecting any name not declared in the RelSource.
-func resolveColumnOrder(columnOrder []string, dag *compile.DAG) ([]int, error) {
-	emit := make([]int, len(columnOrder))
+// resolveColumnOrder returns an emitSlot per column in column_order.
+// Regular columns resolve to DAG indices; when scd2 is non-nil, the
+// start_col and end_col entries resolve to SCD-2-injected slots and
+// must not also be declared as attrs.
+func resolveColumnOrder(
+	columnOrder []string,
+	dag *compile.DAG,
+	scd2 *dgproto.SCD2,
+) ([]emitSlot, error) {
+	startCol, endCol, err := validateSCD2Columns(dag, scd2)
+	if err != nil {
+		return nil, err
+	}
+
+	emit := make([]emitSlot, len(columnOrder))
+
+	var sawStart, sawEnd bool
 
 	for i, name := range columnOrder {
-		pos, ok := dag.Index[name]
-		if !ok {
-			return nil, fmt.Errorf("%w: %q", ErrMissingColumn, name)
+		slot, isStart, isEnd, err := resolveEmitSlot(name, dag, startCol, endCol)
+		if err != nil {
+			return nil, err
 		}
 
-		emit[i] = pos
+		emit[i] = slot
+		sawStart = sawStart || isStart
+		sawEnd = sawEnd || isEnd
+	}
+
+	if scd2 != nil && !sawStart {
+		return nil, fmt.Errorf("%w: scd2 start_col %q not in column_order",
+			ErrMissingColumn, startCol)
+	}
+
+	if scd2 != nil && !sawEnd {
+		return nil, fmt.Errorf("%w: scd2 end_col %q not in column_order",
+			ErrMissingColumn, endCol)
 	}
 
 	return emit, nil
+}
+
+// validateSCD2Columns returns (start_col, end_col) for the supplied
+// SCD2 config, or ("", "") when scd2 is nil. It rejects empty names,
+// start_col == end_col, and SCD2 columns that are also declared attrs.
+func validateSCD2Columns(dag *compile.DAG, scd2 *dgproto.SCD2) (startCol, endCol string, err error) {
+	if scd2 == nil {
+		return "", "", nil
+	}
+
+	startCol = scd2.GetStartCol()
+	endCol = scd2.GetEndCol()
+
+	if startCol == "" || endCol == "" {
+		return "", "", fmt.Errorf("%w: scd2 start_col/end_col required", ErrInvalidSpec)
+	}
+
+	if startCol == endCol {
+		return "", "", fmt.Errorf("%w: scd2 start_col and end_col must differ (%q)",
+			ErrInvalidSpec, startCol)
+	}
+
+	if _, declared := dag.Index[startCol]; declared {
+		return "", "", fmt.Errorf("%w: scd2 start_col %q must not be declared as an attr",
+			ErrInvalidSpec, startCol)
+	}
+
+	if _, declared := dag.Index[endCol]; declared {
+		return "", "", fmt.Errorf("%w: scd2 end_col %q must not be declared as an attr",
+			ErrInvalidSpec, endCol)
+	}
+
+	return startCol, endCol, nil
+}
+
+// resolveEmitSlot resolves one column name to its emitSlot, returning
+// (slot, isSCD2Start, isSCD2End) so the caller can track whether the
+// start/end columns were observed in column_order. Names matching
+// startCol/endCol route to SCD2 slots; anything else must be a known
+// attr in the DAG.
+func resolveEmitSlot(
+	name string,
+	dag *compile.DAG,
+	startCol, endCol string,
+) (slot emitSlot, isStart, isEnd bool, err error) {
+	if startCol != "" && name == startCol {
+		return emitSlot{kind: emitSCD2Start}, true, false, nil
+	}
+
+	if endCol != "" && name == endCol {
+		return emitSlot{kind: emitSCD2End}, false, true, nil
+	}
+
+	pos, ok := dag.Index[name]
+	if !ok {
+		return emitSlot{}, false, false, fmt.Errorf("%w: %q", ErrMissingColumn, name)
+	}
+
+	return emitSlot{kind: emitAttr, ref: pos}, false, false, nil
 }

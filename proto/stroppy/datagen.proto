@@ -79,6 +79,11 @@ message RelSource {
   repeated Cohort cohorts = 6;
   // Sibling populations referenced via Lookup but never iterated.
   repeated LookupPop lookup_pops = 7;
+  // SCD-2 row-split configuration. When set, the runtime auto-injects the
+  // named start_col / end_col values into every row based on a boundary
+  // row index: rows below boundary carry the historical pair, rows at or
+  // above carry the current pair.
+  SCD2 scd2 = 8;
 }
 
 // Population names the entity set a RelSource iterates and its cardinality.
@@ -609,4 +614,33 @@ message CohortLive {
   // Bucket-key override; when unset the Cohort's default bucket_key
   // is used.
   Expr bucket_key = 2;
+}
+
+// SCD2 splits the population's row space into a historical slice and a
+// current slice at a compile-time boundary row index. The runtime
+// auto-injects start_col and end_col values per row; authors list these
+// two columns in RelSource.column_order but do not declare them in
+// RelSource.attrs.
+message SCD2 {
+  // Column name receiving the start-of-validity value. Must appear in
+  // the owning RelSource's column_order and must not be declared in
+  // column_order twice or as an attr name.
+  string start_col = 1 [ (validate.rules).string.min_len = 1 ];
+  // Column name receiving the end-of-validity value.
+  string end_col = 2 [ (validate.rules).string.min_len = 1 ];
+  // Boundary row index. Rows with global row_index < boundary get the
+  // historical pair; rows at or above get the current pair. The Expr
+  // must fold to a constant int64 at NewRuntime time; runtime-varying
+  // boundaries are not supported.
+  Expr boundary = 3 [ (validate.rules).message.required = true ];
+  // Start-of-validity value for the historical slice. Evaluated once
+  // at NewRuntime against an empty-scratch context; must be constant.
+  Expr historical_start = 4 [ (validate.rules).message.required = true ];
+  // End-of-validity value for the historical slice.
+  Expr historical_end = 5 [ (validate.rules).message.required = true ];
+  // Start-of-validity value for the current slice.
+  Expr current_start = 6 [ (validate.rules).message.required = true ];
+  // End-of-validity value for the current slice. When unset, the
+  // runtime emits nil (SQL NULL) for end_col on current rows.
+  Expr current_end = 7;
 }

@@ -32,6 +32,7 @@ import {
   RelSource as PbRelSource,
   Relationship as PbRelationship,
   RowIndex_Kind,
+  SCD2 as PbSCD2,
   Side as PbSide,
   Strategy as PbStrategy,
 } from "./stroppy.pb.js";
@@ -504,6 +505,12 @@ export interface RelTableOpts {
   lookupPops?: PbLookupPop[];
   /** Named cohort schedules readable via `Attr.cohortDraw` / `Attr.cohortLive`. */
   cohorts?: PbCohort[];
+  /**
+   * SCD-2 row-split descriptor. When set, the runtime auto-injects
+   * values for `startCol` and `endCol` based on a boundary row index;
+   * both columns must appear in `columnOrder` but not in `attrs`.
+   */
+  scd2?: PbSCD2;
 }
 
 /**
@@ -519,8 +526,18 @@ function relTable(name: string, opts: RelTableOpts): PbInsertSpec {
   );
 
   const attrKeys = Object.keys(opts.attrs);
-  const columnOrder = opts.columnOrder ? [...opts.columnOrder] : attrKeys;
-  validateColumnOrder(columnOrder, attrKeys);
+  // SCD-2-managed columns live in columnOrder but not in attrs; pass
+  // their names to validateColumnOrder so they survive the unknown-attr
+  // check. Default columnOrder is attrKeys + scd2 pair appended in the
+  // order the spec declares them.
+  const scd2Names: string[] = opts.scd2
+    ? [opts.scd2.startCol, opts.scd2.endCol]
+    : [];
+  const defaultColumnOrder = [...attrKeys, ...scd2Names];
+  const columnOrder = opts.columnOrder
+    ? [...opts.columnOrder]
+    : defaultColumnOrder;
+  validateColumnOrder(columnOrder, attrKeys, scd2Names);
 
   const population: PbPopulation = {
     name,
@@ -536,6 +553,7 @@ function relTable(name: string, opts: RelTableOpts): PbInsertSpec {
     iter: opts.iter ?? "",
     cohorts: opts.cohorts ? [...opts.cohorts] : [],
     lookupPops: opts.lookupPops ? [...opts.lookupPops] : [],
+    scd2: opts.scd2,
   };
 
   const parallelism: PbParallelism = {
@@ -629,16 +647,31 @@ function walkExpr(e: PbExpr, out: Set<string>): void {
   }
 }
 
-function validateColumnOrder(order: readonly string[], keys: readonly string[]): void {
-  if (order.length !== keys.length) {
+function validateColumnOrder(
+  order: readonly string[],
+  keys: readonly string[],
+  scd2Names: readonly string[] = [],
+): void {
+  const expectedLen = keys.length + scd2Names.length;
+  if (order.length !== expectedLen) {
     throw new Error(
-      `datagen: columnOrder length ${order.length} must equal attrs count ${keys.length}`,
+      `datagen: columnOrder length ${order.length} must equal attrs+scd2 count ${expectedLen}`,
     );
   }
   const keySet = new Set(keys);
+  const scd2Set = new Set(scd2Names);
+  for (const s of scd2Names) {
+    if (keySet.has(s)) {
+      throw new Error(
+        `datagen: scd2 column "${s}" must not also be declared in attrs`,
+      );
+    }
+  }
   const seen = new Set<string>();
   for (const name of order) {
-    if (!keySet.has(name)) {
+    const isAttr = keySet.has(name);
+    const isScd2 = scd2Set.has(name);
+    if (!isAttr && !isScd2) {
       throw new Error(`datagen: columnOrder references unknown attr "${name}"`);
     }
     if (seen.has(name)) {
@@ -673,6 +706,42 @@ function relSide(population: string, opts: RelSideOpts): PbSide {
   };
 }
 
+/** Options accepted by `Rel.scd2`. */
+export interface RelSCD2Opts {
+  /** Column name receiving the start-of-validity value. */
+  startCol: string;
+  /** Column name receiving the end-of-validity value. */
+  endCol: string;
+  /** Row-index boundary; rows with index < boundary get the historical pair. */
+  boundary: PbExpr;
+  /** Start-of-validity value for the historical slice. */
+  historicalStart: PbExpr;
+  /** End-of-validity value for the historical slice. */
+  historicalEnd: PbExpr;
+  /** Start-of-validity value for the current slice. */
+  currentStart: PbExpr;
+  /** End-of-validity value for the current slice; omit for SQL NULL. */
+  currentEnd?: PbExpr;
+}
+
+/** Build an SCD-2 row-split descriptor for `Rel.table({ scd2 })`. */
+function relSCD2(opts: RelSCD2Opts): PbSCD2 {
+  if (!opts.startCol) throw new Error("datagen: Rel.scd2 requires startCol");
+  if (!opts.endCol) throw new Error("datagen: Rel.scd2 requires endCol");
+  if (opts.startCol === opts.endCol) {
+    throw new Error("datagen: Rel.scd2 startCol and endCol must differ");
+  }
+  return {
+    startCol: opts.startCol,
+    endCol: opts.endCol,
+    boundary: opts.boundary,
+    historicalStart: opts.historicalStart,
+    historicalEnd: opts.historicalEnd,
+    currentStart: opts.currentStart,
+    currentEnd: opts.currentEnd,
+  };
+}
+
 /** Build a LookupPop — a pure sibling population readable via `Attr.lookup`. */
 function relLookupPop(opts: RelLookupPopOpts): PbLookupPop {
   if (!opts.name) throw new Error("datagen: Rel.lookupPop requires a name");
@@ -700,6 +769,7 @@ export const Rel = {
   relationship: relRelationship,
   side: relSide,
   lookupPop: relLookupPop,
+  scd2: relSCD2,
 };
 
 // -------- Namespace: Draw (reserved) --------

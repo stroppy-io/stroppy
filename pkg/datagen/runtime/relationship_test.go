@@ -4,6 +4,8 @@ import (
 	"errors"
 	"io"
 	"reflect"
+	"sort"
+	"sync"
 	"testing"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
@@ -52,9 +54,9 @@ func fixedSide(pop string, count int64) *dgproto.Side {
 	}
 }
 
-func uniformSide(pop string, minV, maxV int64) *dgproto.Side {
+func uniformSide(minV, maxV int64) *dgproto.Side {
 	return &dgproto.Side{
-		Population: pop,
+		Population: "l",
 		Degree: &dgproto.Degree{Kind: &dgproto.Degree_Uniform{
 			Uniform: &dgproto.DegreeUniform{Min: minV, Max: maxV},
 		}},
@@ -335,19 +337,20 @@ func TestRelationshipSeekOutOfRange(t *testing.T) {
 
 // --- unsupported-feature errors -------------------------------------------
 
-func TestRelationshipRejectsUniformDegree(t *testing.T) {
+func TestRelationshipRejectsInvertedUniformDegree(t *testing.T) {
 	outer := &dgproto.LookupPop{
 		Population:  &dgproto.Population{Name: "o", Size: 2},
 		Attrs:       []*dgproto.Attr{attr("k", rowEntity())},
 		ColumnOrder: []string{"k"},
 	}
 
+	// max < min is rejected.
 	spec := relSpec(
 		"l", 99,
 		[]*dgproto.Attr{attr("v", rowGlobal())},
 		[]string{"v"},
 		outer,
-		[]*dgproto.Side{fixedSide("o", 1), uniformSide("l", 1, 3)},
+		[]*dgproto.Side{fixedSide("o", 1), uniformSide(5, 3)},
 	)
 
 	_, err := NewRuntime(spec)
@@ -492,6 +495,320 @@ func TestRelationshipRejectsUnknownIter(t *testing.T) {
 	_, err := NewRuntime(spec)
 	if !errors.Is(err, ErrUnknownRelationship) {
 		t.Fatalf("got %v, want ErrUnknownRelationship", err)
+	}
+}
+
+// --- Uniform degree -------------------------------------------------------
+
+// TestRelationshipUniformDegreeMinEqualsMax proves that Uniform(n,n)
+// behaves identically to Fixed(n): every outer entity produces n inner
+// rows, and Seek lands on the expected (entity, line).
+func TestRelationshipUniformDegreeMinEqualsMax(t *testing.T) {
+	outer := &dgproto.LookupPop{
+		Population:  &dgproto.Population{Name: "o", Size: 3},
+		Attrs:       []*dgproto.Attr{attr("k", rowEntity())},
+		ColumnOrder: []string{"k"},
+	}
+
+	innerAttrs := []*dgproto.Attr{
+		attr("e", rowEntity()),
+		attr("i", rowLine()),
+	}
+
+	spec := relSpec(
+		"l", 99,
+		innerAttrs,
+		[]string{"e", "i"},
+		outer,
+		[]*dgproto.Side{fixedSide("o", 1), uniformSide(2, 2)},
+	)
+	spec.Seed = 0xABCDEF
+
+	rt, err := NewRuntime(spec)
+	if err != nil {
+		t.Fatalf("NewRuntime: %v", err)
+	}
+
+	rows := drainRel(t, rt)
+	if len(rows) != 6 {
+		t.Fatalf("row count: got %d, want 6", len(rows))
+	}
+
+	want := [][]any{
+		{int64(0), int64(0)},
+		{int64(0), int64(1)},
+		{int64(1), int64(0)},
+		{int64(1), int64(1)},
+		{int64(2), int64(0)},
+		{int64(2), int64(1)},
+	}
+	if !reflect.DeepEqual(rows, want) {
+		t.Fatalf("rows mismatch:\n got %v\nwant %v", rows, want)
+	}
+}
+
+// TestRelationshipUniformDegreeRange checks Uniform(1,5) over a
+// 100-entity outer: total rows land in the valid [100, 500] window and
+// per-entity counts are deterministic across constructions.
+func TestRelationshipUniformDegreeRange(t *testing.T) {
+	const outerSize = int64(100)
+
+	outer := &dgproto.LookupPop{
+		Population:  &dgproto.Population{Name: "o", Size: outerSize},
+		Attrs:       []*dgproto.Attr{attr("k", rowEntity())},
+		ColumnOrder: []string{"k"},
+	}
+
+	innerAttrs := []*dgproto.Attr{
+		attr("e", rowEntity()),
+		attr("i", rowLine()),
+	}
+
+	mkSpec := func() *dgproto.InsertSpec {
+		s := relSpec(
+			"l", 99,
+			innerAttrs,
+			[]string{"e", "i"},
+			outer,
+			[]*dgproto.Side{fixedSide("o", 1), uniformSide(1, 5)},
+		)
+		s.Seed = 0x1234567
+
+		return s
+	}
+
+	rtA, err := NewRuntime(mkSpec())
+	if err != nil {
+		t.Fatalf("NewRuntime A: %v", err)
+	}
+
+	rowsA := drainRel(t, rtA)
+	if int64(len(rowsA)) < outerSize || int64(len(rowsA)) > outerSize*5 {
+		t.Fatalf("total rows %d out of [%d, %d]", len(rowsA), outerSize, outerSize*5)
+	}
+
+	// Determinism: second construction yields the same row sequence.
+	rtB, err := NewRuntime(mkSpec())
+	if err != nil {
+		t.Fatalf("NewRuntime B: %v", err)
+	}
+
+	rowsB := drainRel(t, rtB)
+	if !reflect.DeepEqual(rowsA, rowsB) {
+		t.Fatalf("Uniform degree is non-deterministic: %d vs %d rows", len(rowsA), len(rowsB))
+	}
+
+	// Per-entity counts are recorded from the emitted rows; each block
+	// of rows with the same entity index runs from line 0 upward.
+	perEntity := make(map[int64]int64)
+	for _, r := range rowsA {
+		perEntity[r[0].(int64)]++
+	}
+
+	for e := range outerSize {
+		count := perEntity[e]
+		if count < 1 || count > 5 {
+			t.Fatalf("entity %d count %d not in [1,5]", e, count)
+		}
+	}
+}
+
+// TestRelationshipUniformDegreeParallelDeterminism proves that cloning
+// a Uniform-degree runtime into multiple workers and seeking each to
+// its chunk start emits the same row multiset as a single-worker run.
+func TestRelationshipUniformDegreeParallelDeterminism(t *testing.T) {
+	const outerSize = int64(50)
+
+	outer := &dgproto.LookupPop{
+		Population:  &dgproto.Population{Name: "o", Size: outerSize},
+		Attrs:       []*dgproto.Attr{attr("k", rowEntity())},
+		ColumnOrder: []string{"k"},
+	}
+
+	innerAttrs := []*dgproto.Attr{
+		attr("e", rowEntity()),
+		attr("i", rowLine()),
+	}
+
+	mkSpec := func() *dgproto.InsertSpec {
+		s := relSpec(
+			"l", 99,
+			innerAttrs,
+			[]string{"e", "i"},
+			outer,
+			[]*dgproto.Side{fixedSide("o", 1), uniformSide(1, 4)},
+		)
+		s.Seed = 0x77AABB
+
+		return s
+	}
+
+	// Sequential baseline.
+	baseRT, err := NewRuntime(mkSpec())
+	if err != nil {
+		t.Fatalf("NewRuntime baseline: %v", err)
+	}
+
+	baseRows := drainRel(t, baseRT)
+
+	// Parallel via Clone: split [0, totalRows) into chunks and drain
+	// each chunk in a goroutine.
+	const workers = 4
+
+	totalRows := int64(len(baseRows))
+
+	seed, err := NewRuntime(mkSpec())
+	if err != nil {
+		t.Fatalf("NewRuntime seed: %v", err)
+	}
+
+	chunkSize := totalRows / workers
+	remainder := totalRows % workers
+
+	type chunkBounds struct {
+		start, count int64
+	}
+
+	bounds := make([]chunkBounds, workers)
+
+	var cursor int64
+
+	for i := range workers {
+		c := chunkSize
+		if int64(i) == int64(workers-1) {
+			c += remainder
+		}
+
+		bounds[i] = chunkBounds{start: cursor, count: c}
+		cursor += c
+	}
+
+	var (
+		mu   sync.Mutex
+		got  [][]any
+		wg   sync.WaitGroup
+		errs [workers]error
+	)
+
+	got = make([][]any, 0, totalRows)
+
+	for i := range workers {
+		wg.Add(1)
+
+		go func(idx int, b chunkBounds) {
+			defer wg.Done()
+
+			worker := seed.Clone()
+			if err := worker.SeekRow(b.start); err != nil {
+				errs[idx] = err
+
+				return
+			}
+
+			local := make([][]any, 0, b.count)
+			for range b.count {
+				row, err := worker.Next()
+				if err != nil {
+					errs[idx] = err
+
+					return
+				}
+
+				cp := make([]any, len(row))
+				copy(cp, row)
+				local = append(local, cp)
+			}
+
+			mu.Lock()
+
+			got = append(got, local...)
+			mu.Unlock()
+		}(i, bounds[i])
+	}
+
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("worker %d: %v", i, err)
+		}
+	}
+
+	if len(got) != len(baseRows) {
+		t.Fatalf("parallel emitted %d rows, sequential %d", len(got), len(baseRows))
+	}
+
+	sort.Slice(got, func(i, j int) bool {
+		a, b := got[i], got[j]
+		if a[0].(int64) != b[0].(int64) {
+			return a[0].(int64) < b[0].(int64)
+		}
+
+		return a[1].(int64) < b[1].(int64)
+	})
+
+	if !reflect.DeepEqual(got, baseRows) {
+		t.Fatalf("parallel row multiset differs from sequential")
+	}
+}
+
+// TestRelationshipUniformSeekMidStream seeds a 100-entity parent with
+// Uniform(1,5) degree and verifies SeekRow maps a global row index to
+// the expected (entity, line). The target row is recomputed from the
+// cumulative counts so the test is stable across reseed events.
+func TestRelationshipUniformSeekMidStream(t *testing.T) {
+	const outerSize = int64(100)
+
+	outer := &dgproto.LookupPop{
+		Population:  &dgproto.Population{Name: "o", Size: outerSize},
+		Attrs:       []*dgproto.Attr{attr("k", rowEntity())},
+		ColumnOrder: []string{"k"},
+	}
+
+	innerAttrs := []*dgproto.Attr{
+		attr("e", rowEntity()),
+		attr("i", rowLine()),
+	}
+
+	spec := relSpec(
+		"l", 99,
+		innerAttrs,
+		[]string{"e", "i"},
+		outer,
+		[]*dgproto.Side{fixedSide("o", 1), uniformSide(1, 5)},
+	)
+	spec.Seed = 0xCAFEBABE
+
+	// Emit every row once via a fresh runtime; record the (entity, line)
+	// sequence to pick a mid-stream target.
+	baseline, err := NewRuntime(spec)
+	if err != nil {
+		t.Fatalf("NewRuntime baseline: %v", err)
+	}
+
+	allRows := drainRel(t, baseline)
+	if len(allRows) < 50 {
+		t.Fatalf("too few rows for a meaningful seek: %d", len(allRows))
+	}
+
+	targetRow := int64(len(allRows) / 2)
+
+	rt, err := NewRuntime(spec)
+	if err != nil {
+		t.Fatalf("NewRuntime seek: %v", err)
+	}
+
+	if err := rt.SeekRow(targetRow); err != nil {
+		t.Fatalf("SeekRow: %v", err)
+	}
+
+	got, err := rt.Next()
+	if err != nil {
+		t.Fatalf("Next: %v", err)
+	}
+
+	if !reflect.DeepEqual(got, allRows[targetRow]) {
+		t.Fatalf("seek(%d) got %v, want %v", targetRow, got, allRows[targetRow])
 	}
 }
 

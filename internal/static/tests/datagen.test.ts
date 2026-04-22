@@ -373,6 +373,122 @@ describe("Dict dedup with lookupPops", () => {
   });
 });
 
+describe("Rel.scd2", () => {
+  it("emits the SCD2 shape from options", () => {
+    const s = Rel.scd2({
+      startCol: "valid_from",
+      endCol: "valid_to",
+      boundary: Expr.lit(5),
+      historicalStart: Expr.lit("1900-01-01"),
+      historicalEnd: Expr.lit("1999-12-31"),
+      currentStart: Expr.lit("2000-01-01"),
+      currentEnd: Expr.lit("9999-12-31"),
+    });
+    expect(s.startCol).toBe("valid_from");
+    expect(s.endCol).toBe("valid_to");
+    if (s.boundary?.kind.oneofKind !== "lit") throw new Error("expected lit");
+    if (s.boundary.kind.lit.value.oneofKind === "int64") {
+      expect(s.boundary.kind.lit.value.int64).toBe("5");
+    } else {
+      throw new Error("boundary should be int64");
+    }
+    expect(s.historicalStart).toBeDefined();
+    expect(s.historicalEnd).toBeDefined();
+    expect(s.currentStart).toBeDefined();
+    expect(s.currentEnd).toBeDefined();
+  });
+
+  it("allows omitting currentEnd", () => {
+    const s = Rel.scd2({
+      startCol: "s",
+      endCol: "e",
+      boundary: Expr.lit(1),
+      historicalStart: Expr.lit("h"),
+      historicalEnd: Expr.lit("h"),
+      currentStart: Expr.lit("c"),
+    });
+    expect(s.currentEnd).toBeUndefined();
+  });
+
+  it("rejects equal startCol and endCol", () => {
+    expect(() =>
+      Rel.scd2({
+        startCol: "x",
+        endCol: "x",
+        boundary: Expr.lit(0),
+        historicalStart: Expr.lit("h"),
+        historicalEnd: Expr.lit("h"),
+        currentStart: Expr.lit("c"),
+      }),
+    ).toThrow();
+  });
+});
+
+describe("Rel.table with scd2", () => {
+  it("auto-appends start_col and end_col to columnOrder", () => {
+    const s = Rel.scd2({
+      startCol: "valid_from",
+      endCol: "valid_to",
+      boundary: Expr.lit(5),
+      historicalStart: Expr.lit("1900-01-01"),
+      historicalEnd: Expr.lit("1999-12-31"),
+      currentStart: Expr.lit("2000-01-01"),
+    });
+    const spec = Rel.table("item", {
+      size: 10,
+      attrs: {
+        i_id: Attr.rowId(),
+        i_name: Expr.lit("widget"),
+      },
+      scd2: s,
+    });
+    expect(spec.source?.columnOrder).toEqual([
+      "i_id",
+      "i_name",
+      "valid_from",
+      "valid_to",
+    ]);
+    expect(spec.source?.scd2?.startCol).toBe("valid_from");
+    expect(spec.source?.scd2?.endCol).toBe("valid_to");
+  });
+
+  it("rejects a scd2 column that collides with an attr name", () => {
+    const s = Rel.scd2({
+      startCol: "a",
+      endCol: "valid_to",
+      boundary: Expr.lit(1),
+      historicalStart: Expr.lit("h"),
+      historicalEnd: Expr.lit("h"),
+      currentStart: Expr.lit("c"),
+    });
+    expect(() =>
+      Rel.table("t", {
+        size: 1,
+        attrs: { a: Expr.lit(1) },
+        scd2: s,
+      }),
+    ).toThrow();
+  });
+
+  it("honors an explicit columnOrder that mixes attrs and scd2 columns", () => {
+    const s = Rel.scd2({
+      startCol: "vf",
+      endCol: "vt",
+      boundary: Expr.lit(1),
+      historicalStart: Expr.lit("h"),
+      historicalEnd: Expr.lit("h"),
+      currentStart: Expr.lit("c"),
+    });
+    const spec = Rel.table("t", {
+      size: 1,
+      attrs: { a: Expr.lit(1), b: Expr.lit(2) },
+      columnOrder: ["vf", "a", "vt", "b"],
+      scd2: s,
+    });
+    expect(spec.source?.columnOrder).toEqual(["vf", "a", "vt", "b"]);
+  });
+});
+
 describe("std.* wrappers", () => {
   it("std.format builds a Call with std.format and the given args", () => {
     const e = std.format(Expr.lit("%02d"), Expr.lit(7));

@@ -9847,6 +9847,15 @@ export interface RelSource {
      * @generated from protobuf field: repeated stroppy.datagen.LookupPop lookup_pops = 7
      */
     lookupPops: LookupPop[];
+    /**
+     * SCD-2 row-split configuration. When set, the runtime auto-injects the
+     * named start_col / end_col values into every row based on a boundary
+     * row index: rows below boundary carry the historical pair, rows at or
+     * above carry the current pair.
+     *
+     * @generated from protobuf field: stroppy.datagen.SCD2 scd2 = 8
+     */
+    scd2?: SCD2;
 }
 /**
  * Population names the entity set a RelSource iterates and its cardinality.
@@ -11200,6 +11209,66 @@ export interface CohortLive {
     bucketKey?: Expr;
 }
 /**
+ * SCD2 splits the population's row space into a historical slice and a
+ * current slice at a compile-time boundary row index. The runtime
+ * auto-injects start_col and end_col values per row; authors list these
+ * two columns in RelSource.column_order but do not declare them in
+ * RelSource.attrs.
+ *
+ * @generated from protobuf message stroppy.datagen.SCD2
+ */
+export interface SCD2 {
+    /**
+     * Column name receiving the start-of-validity value. Must appear in
+     * the owning RelSource's column_order and must not be declared in
+     * column_order twice or as an attr name.
+     *
+     * @generated from protobuf field: string start_col = 1
+     */
+    startCol: string;
+    /**
+     * Column name receiving the end-of-validity value.
+     *
+     * @generated from protobuf field: string end_col = 2
+     */
+    endCol: string;
+    /**
+     * Boundary row index. Rows with global row_index < boundary get the
+     * historical pair; rows at or above get the current pair. The Expr
+     * must fold to a constant int64 at NewRuntime time; runtime-varying
+     * boundaries are not supported.
+     *
+     * @generated from protobuf field: stroppy.datagen.Expr boundary = 3
+     */
+    boundary?: Expr;
+    /**
+     * Start-of-validity value for the historical slice. Evaluated once
+     * at NewRuntime against an empty-scratch context; must be constant.
+     *
+     * @generated from protobuf field: stroppy.datagen.Expr historical_start = 4
+     */
+    historicalStart?: Expr;
+    /**
+     * End-of-validity value for the historical slice.
+     *
+     * @generated from protobuf field: stroppy.datagen.Expr historical_end = 5
+     */
+    historicalEnd?: Expr;
+    /**
+     * Start-of-validity value for the current slice.
+     *
+     * @generated from protobuf field: stroppy.datagen.Expr current_start = 6
+     */
+    currentStart?: Expr;
+    /**
+     * End-of-validity value for the current slice. When unset, the
+     * runtime emits nil (SQL NULL) for end_col on current rows.
+     *
+     * @generated from protobuf field: stroppy.datagen.Expr current_end = 7
+     */
+    currentEnd?: Expr;
+}
+/**
  * InsertMethod selects the driver-level protocol used to write rows.
  *
  * @generated from protobuf enum stroppy.datagen.InsertMethod
@@ -11512,7 +11581,8 @@ class RelSource$Type extends MessageType<RelSource> {
             { no: 4, name: "relationships", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Relationship },
             { no: 5, name: "iter", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 6, name: "cohorts", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Cohort },
-            { no: 7, name: "lookup_pops", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => LookupPop }
+            { no: 7, name: "lookup_pops", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => LookupPop },
+            { no: 8, name: "scd2", kind: "message", T: () => SCD2 }
         ]);
     }
     create(value?: PartialMessage<RelSource>): RelSource {
@@ -11553,6 +11623,9 @@ class RelSource$Type extends MessageType<RelSource> {
                 case /* repeated stroppy.datagen.LookupPop lookup_pops */ 7:
                     message.lookupPops.push(LookupPop.internalBinaryRead(reader, reader.uint32(), options));
                     break;
+                case /* stroppy.datagen.SCD2 scd2 */ 8:
+                    message.scd2 = SCD2.internalBinaryRead(reader, reader.uint32(), options, message.scd2);
+                    break;
                 default:
                     let u = options.readUnknownField;
                     if (u === "throw")
@@ -11586,6 +11659,9 @@ class RelSource$Type extends MessageType<RelSource> {
         /* repeated stroppy.datagen.LookupPop lookup_pops = 7; */
         for (let i = 0; i < message.lookupPops.length; i++)
             LookupPop.internalBinaryWrite(message.lookupPops[i], writer.tag(7, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.datagen.SCD2 scd2 = 8; */
+        if (message.scd2)
+            SCD2.internalBinaryWrite(message.scd2, writer.tag(8, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -14347,6 +14423,96 @@ class CohortLive$Type extends MessageType<CohortLive> {
  * @generated MessageType for protobuf message stroppy.datagen.CohortLive
  */
 export const CohortLive = new CohortLive$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class SCD2$Type extends MessageType<SCD2> {
+    constructor() {
+        super("stroppy.datagen.SCD2", [
+            { no: 1, name: "start_col", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "end_col", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "boundary", kind: "message", T: () => Expr },
+            { no: 4, name: "historical_start", kind: "message", T: () => Expr },
+            { no: 5, name: "historical_end", kind: "message", T: () => Expr },
+            { no: 6, name: "current_start", kind: "message", T: () => Expr },
+            { no: 7, name: "current_end", kind: "message", T: () => Expr }
+        ]);
+    }
+    create(value?: PartialMessage<SCD2>): SCD2 {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.startCol = "";
+        message.endCol = "";
+        if (value !== undefined)
+            reflectionMergePartial<SCD2>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: SCD2): SCD2 {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string start_col */ 1:
+                    message.startCol = reader.string();
+                    break;
+                case /* string end_col */ 2:
+                    message.endCol = reader.string();
+                    break;
+                case /* stroppy.datagen.Expr boundary */ 3:
+                    message.boundary = Expr.internalBinaryRead(reader, reader.uint32(), options, message.boundary);
+                    break;
+                case /* stroppy.datagen.Expr historical_start */ 4:
+                    message.historicalStart = Expr.internalBinaryRead(reader, reader.uint32(), options, message.historicalStart);
+                    break;
+                case /* stroppy.datagen.Expr historical_end */ 5:
+                    message.historicalEnd = Expr.internalBinaryRead(reader, reader.uint32(), options, message.historicalEnd);
+                    break;
+                case /* stroppy.datagen.Expr current_start */ 6:
+                    message.currentStart = Expr.internalBinaryRead(reader, reader.uint32(), options, message.currentStart);
+                    break;
+                case /* stroppy.datagen.Expr current_end */ 7:
+                    message.currentEnd = Expr.internalBinaryRead(reader, reader.uint32(), options, message.currentEnd);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: SCD2, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string start_col = 1; */
+        if (message.startCol !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.startCol);
+        /* string end_col = 2; */
+        if (message.endCol !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.endCol);
+        /* stroppy.datagen.Expr boundary = 3; */
+        if (message.boundary)
+            Expr.internalBinaryWrite(message.boundary, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.datagen.Expr historical_start = 4; */
+        if (message.historicalStart)
+            Expr.internalBinaryWrite(message.historicalStart, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.datagen.Expr historical_end = 5; */
+        if (message.historicalEnd)
+            Expr.internalBinaryWrite(message.historicalEnd, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.datagen.Expr current_start = 6; */
+        if (message.currentStart)
+            Expr.internalBinaryWrite(message.currentStart, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
+        /* stroppy.datagen.Expr current_end = 7; */
+        if (message.currentEnd)
+            Expr.internalBinaryWrite(message.currentEnd, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message stroppy.datagen.SCD2
+ */
+export const SCD2 = new SCD2$Type();
 
 // @generated by protobuf-ts 2.11.1 with parameter force_disable_services,force_client_none,force_exclude_all_options,keep_enum_prefix,add_pb_suffix,long_type_string
 // @generated from protobuf file "proto/stroppy/descriptor.proto" (package "stroppy", syntax proto3)

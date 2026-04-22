@@ -3,45 +3,61 @@ package runtime
 import (
 	"fmt"
 	"io"
+	"sort"
+	"strconv"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/compile"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/expr"
 	"github.com/stroppy-io/stroppy/pkg/datagen/lookup"
+	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
 )
 
 // relRuntime wires the nested-loop iteration for a single Relationship
-// with exactly two Sides, Fixed degree, and Sequential strategy. It is
-// constructed by NewRuntime when the RelSource declares a relationship
-// and is accessed through Runtime.nextRelationship.
+// with exactly two Sides. It is constructed by NewRuntime when the
+// RelSource declares a relationship and is accessed through
+// Runtime.nextRelationship.
 //
-// Iteration model:
+// Iteration model (Fixed degree):
 //
 //	for e := 0; e < outerSize; e++ {
-//	    // enter outer entity: reset block caches
 //	    for i := 0; i < innerDegree; i++ {
 //	        // global row counter = e*innerDegree + i
-//	        // evaluate inner-side attr DAG
-//	        // emit row in column_order
 //	    }
 //	}
 //
-// Seek is O(1): given a global row index g, e = g/innerDegree and
-// i = g%innerDegree. The runtime resets block caches on any non-inner
-// transition.
+// For Uniform degree the inner-line count varies per outer entity. The
+// runtime precomputes a cumulativeRows slice so Seek(row) reduces to a
+// binary search that locates (entity, lineWithinEntity) in O(log N).
 type relRuntime struct {
 	dag     *compile.DAG
 	columns []string
-	emit    []int
 
-	outerName   string
-	outerSize   int64
-	innerName   string
-	innerDegree int64
+	outerName string
+	outerSize int64
+	innerName string
+
+	// degree resolves the inner-row count for a given outer-entity
+	// index. For Fixed it is a constant; for Uniform it is a
+	// deterministic PRNG draw keyed by (rootSeed, rel-name, entityIdx).
+	degree degreeResolver
+
+	// cumulativeRows[e] is Σ_{i<=e} degree(i). Populated at construction
+	// so Seek(row) can map a global row back to (entity, line) with a
+	// binary search. Non-nil for both Fixed and Uniform degrees; Fixed
+	// uses it for consistency with the Seek path.
+	cumulativeRows []int64
+
+	// total is cumulativeRows[outerSize-1] when outerSize > 0, else 0.
+	total int64
 
 	outerBlocks *blockCache
 	innerBlocks *blockCache
 }
+
+// degreeResolver returns the inner-row count for the outer entity at
+// index entityIdx. It is pure: equal inputs produce equal outputs.
+type degreeResolver func(entityIdx int64) int64
 
 // expectedSideCount is the only relationship arity this stage supports
 // (outer + inner). Higher arity is rejected with ErrUnsupportedArity.
@@ -59,15 +75,15 @@ type relPlan struct {
 }
 
 // validateRelationship picks the single Relationship the RelSource
-// declares, resolves outer/inner sides, and enforces the Stage-C
-// scope limits (one relationship, two sides, Fixed degree, Sequential
-// strategy, outer side declared as LookupPop).
+// declares, resolves outer/inner sides, and enforces the scope limits
+// (one relationship, two sides, Sequential strategy, outer side declared
+// as LookupPop). It accepts Fixed and Uniform degrees.
 func validateRelationship(
 	source *dgproto.RelSource,
 	dag *compile.DAG,
 	columns []string,
-	emit []int,
 	registry *lookup.LookupRegistry,
+	rootSeed uint64,
 ) (*relPlan, error) {
 	rels := source.GetRelationships()
 	if len(rels) > 1 {
@@ -102,16 +118,11 @@ func validateRelationship(
 		return nil, err
 	}
 
-	innerDegree, err := extractFixedDegree(inner)
-	if err != nil {
-		return nil, err
-	}
-
 	// Outer degree is not consumed by the runtime (the outer side is
 	// iterated once per entity). It is still validated so an invalid
 	// spec fails fast rather than silently ignoring the field.
 	if outer.GetDegree() != nil {
-		if _, err := extractFixedDegree(outer); err != nil {
+		if _, err := extractDegreeResolver(outer, rel.GetName(), rootSeed); err != nil {
 			return nil, err
 		}
 	}
@@ -126,19 +137,27 @@ func validateRelationship(
 		return nil, err
 	}
 
+	innerDegree, err := extractDegreeResolver(inner, rel.GetName(), rootSeed)
+	if err != nil {
+		return nil, err
+	}
+
+	cumulative, total := precomputeCumulative(outerSize, innerDegree)
+
 	return &relPlan{
 		rt: &relRuntime{
-			dag:         dag,
-			columns:     columns,
-			emit:        emit,
-			outerName:   outer.GetPopulation(),
-			outerSize:   outerSize,
-			innerName:   inner.GetPopulation(),
-			innerDegree: innerDegree,
+			dag:            dag,
+			columns:        columns,
+			outerName:      outer.GetPopulation(),
+			outerSize:      outerSize,
+			innerName:      inner.GetPopulation(),
+			degree:         innerDegree,
+			cumulativeRows: cumulative,
+			total:          total,
 		},
 		outerPop:  outer.GetPopulation(),
 		innerPop:  inner.GetPopulation(),
-		totalRows: outerSize * innerDegree,
+		totalRows: total,
 	}, nil
 }
 
@@ -199,12 +218,13 @@ func checkStrategy(side *dgproto.Side) error {
 	}
 }
 
-// extractFixedDegree returns the Fixed count, or ErrUnsupportedDegree
-// for Uniform / missing kinds.
-func extractFixedDegree(side *dgproto.Side) (int64, error) {
+// extractDegreeResolver returns a degreeResolver for the Side. Fixed
+// degrees produce a constant-count resolver; Uniform degrees produce a
+// PRNG-keyed resolver that draws deterministically per outer entity.
+func extractDegreeResolver(side *dgproto.Side, relName string, rootSeed uint64) (degreeResolver, error) {
 	degree := side.GetDegree()
 	if degree == nil {
-		return 0, fmt.Errorf("%w: missing degree on side %q",
+		return nil, fmt.Errorf("%w: missing degree on side %q",
 			ErrUnsupportedDegree, side.GetPopulation())
 	}
 
@@ -212,18 +232,104 @@ func extractFixedDegree(side *dgproto.Side) (int64, error) {
 	case *dgproto.Degree_Fixed:
 		count := kind.Fixed.GetCount()
 		if count <= 0 {
-			return 0, fmt.Errorf("%w: fixed count %d on side %q",
+			return nil, fmt.Errorf("%w: fixed count %d on side %q",
 				ErrUnsupportedDegree, count, side.GetPopulation())
 		}
 
-		return count, nil
+		return func(_ int64) int64 { return count }, nil
 	case *dgproto.Degree_Uniform:
-		return 0, fmt.Errorf("%w: uniform on side %q (lands in Stage D5)",
-			ErrUnsupportedDegree, side.GetPopulation())
+		minV := kind.Uniform.GetMin()
+
+		maxV := kind.Uniform.GetMax()
+		if maxV < minV {
+			return nil, fmt.Errorf("%w: uniform max %d < min %d on side %q",
+				ErrUnsupportedDegree, maxV, minV, side.GetPopulation())
+		}
+
+		if minV < 0 {
+			return nil, fmt.Errorf("%w: uniform min %d < 0 on side %q",
+				ErrUnsupportedDegree, minV, side.GetPopulation())
+		}
+
+		// Uniform min==max is equivalent to Fixed; keep the PRNG call
+		// out of the hot path in that case.
+		if minV == maxV {
+			return func(_ int64) int64 { return minV }, nil
+		}
+
+		span := maxV - minV + 1
+
+		return func(entityIdx int64) int64 {
+			return uniformDegreeFor(entityIdx, minV, span, rootSeed, relName)
+		}, nil
 	default:
-		return 0, fmt.Errorf("%w: unknown degree on side %q",
+		return nil, fmt.Errorf("%w: unknown degree on side %q",
 			ErrUnsupportedDegree, side.GetPopulation())
 	}
+}
+
+// uniformDegreeFor returns the Uniform draw for one outer entity. The
+// per-entity PRNG is keyed by (rootSeed, "degree", relName, "u",
+// entityIdx) so two spec authors that reuse entity indices across
+// relationships still get independent streams.
+func uniformDegreeFor(entityIdx, minV, span int64, rootSeed uint64, relName string) int64 {
+	key := seed.Derive(
+		rootSeed,
+		"degree",
+		relName,
+		"u",
+		strconv.FormatInt(entityIdx, 10),
+	)
+	prng := seed.PRNG(key)
+
+	return minV + prng.Int64N(span)
+}
+
+// precomputeCumulative walks every outer entity, invoking degree(i),
+// and returns the cumulative-sum slice plus the grand total. The slice
+// is indexed by outer entity: cumulative[e] is Σ_{i<=e} degree(i).
+// Callers use it both for size reporting (total == cumulative[size-1])
+// and for Seek (binary search locates the entity containing a given
+// global row index).
+//
+// Cost is O(outerSize). For very large outer populations this is
+// non-trivial but is paid once at NewRuntime and amortizes across every
+// row emitted thereafter.
+func precomputeCumulative(outerSize int64, degree degreeResolver) (cumulative []int64, total int64) {
+	if outerSize <= 0 {
+		return nil, 0
+	}
+
+	cumulative = make([]int64, outerSize)
+
+	for i := range outerSize {
+		total += degree(i)
+		cumulative[i] = total
+	}
+
+	return cumulative, total
+}
+
+// locateRow maps a global row index to (entityIdx, lineIdx) by binary
+// searching cumulativeRows. Pre: 0 <= row < total.
+func (r *relRuntime) locateRow(row int64) (entityIdx, lineIdx int64) {
+	// sort.Search finds the smallest index i such that cumulativeRows[i]
+	// > row; that index is the outer entity hosting row. The line within
+	// the entity is row - (cumulativeRows[i] - degree(i)).
+	idx := sort.Search(len(r.cumulativeRows), func(i int) bool {
+		return r.cumulativeRows[i] > row
+	})
+
+	entityIdx = int64(idx)
+
+	var entityStart int64
+	if entityIdx > 0 {
+		entityStart = r.cumulativeRows[entityIdx-1]
+	}
+
+	lineIdx = row - entityStart
+
+	return entityIdx, lineIdx
 }
 
 // attachBlockCaches wires blockCaches for both sides. Each cache's
@@ -254,10 +360,10 @@ func (r *relRuntime) attachBlockCaches(
 	return nil
 }
 
-// totalRows returns `outerSize × innerDegree`, the number of rows the
-// relationship will emit from SeekRow(0).
+// totalRows returns the precomputed grand total: Σ degree(e) over every
+// outer entity. Equals outerSize × innerDegree for Fixed degrees.
 func (r *relRuntime) totalRows() int64 {
-	return r.outerSize * r.innerDegree
+	return r.total
 }
 
 // nextRelationship advances the Runtime by one inner row. It refreshes
@@ -270,8 +376,7 @@ func (rt *Runtime) nextRelationship() ([]any, error) {
 		return nil, io.EOF
 	}
 
-	entityIdx := rt.row / rel.innerDegree
-	lineIdx := rt.row % rel.innerDegree
+	entityIdx, lineIdx := rel.locateRow(rt.row)
 
 	// Refresh outer-side block cache when entering a new outer entity.
 	// The inner-side cache resets every row (degenerate by spec).
@@ -309,10 +414,7 @@ func (rt *Runtime) nextRelationship() ([]any, error) {
 		rt.ctx.scratch[name] = value
 	}
 
-	out := make([]any, len(rel.emit))
-	for idx, pos := range rel.emit {
-		out[idx] = rt.ctx.scratch[rel.dag.Order[pos].GetName()]
-	}
+	out := rt.assembleRow(rt.row)
 
 	rt.row++
 

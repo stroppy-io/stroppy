@@ -105,6 +105,7 @@
     - [RelSource](#stroppy-datagen-RelSource)
     - [Relationship](#stroppy-datagen-Relationship)
     - [RowIndex](#stroppy-datagen-RowIndex)
+    - [SCD2](#stroppy-datagen-SCD2)
     - [Side](#stroppy-datagen-Side)
     - [Strategy](#stroppy-datagen-Strategy)
     - [StrategyEquitable](#stroppy-datagen-StrategyEquitable)
@@ -1751,6 +1752,7 @@ RelSource is the relational descriptor for the rows a spec emits.
 | iter | [string](#string) |  | Name of the relationship in relationships that drives iteration for this source. Empty when the source iterates its own population directly. |
 | cohorts | [Cohort](#stroppy-datagen-Cohort) | repeated | Named cohort schedules selecting entity slots per bucket key. |
 | lookup_pops | [LookupPop](#stroppy-datagen-LookupPop) | repeated | Sibling populations referenced via Lookup but never iterated. |
+| scd2 | [SCD2](#stroppy-datagen-SCD2) |  | SCD-2 row-split configuration. When set, the runtime auto-injects the named start_col / end_col values into every row based on a boundary row index: rows below boundary carry the historical pair, rows at or above carry the current pair. |
 
 
 
@@ -1782,6 +1784,31 @@ RowIndex produces a monotonically increasing integer tied to a row position.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | kind | [RowIndex.Kind](#stroppy-datagen-RowIndex-Kind) |  | Which row counter to emit. |
+
+
+
+
+
+
+<a name="stroppy-datagen-SCD2"></a>
+
+### SCD2
+SCD2 splits the population&#39;s row space into a historical slice and a
+current slice at a compile-time boundary row index. The runtime
+auto-injects start_col and end_col values per row; authors list these
+two columns in RelSource.column_order but do not declare them in
+RelSource.attrs.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| start_col | [string](#string) |  | Column name receiving the start-of-validity value. Must appear in the owning RelSource&#39;s column_order and must not be declared in column_order twice or as an attr name. |
+| end_col | [string](#string) |  | Column name receiving the end-of-validity value. |
+| boundary | [Expr](#stroppy-datagen-Expr) |  | Boundary row index. Rows with global row_index &lt; boundary get the historical pair; rows at or above get the current pair. The Expr must fold to a constant int64 at NewRuntime time; runtime-varying boundaries are not supported. |
+| historical_start | [Expr](#stroppy-datagen-Expr) |  | Start-of-validity value for the historical slice. Evaluated once at NewRuntime against an empty-scratch context; must be constant. |
+| historical_end | [Expr](#stroppy-datagen-Expr) |  | End-of-validity value for the historical slice. |
+| current_start | [Expr](#stroppy-datagen-Expr) |  | Start-of-validity value for the current slice. |
+| current_end | [Expr](#stroppy-datagen-Expr) |  | End-of-validity value for the current slice. When unset, the runtime emits nil (SQL NULL) for end_col on current rows. |
 
 
 

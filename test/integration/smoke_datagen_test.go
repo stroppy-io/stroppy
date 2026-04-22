@@ -769,3 +769,287 @@ func TestDatagenSmokeWithCohort(t *testing.T) {
 		t.Fatalf("found %d rows outside [0, 9], want 0", outOfRange)
 	}
 }
+
+// --- D4: Uniform degree on an order→lineitem style parent/child load -----
+
+// uniformChildColumns lists the emit order for the uniform-degree
+// integration table.
+var uniformChildColumns = []string{"child_id", "parent_id", "line_no"}
+
+// uniformChildSpec builds an InsertSpec exercising a Uniform(1,4)
+// degree on a 20-entity parent. Each emitted row carries the parent's
+// entity index, the line index within the parent, and a 1-based row id.
+func uniformChildSpec() *dgproto.InsertSpec {
+	parentLookup := &dgproto.LookupPop{
+		Population:  &dgproto.Population{Name: "parents", Size: 20, Pure: true},
+		Attrs:       []*dgproto.Attr{attrOf("p_id", rowIndexOf())},
+		ColumnOrder: []string{"p_id"},
+	}
+
+	entityExpr := &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{
+		Kind: dgproto.RowIndex_ENTITY,
+	}}}
+	lineExpr := &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{
+		Kind: dgproto.RowIndex_LINE,
+	}}}
+	globalExpr := &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{
+		Kind: dgproto.RowIndex_GLOBAL,
+	}}}
+
+	innerAttrs := []*dgproto.Attr{
+		attrOf("child_id", binOpOf(dgproto.BinOp_ADD, globalExpr, litOf(int64(1)))),
+		attrOf("parent_id", entityExpr),
+		attrOf("line_no", lineExpr),
+	}
+
+	sides := []*dgproto.Side{
+		{
+			Population: "parents",
+			Degree: &dgproto.Degree{Kind: &dgproto.Degree_Fixed{
+				Fixed: &dgproto.DegreeFixed{Count: 1},
+			}},
+			Strategy: &dgproto.Strategy{Kind: &dgproto.Strategy_Sequential{
+				Sequential: &dgproto.StrategySequential{},
+			}},
+		},
+		{
+			Population: "children",
+			Degree: &dgproto.Degree{Kind: &dgproto.Degree_Uniform{
+				Uniform: &dgproto.DegreeUniform{Min: 1, Max: 4},
+			}},
+			Strategy: &dgproto.Strategy{Kind: &dgproto.Strategy_Sequential{
+				Sequential: &dgproto.StrategySequential{},
+			}},
+		},
+	}
+
+	return &dgproto.InsertSpec{
+		Table: "uniform_child",
+		Seed:  0xBEEFF00D,
+		Source: &dgproto.RelSource{
+			Population:  &dgproto.Population{Name: "children", Size: 1},
+			Attrs:       innerAttrs,
+			ColumnOrder: uniformChildColumns,
+			LookupPops:  []*dgproto.LookupPop{parentLookup},
+			Relationships: []*dgproto.Relationship{{
+				Name:  "rel",
+				Sides: sides,
+			}},
+		},
+	}
+}
+
+func createUniformChildTable(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+
+	const ddl = `CREATE TABLE uniform_child (
+		child_id int8 PRIMARY KEY,
+		parent_id int8,
+		line_no int8
+	)`
+	if _, err := pool.Exec(context.Background(), ddl); err != nil {
+		t.Fatalf("create uniform_child: %v", err)
+	}
+}
+
+func copyUniformChildRows(t *testing.T, pool *pgxpool.Pool, rows [][]any) int64 {
+	t.Helper()
+
+	n, err := pool.CopyFrom(
+		context.Background(),
+		pgx.Identifier{"uniform_child"},
+		uniformChildColumns,
+		pgx.CopyFromRows(rows),
+	)
+	if err != nil {
+		t.Fatalf("CopyFrom uniform_child: %v", err)
+	}
+
+	return n
+}
+
+// TestDatagenSmokeWithVariableDegree proves the Uniform(1,4) degree
+// emits per-parent counts in [1, 4], matches the PRNG-derived draw
+// profile across runs, and loads through a real PG unaffected.
+func TestDatagenSmokeWithVariableDegree(t *testing.T) {
+	pool := NewTmpfsPG(t)
+	ResetSchema(t, pool)
+	createUniformChildTable(t, pool)
+
+	specA := uniformChildSpec()
+	rtA, err := runtime.NewRuntime(specA)
+	if err != nil {
+		t.Fatalf("NewRuntime A: %v", err)
+	}
+	rowsA := drainRuntime(t, rtA)
+
+	specB := uniformChildSpec()
+	rtB, err := runtime.NewRuntime(specB)
+	if err != nil {
+		t.Fatalf("NewRuntime B: %v", err)
+	}
+	rowsB := drainRuntime(t, rtB)
+
+	if !reflect.DeepEqual(rowsA, rowsB) {
+		t.Fatalf("uniform-degree spec is non-deterministic")
+	}
+
+	total := int64(len(rowsA))
+	if total < 20 || total > 80 {
+		t.Fatalf("total rows %d outside [20, 80]", total)
+	}
+
+	if got := copyUniformChildRows(t, pool, rowsA); got != total {
+		t.Fatalf("CopyFrom inserted %d rows, want %d", got, total)
+	}
+
+	ctx := context.Background()
+
+	var parents int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(DISTINCT parent_id) FROM uniform_child`).Scan(&parents); err != nil {
+		t.Fatalf("distinct parents: %v", err)
+	}
+	if parents != 20 {
+		t.Fatalf("distinct parents = %d, want 20", parents)
+	}
+
+	var minCount, maxCount int64
+	if err := pool.QueryRow(ctx, `
+		SELECT MIN(c), MAX(c) FROM (
+			SELECT COUNT(*) AS c FROM uniform_child GROUP BY parent_id
+		) AS counts`).Scan(&minCount, &maxCount); err != nil {
+		t.Fatalf("per-parent counts: %v", err)
+	}
+	if minCount < 1 || maxCount > 4 {
+		t.Fatalf("per-parent count range [%d,%d] exceeds [1, 4]", minCount, maxCount)
+	}
+
+	// Verify child_id densely covers [1, total]: no gaps, no duplicates.
+	var distinct int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(DISTINCT child_id) FROM uniform_child`).Scan(&distinct); err != nil {
+		t.Fatalf("distinct child_id: %v", err)
+	}
+	if distinct != total {
+		t.Fatalf("distinct child_id = %d, want %d", distinct, total)
+	}
+}
+
+// --- D5: SCD-2 row-split on a flat population ------------------------------
+
+var scd2Columns = []string{"id", "valid_from", "valid_to"}
+
+func scd2SmokeSpec() *dgproto.InsertSpec {
+	attrs := []*dgproto.Attr{
+		attrOf("id", binOpOf(dgproto.BinOp_ADD, rowIndexOf(), litOf(int64(1)))),
+	}
+
+	cfg := &dgproto.SCD2{
+		StartCol:        "valid_from",
+		EndCol:          "valid_to",
+		Boundary:        litOf(int64(5)),
+		HistoricalStart: litOf("1900-01-01"),
+		HistoricalEnd:   litOf("1999-12-31"),
+		CurrentStart:    litOf("2000-01-01"),
+		CurrentEnd:      litOf("9999-12-31"),
+	}
+
+	return &dgproto.InsertSpec{
+		Table: "smoke_scd2",
+		Seed:  0xC0D1CE,
+		Source: &dgproto.RelSource{
+			Population:  &dgproto.Population{Name: "smoke_scd2", Size: 10},
+			Attrs:       attrs,
+			ColumnOrder: scd2Columns,
+			Scd2:        cfg,
+		},
+	}
+}
+
+func createSCD2Table(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+
+	const ddl = `CREATE TABLE smoke_scd2 (
+		id int8 PRIMARY KEY,
+		valid_from text,
+		valid_to text
+	)`
+	if _, err := pool.Exec(context.Background(), ddl); err != nil {
+		t.Fatalf("create smoke_scd2: %v", err)
+	}
+}
+
+func copySCD2Rows(t *testing.T, pool *pgxpool.Pool, rows [][]any) int64 {
+	t.Helper()
+
+	n, err := pool.CopyFrom(
+		context.Background(),
+		pgx.Identifier{"smoke_scd2"},
+		scd2Columns,
+		pgx.CopyFromRows(rows),
+	)
+	if err != nil {
+		t.Fatalf("CopyFrom smoke_scd2: %v", err)
+	}
+
+	return n
+}
+
+// TestDatagenSmokeWithSCD2 loads a 10-row table with boundary=5 and
+// verifies both slices (historical vs current) appear with the expected
+// row counts and start/end pair values.
+func TestDatagenSmokeWithSCD2(t *testing.T) {
+	pool := NewTmpfsPG(t)
+	ResetSchema(t, pool)
+	createSCD2Table(t, pool)
+
+	spec := scd2SmokeSpec()
+	rt, err := runtime.NewRuntime(spec)
+	if err != nil {
+		t.Fatalf("NewRuntime: %v", err)
+	}
+
+	rows := drainRuntime(t, rt)
+	if len(rows) != 10 {
+		t.Fatalf("emitted %d rows, want 10", len(rows))
+	}
+
+	if got := copySCD2Rows(t, pool, rows); got != 10 {
+		t.Fatalf("CopyFrom inserted %d rows, want 10", got)
+	}
+
+	ctx := context.Background()
+
+	// Historical slice: id in [1, 5]; 5 rows with valid_from=1900-01-01.
+	var hist int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM smoke_scd2
+		  WHERE valid_from = '1900-01-01' AND valid_to = '1999-12-31'`).Scan(&hist); err != nil {
+		t.Fatalf("historical count: %v", err)
+	}
+	if hist != 5 {
+		t.Fatalf("historical count = %d, want 5", hist)
+	}
+
+	// Current slice: id in [6, 10]; 5 rows with valid_from=2000-01-01.
+	var curr int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM smoke_scd2
+		  WHERE valid_from = '2000-01-01' AND valid_to = '9999-12-31'`).Scan(&curr); err != nil {
+		t.Fatalf("current count: %v", err)
+	}
+	if curr != 5 {
+		t.Fatalf("current count = %d, want 5", curr)
+	}
+
+	// Boundary row id=6 is the first current row.
+	var firstCurrent int64
+	if err := pool.QueryRow(ctx,
+		`SELECT MIN(id) FROM smoke_scd2 WHERE valid_from = '2000-01-01'`).Scan(&firstCurrent); err != nil {
+		t.Fatalf("first current id: %v", err)
+	}
+	if firstCurrent != 6 {
+		t.Fatalf("first current id = %d, want 6", firstCurrent)
+	}
+}

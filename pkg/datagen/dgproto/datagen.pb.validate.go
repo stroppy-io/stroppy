@@ -826,6 +826,35 @@ func (m *RelSource) validate(all bool) error {
 
 	}
 
+	if all {
+		switch v := interface{}(m.GetScd2()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RelSourceValidationError{
+					field:  "Scd2",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RelSourceValidationError{
+					field:  "Scd2",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetScd2()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RelSourceValidationError{
+				field:  "Scd2",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return RelSourceMultiError(errors)
 	}
@@ -8409,3 +8438,312 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = CohortLiveValidationError{}
+
+// Validate checks the field values on SCD2 with the rules defined in the proto
+// definition for this message. If any rules are violated, the first error
+// encountered is returned, or nil if there are no violations.
+func (m *SCD2) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SCD2 with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in SCD2MultiError, or nil if none found.
+func (m *SCD2) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SCD2) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetStartCol()) < 1 {
+		err := SCD2ValidationError{
+			field:  "StartCol",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetEndCol()) < 1 {
+		err := SCD2ValidationError{
+			field:  "EndCol",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetBoundary() == nil {
+		err := SCD2ValidationError{
+			field:  "Boundary",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetBoundary()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SCD2ValidationError{
+					field:  "Boundary",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SCD2ValidationError{
+					field:  "Boundary",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetBoundary()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SCD2ValidationError{
+				field:  "Boundary",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetHistoricalStart() == nil {
+		err := SCD2ValidationError{
+			field:  "HistoricalStart",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetHistoricalStart()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SCD2ValidationError{
+					field:  "HistoricalStart",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SCD2ValidationError{
+					field:  "HistoricalStart",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetHistoricalStart()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SCD2ValidationError{
+				field:  "HistoricalStart",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetHistoricalEnd() == nil {
+		err := SCD2ValidationError{
+			field:  "HistoricalEnd",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetHistoricalEnd()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SCD2ValidationError{
+					field:  "HistoricalEnd",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SCD2ValidationError{
+					field:  "HistoricalEnd",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetHistoricalEnd()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SCD2ValidationError{
+				field:  "HistoricalEnd",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetCurrentStart() == nil {
+		err := SCD2ValidationError{
+			field:  "CurrentStart",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetCurrentStart()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SCD2ValidationError{
+					field:  "CurrentStart",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SCD2ValidationError{
+					field:  "CurrentStart",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCurrentStart()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SCD2ValidationError{
+				field:  "CurrentStart",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetCurrentEnd()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SCD2ValidationError{
+					field:  "CurrentEnd",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SCD2ValidationError{
+					field:  "CurrentEnd",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCurrentEnd()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SCD2ValidationError{
+				field:  "CurrentEnd",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return SCD2MultiError(errors)
+	}
+
+	return nil
+}
+
+// SCD2MultiError is an error wrapping multiple validation errors returned by
+// SCD2.ValidateAll() if the designated constraints aren't met.
+type SCD2MultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SCD2MultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SCD2MultiError) AllErrors() []error { return m }
+
+// SCD2ValidationError is the validation error returned by SCD2.Validate if the
+// designated constraints aren't met.
+type SCD2ValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SCD2ValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SCD2ValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SCD2ValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SCD2ValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SCD2ValidationError) ErrorName() string { return "SCD2ValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SCD2ValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSCD2.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SCD2ValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SCD2ValidationError{}

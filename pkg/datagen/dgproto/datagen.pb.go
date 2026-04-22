@@ -514,7 +514,12 @@ type RelSource struct {
 	// Named cohort schedules selecting entity slots per bucket key.
 	Cohorts []*Cohort `protobuf:"bytes,6,rep,name=cohorts,proto3" json:"cohorts,omitempty"`
 	// Sibling populations referenced via Lookup but never iterated.
-	LookupPops    []*LookupPop `protobuf:"bytes,7,rep,name=lookup_pops,json=lookupPops,proto3" json:"lookup_pops,omitempty"`
+	LookupPops []*LookupPop `protobuf:"bytes,7,rep,name=lookup_pops,json=lookupPops,proto3" json:"lookup_pops,omitempty"`
+	// SCD-2 row-split configuration. When set, the runtime auto-injects the
+	// named start_col / end_col values into every row based on a boundary
+	// row index: rows below boundary carry the historical pair, rows at or
+	// above carry the current pair.
+	Scd2          *SCD2 `protobuf:"bytes,8,opt,name=scd2,proto3" json:"scd2,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -594,6 +599,13 @@ func (x *RelSource) GetCohorts() []*Cohort {
 func (x *RelSource) GetLookupPops() []*LookupPop {
 	if x != nil {
 		return x.LookupPops
+	}
+	return nil
+}
+
+func (x *RelSource) GetScd2() *SCD2 {
+	if x != nil {
+		return x.Scd2
 	}
 	return nil
 }
@@ -3749,6 +3761,117 @@ func (x *CohortLive) GetBucketKey() *Expr {
 	return nil
 }
 
+// SCD2 splits the population's row space into a historical slice and a
+// current slice at a compile-time boundary row index. The runtime
+// auto-injects start_col and end_col values per row; authors list these
+// two columns in RelSource.column_order but do not declare them in
+// RelSource.attrs.
+type SCD2 struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Column name receiving the start-of-validity value. Must appear in
+	// the owning RelSource's column_order and must not be declared in
+	// column_order twice or as an attr name.
+	StartCol string `protobuf:"bytes,1,opt,name=start_col,json=startCol,proto3" json:"start_col,omitempty"`
+	// Column name receiving the end-of-validity value.
+	EndCol string `protobuf:"bytes,2,opt,name=end_col,json=endCol,proto3" json:"end_col,omitempty"`
+	// Boundary row index. Rows with global row_index < boundary get the
+	// historical pair; rows at or above get the current pair. The Expr
+	// must fold to a constant int64 at NewRuntime time; runtime-varying
+	// boundaries are not supported.
+	Boundary *Expr `protobuf:"bytes,3,opt,name=boundary,proto3" json:"boundary,omitempty"`
+	// Start-of-validity value for the historical slice. Evaluated once
+	// at NewRuntime against an empty-scratch context; must be constant.
+	HistoricalStart *Expr `protobuf:"bytes,4,opt,name=historical_start,json=historicalStart,proto3" json:"historical_start,omitempty"`
+	// End-of-validity value for the historical slice.
+	HistoricalEnd *Expr `protobuf:"bytes,5,opt,name=historical_end,json=historicalEnd,proto3" json:"historical_end,omitempty"`
+	// Start-of-validity value for the current slice.
+	CurrentStart *Expr `protobuf:"bytes,6,opt,name=current_start,json=currentStart,proto3" json:"current_start,omitempty"`
+	// End-of-validity value for the current slice. When unset, the
+	// runtime emits nil (SQL NULL) for end_col on current rows.
+	CurrentEnd    *Expr `protobuf:"bytes,7,opt,name=current_end,json=currentEnd,proto3" json:"current_end,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SCD2) Reset() {
+	*x = SCD2{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SCD2) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SCD2) ProtoMessage() {}
+
+func (x *SCD2) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SCD2.ProtoReflect.Descriptor instead.
+func (*SCD2) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *SCD2) GetStartCol() string {
+	if x != nil {
+		return x.StartCol
+	}
+	return ""
+}
+
+func (x *SCD2) GetEndCol() string {
+	if x != nil {
+		return x.EndCol
+	}
+	return ""
+}
+
+func (x *SCD2) GetBoundary() *Expr {
+	if x != nil {
+		return x.Boundary
+	}
+	return nil
+}
+
+func (x *SCD2) GetHistoricalStart() *Expr {
+	if x != nil {
+		return x.HistoricalStart
+	}
+	return nil
+}
+
+func (x *SCD2) GetHistoricalEnd() *Expr {
+	if x != nil {
+		return x.HistoricalEnd
+	}
+	return nil
+}
+
+func (x *SCD2) GetCurrentStart() *Expr {
+	if x != nil {
+		return x.CurrentStart
+	}
+	return nil
+}
+
+func (x *SCD2) GetCurrentEnd() *Expr {
+	if x != nil {
+		return x.CurrentEnd
+	}
+	return nil
+}
+
 var File_proto_stroppy_datagen_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_datagen_proto_rawDesc = "" +
@@ -3775,7 +3898,7 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x04rows\x18\x03 \x03(\v2\x18.stroppy.datagen.DictRowR\x04rows\";\n" +
 	"\aDictRow\x12\x16\n" +
 	"\x06values\x18\x01 \x03(\tR\x06values\x12\x18\n" +
-	"\aweights\x18\x02 \x03(\x03R\aweights\"\xff\x02\n" +
+	"\aweights\x18\x02 \x03(\x03R\aweights\"\xaa\x03\n" +
 	"\tRelSource\x12E\n" +
 	"\n" +
 	"population\x18\x01 \x01(\v2\x1b.stroppy.datagen.PopulationB\b\xfaB\x05\x8a\x01\x02\x10\x01R\n" +
@@ -3786,7 +3909,8 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x04iter\x18\x05 \x01(\tR\x04iter\x121\n" +
 	"\acohorts\x18\x06 \x03(\v2\x17.stroppy.datagen.CohortR\acohorts\x12;\n" +
 	"\vlookup_pops\x18\a \x03(\v2\x1a.stroppy.datagen.LookupPopR\n" +
-	"lookupPops\"Z\n" +
+	"lookupPops\x12)\n" +
+	"\x04scd2\x18\b \x01(\v2\x15.stroppy.datagen.SCD2R\x04scd2\"Z\n" +
 	"\n" +
 	"Population\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12\x1b\n" +
@@ -4026,7 +4150,16 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"CohortLive\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x124\n" +
 	"\n" +
-	"bucket_key\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprR\tbucketKey*;\n" +
+	"bucket_key\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprR\tbucketKey\"\x9d\x03\n" +
+	"\x04SCD2\x12$\n" +
+	"\tstart_col\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\bstartCol\x12 \n" +
+	"\aend_col\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x06endCol\x12;\n" +
+	"\bboundary\x18\x03 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\bboundary\x12J\n" +
+	"\x10historical_start\x18\x04 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x0fhistoricalStart\x12F\n" +
+	"\x0ehistorical_end\x18\x05 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\rhistoricalEnd\x12D\n" +
+	"\rcurrent_start\x18\x06 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\fcurrentStart\x126\n" +
+	"\vcurrent_end\x18\a \x01(\v2\x15.stroppy.datagen.ExprR\n" +
+	"currentEnd*;\n" +
 	"\fInsertMethod\x12\x0f\n" +
 	"\vPLAIN_QUERY\x10\x00\x12\x0e\n" +
 	"\n" +
@@ -4047,7 +4180,7 @@ func file_proto_stroppy_datagen_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_stroppy_datagen_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_proto_stroppy_datagen_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
+var file_proto_stroppy_datagen_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
 var file_proto_stroppy_datagen_proto_goTypes = []any{
 	(InsertMethod)(0),             // 0: stroppy.datagen.InsertMethod
 	(RowIndex_Kind)(0),            // 1: stroppy.datagen.RowIndex.Kind
@@ -4100,97 +4233,104 @@ var file_proto_stroppy_datagen_proto_goTypes = []any{
 	(*Cohort)(nil),                // 48: stroppy.datagen.Cohort
 	(*CohortDraw)(nil),            // 49: stroppy.datagen.CohortDraw
 	(*CohortLive)(nil),            // 50: stroppy.datagen.CohortLive
-	nil,                           // 51: stroppy.datagen.InsertSpec.DictsEntry
-	(*timestamppb.Timestamp)(nil), // 52: google.protobuf.Timestamp
+	(*SCD2)(nil),                  // 51: stroppy.datagen.SCD2
+	nil,                           // 52: stroppy.datagen.InsertSpec.DictsEntry
+	(*timestamppb.Timestamp)(nil), // 53: google.protobuf.Timestamp
 }
 var file_proto_stroppy_datagen_proto_depIdxs = []int32{
 	0,  // 0: stroppy.datagen.InsertSpec.method:type_name -> stroppy.datagen.InsertMethod
 	4,  // 1: stroppy.datagen.InsertSpec.parallelism:type_name -> stroppy.datagen.Parallelism
 	7,  // 2: stroppy.datagen.InsertSpec.source:type_name -> stroppy.datagen.RelSource
-	51, // 3: stroppy.datagen.InsertSpec.dicts:type_name -> stroppy.datagen.InsertSpec.DictsEntry
+	52, // 3: stroppy.datagen.InsertSpec.dicts:type_name -> stroppy.datagen.InsertSpec.DictsEntry
 	6,  // 4: stroppy.datagen.Dict.rows:type_name -> stroppy.datagen.DictRow
 	8,  // 5: stroppy.datagen.RelSource.population:type_name -> stroppy.datagen.Population
 	9,  // 6: stroppy.datagen.RelSource.attrs:type_name -> stroppy.datagen.Attr
 	19, // 7: stroppy.datagen.RelSource.relationships:type_name -> stroppy.datagen.Relationship
 	48, // 8: stroppy.datagen.RelSource.cohorts:type_name -> stroppy.datagen.Cohort
 	31, // 9: stroppy.datagen.RelSource.lookup_pops:type_name -> stroppy.datagen.LookupPop
-	11, // 10: stroppy.datagen.Attr.expr:type_name -> stroppy.datagen.Expr
-	10, // 11: stroppy.datagen.Attr.null:type_name -> stroppy.datagen.Null
-	12, // 12: stroppy.datagen.Expr.col:type_name -> stroppy.datagen.ColRef
-	13, // 13: stroppy.datagen.Expr.row_index:type_name -> stroppy.datagen.RowIndex
-	14, // 14: stroppy.datagen.Expr.lit:type_name -> stroppy.datagen.Literal
-	15, // 15: stroppy.datagen.Expr.bin_op:type_name -> stroppy.datagen.BinOp
-	16, // 16: stroppy.datagen.Expr.call:type_name -> stroppy.datagen.Call
-	17, // 17: stroppy.datagen.Expr.if_:type_name -> stroppy.datagen.If
-	18, // 18: stroppy.datagen.Expr.dict_at:type_name -> stroppy.datagen.DictAt
-	29, // 19: stroppy.datagen.Expr.block_ref:type_name -> stroppy.datagen.BlockRef
-	30, // 20: stroppy.datagen.Expr.lookup:type_name -> stroppy.datagen.Lookup
-	32, // 21: stroppy.datagen.Expr.stream_draw:type_name -> stroppy.datagen.StreamDraw
-	46, // 22: stroppy.datagen.Expr.choose:type_name -> stroppy.datagen.Choose
-	49, // 23: stroppy.datagen.Expr.cohort_draw:type_name -> stroppy.datagen.CohortDraw
-	50, // 24: stroppy.datagen.Expr.cohort_live:type_name -> stroppy.datagen.CohortLive
-	1,  // 25: stroppy.datagen.RowIndex.kind:type_name -> stroppy.datagen.RowIndex.Kind
-	52, // 26: stroppy.datagen.Literal.timestamp:type_name -> google.protobuf.Timestamp
-	2,  // 27: stroppy.datagen.BinOp.op:type_name -> stroppy.datagen.BinOp.Op
-	11, // 28: stroppy.datagen.BinOp.a:type_name -> stroppy.datagen.Expr
-	11, // 29: stroppy.datagen.BinOp.b:type_name -> stroppy.datagen.Expr
-	11, // 30: stroppy.datagen.Call.args:type_name -> stroppy.datagen.Expr
-	11, // 31: stroppy.datagen.If.cond:type_name -> stroppy.datagen.Expr
-	11, // 32: stroppy.datagen.If.then:type_name -> stroppy.datagen.Expr
-	11, // 33: stroppy.datagen.If.else_:type_name -> stroppy.datagen.Expr
-	11, // 34: stroppy.datagen.DictAt.index:type_name -> stroppy.datagen.Expr
-	20, // 35: stroppy.datagen.Relationship.sides:type_name -> stroppy.datagen.Side
-	21, // 36: stroppy.datagen.Side.degree:type_name -> stroppy.datagen.Degree
-	24, // 37: stroppy.datagen.Side.strategy:type_name -> stroppy.datagen.Strategy
-	28, // 38: stroppy.datagen.Side.block_slots:type_name -> stroppy.datagen.BlockSlot
-	22, // 39: stroppy.datagen.Degree.fixed:type_name -> stroppy.datagen.DegreeFixed
-	23, // 40: stroppy.datagen.Degree.uniform:type_name -> stroppy.datagen.DegreeUniform
-	25, // 41: stroppy.datagen.Strategy.hash:type_name -> stroppy.datagen.StrategyHash
-	26, // 42: stroppy.datagen.Strategy.sequential:type_name -> stroppy.datagen.StrategySequential
-	27, // 43: stroppy.datagen.Strategy.equitable:type_name -> stroppy.datagen.StrategyEquitable
-	11, // 44: stroppy.datagen.BlockSlot.expr:type_name -> stroppy.datagen.Expr
-	11, // 45: stroppy.datagen.Lookup.entity_index:type_name -> stroppy.datagen.Expr
-	8,  // 46: stroppy.datagen.LookupPop.population:type_name -> stroppy.datagen.Population
-	9,  // 47: stroppy.datagen.LookupPop.attrs:type_name -> stroppy.datagen.Attr
-	33, // 48: stroppy.datagen.StreamDraw.int_uniform:type_name -> stroppy.datagen.DrawIntUniform
-	34, // 49: stroppy.datagen.StreamDraw.float_uniform:type_name -> stroppy.datagen.DrawFloatUniform
-	35, // 50: stroppy.datagen.StreamDraw.normal:type_name -> stroppy.datagen.DrawNormal
-	36, // 51: stroppy.datagen.StreamDraw.zipf:type_name -> stroppy.datagen.DrawZipf
-	37, // 52: stroppy.datagen.StreamDraw.nurand:type_name -> stroppy.datagen.DrawNURand
-	38, // 53: stroppy.datagen.StreamDraw.bernoulli:type_name -> stroppy.datagen.DrawBernoulli
-	39, // 54: stroppy.datagen.StreamDraw.dict:type_name -> stroppy.datagen.DrawDict
-	40, // 55: stroppy.datagen.StreamDraw.joint:type_name -> stroppy.datagen.DrawJoint
-	41, // 56: stroppy.datagen.StreamDraw.date:type_name -> stroppy.datagen.DrawDate
-	42, // 57: stroppy.datagen.StreamDraw.decimal:type_name -> stroppy.datagen.DrawDecimal
-	43, // 58: stroppy.datagen.StreamDraw.ascii:type_name -> stroppy.datagen.DrawAscii
-	45, // 59: stroppy.datagen.StreamDraw.phrase:type_name -> stroppy.datagen.DrawPhrase
-	11, // 60: stroppy.datagen.DrawIntUniform.min:type_name -> stroppy.datagen.Expr
-	11, // 61: stroppy.datagen.DrawIntUniform.max:type_name -> stroppy.datagen.Expr
-	11, // 62: stroppy.datagen.DrawFloatUniform.min:type_name -> stroppy.datagen.Expr
-	11, // 63: stroppy.datagen.DrawFloatUniform.max:type_name -> stroppy.datagen.Expr
-	11, // 64: stroppy.datagen.DrawNormal.min:type_name -> stroppy.datagen.Expr
-	11, // 65: stroppy.datagen.DrawNormal.max:type_name -> stroppy.datagen.Expr
-	11, // 66: stroppy.datagen.DrawZipf.min:type_name -> stroppy.datagen.Expr
-	11, // 67: stroppy.datagen.DrawZipf.max:type_name -> stroppy.datagen.Expr
-	11, // 68: stroppy.datagen.DrawDecimal.min:type_name -> stroppy.datagen.Expr
-	11, // 69: stroppy.datagen.DrawDecimal.max:type_name -> stroppy.datagen.Expr
-	11, // 70: stroppy.datagen.DrawAscii.min_len:type_name -> stroppy.datagen.Expr
-	11, // 71: stroppy.datagen.DrawAscii.max_len:type_name -> stroppy.datagen.Expr
-	44, // 72: stroppy.datagen.DrawAscii.alphabet:type_name -> stroppy.datagen.AsciiRange
-	11, // 73: stroppy.datagen.DrawPhrase.min_words:type_name -> stroppy.datagen.Expr
-	11, // 74: stroppy.datagen.DrawPhrase.max_words:type_name -> stroppy.datagen.Expr
-	47, // 75: stroppy.datagen.Choose.branches:type_name -> stroppy.datagen.ChooseBranch
-	11, // 76: stroppy.datagen.ChooseBranch.expr:type_name -> stroppy.datagen.Expr
-	11, // 77: stroppy.datagen.Cohort.bucket_key:type_name -> stroppy.datagen.Expr
-	11, // 78: stroppy.datagen.CohortDraw.slot:type_name -> stroppy.datagen.Expr
-	11, // 79: stroppy.datagen.CohortDraw.bucket_key:type_name -> stroppy.datagen.Expr
-	11, // 80: stroppy.datagen.CohortLive.bucket_key:type_name -> stroppy.datagen.Expr
-	5,  // 81: stroppy.datagen.InsertSpec.DictsEntry.value:type_name -> stroppy.datagen.Dict
-	82, // [82:82] is the sub-list for method output_type
-	82, // [82:82] is the sub-list for method input_type
-	82, // [82:82] is the sub-list for extension type_name
-	82, // [82:82] is the sub-list for extension extendee
-	0,  // [0:82] is the sub-list for field type_name
+	51, // 10: stroppy.datagen.RelSource.scd2:type_name -> stroppy.datagen.SCD2
+	11, // 11: stroppy.datagen.Attr.expr:type_name -> stroppy.datagen.Expr
+	10, // 12: stroppy.datagen.Attr.null:type_name -> stroppy.datagen.Null
+	12, // 13: stroppy.datagen.Expr.col:type_name -> stroppy.datagen.ColRef
+	13, // 14: stroppy.datagen.Expr.row_index:type_name -> stroppy.datagen.RowIndex
+	14, // 15: stroppy.datagen.Expr.lit:type_name -> stroppy.datagen.Literal
+	15, // 16: stroppy.datagen.Expr.bin_op:type_name -> stroppy.datagen.BinOp
+	16, // 17: stroppy.datagen.Expr.call:type_name -> stroppy.datagen.Call
+	17, // 18: stroppy.datagen.Expr.if_:type_name -> stroppy.datagen.If
+	18, // 19: stroppy.datagen.Expr.dict_at:type_name -> stroppy.datagen.DictAt
+	29, // 20: stroppy.datagen.Expr.block_ref:type_name -> stroppy.datagen.BlockRef
+	30, // 21: stroppy.datagen.Expr.lookup:type_name -> stroppy.datagen.Lookup
+	32, // 22: stroppy.datagen.Expr.stream_draw:type_name -> stroppy.datagen.StreamDraw
+	46, // 23: stroppy.datagen.Expr.choose:type_name -> stroppy.datagen.Choose
+	49, // 24: stroppy.datagen.Expr.cohort_draw:type_name -> stroppy.datagen.CohortDraw
+	50, // 25: stroppy.datagen.Expr.cohort_live:type_name -> stroppy.datagen.CohortLive
+	1,  // 26: stroppy.datagen.RowIndex.kind:type_name -> stroppy.datagen.RowIndex.Kind
+	53, // 27: stroppy.datagen.Literal.timestamp:type_name -> google.protobuf.Timestamp
+	2,  // 28: stroppy.datagen.BinOp.op:type_name -> stroppy.datagen.BinOp.Op
+	11, // 29: stroppy.datagen.BinOp.a:type_name -> stroppy.datagen.Expr
+	11, // 30: stroppy.datagen.BinOp.b:type_name -> stroppy.datagen.Expr
+	11, // 31: stroppy.datagen.Call.args:type_name -> stroppy.datagen.Expr
+	11, // 32: stroppy.datagen.If.cond:type_name -> stroppy.datagen.Expr
+	11, // 33: stroppy.datagen.If.then:type_name -> stroppy.datagen.Expr
+	11, // 34: stroppy.datagen.If.else_:type_name -> stroppy.datagen.Expr
+	11, // 35: stroppy.datagen.DictAt.index:type_name -> stroppy.datagen.Expr
+	20, // 36: stroppy.datagen.Relationship.sides:type_name -> stroppy.datagen.Side
+	21, // 37: stroppy.datagen.Side.degree:type_name -> stroppy.datagen.Degree
+	24, // 38: stroppy.datagen.Side.strategy:type_name -> stroppy.datagen.Strategy
+	28, // 39: stroppy.datagen.Side.block_slots:type_name -> stroppy.datagen.BlockSlot
+	22, // 40: stroppy.datagen.Degree.fixed:type_name -> stroppy.datagen.DegreeFixed
+	23, // 41: stroppy.datagen.Degree.uniform:type_name -> stroppy.datagen.DegreeUniform
+	25, // 42: stroppy.datagen.Strategy.hash:type_name -> stroppy.datagen.StrategyHash
+	26, // 43: stroppy.datagen.Strategy.sequential:type_name -> stroppy.datagen.StrategySequential
+	27, // 44: stroppy.datagen.Strategy.equitable:type_name -> stroppy.datagen.StrategyEquitable
+	11, // 45: stroppy.datagen.BlockSlot.expr:type_name -> stroppy.datagen.Expr
+	11, // 46: stroppy.datagen.Lookup.entity_index:type_name -> stroppy.datagen.Expr
+	8,  // 47: stroppy.datagen.LookupPop.population:type_name -> stroppy.datagen.Population
+	9,  // 48: stroppy.datagen.LookupPop.attrs:type_name -> stroppy.datagen.Attr
+	33, // 49: stroppy.datagen.StreamDraw.int_uniform:type_name -> stroppy.datagen.DrawIntUniform
+	34, // 50: stroppy.datagen.StreamDraw.float_uniform:type_name -> stroppy.datagen.DrawFloatUniform
+	35, // 51: stroppy.datagen.StreamDraw.normal:type_name -> stroppy.datagen.DrawNormal
+	36, // 52: stroppy.datagen.StreamDraw.zipf:type_name -> stroppy.datagen.DrawZipf
+	37, // 53: stroppy.datagen.StreamDraw.nurand:type_name -> stroppy.datagen.DrawNURand
+	38, // 54: stroppy.datagen.StreamDraw.bernoulli:type_name -> stroppy.datagen.DrawBernoulli
+	39, // 55: stroppy.datagen.StreamDraw.dict:type_name -> stroppy.datagen.DrawDict
+	40, // 56: stroppy.datagen.StreamDraw.joint:type_name -> stroppy.datagen.DrawJoint
+	41, // 57: stroppy.datagen.StreamDraw.date:type_name -> stroppy.datagen.DrawDate
+	42, // 58: stroppy.datagen.StreamDraw.decimal:type_name -> stroppy.datagen.DrawDecimal
+	43, // 59: stroppy.datagen.StreamDraw.ascii:type_name -> stroppy.datagen.DrawAscii
+	45, // 60: stroppy.datagen.StreamDraw.phrase:type_name -> stroppy.datagen.DrawPhrase
+	11, // 61: stroppy.datagen.DrawIntUniform.min:type_name -> stroppy.datagen.Expr
+	11, // 62: stroppy.datagen.DrawIntUniform.max:type_name -> stroppy.datagen.Expr
+	11, // 63: stroppy.datagen.DrawFloatUniform.min:type_name -> stroppy.datagen.Expr
+	11, // 64: stroppy.datagen.DrawFloatUniform.max:type_name -> stroppy.datagen.Expr
+	11, // 65: stroppy.datagen.DrawNormal.min:type_name -> stroppy.datagen.Expr
+	11, // 66: stroppy.datagen.DrawNormal.max:type_name -> stroppy.datagen.Expr
+	11, // 67: stroppy.datagen.DrawZipf.min:type_name -> stroppy.datagen.Expr
+	11, // 68: stroppy.datagen.DrawZipf.max:type_name -> stroppy.datagen.Expr
+	11, // 69: stroppy.datagen.DrawDecimal.min:type_name -> stroppy.datagen.Expr
+	11, // 70: stroppy.datagen.DrawDecimal.max:type_name -> stroppy.datagen.Expr
+	11, // 71: stroppy.datagen.DrawAscii.min_len:type_name -> stroppy.datagen.Expr
+	11, // 72: stroppy.datagen.DrawAscii.max_len:type_name -> stroppy.datagen.Expr
+	44, // 73: stroppy.datagen.DrawAscii.alphabet:type_name -> stroppy.datagen.AsciiRange
+	11, // 74: stroppy.datagen.DrawPhrase.min_words:type_name -> stroppy.datagen.Expr
+	11, // 75: stroppy.datagen.DrawPhrase.max_words:type_name -> stroppy.datagen.Expr
+	47, // 76: stroppy.datagen.Choose.branches:type_name -> stroppy.datagen.ChooseBranch
+	11, // 77: stroppy.datagen.ChooseBranch.expr:type_name -> stroppy.datagen.Expr
+	11, // 78: stroppy.datagen.Cohort.bucket_key:type_name -> stroppy.datagen.Expr
+	11, // 79: stroppy.datagen.CohortDraw.slot:type_name -> stroppy.datagen.Expr
+	11, // 80: stroppy.datagen.CohortDraw.bucket_key:type_name -> stroppy.datagen.Expr
+	11, // 81: stroppy.datagen.CohortLive.bucket_key:type_name -> stroppy.datagen.Expr
+	11, // 82: stroppy.datagen.SCD2.boundary:type_name -> stroppy.datagen.Expr
+	11, // 83: stroppy.datagen.SCD2.historical_start:type_name -> stroppy.datagen.Expr
+	11, // 84: stroppy.datagen.SCD2.historical_end:type_name -> stroppy.datagen.Expr
+	11, // 85: stroppy.datagen.SCD2.current_start:type_name -> stroppy.datagen.Expr
+	11, // 86: stroppy.datagen.SCD2.current_end:type_name -> stroppy.datagen.Expr
+	5,  // 87: stroppy.datagen.InsertSpec.DictsEntry.value:type_name -> stroppy.datagen.Dict
+	88, // [88:88] is the sub-list for method output_type
+	88, // [88:88] is the sub-list for method input_type
+	88, // [88:88] is the sub-list for extension type_name
+	88, // [88:88] is the sub-list for extension extendee
+	0,  // [0:88] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_datagen_proto_init() }
@@ -4250,7 +4390,7 @@ func file_proto_stroppy_datagen_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_datagen_proto_rawDesc), len(file_proto_stroppy_datagen_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   49,
+			NumMessages:   50,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
