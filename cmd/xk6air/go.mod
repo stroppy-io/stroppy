@@ -13,7 +13,11 @@ require (
 	google.golang.org/protobuf v1.36.11
 )
 
-require github.com/grafana/sobek v0.0.0-20260121195222-d8d9202018c5
+require (
+	github.com/google/uuid v1.6.0
+	github.com/grafana/sobek v0.0.0-20260121195222-d8d9202018c5
+	github.com/shopspring/decimal v1.4.0
+)
 
 require (
 	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.11-20240617172848-e1dbca2775a7.1 // indirect
@@ -45,7 +49,6 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/pprof v0.0.0-20260202012954-cb029daf43ef // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260106090513-285631296b5d // indirect
 	github.com/grafana/k6build v0.5.15 // indirect
@@ -82,7 +85,6 @@ require (
 	github.com/r3labs/sse/v2 v2.10.0 // indirect
 	github.com/redis/go-redis/v9 v9.17.2 // indirect
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e // indirect
-	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/afero v1.10.0 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
@@ -90,8 +92,8 @@ require (
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20251125145508-6d7ef87db5cb // indirect
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.128.3 // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20260311095541-ebbf792c1180 // indirect
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.134.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.38.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.38.0 // indirect

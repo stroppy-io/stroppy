@@ -17,7 +17,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.11.1
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.128.3
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.134.1
 	go.k6.io/k6 v1.6.0
 	go.uber.org/zap v1.27.1
 	google.golang.org/grpc v1.78.0
@@ -91,7 +91,7 @@ require (
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20251125145508-6d7ef87db5cb // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20260311095541-ebbf792c1180 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.38.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.38.0 // indirect
