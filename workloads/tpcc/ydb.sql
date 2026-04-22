@@ -1,22 +1,22 @@
 --+ drop_schema
 --=
-DROP TABLE order_line
+DROP TABLE IF EXISTS order_line
 --=
-DROP TABLE new_order
+DROP TABLE IF EXISTS new_order
 --=
-DROP TABLE orders
+DROP TABLE IF EXISTS orders
 --=
-DROP TABLE history
+DROP TABLE IF EXISTS history
 --=
-DROP TABLE stock
+DROP TABLE IF EXISTS stock
 --=
-DROP TABLE customer
+DROP TABLE IF EXISTS customer
 --=
-DROP TABLE district
+DROP TABLE IF EXISTS district
 --=
-DROP TABLE warehouse
+DROP TABLE IF EXISTS warehouse
 --=
-DROP TABLE item
+DROP TABLE IF EXISTS item
 
 --+ create_schema
 --= warehouse

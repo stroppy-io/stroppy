@@ -282,6 +282,17 @@ const C_LAST_FLAT_DICT: string[] = Array.from({ length: 1000 }, (_, i) =>
   "L" + String(i).padStart(4, "0"),
 );
 
+// Currency literal helper: forces a numeric constant onto the wire as
+// `double`, not int64. `Expr.lit(300000.0)` collapses to int64 because
+// `Number.isInteger(300000.0)` is true in JS, which trips YDB BulkUpsert
+// on `Double` columns (w_ytd, d_ytd, c_credit_lim, c_balance,
+// c_ytd_payment). Other dialects accept an int64 into their
+// DECIMAL/NUMERIC columns; YDB is strict.
+type PbExprLit = ReturnType<typeof Expr.lit>;
+function litDouble(x: number): PbExprLit {
+  return { kind: { oneofKind: "lit", lit: { value: { oneofKind: "double", double: x } } } } as PbExprLit;
+}
+
 // Draw.ascii helper: fixed-width ASCII over an alphabet (default Alphabet.en).
 function asciiFixed(
   width: number,
@@ -319,7 +330,7 @@ function warehouseSpec() {
       w_state:    asciiFixed(2, Alphabet.enUpper),
       w_zip:      asciiFixed(9, Alphabet.num),
       w_tax:      Draw.decimal({ min: Expr.lit(0), max: Expr.lit(0.2), scale: 4 }),
-      w_ytd:      Expr.lit(300000.0),
+      w_ytd:      litDouble(300000.0),
     },
   });
 }
@@ -344,7 +355,7 @@ function districtSpec() {
       d_state:     asciiFixed(2, Alphabet.enUpper),
       d_zip:       asciiFixed(9, Alphabet.num),
       d_tax:       Draw.decimal({ min: Expr.lit(0), max: Expr.lit(0.2), scale: 4 }),
-      d_ytd:       Expr.lit(30000.0),
+      d_ytd:       litDouble(30000.0),
       d_next_o_id: Expr.lit(3001),
     },
   });
@@ -388,10 +399,10 @@ function customerSpec() {
         { weight: 1, expr: Expr.lit("BC") },
         { weight: 9, expr: Expr.lit("GC") },
       ]),
-      c_credit_lim:   Expr.lit(50000.0),
+      c_credit_lim:   litDouble(50000.0),
       c_discount:     Draw.decimal({ min: Expr.lit(0), max: Expr.lit(0.5), scale: 4 }),
-      c_balance:      Expr.lit(-10.0),
-      c_ytd_payment:  Expr.lit(10.0),
+      c_balance:      litDouble(-10.0),
+      c_ytd_payment:  litDouble(10.0),
       c_payment_cnt:  Expr.lit(1),
       c_delivery_cnt: Expr.lit(0),
       c_data:         asciiRange(300, 500),

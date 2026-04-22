@@ -1,12 +1,12 @@
 --+ drop_schema
 --=
-DROP TABLE pgbench_history
+DROP TABLE IF EXISTS pgbench_history
 --=
-DROP TABLE pgbench_accounts
+DROP TABLE IF EXISTS pgbench_accounts
 --=
-DROP TABLE pgbench_tellers
+DROP TABLE IF EXISTS pgbench_tellers
 --=
-DROP TABLE pgbench_branches
+DROP TABLE IF EXISTS pgbench_branches
 
 
 --+ create_schema
