@@ -24,11 +24,11 @@ import (
 // test). It proves the datagen framework composes through the TS Rel /
 // Attr / Draw / Dict / Expr wrappers when driven from a real workload.
 //
-// Simplifications accepted by the workload (documented in tx.ts) are
-// reflected in the assertions here: c_credit distribution tracked at
-// ~10%, o_carrier_id null ratio ~0.3, flat c_last "L0000..L0999"
-// dict, fixed OL_CNT=10, history empty at load. FK integrity walks
-// the spec-mandated edges even though the DDL enforces them on load.
+// Post-Stage-E: the load is spec-compliant modulo o_ol_cnt (fixed at 10
+// instead of Uniform(5,15) — deferred per the workload header). This
+// test enforces the §4.3.3.1 distribution rules on o_carrier_id,
+// ol_delivery_d, ol_amount, c_last, i_data, s_data in addition to the
+// pre-existing row-count / FK-integrity checks.
 func TestTpccWorkloadEndToEnd(t *testing.T) {
 	if os.Getenv(envSkip) == "1" {
 		t.Skipf("skipping integration test: %s=1", envSkip)
@@ -104,6 +104,7 @@ func TestTpccWorkloadEndToEnd(t *testing.T) {
 	assertTpccWorkloadOrderLine(t, pool)
 	assertTpccWorkloadNewOrder(t, pool)
 	assertTpccWorkloadFKIntegrity(t, pool)
+	assertTpccWorkloadSpecCompliance(t, pool)
 }
 
 // Spec §4.3.3.1 cardinalities at WAREHOUSES=1.
@@ -233,14 +234,20 @@ func assertTpccWorkloadCustomer(t *testing.T, pool *pgxpool.Pool) {
 		t.Errorf("customer: %d rows with c_middle <> 'OE'", notOE)
 	}
 
-	// c_last shape "L<4-digit>" from the flat dict.
+	// Spec §4.3.2.3: c_last is a 3-syllable concatenation over the fixed
+	// TPCC_SYLLABLES vocabulary. Shortest emitted form is BARBARBAR
+	// (3×3=9 chars); longest is CALLYCALLYCALLY (3×5=15). Every row
+	// must be in that length band, so reject anything outside [9,15].
 	var badShape int64
 	if err := pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM customer WHERE c_last !~ '^L[0-9]{4}$'`).Scan(&badShape); err != nil {
+		`SELECT COUNT(*) FROM customer
+		  WHERE c_last !~ '^[A-Z]+$'
+		     OR length(c_last) < 9
+		     OR length(c_last) > 15`).Scan(&badShape); err != nil {
 		t.Fatalf("customer c_last shape: %v", err)
 	}
 	if badShape != 0 {
-		t.Errorf("customer: %d rows with non-dict c_last shape", badShape)
+		t.Errorf("customer: %d rows with non-syllable c_last shape", badShape)
 	}
 }
 
@@ -293,15 +300,16 @@ func assertTpccWorkloadOrders(t *testing.T, pool *pgxpool.Pool) {
 		}
 	}
 
-	// o_carrier_id null rate ~0.3 ± 0.05 (simplification).
+	// Spec §4.3.3.1: o_carrier_id NULL iff o_id > 2100 (last 900 per
+	// district × 10 districts × 1 warehouse = 9000).
 	var nulls int64
 	if err := pool.QueryRow(ctx,
 		`SELECT COUNT(*) FROM orders WHERE o_carrier_id IS NULL`).Scan(&nulls); err != nil {
 		t.Fatalf("orders null carrier: %v", err)
 	}
-	rate := float64(nulls) / float64(twOrders)
-	if math.Abs(rate-0.3) > 0.05 {
-		t.Errorf("orders o_carrier_id null rate = %.3f, want 0.30 ± 0.05", rate)
+	const wantNulls = twNewOrders // 9000
+	if nulls != wantNulls {
+		t.Errorf("orders o_carrier_id NULL count = %d, want %d", nulls, wantNulls)
 	}
 
 	// Non-null carriers in [1,10].
@@ -418,5 +426,98 @@ func assertTpccWorkloadFKIntegrity(t *testing.T, pool *pgxpool.Pool) {
 		if orphans != 0 {
 			t.Errorf("FK %s: %d orphan rows", c.name, orphans)
 		}
+	}
+}
+
+// assertTpccWorkloadSpecCompliance enforces the §4.3.3.1 distribution rules
+// the Stage-E pass brought the load up to. These are deterministic except
+// for the two LIKE '%ORIGINAL%' rates, which must fall inside the spec's
+// nominal 10% band. c_last is built via NURand(255,0,999) into the
+// 3-syllable cartesian, so BARBARBAR (i=0, the first entry) should appear
+// at least once.
+func assertTpccWorkloadSpecCompliance(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	ctx := context.Background()
+
+	// Deterministic cuts: Expr.if(o_id > 2100, NULL, …) on o_carrier_id
+	// and ol_delivery_d.
+	for _, c := range []struct {
+		name  string
+		query string
+		want  int64
+	}{
+		{"orders total NULL carrier_id (spec: last 900 × 10 districts)",
+			`SELECT COUNT(*) FROM orders WHERE o_carrier_id IS NULL`, 9000},
+		{"orders undelivered with NOT NULL carrier_id (must be 0)",
+			`SELECT COUNT(*) FROM orders WHERE o_id > 2100 AND o_carrier_id IS NOT NULL`, 0},
+		{"orders delivered with NULL carrier_id (must be 0)",
+			`SELECT COUNT(*) FROM orders WHERE o_id <= 2100 AND o_carrier_id IS NULL`, 0},
+		{"order_line undelivered with NOT NULL delivery_d (must be 0)",
+			`SELECT COUNT(*) FROM order_line WHERE ol_o_id > 2100 AND ol_delivery_d IS NOT NULL`, 0},
+		{"order_line delivered with NULL delivery_d (must be 0)",
+			`SELECT COUNT(*) FROM order_line WHERE ol_o_id <= 2100 AND ol_delivery_d IS NULL`, 0},
+	} {
+		var got int64
+		if err := pool.QueryRow(ctx, c.query).Scan(&got); err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if got != c.want {
+			t.Errorf("%s: got %d, want %d", c.name, got, c.want)
+		}
+	}
+
+	// Spec §4.3.3.1: the set of o_c_id values per district is a
+	// permutation of [1, 3000]. All 3000 must be distinct.
+	var distinctCId int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(DISTINCT o_c_id) FROM orders WHERE o_d_id = 1 AND o_w_id = 1`).
+		Scan(&distinctCId); err != nil {
+		t.Fatalf("distinct o_c_id: %v", err)
+	}
+	if distinctCId != 3000 {
+		t.Errorf("orders distinct o_c_id in (w=1,d=1) = %d, want 3000 (permutation)", distinctCId)
+	}
+
+	// Spec §4.3.2.3: BARBARBAR (i=0 in the 3-syllable cartesian) must
+	// appear at least once — NURand(255,0,999) hotspots on i=0 so 30000
+	// customers give roughly 30 hits on average. ≥1 is the floor that
+	// catches a regressed dict population.
+	var barCount int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM customer WHERE c_last = 'BARBARBAR'`).
+		Scan(&barCount); err != nil {
+		t.Fatalf("customer BARBARBAR: %v", err)
+	}
+	if barCount < 1 {
+		t.Errorf("customer c_last='BARBARBAR' count = %d, want >= 1 (syllable dict i=0)", barCount)
+	}
+
+	// Spec §4.3.3.1: 10% of i_data / s_data carry the "ORIGINAL" marker.
+	// 5..15% band matches validate_population's tolerance.
+	for _, c := range []struct{ name, query string }{
+		{"item i_data ORIGINAL rate", `SELECT COUNT(*) FROM item WHERE i_data LIKE '%ORIGINAL%'`},
+		{"stock s_data ORIGINAL rate", `SELECT COUNT(*) FROM stock WHERE s_data LIKE '%ORIGINAL%'`},
+	} {
+		var hits int64
+		if err := pool.QueryRow(ctx, c.query).Scan(&hits); err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		rate := float64(hits) / float64(twItems)
+		if math.Abs(rate-0.10) > 0.02 {
+			t.Errorf("%s = %d / %d = %.3f, want 0.10 ± 0.02", c.name, hits, twItems, rate)
+		}
+	}
+
+	// Spec §4.3.3.1: ol_amount = Uniform(0.01, 9999.99) for undelivered
+	// orders, 0.00 for delivered. The delivered prefix is o_id ∈ [1,
+	// 2100] × 10 districts × 10 lines = 210000 rows.
+	var deliveredNonZero int64
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM order_line WHERE ol_o_id <= 2100 AND ol_amount <> 0`).
+		Scan(&deliveredNonZero); err != nil {
+		t.Fatalf("order_line delivered ol_amount: %v", err)
+	}
+	if deliveredNonZero != 0 {
+		t.Errorf("order_line delivered rows with ol_amount != 0 = %d, want 0", deliveredNonZero)
 	}
 }

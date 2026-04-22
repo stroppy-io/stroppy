@@ -10,32 +10,37 @@ import {
   Expr,
   InsertMethod as DatagenInsertMethod,
   Rel,
+  std,
 } from "./datagen.ts";
+import { C_LAST_DICT, tpccOriginalOr } from "./tpcc_helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 
 // ============================================================================
-// Data-gen simplifications (framework capability proof, matches Go-side
-// test/integration/tpcc_test.go). Transaction phase is byte-for-byte
-// compliant; load phase trades a few deterministic spec details for a
-// clean Rel.table shape:
+// Data-gen simplifications remaining after the Stage-E spec-parity pass.
+// Transaction phase is byte-for-byte compliant; load phase follows TPC-C
+// §4.3 except for the single deferred item below.
 //
-//   1. Flat populations with row-index-derived FKs (no nested Relationship
-//      composition for warehouse / district / customer).
-//   2. c_last drawn from a flat 1000-entry dict ("L0000".."L0999"), not
-//      the 3-syllable cartesian; NURand(A=255, x=0, y=999) hotspot kept.
-//   3. c_credit split via weighted Expr.choose(1:9) for BC/GC.
-//   4. Addresses / names / phones / fillers are plain ASCII (Alphabet.en /
-//      Alphabet.num), no locale dicts, no "ORIGINAL" substring marker
-//      inside i_data / s_data.
-//   5. o_carrier_id: null-ratio=0.3 via Attr.null, not the spec's
-//      deterministic "last 900 o_ids per district" cut.
-//   6. Per-order line count fixed at 10 (not Uniform 5..15). Mean matches
-//      spec, so sum(o_ol_cnt) == count(order_line) (CC4) still holds.
-//   7. history is empty at load time (0 rows).
+//   1. Per-order line count fixed at 10 (spec wants Uniform 5..15,
+//      §4.3.3.1). Deferred: expressing a variable-degree child population
+//      under Rel.table requires Relationship/Side composition; see plan
+//      §16. With a fixed OL_CNT=10 the mean matches spec's midpoint and
+//      sum(o_ol_cnt) == count(order_line) (CC4) still holds.
+//   2. history is empty at load time per spec §4.3.4 (initial cardinality
+//      0). Not a simplification — included here for completeness.
 //
-// new_order still deterministically covers exactly (d_id, o_id) for
-// o_id ∈ [2101, 3000] per district, so FK integrity new_order → orders
-// holds by construction even though o_carrier_id nullness is random.
+// Everything else in §4.3 is spec-compliant:
+//   - c_last: 3-syllable cartesian from TPCC_SYLLABLES (C_LAST_DICT).
+//   - c_credit: weighted 1:9 BC/GC via Expr.choose.
+//   - i_data / s_data: "ORIGINAL" marker at random position in 10% rows.
+//   - o_carrier_id: NULL for o_id > 2100 (last 900 per district), else
+//     Uniform(1, 10). Uses Expr.if + Expr.litNull.
+//   - o_c_id: std.permuteIndex keyed per (w_id, d_id) so each district
+//     holds a distinct permutation of [1, 3000].
+//   - ol_delivery_d: NULL for the undelivered tail (ol_o_id > 2100),
+//     load-time timestamp for the delivered prefix.
+//   - ol_amount: Uniform(0.01, 9999.99) for undelivered orders, 0.00
+//     for delivered (per §4.3.3.1 column formula).
+//   - c_since, o_entry_d: constant load-captured timestamp (§4.3.2.8).
 // ============================================================================
 
 // Post-run compliance counters for TPC-C auditing. See TPCC_COMPILANCE_REPORT.md
@@ -130,7 +135,7 @@ const TOTAL_STOCK     = WAREHOUSES * ITEMS;
 // Payment and Order-Status (§2.5.1.2 / §2.6.1.2). Module-scoped so the
 // NURand C constant is chosen once for the whole run — mirrors how the
 // existing nurand1023 / nurand8191 pickers are scoped. Indexes into
-// the flat C_LAST_FLAT_DICT populated by the datagen load phase.
+// C_LAST_DICT (3-syllable cartesian, §4.3.2.3) populated by the load phase.
 const nurand255Gen = R.int32(0, 999, Dist.nurand(255, "run")).gen();
 
 // K6 options — weighted dispatch inside default(), VUs/duration set via CLI or k6 defaults.
@@ -276,12 +281,6 @@ const SEED_ORDERS     = 0xC0FFEE06;
 const SEED_ORDER_LINE = 0xC0FFEE07;
 const SEED_NEW_ORDER  = 0xC0FFEE08;
 
-// Flat 1000-entry c_last dict, "L0000".."L0999" — exercises the same
-// NURand-indexed dict primitive as the spec's 3-syllable cartesian.
-const C_LAST_FLAT_DICT: string[] = Array.from({ length: 1000 }, (_, i) =>
-  "L" + String(i).padStart(4, "0"),
-);
-
 // Currency literal note: `Expr.lit(300000.0)` collapses to int64 because
 // `Number.isInteger(300000.0)` is true in JS, which trips YDB BulkUpsert
 // on `Double` columns (w_ytd, d_ytd, c_credit_lim, c_balance,
@@ -306,9 +305,16 @@ function asciiRange(
   return Draw.ascii({ min: Expr.lit(minLen), max: Expr.lit(maxLen), alphabet });
 }
 
-// Common commercial-date range for o_entry_d / ol_delivery_d / c_since.
-const DATE_FROM = new Date(Date.UTC(2023, 0, 1));
-const DATE_TO   = new Date(Date.UTC(2023, 11, 31));
+// Spec §4.3.2.8 / §4.3.3.1: c_since, o_entry_d, and the delivered branch
+// of ol_delivery_d all carry the OS-captured load-time timestamp. We
+// snapshot it once at module load so every row in this run receives the
+// same value — mirrors main's R.dateConst pattern and lets the compliance
+// tests key off a single deterministic instant. `Expr.lit(Date)` emits
+// int64 (epoch days on the wire), so we lift through `std.daysToDate`
+// to get the time.Time scalar the driver layer expects on DATETIME /
+// TIMESTAMP columns.
+const LOAD_TIMESTAMP       = new Date();
+const LOAD_TIMESTAMP_EXPR  = std.daysToDate(Expr.lit(LOAD_TIMESTAMP));
 
 // Warehouse spec: w_id = rowIndex()+1 ∈ [1, WAREHOUSES].
 function warehouseSpec() {
@@ -370,7 +376,7 @@ function customerSpec() {
     Expr.lit(1),
   );
   const cId   = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(1));
-  const lastNameDict = Dict.values(C_LAST_FLAT_DICT);
+  const lastNameDict = Dict.values(C_LAST_DICT);
   const nurandIdx = Draw.nurand({ a: 255, x: 0, y: 999, cSalt: 0xC1A57 });
   return Rel.table("customer", {
     size: WAREHOUSES * perWh,
@@ -389,7 +395,7 @@ function customerSpec() {
       c_state:        asciiFixed(2, Alphabet.enUpper),
       c_zip:          asciiFixed(9, Alphabet.num),
       c_phone:        asciiFixed(16, Alphabet.num),
-      c_since:        Draw.date({ minDate: DATE_FROM, maxDate: DATE_TO }),
+      c_since:        LOAD_TIMESTAMP_EXPR,
       c_credit:       Expr.choose([
         { weight: 1, expr: Expr.lit("BC") },
         { weight: 9, expr: Expr.lit("GC") },
@@ -406,6 +412,8 @@ function customerSpec() {
 }
 
 // Item spec: i_id = rowIndex()+1 ∈ [1, 100_000].
+// Spec §4.3.3.1: i_data is a 26..50 a-string; 10% of rows carry the literal
+// "ORIGINAL" at a random position. tpccOriginalOr composes both branches.
 function itemSpec() {
   return Rel.table("item", {
     size: ITEMS_PER_WH,
@@ -416,7 +424,7 @@ function itemSpec() {
       i_im_id: Draw.intUniform({ min: Expr.lit(1), max: Expr.lit(10_000) }),
       i_name:  asciiRange(14, 24),
       i_price: Draw.decimal({ min: Expr.lit(1.0), max: Expr.lit(100.0), scale: 2 }),
-      i_data:  asciiRange(26, 50),
+      i_data:  tpccOriginalOr(26, 50),
     },
   });
 }
@@ -442,7 +450,9 @@ function stockSpec() {
   attrs.s_ytd        = Expr.lit(0);
   attrs.s_order_cnt  = Expr.lit(0);
   attrs.s_remote_cnt = Expr.lit(0);
-  attrs.s_data       = asciiRange(26, 50);
+  // Spec §4.3.3.1: s_data is a 26..50 a-string; 10% of rows carry the
+  // literal "ORIGINAL" at a random position.
+  attrs.s_data       = tpccOriginalOr(26, 50);
   return Rel.table("stock", {
     size: TOTAL_STOCK,
     seed: SEED_STOCK,
@@ -455,11 +465,19 @@ function stockSpec() {
 //   o_w_id = r / 30_000 + 1 ∈ [1, W]
 //   o_d_id = (r / 3000) % 10 + 1 ∈ [1, 10]
 //   o_id   = r % 3000 + 1 ∈ [1, 3000]
-// o_c_id is a uniform draw in [1, 3000] (simplified from a per-district
-// permutation — order_status early-exits on customers with no orders).
-// o_carrier_id carries a 0.3 null rate injected via Attr.null (patched
-// onto the generated PbAttr below, since RelTableOpts only accepts
-// PbExpr at the moment).
+//
+// Spec §4.3.3.1:
+//   - o_c_id: per-district permutation of [1, 3000]. Realized via
+//     std.permuteIndex keyed off (w_id, d_id) so each district's C-ID
+//     assignment is a distinct Feistel-shuffled bijection.
+//   - o_entry_d: OS-captured load-time timestamp (LOAD_TIMESTAMP_EXPR).
+//   - o_carrier_id: NULL for the last 900 rows per district (o_id >
+//     2100), else Uniform(1, 10). Expressed as Expr.if + Expr.litNull so
+//     the split is deterministic and matches the new_order population by
+//     construction.
+// Distinct salt per scope so permutation streams for o_c_id are
+// uncorrelated with any other per-district key in the workload.
+const ORDERS_PERMUTE_SALT = BigInt("0x1BEEF02CACE1DAD1");
 function ordersSpec() {
   const perWh = CUSTOMERS_PER_DISTRICT * DISTRICTS_PER_WAREHOUSE; // 30_000
   const oWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(1));
@@ -468,7 +486,34 @@ function ordersSpec() {
     Expr.lit(1),
   );
   const oId   = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(1));
-  const spec = Rel.table("orders", {
+
+  // Per-(w_id, d_id) seed: `w_id * 100 + d_id` plus a 64-bit salt so
+  // districts across different warehouses don't collide and the seed is
+  // uncorrelated with other populations keyed by (w, d). permuteIndex
+  // treats the seed as an opaque int64 round-function key — any nonzero
+  // value that varies with (w, d) yields a distinct permutation.
+  const districtKey = Expr.add(
+    Expr.mul(Expr.col("o_w_id"), Expr.lit(100)),
+    Expr.col("o_d_id"),
+  );
+  const permuteSeed = Expr.add(districtKey, Expr.lit(ORDERS_PERMUTE_SALT));
+  const oCId = Expr.add(
+    std.permuteIndex(
+      permuteSeed,
+      Expr.sub(Expr.col("o_id"), Expr.lit(1)),
+      Expr.lit(CUSTOMERS_PER_DISTRICT),
+    ),
+    Expr.lit(1),
+  );
+
+  // o_carrier_id: NULL for the undelivered tail, otherwise Uniform(1,10).
+  const oCarrierId = Expr.if(
+    Expr.gt(Expr.col("o_id"), Expr.lit(ORDERS_DELIVERED)),
+    Expr.litNull(),
+    Draw.intUniform({ min: Expr.lit(1), max: Expr.lit(10) }),
+  );
+
+  return Rel.table("orders", {
     size: WAREHOUSES * perWh,
     seed: SEED_ORDERS,
     method: DatagenInsertMethod.NATIVE,
@@ -476,27 +521,13 @@ function ordersSpec() {
       o_id:         oId,
       o_d_id:       oDId,
       o_w_id:       oWId,
-      o_c_id:       Draw.intUniform({ min: Expr.lit(1), max: Expr.lit(CUSTOMERS_PER_DISTRICT) }),
-      o_entry_d:    Draw.date({ minDate: DATE_FROM, maxDate: DATE_TO }),
-      o_carrier_id: Draw.intUniform({ min: Expr.lit(1), max: Expr.lit(10) }),
+      o_c_id:       oCId,
+      o_entry_d:    LOAD_TIMESTAMP_EXPR,
+      o_carrier_id: oCarrierId,
       o_ol_cnt:     Expr.lit(OL_CNT_FIXED),
       o_all_local:  Expr.lit(1),
     },
   });
-  // Attach Null policy to o_carrier_id. RelTableOpts.attrs is a
-  // Record<string, PbExpr> so the null-spec cannot be passed inline; the
-  // PbAttr is still a plain object on the generated InsertSpec, so we
-  // patch the Null there. See datageneration-plan.md §3.3 (Attr.null).
-  // seedSalt is a uint64 on the wire (protobuf-ts renders it as a decimal
-  // string); 0xCAB01 = 830721 decimal.
-  const attrs = spec.source!.attrs;
-  for (const a of attrs) {
-    if (a.name === "o_carrier_id") {
-      a.null = { rate: 0.3, seedSalt: "830721" };
-      break;
-    }
-  }
-  return spec;
 }
 
 // Order_line spec: row-index layout r ∈ [0, 300_000 W), 10 lines per
@@ -520,6 +551,20 @@ function orderLineSpec() {
     Expr.lit(1),
   );
   const olNum  = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(OL_CNT_FIXED)), Expr.lit(1));
+
+  // Spec §4.3.3.1:
+  //   - ol_delivery_d: NULL for undelivered orders (ol_o_id > 2100), else
+  //     the OS-captured load timestamp.
+  //   - ol_amount: Uniform(0.01, 9999.99) for undelivered rows, 0.00 for
+  //     delivered rows.
+  const undelivered = Expr.gt(Expr.col("ol_o_id"), Expr.lit(ORDERS_DELIVERED));
+  const olDeliveryD = Expr.if(undelivered, Expr.litNull(), LOAD_TIMESTAMP_EXPR);
+  const olAmount    = Expr.if(
+    undelivered,
+    Draw.decimal({ min: Expr.lit(0.01), max: Expr.lit(9999.99), scale: 2 }),
+    Expr.litFloat(0.0),
+  );
+
   return Rel.table("order_line", {
     size: WAREHOUSES * perDWh,
     seed: SEED_ORDER_LINE,
@@ -531,9 +576,9 @@ function orderLineSpec() {
       ol_number:      olNum,
       ol_i_id:        Draw.intUniform({ min: Expr.lit(1), max: Expr.lit(ITEMS_PER_WH) }),
       ol_supply_w_id: olWId,
-      ol_delivery_d:  Draw.date({ minDate: DATE_FROM, maxDate: DATE_TO }),
+      ol_delivery_d:  olDeliveryD,
       ol_quantity:    Draw.intUniform({ min: Expr.lit(1), max: Expr.lit(5) }),
-      ol_amount:      Draw.decimal({ min: Expr.lit(0.01), max: Expr.lit(9999.99), scale: 2 }),
+      ol_amount:      olAmount,
       ol_dist_info:   asciiFixed(24),
     },
   });
@@ -587,6 +632,210 @@ export function setup() {
     driver.insertSpec(orderLineSpec());
     driver.insertSpec(newOrderSpec());
     // history is empty at load time (spec §4.3.4 initial cardinality 0).
+  });
+
+  // Spec §3.3.2 CC1-CC4 + §4.3.4 cardinalities + §4.3.3.1 distribution rules.
+  // Fails setup() hard if any assertion trips so downstream transaction
+  // runs cannot execute on silently-broken data.
+  //
+  // Portability: CC2/CC3 originally use scalar-subquery subtraction and
+  // correlated MAX, which YDB's YQL rejects (it expects Module::Func
+  // syntax inside subquery contexts). We fetch aggregates with plain
+  // `SELECT ... GROUP BY` and fold the per-district comparisons in JS;
+  // every dialect supports the flat shape. `LIKE '%ORIGINAL%'` scans
+  // over item/stock can be expensive on sbroad's default vdbe opcode
+  // budget — the stroppy-playground compose bumps the limit cluster-wide
+  // (see README); locally `make tmpfs-up` is fine for WAREHOUSES=1.
+  Step("validate_population", () => {
+    const TOTAL_ORDERS     = TOTAL_DISTRICTS * CUSTOMERS_PER_DISTRICT;
+    const TOTAL_NEW_ORDER  = TOTAL_DISTRICTS * ORDERS_UNDELIVERED;
+    const TOTAL_ORDER_LINE = TOTAL_ORDERS * OL_CNT_FIXED;
+    const TOTAL_CUSTOMERS  = TOTAL_ORDERS; // 3000 per district
+
+    type DistRow = { dNextOId: number };
+    type NoStats = { maxNoOId: number; minNoOId: number; cnt: number };
+
+    const dKey = (w: unknown, d: unknown) => `${Number(w)}/${Number(d)}`;
+    const distMap: Record<string, DistRow> = {};
+    const ordMaxMap: Record<string, number> = {};
+    const noStatsMap: Record<string, NoStats> = {};
+
+    let cc1WSum = NaN, cc1DSum = NaN;
+    let cc4OSum = NaN, cc4OlCnt = NaN;
+
+    try {
+      for (const r of driver.queryRows("SELECT d_w_id, d_id, d_next_o_id FROM district")) {
+        distMap[dKey(r[0], r[1])] = { dNextOId: Number(r[2]) };
+      }
+      for (const r of driver.queryRows(
+        "SELECT o_w_id, o_d_id, MAX(o_id) FROM orders GROUP BY o_w_id, o_d_id",
+      )) {
+        ordMaxMap[dKey(r[0], r[1])] = Number(r[2]);
+      }
+      for (const r of driver.queryRows(
+        "SELECT no_w_id, no_d_id, MAX(no_o_id), MIN(no_o_id), COUNT(*) FROM new_order GROUP BY no_w_id, no_d_id",
+      )) {
+        noStatsMap[dKey(r[0], r[1])] = {
+          maxNoOId: Number(r[2]),
+          minNoOId: Number(r[3]),
+          cnt:      Number(r[4]),
+        };
+      }
+      cc1WSum  = Number(driver.queryValue("SELECT SUM(w_ytd) FROM warehouse"));
+      cc1DSum  = Number(driver.queryValue("SELECT SUM(d_ytd) FROM district"));
+      cc4OSum  = Number(driver.queryValue("SELECT SUM(o_ol_cnt) FROM orders"));
+      cc4OlCnt = Number(driver.queryValue("SELECT COUNT(*) FROM order_line"));
+    } catch (e) {
+      throw new Error(`validate_population: prefetch failed: ${e}`);
+    }
+
+    const evalCc2a = (): { ok: boolean; detail: string } => {
+      for (const k in distMap) {
+        const want = distMap[k].dNextOId - 1;
+        const got = ordMaxMap[k];
+        if (got !== want) return { ok: false, detail: `district ${k}: d_next_o_id-1=${want}, max(o_id)=${got}` };
+      }
+      return { ok: true, detail: "" };
+    };
+    const evalCc2b = (): { ok: boolean; detail: string } => {
+      for (const k in distMap) {
+        const om = ordMaxMap[k];
+        const ns = noStatsMap[k];
+        const noMax = ns ? ns.maxNoOId : undefined;
+        if (om !== noMax) return { ok: false, detail: `district ${k}: max(o_id)=${om}, max(no_o_id)=${noMax}` };
+      }
+      return { ok: true, detail: "" };
+    };
+    const evalCc3 = (): { ok: boolean; detail: string } => {
+      for (const k in distMap) {
+        const ns = noStatsMap[k];
+        if (!ns) return { ok: false, detail: `district ${k}: missing new_order stats` };
+        if (ns.maxNoOId - ns.minNoOId + 1 !== ns.cnt) {
+          return { ok: false, detail: `district ${k}: max-min+1=${ns.maxNoOId - ns.minNoOId + 1} vs count=${ns.cnt}` };
+        }
+      }
+      return { ok: true, detail: "" };
+    };
+
+    type QueryCheck    = { name: string; query: string; ok: (v: unknown) => boolean };
+    type ComputedCheck = { name: string; computed: () => { ok: boolean; detail: string } };
+    type Check         = QueryCheck | ComputedCheck;
+
+    const checks: Check[] = [
+      // --- §4.3.4 initial cardinalities ---
+      { name: `ITEM = ${ITEMS}`,
+        query: "SELECT COUNT(*) FROM item",
+        ok: v => Number(v) === ITEMS },
+      { name: `WAREHOUSE = ${WAREHOUSES}`,
+        query: "SELECT COUNT(*) FROM warehouse",
+        ok: v => Number(v) === WAREHOUSES },
+      { name: `DISTRICT = ${TOTAL_DISTRICTS}`,
+        query: "SELECT COUNT(*) FROM district",
+        ok: v => Number(v) === TOTAL_DISTRICTS },
+      { name: `CUSTOMER = ${TOTAL_CUSTOMERS}`,
+        query: "SELECT COUNT(*) FROM customer",
+        ok: v => Number(v) === TOTAL_CUSTOMERS },
+      { name: `STOCK = ${TOTAL_STOCK}`,
+        query: "SELECT COUNT(*) FROM stock",
+        ok: v => Number(v) === TOTAL_STOCK },
+      { name: `ORDERS = ${TOTAL_ORDERS}`,
+        query: "SELECT COUNT(*) FROM orders",
+        ok: v => Number(v) === TOTAL_ORDERS },
+      { name: `NEW_ORDER = ${TOTAL_NEW_ORDER}`,
+        query: "SELECT COUNT(*) FROM new_order",
+        ok: v => Number(v) === TOTAL_NEW_ORDER },
+      { name: `ORDER_LINE = ${TOTAL_ORDER_LINE}`,
+        query: "SELECT COUNT(*) FROM order_line",
+        ok: v => Number(v) === TOTAL_ORDER_LINE },
+
+      // --- §3.3.2 CC1: sum(W_YTD) == sum(D_YTD) ---
+      { name: "CC1 sum(W_YTD) = sum(D_YTD)",
+        computed: () => Math.abs(cc1WSum - cc1DSum) < 0.01
+          ? { ok: true, detail: "" }
+          : { ok: false, detail: `sum(w_ytd)=${cc1WSum}, sum(d_ytd)=${cc1DSum}` } },
+
+      // --- §3.3.2 CC2: D_NEXT_O_ID - 1 = max(O_ID) = max(NO_O_ID) per district ---
+      { name: "CC2a D_NEXT_O_ID - 1 = max(O_ID) per district",
+        computed: evalCc2a },
+      { name: "CC2b max(O_ID) = max(NO_O_ID) per district",
+        computed: evalCc2b },
+
+      // --- §3.3.2 CC3: max(NO_O_ID) - min(NO_O_ID) + 1 = count(new_order) per district ---
+      { name: "CC3 new_order contiguous range per district",
+        computed: evalCc3 },
+
+      // --- §3.3.2 CC4: sum(O_OL_CNT) = count(ORDER_LINE) ---
+      { name: "CC4 sum(O_OL_CNT) = count(order_line)",
+        computed: () => cc4OSum === cc4OlCnt
+          ? { ok: true, detail: "" }
+          : { ok: false, detail: `sum(o_ol_cnt)=${cc4OSum}, count(order_line)=${cc4OlCnt}` } },
+
+      // --- §4.3.3.1 distribution rules (5% tolerance — spec allows modest skew) ---
+      { name: "I_DATA 10% contains ORIGINAL (5..15%)",
+        query: "SELECT 100.0 * SUM(CASE WHEN i_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM item",
+        ok: v => Number(v) >= 5 && Number(v) <= 15 },
+      { name: "S_DATA 10% contains ORIGINAL (5..15%)",
+        query: "SELECT 100.0 * SUM(CASE WHEN s_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM stock",
+        ok: v => Number(v) >= 5 && Number(v) <= 15 },
+      { name: "C_CREDIT 10% BC (5..15%)",
+        query: "SELECT 100.0 * SUM(CASE WHEN c_credit = 'BC' THEN 1 ELSE 0 END) / COUNT(*) FROM customer",
+        ok: v => Number(v) >= 5 && Number(v) <= 15 },
+
+      // --- fixed-value sanity checks ---
+      { name: "C_MIDDLE = 'OE' everywhere",
+        query: "SELECT COUNT(*) FROM customer WHERE c_middle <> 'OE'",
+        ok: v => Number(v) === 0 },
+      { name: "W_YTD = 300000 everywhere",
+        query: "SELECT COUNT(*) FROM warehouse WHERE w_ytd <> 300000",
+        ok: v => Number(v) === 0 },
+      { name: "D_NEXT_O_ID = 3001 everywhere",
+        query: "SELECT COUNT(*) FROM district WHERE d_next_o_id <> 3001",
+        ok: v => Number(v) === 0 },
+    ];
+
+    const failures: string[] = [];
+    for (const c of checks) {
+      if ("query" in c) {
+        let v: unknown;
+        try {
+          v = driver.queryValue(c.query);
+        } catch (e) {
+          const msg = `  ✗ ${c.name}: query error: ${e}`;
+          console.error(msg);
+          failures.push(msg);
+          continue;
+        }
+        if (c.ok(v)) {
+          console.log(`  ✓ ${c.name}`);
+        } else {
+          const msg = `  ✗ ${c.name}: got ${v}`;
+          console.error(msg);
+          failures.push(msg);
+        }
+      } else {
+        let res: { ok: boolean; detail: string };
+        try {
+          res = c.computed();
+        } catch (e) {
+          const msg = `  ✗ ${c.name}: compute error: ${e}`;
+          console.error(msg);
+          failures.push(msg);
+          continue;
+        }
+        if (res.ok) {
+          console.log(`  ✓ ${c.name}`);
+        } else {
+          const msg = `  ✗ ${c.name}: ${res.detail}`;
+          console.error(msg);
+          failures.push(msg);
+        }
+      }
+    }
+    if (failures.length > 0) {
+      throw new Error(
+        `validate_population: ${failures.length} check(s) failed:\n${failures.join("\n")}`,
+      );
+    }
   });
 
   Step.begin("workload");
@@ -853,7 +1102,7 @@ function payment() {
   // from C_LAST_DICT via NURand(255, 0, 999), matching the load phase
   // (§4.3.2.3) so lookups hit the populated syllable strings.
   const is_byname = (paymentBynameGen.next() as number) <= 60;
-  const c_last_pick = is_byname ? C_LAST_FLAT_DICT[nurand255Gen.next() as number] : "";
+  const c_last_pick = is_byname ? C_LAST_DICT[nurand255Gen.next() as number] : "";
   // Keep the by-id stream deterministic even when the roll chooses
   // by-name — drain the generator so a mid-run roll switch doesn't
   // shift subsequent c_ids.
@@ -1012,7 +1261,7 @@ function order_status() {
   // per-VU random stream alignment stable run-over-run.
   const c_id_pick = ostatCIdGen.next() as number;
   const is_byname = (ostatBynameGen.next() as number) <= 60;
-  const c_last_pick = is_byname ? C_LAST_FLAT_DICT[nurand255Gen.next() as number] : "";
+  const c_last_pick = is_byname ? C_LAST_DICT[nurand255Gen.next() as number] : "";
 
   // T2.3: tpccOrderStatusByname depends only on the pre-tx is_byname roll
   // (the `return` paths inside the tx happen because the customer has no

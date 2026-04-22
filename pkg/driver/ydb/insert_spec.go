@@ -113,6 +113,15 @@ func (d *Driver) runChunk(
 // otherwise exactly limit rows are emitted. Each row's []any values are
 // mapped to types.Value via toYDBValue, then wrapped in a struct value
 // with the runtime's column names.
+//
+// NULL handling: BulkUpsert requires each struct field to carry a typed
+// value — a bare `types.VoidValue()` is rejected by the server with
+// `Type parse error: Unexpected type, got proto: void_type: NULL_VALUE`.
+// We therefore buffer each batch's raw rows, scan them to infer a
+// per-column concrete type from the first non-nil cell, and materialize
+// struct values using `types.NullValue(colType)` for cells that are nil.
+// Workload rows that use `Expr.if(cond, Expr.litNull(), …)` for the
+// `o_carrier_id` / `ol_delivery_d` spec columns rely on this path.
 func (d *Driver) bulkUpsertRuntime(
 	ctx context.Context,
 	tableName string,
@@ -125,7 +134,7 @@ func (d *Driver) bulkUpsertRuntime(
 	}
 
 	tablePath := path.Join(d.nativeDB.Name(), tableName)
-	batch := make([]types.Value, 0, d.bulkSize)
+	rawBatch := make([][]any, 0, d.bulkSize)
 	remaining := limit
 
 	for limit < 0 || remaining > 0 {
@@ -138,38 +147,37 @@ func (d *Driver) bulkUpsertRuntime(
 			return fmt.Errorf("ydb: runtime.Next: %w", err)
 		}
 
-		structVal, err := d.rowToStructValue(columns, row)
+		converted, err := d.convertRow(columns, row)
 		if err != nil {
 			return err
 		}
 
-		batch = append(batch, structVal)
+		rawBatch = append(rawBatch, converted)
 
 		if limit >= 0 {
 			remaining--
 		}
 
-		if len(batch) >= d.bulkSize {
-			if err := d.flushBulk(ctx, tablePath, tableName, batch); err != nil {
+		if len(rawBatch) >= d.bulkSize {
+			if err := d.flushBulkRaw(ctx, tablePath, tableName, columns, rawBatch); err != nil {
 				return err
 			}
 
-			batch = batch[:0]
+			rawBatch = rawBatch[:0]
 		}
 	}
 
-	if len(batch) > 0 {
-		return d.flushBulk(ctx, tablePath, tableName, batch)
+	if len(rawBatch) > 0 {
+		return d.flushBulkRaw(ctx, tablePath, tableName, columns, rawBatch)
 	}
 
 	return nil
 }
 
-// rowToStructValue converts one runtime row into a ydb struct value by
-// running each cell through the dialect's Convert hook and then
-// toYDBValue to get a types.Value.
-func (d *Driver) rowToStructValue(columns []string, row []any) (types.Value, error) {
-	fields := make([]types.StructValueOption, len(columns))
+// convertRow runs each cell through the dialect.Convert hook and returns
+// the raw []any ready for later type inference + toYDBValue.
+func (d *Driver) convertRow(columns []string, row []any) ([]any, error) {
+	out := make([]any, len(columns))
 
 	for idx, col := range columns {
 		conv, err := d.dialect.Convert(row[idx])
@@ -177,9 +185,148 @@ func (d *Driver) rowToStructValue(columns []string, row []any) (types.Value, err
 			return nil, fmt.Errorf("ydb: convert col %q: %w", col, err)
 		}
 
-		ydbVal, err := toYDBValue(conv)
+		out[idx] = conv
+	}
+
+	return out, nil
+}
+
+// flushBulkRaw converts a raw batch to struct values, using type
+// inference to turn nil cells into typed NullValue() and wrapping the
+// corresponding column's non-nil cells into Optional<T> so the list
+// element type stays uniform across rows. Columns that are nil in every
+// row of the batch fall back to `types.TypeInt64` — a last-resort
+// default that matches the most common column shape; downstream
+// BulkUpsert will still reject the row if the target column happens to
+// be a different type, surfacing as an explicit error rather than a
+// silent mismatch. Columns that are never nil in the batch stay as bare
+// typed values — BulkUpsert auto-lifts them for nullable targets and
+// keeps the historical shape for NOT NULL primary key columns.
+func (d *Driver) flushBulkRaw(
+	ctx context.Context,
+	tablePath, tableName string,
+	columns []string,
+	rawBatch [][]any,
+) error {
+	colTypes := inferColumnTypes(columns, rawBatch)
+	hasNull := columnsWithNulls(columns, rawBatch)
+	batch := make([]types.Value, 0, len(rawBatch))
+
+	for _, row := range rawBatch {
+		sv, err := rowToStructValueTyped(columns, row, colTypes, hasNull)
 		if err != nil {
-			return nil, fmt.Errorf("ydb: col %q: %w", col, err)
+			return err
+		}
+
+		batch = append(batch, sv)
+	}
+
+	return d.flushBulk(ctx, tablePath, tableName, batch)
+}
+
+// columnsWithNulls returns a boolean mask: mask[i] is true iff any row
+// in the batch has a nil value in column i. Signals the downstream
+// converter to wrap non-nil cells for that column in Optional<T>, so
+// the list element struct types stay uniform across rows.
+func columnsWithNulls(columns []string, rawBatch [][]any) []bool {
+	out := make([]bool, len(columns))
+
+	for _, row := range rawBatch {
+		for idx := range columns {
+			if row[idx] == nil {
+				out[idx] = true
+			}
+		}
+	}
+
+	return out
+}
+
+// inferColumnTypes scans a raw batch and returns the concrete types.Type
+// for each column, derived from the first non-nil cell. All-nil columns
+// get TypeInt64 as a fallback.
+func inferColumnTypes(columns []string, rawBatch [][]any) []types.Type {
+	out := make([]types.Type, len(columns))
+
+	for idx := range columns {
+		for _, row := range rawBatch {
+			if row[idx] == nil {
+				continue
+			}
+
+			t, ok := inferYDBType(row[idx])
+			if ok {
+				out[idx] = t
+
+				break
+			}
+		}
+
+		if out[idx] == nil {
+			out[idx] = types.TypeInt64
+		}
+	}
+
+	return out
+}
+
+// inferYDBType returns the ydb Type that matches the Go value shape used
+// by toYDBValue. Kept in lockstep with toYDBValue's switch — adding a
+// case there requires a matching case here.
+func inferYDBType(val any) (types.Type, bool) { //nolint:cyclop // flat type switch
+	switch val.(type) {
+	case bool:
+		return types.TypeBool, true
+	case int64:
+		return types.TypeInt64, true
+	case uint64:
+		return types.TypeUint64, true
+	case float64:
+		return types.TypeDouble, true
+	case string:
+		return types.TypeText, true
+	case *string:
+		return types.TypeText, true
+	case *time.Time:
+		return types.TypeTimestamp, true
+	default:
+		return nil, false
+	}
+}
+
+// rowToStructValueTyped converts one already-dialect-converted row into
+// a ydb struct value. Nil cells use `types.NullValue(colType)` with the
+// column type inferred from non-nil rows in the same batch. For columns
+// where any row in the batch is nil, non-nil cells are promoted to
+// Optional<T> so the ListValue element type stays uniform — BulkUpsert
+// rejects heterogeneous list elements. Columns never nil stay as bare
+// typed values so NOT NULL primary-key columns keep their historical
+// shape.
+func rowToStructValueTyped(
+	columns []string,
+	row []any,
+	colTypes []types.Type,
+	hasNull []bool,
+) (types.Value, error) {
+	fields := make([]types.StructValueOption, len(columns))
+
+	for idx, col := range columns {
+		var (
+			ydbVal types.Value
+			err    error
+		)
+
+		if row[idx] == nil {
+			ydbVal = types.NullValue(colTypes[idx])
+		} else {
+			ydbVal, err = toYDBValue(row[idx])
+			if err != nil {
+				return nil, fmt.Errorf("ydb: col %q: %w", col, err)
+			}
+
+			if hasNull[idx] {
+				ydbVal = types.OptionalValue(ydbVal)
+			}
 		}
 
 		fields[idx] = types.StructFieldValue(col, ydbVal)
