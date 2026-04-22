@@ -117,6 +117,60 @@ export function tpchClerk(maxClerkId: number): Expression {
 }
 
 /**
+ * TPC-H sparse orderkey formula (spec §4.2.3 / dbgen bm_utils.c).
+ * `rowIndex` is the 0-based order row index in [0, rowcount). The
+ * mapping keeps 8 consecutive keys, then skips 24 — e.g. rowIndex 0..7
+ * yields keys 1..8, rowIndex 8..15 yields keys 33..40, and so on.
+ * Max orderkey is 6_000_000 × SF.
+ *
+ * Formula: ((rowIndex / 8) * 32) + (rowIndex % 8) + 1.
+ *
+ * Shared between the orders population and the lineitem LookupPop
+ * so both derive identical orderkeys from the same entity index.
+ */
+export function tpchOrderkey(rowIndex: Expression): Expression {
+  const hi = Expr.mul(Expr.div(rowIndex, Expr.lit(8)), Expr.lit(32));
+  const lo = Expr.mod(rowIndex, Expr.lit(8));
+  return Expr.add(Expr.add(hi, lo), Expr.lit(1));
+}
+
+/**
+ * Stdlib name-bridge helpers. The TS wrapper's `std.*` shortcuts emit
+ * snake-case stdlib names; the Go registry keys them in camelCase.
+ * Until the wrapper stabilizes we call the Go-side names directly via
+ * `std.call`, keeping the TS call sites readable and the intent
+ * spec-traceable.
+ */
+export function tpchDateToDays(date: Expression): Expression {
+  return std.call("std.dateToDays", date);
+}
+export function tpchDaysToDate(days: Expression): Expression {
+  return std.call("std.daysToDate", days);
+}
+export function tpchHashMod(n: Expression, k: Expression): Expression {
+  return std.call("std.hashMod", n, k);
+}
+
+/**
+ * Deterministic orderdate: spec §4.2.3 puts o_orderdate in
+ * [STARTDATE, STARTDATE + 2557] (1992-01-01 .. 1998-12-31). We key the
+ * offset by a splitmix64-derived hash of the row id so:
+ *  - orders and the lineitem `orders` LookupPop produce identical
+ *    dates from the same row id (no Draw.* means no attr-path
+ *    dependence on the PRNG stream);
+ *  - the distribution still covers every day in the window uniformly
+ *    at scale.
+ */
+const TPCH_ORDERDATE_EPOCH_DAYS = 8036; // 1992-01-01 UTC
+const TPCH_ORDERDATE_SPAN_DAYS = 2557;  // 1992-01-01 .. 1998-12-31
+
+export function tpchOrderdateExpr(rowIndex: Expression): Expression {
+  const offset = tpchHashMod(rowIndex, Expr.lit(TPCH_ORDERDATE_SPAN_DAYS));
+  const days = Expr.add(Expr.lit(TPCH_ORDERDATE_EPOCH_DAYS), offset);
+  return tpchDaysToDate(days);
+}
+
+/**
  * Shape of one distribution inside `distributions.json`. The generator in
  * `cmd/tpch-dists` emits every dict in this form; tx.ts coerces to
  * `Dict.values(...)` at build time.
