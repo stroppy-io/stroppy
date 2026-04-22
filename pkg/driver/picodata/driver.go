@@ -15,7 +15,6 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
@@ -213,14 +212,4 @@ func (d *Driver) InsertValues(
 
 		return nil, nil //nolint:nilnil // unreachable after panic
 	}
-}
-
-// InsertSpec is not yet implemented for the picodata driver. The
-// relational path lands per-driver in a later landing; until then this
-// returns the framework's sentinel.
-func (d *Driver) InsertSpec(
-	_ context.Context,
-	_ *dgproto.InsertSpec,
-) (*stats.Query, error) {
-	return nil, driver.ErrInsertSpecNotImplemented
 }
