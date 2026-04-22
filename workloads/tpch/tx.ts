@@ -172,7 +172,7 @@ const SQL_FILE =
 // YDB declares currency columns as `Double` — unlike pg/mysql/pico which
 // accept int64 into DECIMAL. Framework emits float64 from Draw.decimal,
 // but Expr.lit(0.0) collapses to int64 on the wire (Number.isInteger(0.0)
-// is true in JS). litDouble() (below) forces the Double oneofKind so the
+// is true in JS). `Expr.litFloat(...)` forces the Double oneofKind so the
 // zero-init placeholder for o_totalprice serializes as Double on YDB;
 // pg/mysql/pico accept it identically into their DECIMAL/NUMERIC columns.
 
@@ -225,25 +225,10 @@ if (nationRegionKeys.length !== N_NATION) {
   throw new Error(`tpch: nationRegionKeys length ${nationRegionKeys.length} != ${N_NATION}`);
 }
 
-/**
- * Nation → region key as an integer expression. Folded into a nested
- * `Expr.if` chain over rowIndex so the output column type is int64,
- * not string (Dict.values stringifies all entries, which YDB's BulkUpsert
- * rejects for an Int64 column). pg/mysql/pico accept either shape —
- * keeping one path minimizes divergence between dialects.
- */
-function nationRegionKeyExpr(rowIndex: ReturnType<typeof Attr.rowIndex>) {
-  // Build a right-folded `if (rowIndex == 0) → k0 else if (rowIndex == 1) → k1 ...`.
-  let expr = Expr.lit(nationRegionKeys[nationRegionKeys.length - 1]);
-  for (let i = nationRegionKeys.length - 2; i >= 0; i--) {
-    expr = Expr.if(
-      Expr.eq(rowIndex, Expr.lit(i)),
-      Expr.lit(nationRegionKeys[i]),
-      expr,
-    );
-  }
-  return expr;
-}
+// Dict.values always stringifies its entries (DictRow.values is string on the
+// wire), so we coerce back to int64 via Attr.dictAtInt at read time. YDB's
+// BulkUpsert requires an Int64 for n_regionkey; pg/mysql/pico accept either.
+const nationRegionKeyDict = Dict.values(nationRegionKeys.map(String));
 const mktSegmentDict = scalarDictFromJson("msegmnt");
 const orderPriorityDict = scalarDictFromJson("o_oprio");
 const containerDict = scalarDictFromJson("p_cntr");
@@ -267,16 +252,6 @@ const tpchText = makeTpchText(tpchGrammarDicts);
 /** Zero-padded 9-digit id — "%09d" — used by Supplier# / Customer# names. */
 function fmt9(id: ReturnType<typeof Attr.rowId>) {
   return std.format(Expr.lit("%09d"), id);
-}
-
-// Currency literal helper: forces a numeric constant onto the wire as
-// `double`. Mirrors the tpcc workload's fix — `Expr.lit(0.0)` collapses
-// to int64 because `Number.isInteger(0.0)` is true in JS, which trips
-// the YDB driver on `Double` columns. Other dialects (pg/mysql/pico)
-// tolerate int64 into their DECIMAL/NUMERIC columns.
-type PbExprLit = ReturnType<typeof Expr.lit>;
-function litDouble(x: number): PbExprLit {
-  return { kind: { oneofKind: "lit", lit: { value: { oneofKind: "double", double: x } } } } as PbExprLit;
 }
 
 // --------------------------------------------------------------------------
@@ -304,7 +279,7 @@ function nationSpec() {
     attrs: {
       n_nationkey: Attr.rowIndex(),
       n_name: Attr.dictAt(nationsNameDict, Attr.rowIndex()),
-      n_regionkey: nationRegionKeyExpr(Attr.rowIndex()),
+      n_regionkey: Attr.dictAtInt(nationRegionKeyDict, Attr.rowIndex()),
       n_comment: tpchText(31, 114),
     },
   });
@@ -436,9 +411,9 @@ function ordersSpec() {
       //   o_totalprice = Σ l_extendedprice × (1 + l_tax) × (1 - l_discount)
       // across matching lineitems (spec §4.2.3). Can't be computed at
       // orders-emit time because it depends on not-yet-generated lines.
-      // litDouble keeps YDB's Double wire happy; pg/mysql/pico accept it
-      // identically into their DECIMAL/NUMERIC columns.
-      o_totalprice: litDouble(0.0),
+      // Expr.litFloat keeps YDB's Double wire happy; pg/mysql/pico accept
+      // it identically into their DECIMAL/NUMERIC columns.
+      o_totalprice: Expr.litFloat(0.0),
       // Deterministic per-row orderdate (hash(rowIndex) mod 2557); same
       // formula is exposed via the lineitem orders LookupPop so
       // lineitem's derived dates reference the exact stored value.
