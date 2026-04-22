@@ -291,22 +291,22 @@ export const std = {
 
   /** splitmix64(n) mod k — evenly distributes n across [0, k). */
   hashMod(n: PbExpr, k: PbExpr): PbExpr {
-    return call("std.hash_mod", [n, k]);
+    return call("std.hashMod", [n, k]);
   },
 
   /** Deterministic UUID v4 derived from a 64-bit seed. */
   uuidSeeded(seed: PbExpr): PbExpr {
-    return call("std.uuid_seeded", [seed]);
+    return call("std.uuidSeeded", [seed]);
   },
 
   /** Convert epoch-days into a date scalar (YYYY-MM-DD on SQL side). */
   daysToDate(days: PbExpr): PbExpr {
-    return call("std.days_to_date", [days]);
+    return call("std.daysToDate", [days]);
   },
 
   /** Convert a date scalar into epoch-days. */
   dateToDays(t: PbExpr): PbExpr {
-    return call("std.date_to_days", [t]);
+    return call("std.dateToDays", [t]);
   },
 
   /** ASCII lowercase. */
@@ -331,7 +331,7 @@ export const std = {
 
   /** Format any scalar as a string. */
   toString(x: PbExpr): PbExpr {
-    return call("std.to_string", [x]);
+    return call("std.toString", [x]);
   },
 };
 
