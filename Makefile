@@ -241,6 +241,32 @@ tests: # Run tests with coverage
 	go test -race ./... -coverprofile=coverage.out
 
 
+##
+## Reference-data JSON regeneration (build-time, run with upstream inputs)
+##
+
+.PHONY: gen-tpcds-json gen-tpch-json
+
+gen-tpcds-json: # Regenerate workloads/tpcds/distributions.json from upstream .dst files
+	@if [ -z "$(TPCDS_TOOLS_DIR)" ]; then \
+		echo "error: TPCDS_TOOLS_DIR must point to the dsdgen tools directory holding .dst files (e.g. /path/to/DSGen/tools)"; \
+		exit 2; \
+	fi
+	go run ./cmd/dstparse -in $(TPCDS_TOOLS_DIR) -out workloads/tpcds/distributions.json
+
+gen-tpch-json: # Regenerate workloads/tpch/distributions.json and answers_sf1.json from upstream files
+	@if [ -z "$(TPCH_DISTS)" ]; then \
+		echo "error: TPCH_DISTS must point to upstream dists.dss"; \
+		exit 2; \
+	fi
+	@if [ -z "$(TPCH_ANSWERS_DIR)" ]; then \
+		echo "error: TPCH_ANSWERS_DIR must point to the upstream answers/ directory (q*.out / *.ans)"; \
+		exit 2; \
+	fi
+	go run ./cmd/tpch-dists -in $(TPCH_DISTS) -out workloads/tpch/distributions.json
+	go run ./cmd/tpch-answers -in $(TPCH_ANSWERS_DIR) -out workloads/tpch/answers_sf1.json
+
+
 # K6/Stroppy build section
 
 .PHONY: build-k6 build-k6-debug build-debug build build-all
