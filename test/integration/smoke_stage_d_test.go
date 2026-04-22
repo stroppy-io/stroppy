@@ -4,20 +4,15 @@ package integration
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"io"
 	"math"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 )
 
 // TestStageDSmokeIntegration is the Stage D7 end-to-end smoke: four
@@ -32,17 +27,17 @@ func TestStageDSmokeIntegration(t *testing.T) {
 	stageDCreateTables(t, pool)
 
 	catalogSpec := stageDCatalogSpec()
-	stageDRunSpec(t, pool, catalogSpec, "catalog", stageDCatalogColumns)
+	loadSpec(t, pool, catalogSpec, "catalog", stageDCatalogColumns)
 
 	eventsSpec := stageDEventsSpec()
-	stageDRunSpec(t, pool, eventsSpec, "events", stageDEventsColumns)
+	loadSpec(t, pool, eventsSpec, "events", stageDEventsColumns)
 
 	scd2Spec := stageDStoreVersionsSpec()
-	stageDRunSpec(t, pool, scd2Spec, "store_versions", stageDStoreVersionsColumns)
+	loadSpec(t, pool, scd2Spec, "store_versions", stageDStoreVersionsColumns)
 
 	ordersSpec, linesSpec := stageDOrdersSpecs()
-	stageDRunSpec(t, pool, ordersSpec, "orders", stageDOrdersColumns)
-	stageDRunSpec(t, pool, linesSpec, "order_lines", stageDOrderLinesColumns)
+	loadSpec(t, pool, ordersSpec, "orders", stageDOrdersColumns)
+	loadSpec(t, pool, linesSpec, "order_lines", stageDOrderLinesColumns)
 
 	stageDAssertCatalog(t, pool)
 	stageDAssertEvents(t, pool)
@@ -59,8 +54,8 @@ func TestStageDSmokeIntegration(t *testing.T) {
 			stageDStoreVersionsSpec(),
 		}
 		for _, spec := range specs {
-			rowsA := stageDDrain(t, spec)
-			rowsB := stageDDrain(t, spec)
+			rowsA := drainSpec(t, spec)
+			rowsB := drainSpec(t, spec)
 			if !reflect.DeepEqual(rowsA, rowsB) {
 				t.Fatalf("%s: two runtimes with the same spec produced divergent rows",
 					spec.GetTable())
@@ -71,13 +66,13 @@ func TestStageDSmokeIntegration(t *testing.T) {
 		// uniform-degree side; determinism must hold for the child too.
 		os1, ol1 := stageDOrdersSpecs()
 		os2, ol2 := stageDOrdersSpecs()
-		osA := stageDDrain(t, os1)
-		osB := stageDDrain(t, os2)
+		osA := drainSpec(t, os1)
+		osB := drainSpec(t, os2)
 		if !reflect.DeepEqual(osA, osB) {
 			t.Fatalf("orders emission non-deterministic")
 		}
-		olA := stageDDrain(t, ol1)
-		olB := stageDDrain(t, ol2)
+		olA := drainSpec(t, ol1)
+		olB := drainSpec(t, ol2)
 		if !reflect.DeepEqual(olA, olB) {
 			t.Fatalf("order_lines emission non-deterministic")
 		}
@@ -157,7 +152,7 @@ func stageDCatalogSpec() *dgproto.InsertSpec {
 
 	attrs := []*dgproto.Attr{
 		attrOf("item_id", binOpOf(dgproto.BinOp_ADD, rowIndexOf(), litOf(int64(1)))),
-		{Name: "item_name", Expr: stageDStreamDraw(&dgproto.StreamDraw_Ascii{
+		{Name: "item_name", Expr: streamDrawExpr(&dgproto.StreamDraw_Ascii{
 			Ascii: &dgproto.DrawAscii{
 				MinLen: litOf(int64(8)),
 				MaxLen: litOf(int64(12)),
@@ -166,17 +161,17 @@ func stageDCatalogSpec() *dgproto.InsertSpec {
 				},
 			},
 		})},
-		{Name: "price", Expr: stageDStreamDraw(&dgproto.StreamDraw_Decimal{
+		{Name: "price", Expr: streamDrawExpr(&dgproto.StreamDraw_Decimal{
 			Decimal: &dgproto.DrawDecimal{
 				Min:   litFloat(1.00),
 				Max:   litFloat(999.99),
 				Scale: 2,
 			},
 		})},
-		{Name: "category", Expr: stageDStreamDraw(&dgproto.StreamDraw_Dict{
+		{Name: "category", Expr: streamDrawExpr(&dgproto.StreamDraw_Dict{
 			Dict: &dgproto.DrawDict{DictKey: "categories", WeightSet: ""},
 		})},
-		{Name: "popularity", Expr: stageDStreamDraw(&dgproto.StreamDraw_Nurand{
+		{Name: "popularity", Expr: streamDrawExpr(&dgproto.StreamDraw_Nurand{
 			Nurand: &dgproto.DrawNURand{
 				A:     255,
 				X:     1,
@@ -240,26 +235,26 @@ func stageDEventsSpec() *dgproto.InsertSpec {
 
 	attrs := []*dgproto.Attr{
 		attrOf("event_id", binOpOf(dgproto.BinOp_ADD, rowIndexOf(), litOf(int64(1)))),
-		{Name: "event_day", Expr: stageDStreamDraw(&dgproto.StreamDraw_Date{
+		{Name: "event_day", Expr: streamDrawExpr(&dgproto.StreamDraw_Date{
 			Date: &dgproto.DrawDate{
 				MinDaysEpoch: minDays,
 				MaxDaysEpoch: maxDays,
 			},
 		})},
-		{Name: "latency_ms", Expr: stageDStreamDraw(&dgproto.StreamDraw_Normal{
+		{Name: "latency_ms", Expr: streamDrawExpr(&dgproto.StreamDraw_Normal{
 			Normal: &dgproto.DrawNormal{
 				Min:   litFloat(10),
 				Max:   litFloat(1000),
 				Screw: 3.0,
 			},
 		})},
-		{Name: "is_anomaly", Expr: stageDStreamDraw(&dgproto.StreamDraw_Bernoulli{
+		{Name: "is_anomaly", Expr: streamDrawExpr(&dgproto.StreamDraw_Bernoulli{
 			Bernoulli: &dgproto.DrawBernoulli{P: 0.05},
 		})},
 		{Name: "item_id", Expr: &dgproto.Expr{Kind: &dgproto.Expr_CohortDraw{
 			CohortDraw: &dgproto.CohortDraw{
 				Name: "hot_items",
-				Slot: stageDStreamDraw(&dgproto.StreamDraw_IntUniform{
+				Slot: streamDrawExpr(&dgproto.StreamDraw_IntUniform{
 					IntUniform: &dgproto.DrawIntUniform{
 						Min: litOf(int64(0)),
 						Max: litOf(stageDCohortSize - 1),
@@ -276,7 +271,7 @@ func stageDEventsSpec() *dgproto.InsertSpec {
 			litOf(int64(1)),
 			litOf(int64(0)),
 		)},
-		{Name: "phrase", Expr: stageDStreamDraw(&dgproto.StreamDraw_Phrase{
+		{Name: "phrase", Expr: streamDrawExpr(&dgproto.StreamDraw_Phrase{
 			Phrase: &dgproto.DrawPhrase{
 				VocabKey:  "words",
 				MinWords:  litOf(int64(3)),
@@ -318,7 +313,7 @@ var stageDStoreVersionsColumns = []string{
 func stageDStoreVersionsSpec() *dgproto.InsertSpec {
 	attrs := []*dgproto.Attr{
 		attrOf("store_id", binOpOf(dgproto.BinOp_ADD, rowIndexOf(), litOf(int64(1)))),
-		{Name: "store_name", Expr: stageDStreamDraw(&dgproto.StreamDraw_Ascii{
+		{Name: "store_name", Expr: streamDrawExpr(&dgproto.StreamDraw_Ascii{
 			Ascii: &dgproto.DrawAscii{
 				MinLen: litOf(int64(5)),
 				MaxLen: litOf(int64(10)),
@@ -372,7 +367,7 @@ func stageDOrdersSpecs() (parent, child *dgproto.InsertSpec) {
 			ColumnOrder: stageDOrdersColumns,
 			Attrs: []*dgproto.Attr{
 				attrOf("order_id", binOpOf(dgproto.BinOp_ADD, rowIndexOf(), litOf(int64(1)))),
-				{Name: "placed", Expr: stageDStreamDraw(&dgproto.StreamDraw_Date{
+				{Name: "placed", Expr: streamDrawExpr(&dgproto.StreamDraw_Date{
 					Date: &dgproto.DrawDate{
 						MinDaysEpoch: daysEpoch(time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)),
 						MaxDaysEpoch: daysEpoch(time.Date(2022, 12, 31, 0, 0, 0, 0, time.UTC)),
@@ -452,107 +447,7 @@ func stageDOrdersSpecs() (parent, child *dgproto.InsertSpec) {
 
 // ---------- Small proto helpers ----------
 
-// stageDStreamDraw wraps a StreamDraw oneof arm (e.g.
-// *dgproto.StreamDraw_IntUniform) into an Expr. `stream_id` is left 0 —
-// `compile.AssignStreamIDs` fills it during Runtime construction.
-// Typed via `any` because the `isStreamDraw_Draw` interface is
-// unexported from the dgproto package; the type switch enforces arm
-// membership at runtime.
-func stageDStreamDraw(arm any) *dgproto.Expr {
-	sd := &dgproto.StreamDraw{}
-	switch v := arm.(type) {
-	case *dgproto.StreamDraw_IntUniform:
-		sd.Draw = v
-	case *dgproto.StreamDraw_FloatUniform:
-		sd.Draw = v
-	case *dgproto.StreamDraw_Normal:
-		sd.Draw = v
-	case *dgproto.StreamDraw_Zipf:
-		sd.Draw = v
-	case *dgproto.StreamDraw_Nurand:
-		sd.Draw = v
-	case *dgproto.StreamDraw_Bernoulli:
-		sd.Draw = v
-	case *dgproto.StreamDraw_Dict:
-		sd.Draw = v
-	case *dgproto.StreamDraw_Joint:
-		sd.Draw = v
-	case *dgproto.StreamDraw_Date:
-		sd.Draw = v
-	case *dgproto.StreamDraw_Decimal:
-		sd.Draw = v
-	case *dgproto.StreamDraw_Ascii:
-		sd.Draw = v
-	case *dgproto.StreamDraw_Phrase:
-		sd.Draw = v
-	default:
-		panic(fmt.Sprintf("stageDStreamDraw: unknown arm %T", v))
-	}
-	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: sd}}
-}
-
-func litFloat(f float64) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
-		Value: &dgproto.Literal_Double{Double: f},
-	}}}
-}
-
-// daysEpoch returns the number of days since 1970-01-01 UTC for t's
-// midnight-UTC day.
-func daysEpoch(t time.Time) int64 {
-	utc := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
-	return utc.Unix() / 86400
-}
-
 // ---------- Runtime drive + COPY ----------
-
-// stageDDrain materializes a spec to a [][]any. Runs a Runtime to EOF.
-func stageDDrain(t *testing.T, spec *dgproto.InsertSpec) [][]any {
-	t.Helper()
-
-	rt, err := runtime.NewRuntime(spec)
-	if err != nil {
-		t.Fatalf("NewRuntime(%s): %v", spec.GetTable(), err)
-	}
-
-	var rows [][]any
-	for {
-		row, err := rt.Next()
-		if errors.Is(err, io.EOF) {
-			return rows
-		}
-		if err != nil {
-			t.Fatalf("Next(%s): %v", spec.GetTable(), err)
-		}
-		out := make([]any, len(row))
-		copy(out, row)
-		rows = append(rows, out)
-	}
-}
-
-// stageDRunSpec drains the spec into [][]any and bulk-loads via
-// pgx.CopyFrom. Returns the number of rows inserted.
-func stageDRunSpec(
-	t *testing.T,
-	pool *pgxpool.Pool,
-	spec *dgproto.InsertSpec,
-	table string,
-	columns []string,
-) int64 {
-	t.Helper()
-
-	rows := stageDDrain(t, spec)
-	n, err := pool.CopyFrom(
-		context.Background(),
-		pgx.Identifier{table},
-		columns,
-		pgx.CopyFromRows(rows),
-	)
-	if err != nil {
-		t.Fatalf("CopyFrom(%s): %v", table, err)
-	}
-	return n
-}
 
 // ---------- Assertions ----------
 
@@ -863,7 +758,7 @@ func stageDAssertOrders(t *testing.T, pool *pgxpool.Pool) {
 	// a freshly drained copy of the child spec. Counts per parent_id are
 	// compared.
 	_, childSpec := stageDOrdersSpecs()
-	freshRows := stageDDrain(t, childSpec)
+	freshRows := drainSpec(t, childSpec)
 	freshPerParent := map[int64]int64{}
 	for _, r := range freshRows {
 		pid, ok := r[1].(int64)

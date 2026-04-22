@@ -4,13 +4,10 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"reflect"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
@@ -52,18 +49,18 @@ func childSpec() *dgproto.InsertSpec {
 	parents := &dgproto.LookupPop{
 		Population: &dgproto.Population{Name: childParentPop, Size: childParentCount},
 		Attrs: []*dgproto.Attr{
-			relAttr("p_id", binOpOf(dgproto.BinOp_ADD, rowIndexKind(dgproto.RowIndex_ENTITY), litOf(int64(1)))),
-			relAttr("p_label", callOf("std.format", litOf("P%03d"),
+			attrOf("p_id", binOpOf(dgproto.BinOp_ADD, rowIndexKind(dgproto.RowIndex_ENTITY), litOf(int64(1)))),
+			attrOf("p_label", callOf("std.format", litOf("P%03d"),
 				binOpOf(dgproto.BinOp_ADD, rowIndexKind(dgproto.RowIndex_ENTITY), litOf(int64(1))))),
 		},
 		ColumnOrder: []string{"p_id", "p_label"},
 	}
 
 	attrs := []*dgproto.Attr{
-		relAttr("c_id", binOpOf(dgproto.BinOp_ADD, rowIndexKind(dgproto.RowIndex_GLOBAL), litOf(int64(1)))),
-		relAttr("c_parent_id", lookupOf(childParentPop, "p_id", rowIndexKind(dgproto.RowIndex_ENTITY))),
-		relAttr("c_line", binOpOf(dgproto.BinOp_ADD, rowIndexKind(dgproto.RowIndex_LINE), litOf(int64(1)))),
-		relAttr("c_label", callOf("std.format", litOf("%s-%d"),
+		attrOf("c_id", binOpOf(dgproto.BinOp_ADD, rowIndexKind(dgproto.RowIndex_GLOBAL), litOf(int64(1)))),
+		attrOf("c_parent_id", lookupOf(childParentPop, "p_id", rowIndexKind(dgproto.RowIndex_ENTITY))),
+		attrOf("c_line", binOpOf(dgproto.BinOp_ADD, rowIndexKind(dgproto.RowIndex_LINE), litOf(int64(1)))),
+		attrOf("c_label", callOf("std.format", litOf("%s-%d"),
 			lookupOf(childParentPop, "p_label", rowIndexKind(dgproto.RowIndex_ENTITY)),
 			binOpOf(dgproto.BinOp_ADD, rowIndexKind(dgproto.RowIndex_LINE), litOf(int64(1))))),
 	}
@@ -112,26 +109,6 @@ func childSpec() *dgproto.InsertSpec {
 	}
 }
 
-// relAttr is a local builder to avoid colliding with attrOf in
-// smoke_datagen_test.go, which lives in the same package.
-func relAttr(name string, e *dgproto.Expr) *dgproto.Attr {
-	return &dgproto.Attr{Name: name, Expr: e}
-}
-
-// rowIndexKind emits a RowIndex Expr of the requested kind. Distinct
-// from rowIndexOf in the sibling smoke file, which hard-codes GLOBAL.
-func rowIndexKind(kind dgproto.RowIndex_Kind) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{Kind: kind}}}
-}
-
-// lookupOf constructs a Lookup Expr targeting (pop, attr) at the given
-// entity-index Expr.
-func lookupOf(pop, attrName string, idx *dgproto.Expr) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_Lookup{Lookup: &dgproto.Lookup{
-		TargetPop: pop, AttrName: attrName, EntityIndex: idx,
-	}}}
-}
-
 // createChildrenTable (re)creates the target table. ResetSchema has
 // already dropped the public schema, so this always runs against a
 // fresh namespace.
@@ -149,42 +126,11 @@ func createChildrenTable(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
-// drainChildren runs a Runtime to EOF and returns the rows in emit
-// order. Separate from drainRuntime in the sibling file to keep each
-// test file self-contained.
-func drainChildren(t *testing.T, rt *runtime.Runtime) [][]any {
-	t.Helper()
-
-	var rows [][]any
-	for {
-		row, err := rt.Next()
-		if errors.Is(err, io.EOF) {
-			return rows
-		}
-		if err != nil {
-			t.Fatalf("runtime.Next: %v", err)
-		}
-		out := make([]any, len(row))
-		copy(out, row)
-		rows = append(rows, out)
-	}
-}
-
 // copyChildren bulk-inserts rows into the children table via the
 // Postgres COPY protocol and returns the insert count.
 func copyChildren(t *testing.T, pool *pgxpool.Pool, rows [][]any) int64 {
 	t.Helper()
-
-	n, err := pool.CopyFrom(
-		context.Background(),
-		pgx.Identifier{"children"},
-		childColumns,
-		pgx.CopyFromRows(rows),
-	)
-	if err != nil {
-		t.Fatalf("CopyFrom: %v", err)
-	}
-	return n
+	return copyRowsTo(t, pool, "children", childColumns, rows)
 }
 
 // TestRelationshipSmoke drives the Stage-C relationship runtime + Lookup
@@ -201,7 +147,7 @@ func TestRelationshipSmoke(t *testing.T) {
 		t.Fatalf("NewRuntime: %v", err)
 	}
 
-	rows := drainChildren(t, rt)
+	rows := drainRuntime(t, rt)
 	if int64(len(rows)) != childRowCount {
 		t.Fatalf("runtime emitted %d rows, want %d", len(rows), childRowCount)
 	}
@@ -363,8 +309,8 @@ func TestRelationshipSmokeDeterminism(t *testing.T) {
 		t.Fatalf("NewRuntime B: %v", err)
 	}
 
-	rowsA := drainChildren(t, rtA)
-	rowsB := drainChildren(t, rtB)
+	rowsA := drainRuntime(t, rtA)
+	rowsB := drainRuntime(t, rtB)
 
 	if int64(len(rowsA)) != childRowCount {
 		t.Fatalf("A emitted %d rows, want %d", len(rowsA), childRowCount)

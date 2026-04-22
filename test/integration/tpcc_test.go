@@ -83,7 +83,7 @@ const (
 	tpccNewOrdersPerWh      = tpccDistrictsPerWh * tpccNewOrdersPerDist // 9_000
 	tpccStockPerWh          = tpccItems                                 // 100_000
 	tpccOrderLinesPerWh     = tpccOrdersPerWh * tpccOrderLinesPerOrder  // 300_000
-	tpccFirstNewOrderSlotID = int64(2101) // spec: last 900 o_ids per district
+	tpccFirstNewOrderSlotID = int64(2101)                               // spec: last 900 o_ids per district
 )
 
 // ---------- Column lists in emit order ----------
@@ -314,7 +314,7 @@ func tpccAsciiAttr(name string, length int64) *dgproto.Attr {
 
 // tpccAsciiAttrCustom wraps a Draw.ascii over the given alphabet.
 func tpccAsciiAttrCustom(name string, minLen, maxLen int64, alphabet []*dgproto.AsciiRange) *dgproto.Attr {
-	return &dgproto.Attr{Name: name, Expr: stageDStreamDraw(&dgproto.StreamDraw_Ascii{
+	return &dgproto.Attr{Name: name, Expr: streamDrawExpr(&dgproto.StreamDraw_Ascii{
 		Ascii: &dgproto.DrawAscii{
 			MinLen:   litOf(minLen),
 			MaxLen:   litOf(maxLen),
@@ -325,7 +325,7 @@ func tpccAsciiAttrCustom(name string, minLen, maxLen int64, alphabet []*dgproto.
 
 // tpccDecimalAttr wraps a Draw.decimal.
 func tpccDecimalAttr(name string, lo, hi float64, scale uint32) *dgproto.Attr {
-	return &dgproto.Attr{Name: name, Expr: stageDStreamDraw(&dgproto.StreamDraw_Decimal{
+	return &dgproto.Attr{Name: name, Expr: streamDrawExpr(&dgproto.StreamDraw_Decimal{
 		Decimal: &dgproto.DrawDecimal{
 			Min:   litFloat(lo),
 			Max:   litFloat(hi),
@@ -336,14 +336,14 @@ func tpccDecimalAttr(name string, lo, hi float64, scale uint32) *dgproto.Attr {
 
 // tpccIntUniformAttr wraps a Draw.intUniform with integer bounds.
 func tpccIntUniformAttr(name string, lo, hi int64) *dgproto.Attr {
-	return &dgproto.Attr{Name: name, Expr: stageDStreamDraw(&dgproto.StreamDraw_IntUniform{
+	return &dgproto.Attr{Name: name, Expr: streamDrawExpr(&dgproto.StreamDraw_IntUniform{
 		IntUniform: &dgproto.DrawIntUniform{Min: litOf(lo), Max: litOf(hi)},
 	})}
 }
 
 // tpccDateAttr wraps a Draw.date covering a calendar-year window.
 func tpccDateAttr(name string, from, to time.Time) *dgproto.Attr {
-	return &dgproto.Attr{Name: name, Expr: stageDStreamDraw(&dgproto.StreamDraw_Date{
+	return &dgproto.Attr{Name: name, Expr: streamDrawExpr(&dgproto.StreamDraw_Date{
 		Date: &dgproto.DrawDate{
 			MinDaysEpoch: daysEpoch(from),
 			MaxDaysEpoch: daysEpoch(to),
@@ -433,7 +433,7 @@ func tpccCustomerSpec() *dgproto.InsertSpec {
 		litOf(int64(1)),
 	)
 	// NURand(A=255, x=0, y=999) → int64 ∈ [0, 999] for dict indexing.
-	nurandIdx := stageDStreamDraw(&dgproto.StreamDraw_Nurand{
+	nurandIdx := streamDrawExpr(&dgproto.StreamDraw_Nurand{
 		Nurand: &dgproto.DrawNURand{A: 255, X: 0, Y: tpccLastNameDictSize - 1, CSalt: 0xC1A57},
 	})
 
@@ -551,7 +551,7 @@ func tpccOrdersSpec() *dgproto.InsertSpec {
 			time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC)),
 		{
 			Name: "o_carrier_id",
-			Expr: stageDStreamDraw(&dgproto.StreamDraw_IntUniform{
+			Expr: streamDrawExpr(&dgproto.StreamDraw_IntUniform{
 				IntUniform: &dgproto.DrawIntUniform{Min: litOf(int64(1)), Max: litOf(int64(10))},
 			}),
 			Null: &dgproto.Null{Rate: 0.3, SeedSalt: 0xCAB01},
@@ -1063,4 +1063,3 @@ func tpccAssertCLastSkew(t *testing.T, pool *pgxpool.Pool) {
 			maxCount, tpccCustomersPerWh/4)
 	}
 }
-

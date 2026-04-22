@@ -4,15 +4,12 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"reflect"
 	"sort"
 	"sync"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
@@ -67,63 +64,6 @@ func smokeSpec(size int64) *dgproto.InsertSpec {
 	}
 }
 
-func litOf(value any) *dgproto.Expr {
-	switch typed := value.(type) {
-	case int64:
-		return &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
-			Value: &dgproto.Literal_Int64{Int64: typed},
-		}}}
-	case string:
-		return &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
-			Value: &dgproto.Literal_String_{String_: typed},
-		}}}
-	default:
-		panic(fmt.Sprintf("litOf: unsupported type %T", value))
-	}
-}
-
-func rowIndexOf() *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{
-		Kind: dgproto.RowIndex_GLOBAL,
-	}}}
-}
-
-func colOf(name string) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_Col{Col: &dgproto.ColRef{Name: name}}}
-}
-
-func binOpOf(op dgproto.BinOp_Op, a, b *dgproto.Expr) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{
-		Op: op, A: a, B: b,
-	}}}
-}
-
-func callOf(name string, args ...*dgproto.Expr) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_Call{Call: &dgproto.Call{
-		Func: name, Args: args,
-	}}}
-}
-
-func ifOf(cond, thenExpr, elseExpr *dgproto.Expr) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_If_{If_: &dgproto.If{
-		Cond: cond, Then: thenExpr, Else_: elseExpr,
-	}}}
-}
-
-func dictAtOf(key string, index *dgproto.Expr) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_DictAt{DictAt: &dgproto.DictAt{
-		DictKey: key, Index: index,
-	}}}
-}
-
-func attrOf(name string, e *dgproto.Expr) *dgproto.Attr {
-	return &dgproto.Attr{Name: name, Expr: e}
-}
-
-func attrWithNullOf(name string, e *dgproto.Expr, rate float32, salt uint64) *dgproto.Attr {
-	return &dgproto.Attr{Name: name, Expr: e, Null: &dgproto.Null{Rate: rate, SeedSalt: salt}}
-}
-
 // createSmokeTable (re)creates the smoke target table. ResetSchema has
 // already dropped the public schema, so this always runs against a fresh
 // namespace.
@@ -142,42 +82,10 @@ func createSmokeTable(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
-// drainRuntime runs a Runtime to EOF and returns the rows in emit order.
-func drainRuntime(t *testing.T, rt *runtime.Runtime) [][]any {
-	t.Helper()
-
-	var rows [][]any
-
-	for {
-		row, err := rt.Next()
-		if errors.Is(err, io.EOF) {
-			return rows
-		}
-		if err != nil {
-			t.Fatalf("runtime.Next: %v", err)
-		}
-
-		out := make([]any, len(row))
-		copy(out, row)
-		rows = append(rows, out)
-	}
-}
-
-// copyRows bulk-inserts the given rows into the smoke table via the
-// postgres COPY protocol. Returns the number of rows inserted.
+// copyRows is a smoke-table-specific COPY shortcut over copyRowsTo.
 func copyRows(t *testing.T, pool *pgxpool.Pool, rows [][]any) int64 {
 	t.Helper()
-
-	n, err := pool.CopyFrom(
-		context.Background(),
-		pgx.Identifier{"smoke"},
-		smokeColumns,
-		pgx.CopyFromRows(rows),
-	)
-	if err != nil {
-		t.Fatalf("CopyFrom: %v", err)
-	}
-	return n
+	return copyRowsTo(t, pool, "smoke", smokeColumns, rows)
 }
 
 // TestDatagenSmoke proves the Stage-B pipeline emits correct rows into a
@@ -367,34 +275,6 @@ func sortRowsByID(rows [][]any) {
 	})
 }
 
-// streamDrawAttr wraps a named attr whose Expr is a StreamDraw with the
-// given arm (a generated StreamDraw_* wrapper value). stream_id is left
-// zero — compile.AssignStreamIDs fills it in during Runtime construction.
-func streamDrawAttr(name string, draw any) *dgproto.Attr {
-	sd := &dgproto.StreamDraw{}
-
-	switch v := draw.(type) {
-	case *dgproto.StreamDraw_IntUniform:
-		sd.Draw = v
-	case *dgproto.StreamDraw_Bernoulli:
-		sd.Draw = v
-	default:
-		panic(fmt.Sprintf("unsupported draw arm: %T", draw))
-	}
-
-	return &dgproto.Attr{Name: name, Expr: &dgproto.Expr{
-		Kind: &dgproto.Expr_StreamDraw{StreamDraw: sd},
-	}}
-}
-
-// chooseAttr wraps a named attr whose Expr is a Choose over the given
-// branches. stream_id is filled during compile.
-func chooseAttr(name string, branches ...*dgproto.ChooseBranch) *dgproto.Attr {
-	return &dgproto.Attr{Name: name, Expr: &dgproto.Expr{
-		Kind: &dgproto.Expr_Choose{Choose: &dgproto.Choose{Branches: branches}},
-	}}
-}
-
 // drawSmokeColumns mirrors smokeColumns for the StreamDraw smoke spec.
 var drawSmokeColumns = []string{"id", "rand_int", "flag", "bucket"}
 
@@ -446,17 +326,7 @@ func createDrawSmokeTable(t *testing.T, pool *pgxpool.Pool) {
 // copyDrawRows inserts rows into smoke_draw via COPY.
 func copyDrawRows(t *testing.T, pool *pgxpool.Pool, rows [][]any) int64 {
 	t.Helper()
-
-	n, err := pool.CopyFrom(
-		context.Background(),
-		pgx.Identifier{"smoke_draw"},
-		drawSmokeColumns,
-		pgx.CopyFromRows(rows),
-	)
-	if err != nil {
-		t.Fatalf("CopyFrom smoke_draw: %v", err)
-	}
-	return n
+	return copyRowsTo(t, pool, "smoke_draw", drawSmokeColumns, rows)
 }
 
 // TestDatagenSmokeWithStreamDraw loads a small batch through the
@@ -664,18 +534,7 @@ func createCohortSmokeTable(t *testing.T, pool *pgxpool.Pool) {
 // copyCohortRows inserts rows into smoke_cohort via COPY.
 func copyCohortRows(t *testing.T, pool *pgxpool.Pool, rows [][]any) int64 {
 	t.Helper()
-
-	n, err := pool.CopyFrom(
-		context.Background(),
-		pgx.Identifier{"smoke_cohort"},
-		cohortSmokeColumns,
-		pgx.CopyFromRows(rows),
-	)
-	if err != nil {
-		t.Fatalf("CopyFrom smoke_cohort: %v", err)
-	}
-
-	return n
+	return copyRowsTo(t, pool, "smoke_cohort", cohortSmokeColumns, rows)
 }
 
 // TestDatagenSmokeWithCohort proves cohort_draw / cohort_live wire
@@ -854,18 +713,7 @@ func createUniformChildTable(t *testing.T, pool *pgxpool.Pool) {
 
 func copyUniformChildRows(t *testing.T, pool *pgxpool.Pool, rows [][]any) int64 {
 	t.Helper()
-
-	n, err := pool.CopyFrom(
-		context.Background(),
-		pgx.Identifier{"uniform_child"},
-		uniformChildColumns,
-		pgx.CopyFromRows(rows),
-	)
-	if err != nil {
-		t.Fatalf("CopyFrom uniform_child: %v", err)
-	}
-
-	return n
+	return copyRowsTo(t, pool, "uniform_child", uniformChildColumns, rows)
 }
 
 // TestDatagenSmokeWithVariableDegree proves the Uniform(1,4) degree
@@ -982,18 +830,7 @@ func createSCD2Table(t *testing.T, pool *pgxpool.Pool) {
 
 func copySCD2Rows(t *testing.T, pool *pgxpool.Pool, rows [][]any) int64 {
 	t.Helper()
-
-	n, err := pool.CopyFrom(
-		context.Background(),
-		pgx.Identifier{"smoke_scd2"},
-		scd2Columns,
-		pgx.CopyFromRows(rows),
-	)
-	if err != nil {
-		t.Fatalf("CopyFrom smoke_scd2: %v", err)
-	}
-
-	return n
+	return copyRowsTo(t, pool, "smoke_scd2", scd2Columns, rows)
 }
 
 // TestDatagenSmokeWithSCD2 loads a 10-row table with boundary=5 and

@@ -4,17 +4,13 @@ package integration
 
 import (
 	"context"
-	"errors"
-	"io"
 	"math/rand/v2"
 	"reflect"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 )
 
 // TestTpcbSmokeIntegration is the Stage E end-to-end smoke: it proves the
@@ -215,30 +211,6 @@ func padAscii(s string, width int) string {
 
 // ---------- Runtime drive + COPY ----------
 
-// tpcbDrain materializes a spec to a [][]any via runtime.NewRuntime.
-func tpcbDrain(t *testing.T, spec *dgproto.InsertSpec) [][]any {
-	t.Helper()
-
-	rt, err := runtime.NewRuntime(spec)
-	if err != nil {
-		t.Fatalf("NewRuntime(%s): %v", spec.GetTable(), err)
-	}
-
-	var rows [][]any
-	for {
-		row, err := rt.Next()
-		if errors.Is(err, io.EOF) {
-			return rows
-		}
-		if err != nil {
-			t.Fatalf("Next(%s): %v", spec.GetTable(), err)
-		}
-		out := make([]any, len(row))
-		copy(out, row)
-		rows = append(rows, out)
-	}
-}
-
 // tpcbRunSpec drains the spec and bulk-loads via pgx.CopyFrom.
 func tpcbRunSpec(
 	t *testing.T,
@@ -248,16 +220,7 @@ func tpcbRunSpec(
 	columns []string,
 ) {
 	t.Helper()
-
-	rows := tpcbDrain(t, spec)
-	if _, err := pool.CopyFrom(
-		context.Background(),
-		pgx.Identifier{table},
-		columns,
-		pgx.CopyFromRows(rows),
-	); err != nil {
-		t.Fatalf("CopyFrom(%s): %v", table, err)
-	}
+	loadSpec(t, pool, spec, table, columns)
 }
 
 // ---------- TPC-B transactions ----------
