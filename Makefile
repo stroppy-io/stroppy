@@ -350,3 +350,21 @@ ts-test: # Run TypeScript unit tests
 
 ts-watch: # Watch TypeScript files and run tests automatically
 	cd internal/static && npm run test:watch
+
+##
+## Tmpfs Postgres integration harness
+##
+
+.PHONY: tmpfs-up tmpfs-down tmpfs-clean tmpfs-psql
+
+tmpfs-up: # Start tmpfs Postgres container for integration tests
+	docker compose -f test/compose.tmpfs.yml up -d --wait
+
+tmpfs-down: # Stop and remove tmpfs Postgres container and volumes
+	docker compose -f test/compose.tmpfs.yml down -v
+
+tmpfs-clean: # Recycle the tmpfs Postgres container; discards all data
+	$(MAKE) tmpfs-down && $(MAKE) tmpfs-up
+
+tmpfs-psql: # Open psql shell into the tmpfs Postgres container
+	docker exec -it stroppy-pg-tmpfs psql -U postgres -d stroppy
