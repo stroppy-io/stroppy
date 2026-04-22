@@ -53,24 +53,31 @@ type doc struct {
 // level. Block `{ ... }` comments (sometimes appearing in wild .dst)
 // are not emitted by current dsdgen but we skip them defensively.
 //
-// When `set names` is absent the parser synthesises column names
+// When `set names` is absent the parser synthesizes column names
 // (`col1`, `col2`, ...) and a single default weight set called
 // `default`. When `set weights` is `0` (or absent) the dict is uniform
 // and each row's `Weights` slice is empty.
+
+// maxScannerBuf bounds the bufio.Scanner buffer used when reading .dst
+// files line-by-line.
+const maxScannerBuf = 1 << 20
+
+// errParse is the sentinel wrapped by every structural parse error.
+var errParse = errors.New("parse error")
 
 // parseStream reads a whole .dst source from r and returns the
 // distributions in declaration order. Errors carry a 1-based line
 // number.
 func parseStream(r io.Reader) ([]*namedDict, error) {
 	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 1<<20), 1<<20)
+	scanner.Buffer(make([]byte, maxScannerBuf), maxScannerBuf)
 
-	p := &parser{}
+	psr := &parser{}
 
 	lineNum := 0
 	for scanner.Scan() {
 		lineNum++
-		p.line = lineNum
+		psr.line = lineNum
 
 		line := stripLineComment(scanner.Text())
 		for _, stmt := range splitTopSemis(line) {
@@ -78,18 +85,22 @@ func parseStream(r io.Reader) ([]*namedDict, error) {
 			if stmt == "" {
 				continue
 			}
-			if err := p.stmt(stmt); err != nil {
+
+			if err := psr.stmt(stmt); err != nil {
 				return nil, fmt.Errorf("dstparse: line %d: %w", lineNum, err)
 			}
 		}
 	}
+
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("dstparse: scan: %w", err)
 	}
-	if p.current != nil {
-		p.flush()
+
+	if psr.current != nil {
+		psr.flush()
 	}
-	return p.out, nil
+
+	return psr.out, nil
 }
 
 // namedDict carries the parsed distribution plus its declared name and
@@ -112,66 +123,97 @@ type parser struct {
 func (p *parser) stmt(stmt string) error {
 	switch {
 	case hasPrefixFold(stmt, "create "):
-		p.flush()
-		name := strings.TrimSpace(stmt[len("create "):])
-		if name == "" {
-			return errors.New("create: missing distribution name")
-		}
-		p.current = &namedDict{name: name}
-		return nil
-
+		return p.stmtCreate(stmt)
 	case hasPrefixFold(stmt, "set types"):
-		if p.current == nil {
-			return errors.New("set types: no active create")
-		}
-		list, _, err := parseSetList(stmt)
-		if err != nil {
-			return fmt.Errorf("set types: %w", err)
-		}
-		p.current.types = list
-		return nil
-
+		return p.stmtSetTypes(stmt)
 	case hasPrefixFold(stmt, "set weights"):
-		if p.current == nil {
-			return errors.New("set weights: no active create")
-		}
-		_, rhs, ok := strings.Cut(stmt, "=")
-		if !ok {
-			return errors.New("set weights: missing `=`")
-		}
-		n, err := strconv.Atoi(strings.TrimSpace(rhs))
-		if err != nil {
-			return fmt.Errorf("set weights: count: %w", err)
-		}
-		p.current.numWeights = n
-		return nil
-
+		return p.stmtSetWeights(stmt)
 	case hasPrefixFold(stmt, "set names"):
-		if p.current == nil {
-			return errors.New("set names: no active create")
-		}
-		cols, wsets, err := parseSetList(stmt)
-		if err != nil {
-			return fmt.Errorf("set names: %w", err)
-		}
-		p.current.columns = cols
-		p.current.weightSets = wsets
-		return nil
-
+		return p.stmtSetNames(stmt)
 	case hasPrefixFold(stmt, "add "), hasPrefixFold(stmt, "add("):
-		if p.current == nil {
-			return errors.New("add: no active create")
-		}
-		row, err := parseAdd(stmt, p.current.numWeights)
-		if err != nil {
-			return err
-		}
-		p.current.rows = append(p.current.rows, row)
-		return nil
-
+		return p.stmtAdd(stmt)
 	default:
-		return fmt.Errorf("unknown statement %q", firstToken(stmt))
+		return fmt.Errorf("%w: unknown statement %q", errParse, firstToken(stmt))
 	}
+}
+
+func (p *parser) stmtCreate(stmt string) error {
+	p.flush()
+
+	name := strings.TrimSpace(stmt[len("create "):])
+	if name == "" {
+		return fmt.Errorf("%w: create: missing distribution name", errParse)
+	}
+
+	p.current = &namedDict{name: name}
+
+	return nil
+}
+
+func (p *parser) stmtSetTypes(stmt string) error {
+	if p.current == nil {
+		return fmt.Errorf("%w: set types: no active create", errParse)
+	}
+
+	list, _, err := parseSetList(stmt)
+	if err != nil {
+		return fmt.Errorf("set types: %w", err)
+	}
+
+	p.current.types = list
+
+	return nil
+}
+
+func (p *parser) stmtSetWeights(stmt string) error {
+	if p.current == nil {
+		return fmt.Errorf("%w: set weights: no active create", errParse)
+	}
+
+	_, rhs, ok := strings.Cut(stmt, "=")
+	if !ok {
+		return fmt.Errorf("%w: set weights: missing `=`", errParse)
+	}
+
+	n, err := strconv.Atoi(strings.TrimSpace(rhs))
+	if err != nil {
+		return fmt.Errorf("set weights: count: %w", err)
+	}
+
+	p.current.numWeights = n
+
+	return nil
+}
+
+func (p *parser) stmtSetNames(stmt string) error {
+	if p.current == nil {
+		return fmt.Errorf("%w: set names: no active create", errParse)
+	}
+
+	cols, wsets, err := parseSetList(stmt)
+	if err != nil {
+		return fmt.Errorf("set names: %w", err)
+	}
+
+	p.current.columns = cols
+	p.current.weightSets = wsets
+
+	return nil
+}
+
+func (p *parser) stmtAdd(stmt string) error {
+	if p.current == nil {
+		return fmt.Errorf("%w: add: no active create", errParse)
+	}
+
+	row, err := parseAdd(stmt, p.current.numWeights)
+	if err != nil {
+		return err
+	}
+
+	p.current.rows = append(p.current.rows, row)
+
+	return nil
 }
 
 func (p *parser) flush() {
@@ -188,10 +230,12 @@ func (p *parser) flush() {
 // tail slice is returned when no colon is present.
 func parseSetList(stmt string) (lead, tail []string, err error) {
 	open := strings.Index(stmt, "(")
+
 	closeIdx := strings.LastIndex(stmt, ")")
 	if open < 0 || closeIdx <= open {
-		return nil, nil, errors.New("missing `(...)` body")
+		return nil, nil, fmt.Errorf("%w: missing `(...)` body", errParse)
 	}
+
 	inner := stmt[open+1 : closeIdx]
 
 	if colon := splitOnTopColon(inner); colon >= 0 {
@@ -200,6 +244,7 @@ func parseSetList(stmt string) (lead, tail []string, err error) {
 	} else {
 		lead = trimAll(splitTopCommas(inner))
 	}
+
 	return lead, tail, nil
 }
 
@@ -208,10 +253,12 @@ func parseSetList(stmt string) (lead, tail []string, err error) {
 // zero-weight row (uniform) is allowed.
 func parseAdd(stmt string, numWeights int) (dictRow, error) {
 	open := strings.Index(stmt, "(")
+
 	closeIdx := strings.LastIndex(stmt, ")")
 	if open < 0 || closeIdx <= open {
-		return dictRow{}, errors.New("add: missing `(...)` body")
+		return dictRow{}, fmt.Errorf("%w: add: missing `(...)` body", errParse)
 	}
+
 	inner := stmt[open+1 : closeIdx]
 
 	var valuesPart, weightsPart string
@@ -225,30 +272,33 @@ func parseAdd(stmt string, numWeights int) (dictRow, error) {
 	values := stripQuotes(trimAll(splitTopCommas(valuesPart)))
 
 	var weights []int64
+
 	if weightsPart != "" {
 		for _, w := range trimAll(splitTopCommas(weightsPart)) {
 			if w == "" {
 				continue
 			}
+
 			n, err := strconv.ParseInt(w, 10, 64)
 			if err != nil {
 				return dictRow{}, fmt.Errorf("add: weight %q: %w", w, err)
 			}
+
 			weights = append(weights, n)
 		}
 	}
 
 	if numWeights > 0 && len(weights) != numWeights {
 		return dictRow{}, fmt.Errorf(
-			"add: got %d weights, declared `set weights = %d`",
-			len(weights), numWeights,
+			"%w: add: got %d weights, declared `set weights = %d`",
+			errParse, len(weights), numWeights,
 		)
 	}
 
 	return dictRow{Values: values, Weights: weights}, nil
 }
 
-// toDict materialises the uniform Dict-shaped JSON struct. Synthesises
+// toDict materializes the uniform Dict-shaped JSON struct. Synthesizes
 // default column / weight-set names when the .dst did not declare them.
 func (nd *namedDict) toDict() *dict {
 	cols := nd.columns
@@ -258,6 +308,7 @@ func (nd *namedDict) toDict() *dict {
 		if n == 0 {
 			n = 1
 		}
+
 		if n == 1 {
 			cols = []string{"value"}
 		} else {
@@ -270,11 +321,12 @@ func (nd *namedDict) toDict() *dict {
 
 	wsets := nd.weightSets
 	if len(wsets) == 0 {
-		if nd.numWeights <= 0 {
+		switch {
+		case nd.numWeights <= 0:
 			wsets = nil
-		} else if nd.numWeights == 1 {
+		case nd.numWeights == 1:
 			wsets = []string{"default"}
-		} else {
+		default:
 			wsets = make([]string, nd.numWeights)
 			for i := range wsets {
 				wsets[i] = fmt.Sprintf("w%d", i+1)
@@ -293,31 +345,40 @@ func (nd *namedDict) toDict() *dict {
 }
 
 // stripLineComment removes a trailing `--` comment (and the newline).
-// Honours `"..."` quotes so that `--` inside a string is not treated
+// Honors `"..."` quotes so that `--` inside a string is not treated
 // as a comment.
 func stripLineComment(line string) string {
 	inQuote := false
-	for i := 0; i < len(line)-1; i++ {
+
+	for i := range len(line) - 1 {
 		if line[i] == '"' {
 			inQuote = !inQuote
+
 			continue
 		}
+
 		if !inQuote && line[i] == '-' && line[i+1] == '-' {
 			return line[:i]
 		}
 	}
+
 	return line
 }
 
 // splitTopSemis splits a line on `;` outside of `"..."`.
 func splitTopSemis(line string) []string {
-	var out []string
-	var buf strings.Builder
+	var (
+		out []string
+		buf strings.Builder
+	)
+
 	inQuote := false
+
 	for _, r := range line {
 		switch {
 		case r == '"':
 			inQuote = !inQuote
+
 			buf.WriteRune(r)
 		case r == ';' && !inQuote:
 			out = append(out, buf.String())
@@ -326,9 +387,11 @@ func splitTopSemis(line string) []string {
 			buf.WriteRune(r)
 		}
 	}
+
 	if buf.Len() > 0 {
 		out = append(out, buf.String())
 	}
+
 	return out
 }
 
@@ -336,26 +399,34 @@ func splitTopSemis(line string) []string {
 // `"..."`, or -1 if none.
 func splitOnTopColon(s string) int {
 	inQuote := false
+
 	for i, r := range s {
 		if r == '"' {
 			inQuote = !inQuote
 		}
+
 		if r == ':' && !inQuote {
 			return i
 		}
 	}
+
 	return -1
 }
 
 // splitTopCommas splits on `,` outside of `"..."`.
 func splitTopCommas(s string) []string {
-	var out []string
-	var buf strings.Builder
+	var (
+		out []string
+		buf strings.Builder
+	)
+
 	inQuote := false
+
 	for _, r := range s {
 		switch {
 		case r == '"':
 			inQuote = !inQuote
+
 			buf.WriteRune(r)
 		case r == ',' && !inQuote:
 			out = append(out, buf.String())
@@ -364,9 +435,11 @@ func splitTopCommas(s string) []string {
 			buf.WriteRune(r)
 		}
 	}
+
 	if buf.Len() > 0 {
 		out = append(out, buf.String())
 	}
+
 	return out
 }
 
@@ -378,6 +451,7 @@ func trimAll(ss []string) []string {
 			out = append(out, s)
 		}
 	}
+
 	return out
 }
 
@@ -388,8 +462,10 @@ func stripQuotes(ss []string) []string {
 		if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
 			s = s[1 : len(s)-1]
 		}
+
 		out[i] = s
 	}
+
 	return out
 }
 
@@ -397,6 +473,7 @@ func hasPrefixFold(s, prefix string) bool {
 	if len(s) < len(prefix) {
 		return false
 	}
+
 	return strings.EqualFold(s[:len(prefix)], prefix)
 }
 
@@ -405,5 +482,6 @@ func firstToken(stmt string) string {
 	if i := strings.IndexAny(stmt, " \t("); i > 0 {
 		return stmt[:i]
 	}
+
 	return stmt
 }

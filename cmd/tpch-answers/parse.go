@@ -42,93 +42,145 @@ type doc struct {
 // dumps — so we skip them at the tail of the file.
 var rowsFooter = regexp.MustCompile(`^\(\s*\d+\s+rows?\s*\)\s*$`)
 
+// maxScannerBuf bounds the bufio.Scanner buffer used when reading
+// answer files line-by-line.
+const maxScannerBuf = 1 << 20
+
+// errParse is the sentinel wrapped by every structural parse error.
+var errParse = errors.New("parse error")
+
+// lineRec captures one non-skipped input line plus its 1-based source
+// line number for error reporting.
+type lineRec struct {
+	num  int
+	text string
+}
+
 // parseAnswerFile reads one answer file and returns its parsed form.
 func parseAnswerFile(r io.Reader) (*answer, error) {
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 1<<20), 1<<20)
-
-	// Collect every non-skipped line with line number for error
-	// reporting; decide header boundary afterwards.
-	type lineRec struct {
-		num  int
-		text string
+	lines, err := collectLines(r)
+	if err != nil {
+		return nil, err
 	}
 
-	var lines []lineRec
-	lineNum := 0
-	for scanner.Scan() {
-		lineNum++
-		t := strings.TrimRight(scanner.Text(), " \t\r")
-		if t == "" {
-			continue
-		}
-		if rowsFooter.MatchString(t) {
-			continue
-		}
-		// psql-style row separators like `-----+-----+-----` are noise.
-		if isSeparatorLine(t) {
-			continue
-		}
-		lines = append(lines, lineRec{num: lineNum, text: t})
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scan: %w", err)
-	}
 	if len(lines) == 0 {
-		return nil, errors.New("empty answer file")
+		return nil, fmt.Errorf("%w: empty answer file", errParse)
 	}
 
-	// Pick the header: the first line that contains a `|`. Preamble
-	// lines without `|` are skipped. After locking the header we require
-	// every subsequent line to carry the same pipe count — mixed column
-	// widths are a corrupt file, not a tolerable quirk.
-	headerIdx := -1
-	for i, ln := range lines {
-		if strings.Contains(ln.text, "|") {
-			headerIdx = i
-			break
-		}
-	}
-	if headerIdx < 0 {
-		return nil, fmt.Errorf(
-			"line %d: cannot identify header (no pipe-separated line found)",
-			lines[0].num,
-		)
-	}
-	wantPipes := strings.Count(lines[headerIdx].text, "|")
-	for _, ln := range lines[headerIdx+1:] {
-		got := strings.Count(ln.text, "|")
-		if got != wantPipes {
-			return nil, fmt.Errorf(
-				"line %d: cannot identify header (got %d pipes, header declared %d)",
-				ln.num, got, wantPipes,
-			)
-		}
+	headerIdx, err := findHeader(lines)
+	if err != nil {
+		return nil, err
 	}
 
 	header := splitPipe(lines[headerIdx].text)
-	rows := make([][]string, 0, len(lines)-headerIdx-1)
-	for _, ln := range lines[headerIdx+1:] {
-		cells := splitPipe(ln.text)
-		if len(cells) != len(header) {
-			return nil, fmt.Errorf(
-				"line %d: got %d columns, header declares %d",
-				ln.num, len(cells), len(header),
-			)
-		}
-		rows = append(rows, cells)
+
+	rows, err := parseRows(lines[headerIdx+1:], header)
+	if err != nil {
+		return nil, err
 	}
 
 	return &answer{Columns: header, Rows: rows}, nil
 }
 
+// collectLines reads the answer file, dropping blank lines, PSQL row
+// separators, and `(N rows)` footers. It returns every surviving line
+// with its 1-based source line number.
+func collectLines(r io.Reader) ([]lineRec, error) {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, maxScannerBuf), maxScannerBuf)
+
+	var lines []lineRec
+
+	lineNum := 0
+	for scanner.Scan() {
+		lineNum++
+
+		trimmed := strings.TrimRight(scanner.Text(), " \t\r")
+		if trimmed == "" {
+			continue
+		}
+
+		if rowsFooter.MatchString(trimmed) {
+			continue
+		}
+		// psql-style row separators like `-----+-----+-----` are noise.
+		if isSeparatorLine(trimmed) {
+			continue
+		}
+
+		lines = append(lines, lineRec{num: lineNum, text: trimmed})
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan: %w", err)
+	}
+
+	return lines, nil
+}
+
+// findHeader picks the first line containing `|` as the header, then
+// requires every subsequent line to carry the same pipe count. Mixed
+// column widths are a corrupt file, not a tolerable quirk.
+func findHeader(lines []lineRec) (int, error) {
+	headerIdx := -1
+
+	for i, ln := range lines {
+		if strings.Contains(ln.text, "|") {
+			headerIdx = i
+
+			break
+		}
+	}
+
+	if headerIdx < 0 {
+		return 0, fmt.Errorf(
+			"%w: line %d: cannot identify header (no pipe-separated line found)",
+			errParse, lines[0].num,
+		)
+	}
+
+	wantPipes := strings.Count(lines[headerIdx].text, "|")
+	for _, ln := range lines[headerIdx+1:] {
+		got := strings.Count(ln.text, "|")
+		if got != wantPipes {
+			return 0, fmt.Errorf(
+				"%w: line %d: cannot identify header (got %d pipes, header declared %d)",
+				errParse, ln.num, got, wantPipes,
+			)
+		}
+	}
+
+	return headerIdx, nil
+}
+
+// parseRows splits each data line into cells and checks against the
+// header's column count.
+func parseRows(data []lineRec, header []string) ([][]string, error) {
+	rows := make([][]string, 0, len(data))
+	for _, ln := range data {
+		cells := splitPipe(ln.text)
+		if len(cells) != len(header) {
+			return nil, fmt.Errorf(
+				"%w: line %d: got %d columns, header declares %d",
+				errParse, ln.num, len(cells), len(header),
+			)
+		}
+
+		rows = append(rows, cells)
+	}
+
+	return rows, nil
+}
+
 // splitPipe splits on `|` and trims whitespace from each field.
 func splitPipe(line string) []string {
 	parts := strings.Split(line, "|")
+
 	out := make([]string, len(parts))
 	for i, p := range parts {
 		out[i] = strings.TrimSpace(p)
 	}
+
 	return out
 }
 
@@ -136,6 +188,7 @@ func splitPipe(line string) []string {
 // composed only of `-`, `+`, and whitespace.
 func isSeparatorLine(s string) bool {
 	seenDash := false
+
 	for _, r := range s {
 		switch r {
 		case '-':
@@ -146,5 +199,6 @@ func isSeparatorLine(s string) bool {
 			return false
 		}
 	}
+
 	return seenDash
 }

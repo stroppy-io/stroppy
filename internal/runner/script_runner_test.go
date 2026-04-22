@@ -67,8 +67,10 @@ func TestCopyLocalSiblingsSkipsExisting(t *testing.T) {
 	srcDir := t.TempDir()
 	targetDir := t.TempDir()
 
-	const srcBody = "export const fromSrc = true;"
-	const preExisting = "export const preExisting = true;"
+	const (
+		srcBody     = "export const fromSrc = true;"
+		preExisting = "export const preExisting = true;"
+	)
 
 	writeFile(t, filepath.Join(srcDir, "tx.ts"), srcBody)
 	writeFile(t, filepath.Join(srcDir, "helpers.ts"), "export const h = 1;")

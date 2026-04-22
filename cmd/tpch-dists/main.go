@@ -17,18 +17,26 @@ import (
 	"path/filepath"
 )
 
+// exitUsage is the process exit code used for CLI usage errors.
+const exitUsage = 2
+
+// outFilePerm is the permission mode for emitted JSON files. Parsed
+// reference data is not secret but does not need to be world-readable.
+const outFilePerm = 0o600
+
 func main() {
 	in := flag.String("in", "", "path to dists.dss (required)")
 	out := flag.String("out", "", "output JSON path (stdout when omitted)")
 	version := flag.String("version", "1", "schema version string embedded in output")
 	sourceLabel := flag.String("source", "", "human-readable source label (defaults to input basename)")
 	pretty := flag.Bool("pretty", false, "emit indented JSON")
+
 	flag.Parse()
 
 	if *in == "" {
 		fmt.Fprintln(os.Stderr, "tpch-dists: -in is required")
 		flag.Usage()
-		os.Exit(2)
+		os.Exit(exitUsage)
 	}
 
 	raw, err := os.ReadFile(*in)
@@ -60,6 +68,7 @@ func main() {
 	} else {
 		data, err = json.Marshal(root)
 	}
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tpch-dists: marshal: %v\n", err)
 		os.Exit(1)
@@ -68,12 +77,15 @@ func main() {
 	if *out == "" {
 		_, _ = os.Stdout.Write(data)
 		_, _ = os.Stdout.Write([]byte{'\n'})
+
 		return
 	}
-	if err := os.WriteFile(*out, data, 0o644); err != nil {
+
+	if err := os.WriteFile(*out, data, outFilePerm); err != nil {
 		fmt.Fprintf(os.Stderr, "tpch-dists: write %s: %v\n", *out, err)
 		os.Exit(1)
 	}
+
 	fmt.Fprintf(os.Stderr, "tpch-dists: wrote %s (%d distributions, %d bytes)\n",
 		*out, len(root.Distributions), len(data))
 }

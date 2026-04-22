@@ -40,6 +40,7 @@ func TestParseAnswerFile_Basic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseAnswerFile: %v", err)
 	}
+
 	want := &answer{
 		Columns: []string{"l_returnflag", "l_linestatus", "sum_qty"},
 		Rows: [][]string{
@@ -58,12 +59,15 @@ func TestParseAnswerFile_PreambleAndFooter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseAnswerFile: %v", err)
 	}
+
 	if !reflect.DeepEqual(a.Columns, []string{"c_custkey", "c_name", "revenue"}) {
 		t.Errorf("columns: %v", a.Columns)
 	}
+
 	if len(a.Rows) != 3 {
 		t.Fatalf("rows: got %d, want 3", len(a.Rows))
 	}
+
 	if a.Rows[2][1] != "Customer#000000003" {
 		t.Errorf("rows[2][1]: %q", a.Rows[2][1])
 	}
@@ -74,6 +78,7 @@ func TestParseAnswerFile_TrailingBlanks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseAnswerFile: %v", err)
 	}
+
 	if len(a.Columns) != 2 || len(a.Rows) != 1 {
 		t.Errorf("got cols=%v rows=%v", a.Columns, a.Rows)
 	}
@@ -105,6 +110,7 @@ func TestParseAnswerFile_Malformed(t *testing.T) {
 			if err == nil {
 				t.Fatalf("want error containing %q, got nil", tc.want)
 			}
+
 			if !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("error %q does not contain %q", err.Error(), tc.want)
 			}
@@ -117,19 +123,23 @@ func TestRoundTripJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseAnswerFile: %v", err)
 	}
+
 	d := &doc{
 		Version: "1",
 		Source:  "test",
 		Answers: map[string]*answer{"q1": a},
 	}
+
 	blob, err := json.Marshal(d)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
+
 	var back doc
 	if err := json.Unmarshal(blob, &back); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
+
 	if !reflect.DeepEqual(d, &back) {
 		t.Fatalf("round-trip mismatch:\n  orig: %+v\n  back: %+v", d, &back)
 	}

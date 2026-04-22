@@ -51,91 +51,147 @@ type block struct {
 	rows     []dictRow
 }
 
+// maxScannerBuf bounds the bufio.Scanner buffer used when reading
+// dists.dss line-by-line.
+const maxScannerBuf = 1 << 20
+
+// pipePartsExpected is the number of fields a `<left>|<right>` data line
+// must split into.
+const pipePartsExpected = 2
+
+// errParse is the sentinel wrapped by every structural parse error.
+var errParse = errors.New("parse error")
+
+// streamState is the aggregate parse state threaded through line handlers.
+type streamState struct {
+	out   map[string]*dict
+	order []string
+	cur   *block
+}
+
 // parseStream reads a whole dists.dss source from r and returns the
 // distributions in declaration order.
-func parseStream(r io.Reader) (map[string]*dict, []string, error) {
+func parseStream(r io.Reader) (dists map[string]*dict, order []string, err error) {
 	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 1<<20), 1<<20)
+	scanner.Buffer(make([]byte, maxScannerBuf), maxScannerBuf)
 
-	out := map[string]*dict{}
-	var order []string
-	var cur *block
+	st := &streamState{out: map[string]*dict{}}
 
 	lineNum := 0
 	for scanner.Scan() {
 		lineNum++
-		raw := scanner.Text()
-		line := strings.TrimSpace(stripHashComment(raw))
+
+		line := strings.TrimSpace(stripHashComment(scanner.Text()))
 		if line == "" {
 			continue
 		}
-		lower := strings.ToLower(line)
 
-		switch {
-		case strings.HasPrefix(lower, "begin "):
-			if cur != nil {
-				return nil, nil, fmt.Errorf(
-					"tpch-dists: line %d: BEGIN %q while %q still open",
-					lineNum, line[len("BEGIN "):], cur.name,
-				)
-			}
-			name := strings.TrimSpace(line[len("begin "):])
-			if name == "" {
-				return nil, nil, fmt.Errorf("tpch-dists: line %d: BEGIN missing name", lineNum)
-			}
-			cur = &block{name: name}
-
-		case strings.HasPrefix(lower, "end "):
-			if cur == nil {
-				return nil, nil, fmt.Errorf("tpch-dists: line %d: END with no matching BEGIN", lineNum)
-			}
-			name := strings.TrimSpace(line[len("end "):])
-			if !strings.EqualFold(name, cur.name) {
-				return nil, nil, fmt.Errorf(
-					"tpch-dists: line %d: END %q does not match BEGIN %q",
-					lineNum, name, cur.name,
-				)
-			}
-			if cur.declared > 0 && cur.declared != len(cur.rows) {
-				return nil, nil, fmt.Errorf(
-					"tpch-dists: line %d: block %q declared COUNT=%d but has %d rows",
-					lineNum, cur.name, cur.declared, len(cur.rows),
-				)
-			}
-			if _, dup := out[cur.name]; dup {
-				return nil, nil, fmt.Errorf("tpch-dists: line %d: duplicate dist %q", lineNum, cur.name)
-			}
-			out[cur.name] = blockToDict(cur)
-			order = append(order, cur.name)
-			cur = nil
-
-		default:
-			if cur == nil {
-				return nil, nil, fmt.Errorf(
-					"tpch-dists: line %d: data line outside BEGIN/END: %q",
-					lineNum, line,
-				)
-			}
-			if err := parseDataLine(line, cur); err != nil {
-				return nil, nil, fmt.Errorf("tpch-dists: line %d: %w", lineNum, err)
-			}
+		if err := st.handleLine(line, lineNum); err != nil {
+			return nil, nil, err
 		}
 	}
+
 	if err := scanner.Err(); err != nil {
 		return nil, nil, fmt.Errorf("tpch-dists: scan: %w", err)
 	}
-	if cur != nil {
-		return nil, nil, fmt.Errorf("tpch-dists: unterminated block %q", cur.name)
+
+	if st.cur != nil {
+		return nil, nil, fmt.Errorf("%w: tpch-dists: unterminated block %q", errParse, st.cur.name)
 	}
-	return out, order, nil
+
+	return st.out, st.order, nil
+}
+
+// handleLine routes one non-empty, de-commented line to the appropriate
+// block-level handler, mutating st in place.
+func (st *streamState) handleLine(line string, lineNum int) error {
+	lower := strings.ToLower(line)
+
+	switch {
+	case strings.HasPrefix(lower, "begin "):
+		return st.handleBegin(line, lineNum)
+	case strings.HasPrefix(lower, "end "):
+		return st.handleEnd(line, lineNum)
+	default:
+		return st.handleData(line, lineNum)
+	}
+}
+
+// handleBegin opens a new block, rejecting nested BEGINs.
+func (st *streamState) handleBegin(line string, lineNum int) error {
+	if st.cur != nil {
+		return fmt.Errorf(
+			"%w: tpch-dists: line %d: BEGIN %q while %q still open",
+			errParse, lineNum, line[len("BEGIN "):], st.cur.name,
+		)
+	}
+
+	name := strings.TrimSpace(line[len("begin "):])
+	if name == "" {
+		return fmt.Errorf("%w: tpch-dists: line %d: BEGIN missing name", errParse, lineNum)
+	}
+
+	st.cur = &block{name: name}
+
+	return nil
+}
+
+// handleEnd closes the current block, validates its COUNT, and commits
+// the materialized dict into st.out.
+func (st *streamState) handleEnd(line string, lineNum int) error {
+	if st.cur == nil {
+		return fmt.Errorf("%w: tpch-dists: line %d: END with no matching BEGIN", errParse, lineNum)
+	}
+
+	name := strings.TrimSpace(line[len("end "):])
+	if !strings.EqualFold(name, st.cur.name) {
+		return fmt.Errorf(
+			"%w: tpch-dists: line %d: END %q does not match BEGIN %q",
+			errParse, lineNum, name, st.cur.name,
+		)
+	}
+
+	if st.cur.declared > 0 && st.cur.declared != len(st.cur.rows) {
+		return fmt.Errorf(
+			"%w: tpch-dists: line %d: block %q declared COUNT=%d but has %d rows",
+			errParse, lineNum, st.cur.name, st.cur.declared, len(st.cur.rows),
+		)
+	}
+
+	if _, dup := st.out[st.cur.name]; dup {
+		return fmt.Errorf("%w: tpch-dists: line %d: duplicate dist %q", errParse, lineNum, st.cur.name)
+	}
+
+	st.out[st.cur.name] = blockToDict(st.cur)
+	st.order = append(st.order, st.cur.name)
+	st.cur = nil
+
+	return nil
+}
+
+// handleData processes a non-BEGIN/END data line within the current block.
+func (st *streamState) handleData(line string, lineNum int) error {
+	if st.cur == nil {
+		return fmt.Errorf(
+			"%w: tpch-dists: line %d: data line outside BEGIN/END: %q",
+			errParse, lineNum, line,
+		)
+	}
+
+	if err := parseDataLine(line, st.cur); err != nil {
+		return fmt.Errorf("tpch-dists: line %d: %w", lineNum, err)
+	}
+
+	return nil
 }
 
 // parseDataLine handles either `COUNT|N` or `<value>|<weight>`.
 func parseDataLine(line string, cur *block) error {
-	parts := strings.SplitN(line, "|", 2)
-	if len(parts) != 2 {
-		return fmt.Errorf("expected `a|b`, got %q", line)
+	parts := strings.SplitN(line, "|", pipePartsExpected)
+	if len(parts) != pipePartsExpected {
+		return fmt.Errorf("%w: expected `a|b`, got %q", errParse, line)
 	}
+
 	left := strings.TrimSpace(parts[0])
 	right := strings.TrimSpace(parts[1])
 
@@ -144,10 +200,13 @@ func parseDataLine(line string, cur *block) error {
 		if err != nil {
 			return fmt.Errorf("COUNT value: %w", err)
 		}
+
 		if cur.declared > 0 {
-			return errors.New("duplicate COUNT in block")
+			return fmt.Errorf("%w: duplicate COUNT in block", errParse)
 		}
+
 		cur.declared = n
+
 		return nil
 	}
 
@@ -155,17 +214,20 @@ func parseDataLine(line string, cur *block) error {
 	if err != nil {
 		return fmt.Errorf("weight %q: %w", right, err)
 	}
+
 	cur.rows = append(cur.rows, dictRow{
 		Values:  []string{left},
 		Weights: []int64{weight},
 	})
+
 	return nil
 }
 
-// blockToDict materialises the uniform Dict-shaped JSON.
+// blockToDict materializes the uniform Dict-shaped JSON.
 func blockToDict(b *block) *dict {
 	rows := make([]dictRow, len(b.rows))
 	copy(rows, b.rows)
+
 	return &dict{
 		Columns:    []string{"value"},
 		WeightSets: []string{"default"},
@@ -178,5 +240,6 @@ func blockToDict(b *block) *dict {
 // dists.dss does not use quoting.
 func stripHashComment(line string) string {
 	before, _, _ := strings.Cut(line, "#")
+
 	return before
 }
