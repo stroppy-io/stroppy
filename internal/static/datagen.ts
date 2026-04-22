@@ -1,8 +1,8 @@
 /// <reference lib="es2020.bigint" />
 /**
  * datagen.ts — Ergonomic TS wrapper over the generated stroppy.datagen proto
- * types. Workload authors compose `InsertSpec` values through five namespaces:
- * `Rel`, `Attr`, `Expr`, `Dict`, `std`. `Draw` is reserved for Stage D.
+ * types. Workload authors compose `InsertSpec` values through six namespaces:
+ * `Rel`, `Attr`, `Expr`, `Draw`, `Dict`, `std`.
  *
  * The wrapper hides the oneof-kind boilerplate, converts int64-typed fields
  * between `number`/`bigint` and the protobuf-ts wire form (string), and
@@ -10,16 +10,33 @@
  * single entry in `InsertSpec.dicts`.
  */
 import {
+  AsciiRange as PbAsciiRange,
   Attr as PbAttr,
   BinOp_Op,
   BlockRef as PbBlockRef,
   BlockSlot as PbBlockSlot,
   Call as PbCall,
+  Choose as PbChoose,
+  ChooseBranch as PbChooseBranch,
   Cohort as PbCohort,
+  CohortDraw as PbCohortDraw,
+  CohortLive as PbCohortLive,
   Degree as PbDegree,
   DictRow as PbDictRow,
   Dict as PbDict,
   DictAt as PbDictAt,
+  DrawAscii as PbDrawAscii,
+  DrawBernoulli as PbDrawBernoulli,
+  DrawDate as PbDrawDate,
+  DrawDecimal as PbDrawDecimal,
+  DrawDict as PbDrawDict,
+  DrawFloatUniform as PbDrawFloatUniform,
+  DrawIntUniform as PbDrawIntUniform,
+  DrawJoint as PbDrawJoint,
+  DrawNURand as PbDrawNURand,
+  DrawNormal as PbDrawNormal,
+  DrawPhrase as PbDrawPhrase,
+  DrawZipf as PbDrawZipf,
   Expr as PbExpr,
   InsertMethod,
   InsertSpec as PbInsertSpec,
@@ -34,6 +51,7 @@ import {
   RowIndex_Kind,
   SCD2 as PbSCD2,
   Side as PbSide,
+  StreamDraw as PbStreamDraw,
   Strategy as PbStrategy,
 } from "./stroppy.pb.js";
 
@@ -221,6 +239,30 @@ export const Expr = {
    * namespace at attr-level composition sites.
    */
   blockRef: (slot: string): PbExpr => buildBlockRef(slot),
+
+  /**
+   * Weighted pick among a set of Expr branches. Only the selected branch
+   * evaluates. At least one branch is required; all weights must be
+   * positive. `stream_id` is left 0 — `compile.AssignStreamIDs` fills it
+   * in at compile time.
+   */
+  choose(branches: ReadonlyArray<{ weight: Int64Like; expr: PbExpr }>): PbExpr {
+    if (branches.length === 0) {
+      throw new Error("datagen: Expr.choose requires at least one branch");
+    }
+    const pb: PbChooseBranch[] = branches.map((b) => {
+      const w = typeof b.weight === "bigint" ? b.weight : BigInt(b.weight);
+      if (w <= BigInt(0)) {
+        throw new Error("datagen: Expr.choose branch weights must be > 0");
+      }
+      if (!b.expr) {
+        throw new Error("datagen: Expr.choose branch expr is required");
+      }
+      return { weight: w.toString(), expr: b.expr };
+    });
+    const choose: PbChoose = { streamId: 0, branches: pb };
+    return { kind: { oneofKind: "choose", choose } };
+  },
 };
 
 // -------- Namespace: std --------
@@ -331,13 +373,176 @@ function toDictString(v: string | number | bigint): string {
   return v.toString();
 }
 
+/**
+ * Scalar inline dict carrying several named weight profiles. Callers pick a
+ * profile at draw time via `{ weightSet: "<name>" }`. All weight arrays must
+ * have the same length as `values`.
+ */
+function dictMultiWeighted(
+  values: readonly string[],
+  weights: Readonly<Record<string, readonly number[]>>,
+): PbDict {
+  const names = Object.keys(weights);
+  if (names.length === 0) {
+    throw new Error("datagen: Dict.multiWeighted requires at least one weight profile");
+  }
+  for (const name of names) {
+    const arr = weights[name];
+    if (arr.length !== values.length) {
+      throw new Error(
+        `datagen: Dict.multiWeighted: weight profile "${name}" has ` +
+          `${arr.length} entries, expected ${values.length}`,
+      );
+    }
+  }
+  const rows: PbDictRow[] = values.map((v, i) => {
+    const rowWeights = names.map((n) => int64ToString(weights[n][i]));
+    return { values: [v], weights: rowWeights };
+  });
+  return { columns: [], weightSets: names, rows };
+}
+
+/**
+ * Multi-column inline dict. Each row's `values` length must equal
+ * `columns.length`. When no row carries `weights`, the dict is uniform;
+ * when any row carries weights, every row must carry the same count, and
+ * an unnamed default weight-set is synthesized.
+ */
+function dictJoint(
+  columns: readonly string[],
+  rows: ReadonlyArray<{ values: readonly string[]; weights?: readonly Int64Like[] }>,
+): PbDict {
+  if (columns.length === 0) {
+    throw new Error("datagen: Dict.joint requires at least one column");
+  }
+  const anyWeighted = rows.some((r) => r.weights && r.weights.length > 0);
+  const pbRows: PbDictRow[] = rows.map((r, i) => {
+    if (r.values.length !== columns.length) {
+      throw new Error(
+        `datagen: Dict.joint row ${i} has ${r.values.length} values, ` +
+          `expected ${columns.length}`,
+      );
+    }
+    const rowWeights = anyWeighted
+      ? (r.weights && r.weights.length > 0
+          ? (r.weights as readonly Int64Like[]).map((w) => int64ToString(w))
+          : [int64ToString(0)])
+      : [];
+    return { values: Array.from(r.values), weights: rowWeights };
+  });
+  return {
+    columns: Array.from(columns),
+    weightSets: anyWeighted ? [""] : [],
+    rows: pbRows,
+  };
+}
+
+/**
+ * Multi-column inline dict with N named weight profiles. Each row must carry
+ * a `weights` array parallel to `weightSetNames`.
+ */
+function dictJointWeighted(
+  columns: readonly string[],
+  weightSetNames: readonly string[],
+  rows: ReadonlyArray<{ values: readonly string[]; weights: readonly Int64Like[] }>,
+): PbDict {
+  if (columns.length === 0) {
+    throw new Error("datagen: Dict.jointWeighted requires at least one column");
+  }
+  if (weightSetNames.length === 0) {
+    throw new Error("datagen: Dict.jointWeighted requires at least one weight profile");
+  }
+  const pbRows: PbDictRow[] = rows.map((r, i) => {
+    if (r.values.length !== columns.length) {
+      throw new Error(
+        `datagen: Dict.jointWeighted row ${i} has ${r.values.length} values, ` +
+          `expected ${columns.length}`,
+      );
+    }
+    if (r.weights.length !== weightSetNames.length) {
+      throw new Error(
+        `datagen: Dict.jointWeighted row ${i} has ${r.weights.length} weights, ` +
+          `expected ${weightSetNames.length}`,
+      );
+    }
+    return {
+      values: Array.from(r.values),
+      weights: (r.weights as readonly Int64Like[]).map((w) => int64ToString(w)),
+    };
+  });
+  return {
+    columns: Array.from(columns),
+    weightSets: Array.from(weightSetNames),
+    rows: pbRows,
+  };
+}
+
+/**
+ * Shape accepted by `Dict.fromJson` — the canonical output of
+ * `cmd/dstparse`. `columns` and `weight_sets` default to empty, `rows`
+ * carries values and optional parallel weights.
+ */
+export interface DictJsonShape {
+  columns?: readonly string[];
+  weight_sets?: readonly string[];
+  rows: ReadonlyArray<{
+    values: readonly (string | number | bigint)[];
+    weights?: readonly Int64Like[];
+  }>;
+}
+
+/**
+ * Coerce a dstparse-shaped JSON payload into a `PbDict`. Auto-detects
+ * scalar vs joint shape: omitted/empty `columns` produce a scalar dict;
+ * weight arrays are preserved row-by-row.
+ */
+function dictFromJson(json: DictJsonShape): PbDict {
+  if (!json || !Array.isArray(json.rows)) {
+    throw new Error("datagen: Dict.fromJson: missing rows[]");
+  }
+  const columns = json.columns ? [...json.columns] : [];
+  const weightSets = json.weight_sets ? [...json.weight_sets] : [];
+  const rows: PbDictRow[] = json.rows.map((r, i) => {
+    if (!Array.isArray(r.values)) {
+      throw new Error(`datagen: Dict.fromJson row ${i} missing values[]`);
+    }
+    if (weightSets.length > 0) {
+      const weights = r.weights ?? [];
+      if (weights.length !== weightSets.length) {
+        throw new Error(
+          `datagen: Dict.fromJson row ${i} has ${weights.length} weights, ` +
+            `expected ${weightSets.length}`,
+        );
+      }
+      return {
+        values: r.values.map(toDictString),
+        weights: (weights as readonly Int64Like[]).map((w) => int64ToString(w)),
+      };
+    }
+    return {
+      values: r.values.map(toDictString),
+      weights: r.weights
+        ? (r.weights as readonly Int64Like[]).map((w) => int64ToString(w))
+        : [],
+    };
+  });
+  return { columns, weightSets, rows };
+}
+
 export const Dict = {
   values: dictValues,
   weighted: dictWeighted,
+  multiWeighted: dictMultiWeighted,
+  joint: dictJoint,
+  jointWeighted: dictJointWeighted,
+  fromJson: dictFromJson,
 };
 
 /** Anything accepted where a Dict reference is expected. */
 export type DictRef = PbDict | string;
+
+/** Anything accepted where a vocabulary Dict is expected — same as DictRef. */
+export type DictLike = DictRef;
 
 // -------- Namespace: Attr --------
 
@@ -385,6 +590,29 @@ export const Attr = {
    */
   blockRef(slot: string): PbExpr {
     return buildBlockRef(slot);
+  },
+
+  /**
+   * Draw one entity ID from the named cohort's schedule at position `slot`.
+   * `bucketKey` overrides the Cohort's default bucket-key expression; omit
+   * to inherit the default.
+   */
+  cohortDraw(name: string, slot: PbExpr, bucketKey?: PbExpr): PbExpr {
+    if (!name) throw new Error("datagen: Attr.cohortDraw requires a cohort name");
+    if (!slot) throw new Error("datagen: Attr.cohortDraw requires a slot expr");
+    const cd: PbCohortDraw = { name, slot, bucketKey };
+    return { kind: { oneofKind: "cohortDraw", cohortDraw: cd } };
+  },
+
+  /**
+   * Report whether the named cohort's bucket is active for the given key
+   * (or its default bucket-key when unset). Returns an int64 1/0 at the
+   * runtime layer.
+   */
+  cohortLive(name: string, bucketKey?: PbExpr): PbExpr {
+    if (!name) throw new Error("datagen: Attr.cohortLive requires a cohort name");
+    const cl: PbCohortLive = { name, bucketKey };
+    return { kind: { oneofKind: "cohortLive", cohortLive: cl } };
   },
 };
 
@@ -575,6 +803,16 @@ function relTable(name: string, opts: RelTableOpts): PbInsertSpec {
       }
     }
   }
+  for (const c of source.cohorts) {
+    if (c.bucketKey) walkExpr(c.bucketKey, referenced);
+  }
+  if (source.scd2) {
+    if (source.scd2.boundary) walkExpr(source.scd2.boundary, referenced);
+    if (source.scd2.historicalStart) walkExpr(source.scd2.historicalStart, referenced);
+    if (source.scd2.historicalEnd) walkExpr(source.scd2.historicalEnd, referenced);
+    if (source.scd2.currentStart) walkExpr(source.scd2.currentStart, referenced);
+    if (source.scd2.currentEnd) walkExpr(source.scd2.currentEnd, referenced);
+  }
   const dicts: { [key: string]: PbDict } = {};
   if (opts.dicts) {
     for (const [k, v] of Object.entries(opts.dicts)) {
@@ -636,10 +874,73 @@ function walkExpr(e: PbExpr, out: Set<string>): void {
     case "lookup":
       if (k.lookup.entityIndex) walkExpr(k.lookup.entityIndex, out);
       return;
+    case "streamDraw":
+      walkStreamDraw(k.streamDraw, out);
+      return;
+    case "choose":
+      for (const br of k.choose.branches) {
+        if (br.expr) walkExpr(br.expr, out);
+      }
+      return;
+    case "cohortDraw":
+      if (k.cohortDraw.slot) walkExpr(k.cohortDraw.slot, out);
+      if (k.cohortDraw.bucketKey) walkExpr(k.cohortDraw.bucketKey, out);
+      return;
+    case "cohortLive":
+      if (k.cohortLive.bucketKey) walkExpr(k.cohortLive.bucketKey, out);
+      return;
     case "blockRef":
     case "col":
     case "rowIndex":
     case "lit":
+    case undefined:
+      return;
+    default:
+      return;
+  }
+}
+
+function walkStreamDraw(sd: PbStreamDraw, out: Set<string>): void {
+  const arm = sd.draw;
+  switch (arm.oneofKind) {
+    case "intUniform":
+      if (arm.intUniform.min) walkExpr(arm.intUniform.min, out);
+      if (arm.intUniform.max) walkExpr(arm.intUniform.max, out);
+      return;
+    case "floatUniform":
+      if (arm.floatUniform.min) walkExpr(arm.floatUniform.min, out);
+      if (arm.floatUniform.max) walkExpr(arm.floatUniform.max, out);
+      return;
+    case "normal":
+      if (arm.normal.min) walkExpr(arm.normal.min, out);
+      if (arm.normal.max) walkExpr(arm.normal.max, out);
+      return;
+    case "zipf":
+      if (arm.zipf.min) walkExpr(arm.zipf.min, out);
+      if (arm.zipf.max) walkExpr(arm.zipf.max, out);
+      return;
+    case "decimal":
+      if (arm.decimal.min) walkExpr(arm.decimal.min, out);
+      if (arm.decimal.max) walkExpr(arm.decimal.max, out);
+      return;
+    case "ascii":
+      if (arm.ascii.minLen) walkExpr(arm.ascii.minLen, out);
+      if (arm.ascii.maxLen) walkExpr(arm.ascii.maxLen, out);
+      return;
+    case "dict":
+      out.add(arm.dict.dictKey);
+      return;
+    case "joint":
+      out.add(arm.joint.dictKey);
+      return;
+    case "phrase":
+      out.add(arm.phrase.vocabKey);
+      if (arm.phrase.minWords) walkExpr(arm.phrase.minWords, out);
+      if (arm.phrase.maxWords) walkExpr(arm.phrase.maxWords, out);
+      return;
+    case "nurand":
+    case "bernoulli":
+    case "date":
     case undefined:
       return;
     default:
@@ -764,23 +1065,308 @@ function relLookupPop(opts: RelLookupPopOpts): PbLookupPop {
   return { population, attrs: pbAttrs, columnOrder };
 }
 
+/** Options accepted by `Rel.cohort`. */
+export interface RelCohortOpts {
+  /** Stable identifier referenced by Attr.cohortDraw / Attr.cohortLive. */
+  name: string;
+  /** Number of entities drawn per active bucket. */
+  cohortSize: Int64Like;
+  /** Inclusive lower bound on the entity-ID range drawn from. */
+  entityMin: Int64Like;
+  /** Inclusive upper bound on the entity-ID range drawn from. */
+  entityMax: Int64Like;
+  /** Default bucket-key expression; per-call overrides are accepted. */
+  bucketKey?: PbExpr;
+  /** Every N-th bucket is active. 0 or 1 leaves every bucket active. */
+  activeEvery?: Int64Like;
+  /** Modulus used to collapse bucket keys into the persistent slice. */
+  persistenceMod?: Int64Like;
+  /** Fraction of cohortSize drawn from the persistent slice. */
+  persistenceRatio?: number;
+  /** Per-cohort seed salt providing independence from other cohorts. */
+  seedSalt?: Int64Like;
+}
+
+/** Build a Cohort proto for attachment to `RelTableOpts.cohorts`. */
+function relCohort(opts: RelCohortOpts): PbCohort {
+  if (!opts.name) throw new Error("datagen: Rel.cohort requires a name");
+  return {
+    name: opts.name,
+    cohortSize: int64ToString(opts.cohortSize),
+    entityMin: int64ToString(opts.entityMin),
+    entityMax: int64ToString(opts.entityMax),
+    bucketKey: opts.bucketKey,
+    activeEvery: int64ToString(opts.activeEvery ?? 0),
+    persistenceMod: int64ToString(opts.persistenceMod ?? 0),
+    persistenceRatio: opts.persistenceRatio ?? 0,
+    seedSalt: uint64ToString(opts.seedSalt ?? 0),
+  };
+}
+
 export const Rel = {
   table: relTable,
   relationship: relRelationship,
   side: relSide,
   lookupPop: relLookupPop,
   scd2: relSCD2,
+  cohort: relCohort,
 };
 
-// -------- Namespace: Draw (reserved) --------
+// -------- Alphabets (for Draw.ascii) --------
 
 /**
- * Draw is the stream-draw namespace. Populated in Stage D (StreamDraw
- * primitives: intUniform, ascii, bernoulli, zipf, nurand, date, decimal,
- * phrase, dict, joint). Kept here so workloads can import the five core
- * namespaces plus Draw from a single module once Stage D lands.
+ * ASCII code-point ranges used by `Draw.ascii`. Each entry is a
+ * contiguous [min, max] sampled with uniform width. Names mirror the
+ * legacy `AB.*` semantics exactly.
  */
-export const Draw: Record<string, never> = {};
+export const Alphabet: {
+  readonly en: readonly PbAsciiRange[];
+  readonly enNum: readonly PbAsciiRange[];
+  readonly num: readonly PbAsciiRange[];
+  readonly enUpper: readonly PbAsciiRange[];
+  readonly enSpc: readonly PbAsciiRange[];
+  readonly enNumSpc: readonly PbAsciiRange[];
+  readonly ascii: readonly PbAsciiRange[];
+} = {
+  en: [
+    { min: 65, max: 90 },
+    { min: 97, max: 122 },
+  ],
+  enNum: [
+    { min: 65, max: 90 },
+    { min: 97, max: 122 },
+    { min: 48, max: 57 },
+  ],
+  num: [{ min: 48, max: 57 }],
+  enUpper: [{ min: 65, max: 90 }],
+  enSpc: [
+    { min: 65, max: 90 },
+    { min: 97, max: 122 },
+    { min: 32, max: 33 },
+  ],
+  enNumSpc: [
+    { min: 65, max: 90 },
+    { min: 97, max: 122 },
+    { min: 48, max: 57 },
+    { min: 32, max: 33 },
+  ],
+  ascii: [{ min: 32, max: 126 }],
+};
+
+// -------- Namespace: Draw --------
+
+/** Wrap one StreamDraw arm into an Expr with stream_id=0 (filled at compile). */
+function streamDrawExpr(draw: PbStreamDraw["draw"]): PbExpr {
+  const sd: PbStreamDraw = { streamId: 0, draw };
+  return { kind: { oneofKind: "streamDraw", streamDraw: sd } };
+}
+
+/** Opts shared by draws that carry inclusive `min`/`max` bounds. */
+export interface DrawRangeOpts {
+  min: PbExpr;
+  max: PbExpr;
+}
+
+/** Opts accepted by `Draw.normal`. */
+export interface DrawNormalOpts extends DrawRangeOpts {
+  /** Span divisor — larger values tighten the distribution. Default 3.0. */
+  screw?: number;
+}
+
+/** Opts accepted by `Draw.zipf`. */
+export interface DrawZipfOpts extends DrawRangeOpts {
+  /** Power-law exponent; exponents <= 1 are internally nudged. */
+  exponent: number;
+}
+
+/** Opts accepted by `Draw.nurand`. */
+export interface DrawNURandOpts {
+  a: Int64Like;
+  x: Int64Like;
+  y: Int64Like;
+  cSalt?: Int64Like;
+}
+
+/** Opts accepted by `Draw.bernoulli`. */
+export interface DrawBernoulliOpts {
+  p: number;
+}
+
+/** Opts accepted by `Draw.date`. Bounds are JS Dates, converted to epoch days. */
+export interface DrawDateOpts {
+  minDate: Date;
+  maxDate: Date;
+}
+
+/** Opts accepted by `Draw.decimal`. */
+export interface DrawDecimalOpts extends DrawRangeOpts {
+  /** Fractional digits retained after rounding. */
+  scale: number;
+}
+
+/** Opts accepted by `Draw.ascii`. */
+export interface DrawAsciiOpts {
+  min: PbExpr;
+  max: PbExpr;
+  /** Code-point ranges sampled uniformly by width. Defaults to `Alphabet.en`. */
+  alphabet?: readonly PbAsciiRange[];
+}
+
+/** Opts accepted by `Draw.phrase`. */
+export interface DrawPhraseOpts {
+  /** Vocabulary dict — either a dict body or a pre-registered key. */
+  vocab: DictLike;
+  minWords: PbExpr;
+  maxWords: PbExpr;
+  /** String joining adjacent words; defaults to a single space. */
+  separator?: string;
+}
+
+/** Opts accepted by `Draw.dict`. */
+export interface DrawDictOpts {
+  /** Named weight profile; empty/omitted selects uniform / default. */
+  weightSet?: string;
+}
+
+/** Opts accepted by `Draw.joint`. */
+export interface DrawJointOpts {
+  /** Named weight profile; empty/omitted selects uniform / default. */
+  weightSet?: string;
+  /** Tuple-scope identifier reserved for sharing one draw across columns. */
+  tupleScope?: number;
+}
+
+/** Resolve a DictLike down to a registered opaque key. */
+function resolveDictKey(d: DictLike): string {
+  return typeof d === "string" ? d : registerInlineDict(d);
+}
+
+/**
+ * Stream-draw primitives. Every builder emits an `Expr` wrapping a
+ * `StreamDraw` oneof; `stream_id` is left 0 — `compile.AssignStreamIDs`
+ * populates it at runtime-construction time.
+ */
+export const Draw = {
+  /** Uniform integer on [min, max] inclusive. */
+  intUniform(opts: DrawRangeOpts): PbExpr {
+    const arm: PbDrawIntUniform = { min: opts.min, max: opts.max };
+    return streamDrawExpr({ oneofKind: "intUniform", intUniform: arm });
+  },
+
+  /** Uniform float on [min, max). */
+  floatUniform(opts: DrawRangeOpts): PbExpr {
+    const arm: PbDrawFloatUniform = { min: opts.min, max: opts.max };
+    return streamDrawExpr({ oneofKind: "floatUniform", floatUniform: arm });
+  },
+
+  /** Truncated normal clamped to [min, max]. `screw` defaults to 3.0. */
+  normal(opts: DrawNormalOpts): PbExpr {
+    const arm: PbDrawNormal = {
+      min: opts.min,
+      max: opts.max,
+      screw: opts.screw ?? 0,
+    };
+    return streamDrawExpr({ oneofKind: "normal", normal: arm });
+  },
+
+  /** Zipfian power-law over [min, max]. */
+  zipf(opts: DrawZipfOpts): PbExpr {
+    const arm: PbDrawZipf = {
+      min: opts.min,
+      max: opts.max,
+      exponent: opts.exponent,
+    };
+    return streamDrawExpr({ oneofKind: "zipf", zipf: arm });
+  },
+
+  /** TPC-C §2.1.6 NURand(A, x, y) with optional `cSalt`. */
+  nurand(opts: DrawNURandOpts): PbExpr {
+    const arm: PbDrawNURand = {
+      a: int64ToString(opts.a),
+      x: int64ToString(opts.x),
+      y: int64ToString(opts.y),
+      cSalt: uint64ToString(opts.cSalt ?? 0),
+    };
+    return streamDrawExpr({ oneofKind: "nurand", nurand: arm });
+  },
+
+  /** Bernoulli {0, 1} with probability p of 1. */
+  bernoulli(opts: DrawBernoulliOpts): PbExpr {
+    const arm: PbDrawBernoulli = { p: opts.p };
+    return streamDrawExpr({ oneofKind: "bernoulli", bernoulli: arm });
+  },
+
+  /** Uniform date over an inclusive Date range; bounds convert to epoch days. */
+  date(opts: DrawDateOpts): PbExpr {
+    const arm: PbDrawDate = {
+      minDaysEpoch: dateToDays(opts.minDate).toString(),
+      maxDaysEpoch: dateToDays(opts.maxDate).toString(),
+    };
+    return streamDrawExpr({ oneofKind: "date", date: arm });
+  },
+
+  /** Uniform decimal rounded to `scale` fractional digits. */
+  decimal(opts: DrawDecimalOpts): PbExpr {
+    if (!Number.isInteger(opts.scale) || opts.scale < 0) {
+      throw new Error(`datagen: Draw.decimal: scale must be >= 0 integer, got ${opts.scale}`);
+    }
+    const arm: PbDrawDecimal = {
+      min: opts.min,
+      max: opts.max,
+      scale: opts.scale,
+    };
+    return streamDrawExpr({ oneofKind: "decimal", decimal: arm });
+  },
+
+  /** Random ASCII string drawn from `alphabet`; defaults to `Alphabet.en`. */
+  ascii(opts: DrawAsciiOpts): PbExpr {
+    const alphabet = opts.alphabet ?? Alphabet.en;
+    if (alphabet.length === 0) {
+      throw new Error("datagen: Draw.ascii requires at least one alphabet range");
+    }
+    const arm: PbDrawAscii = {
+      minLen: opts.min,
+      maxLen: opts.max,
+      alphabet: alphabet.map((r) => ({ min: r.min, max: r.max })),
+    };
+    return streamDrawExpr({ oneofKind: "ascii", ascii: arm });
+  },
+
+  /** Space-joined word sequence drawn from `vocab`. */
+  phrase(opts: DrawPhraseOpts): PbExpr {
+    const vocabKey = resolveDictKey(opts.vocab);
+    const arm: PbDrawPhrase = {
+      vocabKey,
+      minWords: opts.minWords,
+      maxWords: opts.maxWords,
+      separator: opts.separator ?? " ",
+    };
+    return streamDrawExpr({ oneofKind: "phrase", phrase: arm });
+  },
+
+  /** Weighted or uniform pick from a scalar Dict. */
+  dict(d: DictLike, opts?: DrawDictOpts): PbExpr {
+    const dictKeyStr = resolveDictKey(d);
+    const arm: PbDrawDict = {
+      dictKey: dictKeyStr,
+      weightSet: opts?.weightSet ?? "",
+    };
+    return streamDrawExpr({ oneofKind: "dict", dict: arm });
+  },
+
+  /** Tuple draw from a joint Dict, returning `column`'s value. */
+  joint(d: DictLike, column: string, opts?: DrawJointOpts): PbExpr {
+    if (!column) throw new Error("datagen: Draw.joint requires a column name");
+    const dictKeyStr = resolveDictKey(d);
+    const arm: PbDrawJoint = {
+      dictKey: dictKeyStr,
+      column,
+      tupleScope: opts?.tupleScope ?? 0,
+      weightSet: opts?.weightSet ?? "",
+    };
+    return streamDrawExpr({ oneofKind: "joint", joint: arm });
+  },
+};
 
 // -------- Null-helper namespace member (proto: Null on Attr) --------
 

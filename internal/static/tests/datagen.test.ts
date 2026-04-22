@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  Alphabet,
   Attr,
   Deg,
   Dict,
+  Draw,
   Expr,
   Rel,
   Strat,
@@ -510,5 +512,459 @@ describe("std.* wrappers", () => {
     } else {
       throw new Error("expected int64 arm on +1");
     }
+  });
+});
+
+// Helper to unwrap StreamDraw Expr and assert arm kind.
+function unwrapDraw<K extends string>(
+  e: ReturnType<typeof Draw.intUniform>,
+  kind: K,
+) {
+  if (e.kind.oneofKind !== "streamDraw") throw new Error("not a streamDraw");
+  const arm = e.kind.streamDraw.draw;
+  if (arm.oneofKind !== kind) {
+    throw new Error(`expected draw arm ${kind}, got ${arm.oneofKind}`);
+  }
+  expect(e.kind.streamDraw.streamId).toBe(0);
+  return arm;
+}
+
+describe("Draw primitives", () => {
+  it("Draw.intUniform emits a StreamDraw.int_uniform arm", () => {
+    const e = Draw.intUniform({ min: Expr.lit(0), max: Expr.lit(99) });
+    const arm = unwrapDraw(e, "intUniform");
+    if (arm.oneofKind !== "intUniform") throw new Error("narrow");
+    expect(arm.intUniform.min).toBeDefined();
+    expect(arm.intUniform.max).toBeDefined();
+  });
+
+  it("Draw.floatUniform emits float_uniform arm", () => {
+    const e = Draw.floatUniform({ min: Expr.lit(0.1), max: Expr.lit(0.9) });
+    unwrapDraw(e, "floatUniform");
+  });
+
+  it("Draw.normal carries screw (0 defaults to runtime default)", () => {
+    const e = Draw.normal({
+      min: Expr.lit(0),
+      max: Expr.lit(100),
+      screw: 2.5,
+    });
+    const arm = unwrapDraw(e, "normal");
+    if (arm.oneofKind !== "normal") throw new Error("narrow");
+    expect(arm.normal.screw).toBeCloseTo(2.5);
+
+    const eDef = Draw.normal({ min: Expr.lit(0), max: Expr.lit(100) });
+    const armDef = unwrapDraw(eDef, "normal");
+    if (armDef.oneofKind !== "normal") throw new Error("narrow");
+    expect(armDef.normal.screw).toBe(0);
+  });
+
+  it("Draw.zipf carries exponent", () => {
+    const e = Draw.zipf({
+      min: Expr.lit(1),
+      max: Expr.lit(1000),
+      exponent: 1.3,
+    });
+    const arm = unwrapDraw(e, "zipf");
+    if (arm.oneofKind !== "zipf") throw new Error("narrow");
+    expect(arm.zipf.exponent).toBeCloseTo(1.3);
+  });
+
+  it("Draw.nurand stringifies a/x/y and cSalt (defaults to 0)", () => {
+    const e = Draw.nurand({ a: 255, x: 1, y: 100, cSalt: 0xabcd });
+    const arm = unwrapDraw(e, "nurand");
+    if (arm.oneofKind !== "nurand") throw new Error("narrow");
+    expect(arm.nurand.a).toBe("255");
+    expect(arm.nurand.x).toBe("1");
+    expect(arm.nurand.y).toBe("100");
+    expect(arm.nurand.cSalt).toBe(BigInt(0xabcd).toString());
+
+    const eDef = Draw.nurand({ a: 255, x: 1, y: 100 });
+    const armDef = unwrapDraw(eDef, "nurand");
+    if (armDef.oneofKind !== "nurand") throw new Error("narrow");
+    expect(armDef.nurand.cSalt).toBe("0");
+  });
+
+  it("Draw.bernoulli carries p", () => {
+    const e = Draw.bernoulli({ p: 0.3 });
+    const arm = unwrapDraw(e, "bernoulli");
+    if (arm.oneofKind !== "bernoulli") throw new Error("narrow");
+    expect(arm.bernoulli.p).toBeCloseTo(0.3);
+  });
+
+  it("Draw.date converts Dates to inclusive epoch-day bounds", () => {
+    const e = Draw.date({
+      minDate: new Date("1970-01-01T00:00:00Z"),
+      maxDate: new Date("1970-01-11T00:00:00Z"),
+    });
+    const arm = unwrapDraw(e, "date");
+    if (arm.oneofKind !== "date") throw new Error("narrow");
+    expect(arm.date.minDaysEpoch).toBe("0");
+    expect(arm.date.maxDaysEpoch).toBe("10");
+  });
+
+  it("Draw.decimal carries min/max/scale", () => {
+    const e = Draw.decimal({ min: Expr.lit(1.0), max: Expr.lit(999.99), scale: 2 });
+    const arm = unwrapDraw(e, "decimal");
+    if (arm.oneofKind !== "decimal") throw new Error("narrow");
+    expect(arm.decimal.scale).toBe(2);
+  });
+
+  it("Draw.decimal rejects negative or non-integer scale", () => {
+    expect(() => Draw.decimal({ min: Expr.lit(0), max: Expr.lit(1), scale: -1 })).toThrow();
+    expect(() => Draw.decimal({ min: Expr.lit(0), max: Expr.lit(1), scale: 1.5 })).toThrow();
+  });
+
+  it("Draw.ascii defaults to Alphabet.en and copies ranges", () => {
+    const eDef = Draw.ascii({ min: Expr.lit(3), max: Expr.lit(5) });
+    const armDef = unwrapDraw(eDef, "ascii");
+    if (armDef.oneofKind !== "ascii") throw new Error("narrow");
+    expect(armDef.ascii.alphabet).toHaveLength(Alphabet.en.length);
+    expect(armDef.ascii.alphabet[0]).toEqual({ min: 65, max: 90 });
+
+    const eNum = Draw.ascii({ min: Expr.lit(3), max: Expr.lit(5), alphabet: Alphabet.num });
+    const armNum = unwrapDraw(eNum, "ascii");
+    if (armNum.oneofKind !== "ascii") throw new Error("narrow");
+    expect(armNum.ascii.alphabet).toEqual([{ min: 48, max: 57 }]);
+  });
+
+  it("Draw.phrase registers vocab dict and carries separator default", () => {
+    const vocab = Dict.values(["alpha", "beta", "gamma"]);
+    const e = Draw.phrase({
+      vocab,
+      minWords: Expr.lit(1),
+      maxWords: Expr.lit(3),
+    });
+    const arm = unwrapDraw(e, "phrase");
+    if (arm.oneofKind !== "phrase") throw new Error("narrow");
+    expect(arm.phrase.vocabKey).toMatch(/^d_[0-9a-f]{16}$/);
+    expect(arm.phrase.separator).toBe(" ");
+  });
+
+  it("Draw.dict wraps a DictLike with optional weightSet", () => {
+    const d = Dict.weighted(["A", "B"], [1, 3]);
+    const e = Draw.dict(d, { weightSet: "" });
+    const arm = unwrapDraw(e, "dict");
+    if (arm.oneofKind !== "dict") throw new Error("narrow");
+    expect(arm.dict.dictKey).toMatch(/^d_[0-9a-f]{16}$/);
+    expect(arm.dict.weightSet).toBe("");
+  });
+
+  it("Draw.joint requires a column name and carries weightSet+tupleScope", () => {
+    const d = Dict.joint(
+      ["marital", "edu"],
+      [
+        { values: ["S", "COLLEGE"] },
+        { values: ["M", "HIGH_SCHOOL"] },
+      ],
+    );
+    const e = Draw.joint(d, "marital", { weightSet: "default", tupleScope: 7 });
+    const arm = unwrapDraw(e, "joint");
+    if (arm.oneofKind !== "joint") throw new Error("narrow");
+    expect(arm.joint.column).toBe("marital");
+    expect(arm.joint.weightSet).toBe("default");
+    expect(arm.joint.tupleScope).toBe(7);
+
+    expect(() => Draw.joint(d, "")).toThrow();
+  });
+});
+
+describe("Alphabet constants", () => {
+  it("en covers A-Z and a-z", () => {
+    expect(Alphabet.en).toEqual([
+      { min: 65, max: 90 },
+      { min: 97, max: 122 },
+    ]);
+  });
+
+  it("num covers 0-9", () => {
+    expect(Alphabet.num).toEqual([{ min: 48, max: 57 }]);
+  });
+
+  it("enNum stacks letters + digits", () => {
+    expect(Alphabet.enNum).toEqual([
+      { min: 65, max: 90 },
+      { min: 97, max: 122 },
+      { min: 48, max: 57 },
+    ]);
+  });
+
+  it("enUpper is just A-Z", () => {
+    expect(Alphabet.enUpper).toEqual([{ min: 65, max: 90 }]);
+  });
+
+  it("enSpc and enNumSpc include the [32, 33] space range", () => {
+    expect(Alphabet.enSpc).toEqual([
+      { min: 65, max: 90 },
+      { min: 97, max: 122 },
+      { min: 32, max: 33 },
+    ]);
+    expect(Alphabet.enNumSpc[Alphabet.enNumSpc.length - 1]).toEqual({
+      min: 32,
+      max: 33,
+    });
+  });
+
+  it("ascii covers printable [32, 126]", () => {
+    expect(Alphabet.ascii).toEqual([{ min: 32, max: 126 }]);
+  });
+});
+
+describe("Dict.multiWeighted / Dict.joint / Dict.jointWeighted", () => {
+  it("multiWeighted preserves profile names and per-row weight tuples", () => {
+    const d = Dict.multiWeighted(
+      ["def", "wrong", "late"],
+      { default: [30, 20, 10], premium: [5, 40, 5] },
+    );
+    expect(d.columns).toEqual([]);
+    expect(d.weightSets).toEqual(["default", "premium"]);
+    expect(d.rows).toHaveLength(3);
+    expect(d.rows[0].values).toEqual(["def"]);
+    expect(d.rows[0].weights).toEqual(["30", "5"]);
+    expect(d.rows[2].weights).toEqual(["10", "5"]);
+  });
+
+  it("multiWeighted rejects mismatched profile lengths", () => {
+    expect(() =>
+      Dict.multiWeighted(["a", "b"], { only: [1] }),
+    ).toThrow();
+  });
+
+  it("joint produces uniform dict when no row has weights", () => {
+    const d = Dict.joint(
+      ["nation", "region"],
+      [
+        { values: ["ALGERIA", "0"] },
+        { values: ["ARGENTINA", "1"] },
+      ],
+    );
+    expect(d.columns).toEqual(["nation", "region"]);
+    expect(d.weightSets).toEqual([]);
+    expect(d.rows[0].values).toEqual(["ALGERIA", "0"]);
+    expect(d.rows[0].weights).toEqual([]);
+  });
+
+  it("joint adds default weight-set when any row is weighted", () => {
+    const d = Dict.joint(
+      ["a", "b"],
+      [
+        { values: ["x", "y"], weights: [7] },
+        { values: ["p", "q"] },
+      ],
+    );
+    expect(d.weightSets).toEqual([""]);
+    expect(d.rows[0].weights).toEqual(["7"]);
+    expect(d.rows[1].weights).toEqual(["0"]);
+  });
+
+  it("joint validates row width", () => {
+    expect(() =>
+      Dict.joint(["a", "b"], [{ values: ["only"] }]),
+    ).toThrow();
+  });
+
+  it("jointWeighted requires parallel weight tuples per row", () => {
+    const d = Dict.jointWeighted(
+      ["marital", "edu"],
+      ["default", "premium"],
+      [
+        { values: ["S", "COLLEGE"], weights: [100, 40] },
+        { values: ["M", "HIGH_SCHOOL"], weights: [80, 60] },
+      ],
+    );
+    expect(d.columns).toEqual(["marital", "edu"]);
+    expect(d.weightSets).toEqual(["default", "premium"]);
+    expect(d.rows[0].weights).toEqual(["100", "40"]);
+    expect(d.rows[1].weights).toEqual(["80", "60"]);
+
+    expect(() =>
+      Dict.jointWeighted(
+        ["a"],
+        ["default"],
+        [{ values: ["x"], weights: [1, 2] }],
+      ),
+    ).toThrow();
+  });
+});
+
+describe("Dict.fromJson", () => {
+  it("round-trips a dstparse-shaped scalar dict", () => {
+    const json = {
+      rows: [
+        { values: ["SMALL"] },
+        { values: ["LARGE"] },
+      ],
+    };
+    const d = Dict.fromJson(json);
+    expect(d.columns).toEqual([]);
+    expect(d.weightSets).toEqual([]);
+    expect(d.rows.map((r) => r.values[0])).toEqual(["SMALL", "LARGE"]);
+  });
+
+  it("round-trips a multi-column multi-profile joint dict", () => {
+    const json = {
+      columns: ["marital", "edu"],
+      weight_sets: ["default", "premium"],
+      rows: [
+        { values: ["S", "COLLEGE"], weights: [100, 40] },
+        { values: ["M", "HIGH_SCHOOL"], weights: [80, 60] },
+      ],
+    };
+    const d = Dict.fromJson(json);
+    expect(d.columns).toEqual(["marital", "edu"]);
+    expect(d.weightSets).toEqual(["default", "premium"]);
+    expect(d.rows[0].values).toEqual(["S", "COLLEGE"]);
+    expect(d.rows[0].weights).toEqual(["100", "40"]);
+  });
+
+  it("enforces parallel weight counts when weight_sets declared", () => {
+    const json = {
+      columns: ["a"],
+      weight_sets: ["x", "y"],
+      rows: [{ values: ["v"], weights: [1] }],
+    };
+    expect(() => Dict.fromJson(json)).toThrow();
+  });
+
+  it("coerces numeric values to strings", () => {
+    const json = {
+      rows: [{ values: [42] }, { values: [BigInt(123)] }],
+    };
+    const d = Dict.fromJson(json);
+    expect(d.rows[0].values).toEqual(["42"]);
+    expect(d.rows[1].values).toEqual(["123"]);
+  });
+});
+
+describe("Attr.cohortDraw / Attr.cohortLive / Rel.cohort", () => {
+  it("Rel.cohort packs entity bounds, size, and persistence fields", () => {
+    const c = Rel.cohort({
+      name: "hot",
+      cohortSize: 20,
+      entityMin: 1,
+      entityMax: 500,
+      activeEvery: 3,
+      persistenceMod: 100,
+      persistenceRatio: 0.25,
+      seedSalt: 0xdeadbeef,
+    });
+    expect(c.name).toBe("hot");
+    expect(c.cohortSize).toBe("20");
+    expect(c.entityMin).toBe("1");
+    expect(c.entityMax).toBe("500");
+    expect(c.activeEvery).toBe("3");
+    expect(c.persistenceMod).toBe("100");
+    expect(c.persistenceRatio).toBeCloseTo(0.25);
+    expect(c.seedSalt).toBe(BigInt(0xdeadbeef).toString());
+  });
+
+  it("Attr.cohortDraw emits a cohort_draw arm with slot + bucketKey override", () => {
+    const e = Attr.cohortDraw("hot", Expr.lit(2), Expr.col("bucket"));
+    if (e.kind.oneofKind !== "cohortDraw") throw new Error("not a cohortDraw");
+    expect(e.kind.cohortDraw.name).toBe("hot");
+    expect(e.kind.cohortDraw.slot).toBeDefined();
+    expect(e.kind.cohortDraw.bucketKey?.kind.oneofKind).toBe("col");
+  });
+
+  it("Attr.cohortLive emits a cohort_live arm with optional bucketKey", () => {
+    const e = Attr.cohortLive("hot");
+    if (e.kind.oneofKind !== "cohortLive") throw new Error("not a cohortLive");
+    expect(e.kind.cohortLive.name).toBe("hot");
+    expect(e.kind.cohortLive.bucketKey).toBeUndefined();
+
+    const e2 = Attr.cohortLive("hot", Expr.col("bucket"));
+    if (e2.kind.oneofKind !== "cohortLive") throw new Error("narrow");
+    expect(e2.kind.cohortLive.bucketKey?.kind.oneofKind).toBe("col");
+  });
+
+  it("Attr.cohortDraw rejects empty name or missing slot", () => {
+    expect(() => Attr.cohortDraw("", Expr.lit(0))).toThrow();
+    expect(() =>
+      // undefined slot — mirrors a workload author forgetting the arg.
+      Attr.cohortDraw("hot", undefined as unknown as ReturnType<typeof Expr.lit>),
+    ).toThrow();
+  });
+});
+
+describe("Expr.choose", () => {
+  it("emits Choose with stream_id=0 and parallel weight/expr", () => {
+    const e = Expr.choose([
+      { weight: 1, expr: Expr.lit("critical") },
+      { weight: 9, expr: Expr.lit("normal") },
+    ]);
+    if (e.kind.oneofKind !== "choose") throw new Error("not a choose");
+    expect(e.kind.choose.streamId).toBe(0);
+    expect(e.kind.choose.branches).toHaveLength(2);
+    expect(e.kind.choose.branches[0].weight).toBe("1");
+    expect(e.kind.choose.branches[1].weight).toBe("9");
+  });
+
+  it("rejects empty branches and non-positive weights", () => {
+    expect(() => Expr.choose([])).toThrow();
+    expect(() =>
+      Expr.choose([{ weight: 0, expr: Expr.lit("x") }]),
+    ).toThrow();
+  });
+});
+
+describe("Dict dedup: cohort entity-range and joint draws", () => {
+  it("same dict inline in two attrs (via Draw.dict) lands as one entry", () => {
+    const d1 = Dict.values(["A", "B", "C"]);
+    const d2 = Dict.values(["A", "B", "C"]);
+    const spec = Rel.table("t", {
+      size: 10,
+      attrs: {
+        col1: Draw.dict(d1),
+        col2: Draw.dict(d2),
+      },
+    });
+    const keys = Object.keys(spec.dicts);
+    expect(keys).toHaveLength(1);
+    const key = keys[0];
+
+    const first = spec.source!.attrs[0].expr!;
+    if (first.kind.oneofKind !== "streamDraw") throw new Error("expected streamDraw");
+    const arm = first.kind.streamDraw.draw;
+    if (arm.oneofKind !== "dict") throw new Error("expected dict arm");
+    expect(arm.dict.dictKey).toBe(key);
+  });
+
+  it("Draw.phrase vocab dict shows up in spec.dicts", () => {
+    const vocab = Dict.values(["alpha", "beta", "gamma"]);
+    const spec = Rel.table("t", {
+      size: 3,
+      attrs: {
+        phrase: Draw.phrase({
+          vocab,
+          minWords: Expr.lit(1),
+          maxWords: Expr.lit(2),
+        }),
+      },
+    });
+    expect(Object.keys(spec.dicts)).toHaveLength(1);
+  });
+});
+
+describe("Rel.table with cohorts", () => {
+  it("threads Rel.cohort into RelSource.cohorts", () => {
+    const c = Rel.cohort({
+      name: "hot",
+      cohortSize: 20,
+      entityMin: 1,
+      entityMax: 500,
+      activeEvery: 3,
+    });
+    const spec = Rel.table("events", {
+      size: 100,
+      attrs: {
+        row_index: Attr.rowIndex(),
+        item: Attr.cohortDraw("hot", Expr.lit(0), Expr.col("row_index")),
+        alive: Attr.cohortLive("hot", Expr.col("row_index")),
+      },
+      cohorts: [c],
+    });
+    expect(spec.source?.cohorts).toHaveLength(1);
+    expect(spec.source?.cohorts[0].name).toBe("hot");
+    expect(spec.source?.cohorts[0].cohortSize).toBe("20");
   });
 });
