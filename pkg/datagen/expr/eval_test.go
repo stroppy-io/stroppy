@@ -15,6 +15,8 @@ type fakeCtx struct {
 	rowIndex  map[dgproto.RowIndex_Kind]int64
 	dicts     map[string]*dgproto.Dict
 	calls     map[string]func(args []any) (any, error)
+	blocks    map[string]any
+	lookups   map[string]func(pop, attr string, idx int64) (any, error)
 	colLookup int
 	callCount int
 }
@@ -25,6 +27,8 @@ func newFakeCtx() *fakeCtx {
 		rowIndex: map[dgproto.RowIndex_Kind]int64{},
 		dicts:    map[string]*dgproto.Dict{},
 		calls:    map[string]func(args []any) (any, error){},
+		blocks:   map[string]any{},
+		lookups:  map[string]func(pop, attr string, idx int64) (any, error){},
 	}
 }
 
@@ -61,6 +65,24 @@ func (f *fakeCtx) Call(name string, args []any) (any, error) {
 	}
 
 	return fn(args)
+}
+
+func (f *fakeCtx) BlockSlot(slot string) (any, error) {
+	v, ok := f.blocks[slot]
+	if !ok {
+		return nil, ErrBadExpr
+	}
+
+	return v, nil
+}
+
+func (f *fakeCtx) Lookup(pop, attr string, idx int64) (any, error) {
+	fn, ok := f.lookups[pop+"/"+attr]
+	if !ok {
+		return nil, ErrBadExpr
+	}
+
+	return fn(pop, attr, idx)
 }
 
 // litInt builds an Expr wrapping an int64 literal.
