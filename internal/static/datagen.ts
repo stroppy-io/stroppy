@@ -376,6 +376,23 @@ export const std = {
   parseFloat(x: PbExpr): PbExpr {
     return call("std.parseFloat", [x]);
   },
+
+  /**
+   * Deterministic bijection of [0, n) keyed by `seed`. Iterating `idx`
+   * across [0, n) yields each integer in the range exactly once in a
+   * shuffled order; same (seed, idx, n) always returns the same output;
+   * different seeds produce uncorrelated permutations. Implemented as
+   * a cycle-walking 4-round Feistel cipher over a SplitMix64 round
+   * function — no per-call state, parallel-safe.
+   *
+   * Spec reference: TPC-C §4.3.3.1 requires the set of `o_c_id` values
+   * in each district to be a permutation of [1, 3000]; per-district
+   * `permuteIndex(districtSeed, rowIndex, 3000) + 1` satisfies the
+   * requirement without materializing the schedule.
+   */
+  permuteIndex(seed: PbExpr, idx: PbExpr, n: PbExpr): PbExpr {
+    return call("std.permuteIndex", [seed, idx, n]);
+  },
 };
 
 // -------- Namespace: Dict --------

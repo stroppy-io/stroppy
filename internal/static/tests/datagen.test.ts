@@ -565,6 +565,12 @@ describe("std.* wrappers", () => {
     }
   });
 
+  it("std.permuteIndex builds a Call with the three positional args", () => {
+    const e = std.permuteIndex(Expr.lit(1), Expr.lit(2), Expr.lit(3));
+    if (e.kind.oneofKind !== "call") throw new Error("not a call");
+    expect(e.kind.call.func).toBe("std.permuteIndex");
+    expect(e.kind.call.args).toHaveLength(3);
+  });
 });
 
 // Helper to unwrap StreamDraw Expr and assert arm kind.
