@@ -61,6 +61,29 @@
     - [LoggerConfig.LogLevel](#stroppy-LoggerConfig-LogLevel)
     - [LoggerConfig.LogMode](#stroppy-LoggerConfig-LogMode)
   
+- [proto/stroppy/datagen.proto](#proto_stroppy_datagen-proto)
+    - [Attr](#stroppy-datagen-Attr)
+    - [BinOp](#stroppy-datagen-BinOp)
+    - [Call](#stroppy-datagen-Call)
+    - [ColRef](#stroppy-datagen-ColRef)
+    - [Dict](#stroppy-datagen-Dict)
+    - [DictAt](#stroppy-datagen-DictAt)
+    - [DictRow](#stroppy-datagen-DictRow)
+    - [Expr](#stroppy-datagen-Expr)
+    - [If](#stroppy-datagen-If)
+    - [InsertSpec](#stroppy-datagen-InsertSpec)
+    - [InsertSpec.DictsEntry](#stroppy-datagen-InsertSpec-DictsEntry)
+    - [Literal](#stroppy-datagen-Literal)
+    - [Null](#stroppy-datagen-Null)
+    - [Parallelism](#stroppy-datagen-Parallelism)
+    - [Population](#stroppy-datagen-Population)
+    - [RelSource](#stroppy-datagen-RelSource)
+    - [RowIndex](#stroppy-datagen-RowIndex)
+  
+    - [BinOp.Op](#stroppy-datagen-BinOp-Op)
+    - [InsertMethod](#stroppy-datagen-InsertMethod)
+    - [RowIndex.Kind](#stroppy-datagen-RowIndex-Kind)
+  
 - [proto/stroppy/descriptor.proto](#proto_stroppy_descriptor-proto)
     - [InsertDescriptor](#stroppy-InsertDescriptor)
     - [QueryParamDescriptor](#stroppy-QueryParamDescriptor)
@@ -966,6 +989,364 @@ Error handling mode for query and insert operations
 | ---- | ------ | ----------- |
 | LOG_MODE_DEVELOPMENT | 0 |  |
 | LOG_MODE_PRODUCTION | 1 |  |
+
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="proto_stroppy_datagen-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## proto/stroppy/datagen.proto
+
+
+
+<a name="stroppy-datagen-Attr"></a>
+
+### Attr
+Attr binds a column name to the Expr that produces its value.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Column name; unique within the owning RelSource. |
+| expr | [Expr](#stroppy-datagen-Expr) |  | Expression tree that produces the column value for a row. |
+| null | [Null](#stroppy-datagen-Null) |  | Optional null-injection policy for this column. |
+
+
+
+
+
+
+<a name="stroppy-datagen-BinOp"></a>
+
+### BinOp
+BinOp applies an arithmetic, comparison, or logical operator to sub-expressions.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| op | [BinOp.Op](#stroppy-datagen-BinOp-Op) |  | Operator to apply. |
+| a | [Expr](#stroppy-datagen-Expr) |  | Left operand, or the single operand for NOT. |
+| b | [Expr](#stroppy-datagen-Expr) |  | Right operand; unset for unary operators. |
+
+
+
+
+
+
+<a name="stroppy-datagen-Call"></a>
+
+### Call
+Call invokes a stdlib function registered in pkg/datagen/stdlib.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| func | [string](#string) |  | Registered function name, e.g. &#34;std.format&#34; or &#34;std.days_to_date&#34;. |
+| args | [Expr](#stroppy-datagen-Expr) | repeated | Positional arguments to the function. |
+
+
+
+
+
+
+<a name="stroppy-datagen-ColRef"></a>
+
+### ColRef
+ColRef refers to another attribute in the same RelSource by name.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Name of the referenced attribute. |
+
+
+
+
+
+
+<a name="stroppy-datagen-Dict"></a>
+
+### Dict
+Dict is an inline values table referenced by an opaque key in InsertSpec.dicts.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| columns | [string](#string) | repeated | Column names. Empty for scalar dicts; row values are parallel to this list. |
+| weight_sets | [string](#string) | repeated | Named weight profiles. Empty list means uniform draws. Each entry names one profile — tuple-joint, per-column marginal, per-column-pair conditional — that draw operators select by name at call time. The default profile is addressed by the empty name &#34;&#34;. |
+| rows | [DictRow](#stroppy-datagen-DictRow) | repeated | Row payloads. Length 1 for scalar dicts; parallel to columns otherwise. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DictAt"></a>
+
+### DictAt
+DictAt reads one column of one row from a Dict carried by InsertSpec.dicts.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| dict_key | [string](#string) |  | Opaque dict key matching an entry in InsertSpec.dicts. |
+| index | [Expr](#stroppy-datagen-Expr) |  | Row index into the dict; wrapped modulo row count at evaluation time. |
+| column | [string](#string) |  | Column name for joint dicts; empty for scalar dicts. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DictRow"></a>
+
+### DictRow
+DictRow is one tuple of values plus optional parallel weights.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| values | [string](#string) | repeated | Column values parallel to Dict.columns (length 1 for scalar dicts). |
+| weights | [int64](#int64) | repeated | Weights parallel to Dict.weight_sets. Empty when the dict is uniform. |
+
+
+
+
+
+
+<a name="stroppy-datagen-Expr"></a>
+
+### Expr
+Expr is the closed grammar for attribute value generation.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| col | [ColRef](#stroppy-datagen-ColRef) |  | Read another attr in the current scope by name. |
+| row_index | [RowIndex](#stroppy-datagen-RowIndex) |  | Row-position indicator (entity, line, or global counter). |
+| lit | [Literal](#stroppy-datagen-Literal) |  | Typed scalar constant. |
+| bin_op | [BinOp](#stroppy-datagen-BinOp) |  | Binary or unary operator over sub-expressions. |
+| call | [Call](#stroppy-datagen-Call) |  | Stdlib function call by registered name. |
+| if_ | [If](#stroppy-datagen-If) |  | Typed ternary with lazy branch evaluation. |
+| dict_at | [DictAt](#stroppy-datagen-DictAt) |  | Row lookup into a Dict carried by the owning InsertSpec. |
+
+
+
+
+
+
+<a name="stroppy-datagen-If"></a>
+
+### If
+If is a typed ternary; only the selected branch evaluates.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| cond | [Expr](#stroppy-datagen-Expr) |  | Boolean condition. |
+| then | [Expr](#stroppy-datagen-Expr) |  | Expression evaluated when cond is true. |
+| else_ | [Expr](#stroppy-datagen-Expr) |  | Expression evaluated when cond is false. |
+
+
+
+
+
+
+<a name="stroppy-datagen-InsertSpec"></a>
+
+### InsertSpec
+InsertSpec is the boundary message a workload emits per table load.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| table | [string](#string) |  | Target table name. |
+| seed | [uint64](#uint64) |  | Root PRNG seed for this load; 0 picks a random seed per run. |
+| method | [InsertMethod](#stroppy-datagen-InsertMethod) |  | Wire protocol for row insertion. |
+| parallelism | [Parallelism](#stroppy-datagen-Parallelism) |  | Worker hint for the Loader; clamped to the global cap. |
+| source | [RelSource](#stroppy-datagen-RelSource) |  | Relational descriptor for the rows this spec emits. |
+| dicts | [InsertSpec.DictsEntry](#stroppy-datagen-InsertSpec-DictsEntry) | repeated | Dict bodies keyed by the opaque TS-assigned ID that attrs reference. |
+
+
+
+
+
+
+<a name="stroppy-datagen-InsertSpec-DictsEntry"></a>
+
+### InsertSpec.DictsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [Dict](#stroppy-datagen-Dict) |  |  |
+
+
+
+
+
+
+<a name="stroppy-datagen-Literal"></a>
+
+### Literal
+Literal is a single typed scalar constant.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| int64 | [int64](#int64) |  | Signed 64-bit integer literal. |
+| double | [double](#double) |  | 64-bit floating point literal. |
+| string | [string](#string) |  | UTF-8 string literal. |
+| bool | [bool](#bool) |  | Boolean literal. |
+| bytes | [bytes](#bytes) |  | Raw bytes literal. |
+| timestamp | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Timestamp literal used for date and datetime columns. |
+
+
+
+
+
+
+<a name="stroppy-datagen-Null"></a>
+
+### Null
+Null carries the rate and salt that control null injection for an attr.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| rate | [float](#float) |  | Probability of a null value in [0, 1]. |
+| seed_salt | [uint64](#uint64) |  | Per-attr salt that keeps the null-decision stream independent from the value-generation streams. |
+
+
+
+
+
+
+<a name="stroppy-datagen-Parallelism"></a>
+
+### Parallelism
+Parallelism carries worker hints from the spec author.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| workers | [int32](#int32) |  | Desired worker count; the Loader clamps to the global cap. |
+
+
+
+
+
+
+<a name="stroppy-datagen-Population"></a>
+
+### Population
+Population names the entity set a RelSource iterates and its cardinality.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Stable identifier used by cross-population references. |
+| size | [int64](#int64) |  | Total number of entities this population defines. |
+| pure | [bool](#bool) |  | When true the population is never iterated directly; it is read through cross-population reads only. |
+
+
+
+
+
+
+<a name="stroppy-datagen-RelSource"></a>
+
+### RelSource
+RelSource is the relational descriptor for the rows a spec emits.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| population | [Population](#stroppy-datagen-Population) |  | Population this spec iterates. |
+| attrs | [Attr](#stroppy-datagen-Attr) | repeated | Attr definitions keyed into column_order for emission. |
+| column_order | [string](#string) | repeated | Column order used when rendering rows for the driver. |
+
+
+
+
+
+
+<a name="stroppy-datagen-RowIndex"></a>
+
+### RowIndex
+RowIndex produces a monotonically increasing integer tied to a row position.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| kind | [RowIndex.Kind](#stroppy-datagen-RowIndex-Kind) |  | Which row counter to emit. |
+
+
+
+
+
+ 
+
+
+<a name="stroppy-datagen-BinOp-Op"></a>
+
+### BinOp.Op
+Op selects the operator; NOT is unary and uses only field `a`.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| OP_UNSPECIFIED | 0 |  |
+| ADD | 1 | a &#43; b |
+| SUB | 2 | a - b |
+| MUL | 3 | a * b |
+| DIV | 4 | a / b |
+| MOD | 5 | a % b |
+| CONCAT | 6 | String or list concatenation a || b |
+| EQ | 7 | a == b |
+| NE | 8 | a != b |
+| LT | 9 | a &lt; b |
+| LE | 10 | a &lt;= b |
+| GT | 11 | a &gt; b |
+| GE | 12 | a &gt;= b |
+| AND | 13 | a AND b |
+| OR | 14 | a OR b |
+| NOT | 15 | NOT a (unary; b is ignored) |
+
+
+
+<a name="stroppy-datagen-InsertMethod"></a>
+
+### InsertMethod
+InsertMethod selects the driver-level protocol used to write rows.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| PLAIN_QUERY | 0 | Parameterized SQL statement per row or batch. |
+| PLAIN_BULK | 1 | Multi-row VALUES statement prepared as one query. |
+| NATIVE | 2 | Driver-native path: COPY for Postgres, upload for YDB, bulk for MySQL. |
+
+
+
+<a name="stroppy-datagen-RowIndex-Kind"></a>
+
+### RowIndex.Kind
+Kind selects which counter the index reflects.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| UNSPECIFIED | 0 | Default; treated as ENTITY by evaluators. |
+| ENTITY | 1 | Outer iterating side in a relationship; the population&#39;s own row when no relationship is active. |
+| LINE | 2 | Inner side in a relationship iteration. |
+| GLOBAL | 3 | Global emitted-row counter across the whole load. |
 
 
  

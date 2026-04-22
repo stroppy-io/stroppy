@@ -1,0 +1,239 @@
+syntax = "proto3";
+
+package stroppy.datagen;
+
+import "validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stroppy-io/stroppy/pkg/datagen/dgproto";
+
+// InsertSpec is the boundary message a workload emits per table load.
+message InsertSpec {
+  // Target table name.
+  string table = 1 [ (validate.rules).string.min_len = 1 ];
+  // Root PRNG seed for this load; 0 picks a random seed per run.
+  uint64 seed = 2;
+  // Wire protocol for row insertion.
+  InsertMethod method = 3 [ (validate.rules).enum.defined_only = true ];
+  // Worker hint for the Loader; clamped to the global cap.
+  Parallelism parallelism = 4;
+  // Relational descriptor for the rows this spec emits.
+  RelSource source = 5 [ (validate.rules).message.required = true ];
+  // Dict bodies keyed by the opaque TS-assigned ID that attrs reference.
+  map<string, Dict> dicts = 6;
+}
+
+// InsertMethod selects the driver-level protocol used to write rows.
+enum InsertMethod {
+  // Parameterized SQL statement per row or batch.
+  PLAIN_QUERY = 0;
+  // Multi-row VALUES statement prepared as one query.
+  PLAIN_BULK = 1;
+  // Driver-native path: COPY for Postgres, upload for YDB, bulk for MySQL.
+  NATIVE = 2;
+}
+
+// Parallelism carries worker hints from the spec author.
+message Parallelism {
+  // Desired worker count; the Loader clamps to the global cap.
+  int32 workers = 1;
+}
+
+// Dict is an inline values table referenced by an opaque key in InsertSpec.dicts.
+message Dict {
+  // Column names. Empty for scalar dicts; row values are parallel to this list.
+  repeated string columns = 1;
+  // Named weight profiles. Empty list means uniform draws. Each entry names one
+  // profile — tuple-joint, per-column marginal, per-column-pair conditional —
+  // that draw operators select by name at call time. The default profile is
+  // addressed by the empty name "".
+  repeated string weight_sets = 2;
+  // Row payloads. Length 1 for scalar dicts; parallel to columns otherwise.
+  repeated DictRow rows = 3;
+}
+
+// DictRow is one tuple of values plus optional parallel weights.
+message DictRow {
+  // Column values parallel to Dict.columns (length 1 for scalar dicts).
+  repeated string values = 1;
+  // Weights parallel to Dict.weight_sets. Empty when the dict is uniform.
+  repeated int64 weights = 2;
+}
+
+// RelSource is the relational descriptor for the rows a spec emits.
+message RelSource {
+  // Population this spec iterates.
+  Population population = 1 [ (validate.rules).message.required = true ];
+  // Attr definitions keyed into column_order for emission.
+  repeated Attr attrs = 2
+      [ (validate.rules).repeated = {min_items : 1} ];
+  // Column order used when rendering rows for the driver.
+  repeated string column_order = 3
+      [ (validate.rules).repeated = {min_items : 1} ];
+}
+
+// Population names the entity set a RelSource iterates and its cardinality.
+message Population {
+  // Stable identifier used by cross-population references.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Total number of entities this population defines.
+  int64 size = 2 [ (validate.rules).int64.gt = 0 ];
+  // When true the population is never iterated directly; it is read through
+  // cross-population reads only.
+  bool pure = 3;
+}
+
+// Attr binds a column name to the Expr that produces its value.
+message Attr {
+  // Column name; unique within the owning RelSource.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Expression tree that produces the column value for a row.
+  Expr expr = 2 [ (validate.rules).message.required = true ];
+  // Optional null-injection policy for this column.
+  Null null = 3;
+}
+
+// Null carries the rate and salt that control null injection for an attr.
+message Null {
+  // Probability of a null value in [0, 1].
+  float rate = 1 [ (validate.rules).float = {gte : 0, lte : 1} ];
+  // Per-attr salt that keeps the null-decision stream independent from the
+  // value-generation streams.
+  uint64 seed_salt = 2;
+}
+
+// Expr is the closed grammar for attribute value generation.
+message Expr {
+  oneof kind {
+    option (validate.required) = true;
+    // Read another attr in the current scope by name.
+    ColRef col = 1;
+    // Row-position indicator (entity, line, or global counter).
+    RowIndex row_index = 2;
+    // Typed scalar constant.
+    Literal lit = 3;
+    // Binary or unary operator over sub-expressions.
+    BinOp bin_op = 4;
+    // Stdlib function call by registered name.
+    Call call = 5;
+    // Typed ternary with lazy branch evaluation.
+    If if_ = 6;
+    // Row lookup into a Dict carried by the owning InsertSpec.
+    DictAt dict_at = 7;
+  }
+}
+
+// ColRef refers to another attribute in the same RelSource by name.
+message ColRef {
+  // Name of the referenced attribute.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+}
+
+// RowIndex produces a monotonically increasing integer tied to a row position.
+message RowIndex {
+  // Kind selects which counter the index reflects.
+  enum Kind {
+    // Default; treated as ENTITY by evaluators.
+    UNSPECIFIED = 0;
+    // Outer iterating side in a relationship; the population's own row when
+    // no relationship is active.
+    ENTITY = 1;
+    // Inner side in a relationship iteration.
+    LINE = 2;
+    // Global emitted-row counter across the whole load.
+    GLOBAL = 3;
+  }
+  // Which row counter to emit.
+  Kind kind = 1 [ (validate.rules).enum.defined_only = true ];
+}
+
+// Literal is a single typed scalar constant.
+message Literal {
+  oneof value {
+    option (validate.required) = true;
+    // Signed 64-bit integer literal.
+    int64 int64 = 1;
+    // 64-bit floating point literal.
+    double double = 2;
+    // UTF-8 string literal.
+    string string = 3;
+    // Boolean literal.
+    bool bool = 4;
+    // Raw bytes literal.
+    bytes bytes = 5;
+    // Timestamp literal used for date and datetime columns.
+    google.protobuf.Timestamp timestamp = 6;
+  }
+}
+
+// BinOp applies an arithmetic, comparison, or logical operator to sub-expressions.
+message BinOp {
+  // Op selects the operator; NOT is unary and uses only field `a`.
+  enum Op {
+    OP_UNSPECIFIED = 0;
+    // a + b
+    ADD = 1;
+    // a - b
+    SUB = 2;
+    // a * b
+    MUL = 3;
+    // a / b
+    DIV = 4;
+    // a % b
+    MOD = 5;
+    // String or list concatenation a || b
+    CONCAT = 6;
+    // a == b
+    EQ = 7;
+    // a != b
+    NE = 8;
+    // a < b
+    LT = 9;
+    // a <= b
+    LE = 10;
+    // a > b
+    GT = 11;
+    // a >= b
+    GE = 12;
+    // a AND b
+    AND = 13;
+    // a OR b
+    OR = 14;
+    // NOT a (unary; b is ignored)
+    NOT = 15;
+  }
+  // Operator to apply.
+  Op op = 1 [ (validate.rules).enum.defined_only = true ];
+  // Left operand, or the single operand for NOT.
+  Expr a = 2 [ (validate.rules).message.required = true ];
+  // Right operand; unset for unary operators.
+  Expr b = 3;
+}
+
+// Call invokes a stdlib function registered in pkg/datagen/stdlib.
+message Call {
+  // Registered function name, e.g. "std.format" or "std.days_to_date".
+  string func = 1 [ (validate.rules).string.min_len = 1 ];
+  // Positional arguments to the function.
+  repeated Expr args = 2;
+}
+
+// If is a typed ternary; only the selected branch evaluates.
+message If {
+  // Boolean condition.
+  Expr cond = 1 [ (validate.rules).message.required = true ];
+  // Expression evaluated when cond is true.
+  Expr then = 2 [ (validate.rules).message.required = true ];
+  // Expression evaluated when cond is false.
+  Expr else_ = 3 [ (validate.rules).message.required = true ];
+}
+
+// DictAt reads one column of one row from a Dict carried by InsertSpec.dicts.
+message DictAt {
+  // Opaque dict key matching an entry in InsertSpec.dicts.
+  string dict_key = 1 [ (validate.rules).string.min_len = 1 ];
+  // Row index into the dict; wrapped modulo row count at evaluation time.
+  Expr index = 2 [ (validate.rules).message.required = true ];
+  // Column name for joint dicts; empty for scalar dicts.
+  string column = 3;
+}
