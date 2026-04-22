@@ -6,6 +6,7 @@ import type {
   UnitDescriptor,
   DriverTransactionStat,
   InsertDescriptor,
+  InsertSpec,
   DriverConfig,
   Generation_Rule,
   QueryParamGroup,
@@ -64,6 +65,10 @@ declare module "k6/x/stroppy" {
   export interface Driver {
     /** @throws {Error} on insert failure or protobuf unmarshal error */
     insertValuesBin(insert: BinMsg<InsertDescriptor>): QueryStats;
+    /** Run a relational InsertSpec through the driver. The TS wrapper handles
+     *  marshalling; JS code never constructs the binary directly.
+     *  @throws {Error} on insert failure or protobuf unmarshal error */
+    insertSpecBin(spec: BinMsg<InsertSpec>): QueryStats;
     /** @throws {Error} on query execution or argument processing error */
     runQuery(sql: string, args: Record<string, any>): QueryResult;
     /** Start a transaction with the given isolation level (proto TxIsolationLevel enum value).

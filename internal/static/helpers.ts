@@ -27,6 +27,7 @@ import {
   QueryParamDescriptor,
   InsertDescriptor,
   InsertMethod,
+  InsertSpec as DatagenInsertSpec,
   DriverConfig_ErrorMode,
   DriverConfig_DriverType,
   DriverConfig_PostgresConfig,
@@ -535,6 +536,28 @@ export class DriverX implements QueryAPI {
       handleError(this._errorMode, e, metricTags);
     }
 
+  }
+
+  /** Run a relational InsertSpec through the driver. Mirrors `insert()`
+   *  but targets the `pkg/datagen` pipeline (dgproto.InsertSpec) instead
+   *  of the legacy InsertDescriptor. Metrics and error handling match
+   *  the existing insert path so workload dashboards keep working. */
+  insertSpec(spec: Partial<DatagenInsertSpec>): void {
+    const table = spec.table ?? "unknown";
+    const metricTags = { table_name: table };
+
+    console.log(`InsertSpec into '${table}' starting...`);
+
+    try {
+      const protoBytes = DatagenInsertSpec.toBinary(DatagenInsertSpec.create(spec));
+      const stats = this.driver.insertSpecBin(protoBytes);
+      insertErrRateMetric.add(0, metricTags);
+      insertMetric.add(stats.elapsed.seconds() * 1000, metricTags);
+      console.log(`InsertSpec into '${table}' ended in ${stats.elapsed.string()}`);
+    } catch (e) {
+      insertErrRateMetric.add(1, metricTags);
+      handleError(this._errorMode, e, metricTags);
+    }
   }
 
   /** Start a transaction manually. Call tx.commit() or tx.rollback() when done. */

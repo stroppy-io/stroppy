@@ -17,6 +17,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
@@ -242,6 +243,17 @@ func (d *Driver) InsertValues(
 			descriptor.GetMethod().String(),
 		)
 	}
+}
+
+// InsertSpec is not yet implemented for the mysql driver. The relational
+// path lands per-driver in a later landing; until then this returns the
+// framework's sentinel so callers can distinguish "not wired" from a
+// runtime error.
+func (d *Driver) InsertSpec(
+	_ context.Context,
+	_ *dgproto.InsertSpec,
+) (*stats.Query, error) {
+	return nil, driver.ErrInsertSpecNotImplemented
 }
 
 func (d *Driver) RunQuery(

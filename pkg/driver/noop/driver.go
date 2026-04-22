@@ -5,13 +5,18 @@ package noop
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
@@ -77,6 +82,33 @@ func (d *Driver) InsertValues(
 	// All insert methods map to plain_bulk: exercises full data generation,
 	// discards the final ExecContext call.
 	return sqldriver.InsertPlainBulk(ctx, d.conn, builder, d.bulkSize)
+}
+
+// InsertSpec drains a relational runtime end-to-end and discards the rows.
+// Like InsertValues it exercises the full generation pipeline so benchmarks
+// stay comparable, but no I/O is performed.
+func (d *Driver) InsertSpec(
+	_ context.Context,
+	spec *dgproto.InsertSpec,
+) (*stats.Query, error) {
+	rt, err := runtime.NewRuntime(spec)
+	if err != nil {
+		return nil, fmt.Errorf("noop: build runtime: %w", err)
+	}
+
+	start := time.Now()
+
+	for {
+		if _, err := rt.Next(); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			return nil, fmt.Errorf("noop: runtime.Next: %w", err)
+		}
+	}
+
+	return &stats.Query{Elapsed: time.Since(start)}, nil
 }
 
 func (d *Driver) RunQuery(
