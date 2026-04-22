@@ -108,3 +108,20 @@ func TestLiteralEmpty(t *testing.T) {
 		t.Fatalf("want ErrBadExpr, got %v", err)
 	}
 }
+
+// TestLiteralNull verifies the Null arm evaluates to (nil, nil). The nil
+// return is the row-scratch SQL NULL representation for drivers.
+func TestLiteralNull(t *testing.T) {
+	e := &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
+		Value: &dgproto.Literal_Null{Null: &dgproto.NullMarker{}},
+	}}}
+
+	got, err := Eval(newFakeCtx(), e)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	if got != nil {
+		t.Fatalf("got %v (%T), want nil", got, got)
+	}
+}

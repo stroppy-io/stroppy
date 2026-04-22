@@ -190,8 +190,17 @@ message Literal {
     bytes bytes = 5;
     // Timestamp literal used for date and datetime columns.
     google.protobuf.Timestamp timestamp = 6;
+    // Explicit SQL NULL literal. Evaluates to Go nil in the row scratch,
+    // which the drivers render as NULL. Used for If branches that must
+    // yield NULL (e.g. TPC-C undelivered o_carrier_id / ol_delivery_d).
+    NullMarker null = 7;
   }
 }
+
+// NullMarker is a zero-field marker message used as the payload of
+// typeless oneof arms. Proto oneofs cannot have bare-tag members, so
+// arms that carry no data (today: Literal.null) reference this message.
+message NullMarker {}
 
 // BinOp applies an arithmetic, comparison, or logical operator to sub-expressions.
 message BinOp {

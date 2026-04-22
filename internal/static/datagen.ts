@@ -221,6 +221,16 @@ export const Expr = {
     return exprLit({ value: { oneofKind: "double", double: x } });
   },
 
+  /**
+   * Explicit SQL NULL literal. Evaluates to Go nil in the row scratch,
+   * which drivers render as NULL. Use this inside `Expr.if` branches
+   * that must yield NULL conditionally (e.g. TPC-C `o_carrier_id` when
+   * `o_id ∈ [2101, 3000]`, `ol_delivery_d` for undelivered rows).
+   */
+  litNull(): PbExpr {
+    return exprLit({ value: { oneofKind: "null", null: {} } });
+  },
+
   /** Reference another attribute in the current scope. */
   col(name: string): PbExpr {
     if (!name) throw new Error("datagen: Expr.col requires a name");

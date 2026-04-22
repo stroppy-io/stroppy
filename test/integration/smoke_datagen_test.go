@@ -890,3 +890,107 @@ func TestDatagenSmokeWithSCD2(t *testing.T) {
 		t.Fatalf("first current id = %d, want 6", firstCurrent)
 	}
 }
+
+// --- Literal_Null arm wiring through COPY ---------------------------------
+
+var nullLiteralColumns = []string{"id", "note"}
+
+// nullLiteralSpec builds a flat spec where `note` is an If over row_index:
+// rows with row_index > 100 emit Expr.litNull (SQL NULL), rows ≤ 100 emit
+// the literal string "value". The CopyFrom path must preserve the nil
+// untouched — this is the driver-side check behind TPC-C's `o_carrier_id`
+// and `ol_delivery_d` spec §4.3.3.1 requirements.
+func nullLiteralSpec(size int64) *dgproto.InsertSpec {
+	nullLit := &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
+		Value: &dgproto.Literal_Null{Null: &dgproto.NullMarker{}},
+	}}}
+
+	attrs := []*dgproto.Attr{
+		attrOf("id", binOpOf(dgproto.BinOp_ADD, rowIndexOf(), litOf(int64(1)))),
+		attrOf("note", ifOf(
+			binOpOf(dgproto.BinOp_GT, rowIndexOf(), litOf(int64(100))),
+			nullLit,
+			litOf("value"),
+		)),
+	}
+
+	return &dgproto.InsertSpec{
+		Table: "smoke_null_literal",
+		Seed:  0xA5A5A5A5,
+		Source: &dgproto.RelSource{
+			Population:  &dgproto.Population{Name: "smoke_null_literal", Size: size},
+			Attrs:       attrs,
+			ColumnOrder: nullLiteralColumns,
+		},
+	}
+}
+
+// TestDatagenSmokeLitNull proves the Literal_Null arm flows from the
+// evaluator through CopyFrom into real SQL NULLs.
+func TestDatagenSmokeLitNull(t *testing.T) {
+	const size = int64(200)
+
+	pool := NewTmpfsPG(t)
+	ResetSchema(t, pool)
+
+	const ddl = `CREATE TABLE smoke_null_literal (
+		id int8 PRIMARY KEY,
+		note text
+	)`
+	if _, err := pool.Exec(context.Background(), ddl); err != nil {
+		t.Fatalf("create smoke_null_literal: %v", err)
+	}
+
+	rt, err := runtime.NewRuntime(nullLiteralSpec(size))
+	if err != nil {
+		t.Fatalf("NewRuntime: %v", err)
+	}
+
+	rows := drainRuntime(t, rt)
+	if int64(len(rows)) != size {
+		t.Fatalf("emitted %d rows, want %d", len(rows), size)
+	}
+
+	if got := copyRowsTo(t, pool, "smoke_null_literal", nullLiteralColumns, rows); got != size {
+		t.Fatalf("CopyFrom inserted %d, want %d", got, size)
+	}
+
+	ctx := context.Background()
+
+	// row_index > 100 is true for row_index ∈ [101, 199] → ids ∈ [102, 200]
+	// gets NULL, ids ∈ [1, 101] gets "value".
+	var nullCount, valueCount int64
+	if err := pool.QueryRow(ctx, `
+		SELECT
+		  COUNT(*) FILTER (WHERE note IS NULL),
+		  COUNT(*) FILTER (WHERE note = 'value')
+		FROM smoke_null_literal
+	`).Scan(&nullCount, &valueCount); err != nil {
+		t.Fatalf("count nulls/values: %v", err)
+	}
+	if nullCount != 99 {
+		t.Fatalf("null count = %d, want 99", nullCount)
+	}
+	if valueCount != 101 {
+		t.Fatalf("value count = %d, want 101", valueCount)
+	}
+
+	// Spot-check a specific row on each side of the boundary.
+	var lowNote *string
+	if err := pool.QueryRow(ctx,
+		`SELECT note FROM smoke_null_literal WHERE id = 50`).Scan(&lowNote); err != nil {
+		t.Fatalf("fetch id=50: %v", err)
+	}
+	if lowNote == nil || *lowNote != "value" {
+		t.Fatalf("id=50 note = %v, want \"value\"", lowNote)
+	}
+
+	var highNote *string
+	if err := pool.QueryRow(ctx,
+		`SELECT note FROM smoke_null_literal WHERE id = 150`).Scan(&highNote); err != nil {
+		t.Fatalf("fetch id=150: %v", err)
+	}
+	if highNote != nil {
+		t.Fatalf("id=150 note = %q, want NULL", *highNote)
+	}
+}

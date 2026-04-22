@@ -86,3 +86,46 @@ func TestIfCondNotBool(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+// TestIfBranchNull covers the primary motivation for Literal_Null: an If
+// whose selected branch is a null literal must evaluate to Go nil without
+// erroring. Both the true- and false-branch selection paths are exercised.
+func TestIfBranchNull(t *testing.T) {
+	nullLit := &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
+		Value: &dgproto.Literal_Null{Null: &dgproto.NullMarker{}},
+	}}}
+
+	cases := []struct {
+		name string
+		cond *dgproto.Expr
+		want any
+	}{
+		{
+			name: "cond-true-null-then",
+			cond: litBool(true),
+			want: nil,
+		},
+		{
+			name: "cond-false-null-then",
+			cond: litBool(false),
+			want: int64(7),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &dgproto.Expr{Kind: &dgproto.Expr_If_{If_: &dgproto.If{
+				Cond: tc.cond, Then: nullLit, Else_: litInt(7),
+			}}}
+
+			got, err := Eval(newFakeCtx(), e)
+			if err != nil {
+				t.Fatalf("err: %v", err)
+			}
+
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

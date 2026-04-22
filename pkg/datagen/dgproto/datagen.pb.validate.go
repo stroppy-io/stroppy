@@ -2353,6 +2353,48 @@ func (m *Literal) validate(all bool) error {
 			}
 		}
 
+	case *Literal_Null:
+		if v == nil {
+			err := LiteralValidationError{
+				field:  "Value",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofValuePresent = true
+
+		if all {
+			switch v := interface{}(m.GetNull()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, LiteralValidationError{
+						field:  "Null",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, LiteralValidationError{
+						field:  "Null",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetNull()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return LiteralValidationError{
+					field:  "Null",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -2443,6 +2485,105 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = LiteralValidationError{}
+
+// Validate checks the field values on NullMarker with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *NullMarker) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on NullMarker with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in NullMarkerMultiError, or
+// nil if none found.
+func (m *NullMarker) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *NullMarker) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return NullMarkerMultiError(errors)
+	}
+
+	return nil
+}
+
+// NullMarkerMultiError is an error wrapping multiple validation errors
+// returned by NullMarker.ValidateAll() if the designated constraints aren't met.
+type NullMarkerMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m NullMarkerMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m NullMarkerMultiError) AllErrors() []error { return m }
+
+// NullMarkerValidationError is the validation error returned by
+// NullMarker.Validate if the designated constraints aren't met.
+type NullMarkerValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e NullMarkerValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e NullMarkerValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e NullMarkerValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e NullMarkerValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e NullMarkerValidationError) ErrorName() string { return "NullMarkerValidationError" }
+
+// Error satisfies the builtin error interface
+func (e NullMarkerValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sNullMarker.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = NullMarkerValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = NullMarkerValidationError{}
 
 // Validate checks the field values on BinOp with the rules defined in the
 // proto definition for this message. If any rules are violated, the first

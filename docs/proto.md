@@ -103,6 +103,7 @@
     - [Lookup](#stroppy-datagen-Lookup)
     - [LookupPop](#stroppy-datagen-LookupPop)
     - [Null](#stroppy-datagen-Null)
+    - [NullMarker](#stroppy-datagen-NullMarker)
     - [Parallelism](#stroppy-datagen-Parallelism)
     - [Population](#stroppy-datagen-Population)
     - [RelSource](#stroppy-datagen-RelSource)
@@ -1705,6 +1706,7 @@ Literal is a single typed scalar constant.
 | bool | [bool](#bool) |  | Boolean literal. |
 | bytes | [bytes](#bytes) |  | Raw bytes literal. |
 | timestamp | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Timestamp literal used for date and datetime columns. |
+| null | [NullMarker](#stroppy-datagen-NullMarker) |  | Explicit SQL NULL literal. Evaluates to Go nil in the row scratch, which the drivers render as NULL. Used for If branches that must yield NULL (e.g. TPC-C undelivered o_carrier_id / ol_delivery_d). |
 
 
 
@@ -1756,6 +1758,18 @@ Null carries the rate and salt that control null injection for an attr.
 | ----- | ---- | ----- | ----------- |
 | rate | [float](#float) |  | Probability of a null value in [0, 1]. |
 | seed_salt | [uint64](#uint64) |  | Per-attr salt that keeps the null-decision stream independent from the value-generation streams. |
+
+
+
+
+
+
+<a name="stroppy-datagen-NullMarker"></a>
+
+### NullMarker
+NullMarker is a zero-field marker message used as the payload of
+typeless oneof arms. Proto oneofs cannot have bare-tag members, so
+arms that carry no data (today: Literal.null) reference this message.
 
 
 

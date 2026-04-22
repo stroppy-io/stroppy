@@ -197,6 +197,31 @@ describe("Expr.lit oneof dispatch", () => {
       throw new Error("expected date → int64 days lit");
     }
   });
+
+  it("Expr.litNull emits the null oneof arm", () => {
+    const e = Expr.litNull();
+    if (e.kind.oneofKind !== "lit") throw new Error("not a lit");
+    expect(e.kind.lit.value.oneofKind).toBe("null");
+    if (e.kind.lit.value.oneofKind === "null") {
+      // NullMarker is a zero-field message; the wrapper should not
+      // populate any fields on it.
+      expect(e.kind.lit.value.null).toEqual({});
+    } else {
+      throw new Error("expected null lit arm");
+    }
+  });
+
+  it("Expr.litNull composes inside Expr.if branches", () => {
+    const e = Expr.if(Expr.lit(true), Expr.litNull(), Expr.lit("x"));
+    if (e.kind.oneofKind !== "if") throw new Error("not an if");
+    const thenExpr = e.kind.if.then!;
+    if (
+      thenExpr.kind.oneofKind !== "lit" ||
+      thenExpr.kind.lit.value.oneofKind !== "null"
+    ) {
+      throw new Error("expected then to be null lit");
+    }
+  });
 });
 
 describe("Rel.relationship / Rel.side", () => {
@@ -539,6 +564,7 @@ describe("std.* wrappers", () => {
       throw new Error("expected int64 arm on +1");
     }
   });
+
 });
 
 // Helper to unwrap StreamDraw Expr and assert arm kind.
