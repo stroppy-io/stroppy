@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   Attr,
+  Deg,
   Dict,
   Expr,
   Rel,
+  Strat,
   std,
   InsertMethod,
   RowIndex_Kind,
@@ -166,6 +168,208 @@ describe("Expr.lit oneof dispatch", () => {
     } else {
       throw new Error("expected date → int64 days lit");
     }
+  });
+});
+
+describe("Rel.relationship / Rel.side", () => {
+  it("Rel.relationship with two sides builds the Relationship proto", () => {
+    const parent = Rel.side("orders", {
+      degree: Deg.fixed(1),
+      strategy: Strat.sequential(),
+    });
+    const child = Rel.side("lineitem", {
+      degree: Deg.fixed(7),
+      strategy: Strat.sequential(),
+    });
+    const rel = Rel.relationship("orders_lineitem", [parent, child]);
+    expect(rel.name).toBe("orders_lineitem");
+    expect(rel.sides).toHaveLength(2);
+    expect(rel.sides[0].population).toBe("orders");
+    expect(rel.sides[1].population).toBe("lineitem");
+  });
+
+  it("Rel.relationship rejects fewer than two sides", () => {
+    const s = Rel.side("only", {
+      degree: Deg.fixed(1),
+      strategy: Strat.sequential(),
+    });
+    expect(() => Rel.relationship("r", [s])).toThrow();
+  });
+
+  it("Rel.side with Deg.fixed + Strat.sequential + blockSlots", () => {
+    const side = Rel.side("lineitem", {
+      degree: Deg.fixed(3),
+      strategy: Strat.sequential(),
+      blockSlots: {
+        o_orderkey: Attr.rowIndex(),
+        o_custkey: Expr.lit(BigInt(42)),
+      },
+    });
+    expect(side.population).toBe("lineitem");
+    if (side.degree?.kind.oneofKind !== "fixed") {
+      throw new Error("expected fixed degree");
+    }
+    expect(side.degree.kind.fixed.count).toBe("3");
+    if (side.strategy?.kind.oneofKind !== "sequential") {
+      throw new Error("expected sequential strategy");
+    }
+    expect(side.blockSlots.map((s) => s.name)).toEqual([
+      "o_orderkey",
+      "o_custkey",
+    ]);
+    const second = side.blockSlots[1].expr!;
+    if (second.kind.oneofKind !== "lit" || second.kind.lit.value.oneofKind !== "int64") {
+      throw new Error("expected int64 lit in block slot");
+    }
+    expect(second.kind.lit.value.int64).toBe("42");
+  });
+
+  it("Deg.uniform and Strat.hash/equitable build correct arms", () => {
+    const d = Deg.uniform(1, 7);
+    if (d.kind.oneofKind !== "uniform") throw new Error("expected uniform");
+    expect(d.kind.uniform.min).toBe("1");
+    expect(d.kind.uniform.max).toBe("7");
+
+    expect(Strat.hash().kind.oneofKind).toBe("hash");
+    expect(Strat.equitable().kind.oneofKind).toBe("equitable");
+  });
+});
+
+describe("Rel.lookupPop", () => {
+  it("infers columnOrder from attrs key order and defaults pure=true", () => {
+    const lp = Rel.lookupPop({
+      name: "region",
+      size: 5,
+      attrs: {
+        r_regionkey: Attr.rowIndex(),
+        r_name: Expr.lit("AFRICA"),
+        r_comment: Expr.lit("lorem"),
+      },
+    });
+    expect(lp.population?.name).toBe("region");
+    expect(lp.population?.size).toBe("5");
+    expect(lp.population?.pure).toBe(true);
+    expect(lp.columnOrder).toEqual(["r_regionkey", "r_name", "r_comment"]);
+    expect(lp.attrs.map((a) => a.name)).toEqual([
+      "r_regionkey",
+      "r_name",
+      "r_comment",
+    ]);
+  });
+
+  it("honors explicit pure=false and attaches null spec", () => {
+    const lp = Rel.lookupPop({
+      name: "t",
+      size: BigInt(10),
+      pure: false,
+      attrs: {
+        a: { expr: Expr.lit(1), null: { rate: 0.5, seedSalt: "7" } },
+      },
+    });
+    expect(lp.population?.pure).toBe(false);
+    expect(lp.attrs[0].null?.rate).toBeCloseTo(0.5);
+    expect(lp.attrs[0].null?.seedSalt).toBe("7");
+  });
+});
+
+describe("Attr.lookup / Attr.blockRef / Expr.blockRef", () => {
+  it("Attr.lookup emits a Lookup arm with target_pop, attr_name, entity_index", () => {
+    const e = Attr.lookup("region", "r_name", Expr.col("r_regionkey"));
+    if (e.kind.oneofKind !== "lookup") throw new Error("expected lookup");
+    expect(e.kind.lookup.targetPop).toBe("region");
+    expect(e.kind.lookup.attrName).toBe("r_name");
+    if (e.kind.lookup.entityIndex?.kind.oneofKind !== "col") {
+      throw new Error("expected col expr for entity_index");
+    }
+    expect(e.kind.lookup.entityIndex.kind.col.name).toBe("r_regionkey");
+  });
+
+  it("Attr.blockRef and Expr.blockRef emit BlockRef arms with the slot name", () => {
+    const a = Attr.blockRef("o_orderkey");
+    const b = Expr.blockRef("o_orderkey");
+    if (a.kind.oneofKind !== "blockRef") throw new Error("expected blockRef");
+    if (b.kind.oneofKind !== "blockRef") throw new Error("expected blockRef");
+    expect(a.kind.blockRef.slot).toBe("o_orderkey");
+    expect(b.kind.blockRef.slot).toBe("o_orderkey");
+  });
+
+  it("Attr.lookup rejects empty names", () => {
+    expect(() => Attr.lookup("", "a", Expr.lit(0))).toThrow();
+    expect(() => Attr.lookup("p", "", Expr.lit(0))).toThrow();
+  });
+});
+
+describe("Rel.table with relationships / iter / lookupPops", () => {
+  it("emits RelSource fields populated from opts", () => {
+    const lp = Rel.lookupPop({
+      name: "region",
+      size: 5,
+      attrs: {
+        r_regionkey: Attr.rowIndex(),
+        r_name: Expr.lit("AFRICA"),
+      },
+    });
+    const parent = Rel.side("orders", {
+      degree: Deg.fixed(1),
+      strategy: Strat.sequential(),
+    });
+    const child = Rel.side("lineitem", {
+      degree: Deg.fixed(7),
+      strategy: Strat.sequential(),
+      blockSlots: { o_orderkey: Attr.rowIndex() },
+    });
+    const rel = Rel.relationship("orders_lineitem", [parent, child]);
+
+    const spec = Rel.table("lineitem", {
+      size: 1,
+      iter: "orders_lineitem",
+      relationships: [rel],
+      lookupPops: [lp],
+      attrs: {
+        l_orderkey: Expr.blockRef("o_orderkey"),
+        l_regionkey: Attr.lookup("region", "r_regionkey", Attr.rowIndex()),
+      },
+    });
+
+    expect(spec.source?.iter).toBe("orders_lineitem");
+    expect(spec.source?.relationships).toHaveLength(1);
+    expect(spec.source?.relationships[0].name).toBe("orders_lineitem");
+    expect(spec.source?.lookupPops).toHaveLength(1);
+    expect(spec.source?.lookupPops[0].population?.name).toBe("region");
+    expect(spec.source?.lookupPops[0].population?.pure).toBe(true);
+  });
+});
+
+describe("Dict dedup with lookupPops", () => {
+  it("dedupes dicts referenced by both table attrs and lookup-pop attrs", () => {
+    const shared = Dict.values(["A", "B", "C"]);
+    const lp = Rel.lookupPop({
+      name: "shared_lookup",
+      size: 3,
+      attrs: {
+        s_key: Attr.rowIndex(),
+        s_label: Attr.dictAt(shared, Attr.rowIndex()),
+      },
+    });
+    const spec = Rel.table("main", {
+      size: 10,
+      lookupPops: [lp],
+      attrs: {
+        m_idx: Attr.rowIndex(),
+        m_label: Attr.dictAt(shared, Attr.rowIndex()),
+      },
+    });
+    const keys = Object.keys(spec.dicts);
+    expect(keys).toHaveLength(1);
+    const key = keys[0];
+    // Both the table attr and the lookup-pop attr resolve to the same key.
+    const tableAttr = spec.source?.attrs[1].expr!;
+    if (tableAttr.kind.oneofKind !== "dictAt") throw new Error("expected dictAt");
+    expect(tableAttr.kind.dictAt.dictKey).toBe(key);
+
+    const lpAttr = spec.source?.lookupPops[0].attrs[1].expr!;
+    if (lpAttr.kind.oneofKind !== "dictAt") throw new Error("expected dictAt");
+    expect(lpAttr.kind.dictAt.dictKey).toBe(key);
   });
 });
 

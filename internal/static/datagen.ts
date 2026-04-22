@@ -12,7 +12,10 @@
 import {
   Attr as PbAttr,
   BinOp_Op,
+  BlockRef as PbBlockRef,
+  BlockSlot as PbBlockSlot,
   Call as PbCall,
+  Degree as PbDegree,
   DictRow as PbDictRow,
   Dict as PbDict,
   DictAt as PbDictAt,
@@ -20,11 +23,16 @@ import {
   InsertMethod,
   InsertSpec as PbInsertSpec,
   Literal as PbLiteral,
+  Lookup as PbLookup,
+  LookupPop as PbLookupPop,
   Null as PbNull,
   Parallelism as PbParallelism,
   Population as PbPopulation,
   RelSource as PbRelSource,
+  Relationship as PbRelationship,
   RowIndex_Kind,
+  Side as PbSide,
+  Strategy as PbStrategy,
 } from "./stroppy.pb.js";
 
 // -------- int64 helpers --------
@@ -122,6 +130,27 @@ function binOp(op: BinOp_Op, a: PbExpr, b?: PbExpr): PbExpr {
   return { kind: { oneofKind: "binOp", binOp: { op, a, b } } };
 }
 
+function buildBlockRef(slot: string): PbExpr {
+  if (!slot) throw new Error("datagen: blockRef requires a slot name");
+  const br: PbBlockRef = { slot };
+  return { kind: { oneofKind: "blockRef", blockRef: br } };
+}
+
+function buildLookup(
+  popName: string,
+  attrName: string,
+  entityIdx: PbExpr,
+): PbExpr {
+  if (!popName) throw new Error("datagen: Attr.lookup requires a population name");
+  if (!attrName) throw new Error("datagen: Attr.lookup requires an attr name");
+  const lk: PbLookup = {
+    targetPop: popName,
+    attrName,
+    entityIndex: entityIdx,
+  };
+  return { kind: { oneofKind: "lookup", lookup: lk } };
+}
+
 /** 1970-01-01, the reference date for `std.dateToDays` semantics. */
 const EPOCH_DAYS_ORIGIN_MS = 0;
 const MS_PER_DAY = 86400000;
@@ -183,6 +212,13 @@ export const Expr = {
   and: (a: PbExpr, b: PbExpr) => binOp(BinOp_Op.AND, a, b),
   or: (a: PbExpr, b: PbExpr) => binOp(BinOp_Op.OR, a, b),
   not: (a: PbExpr) => binOp(BinOp_Op.NOT, a),
+
+  /**
+   * Low-level alias for `Attr.blockRef` — reads a named slot on the enclosing
+   * Side, resolved against the current outer-side entity. Prefer the Attr
+   * namespace at attr-level composition sites.
+   */
+  blockRef: (slot: string): PbExpr => buildBlockRef(slot),
 };
 
 // -------- Namespace: std --------
@@ -331,7 +367,25 @@ export const Attr = {
     };
     return { kind: { oneofKind: "dictAt", dictAt: da } };
   },
+
+  /**
+   * Cross-population attribute read. `popName` names the iter-side population
+   * or an entry in the enclosing `RelSource.lookup_pops`; `entityIdx`
+   * evaluates to the target row index.
+   */
+  lookup(popName: string, attrName: string, entityIdx: PbExpr): PbExpr {
+    return buildLookup(popName, attrName, entityIdx);
+  },
+
+  /**
+   * Read a named block slot on the enclosing Side, resolved against the
+   * current outer-side entity. Mirrored by `Expr.blockRef` for low-level use.
+   */
+  blockRef(slot: string): PbExpr {
+    return buildBlockRef(slot);
+  },
 };
+
 
 // -------- Dict registry --------
 
@@ -350,7 +404,77 @@ function registerInlineDict(d: PbDict): string {
   return key;
 }
 
+// -------- Namespace: Deg / Strat --------
+
+/** Degree builders for Relationship Sides. */
+export const Deg = {
+  /** Constant inner-row count per outer entity. */
+  fixed(count: Int64Like): PbDegree {
+    return {
+      kind: {
+        oneofKind: "fixed",
+        fixed: { count: int64ToString(count) },
+      },
+    };
+  },
+
+  /** Uniform-draw inner-row count per outer entity. Inclusive bounds. */
+  uniform(min: Int64Like, max: Int64Like): PbDegree {
+    return {
+      kind: {
+        oneofKind: "uniform",
+        uniform: { min: int64ToString(min), max: int64ToString(max) },
+      },
+    };
+  },
+};
+
+/** Strategy builders for pairing outer entities to inner ones on a Side. */
+export const Strat = {
+  /** Sequential walk over inner entities. */
+  sequential(): PbStrategy {
+    return { kind: { oneofKind: "sequential", sequential: {} } };
+  },
+  /** Hash-of-outer-index pairing. */
+  hash(): PbStrategy {
+    return { kind: { oneofKind: "hash", hash: {} } };
+  },
+  /** Equitable allocation, spreading inner entities evenly across outer. */
+  equitable(): PbStrategy {
+    return { kind: { oneofKind: "equitable", equitable: {} } };
+  },
+};
+
 // -------- Namespace: Rel --------
+
+/** Options accepted by `Rel.side`. */
+export interface RelSideOpts {
+  /** Inner-row count per outer entity. Build via `Deg.fixed` / `Deg.uniform`. */
+  degree: PbDegree;
+  /** Outer→inner pairing strategy. Build via `Strat.*`. */
+  strategy: PbStrategy;
+  /** Optional block slots: slot name → expr evaluated once per outer entity. */
+  blockSlots?: Record<string, PbExpr>;
+}
+
+/** Options accepted by `Rel.lookupPop`. */
+export interface RelLookupPopOpts {
+  /** Population identifier; referenced by `Attr.lookup(popName, …)`. */
+  name: string;
+  /** Entity count for the lookup population. */
+  size: Int64Like;
+  /** Column → generating expression (or expr + null spec). */
+  attrs: Record<string, PbExpr | { expr: PbExpr; null?: NullSpec }>;
+  /** Explicit column order; must cover exactly the keys of `attrs`. */
+  columnOrder?: readonly string[];
+  /** Root PRNG seed; currently unused at the LookupPop proto level. */
+  seed?: Int64Like;
+  /**
+   * Whether this population is pure (read through Lookup only, never
+   * iterated). Defaults to true — the common case for lookup pops.
+   */
+  pure?: boolean;
+}
 
 /** Options accepted by `Rel.table`. */
 export interface RelTableOpts {
@@ -371,6 +495,12 @@ export interface RelTableOpts {
    * declared within attrs are merged automatically.
    */
   dicts?: Record<string, PbDict>;
+  /** Relationships this table participates in; see `Rel.relationship`. */
+  relationships?: PbRelationship[];
+  /** Name of the relationship driving iteration for this table. */
+  iter?: string;
+  /** Pure sibling populations readable via `Attr.lookup`. */
+  lookupPops?: PbLookupPop[];
 }
 
 /**
@@ -399,17 +529,30 @@ function relTable(name: string, opts: RelTableOpts): PbInsertSpec {
     population,
     attrs: pbAttrs,
     columnOrder,
-    relationships: [],
-    iter: "",
-    lookupPops: [],
+    relationships: opts.relationships ? [...opts.relationships] : [],
+    iter: opts.iter ?? "",
+    lookupPops: opts.lookupPops ? [...opts.lookupPops] : [],
   };
 
   const parallelism: PbParallelism = {
     workers: opts.parallelism ?? 0,
   };
 
-  // Dict emission: only dicts actually referenced from this table's attrs.
+  // Dict emission: dicts referenced from this table's attrs, from any
+  // lookup-pop attrs, and from block-slot expressions on relationship sides.
   const referenced = collectDictKeys(pbAttrs);
+  for (const lp of source.lookupPops) {
+    for (const a of lp.attrs) {
+      if (a.expr) walkExpr(a.expr, referenced);
+    }
+  }
+  for (const rel of source.relationships) {
+    for (const side of rel.sides) {
+      for (const slot of side.blockSlots) {
+        if (slot.expr) walkExpr(slot.expr, referenced);
+      }
+    }
+  }
   const dicts: { [key: string]: PbDict } = {};
   if (opts.dicts) {
     for (const [k, v] of Object.entries(opts.dicts)) {
@@ -468,6 +611,10 @@ function walkExpr(e: PbExpr, out: Set<string>): void {
       if (k.if.then) walkExpr(k.if.then, out);
       if (k.if.else) walkExpr(k.if.else, out);
       return;
+    case "lookup":
+      if (k.lookup.entityIndex) walkExpr(k.lookup.entityIndex, out);
+      return;
+    case "blockRef":
     case "col":
     case "rowIndex":
     case "lit":
@@ -497,8 +644,58 @@ function validateColumnOrder(order: readonly string[], keys: readonly string[]):
   }
 }
 
+/** Build a Relationship wrapping two or more Sides under a stable name. */
+function relRelationship(name: string, sides: PbSide[]): PbRelationship {
+  if (!name) throw new Error("datagen: Rel.relationship requires a name");
+  if (sides.length < 2) {
+    throw new Error(
+      `datagen: Rel.relationship "${name}" needs at least two sides`,
+    );
+  }
+  return { name, sides: [...sides] };
+}
+
+/** Build a Side projecting one population into a Relationship. */
+function relSide(population: string, opts: RelSideOpts): PbSide {
+  if (!population) throw new Error("datagen: Rel.side requires a population");
+  const blockSlots: PbBlockSlot[] = opts.blockSlots
+    ? Object.entries(opts.blockSlots).map(([name, expr]) => ({ name, expr }))
+    : [];
+  return {
+    population,
+    degree: opts.degree,
+    strategy: opts.strategy,
+    blockSlots,
+  };
+}
+
+/** Build a LookupPop — a pure sibling population readable via `Attr.lookup`. */
+function relLookupPop(opts: RelLookupPopOpts): PbLookupPop {
+  if (!opts.name) throw new Error("datagen: Rel.lookupPop requires a name");
+  const pbAttrs: PbAttr[] = Object.entries(opts.attrs).map(
+    ([attrName, v]) => {
+      if ("expr" in v && v.expr) {
+        return { name: attrName, expr: v.expr, null: v.null };
+      }
+      return { name: attrName, expr: v as PbExpr };
+    },
+  );
+  const attrKeys = Object.keys(opts.attrs);
+  const columnOrder = opts.columnOrder ? [...opts.columnOrder] : attrKeys;
+  validateColumnOrder(columnOrder, attrKeys);
+  const population: PbPopulation = {
+    name: opts.name,
+    size: int64ToString(opts.size),
+    pure: opts.pure ?? true,
+  };
+  return { population, attrs: pbAttrs, columnOrder };
+}
+
 export const Rel = {
   table: relTable,
+  relationship: relRelationship,
+  side: relSide,
+  lookupPop: relLookupPop,
 };
 
 // -------- Namespace: Draw (reserved) --------
