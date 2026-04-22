@@ -400,3 +400,19 @@ tmpfs-clean: # Recycle the tmpfs Postgres container; discards all data
 
 tmpfs-psql: # Open psql shell into the tmpfs Postgres container
 	docker exec -it stroppy-pg-tmpfs psql -U postgres -d stroppy
+
+##
+## Multi-DB tmpfs integration harness (postgres + mysql + picodata + ydb)
+##
+
+.PHONY: tmpfs-all-up tmpfs-all-down tmpfs-all-clean
+
+tmpfs-all-up: # Start all 4 DBs (pg, mysql, picodata, ydb) on non-default ports
+	docker compose -f test/compose.tmpfs-all.yml up -d --wait pg-tmpfs-all mysql-tmpfs-all picodata-tmpfs-all ydb-tmpfs-all
+	docker compose -f test/compose.tmpfs-all.yml up picodata-init
+
+tmpfs-all-down: # Stop + remove all 4 DBs and their volumes
+	docker compose -f test/compose.tmpfs-all.yml down -v
+
+tmpfs-all-clean: # Recycle the 4-DB harness; discards all data
+	$(MAKE) tmpfs-all-down && $(MAKE) tmpfs-all-up
