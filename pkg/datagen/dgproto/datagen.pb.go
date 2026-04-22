@@ -505,7 +505,14 @@ type RelSource struct {
 	// Attr definitions keyed into column_order for emission.
 	Attrs []*Attr `protobuf:"bytes,2,rep,name=attrs,proto3" json:"attrs,omitempty"`
 	// Column order used when rendering rows for the driver.
-	ColumnOrder   []string `protobuf:"bytes,3,rep,name=column_order,json=columnOrder,proto3" json:"column_order,omitempty"`
+	ColumnOrder []string `protobuf:"bytes,3,rep,name=column_order,json=columnOrder,proto3" json:"column_order,omitempty"`
+	// Cross-population relationships this source participates in.
+	Relationships []*Relationship `protobuf:"bytes,4,rep,name=relationships,proto3" json:"relationships,omitempty"`
+	// Name of the relationship in relationships that drives iteration for this
+	// source. Empty when the source iterates its own population directly.
+	Iter string `protobuf:"bytes,5,opt,name=iter,proto3" json:"iter,omitempty"`
+	// Sibling populations referenced via Lookup but never iterated.
+	LookupPops    []*LookupPop `protobuf:"bytes,7,rep,name=lookup_pops,json=lookupPops,proto3" json:"lookup_pops,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -557,6 +564,27 @@ func (x *RelSource) GetAttrs() []*Attr {
 func (x *RelSource) GetColumnOrder() []string {
 	if x != nil {
 		return x.ColumnOrder
+	}
+	return nil
+}
+
+func (x *RelSource) GetRelationships() []*Relationship {
+	if x != nil {
+		return x.Relationships
+	}
+	return nil
+}
+
+func (x *RelSource) GetIter() string {
+	if x != nil {
+		return x.Iter
+	}
+	return ""
+}
+
+func (x *RelSource) GetLookupPops() []*LookupPop {
+	if x != nil {
+		return x.LookupPops
 	}
 	return nil
 }
@@ -758,6 +786,8 @@ type Expr struct {
 	//	*Expr_Call
 	//	*Expr_If_
 	//	*Expr_DictAt
+	//	*Expr_BlockRef
+	//	*Expr_Lookup
 	Kind          isExpr_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -863,6 +893,24 @@ func (x *Expr) GetDictAt() *DictAt {
 	return nil
 }
 
+func (x *Expr) GetBlockRef() *BlockRef {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_BlockRef); ok {
+			return x.BlockRef
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetLookup() *Lookup {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_Lookup); ok {
+			return x.Lookup
+		}
+	}
+	return nil
+}
+
 type isExpr_Kind interface {
 	isExpr_Kind()
 }
@@ -902,6 +950,16 @@ type Expr_DictAt struct {
 	DictAt *DictAt `protobuf:"bytes,7,opt,name=dict_at,json=dictAt,proto3,oneof"`
 }
 
+type Expr_BlockRef struct {
+	// Named block-slot value from the enclosing Side.
+	BlockRef *BlockRef `protobuf:"bytes,8,opt,name=block_ref,json=blockRef,proto3,oneof"`
+}
+
+type Expr_Lookup struct {
+	// Cross-population column read.
+	Lookup *Lookup `protobuf:"bytes,9,opt,name=lookup,proto3,oneof"`
+}
+
 func (*Expr_Col) isExpr_Kind() {}
 
 func (*Expr_RowIndex) isExpr_Kind() {}
@@ -915,6 +973,10 @@ func (*Expr_Call) isExpr_Kind() {}
 func (*Expr_If_) isExpr_Kind() {}
 
 func (*Expr_DictAt) isExpr_Kind() {}
+
+func (*Expr_BlockRef) isExpr_Kind() {}
+
+func (*Expr_Lookup) isExpr_Kind() {}
 
 // ColRef refers to another attribute in the same RelSource by name.
 type ColRef struct {
@@ -1408,6 +1470,767 @@ func (x *DictAt) GetColumn() string {
 	return ""
 }
 
+// Relationship binds two or more populations into a joint iteration space.
+type Relationship struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Stable identifier; referenced by RelSource.iter.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Participating sides; two or more populations project into the relation.
+	Sides         []*Side `protobuf:"bytes,2,rep,name=sides,proto3" json:"sides,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Relationship) Reset() {
+	*x = Relationship{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Relationship) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Relationship) ProtoMessage() {}
+
+func (x *Relationship) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Relationship.ProtoReflect.Descriptor instead.
+func (*Relationship) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *Relationship) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Relationship) GetSides() []*Side {
+	if x != nil {
+		return x.Sides
+	}
+	return nil
+}
+
+// Side projects one population into a Relationship with a degree and strategy.
+type Side struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Name of the projected population; must match RelSource.population.name or
+	// a declared RelSource.lookup_pops[].population.name.
+	Population string `protobuf:"bytes,1,opt,name=population,proto3" json:"population,omitempty"`
+	// How many inner entities per outer entity this side produces.
+	Degree *Degree `protobuf:"bytes,2,opt,name=degree,proto3" json:"degree,omitempty"`
+	// Pairing strategy used to map outer entities to inner ones.
+	Strategy *Strategy `protobuf:"bytes,3,opt,name=strategy,proto3" json:"strategy,omitempty"`
+	// Named expressions evaluated once per outer-side entity and reused across
+	// that entity's inner rows.
+	BlockSlots    []*BlockSlot `protobuf:"bytes,4,rep,name=block_slots,json=blockSlots,proto3" json:"block_slots,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Side) Reset() {
+	*x = Side{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Side) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Side) ProtoMessage() {}
+
+func (x *Side) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Side.ProtoReflect.Descriptor instead.
+func (*Side) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *Side) GetPopulation() string {
+	if x != nil {
+		return x.Population
+	}
+	return ""
+}
+
+func (x *Side) GetDegree() *Degree {
+	if x != nil {
+		return x.Degree
+	}
+	return nil
+}
+
+func (x *Side) GetStrategy() *Strategy {
+	if x != nil {
+		return x.Strategy
+	}
+	return nil
+}
+
+func (x *Side) GetBlockSlots() []*BlockSlot {
+	if x != nil {
+		return x.BlockSlots
+	}
+	return nil
+}
+
+// Degree sets how many inner rows pair with one outer row for a Side.
+type Degree struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Kind:
+	//
+	//	*Degree_Fixed
+	//	*Degree_Uniform
+	Kind          isDegree_Kind `protobuf_oneof:"kind"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Degree) Reset() {
+	*x = Degree{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Degree) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Degree) ProtoMessage() {}
+
+func (x *Degree) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Degree.ProtoReflect.Descriptor instead.
+func (*Degree) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *Degree) GetKind() isDegree_Kind {
+	if x != nil {
+		return x.Kind
+	}
+	return nil
+}
+
+func (x *Degree) GetFixed() *DegreeFixed {
+	if x != nil {
+		if x, ok := x.Kind.(*Degree_Fixed); ok {
+			return x.Fixed
+		}
+	}
+	return nil
+}
+
+func (x *Degree) GetUniform() *DegreeUniform {
+	if x != nil {
+		if x, ok := x.Kind.(*Degree_Uniform); ok {
+			return x.Uniform
+		}
+	}
+	return nil
+}
+
+type isDegree_Kind interface {
+	isDegree_Kind()
+}
+
+type Degree_Fixed struct {
+	// Constant inner-row count per outer entity.
+	Fixed *DegreeFixed `protobuf:"bytes,1,opt,name=fixed,proto3,oneof"`
+}
+
+type Degree_Uniform struct {
+	// Uniform-draw inner-row count per outer entity.
+	Uniform *DegreeUniform `protobuf:"bytes,2,opt,name=uniform,proto3,oneof"`
+}
+
+func (*Degree_Fixed) isDegree_Kind() {}
+
+func (*Degree_Uniform) isDegree_Kind() {}
+
+// DegreeFixed carries a constant inner-row count per outer entity.
+type DegreeFixed struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inner rows emitted per outer-side entity.
+	Count         int64 `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DegreeFixed) Reset() {
+	*x = DegreeFixed{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DegreeFixed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DegreeFixed) ProtoMessage() {}
+
+func (x *DegreeFixed) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DegreeFixed.ProtoReflect.Descriptor instead.
+func (*DegreeFixed) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *DegreeFixed) GetCount() int64 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+// DegreeUniform draws the inner-row count from a uniform range per entity.
+type DegreeUniform struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inclusive lower bound on inner-row count.
+	Min int64 `protobuf:"varint,1,opt,name=min,proto3" json:"min,omitempty"`
+	// Inclusive upper bound on inner-row count.
+	Max           int64 `protobuf:"varint,2,opt,name=max,proto3" json:"max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DegreeUniform) Reset() {
+	*x = DegreeUniform{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DegreeUniform) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DegreeUniform) ProtoMessage() {}
+
+func (x *DegreeUniform) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DegreeUniform.ProtoReflect.Descriptor instead.
+func (*DegreeUniform) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *DegreeUniform) GetMin() int64 {
+	if x != nil {
+		return x.Min
+	}
+	return 0
+}
+
+func (x *DegreeUniform) GetMax() int64 {
+	if x != nil {
+		return x.Max
+	}
+	return 0
+}
+
+// Strategy selects how outer-side entities are mapped to inner-side entities.
+type Strategy struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Kind:
+	//
+	//	*Strategy_Hash
+	//	*Strategy_Sequential
+	//	*Strategy_Equitable
+	Kind          isStrategy_Kind `protobuf_oneof:"kind"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Strategy) Reset() {
+	*x = Strategy{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Strategy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Strategy) ProtoMessage() {}
+
+func (x *Strategy) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Strategy.ProtoReflect.Descriptor instead.
+func (*Strategy) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *Strategy) GetKind() isStrategy_Kind {
+	if x != nil {
+		return x.Kind
+	}
+	return nil
+}
+
+func (x *Strategy) GetHash() *StrategyHash {
+	if x != nil {
+		if x, ok := x.Kind.(*Strategy_Hash); ok {
+			return x.Hash
+		}
+	}
+	return nil
+}
+
+func (x *Strategy) GetSequential() *StrategySequential {
+	if x != nil {
+		if x, ok := x.Kind.(*Strategy_Sequential); ok {
+			return x.Sequential
+		}
+	}
+	return nil
+}
+
+func (x *Strategy) GetEquitable() *StrategyEquitable {
+	if x != nil {
+		if x, ok := x.Kind.(*Strategy_Equitable); ok {
+			return x.Equitable
+		}
+	}
+	return nil
+}
+
+type isStrategy_Kind interface {
+	isStrategy_Kind()
+}
+
+type Strategy_Hash struct {
+	// Hash-of-outer-index pairing.
+	Hash *StrategyHash `protobuf:"bytes,1,opt,name=hash,proto3,oneof"`
+}
+
+type Strategy_Sequential struct {
+	// Sequential walk over inner entities.
+	Sequential *StrategySequential `protobuf:"bytes,2,opt,name=sequential,proto3,oneof"`
+}
+
+type Strategy_Equitable struct {
+	// Equitable allocation spreading inner entities evenly across outer ones.
+	Equitable *StrategyEquitable `protobuf:"bytes,3,opt,name=equitable,proto3,oneof"`
+}
+
+func (*Strategy_Hash) isStrategy_Kind() {}
+
+func (*Strategy_Sequential) isStrategy_Kind() {}
+
+func (*Strategy_Equitable) isStrategy_Kind() {}
+
+// StrategyHash pairs entities by hashing the outer index.
+type StrategyHash struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StrategyHash) Reset() {
+	*x = StrategyHash{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StrategyHash) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StrategyHash) ProtoMessage() {}
+
+func (x *StrategyHash) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StrategyHash.ProtoReflect.Descriptor instead.
+func (*StrategyHash) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{22}
+}
+
+// StrategySequential walks inner entities in order.
+type StrategySequential struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StrategySequential) Reset() {
+	*x = StrategySequential{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StrategySequential) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StrategySequential) ProtoMessage() {}
+
+func (x *StrategySequential) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StrategySequential.ProtoReflect.Descriptor instead.
+func (*StrategySequential) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{23}
+}
+
+// StrategyEquitable distributes inner entities evenly across outer ones.
+type StrategyEquitable struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StrategyEquitable) Reset() {
+	*x = StrategyEquitable{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StrategyEquitable) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StrategyEquitable) ProtoMessage() {}
+
+func (x *StrategyEquitable) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StrategyEquitable.ProtoReflect.Descriptor instead.
+func (*StrategyEquitable) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{24}
+}
+
+// BlockSlot is a named expression cached per outer-side entity boundary.
+type BlockSlot struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Slot name; referenced by BlockRef.slot from inner-side Expr trees.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Expression evaluated once per outer-side entity.
+	Expr          *Expr `protobuf:"bytes,2,opt,name=expr,proto3" json:"expr,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockSlot) Reset() {
+	*x = BlockSlot{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockSlot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockSlot) ProtoMessage() {}
+
+func (x *BlockSlot) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockSlot.ProtoReflect.Descriptor instead.
+func (*BlockSlot) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *BlockSlot) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *BlockSlot) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+// BlockRef reads a named slot on the enclosing Side, resolved against the
+// current outer-side entity.
+type BlockRef struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Slot name declared on Side.block_slots.
+	Slot          string `protobuf:"bytes,1,opt,name=slot,proto3" json:"slot,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockRef) Reset() {
+	*x = BlockRef{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockRef) ProtoMessage() {}
+
+func (x *BlockRef) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockRef.ProtoReflect.Descriptor instead.
+func (*BlockRef) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *BlockRef) GetSlot() string {
+	if x != nil {
+		return x.Slot
+	}
+	return ""
+}
+
+// Lookup reads an attribute value from another population at a computed index.
+type Lookup struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Target population name; either the current iter-side population or an
+	// entry in the enclosing RelSource.lookup_pops.
+	TargetPop string `protobuf:"bytes,1,opt,name=target_pop,json=targetPop,proto3" json:"target_pop,omitempty"`
+	// Attribute name within the target population.
+	AttrName string `protobuf:"bytes,2,opt,name=attr_name,json=attrName,proto3" json:"attr_name,omitempty"`
+	// Expression yielding the entity index within target_pop.
+	EntityIndex   *Expr `protobuf:"bytes,3,opt,name=entity_index,json=entityIndex,proto3" json:"entity_index,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Lookup) Reset() {
+	*x = Lookup{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Lookup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Lookup) ProtoMessage() {}
+
+func (x *Lookup) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Lookup.ProtoReflect.Descriptor instead.
+func (*Lookup) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *Lookup) GetTargetPop() string {
+	if x != nil {
+		return x.TargetPop
+	}
+	return ""
+}
+
+func (x *Lookup) GetAttrName() string {
+	if x != nil {
+		return x.AttrName
+	}
+	return ""
+}
+
+func (x *Lookup) GetEntityIndex() *Expr {
+	if x != nil {
+		return x.EntityIndex
+	}
+	return nil
+}
+
+// LookupPop describes a pure sibling population that is read via Lookup only.
+// Its attributes are evaluated lazily and cached by the runtime.
+type LookupPop struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Population descriptor for the sibling; referenced by Lookup.target_pop.
+	Population *Population `protobuf:"bytes,1,opt,name=population,proto3" json:"population,omitempty"`
+	// Attribute definitions available for lookup.
+	Attrs []*Attr `protobuf:"bytes,2,rep,name=attrs,proto3" json:"attrs,omitempty"`
+	// Column order for the population; parallels RelSource.column_order.
+	ColumnOrder   []string `protobuf:"bytes,3,rep,name=column_order,json=columnOrder,proto3" json:"column_order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LookupPop) Reset() {
+	*x = LookupPop{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LookupPop) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LookupPop) ProtoMessage() {}
+
+func (x *LookupPop) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LookupPop.ProtoReflect.Descriptor instead.
+func (*LookupPop) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *LookupPop) GetPopulation() *Population {
+	if x != nil {
+		return x.Population
+	}
+	return nil
+}
+
+func (x *LookupPop) GetAttrs() []*Attr {
+	if x != nil {
+		return x.Attrs
+	}
+	return nil
+}
+
+func (x *LookupPop) GetColumnOrder() []string {
+	if x != nil {
+		return x.ColumnOrder
+	}
+	return nil
+}
+
 var File_proto_stroppy_datagen_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_datagen_proto_rawDesc = "" +
@@ -1434,13 +2257,17 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x04rows\x18\x03 \x03(\v2\x18.stroppy.datagen.DictRowR\x04rows\";\n" +
 	"\aDictRow\x12\x16\n" +
 	"\x06values\x18\x01 \x03(\tR\x06values\x12\x18\n" +
-	"\aweights\x18\x02 \x03(\x03R\aweights\"\xb6\x01\n" +
+	"\aweights\x18\x02 \x03(\x03R\aweights\"\xcc\x02\n" +
 	"\tRelSource\x12E\n" +
 	"\n" +
 	"population\x18\x01 \x01(\v2\x1b.stroppy.datagen.PopulationB\b\xfaB\x05\x8a\x01\x02\x10\x01R\n" +
 	"population\x125\n" +
 	"\x05attrs\x18\x02 \x03(\v2\x15.stroppy.datagen.AttrB\b\xfaB\x05\x92\x01\x02\b\x01R\x05attrs\x12+\n" +
-	"\fcolumn_order\x18\x03 \x03(\tB\b\xfaB\x05\x92\x01\x02\b\x01R\vcolumnOrder\"Z\n" +
+	"\fcolumn_order\x18\x03 \x03(\tB\b\xfaB\x05\x92\x01\x02\b\x01R\vcolumnOrder\x12C\n" +
+	"\rrelationships\x18\x04 \x03(\v2\x1d.stroppy.datagen.RelationshipR\rrelationships\x12\x12\n" +
+	"\x04iter\x18\x05 \x01(\tR\x04iter\x12;\n" +
+	"\vlookup_pops\x18\a \x03(\v2\x1a.stroppy.datagen.LookupPopR\n" +
+	"lookupPops\"Z\n" +
 	"\n" +
 	"Population\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12\x1b\n" +
@@ -1454,7 +2281,7 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x04rate\x18\x01 \x01(\x02B\x0f\xfaB\f\n" +
 	"\n" +
 	"\x1d\x00\x00\x80?-\x00\x00\x00\x00R\x04rate\x12\x1b\n" +
-	"\tseed_salt\x18\x02 \x01(\x04R\bseedSalt\"\xe2\x02\n" +
+	"\tseed_salt\x18\x02 \x01(\x04R\bseedSalt\"\xcf\x03\n" +
 	"\x04Expr\x12+\n" +
 	"\x03col\x18\x01 \x01(\v2\x17.stroppy.datagen.ColRefH\x00R\x03col\x128\n" +
 	"\trow_index\x18\x02 \x01(\v2\x19.stroppy.datagen.RowIndexH\x00R\browIndex\x12,\n" +
@@ -1462,7 +2289,9 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x06bin_op\x18\x04 \x01(\v2\x16.stroppy.datagen.BinOpH\x00R\x05binOp\x12+\n" +
 	"\x04call\x18\x05 \x01(\v2\x15.stroppy.datagen.CallH\x00R\x04call\x12&\n" +
 	"\x03if_\x18\x06 \x01(\v2\x13.stroppy.datagen.IfH\x00R\x02if\x122\n" +
-	"\adict_at\x18\a \x01(\v2\x17.stroppy.datagen.DictAtH\x00R\x06dictAtB\v\n" +
+	"\adict_at\x18\a \x01(\v2\x17.stroppy.datagen.DictAtH\x00R\x06dictAt\x128\n" +
+	"\tblock_ref\x18\b \x01(\v2\x19.stroppy.datagen.BlockRefH\x00R\bblockRef\x121\n" +
+	"\x06lookup\x18\t \x01(\v2\x17.stroppy.datagen.LookupH\x00R\x06lookupB\v\n" +
 	"\x04kind\x12\x03\xf8B\x01\"%\n" +
 	"\x06ColRef\x12\x1b\n" +
 	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\"\x83\x01\n" +
@@ -1516,7 +2345,53 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x06DictAt\x12\"\n" +
 	"\bdict_key\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\adictKey\x125\n" +
 	"\x05index\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x05index\x12\x16\n" +
-	"\x06column\x18\x03 \x01(\tR\x06column*;\n" +
+	"\x06column\x18\x03 \x01(\tR\x06column\"b\n" +
+	"\fRelationship\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x125\n" +
+	"\x05sides\x18\x02 \x03(\v2\x15.stroppy.datagen.SideB\b\xfaB\x05\x92\x01\x02\b\x02R\x05sides\"\xd4\x01\n" +
+	"\x04Side\x12'\n" +
+	"\n" +
+	"population\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\n" +
+	"population\x12/\n" +
+	"\x06degree\x18\x02 \x01(\v2\x17.stroppy.datagen.DegreeR\x06degree\x125\n" +
+	"\bstrategy\x18\x03 \x01(\v2\x19.stroppy.datagen.StrategyR\bstrategy\x12;\n" +
+	"\vblock_slots\x18\x04 \x03(\v2\x1a.stroppy.datagen.BlockSlotR\n" +
+	"blockSlots\"\x82\x01\n" +
+	"\x06Degree\x124\n" +
+	"\x05fixed\x18\x01 \x01(\v2\x1c.stroppy.datagen.DegreeFixedH\x00R\x05fixed\x12:\n" +
+	"\auniform\x18\x02 \x01(\v2\x1e.stroppy.datagen.DegreeUniformH\x00R\auniformB\x06\n" +
+	"\x04kind\",\n" +
+	"\vDegreeFixed\x12\x1d\n" +
+	"\x05count\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\x05count\"E\n" +
+	"\rDegreeUniform\x12\x19\n" +
+	"\x03min\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02(\x00R\x03min\x12\x19\n" +
+	"\x03max\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\x03max\"\xd2\x01\n" +
+	"\bStrategy\x123\n" +
+	"\x04hash\x18\x01 \x01(\v2\x1d.stroppy.datagen.StrategyHashH\x00R\x04hash\x12E\n" +
+	"\n" +
+	"sequential\x18\x02 \x01(\v2#.stroppy.datagen.StrategySequentialH\x00R\n" +
+	"sequential\x12B\n" +
+	"\tequitable\x18\x03 \x01(\v2\".stroppy.datagen.StrategyEquitableH\x00R\tequitableB\x06\n" +
+	"\x04kind\"\x0e\n" +
+	"\fStrategyHash\"\x14\n" +
+	"\x12StrategySequential\"\x13\n" +
+	"\x11StrategyEquitable\"]\n" +
+	"\tBlockSlot\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x123\n" +
+	"\x04expr\x18\x02 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04expr\"'\n" +
+	"\bBlockRef\x12\x1b\n" +
+	"\x04slot\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04slot\"\x9a\x01\n" +
+	"\x06Lookup\x12&\n" +
+	"\n" +
+	"target_pop\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\ttargetPop\x12$\n" +
+	"\tattr_name\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\battrName\x12B\n" +
+	"\fentity_index\x18\x03 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\ventityIndex\"\x98\x01\n" +
+	"\tLookupPop\x12;\n" +
+	"\n" +
+	"population\x18\x01 \x01(\v2\x1b.stroppy.datagen.PopulationR\n" +
+	"population\x12+\n" +
+	"\x05attrs\x18\x02 \x03(\v2\x15.stroppy.datagen.AttrR\x05attrs\x12!\n" +
+	"\fcolumn_order\x18\x03 \x03(\tR\vcolumnOrder*;\n" +
 	"\fInsertMethod\x12\x0f\n" +
 	"\vPLAIN_QUERY\x10\x00\x12\x0e\n" +
 	"\n" +
@@ -1537,7 +2412,7 @@ func file_proto_stroppy_datagen_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_stroppy_datagen_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_proto_stroppy_datagen_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_proto_stroppy_datagen_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_proto_stroppy_datagen_proto_goTypes = []any{
 	(InsertMethod)(0),             // 0: stroppy.datagen.InsertMethod
 	(RowIndex_Kind)(0),            // 1: stroppy.datagen.RowIndex.Kind
@@ -1558,42 +2433,72 @@ var file_proto_stroppy_datagen_proto_goTypes = []any{
 	(*Call)(nil),                  // 16: stroppy.datagen.Call
 	(*If)(nil),                    // 17: stroppy.datagen.If
 	(*DictAt)(nil),                // 18: stroppy.datagen.DictAt
-	nil,                           // 19: stroppy.datagen.InsertSpec.DictsEntry
-	(*timestamppb.Timestamp)(nil), // 20: google.protobuf.Timestamp
+	(*Relationship)(nil),          // 19: stroppy.datagen.Relationship
+	(*Side)(nil),                  // 20: stroppy.datagen.Side
+	(*Degree)(nil),                // 21: stroppy.datagen.Degree
+	(*DegreeFixed)(nil),           // 22: stroppy.datagen.DegreeFixed
+	(*DegreeUniform)(nil),         // 23: stroppy.datagen.DegreeUniform
+	(*Strategy)(nil),              // 24: stroppy.datagen.Strategy
+	(*StrategyHash)(nil),          // 25: stroppy.datagen.StrategyHash
+	(*StrategySequential)(nil),    // 26: stroppy.datagen.StrategySequential
+	(*StrategyEquitable)(nil),     // 27: stroppy.datagen.StrategyEquitable
+	(*BlockSlot)(nil),             // 28: stroppy.datagen.BlockSlot
+	(*BlockRef)(nil),              // 29: stroppy.datagen.BlockRef
+	(*Lookup)(nil),                // 30: stroppy.datagen.Lookup
+	(*LookupPop)(nil),             // 31: stroppy.datagen.LookupPop
+	nil,                           // 32: stroppy.datagen.InsertSpec.DictsEntry
+	(*timestamppb.Timestamp)(nil), // 33: google.protobuf.Timestamp
 }
 var file_proto_stroppy_datagen_proto_depIdxs = []int32{
 	0,  // 0: stroppy.datagen.InsertSpec.method:type_name -> stroppy.datagen.InsertMethod
 	4,  // 1: stroppy.datagen.InsertSpec.parallelism:type_name -> stroppy.datagen.Parallelism
 	7,  // 2: stroppy.datagen.InsertSpec.source:type_name -> stroppy.datagen.RelSource
-	19, // 3: stroppy.datagen.InsertSpec.dicts:type_name -> stroppy.datagen.InsertSpec.DictsEntry
+	32, // 3: stroppy.datagen.InsertSpec.dicts:type_name -> stroppy.datagen.InsertSpec.DictsEntry
 	6,  // 4: stroppy.datagen.Dict.rows:type_name -> stroppy.datagen.DictRow
 	8,  // 5: stroppy.datagen.RelSource.population:type_name -> stroppy.datagen.Population
 	9,  // 6: stroppy.datagen.RelSource.attrs:type_name -> stroppy.datagen.Attr
-	11, // 7: stroppy.datagen.Attr.expr:type_name -> stroppy.datagen.Expr
-	10, // 8: stroppy.datagen.Attr.null:type_name -> stroppy.datagen.Null
-	12, // 9: stroppy.datagen.Expr.col:type_name -> stroppy.datagen.ColRef
-	13, // 10: stroppy.datagen.Expr.row_index:type_name -> stroppy.datagen.RowIndex
-	14, // 11: stroppy.datagen.Expr.lit:type_name -> stroppy.datagen.Literal
-	15, // 12: stroppy.datagen.Expr.bin_op:type_name -> stroppy.datagen.BinOp
-	16, // 13: stroppy.datagen.Expr.call:type_name -> stroppy.datagen.Call
-	17, // 14: stroppy.datagen.Expr.if_:type_name -> stroppy.datagen.If
-	18, // 15: stroppy.datagen.Expr.dict_at:type_name -> stroppy.datagen.DictAt
-	1,  // 16: stroppy.datagen.RowIndex.kind:type_name -> stroppy.datagen.RowIndex.Kind
-	20, // 17: stroppy.datagen.Literal.timestamp:type_name -> google.protobuf.Timestamp
-	2,  // 18: stroppy.datagen.BinOp.op:type_name -> stroppy.datagen.BinOp.Op
-	11, // 19: stroppy.datagen.BinOp.a:type_name -> stroppy.datagen.Expr
-	11, // 20: stroppy.datagen.BinOp.b:type_name -> stroppy.datagen.Expr
-	11, // 21: stroppy.datagen.Call.args:type_name -> stroppy.datagen.Expr
-	11, // 22: stroppy.datagen.If.cond:type_name -> stroppy.datagen.Expr
-	11, // 23: stroppy.datagen.If.then:type_name -> stroppy.datagen.Expr
-	11, // 24: stroppy.datagen.If.else_:type_name -> stroppy.datagen.Expr
-	11, // 25: stroppy.datagen.DictAt.index:type_name -> stroppy.datagen.Expr
-	5,  // 26: stroppy.datagen.InsertSpec.DictsEntry.value:type_name -> stroppy.datagen.Dict
-	27, // [27:27] is the sub-list for method output_type
-	27, // [27:27] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	19, // 7: stroppy.datagen.RelSource.relationships:type_name -> stroppy.datagen.Relationship
+	31, // 8: stroppy.datagen.RelSource.lookup_pops:type_name -> stroppy.datagen.LookupPop
+	11, // 9: stroppy.datagen.Attr.expr:type_name -> stroppy.datagen.Expr
+	10, // 10: stroppy.datagen.Attr.null:type_name -> stroppy.datagen.Null
+	12, // 11: stroppy.datagen.Expr.col:type_name -> stroppy.datagen.ColRef
+	13, // 12: stroppy.datagen.Expr.row_index:type_name -> stroppy.datagen.RowIndex
+	14, // 13: stroppy.datagen.Expr.lit:type_name -> stroppy.datagen.Literal
+	15, // 14: stroppy.datagen.Expr.bin_op:type_name -> stroppy.datagen.BinOp
+	16, // 15: stroppy.datagen.Expr.call:type_name -> stroppy.datagen.Call
+	17, // 16: stroppy.datagen.Expr.if_:type_name -> stroppy.datagen.If
+	18, // 17: stroppy.datagen.Expr.dict_at:type_name -> stroppy.datagen.DictAt
+	29, // 18: stroppy.datagen.Expr.block_ref:type_name -> stroppy.datagen.BlockRef
+	30, // 19: stroppy.datagen.Expr.lookup:type_name -> stroppy.datagen.Lookup
+	1,  // 20: stroppy.datagen.RowIndex.kind:type_name -> stroppy.datagen.RowIndex.Kind
+	33, // 21: stroppy.datagen.Literal.timestamp:type_name -> google.protobuf.Timestamp
+	2,  // 22: stroppy.datagen.BinOp.op:type_name -> stroppy.datagen.BinOp.Op
+	11, // 23: stroppy.datagen.BinOp.a:type_name -> stroppy.datagen.Expr
+	11, // 24: stroppy.datagen.BinOp.b:type_name -> stroppy.datagen.Expr
+	11, // 25: stroppy.datagen.Call.args:type_name -> stroppy.datagen.Expr
+	11, // 26: stroppy.datagen.If.cond:type_name -> stroppy.datagen.Expr
+	11, // 27: stroppy.datagen.If.then:type_name -> stroppy.datagen.Expr
+	11, // 28: stroppy.datagen.If.else_:type_name -> stroppy.datagen.Expr
+	11, // 29: stroppy.datagen.DictAt.index:type_name -> stroppy.datagen.Expr
+	20, // 30: stroppy.datagen.Relationship.sides:type_name -> stroppy.datagen.Side
+	21, // 31: stroppy.datagen.Side.degree:type_name -> stroppy.datagen.Degree
+	24, // 32: stroppy.datagen.Side.strategy:type_name -> stroppy.datagen.Strategy
+	28, // 33: stroppy.datagen.Side.block_slots:type_name -> stroppy.datagen.BlockSlot
+	22, // 34: stroppy.datagen.Degree.fixed:type_name -> stroppy.datagen.DegreeFixed
+	23, // 35: stroppy.datagen.Degree.uniform:type_name -> stroppy.datagen.DegreeUniform
+	25, // 36: stroppy.datagen.Strategy.hash:type_name -> stroppy.datagen.StrategyHash
+	26, // 37: stroppy.datagen.Strategy.sequential:type_name -> stroppy.datagen.StrategySequential
+	27, // 38: stroppy.datagen.Strategy.equitable:type_name -> stroppy.datagen.StrategyEquitable
+	11, // 39: stroppy.datagen.BlockSlot.expr:type_name -> stroppy.datagen.Expr
+	11, // 40: stroppy.datagen.Lookup.entity_index:type_name -> stroppy.datagen.Expr
+	8,  // 41: stroppy.datagen.LookupPop.population:type_name -> stroppy.datagen.Population
+	9,  // 42: stroppy.datagen.LookupPop.attrs:type_name -> stroppy.datagen.Attr
+	5,  // 43: stroppy.datagen.InsertSpec.DictsEntry.value:type_name -> stroppy.datagen.Dict
+	44, // [44:44] is the sub-list for method output_type
+	44, // [44:44] is the sub-list for method input_type
+	44, // [44:44] is the sub-list for extension type_name
+	44, // [44:44] is the sub-list for extension extendee
+	0,  // [0:44] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_datagen_proto_init() }
@@ -1609,6 +2514,8 @@ func file_proto_stroppy_datagen_proto_init() {
 		(*Expr_Call)(nil),
 		(*Expr_If_)(nil),
 		(*Expr_DictAt)(nil),
+		(*Expr_BlockRef)(nil),
+		(*Expr_Lookup)(nil),
 	}
 	file_proto_stroppy_datagen_proto_msgTypes[11].OneofWrappers = []any{
 		(*Literal_Int64)(nil),
@@ -1618,13 +2525,22 @@ func file_proto_stroppy_datagen_proto_init() {
 		(*Literal_Bytes)(nil),
 		(*Literal_Timestamp)(nil),
 	}
+	file_proto_stroppy_datagen_proto_msgTypes[18].OneofWrappers = []any{
+		(*Degree_Fixed)(nil),
+		(*Degree_Uniform)(nil),
+	}
+	file_proto_stroppy_datagen_proto_msgTypes[21].OneofWrappers = []any{
+		(*Strategy_Hash)(nil),
+		(*Strategy_Sequential)(nil),
+		(*Strategy_Equitable)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_datagen_proto_rawDesc), len(file_proto_stroppy_datagen_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   17,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

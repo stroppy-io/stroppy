@@ -70,6 +70,13 @@ message RelSource {
   // Column order used when rendering rows for the driver.
   repeated string column_order = 3
       [ (validate.rules).repeated = {min_items : 1} ];
+  // Cross-population relationships this source participates in.
+  repeated Relationship relationships = 4;
+  // Name of the relationship in relationships that drives iteration for this
+  // source. Empty when the source iterates its own population directly.
+  string iter = 5;
+  // Sibling populations referenced via Lookup but never iterated.
+  repeated LookupPop lookup_pops = 7;
 }
 
 // Population names the entity set a RelSource iterates and its cardinality.
@@ -120,6 +127,10 @@ message Expr {
     If if_ = 6;
     // Row lookup into a Dict carried by the owning InsertSpec.
     DictAt dict_at = 7;
+    // Named block-slot value from the enclosing Side.
+    BlockRef block_ref = 8;
+    // Cross-population column read.
+    Lookup lookup = 9;
   }
 }
 
@@ -236,4 +247,109 @@ message DictAt {
   Expr index = 2 [ (validate.rules).message.required = true ];
   // Column name for joint dicts; empty for scalar dicts.
   string column = 3;
+}
+
+// Relationship binds two or more populations into a joint iteration space.
+message Relationship {
+  // Stable identifier; referenced by RelSource.iter.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Participating sides; two or more populations project into the relation.
+  repeated Side sides = 2
+      [ (validate.rules).repeated = {min_items : 2} ];
+}
+
+// Side projects one population into a Relationship with a degree and strategy.
+message Side {
+  // Name of the projected population; must match RelSource.population.name or
+  // a declared RelSource.lookup_pops[].population.name.
+  string population = 1 [ (validate.rules).string.min_len = 1 ];
+  // How many inner entities per outer entity this side produces.
+  Degree degree = 2;
+  // Pairing strategy used to map outer entities to inner ones.
+  Strategy strategy = 3;
+  // Named expressions evaluated once per outer-side entity and reused across
+  // that entity's inner rows.
+  repeated BlockSlot block_slots = 4;
+}
+
+// Degree sets how many inner rows pair with one outer row for a Side.
+message Degree {
+  oneof kind {
+    // Constant inner-row count per outer entity.
+    DegreeFixed fixed = 1;
+    // Uniform-draw inner-row count per outer entity.
+    DegreeUniform uniform = 2;
+  }
+}
+
+// DegreeFixed carries a constant inner-row count per outer entity.
+message DegreeFixed {
+  // Inner rows emitted per outer-side entity.
+  int64 count = 1 [ (validate.rules).int64.gt = 0 ];
+}
+
+// DegreeUniform draws the inner-row count from a uniform range per entity.
+message DegreeUniform {
+  // Inclusive lower bound on inner-row count.
+  int64 min = 1 [ (validate.rules).int64.gte = 0 ];
+  // Inclusive upper bound on inner-row count.
+  int64 max = 2 [ (validate.rules).int64.gt = 0 ];
+}
+
+// Strategy selects how outer-side entities are mapped to inner-side entities.
+message Strategy {
+  oneof kind {
+    // Hash-of-outer-index pairing.
+    StrategyHash hash = 1;
+    // Sequential walk over inner entities.
+    StrategySequential sequential = 2;
+    // Equitable allocation spreading inner entities evenly across outer ones.
+    StrategyEquitable equitable = 3;
+  }
+}
+
+// StrategyHash pairs entities by hashing the outer index.
+message StrategyHash {}
+
+// StrategySequential walks inner entities in order.
+message StrategySequential {}
+
+// StrategyEquitable distributes inner entities evenly across outer ones.
+message StrategyEquitable {}
+
+// BlockSlot is a named expression cached per outer-side entity boundary.
+message BlockSlot {
+  // Slot name; referenced by BlockRef.slot from inner-side Expr trees.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Expression evaluated once per outer-side entity.
+  Expr expr = 2 [ (validate.rules).message.required = true ];
+}
+
+// BlockRef reads a named slot on the enclosing Side, resolved against the
+// current outer-side entity.
+message BlockRef {
+  // Slot name declared on Side.block_slots.
+  string slot = 1 [ (validate.rules).string.min_len = 1 ];
+}
+
+// Lookup reads an attribute value from another population at a computed index.
+message Lookup {
+  // Target population name; either the current iter-side population or an
+  // entry in the enclosing RelSource.lookup_pops.
+  string target_pop = 1 [ (validate.rules).string.min_len = 1 ];
+  // Attribute name within the target population.
+  string attr_name = 2 [ (validate.rules).string.min_len = 1 ];
+  // Expression yielding the entity index within target_pop.
+  Expr entity_index = 3 [ (validate.rules).message.required = true ];
+}
+
+// LookupPop describes a pure sibling population that is read via Lookup only.
+// Its attributes are evaluated lazily and cached by the runtime.
+message LookupPop {
+  // Population descriptor for the sibling; referenced by Lookup.target_pop.
+  Population population = 1;
+  // Attribute definitions available for lookup.
+  repeated Attr attrs = 2;
+  // Column order for the population; parallels RelSource.column_order.
+  repeated string column_order = 3;
 }

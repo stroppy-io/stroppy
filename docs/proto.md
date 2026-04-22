@@ -64,8 +64,13 @@
 - [proto/stroppy/datagen.proto](#proto_stroppy_datagen-proto)
     - [Attr](#stroppy-datagen-Attr)
     - [BinOp](#stroppy-datagen-BinOp)
+    - [BlockRef](#stroppy-datagen-BlockRef)
+    - [BlockSlot](#stroppy-datagen-BlockSlot)
     - [Call](#stroppy-datagen-Call)
     - [ColRef](#stroppy-datagen-ColRef)
+    - [Degree](#stroppy-datagen-Degree)
+    - [DegreeFixed](#stroppy-datagen-DegreeFixed)
+    - [DegreeUniform](#stroppy-datagen-DegreeUniform)
     - [Dict](#stroppy-datagen-Dict)
     - [DictAt](#stroppy-datagen-DictAt)
     - [DictRow](#stroppy-datagen-DictRow)
@@ -74,11 +79,19 @@
     - [InsertSpec](#stroppy-datagen-InsertSpec)
     - [InsertSpec.DictsEntry](#stroppy-datagen-InsertSpec-DictsEntry)
     - [Literal](#stroppy-datagen-Literal)
+    - [Lookup](#stroppy-datagen-Lookup)
+    - [LookupPop](#stroppy-datagen-LookupPop)
     - [Null](#stroppy-datagen-Null)
     - [Parallelism](#stroppy-datagen-Parallelism)
     - [Population](#stroppy-datagen-Population)
     - [RelSource](#stroppy-datagen-RelSource)
+    - [Relationship](#stroppy-datagen-Relationship)
     - [RowIndex](#stroppy-datagen-RowIndex)
+    - [Side](#stroppy-datagen-Side)
+    - [Strategy](#stroppy-datagen-Strategy)
+    - [StrategyEquitable](#stroppy-datagen-StrategyEquitable)
+    - [StrategyHash](#stroppy-datagen-StrategyHash)
+    - [StrategySequential](#stroppy-datagen-StrategySequential)
   
     - [BinOp.Op](#stroppy-datagen-BinOp-Op)
     - [InsertMethod](#stroppy-datagen-InsertMethod)
@@ -1040,6 +1053,38 @@ BinOp applies an arithmetic, comparison, or logical operator to sub-expressions.
 
 
 
+<a name="stroppy-datagen-BlockRef"></a>
+
+### BlockRef
+BlockRef reads a named slot on the enclosing Side, resolved against the
+current outer-side entity.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| slot | [string](#string) |  | Slot name declared on Side.block_slots. |
+
+
+
+
+
+
+<a name="stroppy-datagen-BlockSlot"></a>
+
+### BlockSlot
+BlockSlot is a named expression cached per outer-side entity boundary.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Slot name; referenced by BlockRef.slot from inner-side Expr trees. |
+| expr | [Expr](#stroppy-datagen-Expr) |  | Expression evaluated once per outer-side entity. |
+
+
+
+
+
+
 <a name="stroppy-datagen-Call"></a>
 
 ### Call
@@ -1065,6 +1110,53 @@ ColRef refers to another attribute in the same RelSource by name.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Name of the referenced attribute. |
+
+
+
+
+
+
+<a name="stroppy-datagen-Degree"></a>
+
+### Degree
+Degree sets how many inner rows pair with one outer row for a Side.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| fixed | [DegreeFixed](#stroppy-datagen-DegreeFixed) |  | Constant inner-row count per outer entity. |
+| uniform | [DegreeUniform](#stroppy-datagen-DegreeUniform) |  | Uniform-draw inner-row count per outer entity. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DegreeFixed"></a>
+
+### DegreeFixed
+DegreeFixed carries a constant inner-row count per outer entity.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| count | [int64](#int64) |  | Inner rows emitted per outer-side entity. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DegreeUniform"></a>
+
+### DegreeUniform
+DegreeUniform draws the inner-row count from a uniform range per entity.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min | [int64](#int64) |  | Inclusive lower bound on inner-row count. |
+| max | [int64](#int64) |  | Inclusive upper bound on inner-row count. |
 
 
 
@@ -1136,6 +1228,8 @@ Expr is the closed grammar for attribute value generation.
 | call | [Call](#stroppy-datagen-Call) |  | Stdlib function call by registered name. |
 | if_ | [If](#stroppy-datagen-If) |  | Typed ternary with lazy branch evaluation. |
 | dict_at | [DictAt](#stroppy-datagen-DictAt) |  | Row lookup into a Dict carried by the owning InsertSpec. |
+| block_ref | [BlockRef](#stroppy-datagen-BlockRef) |  | Named block-slot value from the enclosing Side. |
+| lookup | [Lookup](#stroppy-datagen-Lookup) |  | Cross-population column read. |
 
 
 
@@ -1215,6 +1309,41 @@ Literal is a single typed scalar constant.
 
 
 
+<a name="stroppy-datagen-Lookup"></a>
+
+### Lookup
+Lookup reads an attribute value from another population at a computed index.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| target_pop | [string](#string) |  | Target population name; either the current iter-side population or an entry in the enclosing RelSource.lookup_pops. |
+| attr_name | [string](#string) |  | Attribute name within the target population. |
+| entity_index | [Expr](#stroppy-datagen-Expr) |  | Expression yielding the entity index within target_pop. |
+
+
+
+
+
+
+<a name="stroppy-datagen-LookupPop"></a>
+
+### LookupPop
+LookupPop describes a pure sibling population that is read via Lookup only.
+Its attributes are evaluated lazily and cached by the runtime.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| population | [Population](#stroppy-datagen-Population) |  | Population descriptor for the sibling; referenced by Lookup.target_pop. |
+| attrs | [Attr](#stroppy-datagen-Attr) | repeated | Attribute definitions available for lookup. |
+| column_order | [string](#string) | repeated | Column order for the population; parallels RelSource.column_order. |
+
+
+
+
+
+
 <a name="stroppy-datagen-Null"></a>
 
 ### Null
@@ -1274,6 +1403,25 @@ RelSource is the relational descriptor for the rows a spec emits.
 | population | [Population](#stroppy-datagen-Population) |  | Population this spec iterates. |
 | attrs | [Attr](#stroppy-datagen-Attr) | repeated | Attr definitions keyed into column_order for emission. |
 | column_order | [string](#string) | repeated | Column order used when rendering rows for the driver. |
+| relationships | [Relationship](#stroppy-datagen-Relationship) | repeated | Cross-population relationships this source participates in. |
+| iter | [string](#string) |  | Name of the relationship in relationships that drives iteration for this source. Empty when the source iterates its own population directly. |
+| lookup_pops | [LookupPop](#stroppy-datagen-LookupPop) | repeated | Sibling populations referenced via Lookup but never iterated. |
+
+
+
+
+
+
+<a name="stroppy-datagen-Relationship"></a>
+
+### Relationship
+Relationship binds two or more populations into a joint iteration space.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Stable identifier; referenced by RelSource.iter. |
+| sides | [Side](#stroppy-datagen-Side) | repeated | Participating sides; two or more populations project into the relation. |
 
 
 
@@ -1289,6 +1437,71 @@ RowIndex produces a monotonically increasing integer tied to a row position.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | kind | [RowIndex.Kind](#stroppy-datagen-RowIndex-Kind) |  | Which row counter to emit. |
+
+
+
+
+
+
+<a name="stroppy-datagen-Side"></a>
+
+### Side
+Side projects one population into a Relationship with a degree and strategy.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| population | [string](#string) |  | Name of the projected population; must match RelSource.population.name or a declared RelSource.lookup_pops[].population.name. |
+| degree | [Degree](#stroppy-datagen-Degree) |  | How many inner entities per outer entity this side produces. |
+| strategy | [Strategy](#stroppy-datagen-Strategy) |  | Pairing strategy used to map outer entities to inner ones. |
+| block_slots | [BlockSlot](#stroppy-datagen-BlockSlot) | repeated | Named expressions evaluated once per outer-side entity and reused across that entity&#39;s inner rows. |
+
+
+
+
+
+
+<a name="stroppy-datagen-Strategy"></a>
+
+### Strategy
+Strategy selects how outer-side entities are mapped to inner-side entities.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| hash | [StrategyHash](#stroppy-datagen-StrategyHash) |  | Hash-of-outer-index pairing. |
+| sequential | [StrategySequential](#stroppy-datagen-StrategySequential) |  | Sequential walk over inner entities. |
+| equitable | [StrategyEquitable](#stroppy-datagen-StrategyEquitable) |  | Equitable allocation spreading inner entities evenly across outer ones. |
+
+
+
+
+
+
+<a name="stroppy-datagen-StrategyEquitable"></a>
+
+### StrategyEquitable
+StrategyEquitable distributes inner entities evenly across outer ones.
+
+
+
+
+
+
+<a name="stroppy-datagen-StrategyHash"></a>
+
+### StrategyHash
+StrategyHash pairs entities by hashing the outer index.
+
+
+
+
+
+
+<a name="stroppy-datagen-StrategySequential"></a>
+
+### StrategySequential
+StrategySequential walks inner entities in order.
 
 
 

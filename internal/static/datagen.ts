@@ -399,6 +399,9 @@ function relTable(name: string, opts: RelTableOpts): PbInsertSpec {
     population,
     attrs: pbAttrs,
     columnOrder,
+    relationships: [],
+    iter: "",
+    lookupPops: [],
   };
 
   const parallelism: PbParallelism = {
