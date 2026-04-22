@@ -86,6 +86,9 @@
     - [DrawDecimal](#stroppy-datagen-DrawDecimal)
     - [DrawDict](#stroppy-datagen-DrawDict)
     - [DrawFloatUniform](#stroppy-datagen-DrawFloatUniform)
+    - [DrawGrammar](#stroppy-datagen-DrawGrammar)
+    - [DrawGrammar.LeavesEntry](#stroppy-datagen-DrawGrammar-LeavesEntry)
+    - [DrawGrammar.PhrasesEntry](#stroppy-datagen-DrawGrammar-PhrasesEntry)
     - [DrawIntUniform](#stroppy-datagen-DrawIntUniform)
     - [DrawJoint](#stroppy-datagen-DrawJoint)
     - [DrawNURand](#stroppy-datagen-DrawNURand)
@@ -1446,6 +1449,60 @@ DrawFloatUniform draws a float uniformly from [min, max).
 
 
 
+<a name="stroppy-datagen-DrawGrammar"></a>
+
+### DrawGrammar
+DrawGrammar walks a two-phase template: a root dict carries sentence
+templates whose tokens are either literal words or single uppercase
+ASCII letters; each letter resolves either into a phrase template
+(one expansion level) or directly into a leaf word.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| root_dict | [string](#string) |  | Opaque key of the root template dict in InsertSpec.dicts. |
+| phrases | [DrawGrammar.PhrasesEntry](#stroppy-datagen-DrawGrammar-PhrasesEntry) | repeated | Phrase-level nonterminals: letter -&gt; dict key of template rows. When a letter in root_dict&#39;s picked template matches a key here, the walker picks a phrase template from the referenced dict and tokenizes it — letters inside that phrase resolve via `leaves`. Exactly one level of phrase expansion; no further phrase recursion. |
+| leaves | [DrawGrammar.LeavesEntry](#stroppy-datagen-DrawGrammar-LeavesEntry) | repeated | Leaf nonterminals: letter -&gt; dict key of leaf word rows. Used when a letter has no `phrases` entry, and when resolving letters inside a phrase expansion. |
+| max_len | [Expr](#stroppy-datagen-Expr) |  | Length bound (characters, not tokens) on the final joined string. If the walked text is longer, it is truncated. If shorter, it is accepted as-is (no padding — spec doesn&#39;t require minimum). |
+| min_len | [Expr](#stroppy-datagen-Expr) |  | Optional. If set and walked length &lt; min_len, re-walk with a fresh sub-stream until a long-enough string is produced or max_attempts (fixed at 8) is exhausted; on exhaustion, return what we have. |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawGrammar-LeavesEntry"></a>
+
+### DrawGrammar.LeavesEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="stroppy-datagen-DrawGrammar-PhrasesEntry"></a>
+
+### DrawGrammar.PhrasesEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="stroppy-datagen-DrawIntUniform"></a>
 
 ### DrawIntUniform
@@ -1903,6 +1960,7 @@ streams across runs without any pointer-keyed memoization.
 | decimal | [DrawDecimal](#stroppy-datagen-DrawDecimal) |  | Uniform decimal draw rounded to a fixed scale. |
 | ascii | [DrawAscii](#stroppy-datagen-DrawAscii) |  | Random ASCII string drawn from an alphabet. |
 | phrase | [DrawPhrase](#stroppy-datagen-DrawPhrase) |  | Space-joined word sequence drawn from a vocabulary Dict. |
+| grammar | [DrawGrammar](#stroppy-datagen-DrawGrammar) |  | Two-phase template walker over a root / phrase / leaf dict set. |
 
 
 

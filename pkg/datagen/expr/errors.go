@@ -44,3 +44,8 @@ var ErrBadChoose = errors.New("expr: bad choose")
 // ErrBadCohort is returned by cohort_draw / cohort_live nodes that lack
 // a schedule name or carry an unusable bucket_key expression.
 var ErrBadCohort = errors.New("expr: bad cohort reference")
+
+// ErrBadGrammar is returned by DrawGrammar when the walker hits a
+// single-uppercase-letter token that resolves neither through `phrases`
+// nor through `leaves`, or when a referenced dict is missing.
+var ErrBadGrammar = errors.New("expr: bad grammar reference")

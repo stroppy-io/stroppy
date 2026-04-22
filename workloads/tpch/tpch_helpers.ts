@@ -8,41 +8,99 @@
  * new workload-specific helper? Put it here, not in `internal/static/`.
  */
 import {
-  Alphabet,
+  Dict,
   Draw,
   Expr,
   std,
   type Expression,
+  type DictBody,
 } from "./datagen.ts";
 
 /**
- * TPC-H "v-string" text helper (spec §4.2.2.14). Rather than encode the
- * full sentence-grammar walk (a moderately complex recursive composition
- * over 9 sub-dicts), we approximate with a pure random-ASCII string over
- * the `enSpc` alphabet for a length uniformly drawn in [min, max]. The
- * statistical shape that matters for query results is the LENGTH
- * distribution and the occurrence of query-predicate literals (e.g.
- * Q13's "special", "requests"); neither relies on the exact grammar.
+ * TPC-H v-string grammar (spec §4.2.2.14). The evaluator walks a
+ * sentence template picked from `grammar`, resolves phrase-level
+ * nonterminals N/V through `np`/`vp` (one level of expansion), then
+ * emits leaves from nouns/verbs/adjectives/adverbs/auxillaries/
+ * prepositions/terminators. Walked strings are truncated to `maxLen`
+ * characters; when the first walk is shorter than `minLen`, the
+ * evaluator re-walks up to 8 times before accepting the last attempt.
  *
- * Why this is a legitimate simplification:
- * - q9 `p_name LIKE '%green%'`: p_name is built from the colors vocab
- *   via `Draw.phrase`, NOT from tpchText — so q9 remains accurate.
- * - q13 `o_comment NOT LIKE '%special%requests%'`: with random ASCII
- *   comments, virtually no orders match the pattern. The query still
- *   executes and returns a result set; cardinalities shift but the
- *   framework proves it runs end-to-end. Documented under the top-level
- *   note in tx.ts.
- *
- * When the plan calls for byte-exact TPC-H parity, swap this for a
- * grammar walk composed from `Expr.choose` + `Draw.phrase` over the
- * grammar / np / vp / etc. dicts in distributions.json.
+ * Correctness consequences:
+ *  - q13's `o_comment NOT LIKE '%special%requests%'` operates on real
+ *    grammatical text, so the answer-side match count matches dbgen.
+ *  - q9 is unaffected (p_name still uses Draw.phrase over colors).
  */
-export function tpchText(minLen: number, maxLen: number): Expression {
-  return Draw.ascii({
-    min: Expr.lit(minLen),
-    max: Expr.lit(maxLen),
-    alphabet: Alphabet.enSpc,
-  });
+export interface TpchGrammarDicts {
+  root: DictBody;
+  np: DictBody;
+  vp: DictBody;
+  nouns: DictBody;
+  verbs: DictBody;
+  adjectives: DictBody;
+  adverbs: DictBody;
+  auxillaries: DictBody;
+  prepositions: DictBody;
+  terminators: DictBody;
+}
+
+/** Mint a `tpchText(min, max)` helper bound to the grammar dicts. */
+export function makeTpchText(g: TpchGrammarDicts): (min: number, max: number) => Expression {
+  return function tpchText(minLen: number, maxLen: number): Expression {
+    return Draw.grammar({
+      rootDict: g.root,
+      phrases: { N: g.np, V: g.vp },
+      leaves: {
+        N: g.nouns,
+        V: g.verbs,
+        J: g.adjectives,
+        D: g.adverbs,
+        X: g.auxillaries,
+        P: g.prepositions,
+        T: g.terminators,
+      },
+      minLen,
+      maxLen,
+    });
+  };
+}
+
+/**
+ * Build a `TpchGrammarDicts` from a `distributions.json`-shaped map. The
+ * ten referenced dist names are spec-frozen (root "grammar", np, vp,
+ * nouns, verbs, adjectives, adverbs, auxillaries, prepositions,
+ * terminators). Each lookup returns a weighted `DictBody` — the
+ * evaluator honors the first weight set declared on each dict.
+ */
+export function makeTpchGrammarDicts(
+  dists: Record<string, { columns?: readonly string[]; weight_sets?: readonly string[];
+    rows: ReadonlyArray<{ values: readonly (string | number)[]; weights?: readonly number[] }> }>,
+): TpchGrammarDicts {
+  const pick = (name: string): DictBody => {
+    const d = dists[name];
+    if (!d || !d.rows || d.rows.length === 0) {
+      return Dict.values([""]);
+    }
+    return Dict.fromJson({
+      columns: d.columns,
+      weight_sets: d.weight_sets,
+      rows: d.rows.map((r) => ({
+        values: r.values,
+        weights: r.weights,
+      })),
+    });
+  };
+  return {
+    root: pick("grammar"),
+    np: pick("np"),
+    vp: pick("vp"),
+    nouns: pick("nouns"),
+    verbs: pick("verbs"),
+    adjectives: pick("adjectives"),
+    adverbs: pick("adverbs"),
+    auxillaries: pick("auxillaries"),
+    prepositions: pick("prepositions"),
+    terminators: pick("terminators"),
+  };
 }
 
 /**

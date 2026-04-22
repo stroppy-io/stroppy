@@ -106,6 +106,9 @@ func assignStreamIDsStreamDraw(node *dgproto.StreamDraw, counter *uint32) {
 	case *dgproto.StreamDraw_Phrase:
 		assignStreamIDsExpr(arm.Phrase.GetMinWords(), counter)
 		assignStreamIDsExpr(arm.Phrase.GetMaxWords(), counter)
+	case *dgproto.StreamDraw_Grammar:
+		assignStreamIDsExpr(arm.Grammar.GetMaxLen(), counter)
+		assignStreamIDsExpr(arm.Grammar.GetMinLen(), counter)
 	default:
 		// Remaining arms carry no Expr children.
 	}

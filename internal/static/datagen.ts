@@ -31,6 +31,7 @@ import {
   DrawDecimal as PbDrawDecimal,
   DrawDict as PbDrawDict,
   DrawFloatUniform as PbDrawFloatUniform,
+  DrawGrammar as PbDrawGrammar,
   DrawIntUniform as PbDrawIntUniform,
   DrawJoint as PbDrawJoint,
   DrawNURand as PbDrawNURand,
@@ -938,6 +939,13 @@ function walkStreamDraw(sd: PbStreamDraw, out: Set<string>): void {
       if (arm.phrase.minWords) walkExpr(arm.phrase.minWords, out);
       if (arm.phrase.maxWords) walkExpr(arm.phrase.maxWords, out);
       return;
+    case "grammar":
+      out.add(arm.grammar.rootDict);
+      for (const k of Object.values(arm.grammar.phrases ?? {})) out.add(k);
+      for (const k of Object.values(arm.grammar.leaves ?? {})) out.add(k);
+      if (arm.grammar.maxLen) walkExpr(arm.grammar.maxLen, out);
+      if (arm.grammar.minLen) walkExpr(arm.grammar.minLen, out);
+      return;
     case "nurand":
     case "bernoulli":
     case "date":
@@ -1236,6 +1244,32 @@ export interface DrawJointOpts {
   tupleScope?: number;
 }
 
+/** Opts accepted by `Draw.grammar`. */
+export interface DrawGrammarOpts {
+  /** Root template dict: sentence templates mixing letters and literals. */
+  rootDict: DictLike;
+  /**
+   * Phrase-level nonterminals: letter → dict whose rows are phrase templates
+   * (e.g. `N` → `np` dict with rows `"N"`, `"J N"`, `"J, J N"`). Each picked
+   * phrase is tokenized and its letters resolve via `leaves`.
+   */
+  phrases?: Record<string, DictLike>;
+  /**
+   * Leaf nonterminals: letter → dict whose rows are individual words (e.g.
+   * `N` → `nouns`, `V` → `verbs`). Must cover every letter the root or a
+   * phrase may emit; unresolved letters error out at evaluation time.
+   */
+  leaves: Record<string, DictLike>;
+  /** Maximum character length of the final joined string; over-long walks truncate. */
+  maxLen: PbExpr | number | bigint;
+  /**
+   * Minimum character length. When set and a walk produces a shorter string,
+   * the evaluator re-walks up to 8 times to satisfy. Omit to accept any
+   * length up to `maxLen`.
+   */
+  minLen?: PbExpr | number | bigint;
+}
+
 /** Resolve a DictLike down to a registered opaque key. */
 function resolveDictKey(d: DictLike): string {
   return typeof d === "string" ? d : registerInlineDict(d);
@@ -1366,7 +1400,46 @@ export const Draw = {
     };
     return streamDrawExpr({ oneofKind: "joint", joint: arm });
   },
+
+  /**
+   * Two-phase template walker (spec §4.2.2.14). Picks a sentence from
+   * `rootDict`; for every single-uppercase-ASCII-letter token, either
+   * expands the phrase template found in `phrases[letter]` (one level
+   * deep, sub-letters resolve via `leaves`) or emits a leaf word from
+   * `leaves[letter]`. Result is truncated to `maxLen` characters; when
+   * `minLen` is set, the evaluator re-walks up to 8 times to satisfy.
+   */
+  grammar(opts: DrawGrammarOpts): PbExpr {
+    const rootKey = resolveDictKey(opts.rootDict);
+    const phraseKeys: Record<string, string> = {};
+    if (opts.phrases) {
+      for (const [letter, dict] of Object.entries(opts.phrases)) {
+        phraseKeys[letter] = resolveDictKey(dict);
+      }
+    }
+    const leafKeys: Record<string, string> = {};
+    for (const [letter, dict] of Object.entries(opts.leaves)) {
+      leafKeys[letter] = resolveDictKey(dict);
+    }
+    if (Object.keys(leafKeys).length === 0) {
+      throw new Error("datagen: Draw.grammar requires at least one leaf dict");
+    }
+    const arm: PbDrawGrammar = {
+      rootDict: rootKey,
+      phrases: phraseKeys,
+      leaves: leafKeys,
+      maxLen: coerceExpr(opts.maxLen),
+      minLen: opts.minLen !== undefined ? coerceExpr(opts.minLen) : undefined,
+    };
+    return streamDrawExpr({ oneofKind: "grammar", grammar: arm });
+  },
 };
+
+/** Coerce an Expr|number|bigint into an Expr via `Expr.lit` when needed. */
+function coerceExpr(v: PbExpr | number | bigint): PbExpr {
+  if (typeof v === "number" || typeof v === "bigint") return Expr.lit(v);
+  return v;
+}
 
 // -------- Null-helper namespace member (proto: Null on Attr) --------
 

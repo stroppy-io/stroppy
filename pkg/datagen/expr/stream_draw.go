@@ -66,6 +66,9 @@ func evalStreamDraw(ctx Context, node *dgproto.StreamDraw) (any, error) {
 		return drawASCII(ctx, prng, node.GetAscii())
 	case *dgproto.StreamDraw_Phrase:
 		return drawPhrase(ctx, prng, node.GetPhrase())
+	case *dgproto.StreamDraw_Grammar:
+		return drawGrammar(ctx, node.GetGrammar(), node.GetStreamId(),
+			ctx.AttrPath(), ctx.RowIndex(dgproto.RowIndex_UNSPECIFIED))
 	default:
 		return nil, fmt.Errorf("%w: %T", ErrBadDraw, arm)
 	}

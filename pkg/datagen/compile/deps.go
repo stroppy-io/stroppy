@@ -98,6 +98,9 @@ func walkStreamDraw(node *dgproto.StreamDraw, seen map[string]struct{}, out *[]s
 	case *dgproto.StreamDraw_Phrase:
 		walkExpr(arm.Phrase.GetMinWords(), seen, out)
 		walkExpr(arm.Phrase.GetMaxWords(), seen, out)
+	case *dgproto.StreamDraw_Grammar:
+		walkExpr(arm.Grammar.GetMaxLen(), seen, out)
+		walkExpr(arm.Grammar.GetMinLen(), seen, out)
 	default:
 		// Remaining arms (Nurand, Bernoulli, Dict, Joint, Date) carry no
 		// Expr subfields.

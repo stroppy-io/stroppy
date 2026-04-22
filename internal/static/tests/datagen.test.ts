@@ -968,3 +968,69 @@ describe("Rel.table with cohorts", () => {
     expect(spec.source?.cohorts[0].cohortSize).toBe("20");
   });
 });
+
+describe("Draw.grammar", () => {
+  it("builds a StreamDraw.grammar arm wiring root, phrases, and leaves", () => {
+    const root = Dict.values(["N V T"]);
+    const np = Dict.values(["J N"]);
+    const nouns = Dict.values(["packages"]);
+    const verbs = Dict.values(["wake"]);
+    const adjs = Dict.values(["ironic"]);
+    const terms = Dict.values(["."]);
+
+    const e = Draw.grammar({
+      rootDict: root,
+      phrases: { N: np },
+      leaves: { N: nouns, V: verbs, J: adjs, T: terms },
+      minLen: 10,
+      maxLen: 80,
+    });
+
+    if (e.kind.oneofKind !== "streamDraw") throw new Error("not a streamDraw");
+    const draw = e.kind.streamDraw.draw;
+    if (draw.oneofKind !== "grammar") throw new Error("not a grammar arm");
+    const g = draw.grammar;
+
+    expect(g.rootDict).toMatch(/^d_[0-9a-f]{16}$/);
+    expect(Object.keys(g.phrases).sort()).toEqual(["N"]);
+    expect(g.phrases["N"]).toMatch(/^d_[0-9a-f]{16}$/);
+    expect(Object.keys(g.leaves).sort()).toEqual(["J", "N", "T", "V"]);
+    // minLen and maxLen are coerced to int64 literal Exprs.
+    if (g.maxLen?.kind.oneofKind !== "lit") throw new Error("maxLen not a lit");
+    if (g.maxLen.kind.lit.value.oneofKind === "int64") {
+      expect(g.maxLen.kind.lit.value.int64).toBe("80");
+    } else {
+      throw new Error("maxLen not int64");
+    }
+    if (g.minLen?.kind.oneofKind !== "lit") throw new Error("minLen not a lit");
+    if (g.minLen.kind.lit.value.oneofKind === "int64") {
+      expect(g.minLen.kind.lit.value.int64).toBe("10");
+    } else {
+      throw new Error("minLen not int64");
+    }
+  });
+
+  it("registers root, phrase, and leaf dicts once each in InsertSpec.dicts", () => {
+    const root = Dict.values(["N V T"]);
+    const np = Dict.values(["J N"]);
+    const nouns = Dict.values(["packages", "requests"]);
+    const verbs = Dict.values(["wake"]);
+    const adjs = Dict.values(["ironic"]);
+    const terms = Dict.values(["."]);
+
+    const spec = Rel.table("t", {
+      size: 10,
+      attrs: {
+        comment: Draw.grammar({
+          rootDict: root,
+          phrases: { N: np },
+          leaves: { N: nouns, V: verbs, J: adjs, T: terms },
+          maxLen: 80,
+        }),
+      },
+    });
+
+    // 6 unique dict bodies (root, np, nouns, verbs, adjs, terms).
+    expect(Object.keys(spec.dicts)).toHaveLength(6);
+  });
+});

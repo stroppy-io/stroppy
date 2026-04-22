@@ -93,7 +93,56 @@ func TestTpchWorkloadEndToEnd(t *testing.T) {
 	assertTpchExtendedPrice(t, pool)
 	assertTpchDateOrdering(t, pool)
 	assertTpchTotalpriceFinalized(t, pool)
+	assertTpchGrammarComments(t, pool)
 	assertTpchQueriesLogged(t, out)
+}
+
+// assertTpchGrammarComments spot-checks that Draw.grammar is producing
+// grammatical text: a majority of o_comment values should contain at
+// least one recognized TPC-H noun / verb / terminator. With 15 000
+// orders at SF=0.01 and a comment length ≥ 19, essentially every row
+// should hit at least one of these lexemes. The 90 % floor keeps a
+// comfortable margin for truncation of walk-tail words.
+func assertTpchGrammarComments(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	ctx := context.Background()
+
+	// A small hand-picked subset of tokens that appear in any of the
+	// nouns / verbs / terminators dicts (distributions.json). If the
+	// grammar walker is wired correctly, the vast majority of comments
+	// contain at least one of them.
+	tokens := []string{
+		"packages", "requests", "accounts", "deposits", "foxes",
+		"sleep", "wake", "cajole", "haggle", "nag",
+		".", "!", "?",
+	}
+
+	// Build a single OR-chain of LIKE '%tok%' predicates.
+	var b strings.Builder
+	b.WriteString(`SELECT COUNT(*) FROM orders WHERE `)
+	for i, tok := range tokens {
+		if i > 0 {
+			b.WriteString(" OR ")
+		}
+		b.WriteString(`o_comment LIKE '%`)
+		b.WriteString(strings.ReplaceAll(tok, "'", "''"))
+		b.WriteString(`%'`)
+	}
+	var hits, total int64
+	if err := pool.QueryRow(ctx, b.String()).Scan(&hits); err != nil {
+		t.Fatalf("grammar hit count: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM orders`).Scan(&total); err != nil {
+		t.Fatalf("orders total: %v", err)
+	}
+	if total == 0 {
+		t.Fatalf("no orders rows to spot-check")
+	}
+	ratio := float64(hits) / float64(total)
+	if ratio < 0.90 {
+		t.Errorf("only %.1f%% of o_comment rows carry a recognized grammar token "+
+			"(%d/%d); grammar walker likely broken", ratio*100, hits, total)
+	}
 }
 
 // assertTpchRowCounts checks cardinality against the spec-derived formula.

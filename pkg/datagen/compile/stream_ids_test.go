@@ -168,6 +168,43 @@ func TestBuildAssignsStreamIDsDeterministically(t *testing.T) {
 	}
 }
 
+func TestAssignStreamIDsGrammarAndInnerExprs(t *testing.T) {
+	// DrawGrammar carries Expr min/max fields; a Choose nested inside
+	// min_len must also be reached by the assignment walker.
+	innerChoose := &dgproto.Expr{Kind: &dgproto.Expr_Choose{Choose: &dgproto.Choose{
+		Branches: []*dgproto.ChooseBranch{
+			{Weight: 1, Expr: &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
+				Value: &dgproto.Literal_Int64{Int64: 20},
+			}}}},
+		},
+	}}}
+
+	grammar := &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
+		Draw: &dgproto.StreamDraw_Grammar{Grammar: &dgproto.DrawGrammar{
+			RootDict: "root",
+			Leaves:   map[string]string{"N": "nouns"},
+			MaxLen: &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
+				Value: &dgproto.Literal_Int64{Int64: 80},
+			}}},
+			MinLen: innerChoose,
+		}},
+	}}}
+
+	a := attr("a", grammar)
+
+	if err := AssignStreamIDs([]*dgproto.Attr{a}); err != nil {
+		t.Fatalf("AssignStreamIDs: %v", err)
+	}
+
+	if got := grammar.GetStreamDraw().GetStreamId(); got != 1 {
+		t.Fatalf("outer grammar id = %d, want 1", got)
+	}
+
+	if got := innerChoose.GetChoose().GetStreamId(); got != 2 {
+		t.Fatalf("nested choose id = %d, want 2", got)
+	}
+}
+
 func TestAssignStreamIDsNestedWithinStreamDraw(t *testing.T) {
 	// DrawDecimal has an Expr min/max; nest a Choose inside.
 	innerChoose := &dgproto.Expr{Kind: &dgproto.Expr_Choose{Choose: &dgproto.Choose{

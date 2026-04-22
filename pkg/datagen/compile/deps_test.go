@@ -150,3 +150,23 @@ func TestCollectColRefsEmptyKind(t *testing.T) {
 		t.Fatalf("want nil, got %v", got)
 	}
 }
+
+func TestCollectColRefsGrammarMinMax(t *testing.T) {
+	// DrawGrammar carries Expr min_len and max_len; ColRefs inside
+	// either must surface in the dependency set.
+	grammar := &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
+		Draw: &dgproto.StreamDraw_Grammar{Grammar: &dgproto.DrawGrammar{
+			RootDict: "root",
+			Leaves:   map[string]string{"N": "nouns"},
+			MaxLen:   colRef("maxLen"),
+			MinLen:   colRef("minLen"),
+		}},
+	}}}
+
+	got := CollectColRefs(grammar)
+
+	want := []string{"maxLen", "minLen"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}

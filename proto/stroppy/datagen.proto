@@ -405,6 +405,8 @@ message StreamDraw {
     DrawAscii ascii = 20;
     // Space-joined word sequence drawn from a vocabulary Dict.
     DrawPhrase phrase = 21;
+    // Two-phase template walker over a root / phrase / leaf dict set.
+    DrawGrammar grammar = 22;
   }
 }
 
@@ -542,6 +544,33 @@ message DrawPhrase {
   Expr max_words = 3 [ (validate.rules).message.required = true ];
   // Separator joining drawn words; empty means no separator.
   string separator = 4;
+}
+
+// DrawGrammar walks a two-phase template: a root dict carries sentence
+// templates whose tokens are either literal words or single uppercase
+// ASCII letters; each letter resolves either into a phrase template
+// (one expansion level) or directly into a leaf word.
+message DrawGrammar {
+  // Opaque key of the root template dict in InsertSpec.dicts.
+  string root_dict = 1 [ (validate.rules).string.min_len = 1 ];
+  // Phrase-level nonterminals: letter -> dict key of template rows.
+  // When a letter in root_dict's picked template matches a key here,
+  // the walker picks a phrase template from the referenced dict and
+  // tokenizes it — letters inside that phrase resolve via `leaves`.
+  // Exactly one level of phrase expansion; no further phrase recursion.
+  map<string, string> phrases = 2;
+  // Leaf nonterminals: letter -> dict key of leaf word rows.
+  // Used when a letter has no `phrases` entry, and when resolving
+  // letters inside a phrase expansion.
+  map<string, string> leaves = 3 [ (validate.rules).map.min_pairs = 1 ];
+  // Length bound (characters, not tokens) on the final joined string.
+  // If the walked text is longer, it is truncated. If shorter, it is
+  // accepted as-is (no padding — spec doesn't require minimum).
+  Expr max_len = 4 [ (validate.rules).message.required = true ];
+  // Optional. If set and walked length < min_len, re-walk with a fresh
+  // sub-stream until a long-enough string is produced or max_attempts
+  // (fixed at 8) is exhausted; on exhaustion, return what we have.
+  Expr min_len = 5;
 }
 
 // Choose picks one of several Expr branches at random with probability
