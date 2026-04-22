@@ -95,12 +95,20 @@ func (r *Runtime) Next() ([]any, error) {
 	}
 
 	for _, attr := range r.dag.Order {
-		value, err := expr.Eval(r.ctx, attr.GetExpr())
-		if err != nil {
-			return nil, fmt.Errorf("runtime: attr %q at row %d: %w", attr.GetName(), r.row, err)
+		name := attr.GetName()
+
+		if null := attr.GetNull(); null != nil && nullProbabilityHit(null, name, r.row) {
+			r.ctx.scratch[name] = nil
+
+			continue
 		}
 
-		r.ctx.scratch[attr.GetName()] = value
+		value, err := expr.Eval(r.ctx, attr.GetExpr())
+		if err != nil {
+			return nil, fmt.Errorf("runtime: attr %q at row %d: %w", name, r.row, err)
+		}
+
+		r.ctx.scratch[name] = value
 	}
 
 	out := make([]any, len(r.emit))

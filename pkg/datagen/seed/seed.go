@@ -27,10 +27,18 @@ const pathSep = "/"
 
 // Derive is the stream key for (root, path) under formula splitmix64(root ^ fnv1a64(joined(path))).
 func Derive(root uint64, path ...string) uint64 {
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(strings.Join(path, pathSep)))
+	return SplitMix64(root ^ FNV1a64(strings.Join(path, pathSep)))
+}
 
-	return SplitMix64(root ^ h.Sum64())
+// FNV1a64 is the 64-bit FNV-1a hash of s. It is the single source of
+// truth for string-to-uint64 hashing in the datagen framework; null
+// injection, dict salting, and any future component that needs a stable
+// name hash must call this rather than reimplementing FNV.
+func FNV1a64(s string) uint64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(s))
+
+	return h.Sum64()
 }
 
 // PRNG is a fresh *rand.Rand backed by a PCG source seeded from key.

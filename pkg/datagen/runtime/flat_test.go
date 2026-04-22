@@ -70,6 +70,10 @@ func attr(name string, e *dgproto.Expr) *dgproto.Attr {
 	return &dgproto.Attr{Name: name, Expr: e}
 }
 
+func attrWithNull(name string, e *dgproto.Expr, rate float32, salt uint64) *dgproto.Attr {
+	return &dgproto.Attr{Name: name, Expr: e, Null: &dgproto.Null{Rate: rate, SeedSalt: salt}}
+}
+
 // spec assembles an InsertSpec with a single RelSource population of
 // the requested size. Dicts may be nil.
 func spec(size int64, columnOrder []string, attrs []*dgproto.Attr, dicts map[string]*dgproto.Dict) *dgproto.InsertSpec {
@@ -428,6 +432,46 @@ func TestFlatColumnsStableAcrossNext(t *testing.T) {
 	after := rt.Columns()
 	if !reflect.DeepEqual(before, after) {
 		t.Fatalf("Columns shifted: %v vs %v", before, after)
+	}
+}
+
+func TestFlatNullRatio(t *testing.T) {
+	const (
+		rows      = 1000
+		rate      = float32(0.2)
+		tolerance = 40 // ±4% at rate=0.2 on 1000 rows absorbs sampling noise.
+	)
+
+	attrs := []*dgproto.Attr{
+		attr("row_id", binOp(dgproto.BinOp_ADD, rowIndex(), lit(int64(1)))),
+		attrWithNull("c_address", lit("addr"), rate, 0xBEEFF00DBEEFF00D),
+	}
+
+	rt, err := NewRuntime(spec(rows, []string{"row_id", "c_address"}, attrs, nil))
+	if err != nil {
+		t.Fatalf("NewRuntime: %v", err)
+	}
+
+	got := collect(t, rt)
+	if len(got) != rows {
+		t.Fatalf("row count: got %d, want %d", len(got), rows)
+	}
+
+	nulls := 0
+
+	for i, row := range got {
+		if row[0] == nil {
+			t.Fatalf("row %d: row_id must never be nil", i)
+		}
+
+		if row[1] == nil {
+			nulls++
+		}
+	}
+
+	expected := int(float32(rows) * rate)
+	if nulls < expected-tolerance || nulls > expected+tolerance {
+		t.Fatalf("null count %d outside %d±%d", nulls, expected, tolerance)
 	}
 }
 

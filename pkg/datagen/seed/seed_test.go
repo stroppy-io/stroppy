@@ -33,6 +33,32 @@ func TestSplitMix64(t *testing.T) {
 	}
 }
 
+func TestFNV1a64(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   string
+		want uint64
+	}{
+		{"empty", "", 0xCBF29CE484222325},
+		{"a", "a", 0xAF63DC4C8601EC8C},
+		{"ab", "a/b", 0xE620C3190468CF61},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := seed.FNV1a64(tc.in)
+			require.Equalf(t, tc.want, got, "FNV1a64(%q)", tc.in)
+		})
+	}
+
+	// Cross-check: Derive must equal SplitMix64(root ^ FNV1a64(joined)).
+	require.Equal(t, seed.SplitMix64(42^seed.FNV1a64("a/b")), seed.Derive(42, "a", "b"))
+}
+
 func TestDerive(t *testing.T) {
 	t.Parallel()
 
