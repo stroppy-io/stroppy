@@ -35,12 +35,8 @@ type DriverRunConfig struct {
 	// Matches TS DriverSetup.driverType (string union, not proto enum).
 	DriverType string `protobuf:"bytes,1,opt,name=driver_type,json=driverType,proto3" json:"driver_type,omitempty"`
 	// * Database connection URL
-	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
-	// *
-	// Default insert method. One of: "native", "plain_bulk", "plain_query".
-	// Matches TS DriverSetup.defaultInsertMethod.
-	DefaultInsertMethod string                      `protobuf:"bytes,3,opt,name=default_insert_method,json=defaultInsertMethod,proto3" json:"default_insert_method,omitempty"`
-	Pool                *DriverRunConfig_PoolConfig `protobuf:"bytes,4,opt,name=pool,proto3,oneof" json:"pool,omitempty"`
+	Url  string                      `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	Pool *DriverRunConfig_PoolConfig `protobuf:"bytes,4,opt,name=pool,proto3,oneof" json:"pool,omitempty"`
 	// *
 	// Error handling mode. One of: "silent", "log", "throw", "fail", "abort".
 	// Matches TS DriverSetup.errorMode.
@@ -106,13 +102,6 @@ func (x *DriverRunConfig) GetDriverType() string {
 func (x *DriverRunConfig) GetUrl() string {
 	if x != nil {
 		return x.Url
-	}
-	return ""
-}
-
-func (x *DriverRunConfig) GetDefaultInsertMethod() string {
-	if x != nil {
-		return x.DefaultInsertMethod
 	}
 	return ""
 }
@@ -502,12 +491,11 @@ var File_proto_stroppy_run_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_run_proto_rawDesc = "" +
 	"\n" +
-	"\x17proto/stroppy/run.proto\x12\astroppy\x1a\x1aproto/stroppy/config.proto\"\x92\f\n" +
+	"\x17proto/stroppy/run.proto\x12\astroppy\x1a\x1aproto/stroppy/config.proto\"\xde\v\n" +
 	"\x0fDriverRunConfig\x12\x1f\n" +
 	"\vdriver_type\x18\x01 \x01(\tR\n" +
 	"driverType\x12\x10\n" +
-	"\x03url\x18\x02 \x01(\tR\x03url\x122\n" +
-	"\x15default_insert_method\x18\x03 \x01(\tR\x13defaultInsertMethod\x12<\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12<\n" +
 	"\x04pool\x18\x04 \x01(\v2#.stroppy.DriverRunConfig.PoolConfigH\x00R\x04pool\x88\x01\x01\x12\x1d\n" +
 	"\n" +
 	"error_mode\x18\x05 \x01(\tR\terrorMode\x12 \n" +

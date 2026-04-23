@@ -7,7 +7,6 @@
 package stroppy
 
 import (
-	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -22,59 +21,8 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// * Data insertion method
-type InsertMethod int32
-
-const (
-	InsertMethod_PLAIN_QUERY InsertMethod = 0
-	InsertMethod_NATIVE      InsertMethod = 1
-	InsertMethod_PLAIN_BULK  InsertMethod = 2
-)
-
-// Enum value maps for InsertMethod.
-var (
-	InsertMethod_name = map[int32]string{
-		0: "PLAIN_QUERY",
-		1: "NATIVE",
-		2: "PLAIN_BULK",
-	}
-	InsertMethod_value = map[string]int32{
-		"PLAIN_QUERY": 0,
-		"NATIVE":      1,
-		"PLAIN_BULK":  2,
-	}
-)
-
-func (x InsertMethod) Enum() *InsertMethod {
-	p := new(InsertMethod)
-	*p = x
-	return p
-}
-
-func (x InsertMethod) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (InsertMethod) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_stroppy_descriptor_proto_enumTypes[0].Descriptor()
-}
-
-func (InsertMethod) Type() protoreflect.EnumType {
-	return &file_proto_stroppy_descriptor_proto_enumTypes[0]
-}
-
-func (x InsertMethod) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use InsertMethod.Descriptor instead.
-func (InsertMethod) EnumDescriptor() ([]byte, []int) {
-	return file_proto_stroppy_descriptor_proto_rawDescGZIP(), []int{0}
-}
-
 // *
-// TransactionIsolationLevel defines the isolation level for a database
-// transaction.
+// TxIsolationLevel defines the isolation level for a database transaction.
 type TxIsolationLevel int32
 
 const (
@@ -122,11 +70,11 @@ func (x TxIsolationLevel) String() string {
 }
 
 func (TxIsolationLevel) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_stroppy_descriptor_proto_enumTypes[1].Descriptor()
+	return file_proto_stroppy_descriptor_proto_enumTypes[0].Descriptor()
 }
 
 func (TxIsolationLevel) Type() protoreflect.EnumType {
-	return &file_proto_stroppy_descriptor_proto_enumTypes[1]
+	return &file_proto_stroppy_descriptor_proto_enumTypes[0]
 }
 
 func (x TxIsolationLevel) Number() protoreflect.EnumNumber {
@@ -135,268 +83,14 @@ func (x TxIsolationLevel) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TxIsolationLevel.Descriptor instead.
 func (TxIsolationLevel) EnumDescriptor() ([]byte, []int) {
-	return file_proto_stroppy_descriptor_proto_rawDescGZIP(), []int{1}
-}
-
-// *
-// InsertDescription defines data to fill database.
-type InsertDescriptor struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Count int32                  `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
-	// * Which table to insert the values
-	TableName string `protobuf:"bytes,2,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
-	// * Allows to use a percise method of data insertion
-	Method *InsertMethod `protobuf:"varint,3,opt,name=method,proto3,enum=stroppy.InsertMethod,oneof" json:"method,omitempty"`
-	// * Seed for data generation. 0 = random, >0 = fixed (reproducible).
-	Seed uint64 `protobuf:"varint,6,opt,name=seed,proto3" json:"seed,omitempty"`
-	// *
-	// Parameters used in the insert.
-	// Names threated as db columns names, regexp is ignored.
-	Params []*QueryParamDescriptor `protobuf:"bytes,4,rep,name=params,proto3" json:"params,omitempty"`
-	// * Groups of the columns
-	Groups        []*QueryParamGroup `protobuf:"bytes,5,rep,name=groups,proto3" json:"groups,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *InsertDescriptor) Reset() {
-	*x = InsertDescriptor{}
-	mi := &file_proto_stroppy_descriptor_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *InsertDescriptor) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*InsertDescriptor) ProtoMessage() {}
-
-func (x *InsertDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_descriptor_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use InsertDescriptor.ProtoReflect.Descriptor instead.
-func (*InsertDescriptor) Descriptor() ([]byte, []int) {
 	return file_proto_stroppy_descriptor_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *InsertDescriptor) GetCount() int32 {
-	if x != nil {
-		return x.Count
-	}
-	return 0
-}
-
-func (x *InsertDescriptor) GetTableName() string {
-	if x != nil {
-		return x.TableName
-	}
-	return ""
-}
-
-func (x *InsertDescriptor) GetMethod() InsertMethod {
-	if x != nil && x.Method != nil {
-		return *x.Method
-	}
-	return InsertMethod_PLAIN_QUERY
-}
-
-func (x *InsertDescriptor) GetSeed() uint64 {
-	if x != nil {
-		return x.Seed
-	}
-	return 0
-}
-
-func (x *InsertDescriptor) GetParams() []*QueryParamDescriptor {
-	if x != nil {
-		return x.Params
-	}
-	return nil
-}
-
-func (x *InsertDescriptor) GetGroups() []*QueryParamGroup {
-	if x != nil {
-		return x.Groups
-	}
-	return nil
-}
-
-// *
-// QueryParamDescriptor defines a parameter that can be used in a query.
-type QueryParamDescriptor struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Name of the parameter
-	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// * Regular expression pattern to replace with the parameter value default
-	// is "${<param_name>}"
-	ReplaceRegex *string `protobuf:"bytes,2,opt,name=replace_regex,json=replaceRegex,proto3,oneof" json:"replace_regex,omitempty"`
-	// * Rule for generating parameter values
-	GenerationRule *Generation_Rule `protobuf:"bytes,3,opt,name=generation_rule,json=generationRule,proto3" json:"generation_rule,omitempty"`
-	// * Database-specific parameter properties
-	DbSpecific    *Value_Struct `protobuf:"bytes,4,opt,name=db_specific,json=dbSpecific,proto3,oneof" json:"db_specific,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *QueryParamDescriptor) Reset() {
-	*x = QueryParamDescriptor{}
-	mi := &file_proto_stroppy_descriptor_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *QueryParamDescriptor) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*QueryParamDescriptor) ProtoMessage() {}
-
-func (x *QueryParamDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_descriptor_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use QueryParamDescriptor.ProtoReflect.Descriptor instead.
-func (*QueryParamDescriptor) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_descriptor_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *QueryParamDescriptor) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *QueryParamDescriptor) GetReplaceRegex() string {
-	if x != nil && x.ReplaceRegex != nil {
-		return *x.ReplaceRegex
-	}
-	return ""
-}
-
-func (x *QueryParamDescriptor) GetGenerationRule() *Generation_Rule {
-	if x != nil {
-		return x.GenerationRule
-	}
-	return nil
-}
-
-func (x *QueryParamDescriptor) GetDbSpecific() *Value_Struct {
-	if x != nil {
-		return x.DbSpecific
-	}
-	return nil
-}
-
-// *
-// QueryParamGroup defines a group of dependent parameters.
-// New values generated in Carthesian product manner.
-// It's useful to define composite primary keys.
-// Every evaluation step only one param changes.
-type QueryParamGroup struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// * Group name
-	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// * Grouped dependent parameters
-	Params        []*QueryParamDescriptor `protobuf:"bytes,2,rep,name=params,proto3" json:"params,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *QueryParamGroup) Reset() {
-	*x = QueryParamGroup{}
-	mi := &file_proto_stroppy_descriptor_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *QueryParamGroup) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*QueryParamGroup) ProtoMessage() {}
-
-func (x *QueryParamGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_descriptor_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use QueryParamGroup.ProtoReflect.Descriptor instead.
-func (*QueryParamGroup) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_descriptor_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *QueryParamGroup) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *QueryParamGroup) GetParams() []*QueryParamDescriptor {
-	if x != nil {
-		return x.Params
-	}
-	return nil
 }
 
 var File_proto_stroppy_descriptor_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_descriptor_proto_rawDesc = "" +
 	"\n" +
-	"\x1eproto/stroppy/descriptor.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\xa4\x02\n" +
-	"\x10InsertDescriptor\x12\x1d\n" +
-	"\x05count\x18\x01 \x01(\x05B\a\xfaB\x04\x1a\x02 \x00R\x05count\x12&\n" +
-	"\n" +
-	"table_name\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\ttableName\x122\n" +
-	"\x06method\x18\x03 \x01(\x0e2\x15.stroppy.InsertMethodH\x00R\x06method\x88\x01\x01\x12\x12\n" +
-	"\x04seed\x18\x06 \x01(\x04R\x04seed\x12D\n" +
-	"\x06params\x18\x04 \x03(\v2\x1d.stroppy.QueryParamDescriptorB\r\xfaB\n" +
-	"\x92\x01\a\"\x05\x8a\x01\x02\x10\x01R\x06params\x120\n" +
-	"\x06groups\x18\x05 \x03(\v2\x18.stroppy.QueryParamGroupR\x06groupsB\t\n" +
-	"\a_method\"\x89\x02\n" +
-	"\x14QueryParamDescriptor\x12\x1b\n" +
-	"\x04name\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12(\n" +
-	"\rreplace_regex\x18\x02 \x01(\tH\x00R\freplaceRegex\x88\x01\x01\x12K\n" +
-	"\x0fgeneration_rule\x18\x03 \x01(\v2\x18.stroppy.Generation.RuleB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x0egenerationRule\x12;\n" +
-	"\vdb_specific\x18\x04 \x01(\v2\x15.stroppy.Value.StructH\x01R\n" +
-	"dbSpecific\x88\x01\x01B\x10\n" +
-	"\x0e_replace_regexB\x0e\n" +
-	"\f_db_specific\"\\\n" +
-	"\x0fQueryParamGroup\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x125\n" +
-	"\x06params\x18\x02 \x03(\v2\x1d.stroppy.QueryParamDescriptorR\x06params*;\n" +
-	"\fInsertMethod\x12\x0f\n" +
-	"\vPLAIN_QUERY\x10\x00\x12\n" +
-	"\n" +
-	"\x06NATIVE\x10\x01\x12\x0e\n" +
-	"\n" +
-	"PLAIN_BULK\x10\x02*\x93\x01\n" +
+	"\x1eproto/stroppy/descriptor.proto\x12\astroppy*\x93\x01\n" +
 	"\x10TxIsolationLevel\x12\x0f\n" +
 	"\vUNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10READ_UNCOMMITTED\x10\x01\x12\x12\n" +
@@ -418,29 +112,16 @@ func file_proto_stroppy_descriptor_proto_rawDescGZIP() []byte {
 	return file_proto_stroppy_descriptor_proto_rawDescData
 }
 
-var file_proto_stroppy_descriptor_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_proto_stroppy_descriptor_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_proto_stroppy_descriptor_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_proto_stroppy_descriptor_proto_goTypes = []any{
-	(InsertMethod)(0),            // 0: stroppy.InsertMethod
-	(TxIsolationLevel)(0),        // 1: stroppy.TxIsolationLevel
-	(*InsertDescriptor)(nil),     // 2: stroppy.InsertDescriptor
-	(*QueryParamDescriptor)(nil), // 3: stroppy.QueryParamDescriptor
-	(*QueryParamGroup)(nil),      // 4: stroppy.QueryParamGroup
-	(*Generation_Rule)(nil),      // 5: stroppy.Generation.Rule
-	(*Value_Struct)(nil),         // 6: stroppy.Value.Struct
+	(TxIsolationLevel)(0), // 0: stroppy.TxIsolationLevel
 }
 var file_proto_stroppy_descriptor_proto_depIdxs = []int32{
-	0, // 0: stroppy.InsertDescriptor.method:type_name -> stroppy.InsertMethod
-	3, // 1: stroppy.InsertDescriptor.params:type_name -> stroppy.QueryParamDescriptor
-	4, // 2: stroppy.InsertDescriptor.groups:type_name -> stroppy.QueryParamGroup
-	5, // 3: stroppy.QueryParamDescriptor.generation_rule:type_name -> stroppy.Generation.Rule
-	6, // 4: stroppy.QueryParamDescriptor.db_specific:type_name -> stroppy.Value.Struct
-	3, // 5: stroppy.QueryParamGroup.params:type_name -> stroppy.QueryParamDescriptor
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	0, // [0:0] is the sub-list for method output_type
+	0, // [0:0] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_descriptor_proto_init() }
@@ -448,23 +129,19 @@ func file_proto_stroppy_descriptor_proto_init() {
 	if File_proto_stroppy_descriptor_proto != nil {
 		return
 	}
-	file_proto_stroppy_common_proto_init()
-	file_proto_stroppy_descriptor_proto_msgTypes[0].OneofWrappers = []any{}
-	file_proto_stroppy_descriptor_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_descriptor_proto_rawDesc), len(file_proto_stroppy_descriptor_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   3,
+			NumEnums:      1,
+			NumMessages:   0,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_proto_stroppy_descriptor_proto_goTypes,
 		DependencyIndexes: file_proto_stroppy_descriptor_proto_depIdxs,
 		EnumInfos:         file_proto_stroppy_descriptor_proto_enumTypes,
-		MessageInfos:      file_proto_stroppy_descriptor_proto_msgTypes,
 	}.Build()
 	File_proto_stroppy_descriptor_proto = out.File
 	file_proto_stroppy_descriptor_proto_goTypes = nil

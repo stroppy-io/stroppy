@@ -17,8 +17,6 @@ message DriverQuery {
   string request = 1;
   /** Parameters of the query */
   repeated Value params = 2;
-  /** If alternate insertion method required */
-  optional InsertMethod method = 3;
 }
 
 /**

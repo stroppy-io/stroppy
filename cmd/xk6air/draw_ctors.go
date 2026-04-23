@@ -1,8 +1,7 @@
 // Package xk6air draw_ctors.go — 13 exported constructor functions
 // (NewDrawX). Each resolves handles and validates bounds once, then
 // returns a *drawX pointer that sobek binds by reflection. Errors
-// return as any (matching NewGeneratorByRuleBin) so sobek converts
-// them to a JS exception.
+// return as any so sobek converts them to a JS exception.
 package xk6air
 
 import (

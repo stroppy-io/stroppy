@@ -29,9 +29,7 @@ type DriverQuery struct {
 	// * Request of the query
 	Request string `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
 	// * Parameters of the query
-	Params []*Value `protobuf:"bytes,2,rep,name=params,proto3" json:"params,omitempty"`
-	// * If alternate insertion method required
-	Method        *InsertMethod `protobuf:"varint,3,opt,name=method,proto3,enum=stroppy.InsertMethod,oneof" json:"method,omitempty"`
+	Params        []*Value `protobuf:"bytes,2,rep,name=params,proto3" json:"params,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -78,13 +76,6 @@ func (x *DriverQuery) GetParams() []*Value {
 		return x.Params
 	}
 	return nil
-}
-
-func (x *DriverQuery) GetMethod() InsertMethod {
-	if x != nil && x.Method != nil {
-		return *x.Method
-	}
-	return InsertMethod_PLAIN_QUERY
 }
 
 // *
@@ -266,12 +257,10 @@ var File_proto_stroppy_runtime_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_runtime_proto_rawDesc = "" +
 	"\n" +
-	"\x1bproto/stroppy/runtime.proto\x12\astroppy\x1a\x1egoogle/protobuf/duration.proto\x1a\x1aproto/stroppy/common.proto\x1a\x1eproto/stroppy/descriptor.proto\"\x8e\x01\n" +
+	"\x1bproto/stroppy/runtime.proto\x12\astroppy\x1a\x1egoogle/protobuf/duration.proto\x1a\x1aproto/stroppy/common.proto\x1a\x1eproto/stroppy/descriptor.proto\"O\n" +
 	"\vDriverQuery\x12\x18\n" +
 	"\arequest\x18\x01 \x01(\tR\arequest\x12&\n" +
-	"\x06params\x18\x02 \x03(\v2\x0e.stroppy.ValueR\x06params\x122\n" +
-	"\x06method\x18\x03 \x01(\x0e2\x15.stroppy.InsertMethodH\x00R\x06method\x88\x01\x01B\t\n" +
-	"\a_method\"\x87\x01\n" +
+	"\x06params\x18\x02 \x03(\v2\x0e.stroppy.ValueR\x06params\"\x87\x01\n" +
 	"\x11DriverTransaction\x12.\n" +
 	"\aqueries\x18\x01 \x03(\v2\x14.stroppy.DriverQueryR\aqueries\x12B\n" +
 	"\x0fisolation_level\x18\x02 \x01(\x0e2\x19.stroppy.TxIsolationLevelR\x0eisolationLevel\"e\n" +
@@ -302,24 +291,22 @@ var file_proto_stroppy_runtime_proto_goTypes = []any{
 	(*DriverQueryStat)(nil),       // 2: stroppy.DriverQueryStat
 	(*DriverTransactionStat)(nil), // 3: stroppy.DriverTransactionStat
 	(*Value)(nil),                 // 4: stroppy.Value
-	(InsertMethod)(0),             // 5: stroppy.InsertMethod
-	(TxIsolationLevel)(0),         // 6: stroppy.TxIsolationLevel
-	(*durationpb.Duration)(nil),   // 7: google.protobuf.Duration
+	(TxIsolationLevel)(0),         // 5: stroppy.TxIsolationLevel
+	(*durationpb.Duration)(nil),   // 6: google.protobuf.Duration
 }
 var file_proto_stroppy_runtime_proto_depIdxs = []int32{
 	4, // 0: stroppy.DriverQuery.params:type_name -> stroppy.Value
-	5, // 1: stroppy.DriverQuery.method:type_name -> stroppy.InsertMethod
-	0, // 2: stroppy.DriverTransaction.queries:type_name -> stroppy.DriverQuery
-	6, // 3: stroppy.DriverTransaction.isolation_level:type_name -> stroppy.TxIsolationLevel
-	7, // 4: stroppy.DriverQueryStat.exec_duration:type_name -> google.protobuf.Duration
-	2, // 5: stroppy.DriverTransactionStat.queries:type_name -> stroppy.DriverQueryStat
-	7, // 6: stroppy.DriverTransactionStat.exec_duration:type_name -> google.protobuf.Duration
-	6, // 7: stroppy.DriverTransactionStat.isolation_level:type_name -> stroppy.TxIsolationLevel
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	0, // 1: stroppy.DriverTransaction.queries:type_name -> stroppy.DriverQuery
+	5, // 2: stroppy.DriverTransaction.isolation_level:type_name -> stroppy.TxIsolationLevel
+	6, // 3: stroppy.DriverQueryStat.exec_duration:type_name -> google.protobuf.Duration
+	2, // 4: stroppy.DriverTransactionStat.queries:type_name -> stroppy.DriverQueryStat
+	6, // 5: stroppy.DriverTransactionStat.exec_duration:type_name -> google.protobuf.Duration
+	5, // 6: stroppy.DriverTransactionStat.isolation_level:type_name -> stroppy.TxIsolationLevel
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_runtime_proto_init() }
@@ -329,7 +316,6 @@ func file_proto_stroppy_runtime_proto_init() {
 	}
 	file_proto_stroppy_common_proto_init()
 	file_proto_stroppy_descriptor_proto_init()
-	file_proto_stroppy_runtime_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
