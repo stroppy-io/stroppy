@@ -36,7 +36,7 @@ Useful env overrides:
 
 1. `drop_schema` — drops all nine tables if present.
 2. `create_schema` — applies `{pg,mysql,pico,ydb}.sql`.
-3. `populate` — seeds `warehouse`, `district`, `customer`, `item`, `stock`,
+3. `load_data` — seeds `warehouse`, `district`, `customer`, `item`, `stock`,
    `orders`, `order_line`, `new_order` via `driver.insertSpec`. `history`
    stays empty (spec §4.3.4 initial cardinality = 0).
 4. *(workload)* — k6 iterations run the standard 45/43/4/4/4 New-Order /

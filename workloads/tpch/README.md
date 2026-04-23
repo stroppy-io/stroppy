@@ -23,7 +23,7 @@ Useful env overrides:
 
 1. `drop_schema` — drops all eight tables if present.
 2. `create_schema` — applies `pg.sql`.
-3. `populate` — seeds `region`, `nation`, `part`, `supplier`, `partsupp`,
+3. `load_data` — seeds `region`, `nation`, `part`, `supplier`, `partsupp`,
    `customer`, `orders`, `lineitem` via `driver.insertSpec`. Orders ↔
    lineitem is a Relationship with `Uniform(1, 7)` degree; part ↔ partsupp
    is fixed fan-out of 4 via hash-derived sibling suppkeys.
