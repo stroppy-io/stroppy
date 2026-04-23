@@ -31,8 +31,9 @@ type schedule struct {
 }
 
 // Registry answers Draw/Live queries for a set of compiled Cohort
-// schedules. It is not safe for concurrent use; parallel workers build
-// their own Registry from the same protos.
+// schedules. A single registry is single-owner: its per-schedule
+// slotCache is not guarded. Parallel workers must each get their own
+// registry via CloneRegistry — runtime clones do so unconditionally.
 type Registry struct {
 	schedules map[string]*schedule
 	rootSeed  uint64
@@ -72,6 +73,40 @@ func New(cohorts []*dgproto.Cohort, rootSeed uint64, cacheSize int) (*Registry, 
 	}
 
 	return reg, nil
+}
+
+// CloneRegistry returns an independent registry that shares the read-only
+// schedule metadata (name, entity range, seed salt, persistence params)
+// with the receiver but owns fresh per-schedule slot caches. The
+// original registry is unaffected.
+//
+// Purpose: give every parallel worker its own cache state so writes
+// through the LRU do not race with sibling workers. Cache capacity is
+// preserved per-clone — each clone's LRU is the same size as the
+// source's, not a fraction of it.
+func (r *Registry) CloneRegistry() *Registry {
+	clone := &Registry{
+		schedules: make(map[string]*schedule, len(r.schedules)),
+		rootSeed:  r.rootSeed,
+		cacheSize: r.cacheSize,
+	}
+
+	for name, src := range r.schedules {
+		clone.schedules[name] = &schedule{
+			name:             src.name,
+			cohortSize:       src.cohortSize,
+			entityMin:        src.entityMin,
+			entityMax:        src.entityMax,
+			span:             src.span,
+			activeEvery:      src.activeEvery,
+			persistenceMod:   src.persistenceMod,
+			persistenceRatio: src.persistenceRatio,
+			seedSalt:         src.seedSalt,
+			cache:            newSlotCache(src.cache.cap),
+		}
+	}
+
+	return clone
 }
 
 // Has reports whether the registry hosts a schedule by the given name.
