@@ -45,10 +45,8 @@ type (
 	}
 
 	Driver interface {
-		InsertValues(ctx context.Context, unit *stroppy.InsertDescriptor) (*stats.Query, error)
 		// InsertSpec runs a relational InsertSpec through the driver, streaming
-		// rows from a dgproto-driven runtime.Runtime into the database. Drivers
-		// that do not yet support the relational path return ErrInsertSpecNotImplemented.
+		// rows from a dgproto-driven runtime.Runtime into the database.
 		InsertSpec(ctx context.Context, spec *dgproto.InsertSpec) (*stats.Query, error)
 		RunQuery(ctx context.Context, sql string, args map[string]any) (*QueryResult, error)
 		Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (Tx, error)

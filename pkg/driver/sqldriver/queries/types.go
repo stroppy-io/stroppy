@@ -1,14 +1,5 @@
 package queries
 
-import (
-	"github.com/stroppy-io/stroppy/pkg/common/generate"
-)
-
-type (
-	GeneratorID = string
-	Generators  = map[GeneratorID]generate.ValueGenerator
-)
-
 // Dialect abstracts database-specific SQL differences for database/sql drivers.
 type Dialect interface {
 	// Placeholder returns the SQL placeholder for the given 0-based parameter index.

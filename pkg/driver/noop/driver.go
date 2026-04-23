@@ -12,7 +12,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
@@ -65,28 +64,9 @@ func NewDriver(opts driver.Options) *Driver {
 	}
 }
 
-func (d *Driver) InsertValues(
-	ctx context.Context,
-	descriptor *stroppy.InsertDescriptor,
-) (*stats.Query, error) {
-	builder, err := queries.NewQueryBuilder(
-		d.logger,
-		d.dialect,
-		generate.ResolveSeed(descriptor.GetSeed()),
-		descriptor,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("can't create query builder: %w", err)
-	}
-
-	// All insert methods map to plain_bulk: exercises full data generation,
-	// discards the final ExecContext call.
-	return sqldriver.InsertPlainBulk(ctx, d.conn, builder, d.bulkSize)
-}
-
 // InsertSpec drains a relational runtime end-to-end and discards the rows.
-// Like InsertValues it exercises the full generation pipeline so benchmarks
-// stay comparable, but no I/O is performed.
+// Exercises the full generation pipeline so benchmarks stay comparable, but
+// no I/O is performed.
 func (d *Driver) InsertSpec(
 	_ context.Context,
 	spec *dgproto.InsertSpec,

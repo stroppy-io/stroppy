@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"database/sql"
 	godriver "database/sql/driver"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -14,16 +13,12 @@ import (
 	gomysql "github.com/go-sql-driver/mysql"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
-	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
-
-var ErrUnsupportedInsertMethod = errors.New("unsupported insert method for mysql driver")
 
 func init() {
 	driver.RegisterDriver(
@@ -212,36 +207,6 @@ func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) 
 		d.dialect,
 		d.logger,
 	), nil
-}
-
-func (d *Driver) InsertValues(
-	ctx context.Context,
-	descriptor *stroppy.InsertDescriptor,
-) (*stats.Query, error) {
-	builder, err := queries.NewQueryBuilder(
-		d.logger,
-		d.dialect,
-		generate.ResolveSeed(descriptor.GetSeed()),
-		descriptor,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("can't create query builder: %w", err)
-	}
-
-	switch descriptor.GetMethod() {
-	case stroppy.InsertMethod_PLAIN_QUERY:
-		return sqldriver.InsertPlainQuery(ctx, d.db, builder)
-	case stroppy.InsertMethod_PLAIN_BULK:
-		return sqldriver.InsertPlainBulk(ctx, d.db, builder, d.bulkSize)
-	case stroppy.InsertMethod_NATIVE:
-		return nil, fmt.Errorf("%w: NATIVE", ErrUnsupportedInsertMethod)
-	default:
-		return nil, fmt.Errorf(
-			"%w: %s",
-			ErrUnsupportedInsertMethod,
-			descriptor.GetMethod().String(),
-		)
-	}
 }
 
 func (d *Driver) RunQuery(
