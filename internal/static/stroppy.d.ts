@@ -5,11 +5,8 @@ import type {
   GlobalConfig,
   UnitDescriptor,
   DriverTransactionStat,
-  InsertDescriptor,
   InsertSpec,
   DriverConfig,
-  Generation_Rule,
-  QueryParamGroup,
   DateTime,
 } from "./stroppy.pb.js";
 
@@ -63,8 +60,6 @@ declare module "k6/x/stroppy" {
   // Driver interface - provides database operations.
   // All methods throw on error (Go errors become JS exceptions via sobek).
   export interface Driver {
-    /** @throws {Error} on insert failure or protobuf unmarshal error */
-    insertValuesBin(insert: BinMsg<InsertDescriptor>): QueryStats;
     /** Run a relational InsertSpec through the driver. The TS wrapper handles
      *  marshalling; JS code never constructs the binary directly.
      *  @throws {Error} on insert failure or protobuf unmarshal error */
@@ -80,23 +75,10 @@ declare module "k6/x/stroppy" {
     setup(configBin: BinMsg<DriverConfig>): void;
   }
 
-  // Generator interface - provides data generation
-  export interface Generator {
-    next(): any;
-  }
-
   // k6 module functions provided by Go module
   export declare function NotifyStep(name: String, status: number): void;
   export declare function Teardown(): Error;
   export declare function NewDriver(): Driver;
-  export declare function NewGeneratorByRuleBin(
-    seed: number,
-    rule: BinMsg<Generation_Rule>,
-  ): Generator;
-  export declare function NewGroupGeneratorByRulesBin(
-    seed: number,
-    rule: BinMsg<QueryParamGroup>,
-  ): Generator;
 
   export interface Picker {
     pick(array: any[]): any;

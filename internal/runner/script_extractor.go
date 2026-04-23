@@ -323,17 +323,6 @@ func (*rowsStub) ReadAll(int) [][]any { return [][]any{{int64(0)}} }
 func (*rowsStub) Err() error          { return nil }
 func (*rowsStub) Close() error        { return nil }
 
-type genStub struct{}
-
-// Next returns a non-nil numeric value so TS loops like
-// `for (i=1; i<=ol_cnt; i++)` actually iterate at least once, giving the
-// probe a chance to register SQL queries that live inside those loops.
-func (*genStub) Next() any { return int64(1) }
-
-type groupGenStub struct{}
-
-func (*groupGenStub) Next() any { return []any{} }
-
 // drawStub mirrors the sobek-bound Drawer contract (Sample/Next/Seek/Reset)
 // for the probe VM. Every NewDrawX factory returns one of these. Values
 // are stable non-zero placeholders — enough for workload init code that
@@ -429,8 +418,6 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 
 		// k6/x/stroppy defines
 		{"NewDriver", newDriverStub},
-		{"NewGeneratorByRuleBin", func() any { return &genStub{} }},
-		{"NewGroupGeneratorByRulesBin", func() any { return &groupGenStub{} }},
 		{"Teardown", func(any) {}},
 		{"NotifyStep", notifyStepSpy(&probeprint.Steps)},
 		// TODO: research. Some esbuild name resolution artifact, probably
