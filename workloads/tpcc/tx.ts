@@ -91,6 +91,7 @@ const tpccStockLevelDuration  = new Trend("tpcc_stock_level_duration", true);
 // TPC-C Configuration Constants
 const POOL_SIZE   = ENV("POOL_SIZE", 100, "Connection pool size");
 const WAREHOUSES  = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
+const LOAD_WORKERS = ENV("LOAD_WORKERS", 0, "Load-time worker count per spec (0 = framework default)") as number;
 // T2.3: how many attempts the retry helper makes before giving up on a
 // serialization failure. 3 = original try + 2 retries; immediate, no sleep.
 // Override via -e RETRY_ATTEMPTS=N for benchmarking the isolation tradeoff.
@@ -339,6 +340,7 @@ function warehouseSpec() {
     size: WAREHOUSES,
     seed: SEED_WAREHOUSE,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       w_id:       Attr.rowId(),
       w_name:     asciiRange(6, 10),
@@ -363,6 +365,7 @@ function districtSpec() {
     size: TOTAL_DISTRICTS,
     seed: SEED_DISTRICT,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       d_id:        dId,
       d_w_id:      dWId,
@@ -399,6 +402,7 @@ function customerSpec() {
     size: WAREHOUSES * perWh,
     seed: SEED_CUSTOMER,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       c_id:           cId,
       c_d_id:         cDId,
@@ -436,6 +440,7 @@ function itemSpec() {
     size: ITEMS_PER_WH,
     seed: SEED_ITEM,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       i_id:    Attr.rowId(),
       i_im_id: Draw.intUniform({ min: Expr.lit(1), max: Expr.lit(10_000) }),
@@ -474,6 +479,7 @@ function stockSpec() {
     size: TOTAL_STOCK,
     seed: SEED_STOCK,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs,
   });
 }
@@ -534,6 +540,7 @@ function ordersSpec() {
     size: WAREHOUSES * perWh,
     seed: SEED_ORDERS,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       o_id:         oId,
       o_d_id:       oDId,
@@ -586,6 +593,7 @@ function orderLineSpec() {
     size: WAREHOUSES * perDWh,
     seed: SEED_ORDER_LINE,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       ol_o_id:        olOId,
       ol_d_id:        olDId,
@@ -618,6 +626,7 @@ function newOrderSpec() {
     size: WAREHOUSES * perWh,
     seed: SEED_NEW_ORDER,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       no_o_id: noOId,
       no_d_id: noDId,
