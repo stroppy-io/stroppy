@@ -22,6 +22,7 @@ import {
   DriverConfig_DriverType,
   DriverConfig_PostgresConfig,
   DriverConfig_SqlConfig,
+  InsertMethod,
   StroppyRun_Status,
   TxIsolationLevel,
 } from "./stroppy.pb.js";
@@ -91,6 +92,14 @@ const txIsolationMap: Record<TxIsolationName, TxIsolationLevel> = {
   serializable: TxIsolationLevel.SERIALIZABLE,
   conn: TxIsolationLevel.CONNECTION_ONLY,
   none: TxIsolationLevel.NONE,
+};
+
+export type InsertMethodName = "plain_query" | "plain_bulk" | "native";
+
+const insertMethodMap: Record<InsertMethodName, InsertMethod> = {
+  plain_query: InsertMethod.PLAIN_QUERY,
+  plain_bulk: InsertMethod.PLAIN_BULK,
+  native: InsertMethod.NATIVE,
 };
 
 const insertMetric = new Trend("insert_duration", true);
@@ -311,6 +320,10 @@ export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode" | "driverType"
   errorMode?: ErrorModeName;
   driverType?: DriverTypeName;
   defaultTxIsolation?: TxIsolationName;
+  /** Driver-level insert method; pins every InsertSpec's method when set.
+   *  Useful for cross-DB raw-insert comparison. Per-spec method field is
+   *  overridden when this is set. */
+  defaultInsertMethod?: InsertMethodName;
   /** Unified pool config — mapped to postgres:{} or sql:{} based on driverType. */
   pool?: PoolConfig;
   /** PostgreSQL-specific pool config (takes priority over pool if set). */
@@ -383,6 +396,7 @@ export function declareDriverSetup(index: number, defaults: DriverSetup): Driver
   if (cli.driverType          !== undefined) merged.driverType          = cli.driverType          as DriverTypeName;
   if (cli.url                 !== undefined) merged.url                 = cli.url;
   if (cli.defaultTxIsolation  !== undefined) merged.defaultTxIsolation  = cli.defaultTxIsolation  as TxIsolationName;
+  if (cli.defaultInsertMethod !== undefined) merged.defaultInsertMethod = cli.defaultInsertMethod as InsertMethodName;
   if (cli.errorMode           !== undefined) merged.errorMode           = cli.errorMode           as ErrorModeName;
   if (cli.pool                !== undefined) merged.pool                = cli.pool;
   if (cli.postgres            !== undefined) merged.postgres            = cli.postgres;
@@ -405,6 +419,7 @@ export class DriverX implements QueryAPI {
   private q: QueryAPI;
   private _errorMode: ErrorModeName = "log";
   private _defaultTxIsolation: TxIsolationName = "db_default";
+  private _defaultInsertMethod?: InsertMethodName;
 
   exec!: QueryAPI["exec"];
   queryRows!: QueryAPI["queryRows"];
@@ -445,9 +460,13 @@ export class DriverX implements QueryAPI {
     if (config.defaultTxIsolation) {
       this._defaultTxIsolation = config.defaultTxIsolation;
     }
+    // Resolve default insert method (pins every InsertSpec when set).
+    if (config.defaultInsertMethod) {
+      this._defaultInsertMethod = config.defaultInsertMethod;
+    }
     // Convert DriverSetup to proto DriverConfig
     const resolved = resolvePoolConfig(config);
-    const { postgres: _pg, sql: _sql, pool: _pool, defaultTxIsolation: _dti, ...rest } = config;
+    const { postgres: _pg, sql: _sql, pool: _pool, defaultTxIsolation: _dti, defaultInsertMethod: _dim, ...rest } = config;
     const postgres = resolved.postgres;
     const sql = resolved.sql;
     const driverSpecific: DriverConfig["driverSpecific"] = postgres
@@ -474,10 +493,16 @@ export class DriverX implements QueryAPI {
     const table = spec.table ?? "unknown";
     const metricTags = { table_name: table };
 
+    // Driver-level default pins every InsertSpec's method when set, so
+    // cross-DB runs exercise the same protocol for fair comparison.
+    const effectiveSpec = this._defaultInsertMethod !== undefined
+      ? { ...spec, method: insertMethodMap[this._defaultInsertMethod] }
+      : spec;
+
     console.log(`InsertSpec into '${table}' starting...`);
 
     try {
-      const protoBytes = DatagenInsertSpec.toBinary(DatagenInsertSpec.create(spec));
+      const protoBytes = DatagenInsertSpec.toBinary(DatagenInsertSpec.create(effectiveSpec));
       const stats = this.driver.insertSpecBin(protoBytes);
       insertErrRateMetric.add(0, metricTags);
       insertMetric.add(stats.elapsed.seconds() * 1000, metricTags);
