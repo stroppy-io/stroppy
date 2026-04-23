@@ -187,9 +187,11 @@ func (r *Runtime) Columns() []string {
 // Clone returns an independent Runtime that shares the compiled DAG,
 // column metadata, dict map, cohort registry, and (for relationship
 // runtimes) the immutable cumulativeRows profile with the receiver,
-// but owns a fresh scratch buffer, row counter, and block caches. The
-// shared fields are read-only after NewRuntime, so clones are safe to
-// run concurrently without locks.
+// but owns a fresh scratch buffer, row counter, block caches, and
+// lookup registry. The shared fields are read-only after NewRuntime,
+// so clones are safe to run concurrently without locks; the lookup
+// registry is cloned so each worker writes into its own LRU state
+// rather than racing on a shared map.
 //
 // A cloned Runtime starts at row 0; call SeekRow to position it at a
 // chunk boundary before iterating.
@@ -204,7 +206,7 @@ func (r *Runtime) Clone() *Runtime {
 		ctx: &evalContext{
 			scratch:          make(map[string]any, len(r.dag.Order)),
 			dicts:            r.ctx.dicts,
-			registry:         r.ctx.registry,
+			registry:         r.ctx.registry.CloneRegistry(),
 			rootSeed:         r.ctx.rootSeed,
 			iterPop:          r.ctx.iterPop,
 			cohorts:          r.ctx.cohorts,

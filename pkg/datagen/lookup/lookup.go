@@ -79,8 +79,10 @@ type cacheEntry struct {
 }
 
 // LookupRegistry routes Lookup reads to the right compiled LookupPop.
-// It owns one bounded LRU per population. Reads are not thread-safe;
-// the runtime serializes them per worker.
+// It owns one bounded LRU per population. A single registry is
+// single-owner: its caches and inFlight set are not guarded. Parallel
+// workers must each get their own registry via CloneRegistry — runtime
+// clones do so unconditionally.
 type LookupRegistry struct {
 	pops     map[string]*pop
 	dicts    map[string]*dgproto.Dict
@@ -122,6 +124,35 @@ func NewLookupRegistry(
 	}
 
 	return reg, nil
+}
+
+// CloneRegistry returns an independent registry that shares the read-only
+// DAG, population metadata, dict map, and root seed with the receiver,
+// but owns fresh per-pop caches and a fresh inFlight set. The original
+// registry is unaffected.
+//
+// Purpose: give every parallel worker its own cache/inFlight state so
+// writes through the LRU do not race with sibling workers. Cache
+// capacity is preserved per-clone — each clone's LRU is the same size
+// as the source's, not a fraction of it.
+func (r *LookupRegistry) CloneRegistry() *LookupRegistry {
+	clone := &LookupRegistry{
+		pops:     make(map[string]*pop, len(r.pops)),
+		dicts:    r.dicts, // read-only after NewLookupRegistry
+		inFlight: make(map[string]struct{}),
+		rootSeed: r.rootSeed,
+	}
+
+	for name, src := range r.pops {
+		clone.pops[name] = &pop{
+			name:  src.name,
+			size:  src.size,
+			dag:   src.dag, // DAG is read-only after compile
+			cache: newRowCache(src.cache.cap),
+		}
+	}
+
+	return clone
 }
 
 // SetRootSeed installs the InsertSpec seed so the registry can forward
