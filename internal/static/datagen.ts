@@ -1522,6 +1522,342 @@ function coerceExpr(v: PbExpr | number | bigint): PbExpr {
 
 export type NullSpec = PbNull;
 
+// -------- Namespace: DrawRT (tx-time draw, iter 2) --------
+
+/**
+ * SampleableDraw is the JS-visible surface returned by every DrawRT.xxx
+ * builder. Sobek binds the Go struct's Sample/Next/Seek/Reset methods
+ * as camelCased JS methods via k6's FieldNameMapper.
+ *
+ * Concurrency: one instance per VU. Do NOT share across VUs — the
+ * internal cursor is plain, not atomic.
+ */
+export interface SampleableDraw {
+  /** Stateless sample at (seed, key). Does not touch the cursor. */
+  sample(seed: number, key: number): any;
+  /** Value at current cursor; advances the cursor. */
+  next(): any;
+  /** Set the cursor to `key` (absolute). */
+  seek(key: number): void;
+  /** Reset the cursor to 0. */
+  reset(): void;
+}
+
+/** Coerce a Literal-arm Expr, number, or bigint to a numeric int64. */
+function coerceLitInt(v: PbExpr | number | bigint): number {
+  if (typeof v === "number") {
+    if (!Number.isInteger(v)) {
+      throw new Error(`datagen: DrawRT requires integer bound, got ${v}`);
+    }
+    return v;
+  }
+  if (typeof v === "bigint") {
+    return Number(v);
+  }
+  const kind = v.kind;
+  if (kind?.oneofKind !== "lit") {
+    throw new Error("datagen: DrawRT requires literal bound, got non-literal Expr");
+  }
+  const val = kind.lit.value;
+  if (val?.oneofKind === "int64") return Number(val.int64);
+  throw new Error(`datagen: DrawRT requires int literal, got ${val?.oneofKind}`);
+}
+
+/** Coerce a Literal-arm Expr, number, or bigint to a numeric float64. */
+function coerceLitFloat(v: PbExpr | number | bigint): number {
+  if (typeof v === "number") return v;
+  if (typeof v === "bigint") return Number(v);
+  const kind = v.kind;
+  if (kind?.oneofKind !== "lit") {
+    throw new Error("datagen: DrawRT requires literal bound, got non-literal Expr");
+  }
+  const val = kind.lit.value;
+  if (val?.oneofKind === "double") return val.double;
+  if (val?.oneofKind === "int64") return Number(val.int64);
+  throw new Error(`datagen: DrawRT requires numeric literal, got ${val?.oneofKind}`);
+}
+
+/**
+ * stroppyModule is the xk6air module namespace. We defer resolution
+ * until first use so datagen.ts can be imported under vitest
+ * (k6/x/stroppy is absent there); tests stub the module via
+ * tests/k6_stroppy_stub.ts before touching DrawRT.
+ */
+let stroppyModule: any | null = null;
+
+function getStroppyModule(): any {
+  if (stroppyModule !== null) return stroppyModule;
+  // Require rather than import so vitest can stub the module lazily.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  stroppyModule = require("k6/x/stroppy");
+  return stroppyModule;
+}
+
+/** Override the xk6air module import — unit-test seam only. */
+export function __setDrawRTStroppyModule(mod: unknown): void {
+  stroppyModule = mod;
+}
+
+/**
+ * Register an alphabet (AsciiRange list) with the Go handle registry.
+ * Returns an opaque uint64 handle suitable for DrawRT.ascii.
+ */
+function registerAlphabetHandle(alphabet: ReadonlyArray<{ min: number; max: number }>): number {
+  const holder: PbDrawAscii = {
+    minLen: Expr.lit(0),
+    maxLen: Expr.lit(0),
+    alphabet: alphabet.map((r) => ({ min: r.min, max: r.max } as PbAsciiRange)),
+  };
+  const bin = PbDrawAscii.toBinary(holder);
+  return getStroppyModule().RegisterAlphabet(bin);
+}
+
+/**
+ * Register a dict body with the Go handle registry under `name`.
+ * Returns an opaque uint64 handle suitable for DrawRT.dict / joint /
+ * phrase. `name` additionally enters the named-dict table used by
+ * DrawRT.grammar.
+ */
+function registerDictHandle(name: string, dict: PbDict): number {
+  const bin = PbDict.toBinary(dict);
+  return getStroppyModule().RegisterDict(name, bin);
+}
+
+/**
+ * Resolve a DictLike to a numeric dict handle. Accepts a DictRef
+ * (PbDict body or string key) and walks the pendingDicts registry to
+ * recover the PbDict if given by key.
+ */
+function dictToHandle(d: DictLike): number {
+  if (typeof d === "string") {
+    const pb = pendingDicts.get(d);
+    if (!pb) throw new Error(`datagen: DrawRT unknown dict key "${d}"`);
+    return registerDictHandle(d, pb);
+  }
+  // Inline PbDict: derive a stable name from its FNV content hash so
+  // duplicate registrations share a handle on the Go side (the
+  // sync.Map tolerates repeat writes for the same named key).
+  const key = dictKey(d);
+  return registerDictHandle(key, d);
+}
+
+/** Register a grammar with the Go handle registry. */
+function registerGrammarHandle(g: PbDrawGrammar): number {
+  const bin = PbDrawGrammar.toBinary(g);
+  return getStroppyModule().RegisterGrammar(bin);
+}
+
+/** Options accepted by DrawRT.normal. */
+export interface DrawRTNormalOpts {
+  screw?: number;
+}
+
+/** Options accepted by DrawRT.zipf. */
+export interface DrawRTZipfOpts {
+  exponent?: number;
+}
+
+/** Options accepted by DrawRT.nurand. */
+export interface DrawRTNURandOpts {
+  cSalt?: number | bigint;
+}
+
+/** Options accepted by DrawRT.decimal. */
+export interface DrawRTDecimalOpts {
+  scale: number;
+}
+
+/** Options accepted by DrawRT.dict / joint. */
+export interface DrawRTDictOpts {
+  weightSet?: string;
+}
+
+/** Options accepted by DrawRT.joint beyond its column argument. */
+export interface DrawRTJointOpts extends DrawRTDictOpts {}
+
+/** Options accepted by DrawRT.phrase. */
+export interface DrawRTPhraseOpts {
+  separator?: string;
+}
+
+/** Options accepted by DrawRT.grammar. */
+export interface DrawRTGrammarOpts {
+  rootDict: DictLike;
+  phrases?: Record<string, DictLike>;
+  leaves: Record<string, DictLike>;
+  minLen?: number;
+}
+
+/**
+ * DrawRT is the tx-time draw surface. Each builder resolves non-
+ * literal inputs once and hands the sobek-bound Go struct back to the
+ * caller, who calls .sample/.next/.seek/.reset. This path bypasses
+ * expr.Eval entirely for the hot loop.
+ */
+export const DrawRT = {
+  intUniform(
+    seed: number,
+    lo: PbExpr | number | bigint,
+    hi: PbExpr | number | bigint,
+  ): SampleableDraw {
+    return getStroppyModule().NewDrawIntUniform(seed, coerceLitInt(lo), coerceLitInt(hi));
+  },
+
+  floatUniform(
+    seed: number,
+    lo: PbExpr | number | bigint,
+    hi: PbExpr | number | bigint,
+  ): SampleableDraw {
+    return getStroppyModule().NewDrawFloatUniform(seed, coerceLitFloat(lo), coerceLitFloat(hi));
+  },
+
+  normal(
+    seed: number,
+    lo: PbExpr | number | bigint,
+    hi: PbExpr | number | bigint,
+    opts?: DrawRTNormalOpts,
+  ): SampleableDraw {
+    return getStroppyModule().NewDrawNormal(
+      seed,
+      coerceLitFloat(lo),
+      coerceLitFloat(hi),
+      opts?.screw ?? 0,
+    );
+  },
+
+  zipf(
+    seed: number,
+    lo: PbExpr | number | bigint,
+    hi: PbExpr | number | bigint,
+    opts?: DrawRTZipfOpts,
+  ): SampleableDraw {
+    return getStroppyModule().NewDrawZipf(
+      seed,
+      coerceLitInt(lo),
+      coerceLitInt(hi),
+      opts?.exponent ?? 0,
+    );
+  },
+
+  nurand(
+    seed: number,
+    a: Int64Like,
+    x: Int64Like,
+    y: Int64Like,
+    opts?: DrawRTNURandOpts,
+  ): SampleableDraw {
+    const cSalt = opts?.cSalt ?? 0;
+    return getStroppyModule().NewDrawNURand(
+      seed,
+      typeof a === "bigint" ? Number(a) : a,
+      typeof x === "bigint" ? Number(x) : x,
+      typeof y === "bigint" ? Number(y) : y,
+      typeof cSalt === "bigint" ? Number(cSalt) : cSalt,
+    );
+  },
+
+  bernoulli(seed: number, p: number): SampleableDraw {
+    return getStroppyModule().NewDrawBernoulli(seed, p);
+  },
+
+  date(seed: number, minDate: Date, maxDate: Date): SampleableDraw {
+    return getStroppyModule().NewDrawDate(seed, dateToDays(minDate), dateToDays(maxDate));
+  },
+
+  decimal(
+    seed: number,
+    lo: PbExpr | number | bigint,
+    hi: PbExpr | number | bigint,
+    opts: DrawRTDecimalOpts,
+  ): SampleableDraw {
+    return getStroppyModule().NewDrawDecimal(
+      seed,
+      coerceLitFloat(lo),
+      coerceLitFloat(hi),
+      opts.scale,
+    );
+  },
+
+  ascii(
+    seed: number,
+    minLen: number,
+    maxLen: number,
+    alphabet?: ReadonlyArray<{ min: number; max: number }>,
+  ): SampleableDraw {
+    const handle = registerAlphabetHandle(alphabet ?? Alphabet.en);
+    return getStroppyModule().NewDrawASCII(seed, minLen, maxLen, handle);
+  },
+
+  dict(seed: number, d: DictLike, opts?: DrawRTDictOpts): SampleableDraw {
+    return getStroppyModule().NewDrawDict(seed, dictToHandle(d), opts?.weightSet ?? "");
+  },
+
+  joint(seed: number, d: DictLike, column: string, opts?: DrawRTJointOpts): SampleableDraw {
+    return getStroppyModule().NewDrawJoint(
+      seed,
+      dictToHandle(d),
+      column,
+      opts?.weightSet ?? "",
+    );
+  },
+
+  phrase(
+    seed: number,
+    vocab: DictLike,
+    minW: number,
+    maxW: number,
+    opts?: DrawRTPhraseOpts,
+  ): SampleableDraw {
+    return getStroppyModule().NewDrawPhrase(
+      seed,
+      dictToHandle(vocab),
+      minW,
+      maxW,
+      opts?.separator ?? " ",
+    );
+  },
+
+  grammar(seed: number, maxLen: number, opts: DrawRTGrammarOpts): SampleableDraw {
+    // Register the root + phrase + leaf dicts under stable names so
+    // the Go grammar walker can resolve them by name.
+    const rootKey = resolveDictKey(opts.rootDict);
+    const rootPb = pendingDicts.get(rootKey);
+    if (!rootPb) throw new Error(`datagen: DrawRT.grammar unknown rootDict "${rootKey}"`);
+    registerDictHandle(rootKey, rootPb);
+
+    const phraseKeys: Record<string, string> = {};
+    if (opts.phrases) {
+      for (const [letter, d] of Object.entries(opts.phrases)) {
+        const k = resolveDictKey(d);
+        const pb = pendingDicts.get(k);
+        if (!pb) throw new Error(`datagen: DrawRT.grammar unknown phrase dict "${k}"`);
+        registerDictHandle(k, pb);
+        phraseKeys[letter] = k;
+      }
+    }
+
+    const leafKeys: Record<string, string> = {};
+    for (const [letter, d] of Object.entries(opts.leaves)) {
+      const k = resolveDictKey(d);
+      const pb = pendingDicts.get(k);
+      if (!pb) throw new Error(`datagen: DrawRT.grammar unknown leaf dict "${k}"`);
+      registerDictHandle(k, pb);
+      leafKeys[letter] = k;
+    }
+
+    const grammarPb: PbDrawGrammar = {
+      rootDict: rootKey,
+      phrases: phraseKeys,
+      leaves: leafKeys,
+      maxLen: Expr.lit(maxLen),
+      minLen: opts.minLen !== undefined ? Expr.lit(opts.minLen) : undefined,
+    };
+    const handle = registerGrammarHandle(grammarPb);
+
+    return getStroppyModule().NewDrawGrammar(seed, handle, opts.minLen ?? 0, maxLen);
+  },
+};
+
 // -------- Convenience re-exports of enums commonly used in workload code --------
 
 export { InsertMethod, RowIndex_Kind };
