@@ -1,12 +1,13 @@
 import { Options } from "k6/options";
 import { sleep } from "k6";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { Counter, Trend, AB, R, Step, DriverX, ENV, Dist, TxIsolationName, declareDriverSetup, retry, isSerializationError } from "./helpers.ts";
+import { Counter, Trend, Step, DriverX, ENV, TxIsolationName, declareDriverSetup, retry, isSerializationError } from "./helpers.ts";
 import {
   Alphabet,
   Attr,
   Dict,
   Draw,
+  DrawRT,
   Expr,
   InsertMethod as DatagenInsertMethod,
   Rel,
@@ -131,12 +132,29 @@ const ITEMS = 100000;
 const TOTAL_DISTRICTS = WAREHOUSES * DISTRICTS_PER_WAREHOUSE;
 const TOTAL_STOCK     = WAREHOUSES * ITEMS;
 
+declare const __VU: number;
+
+// Per-VU seed for tx-time draws. Each slot name hashes to a distinct
+// offset so concurrent VUs draw independent sequences. The VU guard
+// matches the pattern used further down in the file (see `_vu` in the
+// hid_counter block) — the probe VM runs without k6 and reports
+// undefined, so we coerce that case to 0.
+const seedOf = (slot: string): number => {
+  let h = 0;
+  for (let i = 0; i < slot.length; i++) h = (h * 131 + slot.charCodeAt(i)) | 0;
+  const vu = (typeof __VU === "number" && __VU > 0) ? __VU : 0;
+  return (vu * 0x9e3779b9) ^ (h >>> 0);
+};
+
 // Runtime NURand(255, 0, 999) picker used by the by-name branch of
 // Payment and Order-Status (§2.5.1.2 / §2.6.1.2). Module-scoped so the
 // NURand C constant is chosen once for the whole run — mirrors how the
 // existing nurand1023 / nurand8191 pickers are scoped. Indexes into
 // C_LAST_DICT (3-syllable cartesian, §4.3.2.3) populated by the load phase.
-const nurand255Gen = R.int32(0, 999, Dist.nurand(255, "run")).gen();
+// cSalt=0 yields the spec-compliant deterministic-default C via
+// splitmix64(0); pass per run-scope since the salt is constant for
+// this process.
+const nurand255Gen = DrawRT.nurand(seedOf("nurand255"), 255, 0, 999);
 
 // K6 options — weighted dispatch inside default(), VUs/duration set via CLI or k6 defaults.
 // T3.2: k6 thresholds on the per-tx Trend metrics auto-fail the run if any
@@ -211,7 +229,6 @@ const sql = parse_sql_with_sections(open(SQL_FILE));
 // TPC-C spec, but picodata/ydb require one, so we add h_id to all dialects
 // and generate it client-side. o_id is NOT a counter — we read d_next_o_id
 // from district at the start of each new_order tx (see below).
-declare const __VU: number;
 const _vu = (typeof __VU === "number" && __VU > 0) ? __VU : 1;
 let hid_counter = _vu * 10_000_000;
 const nextHid = (): number => ++hid_counter;
@@ -225,7 +242,7 @@ const HOME_W_ID = 1 + ((_vu - 1) % WAREHOUSES);
 // Callers must guard with WAREHOUSES > 1; with a single warehouse there is
 // no valid remote target and the caller must fall back to HOME_W_ID.
 const _remoteWhGen = WAREHOUSES > 1
-  ? R.int32(1, WAREHOUSES - 1).gen()
+  ? DrawRT.intUniform(seedOf("remoteWh"), 1, WAREHOUSES - 1)
   : null;
 function pickRemoteWh(): number {
   if (_remoteWhGen === null) return HOME_W_ID;
@@ -851,16 +868,16 @@ export function setup() {
 //   - §2.4.2.2: read customer/warehouse/district → increment d_next_o_id →
 //               for each line: get item, get stock, update stock, insert OL.
 // =====================================================================
-const newordDIdGen      = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const newordCIdGen      = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023, "run")).gen();
-const newordOOlCntGen   = R.int32(5, 15).gen();
-const newordItemIdGen   = R.int32(1, ITEMS, Dist.nurand(8191, "run")).gen();
-const newordQuantityGen = R.int32(1, 10).gen();
+const newordDIdGen      = DrawRT.intUniform(seedOf("neword.d_id"), 1, DISTRICTS_PER_WAREHOUSE);
+const newordCIdGen      = DrawRT.nurand(seedOf("neword.c_id"), 1023, 1, CUSTOMERS_PER_DISTRICT);
+const newordOOlCntGen   = DrawRT.intUniform(seedOf("neword.ol_cnt"), 5, 15);
+const newordItemIdGen   = DrawRT.nurand(seedOf("neword.item_id"), 8191, 1, ITEMS);
+const newordQuantityGen = DrawRT.intUniform(seedOf("neword.quantity"), 1, 10);
 // Use int32(1, 100) + threshold compare rather than bool(0.01) so that the
 // seeded stream is deterministic and matches what the report compliance
 // checker expects (1% rollback, 1% remote).
-const newordRemoteLineGen = R.int32(1, 100).gen();  // <=1 ⇒ remote supply warehouse
-const newordRollbackGen   = R.int32(1, 100).gen();  // <=1 ⇒ force rollback via bogus i_id
+const newordRemoteLineGen = DrawRT.intUniform(seedOf("neword.remote_line"), 1, 100);  // <=1 ⇒ remote supply warehouse
+const newordRollbackGen   = DrawRT.intUniform(seedOf("neword.rollback"), 1, 100);     // <=1 ⇒ force rollback via bogus i_id
 
 function new_order() {
   tpccNewOrderTotal.add(1);
@@ -1070,15 +1087,15 @@ function new_order() {
 //               c_last picked via NURand(255, 0, 999) into C_LAST_DICT;
 //               c_id drawn via NURand(1023, 1, 3000).
 // =====================================================================
-const paymentDIdGen     = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const paymentCDIdGen    = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const paymentCIdGen     = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023, "run")).gen();
-const paymentHAmountGen = R.double(1, 5000).gen();
-const paymentHDataGen   = R.str(12, 24, AB.enSpc).gen();
+const paymentDIdGen     = DrawRT.intUniform(seedOf("payment.d_id"),  1, DISTRICTS_PER_WAREHOUSE);
+const paymentCDIdGen    = DrawRT.intUniform(seedOf("payment.c_d_id"), 1, DISTRICTS_PER_WAREHOUSE);
+const paymentCIdGen     = DrawRT.nurand(seedOf("payment.c_id"), 1023, 1, CUSTOMERS_PER_DISTRICT);
+const paymentHAmountGen = DrawRT.floatUniform(seedOf("payment.h_amount"), 1, 5000);
+const paymentHDataGen   = DrawRT.ascii(seedOf("payment.h_data"), 12, 24, Alphabet.enSpc);
 // 15% remote. <=15 on a uniform [1,100] gives 15% exactly.
-const paymentRemoteGen  = R.int32(1, 100).gen();
+const paymentRemoteGen  = DrawRT.intUniform(seedOf("payment.remote"), 1, 100);
 // 60% by-name. <=60 on a uniform [1,100].
-const paymentBynameGen  = R.int32(1, 100).gen();
+const paymentBynameGen  = DrawRT.intUniform(seedOf("payment.byname"), 1, 100);
 
 function payment() {
   tpccPaymentTotal.add(1);
@@ -1248,9 +1265,9 @@ function payment() {
 //   - §2.6.1.2: 60% by-name / 40% by-id. c_id ~ NURand(1023, 1, 3000);
 //               c_last via NURand(255, 0, 999) into C_LAST_DICT.
 // =====================================================================
-const ostatDIdGen    = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const ostatCIdGen    = R.int32(1, CUSTOMERS_PER_DISTRICT, Dist.nurand(1023, "run")).gen();
-const ostatBynameGen = R.int32(1, 100).gen();
+const ostatDIdGen    = DrawRT.intUniform(seedOf("ostat.d_id"), 1, DISTRICTS_PER_WAREHOUSE);
+const ostatCIdGen    = DrawRT.nurand(seedOf("ostat.c_id"), 1023, 1, CUSTOMERS_PER_DISTRICT);
+const ostatBynameGen = DrawRT.intUniform(seedOf("ostat.byname"), 1, 100);
 
 function order_status() {
   tpccOrderStatusTotal.add(1);
@@ -1335,7 +1352,7 @@ function order_status() {
 // Every ID and amount used below comes from a real SELECT inside the tx.
 //   - §2.7.1.1: w_id is the terminal's fixed home warehouse.
 // =====================================================================
-const deliveryOCarrierIdGen = R.int32(1, 10).gen();
+const deliveryOCarrierIdGen = DrawRT.intUniform(seedOf("delivery.o_carrier_id"), 1, 10);
 
 function delivery() {
   tpccDeliveryTotal.add(1);
@@ -1399,8 +1416,8 @@ function delivery() {
 //               d_id per terminal too, but uniform is closer to the
 //               populated-clients case.)
 // =====================================================================
-const slevDIdGen       = R.int32(1, DISTRICTS_PER_WAREHOUSE).gen();
-const slevThresholdGen = R.int32(10, 20).gen();
+const slevDIdGen       = DrawRT.intUniform(seedOf("slev.d_id"), 1, DISTRICTS_PER_WAREHOUSE);
+const slevThresholdGen = DrawRT.intUniform(seedOf("slev.threshold"), 10, 20);
 
 function stock_level() {
   tpccStockLevelTotal.add(1);
