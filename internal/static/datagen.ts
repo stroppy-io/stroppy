@@ -1588,8 +1588,17 @@ let stroppyModule: any | null = null;
 function getStroppyModule(): any {
   if (stroppyModule !== null) return stroppyModule;
   // Require rather than import so vitest can stub the module lazily.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  stroppyModule = require("k6/x/stroppy");
+  // If require() is absent or fails (e.g. the stroppy probe VM, which
+  // exposes the xk6air symbols as globals but has no module resolver),
+  // fall back to globalThis — the probe sets NewDriver, NewDrawX,
+  // RegisterDict, etc. on the global scope, which is exactly what the
+  // require() return value would otherwise expose.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    stroppyModule = require("k6/x/stroppy");
+  } catch (_e) {
+    stroppyModule = globalThis as unknown;
+  }
   return stroppyModule;
 }
 

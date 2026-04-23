@@ -1,10 +1,11 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { DriverX, R, Step, ENV, TxIsolationName, declareDriverSetup } from "./helpers.ts";
+import { DriverX, Step, ENV, TxIsolationName, declareDriverSetup } from "./helpers.ts";
 import {
   Alphabet,
   Attr,
   Draw,
+  DrawRT,
   Expr,
   InsertMethod as DatagenInsertMethod,
   Rel,
@@ -156,12 +157,25 @@ export function setup() {
   return;
 }
 
+// Per-VU seed for tx-time draws. Each slot name hashes to a distinct
+// offset so concurrent VUs draw independent sequences. __VU is 1-based
+// in k6; the probe pass (script metadata extraction) runs outside k6
+// so we guard with typeof to avoid a ReferenceError there.
+const _vuId = typeof __VU === "number" ? __VU : 0;
+const seedOf = (slot: string): number => {
+  let h = 0;
+  for (let i = 0; i < slot.length; i++) h = (h * 131 + slot.charCodeAt(i)) | 0;
+  return ((_vuId | 0) * 0x9e3779b9) ^ (h >>> 0);
+};
+
 // Generators for transaction parameters (per-VU runtime state; tx-level SQL
-// unchanged from the pre-datagen workload).
-const aidGen   = R.int32(1, ACCOUNTS).gen();
-const tidGen   = R.int32(1, TELLERS).gen();
-const bidGen   = R.int32(1, BRANCHES).gen();
-const deltaGen = R.int32(-5000, 5000).gen();
+// unchanged from the pre-datagen workload). Built at init scope because
+// DrawRT constructors resolve the xk6 stroppy module via require(), which
+// k6 only permits during init.
+const aidGen   = DrawRT.intUniform(seedOf("aid"),   1, ACCOUNTS);
+const tidGen   = DrawRT.intUniform(seedOf("tid"),   1, TELLERS);
+const bidGen   = DrawRT.intUniform(seedOf("bid"),   1, BRANCHES);
+const deltaGen = DrawRT.intUniform(seedOf("delta"), -5000, 5000);
 
 // Per-VU monotonic counter for history PK (uniform across all dialects).
 let hcounter = (typeof __VU === "number" ? __VU : 1) * 1_000_000_000;
