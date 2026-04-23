@@ -93,6 +93,7 @@ const POOL_SIZE = ENV("POOL_SIZE", 50, "Connection pool size");
 const SCALE_FACTOR = Number(
   ENV("SCALE_FACTOR", "1", "TPC-H scale factor; 0.01 supported for smoke tests"),
 );
+const LOAD_WORKERS = ENV("LOAD_WORKERS", 0, "Load-time worker count per spec (0 = framework default)") as number;
 
 if (!Number.isFinite(SCALE_FACTOR) || SCALE_FACTOR <= 0) {
   throw new Error(`SCALE_FACTOR must be a positive number, got ${SCALE_FACTOR}`);
@@ -263,6 +264,7 @@ function regionSpec() {
     size: N_REGION,
     seed: SEED_REGION,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       r_regionkey: Attr.rowIndex(),
       r_name: Attr.dictAt(regionsDict, Attr.rowIndex()),
@@ -276,6 +278,7 @@ function nationSpec() {
     size: N_NATION,
     seed: SEED_NATION,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       n_nationkey: Attr.rowIndex(),
       n_name: Attr.dictAt(nationsNameDict, Attr.rowIndex()),
@@ -291,6 +294,7 @@ function partSpec() {
     size: N_PART,
     seed: SEED_PART,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       p_partkey: Attr.rowId(),
       p_name: Draw.phrase({
@@ -315,6 +319,7 @@ function supplierSpec() {
     size: N_SUPPLIER,
     seed: SEED_SUPPLIER,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       s_suppkey: Attr.rowId(),
       s_name: Expr.concat(Expr.lit("Supplier#"), fmt9(Attr.rowId())),
@@ -354,6 +359,7 @@ function partSuppSpec() {
     size: N_PARTSUPP,
     seed: SEED_PARTSUPP,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       ps_partkey: partkey,
       ps_suppkey: suppkey,
@@ -369,6 +375,7 @@ function customerSpec() {
     size: N_CUSTOMER,
     seed: SEED_CUSTOMER,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       c_custkey: Attr.rowId(),
       c_name: Expr.concat(Expr.lit("Customer#"), fmt9(Attr.rowId())),
@@ -393,6 +400,7 @@ function ordersSpec() {
     size: N_ORDERS,
     seed: SEED_ORDERS,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       // Sparse orderkey per spec §4.2.3 / dbgen bm_utils.c; see
       // tpchOrderkey() for the formula. The lineitem spec derives
@@ -484,6 +492,7 @@ function lineitemSpec() {
     size: N_LINEITEM_EST,
     seed: SEED_LINEITEM,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     lookupPops: [ordersLookup, partLookup],
     relationships: [Rel.relationship("orders_lineitem", [ordersSide, lineitemSide])],
     iter: "orders_lineitem",

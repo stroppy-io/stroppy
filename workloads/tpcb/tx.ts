@@ -18,6 +18,7 @@ declare const __VU: number;
 // TPC-B Configuration Constants
 const SCALE_FACTOR = ENV(["SCALE_FACTOR", "BRANCHES"], 1, "TPC-B scale factor");
 const POOL_SIZE   = ENV("POOL_SIZE", 50, "Connection pool size");
+const LOAD_WORKERS = ENV("LOAD_WORKERS", 0, "Load-time worker count per spec (0 = framework default)") as number;
 
 const BRANCHES = SCALE_FACTOR;
 const TELLERS  = 10 * SCALE_FACTOR;
@@ -93,6 +94,7 @@ function branchesSpec() {
     size: BRANCHES,
     seed: SEED_BRANCHES,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       bid:      Attr.rowId(),
       bbalance: Expr.lit(0),
@@ -107,6 +109,7 @@ function tellersSpec() {
     size: TELLERS,
     seed: SEED_TELLERS,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       tid: Attr.rowId(),
       bid: Expr.add(
@@ -125,6 +128,7 @@ function accountsSpec() {
     size: ACCOUNTS,
     seed: SEED_ACCOUNTS,
     method: DatagenInsertMethod.NATIVE,
+    parallelism: LOAD_WORKERS || undefined,
     attrs: {
       aid: Attr.rowId(),
       bid: Expr.add(
