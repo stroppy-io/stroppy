@@ -80,25 +80,6 @@ func (d *DriverWrapper) RunQuery(sql string, args map[string]any) (*driver.Query
 	return result, nil
 }
 
-// InsertValuesBin starts bulk insert blocking operation on driver.
-func (d *DriverWrapper) InsertValuesBin(insertMsg []byte, count int64) (*stats.Query, error) {
-	d.ensureReady()
-
-	var descriptor stroppy.InsertDescriptor
-
-	err := proto.Unmarshal(insertMsg, &descriptor)
-	if err != nil {
-		return nil, fmt.Errorf("error while unmarshalling insert descriptor: %w", err)
-	}
-
-	result, err := d.drv.InsertValues(d.vu.Context(), &descriptor)
-	if err != nil {
-		return nil, fmt.Errorf("error while executing insert: %w", err)
-	}
-
-	return result, nil
-}
-
 // InsertSpecBin starts a relational bulk insert (InsertSpec) on the driver.
 // The argument is a serialised dgproto.InsertSpec — the TS wrapper handles
 // the marshal step so JS code never touches raw protobuf types.

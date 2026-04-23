@@ -4,8 +4,6 @@ import (
 	"sync"
 
 	"github.com/grafana/sobek"
-	"github.com/stroppy-io/stroppy/pkg/common/generate"
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/mysql"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/picodata"
@@ -45,15 +43,12 @@ func NewInstance(vu modules.VU) modules.Instance {
 }
 
 func (i *Instance) Exports() modules.Exports {
-	generate.NewValueGenerator(0, &stroppy.QueryParamDescriptor{})
 	return modules.Exports{
 		Default: i,
 		Named: map[string]any{
 			"NotifyStep":                  rootModule.NotifyStep,
 			"NewDriver":                   i.NewDriver,
 			"Teardown":                    rootModule.Teardown,
-			"NewGeneratorByRuleBin":       NewGeneratorByRuleBin,
-			"NewGroupGeneratorByRulesBin": NewGroupGeneratorByRulesBin,
 			"NewPicker":                   NewPicker,
 			"DeclareEnv":                  func([]string, string, string) {},
 			"Once":                        i.Once,
