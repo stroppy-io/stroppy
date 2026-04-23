@@ -61,7 +61,7 @@ const errorModeMap: Record<ErrorModeName, DriverConfig_ErrorMode> = {
   abort: DriverConfig_ErrorMode.ERROR_MODE_ABORT,
 };
 
-export type DriverTypeName = "postgres" | "mysql" | "picodata" | "ydb" | "noop";
+export type DriverTypeName = "postgres" | "mysql" | "picodata" | "ydb" | "noop" | "csv";
 
 const driverTypeMap: Record<DriverTypeName, DriverConfig_DriverType> = {
   postgres: DriverConfig_DriverType.DRIVER_TYPE_POSTGRES,
@@ -69,6 +69,7 @@ const driverTypeMap: Record<DriverTypeName, DriverConfig_DriverType> = {
   picodata: DriverConfig_DriverType.DRIVER_TYPE_PICODATA,
   ydb: DriverConfig_DriverType.DRIVER_TYPE_YDB,
   noop: DriverConfig_DriverType.DRIVER_TYPE_NOOP,
+  csv: DriverConfig_DriverType.DRIVER_TYPE_CSV,
 };
 
 const _envErrorMode = ENV("STROPPY_ERROR_MODE", undefined, 

@@ -508,6 +508,7 @@ It controls log levels and output formatting.
 | DRIVER_TYPE_PICODATA | 3 |  |
 | DRIVER_TYPE_YDB | 4 |  |
 | DRIVER_TYPE_NOOP | 5 |  |
+| DRIVER_TYPE_CSV | 6 |  |
 
 
 
