@@ -622,7 +622,7 @@ export function setup(): void {
     runSection("create_schema");
   });
 
-  Step("populate", () => {
+  Step("load_data", () => {
     driver.insertSpec(regionSpec());
     driver.insertSpec(nationSpec());
     driver.insertSpec(partSpec());

@@ -639,7 +639,7 @@ export function setup() {
   // an InsertSpec into the new datagen runtime via driver.insertSpec;
   // FK-friendly order (warehouse → district → customer → item → stock →
   // orders → order_line → new_order) matches the PG REFERENCES constraints.
-  Step("populate", () => {
+  Step("load_data", () => {
     driver.insertSpec(warehouseSpec());
     driver.insertSpec(districtSpec());
     driver.insertSpec(customerSpec());

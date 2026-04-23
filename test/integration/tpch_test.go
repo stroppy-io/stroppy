@@ -50,7 +50,7 @@ func TestTpchWorkloadEndToEnd(t *testing.T) {
 		"-D", "url="+url,
 		"-e", "SCALE_FACTOR=0.01",
 		"-e", "STROPPY_NO_DEFAULT=true",
-		"--steps", "drop_schema,create_schema,populate,set_logged,create_indexes,finalize_totals,queries",
+		"--steps", "drop_schema,create_schema,load_data,set_logged,create_indexes,finalize_totals,queries",
 	)
 	cmd.Dir = repoRoot
 	var stdout, stderr bytes.Buffer
@@ -531,7 +531,7 @@ func TestTpchAnswersSpotCheck(t *testing.T) {
 		"-D", "url="+url,
 		"-e", "SCALE_FACTOR=1",
 		"-e", "STROPPY_NO_DEFAULT=true",
-		"--steps", "drop_schema,create_schema,populate,set_logged,create_indexes,finalize_totals,validate_answers",
+		"--steps", "drop_schema,create_schema,load_data,set_logged,create_indexes,finalize_totals,validate_answers",
 	)
 	cmd.Dir = repoRoot
 	var stdout, stderr bytes.Buffer

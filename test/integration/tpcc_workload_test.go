@@ -61,7 +61,7 @@ func TestTpccWorkloadEndToEnd(t *testing.T) {
 		"-D", "url="+url,
 		"-e", "WAREHOUSES=1",
 		"-e", "STROPPY_NO_DEFAULT=true",
-		"--steps", "drop_schema,create_schema,populate",
+		"--steps", "drop_schema,create_schema,load_data",
 	)
 	cmd.Dir = repoRoot
 	var stdout, stderr bytes.Buffer
@@ -73,7 +73,7 @@ func TestTpccWorkloadEndToEnd(t *testing.T) {
 			err, stdout.String(), stderr.String())
 	}
 	loadElapsed := time.Since(start)
-	t.Logf("stroppy populate completed in %s", loadElapsed)
+	t.Logf("stroppy load_data completed in %s", loadElapsed)
 
 	if loadElapsed > 3*time.Minute {
 		t.Errorf("load took %s, exceeds the 3m WAREHOUSES=1 budget", loadElapsed)
