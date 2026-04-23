@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/grafana/sobek"
+	_ "github.com/stroppy-io/stroppy/pkg/driver/csv"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/mysql"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/picodata"
