@@ -2,12 +2,9 @@ package expr
 
 import (
 	"fmt"
-	"math"
 	"math/rand/v2"
-	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
 )
 
 // defaultNormalScrew is the fallback screw factor for DrawNormal when
@@ -138,7 +135,8 @@ func evalFloat64(ctx Context, e *dgproto.Expr) (float64, error) {
 	}
 }
 
-// drawIntUniform returns an int64 uniformly from [min, max] inclusive.
+// drawIntUniform evaluates sub-Expr bounds and forwards to
+// KernelIntUniform.
 func drawIntUniform(ctx Context, prng *rand.Rand, node *dgproto.DrawIntUniform) (any, error) {
 	if node == nil {
 		return nil, ErrBadDraw
@@ -149,14 +147,11 @@ func drawIntUniform(ctx Context, prng *rand.Rand, node *dgproto.DrawIntUniform) 
 		return nil, err
 	}
 
-	if lo > hi {
-		return nil, fmt.Errorf("%w: int_uniform min %d > max %d", ErrBadDraw, lo, hi)
-	}
-
-	return prng.Int64N(hi-lo+1) + lo, nil
+	return KernelIntUniform(prng, lo, hi)
 }
 
-// drawFloatUniform returns a float64 uniformly from [min, max).
+// drawFloatUniform evaluates sub-Expr bounds and forwards to
+// KernelFloatUniform.
 func drawFloatUniform(ctx Context, prng *rand.Rand, node *dgproto.DrawFloatUniform) (any, error) {
 	if node == nil {
 		return nil, ErrBadDraw
@@ -167,16 +162,10 @@ func drawFloatUniform(ctx Context, prng *rand.Rand, node *dgproto.DrawFloatUnifo
 		return nil, err
 	}
 
-	if lo >= hi {
-		return nil, fmt.Errorf("%w: float_uniform min %v >= max %v", ErrBadDraw, lo, hi)
-	}
-
-	return prng.Float64()*(hi-lo) + lo, nil
+	return KernelFloatUniform(prng, lo, hi)
 }
 
-// drawNormal returns a float64 drawn from a normal distribution with
-// mean = (min+max)/2 and stddev = (max-min)/(2*screw), clamped to the
-// range. screw=0 picks the default 3.0.
+// drawNormal evaluates sub-Expr bounds and forwards to KernelNormal.
 func drawNormal(ctx Context, prng *rand.Rand, node *dgproto.DrawNormal) (any, error) {
 	if node == nil {
 		return nil, ErrBadDraw
@@ -187,32 +176,10 @@ func drawNormal(ctx Context, prng *rand.Rand, node *dgproto.DrawNormal) (any, er
 		return nil, err
 	}
 
-	if lo >= hi {
-		return nil, fmt.Errorf("%w: normal min %v >= max %v", ErrBadDraw, lo, hi)
-	}
-
-	screw := float64(node.GetScrew())
-	if screw == 0 {
-		screw = defaultNormalScrew
-	}
-
-	mean := (lo + hi) / normalSpanDivisor
-	stddev := (hi - lo) / (normalSpanDivisor * screw)
-	value := prng.NormFloat64()*stddev + mean
-
-	if value < lo {
-		value = lo
-	}
-
-	if value > hi {
-		value = hi
-	}
-
-	return value, nil
+	return KernelNormal(prng, lo, hi, node.GetScrew())
 }
 
-// drawZipf returns an int64 drawn from a Zipf distribution over
-// [min, max]. Exponent defaults to 1.0 when the spec carries 0.
+// drawZipf evaluates sub-Expr bounds and forwards to KernelZipf.
 func drawZipf(ctx Context, prng *rand.Rand, node *dgproto.DrawZipf) (any, error) {
 	if node == nil {
 		return nil, ErrBadDraw
@@ -223,87 +190,28 @@ func drawZipf(ctx Context, prng *rand.Rand, node *dgproto.DrawZipf) (any, error)
 		return nil, err
 	}
 
-	if lo > hi {
-		return nil, fmt.Errorf("%w: zipf min %d > max %d", ErrBadDraw, lo, hi)
-	}
-
-	exponent := node.GetExponent()
-	if exponent == 0 {
-		exponent = defaultZipfExponent
-	}
-
-	if exponent <= 1 {
-		// rand.NewZipf requires s > 1; accept 1.0 as "mild skew" by
-		// nudging slightly. Arguments with <=1 exponents are treated as
-		// equivalent to a uniform-ish draw plus a bump.
-		exponent = 1 + zipfEpsilon
-	}
-
-	//nolint:gosec // evalInt64Pair already asserts hi >= lo ⇒ width >= 0.
-	width := uint64(hi - lo)
-
-	z := rand.NewZipf(prng, exponent, 1.0, width)
-	if z == nil {
-		return nil, fmt.Errorf("%w: zipf invalid params", ErrBadDraw)
-	}
-
-	//nolint:gosec // width-bounded Zipf value fits in int64 comfortably.
-	return int64(z.Uint64()) + lo, nil
+	return KernelZipf(prng, lo, hi, node.GetExponent())
 }
 
-// drawNURand implements the TPC-C §2.1.6 NURand(A, x, y) formula:
-//
-//	NURand(A, x, y) = (((rand(0, A) | rand(x, y)) + C) mod (y - x + 1)) + x
-//
-// C is derived once per (c_salt, A) via splitmix64 so that distinct
-// salts produce independent "hotspot" profiles. c_salt=0 yields a
-// deterministic well-known C that matches main's default.
+// drawNURand forwards to KernelNURand.
 func drawNURand(prng *rand.Rand, node *dgproto.DrawNURand) (any, error) {
 	if node == nil {
 		return nil, ErrBadDraw
 	}
 
-	// TPC-C §2.1.6 names the parameters A, x, y. We keep those names
-	// here to match the spec formula exactly.
-	paramA, lower, upper := node.GetA(), node.GetX(), node.GetY()
-	if paramA < 0 || lower < 0 || upper < lower {
-		return nil, fmt.Errorf("%w: nurand A=%d x=%d y=%d",
-			ErrBadDraw, paramA, lower, upper)
-	}
-
-	span := upper - lower + 1
-	//nolint:gosec // deterministic hash space, not crypto.
-	paramC := int64(seed.SplitMix64(node.GetCSalt())) & paramA
-
-	aDraw := prng.Int64N(paramA + 1)
-	yDraw := prng.Int64N(span) + lower
-
-	return ((aDraw|yDraw)+paramC)%span + lower, nil
+	return KernelNURand(prng, node.GetA(), node.GetX(), node.GetY(), node.GetCSalt())
 }
 
-// drawBernoulli returns int64(1) with probability p and int64(0)
-// otherwise. p must be in [0, 1].
+// drawBernoulli forwards to KernelBernoulli.
 func drawBernoulli(prng *rand.Rand, node *dgproto.DrawBernoulli) (any, error) {
 	if node == nil {
 		return nil, ErrBadDraw
 	}
 
-	p := node.GetP()
-	if p < 0 || p > 1 {
-		return nil, fmt.Errorf("%w: bernoulli p=%v", ErrBadDraw, p)
-	}
-
-	if prng.Float32() < p {
-		return int64(1), nil
-	}
-
-	return int64(0), nil
+	return KernelBernoulli(prng, node.GetP())
 }
 
-// drawDict picks one row of a scalar Dict and returns its first value.
-// An empty weight_set name selects the default profile (first declared
-// weight-set, if any) and falls back to a uniform draw when the dict
-// has no weights.
+// drawDict resolves the dict by key and forwards to KernelDict.
 func drawDict(ctx Context, prng *rand.Rand, node *dgproto.DrawDict) (any, error) {
 	if node == nil {
 		return nil, ErrBadDraw
@@ -314,27 +222,16 @@ func drawDict(ctx Context, prng *rand.Rand, node *dgproto.DrawDict) (any, error)
 		return nil, err
 	}
 
-	rows := dict.GetRows()
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("%w: empty dict %q", ErrBadDraw, node.GetDictKey())
-	}
-
-	idx, err := pickWeightedRow(prng, dict, node.GetWeightSet())
+	v, err := KernelDict(prng, dict, node.GetWeightSet())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: dict %q: %w", ErrBadDraw, node.GetDictKey(), err)
 	}
 
-	values := rows[idx].GetValues()
-	if len(values) == 0 {
-		return nil, fmt.Errorf("%w: dict %q row %d empty", ErrBadDraw, node.GetDictKey(), idx)
-	}
-
-	return values[0], nil
+	return v, nil
 }
 
-// drawJoint picks a row of a multi-column Dict and returns the named
-// column's value. tuple_scope is accepted but not yet used — D1 treats
-// every DrawJoint as an independent draw.
+// drawJoint resolves the dict by key, resolves the column index, and
+// forwards to KernelJoint.
 func drawJoint(ctx Context, prng *rand.Rand, node *dgproto.DrawJoint) (any, error) {
 	if node == nil {
 		return nil, ErrBadDraw
@@ -345,38 +242,18 @@ func drawJoint(ctx Context, prng *rand.Rand, node *dgproto.DrawJoint) (any, erro
 		return nil, err
 	}
 
-	colIdx := -1
-
-	for i, name := range dict.GetColumns() {
-		if name == node.GetColumn() {
-			colIdx = i
-
-			break
-		}
-	}
-
+	colIdx := LookupJointColumn(dict, node.GetColumn())
 	if colIdx < 0 {
 		return nil, fmt.Errorf("%w: joint dict %q has no column %q",
 			ErrBadDraw, node.GetDictKey(), node.GetColumn())
 	}
 
-	rows := dict.GetRows()
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("%w: empty dict %q", ErrBadDraw, node.GetDictKey())
-	}
-
-	rowIdx, err := pickWeightedRow(prng, dict, node.GetWeightSet())
+	v, err := KernelJoint(prng, dict, colIdx, node.GetWeightSet())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: joint dict %q: %w", ErrBadDraw, node.GetDictKey(), err)
 	}
 
-	values := rows[rowIdx].GetValues()
-	if colIdx >= len(values) {
-		return nil, fmt.Errorf("%w: joint dict %q row %d missing col %q",
-			ErrBadDraw, node.GetDictKey(), rowIdx, node.GetColumn())
-	}
-
-	return values[colIdx], nil
+	return v, nil
 }
 
 // pickWeightedRow returns a row index drawn by the named weight profile
@@ -434,27 +311,16 @@ func pickWeightedRow(prng *rand.Rand, dict *dgproto.Dict, weightSet string) (int
 	return len(rows) - 1, nil
 }
 
-// drawDate returns a time.Time at UTC midnight drawn uniformly from the
-// inclusive [min_days_epoch, max_days_epoch] range.
+// drawDate forwards to KernelDate.
 func drawDate(prng *rand.Rand, node *dgproto.DrawDate) (any, error) {
 	if node == nil {
 		return nil, ErrBadDraw
 	}
 
-	lo, hi := node.GetMinDaysEpoch(), node.GetMaxDaysEpoch()
-	if lo > hi {
-		return nil, fmt.Errorf("%w: date min %d > max %d", ErrBadDraw, lo, hi)
-	}
-
-	days := prng.Int64N(hi-lo+1) + lo
-
-	const secondsPerDay int64 = 86400
-
-	return time.Unix(days*secondsPerDay, 0).UTC(), nil
+	return KernelDate(prng, node.GetMinDaysEpoch(), node.GetMaxDaysEpoch())
 }
 
-// drawDecimal draws a float64 uniformly from [min, max] and rounds it
-// to `scale` fractional digits via half-away-from-zero rounding.
+// drawDecimal evaluates sub-Expr bounds and forwards to KernelDecimal.
 func drawDecimal(ctx Context, prng *rand.Rand, node *dgproto.DrawDecimal) (any, error) {
 	if node == nil {
 		return nil, ErrBadDraw
@@ -465,15 +331,7 @@ func drawDecimal(ctx Context, prng *rand.Rand, node *dgproto.DrawDecimal) (any, 
 		return nil, err
 	}
 
-	if lo > hi {
-		return nil, fmt.Errorf("%w: decimal min %v > max %v", ErrBadDraw, lo, hi)
-	}
-
-	raw := lo + prng.Float64()*(hi-lo)
-	factor := math.Pow(decimalBase, float64(node.GetScale()))
-	rounded := math.Round(raw*factor) / factor
-
-	return rounded, nil
+	return KernelDecimal(prng, lo, hi, node.GetScale())
 }
 
 // Text-producing arms (drawASCII, drawPhrase) live in stream_draw_text.go.
