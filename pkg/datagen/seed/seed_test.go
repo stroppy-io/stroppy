@@ -2,6 +2,7 @@ package seed_test
 
 import (
 	"math"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -180,4 +181,24 @@ func TestPRNG(t *testing.T) {
 			seen[seq] = k
 		}
 	})
+}
+
+func TestSeedPCG(t *testing.T) {
+	t.Parallel()
+
+	// SeedPCG must produce the exact same byte stream as seed.PRNG(key).
+	// If these diverge, the pooled Draw path has drifted from the single
+	// seed formula.
+	for _, key := range []uint64{0, 1, 0xDEADBEEF, math.MaxUint64} {
+		ref := seed.PRNG(key)
+		src := &rand.PCG{}
+		seed.SeedPCG(src, key)
+		reused := rand.New(src)
+
+		for i := 0; i < 8; i++ {
+			r := ref.Uint64()
+			u := reused.Uint64()
+			require.Equalf(t, r, u, "SeedPCG diverged at i=%d key=0x%016X", i, key)
+		}
+	}
 }

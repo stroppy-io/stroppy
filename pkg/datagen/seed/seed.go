@@ -46,6 +46,16 @@ func PRNG(key uint64) *rand.Rand {
 	return rand.New(rand.NewPCG(key, key^pcgStream2)) //nolint:gosec // deterministic datagen, not crypto
 }
 
+// SeedPCG re-seeds an existing PCG source with the same (key, key^stream2)
+// pair that PRNG uses to construct a fresh one. It is the only approved
+// way to reuse a PCG source across samples while preserving the single
+// seed composition (Derive → (key, key^stream2)). Callers who pool
+// *rand.Rand values must route through this helper rather than inlining
+// the stream constant themselves.
+func SeedPCG(src *rand.PCG, key uint64) {
+	src.Seed(key, key^pcgStream2)
+}
+
 // SplitMix64 is the splitmix64 bit-mixer (5 XORs + 2 multiplies).
 func SplitMix64(x uint64) uint64 {
 	x += smixGamma

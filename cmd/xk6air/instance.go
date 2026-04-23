@@ -57,6 +57,28 @@ func (i *Instance) Exports() modules.Exports {
 			"NewPicker":                   NewPicker,
 			"DeclareEnv":                  func([]string, string, string) {},
 			"Once":                        i.Once,
+
+			// Draw iter 2 — sobek-bound Go structs, one per StreamDraw arm.
+			// Handle registries for dict / alphabet / grammar are exposed
+			// so the TS DrawRT builders can resolve non-literal inputs
+			// once at init time and forward only numeric handles to the
+			// per-arm constructors.
+			"RegisterDict":       RegisterDict,
+			"RegisterAlphabet":   RegisterAlphabet,
+			"RegisterGrammar":    RegisterGrammar,
+			"NewDrawIntUniform":   NewDrawIntUniform,
+			"NewDrawFloatUniform": NewDrawFloatUniform,
+			"NewDrawNormal":       NewDrawNormal,
+			"NewDrawZipf":         NewDrawZipf,
+			"NewDrawNURand":       NewDrawNURand,
+			"NewDrawBernoulli":    NewDrawBernoulli,
+			"NewDrawDate":         NewDrawDate,
+			"NewDrawDecimal":      NewDrawDecimal,
+			"NewDrawASCII":        NewDrawASCII,
+			"NewDrawDict":         NewDrawDict,
+			"NewDrawJoint":        NewDrawJoint,
+			"NewDrawPhrase":       NewDrawPhrase,
+			"NewDrawGrammar":      NewDrawGrammar,
 		},
 	}
 }

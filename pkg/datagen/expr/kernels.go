@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
@@ -243,6 +245,179 @@ func LookupJointColumn(dict *dgproto.Dict, column string) int {
 	}
 
 	return -1
+}
+
+// KernelGrammar walks a pre-resolved DrawGrammar. `dicts` must contain
+// every dict the grammar references (root + phrases values + leaves
+// values). minLen / maxLen are already evaluated bounds. Seeding is
+// performed by the caller: `rootPRNG` is the first-level PRNG (used to
+// derive the per-attempt sub-streams via seed.Derive), matching the
+// semantics of evaluator drawGrammar at the cost of carrying a little
+// more knowledge about attempts into the kernel.
+func KernelGrammar(
+	rootPRNG *rand.Rand,
+	grammar *dgproto.DrawGrammar,
+	dicts map[string]*dgproto.Dict,
+	minLen, maxLen int64,
+) (string, error) {
+	if grammar == nil {
+		return "", ErrBadGrammar
+	}
+
+	if maxLen <= 0 {
+		return "", fmt.Errorf("%w: max_len %d must be > 0", ErrBadGrammar, maxLen)
+	}
+
+	if minLen < 0 {
+		return "", fmt.Errorf("%w: min_len %d must be >= 0", ErrBadGrammar, minLen)
+	}
+
+	if minLen > maxLen {
+		return "", fmt.Errorf("%w: min_len %d > max_len %d",
+			ErrBadGrammar, minLen, maxLen)
+	}
+
+	rootKey := rootPRNG.Uint64()
+
+	var last string
+
+	for attempt := 0; attempt < grammarMaxAttempts; attempt++ {
+		walkKey := seed.Derive(rootKey, "grammar", strconv.Itoa(attempt))
+		prng := seed.PRNG(walkKey)
+
+		out, err := walkGrammarResolved(prng, grammar, dicts)
+		if err != nil {
+			return "", err
+		}
+
+		last = truncateRunes(out, maxLen)
+		if int64(len([]rune(last))) >= minLen {
+			return last, nil
+		}
+	}
+
+	return last, nil
+}
+
+// walkGrammarResolved is the walker used by KernelGrammar. It mirrors
+// walkGrammar but reads dicts from the caller-supplied map instead of
+// a Context.
+func walkGrammarResolved(
+	prng *rand.Rand,
+	grammar *dgproto.DrawGrammar,
+	dicts map[string]*dgproto.Dict,
+) (string, error) {
+	rootDict, ok := dicts[grammar.GetRootDict()]
+	if !ok {
+		return "", fmt.Errorf("%w: root_dict %q missing", ErrBadGrammar, grammar.GetRootDict())
+	}
+
+	rootTemplate, err := pickTemplate(prng, rootDict, grammar.GetRootDict())
+	if err != nil {
+		return "", err
+	}
+
+	var out strings.Builder
+
+	for i, tok := range strings.Fields(rootTemplate) {
+		if i > 0 {
+			out.WriteByte(' ')
+		}
+
+		letter, isLetter := grammarLetter(tok)
+		if !isLetter {
+			out.WriteString(tok)
+
+			continue
+		}
+
+		if dictKey, phraseOK := grammar.GetPhrases()[letter]; phraseOK {
+			expanded, expErr := expandPhraseResolved(prng, grammar, dicts, dictKey, letter)
+			if expErr != nil {
+				return "", expErr
+			}
+
+			out.WriteString(expanded)
+
+			continue
+		}
+
+		leaf, leafErr := resolveLeafResolved(prng, grammar, dicts, letter)
+		if leafErr != nil {
+			return "", leafErr
+		}
+
+		out.WriteString(leaf)
+	}
+
+	return out.String(), nil
+}
+
+// expandPhraseResolved mirrors expandPhrase using the pre-resolved
+// dicts map.
+func expandPhraseResolved(
+	prng *rand.Rand,
+	grammar *dgproto.DrawGrammar,
+	dicts map[string]*dgproto.Dict,
+	phraseDictKey string,
+	letter string,
+) (string, error) {
+	dict, ok := dicts[phraseDictKey]
+	if !ok {
+		return "", fmt.Errorf("%w: phrase dict %q for %q missing",
+			ErrBadGrammar, phraseDictKey, letter)
+	}
+
+	template, err := pickTemplate(prng, dict, phraseDictKey)
+	if err != nil {
+		return "", err
+	}
+
+	var out strings.Builder
+
+	for i, tok := range strings.Fields(template) {
+		if i > 0 {
+			out.WriteByte(' ')
+		}
+
+		subLetter, ok := grammarLetter(tok)
+		if !ok {
+			out.WriteString(tok)
+
+			continue
+		}
+
+		leaf, leafErr := resolveLeafResolved(prng, grammar, dicts, subLetter)
+		if leafErr != nil {
+			return "", leafErr
+		}
+
+		out.WriteString(leaf)
+	}
+
+	return out.String(), nil
+}
+
+// resolveLeafResolved mirrors resolveLeaf using the pre-resolved dicts
+// map.
+func resolveLeafResolved(
+	prng *rand.Rand,
+	grammar *dgproto.DrawGrammar,
+	dicts map[string]*dgproto.Dict,
+	letter string,
+) (string, error) {
+	leafKey, ok := grammar.GetLeaves()[letter]
+	if !ok {
+		return "", fmt.Errorf("%w: unresolved letter %q", ErrBadGrammar, letter)
+	}
+
+	dict, ok := dicts[leafKey]
+	if !ok {
+		return "", fmt.Errorf("%w: leaf dict %q for %q missing",
+			ErrBadGrammar, leafKey, letter)
+	}
+
+	return pickTemplate(prng, dict, leafKey)
 }
 
 // KernelPhrase draws [minWords, maxWords] words uniformly from vocab
