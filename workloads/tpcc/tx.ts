@@ -386,7 +386,11 @@ function districtSpec() {
 //   c_w_id = r / 30_000 + 1 ∈ [1, W]
 //   c_d_id = (r / 3000) % 10 + 1 ∈ [1, 10]
 //   c_id   = r % 3000 + 1 ∈ [1, 3000]
-// c_last draws via NURand(A=255, x=0, y=999) into the flat 1000-entry dict.
+// Spec §4.3.2.3: first 1000 c_ids per district use sequential C_LAST indices
+// [0..999] so every name in the 1000-entry dict is guaranteed present in each
+// district; remaining 2000 draw via NURand(A=255, x=0, y=999). Without the
+// sequential prefix, by-name lookups at tx time (Payment / Order-Status) can
+// roll a c_last that no customer in (c_w_id, c_d_id) carries.
 // c_credit splits 1:9 BC/GC through Expr.choose.
 function customerSpec() {
   const perWh = CUSTOMERS_PER_DISTRICT * DISTRICTS_PER_WAREHOUSE; // 30_000
@@ -397,7 +401,11 @@ function customerSpec() {
   );
   const cId   = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(1));
   const lastNameDict = Dict.values(C_LAST_DICT);
-  const nurandIdx = Draw.nurand({ a: 255, x: 0, y: 999, cSalt: 0xC1A57 });
+  const cLastIdx = Expr.if(
+    Expr.le(cId, Expr.lit(C_LAST_DICT.length)),
+    Expr.sub(cId, Expr.lit(1)),
+    Draw.nurand({ a: 255, x: 0, y: 999, cSalt: 0xC1A57 }),
+  );
   return Rel.table("customer", {
     size: WAREHOUSES * perWh,
     seed: SEED_CUSTOMER,
@@ -409,7 +417,7 @@ function customerSpec() {
       c_w_id:         cWId,
       c_first:        asciiRange(8, 16),
       c_middle:       Expr.lit("OE"),
-      c_last:         Attr.dictAt(lastNameDict, nurandIdx),
+      c_last:         Attr.dictAt(lastNameDict, cLastIdx),
       c_street_1:     asciiRange(10, 20),
       c_street_2:     asciiRange(10, 20),
       c_city:         asciiRange(10, 20),

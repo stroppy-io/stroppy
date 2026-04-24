@@ -235,7 +235,14 @@ function customerSpec() {
   );
   const cId   = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(1));
   const lastNameDict = Dict.values(C_LAST_DICT);
-  const nurandIdx = Draw.nurand({ a: 255, x: 0, y: 999, cSalt: 0xC1A57 });
+  // Spec §4.3.2.3: first 1000 c_ids per district cycle dict [0..999]
+  // sequentially so every c_last is present in each district; the remaining
+  // 2000 draw via NURand. By-name tx lookups depend on the prefix guarantee.
+  const cLastIdx = Expr.if(
+    Expr.le(cId, Expr.lit(C_LAST_DICT.length)),
+    Expr.sub(cId, Expr.lit(1)),
+    Draw.nurand({ a: 255, x: 0, y: 999, cSalt: 0xC1A57 }),
+  );
   return Rel.table("customer", {
     size: WAREHOUSES * perWh,
     seed: SEED_CUSTOMER,
@@ -246,7 +253,7 @@ function customerSpec() {
       c_w_id:         cWId,
       c_first:        asciiRange(8, 16),
       c_middle:       Expr.lit("OE"),
-      c_last:         Attr.dictAt(lastNameDict, nurandIdx),
+      c_last:         Attr.dictAt(lastNameDict, cLastIdx),
       c_street_1:     asciiRange(10, 20),
       c_street_2:     asciiRange(10, 20),
       c_city:         asciiRange(10, 20),
