@@ -65,7 +65,7 @@ func NewDriver(
 			WithOptions(zap.AddCallerSkip(0))
 	}
 
-	const defaultBulkSize = 500
+	const defaultBulkSize = 2500
 
 	d = &Driver{
 		logger:   lg,

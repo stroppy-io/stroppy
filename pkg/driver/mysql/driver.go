@@ -72,7 +72,7 @@ func NewDriver(
 		return nil, err
 	}
 
-	const defaultBulkSize = 500
+	const defaultBulkSize = 2500
 
 	bulkSize := defaultBulkSize
 	if cfg.BulkSize != nil {

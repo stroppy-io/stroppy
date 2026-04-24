@@ -23,7 +23,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
-const defaultBulkSize = 500
+const defaultBulkSize = 2500
 
 func init() {
 	driver.RegisterDriver(
