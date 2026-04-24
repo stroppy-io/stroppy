@@ -78,6 +78,47 @@ func TestCsvDriverTpcbSF001(t *testing.T) {
 	}
 }
 
+// TestCsvDriverGoldenTpcbSF1 pins the byte-for-byte content of the
+// CSV driver's output against committed SHA-256 hashes. A failure
+// means either (a) seed derivation changed, (b) CSV encoding changed,
+// or (c) tpcb spec changed. Any of these is load-bearing; the fix is
+// to validate manually and update testdata/csv/tpcb_sf1/*.sha256.
+func TestCsvDriverGoldenTpcbSF1(t *testing.T) {
+	if os.Getenv(envSkip) == "1" {
+		t.Skipf("skipping integration test: %s=1", envSkip)
+	}
+
+	repoRoot := findRepoRoot(t)
+
+	binary := filepath.Join(repoRoot, "build", "stroppy")
+	if _, err := os.Stat(binary); err != nil {
+		t.Fatalf("stroppy binary not found: %v", err)
+	}
+
+	outDir := t.TempDir()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	runCsvTpcb(t, ctx, repoRoot, binary, outDir, "tpcb_sf1", "true", "1")
+
+	workloadDir := filepath.Join(outDir, "tpcb_sf1")
+	goldenDir := filepath.Join(repoRoot, "testdata", "csv", "tpcb_sf1")
+
+	for _, table := range []string{
+		"pgbench_branches",
+		"pgbench_tellers",
+		"pgbench_accounts",
+	} {
+		got := sha256OfFile(t, filepath.Join(workloadDir, table+".csv"))
+		want := readGolden(t, filepath.Join(goldenDir, table+".csv.sha256"))
+
+		if got != want {
+			t.Errorf("%s SHA mismatch\n  got  %s\n  want %s", table, got, want)
+		}
+	}
+}
+
 // TestCsvDriverDeterminismAcrossWorkers runs the tpcb workload at
 // LOAD_WORKERS ∈ {1, 4, 16} with ?merge=true, sorts every emitted
 // table's lines, and asserts all three workers produce identical
@@ -181,6 +222,35 @@ func csvRowCount(t *testing.T, path string) (int64, string) {
 	}
 
 	return int64(len(all) - 1), strings.Join(all[0], ",")
+}
+
+// sha256OfFile returns the SHA-256 hex digest of the file at path.
+// Used by the golden-hash test to compare against committed digests.
+func sha256OfFile(t *testing.T, path string) string {
+	t.Helper()
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %q: %v", path, err)
+	}
+
+	sum := sha256.Sum256(b)
+
+	return hex.EncodeToString(sum[:])
+}
+
+// readGolden reads a single-line hex SHA-256 from path, trimmed of
+// surrounding whitespace. Committed hashes are one-per-file so the
+// lineage to `sha256sum` output stays obvious.
+func readGolden(t *testing.T, path string) string {
+	t.Helper()
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read golden %q: %v", path, err)
+	}
+
+	return strings.TrimSpace(string(b))
 }
 
 // sha256OfSortedBody returns the SHA-256 of the file's rows, excluding
