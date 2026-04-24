@@ -101,9 +101,12 @@ func TestInsertSpecHonoursWorkers(t *testing.T) {
 
 	for _, workers := range []int32{1, 4, 16} {
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			d := NewDriver(testOpts())
 
 			sp := plainSpec(size, workers)
+
 			stat, err := d.InsertSpec(ctx, sp)
 			if err != nil {
 				t.Fatalf("InsertSpec(workers=%d): %v", workers, err)
@@ -189,6 +192,8 @@ func TestInsertSpecParallelLookupsNoRace(t *testing.T) {
 
 	for _, workers := range []int32{1, 4, 16} {
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			d := NewDriver(testOpts())
 
 			sp := lookupingSpec(size, workers)

@@ -43,6 +43,7 @@ func TestCloneRegistryNoRace(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
+
 	errs := make(chan error, workers)
 
 	for worker := range workers {
@@ -116,7 +117,7 @@ func TestCloneRegistryIsolatedCaches(t *testing.T) {
 	right := base.CloneRegistry()
 
 	// Warm the left clone at indices {0, 1, 2}.
-	for i := int64(0); i < 3; i++ {
+	for i := range int64(3) {
 		if _, err := left.Get("p", "v", i); err != nil {
 			t.Fatalf("left Get(%d): %v", i, err)
 		}

@@ -29,31 +29,31 @@ func TestDeterminismAcrossWorkers(t *testing.T) {
 		spec *dgproto.InsertSpec
 	}{
 		{"literal+binop+dict+if+call+null", mixedFlatSpec(300)},
-		{"streamDraw.intUniform", streamDrawFlatSpec(300, &dgproto.StreamDraw_IntUniform{
+		{"streamDraw.intUniform", streamDrawFlatSpec(&dgproto.StreamDraw_IntUniform{
 			IntUniform: &dgproto.DrawIntUniform{Min: litInt64(0), Max: litInt64(1_000_000)},
 		})},
-		{"streamDraw.floatUniform", streamDrawFlatSpec(300, &dgproto.StreamDraw_FloatUniform{
+		{"streamDraw.floatUniform", streamDrawFlatSpec(&dgproto.StreamDraw_FloatUniform{
 			FloatUniform: &dgproto.DrawFloatUniform{Min: litFloat64(0), Max: litFloat64(1)},
 		})},
-		{"streamDraw.normal", streamDrawFlatSpec(300, &dgproto.StreamDraw_Normal{
+		{"streamDraw.normal", streamDrawFlatSpec(&dgproto.StreamDraw_Normal{
 			Normal: &dgproto.DrawNormal{Min: litFloat64(0), Max: litFloat64(100), Screw: 3},
 		})},
-		{"streamDraw.zipf", streamDrawFlatSpec(300, &dgproto.StreamDraw_Zipf{
+		{"streamDraw.zipf", streamDrawFlatSpec(&dgproto.StreamDraw_Zipf{
 			Zipf: &dgproto.DrawZipf{Min: litInt64(1), Max: litInt64(100), Exponent: 1.3},
 		})},
-		{"streamDraw.nurand", streamDrawFlatSpec(300, &dgproto.StreamDraw_Nurand{
+		{"streamDraw.nurand", streamDrawFlatSpec(&dgproto.StreamDraw_Nurand{
 			Nurand: &dgproto.DrawNURand{A: 255, X: 0, Y: 9999, CSalt: 7},
 		})},
-		{"streamDraw.bernoulli", streamDrawFlatSpec(300, &dgproto.StreamDraw_Bernoulli{
+		{"streamDraw.bernoulli", streamDrawFlatSpec(&dgproto.StreamDraw_Bernoulli{
 			Bernoulli: &dgproto.DrawBernoulli{P: 0.3},
 		})},
-		{"streamDraw.date", streamDrawFlatSpec(300, &dgproto.StreamDraw_Date{
+		{"streamDraw.date", streamDrawFlatSpec(&dgproto.StreamDraw_Date{
 			Date: &dgproto.DrawDate{MinDaysEpoch: 100, MaxDaysEpoch: 400},
 		})},
-		{"streamDraw.decimal", streamDrawFlatSpec(300, &dgproto.StreamDraw_Decimal{
+		{"streamDraw.decimal", streamDrawFlatSpec(&dgproto.StreamDraw_Decimal{
 			Decimal: &dgproto.DrawDecimal{Min: litFloat64(0), Max: litFloat64(100), Scale: 2},
 		})},
-		{"streamDraw.ascii", streamDrawFlatSpec(300, &dgproto.StreamDraw_Ascii{
+		{"streamDraw.ascii", streamDrawFlatSpec(&dgproto.StreamDraw_Ascii{
 			Ascii: &dgproto.DrawAscii{
 				MinLen:   litInt64(4),
 				MaxLen:   litInt64(8),
@@ -242,17 +242,19 @@ func mixedFlatSpec(size int64) *dgproto.InsertSpec {
 // one StreamDraw column. Used for arms that need no ancillary state
 // (int/float uniform, normal, zipf, nurand, bernoulli, date, decimal,
 // ascii).
-func streamDrawFlatSpec(size int64, draw any) *dgproto.InsertSpec {
+func streamDrawFlatSpec(draw any) *dgproto.InsertSpec {
 	attrs := []*dgproto.Attr{
 		attr("rowId", rowIndex()),
-		attr("v", streamDraw(1, draw)),
+		attr("v", streamDraw(draw)),
 	}
 
-	s := spec(size, []string{"rowId", "v"}, attrs, nil)
+	s := spec(streamDrawFlatSpecSize, []string{"rowId", "v"}, attrs, nil)
 	s.Seed = 0xD06E
 
 	return s
 }
+
+const streamDrawFlatSpecSize int64 = 300
 
 // streamDrawDictSpec wraps DrawDict; requires a dict under "items".
 func streamDrawDictSpec(size int64) *dgproto.InsertSpec {
@@ -269,7 +271,7 @@ func streamDrawDictSpec(size int64) *dgproto.InsertSpec {
 
 	attrs := []*dgproto.Attr{
 		attr("rowId", rowIndex()),
-		attr("pick", streamDraw(1, &dgproto.StreamDraw_Dict{
+		attr("pick", streamDraw(&dgproto.StreamDraw_Dict{
 			Dict: &dgproto.DrawDict{DictKey: "items"},
 		})),
 	}
@@ -295,7 +297,7 @@ func streamDrawJointSpec(size int64) *dgproto.InsertSpec {
 
 	attrs := []*dgproto.Attr{
 		attr("rowId", rowIndex()),
-		attr("reg", streamDraw(1, &dgproto.StreamDraw_Joint{
+		attr("reg", streamDraw(&dgproto.StreamDraw_Joint{
 			Joint: &dgproto.DrawJoint{DictKey: "nations", Column: "region_idx"},
 		})),
 	}
@@ -322,7 +324,7 @@ func streamDrawPhraseSpec(size int64) *dgproto.InsertSpec {
 
 	attrs := []*dgproto.Attr{
 		attr("rowId", rowIndex()),
-		attr("text", streamDraw(1, &dgproto.StreamDraw_Phrase{
+		attr("text", streamDraw(&dgproto.StreamDraw_Phrase{
 			Phrase: &dgproto.DrawPhrase{
 				VocabKey:  "vocab",
 				MinWords:  litInt64(2),
@@ -351,7 +353,7 @@ func streamDrawGrammarSpec(size int64) *dgproto.InsertSpec {
 
 	attrs := []*dgproto.Attr{
 		attr("rowId", rowIndex()),
-		attr("note", streamDraw(1, &dgproto.StreamDraw_Grammar{
+		attr("note", streamDraw(&dgproto.StreamDraw_Grammar{
 			Grammar: &dgproto.DrawGrammar{
 				RootDict: "root",
 				Leaves: map[string]string{
@@ -485,7 +487,7 @@ func scd2DeterminismSpec(size int64) *dgproto.InsertSpec {
 	cfg := &dgproto.SCD2{
 		StartCol:        "valid_from",
 		EndCol:          "valid_to",
-		Boundary:        lit(int64(size / 2)),
+		Boundary:        lit(size / 2),
 		HistoricalStart: lit("1900-01-01"),
 		HistoricalEnd:   lit("1999-12-31"),
 		CurrentStart:    lit("2000-01-01"),
@@ -501,10 +503,15 @@ func scd2DeterminismSpec(size int64) *dgproto.InsertSpec {
 // --- proto builders local to this determinism suite ------------------------
 // (The `expr` package keeps its streamDrawExpr unexported; replicate here.)
 
-// streamDraw wraps any StreamDraw arm into an Expr keyed by `streamID`.
-// Accepts an any because the isStreamDraw_Draw interface is unexported.
-func streamDraw(streamID uint32, drawArm any) *dgproto.Expr {
-	out := &dgproto.StreamDraw{StreamId: streamID}
+// streamDrawStreamID is the stream ID used by every streamDraw helper
+// in this file — the determinism suite exercises one stream per spec.
+const streamDrawStreamID uint32 = 1
+
+// streamDraw wraps any StreamDraw arm into an Expr keyed by the suite's
+// single stream ID. Accepts an any because the isStreamDraw_Draw
+// interface is unexported.
+func streamDraw(drawArm any) *dgproto.Expr {
+	out := &dgproto.StreamDraw{StreamId: streamDrawStreamID}
 
 	switch v := drawArm.(type) {
 	case *dgproto.StreamDraw_IntUniform:

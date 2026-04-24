@@ -177,4 +177,3 @@ var (
 func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (driver.Tx, error) {
 	return nil, ErrTransactionsUnsupported
 }
-

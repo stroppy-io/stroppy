@@ -171,7 +171,6 @@ func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) 
 	), nil
 }
 
-
 func (d *Driver) RunQuery(
 	ctx context.Context,
 	sqlStr string,

@@ -69,6 +69,7 @@ func TestCloneCohortRegistryNoRace(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
+
 	errs := make(chan error, workers)
 
 	for worker := range workers {
@@ -131,7 +132,7 @@ func TestCloneCohortRegistryIsolatedCaches(t *testing.T) {
 	right := base.CloneRegistry()
 
 	// Warm the left clone at buckets {0, 1, 2}.
-	for bucket := int64(0); bucket < 3; bucket++ {
+	for bucket := range int64(3) {
 		if _, err := left.Draw("hot", bucket, 0); err != nil {
 			t.Fatalf("left Draw(%d): %v", bucket, err)
 		}

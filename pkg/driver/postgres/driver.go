@@ -141,4 +141,3 @@ func (d *Driver) RunQuery(
 ) (*driver.QueryResult, error) {
 	return sqldriver.RunQuery(ctx, d.pool, NewRows, PgxDialect{}, d.logger, sql, args)
 }
-

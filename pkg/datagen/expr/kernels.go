@@ -281,7 +281,7 @@ func KernelGrammar(
 
 	var last string
 
-	for attempt := 0; attempt < grammarMaxAttempts; attempt++ {
+	for attempt := range grammarMaxAttempts {
 		walkKey := seed.Derive(rootKey, "grammar", strconv.Itoa(attempt))
 		prng := seed.PRNG(walkKey)
 
@@ -380,8 +380,8 @@ func expandPhraseResolved(
 			out.WriteByte(' ')
 		}
 
-		subLetter, ok := grammarLetter(tok)
-		if !ok {
+		subLetter, isLetter := grammarLetter(tok)
+		if !isLetter {
 			out.WriteString(tok)
 
 			continue

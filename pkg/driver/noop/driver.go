@@ -67,7 +67,7 @@ func NewDriver(opts driver.Options) *Driver {
 
 // InsertSpec drains a relational runtime end-to-end and discards the rows.
 // Exercises the full generation pipeline so benchmarks stay comparable, but
-// no I/O is performed. Honours spec.Parallelism.Workers so framework-only
+// no I/O is performed. Honors spec.Parallelism.Workers so framework-only
 // scaling is measurable: single-path runs the seed runtime inline, parallel
 // path fans out through common.RunParallel with one cloned runtime per
 // worker.

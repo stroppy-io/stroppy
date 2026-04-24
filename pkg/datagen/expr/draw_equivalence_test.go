@@ -19,22 +19,30 @@ import (
 // because the xk6air package cannot be imported here (separate
 // module, internal/common boundary).
 
+// drawEquivRoot is the single root seed shared by every equivalence
+// case below. Keeping it hoisted to package scope lets the helpers
+// drop an otherwise always-constant parameter.
+const drawEquivRoot uint64 = 0xA3_5F_EE_10_BE_EF_CA_FE
+
 // drawPRNG recreates the seed composition iter-2's *drawX structs use
 // in draw_arms.go. If it drifts from evalContext.Draw, this test
 // catches it before the drawbench numbers do.
-func drawPRNG(rootSeed uint64, key int64) *rand.Rand {
-	k := seed.Derive(rootSeed, "draw", "s0", strconv.FormatInt(key, 10))
+func drawPRNG(key int64) *rand.Rand {
+	k := seed.Derive(drawEquivRoot, "draw", "s0", strconv.FormatInt(key, 10))
+
 	return seed.PRNG(k)
 }
 
 // evalContextPRNG mirrors the composition in runtime.evalContext.Draw.
-// Keeping both in this file makes divergences stand out in a single
-// diff.
-func evalContextPRNG(rootSeed uint64, attrPath string, streamID uint32, rowIdx int64) *rand.Rand {
+// The equivalence suite always compares against the canonical evaluator
+// path — attrPath="draw", streamID=0 — so both are fixed here. Keeping
+// this helper and drawPRNG in one file makes divergences stand out in
+// a single diff.
+func evalContextPRNG(rowIdx int64) *rand.Rand {
 	return seed.PRNG(seed.Derive(
-		rootSeed,
-		attrPath,
-		"s"+strconv.FormatUint(uint64(streamID), 10),
+		drawEquivRoot,
+		"draw",
+		"s0",
 		strconv.FormatInt(rowIdx, 10),
 	))
 }
@@ -42,13 +50,11 @@ func evalContextPRNG(rootSeed uint64, attrPath string, streamID uint32, rowIdx i
 func TestDraw2_SeedCompositionMatchesEvaluator(t *testing.T) {
 	t.Parallel()
 
-	const root uint64 = 0xA3_5F_EE_10_BE_EF_CA_FE
-
 	for _, key := range []int64{0, 1, 7, 42, 1_000_000} {
-		drawRand := drawPRNG(root, key)
-		evalRand := evalContextPRNG(root, "draw", 0, key)
+		drawRand := drawPRNG(key)
+		evalRand := evalContextPRNG(key)
 
-		for i := 0; i < 8; i++ {
+		for i := range 8 {
 			require.Equalf(t, evalRand.Uint64(), drawRand.Uint64(),
 				"iter-2 seed diverged from evaluator at key=%d i=%d", key, i)
 		}
@@ -58,11 +64,9 @@ func TestDraw2_SeedCompositionMatchesEvaluator(t *testing.T) {
 func TestDraw2_IntUniformMatchesEvaluator(t *testing.T) {
 	t.Parallel()
 
-	const root uint64 = 0xA3_5F_EE_10_BE_EF_CA_FE
-
 	for _, key := range []int64{0, 5, 99, 12345} {
-		draw := drawPRNG(root, key)
-		eval := evalContextPRNG(root, "draw", 0, key)
+		draw := drawPRNG(key)
+		eval := evalContextPRNG(key)
 
 		v1, err := expr.KernelIntUniform(draw, 1, 1_000_000)
 		require.NoError(t, err)
@@ -77,13 +81,11 @@ func TestDraw2_IntUniformMatchesEvaluator(t *testing.T) {
 func TestDraw2_NURandMatchesEvaluator(t *testing.T) {
 	t.Parallel()
 
-	const root uint64 = 0xA3_5F_EE_10_BE_EF_CA_FE
-
 	for _, key := range []int64{0, 11, 555} {
-		v1, err := expr.KernelNURand(drawPRNG(root, key), 255, 0, 9999, 0)
+		v1, err := expr.KernelNURand(drawPRNG(key), 255, 0, 9999, 0)
 		require.NoError(t, err)
 
-		v2, err := expr.KernelNURand(evalContextPRNG(root, "draw", 0, key), 255, 0, 9999, 0)
+		v2, err := expr.KernelNURand(evalContextPRNG(key), 255, 0, 9999, 0)
 		require.NoError(t, err)
 
 		require.Equal(t, v2, v1)
@@ -93,15 +95,13 @@ func TestDraw2_NURandMatchesEvaluator(t *testing.T) {
 func TestDraw2_ASCIIMatchesEvaluator(t *testing.T) {
 	t.Parallel()
 
-	const root uint64 = 0xA3_5F_EE_10_BE_EF_CA_FE
-
 	alphabet := []*dgproto.AsciiRange{{Min: 0x61, Max: 0x7A}}
 
 	for _, key := range []int64{0, 2, 99} {
-		v1, err := expr.KernelASCII(drawPRNG(root, key), 3, 10, alphabet)
+		v1, err := expr.KernelASCII(drawPRNG(key), 3, 10, alphabet)
 		require.NoError(t, err)
 
-		v2, err := expr.KernelASCII(evalContextPRNG(root, "draw", 0, key), 3, 10, alphabet)
+		v2, err := expr.KernelASCII(evalContextPRNG(key), 3, 10, alphabet)
 		require.NoError(t, err)
 
 		require.Equal(t, v2, v1)
@@ -110,8 +110,6 @@ func TestDraw2_ASCIIMatchesEvaluator(t *testing.T) {
 
 func TestDraw2_DictMatchesEvaluator(t *testing.T) {
 	t.Parallel()
-
-	const root uint64 = 0xA3_5F_EE_10_BE_EF_CA_FE
 
 	dict := &dgproto.Dict{
 		Columns: []string{"name"},
@@ -124,10 +122,10 @@ func TestDraw2_DictMatchesEvaluator(t *testing.T) {
 	}
 
 	for _, key := range []int64{0, 3, 50} {
-		v1, err := expr.KernelDict(drawPRNG(root, key), dict, "")
+		v1, err := expr.KernelDict(drawPRNG(key), dict, "")
 		require.NoError(t, err)
 
-		v2, err := expr.KernelDict(evalContextPRNG(root, "draw", 0, key), dict, "")
+		v2, err := expr.KernelDict(evalContextPRNG(key), dict, "")
 		require.NoError(t, err)
 
 		require.Equal(t, v2, v1)
@@ -143,10 +141,8 @@ func TestDraw2_DictMatchesEvaluator(t *testing.T) {
 func TestDraw2_PooledPRNGMatchesFresh(t *testing.T) {
 	t.Parallel()
 
-	const root uint64 = 0xA3_5F_EE_10_BE_EF_CA_FE
-
 	for _, key := range []int64{0, 1, 99} {
-		k := seed.Derive(root, "draw", "s0", strconv.FormatInt(key, 10))
+		k := seed.Derive(drawEquivRoot, "draw", "s0", strconv.FormatInt(key, 10))
 
 		fresh := seed.PRNG(k)
 
@@ -154,7 +150,7 @@ func TestDraw2_PooledPRNGMatchesFresh(t *testing.T) {
 		seed.SeedPCG(src, k)
 		reused := rand.New(src)
 
-		for i := 0; i < 16; i++ {
+		for range 16 {
 			require.Equal(t, fresh.Uint64(), reused.Uint64())
 		}
 	}

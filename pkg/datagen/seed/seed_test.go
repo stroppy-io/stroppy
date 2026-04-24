@@ -195,7 +195,7 @@ func TestSeedPCG(t *testing.T) {
 		seed.SeedPCG(src, key)
 		reused := rand.New(src)
 
-		for i := 0; i < 8; i++ {
+		for i := range 8 {
 			r := ref.Uint64()
 			u := reused.Uint64()
 			require.Equalf(t, r, u, "SeedPCG diverged at i=%d key=0x%016X", i, key)
