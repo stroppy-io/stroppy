@@ -346,7 +346,7 @@ function resolvePoolConfig(config: DriverSetup): {
   const p = config.pool;
   const driverType = config.driverType ?? "postgres";
 
-  if (driverType === "noop") {
+  if (driverType === "noop" || driverType === "csv") {
     return {};
   }
 
