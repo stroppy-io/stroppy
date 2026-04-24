@@ -22,6 +22,15 @@ Replace `pg` with `mysql`, `pico`, or `ydb` to change driver.
 ./build/stroppy run tpcb/tx -d pico  -D url=pg://admin:T0psecret@localhost:5433/public
 ./build/stroppy run tpcb/tx -d ydb   -D url=grpc://localhost:2136/local
 
+# Dump every row to CSV (no database required). Workload steps stay
+# limited to drop_schema + create_schema + load_data because the CSV
+# driver has no query path.
+./build/stroppy run ./workloads/tpcb/tx.ts \
+  -D url='/tmp/tpcb-csv?merge=true&workload=tpcb' \
+  -D driverType=csv \
+  -e SCALE_FACTOR=1 \
+  --steps drop_schema,create_schema,load_data
+
 # Stored-procs variant (pg / mysql only)
 ./build/stroppy run tpcb/procs -d pg
 ```
