@@ -226,6 +226,24 @@ const HAS_RETURNING = driverConfig.driverType === "postgres" || driverConfig.dri
 
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
+// ydb.sql DDL placeholders. {partition_keys} expands to a comma-list of
+// (w_id) split points giving one tablet per warehouse; {partition_count}
+// to W. For W=1 the split list collapses to "(2)" — single functional
+// tablet, satisfies YDB's "PARTITION_AT_KEYS must be non-empty" rule.
+// Other dialects' .sql files don't contain these tokens, so the replace
+// is a no-op there.
+function ydbPartitionKeys(w: number): string {
+  if (w <= 1) return "(2)";
+  const parts: string[] = [];
+  for (let i = 2; i <= w; i++) parts.push(`(${i})`);
+  return parts.join(", ");
+}
+function renderDDL(s: string): string {
+  return s
+    .replace(/\{partition_keys\}/g, ydbPartitionKeys(WAREHOUSES))
+    .replace(/\{partition_count\}/g, String(Math.max(WAREHOUSES, 1)));
+}
+
 // Per-VU monotonic counter for h_id only. history has no natural PK in the
 // TPC-C spec, but picodata/ydb require one, so we add h_id to all dialects
 // and generate it client-side. o_id is NOT a counter — we read d_next_o_id
@@ -649,7 +667,9 @@ export function setup() {
   });
 
   Step("create_schema", () => {
-    sql("create_schema").forEach((query) => driver.exec(query, {}));
+    sql("create_schema").forEach((query) =>
+      driver.exec({ ...query, sql: renderDDL(query.sql) }, {}),
+    );
   });
 
   // Single bulk-load step covering all nine TPC-C tables. Each call feeds
@@ -666,6 +686,13 @@ export function setup() {
     driver.insertSpec(orderLineSpec());
     driver.insertSpec(newOrderSpec());
     // history is empty at load time (spec §4.3.4 initial cardinality 0).
+  });
+
+  // Built post-load on YDB to keep secondary-index write amplification
+  // out of the bulk-load path. Other dialects don't define this section,
+  // so sql("create_indexes") is empty and this step is a no-op.
+  Step("create_indexes", () => {
+    sql("create_indexes").forEach((query) => driver.exec(query, {}));
   });
 
   // Spec §3.3.2 CC1-CC4 + §4.3.4 cardinalities + §4.3.3.1 distribution rules.

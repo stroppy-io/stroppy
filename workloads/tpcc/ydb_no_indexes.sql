@@ -19,13 +19,6 @@ DROP TABLE IF EXISTS warehouse
 DROP TABLE IF EXISTS item
 
 --+ create_schema
-/* Partitioning: warehouse-keyed tables get one tablet per warehouse via
-   PARTITION_AT_KEYS, rendered from {partition_keys}/{partition_count} in
-   tx.ts. history is h_id-keyed (uniform) and populated only by workload
-   tx, so UNIFORM_PARTITIONS suffices. warehouse and item are small enough
-   to live on a single tablet. Secondary indexes are built post-load (see
-   the create indexes section below) to keep index-write amplification
-   out of the bulk-load path. */
 --= warehouse
 CREATE TABLE warehouse (
     w_id Int64 NOT NULL,
@@ -53,11 +46,6 @@ CREATE TABLE district (
     d_ytd Double,
     d_next_o_id Int64,
     PRIMARY KEY (d_w_id, d_id)
-) WITH (
-    PARTITION_AT_KEYS = ({partition_keys}),
-    AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 --= customer
 CREATE TABLE customer (
@@ -83,11 +71,6 @@ CREATE TABLE customer (
     c_delivery_cnt Int64,
     c_data Utf8,
     PRIMARY KEY (c_w_id, c_d_id, c_id)
-) WITH (
-    PARTITION_AT_KEYS = ({partition_keys}),
-    AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 --= history
 CREATE TABLE history (
@@ -101,10 +84,6 @@ CREATE TABLE history (
     h_amount Double,
     h_data Utf8,
     PRIMARY KEY (h_id)
-) WITH (
-    AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 --= new_order
 CREATE TABLE new_order (
@@ -112,11 +91,6 @@ CREATE TABLE new_order (
     no_d_id Int64 NOT NULL,
     no_o_id Int64 NOT NULL,
     PRIMARY KEY (no_w_id, no_d_id, no_o_id)
-) WITH (
-    PARTITION_AT_KEYS = ({partition_keys}),
-    AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 --= orders
 CREATE TABLE orders (
@@ -129,11 +103,6 @@ CREATE TABLE orders (
     o_ol_cnt Int64,
     o_all_local Int64,
     PRIMARY KEY (o_w_id, o_d_id, o_id)
-) WITH (
-    PARTITION_AT_KEYS = ({partition_keys}),
-    AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 --= order_line
 CREATE TABLE order_line (
@@ -148,11 +117,6 @@ CREATE TABLE order_line (
     ol_amount Double,
     ol_dist_info Utf8,
     PRIMARY KEY (ol_w_id, ol_d_id, ol_o_id, ol_number)
-) WITH (
-    PARTITION_AT_KEYS = ({partition_keys}),
-    AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 --= item
 CREATE TABLE item (
@@ -183,24 +147,7 @@ CREATE TABLE stock (
     s_remote_cnt Int64,
     s_data Utf8,
     PRIMARY KEY (s_w_id, s_i_id)
-) WITH (
-    PARTITION_AT_KEYS = ({partition_keys}),
-    AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
-
---+ create_indexes
-/* Built post-load to keep index-write amplification out of the bulk-load
-   path. GLOBAL SYNC = ACID-maintained alongside base writes (TPC-C 1.4
-   compliant). idx_customer_name supports the (w_id, d_id, c_last)
-   lookup with c_first ordering used by Payment 2.5.2.2 and Order-Status
-   2.6.2.2. idx_order supports the "latest order for a customer" probe
-   used by Order-Status 2.6.2.2. */
---= idx_customer_name
-ALTER TABLE customer ADD INDEX idx_customer_name GLOBAL SYNC ON (c_w_id, c_d_id, c_last, c_first)
---= idx_order
-ALTER TABLE orders ADD INDEX idx_order GLOBAL SYNC ON (o_w_id, o_d_id, o_c_id, o_id)
 
 --+ workload_tx_new_order
 --= get_customer
@@ -254,7 +201,7 @@ SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip
 FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 --= count_customers_by_name
 /* TPC-C 2.5.1.2: 60% of Payment lookups are by (w_id, d_id, c_last). */
-SELECT COUNT(*) FROM customer VIEW idx_customer_name WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 --= get_customer_by_name
 /* TPC-C 2.5.2.2: pick row ceil(n/2) ordered by c_first — zero-indexed
    OFFSET is (n - 1) / 2, computed client-side and passed in.
@@ -262,7 +209,7 @@ SELECT COUNT(*) FROM customer VIEW idx_customer_name WHERE c_w_id = :w_id AND c_
    Note: YDB OFFSET requires Uint64; JS Number arrives as Int64 via
    AutoDeclare, so wrap in CAST to satisfy the type checker. */
 SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
-FROM customer VIEW idx_customer_name WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 ORDER BY c_first
 LIMIT 1 OFFSET CAST(:offset AS Uint64)
 --= update_customer
@@ -287,17 +234,17 @@ VALUES (:h_id, :h_c_id, :h_c_d_id, :h_c_w_id, :h_d_id, :h_w_id, CurrentUtcTimest
 SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer WHERE c_id = :c_id AND c_d_id = :d_id AND c_w_id = :w_id
 --= count_customers_by_name
 /* TPC-C 2.6.1.2: 60% of Order-Status lookups are by (w_id, d_id, c_last). */
-SELECT COUNT(*) FROM customer VIEW idx_customer_name WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
+SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 --= get_customer_by_name
 /* TPC-C 2.6.2.2: pick row ceil(n/2) ordered by c_first — zero-indexed
    OFFSET is (n - 1) / 2, computed client-side.
    Note: YDB OFFSET requires Uint64; CAST forces the type. */
-SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer VIEW idx_customer_name
+SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer
 WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 ORDER BY c_first
 LIMIT 1 OFFSET CAST(:offset AS Uint64)
 --= get_last_order
-SELECT o_id, o_carrier_id, o_entry_d FROM orders VIEW idx_order WHERE o_d_id = :d_id AND o_w_id = :w_id AND o_c_id = :c_id ORDER BY o_id DESC LIMIT 1
+SELECT o_id, o_carrier_id, o_entry_d FROM orders WHERE o_d_id = :d_id AND o_w_id = :w_id AND o_c_id = :c_id ORDER BY o_id DESC LIMIT 1
 --= get_order_lines
 SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d FROM order_line WHERE ol_o_id = :o_id AND ol_d_id = :d_id AND ol_w_id = :w_id
 

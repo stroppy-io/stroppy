@@ -35,12 +35,47 @@ Useful env overrides:
 ## Steps
 
 1. `drop_schema` — drops all nine tables if present.
-2. `create_schema` — applies `{pg,mysql,pico,ydb}.sql`.
+2. `create_schema` — applies `{pg,mysql,pico,ydb}.sql`. For YDB the DDL
+   carries `{partition_keys}` / `{partition_count}` placeholders that
+   `tx.ts` substitutes with one partition per warehouse (W splits for
+   warehouse-keyed tables, `MIN_PARTITIONS_COUNT = W` for history).
 3. `load_data` — seeds `warehouse`, `district`, `customer`, `item`, `stock`,
    `orders`, `order_line`, `new_order` via `driver.insertSpec`. `history`
    stays empty (spec §4.3.4 initial cardinality = 0).
-4. *(workload)* — k6 iterations run the standard 45/43/4/4/4 New-Order /
+4. `create_indexes` — YDB-only: builds `idx_customer_name` and `idx_order`
+   via `ALTER TABLE ... ADD INDEX ... GLOBAL SYNC`. Built post-load to
+   keep secondary-index write amplification out of the bulk-load path.
+   Indexes are GLOBAL SYNC = ACID-maintained (TPC-C 1.4 compliant). For
+   pg/mysql/picodata the section is empty and the step is a no-op.
+5. `validate_population` — spec §3.3.2 CC1-CC4 + §4.3.4 cardinality checks.
+6. *(workload)* — k6 iterations run the standard 45/43/4/4/4 New-Order /
    Payment / Order-Status / Delivery / Stock-Level mix.
+
+## YDB load-path tuning
+
+`ydb.sql` is the tuned schema: pre-split tablets (1 per warehouse) +
+auto-partitioning + post-load indexes. `ydb_no_indexes.sql` is the
+baseline (single tablet per table, no secondary indexes) kept for
+comparison. To benchmark load time, run both and diff the
+`load_data` step duration:
+
+```bash
+# baseline (1 tablet per table, no indexes)
+stroppy run tpcc/tx tpcc/ydb_no_indexes -d ydb -D url=grpc://host:2136/db \
+  -e SCALE_FACTOR=50 -e LOAD_WORKERS=8 \
+  --steps drop_schema,create_schema,load_data \
+  -- --duration 15s --vus 1
+
+# tuned (W tablets per warehouse-keyed table, post-load indexes)
+stroppy run tpcc/tx tpcc/ydb -d ydb -D url=grpc://host:2136/db \
+  -e SCALE_FACTOR=50 -e LOAD_WORKERS=8 \
+  --steps drop_schema,create_schema,load_data,create_indexes \
+  -- --duration 15s --vus 1
+```
+
+The `Start of 'load_data' step` and `End of 'load_data' step` console
+lines mark the load interval. k6 args (`--duration`, `--vus`) must come
+after `--`.
 
 ## Known simplifications vs spec
 
