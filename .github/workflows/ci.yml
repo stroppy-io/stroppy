@@ -49,6 +49,39 @@ jobs:
       - name: Run TS tests
         run: make ts-test
 
+  build:
+    needs: [golang-ci, typescript-ci]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.3"
+          cache: true
+
+      - name: Install xk6 (k6 builder)
+        run: make install-xk6
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          XK6_RACE_DETECTOR: "0"
+          GOOS: linux
+          GOARCH: amd64
+          VERSION: ${{ github.sha }}
+        run: make build
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stroppy-linux-amd64
+          path: build/stroppy
+          if-no-files-found: error
+          retention-days: 7
+
   integration:
     needs: [golang-ci, typescript-ci]
     uses: ./.github/workflows/integration.yml
