@@ -52,6 +52,8 @@ jobs:
   build:
     needs: [golang-ci, typescript-ci]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -65,13 +67,17 @@ jobs:
       - name: Install xk6 (k6 builder)
         run: make install-xk6
 
+      - name: Compute short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
       - name: Build
         env:
           CGO_ENABLED: "0"
           XK6_RACE_DETECTOR: "0"
           GOOS: linux
           GOARCH: amd64
-          VERSION: ${{ github.sha }}
+          VERSION: nightly-${{ steps.sha.outputs.short }}
         run: make build
 
       - name: Upload binary artifact
@@ -81,6 +87,18 @@ jobs:
           path: build/stroppy
           if-no-files-found: error
           retention-days: 7
+
+      - name: Pre-release per commit
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly-${{ steps.sha.outputs.short }}
+          name: nightly-${{ steps.sha.outputs.short }}
+          prerelease: true
+          files: build/stroppy
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   integration:
     needs: [golang-ci, typescript-ci]
