@@ -2,71 +2,10 @@ syntax = "proto3";
 
 package stroppy;
 
-import "proto/stroppy/common.proto";
-import "validate/validate.proto";
-
 option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
 
 /**
- * InsertDescription defines data to fill database.
- */
-message InsertDescriptor {
-  int32 count = 1 [ (validate.rules).int32.gt = 0 ];
-  /** Which table to insert the values */
-  string table_name = 2 [ (validate.rules).string.min_len = 1 ];
-  /** Allows to use a percise method of data insertion */
-  optional InsertMethod method = 3;
-  /** Seed for data generation. 0 = random, >0 = fixed (reproducible). */
-  uint64 seed = 6;
-  /**
-   * Parameters used in the insert.
-   * Names threated as db columns names, regexp is ignored.
-   */
-  repeated QueryParamDescriptor params = 4
-      [ (validate.rules).repeated = {items : {message : {required : true}}} ];
-  /** Groups of the columns */
-  repeated QueryParamGroup groups = 5;
-}
-
-/** Data insertion method */
-enum InsertMethod {
-  PLAIN_QUERY = 0;
-  NATIVE = 1;
-  PLAIN_BULK = 2;
-}
-
-/**
- * QueryParamDescriptor defines a parameter that can be used in a query.
- */
-message QueryParamDescriptor {
-  /** Name of the parameter */
-  string name = 1 [ (validate.rules).string.min_len = 1 ];
-  /** Regular expression pattern to replace with the parameter value default
-   * is "${<param_name>}" */
-  optional string replace_regex = 2;
-  /** Rule for generating parameter values */
-  stroppy.Generation.Rule generation_rule = 3
-      [ (validate.rules).message.required = true ];
-  /** Database-specific parameter properties */
-  optional stroppy.Value.Struct db_specific = 4;
-}
-
-/**
- * QueryParamGroup defines a group of dependent parameters.
- * New values generated in Carthesian product manner.
- * It's useful to define composite primary keys.
- * Every evaluation step only one param changes.
- */
-message QueryParamGroup {
-  /** Group name */
-  string name = 1;
-  /** Grouped dependent parameters */
-  repeated QueryParamDescriptor params = 2;
-}
-
-/**
- * TransactionIsolationLevel defines the isolation level for a database
- * transaction.
+ * TxIsolationLevel defines the isolation level for a database transaction.
  */
 enum TxIsolationLevel {
   UNSPECIFIED = 0;

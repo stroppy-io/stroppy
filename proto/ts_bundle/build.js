@@ -34,14 +34,15 @@ async function buildProtobufSDK() {
         path.join(tsSourceDir, "google", "protobuf"),
     );
 
-    // Create entry file that re-exports everything
+    // Create entry file that re-exports everything. There is no longer a
+    // name collision across the concatenated modules (legacy
+    // `stroppy.InsertMethod` was deleted with `descriptor.proto`), so plain
+    // star re-exports suffice.
     const entryPath = path.join(__dirname, "_entry.ts");
-    const entryContent = stroppyFiles
-        .map(
-            (file) =>
-                `export * from './${path.relative(__dirname, file).replace(/\\/g, "/").replace(/\.ts$/, "")}';`,
-        )
-        .join("\n");
+    const rel = (file) =>
+        "./" + path.relative(__dirname, file).replace(/\\/g, "/").replace(/\.ts$/, "");
+    const starLines = stroppyFiles.map((file) => `export * from '${rel(file)}';`);
+    const entryContent = starLines.join("\n");
     fs.writeFileSync(entryPath, entryContent);
 
     // Bundle to JS

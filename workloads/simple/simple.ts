@@ -1,82 +1,97 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { DriverX, AB, R, S, Step, setSeed, ENV, declareDriverSetup } from "./helpers.ts";
+
+import { DriverX, Step, declareDriverSetup } from "./helpers.ts";
+import {
+  Alphabet,
+  Attr,
+  Draw,
+  DrawRT,
+  Expr,
+  InsertMethod as DatagenInsertMethod,
+  Rel,
+} from "./datagen.ts";
+
+// simple.ts — minimal stroppy demo for new users. Loads a small table
+// via driver.insertSpec, runs one query, asserts the row count, and
+// tears down. No stored procs, no multi-dialect SQL, no mix weights.
+// Intended as the first workload a new user reads.
+//
+// Run against the built-in postgres preset:
+//   stroppy run simple -D url=postgres://user:pw@localhost:5432/postgres
+// Or against any driver via --driver:
+//   stroppy run simple -d noop
 
 export const options: Options = {
-  setupTimeout: "5m",
+  setupTimeout: "1m",
   scenarios: {
-    workload: {
-      executor: "shared-iterations",
-      exec: "workload",
-      vus: 1,
-      iterations: 1,
-    },
+    workload: { executor: "shared-iterations", exec: "workload", vus: 1, iterations: 1 },
   },
 };
 
 const driverConfig = declareDriverSetup(0, {
-  url: "postgres://postgres:postgres@localhost:5432",
+  url:        "postgres://postgres:postgres@localhost:5432",
   driverType: "postgres",
 });
-
 const driver = DriverX.create().setup(driverConfig);
 
-setSeed(42);
+const DEMO_ROWS = 100;
+const DEMO_SEED = 0xC0FFEE;
 
-export function setup() {
-  Step("example", () => {
-    // You can structure test into steps with Step function.
-  })
-  // Also you can use Step.begin and Step.end functions to define step.
-  Step.begin("workload");
-  return;
+// A three-column demo table. id is the 1-based row counter, label is
+// an 8-char ASCII string, value is a uniformly-drawn integer in [0, 999].
+function demoSpec() {
+  return Rel.table("stroppy_demo", {
+    size: DEMO_ROWS,
+    seed: DEMO_SEED,
+    method: DatagenInsertMethod.PLAIN_BULK,
+    attrs: {
+      id:    Attr.rowId(),
+      label: Draw.ascii({ min: Expr.lit(8), max: Expr.lit(8), alphabet: Alphabet.en }),
+      value: Draw.intUniform({ min: Expr.lit(0), max: Expr.lit(999) }),
+    },
+  });
 }
 
-// No seed → uses module-wide default (0 if not set) → random each run.
-const genRandom = R.int32(0, 100).gen();
+export function setup() {
+  Step("drop_schema", () => {
+    driver.exec("DROP TABLE IF EXISTS stroppy_demo");
+  });
+  Step("create_schema", () => {
+    driver.exec("CREATE TABLE stroppy_demo (id INT PRIMARY KEY, label TEXT, value INT)");
+  });
+  Step("load_data", () => {
+    driver.insertSpec(demoSpec());
+  });
+  Step.begin("workload");
+}
 
-// Explicit seed → always produces the same sequence regardless of global seed.
-const genFixed = R.str(10, AB.en).gen(111);
-
-// Sequence generator: produces 1, 2, 3, ... exhausting after max.
-const seqGen = S.int32(1, 10).gen();
-
-// Group generator: cartesian-product of dependent params.
-// Useful for composite keys — see logs for the pattern.
-const groupGen = R.group({
-    some: S.int32(1, 2),
-    second: S.int32(1, 3),
-    bool: R.bool(1, true),
-  }).gen(5)
+// A handful of DrawRT samples used inside the workload loop. These are
+// built at init scope because DrawRT's backing module resolves
+// lazily via k6 require(), which is only legal during init.
+const pickIdGen = DrawRT.intUniform(DEMO_SEED ^ 1, 1, DEMO_ROWS);
 
 export function workload() {
-  // driver uses :arg syntax for query parameters
-  driver.exec("select 1;", {});
+  // 1. Aggregate check: the loaded row count equals DEMO_ROWS.
+  const count = Number(driver.queryValue("SELECT COUNT(*) FROM stroppy_demo"));
+  if (count !== DEMO_ROWS) {
+    throw new Error(`expected ${DEMO_ROWS} rows, got ${count}`);
+  }
+  console.log(`loaded ${count} rows into stroppy_demo`);
 
-  const value = genRandom.next();
-  console.log("random value:", value);
-  driver.exec("select 90000 + :value + :second;", {
-    value,
-    second: genRandom.next(),
-  });
-
-  console.log("value is:",
-    driver.queryValue("select :a::int + :b::int", { a: 34, b: 35 }));
-
-  const str = genFixed.next();
-  console.log("fixed-seed string (same every run):", str);
-  driver.exec("select 'Hello, ' || :a || '!'", { a: str });
-
-
-  console.log("sequence (exhausts after 10):", seqGen.next());
-
-  for (let i = 0; i < 12; i++) {
-    const [a, b, c] = groupGen.next();
-    console.log("group cartesian product — a:", a, "b:", b, "c:", c);
+  // 2. Per-row lookup: pick 3 ids via a tx-time DrawRT generator and
+  //    confirm each row is present. Shows how tx-time randomness is
+  //    wired — construct the Drawer at init, call .next() in the
+  //    workload body.
+  for (let i = 0; i < 3; i++) {
+    const id = Number(pickIdGen.next());
+    const label = driver.queryValue("SELECT label FROM stroppy_demo WHERE id = :id", { id });
+    console.log(`id=${id} → label=${label}`);
   }
 }
 
 export function teardown() {
   Step.end("workload");
+  driver.exec("DROP TABLE IF EXISTS stroppy_demo");
   Teardown();
 }

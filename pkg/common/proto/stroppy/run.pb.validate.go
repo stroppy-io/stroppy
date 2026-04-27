@@ -61,8 +61,6 @@ func (m *DriverRunConfig) validate(all bool) error {
 
 	// no validation rules for Url
 
-	// no validation rules for DefaultInsertMethod
-
 	// no validation rules for ErrorMode
 
 	// no validation rules for DefaultTxIsolation

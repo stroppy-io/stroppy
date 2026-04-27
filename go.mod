@@ -20,6 +20,7 @@ require (
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.134.1
 	go.k6.io/k6 v1.6.0
 	go.uber.org/zap v1.27.1
+	golang.org/x/sync v0.19.0
 	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11
 	sigs.k8s.io/yaml v1.6.0
@@ -109,7 +110,6 @@ require (
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20260113154411-7d0074ccc6f1 // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
 	golang.org/x/text v0.33.0 // indirect

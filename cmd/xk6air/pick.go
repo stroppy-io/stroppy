@@ -5,7 +5,7 @@ import (
 	"math/rand"
 
 	"github.com/grafana/sobek"
-	"github.com/stroppy-io/stroppy/pkg/common/generate"
+	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
 )
 
 type Picker struct {
@@ -13,12 +13,12 @@ type Picker struct {
 	seed       uint64
 }
 
-func NewPicker(seed uint64) *Picker {
-	seed = generate.ResolveSeed(seed)
+func NewPicker(pickerSeed uint64) *Picker {
+	pickerSeed = seed.ResolveSeed(pickerSeed)
 
 	return &Picker{
-		randomness: rand.New(rand.NewSource(int64(seed))),
-		seed:       seed,
+		randomness: rand.New(rand.NewSource(int64(pickerSeed))),
+		seed:       pickerSeed,
 	}
 }
 

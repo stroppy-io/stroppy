@@ -12,15 +12,12 @@ import (
 	"github.com/picodata/picodata-go"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
-	sqlqueries "github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
-	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
 const (
@@ -83,7 +80,7 @@ func NewDriver(
 			WithOptions(zap.AddCallerSkip(0))
 	}
 
-	const defaultBulkSize = 500
+	const defaultBulkSize = 2500
 
 	cfg := opts.Config
 
@@ -179,37 +176,4 @@ var (
 
 func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (driver.Tx, error) {
 	return nil, ErrTransactionsUnsupported
-}
-
-// InsertValues inserts multiple rows into the database based on the descriptor.
-// It supports two methods:
-// - PLAIN_QUERY: executes individual INSERT statements for each row
-// - PLAIN_BULK: executes batched bulk INSERT statements using multi-row VALUES syntax
-// - NATIVE: unsupported.
-func (d *Driver) InsertValues(
-	ctx context.Context,
-	descriptor *stroppy.InsertDescriptor,
-) (*stats.Query, error) {
-	builder, err := sqlqueries.NewQueryBuilder(
-		d.logger,
-		PicoDialect{},
-		generate.ResolveSeed(descriptor.GetSeed()),
-		descriptor,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("can't create query builder: %w", err)
-	}
-
-	switch descriptor.GetMethod() {
-	case stroppy.InsertMethod_PLAIN_QUERY:
-		return sqldriver.InsertPlainQuery(ctx, d.pool, builder)
-	case stroppy.InsertMethod_PLAIN_BULK:
-		return sqldriver.InsertPlainBulk(ctx, d.pool, builder, d.bulkSize)
-	case stroppy.InsertMethod_NATIVE:
-		return nil, ErrNativeUnsupported
-	default:
-		d.logger.Panic("unexpected proto.InsertMethod")
-
-		return nil, nil //nolint:nilnil // unreachable after panic
-	}
 }

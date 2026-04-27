@@ -2,7 +2,6 @@ package picodata
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -11,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 type mockPool struct {
@@ -56,50 +54,6 @@ func newTestDriver(pool Executor) *Driver {
 	return &Driver{
 		logger: logger.Global(),
 		pool:   pool,
-	}
-}
-
-func ptr[T any](v T) *T {
-	return &v
-}
-
-func TestDriver_InsertValuesPlainQuery(t *testing.T) {
-	mock := &mockPool{}
-	drv := newTestDriver(mock)
-
-	ctx := context.Background()
-	descriptor := &stroppy.InsertDescriptor{
-		Count:     3,
-		TableName: "test_table",
-		Method:    stroppy.InsertMethod_PLAIN_QUERY.Enum(),
-		Params: []*stroppy.QueryParamDescriptor{
-			{
-				Name: "id",
-				GenerationRule: &stroppy.Generation_Rule{
-					Kind: &stroppy.Generation_Rule_Int64Range{
-						Int64Range: &stroppy.Generation_Range_Int64{
-							Min: ptr[int64](1),
-							Max: 100,
-						},
-					},
-					Unique: ptr(true),
-				},
-			},
-		},
-	}
-
-	stats, err := drv.InsertValues(ctx, descriptor)
-	require.NoError(t, err)
-	require.NotNil(t, stats)
-
-	require.Len(t, mock.execCalls, 3, "expected 3 insert executions")
-
-	for i, call := range mock.execCalls {
-		require.Contains(t, strings.ToLower(call.SQL), "insert",
-			"call %d: expected INSERT statement, got %q", i+1, call.SQL)
-		require.Contains(t, strings.ToLower(call.SQL), "test_table",
-			"call %d: expected test_table in SQL, got %q", i+1, call.SQL)
-		require.Len(t, call.Args, 1, "call %d: expected 1 arg (id)", i+1)
 	}
 }
 

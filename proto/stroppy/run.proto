@@ -25,12 +25,6 @@ message DriverRunConfig {
   string url = 2;
 
   /**
-   * Default insert method. One of: "native", "plain_bulk", "plain_query".
-   * Matches TS DriverSetup.defaultInsertMethod.
-   */
-  string default_insert_method = 3;
-
-  /**
    * Pool configuration. Sugar field that maps to PostgresConfig or SqlConfig
    * in the TypeScript layer based on driver_type.
    * Matches TS DriverSetup.pool (PoolConfig).

@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
@@ -44,7 +45,9 @@ type (
 	}
 
 	Driver interface {
-		InsertValues(ctx context.Context, unit *stroppy.InsertDescriptor) (*stats.Query, error)
+		// InsertSpec runs a relational InsertSpec through the driver, streaming
+		// rows from a dgproto-driven runtime.Runtime into the database.
+		InsertSpec(ctx context.Context, spec *dgproto.InsertSpec) (*stats.Query, error)
 		RunQuery(ctx context.Context, sql string, args map[string]any) (*QueryResult, error)
 		Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (Tx, error)
 		Teardown(ctx context.Context) error
@@ -54,6 +57,12 @@ type (
 )
 
 var ErrNoRegisteredDriver = errors.New("no registered driver")
+
+// ErrInsertSpecNotImplemented is returned by drivers that have not yet
+// wired up the relational InsertSpec path. Drivers opt in by implementing
+// the full InsertSpec method; until then they return this sentinel so
+// callers can distinguish "not wired" from a genuine driver error.
+var ErrInsertSpecNotImplemented = errors.New("driver: InsertSpec not implemented")
 
 var registry = map[stroppy.DriverConfig_DriverType]driverConstructor{}
 

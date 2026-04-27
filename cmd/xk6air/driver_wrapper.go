@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 	"go.k6.io/k6/js/modules"
@@ -79,20 +80,21 @@ func (d *DriverWrapper) RunQuery(sql string, args map[string]any) (*driver.Query
 	return result, nil
 }
 
-// InsertValuesBin starts bulk insert blocking operation on driver.
-func (d *DriverWrapper) InsertValuesBin(insertMsg []byte, count int64) (*stats.Query, error) {
+// InsertSpecBin starts a relational bulk insert (InsertSpec) on the driver.
+// The argument is a serialised dgproto.InsertSpec — the TS wrapper handles
+// the marshal step so JS code never touches raw protobuf types.
+func (d *DriverWrapper) InsertSpecBin(specBin []byte) (*stats.Query, error) {
 	d.ensureReady()
 
-	var descriptor stroppy.InsertDescriptor
+	var spec dgproto.InsertSpec
 
-	err := proto.Unmarshal(insertMsg, &descriptor)
-	if err != nil {
-		return nil, fmt.Errorf("error while unmarshalling insert descriptor: %w", err)
+	if err := proto.Unmarshal(specBin, &spec); err != nil {
+		return nil, fmt.Errorf("error while unmarshalling InsertSpec: %w", err)
 	}
 
-	result, err := d.drv.InsertValues(d.vu.Context(), &descriptor)
+	result, err := d.drv.InsertSpec(d.vu.Context(), &spec)
 	if err != nil {
-		return nil, fmt.Errorf("error while executing insert: %w", err)
+		return nil, fmt.Errorf("error while executing InsertSpec: %w", err)
 	}
 
 	return result, nil

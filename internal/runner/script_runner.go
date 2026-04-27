@@ -185,11 +185,23 @@ func CreateAndInitTempDir(
 		filenames = append(filenames, input.SQL.Name)
 	}
 
-	// Copy all SQL files from the preset directory so TS can pick by driver type.
-	if input.Preset != "" {
-		copied, err := copyPresetSQLFiles(input.Preset, tempDir)
+	// Pull in sibling .ts / .sql files so multi-file workloads can import
+	// helpers (e.g. `./tpch_helpers.ts`) and pick SQL by driver type. The
+	// entry script and user-specified SQL are already in place; sibling
+	// helpers skip anything already present.
+	if input.Script.Source == SourceCwd && input.Script.Path != "" {
+		copied, err := copyLocalSiblings(filepath.Dir(input.Script.Path), tempDir)
 		if err != nil {
-			lg.Debug("Could not copy preset SQL files", zap.Error(err))
+			lg.Debug("Could not copy local sibling files", zap.Error(err))
+		} else {
+			filenames = append(filenames, copied...)
+		}
+	}
+
+	if input.Preset != "" {
+		copied, err := copyPresetSiblings(input.Preset, tempDir)
+		if err != nil {
+			lg.Debug("Could not copy preset sibling files", zap.Error(err))
 		} else {
 			filenames = append(filenames, copied...)
 		}
@@ -491,9 +503,11 @@ func (r *ScriptRunner) runK6(
 	return nil
 }
 
-// copyPresetSQLFiles copies all .sql files from an embedded preset directory to targetDir.
-// Files that already exist in targetDir are skipped.
-func copyPresetSQLFiles(preset, targetDir string) ([]string, error) {
+// copyPresetSiblings copies .ts and .sql files from an embedded preset
+// directory into targetDir. Files already present in targetDir (entry
+// script, user-chosen SQL override) are skipped so callers keep the first
+// write.
+func copyPresetSiblings(preset, targetDir string) ([]string, error) {
 	entries, err := workloads.Content.ReadDir(preset)
 	if err != nil {
 		return nil, err
@@ -502,13 +516,13 @@ func copyPresetSQLFiles(preset, targetDir string) ([]string, error) {
 	var copied []string
 
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+		if entry.IsDir() || !isWorkloadSibling(entry.Name()) {
 			continue
 		}
 
 		dest := filepath.Join(targetDir, entry.Name())
 		if _, err := os.Stat(dest); err == nil {
-			continue // already copied (e.g. the user-specified SQL file)
+			continue
 		}
 
 		data, err := workloads.Content.ReadFile(filepath.Join(preset, entry.Name()))
@@ -524,6 +538,53 @@ func copyPresetSQLFiles(preset, targetDir string) ([]string, error) {
 	}
 
 	return copied, nil
+}
+
+// copyLocalSiblings copies .ts and .sql files from srcDir on disk into
+// targetDir, skipping files already present. Used when the entry script
+// was resolved from the working directory so esbuild can resolve sibling
+// imports inside the temp working dir.
+func copyLocalSiblings(srcDir, targetDir string) ([]string, error) {
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var copied []string
+
+	for _, entry := range entries {
+		if entry.IsDir() || !isWorkloadSibling(entry.Name()) {
+			continue
+		}
+
+		dest := filepath.Join(targetDir, entry.Name())
+		if _, err := os.Stat(dest); err == nil {
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(srcDir, entry.Name()))
+		if err != nil {
+			return copied, err
+		}
+
+		if err := os.WriteFile(dest, data, common.FileMode); err != nil {
+			return copied, err
+		}
+
+		copied = append(copied, entry.Name())
+	}
+
+	return copied, nil
+}
+
+// isWorkloadSibling reports whether a filename is eligible to be auto-copied
+// alongside a workload entry script: TS helpers, SQL dialect files, and JSON
+// data files (e.g. distributions.json, answers_sf1.json, joints.json) that
+// workloads load at runtime.
+func isWorkloadSibling(name string) bool {
+	ext := filepath.Ext(name)
+
+	return ext == ".ts" || ext == ".sql" || ext == ".json"
 }
 
 // setEnvs set environment variables in [os.Environ] compatible format.

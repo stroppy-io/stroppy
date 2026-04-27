@@ -1,0 +1,684 @@
+syntax = "proto3";
+
+package stroppy.datagen;
+
+import "validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stroppy-io/stroppy/pkg/datagen/dgproto";
+
+// InsertSpec is the boundary message a workload emits per table load.
+message InsertSpec {
+  // Target table name.
+  string table = 1 [ (validate.rules).string.min_len = 1 ];
+  // Root PRNG seed for this load; 0 picks a random seed per run.
+  uint64 seed = 2;
+  // Wire protocol for row insertion.
+  InsertMethod method = 3 [ (validate.rules).enum.defined_only = true ];
+  // Worker hint for the Loader; clamped to the global cap.
+  Parallelism parallelism = 4;
+  // Relational descriptor for the rows this spec emits.
+  RelSource source = 5 [ (validate.rules).message.required = true ];
+  // Dict bodies keyed by the opaque TS-assigned ID that attrs reference.
+  map<string, Dict> dicts = 6;
+}
+
+// InsertMethod selects the driver-level protocol used to write rows.
+enum InsertMethod {
+  // Parameterized SQL statement per row or batch.
+  PLAIN_QUERY = 0;
+  // Multi-row VALUES statement prepared as one query.
+  PLAIN_BULK = 1;
+  // Driver-native path: COPY for Postgres, upload for YDB, bulk for MySQL.
+  NATIVE = 2;
+}
+
+// Parallelism carries worker hints from the spec author.
+message Parallelism {
+  // Desired worker count; the Loader clamps to the global cap.
+  int32 workers = 1;
+}
+
+// Dict is an inline values table referenced by an opaque key in InsertSpec.dicts.
+message Dict {
+  // Column names. Empty for scalar dicts; row values are parallel to this list.
+  repeated string columns = 1;
+  // Named weight profiles. Empty list means uniform draws. Each entry names one
+  // profile — tuple-joint, per-column marginal, per-column-pair conditional —
+  // that draw operators select by name at call time. The default profile is
+  // addressed by the empty name "".
+  repeated string weight_sets = 2;
+  // Row payloads. Length 1 for scalar dicts; parallel to columns otherwise.
+  repeated DictRow rows = 3;
+}
+
+// DictRow is one tuple of values plus optional parallel weights.
+message DictRow {
+  // Column values parallel to Dict.columns (length 1 for scalar dicts).
+  repeated string values = 1;
+  // Weights parallel to Dict.weight_sets. Empty when the dict is uniform.
+  repeated int64 weights = 2;
+}
+
+// RelSource is the relational descriptor for the rows a spec emits.
+message RelSource {
+  // Population this spec iterates.
+  Population population = 1 [ (validate.rules).message.required = true ];
+  // Attr definitions keyed into column_order for emission.
+  repeated Attr attrs = 2
+      [ (validate.rules).repeated = {min_items : 1} ];
+  // Column order used when rendering rows for the driver.
+  repeated string column_order = 3
+      [ (validate.rules).repeated = {min_items : 1} ];
+  // Cross-population relationships this source participates in.
+  repeated Relationship relationships = 4;
+  // Name of the relationship in relationships that drives iteration for this
+  // source. Empty when the source iterates its own population directly.
+  string iter = 5;
+  // Named cohort schedules selecting entity slots per bucket key.
+  repeated Cohort cohorts = 6;
+  // Sibling populations referenced via Lookup but never iterated.
+  repeated LookupPop lookup_pops = 7;
+  // SCD-2 row-split configuration. When set, the runtime auto-injects the
+  // named start_col / end_col values into every row based on a boundary
+  // row index: rows below boundary carry the historical pair, rows at or
+  // above carry the current pair.
+  SCD2 scd2 = 8;
+}
+
+// Population names the entity set a RelSource iterates and its cardinality.
+message Population {
+  // Stable identifier used by cross-population references.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Total number of entities this population defines.
+  int64 size = 2 [ (validate.rules).int64.gt = 0 ];
+  // When true the population is never iterated directly; it is read through
+  // cross-population reads only.
+  bool pure = 3;
+}
+
+// Attr binds a column name to the Expr that produces its value.
+message Attr {
+  // Column name; unique within the owning RelSource.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Expression tree that produces the column value for a row.
+  Expr expr = 2 [ (validate.rules).message.required = true ];
+  // Optional null-injection policy for this column.
+  Null null = 3;
+}
+
+// Null carries the rate and salt that control null injection for an attr.
+message Null {
+  // Probability of a null value in [0, 1].
+  float rate = 1 [ (validate.rules).float = {gte : 0, lte : 1} ];
+  // Per-attr salt that keeps the null-decision stream independent from the
+  // value-generation streams.
+  uint64 seed_salt = 2;
+}
+
+// Expr is the closed grammar for attribute value generation.
+message Expr {
+  oneof kind {
+    option (validate.required) = true;
+    // Read another attr in the current scope by name.
+    ColRef col = 1;
+    // Row-position indicator (entity, line, or global counter).
+    RowIndex row_index = 2;
+    // Typed scalar constant.
+    Literal lit = 3;
+    // Binary or unary operator over sub-expressions.
+    BinOp bin_op = 4;
+    // Stdlib function call by registered name.
+    Call call = 5;
+    // Typed ternary with lazy branch evaluation.
+    If if_ = 6;
+    // Row lookup into a Dict carried by the owning InsertSpec.
+    DictAt dict_at = 7;
+    // Named block-slot value from the enclosing Side.
+    BlockRef block_ref = 8;
+    // Cross-population column read.
+    Lookup lookup = 9;
+    // Seeded PRNG draw from a closed distribution catalog.
+    StreamDraw stream_draw = 10;
+    // Weighted random pick among Expr branches; only the selected
+    // branch evaluates.
+    Choose choose = 11;
+    // Entity-id draw from a named cohort schedule at a computed slot.
+    CohortDraw cohort_draw = 12;
+    // Boolean reporting whether the named cohort's bucket is active.
+    CohortLive cohort_live = 13;
+  }
+}
+
+// ColRef refers to another attribute in the same RelSource by name.
+message ColRef {
+  // Name of the referenced attribute.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+}
+
+// RowIndex produces a monotonically increasing integer tied to a row position.
+message RowIndex {
+  // Kind selects which counter the index reflects.
+  enum Kind {
+    // Default; treated as ENTITY by evaluators.
+    UNSPECIFIED = 0;
+    // Outer iterating side in a relationship; the population's own row when
+    // no relationship is active.
+    ENTITY = 1;
+    // Inner side in a relationship iteration.
+    LINE = 2;
+    // Global emitted-row counter across the whole load.
+    GLOBAL = 3;
+  }
+  // Which row counter to emit.
+  Kind kind = 1 [ (validate.rules).enum.defined_only = true ];
+}
+
+// Literal is a single typed scalar constant.
+message Literal {
+  oneof value {
+    option (validate.required) = true;
+    // Signed 64-bit integer literal.
+    int64 int64 = 1;
+    // 64-bit floating point literal.
+    double double = 2;
+    // UTF-8 string literal.
+    string string = 3;
+    // Boolean literal.
+    bool bool = 4;
+    // Raw bytes literal.
+    bytes bytes = 5;
+    // Timestamp literal used for date and datetime columns.
+    google.protobuf.Timestamp timestamp = 6;
+    // Explicit SQL NULL literal. Evaluates to Go nil in the row scratch,
+    // which the drivers render as NULL. Used for If branches that must
+    // yield NULL (e.g. TPC-C undelivered o_carrier_id / ol_delivery_d).
+    NullMarker null = 7;
+  }
+}
+
+// NullMarker is a zero-field marker message used as the payload of
+// typeless oneof arms. Proto oneofs cannot have bare-tag members, so
+// arms that carry no data (today: Literal.null) reference this message.
+message NullMarker {}
+
+// BinOp applies an arithmetic, comparison, or logical operator to sub-expressions.
+message BinOp {
+  // Op selects the operator; NOT is unary and uses only field `a`.
+  enum Op {
+    OP_UNSPECIFIED = 0;
+    // a + b
+    ADD = 1;
+    // a - b
+    SUB = 2;
+    // a * b
+    MUL = 3;
+    // a / b
+    DIV = 4;
+    // a % b
+    MOD = 5;
+    // String or list concatenation a || b
+    CONCAT = 6;
+    // a == b
+    EQ = 7;
+    // a != b
+    NE = 8;
+    // a < b
+    LT = 9;
+    // a <= b
+    LE = 10;
+    // a > b
+    GT = 11;
+    // a >= b
+    GE = 12;
+    // a AND b
+    AND = 13;
+    // a OR b
+    OR = 14;
+    // NOT a (unary; b is ignored)
+    NOT = 15;
+  }
+  // Operator to apply.
+  Op op = 1 [ (validate.rules).enum.defined_only = true ];
+  // Left operand, or the single operand for NOT.
+  Expr a = 2 [ (validate.rules).message.required = true ];
+  // Right operand; unset for unary operators.
+  Expr b = 3;
+}
+
+// Call invokes a stdlib function registered in pkg/datagen/stdlib.
+message Call {
+  // Registered function name, e.g. "std.format" or "std.days_to_date".
+  string func = 1 [ (validate.rules).string.min_len = 1 ];
+  // Positional arguments to the function.
+  repeated Expr args = 2;
+}
+
+// If is a typed ternary; only the selected branch evaluates.
+message If {
+  // Boolean condition.
+  Expr cond = 1 [ (validate.rules).message.required = true ];
+  // Expression evaluated when cond is true.
+  Expr then = 2 [ (validate.rules).message.required = true ];
+  // Expression evaluated when cond is false.
+  Expr else_ = 3 [ (validate.rules).message.required = true ];
+}
+
+// DictAt reads one column of one row from a Dict carried by InsertSpec.dicts.
+message DictAt {
+  // Opaque dict key matching an entry in InsertSpec.dicts.
+  string dict_key = 1 [ (validate.rules).string.min_len = 1 ];
+  // Row index into the dict; wrapped modulo row count at evaluation time.
+  Expr index = 2 [ (validate.rules).message.required = true ];
+  // Column name for joint dicts; empty for scalar dicts.
+  string column = 3;
+}
+
+// Relationship binds two or more populations into a joint iteration space.
+message Relationship {
+  // Stable identifier; referenced by RelSource.iter.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Participating sides; two or more populations project into the relation.
+  repeated Side sides = 2
+      [ (validate.rules).repeated = {min_items : 2} ];
+}
+
+// Side projects one population into a Relationship with a degree and strategy.
+message Side {
+  // Name of the projected population; must match RelSource.population.name or
+  // a declared RelSource.lookup_pops[].population.name.
+  string population = 1 [ (validate.rules).string.min_len = 1 ];
+  // How many inner entities per outer entity this side produces.
+  Degree degree = 2;
+  // Pairing strategy used to map outer entities to inner ones.
+  Strategy strategy = 3;
+  // Named expressions evaluated once per outer-side entity and reused across
+  // that entity's inner rows.
+  repeated BlockSlot block_slots = 4;
+}
+
+// Degree sets how many inner rows pair with one outer row for a Side.
+message Degree {
+  oneof kind {
+    // Constant inner-row count per outer entity.
+    DegreeFixed fixed = 1;
+    // Uniform-draw inner-row count per outer entity.
+    DegreeUniform uniform = 2;
+  }
+}
+
+// DegreeFixed carries a constant inner-row count per outer entity.
+message DegreeFixed {
+  // Inner rows emitted per outer-side entity.
+  int64 count = 1 [ (validate.rules).int64.gt = 0 ];
+}
+
+// DegreeUniform draws the inner-row count from a uniform range per entity.
+message DegreeUniform {
+  // Inclusive lower bound on inner-row count.
+  int64 min = 1 [ (validate.rules).int64.gte = 0 ];
+  // Inclusive upper bound on inner-row count.
+  int64 max = 2 [ (validate.rules).int64.gt = 0 ];
+}
+
+// Strategy selects how outer-side entities are mapped to inner-side entities.
+message Strategy {
+  oneof kind {
+    // Hash-of-outer-index pairing.
+    StrategyHash hash = 1;
+    // Sequential walk over inner entities.
+    StrategySequential sequential = 2;
+    // Equitable allocation spreading inner entities evenly across outer ones.
+    StrategyEquitable equitable = 3;
+  }
+}
+
+// StrategyHash pairs entities by hashing the outer index.
+message StrategyHash {}
+
+// StrategySequential walks inner entities in order.
+message StrategySequential {}
+
+// StrategyEquitable distributes inner entities evenly across outer ones.
+message StrategyEquitable {}
+
+// BlockSlot is a named expression cached per outer-side entity boundary.
+message BlockSlot {
+  // Slot name; referenced by BlockRef.slot from inner-side Expr trees.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Expression evaluated once per outer-side entity.
+  Expr expr = 2 [ (validate.rules).message.required = true ];
+}
+
+// BlockRef reads a named slot on the enclosing Side, resolved against the
+// current outer-side entity.
+message BlockRef {
+  // Slot name declared on Side.block_slots.
+  string slot = 1 [ (validate.rules).string.min_len = 1 ];
+}
+
+// Lookup reads an attribute value from another population at a computed index.
+message Lookup {
+  // Target population name; either the current iter-side population or an
+  // entry in the enclosing RelSource.lookup_pops.
+  string target_pop = 1 [ (validate.rules).string.min_len = 1 ];
+  // Attribute name within the target population.
+  string attr_name = 2 [ (validate.rules).string.min_len = 1 ];
+  // Expression yielding the entity index within target_pop.
+  Expr entity_index = 3 [ (validate.rules).message.required = true ];
+}
+
+// LookupPop describes a pure sibling population that is read via Lookup only.
+// Its attributes are evaluated lazily and cached by the runtime.
+message LookupPop {
+  // Population descriptor for the sibling; referenced by Lookup.target_pop.
+  Population population = 1;
+  // Attribute definitions available for lookup.
+  repeated Attr attrs = 2;
+  // Column order for the population; parallels RelSource.column_order.
+  repeated string column_order = 3;
+}
+
+// StreamDraw carries every randomness-producing arm. stream_id is
+// assigned at compile time so that identical specs produce identical
+// streams across runs without any pointer-keyed memoization.
+message StreamDraw {
+  // Compile-time assigned identifier unique within an InsertSpec. The
+  // per-row PRNG is seeded from (root_seed, attr_path, stream_id,
+  // row_index); stream_id keeps multiple draws within one attr
+  // independent.
+  uint32 stream_id = 1;
+  oneof draw {
+    option (validate.required) = true;
+    // Uniform integer draw over [min, max] inclusive.
+    DrawIntUniform int_uniform = 10;
+    // Uniform float draw over [min, max).
+    DrawFloatUniform float_uniform = 11;
+    // Truncated normal draw clamped to [min, max].
+    DrawNormal normal = 12;
+    // Zipfian power-law draw over [min, max].
+    DrawZipf zipf = 13;
+    // TPC-C §2.1.6 non-uniform random draw.
+    DrawNURand nurand = 14;
+    // Bernoulli {0, 1} draw with probability p of 1.
+    DrawBernoulli bernoulli = 15;
+    // Weighted or uniform pick from a Dict.
+    DrawDict dict = 16;
+    // Joint tuple draw from a multi-column Dict.
+    DrawJoint joint = 17;
+    // Uniform date draw over an epoch-day range.
+    DrawDate date = 18;
+    // Uniform decimal draw rounded to a fixed scale.
+    DrawDecimal decimal = 19;
+    // Random ASCII string drawn from an alphabet.
+    DrawAscii ascii = 20;
+    // Space-joined word sequence drawn from a vocabulary Dict.
+    DrawPhrase phrase = 21;
+    // Two-phase template walker over a root / phrase / leaf dict set.
+    DrawGrammar grammar = 22;
+  }
+}
+
+// DrawIntUniform draws an integer uniformly from [min, max] inclusive.
+message DrawIntUniform {
+  // Inclusive lower bound; evaluates to int64.
+  Expr min = 1 [ (validate.rules).message.required = true ];
+  // Inclusive upper bound; evaluates to int64 and must be >= min.
+  Expr max = 2 [ (validate.rules).message.required = true ];
+}
+
+// DrawFloatUniform draws a float uniformly from [min, max).
+message DrawFloatUniform {
+  // Inclusive lower bound; evaluates to float64.
+  Expr min = 1 [ (validate.rules).message.required = true ];
+  // Exclusive upper bound; evaluates to float64 and must be > min.
+  Expr max = 2 [ (validate.rules).message.required = true ];
+}
+
+// DrawNormal draws from a truncated normal clamped to [min, max].
+// Mean is (min+max)/2 and stddev is (max-min)/(2*screw). screw=0 falls
+// back to the default of 3.0.
+message DrawNormal {
+  // Inclusive lower clamp; evaluates to float64.
+  Expr min = 1 [ (validate.rules).message.required = true ];
+  // Inclusive upper clamp; evaluates to float64.
+  Expr max = 2 [ (validate.rules).message.required = true ];
+  // Screw factor; controls spread. 0 means default 3.0.
+  float screw = 3;
+}
+
+// DrawZipf draws from a Zipfian distribution over [min, max].
+message DrawZipf {
+  // Inclusive lower bound; evaluates to int64.
+  Expr min = 1 [ (validate.rules).message.required = true ];
+  // Inclusive upper bound; evaluates to int64.
+  Expr max = 2 [ (validate.rules).message.required = true ];
+  // Skew exponent; 0 means default 1.0.
+  double exponent = 3;
+}
+
+// DrawNURand realizes the TPC-C §2.1.6 NURand(A, x, y) formula.
+message DrawNURand {
+  // Bitmask upper bound; TPC-C spec names A.
+  int64 a = 1;
+  // Inclusive lower bound on the output range.
+  int64 x = 2;
+  // Inclusive upper bound on the output range.
+  int64 y = 3;
+  // Salt from which the per-stream constant C is derived.
+  uint64 c_salt = 4;
+}
+
+// DrawBernoulli draws a {0, 1} int64 with probability p of 1.
+message DrawBernoulli {
+  // Probability of a 1 outcome; must be in [0, 1].
+  float p = 1 [ (validate.rules).float = {gte : 0, lte : 1} ];
+}
+
+// DrawDict draws a row from a scalar Dict, optionally weighted.
+message DrawDict {
+  // Opaque dict key matching an entry in InsertSpec.dicts.
+  string dict_key = 1 [ (validate.rules).string.min_len = 1 ];
+  // Weight profile to use; empty selects the default (or uniform if
+  // the dict carries no weights).
+  string weight_set = 2;
+}
+
+// DrawJoint draws a tuple from a multi-column Dict and returns one
+// column of the chosen tuple.
+message DrawJoint {
+  // Opaque dict key matching an entry in InsertSpec.dicts.
+  string dict_key = 1 [ (validate.rules).string.min_len = 1 ];
+  // Column name whose value is returned.
+  string column = 2 [ (validate.rules).string.min_len = 1 ];
+  // Tuple-scoping identifier reserved for sharing one draw across
+  // several columns; D1 treats each DrawJoint as independent.
+  uint32 tuple_scope = 3;
+  // Weight profile to use; empty selects the default (or uniform).
+  string weight_set = 4;
+}
+
+// DrawDate draws a date uniformly from an epoch-day range. Both bounds
+// are counted in days since 1970-01-01 UTC.
+message DrawDate {
+  // Inclusive lower bound in days since the epoch.
+  int64 min_days_epoch = 1;
+  // Inclusive upper bound in days since the epoch.
+  int64 max_days_epoch = 2;
+}
+
+// DrawDecimal draws a float64 uniformly from [min, max] and rounds the
+// result to `scale` fractional digits.
+message DrawDecimal {
+  // Inclusive lower bound; evaluates to float64.
+  Expr min = 1 [ (validate.rules).message.required = true ];
+  // Inclusive upper bound; evaluates to float64.
+  Expr max = 2 [ (validate.rules).message.required = true ];
+  // Number of fractional digits to retain.
+  uint32 scale = 3;
+}
+
+// DrawAscii constructs a string from `alphabet` with a uniformly-drawn
+// length in [min_len, max_len].
+message DrawAscii {
+  // Inclusive lower length bound; evaluates to int64 and must be >= 0.
+  Expr min_len = 1 [ (validate.rules).message.required = true ];
+  // Inclusive upper length bound; evaluates to int64 and must be >=
+  // min_len.
+  Expr max_len = 2 [ (validate.rules).message.required = true ];
+  // Codepoint ranges sampled uniformly by width.
+  repeated AsciiRange alphabet = 3
+      [ (validate.rules).repeated = {min_items : 1} ];
+}
+
+// AsciiRange is one contiguous [min, max] codepoint range sampled by
+// DrawAscii.
+message AsciiRange {
+  // Inclusive lower codepoint.
+  uint32 min = 1;
+  // Inclusive upper codepoint; must be >= min.
+  uint32 max = 2;
+}
+
+// DrawPhrase concatenates `n` words drawn uniformly from a vocabulary
+// Dict, separated by `separator`.
+message DrawPhrase {
+  // Opaque dict key matching an entry in InsertSpec.dicts.
+  string vocab_key = 1 [ (validate.rules).string.min_len = 1 ];
+  // Inclusive lower word-count bound; evaluates to int64 and must be
+  // >= 1.
+  Expr min_words = 2 [ (validate.rules).message.required = true ];
+  // Inclusive upper word-count bound; evaluates to int64 and must be
+  // >= min_words.
+  Expr max_words = 3 [ (validate.rules).message.required = true ];
+  // Separator joining drawn words; empty means no separator.
+  string separator = 4;
+}
+
+// DrawGrammar walks a two-phase template: a root dict carries sentence
+// templates whose tokens are either literal words or single uppercase
+// ASCII letters; each letter resolves either into a phrase template
+// (one expansion level) or directly into a leaf word.
+message DrawGrammar {
+  // Opaque key of the root template dict in InsertSpec.dicts.
+  string root_dict = 1 [ (validate.rules).string.min_len = 1 ];
+  // Phrase-level nonterminals: letter -> dict key of template rows.
+  // When a letter in root_dict's picked template matches a key here,
+  // the walker picks a phrase template from the referenced dict and
+  // tokenizes it — letters inside that phrase resolve via `leaves`.
+  // Exactly one level of phrase expansion; no further phrase recursion.
+  map<string, string> phrases = 2;
+  // Leaf nonterminals: letter -> dict key of leaf word rows.
+  // Used when a letter has no `phrases` entry, and when resolving
+  // letters inside a phrase expansion.
+  map<string, string> leaves = 3 [ (validate.rules).map.min_pairs = 1 ];
+  // Length bound (characters, not tokens) on the final joined string.
+  // If the walked text is longer, it is truncated. If shorter, it is
+  // accepted as-is (no padding — spec doesn't require minimum).
+  Expr max_len = 4 [ (validate.rules).message.required = true ];
+  // Optional. If set and walked length < min_len, re-walk with a fresh
+  // sub-stream until a long-enough string is produced or max_attempts
+  // (fixed at 8) is exhausted; on exhaustion, return what we have.
+  Expr min_len = 5;
+}
+
+// Choose picks one of several Expr branches at random with probability
+// proportional to branch weight. Only the selected branch evaluates.
+message Choose {
+  // Compile-time assigned identifier unique within an InsertSpec; used
+  // to seed the selection draw alongside attr_path and row_index.
+  uint32 stream_id = 1;
+  // Candidate branches; at least one required, all weights positive.
+  repeated ChooseBranch branches = 2
+      [ (validate.rules).repeated = {min_items : 1} ];
+}
+
+// ChooseBranch is one weighted alternative within a Choose.
+message ChooseBranch {
+  // Positive relative weight; larger weight raises selection probability.
+  int64 weight = 1 [ (validate.rules).int64.gt = 0 ];
+  // Expression evaluated only when this branch is selected.
+  Expr expr = 2 [ (validate.rules).message.required = true ];
+}
+
+// Cohort is a named schedule that picks cohort_size entity IDs from
+// the inclusive range [entity_min, entity_max] per bucket key. The
+// schedule is stateless: repeated draws for the same (name, bucket_key,
+// slot) triple return the same entity ID across runs and workers.
+message Cohort {
+  // Stable identifier referenced by CohortDraw.name and CohortLive.name.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Number of entities drawn per active bucket; must be <= span + 1.
+  int64 cohort_size = 2 [ (validate.rules).int64.gt = 0 ];
+  // Inclusive lower bound on the entity ID range drawn from.
+  int64 entity_min = 3 [ (validate.rules).int64.gte = 0 ];
+  // Inclusive upper bound on the entity ID range drawn from.
+  int64 entity_max = 4 [ (validate.rules).int64.gte = 0 ];
+  // Default bucket-key expression; may be overridden at each call site.
+  Expr bucket_key = 5;
+  // Every N-th bucket is active. 0 or 1 means every bucket is active.
+  int64 active_every = 6 [ (validate.rules).int64.gte = 0 ];
+  // Modulus used to collapse bucket keys when seeding the persistent
+  // slice. 0 disables persistence regardless of persistence_ratio.
+  int64 persistence_mod = 7 [ (validate.rules).int64.gte = 0 ];
+  // Fraction of cohort_size seeded by (bucket_key mod persistence_mod);
+  // the remainder is seeded by bucket_key directly. 0 disables
+  // persistence regardless of persistence_mod.
+  float persistence_ratio = 8 [ (validate.rules).float = {gte : 0, lte : 1} ];
+  // Per-cohort salt providing independence across schedules that share
+  // the same entity range.
+  uint64 seed_salt = 9;
+}
+
+// CohortDraw reads the entity ID at position `slot` in the named
+// cohort's schedule for the bucket key yielded by bucket_key (falling
+// back to the Cohort's default bucket_key when unset).
+message CohortDraw {
+  // Cohort schedule name; must match an entry in RelSource.cohorts.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Slot index within the cohort; must be in [0, cohort_size).
+  Expr slot = 2 [ (validate.rules).message.required = true ];
+  // Bucket-key override; when unset the Cohort's default bucket_key
+  // is used.
+  Expr bucket_key = 3;
+}
+
+// CohortLive reports whether the bucket named by bucket_key (or the
+// Cohort's default bucket_key when unset) is active in the named
+// cohort's schedule.
+message CohortLive {
+  // Cohort schedule name; must match an entry in RelSource.cohorts.
+  string name = 1 [ (validate.rules).string.min_len = 1 ];
+  // Bucket-key override; when unset the Cohort's default bucket_key
+  // is used.
+  Expr bucket_key = 2;
+}
+
+// SCD2 splits the population's row space into a historical slice and a
+// current slice at a compile-time boundary row index. The runtime
+// auto-injects start_col and end_col values per row; authors list these
+// two columns in RelSource.column_order but do not declare them in
+// RelSource.attrs.
+message SCD2 {
+  // Column name receiving the start-of-validity value. Must appear in
+  // the owning RelSource's column_order and must not be declared in
+  // column_order twice or as an attr name.
+  string start_col = 1 [ (validate.rules).string.min_len = 1 ];
+  // Column name receiving the end-of-validity value.
+  string end_col = 2 [ (validate.rules).string.min_len = 1 ];
+  // Boundary row index. Rows with global row_index < boundary get the
+  // historical pair; rows at or above get the current pair. The Expr
+  // must fold to a constant int64 at NewRuntime time; runtime-varying
+  // boundaries are not supported.
+  Expr boundary = 3 [ (validate.rules).message.required = true ];
+  // Start-of-validity value for the historical slice. Evaluated once
+  // at NewRuntime against an empty-scratch context; must be constant.
+  Expr historical_start = 4 [ (validate.rules).message.required = true ];
+  // End-of-validity value for the historical slice.
+  Expr historical_end = 5 [ (validate.rules).message.required = true ];
+  // Start-of-validity value for the current slice.
+  Expr current_start = 6 [ (validate.rules).message.required = true ];
+  // End-of-validity value for the current slice. When unset, the
+  // runtime emits nil (SQL NULL) for end_col on current rows.
+  Expr current_end = 7;
+}
