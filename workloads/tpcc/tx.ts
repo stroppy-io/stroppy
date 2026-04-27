@@ -690,9 +690,9 @@ export function setup() {
 
   // Built post-load on YDB to keep secondary-index write amplification
   // out of the bulk-load path. Other dialects don't define this section,
-  // so sql("create_indexes") is empty and this step is a no-op.
+  // so the lookup returns undefined and this step is a no-op.
   Step("create_indexes", () => {
-    sql("create_indexes").forEach((query) => driver.exec(query, {}));
+    (sql("create_indexes") ?? []).forEach((query) => driver.exec(query, {}));
   });
 
   // Spec §3.3.2 CC1-CC4 + §4.3.4 cardinalities + §4.3.3.1 distribution rules.
