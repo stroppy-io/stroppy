@@ -9,13 +9,22 @@ import (
 	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
+const defaultBulkWorkers = 8
+
 // insertValuesNative uses YDB native BulkUpsert for fast non-transactional
 // batch insertion via the underlying ydb-go-sdk driver.
+//
+// Row generation is sequential (generators maintain internal state), but
+// completed batches are flushed concurrently — up to defaultBulkWorkers
+// BulkUpsert calls in flight at once. Each goroutine owns its batch slice;
+// the main loop allocates a fresh slice after dispatching.
 func (d *Driver) insertValuesNative(
 	ctx context.Context,
 	builder *queries.QueryBuilder,
@@ -25,25 +34,12 @@ func (d *Driver) insertValuesNative(
 	tablePath := path.Join(d.nativeDB.Name(), builder.TableName())
 
 	start := time.Now()
+
+	g, gctx := errgroup.WithContext(ctx)
+	sem := semaphore.NewWeighted(defaultBulkWorkers)
+
 	values := make([]any, len(cols))
 	batch := make([]types.Value, 0, d.bulkSize)
-
-	flush := func() error {
-		if len(batch) == 0 {
-			return nil
-		}
-
-		rows := types.ListValue(batch...)
-		if err := d.nativeDB.Table().BulkUpsert(
-			ctx, tablePath, table.BulkUpsertDataRows(rows),
-		); err != nil {
-			return fmt.Errorf("ydb bulk upsert: %w", err)
-		}
-
-		batch = batch[:0]
-
-		return nil
-	}
 
 	for i := range total {
 		if err := builder.Build(values); err != nil {
@@ -63,13 +59,49 @@ func (d *Driver) insertValuesNative(
 		batch = append(batch, types.StructValue(fields...))
 
 		if len(batch) >= d.bulkSize {
-			if err := flush(); err != nil {
-				return nil, err
+			if err := sem.Acquire(gctx, 1); err != nil {
+				break // context cancelled by a failed flush
 			}
+
+			toFlush := batch
+			batch = make([]types.Value, 0, d.bulkSize)
+
+			g.Go(func() error {
+				defer sem.Release(1)
+
+				rows := types.ListValue(toFlush...)
+				if err := d.nativeDB.Table().BulkUpsert(
+					gctx, tablePath, table.BulkUpsertDataRows(rows),
+				); err != nil {
+					return fmt.Errorf("ydb bulk upsert: %w", err)
+				}
+
+				return nil
+			})
 		}
 	}
 
-	if err := flush(); err != nil {
+	// Flush trailing partial batch.
+	if len(batch) > 0 {
+		if err := sem.Acquire(gctx, 1); err == nil {
+			toFlush := batch
+
+			g.Go(func() error {
+				defer sem.Release(1)
+
+				rows := types.ListValue(toFlush...)
+				if err := d.nativeDB.Table().BulkUpsert(
+					gctx, tablePath, table.BulkUpsertDataRows(rows),
+				); err != nil {
+					return fmt.Errorf("ydb bulk upsert: %w", err)
+				}
+
+				return nil
+			})
+		}
+	}
+
+	if err := g.Wait(); err != nil {
 		return nil, err
 	}
 
