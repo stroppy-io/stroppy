@@ -18,6 +18,7 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.11.1
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.134.1
+	github.com/ydb-platform/ydb-go-yc-metadata v0.6.1
 	go.k6.io/k6 v1.6.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/sync v0.19.0

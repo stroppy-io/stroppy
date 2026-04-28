@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	ydbsdk "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	yc "github.com/ydb-platform/ydb-go-yc-metadata"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
@@ -18,6 +20,8 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 )
+
+const primaryConnectTimeout = 3 * time.Second
 
 var ErrUnsupportedInsertMethod = errors.New("unsupported insert method for ydb driver")
 
@@ -51,42 +55,29 @@ func NewDriver(
 	}
 
 	cfg := opts.Config
-
+	sqlCfg := cfg.GetSql()
 	connOpts := buildConnectionOptions(lg, cfg, opts.DialFunc)
 
-	nativeDB, err := ydbsdk.Open(ctx, cfg.GetUrl(), connOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open ydb connection: %w", err)
-	}
+	primaryCtx, cancelPrimary := context.WithTimeout(ctx, primaryConnectTimeout)
+	db, nativeDB, primaryErr := tryConnect(primaryCtx, lg, cfg, sqlCfg, connOpts, primaryConnectTimeout)
 
-	connector, err := ydbsdk.Connector(nativeDB,
-		ydbsdk.WithQueryService(true),
-		ydbsdk.WithAutoDeclare(),
-		ydbsdk.WithPositionalArgs(),
-	)
-	if err != nil {
-		nativeDB.Close(ctx)
+	cancelPrimary()
 
-		return nil, fmt.Errorf("failed to create ydb connector: %w", err)
-	}
+	if primaryErr != nil {
+		lg.Warn("primary auth failed, retrying with Yandex Cloud metadata service",
+			zap.Error(primaryErr))
 
-	db := sql.OpenDB(connector)
+		ycOpts := []ydbsdk.Option{yc.WithCredentials(), yc.WithInternalCA()}
+		fallbackOpts := make([]ydbsdk.Option, 0, len(connOpts)+len(ycOpts))
+		fallbackOpts = append(fallbackOpts, connOpts...)
+		fallbackOpts = append(fallbackOpts, ycOpts...)
 
-	sqlCfg := cfg.GetSql()
-	if err = sqldriver.ApplySQLConfig(db, sqlCfg); err != nil {
-		db.Close()
-		nativeDB.Close(ctx)
+		var fallbackErr error
 
-		return nil, fmt.Errorf("failed to apply SQL config: %w", err)
-	}
-
-	lg.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
-
-	if err = sqldriver.WaitForDB(ctx, lg, &sqldriver.DBPinger{DB: db}, 0); err != nil {
-		db.Close()
-		nativeDB.Close(ctx)
-
-		return nil, err
+		db, nativeDB, fallbackErr = tryConnect(ctx, lg, cfg, sqlCfg, fallbackOpts, 0)
+		if fallbackErr != nil {
+			return nil, errors.Join(primaryErr, fmt.Errorf("yc metadata fallback: %w", fallbackErr))
+		}
 	}
 
 	const defaultBulkSize = 2500
@@ -104,6 +95,51 @@ func NewDriver(
 		sqlCfg:   sqlCfg,
 		bulkSize: bulkSize,
 	}, nil
+}
+
+func tryConnect(
+	ctx context.Context,
+	lg *zap.Logger,
+	cfg *stroppy.DriverConfig,
+	sqlCfg *stroppy.DriverConfig_SqlConfig,
+	connOpts []ydbsdk.Option,
+	pingTimeout time.Duration,
+) (*sql.DB, *ydbsdk.Driver, error) {
+	nativeDB, err := ydbsdk.Open(ctx, cfg.GetUrl(), connOpts...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open ydb connection: %w", err)
+	}
+
+	connector, err := ydbsdk.Connector(nativeDB,
+		ydbsdk.WithQueryService(true),
+		ydbsdk.WithAutoDeclare(),
+		ydbsdk.WithPositionalArgs(),
+	)
+	if err != nil {
+		nativeDB.Close(ctx)
+
+		return nil, nil, fmt.Errorf("create ydb connector: %w", err)
+	}
+
+	db := sql.OpenDB(connector)
+
+	if err = sqldriver.ApplySQLConfig(db, sqlCfg); err != nil {
+		db.Close()
+		nativeDB.Close(ctx)
+
+		return nil, nil, fmt.Errorf("apply SQL config: %w", err)
+	}
+
+	lg.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
+
+	if err = sqldriver.WaitForDB(ctx, lg, &sqldriver.DBPinger{DB: db}, pingTimeout); err != nil {
+		db.Close()
+		nativeDB.Close(ctx)
+
+		return nil, nil, err
+	}
+
+	return db, nativeDB, nil
 }
 
 func buildConnectionOptions(
