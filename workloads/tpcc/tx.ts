@@ -186,7 +186,9 @@ const driver = DriverX.create().setup(driverConfig);
 const IS_PICODATA = driverConfig.driverType === "picodata";
 // pg and ydb support UPDATE...RETURNING — merge UPDATE + SELECT into one
 // round-trip in payment() for warehouse/district YTD updates.
-const HAS_RETURNING = driverConfig.driverType === "postgres" || driverConfig.driverType === "ydb";
+// Override with HAS_RETURNING=false for pgwire-compat layers that don't support portals.
+const HAS_RETURNING = ENV("HAS_RETURNING", ENV.auto, "Force RETURNING support on/off") !== "false"
+  && (driverConfig.driverType === "postgres" || driverConfig.driverType === "ydb");
 
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
