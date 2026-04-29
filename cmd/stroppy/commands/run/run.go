@@ -16,13 +16,23 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 )
 
-const consumedPairFlag = 2 // number of tokens consumed for a two-token flag (e.g. "-d pg")
+const (
+	consumedPairFlag = 2 // number of tokens consumed for a two-token flag (e.g. "-d pg")
+	flagSteps        = "--steps"
+	flagNoSteps      = "--no-steps"
+)
 
 var (
-	errNoScript          = errors.New("script argument is required")
-	errFlagRequiresValue = errors.New("flag requires a value")
-	errStepsMutExclusive = errors.New("--steps and --no-steps are mutually exclusive")
-	errBadKeyValue       = errors.New("expected key=value format")
+	errNoScript           = errors.New("script argument is required")
+	errFlagRequiresValue  = errors.New("flag requires a value")
+	errStepsMutExclusive  = errors.New("--steps and --no-steps are mutually exclusive")
+	errBadKeyValue        = errors.New("expected key=value format")
+	errUnknownRunFlag     = errors.New("unknown run flag")
+	errPositionalAfterOpt = errors.New("unexpected positional argument after options")
+	errKeyValuePositional = errors.New("unexpected key=value positional argument")
+	errTooManyPositionals = errors.New(
+		"too many positional arguments; expected script and optional sql_file before --",
+	)
 )
 
 var Cmd = &cobra.Command{
@@ -39,6 +49,7 @@ var Cmd = &cobra.Command{
 Files are searched in: current directory → ~/.stroppy/ → built-in workloads.
 SQL files are auto-derived from the preset/script name unless specified explicitly.
 See 'stroppy help resolution' for details on how files are found.
+The script and optional sql_file positionals must be adjacent before --.
 
 Environment flags:
   -e, --env KEY=VALUE     Set env var for the script (lowercase auto-uppercased)
@@ -143,7 +154,9 @@ Config file flags:
 
 		for idx, opts := range parsed.driverOpts {
 			for _, kv := range opts {
-				applyDriverOpt(driverConfigs, idx, kv[0], kv[1])
+				if err := applyDriverOpt(driverConfigs, idx, kv[0], kv[1]); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -198,6 +211,14 @@ type runArgs struct {
 // Returns the number of tokens consumed, or 0 if the arg is not this flag.
 type flagParser func(args []string, i int, parsed *runArgs) (int, error)
 
+type positionalState int
+
+const (
+	beforePositionals positionalState = iota
+	inPositionals
+	afterPositionals
+)
+
 // parseRunArgs parses the raw CLI args (after cobra hands them to RunE) and
 // returns the structured result without performing any file or preset resolution.
 func parseRunArgs(args []string) (runArgs, error) {
@@ -219,23 +240,8 @@ func parseRunArgs(args []string) (runArgs, error) {
 		parseDriverFlags,
 	}
 
-	for i := 0; i < len(positional); i++ {
-		consumed, err := dispatchFlag(parsers, positional, i, &parsed)
-		if err != nil {
-			return runArgs{}, err
-		}
-
-		if consumed > 0 {
-			i += consumed - 1
-
-			continue
-		}
-
-		if parsed.scriptArg == "" {
-			parsed.scriptArg = positional[i]
-		} else {
-			parsed.sqlArg = positional[i]
-		}
+	if err := parseRunArgsBeforeDash(positional, parsers, &parsed); err != nil {
+		return runArgs{}, err
 	}
 
 	if len(parsed.steps) > 0 && len(parsed.noSteps) > 0 {
@@ -243,6 +249,59 @@ func parseRunArgs(args []string) (runArgs, error) {
 	}
 
 	return parsed, nil
+}
+
+func parseRunArgsBeforeDash(positional []string, parsers []flagParser, parsed *runArgs) error {
+	state := beforePositionals
+
+	for i := 0; i < len(positional); i++ {
+		consumed, err := dispatchFlag(parsers, positional, i, parsed)
+		if err != nil {
+			return err
+		}
+
+		if consumed > 0 {
+			if state == inPositionals {
+				state = afterPositionals
+			}
+
+			i += consumed - 1
+
+			continue
+		}
+
+		state, err = applyPositionalArg(positional[i], state, parsed)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func applyPositionalArg(arg string, state positionalState, parsed *runArgs) (positionalState, error) {
+	if strings.HasPrefix(arg, "-") && arg != "-" {
+		return state, fmt.Errorf("%w %q; pass k6 flags after --", errUnknownRunFlag, arg)
+	}
+
+	if state == afterPositionals {
+		return state, positionalAfterOptionsError(arg)
+	}
+
+	if isKeyValuePositional(arg) {
+		return state, keyValuePositionalError(arg)
+	}
+
+	switch {
+	case parsed.scriptArg == "":
+		parsed.scriptArg = arg
+	case parsed.sqlArg == "":
+		parsed.sqlArg = arg
+	default:
+		return state, fmt.Errorf("%w: %q", errTooManyPositionals, arg)
+	}
+
+	return inPositionals, nil
 }
 
 // dispatchFlag tries each parser in order until one consumes the arg at
@@ -268,13 +327,14 @@ func parseStepsFlag(args []string, i int, parsed *runArgs) (int, error) {
 	arg := args[i]
 
 	switch {
-	case arg == "--steps" || arg == "--no-steps":
-		if i+1 >= len(args) {
-			return 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
+	case arg == flagSteps || arg == flagNoSteps:
+		value, err := nextFlagValue(args, i)
+		if err != nil {
+			return 0, err
 		}
 
-		vals := strings.Split(args[i+1], ",")
-		if arg == "--steps" {
+		vals := strings.Split(value, ",")
+		if arg == flagSteps {
 			parsed.steps = append(parsed.steps, vals...)
 		} else {
 			parsed.noSteps = append(parsed.noSteps, vals...)
@@ -282,13 +342,13 @@ func parseStepsFlag(args []string, i int, parsed *runArgs) (int, error) {
 
 		return consumedPairFlag, nil
 
-	case strings.HasPrefix(arg, "--steps="):
-		parsed.steps = append(parsed.steps, strings.Split(strings.TrimPrefix(arg, "--steps="), ",")...)
+	case strings.HasPrefix(arg, flagSteps+"="):
+		parsed.steps = append(parsed.steps, strings.Split(strings.TrimPrefix(arg, flagSteps+"="), ",")...)
 
 		return 1, nil
 
-	case strings.HasPrefix(arg, "--no-steps="):
-		parsed.noSteps = append(parsed.noSteps, strings.Split(strings.TrimPrefix(arg, "--no-steps="), ",")...)
+	case strings.HasPrefix(arg, flagNoSteps+"="):
+		parsed.noSteps = append(parsed.noSteps, strings.Split(strings.TrimPrefix(arg, flagNoSteps+"="), ",")...)
 
 		return 1, nil
 	}
@@ -303,11 +363,12 @@ func parseFileFlag(args []string, i int, parsed *runArgs) (int, error) {
 
 	switch {
 	case arg == "-f" || arg == "--file":
-		if i+1 >= len(args) {
-			return 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
+		value, err := nextFlagValue(args, i)
+		if err != nil {
+			return 0, err
 		}
 
-		parsed.fileArg = args[i+1]
+		parsed.fileArg = value
 
 		return consumedPairFlag, nil
 
@@ -332,11 +393,12 @@ func parseEnvFlag(args []string, i int, parsed *runArgs) (int, error) {
 
 	switch {
 	case arg == "-e" || arg == "--env":
-		if i+1 >= len(args) {
-			return 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
+		value, err := nextFlagValue(args, i)
+		if err != nil {
+			return 0, err
 		}
 
-		parsed.envArgs = append(parsed.envArgs, args[i+1])
+		parsed.envArgs = append(parsed.envArgs, value)
 
 		return consumedPairFlag, nil
 
@@ -397,11 +459,12 @@ func parseFlagNextArg(
 
 	for _, prefix := range []string{shortPrefix, longPrefix} {
 		if idx, ok := parseShortFlag(arg, prefix); ok {
-			if i+1 >= len(args) {
-				return 0, "", 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
+			next, err := nextFlagValue(args, i)
+			if err != nil {
+				return 0, "", 0, err
 			}
 
-			return idx, args[i+1], consumedPairFlag, nil
+			return idx, next, consumedPairFlag, nil
 		}
 	}
 
@@ -472,13 +535,14 @@ func parseDriverOptFlag(args []string, i int) (driverIndex int, key, value strin
 
 	// -D / -D0 / -D1 (short form, two tokens)
 	if idx, ok := parseShortFlag(arg, "-D"); ok {
-		if i+1 >= len(args) {
-			return 0, "", "", 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
+		raw, err := nextFlagValue(args, i)
+		if err != nil {
+			return 0, "", "", 0, err
 		}
 
-		key, value, err = splitKeyValue(args[i+1])
+		key, value, err = splitKeyValue(raw)
 		if err != nil {
-			return 0, "", "", 0, fmt.Errorf("%s %s: %w", arg, args[i+1], err)
+			return 0, "", "", 0, fmt.Errorf("%s %s: %w", arg, raw, err)
 		}
 
 		return idx, key, value, consumedPairFlag, nil
@@ -486,13 +550,14 @@ func parseDriverOptFlag(args []string, i int) (driverIndex int, key, value strin
 
 	// --driver-opt / --driver1-opt / --driver0-opt (long form, two tokens)
 	if idx, ok := parseIndexedInfixFlag(arg, "--driver", "-opt"); ok {
-		if i+1 >= len(args) {
-			return 0, "", "", 0, fmt.Errorf("%s: %w", arg, errFlagRequiresValue)
+		raw, err := nextFlagValue(args, i)
+		if err != nil {
+			return 0, "", "", 0, err
 		}
 
-		key, value, err = splitKeyValue(args[i+1])
+		key, value, err = splitKeyValue(raw)
 		if err != nil {
-			return 0, "", "", 0, fmt.Errorf("%s %s: %w", arg, args[i+1], err)
+			return 0, "", "", 0, fmt.Errorf("%s %s: %w", arg, raw, err)
 		}
 
 		return idx, key, value, consumedPairFlag, nil
@@ -619,6 +684,55 @@ func splitKeyValue(s string) (key, val string, err error) {
 	return key, val, nil
 }
 
+func positionalAfterOptionsError(arg string) error {
+	message := "script and sql_file must be adjacent before --"
+	if strings.Contains(arg, "=") {
+		message += "; quote driver/env values that contain spaces"
+	}
+
+	return fmt.Errorf("%w: %q; %s", errPositionalAfterOpt, arg, message)
+}
+
+func keyValuePositionalError(arg string) error {
+	return fmt.Errorf(
+		"%w: %q; key=value arguments must follow -D/--driver-opt or -e/--env; quote values that contain spaces",
+		errKeyValuePositional,
+		arg,
+	)
+}
+
+func isKeyValuePositional(arg string) bool {
+	key, _, ok := strings.Cut(arg, "=")
+	if !ok || key == "" || strings.ContainsAny(arg, " \t\n") {
+		return false
+	}
+
+	for _, r := range key {
+		if r == '_' || r == '-' || r == '.' || r >= '0' && r <= '9' ||
+			r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' {
+			continue
+		}
+
+		return false
+	}
+
+	return true
+}
+
+func nextFlagValue(args []string, i int) (string, error) {
+	flag := args[i]
+	if i+1 >= len(args) {
+		return "", fmt.Errorf("%s: %w", flag, errFlagRequiresValue)
+	}
+
+	next := args[i+1]
+	if strings.HasPrefix(next, "-") && next != "-" {
+		return "", fmt.Errorf("%s: %w", flag, errFlagRequiresValue)
+	}
+
+	return next, nil
+}
+
 // applyDriverPreset loads a preset or parses raw JSON and sets it on the config map.
 // If the value starts with '{', it's treated as a JSON driver config; otherwise as a preset name.
 func applyDriverPreset(configs runner.DriverCLIConfigs, idx int, value string) error {
@@ -645,12 +759,12 @@ func applyDriverPreset(configs runner.DriverCLIConfigs, idx int, value string) e
 }
 
 // applyDriverOpt applies a -D key=value override to the driver at the given index.
-func applyDriverOpt(configs runner.DriverCLIConfigs, idx int, key, value string) {
+func applyDriverOpt(configs runner.DriverCLIConfigs, idx int, key, value string) error {
 	cfg, ok := configs[idx]
 	if !ok {
 		cfg = &runner.DriverCLIConfig{}
 		configs[idx] = cfg
 	}
 
-	cfg.ApplyOverride(key, value)
+	return cfg.ApplyOverride(key, value)
 }

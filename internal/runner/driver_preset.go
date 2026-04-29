@@ -24,7 +24,11 @@ var pathFields = map[string]bool{
 	"cacertfile": true,
 }
 
-var errUnknownDriver = errors.New("unknown driver")
+var (
+	errUnknownDriver          = errors.New("unknown driver")
+	errInvalidDriverOverride  = errors.New("invalid driver override")
+	errDriverOverrideConflict = errors.New("driver override conflicts with existing non-object value")
+)
 
 // inferType converts a CLI string value to its most specific Go type
 // so that JSON serialization emits a number/bool instead of a quoted string.
@@ -151,7 +155,15 @@ func (d DriverCLIConfig) MarshalJSON() ([]byte, error) {
 
 // ApplyOverride sets a field by key=value. Known fields are set on the struct,
 // unknown fields go into Extra for pass-through to TS.
-func (d *DriverCLIConfig) ApplyOverride(key, value string) {
+func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
+	if key == "" {
+		return fmt.Errorf("%w: empty key", errInvalidDriverOverride)
+	}
+
+	if parent, child, ok := strings.Cut(key, "."); ok {
+		return d.applyDottedOverride(parent, child, value)
+	}
+
 	switch strings.ToLower(key) {
 	case "drivertype":
 		d.DriverType = value
@@ -160,18 +172,110 @@ func (d *DriverCLIConfig) ApplyOverride(key, value string) {
 	case "defaultinsertmethod":
 		d.DefaultInsertMethod = value
 	default:
-		if d.Extra == nil {
-			d.Extra = make(map[string]any)
-		}
-
-		if pathFields[strings.ToLower(key)] {
-			if abs, err := filepath.Abs(value); err == nil {
-				value = abs
-			}
-		}
-
-		d.Extra[key] = inferType(value)
+		d.setExtra(key, convertOverrideValue(key, value))
 	}
+
+	return nil
+}
+
+func (d *DriverCLIConfig) applyDottedOverride(parent, child, value string) error {
+	if child == "" {
+		return fmt.Errorf("%w: empty nested field in %q", errInvalidDriverOverride, parent)
+	}
+
+	switch strings.ToLower(parent) {
+	case "pool":
+		field, err := canonicalPoolField(child)
+		if err != nil {
+			return err
+		}
+
+		return d.setNestedExtra("pool", field, inferType(value))
+	case "postgres", "sql":
+		return d.setNestedExtra(strings.ToLower(parent), child, inferType(value))
+	case "tls":
+		return d.applyTLSOverride(child, value)
+	default:
+		// Preserve unknown dotted keys for forward-compatible top-level TS fields.
+		d.setExtra(parent+"."+child, inferType(value))
+
+		return nil
+	}
+}
+
+func canonicalPoolField(field string) (string, error) {
+	switch normalizeKey(field) {
+	case "maxconns":
+		return "maxConns", nil
+	case "minconns":
+		return "minConns", nil
+	case "maxconnlifetime":
+		return "maxConnLifetime", nil
+	case "maxconnidletime":
+		return "maxConnIdleTime", nil
+	default:
+		return "", fmt.Errorf("%w: unknown pool option %q", errInvalidDriverOverride, field)
+	}
+}
+
+func (d *DriverCLIConfig) applyTLSOverride(field, value string) error {
+	switch normalizeKey(field) {
+	case "cacert", "cacertfile":
+		d.setExtra("caCertFile", convertOverrideValue("caCertFile", value))
+	case "insecureskipverify", "tlsinsecureskipverify":
+		d.setExtra("tlsInsecureSkipVerify", inferType(value))
+	default:
+		return fmt.Errorf("%w: unknown tls option %q", errInvalidDriverOverride, field)
+	}
+
+	return nil
+}
+
+func (d *DriverCLIConfig) setNestedExtra(parent, child string, value any) error {
+	if d.Extra == nil {
+		d.Extra = make(map[string]any)
+	}
+
+	existing, ok := d.Extra[parent]
+	if !ok {
+		nested := map[string]any{child: value}
+		d.Extra[parent] = nested
+
+		return nil
+	}
+
+	nested, ok := existing.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%w: %q", errDriverOverrideConflict, parent)
+	}
+
+	nested[child] = value
+
+	return nil
+}
+
+func (d *DriverCLIConfig) setExtra(key string, value any) {
+	if d.Extra == nil {
+		d.Extra = make(map[string]any)
+	}
+
+	d.Extra[key] = value
+}
+
+func convertOverrideValue(key, value string) any {
+	if pathFields[normalizeKey(key)] {
+		if abs, err := filepath.Abs(value); err == nil {
+			return abs
+		}
+	}
+
+	return inferType(value)
+}
+
+func normalizeKey(key string) string {
+	replacer := strings.NewReplacer("_", "", "-", "")
+
+	return strings.ToLower(replacer.Replace(key))
 }
 
 // NewDriverCLIConfigFromPreset creates a DriverCLIConfig from a preset.
@@ -208,7 +312,7 @@ func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
 				cfg.Extra = make(map[string]any)
 			}
 
-			if pathFields[strings.ToLower(field)] {
+			if pathFields[normalizeKey(field)] {
 				if s, ok := val.(string); ok {
 					if abs, err := filepath.Abs(s); err == nil {
 						val = abs
