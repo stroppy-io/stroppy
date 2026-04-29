@@ -71,7 +71,7 @@ DRIVER OPTIONS (-D / --driver-opt)
                                      repeatable_read | serializable |
                                      connection_only | none
     errorMode              string    silent | log | throw | fail | abort
-    bulkSize               int       Rows per bulk INSERT (default: 500)
+    bulkSize               int       Rows per bulk INSERT (default: 2500)
     pool.maxConns          int       Maximum pool connections
     pool.minConns          int       Minimum pool connections
     pool.maxConnLifetime   duration  Max connection lifetime  (e.g. "1h")

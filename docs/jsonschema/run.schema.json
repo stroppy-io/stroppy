@@ -152,9 +152,6 @@
         "url": {
           "$ref": "#/$defs/.stroppy.DriverRunConfig.url"
         },
-        "defaultInsertMethod": {
-          "$ref": "#/$defs/.stroppy.DriverRunConfig.default_insert_method"
-        },
         "pool": {
           "oneOf": [
             {
@@ -236,7 +233,6 @@
       "required": [
         "driverType",
         "url",
-        "defaultInsertMethod",
         "errorMode",
         "defaultTxIsolation"
       ],
@@ -700,10 +696,6 @@
     ".stroppy.DriverRunConfig.ca_cert_file": {
       "type": "string",
       "description": "* Path to CA certificate PEM file. Matches TS DriverSetup.caCertFile."
-    },
-    ".stroppy.DriverRunConfig.default_insert_method": {
-      "type": "string",
-      "description": "*\n Default insert method. One of: \"native\", \"plain_bulk\", \"plain_query\".\n Matches TS DriverSetup.defaultInsertMethod."
     },
     ".stroppy.DriverRunConfig.default_tx_isolation": {
       "type": "string",

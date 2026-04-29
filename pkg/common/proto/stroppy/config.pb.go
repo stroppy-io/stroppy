@@ -31,6 +31,7 @@ const (
 	DriverConfig_DRIVER_TYPE_PICODATA    DriverConfig_DriverType = 3
 	DriverConfig_DRIVER_TYPE_YDB         DriverConfig_DriverType = 4
 	DriverConfig_DRIVER_TYPE_NOOP        DriverConfig_DriverType = 5
+	DriverConfig_DRIVER_TYPE_CSV         DriverConfig_DriverType = 6
 )
 
 // Enum value maps for DriverConfig_DriverType.
@@ -42,6 +43,7 @@ var (
 		3: "DRIVER_TYPE_PICODATA",
 		4: "DRIVER_TYPE_YDB",
 		5: "DRIVER_TYPE_NOOP",
+		6: "DRIVER_TYPE_CSV",
 	}
 	DriverConfig_DriverType_value = map[string]int32{
 		"DRIVER_TYPE_UNSPECIFIED": 0,
@@ -50,6 +52,7 @@ var (
 		"DRIVER_TYPE_PICODATA":    3,
 		"DRIVER_TYPE_YDB":         4,
 		"DRIVER_TYPE_NOOP":        5,
+		"DRIVER_TYPE_CSV":         6,
 	}
 )
 
@@ -818,7 +821,7 @@ var File_proto_stroppy_config_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\x8f\x0f\n" +
+	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\xa4\x0f\n" +
 	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12K\n" +
 	"\vdriver_type\x18\x02 \x01(\x0e2 .stroppy.DriverConfig.DriverTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
@@ -865,7 +868,7 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\x0f_max_open_connsB\x11\n" +
 	"\x0f_max_idle_connsB\x14\n" +
 	"\x12_conn_max_lifetimeB\x15\n" +
-	"\x13_conn_max_idle_time\"\x9f\x01\n" +
+	"\x13_conn_max_idle_time\"\xb4\x01\n" +
 	"\n" +
 	"DriverType\x12\x1b\n" +
 	"\x17DRIVER_TYPE_UNSPECIFIED\x10\x00\x12\x18\n" +
@@ -873,7 +876,8 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\x11DRIVER_TYPE_MYSQL\x10\x02\x12\x18\n" +
 	"\x14DRIVER_TYPE_PICODATA\x10\x03\x12\x13\n" +
 	"\x0fDRIVER_TYPE_YDB\x10\x04\x12\x14\n" +
-	"\x10DRIVER_TYPE_NOOP\x10\x05\"\x93\x01\n" +
+	"\x10DRIVER_TYPE_NOOP\x10\x05\x12\x13\n" +
+	"\x0fDRIVER_TYPE_CSV\x10\x06\"\x93\x01\n" +
 	"\tErrorMode\x12\x1a\n" +
 	"\x16ERROR_MODE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11ERROR_MODE_SILENT\x10\x01\x12\x12\n" +

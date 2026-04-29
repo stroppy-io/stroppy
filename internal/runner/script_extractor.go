@@ -323,16 +323,19 @@ func (*rowsStub) ReadAll(int) [][]any { return [][]any{{int64(0)}} }
 func (*rowsStub) Err() error          { return nil }
 func (*rowsStub) Close() error        { return nil }
 
-type genStub struct{}
+// drawStub mirrors the sobek-bound Drawer contract (Sample/Next/Seek/Reset)
+// for the probe VM. Every NewDrawX factory returns one of these. Values
+// are stable non-zero placeholders — enough for workload init code that
+// calls .next() during module-scope construction to type-check and for
+// the default()/setup() spin in the probe to pass without errors.
+type drawStub struct{}
 
-// Next returns a non-nil numeric value so TS loops like
-// `for (i=1; i<=ol_cnt; i++)` actually iterate at least once, giving the
-// probe a chance to register SQL queries that live inside those loops.
-func (*genStub) Next() any { return int64(1) }
+func (*drawStub) Sample(uint64, int64) any { return int64(1) }
+func (*drawStub) Next() any                { return int64(1) }
+func (*drawStub) Seek(int64)               {}
+func (*drawStub) Reset()                   {}
 
-type groupGenStub struct{}
-
-func (*groupGenStub) Next() any { return []any{} }
+func newDrawStub() any { return &drawStub{} }
 
 // pickerStub executes ALL supplied workload candidates (ignoring weights and
 // errors) so that every function's SQL sections get registered, not only the
@@ -415,13 +418,29 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 
 		// k6/x/stroppy defines
 		{"NewDriver", newDriverStub},
-		{"NewGeneratorByRuleBin", func() any { return &genStub{} }},
-		{"NewGroupGeneratorByRulesBin", func() any { return &groupGenStub{} }},
 		{"Teardown", func(any) {}},
 		{"NotifyStep", notifyStepSpy(&probeprint.Steps)},
 		// TODO: research. Some esbuild name resolution artifact, probably
 		{"NotifyStep2", notifyStepSpy(&probeprint.Steps)},
 		{"NewPicker", newPickerStubFactory(vm)},
+		// DrawRT factories — datagen.ts resolves these via globalThis fallback
+		// when the probe's esbuild-bundled require("k6/x/stroppy") fails.
+		{"NewDrawIntUniform", func(...any) any { return newDrawStub() }},
+		{"NewDrawFloatUniform", func(...any) any { return newDrawStub() }},
+		{"NewDrawNormal", func(...any) any { return newDrawStub() }},
+		{"NewDrawZipf", func(...any) any { return newDrawStub() }},
+		{"NewDrawNURand", func(...any) any { return newDrawStub() }},
+		{"NewDrawBernoulli", func(...any) any { return newDrawStub() }},
+		{"NewDrawDate", func(...any) any { return newDrawStub() }},
+		{"NewDrawDecimal", func(...any) any { return newDrawStub() }},
+		{"NewDrawASCII", func(...any) any { return newDrawStub() }},
+		{"NewDrawDict", func(...any) any { return newDrawStub() }},
+		{"NewDrawJoint", func(...any) any { return newDrawStub() }},
+		{"NewDrawPhrase", func(...any) any { return newDrawStub() }},
+		{"NewDrawGrammar", func(...any) any { return newDrawStub() }},
+		{"RegisterDict", func(string, []byte) uint64 { return 1 }},
+		{"RegisterAlphabet", func([]byte) uint64 { return 1 }},
+		{"RegisterGrammar", func([]byte) uint64 { return 1 }},
 		{"DeclareEnv", declareEnvSpy(&probeprint.EnvDeclarations)},
 		{"DeclareDriverSetup", declareDriverSetupSpy(&probeprint.DriverSetups)},
 		{"Once", func(x any) any { return x }},

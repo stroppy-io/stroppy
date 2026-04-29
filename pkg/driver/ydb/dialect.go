@@ -26,7 +26,12 @@ func (ydbDialect) Convert(val any) (any, error) {
 	case uuid.UUID:
 		return v.String(), nil
 	case time.Time:
-		return v, nil
+		// Promote to *time.Time so toYDBValue's addressable-time case fires.
+		// stdlib/std.daysToDate and Draw.date both return time.Time by value;
+		// without this promotion the native BulkUpsert path would reject the
+		// unaddressable value. Timestamp columns get TimestampValueFromTime;
+		// Date columns accept it via YDB's implicit cast.
+		return &v, nil
 	case decimal.Decimal:
 		return v.String(), nil
 	case *decimal.Decimal:

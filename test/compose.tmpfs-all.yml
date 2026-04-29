@@ -1,0 +1,129 @@
+# Multi-DB tmpfs harness for integration tests across postgres, mysql,
+# picodata, ydb. Non-default host ports so this compose can run side-by-side
+# with a local dev stack. Tmpfs-backed where the server tolerates it; YDB
+# relies on YDB_USE_IN_MEMORY_PDISKS, picodata accepts an anonymous volume
+# that `make tmpfs-all-down -v` flushes.
+#
+# Tmpfs budget: ~8 GB data + 2 GB headroom per project CLAUDE.md.
+services:
+
+  pg-tmpfs-all:
+    image: postgres:17
+    container_name: stroppy-pg-tmpfs-all
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: stroppy
+    ports:
+      - "5434:5432"
+    tmpfs:
+      - /var/lib/postgresql/data:size=2g,uid=999,gid=999
+    command: >
+      postgres
+      -c fsync=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
+      -c shared_buffers=512MB
+      -c work_mem=64MB
+      -c maintenance_work_mem=256MB
+      -c max_wal_size=2GB
+      -c checkpoint_timeout=1h
+      -c max_connections=200
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stroppy"]
+      interval: 2s
+      timeout: 1s
+      retries: 30
+
+  mysql-tmpfs-all:
+    image: mysql:8.0
+    container_name: stroppy-mysql-tmpfs-all
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: myuser
+      MYSQL_PASSWORD: mypassword
+      MYSQL_DATABASE: mydb
+    ports:
+      - "3307:3306"
+    tmpfs:
+      - /var/lib/mysql:size=2g,uid=999,gid=999
+    command:
+      - --innodb-flush-log-at-trx-commit=0
+      - --innodb-doublewrite=0
+      - --sync-binlog=0
+      - --skip-log-bin
+      - --max-connections=300
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -prootpassword --silent"]
+      interval: 3s
+      timeout: 2s
+      retries: 40
+
+  picodata-tmpfs-all:
+    image: docker-public.binary.picodata.io/picodata:master
+    container_name: stroppy-pico-tmpfs-all
+    environment:
+      PICODATA_ADMIN_PASSWORD: T0psecret
+      PICODATA_LOG_LEVEL: info
+      PICODATA_PG_LISTEN: "0.0.0.0:5432"
+      PICODATA_LISTEN: "0.0.0.0:3301"
+      PICODATA_MEMTX_MEMORY: "2G"
+    ports:
+      - "1331:5432"
+      - "3311:3301"
+    # No tmpfs: picodata wants a real FS for wal/snap. An anonymous volume
+    # is flushed by `docker compose down -v` (make tmpfs-all-down).
+    volumes:
+      - pico_data_tmpfs:/pico
+
+  # One-shot init: picodata's default sql_vdbe_opcode_max (45000) trips the
+  # big full-scan aggregates some workloads need. Raise cluster-wide; the
+  # setting is raft-persisted, idempotent, survives restart.
+  picodata-init:
+    image: postgres:17
+    container_name: stroppy-pico-init-all
+    depends_on:
+      - picodata-tmpfs-all
+    environment:
+      PGPASSWORD: T0psecret
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "picodata-init: waiting for picodata PG listener..."
+        until psql -h picodata-tmpfs-all -p 5432 -U admin -d admin -c 'SELECT 1' >/dev/null 2>&1; do
+          sleep 1
+        done
+        echo "picodata-init: raising sql_vdbe_opcode_max."
+        psql -h picodata-tmpfs-all -p 5432 -U admin -d admin -c \
+          "ALTER SYSTEM SET sql_vdbe_opcode_max = 100000000;"
+        echo "picodata-init: done."
+
+  ydb-tmpfs-all:
+    image: ghcr.io/ydb-platform/local-ydb:nightly
+    platform: linux/amd64
+    container_name: stroppy-ydb-tmpfs-all
+    hostname: localhost
+    ports:
+      - "2135:2135"
+      - "2136:2136"
+      - "8765:8765"
+      - "5433:5432"
+    environment:
+      GRPC_TLS_PORT: 2135
+      GRPC_PORT: 2136
+      MON_PORT: 8765
+      YDB_USE_IN_MEMORY_PDISKS: "true"
+      YDB_EXPERIMENTAL_PG: 1
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: "1234"
+    volumes:
+      - ./ydb_auth.txt:/tmp/ydb_auth.txt:ro,z
+    command: ["--auth-config-path", "/tmp/ydb_auth.txt"]
+    # Intentionally no persistent volume: YDB_USE_IN_MEMORY_PDISKS requires
+    # ephemeral storage. Mounting corrupts pdisk state on restart
+    # (code 2017: "database doesn't have storage pools at all").
+
+volumes:
+  pico_data_tmpfs:

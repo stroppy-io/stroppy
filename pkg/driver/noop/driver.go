@@ -5,20 +5,25 @@ package noop
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"time"
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/generate"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
-const defaultBulkSize = 500
+const defaultBulkSize = 2500
 
 func init() {
 	driver.RegisterDriver(
@@ -60,23 +65,90 @@ func NewDriver(opts driver.Options) *Driver {
 	}
 }
 
-func (d *Driver) InsertValues(
+// InsertSpec drains a relational runtime end-to-end and discards the rows.
+// Exercises the full generation pipeline so benchmarks stay comparable, but
+// no I/O is performed. Honors spec.Parallelism.Workers so framework-only
+// scaling is measurable: single-path runs the seed runtime inline, parallel
+// path fans out through common.RunParallel with one cloned runtime per
+// worker.
+func (d *Driver) InsertSpec(
 	ctx context.Context,
-	descriptor *stroppy.InsertDescriptor,
+	spec *dgproto.InsertSpec,
 ) (*stats.Query, error) {
-	builder, err := queries.NewQueryBuilder(
-		d.logger,
-		d.dialect,
-		generate.ResolveSeed(descriptor.GetSeed()),
-		descriptor,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("can't create query builder: %w", err)
+	if spec == nil {
+		return nil, fmt.Errorf("noop: %w", runtime.ErrInvalidSpec)
 	}
 
-	// All insert methods map to plain_bulk: exercises full data generation,
-	// discards the final ExecContext call.
-	return sqldriver.InsertPlainBulk(ctx, d.conn, builder, d.bulkSize)
+	workers := int(spec.GetParallelism().GetWorkers())
+	if workers <= 1 {
+		return d.insertSpecSingle(spec)
+	}
+
+	return d.insertSpecParallel(ctx, spec, workers)
+}
+
+// insertSpecSingle drains a single seed Runtime to EOF without the
+// common.RunParallel overhead when the caller requested workers ≤ 1.
+func (d *Driver) insertSpecSingle(spec *dgproto.InsertSpec) (*stats.Query, error) {
+	rt, err := runtime.NewRuntime(spec)
+	if err != nil {
+		return nil, fmt.Errorf("noop: build runtime: %w", err)
+	}
+
+	start := time.Now()
+
+	if err := drainRuntime(rt, -1); err != nil {
+		return nil, err
+	}
+
+	return &stats.Query{Elapsed: time.Since(start)}, nil
+}
+
+// insertSpecParallel fans the spec out across workers goroutines via
+// common.RunParallel. Each worker owns an independent Runtime clone
+// pre-seeked to its chunk boundary and drains exactly chunk.Count rows.
+// There is no I/O to arbitrate: the whole point is to scale row
+// generation alone.
+func (d *Driver) insertSpecParallel(
+	ctx context.Context,
+	spec *dgproto.InsertSpec,
+	workers int,
+) (*stats.Query, error) {
+	total := spec.GetSource().GetPopulation().GetSize()
+	chunks := common.SplitChunks(total, workers)
+
+	start := time.Now()
+
+	err := common.RunParallel(ctx, spec, chunks,
+		func(_ context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
+			return drainRuntime(rt, chunk.Count)
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	return &stats.Query{Elapsed: time.Since(start)}, nil
+}
+
+// drainRuntime pulls rows from rt and discards them. When count is
+// negative the runtime is drained to EOF; otherwise it emits exactly
+// count rows (or returns early on error).
+func drainRuntime(rt *runtime.Runtime, count int64) error {
+	for count < 0 || count > 0 {
+		if _, err := rt.Next(); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+
+			return fmt.Errorf("noop: runtime.Next: %w", err)
+		}
+
+		if count > 0 {
+			count--
+		}
+	}
+
+	return nil
 }
 
 func (d *Driver) RunQuery(

@@ -1,0 +1,28 @@
+services:
+  pg-tmpfs:
+    image: postgres:17
+    container_name: stroppy-pg-tmpfs
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: stroppy
+    ports:
+      - "5434:5432"   # non-default port; avoids colliding with local pg
+    tmpfs:
+      - /var/lib/postgresql/data:size=8g,uid=999,gid=999
+    command: >
+      postgres
+      -c fsync=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
+      -c shared_buffers=1GB
+      -c work_mem=64MB
+      -c maintenance_work_mem=512MB
+      -c max_wal_size=2GB
+      -c checkpoint_timeout=1h
+      -c max_connections=200
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stroppy"]
+      interval: 2s
+      timeout: 1s
+      retries: 30
