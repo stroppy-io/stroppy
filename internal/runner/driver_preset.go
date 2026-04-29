@@ -30,6 +30,12 @@ var (
 	errDriverOverrideConflict = errors.New("driver override conflicts with existing non-object value")
 )
 
+const (
+	driverTypeKey          = "drivertype"
+	urlKey                 = "url"
+	defaultInsertMethodKey = "defaultinsertmethod"
+)
+
 // inferType converts a CLI string value to its most specific Go type
 // so that JSON serialization emits a number/bool instead of a quoted string.
 // This is required because protobuf (TS side) rejects "20" for int32 fields.
@@ -160,106 +166,81 @@ func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
 		return fmt.Errorf("%w: empty key", errInvalidDriverOverride)
 	}
 
-	if parent, child, ok := strings.Cut(key, "."); ok {
-		return d.applyDottedOverride(parent, child, value)
-	}
-
-	switch strings.ToLower(key) {
-	case "drivertype":
+	switch normalizeKey(key) {
+	case driverTypeKey:
 		d.DriverType = value
-	case "url":
+	case urlKey:
 		d.URL = value
-	case "defaultinsertmethod":
+	case defaultInsertMethodKey:
 		d.DefaultInsertMethod = value
 	default:
-		d.setExtra(key, convertOverrideValue(key, value))
+		return d.setExtraPath(strings.Split(key, "."), convertOverrideValue(key, value))
 	}
 
 	return nil
 }
 
-func (d *DriverCLIConfig) applyDottedOverride(parent, child, value string) error {
-	if child == "" {
-		return fmt.Errorf("%w: empty nested field in %q", errInvalidDriverOverride, parent)
+func (d *DriverCLIConfig) setExtraPath(path []string, value any) error {
+	if err := validateOverridePath(path); err != nil {
+		return err
 	}
 
-	switch strings.ToLower(parent) {
-	case "pool":
-		field, err := canonicalPoolField(child)
-		if err != nil {
-			return err
+	if d.Extra == nil {
+		d.Extra = make(map[string]any)
+	}
+
+	target := d.Extra
+	for _, part := range path[:len(path)-1] {
+		next, ok := target[part]
+		if !ok {
+			nested := make(map[string]any)
+			target[part] = nested
+			target = nested
+
+			continue
 		}
 
-		return d.setNestedExtra("pool", field, inferType(value))
-	case "postgres", "sql":
-		return d.setNestedExtra(strings.ToLower(parent), child, inferType(value))
-	case "tls":
-		return d.applyTLSOverride(child, value)
-	default:
-		// Preserve unknown dotted keys for forward-compatible top-level TS fields.
-		d.setExtra(parent+"."+child, inferType(value))
+		nested, ok := next.(map[string]any)
+		if !ok {
+			return fmt.Errorf("%w: %q", errDriverOverrideConflict, part)
+		}
 
-		return nil
+		target = nested
 	}
+
+	last := path[len(path)-1]
+	if existing, exists := target[last]; exists {
+		if _, isObject := existing.(map[string]any); isObject {
+			return fmt.Errorf("%w: %q", errDriverOverrideConflict, last)
+		}
+	}
+
+	target[last] = value
+
+	return nil
 }
 
-func canonicalPoolField(field string) (string, error) {
-	switch normalizeKey(field) {
-	case "maxconns":
-		return "maxConns", nil
-	case "minconns":
-		return "minConns", nil
-	case "maxconnlifetime":
-		return "maxConnLifetime", nil
-	case "maxconnidletime":
-		return "maxConnIdleTime", nil
-	default:
-		return "", fmt.Errorf("%w: unknown pool option %q", errInvalidDriverOverride, field)
+func validateOverridePath(path []string) error {
+	for _, part := range path {
+		if part == "" {
+			return fmt.Errorf("%w: empty dotted path segment", errInvalidDriverOverride)
+		}
 	}
-}
 
-func (d *DriverCLIConfig) applyTLSOverride(field, value string) error {
-	switch normalizeKey(field) {
-	case "cacert", "cacertfile":
-		d.setExtra("caCertFile", convertOverrideValue("caCertFile", value))
-	case "insecureskipverify", "tlsinsecureskipverify":
-		d.setExtra("tlsInsecureSkipVerify", inferType(value))
-	default:
-		return fmt.Errorf("%w: unknown tls option %q", errInvalidDriverOverride, field)
+	if len(path) > 1 && isDriverCLIField(path[0]) {
+		return fmt.Errorf("%w: %q", errDriverOverrideConflict, path[0])
 	}
 
 	return nil
 }
 
-func (d *DriverCLIConfig) setNestedExtra(parent, child string, value any) error {
-	if d.Extra == nil {
-		d.Extra = make(map[string]any)
+func isDriverCLIField(key string) bool {
+	switch normalizeKey(key) {
+	case driverTypeKey, urlKey, defaultInsertMethodKey:
+		return true
+	default:
+		return false
 	}
-
-	existing, ok := d.Extra[parent]
-	if !ok {
-		nested := map[string]any{child: value}
-		d.Extra[parent] = nested
-
-		return nil
-	}
-
-	nested, ok := existing.(map[string]any)
-	if !ok {
-		return fmt.Errorf("%w: %q", errDriverOverrideConflict, parent)
-	}
-
-	nested[child] = value
-
-	return nil
-}
-
-func (d *DriverCLIConfig) setExtra(key string, value any) {
-	if d.Extra == nil {
-		d.Extra = make(map[string]any)
-	}
-
-	d.Extra[key] = value
 }
 
 func convertOverrideValue(key, value string) any {
@@ -300,12 +281,12 @@ func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
 	for field, val := range m {
 		str, _ := val.(string)
 
-		switch strings.ToLower(field) {
-		case "drivertype":
+		switch normalizeKey(field) {
+		case driverTypeKey:
 			cfg.DriverType = str
-		case "url":
+		case urlKey:
 			cfg.URL = str
-		case "defaultinsertmethod":
+		case defaultInsertMethodKey:
 			cfg.DefaultInsertMethod = str
 		default:
 			if cfg.Extra == nil {

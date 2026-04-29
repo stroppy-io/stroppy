@@ -333,6 +333,116 @@ export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode" | "driverType"
   sql?: Partial<DriverConfig_SqlConfig>;
 }
 
+type ScalarKind = "string" | "number" | "boolean";
+type FieldRule = ScalarKind | { enum: Set<string> } | { object: Schema };
+type Schema = Record<string, FieldRule>;
+
+const poolSchema: Schema = {
+  maxConns: "number",
+  minConns: "number",
+  maxConnLifetime: "string",
+  maxConnIdleTime: "string",
+};
+
+const postgresSchema: Schema = {
+  traceLogLevel: "string",
+  maxConnLifetime: "string",
+  maxConnIdleTime: "string",
+  maxConns: "number",
+  minConns: "number",
+  minIdleConns: "number",
+  defaultQueryExecMode: "string",
+  descriptionCacheCapacity: "number",
+  statementCacheCapacity: "number",
+};
+
+const sqlSchema: Schema = {
+  maxOpenConns: "number",
+  maxIdleConns: "number",
+  connMaxLifetime: "string",
+  connMaxIdleTime: "string",
+};
+
+const driverSetupSchema: Schema = {
+  url: "string",
+  driverType: { enum: new Set(Object.keys(driverTypeMap)) },
+  defaultTxIsolation: { enum: new Set(Object.keys(txIsolationMap)) },
+  defaultInsertMethod: { enum: new Set(Object.keys(insertMethodMap)) },
+  errorMode: { enum: new Set(Object.keys(errorModeMap)) },
+  pool: { object: poolSchema },
+  postgres: { object: postgresSchema },
+  sql: { object: sqlSchema },
+  bulkSize: "number",
+  caCertFile: "string",
+  authToken: "string",
+  authUser: "string",
+  authPassword: "string",
+  tlsInsecureSkipVerify: "boolean",
+};
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function schemaKeys(schema: Schema): string {
+  return Object.keys(schema).sort().join(", ");
+}
+
+function validateSchema(source: string, path: string, value: unknown, schema: Schema): void {
+  if (!isPlainObject(value)) {
+    throw new Error(`${source}: ${path} must be object`);
+  }
+
+  for (const [key, nested] of Object.entries(value)) {
+    if (nested === undefined) continue;
+
+    const rule = schema[key];
+    if (!rule) {
+      throw new Error(`${source}: unknown ${path} option "${key}" (available: ${schemaKeys(schema)})`);
+    }
+
+    const fieldPath = path === "driver" ? key : `${path}.${key}`;
+    if (typeof rule === "string") {
+      validateKind(source, fieldPath, nested, rule);
+    } else if ("enum" in rule) {
+      validateEnum(source, fieldPath, nested, rule.enum);
+    } else {
+      validateSchema(source, fieldPath, nested, rule.object);
+    }
+  }
+}
+
+function validateKind(source: string, path: string, value: unknown, kind: ScalarKind): void {
+  if (typeof value !== kind) {
+    throw new Error(`${source}: ${path} must be ${kind}, got ${typeof value}`);
+  }
+}
+
+function validateEnum(source: string, path: string, value: unknown, allowed: Set<string>): void {
+  validateKind(source, path, value, "string");
+  if (!allowed.has(value as string)) {
+    throw new Error(`${source}: ${path} must be one of: ${[...allowed].sort().join(", ")}`);
+  }
+}
+
+export function validateDriverSetup(source: string, setup: unknown): asserts setup is DriverSetup {
+  validateSchema(source, "driver", setup, driverSetupSchema);
+}
+
+function mergeDriverSetup(defaults: DriverSetup, cli: Partial<DriverSetup>): DriverSetup {
+  const merged: Record<string, unknown> = { ...defaults };
+  for (const [key, value] of Object.entries(cli)) {
+    if (value === undefined) continue;
+    if ((key === "pool" || key === "postgres" || key === "sql") && isPlainObject(value)) {
+      merged[key] = { ...((defaults as Record<string, unknown>)[key] as object | undefined), ...value };
+    } else {
+      merged[key] = value;
+    }
+  }
+
+  return merged as DriverSetup;
+}
+
 /** Resolve pool sugar into the appropriate driver-specific config. */
 function resolvePoolConfig(config: DriverSetup): {
   postgres?: Partial<DriverConfig_PostgresConfig>;
@@ -390,29 +500,18 @@ export function declareDriverSetup(index: number, defaults: DriverSetup): Driver
   const raw = __ENV[envKey];
   if (!raw || raw === "") return defaults;
 
+  let cli: unknown;
   try {
-    const cli = JSON.parse(raw) as Partial<DriverSetup>;
-    // Deep merge: CLI fields override defaults, but only if actually set.
-    const merged: DriverSetup = { ...defaults };
-  if (cli.driverType          !== undefined) merged.driverType          = cli.driverType          as DriverTypeName;
-  if (cli.url                 !== undefined) merged.url                 = cli.url;
-  if (cli.defaultTxIsolation  !== undefined) merged.defaultTxIsolation  = cli.defaultTxIsolation  as TxIsolationName;
-  if (cli.defaultInsertMethod !== undefined) merged.defaultInsertMethod = cli.defaultInsertMethod as InsertMethodName;
-  if (cli.errorMode           !== undefined) merged.errorMode           = cli.errorMode           as ErrorModeName;
-  if (cli.pool                !== undefined) merged.pool                = cli.pool;
-  if (cli.postgres            !== undefined) merged.postgres            = cli.postgres;
-  if (cli.sql                 !== undefined) merged.sql                 = cli.sql;
-    if ((cli as any).bulkSize !== undefined) merged.bulkSize = (cli as any).bulkSize;
-  if (cli.caCertFile           !== undefined) merged.caCertFile           = cli.caCertFile;
-  if (cli.authToken            !== undefined) merged.authToken            = cli.authToken;
-  if (cli.authUser             !== undefined) merged.authUser             = cli.authUser;
-  if (cli.authPassword         !== undefined) merged.authPassword         = cli.authPassword;
-  if (cli.tlsInsecureSkipVerify !== undefined) merged.tlsInsecureSkipVerify = cli.tlsInsecureSkipVerify;
-    return merged;
+    cli = JSON.parse(raw);
   } catch (e) {
-    console.error(`[stroppy] failed to parse ${envKey}: ${e}`);
-    return defaults;
+    throw new Error(`[stroppy] failed to parse ${envKey}: ${e}`);
   }
+
+  validateDriverSetup(envKey, cli);
+  const merged = mergeDriverSetup(defaults, cli);
+  validateDriverSetup(`${envKey} merged`, merged);
+
+  return merged;
 }
 
 export class DriverX implements QueryAPI {

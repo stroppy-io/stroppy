@@ -633,28 +633,52 @@ func TestApplyDriverOptDottedPoolUnknownField(t *testing.T) {
 
 	configs := runner.DriverCLIConfigs{}
 
-	err := applyDriverOpt(configs, 0, "pool.maximum", "20")
-	if err == nil {
-		t.Fatal("expected error for unknown pool field")
-	}
-
-	if !contains(err.Error(), "unknown pool option") {
-		t.Fatalf("got error %q, want it to contain unknown pool option", err.Error())
-	}
-}
-
-func TestApplyDriverOptTLSAliases(t *testing.T) {
-	t.Parallel()
-
-	configs := runner.DriverCLIConfigs{}
-
-	if err := applyDriverOpt(configs, 0, "tls.insecureSkipVerify", "true"); err != nil {
+	if err := applyDriverOpt(configs, 0, "pool.maximum", "20"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	got := marshalDriverConfig(t, configs[0])
-	if got["tlsInsecureSkipVerify"] != true {
-		t.Errorf("tlsInsecureSkipVerify: got %v, want true", got["tlsInsecureSkipVerify"])
+	pool := objectField(t, got, "pool")
+
+	if pool["maximum"] != float64(20) {
+		t.Errorf("pool.maximum: got %v, want 20", pool["maximum"])
+	}
+}
+
+func TestApplyDriverOptDottedPathIsGeneric(t *testing.T) {
+	t.Parallel()
+
+	configs := runner.DriverCLIConfigs{}
+
+	if err := applyDriverOpt(configs, 0, "custom.deep.value", "1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := marshalDriverConfig(t, configs[0])
+	custom := objectField(t, got, "custom")
+	deep := objectField(t, custom, "deep")
+
+	if deep["value"] != float64(1) {
+		t.Errorf("custom.deep.value: got %v, want 1", deep["value"])
+	}
+}
+
+func TestApplyDriverOptDottedPathConflict(t *testing.T) {
+	t.Parallel()
+
+	configs := runner.DriverCLIConfigs{}
+
+	if err := applyDriverOpt(configs, 0, "pool", "not-object"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	err := applyDriverOpt(configs, 0, "pool.maxConns", "20")
+	if err == nil {
+		t.Fatal("expected structural conflict error")
+	}
+
+	if !contains(err.Error(), "conflicts") {
+		t.Fatalf("got error %q, want conflict", err.Error())
 	}
 }
 
