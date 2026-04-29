@@ -16,10 +16,8 @@
     "rootDir": "..",
     "baseUrl": "..",
     "paths": {
-      "k6/metrics": ["tests/stubs/k6_metrics.ts"],
-      "k6/execution": ["tests/stubs/k6_execution.ts"],
-      "k6/x/encoding": ["tests/stubs/k6_x_encoding.ts"],
-      "k6/x/stroppy": ["tests/stubs/k6_x_stroppy.ts"]
+      "k6/x/stroppy": ["stroppy.d.ts"],
+      "k6/x/encoding": ["encoding.d.ts"]
     }
   },
   "include": ["../**/*.ts", "**/*.ts"],

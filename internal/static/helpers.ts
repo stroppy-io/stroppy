@@ -333,100 +333,85 @@ export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode" | "driverType"
   sql?: Partial<DriverConfig_SqlConfig>;
 }
 
-type ScalarKind = "string" | "number" | "boolean";
-type FieldRule = ScalarKind | { enum: Set<string> } | { object: Schema };
-type Schema = Record<string, FieldRule>;
+const driverSetupKeys = new Set([
+  "url",
+  "driverType",
+  "defaultTxIsolation",
+  "defaultInsertMethod",
+  "errorMode",
+  "pool",
+  "postgres",
+  "sql",
+  "bulkSize",
+  "caCertFile",
+  "authToken",
+  "authUser",
+  "authPassword",
+  "tlsInsecureSkipVerify",
+]);
 
-const poolSchema: Schema = {
-  maxConns: "number",
-  minConns: "number",
-  maxConnLifetime: "string",
-  maxConnIdleTime: "string",
+const nestedDriverSetupKeys: Record<string, Set<string>> = {
+  pool: new Set(["maxConns", "minConns", "maxConnLifetime", "maxConnIdleTime"]),
+  postgres: new Set([
+    "traceLogLevel",
+    "maxConnLifetime",
+    "maxConnIdleTime",
+    "maxConns",
+    "minConns",
+    "minIdleConns",
+    "defaultQueryExecMode",
+    "descriptionCacheCapacity",
+    "statementCacheCapacity",
+  ]),
+  sql: new Set(["maxOpenConns", "maxIdleConns", "connMaxLifetime", "connMaxIdleTime"]),
 };
 
-const postgresSchema: Schema = {
-  traceLogLevel: "string",
-  maxConnLifetime: "string",
-  maxConnIdleTime: "string",
-  maxConns: "number",
-  minConns: "number",
-  minIdleConns: "number",
-  defaultQueryExecMode: "string",
-  descriptionCacheCapacity: "number",
-  statementCacheCapacity: "number",
-};
-
-const sqlSchema: Schema = {
-  maxOpenConns: "number",
-  maxIdleConns: "number",
-  connMaxLifetime: "string",
-  connMaxIdleTime: "string",
-};
-
-const driverSetupSchema: Schema = {
-  url: "string",
-  driverType: { enum: new Set(Object.keys(driverTypeMap)) },
-  defaultTxIsolation: { enum: new Set(Object.keys(txIsolationMap)) },
-  defaultInsertMethod: { enum: new Set(Object.keys(insertMethodMap)) },
-  errorMode: { enum: new Set(Object.keys(errorModeMap)) },
-  pool: { object: poolSchema },
-  postgres: { object: postgresSchema },
-  sql: { object: sqlSchema },
-  bulkSize: "number",
-  caCertFile: "string",
-  authToken: "string",
-  authUser: "string",
-  authPassword: "string",
-  tlsInsecureSkipVerify: "boolean",
+const driverSetupEnums: Record<string, Set<string>> = {
+  driverType: new Set(Object.keys(driverTypeMap)),
+  defaultTxIsolation: new Set(Object.keys(txIsolationMap)),
+  defaultInsertMethod: new Set(Object.keys(insertMethodMap)),
+  errorMode: new Set(Object.keys(errorModeMap)),
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function schemaKeys(schema: Schema): string {
-  return Object.keys(schema).sort().join(", ");
-}
-
-function validateSchema(source: string, path: string, value: unknown, schema: Schema): void {
-  if (!isPlainObject(value)) {
-    throw new Error(`${source}: ${path} must be object`);
-  }
-
-  for (const [key, nested] of Object.entries(value)) {
-    if (nested === undefined) continue;
-
-    const rule = schema[key];
-    if (!rule) {
-      throw new Error(`${source}: unknown ${path} option "${key}" (available: ${schemaKeys(schema)})`);
-    }
-
-    const fieldPath = path === "driver" ? key : `${path}.${key}`;
-    if (typeof rule === "string") {
-      validateKind(source, fieldPath, nested, rule);
-    } else if ("enum" in rule) {
-      validateEnum(source, fieldPath, nested, rule.enum);
-    } else {
-      validateSchema(source, fieldPath, nested, rule.object);
-    }
-  }
-}
-
-function validateKind(source: string, path: string, value: unknown, kind: ScalarKind): void {
-  if (typeof value !== kind) {
-    throw new Error(`${source}: ${path} must be ${kind}, got ${typeof value}`);
-  }
+function allowedList(keys: Set<string>): string {
+  return [...keys].sort().join(", ");
 }
 
 function validateEnum(source: string, path: string, value: unknown, allowed: Set<string>): void {
-  validateKind(source, path, value, "string");
-  if (!allowed.has(value as string)) {
-    throw new Error(`${source}: ${path} must be one of: ${[...allowed].sort().join(", ")}`);
+  if (value !== undefined && (typeof value !== "string" || !allowed.has(value))) {
+    throw new Error(`${source}: ${path} must be one of: ${allowedList(allowed)}`);
   }
 }
 
 export function validateDriverSetup(source: string, setup: unknown): asserts setup is DriverSetup {
-  validateSchema(source, "driver", setup, driverSetupSchema);
+  if (!isPlainObject(setup)) {
+    throw new Error(`${source}: driver setup must be object`);
+  }
+
+  for (const [key, value] of Object.entries(setup)) {
+    if (!driverSetupKeys.has(key)) {
+      throw new Error(`${source}: unknown driver option "${key}" (available: ${allowedList(driverSetupKeys)})`);
+    }
+
+    const enumValues = driverSetupEnums[key];
+    if (enumValues) validateEnum(source, key, value, enumValues);
+
+    const nestedKeys = nestedDriverSetupKeys[key];
+    if (!nestedKeys || value === undefined) continue;
+    if (!isPlainObject(value)) {
+      throw new Error(`${source}: ${key} must be object`);
+    }
+
+    for (const nestedKey of Object.keys(value)) {
+      if (!nestedKeys.has(nestedKey)) {
+        throw new Error(`${source}: unknown ${key} option "${nestedKey}" (available: ${allowedList(nestedKeys)})`);
+      }
+    }
+  }
 }
 
 function mergeDriverSetup(defaults: DriverSetup, cli: Partial<DriverSetup>): DriverSetup {
