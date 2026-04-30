@@ -474,6 +474,8 @@ func (r *ScriptRunner) runK6(
 	r.logger.Info("Running k6", zap.Strings("args", os.Args))
 
 	// run the test
+	stopExitCapture := BeginK6ExitCapture()
+	defer stopExitCapture()
 	k6cmd.Execute()
 
 	defer func() { err = errors.Join(err, exitCodeToError()) }()

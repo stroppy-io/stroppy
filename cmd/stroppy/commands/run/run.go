@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
@@ -92,13 +94,13 @@ Config file flags:
 
 		parsed, err := parseRunArgs(args)
 		if err != nil {
-			return err
+			return invalidConfig(err)
 		}
 
 		// Load config file if -f is specified or stroppy-config.json exists.
 		fileConfig, _, err := runner.LoadRunConfig(parsed.fileArg)
 		if err != nil {
-			return fmt.Errorf("failed to load config file: %w", err)
+			return invalidConfig(fmt.Errorf("failed to load config file: %w", err))
 		}
 
 		// Apply effective values: CLI overrides config file.
@@ -109,7 +111,7 @@ Config file flags:
 		k6RunArgs := runner.EffectiveK6Args(parsed.afterDash, fileConfig)
 
 		if scriptArg == "" {
-			return errNoScript
+			return invalidConfig(errNoScript)
 		}
 
 		// Log override decisions when both CLI and file config are present.
@@ -141,21 +143,21 @@ Config file flags:
 		// Resolve -e overrides (uppercase keys, validate format).
 		envOverrides, err := runner.ResolveEnvOverrides(parsed.envArgs)
 		if err != nil {
-			return err
+			return invalidConfig(err)
 		}
 
 		driverConfigs := runner.DriverCLIConfigs{}
 
 		for idx, presetName := range parsed.driverPresets {
 			if err := applyDriverPreset(driverConfigs, idx, presetName); err != nil {
-				return err
+				return invalidConfig(err)
 			}
 		}
 
 		for idx, opts := range parsed.driverOpts {
 			for _, kv := range opts {
 				if err := applyDriverOpt(driverConfigs, idx, kv[0], kv[1]); err != nil {
-					return err
+					return invalidConfig(err)
 				}
 			}
 		}
@@ -163,7 +165,7 @@ Config file flags:
 		// Resolve files through search path.
 		input, err := runner.ResolveInput(scriptArg, sqlArg)
 		if err != nil {
-			return fmt.Errorf("failed to resolve input: %w", err)
+			return invalidConfig(fmt.Errorf("failed to resolve input: %w", err))
 		}
 
 		scriptRunner, err := runner.NewScriptRunner(
@@ -176,7 +178,7 @@ Config file flags:
 			fileConfig,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to create runner: %w", err)
+			return invalidConfig(fmt.Errorf("failed to create runner: %w", err))
 		}
 
 		err = scriptRunner.Run(context.Background())
@@ -192,6 +194,10 @@ Config file flags:
 
 		return nil
 	},
+}
+
+func invalidConfig(err error) error {
+	return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 }
 
 // runArgs holds the result of parseRunArgs.

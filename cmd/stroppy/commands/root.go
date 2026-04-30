@@ -85,7 +85,9 @@ func Root() *cobra.Command {
 
 func K6Subcommand(gs *state.GlobalState) *cobra.Command {
 	inteceptInteruptSignals(gs)
-	gs.OSExit = runner.OSExit // handles exit code
+	if runner.K6ExitCaptureEnabled() {
+		gs.OSExit = runner.OSExit
+	}
 
 	return rootCmd
 }
