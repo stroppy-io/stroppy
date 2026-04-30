@@ -74,7 +74,11 @@ const TOTAL_STOCK     = WAREHOUSES * ITEMS;
 // K6 options — weighted dispatch inside default(), VUs/duration set via CLI or k6 defaults.
 export const options: Options = {
   setupTimeout: String(WAREHOUSES * 5) + "m",
-  summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"],
+  summaryTrendStats: [
+    "avg", "min", "med", "max",
+    "p(1)", "p(5)", "p(10)",
+    "p(90)", "p(95)", "p(99)",
+  ],
   thresholds: {
     "tpcc_new_order_duration":    ["p(90)<5000"],
     "tpcc_payment_duration":      ["p(90)<5000"],
@@ -883,6 +887,16 @@ export function handleSummary(data: any): Record<string, string> {
     const fmt = (x: any) => (typeof x === "number" ? x.toFixed(1) : "—");
     return `avg=${fmt(v.avg)}  p50=${fmt(v.med)}  p90=${fmt(v["p(90)"])}  p95=${fmt(v["p(95)"])}  p99=${fmt(v["p(99)"])}`;
   };
+  const tpsTrendLines = (name: string): [string, string] => {
+    const v = m[name]?.values ?? {};
+    const fmt = (x: any) => (typeof x === "number" ? x.toFixed(1) : "—");
+    return [
+      `  tx_tps buckets (tx/s): avg=${fmt(v.avg)}  p1=${fmt(v["p(1)"])}  ` +
+        `p5=${fmt(v["p(5)"])}  p10=${fmt(v["p(10)"])}`,
+      `                         p50=${fmt(v.med)}  p90=${fmt(v["p(90)"])}  ` +
+        `p95=${fmt(v["p(95)"])}  p99=${fmt(v["p(99)"])}  (active 1s buckets)`,
+    ];
+  };
   const rateStr = (name: string): string => {
     const v = m[name]?.values?.rate;
     return typeof v === "number" ? (v * 100).toFixed(2) + "%" : "n/a";
@@ -936,10 +950,12 @@ export function handleSummary(data: any): Record<string, string> {
     `  stock_level  (ceil 20000): ${trendLine("tpcc_stock_level_duration")}`,
     `  delivery     (ceil 80000): ${trendLine("tpcc_delivery_duration")}`,
     "",
-    "===== Driver query / tx timings (from helpers.ts metrics) =====",
+    "===== Driver query / tx metrics =====",
     `  queries executed    : ${queries}`,
+    `  avg query throughput: ${counterRateStr("run_query_count")}`,
     `  tx attempts         : ${txs}`,
-    `  avg tx throughput   : ${counterRateStr("tx_count")}`,
+    `  avg tx throughput   : ${counterRateStr("tx_count")}  (whole run)`,
+    ...tpsTrendLines("tx_tps"),
     `  run_query_duration  : ${trendLine("run_query_duration")}`,
     `  run_query_error_rate: ${rateStr("run_query_error_rate")}`,
     `  tx_total_duration   : ${trendLine("tx_total_duration")}`,

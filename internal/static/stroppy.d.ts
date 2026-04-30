@@ -68,7 +68,7 @@ declare module "k6/x/stroppy" {
     runQuery(sql: string, args: Record<string, any>): QueryResult;
     /** Start a transaction with the given isolation level (proto TxIsolationLevel enum value).
      *  @throws {Error} if the driver does not support the requested isolation level */
-    begin(isolationLevel: number): Tx;
+    begin(isolationLevel: number, txName?: string): Tx;
     /** Store driver configuration. The driver is lazily dispatched on first use.
      *  If called at init phase (VU state nil): marks driver as shared.
      *  If called at iteration phase: marks driver as per-VU. */

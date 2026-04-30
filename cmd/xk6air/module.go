@@ -37,6 +37,7 @@ func init() {
 		instanceTeardown: make(map[*Instance]func() error),
 		sharedSlots:      make(map[uint64]*sharedDriverSlot),
 		steps:            make(map[string]stroppy.StroppyRun_Status),
+		txMetrics:        &txMetrics{},
 	}
 
 	rootModule.runULID, rootModule.cloudClient = NewCloudClient(lg)
@@ -68,11 +69,14 @@ type RootModule struct {
 
 	stepsMu sync.Mutex
 	steps   map[string]stroppy.StroppyRun_Status
+
+	txMetrics *txMetrics
 }
 
 // NewModuleInstance factory method for Instances.
 // One instance creates per VU.
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	r.txMetrics.ensureRegistered(vu, r.lg)
 	return NewInstance(vu)
 }
 
@@ -133,6 +137,8 @@ func (r *RootModule) initSharedDriver(
 }
 
 func (r *RootModule) Teardown() error {
+	r.txMetrics.stop()
+
 	var err error
 	r.instanceMu.Lock()
 	for _, teardown := range r.instanceTeardown {

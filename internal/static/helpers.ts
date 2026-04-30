@@ -110,7 +110,6 @@ const runQueryCounterMetric = new Counter("run_query_count");
 const runQueryErrRateMetric = new Rate("run_query_error_rate");
 const txTotalDurationMetric = new Trend("tx_total_duration", true);
 const txCleanDurationMetric = new Trend("tx_clean_duration", true);
-const txCounterMetric = new Counter("tx_count");
 const txCommitRateMetric = new Rate("tx_commit_rate");
 const txErrRateMetric = new Rate("tx_error_rate");
 const txQueriesPerTxMetric = new Trend("tx_queries_per_tx", false);
@@ -295,7 +294,6 @@ export class TxX implements QueryAPI {
     const tags = this._tags("commit");
     txTotalDurationMetric.add(elapsed, tags);
     txCleanDurationMetric.add(this._cleanDuration, tags);
-    txCounterMetric.add(1, tags);
     txCommitRateMetric.add(1, tags);
     txQueriesPerTxMetric.add(this._queryCount, tags);
   }
@@ -305,7 +303,6 @@ export class TxX implements QueryAPI {
     const tags = this._tags("rollback");
     txTotalDurationMetric.add(elapsed, tags);
     txCleanDurationMetric.add(this._cleanDuration, tags);
-    txCounterMetric.add(1, tags);
     txCommitRateMetric.add(0, tags);
     txQueriesPerTxMetric.add(this._queryCount, tags);
     this.tx.rollback();
@@ -604,7 +601,7 @@ export class DriverX implements QueryAPI {
   /** Start a transaction manually. Call tx.commit() or tx.rollback() when done. */
   begin(options?: { isolation?: TxIsolationName; name?: string }): TxX {
     const level = options?.isolation ?? this._defaultTxIsolation;
-    const tx = this.driver.begin(txIsolationMap[level]);
+    const tx = this.driver.begin(txIsolationMap[level], options?.name ?? "");
     return new TxX(tx, level, () => this._errorMode, options?.name);
   }
 
