@@ -301,6 +301,7 @@ func (r *ScriptRunner) buildEnvVars() ([]string, error) {
 		fileEnvs := BuildFileEnvLookup(r.fileConfig.GetEnv())
 
 		var skipped []string
+
 		fileEnvs, skipped = keepNewEnvEntries(fileEnvs, envKeys)
 		if len(skipped) > 0 {
 			r.logger.Debug("Config file env skipped: higher-precedence env already set",
@@ -492,6 +493,7 @@ func (r *ScriptRunner) runK6(
 	// run the test
 	stopExitCapture := BeginK6ExitCapture()
 	defer stopExitCapture()
+
 	k6cmd.Execute()
 
 	defer func() { err = errors.Join(err, exitCodeToError()) }()

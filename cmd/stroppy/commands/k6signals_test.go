@@ -81,6 +81,7 @@ func TestK6SubcommandScopesExitCapture(t *testing.T) {
 	require.True(t, called)
 
 	called = false
+
 	stop := runner.BeginK6ExitCapture()
 	defer stop()
 

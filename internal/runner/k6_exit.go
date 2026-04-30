@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"math"
 	"sync/atomic"
 )
 
@@ -45,5 +46,17 @@ func exitCodeToError() error {
 }
 
 func OSExit(i int) {
+	if i > math.MaxInt32 {
+		exitCode.Store(math.MaxInt32)
+
+		return
+	}
+
+	if i < math.MinInt32 {
+		exitCode.Store(math.MinInt32)
+
+		return
+	}
+
 	exitCode.Store(int32(i))
 }

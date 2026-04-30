@@ -69,7 +69,7 @@ func unknownScriptEnvKeys(envs []string, probe *Probeprint) []string {
 			continue
 		}
 
-		if _, ok := known[key]; !ok {
+		if _, exists := known[key]; !exists {
 			unknown = append(unknown, key)
 		}
 	}
@@ -125,18 +125,15 @@ func rememberEnvKeys(keys map[string]struct{}, envs []string) {
 	}
 }
 
-func keepNewEnvEntries(envs []string, known map[string]struct{}) ([]string, []string) {
-	kept := make([]string, 0, len(envs))
-
-	var skipped []string
-
+func keepNewEnvEntries(envs []string, known map[string]struct{}) (kept, skipped []string) {
+	kept = make([]string, 0, len(envs))
 	for _, env := range envs {
 		key, _, ok := strings.Cut(env, "=")
 		if !ok || key == "" {
 			continue
 		}
 
-		if _, ok := known[key]; ok {
+		if _, exists := known[key]; exists {
 			skipped = append(skipped, key)
 
 			continue
