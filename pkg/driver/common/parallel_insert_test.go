@@ -126,6 +126,47 @@ func mixedSpec(size int64) *dgproto.InsertSpec {
 	}
 }
 
+func rowIndexKind(kind dgproto.RowIndex_Kind) *dgproto.Expr {
+	return &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{
+		Kind: kind,
+	}}}
+}
+
+func fixedDegree(count int64) *dgproto.Degree {
+	return &dgproto.Degree{Kind: &dgproto.Degree_Fixed{Fixed: &dgproto.DegreeFixed{
+		Count: count,
+	}}}
+}
+
+func relationshipSpec(outerSize, degree, sizeHint int64) *dgproto.InsertSpec {
+	return &dgproto.InsertSpec{
+		Table:  "rel_t",
+		Method: dgproto.InsertMethod_NATIVE,
+		Source: &dgproto.RelSource{
+			Population: &dgproto.Population{Name: "lineitem", Size: sizeHint},
+			Attrs: []*dgproto.Attr{
+				attr("order_idx", rowIndexKind(dgproto.RowIndex_ENTITY)),
+				attr("line_idx", rowIndexKind(dgproto.RowIndex_LINE)),
+				attr("global_idx", rowIndexKind(dgproto.RowIndex_GLOBAL)),
+			},
+			ColumnOrder: []string{"order_idx", "line_idx", "global_idx"},
+			LookupPops: []*dgproto.LookupPop{{
+				Population:  &dgproto.Population{Name: "orders", Size: outerSize},
+				Attrs:       []*dgproto.Attr{attr("o_id", rowIndex())},
+				ColumnOrder: []string{"o_id"},
+			}},
+			Relationships: []*dgproto.Relationship{{
+				Name: "orders_lineitem",
+				Sides: []*dgproto.Side{
+					{Population: "orders", Degree: fixedDegree(1)},
+					{Population: "lineitem", Degree: fixedDegree(degree)},
+				},
+			}},
+			Iter: "orders_lineitem",
+		},
+	}
+}
+
 // collectAllRows uses RunParallel to drain every chunk into one []string
 // slice. Rows are rendered with fmt.Sprint so the comparison is
 // canonical. The caller is responsible for sorting, since chunks arrive
@@ -194,6 +235,47 @@ func TestRunParallelDeterminismAcrossWorkers(t *testing.T) {
 		if !reflect.DeepEqual(baseline, results[workers]) {
 			t.Fatalf("workers=%d produced a different multiset than workers=1", workers)
 		}
+	}
+}
+
+func TestRunParallelByWorkersUsesRuntimeTotalRows(t *testing.T) {
+	t.Parallel()
+
+	const (
+		outerSize = int64(5)
+		degree    = int64(3)
+		sizeHint  = int64(999)
+		wantRows  = outerSize * degree
+	)
+
+	var drained atomic.Int64
+
+	gotRows, err := RunParallelByWorkers(
+		context.Background(),
+		relationshipSpec(outerSize, degree, sizeHint),
+		4,
+		func(_ context.Context, chunk Chunk, rt *runtime.Runtime) error {
+			drained.Add(chunk.Count)
+
+			for range chunk.Count {
+				if _, rowErr := rt.Next(); rowErr != nil {
+					return fmt.Errorf("row: %w", rowErr)
+				}
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("RunParallelByWorkers: %v", err)
+	}
+
+	if gotRows != wantRows {
+		t.Fatalf("total rows = %d, want %d", gotRows, wantRows)
+	}
+
+	if drained.Load() != wantRows {
+		t.Fatalf("drained rows = %d, want %d", drained.Load(), wantRows)
 	}
 }
 

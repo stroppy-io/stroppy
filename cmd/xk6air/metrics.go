@@ -20,6 +20,8 @@ type txMetrics struct {
 	txCount     *k6metrics.Metric
 	txTPS       *k6metrics.Metric
 	runQueryQPS *k6metrics.Metric
+	insertRows  *k6metrics.Metric
+	insertRPS   *k6metrics.Metric
 	tags        *k6metrics.TagSet
 
 	txTotal    uint64
@@ -44,7 +46,8 @@ func (m *txMetrics) ensureRegistered(vu modules.VU, lg *zap.Logger) {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.txCount != nil && m.txTPS != nil && m.runQueryQPS != nil {
+	if m.txCount != nil && m.txTPS != nil && m.runQueryQPS != nil &&
+		m.insertRows != nil && m.insertRPS != nil {
 		return
 	}
 
@@ -61,10 +64,20 @@ func (m *txMetrics) ensureRegistered(vu modules.VU, lg *zap.Logger) {
 	if err != nil {
 		lg.Fatal("can't register run_query_qps metric", zap.Error(err))
 	}
+	insertRows, err := registry.NewMetric("insert_rows_total", k6metrics.Counter)
+	if err != nil {
+		lg.Fatal("can't register insert_rows_total metric", zap.Error(err))
+	}
+	insertRPS, err := registry.NewMetric("insert_rows_per_second", k6metrics.Trend)
+	if err != nil {
+		lg.Fatal("can't register insert_rows_per_second metric", zap.Error(err))
+	}
 
 	m.txCount = txCount
 	m.txTPS = txTPS
 	m.runQueryQPS = runQueryQPS
+	m.insertRows = insertRows
+	m.insertRPS = insertRPS
 	m.tags = registry.RootTagSet()
 }
 
@@ -76,6 +89,53 @@ func (m *txMetrics) recordQuery(vu modules.VU) {
 	}
 
 	atomic.AddUint64(&m.queryTotal, 1)
+}
+
+func (m *txMetrics) recordInsert(vu modules.VU, table string, rows int64, elapsed time.Duration) {
+	m.ensureRegistered(vu, rootModule.lg)
+
+	state := vu.State()
+	if state == nil {
+		return
+	}
+
+	insertRows, insertRPS, tags, ok := m.snapshotInsertMetrics()
+	if !ok {
+		return
+	}
+
+	if table == "" {
+		table = "unknown"
+	}
+	if rows < 0 {
+		rows = 0
+	}
+
+	now := time.Now()
+	tags = tags.With("table_name", table)
+
+	k6metrics.PushIfNotDone(vu.Context(), state.Samples, k6metrics.Sample{
+		TimeSeries: k6metrics.TimeSeries{
+			Metric: insertRows,
+			Tags:   tags,
+		},
+		Time:  now,
+		Value: float64(rows),
+	})
+
+	rowsPerSecond := float64(0)
+	if elapsed > 0 {
+		rowsPerSecond = float64(rows) / elapsed.Seconds()
+	}
+
+	k6metrics.PushIfNotDone(vu.Context(), state.Samples, k6metrics.Sample{
+		TimeSeries: k6metrics.TimeSeries{
+			Metric: insertRPS,
+			Tags:   tags,
+		},
+		Time:  now,
+		Value: rowsPerSecond,
+	})
 }
 
 func (m *txMetrics) record(vu modules.VU, action, name string, isolation stroppy.TxIsolationLevel) {
@@ -168,6 +228,21 @@ func (m *txMetrics) snapshotCountMetric() (*k6metrics.Metric, *k6metrics.TagSet,
 		return nil, nil, false
 	}
 	return m.txCount, m.tags, true
+}
+
+func (m *txMetrics) snapshotInsertMetrics() (
+	*k6metrics.Metric,
+	*k6metrics.Metric,
+	*k6metrics.TagSet,
+	bool,
+) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.insertRows == nil || m.insertRPS == nil || m.tags == nil {
+		return nil, nil, nil, false
+	}
+
+	return m.insertRows, m.insertRPS, m.tags, true
 }
 
 func runThroughputSampler(

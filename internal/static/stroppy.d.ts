@@ -28,6 +28,7 @@ declare module "k6/x/stroppy" {
 
   export interface QueryStats {
     elapsed: GoDuration;
+    rows: number;
   }
 
   // Cursor-style row iteration over query results.

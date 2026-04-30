@@ -70,7 +70,7 @@ func (d *Driver) insertSpecSingle(spec *dgproto.InsertSpec) (*stats.Query, error
 
 	d.recordShards(spec.GetTable(), rt.Columns(), 1, count)
 
-	return &stats.Query{Elapsed: time.Since(start)}, nil
+	return &stats.Query{Elapsed: time.Since(start), Rows: count}, nil
 }
 
 // insertSpecParallel fans the spec out across workers goroutines via
@@ -83,14 +83,11 @@ func (d *Driver) insertSpecParallel(
 	spec *dgproto.InsertSpec,
 	workers int,
 ) (*stats.Query, error) {
-	total := spec.GetSource().GetPopulation().GetSize()
-	chunks := common.SplitChunks(total, workers)
-
 	start := time.Now()
 
 	var columns []string
 
-	err := common.RunParallel(ctx, spec, chunks,
+	rows, err := common.RunParallelByWorkers(ctx, spec, workers,
 		func(_ context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
 			rowCount, err := d.writeShard(spec.GetTable(), rt, chunk.Index, chunk.Count)
 			if err != nil {
@@ -115,7 +112,7 @@ func (d *Driver) insertSpecParallel(
 		d.recordShards(spec.GetTable(), columns, 0, 0)
 	}
 
-	return &stats.Query{Elapsed: time.Since(start)}, nil
+	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
 // writeShard drains rt (or stops after count rows when count >= 0),

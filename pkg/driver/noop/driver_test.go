@@ -37,6 +37,10 @@ func rowIndex() *dgproto.Expr {
 	}}}
 }
 
+func rowIndexKind(kind dgproto.RowIndex_Kind) *dgproto.Expr {
+	return &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{Kind: kind}}}
+}
+
 func binOp(op dgproto.BinOp_Op, a, b *dgproto.Expr) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{
 		Op: op, A: a, B: b,
@@ -89,6 +93,48 @@ func plainSpec(size int64, workers int32) *dgproto.InsertSpec {
 	}
 }
 
+func fixedDegree(count int64) *dgproto.Degree {
+	return &dgproto.Degree{Kind: &dgproto.Degree_Fixed{Fixed: &dgproto.DegreeFixed{
+		Count: count,
+	}}}
+}
+
+func relationshipSpec(outerSize, degree, sizeHint int64, workers int32) *dgproto.InsertSpec {
+	outerAttrs := []*dgproto.Attr{
+		{Name: "o_id", Expr: rowIndex()},
+	}
+
+	childAttrs := []*dgproto.Attr{
+		{Name: "order_idx", Expr: rowIndexKind(dgproto.RowIndex_ENTITY)},
+		{Name: "line_idx", Expr: rowIndexKind(dgproto.RowIndex_LINE)},
+		{Name: "global_idx", Expr: rowIndexKind(dgproto.RowIndex_GLOBAL)},
+	}
+
+	return &dgproto.InsertSpec{
+		Table:       "noop_rel_t",
+		Method:      dgproto.InsertMethod_NATIVE,
+		Parallelism: &dgproto.Parallelism{Workers: workers},
+		Source: &dgproto.RelSource{
+			Population:  &dgproto.Population{Name: "lineitem", Size: sizeHint},
+			Attrs:       childAttrs,
+			ColumnOrder: []string{"order_idx", "line_idx", "global_idx"},
+			LookupPops: []*dgproto.LookupPop{{
+				Population:  &dgproto.Population{Name: "orders", Size: outerSize},
+				Attrs:       outerAttrs,
+				ColumnOrder: []string{"o_id"},
+			}},
+			Relationships: []*dgproto.Relationship{{
+				Name: "orders_lineitem",
+				Sides: []*dgproto.Side{
+					{Population: "orders", Degree: fixedDegree(1)},
+					{Population: "lineitem", Degree: fixedDegree(degree)},
+				},
+			}},
+			Iter: "orders_lineitem",
+		},
+	}
+}
+
 // TestInsertSpecHonoursWorkers drives the noop driver with workers ∈
 // {1, 4, 16}, exercising the parallel fan-out added for Gap 1. Under
 // -race this must complete without tripping a framework-level data race.
@@ -119,6 +165,10 @@ func TestInsertSpecHonoursWorkers(t *testing.T) {
 			if stat.Elapsed <= 0 {
 				t.Fatalf("InsertSpec(workers=%d): non-positive elapsed %v", workers, stat.Elapsed)
 			}
+
+			if stat.Rows != size {
+				t.Fatalf("InsertSpec(workers=%d): rows = %d, want %d", workers, stat.Rows, size)
+			}
 		})
 	}
 }
@@ -132,8 +182,44 @@ func TestInsertSpecSingleWorkerShape(t *testing.T) {
 
 	// No Parallelism => workers = 0 => single-path.
 	sp := plainSpec(200, 0)
-	if _, err := d.InsertSpec(context.Background(), sp); err != nil {
+
+	stat, err := d.InsertSpec(context.Background(), sp)
+	if err != nil {
 		t.Fatalf("InsertSpec: %v", err)
+	}
+
+	if stat.Rows != 200 {
+		t.Fatalf("rows = %d, want 200", stat.Rows)
+	}
+}
+
+func TestInsertSpecRowsUsesRelationshipTotal(t *testing.T) {
+	t.Parallel()
+
+	const (
+		outerSize = int64(7)
+		degree    = int64(3)
+		sizeHint  = int64(999)
+		wantRows  = outerSize * degree
+	)
+
+	ctx := context.Background()
+
+	for _, workers := range []int32{1, 4} {
+		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
+			d := NewDriver(testOpts())
+
+			stat, err := d.InsertSpec(ctx, relationshipSpec(outerSize, degree, sizeHint, workers))
+			if err != nil {
+				t.Fatalf("InsertSpec(workers=%d): %v", workers, err)
+			}
+
+			if stat.Rows != wantRows {
+				t.Fatalf("InsertSpec(workers=%d): rows = %d, want %d", workers, stat.Rows, wantRows)
+			}
+		})
 	}
 }
 

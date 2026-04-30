@@ -128,8 +128,13 @@ func TestInsertSpecSingleShardMerge(t *testing.T) {
 
 	sp := rowsSpec("t1", 100, 0)
 
-	if _, err := d.InsertSpec(context.Background(), sp); err != nil {
+	stat, err := d.InsertSpec(context.Background(), sp)
+	if err != nil {
 		t.Fatalf("InsertSpec: %v", err)
+	}
+
+	if stat.Rows != 100 {
+		t.Fatalf("InsertSpec rows = %d, want 100", stat.Rows)
 	}
 
 	if err := d.Teardown(context.Background()); err != nil {
@@ -171,8 +176,13 @@ func TestInsertSpecParallelMerge(t *testing.T) {
 
 	sp := rowsSpec("t_multi", total, 4)
 
-	if _, err := d.InsertSpec(context.Background(), sp); err != nil {
+	stat, err := d.InsertSpec(context.Background(), sp)
+	if err != nil {
 		t.Fatalf("InsertSpec: %v", err)
+	}
+
+	if stat.Rows != total {
+		t.Fatalf("InsertSpec rows = %d, want %d", stat.Rows, total)
 	}
 
 	if err := d.Teardown(context.Background()); err != nil {
@@ -209,8 +219,13 @@ func TestInsertSpecShardsNoMerge(t *testing.T) {
 
 	sp := rowsSpec("t_no_merge", 250, 3)
 
-	if _, err := d.InsertSpec(context.Background(), sp); err != nil {
+	stat, err := d.InsertSpec(context.Background(), sp)
+	if err != nil {
 		t.Fatalf("InsertSpec: %v", err)
+	}
+
+	if stat.Rows != 250 {
+		t.Fatalf("InsertSpec rows = %d, want 250", stat.Rows)
 	}
 
 	if err := d.Teardown(context.Background()); err != nil {

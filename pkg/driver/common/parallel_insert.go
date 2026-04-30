@@ -51,6 +51,39 @@ type Chunk struct {
 // the first error, and the callback is expected to return promptly.
 type ChunkFn func(ctx context.Context, chunk Chunk, rt *runtime.Runtime) error
 
+// RunParallelByWorkers builds one seed Runtime, splits its actual row range,
+// and drains the chunks concurrently. It returns the runtime's total row count,
+// which may differ from RelSource.population.size for relationship-backed
+// specs.
+func RunParallelByWorkers(
+	ctx context.Context,
+	spec *dgproto.InsertSpec,
+	workers int,
+	fn ChunkFn,
+) (int64, error) {
+	if spec == nil {
+		return 0, ErrNilSpec
+	}
+
+	if fn == nil {
+		return 0, ErrNilChunkFn
+	}
+
+	seed, err := runtime.NewRuntime(spec)
+	if err != nil {
+		return 0, fmt.Errorf("common: build seed runtime: %w", err)
+	}
+
+	total := seed.TotalRows()
+
+	chunks := SplitChunks(total, workers)
+	if err := runParallel(ctx, seed, chunks, fn); err != nil {
+		return 0, err
+	}
+
+	return total, nil
+}
+
 // SplitChunks carves the row range [0, total) into exactly max(workers, 1)
 // contiguous chunks. Every chunk has floor(total/workers) rows except the
 // last, which absorbs the remainder so the total count is preserved
@@ -115,6 +148,18 @@ func RunParallel(ctx context.Context, spec *dgproto.InsertSpec, chunks []Chunk, 
 	seed, err := runtime.NewRuntime(spec)
 	if err != nil {
 		return fmt.Errorf("common: build seed runtime: %w", err)
+	}
+
+	return runParallel(ctx, seed, chunks, fn)
+}
+
+func runParallel(ctx context.Context, seed *runtime.Runtime, chunks []Chunk, fn ChunkFn) error {
+	if fn == nil {
+		return ErrNilChunkFn
+	}
+
+	if len(chunks) == 0 {
+		return ErrNoChunks
 	}
 
 	group, groupCtx := errgroup.WithContext(ctx)

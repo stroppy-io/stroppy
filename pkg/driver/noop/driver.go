@@ -95,13 +95,15 @@ func (d *Driver) insertSpecSingle(spec *dgproto.InsertSpec) (*stats.Query, error
 		return nil, fmt.Errorf("noop: build runtime: %w", err)
 	}
 
+	rows := rt.TotalRows()
+
 	start := time.Now()
 
 	if err := drainRuntime(rt, -1); err != nil {
 		return nil, err
 	}
 
-	return &stats.Query{Elapsed: time.Since(start)}, nil
+	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
 // insertSpecParallel fans the spec out across workers goroutines via
@@ -114,12 +116,9 @@ func (d *Driver) insertSpecParallel(
 	spec *dgproto.InsertSpec,
 	workers int,
 ) (*stats.Query, error) {
-	total := spec.GetSource().GetPopulation().GetSize()
-	chunks := common.SplitChunks(total, workers)
-
 	start := time.Now()
 
-	err := common.RunParallel(ctx, spec, chunks,
+	rows, err := common.RunParallelByWorkers(ctx, spec, workers,
 		func(_ context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
 			return drainRuntime(rt, chunk.Count)
 		})
@@ -127,7 +126,7 @@ func (d *Driver) insertSpecParallel(
 		return nil, err
 	}
 
-	return &stats.Query{Elapsed: time.Since(start)}, nil
+	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
 // drainRuntime pulls rows from rt and discards them. When count is

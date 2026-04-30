@@ -60,30 +60,29 @@ func (d *Driver) insertSpecSingle(
 		return nil, fmt.Errorf("postgres: build runtime: %w", err)
 	}
 
+	rows := rt.TotalRows()
+
 	start := time.Now()
 
 	if err := d.runChunk(ctx, spec, rt, -1); err != nil {
 		return nil, err
 	}
 
-	return &stats.Query{Elapsed: time.Since(start)}, nil
+	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
 // insertSpecParallel fans the spec out across workers goroutines via
 // common.RunParallel. Each worker owns an independent Runtime clone
-// pre-seeked to its chunk.Start; per-worker row counts are accumulated
-// atomically and reported back on the final stats.Query.
+// pre-seeked to its chunk.Start; the final stats.Query reports the
+// runtime's actual total row count.
 func (d *Driver) insertSpecParallel(
 	ctx context.Context,
 	spec *dgproto.InsertSpec,
 	workers int,
 ) (*stats.Query, error) {
-	total := spec.GetSource().GetPopulation().GetSize()
-	chunks := common.SplitChunks(total, workers)
-
 	start := time.Now()
 
-	err := common.RunParallel(ctx, spec, chunks,
+	rows, err := common.RunParallelByWorkers(ctx, spec, workers,
 		func(workerCtx context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
 			return d.runChunk(workerCtx, spec, rt, chunk.Count)
 		})
@@ -91,7 +90,7 @@ func (d *Driver) insertSpecParallel(
 		return nil, err
 	}
 
-	return &stats.Query{Elapsed: time.Since(start)}, nil
+	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
 // runChunk dispatches one runtime's output into the database per the

@@ -98,6 +98,7 @@ func (d *DriverWrapper) InsertSpecBin(specBin []byte) (*stats.Query, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error while executing InsertSpec: %w", err)
 	}
+	rootModule.txMetrics.recordInsert(d.vu, spec.GetTable(), result.Rows, result.Elapsed)
 
 	return result, nil
 }

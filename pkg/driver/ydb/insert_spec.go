@@ -57,13 +57,15 @@ func (d *Driver) insertSpecSingle(
 		return nil, fmt.Errorf("ydb: build runtime: %w", err)
 	}
 
+	rows := rt.TotalRows()
+
 	start := time.Now()
 
 	if err := d.runChunk(ctx, spec, rt, -1); err != nil {
 		return nil, err
 	}
 
-	return &stats.Query{Elapsed: time.Since(start)}, nil
+	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
 // insertSpecParallel fans out over workers goroutines via common.RunParallel.
@@ -72,12 +74,9 @@ func (d *Driver) insertSpecParallel(
 	spec *dgproto.InsertSpec,
 	workers int,
 ) (*stats.Query, error) {
-	total := spec.GetSource().GetPopulation().GetSize()
-	chunks := common.SplitChunks(total, workers)
-
 	start := time.Now()
 
-	err := common.RunParallel(ctx, spec, chunks,
+	rows, err := common.RunParallelByWorkers(ctx, spec, workers,
 		func(workerCtx context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
 			return d.runChunk(workerCtx, spec, rt, chunk.Count)
 		})
@@ -85,7 +84,7 @@ func (d *Driver) insertSpecParallel(
 		return nil, err
 	}
 
-	return &stats.Query{Elapsed: time.Since(start)}, nil
+	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
 // runChunk dispatches one runtime's rows per spec.Method. NATIVE uses

@@ -59,15 +59,15 @@ writing concurrently.
    the shared orchestrator:
 
    ```go
-   chunks := common.SplitChunks(rowCount, int(spec.GetParallelism().GetWorkers()))
-   err := common.RunParallel(ctx, spec, chunks, func(ctx, chunk, rt) error {
+   rows, err := common.RunParallelByWorkers(ctx, spec, workers, func(ctx, chunk, rt) error {
        return drainChunk(ctx, chunk, rt, writer)
    })
    ```
 
-4. **SplitChunks.** Divides `[0, rowCount)` into `max(workers, 1)`
-   contiguous ranges. Every chunk holds `floor(total/workers)` rows;
-   the last absorbs the remainder.
+4. **SplitChunks.** The shared helper builds a seed `runtime.Runtime`,
+   asks it for the actual emitted-row total, then divides `[0, rows)`
+   into `max(workers, 1)` contiguous ranges. Every chunk holds
+   `floor(total/workers)` rows; the last absorbs the remainder.
 
 5. **RunParallel.** Builds one seed `runtime.Runtime` from the spec,
    then spawns one goroutine per chunk via `errgroup`. Each goroutine

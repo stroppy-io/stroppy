@@ -184,6 +184,13 @@ func (r *Runtime) Columns() []string {
 	return r.columns
 }
 
+// TotalRows returns the number of rows this runtime will emit. For flat
+// populations it equals RelSource.population.size; for relationship-backed
+// sources it is the computed relationship row total.
+func (r *Runtime) TotalRows() int64 {
+	return r.size
+}
+
 // Clone returns an independent Runtime that shares the compiled DAG,
 // column metadata, dict map, and (for relationship runtimes) the
 // immutable cumulativeRows profile with the receiver, but owns a fresh

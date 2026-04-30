@@ -143,13 +143,14 @@ func RunInsertSpecStats[T any](
 	dialect queries.Dialect,
 	batchSize int,
 ) (*stats.Query, error) {
+	rows := rt.TotalRows()
 	start := time.Now()
 
 	if err := RunInsertSpec(ctx, db, spec, rt, dialect, batchSize); err != nil {
 		return nil, err
 	}
 
-	return &stats.Query{Elapsed: time.Since(start)}, nil
+	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
 // convertRow runs dialect.Convert over every value in row, copying into a
