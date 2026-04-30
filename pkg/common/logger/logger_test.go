@@ -45,6 +45,7 @@ func TestNewZapCfg(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := newZapCfg(tt.mod, tt.level)
 			require.Equal(t, tt.expected, cfg.Level.Level())
+			require.True(t, cfg.DisableStacktrace)
 		})
 	}
 }

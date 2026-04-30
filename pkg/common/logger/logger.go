@@ -52,6 +52,8 @@ func newZapCfg(mod LogMod, logLevel zapcore.Level) zap.Config {
 		cfg.Level.SetLevel(logLevel)
 	}
 
+	cfg.DisableStacktrace = true
+
 	return cfg
 }
 
