@@ -1593,6 +1593,10 @@ export function handleSummary(data: any): Record<string, string> {
     const v = m[name]?.values?.rate;
     return typeof v === "number" ? (v * 100).toFixed(2) + "%" : "n/a";
   };
+  const counterRateStr = (name: string): string => {
+    const v = m[name]?.values?.rate;
+    return typeof v === "number" ? v.toFixed(2) + "/s" : "n/a";
+  };
 
   const no  = cnt("tpcc_new_order_total");
   const pay = cnt("tpcc_payment_total");
@@ -1614,6 +1618,7 @@ export function handleSummary(data: any): Record<string, string> {
   const iterDur = m.iteration_duration?.values?.avg;
   const iterDurStr = typeof iterDur === "number" ? iterDur.toFixed(2) + " ms" : "n/a";
   const queries = cnt("run_query_count");
+  const txs = cnt("tx_count");
 
   const lines: string[] = [
     "",
@@ -1647,6 +1652,8 @@ export function handleSummary(data: any): Record<string, string> {
     "",
     "===== Driver query / tx timings (from helpers.ts metrics) =====",
     `  queries executed    : ${queries}`,
+    `  tx attempts         : ${txs}`,
+    `  avg tx throughput   : ${counterRateStr("tx_count")}`,
     `  run_query_duration  : ${trendLine("run_query_duration")}`,
     `  run_query_error_rate: ${rateStr("run_query_error_rate")}`,
     `  tx_total_duration   : ${trendLine("tx_total_duration")}`,
