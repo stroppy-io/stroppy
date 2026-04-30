@@ -333,6 +333,101 @@ export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode" | "driverType"
   sql?: Partial<DriverConfig_SqlConfig>;
 }
 
+const driverSetupKeys = new Set([
+  "url",
+  "driverType",
+  "defaultTxIsolation",
+  "defaultInsertMethod",
+  "errorMode",
+  "pool",
+  "postgres",
+  "sql",
+  "bulkSize",
+  "caCertFile",
+  "authToken",
+  "authUser",
+  "authPassword",
+  "tlsInsecureSkipVerify",
+]);
+
+const nestedDriverSetupKeys: Record<string, Set<string>> = {
+  pool: new Set(["maxConns", "minConns", "maxConnLifetime", "maxConnIdleTime"]),
+  postgres: new Set([
+    "traceLogLevel",
+    "maxConnLifetime",
+    "maxConnIdleTime",
+    "maxConns",
+    "minConns",
+    "minIdleConns",
+    "defaultQueryExecMode",
+    "descriptionCacheCapacity",
+    "statementCacheCapacity",
+  ]),
+  sql: new Set(["maxOpenConns", "maxIdleConns", "connMaxLifetime", "connMaxIdleTime"]),
+};
+
+const driverSetupEnums: Record<string, Set<string>> = {
+  driverType: new Set(Object.keys(driverTypeMap)),
+  defaultTxIsolation: new Set(Object.keys(txIsolationMap)),
+  defaultInsertMethod: new Set(Object.keys(insertMethodMap)),
+  errorMode: new Set(Object.keys(errorModeMap)),
+};
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function allowedList(keys: Set<string>): string {
+  return [...keys].sort().join(", ");
+}
+
+function validateEnum(source: string, path: string, value: unknown, allowed: Set<string>): void {
+  if (value !== undefined && (typeof value !== "string" || !allowed.has(value))) {
+    throw new Error(`${source}: ${path} must be one of: ${allowedList(allowed)}`);
+  }
+}
+
+export function validateDriverSetup(source: string, setup: unknown): asserts setup is DriverSetup {
+  if (!isPlainObject(setup)) {
+    throw new Error(`${source}: driver setup must be object`);
+  }
+
+  for (const [key, value] of Object.entries(setup)) {
+    if (!driverSetupKeys.has(key)) {
+      throw new Error(`${source}: unknown driver option "${key}" (available: ${allowedList(driverSetupKeys)})`);
+    }
+
+    const enumValues = driverSetupEnums[key];
+    if (enumValues) validateEnum(source, key, value, enumValues);
+
+    const nestedKeys = nestedDriverSetupKeys[key];
+    if (!nestedKeys || value === undefined) continue;
+    if (!isPlainObject(value)) {
+      throw new Error(`${source}: ${key} must be object`);
+    }
+
+    for (const nestedKey of Object.keys(value)) {
+      if (!nestedKeys.has(nestedKey)) {
+        throw new Error(`${source}: unknown ${key} option "${nestedKey}" (available: ${allowedList(nestedKeys)})`);
+      }
+    }
+  }
+}
+
+function mergeDriverSetup(defaults: DriverSetup, cli: Partial<DriverSetup>): DriverSetup {
+  const merged: Record<string, unknown> = { ...defaults };
+  for (const [key, value] of Object.entries(cli)) {
+    if (value === undefined) continue;
+    if ((key === "pool" || key === "postgres" || key === "sql") && isPlainObject(value)) {
+      merged[key] = { ...((defaults as Record<string, unknown>)[key] as object | undefined), ...value };
+    } else {
+      merged[key] = value;
+    }
+  }
+
+  return merged as DriverSetup;
+}
+
 /** Resolve pool sugar into the appropriate driver-specific config. */
 function resolvePoolConfig(config: DriverSetup): {
   postgres?: Partial<DriverConfig_PostgresConfig>;
@@ -390,29 +485,18 @@ export function declareDriverSetup(index: number, defaults: DriverSetup): Driver
   const raw = __ENV[envKey];
   if (!raw || raw === "") return defaults;
 
+  let cli: unknown;
   try {
-    const cli = JSON.parse(raw) as Partial<DriverSetup>;
-    // Deep merge: CLI fields override defaults, but only if actually set.
-    const merged: DriverSetup = { ...defaults };
-  if (cli.driverType          !== undefined) merged.driverType          = cli.driverType          as DriverTypeName;
-  if (cli.url                 !== undefined) merged.url                 = cli.url;
-  if (cli.defaultTxIsolation  !== undefined) merged.defaultTxIsolation  = cli.defaultTxIsolation  as TxIsolationName;
-  if (cli.defaultInsertMethod !== undefined) merged.defaultInsertMethod = cli.defaultInsertMethod as InsertMethodName;
-  if (cli.errorMode           !== undefined) merged.errorMode           = cli.errorMode           as ErrorModeName;
-  if (cli.pool                !== undefined) merged.pool                = cli.pool;
-  if (cli.postgres            !== undefined) merged.postgres            = cli.postgres;
-  if (cli.sql                 !== undefined) merged.sql                 = cli.sql;
-    if ((cli as any).bulkSize !== undefined) merged.bulkSize = (cli as any).bulkSize;
-  if (cli.caCertFile           !== undefined) merged.caCertFile           = cli.caCertFile;
-  if (cli.authToken            !== undefined) merged.authToken            = cli.authToken;
-  if (cli.authUser             !== undefined) merged.authUser             = cli.authUser;
-  if (cli.authPassword         !== undefined) merged.authPassword         = cli.authPassword;
-  if (cli.tlsInsecureSkipVerify !== undefined) merged.tlsInsecureSkipVerify = cli.tlsInsecureSkipVerify;
-    return merged;
+    cli = JSON.parse(raw);
   } catch (e) {
-    console.error(`[stroppy] failed to parse ${envKey}: ${e}`);
-    return defaults;
+    throw new Error(`[stroppy] failed to parse ${envKey}: ${e}`);
   }
+
+  validateDriverSetup(envKey, cli);
+  const merged = mergeDriverSetup(defaults, cli);
+  validateDriverSetup(`${envKey} merged`, merged);
+
+  return merged;
 }
 
 export class DriverX implements QueryAPI {
@@ -517,7 +601,7 @@ export class DriverX implements QueryAPI {
   /** Start a transaction manually. Call tx.commit() or tx.rollback() when done. */
   begin(options?: { isolation?: TxIsolationName; name?: string }): TxX {
     const level = options?.isolation ?? this._defaultTxIsolation;
-    const tx = this.driver.begin(txIsolationMap[level]);
+    const tx = this.driver.begin(txIsolationMap[level], options?.name ?? "");
     return new TxX(tx, level, () => this._errorMode, options?.name);
   }
 

@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd/state"
+
+	"github.com/stroppy-io/stroppy/internal/runner"
 )
 
 func sendInt(t *testing.T) {
@@ -68,4 +70,23 @@ func TestInterceptMiddleware(_ *testing.T) {
 
 	// SignalStop should not panic and should clean up.
 	gs.SignalStop(ch)
+}
+
+func TestK6SubcommandScopesExitCapture(t *testing.T) {
+	called := false
+	gs := &state.GlobalState{OSExit: func(int) { called = true }}
+
+	K6Subcommand(gs)
+	gs.OSExit(1)
+	require.True(t, called)
+
+	called = false
+
+	stop := runner.BeginK6ExitCapture()
+	defer stop()
+
+	gs = &state.GlobalState{OSExit: func(int) { called = true }}
+	K6Subcommand(gs)
+	gs.OSExit(1)
+	require.False(t, called)
 }

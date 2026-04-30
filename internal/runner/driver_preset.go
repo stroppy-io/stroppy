@@ -24,7 +24,17 @@ var pathFields = map[string]bool{
 	"cacertfile": true,
 }
 
-var errUnknownDriver = errors.New("unknown driver")
+var (
+	errUnknownDriver          = errors.New("unknown driver")
+	errInvalidDriverOverride  = errors.New("invalid driver override")
+	errDriverOverrideConflict = errors.New("driver override conflicts with existing non-object value")
+)
+
+const (
+	driverTypeKey          = "drivertype"
+	urlKey                 = "url"
+	defaultInsertMethodKey = "defaultinsertmethod"
+)
 
 // inferType converts a CLI string value to its most specific Go type
 // so that JSON serialization emits a number/bool instead of a quoted string.
@@ -151,27 +161,102 @@ func (d DriverCLIConfig) MarshalJSON() ([]byte, error) {
 
 // ApplyOverride sets a field by key=value. Known fields are set on the struct,
 // unknown fields go into Extra for pass-through to TS.
-func (d *DriverCLIConfig) ApplyOverride(key, value string) {
-	switch strings.ToLower(key) {
-	case "drivertype":
+func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
+	if key == "" {
+		return fmt.Errorf("%w: empty key", errInvalidDriverOverride)
+	}
+
+	switch normalizeKey(key) {
+	case driverTypeKey:
 		d.DriverType = value
-	case "url":
+	case urlKey:
 		d.URL = value
-	case "defaultinsertmethod":
+	case defaultInsertMethodKey:
 		d.DefaultInsertMethod = value
 	default:
-		if d.Extra == nil {
-			d.Extra = make(map[string]any)
-		}
-
-		if pathFields[strings.ToLower(key)] {
-			if abs, err := filepath.Abs(value); err == nil {
-				value = abs
-			}
-		}
-
-		d.Extra[key] = inferType(value)
+		return d.setExtraPath(strings.Split(key, "."), convertOverrideValue(key, value))
 	}
+
+	return nil
+}
+
+func (d *DriverCLIConfig) setExtraPath(path []string, value any) error {
+	if err := validateOverridePath(path); err != nil {
+		return err
+	}
+
+	if d.Extra == nil {
+		d.Extra = make(map[string]any)
+	}
+
+	target := d.Extra
+	for _, part := range path[:len(path)-1] {
+		next, ok := target[part]
+		if !ok {
+			nested := make(map[string]any)
+			target[part] = nested
+			target = nested
+
+			continue
+		}
+
+		nested, ok := next.(map[string]any)
+		if !ok {
+			return fmt.Errorf("%w: %q", errDriverOverrideConflict, part)
+		}
+
+		target = nested
+	}
+
+	last := path[len(path)-1]
+	if existing, exists := target[last]; exists {
+		if _, isObject := existing.(map[string]any); isObject {
+			return fmt.Errorf("%w: %q", errDriverOverrideConflict, last)
+		}
+	}
+
+	target[last] = value
+
+	return nil
+}
+
+func validateOverridePath(path []string) error {
+	for _, part := range path {
+		if part == "" {
+			return fmt.Errorf("%w: empty dotted path segment", errInvalidDriverOverride)
+		}
+	}
+
+	if len(path) > 1 && isDriverCLIField(path[0]) {
+		return fmt.Errorf("%w: %q", errDriverOverrideConflict, path[0])
+	}
+
+	return nil
+}
+
+func isDriverCLIField(key string) bool {
+	switch normalizeKey(key) {
+	case driverTypeKey, urlKey, defaultInsertMethodKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func convertOverrideValue(key, value string) any {
+	if pathFields[normalizeKey(key)] {
+		if abs, err := filepath.Abs(value); err == nil {
+			return abs
+		}
+	}
+
+	return inferType(value)
+}
+
+func normalizeKey(key string) string {
+	replacer := strings.NewReplacer("_", "", "-", "")
+
+	return strings.ToLower(replacer.Replace(key))
 }
 
 // NewDriverCLIConfigFromPreset creates a DriverCLIConfig from a preset.
@@ -196,19 +281,19 @@ func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
 	for field, val := range m {
 		str, _ := val.(string)
 
-		switch strings.ToLower(field) {
-		case "drivertype":
+		switch normalizeKey(field) {
+		case driverTypeKey:
 			cfg.DriverType = str
-		case "url":
+		case urlKey:
 			cfg.URL = str
-		case "defaultinsertmethod":
+		case defaultInsertMethodKey:
 			cfg.DefaultInsertMethod = str
 		default:
 			if cfg.Extra == nil {
 				cfg.Extra = make(map[string]any)
 			}
 
-			if pathFields[strings.ToLower(field)] {
+			if pathFields[normalizeKey(field)] {
 				if s, ok := val.(string); ok {
 					if abs, err := filepath.Abs(s); err == nil {
 						val = abs

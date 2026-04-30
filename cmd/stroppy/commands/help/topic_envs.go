@@ -150,7 +150,18 @@ CONFIG FILE ALTERNATIVE
 
 DEBUG: TRACING ENV RESOLUTION
 
-  To see which env vars are applied and where they came from:
+  Normal run logs show -e/config env entries that were applied:
+
+    stroppy run tpcc/tx -e load_workers=8
+
+    INFO script_runner Applied script env {"source":"cli","env":["LOAD_WORKERS=8"]}
+
+  If an applied env key is not declared by the workload's ENV() calls, Stroppy
+  warns so typos are visible:
+
+    WARN script_runner Script env is not declared by workload {"keys":["LOAD_WROKERS"]}
+
+  To inspect skipped env entries and precedence decisions:
 
     LOG_LEVEL=debug stroppy run <script>
 

@@ -102,14 +102,18 @@ func (d *DriverWrapper) InsertSpecBin(specBin []byte) (*stats.Query, error) {
 
 // Begin starts a new transaction with the given isolation level.
 // isolationLevel maps to proto TxIsolationLevel int32 values.
-func (d *DriverWrapper) Begin(isolationLevel int32) (*TxWrapper, error) {
+func (d *DriverWrapper) Begin(isolationLevel int32, txName ...string) (*TxWrapper, error) {
 	d.ensureReady()
 
 	level := stroppy.TxIsolationLevel(isolationLevel)
+	name := ""
+	if len(txName) > 0 {
+		name = txName[0]
+	}
 
 	// NONE mode: no actual transaction, delegate to driver.RunQuery
 	if level == stroppy.TxIsolationLevel_NONE {
-		return &TxWrapper{tx: nil, drv: d, vu: d.vu}, nil
+		return &TxWrapper{tx: nil, drv: d, vu: d.vu, isolation: level, name: name}, nil
 	}
 
 	tx, err := d.drv.Begin(d.vu.Context(), level)
@@ -117,15 +121,17 @@ func (d *DriverWrapper) Begin(isolationLevel int32) (*TxWrapper, error) {
 		return nil, fmt.Errorf("error starting transaction: %w", err)
 	}
 
-	return &TxWrapper{tx: tx, drv: d, vu: d.vu}, nil
+	return &TxWrapper{tx: tx, drv: d, vu: d.vu, isolation: level, name: name}, nil
 }
 
 // TxWrapper wraps a driver.Tx for JS exposure.
 // For NONE mode, tx is nil and queries delegate to the parent driver.
 type TxWrapper struct {
-	tx  driver.Tx
-	drv *DriverWrapper
-	vu  modules.VU
+	tx        driver.Tx
+	drv       *DriverWrapper
+	vu        modules.VU
+	isolation stroppy.TxIsolationLevel
+	name      string
 }
 
 func (t *TxWrapper) RunQuery(sql string, args map[string]any) (*driver.QueryResult, error) {
@@ -143,17 +149,23 @@ func (t *TxWrapper) RunQuery(sql string, args map[string]any) (*driver.QueryResu
 }
 
 func (t *TxWrapper) Commit() error {
-	if t.tx == nil {
-		return nil
+	if t.tx != nil {
+		if err := t.tx.Commit(t.vu.Context()); err != nil {
+			return err
+		}
 	}
 
-	return t.tx.Commit(t.vu.Context())
+	rootModule.txMetrics.record(t.vu, "commit", t.name, t.isolation)
+	return nil
 }
 
 func (t *TxWrapper) Rollback() error {
-	if t.tx == nil {
-		return nil
+	if t.tx != nil {
+		if err := t.tx.Rollback(t.vu.Context()); err != nil {
+			return err
+		}
 	}
 
-	return t.tx.Rollback(t.vu.Context())
+	rootModule.txMetrics.record(t.vu, "rollback", t.name, t.isolation)
+	return nil
 }

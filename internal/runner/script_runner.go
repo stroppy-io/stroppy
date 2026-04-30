@@ -286,15 +286,32 @@ func copyFiles(srcDir, dstDir string, excludeNames []string) (copied []string, e
 // real env > -e overrides > file env > file drivers > CLI drivers > logger/OTEL > sql/steps.
 func (r *ScriptRunner) buildEnvVars() ([]string, error) {
 	envs := os.Environ() // inherit parent environment
+	envKeys := envKeySet(envs)
 
 	// Add -e overrides (real env takes precedence; warns on override).
 	if len(r.envOverrides) > 0 {
-		envs = append(envs, BuildEnvLookup(r.envOverrides, true)...)
+		cliEnvs := BuildEnvLookup(r.envOverrides, true)
+		r.logAppliedScriptEnv("cli", cliEnvs)
+		envs = append(envs, cliEnvs...)
+		rememberEnvKeys(envKeys, cliEnvs)
 	}
 
 	// Config file env overrides (real env takes precedence; silent skip).
 	if r.fileConfig != nil && len(r.fileConfig.GetEnv()) > 0 {
-		envs = append(envs, BuildFileEnvLookup(r.fileConfig.GetEnv())...)
+		fileEnvs := BuildFileEnvLookup(r.fileConfig.GetEnv())
+
+		var skipped []string
+
+		fileEnvs, skipped = keepNewEnvEntries(fileEnvs, envKeys)
+		if len(skipped) > 0 {
+			r.logger.Debug("Config file env skipped: higher-precedence env already set",
+				zap.Strings("keys", skipped),
+			)
+		}
+
+		r.logAppliedScriptEnv("config_file", fileEnvs)
+		envs = append(envs, fileEnvs...)
+		rememberEnvKeys(envKeys, fileEnvs)
 	}
 
 	// File driver configs (skipped if real env or CLI already covers the index).
@@ -474,6 +491,9 @@ func (r *ScriptRunner) runK6(
 	r.logger.Info("Running k6", zap.Strings("args", os.Args))
 
 	// run the test
+	stopExitCapture := BeginK6ExitCapture()
+	defer stopExitCapture()
+
 	k6cmd.Execute()
 
 	defer func() { err = errors.Join(err, exitCodeToError()) }()

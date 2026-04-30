@@ -14,9 +14,12 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "rootDir": "..",
-    "baseUrl": ".."
+    "baseUrl": "..",
+    "paths": {
+      "k6/x/stroppy": ["stroppy.d.ts"],
+      "k6/x/encoding": ["encoding.d.ts"]
+    }
   },
   "include": ["../**/*.ts", "**/*.ts"],
   "exclude": ["node_modules"]
 }
-

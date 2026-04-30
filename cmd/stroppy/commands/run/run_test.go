@@ -1,6 +1,7 @@
 package run
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"testing"
@@ -50,6 +51,22 @@ func TestParseRunArgs(t *testing.T) {
 			wantScript: "./benchmarks/custom.ts",
 			wantSQL:    "data.sql",
 		},
+		{
+			name:       "third positional returns error",
+			args:       []string{"tpcc", "pg.sql", "extra.sql"},
+			wantErrStr: "too many positional arguments",
+		},
+		{
+			name:       "unknown flag before separator returns error",
+			args:       []string{"tpcc", "--vus", "10"},
+			wantErrStr: "pass k6 flags after --",
+		},
+		{
+			name:        "inline SQL query with spaces and equals is single positional",
+			args:        []string{"select a=1", "-d", "pg"},
+			wantScript:  "select a=1",
+			wantPresets: map[int]string{0: "pg"},
+		},
 
 		// ── Missing script ─────────────────────────────────────────────────
 		{
@@ -81,6 +98,23 @@ func TestParseRunArgs(t *testing.T) {
 			name:     "-f without script is allowed (script may come from file)",
 			args:     []string{"-f", "myconfig.json"},
 			wantFile: "myconfig.json",
+		},
+		{
+			name:       "-f followed by driver flag returns missing value",
+			args:       []string{"-f", "-d", "pg"},
+			wantErrStr: "-f: flag requires a value",
+		},
+
+		// ── -e / --env ─────────────────────────────────────────────────────
+		{
+			name:       "-e accepts values starting with dash after equals",
+			args:       []string{"tpcc", "-e", "TOKEN=-abc"},
+			wantScript: "tpcc",
+		},
+		{
+			name:       "-e followed by steps flag returns missing value",
+			args:       []string{"tpcc", "-e", "--steps", "load"},
+			wantErrStr: "-e: flag requires a value",
 		},
 
 		// ── --steps / --no-steps ───────────────────────────────────────────
@@ -122,6 +156,16 @@ func TestParseRunArgs(t *testing.T) {
 			name:       "--no-steps missing value returns error",
 			args:       []string{"tpcc", "--no-steps"},
 			wantErrStr: "flag requires a value",
+		},
+		{
+			name:       "--steps followed by known flag returns missing value",
+			args:       []string{"tpcc", "--steps", "-d", "pg"},
+			wantErrStr: "--steps: flag requires a value",
+		},
+		{
+			name:       "--steps followed by unknown flag returns missing value",
+			args:       []string{"tpcc", "--steps", "--vus", "10"},
+			wantErrStr: "--steps: flag requires a value",
 		},
 
 		// ── Driver preset flags ────────────────────────────────────────────
@@ -184,6 +228,16 @@ func TestParseRunArgs(t *testing.T) {
 			wantErrStr: "flag requires a value",
 		},
 		{
+			name:       "-d followed by driver option flag returns missing value",
+			args:       []string{"tpcc", "-d", "-D", "url=postgres://prod"},
+			wantErrStr: "-d: flag requires a value",
+		},
+		{
+			name:       "--driver followed by steps flag returns missing value",
+			args:       []string{"tpcc", "--driver", "--steps", "load"},
+			wantErrStr: "--driver: flag requires a value",
+		},
+		{
 			name:        "two drivers -d and -d1",
 			args:        []string{"tpcc", "-d", "pg", "-d1", "mysql"},
 			wantScript:  "tpcc",
@@ -196,6 +250,16 @@ func TestParseRunArgs(t *testing.T) {
 			args:       []string{"tpcc", "-D", "url=postgres://prod:5432"},
 			wantScript: "tpcc",
 			wantOpts:   map[int][][2]string{0: {{"url", "postgres://prod:5432"}}},
+		},
+		{
+			name:       "unquoted driver value fragment returns quote hint",
+			args:       []string{"tpcc", "-D", "url=host=localhost", "user=postgres"},
+			wantErrStr: "quote driver/env values",
+		},
+		{
+			name:       "unquoted driver value fragment before script returns key value hint",
+			args:       []string{"-D", "url=host=localhost", "user=postgres", "tpcc"},
+			wantErrStr: "key=value arguments must follow",
 		},
 		{
 			name:       "-D1 key=value",
@@ -258,6 +322,11 @@ func TestParseRunArgs(t *testing.T) {
 			wantErrStr: "flag requires a value",
 		},
 		{
+			name:       "--driver-opt followed by steps flag returns missing value",
+			args:       []string{"tpcc", "--driver-opt", "--steps", "load"},
+			wantErrStr: "--driver-opt: flag requires a value",
+		},
+		{
 			name:       "-D value without = returns error",
 			args:       []string{"tpcc", "-D", "noequals"},
 			wantErrStr: "expected key=value format",
@@ -297,6 +366,19 @@ func TestParseRunArgs(t *testing.T) {
 			wantPresets:   map[int]string{0: "pg"},
 			wantSteps:     []string{"load", "run"},
 			wantAfterDash: []string{"--duration", "5m"},
+		},
+		{
+			name:        "flags may wrap adjacent script sql block",
+			args:        []string{"-f", "prod.json", "tpcc", "tpcc/pico", "-d", "pico"},
+			wantScript:  "tpcc",
+			wantSQL:     "tpcc/pico",
+			wantFile:    "prod.json",
+			wantPresets: map[int]string{0: "pico"},
+		},
+		{
+			name:       "positional after option following script returns adjacency error",
+			args:       []string{"tpcc", "-d", "pg", "tpcc/pico"},
+			wantErrStr: "script and sql_file must be adjacent",
 		},
 		{
 			name:        "script + sql + two drivers + driver opt",
@@ -496,6 +578,110 @@ func TestApplyDriverPresetInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestApplyDriverOptDottedPool(t *testing.T) {
+	t.Parallel()
+
+	configs := runner.DriverCLIConfigs{}
+
+	if err := applyDriverOpt(configs, 0, "pool.maxConns", "20"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if err := applyDriverOpt(configs, 0, "pool.maxConnLifetime", "30m"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := marshalDriverConfig(t, configs[0])
+	pool := objectField(t, got, "pool")
+
+	if pool["maxConns"] != float64(20) {
+		t.Errorf("pool.maxConns: got %v, want 20", pool["maxConns"])
+	}
+
+	if pool["maxConnLifetime"] != "30m" {
+		t.Errorf("pool.maxConnLifetime: got %v, want 30m", pool["maxConnLifetime"])
+	}
+}
+
+func TestApplyDriverOptDottedPoolMergesJSONPreset(t *testing.T) {
+	t.Parallel()
+
+	configs := runner.DriverCLIConfigs{}
+
+	if err := applyDriverPreset(configs, 0, `{"driverType":"postgres","pool":{"minConns":5}}`); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if err := applyDriverOpt(configs, 0, "pool.maxConns", "20"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := marshalDriverConfig(t, configs[0])
+	pool := objectField(t, got, "pool")
+
+	if pool["minConns"] != float64(5) {
+		t.Errorf("pool.minConns: got %v, want 5", pool["minConns"])
+	}
+
+	if pool["maxConns"] != float64(20) {
+		t.Errorf("pool.maxConns: got %v, want 20", pool["maxConns"])
+	}
+}
+
+func TestApplyDriverOptDottedPoolUnknownField(t *testing.T) {
+	t.Parallel()
+
+	configs := runner.DriverCLIConfigs{}
+
+	if err := applyDriverOpt(configs, 0, "pool.maximum", "20"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := marshalDriverConfig(t, configs[0])
+	pool := objectField(t, got, "pool")
+
+	if pool["maximum"] != float64(20) {
+		t.Errorf("pool.maximum: got %v, want 20", pool["maximum"])
+	}
+}
+
+func TestApplyDriverOptDottedPathIsGeneric(t *testing.T) {
+	t.Parallel()
+
+	configs := runner.DriverCLIConfigs{}
+
+	if err := applyDriverOpt(configs, 0, "custom.deep.value", "1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := marshalDriverConfig(t, configs[0])
+	custom := objectField(t, got, "custom")
+	deep := objectField(t, custom, "deep")
+
+	if deep["value"] != float64(1) {
+		t.Errorf("custom.deep.value: got %v, want 1", deep["value"])
+	}
+}
+
+func TestApplyDriverOptDottedPathConflict(t *testing.T) {
+	t.Parallel()
+
+	configs := runner.DriverCLIConfigs{}
+
+	if err := applyDriverOpt(configs, 0, "pool", "not-object"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	err := applyDriverOpt(configs, 0, "pool.maxConns", "20")
+	if err == nil {
+		t.Fatal("expected structural conflict error")
+	}
+
+	if !contains(err.Error(), "conflicts") {
+		t.Fatalf("got error %q, want conflict", err.Error())
+	}
+}
+
 func TestToEnvVarsRespectsExistingEnv(t *testing.T) {
 	t.Setenv("STROPPY_DRIVER_0", `{"url":"from-env"}`)
 
@@ -531,6 +717,38 @@ func TestToEnvVarsSetsWhenNotInEnv(t *testing.T) {
 	if len(envs) == 0 {
 		t.Fatal("expected STROPPY_DRIVER_0 to be set")
 	}
+}
+
+func marshalDriverConfig(t *testing.T, cfg *runner.DriverCLIConfig) map[string]any {
+	t.Helper()
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal driver config: %v", err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal driver config: %v", err)
+	}
+
+	return got
+}
+
+func objectField(t *testing.T, m map[string]any, key string) map[string]any {
+	t.Helper()
+
+	raw, ok := m[key]
+	if !ok {
+		t.Fatalf("missing object field %q in %#v", key, m)
+	}
+
+	obj, ok := raw.(map[string]any)
+	if !ok {
+		t.Fatalf("field %q has type %T, want object", key, raw)
+	}
+
+	return obj
 }
 
 func driverOptMapsEqual(a, b map[int][][2]string) bool {
