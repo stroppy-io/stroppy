@@ -77,6 +77,8 @@ func (d *DriverWrapper) RunQuery(sql string, args map[string]any) (*driver.Query
 	if err != nil {
 		return nil, fmt.Errorf("error while executing sql query: %w", err)
 	}
+	rootModule.txMetrics.recordQuery(d.vu)
+
 	return result, nil
 }
 
@@ -144,6 +146,7 @@ func (t *TxWrapper) RunQuery(sql string, args map[string]any) (*driver.QueryResu
 	if err != nil {
 		return nil, fmt.Errorf("error executing query in transaction: %w", err)
 	}
+	rootModule.txMetrics.recordQuery(t.vu)
 
 	return result, nil
 }

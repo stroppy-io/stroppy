@@ -887,13 +887,16 @@ export function handleSummary(data: any): Record<string, string> {
     const fmt = (x: any) => (typeof x === "number" ? x.toFixed(1) : "—");
     return `avg=${fmt(v.avg)}  p50=${fmt(v.med)}  p90=${fmt(v["p(90)"])}  p95=${fmt(v["p(95)"])}  p99=${fmt(v["p(99)"])}`;
   };
-  const tpsTrendLines = (name: string): [string, string] => {
+  const throughputTrendLines = (label: string, name: string): [string, string] => {
     const v = m[name]?.values ?? {};
     const fmt = (x: any) => (typeof x === "number" ? x.toFixed(1) : "—");
+    const prefix = `  ${label}: `;
+    const indent = " ".repeat(prefix.length);
+
     return [
-      `  tx_tps buckets (tx/s): avg=${fmt(v.avg)}  p1=${fmt(v["p(1)"])}  ` +
-        `p5=${fmt(v["p(5)"])}  p10=${fmt(v["p(10)"])}`,
-      `                         p50=${fmt(v.med)}  p90=${fmt(v["p(90)"])}  ` +
+      `${prefix}avg=${fmt(v.avg)}  p1=${fmt(v["p(1)"])}  p5=${fmt(v["p(5)"])}  ` +
+        `p10=${fmt(v["p(10)"])}`,
+      `${indent}p50=${fmt(v.med)}  p90=${fmt(v["p(90)"])}  ` +
         `p95=${fmt(v["p(95)"])}  p99=${fmt(v["p(99)"])}  (active 1s buckets)`,
     ];
   };
@@ -953,9 +956,10 @@ export function handleSummary(data: any): Record<string, string> {
     "===== Driver query / tx metrics =====",
     `  queries executed    : ${queries}`,
     `  avg query throughput: ${counterRateStr("run_query_count")}`,
+    ...throughputTrendLines("query_qps buckets (q/s)", "run_query_qps"),
     `  tx attempts         : ${txs}`,
     `  avg tx throughput   : ${counterRateStr("tx_count")}  (whole run)`,
-    ...tpsTrendLines("tx_tps"),
+    ...throughputTrendLines("tx_tps buckets (tx/s)", "tx_tps"),
     `  run_query_duration  : ${trendLine("run_query_duration")}`,
     `  run_query_error_rate: ${rateStr("run_query_error_rate")}`,
     `  tx_total_duration   : ${trendLine("tx_total_duration")}`,

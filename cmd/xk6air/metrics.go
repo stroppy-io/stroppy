@@ -12,17 +12,24 @@ import (
 	"go.uber.org/zap"
 )
 
-const txTPSInterval = time.Second
+const throughputInterval = time.Second
 
 type txMetrics struct {
 	mu sync.Mutex
 
-	txCount *k6metrics.Metric
-	txTPS   *k6metrics.Metric
-	tags    *k6metrics.TagSet
+	txCount     *k6metrics.Metric
+	txTPS       *k6metrics.Metric
+	runQueryQPS *k6metrics.Metric
+	tags        *k6metrics.TagSet
 
-	total uint64
+	txTotal    uint64
+	queryTotal uint64
 
+	txSampler    throughputSampler
+	querySampler throughputSampler
+}
+
+type throughputSampler struct {
 	started bool
 	stopped bool
 	stopCh  chan struct{}
@@ -37,7 +44,7 @@ func (m *txMetrics) ensureRegistered(vu modules.VU, lg *zap.Logger) {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.txCount != nil && m.txTPS != nil {
+	if m.txCount != nil && m.txTPS != nil && m.runQueryQPS != nil {
 		return
 	}
 
@@ -50,10 +57,25 @@ func (m *txMetrics) ensureRegistered(vu modules.VU, lg *zap.Logger) {
 	if err != nil {
 		lg.Fatal("can't register tx_tps metric", zap.Error(err))
 	}
+	runQueryQPS, err := registry.NewMetric("run_query_qps", k6metrics.Trend)
+	if err != nil {
+		lg.Fatal("can't register run_query_qps metric", zap.Error(err))
+	}
 
 	m.txCount = txCount
 	m.txTPS = txTPS
+	m.runQueryQPS = runQueryQPS
 	m.tags = registry.RootTagSet()
+}
+
+func (m *txMetrics) recordQuery(vu modules.VU) {
+	m.ensureRegistered(vu, rootModule.lg)
+
+	if vu.State() == nil {
+		return
+	}
+
+	atomic.AddUint64(&m.queryTotal, 1)
 }
 
 func (m *txMetrics) record(vu modules.VU, action, name string, isolation stroppy.TxIsolationLevel) {
@@ -65,7 +87,7 @@ func (m *txMetrics) record(vu modules.VU, action, name string, isolation stroppy
 	}
 
 	m.start(state.Samples, rootModule.ctx)
-	atomic.AddUint64(&m.total, 1)
+	atomic.AddUint64(&m.txTotal, 1)
 
 	txCount, tags, ok := m.snapshotCountMetric()
 	if !ok {
@@ -93,25 +115,43 @@ func (m *txMetrics) record(vu modules.VU, action, name string, isolation stroppy
 func (m *txMetrics) start(samples chan<- k6metrics.SampleContainer, ctx context.Context) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.started || m.stopped || m.txTPS == nil || m.tags == nil {
-		return
-	}
 
-	m.started = true
-	m.stopCh = make(chan struct{})
-	m.doneCh = make(chan struct{})
-	go m.runSampler(ctx, samples, m.txTPS, m.tags, m.stopCh, m.doneCh)
+	m.startSamplerLocked(&m.txSampler, &m.txTotal, ctx, samples, m.txTPS, m.tags)
+	m.startSamplerLocked(&m.querySampler, &m.queryTotal, ctx, samples, m.runQueryQPS, m.tags)
 }
 
 func (m *txMetrics) stop() {
+	m.stopSampler(&m.txSampler)
+	m.stopSampler(&m.querySampler)
+}
+
+func (m *txMetrics) startSamplerLocked(
+	sampler *throughputSampler,
+	total *uint64,
+	ctx context.Context,
+	samples chan<- k6metrics.SampleContainer,
+	metric *k6metrics.Metric,
+	tags *k6metrics.TagSet,
+) {
+	if sampler.started || sampler.stopped || metric == nil || tags == nil {
+		return
+	}
+
+	sampler.started = true
+	sampler.stopCh = make(chan struct{})
+	sampler.doneCh = make(chan struct{})
+	go runThroughputSampler(ctx, samples, metric, tags, total, sampler.stopCh, sampler.doneCh)
+}
+
+func (m *txMetrics) stopSampler(sampler *throughputSampler) {
 	m.mu.Lock()
-	if !m.started || m.stopped {
+	if !sampler.started || sampler.stopped {
 		m.mu.Unlock()
 		return
 	}
-	stopCh := m.stopCh
-	doneCh := m.doneCh
-	m.stopped = true
+	stopCh := sampler.stopCh
+	doneCh := sampler.doneCh
+	sampler.stopped = true
 	close(stopCh)
 	m.mu.Unlock()
 
@@ -130,26 +170,27 @@ func (m *txMetrics) snapshotCountMetric() (*k6metrics.Metric, *k6metrics.TagSet,
 	return m.txCount, m.tags, true
 }
 
-func (m *txMetrics) runSampler(
+func runThroughputSampler(
 	ctx context.Context,
 	samples chan<- k6metrics.SampleContainer,
 	metric *k6metrics.Metric,
 	tags *k6metrics.TagSet,
+	total *uint64,
 	stopCh <-chan struct{},
 	doneCh chan<- struct{},
 ) {
 	defer close(doneCh)
 
-	ticker := time.NewTicker(txTPSInterval)
+	ticker := time.NewTicker(throughputInterval)
 	defer ticker.Stop()
 
-	prevTotal := atomic.LoadUint64(&m.total)
+	prevTotal := atomic.LoadUint64(total)
 	prevTime := time.Now()
 
 	for {
 		select {
 		case now := <-ticker.C:
-			prevTotal, prevTime = m.emitTPS(ctx, samples, metric, tags, prevTotal, prevTime, now, true)
+			prevTotal, prevTime = emitThroughput(ctx, samples, metric, tags, total, prevTotal, prevTime, now, true)
 		case <-stopCh:
 			return
 		case <-ctx.Done():
@@ -158,11 +199,12 @@ func (m *txMetrics) runSampler(
 	}
 }
 
-func (m *txMetrics) emitTPS(
+func emitThroughput(
 	ctx context.Context,
 	samples chan<- k6metrics.SampleContainer,
 	metric *k6metrics.Metric,
 	tags *k6metrics.TagSet,
+	totalCounter *uint64,
 	prevTotal uint64,
 	prevTime time.Time,
 	now time.Time,
@@ -173,7 +215,7 @@ func (m *txMetrics) emitTPS(
 		return prevTotal, prevTime
 	}
 
-	total := atomic.LoadUint64(&m.total)
+	total := atomic.LoadUint64(totalCounter)
 	delta := total - prevTotal
 	if delta == 0 && !emitZero {
 		return total, now
