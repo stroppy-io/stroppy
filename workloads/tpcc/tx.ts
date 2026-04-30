@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import { sleep } from "k6";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { Counter, Trend, Step, DriverX, ENV, TxIsolationName, declareDriverSetup, retry, isSerializationError } from "./helpers.ts";
+import { Counter, Trend, Step, DriverX, ENV, TxIsolationName, declareDriverSetup, retryWithPolicy, txRetryPolicy } from "./helpers.ts";
 import {
   Alphabet,
   Attr,
@@ -271,19 +271,17 @@ function pickRemoteWh(): number {
   return alt >= HOME_W_ID ? alt + 1 : alt;
 }
 
-// T2.3: thin wrapper that wires the module-wide retry budget and counter
-// into every transaction body. Each retry counts ONCE in tpccRetryAttempts
-// regardless of where in the body the abort fired. The wrapper preserves
-// the spec §2.4.2.3 New-Order rollback sentinel — `isSerializationError`
-// short-circuits on `tpcc_rollback:` so the rollback path always escapes
-// the loop on the first attempt.
+const tpccTxRetryPolicy = txRetryPolicy(driverConfig.driverType, {
+  maxAttempts: RETRY_ATTEMPTS,
+  onRetry: () => { tpccRetryAttempts.add(1); },
+});
+
+// T2.3: thin wrapper that wires the module-wide retry budget and counter into
+// every transaction body. Each retry counts ONCE in tpccRetryAttempts regardless
+// of where in the body the abort fired. The shared policy preserves the spec
+// §2.4.2.3 New-Order rollback sentinel by never retrying `tpcc_rollback:`.
 function tpccRetry<T>(fn: () => T): T {
-  return retry(
-    RETRY_ATTEMPTS,
-    isSerializationError,
-    fn,
-    () => { tpccRetryAttempts.add(1); },
-  );
+  return retryWithPolicy(tpccTxRetryPolicy, fn);
 }
 
 // ============================================================================
@@ -978,13 +976,12 @@ function new_order() {
     line_i_id[ol_cnt - 1] = ITEMS + 1;
   }
 
-  // T2.3: wrap the tx body in tpccRetry so PG snapshot-isolation aborts
-  // (SQLSTATE 40001) replay against a fresh snapshot. Pre-tx random picks
-  // (line ids, force_rollback decision, counters) stay OUTSIDE the loop —
-  // a retry replays the SAME logical transaction, not a different one. The
-  // spec §2.4.2.3 rollback sentinel is filtered out by isSerializationError
-  // (its `tpcc_rollback:` prefix short-circuits the regex), so the rollback
-  // path always escapes the retry loop on the first attempt as before.
+  // T2.3: wrap the tx body in tpccRetry so retryable transaction aborts replay
+  // against a fresh transaction. Pre-tx random picks (line ids, force_rollback
+  // decision, counters) stay OUTSIDE the loop — a retry replays the SAME logical
+  // transaction, not a different one. The spec §2.4.2.3 rollback sentinel is
+  // filtered out by the retry policy, so the rollback path always escapes the
+  // retry loop on the first attempt as before.
   try {
     tpccRetry(() => {
       const tx = driver.begin({ isolation: TX_ISOLATION });

@@ -761,3 +761,107 @@ export const retry = <T>(
   throw lastErr; // unreachable — last iteration always throws or returns
 };
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+export interface RetryDecision {
+  retry: boolean;
+  delaySeconds?: number;
+  reason?: string;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export interface RetryPolicy {
+  maxAttempts: number;
+  classify: (e: any, attempt: number) => boolean | RetryDecision;
+  onRetry?: (attempt: number, e: any, decision: RetryDecision) => void;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+function normalizeRetryDecision(decision: boolean | RetryDecision): RetryDecision {
+  return typeof decision === "boolean" ? { retry: decision } : decision;
+}
+
+function backoffSeconds(attempt: number, baseSeconds: number, maxSeconds: number): number {
+  const retryIndex = Math.max(attempt - 1, 0);
+  const capped = Math.min(maxSeconds, baseSeconds * Math.pow(2, retryIndex));
+  return capped + Math.random() * capped * 0.2;
+}
+
+function sleepForRetry(seconds: number): void {
+  const k6Sleep = (globalThis as typeof globalThis & { sleep?: (t: number) => void }).sleep;
+  if (k6Sleep) k6Sleep(seconds);
+}
+
+function isYDBTransientTxErrorMessage(msg: string): boolean {
+  return /operation\/OVERLOADED/i.test(msg)
+      || /operation\/ABORTED/i.test(msg)
+      || /operation\/BAD_SESSION/i.test(msg)
+      || /operation\/SESSION_BUSY/i.test(msg)
+      || /code\s*=\s*400060/i.test(msg)
+      || /code\s*=\s*400100/i.test(msg)
+      || /WRONG_SHARD_STATE/i.test(msg)
+      || /Transaction locks invalidated/i.test(msg);
+}
+
+export interface TxRetryPolicyOptions {
+  maxAttempts: number;
+  baseDelaySeconds?: number;
+  maxDelaySeconds?: number;
+  onRetry?: RetryPolicy["onRetry"];
+}
+
+export function txRetryPolicy(
+  driverType: DriverTypeName | undefined,
+  options: TxRetryPolicyOptions,
+): RetryPolicy {
+  const baseDelaySeconds = options.baseDelaySeconds ?? 0.05;
+  const maxDelaySeconds = options.maxDelaySeconds ?? 1;
+
+  return {
+    maxAttempts: options.maxAttempts,
+    onRetry: options.onRetry,
+    classify: (e, attempt) => {
+      const msg = String(e?.message ?? e);
+      if (msg.indexOf("tpcc_rollback:") >= 0) return false;
+
+      if (isSerializationError(e)) {
+        return { retry: true, reason: "serialization" };
+      }
+
+      if (driverType === "ydb" && isYDBTransientTxErrorMessage(msg)) {
+        return {
+          retry: true,
+          delaySeconds: backoffSeconds(attempt, baseDelaySeconds, maxDelaySeconds),
+          reason: "ydb_transient",
+        };
+      }
+
+      return false;
+    },
+  };
+}
+
+/** Run `fn` under a retry policy. The policy owns error classification and
+ * optional backoff; callers own the transaction closure being replayed. */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const retryWithPolicy = <T>(
+  policy: RetryPolicy,
+  fn: () => T,
+): T => {
+  let lastErr: any;
+  for (let attempt = 1; attempt <= policy.maxAttempts; attempt++) {
+    try {
+      return fn();
+    } catch (e) {
+      lastErr = e;
+      const decision = normalizeRetryDecision(policy.classify(e, attempt));
+      if (!decision.retry || attempt === policy.maxAttempts) {
+        throw e;
+      }
+      if (policy.onRetry) policy.onRetry(attempt + 1, e, decision);
+      const delaySeconds = decision.delaySeconds ?? 0;
+      if (delaySeconds > 0) sleepForRetry(delaySeconds);
+    }
+  }
+  throw lastErr; // unreachable — last iteration always throws or returns
+};
+/* eslint-enable @typescript-eslint/no-explicit-any */
