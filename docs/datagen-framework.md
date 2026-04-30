@@ -42,7 +42,7 @@ rerunning a spec with the same seed reproduces rows byte-for-byte.
 Compared to `dbgen`/`dsdgen` (one binary per spec), go-tpc (Go-only,
 tightly coupled to the spec), or bespoke fixtures, stroppy separates
 **schema** (TS) from **evaluator** (Go) from **driver** (per-DB). The
-same TS spec runs against five drivers. The same row generator runs in
+same TS spec runs against six drivers. The same row generator runs in
 a goroutine or a worker pool with no code path changes because every
 primitive is seekable.
 
@@ -1017,7 +1017,7 @@ export function teardown() {
    LOAD_WORKERS=4 stroppy run ... > out4.log
    # Dump rows with ORDER BY pk, compare; multisets must match.
    ```
-5. `-D driverType=csv -D url=file:///tmp/out.csv` — bulk reference
+5. `-D driverType=csv -D url='/tmp/out?merge=true&workload=demo'` — bulk reference
    output for downstream tools.
 
 ---

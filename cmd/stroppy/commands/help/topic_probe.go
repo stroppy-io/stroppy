@@ -47,7 +47,7 @@ SECTIONS
     Shows the logical steps registered in the script via:
       Step("step name", () => { ... })
     or the begin/end pair:
-      StepBegin("step name"); StepEnd("step name");
+      Step.begin("step name"); Step.end("step name");
 
   Environment Variables (--envs)
 
@@ -135,6 +135,9 @@ EXAMPLES
 
   # Show driver defaults
   stroppy probe workloads/tpcc/procs --drivers
+
+  # Probe TPC-H's SQL sections, envs, and driver defaults
+  stroppy probe tpch/tx --sql --envs --drivers
 
   # Machine-readable JSON output
   stroppy probe workloads/tpcc/procs -o json

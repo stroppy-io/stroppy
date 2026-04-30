@@ -796,7 +796,7 @@ export interface RelTableOpts {
   columnOrder?: readonly string[];
   /** Wire protocol for row insertion. */
   method?: InsertMethod;
-  /** Worker hint; clamped by the Loader. */
+  /** Worker hint consumed by drivers that support parallel InsertSpec loads. */
   parallelism?: number;
   /**
    * Pre-registered dict bodies keyed by their opaque string. Inline dicts

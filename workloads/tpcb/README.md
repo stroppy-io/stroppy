@@ -6,7 +6,7 @@ transaction blocks.
 
 ## Variants
 
-- `tx.ts` — raw transactions. Runs against **any supported driver**
+- `tx.ts` — raw transactions. Runs against **all SQL drivers**
   (postgres, mysql, picodata, ydb).
 - `procs.ts` — stored-procedure variant. Runs against **postgres and
   mysql** only.

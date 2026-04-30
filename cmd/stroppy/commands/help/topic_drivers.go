@@ -43,6 +43,18 @@ DRIVER PRESETS (-d / --driver)
   Each preset includes default credentials for local development.
   Use -D url=... to override the connection URL.
 
+  CSV is a driver type but intentionally has no short preset. Configure it
+  directly when you want to dump generated rows instead of talking to a
+  database:
+
+    stroppy run tpcb/tx -D driverType=csv \
+      -D url='/tmp/tpcb-csv?merge=true&workload=tpcb' \
+      --steps drop_schema,create_schema,load_data
+
+  The CSV driver supports relational InsertSpec loads only. It accepts DDL
+  in setup steps, rejects runtime query execution, and requires native
+  InsertSpec emission.
+
   Use -d (driver 0) or -d1, -d2, ... for additional drivers:
 
     stroppy run tpcc/procs -d pg                # driver 0 = pg preset
@@ -65,11 +77,12 @@ DRIVER OPTIONS (-D / --driver-opt)
   Available option keys:
 
     url                    string    Database connection URL
-    driverType             string    postgres | mysql | picodata | ydb
+    driverType             string    postgres | mysql | picodata | ydb |
+                                     noop | csv
     defaultInsertMethod    string    plain_query | native | plain_bulk
     defaultTxIsolation     string    read_uncommitted | read_committed |
                                      repeatable_read | serializable |
-                                     connection_only | none
+                                     db_default | conn | none
     errorMode              string    silent | log | throw | fail | abort
     bulkSize               int       Rows per bulk INSERT (default: 2500)
     pool.maxConns          int       Maximum pool connections
@@ -90,7 +103,8 @@ DRIVER OPTIONS (-D / --driver-opt)
   server uses a private CA or requires authentication.
 
   Note: pool.* options are sugar — they map to the driver-specific pool
-  config (pgx pool or sql pool) based on driverType.
+  config (pgx pool or sql pool) based on driverType. They are ignored for
+  noop and csv.
 
 HOW IT WORKS
 
@@ -125,13 +139,18 @@ EXAMPLES
   # Override a field without specifying a preset
   stroppy run tpcc/procs -D errorMode=throw
 
+  # Dump generated TPC-B data to CSV and stop before the workload phase
+  stroppy run tpcb/tx -D driverType=csv \
+    -D url='/tmp/tpcb-csv?separator=comma&header=true&merge=true&workload=tpcb' \
+    --steps drop_schema,create_schema,load_data
+
   # Pool tuning
   stroppy run tpcc/procs.ts -d pg -D pool.maxConns=20 -D pool.maxConnLifetime=30m
 
   # Full JSON config instead of preset
   stroppy run tpcc/procs -d '{"url":"postgres://prod:5432","driverType":"postgres","errorMode":"throw"}'
 
-  # YDB with TLS and token auth (tx — raw transactions, works with any DB)
+  # YDB with TLS and token auth (tx — raw transactions on SQL drivers)
   stroppy run tpcc/tx -d ydb -D url=grpcs://host:2135/db \
     -D caCertFile=./certs/ca.pem -D authToken=t1.xxx...
 

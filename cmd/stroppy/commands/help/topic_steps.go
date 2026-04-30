@@ -58,16 +58,16 @@ DISCOVERING STEPS
 EXAMPLES
 
   # Only create the schema — skip data load and benchmark run
-  stroppy run tpcc --steps create_schema
+  stroppy run tpcc/tx --steps create_schema
 
   # Create schema and load data, then stop
-  stroppy run tpcc --steps create_schema,load_data
+  stroppy run tpcc/tx --steps create_schema,load_data
 
   # Run everything except the schema drop
-  stroppy run tpcc --no-steps drop_schema
+  stroppy run tpcc/tx --no-steps drop_schema
 
   # See what steps tpcc defines
-  stroppy probe tpcc --steps
+  stroppy probe tpcc/tx --steps
 
 SEE ALSO
 

@@ -62,9 +62,11 @@ SETTING VALUES
 
     WAREHOUSES=50 stroppy run tpcc/tx
 
-  Alternatively, pass them through k6's -e flag after the k6 separator:
+  Or use stroppy's -e/--env flag before the k6 separator. Keys are
+  uppercased, logged, and checked against the workload's ENV()
+  declarations:
 
-    stroppy run tpcc/procs -- -e WAREHOUSES=20 -e POOL_SIZE=50
+    stroppy run tpcc/procs -e warehouses=20 -e pool_size=50
 
 DEFAULTS
 
@@ -130,8 +132,11 @@ EXAMPLES
   stroppy probe tpcc/procs --envs
   stroppy probe tpcc/tx.ts --envs
 
-  # Pass via k6 -e after the separator
-  stroppy run tpcc/procs -- -e WAREHOUSES=20 -e POOL_SIZE=50
+  # Pass via stroppy -e before the k6 separator
+  stroppy run tpcc/procs -e WAREHOUSES=20 -e POOL_SIZE=50
+
+  # Parallelize Rel.table InsertSpec loads where supported
+  stroppy run tpcc/tx -e LOAD_WORKERS=8 --steps drop_schema,create_schema,load_data
 
 CONFIG FILE ALTERNATIVE
 

@@ -2,13 +2,18 @@
 
 Relational-framework implementation of TPC-H (spec §4). Eight tables
 seeded from Rel-framework specs; reads answers_sf1.json for query
-validation at SF=1. Currently PostgreSQL-only.
+validation at SF=1 for PostgreSQL. Load and query execution have dialect
+files for PostgreSQL, MySQL, Picodata, and YDB.
 
 ## Run it
 
 ```bash
 ./build/stroppy run tpch/tx -d pg \
     -D url=postgres://postgres:postgres@localhost:5432/stroppy \
+    -e scale_factor=0.01
+
+./build/stroppy run tpch/tx -d mysql \
+    -D url=mysql://root:pass@localhost:3306/stroppy \
     -e scale_factor=0.01
 ```
 
@@ -17,6 +22,7 @@ Useful env overrides:
 ```bash
 -e scale_factor=0.01   # 0.01, 1, or any positive float. 1 enables answer validation.
 -e pool_size=50        # per-VU pool size
+-e load_workers=8      # parallel InsertSpec workers during load_data
 ```
 
 ## Steps

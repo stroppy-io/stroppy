@@ -27,7 +27,7 @@ Precedence (highest to lowest):
 Example stroppy-config.json:
   {
     "version": "1",
-    "script": "tpcc/procs",
+    "script": "tpcc/tx",
     "global": {
       "logger": { "logLevel": "LOG_LEVEL_INFO" },
       "exporter": {
@@ -48,7 +48,7 @@ Example stroppy-config.json:
     "k6Args": ["--vus", "10", "--duration", "30m"]
   }
 
-Driver types: postgres, mysql, picodata, ydb, noop
+Driver types: postgres, mysql, picodata, ydb, noop, csv
 Error modes:  silent, log, throw, fail, abort
 Insert methods: native, plain_bulk, plain_query
 
@@ -68,7 +68,7 @@ PRECEDENCE (highest to lowest)
 
     script / sql positional args:  CLI arg > config file "script"/"sql" fields
     steps / no-steps:              CLI --steps > config file "steps" field
-    k6_args:                       config file "k6_args" prepended, then CLI "--" args appended
+    k6Args:                        config file "k6Args" prepended, then CLI "--" args appended
                                    (last-wins for most k6 flags, so CLI overrides)
     logger / OTEL exporter:        config file "global" only (no CLI equivalent)
 

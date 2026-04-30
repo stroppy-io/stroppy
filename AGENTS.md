@@ -17,7 +17,7 @@ make linter         # read-only check after linter_fix
 make tests          # all tests with race detector and coverage
 make proto          # regenerate Go/TS/docs from .proto; wipes pkg/common/proto/* — never hand-edit generated files
 make ts-test        # TypeScript unit tests
-make ts-typecheck   # typecheck helpers.ts / parse_sql.ts / stroppy.d.ts
+make ts-typecheck   # typecheck helpers.ts / datagen.ts / parse_sql.ts / stroppy.d.ts
 ```
 
 **Embedded FS rebuild rule:** `workloads/` is `//go:embed *` — if you pass a workload by short name (`tpcc/tx`, `tpcb/procs`), the binary serves from its embedded snapshot. Edits to `workloads/` on disk have **no effect** until `make build` reruns.
@@ -36,25 +36,35 @@ Resolution order: **cwd → `~/.stroppy/` → embedded**.
 | `cmd/stroppy/commands/` | cobra CLI subcommands: gen, run, probe, version |
 | `cmd/xk6air/` | k6 extension entry; registers `k6/x/stroppy`, manages per-VU instances |
 | `pkg/driver/dispatcher.go` | driver registry: `RegisterDriver()` + `Dispatch()` |
-| `pkg/driver/{postgres,mysql,picodata,ydb,noop}/` | driver implementations |
+| `pkg/driver/{postgres,mysql,picodata,ydb,noop,csv}/` | driver implementations |
 | `pkg/driver/sqldriver/` | shared sql.DB-backed base (mysql, ydb use this) |
-| `pkg/common/generate/` | data generators (uniform/normal/zipfian; int/float/string/uuid/bool/datetime/decimal) |
-| `internal/static/` | `helpers.ts`, `parse_sql.ts`, generated TS type bindings |
+| `pkg/datagen/` | relational data-generation runtime: compile, expr, runtime, lookup, cohort, stdlib, seed |
+| `internal/static/` | `helpers.ts`, `datagen.ts`, `parse_sql.ts`, generated TS type bindings |
 | `internal/runner/` | esbuild transpilation, config extraction via Sobek, k6 process management |
-| `proto/stroppy/` | protobuf schemas (config, descriptor, common, runtime) |
-| `workloads/` | embedded workloads: simple, tpcb, tpcc, tpcds, execute_sql |
+| `proto/stroppy/` | protobuf schemas (config, run, descriptor, datagen, common, runtime) |
+| `workloads/` | embedded workloads: simple, tpcb, tpcc, tpch, tpcds, execute_sql |
+| `docs/datagen-framework.md` | authoritative relational datagen guide |
+| `docs/parallelism.md` | InsertSpec parallelism contract and tuning |
 
 ## Drivers
 
 | Preset | Type enum | Notes |
 |--------|-----------|-------|
-| `pg` | DRIVER_TYPE_PG | pgxpool-based; supports plain_query, plain_bulk, native (COPY) |
+| `pg` | DRIVER_TYPE_POSTGRES | pgxpool-based; supports plain_query, plain_bulk, native (COPY) |
 | `mysql` | DRIVER_TYPE_MYSQL | sql.DB-backed via sqldriver |
 | `pico` | DRIVER_TYPE_PICODATA | sql.DB-backed; `Begin()` always errors — use isolation `"none"` |
-| `ydb` | DRIVER_TYPE_YDB | sql.DB-backed |
-| `noop` | DRIVER_TYPE_NOOP = 5 | discards all I/O; benchmarks stroppy overhead (~65-70K iter/s) |
+| `ydb` | DRIVER_TYPE_YDB | sql.DB-backed; native maps to BulkUpsert |
+| `noop` | DRIVER_TYPE_NOOP = 5 | discards all I/O; benchmarks stroppy/framework overhead |
+| *(no preset)* | DRIVER_TYPE_CSV = 6 | URL-configured CSV output driver; InsertSpec/native-only, no query path |
 
-Add driver: package under `pkg/driver/<name>/`, implement `driver.Driver`, call `RegisterDriver()` in `init()`, import in `cmd/xk6air/module.go`.
+CSV example:
+```bash
+./build/stroppy run tpcb/tx -D driverType=csv \
+  -D url='/tmp/tpcb-csv?merge=true&workload=tpcb' \
+  --steps drop_schema,create_schema,load_data
+```
+
+Add driver: package under `pkg/driver/<name>/`, implement `driver.Driver` (`InsertSpec`, `RunQuery`, `Begin`, `Teardown`), call `RegisterDriver()` in `init()`, import in `cmd/xk6air/module.go`.
 
 ## CLI Usage
 
@@ -63,13 +73,13 @@ Add driver: package under `pkg/driver/<name>/`, implement `driver.Driver`, call 
 ```
 
 **Positional:**
-- 1st: workload — bare name (`tpcc`), preset-relative path (`tpcc/tx`), `.ts` file, `.sql` file, or inline SQL string
+- 1st: workload — preset-relative path (`tpcc/tx`, `tpcb/procs`, `tpch/tx`), bare preset with a matching `.ts` (`simple`, `tpcds`), `.ts` file, `.sql` file, or inline SQL string
 - 2nd (optional): SQL file override (e.g. `tpcc/pico`, `./workloads/tpcc/pico.sql`)
 
 **Driver flags:**
 - `-d <preset>` — driver preset: `pg`, `mysql`, `pico`, `ydb`, `noop`
 - `-d '{"url":"...","bulkSize":20}'` — raw JSON driver config
-- `-D key=value` — override driver field (url, driverType, defaultInsertMethod, bulkSize, pool.*, tls.*); multiple `-D` accumulate
+- `-D key=value` — override driver field (url, driverType, defaultInsertMethod, defaultTxIsolation, errorMode, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
 - `-d1 <preset>`, `-D1 key=value` — same for second driver index (multi-driver workloads)
 
 **Script env flags:**
@@ -91,13 +101,16 @@ Add driver: package under `pkg/driver/<name>/`, implement `driver.Driver`, call 
 **Examples:**
 ```bash
 # TPC-C with postgres
-./build/stroppy run tpcc -d pg -D url=postgres://... -- --vus 10 --duration 60s
+./build/stroppy run tpcc/tx -d pg -D url=postgres://... -- --vus 10 --duration 60s
 
 # TPC-C with picodata, local SQL file (no rebuild needed)
 ./build/stroppy run ./workloads/tpcc/tx.ts ./workloads/tpcc/pico.sql -d pico -D url=http://...
 
 # TPC-B
-./build/stroppy run tpcb -d pg -D url=postgres://... -- --duration 30s
+./build/stroppy run tpcb/tx -d pg -D url=postgres://... -- --duration 30s
+
+# TPC-H
+./build/stroppy run tpch/tx -d pg -D url=postgres://... -e SCALE_FACTOR=0.01
 
 # Noop overhead benchmark
 ./build/stroppy run simple -d noop -- --vus 4 --duration 10s
@@ -108,7 +121,7 @@ Add driver: package under `pkg/driver/<name>/`, implement `driver.Driver`, call 
 
 ## Workload Structure
 
-Per-dialect SQL files: `pg.sql`, `mysql.sql`, `pico.sql`, `ydb.sql` under `workloads/{tpcb,tpcc}/`.
+Per-dialect SQL files: `pg.sql`, `mysql.sql`, `pico.sql`, `ydb.sql` under `workloads/{tpcb,tpcc,tpch}/`.
 
 Section layout (must be identical across dialects):
 ```sql
@@ -125,9 +138,16 @@ Section layout (must be identical across dialects):
 
 Two TS variants per workload:
 - `procs.ts` — calls stored procs via `workload_procs` section; pg + mysql only; throws at load time on pico/ydb
-- `tx.ts` — runs ordered DML steps inside `driver.beginTx()`; all 4 DBs; has `export default function` and `export const options`
+- `tx.ts` — runs ordered DML steps inside `driver.beginTx()`; SQL drivers (pg/mysql/pico/ydb); has `export default function` and `export const options`
 
 Both `tx.ts` files export a `default` function — `-- --vus N --duration Xs` works for both tpcc and tpcb.
+
+TPC-H has `tpch/tx.ts` only: relational load of 8 tables plus q1–q22 execution; SF=1 answer validation is PostgreSQL-only, while load/query execution has pg/mysql/pico/ydb dialect files.
+
+Relational workloads use `Step("load_data", ...)` and `driver.insertSpec(Rel.table(...))`. `LOAD_WORKERS` controls per-table InsertSpec fan-out where wired:
+```bash
+./build/stroppy run tpcc/tx -d pg -e LOAD_WORKERS=8 --steps drop_schema,create_schema,load_data
+```
 
 Isolation by driver in `tx.ts`:
 - postgres → `read_committed`
@@ -138,35 +158,41 @@ Isolation by driver in `tx.ts`:
 
 Full isolation type names: `read_uncommitted`, `read_committed`, `repeatable_read`, `serializable`, `db_default`, `conn`, `none`
 
-## TypeScript API (helpers.ts)
+## TypeScript API
 
-- `C` — const generators: `C.str()`, `C.int32/64()`, `C.uint32/64()`, `C.float/double()`, `C.decimal()`, `C.datetime()`, `C.bool()`, `C.uuid()`
-- `R` — random generators (same types + `R.uuidSeeded()`, `R.group()`, `R.groups()`)
-- `S` — sequence (unique) generators: `S.str()`, `S.int32/64()`, `S.uint32/64()`, `S.uuid()`
-- `AB` — alphabets: `en`, `enNum`, `num`, `enUpper`, `enSpc`, `enNumSpc`
-- `Dist` — distributions: `Dist.normal()`, `Dist.uniform()`, `Dist.zipf()`
-- `setSeed(n)` — module-wide seed (0 = random, >0 = fixed)
-- `DriverX` — typed driver wrapper with metrics; `DriverX.fromConfig()`, `.insert()`, `.runQuery()`, `.begin()`, `.beginTx()`
+### `helpers.ts`
+
+- `DriverX` — typed driver wrapper with metrics; `DriverX.create().setup()`, `.insertSpec()`, `.exec()`, `.queryRows()`, `.queryRow()`, `.queryValue<T>()`, `.queryCursor()`, `.begin()`, `.beginTx()`
 - `TxX` — transaction wrapper; full query API: `exec`, `queryRow`, `queryValue<T>`, `queryRows`, `queryCursor`
 - `declareDriverSetup(index, defaults)` — reads CLI driver config, merges over TS defaults; returns `DriverSetup`
 - `ENV(name, default?)` — typed env accessor; metadata captured by probe
 - `Step(name, fn)` — named execution block with cloud notification
-- `NewPicker(seed)` — weighted random selection; `.pick(items)`, `.pickWeighted(items, weights)`
 - `InsertMethodName` — `"plain_query" | "plain_bulk" | "native"` (pg→COPY, ydb→BulkUpsert)
 - `ErrorModeName` — `"silent" | "log" | "throw" | "fail" | "abort"`
-- `DriverTypeName` — `"postgres" | "mysql" | "picodata" | "ydb" | "noop"`
-- `retry<T>(fn, maxAttempts, isRetryable, onRetry?)` — retry helper
+- `DriverTypeName` — `"postgres" | "mysql" | "picodata" | "ydb" | "noop" | "csv"`
+- `retry<T>(fn, maxAttempts, isRetryable, onRetry?)`, `retryWithPolicy()`, `txRetryPolicy()` — retry helpers
 - `isSerializationError(e)` — detects SQLSTATE 40001 / deadlock for retry decisions
 - `once` — run-once guard utility
 
 `TxX` query methods return real values — always use `tx.queryRow()`/`tx.queryValue<T>()` to thread values within a transaction. Synthetic per-VU counters are only justified for PKs with no DB-side value (e.g. synthetic `h_id` on history table for picodata/ydb).
+
+### `datagen.ts`
+
+- `Rel.table(name, opts)` — build an InsertSpec for a table; use `driver.insertSpec(spec)` in `load_data`
+- `Attr` — attribute helpers: `rowIndex`, `rowId`, `dictAt`, `dictAtInt/Float`, `lookup`, `blockRef`, `cohortDraw`, `cohortLive`
+- `Expr` — literals, `litFloat`, `litNull`, `col`, arithmetic/comparison/logical ops, `if`, stdlib calls
+- `Draw` — deterministic load-time distributions: int/float uniform, normal, zipf, NURand, decimal, ascii, phrase, dict, joint, grammar, bernoulli, date
+- `DrawRT` — transaction-time random generators; construct at init, call `.next()`/`.sample()`/`.seek()`/`.reset()` in workload code
+- `Dict` — inline dictionaries and JSON dictionaries, auto-emitted under InsertSpec dicts when referenced
+- `Rel.relationship`, `Rel.lookupPop`, `Rel.cohort`, `Rel.scd2` — relationship, lookup, cohort, and SCD-2 population features
+- `InsertMethod` — datagen enum used in `Rel.table({ method })`; driver config `defaultInsertMethod` can pin/override per-spec method
 
 ## SQL Syntax Rules
 
 - Query parameters: `:paramName` — converted to `$1, $2...` (PostgreSQL), `?` (MySQL)
 - `--+ section_name` — groups statements into sections
 - `--= query_name` — names individual queries within a section
-- `parse_sql_with_groups()` → `Record<string, ParsedQuery[]>`
+- `parse_sql_with_sections()` → section/query lookup function; `parse_sql()` → flat query lookup
 - **`--` comment lines inside query bodies are stripped by `parse_sql.ts`** before reaching DB. Use `/* */` block comments inside procedure bodies — except on picodata (see below).
 
 ## Picodata-Specific Limits

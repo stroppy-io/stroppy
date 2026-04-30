@@ -21,7 +21,7 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "stroppy",
-	Short: "Tool to generate and run stress tests (e.g benchmarking) for databases",
+	Short: "Generate and run k6-powered database stress tests",
 }
 
 // versionJSON controls whether `stroppy version` outputs machine-readable JSON.

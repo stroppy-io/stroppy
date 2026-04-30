@@ -344,8 +344,8 @@ function asciiRange(
 // Spec §4.3.2.8 / §4.3.3.1: c_since, o_entry_d, and the delivered branch
 // of ol_delivery_d all carry the OS-captured load-time timestamp. We
 // snapshot it once at module load so every row in this run receives the
-// same value — mirrors main's R.dateConst pattern and lets the compliance
-// tests key off a single deterministic instant. `Expr.lit(Date)` emits
+// same value and the compliance tests can key off a single deterministic
+// instant. `Expr.lit(Date)` emits
 // int64 (epoch days on the wire), so we lift through `std.daysToDate`
 // to get the time.Time scalar the driver layer expects on DATETIME /
 // TIMESTAMP columns.

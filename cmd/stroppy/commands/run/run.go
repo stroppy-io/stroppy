@@ -43,13 +43,14 @@ var Cmd = &cobra.Command{
 	Short: "Run benchmark script with k6",
 	Long: `Run a benchmark with k6. The extension determines the mode:
 
-  no extension → preset    stroppy run tpcc
+  no extension → preset    stroppy run simple
   .ts          → script    stroppy run bench.ts
   .sql         → SQL file  stroppy run queries.sql
   "..."        → inline    stroppy run "select 1"
 
 Files are searched in: current directory → ~/.stroppy/ → built-in workloads.
-SQL files are auto-derived from the preset/script name unless specified explicitly.
+Legacy <preset>.sql files are auto-derived when present; modern multi-dialect
+workloads usually choose sibling SQL files inside TypeScript by driver type.
 See 'stroppy help resolution' for details on how files are found.
 The script and optional sql_file positionals must be adjacent before --.
 
@@ -58,7 +59,7 @@ Environment flags:
                           Real env takes precedence over -e values.
 
 Driver flags:
-  -d, --driver NAME       Use a driver preset (pg, mysql, pico)
+  -d, --driver NAME       Use a driver preset (pg, mysql, pico, ydb, noop)
   -D, --driver-opt K=V    Override a driver field (url, driverType, etc.)
 
   See 'stroppy help drivers' for all options and presets.
@@ -71,21 +72,24 @@ Config file flags:
 	DisableFlagParsing: true,
 	SilenceErrors:      false,
 	Example: `
-  stroppy run tpcc                              # built-in TPC-C preset
-  stroppy run tpcb -- --duration 5m             # preset with k6 args
+  stroppy run tpcc/tx                           # built-in TPC-C tx workload
+  stroppy run tpcb/tx -- --duration 5m          # workload with k6 args
   stroppy run tpcds tpcds-scale-100             # preset with explicit SQL variant
+  stroppy run tpch/tx                           # TPC-H load + query suite
   stroppy run simple                            # preset without SQL
   stroppy run my_benchmark.ts                   # custom test script
   stroppy run ./benchmarks/custom.ts data.sql   # explicit paths
   stroppy run queries.sql                       # execute a SQL file
   stroppy run "select 1"                        # execute inline SQL
-  stroppy run tpcc --steps create_schema,load   # only run specified steps
-  stroppy run tpcc --no-steps load              # run all steps except specified
-  stroppy run tpcc -d pg                        # use PostgreSQL driver preset
-  stroppy run tpcc -d pg -D url=postgres://prod:5432  # preset with URL override
-  stroppy run tpcc -d pg -d1 mysql              # two drivers: pg + mysql
-  stroppy run tpcc -e pool_size=200             # set POOL_SIZE env for the script
-  stroppy run tpcc -e FOO=bar -e BAZ=qux        # multiple env overrides
+  stroppy run tpcc/tx --steps create_schema,load_data  # only run specified steps
+  stroppy run tpcc/tx --no-steps load_data       # run all steps except specified
+  stroppy run tpcc/tx -d pg                      # use PostgreSQL driver preset
+  stroppy run tpcc/tx -d pg -D url=postgres://prod:5432  # preset with URL override
+  stroppy run tpcc/procs -d pg -d1 mysql         # two drivers: pg + mysql
+  stroppy run tpcc/tx -e pool_size=200           # set POOL_SIZE env for the script
+  stroppy run tpcc/tx -e FOO=bar -e BAZ=qux      # multiple env overrides
+  stroppy run tpcb/tx -D driverType=csv -D url='/tmp/tpcb-csv?merge=true' \
+    --steps drop_schema,create_schema,load_data  # dump generated rows to CSV
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) > 0 && (args[0] == "--help" || args[0] == "-h") {

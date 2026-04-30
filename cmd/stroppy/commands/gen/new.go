@@ -33,9 +33,9 @@ Generate a stroppy development environment with TypeScript support.
 
 This command creates a working directory with:
 - Proto files (stroppy.pb.js, stroppy.pb.ts)
-- Helper files (helpers.ts, parse_sql.ts)
+- Helper files (helpers.ts, datagen.ts, parse_sql.ts)
 - Package.json for TypeScript types
-- K6 binary (stroppy-k6)
+- Stroppy binary and k6 symlink
 - Optional preset example script
 
 Available presets: %s
@@ -132,7 +132,7 @@ Examples:
 
 			// Log usage instructions
 			log.Info(
-				"Files included: stroppy.pb.ts, stroppy.pb.js, helpers.ts, parse_sql.ts, package.json, stroppy-k6, stroppy",
+				"Files included: stroppy.pb.ts, stroppy.pb.js, helpers.ts, datagen.ts, parse_sql.ts, package.json, stroppy, k6",
 			)
 
 			if preset != "" {

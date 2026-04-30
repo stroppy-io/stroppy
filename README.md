@@ -4,15 +4,16 @@
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/2mSSrkBkHm)
 [![Docs](https://img.shields.io/badge/docs-stroppy--io.github.io-blue)](https://stroppy-io.github.io)
 
-Database stress testing CLI tool powered by k6 workload engine.
+Database stress testing CLI tool powered by the k6 workload engine.
 
 ## Features
 
-- Built-in TPC-B, TPC-C, TPC-DS like workload tests
-- Custom test scenarios support via TypeScript
-- PostgreSQL, MySQL, YDB, Picodata drivers (more DBMSs coming soon)
+- Built-in TPC-B, TPC-C, TPC-H, and TPC-DS-like workload tests
+- Custom workload support in TypeScript
+- Deterministic relational data generation with `Rel.table` and `driver.insertSpec`
+- PostgreSQL, MySQL, YDB, Picodata, CSV, and noop drivers
 - Transaction support with configurable isolation levels
-- k6-based load generation engine
+- k6-based load generation, metrics, thresholds, and output integrations
 
 ## Installation
 
@@ -43,10 +44,10 @@ The binary will be available at `./build/stroppy`.
 
 ## Quick Start
 
-Configure the target database via driver flags (defaults to a local PostgreSQL instance):
+Configure the target database via driver flags:
 
 ```bash
-stroppy run tpcc/procs -d pg -D url=postgres://user:password@host:5432/dbname
+stroppy run tpcc/tx -d pg -D url=postgres://user:password@host:5432/dbname
 ```
 
 ### Run Tests
@@ -61,7 +62,10 @@ Many tests are embedded in stroppy. The first argument is a `.ts` workload, the 
 
 TPC-B and TPC-C each ship two scripts:
 - `procs` — uses stored procedures; supports **PostgreSQL and MySQL**
-- `tx` — uses raw transactions; works with **any DB** (PostgreSQL, MySQL, Picodata, YDB)
+- `tx` — uses raw transactions; works with **all SQL drivers** (PostgreSQL, MySQL, Picodata, YDB)
+
+TPC-H ships `tpch/tx`, a relational-framework workload that loads all eight
+tables and runs the 22 query suite. TPC-DS is available as a SQL-query workload.
 
 ```bash
 stroppy run tpcc/procs        # TPC-C, stored procedures (pg/mysql)
@@ -69,6 +73,8 @@ stroppy run tpcc/procs.ts     # same, explicit extension
 stroppy run tpcc/tx           # TPC-C, raw transactions (any DB)
 stroppy run tpcb/procs        # TPC-B, stored procedures (pg/mysql)
 stroppy run tpcb/tx           # TPC-B, raw transactions (any DB)
+stroppy run tpch/tx           # TPC-H, relational load + query suite
+stroppy run tpcds tpcds-scale-100  # TPC-DS-like SQL query set
 ```
 
 And you can mix builtin tests with your own scripts or SQL files:
@@ -85,20 +91,33 @@ stroppy run tpcc/procs -d pg
 stroppy run tpcc/procs -d mysql -D url=mysql://root:pass@localhost:3306/bench
 stroppy run tpcc/tx -d pico                   # picodata: use tx variant
 stroppy run tpcc/procs -d pg -d1 mysql        # two drivers
+stroppy run simple -d noop                    # framework/runner overhead only
 ```
 
 Pass environment variables to the script with `-e` (keys are auto-uppercased):
 
 ```bash
-stroppy run tpcc/procs -e pool_size=200
-stroppy run tpcc/procs -d pg -e scale_factor=2
+stroppy run tpcc/tx -e pool_size=200
+stroppy run tpcc/tx -d pg -e scale_factor=2
+stroppy run tpcc/tx -d pg -e load_workers=8   # parallelize load_data InsertSpecs
 ```
+
+Collect repeated settings in `stroppy-config.json` or an explicit `-f` file:
+
+```bash
+stroppy run -f prod.json
+stroppy probe -f prod.json --envs --drivers
+```
+
+Precedence is: real environment > `-e` > config `env` > `-d/-D` >
+config `drivers` > script defaults.
 
 Use `stroppy help` to explore available topics:
 
 ```bash
 stroppy help drivers
 stroppy help resolution
+stroppy help datagen
 ```
 
 ### Probe Tests
@@ -119,7 +138,8 @@ stroppy help probe
 ├─ simple
 │  └─ simple.ts
 ├─ tests
-│  └─ multi_drivers_test.ts sqlapi_test.ts transaction_test.ts
+│  └─ csv_smoke.ts multi_drivers_test.ts runtime_generators_api_test.ts
+│     sqlapi_test.ts transaction_test.ts
 ├─ tpcb
 │  ├─ procs.ts            (stored procedures — pg/mysql)
 │  ├─ tx.ts               (raw transactions  — any DB)
@@ -127,7 +147,11 @@ stroppy help probe
 ├─ tpcc
 │  ├─ procs.ts            (stored procedures — pg/mysql)
 │  ├─ tx.ts               (raw transactions  — any DB)
-│  └─ pg.sql mysql.sql pico.sql ydb.sql
+│  └─ pg.sql mysql.sql pico.sql ydb.sql ydb_no_indexes.sql
+├─ tpch
+│  ├─ tx.ts               (relational load + 22 queries)
+│  ├─ tpch_helpers.ts tpch_validate.ts
+│  └─ pg.sql mysql.sql pico.sql ydb.sql distributions.json answers_sf1.json
 └─ tpcds
    ├─ tpcds-scale-(1/10/100/300/1000/3000/10000/30000/50000/100000).sql
    └─ tpcds.ts
@@ -163,11 +187,12 @@ cd mytest && npm install
 After generating a workspace:
 
 1. Edit TypeScript test files in your workdir
-2. Import stroppy types and use helpers framework.
+2. Import stroppy helpers and, for generated loads, `datagen.ts`.
 3. Use k6 APIs for test scenarios
 4. Run with `./stroppy run <test-file>.ts`
 
-Look at `simple.ts` and `tpcb/procs.ts` first as a reference.
+Look at `simple.ts`, `tpcb/tx.ts`, and `docs/datagen-framework.md` first as
+references.
 
 ## Docker Usage
 
@@ -189,7 +214,7 @@ docker run --network host stroppy run tpcb/procs \
   -d pg -D url=postgres://user:password@host:5432/dbname
 ```
 
-Available workloads: `simple`, `tpcb`, `tpcc`, `tpcds`
+Available workloads: `simple`, `tpcb`, `tpcc`, `tpch`, `tpcds`, `execute_sql`
 
 ### Create Persistent Workdir
 

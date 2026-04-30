@@ -12,13 +12,15 @@ func init() {
 
 INPUT MODES
 
-  no extension   Preset mode. stroppy appends ".ts" and searches for the
-                 script. A matching SQL file is auto-derived (see below).
+  no extension   Script/preset mode. stroppy appends ".ts" and searches for
+                 the script. A matching SQL file may be auto-derived (see
+                 below).
 
-                   stroppy run tpcc
+                   stroppy run simple
+                   stroppy run tpcds
 
   .ts extension  Script mode. stroppy searches for the named TypeScript
-                 file. A matching SQL file is auto-derived (see below).
+                 file. A matching SQL file may be auto-derived (see below).
 
                    stroppy run bench.ts
 
@@ -51,10 +53,10 @@ SEARCH PATH
   Explicit relative paths (starting with ./) and absolute paths (starting
   with /) skip preset-based lookup in stage 4.
 
-SQL AUTO-DERIVATION
+SQL AUTO-DERIVATION AND SIBLINGS
 
   When the first argument is a preset or .ts script, stroppy attempts to
-  locate a SQL file automatically:
+  locate a legacy <preset>.sql file automatically:
 
   - The preset name is derived from the argument (e.g. "tpcc" from "tpcc",
     "tpcc.ts", or "tpcc/procs.ts").
@@ -65,11 +67,17 @@ SQL AUTO-DERIVATION
   Auto-derivation is not an error condition: a missing SQL file is silently
   ignored unless a SQL file was explicitly requested (see below).
 
+  Modern multi-dialect workloads such as tpcb/tx, tpcc/tx, and tpch/tx
+  normally choose their SQL file inside TypeScript based on driverType
+  (pg.sql, mysql.sql, pico.sql, ydb.sql). For those workloads stroppy copies
+  sibling .ts, .sql, and .json files into the k6 temp directory so imports
+  and driver-selected SQL files resolve without a rebuild.
+
 PRESET INFERENCE
 
   The preset name is inferred from the argument as follows:
 
-    tpcc             → preset "tpcc"
+    tpcc             → preset "tpcc"   (but requires a tpcc.ts script to exist)
     tpcc.ts          → preset "tpcc"   (extension stripped)
     tpcc.sql         → preset "tpcc"   (extension stripped)
     tpcc/procs       → preset "tpcc"   (directory component used)
@@ -84,21 +92,24 @@ PRESET INFERENCE
 SECOND POSITIONAL ARGUMENT
 
   An optional second positional argument specifies an explicit SQL file.
-  It overrides auto-derivation and is required to exist.
+  It overrides auto-derivation, is required to exist, and is passed to the
+  script as SQL_FILE.
 
-    stroppy run tpcc tpcc-pg          # looks for tpcc-pg.sql
-    stroppy run tpcc tpcc-pg.sql      # same (extension optional)
+    stroppy run tpcc/tx tpcc-pg       # looks for tpcc-pg.sql
+    stroppy run tpcc/tx tpcc-pg.sql   # same (extension optional)
     stroppy run tpcds tpcds-scale-100 # large-dataset variant
+    stroppy run tpcc/tx tpcc/pico     # tx script with explicit pico.sql
 
   If the SQL file is not found in any search location, stroppy exits with
   an error.
 
 EXAMPLES
 
-  # Preset: script from embedded workloads, SQL auto-derived
+  # Embedded workloads
   stroppy run simple
   stroppy run tpcc/procs     # pg/mysql (stored procedures)
-  stroppy run tpcc/tx        # any DB   (raw transactions)
+  stroppy run tpcc/tx        # SQL drivers (raw transactions)
+  stroppy run tpch/tx        # TPC-H relational load + queries
 
   # Preset with explicit SQL variant
   stroppy run tpcds tpcds-scale-100
@@ -115,9 +126,8 @@ EXAMPLES
   # Inline SQL
   stroppy run "select count(*) from orders"
 
-  # Override embedded tpcc SQL with a local copy
-  # (place tpcc.sql in cwd; script still comes from embedded)
-  stroppy run tpcc/procs
+  # Use a local workload file without rebuilding embedded workloads
+  stroppy run ./workloads/tpcc/tx.ts ./workloads/tpcc/pico.sql -d pico
 
 SEE ALSO
 

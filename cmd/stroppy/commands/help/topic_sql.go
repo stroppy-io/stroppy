@@ -93,7 +93,8 @@ MULTI-DIALECT PATTERN
       || ({
            postgres: "./pg.sql",
            mysql:    "./mysql.sql",
-           picodata: "./ansi.sql",
+           picodata: "./pico.sql",
+           ydb:      "./ydb.sql",
          }[driverConfig.driverType!] ?? "./pg.sql");
 
     const sql = parse_sql_with_sections(open(SQL_FILE));
@@ -110,9 +111,9 @@ MULTI-DIALECT PATTERN
   the script as the SQL_FILE environment variable, which takes priority
   over the driver-based auto-selection.
 
-parse_sql vs parse_sql_with_sections
+parse_sql_with_sections vs parse_sql
 
-  Returns a two-level lookup: section then query.
+  parse_sql_with_sections  Returns a two-level lookup: section then query.
                             Use this when your file has --+ section markers.
                             This is the standard choice for workloads.
 
@@ -149,8 +150,8 @@ EXAMPLES
   # Pass an explicit SQL file as positional argument
   stroppy run workloads/tpcc/procs workloads/tpcc/mysql.sql -d mysql
 
-  # Override the SQL file via environment variable (tx — universal, works with pico/ydb)
-  stroppy run workloads/tpcc/tx.ts -d pico -e SQL_FILE=./my_pico.sql
+  # Override the SQL file via the second positional argument
+  stroppy run workloads/tpcc/tx.ts workloads/tpcc/pico.sql -d pico
 
   # Show the SQL structure a script expects
   stroppy probe workloads/tpcc/procs --sql
