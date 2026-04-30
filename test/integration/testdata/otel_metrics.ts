@@ -43,6 +43,7 @@ export function setup() {
     driver.insertSpec(numberSpec("numbers_a", ROWS));
     driver.insertSpec(numberSpec("numbers_b", ROWS));
   });
+  Step.begin("workload");
 }
 
 export default function () {
@@ -63,5 +64,6 @@ export default function () {
 }
 
 export function teardown() {
+  Step.end("workload");
   Teardown();
 }

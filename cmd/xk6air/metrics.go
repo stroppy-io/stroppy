@@ -103,6 +103,11 @@ func (m *txMetrics) recordInsert(vu modules.VU, table string, rows int64, elapse
 	if !ok {
 		return
 	}
+	if state.Tags != nil {
+		tags = currentVUTags(state.Tags.GetCurrentValues(), tags)
+	} else {
+		tags = withCurrentStepTag(tags)
+	}
 
 	if table == "" {
 		table = "unknown"
@@ -152,6 +157,11 @@ func (m *txMetrics) record(vu modules.VU, action, name string, isolation stroppy
 	txCount, tags, ok := m.snapshotCountMetric()
 	if !ok {
 		return
+	}
+	if state.Tags != nil {
+		tags = currentVUTags(state.Tags.GetCurrentValues(), tags)
+	} else {
+		tags = withCurrentStepTag(tags)
 	}
 	now := time.Now()
 	tags = tags.With("tx_action", action)
@@ -243,6 +253,29 @@ func (m *txMetrics) snapshotInsertMetrics() (
 	}
 
 	return m.insertRows, m.insertRPS, m.tags, true
+}
+
+func currentVUTags(tagsAndMeta k6metrics.TagsAndMeta, fallback *k6metrics.TagSet) *k6metrics.TagSet {
+	tags := fallback
+	if tagsAndMeta.Tags == nil {
+		return withCurrentStepTag(tags)
+	}
+
+	tags = tagsAndMeta.Tags
+	return withCurrentStepTag(tags)
+}
+
+func withCurrentStepTag(tags *k6metrics.TagSet) *k6metrics.TagSet {
+	if tags == nil {
+		return nil
+	}
+	if _, ok := tags.Get("step"); ok {
+		return tags
+	}
+	if step := rootModule.CurrentStep(); step != "" {
+		return tags.With("step", step)
+	}
+	return tags
 }
 
 func runThroughputSampler(

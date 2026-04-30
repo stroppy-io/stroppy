@@ -420,6 +420,9 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		{"NewDriver", newDriverStub},
 		{"Teardown", func(any) {}},
 		{"NotifyStep", notifyStepSpy(&probeprint.Steps)},
+		{"SetStepTag", func(string) {}},
+		{"ClearStepTag", func(string) {}},
+		{"CurrentStep", func() string { return "" }},
 		// TODO: research. Some esbuild name resolution artifact, probably
 		{"NotifyStep2", notifyStepSpy(&probeprint.Steps)},
 		{"NewPicker", newPickerStubFactory(vm)},

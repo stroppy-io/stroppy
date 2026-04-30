@@ -8,6 +8,9 @@ globalThis.TextDecoder = encoding.TextDecoder;
 import {
   NewDriver,
   NotifyStep,
+  SetStepTag,
+  ClearStepTag,
+  CurrentStep,
   DeclareEnv,
   Once,
   Driver,
@@ -114,6 +117,12 @@ const txCommitRateMetric = new Rate("tx_commit_rate");
 const txErrRateMetric = new Rate("tx_error_rate");
 const txQueriesPerTxMetric = new Trend("tx_queries_per_tx", false);
 
+function withStepTag(tags?: Record<string, string>): Record<string, string> | undefined {
+  const step = CurrentStep();
+  if (!step) return tags;
+  return { ...(tags ?? {}), step };
+}
+
 export interface TaggedQuery {
   sql: string | ParsedQuery;
   tags?: Record<string, string>;
@@ -182,12 +191,12 @@ function createQueryAPI(rawRunQuery: RunQueryFn, getErrorMode: () => ErrorModeNa
       const result = rawRunQuery(s, args);
       // .seconds() returns a float — multiply by 1000 for sub-ms precision.
       // .milliseconds() truncates to int64 and reports 0 for sub-ms queries.
-      runQueryMetric.add(result.stats.elapsed.seconds() * 1000, tags);
-      runQueryErrRateMetric.add(0, tags);
-      runQueryCounterMetric.add(1, tags);
+      runQueryMetric.add(result.stats.elapsed.seconds() * 1000, withStepTag(tags));
+      runQueryErrRateMetric.add(0, withStepTag(tags));
+      runQueryCounterMetric.add(1, withStepTag(tags));
       return result;
     } catch (e) {
-      runQueryErrRateMetric.add(1, tags);
+      runQueryErrRateMetric.add(1, withStepTag(tags));
       if (isTx) { throw e }
       handleError(getErrorMode(), e, tags);
       return undefined;
@@ -292,19 +301,19 @@ export class TxX implements QueryAPI {
     const elapsed = Date.now() - this._startTime;
     this.tx.commit();
     const tags = this._tags("commit");
-    txTotalDurationMetric.add(elapsed, tags);
-    txCleanDurationMetric.add(this._cleanDuration, tags);
-    txCommitRateMetric.add(1, tags);
-    txQueriesPerTxMetric.add(this._queryCount, tags);
+    txTotalDurationMetric.add(elapsed, withStepTag(tags));
+    txCleanDurationMetric.add(this._cleanDuration, withStepTag(tags));
+    txCommitRateMetric.add(1, withStepTag(tags));
+    txQueriesPerTxMetric.add(this._queryCount, withStepTag(tags));
   }
 
   rollback(): void {
     const elapsed = Date.now() - this._startTime;
     const tags = this._tags("rollback");
-    txTotalDurationMetric.add(elapsed, tags);
-    txCleanDurationMetric.add(this._cleanDuration, tags);
-    txCommitRateMetric.add(0, tags);
-    txQueriesPerTxMetric.add(this._queryCount, tags);
+    txTotalDurationMetric.add(elapsed, withStepTag(tags));
+    txCleanDurationMetric.add(this._cleanDuration, withStepTag(tags));
+    txCommitRateMetric.add(0, withStepTag(tags));
+    txQueriesPerTxMetric.add(this._queryCount, withStepTag(tags));
     this.tx.rollback();
   }
 }
@@ -589,11 +598,11 @@ export class DriverX implements QueryAPI {
     try {
       const protoBytes = DatagenInsertSpec.toBinary(DatagenInsertSpec.create(effectiveSpec));
       const stats = this.driver.insertSpecBin(protoBytes);
-      insertErrRateMetric.add(0, metricTags);
-      insertMetric.add(stats.elapsed.seconds() * 1000, metricTags);
+      insertErrRateMetric.add(0, withStepTag(metricTags));
+      insertMetric.add(stats.elapsed.seconds() * 1000, withStepTag(metricTags));
       console.log(`InsertSpec into '${table}' ended in ${stats.elapsed.string()}`);
     } catch (e) {
-      insertErrRateMetric.add(1, metricTags);
+      insertErrRateMetric.add(1, withStepTag(metricTags));
       handleError(this._errorMode, e, metricTags);
     }
   }
@@ -623,9 +632,9 @@ export class DriverX implements QueryAPI {
     try {
       fn(tx);
       tx.commit();
-      txErrRateMetric.add(0, errTags);
+      txErrRateMetric.add(0, withStepTag(errTags));
     } catch (e) {
-      txErrRateMetric.add(1, errTags);
+      txErrRateMetric.add(1, withStepTag(errTags));
       try { tx.rollback(); } catch (_) { /* ignore rollback error */ }
       throw e;
     }
@@ -662,17 +671,28 @@ export const Step = Object.assign(
       return;
     }
     Step.begin(name);
-    step();
-    Step.end(name);
+    let completed = false;
+    try {
+      step();
+      completed = true;
+    } finally {
+      if (completed) {
+        Step.end(name);
+      } else {
+        ClearStepTag(name);
+      }
+    }
   },
   {
     begin: (name: string): void => {
+      SetStepTag(name);
       NotifyStep(name, StroppyRun_Status.STATUS_RUNNING);
       console.log(`Start of '${name}' step`);
     },
     end: (name: string): void => {
       console.log(`End of '${name}' step`);
       NotifyStep(name, StroppyRun_Status.STATUS_COMPLETED);
+      ClearStepTag(name);
     },
   }
 );

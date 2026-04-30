@@ -201,7 +201,7 @@ export default function (): void {
   const delta = deltaGen.next();
   const hid = nextHid();
 
-  driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
+  driver.beginTx({ isolation: TX_ISOLATION, name: "tpcb" }, (tx) => {
     tx.exec(sql("workload_tx_tpcb", "update_account")!, { aid, delta });
 
     const abalance = tx.queryValue<number>(

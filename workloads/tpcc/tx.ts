@@ -984,7 +984,7 @@ function new_order() {
   // retry loop on the first attempt as before.
   try {
     tpccRetry(() => {
-      const tx = driver.begin({ isolation: TX_ISOLATION });
+      const tx = driver.begin({ isolation: TX_ISOLATION, name: "new_order" });
       try {
         // Read customer discount / credit and warehouse tax (real round-trip).
         tx.queryRow(sql("workload_tx_new_order", "get_customer")!, { c_id, d_id, w_id });
@@ -1177,7 +1177,7 @@ function payment() {
   try {
     tpccRetry(() => {
       payment_was_bc = false; // reset across attempts so the final attempt's branch wins
-      driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
+      driver.beginTx({ isolation: TX_ISOLATION, name: "payment" }, (tx) => {
         // Layer 1: pg/ydb merge UPDATE + SELECT into a single
         // UPDATE...RETURNING round-trip; mysql/pico keep the two-query path.
         let w_name: string;
@@ -1333,7 +1333,7 @@ function order_status() {
   try {
     tpccRetry(() => {
       order_status_byname_observed = false;
-      driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
+      driver.beginTx({ isolation: TX_ISOLATION, name: "order_status" }, (tx) => {
         let c_id: number;
         if (is_byname) {
           const cntRaw = tx.queryValue(
@@ -1411,7 +1411,7 @@ function delivery() {
   // anyway so the fail mode is uniform across tx types.
   try {
     tpccRetry(() => {
-      driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
+      driver.beginTx({ isolation: TX_ISOLATION, name: "delivery" }, (tx) => {
         for (let d_id = 1; d_id <= DISTRICTS_PER_WAREHOUSE; d_id++) {
           const minRow = tx.queryRow(
             sql("workload_tx_delivery", "get_min_new_order")!, { d_id, w_id },
@@ -1473,7 +1473,7 @@ function stock_level() {
   // is cheap and keeps the dispatch shape uniform across all five tx types.
   try {
     tpccRetry(() => {
-      driver.beginTx({ isolation: TX_ISOLATION }, (tx) => {
+      driver.beginTx({ isolation: TX_ISOLATION, name: "stock_level" }, (tx) => {
         const next_o_id = tx.queryValue<number>(
           sql("workload_tx_stock_level", "get_district")!, { w_id, d_id },
         );

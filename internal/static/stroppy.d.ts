@@ -78,6 +78,9 @@ declare module "k6/x/stroppy" {
 
   // k6 module functions provided by Go module
   export declare function NotifyStep(name: String, status: number): void;
+  export declare function SetStepTag(name: string): void;
+  export declare function ClearStepTag(name: string): void;
+  export declare function CurrentStep(): string;
   export declare function Teardown(): Error;
   export declare function NewDriver(): Driver;
 

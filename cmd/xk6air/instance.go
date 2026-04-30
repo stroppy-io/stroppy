@@ -11,6 +11,7 @@ import (
 	_ "github.com/stroppy-io/stroppy/pkg/driver/postgres"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/ydb"
 	"go.k6.io/k6/js/modules"
+	k6metrics "go.k6.io/k6/metrics"
 	"go.uber.org/zap"
 )
 
@@ -47,21 +48,24 @@ func (i *Instance) Exports() modules.Exports {
 	return modules.Exports{
 		Default: i,
 		Named: map[string]any{
-			"NotifyStep":                  rootModule.NotifyStep,
-			"NewDriver":                   i.NewDriver,
-			"Teardown":                    rootModule.Teardown,
-			"NewPicker":                   NewPicker,
-			"DeclareEnv":                  func([]string, string, string) {},
-			"Once":                        i.Once,
+			"NotifyStep":   rootModule.NotifyStep,
+			"SetStepTag":   i.SetStepTag,
+			"ClearStepTag": i.ClearStepTag,
+			"CurrentStep":  rootModule.CurrentStep,
+			"NewDriver":    i.NewDriver,
+			"Teardown":     rootModule.Teardown,
+			"NewPicker":    NewPicker,
+			"DeclareEnv":   func([]string, string, string) {},
+			"Once":         i.Once,
 
 			// Draw iter 2 — sobek-bound Go structs, one per StreamDraw arm.
 			// Handle registries for dict / alphabet / grammar are exposed
 			// so the TS DrawRT builders can resolve non-literal inputs
 			// once at init time and forward only numeric handles to the
 			// per-arm constructors.
-			"RegisterDict":       RegisterDict,
-			"RegisterAlphabet":   RegisterAlphabet,
-			"RegisterGrammar":    RegisterGrammar,
+			"RegisterDict":        RegisterDict,
+			"RegisterAlphabet":    RegisterAlphabet,
+			"RegisterGrammar":     RegisterGrammar,
 			"NewDrawIntUniform":   NewDrawIntUniform,
 			"NewDrawFloatUniform": NewDrawFloatUniform,
 			"NewDrawNormal":       NewDrawNormal,
@@ -77,6 +81,37 @@ func (i *Instance) Exports() modules.Exports {
 			"NewDrawGrammar":      NewDrawGrammar,
 		},
 	}
+}
+
+// SetStepTag marks subsequent VU metric samples with the logical Stroppy step.
+func (i *Instance) SetStepTag(name string) {
+	rootModule.SetCurrentStep(name)
+
+	state := i.vu.State()
+	if state == nil || state.Tags == nil {
+		return
+	}
+
+	state.Tags.Modify(func(tagsAndMeta *k6metrics.TagsAndMeta) {
+		tagsAndMeta.SetTag("step", name)
+	})
+}
+
+// ClearStepTag removes the logical Stroppy step tag if it is still active.
+func (i *Instance) ClearStepTag(name string) {
+	rootModule.ClearCurrentStep(name)
+
+	state := i.vu.State()
+	if state == nil || state.Tags == nil {
+		return
+	}
+
+	state.Tags.Modify(func(tagsAndMeta *k6metrics.TagsAndMeta) {
+		current, ok := tagsAndMeta.Tags.Get("step")
+		if ok && current == name {
+			tagsAndMeta.DeleteTag("step")
+		}
+	})
 }
 
 // NewDriver creates an empty DriverWrapper shell.

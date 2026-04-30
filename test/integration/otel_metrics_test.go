@@ -80,51 +80,83 @@ func TestOtelStroppyMetricsNoop(t *testing.T) {
 
 	body := waitForMetrics(t, prometheusURL, func(body string) error {
 		for _, table := range []string{"numbers_a", "numbers_b"} {
-			if err := requirePrometheusSample(body, "stroppy_insert_rows_total", labels{"table_name": table}, 100); err != nil {
+			if err := requirePrometheusSample(body, "stroppy_insert_rows_total", labels{
+				"table_name": table,
+				"step":       "load_data",
+			}, 100); err != nil {
 				return err
 			}
-			if err := requirePrometheusSample(body, "stroppy_insert_rows_per_second", labels{"table_name": table}, 0); err != nil {
+			if err := requirePrometheusSample(body, "stroppy_insert_rows_per_second", labels{
+				"table_name": table,
+				"step":       "load_data",
+			}, 0); err != nil {
 				return err
 			}
-			if err := requirePrometheusSample(body, "stroppy_insert_duration", labels{"table_name": table}, 0); err != nil {
+			if err := requirePrometheusSample(body, "stroppy_insert_duration", labels{
+				"table_name": table,
+				"step":       "load_data",
+			}, 0); err != nil {
 				return err
 			}
-			if err := requirePrometheusSample(body, "stroppy_insert_error_rate", labels{"table_name": table}, 0); err != nil {
+			if err := requirePrometheusSample(body, "stroppy_insert_error_rate", labels{
+				"table_name": table,
+				"step":       "load_data",
+			}, 0); err != nil {
 				return err
 			}
 		}
 
 		expected := []metricExpectation{
-			{prefix: "stroppy_run_query_duration", labels: labels{"name": "outside_query", "type": "metrics"}},
-			{prefix: "stroppy_run_query_count", labels: labels{"name": "outside_query", "type": "metrics"}, minValue: 1},
-			{prefix: "stroppy_run_query_error_rate", labels: labels{"name": "outside_query", "type": "metrics"}},
+			{prefix: "stroppy_run_query_duration", labels: labels{
+				"name": "outside_query",
+				"type": "metrics",
+				"step": "workload",
+			}},
+			{prefix: "stroppy_run_query_count", labels: labels{
+				"name": "outside_query",
+				"type": "metrics",
+				"step": "workload",
+			}, minValue: 1},
+			{prefix: "stroppy_run_query_error_rate", labels: labels{
+				"name": "outside_query",
+				"type": "metrics",
+				"step": "workload",
+			}},
 			{prefix: "stroppy_run_query_qps"},
 			{prefix: "stroppy_tx_count", labels: labels{
 				"tx_action":    "commit",
 				"tx_name":      "metrics_tx",
 				"tx_isolation": "none",
+				"step":         "workload",
 			}, minValue: 1},
 			{prefix: "stroppy_tx_tps"},
 			{prefix: "stroppy_tx_total_duration", labels: labels{
 				"tx_action":    "commit",
 				"tx_name":      "metrics_tx",
 				"tx_isolation": "none",
+				"step":         "workload",
 			}},
 			{prefix: "stroppy_tx_clean_duration", labels: labels{
 				"tx_action":    "commit",
 				"tx_name":      "metrics_tx",
 				"tx_isolation": "none",
+				"step":         "workload",
 			}},
 			{prefix: "stroppy_tx_commit_rate", labels: labels{
 				"tx_action":    "commit",
 				"tx_name":      "metrics_tx",
 				"tx_isolation": "none",
+				"step":         "workload",
 			}},
-			{prefix: "stroppy_tx_error_rate", labels: labels{"name": "metrics_tx"}},
+			{prefix: "stroppy_tx_error_rate", labels: labels{
+				"name": "metrics_tx",
+				"step": "workload",
+			}},
 			{prefix: "stroppy_tx_queries_per_tx", labels: labels{
 				"tx_action":    "commit",
 				"tx_name":      "metrics_tx",
 				"tx_isolation": "none",
+				"step":         "workload",
 			}, minValue: 1},
 		}
 		for _, exp := range expected {
