@@ -16,17 +16,6 @@ import {
   type DictBody,
 } from "./datagen.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
-// Note: `import ... from "./distributions.json" with { type: "json" }`
-// hangs k6's goja runtime at module-compile (v1.7.0). Load the same blob
-// via `open()` instead — same content, instant startup. Wrapped in a
-// tolerant parse so the probe phase (where `open()` is stubbed to "") sees
-// an empty-but-structurally-valid payload; setup() replaces it lazily.
-function readDistributions(): TpchDistributions {
-  const raw = open("./distributions.json");
-  if (!raw) return { version: "", source: "", distributions: {} };
-  return JSON.parse(raw) as TpchDistributions;
-}
-const distributions: TpchDistributions = readDistributions();
 import {
   makeTpchText,
   makeTpchGrammarDicts,
@@ -47,6 +36,24 @@ import {
   logSummary,
   type AnswersFile,
 } from "./tpch_validate.ts";
+
+// Note: `import ... from "./distributions.json" with { type: "json" }`
+// hangs k6's sobek runtime at module-compile (v1.7.0). Load the same blob
+// via `open()` instead — same content, instant startup. Wrapped in a
+// tolerant parse so the probe phase (where `open()` is stubbed to "") sees
+// an empty-but-structurally-valid payload.
+function readDistributions(): TpchDistributions {
+  const raw = open("./distributions.json");
+  if (!raw) return { version: "", source: "", distributions: {} };
+  return JSON.parse(raw) as TpchDistributions;
+}
+const distributions: TpchDistributions = readDistributions();
+
+function readAnswersSf1(): AnswersFile {
+  const raw = open("./answers_sf1.json");
+  if (!raw) return { version: "", source: "", answers: {} };
+  return JSON.parse(raw) as AnswersFile;
+}
 
 // ============================================================================
 // Data-gen simplifications (framework capability proof, not dbgen byte-parity):
@@ -192,6 +199,13 @@ void TX_ISOLATION; // queries are read-only; kept for symmetry with other worklo
 
 const driver = DriverX.create().setup(driverConfig);
 const sql = parse_sql_with_sections(open(SQL_FILE));
+const shouldValidateAnswers =
+  Math.abs(SCALE_FACTOR - 1) <= 1e-9 && driverConfig.driverType === "postgres";
+// k6 permits open() only during module init. Keep this guarded, but do not
+// defer it into setup().
+const answersSf1: AnswersFile = shouldValidateAnswers
+  ? readAnswersSf1()
+  : { version: "", source: "", answers: {} };
 
 // --------------------------------------------------------------------------
 // Dict wiring — pulled from distributions.json
@@ -700,9 +714,7 @@ export function setup(): void {
       const body = sql(name, "body");
       if (body) queries[name] = body;
     }
-    // Load the 2 MB answers blob only when we actually need it.
-    const answers = JSON.parse(open("./answers_sf1.json")) as AnswersFile;
-    const results = runAndCompareAllQueries(driver, queries, queryParams, answers);
+    const results = runAndCompareAllQueries(driver, queries, queryParams, answersSf1);
     logSummary(results);
   });
 
