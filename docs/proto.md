@@ -1622,17 +1622,20 @@ This is intentionally separate from DriverConfig (the runtime binary proto for T
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| driver_type | [string](#string) |  | Driver type. One of: &#34;postgres&#34;, &#34;mysql&#34;, &#34;picodata&#34;, &#34;ydb&#34;, &#34;noop&#34;. Matches TS DriverSetup.driverType (string union, not proto enum). |
-| url | [string](#string) |  | Database connection URL |
+| driver_type | [string](#string) | optional | Driver type. One of: &#34;postgres&#34;, &#34;mysql&#34;, &#34;picodata&#34;, &#34;ydb&#34;, &#34;noop&#34;, &#34;csv&#34;. Matches TS DriverSetup.driverType (string union, not proto enum). |
+| url | [string](#string) | optional | Database connection URL |
 | pool | [DriverRunConfig.PoolConfig](#stroppy-DriverRunConfig-PoolConfig) | optional |  |
-| error_mode | [string](#string) |  | Error handling mode. One of: &#34;silent&#34;, &#34;log&#34;, &#34;throw&#34;, &#34;fail&#34;, &#34;abort&#34;. Matches TS DriverSetup.errorMode. |
+| error_mode | [string](#string) | optional | Error handling mode. One of: &#34;silent&#34;, &#34;log&#34;, &#34;throw&#34;, &#34;fail&#34;, &#34;abort&#34;. Matches TS DriverSetup.errorMode. |
 | bulk_size | [int32](#int32) | optional | Rows per bulk INSERT statement. Matches TS DriverSetup.bulkSize. |
 | ca_cert_file | [string](#string) | optional | Path to CA certificate PEM file. Matches TS DriverSetup.caCertFile. |
 | auth_token | [string](#string) | optional | Authentication token (e.g. IAM token). Matches TS DriverSetup.authToken. |
 | auth_user | [string](#string) | optional | Username for static credentials. Matches TS DriverSetup.authUser. |
 | auth_password | [string](#string) | optional | Password for static credentials. Matches TS DriverSetup.authPassword. |
 | tls_insecure_skip_verify | [bool](#bool) | optional | Skip TLS certificate verification. Matches TS DriverSetup.tlsInsecureSkipVerify. |
-| default_tx_isolation | [string](#string) |  | Default transaction isolation level. One of: &#34;read_uncommitted&#34;, &#34;read_committed&#34;, &#34;repeatable_read&#34;, &#34;serializable&#34;. Matches TS DriverSetup.defaultTxIsolation. |
+| default_tx_isolation | [string](#string) | optional | Default transaction isolation level. One of: &#34;read_uncommitted&#34;, &#34;read_committed&#34;, &#34;repeatable_read&#34;, &#34;serializable&#34;, &#34;db_default&#34;, &#34;conn&#34;, &#34;none&#34;. Matches TS DriverSetup.defaultTxIsolation. |
+| default_insert_method | [string](#string) | optional | Driver-level insert method. One of: &#34;plain_query&#34;, &#34;plain_bulk&#34;, &#34;native&#34;. Matches TS DriverSetup.defaultInsertMethod. |
+| postgres | [DriverConfig.PostgresConfig](#stroppy-DriverConfig-PostgresConfig) | optional | PostgreSQL-specific pool config. Matches TS DriverSetup.postgres. Takes priority over pool when both are set. |
+| sql | [DriverConfig.SqlConfig](#stroppy-DriverConfig-SqlConfig) | optional | Generic database/sql pool config. Matches TS DriverSetup.sql. Takes priority over pool when both are set. |
 
 
 
@@ -1688,7 +1691,7 @@ Example (stroppy-config.json):
     },
     &#34;drivers&#34;: {
       &#34;0&#34;: { &#34;driverType&#34;: &#34;postgres&#34;, &#34;url&#34;: &#34;postgres://user:pass@db:5432/bench&#34;,
-              &#34;pool&#34;: { &#34;maxConns&#34;: 200 } }
+              &#34;defaultInsertMethod&#34;: &#34;native&#34;, &#34;pool&#34;: { &#34;maxConns&#34;: 200 } }
     },
     &#34;env&#34;: { &#34;WAREHOUSES&#34;: &#34;10&#34; },
     &#34;k6Args&#34;: [&#34;--vus&#34;, &#34;10&#34;, &#34;--duration&#34;, &#34;30m&#34;]

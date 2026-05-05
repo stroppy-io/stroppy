@@ -16,13 +16,13 @@ option go_package = "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy";
  */
 message DriverRunConfig {
   /**
-   * Driver type. One of: "postgres", "mysql", "picodata", "ydb", "noop".
+   * Driver type. One of: "postgres", "mysql", "picodata", "ydb", "noop", "csv".
    * Matches TS DriverSetup.driverType (string union, not proto enum).
    */
-  string driver_type = 1;
+  optional string driver_type = 1;
 
   /** Database connection URL */
-  string url = 2;
+  optional string url = 2;
 
   /**
    * Pool configuration. Sugar field that maps to PostgresConfig or SqlConfig
@@ -53,7 +53,7 @@ message DriverRunConfig {
    * Error handling mode. One of: "silent", "log", "throw", "fail", "abort".
    * Matches TS DriverSetup.errorMode.
    */
-  string error_mode = 5;
+  optional string error_mode = 5;
 
   /** Rows per bulk INSERT statement. Matches TS DriverSetup.bulkSize. */
   optional int32 bulk_size = 6;
@@ -75,10 +75,29 @@ message DriverRunConfig {
 
   /**
    * Default transaction isolation level.
-   * One of: "read_uncommitted", "read_committed", "repeatable_read", "serializable".
+   * One of: "read_uncommitted", "read_committed", "repeatable_read",
+   * "serializable", "db_default", "conn", "none".
    * Matches TS DriverSetup.defaultTxIsolation.
    */
-  string default_tx_isolation = 12;
+  optional string default_tx_isolation = 12;
+
+  /**
+   * Driver-level insert method. One of: "plain_query", "plain_bulk", "native".
+   * Matches TS DriverSetup.defaultInsertMethod.
+   */
+  optional string default_insert_method = 13;
+
+  /**
+   * PostgreSQL-specific pool config. Matches TS DriverSetup.postgres.
+   * Takes priority over pool when both are set.
+   */
+  optional DriverConfig.PostgresConfig postgres = 14;
+
+  /**
+   * Generic database/sql pool config. Matches TS DriverSetup.sql.
+   * Takes priority over pool when both are set.
+   */
+  optional DriverConfig.SqlConfig sql = 15;
 }
 
 /**
@@ -99,7 +118,7 @@ message DriverRunConfig {
  *     },
  *     "drivers": {
  *       "0": { "driverType": "postgres", "url": "postgres://user:pass@db:5432/bench",
- *               "pool": { "maxConns": 200 } }
+ *               "defaultInsertMethod": "native", "pool": { "maxConns": 200 } }
  *     },
  *     "env": { "WAREHOUSES": "10" },
  *     "k6Args": ["--vus", "10", "--duration", "30m"]

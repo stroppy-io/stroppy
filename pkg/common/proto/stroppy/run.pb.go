@@ -31,16 +31,16 @@ const (
 type DriverRunConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// *
-	// Driver type. One of: "postgres", "mysql", "picodata", "ydb", "noop".
+	// Driver type. One of: "postgres", "mysql", "picodata", "ydb", "noop", "csv".
 	// Matches TS DriverSetup.driverType (string union, not proto enum).
-	DriverType string `protobuf:"bytes,1,opt,name=driver_type,json=driverType,proto3" json:"driver_type,omitempty"`
+	DriverType *string `protobuf:"bytes,1,opt,name=driver_type,json=driverType,proto3,oneof" json:"driver_type,omitempty"`
 	// * Database connection URL
-	Url  string                      `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	Url  *string                     `protobuf:"bytes,2,opt,name=url,proto3,oneof" json:"url,omitempty"`
 	Pool *DriverRunConfig_PoolConfig `protobuf:"bytes,4,opt,name=pool,proto3,oneof" json:"pool,omitempty"`
 	// *
 	// Error handling mode. One of: "silent", "log", "throw", "fail", "abort".
 	// Matches TS DriverSetup.errorMode.
-	ErrorMode string `protobuf:"bytes,5,opt,name=error_mode,json=errorMode,proto3" json:"error_mode,omitempty"`
+	ErrorMode *string `protobuf:"bytes,5,opt,name=error_mode,json=errorMode,proto3,oneof" json:"error_mode,omitempty"`
 	// * Rows per bulk INSERT statement. Matches TS DriverSetup.bulkSize.
 	BulkSize *int32 `protobuf:"varint,6,opt,name=bulk_size,json=bulkSize,proto3,oneof" json:"bulk_size,omitempty"`
 	// * Path to CA certificate PEM file. Matches TS DriverSetup.caCertFile.
@@ -55,11 +55,24 @@ type DriverRunConfig struct {
 	TlsInsecureSkipVerify *bool `protobuf:"varint,11,opt,name=tls_insecure_skip_verify,json=tlsInsecureSkipVerify,proto3,oneof" json:"tls_insecure_skip_verify,omitempty"`
 	// *
 	// Default transaction isolation level.
-	// One of: "read_uncommitted", "read_committed", "repeatable_read", "serializable".
+	// One of: "read_uncommitted", "read_committed", "repeatable_read",
+	// "serializable", "db_default", "conn", "none".
 	// Matches TS DriverSetup.defaultTxIsolation.
-	DefaultTxIsolation string `protobuf:"bytes,12,opt,name=default_tx_isolation,json=defaultTxIsolation,proto3" json:"default_tx_isolation,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	DefaultTxIsolation *string `protobuf:"bytes,12,opt,name=default_tx_isolation,json=defaultTxIsolation,proto3,oneof" json:"default_tx_isolation,omitempty"`
+	// *
+	// Driver-level insert method. One of: "plain_query", "plain_bulk", "native".
+	// Matches TS DriverSetup.defaultInsertMethod.
+	DefaultInsertMethod *string `protobuf:"bytes,13,opt,name=default_insert_method,json=defaultInsertMethod,proto3,oneof" json:"default_insert_method,omitempty"`
+	// *
+	// PostgreSQL-specific pool config. Matches TS DriverSetup.postgres.
+	// Takes priority over pool when both are set.
+	Postgres *DriverConfig_PostgresConfig `protobuf:"bytes,14,opt,name=postgres,proto3,oneof" json:"postgres,omitempty"`
+	// *
+	// Generic database/sql pool config. Matches TS DriverSetup.sql.
+	// Takes priority over pool when both are set.
+	Sql           *DriverConfig_SqlConfig `protobuf:"bytes,15,opt,name=sql,proto3,oneof" json:"sql,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DriverRunConfig) Reset() {
@@ -93,15 +106,15 @@ func (*DriverRunConfig) Descriptor() ([]byte, []int) {
 }
 
 func (x *DriverRunConfig) GetDriverType() string {
-	if x != nil {
-		return x.DriverType
+	if x != nil && x.DriverType != nil {
+		return *x.DriverType
 	}
 	return ""
 }
 
 func (x *DriverRunConfig) GetUrl() string {
-	if x != nil {
-		return x.Url
+	if x != nil && x.Url != nil {
+		return *x.Url
 	}
 	return ""
 }
@@ -114,8 +127,8 @@ func (x *DriverRunConfig) GetPool() *DriverRunConfig_PoolConfig {
 }
 
 func (x *DriverRunConfig) GetErrorMode() string {
-	if x != nil {
-		return x.ErrorMode
+	if x != nil && x.ErrorMode != nil {
+		return *x.ErrorMode
 	}
 	return ""
 }
@@ -163,10 +176,31 @@ func (x *DriverRunConfig) GetTlsInsecureSkipVerify() bool {
 }
 
 func (x *DriverRunConfig) GetDefaultTxIsolation() string {
-	if x != nil {
-		return x.DefaultTxIsolation
+	if x != nil && x.DefaultTxIsolation != nil {
+		return *x.DefaultTxIsolation
 	}
 	return ""
+}
+
+func (x *DriverRunConfig) GetDefaultInsertMethod() string {
+	if x != nil && x.DefaultInsertMethod != nil {
+		return *x.DefaultInsertMethod
+	}
+	return ""
+}
+
+func (x *DriverRunConfig) GetPostgres() *DriverConfig_PostgresConfig {
+	if x != nil {
+		return x.Postgres
+	}
+	return nil
+}
+
+func (x *DriverRunConfig) GetSql() *DriverConfig_SqlConfig {
+	if x != nil {
+		return x.Sql
+	}
+	return nil
 }
 
 // *
@@ -189,7 +223,7 @@ func (x *DriverRunConfig) GetDefaultTxIsolation() string {
 //	  },
 //	  "drivers": {
 //	    "0": { "driverType": "postgres", "url": "postgres://user:pass@db:5432/bench",
-//	            "pool": { "maxConns": 200 } }
+//	            "defaultInsertMethod": "native", "pool": { "maxConns": 200 } }
 //	  },
 //	  "env": { "WAREHOUSES": "10" },
 //	  "k6Args": ["--vus", "10", "--duration", "30m"]
@@ -491,24 +525,28 @@ var File_proto_stroppy_run_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_run_proto_rawDesc = "" +
 	"\n" +
-	"\x17proto/stroppy/run.proto\x12\astroppy\x1a\x1aproto/stroppy/config.proto\"\xde\v\n" +
-	"\x0fDriverRunConfig\x12\x1f\n" +
-	"\vdriver_type\x18\x01 \x01(\tR\n" +
-	"driverType\x12\x10\n" +
-	"\x03url\x18\x02 \x01(\tR\x03url\x12<\n" +
-	"\x04pool\x18\x04 \x01(\v2#.stroppy.DriverRunConfig.PoolConfigH\x00R\x04pool\x88\x01\x01\x12\x1d\n" +
+	"\x17proto/stroppy/run.proto\x12\astroppy\x1a\x1aproto/stroppy/config.proto\"\x99\x0e\n" +
+	"\x0fDriverRunConfig\x12$\n" +
+	"\vdriver_type\x18\x01 \x01(\tH\x00R\n" +
+	"driverType\x88\x01\x01\x12\x15\n" +
+	"\x03url\x18\x02 \x01(\tH\x01R\x03url\x88\x01\x01\x12<\n" +
+	"\x04pool\x18\x04 \x01(\v2#.stroppy.DriverRunConfig.PoolConfigH\x02R\x04pool\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"error_mode\x18\x05 \x01(\tR\terrorMode\x12 \n" +
-	"\tbulk_size\x18\x06 \x01(\x05H\x01R\bbulkSize\x88\x01\x01\x12%\n" +
-	"\fca_cert_file\x18\a \x01(\tH\x02R\n" +
+	"error_mode\x18\x05 \x01(\tH\x03R\terrorMode\x88\x01\x01\x12 \n" +
+	"\tbulk_size\x18\x06 \x01(\x05H\x04R\bbulkSize\x88\x01\x01\x12%\n" +
+	"\fca_cert_file\x18\a \x01(\tH\x05R\n" +
 	"caCertFile\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"auth_token\x18\b \x01(\tH\x03R\tauthToken\x88\x01\x01\x12 \n" +
-	"\tauth_user\x18\t \x01(\tH\x04R\bauthUser\x88\x01\x01\x12(\n" +
+	"auth_token\x18\b \x01(\tH\x06R\tauthToken\x88\x01\x01\x12 \n" +
+	"\tauth_user\x18\t \x01(\tH\aR\bauthUser\x88\x01\x01\x12(\n" +
 	"\rauth_password\x18\n" +
-	" \x01(\tH\x05R\fauthPassword\x88\x01\x01\x12<\n" +
-	"\x18tls_insecure_skip_verify\x18\v \x01(\bH\x06R\x15tlsInsecureSkipVerify\x88\x01\x01\x120\n" +
-	"\x14default_tx_isolation\x18\f \x01(\tR\x12defaultTxIsolation\x1a\x9d\a\n" +
+	" \x01(\tH\bR\fauthPassword\x88\x01\x01\x12<\n" +
+	"\x18tls_insecure_skip_verify\x18\v \x01(\bH\tR\x15tlsInsecureSkipVerify\x88\x01\x01\x125\n" +
+	"\x14default_tx_isolation\x18\f \x01(\tH\n" +
+	"R\x12defaultTxIsolation\x88\x01\x01\x127\n" +
+	"\x15default_insert_method\x18\r \x01(\tH\vR\x13defaultInsertMethod\x88\x01\x01\x12E\n" +
+	"\bpostgres\x18\x0e \x01(\v2$.stroppy.DriverConfig.PostgresConfigH\fR\bpostgres\x88\x01\x01\x126\n" +
+	"\x03sql\x18\x0f \x01(\v2\x1f.stroppy.DriverConfig.SqlConfigH\rR\x03sql\x88\x01\x01\x1a\x9d\a\n" +
 	"\n" +
 	"PoolConfig\x12 \n" +
 	"\tmax_conns\x18\x01 \x01(\x05H\x00R\bmaxConns\x88\x01\x01\x12 \n" +
@@ -540,8 +578,11 @@ const file_proto_stroppy_run_proto_rawDesc = "" +
 	"\x0f_max_open_connsB\x11\n" +
 	"\x0f_max_idle_connsB\x14\n" +
 	"\x12_conn_max_lifetimeB\x15\n" +
-	"\x13_conn_max_idle_timeB\a\n" +
-	"\x05_poolB\f\n" +
+	"\x13_conn_max_idle_timeB\x0e\n" +
+	"\f_driver_typeB\x06\n" +
+	"\x04_urlB\a\n" +
+	"\x05_poolB\r\n" +
+	"\v_error_modeB\f\n" +
 	"\n" +
 	"_bulk_sizeB\x0f\n" +
 	"\r_ca_cert_fileB\r\n" +
@@ -549,7 +590,11 @@ const file_proto_stroppy_run_proto_rawDesc = "" +
 	"\n" +
 	"_auth_userB\x10\n" +
 	"\x0e_auth_passwordB\x1b\n" +
-	"\x19_tls_insecure_skip_verify\"\x8d\x04\n" +
+	"\x19_tls_insecure_skip_verifyB\x17\n" +
+	"\x15_default_tx_isolationB\x18\n" +
+	"\x16_default_insert_methodB\v\n" +
+	"\t_postgresB\x06\n" +
+	"\x04_sql\"\x8d\x04\n" +
 	"\tRunConfig\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x1b\n" +
 	"\x06script\x18\x02 \x01(\tH\x00R\x06script\x88\x01\x01\x12\x15\n" +
@@ -587,24 +632,28 @@ func file_proto_stroppy_run_proto_rawDescGZIP() []byte {
 
 var file_proto_stroppy_run_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_proto_stroppy_run_proto_goTypes = []any{
-	(*DriverRunConfig)(nil),            // 0: stroppy.DriverRunConfig
-	(*RunConfig)(nil),                  // 1: stroppy.RunConfig
-	(*DriverRunConfig_PoolConfig)(nil), // 2: stroppy.DriverRunConfig.PoolConfig
-	nil,                                // 3: stroppy.RunConfig.DriversEntry
-	nil,                                // 4: stroppy.RunConfig.EnvEntry
-	(*GlobalConfig)(nil),               // 5: stroppy.GlobalConfig
+	(*DriverRunConfig)(nil),             // 0: stroppy.DriverRunConfig
+	(*RunConfig)(nil),                   // 1: stroppy.RunConfig
+	(*DriverRunConfig_PoolConfig)(nil),  // 2: stroppy.DriverRunConfig.PoolConfig
+	nil,                                 // 3: stroppy.RunConfig.DriversEntry
+	nil,                                 // 4: stroppy.RunConfig.EnvEntry
+	(*DriverConfig_PostgresConfig)(nil), // 5: stroppy.DriverConfig.PostgresConfig
+	(*DriverConfig_SqlConfig)(nil),      // 6: stroppy.DriverConfig.SqlConfig
+	(*GlobalConfig)(nil),                // 7: stroppy.GlobalConfig
 }
 var file_proto_stroppy_run_proto_depIdxs = []int32{
 	2, // 0: stroppy.DriverRunConfig.pool:type_name -> stroppy.DriverRunConfig.PoolConfig
-	5, // 1: stroppy.RunConfig.global:type_name -> stroppy.GlobalConfig
-	3, // 2: stroppy.RunConfig.drivers:type_name -> stroppy.RunConfig.DriversEntry
-	4, // 3: stroppy.RunConfig.env:type_name -> stroppy.RunConfig.EnvEntry
-	0, // 4: stroppy.RunConfig.DriversEntry.value:type_name -> stroppy.DriverRunConfig
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	5, // 1: stroppy.DriverRunConfig.postgres:type_name -> stroppy.DriverConfig.PostgresConfig
+	6, // 2: stroppy.DriverRunConfig.sql:type_name -> stroppy.DriverConfig.SqlConfig
+	7, // 3: stroppy.RunConfig.global:type_name -> stroppy.GlobalConfig
+	3, // 4: stroppy.RunConfig.drivers:type_name -> stroppy.RunConfig.DriversEntry
+	4, // 5: stroppy.RunConfig.env:type_name -> stroppy.RunConfig.EnvEntry
+	0, // 6: stroppy.RunConfig.DriversEntry.value:type_name -> stroppy.DriverRunConfig
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_run_proto_init() }

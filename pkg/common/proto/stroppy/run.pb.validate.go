@@ -57,13 +57,13 @@ func (m *DriverRunConfig) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for DriverType
+	if m.DriverType != nil {
+		// no validation rules for DriverType
+	}
 
-	// no validation rules for Url
-
-	// no validation rules for ErrorMode
-
-	// no validation rules for DefaultTxIsolation
+	if m.Url != nil {
+		// no validation rules for Url
+	}
 
 	if m.Pool != nil {
 
@@ -98,6 +98,10 @@ func (m *DriverRunConfig) validate(all bool) error {
 
 	}
 
+	if m.ErrorMode != nil {
+		// no validation rules for ErrorMode
+	}
+
 	if m.BulkSize != nil {
 		// no validation rules for BulkSize
 	}
@@ -120,6 +124,80 @@ func (m *DriverRunConfig) validate(all bool) error {
 
 	if m.TlsInsecureSkipVerify != nil {
 		// no validation rules for TlsInsecureSkipVerify
+	}
+
+	if m.DefaultTxIsolation != nil {
+		// no validation rules for DefaultTxIsolation
+	}
+
+	if m.DefaultInsertMethod != nil {
+		// no validation rules for DefaultInsertMethod
+	}
+
+	if m.Postgres != nil {
+
+		if all {
+			switch v := interface{}(m.GetPostgres()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, DriverRunConfigValidationError{
+						field:  "Postgres",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, DriverRunConfigValidationError{
+						field:  "Postgres",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetPostgres()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return DriverRunConfigValidationError{
+					field:  "Postgres",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if m.Sql != nil {
+
+		if all {
+			switch v := interface{}(m.GetSql()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, DriverRunConfigValidationError{
+						field:  "Sql",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, DriverRunConfigValidationError{
+						field:  "Sql",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSql()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return DriverRunConfigValidationError{
+					field:  "Sql",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	}
 
 	if len(errors) > 0 {

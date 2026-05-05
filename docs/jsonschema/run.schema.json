@@ -2,8 +2,506 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$ref": "#/$defs/.stroppy.RunConfig",
   "$defs": {
+    ".stroppy.DriverConfig.PostgresConfig": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "traceLogLevel"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "traceLogLevel"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "maxConnLifetime"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "maxConnLifetime"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "maxConnIdleTime"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "maxConnIdleTime"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "maxConns"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "maxConns"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "minConns"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "minConns"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "minIdleConns"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "minIdleConns"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "defaultQueryExecMode"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "defaultQueryExecMode"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "descriptionCacheCapacity"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "descriptionCacheCapacity"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "statementCacheCapacity"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "statementCacheCapacity"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "traceLogLevel": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.trace_log_level"
+            }
+          ]
+        },
+        "maxConnLifetime": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.max_conn_lifetime"
+            }
+          ]
+        },
+        "maxConnIdleTime": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.max_conn_idle_time"
+            }
+          ]
+        },
+        "maxConns": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.max_conns"
+            }
+          ]
+        },
+        "minConns": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.min_conns"
+            }
+          ]
+        },
+        "minIdleConns": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.min_idle_conns"
+            }
+          ]
+        },
+        "defaultQueryExecMode": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.default_query_exec_mode"
+            }
+          ]
+        },
+        "descriptionCacheCapacity": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.description_cache_capacity"
+            }
+          ]
+        },
+        "statementCacheCapacity": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.statement_cache_capacity"
+            }
+          ]
+        }
+      },
+      "type": "object",
+      "description": "* PostgreSQL-specific pool and connection configuration"
+    },
+    ".stroppy.DriverConfig.PostgresConfig.default_query_exec_mode": {
+      "type": "string",
+      "description": "* Query execution mode: exec, cache_statement, cache_describe,\n describe_exec, simple_protocol"
+    },
+    ".stroppy.DriverConfig.PostgresConfig.description_cache_capacity": {
+      "type": "integer",
+      "description": "* Description cache capacity (only with cache_describe mode)"
+    },
+    ".stroppy.DriverConfig.PostgresConfig.max_conn_idle_time": {
+      "type": "string",
+      "description": "* Max connection idle time (Go duration string, e.g. \"10m\")"
+    },
+    ".stroppy.DriverConfig.PostgresConfig.max_conn_lifetime": {
+      "type": "string",
+      "description": "* Max connection lifetime (Go duration string, e.g. \"1h\")"
+    },
+    ".stroppy.DriverConfig.PostgresConfig.max_conns": {
+      "type": "integer",
+      "description": "* Maximum number of connections in the pool"
+    },
+    ".stroppy.DriverConfig.PostgresConfig.min_conns": {
+      "type": "integer",
+      "description": "* Minimum number of connections in the pool"
+    },
+    ".stroppy.DriverConfig.PostgresConfig.min_idle_conns": {
+      "type": "integer",
+      "description": "* Minimum number of idle connections"
+    },
+    ".stroppy.DriverConfig.PostgresConfig.statement_cache_capacity": {
+      "type": "integer",
+      "description": "* Statement cache capacity (only with cache_statement mode)"
+    },
+    ".stroppy.DriverConfig.PostgresConfig.trace_log_level": {
+      "type": "string",
+      "description": "* pgx trace log level: debug, info, warn, error"
+    },
+    ".stroppy.DriverConfig.SqlConfig": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "maxOpenConns"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "maxOpenConns"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "maxIdleConns"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "maxIdleConns"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "connMaxLifetime"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "connMaxLifetime"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "connMaxIdleTime"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "connMaxIdleTime"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "maxOpenConns": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.SqlConfig.max_open_conns"
+            }
+          ]
+        },
+        "maxIdleConns": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.SqlConfig.max_idle_conns"
+            }
+          ]
+        },
+        "connMaxLifetime": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.SqlConfig.conn_max_lifetime"
+            }
+          ]
+        },
+        "connMaxIdleTime": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.SqlConfig.conn_max_idle_time"
+            }
+          ]
+        }
+      },
+      "type": "object",
+      "description": "* Generic database/sql pool settings for SQL-based drivers"
+    },
+    ".stroppy.DriverConfig.SqlConfig.conn_max_idle_time": {
+      "type": "string",
+      "description": "* Maximum idle connection time (Go duration string, e.g. \"10m\")"
+    },
+    ".stroppy.DriverConfig.SqlConfig.conn_max_lifetime": {
+      "type": "string",
+      "description": "* Maximum connection lifetime (Go duration string, e.g. \"1h\")"
+    },
+    ".stroppy.DriverConfig.SqlConfig.max_idle_conns": {
+      "type": "integer",
+      "description": "* Maximum number of idle connections"
+    },
+    ".stroppy.DriverConfig.SqlConfig.max_open_conns": {
+      "type": "integer",
+      "description": "* Maximum number of open connections"
+    },
     ".stroppy.DriverRunConfig": {
       "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "driverType"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "driverType"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "url"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "url"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
         {
           "oneOf": [
             {
@@ -17,6 +515,26 @@
                   {
                     "required": [
                       "pool"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "errorMode"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "errorMode"
                     ]
                   }
                 ]
@@ -143,14 +661,108 @@
               }
             }
           ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "defaultTxIsolation"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "defaultTxIsolation"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "defaultInsertMethod"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "defaultInsertMethod"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "postgres"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "postgres"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "sql"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "sql"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
         }
       ],
       "properties": {
         "driverType": {
-          "$ref": "#/$defs/.stroppy.DriverRunConfig.driver_type"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.driver_type"
+            }
+          ]
         },
         "url": {
-          "$ref": "#/$defs/.stroppy.DriverRunConfig.url"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.url"
+            }
+          ]
         },
         "pool": {
           "oneOf": [
@@ -163,7 +775,14 @@
           ]
         },
         "errorMode": {
-          "$ref": "#/$defs/.stroppy.DriverRunConfig.error_mode"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.error_mode"
+            }
+          ]
         },
         "bulkSize": {
           "oneOf": [
@@ -226,16 +845,47 @@
           ]
         },
         "defaultTxIsolation": {
-          "$ref": "#/$defs/.stroppy.DriverRunConfig.default_tx_isolation"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.default_tx_isolation"
+            }
+          ]
+        },
+        "defaultInsertMethod": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.default_insert_method"
+            }
+          ]
+        },
+        "postgres": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.postgres"
+            }
+          ]
+        },
+        "sql": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.sql"
+            }
+          ]
         }
       },
       "type": "object",
-      "required": [
-        "driverType",
-        "url",
-        "errorMode",
-        "defaultTxIsolation"
-      ],
       "description": "*\n DriverRunConfig is the user-facing driver configuration for the stroppy config file.\n It mirrors the TypeScript DriverSetup interface so that protojson serialization\n (camelCase field names, string values) is directly readable by declareDriverSetup()\n in the TypeScript layer via the STROPPY_DRIVER_N environment variable.\n\n This is intentionally separate from DriverConfig (the runtime binary proto for TS-\u003eGo dispatch)."
     },
     ".stroppy.DriverRunConfig.PoolConfig": {
@@ -697,13 +1347,17 @@
       "type": "string",
       "description": "* Path to CA certificate PEM file. Matches TS DriverSetup.caCertFile."
     },
+    ".stroppy.DriverRunConfig.default_insert_method": {
+      "type": "string",
+      "description": "*\n Driver-level insert method. One of: \"plain_query\", \"plain_bulk\", \"native\".\n Matches TS DriverSetup.defaultInsertMethod."
+    },
     ".stroppy.DriverRunConfig.default_tx_isolation": {
       "type": "string",
-      "description": "*\n Default transaction isolation level.\n One of: \"read_uncommitted\", \"read_committed\", \"repeatable_read\", \"serializable\".\n Matches TS DriverSetup.defaultTxIsolation."
+      "description": "*\n Default transaction isolation level.\n One of: \"read_uncommitted\", \"read_committed\", \"repeatable_read\",\n \"serializable\", \"db_default\", \"conn\", \"none\".\n Matches TS DriverSetup.defaultTxIsolation."
     },
     ".stroppy.DriverRunConfig.driver_type": {
       "type": "string",
-      "description": "*\n Driver type. One of: \"postgres\", \"mysql\", \"picodata\", \"ydb\", \"noop\".\n Matches TS DriverSetup.driverType (string union, not proto enum)."
+      "description": "*\n Driver type. One of: \"postgres\", \"mysql\", \"picodata\", \"ydb\", \"noop\", \"csv\".\n Matches TS DriverSetup.driverType (string union, not proto enum)."
     },
     ".stroppy.DriverRunConfig.error_mode": {
       "type": "string",
@@ -711,6 +1365,14 @@
     },
     ".stroppy.DriverRunConfig.pool": {
       "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig"
+    },
+    ".stroppy.DriverRunConfig.postgres": {
+      "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig",
+      "description": "*\n PostgreSQL-specific pool config. Matches TS DriverSetup.postgres.\n Takes priority over pool when both are set."
+    },
+    ".stroppy.DriverRunConfig.sql": {
+      "$ref": "#/$defs/.stroppy.DriverConfig.SqlConfig",
+      "description": "*\n Generic database/sql pool config. Matches TS DriverSetup.sql.\n Takes priority over pool when both are set."
     },
     ".stroppy.DriverRunConfig.tls_insecure_skip_verify": {
       "type": "boolean",
@@ -1175,7 +1837,7 @@
         "version",
         "global"
       ],
-      "description": "*\n RunConfig is the top-level stroppy config file schema.\n\n Default file: ./stroppy-config.json (auto-discovered by stroppy run and stroppy probe).\n Override with -f/--file flag.\n\n Precedence (highest to lowest):\n   real env \u003e -e flags \u003e this file \u003e -d/-D presets \u003e script defaults\n\n Example (stroppy-config.json):\n   {\n     \"version\": \"1\",\n     \"script\": \"tpcc\",\n     \"global\": {\n       \"logger\": { \"logLevel\": \"LOG_LEVEL_INFO\" }\n     },\n     \"drivers\": {\n       \"0\": { \"driverType\": \"postgres\", \"url\": \"postgres://user:pass@db:5432/bench\",\n               \"pool\": { \"maxConns\": 200 } }\n     },\n     \"env\": { \"WAREHOUSES\": \"10\" },\n     \"k6Args\": [\"--vus\", \"10\", \"--duration\", \"30m\"]\n   }"
+      "description": "*\n RunConfig is the top-level stroppy config file schema.\n\n Default file: ./stroppy-config.json (auto-discovered by stroppy run and stroppy probe).\n Override with -f/--file flag.\n\n Precedence (highest to lowest):\n   real env \u003e -e flags \u003e this file \u003e -d/-D presets \u003e script defaults\n\n Example (stroppy-config.json):\n   {\n     \"version\": \"1\",\n     \"script\": \"tpcc\",\n     \"global\": {\n       \"logger\": { \"logLevel\": \"LOG_LEVEL_INFO\" }\n     },\n     \"drivers\": {\n       \"0\": { \"driverType\": \"postgres\", \"url\": \"postgres://user:pass@db:5432/bench\",\n               \"defaultInsertMethod\": \"native\", \"pool\": { \"maxConns\": 200 } }\n     },\n     \"env\": { \"WAREHOUSES\": \"10\" },\n     \"k6Args\": [\"--vus\", \"10\", \"--duration\", \"30m\"]\n   }"
     },
     ".stroppy.RunConfig.drivers": {
       "additionalProperties": {

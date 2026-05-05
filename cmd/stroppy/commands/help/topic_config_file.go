@@ -38,6 +38,7 @@ Example stroppy-config.json:
       "0": {
         "driverType": "postgres",
         "url": "postgres://user:pass@db:5432/bench",
+        "defaultInsertMethod": "native",
         "pool": { "maxConns": 200, "minConns": 200 }
       }
     },

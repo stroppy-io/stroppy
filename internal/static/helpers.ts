@@ -320,10 +320,22 @@ export class TxX implements QueryAPI {
 
 /** Unified pool configuration sugar. Mapped to postgres:{} or sql:{} by driverType. */
 export interface PoolConfig {
+  // Shared aliases used by workload defaults and CLI examples.
   maxConns?: number;
   minConns?: number;
   maxConnLifetime?: string;
   maxConnIdleTime?: string;
+  // pgx / postgres pool fields.
+  minIdleConns?: number;
+  traceLogLevel?: string;
+  defaultQueryExecMode?: string;
+  descriptionCacheCapacity?: number;
+  statementCacheCapacity?: number;
+  // database/sql pool fields.
+  maxOpenConns?: number;
+  maxIdleConns?: number;
+  connMaxLifetime?: string;
+  connMaxIdleTime?: string;
 }
 
 export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode" | "driverType" | "driverSpecific"> & {
@@ -360,7 +372,21 @@ const driverSetupKeys = new Set([
 ]);
 
 const nestedDriverSetupKeys: Record<string, Set<string>> = {
-  pool: new Set(["maxConns", "minConns", "maxConnLifetime", "maxConnIdleTime"]),
+  pool: new Set([
+    "maxConns",
+    "minConns",
+    "maxConnLifetime",
+    "maxConnIdleTime",
+    "minIdleConns",
+    "traceLogLevel",
+    "defaultQueryExecMode",
+    "descriptionCacheCapacity",
+    "statementCacheCapacity",
+    "maxOpenConns",
+    "maxIdleConns",
+    "connMaxLifetime",
+    "connMaxIdleTime",
+  ]),
   postgres: new Set([
     "traceLogLevel",
     "maxConnLifetime",
@@ -457,10 +483,10 @@ function resolvePoolConfig(config: DriverSetup): {
   if (driverType === "mysql" || driverType === "ydb") {
     return {
       sql: {
-        maxOpenConns: p.maxConns,
-        maxIdleConns: p.minConns,
-        connMaxLifetime: p.maxConnLifetime,
-        connMaxIdleTime: p.maxConnIdleTime,
+        maxOpenConns: p.maxOpenConns ?? p.maxConns,
+        maxIdleConns: p.maxIdleConns ?? p.minConns,
+        connMaxLifetime: p.connMaxLifetime ?? p.maxConnLifetime,
+        connMaxIdleTime: p.connMaxIdleTime ?? p.maxConnIdleTime,
       },
     };
   }
@@ -470,8 +496,13 @@ function resolvePoolConfig(config: DriverSetup): {
     postgres: {
       maxConns: p.maxConns,
       minConns: p.minConns,
+      minIdleConns: p.minIdleConns,
       maxConnLifetime: p.maxConnLifetime,
       maxConnIdleTime: p.maxConnIdleTime,
+      traceLogLevel: p.traceLogLevel,
+      defaultQueryExecMode: p.defaultQueryExecMode,
+      descriptionCacheCapacity: p.descriptionCacheCapacity,
+      statementCacheCapacity: p.statementCacheCapacity,
     },
   };
 }

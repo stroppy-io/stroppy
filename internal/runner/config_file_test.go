@@ -94,7 +94,10 @@ func TestLoadRunConfig_DriverConfig(t *testing.T) {
             "0": {
                 "driverType": "postgres",
                 "url": "postgres://user:pass@localhost:5432/bench",
-                "pool": { "maxConns": 200, "minConns": 10 }
+                "defaultInsertMethod": "native",
+                "pool": { "maxConns": 200, "minConns": 10, "minIdleConns": 5 },
+                "postgres": { "statementCacheCapacity": 128 },
+                "sql": { "maxOpenConns": 12 }
             }
         }
     }`
@@ -112,6 +115,11 @@ func TestLoadRunConfig_DriverConfig(t *testing.T) {
 
 	drv := cfg.Drivers[0]
 	require.NotNil(t, drv)
-	assert.Equal(t, "postgres", drv.DriverType)
+	assert.Equal(t, "postgres", drv.GetDriverType())
+	assert.Equal(t, "postgres://user:pass@localhost:5432/bench", drv.GetUrl())
 	assert.Equal(t, int32(200), drv.Pool.GetMaxConns())
+	assert.Equal(t, "native", drv.GetDefaultInsertMethod())
+	assert.Equal(t, int32(5), drv.Pool.GetMinIdleConns())
+	assert.Equal(t, int32(128), drv.Postgres.GetStatementCacheCapacity())
+	assert.Equal(t, int32(12), drv.Sql.GetMaxOpenConns())
 }
