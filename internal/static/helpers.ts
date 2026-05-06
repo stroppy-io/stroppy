@@ -508,7 +508,7 @@ function resolvePoolConfig(config: DriverSetup): {
 }
 
 // For Go probe spy function
-declare function DeclareDriverSetup(index: number, defaults: DriverSetup): DriverSetup;
+declare function DeclareDriverSetup(index: number, setup: DriverSetup): DriverSetup;
 
 /**
  * Declare a driver setup with defaults, optionally overridden by CLI via STROPPY_DRIVER_N env.
@@ -517,26 +517,29 @@ declare function DeclareDriverSetup(index: number, defaults: DriverSetup): Drive
  * @param defaults Script-defined default configuration
  */
 export function declareDriverSetup(index: number, defaults: DriverSetup): DriverSetup {
-  // Notify probe spy if present (set by Go VM during probe)
-  if (typeof DeclareDriverSetup !== 'undefined') {
-    DeclareDriverSetup(index, defaults);
-  }
   const envKey = `STROPPY_DRIVER_${index}`;
   const raw = __ENV[envKey];
-  if (!raw || raw === "") return defaults;
+  let setup = defaults;
 
-  let cli: unknown;
-  try {
-    cli = JSON.parse(raw);
-  } catch (e) {
-    throw new Error(`[stroppy] failed to parse ${envKey}: ${e}`);
+  if (raw && raw !== "") {
+    let cli: unknown;
+    try {
+      cli = JSON.parse(raw);
+    } catch (e) {
+      throw new Error(`[stroppy] failed to parse ${envKey}: ${e}`);
+    }
+
+    validateDriverSetup(envKey, cli);
+    setup = mergeDriverSetup(defaults, cli);
+    validateDriverSetup(`${envKey} merged`, setup);
   }
 
-  validateDriverSetup(envKey, cli);
-  const merged = mergeDriverSetup(defaults, cli);
-  validateDriverSetup(`${envKey} merged`, merged);
+  // Notify probe spy if present (set by Go VM during probe)
+  if (typeof DeclareDriverSetup !== 'undefined') {
+    DeclareDriverSetup(index, setup);
+  }
 
-  return merged;
+  return setup;
 }
 
 export class DriverX implements QueryAPI {

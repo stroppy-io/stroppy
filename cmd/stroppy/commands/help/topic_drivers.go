@@ -121,7 +121,7 @@ HOW IT WORKS
 
   3. The merged config is then passed to the driver constructor.
 
-  To inspect what a script declares before running it:
+  To inspect the driver setup a script will use before running it:
 
     stroppy probe <script> --drivers
 
@@ -161,7 +161,7 @@ EXAMPLES
   # Pre-set env takes precedence over CLI flags
   STROPPY_DRIVER_0='{"url":"postgres://staging:5432"}' stroppy run tpcc/procs -d pg
 
-  # Inspect script driver defaults
+  # Inspect script driver setup
   stroppy probe tpcc/procs --drivers
 
 SEE ALSO

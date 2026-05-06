@@ -17,9 +17,19 @@ func Script(scriptPath string) (*runner.Probeprint, error) {
 	return runner.ProbeScript(scriptPath)
 }
 
+// ScriptWithEnv works as Script with a pre-populated mocked __ENV object.
+func ScriptWithEnv(scriptPath string, env map[string]string) (*runner.Probeprint, error) {
+	return runner.ProbeScriptWithEnv(scriptPath, env)
+}
+
 // ScriptInTmp works as [Script], but don't requires working directory.
 // sqlPath might be empty "".
 func ScriptInTmp(scriptPath, sqlPath string) (*runner.Probeprint, error) {
+	return ScriptInTmpWithEnv(scriptPath, sqlPath, nil)
+}
+
+// ScriptInTmpWithEnv works as ScriptInTmp with a pre-populated mocked __ENV object.
+func ScriptInTmpWithEnv(scriptPath, sqlPath string, env map[string]string) (*runner.Probeprint, error) {
 	input, err := runner.ResolveInput(scriptPath, sqlPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve input: %w", err)
@@ -31,5 +41,5 @@ func ScriptInTmp(scriptPath, sqlPath string) (*runner.Probeprint, error) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	return runner.ProbeScript(filepath.Join(tempDir, input.Script.Name))
+	return runner.ProbeScriptWithEnv(filepath.Join(tempDir, input.Script.Name), env)
 }

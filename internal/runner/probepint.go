@@ -31,9 +31,11 @@ type EnvDeclaration struct {
 	Description string   `json:"description,omitempty"`
 }
 
-// DriverSetupDecl captures a declareDriverSetup(index, defaults) call from the script.
+// DriverSetupDecl captures a declareDriverSetup(index, setup) call from the script.
 type DriverSetupDecl struct {
-	Index    int            `json:"index"`
+	Index int `json:"index"`
+	// Defaults is the legacy JSON field name. The value is the effective setup
+	// after __ENV.STROPPY_DRIVER_N overrides have been merged.
 	Defaults map[string]any `json:"defaults"`
 }
 
@@ -58,7 +60,7 @@ type Subprobe struct {
 	// Serialized via protojson in Probeprint.MarshalJSON.
 	Drivers []*stroppy.DriverConfig `json:"-"`
 
-	// DriverSetups captures declareDriverSetup() calls — human-readable driver defaults from the script.
+	// DriverSetups captures declareDriverSetup() calls — human-readable effective driver setups.
 	DriverSetups []DriverSetupDecl `json:"driver_setups"`
 }
 

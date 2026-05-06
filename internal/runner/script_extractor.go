@@ -84,6 +84,11 @@ func TranspileTypeScript(entryPath string) (string, error) {
 // TODO: Drop the workdir requirement.
 // Refactor the transpilation to put workdir scripts at the transpilation phase directly to a user script.
 func ProbeScript(scriptPath string) (*Probeprint, error) {
+	return ProbeScriptWithEnv(scriptPath, nil)
+}
+
+// ProbeScriptWithEnv is ProbeScript with a pre-populated __ENV object.
+func ProbeScriptWithEnv(scriptPath string, env map[string]string) (*Probeprint, error) {
 	jsCode, err := TranspileTypeScript(scriptPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transpile TypeScript: %w", err)
@@ -91,7 +96,7 @@ func ProbeScript(scriptPath string) (*Probeprint, error) {
 
 	vm := createVM()
 
-	probeprint, err := ProbeJSTest(vm, jsCode)
+	probeprint, err := ProbeJSTestWithEnv(vm, jsCode, env)
 	if err != nil {
 		return nil, err // TODO: wrap
 	}
@@ -108,6 +113,10 @@ var reEncodingObjectImport = regexp.MustCompile(`import\s+(\w+)\s+from\s+["']k6/
 var reK6BareImport = regexp.MustCompile(`import\s*\{([^}]+)\}\s*from\s*["']k6["'];?`)
 
 func ProbeJSTest(vm *js.Runtime, jsCode string) (*Probeprint, error) {
+	return ProbeJSTestWithEnv(vm, jsCode, nil)
+}
+
+func ProbeJSTestWithEnv(vm *js.Runtime, jsCode string, env map[string]string) (*Probeprint, error) {
 	// Mock k6/x/encoding import
 	// This is needed because the extraction VM doesn't have the k6/x/encoding module.
 	// We replace the import with a const that exposes the polyfilled TextEncoder/TextDecoder.
@@ -141,7 +150,7 @@ func ProbeJSTest(vm *js.Runtime, jsCode string) (*Probeprint, error) {
 	})
 
 	probeprint := &Probeprint{}
-	if err := prepareVMEnvironment(vm, probeprint); err != nil {
+	if err := prepareVMEnvironment(vm, probeprint, env); err != nil {
 		return nil, fmt.Errorf("failed to prepare VM environment: %w", err)
 	}
 
@@ -389,7 +398,7 @@ func (m Mocks) Set(vm *js.Runtime) error {
 }
 
 // prepareVMEnvironment sets up all mocks, polyfills, and globals needed for script execution.
-func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
+func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint, env map[string]string) error {
 	if err := injectEncoderPolyfill(vm); err != nil {
 		return fmt.Errorf("failed to inject encoder polyfill: %w", err)
 	}
@@ -405,9 +414,16 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint) error {
 		return &driverStub{drivers: &probeprint.Drivers}
 	}
 
+	envObject := vm.NewObject()
+	for key, value := range env {
+		if err := envObject.Set(key, value); err != nil {
+			return fmt.Errorf("failed to set __ENV.%s: %w", key, err)
+		}
+	}
+
 	if err := (Mocks{
 		// k6 mocks
-		{"__ENV", spyProxyObject(vm, vm.NewObject(), &probeprint.Envs)},
+		{"__ENV", spyProxyObject(vm, envObject, &probeprint.Envs)},
 		{"open", func(string) string { return "" }},
 		{"console", consoleMock(vm)},
 		// k6/metrics
@@ -588,7 +604,7 @@ func spyProxyObject(
 			) (value js.Value) {
 				*accessedProperties = append(*accessedProperties, property)
 
-				return js.Undefined()
+				return obj.Get(property)
 			},
 		},
 	)

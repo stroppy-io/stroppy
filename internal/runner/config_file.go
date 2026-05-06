@@ -78,3 +78,54 @@ func LoadRunConfig(path string) (*stroppy.RunConfig, bool, error) {
 
 	return cfg, true, nil
 }
+
+// BuildProbeEnvFromRunConfig returns the config-derived environment that probe
+// should expose through the mocked __ENV object before the script is executed.
+func BuildProbeEnvFromRunConfig(cfg *stroppy.RunConfig) (map[string]string, error) {
+	if cfg == nil {
+		return map[string]string{}, nil
+	}
+
+	env := make(map[string]string)
+
+	for _, entry := range BuildFileEnvLookup(cfg.GetEnv()) {
+		addEnvEntry(env, entry)
+	}
+
+	driverEnvs, err := fileDriverRunConfigsToEnvVars(cfg.GetDrivers(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range driverEnvs {
+		addEnvEntry(env, entry)
+	}
+
+	for key := range cfg.GetEnv() {
+		if value, ok := os.LookupEnv(key); ok {
+			env[key] = value
+		}
+	}
+
+	for idx := range cfg.GetDrivers() {
+		key := fmt.Sprintf("STROPPY_DRIVER_%d", idx)
+		if value, ok := os.LookupEnv(key); ok {
+			env[key] = value
+		}
+	}
+
+	if len(env) == 0 {
+		return map[string]string{}, nil
+	}
+
+	return env, nil
+}
+
+func addEnvEntry(env map[string]string, entry string) {
+	key, value, ok := strings.Cut(entry, "=")
+	if !ok || key == "" {
+		return
+	}
+
+	env[key] = value
+}

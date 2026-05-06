@@ -94,12 +94,17 @@ to filter output. See 'stroppy help probe' for section descriptions.
 					)
 				}
 
+				probeEnv, err := runner.BuildProbeEnvFromRunConfig(fileConfig)
+				if err != nil {
+					return fmt.Errorf("failed to build probe env from config file: %w", err)
+				}
+
 				var probeprint *runner.Probeprint
 
 				if localFlagValue {
-					probeprint, err = runner.ProbeScript(scriptPath)
+					probeprint, err = runner.ProbeScriptWithEnv(scriptPath, probeEnv)
 				} else {
-					probeprint, err = probe.ScriptInTmp(scriptPath, sqlPath)
+					probeprint, err = probe.ScriptInTmpWithEnv(scriptPath, sqlPath, probeEnv)
 				}
 
 				if err != nil {

@@ -9,13 +9,13 @@ func init() {
   stroppy probe runs a TypeScript benchmark script inside a mocked k6
   environment without connecting to any real database. It extracts metadata
   declared by the script — configuration, k6 options, SQL structure, steps,
-  environment variables, and driver defaults — and prints them for inspection.
+  environment variables, and driver setup — and prints them for inspection.
 
   Use probe to:
     - Verify a script is syntactically and structurally valid before a run
     - Understand what SQL sections and queries the script requires
     - Check which environment variables the script reads
-    - Review the driver setup defaults declared in the script
+    - Review the driver setup declared in the script, including config-file overrides
 
 SECTIONS
 
@@ -65,9 +65,10 @@ SECTIONS
 
   Drivers (--drivers)
 
-    Shows the driver default configuration declared in the script via
-    declareDriverSetup(index, defaults). This is the script's starting point
-    before any CLI overrides (-d, -D) are applied.
+    Shows the effective driver configuration returned by
+    declareDriverSetup(index, defaults). With -f, config-file drivers are
+    exposed to the probe VM through STROPPY_DRIVER_N before the script loads.
+    Without overrides this is the script's declared default.
 
     See 'stroppy help drivers' for how presets and CLI overrides work.
 
@@ -101,8 +102,10 @@ CONFIG FILE (-f)
 
   Pass -f to load a config file when probing. The Config section then shows
   the file's global settings (logger, OTEL exporter) instead of the empty
-  default. The effective script and SQL are also resolved from the file when
-  not provided as positional arguments:
+  default. File env and driver settings are applied while probing, so
+  driver-dependent script branches match the effective run configuration.
+  The effective script and SQL are also resolved from the file when not
+  provided as positional arguments:
 
     stroppy probe -f stroppy-config.json          # script from file
     stroppy probe -f stroppy-config.json tpcc/procs     # script overrides file
@@ -133,10 +136,10 @@ EXAMPLES
   # Show SQL structure and steps together
   stroppy probe workloads/tpcc/procs.ts --sql --steps
 
-  # Show driver defaults
+  # Show driver setup
   stroppy probe workloads/tpcc/procs --drivers
 
-  # Probe TPC-H's SQL sections, envs, and driver defaults
+  # Probe TPC-H's SQL sections, envs, and driver setup
   stroppy probe tpch/tx --sql --envs --drivers
 
   # Machine-readable JSON output

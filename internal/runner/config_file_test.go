@@ -7,8 +7,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 func TestLoadRunConfig_ExplicitPath(t *testing.T) {
@@ -122,4 +124,32 @@ func TestLoadRunConfig_DriverConfig(t *testing.T) {
 	assert.Equal(t, int32(5), drv.Pool.GetMinIdleConns())
 	assert.Equal(t, int32(128), drv.Postgres.GetStatementCacheCapacity())
 	assert.Equal(t, int32(12), drv.Sql.GetMaxOpenConns())
+}
+
+func TestBuildProbeEnvFromRunConfigIncludesFileDriver(t *testing.T) {
+	cfg := &stroppy.RunConfig{
+		Env: map[string]string{"WAREHOUSES": "10"},
+		Drivers: map[uint32]*stroppy.DriverRunConfig{
+			0: {
+				DriverType:          proto.String("ydb"),
+				Url:                 proto.String("grpc://localhost:2136/local"),
+				DefaultInsertMethod: proto.String("native"),
+				DefaultTxIsolation:  proto.String("repeatable_read"),
+				Pool: &stroppy.DriverRunConfig_PoolConfig{
+					MaxOpenConns: proto.Int32(7),
+				},
+			},
+		},
+	}
+
+	env, err := runner.BuildProbeEnvFromRunConfig(cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "10", env["WAREHOUSES"])
+	assert.JSONEq(t, `{
+		"driverType": "ydb",
+		"url": "grpc://localhost:2136/local",
+		"defaultInsertMethod": "native",
+		"defaultTxIsolation": "repeatable_read",
+		"pool": { "maxOpenConns": 7 }
+	}`, env["STROPPY_DRIVER_0"])
 }
