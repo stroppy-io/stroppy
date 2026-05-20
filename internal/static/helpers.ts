@@ -863,6 +863,7 @@ function isYDBTransientTxErrorMessage(msg: string): boolean {
       || /code\s*=\s*400050/i.test(msg)
       || /code\s*=\s*400060/i.test(msg)
       || /code\s*=\s*400100/i.test(msg)
+      || /WRONG_SHARD_STATE/i.test(msg)
       || /wrong[\s_]shard[\s_]state/i.test(msg)
       || /Transaction locks invalidated/i.test(msg);
 }
