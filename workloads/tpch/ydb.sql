@@ -13,16 +13,17 @@
 --
 -- Query rewrites vs pg.sql (permissible per spec §2.2.3.3):
 --   - Comma-joins → CROSS JOIN (§2.2.3.3 (q)).
---   - Correlated subqueries decorrelated into named $subqueries (§(m)/(q)).
---     Affected queries: q2, q4, q15, q17, q20, q21, q22.
+--   - Correlated/scalar subqueries decorrelated into named $subqueries (§(m)/(q)).
+--     Affected queries: q2, q4, q11, q15, q17, q20, q21, q22.
 --   - extract(year FROM ...) → DateTime::GetYear(DateTime::Split(...)).
 --   - substring(x FROM a FOR b) → Substring(CAST(x AS String), a-1, b).
 --
+-- Q11/Q15/Q22 lift scalar aggregate subqueries into named subqueries.
 -- Q15 lifts the spec CTE to a YQL named subquery `$revenue = (SELECT ...);`
 -- Q17/Q20 precompute the spec per-part thresholds via JOIN-on-aggregate.
 -- Q21 decorrelates the two correlated EXISTS subqueries into $multi and
 -- $late_per_order sets.
--- Q22 rewrites the NOT EXISTS correlated subquery as NOT IN on orders.o_custkey.
+-- Q22 rewrites the NOT EXISTS correlated subquery as LEFT ONLY JOIN orders.
 
 --+ drop_schema
 --= drop_lineitem
@@ -146,13 +147,14 @@ SELECT 1
 
 --+ finalize_totals
 -- Spec §4.2.3 o_totalprice = Σ l_extendedprice × (1 + l_tax) × (1 - l_discount).
--- YDB's UPDATE supports a correlated scalar subquery. Use UPSERT-style
--- SET with a CTE lifted into a named subquery so the planner can batch.
---= update_totalprice
+-- YDB's UPDATE supports UPSERT-style UPDATE ... ON. Split into disjoint
+-- key-modulo batches so SF=1 does not exceed DQ channel/buffer limits.
+--= update_totalprice_0
 $per_order = (
     SELECT l_orderkey,
            SUM(l_extendedprice * (1.0 + l_tax) * (1.0 - l_discount)) AS tot
     FROM   lineitem
+    WHERE  l_orderkey % 8 = 0
     GROUP  BY l_orderkey
 );
 UPDATE orders ON
@@ -167,6 +169,161 @@ SELECT o.o_orderkey AS o_orderkey,
        o.o_comment AS o_comment
 FROM   orders AS o
        LEFT JOIN $per_order AS p ON p.l_orderkey = o.o_orderkey
+WHERE  o.o_orderkey % 8 = 0
+
+--= update_totalprice_1
+$per_order = (
+    SELECT l_orderkey,
+           SUM(l_extendedprice * (1.0 + l_tax) * (1.0 - l_discount)) AS tot
+    FROM   lineitem
+    WHERE  l_orderkey % 8 = 1
+    GROUP  BY l_orderkey
+);
+UPDATE orders ON
+SELECT o.o_orderkey AS o_orderkey,
+       o.o_custkey AS o_custkey,
+       o.o_orderstatus AS o_orderstatus,
+       COALESCE(p.tot, 0.0) AS o_totalprice,
+       o.o_orderdate AS o_orderdate,
+       o.o_orderpriority AS o_orderpriority,
+       o.o_clerk AS o_clerk,
+       o.o_shippriority AS o_shippriority,
+       o.o_comment AS o_comment
+FROM   orders AS o
+       LEFT JOIN $per_order AS p ON p.l_orderkey = o.o_orderkey
+WHERE  o.o_orderkey % 8 = 1
+
+--= update_totalprice_2
+$per_order = (
+    SELECT l_orderkey,
+           SUM(l_extendedprice * (1.0 + l_tax) * (1.0 - l_discount)) AS tot
+    FROM   lineitem
+    WHERE  l_orderkey % 8 = 2
+    GROUP  BY l_orderkey
+);
+UPDATE orders ON
+SELECT o.o_orderkey AS o_orderkey,
+       o.o_custkey AS o_custkey,
+       o.o_orderstatus AS o_orderstatus,
+       COALESCE(p.tot, 0.0) AS o_totalprice,
+       o.o_orderdate AS o_orderdate,
+       o.o_orderpriority AS o_orderpriority,
+       o.o_clerk AS o_clerk,
+       o.o_shippriority AS o_shippriority,
+       o.o_comment AS o_comment
+FROM   orders AS o
+       LEFT JOIN $per_order AS p ON p.l_orderkey = o.o_orderkey
+WHERE  o.o_orderkey % 8 = 2
+
+--= update_totalprice_3
+$per_order = (
+    SELECT l_orderkey,
+           SUM(l_extendedprice * (1.0 + l_tax) * (1.0 - l_discount)) AS tot
+    FROM   lineitem
+    WHERE  l_orderkey % 8 = 3
+    GROUP  BY l_orderkey
+);
+UPDATE orders ON
+SELECT o.o_orderkey AS o_orderkey,
+       o.o_custkey AS o_custkey,
+       o.o_orderstatus AS o_orderstatus,
+       COALESCE(p.tot, 0.0) AS o_totalprice,
+       o.o_orderdate AS o_orderdate,
+       o.o_orderpriority AS o_orderpriority,
+       o.o_clerk AS o_clerk,
+       o.o_shippriority AS o_shippriority,
+       o.o_comment AS o_comment
+FROM   orders AS o
+       LEFT JOIN $per_order AS p ON p.l_orderkey = o.o_orderkey
+WHERE  o.o_orderkey % 8 = 3
+
+--= update_totalprice_4
+$per_order = (
+    SELECT l_orderkey,
+           SUM(l_extendedprice * (1.0 + l_tax) * (1.0 - l_discount)) AS tot
+    FROM   lineitem
+    WHERE  l_orderkey % 8 = 4
+    GROUP  BY l_orderkey
+);
+UPDATE orders ON
+SELECT o.o_orderkey AS o_orderkey,
+       o.o_custkey AS o_custkey,
+       o.o_orderstatus AS o_orderstatus,
+       COALESCE(p.tot, 0.0) AS o_totalprice,
+       o.o_orderdate AS o_orderdate,
+       o.o_orderpriority AS o_orderpriority,
+       o.o_clerk AS o_clerk,
+       o.o_shippriority AS o_shippriority,
+       o.o_comment AS o_comment
+FROM   orders AS o
+       LEFT JOIN $per_order AS p ON p.l_orderkey = o.o_orderkey
+WHERE  o.o_orderkey % 8 = 4
+
+--= update_totalprice_5
+$per_order = (
+    SELECT l_orderkey,
+           SUM(l_extendedprice * (1.0 + l_tax) * (1.0 - l_discount)) AS tot
+    FROM   lineitem
+    WHERE  l_orderkey % 8 = 5
+    GROUP  BY l_orderkey
+);
+UPDATE orders ON
+SELECT o.o_orderkey AS o_orderkey,
+       o.o_custkey AS o_custkey,
+       o.o_orderstatus AS o_orderstatus,
+       COALESCE(p.tot, 0.0) AS o_totalprice,
+       o.o_orderdate AS o_orderdate,
+       o.o_orderpriority AS o_orderpriority,
+       o.o_clerk AS o_clerk,
+       o.o_shippriority AS o_shippriority,
+       o.o_comment AS o_comment
+FROM   orders AS o
+       LEFT JOIN $per_order AS p ON p.l_orderkey = o.o_orderkey
+WHERE  o.o_orderkey % 8 = 5
+
+--= update_totalprice_6
+$per_order = (
+    SELECT l_orderkey,
+           SUM(l_extendedprice * (1.0 + l_tax) * (1.0 - l_discount)) AS tot
+    FROM   lineitem
+    WHERE  l_orderkey % 8 = 6
+    GROUP  BY l_orderkey
+);
+UPDATE orders ON
+SELECT o.o_orderkey AS o_orderkey,
+       o.o_custkey AS o_custkey,
+       o.o_orderstatus AS o_orderstatus,
+       COALESCE(p.tot, 0.0) AS o_totalprice,
+       o.o_orderdate AS o_orderdate,
+       o.o_orderpriority AS o_orderpriority,
+       o.o_clerk AS o_clerk,
+       o.o_shippriority AS o_shippriority,
+       o.o_comment AS o_comment
+FROM   orders AS o
+       LEFT JOIN $per_order AS p ON p.l_orderkey = o.o_orderkey
+WHERE  o.o_orderkey % 8 = 6
+
+--= update_totalprice_7
+$per_order = (
+    SELECT l_orderkey,
+           SUM(l_extendedprice * (1.0 + l_tax) * (1.0 - l_discount)) AS tot
+    FROM   lineitem
+    WHERE  l_orderkey % 8 = 7
+    GROUP  BY l_orderkey
+);
+UPDATE orders ON
+SELECT o.o_orderkey AS o_orderkey,
+       o.o_custkey AS o_custkey,
+       o.o_orderstatus AS o_orderstatus,
+       COALESCE(p.tot, 0.0) AS o_totalprice,
+       o.o_orderdate AS o_orderdate,
+       o.o_orderpriority AS o_orderpriority,
+       o.o_clerk AS o_clerk,
+       o.o_shippriority AS o_shippriority,
+       o.o_comment AS o_comment
+FROM   orders AS o
+       LEFT JOIN $per_order AS p ON p.l_orderkey = o.o_orderkey
+WHERE  o.o_orderkey % 8 = 7
 
 -- ==========================================================================
 -- 22 TPC-H queries, YQL port. Permissible deviations per §2.2.3.3.
@@ -184,7 +341,7 @@ SELECT l_returnflag, l_linestatus,
        avg(l_discount) AS avg_disc,
        count(*) AS count_order
 FROM   lineitem
-WHERE  l_shipdate <= CAST('1998-12-01' AS Timestamp) - DateTime::IntervalFromDays(CAST(:delta AS Int64))
+WHERE  l_shipdate <= CAST('1998-12-01' AS Timestamp) - DateTime::IntervalFromDays(CAST(:delta AS Int32))
 GROUP  BY l_returnflag, l_linestatus
 ORDER  BY l_returnflag, l_linestatus
 
@@ -389,24 +546,36 @@ LIMIT 20
 
 --+ q11
 --= body
-SELECT ps.ps_partkey AS ps_partkey,
-       sum(ps.ps_supplycost * ps.ps_availqty) AS value
-FROM   partsupp AS ps
-       CROSS JOIN supplier AS s
-       CROSS JOIN nation AS n
-WHERE  ps.ps_suppkey = s.s_suppkey
-  AND  s.s_nationkey = n.n_nationkey
-  AND  n.n_name = :nation
-GROUP  BY ps.ps_partkey
-HAVING sum(ps.ps_supplycost * ps.ps_availqty) > (
-       SELECT sum(ps2.ps_supplycost * ps2.ps_availqty) * :fraction
-       FROM   partsupp AS ps2
-              CROSS JOIN supplier AS s2
-              CROSS JOIN nation AS n2
-       WHERE  ps2.ps_suppkey = s2.s_suppkey
-         AND  s2.s_nationkey = n2.n_nationkey
-         AND  n2.n_name = :nation
-)
+$nation_suppliers = (
+    SELECT s.s_suppkey AS s_suppkey
+    FROM   supplier AS s
+           CROSS JOIN nation AS n
+    WHERE  s.s_nationkey = n.n_nationkey
+      AND  n.n_name = :nation
+);
+$nation_partsupp = (
+    SELECT ps.ps_partkey AS ps_partkey,
+           ps.ps_supplycost AS ps_supplycost,
+           ps.ps_availqty AS ps_availqty
+    FROM   partsupp AS ps
+           CROSS JOIN $nation_suppliers AS ns
+    WHERE  ps.ps_suppkey = ns.s_suppkey
+);
+$threshold = (
+    SELECT sum(ps_supplycost * ps_availqty) * CAST(:fraction AS Double) AS threshold
+    FROM   $nation_partsupp
+);
+$values = (
+    SELECT ps_partkey,
+           sum(ps_supplycost * ps_availqty) AS value
+    FROM   $nation_partsupp
+    GROUP  BY ps_partkey
+);
+SELECT v.ps_partkey AS ps_partkey,
+       v.value AS value
+FROM   $values AS v
+       CROSS JOIN $threshold AS t
+WHERE  v.value > t.threshold
 ORDER  BY value DESC
 
 --+ q12
@@ -473,11 +642,20 @@ $revenue = (
       AND  l_shipdate <  CAST(:date_3m AS Timestamp)
     GROUP  BY l_suppkey
 );
-SELECT s_suppkey, s_name, s_address, s_phone, total_revenue
-FROM   supplier
+$max_revenue = (
+    SELECT max(total_revenue) AS max_revenue
+    FROM   $revenue
+);
+SELECT s.s_suppkey AS s_suppkey,
+       s.s_name AS s_name,
+       s.s_address AS s_address,
+       s.s_phone AS s_phone,
+       revenue.total_revenue AS total_revenue
+FROM   supplier AS s
        CROSS JOIN $revenue AS revenue
-WHERE  s_suppkey = revenue.supplier_no
-  AND  revenue.total_revenue = (SELECT max(total_revenue) FROM $revenue)
+       CROSS JOIN $max_revenue AS max_revenue
+WHERE  s.s_suppkey = revenue.supplier_no
+  AND  revenue.total_revenue = max_revenue.max_revenue
 ORDER  BY s_suppkey
 
 --+ q16
@@ -639,27 +817,44 @@ LIMIT 100
 
 --+ q22
 --= body
--- NOT EXISTS correlated subquery rewritten as NOT IN on orders.o_custkey.
+-- NOT EXISTS correlated subquery rewritten as LEFT ONLY JOIN orders.
 -- substring(phone FROM 1 FOR 2) → Substring(CAST(phone AS String), 0, 2).
+$customers = (
+    SELECT c.c_acctbal AS c_acctbal,
+           c.c_custkey AS c_custkey,
+           Substring(CAST(c.c_phone AS String), 0u, 2u) AS cntrycode
+    FROM   customer AS c
+);
+$country_customers = (
+    SELECT c_acctbal,
+           c_custkey,
+           cntrycode
+    FROM   $customers
+    WHERE  cntrycode IN (CAST(:cc1 AS String), CAST(:cc2 AS String), CAST(:cc3 AS String),
+                         CAST(:cc4 AS String), CAST(:cc5 AS String), CAST(:cc6 AS String),
+                         CAST(:cc7 AS String))
+);
+$avg_balance = (
+    SELECT avg(c_acctbal) AS avg_acctbal
+    FROM   $country_customers
+    WHERE  c_acctbal > 0.0
+);
+$above_avg = (
+    SELECT c.c_acctbal AS c_acctbal,
+           c.c_custkey AS c_custkey,
+           c.cntrycode AS cntrycode
+    FROM   $country_customers AS c
+           CROSS JOIN $avg_balance AS a
+    WHERE  c.c_acctbal > a.avg_acctbal
+);
+$custsale = (
+    SELECT aa.cntrycode AS cntrycode,
+           aa.c_acctbal AS c_acctbal
+    FROM   $above_avg AS aa
+           LEFT ONLY JOIN orders AS o
+    ON     o.o_custkey = aa.c_custkey
+);
 SELECT cntrycode, count(*) AS numcust, sum(c_acctbal) AS totacctbal
-FROM (
-  SELECT Substring(CAST(c.c_phone AS String), 0u, 2u) AS cntrycode,
-         c.c_acctbal AS c_acctbal
-  FROM   customer AS c
-  WHERE  Substring(CAST(c.c_phone AS String), 0u, 2u) IN
-         (CAST(:cc1 AS String), CAST(:cc2 AS String), CAST(:cc3 AS String),
-          CAST(:cc4 AS String), CAST(:cc5 AS String), CAST(:cc6 AS String),
-          CAST(:cc7 AS String))
-    AND  c.c_acctbal > (
-         SELECT avg(c2.c_acctbal)
-         FROM   customer AS c2
-         WHERE  c2.c_acctbal > 0.0
-           AND  Substring(CAST(c2.c_phone AS String), 0u, 2u) IN
-                (CAST(:cc1 AS String), CAST(:cc2 AS String), CAST(:cc3 AS String),
-                 CAST(:cc4 AS String), CAST(:cc5 AS String), CAST(:cc6 AS String),
-                 CAST(:cc7 AS String))
-    )
-    AND  c.c_custkey NOT IN (SELECT o.o_custkey FROM orders AS o)
-) AS custsale
+FROM   $custsale
 GROUP  BY cntrycode
 ORDER  BY cntrycode
