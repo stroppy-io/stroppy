@@ -20,7 +20,6 @@ const (
 	StroppyDTSFileName FileName = "stroppy.d.ts"
 
 	HelpersFileName FileName = "helpers.ts"
-	RetryFileName   FileName = "retry.ts"
 	DatagenFileName FileName = "datagen.ts"
 
 	ParseSQLTSFileName FileName = "parse_sql.ts"
@@ -37,7 +36,6 @@ const (
 var StaticFiles = []FileName{
 	ProtoJSFileName,
 	HelpersFileName,
-	RetryFileName,
 	DatagenFileName,
 	ParseSQLJSFileName,
 	StroppyDTSFileName,
