@@ -1,8 +1,11 @@
 package expr
 
 import (
+	"encoding/binary"
 	"fmt"
+	"hash/fnv"
 	"math/rand/v2"
+	"sync"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 )
@@ -48,23 +51,94 @@ func alphabetWidth(ranges []*dgproto.AsciiRange) (int64, error) {
 	return total, nil
 }
 
-// alphabetAt maps a flattened index [0, totalWidth) into the
-// corresponding codepoint in the alphabet.
-func alphabetAt(ranges []*dgproto.AsciiRange, pick int64) rune {
-	var acc int64
+// asciiAlphabet is a pre-flattened codepoint table for O(1) picks.
+// byteTable is used when every codepoint fits in a byte; otherwise
+// runeTable holds the full alphabet.
+type asciiAlphabet struct {
+	byteTable []byte
+	runeTable []rune
+}
+
+var asciiAlphabetCache sync.Map // map[uint64]*asciiAlphabet
+
+// alphabetTableKey fingerprints an alphabet range list for cache lookup.
+func alphabetTableKey(ranges []*dgproto.AsciiRange) uint64 {
+	h := fnv.New64a()
+
+	var buf [8]byte
 
 	for _, r := range ranges {
-		width := int64(r.GetMax()-r.GetMin()) + 1
-		if pick < acc+width {
-			//nolint:gosec // alphabet ranges are bounded uint32, fit in rune.
-			return rune(int64(r.GetMin()) + (pick - acc))
-		}
-
-		acc += width
+		binary.LittleEndian.PutUint32(buf[0:4], r.GetMin())
+		binary.LittleEndian.PutUint32(buf[4:8], r.GetMax())
+		_, _ = h.Write(buf[:])
 	}
 
-	// Unreachable for pick < totalWidth.
-	return 0
+	return h.Sum64()
+}
+
+// lookupASCIIAlphabet returns a cached flattened alphabet table.
+func lookupASCIIAlphabet(ranges []*dgproto.AsciiRange) (*asciiAlphabet, int64, error) {
+	key := alphabetTableKey(ranges)
+
+	if cached, ok := asciiAlphabetCache.Load(key); ok {
+		table, _ := cached.(*asciiAlphabet)
+
+		return table, alphabetTableLen(table), nil
+	}
+
+	table, err := buildASCIIAlphabet(ranges)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	actual, _ := asciiAlphabetCache.LoadOrStore(key, table)
+
+	return actual.(*asciiAlphabet), alphabetTableLen(table), nil
+}
+
+func alphabetTableLen(table *asciiAlphabet) int64 {
+	if len(table.byteTable) > 0 {
+		return int64(len(table.byteTable))
+	}
+
+	return int64(len(table.runeTable))
+}
+
+func buildASCIIAlphabet(ranges []*dgproto.AsciiRange) (*asciiAlphabet, error) {
+	total, err := alphabetWidth(ranges)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &asciiAlphabet{
+		byteTable: make([]byte, 0, total),
+	}
+
+	for _, r := range ranges {
+		for cp := r.GetMin(); cp <= r.GetMax(); cp++ {
+			if cp > 0xFF {
+				return buildWideASCIIAlphabet(ranges, total)
+			}
+
+			out.byteTable = append(out.byteTable, byte(cp))
+		}
+	}
+
+	return out, nil
+}
+
+func buildWideASCIIAlphabet(ranges []*dgproto.AsciiRange, total int64) (*asciiAlphabet, error) {
+	out := &asciiAlphabet{
+		runeTable: make([]rune, 0, total),
+	}
+
+	for _, r := range ranges {
+		for cp := r.GetMin(); cp <= r.GetMax(); cp++ {
+			out.runeTable = append(out.runeTable, rune(cp))
+		}
+	}
+
+	return out, nil
 }
 
 // drawPhrase evaluates sub-Expr word counts, resolves the vocab dict,

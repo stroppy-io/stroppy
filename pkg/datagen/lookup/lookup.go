@@ -375,6 +375,7 @@ type popCtx struct {
 	dicts     map[string]*dgproto.Dict
 	popName   string
 	attrPath  string
+	drawPRNG  *seed.ReusablePRNG
 }
 
 // LookupCol resolves a ColRef within the LookupPop's own scratch.
@@ -426,14 +427,19 @@ func (c *popCtx) Lookup(popName, attrName string, entityIdx int64) (any, error) 
 // the flat runtime, ensuring that a LookupPop attr that itself carries
 // a random draw is still seekable.
 func (c *popCtx) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand {
+	if c.drawPRNG == nil {
+		c.drawPRNG = seed.NewReusablePRNG()
+	}
+
 	key := seed.Derive(
 		c.reg.rootSeed,
 		attrPath,
 		"s"+strconv.FormatUint(uint64(streamID), 10),
 		strconv.FormatInt(rowIdx, 10),
 	)
+	c.drawPRNG.Seed(key)
 
-	return seed.PRNG(key)
+	return c.drawPRNG.Rand()
 }
 
 // AttrPath returns the pop-qualified attr path currently under

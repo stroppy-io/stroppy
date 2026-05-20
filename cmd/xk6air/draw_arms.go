@@ -32,7 +32,7 @@ type drawIntUniform struct {
 
 func (d *drawIntUniform) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelIntUniform(p.r, d.lo, d.hi)
+	v, _ := expr.KernelIntUniform(p.R, d.lo, d.hi)
 	releasePRNG(p)
 	return v
 }
@@ -55,7 +55,7 @@ type drawFloatUniform struct {
 
 func (d *drawFloatUniform) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelFloatUniform(p.r, d.lo, d.hi)
+	v, _ := expr.KernelFloatUniform(p.R, d.lo, d.hi)
 	releasePRNG(p)
 	return v
 }
@@ -79,7 +79,7 @@ type drawNormal struct {
 
 func (d *drawNormal) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelNormal(p.r, d.lo, d.hi, d.screw)
+	v, _ := expr.KernelNormal(p.R, d.lo, d.hi, d.screw)
 	releasePRNG(p)
 	return v
 }
@@ -103,7 +103,7 @@ type drawZipf struct {
 
 func (d *drawZipf) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelZipf(p.r, d.lo, d.hi, d.exponent)
+	v, _ := expr.KernelZipf(p.R, d.lo, d.hi, d.exponent)
 	releasePRNG(p)
 	return v
 }
@@ -127,7 +127,7 @@ type drawNURand struct {
 
 func (d *drawNURand) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelNURand(p.r, d.a, d.x, d.y, d.cSalt)
+	v, _ := expr.KernelNURand(p.R, d.a, d.x, d.y, d.cSalt)
 	releasePRNG(p)
 	return v
 }
@@ -150,7 +150,7 @@ type drawBernoulli struct {
 
 func (d *drawBernoulli) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelBernoulli(p.r, d.p)
+	v, _ := expr.KernelBernoulli(p.R, d.p)
 	releasePRNG(p)
 	return v
 }
@@ -173,7 +173,7 @@ type drawDate struct {
 
 func (d *drawDate) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelDate(p.r, d.loDays, d.hiDays)
+	v, _ := expr.KernelDate(p.R, d.loDays, d.hiDays)
 	releasePRNG(p)
 	return toJSDraw(v)
 }
@@ -197,7 +197,7 @@ type drawDecimal struct {
 
 func (d *drawDecimal) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelDecimal(p.r, d.lo, d.hi, d.scale)
+	v, _ := expr.KernelDecimal(p.R, d.lo, d.hi, d.scale)
 	releasePRNG(p)
 	return v
 }
@@ -221,7 +221,7 @@ type drawASCII struct {
 
 func (d *drawASCII) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelASCII(p.r, d.minLen, d.maxLen, d.alphabet)
+	v, _ := expr.KernelASCII(p.R, d.minLen, d.maxLen, d.alphabet)
 	releasePRNG(p)
 	return v
 }
@@ -245,7 +245,7 @@ type drawDict struct {
 
 func (d *drawDict) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelDict(p.r, d.dict, d.weightSet)
+	v, _ := expr.KernelDict(p.R, d.dict, d.weightSet)
 	releasePRNG(p)
 	return toJSDraw(v)
 }
@@ -270,7 +270,7 @@ type drawJoint struct {
 
 func (d *drawJoint) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelJoint(p.r, d.dict, d.colIdx, d.weightSet)
+	v, _ := expr.KernelJoint(p.R, d.dict, d.colIdx, d.weightSet)
 	releasePRNG(p)
 	return toJSDraw(v)
 }
@@ -295,7 +295,7 @@ type drawPhrase struct {
 
 func (d *drawPhrase) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelPhrase(p.r, d.vocab, d.minW, d.maxW, d.sep)
+	v, _ := expr.KernelPhrase(p.R, d.vocab, d.minW, d.maxW, d.sep)
 	releasePRNG(p)
 	return v
 }
@@ -321,7 +321,7 @@ type drawGrammar struct {
 
 func (d *drawGrammar) Sample(rootSeed uint64, key int64) any {
 	p := acquirePRNG(drawKey(rootSeed, key))
-	v, _ := expr.KernelGrammar(p.r, d.grammar, d.dicts, d.minLen, d.maxLen)
+	v, _ := expr.KernelGrammar(p.R, d.grammar, d.dicts, d.minLen, d.maxLen)
 	releasePRNG(p)
 	return v
 }
