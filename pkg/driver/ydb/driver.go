@@ -147,7 +147,11 @@ func buildConnectionOptions(
 	cfg *stroppy.DriverConfig,
 	dialFunc func(ctx context.Context, network, addr string) (net.Conn, error),
 ) []ydbsdk.Option {
-	var opts []ydbsdk.Option
+	opts := []ydbsdk.Option{
+		// Defer BeginTransaction until the first statement in a sql.Tx so TPC-C
+		// and other multi-statement workloads save one query-service RPC per tx.
+		ydbsdk.WithLazyTx(true),
+	}
 
 	if dialFunc != nil {
 		opts = append(opts, ydbsdk.With(
