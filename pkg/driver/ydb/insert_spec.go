@@ -16,6 +16,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
+	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
@@ -107,20 +108,109 @@ func (d *Driver) runChunk(
 	}
 }
 
+// bulkUpsertWriter streams converted rows into BulkUpsert batches while
+// reusing buffers and caching per-column YDB types across flushes.
+type bulkUpsertWriter struct {
+	d          *Driver
+	tablePath  string
+	tableName  string
+	columns    []string
+	colTypes   []types.Type
+	effective  []types.Type
+	hasNullBuf []bool
+	rowCells   [][]any
+	valueBatch []types.Value
+	fieldsBuf  []types.StructValueOption
+	batchLen   int
+	bulkSize   int
+}
+
+func newBulkUpsertWriter(
+	d *Driver,
+	tablePath, tableName string,
+	columns []string,
+) *bulkUpsertWriter {
+	n := len(columns)
+
+	w := &bulkUpsertWriter{
+		d:          d,
+		tablePath:  tablePath,
+		tableName:  tableName,
+		columns:    columns,
+		colTypes:   make([]types.Type, n),
+		effective:  make([]types.Type, n),
+		hasNullBuf: make([]bool, n),
+		rowCells:   make([][]any, d.bulkSize),
+		valueBatch: make([]types.Value, 0, d.bulkSize),
+		fieldsBuf:  make([]types.StructValueOption, n),
+		bulkSize:   d.bulkSize,
+	}
+
+	for i := range w.rowCells {
+		w.rowCells[i] = make([]any, n)
+	}
+
+	return w
+}
+
+func (w *bulkUpsertWriter) appendRowCtx(ctx context.Context, row []any) error {
+	if err := convertRowInto(w.d.dialect, w.columns, w.rowCells[w.batchLen], row); err != nil {
+		return err
+	}
+
+	w.batchLen++
+
+	if w.batchLen >= w.bulkSize {
+		return w.flush(ctx)
+	}
+
+	return nil
+}
+
+// flush materializes the open batch and issues BulkUpsert.
+func (w *bulkUpsertWriter) flush(ctx context.Context) error {
+	if w.batchLen == 0 {
+		return nil
+	}
+
+	batch := w.rowCells[:w.batchLen]
+
+	mergeColumnTypes(w.colTypes, batch)
+	colTypes := effectiveColumnTypesInto(w.effective, w.colTypes, batch)
+	hasNull := columnsWithNullsInto(w.hasNullBuf, batch)
+
+	w.valueBatch = w.valueBatch[:0]
+
+	for _, row := range batch {
+		sv, err := rowToStructValueTyped(w.columns, row, colTypes, hasNull, w.fieldsBuf)
+		if err != nil {
+			return err
+		}
+
+		w.valueBatch = append(w.valueBatch, sv)
+	}
+
+	if err := w.d.flushBulk(ctx, w.tablePath, w.tableName, w.valueBatch); err != nil {
+		return err
+	}
+
+	w.batchLen = 0
+
+	return nil
+}
+
 // bulkUpsertRuntime streams rt into ydb-go-sdk's Table().BulkUpsert in
 // batches of at most d.bulkSize rows. limit < 0 drains the runtime;
-// otherwise exactly limit rows are emitted. Each row's []any values are
-// mapped to types.Value via toYDBValue, then wrapped in a struct value
-// with the runtime's column names.
+// otherwise exactly limit rows are emitted.
 //
 // NULL handling: BulkUpsert requires each struct field to carry a typed
 // value — a bare `types.VoidValue()` is rejected by the server with
 // `Type parse error: Unexpected type, got proto: void_type: NULL_VALUE`.
-// We therefore buffer each batch's raw rows, scan them to infer a
-// per-column concrete type from the first non-nil cell, and materialize
-// struct values using `types.NullValue(colType)` for cells that are nil.
-// Workload rows that use `Expr.if(cond, Expr.litNull(), …)` for the
-// `o_carrier_id` / `ol_delivery_d` spec columns rely on this path.
+// Per-column concrete types are inferred from the first non-nil cell and
+// cached for the rest of the worker; each batch still scans for nulls so
+// non-nil cells in nullable columns are wrapped in Optional<T>. Workload
+// rows that use `Expr.if(cond, Expr.litNull(), …)` for the `o_carrier_id`
+// / `ol_delivery_d` spec columns rely on this path.
 func (d *Driver) bulkUpsertRuntime(
 	ctx context.Context,
 	tableName string,
@@ -133,7 +223,7 @@ func (d *Driver) bulkUpsertRuntime(
 	}
 
 	tablePath := path.Join(d.nativeDB.Name(), tableName)
-	rawBatch := make([][]any, 0, d.bulkSize)
+	w := newBulkUpsertWriter(d, tablePath, tableName, columns)
 	remaining := limit
 
 	for limit < 0 || remaining > 0 {
@@ -146,127 +236,112 @@ func (d *Driver) bulkUpsertRuntime(
 			return fmt.Errorf("ydb: runtime.Next: %w", err)
 		}
 
-		converted, err := d.convertRow(columns, row)
-		if err != nil {
+		if err := w.appendRowCtx(ctx, row); err != nil {
 			return err
 		}
-
-		rawBatch = append(rawBatch, converted)
 
 		if limit >= 0 {
 			remaining--
 		}
-
-		if len(rawBatch) >= d.bulkSize {
-			if err := d.flushBulkRaw(ctx, tablePath, tableName, columns, rawBatch); err != nil {
-				return err
-			}
-
-			rawBatch = rawBatch[:0]
-		}
 	}
 
-	if len(rawBatch) > 0 {
-		return d.flushBulkRaw(ctx, tablePath, tableName, columns, rawBatch)
+	return w.flush(ctx)
+}
+
+// convertRowInto runs each cell through the dialect.Convert hook into
+// dest, which must be sized to the row width.
+func convertRowInto(dialect queries.Dialect, columns []string, dest, row []any) error {
+	for idx, col := range columns {
+		conv, err := dialect.Convert(row[idx])
+		if err != nil {
+			return fmt.Errorf("ydb: convert col %q: %w", col, err)
+		}
+
+		dest[idx] = conv
 	}
 
 	return nil
 }
 
-// convertRow runs each cell through the dialect.Convert hook and returns
-// the raw []any ready for later type inference + toYDBValue.
-func (d *Driver) convertRow(columns []string, row []any) ([]any, error) {
-	out := make([]any, len(columns))
-
-	for idx, col := range columns {
-		conv, err := d.dialect.Convert(row[idx])
-		if err != nil {
-			return nil, fmt.Errorf("ydb: convert col %q: %w", col, err)
-		}
-
-		out[idx] = conv
-	}
-
-	return out, nil
-}
-
-// flushBulkRaw converts a raw batch to struct values, using type
-// inference to turn nil cells into typed NullValue() and wrapping the
-// corresponding column's non-nil cells into Optional<T> so the list
-// element type stays uniform across rows. Columns that are nil in every
-// row of the batch fall back to `types.TypeInt64` — a last-resort
-// default that matches the most common column shape; downstream
-// BulkUpsert will still reject the row if the target column happens to
-// be a different type, surfacing as an explicit error rather than a
-// silent mismatch. Columns that are never nil in the batch stay as bare
-// typed values — BulkUpsert auto-lifts them for nullable targets and
-// keeps the historical shape for NOT NULL primary key columns.
-func (d *Driver) flushBulkRaw(
-	ctx context.Context,
-	tablePath, tableName string,
-	columns []string,
-	rawBatch [][]any,
-) error {
-	colTypes := inferColumnTypes(columns, rawBatch)
-	hasNull := columnsWithNulls(columns, rawBatch)
-	batch := make([]types.Value, 0, len(rawBatch))
-
-	for _, row := range rawBatch {
-		sv, err := rowToStructValueTyped(columns, row, colTypes, hasNull)
-		if err != nil {
-			return err
-		}
-
-		batch = append(batch, sv)
-	}
-
-	return d.flushBulk(ctx, tablePath, tableName, batch)
-}
-
 // columnsWithNulls returns a boolean mask: mask[i] is true iff any row
-// in the batch has a nil value in column i. Signals the downstream
-// converter to wrap non-nil cells for that column in Optional<T>, so
-// the list element struct types stay uniform across rows.
-func columnsWithNulls(columns []string, rawBatch [][]any) []bool {
-	out := make([]bool, len(columns))
+// in the batch has a nil value in column i.
+func columnsWithNulls(columns []string, batch [][]any) []bool {
+	return columnsWithNullsInto(make([]bool, len(columns)), batch)
+}
 
-	for _, row := range rawBatch {
-		for idx := range columns {
+// columnsWithNullsInto clears and fills dest, reusing its backing array.
+func columnsWithNullsInto(dest []bool, batch [][]any) []bool {
+	clear(dest)
+
+	for _, row := range batch {
+		for idx := range dest {
 			if row[idx] == nil {
-				out[idx] = true
+				dest[idx] = true
 			}
 		}
 	}
 
-	return out
+	return dest
 }
 
-// inferColumnTypes scans a raw batch and returns the concrete types.Type
-// for each column, derived from the first non-nil cell. All-nil columns
-// get TypeInt64 as a fallback.
-func inferColumnTypes(columns []string, rawBatch [][]any) []types.Type {
-	out := make([]types.Type, len(columns))
+// mergeColumnTypes records the first non-nil YDB type seen per column
+// into colTypes. It never writes fallback types — all-nil columns stay
+// unknown until a later batch supplies a concrete value.
+func mergeColumnTypes(colTypes []types.Type, batch [][]any) {
+	for idx := range colTypes {
+		if colTypes[idx] != nil {
+			continue
+		}
 
-	for idx := range columns {
-		for _, row := range rawBatch {
+		for _, row := range batch {
 			if row[idx] == nil {
 				continue
 			}
 
 			t, ok := inferYDBType(row[idx])
 			if ok {
-				out[idx] = t
+				colTypes[idx] = t
+
+				break
+			}
+		}
+	}
+}
+
+// effectiveColumnTypes returns per-batch types for materialization.
+func effectiveColumnTypes(cached []types.Type, batch [][]any) []types.Type {
+	return effectiveColumnTypesInto(make([]types.Type, len(cached)), cached, batch)
+}
+
+// effectiveColumnTypesInto fills dest with cached types, batch inference,
+// and TypeInt64 fallback for all-nil unknown columns.
+func effectiveColumnTypesInto(dest, cached []types.Type, batch [][]any) []types.Type {
+	copy(dest, cached)
+
+	for idx := range dest {
+		if dest[idx] != nil {
+			continue
+		}
+
+		for _, row := range batch {
+			if row[idx] == nil {
+				continue
+			}
+
+			t, ok := inferYDBType(row[idx])
+			if ok {
+				dest[idx] = t
 
 				break
 			}
 		}
 
-		if out[idx] == nil {
-			out[idx] = types.TypeInt64
+		if dest[idx] == nil {
+			dest[idx] = types.TypeInt64
 		}
 	}
 
-	return out
+	return dest
 }
 
 // inferYDBType returns the ydb Type that matches the Go value shape used
@@ -300,14 +375,19 @@ func inferYDBType(val any) (types.Type, bool) { //nolint:cyclop // flat type swi
 // Optional<T> so the ListValue element type stays uniform — BulkUpsert
 // rejects heterogeneous list elements. Columns never nil stay as bare
 // typed values so NOT NULL primary-key columns keep their historical
-// shape.
+// shape. fieldsBuf is reused across rows in a batch when len(fieldsBuf)
+// matches the column count.
 func rowToStructValueTyped(
 	columns []string,
 	row []any,
 	colTypes []types.Type,
 	hasNull []bool,
+	fieldsBuf []types.StructValueOption,
 ) (types.Value, error) {
-	fields := make([]types.StructValueOption, len(columns))
+	fields := fieldsBuf
+	if len(fields) != len(columns) {
+		fields = make([]types.StructValueOption, len(columns))
+	}
 
 	for idx, col := range columns {
 		var (
