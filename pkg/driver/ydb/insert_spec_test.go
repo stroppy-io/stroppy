@@ -15,9 +15,11 @@ func TestMergeColumnTypesCachesAcrossBatches(t *testing.T) {
 	mergeColumnTypes(colTypes, [][]any{
 		{int64(1), nil},
 	})
+
 	if colTypes[0] != types.TypeInt64 {
 		t.Fatalf("col0 = %v, want Int64", colTypes[0])
 	}
+
 	if colTypes[1] != nil {
 		t.Fatalf("col1 = %v, want unknown", colTypes[1])
 	}
@@ -30,9 +32,11 @@ func TestMergeColumnTypesCachesAcrossBatches(t *testing.T) {
 	mergeColumnTypes(colTypes, [][]any{
 		{int64(2), "text"},
 	})
+
 	if colTypes[0] != types.TypeInt64 {
 		t.Fatalf("col0 changed to %v", colTypes[0])
 	}
+
 	if colTypes[1] != types.TypeText {
 		t.Fatalf("col1 = %v, want Text", colTypes[1])
 	}
@@ -71,6 +75,7 @@ func TestRowToStructValueTypedOptionalNull(t *testing.T) {
 	if err != nil {
 		t.Fatalf("non-null row: %v", err)
 	}
+
 	if sv == nil {
 		t.Fatal("expected struct value")
 	}
@@ -83,6 +88,7 @@ func TestRowToStructValueTypedOptionalNull(t *testing.T) {
 	if err != nil {
 		t.Fatalf("null row: %v", err)
 	}
+
 	if sv == nil {
 		t.Fatal("expected struct value")
 	}
@@ -102,6 +108,7 @@ func TestConvertRowInto(t *testing.T) {
 	if dest[0] != int64(1) {
 		t.Fatalf("dest[0] = %v", dest[0])
 	}
+
 	if dest[1] != 0.05 {
 		t.Fatalf("dest[1] = %v", dest[1])
 	}

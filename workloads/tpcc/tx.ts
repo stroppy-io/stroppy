@@ -245,6 +245,14 @@ const IS_PICODATA = driverConfig.driverType === "picodata";
 // pg and ydb support UPDATE...RETURNING — merge UPDATE + SELECT into one
 // round-trip in payment() for warehouse/district YTD updates.
 const HAS_RETURNING = driverConfig.driverType === "postgres" || driverConfig.driverType === "ydb";
+// YDB-only path: the three IN-list queries (new_order's batched item+stock
+// reads and stock_level's threshold count) take their id list as a bound
+// List<Int64> parameter instead of inlining a comma list. The dialect
+// promotes the JS array to []int64 server-side; the query text stays
+// identical across calls so YDB's query-service plan cache hits. Without
+// this branch each call ships unique SQL and forces a fresh compile —
+// observed at 330+ compiles/s during TPC-C steady state.
+const IS_YDB = driverConfig.driverType === "ydb";
 
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
@@ -1062,8 +1070,17 @@ function new_order() {
         // Deduplicate item IDs; NURand can produce duplicates across lines.
         const uniqueItemIds = [...new Set(line_i_id)];
         const itemTemplate = sql("workload_tx_new_order", "get_items_batch")!;
-        const itemQuery = itemTemplate.sql.replace(/\{item_ids\}/g, uniqueItemIds.join(","));
-        const itemRows = tx.queryRows(itemQuery, {});
+        // YDB: pass the id list as a bound List<Int64>; the SQL text stays
+        // identical across calls so the server plan cache hits. Other
+        // dialects keep the inline-comma-list path because their planners
+        // either cache by structure (pgx) or have no list-parameter form.
+        let itemRows: any[][];
+        if (IS_YDB) {
+          itemRows = tx.queryRows(itemTemplate, { item_ids: uniqueItemIds });
+        } else {
+          const itemQuery = itemTemplate.sql.replace(/\{item_ids\}/g, uniqueItemIds.join(","));
+          itemRows = tx.queryRows(itemQuery, {});
+        }
         // Index by i_id. Batch result columns: [0]=i_id, [1]=i_price, [2]=i_name, [3]=i_data.
         const itemMap = new Map<number, any[]>();
         for (const row of itemRows) {
@@ -1093,8 +1110,16 @@ function new_order() {
         const stockMap = new Map<string, any[]>();
         const stockTemplate = sql("workload_tx_new_order", "get_stocks_batch")!;
         for (const [sw, iids] of stockByWh) {
-          const q = stockTemplate.sql.replace(/\{item_ids\}/g, [...iids].join(","));
-          const rows = tx.queryRows(q, { w_id: sw });
+          const idsArr = [...iids];
+          // Same YDB-vs-others split as the item batch read above; see
+          // its comment for the plan-cache rationale.
+          let rows: any[][];
+          if (IS_YDB) {
+            rows = tx.queryRows(stockTemplate, { w_id: sw, item_ids: idsArr });
+          } else {
+            const q = stockTemplate.sql.replace(/\{item_ids\}/g, idsArr.join(","));
+            rows = tx.queryRows(q, { w_id: sw });
+          }
           for (const row of rows) {
             stockMap.set(`${sw}/${Number(row[0])}`, row);
           }
@@ -1547,11 +1572,17 @@ function stock_level() {
         }
         if (ids.length === 0) return;
 
-        // Inline the integer list; stroppy's :name substitution leaves IN list
+        // YDB: pass the id list as a bound List<Int64> (same plan-cache
+        // rationale as new_order's batch reads). Other dialects inline the
+        // integer list; stroppy's :name substitution leaves IN list
         // contents alone and the ids come from a trusted SELECT, not user input.
         const template = sql("workload_tx_stock_level", "stock_count_in")!;
-        const rendered = template.sql.replace("{ids}", ids.join(","));
-        tx.queryValue<number>(rendered, { w_id, threshold });
+        if (IS_YDB) {
+          tx.queryValue<number>(template, { w_id, threshold, ids });
+        } else {
+          const rendered = template.sql.replace("{ids}", ids.join(","));
+          tx.queryValue<number>(rendered, { w_id, threshold });
+        }
       });
     });
   } finally {
