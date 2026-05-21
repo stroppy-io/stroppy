@@ -30,7 +30,48 @@ Useful env overrides:
 ```bash
 -e warehouses=1        # scale factor (W); default 1 for smoke
 -e pool_size=200       # per-VU pool size
+-e warehouse_start=1   # first warehouse id for this instance (>=1)
+-e load_items=true     # load the global item table (default: true when WAREHOUSE_START=1)
 ```
+
+## Distributed runs (multiple instances over disjoint warehouse ranges)
+
+Several stroppy instances can target the same database collectively, each
+handling a slice of warehouses. Set `WAREHOUSE_START` per instance so the
+slices don't overlap:
+
+```bash
+# Instance A: warehouses 1..100, also creates schema + loads the global item table.
+./build/stroppy run tpcc/tx -d pg -D url=postgres://host/db \
+  -e WAREHOUSE_START=1 -e WAREHOUSES=100 \
+  --steps drop_schema,create_schema,load_data,validate_population
+
+# Instance B: warehouses 101..200, skips schema + item load.
+./build/stroppy run tpcc/tx -d pg -D url=postgres://host/db \
+  -e WAREHOUSE_START=101 -e WAREHOUSES=100 \
+  --steps load_data,validate_population
+
+# After every slice is loaded, all instances can run the transaction phase
+# (default mix). Each VU is pinned to a home warehouse inside its slice;
+# remote-warehouse picks (Payment §2.5.1.2, New-Order §2.4.1.5) stay
+# inside the local slice.
+./build/stroppy run tpcc/tx -d pg -D url=postgres://host/db \
+  -e WAREHOUSE_START=1 -e WAREHOUSES=100 \
+  --no-steps drop_schema,create_schema,load_data,validate_population \
+  -- --vus 50 --duration 5m
+```
+
+Notes:
+
+- The `item` table is global (100 000 rows independent of W). Only the
+  first instance (default `WAREHOUSE_START=1`) loads it; other instances
+  default `LOAD_ITEMS=false`. Override with `-e LOAD_ITEMS=true/false`.
+- For YDB, run `create_schema` once with `WAREHOUSE_START=1` and
+  `WAREHOUSES=<total>` so the partition split keys cover every warehouse
+  globally. Loader instances then skip `create_schema`.
+- `validate_population` filters all per-warehouse aggregates by
+  `w_id BETWEEN WAREHOUSE_START AND WAREHOUSE_START + WAREHOUSES - 1`,
+  so each instance validates only its own slice.
 
 ## Steps
 

@@ -159,6 +159,7 @@ CREATE TABLE stock (
 --= neword
 CREATE OR REPLACE FUNCTION NEWORD (
   no_w_id INTEGER,
+  no_min_w_id INTEGER,
   no_max_w_id INTEGER,
   no_d_id INTEGER,
   no_c_id INTEGER,
@@ -212,9 +213,13 @@ BEGIN
       v_i_id := 100001;
     END IF;
     /* TPC-C 2.4.1.5: ~1% of order lines pick a remote supply warehouse
-       (uniform over {1..no_max_w_id} \ {no_w_id}) when multiple warehouses exist. */
-    IF no_max_w_id > 1 AND floor(random() * 100)::INTEGER = 0 THEN
-      v_supply_w_id := 1 + (floor(random() * (no_max_w_id - 1)))::INTEGER;
+       (uniform over {no_min_w_id..no_max_w_id} \ {no_w_id}) when the range
+       holds more than one warehouse. For the standard single-instance run
+       no_min_w_id=1 and no_max_w_id=W, collapsing to the original formula;
+       distributed runs pass the local slice bounds so the remote pick
+       stays inside warehouses this instance actually loaded. */
+    IF no_max_w_id > no_min_w_id AND floor(random() * 100)::INTEGER = 0 THEN
+      v_supply_w_id := no_min_w_id + (floor(random() * (no_max_w_id - no_min_w_id)))::INTEGER;
       IF v_supply_w_id >= no_w_id THEN
         v_supply_w_id := v_supply_w_id + 1;
       END IF;
@@ -499,7 +504,7 @@ $$ LANGUAGE 'plpgsql';
 
 --+ workload_procs
 --= new_order
-SELECT NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt, :force_rollback)
+SELECT NEWORD(:w_id, :min_w_id, :max_w_id, :d_id, :c_id, :ol_cnt, :force_rollback)
 --= payment
 SELECT PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last, :p_h_id)
 --= order_status

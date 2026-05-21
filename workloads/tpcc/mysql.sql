@@ -162,6 +162,7 @@ CREATE TABLE stock (
 --= neword
 CREATE PROCEDURE NEWORD(
   IN no_w_id INT,
+  IN no_min_w_id INT,
   IN no_max_w_id INT,
   IN no_d_id INT,
   IN no_c_id INT,
@@ -225,9 +226,13 @@ BEGIN
       SET v_i_id = 100001;
     END IF;
     /* TPC-C 2.4.1.5: ~1% of order lines pick a remote supply warehouse
-       (uniform over {1..no_max_w_id} \ {no_w_id}) when multiple warehouses exist. */
-    IF no_max_w_id > 1 AND FLOOR(RAND() * 100) = 0 THEN
-      SET v_supply_w_id = 1 + FLOOR(RAND() * (no_max_w_id - 1));
+       (uniform over {no_min_w_id..no_max_w_id} \ {no_w_id}) when the range
+       holds more than one warehouse. For the standard single-instance run
+       no_min_w_id=1 and no_max_w_id=W, collapsing to the original formula;
+       distributed runs pass the local slice bounds so the remote pick
+       stays inside warehouses this instance actually loaded. */
+    IF no_max_w_id > no_min_w_id AND FLOOR(RAND() * 100) = 0 THEN
+      SET v_supply_w_id = no_min_w_id + FLOOR(RAND() * (no_max_w_id - no_min_w_id));
       IF v_supply_w_id >= no_w_id THEN
         SET v_supply_w_id = v_supply_w_id + 1;
       END IF;
@@ -504,7 +509,7 @@ END
 
 --+ workload_procs
 --= new_order
-CALL NEWORD(:w_id, :max_w_id, :d_id, :c_id, :ol_cnt, :force_rollback)
+CALL NEWORD(:w_id, :min_w_id, :max_w_id, :d_id, :c_id, :ol_cnt, :force_rollback)
 --= payment
 CALL PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last, :p_h_id)
 --= order_status

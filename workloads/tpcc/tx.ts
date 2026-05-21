@@ -91,6 +91,26 @@ const tpccStockLevelDuration  = new Trend("tpcc_stock_level_duration", true);
 // TPC-C Configuration Constants
 const POOL_SIZE   = ENV("POOL_SIZE", 100, "Connection pool size");
 const WAREHOUSES  = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
+// First warehouse id assigned to this instance. Default 1 matches the standard
+// single-instance run. Set > 1 when running multiple stroppy instances against
+// the same database in disjoint warehouse ranges (e.g. instance A: START=1
+// WAREHOUSES=100, instance B: START=101 WAREHOUSES=100). Affects the load
+// phase (w_ids are emitted in [START, START+W-1]), HOME_W_ID assignment in the
+// transaction phase, the remote-warehouse picker (pickRemoteWh), the YDB
+// partition split keys, and validate_population's w_id range filters.
+const WAREHOUSE_START = ENV("WAREHOUSE_START", 1, "First warehouse id for this instance (>=1)") as number;
+// Inclusive upper bound; this instance owns warehouses [WAREHOUSE_START, W_ID_MAX].
+const W_ID_MAX = WAREHOUSE_START + WAREHOUSES - 1;
+// The item table is global (size = ITEMS, independent of WAREHOUSES). In a
+// distributed run only ONE instance should load it. Default: only the instance
+// at WAREHOUSE_START=1 loads it; override with -e LOAD_ITEMS=true/false to
+// coordinate manually (e.g. run an item-only load step ahead of time and set
+// LOAD_ITEMS=false everywhere).
+const LOAD_ITEMS = ENV(
+  "LOAD_ITEMS",
+  WAREHOUSE_START === 1 ? "true" : "false",
+  "Load the global item table (default: true when WAREHOUSE_START=1)",
+) === "true";
 const LOAD_WORKERS = ENV("LOAD_WORKERS", 0, "Load-time worker count per spec (0 = framework default)") as number;
 // T2.3: how many attempts the retry helper makes before giving up on a
 // serialization failure. 3 = original try + 2 retries; immediate, no sleep.
@@ -229,20 +249,26 @@ const HAS_RETURNING = driverConfig.driverType === "postgres" || driverConfig.dri
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
 // ydb.sql DDL placeholders. {partition_keys} expands to a comma-list of
-// (w_id) split points giving one tablet per warehouse; {partition_count}
-// to W. For W=1 the split list collapses to "(2)" — single functional
-// tablet, satisfies YDB's "PARTITION_AT_KEYS must be non-empty" rule.
+// (w_id) split points giving one tablet per warehouse in this instance's
+// range [WAREHOUSE_START, W_ID_MAX]; {partition_count} to W. For W=1 the
+// split list collapses to a single key, satisfying YDB's
+// "PARTITION_AT_KEYS must be non-empty" rule.
 // Other dialects' .sql files don't contain these tokens, so the replace
 // is a no-op there.
-function ydbPartitionKeys(w: number): string {
-  if (w <= 1) return "(2)";
+//
+// In a distributed run only ONE instance should run create_schema (with
+// WAREHOUSE_START=1 and WAREHOUSES set to the total) so the partition
+// layout covers every warehouse globally; other instances skip schema
+// creation via --steps.
+function ydbPartitionKeys(): string {
+  if (WAREHOUSES <= 1) return `(${WAREHOUSE_START + 1})`;
   const parts: string[] = [];
-  for (let i = 2; i <= w; i++) parts.push(`(${i})`);
+  for (let i = WAREHOUSE_START + 1; i <= W_ID_MAX; i++) parts.push(`(${i})`);
   return parts.join(", ");
 }
 function renderDDL(s: string): string {
   return s
-    .replace(/\{partition_keys\}/g, ydbPartitionKeys(WAREHOUSES))
+    .replace(/\{partition_keys\}/g, ydbPartitionKeys())
     .replace(/\{partition_count\}/g, String(Math.max(WAREHOUSES, 1)));
 }
 
@@ -256,18 +282,25 @@ const nextHid = (): number => ++hid_counter;
 
 // Spec §5.2.2 / Clause 4.2: each VU ("terminal") is bound to a single home
 // warehouse for the run. This is what drives the 1%/15% remote-access
-// minimums in new_order/payment. Scaling beyond WAREHOUSES VUs wraps.
-const HOME_W_ID = 1 + ((_vu - 1) % WAREHOUSES);
+// minimums in new_order/payment. Scaling beyond WAREHOUSES VUs wraps within
+// this instance's range [WAREHOUSE_START, W_ID_MAX].
+const HOME_W_ID = WAREHOUSE_START + ((_vu - 1) % WAREHOUSES);
 
-// Pick a uniformly-random OTHER warehouse in [1, WAREHOUSES] \ {HOME_W_ID}.
-// Callers must guard with WAREHOUSES > 1; with a single warehouse there is
-// no valid remote target and the caller must fall back to HOME_W_ID.
+// Pick a uniformly-random OTHER warehouse in
+// [WAREHOUSE_START, W_ID_MAX] \ {HOME_W_ID}. Callers must guard with
+// WAREHOUSES > 1; with a single warehouse there is no valid remote target
+// and the caller must fall back to HOME_W_ID. Remote picks stay within this
+// instance's range — coordinating cross-range remote picks across instances
+// is out of scope here.
 const _remoteWhGen = WAREHOUSES > 1
   ? DrawRT.intUniform(seedOf("remoteWh"), 1, WAREHOUSES - 1)
   : null;
 function pickRemoteWh(): number {
   if (_remoteWhGen === null) return HOME_W_ID;
-  const alt = _remoteWhGen.next() as number;
+  // _remoteWhGen returns [1, W-1]; offset to [WAREHOUSE_START, W_ID_MAX - 1]
+  // then shift past HOME_W_ID so the result spans the full range minus the
+  // home slot. With WAREHOUSE_START=1 this collapses to the original formula.
+  const alt = (_remoteWhGen.next() as number) + WAREHOUSE_START - 1;
   return alt >= HOME_W_ID ? alt + 1 : alt;
 }
 
@@ -352,7 +385,7 @@ function asciiRange(
 const LOAD_TIMESTAMP       = new Date();
 const LOAD_TIMESTAMP_EXPR  = std.daysToDate(Expr.lit(LOAD_TIMESTAMP));
 
-// Warehouse spec: w_id = rowIndex()+1 ∈ [1, WAREHOUSES].
+// Warehouse spec: w_id = rowIndex() + WAREHOUSE_START ∈ [START, W_ID_MAX].
 function warehouseSpec() {
   return Rel.table("warehouse", {
     size: WAREHOUSES,
@@ -360,7 +393,7 @@ function warehouseSpec() {
     method: DatagenInsertMethod.NATIVE,
     parallelism: LOAD_WORKERS || undefined,
     attrs: {
-      w_id:       Attr.rowId(),
+      w_id:       Expr.add(Attr.rowIndex(), Expr.lit(WAREHOUSE_START)),
       w_name:     asciiRange(6, 10),
       w_street_1: asciiRange(10, 20),
       w_street_2: asciiRange(10, 20),
@@ -374,10 +407,10 @@ function warehouseSpec() {
 }
 
 // District spec: row-index layout r ∈ [0, 10W):
-//   d_w_id = r / 10 + 1 ∈ [1, W]
+//   d_w_id = r / 10 + WAREHOUSE_START ∈ [START, W_ID_MAX]
 //   d_id   = r % 10 + 1 ∈ [1, 10]
 function districtSpec() {
-  const dWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(DISTRICTS_PER_WAREHOUSE)), Expr.lit(1));
+  const dWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(DISTRICTS_PER_WAREHOUSE)), Expr.lit(WAREHOUSE_START));
   const dId  = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(DISTRICTS_PER_WAREHOUSE)), Expr.lit(1));
   return Rel.table("district", {
     size: TOTAL_DISTRICTS,
@@ -401,7 +434,7 @@ function districtSpec() {
 }
 
 // Customer spec: row-index layout r ∈ [0, 30_000 W):
-//   c_w_id = r / 30_000 + 1 ∈ [1, W]
+//   c_w_id = r / 30_000 + WAREHOUSE_START ∈ [START, W_ID_MAX]
 //   c_d_id = (r / 3000) % 10 + 1 ∈ [1, 10]
 //   c_id   = r % 3000 + 1 ∈ [1, 3000]
 // Spec §4.3.2.3: first 1000 c_ids per district use sequential C_LAST indices
@@ -412,7 +445,7 @@ function districtSpec() {
 // c_credit splits 1:9 BC/GC through Expr.choose.
 function customerSpec() {
   const perWh = CUSTOMERS_PER_DISTRICT * DISTRICTS_PER_WAREHOUSE; // 30_000
-  const cWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(1));
+  const cWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(WAREHOUSE_START));
   const cDId  = Expr.add(
     Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
     Expr.lit(1),
@@ -478,10 +511,10 @@ function itemSpec() {
 }
 
 // Stock spec: row-index layout r ∈ [0, 100_000 W):
-//   s_w_id = r / 100_000 + 1 ∈ [1, W]
+//   s_w_id = r / 100_000 + WAREHOUSE_START ∈ [START, W_ID_MAX]
 //   s_i_id = r % 100_000 + 1 ∈ [1, 100_000]
 function stockSpec() {
-  const sWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(ITEMS_PER_WH)), Expr.lit(1));
+  const sWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(ITEMS_PER_WH)), Expr.lit(WAREHOUSE_START));
   const sIId = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(ITEMS_PER_WH)), Expr.lit(1));
   // attrs typed as Record<string, PbExpr> via Expr.lit's return type so
   // the s_dist_01..s_dist_10 loop below can append without ceremony.
@@ -529,7 +562,7 @@ function stockSpec() {
 const ORDERS_PERMUTE_SALT = BigInt("0x1BEEF02CACE1DAD1");
 function ordersSpec() {
   const perWh = CUSTOMERS_PER_DISTRICT * DISTRICTS_PER_WAREHOUSE; // 30_000
-  const oWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(1));
+  const oWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(WAREHOUSE_START));
   const oDId  = Expr.add(
     Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
     Expr.lit(1),
@@ -591,7 +624,7 @@ function ordersSpec() {
 function orderLineSpec() {
   const perDWh = CUSTOMERS_PER_DISTRICT * DISTRICTS_PER_WAREHOUSE * OL_CNT_FIXED; // 300_000
   const perD   = CUSTOMERS_PER_DISTRICT * OL_CNT_FIXED;                           // 30_000
-  const olWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perDWh)), Expr.lit(1));
+  const olWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perDWh)), Expr.lit(WAREHOUSE_START));
   const olDId  = Expr.add(
     Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(perD)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
     Expr.lit(1),
@@ -642,7 +675,7 @@ function orderLineSpec() {
 //   no_o_id = r % 900 + 2101 ∈ [2101, 3000]
 function newOrderSpec() {
   const perWh = ORDERS_UNDELIVERED * DISTRICTS_PER_WAREHOUSE; // 9000
-  const noWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(1));
+  const noWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(WAREHOUSE_START));
   const noDId = Expr.add(
     Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(ORDERS_UNDELIVERED)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
     Expr.lit(1),
@@ -680,7 +713,14 @@ export function setup() {
     driver.insertSpec(warehouseSpec());
     driver.insertSpec(districtSpec());
     driver.insertSpec(customerSpec());
-    driver.insertSpec(itemSpec());
+    // item is a global table (size = ITEMS, not warehouse-scoped). In a
+    // distributed run only ONE instance should load it — by default the
+    // instance with WAREHOUSE_START=1, opt-in/out via -e LOAD_ITEMS=...
+    if (LOAD_ITEMS) {
+      driver.insertSpec(itemSpec());
+    } else {
+      console.log(`load_data: skipping item (LOAD_ITEMS=false; WAREHOUSE_START=${WAREHOUSE_START})`);
+    }
     driver.insertSpec(stockSpec());
     driver.insertSpec(ordersSpec());
     driver.insertSpec(orderLineSpec());
@@ -713,6 +753,13 @@ export function setup() {
     const TOTAL_ORDER_LINE = TOTAL_ORDERS * OL_CNT_FIXED;
     const TOTAL_CUSTOMERS  = TOTAL_ORDERS; // 3000 per district
 
+    // All counts here describe this instance's warehouse slice only; item is
+    // global and stays unfiltered. The helper inlines a BETWEEN predicate so
+    // we don't need a per-dialect param-binding dance for what is a constant
+    // pair of integers, and so it composes cleanly into existing aggregate
+    // queries (some of which don't accept named params on every dialect).
+    const wWhere = (col: string) => `WHERE ${col} BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`;
+
     type DistRow = { dNextOId: number };
     type NoStats = { maxNoOId: number; minNoOId: number; cnt: number };
 
@@ -725,16 +772,18 @@ export function setup() {
     let cc4OSum = NaN, cc4OlCnt = NaN;
 
     try {
-      for (const r of driver.queryRows("SELECT d_w_id, d_id, d_next_o_id FROM district")) {
+      for (const r of driver.queryRows(
+        `SELECT d_w_id, d_id, d_next_o_id FROM district ${wWhere("d_w_id")}`,
+      )) {
         distMap[dKey(r[0], r[1])] = { dNextOId: Number(r[2]) };
       }
       for (const r of driver.queryRows(
-        "SELECT o_w_id, o_d_id, MAX(o_id) FROM orders GROUP BY o_w_id, o_d_id",
+        `SELECT o_w_id, o_d_id, MAX(o_id) FROM orders ${wWhere("o_w_id")} GROUP BY o_w_id, o_d_id`,
       )) {
         ordMaxMap[dKey(r[0], r[1])] = Number(r[2]);
       }
       for (const r of driver.queryRows(
-        "SELECT no_w_id, no_d_id, MAX(no_o_id), MIN(no_o_id), COUNT(*) FROM new_order GROUP BY no_w_id, no_d_id",
+        `SELECT no_w_id, no_d_id, MAX(no_o_id), MIN(no_o_id), COUNT(*) FROM new_order ${wWhere("no_w_id")} GROUP BY no_w_id, no_d_id`,
       )) {
         noStatsMap[dKey(r[0], r[1])] = {
           maxNoOId: Number(r[2]),
@@ -742,10 +791,10 @@ export function setup() {
           cnt:      Number(r[4]),
         };
       }
-      cc1WSum  = Number(driver.queryValue("SELECT SUM(w_ytd) FROM warehouse"));
-      cc1DSum  = Number(driver.queryValue("SELECT SUM(d_ytd) FROM district"));
-      cc4OSum  = Number(driver.queryValue("SELECT SUM(o_ol_cnt) FROM orders"));
-      cc4OlCnt = Number(driver.queryValue("SELECT COUNT(*) FROM order_line"));
+      cc1WSum  = Number(driver.queryValue(`SELECT SUM(w_ytd) FROM warehouse ${wWhere("w_id")}`));
+      cc1DSum  = Number(driver.queryValue(`SELECT SUM(d_ytd) FROM district ${wWhere("d_w_id")}`));
+      cc4OSum  = Number(driver.queryValue(`SELECT SUM(o_ol_cnt) FROM orders ${wWhere("o_w_id")}`));
+      cc4OlCnt = Number(driver.queryValue(`SELECT COUNT(*) FROM order_line ${wWhere("ol_w_id")}`));
     } catch (e) {
       throw new Error(`validate_population: prefetch failed: ${e}`);
     }
@@ -782,34 +831,36 @@ export function setup() {
     type ComputedCheck = { name: string; computed: () => { ok: boolean; detail: string } };
     type Check         = QueryCheck | ComputedCheck;
 
+    // Local-slice cardinalities. item is global (not warehouse-scoped) so
+    // its check stays unfiltered — every instance assumes it's loaded once.
     const checks: Check[] = [
-      // --- §4.3.4 initial cardinalities ---
+      // --- §4.3.4 initial cardinalities (this instance's slice) ---
       { name: `ITEM = ${ITEMS}`,
         query: "SELECT COUNT(*) FROM item",
         ok: v => Number(v) === ITEMS },
       { name: `WAREHOUSE = ${WAREHOUSES}`,
-        query: "SELECT COUNT(*) FROM warehouse",
+        query: `SELECT COUNT(*) FROM warehouse ${wWhere("w_id")}`,
         ok: v => Number(v) === WAREHOUSES },
       { name: `DISTRICT = ${TOTAL_DISTRICTS}`,
-        query: "SELECT COUNT(*) FROM district",
+        query: `SELECT COUNT(*) FROM district ${wWhere("d_w_id")}`,
         ok: v => Number(v) === TOTAL_DISTRICTS },
       { name: `CUSTOMER = ${TOTAL_CUSTOMERS}`,
-        query: "SELECT COUNT(*) FROM customer",
+        query: `SELECT COUNT(*) FROM customer ${wWhere("c_w_id")}`,
         ok: v => Number(v) === TOTAL_CUSTOMERS },
       { name: `STOCK = ${TOTAL_STOCK}`,
-        query: "SELECT COUNT(*) FROM stock",
+        query: `SELECT COUNT(*) FROM stock ${wWhere("s_w_id")}`,
         ok: v => Number(v) === TOTAL_STOCK },
       { name: `ORDERS = ${TOTAL_ORDERS}`,
-        query: "SELECT COUNT(*) FROM orders",
+        query: `SELECT COUNT(*) FROM orders ${wWhere("o_w_id")}`,
         ok: v => Number(v) === TOTAL_ORDERS },
       { name: `NEW_ORDER = ${TOTAL_NEW_ORDER}`,
-        query: "SELECT COUNT(*) FROM new_order",
+        query: `SELECT COUNT(*) FROM new_order ${wWhere("no_w_id")}`,
         ok: v => Number(v) === TOTAL_NEW_ORDER },
       { name: `ORDER_LINE = ${TOTAL_ORDER_LINE}`,
-        query: "SELECT COUNT(*) FROM order_line",
+        query: `SELECT COUNT(*) FROM order_line ${wWhere("ol_w_id")}`,
         ok: v => Number(v) === TOTAL_ORDER_LINE },
 
-      // --- §3.3.2 CC1: sum(W_YTD) == sum(D_YTD) ---
+      // --- §3.3.2 CC1: sum(W_YTD) == sum(D_YTD) (over this instance's slice) ---
       { name: "CC1 sum(W_YTD) = sum(D_YTD)",
         computed: () => Math.abs(cc1WSum - cc1DSum) < 0.01
           ? { ok: true, detail: "" }
@@ -836,21 +887,21 @@ export function setup() {
         query: "SELECT 100.0 * SUM(CASE WHEN i_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM item",
         ok: v => Number(v) >= 5 && Number(v) <= 15 },
       { name: "S_DATA 10% contains ORIGINAL (5..15%)",
-        query: "SELECT 100.0 * SUM(CASE WHEN s_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM stock",
+        query: `SELECT 100.0 * SUM(CASE WHEN s_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM stock ${wWhere("s_w_id")}`,
         ok: v => Number(v) >= 5 && Number(v) <= 15 },
       { name: "C_CREDIT 10% BC (5..15%)",
-        query: "SELECT 100.0 * SUM(CASE WHEN c_credit = 'BC' THEN 1 ELSE 0 END) / COUNT(*) FROM customer",
+        query: `SELECT 100.0 * SUM(CASE WHEN c_credit = 'BC' THEN 1 ELSE 0 END) / COUNT(*) FROM customer ${wWhere("c_w_id")}`,
         ok: v => Number(v) >= 5 && Number(v) <= 15 },
 
-      // --- fixed-value sanity checks ---
+      // --- fixed-value sanity checks (this instance's slice) ---
       { name: "C_MIDDLE = 'OE' everywhere",
-        query: "SELECT COUNT(*) FROM customer WHERE c_middle <> 'OE'",
+        query: `SELECT COUNT(*) FROM customer WHERE c_middle <> 'OE' AND c_w_id BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`,
         ok: v => Number(v) === 0 },
       { name: "W_YTD = 300000 everywhere",
-        query: "SELECT COUNT(*) FROM warehouse WHERE w_ytd <> 300000",
+        query: `SELECT COUNT(*) FROM warehouse WHERE w_ytd <> 300000 AND w_id BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`,
         ok: v => Number(v) === 0 },
       { name: "D_NEXT_O_ID = 3001 everywhere",
-        query: "SELECT COUNT(*) FROM district WHERE d_next_o_id <> 3001",
+        query: `SELECT COUNT(*) FROM district WHERE d_next_o_id <> 3001 AND d_w_id BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`,
         ok: v => Number(v) === 0 },
     ];
 
