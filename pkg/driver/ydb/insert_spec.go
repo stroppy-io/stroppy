@@ -126,31 +126,31 @@ type bulkUpsertWriter struct {
 }
 
 func newBulkUpsertWriter(
-	d *Driver,
+	ydbDriver *Driver,
 	tablePath, tableName string,
 	columns []string,
 ) *bulkUpsertWriter {
-	n := len(columns)
+	columnCount := len(columns)
 
-	w := &bulkUpsertWriter{
-		d:          d,
+	writer := &bulkUpsertWriter{
+		d:          ydbDriver,
 		tablePath:  tablePath,
 		tableName:  tableName,
 		columns:    columns,
-		colTypes:   make([]types.Type, n),
-		effective:  make([]types.Type, n),
-		hasNullBuf: make([]bool, n),
-		rowCells:   make([][]any, d.bulkSize),
-		valueBatch: make([]types.Value, 0, d.bulkSize),
-		fieldsBuf:  make([]types.StructValueOption, n),
-		bulkSize:   d.bulkSize,
+		colTypes:   make([]types.Type, columnCount),
+		effective:  make([]types.Type, columnCount),
+		hasNullBuf: make([]bool, columnCount),
+		rowCells:   make([][]any, ydbDriver.bulkSize),
+		valueBatch: make([]types.Value, 0, ydbDriver.bulkSize),
+		fieldsBuf:  make([]types.StructValueOption, columnCount),
+		bulkSize:   ydbDriver.bulkSize,
 	}
 
-	for i := range w.rowCells {
-		w.rowCells[i] = make([]any, n)
+	for i := range writer.rowCells {
+		writer.rowCells[i] = make([]any, columnCount)
 	}
 
-	return w
+	return writer
 }
 
 func (w *bulkUpsertWriter) appendRowCtx(ctx context.Context, row []any) error {
@@ -223,7 +223,7 @@ func (d *Driver) bulkUpsertRuntime(
 	}
 
 	tablePath := path.Join(d.nativeDB.Name(), tableName)
-	w := newBulkUpsertWriter(d, tablePath, tableName, columns)
+	writer := newBulkUpsertWriter(d, tablePath, tableName, columns)
 	remaining := limit
 
 	for limit < 0 || remaining > 0 {
@@ -236,7 +236,7 @@ func (d *Driver) bulkUpsertRuntime(
 			return fmt.Errorf("ydb: runtime.Next: %w", err)
 		}
 
-		if err := w.appendRowCtx(ctx, row); err != nil {
+		if err := writer.appendRowCtx(ctx, row); err != nil {
 			return err
 		}
 
@@ -245,7 +245,7 @@ func (d *Driver) bulkUpsertRuntime(
 		}
 	}
 
-	return w.flush(ctx)
+	return writer.flush(ctx)
 }
 
 // convertRowInto runs each cell through the dialect.Convert hook into

@@ -6,9 +6,14 @@ import (
 	"hash/fnv"
 	"math/rand/v2"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 )
+
+const maxSingleByteCodepoint = uint32(^byte(0))
+
+const maxRuneCodepoint = uint32(utf8.MaxRune)
 
 // drawASCII evaluates sub-Expr length bounds and forwards to
 // KernelASCII.
@@ -35,13 +40,18 @@ func drawASCII(ctx Context, prng *rand.Rand, node *dgproto.DrawAscii) (any, erro
 func alphabetWidth(ranges []*dgproto.AsciiRange) (int64, error) {
 	var total int64
 
-	for _, r := range ranges {
-		if r.GetMin() > r.GetMax() {
+	for _, asciiRange := range ranges {
+		if asciiRange.GetMin() > asciiRange.GetMax() {
 			return 0, fmt.Errorf("%w: ascii range [%d, %d] inverted",
-				ErrBadDraw, r.GetMin(), r.GetMax())
+				ErrBadDraw, asciiRange.GetMin(), asciiRange.GetMax())
 		}
 
-		total += int64(r.GetMax()-r.GetMin()) + 1
+		if asciiRange.GetMax() > maxRuneCodepoint {
+			return 0, fmt.Errorf("%w: ascii range max %d exceeds max rune %d",
+				ErrBadDraw, asciiRange.GetMax(), maxRuneCodepoint)
+		}
+
+		total += int64(asciiRange.GetMax()-asciiRange.GetMin()) + 1
 	}
 
 	if total == 0 {
@@ -80,8 +90,11 @@ func alphabetTableKey(ranges []*dgproto.AsciiRange) uint64 {
 func lookupASCIIAlphabet(ranges []*dgproto.AsciiRange) (*asciiAlphabet, int64, error) {
 	key := alphabetTableKey(ranges)
 
-	if cached, ok := asciiAlphabetCache.Load(key); ok {
-		table, _ := cached.(*asciiAlphabet)
+	if cached, found := asciiAlphabetCache.Load(key); found {
+		table, ok := cached.(*asciiAlphabet)
+		if !ok {
+			return nil, 0, fmt.Errorf("%w: invalid ascii alphabet cache entry %T", ErrBadDraw, cached)
+		}
 
 		return table, alphabetTableLen(table), nil
 	}
@@ -93,7 +106,12 @@ func lookupASCIIAlphabet(ranges []*dgproto.AsciiRange) (*asciiAlphabet, int64, e
 
 	actual, _ := asciiAlphabetCache.LoadOrStore(key, table)
 
-	return actual.(*asciiAlphabet), alphabetTableLen(table), nil
+	actualTable, ok := actual.(*asciiAlphabet)
+	if !ok {
+		return nil, 0, fmt.Errorf("%w: invalid ascii alphabet cache entry %T", ErrBadDraw, actual)
+	}
+
+	return actualTable, alphabetTableLen(actualTable), nil
 }
 
 func alphabetTableLen(table *asciiAlphabet) int64 {
@@ -116,7 +134,7 @@ func buildASCIIAlphabet(ranges []*dgproto.AsciiRange) (*asciiAlphabet, error) {
 
 	for _, r := range ranges {
 		for cp := r.GetMin(); cp <= r.GetMax(); cp++ {
-			if cp > 0xFF {
+			if cp > maxSingleByteCodepoint {
 				return buildWideASCIIAlphabet(ranges, total)
 			}
 
@@ -134,6 +152,12 @@ func buildWideASCIIAlphabet(ranges []*dgproto.AsciiRange, total int64) (*asciiAl
 
 	for _, r := range ranges {
 		for cp := r.GetMin(); cp <= r.GetMax(); cp++ {
+			if cp > maxRuneCodepoint {
+				return nil, fmt.Errorf("%w: ascii range max %d exceeds max rune %d",
+					ErrBadDraw, cp, maxRuneCodepoint)
+			}
+
+			//nolint:gosec // cp is checked against utf8.MaxRune before conversion.
 			out.runeTable = append(out.runeTable, rune(cp))
 		}
 	}
