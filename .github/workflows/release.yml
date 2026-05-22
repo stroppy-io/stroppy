@@ -26,7 +26,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.24.3"]
         os: [linux, darwin]
         arch: [amd64, arm64]
 
@@ -35,7 +34,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go }}
+          go-version-file: go.mod
           cache: true
 
       - name: Compute names
