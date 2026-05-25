@@ -93,6 +93,12 @@ DEBUG LOGGING
     "Starting benchmark: script=<name> steps=[...] config_file=true"
     "Running k6: args=[k6 run ...]"
 
+  The same logger config is propagated to the embedded k6 process:
+
+    LOG_LEVEL_DEBUG       enables k6 --verbose
+    LOG_MODE_DEVELOPMENT  maps to K6_LOG_FORMAT=text
+    LOG_MODE_PRODUCTION   maps to K6_LOG_FORMAT=json
+
 SEE ALSO
 
   stroppy help drivers   (driver types, presets, pool options)
