@@ -166,18 +166,32 @@ func KernelASCII(prng *rand.Rand, minLen, maxLen int64, alphabet []*dgproto.Asci
 		return "", fmt.Errorf("%w: ascii len range [%d, %d]", ErrBadDraw, minLen, maxLen)
 	}
 
-	total, err := alphabetWidth(alphabet)
+	table, total, err := lookupASCIIAlphabet(alphabet)
 	if err != nil {
 		return "", err
 	}
 
-	length := prng.Int64N(maxLen-minLen+1) + minLen
+	var length int64
+	if minLen == maxLen {
+		length = minLen
+	} else {
+		length = prng.Int64N(maxLen-minLen+1) + minLen
+	}
 
-	buf := make([]rune, 0, length)
+	if len(table.byteTable) > 0 {
+		buf := make([]byte, length)
 
-	for range length {
-		pick := prng.Int64N(total)
-		buf = append(buf, alphabetAt(alphabet, pick))
+		for i := range buf {
+			buf[i] = table.byteTable[prng.Int64N(total)]
+		}
+
+		return string(buf), nil
+	}
+
+	buf := make([]rune, length)
+
+	for i := range buf {
+		buf[i] = table.runeTable[prng.Int64N(total)]
 	}
 
 	return string(buf), nil

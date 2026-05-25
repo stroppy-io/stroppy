@@ -75,7 +75,7 @@ const driverTypeMap: Record<DriverTypeName, DriverConfig_DriverType> = {
   csv: DriverConfig_DriverType.DRIVER_TYPE_CSV,
 };
 
-const _envErrorMode = ENV("STROPPY_ERROR_MODE", undefined, 
+const _envErrorMode = ENV("STROPPY_ERROR_MODE", undefined,
 "(default: by config, else 'log') error handling mode: silent, log, throw, fail, abort",
 ) as ErrorModeName | undefined;
 
@@ -174,7 +174,7 @@ type RunQueryFn = (sql: string, args: Record<string, any>) => QueryResult;
 function handleError(mode: ErrorModeName, e: unknown, tags?: Record<string, string>): void {
   if (mode !== "silent") {
     console.error(`[stroppy] query error${tags ? ` [${Object.values(tags).join(",")}]` : ""}: ${e}`);
-  } 
+  }
   if (mode === "throw") {
     throw e;
   } else if (mode === "fail") {
@@ -274,7 +274,7 @@ export class TxX implements QueryAPI {
     this._startTime = Date.now();
     this.q = createQueryAPI(
       (sql, args) => {
-        this._queryCount++; 
+        this._queryCount++;
         const res = tx.runQuery(sql, args);
         this._cleanDuration += res.stats.elapsed.seconds() * 1000;
         return res;
@@ -650,11 +650,11 @@ export class DriverX implements QueryAPI {
 
   /** Execute a callback within a transaction. Auto-commits on success, auto-rollbacks on error. */
   beginTx(fn: (tx: TxX) => void): void;
-  beginTx(options: { isolation?: TxIsolationName; name?: string }, 
+  beginTx(options: { isolation?: TxIsolationName; name?: string },
     fn: (tx: TxX) => void): void;
 
   beginTx(
-    optionsOrFn: { isolation?: TxIsolationName; name?: string } | ((tx: TxX) => void), 
+    optionsOrFn: { isolation?: TxIsolationName; name?: string } | ((tx: TxX) => void),
     maybeFn?: (tx: TxX) => void): void {
 
     const isOptions = typeof optionsOrFn === "object";
@@ -767,6 +767,12 @@ export const once = Once;
 // '45000'`, neither of which match the serialization patterns below — but we
 // add an explicit early-out so a future regex tweak can't accidentally trip
 // the rollback path.
+//
+// YDB: the ydb-go-sdk surfaces gRPC status text (operation/UNAVAILABLE,
+// operation/ABORTED, wrong shard state during tablet splits, etc.) rather
+// than SQLSTATE. txRetryPolicy() matches those via isYDBTransientTxErrorMessage
+// and applies exponential backoff (default 50 ms → 1 s) before replaying the
+// transaction closure. Serialization-class errors still retry immediately.
 
 /** Check if an error is a transient serialization failure or deadlock that
  *  should be retried. Matches both PostgreSQL and MySQL error texts.
@@ -845,14 +851,20 @@ function sleepForRetry(seconds: number): void {
   if (k6Sleep) k6Sleep(seconds);
 }
 
+// YDB transient tx errors: match gRPC status / issue text from ydb-go-sdk.
+// Includes split/offline shard states (operation/UNAVAILABLE, code 400050,
+// "wrong shard state") that are not visible as SQLSTATE in the error string.
 function isYDBTransientTxErrorMessage(msg: string): boolean {
   return /operation\/OVERLOADED/i.test(msg)
       || /operation\/ABORTED/i.test(msg)
+      || /operation\/UNAVAILABLE/i.test(msg)
       || /operation\/BAD_SESSION/i.test(msg)
       || /operation\/SESSION_BUSY/i.test(msg)
+      || /code\s*=\s*400050/i.test(msg)
       || /code\s*=\s*400060/i.test(msg)
       || /code\s*=\s*400100/i.test(msg)
       || /WRONG_SHARD_STATE/i.test(msg)
+      || /wrong[\s_]shard[\s_]state/i.test(msg)
       || /Transaction locks invalidated/i.test(msg);
 }
 

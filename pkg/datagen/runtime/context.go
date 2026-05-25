@@ -69,6 +69,10 @@ type evalContext struct {
 	// this before calling into expr.Eval so StreamDraw / Choose mix
 	// the attr identity into the per-draw seed.
 	attrPath string
+
+	// drawPRNG is lazily allocated and re-seeded on every Draw call so
+	// StreamDraw / Choose avoid a fresh rand.New per sample.
+	drawPRNG *seed.ReusablePRNG
 }
 
 // LookupCol resolves a ColRef by consulting the current row's scratch
@@ -169,14 +173,19 @@ func (c *evalContext) Lookup(popName, attrName string, entityIdx int64) (any, er
 // serialized with an "s" prefix so the hash input for a same-row
 // draw never collides with an attrPath that happens to be numeric.
 func (c *evalContext) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand {
+	if c.drawPRNG == nil {
+		c.drawPRNG = seed.NewReusablePRNG()
+	}
+
 	key := seed.Derive(
 		c.rootSeed,
 		attrPath,
 		"s"+strconv.FormatUint(uint64(streamID), 10),
 		strconv.FormatInt(rowIdx, 10),
 	)
+	c.drawPRNG.Seed(key)
 
-	return seed.PRNG(key)
+	return c.drawPRNG.Rand()
 }
 
 // AttrPath returns the attr currently being evaluated. Empty when no

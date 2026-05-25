@@ -57,7 +57,8 @@ CREATE TABLE district (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
 )
 --= customer
 CREATE TABLE customer (
@@ -87,7 +88,8 @@ CREATE TABLE customer (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
 )
 --= history
 CREATE TABLE history (
@@ -104,7 +106,8 @@ CREATE TABLE history (
 ) WITH (
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
 )
 --= new_order
 CREATE TABLE new_order (
@@ -116,7 +119,8 @@ CREATE TABLE new_order (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
 )
 --= orders
 CREATE TABLE orders (
@@ -133,7 +137,8 @@ CREATE TABLE orders (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
 )
 --= order_line
 CREATE TABLE order_line (
@@ -152,7 +157,8 @@ CREATE TABLE order_line (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
 )
 --= item
 CREATE TABLE item (
@@ -162,6 +168,11 @@ CREATE TABLE item (
     i_price Double,
     i_data Utf8,
     PRIMARY KEY (i_id)
+) WITH (
+    AUTO_PARTITIONING_BY_LOAD = ENABLED,
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 500,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 550
 )
 --= stock
 CREATE TABLE stock (
@@ -187,7 +198,8 @@ CREATE TABLE stock (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
 )
 
 --+ create_indexes
@@ -199,8 +211,24 @@ CREATE TABLE stock (
    used by Order-Status 2.6.2.2. */
 --= idx_customer_name
 ALTER TABLE customer ADD INDEX idx_customer_name GLOBAL SYNC ON (c_w_id, c_d_id, c_last, c_first)
+--= idx_customer_name_setup
+ALTER TABLE customer ALTER INDEX idx_customer_name SET (
+    AUTO_PARTITIONING_BY_LOAD = ENABLED,
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 500,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1000,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
+)
 --= idx_order
 ALTER TABLE orders ADD INDEX idx_order GLOBAL SYNC ON (o_w_id, o_d_id, o_c_id, o_id)
+--= idx_order_setup
+ALTER TABLE orders ALTER INDEX idx_order SET (
+    AUTO_PARTITIONING_BY_LOAD = ENABLED,
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 500,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1000,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
+)
 
 --+ workload_tx_new_order
 --= get_customer
@@ -228,10 +256,10 @@ WHERE s_i_id = :i_id AND s_w_id = :w_id
 UPSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info)
 VALUES (:o_id, :d_id, :w_id, :ol_number, :i_id, :supply_w_id, :quantity, :amount, :dist_info)
 --= get_items_batch
-SELECT i_id, i_price, i_name, i_data FROM item WHERE i_id IN ({item_ids})
+SELECT i_id, i_price, i_name, i_data FROM item WHERE i_id IN :item_ids
 --= get_stocks_batch
 SELECT s_i_id, s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10
-FROM stock WHERE s_w_id = :w_id AND s_i_id IN ({item_ids})
+FROM stock WHERE s_w_id = :w_id AND s_i_id IN :item_ids
 
 --+ workload_tx_payment
 --= update_warehouse
@@ -328,7 +356,10 @@ WHERE ol_w_id = :w_id
   AND ol_o_id >= :min_o_id
   AND ol_o_id < :next_o_id
 --= stock_count_in
+/* Bound List<Int64> for the IN clause; see get_items_batch for the
+   plan-cache rationale. The id list comes from the get_window_items
+   round-trip above. */
 SELECT COUNT(*) FROM stock
 WHERE s_w_id = :w_id
   AND s_quantity < :threshold
-  AND s_i_id IN ({ids})
+  AND s_i_id IN :ids

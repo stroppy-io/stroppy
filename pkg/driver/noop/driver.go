@@ -241,8 +241,8 @@ func (r *rows) Err() error            { return nil }
 func (r *rows) Close() error          { return nil }
 
 // ── noopDialect ───────────────────────────────────────────────────────────────
-// Uses ? placeholders; ValueToAny returns nil so generated values are discarded
-// before reaching ExecContext.
+// Uses ? placeholders; values pass through conversion and noopConn discards
+// them at the final I/O boundary.
 
 type noopDialect struct{}
 
@@ -251,6 +251,6 @@ var _ queries.Dialect = noopDialect{}
 func (noopDialect) Placeholder(_ int) string { return "?" }
 func (noopDialect) Deduplicate() bool        { return false }
 
-func (noopDialect) Convert(_ any) (any, error) {
-	return nil, nil //nolint:nilnil // noop: generated values are intentionally discarded
+func (noopDialect) Convert(v any) (any, error) {
+	return v, nil
 }

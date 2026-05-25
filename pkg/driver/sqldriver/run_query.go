@@ -169,11 +169,21 @@ func ProcessArgs(
 	var missedArgs []string
 
 	for i, name := range pq.argOrder {
-		if val, ok := args[name]; ok {
-			argsSlice[i] = val
-		} else if !slices.Contains(missedArgs, name) {
-			missedArgs = append(missedArgs, name)
+		val, ok := args[name]
+		if !ok {
+			if !slices.Contains(missedArgs, name) {
+				missedArgs = append(missedArgs, name)
+			}
+
+			continue
 		}
+
+		conv, convErr := dialect.Convert(val)
+		if convErr != nil {
+			return "", nil, fmt.Errorf("dialect convert arg %q: %w", name, convErr)
+		}
+
+		argsSlice[i] = conv
 	}
 
 	if len(missedArgs) > 0 {

@@ -61,6 +61,20 @@ const tpccStockLevelDuration  = new Trend("tpcc_stock_level_duration", true);
 // TPC-C Configuration Constants
 const POOL_SIZE   = ENV("POOL_SIZE", 100, "Connection pool size");
 const WAREHOUSES  = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
+// First warehouse id assigned to this instance — see tx.ts for the full
+// distributed-run pattern. Affects the load phase, HOME_W_ID, the payment
+// remote pick (client-side), the new_order remote-line pick (which happens
+// inside the stored procedure: we pass min_w_id/max_w_id as the absolute
+// bounds), and validate_population's range filters.
+const WAREHOUSE_START = ENV("WAREHOUSE_START", 1, "First warehouse id for this instance (>=1)") as number;
+const W_ID_MAX = WAREHOUSE_START + WAREHOUSES - 1;
+// In a distributed run only ONE instance should load the global item table.
+// Default: only the WAREHOUSE_START=1 instance loads it.
+const LOAD_ITEMS = ENV(
+  "LOAD_ITEMS",
+  WAREHOUSE_START === 1 ? "true" : "false",
+  "Load the global item table (default: true when WAREHOUSE_START=1)",
+) === "true";
 const RETRY_ATTEMPTS = ENV("RETRY_ATTEMPTS", 3, "Max attempts for serialization-failure retries (1 = no retry)");
 
 const DISTRICTS_PER_WAREHOUSE = 10;
@@ -139,7 +153,7 @@ const _vu = (typeof __VU === "number" && __VU > 0) ? __VU : 1;
 let hid_counter = _vu * 10_000_000;
 const nextHid = (): number => ++hid_counter;
 
-const HOME_W_ID = 1 + ((_vu - 1) % WAREHOUSES);
+const HOME_W_ID = WAREHOUSE_START + ((_vu - 1) % WAREHOUSES);
 
 // Per-VU seed for tx-time draws. Mirrors tx.ts formula so procs and tx
 // runs at the same __VU produce identical draw sequences.
@@ -194,7 +208,7 @@ function warehouseSpec() {
     seed: SEED_WAREHOUSE,
     method: DatagenInsertMethod.NATIVE,
     attrs: {
-      w_id:       Attr.rowId(),
+      w_id:       Expr.add(Attr.rowIndex(), Expr.lit(WAREHOUSE_START)),
       w_name:     asciiRange(6, 10),
       w_street_1: asciiRange(10, 20),
       w_street_2: asciiRange(10, 20),
@@ -208,7 +222,7 @@ function warehouseSpec() {
 }
 
 function districtSpec() {
-  const dWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(DISTRICTS_PER_WAREHOUSE)), Expr.lit(1));
+  const dWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(DISTRICTS_PER_WAREHOUSE)), Expr.lit(WAREHOUSE_START));
   const dId  = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(DISTRICTS_PER_WAREHOUSE)), Expr.lit(1));
   return Rel.table("district", {
     size: TOTAL_DISTRICTS,
@@ -232,7 +246,7 @@ function districtSpec() {
 
 function customerSpec() {
   const perWh = CUSTOMERS_PER_DISTRICT * DISTRICTS_PER_WAREHOUSE;
-  const cWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(1));
+  const cWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(WAREHOUSE_START));
   const cDId  = Expr.add(
     Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
     Expr.lit(1),
@@ -296,7 +310,7 @@ function itemSpec() {
 }
 
 function stockSpec() {
-  const sWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(ITEMS_PER_WH)), Expr.lit(1));
+  const sWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(ITEMS_PER_WH)), Expr.lit(WAREHOUSE_START));
   const sIId = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(ITEMS_PER_WH)), Expr.lit(1));
   type AttrExpr = ReturnType<typeof Expr.lit>;
   const attrs: Record<string, AttrExpr> = {
@@ -323,7 +337,7 @@ function stockSpec() {
 const ORDERS_PERMUTE_SALT = BigInt("0x1BEEF02CACE1DAD1");
 function ordersSpec() {
   const perWh = CUSTOMERS_PER_DISTRICT * DISTRICTS_PER_WAREHOUSE;
-  const oWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(1));
+  const oWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(WAREHOUSE_START));
   const oDId  = Expr.add(
     Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
     Expr.lit(1),
@@ -370,7 +384,7 @@ function ordersSpec() {
 function orderLineSpec() {
   const perDWh = CUSTOMERS_PER_DISTRICT * DISTRICTS_PER_WAREHOUSE * OL_CNT_FIXED;
   const perD   = CUSTOMERS_PER_DISTRICT * OL_CNT_FIXED;
-  const olWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perDWh)), Expr.lit(1));
+  const olWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perDWh)), Expr.lit(WAREHOUSE_START));
   const olDId  = Expr.add(
     Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(perD)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
     Expr.lit(1),
@@ -410,7 +424,7 @@ function orderLineSpec() {
 
 function newOrderSpec() {
   const perWh = ORDERS_UNDELIVERED * DISTRICTS_PER_WAREHOUSE;
-  const noWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(1));
+  const noWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(WAREHOUSE_START));
   const noDId = Expr.add(
     Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(ORDERS_UNDELIVERED)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
     Expr.lit(1),
@@ -429,13 +443,14 @@ function newOrderSpec() {
 }
 
 // Remote-warehouse picker for payment (§2.5.1.2 remote branch). With
-// WAREHOUSES=1 there is no valid remote target.
+// WAREHOUSES=1 there is no valid remote target. Picks within this
+// instance's range [WAREHOUSE_START, W_ID_MAX] \ {HOME_W_ID}.
 const _remoteWhGen = WAREHOUSES > 1
   ? DrawRT.intUniform(seedOf("remoteWh"), 1, WAREHOUSES - 1)
   : null;
 function pickRemoteWh(): number {
   if (_remoteWhGen === null) return HOME_W_ID;
-  const alt = _remoteWhGen.next() as number;
+  const alt = (_remoteWhGen.next() as number) + WAREHOUSE_START - 1;
   return alt >= HOME_W_ID ? alt + 1 : alt;
 }
 
@@ -467,7 +482,13 @@ export function setup() {
     driver.insertSpec(warehouseSpec());
     driver.insertSpec(districtSpec());
     driver.insertSpec(customerSpec());
-    driver.insertSpec(itemSpec());
+    // item is a global table; in a distributed run only ONE instance should
+    // load it. Default: load when WAREHOUSE_START=1, opt-in/out via LOAD_ITEMS.
+    if (LOAD_ITEMS) {
+      driver.insertSpec(itemSpec());
+    } else {
+      console.log(`load_data: skipping item (LOAD_ITEMS=false; WAREHOUSE_START=${WAREHOUSE_START})`);
+    }
     driver.insertSpec(stockSpec());
     driver.insertSpec(ordersSpec());
     driver.insertSpec(orderLineSpec());
@@ -482,6 +503,10 @@ export function setup() {
     const TOTAL_NEW_ORDER  = TOTAL_DISTRICTS * ORDERS_UNDELIVERED;
     const TOTAL_ORDER_LINE = TOTAL_ORDERS * OL_CNT_FIXED;
 
+    // Counts here describe this instance's warehouse slice only; item is
+    // global and stays unfiltered.
+    const wWhere = (col: string) => `WHERE ${col} BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`;
+
     type DistRow = { dNextOId: number };
     type NoStats = { maxNoOId: number; minNoOId: number; cnt: number };
 
@@ -494,16 +519,18 @@ export function setup() {
     let cc4OSum = NaN, cc4OlCnt = NaN;
 
     try {
-      for (const r of driver.queryRows("SELECT d_w_id, d_id, d_next_o_id FROM district")) {
+      for (const r of driver.queryRows(
+        `SELECT d_w_id, d_id, d_next_o_id FROM district ${wWhere("d_w_id")}`,
+      )) {
         distMap[dKey(r[0], r[1])] = { dNextOId: Number(r[2]) };
       }
       for (const r of driver.queryRows(
-        "SELECT o_w_id, o_d_id, MAX(o_id) FROM orders GROUP BY o_w_id, o_d_id",
+        `SELECT o_w_id, o_d_id, MAX(o_id) FROM orders ${wWhere("o_w_id")} GROUP BY o_w_id, o_d_id`,
       )) {
         ordMaxMap[dKey(r[0], r[1])] = Number(r[2]);
       }
       for (const r of driver.queryRows(
-        "SELECT no_w_id, no_d_id, MAX(no_o_id), MIN(no_o_id), COUNT(*) FROM new_order GROUP BY no_w_id, no_d_id",
+        `SELECT no_w_id, no_d_id, MAX(no_o_id), MIN(no_o_id), COUNT(*) FROM new_order ${wWhere("no_w_id")} GROUP BY no_w_id, no_d_id`,
       )) {
         noStatsMap[dKey(r[0], r[1])] = {
           maxNoOId: Number(r[2]),
@@ -511,10 +538,10 @@ export function setup() {
           cnt:      Number(r[4]),
         };
       }
-      cc1WSum  = Number(driver.queryValue("SELECT SUM(w_ytd) FROM warehouse"));
-      cc1DSum  = Number(driver.queryValue("SELECT SUM(d_ytd) FROM district"));
-      cc4OSum  = Number(driver.queryValue("SELECT SUM(o_ol_cnt) FROM orders"));
-      cc4OlCnt = Number(driver.queryValue("SELECT COUNT(*) FROM order_line"));
+      cc1WSum  = Number(driver.queryValue(`SELECT SUM(w_ytd) FROM warehouse ${wWhere("w_id")}`));
+      cc1DSum  = Number(driver.queryValue(`SELECT SUM(d_ytd) FROM district ${wWhere("d_w_id")}`));
+      cc4OSum  = Number(driver.queryValue(`SELECT SUM(o_ol_cnt) FROM orders ${wWhere("o_w_id")}`));
+      cc4OlCnt = Number(driver.queryValue(`SELECT COUNT(*) FROM order_line ${wWhere("ol_w_id")}`));
     } catch (e) {
       throw new Error(`validate_population: prefetch failed: ${e}`);
     }
@@ -556,25 +583,25 @@ export function setup() {
         query: "SELECT COUNT(*) FROM item",
         ok: v => Number(v) === ITEMS },
       { name: `WAREHOUSE = ${WAREHOUSES}`,
-        query: "SELECT COUNT(*) FROM warehouse",
+        query: `SELECT COUNT(*) FROM warehouse ${wWhere("w_id")}`,
         ok: v => Number(v) === WAREHOUSES },
       { name: `DISTRICT = ${TOTAL_DISTRICTS}`,
-        query: "SELECT COUNT(*) FROM district",
+        query: `SELECT COUNT(*) FROM district ${wWhere("d_w_id")}`,
         ok: v => Number(v) === TOTAL_DISTRICTS },
       { name: `CUSTOMER = ${TOTAL_CUSTOMERS}`,
-        query: "SELECT COUNT(*) FROM customer",
+        query: `SELECT COUNT(*) FROM customer ${wWhere("c_w_id")}`,
         ok: v => Number(v) === TOTAL_CUSTOMERS },
       { name: `STOCK = ${TOTAL_STOCK}`,
-        query: "SELECT COUNT(*) FROM stock",
+        query: `SELECT COUNT(*) FROM stock ${wWhere("s_w_id")}`,
         ok: v => Number(v) === TOTAL_STOCK },
       { name: `ORDERS = ${TOTAL_ORDERS}`,
-        query: "SELECT COUNT(*) FROM orders",
+        query: `SELECT COUNT(*) FROM orders ${wWhere("o_w_id")}`,
         ok: v => Number(v) === TOTAL_ORDERS },
       { name: `NEW_ORDER = ${TOTAL_NEW_ORDER}`,
-        query: "SELECT COUNT(*) FROM new_order",
+        query: `SELECT COUNT(*) FROM new_order ${wWhere("no_w_id")}`,
         ok: v => Number(v) === TOTAL_NEW_ORDER },
       { name: `ORDER_LINE = ${TOTAL_ORDER_LINE}`,
-        query: "SELECT COUNT(*) FROM order_line",
+        query: `SELECT COUNT(*) FROM order_line ${wWhere("ol_w_id")}`,
         ok: v => Number(v) === TOTAL_ORDER_LINE },
 
       { name: "CC1 sum(W_YTD) = sum(D_YTD)",
@@ -599,20 +626,20 @@ export function setup() {
         query: "SELECT 100.0 * SUM(CASE WHEN i_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM item",
         ok: v => Number(v) >= 5 && Number(v) <= 15 },
       { name: "S_DATA 10% contains ORIGINAL (5..15%)",
-        query: "SELECT 100.0 * SUM(CASE WHEN s_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM stock",
+        query: `SELECT 100.0 * SUM(CASE WHEN s_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM stock ${wWhere("s_w_id")}`,
         ok: v => Number(v) >= 5 && Number(v) <= 15 },
       { name: "C_CREDIT 10% BC (5..15%)",
-        query: "SELECT 100.0 * SUM(CASE WHEN c_credit = 'BC' THEN 1 ELSE 0 END) / COUNT(*) FROM customer",
+        query: `SELECT 100.0 * SUM(CASE WHEN c_credit = 'BC' THEN 1 ELSE 0 END) / COUNT(*) FROM customer ${wWhere("c_w_id")}`,
         ok: v => Number(v) >= 5 && Number(v) <= 15 },
 
       { name: "C_MIDDLE = 'OE' everywhere",
-        query: "SELECT COUNT(*) FROM customer WHERE c_middle <> 'OE'",
+        query: `SELECT COUNT(*) FROM customer WHERE c_middle <> 'OE' AND c_w_id BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`,
         ok: v => Number(v) === 0 },
       { name: "W_YTD = 300000 everywhere",
-        query: "SELECT COUNT(*) FROM warehouse WHERE w_ytd <> 300000",
+        query: `SELECT COUNT(*) FROM warehouse WHERE w_ytd <> 300000 AND w_id BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`,
         ok: v => Number(v) === 0 },
       { name: "D_NEXT_O_ID = 3001 everywhere",
-        query: "SELECT COUNT(*) FROM district WHERE d_next_o_id <> 3001",
+        query: `SELECT COUNT(*) FROM district WHERE d_next_o_id <> 3001 AND d_w_id BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`,
         ok: v => Number(v) === 0 },
     ];
 
@@ -689,7 +716,12 @@ function new_order() {
     tpccRollbackDecided.add(1);
   }
 
-  const max_w_id = WAREHOUSES;
+  // Pass the absolute warehouse range bounds so the NEWORD proc's
+  // §2.4.1.5 remote-line pick stays inside this instance's slice. For the
+  // default single-instance run (WAREHOUSE_START=1) min_w_id=1, max_w_id=W
+  // and the proc behaves exactly as before.
+  const min_w_id = WAREHOUSE_START;
+  const max_w_id = W_ID_MAX;
   const d_id     = newOrderDistrictGen.next();
   const c_id     = newOrderCustomerGen.next();
   const ol_cnt   = newOrderOlCntGen.next();
@@ -699,6 +731,7 @@ function new_order() {
       driver.beginTx({ isolation: TX_ISOLATION, name: "new_order" }, (tx) => {
         tx.exec(sql("workload_procs", "new_order")!, {
           w_id: HOME_W_ID,
+          min_w_id,
           max_w_id,
           d_id,
           c_id,

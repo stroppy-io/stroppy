@@ -7,7 +7,8 @@ type Dialect interface {
 	// For MySQL: "?", "?", ...
 	Placeholder(index int) string
 
-	// Convert converts a native Go value to a Go type suitable for the target database.
+	// Convert converts a native Go value to a Go type suitable for binding to
+	// the target database, both for insert rows and query arguments.
 	Convert(v any) (any, error)
 
 	// Deduplicate reports whether repeated named parameters should share
