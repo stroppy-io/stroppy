@@ -10,6 +10,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
@@ -93,6 +94,11 @@ func RunBulkInsert[T any](
 	batch := make([][]any, 0, batchSize)
 	remaining := limit
 
+	generatedProgress := insertprogress.NewGeneratedRowCounter(ctx)
+	defer generatedProgress.Flush()
+
+	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
+
 	for limit < 0 || remaining > 0 {
 		row, err := rt.Next()
 		if errors.Is(err, io.EOF) {
@@ -110,12 +116,16 @@ func RunBulkInsert[T any](
 
 		batch = append(batch, rowCopy)
 
+		generatedProgress.Add(1)
+
 		if limit >= 0 {
 			remaining--
 		}
 
 		if len(batch) >= batchSize {
-			if err := execBulkBatch(ctx, db, table, columns, batch, dialect); err != nil {
+			generatedProgress.Flush()
+
+			if err := execProgressBulkBatch(ctx, db, table, columns, batch, dialect); err != nil {
 				return err
 			}
 
@@ -124,10 +134,37 @@ func RunBulkInsert[T any](
 	}
 
 	if len(batch) > 0 {
-		if err := execBulkBatch(ctx, db, table, columns, batch, dialect); err != nil {
+		generatedProgress.Flush()
+
+		if err := execProgressBulkBatch(ctx, db, table, columns, batch, dialect); err != nil {
 			return err
 		}
 	}
+
+	return nil
+}
+
+func execProgressBulkBatch[T any](
+	ctx context.Context,
+	db ExecContext[T],
+	table string,
+	columns []string,
+	batch [][]any,
+	dialect queries.Dialect,
+) error {
+	rows := int64(len(batch))
+
+	insertprogress.SetStage(ctx, insertprogress.StageSQLBulkInsertExec)
+
+	start := time.Now()
+
+	if err := execBulkBatch(ctx, db, table, columns, batch, dialect); err != nil {
+		return err
+	}
+
+	insertprogress.AddConfirmed(ctx, rows)
+	insertprogress.AddBatch(ctx, rows, time.Since(start))
+	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
 	return nil
 }
@@ -144,9 +181,12 @@ func RunInsertSpecStats[T any](
 	batchSize int,
 ) (*stats.Query, error) {
 	rows := rt.TotalRows()
+	insertprogress.SetTotal(ctx, rows)
+	insertprogress.SetWorkers(ctx, 1)
+	workerCtx := insertprogress.ContextWithWorker(ctx, 0)
 	start := time.Now()
 
-	if err := RunInsertSpec(ctx, db, spec, rt, dialect, batchSize); err != nil {
+	if err := RunInsertSpec(workerCtx, db, spec, rt, dialect, batchSize); err != nil {
 		return nil, err
 	}
 

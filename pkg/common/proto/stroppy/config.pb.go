@@ -279,8 +279,10 @@ type DriverConfig struct {
 	AuthPassword *string `protobuf:"bytes,23,opt,name=auth_password,json=authPassword,proto3,oneof" json:"auth_password,omitempty"`
 	// * Skip TLS certificate verification (insecure, testing only)
 	TlsInsecureSkipVerify *bool `protobuf:"varint,24,opt,name=tls_insecure_skip_verify,json=tlsInsecureSkipVerify,proto3,oneof" json:"tls_insecure_skip_verify,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// * Periodic InsertSpec progress reporting configuration.
+	InsertProgress *DriverConfig_InsertProgressConfig `protobuf:"bytes,25,opt,name=insert_progress,json=insertProgress,proto3,oneof" json:"insert_progress,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *DriverConfig) Reset() {
@@ -399,6 +401,13 @@ func (x *DriverConfig) GetTlsInsecureSkipVerify() bool {
 		return *x.TlsInsecureSkipVerify
 	}
 	return false
+}
+
+func (x *DriverConfig) GetInsertProgress() *DriverConfig_InsertProgressConfig {
+	if x != nil {
+		return x.InsertProgress
+	}
+	return nil
 }
 
 type isDriverConfig_DriverSpecific interface {
@@ -817,11 +826,84 @@ func (x *DriverConfig_SqlConfig) GetConnMaxIdleTime() string {
 	return ""
 }
 
+// * Periodic InsertSpec progress reporting.
+type DriverConfig_InsertProgressConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// * Enable progress watcher for long-running data loads (default: true).
+	Enabled *bool `protobuf:"varint,1,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
+	// * Reporting cadence as Go duration string, e.g. "10s", "30s", "1m".
+	Interval *string `protobuf:"bytes,2,opt,name=interval,proto3,oneof" json:"interval,omitempty"`
+	// * No-progress duration before stall warnings, e.g. "60s", "2m".
+	StallAfter *string `protobuf:"bytes,3,opt,name=stall_after,json=stallAfter,proto3,oneof" json:"stall_after,omitempty"`
+	// * Output mode: off, log, metrics, both (default: both).
+	Mode          *string `protobuf:"bytes,4,opt,name=mode,proto3,oneof" json:"mode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DriverConfig_InsertProgressConfig) Reset() {
+	*x = DriverConfig_InsertProgressConfig{}
+	mi := &file_proto_stroppy_config_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DriverConfig_InsertProgressConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DriverConfig_InsertProgressConfig) ProtoMessage() {}
+
+func (x *DriverConfig_InsertProgressConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_config_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DriverConfig_InsertProgressConfig.ProtoReflect.Descriptor instead.
+func (*DriverConfig_InsertProgressConfig) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_config_proto_rawDescGZIP(), []int{0, 2}
+}
+
+func (x *DriverConfig_InsertProgressConfig) GetEnabled() bool {
+	if x != nil && x.Enabled != nil {
+		return *x.Enabled
+	}
+	return false
+}
+
+func (x *DriverConfig_InsertProgressConfig) GetInterval() string {
+	if x != nil && x.Interval != nil {
+		return *x.Interval
+	}
+	return ""
+}
+
+func (x *DriverConfig_InsertProgressConfig) GetStallAfter() string {
+	if x != nil && x.StallAfter != nil {
+		return *x.StallAfter
+	}
+	return ""
+}
+
+func (x *DriverConfig_InsertProgressConfig) GetMode() string {
+	if x != nil && x.Mode != nil {
+		return *x.Mode
+	}
+	return ""
+}
+
 var File_proto_stroppy_config_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\xa4\x0f\n" +
+	"\x1aproto/stroppy/config.proto\x12\astroppy\x1a\x1aproto/stroppy/common.proto\x1a\x17validate/validate.proto\"\xdc\x11\n" +
 	"\fDriverConfig\x12\x1a\n" +
 	"\x03url\x18\x01 \x01(\tB\b\xfaB\x05r\x03\x90\x01\x01R\x03url\x12K\n" +
 	"\vdriver_type\x18\x02 \x01(\x0e2 .stroppy.DriverConfig.DriverTypeB\b\xfaB\x05\x82\x01\x02\x10\x01R\n" +
@@ -838,7 +920,8 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"auth_token\x18\x15 \x01(\tH\x03R\tauthToken\x88\x01\x01\x12 \n" +
 	"\tauth_user\x18\x16 \x01(\tH\x04R\bauthUser\x88\x01\x01\x12(\n" +
 	"\rauth_password\x18\x17 \x01(\tH\x05R\fauthPassword\x88\x01\x01\x12<\n" +
-	"\x18tls_insecure_skip_verify\x18\x18 \x01(\bH\x06R\x15tlsInsecureSkipVerify\x88\x01\x01\x1a\x95\x05\n" +
+	"\x18tls_insecure_skip_verify\x18\x18 \x01(\bH\x06R\x15tlsInsecureSkipVerify\x88\x01\x01\x12X\n" +
+	"\x0finsert_progress\x18\x19 \x01(\v2*.stroppy.DriverConfig.InsertProgressConfigH\aR\x0einsertProgress\x88\x01\x01\x1a\x95\x05\n" +
 	"\x0ePostgresConfig\x12+\n" +
 	"\x0ftrace_log_level\x18\x01 \x01(\tH\x00R\rtraceLogLevel\x88\x01\x01\x12/\n" +
 	"\x11max_conn_lifetime\x18\x02 \x01(\tH\x01R\x0fmaxConnLifetime\x88\x01\x01\x120\n" +
@@ -868,7 +951,18 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\x0f_max_open_connsB\x11\n" +
 	"\x0f_max_idle_connsB\x14\n" +
 	"\x12_conn_max_lifetimeB\x15\n" +
-	"\x13_conn_max_idle_time\"\xb4\x01\n" +
+	"\x13_conn_max_idle_time\x1a\xc7\x01\n" +
+	"\x14InsertProgressConfig\x12\x1d\n" +
+	"\aenabled\x18\x01 \x01(\bH\x00R\aenabled\x88\x01\x01\x12\x1f\n" +
+	"\binterval\x18\x02 \x01(\tH\x01R\binterval\x88\x01\x01\x12$\n" +
+	"\vstall_after\x18\x03 \x01(\tH\x02R\n" +
+	"stallAfter\x88\x01\x01\x12\x17\n" +
+	"\x04mode\x18\x04 \x01(\tH\x03R\x04mode\x88\x01\x01B\n" +
+	"\n" +
+	"\b_enabledB\v\n" +
+	"\t_intervalB\x0e\n" +
+	"\f_stall_afterB\a\n" +
+	"\x05_mode\"\xb4\x01\n" +
 	"\n" +
 	"DriverType\x12\x1b\n" +
 	"\x17DRIVER_TYPE_UNSPECIFIED\x10\x00\x12\x18\n" +
@@ -893,7 +987,8 @@ const file_proto_stroppy_config_proto_rawDesc = "" +
 	"\n" +
 	"_auth_userB\x10\n" +
 	"\x0e_auth_passwordB\x1b\n" +
-	"\x19_tls_insecure_skip_verify\"\xca\x02\n" +
+	"\x19_tls_insecure_skip_verifyB\x12\n" +
+	"\x10_insert_progress\"\xca\x02\n" +
 	"\fLoggerConfig\x12E\n" +
 	"\tlog_level\x18\x01 \x01(\x0e2\x1e.stroppy.LoggerConfig.LogLevelB\b\xfaB\x05\x82\x01\x02\x10\x01R\blogLevel\x12B\n" +
 	"\blog_mode\x18\x02 \x01(\x0e2\x1d.stroppy.LoggerConfig.LogModeB\b\xfaB\x05\x82\x01\x02\x10\x01R\alogMode\"q\n" +
@@ -934,37 +1029,39 @@ func file_proto_stroppy_config_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_stroppy_config_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_proto_stroppy_config_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_proto_stroppy_config_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_proto_stroppy_config_proto_goTypes = []any{
-	(DriverConfig_DriverType)(0),        // 0: stroppy.DriverConfig.DriverType
-	(DriverConfig_ErrorMode)(0),         // 1: stroppy.DriverConfig.ErrorMode
-	(LoggerConfig_LogLevel)(0),          // 2: stroppy.LoggerConfig.LogLevel
-	(LoggerConfig_LogMode)(0),           // 3: stroppy.LoggerConfig.LogMode
-	(*DriverConfig)(nil),                // 4: stroppy.DriverConfig
-	(*LoggerConfig)(nil),                // 5: stroppy.LoggerConfig
-	(*ExporterConfig)(nil),              // 6: stroppy.ExporterConfig
-	(*GlobalConfig)(nil),                // 7: stroppy.GlobalConfig
-	(*DriverConfig_PostgresConfig)(nil), // 8: stroppy.DriverConfig.PostgresConfig
-	(*DriverConfig_SqlConfig)(nil),      // 9: stroppy.DriverConfig.SqlConfig
-	nil,                                 // 10: stroppy.GlobalConfig.MetadataEntry
-	(*OtlpExport)(nil),                  // 11: stroppy.OtlpExport
+	(DriverConfig_DriverType)(0),              // 0: stroppy.DriverConfig.DriverType
+	(DriverConfig_ErrorMode)(0),               // 1: stroppy.DriverConfig.ErrorMode
+	(LoggerConfig_LogLevel)(0),                // 2: stroppy.LoggerConfig.LogLevel
+	(LoggerConfig_LogMode)(0),                 // 3: stroppy.LoggerConfig.LogMode
+	(*DriverConfig)(nil),                      // 4: stroppy.DriverConfig
+	(*LoggerConfig)(nil),                      // 5: stroppy.LoggerConfig
+	(*ExporterConfig)(nil),                    // 6: stroppy.ExporterConfig
+	(*GlobalConfig)(nil),                      // 7: stroppy.GlobalConfig
+	(*DriverConfig_PostgresConfig)(nil),       // 8: stroppy.DriverConfig.PostgresConfig
+	(*DriverConfig_SqlConfig)(nil),            // 9: stroppy.DriverConfig.SqlConfig
+	(*DriverConfig_InsertProgressConfig)(nil), // 10: stroppy.DriverConfig.InsertProgressConfig
+	nil,                // 11: stroppy.GlobalConfig.MetadataEntry
+	(*OtlpExport)(nil), // 12: stroppy.OtlpExport
 }
 var file_proto_stroppy_config_proto_depIdxs = []int32{
 	0,  // 0: stroppy.DriverConfig.driver_type:type_name -> stroppy.DriverConfig.DriverType
 	1,  // 1: stroppy.DriverConfig.error_mode:type_name -> stroppy.DriverConfig.ErrorMode
 	8,  // 2: stroppy.DriverConfig.postgres:type_name -> stroppy.DriverConfig.PostgresConfig
 	9,  // 3: stroppy.DriverConfig.sql:type_name -> stroppy.DriverConfig.SqlConfig
-	2,  // 4: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
-	3,  // 5: stroppy.LoggerConfig.log_mode:type_name -> stroppy.LoggerConfig.LogMode
-	11, // 6: stroppy.ExporterConfig.otlp_export:type_name -> stroppy.OtlpExport
-	10, // 7: stroppy.GlobalConfig.metadata:type_name -> stroppy.GlobalConfig.MetadataEntry
-	5,  // 8: stroppy.GlobalConfig.logger:type_name -> stroppy.LoggerConfig
-	6,  // 9: stroppy.GlobalConfig.exporter:type_name -> stroppy.ExporterConfig
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	10, // 4: stroppy.DriverConfig.insert_progress:type_name -> stroppy.DriverConfig.InsertProgressConfig
+	2,  // 5: stroppy.LoggerConfig.log_level:type_name -> stroppy.LoggerConfig.LogLevel
+	3,  // 6: stroppy.LoggerConfig.log_mode:type_name -> stroppy.LoggerConfig.LogMode
+	12, // 7: stroppy.ExporterConfig.otlp_export:type_name -> stroppy.OtlpExport
+	11, // 8: stroppy.GlobalConfig.metadata:type_name -> stroppy.GlobalConfig.MetadataEntry
+	5,  // 9: stroppy.GlobalConfig.logger:type_name -> stroppy.LoggerConfig
+	6,  // 10: stroppy.GlobalConfig.exporter:type_name -> stroppy.ExporterConfig
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_config_proto_init() }
@@ -979,13 +1076,14 @@ func file_proto_stroppy_config_proto_init() {
 	}
 	file_proto_stroppy_config_proto_msgTypes[4].OneofWrappers = []any{}
 	file_proto_stroppy_config_proto_msgTypes[5].OneofWrappers = []any{}
+	file_proto_stroppy_config_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_config_proto_rawDesc), len(file_proto_stroppy_config_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

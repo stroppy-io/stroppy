@@ -200,6 +200,39 @@ func (m *DriverRunConfig) validate(all bool) error {
 
 	}
 
+	if m.InsertProgress != nil {
+
+		if all {
+			switch v := interface{}(m.GetInsertProgress()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, DriverRunConfigValidationError{
+						field:  "InsertProgress",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, DriverRunConfigValidationError{
+						field:  "InsertProgress",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetInsertProgress()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return DriverRunConfigValidationError{
+					field:  "InsertProgress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return DriverRunConfigMultiError(errors)
 	}

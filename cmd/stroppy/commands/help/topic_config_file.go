@@ -39,6 +39,7 @@ Example stroppy-config.json:
         "driverType": "postgres",
         "url": "postgres://user:pass@db:5432/bench",
         "defaultInsertMethod": "native",
+        "insertProgress": { "interval": "30s", "stallAfter": "2m", "mode": "both" },
         "pool": { "maxConns": 200, "minConns": 200 }
       }
     },

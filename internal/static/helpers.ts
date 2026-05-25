@@ -106,6 +106,19 @@ const insertMethodMap: Record<InsertMethodName, InsertMethod> = {
   native: InsertMethod.NATIVE,
 };
 
+export type InsertProgressMode = "off" | "log" | "metrics" | "both";
+
+export interface InsertProgressConfig {
+  /** Enable periodic InsertSpec progress samples. Defaults to true. */
+  enabled?: boolean;
+  /** Reporting cadence, Go duration syntax: "10s", "30s", "1m". */
+  interval?: string;
+  /** No-progress duration before stall warnings, Go duration syntax. */
+  stallAfter?: string;
+  /** Where progress samples are emitted. Defaults to "both". */
+  mode?: InsertProgressMode;
+}
+
 const insertMetric = new Trend("insert_duration", true);
 const insertErrRateMetric = new Rate("insert_error_rate");
 const runQueryMetric = new Trend("run_query_duration", true);
@@ -352,6 +365,8 @@ export type DriverSetup = Omit<Partial<DriverConfig>, "errorMode" | "driverType"
   postgres?: Partial<DriverConfig_PostgresConfig>;
   /** Generic SQL pool config (takes priority over pool if set). */
   sql?: Partial<DriverConfig_SqlConfig>;
+  /** Periodic InsertSpec progress watcher configuration. */
+  insertProgress?: InsertProgressConfig;
 }
 
 const driverSetupKeys = new Set([
@@ -364,6 +379,7 @@ const driverSetupKeys = new Set([
   "postgres",
   "sql",
   "bulkSize",
+  "insertProgress",
   "caCertFile",
   "authToken",
   "authUser",
@@ -399,7 +415,10 @@ const nestedDriverSetupKeys: Record<string, Set<string>> = {
     "statementCacheCapacity",
   ]),
   sql: new Set(["maxOpenConns", "maxIdleConns", "connMaxLifetime", "connMaxIdleTime"]),
+  insertProgress: new Set(["enabled", "interval", "stallAfter", "mode"]),
 };
+
+const insertProgressModes = new Set(["off", "log", "metrics", "both"]);
 
 const driverSetupEnums: Record<string, Set<string>> = {
   driverType: new Set(Object.keys(driverTypeMap)),
@@ -445,6 +464,9 @@ export function validateDriverSetup(source: string, setup: unknown): asserts set
       if (!nestedKeys.has(nestedKey)) {
         throw new Error(`${source}: unknown ${key} option "${nestedKey}" (available: ${allowedList(nestedKeys)})`);
       }
+      if (key === "insertProgress" && nestedKey === "mode") {
+        validateEnum(source, `${key}.${nestedKey}`, value[nestedKey], insertProgressModes);
+      }
     }
   }
 }
@@ -453,7 +475,7 @@ function mergeDriverSetup(defaults: DriverSetup, cli: Partial<DriverSetup>): Dri
   const merged: Record<string, unknown> = { ...defaults };
   for (const [key, value] of Object.entries(cli)) {
     if (value === undefined) continue;
-    if ((key === "pool" || key === "postgres" || key === "sql") && isPlainObject(value)) {
+    if ((key === "pool" || key === "postgres" || key === "sql" || key === "insertProgress") && isPlainObject(value)) {
       merged[key] = { ...((defaults as Record<string, unknown>)[key] as object | undefined), ...value };
     } else {
       merged[key] = value;

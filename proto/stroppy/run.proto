@@ -98,6 +98,11 @@ message DriverRunConfig {
    * Takes priority over pool when both are set.
    */
   optional DriverConfig.SqlConfig sql = 15;
+
+  /**
+   * Periodic InsertSpec progress reporting. Matches TS DriverSetup.insertProgress.
+   */
+  optional DriverConfig.InsertProgressConfig insert_progress = 16;
 }
 
 /**

@@ -24,6 +24,7 @@
   
 - [proto/stroppy/config.proto](#proto_stroppy_config-proto)
     - [DriverConfig](#stroppy-DriverConfig)
+    - [DriverConfig.InsertProgressConfig](#stroppy-DriverConfig-InsertProgressConfig)
     - [DriverConfig.PostgresConfig](#stroppy-DriverConfig-PostgresConfig)
     - [DriverConfig.SqlConfig](#stroppy-DriverConfig-SqlConfig)
     - [ExporterConfig](#stroppy-ExporterConfig)
@@ -377,6 +378,25 @@ by the k6 lifecycle stage: init phase = shared, iteration = per-VU.
 | auth_user | [string](#string) | optional | Username for static credentials auth |
 | auth_password | [string](#string) | optional | Password for static credentials auth |
 | tls_insecure_skip_verify | [bool](#bool) | optional | Skip TLS certificate verification (insecure, testing only) |
+| insert_progress | [DriverConfig.InsertProgressConfig](#stroppy-DriverConfig-InsertProgressConfig) | optional | Periodic InsertSpec progress reporting configuration. |
+
+
+
+
+
+
+<a name="stroppy-DriverConfig-InsertProgressConfig"></a>
+
+### DriverConfig.InsertProgressConfig
+Periodic InsertSpec progress reporting.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| enabled | [bool](#bool) | optional | Enable progress watcher for long-running data loads (default: true). |
+| interval | [string](#string) | optional | Reporting cadence as Go duration string, e.g. &#34;10s&#34;, &#34;30s&#34;, &#34;1m&#34;. |
+| stall_after | [string](#string) | optional | No-progress duration before stall warnings, e.g. &#34;60s&#34;, &#34;2m&#34;. |
+| mode | [string](#string) | optional | Output mode: off, log, metrics, both (default: both). |
 
 
 
@@ -1636,6 +1656,7 @@ This is intentionally separate from DriverConfig (the runtime binary proto for T
 | default_insert_method | [string](#string) | optional | Driver-level insert method. One of: &#34;plain_query&#34;, &#34;plain_bulk&#34;, &#34;native&#34;. Matches TS DriverSetup.defaultInsertMethod. |
 | postgres | [DriverConfig.PostgresConfig](#stroppy-DriverConfig-PostgresConfig) | optional | PostgreSQL-specific pool config. Matches TS DriverSetup.postgres. Takes priority over pool when both are set. |
 | sql | [DriverConfig.SqlConfig](#stroppy-DriverConfig-SqlConfig) | optional | Generic database/sql pool config. Matches TS DriverSetup.sql. Takes priority over pool when both are set. |
+| insert_progress | [DriverConfig.InsertProgressConfig](#stroppy-DriverConfig-InsertProgressConfig) | optional | Periodic InsertSpec progress reporting. Matches TS DriverSetup.insertProgress. |
 
 
 

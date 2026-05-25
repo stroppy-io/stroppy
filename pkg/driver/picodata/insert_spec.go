@@ -9,6 +9,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
+	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
@@ -52,10 +53,13 @@ func (d *Driver) insertSpecSingle(
 	}
 
 	rows := rt.TotalRows()
+	insertprogress.SetTotal(ctx, rows)
+	insertprogress.SetWorkers(ctx, 1)
+	workerCtx := insertprogress.ContextWithWorker(ctx, 0)
 
 	start := time.Now()
 
-	if err := d.runChunk(ctx, spec, rt, -1); err != nil {
+	if err := d.runChunk(workerCtx, spec, rt, -1); err != nil {
 		return nil, err
 	}
 

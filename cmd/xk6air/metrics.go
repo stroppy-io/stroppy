@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"go.k6.io/k6/js/modules"
 	k6metrics "go.k6.io/k6/metrics"
 	"go.uber.org/zap"
@@ -17,12 +18,14 @@ const throughputInterval = time.Second
 type txMetrics struct {
 	mu sync.Mutex
 
-	txCount     *k6metrics.Metric
-	txTPS       *k6metrics.Metric
-	runQueryQPS *k6metrics.Metric
-	insertRows  *k6metrics.Metric
-	insertRPS   *k6metrics.Metric
-	tags        *k6metrics.TagSet
+	txCount      *k6metrics.Metric
+	txTPS        *k6metrics.Metric
+	runQueryQPS  *k6metrics.Metric
+	insertRows   *k6metrics.Metric
+	insertRPS    *k6metrics.Metric
+	progressRows *k6metrics.Metric
+	progressRPS  *k6metrics.Metric
+	tags         *k6metrics.TagSet
 
 	txTotal    uint64
 	queryTotal uint64
@@ -47,7 +50,7 @@ func (m *txMetrics) ensureRegistered(vu modules.VU, lg *zap.Logger) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.txCount != nil && m.txTPS != nil && m.runQueryQPS != nil &&
-		m.insertRows != nil && m.insertRPS != nil {
+		m.insertRows != nil && m.insertRPS != nil && m.progressRows != nil && m.progressRPS != nil {
 		return
 	}
 
@@ -72,12 +75,22 @@ func (m *txMetrics) ensureRegistered(vu modules.VU, lg *zap.Logger) {
 	if err != nil {
 		lg.Fatal("can't register insert_rows_per_second metric", zap.Error(err))
 	}
+	progressRows, err := registry.NewMetric("insert_progress_rows_total", k6metrics.Counter)
+	if err != nil {
+		lg.Fatal("can't register insert_progress_rows_total metric", zap.Error(err))
+	}
+	progressRPS, err := registry.NewMetric("insert_progress_rows_per_second", k6metrics.Trend)
+	if err != nil {
+		lg.Fatal("can't register insert_progress_rows_per_second metric", zap.Error(err))
+	}
 
 	m.txCount = txCount
 	m.txTPS = txTPS
 	m.runQueryQPS = runQueryQPS
 	m.insertRows = insertRows
 	m.insertRPS = insertRPS
+	m.progressRows = progressRows
+	m.progressRPS = progressRPS
 	m.tags = registry.RootTagSet()
 }
 
@@ -89,6 +102,51 @@ func (m *txMetrics) recordQuery(vu modules.VU) {
 	}
 
 	atomic.AddUint64(&m.queryTotal, 1)
+}
+
+func (m *txMetrics) recordInsertProgress(vu modules.VU, snapshot insertprogress.Snapshot) {
+	m.ensureRegistered(vu, rootModule.lg)
+
+	state := vu.State()
+	if state == nil {
+		return
+	}
+
+	progressRows, progressRPS, tags, ok := m.snapshotProgressMetrics()
+	if !ok {
+		return
+	}
+	if state.Tags != nil {
+		tags = currentVUTags(state.Tags.GetCurrentValues(), tags)
+	} else {
+		tags = withCurrentStepTag(tags)
+	}
+
+	tags = tags.With("table_name", snapshot.Table).
+		With("method", snapshot.Method).
+		With("event", string(snapshot.Event)).
+		With("row_kind", snapshot.RowKind)
+	now := time.Now()
+
+	if snapshot.DeltaRows > 0 {
+		k6metrics.PushIfNotDone(vu.Context(), state.Samples, k6metrics.Sample{
+			TimeSeries: k6metrics.TimeSeries{
+				Metric: progressRows,
+				Tags:   tags,
+			},
+			Time:  now,
+			Value: float64(snapshot.DeltaRows),
+		})
+	}
+
+	k6metrics.PushIfNotDone(vu.Context(), state.Samples, k6metrics.Sample{
+		TimeSeries: k6metrics.TimeSeries{
+			Metric: progressRPS,
+			Tags:   tags,
+		},
+		Time:  now,
+		Value: snapshot.CurrentRowsPerSecond,
+	})
 }
 
 func (m *txMetrics) recordInsert(vu modules.VU, table string, rows int64, elapsed time.Duration) {
@@ -253,6 +311,21 @@ func (m *txMetrics) snapshotInsertMetrics() (
 	}
 
 	return m.insertRows, m.insertRPS, m.tags, true
+}
+
+func (m *txMetrics) snapshotProgressMetrics() (
+	*k6metrics.Metric,
+	*k6metrics.Metric,
+	*k6metrics.TagSet,
+	bool,
+) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.progressRows == nil || m.progressRPS == nil || m.tags == nil {
+		return nil, nil, nil, false
+	}
+
+	return m.progressRows, m.progressRPS, m.tags, true
 }
 
 func currentVUTags(tagsAndMeta k6metrics.TagsAndMeta, fallback *k6metrics.TagSet) *k6metrics.TagSet {

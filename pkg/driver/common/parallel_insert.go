@@ -15,6 +15,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 )
 
 // ErrNoChunks is returned by RunParallel when the supplied chunk slice
@@ -77,6 +78,9 @@ func RunParallelByWorkers(
 	total := seed.TotalRows()
 
 	chunks := SplitChunks(total, workers)
+	insertprogress.SetTotal(ctx, total)
+	insertprogress.SetWorkers(ctx, len(chunks))
+
 	if err := runParallel(ctx, seed, chunks, fn); err != nil {
 		return 0, err
 	}
@@ -150,6 +154,9 @@ func RunParallel(ctx context.Context, spec *dgproto.InsertSpec, chunks []Chunk, 
 		return fmt.Errorf("common: build seed runtime: %w", err)
 	}
 
+	insertprogress.SetTotal(ctx, seed.TotalRows())
+	insertprogress.SetWorkers(ctx, len(chunks))
+
 	return runParallel(ctx, seed, chunks, fn)
 }
 
@@ -166,12 +173,14 @@ func runParallel(ctx context.Context, seed *runtime.Runtime, chunks []Chunk, fn 
 
 	for _, chunk := range chunks {
 		group.Go(func() error {
+			workerCtx := insertprogress.ContextWithWorker(groupCtx, chunk.Index)
+
 			worker := seed.Clone()
 			if err := worker.SeekRow(chunk.Start); err != nil {
 				return fmt.Errorf("common: worker %d seek to %d: %w", chunk.Index, chunk.Start, err)
 			}
 
-			if err := fn(groupCtx, chunk, worker); err != nil {
+			if err := fn(workerCtx, chunk, worker); err != nil {
 				return fmt.Errorf("common: worker %d: %w", chunk.Index, err)
 			}
 

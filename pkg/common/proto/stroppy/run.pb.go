@@ -70,9 +70,12 @@ type DriverRunConfig struct {
 	// *
 	// Generic database/sql pool config. Matches TS DriverSetup.sql.
 	// Takes priority over pool when both are set.
-	Sql           *DriverConfig_SqlConfig `protobuf:"bytes,15,opt,name=sql,proto3,oneof" json:"sql,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Sql *DriverConfig_SqlConfig `protobuf:"bytes,15,opt,name=sql,proto3,oneof" json:"sql,omitempty"`
+	// *
+	// Periodic InsertSpec progress reporting. Matches TS DriverSetup.insertProgress.
+	InsertProgress *DriverConfig_InsertProgressConfig `protobuf:"bytes,16,opt,name=insert_progress,json=insertProgress,proto3,oneof" json:"insert_progress,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *DriverRunConfig) Reset() {
@@ -199,6 +202,13 @@ func (x *DriverRunConfig) GetPostgres() *DriverConfig_PostgresConfig {
 func (x *DriverRunConfig) GetSql() *DriverConfig_SqlConfig {
 	if x != nil {
 		return x.Sql
+	}
+	return nil
+}
+
+func (x *DriverRunConfig) GetInsertProgress() *DriverConfig_InsertProgressConfig {
+	if x != nil {
+		return x.InsertProgress
 	}
 	return nil
 }
@@ -525,7 +535,7 @@ var File_proto_stroppy_run_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_run_proto_rawDesc = "" +
 	"\n" +
-	"\x17proto/stroppy/run.proto\x12\astroppy\x1a\x1aproto/stroppy/config.proto\"\x99\x0e\n" +
+	"\x17proto/stroppy/run.proto\x12\astroppy\x1a\x1aproto/stroppy/config.proto\"\x87\x0f\n" +
 	"\x0fDriverRunConfig\x12$\n" +
 	"\vdriver_type\x18\x01 \x01(\tH\x00R\n" +
 	"driverType\x88\x01\x01\x12\x15\n" +
@@ -546,7 +556,8 @@ const file_proto_stroppy_run_proto_rawDesc = "" +
 	"R\x12defaultTxIsolation\x88\x01\x01\x127\n" +
 	"\x15default_insert_method\x18\r \x01(\tH\vR\x13defaultInsertMethod\x88\x01\x01\x12E\n" +
 	"\bpostgres\x18\x0e \x01(\v2$.stroppy.DriverConfig.PostgresConfigH\fR\bpostgres\x88\x01\x01\x126\n" +
-	"\x03sql\x18\x0f \x01(\v2\x1f.stroppy.DriverConfig.SqlConfigH\rR\x03sql\x88\x01\x01\x1a\x9d\a\n" +
+	"\x03sql\x18\x0f \x01(\v2\x1f.stroppy.DriverConfig.SqlConfigH\rR\x03sql\x88\x01\x01\x12X\n" +
+	"\x0finsert_progress\x18\x10 \x01(\v2*.stroppy.DriverConfig.InsertProgressConfigH\x0eR\x0einsertProgress\x88\x01\x01\x1a\x9d\a\n" +
 	"\n" +
 	"PoolConfig\x12 \n" +
 	"\tmax_conns\x18\x01 \x01(\x05H\x00R\bmaxConns\x88\x01\x01\x12 \n" +
@@ -594,7 +605,8 @@ const file_proto_stroppy_run_proto_rawDesc = "" +
 	"\x15_default_tx_isolationB\x18\n" +
 	"\x16_default_insert_methodB\v\n" +
 	"\t_postgresB\x06\n" +
-	"\x04_sql\"\x8d\x04\n" +
+	"\x04_sqlB\x12\n" +
+	"\x10_insert_progress\"\x8d\x04\n" +
 	"\tRunConfig\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x1b\n" +
 	"\x06script\x18\x02 \x01(\tH\x00R\x06script\x88\x01\x01\x12\x15\n" +
@@ -639,21 +651,23 @@ var file_proto_stroppy_run_proto_goTypes = []any{
 	nil,                                 // 4: stroppy.RunConfig.EnvEntry
 	(*DriverConfig_PostgresConfig)(nil), // 5: stroppy.DriverConfig.PostgresConfig
 	(*DriverConfig_SqlConfig)(nil),      // 6: stroppy.DriverConfig.SqlConfig
-	(*GlobalConfig)(nil),                // 7: stroppy.GlobalConfig
+	(*DriverConfig_InsertProgressConfig)(nil), // 7: stroppy.DriverConfig.InsertProgressConfig
+	(*GlobalConfig)(nil),                      // 8: stroppy.GlobalConfig
 }
 var file_proto_stroppy_run_proto_depIdxs = []int32{
 	2, // 0: stroppy.DriverRunConfig.pool:type_name -> stroppy.DriverRunConfig.PoolConfig
 	5, // 1: stroppy.DriverRunConfig.postgres:type_name -> stroppy.DriverConfig.PostgresConfig
 	6, // 2: stroppy.DriverRunConfig.sql:type_name -> stroppy.DriverConfig.SqlConfig
-	7, // 3: stroppy.RunConfig.global:type_name -> stroppy.GlobalConfig
-	3, // 4: stroppy.RunConfig.drivers:type_name -> stroppy.RunConfig.DriversEntry
-	4, // 5: stroppy.RunConfig.env:type_name -> stroppy.RunConfig.EnvEntry
-	0, // 6: stroppy.RunConfig.DriversEntry.value:type_name -> stroppy.DriverRunConfig
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	7, // 3: stroppy.DriverRunConfig.insert_progress:type_name -> stroppy.DriverConfig.InsertProgressConfig
+	8, // 4: stroppy.RunConfig.global:type_name -> stroppy.GlobalConfig
+	3, // 5: stroppy.RunConfig.drivers:type_name -> stroppy.RunConfig.DriversEntry
+	4, // 6: stroppy.RunConfig.env:type_name -> stroppy.RunConfig.EnvEntry
+	0, // 7: stroppy.RunConfig.DriversEntry.value:type_name -> stroppy.DriverRunConfig
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_run_proto_init() }

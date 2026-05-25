@@ -18,6 +18,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
+	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
@@ -81,7 +82,7 @@ func (d *Driver) InsertSpec(
 
 	workers := int(spec.GetParallelism().GetWorkers())
 	if workers <= 1 {
-		return d.insertSpecSingle(spec)
+		return d.insertSpecSingle(ctx, spec)
 	}
 
 	return d.insertSpecParallel(ctx, spec, workers)
@@ -89,17 +90,20 @@ func (d *Driver) InsertSpec(
 
 // insertSpecSingle drains a single seed Runtime to EOF without the
 // common.RunParallel overhead when the caller requested workers ≤ 1.
-func (d *Driver) insertSpecSingle(spec *dgproto.InsertSpec) (*stats.Query, error) {
+func (d *Driver) insertSpecSingle(ctx context.Context, spec *dgproto.InsertSpec) (*stats.Query, error) {
 	rt, err := runtime.NewRuntime(spec)
 	if err != nil {
 		return nil, fmt.Errorf("noop: build runtime: %w", err)
 	}
 
 	rows := rt.TotalRows()
+	insertprogress.SetTotal(ctx, rows)
+	insertprogress.SetWorkers(ctx, 1)
+	workerCtx := insertprogress.ContextWithWorker(ctx, 0)
 
 	start := time.Now()
 
-	if err := drainRuntime(rt, -1); err != nil {
+	if err := drainRuntime(workerCtx, rt, -1); err != nil {
 		return nil, err
 	}
 
@@ -119,8 +123,8 @@ func (d *Driver) insertSpecParallel(
 	start := time.Now()
 
 	rows, err := common.RunParallelByWorkers(ctx, spec, workers,
-		func(_ context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
-			return drainRuntime(rt, chunk.Count)
+		func(workerCtx context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
+			return drainRuntime(workerCtx, rt, chunk.Count)
 		})
 	if err != nil {
 		return nil, err
@@ -132,20 +136,39 @@ func (d *Driver) insertSpecParallel(
 // drainRuntime pulls rows from rt and discards them. When count is
 // negative the runtime is drained to EOF; otherwise it emits exactly
 // count rows (or returns early on error).
-func drainRuntime(rt *runtime.Runtime, count int64) error {
+func drainRuntime(ctx context.Context, rt *runtime.Runtime, count int64) error {
+	generatedProgress := insertprogress.NewGeneratedRowCounter(ctx)
+	confirmedProgress := insertprogress.NewConfirmedRowCounter(ctx)
+
+	defer generatedProgress.Flush()
+	defer confirmedProgress.Flush()
+
+	insertprogress.SetStage(ctx, insertprogress.StageNoopDrain)
+
+	start := time.Now()
+
+	var drainedRows int64
+
 	for count < 0 || count > 0 {
 		if _, err := rt.Next(); err != nil {
 			if errors.Is(err, io.EOF) {
-				return nil
+				break
 			}
 
 			return fmt.Errorf("noop: runtime.Next: %w", err)
 		}
 
+		generatedProgress.Add(1)
+		confirmedProgress.Add(1)
+
+		drainedRows++
+
 		if count > 0 {
 			count--
 		}
 	}
+
+	insertprogress.AddBatch(ctx, drainedRows, time.Since(start))
 
 	return nil
 }

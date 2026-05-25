@@ -65,6 +65,18 @@ message DriverConfig {
     optional string conn_max_idle_time = 4;
   }
 
+  /** Periodic InsertSpec progress reporting. */
+  message InsertProgressConfig {
+    /** Enable progress watcher for long-running data loads (default: true). */
+    optional bool enabled = 1;
+    /** Reporting cadence as Go duration string, e.g. "10s", "30s", "1m". */
+    optional string interval = 2;
+    /** No-progress duration before stall warnings, e.g. "60s", "2m". */
+    optional string stall_after = 3;
+    /** Output mode: off, log, metrics, both (default: both). */
+    optional string mode = 4;
+  }
+
   /** Rows per bulk INSERT statement (default: 500) */
   optional int32 bulk_size = 4;
 
@@ -102,6 +114,9 @@ message DriverConfig {
   optional string auth_password = 23;
   /** Skip TLS certificate verification (insecure, testing only) */
   optional bool tls_insecure_skip_verify = 24;
+
+  /** Periodic InsertSpec progress reporting configuration. */
+  optional InsertProgressConfig insert_progress = 25;
 }
 
 /**
