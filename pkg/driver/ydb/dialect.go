@@ -8,14 +8,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 )
 
-var (
-	_ queries.Dialect        = ydbDialect{}
-	_ sqldriver.ArgConverter = ydbDialect{}
-)
+var _ queries.Dialect = ydbDialect{}
 
 var ErrUnsupportedType = errors.New("unsupported value type")
 
@@ -41,34 +37,26 @@ func (ydbDialect) Convert(val any) (any, error) {
 		return v.String(), nil
 	case *decimal.Decimal:
 		return v.String(), nil
+	case []any:
+		return convertAnySlice(v)
 	default:
 		return v, nil
 	}
 }
 
-// ConvertArg promotes JS-shaped values into types the YDB SDK can declare
-// natively for query parameters. Sobek delivers JS Arrays to Go as []any
-// with elements typed individually (Number → int64 when integral, else
-// float64; String → string). The YDB SDK's reflect-based parameter binder
-// cannot resolve interface{} as a list element type, so we collapse []any
-// to a concrete typed slice here. After this hook WithAutoDeclare emits
-// e.g. `DECLARE $pN AS List<Int64>;` and the query text stays identical
-// across calls — the server plan cache hits, eliminating the per-call
-// compilation cost we'd otherwise pay on every TPC-C IN-list batch.
-//
-// Scalar values pass through unchanged; the existing Convert() hook on
-// the bulk-load path handles their conversion when needed.
-func (ydbDialect) ConvertArg(val any) (any, error) {
-	arr, ok := val.([]any)
-	if !ok {
-		return val, nil
-	}
-
+// convertAnySlice promotes JS-shaped arrays into types the YDB SDK can declare
+// natively for query parameters. Sobek delivers JS Arrays to Go as []any with
+// elements typed individually (Number -> int64 when integral, else float64;
+// String -> string). The YDB SDK's reflect-based parameter binder cannot
+// resolve interface{} as a list element type, so we collapse []any to a
+// concrete typed slice here. WithAutoDeclare can then emit stable declarations
+// such as `DECLARE $pN AS List<Int64>;`, which preserves server plan-cache hits.
+func convertAnySlice(arr []any) (any, error) {
 	// Empty list: YDB rejects empty IN-comparisons. Pass through unchanged
 	// so the SDK surfaces a useful error if the caller missed an empty
 	// guard; we don't want to silently turn this into a typed empty list.
 	if len(arr) == 0 {
-		return val, nil
+		return arr, nil
 	}
 
 	// Choose target element type from the first non-nil element. All-nil
@@ -129,7 +117,7 @@ func (ydbDialect) ConvertArg(val any) (any, error) {
 		return out, nil
 	default:
 		return nil, fmt.Errorf(
-			"%w: list element type %T not supported by YDB ConvertArg",
+			"%w: list element type %T not supported by YDB Convert",
 			ErrUnsupportedType, sample,
 		)
 	}

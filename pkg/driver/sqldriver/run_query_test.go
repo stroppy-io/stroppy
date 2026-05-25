@@ -14,9 +14,31 @@ type testDialect struct{}
 
 func (testDialect) Placeholder(_ int) string { return "?" }
 func (testDialect) Convert(v any) (any, error) {
-	return v, nil //nolint:nilnil // test stub
+	return v, nil
 }
 func (testDialect) Deduplicate() bool { return false }
+
+var errConvertTest = errors.New("convert failed")
+
+type convertingDialect struct{ testDialect }
+
+func (convertingDialect) Convert(v any) (any, error) {
+	if n, ok := v.(int); ok {
+		return n + 1, nil
+	}
+
+	return v, nil
+}
+
+type failingDialect struct{ testDialect }
+
+func (failingDialect) Convert(v any) (any, error) {
+	if v == "bad" {
+		return nil, errConvertTest
+	}
+
+	return v, nil
+}
 
 func TestProcessArgs(t *testing.T) {
 	dialect := testDialect{}
@@ -143,6 +165,53 @@ func TestProcessArgs(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestProcessArgsUsesDialectConvert(t *testing.T) {
+	t.Parallel()
+
+	gotSQL, gotArgs, err := ProcessArgs(
+		convertingDialect{},
+		"SELECT :a, :b ",
+		map[string]any{"a": 1, "b": "unchanged"},
+	)
+	if err != nil {
+		t.Fatalf("ProcessArgs() unexpected error: %v", err)
+	}
+
+	if gotSQL != "SELECT ?, ? " {
+		t.Fatalf("SQL = %q, want %q", gotSQL, "SELECT ?, ? ")
+	}
+
+	if len(gotArgs) != 2 {
+		t.Fatalf("args len = %d, want 2", len(gotArgs))
+	}
+
+	if gotArgs[0] != 2 || gotArgs[1] != "unchanged" {
+		t.Fatalf("args = %#v, want []any{2, %q}", gotArgs, "unchanged")
+	}
+}
+
+func TestProcessArgsConvertErrorIncludesArgName(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := ProcessArgs(
+		failingDialect{},
+		"SELECT :arg ",
+		map[string]any{"arg": "bad"},
+	)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !errors.Is(err, errConvertTest) {
+		t.Fatalf("expected errConvertTest, got %v", err)
+	}
+
+	want := `dialect convert arg "arg": convert failed`
+	if err.Error() != want {
+		t.Fatalf("error = %q, want %q", err.Error(), want)
 	}
 }
 

@@ -1,6 +1,8 @@
 package ydb
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -111,5 +113,59 @@ func TestConvertRowInto(t *testing.T) {
 
 	if dest[1] != 0.05 {
 		t.Fatalf("dest[1] = %v", dest[1])
+	}
+}
+
+func TestDialectConvertAnySlice(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   []any
+		want any
+	}{
+		{
+			name: "int64 list",
+			in:   []any{int64(1), int64(2), int64(3)},
+			want: []int64{1, 2, 3},
+		},
+		{
+			name: "string list",
+			in:   []any{"a", "b"},
+			want: []string{"a", "b"},
+		},
+		{
+			name: "empty list passes through",
+			in:   []any{},
+			want: []any{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ydbDialect{}.Convert(tt.in)
+			if err != nil {
+				t.Fatalf("Convert() unexpected error: %v", err)
+			}
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("Convert() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDialectConvertAnySliceMixedTypes(t *testing.T) {
+	t.Parallel()
+
+	_, err := ydbDialect{}.Convert([]any{int64(1), "2"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !errors.Is(err, ErrUnsupportedType) {
+		t.Fatalf("expected ErrUnsupportedType, got %v", err)
 	}
 }

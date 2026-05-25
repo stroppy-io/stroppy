@@ -26,17 +26,6 @@ var (
 	argsRe = regexp.MustCompile(`(\s|^|\()(:[a-zA-Z0-9_]+)(\s|$|;|::|,|\))`)
 )
 
-// ArgConverter is an optional Dialect extension that pre-processes named-arg
-// values before they reach the underlying database driver. Dialects implement
-// it when they need to coerce JS-supplied shapes (e.g. []any from a JS Array)
-// into typed Go values the SDK can declare natively — for instance, YDB
-// promotes []any to []int64 so WithAutoDeclare emits `List<Int64>` and the
-// query text stays identical across calls, hitting the server plan cache.
-// Dialects that don't implement it keep the existing pass-through behavior.
-type ArgConverter interface {
-	ConvertArg(v any) (any, error)
-}
-
 // parsedQuery is the dialect-specific, value-independent decomposition of a SQL template.
 // It is computed once per unique (dialect, sqlStr) pair and reused across all calls.
 type parsedQuery struct {
@@ -179,8 +168,6 @@ func ProcessArgs(
 
 	var missedArgs []string
 
-	ac, _ := dialect.(ArgConverter)
-
 	for i, name := range pq.argOrder {
 		val, ok := args[name]
 		if !ok {
@@ -191,16 +178,12 @@ func ProcessArgs(
 			continue
 		}
 
-		if ac != nil {
-			conv, convErr := ac.ConvertArg(val)
-			if convErr != nil {
-				return "", nil, fmt.Errorf("dialect convert arg %q: %w", name, convErr)
-			}
-
-			val = conv
+		conv, convErr := dialect.Convert(val)
+		if convErr != nil {
+			return "", nil, fmt.Errorf("dialect convert arg %q: %w", name, convErr)
 		}
 
-		argsSlice[i] = val
+		argsSlice[i] = conv
 	}
 
 	if len(missedArgs) > 0 {
