@@ -101,6 +101,11 @@ const SCALE_FACTOR = Number(
   ENV("SCALE_FACTOR", "1", "TPC-H scale factor; 0.01 supported for smoke tests"),
 );
 const LOAD_WORKERS = ENV("LOAD_WORKERS", 0, "Load-time worker count per spec (0 = framework default)") as number;
+const FINALIZE_BUCKETS_OVERRIDE = ENV(
+  "FINALIZE_BUCKETS",
+  0,
+  "Override o_totalprice finalize bucket count (0 = auto; YDB only)",
+) as number;
 
 if (!Number.isFinite(SCALE_FACTOR) || SCALE_FACTOR <= 0) {
   throw new Error(`SCALE_FACTOR must be a positive number, got ${SCALE_FACTOR}`);
@@ -129,6 +134,22 @@ const N_PARTSUPP = N_PART * PARTSUPPS_PER_PART;
 const LINES_PER_ORDER_MIN = 1;
 const LINES_PER_ORDER_MAX = 7;
 const N_LINEITEM_EST = N_ORDERS * 4;
+
+if (
+  !Number.isFinite(FINALIZE_BUCKETS_OVERRIDE)
+  || FINALIZE_BUCKETS_OVERRIDE < 0
+  || !Number.isInteger(FINALIZE_BUCKETS_OVERRIDE)
+) {
+  throw new Error(`FINALIZE_BUCKETS must be 0 or a positive integer, got ${FINALIZE_BUCKETS_OVERRIDE}`);
+}
+
+// SF=1 needs 8 buckets on YDB's default 48 MiB DQ chunk limit. Scale by
+// order count so smoke sizes (SF=0.01) stay single-pass while SF=10+ keeps
+// per-bucket materialization near the SF=1-tested shape.
+const FINALIZE_TARGET_ORDERS_PER_BUCKET = 187_500;
+const FINALIZE_BUCKETS = FINALIZE_BUCKETS_OVERRIDE > 0
+  ? FINALIZE_BUCKETS_OVERRIDE
+  : Math.max(1, Math.ceil(N_ORDERS / FINALIZE_TARGET_ORDERS_PER_BUCKET));
 
 // Per-line date offset bands (spec §4.2.3).
 const L_SHIPDATE_OFF_MIN = 1;
@@ -636,6 +657,22 @@ function runSection(section: string): void {
   queries.forEach((q) => driver.exec(q, {}));
 }
 
+function runFinalizeTotals(): void {
+  const queries = sql("finalize_totals");
+  if (!queries) return;
+
+  queries.forEach((q) => {
+    if (q.params.includes("bucket") && q.params.includes("buckets")) {
+      console.log(`[tpch] finalize_totals: ${FINALIZE_BUCKETS} buckets`);
+      for (let bucket = 0; bucket < FINALIZE_BUCKETS; bucket++) {
+        driver.exec(q, { bucket, buckets: FINALIZE_BUCKETS });
+      }
+    } else {
+      driver.exec(q, {});
+    }
+  });
+}
+
 export function setup(): void {
   Step("drop_schema", () => {
     runSection("drop_schema");
@@ -671,7 +708,7 @@ export function setup(): void {
   // generated lines at orders-emit time. Runs after create_indexes so
   // the correlated subquery can use idx_lineitem_orderkey (pg/mysql/pico).
   Step("finalize_totals", () => {
-    runSection("finalize_totals");
+    runFinalizeTotals();
   });
 
   Step("queries", () => {

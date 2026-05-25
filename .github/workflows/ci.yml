@@ -15,16 +15,16 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
 
-      - name: Install linter dependencies
-        run: make install-linter
-
       - name: Run linter
-        run: make linter
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.10.1
+          args: --config .golangci.yml
 
       - name: Run tests
         run: make tests
@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
 
@@ -59,7 +59,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
@@ -90,7 +90,7 @@ jobs:
 
       - name: Pre-release per commit
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: nightly-${{ steps.sha.outputs.short }}
           name: nightly-${{ steps.sha.outputs.short }}
