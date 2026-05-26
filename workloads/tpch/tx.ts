@@ -198,6 +198,20 @@ const SQL_FILE =
   _sqlByDriver[driverConfig.driverType!] ??
   "./pg.sql";
 
+type YdbStoreMode = "column" | "row";
+
+function parseYdbStoreMode(raw: string): YdbStoreMode {
+  const mode = raw.trim().toLowerCase();
+  if (mode !== "column" && mode !== "row") {
+    throw new Error(`YDB_STORE_MODE must be "column" or "row", got ${raw}`);
+  }
+  return mode;
+}
+
+const YDB_STORE_MODE = parseYdbStoreMode(
+  ENV("YDB_STORE_MODE", "column", "YDB TPC-H storage mode: column or row"),
+);
+
 // YDB declares currency columns as `Double` — unlike pg/mysql/pico which
 // accept int64 into DECIMAL. Framework emits float64 from Draw.decimal,
 // but Expr.lit(0.0) collapses to int64 on the wire (Number.isInteger(0.0)
@@ -679,7 +693,10 @@ export function setup(): void {
   });
 
   Step("create_schema", () => {
-    runSection("create_schema");
+    const section = driverConfig.driverType === "ydb" && YDB_STORE_MODE === "column"
+      ? "create_schema_column"
+      : "create_schema";
+    runSection(section);
   });
 
   Step("load_data", () => {

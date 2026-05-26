@@ -1,15 +1,25 @@
 -- TPC-H workload for YDB (YQL via the native driver). Schema follows the
 -- TPC-H spec §1.4 shape with YQL type substitutions:
---   - CHAR(N) / VARCHAR(N) → Utf8 (YDB row tables have no fixed-width CHAR).
+--   - CHAR(N) / VARCHAR(N) → Utf8 (YDB has no fixed-width CHAR).
 --   - Currency columns → Double. Framework emits float64 from Draw.decimal;
 --     Expr.lit(0.0) needs litDouble() in tx.ts to keep zero-initialized
 --     o_totalprice on the Double wire (see workloads/tpch/tx.ts).
 --   - No FOREIGN KEY support; PRIMARY KEY only.
 --   - DATE literals: `DATE '1998-12-01'` → `CAST('1998-12-01' AS Timestamp)`.
 --
--- Secondary indexes are skipped — YDB row tables already shard on PRIMARY
--- KEY; secondary materialization has no query benefit for the full-scan
--- analytic shape of TPC-H.
+-- Storage modes:
+--   - create_schema_column is the default via YDB_STORE_MODE=column and uses
+--     YDB column store for OLAP-oriented TPC-H scans.
+--   - create_schema is selected via YDB_STORE_MODE=row and keeps row-store
+--     compatibility while pinning the same initial partition counts.
+--
+-- Partition counts follow YDB's own TPC-H workload defaults for SF <= 10:
+-- 64 partitions for fact/large dimensions, 1 partition for region/nation.
+-- YDB switches to 256 partitions above SF=10; add an explicit env override
+-- if this workload needs scale-aware DDL later.
+--
+-- Secondary indexes are skipped. TPC-H is a full-scan analytic workload, so
+-- secondary materialization has no query benefit for the benchmark shape.
 --
 -- Query rewrites vs pg.sql (permissible per spec §2.2.3.3):
 --   - Comma-joins → CROSS JOIN (§2.2.3.3 (q)).
@@ -51,6 +61,11 @@ CREATE TABLE region (
     r_comment    Utf8,
     PRIMARY KEY (r_regionkey)
 )
+WITH (
+    STORE = ROW,
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+)
 --= create_nation
 CREATE TABLE nation (
     n_nationkey  Int64           NOT NULL,
@@ -58,6 +73,11 @@ CREATE TABLE nation (
     n_regionkey  Int64           NOT NULL,
     n_comment    Utf8,
     PRIMARY KEY (n_nationkey)
+)
+WITH (
+    STORE = ROW,
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
 )
 --= create_part
 CREATE TABLE part (
@@ -72,6 +92,11 @@ CREATE TABLE part (
     p_comment     Utf8            NOT NULL,
     PRIMARY KEY (p_partkey)
 )
+WITH (
+    STORE = ROW,
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+)
 --= create_supplier
 CREATE TABLE supplier (
     s_suppkey    Int64           NOT NULL,
@@ -83,6 +108,11 @@ CREATE TABLE supplier (
     s_comment    Utf8            NOT NULL,
     PRIMARY KEY (s_suppkey)
 )
+WITH (
+    STORE = ROW,
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+)
 --= create_partsupp
 CREATE TABLE partsupp (
     ps_partkey    Int64          NOT NULL,
@@ -91,6 +121,11 @@ CREATE TABLE partsupp (
     ps_supplycost Double         NOT NULL,
     ps_comment    Utf8           NOT NULL,
     PRIMARY KEY (ps_partkey, ps_suppkey)
+)
+WITH (
+    STORE = ROW,
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
 )
 --= create_customer
 CREATE TABLE customer (
@@ -104,6 +139,11 @@ CREATE TABLE customer (
     c_comment     Utf8            NOT NULL,
     PRIMARY KEY (c_custkey)
 )
+WITH (
+    STORE = ROW,
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+)
 --= create_orders
 CREATE TABLE orders (
     o_orderkey      Int64           NOT NULL,
@@ -116,6 +156,11 @@ CREATE TABLE orders (
     o_shippriority  Int64           NOT NULL,
     o_comment       Utf8            NOT NULL,
     PRIMARY KEY (o_orderkey)
+)
+WITH (
+    STORE = ROW,
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
 )
 --= create_lineitem
 CREATE TABLE lineitem (
@@ -137,9 +182,149 @@ CREATE TABLE lineitem (
     l_comment       Utf8            NOT NULL,
     PRIMARY KEY (l_orderkey, l_linenumber)
 )
+WITH (
+    STORE = ROW,
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+)
+
+--+ create_schema_column
+--= create_region
+CREATE TABLE region (
+    r_regionkey  Int64           NOT NULL,
+    r_name       Utf8            NOT NULL,
+    r_comment    Utf8,
+    PRIMARY KEY (r_regionkey)
+)
+PARTITION BY HASH (r_regionkey)
+WITH (
+    STORE = COLUMN,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+)
+--= create_nation
+CREATE TABLE nation (
+    n_nationkey  Int64           NOT NULL,
+    n_name       Utf8            NOT NULL,
+    n_regionkey  Int64           NOT NULL,
+    n_comment    Utf8,
+    PRIMARY KEY (n_nationkey)
+)
+PARTITION BY HASH (n_nationkey)
+WITH (
+    STORE = COLUMN,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+)
+--= create_part
+CREATE TABLE part (
+    p_partkey     Int64           NOT NULL,
+    p_name        Utf8            NOT NULL,
+    p_mfgr        Utf8            NOT NULL,
+    p_brand       Utf8            NOT NULL,
+    p_type        Utf8            NOT NULL,
+    p_size        Int64           NOT NULL,
+    p_container   Utf8            NOT NULL,
+    p_retailprice Double          NOT NULL,
+    p_comment     Utf8            NOT NULL,
+    PRIMARY KEY (p_partkey)
+)
+PARTITION BY HASH (p_partkey)
+WITH (
+    STORE = COLUMN,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+)
+--= create_supplier
+CREATE TABLE supplier (
+    s_suppkey    Int64           NOT NULL,
+    s_name       Utf8            NOT NULL,
+    s_address    Utf8            NOT NULL,
+    s_nationkey  Int64           NOT NULL,
+    s_phone      Utf8            NOT NULL,
+    s_acctbal    Double          NOT NULL,
+    s_comment    Utf8            NOT NULL,
+    PRIMARY KEY (s_suppkey)
+)
+PARTITION BY HASH (s_suppkey)
+WITH (
+    STORE = COLUMN,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+)
+--= create_partsupp
+CREATE TABLE partsupp (
+    ps_partkey    Int64          NOT NULL,
+    ps_suppkey    Int64          NOT NULL,
+    ps_availqty   Int64          NOT NULL,
+    ps_supplycost Double         NOT NULL,
+    ps_comment    Utf8           NOT NULL,
+    PRIMARY KEY (ps_partkey, ps_suppkey)
+)
+PARTITION BY HASH (ps_partkey, ps_suppkey)
+WITH (
+    STORE = COLUMN,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+)
+--= create_customer
+CREATE TABLE customer (
+    c_custkey     Int64           NOT NULL,
+    c_name        Utf8            NOT NULL,
+    c_address     Utf8            NOT NULL,
+    c_nationkey   Int64           NOT NULL,
+    c_phone       Utf8            NOT NULL,
+    c_acctbal     Double          NOT NULL,
+    c_mktsegment  Utf8            NOT NULL,
+    c_comment     Utf8            NOT NULL,
+    PRIMARY KEY (c_custkey)
+)
+PARTITION BY HASH (c_custkey)
+WITH (
+    STORE = COLUMN,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+)
+--= create_orders
+CREATE TABLE orders (
+    o_orderkey      Int64           NOT NULL,
+    o_custkey       Int64           NOT NULL,
+    o_orderstatus   Utf8            NOT NULL,
+    o_totalprice    Double          NOT NULL,
+    o_orderdate     Timestamp       NOT NULL,
+    o_orderpriority Utf8            NOT NULL,
+    o_clerk         Utf8            NOT NULL,
+    o_shippriority  Int64           NOT NULL,
+    o_comment       Utf8            NOT NULL,
+    PRIMARY KEY (o_orderkey)
+)
+PARTITION BY HASH (o_orderkey)
+WITH (
+    STORE = COLUMN,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+)
+--= create_lineitem
+CREATE TABLE lineitem (
+    l_orderkey      Int64           NOT NULL,
+    l_partkey       Int64           NOT NULL,
+    l_suppkey       Int64           NOT NULL,
+    l_linenumber    Int64           NOT NULL,
+    l_quantity      Double          NOT NULL,
+    l_extendedprice Double          NOT NULL,
+    l_discount      Double          NOT NULL,
+    l_tax           Double          NOT NULL,
+    l_returnflag    Utf8            NOT NULL,
+    l_linestatus    Utf8            NOT NULL,
+    l_shipdate      Timestamp       NOT NULL,
+    l_commitdate    Timestamp       NOT NULL,
+    l_receiptdate   Timestamp       NOT NULL,
+    l_shipinstruct  Utf8            NOT NULL,
+    l_shipmode      Utf8            NOT NULL,
+    l_comment       Utf8            NOT NULL,
+    PRIMARY KEY (l_orderkey, l_linenumber)
+)
+PARTITION BY HASH (l_orderkey)
+WITH (
+    STORE = COLUMN,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+)
 
 --+ create_indexes
--- YDB row tables key-shard on PRIMARY KEY; secondary indexes carry
+-- YDB TPC-H tables shard via primary/hash keys; secondary indexes carry
 -- materialization cost without query benefit for full-scan analytics.
 -- The spec lists indexes as auxiliary, not required.
 --= noop
