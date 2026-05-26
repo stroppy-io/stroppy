@@ -87,6 +87,50 @@ func TestCopyLocalSiblingsSkipsExisting(t *testing.T) {
 	require.Equal(t, preExisting, string(got))
 }
 
+func TestAddK6LoggerArgsFromStroppyEnv(t *testing.T) {
+	runner := &ScriptRunner{}
+
+	args, envs := runner.addK6LoggerArgs(nil, []string{
+		"LOG_LEVEL=debug",
+		"LOG_MODE=production",
+	})
+
+	require.Contains(t, args, "--verbose")
+	require.Contains(t, envs, "K6_LOG_FORMAT=json")
+}
+
+func TestAddK6LoggerArgsDevelopmentMode(t *testing.T) {
+	runner := &ScriptRunner{}
+
+	args, envs := runner.addK6LoggerArgs(nil, []string{
+		"LOG_LEVEL=info",
+		"LOG_MODE=development",
+	})
+
+	require.NotContains(t, args, "--verbose")
+	require.Contains(t, envs, "K6_LOG_FORMAT=text")
+}
+
+func TestAddK6LoggerArgsPreservesExplicitK6LogFormat(t *testing.T) {
+	runner := &ScriptRunner{}
+
+	_, envs := runner.addK6LoggerArgs(nil, []string{
+		"K6_LOG_FORMAT=raw",
+		"LOG_MODE=production",
+	})
+
+	require.Contains(t, envs, "K6_LOG_FORMAT=raw")
+	require.NotContains(t, envs, "K6_LOG_FORMAT=json")
+}
+
+func TestAddK6LoggerArgsDoesNotDuplicateVerbose(t *testing.T) {
+	runner := &ScriptRunner{k6RunArgs: []string{"--verbose"}}
+
+	args, _ := runner.addK6LoggerArgs(nil, []string{"LOG_LEVEL=debug"})
+
+	require.NotContains(t, args, "--verbose")
+}
+
 func writeFile(t *testing.T, path, body string) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(path, []byte(body), 0o644))

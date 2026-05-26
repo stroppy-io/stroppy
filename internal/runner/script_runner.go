@@ -147,6 +147,7 @@ func (r *ScriptRunner) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to build env vars: %w", err)
 	}
 
+	args, envs = r.addK6LoggerArgs(args, envs)
 	args, envs = r.addOtelExportArgs(args, envs)
 
 	return r.runK6(ctx, args, envs)
@@ -442,6 +443,59 @@ func (r *ScriptRunner) addOtelExportArgs(args, envs []string) (argsOut, envsOut 
 	args = append(args, "--out", "opentelemetry")
 
 	return args, envs
+}
+
+func (r *ScriptRunner) addK6LoggerArgs(args, envs []string) (argsOut, envsOut []string) {
+	if logMode, ok := effectiveEnvValue(envs, "LOG_MODE"); ok && !hasEffectiveEnv(envs, "K6_LOG_FORMAT") {
+		if logFormat, mapped := k6LogFormatFromStroppyMode(logMode); mapped {
+			envs = append(envs, "K6_LOG_FORMAT="+logFormat)
+		}
+	}
+
+	if logLevel, ok := effectiveEnvValue(envs, "LOG_LEVEL"); ok && strings.EqualFold(logLevel, "debug") &&
+		!hasVerboseFlag(r.k6RunArgs) && !hasVerboseFlag(args) {
+		args = append(args, "--verbose")
+	}
+
+	return args, envs
+}
+
+func k6LogFormatFromStroppyMode(mode string) (logFormat string, ok bool) {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case string(logger.ProductionMod):
+		return "json", true
+	case string(logger.DevelopmentMod):
+		return "text", true
+	default:
+		return "", false
+	}
+}
+
+func hasVerboseFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "-v" || arg == "--verbose" || strings.HasPrefix(arg, "--verbose=") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasEffectiveEnv(envs []string, key string) bool {
+	_, ok := effectiveEnvValue(envs, key)
+
+	return ok
+}
+
+func effectiveEnvValue(envs []string, key string) (value string, ok bool) {
+	for _, env := range envs {
+		envKey, envValue, found := strings.Cut(env, "=")
+		if found && envKey == key {
+			return envValue, true
+		}
+	}
+
+	return "", false
 }
 
 // runK6 executes the k6.

@@ -13,6 +13,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
+	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
@@ -61,10 +62,13 @@ func (d *Driver) insertSpecSingle(
 	}
 
 	rows := rt.TotalRows()
+	insertprogress.SetTotal(ctx, rows)
+	insertprogress.SetWorkers(ctx, 1)
+	workerCtx := insertprogress.ContextWithWorker(ctx, 0)
 
 	start := time.Now()
 
-	if err := d.runChunk(ctx, spec, rt, -1); err != nil {
+	if err := d.runChunk(workerCtx, spec, rt, -1); err != nil {
 		return nil, err
 	}
 
@@ -125,11 +129,24 @@ func (d *Driver) copyFromRuntime(
 	rt *runtime.Runtime,
 	limit int64,
 ) error {
-	src := &rowSource{rt: rt, limit: limit}
+	insertprogress.SetStage(ctx, insertprogress.StagePostgresCopyFrom)
+	src := &rowSource{
+		rt:       rt,
+		limit:    limit,
+		progress: insertprogress.NewGeneratedRowCounter(ctx),
+	}
 
-	if _, err := d.pool.CopyFrom(ctx, pgx.Identifier{table}, rt.Columns(), src); err != nil {
+	start := time.Now()
+	rowsCopied, err := d.pool.CopyFrom(ctx, pgx.Identifier{table}, rt.Columns(), src)
+	src.progress.Flush()
+
+	if err != nil {
 		return fmt.Errorf("postgres: CopyFrom %q: %w", table, err)
 	}
+
+	insertprogress.AddConfirmed(ctx, rowsCopied)
+	insertprogress.AddBatch(ctx, rowsCopied, time.Since(start))
+	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
 	return nil
 }
@@ -156,6 +173,11 @@ func (d *Driver) bulkInsertRuntime(
 	batch := make([][]any, 0, batchSize)
 	remaining := limit
 
+	generatedProgress := insertprogress.NewGeneratedRowCounter(ctx)
+	defer generatedProgress.Flush()
+
+	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
+
 	for limit < 0 || remaining > 0 {
 		row, err := rt.Next()
 		if errors.Is(err, io.EOF) {
@@ -171,12 +193,16 @@ func (d *Driver) bulkInsertRuntime(
 		copy(rowCopy, row)
 		batch = append(batch, rowCopy)
 
+		generatedProgress.Add(1)
+
 		if limit >= 0 {
 			remaining--
 		}
 
 		if len(batch) >= batchSize {
-			if err := d.execBulkBatch(ctx, table, columns, batch); err != nil {
+			generatedProgress.Flush()
+
+			if err := d.execProgressBulkBatch(ctx, table, columns, batch); err != nil {
 				return err
 			}
 
@@ -185,10 +211,35 @@ func (d *Driver) bulkInsertRuntime(
 	}
 
 	if len(batch) > 0 {
-		if err := d.execBulkBatch(ctx, table, columns, batch); err != nil {
+		generatedProgress.Flush()
+
+		if err := d.execProgressBulkBatch(ctx, table, columns, batch); err != nil {
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (d *Driver) execProgressBulkBatch(
+	ctx context.Context,
+	table string,
+	columns []string,
+	batch [][]any,
+) error {
+	rows := int64(len(batch))
+
+	insertprogress.SetStage(ctx, insertprogress.StagePostgresBulkInsertExec)
+
+	start := time.Now()
+
+	if err := d.execBulkBatch(ctx, table, columns, batch); err != nil {
+		return err
+	}
+
+	insertprogress.AddConfirmed(ctx, rows)
+	insertprogress.AddBatch(ctx, rows, time.Since(start))
+	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
 	return nil
 }
@@ -264,11 +315,12 @@ func buildBulkInsert(table string, columns []string, rows [][]any) (query string
 // call pulls one row from the runtime; emission stops at EOF or after
 // `limit` rows when limit ≥ 0. Errors are stored and surfaced via Err().
 type rowSource struct {
-	rt    *runtime.Runtime
-	limit int64 // < 0 means unbounded
-	row   []any
-	err   error
-	sent  int64
+	rt       *runtime.Runtime
+	progress insertprogress.RowCounter
+	limit    int64 // < 0 means unbounded
+	row      []any
+	err      error
+	sent     int64
 }
 
 // Next advances the runtime cursor. Returns false at EOF, on error, or
@@ -295,6 +347,7 @@ func (s *rowSource) Next() bool {
 
 	s.row = row
 	s.sent++
+	s.progress.Add(1)
 
 	return true
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
+	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
@@ -59,10 +60,13 @@ func (d *Driver) insertSpecSingle(
 	}
 
 	rows := rt.TotalRows()
+	insertprogress.SetTotal(ctx, rows)
+	insertprogress.SetWorkers(ctx, 1)
+	workerCtx := insertprogress.ContextWithWorker(ctx, 0)
 
 	start := time.Now()
 
-	if err := d.runChunk(ctx, spec, rt, -1); err != nil {
+	if err := d.runChunk(workerCtx, spec, rt, -1); err != nil {
 		return nil, err
 	}
 
@@ -174,6 +178,7 @@ func (w *bulkUpsertWriter) flush(ctx context.Context) error {
 	}
 
 	batch := w.rowCells[:w.batchLen]
+	batchRows := int64(w.batchLen)
 
 	mergeColumnTypes(w.colTypes, batch)
 	colTypes := effectiveColumnTypesInto(w.effective, w.colTypes, batch)
@@ -190,9 +195,18 @@ func (w *bulkUpsertWriter) flush(ctx context.Context) error {
 		w.valueBatch = append(w.valueBatch, sv)
 	}
 
+	insertprogress.AddGenerated(ctx, batchRows)
+	insertprogress.SetStage(ctx, insertprogress.StageYDBBulkUpsert)
+
+	start := time.Now()
+
 	if err := w.d.flushBulk(ctx, w.tablePath, w.tableName, w.valueBatch); err != nil {
 		return err
 	}
+
+	insertprogress.AddConfirmed(ctx, batchRows)
+	insertprogress.AddBatch(ctx, batchRows, time.Since(start))
+	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
 	w.batchLen = 0
 
@@ -225,6 +239,8 @@ func (d *Driver) bulkUpsertRuntime(
 	tablePath := path.Join(d.nativeDB.Name(), tableName)
 	writer := newBulkUpsertWriter(d, tablePath, tableName, columns)
 	remaining := limit
+
+	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
 	for limit < 0 || remaining > 0 {
 		row, err := rt.Next()

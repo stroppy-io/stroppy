@@ -193,6 +193,39 @@ func (m *DriverConfig) validate(all bool) error {
 		// no validation rules for TlsInsecureSkipVerify
 	}
 
+	if m.InsertProgress != nil {
+
+		if all {
+			switch v := interface{}(m.GetInsertProgress()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, DriverConfigValidationError{
+						field:  "InsertProgress",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, DriverConfigValidationError{
+						field:  "InsertProgress",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetInsertProgress()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return DriverConfigValidationError{
+					field:  "InsertProgress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return DriverConfigMultiError(errors)
 	}
@@ -972,3 +1005,124 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = DriverConfig_SqlConfigValidationError{}
+
+// Validate checks the field values on DriverConfig_InsertProgressConfig with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *DriverConfig_InsertProgressConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DriverConfig_InsertProgressConfig
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// DriverConfig_InsertProgressConfigMultiError, or nil if none found.
+func (m *DriverConfig_InsertProgressConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DriverConfig_InsertProgressConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.Enabled != nil {
+		// no validation rules for Enabled
+	}
+
+	if m.Interval != nil {
+		// no validation rules for Interval
+	}
+
+	if m.StallAfter != nil {
+		// no validation rules for StallAfter
+	}
+
+	if m.Mode != nil {
+		// no validation rules for Mode
+	}
+
+	if len(errors) > 0 {
+		return DriverConfig_InsertProgressConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// DriverConfig_InsertProgressConfigMultiError is an error wrapping multiple
+// validation errors returned by
+// DriverConfig_InsertProgressConfig.ValidateAll() if the designated
+// constraints aren't met.
+type DriverConfig_InsertProgressConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DriverConfig_InsertProgressConfigMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DriverConfig_InsertProgressConfigMultiError) AllErrors() []error { return m }
+
+// DriverConfig_InsertProgressConfigValidationError is the validation error
+// returned by DriverConfig_InsertProgressConfig.Validate if the designated
+// constraints aren't met.
+type DriverConfig_InsertProgressConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DriverConfig_InsertProgressConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DriverConfig_InsertProgressConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DriverConfig_InsertProgressConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DriverConfig_InsertProgressConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DriverConfig_InsertProgressConfigValidationError) ErrorName() string {
+	return "DriverConfig_InsertProgressConfigValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e DriverConfig_InsertProgressConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDriverConfig_InsertProgressConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DriverConfig_InsertProgressConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DriverConfig_InsertProgressConfigValidationError{}

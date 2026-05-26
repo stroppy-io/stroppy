@@ -39,6 +39,7 @@ Example stroppy-config.json:
         "driverType": "postgres",
         "url": "postgres://user:pass@db:5432/bench",
         "defaultInsertMethod": "native",
+        "insertProgress": { "interval": "30s", "stallAfter": "2m", "mode": "both" },
         "pool": { "maxConns": 200, "minConns": 200 }
       }
     },
@@ -91,6 +92,12 @@ DEBUG LOGGING
     "Loaded config file: <path>"
     "Starting benchmark: script=<name> steps=[...] config_file=true"
     "Running k6: args=[k6 run ...]"
+
+  The same logger config is propagated to the embedded k6 process:
+
+    LOG_LEVEL_DEBUG       enables k6 --verbose
+    LOG_MODE_DEVELOPMENT  maps to K6_LOG_FORMAT=text
+    LOG_MODE_PRODUCTION   maps to K6_LOG_FORMAT=json
 
 SEE ALSO
 

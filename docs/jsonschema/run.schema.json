@@ -2,6 +2,150 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$ref": "#/$defs/.stroppy.RunConfig",
   "$defs": {
+    ".stroppy.DriverConfig.InsertProgressConfig": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "enabled"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "enabled"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "interval"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "interval"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "stallAfter"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "stallAfter"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "mode"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "mode"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "enabled": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.InsertProgressConfig.enabled"
+            }
+          ]
+        },
+        "interval": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.InsertProgressConfig.interval"
+            }
+          ]
+        },
+        "stallAfter": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.InsertProgressConfig.stall_after"
+            }
+          ]
+        },
+        "mode": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverConfig.InsertProgressConfig.mode"
+            }
+          ]
+        }
+      },
+      "type": "object",
+      "description": "* Periodic InsertSpec progress reporting."
+    },
+    ".stroppy.DriverConfig.InsertProgressConfig.enabled": {
+      "type": "boolean",
+      "description": "* Enable progress watcher for long-running data loads (default: true)."
+    },
+    ".stroppy.DriverConfig.InsertProgressConfig.interval": {
+      "type": "string",
+      "description": "* Reporting cadence as Go duration string, e.g. \"10s\", \"30s\", \"1m\"."
+    },
+    ".stroppy.DriverConfig.InsertProgressConfig.mode": {
+      "type": "string",
+      "description": "* Output mode: off, log, metrics, both (default: both)."
+    },
+    ".stroppy.DriverConfig.InsertProgressConfig.stall_after": {
+      "type": "string",
+      "description": "* No-progress duration before stall warnings, e.g. \"60s\", \"2m\"."
+    },
     ".stroppy.DriverConfig.PostgresConfig": {
       "allOf": [
         {
@@ -741,6 +885,26 @@
               }
             }
           ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "insertProgress"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "insertProgress"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
         }
       ],
       "properties": {
@@ -881,6 +1045,16 @@
             },
             {
               "$ref": "#/$defs/.stroppy.DriverRunConfig.sql"
+            }
+          ]
+        },
+        "insertProgress": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/.stroppy.DriverRunConfig.insert_progress"
             }
           ]
         }
@@ -1362,6 +1536,10 @@
     ".stroppy.DriverRunConfig.error_mode": {
       "type": "string",
       "description": "*\n Error handling mode. One of: \"silent\", \"log\", \"throw\", \"fail\", \"abort\".\n Matches TS DriverSetup.errorMode."
+    },
+    ".stroppy.DriverRunConfig.insert_progress": {
+      "$ref": "#/$defs/.stroppy.DriverConfig.InsertProgressConfig",
+      "description": "*\n Periodic InsertSpec progress reporting. Matches TS DriverSetup.insertProgress."
     },
     ".stroppy.DriverRunConfig.pool": {
       "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig"

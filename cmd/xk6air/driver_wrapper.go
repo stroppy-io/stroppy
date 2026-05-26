@@ -2,11 +2,14 @@ package xk6air
 
 import (
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 	"go.k6.io/k6/js/modules"
 	"go.uber.org/zap"
@@ -83,7 +86,7 @@ func (d *DriverWrapper) RunQuery(sql string, args map[string]any) (*driver.Query
 }
 
 // InsertSpecBin starts a relational bulk insert (InsertSpec) on the driver.
-// The argument is a serialised dgproto.InsertSpec — the TS wrapper handles
+// The argument is a serialized dgproto.InsertSpec — the TS wrapper handles
 // the marshal step so JS code never touches raw protobuf types.
 func (d *DriverWrapper) InsertSpecBin(specBin []byte) (*stats.Query, error) {
 	d.ensureReady()
@@ -94,13 +97,114 @@ func (d *DriverWrapper) InsertSpecBin(specBin []byte) (*stats.Query, error) {
 		return nil, fmt.Errorf("error while unmarshalling InsertSpec: %w", err)
 	}
 
-	result, err := d.drv.InsertSpec(d.vu.Context(), &spec)
+	tracker, err := d.newInsertProgressTracker(&spec)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := d.vu.Context()
+	if tracker.Enabled() {
+		ctx = insertprogress.ContextWithTracker(ctx, tracker)
+		tracker.Start(ctx)
+	}
+
+	result, err := d.drv.InsertSpec(ctx, &spec)
+	if tracker.Enabled() {
+		tracker.Finish(err)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error while executing InsertSpec: %w", err)
 	}
 	rootModule.txMetrics.recordInsert(d.vu, spec.GetTable(), result.Rows, result.Elapsed)
 
 	return result, nil
+}
+
+func (d *DriverWrapper) newInsertProgressTracker(
+	spec *dgproto.InsertSpec,
+) (*insertprogress.Tracker, error) {
+	config := insertprogress.DefaultConfig()
+	config.Table = spec.GetTable()
+	config.Method = insertMethodName(spec.GetMethod())
+	config.Workers = int(spec.GetParallelism().GetWorkers())
+	config.Logger = d.lg.Named("insert-progress")
+	config.OnSample = func(snapshot insertprogress.Snapshot) {
+		rootModule.txMetrics.recordInsertProgress(d.vu, snapshot)
+	}
+
+	if err := applyInsertProgressConfig(&config, d.cfg.GetInsertProgress()); err != nil {
+		return nil, err
+	}
+
+	return insertprogress.NewTracker(&config), nil
+}
+
+func applyInsertProgressConfig(
+	config *insertprogress.Config,
+	raw *stroppy.DriverConfig_InsertProgressConfig,
+) error {
+	if raw == nil {
+		return nil
+	}
+
+	if raw.Enabled != nil {
+		config.Enabled = raw.GetEnabled()
+	}
+
+	if raw.Interval != nil {
+		interval, err := parseInsertProgressDuration("insertProgress.interval", raw.GetInterval())
+		if err != nil {
+			return err
+		}
+
+		config.Interval = interval
+	}
+
+	if raw.StallAfter != nil {
+		stallAfter, err := parseInsertProgressDuration("insertProgress.stallAfter", raw.GetStallAfter())
+		if err != nil {
+			return err
+		}
+
+		config.StallAfter = stallAfter
+	}
+
+	if raw.Mode != nil {
+		mode, err := insertprogress.ParseMode(raw.GetMode())
+		if err != nil {
+			return err
+		}
+
+		config.Mode = mode
+	}
+
+	return nil
+}
+
+func parseInsertProgressDuration(name, raw string) (time.Duration, error) {
+	duration, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%s: parse duration %q: %w", name, raw, err)
+	}
+
+	if duration <= 0 {
+		return 0, fmt.Errorf("%s must be positive, got %q", name, raw)
+	}
+
+	return duration, nil
+}
+
+func insertMethodName(method dgproto.InsertMethod) string {
+	switch method {
+	case dgproto.InsertMethod_PLAIN_QUERY:
+		return "plain_query"
+	case dgproto.InsertMethod_PLAIN_BULK:
+		return "plain_bulk"
+	case dgproto.InsertMethod_NATIVE:
+		return "native"
+	default:
+		return strings.ToLower(method.String())
+	}
 }
 
 // Begin starts a new transaction with the given isolation level.

@@ -85,6 +85,10 @@ DRIVER OPTIONS (-D / --driver-opt)
                                      db_default | conn | none
     errorMode              string    silent | log | throw | fail | abort
     bulkSize               int       Rows per bulk INSERT (default: 2500)
+    insertProgress.enabled bool      Enable InsertSpec progress watcher
+    insertProgress.interval duration  Progress log/metric cadence (default: 10s)
+    insertProgress.stallAfter duration Warn after no row progress (default: 60s)
+    insertProgress.mode    string    off | log | metrics | both
     pool.maxConns          int       Maximum pool connections
     pool.minConns          int       Minimum pool connections
     pool.maxConnLifetime   duration  Max connection lifetime  (e.g. "1h")
@@ -146,6 +150,10 @@ EXAMPLES
 
   # Pool tuning
   stroppy run tpcc/procs.ts -d pg -D pool.maxConns=20 -D pool.maxConnLifetime=30m
+
+  # Show InsertSpec load progress every 30 seconds and warn after 2 minutes idle
+  stroppy run tpcc/tx -d pg -D insertProgress.interval=30s \
+    -D insertProgress.stallAfter=2m
 
   # Full JSON config instead of preset
   stroppy run tpcc/procs -d '{"url":"postgres://prod:5432","driverType":"postgres","errorMode":"throw"}'
