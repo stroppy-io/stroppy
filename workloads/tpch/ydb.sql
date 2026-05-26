@@ -334,6 +334,9 @@ SELECT 1
 -- Spec §4.2.3 o_totalprice = Σ l_extendedprice × (1 + l_tax) × (1 - l_discount).
 -- YDB's UPDATE supports UPSERT-style UPDATE ... ON. Split into disjoint
 -- key-modulo batches from tx.ts so larger scale factors stay below DQ limits.
+-- Every generated TPC-H order has 1-7 lineitems, so an inner join is enough.
+-- Avoid COALESCE here: YDB column-store block execution can reject it when
+-- the aggregate side is inferred as non-Optional.
 --= update_totalprice_bucket
 $per_order = (
     SELECT l_orderkey,
@@ -346,14 +349,14 @@ UPDATE orders ON
 SELECT o.o_orderkey AS o_orderkey,
        o.o_custkey AS o_custkey,
        o.o_orderstatus AS o_orderstatus,
-       COALESCE(p.tot, 0.0) AS o_totalprice,
+       p.tot AS o_totalprice,
        o.o_orderdate AS o_orderdate,
        o.o_orderpriority AS o_orderpriority,
        o.o_clerk AS o_clerk,
        o.o_shippriority AS o_shippriority,
        o.o_comment AS o_comment
 FROM   orders AS o
-       LEFT JOIN $per_order AS p ON p.l_orderkey = o.o_orderkey
+       JOIN $per_order AS p ON p.l_orderkey = o.o_orderkey
 WHERE  o.o_orderkey % CAST(:buckets AS Int64) = CAST(:bucket AS Int64)
 
 -- ==========================================================================
