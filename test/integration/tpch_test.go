@@ -49,7 +49,6 @@ func TestTpchWorkloadEndToEnd(t *testing.T) {
 		"run", "./workloads/tpch/tx.ts",
 		"-D", "url="+url,
 		"-e", "SCALE_FACTOR=0.01",
-		"-e", "STROPPY_NO_DEFAULT=true",
 		"--steps", "drop_schema,create_schema,load_data,set_logged,create_indexes,finalize_totals,queries",
 	)
 	cmd.Dir = repoRoot
@@ -480,9 +479,8 @@ func assertTpchTotalpriceFinalized(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
-// assertTpchQueriesLogged verifies every q1..q22 ran without an error
-// line in the tx.ts log output. The `queries` step prints `[tpch] qN: ok
-// in …ms` per success and `[tpch] qN: error …` per failure.
+// assertTpchQueriesLogged verifies the workload-phase `queries` step made
+// visible progress and emitted the consolidated timing report.
 func assertTpchQueriesLogged(t *testing.T, out string) {
 	t.Helper()
 	// At minimum, 5 spec-covered queries must succeed: q1, q3, q6, q13, q14.
@@ -495,6 +493,12 @@ func assertTpchQueriesLogged(t *testing.T, out string) {
 		if !strings.Contains(out, needle) {
 			t.Errorf("missing ok marker for %s in stroppy output", q)
 		}
+	}
+	if !strings.Contains(out, "TPC-H query timings (workload phase, ms)") {
+		t.Errorf("missing TPC-H timing summary in stroppy output")
+	}
+	if !strings.Contains(out, "  SUM") {
+		t.Errorf("missing TPC-H timing summary SUM row in stroppy output")
 	}
 }
 
@@ -530,7 +534,6 @@ func TestTpchAnswersSpotCheck(t *testing.T) {
 		"run", "./workloads/tpch/tx.ts",
 		"-D", "url="+url,
 		"-e", "SCALE_FACTOR=1",
-		"-e", "STROPPY_NO_DEFAULT=true",
 		"--steps", "drop_schema,create_schema,load_data,set_logged,create_indexes,finalize_totals,validate_answers",
 	)
 	cmd.Dir = repoRoot

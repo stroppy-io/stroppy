@@ -135,7 +135,6 @@ func runTpchStroppy(t *testing.T, driverType, url string, budget time.Duration) 
 		"-D", "url="+url,
 		"-D", "driverType="+driverType,
 		"-e", "SCALE_FACTOR=0.01",
-		"-e", "STROPPY_NO_DEFAULT=true",
 		"--steps", "drop_schema,create_schema,load_data,create_indexes,finalize_totals,queries",
 	)
 	cmd.Dir = repoRoot

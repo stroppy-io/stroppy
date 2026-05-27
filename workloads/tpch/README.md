@@ -37,7 +37,9 @@ Useful env overrides:
 5. `create_indexes` — creates the ~12 secondary indexes needed for q1–q22.
 6. `finalize_totals` — runs the `o_totalprice` recompute UPDATE (spec
    §4.2.3 formula depends on post-load lineitems).
-7. `queries` — executes q1–q22 once each, logging per-query timings.
+7. `queries` — workload-phase step in `default()`. Each iteration executes
+   q1–q22 in order, logs `[tpch] qN: ok in ...ms`, and feeds the final
+   consolidated timing report with per-query totals and a SUM row.
 8. `validate_answers` — diffs query results against `answers_sf1.json`
    (SF=1 only; skipped otherwise).
 

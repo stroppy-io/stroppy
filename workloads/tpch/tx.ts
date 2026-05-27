@@ -1,6 +1,6 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { DriverX, Step, ENV, TxIsolationName, declareDriverSetup } from "./helpers.ts";
+import { Counter, DriverX, Step, ENV, Trend, TxIsolationName, declareDriverSetup } from "./helpers.ts";
 import {
   Alphabet,
   Attr,
@@ -175,7 +175,27 @@ const SEED_LINEITEM = 0x7EC108;
 
 export const options: Options = {
   setupTimeout: String(Math.max(5, Math.ceil(SCALE_FACTOR * 15))) + "m",
+  summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"],
 };
+
+const TPCH_QUERY_NAMES = Array.from({ length: 22 }, (_, i) => "q" + String(i + 1));
+
+interface TpchQueryMetrics {
+  duration: Trend;
+  runs: Counter;
+  errors: Counter;
+  elapsedTotal: Counter;
+}
+
+const tpchQueryMetrics: Record<string, TpchQueryMetrics> = {};
+for (const name of TPCH_QUERY_NAMES) {
+  tpchQueryMetrics[name] = {
+    duration: new Trend(`tpch_${name}_duration`, true),
+    runs: new Counter(`tpch_${name}_runs`),
+    errors: new Counter(`tpch_${name}_errors`),
+    elapsedTotal: new Counter(`tpch_${name}_elapsed_total`),
+  };
+}
 
 // --------------------------------------------------------------------------
 // Driver / SQL wiring
@@ -690,6 +710,48 @@ function runFinalizeTotals(): void {
   });
 }
 
+function recordTpchQueryAttempt(name: string, elapsedMs: number, failed: boolean): void {
+  const metrics = tpchQueryMetrics[name];
+  if (!metrics) return;
+
+  metrics.runs.add(1);
+  metrics.duration.add(elapsedMs);
+  metrics.elapsedTotal.add(elapsedMs);
+  if (failed) metrics.errors.add(1);
+}
+
+function runTpchQueries(): void {
+  // Run each query once with pinned defaults. Keep per-query progress logs
+  // while metrics feed handleSummary's consolidated timing report.
+  for (const name of TPCH_QUERY_NAMES) {
+    const body = sql(name, "body");
+    if (!body) {
+      console.log(`[tpch] ${name}: skipped (no body in SQL file)`);
+      continue;
+    }
+
+    const params = withEndDates(queryParams[name] ?? {});
+    const t0 = Date.now();
+    try {
+      const result = driver.getDriver().runQuery(body.sql, params);
+      try {
+        result.rows.readAll(0);
+        const rowsErr = result.rows.err();
+        if (rowsErr) throw rowsErr;
+      } finally {
+        result.rows.close();
+      }
+      const elapsed = Date.now() - t0;
+      recordTpchQueryAttempt(name, elapsed, false);
+      console.log(`[tpch] ${name}: ok in ${elapsed}ms`);
+    } catch (e) {
+      const elapsed = Date.now() - t0;
+      recordTpchQueryAttempt(name, elapsed, true);
+      console.log(`[tpch] ${name}: error in ${elapsed}ms ${(e as Error)?.message ?? e}`);
+    }
+  }
+}
+
 export function setup(): void {
   Step("drop_schema", () => {
     runSection("drop_schema");
@@ -731,27 +793,6 @@ export function setup(): void {
     runFinalizeTotals();
   });
 
-  Step("queries", () => {
-    // Run each query once with pinned defaults. Log timings; tolerate
-    // missing bodies gracefully so incremental bring-up works.
-    for (let i = 1; i <= 22; i++) {
-      const name = "q" + String(i);
-      const body = sql(name, "body");
-      if (!body) {
-        console.log(`[tpch] ${name}: skipped (no body in SQL file)`);
-        continue;
-      }
-      const params = withEndDates(queryParams[name] ?? {});
-      const t0 = Date.now();
-      try {
-        driver.queryRows(body, params);
-        console.log(`[tpch] ${name}: ok in ${Date.now() - t0}ms`);
-      } catch (e) {
-        console.log(`[tpch] ${name}: error ${(e as Error)?.message ?? e}`);
-      }
-    }
-  });
-
   Step("validate_answers", () => {
     if (Math.abs(SCALE_FACTOR - 1) > 1e-9) {
       console.log(
@@ -779,11 +820,97 @@ export function setup(): void {
 }
 
 export default function (): void {
-  // TPC-H has no per-iteration transaction workload; loading + querying
-  // runs entirely from setup().
+  Step("queries", () => {
+    runTpchQueries();
+  });
 }
 
 export function teardown(): void {
   Step.end("workload");
   Teardown();
 }
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export function handleSummary(data: any): Record<string, string> {
+  const metrics = data.metrics ?? {};
+  const values = (name: string): Record<string, any> => metrics[name]?.values ?? {};
+  const finite = (value: any): number | undefined =>
+    typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  const counter = (name: string): number => finite(metrics[name]?.values?.count) ?? 0;
+  const countText = (value: number): string => String(Math.round(value));
+  const msText = (value: any): string => {
+    const n = finite(value);
+    return n === undefined ? "n/a" : n.toFixed(1);
+  };
+  const totalText = (value: number): string => value.toFixed(1);
+  const row = (
+    query: string,
+    runs: string,
+    errors: string,
+    totalMs: string,
+    avg: string,
+    min: string,
+    med: string,
+    p90: string,
+    p95: string,
+    p99: string,
+    max: string,
+  ): string =>
+    `  ${query.padEnd(5)} ${runs.padStart(6)} ${errors.padStart(6)} ` +
+    `${totalMs.padStart(12)} ${avg.padStart(8)} ${min.padStart(8)} ` +
+    `${med.padStart(8)} ${p90.padStart(8)} ${p95.padStart(8)} ` +
+    `${p99.padStart(8)} ${max.padStart(8)}`;
+
+  let totalRuns = 0;
+  let totalErrors = 0;
+  let totalElapsedMs = 0;
+  const lines: string[] = [
+    "",
+    "===== TPC-H query timings (workload phase, ms) =====",
+    "  total_ms is summed per-query elapsed time across all executions, not wall-clock time.",
+    row("query", "runs", "errors", "total_ms", "avg", "min", "med", "p90", "p95", "p99", "max"),
+  ];
+
+  for (const name of TPCH_QUERY_NAMES) {
+    const runs = counter(`tpch_${name}_runs`);
+    const errors = counter(`tpch_${name}_errors`);
+    const elapsedTotal = counter(`tpch_${name}_elapsed_total`);
+    const duration = values(`tpch_${name}_duration`);
+
+    totalRuns += runs;
+    totalErrors += errors;
+    totalElapsedMs += elapsedTotal;
+
+    lines.push(row(
+      name,
+      countText(runs),
+      countText(errors),
+      totalText(elapsedTotal),
+      msText(duration.avg),
+      msText(duration.min),
+      msText(duration.med),
+      msText(duration["p(90)"]),
+      msText(duration["p(95)"]),
+      msText(duration["p(99)"]),
+      msText(duration.max),
+    ));
+  }
+
+  lines.push(row(
+    "SUM",
+    countText(totalRuns),
+    countText(totalErrors),
+    totalText(totalElapsedMs),
+    totalRuns > 0 ? totalText(totalElapsedMs / totalRuns) : "n/a",
+    "n/a",
+    "n/a",
+    "n/a",
+    "n/a",
+    "n/a",
+    "n/a",
+  ));
+  lines.push("");
+
+  return { stdout: lines.join("\n") };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */

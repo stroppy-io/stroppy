@@ -61,7 +61,6 @@ func TestTpchParallelLoadNoRace(t *testing.T) {
 			"run", "./workloads/tpch/tx.ts",
 			"-D", "url="+url,
 			"-e", "SCALE_FACTOR=0.1",
-			"-e", "STROPPY_NO_DEFAULT=true",
 			"--steps", "drop_schema,create_schema,load_data",
 		)
 		cmd.Dir = repoRoot
