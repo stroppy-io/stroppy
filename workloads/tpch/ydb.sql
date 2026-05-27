@@ -282,14 +282,18 @@ WITH (
 --= create_orders
 CREATE TABLE orders (
     o_orderkey      Int64           NOT NULL,
-    o_custkey       Int64           NOT NULL,
-    o_orderstatus   Utf8            NOT NULL,
-    o_totalprice    Double          NOT NULL,
-    o_orderdate     Timestamp       NOT NULL,
-    o_orderpriority Utf8            NOT NULL,
-    o_clerk         Utf8            NOT NULL,
-    o_shippriority  Int64           NOT NULL,
-    o_comment       Utf8            NOT NULL,
+    -- Non-key columns are nullable in column mode so finalize_totals can partial
+    -- UPSERT only o_orderkey/o_totalprice. YDB 25.2 column-store full-row
+    -- UPSERT/UPDATE over an aggregate can hit BlockCoalesce on non-Optional
+    -- values.
+    o_custkey       Int64,
+    o_orderstatus   Utf8,
+    o_totalprice    Double,
+    o_orderdate     Timestamp,
+    o_orderpriority Utf8,
+    o_clerk         Utf8,
+    o_shippriority  Int64,
+    o_comment       Utf8,
     PRIMARY KEY (o_orderkey)
 )
 PARTITION BY HASH (o_orderkey)
@@ -332,32 +336,29 @@ SELECT 1
 
 --+ finalize_totals
 -- Spec §4.2.3 o_totalprice = Σ l_extendedprice × (1 + l_tax) × (1 - l_discount).
--- YDB's UPDATE supports UPSERT-style UPDATE ... ON. Split into disjoint
--- key-modulo batches from tx.ts so larger scale factors stay below DQ limits.
--- Every generated TPC-H order has 1-7 lineitems, so an inner join is enough.
--- Avoid COALESCE here: YDB column-store block execution can reject it when
--- the aggregate side is inferred as non-Optional.
+-- Split into disjoint order-key range batches from tx.ts so larger scale
+-- factors stay below DQ limits. Avoid modulo filters here: YDB 25.2
+-- column-store aggregation can lower them through BlockCoalesce incorrectly.
+-- Every generated TPC-H order has 1-7 lineitems. Column-store orders has
+-- nullable non-key columns so this can be a partial UPSERT. Avoid full-row
+-- UPSERT/UPDATE here: YDB 25.2 can lower that path through BlockCoalesce and
+-- reject non-Optional aggregate values.
 --= update_totalprice_bucket
 $per_order = (
     SELECT l_orderkey,
-           SUM(l_extendedprice * (1.0 + l_tax) * (1.0 - l_discount)) AS tot
+           SUM(Just(l_extendedprice * (1.0 + l_tax) * (1.0 - l_discount))) AS tot
     FROM   lineitem
-    WHERE  l_orderkey % CAST(:buckets AS Int64) = CAST(:bucket AS Int64)
+    WHERE  l_orderkey >= CAST(:min_orderkey AS Int64)
+      AND  l_orderkey <= CAST(:max_orderkey AS Int64)
     GROUP  BY l_orderkey
 );
-UPDATE orders ON
-SELECT o.o_orderkey AS o_orderkey,
-       o.o_custkey AS o_custkey,
-       o.o_orderstatus AS o_orderstatus,
-       p.tot AS o_totalprice,
-       o.o_orderdate AS o_orderdate,
-       o.o_orderpriority AS o_orderpriority,
-       o.o_clerk AS o_clerk,
-       o.o_shippriority AS o_shippriority,
-       o.o_comment AS o_comment
-FROM   orders AS o
-       JOIN $per_order AS p ON p.l_orderkey = o.o_orderkey
-WHERE  o.o_orderkey % CAST(:buckets AS Int64) = CAST(:bucket AS Int64)
+UPSERT INTO orders (
+       o_orderkey,
+       o_totalprice
+)
+SELECT p.l_orderkey AS o_orderkey,
+       p.tot AS o_totalprice
+FROM   $per_order AS p
 
 -- ==========================================================================
 -- 22 TPC-H queries, YQL port. Permissible deviations per §2.2.3.3.

@@ -134,6 +134,7 @@ const N_PARTSUPP = N_PART * PARTSUPPS_PER_PART;
 const LINES_PER_ORDER_MIN = 1;
 const LINES_PER_ORDER_MAX = 7;
 const N_LINEITEM_EST = N_ORDERS * 4;
+const MAX_ORDERKEY = Math.floor((N_ORDERS - 1) / 8) * 32 + ((N_ORDERS - 1) % 8) + 1;
 
 if (
   !Number.isFinite(FINALIZE_BUCKETS_OVERRIDE)
@@ -676,10 +677,12 @@ function runFinalizeTotals(): void {
   if (!queries) return;
 
   queries.forEach((q) => {
-    if (q.params.includes("bucket") && q.params.includes("buckets")) {
+    if (q.params.includes("min_orderkey") && q.params.includes("max_orderkey")) {
       console.log(`[tpch] finalize_totals: ${FINALIZE_BUCKETS} buckets`);
       for (let bucket = 0; bucket < FINALIZE_BUCKETS; bucket++) {
-        driver.exec(q, { bucket, buckets: FINALIZE_BUCKETS });
+        const min_orderkey = Math.floor((MAX_ORDERKEY * bucket) / FINALIZE_BUCKETS) + 1;
+        const max_orderkey = Math.floor((MAX_ORDERKEY * (bucket + 1)) / FINALIZE_BUCKETS);
+        driver.exec(q, { min_orderkey, max_orderkey });
       }
     } else {
       driver.exec(q, {});
