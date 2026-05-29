@@ -13,6 +13,7 @@ import {
   CurrentStep,
   DeclareEnv,
   Once,
+  GlobalOnce,
   Driver,
   Tx,
   QueryStats,
@@ -758,6 +759,10 @@ export const Step = Object.assign(
  *  Call once() during init to capture the guard, then invoke the
  *  returned function during iterations — it only fires on the first call. */
 export const once = Once;
+
+/** Execute a function once globally across VUs in this k6 process.
+ *  Other VUs block until the first caller completes; failures are rethrown. */
+export { GlobalOnce };
 
 // ============================================================================
 // T2.3: SQLSTATE 40001 / deadlock retry helper

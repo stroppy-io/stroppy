@@ -88,6 +88,32 @@ export default function() {}
 	require.EqualValues(t, 7, pool["maxIdleConns"])
 }
 
+func TestProbeScriptWithGlobalOnceDiscoversSteps(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, static.CopyAllStaticFilesToPath(dir, common.FileMode))
+
+	scriptPath := filepath.Join(dir, "global_once_probe.ts")
+	require.NoError(t, os.WriteFile(scriptPath, []byte(`
+import { GlobalOnce, Step } from "./helpers.ts";
+
+export const options = {};
+
+function prepare() {
+  Step("load_data", () => {});
+}
+
+export default function() {
+  GlobalOnce("prepare", prepare);
+  Step("queries", () => {});
+}
+`), common.FileMode))
+
+	probe, err := ProbeScript(scriptPath)
+	require.NoError(t, err)
+	require.Contains(t, probe.Steps, "load_data")
+	require.Contains(t, probe.Steps, "queries")
+}
+
 func Test_stepSpy(t *testing.T) {
 	vm := createVM()
 	steps := []string{}

@@ -36,6 +36,7 @@ func init() {
 		ctx:              context.Background(),
 		instanceTeardown: make(map[*Instance]func() error),
 		sharedSlots:      make(map[uint64]*sharedDriverSlot),
+		globalOnceSlots:  make(map[string]*globalOnceSlot),
 		steps:            make(map[string]stroppy.StroppyRun_Status),
 		txMetrics:        &txMetrics{},
 	}
@@ -54,6 +55,11 @@ type sharedDriverSlot struct {
 	drv  driver.Driver
 }
 
+type globalOnceSlot struct {
+	once sync.Once
+	err  error
+}
+
 // RootModule global object for all the VU instances.
 type RootModule struct {
 	lg          *zap.Logger
@@ -63,6 +69,9 @@ type RootModule struct {
 
 	sharedMu    sync.Mutex
 	sharedSlots map[uint64]*sharedDriverSlot
+
+	globalOnceMu    sync.Mutex
+	globalOnceSlots map[string]*globalOnceSlot
 
 	instanceMu       sync.Mutex
 	instanceTeardown map[*Instance]func() error
@@ -123,6 +132,19 @@ func (r *RootModule) CurrentStep() string {
 	return r.activeStep
 }
 
+func (r *RootModule) globalOnceSlot(name string) *globalOnceSlot {
+	r.globalOnceMu.Lock()
+	defer r.globalOnceMu.Unlock()
+
+	slot, ok := r.globalOnceSlots[name]
+	if !ok {
+		slot = &globalOnceSlot{}
+		r.globalOnceSlots[name] = slot
+	}
+
+	return slot
+}
+
 func (r *RootModule) addVuTeardown(instance *Instance) {
 	r.instanceMu.Lock()
 	r.instanceTeardown[instance] = instance.Teardown
@@ -176,6 +198,10 @@ func (r *RootModule) Teardown() error {
 		}
 	}
 	r.sharedMu.Unlock()
+
+	r.globalOnceMu.Lock()
+	r.globalOnceSlots = make(map[string]*globalOnceSlot)
+	r.globalOnceMu.Unlock()
 
 	r.stepsMu.Lock()
 	snapshot := make(map[string]stroppy.StroppyRun_Status, len(r.steps))

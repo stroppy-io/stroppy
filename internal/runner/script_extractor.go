@@ -463,6 +463,15 @@ func prepareVMEnvironment(vm *js.Runtime, probeprint *Probeprint, env map[string
 		{"DeclareEnv", declareEnvSpy(&probeprint.EnvDeclarations)},
 		{"DeclareDriverSetup", declareDriverSetupSpy(&probeprint.DriverSetups)},
 		{"Once", func(x any) any { return x }},
+		{"GlobalOnce", func(_ string, fn js.Callable) error {
+			if fn == nil {
+				return nil
+			}
+
+			_, err := fn(js.Undefined())
+
+			return err
+		}},
 
 		{"parse_sql_with_sections", parseSectionsSpy(&probeprint.SQLSections)},
 		{"parse_sql", parseSpy(&probeprint.SQLSections)},

@@ -1,6 +1,7 @@
 package xk6air
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/grafana/sobek"
@@ -57,6 +58,7 @@ func (i *Instance) Exports() modules.Exports {
 			"NewPicker":    NewPicker,
 			"DeclareEnv":   func([]string, string, string) {},
 			"Once":         i.Once,
+			"GlobalOnce":   i.GlobalOnce,
 
 			// Draw iter 2 — sobek-bound Go structs, one per StreamDraw arm.
 			// Handle registries for dict / alphabet / grammar are exposed
@@ -158,6 +160,49 @@ func (i *Instance) Once(call sobek.FunctionCall) sobek.Value {
 		}
 		return result
 	})
+}
+
+// GlobalOnce executes a callback once across all VUs in this process.
+func (i *Instance) GlobalOnce(call sobek.FunctionCall) sobek.Value {
+	rt := i.vu.Runtime()
+	const globalOnceArgs = 2
+	if len(call.Arguments) < globalOnceArgs {
+		panic(rt.NewTypeError("GlobalOnce() requires a name and function argument"))
+	}
+
+	name := call.Argument(0).String()
+	if name == "" {
+		panic(rt.NewTypeError("GlobalOnce() requires a non-empty name"))
+	}
+
+	fn, ok := sobek.AssertFunction(call.Argument(1))
+	if !ok {
+		panic(rt.NewTypeError("GlobalOnce() requires a function argument"))
+	}
+
+	slot := rootModule.globalOnceSlot(name)
+	slot.once.Do(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slot.err = recoveredToError(r)
+			}
+		}()
+
+		_, slot.err = fn(sobek.Undefined())
+	})
+	if slot.err != nil {
+		panic(rt.NewGoError(fmt.Errorf("global once %q failed: %w", name, slot.err)))
+	}
+
+	return sobek.Undefined()
+}
+
+func recoveredToError(value any) error {
+	if err, ok := value.(error); ok {
+		return err
+	}
+
+	return fmt.Errorf("%v", value)
 }
 
 // Teardown mirrors k6 "function teardown()".

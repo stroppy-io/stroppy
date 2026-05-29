@@ -101,6 +101,10 @@ declare module "k6/x/stroppy" {
    *  The wrapped function caches and returns the result of the first invocation. */
   export declare function Once<F extends (...args: any[]) => any>(fn: F): F;
 
+  /** Execute a function once globally across VUs in this k6 process.
+   *  Other VUs block until completion; failures are rethrown to all callers. */
+  export declare function GlobalOnce(name: string, fn: () => void): void;
+
   // -------- Draw iter 2: sobek-bound Go structs per StreamDraw arm --------
 
   /** Concurrency: one Draw instance per VU. Cursors are not atomic. */

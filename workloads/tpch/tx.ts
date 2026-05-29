@@ -1,6 +1,6 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { Counter, DriverX, Step, ENV, Trend, TxIsolationName, declareDriverSetup } from "./helpers.ts";
+import { Counter, DriverX, Step, ENV, GlobalOnce, Trend, TxIsolationName, declareDriverSetup } from "./helpers.ts";
 import {
   Alphabet,
   Attr,
@@ -174,7 +174,6 @@ const SEED_LINEITEM = 0x7EC108;
 // dates are derived from o_orderdate — see lineitemSpec().
 
 export const options: Options = {
-  setupTimeout: String(Math.max(5, Math.ceil(SCALE_FACTOR * 15))) + "m",
   summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"],
 };
 
@@ -752,7 +751,7 @@ function runTpchQueries(): void {
   }
 }
 
-export function setup(): void {
+function prepareDatabase(): void {
   Step("drop_schema", () => {
     runSection("drop_schema");
   });
@@ -820,6 +819,8 @@ export function setup(): void {
 }
 
 export default function (): void {
+  GlobalOnce("tpch.prepare", prepareDatabase);
+
   Step("queries", () => {
     runTpchQueries();
   });
