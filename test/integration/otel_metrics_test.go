@@ -86,10 +86,13 @@ func TestOtelStroppyMetricsNoop(t *testing.T) {
 			}, 100); err != nil {
 				return err
 			}
-			if err := requirePrometheusSample(body, "stroppy_insert_rows_per_second", labels{
+			if err := requirePrometheusSample(body, "stroppy_insert_progress_rows_total", labels{
+				"event":      "completed",
+				"method":     "native",
+				"row_kind":   "confirmed",
 				"table_name": table,
 				"step":       "load_data",
-			}, 0); err != nil {
+			}, 100); err != nil {
 				return err
 			}
 			if err := requirePrometheusSample(body, "stroppy_insert_duration", labels{
