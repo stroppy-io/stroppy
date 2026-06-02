@@ -179,22 +179,23 @@ func KernelASCII(prng *rand.Rand, minLen, maxLen int64, alphabet []*dgproto.Asci
 	}
 
 	if len(table.byteTable) > 0 {
-		buf := make([]byte, length)
+		var out strings.Builder
+		out.Grow(int(length))
 
-		for i := range buf {
-			buf[i] = table.byteTable[prng.Int64N(total)]
+		for range length {
+			out.WriteByte(table.byteTable[prng.Int64N(total)])
 		}
 
-		return string(buf), nil
+		return out.String(), nil
 	}
 
-	buf := make([]rune, length)
+	var out strings.Builder
 
-	for i := range buf {
-		buf[i] = table.runeTable[prng.Int64N(total)]
+	for range length {
+		out.WriteRune(table.runeTable[prng.Int64N(total)])
 	}
 
-	return string(buf), nil
+	return out.String(), nil
 }
 
 // KernelDict draws one row from dict under `weightSet` (empty ⇒ default
@@ -299,13 +300,13 @@ func KernelGrammar(
 		walkKey := seed.Derive(rootKey, "grammar", strconv.Itoa(attempt))
 		prng := seed.PRNG(walkKey)
 
-		out, err := walkGrammarResolved(prng, grammar, dicts)
+		out, err := walkGrammarResolved(prng, grammar, dicts, maxLen)
 		if err != nil {
 			return "", err
 		}
 
 		last = truncateRunes(out, maxLen)
-		if int64(len([]rune(last))) >= minLen {
+		if runeLenAtLeast(last, minLen) {
 			return last, nil
 		}
 	}
@@ -320,123 +321,23 @@ func walkGrammarResolved(
 	prng *rand.Rand,
 	grammar *dgproto.DrawGrammar,
 	dicts map[string]*dgproto.Dict,
+	maxLen int64,
 ) (string, error) {
-	rootDict, ok := dicts[grammar.GetRootDict()]
-	if !ok {
-		return "", fmt.Errorf("%w: root_dict %q missing", ErrBadGrammar, grammar.GetRootDict())
-	}
-
-	rootTemplate, err := pickTemplate(prng, rootDict, grammar.GetRootDict())
-	if err != nil {
-		return "", err
-	}
-
-	var out strings.Builder
-
-	for i, tok := range strings.Fields(rootTemplate) {
-		if i > 0 {
-			out.WriteByte(' ')
+	return walkGrammarWithResolver(prng, grammar, maxLen, func(key string) (*dgproto.Dict, error) {
+		dict, ok := dicts[key]
+		if !ok {
+			return nil, ErrDictMissing
 		}
 
-		letter, isLetter := grammarLetter(tok)
-		if !isLetter {
-			out.WriteString(tok)
-
-			continue
-		}
-
-		if dictKey, phraseOK := grammar.GetPhrases()[letter]; phraseOK {
-			expanded, expErr := expandPhraseResolved(prng, grammar, dicts, dictKey, letter)
-			if expErr != nil {
-				return "", expErr
-			}
-
-			out.WriteString(expanded)
-
-			continue
-		}
-
-		leaf, leafErr := resolveLeafResolved(prng, grammar, dicts, letter)
-		if leafErr != nil {
-			return "", leafErr
-		}
-
-		out.WriteString(leaf)
-	}
-
-	return out.String(), nil
-}
-
-// expandPhraseResolved mirrors expandPhrase using the pre-resolved
-// dicts map.
-func expandPhraseResolved(
-	prng *rand.Rand,
-	grammar *dgproto.DrawGrammar,
-	dicts map[string]*dgproto.Dict,
-	phraseDictKey string,
-	letter string,
-) (string, error) {
-	dict, ok := dicts[phraseDictKey]
-	if !ok {
-		return "", fmt.Errorf("%w: phrase dict %q for %q missing",
-			ErrBadGrammar, phraseDictKey, letter)
-	}
-
-	template, err := pickTemplate(prng, dict, phraseDictKey)
-	if err != nil {
-		return "", err
-	}
-
-	var out strings.Builder
-
-	for i, tok := range strings.Fields(template) {
-		if i > 0 {
-			out.WriteByte(' ')
-		}
-
-		subLetter, isLetter := grammarLetter(tok)
-		if !isLetter {
-			out.WriteString(tok)
-
-			continue
-		}
-
-		leaf, leafErr := resolveLeafResolved(prng, grammar, dicts, subLetter)
-		if leafErr != nil {
-			return "", leafErr
-		}
-
-		out.WriteString(leaf)
-	}
-
-	return out.String(), nil
-}
-
-// resolveLeafResolved mirrors resolveLeaf using the pre-resolved dicts
-// map.
-func resolveLeafResolved(
-	prng *rand.Rand,
-	grammar *dgproto.DrawGrammar,
-	dicts map[string]*dgproto.Dict,
-	letter string,
-) (string, error) {
-	leafKey, ok := grammar.GetLeaves()[letter]
-	if !ok {
-		return "", fmt.Errorf("%w: unresolved letter %q", ErrBadGrammar, letter)
-	}
-
-	dict, ok := dicts[leafKey]
-	if !ok {
-		return "", fmt.Errorf("%w: leaf dict %q for %q missing",
-			ErrBadGrammar, leafKey, letter)
-	}
-
-	return pickTemplate(prng, dict, leafKey)
+		return dict, nil
+	})
 }
 
 // KernelPhrase draws [minWords, maxWords] words uniformly from vocab
 // and joins them with sep.
 func KernelPhrase(prng *rand.Rand, vocab *dgproto.Dict, minWords, maxWords int64, sep string) (string, error) {
+	const phraseStackWordLimit int64 = 16
+
 	if vocab == nil {
 		return "", fmt.Errorf("%w: phrase vocab nil", ErrBadDraw)
 	}
@@ -451,9 +352,33 @@ func KernelPhrase(prng *rand.Rand, vocab *dgproto.Dict, minWords, maxWords int64
 	}
 
 	count := prng.Int64N(maxWords-minWords+1) + minWords
-	words := make([]string, 0, count)
+	if count > phraseStackWordLimit {
+		var out strings.Builder
 
-	for range count {
+		for wordIndex := range count {
+			idx := prng.IntN(len(rows))
+
+			values := rows[idx].GetValues()
+			if len(values) == 0 {
+				return "", fmt.Errorf("%w: phrase row %d empty", ErrBadDraw, idx)
+			}
+
+			if wordIndex > 0 {
+				out.WriteString(sep)
+			}
+
+			out.WriteString(values[0])
+		}
+
+		return out.String(), nil
+	}
+
+	var stackWords [phraseStackWordLimit]string
+
+	words := stackWords[:int(count)]
+	totalLen := len(sep) * (len(words) - 1)
+
+	for wordIndex := range words {
 		idx := prng.IntN(len(rows))
 
 		values := rows[idx].GetValues()
@@ -461,32 +386,20 @@ func KernelPhrase(prng *rand.Rand, vocab *dgproto.Dict, minWords, maxWords int64
 			return "", fmt.Errorf("%w: phrase row %d empty", ErrBadDraw, idx)
 		}
 
-		words = append(words, values[0])
+		words[wordIndex] = values[0]
+		totalLen += len(values[0])
 	}
 
-	return joinWords(words, sep), nil
-}
+	var out strings.Builder
+	out.Grow(totalLen)
 
-// joinWords concatenates parts with sep without allocating the slice
-// twice. strings.Join allocates an intermediate size; this variant uses
-// a single strings.Builder.
-func joinWords(parts []string, sep string) string {
-	if len(parts) == 0 {
-		return ""
+	for wordIndex, word := range words {
+		if wordIndex > 0 {
+			out.WriteString(sep)
+		}
+
+		out.WriteString(word)
 	}
 
-	total := len(sep) * (len(parts) - 1)
-	for _, p := range parts {
-		total += len(p)
-	}
-
-	out := make([]byte, 0, total)
-	out = append(out, parts[0]...)
-
-	for _, p := range parts[1:] {
-		out = append(out, sep...)
-		out = append(out, p...)
-	}
-
-	return string(out)
+	return out.String(), nil
 }

@@ -2,9 +2,12 @@ package expr
 
 import (
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
@@ -82,13 +85,13 @@ func drawGrammar(
 		walkKey := seed.Derive(rootKey, "grammar", strconv.Itoa(attempt))
 		prng := seed.PRNG(walkKey)
 
-		out, walkErr := walkGrammar(ctx, prng, grammar)
+		out, walkErr := walkGrammar(ctx, prng, grammar, maxLen)
 		if walkErr != nil {
 			return nil, walkErr
 		}
 
 		last = truncateRunes(out, maxLen)
-		if int64(len([]rune(last))) >= minLen {
+		if runeLenAtLeast(last, minLen) {
 			return last, nil
 		}
 	}
@@ -104,8 +107,20 @@ func walkGrammar(
 	ctx Context,
 	prng *rand.Rand,
 	grammar *dgproto.DrawGrammar,
+	maxLen int64,
 ) (string, error) {
-	rootDict, err := ctx.LookupDict(grammar.GetRootDict())
+	return walkGrammarWithResolver(prng, grammar, maxLen, ctx.LookupDict)
+}
+
+type grammarDictResolver func(key string) (*dgproto.Dict, error)
+
+func walkGrammarWithResolver(
+	prng *rand.Rand,
+	grammar *dgproto.DrawGrammar,
+	maxLen int64,
+	resolve grammarDictResolver,
+) (string, error) {
+	rootDict, err := resolve(grammar.GetRootDict())
 	if err != nil {
 		return "", fmt.Errorf("%w: root_dict %q: %w",
 			ErrBadGrammar, grammar.GetRootDict(), err)
@@ -116,9 +131,15 @@ func walkGrammar(
 		return "", err
 	}
 
-	var out strings.Builder
+	growHint := len(rootTemplate)
+	if maxLen > int64(growHint) && maxLen <= math.MaxInt {
+		growHint = int(maxLen)
+	}
 
-	for i, tok := range strings.Fields(rootTemplate) {
+	var out strings.Builder
+	out.Grow(growHint)
+
+	if err := forEachField(rootTemplate, func(i int, tok string) error {
 		if i > 0 {
 			out.WriteByte(' ')
 		}
@@ -127,57 +148,48 @@ func walkGrammar(
 		if !ok {
 			out.WriteString(tok)
 
-			continue
+			return nil
 		}
 
 		if dictKey, phraseOK := grammar.GetPhrases()[letter]; phraseOK {
-			expanded, expandErr := expandPhrase(ctx, prng, grammar, dictKey, letter)
-			if expandErr != nil {
-				return "", expandErr
-			}
-
-			out.WriteString(expanded)
-
-			continue
+			return appendPhraseWithResolver(&out, prng, grammar, resolve, dictKey, letter)
 		}
 
-		leaf, leafErr := resolveLeaf(ctx, prng, grammar, letter)
+		leaf, leafErr := resolveLeafWithResolver(prng, grammar, resolve, letter)
 		if leafErr != nil {
-			return "", leafErr
+			return leafErr
 		}
 
 		out.WriteString(leaf)
+
+		return nil
+	}); err != nil {
+		return "", err
 	}
 
 	return out.String(), nil
 }
 
-// expandPhrase picks a template from the phrase dict referenced by
-// `letter`, splits it into tokens, and resolves every single-letter
-// token through the grammar's leaves map. Only one expansion level is
-// permitted: if an expanded token is itself a nonterminal, it must
-// resolve into leaves — nested phrase references are rejected.
-func expandPhrase(
-	ctx Context,
+func appendPhraseWithResolver(
+	out *strings.Builder,
 	prng *rand.Rand,
 	grammar *dgproto.DrawGrammar,
+	resolve grammarDictResolver,
 	phraseDictKey string,
 	letter string,
-) (string, error) {
-	dict, err := ctx.LookupDict(phraseDictKey)
+) error {
+	dict, err := resolve(phraseDictKey)
 	if err != nil {
-		return "", fmt.Errorf("%w: phrase dict %q for %q: %w",
+		return fmt.Errorf("%w: phrase dict %q for %q: %w",
 			ErrBadGrammar, phraseDictKey, letter, err)
 	}
 
 	template, err := pickTemplate(prng, dict, phraseDictKey)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	var out strings.Builder
-
-	for i, tok := range strings.Fields(template) {
+	return forEachField(template, func(i int, tok string) error {
 		if i > 0 {
 			out.WriteByte(' ')
 		}
@@ -186,27 +198,24 @@ func expandPhrase(
 		if !ok {
 			out.WriteString(tok)
 
-			continue
+			return nil
 		}
 
-		leaf, leafErr := resolveLeaf(ctx, prng, grammar, subLetter)
+		leaf, leafErr := resolveLeafWithResolver(prng, grammar, resolve, subLetter)
 		if leafErr != nil {
-			return "", leafErr
+			return leafErr
 		}
 
 		out.WriteString(leaf)
-	}
 
-	return out.String(), nil
+		return nil
+	})
 }
 
-// resolveLeaf picks a leaf word from the dict referenced by `letter`.
-// Returns ErrBadGrammar if the letter has no leaves entry, so walkers
-// surface a precise error rather than silently emitting the letter.
-func resolveLeaf(
-	ctx Context,
+func resolveLeafWithResolver(
 	prng *rand.Rand,
 	grammar *dgproto.DrawGrammar,
+	resolve grammarDictResolver,
 	letter string,
 ) (string, error) {
 	leafKey, ok := grammar.GetLeaves()[letter]
@@ -214,13 +223,50 @@ func resolveLeaf(
 		return "", fmt.Errorf("%w: unresolved letter %q", ErrBadGrammar, letter)
 	}
 
-	dict, err := ctx.LookupDict(leafKey)
+	dict, err := resolve(leafKey)
 	if err != nil {
 		return "", fmt.Errorf("%w: leaf dict %q for %q: %w",
 			ErrBadGrammar, leafKey, letter, err)
 	}
 
 	return pickTemplate(prng, dict, leafKey)
+}
+
+func forEachField(text string, fn func(index int, tok string) error) error {
+	fieldIndex := 0
+
+	for pos := 0; pos < len(text); {
+		for pos < len(text) {
+			r, size := utf8.DecodeRuneInString(text[pos:])
+			if !unicode.IsSpace(r) {
+				break
+			}
+
+			pos += size
+		}
+
+		if pos >= len(text) {
+			break
+		}
+
+		start := pos
+		for pos < len(text) {
+			r, size := utf8.DecodeRuneInString(text[pos:])
+			if unicode.IsSpace(r) {
+				break
+			}
+
+			pos += size
+		}
+
+		if err := fn(fieldIndex, text[start:pos]); err != nil {
+			return err
+		}
+
+		fieldIndex++
+	}
+
+	return nil
 }
 
 // pickTemplate draws one row from dict. When the dict declares any
@@ -273,15 +319,43 @@ func grammarLetter(tok string) (string, bool) {
 // truncateRunes truncates s to at most n Unicode runes. It counts
 // runes rather than bytes because dict contents may carry non-ASCII
 // words (e.g. "sauternes", "Tiresias" in the TPC-H grammar).
-func truncateRunes(s string, n int64) string {
-	if n <= 0 {
+func truncateRunes(text string, maxRunes int64) string {
+	if maxRunes <= 0 {
 		return ""
 	}
 
-	runes := []rune(s)
-	if int64(len(runes)) <= n {
-		return s
+	if int64(len(text)) <= maxRunes {
+		return text
 	}
 
-	return string(runes[:n])
+	var count int64
+	for idx := range text {
+		if count == maxRunes {
+			return text[:idx]
+		}
+
+		count++
+	}
+
+	return text
+}
+
+func runeLenAtLeast(text string, minRunes int64) bool {
+	if minRunes <= 0 {
+		return true
+	}
+
+	if int64(len(text)) < minRunes {
+		return false
+	}
+
+	var count int64
+	for range text {
+		count++
+		if count >= minRunes {
+			return true
+		}
+	}
+
+	return false
 }
