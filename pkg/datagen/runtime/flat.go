@@ -22,8 +22,10 @@ import (
 // Runtimes built from the same InsertSpec.
 type Runtime struct {
 	dag     *compile.DAG
+	evals   []expr.SlotEval
 	columns []string
 	emit    []emitSlot
+	rowOut  []any
 	size    int64
 	row     int64
 	ctx     *evalContext
@@ -103,7 +105,9 @@ func NewRuntime(spec *dgproto.InsertSpec) (*Runtime, error) {
 	}
 
 	ctx := &evalContext{
-		scratch:          make(map[string]any, len(dag.Order)),
+		slots:            make([]expr.Slot, len(dag.Order)),
+		set:              make([]bool, len(dag.Order)),
+		attrIdx:          dag.Index,
 		dicts:            spec.GetDicts(),
 		registry:         registry,
 		cohorts:          cohorts,
@@ -114,8 +118,10 @@ func NewRuntime(spec *dgproto.InsertSpec) (*Runtime, error) {
 
 	runtime := &Runtime{
 		dag:     dag,
+		evals:   compileSlotEvals(dag, spec.GetDicts()),
 		columns: columns,
 		emit:    emit,
+		rowOut:  make([]any, len(emit)),
 		size:    size,
 		ctx:     ctx,
 	}
@@ -178,6 +184,15 @@ func relSides(rel *dgproto.Relationship, iterPop string) (outer, inner *dgproto.
 	return first, second
 }
 
+func compileSlotEvals(dag *compile.DAG, dicts map[string]*dgproto.Dict) []expr.SlotEval {
+	evals := make([]expr.SlotEval, len(dag.Order))
+	for idx, attr := range dag.Order {
+		evals[idx] = expr.CompileSlot(attr.GetExpr(), dag.Index, dicts)
+	}
+
+	return evals
+}
+
 // Columns returns the emitted column order. The slice is owned by the
 // Runtime; callers must not mutate it.
 func (r *Runtime) Columns() []string {
@@ -205,13 +220,17 @@ func (r *Runtime) TotalRows() int64 {
 func (r *Runtime) Clone() *Runtime {
 	clone := &Runtime{
 		dag:     r.dag,
+		evals:   r.evals,
 		columns: r.columns,
 		emit:    r.emit,
+		rowOut:  make([]any, len(r.emit)),
 		size:    r.size,
 		row:     0,
 		scd2:    r.scd2,
 		ctx: &evalContext{
-			scratch:          make(map[string]any, len(r.dag.Order)),
+			slots:            make([]expr.Slot, len(r.dag.Order)),
+			set:              make([]bool, len(r.dag.Order)),
+			attrIdx:          r.dag.Index,
 			dicts:            r.ctx.dicts,
 			registry:         r.ctx.registry.CloneRegistry(),
 			rootSeed:         r.ctx.rootSeed,
@@ -315,27 +334,27 @@ func (r *Runtime) nextFlat() ([]any, error) {
 	}
 
 	r.ctx.rowIdx = r.row
-	for key := range r.ctx.scratch {
-		delete(r.ctx.scratch, key)
-	}
+	clear(r.ctx.set)
 
-	for _, attrNode := range r.dag.Order {
+	for attrIdx, attrNode := range r.dag.Order {
 		name := attrNode.GetName()
 
 		if null := attrNode.GetNull(); null != nil && nullProbabilityHit(null, name, r.row) {
-			r.ctx.scratch[name] = nil
+			r.ctx.slots[attrIdx] = expr.SlotNullValue()
+			r.ctx.set[attrIdx] = true
 
 			continue
 		}
 
 		r.ctx.attrPath = name
 
-		value, err := expr.Eval(r.ctx, attrNode.GetExpr())
+		value, err := r.evals[attrIdx](r.ctx)
 		if err != nil {
 			return nil, fmt.Errorf("runtime: attr %q at row %d: %w", name, r.row, err)
 		}
 
-		r.ctx.scratch[name] = value
+		r.ctx.slots[attrIdx] = value
+		r.ctx.set[attrIdx] = true
 	}
 
 	out := r.assembleRow(r.row)
@@ -349,12 +368,12 @@ func (r *Runtime) nextFlat() ([]any, error) {
 // consulting the DAG scratch for emitAttr slots and the SCD2 state for
 // emitSCD2Start / emitSCD2End slots.
 func (r *Runtime) assembleRow(rowIdx int64) []any {
-	out := make([]any, len(r.emit))
+	out := r.rowOut
 
 	for i, slot := range r.emit {
 		switch slot.kind {
 		case emitAttr:
-			out[i] = r.ctx.scratch[r.dag.Order[slot.ref].GetName()]
+			out[i] = r.ctx.slots[slot.ref].Any()
 		case emitSCD2Start:
 			out[i] = r.scd2.startFor(rowIdx)
 		case emitSCD2End:

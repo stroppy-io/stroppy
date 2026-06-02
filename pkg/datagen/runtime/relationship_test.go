@@ -127,7 +127,7 @@ func drainRel(t *testing.T, r *Runtime) [][]any {
 			t.Fatalf("Next: %v", err)
 		}
 
-		rows = append(rows, row)
+		rows = append(rows, append([]any(nil), row...))
 	}
 }
 

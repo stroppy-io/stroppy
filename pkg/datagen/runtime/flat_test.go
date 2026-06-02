@@ -103,7 +103,7 @@ func collect(t *testing.T, r *Runtime) [][]any {
 			t.Fatalf("Next: %v", err)
 		}
 
-		rows = append(rows, row)
+		rows = append(rows, append([]any(nil), row...))
 	}
 }
 
@@ -274,7 +274,7 @@ func TestFlatSeekDeterminism(t *testing.T) {
 			t.Fatalf("Next: %v", err)
 		}
 
-		baseline = append(baseline, row)
+		baseline = append(baseline, append([]any(nil), row...))
 	}
 
 	// SeekRow(0) on a fresh Runtime must match.
@@ -295,7 +295,7 @@ func TestFlatSeekDeterminism(t *testing.T) {
 			t.Fatalf("Next: %v", err)
 		}
 
-		replayed = append(replayed, row)
+		replayed = append(replayed, append([]any(nil), row...))
 	}
 
 	if !reflect.DeepEqual(baseline, replayed) {
