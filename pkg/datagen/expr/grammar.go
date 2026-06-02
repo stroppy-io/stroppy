@@ -2,10 +2,7 @@ package expr
 
 import (
 	"fmt"
-	"math"
 	"math/rand/v2"
-	"strconv"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -18,6 +15,12 @@ import (
 // drawGrammar returns the last walk result as-is; the spec does not
 // require padding.
 const grammarMaxAttempts = 8
+
+// grammarStackBytes covers the common TPC-H text widths without a heap
+// buffer; the returned string still owns its bytes via the final copy.
+const grammarStackBytes = 256
+
+var grammarAttemptKeys = [grammarMaxAttempts]string{"0", "1", "2", "3", "4", "5", "6", "7"}
 
 // drawGrammar implements DrawGrammar — a two-phase template walker.
 // The walker picks a template from root_dict, splits it on whitespace,
@@ -82,7 +85,7 @@ func drawGrammar(
 	var last string
 
 	for attempt := range grammarMaxAttempts {
-		walkKey := seed.Derive(rootKey, "grammar", strconv.Itoa(attempt))
+		walkKey := seed.Derive(rootKey, "grammar", grammarAttemptKeys[attempt])
 		prng := seed.PRNG(walkKey)
 
 		out, walkErr := walkGrammar(ctx, prng, grammar, maxLen)
@@ -131,28 +134,145 @@ func walkGrammarWithResolver(
 		return "", err
 	}
 
-	growHint := len(rootTemplate)
-	if maxLen > int64(growHint) && maxLen <= math.MaxInt {
-		growHint = int(maxLen)
+	out := grammarOutput{
+		maxRunes: maxLen,
 	}
 
-	var out strings.Builder
-	out.Grow(growHint)
+	if err := appendRootTemplate(&out, prng, grammar, resolve, rootTemplate); err != nil {
+		return "", err
+	}
 
-	if err := forEachField(rootTemplate, func(i int, tok string) error {
-		if i > 0 {
-			out.WriteByte(' ')
+	return out.result(), nil
+}
+
+type grammarOutput struct {
+	stack     [grammarStackBytes]byte
+	heap      []byte
+	length    int
+	maxRunes  int64
+	runeCount int64
+}
+
+func (out *grammarOutput) writeByte(value byte) {
+	if out.runeCount >= out.maxRunes {
+		return
+	}
+
+	out.appendByte(value)
+	out.runeCount++
+}
+
+func (out *grammarOutput) writeString(text string) {
+	remaining := out.maxRunes - out.runeCount
+	if remaining <= 0 || text == "" {
+		return
+	}
+
+	var runeCount int64
+
+	end := len(text)
+
+	for idx := range text {
+		if runeCount == remaining {
+			end = idx
+
+			break
+		}
+
+		runeCount++
+	}
+
+	out.appendBytes(text[:end])
+	out.runeCount += runeCount
+}
+
+func (out *grammarOutput) appendBytes(text string) {
+	if out.heap != nil {
+		out.heap = append(out.heap, text...)
+		out.length += len(text)
+
+		return
+	}
+
+	requiredLen := out.length + len(text)
+	if requiredLen <= len(out.stack) {
+		copy(out.stack[out.length:], text)
+		out.length = requiredLen
+
+		return
+	}
+
+	out.heap = make([]byte, out.length, requiredLen)
+	copy(out.heap, out.stack[:out.length])
+	out.heap = append(out.heap, text...)
+	out.length = len(out.heap)
+}
+
+func (out *grammarOutput) appendByte(value byte) {
+	if out.heap != nil {
+		out.heap = append(out.heap, value)
+		out.length++
+
+		return
+	}
+
+	if out.length < len(out.stack) {
+		out.stack[out.length] = value
+		out.length++
+
+		return
+	}
+
+	out.heap = make([]byte, out.length, out.length+1)
+	copy(out.heap, out.stack[:out.length])
+	out.heap = append(out.heap, value)
+	out.length = len(out.heap)
+}
+
+func (out *grammarOutput) result() string {
+	if out.heap != nil {
+		return string(out.heap[:out.length])
+	}
+
+	return string(out.stack[:out.length])
+}
+
+func appendRootTemplate(
+	out *grammarOutput,
+	prng *rand.Rand,
+	grammar *dgproto.DrawGrammar,
+	resolve grammarDictResolver,
+	template string,
+) error {
+	fieldIndex := 0
+
+	for pos := 0; ; fieldIndex++ {
+		tok, nextPos, ok := nextField(template, pos)
+		if !ok {
+			return nil
+		}
+
+		if fieldIndex > 0 {
+			out.writeByte(' ')
 		}
 
 		letter, ok := grammarLetter(tok)
 		if !ok {
-			out.WriteString(tok)
+			out.writeString(tok)
 
-			return nil
+			pos = nextPos
+
+			continue
 		}
 
 		if dictKey, phraseOK := grammar.GetPhrases()[letter]; phraseOK {
-			return appendPhraseWithResolver(&out, prng, grammar, resolve, dictKey, letter)
+			if err := appendPhraseWithResolver(out, prng, grammar, resolve, dictKey, letter); err != nil {
+				return err
+			}
+
+			pos = nextPos
+
+			continue
 		}
 
 		leaf, leafErr := resolveLeafWithResolver(prng, grammar, resolve, letter)
@@ -160,18 +280,14 @@ func walkGrammarWithResolver(
 			return leafErr
 		}
 
-		out.WriteString(leaf)
+		out.writeString(leaf)
 
-		return nil
-	}); err != nil {
-		return "", err
+		pos = nextPos
 	}
-
-	return out.String(), nil
 }
 
 func appendPhraseWithResolver(
-	out *strings.Builder,
+	out *grammarOutput,
 	prng *rand.Rand,
 	grammar *dgproto.DrawGrammar,
 	resolve grammarDictResolver,
@@ -189,16 +305,25 @@ func appendPhraseWithResolver(
 		return err
 	}
 
-	return forEachField(template, func(i int, tok string) error {
-		if i > 0 {
-			out.WriteByte(' ')
+	fieldIndex := 0
+
+	for pos := 0; ; fieldIndex++ {
+		tok, nextPos, ok := nextField(template, pos)
+		if !ok {
+			return nil
+		}
+
+		if fieldIndex > 0 {
+			out.writeByte(' ')
 		}
 
 		subLetter, ok := grammarLetter(tok)
 		if !ok {
-			out.WriteString(tok)
+			out.writeString(tok)
 
-			return nil
+			pos = nextPos
+
+			continue
 		}
 
 		leaf, leafErr := resolveLeafWithResolver(prng, grammar, resolve, subLetter)
@@ -206,10 +331,37 @@ func appendPhraseWithResolver(
 			return leafErr
 		}
 
-		out.WriteString(leaf)
+		out.writeString(leaf)
 
-		return nil
-	})
+		pos = nextPos
+	}
+}
+
+func nextField(text string, pos int) (token string, nextPos int, ok bool) {
+	for pos < len(text) {
+		r, size := utf8.DecodeRuneInString(text[pos:])
+		if !unicode.IsSpace(r) {
+			break
+		}
+
+		pos += size
+	}
+
+	if pos >= len(text) {
+		return "", pos, false
+	}
+
+	start := pos
+	for pos < len(text) {
+		r, size := utf8.DecodeRuneInString(text[pos:])
+		if unicode.IsSpace(r) {
+			break
+		}
+
+		pos += size
+	}
+
+	return text[start:pos], pos, true
 }
 
 func resolveLeafWithResolver(
@@ -230,43 +382,6 @@ func resolveLeafWithResolver(
 	}
 
 	return pickTemplate(prng, dict, leafKey)
-}
-
-func forEachField(text string, fn func(index int, tok string) error) error {
-	fieldIndex := 0
-
-	for pos := 0; pos < len(text); {
-		for pos < len(text) {
-			r, size := utf8.DecodeRuneInString(text[pos:])
-			if !unicode.IsSpace(r) {
-				break
-			}
-
-			pos += size
-		}
-
-		if pos >= len(text) {
-			break
-		}
-
-		start := pos
-		for pos < len(text) {
-			r, size := utf8.DecodeRuneInString(text[pos:])
-			if unicode.IsSpace(r) {
-				break
-			}
-
-			pos += size
-		}
-
-		if err := fn(fieldIndex, text[start:pos]); err != nil {
-			return err
-		}
-
-		fieldIndex++
-	}
-
-	return nil
 }
 
 // pickTemplate draws one row from dict. When the dict declares any

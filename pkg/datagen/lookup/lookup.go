@@ -58,14 +58,19 @@ type pop struct {
 	name  string
 	size  int64
 	dag   *compile.DAG
+	attrs []lookupAttr
 	cache *rowCache
 }
 
+type lookupAttr struct {
+	name string
+	path string
+	expr *dgproto.Expr
+}
+
 // rowCache is a bounded LRU of already-evaluated rows keyed by entity
-// index. A row is a map from attr name to value (nil meaning a hit from
-// a non-present attr is impossible here — attrs always produce a value,
-// even if that value is nil via Null). We store the full row so that
-// repeated attr reads at the same index share one evaluation.
+// index. A row is ordered to match pop.dag.Order. We store the full row
+// so that repeated attr reads at the same index share one evaluation.
 type rowCache struct {
 	cap   int
 	order *list.List
@@ -75,7 +80,7 @@ type rowCache struct {
 // cacheEntry binds an entity index to its attr row.
 type cacheEntry struct {
 	idx int64
-	row map[string]any
+	row []any
 }
 
 // LookupRegistry routes Lookup reads to the right compiled LookupPop.
@@ -88,6 +93,8 @@ type LookupRegistry struct {
 	dicts    map[string]*dgproto.Dict
 	inFlight map[string]struct{}
 	rootSeed uint64
+	ctxStack []popCtx
+	ctxDepth int
 }
 
 // NewLookupRegistry compiles the given LookupPops and returns a ready
@@ -104,6 +111,7 @@ func NewLookupRegistry(
 		pops:     make(map[string]*pop, len(lookupPops)),
 		dicts:    dicts,
 		inFlight: make(map[string]struct{}),
+		ctxStack: make([]popCtx, 1),
 	}
 
 	for i, lp := range lookupPops {
@@ -141,6 +149,7 @@ func (r *LookupRegistry) CloneRegistry() *LookupRegistry {
 		dicts:    r.dicts, // read-only after NewLookupRegistry
 		inFlight: make(map[string]struct{}),
 		rootSeed: r.rootSeed,
+		ctxStack: make([]popCtx, 1),
 	}
 
 	for name, src := range r.pops {
@@ -148,6 +157,7 @@ func (r *LookupRegistry) CloneRegistry() *LookupRegistry {
 			name:  src.name,
 			size:  src.size,
 			dag:   src.dag, // DAG is read-only after compile
+			attrs: src.attrs,
 			cache: newRowCache(src.cache.cap),
 		}
 	}
@@ -193,7 +203,8 @@ func (r *LookupRegistry) Get(popName, attrName string, entityIdx int64) (any, er
 		return nil, fmt.Errorf("%w: %d not in [0, %d)", ErrOutOfRange, entityIdx, population.size)
 	}
 
-	if _, hasAttr := population.dag.Index[attrName]; !hasAttr {
+	attrIdx, hasAttr := population.dag.Index[attrName]
+	if !hasAttr {
 		return nil, fmt.Errorf("%w: %q.%q", ErrUnknownAttr, popName, attrName)
 	}
 
@@ -202,13 +213,13 @@ func (r *LookupRegistry) Get(popName, attrName string, entityIdx int64) (any, er
 		return nil, err
 	}
 
-	return row[attrName], nil
+	return row[attrIdx], nil
 }
 
 // rowAt returns the memoized attr row for (population, idx), evaluating the
 // DAG on a miss. The row is inserted into the LRU on miss and promoted
 // on hit.
-func (r *LookupRegistry) rowAt(population *pop, idx int64) (map[string]any, error) {
+func (r *LookupRegistry) rowAt(population *pop, idx int64) ([]any, error) {
 	if row, hit := population.cache.get(idx); hit {
 		return row, nil
 	}
@@ -231,31 +242,52 @@ func (r *LookupRegistry) rowAt(population *pop, idx int64) (map[string]any, erro
 }
 
 // evalRow runs the compiled DAG of population at entity index idx and
-// returns the attr-name → value map.
-func (r *LookupRegistry) evalRow(population *pop, idx int64) (map[string]any, error) {
-	scratch := make(map[string]any, len(population.dag.Order))
-	ctx := &popCtx{
-		reg:       r,
-		scratch:   scratch,
-		entityIdx: idx,
-		dicts:     r.dicts,
-		popName:   population.name,
+// returns the attr values ordered to match population.dag.Order.
+func (r *LookupRegistry) evalRow(population *pop, idx int64) ([]any, error) {
+	row := make([]any, len(population.attrs))
+	ctx := r.acquireCtx()
+
+	*ctx = popCtx{
+		reg:        r,
+		population: population,
+		scratch:    row,
+		entityIdx:  idx,
+		dicts:      r.dicts,
 	}
 
-	for _, attr := range population.dag.Order {
-		name := attr.GetName()
-		ctx.attrPath = population.name + "/" + name
+	for attrIdx, attr := range population.attrs {
+		ctx.attrPath = attr.path
 
-		value, err := expr.Eval(ctx, attr.GetExpr())
+		value, err := expr.Eval(ctx, attr.expr)
 		if err != nil {
+			r.releaseCtx()
+
 			return nil, fmt.Errorf("lookup: pop %q attr %q at entity %d: %w",
-				population.name, name, idx, err)
+				population.name, attr.name, idx, err)
 		}
 
-		scratch[name] = value
+		row[attrIdx] = value
 	}
 
-	return scratch, nil
+	r.releaseCtx()
+
+	return row, nil
+}
+
+func (r *LookupRegistry) acquireCtx() *popCtx {
+	depth := r.ctxDepth
+	if depth == len(r.ctxStack) {
+		r.ctxStack = append(r.ctxStack, popCtx{})
+	}
+
+	r.ctxDepth++
+
+	return &r.ctxStack[depth]
+}
+
+func (r *LookupRegistry) releaseCtx() {
+	r.ctxDepth--
+	r.ctxStack[r.ctxDepth] = popCtx{}
 }
 
 // compilePop validates a LookupPop and wraps it with a fresh cache.
@@ -285,10 +317,21 @@ func compilePop(lp *dgproto.LookupPop, cacheSize int) (*pop, error) {
 		return nil, fmt.Errorf("lookup: compile %q: %w", name, err)
 	}
 
+	attrsByOrder := make([]lookupAttr, len(dag.Order))
+	for idx, attr := range dag.Order {
+		attrName := attr.GetName()
+		attrsByOrder[idx] = lookupAttr{
+			name: attrName,
+			path: name + "/" + attrName,
+			expr: attr.GetExpr(),
+		}
+	}
+
 	return &pop{
 		name:  name,
 		size:  size,
 		dag:   dag,
+		attrs: attrsByOrder,
 		cache: newRowCache(cacheSize),
 	}, nil
 }
@@ -323,7 +366,7 @@ func newRowCache(capacity int) *rowCache {
 }
 
 // get promotes and returns the cached row at idx, or reports a miss.
-func (c *rowCache) get(idx int64) (map[string]any, bool) {
+func (c *rowCache) get(idx int64) ([]any, bool) {
 	elem, ok := c.index[idx]
 	if !ok {
 		return nil, false
@@ -338,7 +381,7 @@ func (c *rowCache) get(idx int64) (map[string]any, bool) {
 
 // put inserts (idx, row) at the MRU end, evicting the LRU entry if the
 // cap is already reached. It is a no-op if idx is already present.
-func (c *rowCache) put(idx int64, row map[string]any) {
+func (c *rowCache) put(idx int64, row []any) {
 	if _, ok := c.index[idx]; ok {
 		return
 	}
@@ -369,23 +412,23 @@ func (c *rowCache) Len() int {
 // BlockSlots belong to Sides, not pure populations — so BlockRef
 // returns a type error.
 type popCtx struct {
-	reg       *LookupRegistry
-	scratch   map[string]any
-	entityIdx int64
-	dicts     map[string]*dgproto.Dict
-	popName   string
-	attrPath  string
-	drawPRNG  *seed.ReusablePRNG
+	reg        *LookupRegistry
+	population *pop
+	scratch    []any
+	entityIdx  int64
+	dicts      map[string]*dgproto.Dict
+	attrPath   string
+	drawPRNG   *seed.ReusablePRNG
 }
 
 // LookupCol resolves a ColRef within the LookupPop's own scratch.
 func (c *popCtx) LookupCol(name string) (any, error) {
-	value, ok := c.scratch[name]
+	idx, ok := c.population.dag.Index[name]
 	if !ok {
 		return nil, expr.ErrUnknownCol
 	}
 
-	return value, nil
+	return c.scratch[idx], nil
 }
 
 // RowIndex returns the entity index for the LookupPop row being

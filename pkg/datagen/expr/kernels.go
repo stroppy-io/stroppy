@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
-	"strconv"
 	"strings"
 	"time"
 
@@ -297,7 +296,7 @@ func KernelGrammar(
 	var last string
 
 	for attempt := range grammarMaxAttempts {
-		walkKey := seed.Derive(rootKey, "grammar", strconv.Itoa(attempt))
+		walkKey := seed.Derive(rootKey, "grammar", grammarAttemptKeys[attempt])
 		prng := seed.PRNG(walkKey)
 
 		out, err := walkGrammarResolved(prng, grammar, dicts, maxLen)
