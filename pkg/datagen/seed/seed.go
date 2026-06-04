@@ -3,11 +3,7 @@
 // alternate formula introduced elsewhere is a bug.
 package seed
 
-import (
-	"hash/fnv"
-	"math/rand/v2"
-	"strings"
-)
+import "math/rand/v2"
 
 // splitmix64 round constants (Steele, Lea, Flood 2014).
 const (
@@ -22,23 +18,66 @@ const (
 // pcgStream2 is the second PCG stream constant (golden ratio, XORed with key).
 const pcgStream2 = 0x9E3779B97F4A7C15
 
-// pathSep joins path elements into a single byte string prior to hashing.
-const pathSep = "/"
-
 // Derive is the stream key for (root, path) under formula splitmix64(root ^ fnv1a64(joined(path))).
+// The path elements are concatenated with "/" separators and hashed in-place, avoiding string
+// allocation by hashing each byte directly.
 func Derive(root uint64, path ...string) uint64 {
-	return SplitMix64(root ^ FNV1a64(strings.Join(path, pathSep)))
+	return SplitMix64(root ^ fnv1a64Path(path))
 }
 
-// FNV1a64 is the 64-bit FNV-1a hash of s. It is the single source of
-// truth for string-to-uint64 hashing in the datagen framework; null
-// injection, dict salting, and any future component that needs a stable
-// name hash must call this rather than reimplementing FNV.
-func FNV1a64(s string) uint64 {
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(s))
+// fnv1a64 hashes a single string using the FNV-1a algorithm (no allocations).
+// It is the single source of truth for string-to-uint64 hashing in the datagen
+// framework; null injection, dict salting, and any future component that needs
+// a stable name hash must call this rather than reimplementing FNV.
+func fnv1a64(s string) uint64 {
+	const (
+		fnvOffset = uint64(14695981039346656037)
+		fnvPrime  = uint64(1099511628211)
+	)
 
-	return h.Sum64()
+	h := fnvOffset
+	for i := 0; i < len(s); i++ {
+		h ^= uint64(s[i])
+		h *= fnvPrime
+	}
+
+	return h
+}
+
+// Fn1a64 is the exported version of fnv1a64 for use by tests that
+// cross-check Derive against the old string-based implementation.
+func Fn1a64(s string) uint64 {
+	return fnv1a64(s)
+}
+
+// fnv1a64Path hashes path elements concatenated with "/" separators, avoiding any
+// string allocation by hashing each element and the separator bytes directly. The
+// result is mathematically identical to fnv1a64(strings.Join(path, "/")).
+func fnv1a64Path(path []string) uint64 {
+	const (
+		fnvOffset = uint64(14695981039346656037)
+		fnvPrime  = uint64(1099511628211)
+	)
+
+	h := fnvOffset
+	for i, p := range path {
+		if i > 0 {
+			h ^= '/'
+			h *= fnvPrime
+		}
+
+		for j := 0; j < len(p); j++ {
+			h ^= uint64(p[j])
+			h *= fnvPrime
+		}
+	}
+
+	return h
+}
+
+// Fnv1a64Path is the exported version of fnv1a64Path for test cross-checks.
+func Fnv1a64Path(path []string) uint64 {
+	return fnv1a64Path(path)
 }
 
 // PRNG is a fresh *rand.Rand backed by a PCG source seeded from key.

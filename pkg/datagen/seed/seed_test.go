@@ -3,6 +3,7 @@ package seed_test
 import (
 	"math"
 	"math/rand/v2"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -51,13 +52,17 @@ func TestFNV1a64(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := seed.FNV1a64(tc.in)
-			require.Equalf(t, tc.want, got, "FNV1a64(%q)", tc.in)
+			got := seed.Fn1a64(tc.in)
+			require.Equalf(t, tc.want, got, "Fn1a64(%q)", tc.in)
 		})
 	}
 
-	// Cross-check: Derive must equal SplitMix64(root ^ FNV1a64(joined)).
-	require.Equal(t, seed.SplitMix64(42^seed.FNV1a64("a/b")), seed.Derive(42, "a", "b"))
+	// Cross-check: Derive must equal SplitMix64(root ^ fnv1a64(joined)).
+	require.Equal(t, seed.SplitMix64(42^seed.Fn1a64("a/b")), seed.Derive(42, "a", "b"))
+
+	// Cross-check: fnv1a64Path(path) must equal fnv1a64(strings.Join(path, "/")).
+	require.Equal(t, seed.Fn1a64(strings.Join([]string{"a", "b"}, "/")), seed.Fnv1a64Path([]string{"a", "b"}))
+	require.Equal(t, seed.Fn1a64(strings.Join([]string{"lineitem", "l_partkey"}, "/")), seed.Fnv1a64Path([]string{"lineitem", "l_partkey"}))
 }
 
 func TestDerive(t *testing.T) {

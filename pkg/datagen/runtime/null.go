@@ -51,7 +51,7 @@ func nullProbabilityHit(null *dgproto.Null, attrPath string, rowID int64) bool {
 
 	//nolint:gosec // bit reinterpret of row index is intentional; seed mixing is hash-space
 	h := seed.SplitMix64(
-		seed.SplitMix64(uint64(rowID)) ^ seed.FNV1a64(attrPath) ^ null.GetSeedSalt(),
+		seed.SplitMix64(uint64(rowID)) ^ seed.Fn1a64(attrPath) ^ null.GetSeedSalt(),
 	)
 	draw := float32(h&nullDrawMask) / float32(nullDrawScale)
 

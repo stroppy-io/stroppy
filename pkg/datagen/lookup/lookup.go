@@ -74,8 +74,9 @@ type rowCache struct {
 
 // cacheEntry binds an entity index to its attr row.
 type cacheEntry struct {
-	idx int64
-	row map[string]any
+	idx  int64
+	row  map[string]any
+	keys []string // ordered attr names for fast clearing (cache miss only)
 }
 
 // LookupRegistry routes Lookup reads to the right compiled LookupPop.
@@ -225,7 +226,7 @@ func (r *LookupRegistry) rowAt(population *pop, idx int64) (map[string]any, erro
 		return nil, err
 	}
 
-	population.cache.put(idx, row)
+	population.cache.putAndClear(idx, row, nil)
 
 	return row, nil
 }
@@ -234,9 +235,11 @@ func (r *LookupRegistry) rowAt(population *pop, idx int64) (map[string]any, erro
 // returns the attr-name → value map.
 func (r *LookupRegistry) evalRow(population *pop, idx int64) (map[string]any, error) {
 	scratch := make(map[string]any, len(population.dag.Order))
+	keys := make([]string, 0, len(population.dag.Order))
 	ctx := &popCtx{
 		reg:       r,
 		scratch:   scratch,
+		keys:      keys,
 		entityIdx: idx,
 		dicts:     r.dicts,
 		popName:   population.name,
@@ -253,6 +256,7 @@ func (r *LookupRegistry) evalRow(population *pop, idx int64) (map[string]any, er
 		}
 
 		scratch[name] = value
+		ctx.keys = append(ctx.keys, name)
 	}
 
 	return scratch, nil
@@ -332,13 +336,13 @@ func (c *rowCache) get(idx int64) (map[string]any, bool) {
 	c.order.MoveToFront(elem)
 
 	entry, _ := elem.Value.(*cacheEntry)
-
 	return entry.row, true
 }
 
-// put inserts (idx, row) at the MRU end, evicting the LRU entry if the
-// cap is already reached. It is a no-op if idx is already present.
-func (c *rowCache) put(idx int64, row map[string]any) {
+// putAndClear inserts (idx, row) at the MRU end, evicting the LRU entry if the
+// cap is already reached. It also clears the previous row's keys (via keys) so
+// the cache entry carries only the current row's attr names for fast reuse.
+func (c *rowCache) putAndClear(idx int64, row map[string]any, keys []string) {
 	if _, ok := c.index[idx]; ok {
 		return
 	}
@@ -355,6 +359,10 @@ func (c *rowCache) put(idx int64, row map[string]any) {
 
 	elem := c.order.PushFront(&cacheEntry{idx: idx, row: row})
 	c.index[idx] = elem
+
+	// Store keys on the cache entry for fast clearing on next use.
+	entry := elem.Value.(*cacheEntry)
+	entry.keys = keys
 }
 
 // Len returns the current number of entries in the cache. Test-only.
@@ -371,6 +379,7 @@ func (c *rowCache) Len() int {
 type popCtx struct {
 	reg       *LookupRegistry
 	scratch   map[string]any
+	keys      []string // ordered list of keys written in current eval (for fast clear)
 	entityIdx int64
 	dicts     map[string]*dgproto.Dict
 	popName   string
@@ -431,15 +440,49 @@ func (c *popCtx) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand
 		c.drawPRNG = seed.NewReusablePRNG()
 	}
 
-	key := seed.Derive(
-		c.reg.rootSeed,
-		attrPath,
-		"s"+strconv.FormatUint(uint64(streamID), 10),
-		strconv.FormatInt(rowIdx, 10),
-	)
+	key := c.deriveDraw(streamID, attrPath, rowIdx)
 	c.drawPRNG.Seed(key)
 
 	return c.drawPRNG.Rand()
+}
+
+// deriveDraw computes the seed for a StreamDraw call without allocating strings.
+// Identical to evalContext.deriveDraw but uses c.reg.rootSeed.
+func (c *popCtx) deriveDraw(streamID uint32, attrPath string, rowIdx int64) uint64 {
+	const prefix = 's'
+
+	var h uint64 = 0x9E3779B97F4A7C15
+
+	// Hash attrPath (with "/" prefix).
+	h ^= 0x9E3779B97F4A7C15 ^ '/'
+	h *= 0x9E3779B97F4A7C15
+	for i := 0; i < len(attrPath); i++ {
+		h ^= uint64(attrPath[i])
+		h *= 0x9E3779B97F4A7C15
+	}
+
+	// Hash "s" prefix.
+	h ^= prefix
+	h *= 0x9E3779B97F4A7C15
+
+	// Hash streamID as decimal bytes.
+	for d := uint32(1); d <= streamID; d *= 10 {
+		h ^= uint64('0' + byte(streamID/d%10))
+		h *= 0x9E3779B97F4A7C15
+	}
+
+	// Hash rowIdx as decimal bytes (with "-" sign if negative).
+	if rowIdx < 0 {
+		h ^= '-'
+		h *= 0x9E3779B97F4A7C15
+		rowIdx = -rowIdx
+	}
+	for d := int64(1); d <= rowIdx; d *= 10 {
+		h ^= uint64('0' + byte(rowIdx/d%10))
+		h *= 0x9E3779B97F4A7C15
+	}
+
+	return seed.SplitMix64(h)
 }
 
 // AttrPath returns the pop-qualified attr path currently under

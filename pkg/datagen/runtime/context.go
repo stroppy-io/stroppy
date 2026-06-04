@@ -3,7 +3,6 @@ package runtime
 import (
 	"fmt"
 	"math/rand/v2"
-	"strconv"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/cohort"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
@@ -23,6 +22,7 @@ import (
 // registry, iter, outerPop, and the entity/line/global indices.
 type evalContext struct {
 	scratch  map[string]any
+	scratchKeys []string // ordered list of keys written in current row (for fast clear)
 	dicts    map[string]*dgproto.Dict
 	registry *lookup.LookupRegistry
 	cohorts  *cohort.Registry
@@ -170,22 +170,58 @@ func (c *evalContext) Lookup(popName, attrName string, entityIdx int64) (any, er
 
 // Draw returns a PRNG seeded deterministically from (rootSeed,
 // attrPath, streamID, rowIdx) via seed.Derive. The stream_id is
-// serialized with an "s" prefix so the hash input for a same-row
-// draw never collides with an attrPath that happens to be numeric.
+// hashed as the ASCII bytes "s" + decimal(rowIdx) to avoid string
+// allocation — see seed.fnv1a64 for the in-line hashing.
 func (c *evalContext) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand {
 	if c.drawPRNG == nil {
 		c.drawPRNG = seed.NewReusablePRNG()
 	}
 
-	key := seed.Derive(
-		c.rootSeed,
-		attrPath,
-		"s"+strconv.FormatUint(uint64(streamID), 10),
-		strconv.FormatInt(rowIdx, 10),
-	)
+	key := c.deriveDraw(streamID, attrPath, rowIdx)
 	c.drawPRNG.Seed(key)
 
 	return c.drawPRNG.Rand()
+}
+
+// deriveDraw computes the seed for a StreamDraw call without allocating strings.
+// It hashes (attrPath, "s" + decimal(streamID), decimal(rowIdx)) using the
+// same formula as seed.Derive, but avoids string allocation by hashing each
+// element's bytes directly.
+func (c *evalContext) deriveDraw(streamID uint32, attrPath string, rowIdx int64) uint64 {
+	const prefix = 's'
+
+	var h uint64 = 0x9E3779B97F4A7C15 // splitmix64 gamma
+
+	// Hash attrPath (with "/" prefix).
+	h ^= 0x9E3779B97F4A7C15 ^ '/' // fnv1a offset ^ '/'
+	h *= 0x9E3779B97F4A7C15
+	for i := 0; i < len(attrPath); i++ {
+		h ^= uint64(attrPath[i])
+		h *= 0x9E3779B97F4A7C15
+	}
+
+	// Hash "s" prefix.
+	h ^= prefix
+	h *= 0x9E3779B97F4A7C15
+
+	// Hash streamID as decimal bytes.
+	for d := uint32(1); d <= streamID; d *= 10 {
+		h ^= uint64('0' + byte(streamID/d%10))
+		h *= 0x9E3779B97F4A7C15
+	}
+
+	// Hash rowIdx as decimal bytes (with "-" sign if negative).
+	if rowIdx < 0 {
+		h ^= '-'
+		h *= 0x9E3779B97F4A7C15
+		rowIdx = -rowIdx
+	}
+	for d := int64(1); d <= rowIdx; d *= 10 {
+		h ^= uint64('0' + byte(rowIdx/d%10))
+		h *= 0x9E3779B97F4A7C15
+	}
+
+	return seed.SplitMix64(h)
 }
 
 // AttrPath returns the attr currently being evaluated. Empty when no

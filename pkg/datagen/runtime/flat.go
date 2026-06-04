@@ -104,6 +104,7 @@ func NewRuntime(spec *dgproto.InsertSpec) (*Runtime, error) {
 
 	ctx := &evalContext{
 		scratch:          make(map[string]any, len(dag.Order)),
+		scratchKeys:      make([]string, 0, len(dag.Order)),
 		dicts:            spec.GetDicts(),
 		registry:         registry,
 		cohorts:          cohorts,
@@ -117,6 +118,7 @@ func NewRuntime(spec *dgproto.InsertSpec) (*Runtime, error) {
 		columns: columns,
 		emit:    emit,
 		size:    size,
+		row:     0,
 		ctx:     ctx,
 	}
 
@@ -212,6 +214,7 @@ func (r *Runtime) Clone() *Runtime {
 		scd2:    r.scd2,
 		ctx: &evalContext{
 			scratch:          make(map[string]any, len(r.dag.Order)),
+			scratchKeys:      make([]string, 0, len(r.dag.Order)),
 			dicts:            r.ctx.dicts,
 			registry:         r.ctx.registry.CloneRegistry(),
 			rootSeed:         r.ctx.rootSeed,
@@ -315,9 +318,11 @@ func (r *Runtime) nextFlat() ([]any, error) {
 	}
 
 	r.ctx.rowIdx = r.row
-	for key := range r.ctx.scratch {
-		delete(r.ctx.scratch, key)
+	// Fast clear: only delete keys we wrote last row (O(written) vs O(cap)).
+	for _, k := range r.ctx.scratchKeys {
+		delete(r.ctx.scratch, k)
 	}
+	r.ctx.scratchKeys = r.ctx.scratchKeys[:0]
 
 	for _, attrNode := range r.dag.Order {
 		name := attrNode.GetName()
@@ -336,6 +341,7 @@ func (r *Runtime) nextFlat() ([]any, error) {
 		}
 
 		r.ctx.scratch[name] = value
+		r.ctx.scratchKeys = append(r.ctx.scratchKeys, name)
 	}
 
 	out := r.assembleRow(r.row)
