@@ -10,6 +10,11 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
 )
 
+// tokenizedTemplate holds a pre-tokenized template to avoid re-parsing.
+type tokenizedTemplate struct {
+	tokens []string // tokens from strings.Fields equivalent
+}
+
 // grammarMaxAttempts bounds re-walk attempts when a min_len is set and
 // the first walk produces a shorter string. After exhausting attempts,
 // drawGrammar returns the last walk result as-is; the spec does not
@@ -39,6 +44,11 @@ func drawGrammar(
 ) (any, error) {
 	if grammar == nil {
 		return nil, ErrBadGrammar
+	}
+
+	rootDict, err := ctx.LookupDict(grammar.GetRootDict())
+	if err != nil {
+		return "", fmt.Errorf("%w: root_dict %q: %w", ErrBadGrammar, grammar.GetRootDict(), err)
 	}
 
 	maxLen, err := evalInt64(ctx, grammar.GetMaxLen())
@@ -76,13 +86,20 @@ func drawGrammar(
 	// second formula.
 	rootKey := rootPRNG.Uint64()
 
+	// Pick the root template once (it's the same for all re-walk
+	// attempts), then cache its tokenized form so we don't re-parse.
+	rootTemplate, err := pickTemplate(rootPRNG, rootDict, grammar.GetRootDict())
+	if err != nil {
+		return "", err
+	}
+
 	var last string
 
 	for attempt := range grammarMaxAttempts {
 		walkKey := seed.Derive(rootKey, "grammar", strconv.Itoa(attempt))
 		prng := seed.PRNG(walkKey)
 
-		out, walkErr := walkGrammar(ctx, prng, grammar)
+		out, walkErr := walkGrammar(ctx, prng, grammar, tokenizedTemplate{tokens: tokenize(rootTemplate)})
 		if walkErr != nil {
 			return nil, walkErr
 		}
@@ -104,21 +121,11 @@ func walkGrammar(
 	ctx Context,
 	prng *rand.Rand,
 	grammar *dgproto.DrawGrammar,
+	root tokenizedTemplate,
 ) (string, error) {
-	rootDict, err := ctx.LookupDict(grammar.GetRootDict())
-	if err != nil {
-		return "", fmt.Errorf("%w: root_dict %q: %w",
-			ErrBadGrammar, grammar.GetRootDict(), err)
-	}
-
-	rootTemplate, err := pickTemplate(prng, rootDict, grammar.GetRootDict())
-	if err != nil {
-		return "", err
-	}
-
 	var out strings.Builder
 
-	for i, tok := range strings.Fields(rootTemplate) {
+	for i, tok := range root.tokens {
 		if i > 0 {
 			out.WriteByte(' ')
 		}
@@ -131,7 +138,12 @@ func walkGrammar(
 		}
 
 		if dictKey, phraseOK := grammar.GetPhrases()[letter]; phraseOK {
-			expanded, expandErr := expandPhrase(ctx, prng, grammar, dictKey, letter)
+			phraseDict, err := ctx.LookupDict(dictKey)
+			if err != nil {
+				return "", fmt.Errorf("%w: phrase dict %q for %q: %w", ErrBadGrammar, dictKey, letter, err)
+			}
+
+			expanded, expandErr := expandPhrase(ctx, prng, grammar, phraseDict)
 			if expandErr != nil {
 				return "", expandErr
 			}
@@ -161,23 +173,16 @@ func expandPhrase(
 	ctx Context,
 	prng *rand.Rand,
 	grammar *dgproto.DrawGrammar,
-	phraseDictKey string,
-	letter string,
+	dict *dgproto.Dict,
 ) (string, error) {
-	dict, err := ctx.LookupDict(phraseDictKey)
-	if err != nil {
-		return "", fmt.Errorf("%w: phrase dict %q for %q: %w",
-			ErrBadGrammar, phraseDictKey, letter, err)
-	}
-
-	template, err := pickTemplate(prng, dict, phraseDictKey)
+	template, err := pickTemplate(prng, dict, dict.GetRows()[0].GetValues()[0])
 	if err != nil {
 		return "", err
 	}
 
 	var out strings.Builder
 
-	for i, tok := range strings.Fields(template) {
+	for i, tok := range tokenize(template) {
 		if i > 0 {
 			out.WriteByte(' ')
 		}
@@ -268,6 +273,32 @@ func grammarLetter(tok string) (string, bool) {
 	}
 
 	return tok, true
+}
+
+// tokenize splits s into whitespace-delimited tokens without allocating
+// a slice of strings. For short templates (typical < 100 bytes) this
+// avoids the allocation overhead of strings.Fields.
+func tokenize(s string) []string {
+	// Fast path: if there's no whitespace, return a single-element slice.
+	if strings.IndexByte(s, ' ') < 0 {
+		return []string{s}
+	}
+
+	// Manual split — templates are short, so this is cheap.
+	var tokens []string
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == ' ' {
+			if i > start {
+				tokens = append(tokens, s[start:i])
+			}
+			start = i + 1
+		}
+	}
+	if start < len(s) {
+		tokens = append(tokens, s[start:])
+	}
+	return tokens
 }
 
 // truncateRunes truncates s to at most n Unicode runes. It counts
