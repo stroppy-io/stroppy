@@ -370,6 +370,10 @@ func (r *relRuntime) totalRows() int64 {
 // the outer block cache on every new outer entity, evaluates the
 // RelSource attr DAG into scratch, and assembles the emit slice.
 func (rt *Runtime) nextRelationship() ([]any, error) {
+	return rt.nextRelationshipInto(nil)
+}
+
+func (rt *Runtime) nextRelationshipInto(dst []any) ([]any, error) {
 	rel := rt.rel
 
 	if rt.row >= rel.totalRows() {
@@ -414,9 +418,63 @@ func (rt *Runtime) nextRelationship() ([]any, error) {
 		rt.ctx.scratch[name] = value
 	}
 
-	out := rt.assembleRow(rt.row)
+	out := rt.assembleRowInto(dst, rt.row)
 
 	rt.row++
 
 	return out, nil
+}
+
+func (rt *Runtime) nextRelationshipDiscard() error {
+	rel := rt.rel
+
+	if rt.row >= rel.totalRows() {
+		return io.EOF
+	}
+
+	entityIdx, lineIdx := rel.locateRow(rt.row)
+
+	if !rt.ctx.blocks.hasEntity || rt.ctx.blocks.currentEntity != entityIdx {
+		rel.outerBlocks.reset(entityIdx)
+	}
+
+	rel.innerBlocks.reset(entityIdx)
+
+	rt.ctx.entityIdx = entityIdx
+	rt.ctx.lineIdx = lineIdx
+	rt.ctx.rowIdx = rt.row
+
+	if rt.discardNeedsScratch {
+		for key := range rt.ctx.scratch {
+			delete(rt.ctx.scratch, key)
+		}
+	}
+
+	for _, attr := range rel.dag.Order {
+		name := attr.GetName()
+
+		if null := attr.GetNull(); null != nil && nullProbabilityHit(null, name, rt.row) {
+			if rt.discardNeedsScratch {
+				rt.ctx.scratch[name] = nil
+			}
+
+			continue
+		}
+
+		rt.ctx.attrPath = name
+
+		value, err := expr.Eval(rt.ctx, attr.GetExpr())
+		if err != nil {
+			return fmt.Errorf("runtime: attr %q at (e=%d,i=%d): %w",
+				name, entityIdx, lineIdx, err)
+		}
+
+		if rt.discardNeedsScratch {
+			rt.ctx.scratch[name] = value
+		}
+	}
+
+	rt.row++
+
+	return nil
 }

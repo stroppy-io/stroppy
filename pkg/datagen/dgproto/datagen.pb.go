@@ -386,9 +386,10 @@ type Dict struct {
 	// addressed by the empty name "".
 	WeightSets []string `protobuf:"bytes,2,rep,name=weight_sets,json=weightSets,proto3" json:"weight_sets,omitempty"`
 	// Row payloads. Length 1 for scalar dicts; parallel to columns otherwise.
-	Rows          []*DictRow `protobuf:"bytes,3,rep,name=rows,proto3" json:"rows,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Rows             []*DictRow `protobuf:"bytes,3,rep,name=rows,proto3" json:"rows,omitempty"`
+	TokenizedTemplates []string   `protobuf:"bytes,4,rep,name=tokenized_templates,json=tokenizedTemplates,proto3" json:"tokenized_templates,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Dict) Reset() {

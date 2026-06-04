@@ -239,11 +239,12 @@ func (d *Driver) bulkUpsertRuntime(
 	tablePath := path.Join(d.nativeDB.Name(), tableName)
 	writer := newBulkUpsertWriter(d, tablePath, tableName, columns)
 	remaining := limit
+	var rowBuf []any
 
 	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
 	for limit < 0 || remaining > 0 {
-		row, err := rt.Next()
+		row, err := rt.NextInto(rowBuf)
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -251,6 +252,7 @@ func (d *Driver) bulkUpsertRuntime(
 		if err != nil {
 			return fmt.Errorf("ydb: runtime.Next: %w", err)
 		}
+		rowBuf = row
 
 		if err := writer.appendRowCtx(ctx, row); err != nil {
 			return err

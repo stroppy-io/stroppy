@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 
 	"golang.org/x/sync/errgroup"
 
@@ -134,8 +133,7 @@ func SplitChunks(total int64, workers int) []Chunk {
 
 // runParallel fans the work out across worker goroutines. Each worker
 // owns an independent Runtime clone pre-seeked to its chunk boundary and
-// drains exactly chunk.Count rows. Workers are pinned to OS threads via
-// LockOSThread to reduce context switching overhead.
+// drains exactly chunk.Count rows.
 func runParallel(ctx context.Context, seed *dgruntime.Runtime, chunks []Chunk, fn ChunkFn) error {
 	if fn == nil {
 		return ErrNilChunkFn
@@ -149,8 +147,6 @@ func runParallel(ctx context.Context, seed *dgruntime.Runtime, chunks []Chunk, f
 
 	for _, chunk := range chunks {
 		group.Go(func() error {
-			runtime.LockOSThread()
-
 			workerCtx := insertprogress.ContextWithWorker(groupCtx, chunk.Index)
 
 			worker := seed.Clone()

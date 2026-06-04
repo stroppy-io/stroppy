@@ -192,6 +192,7 @@ func drainRows(
 		generatedProgress = insertprogress.NewGeneratedRowCounter(ctx)
 		confirmedProgress = insertprogress.NewConfirmedRowCounter(ctx)
 		written           int64
+		rowBuf            []any
 		record            []string
 	)
 	defer generatedProgress.Flush()
@@ -200,7 +201,7 @@ func drainRows(
 	insertprogress.SetStage(ctx, insertprogress.StageCSVWrite)
 
 	for count < 0 || written < count {
-		row, err := rt.Next()
+		row, err := rt.NextInto(rowBuf)
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -208,6 +209,7 @@ func drainRows(
 		if err != nil {
 			return written, fmt.Errorf("csv: runtime.Next %q: %w", table, err)
 		}
+		rowBuf = row
 
 		generatedProgress.Add(1)
 

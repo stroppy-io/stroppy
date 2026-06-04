@@ -21,11 +21,11 @@ import (
 // and dicts. The relationship runtime additionally populates blocks,
 // registry, iter, outerPop, and the entity/line/global indices.
 type evalContext struct {
-	scratch  map[string]any
+	scratch     map[string]any
 	scratchKeys []string // ordered list of keys written in current row (for fast clear)
-	dicts    map[string]*dgproto.Dict
-	registry *lookup.LookupRegistry
-	cohorts  *cohort.Registry
+	dicts       map[string]*dgproto.Dict
+	registry    *lookup.LookupRegistry
+	cohorts     *cohort.Registry
 
 	// cohortBucketKeys holds each schedule's default bucket_key Expr so
 	// CohortDraw / CohortLive arms that omit a per-arm override can
@@ -178,6 +178,19 @@ func (c *evalContext) Draw(streamID uint32, attrPath string, rowIdx int64) *rand
 	}
 
 	key := c.deriveDraw(streamID, attrPath, rowIdx)
+	c.drawPRNG.Seed(key)
+
+	return c.drawPRNG.Rand()
+}
+
+// DrawKey returns a PRNG seeded directly from key, reusing the same per-runtime
+// source as Draw. It is intentionally not part of expr.Context; hot paths that
+// already derived a substream key can use it via an optional interface.
+func (c *evalContext) DrawKey(key uint64) *rand.Rand {
+	if c.drawPRNG == nil {
+		c.drawPRNG = seed.NewReusablePRNG()
+	}
+
 	c.drawPRNG.Seed(key)
 
 	return c.drawPRNG.Rand()

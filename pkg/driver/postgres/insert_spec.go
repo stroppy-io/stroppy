@@ -172,6 +172,7 @@ func (d *Driver) bulkInsertRuntime(
 
 	batch := make([][]any, 0, batchSize)
 	remaining := limit
+	var rowBuf []any
 
 	generatedProgress := insertprogress.NewGeneratedRowCounter(ctx)
 	defer generatedProgress.Flush()
@@ -179,7 +180,7 @@ func (d *Driver) bulkInsertRuntime(
 	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
 	for limit < 0 || remaining > 0 {
-		row, err := rt.Next()
+		row, err := rt.NextInto(rowBuf)
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -187,8 +188,9 @@ func (d *Driver) bulkInsertRuntime(
 		if err != nil {
 			return fmt.Errorf("postgres: runtime.Next: %w", err)
 		}
+		rowBuf = row
 
-		// Copy the row: Runtime reuses its scratch slice across calls.
+		// Copy the row: the reusable buffer is overwritten by the next row.
 		rowCopy := make([]any, len(row))
 		copy(rowCopy, row)
 		batch = append(batch, rowCopy)
@@ -334,7 +336,7 @@ func (s *rowSource) Next() bool {
 		return false
 	}
 
-	row, err := s.rt.Next()
+	row, err := s.rt.NextInto(s.row)
 	if errors.Is(err, io.EOF) {
 		return false
 	}

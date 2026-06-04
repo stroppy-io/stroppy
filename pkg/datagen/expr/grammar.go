@@ -5,14 +5,14 @@ import (
 	"math/rand/v2"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
 )
 
-// tokenizedTemplate holds a pre-tokenized template to avoid re-parsing.
-type tokenizedTemplate struct {
-	tokens []string // tokens from strings.Fields equivalent
+type keyedDrawer interface {
+	DrawKey(key uint64) *rand.Rand
 }
 
 // grammarMaxAttempts bounds re-walk attempts when a min_len is set and
@@ -86,26 +86,19 @@ func drawGrammar(
 	// second formula.
 	rootKey := rootPRNG.Uint64()
 
-	// Pick the root template once (it's the same for all re-walk
-	// attempts), then cache its tokenized form so we don't re-parse.
-	rootTemplate, err := pickTemplate(rootPRNG, rootDict, grammar.GetRootDict())
-	if err != nil {
-		return "", err
-	}
-
 	var last string
 
 	for attempt := range grammarMaxAttempts {
 		walkKey := seed.Derive(rootKey, "grammar", strconv.Itoa(attempt))
-		prng := seed.PRNG(walkKey)
+		prng := prngForKey(ctx, walkKey)
 
-		out, walkErr := walkGrammar(ctx, prng, grammar, tokenizedTemplate{tokens: tokenize(rootTemplate)})
+		out, walkErr := walkGrammar(ctx, prng, grammar, rootDict)
 		if walkErr != nil {
 			return nil, walkErr
 		}
 
 		last = truncateRunes(out, maxLen)
-		if int64(len([]rune(last))) >= minLen {
+		if runeCount(last) >= minLen {
 			return last, nil
 		}
 	}
@@ -113,19 +106,37 @@ func drawGrammar(
 	return last, nil
 }
 
-// walkGrammar picks a root template, then walks its tokens: literal
-// tokens pass through, single-uppercase-letter tokens resolve through
-// phrases (one level) or leaves. Returns ErrBadGrammar when a letter
-// resolves through neither map.
+func prngForKey(ctx Context, key uint64) *rand.Rand {
+	if drawer, ok := ctx.(keyedDrawer); ok {
+		return drawer.DrawKey(key)
+	}
+
+	return seed.PRNG(key)
+}
+
+// walkGrammar walks a template using pre-computed tokens from dict.TokenizedTemplates.
 func walkGrammar(
 	ctx Context,
 	prng *rand.Rand,
 	grammar *dgproto.DrawGrammar,
-	root tokenizedTemplate,
+	rootDict *dgproto.Dict,
 ) (string, error) {
+	templateIdx, err := pickWeightedRow(prng, rootDict, "")
+	if err != nil {
+		return "", fmt.Errorf("%w: root template pick: %w", ErrBadGrammar, err)
+	}
+
+	template := rootDict.GetRows()[templateIdx].GetValues()[0]
+	if len(rootDict.TokenizedTemplates) > templateIdx {
+		template = rootDict.TokenizedTemplates[templateIdx]
+	}
+	if !hasGrammarToken(template) {
+		return template, nil
+	}
+
 	var out strings.Builder
 
-	for i, tok := range root.tokens {
+	if err := forEachToken(template, func(i int, tok string) error {
 		if i > 0 {
 			out.WriteByte(' ')
 		}
@@ -134,31 +145,35 @@ func walkGrammar(
 		if !ok {
 			out.WriteString(tok)
 
-			continue
+			return nil
 		}
 
 		if dictKey, phraseOK := grammar.GetPhrases()[letter]; phraseOK {
 			phraseDict, err := ctx.LookupDict(dictKey)
 			if err != nil {
-				return "", fmt.Errorf("%w: phrase dict %q for %q: %w", ErrBadGrammar, dictKey, letter, err)
+				return fmt.Errorf("%w: phrase dict %q for %q: %w", ErrBadGrammar, dictKey, letter, err)
 			}
 
 			expanded, expandErr := expandPhrase(ctx, prng, grammar, phraseDict)
 			if expandErr != nil {
-				return "", expandErr
+				return expandErr
 			}
 
 			out.WriteString(expanded)
 
-			continue
+			return nil
 		}
 
 		leaf, leafErr := resolveLeaf(ctx, prng, grammar, letter)
 		if leafErr != nil {
-			return "", leafErr
+			return leafErr
 		}
 
 		out.WriteString(leaf)
+
+		return nil
+	}); err != nil {
+		return "", err
 	}
 
 	return out.String(), nil
@@ -175,14 +190,22 @@ func expandPhrase(
 	grammar *dgproto.DrawGrammar,
 	dict *dgproto.Dict,
 ) (string, error) {
-	template, err := pickTemplate(prng, dict, dict.GetRows()[0].GetValues()[0])
+	templateIdx, err := pickWeightedRow(prng, dict, "")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: template pick: %w", ErrBadGrammar, err)
+	}
+
+	template := dict.GetRows()[templateIdx].GetValues()[0]
+	if len(dict.TokenizedTemplates) > templateIdx {
+		template = dict.TokenizedTemplates[templateIdx]
+	}
+	if !hasGrammarToken(template) {
+		return template, nil
 	}
 
 	var out strings.Builder
 
-	for i, tok := range tokenize(template) {
+	if err := forEachToken(template, func(i int, tok string) error {
 		if i > 0 {
 			out.WriteByte(' ')
 		}
@@ -191,15 +214,19 @@ func expandPhrase(
 		if !ok {
 			out.WriteString(tok)
 
-			continue
+			return nil
 		}
 
 		leaf, leafErr := resolveLeaf(ctx, prng, grammar, subLetter)
 		if leafErr != nil {
-			return "", leafErr
+			return leafErr
 		}
 
 		out.WriteString(leaf)
+
+		return nil
+	}); err != nil {
+		return "", err
 	}
 
 	return out.String(), nil
@@ -275,30 +302,44 @@ func grammarLetter(tok string) (string, bool) {
 	return tok, true
 }
 
-// tokenize splits s into whitespace-delimited tokens without allocating
-// a slice of strings. For short templates (typical < 100 bytes) this
-// avoids the allocation overhead of strings.Fields.
-func tokenize(s string) []string {
-	// Fast path: if there's no whitespace, return a single-element slice.
-	if strings.IndexByte(s, ' ') < 0 {
-		return []string{s}
-	}
+func forEachToken(s string, fn func(i int, tok string) error) error {
+	start := -1
+	idx := 0
 
-	// Manual split — templates are short, so this is cheap.
-	var tokens []string
-	start := 0
 	for i := 0; i < len(s); i++ {
-		if s[i] == ' ' {
-			if i > start {
-				tokens = append(tokens, s[start:i])
+		if s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r' {
+			if start >= 0 {
+				if err := fn(idx, s[start:i]); err != nil {
+					return err
+				}
+				idx++
+				start = -1
 			}
-			start = i + 1
+
+			continue
+		}
+
+		if start < 0 {
+			start = i
 		}
 	}
-	if start < len(s) {
-		tokens = append(tokens, s[start:])
+
+	if start >= 0 {
+		return fn(idx, s[start:])
 	}
-	return tokens
+
+	return nil
+}
+
+func hasGrammarToken(s string) bool {
+	found := false
+	_ = forEachToken(s, func(_ int, tok string) error {
+		_, ok := grammarLetter(tok)
+		found = found || ok
+		return nil
+	})
+
+	return found
 }
 
 // truncateRunes truncates s to at most n Unicode runes. It counts
@@ -309,10 +350,26 @@ func truncateRunes(s string, n int64) string {
 		return ""
 	}
 
-	runes := []rune(s)
-	if int64(len(runes)) <= n {
+	if int64(len(s)) <= n {
 		return s
 	}
 
-	return string(runes[:n])
+	var count int64
+	for idx := range s {
+		if count == n {
+			return s[:idx]
+		}
+		count++
+	}
+
+	return s
+}
+
+func runeCount(s string) int64 {
+	count := utf8.RuneCountInString(s)
+	if count == len(s) {
+		return int64(len(s))
+	}
+
+	return int64(count)
 }

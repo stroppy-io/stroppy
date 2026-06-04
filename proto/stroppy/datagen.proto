@@ -50,6 +50,10 @@ message Dict {
   repeated string weight_sets = 2;
   // Row payloads. Length 1 for scalar dicts; parallel to columns otherwise.
   repeated DictRow rows = 3;
+  // Pre-computed tokenized templates for grammar dicts. Each entry is the
+  // tokenized form of rows[i].values[0], computed at compile time so that
+  // runtime evaluation avoids re-parsing. Empty for non-grammar dicts.
+  repeated string tokenized_templates = 4;
 }
 
 // DictRow is one tuple of values plus optional parallel weights.

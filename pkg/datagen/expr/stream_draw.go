@@ -88,6 +88,12 @@ func evalInt64Pair(ctx Context, a, b *dgproto.Expr) (lo, hi int64, err error) {
 
 // evalInt64 evaluates expr and requires its result to be int64.
 func evalInt64(ctx Context, e *dgproto.Expr) (int64, error) {
+	if lit := e.GetLit(); lit != nil {
+		if value, ok := lit.GetValue().(*dgproto.Literal_Int64); ok {
+			return value.Int64, nil
+		}
+	}
+
 	value, err := Eval(ctx, e)
 	if err != nil {
 		return 0, err
@@ -120,6 +126,15 @@ func evalFloat64Pair(ctx Context, a, b *dgproto.Expr) (lo, hi float64, err error
 // evalFloat64 evaluates expr and requires its result to be float64 or
 // int64 (promoted).
 func evalFloat64(ctx Context, e *dgproto.Expr) (float64, error) {
+	if lit := e.GetLit(); lit != nil {
+		switch value := lit.GetValue().(type) {
+		case *dgproto.Literal_Double:
+			return value.Double, nil
+		case *dgproto.Literal_Int64:
+			return float64(value.Int64), nil
+		}
+	}
+
 	value, err := Eval(ctx, e)
 	if err != nil {
 		return 0, err

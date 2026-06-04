@@ -21,12 +21,13 @@ import (
 // counter are mutated per call. Parallel workers own independent
 // Runtimes built from the same InsertSpec.
 type Runtime struct {
-	dag     *compile.DAG
-	columns []string
-	emit    []emitSlot
-	size    int64
-	row     int64
-	ctx     *evalContext
+	dag                 *compile.DAG
+	columns             []string
+	emit                []emitSlot
+	size                int64
+	row                 int64
+	ctx                 *evalContext
+	discardNeedsScratch bool
 
 	// rel is non-nil when the RelSource declares a Relationship. In
 	// that mode `size` is the per-entity count summed over all outer
@@ -114,12 +115,13 @@ func NewRuntime(spec *dgproto.InsertSpec) (*Runtime, error) {
 	}
 
 	runtime := &Runtime{
-		dag:     dag,
-		columns: columns,
-		emit:    emit,
-		size:    size,
-		row:     0,
-		ctx:     ctx,
+		dag:                 dag,
+		columns:             columns,
+		emit:                emit,
+		size:                size,
+		row:                 0,
+		ctx:                 ctx,
+		discardNeedsScratch: discardNeedsScratch(source),
 	}
 
 	if len(source.GetRelationships()) > 0 {
@@ -224,6 +226,7 @@ func (r *Runtime) Clone() *Runtime {
 			inRelationship:   r.ctx.inRelationship,
 			outerPop:         r.ctx.outerPop,
 		},
+		discardNeedsScratch: r.discardNeedsScratch,
 	}
 
 	if r.rel != nil {
@@ -303,16 +306,39 @@ func (r *Runtime) SeekRow(row int64) error {
 // (nil, io.EOF). Evaluation errors are wrapped with the attr name and
 // row index so a loader log entry is sufficient to reproduce.
 func (r *Runtime) Next() ([]any, error) {
+	return r.NextInto(nil)
+}
+
+// NextInto evaluates the next row into dst and returns the row slice. If dst is
+// nil or too small, a new slice is allocated; otherwise dst[:len(Columns())] is
+// reused. The returned slice is owned by the caller until the next mutation of
+// the supplied dst.
+func (r *Runtime) NextInto(dst []any) ([]any, error) {
 	if r.rel != nil {
-		return r.nextRelationship()
+		return r.nextRelationshipInto(dst)
 	}
 
-	return r.nextFlat()
+	return r.nextFlatInto(dst)
+}
+
+// NextDiscard advances the runtime after evaluating the current row without
+// assembling or returning the row values. It is intended for sinks that truly
+// discard rows, such as the noop driver benchmark path.
+func (r *Runtime) NextDiscard() error {
+	if r.rel != nil {
+		return r.nextRelationshipDiscard()
+	}
+
+	return r.nextFlatDiscard()
 }
 
 // nextFlat is the original Stage-B row emitter: linear over the
 // RelSource's population, evaluating attrs once per row.
 func (r *Runtime) nextFlat() ([]any, error) {
+	return r.nextFlatInto(nil)
+}
+
+func (r *Runtime) nextFlatInto(dst []any) ([]any, error) {
 	if r.row >= r.size {
 		return nil, io.EOF
 	}
@@ -344,31 +370,83 @@ func (r *Runtime) nextFlat() ([]any, error) {
 		r.ctx.scratchKeys = append(r.ctx.scratchKeys, name)
 	}
 
-	out := r.assembleRow(r.row)
+	out := r.assembleRowInto(dst, r.row)
 
 	r.row++
 
 	return out, nil
 }
 
+func (r *Runtime) nextFlatDiscard() error {
+	if r.row >= r.size {
+		return io.EOF
+	}
+
+	r.ctx.rowIdx = r.row
+	if r.discardNeedsScratch {
+		for _, k := range r.ctx.scratchKeys {
+			delete(r.ctx.scratch, k)
+		}
+		r.ctx.scratchKeys = r.ctx.scratchKeys[:0]
+	}
+
+	for _, attrNode := range r.dag.Order {
+		name := attrNode.GetName()
+
+		if null := attrNode.GetNull(); null != nil && nullProbabilityHit(null, name, r.row) {
+			if r.discardNeedsScratch {
+				r.ctx.scratch[name] = nil
+				r.ctx.scratchKeys = append(r.ctx.scratchKeys, name)
+			}
+
+			continue
+		}
+
+		r.ctx.attrPath = name
+
+		value, err := expr.Eval(r.ctx, attrNode.GetExpr())
+		if err != nil {
+			return fmt.Errorf("runtime: attr %q at row %d: %w", name, r.row, err)
+		}
+
+		if r.discardNeedsScratch {
+			r.ctx.scratch[name] = value
+			r.ctx.scratchKeys = append(r.ctx.scratchKeys, name)
+		}
+	}
+
+	r.row++
+
+	return nil
+}
+
 // assembleRow builds the output row for the given global row index,
 // consulting the DAG scratch for emitAttr slots and the SCD2 state for
 // emitSCD2Start / emitSCD2End slots.
 func (r *Runtime) assembleRow(rowIdx int64) []any {
-	out := make([]any, len(r.emit))
+	return r.assembleRowInto(nil, rowIdx)
+}
+
+func (r *Runtime) assembleRowInto(dst []any, rowIdx int64) []any {
+	if cap(dst) < len(r.emit) {
+		dst = make([]any, len(r.emit))
+	} else {
+		dst = dst[:len(r.emit)]
+		clear(dst)
+	}
 
 	for i, slot := range r.emit {
 		switch slot.kind {
 		case emitAttr:
-			out[i] = r.ctx.scratch[r.dag.Order[slot.ref].GetName()]
+			dst[i] = r.ctx.scratch[r.dag.Order[slot.ref].GetName()]
 		case emitSCD2Start:
-			out[i] = r.scd2.startFor(rowIdx)
+			dst[i] = r.scd2.startFor(rowIdx)
 		case emitSCD2End:
-			out[i] = r.scd2.endFor(rowIdx)
+			dst[i] = r.scd2.endFor(rowIdx)
 		}
 	}
 
-	return out
+	return dst
 }
 
 // validateSpec enforces the minimal preconditions for the flat runtime:
@@ -399,6 +477,90 @@ func validateSpec(spec *dgproto.InsertSpec) (*dgproto.RelSource, int64, error) {
 	}
 
 	return source, size, nil
+}
+
+func discardNeedsScratch(source *dgproto.RelSource) bool {
+	iterPop := source.GetPopulation().GetName()
+
+	for _, attr := range source.GetAttrs() {
+		if len(compile.CollectColRefs(attr.GetExpr())) > 0 || hasSelfLookup(attr.GetExpr(), iterPop) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasSelfLookup(e *dgproto.Expr, iterPop string) bool {
+	if e == nil {
+		return false
+	}
+
+	switch kind := e.GetKind().(type) {
+	case *dgproto.Expr_BinOp:
+		return hasSelfLookup(kind.BinOp.GetA(), iterPop) || hasSelfLookup(kind.BinOp.GetB(), iterPop)
+	case *dgproto.Expr_Call:
+		for _, arg := range kind.Call.GetArgs() {
+			if hasSelfLookup(arg, iterPop) {
+				return true
+			}
+		}
+	case *dgproto.Expr_If_:
+		ifExpr := kind.If_
+		return hasSelfLookup(ifExpr.GetCond(), iterPop) ||
+			hasSelfLookup(ifExpr.GetThen(), iterPop) ||
+			hasSelfLookup(ifExpr.GetElse_(), iterPop)
+	case *dgproto.Expr_DictAt:
+		return hasSelfLookup(kind.DictAt.GetIndex(), iterPop)
+	case *dgproto.Expr_Lookup:
+		return kind.Lookup.GetTargetPop() == iterPop || hasSelfLookup(kind.Lookup.GetEntityIndex(), iterPop)
+	case *dgproto.Expr_StreamDraw:
+		return streamDrawHasSelfLookup(kind.StreamDraw, iterPop)
+	case *dgproto.Expr_Choose:
+		for _, branch := range kind.Choose.GetBranches() {
+			if hasSelfLookup(branch.GetExpr(), iterPop) {
+				return true
+			}
+		}
+	case *dgproto.Expr_CohortDraw:
+		return hasSelfLookup(kind.CohortDraw.GetSlot(), iterPop) ||
+			hasSelfLookup(kind.CohortDraw.GetBucketKey(), iterPop)
+	case *dgproto.Expr_CohortLive:
+		return hasSelfLookup(kind.CohortLive.GetBucketKey(), iterPop)
+	case *dgproto.Expr_Col:
+		return true
+	case *dgproto.Expr_RowIndex, *dgproto.Expr_Lit, *dgproto.Expr_BlockRef, nil:
+		return false
+	}
+
+	return false
+}
+
+func streamDrawHasSelfLookup(node *dgproto.StreamDraw, iterPop string) bool {
+	if node == nil {
+		return false
+	}
+
+	switch arm := node.GetDraw().(type) {
+	case *dgproto.StreamDraw_IntUniform:
+		return hasSelfLookup(arm.IntUniform.GetMin(), iterPop) || hasSelfLookup(arm.IntUniform.GetMax(), iterPop)
+	case *dgproto.StreamDraw_FloatUniform:
+		return hasSelfLookup(arm.FloatUniform.GetMin(), iterPop) || hasSelfLookup(arm.FloatUniform.GetMax(), iterPop)
+	case *dgproto.StreamDraw_Normal:
+		return hasSelfLookup(arm.Normal.GetMin(), iterPop) || hasSelfLookup(arm.Normal.GetMax(), iterPop)
+	case *dgproto.StreamDraw_Zipf:
+		return hasSelfLookup(arm.Zipf.GetMin(), iterPop) || hasSelfLookup(arm.Zipf.GetMax(), iterPop)
+	case *dgproto.StreamDraw_Decimal:
+		return hasSelfLookup(arm.Decimal.GetMin(), iterPop) || hasSelfLookup(arm.Decimal.GetMax(), iterPop)
+	case *dgproto.StreamDraw_Ascii:
+		return hasSelfLookup(arm.Ascii.GetMinLen(), iterPop) || hasSelfLookup(arm.Ascii.GetMaxLen(), iterPop)
+	case *dgproto.StreamDraw_Phrase:
+		return hasSelfLookup(arm.Phrase.GetMinWords(), iterPop) || hasSelfLookup(arm.Phrase.GetMaxWords(), iterPop)
+	case *dgproto.StreamDraw_Grammar:
+		return hasSelfLookup(arm.Grammar.GetMinLen(), iterPop) || hasSelfLookup(arm.Grammar.GetMaxLen(), iterPop)
+	default:
+		return false
+	}
 }
 
 // resolveColumnOrder returns an emitSlot per column in column_order.

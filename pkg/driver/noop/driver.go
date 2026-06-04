@@ -147,10 +147,12 @@ func drainRuntime(ctx context.Context, rt *runtime.Runtime, count int64) error {
 
 	start := time.Now()
 
-	var drainedRows int64
+	var (
+		drainedRows int64
+	)
 
 	for count < 0 || count > 0 {
-		if _, err := rt.Next(); err != nil {
+		if err := rt.NextDiscard(); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
