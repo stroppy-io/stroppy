@@ -19,27 +19,9 @@ func litInt(n int64) *dgproto.Expr {
 	}}}
 }
 
-func litStr(s string) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
-		Value: &dgproto.Literal_String_{String_: s},
-	}}}
-}
-
 func litFloat(f float64) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
 		Value: &dgproto.Literal_Double{Double: f},
-	}}}
-}
-
-func litNull() *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
-		Value: &dgproto.Literal_Null{},
-	}}}
-}
-
-func rowIndex() *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{
-		Kind: dgproto.RowIndex_GLOBAL,
 	}}}
 }
 
@@ -53,20 +35,10 @@ func binOp(op dgproto.BinOp_Op, a, b *dgproto.Expr) *dgproto.Expr {
 	}}}
 }
 
-func callExpr(name string, args ...*dgproto.Expr) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_Call{Call: &dgproto.Call{
-		Func: name, Args: args,
-	}}}
-}
-
 func lookupExpr(pop, attrName string, idx *dgproto.Expr) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_Lookup{Lookup: &dgproto.Lookup{
 		TargetPop: pop, AttrName: attrName, EntityIndex: idx,
 	}}}
-}
-
-func modExpr(a, b *dgproto.Expr) *dgproto.Expr {
-	return binOp(dgproto.BinOp_MOD, a, b)
 }
 
 func fixedDegree(count int64) *dgproto.Degree {
@@ -75,27 +47,20 @@ func fixedDegree(count int64) *dgproto.Degree {
 	}}}
 }
 
-func dictAtExpr(dictKey string, index *dgproto.Expr) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_DictAt{DictAt: &dgproto.DictAt{
-		DictKey: dictKey,
-		Index:   index,
-	}}}
-}
-
 // --- Draw helpers (StreamDraw arms). ---
 
-func drawIntUniform(min, max int64) *dgproto.Expr {
+func drawIntUniform(lo, hi int64) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
 		Draw: &dgproto.StreamDraw_IntUniform{IntUniform: &dgproto.DrawIntUniform{
-			Min: litInt(min), Max: litInt(max),
+			Min: litInt(lo), Max: litInt(hi),
 		}},
 	}}}
 }
 
-func drawDecimal(min, max float64, scale uint32) *dgproto.Expr {
+func drawDecimal(lo, hi float64, scale uint32) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
 		Draw: &dgproto.StreamDraw_Decimal{Decimal: &dgproto.DrawDecimal{
-			Min:   litFloat(min), Max: litFloat(max), Scale: scale,
+			Min: litFloat(lo), Max: litFloat(hi), Scale: scale,
 		}},
 	}}}
 }
@@ -109,34 +74,16 @@ func drawDateUniform(minDays, maxDays int64) *dgproto.Expr {
 	}}}
 }
 
-func drawBernoulli(p float32) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
-		Draw: &dgproto.StreamDraw_Bernoulli{Bernoulli: &dgproto.DrawBernoulli{
-			P: p,
-		}},
-	}}}
-}
-
-func drawAscii(minLen, maxLen int64) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
-		Draw: &dgproto.StreamDraw_Ascii{Ascii: &dgproto.DrawAscii{
-			MinLen:   litInt(minLen),
-			MaxLen:   litInt(maxLen),
-			Alphabet: []*dgproto.AsciiRange{{Min: 32, Max: 126}},
-		}},
-	}}}
-}
-
 // grammarDict builds a DrawGrammar expression using the given root, phrases, and
 // leaves dicts. This is the minimal grammar-based text generator (spec §4.2).
 func grammarText(rootKey, npKey, vpKey string, minLen, maxLen int64) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
 		Draw: &dgproto.StreamDraw_Grammar{Grammar: &dgproto.DrawGrammar{
-			RootDict:  rootKey,
-			Phrases:   map[string]string{"N": npKey, "V": vpKey},
-			Leaves:    map[string]string{"N": npKey, "V": vpKey},
-			MinLen:    litInt(minLen),
-			MaxLen:    litInt(maxLen),
+			RootDict: rootKey,
+			Phrases:  map[string]string{"N": npKey, "V": vpKey},
+			Leaves:   map[string]string{"N": npKey, "V": vpKey},
+			MinLen:   litInt(minLen),
+			MaxLen:   litInt(maxLen),
 		}},
 	}}}
 }
@@ -273,6 +220,7 @@ func TestLineitemSpec_SingleWorker(t *testing.T) {
 	t.Parallel()
 
 	const size = int64(6_000_000) // TPC-H SF=1
+
 	ctx := context.Background()
 
 	d := noop.NewDriver(driver.Options{Config: &stroppy.DriverConfig{}})

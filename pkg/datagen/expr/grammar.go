@@ -130,6 +130,7 @@ func walkGrammar(
 	if len(rootDict.TokenizedTemplates) > templateIdx {
 		template = rootDict.TokenizedTemplates[templateIdx]
 	}
+
 	if !hasGrammarToken(template) {
 		return template, nil
 	}
@@ -199,6 +200,7 @@ func expandPhrase(
 	if len(dict.TokenizedTemplates) > templateIdx {
 		template = dict.TokenizedTemplates[templateIdx]
 	}
+
 	if !hasGrammarToken(template) {
 		return template, nil
 	}
@@ -302,16 +304,17 @@ func grammarLetter(tok string) (string, bool) {
 	return tok, true
 }
 
-func forEachToken(s string, fn func(i int, tok string) error) error {
+func forEachToken(template string, fn func(i int, tok string) error) error {
 	start := -1
 	idx := 0
 
-	for i := 0; i < len(s); i++ {
-		if s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r' {
+	for i := range len(template) {
+		if template[i] == ' ' || template[i] == '\t' || template[i] == '\n' || template[i] == '\r' {
 			if start >= 0 {
-				if err := fn(idx, s[start:i]); err != nil {
+				if err := fn(idx, template[start:i]); err != nil {
 					return err
 				}
+
 				idx++
 				start = -1
 			}
@@ -325,17 +328,18 @@ func forEachToken(s string, fn func(i int, tok string) error) error {
 	}
 
 	if start >= 0 {
-		return fn(idx, s[start:])
+		return fn(idx, template[start:])
 	}
 
 	return nil
 }
 
-func hasGrammarToken(s string) bool {
+func hasGrammarToken(template string) bool {
 	found := false
-	_ = forEachToken(s, func(_ int, tok string) error {
+	_ = forEachToken(template, func(_ int, tok string) error {
 		_, ok := grammarLetter(tok)
 		found = found || ok
+
 		return nil
 	})
 
@@ -345,24 +349,25 @@ func hasGrammarToken(s string) bool {
 // truncateRunes truncates s to at most n Unicode runes. It counts
 // runes rather than bytes because dict contents may carry non-ASCII
 // words (e.g. "sauternes", "Tiresias" in the TPC-H grammar).
-func truncateRunes(s string, n int64) string {
-	if n <= 0 {
+func truncateRunes(text string, maxRunes int64) string {
+	if maxRunes <= 0 {
 		return ""
 	}
 
-	if int64(len(s)) <= n {
-		return s
+	if int64(len(text)) <= maxRunes {
+		return text
 	}
 
 	var count int64
-	for idx := range s {
-		if count == n {
-			return s[:idx]
+	for idx := range text {
+		if count == maxRunes {
+			return text[:idx]
 		}
+
 		count++
 	}
 
-	return s
+	return text
 }
 
 func runeCount(s string) int64 {

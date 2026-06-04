@@ -91,6 +91,38 @@ func RunParallelByWorkers(
 	return total, nil
 }
 
+// RunParallel drains explicit chunks concurrently. Callers that already know
+// their split use this directly; RunParallelByWorkers is the common helper for
+// worker-count based splitting.
+func RunParallel(
+	ctx context.Context,
+	spec *dgproto.InsertSpec,
+	chunks []Chunk,
+	fn ChunkFn,
+) error {
+	if spec == nil {
+		return ErrNilSpec
+	}
+
+	if fn == nil {
+		return ErrNilChunkFn
+	}
+
+	if len(chunks) == 0 {
+		return ErrNoChunks
+	}
+
+	seed, err := dgruntime.NewRuntime(spec)
+	if err != nil {
+		return fmt.Errorf("common: build seed runtime: %w", err)
+	}
+
+	insertprogress.SetTotal(ctx, seed.TotalRows())
+	insertprogress.SetWorkers(ctx, len(chunks))
+
+	return runParallel(ctx, seed, chunks, fn)
+}
+
 // SplitChunks carves the row range [0, total) into exactly max(workers, 1)
 // contiguous chunks. Every chunk has floor(total/workers) rows except the
 // last, which absorbs the remainder so the total count is preserved
@@ -115,15 +147,17 @@ func SplitChunks(total int64, workers int) []Chunk {
 	base := total / int64(workers)
 	remainder := total - base*int64(workers)
 
-	for i := 0; i < workers; i++ {
+	for i := range workers {
 		count := base
 		if i < int(remainder) {
 			count++
 		}
 
+		priorRemainder := min(i, int(remainder))
+
 		chunks[i] = Chunk{
 			Index: i,
-			Start: base*int64(i) + int64(min(0, int(remainder)-i)),
+			Start: base*int64(i) + int64(priorRemainder),
 			Count: count,
 		}
 	}

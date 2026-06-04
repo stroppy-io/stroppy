@@ -201,40 +201,47 @@ func (c *evalContext) DrawKey(key uint64) *rand.Rand {
 // same formula as seed.Derive, but avoids string allocation by hashing each
 // element's bytes directly.
 func (c *evalContext) deriveDraw(streamID uint32, attrPath string, rowIdx int64) uint64 {
-	const prefix = 's'
+	const (
+		prefix        = 's'
+		drawHashGamma = uint64(0x9E3779B97F4A7C15)
+		decimalRadix  = 10
+	)
 
-	var h uint64 = 0x9E3779B97F4A7C15 // splitmix64 gamma
+	hash := drawHashGamma
 
 	// Hash attrPath (with "/" prefix).
-	h ^= 0x9E3779B97F4A7C15 ^ '/' // fnv1a offset ^ '/'
-	h *= 0x9E3779B97F4A7C15
-	for i := 0; i < len(attrPath); i++ {
-		h ^= uint64(attrPath[i])
-		h *= 0x9E3779B97F4A7C15
+	hash ^= drawHashGamma ^ '/'
+
+	hash *= drawHashGamma
+	for i := range len(attrPath) {
+		hash ^= uint64(attrPath[i])
+		hash *= drawHashGamma
 	}
 
 	// Hash "s" prefix.
-	h ^= prefix
-	h *= 0x9E3779B97F4A7C15
+	hash ^= prefix
+	hash *= drawHashGamma
 
 	// Hash streamID as decimal bytes.
-	for d := uint32(1); d <= streamID; d *= 10 {
-		h ^= uint64('0' + byte(streamID/d%10))
-		h *= 0x9E3779B97F4A7C15
+	for d := uint32(1); d <= streamID; d *= decimalRadix {
+		hash ^= uint64('0') + uint64(streamID/d%decimalRadix)
+		hash *= drawHashGamma
 	}
 
 	// Hash rowIdx as decimal bytes (with "-" sign if negative).
 	if rowIdx < 0 {
-		h ^= '-'
-		h *= 0x9E3779B97F4A7C15
+		hash ^= '-'
+		hash *= drawHashGamma
 		rowIdx = -rowIdx
 	}
-	for d := int64(1); d <= rowIdx; d *= 10 {
-		h ^= uint64('0' + byte(rowIdx/d%10))
-		h *= 0x9E3779B97F4A7C15
+
+	for d := int64(1); d <= rowIdx; d *= decimalRadix {
+		//nolint:gosec // rowIdx is non-negative here and the modulo result is 0..9.
+		hash ^= uint64('0') + uint64(rowIdx/d%decimalRadix)
+		hash *= drawHashGamma
 	}
 
-	return seed.SplitMix64(h)
+	return seed.SplitMix64(hash)
 }
 
 // AttrPath returns the attr currently being evaluated. Empty when no

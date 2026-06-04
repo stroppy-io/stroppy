@@ -366,13 +366,6 @@ func (r *relRuntime) totalRows() int64 {
 	return r.total
 }
 
-// nextRelationship advances the Runtime by one inner row. It refreshes
-// the outer block cache on every new outer entity, evaluates the
-// RelSource attr DAG into scratch, and assembles the emit slice.
-func (rt *Runtime) nextRelationship() ([]any, error) {
-	return rt.nextRelationshipInto(nil)
-}
-
 func (rt *Runtime) nextRelationshipInto(dst []any) ([]any, error) {
 	rel := rt.rel
 

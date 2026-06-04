@@ -36,7 +36,7 @@ func fnv1a64(s string) uint64 {
 	)
 
 	h := fnvOffset
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		h ^= uint64(s[i])
 		h *= fnvPrime
 	}
@@ -59,20 +59,21 @@ func fnv1a64Path(path []string) uint64 {
 		fnvPrime  = uint64(1099511628211)
 	)
 
-	h := fnvOffset
+	hash := fnvOffset
+
 	for i, p := range path {
 		if i > 0 {
-			h ^= '/'
-			h *= fnvPrime
+			hash ^= '/'
+			hash *= fnvPrime
 		}
 
-		for j := 0; j < len(p); j++ {
-			h ^= uint64(p[j])
-			h *= fnvPrime
+		for j := range len(p) {
+			hash ^= uint64(p[j])
+			hash *= fnvPrime
 		}
 	}
 
-	return h
+	return hash
 }
 
 // Fnv1a64Path is the exported version of fnv1a64Path for test cross-checks.

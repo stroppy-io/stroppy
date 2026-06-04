@@ -172,6 +172,7 @@ func (d *Driver) bulkInsertRuntime(
 
 	batch := make([][]any, 0, batchSize)
 	remaining := limit
+
 	var rowBuf []any
 
 	generatedProgress := insertprogress.NewGeneratedRowCounter(ctx)
@@ -188,6 +189,7 @@ func (d *Driver) bulkInsertRuntime(
 		if err != nil {
 			return fmt.Errorf("postgres: runtime.Next: %w", err)
 		}
+
 		rowBuf = row
 
 		// Copy the row: the reusable buffer is overwritten by the next row.

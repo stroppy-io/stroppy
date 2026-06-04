@@ -93,6 +93,7 @@ func RunBulkInsert[T any](
 
 	batch := make([][]any, 0, batchSize)
 	remaining := limit
+
 	var rowBuf []any
 
 	generatedProgress := insertprogress.NewGeneratedRowCounter(ctx)
@@ -109,6 +110,7 @@ func RunBulkInsert[T any](
 		if err != nil {
 			return fmt.Errorf("sqldriver: runtime.Next: %w", err)
 		}
+
 		rowBuf = row
 
 		rowCopy, err := convertRow(row, dialect)

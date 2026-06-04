@@ -336,6 +336,7 @@ func (c *rowCache) get(idx int64) (map[string]any, bool) {
 	c.order.MoveToFront(elem)
 
 	entry, _ := elem.Value.(*cacheEntry)
+
 	return entry.row, true
 }
 
@@ -361,8 +362,9 @@ func (c *rowCache) putAndClear(idx int64, row map[string]any, keys []string) {
 	c.index[idx] = elem
 
 	// Store keys on the cache entry for fast clearing on next use.
-	entry := elem.Value.(*cacheEntry)
-	entry.keys = keys
+	if entry, ok := elem.Value.(*cacheEntry); ok {
+		entry.keys = keys
+	}
 }
 
 // Len returns the current number of entries in the cache. Test-only.
@@ -449,40 +451,47 @@ func (c *popCtx) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand
 // deriveDraw computes the seed for a StreamDraw call without allocating strings.
 // Identical to evalContext.deriveDraw but uses c.reg.rootSeed.
 func (c *popCtx) deriveDraw(streamID uint32, attrPath string, rowIdx int64) uint64 {
-	const prefix = 's'
+	const (
+		prefix        = 's'
+		drawHashGamma = uint64(0x9E3779B97F4A7C15)
+		decimalRadix  = 10
+	)
 
-	var h uint64 = 0x9E3779B97F4A7C15
+	hash := drawHashGamma
 
 	// Hash attrPath (with "/" prefix).
-	h ^= 0x9E3779B97F4A7C15 ^ '/'
-	h *= 0x9E3779B97F4A7C15
-	for i := 0; i < len(attrPath); i++ {
-		h ^= uint64(attrPath[i])
-		h *= 0x9E3779B97F4A7C15
+	hash ^= drawHashGamma ^ '/'
+
+	hash *= drawHashGamma
+	for i := range len(attrPath) {
+		hash ^= uint64(attrPath[i])
+		hash *= drawHashGamma
 	}
 
 	// Hash "s" prefix.
-	h ^= prefix
-	h *= 0x9E3779B97F4A7C15
+	hash ^= prefix
+	hash *= drawHashGamma
 
 	// Hash streamID as decimal bytes.
-	for d := uint32(1); d <= streamID; d *= 10 {
-		h ^= uint64('0' + byte(streamID/d%10))
-		h *= 0x9E3779B97F4A7C15
+	for d := uint32(1); d <= streamID; d *= decimalRadix {
+		hash ^= uint64('0') + uint64(streamID/d%decimalRadix)
+		hash *= drawHashGamma
 	}
 
 	// Hash rowIdx as decimal bytes (with "-" sign if negative).
 	if rowIdx < 0 {
-		h ^= '-'
-		h *= 0x9E3779B97F4A7C15
+		hash ^= '-'
+		hash *= drawHashGamma
 		rowIdx = -rowIdx
 	}
-	for d := int64(1); d <= rowIdx; d *= 10 {
-		h ^= uint64('0' + byte(rowIdx/d%10))
-		h *= 0x9E3779B97F4A7C15
+
+	for d := int64(1); d <= rowIdx; d *= decimalRadix {
+		//nolint:gosec // rowIdx is non-negative here and the modulo result is 0..9.
+		hash ^= uint64('0') + uint64(rowIdx/d%decimalRadix)
+		hash *= drawHashGamma
 	}
 
-	return seed.SplitMix64(h)
+	return seed.SplitMix64(hash)
 }
 
 // AttrPath returns the pop-qualified attr path currently under

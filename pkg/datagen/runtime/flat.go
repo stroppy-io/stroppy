@@ -332,12 +332,6 @@ func (r *Runtime) NextDiscard() error {
 	return r.nextFlatDiscard()
 }
 
-// nextFlat is the original Stage-B row emitter: linear over the
-// RelSource's population, evaluating attrs once per row.
-func (r *Runtime) nextFlat() ([]any, error) {
-	return r.nextFlatInto(nil)
-}
-
 func (r *Runtime) nextFlatInto(dst []any) ([]any, error) {
 	if r.row >= r.size {
 		return nil, io.EOF
@@ -348,6 +342,7 @@ func (r *Runtime) nextFlatInto(dst []any) ([]any, error) {
 	for _, k := range r.ctx.scratchKeys {
 		delete(r.ctx.scratch, k)
 	}
+
 	r.ctx.scratchKeys = r.ctx.scratchKeys[:0]
 
 	for _, attrNode := range r.dag.Order {
@@ -387,6 +382,7 @@ func (r *Runtime) nextFlatDiscard() error {
 		for _, k := range r.ctx.scratchKeys {
 			delete(r.ctx.scratch, k)
 		}
+
 		r.ctx.scratchKeys = r.ctx.scratchKeys[:0]
 	}
 
@@ -418,13 +414,6 @@ func (r *Runtime) nextFlatDiscard() error {
 	r.row++
 
 	return nil
-}
-
-// assembleRow builds the output row for the given global row index,
-// consulting the DAG scratch for emitAttr slots and the SCD2 state for
-// emitSCD2Start / emitSCD2End slots.
-func (r *Runtime) assembleRow(rowIdx int64) []any {
-	return r.assembleRowInto(nil, rowIdx)
 }
 
 func (r *Runtime) assembleRowInto(dst []any, rowIdx int64) []any {
@@ -491,6 +480,7 @@ func discardNeedsScratch(source *dgproto.RelSource) bool {
 	return false
 }
 
+//nolint:gocognit,cyclop // Conservative recursive scanner mirrors the Expr oneof shape.
 func hasSelfLookup(e *dgproto.Expr, iterPop string) bool {
 	if e == nil {
 		return false
@@ -507,6 +497,7 @@ func hasSelfLookup(e *dgproto.Expr, iterPop string) bool {
 		}
 	case *dgproto.Expr_If_:
 		ifExpr := kind.If_
+
 		return hasSelfLookup(ifExpr.GetCond(), iterPop) ||
 			hasSelfLookup(ifExpr.GetThen(), iterPop) ||
 			hasSelfLookup(ifExpr.GetElse_(), iterPop)

@@ -62,7 +62,11 @@ func TestFNV1a64(t *testing.T) {
 
 	// Cross-check: fnv1a64Path(path) must equal fnv1a64(strings.Join(path, "/")).
 	require.Equal(t, seed.Fn1a64(strings.Join([]string{"a", "b"}, "/")), seed.Fnv1a64Path([]string{"a", "b"}))
-	require.Equal(t, seed.Fn1a64(strings.Join([]string{"lineitem", "l_partkey"}, "/")), seed.Fnv1a64Path([]string{"lineitem", "l_partkey"}))
+	require.Equal(
+		t,
+		seed.Fn1a64(strings.Join([]string{"lineitem", "l_partkey"}, "/")),
+		seed.Fnv1a64Path([]string{"lineitem", "l_partkey"}),
+	)
 }
 
 func TestDerive(t *testing.T) {

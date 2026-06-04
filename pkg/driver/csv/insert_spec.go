@@ -209,6 +209,7 @@ func drainRows(
 		if err != nil {
 			return written, fmt.Errorf("csv: runtime.Next %q: %w", table, err)
 		}
+
 		rowBuf = row
 
 		generatedProgress.Add(1)
