@@ -3,7 +3,6 @@ package runtime
 import (
 	"fmt"
 	"math/rand/v2"
-	"strconv"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/cohort"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
@@ -169,20 +168,16 @@ func (c *evalContext) Lookup(popName, attrName string, entityIdx int64) (any, er
 }
 
 // Draw returns a PRNG seeded deterministically from (rootSeed,
-// attrPath, streamID, rowIdx) via seed.Derive. The stream_id is
-// serialized with an "s" prefix so the hash input for a same-row
-// draw never collides with an attrPath that happens to be numeric.
+// attrPath, streamID, rowIdx) via seed.DeriveDraw, which is byte-identical
+// to the historical seed.Derive(rootSeed, attrPath, "s"+streamID, rowIdx)
+// formula but allocates nothing. The stream_id keeps its "s" prefix so the
+// hash input for a same-row draw never collides with a numeric attrPath.
 func (c *evalContext) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand {
 	if c.drawPRNG == nil {
 		c.drawPRNG = seed.NewReusablePRNG()
 	}
 
-	key := seed.Derive(
-		c.rootSeed,
-		attrPath,
-		"s"+strconv.FormatUint(uint64(streamID), 10),
-		strconv.FormatInt(rowIdx, 10),
-	)
+	key := seed.DeriveDraw(c.rootSeed, attrPath, streamID, rowIdx)
 	c.drawPRNG.Seed(key)
 
 	return c.drawPRNG.Rand()
