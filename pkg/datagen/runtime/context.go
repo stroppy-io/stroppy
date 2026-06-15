@@ -74,6 +74,18 @@ type evalContext struct {
 	// drawPRNG is lazily allocated and re-seeded on every Draw call so
 	// StreamDraw / Choose avoid a fresh rand.New per sample.
 	drawPRNG *seed.ReusablePRNG
+
+	// grammarBuf is the reused assembly buffer lent to grammar draws via
+	// GrammarScratch. It holds capacity across rows so a grammar walk
+	// appends without allocating; only the result string is fresh.
+	grammarBuf []byte
+}
+
+// GrammarScratch lends the per-runtime grammar assembly buffer to the expr
+// grammar walker (the expr grammarBufferer optimization), so grammar output is
+// built into a buffer reused across rows rather than a fresh per-attempt one.
+func (c *evalContext) GrammarScratch() *[]byte {
+	return &c.grammarBuf
 }
 
 // LookupCol resolves a ColRef by consulting the current row's scratch

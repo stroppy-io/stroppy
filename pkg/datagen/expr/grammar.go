@@ -3,7 +3,6 @@ package expr
 import (
 	"fmt"
 	"math/rand/v2"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -16,11 +15,6 @@ import (
 // drawGrammar returns the last walk result as-is; the spec does not
 // require padding.
 const grammarMaxAttempts = 8
-
-// grammarGrowSlack is added to max_len when sizing the walk buffer so a typical
-// untruncated walk (which may overshoot max_len before truncation) fits in one
-// allocation. Overshoots beyond this trigger at most one append regrowth.
-const grammarGrowSlack = 64
 
 // keyedDrawer is an optional Context capability: return a PRNG seeded directly
 // from a precomputed sub-stream key, reusing the context's pooled PCG instead
@@ -39,6 +33,29 @@ func grammarPRNG(ctx Context, key uint64) *rand.Rand {
 	}
 
 	return seed.PRNG(key)
+}
+
+// grammarBufferer is an optional Context capability: lend a reusable byte
+// buffer for assembling grammar output. Reusing a context-owned buffer across
+// rows means a grammar draw allocates only its final, exact-sized result
+// string rather than an over-sized builder backing per re-walk attempt.
+// evalContext and the lookup popCtx implement it; other contexts get a local
+// buffer (one slice per call).
+type grammarBufferer interface {
+	GrammarScratch() *[]byte
+}
+
+// grammarScratch returns a reusable assembly buffer for one grammar draw. For
+// contexts that own a buffer it is reused across rows; otherwise a fresh local
+// slice is returned.
+func grammarScratch(ctx Context) *[]byte {
+	if gb, ok := ctx.(grammarBufferer); ok {
+		return gb.GrammarScratch()
+	}
+
+	var local []byte
+
+	return &local
 }
 
 // drawGrammar implements DrawGrammar — a two-phase template walker.
@@ -101,27 +118,29 @@ func drawGrammar(
 	// second formula.
 	rootKey := rootPRNG.Uint64()
 
+	// buf is a context-owned, reused assembly buffer: after warm-up it holds
+	// capacity across rows and attempts, so each walk appends without
+	// allocating. Only the truncated result string is freshly allocated (at
+	// its exact length) per returned row.
+	buf := grammarScratch(ctx)
+
 	var (
-		out  strings.Builder
-		last string
+		last     string
+		lastRune int64
 	)
 
 	for attempt := range grammarMaxAttempts {
 		walkKey := seed.DeriveGrammarAttempt(rootKey, attempt)
 		prng := grammarPRNG(ctx, walkKey)
 
-		// Reset clears the backing slice; Grow must follow it (not precede
-		// the loop) so each attempt builds into one sized allocation rather
-		// than regrowing geometrically from nil.
-		out.Reset()
-		out.Grow(int(maxLen) + grammarGrowSlack)
+		*buf = (*buf)[:0]
 
-		if walkErr := walkGrammar(ctx, prng, grammar, &out); walkErr != nil {
+		if walkErr := walkGrammar(ctx, prng, grammar, buf); walkErr != nil {
 			return nil, walkErr
 		}
 
-		last = truncateRunes(out.String(), maxLen)
-		if int64(utf8.RuneCountInString(last)) >= minLen {
+		last, lastRune = truncateRunesToString(*buf, maxLen)
+		if lastRune >= minLen {
 			return last, nil
 		}
 	}
@@ -137,7 +156,7 @@ func walkGrammar(
 	ctx Context,
 	prng *rand.Rand,
 	grammar *dgproto.DrawGrammar,
-	out *strings.Builder,
+	out *[]byte,
 ) error {
 	rootDict, err := ctx.LookupDict(grammar.GetRootDict())
 	if err != nil {
@@ -154,14 +173,14 @@ func walkGrammar(
 
 	return forEachField(rootTemplate, func(tok string) error {
 		if !first {
-			out.WriteByte(' ')
+			*out = append(*out, ' ')
 		}
 
 		first = false
 
 		letter, ok := grammarLetter(tok)
 		if !ok {
-			out.WriteString(tok)
+			*out = append(*out, tok...)
 
 			return nil
 		}
@@ -175,7 +194,7 @@ func walkGrammar(
 			return leafErr
 		}
 
-		out.WriteString(leaf)
+		*out = append(*out, leaf...)
 
 		return nil
 	})
@@ -193,7 +212,7 @@ func expandPhrase(
 	grammar *dgproto.DrawGrammar,
 	phraseDictKey string,
 	letter string,
-	out *strings.Builder,
+	out *[]byte,
 ) error {
 	dict, err := ctx.LookupDict(phraseDictKey)
 	if err != nil {
@@ -210,14 +229,14 @@ func expandPhrase(
 
 	return forEachField(template, func(tok string) error {
 		if !first {
-			out.WriteByte(' ')
+			*out = append(*out, ' ')
 		}
 
 		first = false
 
 		subLetter, ok := grammarLetter(tok)
 		if !ok {
-			out.WriteString(tok)
+			*out = append(*out, tok...)
 
 			return nil
 		}
@@ -227,7 +246,7 @@ func expandPhrase(
 			return leafErr
 		}
 
-		out.WriteString(leaf)
+		*out = append(*out, leaf...)
 
 		return nil
 	})
@@ -356,4 +375,29 @@ func truncateRunes(s string, n int64) string {
 	}
 
 	return s
+}
+
+// truncateRunesToString returns the first n runes of buf as a freshly
+// allocated, exactly-sized string, along with that string's rune count
+// (min(n, total runes)). It counts runes rather than bytes so multi-byte dict
+// words are never split mid-rune. The returned string copies buf, so the
+// caller may reuse buf afterward.
+func truncateRunesToString(buf []byte, n int64) (string, int64) {
+	if n <= 0 {
+		return "", 0
+	}
+
+	count := int64(0)
+
+	for i := 0; i < len(buf); {
+		if count == n {
+			return string(buf[:i]), count
+		}
+
+		_, size := utf8.DecodeRune(buf[i:])
+		i += size
+		count++
+	}
+
+	return string(buf), count
 }
