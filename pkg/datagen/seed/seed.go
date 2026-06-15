@@ -63,6 +63,18 @@ func DeriveDraw(root uint64, attrPath string, streamID uint32, rowIdx int64) uin
 	return SplitMix64(root ^ h)
 }
 
+// DeriveGrammarAttempt is the allocation-free sub-stream key for grammar
+// re-walk attempt n, byte-identical to Derive(root, "grammar", strconv.Itoa(n))
+// for n >= 0 (i.e. SplitMix64(root ^ FNV1a64("grammar/" + dec(n)))).
+func DeriveGrammarAttempt(root uint64, attempt int) uint64 {
+	h := fnvOffset64
+	h = fnv1aString(h, "grammar")
+	h = fnv1aByte(h, '/')
+	h = fnv1aInt(h, int64(attempt))
+
+	return SplitMix64(root ^ h)
+}
+
 // fnv1aString folds s's bytes into an in-progress FNV-1a accumulator.
 func fnv1aString(h uint64, s string) uint64 {
 	for i := range len(s) {

@@ -37,6 +37,26 @@ func TestDeriveDrawMatchesDerive(t *testing.T) {
 	}
 }
 
+// TestDeriveGrammarAttemptMatchesDerive locks the alloc-free grammar re-walk
+// key to the historical Derive(root, "grammar", strconv.Itoa(attempt)).
+func TestDeriveGrammarAttemptMatchesDerive(t *testing.T) {
+	t.Parallel()
+
+	roots := []uint64{0, 1, 42, 0xA35F1C2D9E3779B9, math.MaxUint64}
+
+	for _, root := range roots {
+		for attempt := range 8 {
+			want := Derive(root, "grammar", strconv.Itoa(attempt))
+
+			got := DeriveGrammarAttempt(root, attempt)
+			if got != want {
+				t.Fatalf("DeriveGrammarAttempt(%#x, %d) = %#x, want %#x",
+					root, attempt, got, want)
+			}
+		}
+	}
+}
+
 // TestDeriveDrawRootSensitive guards against the rootSeed-dropping regression
 // seen on the datagen-performance branch: changing root must change the key, so
 // the global seed actually influences generated data.

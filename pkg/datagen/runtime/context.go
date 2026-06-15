@@ -183,6 +183,19 @@ func (c *evalContext) Draw(streamID uint32, attrPath string, rowIdx int64) *rand
 	return c.drawPRNG.Rand()
 }
 
+// DrawKey returns a PRNG seeded directly from a precomputed sub-stream key,
+// reusing the per-runtime drawPRNG. It satisfies the expr keyedDrawer
+// optimization (grammar re-walks); the stream is identical to seed.PRNG(key).
+func (c *evalContext) DrawKey(key uint64) *rand.Rand {
+	if c.drawPRNG == nil {
+		c.drawPRNG = seed.NewReusablePRNG()
+	}
+
+	c.drawPRNG.Seed(key)
+
+	return c.drawPRNG.Rand()
+}
+
 // AttrPath returns the attr currently being evaluated. Empty when no
 // attr is active (e.g. a test harness that bypasses Runtime).
 func (c *evalContext) AttrPath() string {
