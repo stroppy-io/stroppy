@@ -17,11 +17,13 @@ import (
 // scratch, indices, and active block cache between evaluations rather
 // than allocating a fresh context each row.
 //
-// The flat runtime (no relationships) uses the fields scratch, rowIdx,
+// The flat runtime (no relationships) uses the fields slots, rowIdx,
 // and dicts. The relationship runtime additionally populates blocks,
 // registry, iter, outerPop, and the entity/line/global indices.
 type evalContext struct {
-	scratch  map[string]any
+	slots    []expr.Slot
+	set      []bool
+	attrIdx  map[string]int
 	dicts    map[string]*dgproto.Dict
 	registry *lookup.LookupRegistry
 	cohorts  *cohort.Registry
@@ -75,15 +77,23 @@ type evalContext struct {
 }
 
 // LookupCol resolves a ColRef by consulting the current row's scratch
-// map, returning expr.ErrUnknownCol when the referenced attr has not yet
+// slots, returning expr.ErrUnknownCol when the referenced attr has not yet
 // been evaluated (for example, a forward reference or a DAG bug).
 func (c *evalContext) LookupCol(name string) (any, error) {
-	value, ok := c.scratch[name]
-	if !ok {
+	idx, ok := c.attrIdx[name]
+	if !ok || !c.set[idx] {
 		return nil, expr.ErrUnknownCol
 	}
 
-	return value, nil
+	return c.slots[idx].Any(), nil
+}
+
+func (c *evalContext) SlotValue(index int) (expr.Slot, bool) {
+	if index < 0 || index >= len(c.slots) || !c.set[index] {
+		return expr.Slot{}, false
+	}
+
+	return c.slots[index], true
 }
 
 // RowIndex returns the counter matching the requested kind. In flat
@@ -151,12 +161,12 @@ func (c *evalContext) Lookup(popName, attrName string, entityIdx int64) (any, er
 			)
 		}
 
-		value, ok := c.scratch[attrName]
-		if !ok {
+		idx, ok := c.attrIdx[attrName]
+		if !ok || !c.set[idx] {
 			return nil, expr.ErrUnknownCol
 		}
 
-		return value, nil
+		return c.slots[idx].Any(), nil
 	}
 
 	if c.registry == nil {
