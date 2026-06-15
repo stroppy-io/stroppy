@@ -8,6 +8,14 @@ proto/bin
 .idea
 # test coverage
 coverage.out
+# datagen perf profiling artifacts
+/tmp/
+*.test
+*.pprof
+*.mem
+*.trace
+cpu.out
+mem.out
 #
 venv
 *node_modules
