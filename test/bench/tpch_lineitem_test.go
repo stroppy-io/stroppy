@@ -8,6 +8,8 @@
 // stress test for the per-row hot path and for worker scaling.
 //
 // Knobs:
+//   - STROPPY_RUN_BENCH_TESTS=1 enables the correctness test in this package.
+//     It is skipped by default because it drains the full SF=1 lineitem spec.
 //   - STROPPY_BENCH_ROWS overrides the row count (default 6,000,000 = SF=1).
 //     The value is rounded down to a multiple of 16 so the orders->lineitem
 //     relationship tiles exactly.
@@ -51,6 +53,8 @@ const relationshipDegree = 16
 
 // workerCounts is the scaling sweep shared by every benchmark.
 var workerCounts = []int32{1, 2, 4, 8, 16}
+
+const envRunBenchTests = "STROPPY_RUN_BENCH_TESTS"
 
 // benchRows returns the lineitem row count, overridable via STROPPY_BENCH_ROWS,
 // rounded down to a multiple of relationshipDegree so orders*degree == rows.
@@ -294,6 +298,10 @@ func newMetricsTracker() *insertprogress.Tracker {
 // number is trusted.
 func TestLineitemSpec_SingleWorker(t *testing.T) {
 	t.Parallel()
+
+	if os.Getenv(envRunBenchTests) != "1" {
+		t.Skipf("skipping bench correctness test: set %s=1 to enable", envRunBenchTests)
+	}
 
 	size := benchRows()
 	ctx := context.Background()
