@@ -86,8 +86,18 @@ func evalInt64Pair(ctx Context, a, b *dgproto.Expr) (lo, hi int64, err error) {
 	return lo, hi, nil
 }
 
-// evalInt64 evaluates expr and requires its result to be int64.
+// evalInt64 evaluates expr and requires its result to be int64. A literal
+// int64 bound (the common case for draw min/max) is read directly, skipping
+// the Eval boxing round-trip; this is value-identical to evalLiteral's Int64
+// arm. Non-int64 literals fall through to Eval so the type-mismatch error path
+// is unchanged.
 func evalInt64(ctx Context, e *dgproto.Expr) (int64, error) {
+	if lit := e.GetLit(); lit != nil {
+		if v, ok := lit.GetValue().(*dgproto.Literal_Int64); ok {
+			return v.Int64, nil
+		}
+	}
+
 	value, err := Eval(ctx, e)
 	if err != nil {
 		return 0, err
@@ -118,8 +128,19 @@ func evalFloat64Pair(ctx Context, a, b *dgproto.Expr) (lo, hi float64, err error
 }
 
 // evalFloat64 evaluates expr and requires its result to be float64 or
-// int64 (promoted).
+// int64 (promoted). Literal double/int64 bounds are read directly, skipping
+// the Eval boxing round-trip; this matches evalLiteral's Double/Int64 arms
+// (int64 promoted to float64). Other literals fall through to Eval.
 func evalFloat64(ctx Context, e *dgproto.Expr) (float64, error) {
+	if lit := e.GetLit(); lit != nil {
+		switch v := lit.GetValue().(type) {
+		case *dgproto.Literal_Double:
+			return v.Double, nil
+		case *dgproto.Literal_Int64:
+			return float64(v.Int64), nil
+		}
+	}
+
 	value, err := Eval(ctx, e)
 	if err != nil {
 		return 0, err
