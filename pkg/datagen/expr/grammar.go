@@ -17,6 +17,11 @@ import (
 // require padding.
 const grammarMaxAttempts = 8
 
+// grammarGrowSlack is added to max_len when sizing the walk buffer so a typical
+// untruncated walk (which may overshoot max_len before truncation) fits in one
+// allocation. Overshoots beyond this trigger at most one append regrowth.
+const grammarGrowSlack = 64
+
 // keyedDrawer is an optional Context capability: return a PRNG seeded directly
 // from a precomputed sub-stream key, reusing the context's pooled PCG instead
 // of allocating a fresh source per call. The produced stream is identical to
@@ -96,22 +101,20 @@ func drawGrammar(
 	// second formula.
 	rootKey := rootPRNG.Uint64()
 
-	// out is reused across attempts: each attempt Resets and rebuilds it.
-	// last always views the most recent attempt's backing (no Reset follows
-	// the attempt that produces the returned value), so reuse is safe and
-	// the result costs one backing allocation per row rather than per walk.
 	var (
 		out  strings.Builder
 		last string
 	)
 
-	out.Grow(int(maxLen) + utf8.UTFMax)
-
 	for attempt := range grammarMaxAttempts {
 		walkKey := seed.DeriveGrammarAttempt(rootKey, attempt)
 		prng := grammarPRNG(ctx, walkKey)
 
+		// Reset clears the backing slice; Grow must follow it (not precede
+		// the loop) so each attempt builds into one sized allocation rather
+		// than regrowing geometrically from nil.
 		out.Reset()
+		out.Grow(int(maxLen) + grammarGrowSlack)
 
 		if walkErr := walkGrammar(ctx, prng, grammar, &out); walkErr != nil {
 			return nil, walkErr
