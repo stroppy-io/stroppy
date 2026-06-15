@@ -56,6 +56,7 @@ var workerCounts = []int32{1, 2, 4, 8, 16}
 // rounded down to a multiple of relationshipDegree so orders*degree == rows.
 func benchRows() int64 {
 	rows := defaultBenchRows
+
 	if v := os.Getenv("STROPPY_BENCH_ROWS"); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
 			rows = n

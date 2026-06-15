@@ -275,18 +275,18 @@ func resolveLeaf(
 	return pickTemplate(prng, dict, leafKey)
 }
 
-// forEachField invokes fn for each whitespace-delimited field of s, matching
+// forEachField invokes fn for each whitespace-delimited field of text, matching
 // strings.Fields semantics (runs of unicode.IsSpace separate fields; leading,
 // trailing, and repeated whitespace are ignored) but without allocating a
-// []string — each token is a sub-slice of s. fn returning a non-nil error
+// []string — each token is a sub-slice of text. fn returning a non-nil error
 // stops iteration and is propagated.
-func forEachField(s string, fn func(tok string) error) error {
+func forEachField(text string, fn func(tok string) error) error {
 	start := -1
 
-	for i, r := range s {
+	for i, r := range text {
 		if unicode.IsSpace(r) {
 			if start >= 0 {
-				if err := fn(s[start:i]); err != nil {
+				if err := fn(text[start:i]); err != nil {
 					return err
 				}
 
@@ -302,7 +302,7 @@ func forEachField(s string, fn func(tok string) error) error {
 	}
 
 	if start >= 0 {
-		return fn(s[start:])
+		return fn(text[start:])
 	}
 
 	return nil
@@ -355,26 +355,26 @@ func grammarLetter(tok string) (string, bool) {
 	return tok, true
 }
 
-// truncateRunes truncates s to at most n Unicode runes without allocating a
+// truncateRunes truncates text to at most n Unicode runes without allocating a
 // []rune: it scans rune boundaries and slices at the n-th one. It counts runes
 // rather than bytes because dict contents may carry non-ASCII words (e.g.
 // "sauternes", "Tiresias" in the TPC-H grammar).
-func truncateRunes(s string, n int64) string {
+func truncateRunes(text string, n int64) string {
 	if n <= 0 {
 		return ""
 	}
 
 	count := int64(0)
 
-	for i := range s {
+	for i := range text {
 		if count == n {
-			return s[:i]
+			return text[:i]
 		}
 
 		count++
 	}
 
-	return s
+	return text
 }
 
 // truncateRunesToString returns the first n runes of buf as a freshly
@@ -382,22 +382,20 @@ func truncateRunes(s string, n int64) string {
 // (min(n, total runes)). It counts runes rather than bytes so multi-byte dict
 // words are never split mid-rune. The returned string copies buf, so the
 // caller may reuse buf afterward.
-func truncateRunesToString(buf []byte, n int64) (string, int64) {
+func truncateRunesToString(buf []byte, n int64) (truncated string, runeCount int64) {
 	if n <= 0 {
 		return "", 0
 	}
 
-	count := int64(0)
-
 	for i := 0; i < len(buf); {
-		if count == n {
-			return string(buf[:i]), count
+		if runeCount == n {
+			return string(buf[:i]), runeCount
 		}
 
 		_, size := utf8.DecodeRune(buf[i:])
 		i += size
-		count++
+		runeCount++
 	}
 
-	return string(buf), count
+	return string(buf), runeCount
 }

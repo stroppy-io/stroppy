@@ -152,8 +152,8 @@ func binOp(op dgproto.BinOp_Op, a, b *dgproto.Expr) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{Op: op, A: a, B: b}}}
 }
 
-func unOp(op dgproto.BinOp_Op, a *dgproto.Expr) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{Op: op, A: a}}}
+func notOp(a *dgproto.Expr) *dgproto.Expr {
+	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{Op: dgproto.BinOp_NOT, A: a}}}
 }
 
 func ifExpr(cond, then, els *dgproto.Expr) *dgproto.Expr {
@@ -280,8 +280,8 @@ func TestCompileSlotEquivTable(t *testing.T) {
 		{"and_ff", binOp(dgproto.BinOp_AND, litBool(false), litBool(true))},
 		{"or_ff", binOp(dgproto.BinOp_OR, litBool(false), litBool(false))},
 		{"or_tf", binOp(dgproto.BinOp_OR, litBool(true), litBool(false))},
-		{"not_t", unOp(dgproto.BinOp_NOT, litBool(true))},
-		{"not_f", unOp(dgproto.BinOp_NOT, litBool(false))},
+		{"not_t", notOp(litBool(true))},
+		{"not_f", notOp(litBool(false))},
 		{"and_cmp", binOp(dgproto.BinOp_AND,
 			binOp(dgproto.BinOp_LT, litInt(1), litInt(2)),
 			binOp(dgproto.BinOp_GT, litInt(5), litInt(4)))},
@@ -398,12 +398,12 @@ func TestCompileSlotEquivRandomized(t *testing.T) {
 	for _, rootSeed := range []uint64{0x1234, 0xABCDEF, 99} {
 		rng := rand.New(rand.NewPCG(rootSeed, rootSeed^0x9E3779B97F4A7C15))
 
-		for iter := 0; iter < 4000; iter++ {
+		for iter := range 4000 {
 			rowIdx := int64(rng.Uint64() % 1_000_003)
 
 			cols := map[string]any{
-				"i": int64(rng.Int64N(2001) - 1000),
-				"j": int64(rng.Int64N(2001) - 1000),
+				"i": rng.Int64N(2001) - 1000,
+				"j": rng.Int64N(2001) - 1000,
 				"f": float64(rng.Int64N(20001)-10000) / 100.0,
 				"g": float64(rng.Int64N(20001)-10000) / 100.0,
 				"b": rng.Uint64()&1 == 0,
@@ -432,7 +432,8 @@ func TestCompileSlotEquivRandomized(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(got, want) {
-				t.Fatalf("seed %d iter %d row %d: mismatch:\n  Eval        = %#v (%T)\n  CompileSlot = %#v (%T)\n  expr        = %v",
+				t.Fatalf("seed %d iter %d row %d: mismatch:\n"+
+					"  Eval        = %#v (%T)\n  CompileSlot = %#v (%T)\n  expr        = %v",
 					rootSeed, iter, rowIdx, want, want, got, got, e)
 			}
 		}
@@ -478,6 +479,7 @@ func randExpr(rng *rand.Rand, depth int) *dgproto.Expr {
 		// truncation is zero panics in BOTH (pre-existing, identical),
 		// so keep |divisor| >= 1 to stay in the defined domain.
 		op := []dgproto.BinOp_Op{dgproto.BinOp_DIV, dgproto.BinOp_MOD}[rng.IntN(2)]
+
 		divisor := rng.Int64N(1000) + 1
 		if rng.IntN(2) == 0 {
 			divisor = -divisor
@@ -496,7 +498,7 @@ func randExpr(rng *rand.Rand, depth int) *dgproto.Expr {
 	case 5: // OR
 		return binOp(dgproto.BinOp_OR, randBoolExpr(rng, depth-1), randBoolExpr(rng, depth-1))
 	case 6: // NOT
-		return unOp(dgproto.BinOp_NOT, randBoolExpr(rng, depth-1))
+		return notOp(randBoolExpr(rng, depth-1))
 	case 7: // If
 		return ifExpr(randBoolExpr(rng, depth-1), randExpr(rng, depth-1), randExpr(rng, depth-1))
 	case 8: // DictAt
@@ -554,7 +556,7 @@ func randBoolExpr(rng *rand.Rand, depth int) *dgproto.Expr {
 	case 1:
 		return binOp(dgproto.BinOp_OR, randBoolExpr(rng, depth-1), randBoolExpr(rng, depth-1))
 	default:
-		return unOp(dgproto.BinOp_NOT, randBoolExpr(rng, depth-1))
+		return notOp(randBoolExpr(rng, depth-1))
 	}
 }
 

@@ -142,13 +142,11 @@ func RunBulkInsert[T any](
 		if filled >= batchSize {
 			generatedProgress.Flush()
 
-			if fullBatchQuery == "" {
-				fullBatchQuery = buildBulkInsertQuery(dialect, table, columns, batchSize)
-			}
+			var err error
 
-			args = appendFlatArgs(args, batch[:filled])
-
-			if err := execProgressBulkBatch(ctx, db, table, fullBatchQuery, args, int64(filled)); err != nil {
+			args, err = flushBulkInsertBatch(
+				ctx, db, table, columns, batch[:filled], dialect, args, &fullBatchQuery)
+			if err != nil {
 				return err
 			}
 
@@ -156,18 +154,59 @@ func RunBulkInsert[T any](
 		}
 	}
 
-	if filled > 0 {
-		generatedProgress.Flush()
+	return flushBulkInsertRemainder(
+		ctx, db, table, columns, batch[:filled], dialect, args, &fullBatchQuery, generatedProgress)
+}
 
-		query := buildBulkInsertQuery(dialect, table, columns, filled)
-		args = appendFlatArgs(args, batch[:filled])
-
-		if err := execProgressBulkBatch(ctx, db, table, query, args, int64(filled)); err != nil {
-			return err
-		}
+func flushBulkInsertRemainder[T any](
+	ctx context.Context,
+	db ExecContext[T],
+	table string,
+	columns []string,
+	rows [][]any,
+	dialect queries.Dialect,
+	args []any,
+	fullBatchQuery *string,
+	generatedProgress insertprogress.RowCounter,
+) error {
+	if len(rows) == 0 {
+		return nil
 	}
 
-	return nil
+	generatedProgress.Flush()
+
+	_, err := flushBulkInsertBatch(ctx, db, table, columns, rows, dialect, args, fullBatchQuery)
+
+	return err
+}
+
+func flushBulkInsertBatch[T any](
+	ctx context.Context,
+	db ExecContext[T],
+	table string,
+	columns []string,
+	rows [][]any,
+	dialect queries.Dialect,
+	args []any,
+	fullBatchQuery *string,
+) ([]any, error) {
+	rowCount := len(rows)
+
+	query := buildBulkInsertQuery(dialect, table, columns, rowCount)
+	if rowCount == cap(rows) {
+		if *fullBatchQuery == "" {
+			*fullBatchQuery = query
+		}
+
+		query = *fullBatchQuery
+	}
+
+	args = appendFlatArgs(args, rows)
+	if err := execProgressBulkBatch(ctx, db, table, query, args, int64(rowCount)); err != nil {
+		return args, err
+	}
+
+	return args, nil
 }
 
 func execProgressBulkBatch[T any](
@@ -277,7 +316,7 @@ func buildBulkInsertQuery(dialect queries.Dialect, table string, columns []strin
 
 		sb.WriteByte('(')
 
-		for colIdx := 0; colIdx < colCount; colIdx++ {
+		for colIdx := range colCount {
 			if colIdx > 0 {
 				sb.WriteString(", ")
 			}

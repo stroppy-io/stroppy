@@ -93,30 +93,30 @@ func fnv1aByte(h, b uint64) uint64 {
 	return h
 }
 
-// fnv1aUint folds the ASCII decimal digits of v (most-significant first) into
-// an in-progress FNV-1a accumulator, matching strconv.FormatUint(v, 10).
-func fnv1aUint(h, v uint64) uint64 {
+// fnv1aUint folds the ASCII decimal digits of value (most-significant first)
+// into an in-progress FNV-1a accumulator, matching strconv.FormatUint(value, 10).
+func fnv1aUint(hash, value uint64) uint64 {
 	var buf [maxUint64Digits]byte
 
 	pos := len(buf)
 
-	if v == 0 {
+	if value == 0 {
 		pos--
 		buf[pos] = '0'
 	} else {
-		for v > 0 {
+		for value > 0 {
 			pos--
-			buf[pos] = byte('0' + v%decimalBase)
-			v /= decimalBase
+			buf[pos] = byte('0' + value%decimalBase)
+			value /= decimalBase
 		}
 	}
 
 	for ; pos < len(buf); pos++ {
-		h ^= uint64(buf[pos])
-		h *= fnvPrime64
+		hash ^= uint64(buf[pos])
+		hash *= fnvPrime64
 	}
 
-	return h
+	return hash
 }
 
 // fnv1aInt folds the ASCII decimal digits of v (with a leading '-' for negative
