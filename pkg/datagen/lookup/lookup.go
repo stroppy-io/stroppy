@@ -431,12 +431,20 @@ func (c *popCtx) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand
 		c.drawPRNG = seed.NewReusablePRNG()
 	}
 
-	key := seed.Derive(
-		c.reg.rootSeed,
-		attrPath,
-		"s"+strconv.FormatUint(uint64(streamID), 10),
-		strconv.FormatInt(rowIdx, 10),
-	)
+	key := seed.DeriveDraw(c.reg.rootSeed, attrPath, streamID, rowIdx)
+	c.drawPRNG.Seed(key)
+
+	return c.drawPRNG.Rand()
+}
+
+// DrawKey returns a PRNG seeded directly from a precomputed sub-stream key,
+// reusing the pooled drawPRNG. It satisfies the expr keyedDrawer optimization
+// (grammar re-walks); the stream is identical to seed.PRNG(key).
+func (c *popCtx) DrawKey(key uint64) *rand.Rand {
+	if c.drawPRNG == nil {
+		c.drawPRNG = seed.NewReusablePRNG()
+	}
+
 	c.drawPRNG.Seed(key)
 
 	return c.drawPRNG.Rand()

@@ -390,28 +390,28 @@ func (rt *Runtime) nextRelationship() ([]any, error) {
 	rt.ctx.lineIdx = lineIdx
 	rt.ctx.rowIdx = rt.row
 
-	for key := range rt.ctx.scratch {
-		delete(rt.ctx.scratch, key)
-	}
+	clear(rt.ctx.set)
 
-	for _, attr := range rel.dag.Order {
+	for attrIdx, attr := range rel.dag.Order {
 		name := attr.GetName()
 
 		if null := attr.GetNull(); null != nil && nullProbabilityHit(null, name, rt.row) {
-			rt.ctx.scratch[name] = nil
+			rt.ctx.slots[attrIdx] = expr.SlotNullValue()
+			rt.ctx.set[attrIdx] = true
 
 			continue
 		}
 
 		rt.ctx.attrPath = name
 
-		value, err := expr.Eval(rt.ctx, attr.GetExpr())
+		value, err := rt.evals[attrIdx](rt.ctx)
 		if err != nil {
 			return nil, fmt.Errorf("runtime: attr %q at (e=%d,i=%d): %w",
 				name, entityIdx, lineIdx, err)
 		}
 
-		rt.ctx.scratch[name] = value
+		rt.ctx.slots[attrIdx] = value
+		rt.ctx.set[attrIdx] = true
 	}
 
 	out := rt.assembleRow(rt.row)

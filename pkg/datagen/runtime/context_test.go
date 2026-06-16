@@ -10,7 +10,11 @@ import (
 )
 
 func TestContextLookupColPresent(t *testing.T) {
-	ctx := &evalContext{scratch: map[string]any{"a": int64(7)}}
+	ctx := &evalContext{
+		slots:   []expr.Slot{expr.SlotInt64Value(7)},
+		set:     []bool{true},
+		attrIdx: map[string]int{"a": 0},
+	}
 
 	got, err := ctx.LookupCol("a")
 	if err != nil {
@@ -23,7 +27,7 @@ func TestContextLookupColPresent(t *testing.T) {
 }
 
 func TestContextLookupColMissing(t *testing.T) {
-	ctx := &evalContext{scratch: map[string]any{}}
+	ctx := &evalContext{attrIdx: map[string]int{}}
 	if _, err := ctx.LookupCol("absent"); !errors.Is(err, expr.ErrUnknownCol) {
 		t.Fatalf("want ErrUnknownCol, got %v", err)
 	}

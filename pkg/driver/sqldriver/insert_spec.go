@@ -87,12 +87,30 @@ func RunBulkInsert[T any](
 	}
 
 	columns := rt.Columns()
-	if len(columns) == 0 {
+
+	colCount := len(columns)
+	if colCount == 0 {
 		return fmt.Errorf("%w: table %q", ErrEmptyColumnOrder, table)
 	}
 
-	batch := make([][]any, 0, batchSize)
+	// Buffers reused across this worker's batches: a fixed pool of row slices
+	// (filled in place by convertRowInto), the flattened args slice, and the
+	// cached full-batch INSERT statement (byte-identical for every
+	// batchSize-row batch). database/sql consumes the query and args
+	// synchronously inside ExecContext, so reusing them after a batch flush is
+	// safe; this turns the per-row slice, per-batch SQL string, and per-batch
+	// args allocations into one-time-per-worker costs.
+	batch := make([][]any, batchSize)
+	for i := range batch {
+		batch[i] = make([]any, colCount)
+	}
+
+	args := make([]any, 0, batchSize*colCount)
+
+	var fullBatchQuery string
+
 	remaining := limit
+	filled := 0
 
 	generatedProgress := insertprogress.NewGeneratedRowCounter(ctx)
 	defer generatedProgress.Flush()
@@ -109,12 +127,11 @@ func RunBulkInsert[T any](
 			return fmt.Errorf("sqldriver: runtime.Next: %w", err)
 		}
 
-		rowCopy, err := convertRow(row, dialect)
-		if err != nil {
+		if err := convertRowInto(batch[filled], row, dialect); err != nil {
 			return fmt.Errorf("sqldriver: convert row: %w", err)
 		}
 
-		batch = append(batch, rowCopy)
+		filled++
 
 		generatedProgress.Add(1)
 
@@ -122,43 +139,89 @@ func RunBulkInsert[T any](
 			remaining--
 		}
 
-		if len(batch) >= batchSize {
+		if filled >= batchSize {
 			generatedProgress.Flush()
 
-			if err := execProgressBulkBatch(ctx, db, table, columns, batch, dialect); err != nil {
+			var err error
+
+			args, err = flushBulkInsertBatch(
+				ctx, db, table, columns, batch[:filled], dialect, args, &fullBatchQuery)
+			if err != nil {
 				return err
 			}
 
-			batch = batch[:0]
+			filled = 0
 		}
 	}
 
-	if len(batch) > 0 {
-		generatedProgress.Flush()
+	return flushBulkInsertRemainder(
+		ctx, db, table, columns, batch[:filled], dialect, args, &fullBatchQuery, generatedProgress)
+}
 
-		if err := execProgressBulkBatch(ctx, db, table, columns, batch, dialect); err != nil {
-			return err
-		}
+func flushBulkInsertRemainder[T any](
+	ctx context.Context,
+	db ExecContext[T],
+	table string,
+	columns []string,
+	rows [][]any,
+	dialect queries.Dialect,
+	args []any,
+	fullBatchQuery *string,
+	generatedProgress insertprogress.RowCounter,
+) error {
+	if len(rows) == 0 {
+		return nil
 	}
 
-	return nil
+	generatedProgress.Flush()
+
+	_, err := flushBulkInsertBatch(ctx, db, table, columns, rows, dialect, args, fullBatchQuery)
+
+	return err
+}
+
+func flushBulkInsertBatch[T any](
+	ctx context.Context,
+	db ExecContext[T],
+	table string,
+	columns []string,
+	rows [][]any,
+	dialect queries.Dialect,
+	args []any,
+	fullBatchQuery *string,
+) ([]any, error) {
+	rowCount := len(rows)
+
+	query := buildBulkInsertQuery(dialect, table, columns, rowCount)
+	if rowCount == cap(rows) {
+		if *fullBatchQuery == "" {
+			*fullBatchQuery = query
+		}
+
+		query = *fullBatchQuery
+	}
+
+	args = appendFlatArgs(args, rows)
+	if err := execProgressBulkBatch(ctx, db, table, query, args, int64(rowCount)); err != nil {
+		return args, err
+	}
+
+	return args, nil
 }
 
 func execProgressBulkBatch[T any](
 	ctx context.Context,
 	db ExecContext[T],
 	table string,
-	columns []string,
-	batch [][]any,
-	dialect queries.Dialect,
+	query string,
+	args []any,
+	rows int64,
 ) error {
-	rows := int64(len(batch))
-
 	insertprogress.SetStage(ctx, insertprogress.StageSQLBulkInsertExec)
 
 	start := time.Now()
 
-	if err := execBulkBatch(ctx, db, table, columns, batch, dialect); err != nil {
+	if err := execBulkBatch(ctx, db, table, query, args); err != nil {
 		return err
 	}
 
@@ -193,38 +256,33 @@ func RunInsertSpecStats[T any](
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
-// convertRow runs dialect.Convert over every value in row, copying into a
-// fresh slice (the runtime reuses its scratch slice across Next calls,
-// so the caller must detach before batching).
-func convertRow(row []any, dialect queries.Dialect) ([]any, error) {
-	out := make([]any, len(row))
-
+// convertRowInto runs dialect.Convert over every value in row, writing the
+// results into dst (which must have len >= len(row)). dst is a caller-owned,
+// reused slice — the runtime reuses its scratch slice across Next calls and
+// the batch reuses its row slices across flushes, so values are detached by
+// the conversion copy here rather than by allocating a fresh slice per row.
+func convertRowInto(dst, row []any, dialect queries.Dialect) error {
 	for i, v := range row {
 		conv, err := dialect.Convert(v)
 		if err != nil {
-			return nil, fmt.Errorf("column %d: %w", i, err)
+			return fmt.Errorf("column %d: %w", i, err)
 		}
 
-		out[i] = conv
+		dst[i] = conv
 	}
 
-	return out, nil
+	return nil
 }
 
-// execBulkBatch formats a multi-row INSERT and executes it. Identifiers
-// (table + column names) pass through unquoted — workload specs already
-// supply dialect-legal names. Placeholders come from dialect.Placeholder
-// in left-to-right row-major order.
+// execBulkBatch executes a prebuilt multi-row INSERT. The query and args are
+// owned (and reused) by the caller; ExecContext consumes them synchronously.
 func execBulkBatch[T any](
 	ctx context.Context,
 	db ExecContext[T],
 	table string,
-	columns []string,
-	rows [][]any,
-	dialect queries.Dialect,
+	query string,
+	args []any,
 ) error {
-	query, args := buildBulkInsertSQL(dialect, table, columns, rows)
-
 	if _, err := db.ExecContext(ctx, query, args...); err != nil {
 		return fmt.Errorf("sqldriver: bulk INSERT %q: %w", table, err)
 	}
@@ -232,15 +290,13 @@ func execBulkBatch[T any](
 	return nil
 }
 
-// buildBulkInsertSQL returns the multi-row INSERT statement for the
-// given table, column list, and row batch, along with the flattened
-// argument slice. Placeholders are numbered left-to-right, row-major.
-func buildBulkInsertSQL(
-	dialect queries.Dialect,
-	table string,
-	columns []string,
-	rows [][]any,
-) (query string, args []any) {
+// buildBulkInsertQuery returns the multi-row INSERT statement for nRows rows of
+// len(columns) columns each. Placeholders are numbered left-to-right,
+// row-major, so a full batch produces a byte-identical statement every time —
+// callers cache the full-batch query and rebuild only the final short batch.
+// Identifiers (table + column names) pass through unquoted; workload specs
+// already supply dialect-legal names.
+func buildBulkInsertQuery(dialect queries.Dialect, table string, columns []string, nRows int) string {
 	var sb strings.Builder
 
 	colCount := len(columns)
@@ -251,17 +307,16 @@ func buildBulkInsertSQL(
 	sb.WriteString(strings.Join(columns, ", "))
 	sb.WriteString(") VALUES ")
 
-	args = make([]any, 0, len(rows)*colCount)
 	placeholder := 0
 
-	for rowIdx, row := range rows {
+	for rowIdx := range nRows {
 		if rowIdx > 0 {
 			sb.WriteString(", ")
 		}
 
 		sb.WriteByte('(')
 
-		for colIdx := range row {
+		for colIdx := range colCount {
 			if colIdx > 0 {
 				sb.WriteString(", ")
 			}
@@ -271,9 +326,33 @@ func buildBulkInsertSQL(
 		}
 
 		sb.WriteByte(')')
-
-		args = append(args, row...)
 	}
 
-	return sb.String(), args
+	return sb.String()
+}
+
+// appendFlatArgs resets dst and appends every row's values in row-major order,
+// reusing dst's backing array across batches.
+func appendFlatArgs(dst []any, rows [][]any) []any {
+	dst = dst[:0]
+	for _, row := range rows {
+		dst = append(dst, row...)
+	}
+
+	return dst
+}
+
+// buildBulkInsertSQL returns the multi-row INSERT statement and flattened args
+// for a row batch. Retained for callers/tests that build both at once; the
+// hot path uses buildBulkInsertQuery + appendFlatArgs to reuse buffers.
+func buildBulkInsertSQL(
+	dialect queries.Dialect,
+	table string,
+	columns []string,
+	rows [][]any,
+) (query string, args []any) {
+	query = buildBulkInsertQuery(dialect, table, columns, len(rows))
+	args = appendFlatArgs(make([]any, 0, len(rows)*len(columns)), rows)
+
+	return query, args
 }

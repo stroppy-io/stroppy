@@ -3,8 +3,8 @@ package expr
 import (
 	"fmt"
 	"math/rand/v2"
-	"strconv"
-	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
@@ -15,6 +15,48 @@ import (
 // drawGrammar returns the last walk result as-is; the spec does not
 // require padding.
 const grammarMaxAttempts = 8
+
+// keyedDrawer is an optional Context capability: return a PRNG seeded directly
+// from a precomputed sub-stream key, reusing the context's pooled PCG instead
+// of allocating a fresh source per call. The produced stream is identical to
+// seed.PRNG(key) (both route through SeedPCG). evalContext and the lookup
+// popCtx implement it; contexts that do not fall back to seed.PRNG.
+type keyedDrawer interface {
+	DrawKey(key uint64) *rand.Rand
+}
+
+// grammarPRNG returns the PRNG for one grammar walk attempt. It reuses the
+// context's pooled PCG when available so the re-walk loop allocates no PRNG.
+func grammarPRNG(ctx Context, key uint64) *rand.Rand {
+	if kd, ok := ctx.(keyedDrawer); ok {
+		return kd.DrawKey(key)
+	}
+
+	return seed.PRNG(key)
+}
+
+// grammarBufferer is an optional Context capability: lend a reusable byte
+// buffer for assembling grammar output. Reusing a context-owned buffer across
+// rows means a grammar draw allocates only its final, exact-sized result
+// string rather than an over-sized builder backing per re-walk attempt.
+// evalContext and the lookup popCtx implement it; other contexts get a local
+// buffer (one slice per call).
+type grammarBufferer interface {
+	GrammarScratch() *[]byte
+}
+
+// grammarScratch returns a reusable assembly buffer for one grammar draw. For
+// contexts that own a buffer it is reused across rows; otherwise a fresh local
+// slice is returned.
+func grammarScratch(ctx Context) *[]byte {
+	if gb, ok := ctx.(grammarBufferer); ok {
+		return gb.GrammarScratch()
+	}
+
+	var local []byte
+
+	return &local
+}
 
 // drawGrammar implements DrawGrammar — a two-phase template walker.
 // The walker picks a template from root_dict, splits it on whitespace,
@@ -76,19 +118,29 @@ func drawGrammar(
 	// second formula.
 	rootKey := rootPRNG.Uint64()
 
-	var last string
+	// buf is a context-owned, reused assembly buffer: after warm-up it holds
+	// capacity across rows and attempts, so each walk appends without
+	// allocating. Only the truncated result string is freshly allocated (at
+	// its exact length) per returned row.
+	buf := grammarScratch(ctx)
+
+	var (
+		last     string
+		lastRune int64
+	)
 
 	for attempt := range grammarMaxAttempts {
-		walkKey := seed.Derive(rootKey, "grammar", strconv.Itoa(attempt))
-		prng := seed.PRNG(walkKey)
+		walkKey := seed.DeriveGrammarAttempt(rootKey, attempt)
+		prng := grammarPRNG(ctx, walkKey)
 
-		out, walkErr := walkGrammar(ctx, prng, grammar)
-		if walkErr != nil {
+		*buf = (*buf)[:0]
+
+		if walkErr := walkGrammar(ctx, prng, grammar, buf); walkErr != nil {
 			return nil, walkErr
 		}
 
-		last = truncateRunes(out, maxLen)
-		if int64(len([]rune(last))) >= minLen {
+		last, lastRune = truncateRunesToString(*buf, maxLen)
+		if lastRune >= minLen {
 			return last, nil
 		}
 	}
@@ -96,108 +148,108 @@ func drawGrammar(
 	return last, nil
 }
 
-// walkGrammar picks a root template, then walks its tokens: literal
-// tokens pass through, single-uppercase-letter tokens resolve through
-// phrases (one level) or leaves. Returns ErrBadGrammar when a letter
-// resolves through neither map.
+// walkGrammar picks a root template, then walks its tokens directly into out:
+// literal tokens pass through, single-uppercase-letter tokens resolve through
+// phrases (one level) or leaves. Returns ErrBadGrammar when a letter resolves
+// through neither map.
 func walkGrammar(
 	ctx Context,
 	prng *rand.Rand,
 	grammar *dgproto.DrawGrammar,
-) (string, error) {
+	out *[]byte,
+) error {
 	rootDict, err := ctx.LookupDict(grammar.GetRootDict())
 	if err != nil {
-		return "", fmt.Errorf("%w: root_dict %q: %w",
+		return fmt.Errorf("%w: root_dict %q: %w",
 			ErrBadGrammar, grammar.GetRootDict(), err)
 	}
 
 	rootTemplate, err := pickTemplate(prng, rootDict, grammar.GetRootDict())
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	var out strings.Builder
+	first := true
 
-	for i, tok := range strings.Fields(rootTemplate) {
-		if i > 0 {
-			out.WriteByte(' ')
+	return forEachField(rootTemplate, func(tok string) error {
+		if !first {
+			*out = append(*out, ' ')
 		}
+
+		first = false
 
 		letter, ok := grammarLetter(tok)
 		if !ok {
-			out.WriteString(tok)
+			*out = append(*out, tok...)
 
-			continue
+			return nil
 		}
 
 		if dictKey, phraseOK := grammar.GetPhrases()[letter]; phraseOK {
-			expanded, expandErr := expandPhrase(ctx, prng, grammar, dictKey, letter)
-			if expandErr != nil {
-				return "", expandErr
-			}
-
-			out.WriteString(expanded)
-
-			continue
+			return expandPhrase(ctx, prng, grammar, dictKey, letter, out)
 		}
 
 		leaf, leafErr := resolveLeaf(ctx, prng, grammar, letter)
 		if leafErr != nil {
-			return "", leafErr
+			return leafErr
 		}
 
-		out.WriteString(leaf)
-	}
+		*out = append(*out, leaf...)
 
-	return out.String(), nil
+		return nil
+	})
 }
 
 // expandPhrase picks a template from the phrase dict referenced by
 // `letter`, splits it into tokens, and resolves every single-letter
-// token through the grammar's leaves map. Only one expansion level is
-// permitted: if an expanded token is itself a nonterminal, it must
-// resolve into leaves — nested phrase references are rejected.
+// token through the grammar's leaves map, writing directly into out.
+// Only one expansion level is permitted: if an expanded token is itself a
+// nonterminal, it must resolve into leaves — nested phrase references are
+// rejected.
 func expandPhrase(
 	ctx Context,
 	prng *rand.Rand,
 	grammar *dgproto.DrawGrammar,
 	phraseDictKey string,
 	letter string,
-) (string, error) {
+	out *[]byte,
+) error {
 	dict, err := ctx.LookupDict(phraseDictKey)
 	if err != nil {
-		return "", fmt.Errorf("%w: phrase dict %q for %q: %w",
+		return fmt.Errorf("%w: phrase dict %q for %q: %w",
 			ErrBadGrammar, phraseDictKey, letter, err)
 	}
 
 	template, err := pickTemplate(prng, dict, phraseDictKey)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	var out strings.Builder
+	first := true
 
-	for i, tok := range strings.Fields(template) {
-		if i > 0 {
-			out.WriteByte(' ')
+	return forEachField(template, func(tok string) error {
+		if !first {
+			*out = append(*out, ' ')
 		}
+
+		first = false
 
 		subLetter, ok := grammarLetter(tok)
 		if !ok {
-			out.WriteString(tok)
+			*out = append(*out, tok...)
 
-			continue
+			return nil
 		}
 
 		leaf, leafErr := resolveLeaf(ctx, prng, grammar, subLetter)
 		if leafErr != nil {
-			return "", leafErr
+			return leafErr
 		}
 
-		out.WriteString(leaf)
-	}
+		*out = append(*out, leaf...)
 
-	return out.String(), nil
+		return nil
+	})
 }
 
 // resolveLeaf picks a leaf word from the dict referenced by `letter`.
@@ -221,6 +273,39 @@ func resolveLeaf(
 	}
 
 	return pickTemplate(prng, dict, leafKey)
+}
+
+// forEachField invokes fn for each whitespace-delimited field of text, matching
+// strings.Fields semantics (runs of unicode.IsSpace separate fields; leading,
+// trailing, and repeated whitespace are ignored) but without allocating a
+// []string — each token is a sub-slice of text. fn returning a non-nil error
+// stops iteration and is propagated.
+func forEachField(text string, fn func(tok string) error) error {
+	start := -1
+
+	for i, r := range text {
+		if unicode.IsSpace(r) {
+			if start >= 0 {
+				if err := fn(text[start:i]); err != nil {
+					return err
+				}
+
+				start = -1
+			}
+
+			continue
+		}
+
+		if start < 0 {
+			start = i
+		}
+	}
+
+	if start >= 0 {
+		return fn(text[start:])
+	}
+
+	return nil
 }
 
 // pickTemplate draws one row from dict. When the dict declares any
@@ -270,18 +355,47 @@ func grammarLetter(tok string) (string, bool) {
 	return tok, true
 }
 
-// truncateRunes truncates s to at most n Unicode runes. It counts
-// runes rather than bytes because dict contents may carry non-ASCII
-// words (e.g. "sauternes", "Tiresias" in the TPC-H grammar).
-func truncateRunes(s string, n int64) string {
+// truncateRunes truncates text to at most n Unicode runes without allocating a
+// []rune: it scans rune boundaries and slices at the n-th one. It counts runes
+// rather than bytes because dict contents may carry non-ASCII words (e.g.
+// "sauternes", "Tiresias" in the TPC-H grammar).
+func truncateRunes(text string, n int64) string {
 	if n <= 0 {
 		return ""
 	}
 
-	runes := []rune(s)
-	if int64(len(runes)) <= n {
-		return s
+	count := int64(0)
+
+	for i := range text {
+		if count == n {
+			return text[:i]
+		}
+
+		count++
 	}
 
-	return string(runes[:n])
+	return text
+}
+
+// truncateRunesToString returns the first n runes of buf as a freshly
+// allocated, exactly-sized string, along with that string's rune count
+// (min(n, total runes)). It counts runes rather than bytes so multi-byte dict
+// words are never split mid-rune. The returned string copies buf, so the
+// caller may reuse buf afterward.
+func truncateRunesToString(buf []byte, n int64) (truncated string, runeCount int64) {
+	if n <= 0 {
+		return "", 0
+	}
+
+	for i := 0; i < len(buf); {
+		if runeCount == n {
+			return string(buf[:i]), runeCount
+		}
+
+		_, size := utf8.DecodeRune(buf[i:])
+		i += size
+		runeCount++
+	}
+
+	return string(buf), runeCount
 }

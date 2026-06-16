@@ -3,7 +3,6 @@ package runtime
 import (
 	"fmt"
 	"math/rand/v2"
-	"strconv"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/cohort"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
@@ -18,11 +17,13 @@ import (
 // scratch, indices, and active block cache between evaluations rather
 // than allocating a fresh context each row.
 //
-// The flat runtime (no relationships) uses the fields scratch, rowIdx,
+// The flat runtime (no relationships) uses the fields slots, rowIdx,
 // and dicts. The relationship runtime additionally populates blocks,
 // registry, iter, outerPop, and the entity/line/global indices.
 type evalContext struct {
-	scratch  map[string]any
+	slots    []expr.Slot
+	set      []bool
+	attrIdx  map[string]int
 	dicts    map[string]*dgproto.Dict
 	registry *lookup.LookupRegistry
 	cohorts  *cohort.Registry
@@ -73,18 +74,38 @@ type evalContext struct {
 	// drawPRNG is lazily allocated and re-seeded on every Draw call so
 	// StreamDraw / Choose avoid a fresh rand.New per sample.
 	drawPRNG *seed.ReusablePRNG
+
+	// grammarBuf is the reused assembly buffer lent to grammar draws via
+	// GrammarScratch. It holds capacity across rows so a grammar walk
+	// appends without allocating; only the result string is fresh.
+	grammarBuf []byte
+}
+
+// GrammarScratch lends the per-runtime grammar assembly buffer to the expr
+// grammar walker (the expr grammarBufferer optimization), so grammar output is
+// built into a buffer reused across rows rather than a fresh per-attempt one.
+func (c *evalContext) GrammarScratch() *[]byte {
+	return &c.grammarBuf
 }
 
 // LookupCol resolves a ColRef by consulting the current row's scratch
-// map, returning expr.ErrUnknownCol when the referenced attr has not yet
+// slots, returning expr.ErrUnknownCol when the referenced attr has not yet
 // been evaluated (for example, a forward reference or a DAG bug).
 func (c *evalContext) LookupCol(name string) (any, error) {
-	value, ok := c.scratch[name]
-	if !ok {
+	idx, ok := c.attrIdx[name]
+	if !ok || !c.set[idx] {
 		return nil, expr.ErrUnknownCol
 	}
 
-	return value, nil
+	return c.slots[idx].Any(), nil
+}
+
+func (c *evalContext) SlotValue(index int) (expr.Slot, bool) {
+	if index < 0 || index >= len(c.slots) || !c.set[index] {
+		return expr.Slot{}, false
+	}
+
+	return c.slots[index], true
 }
 
 // RowIndex returns the counter matching the requested kind. In flat
@@ -152,12 +173,12 @@ func (c *evalContext) Lookup(popName, attrName string, entityIdx int64) (any, er
 			)
 		}
 
-		value, ok := c.scratch[attrName]
-		if !ok {
+		idx, ok := c.attrIdx[attrName]
+		if !ok || !c.set[idx] {
 			return nil, expr.ErrUnknownCol
 		}
 
-		return value, nil
+		return c.slots[idx].Any(), nil
 	}
 
 	if c.registry == nil {
@@ -169,20 +190,29 @@ func (c *evalContext) Lookup(popName, attrName string, entityIdx int64) (any, er
 }
 
 // Draw returns a PRNG seeded deterministically from (rootSeed,
-// attrPath, streamID, rowIdx) via seed.Derive. The stream_id is
-// serialized with an "s" prefix so the hash input for a same-row
-// draw never collides with an attrPath that happens to be numeric.
+// attrPath, streamID, rowIdx) via seed.DeriveDraw, which is byte-identical
+// to the historical seed.Derive(rootSeed, attrPath, "s"+streamID, rowIdx)
+// formula but allocates nothing. The stream_id keeps its "s" prefix so the
+// hash input for a same-row draw never collides with a numeric attrPath.
 func (c *evalContext) Draw(streamID uint32, attrPath string, rowIdx int64) *rand.Rand {
 	if c.drawPRNG == nil {
 		c.drawPRNG = seed.NewReusablePRNG()
 	}
 
-	key := seed.Derive(
-		c.rootSeed,
-		attrPath,
-		"s"+strconv.FormatUint(uint64(streamID), 10),
-		strconv.FormatInt(rowIdx, 10),
-	)
+	key := seed.DeriveDraw(c.rootSeed, attrPath, streamID, rowIdx)
+	c.drawPRNG.Seed(key)
+
+	return c.drawPRNG.Rand()
+}
+
+// DrawKey returns a PRNG seeded directly from a precomputed sub-stream key,
+// reusing the per-runtime drawPRNG. It satisfies the expr keyedDrawer
+// optimization (grammar re-walks); the stream is identical to seed.PRNG(key).
+func (c *evalContext) DrawKey(key uint64) *rand.Rand {
+	if c.drawPRNG == nil {
+		c.drawPRNG = seed.NewReusablePRNG()
+	}
+
 	c.drawPRNG.Seed(key)
 
 	return c.drawPRNG.Rand()
