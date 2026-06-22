@@ -2,6 +2,10 @@
 
 Database stress testing CLI powered by k6. Apache 2.0.
 
+## Changelog
+
+`CHANGELOG.md` feeds the docs site — write plain-English one-liners for *users* (not commit-speak), grouped under `## [Unreleased]` by Added/Changed/Fixed. For any user-facing change, add the line **in the same commit** as the change (atomic) — propose it with the diff, don't chase it afterward; for direct/no-PR commits leave it plain text. When the change goes through a PR, after the PR is opened add a follow-up commit that appends the correct link `([#NN](https://github.com/stroppy-io/stroppy/pull/NN))` to that line.
+
 ## Binary Layout
 
 - `./build/stroppy` — main binary (built by `make build`)
