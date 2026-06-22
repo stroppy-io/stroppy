@@ -33,6 +33,7 @@ var (
 	ErrJSFuncNotDefined = errors.New("function not defined or not exported")
 	ErrNotAJSFunc       = errors.New("found, but is not a function")
 	ErrCallJSFunc       = errors.New("failed to call js function")
+	ErrNoOptions        = errors.New("script exports no `options`; not a runnable k6 entrypoint")
 )
 
 // TranspileTypeScript transpiles TypeScript to JavaScript using esbuild.
@@ -205,7 +206,12 @@ func runK6Handles(vm *js.Runtime) error {
 		return err
 	}
 
-	options, err := unwrapOptions(vm.Get("options"))
+	optionsValue := vm.Get("options")
+	if optionsValue == nil || js.IsUndefined(optionsValue) || js.IsNull(optionsValue) {
+		return ErrNoOptions
+	}
+
+	options, err := unwrapOptions(optionsValue)
 	if err != nil {
 		return err
 	}
