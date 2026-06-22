@@ -26,10 +26,11 @@ var _ modules.Module = new(RootModule)
 
 // rootModule initialization.
 func init() {
+	// No stacktrace on Fatal: these are operational failures (DB unreachable,
+	// missing config), not bugs. A goroutine dump only confuses users.
 	lg := logger.
 		NewFromEnv().
-		Named("k6-module").
-		WithOptions(zap.AddStacktrace(zap.FatalLevel))
+		Named("k6-module")
 
 	rootModule = &RootModule{
 		lg:               lg,
