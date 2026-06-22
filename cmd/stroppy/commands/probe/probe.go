@@ -13,6 +13,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/internal/runner"
 	"github.com/stroppy-io/stroppy/pkg/probe"
+	"github.com/stroppy-io/stroppy/workloads"
 )
 
 const (
@@ -38,7 +39,6 @@ var (
 	formats             = []string{humanFormat, jsonFormat}
 	formatsWithCommas   = strings.Join(formats, ", ")
 	ErrUnsoportedFormat = errors.New("unsupported format")
-	errNoScript         = errors.New("script argument is required (pass positional or set 'script' in config file)")
 	Cmd                 = func() *cobra.Command {
 		cmd := &cobra.Command{
 			Use:   "probe",
@@ -47,16 +47,26 @@ var (
 without executing the actual benchmark. Shows configuration, k6 options,
 SQL structure, steps, environment variables, and driver setup.
 
+With no script argument, probe lists the embedded presets and which of
+their scripts are runnable (-o json for machine output).
+
 Use section flags (--config, --options, --sql, --steps, --envs, --drivers)
 to filter output. See 'stroppy help probe' for section descriptions.
 `,
-			// TODO: auto detect tests with magic test.ts name.
-			// Or do "probe" of this dir, go trough all ts files, show all sql, or like this.
 			Args: cobra.RangeArgs(0, maxArgs),
 			RunE: func(cmd *cobra.Command, args []string) error {
 				localFlagValue, _ := cmd.Flags().GetBool(localFlag)
 				formatFlagValue := cmd.Flag(formatFlag).Value.String()
 				fileFlagValue := cmd.Flag(fileFlag).Value.String()
+
+				if !slices.Contains(formats, formatFlagValue) {
+					return fmt.Errorf(
+						"%q, available (%s): %w",
+						formatFlagValue,
+						formatsWithCommas,
+						ErrUnsoportedFormat,
+					)
+				}
 
 				// Load config file if -f is specified or stroppy-config.json exists.
 				fileConfig, _, err := runner.LoadRunConfig(fileFlagValue)
@@ -81,17 +91,10 @@ to filter output. See 'stroppy help probe' for section descriptions.
 				scriptPath = runner.EffectiveScript(scriptPath, fileConfig)
 				sqlPath = runner.EffectiveSQL(sqlPath, fileConfig)
 
+				// No script anywhere → show the catalog of embedded presets and
+				// which of their scripts are runnable.
 				if scriptPath == "" {
-					return errNoScript
-				}
-
-				if !slices.Contains(formats, formatFlagValue) {
-					return fmt.Errorf(
-						"%q, available (%s): %w",
-						formatFlagValue,
-						formatsWithCommas,
-						ErrUnsoportedFormat,
-					)
+					return printCatalog(formatFlagValue)
 				}
 
 				probeEnv, err := runner.BuildProbeEnvFromRunConfig(fileConfig)
@@ -184,4 +187,81 @@ func buildSections(cmd *cobra.Command) runner.ExplainSection {
 	}
 
 	return sections
+}
+
+// printCatalog renders the embedded preset catalog in the requested format.
+func printCatalog(format string) error {
+	catalog, err := workloads.Catalog()
+	if err != nil {
+		return fmt.Errorf("failed to build workloads catalog: %w", err)
+	}
+
+	switch format {
+	case jsonFormat:
+		bytes, err := json.Marshal(map[string]any{"presets": catalog})
+		if err != nil {
+			return fmt.Errorf("can't marshal catalog: %w", err)
+		}
+
+		fmt.Fprintf(os.Stdout, "%s\n", string(bytes))
+	case humanFormat:
+		fmt.Fprint(os.Stdout, formatCatalog(catalog))
+	}
+
+	return nil
+}
+
+// formatCatalog builds the human-readable preset listing.
+func formatCatalog(catalog []workloads.PresetInfo) string {
+	var builder strings.Builder
+
+	builder.WriteString("\nPRESETS (embedded workloads)\n\n")
+
+	for _, preset := range catalog {
+		builder.WriteString("  " + preset.Name + "\n")
+
+		var runnable []string
+
+		for _, script := range preset.Scripts {
+			if script.Runnable {
+				runnable = append(runnable, script.Name)
+			}
+		}
+
+		if len(runnable) > 0 {
+			builder.WriteString("    scripts:  " + strings.Join(runnable, ", ") + "\n")
+		}
+
+		if len(preset.SQL) > 0 {
+			builder.WriteString("    sql:      " + strings.Join(preset.SQL, ", ") + "\n")
+		}
+
+		if len(preset.Docs) > 0 {
+			builder.WriteString("    docs:     " + strings.Join(preset.Docs, ", ") + "\n")
+		}
+
+		if ex := runExample(preset.Name, runnable); ex != "" {
+			builder.WriteString("    run:      " + ex + "\n")
+		}
+
+		builder.WriteString("\n")
+	}
+
+	builder.WriteString("Probe any script for details:  stroppy probe <preset>/<script>\n")
+
+	return builder.String()
+}
+
+// runExample returns a ready-to-copy run command for the first runnable script.
+func runExample(preset string, runnable []string) string {
+	if len(runnable) == 0 {
+		return ""
+	}
+
+	stem := strings.TrimSuffix(runnable[0], ".ts")
+	if stem == preset {
+		return "stroppy run " + preset
+	}
+
+	return "stroppy run " + preset + "/" + stem
 }

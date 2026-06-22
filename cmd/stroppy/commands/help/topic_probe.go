@@ -17,6 +17,18 @@ func init() {
     - Check which environment variables the script reads
     - Review the driver setup declared in the script, including config-file overrides
 
+CATALOG (no script argument)
+
+  Run probe with no script to list the embedded presets and which of their
+  scripts are runnable, plus the SQL dialects/variants each ships with:
+
+    stroppy probe            # human-readable catalog
+    stroppy probe -o json    # machine-readable catalog
+
+  Only scripts that declare 'export const options' are k6 entrypoints; helper
+  modules are omitted from the human view and marked "runnable": false in JSON.
+  Each preset shows a ready-to-copy 'stroppy run ...' example.
+
 SECTIONS
 
   Config (--config)
