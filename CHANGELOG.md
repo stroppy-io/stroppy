@@ -1,0 +1,84 @@
+# Changelog
+
+User-facing changes in plain English, for the docs site changelog page.
+This is **not** the git log — write one-liners a stroppy *user* understands,
+not commit-speak. Format follows [Keep a Changelog](https://keepachangelog.com).
+
+Newest on top. Everything under `## [Unreleased]` is not yet released.
+Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
+`([#NN](https://github.com/stroppy-io/stroppy/pull/NN))` when the change had one.
+
+## [Unreleased]
+
+### Added
+
+- `stroppy probe` with no script argument now lists the available preset catalog. ([#73](https://github.com/stroppy-io/stroppy/pull/73))
+
+### Fixed
+
+- Clearer error when a probed script has no `options` export. ([#73](https://github.com/stroppy-io/stroppy/pull/73))
+- Fatal log lines no longer dump a goroutine stacktrace. ([#73](https://github.com/stroppy-io/stroppy/pull/73))
+
+## [5.3.4] - 2026-06-16
+
+### Changed
+
+- Faster data generation and bulk inserts: TPC-H lineitem loading now runs significantly quicker and uses far less memory, with up to ~38% higher throughput on the insert path and large reductions in allocations during generation. ([#72](https://github.com/stroppy-io/stroppy/pull/72))
+
+## [5.3.3] - 2026-05-29
+
+### Changed
+
+- TPC-H now prepares the database once per run instead of repeating setup work.
+
+### Fixed
+
+- Insert throughput is now reported from live progress metrics for more accurate numbers.
+
+## [5.3.2] - 2026-05-27
+
+### Added
+
+- TPC-H now reports per-query timings for the workload.
+
+### Fixed
+
+- Worked around a YDB error that could interrupt TPC-H runs.
+
+## [5.3.1] - 2026-05-27
+
+### Fixed
+
+- TPC-H totals no longer apply YDB column coalescing, producing correct results.
+
+## [5.3.0] - 2026-05-27
+
+### Added
+
+- TPC-H can now run against YDB column-store tables.
+
+## [5.2.0] - 2026-05-26
+
+### Added
+
+- Live insert progress is now reported while data loads. ([#71](https://github.com/stroppy-io/stroppy/pull/71))
+- A single TPC-C test can now drive multiple tool instances at once.
+- k6 logger settings are now synced with the runner configuration.
+
+### Changed
+
+- Faster data generation through performance refactoring.
+- YDB data ingestion, table partitioning, and index partitioning settings improved for better load performance.
+- YDB now uses lazy transactions and parameter-based IN queries.
+- Query arguments now go through dialect conversion, with YDB list parameters still normalized to typed slices.
+- TPC-H finalize step is now dynamic.
+
+### Fixed
+
+- YDB now retries UNAVAILABLE errors instead of failing.
+
+## [5.1.3] - 2026-05-20
+
+### Fixed
+
+- TPC-H scale-factor 1 queries now pass on YDB.
