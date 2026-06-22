@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-06-22
+
 ### Added
 
 - `stroppy probe` with no script argument now lists the available preset catalog. ([#73](https://github.com/stroppy-io/stroppy/pull/73))
