@@ -124,28 +124,29 @@ func sIsNull(nullBitMap int64, localIdx int) bool {
 	return nullBitMap&(int64(1)<<uint(off)) != 0
 }
 
-// storeState carries the previous emitted row's slowly-changing-dimension fields
-// so that a revision of an existing business key can inherit unchanged values.
-// dsdgen generates the table sequentially from row 1; this state is reset
-// whenever generation restarts at (or before) the first row.
-type storeState struct {
-	valid      bool
-	closedDate int64
-	name       string
-	employees  int
-	floorSpace int
-	manager    string
-	marketID   int
-	tax        Decimal
-	marketDesc string
-	marketMgr  string
-	gmtOffset  int
-	streetNum  int
-	zip        int
+// storeRow holds one store row's fully resolved fields (after SCD inheritance),
+// everything StoreRow.getValues needs. It doubles as the carrier for a base
+// row's values when a later revision inherits from it.
+type storeRow struct {
+	nullBitMap                                int64
+	storeID                                   string
+	recStart, recEnd, closedDate              int64
+	name                                      string
+	employees, floorSpace                     int
+	hours, manager                            string
+	marketID                                  int
+	geographyClass, marketDesc, marketManager string
+	divisionID, companyID                     int64
+	divisionName, companyName                 string
+	addr                                      Address
+	tax                                       Decimal
 }
 
-var storePrev storeState
-
+// scdBaseRow returns the row number whose first-revision values a revision row
+// inherits: the row before for a 2nd revision, two rows before for a 3rd. Only
+// valid for revision rows; the chain bottoms out at the new-key row at most two
+// rows back, so recomputation depth is bounded by 2.
+//
 // pickStoreName generates a store manager's full name, drawing first then last
 // name from the same stream, mirroring StoreRowGenerator.
 func pickStoreName(s *RNStream) string {
@@ -153,6 +154,112 @@ func pickStoreName(s *RNStream) string {
 	last := lastNamesDist.PickRandomValue(0, 0, s)
 
 	return fmt.Sprintf("%s %s", first, last)
+}
+
+// computeStore generates one store row by drawing on ss in dsdgen's exact order.
+// For a revision row it reconstructs the business key's first revision on an
+// independent streamSet and inherits the unchanged fields, so the result depends
+// only on rowNumber (partition-safe, no shared state).
+func computeStore(rowNumber int64, ss *streamSet, sc *Scaling) storeRow {
+	var r storeRow
+	r.nullBitMap = CreateNullBitMap(storeNullBasis, storeNotNullBitMap, ss.at(sNulls))
+
+	scd := ComputeScdKey(tSStore, rowNumber)
+	r.storeID = scd.BusinessKey
+	r.recStart = scd.StartDate
+	r.recEnd = scd.EndDate
+	isNewKey := scd.IsNewKey
+
+	// A revision inherits unchanged fields from the immediately preceding row
+	// (the previous revision of the same key), reconstructed independently so the
+	// result depends only on rowNumber.
+	var prev storeRow
+	if !isNewKey {
+		base := rowNumber - 1
+		bss := newStreamSet(storeCols)
+		bss.skipRows(base - 1)
+		prev = computeStore(base, bss, sc)
+	}
+
+	fieldChangeFlags := ss.at(sScd).NextRandom()
+	scdField := func(old, drawn any) any {
+		if isNewKey {
+			return drawn
+		}
+
+		return SCDValue(int(fieldChangeFlags), false, old, drawn)
+	}
+
+	percentage := GenerateUniformRandomInt(1, 100, ss.at(sClosedDateID))
+	daysOpen := GenerateUniformRandomInt(storeMinDaysOpen, storeMaxDaysOpen, ss.at(sClosedDateID))
+	closedDateID := int64(-1)
+	if percentage < storeClosedPct {
+		closedDateID = int64(JulianDateMinimum) + int64(daysOpen)
+	}
+	r.closedDate = scdField(prev.closedDate, closedDateID).(int64)
+	fieldChangeFlags >>= 1
+
+	r.name = scdField(prev.name, generateWord(rowNumber, storeNameMaxChars, syllablesDist)).(string)
+	fieldChangeFlags >>= 1
+
+	r.employees = scdField(prev.employees, GenerateUniformRandomInt(200, 300, ss.at(sEmployees))).(int)
+	fieldChangeFlags >>= 1
+
+	r.floorSpace = scdField(prev.floorSpace, GenerateUniformRandomInt(5000000, 10000000, ss.at(sFloorSpace))).(int)
+	fieldChangeFlags >>= 1
+
+	r.hours = storeHoursDist.PickRandomValue(0, 0, ss.at(sHours)) // not SCD-tracked
+	fieldChangeFlags >>= 1
+
+	r.manager = scdField(prev.manager, pickStoreName(ss.at(sManager))).(string)
+	fieldChangeFlags >>= 1
+
+	r.marketID = scdField(prev.marketID, GenerateUniformRandomInt(1, 10, ss.at(sMarketID))).(int)
+	fieldChangeFlags >>= 1
+
+	r.tax = scdField(prev.tax, GenerateUniformRandomDecimal(storeMinTaxPercentage, storeMaxTaxPercentage, ss.at(sTaxPercentage))).(Decimal)
+	fieldChangeFlags >>= 1
+
+	r.geographyClass = "Unknown" // single-value distribution, inlined
+	fieldChangeFlags >>= 1
+
+	r.marketDesc = scdField(prev.marketDesc, GenerateRandomText(storeDescMin, storeMarketDescRowSize, ss.at(sMarketDesc))).(string)
+	fieldChangeFlags >>= 1
+
+	r.marketManager = scdField(prev.marketManager, pickStoreName(ss.at(sMarketManager))).(string)
+	fieldChangeFlags >>= 1
+
+	r.divisionName = "Unknown"
+	r.divisionID = 1
+	fieldChangeFlags >>= 1 // divisionId
+	fieldChangeFlags >>= 1 // divisionName
+
+	r.companyName = "Unknown"
+	r.companyID = 1
+	fieldChangeFlags >>= 1 // companyId
+	fieldChangeFlags >>= 1 // companyName
+
+	// Many address fields are never updated for a revision (a C-code bug we copy),
+	// but the field-change flags still advance for each.
+	addr := makeAddressSmall(ss.at(sAddress), sc, TStore)
+	fieldChangeFlags >>= 1 // city
+	fieldChangeFlags >>= 1 // county
+
+	addr.GmtOffset = scdField(prev.addr.GmtOffset, addr.GmtOffset).(int)
+	fieldChangeFlags >>= 1
+
+	fieldChangeFlags >>= 1 // state
+	fieldChangeFlags >>= 1 // streetType
+	fieldChangeFlags >>= 1 // streetName1
+	fieldChangeFlags >>= 1 // streetName2
+
+	addr.StreetNumber = scdField(prev.addr.StreetNumber, addr.StreetNumber).(int)
+	fieldChangeFlags >>= 1
+
+	addr.Zip = scdField(prev.addr.Zip, addr.Zip).(int)
+	r.addr = addr
+
+	return r
 }
 
 // Store is the TPC-DS store table. It keeps history (SCD) and uses the
@@ -173,271 +280,98 @@ var Store = &Table{
 	Cols:     storeCols,
 	RowCount: func(sf float64) int64 { return NewScaling(sf).RowCount(TStore) },
 	Row: func(rowNumber int64, ss *streamSet, sc *Scaling) []any {
-		if rowNumber <= 1 {
-			storePrev = storeState{}
-		}
+		r := computeStore(rowNumber, ss, sc)
+		nb := r.nullBitMap
 
-		nullBitMap := CreateNullBitMap(storeNullBasis, storeNotNullBitMap, ss.at(sNulls))
-
-		scd := ComputeScdKey(tSStore, rowNumber)
-		storeID := scd.BusinessKey
-		recStartDateID := scd.StartDate
-		recEndDateID := scd.EndDate
-		isNewKey := scd.IsNewKey
-
-		fieldChangeFlags := ss.at(sScd).NextRandom()
-
-		// closed_date_id: random "is closed" percentage and days-open offset.
-		percentage := GenerateUniformRandomInt(1, 100, ss.at(sClosedDateID))
-		daysOpen := GenerateUniformRandomInt(storeMinDaysOpen, storeMaxDaysOpen, ss.at(sClosedDateID))
-		var closedDateID int64
-		if percentage < storeClosedPct {
-			closedDateID = int64(JulianDateMinimum) + int64(daysOpen)
-		} else {
-			closedDateID = -1
-		}
-		if storePrev.valid {
-			closedDateID = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.closedDate, closedDateID)
-		}
-		fieldChangeFlags >>= 1
-
-		storeName := generateWord(rowNumber, storeNameMaxChars, syllablesDist)
-		if storePrev.valid {
-			storeName = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.name, storeName)
-		}
-		fieldChangeFlags >>= 1
-
-		employees := GenerateUniformRandomInt(200, 300, ss.at(sEmployees))
-		if storePrev.valid {
-			employees = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.employees, employees)
-		}
-		fieldChangeFlags >>= 1
-
-		floorSpace := GenerateUniformRandomInt(5000000, 10000000, ss.at(sFloorSpace))
-		if storePrev.valid {
-			floorSpace = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.floorSpace, floorSpace)
-		}
-		fieldChangeFlags >>= 1
-
-		hours := storeHoursDist.PickRandomValue(0, 0, ss.at(sHours))
-		fieldChangeFlags >>= 1
-
-		storeManager := pickStoreName(ss.at(sManager))
-		if storePrev.valid {
-			storeManager = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.manager, storeManager)
-		}
-		fieldChangeFlags >>= 1
-
-		marketID := GenerateUniformRandomInt(1, 10, ss.at(sMarketID))
-		if storePrev.valid {
-			marketID = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.marketID, marketID)
-		}
-		fieldChangeFlags >>= 1
-
-		tax := GenerateUniformRandomDecimal(storeMinTaxPercentage, storeMaxTaxPercentage, ss.at(sTaxPercentage))
-		if storePrev.valid {
-			tax = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.tax, tax)
-		}
-		fieldChangeFlags >>= 1
-
-		// geography_class distribution had a single value: inline constant. Still
-		// shift the field-change flags.
-		geographyClass := "Unknown"
-		fieldChangeFlags >>= 1 // geographyClass
-
-		marketDesc := GenerateRandomText(storeDescMin, storeMarketDescRowSize, ss.at(sMarketDesc))
-		if storePrev.valid {
-			marketDesc = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.marketDesc, marketDesc)
-		}
-		fieldChangeFlags >>= 1
-
-		marketManager := pickStoreName(ss.at(sMarketManager))
-		if storePrev.valid {
-			marketManager = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.marketMgr, marketManager)
-		}
-		fieldChangeFlags >>= 1
-
-		// Single-value distributions, inlined as constants; flags still shift.
-		divisionName := "Unknown"
-		divisionID := int64(1)
-		fieldChangeFlags >>= 1 // divisionId
-		fieldChangeFlags >>= 1 // divisionName
-
-		companyName := "Unknown"
-		companyID := int64(1)
-		fieldChangeFlags >>= 1 // companyId
-		fieldChangeFlags >>= 1 // companyName
-
-		// Many address values never get updated (a bug in the C code we copy), but
-		// the field-change flags still advance for each.
-		addr := makeAddressSmall(ss.at(sAddress), sc, TStore)
-		fieldChangeFlags >>= 1 // city
-		fieldChangeFlags >>= 1 // county
-
-		gmtOffset := addr.GmtOffset
-		if storePrev.valid {
-			gmtOffset = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.gmtOffset, gmtOffset)
-		}
-		fieldChangeFlags >>= 1
-
-		fieldChangeFlags >>= 1 // state
-		fieldChangeFlags >>= 1 // streetType
-		fieldChangeFlags >>= 1 // streetName1
-		fieldChangeFlags >>= 1 // streetName2
-
-		streetNumber := addr.StreetNumber
-		if storePrev.valid {
-			streetNumber = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.streetNum, streetNumber)
-		}
-		fieldChangeFlags >>= 1
-
-		zip := addr.Zip
-		if storePrev.valid {
-			zip = SCDValue(int(fieldChangeFlags), isNewKey, storePrev.zip, zip)
-		}
-
-		// Rebuild the address with the (possibly inherited) street number and zip.
-		addr.StreetNumber = streetNumber
-		addr.Zip = zip
-		addr.GmtOffset = gmtOffset
-
-		// Record this row's SCD fields for the next revision.
-		storePrev = storeState{
-			valid:      true,
-			closedDate: closedDateID,
-			name:       storeName,
-			employees:  employees,
-			floorSpace: floorSpace,
-			manager:    storeManager,
-			marketID:   marketID,
-			tax:        tax,
-			marketDesc: marketDesc,
-			marketMgr:  marketManager,
-			gmtOffset:  gmtOffset,
-			streetNum:  streetNumber,
-			zip:        zip,
-		}
-
-		// Output in StoreRow.getValues order. A nulled column becomes nil (empty
-		// field). Key columns use the key-null rule (also nil when value == -1);
-		// date columns from julian days are nil when negative.
+		// Output in StoreRow.getValues order; a nulled column becomes nil (empty
+		// field). Key/date columns are also nil when their sentinel (-1) is set.
 		vals := make([]any, 29)
-
-		// s_store_sk (key)
-		if !sIsNull(nullBitMap, sStoreSk) && rowNumber != -1 {
+		if !sIsNull(nb, sStoreSk) && rowNumber != -1 {
 			vals[0] = rowNumber
 		}
-		// s_store_id
-		if !sIsNull(nullBitMap, sStoreID) {
-			vals[1] = storeID
+		if !sIsNull(nb, sStoreID) {
+			vals[1] = r.storeID
 		}
-		// s_rec_start_date (julian -> date, nil if negative)
-		if !sIsNull(nullBitMap, sRecStartDateID) && recStartDateID >= 0 {
-			vals[2] = FromJulianDays(int(recStartDateID))
+		if !sIsNull(nb, sRecStartDateID) && r.recStart >= 0 {
+			vals[2] = FromJulianDays(int(r.recStart))
 		}
-		// s_rec_end_date
-		if !sIsNull(nullBitMap, sRecEndDateID) && recEndDateID >= 0 {
-			vals[3] = FromJulianDays(int(recEndDateID))
+		if !sIsNull(nb, sRecEndDateID) && r.recEnd >= 0 {
+			vals[3] = FromJulianDays(int(r.recEnd))
 		}
-		// s_closed_date_sk (key)
-		if !sIsNull(nullBitMap, sClosedDateID) && closedDateID != -1 {
-			vals[4] = closedDateID
+		if !sIsNull(nb, sClosedDateID) && r.closedDate != -1 {
+			vals[4] = r.closedDate
 		}
-		// s_store_name
-		if !sIsNull(nullBitMap, sStoreName) {
-			vals[5] = storeName
+		if !sIsNull(nb, sStoreName) {
+			vals[5] = r.name
 		}
-		// s_number_employees
-		if !sIsNull(nullBitMap, sEmployees) {
-			vals[6] = int64(employees)
+		if !sIsNull(nb, sEmployees) {
+			vals[6] = int64(r.employees)
 		}
-		// s_floor_space
-		if !sIsNull(nullBitMap, sFloorSpace) {
-			vals[7] = int64(floorSpace)
+		if !sIsNull(nb, sFloorSpace) {
+			vals[7] = int64(r.floorSpace)
 		}
-		// s_hours
-		if !sIsNull(nullBitMap, sHours) {
-			vals[8] = hours
+		if !sIsNull(nb, sHours) {
+			vals[8] = r.hours
 		}
-		// s_manager
-		if !sIsNull(nullBitMap, sManager) {
-			vals[9] = storeManager
+		if !sIsNull(nb, sManager) {
+			vals[9] = r.manager
 		}
-		// s_market_id
-		if !sIsNull(nullBitMap, sMarketID) {
-			vals[10] = int64(marketID)
+		if !sIsNull(nb, sMarketID) {
+			vals[10] = int64(r.marketID)
 		}
-		// s_geography_class
-		if !sIsNull(nullBitMap, sGeographyClass) {
-			vals[11] = geographyClass
+		if !sIsNull(nb, sGeographyClass) {
+			vals[11] = r.geographyClass
 		}
-		// s_market_desc
-		if !sIsNull(nullBitMap, sMarketDesc) {
-			vals[12] = marketDesc
+		if !sIsNull(nb, sMarketDesc) {
+			vals[12] = r.marketDesc
 		}
-		// s_market_manager
-		if !sIsNull(nullBitMap, sMarketManager) {
-			vals[13] = marketManager
+		if !sIsNull(nb, sMarketManager) {
+			vals[13] = r.marketManager
 		}
-		// s_division_id (key)
-		if !sIsNull(nullBitMap, sDivisionID) && divisionID != -1 {
-			vals[14] = divisionID
+		if !sIsNull(nb, sDivisionID) && r.divisionID != -1 {
+			vals[14] = r.divisionID
 		}
-		// s_division_name
-		if !sIsNull(nullBitMap, sDivisionName) {
-			vals[15] = divisionName
+		if !sIsNull(nb, sDivisionName) {
+			vals[15] = r.divisionName
 		}
-		// s_company_id (key)
-		if !sIsNull(nullBitMap, sCompanyID) && companyID != -1 {
-			vals[16] = companyID
+		if !sIsNull(nb, sCompanyID) && r.companyID != -1 {
+			vals[16] = r.companyID
 		}
-		// s_company_name
-		if !sIsNull(nullBitMap, sCompanyName) {
-			vals[17] = companyName
+		if !sIsNull(nb, sCompanyName) {
+			vals[17] = r.companyName
 		}
-		// s_street_number
-		if !sIsNull(nullBitMap, sAddrStreetNum) {
-			vals[18] = int64(addr.StreetNumber)
+		if !sIsNull(nb, sAddrStreetNum) {
+			vals[18] = int64(r.addr.StreetNumber)
 		}
-		// s_street_name
-		if !sIsNull(nullBitMap, sAddrStreetName1) {
-			vals[19] = addr.StreetName()
+		if !sIsNull(nb, sAddrStreetName1) {
+			vals[19] = r.addr.StreetName()
 		}
-		// s_street_type
-		if !sIsNull(nullBitMap, sAddrStreetType) {
-			vals[20] = addr.StreetType
+		if !sIsNull(nb, sAddrStreetType) {
+			vals[20] = r.addr.StreetType
 		}
-		// s_suite_number
-		if !sIsNull(nullBitMap, sAddrSuiteNum) {
-			vals[21] = addr.SuiteNumber
+		if !sIsNull(nb, sAddrSuiteNum) {
+			vals[21] = r.addr.SuiteNumber
 		}
-		// s_city
-		if !sIsNull(nullBitMap, sAddrCity) {
-			vals[22] = addr.City
+		if !sIsNull(nb, sAddrCity) {
+			vals[22] = r.addr.City
 		}
-		// s_county
-		if !sIsNull(nullBitMap, sAddrCounty) {
-			vals[23] = addr.County
+		if !sIsNull(nb, sAddrCounty) {
+			vals[23] = r.addr.County
 		}
-		// s_state
-		if !sIsNull(nullBitMap, sAddrState) {
-			vals[24] = addr.State
+		if !sIsNull(nb, sAddrState) {
+			vals[24] = r.addr.State
 		}
-		// s_zip
-		if !sIsNull(nullBitMap, sAddrZip) {
-			vals[25] = fmt.Sprintf("%05d", addr.Zip)
+		if !sIsNull(nb, sAddrZip) {
+			vals[25] = fmt.Sprintf("%05d", r.addr.Zip)
 		}
-		// s_country
-		if !sIsNull(nullBitMap, sAddrCountry) {
-			vals[26] = addr.Country
+		if !sIsNull(nb, sAddrCountry) {
+			vals[26] = r.addr.Country
 		}
-		// s_gmt_offset
-		if !sIsNull(nullBitMap, sAddrGmtOffset) {
-			vals[27] = int64(addr.GmtOffset)
+		if !sIsNull(nb, sAddrGmtOffset) {
+			vals[27] = int64(r.addr.GmtOffset)
 		}
-		// s_tax_precentage
-		if !sIsNull(nullBitMap, sTaxPercentage) {
-			vals[28] = tax
+		if !sIsNull(nb, sTaxPercentage) {
+			vals[28] = r.tax
 		}
 
 		return vals
