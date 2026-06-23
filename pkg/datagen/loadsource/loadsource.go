@@ -11,12 +11,14 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
+	"github.com/stroppy-io/stroppy/pkg/datagen/tpcdsgen"
 	"github.com/stroppy-io/stroppy/pkg/datagen/tpchgen"
 )
 
 // Build returns the Partitionable that produces the rows for spec. It selects
 // the generator backend from the spec's `generator` oneof: the ported TPC-H
-// dbgen generator when `tpch` is set, otherwise the native seekable runtime.
+// dbgen generator when `tpch` is set, the ported TPC-DS dsdgen generator when
+// `tpcds` is set, otherwise the native seekable runtime.
 func Build(spec *dgproto.InsertSpec) (source.Partitionable, error) {
 	if spec == nil {
 		return nil, fmt.Errorf("loadsource: %w", runtime.ErrInvalidSpec)
@@ -26,6 +28,15 @@ func Build(spec *dgproto.InsertSpec) (source.Partitionable, error) {
 		p, err := tpchgen.New(tpch.GetTable(), tpch.GetScaleFactor())
 		if err != nil {
 			return nil, fmt.Errorf("loadsource: build tpch source: %w", err)
+		}
+
+		return p, nil
+	}
+
+	if tpcds := spec.GetTpcds(); tpcds != nil {
+		p, err := tpcdsgen.New(tpcds.GetTable(), tpcds.GetScaleFactor())
+		if err != nil {
+			return nil, fmt.Errorf("loadsource: build tpcds source: %w", err)
 		}
 
 		return p, nil

@@ -92,6 +92,8 @@
     - [StrategyHash](#stroppy-datagen-StrategyHash)
     - [StrategySequential](#stroppy-datagen-StrategySequential)
     - [StreamDraw](#stroppy-datagen-StreamDraw)
+    - [TpcdsSource](#stroppy-datagen-TpcdsSource)
+    - [TpchSource](#stroppy-datagen-TpchSource)
   
     - [BinOp.Op](#stroppy-datagen-BinOp-Op)
     - [InsertMethod](#stroppy-datagen-InsertMethod)
@@ -1215,6 +1217,8 @@ InsertSpec is the boundary message a workload emits per table load.
 | method | [InsertMethod](#stroppy-datagen-InsertMethod) |  | Wire protocol for row insertion. |
 | parallelism | [Parallelism](#stroppy-datagen-Parallelism) |  | Worker hint for the Loader; clamped to the global cap. |
 | source | [RelSource](#stroppy-datagen-RelSource) |  | Relational descriptor for the rows this spec emits. |
+| tpch | [TpchSource](#stroppy-datagen-TpchSource) |  | Ported TPC-H dbgen backend descriptor. |
+| tpcds | [TpcdsSource](#stroppy-datagen-TpcdsSource) |  | Ported TPC-DS dsdgen backend descriptor. |
 | dicts | [InsertSpec.DictsEntry](#stroppy-datagen-InsertSpec-DictsEntry) | repeated | Dict bodies keyed by the opaque TS-assigned ID that attrs reference. |
 
 
@@ -1521,6 +1525,42 @@ streams across runs without any pointer-keyed memoization.
 | ascii | [DrawAscii](#stroppy-datagen-DrawAscii) |  | Random ASCII string drawn from an alphabet. |
 | phrase | [DrawPhrase](#stroppy-datagen-DrawPhrase) |  | Space-joined word sequence drawn from a vocabulary Dict. |
 | grammar | [DrawGrammar](#stroppy-datagen-DrawGrammar) |  | Two-phase template walker over a root / phrase / leaf dict set. |
+
+
+
+
+
+
+<a name="stroppy-datagen-TpcdsSource"></a>
+
+### TpcdsSource
+TpcdsSource selects the ported TPC-DS dsdgen generator for one table. As with
+TPC-H the schema and column order are fixed by the spec, so only the table
+name and scale factor are needed; the Go side owns the byte-exact generation.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| table | [string](#string) |  | TPC-DS table to load: one of the 24 base tables (e.g. store_sales, customer, item, inventory, ...). |
+| scale_factor | [double](#double) |  | Scale factor. Fractional values are allowed; every table scales by the same factor so foreign keys stay consistent. |
+
+
+
+
+
+
+<a name="stroppy-datagen-TpchSource"></a>
+
+### TpchSource
+TpchSource selects the ported TPC-H dbgen generator for one table. The table
+schema and column order are fixed by the TPC-H spec, so only the table name
+and scale factor are needed; the Go side owns the generation.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| table | [string](#string) |  | TPC-H table to load: one of region, nation, part, supplier, partsupp, customer, orders, lineitem. |
+| scale_factor | [double](#double) |  | Scale factor. Fractional values are allowed (e.g. 0.01 for tests); every table scales by the same factor so foreign keys stay consistent. |
 
 
 
