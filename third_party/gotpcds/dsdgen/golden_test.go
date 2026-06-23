@@ -65,7 +65,9 @@ func formatTable(tbl *Table, sf float64) []byte {
 			if i > 0 {
 				b.WriteByte('|')
 			}
-			fmt.Fprintf(&b, "%v", v)
+			if v != nil { // a nil column is a SQL null: dsdgen prints an empty field
+				fmt.Fprintf(&b, "%v", v)
+			}
 		}
 		b.WriteByte('\n')
 	}
