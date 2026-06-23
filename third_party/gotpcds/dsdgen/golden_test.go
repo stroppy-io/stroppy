@@ -28,13 +28,16 @@ func oracleBin(t *testing.T) (bin, toolsDir string) {
 	return bin, toolsDir
 }
 
-// runOracleToFile generates one table with the reference binary and returns the
-// path to its .dat. dsdgen must run from the tools dir so it finds tpcds.idx.
-func runOracleToFile(t *testing.T, bin, toolsDir, table string, scale int) string {
+// runOracleToFile generates genTable with the reference binary and returns the
+// path to readTable's .dat. They differ for child (returns) tables: dsdgen
+// rejects "-table <child>", emitting the child only as a side effect of building
+// its parent, so we generate the parent and read the child's sibling .dat.
+// dsdgen must run from the tools dir so it finds tpcds.idx.
+func runOracleToFile(t *testing.T, bin, toolsDir, genTable, readTable string, scale int) string {
 	t.Helper()
 	out := t.TempDir()
 	cmd := exec.Command(bin,
-		"-table", table,
+		"-table", genTable,
 		"-scale", fmt.Sprint(scale),
 		"-force", "Y",
 		"-terminate", "N",
@@ -45,13 +48,13 @@ func runOracleToFile(t *testing.T, bin, toolsDir, table string, scale int) strin
 		t.Fatalf("dsdgen failed: %v\n%s", err, b)
 	}
 
-	return filepath.Join(out, table+".dat")
+	return filepath.Join(out, readTable+".dat")
 }
 
 // runOracle generates one table and returns its raw .dat bytes (for small tables).
 func runOracle(t *testing.T, bin, toolsDir, table string, scale int) []byte {
 	t.Helper()
-	data, err := os.ReadFile(runOracleToFile(t, bin, toolsDir, table, scale))
+	data, err := os.ReadFile(runOracleToFile(t, bin, toolsDir, table, table, scale))
 	if err != nil {
 		t.Fatalf("read oracle output: %v", err)
 	}
@@ -74,18 +77,16 @@ func formatRow(row []any) string {
 	return b.String()
 }
 
-// formatTable renders the whole table with the Go port using the dsdgen field
-// layout: "|"-separated fields, one row per line, no trailing separator.
 // rowStreamer is the common surface of the dimension Stream and the fact
 // FactStream.
 type rowStreamer interface{ Next() ([]any, bool) }
 
 // streamMatchesOracle compares a full row stream to the reference dsdgen output
 // line-by-line, in O(1) memory (so multi-million-row tables are fine).
-func streamMatchesOracle(t *testing.T, name string, scale int, s rowStreamer) {
+func streamMatchesOracle(t *testing.T, genTable, readTable string, scale int, s rowStreamer) {
 	t.Helper()
 	bin, toolsDir := oracleBin(t)
-	f, err := os.Open(runOracleToFile(t, bin, toolsDir, name, scale))
+	f, err := os.Open(runOracleToFile(t, bin, toolsDir, genTable, readTable, scale))
 	if err != nil {
 		t.Fatalf("open oracle output: %v", err)
 	}
@@ -98,17 +99,17 @@ func streamMatchesOracle(t *testing.T, name string, scale int, s rowStreamer) {
 		line++
 		row, ok := s.Next()
 		if !ok {
-			t.Fatalf("%s sf=%d: port ended at row %d but oracle has more", name, scale, line)
+			t.Fatalf("%s sf=%d: port ended at row %d but oracle has more", readTable, scale, line)
 		}
 		if got := formatRow(row); got != sc.Text() {
-			t.Fatalf("%s sf=%d row %d differs\n got: %s\nwant: %s", name, scale, line, got, sc.Text())
+			t.Fatalf("%s sf=%d row %d differs\n got: %s\nwant: %s", readTable, scale, line, got, sc.Text())
 		}
 	}
 	if err := sc.Err(); err != nil {
 		t.Fatalf("scan oracle: %v", err)
 	}
 	if _, ok := s.Next(); ok {
-		t.Fatalf("%s sf=%d: port produced more than the oracle's %d rows", name, scale, line)
+		t.Fatalf("%s sf=%d: port produced more than the oracle's %d rows", readTable, scale, line)
 	}
 }
 
@@ -163,7 +164,13 @@ func assertFactTableByteEqual(t *testing.T, tbl *FactTable, scales ...int) {
 	for _, scale := range scales {
 		scale := scale
 		t.Run(fmt.Sprintf("sf%d", scale), func(t *testing.T) {
-			streamMatchesOracle(t, tbl.Name, scale, tbl.NewStream(float64(scale), 1, -1))
+			// Child (returns) tables can't be generated directly; dsdgen emits
+			// them while building the parent sales table.
+			genTable := tbl.Name
+			if tbl.emitReturns {
+				genTable = strings.Replace(tbl.Name, "_returns", "_sales", 1)
+			}
+			streamMatchesOracle(t, genTable, tbl.Name, scale, tbl.NewStream(float64(scale), 1, -1))
 		})
 	}
 }
@@ -176,7 +183,7 @@ func assertTableByteEqual(t *testing.T, tbl *Table, scales ...int) {
 	for _, scale := range scales {
 		scale := scale
 		t.Run(fmt.Sprintf("sf%d", scale), func(t *testing.T) {
-			streamMatchesOracle(t, tbl.Name, scale, tbl.NewStream(float64(scale), 1, -1))
+			streamMatchesOracle(t, tbl.Name, tbl.Name, scale, tbl.NewStream(float64(scale), 1, -1))
 		})
 	}
 }
