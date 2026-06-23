@@ -87,6 +87,45 @@ func (d *StringValuesDistribution) ValueAtIndex(valueListIndex, valueIndex int) 
 // Size is the number of entries in the distribution.
 func (d *StringValuesDistribution) Size() int { return len(d.values[0]) }
 
+// PickRandomValue draws a weighted-random value from value column
+// valueListIndex using weight column weightListIndex. Mirrors pickRandomValue.
+func (d *StringValuesDistribution) PickRandomValue(valueListIndex, weightListIndex int, s *RNStream) string {
+	return d.values[valueListIndex][d.PickRandomIndex(weightListIndex, s)]
+}
+
+// PickRandomIndex draws a weighted-random row index using weight column
+// weightListIndex. Mirrors pickRandomIndex.
+func (d *StringValuesDistribution) PickRandomIndex(weightListIndex int, s *RNStream) int {
+	weights := d.weights[weightListIndex]
+	weight := GenerateUniformRandomInt(1, weights[len(weights)-1], s)
+	for i, cum := range weights {
+		if weight <= cum {
+			return i
+		}
+	}
+
+	panic("dsdgen: random weight exceeded max weight")
+}
+
+// ValueForIndexModSize returns the value at (index mod size) in value column
+// valueListIndex. Mirrors getValueForIndexModSize.
+func (d *StringValuesDistribution) ValueForIndexModSize(index int64, valueListIndex int) string {
+	vals := d.values[valueListIndex]
+
+	return vals[int(index%int64(len(vals)))]
+}
+
+// WeightForIndex returns the (de-accumulated) weight at index in weight column
+// weightListIndex. Mirrors getWeightForIndex.
+func (d *StringValuesDistribution) WeightForIndex(index, weightListIndex int) int {
+	weights := d.weights[weightListIndex]
+	if index == 0 {
+		return weights[0]
+	}
+
+	return weights[index] - weights[index-1]
+}
+
 // splitUnescaped splits s on sep, ignoring separators escaped with a backslash,
 // then trims each field and removes the escaping backslashes. Mirrors the
 // negative-lookbehind splitting and "\\"-stripping in DistributionUtils.
