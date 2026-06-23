@@ -97,7 +97,10 @@ func TestOfficialAnswersQ1Q6SF1(t *testing.T) {
 	want := map[string]agg{
 		"AF": {sumQty: 37734107, sumBase: 56586554400.73, sumDisc: 53758257134.87, sumCharge: 55909065222.83, cnt: 1478493},
 		"NF": {sumQty: 991417, sumBase: 1487504710.38, sumDisc: 1413082168.05, sumCharge: 1469649223.19, cnt: 38854},
-		"NO": {sumQty: 74476040, sumBase: 111701729697.74, sumDisc: 106118230307.61, sumCharge: 110367043872.50, cnt: 2920374},
+		"NO": {
+			sumQty: 74476040, sumBase: 111701729697.74,
+			sumDisc: 106118230307.61, sumCharge: 110367043872.50, cnt: 2920374,
+		},
 		"RF": {sumQty: 37719753, sumBase: 56568041380.90, sumDisc: 53741292684.60, sumCharge: 55889619119.83, cnt: 1478870},
 	}
 
@@ -105,6 +108,7 @@ func TestOfficialAnswersQ1Q6SF1(t *testing.T) {
 		a := groups[k]
 		if a == nil {
 			t.Fatalf("Q1 group %q missing", k)
+
 			continue
 		}
 

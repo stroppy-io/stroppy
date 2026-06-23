@@ -55,11 +55,11 @@ type RowFn func(ctx context.Context, chunk Chunk, src source.RowSource) error
 // relationship-backed or fan-out specs).
 func RunParallelByWorkers(
 	ctx context.Context,
-	p source.Partitionable,
+	part source.Partitionable,
 	workers int,
 	fn RowFn,
 ) (int64, error) {
-	if p == nil {
+	if part == nil {
 		return 0, ErrNilSource
 	}
 
@@ -69,12 +69,12 @@ func RunParallelByWorkers(
 
 	// Chunk by partition units (entities); report progress/stats in output
 	// rows. These differ for fan-out generators (e.g. TPC-H lineitem).
-	chunks := SplitChunks(p.Units(), workers)
-	totalRows := p.TotalRows()
+	chunks := SplitChunks(part.Units(), workers)
+	totalRows := part.TotalRows()
 	insertprogress.SetTotal(ctx, totalRows)
 	insertprogress.SetWorkers(ctx, len(chunks))
 
-	if err := runParallel(ctx, p, chunks, fn); err != nil {
+	if err := runParallel(ctx, part, chunks, fn); err != nil {
 		return 0, err
 	}
 
@@ -124,8 +124,8 @@ func SplitChunks(total int64, workers int) []Chunk {
 // Each goroutine asks the source for its partition (pre-seeked to chunk.Start,
 // bounded to chunk.Count) and hands it to fn. The first non-nil error cancels
 // the shared context so siblings abort quickly; that error is returned.
-func RunParallel(ctx context.Context, p source.Partitionable, chunks []Chunk, fn RowFn) error {
-	if p == nil {
+func RunParallel(ctx context.Context, part source.Partitionable, chunks []Chunk, fn RowFn) error {
+	if part == nil {
 		return ErrNilSource
 	}
 
@@ -137,10 +137,10 @@ func RunParallel(ctx context.Context, p source.Partitionable, chunks []Chunk, fn
 		return ErrNoChunks
 	}
 
-	return runParallel(ctx, p, chunks, fn)
+	return runParallel(ctx, part, chunks, fn)
 }
 
-func runParallel(ctx context.Context, p source.Partitionable, chunks []Chunk, fn RowFn) error {
+func runParallel(ctx context.Context, part source.Partitionable, chunks []Chunk, fn RowFn) error {
 	if fn == nil {
 		return ErrNilRowFn
 	}
@@ -155,7 +155,7 @@ func runParallel(ctx context.Context, p source.Partitionable, chunks []Chunk, fn
 		group.Go(func() error {
 			workerCtx := insertprogress.ContextWithWorker(groupCtx, chunk.Index)
 
-			src, err := p.Partition(chunk.Start, chunk.Count)
+			src, err := part.Partition(chunk.Start, chunk.Count)
 			if err != nil {
 				return fmt.Errorf("common: worker %d partition at %d: %w", chunk.Index, chunk.Start, err)
 			}

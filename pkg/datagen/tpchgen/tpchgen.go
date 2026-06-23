@@ -15,6 +15,7 @@
 package tpchgen
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -24,10 +25,10 @@ import (
 
 // ErrUnknownTable is returned by New when the requested table is not a TPC-H
 // table this generator knows how to produce.
-var ErrUnknownTable = fmt.Errorf("tpchgen: unknown TPC-H table")
+var ErrUnknownTable = errors.New("tpchgen: unknown TPC-H table")
 
 // ErrNonPositiveScale is returned by New when the scale factor is not > 0.
-var ErrNonPositiveScale = fmt.Errorf("tpchgen: scale factor must be > 0")
+var ErrNonPositiveScale = errors.New("tpchgen: scale factor must be > 0")
 
 // tableSpec describes how to generate and project one TPC-H table.
 type tableSpec struct {
@@ -50,6 +51,15 @@ type tableSpec struct {
 
 func scaled(base int64, sf float64) int64 { return int64(float64(base) * sf) }
 
+const (
+	// partSuppPerPart is dbgen's suppPerPart: every part emits this many
+	// partsupp rows (exact).
+	partSuppPerPart = 4
+	// linesPerOrderNominal is the spec-nominal L_COUNT average (uniform 1..7);
+	// the exact lineitem count is only known after generation.
+	linesPerOrderNominal = 4
+)
+
 // specs is the per-table generation registry, keyed by Stroppy table name.
 var specs = map[string]tableSpec{
 	"region": {
@@ -59,6 +69,7 @@ var specs = map[string]tableSpec{
 		seek:        func(g *dbgen.Generator, skip int64) { g.SeekRegion(skip) },
 		project: func(g *dbgen.Generator, idx int64) [][]any {
 			r := g.MakeRegion(idx)
+
 			return [][]any{{int64(r.Code), r.Text, r.Comment}}
 		},
 	},
@@ -69,6 +80,7 @@ var specs = map[string]tableSpec{
 		seek:        func(g *dbgen.Generator, skip int64) { g.SeekNation(skip) },
 		project: func(g *dbgen.Generator, idx int64) [][]any {
 			n := g.MakeNation(idx)
+
 			return [][]any{{int64(n.Code), n.Text, int64(n.Join), n.Comment}}
 		},
 	},
@@ -82,6 +94,7 @@ var specs = map[string]tableSpec{
 		seek:        func(g *dbgen.Generator, skip int64) { g.Seek(dbgen.TPart, skip) },
 		project: func(g *dbgen.Generator, idx int64) [][]any {
 			p := g.MakePart(idx)
+
 			return [][]any{{
 				int64(p.PartKey), p.Name, p.Mfgr, p.Brand, p.Type,
 				int64(p.Size), p.Container, dbgen.Money(int64(p.RetailPrice)), p.Comment,
@@ -93,10 +106,11 @@ var specs = map[string]tableSpec{
 		genTable: dbgen.TPart, // makePart emits the partsupp rows
 		// One partsupp entity == one part entity (each part yields suppPerPart rows).
 		entityCount:   func(sf float64) int64 { return scaled(dbgen.BaseRowCount(dbgen.TPart), sf) },
-		rowsPerEntity: 4, // suppPerPart — exact
+		rowsPerEntity: partSuppPerPart,
 		seek:          func(g *dbgen.Generator, skip int64) { g.SeekPartSupp(skip) },
 		project: func(g *dbgen.Generator, idx int64) [][]any {
 			p := g.MakePart(idx)
+
 			rows := make([][]any, 0, len(p.S))
 			for _, ps := range p.S {
 				rows = append(rows, []any{
@@ -104,6 +118,7 @@ var specs = map[string]tableSpec{
 					dbgen.Money(int64(ps.SCost)), ps.Comment,
 				})
 			}
+
 			return rows
 		},
 	},
@@ -117,6 +132,7 @@ var specs = map[string]tableSpec{
 		seek:        func(g *dbgen.Generator, skip int64) { g.Seek(dbgen.TSupp, skip) },
 		project: func(g *dbgen.Generator, idx int64) [][]any {
 			s := g.MakeSupp(idx)
+
 			return [][]any{{
 				int64(s.SuppKey), s.Name, s.Address, int64(s.NationCode),
 				s.Phone, dbgen.Money(int64(s.Acctbal)), s.Comment,
@@ -133,6 +149,7 @@ var specs = map[string]tableSpec{
 		seek:        func(g *dbgen.Generator, skip int64) { g.Seek(dbgen.TCust, skip) },
 		project: func(g *dbgen.Generator, idx int64) [][]any {
 			c := g.MakeCust(idx)
+
 			return [][]any{{
 				int64(c.CustKey), c.Name, c.Address, int64(c.NationCode),
 				c.Phone, dbgen.Money(int64(c.Acctbal)), c.MktSegment, c.Comment,
@@ -149,9 +166,10 @@ var specs = map[string]tableSpec{
 		seek:        func(g *dbgen.Generator, skip int64) { g.SeekOrderLine(skip) },
 		project: func(g *dbgen.Generator, idx int64) [][]any {
 			o := g.MakeOrder(idx)
+
 			return [][]any{{
 				int64(o.OKey), int64(o.CustKey), o.Status, dbgen.Money(int64(o.TotalPrice)),
-				o.Date, o.OrderPriority, o.Clerk, int64(o.ShipPriority), o.Comment,
+				o.Date, o.OrderPriority, o.Clerk, o.ShipPriority, o.Comment,
 			}}
 		},
 	},
@@ -164,10 +182,11 @@ var specs = map[string]tableSpec{
 		},
 		genTable:      dbgen.TOrder, // makeOrder emits the lineitem rows
 		entityCount:   func(sf float64) int64 { return scaled(dbgen.BaseRowCount(dbgen.TOrder), sf) },
-		rowsPerEntity: 4, // L_COUNT averages 4 (uniform 1..7); nominal, exact only after drain
+		rowsPerEntity: linesPerOrderNominal,
 		seek:          func(g *dbgen.Generator, skip int64) { g.SeekOrderLine(skip) },
 		project: func(g *dbgen.Generator, idx int64) [][]any {
 			o := g.MakeOrder(idx)
+
 			rows := make([][]any, 0, len(o.Lines))
 			for _, ln := range o.Lines {
 				rows = append(rows, []any{
@@ -177,6 +196,7 @@ var specs = map[string]tableSpec{
 					ln.SDate, ln.CDate, ln.RDate, ln.ShipInstruct, ln.ShipMode, ln.Comment,
 				})
 			}
+
 			return rows
 		},
 	},

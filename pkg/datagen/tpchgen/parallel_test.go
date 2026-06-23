@@ -145,6 +145,7 @@ func TestConcurrentPartitionsRace(t *testing.T) {
 			src, err := g.Partition(start, count)
 			if err != nil {
 				t.Errorf("Partition(%d,%d): %v", start, count, err)
+
 				return
 			}
 
@@ -154,7 +155,7 @@ func TestConcurrentPartitionsRace(t *testing.T) {
 
 	wg.Wait()
 
-	var got []string
+	got := make([]string, 0, len(want))
 	for _, p := range parts {
 		got = append(got, p...)
 	}

@@ -19,7 +19,7 @@ import (
 )
 
 // mustPartitionable builds a source.Partitionable for spec, failing the
-// test on error. It is the test-side analogue of loadsource.Build used by
+// test on error. It is the test-side analog of loadsource.Build used by
 // the drivers.
 func mustPartitionable(t *testing.T, spec *dgproto.InsertSpec) source.Partitionable {
 	t.Helper()
@@ -427,7 +427,8 @@ func TestRunParallelContextCancel(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		done <- RunParallel(ctx, mustPartitionable(t, spec), chunks, func(ctx context.Context, _ Chunk, src source.RowSource) error {
+		part := mustPartitionable(t, spec)
+		done <- RunParallel(ctx, part, chunks, func(ctx context.Context, _ Chunk, src source.RowSource) error {
 			startOnce.Do(func() { close(started) })
 
 			for {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"strconv"
 	"testing"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/tpchgen"
@@ -27,19 +28,35 @@ func TestGoldenHashSF001(t *testing.T) {
 	tables := []string{"region", "nation", "part", "supplier", "partsupp", "customer", "orders", "lineitem"}
 	for _, table := range tables {
 		g, err := tpchgen.New(table, sf)
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		src, err := g.Partition(0, -1)
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		h := fnv.New64a()
+
 		for {
 			row, err := src.Next()
-			if errors.Is(err, io.EOF) { break }
-			if err != nil { t.Fatal(err) }
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			fmt.Fprintln(h, row...)
 		}
-		got := fmt.Sprintf("%x", h.Sum64())
+
+		got := strconv.FormatUint(h.Sum64(), 16)
 		if want, ok := goldenHashes[table]; ok {
-			if got != want { t.Errorf("%s: hash %s != golden %s", table, got, want) }
+			if got != want {
+				t.Errorf("%s: hash %s != golden %s", table, got, want)
+			}
 		} else {
 			t.Logf("GOLDEN %q: %q,", table, got)
 		}

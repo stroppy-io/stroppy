@@ -50,7 +50,7 @@ func (d *Driver) InsertSpec(
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedInsertMethod, spec.GetMethod().String())
 	}
 
-	p, err := loadsource.Build(spec)
+	part, err := loadsource.Build(spec)
 	if err != nil {
 		return nil, fmt.Errorf("csv: %w", err)
 	}
@@ -64,7 +64,7 @@ func (d *Driver) InsertSpec(
 
 	var columns []string
 
-	rows, err := common.RunParallelByWorkers(ctx, p, workers,
+	rows, err := common.RunParallelByWorkers(ctx, part, workers,
 		func(workerCtx context.Context, chunk common.Chunk, src source.RowSource) error {
 			rowCount, err := d.writeShard(workerCtx, spec.GetTable(), src, chunk.Index)
 			if err != nil {

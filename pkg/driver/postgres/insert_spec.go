@@ -45,7 +45,7 @@ func (d *Driver) InsertSpec(
 		return nil, fmt.Errorf("%w: nil spec", runtime.ErrInvalidSpec)
 	}
 
-	p, err := loadsource.Build(spec)
+	part, err := loadsource.Build(spec)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: %w", err)
 	}
@@ -57,7 +57,7 @@ func (d *Driver) InsertSpec(
 
 	start := time.Now()
 
-	rows, err := common.RunParallelByWorkers(ctx, p, workers,
+	rows, err := common.RunParallelByWorkers(ctx, part, workers,
 		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
 			return d.runChunk(workerCtx, spec, src)
 		})
