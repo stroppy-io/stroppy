@@ -57,6 +57,7 @@ type RowFunc func(rowNumber int64, ss *streamSet) []any
 // layout, the per-scale row count, and the row generator.
 type Table struct {
 	Name     string
+	ID       TableID // ordinal in the dsdgen table enum (for Scaling/SCD lookups)
 	Columns  []string
 	Cols     []GeneratorColumn
 	RowCount func(sf float64) int64
