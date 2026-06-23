@@ -15,7 +15,9 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
@@ -66,12 +68,12 @@ func NewDriver(opts driver.Options) *Driver {
 	}
 }
 
-// InsertSpec drains a relational runtime end-to-end and discards the rows.
+// InsertSpec drains a relational source end-to-end and discards the rows.
 // Exercises the full generation pipeline so benchmarks stay comparable, but
 // no I/O is performed. Honors spec.Parallelism.Workers so framework-only
-// scaling is measurable: single-path runs the seed runtime inline, parallel
-// path fans out through common.RunParallel with one cloned runtime per
-// worker.
+// scaling is measurable: workers fan out through common.RunParallelByWorkers,
+// each draining its own partition. There is no I/O to arbitrate: the whole
+// point is to scale row generation alone.
 func (d *Driver) InsertSpec(
 	ctx context.Context,
 	spec *dgproto.InsertSpec,
@@ -80,51 +82,21 @@ func (d *Driver) InsertSpec(
 		return nil, fmt.Errorf("noop: %w", runtime.ErrInvalidSpec)
 	}
 
-	workers := int(spec.GetParallelism().GetWorkers())
-	if workers <= 1 {
-		return d.insertSpecSingle(ctx, spec)
-	}
-
-	return d.insertSpecParallel(ctx, spec, workers)
-}
-
-// insertSpecSingle drains a single seed Runtime to EOF without the
-// common.RunParallel overhead when the caller requested workers ≤ 1.
-func (d *Driver) insertSpecSingle(ctx context.Context, spec *dgproto.InsertSpec) (*stats.Query, error) {
-	rt, err := runtime.NewRuntime(spec)
+	p, err := loadsource.Build(spec)
 	if err != nil {
-		return nil, fmt.Errorf("noop: build runtime: %w", err)
+		return nil, fmt.Errorf("noop: %w", err)
 	}
 
-	rows := rt.TotalRows()
-	insertprogress.SetTotal(ctx, rows)
-	insertprogress.SetWorkers(ctx, 1)
-	workerCtx := insertprogress.ContextWithWorker(ctx, 0)
+	workers := int(spec.GetParallelism().GetWorkers())
+	if workers < 1 {
+		workers = 1
+	}
 
 	start := time.Now()
 
-	if err := drainRuntime(workerCtx, rt, -1); err != nil {
-		return nil, err
-	}
-
-	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
-}
-
-// insertSpecParallel fans the spec out across workers goroutines via
-// common.RunParallel. Each worker owns an independent Runtime clone
-// pre-seeked to its chunk boundary and drains exactly chunk.Count rows.
-// There is no I/O to arbitrate: the whole point is to scale row
-// generation alone.
-func (d *Driver) insertSpecParallel(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-	workers int,
-) (*stats.Query, error) {
-	start := time.Now()
-
-	rows, err := common.RunParallelByWorkers(ctx, spec, workers,
-		func(workerCtx context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
-			return drainRuntime(workerCtx, rt, chunk.Count)
+	rows, err := common.RunParallelByWorkers(ctx, p, workers,
+		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
+			return drainSource(workerCtx, src)
 		})
 	if err != nil {
 		return nil, err
@@ -133,10 +105,8 @@ func (d *Driver) insertSpecParallel(
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
-// drainRuntime pulls rows from rt and discards them. When count is
-// negative the runtime is drained to EOF; otherwise it emits exactly
-// count rows (or returns early on error).
-func drainRuntime(ctx context.Context, rt *runtime.Runtime, count int64) error {
+// drainSource pulls rows from src and discards them, draining to EOF.
+func drainSource(ctx context.Context, src source.RowSource) error {
 	generatedProgress := insertprogress.NewGeneratedRowCounter(ctx)
 	confirmedProgress := insertprogress.NewConfirmedRowCounter(ctx)
 
@@ -149,23 +119,19 @@ func drainRuntime(ctx context.Context, rt *runtime.Runtime, count int64) error {
 
 	var drainedRows int64
 
-	for count < 0 || count > 0 {
-		if _, err := rt.Next(); err != nil {
+	for {
+		if _, err := src.Next(); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
 
-			return fmt.Errorf("noop: runtime.Next: %w", err)
+			return fmt.Errorf("noop: source.Next: %w", err)
 		}
 
 		generatedProgress.Add(1)
 		confirmedProgress.Add(1)
 
 		drainedRows++
-
-		if count > 0 {
-			count--
-		}
 	}
 
 	insertprogress.AddBatch(ctx, drainedRows, time.Since(start))

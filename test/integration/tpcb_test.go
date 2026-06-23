@@ -145,11 +145,11 @@ func tpcbBranchesSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "branches",
 		Seed:  0x7B01B,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "branches", Size: tpcbBranches},
 			Attrs:       attrs,
 			ColumnOrder: tpcbBranchesColumns,
-		},
+		}},
 	}
 }
 
@@ -166,11 +166,11 @@ func tpcbTellersSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "tellers",
 		Seed:  0x7E11E,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "tellers", Size: tpcbTellers},
 			Attrs:       attrs,
 			ColumnOrder: tpcbTellersColumns,
-		},
+		}},
 	}
 }
 
@@ -185,11 +185,11 @@ func tpcbAccountsSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "accounts",
 		Seed:  0xACC07,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "accounts", Size: tpcbAccounts},
 			Attrs:       attrs,
 			ColumnOrder: tpcbAccountsColumns,
-		},
+		}},
 	}
 }
 

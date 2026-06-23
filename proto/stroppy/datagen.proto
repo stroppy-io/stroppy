@@ -17,10 +17,29 @@ message InsertSpec {
   InsertMethod method = 3 [ (validate.rules).enum.defined_only = true ];
   // Worker hint for the Loader; clamped to the global cap.
   Parallelism parallelism = 4;
-  // Relational descriptor for the rows this spec emits.
-  RelSource source = 5 [ (validate.rules).message.required = true ];
+  // Generator backend that produces this spec's rows. Exactly one arm is set:
+  // `source` for the native seekable evaluator, `tpch` for the ported TPC-H
+  // dbgen generator.
+  oneof generator {
+    // Relational descriptor for the rows this spec emits.
+    RelSource source = 5;
+    // Ported TPC-H dbgen backend descriptor.
+    TpchSource tpch = 7;
+  }
   // Dict bodies keyed by the opaque TS-assigned ID that attrs reference.
   map<string, Dict> dicts = 6;
+}
+
+// TpchSource selects the ported TPC-H dbgen generator for one table. The table
+// schema and column order are fixed by the TPC-H spec, so only the table name
+// and scale factor are needed; the Go side owns the generation.
+message TpchSource {
+  // TPC-H table to load: one of region, nation, part, supplier, partsupp,
+  // customer, orders, lineitem.
+  string table = 1 [ (validate.rules).string.min_len = 1 ];
+  // Scale factor. Fractional values are allowed (e.g. 0.01 for tests); every
+  // table scales by the same factor so foreign keys stay consistent.
+  double scale_factor = 2 [ (validate.rules).double.gt = 0 ];
 }
 
 // InsertMethod selects the driver-level protocol used to write rows.

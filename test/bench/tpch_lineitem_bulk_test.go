@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
+	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
@@ -69,13 +70,18 @@ func BenchmarkLineitemBulkInsert(b *testing.B) {
 				totalSeconds float64
 			)
 
+			p, err := loadsource.Build(spec)
+			if err != nil {
+				b.Fatal(err)
+			}
+
 			for b.Loop() {
 				start := time.Now()
 
-				rows, err := common.RunParallelByWorkers(ctx, spec, int(workers),
-					func(wctx context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
+				rows, err := common.RunParallelByWorkers(ctx, p, int(workers),
+					func(wctx context.Context, _ common.Chunk, src source.RowSource) error {
 						return sqldriver.RunBulkInsert(
-							wctx, conn, spec.GetTable(), rt, dialect, chunk.Count, benchBulkBatchSize)
+							wctx, conn, spec.GetTable(), src, dialect, benchBulkBatchSize)
 					})
 				if err != nil {
 					b.Fatal(err)

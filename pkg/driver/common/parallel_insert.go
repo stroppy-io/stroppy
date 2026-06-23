@@ -13,8 +13,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 )
 
@@ -23,14 +22,13 @@ import (
 // a caller bug rather than a degenerate input.
 var ErrNoChunks = errors.New("common: RunParallel requires at least one chunk")
 
-// ErrNilSpec is returned by RunParallel when the InsertSpec argument is
-// nil. The spec is required to build the seed Runtime that every worker
-// clones from.
-var ErrNilSpec = errors.New("common: RunParallel requires a non-nil InsertSpec")
+// ErrNilSource is returned by the parallel helpers when the Partitionable
+// argument is nil. The source is required to size the row range and hand out
+// per-worker RowSources.
+var ErrNilSource = errors.New("common: RunParallel requires a non-nil source")
 
-// ErrNilChunkFn is returned by RunParallel when the per-chunk callback
-// is nil.
-var ErrNilChunkFn = errors.New("common: RunParallel requires a non-nil ChunkFn")
+// ErrNilRowFn is returned when the per-chunk callback is nil.
+var ErrNilRowFn = errors.New("common: RunParallel requires a non-nil RowFn")
 
 // Chunk describes one worker's slice of a population's row range.
 // Start is inclusive; Count is the number of rows the worker must emit.
@@ -42,46 +40,39 @@ type Chunk struct {
 	Count int64
 }
 
-// ChunkFn consumes a single Chunk. The Runtime passed in is already
-// positioned at chunk.Start, so the callback must call rt.Next exactly
-// chunk.Count times (or return early with an error). An io.EOF from
-// rt.Next inside a ChunkFn is a framework bug: SplitChunks guarantees
-// every chunk lies within [0, total).
+// RowFn consumes a single chunk's RowSource. The RowSource is already
+// positioned at chunk.Start and bounded to chunk.Count rows, so the callback
+// drains it to io.EOF — it must not assume any particular row count beyond
+// what Next reports.
 //
-// ChunkFn must honor ctx.Done: RunParallel cancels sibling workers on
+// RowFn must honor ctx.Done: the parallel helpers cancel sibling workers on
 // the first error, and the callback is expected to return promptly.
-type ChunkFn func(ctx context.Context, chunk Chunk, rt *runtime.Runtime) error
+type RowFn func(ctx context.Context, chunk Chunk, src source.RowSource) error
 
-// RunParallelByWorkers builds one seed Runtime, splits its actual row range,
-// and drains the chunks concurrently. It returns the runtime's total row count,
-// which may differ from RelSource.population.size for relationship-backed
-// specs.
+// RunParallelByWorkers sizes the source's row range, splits it into `workers`
+// contiguous chunks, and drains them concurrently. It returns the source's
+// total row count (which may differ from the population size for
+// relationship-backed or fan-out specs).
 func RunParallelByWorkers(
 	ctx context.Context,
-	spec *dgproto.InsertSpec,
+	p source.Partitionable,
 	workers int,
-	fn ChunkFn,
+	fn RowFn,
 ) (int64, error) {
-	if spec == nil {
-		return 0, ErrNilSpec
+	if p == nil {
+		return 0, ErrNilSource
 	}
 
 	if fn == nil {
-		return 0, ErrNilChunkFn
+		return 0, ErrNilRowFn
 	}
 
-	seed, err := runtime.NewRuntime(spec)
-	if err != nil {
-		return 0, fmt.Errorf("common: build seed runtime: %w", err)
-	}
-
-	total := seed.TotalRows()
-
+	total := p.TotalRows()
 	chunks := SplitChunks(total, workers)
 	insertprogress.SetTotal(ctx, total)
 	insertprogress.SetWorkers(ctx, len(chunks))
 
-	if err := runParallel(ctx, seed, chunks, fn); err != nil {
+	if err := runParallel(ctx, p, chunks, fn); err != nil {
 		return 0, err
 	}
 
@@ -127,42 +118,29 @@ func SplitChunks(total int64, workers int) []Chunk {
 	return chunks
 }
 
-// RunParallel spawns one goroutine per chunk, each invoking fn with its
-// own Runtime clone pre-seeked to chunk.Start. The first non-nil error
-// returned by any worker cancels the shared context so siblings abort
-// quickly; RunParallel returns that first error. A nil return means
-// every worker completed without error.
-//
-// Workers share a single seed Runtime built from spec; each clone owns
-// its own row counter and scratch buffer, so the workers do not contend
-// on Runtime state.
-func RunParallel(ctx context.Context, spec *dgproto.InsertSpec, chunks []Chunk, fn ChunkFn) error {
-	if spec == nil {
-		return ErrNilSpec
+// RunParallel drains the given chunks concurrently, one goroutine per chunk.
+// Each goroutine asks the source for its partition (pre-seeked to chunk.Start,
+// bounded to chunk.Count) and hands it to fn. The first non-nil error cancels
+// the shared context so siblings abort quickly; that error is returned.
+func RunParallel(ctx context.Context, p source.Partitionable, chunks []Chunk, fn RowFn) error {
+	if p == nil {
+		return ErrNilSource
 	}
 
 	if fn == nil {
-		return ErrNilChunkFn
+		return ErrNilRowFn
 	}
 
 	if len(chunks) == 0 {
 		return ErrNoChunks
 	}
 
-	seed, err := runtime.NewRuntime(spec)
-	if err != nil {
-		return fmt.Errorf("common: build seed runtime: %w", err)
-	}
-
-	insertprogress.SetTotal(ctx, seed.TotalRows())
-	insertprogress.SetWorkers(ctx, len(chunks))
-
-	return runParallel(ctx, seed, chunks, fn)
+	return runParallel(ctx, p, chunks, fn)
 }
 
-func runParallel(ctx context.Context, seed *runtime.Runtime, chunks []Chunk, fn ChunkFn) error {
+func runParallel(ctx context.Context, p source.Partitionable, chunks []Chunk, fn RowFn) error {
 	if fn == nil {
-		return ErrNilChunkFn
+		return ErrNilRowFn
 	}
 
 	if len(chunks) == 0 {
@@ -175,12 +153,12 @@ func runParallel(ctx context.Context, seed *runtime.Runtime, chunks []Chunk, fn 
 		group.Go(func() error {
 			workerCtx := insertprogress.ContextWithWorker(groupCtx, chunk.Index)
 
-			worker := seed.Clone()
-			if err := worker.SeekRow(chunk.Start); err != nil {
-				return fmt.Errorf("common: worker %d seek to %d: %w", chunk.Index, chunk.Start, err)
+			src, err := p.Partition(chunk.Start, chunk.Count)
+			if err != nil {
+				return fmt.Errorf("common: worker %d partition at %d: %w", chunk.Index, chunk.Start, err)
 			}
 
-			if err := fn(workerCtx, chunk, worker); err != nil {
+			if err := fn(workerCtx, chunk, src); err != nil {
 				return fmt.Errorf("common: worker %d: %w", chunk.Index, err)
 			}
 
@@ -188,9 +166,5 @@ func runParallel(ctx context.Context, seed *runtime.Runtime, chunks []Chunk, fn 
 		})
 	}
 
-	if err := group.Wait(); err != nil {
-		return err
-	}
-
-	return nil
+	return group.Wait()
 }

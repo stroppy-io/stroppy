@@ -14,8 +14,41 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
+	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 )
+
+// mustPartitionable builds a source.Partitionable for spec, failing the
+// test on error. It is the test-side analogue of loadsource.Build used by
+// the drivers.
+func mustPartitionable(t *testing.T, spec *dgproto.InsertSpec) source.Partitionable {
+	t.Helper()
+
+	p, err := loadsource.Build(spec)
+	if err != nil {
+		t.Fatalf("loadsource.Build: %v", err)
+	}
+
+	return p
+}
+
+// drainSource pulls every row from src to io.EOF, invoking onRow for each.
+func drainSource(src source.RowSource, onRow func([]any)) error {
+	for {
+		row, err := src.Next()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+
+		if err != nil {
+			return fmt.Errorf("row: %w", err)
+		}
+
+		if onRow != nil {
+			onRow(row)
+		}
+	}
+}
 
 // --- proto builders (mirror those in runtime/flat_test.go; kept local
 //     so the common package has no test-time dep on runtime internals).
@@ -117,11 +150,11 @@ func mixedSpec(size int64) *dgproto.InsertSpec {
 	}
 
 	return &dgproto.InsertSpec{
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "mixed", Size: size},
 			Attrs:       attrs,
 			ColumnOrder: []string{"row_id", "region", "label", "bucket", "chain", "optional"},
-		},
+		}},
 		Dicts: dicts,
 	}
 }
@@ -142,7 +175,7 @@ func relationshipSpec(outerSize, degree, sizeHint int64) *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table:  "rel_t",
 		Method: dgproto.InsertMethod_NATIVE,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population: &dgproto.Population{Name: "lineitem", Size: sizeHint},
 			Attrs: []*dgproto.Attr{
 				attr("order_idx", rowIndexKind(dgproto.RowIndex_ENTITY)),
@@ -163,32 +196,27 @@ func relationshipSpec(outerSize, degree, sizeHint int64) *dgproto.InsertSpec {
 				},
 			}},
 			Iter: "orders_lineitem",
-		},
+		}},
 	}
 }
 
-// collectAllRows uses RunParallel to drain every chunk into one []string
-// slice. Rows are rendered with fmt.Sprint so the comparison is
+// collectAllRows uses RunParallelByWorkers to drain every chunk into one
+// []string slice. Rows are rendered with fmt.Sprint so the comparison is
 // canonical. The caller is responsible for sorting, since chunks arrive
 // in worker-completion order.
-func collectAllRows(ctx context.Context, spec *dgproto.InsertSpec, workers int) ([]string, error) {
-	chunks := SplitChunks(spec.GetSource().GetPopulation().GetSize(), workers)
-
+func collectAllRows(ctx context.Context, p source.Partitionable, workers int) ([]string, error) {
 	var (
 		mu   sync.Mutex
 		rows []string
 	)
 
-	err := RunParallel(ctx, spec, chunks, func(_ context.Context, chunk Chunk, rt *runtime.Runtime) error {
+	_, err := RunParallelByWorkers(ctx, p, workers, func(_ context.Context, chunk Chunk, src source.RowSource) error {
 		local := make([]string, 0, chunk.Count)
 
-		for range chunk.Count {
-			row, err := rt.Next()
-			if err != nil {
-				return fmt.Errorf("row: %w", err)
-			}
-
+		if err := drainSource(src, func(row []any) {
 			local = append(local, fmt.Sprint(row))
+		}); err != nil {
+			return err
 		}
 
 		mu.Lock()
@@ -217,7 +245,7 @@ func TestRunParallelDeterminismAcrossWorkers(t *testing.T) {
 	results := make(map[int][]string, len(workerCounts))
 
 	for _, workers := range workerCounts {
-		rows, err := collectAllRows(ctx, spec, workers)
+		rows, err := collectAllRows(ctx, mustPartitionable(t, spec), workers)
 		if err != nil {
 			t.Fatalf("workers=%d: %v", workers, err)
 		}
@@ -252,18 +280,10 @@ func TestRunParallelByWorkersUsesRuntimeTotalRows(t *testing.T) {
 
 	gotRows, err := RunParallelByWorkers(
 		context.Background(),
-		relationshipSpec(outerSize, degree, sizeHint),
+		mustPartitionable(t, relationshipSpec(outerSize, degree, sizeHint)),
 		4,
-		func(_ context.Context, chunk Chunk, rt *runtime.Runtime) error {
-			drained.Add(chunk.Count)
-
-			for range chunk.Count {
-				if _, rowErr := rt.Next(); rowErr != nil {
-					return fmt.Errorf("row: %w", rowErr)
-				}
-			}
-
-			return nil
+		func(_ context.Context, _ Chunk, src source.RowSource) error {
+			return drainSource(src, func([]any) { drained.Add(1) })
 		},
 	)
 	if err != nil {
@@ -346,14 +366,14 @@ func TestRunParallelPropagatesError(t *testing.T) {
 		siblingRan     atomic.Int32
 	)
 
-	chunkFn := func(ctx context.Context, chunk Chunk, rt *runtime.Runtime) error {
+	chunkFn := func(ctx context.Context, chunk Chunk, src source.RowSource) error {
 		if chunk.Index == 1 {
 			return sentinel
 		}
 
 		siblingRan.Add(1)
 
-		for range chunk.Count {
+		for {
 			select {
 			case <-ctx.Done():
 				siblingAborted.Store(true)
@@ -362,7 +382,9 @@ func TestRunParallelPropagatesError(t *testing.T) {
 			default:
 			}
 
-			if _, rowErr := rt.Next(); rowErr != nil && !errors.Is(rowErr, io.EOF) {
+			if _, rowErr := src.Next(); errors.Is(rowErr, io.EOF) {
+				break
+			} else if rowErr != nil {
 				return fmt.Errorf("row: %w", rowErr)
 			}
 
@@ -374,7 +396,7 @@ func TestRunParallelPropagatesError(t *testing.T) {
 		return nil
 	}
 
-	err := RunParallel(context.Background(), spec, chunks, chunkFn)
+	err := RunParallel(context.Background(), mustPartitionable(t, spec), chunks, chunkFn)
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("want sentinel error, got %v", err)
 	}
@@ -405,10 +427,10 @@ func TestRunParallelContextCancel(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		done <- RunParallel(ctx, spec, chunks, func(ctx context.Context, chunk Chunk, rt *runtime.Runtime) error {
+		done <- RunParallel(ctx, mustPartitionable(t, spec), chunks, func(ctx context.Context, _ Chunk, src source.RowSource) error {
 			startOnce.Do(func() { close(started) })
 
-			for range chunk.Count {
+			for {
 				select {
 				case <-ctx.Done():
 					observed.Add(1)
@@ -417,7 +439,9 @@ func TestRunParallelContextCancel(t *testing.T) {
 				default:
 				}
 
-				if _, rowErr := rt.Next(); rowErr != nil && !errors.Is(rowErr, io.EOF) {
+				if _, rowErr := src.Next(); errors.Is(rowErr, io.EOF) {
+					break
+				} else if rowErr != nil {
 					return fmt.Errorf("row: %w", rowErr)
 				}
 
@@ -457,17 +481,17 @@ func TestRunParallelRejectsNilInputs(t *testing.T) {
 
 	ctx := context.Background()
 	chunks := []Chunk{{Index: 0, Start: 0, Count: 1}}
-	noop := func(context.Context, Chunk, *runtime.Runtime) error { return nil }
+	noop := func(context.Context, Chunk, source.RowSource) error { return nil }
 
-	if err := RunParallel(ctx, nil, chunks, noop); !errors.Is(err, ErrNilSpec) {
-		t.Fatalf("nil spec: want ErrNilSpec, got %v", err)
+	if err := RunParallel(ctx, nil, chunks, noop); !errors.Is(err, ErrNilSource) {
+		t.Fatalf("nil source: want ErrNilSource, got %v", err)
 	}
 
-	if err := RunParallel(ctx, mixedSpec(1), chunks, nil); !errors.Is(err, ErrNilChunkFn) {
-		t.Fatalf("nil fn: want ErrNilChunkFn, got %v", err)
+	if err := RunParallel(ctx, mustPartitionable(t, mixedSpec(1)), chunks, nil); !errors.Is(err, ErrNilRowFn) {
+		t.Fatalf("nil fn: want ErrNilRowFn, got %v", err)
 	}
 
-	if err := RunParallel(ctx, mixedSpec(1), nil, noop); !errors.Is(err, ErrNoChunks) {
+	if err := RunParallel(ctx, mustPartitionable(t, mixedSpec(1)), nil, noop); !errors.Is(err, ErrNoChunks) {
 		t.Fatalf("nil chunks: want ErrNoChunks, got %v", err)
 	}
 }

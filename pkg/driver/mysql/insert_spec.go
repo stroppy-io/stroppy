@@ -6,21 +6,22 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
-	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
 // InsertSpec runs one relational InsertSpec through the mysql driver.
-// It builds a seed runtime.Runtime from the spec, then dispatches by
+// It builds a source.Partitionable from the spec, then dispatches by
 // spec.Method. NATIVE collapses onto the multi-row PLAIN_BULK path —
 // go-sql-driver/mysql does not expose a dedicated bulk primitive (LOAD
 // DATA LOCAL INFILE requires server-side opt-in and a client-side file
-// stream, which this harness does not have). When the spec requests
-// parallelism the seed runtime is cloned per worker via common.RunParallel.
+// stream, which this harness does not have). Workers fan the spec out
+// across per-partition RowSources via common.RunParallelByWorkers.
 func (d *Driver) InsertSpec(
 	ctx context.Context,
 	spec *dgproto.InsertSpec,
@@ -36,52 +37,21 @@ func (d *Driver) InsertSpec(
 		return nil, fmt.Errorf("%w: %s", driver.ErrInsertSpecNotImplemented, spec.GetMethod().String())
 	}
 
-	workers := int(spec.GetParallelism().GetWorkers())
-	if workers <= 1 {
-		return d.insertSpecSingle(ctx, spec)
-	}
-
-	return d.insertSpecParallel(ctx, spec, workers)
-}
-
-// insertSpecSingle builds one seed Runtime and drains it from the calling
-// goroutine; used whenever spec.Parallelism.Workers ≤ 1.
-func (d *Driver) insertSpecSingle(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-) (*stats.Query, error) {
-	rt, err := runtime.NewRuntime(spec)
+	p, err := loadsource.Build(spec)
 	if err != nil {
-		return nil, fmt.Errorf("mysql: build runtime: %w", err)
+		return nil, fmt.Errorf("mysql: %w", err)
 	}
 
-	rows := rt.TotalRows()
-	insertprogress.SetTotal(ctx, rows)
-	insertprogress.SetWorkers(ctx, 1)
-	workerCtx := insertprogress.ContextWithWorker(ctx, 0)
+	workers := int(spec.GetParallelism().GetWorkers())
+	if workers < 1 {
+		workers = 1
+	}
 
 	start := time.Now()
 
-	if err := d.runChunk(workerCtx, spec, rt, -1); err != nil {
-		return nil, err
-	}
-
-	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
-}
-
-// insertSpecParallel splits the population across workers goroutines via
-// common.RunParallel. Each worker gets its own Runtime clone pre-seeked
-// to its chunk.Start.
-func (d *Driver) insertSpecParallel(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-	workers int,
-) (*stats.Query, error) {
-	start := time.Now()
-
-	rows, err := common.RunParallelByWorkers(ctx, spec, workers,
-		func(workerCtx context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
-			return d.runChunk(workerCtx, spec, rt, chunk.Count)
+	rows, err := common.RunParallelByWorkers(ctx, p, workers,
+		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
+			return d.runChunk(workerCtx, spec, src)
 		})
 	if err != nil {
 		return nil, err
@@ -90,23 +60,21 @@ func (d *Driver) insertSpecParallel(
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
-// runChunk dispatches one runtime's rows according to spec.Method.
-// count < 0 means "drain to EOF"; otherwise exactly count rows are
-// emitted before returning. PLAIN_QUERY degrades to a bulk path with
+// runChunk dispatches one partition's rows according to spec.Method.
+// src is drained to EOF. PLAIN_QUERY degrades to a bulk path with
 // batchSize=1 so both arms share one codepath.
 func (d *Driver) runChunk(
 	ctx context.Context,
 	spec *dgproto.InsertSpec,
-	rt *runtime.Runtime,
-	count int64,
+	src source.RowSource,
 ) error {
 	table := spec.GetTable()
 
 	switch spec.GetMethod() {
 	case dgproto.InsertMethod_NATIVE, dgproto.InsertMethod_PLAIN_BULK:
-		return sqldriver.RunBulkInsert(ctx, d.db, table, rt, d.dialect, count, d.bulkSize)
+		return sqldriver.RunBulkInsert(ctx, d.db, table, src, d.dialect, d.bulkSize)
 	case dgproto.InsertMethod_PLAIN_QUERY:
-		return sqldriver.RunBulkInsert(ctx, d.db, table, rt, d.dialect, count, 1)
+		return sqldriver.RunBulkInsert(ctx, d.db, table, src, d.dialect, 1)
 	default:
 		return fmt.Errorf("%w: %s", driver.ErrInsertSpecNotImplemented, spec.GetMethod().String())
 	}

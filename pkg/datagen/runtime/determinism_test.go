@@ -386,7 +386,7 @@ func cohortDeterminismSpec(size int64) *dgproto.InsertSpec {
 
 	s := spec(size, []string{"rowId", "pick", "live"}, attrs, nil)
 	s.Seed = 0xC087
-	s.Source.Cohorts = []*dgproto.Cohort{
+	s.GetSource().Cohorts = []*dgproto.Cohort{
 		{
 			Name:        "hot",
 			CohortSize:  16,
@@ -417,7 +417,7 @@ func lookupDeterminismSpec(size int64) *dgproto.InsertSpec {
 
 	s := spec(size, []string{"rowId", "fk", "looked"}, attrs, nil)
 	s.Seed = 0x10090
-	s.Source.LookupPops = []*dgproto.LookupPop{{
+	s.GetSource().LookupPops = []*dgproto.LookupPop{{
 		Population:  &dgproto.Population{Name: "ref", Size: 50},
 		Attrs:       lookupAttrs,
 		ColumnOrder: []string{"v"},

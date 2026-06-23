@@ -85,11 +85,11 @@ func plainSpec(size int64, workers int32) *dgproto.InsertSpec {
 		Table:       "noop_t",
 		Method:      dgproto.InsertMethod_NATIVE,
 		Parallelism: &dgproto.Parallelism{Workers: workers},
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "plain", Size: size},
 			Attrs:       attrs,
 			ColumnOrder: []string{"row_id", "squared", "label"},
-		},
+		}},
 	}
 }
 
@@ -114,7 +114,7 @@ func relationshipSpec(outerSize, degree, sizeHint int64, workers int32) *dgproto
 		Table:       "noop_rel_t",
 		Method:      dgproto.InsertMethod_NATIVE,
 		Parallelism: &dgproto.Parallelism{Workers: workers},
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "lineitem", Size: sizeHint},
 			Attrs:       childAttrs,
 			ColumnOrder: []string{"order_idx", "line_idx", "global_idx"},
@@ -131,7 +131,7 @@ func relationshipSpec(outerSize, degree, sizeHint int64, workers int32) *dgproto
 				},
 			}},
 			Iter: "orders_lineitem",
-		},
+		}},
 	}
 }
 
@@ -250,7 +250,7 @@ func lookupingSpec(size int64, workers int32) *dgproto.InsertSpec {
 		Table:       "noop_t",
 		Method:      dgproto.InsertMethod_NATIVE,
 		Parallelism: &dgproto.Parallelism{Workers: workers},
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "child", Size: size},
 			Attrs:       outerAttrs,
 			ColumnOrder: []string{"entity_idx", "looked_up", "label"},
@@ -259,7 +259,7 @@ func lookupingSpec(size int64, workers int32) *dgproto.InsertSpec {
 				Attrs:       parentAttrs,
 				ColumnOrder: []string{"p_val"},
 			}},
-		},
+		}},
 	}
 }
 

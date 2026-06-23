@@ -16,7 +16,9 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
@@ -31,9 +33,10 @@ import (
 var ErrUnsupportedInsertMethod = errors.New("csv: unsupported InsertSpec method")
 
 // InsertSpec runs one relational InsertSpec through the CSV driver by
-// draining a seed runtime.Runtime into one file per worker. Under
+// draining each partition's RowSource into one file per worker. Under
 // parallelism each worker writes to its own shard so the hot path is
-// lock-free; final per-table merge happens at Teardown when
+// lock-free; the single-worker case naturally falls out as one chunk
+// (index 0 → w000). Final per-table merge happens at Teardown when
 // merge=true.
 func (d *Driver) InsertSpec(
 	ctx context.Context,
@@ -47,63 +50,31 @@ func (d *Driver) InsertSpec(
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedInsertMethod, spec.GetMethod().String())
 	}
 
+	p, err := loadsource.Build(spec)
+	if err != nil {
+		return nil, fmt.Errorf("csv: %w", err)
+	}
+
 	workers := int(spec.GetParallelism().GetWorkers())
-	if workers <= 1 {
-		return d.insertSpecSingle(ctx, spec)
+	if workers < 1 {
+		workers = 1
 	}
 
-	return d.insertSpecParallel(ctx, spec, workers)
-}
-
-// insertSpecSingle runs the spec as a single shard labeled w000.
-func (d *Driver) insertSpecSingle(ctx context.Context, spec *dgproto.InsertSpec) (*stats.Query, error) {
-	rt, err := runtime.NewRuntime(spec)
-	if err != nil {
-		return nil, fmt.Errorf("csv: build runtime: %w", err)
-	}
-
-	rows := rt.TotalRows()
-	insertprogress.SetTotal(ctx, rows)
-	insertprogress.SetWorkers(ctx, 1)
-	workerCtx := insertprogress.ContextWithWorker(ctx, 0)
-
-	start := time.Now()
-
-	count, err := d.writeShard(workerCtx, spec.GetTable(), rt, 0, -1)
-	if err != nil {
-		return nil, err
-	}
-
-	d.recordShards(spec.GetTable(), rt.Columns(), 1, count)
-
-	return &stats.Query{Elapsed: time.Since(start), Rows: count}, nil
-}
-
-// insertSpecParallel fans the spec out across workers goroutines via
-// common.RunParallel. Each worker writes its own shard file labeled
-// w%03d where %d is the chunk index, so contention is limited to the
-// two small metadata structures (d.tables and common.RunParallel's
-// errgroup) and not to file I/O.
-func (d *Driver) insertSpecParallel(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-	workers int,
-) (*stats.Query, error) {
 	start := time.Now()
 
 	var columns []string
 
-	rows, err := common.RunParallelByWorkers(ctx, spec, workers,
-		func(workerCtx context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
-			rowCount, err := d.writeShard(workerCtx, spec.GetTable(), rt, chunk.Index, chunk.Count)
+	rows, err := common.RunParallelByWorkers(ctx, p, workers,
+		func(workerCtx context.Context, chunk common.Chunk, src source.RowSource) error {
+			rowCount, err := d.writeShard(workerCtx, spec.GetTable(), src, chunk.Index)
 			if err != nil {
 				return err
 			}
 
-			d.recordShards(spec.GetTable(), rt.Columns(), 1, rowCount)
+			d.recordShards(spec.GetTable(), src.Columns(), 1, rowCount)
 
 			if chunk.Index == 0 {
-				columns = append([]string(nil), rt.Columns()...)
+				columns = append([]string(nil), src.Columns()...)
 			}
 
 			return nil
@@ -121,15 +92,13 @@ func (d *Driver) insertSpecParallel(
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
-// writeShard drains rt (or stops after count rows when count >= 0),
-// serializing each row into the shard file for table/worker. Returns
-// the number of rows written.
+// writeShard drains src to EOF, serializing each row into the shard file
+// for table/worker. Returns the number of rows written.
 func (d *Driver) writeShard(
 	ctx context.Context,
 	table string,
-	rt *runtime.Runtime,
+	src source.RowSource,
 	workerIdx int,
-	count int64,
 ) (int64, error) {
 	shardPath := d.shardPath(table, workerIdx)
 
@@ -148,7 +117,7 @@ func (d *Driver) writeShard(
 
 	start := time.Now()
 
-	written, err := drainRows(ctx, rt, writer, table, count)
+	written, err := drainRows(ctx, src, writer, table)
 	if err != nil {
 		_ = file.Close()
 
@@ -178,15 +147,14 @@ func (d *Driver) writeShard(
 	return written, nil
 }
 
-// drainRows pulls rows from rt, encodes each into record strings, and
-// writes them to writer until EOF or count is reached. writer.Flush
-// is the caller's responsibility.
+// drainRows pulls rows from src, encodes each into record strings, and
+// writes them to writer until EOF. writer.Flush is the caller's
+// responsibility.
 func drainRows(
 	ctx context.Context,
-	rt *runtime.Runtime,
+	src source.RowSource,
 	writer *stdcsv.Writer,
 	table string,
-	count int64,
 ) (int64, error) {
 	var (
 		generatedProgress = insertprogress.NewGeneratedRowCounter(ctx)
@@ -199,14 +167,14 @@ func drainRows(
 
 	insertprogress.SetStage(ctx, insertprogress.StageCSVWrite)
 
-	for count < 0 || written < count {
-		row, err := rt.Next()
+	for {
+		row, err := src.Next()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 
 		if err != nil {
-			return written, fmt.Errorf("csv: runtime.Next %q: %w", table, err)
+			return written, fmt.Errorf("csv: source.Next %q: %w", table, err)
 		}
 
 		generatedProgress.Add(1)

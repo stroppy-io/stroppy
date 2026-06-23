@@ -78,11 +78,11 @@ func attrWithNull(name string, e *dgproto.Expr, rate float32, salt uint64) *dgpr
 // the requested size. Dicts may be nil.
 func spec(size int64, columnOrder []string, attrs []*dgproto.Attr, dicts map[string]*dgproto.Dict) *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "p", Size: size},
 			Attrs:       attrs,
 			ColumnOrder: columnOrder,
-		},
+		}},
 		Dicts: dicts,
 	}
 }
@@ -490,7 +490,7 @@ func TestNewRuntimeNilSource(t *testing.T) {
 }
 
 func TestNewRuntimeNilPopulation(t *testing.T) {
-	spec := &dgproto.InsertSpec{Source: &dgproto.RelSource{}}
+	spec := &dgproto.InsertSpec{Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{}}}
 	if _, err := NewRuntime(spec); !errors.Is(err, ErrInvalidSpec) {
 		t.Fatalf("want ErrInvalidSpec, got %v", err)
 	}
