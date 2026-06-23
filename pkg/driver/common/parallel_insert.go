@@ -67,16 +67,18 @@ func RunParallelByWorkers(
 		return 0, ErrNilRowFn
 	}
 
-	total := p.TotalRows()
-	chunks := SplitChunks(total, workers)
-	insertprogress.SetTotal(ctx, total)
+	// Chunk by partition units (entities); report progress/stats in output
+	// rows. These differ for fan-out generators (e.g. TPC-H lineitem).
+	chunks := SplitChunks(p.Units(), workers)
+	totalRows := p.TotalRows()
+	insertprogress.SetTotal(ctx, totalRows)
 	insertprogress.SetWorkers(ctx, len(chunks))
 
 	if err := runParallel(ctx, p, chunks, fn); err != nil {
 		return 0, err
 	}
 
-	return total, nil
+	return totalRows, nil
 }
 
 // SplitChunks carves the row range [0, total) into exactly max(workers, 1)

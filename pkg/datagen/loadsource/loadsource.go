@@ -44,6 +44,8 @@ func Build(spec *dgproto.InsertSpec) (source.Partitionable, error) {
 // so workers never contend.
 type runtimeSource struct{ rt *runtime.Runtime }
 
+// Units == TotalRows for the native runtime: a unit is one output row.
+func (s *runtimeSource) Units() int64     { return s.rt.TotalRows() }
 func (s *runtimeSource) TotalRows() int64 { return s.rt.TotalRows() }
 
 func (s *runtimeSource) Partition(start, count int64) (source.RowSource, error) {

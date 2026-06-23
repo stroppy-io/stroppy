@@ -121,6 +121,41 @@ func TestDeterministicAcrossRebuild(t *testing.T) {
 	}
 }
 
+// TestUnitsVsTotalRows pins the fan-out accounting fix: Units() is the entity
+// (partition) count, TotalRows() is the output-row count. They must be equal
+// for flat tables and differ by the fan-out for partsupp/lineitem. TotalRows
+// must equal the actual drained rows exactly for flat tables and partsupp, and
+// be within a small tolerance for lineitem (nominal estimate).
+func TestUnitsVsTotalRows(t *testing.T) {
+	exact := []string{"region", "nation", "part", "supplier", "customer", "orders", "partsupp"}
+	for _, table := range exact {
+		g, err := tpchgen.New(table, sf)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, rows := drain(t, table)
+		if got := g.TotalRows(); got != int64(len(rows)) {
+			t.Errorf("%s: TotalRows()=%d, actual rows=%d", table, got, len(rows))
+		}
+	}
+
+	// partsupp must fan out exactly 4x its units; flat tables 1x.
+	ps, _ := tpchgen.New("partsupp", sf)
+	if ps.TotalRows() != ps.Units()*4 {
+		t.Errorf("partsupp TotalRows %d != Units %d * 4", ps.TotalRows(), ps.Units())
+	}
+
+	li, _ := tpchgen.New("lineitem", sf)
+	_, liRows := drain(t, "lineitem")
+	// nominal estimate (units*4) within 5% of actual.
+	diff := float64(li.TotalRows()-int64(len(liRows))) / float64(len(liRows))
+	if diff < -0.05 || diff > 0.05 {
+		t.Errorf("lineitem TotalRows nominal %d vs actual %d (%.2f%%) exceeds 5%%",
+			li.TotalRows(), len(liRows), diff*100)
+	}
+}
+
 func TestUnknownTableRejected(t *testing.T) {
 	if _, err := tpchgen.New("nope", sf); !errors.Is(err, tpchgen.ErrUnknownTable) {
 		t.Fatalf("want ErrUnknownTable, got %v", err)

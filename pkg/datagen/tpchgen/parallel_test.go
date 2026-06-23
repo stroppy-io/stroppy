@@ -87,7 +87,7 @@ func TestParallelMatchesSingle(t *testing.T) {
 
 			var got []string
 
-			for _, r := range splitRanges(g.TotalRows(), 4) {
+			for _, r := range splitRanges(g.Units(), 4) {
 				src, err := g.Partition(r[0], r[1])
 				if err != nil {
 					t.Fatalf("Partition(%d,%d): %v", r[0], r[1], err)
@@ -131,7 +131,7 @@ func TestConcurrentPartitionsRace(t *testing.T) {
 
 	want := drainPartition(t, full)
 
-	ranges := splitRanges(g.TotalRows(), 4)
+	ranges := splitRanges(g.Units(), 4)
 	parts := make([][]string, len(ranges))
 
 	var wg sync.WaitGroup

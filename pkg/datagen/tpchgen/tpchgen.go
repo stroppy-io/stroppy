@@ -34,7 +34,13 @@ type tableSpec struct {
 	columns  []string
 	genTable dbgen.Table // table passed to RowStart/RowStop (and Seek for self-contained tables)
 	// entityCount returns the number of entities (maker calls) for scale sf.
+	// This is the partition unit (Units()).
 	entityCount func(sf float64) int64
+	// rowsPerEntity is the number of output rows each entity emits: 1 for flat
+	// tables, suppPerPart (4) for partsupp, and the spec-nominal average for
+	// lineitem (1..7, averaging 4). It maps entity count to TotalRows for
+	// progress and stats; the exact lineitem count is only known after drain.
+	rowsPerEntity int64
 	// seek positions gen's streams past `skip` entities (no-op for skip==0).
 	seek func(g *dbgen.Generator, skip int64)
 	// project runs the maker for 1-based idx on gen and returns its output
@@ -86,8 +92,9 @@ var specs = map[string]tableSpec{
 		columns:  []string{"ps_partkey", "ps_suppkey", "ps_availqty", "ps_supplycost", "ps_comment"},
 		genTable: dbgen.TPart, // makePart emits the partsupp rows
 		// One partsupp entity == one part entity (each part yields suppPerPart rows).
-		entityCount: func(sf float64) int64 { return scaled(dbgen.BaseRowCount(dbgen.TPart), sf) },
-		seek:        func(g *dbgen.Generator, skip int64) { g.SeekPartSupp(skip) },
+		entityCount:   func(sf float64) int64 { return scaled(dbgen.BaseRowCount(dbgen.TPart), sf) },
+		rowsPerEntity: 4, // suppPerPart — exact
+		seek:          func(g *dbgen.Generator, skip int64) { g.SeekPartSupp(skip) },
 		project: func(g *dbgen.Generator, idx int64) [][]any {
 			p := g.MakePart(idx)
 			rows := make([][]any, 0, len(p.S))
@@ -155,9 +162,10 @@ var specs = map[string]tableSpec{
 			"l_shipdate", "l_commitdate", "l_receiptdate", "l_shipinstruct",
 			"l_shipmode", "l_comment",
 		},
-		genTable:    dbgen.TOrder, // makeOrder emits the lineitem rows
-		entityCount: func(sf float64) int64 { return scaled(dbgen.BaseRowCount(dbgen.TOrder), sf) },
-		seek:        func(g *dbgen.Generator, skip int64) { g.SeekOrderLine(skip) },
+		genTable:      dbgen.TOrder, // makeOrder emits the lineitem rows
+		entityCount:   func(sf float64) int64 { return scaled(dbgen.BaseRowCount(dbgen.TOrder), sf) },
+		rowsPerEntity: 4, // L_COUNT averages 4 (uniform 1..7); nominal, exact only after drain
+		seek:          func(g *dbgen.Generator, skip int64) { g.SeekOrderLine(skip) },
 		project: func(g *dbgen.Generator, idx int64) [][]any {
 			o := g.MakeOrder(idx)
 			rows := make([][]any, 0, len(o.Lines))
@@ -194,11 +202,28 @@ func New(table string, sf float64) (source.Partitionable, error) {
 	return &generator{spec: spec, sf: sf}, nil
 }
 
-// TotalRows reports the entity count for this table at this scale.
-func (g *generator) TotalRows() int64 {
+// Units reports the entity count — the partition unit. For fan-out tables this
+// is fewer than the output rows (one part -> 4 partsupps, one order -> ~4
+// lineitems), so chunking happens over entities while progress counts rows.
+func (g *generator) Units() int64 {
 	dbgen.EnsureInit(g.sf)
 
 	return g.spec.entityCount(g.sf)
+}
+
+// TotalRows reports the output row count for progress and stats. It is exact
+// for flat tables and partsupp (fixed fan-out); for lineitem it is the
+// spec-nominal estimate (entities x 4), since the exact count is only known
+// after generation.
+func (g *generator) TotalRows() int64 {
+	dbgen.EnsureInit(g.sf)
+
+	per := g.spec.rowsPerEntity
+	if per < 1 {
+		per = 1
+	}
+
+	return g.spec.entityCount(g.sf) * per
 }
 
 // Partition returns a streaming RowSource over entities [start, start+count).

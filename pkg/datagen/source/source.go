@@ -19,16 +19,26 @@ type RowSource interface {
 
 // Partitionable is a generator that can be split into independent RowSources.
 //
-// TotalRows is the number of output rows the generator will emit in full; it is
-// the range the loader carves into chunks. Partition returns a RowSource that
-// emits exactly the rows for [start, start+count) — already positioned at
-// start, so workers need no warm-up. A negative count means "from start to the
-// end" (used by the single-worker path).
+// Units is the number of partitionable units — the range the loader carves into
+// chunks and the unit of Partition's (start, count). For row-at-a-time
+// generators (the native runtime) a unit is one output row, so Units ==
+// TotalRows. For generators whose unit fans out into many rows (TPC-H: one
+// order -> many lineitems, one part -> many partsupps) a unit is one entity and
+// Units < TotalRows.
+//
+// TotalRows is the number of output rows the generator emits in full. It is
+// used for progress and stats, not for chunking. For fan-out tables whose exact
+// row count is only known after generation it may be the spec-nominal estimate.
+//
+// Partition returns a RowSource for units [start, start+count) — already
+// positioned at start, so workers need no warm-up. A negative count means "from
+// start to the end" (the single-worker path).
 //
 // Partition implementations must be safe to call and drain concurrently across
-// chunks (the native runtime achieves this with per-clone state; ported
-// generators may serialize internally until their state is instanced).
+// chunks (both the native runtime and the instanced TPC-H generator own their
+// per-partition state).
 type Partitionable interface {
+	Units() int64
 	TotalRows() int64
 	Partition(start, count int64) (RowSource, error)
 }
