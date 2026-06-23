@@ -54,11 +54,11 @@ func buildDriverSmokeSpec(t *testing.T, size int64, method dgproto.InsertMethod,
 		Parallelism: &dgproto.Parallelism{
 			Workers: workers,
 		},
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "smoke_spec", Size: size},
 			Attrs:       attrs,
 			ColumnOrder: specDriverColumns,
-		},
+		}},
 		Dicts: map[string]*dgproto.Dict{"categories": dict},
 	}
 }

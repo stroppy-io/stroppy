@@ -12,7 +12,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
@@ -24,8 +26,8 @@ import (
 // InsertSpec runs one relational InsertSpec through the ydb driver.
 // NATIVE uses ydb-go-sdk's Table().BulkUpsert for non-transactional
 // batch writes; PLAIN_BULK and PLAIN_QUERY go through the generic
-// sqldriver helper. When spec.Parallelism.Workers > 1 the seed Runtime
-// is cloned per worker via common.RunParallel.
+// sqldriver helper. Workers fan the spec out across per-partition
+// RowSources via common.RunParallelByWorkers.
 func (d *Driver) InsertSpec(
 	ctx context.Context,
 	spec *dgproto.InsertSpec,
@@ -41,49 +43,21 @@ func (d *Driver) InsertSpec(
 		return nil, fmt.Errorf("%w: %s", driver.ErrInsertSpecNotImplemented, spec.GetMethod().String())
 	}
 
-	workers := int(spec.GetParallelism().GetWorkers())
-	if workers <= 1 {
-		return d.insertSpecSingle(ctx, spec)
-	}
-
-	return d.insertSpecParallel(ctx, spec, workers)
-}
-
-// insertSpecSingle drains one seed Runtime on the calling goroutine.
-func (d *Driver) insertSpecSingle(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-) (*stats.Query, error) {
-	rt, err := runtime.NewRuntime(spec)
+	part, err := loadsource.Build(spec)
 	if err != nil {
-		return nil, fmt.Errorf("ydb: build runtime: %w", err)
+		return nil, fmt.Errorf("ydb: %w", err)
 	}
 
-	rows := rt.TotalRows()
-	insertprogress.SetTotal(ctx, rows)
-	insertprogress.SetWorkers(ctx, 1)
-	workerCtx := insertprogress.ContextWithWorker(ctx, 0)
+	workers := int(spec.GetParallelism().GetWorkers())
+	if workers < 1 {
+		workers = 1
+	}
 
 	start := time.Now()
 
-	if err := d.runChunk(workerCtx, spec, rt, -1); err != nil {
-		return nil, err
-	}
-
-	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
-}
-
-// insertSpecParallel fans out over workers goroutines via common.RunParallel.
-func (d *Driver) insertSpecParallel(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-	workers int,
-) (*stats.Query, error) {
-	start := time.Now()
-
-	rows, err := common.RunParallelByWorkers(ctx, spec, workers,
-		func(workerCtx context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
-			return d.runChunk(workerCtx, spec, rt, chunk.Count)
+	rows, err := common.RunParallelByWorkers(ctx, part, workers,
+		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
+			return d.runChunk(workerCtx, spec, src)
 		})
 	if err != nil {
 		return nil, err
@@ -92,21 +66,21 @@ func (d *Driver) insertSpecParallel(
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
-// runChunk dispatches one runtime's rows per spec.Method. NATIVE uses
-// BulkUpsert; PLAIN_BULK and PLAIN_QUERY share the SQL path.
+// runChunk dispatches one partition's rows per spec.Method. NATIVE uses
+// BulkUpsert; PLAIN_BULK and PLAIN_QUERY share the SQL path. src is
+// drained to EOF.
 func (d *Driver) runChunk(
 	ctx context.Context,
 	spec *dgproto.InsertSpec,
-	rt *runtime.Runtime,
-	count int64,
+	src source.RowSource,
 ) error {
 	switch spec.GetMethod() {
 	case dgproto.InsertMethod_NATIVE:
-		return d.bulkUpsertRuntime(ctx, spec.GetTable(), rt, count)
+		return d.bulkUpsertRuntime(ctx, spec.GetTable(), src)
 	case dgproto.InsertMethod_PLAIN_BULK:
-		return sqldriver.RunBulkInsert(ctx, d.db, spec.GetTable(), rt, d.dialect, count, d.bulkSize)
+		return sqldriver.RunBulkInsert(ctx, d.db, spec.GetTable(), src, d.dialect, d.bulkSize)
 	case dgproto.InsertMethod_PLAIN_QUERY:
-		return sqldriver.RunBulkInsert(ctx, d.db, spec.GetTable(), rt, d.dialect, count, 1)
+		return sqldriver.RunBulkInsert(ctx, d.db, spec.GetTable(), src, d.dialect, 1)
 	default:
 		return fmt.Errorf("%w: %s", driver.ErrInsertSpecNotImplemented, spec.GetMethod().String())
 	}
@@ -213,9 +187,8 @@ func (w *bulkUpsertWriter) flush(ctx context.Context) error {
 	return nil
 }
 
-// bulkUpsertRuntime streams rt into ydb-go-sdk's Table().BulkUpsert in
-// batches of at most d.bulkSize rows. limit < 0 drains the runtime;
-// otherwise exactly limit rows are emitted.
+// bulkUpsertRuntime streams src into ydb-go-sdk's Table().BulkUpsert in
+// batches of at most d.bulkSize rows, draining src to io.EOF.
 //
 // NULL handling: BulkUpsert requires each struct field to carry a typed
 // value — a bare `types.VoidValue()` is rejected by the server with
@@ -228,36 +201,30 @@ func (w *bulkUpsertWriter) flush(ctx context.Context) error {
 func (d *Driver) bulkUpsertRuntime(
 	ctx context.Context,
 	tableName string,
-	rt *runtime.Runtime,
-	limit int64,
+	src source.RowSource,
 ) error {
-	columns := rt.Columns()
+	columns := src.Columns()
 	if len(columns) == 0 {
 		return fmt.Errorf("%w: table %q", sqldriver.ErrEmptyColumnOrder, tableName)
 	}
 
 	tablePath := path.Join(d.nativeDB.Name(), tableName)
 	writer := newBulkUpsertWriter(d, tablePath, tableName, columns)
-	remaining := limit
 
 	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
-	for limit < 0 || remaining > 0 {
-		row, err := rt.Next()
+	for {
+		row, err := src.Next()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 
 		if err != nil {
-			return fmt.Errorf("ydb: runtime.Next: %w", err)
+			return fmt.Errorf("ydb: source.Next: %w", err)
 		}
 
 		if err := writer.appendRowCtx(ctx, row); err != nil {
 			return err
-		}
-
-		if limit >= 0 {
-			remaining--
 		}
 	}
 

@@ -40,7 +40,7 @@ func TestBlockSlotEvaluatedOncePerOuterEntity(t *testing.T) {
 	}
 
 	spec := &dgproto.InsertSpec{
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "l", Size: 99},
 			Attrs:       innerAttrs,
 			ColumnOrder: []string{"t"},
@@ -49,7 +49,7 @@ func TestBlockSlotEvaluatedOncePerOuterEntity(t *testing.T) {
 				Name:  "rel",
 				Sides: []*dgproto.Side{outerSide, innerSide},
 			}},
-		},
+		}},
 	}
 
 	rt, err := NewRuntime(spec)
@@ -108,7 +108,7 @@ func TestBlockSlotInnerSideAccepted(t *testing.T) {
 	innerAttrs := []*dgproto.Attr{attr("t", blockRefExpr("line_tag"))}
 
 	spec := &dgproto.InsertSpec{
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "l", Size: 99},
 			Attrs:       innerAttrs,
 			ColumnOrder: []string{"t"},
@@ -117,7 +117,7 @@ func TestBlockSlotInnerSideAccepted(t *testing.T) {
 				Name:  "rel",
 				Sides: []*dgproto.Side{outerSide, innerSide},
 			}},
-		},
+		}},
 	}
 
 	rt, err := NewRuntime(spec)
@@ -156,7 +156,7 @@ func TestBlockRefMissingSlot(t *testing.T) {
 	}
 
 	spec := &dgproto.InsertSpec{
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "l", Size: 99},
 			Attrs:       innerAttrs,
 			ColumnOrder: []string{"t"},
@@ -165,7 +165,7 @@ func TestBlockRefMissingSlot(t *testing.T) {
 				Name:  "rel",
 				Sides: []*dgproto.Side{outerSide, innerSide},
 			}},
-		},
+		}},
 	}
 
 	rt, err := NewRuntime(spec)
@@ -204,7 +204,7 @@ func TestBlockSlotDuplicateName(t *testing.T) {
 	}
 
 	spec := &dgproto.InsertSpec{
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "l", Size: 99},
 			Attrs:       []*dgproto.Attr{attr("v", rowEntity())},
 			ColumnOrder: []string{"v"},
@@ -213,7 +213,7 @@ func TestBlockSlotDuplicateName(t *testing.T) {
 				Name:  "rel",
 				Sides: []*dgproto.Side{outerSide, innerSide},
 			}},
-		},
+		}},
 	}
 
 	if _, err := NewRuntime(spec); !errors.Is(err, ErrUnknownBlockSlot) {

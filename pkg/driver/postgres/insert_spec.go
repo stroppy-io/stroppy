@@ -11,7 +11,9 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
@@ -24,16 +26,17 @@ import (
 var ErrUnsupportedInsertMethod = errors.New("postgres: unsupported InsertSpec method")
 
 // ErrEmptyColumnOrder is returned by the bulk insert path when the
-// runtime reports zero columns; a multi-row INSERT would be degenerate
+// source reports zero columns; a multi-row INSERT would be degenerate
 // without them.
-var ErrEmptyColumnOrder = errors.New("postgres: runtime reports zero columns")
+var ErrEmptyColumnOrder = errors.New("postgres: source reports zero columns")
 
 // InsertSpec runs one relational InsertSpec through the postgres driver.
-// It builds a seed runtime.Runtime from the spec, then dispatches by
+// It builds a source.Partitionable from the spec, then dispatches by
 // spec.Method to one of three row-insertion strategies (NATIVE COPY,
-// PLAIN_BULK multi-row INSERT, PLAIN_QUERY per-row INSERT). When the
-// spec requests parallelism the seed runtime is cloned per worker via
-// common.RunParallel; each clone is pre-seeked to its chunk boundary.
+// PLAIN_BULK multi-row INSERT, PLAIN_QUERY per-row INSERT). Workers fan
+// the spec out across per-partition RowSources via
+// common.RunParallelByWorkers; each RowSource is pre-seeked and bounded
+// to its chunk.
 func (d *Driver) InsertSpec(
 	ctx context.Context,
 	spec *dgproto.InsertSpec,
@@ -42,53 +45,21 @@ func (d *Driver) InsertSpec(
 		return nil, fmt.Errorf("%w: nil spec", runtime.ErrInvalidSpec)
 	}
 
-	workers := int(spec.GetParallelism().GetWorkers())
-	if workers <= 1 {
-		return d.insertSpecSingle(ctx, spec)
-	}
-
-	return d.insertSpecParallel(ctx, spec, workers)
-}
-
-// insertSpecSingle runs the spec on a single seed Runtime without the
-// overhead of RunParallel when the caller requested workers ≤ 1.
-func (d *Driver) insertSpecSingle(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-) (*stats.Query, error) {
-	rt, err := runtime.NewRuntime(spec)
+	part, err := loadsource.Build(spec)
 	if err != nil {
-		return nil, fmt.Errorf("postgres: build runtime: %w", err)
+		return nil, fmt.Errorf("postgres: %w", err)
 	}
 
-	rows := rt.TotalRows()
-	insertprogress.SetTotal(ctx, rows)
-	insertprogress.SetWorkers(ctx, 1)
-	workerCtx := insertprogress.ContextWithWorker(ctx, 0)
+	workers := int(spec.GetParallelism().GetWorkers())
+	if workers < 1 {
+		workers = 1
+	}
 
 	start := time.Now()
 
-	if err := d.runChunk(workerCtx, spec, rt, -1); err != nil {
-		return nil, err
-	}
-
-	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
-}
-
-// insertSpecParallel fans the spec out across workers goroutines via
-// common.RunParallel. Each worker owns an independent Runtime clone
-// pre-seeked to its chunk.Start; the final stats.Query reports the
-// runtime's actual total row count.
-func (d *Driver) insertSpecParallel(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-	workers int,
-) (*stats.Query, error) {
-	start := time.Now()
-
-	rows, err := common.RunParallelByWorkers(ctx, spec, workers,
-		func(workerCtx context.Context, chunk common.Chunk, rt *runtime.Runtime) error {
-			return d.runChunk(workerCtx, spec, rt, chunk.Count)
+	rows, err := common.RunParallelByWorkers(ctx, part, workers,
+		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
+			return d.runChunk(workerCtx, spec, src)
 		})
 	if err != nil {
 		return nil, err
@@ -97,48 +68,43 @@ func (d *Driver) insertSpecParallel(
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
-// runChunk dispatches one runtime's output into the database per the
-// spec's InsertMethod. When count is negative the runtime is drained to
-// EOF; otherwise it emits exactly count rows before stopping.
+// runChunk dispatches one partition's output into the database per the
+// spec's InsertMethod. src is drained to EOF.
 func (d *Driver) runChunk(
 	ctx context.Context,
 	spec *dgproto.InsertSpec,
-	rt *runtime.Runtime,
-	count int64,
+	src source.RowSource,
 ) error {
 	switch spec.GetMethod() {
 	case dgproto.InsertMethod_NATIVE:
-		return d.copyFromRuntime(ctx, spec.GetTable(), rt, count)
+		return d.copyFromRuntime(ctx, spec.GetTable(), src)
 	case dgproto.InsertMethod_PLAIN_BULK:
-		return d.bulkInsertRuntime(ctx, spec.GetTable(), rt, count, d.bulkSize)
+		return d.bulkInsertRuntime(ctx, spec.GetTable(), src, d.bulkSize)
 	case dgproto.InsertMethod_PLAIN_QUERY:
 		// Per-row INSERT reuses the bulk path with batch_size=1 so both
 		// arms share exactly one SQL-building codepath.
-		return d.bulkInsertRuntime(ctx, spec.GetTable(), rt, count, 1)
+		return d.bulkInsertRuntime(ctx, spec.GetTable(), src, 1)
 	default:
 		return fmt.Errorf("%w: %s", ErrUnsupportedInsertMethod, spec.GetMethod().String())
 	}
 }
 
-// copyFromRuntime streams runtime rows into pgx.CopyFrom without buffering
-// the full result set. The adapter bounds emission by `limit`, or drains
-// to EOF when limit < 0.
+// copyFromRuntime streams source rows into pgx.CopyFrom without buffering
+// the full result set. The adapter drains src to EOF.
 func (d *Driver) copyFromRuntime(
 	ctx context.Context,
 	table string,
-	rt *runtime.Runtime,
-	limit int64,
+	src source.RowSource,
 ) error {
 	insertprogress.SetStage(ctx, insertprogress.StagePostgresCopyFrom)
-	src := &rowSource{
-		rt:       rt,
-		limit:    limit,
+	copySrc := &rowSource{
+		src:      src,
 		progress: insertprogress.NewGeneratedRowCounter(ctx),
 	}
 
 	start := time.Now()
-	rowsCopied, err := d.pool.CopyFrom(ctx, pgx.Identifier{table}, rt.Columns(), src)
-	src.progress.Flush()
+	rowsCopied, err := d.pool.CopyFrom(ctx, pgx.Identifier{table}, src.Columns(), copySrc)
+	copySrc.progress.Flush()
 
 	if err != nil {
 		return fmt.Errorf("postgres: CopyFrom %q: %w", table, err)
@@ -152,52 +118,46 @@ func (d *Driver) copyFromRuntime(
 }
 
 // bulkInsertRuntime emits multi-row INSERT statements of up to batchSize
-// rows each. It exhausts the runtime (or stops after `limit` rows when
-// limit ≥ 0). Placeholders are pgx's numbered $1,$2,... form.
+// rows each, draining src to io.EOF. Placeholders are pgx's numbered
+// $1,$2,... form.
 func (d *Driver) bulkInsertRuntime(
 	ctx context.Context,
 	table string,
-	rt *runtime.Runtime,
-	limit int64,
+	src source.RowSource,
 	batchSize int,
 ) error {
 	if batchSize < 1 {
 		batchSize = 1
 	}
 
-	columns := rt.Columns()
+	columns := src.Columns()
 	if len(columns) == 0 {
 		return fmt.Errorf("%w: table %q", ErrEmptyColumnOrder, table)
 	}
 
 	batch := make([][]any, 0, batchSize)
-	remaining := limit
 
 	generatedProgress := insertprogress.NewGeneratedRowCounter(ctx)
 	defer generatedProgress.Flush()
 
 	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
-	for limit < 0 || remaining > 0 {
-		row, err := rt.Next()
+	for {
+		row, err := src.Next()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 
 		if err != nil {
-			return fmt.Errorf("postgres: runtime.Next: %w", err)
+			return fmt.Errorf("postgres: source.Next: %w", err)
 		}
 
-		// Copy the row: Runtime reuses its scratch slice across calls.
+		// Copy the row: the source reuses its scratch slice across calls.
 		rowCopy := make([]any, len(row))
 		copy(rowCopy, row)
 		batch = append(batch, rowCopy)
 
 		generatedProgress.Add(1)
-
-		if limit >= 0 {
-			remaining--
-		}
 
 		if len(batch) >= batchSize {
 			generatedProgress.Flush()
@@ -311,30 +271,23 @@ func buildBulkInsert(table string, columns []string, rows [][]any) (query string
 	return query, args
 }
 
-// rowSource adapts *runtime.Runtime to pgx.CopyFromSource. Each Next()
-// call pulls one row from the runtime; emission stops at EOF or after
-// `limit` rows when limit ≥ 0. Errors are stored and surfaced via Err().
+// rowSource adapts a source.RowSource to pgx.CopyFromSource. Each Next()
+// call pulls one row from src; emission stops at EOF. Errors are stored
+// and surfaced via Err().
 type rowSource struct {
-	rt       *runtime.Runtime
+	src      source.RowSource
 	progress insertprogress.RowCounter
-	limit    int64 // < 0 means unbounded
 	row      []any
 	err      error
-	sent     int64
 }
 
-// Next advances the runtime cursor. Returns false at EOF, on error, or
-// when the configured limit has been reached.
+// Next advances the source cursor. Returns false at EOF or on error.
 func (s *rowSource) Next() bool {
 	if s.err != nil {
 		return false
 	}
 
-	if s.limit >= 0 && s.sent >= s.limit {
-		return false
-	}
-
-	row, err := s.rt.Next()
+	row, err := s.src.Next()
 	if errors.Is(err, io.EOF) {
 		return false
 	}
@@ -346,17 +299,16 @@ func (s *rowSource) Next() bool {
 	}
 
 	s.row = row
-	s.sent++
 	s.progress.Add(1)
 
 	return true
 }
 
 // Values returns the current row. pgx calls Values once per successful
-// Next, so the runtime's scratch slice is safe to return directly —
+// Next, so the source's scratch slice is safe to return directly —
 // pgx.CopyFrom serializes each row before advancing.
 func (s *rowSource) Values() ([]any, error) { return s.row, nil }
 
-// Err reports any runtime error encountered during iteration. pgx
+// Err reports any source error encountered during iteration. pgx
 // aborts the COPY transaction when Err is non-nil.
 func (s *rowSource) Err() error { return s.err }

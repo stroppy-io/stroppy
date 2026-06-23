@@ -10,14 +10,14 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
-	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
-// ErrEmptyColumnOrder is returned when the runtime reports zero columns;
+// ErrEmptyColumnOrder is returned when the source reports zero columns;
 // an INSERT without columns is not a valid target for the bulk path.
-var ErrEmptyColumnOrder = errors.New("sqldriver: runtime reports zero columns")
+var ErrEmptyColumnOrder = errors.New("sqldriver: source reports zero columns")
 
 // ErrUnsupportedInsertMethod is returned by RunInsertSpec when the spec
 // requests a method this generic helper cannot serve (today: NATIVE).
@@ -29,12 +29,12 @@ var ErrUnsupportedInsertMethod = errors.New("sqldriver: unsupported InsertSpec m
 // database/sql–style Execer. It handles the two SQL-based InsertMethod
 // arms uniformly:
 //
-//   - PLAIN_QUERY: one INSERT statement per row, drained from rt.
+//   - PLAIN_QUERY: one INSERT statement per row, drained from src.
 //   - PLAIN_BULK: multi-row INSERTs of at most batchSize rows each.
 //
-// limit controls how many rows to emit; a negative limit drains the
-// runtime to EOF. dialect supplies placeholder formatting and per-value
-// type conversions. batchSize values ≤ 1 collapse the bulk path into the
+// src is drained to io.EOF; its row range is already bounded by the
+// partition. dialect supplies placeholder formatting and per-value type
+// conversions. batchSize values ≤ 1 collapse the bulk path into the
 // per-row path; callers pass 1 explicitly for PLAIN_QUERY.
 //
 // NATIVE is deliberately not routed here: each driver's native bulk
@@ -45,7 +45,7 @@ func RunInsertSpec[T any](
 	ctx context.Context,
 	db ExecContext[T],
 	spec *dgproto.InsertSpec,
-	rt *runtime.Runtime,
+	src source.RowSource,
 	dialect queries.Dialect,
 	batchSize int,
 ) error {
@@ -55,9 +55,9 @@ func RunInsertSpec[T any](
 
 	switch spec.GetMethod() {
 	case dgproto.InsertMethod_PLAIN_BULK:
-		return RunBulkInsert(ctx, db, spec.GetTable(), rt, dialect, -1, batchSize)
+		return RunBulkInsert(ctx, db, spec.GetTable(), src, dialect, batchSize)
 	case dgproto.InsertMethod_PLAIN_QUERY:
-		return RunBulkInsert(ctx, db, spec.GetTable(), rt, dialect, -1, 1)
+		return RunBulkInsert(ctx, db, spec.GetTable(), src, dialect, 1)
 	case dgproto.InsertMethod_NATIVE:
 		return fmt.Errorf("%w: NATIVE", ErrUnsupportedInsertMethod)
 	default:
@@ -65,28 +65,26 @@ func RunInsertSpec[T any](
 	}
 }
 
-// RunBulkInsert drains rt into multi-row INSERTs against table, batching
-// by batchSize rows. limit < 0 means "drain to EOF"; limit ≥ 0 stops
-// after that many rows. batchSize ≤ 0 is clamped to 1.
+// RunBulkInsert drains src into multi-row INSERTs against table, batching
+// by batchSize rows. src is drained to io.EOF; its row range is already
+// bounded by the partition. batchSize ≤ 0 is clamped to 1.
 //
 // Exposed separately from RunInsertSpec so callers that already run
 // their own InsertMethod switch (for example, to call a driver-native
-// path for NATIVE) can reuse the bulk implementation directly, and so
-// parallel workers can pass their chunk.Count as limit.
+// path for NATIVE) can reuse the bulk implementation directly.
 func RunBulkInsert[T any](
 	ctx context.Context,
 	db ExecContext[T],
 	table string,
-	rt *runtime.Runtime,
+	src source.RowSource,
 	dialect queries.Dialect,
-	limit int64,
 	batchSize int,
 ) error {
 	if batchSize < 1 {
 		batchSize = 1
 	}
 
-	columns := rt.Columns()
+	columns := src.Columns()
 
 	colCount := len(columns)
 	if colCount == 0 {
@@ -109,7 +107,6 @@ func RunBulkInsert[T any](
 
 	var fullBatchQuery string
 
-	remaining := limit
 	filled := 0
 
 	generatedProgress := insertprogress.NewGeneratedRowCounter(ctx)
@@ -117,14 +114,14 @@ func RunBulkInsert[T any](
 
 	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
-	for limit < 0 || remaining > 0 {
-		row, err := rt.Next()
+	for {
+		row, err := src.Next()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 
 		if err != nil {
-			return fmt.Errorf("sqldriver: runtime.Next: %w", err)
+			return fmt.Errorf("sqldriver: source.Next: %w", err)
 		}
 
 		if err := convertRowInto(batch[filled], row, dialect); err != nil {
@@ -134,10 +131,6 @@ func RunBulkInsert[T any](
 		filled++
 
 		generatedProgress.Add(1)
-
-		if limit >= 0 {
-			remaining--
-		}
 
 		if filled >= batchSize {
 			generatedProgress.Flush()
@@ -230,30 +223,6 @@ func execProgressBulkBatch[T any](
 	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
 	return nil
-}
-
-// RunInsertSpecStats is the common wrapper that measures elapsed time
-// around a RunInsertSpec call and returns a *stats.Query. Drivers that
-// do not need extra per-call logic can assign this result as-is.
-func RunInsertSpecStats[T any](
-	ctx context.Context,
-	db ExecContext[T],
-	spec *dgproto.InsertSpec,
-	rt *runtime.Runtime,
-	dialect queries.Dialect,
-	batchSize int,
-) (*stats.Query, error) {
-	rows := rt.TotalRows()
-	insertprogress.SetTotal(ctx, rows)
-	insertprogress.SetWorkers(ctx, 1)
-	workerCtx := insertprogress.ContextWithWorker(ctx, 0)
-	start := time.Now()
-
-	if err := RunInsertSpec(workerCtx, db, spec, rt, dialect, batchSize); err != nil {
-		return nil, err
-	}
-
-	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
 // convertRowInto runs dialect.Convert over every value in row, writing the

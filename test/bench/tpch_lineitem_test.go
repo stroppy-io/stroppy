@@ -239,7 +239,7 @@ func lineitemSpec(size int64, workers int32) *dgproto.InsertSpec {
 		Method:      dgproto.InsertMethod_NATIVE,
 		Parallelism: &dgproto.Parallelism{Workers: workers},
 		Dicts:       commentGrammarDicts(),
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "lineitem", Size: size},
 			Attrs:       lineAttrs,
 			ColumnOrder: columnOrder(),
@@ -263,7 +263,7 @@ func lineitemSpec(size int64, workers int32) *dgproto.InsertSpec {
 				},
 			}},
 			Iter: "orders_lineitem",
-		},
+		}},
 	}
 }
 

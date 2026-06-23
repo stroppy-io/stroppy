@@ -7,9 +7,29 @@ import (
 	"testing"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
+	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
+	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 )
+
+// srcOf builds a full-range RowSource for spec via loadsource. Partition
+// (0, -1) returns an unbounded source draining the whole population, the
+// same shape RunBulkInsert now consumes.
+func srcOf(t *testing.T, spec *dgproto.InsertSpec) source.RowSource {
+	t.Helper()
+
+	p, err := loadsource.Build(spec)
+	if err != nil {
+		t.Fatalf("loadsource.Build: %v", err)
+	}
+
+	src, err := p.Partition(0, -1)
+	if err != nil {
+		t.Fatalf("Partition: %v", err)
+	}
+
+	return src
+}
 
 // mockExecer captures every ExecContext call so the test can inspect
 // the SQL emitted by the bulk helper.
@@ -73,13 +93,13 @@ func specOf(t *testing.T, table string, size int64, method dgproto.InsertMethod)
 	return &dgproto.InsertSpec{
 		Table:  table,
 		Method: method,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population: &dgproto.Population{Name: "p", Size: size},
 			Attrs: []*dgproto.Attr{
 				{Name: "id", Expr: binOpExpr(dgproto.BinOp_ADD, rowIndexExpr(), litExpr(1))},
 			},
 			ColumnOrder: []string{"id"},
-		},
+		}},
 	}
 }
 
@@ -89,13 +109,8 @@ func TestRunInsertSpecPlainQueryEmitsOneInsertPerRow(t *testing.T) {
 	ctx := context.Background()
 	spec := specOf(t, "t_plain", 3, dgproto.InsertMethod_PLAIN_QUERY)
 
-	rt, err := runtime.NewRuntime(spec)
-	if err != nil {
-		t.Fatalf("NewRuntime: %v", err)
-	}
-
 	m := &mockExecer{}
-	if err := RunInsertSpec[int64](ctx, m, spec, rt, qmark{}, 500); err != nil {
+	if err := RunInsertSpec[int64](ctx, m, spec, srcOf(t, spec), qmark{}, 500); err != nil {
 		t.Fatalf("RunInsertSpec: %v", err)
 	}
 
@@ -123,14 +138,9 @@ func TestRunInsertSpecPlainBulkEmitsMultiRowInsert(t *testing.T) {
 	ctx := context.Background()
 	spec := specOf(t, "t_bulk", 4, dgproto.InsertMethod_PLAIN_BULK)
 
-	rt, err := runtime.NewRuntime(spec)
-	if err != nil {
-		t.Fatalf("NewRuntime: %v", err)
-	}
-
 	m := &mockExecer{}
 	// batchSize == 10 fits all 4 rows in one call.
-	if err := RunInsertSpec[int64](ctx, m, spec, rt, qmark{}, 10); err != nil {
+	if err := RunInsertSpec[int64](ctx, m, spec, srcOf(t, spec), qmark{}, 10); err != nil {
 		t.Fatalf("RunInsertSpec: %v", err)
 	}
 
@@ -158,13 +168,8 @@ func TestRunInsertSpecBulkBatchingAbsorbsRemainder(t *testing.T) {
 
 	spec := specOf(t, "t_rem", total, dgproto.InsertMethod_PLAIN_BULK)
 
-	rt, err := runtime.NewRuntime(spec)
-	if err != nil {
-		t.Fatalf("NewRuntime: %v", err)
-	}
-
 	m := &mockExecer{}
-	if err := RunInsertSpec[int64](ctx, m, spec, rt, qmark{}, 500); err != nil {
+	if err := RunInsertSpec[int64](ctx, m, spec, srcOf(t, spec), qmark{}, 500); err != nil {
 		t.Fatalf("RunInsertSpec: %v", err)
 	}
 
@@ -203,15 +208,10 @@ func TestRunInsertSpecPropagatesExecError(t *testing.T) {
 	ctx := context.Background()
 	spec := specOf(t, "t_err", 5, dgproto.InsertMethod_PLAIN_BULK)
 
-	rt, err := runtime.NewRuntime(spec)
-	if err != nil {
-		t.Fatalf("NewRuntime: %v", err)
-	}
-
 	boom := errors.New("boom")
 	m := &mockExecer{fail: boom, stop: 1}
 
-	err = RunInsertSpec[int64](ctx, m, spec, rt, qmark{}, 2)
+	err := RunInsertSpec[int64](ctx, m, spec, srcOf(t, spec), qmark{}, 2)
 	if err == nil {
 		t.Fatalf("RunInsertSpec: want error")
 	}
@@ -231,14 +231,9 @@ func TestRunInsertSpecRejectsNative(t *testing.T) {
 	ctx := context.Background()
 	spec := specOf(t, "t_native", 2, dgproto.InsertMethod_NATIVE)
 
-	rt, err := runtime.NewRuntime(spec)
-	if err != nil {
-		t.Fatalf("NewRuntime: %v", err)
-	}
-
 	m := &mockExecer{}
 
-	err = RunInsertSpec[int64](ctx, m, spec, rt, qmark{}, 500)
+	err := RunInsertSpec[int64](ctx, m, spec, srcOf(t, spec), qmark{}, 500)
 	if err == nil || !errors.Is(err, ErrUnsupportedInsertMethod) {
 		t.Fatalf("err = %v, want ErrUnsupportedInsertMethod", err)
 	}

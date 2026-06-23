@@ -1,0 +1,34 @@
+Vendored TPC-H dbgen generator
+==============================
+
+The contents of third_party/gotpc/dbgen/ are derived from the `tpch/dbgen`
+package of go-tpc (https://github.com/pingcap/go-tpc), which is licensed under
+the Apache License, Version 2.0. A copy of that license is in
+third_party/gotpc/LICENSE.
+
+Modifications made by Stroppy (per Apache License §4(b), "carry prominent
+notices stating that You changed the files"):
+
+  - dbgen/*.go: removed the SQL/CSV `*sink.CSVSink`-based loader types,
+    constructors, and the loader-driven genTbl/DbGen entry points, which
+    depended on go-tpc's internal `pkg/sink`. Row generation logic (the
+    make*/sd*/init* functions, the RNG streams, distributions, and text pool)
+    is preserved verbatim.
+  - dbgen/driver.go and the table files: the scale factor `scale` was changed
+    from int64 to float64 to restore upstream dbgen's fractional scale-factor
+    support (e.g. 0.01 for tests); the `base * scale` products that derive row
+    counts and foreign-key ranges were updated to compute in float and floor to
+    int64.
+  - dbgen/api.go: NEW, Stroppy-authored. Exposes a minimal exported surface
+    (EnsureInit, Reset, Seek, RowStart/RowStop, the Make* makers, row-count
+    accessors, and a global generation mutex) so the pkg/datagen/tpchgen
+    adapter can drive row production. Not part of upstream go-tpc.
+
+Trademark notice (from upstream, dbgen/copyright):
+
+  TPC, TPC Benchmark and TPC-C are trademarks of the Transaction Processing
+  Performance Council. All other materials are (c) 2015-2016 TPC.
+
+This generator produces TPC-H-derived data. It is NOT a certified TPC-H
+implementation and its output must not be represented as official TPC-H
+benchmark results.

@@ -184,11 +184,11 @@ func stageDCatalogSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "catalog",
 		Seed:  stageDCatalogSeed,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "catalog", Size: stageDCatalogSize},
 			Attrs:       attrs,
 			ColumnOrder: stageDCatalogColumns,
-		},
+		}},
 		Dicts: map[string]*dgproto.Dict{"categories": categoryDict},
 	}
 }
@@ -288,7 +288,7 @@ func stageDEventsSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "events",
 		Seed:  stageDEventsSeed,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "events", Size: stageDEventsSize},
 			Attrs:       attrs,
 			ColumnOrder: stageDEventsColumns,
@@ -299,7 +299,7 @@ func stageDEventsSpec() *dgproto.InsertSpec {
 				EntityMax:   stageDCohortEntityMax,
 				ActiveEvery: stageDCohortActive,
 			}},
-		},
+		}},
 		Dicts: map[string]*dgproto.Dict{"words": wordsDict},
 	}
 }
@@ -327,7 +327,7 @@ func stageDStoreVersionsSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "store_versions",
 		Seed:  0x5CD2B001,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "store_versions", Size: 10},
 			Attrs:       attrs,
 			ColumnOrder: stageDStoreVersionsColumns,
@@ -340,7 +340,7 @@ func stageDStoreVersionsSpec() *dgproto.InsertSpec {
 				CurrentStart:    litOf("2000-01-01"),
 				// CurrentEnd omitted → runtime emits nil.
 			},
-		},
+		}},
 	}
 }
 
@@ -362,7 +362,7 @@ func stageDOrdersSpecs() (parent, child *dgproto.InsertSpec) {
 	parentSpec := &dgproto.InsertSpec{
 		Table: "orders",
 		Seed:  0x00011111,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "orders", Size: stageDOrderParents},
 			ColumnOrder: stageDOrdersColumns,
 			Attrs: []*dgproto.Attr{
@@ -374,7 +374,7 @@ func stageDOrdersSpecs() (parent, child *dgproto.InsertSpec) {
 					},
 				})},
 			},
-		},
+		}},
 	}
 
 	parentLookup := &dgproto.LookupPop{
@@ -433,13 +433,13 @@ func stageDOrdersSpecs() (parent, child *dgproto.InsertSpec) {
 	childSpec := &dgproto.InsertSpec{
 		Table: "order_lines",
 		Seed:  0x0C1D04,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:    &dgproto.Population{Name: "order_lines", Size: 1},
 			Attrs:         childAttrs,
 			ColumnOrder:   stageDOrderLinesColumns,
 			LookupPops:    []*dgproto.LookupPop{parentLookup},
 			Relationships: []*dgproto.Relationship{rel},
-		},
+		}},
 	}
 
 	return parentSpec, childSpec

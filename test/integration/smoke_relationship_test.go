@@ -92,7 +92,7 @@ func childSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: childIterPop,
 		Seed:  0xBADDCAFE,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			// Size must be > 0 per proto validation; the runtime derives
 			// the real total from outerSize × innerDegree once the
 			// relationship is installed.
@@ -105,7 +105,7 @@ func childSpec() *dgproto.InsertSpec {
 				Sides: sides,
 			}},
 			Iter: childRelationship,
-		},
+		}},
 	}
 }
 

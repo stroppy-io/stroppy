@@ -664,6 +664,26 @@ export class DriverX implements QueryAPI {
     }
   }
 
+  /** Load one TPC-H table via the ported dbgen generator. `table` is the
+   *  TPC-H table name (region, nation, part, supplier, partsupp, customer,
+   *  orders, lineitem); `sf` the scale factor (fractional allowed); `workers`
+   *  the parallel hint. Shares insertSpec's metrics and error handling. */
+  insertTpch(table: string, sf: number, workers = 1): void {
+    const metricTags = { table_name: table };
+
+    console.log(`InsertTpch into '${table}' (sf=${sf}) starting...`);
+
+    try {
+      const stats = this.driver.insertTpch(table, sf, workers);
+      insertErrRateMetric.add(0, withStepTag(metricTags));
+      insertMetric.add(stats.elapsed.seconds() * 1000, withStepTag(metricTags));
+      console.log(`InsertTpch into '${table}' ended in ${stats.elapsed.string()}`);
+    } catch (e) {
+      insertErrRateMetric.add(1, withStepTag(metricTags));
+      handleError(this._errorMode, e, metricTags);
+    }
+  }
+
   /** Start a transaction manually. Call tx.commit() or tx.rollback() when done. */
   begin(options?: { isolation?: TxIsolationName; name?: string }): TxX {
     const level = options?.isolation ?? this._defaultTxIsolation;

@@ -101,6 +101,18 @@ const SCALE_FACTOR = Number(
   ENV("SCALE_FACTOR", "1", "TPC-H scale factor; 0.01 supported for smoke tests"),
 );
 const LOAD_WORKERS = ENV("LOAD_WORKERS", 0, "Load-time worker count per spec (0 = framework default)") as number;
+// Data generator backend: "gotpc" (ported TPC-H dbgen, default — correct
+// answers, gen-time totals) or "relgen" (native datagen framework, kept for
+// comparison; needs the finalize_totals post-load step).
+const TPCH_GENERATOR = String(
+  ENV("TPCH_GENERATOR", "gotpc", "TPC-H data generator: gotpc | relgen"),
+);
+const USE_GOTPC = TPCH_GENERATOR === "gotpc";
+// TPC-H table load order: parents before children for FK consistency.
+const TPCH_TABLES = [
+  "region", "nation", "part", "supplier",
+  "partsupp", "customer", "orders", "lineitem",
+];
 const FINALIZE_BUCKETS_OVERRIDE = ENV(
   "FINALIZE_BUCKETS",
   0,
@@ -764,6 +776,14 @@ function prepareDatabase(): void {
   });
 
   Step("load_data", () => {
+    if (USE_GOTPC) {
+      // Ported dbgen: the Go side owns generation; pass table + scale factor.
+      for (const table of TPCH_TABLES) {
+        driver.insertTpch(table, SCALE_FACTOR, LOAD_WORKERS);
+      }
+      return;
+    }
+
     driver.insertSpec(regionSpec());
     driver.insertSpec(nationSpec());
     driver.insertSpec(partSpec());
@@ -785,10 +805,14 @@ function prepareDatabase(): void {
   });
 
   // Spec §4.2.3: o_totalprice = Σ l_extendedprice × (1+l_tax) × (1-l_discount)
-  // over lineitems. We fill it post-load since it depends on yet-to-be
-  // generated lines at orders-emit time. Runs after create_indexes so
-  // the correlated subquery can use idx_lineitem_orderkey (pg/mysql/pico).
+  // over lineitems. relgen fills it post-load since it depends on yet-to-be
+  // generated lines at orders-emit time. gotpc computes o_totalprice at
+  // generation time (makeOrder sums its lines), so the step is skipped.
   Step("finalize_totals", () => {
+    if (USE_GOTPC) {
+      console.log("[tpch] finalize_totals: skipped (gotpc finalizes at gen time)");
+      return;
+    }
     runFinalizeTotals();
   });
 

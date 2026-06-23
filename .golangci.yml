@@ -244,7 +244,7 @@ linters:
     paths:
       - pb.go$
       - internal/repositories/models
-      - third_party$
+      - ^third_party/
       - builtin$
       - examples$
 issues:
@@ -269,6 +269,6 @@ formatters:
     generated: lax
     paths:
       - internal/repositories/models
-      - third_party$
+      - ^third_party/
       - builtin$
       - examples$

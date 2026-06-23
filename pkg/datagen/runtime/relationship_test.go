@@ -99,7 +99,7 @@ func relSpec(
 	sides []*dgproto.Side,
 ) *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: innerPop, Size: innerSize},
 			Attrs:       innerAttrs,
 			ColumnOrder: innerColumns,
@@ -108,7 +108,7 @@ func relSpec(
 				Name:  "rel",
 				Sides: sides,
 			}},
-		},
+		}},
 	}
 }
 
@@ -428,7 +428,7 @@ func TestRelationshipRejectsThreeSides(t *testing.T) {
 
 func TestRelationshipRejectsMissingLookupPop(t *testing.T) {
 	spec := &dgproto.InsertSpec{
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "l", Size: 99},
 			Attrs:       []*dgproto.Attr{attr("v", rowGlobal())},
 			ColumnOrder: []string{"v"},
@@ -437,7 +437,7 @@ func TestRelationshipRejectsMissingLookupPop(t *testing.T) {
 				Sides: []*dgproto.Side{fixedSide("o", 1), fixedSide("l", 3)},
 			}},
 			// no LookupPops declared for the outer side "o"
-		},
+		}},
 	}
 
 	_, err := NewRuntime(spec)
@@ -454,7 +454,7 @@ func TestRelationshipRejectsMultipleRelationships(t *testing.T) {
 	}
 
 	spec := &dgproto.InsertSpec{
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "l", Size: 99},
 			Attrs:       []*dgproto.Attr{attr("v", rowGlobal())},
 			ColumnOrder: []string{"v"},
@@ -463,7 +463,7 @@ func TestRelationshipRejectsMultipleRelationships(t *testing.T) {
 				{Name: "a", Sides: []*dgproto.Side{fixedSide("o", 1), fixedSide("l", 3)}},
 				{Name: "b", Sides: []*dgproto.Side{fixedSide("o", 1), fixedSide("l", 3)}},
 			},
-		},
+		}},
 	}
 
 	_, err := NewRuntime(spec)
@@ -480,7 +480,7 @@ func TestRelationshipRejectsUnknownIter(t *testing.T) {
 	}
 
 	spec := &dgproto.InsertSpec{
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "l", Size: 99},
 			Attrs:       []*dgproto.Attr{attr("v", rowGlobal())},
 			ColumnOrder: []string{"v"},
@@ -489,7 +489,7 @@ func TestRelationshipRejectsUnknownIter(t *testing.T) {
 			Relationships: []*dgproto.Relationship{
 				{Name: "rel", Sides: []*dgproto.Side{fixedSide("o", 1), fixedSide("l", 3)}},
 			},
-		},
+		}},
 	}
 
 	_, err := NewRuntime(spec)

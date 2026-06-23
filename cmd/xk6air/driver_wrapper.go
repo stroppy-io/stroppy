@@ -120,6 +120,51 @@ func (d *DriverWrapper) InsertSpecBin(specBin []byte) (*stats.Query, error) {
 	return result, nil
 }
 
+// InsertTpch loads one TPC-H table using the ported dbgen generator. The JS
+// side passes only the table name and scale factor; the spec (with the tpch
+// generator arm) is assembled here so workloads never model TpchSource in TS.
+// Method is driver-native (COPY / bulk / CSV shard); workers <= 0 means 1.
+func (d *DriverWrapper) InsertTpch(table string, scaleFactor float64, workers int) (*stats.Query, error) {
+	d.ensureReady()
+
+	if workers < 1 {
+		workers = 1
+	}
+
+	spec := &dgproto.InsertSpec{
+		Table:       table,
+		Method:      dgproto.InsertMethod_NATIVE,
+		Parallelism: &dgproto.Parallelism{Workers: int32(workers)},
+		Generator: &dgproto.InsertSpec_Tpch{
+			Tpch: &dgproto.TpchSource{Table: table, ScaleFactor: scaleFactor},
+		},
+	}
+
+	tracker, err := d.newInsertProgressTracker(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := d.vu.Context()
+	if tracker.Enabled() {
+		ctx = insertprogress.ContextWithTracker(ctx, tracker)
+		tracker.Start(ctx)
+	}
+
+	result, err := d.drv.InsertSpec(ctx, spec)
+	if tracker.Enabled() {
+		tracker.Finish(err)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error while executing InsertTpch %q: %w", table, err)
+	}
+
+	rootModule.txMetrics.recordInsert(d.vu, table, result.Rows)
+
+	return result, nil
+}
+
 func (d *DriverWrapper) newInsertProgressTracker(
 	spec *dgproto.InsertSpec,
 ) (*insertprogress.Tracker, error) {

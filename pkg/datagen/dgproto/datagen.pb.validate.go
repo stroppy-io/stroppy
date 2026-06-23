@@ -110,46 +110,6 @@ func (m *InsertSpec) validate(all bool) error {
 		}
 	}
 
-	if m.GetSource() == nil {
-		err := InsertSpecValidationError{
-			field:  "Source",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetSource()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, InsertSpecValidationError{
-					field:  "Source",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, InsertSpecValidationError{
-					field:  "Source",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetSource()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return InsertSpecValidationError{
-				field:  "Source",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
 	{
 		sorted_keys := make([]string, len(m.GetDicts()))
 		i := 0
@@ -194,6 +154,93 @@ func (m *InsertSpec) validate(all bool) error {
 			}
 
 		}
+	}
+
+	switch v := m.Generator.(type) {
+	case *InsertSpec_Source:
+		if v == nil {
+			err := InsertSpecValidationError{
+				field:  "Generator",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetSource()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InsertSpecValidationError{
+						field:  "Source",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InsertSpecValidationError{
+						field:  "Source",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSource()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InsertSpecValidationError{
+					field:  "Source",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *InsertSpec_Tpch:
+		if v == nil {
+			err := InsertSpecValidationError{
+				field:  "Generator",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetTpch()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InsertSpecValidationError{
+						field:  "Tpch",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InsertSpecValidationError{
+						field:  "Tpch",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTpch()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InsertSpecValidationError{
+					field:  "Tpch",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -272,6 +319,127 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = InsertSpecValidationError{}
+
+// Validate checks the field values on TpchSource with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *TpchSource) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TpchSource with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in TpchSourceMultiError, or
+// nil if none found.
+func (m *TpchSource) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TpchSource) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetTable()) < 1 {
+		err := TpchSourceValidationError{
+			field:  "Table",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetScaleFactor() <= 0 {
+		err := TpchSourceValidationError{
+			field:  "ScaleFactor",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return TpchSourceMultiError(errors)
+	}
+
+	return nil
+}
+
+// TpchSourceMultiError is an error wrapping multiple validation errors
+// returned by TpchSource.ValidateAll() if the designated constraints aren't met.
+type TpchSourceMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TpchSourceMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TpchSourceMultiError) AllErrors() []error { return m }
+
+// TpchSourceValidationError is the validation error returned by
+// TpchSource.Validate if the designated constraints aren't met.
+type TpchSourceValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TpchSourceValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TpchSourceValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TpchSourceValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TpchSourceValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TpchSourceValidationError) ErrorName() string { return "TpchSourceValidationError" }
+
+// Error satisfies the builtin error interface
+func (e TpchSourceValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTpchSource.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TpchSourceValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TpchSourceValidationError{}
 
 // Validate checks the field values on Parallelism with the rules defined in
 // the proto definition for this message. If any rules are violated, the first

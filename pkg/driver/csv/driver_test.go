@@ -90,11 +90,11 @@ func rowsSpec(table string, size int64, workers int32) *dgproto.InsertSpec {
 		Table:       table,
 		Method:      dgproto.InsertMethod_NATIVE,
 		Parallelism: &dgproto.Parallelism{Workers: workers},
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: table, Size: size},
 			Attrs:       attrs,
 			ColumnOrder: []string{"id", "squared", "label"},
-		},
+		}},
 	}
 }
 

@@ -55,11 +55,11 @@ func smokeSpec(size int64) *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "smoke",
 		Seed:  0xC0FFEE,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "smoke", Size: size},
 			Attrs:       attrs,
 			ColumnOrder: smokeColumns,
-		},
+		}},
 		Dicts: map[string]*dgproto.Dict{"categories": dict},
 	}
 }
@@ -300,11 +300,11 @@ func drawSmokeSpec(size int64) *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "smoke_draw",
 		Seed:  0xA1B2C3D4,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "smoke_draw", Size: size},
 			Attrs:       attrs,
 			ColumnOrder: drawSmokeColumns,
-		},
+		}},
 	}
 }
 
@@ -500,7 +500,7 @@ func cohortSmokeSpec(size int64) *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "smoke_cohort",
 		Seed:  0xC0FFEE42,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "smoke_cohort", Size: size},
 			Attrs:       attrs,
 			ColumnOrder: cohortSmokeColumns,
@@ -511,7 +511,7 @@ func cohortSmokeSpec(size int64) *dgproto.InsertSpec {
 				EntityMax:   9,
 				ActiveEvery: 2,
 			}},
-		},
+		}},
 	}
 }
 
@@ -685,7 +685,7 @@ func uniformChildSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "uniform_child",
 		Seed:  0xBEEFF00D,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "children", Size: 1},
 			Attrs:       innerAttrs,
 			ColumnOrder: uniformChildColumns,
@@ -694,7 +694,7 @@ func uniformChildSpec() *dgproto.InsertSpec {
 				Name:  "rel",
 				Sides: sides,
 			}},
-		},
+		}},
 	}
 }
 
@@ -806,12 +806,12 @@ func scd2SmokeSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "smoke_scd2",
 		Seed:  0xC0D1CE,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "smoke_scd2", Size: 10},
 			Attrs:       attrs,
 			ColumnOrder: scd2Columns,
 			Scd2:        cfg,
-		},
+		}},
 	}
 }
 
@@ -917,11 +917,11 @@ func nullLiteralSpec(size int64) *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "smoke_null_literal",
 		Seed:  0xA5A5A5A5,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "smoke_null_literal", Size: size},
 			Attrs:       attrs,
 			ColumnOrder: nullLiteralColumns,
-		},
+		}},
 	}
 }
 

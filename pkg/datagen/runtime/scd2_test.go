@@ -18,12 +18,12 @@ func scd2Spec(
 	cfg *dgproto.SCD2,
 ) *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "p", Size: size},
 			Attrs:       attrs,
 			ColumnOrder: columnOrder,
 			Scd2:        cfg,
-		},
+		}},
 	}
 }
 

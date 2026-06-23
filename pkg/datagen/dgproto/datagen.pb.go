@@ -131,7 +131,7 @@ func (x RowIndex_Kind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RowIndex_Kind.Descriptor instead.
 func (RowIndex_Kind) EnumDescriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{10, 0}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{11, 0}
 }
 
 // Op selects the operator; NOT is unary and uses only field `a`.
@@ -235,7 +235,7 @@ func (x BinOp_Op) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BinOp_Op.Descriptor instead.
 func (BinOp_Op) EnumDescriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{13, 0}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{14, 0}
 }
 
 // InsertSpec is the boundary message a workload emits per table load.
@@ -249,8 +249,15 @@ type InsertSpec struct {
 	Method InsertMethod `protobuf:"varint,3,opt,name=method,proto3,enum=stroppy.datagen.InsertMethod" json:"method,omitempty"`
 	// Worker hint for the Loader; clamped to the global cap.
 	Parallelism *Parallelism `protobuf:"bytes,4,opt,name=parallelism,proto3" json:"parallelism,omitempty"`
-	// Relational descriptor for the rows this spec emits.
-	Source *RelSource `protobuf:"bytes,5,opt,name=source,proto3" json:"source,omitempty"`
+	// Generator backend that produces this spec's rows. Exactly one arm is set:
+	// `source` for the native seekable evaluator, `tpch` for the ported TPC-H
+	// dbgen generator.
+	//
+	// Types that are valid to be assigned to Generator:
+	//
+	//	*InsertSpec_Source
+	//	*InsertSpec_Tpch
+	Generator isInsertSpec_Generator `protobuf_oneof:"generator"`
 	// Dict bodies keyed by the opaque TS-assigned ID that attrs reference.
 	Dicts         map[string]*Dict `protobuf:"bytes,6,rep,name=dicts,proto3" json:"dicts,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
@@ -315,9 +322,27 @@ func (x *InsertSpec) GetParallelism() *Parallelism {
 	return nil
 }
 
+func (x *InsertSpec) GetGenerator() isInsertSpec_Generator {
+	if x != nil {
+		return x.Generator
+	}
+	return nil
+}
+
 func (x *InsertSpec) GetSource() *RelSource {
 	if x != nil {
-		return x.Source
+		if x, ok := x.Generator.(*InsertSpec_Source); ok {
+			return x.Source
+		}
+	}
+	return nil
+}
+
+func (x *InsertSpec) GetTpch() *TpchSource {
+	if x != nil {
+		if x, ok := x.Generator.(*InsertSpec_Tpch); ok {
+			return x.Tpch
+		}
 	}
 	return nil
 }
@@ -327,6 +352,83 @@ func (x *InsertSpec) GetDicts() map[string]*Dict {
 		return x.Dicts
 	}
 	return nil
+}
+
+type isInsertSpec_Generator interface {
+	isInsertSpec_Generator()
+}
+
+type InsertSpec_Source struct {
+	// Relational descriptor for the rows this spec emits.
+	Source *RelSource `protobuf:"bytes,5,opt,name=source,proto3,oneof"`
+}
+
+type InsertSpec_Tpch struct {
+	// Ported TPC-H dbgen backend descriptor.
+	Tpch *TpchSource `protobuf:"bytes,7,opt,name=tpch,proto3,oneof"`
+}
+
+func (*InsertSpec_Source) isInsertSpec_Generator() {}
+
+func (*InsertSpec_Tpch) isInsertSpec_Generator() {}
+
+// TpchSource selects the ported TPC-H dbgen generator for one table. The table
+// schema and column order are fixed by the TPC-H spec, so only the table name
+// and scale factor are needed; the Go side owns the generation.
+type TpchSource struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// TPC-H table to load: one of region, nation, part, supplier, partsupp,
+	// customer, orders, lineitem.
+	Table string `protobuf:"bytes,1,opt,name=table,proto3" json:"table,omitempty"`
+	// Scale factor. Fractional values are allowed (e.g. 0.01 for tests); every
+	// table scales by the same factor so foreign keys stay consistent.
+	ScaleFactor   float64 `protobuf:"fixed64,2,opt,name=scale_factor,json=scaleFactor,proto3" json:"scale_factor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TpchSource) Reset() {
+	*x = TpchSource{}
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TpchSource) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TpchSource) ProtoMessage() {}
+
+func (x *TpchSource) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TpchSource.ProtoReflect.Descriptor instead.
+func (*TpchSource) Descriptor() ([]byte, []int) {
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TpchSource) GetTable() string {
+	if x != nil {
+		return x.Table
+	}
+	return ""
+}
+
+func (x *TpchSource) GetScaleFactor() float64 {
+	if x != nil {
+		return x.ScaleFactor
+	}
+	return 0
 }
 
 // Parallelism carries worker hints from the spec author.
@@ -340,7 +442,7 @@ type Parallelism struct {
 
 func (x *Parallelism) Reset() {
 	*x = Parallelism{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[1]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -352,7 +454,7 @@ func (x *Parallelism) String() string {
 func (*Parallelism) ProtoMessage() {}
 
 func (x *Parallelism) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[1]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -365,7 +467,7 @@ func (x *Parallelism) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Parallelism.ProtoReflect.Descriptor instead.
 func (*Parallelism) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{1}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Parallelism) GetWorkers() int32 {
@@ -393,7 +495,7 @@ type Dict struct {
 
 func (x *Dict) Reset() {
 	*x = Dict{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[2]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -405,7 +507,7 @@ func (x *Dict) String() string {
 func (*Dict) ProtoMessage() {}
 
 func (x *Dict) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[2]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -418,7 +520,7 @@ func (x *Dict) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Dict.ProtoReflect.Descriptor instead.
 func (*Dict) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{2}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Dict) GetColumns() []string {
@@ -455,7 +557,7 @@ type DictRow struct {
 
 func (x *DictRow) Reset() {
 	*x = DictRow{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[3]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +569,7 @@ func (x *DictRow) String() string {
 func (*DictRow) ProtoMessage() {}
 
 func (x *DictRow) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[3]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +582,7 @@ func (x *DictRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictRow.ProtoReflect.Descriptor instead.
 func (*DictRow) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{3}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *DictRow) GetValues() []string {
@@ -526,7 +628,7 @@ type RelSource struct {
 
 func (x *RelSource) Reset() {
 	*x = RelSource{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[4]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -538,7 +640,7 @@ func (x *RelSource) String() string {
 func (*RelSource) ProtoMessage() {}
 
 func (x *RelSource) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[4]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -551,7 +653,7 @@ func (x *RelSource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelSource.ProtoReflect.Descriptor instead.
 func (*RelSource) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{4}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RelSource) GetPopulation() *Population {
@@ -626,7 +728,7 @@ type Population struct {
 
 func (x *Population) Reset() {
 	*x = Population{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[5]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -638,7 +740,7 @@ func (x *Population) String() string {
 func (*Population) ProtoMessage() {}
 
 func (x *Population) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[5]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -651,7 +753,7 @@ func (x *Population) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Population.ProtoReflect.Descriptor instead.
 func (*Population) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{5}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Population) GetName() string {
@@ -690,7 +792,7 @@ type Attr struct {
 
 func (x *Attr) Reset() {
 	*x = Attr{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[6]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -702,7 +804,7 @@ func (x *Attr) String() string {
 func (*Attr) ProtoMessage() {}
 
 func (x *Attr) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[6]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -715,7 +817,7 @@ func (x *Attr) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Attr.ProtoReflect.Descriptor instead.
 func (*Attr) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{6}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Attr) GetName() string {
@@ -753,7 +855,7 @@ type Null struct {
 
 func (x *Null) Reset() {
 	*x = Null{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[7]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -765,7 +867,7 @@ func (x *Null) String() string {
 func (*Null) ProtoMessage() {}
 
 func (x *Null) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[7]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -778,7 +880,7 @@ func (x *Null) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Null.ProtoReflect.Descriptor instead.
 func (*Null) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{7}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Null) GetRate() float32 {
@@ -820,7 +922,7 @@ type Expr struct {
 
 func (x *Expr) Reset() {
 	*x = Expr{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[8]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -832,7 +934,7 @@ func (x *Expr) String() string {
 func (*Expr) ProtoMessage() {}
 
 func (x *Expr) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[8]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -845,7 +947,7 @@ func (x *Expr) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Expr.ProtoReflect.Descriptor instead.
 func (*Expr) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{8}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Expr) GetKind() isExpr_Kind {
@@ -1079,7 +1181,7 @@ type ColRef struct {
 
 func (x *ColRef) Reset() {
 	*x = ColRef{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[9]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1091,7 +1193,7 @@ func (x *ColRef) String() string {
 func (*ColRef) ProtoMessage() {}
 
 func (x *ColRef) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[9]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1104,7 +1206,7 @@ func (x *ColRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ColRef.ProtoReflect.Descriptor instead.
 func (*ColRef) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{9}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ColRef) GetName() string {
@@ -1125,7 +1227,7 @@ type RowIndex struct {
 
 func (x *RowIndex) Reset() {
 	*x = RowIndex{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[10]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1137,7 +1239,7 @@ func (x *RowIndex) String() string {
 func (*RowIndex) ProtoMessage() {}
 
 func (x *RowIndex) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[10]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1150,7 +1252,7 @@ func (x *RowIndex) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RowIndex.ProtoReflect.Descriptor instead.
 func (*RowIndex) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{10}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RowIndex) GetKind() RowIndex_Kind {
@@ -1179,7 +1281,7 @@ type Literal struct {
 
 func (x *Literal) Reset() {
 	*x = Literal{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[11]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1191,7 +1293,7 @@ func (x *Literal) String() string {
 func (*Literal) ProtoMessage() {}
 
 func (x *Literal) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[11]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1204,7 +1306,7 @@ func (x *Literal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Literal.ProtoReflect.Descriptor instead.
 func (*Literal) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{11}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Literal) GetValue() isLiteral_Value {
@@ -1343,7 +1445,7 @@ type NullMarker struct {
 
 func (x *NullMarker) Reset() {
 	*x = NullMarker{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[12]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1355,7 +1457,7 @@ func (x *NullMarker) String() string {
 func (*NullMarker) ProtoMessage() {}
 
 func (x *NullMarker) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[12]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1368,7 +1470,7 @@ func (x *NullMarker) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NullMarker.ProtoReflect.Descriptor instead.
 func (*NullMarker) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{12}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{13}
 }
 
 // BinOp applies an arithmetic, comparison, or logical operator to sub-expressions.
@@ -1386,7 +1488,7 @@ type BinOp struct {
 
 func (x *BinOp) Reset() {
 	*x = BinOp{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[13]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1398,7 +1500,7 @@ func (x *BinOp) String() string {
 func (*BinOp) ProtoMessage() {}
 
 func (x *BinOp) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[13]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1411,7 +1513,7 @@ func (x *BinOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BinOp.ProtoReflect.Descriptor instead.
 func (*BinOp) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{13}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *BinOp) GetOp() BinOp_Op {
@@ -1448,7 +1550,7 @@ type Call struct {
 
 func (x *Call) Reset() {
 	*x = Call{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[14]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1460,7 +1562,7 @@ func (x *Call) String() string {
 func (*Call) ProtoMessage() {}
 
 func (x *Call) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[14]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1473,7 +1575,7 @@ func (x *Call) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Call.ProtoReflect.Descriptor instead.
 func (*Call) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{14}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Call) GetFunc() string {
@@ -1505,7 +1607,7 @@ type If struct {
 
 func (x *If) Reset() {
 	*x = If{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[15]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1517,7 +1619,7 @@ func (x *If) String() string {
 func (*If) ProtoMessage() {}
 
 func (x *If) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[15]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1530,7 +1632,7 @@ func (x *If) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use If.ProtoReflect.Descriptor instead.
 func (*If) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{15}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *If) GetCond() *Expr {
@@ -1569,7 +1671,7 @@ type DictAt struct {
 
 func (x *DictAt) Reset() {
 	*x = DictAt{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[16]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1581,7 +1683,7 @@ func (x *DictAt) String() string {
 func (*DictAt) ProtoMessage() {}
 
 func (x *DictAt) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[16]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1594,7 +1696,7 @@ func (x *DictAt) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DictAt.ProtoReflect.Descriptor instead.
 func (*DictAt) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{16}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *DictAt) GetDictKey() string {
@@ -1631,7 +1733,7 @@ type Relationship struct {
 
 func (x *Relationship) Reset() {
 	*x = Relationship{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[17]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1643,7 +1745,7 @@ func (x *Relationship) String() string {
 func (*Relationship) ProtoMessage() {}
 
 func (x *Relationship) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[17]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1656,7 +1758,7 @@ func (x *Relationship) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Relationship.ProtoReflect.Descriptor instead.
 func (*Relationship) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{17}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Relationship) GetName() string {
@@ -1692,7 +1794,7 @@ type Side struct {
 
 func (x *Side) Reset() {
 	*x = Side{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[18]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1704,7 +1806,7 @@ func (x *Side) String() string {
 func (*Side) ProtoMessage() {}
 
 func (x *Side) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[18]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1717,7 +1819,7 @@ func (x *Side) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Side.ProtoReflect.Descriptor instead.
 func (*Side) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{18}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Side) GetPopulation() string {
@@ -1762,7 +1864,7 @@ type Degree struct {
 
 func (x *Degree) Reset() {
 	*x = Degree{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[19]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1774,7 +1876,7 @@ func (x *Degree) String() string {
 func (*Degree) ProtoMessage() {}
 
 func (x *Degree) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[19]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1787,7 +1889,7 @@ func (x *Degree) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Degree.ProtoReflect.Descriptor instead.
 func (*Degree) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{19}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Degree) GetKind() isDegree_Kind {
@@ -1844,7 +1946,7 @@ type DegreeFixed struct {
 
 func (x *DegreeFixed) Reset() {
 	*x = DegreeFixed{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[20]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1856,7 +1958,7 @@ func (x *DegreeFixed) String() string {
 func (*DegreeFixed) ProtoMessage() {}
 
 func (x *DegreeFixed) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[20]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1869,7 +1971,7 @@ func (x *DegreeFixed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DegreeFixed.ProtoReflect.Descriptor instead.
 func (*DegreeFixed) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{20}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DegreeFixed) GetCount() int64 {
@@ -1892,7 +1994,7 @@ type DegreeUniform struct {
 
 func (x *DegreeUniform) Reset() {
 	*x = DegreeUniform{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[21]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1904,7 +2006,7 @@ func (x *DegreeUniform) String() string {
 func (*DegreeUniform) ProtoMessage() {}
 
 func (x *DegreeUniform) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[21]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1917,7 +2019,7 @@ func (x *DegreeUniform) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DegreeUniform.ProtoReflect.Descriptor instead.
 func (*DegreeUniform) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{21}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *DegreeUniform) GetMin() int64 {
@@ -1949,7 +2051,7 @@ type Strategy struct {
 
 func (x *Strategy) Reset() {
 	*x = Strategy{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[22]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1961,7 +2063,7 @@ func (x *Strategy) String() string {
 func (*Strategy) ProtoMessage() {}
 
 func (x *Strategy) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[22]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1974,7 +2076,7 @@ func (x *Strategy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Strategy.ProtoReflect.Descriptor instead.
 func (*Strategy) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{22}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *Strategy) GetKind() isStrategy_Kind {
@@ -2045,7 +2147,7 @@ type StrategyHash struct {
 
 func (x *StrategyHash) Reset() {
 	*x = StrategyHash{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[23]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2057,7 +2159,7 @@ func (x *StrategyHash) String() string {
 func (*StrategyHash) ProtoMessage() {}
 
 func (x *StrategyHash) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[23]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2070,7 +2172,7 @@ func (x *StrategyHash) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StrategyHash.ProtoReflect.Descriptor instead.
 func (*StrategyHash) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{23}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{24}
 }
 
 // StrategySequential walks inner entities in order.
@@ -2082,7 +2184,7 @@ type StrategySequential struct {
 
 func (x *StrategySequential) Reset() {
 	*x = StrategySequential{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[24]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2094,7 +2196,7 @@ func (x *StrategySequential) String() string {
 func (*StrategySequential) ProtoMessage() {}
 
 func (x *StrategySequential) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[24]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2107,7 +2209,7 @@ func (x *StrategySequential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StrategySequential.ProtoReflect.Descriptor instead.
 func (*StrategySequential) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{24}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{25}
 }
 
 // StrategyEquitable distributes inner entities evenly across outer ones.
@@ -2119,7 +2221,7 @@ type StrategyEquitable struct {
 
 func (x *StrategyEquitable) Reset() {
 	*x = StrategyEquitable{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[25]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2131,7 +2233,7 @@ func (x *StrategyEquitable) String() string {
 func (*StrategyEquitable) ProtoMessage() {}
 
 func (x *StrategyEquitable) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[25]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2144,7 +2246,7 @@ func (x *StrategyEquitable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StrategyEquitable.ProtoReflect.Descriptor instead.
 func (*StrategyEquitable) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{25}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{26}
 }
 
 // BlockSlot is a named expression cached per outer-side entity boundary.
@@ -2160,7 +2262,7 @@ type BlockSlot struct {
 
 func (x *BlockSlot) Reset() {
 	*x = BlockSlot{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[26]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2172,7 +2274,7 @@ func (x *BlockSlot) String() string {
 func (*BlockSlot) ProtoMessage() {}
 
 func (x *BlockSlot) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[26]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2185,7 +2287,7 @@ func (x *BlockSlot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockSlot.ProtoReflect.Descriptor instead.
 func (*BlockSlot) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{26}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *BlockSlot) GetName() string {
@@ -2214,7 +2316,7 @@ type BlockRef struct {
 
 func (x *BlockRef) Reset() {
 	*x = BlockRef{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[27]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2226,7 +2328,7 @@ func (x *BlockRef) String() string {
 func (*BlockRef) ProtoMessage() {}
 
 func (x *BlockRef) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[27]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2239,7 +2341,7 @@ func (x *BlockRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockRef.ProtoReflect.Descriptor instead.
 func (*BlockRef) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{27}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *BlockRef) GetSlot() string {
@@ -2265,7 +2367,7 @@ type Lookup struct {
 
 func (x *Lookup) Reset() {
 	*x = Lookup{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[28]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2277,7 +2379,7 @@ func (x *Lookup) String() string {
 func (*Lookup) ProtoMessage() {}
 
 func (x *Lookup) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[28]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2290,7 +2392,7 @@ func (x *Lookup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Lookup.ProtoReflect.Descriptor instead.
 func (*Lookup) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{28}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Lookup) GetTargetPop() string {
@@ -2330,7 +2432,7 @@ type LookupPop struct {
 
 func (x *LookupPop) Reset() {
 	*x = LookupPop{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[29]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2342,7 +2444,7 @@ func (x *LookupPop) String() string {
 func (*LookupPop) ProtoMessage() {}
 
 func (x *LookupPop) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[29]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2355,7 +2457,7 @@ func (x *LookupPop) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LookupPop.ProtoReflect.Descriptor instead.
 func (*LookupPop) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{29}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *LookupPop) GetPopulation() *Population {
@@ -2411,7 +2513,7 @@ type StreamDraw struct {
 
 func (x *StreamDraw) Reset() {
 	*x = StreamDraw{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[30]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2423,7 +2525,7 @@ func (x *StreamDraw) String() string {
 func (*StreamDraw) ProtoMessage() {}
 
 func (x *StreamDraw) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[30]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2436,7 +2538,7 @@ func (x *StreamDraw) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamDraw.ProtoReflect.Descriptor instead.
 func (*StreamDraw) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{30}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *StreamDraw) GetStreamId() uint32 {
@@ -2678,7 +2780,7 @@ type DrawIntUniform struct {
 
 func (x *DrawIntUniform) Reset() {
 	*x = DrawIntUniform{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[31]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2690,7 +2792,7 @@ func (x *DrawIntUniform) String() string {
 func (*DrawIntUniform) ProtoMessage() {}
 
 func (x *DrawIntUniform) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[31]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2703,7 +2805,7 @@ func (x *DrawIntUniform) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawIntUniform.ProtoReflect.Descriptor instead.
 func (*DrawIntUniform) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{31}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *DrawIntUniform) GetMin() *Expr {
@@ -2733,7 +2835,7 @@ type DrawFloatUniform struct {
 
 func (x *DrawFloatUniform) Reset() {
 	*x = DrawFloatUniform{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[32]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2745,7 +2847,7 @@ func (x *DrawFloatUniform) String() string {
 func (*DrawFloatUniform) ProtoMessage() {}
 
 func (x *DrawFloatUniform) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[32]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2758,7 +2860,7 @@ func (x *DrawFloatUniform) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawFloatUniform.ProtoReflect.Descriptor instead.
 func (*DrawFloatUniform) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{32}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *DrawFloatUniform) GetMin() *Expr {
@@ -2792,7 +2894,7 @@ type DrawNormal struct {
 
 func (x *DrawNormal) Reset() {
 	*x = DrawNormal{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[33]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2804,7 +2906,7 @@ func (x *DrawNormal) String() string {
 func (*DrawNormal) ProtoMessage() {}
 
 func (x *DrawNormal) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[33]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2817,7 +2919,7 @@ func (x *DrawNormal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawNormal.ProtoReflect.Descriptor instead.
 func (*DrawNormal) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{33}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *DrawNormal) GetMin() *Expr {
@@ -2856,7 +2958,7 @@ type DrawZipf struct {
 
 func (x *DrawZipf) Reset() {
 	*x = DrawZipf{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[34]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2868,7 +2970,7 @@ func (x *DrawZipf) String() string {
 func (*DrawZipf) ProtoMessage() {}
 
 func (x *DrawZipf) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[34]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2881,7 +2983,7 @@ func (x *DrawZipf) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawZipf.ProtoReflect.Descriptor instead.
 func (*DrawZipf) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{34}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *DrawZipf) GetMin() *Expr {
@@ -2922,7 +3024,7 @@ type DrawNURand struct {
 
 func (x *DrawNURand) Reset() {
 	*x = DrawNURand{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[35]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2934,7 +3036,7 @@ func (x *DrawNURand) String() string {
 func (*DrawNURand) ProtoMessage() {}
 
 func (x *DrawNURand) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[35]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2947,7 +3049,7 @@ func (x *DrawNURand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawNURand.ProtoReflect.Descriptor instead.
 func (*DrawNURand) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{35}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *DrawNURand) GetA() int64 {
@@ -2989,7 +3091,7 @@ type DrawBernoulli struct {
 
 func (x *DrawBernoulli) Reset() {
 	*x = DrawBernoulli{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[36]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3001,7 +3103,7 @@ func (x *DrawBernoulli) String() string {
 func (*DrawBernoulli) ProtoMessage() {}
 
 func (x *DrawBernoulli) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[36]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3014,7 +3116,7 @@ func (x *DrawBernoulli) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawBernoulli.ProtoReflect.Descriptor instead.
 func (*DrawBernoulli) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{36}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *DrawBernoulli) GetP() float32 {
@@ -3038,7 +3140,7 @@ type DrawDict struct {
 
 func (x *DrawDict) Reset() {
 	*x = DrawDict{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[37]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3050,7 +3152,7 @@ func (x *DrawDict) String() string {
 func (*DrawDict) ProtoMessage() {}
 
 func (x *DrawDict) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[37]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3063,7 +3165,7 @@ func (x *DrawDict) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawDict.ProtoReflect.Descriptor instead.
 func (*DrawDict) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{37}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *DrawDict) GetDictKey() string {
@@ -3099,7 +3201,7 @@ type DrawJoint struct {
 
 func (x *DrawJoint) Reset() {
 	*x = DrawJoint{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[38]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3111,7 +3213,7 @@ func (x *DrawJoint) String() string {
 func (*DrawJoint) ProtoMessage() {}
 
 func (x *DrawJoint) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[38]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3124,7 +3226,7 @@ func (x *DrawJoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawJoint.ProtoReflect.Descriptor instead.
 func (*DrawJoint) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{38}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *DrawJoint) GetDictKey() string {
@@ -3169,7 +3271,7 @@ type DrawDate struct {
 
 func (x *DrawDate) Reset() {
 	*x = DrawDate{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[39]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3181,7 +3283,7 @@ func (x *DrawDate) String() string {
 func (*DrawDate) ProtoMessage() {}
 
 func (x *DrawDate) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[39]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3194,7 +3296,7 @@ func (x *DrawDate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawDate.ProtoReflect.Descriptor instead.
 func (*DrawDate) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{39}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *DrawDate) GetMinDaysEpoch() int64 {
@@ -3227,7 +3329,7 @@ type DrawDecimal struct {
 
 func (x *DrawDecimal) Reset() {
 	*x = DrawDecimal{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[40]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3239,7 +3341,7 @@ func (x *DrawDecimal) String() string {
 func (*DrawDecimal) ProtoMessage() {}
 
 func (x *DrawDecimal) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[40]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3252,7 +3354,7 @@ func (x *DrawDecimal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawDecimal.ProtoReflect.Descriptor instead.
 func (*DrawDecimal) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{40}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *DrawDecimal) GetMin() *Expr {
@@ -3293,7 +3395,7 @@ type DrawAscii struct {
 
 func (x *DrawAscii) Reset() {
 	*x = DrawAscii{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[41]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3305,7 +3407,7 @@ func (x *DrawAscii) String() string {
 func (*DrawAscii) ProtoMessage() {}
 
 func (x *DrawAscii) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[41]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3318,7 +3420,7 @@ func (x *DrawAscii) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawAscii.ProtoReflect.Descriptor instead.
 func (*DrawAscii) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{41}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *DrawAscii) GetMinLen() *Expr {
@@ -3356,7 +3458,7 @@ type AsciiRange struct {
 
 func (x *AsciiRange) Reset() {
 	*x = AsciiRange{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[42]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3368,7 +3470,7 @@ func (x *AsciiRange) String() string {
 func (*AsciiRange) ProtoMessage() {}
 
 func (x *AsciiRange) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[42]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3381,7 +3483,7 @@ func (x *AsciiRange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AsciiRange.ProtoReflect.Descriptor instead.
 func (*AsciiRange) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{42}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *AsciiRange) GetMin() uint32 {
@@ -3418,7 +3520,7 @@ type DrawPhrase struct {
 
 func (x *DrawPhrase) Reset() {
 	*x = DrawPhrase{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[43]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3430,7 +3532,7 @@ func (x *DrawPhrase) String() string {
 func (*DrawPhrase) ProtoMessage() {}
 
 func (x *DrawPhrase) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[43]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3443,7 +3545,7 @@ func (x *DrawPhrase) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawPhrase.ProtoReflect.Descriptor instead.
 func (*DrawPhrase) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{43}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *DrawPhrase) GetVocabKey() string {
@@ -3506,7 +3608,7 @@ type DrawGrammar struct {
 
 func (x *DrawGrammar) Reset() {
 	*x = DrawGrammar{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[44]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3518,7 +3620,7 @@ func (x *DrawGrammar) String() string {
 func (*DrawGrammar) ProtoMessage() {}
 
 func (x *DrawGrammar) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[44]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3531,7 +3633,7 @@ func (x *DrawGrammar) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawGrammar.ProtoReflect.Descriptor instead.
 func (*DrawGrammar) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{44}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *DrawGrammar) GetRootDict() string {
@@ -3584,7 +3686,7 @@ type Choose struct {
 
 func (x *Choose) Reset() {
 	*x = Choose{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[45]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3596,7 +3698,7 @@ func (x *Choose) String() string {
 func (*Choose) ProtoMessage() {}
 
 func (x *Choose) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[45]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3609,7 +3711,7 @@ func (x *Choose) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Choose.ProtoReflect.Descriptor instead.
 func (*Choose) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{45}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *Choose) GetStreamId() uint32 {
@@ -3639,7 +3741,7 @@ type ChooseBranch struct {
 
 func (x *ChooseBranch) Reset() {
 	*x = ChooseBranch{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[46]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3651,7 +3753,7 @@ func (x *ChooseBranch) String() string {
 func (*ChooseBranch) ProtoMessage() {}
 
 func (x *ChooseBranch) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[46]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3664,7 +3766,7 @@ func (x *ChooseBranch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChooseBranch.ProtoReflect.Descriptor instead.
 func (*ChooseBranch) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{46}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *ChooseBranch) GetWeight() int64 {
@@ -3715,7 +3817,7 @@ type Cohort struct {
 
 func (x *Cohort) Reset() {
 	*x = Cohort{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[47]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3727,7 +3829,7 @@ func (x *Cohort) String() string {
 func (*Cohort) ProtoMessage() {}
 
 func (x *Cohort) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[47]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3740,7 +3842,7 @@ func (x *Cohort) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Cohort.ProtoReflect.Descriptor instead.
 func (*Cohort) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{47}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *Cohort) GetName() string {
@@ -3824,7 +3926,7 @@ type CohortDraw struct {
 
 func (x *CohortDraw) Reset() {
 	*x = CohortDraw{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[48]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3836,7 +3938,7 @@ func (x *CohortDraw) String() string {
 func (*CohortDraw) ProtoMessage() {}
 
 func (x *CohortDraw) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[48]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3849,7 +3951,7 @@ func (x *CohortDraw) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CohortDraw.ProtoReflect.Descriptor instead.
 func (*CohortDraw) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{48}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *CohortDraw) GetName() string {
@@ -3889,7 +3991,7 @@ type CohortLive struct {
 
 func (x *CohortLive) Reset() {
 	*x = CohortLive{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[49]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3901,7 +4003,7 @@ func (x *CohortLive) String() string {
 func (*CohortLive) ProtoMessage() {}
 
 func (x *CohortLive) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[49]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3914,7 +4016,7 @@ func (x *CohortLive) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CohortLive.ProtoReflect.Descriptor instead.
 func (*CohortLive) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{49}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *CohortLive) GetName() string {
@@ -3965,7 +4067,7 @@ type SCD2 struct {
 
 func (x *SCD2) Reset() {
 	*x = SCD2{}
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[50]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3977,7 +4079,7 @@ func (x *SCD2) String() string {
 func (*SCD2) ProtoMessage() {}
 
 func (x *SCD2) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_stroppy_datagen_proto_msgTypes[50]
+	mi := &file_proto_stroppy_datagen_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3990,7 +4092,7 @@ func (x *SCD2) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SCD2.ProtoReflect.Descriptor instead.
 func (*SCD2) Descriptor() ([]byte, []int) {
-	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{50}
+	return file_proto_stroppy_datagen_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *SCD2) GetStartCol() string {
@@ -4046,19 +4148,25 @@ var File_proto_stroppy_datagen_proto protoreflect.FileDescriptor
 
 const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\n" +
-	"\x1bproto/stroppy/datagen.proto\x12\x0fstroppy.datagen\x1a\x17validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8d\x03\n" +
+	"\x1bproto/stroppy/datagen.proto\x12\x0fstroppy.datagen\x1a\x17validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc5\x03\n" +
 	"\n" +
 	"InsertSpec\x12\x1d\n" +
 	"\x05table\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x05table\x12\x12\n" +
 	"\x04seed\x18\x02 \x01(\x04R\x04seed\x12?\n" +
 	"\x06method\x18\x03 \x01(\x0e2\x1d.stroppy.datagen.InsertMethodB\b\xfaB\x05\x82\x01\x02\x10\x01R\x06method\x12>\n" +
-	"\vparallelism\x18\x04 \x01(\v2\x1c.stroppy.datagen.ParallelismR\vparallelism\x12<\n" +
-	"\x06source\x18\x05 \x01(\v2\x1a.stroppy.datagen.RelSourceB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x06source\x12<\n" +
+	"\vparallelism\x18\x04 \x01(\v2\x1c.stroppy.datagen.ParallelismR\vparallelism\x124\n" +
+	"\x06source\x18\x05 \x01(\v2\x1a.stroppy.datagen.RelSourceH\x00R\x06source\x121\n" +
+	"\x04tpch\x18\a \x01(\v2\x1b.stroppy.datagen.TpchSourceH\x00R\x04tpch\x12<\n" +
 	"\x05dicts\x18\x06 \x03(\v2&.stroppy.datagen.InsertSpec.DictsEntryR\x05dicts\x1aO\n" +
 	"\n" +
 	"DictsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12+\n" +
-	"\x05value\x18\x02 \x01(\v2\x15.stroppy.datagen.DictR\x05value:\x028\x01\"'\n" +
+	"\x05value\x18\x02 \x01(\v2\x15.stroppy.datagen.DictR\x05value:\x028\x01B\v\n" +
+	"\tgenerator\"^\n" +
+	"\n" +
+	"TpchSource\x12\x1d\n" +
+	"\x05table\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x05table\x121\n" +
+	"\fscale_factor\x18\x02 \x01(\x01B\x0e\xfaB\v\x12\t!\x00\x00\x00\x00\x00\x00\x00\x00R\vscaleFactor\"'\n" +
 	"\vParallelism\x12\x18\n" +
 	"\aworkers\x18\x01 \x01(\x05R\aworkers\"o\n" +
 	"\x04Dict\x12\x18\n" +
@@ -4366,167 +4474,169 @@ func file_proto_stroppy_datagen_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_stroppy_datagen_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_proto_stroppy_datagen_proto_msgTypes = make([]protoimpl.MessageInfo, 54)
+var file_proto_stroppy_datagen_proto_msgTypes = make([]protoimpl.MessageInfo, 55)
 var file_proto_stroppy_datagen_proto_goTypes = []any{
 	(InsertMethod)(0),             // 0: stroppy.datagen.InsertMethod
 	(RowIndex_Kind)(0),            // 1: stroppy.datagen.RowIndex.Kind
 	(BinOp_Op)(0),                 // 2: stroppy.datagen.BinOp.Op
 	(*InsertSpec)(nil),            // 3: stroppy.datagen.InsertSpec
-	(*Parallelism)(nil),           // 4: stroppy.datagen.Parallelism
-	(*Dict)(nil),                  // 5: stroppy.datagen.Dict
-	(*DictRow)(nil),               // 6: stroppy.datagen.DictRow
-	(*RelSource)(nil),             // 7: stroppy.datagen.RelSource
-	(*Population)(nil),            // 8: stroppy.datagen.Population
-	(*Attr)(nil),                  // 9: stroppy.datagen.Attr
-	(*Null)(nil),                  // 10: stroppy.datagen.Null
-	(*Expr)(nil),                  // 11: stroppy.datagen.Expr
-	(*ColRef)(nil),                // 12: stroppy.datagen.ColRef
-	(*RowIndex)(nil),              // 13: stroppy.datagen.RowIndex
-	(*Literal)(nil),               // 14: stroppy.datagen.Literal
-	(*NullMarker)(nil),            // 15: stroppy.datagen.NullMarker
-	(*BinOp)(nil),                 // 16: stroppy.datagen.BinOp
-	(*Call)(nil),                  // 17: stroppy.datagen.Call
-	(*If)(nil),                    // 18: stroppy.datagen.If
-	(*DictAt)(nil),                // 19: stroppy.datagen.DictAt
-	(*Relationship)(nil),          // 20: stroppy.datagen.Relationship
-	(*Side)(nil),                  // 21: stroppy.datagen.Side
-	(*Degree)(nil),                // 22: stroppy.datagen.Degree
-	(*DegreeFixed)(nil),           // 23: stroppy.datagen.DegreeFixed
-	(*DegreeUniform)(nil),         // 24: stroppy.datagen.DegreeUniform
-	(*Strategy)(nil),              // 25: stroppy.datagen.Strategy
-	(*StrategyHash)(nil),          // 26: stroppy.datagen.StrategyHash
-	(*StrategySequential)(nil),    // 27: stroppy.datagen.StrategySequential
-	(*StrategyEquitable)(nil),     // 28: stroppy.datagen.StrategyEquitable
-	(*BlockSlot)(nil),             // 29: stroppy.datagen.BlockSlot
-	(*BlockRef)(nil),              // 30: stroppy.datagen.BlockRef
-	(*Lookup)(nil),                // 31: stroppy.datagen.Lookup
-	(*LookupPop)(nil),             // 32: stroppy.datagen.LookupPop
-	(*StreamDraw)(nil),            // 33: stroppy.datagen.StreamDraw
-	(*DrawIntUniform)(nil),        // 34: stroppy.datagen.DrawIntUniform
-	(*DrawFloatUniform)(nil),      // 35: stroppy.datagen.DrawFloatUniform
-	(*DrawNormal)(nil),            // 36: stroppy.datagen.DrawNormal
-	(*DrawZipf)(nil),              // 37: stroppy.datagen.DrawZipf
-	(*DrawNURand)(nil),            // 38: stroppy.datagen.DrawNURand
-	(*DrawBernoulli)(nil),         // 39: stroppy.datagen.DrawBernoulli
-	(*DrawDict)(nil),              // 40: stroppy.datagen.DrawDict
-	(*DrawJoint)(nil),             // 41: stroppy.datagen.DrawJoint
-	(*DrawDate)(nil),              // 42: stroppy.datagen.DrawDate
-	(*DrawDecimal)(nil),           // 43: stroppy.datagen.DrawDecimal
-	(*DrawAscii)(nil),             // 44: stroppy.datagen.DrawAscii
-	(*AsciiRange)(nil),            // 45: stroppy.datagen.AsciiRange
-	(*DrawPhrase)(nil),            // 46: stroppy.datagen.DrawPhrase
-	(*DrawGrammar)(nil),           // 47: stroppy.datagen.DrawGrammar
-	(*Choose)(nil),                // 48: stroppy.datagen.Choose
-	(*ChooseBranch)(nil),          // 49: stroppy.datagen.ChooseBranch
-	(*Cohort)(nil),                // 50: stroppy.datagen.Cohort
-	(*CohortDraw)(nil),            // 51: stroppy.datagen.CohortDraw
-	(*CohortLive)(nil),            // 52: stroppy.datagen.CohortLive
-	(*SCD2)(nil),                  // 53: stroppy.datagen.SCD2
-	nil,                           // 54: stroppy.datagen.InsertSpec.DictsEntry
-	nil,                           // 55: stroppy.datagen.DrawGrammar.PhrasesEntry
-	nil,                           // 56: stroppy.datagen.DrawGrammar.LeavesEntry
-	(*timestamppb.Timestamp)(nil), // 57: google.protobuf.Timestamp
+	(*TpchSource)(nil),            // 4: stroppy.datagen.TpchSource
+	(*Parallelism)(nil),           // 5: stroppy.datagen.Parallelism
+	(*Dict)(nil),                  // 6: stroppy.datagen.Dict
+	(*DictRow)(nil),               // 7: stroppy.datagen.DictRow
+	(*RelSource)(nil),             // 8: stroppy.datagen.RelSource
+	(*Population)(nil),            // 9: stroppy.datagen.Population
+	(*Attr)(nil),                  // 10: stroppy.datagen.Attr
+	(*Null)(nil),                  // 11: stroppy.datagen.Null
+	(*Expr)(nil),                  // 12: stroppy.datagen.Expr
+	(*ColRef)(nil),                // 13: stroppy.datagen.ColRef
+	(*RowIndex)(nil),              // 14: stroppy.datagen.RowIndex
+	(*Literal)(nil),               // 15: stroppy.datagen.Literal
+	(*NullMarker)(nil),            // 16: stroppy.datagen.NullMarker
+	(*BinOp)(nil),                 // 17: stroppy.datagen.BinOp
+	(*Call)(nil),                  // 18: stroppy.datagen.Call
+	(*If)(nil),                    // 19: stroppy.datagen.If
+	(*DictAt)(nil),                // 20: stroppy.datagen.DictAt
+	(*Relationship)(nil),          // 21: stroppy.datagen.Relationship
+	(*Side)(nil),                  // 22: stroppy.datagen.Side
+	(*Degree)(nil),                // 23: stroppy.datagen.Degree
+	(*DegreeFixed)(nil),           // 24: stroppy.datagen.DegreeFixed
+	(*DegreeUniform)(nil),         // 25: stroppy.datagen.DegreeUniform
+	(*Strategy)(nil),              // 26: stroppy.datagen.Strategy
+	(*StrategyHash)(nil),          // 27: stroppy.datagen.StrategyHash
+	(*StrategySequential)(nil),    // 28: stroppy.datagen.StrategySequential
+	(*StrategyEquitable)(nil),     // 29: stroppy.datagen.StrategyEquitable
+	(*BlockSlot)(nil),             // 30: stroppy.datagen.BlockSlot
+	(*BlockRef)(nil),              // 31: stroppy.datagen.BlockRef
+	(*Lookup)(nil),                // 32: stroppy.datagen.Lookup
+	(*LookupPop)(nil),             // 33: stroppy.datagen.LookupPop
+	(*StreamDraw)(nil),            // 34: stroppy.datagen.StreamDraw
+	(*DrawIntUniform)(nil),        // 35: stroppy.datagen.DrawIntUniform
+	(*DrawFloatUniform)(nil),      // 36: stroppy.datagen.DrawFloatUniform
+	(*DrawNormal)(nil),            // 37: stroppy.datagen.DrawNormal
+	(*DrawZipf)(nil),              // 38: stroppy.datagen.DrawZipf
+	(*DrawNURand)(nil),            // 39: stroppy.datagen.DrawNURand
+	(*DrawBernoulli)(nil),         // 40: stroppy.datagen.DrawBernoulli
+	(*DrawDict)(nil),              // 41: stroppy.datagen.DrawDict
+	(*DrawJoint)(nil),             // 42: stroppy.datagen.DrawJoint
+	(*DrawDate)(nil),              // 43: stroppy.datagen.DrawDate
+	(*DrawDecimal)(nil),           // 44: stroppy.datagen.DrawDecimal
+	(*DrawAscii)(nil),             // 45: stroppy.datagen.DrawAscii
+	(*AsciiRange)(nil),            // 46: stroppy.datagen.AsciiRange
+	(*DrawPhrase)(nil),            // 47: stroppy.datagen.DrawPhrase
+	(*DrawGrammar)(nil),           // 48: stroppy.datagen.DrawGrammar
+	(*Choose)(nil),                // 49: stroppy.datagen.Choose
+	(*ChooseBranch)(nil),          // 50: stroppy.datagen.ChooseBranch
+	(*Cohort)(nil),                // 51: stroppy.datagen.Cohort
+	(*CohortDraw)(nil),            // 52: stroppy.datagen.CohortDraw
+	(*CohortLive)(nil),            // 53: stroppy.datagen.CohortLive
+	(*SCD2)(nil),                  // 54: stroppy.datagen.SCD2
+	nil,                           // 55: stroppy.datagen.InsertSpec.DictsEntry
+	nil,                           // 56: stroppy.datagen.DrawGrammar.PhrasesEntry
+	nil,                           // 57: stroppy.datagen.DrawGrammar.LeavesEntry
+	(*timestamppb.Timestamp)(nil), // 58: google.protobuf.Timestamp
 }
 var file_proto_stroppy_datagen_proto_depIdxs = []int32{
 	0,  // 0: stroppy.datagen.InsertSpec.method:type_name -> stroppy.datagen.InsertMethod
-	4,  // 1: stroppy.datagen.InsertSpec.parallelism:type_name -> stroppy.datagen.Parallelism
-	7,  // 2: stroppy.datagen.InsertSpec.source:type_name -> stroppy.datagen.RelSource
-	54, // 3: stroppy.datagen.InsertSpec.dicts:type_name -> stroppy.datagen.InsertSpec.DictsEntry
-	6,  // 4: stroppy.datagen.Dict.rows:type_name -> stroppy.datagen.DictRow
-	8,  // 5: stroppy.datagen.RelSource.population:type_name -> stroppy.datagen.Population
-	9,  // 6: stroppy.datagen.RelSource.attrs:type_name -> stroppy.datagen.Attr
-	20, // 7: stroppy.datagen.RelSource.relationships:type_name -> stroppy.datagen.Relationship
-	50, // 8: stroppy.datagen.RelSource.cohorts:type_name -> stroppy.datagen.Cohort
-	32, // 9: stroppy.datagen.RelSource.lookup_pops:type_name -> stroppy.datagen.LookupPop
-	53, // 10: stroppy.datagen.RelSource.scd2:type_name -> stroppy.datagen.SCD2
-	11, // 11: stroppy.datagen.Attr.expr:type_name -> stroppy.datagen.Expr
-	10, // 12: stroppy.datagen.Attr.null:type_name -> stroppy.datagen.Null
-	12, // 13: stroppy.datagen.Expr.col:type_name -> stroppy.datagen.ColRef
-	13, // 14: stroppy.datagen.Expr.row_index:type_name -> stroppy.datagen.RowIndex
-	14, // 15: stroppy.datagen.Expr.lit:type_name -> stroppy.datagen.Literal
-	16, // 16: stroppy.datagen.Expr.bin_op:type_name -> stroppy.datagen.BinOp
-	17, // 17: stroppy.datagen.Expr.call:type_name -> stroppy.datagen.Call
-	18, // 18: stroppy.datagen.Expr.if_:type_name -> stroppy.datagen.If
-	19, // 19: stroppy.datagen.Expr.dict_at:type_name -> stroppy.datagen.DictAt
-	30, // 20: stroppy.datagen.Expr.block_ref:type_name -> stroppy.datagen.BlockRef
-	31, // 21: stroppy.datagen.Expr.lookup:type_name -> stroppy.datagen.Lookup
-	33, // 22: stroppy.datagen.Expr.stream_draw:type_name -> stroppy.datagen.StreamDraw
-	48, // 23: stroppy.datagen.Expr.choose:type_name -> stroppy.datagen.Choose
-	51, // 24: stroppy.datagen.Expr.cohort_draw:type_name -> stroppy.datagen.CohortDraw
-	52, // 25: stroppy.datagen.Expr.cohort_live:type_name -> stroppy.datagen.CohortLive
-	1,  // 26: stroppy.datagen.RowIndex.kind:type_name -> stroppy.datagen.RowIndex.Kind
-	57, // 27: stroppy.datagen.Literal.timestamp:type_name -> google.protobuf.Timestamp
-	15, // 28: stroppy.datagen.Literal.null:type_name -> stroppy.datagen.NullMarker
-	2,  // 29: stroppy.datagen.BinOp.op:type_name -> stroppy.datagen.BinOp.Op
-	11, // 30: stroppy.datagen.BinOp.a:type_name -> stroppy.datagen.Expr
-	11, // 31: stroppy.datagen.BinOp.b:type_name -> stroppy.datagen.Expr
-	11, // 32: stroppy.datagen.Call.args:type_name -> stroppy.datagen.Expr
-	11, // 33: stroppy.datagen.If.cond:type_name -> stroppy.datagen.Expr
-	11, // 34: stroppy.datagen.If.then:type_name -> stroppy.datagen.Expr
-	11, // 35: stroppy.datagen.If.else_:type_name -> stroppy.datagen.Expr
-	11, // 36: stroppy.datagen.DictAt.index:type_name -> stroppy.datagen.Expr
-	21, // 37: stroppy.datagen.Relationship.sides:type_name -> stroppy.datagen.Side
-	22, // 38: stroppy.datagen.Side.degree:type_name -> stroppy.datagen.Degree
-	25, // 39: stroppy.datagen.Side.strategy:type_name -> stroppy.datagen.Strategy
-	29, // 40: stroppy.datagen.Side.block_slots:type_name -> stroppy.datagen.BlockSlot
-	23, // 41: stroppy.datagen.Degree.fixed:type_name -> stroppy.datagen.DegreeFixed
-	24, // 42: stroppy.datagen.Degree.uniform:type_name -> stroppy.datagen.DegreeUniform
-	26, // 43: stroppy.datagen.Strategy.hash:type_name -> stroppy.datagen.StrategyHash
-	27, // 44: stroppy.datagen.Strategy.sequential:type_name -> stroppy.datagen.StrategySequential
-	28, // 45: stroppy.datagen.Strategy.equitable:type_name -> stroppy.datagen.StrategyEquitable
-	11, // 46: stroppy.datagen.BlockSlot.expr:type_name -> stroppy.datagen.Expr
-	11, // 47: stroppy.datagen.Lookup.entity_index:type_name -> stroppy.datagen.Expr
-	8,  // 48: stroppy.datagen.LookupPop.population:type_name -> stroppy.datagen.Population
-	9,  // 49: stroppy.datagen.LookupPop.attrs:type_name -> stroppy.datagen.Attr
-	34, // 50: stroppy.datagen.StreamDraw.int_uniform:type_name -> stroppy.datagen.DrawIntUniform
-	35, // 51: stroppy.datagen.StreamDraw.float_uniform:type_name -> stroppy.datagen.DrawFloatUniform
-	36, // 52: stroppy.datagen.StreamDraw.normal:type_name -> stroppy.datagen.DrawNormal
-	37, // 53: stroppy.datagen.StreamDraw.zipf:type_name -> stroppy.datagen.DrawZipf
-	38, // 54: stroppy.datagen.StreamDraw.nurand:type_name -> stroppy.datagen.DrawNURand
-	39, // 55: stroppy.datagen.StreamDraw.bernoulli:type_name -> stroppy.datagen.DrawBernoulli
-	40, // 56: stroppy.datagen.StreamDraw.dict:type_name -> stroppy.datagen.DrawDict
-	41, // 57: stroppy.datagen.StreamDraw.joint:type_name -> stroppy.datagen.DrawJoint
-	42, // 58: stroppy.datagen.StreamDraw.date:type_name -> stroppy.datagen.DrawDate
-	43, // 59: stroppy.datagen.StreamDraw.decimal:type_name -> stroppy.datagen.DrawDecimal
-	44, // 60: stroppy.datagen.StreamDraw.ascii:type_name -> stroppy.datagen.DrawAscii
-	46, // 61: stroppy.datagen.StreamDraw.phrase:type_name -> stroppy.datagen.DrawPhrase
-	47, // 62: stroppy.datagen.StreamDraw.grammar:type_name -> stroppy.datagen.DrawGrammar
-	11, // 63: stroppy.datagen.DrawIntUniform.min:type_name -> stroppy.datagen.Expr
-	11, // 64: stroppy.datagen.DrawIntUniform.max:type_name -> stroppy.datagen.Expr
-	11, // 65: stroppy.datagen.DrawFloatUniform.min:type_name -> stroppy.datagen.Expr
-	11, // 66: stroppy.datagen.DrawFloatUniform.max:type_name -> stroppy.datagen.Expr
-	11, // 67: stroppy.datagen.DrawNormal.min:type_name -> stroppy.datagen.Expr
-	11, // 68: stroppy.datagen.DrawNormal.max:type_name -> stroppy.datagen.Expr
-	11, // 69: stroppy.datagen.DrawZipf.min:type_name -> stroppy.datagen.Expr
-	11, // 70: stroppy.datagen.DrawZipf.max:type_name -> stroppy.datagen.Expr
-	11, // 71: stroppy.datagen.DrawDecimal.min:type_name -> stroppy.datagen.Expr
-	11, // 72: stroppy.datagen.DrawDecimal.max:type_name -> stroppy.datagen.Expr
-	11, // 73: stroppy.datagen.DrawAscii.min_len:type_name -> stroppy.datagen.Expr
-	11, // 74: stroppy.datagen.DrawAscii.max_len:type_name -> stroppy.datagen.Expr
-	45, // 75: stroppy.datagen.DrawAscii.alphabet:type_name -> stroppy.datagen.AsciiRange
-	11, // 76: stroppy.datagen.DrawPhrase.min_words:type_name -> stroppy.datagen.Expr
-	11, // 77: stroppy.datagen.DrawPhrase.max_words:type_name -> stroppy.datagen.Expr
-	55, // 78: stroppy.datagen.DrawGrammar.phrases:type_name -> stroppy.datagen.DrawGrammar.PhrasesEntry
-	56, // 79: stroppy.datagen.DrawGrammar.leaves:type_name -> stroppy.datagen.DrawGrammar.LeavesEntry
-	11, // 80: stroppy.datagen.DrawGrammar.max_len:type_name -> stroppy.datagen.Expr
-	11, // 81: stroppy.datagen.DrawGrammar.min_len:type_name -> stroppy.datagen.Expr
-	49, // 82: stroppy.datagen.Choose.branches:type_name -> stroppy.datagen.ChooseBranch
-	11, // 83: stroppy.datagen.ChooseBranch.expr:type_name -> stroppy.datagen.Expr
-	11, // 84: stroppy.datagen.Cohort.bucket_key:type_name -> stroppy.datagen.Expr
-	11, // 85: stroppy.datagen.CohortDraw.slot:type_name -> stroppy.datagen.Expr
-	11, // 86: stroppy.datagen.CohortDraw.bucket_key:type_name -> stroppy.datagen.Expr
-	11, // 87: stroppy.datagen.CohortLive.bucket_key:type_name -> stroppy.datagen.Expr
-	11, // 88: stroppy.datagen.SCD2.boundary:type_name -> stroppy.datagen.Expr
-	11, // 89: stroppy.datagen.SCD2.historical_start:type_name -> stroppy.datagen.Expr
-	11, // 90: stroppy.datagen.SCD2.historical_end:type_name -> stroppy.datagen.Expr
-	11, // 91: stroppy.datagen.SCD2.current_start:type_name -> stroppy.datagen.Expr
-	11, // 92: stroppy.datagen.SCD2.current_end:type_name -> stroppy.datagen.Expr
-	5,  // 93: stroppy.datagen.InsertSpec.DictsEntry.value:type_name -> stroppy.datagen.Dict
-	94, // [94:94] is the sub-list for method output_type
-	94, // [94:94] is the sub-list for method input_type
-	94, // [94:94] is the sub-list for extension type_name
-	94, // [94:94] is the sub-list for extension extendee
-	0,  // [0:94] is the sub-list for field type_name
+	5,  // 1: stroppy.datagen.InsertSpec.parallelism:type_name -> stroppy.datagen.Parallelism
+	8,  // 2: stroppy.datagen.InsertSpec.source:type_name -> stroppy.datagen.RelSource
+	4,  // 3: stroppy.datagen.InsertSpec.tpch:type_name -> stroppy.datagen.TpchSource
+	55, // 4: stroppy.datagen.InsertSpec.dicts:type_name -> stroppy.datagen.InsertSpec.DictsEntry
+	7,  // 5: stroppy.datagen.Dict.rows:type_name -> stroppy.datagen.DictRow
+	9,  // 6: stroppy.datagen.RelSource.population:type_name -> stroppy.datagen.Population
+	10, // 7: stroppy.datagen.RelSource.attrs:type_name -> stroppy.datagen.Attr
+	21, // 8: stroppy.datagen.RelSource.relationships:type_name -> stroppy.datagen.Relationship
+	51, // 9: stroppy.datagen.RelSource.cohorts:type_name -> stroppy.datagen.Cohort
+	33, // 10: stroppy.datagen.RelSource.lookup_pops:type_name -> stroppy.datagen.LookupPop
+	54, // 11: stroppy.datagen.RelSource.scd2:type_name -> stroppy.datagen.SCD2
+	12, // 12: stroppy.datagen.Attr.expr:type_name -> stroppy.datagen.Expr
+	11, // 13: stroppy.datagen.Attr.null:type_name -> stroppy.datagen.Null
+	13, // 14: stroppy.datagen.Expr.col:type_name -> stroppy.datagen.ColRef
+	14, // 15: stroppy.datagen.Expr.row_index:type_name -> stroppy.datagen.RowIndex
+	15, // 16: stroppy.datagen.Expr.lit:type_name -> stroppy.datagen.Literal
+	17, // 17: stroppy.datagen.Expr.bin_op:type_name -> stroppy.datagen.BinOp
+	18, // 18: stroppy.datagen.Expr.call:type_name -> stroppy.datagen.Call
+	19, // 19: stroppy.datagen.Expr.if_:type_name -> stroppy.datagen.If
+	20, // 20: stroppy.datagen.Expr.dict_at:type_name -> stroppy.datagen.DictAt
+	31, // 21: stroppy.datagen.Expr.block_ref:type_name -> stroppy.datagen.BlockRef
+	32, // 22: stroppy.datagen.Expr.lookup:type_name -> stroppy.datagen.Lookup
+	34, // 23: stroppy.datagen.Expr.stream_draw:type_name -> stroppy.datagen.StreamDraw
+	49, // 24: stroppy.datagen.Expr.choose:type_name -> stroppy.datagen.Choose
+	52, // 25: stroppy.datagen.Expr.cohort_draw:type_name -> stroppy.datagen.CohortDraw
+	53, // 26: stroppy.datagen.Expr.cohort_live:type_name -> stroppy.datagen.CohortLive
+	1,  // 27: stroppy.datagen.RowIndex.kind:type_name -> stroppy.datagen.RowIndex.Kind
+	58, // 28: stroppy.datagen.Literal.timestamp:type_name -> google.protobuf.Timestamp
+	16, // 29: stroppy.datagen.Literal.null:type_name -> stroppy.datagen.NullMarker
+	2,  // 30: stroppy.datagen.BinOp.op:type_name -> stroppy.datagen.BinOp.Op
+	12, // 31: stroppy.datagen.BinOp.a:type_name -> stroppy.datagen.Expr
+	12, // 32: stroppy.datagen.BinOp.b:type_name -> stroppy.datagen.Expr
+	12, // 33: stroppy.datagen.Call.args:type_name -> stroppy.datagen.Expr
+	12, // 34: stroppy.datagen.If.cond:type_name -> stroppy.datagen.Expr
+	12, // 35: stroppy.datagen.If.then:type_name -> stroppy.datagen.Expr
+	12, // 36: stroppy.datagen.If.else_:type_name -> stroppy.datagen.Expr
+	12, // 37: stroppy.datagen.DictAt.index:type_name -> stroppy.datagen.Expr
+	22, // 38: stroppy.datagen.Relationship.sides:type_name -> stroppy.datagen.Side
+	23, // 39: stroppy.datagen.Side.degree:type_name -> stroppy.datagen.Degree
+	26, // 40: stroppy.datagen.Side.strategy:type_name -> stroppy.datagen.Strategy
+	30, // 41: stroppy.datagen.Side.block_slots:type_name -> stroppy.datagen.BlockSlot
+	24, // 42: stroppy.datagen.Degree.fixed:type_name -> stroppy.datagen.DegreeFixed
+	25, // 43: stroppy.datagen.Degree.uniform:type_name -> stroppy.datagen.DegreeUniform
+	27, // 44: stroppy.datagen.Strategy.hash:type_name -> stroppy.datagen.StrategyHash
+	28, // 45: stroppy.datagen.Strategy.sequential:type_name -> stroppy.datagen.StrategySequential
+	29, // 46: stroppy.datagen.Strategy.equitable:type_name -> stroppy.datagen.StrategyEquitable
+	12, // 47: stroppy.datagen.BlockSlot.expr:type_name -> stroppy.datagen.Expr
+	12, // 48: stroppy.datagen.Lookup.entity_index:type_name -> stroppy.datagen.Expr
+	9,  // 49: stroppy.datagen.LookupPop.population:type_name -> stroppy.datagen.Population
+	10, // 50: stroppy.datagen.LookupPop.attrs:type_name -> stroppy.datagen.Attr
+	35, // 51: stroppy.datagen.StreamDraw.int_uniform:type_name -> stroppy.datagen.DrawIntUniform
+	36, // 52: stroppy.datagen.StreamDraw.float_uniform:type_name -> stroppy.datagen.DrawFloatUniform
+	37, // 53: stroppy.datagen.StreamDraw.normal:type_name -> stroppy.datagen.DrawNormal
+	38, // 54: stroppy.datagen.StreamDraw.zipf:type_name -> stroppy.datagen.DrawZipf
+	39, // 55: stroppy.datagen.StreamDraw.nurand:type_name -> stroppy.datagen.DrawNURand
+	40, // 56: stroppy.datagen.StreamDraw.bernoulli:type_name -> stroppy.datagen.DrawBernoulli
+	41, // 57: stroppy.datagen.StreamDraw.dict:type_name -> stroppy.datagen.DrawDict
+	42, // 58: stroppy.datagen.StreamDraw.joint:type_name -> stroppy.datagen.DrawJoint
+	43, // 59: stroppy.datagen.StreamDraw.date:type_name -> stroppy.datagen.DrawDate
+	44, // 60: stroppy.datagen.StreamDraw.decimal:type_name -> stroppy.datagen.DrawDecimal
+	45, // 61: stroppy.datagen.StreamDraw.ascii:type_name -> stroppy.datagen.DrawAscii
+	47, // 62: stroppy.datagen.StreamDraw.phrase:type_name -> stroppy.datagen.DrawPhrase
+	48, // 63: stroppy.datagen.StreamDraw.grammar:type_name -> stroppy.datagen.DrawGrammar
+	12, // 64: stroppy.datagen.DrawIntUniform.min:type_name -> stroppy.datagen.Expr
+	12, // 65: stroppy.datagen.DrawIntUniform.max:type_name -> stroppy.datagen.Expr
+	12, // 66: stroppy.datagen.DrawFloatUniform.min:type_name -> stroppy.datagen.Expr
+	12, // 67: stroppy.datagen.DrawFloatUniform.max:type_name -> stroppy.datagen.Expr
+	12, // 68: stroppy.datagen.DrawNormal.min:type_name -> stroppy.datagen.Expr
+	12, // 69: stroppy.datagen.DrawNormal.max:type_name -> stroppy.datagen.Expr
+	12, // 70: stroppy.datagen.DrawZipf.min:type_name -> stroppy.datagen.Expr
+	12, // 71: stroppy.datagen.DrawZipf.max:type_name -> stroppy.datagen.Expr
+	12, // 72: stroppy.datagen.DrawDecimal.min:type_name -> stroppy.datagen.Expr
+	12, // 73: stroppy.datagen.DrawDecimal.max:type_name -> stroppy.datagen.Expr
+	12, // 74: stroppy.datagen.DrawAscii.min_len:type_name -> stroppy.datagen.Expr
+	12, // 75: stroppy.datagen.DrawAscii.max_len:type_name -> stroppy.datagen.Expr
+	46, // 76: stroppy.datagen.DrawAscii.alphabet:type_name -> stroppy.datagen.AsciiRange
+	12, // 77: stroppy.datagen.DrawPhrase.min_words:type_name -> stroppy.datagen.Expr
+	12, // 78: stroppy.datagen.DrawPhrase.max_words:type_name -> stroppy.datagen.Expr
+	56, // 79: stroppy.datagen.DrawGrammar.phrases:type_name -> stroppy.datagen.DrawGrammar.PhrasesEntry
+	57, // 80: stroppy.datagen.DrawGrammar.leaves:type_name -> stroppy.datagen.DrawGrammar.LeavesEntry
+	12, // 81: stroppy.datagen.DrawGrammar.max_len:type_name -> stroppy.datagen.Expr
+	12, // 82: stroppy.datagen.DrawGrammar.min_len:type_name -> stroppy.datagen.Expr
+	50, // 83: stroppy.datagen.Choose.branches:type_name -> stroppy.datagen.ChooseBranch
+	12, // 84: stroppy.datagen.ChooseBranch.expr:type_name -> stroppy.datagen.Expr
+	12, // 85: stroppy.datagen.Cohort.bucket_key:type_name -> stroppy.datagen.Expr
+	12, // 86: stroppy.datagen.CohortDraw.slot:type_name -> stroppy.datagen.Expr
+	12, // 87: stroppy.datagen.CohortDraw.bucket_key:type_name -> stroppy.datagen.Expr
+	12, // 88: stroppy.datagen.CohortLive.bucket_key:type_name -> stroppy.datagen.Expr
+	12, // 89: stroppy.datagen.SCD2.boundary:type_name -> stroppy.datagen.Expr
+	12, // 90: stroppy.datagen.SCD2.historical_start:type_name -> stroppy.datagen.Expr
+	12, // 91: stroppy.datagen.SCD2.historical_end:type_name -> stroppy.datagen.Expr
+	12, // 92: stroppy.datagen.SCD2.current_start:type_name -> stroppy.datagen.Expr
+	12, // 93: stroppy.datagen.SCD2.current_end:type_name -> stroppy.datagen.Expr
+	6,  // 94: stroppy.datagen.InsertSpec.DictsEntry.value:type_name -> stroppy.datagen.Dict
+	95, // [95:95] is the sub-list for method output_type
+	95, // [95:95] is the sub-list for method input_type
+	95, // [95:95] is the sub-list for extension type_name
+	95, // [95:95] is the sub-list for extension extendee
+	0,  // [0:95] is the sub-list for field type_name
 }
 
 func init() { file_proto_stroppy_datagen_proto_init() }
@@ -4534,7 +4644,11 @@ func file_proto_stroppy_datagen_proto_init() {
 	if File_proto_stroppy_datagen_proto != nil {
 		return
 	}
-	file_proto_stroppy_datagen_proto_msgTypes[8].OneofWrappers = []any{
+	file_proto_stroppy_datagen_proto_msgTypes[0].OneofWrappers = []any{
+		(*InsertSpec_Source)(nil),
+		(*InsertSpec_Tpch)(nil),
+	}
+	file_proto_stroppy_datagen_proto_msgTypes[9].OneofWrappers = []any{
 		(*Expr_Col)(nil),
 		(*Expr_RowIndex)(nil),
 		(*Expr_Lit)(nil),
@@ -4549,7 +4663,7 @@ func file_proto_stroppy_datagen_proto_init() {
 		(*Expr_CohortDraw)(nil),
 		(*Expr_CohortLive)(nil),
 	}
-	file_proto_stroppy_datagen_proto_msgTypes[11].OneofWrappers = []any{
+	file_proto_stroppy_datagen_proto_msgTypes[12].OneofWrappers = []any{
 		(*Literal_Int64)(nil),
 		(*Literal_Double)(nil),
 		(*Literal_String_)(nil),
@@ -4558,16 +4672,16 @@ func file_proto_stroppy_datagen_proto_init() {
 		(*Literal_Timestamp)(nil),
 		(*Literal_Null)(nil),
 	}
-	file_proto_stroppy_datagen_proto_msgTypes[19].OneofWrappers = []any{
+	file_proto_stroppy_datagen_proto_msgTypes[20].OneofWrappers = []any{
 		(*Degree_Fixed)(nil),
 		(*Degree_Uniform)(nil),
 	}
-	file_proto_stroppy_datagen_proto_msgTypes[22].OneofWrappers = []any{
+	file_proto_stroppy_datagen_proto_msgTypes[23].OneofWrappers = []any{
 		(*Strategy_Hash)(nil),
 		(*Strategy_Sequential)(nil),
 		(*Strategy_Equitable)(nil),
 	}
-	file_proto_stroppy_datagen_proto_msgTypes[30].OneofWrappers = []any{
+	file_proto_stroppy_datagen_proto_msgTypes[31].OneofWrappers = []any{
 		(*StreamDraw_IntUniform)(nil),
 		(*StreamDraw_FloatUniform)(nil),
 		(*StreamDraw_Normal)(nil),
@@ -4588,7 +4702,7 @@ func file_proto_stroppy_datagen_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_stroppy_datagen_proto_rawDesc), len(file_proto_stroppy_datagen_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   54,
+			NumMessages:   55,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

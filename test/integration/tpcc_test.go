@@ -369,11 +369,11 @@ func tpccWarehouseSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "warehouse",
 		Seed:  0xC0FFEE01,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "warehouse", Size: tpccWarehouses},
 			Attrs:       attrs,
 			ColumnOrder: tpccWarehouseColumns,
-		},
+		}},
 	}
 }
 
@@ -395,11 +395,11 @@ func tpccDistrictSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "district",
 		Seed:  0xC0FFEE02,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "district", Size: tpccDistrictsPerWh},
 			Attrs:       attrs,
 			ColumnOrder: tpccDistrictColumns,
-		},
+		}},
 	}
 }
 
@@ -468,11 +468,11 @@ func tpccCustomerSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "customer",
 		Seed:  0xC0FFEE03,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "customer", Size: tpccCustomersPerWh},
 			Attrs:       attrs,
 			ColumnOrder: tpccCustomerColumns,
-		},
+		}},
 		Dicts: map[string]*dgproto.Dict{"lastnames": tpccLastNameDict()},
 	}
 }
@@ -489,11 +489,11 @@ func tpccItemSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "item",
 		Seed:  0xC0FFEE04,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "item", Size: tpccItems},
 			Attrs:       attrs,
 			ColumnOrder: tpccItemColumns,
-		},
+		}},
 	}
 }
 
@@ -517,11 +517,11 @@ func tpccStockSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "stock",
 		Seed:  0xC0FFEE05,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "stock", Size: tpccStockPerWh},
 			Attrs:       attrs,
 			ColumnOrder: tpccStockColumns,
-		},
+		}},
 	}
 }
 
@@ -562,11 +562,11 @@ func tpccOrdersSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "orders",
 		Seed:  0xC0FFEE06,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "orders", Size: tpccOrdersPerWh},
 			Attrs:       attrs,
 			ColumnOrder: tpccOrdersColumns,
-		},
+		}},
 	}
 }
 
@@ -612,11 +612,11 @@ func tpccOrderLineSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "order_line",
 		Seed:  0xC0FFEE07,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "order_line", Size: tpccOrderLinesPerWh},
 			Attrs:       attrs,
 			ColumnOrder: tpccOrderLineColumns,
-		},
+		}},
 	}
 }
 
@@ -643,11 +643,11 @@ func tpccNewOrderSpec() *dgproto.InsertSpec {
 	return &dgproto.InsertSpec{
 		Table: "new_order",
 		Seed:  0xC0FFEE08,
-		Source: &dgproto.RelSource{
+		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
 			Population:  &dgproto.Population{Name: "new_order", Size: tpccNewOrdersPerWh},
 			Attrs:       attrs,
 			ColumnOrder: tpccNewOrderColumns,
-		},
+		}},
 	}
 }
 
