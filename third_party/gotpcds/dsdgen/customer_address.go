@@ -139,7 +139,7 @@ var CustomerAddress = &Table{
 	},
 	Cols:     customerAddressCols,
 	RowCount: customerAddressRowCount,
-	Row: func(rowNumber int64, ss *streamSet) []any {
+	Row: func(rowNumber int64, ss *streamSet, _ *Scaling) []any {
 		nullBitMap := CreateNullBitMap(customerAddressNullBasis, customerAddressNotNullBitMap, ss.at(caNulls))
 		addrID := MakeBusinessKey(rowNumber)
 		addr := makeAddress(ss.at(caAddress))

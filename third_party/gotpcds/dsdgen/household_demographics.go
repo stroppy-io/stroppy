@@ -43,7 +43,7 @@ var HouseholdDemographics = &Table{
 	Columns:  []string{"hd_demo_sk", "hd_income_band_sk", "hd_buy_potential", "hd_dep_count", "hd_vehicle_count"},
 	Cols:     householdDemographicsCols,
 	RowCount: func(float64) int64 { return 7200 },
-	Row: func(rowNumber int64, ss *streamSet) []any {
+	Row: func(rowNumber int64, ss *streamSet, _ *Scaling) []any {
 		CreateNullBitMap(0, 0x01, ss.at(hdNulls))
 
 		index := rowNumber

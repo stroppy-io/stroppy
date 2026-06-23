@@ -101,7 +101,7 @@ var DateDim = &Table{
 	},
 	Cols:     dateDimCols,
 	RowCount: func(float64) int64 { return 73049 },
-	Row: func(rowNumber int64, ss *streamSet) []any {
+	Row: func(rowNumber int64, ss *streamSet, _ *Scaling) []any {
 		CreateNullBitMap(0, 0x03, ss.at(dNulls))
 
 		baseDate := Date{1900, 1, 1}

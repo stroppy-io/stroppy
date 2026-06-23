@@ -43,7 +43,7 @@ var TimeDim = &Table{
 	},
 	Cols:     timeDimCols,
 	RowCount: func(float64) int64 { return 86400 },
-	Row: func(rowNumber int64, ss *streamSet) []any {
+	Row: func(rowNumber int64, ss *streamSet, _ *Scaling) []any {
 		CreateNullBitMap(0, 0x03, ss.at(tNulls))
 
 		sk := rowNumber - 1

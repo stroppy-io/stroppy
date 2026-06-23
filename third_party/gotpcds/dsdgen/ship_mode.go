@@ -64,7 +64,7 @@ var ShipMode = &Table{
 	Columns:  []string{"sm_ship_mode_sk", "sm_ship_mode_id", "sm_type", "sm_code", "sm_carrier", "sm_contract"},
 	Cols:     shipModeCols,
 	RowCount: func(float64) int64 { return 20 },
-	Row: func(rowNumber int64, ss *streamSet) []any {
+	Row: func(rowNumber int64, ss *streamSet, _ *Scaling) []any {
 		CreateNullBitMap(0, 0x03, ss.at(smNulls))
 
 		smTypeVal := valueForIndexModSize(shipModeTypeDist, rowNumber)

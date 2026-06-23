@@ -93,7 +93,7 @@ var CatalogPage = &Table{
 		catalogPageMax = catalogPageMaxFor(rc) // published for the Row closure
 		return rc
 	},
-	Row: func(rowNumber int64, ss *streamSet) []any {
+	Row: func(rowNumber int64, ss *streamSet, _ *Scaling) []any {
 		department := "DEPARTMENT"
 		nullBitMap := CreateNullBitMap(catalogPageNullBasis, catalogPageNotNullBitMp, ss.at(cpNulls))
 		catalogPageID := MakeBusinessKey(rowNumber)

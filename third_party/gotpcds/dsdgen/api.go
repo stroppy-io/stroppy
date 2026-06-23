@@ -51,7 +51,7 @@ func (ss *streamSet) consumeRemaining() {
 // RowFunc generates one row's column values given its 1-based row number and the
 // table's column streams. Flat tables return a single row; fan-out/child tables
 // will return more (handled when those tables are ported).
-type RowFunc func(rowNumber int64, ss *streamSet) []any
+type RowFunc func(rowNumber int64, ss *streamSet, _ *Scaling) []any
 
 // Table is a ported TPC-DS base table: its output column names, the RNG column
 // layout, the per-scale row count, and the row generator.
@@ -71,6 +71,7 @@ type Table struct {
 type Stream struct {
 	tbl  *Table
 	ss   *streamSet
+	sc   *Scaling
 	next int64
 	end  int64
 }
@@ -86,7 +87,7 @@ func (t *Table) NewStream(sf float64, start, count int64) *Stream {
 	ss := newStreamSet(t.Cols)
 	ss.skipRows(start - 1)
 
-	return &Stream{tbl: t, ss: ss, next: start, end: end}
+	return &Stream{tbl: t, ss: ss, sc: NewScaling(sf), next: start, end: end}
 }
 
 // Next returns the next row's values, or false at end of range.
@@ -95,7 +96,7 @@ func (s *Stream) Next() ([]any, bool) {
 		return nil, false
 	}
 
-	row := s.tbl.Row(s.next, s.ss)
+	row := s.tbl.Row(s.next, s.ss, s.sc)
 	s.ss.consumeRemaining()
 	s.next++
 
