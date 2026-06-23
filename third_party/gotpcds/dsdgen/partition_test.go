@@ -19,6 +19,11 @@ func TestPartitionByteEqual(t *testing.T) {
 		{HouseholdDemographics, 1, 3000, 500},
 		{Store, 10, 5, 12},     // starts on a revision row (5 % 6 == 5)
 		{CallCenter, 10, 3, 8}, // starts on a revision row (3 % 6 == 3)
+		{Customer, 1, 40000, 1000},
+		{Promotion, 1, 100, 50},
+		{Item, 1, 5, 12},    // SCD, starts on a revision row
+		{WebPage, 1, 5, 12}, // SCD, starts on a revision row
+		{WebSite, 1, 3, 8},  // SCD, starts on a revision row
 	}
 	for _, c := range cases {
 		c := c
