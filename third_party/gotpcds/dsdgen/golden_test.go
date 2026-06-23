@@ -76,26 +76,40 @@ func formatRow(row []any) string {
 
 // formatTable renders the whole table with the Go port using the dsdgen field
 // layout: "|"-separated fields, one row per line, no trailing separator.
-func formatTable(tbl *Table, sf float64) []byte {
-	var b strings.Builder
-	s := tbl.NewStream(sf, 1, -1)
-	for {
+// rowStreamer is the common surface of the dimension Stream and the fact
+// FactStream.
+type rowStreamer interface{ Next() ([]any, bool) }
+
+// streamMatchesOracle compares a full row stream to the reference dsdgen output
+// line-by-line, in O(1) memory (so multi-million-row tables are fine).
+func streamMatchesOracle(t *testing.T, name string, scale int, s rowStreamer) {
+	t.Helper()
+	bin, toolsDir := oracleBin(t)
+	f, err := os.Open(runOracleToFile(t, bin, toolsDir, name, scale))
+	if err != nil {
+		t.Fatalf("open oracle output: %v", err)
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
+
+	line := 0
+	for sc.Scan() {
+		line++
 		row, ok := s.Next()
 		if !ok {
-			break
+			t.Fatalf("%s sf=%d: port ended at row %d but oracle has more", name, scale, line)
 		}
-		for i, v := range row {
-			if i > 0 {
-				b.WriteByte('|')
-			}
-			if v != nil { // a nil column is a SQL null: dsdgen prints an empty field
-				fmt.Fprintf(&b, "%v", v)
-			}
+		if got := formatRow(row); got != sc.Text() {
+			t.Fatalf("%s sf=%d row %d differs\n got: %s\nwant: %s", name, scale, line, got, sc.Text())
 		}
-		b.WriteByte('\n')
 	}
-
-	return []byte(b.String())
+	if err := sc.Err(); err != nil {
+		t.Fatalf("scan oracle: %v", err)
+	}
+	if _, ok := s.Next(); ok {
+		t.Fatalf("%s sf=%d: port produced more than the oracle's %d rows", name, scale, line)
+	}
 }
 
 // assertPartitionByteEqual generates ONLY the row range [start, start+count) via
@@ -146,36 +160,10 @@ func assertPartitionByteEqual(t *testing.T, tbl *Table, scale int, start, count 
 // multi-million-row table is compared in O(1) memory.
 func assertFactTableByteEqual(t *testing.T, tbl *FactTable, scales ...int) {
 	t.Helper()
-	bin, toolsDir := oracleBin(t)
 	for _, scale := range scales {
 		scale := scale
 		t.Run(fmt.Sprintf("sf%d", scale), func(t *testing.T) {
-			f, err := os.Open(runOracleToFile(t, bin, toolsDir, tbl.Name, scale))
-			if err != nil {
-				t.Fatalf("open oracle output: %v", err)
-			}
-			defer f.Close()
-			sc := bufio.NewScanner(f)
-			sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-
-			s := tbl.NewStream(float64(scale), 1, -1)
-			line := 0
-			for sc.Scan() {
-				line++
-				row, ok := s.Next()
-				if !ok {
-					t.Fatalf("%s sf=%d: port ended at row %d but oracle has more", tbl.Name, scale, line)
-				}
-				if got := formatRow(row); got != sc.Text() {
-					t.Fatalf("%s sf=%d row %d differs\n got: %s\nwant: %s", tbl.Name, scale, line, got, sc.Text())
-				}
-			}
-			if err := sc.Err(); err != nil {
-				t.Fatalf("scan oracle: %v", err)
-			}
-			if _, ok := s.Next(); ok {
-				t.Fatalf("%s sf=%d: port produced more than the oracle's %d rows", tbl.Name, scale, line)
-			}
+			streamMatchesOracle(t, tbl.Name, scale, tbl.NewStream(float64(scale), 1, -1))
 		})
 	}
 }
@@ -185,16 +173,10 @@ func assertFactTableByteEqual(t *testing.T, tbl *FactTable, scales ...int) {
 // dsdgen output. Each ported table gets a small _test.go calling this.
 func assertTableByteEqual(t *testing.T, tbl *Table, scales ...int) {
 	t.Helper()
-	bin, toolsDir := oracleBin(t)
 	for _, scale := range scales {
 		scale := scale
 		t.Run(fmt.Sprintf("sf%d", scale), func(t *testing.T) {
-			want := runOracle(t, bin, toolsDir, tbl.Name, scale)
-			got := formatTable(tbl, float64(scale))
-			if string(got) != string(want) {
-				t.Errorf("%s output differs from dsdgen at sf=%d\n--- got ---\n%s\n--- want ---\n%s",
-					tbl.Name, scale, firstLines(got, 5), firstLines(want, 5))
-			}
+			streamMatchesOracle(t, tbl.Name, scale, tbl.NewStream(float64(scale), 1, -1))
 		})
 	}
 }
