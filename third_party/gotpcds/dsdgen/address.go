@@ -92,10 +92,29 @@ func (f *fipsCounty) pickRandomIndex(weightListIndex int, s *RNStream) int {
 	return f.dist.PickRandomIndex(weightListIndex, s)
 }
 
+// getCityAtIndex / getCountyAtIndex / getStateAbbreviationAtIndex are the
+// positional lookups used by the small-table path. Mirror AddressDistributions /
+// FipsCountyDistribution.
+func getCityAtIndex(i int) string              { return citiesDist.ValueAtIndex(0, i) }
+func getCountyAtIndex(i int) string            { return fipsDist.counties[i] }
+func getStateAbbreviationAtIndex(i int) string { return fipsDist.stateAbbrevs[i] }
+
 // makeAddress reproduces Address.makeAddressForColumn for a large (non-small)
-// table: the RNG draws happen in the exact order and on the exact stream that
-// the Java code uses, so the consumed seed sequence is byte-identical to dsdgen.
-func makeAddress(s *RNStream) Address {
+// table.
+func makeAddress(s *RNStream) Address { return makeAddr(s, false, 0, 0) }
+
+// makeAddressSmall reproduces the small-table branch, where the city and county
+// are drawn uniformly from the limited active-city/active-county pools (sized by
+// the pseudo-table scaling and clamped to the table's own row count).
+func makeAddressSmall(s *RNStream, scaling *Scaling, table TableID) Address {
+	return makeAddr(s, true, int(scaling.RowCount(table)), scaling.scale)
+}
+
+// makeAddr is the shared address generator. The RNG draws happen in the exact
+// order and on the exact stream the Java code uses, so the consumed seed
+// sequence is byte-identical to dsdgen for both the small and non-small paths
+// (each path makes the same number of draws; only the selection differs).
+func makeAddr(s *RNStream, small bool, rowCount int, scale float64) Address {
 	var a Address
 	a.StreetNumber = GenerateUniformRandomInt(1, 1000, s)
 	a.StreetName1 = streetNamesDist.PickRandomValue(0, streetNamesDefault, s)
@@ -109,11 +128,19 @@ func makeAddress(s *RNStream) Address {
 		a.SuiteNumber = fmt.Sprintf("Suite %c", rune((randomInt/2)%25)+'A')
 	}
 
-	a.City = citiesDist.PickRandomValue(0, citiesUnifiedStepFunction, s)
+	var regionNumber int
+	if small {
+		maxCities := int(activeCities.rowCountForScale(scale))
+		a.City = getCityAtIndex(GenerateUniformRandomInt(0, clampMax(maxCities, rowCount)-1, s))
 
-	regionNumber := fipsDist.pickRandomIndex(fipsUniform, s)
-	a.County = fipsDist.counties[regionNumber]
-	a.State = fipsDist.stateAbbrevs[regionNumber]
+		maxCounties := int(activeCounties.rowCountForScale(scale))
+		regionNumber = GenerateUniformRandomInt(0, clampMax(maxCounties, rowCount)-1, s)
+	} else {
+		a.City = citiesDist.PickRandomValue(0, citiesUnifiedStepFunction, s)
+		regionNumber = fipsDist.pickRandomIndex(fipsUniform, s)
+	}
+	a.County = getCountyAtIndex(regionNumber)
+	a.State = getStateAbbreviationAtIndex(regionNumber)
 
 	zip := computeCityHash(a.City)
 	zipPrefix := fipsDist.zipPrefixes[regionNumber]
@@ -126,6 +153,16 @@ func makeAddress(s *RNStream) Address {
 	a.Country = "United States"
 
 	return a
+}
+
+// clampMax returns max unless it exceeds rowCount, mirroring the
+// "(maxX > rowCount) ? rowCount : maxX" cap in the small-table path.
+func clampMax(max, rowCount int) int {
+	if max > rowCount {
+		return rowCount
+	}
+
+	return max
 }
 
 // StreetName mirrors Address.getStreetName: streetName1 and streetName2 joined
