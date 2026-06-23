@@ -119,6 +119,51 @@ func assertPartitionByteEqual(t *testing.T, tbl *Table, scale int, start, count 
 	}
 }
 
+// rowStreamer is the common surface of the dimension Stream and the fact
+// FactStream: pull rows until exhausted.
+type rowStreamer interface{ Next() ([]any, bool) }
+
+// formatStreamer renders an entire row stream the way dsdgen prints: '|'-joined
+// fields, one row per line, nil columns empty, no trailing separator.
+func formatStreamer(s rowStreamer) []byte {
+	var b bytes.Buffer
+	for {
+		row, ok := s.Next()
+		if !ok {
+			break
+		}
+		for i, v := range row {
+			if i > 0 {
+				b.WriteByte('|')
+			}
+			if v != nil {
+				fmt.Fprintf(&b, "%v", v)
+			}
+		}
+		b.WriteByte('\n')
+	}
+
+	return b.Bytes()
+}
+
+// assertFactTableByteEqual checks a fan-out fact table (sales/returns) against
+// the reference dsdgen at each scale.
+func assertFactTableByteEqual(t *testing.T, tbl *FactTable, scales ...int) {
+	t.Helper()
+	bin, toolsDir := oracleBin(t)
+	for _, scale := range scales {
+		scale := scale
+		t.Run(fmt.Sprintf("sf%d", scale), func(t *testing.T) {
+			want := runOracle(t, bin, toolsDir, tbl.Name, scale)
+			got := formatStreamer(tbl.NewStream(float64(scale), 1, -1))
+			if !bytes.Equal(got, want) {
+				t.Errorf("%s output differs from dsdgen at sf=%d\n--- got ---\n%s\n--- want ---\n%s",
+					tbl.Name, scale, firstLines(got, 5), firstLines(want, 5))
+			}
+		})
+	}
+}
+
 // assertTableByteEqual is the per-table byte-equality harness: it generates tbl
 // with the Go port at each scale and compares it byte-for-byte to the reference
 // dsdgen output. Each ported table gets a small _test.go calling this.
