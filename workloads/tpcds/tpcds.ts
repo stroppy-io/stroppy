@@ -3,9 +3,6 @@ import { Teardown } from "k6/x/stroppy";
 import { DriverX, Step, ENV, GlobalOnce, declareDriverSetup } from "./helpers.ts";
 import { parse_sql, parse_sql_with_sections } from "./parse_sql.js";
 
-// Backend query set (the 99 TPC-DS queries), unchanged. Set automatically when a
-// .sql file is passed as the run argument.
-const SQL_FILE = ENV("SQL_FILE", "", "Path to TPC-DS query SQL file");
 // Data generation: the ported dsdgen generator owns it; we pass table + scale.
 const SCALE_FACTOR = Number(
   ENV("SCALE_FACTOR", "1", "TPC-DS scale factor; fractional allowed for smoke tests"),
@@ -43,9 +40,28 @@ const driverConfig = declareDriverSetup(0, {
 
 const driver = DriverX.create().setup(driverConfig);
 
+// The 99 TPC-DS queries, generated per dialect from the official query templates
+// at the canonical qualification parameters (see workloads/tpcds/README or the
+// dsqgen port). Picked by driverType; SQL_FILE overrides. Dialects without their
+// own file fall back to pg.sql.
+const _sqlByDriver: Record<string, string> = {
+  postgres: "./pg.sql",
+  mysql: "./mysql.sql",
+};
+const _schemaByDriver: Record<string, string> = {
+  postgres: "./schema.pg.sql",
+  mysql: "./schema.mysql.sql",
+};
+const SQL_FILE =
+  ENV("SQL_FILE", "", "Path to TPC-DS query SQL file (defaults per driverType)") ||
+  _sqlByDriver[driverConfig.driverType!] ||
+  "./pg.sql";
+const SCHEMA_FILE =
+  _schemaByDriver[driverConfig.driverType!] || "./schema.pg.sql";
+
 // Schema DDL (one "create_schema" section) and the read-only query set, read at
 // module init like the TPC-H workload.
-const schema = parse_sql_with_sections(open("./schema.pg.sql"));
+const schema = parse_sql_with_sections(open(SCHEMA_FILE));
 const queries = parse_sql(open(SQL_FILE));
 
 // prepareDatabase creates the schema, then generates and bulk-loads every table

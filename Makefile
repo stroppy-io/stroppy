@@ -353,7 +353,8 @@ run-tpcc-mysql-test:
 		./build/stroppy run tpcc/procs.ts -d mysql -- -q
 
 run-tpcds-test:
-	./build/stroppy run tpcds tpcds-scale-1.sql
+	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
+		./build/stroppy run tpcds/tpcds -e SCALE_FACTOR=0.01
 
 run-k6-tests: # Run SQL API integration tests
 # rc - return code
