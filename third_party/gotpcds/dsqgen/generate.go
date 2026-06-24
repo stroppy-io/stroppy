@@ -41,5 +41,17 @@ func Generate(dialect Dialect, scale float64, seed int64, streamNum int) (*Resul
 		sql := dialect.render(t, env, i+1, streamNum, seed)
 		res.Queries = append(res.Queries, Query{Name: t.Name, SQL: sql})
 	}
+	// Each stream runs the queries in its own permutation (TPC-DS Clause 7.1.4).
+	permuteQueries(res.Queries, seed^(int64(streamNum+1)*2654435761))
 	return res, nil
+}
+
+// permuteQueries shuffles queries in place with a seeded Fisher-Yates, so a
+// given (seed, stream) yields a stable, reproducible order.
+func permuteQueries(qs []Query, seed int64) {
+	r := newRNG(seed)
+	for i := len(qs) - 1; i > 0; i-- {
+		j := int(r.intn(0, int64(i)))
+		qs[i], qs[j] = qs[j], qs[i]
+	}
 }

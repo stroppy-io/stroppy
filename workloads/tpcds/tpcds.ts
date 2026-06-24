@@ -1,4 +1,5 @@
 import { Options } from "k6/options";
+import exec from "k6/execution";
 import { Teardown, GenerateTpcdsQueries } from "k6/x/stroppy";
 import { DriverX, Step, ENV, GlobalOnce, declareDriverSetup } from "./helpers.ts";
 import { parse_sql, parse_sql_with_sections } from "./parse_sql.js";
@@ -32,14 +33,22 @@ const TPCDS_TABLES = [
   "web_sales", "web_returns",
 ];
 
-// One shared iteration. Declared as a scenario (not the vus/iterations
+// STREAMS > 1 runs a Throughput Test: that many concurrent query streams (TPC-DS
+// Clause 7.1.9), one per VU, each executing all 99 queries in its own
+// permutation. STREAMS <= 1 is the single-stream Power Test (Clause 7.1.10).
+const STREAMS = Number(
+  ENV("STREAMS", "1", "Concurrent throughput query streams (1 = single power-test stream)"),
+);
+const THROUGHPUT = Number.isFinite(STREAMS) && STREAMS > 1;
+
+// One iteration per stream. Declared as a scenario (not the vus/iterations
 // shorthand) so maxDuration can lift k6's 10m default for large-scale loads.
 export const options: Options = {
   scenarios: {
     tpcds: {
       executor: "shared-iterations",
-      vus: 1,
-      iterations: 1,
+      vus: THROUGHPUT ? STREAMS : 1,
+      iterations: THROUGHPUT ? STREAMS : 1,
       maxDuration: MAX_DURATION,
     },
   },
@@ -83,21 +92,35 @@ const QUERY_SEED = Number(
   ENV("QUERY_SEED", "19620718", "RNG seed for generated query streams"),
 );
 
-// Schema DDL (one "create_schema" section) and the read-only query set, read at
-// module init like the TPC-H workload.
+// Schema DDL (one "create_schema" section), read at module init.
 const schema = parse_sql_with_sections(open(SCHEMA_FILE));
-const queries: () => Array<{ name: string }> =
-  QUERY_STREAM !== ""
-    ? (() => {
-        const gen = GenerateTpcdsQueries(
-          driverConfig.driverType ?? "postgres",
-          SCALE_FACTOR,
-          QUERY_SEED,
-          Number(QUERY_STREAM),
-        );
-        return () => gen;
-      })()
-    : parse_sql(open(SQL_FILE));
+
+// Baked canonical query set, read at init only when neither throughput nor an
+// explicit QUERY_STREAM is requested (open() is allowed only during init).
+const baked =
+  !THROUGHPUT && QUERY_STREAM === "" ? parse_sql(open(SQL_FILE)) : null;
+
+// resolveQueries returns this VU's query list. Throughput: VU N runs stream N
+// (in-process generated + permuted). Single QUERY_STREAM: that stream. Otherwise
+// the baked canonical set. Memoized per VU.
+let myQueries: Array<{ name: string }> | null = null;
+function resolveQueries(): Array<{ name: string }> {
+  if (myQueries) return myQueries;
+  if (baked) {
+    myQueries = baked() as Array<{ name: string }>;
+    return myQueries;
+  }
+  const streamIdx = THROUGHPUT
+    ? exec.vu.idInTest - 1
+    : Number(QUERY_STREAM || "0");
+  myQueries = GenerateTpcdsQueries(
+    driverConfig.driverType ?? "postgres",
+    SCALE_FACTOR,
+    QUERY_SEED,
+    streamIdx,
+  );
+  return myQueries;
+}
 
 // prepareDatabase creates the schema, then generates and bulk-loads every table
 // with the ported dsdgen generator. Runs once per process via GlobalOnce.
@@ -124,11 +147,13 @@ export function setup(): void {
 }
 
 export default function (): void {
+  // Load runs once across all VUs (process-global); concurrent throughput VUs
+  // block here until the single loader finishes, then each runs its stream.
   GlobalOnce("tpcds.prepare", prepareDatabase);
 
-  Step("queries", () => {
-    queries().forEach((query) => {
-      console.log(`tpc-ds-like: ${query.name}`);
+  const stepName = THROUGHPUT ? `queries_stream_${exec.vu.idInTest}` : "queries";
+  Step(stepName, () => {
+    resolveQueries().forEach((query) => {
       driver.exec(query, {});
     });
   });

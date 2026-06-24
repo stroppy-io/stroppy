@@ -26,7 +26,8 @@ Env overrides:
 -e LOAD_WORKERS=4      # parallel InsertSpec workers per table during load.
 -e MAX_DURATION=24h    # run wall-clock cap (default 24h; the workload sets its
                        # own so large-scale loads aren't killed by k6's 10m default).
--e QUERY_STREAM=0      # generate query stream N in-process (empty = baked set).
+-e STREAMS=4           # concurrent throughput streams (1 = single power-test stream).
+-e QUERY_STREAM=0      # single generated stream N in-process (empty = baked set).
 -e QUERY_SEED=42       # seed for generated streams.
 -e SQL_FILE=./pg.sql   # override the per-driver baked query file.
 ```
@@ -102,9 +103,29 @@ regenerated — those are correct in the baked `mysql.sql`). The same generator 
 available as a standalone CLI (`third_party/gotpcds/dsqgen/cmd/dsqgen`, or
 `make gen-tpcds-streams`) for writing stream `.sql` files offline.
 
+## TPC-DS spec phases (Clause 7)
+
+The full benchmark is Load + Power + Throughput1 + DataMaint1 + Throughput2 +
+DataMaint2, scored as QphDS@SF. This workload covers:
+
+- **Database Load Test** — `load_data` step. ✅
+- **Power Test** (1 stream, 99 queries serially) — default run (`STREAMS=1`). ✅
+- **Throughput Test** (Sq concurrent streams, each a permuted 99) — `STREAMS=Sq`
+  runs Sq VUs, one stream each, load shared once. ✅ (Sq should be even ≥ 4 for a
+  compliant run; any value works for testing.)
+- **Data Maintenance Test** (sequential refresh runs: fact insert/delete +
+  inventory delete over dsdgen refresh data) — not implemented.
+- **QphDS@SF metric** — not computed (per-step timings are reported by k6).
+
+```bash
+# Throughput test: 4 concurrent streams
+./build/stroppy run tpcds/tpcds -d pg -D url=... -e SCALE_FACTOR=1 -e STREAMS=4
+```
+
 ## Status / TODO
 
 - PostgreSQL and MySQL: load + all 103 statements verified on a local
   instance at SCALE_FACTOR=0.01.
-- Not yet done: SF=1 answer-set validation against the kit's `answer_sets/`,
-  and Picodata + YDB dialect files (queries and schema).
+- Not yet done: the Data Maintenance phase (refresh-data generation + insert/
+  delete DM functions) and the QphDS@SF metric; SF=1 answer-set validation against
+  the kit's `answer_sets/`; Picodata + YDB dialect files (queries and schema).
