@@ -123,18 +123,21 @@ func (s *streamSource) Next() ([]any, error) {
 	return normalize(row), nil
 }
 
-// normalize converts the generator's struct-valued columns (Date, Decimal) to
-// their canonical text form so the SQL driver can encode them directly; the text
-// matches dsdgen's output byte-for-byte. Scalar columns (int64, string) and SQL
-// nulls (nil) pass through unchanged.
+// normalize renders every non-null column as its canonical dsdgen text — the
+// exact bytes the reference generator emits — so a single value form (string)
+// loads into any column type. This mirrors the canonical "COPY the dsdgen text
+// output" load: the driver's binary COPY accepts a Go string for int, numeric,
+// date and char/varchar columns alike, while several columns the spec types as
+// char actually carry numbers (e.g. street_number) or julian dates
+// (c_last_review_date) that must not be encoded as integers. SQL nulls (nil)
+// pass through.
 func normalize(row []any) []any {
 	for i, v := range row {
-		switch x := v.(type) {
-		case dsdgen.Date:
-			row[i] = x.String()
-		case dsdgen.Decimal:
-			row[i] = x.String()
+		if v == nil {
+			continue
 		}
+
+		row[i] = fmt.Sprintf("%v", v)
 	}
 
 	return row

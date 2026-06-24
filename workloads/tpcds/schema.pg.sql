@@ -1,18 +1,21 @@
---= create_schema
 -- TPC-DS schema (PostgreSQL). Column names match the ported dsdgen
 -- generator's emission order; types are the canonical TPC-DS types from the
 -- official tpcds.sql. No constraints: the load path uses bulk COPY and the
--- query workload is read-only. One '--= create_schema' section, parsed by
--- parse_sql_with_sections like the TPC-H schema.
-
+-- query workload is read-only. One '--+ create_schema' section; each DROP and
+-- CREATE is a named '--=' statement, parsed by parse_sql_with_sections like
+-- the TPC-H schema.
+--+ create_schema
+--= drop_income_band
 DROP TABLE IF EXISTS income_band;
+--= income_band
 CREATE TABLE income_band (
     ib_income_band_sk          integer,
     ib_lower_bound             integer,
     ib_upper_bound             integer
 );
-
+--= drop_ship_mode
 DROP TABLE IF EXISTS ship_mode;
+--= ship_mode
 CREATE TABLE ship_mode (
     sm_ship_mode_sk            integer,
     sm_ship_mode_id            char(16),
@@ -21,15 +24,17 @@ CREATE TABLE ship_mode (
     sm_carrier                 char(20),
     sm_contract                char(20)
 );
-
+--= drop_reason
 DROP TABLE IF EXISTS reason;
+--= reason
 CREATE TABLE reason (
     r_reason_sk                integer,
     r_reason_id                char(16),
     r_reason_desc              char(100)
 );
-
+--= drop_household_demographics
 DROP TABLE IF EXISTS household_demographics;
+--= household_demographics
 CREATE TABLE household_demographics (
     hd_demo_sk                 integer,
     hd_income_band_sk          integer,
@@ -37,8 +42,9 @@ CREATE TABLE household_demographics (
     hd_dep_count               integer,
     hd_vehicle_count           integer
 );
-
+--= drop_customer_demographics
 DROP TABLE IF EXISTS customer_demographics;
+--= customer_demographics
 CREATE TABLE customer_demographics (
     cd_demo_sk                 integer,
     cd_gender                  char(1),
@@ -50,8 +56,9 @@ CREATE TABLE customer_demographics (
     cd_dep_employed_count      integer,
     cd_dep_college_count       integer
 );
-
+--= drop_date_dim
 DROP TABLE IF EXISTS date_dim;
+--= date_dim
 CREATE TABLE date_dim (
     d_date_sk                  integer,
     d_date_id                  char(16),
@@ -82,8 +89,9 @@ CREATE TABLE date_dim (
     d_current_quarter          char(1),
     d_current_year             char(1)
 );
-
+--= drop_time_dim
 DROP TABLE IF EXISTS time_dim;
+--= time_dim
 CREATE TABLE time_dim (
     t_time_sk                  integer,
     t_time_id                  char(16),
@@ -96,8 +104,9 @@ CREATE TABLE time_dim (
     t_sub_shift                char(20),
     t_meal_time                char(20)
 );
-
+--= drop_warehouse
 DROP TABLE IF EXISTS warehouse;
+--= warehouse
 CREATE TABLE warehouse (
     w_warehouse_sk             integer,
     w_warehouse_id             char(16),
@@ -114,8 +123,9 @@ CREATE TABLE warehouse (
     w_country                  varchar(20),
     w_gmt_offset               decimal(5,2)
 );
-
+--= drop_web_page
 DROP TABLE IF EXISTS web_page;
+--= web_page
 CREATE TABLE web_page (
     wp_web_page_sk             integer,
     wp_web_page_id             char(16),
@@ -132,8 +142,9 @@ CREATE TABLE web_page (
     wp_image_count             integer,
     wp_max_ad_count            integer
 );
-
+--= drop_web_site
 DROP TABLE IF EXISTS web_site;
+--= web_site
 CREATE TABLE web_site (
     web_site_sk                integer,
     web_site_id                char(16),
@@ -162,8 +173,9 @@ CREATE TABLE web_site (
     web_gmt_offset             decimal(5,2),
     web_tax_percentage         decimal(5,2)
 );
-
+--= drop_catalog_page
 DROP TABLE IF EXISTS catalog_page;
+--= catalog_page
 CREATE TABLE catalog_page (
     cp_catalog_page_sk         integer,
     cp_catalog_page_id         char(16),
@@ -175,8 +187,9 @@ CREATE TABLE catalog_page (
     cp_description             varchar(100),
     cp_type                    varchar(100)
 );
-
+--= drop_customer_address
 DROP TABLE IF EXISTS customer_address;
+--= customer_address
 CREATE TABLE customer_address (
     ca_address_sk              integer,
     ca_address_id              char(16),
@@ -192,8 +205,9 @@ CREATE TABLE customer_address (
     ca_gmt_offset              decimal(5,2),
     ca_location_type           char(20)
 );
-
+--= drop_customer
 DROP TABLE IF EXISTS customer;
+--= customer
 CREATE TABLE customer (
     c_customer_sk              integer,
     c_customer_id              char(16),
@@ -214,8 +228,9 @@ CREATE TABLE customer (
     c_email_address            char(50),
     c_last_review_date         char(10)
 );
-
+--= drop_call_center
 DROP TABLE IF EXISTS call_center;
+--= call_center
 CREATE TABLE call_center (
     cc_call_center_sk          integer,
     cc_call_center_id          char(16),
@@ -249,8 +264,9 @@ CREATE TABLE call_center (
     cc_gmt_offset              decimal(5,2),
     cc_tax_percentage          decimal(5,2)
 );
-
+--= drop_store
 DROP TABLE IF EXISTS store;
+--= store
 CREATE TABLE store (
     s_store_sk                 integer,
     s_store_id                 char(16),
@@ -282,8 +298,9 @@ CREATE TABLE store (
     s_gmt_offset               decimal(5,2),
     s_tax_precentage           decimal(5,2)
 );
-
+--= drop_promotion
 DROP TABLE IF EXISTS promotion;
+--= promotion
 CREATE TABLE promotion (
     p_promo_sk                 integer,
     p_promo_id                 char(16),
@@ -305,8 +322,9 @@ CREATE TABLE promotion (
     p_purpose                  char(15),
     p_discount_active          char(1)
 );
-
+--= drop_item
 DROP TABLE IF EXISTS item;
+--= item
 CREATE TABLE item (
     i_item_sk                  integer,
     i_item_id                  char(16),
@@ -331,16 +349,18 @@ CREATE TABLE item (
     i_manager_id               integer,
     i_product_name             char(50)
 );
-
+--= drop_inventory
 DROP TABLE IF EXISTS inventory;
+--= inventory
 CREATE TABLE inventory (
     inv_date_sk                integer,
     inv_item_sk                integer,
     inv_warehouse_sk           integer,
     inv_quantity_on_hand       integer
 );
-
+--= drop_store_sales
 DROP TABLE IF EXISTS store_sales;
+--= store_sales
 CREATE TABLE store_sales (
     ss_sold_date_sk            integer,
     ss_sold_time_sk            integer,
@@ -366,8 +386,9 @@ CREATE TABLE store_sales (
     ss_net_paid_inc_tax        decimal(7,2),
     ss_net_profit              decimal(7,2)
 );
-
+--= drop_store_returns
 DROP TABLE IF EXISTS store_returns;
+--= store_returns
 CREATE TABLE store_returns (
     sr_returned_date_sk        integer,
     sr_return_time_sk          integer,
@@ -390,8 +411,9 @@ CREATE TABLE store_returns (
     sr_store_credit            decimal(7,2),
     sr_net_loss                decimal(7,2)
 );
-
+--= drop_catalog_sales
 DROP TABLE IF EXISTS catalog_sales;
+--= catalog_sales
 CREATE TABLE catalog_sales (
     cs_sold_date_sk            integer,
     cs_sold_time_sk            integer,
@@ -428,8 +450,9 @@ CREATE TABLE catalog_sales (
     cs_net_paid_inc_ship_tax   decimal(7,2),
     cs_net_profit              decimal(7,2)
 );
-
+--= drop_catalog_returns
 DROP TABLE IF EXISTS catalog_returns;
+--= catalog_returns
 CREATE TABLE catalog_returns (
     cr_returned_date_sk        integer,
     cr_returned_time_sk        integer,
@@ -459,8 +482,9 @@ CREATE TABLE catalog_returns (
     cr_store_credit            decimal(7,2),
     cr_net_loss                decimal(7,2)
 );
-
+--= drop_web_sales
 DROP TABLE IF EXISTS web_sales;
+--= web_sales
 CREATE TABLE web_sales (
     ws_sold_date_sk            integer,
     ws_sold_time_sk            integer,
@@ -497,8 +521,9 @@ CREATE TABLE web_sales (
     ws_net_paid_inc_ship_tax   decimal(7,2),
     ws_net_profit              decimal(7,2)
 );
-
+--= drop_web_returns
 DROP TABLE IF EXISTS web_returns;
+--= web_returns
 CREATE TABLE web_returns (
     wr_returned_date_sk        integer,
     wr_returned_time_sk        integer,
@@ -525,4 +550,3 @@ CREATE TABLE web_returns (
     wr_account_credit          decimal(7,2),
     wr_net_loss                decimal(7,2)
 );
-
