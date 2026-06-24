@@ -23,6 +23,8 @@ ifeq ($(UNAME_M),x86_64)
   ARCH := x86_64
 else ifeq ($(UNAME_M),arm64)
   ARCH := aarch_64
+else ifeq ($(UNAME_M), aarch64)
+  ARCH := aarch_64
 else
   $(error Unsupported architecture: $(UNAME_M))
 endif
