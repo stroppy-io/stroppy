@@ -38,10 +38,11 @@ const (
 type Expr struct {
 	Kind ExprKind
 	Func string // ExprCall: function name
-	Word string // ExprWord/ExprRef: identifier
+	Word string // ExprWord/ExprRef: identifier (ExprRef: base name without .K suffix)
 	Str  string // ExprStr
 	Int  int64  // ExprInt
-	Args []Expr // ExprCall/ExprTuple operands; ExprAdd: exactly two
+	Idx  int    // ExprRef: 1-based element of a multi-value (ulist) define; 0 = first
+	Args []Expr // ExprCall/ExprTuple operands; ExprBinary: exactly two
 }
 
 // Define is one `define NAME = RHS;` directive.
@@ -225,7 +226,14 @@ func (p *parser) parseRef() (Expr, error) {
 	}
 	name := strings.TrimSpace(p.s[start:p.pos])
 	p.pos++ // ']'
-	return Expr{Kind: ExprRef, Word: name}, nil
+	idx := 0
+	if dot := strings.LastIndexByte(name, '.'); dot >= 0 {
+		if k, err := strconv.Atoi(name[dot+1:]); err == nil {
+			idx = k
+			name = name[:dot]
+		}
+	}
+	return Expr{Kind: ExprRef, Word: name, Idx: idx}, nil
 }
 
 func (p *parser) parseTuple() (Expr, error) {

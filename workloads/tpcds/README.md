@@ -72,10 +72,32 @@ correlated per-category `avg(i_current_price)` is decorrelated into a grouped
 join (MySQL re-evaluates the correlated subquery per row — O(n²) — where
 Postgres does not; the rewrite is semantically identical).
 
+## Query streams (generated)
+
+The default run uses the baked, verified `pg.sql` / `mysql.sql` (the canonical
+qualification parameters). For throughput-style runs that vary parameters per
+stream, generate stream files with the `dsqgen` tool and point `SQL_FILE` at one:
+
+```bash
+go run ./third_party/gotpcds/dsqgen/cmd/dsqgen \
+    -dialect postgres -scale 1 -seed 42 -streams 4 -out /tmp/tpcds-streams
+./build/stroppy run tpcds/tpcds -d pg \
+    -D url=postgres://postgres:postgres@localhost:5432 \
+    -e SCALE_FACTOR=1 -e SQL_FILE=/tmp/tpcds-streams/postgres_stream_0.sql
+```
+
+The generator parses the official query templates' `define` headers and produces
+valid, scale-correct parameter values with its own seeded RNG (it does NOT
+reproduce the C `dsqgen`'s exact value stream — query generation is independent
+of data generation; it only needs the same parameter domains so filters hit real
+rows). Postgres streams cover all 99 queries; MySQL streams cover 96 (query88's
+syllable-generated store names and queries 51/97's full-outer-join are not
+regenerated — those are correct in the baked `mysql.sql`). See
+`third_party/gotpcds/dsqgen`.
+
 ## Status / TODO
 
 - PostgreSQL and MySQL: load + all 103 statements verified on a local
   instance at SCALE_FACTOR=0.01.
-- Not yet done: a Go port of `dsqgen` (so query generation does not depend
-  on the C kit), SF=1 answer-set validation against the kit's `answer_sets/`,
-  Picodata and YDB dialect files, and randomized query streams.
+- Not yet done: SF=1 answer-set validation against the kit's `answer_sets/`,
+  and Picodata + YDB dialect files (queries and schema).

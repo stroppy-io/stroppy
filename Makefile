@@ -262,6 +262,12 @@ gen-tpcds-json: # Regenerate workloads/tpcds/distributions.json from upstream .d
 	fi
 	go run ./cmd/dstparse -in $(TPCDS_TOOLS_DIR) -out workloads/tpcds/distributions.json
 
+gen-tpcds-streams: # Generate TPC-DS query streams (DIALECT, SCALE, SEED, STREAMS, OUT)
+	go run ./third_party/gotpcds/dsqgen/cmd/dsqgen \
+		-dialect $(or $(DIALECT),postgres) -scale $(or $(SCALE),1) \
+		-seed $(or $(SEED),19620718) -streams $(or $(STREAMS),1) \
+		-out $(or $(OUT),./tpcds-streams)
+
 gen-tpch-json: # Regenerate workloads/tpch/distributions.json and answers_sf1.json from upstream files
 	@if [ -z "$(TPCH_DISTS)" ]; then \
 		echo "error: TPCH_DISTS must point to upstream dists.dss"; \

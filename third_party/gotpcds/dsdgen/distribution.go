@@ -24,6 +24,13 @@ type StringValuesDistribution struct {
 	weights [][]int // cumulative
 }
 
+// ReadDistFile returns the raw bytes of an embedded distribution file (e.g.
+// "fips.dst"). Exposed so sibling generators (the dsqgen query-parameter
+// generator) can reuse the vendored .dst tables without duplicating them.
+func ReadDistFile(name string) ([]byte, error) {
+	return distFS.ReadFile("distributions/" + name)
+}
+
 // loadStringValuesDistribution parses filename into numValueFields value columns
 // and numWeightFields cumulative-weight columns.
 func loadStringValuesDistribution(filename string, numValueFields, numWeightFields int) (*StringValuesDistribution, error) {
