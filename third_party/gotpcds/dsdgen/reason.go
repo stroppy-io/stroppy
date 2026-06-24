@@ -34,7 +34,7 @@ func mustLoadStringValues(file string, nv, nw int) *StringValuesDistribution {
 // consumes its two draws per row to keep stream alignment identical to dsdgen.
 var Reason = &Table{
 	Name:     "reason",
-	Columns:  []string{"r_reason_sk", "r_reason_id", "r_reason_description"},
+	Columns:  []string{"r_reason_sk", "r_reason_id", "r_reason_desc"},
 	Cols:     reasonCols,
 	RowCount: func(float64) int64 { return 75 },
 	Row: func(rowNumber int64, ss *streamSet, _ *Scaling) []any {

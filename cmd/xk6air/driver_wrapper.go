@@ -165,6 +165,51 @@ func (d *DriverWrapper) InsertTpch(table string, scaleFactor float64, workers in
 	return result, nil
 }
 
+// InsertTpcds loads one TPC-DS table using the ported dsdgen generator. As with
+// InsertTpch the JS side passes only the table name and scale factor; the spec
+// (with the tpcds generator arm) is assembled here so workloads never model
+// TpcdsSource in TS. Method is driver-native; workers <= 0 means 1.
+func (d *DriverWrapper) InsertTpcds(table string, scaleFactor float64, workers int) (*stats.Query, error) {
+	d.ensureReady()
+
+	if workers < 1 {
+		workers = 1
+	}
+
+	spec := &dgproto.InsertSpec{
+		Table:       table,
+		Method:      dgproto.InsertMethod_NATIVE,
+		Parallelism: &dgproto.Parallelism{Workers: int32(workers)},
+		Generator: &dgproto.InsertSpec_Tpcds{
+			Tpcds: &dgproto.TpcdsSource{Table: table, ScaleFactor: scaleFactor},
+		},
+	}
+
+	tracker, err := d.newInsertProgressTracker(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := d.vu.Context()
+	if tracker.Enabled() {
+		ctx = insertprogress.ContextWithTracker(ctx, tracker)
+		tracker.Start(ctx)
+	}
+
+	result, err := d.drv.InsertSpec(ctx, spec)
+	if tracker.Enabled() {
+		tracker.Finish(err)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error while executing InsertTpcds %q: %w", table, err)
+	}
+
+	rootModule.txMetrics.recordInsert(d.vu, table, result.Rows)
+
+	return result, nil
+}
+
 func (d *DriverWrapper) newInsertProgressTracker(
 	spec *dgproto.InsertSpec,
 ) (*insertprogress.Tracker, error) {

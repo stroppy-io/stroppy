@@ -69,6 +69,10 @@ declare module "k6/x/stroppy" {
      *  assembles the spec from the table name and scale factor.
      *  @throws {Error} on insert failure or unknown table */
     insertTpch(table: string, scaleFactor: number, workers: number): QueryStats;
+    /** Load one TPC-DS table with the ported dsdgen generator. The Go side
+     *  assembles the spec from the table name and scale factor.
+     *  @throws {Error} on insert failure or unknown table */
+    insertTpcds(table: string, scaleFactor: number, workers: number): QueryStats;
     /** @throws {Error} on query execution or argument processing error */
     runQuery(sql: string, args: Record<string, any>): QueryResult;
     /** Start a transaction with the given isolation level (proto TxIsolationLevel enum value).

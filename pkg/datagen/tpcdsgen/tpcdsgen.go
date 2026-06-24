@@ -120,7 +120,24 @@ func (s *streamSource) Next() ([]any, error) {
 		return nil, io.EOF
 	}
 
-	return row, nil
+	return normalize(row), nil
+}
+
+// normalize converts the generator's struct-valued columns (Date, Decimal) to
+// their canonical text form so the SQL driver can encode them directly; the text
+// matches dsdgen's output byte-for-byte. Scalar columns (int64, string) and SQL
+// nulls (nil) pass through unchanged.
+func normalize(row []any) []any {
+	for i, v := range row {
+		switch x := v.(type) {
+		case dsdgen.Date:
+			row[i] = x.String()
+		case dsdgen.Decimal:
+			row[i] = x.String()
+		}
+	}
+
+	return row
 }
 
 // factGen is a source.Partitionable over a fan-out fact table at one scale. The
@@ -153,5 +170,5 @@ func (s *factSource) Next() ([]any, error) {
 		return nil, io.EOF
 	}
 
-	return row, nil
+	return normalize(row), nil
 }

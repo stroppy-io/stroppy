@@ -117,7 +117,7 @@ var Customer = &Table{
 		"c_current_hdemo_sk", "c_current_addr_sk", "c_first_shipto_date_sk",
 		"c_first_sales_date_sk", "c_salutation", "c_first_name", "c_last_name",
 		"c_preferred_cust_flag", "c_birth_day", "c_birth_month", "c_birth_year",
-		"c_birth_country", "c_login", "c_email_address", "c_last_review_date_sk",
+		"c_birth_country", "c_login", "c_email_address", "c_last_review_date",
 	},
 	Cols:     customerCols,
 	RowCount: func(sf float64) int64 { return NewScaling(sf).RowCount(TCustomer) },
