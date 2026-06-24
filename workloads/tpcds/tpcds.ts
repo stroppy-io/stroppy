@@ -1,5 +1,5 @@
 import { Options } from "k6/options";
-import { Teardown } from "k6/x/stroppy";
+import { Teardown, GenerateTpcdsQueries } from "k6/x/stroppy";
 import { DriverX, Step, ENV, GlobalOnce, declareDriverSetup } from "./helpers.ts";
 import { parse_sql, parse_sql_with_sections } from "./parse_sql.js";
 
@@ -17,6 +17,10 @@ if (!Number.isFinite(SCALE_FACTOR) || SCALE_FACTOR <= 0) {
   throw new Error(`SCALE_FACTOR must be a positive number, got ${SCALE_FACTOR}`);
 }
 
+// A full load + single query pass at large scale far exceeds k6's default 10m
+// cap, so the workload sets its own. Override with MAX_DURATION if needed.
+const MAX_DURATION = ENV("MAX_DURATION", "24h", "Max wall-clock for the run (k6 duration)");
+
 // Table load order: dimensions and static tables first, fan-out fact tables
 // last (each returns table after its parent sales table).
 const TPCDS_TABLES = [
@@ -28,9 +32,17 @@ const TPCDS_TABLES = [
   "web_sales", "web_returns",
 ];
 
+// One shared iteration. Declared as a scenario (not the vus/iterations
+// shorthand) so maxDuration can lift k6's 10m default for large-scale loads.
 export const options: Options = {
-  vus: 1,
-  iterations: 1,
+  scenarios: {
+    tpcds: {
+      executor: "shared-iterations",
+      vus: 1,
+      iterations: 1,
+      maxDuration: MAX_DURATION,
+    },
+  },
 };
 
 const driverConfig = declareDriverSetup(0, {
@@ -59,10 +71,33 @@ const SQL_FILE =
 const SCHEMA_FILE =
   _schemaByDriver[driverConfig.driverType!] || "./schema.pg.sql";
 
+// Query source. Default: the baked canonical (qualification) query set for the
+// driver. If QUERY_STREAM is set, generate that stream's parameters in-process
+// (no offline step) — valid, scale-correct, varied per seed.
+const QUERY_STREAM = ENV(
+  "QUERY_STREAM",
+  "",
+  "Generate query stream N in-process (empty = baked canonical set)",
+);
+const QUERY_SEED = Number(
+  ENV("QUERY_SEED", "19620718", "RNG seed for generated query streams"),
+);
+
 // Schema DDL (one "create_schema" section) and the read-only query set, read at
 // module init like the TPC-H workload.
 const schema = parse_sql_with_sections(open(SCHEMA_FILE));
-const queries = parse_sql(open(SQL_FILE));
+const queries: () => Array<{ name: string }> =
+  QUERY_STREAM !== ""
+    ? (() => {
+        const gen = GenerateTpcdsQueries(
+          driverConfig.driverType ?? "postgres",
+          SCALE_FACTOR,
+          QUERY_SEED,
+          Number(QUERY_STREAM),
+        );
+        return () => gen;
+      })()
+    : parse_sql(open(SQL_FILE));
 
 // prepareDatabase creates the schema, then generates and bulk-loads every table
 // with the ported dsdgen generator. Runs once per process via GlobalOnce.

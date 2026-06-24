@@ -24,7 +24,11 @@ Env overrides:
 ```bash
 -e SCALE_FACTOR=0.01   # any positive float; fractional for smoke tests.
 -e LOAD_WORKERS=4      # parallel InsertSpec workers per table during load.
--e SQL_FILE=./pg.sql   # override the per-driver query file.
+-e MAX_DURATION=24h    # run wall-clock cap (default 24h; the workload sets its
+                       # own so large-scale loads aren't killed by k6's 10m default).
+-e QUERY_STREAM=0      # generate query stream N in-process (empty = baked set).
+-e QUERY_SEED=42       # seed for generated streams.
+-e SQL_FILE=./pg.sql   # override the per-driver baked query file.
 ```
 
 Note: the static tables (`date_dim`, `time_dim`, `customer_demographics`)
@@ -72,19 +76,21 @@ correlated per-category `avg(i_current_price)` is decorrelated into a grouped
 join (MySQL re-evaluates the correlated subquery per row — O(n²) — where
 Postgres does not; the rewrite is semantically identical).
 
-## Query streams (generated)
+## Query streams (generated, in-process)
 
 The default run uses the baked, verified `pg.sql` / `mysql.sql` (the canonical
-qualification parameters). For throughput-style runs that vary parameters per
-stream, generate stream files with the `dsqgen` tool and point `SQL_FILE` at one:
+qualification parameters). For throughput-style runs that vary parameters,
+set `QUERY_STREAM` and the workload generates that stream's queries **in-process**
+during the run — no offline step:
 
 ```bash
-go run ./third_party/gotpcds/dsqgen/cmd/dsqgen \
-    -dialect postgres -scale 1 -seed 42 -streams 4 -out /tmp/tpcds-streams
 ./build/stroppy run tpcds/tpcds -d pg \
     -D url=postgres://postgres:postgres@localhost:5432 \
-    -e SCALE_FACTOR=1 -e SQL_FILE=/tmp/tpcds-streams/postgres_stream_0.sql
+    -e SCALE_FACTOR=1 -e QUERY_STREAM=0 -e QUERY_SEED=42
 ```
+
+- `QUERY_STREAM=N` selects stream N (empty = baked canonical set).
+- `QUERY_SEED` seeds the generator (reproducible per seed).
 
 The generator parses the official query templates' `define` headers and produces
 valid, scale-correct parameter values with its own seeded RNG (it does NOT
@@ -92,8 +98,9 @@ reproduce the C `dsqgen`'s exact value stream — query generation is independen
 of data generation; it only needs the same parameter domains so filters hit real
 rows). Postgres streams cover all 99 queries; MySQL streams cover 96 (query88's
 syllable-generated store names and queries 51/97's full-outer-join are not
-regenerated — those are correct in the baked `mysql.sql`). See
-`third_party/gotpcds/dsqgen`.
+regenerated — those are correct in the baked `mysql.sql`). The same generator is
+available as a standalone CLI (`third_party/gotpcds/dsqgen/cmd/dsqgen`, or
+`make gen-tpcds-streams`) for writing stream `.sql` files offline.
 
 ## Status / TODO
 

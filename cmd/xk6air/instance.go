@@ -60,6 +60,9 @@ func (i *Instance) Exports() modules.Exports {
 			"Once":         i.Once,
 			"GlobalOnce":   i.GlobalOnce,
 
+			// In-process TPC-DS query-stream generation (no offline step).
+			"GenerateTpcdsQueries": GenerateTpcdsQueries,
+
 			// Draw iter 2 — sobek-bound Go structs, one per StreamDraw arm.
 			// Handle registries for dict / alphabet / grammar are exposed
 			// so the TS DrawRT builders can resolve non-literal inputs
