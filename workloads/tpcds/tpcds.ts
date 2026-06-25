@@ -3,6 +3,13 @@ import exec from "k6/execution";
 import { Teardown, GenerateTpcdsQueries } from "k6/x/stroppy";
 import { DriverX, Step, ENV, GlobalOnce, declareDriverSetup } from "./helpers.ts";
 import { parse_sql, parse_sql_with_sections } from "./parse_sql.js";
+import type { SqlQuery } from "./helpers.ts";
+import {
+  runAndCapture,
+  logSummary,
+  type AnswersFile,
+  type NamedQuery,
+} from "./tpcds_validate.ts";
 
 // Data generation: the ported dsdgen generator owns it; we pass table + scale.
 const SCALE_FACTOR = Number(
@@ -92,8 +99,30 @@ const QUERY_SEED = Number(
   ENV("QUERY_SEED", "19620718", "RNG seed for generated query streams"),
 );
 
+// Answer validation runs only for the baked qualification set at SF=1 (the
+// only scale the kit ships answers for). The kit answers are byte-oracle
+// derived, so they validate any engine — here postgres and mysql.
+// VALIDATE_FORCE=1 runs the validation path at any scale (answers stay SF=1, so
+// rows will DIFF at other scales) — a fast way to exercise the comparator.
+const VALIDATE_FORCE = ENV("VALIDATE_FORCE", "", "Force answer validation at any scale") !== "";
+
+// ANSWER_DUMP emits each query's normalized result to the run log (one line
+// per query, prefixed __TPCDS_DUMP__) so cmd/tpcds-diff can compare engines
+// against each other at any scale (the cross-DB / pg-oracle check).
+const ANSWER_DUMP = ENV("ANSWER_DUMP", "", "Dump normalized query results to the log for cross-DB diff") !== "";
+const VALIDATE_ANSWERS =
+  !THROUGHPUT &&
+  QUERY_STREAM === "" &&
+  (VALIDATE_FORCE || Math.abs(SCALE_FACTOR - 1) < 1e-9) &&
+  (driverConfig.driverType === "postgres" || driverConfig.driverType === "mysql");
+
 // Schema DDL (one "create_schema" section), read at module init.
 const schema = parse_sql_with_sections(open(SCHEMA_FILE));
+
+// SF=1 reference answers, read at init only when validation will run.
+const answersSf1: AnswersFile | null = VALIDATE_ANSWERS
+  ? (JSON.parse(open("./answers_sf1.json")) as AnswersFile)
+  : null;
 
 // Baked canonical query set, read at init only when neither throughput nor an
 // explicit QUERY_STREAM is requested (open() is allowed only during init).
@@ -139,6 +168,29 @@ function prepareDatabase(): void {
     }
   });
 
+  // Indexes are built AFTER the bulk load (one-shot build is far cheaper than
+  // maintaining them per-insert). Without them the unindexed multi-way joins
+  // are unrunnable at scale, especially on MySQL's nested-loop joins.
+  Step("create_indexes", () => {
+    const stmts = schema("create_indexes");
+    if (stmts) {
+      stmts.forEach((q) => driver.exec(q, {}));
+    }
+  });
+
+  // Bulk load leaves the planner with no statistics; without ANALYZE pg/mysql
+  // pick catastrophic plans (e.g. O(n²) correlated nested loops) on big queries.
+  Step("analyze", () => {
+    const dt = driverConfig.driverType;
+    if (dt === "postgres") {
+      driver.exec("ANALYZE" as unknown as { name: string }, {});
+    } else if (dt === "mysql") {
+      for (const table of TPCDS_TABLES) {
+        driver.exec(`ANALYZE TABLE ${table}` as unknown as { name: string }, {});
+      }
+    }
+  });
+
   Step.begin("workload");
 }
 
@@ -151,12 +203,49 @@ export default function (): void {
   // block here until the single loader finishes, then each runs its stream.
   GlobalOnce("tpcds.prepare", prepareDatabase);
 
-  const stepName = THROUGHPUT ? `queries_stream_${exec.vu.idInTest}` : "queries";
-  Step(stepName, () => {
-    resolveQueries().forEach((query) => {
-      driver.exec(query, {});
+  // Power/throughput query execution. When validating or dumping, the steps
+  // below execute each query (via queryRows) instead, so skip this redundant pass.
+  if (!answersSf1 && !ANSWER_DUMP) {
+    const stepName = THROUGHPUT ? `queries_stream_${exec.vu.idInTest}` : "queries";
+    Step(stepName, () => {
+      resolveQueries().forEach((query) => {
+        driver.exec(query, {});
+      });
     });
-  });
+  }
+
+  const named = (): NamedQuery[] =>
+    resolveQueries().map((q) => ({
+      name: (q as { name: string }).name,
+      query: q as unknown as SqlQuery,
+    }));
+
+  // Safety: cap any single query so a pathological plan can't wedge the run.
+  // A capped query throws → captured as ERR: in the dump, run continues.
+  const QUERY_CAP_MS = Number(ENV("QUERY_CAP_MS", "180000", "Per-query timeout (ms) in validate/dump"));
+  if (answersSf1 || ANSWER_DUMP) {
+    try {
+      if (driverConfig.driverType === "postgres") {
+        driver.exec(`SET statement_timeout = '${QUERY_CAP_MS}'` as unknown as SqlQuery, {});
+      } else if (driverConfig.driverType === "mysql") {
+        driver.exec(`SET SESSION max_execution_time = ${QUERY_CAP_MS}` as unknown as SqlQuery, {});
+      }
+    } catch (_e) { /* best-effort */ }
+  }
+
+  // Run each query once; feed both the official SF=1 compare (answersSf1) and
+  // the cross-DB dump (ANSWER_DUMP) from the same execution.
+  if (answersSf1 || ANSWER_DUMP) {
+    Step("validate_answers", () => {
+      const { dumps, results } = runAndCapture(driver, named(), answersSf1);
+      if (ANSWER_DUMP) {
+        for (const d of dumps) {
+          console.log(`__TPCDS_DUMP__\t${d.name}\t${d.error ? "ERR:" + d.error : JSON.stringify(d.rows)}`);
+        }
+      }
+      if (answersSf1) logSummary(results);
+    });
+  }
 }
 
 export function teardown(): void {

@@ -16,13 +16,14 @@ where sr_returned_date_sk = d_date_sk
 and d_year =2000
 group by sr_customer_sk
 ,sr_store_sk)
+,ctr_store_avg as (select ctr_store_sk, avg(ctr_total_return)*1.2 as ctr_avg from customer_total_return group by ctr_store_sk)
  select  c_customer_id
 from customer_total_return ctr1
 ,store
 ,customer
-where ctr1.ctr_total_return > (select avg(ctr_total_return)*1.2
-from customer_total_return ctr2
-where ctr1.ctr_store_sk = ctr2.ctr_store_sk)
+,ctr_store_avg
+where ctr1.ctr_total_return > ctr_store_avg.ctr_avg
+and ctr_store_avg.ctr_store_sk = ctr1.ctr_store_sk
 and s_store_sk = ctr1.ctr_store_sk
 and s_state = 'TN'
 and ctr1.ctr_customer_sk = c_customer_sk
@@ -1654,15 +1655,16 @@ with customer_total_return as
    and wr_returning_addr_sk = ca_address_sk 
  group by wr_returning_customer_sk
          ,ca_state)
+,ctr_state_avg as (select ctr_state, avg(ctr_total_return)*1.2 as ctr_avg from customer_total_return group by ctr_state)
   select  c_customer_id,c_salutation,c_first_name,c_last_name,c_preferred_cust_flag
        ,c_birth_day,c_birth_month,c_birth_year,c_birth_country,c_login,c_email_address
        ,c_last_review_date,ctr_total_return
  from customer_total_return ctr1
      ,customer_address
      ,customer
- where ctr1.ctr_total_return > (select avg(ctr_total_return)*1.2
- 			  from customer_total_return ctr2 
-                  	  where ctr1.ctr_state = ctr2.ctr_state)
+     ,ctr_state_avg
+ where ctr1.ctr_total_return > ctr_state_avg.ctr_avg
+ 			  and ctr_state_avg.ctr_state = ctr1.ctr_state
        and ca_address_sk = c_current_addr_sk
        and ca_state = 'AR'
        and ctr1.ctr_customer_sk = c_customer_sk
@@ -3740,7 +3742,7 @@ left outer join promotion on (cs_promo_sk=p_promo_sk)
 left outer join catalog_returns on (cr_item_sk = cs_item_sk and cr_order_number = cs_order_number)
 where d1.d_week_seq = d2.d_week_seq
   and inv_quantity_on_hand < cs_quantity 
-  and d3.d_date > d1.d_date + 5
+  and d3.d_date > d1.d_date + interval 5 day
   and hd_buy_potential = '1001-5000'
   and d1.d_year = 1998
   and cd_marital_status = 'S'
@@ -4230,15 +4232,16 @@ with customer_total_return as
    and cr_returning_addr_sk = ca_address_sk 
  group by cr_returning_customer_sk
          ,ca_state )
+,ctr_state_avg as (select ctr_state, avg(ctr_total_return)*1.2 as ctr_avg from customer_total_return group by ctr_state)
   select  c_customer_id,c_salutation,c_first_name,c_last_name,ca_street_number,ca_street_name
                    ,ca_street_type,ca_suite_number,ca_city,ca_county,ca_state,ca_zip,ca_country,ca_gmt_offset
                   ,ca_location_type,ctr_total_return
  from customer_total_return ctr1
      ,customer_address
      ,customer
- where ctr1.ctr_total_return > (select avg(ctr_total_return)*1.2
- 			  from customer_total_return ctr2 
-                  	  where ctr1.ctr_state = ctr2.ctr_state)
+     ,ctr_state_avg
+ where ctr1.ctr_total_return > ctr_state_avg.ctr_avg
+ 			  and ctr_state_avg.ctr_state = ctr1.ctr_state
        and ca_address_sk = c_current_addr_sk
        and ca_state = 'TN'
        and ctr1.ctr_customer_sk = c_customer_sk

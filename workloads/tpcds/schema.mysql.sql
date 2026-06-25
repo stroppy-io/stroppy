@@ -551,3 +551,140 @@ CREATE TABLE web_returns (
     wr_account_credit          decimal(7,2),
     wr_net_loss                decimal(7,2)
 );
+
+-- Indexes (TPC-DS Clause 2.5 permits single-table indexes). Built AFTER the
+-- bulk load by the create_indexes step so they don't slow the load. Cover the
+-- surrogate/foreign-key join columns plus the few filter columns the 99
+-- queries lean on; dimension tables are small enough that other filters scan.
+--+ create_indexes
+-- dimension keys (fact tables join to these)
+--= i_d_date_sk
+create index i_d_date_sk on date_dim (d_date_sk);
+--= i_d_year
+create index i_d_year on date_dim (d_year);
+--= i_d_month_seq
+create index i_d_month_seq on date_dim (d_month_seq);
+--= i_d_week_seq
+create index i_d_week_seq on date_dim (d_week_seq);
+--= i_t_time_sk
+create index i_t_time_sk on time_dim (t_time_sk);
+--= i_i_item_sk
+create index i_i_item_sk on item (i_item_sk);
+--= i_i_category
+create index i_i_category on item (i_category);
+--= i_c_customer_sk
+create index i_c_customer_sk on customer (c_customer_sk);
+--= i_c_current_addr_sk
+create index i_c_current_addr_sk on customer (c_current_addr_sk);
+--= i_c_current_cdemo_sk
+create index i_c_current_cdemo_sk on customer (c_current_cdemo_sk);
+--= i_c_current_hdemo_sk
+create index i_c_current_hdemo_sk on customer (c_current_hdemo_sk);
+--= i_ca_address_sk
+create index i_ca_address_sk on customer_address (ca_address_sk);
+--= i_cd_demo_sk
+create index i_cd_demo_sk on customer_demographics (cd_demo_sk);
+--= i_hd_demo_sk
+create index i_hd_demo_sk on household_demographics (hd_demo_sk);
+--= i_hd_income_band_sk
+create index i_hd_income_band_sk on household_demographics (hd_income_band_sk);
+--= i_ib_income_band_sk
+create index i_ib_income_band_sk on income_band (ib_income_band_sk);
+--= i_s_store_sk
+create index i_s_store_sk on store (s_store_sk);
+--= i_w_warehouse_sk
+create index i_w_warehouse_sk on warehouse (w_warehouse_sk);
+--= i_p_promo_sk
+create index i_p_promo_sk on promotion (p_promo_sk);
+--= i_cc_call_center_sk
+create index i_cc_call_center_sk on call_center (cc_call_center_sk);
+--= i_cp_catalog_page_sk
+create index i_cp_catalog_page_sk on catalog_page (cp_catalog_page_sk);
+--= i_wp_web_page_sk
+create index i_wp_web_page_sk on web_page (wp_web_page_sk);
+--= i_web_site_sk
+create index i_web_site_sk on web_site (web_site_sk);
+--= i_sm_ship_mode_sk
+create index i_sm_ship_mode_sk on ship_mode (sm_ship_mode_sk);
+--= i_r_reason_sk
+create index i_r_reason_sk on reason (r_reason_sk);
+-- store_sales / store_returns
+--= i_ss_sold_date_sk
+create index i_ss_sold_date_sk on store_sales (ss_sold_date_sk);
+--= i_ss_item_sk
+create index i_ss_item_sk on store_sales (ss_item_sk);
+--= i_ss_customer_sk
+create index i_ss_customer_sk on store_sales (ss_customer_sk);
+--= i_ss_cdemo_sk
+create index i_ss_cdemo_sk on store_sales (ss_cdemo_sk);
+--= i_ss_hdemo_sk
+create index i_ss_hdemo_sk on store_sales (ss_hdemo_sk);
+--= i_ss_addr_sk
+create index i_ss_addr_sk on store_sales (ss_addr_sk);
+--= i_ss_store_sk
+create index i_ss_store_sk on store_sales (ss_store_sk);
+--= i_ss_promo_sk
+create index i_ss_promo_sk on store_sales (ss_promo_sk);
+--= i_ss_ticket_number
+create index i_ss_ticket_number on store_sales (ss_ticket_number);
+--= i_sr_returned_date_sk
+create index i_sr_returned_date_sk on store_returns (sr_returned_date_sk);
+--= i_sr_item_sk
+create index i_sr_item_sk on store_returns (sr_item_sk);
+--= i_sr_customer_sk
+create index i_sr_customer_sk on store_returns (sr_customer_sk);
+--= i_sr_ticket_number
+create index i_sr_ticket_number on store_returns (sr_ticket_number);
+-- catalog_sales / catalog_returns
+--= i_cs_sold_date_sk
+create index i_cs_sold_date_sk on catalog_sales (cs_sold_date_sk);
+--= i_cs_ship_date_sk
+create index i_cs_ship_date_sk on catalog_sales (cs_ship_date_sk);
+--= i_cs_item_sk
+create index i_cs_item_sk on catalog_sales (cs_item_sk);
+--= i_cs_bill_customer_sk
+create index i_cs_bill_customer_sk on catalog_sales (cs_bill_customer_sk);
+--= i_cs_bill_cdemo_sk
+create index i_cs_bill_cdemo_sk on catalog_sales (cs_bill_cdemo_sk);
+--= i_cs_bill_hdemo_sk
+create index i_cs_bill_hdemo_sk on catalog_sales (cs_bill_hdemo_sk);
+--= i_cs_bill_addr_sk
+create index i_cs_bill_addr_sk on catalog_sales (cs_bill_addr_sk);
+--= i_cs_warehouse_sk
+create index i_cs_warehouse_sk on catalog_sales (cs_warehouse_sk);
+--= i_cs_order_number
+create index i_cs_order_number on catalog_sales (cs_order_number);
+--= i_cr_returned_date_sk
+create index i_cr_returned_date_sk on catalog_returns (cr_returned_date_sk);
+--= i_cr_item_sk
+create index i_cr_item_sk on catalog_returns (cr_item_sk);
+--= i_cr_order_number
+create index i_cr_order_number on catalog_returns (cr_order_number);
+--= i_cr_returning_customer_sk
+create index i_cr_returning_customer_sk on catalog_returns (cr_returning_customer_sk);
+--= i_cr_returning_addr_sk
+create index i_cr_returning_addr_sk on catalog_returns (cr_returning_addr_sk);
+-- web_sales / web_returns
+--= i_ws_sold_date_sk
+create index i_ws_sold_date_sk on web_sales (ws_sold_date_sk);
+--= i_ws_ship_date_sk
+create index i_ws_ship_date_sk on web_sales (ws_ship_date_sk);
+--= i_ws_item_sk
+create index i_ws_item_sk on web_sales (ws_item_sk);
+--= i_ws_bill_customer_sk
+create index i_ws_bill_customer_sk on web_sales (ws_bill_customer_sk);
+--= i_ws_order_number
+create index i_ws_order_number on web_sales (ws_order_number);
+--= i_wr_returned_date_sk
+create index i_wr_returned_date_sk on web_returns (wr_returned_date_sk);
+--= i_wr_item_sk
+create index i_wr_item_sk on web_returns (wr_item_sk);
+--= i_wr_order_number
+create index i_wr_order_number on web_returns (wr_order_number);
+-- inventory
+--= i_inv_date_sk
+create index i_inv_date_sk on inventory (inv_date_sk);
+--= i_inv_item_sk
+create index i_inv_item_sk on inventory (inv_item_sk);
+--= i_inv_warehouse_sk
+create index i_inv_warehouse_sk on inventory (inv_warehouse_sk);
