@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import exec from "k6/execution";
 import { Teardown, GenerateTpcdsQueries } from "k6/x/stroppy";
-import { DriverX, Step, ENV, GlobalOnce, declareDriverSetup } from "./helpers.ts";
+import { DriverX, Step, ENV, GlobalOnce, declareDriverSetup, declareScenario } from "./helpers.ts";
 import { parse_sql, parse_sql_with_sections } from "./parse_sql.js";
 import type { SqlQuery } from "./helpers.ts";
 import {
@@ -20,14 +20,11 @@ const LOAD_WORKERS = ENV(
   0,
   "Load-time worker count per table (0 = framework default)",
 ) as number;
+const POOL_SIZE = ENV("POOL_SIZE", 50, "Connection pool size");
 
 if (!Number.isFinite(SCALE_FACTOR) || SCALE_FACTOR <= 0) {
   throw new Error(`SCALE_FACTOR must be a positive number, got ${SCALE_FACTOR}`);
 }
-
-// A full load + single query pass at large scale far exceeds k6's default 10m
-// cap, so the workload sets its own. Override with MAX_DURATION if needed.
-const MAX_DURATION = ENV("MAX_DURATION", "24h", "Max wall-clock for the run (k6 duration)");
 
 // Table load order: dimensions and static tables first, fan-out fact tables
 // last (each returns table after its parent sales table).
@@ -51,22 +48,24 @@ const THROUGHPUT = Number.isFinite(STREAMS) && STREAMS > 1;
 // One iteration per stream. Declared as a scenario (not the vus/iterations
 // shorthand) so maxDuration can lift k6's 10m default for large-scale loads.
 export const options: Options = {
-  scenarios: {
-    tpcds: {
-      executor: "shared-iterations",
-      vus: THROUGHPUT ? STREAMS : 1,
-      iterations: THROUGHPUT ? STREAMS : 1,
-      maxDuration: MAX_DURATION,
-    },
-  },
+  scenarios: declareScenario("tpcds", {
+    vus: THROUGHPUT ? STREAMS : 1,
+    iterations: THROUGHPUT ? STREAMS : 1,
+  }),
 };
 
 const driverConfig = declareDriverSetup(0, {
   url: "postgres://postgres:postgres@localhost:5432",
   driverType: "postgres",
+  pool: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
 });
 
 const driver = DriverX.create().setup(driverConfig);
+
+// PostgreSQL only: flip to UNLOGGED for a WAL-free bulk load of the 24 tables,
+// back to LOGGED after. Disable with PG_UNLOGGED=false.
+const PG_UNLOGGED = ENV("PG_UNLOGGED", "true", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") !== "false";
+const useUnlogged = PG_UNLOGGED && driverConfig.driverType === "postgres";
 
 // The 99 TPC-DS queries, generated per dialect from the official query templates
 // at the canonical qualification parameters (see workloads/tpcds/README or the
@@ -119,10 +118,14 @@ const VALIDATE_ANSWERS =
 // Schema DDL (one "create_schema" section), read at module init.
 const schema = parse_sql_with_sections(open(SCHEMA_FILE));
 
-// SF=1 reference answers, read at init only when validation will run.
-const answersSf1: AnswersFile | null = VALIDATE_ANSWERS
-  ? (JSON.parse(open("./answers_sf1.json")) as AnswersFile)
-  : null;
+// SF=1 reference answers, read at init only when validation will run. Guard
+// the empty string the probe stubs open() with, so probe can introspect.
+function readAnswersSf1(): AnswersFile | null {
+  const raw = open("./answers_sf1.json");
+  if (!raw) return null;
+  return JSON.parse(raw) as AnswersFile;
+}
+const answersSf1: AnswersFile | null = VALIDATE_ANSWERS ? readAnswersSf1() : null;
 
 // Baked canonical query set, read at init only when neither throughput nor an
 // explicit QUERY_STREAM is requested (open() is allowed only during init).
@@ -154,12 +157,31 @@ function resolveQueries(): Array<{ name: string }> {
 // prepareDatabase creates the schema, then generates and bulk-loads every table
 // with the ported dsdgen generator. Runs once per process via GlobalOnce.
 function prepareDatabase(): void {
+  // Drop in reverse load order (fact tables before their dimensions); tpcds has
+  // no FK constraints so IF EXISTS is enough, but reverse order is tidy.
+  Step("drop_schema", () => {
+    for (const table of [...TPCDS_TABLES].reverse()) {
+      driver.exec(`DROP TABLE IF EXISTS ${table}` as unknown as { name: string }, {});
+    }
+  });
+
   Step("create_schema", () => {
     const stmts = schema("create_schema");
     if (stmts) {
       stmts.forEach((q) => driver.exec(q, {}));
     }
   });
+
+  // pg-only: flip the 24 tables to UNLOGGED for a WAL-free bulk load; set_logged
+  // restores durability after. Driven from the TPCDS_TABLES list (like ANALYZE
+  // below) rather than per-table SQL, since the schema lives in schema.*.sql.
+  if (useUnlogged) {
+    Step("set_unlogged", () => {
+      for (const table of TPCDS_TABLES) {
+        driver.exec(`ALTER TABLE ${table} SET UNLOGGED` as unknown as { name: string }, {});
+      }
+    });
+  }
 
   Step("load_data", () => {
     // Ported dsdgen: the Go side owns generation; pass table + scale factor.
@@ -169,14 +191,23 @@ function prepareDatabase(): void {
   });
 
   // Indexes are built AFTER the bulk load (one-shot build is far cheaper than
-  // maintaining them per-insert). Without them the unindexed multi-way joins
-  // are unrunnable at scale, especially on MySQL's nested-loop joins.
+  // maintaining them per-insert, and cheaper still while tables are UNLOGGED).
+  // Without them the unindexed multi-way joins are unrunnable at scale,
+  // especially on MySQL's nested-loop joins.
   Step("create_indexes", () => {
     const stmts = schema("create_indexes");
     if (stmts) {
       stmts.forEach((q) => driver.exec(q, {}));
     }
   });
+
+  if (useUnlogged) {
+    Step("set_logged", () => {
+      for (const table of TPCDS_TABLES) {
+        driver.exec(`ALTER TABLE ${table} SET LOGGED` as unknown as { name: string }, {});
+      }
+    });
+  }
 
   // Bulk load leaves the planner with no statistics; without ANALYZE pg/mysql
   // pick catastrophic plans (e.g. O(n²) correlated nested loops) on big queries.
@@ -190,12 +221,6 @@ function prepareDatabase(): void {
       }
     }
   });
-
-  Step.begin("workload");
-}
-
-export function setup(): void {
-  return;
 }
 
 export default function (): void {
@@ -206,8 +231,10 @@ export default function (): void {
   // Power/throughput query execution. When validating or dumping, the steps
   // below execute each query (via queryRows) instead, so skip this redundant pass.
   if (!answersSf1 && !ANSWER_DUMP) {
-    const stepName = THROUGHPUT ? `queries_stream_${exec.vu.idInTest}` : "queries";
-    Step(stepName, () => {
+    // The measured pass. Single gatable step name across power and throughput
+    // (streams stay distinguishable by VU tag) so the two-run flow works:
+    // `--no-steps workload` (prep) then `--steps workload` (measure).
+    Step("workload", () => {
       resolveQueries().forEach((query) => {
         driver.exec(query, {});
       });
@@ -249,6 +276,5 @@ export default function (): void {
 }
 
 export function teardown(): void {
-  Step.end("workload");
   Teardown();
 }
