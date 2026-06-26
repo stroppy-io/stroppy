@@ -42,10 +42,19 @@ CREATE TABLE pgbench_history (
     mtime TIMESTAMP,
     filler CHAR(22)
 );
---=
-CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid);
---=
-CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid);
+
+
+--+ set_unlogged
+-- Flip tables to UNLOGGED for a WAL-free bulk load; set_logged restores
+-- durability after population. Gated by PG_UNLOGGED (default true), pg-only.
+--= branches
+ALTER TABLE pgbench_branches SET UNLOGGED;
+--= tellers
+ALTER TABLE pgbench_tellers  SET UNLOGGED;
+--= accounts
+ALTER TABLE pgbench_accounts SET UNLOGGED;
+--= history
+ALTER TABLE pgbench_history  SET UNLOGGED;
 
 
 --+ create_procedures
@@ -85,6 +94,33 @@ BEGIN
     RETURN v_balance;
 END;
 $$;
+
+
+--+ create_indexes
+-- Built AFTER the bulk load: a one-shot index build is far cheaper than
+-- maintaining the index per row during population.
+--= accounts_bid
+CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid);
+--= tellers_bid
+CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid);
+
+
+--+ set_logged
+-- Restore durability after the UNLOGGED bulk load (pg-only, PG_UNLOGGED).
+--= branches
+ALTER TABLE pgbench_branches SET LOGGED;
+--= tellers
+ALTER TABLE pgbench_tellers  SET LOGGED;
+--= accounts
+ALTER TABLE pgbench_accounts SET LOGGED;
+--= history
+ALTER TABLE pgbench_history  SET LOGGED;
+
+
+--+ analyze
+-- Refresh planner statistics after the bulk load.
+--=
+ANALYZE;
 
 
 --+ workload_procs

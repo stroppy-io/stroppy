@@ -42,10 +42,6 @@ CREATE TABLE pgbench_history (
     mtime DATETIME,
     filler CHAR(22)
 ) ENGINE=InnoDB
---=
-CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid)
---=
-CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid)
 
 
 --+ create_procedures
@@ -66,6 +62,21 @@ BEGIN
     VALUES (p_hid, p_tid, p_bid, p_aid, p_delta, NOW(), '');
     COMMIT;
 END
+
+
+--+ create_indexes
+-- Built AFTER the bulk load: a one-shot index build is far cheaper than
+-- maintaining the index per row during population.
+--= accounts_bid
+CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid)
+--= tellers_bid
+CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid)
+
+
+--+ analyze
+-- Refresh planner statistics after the bulk load.
+--=
+ANALYZE TABLE pgbench_branches, pgbench_tellers, pgbench_accounts, pgbench_history
 
 
 --+ workload_procs
