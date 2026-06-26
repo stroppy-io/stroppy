@@ -185,8 +185,22 @@ const SEED_LINEITEM = 0x7EC108;
 // Date windows live in tpch_helpers.ts (tpchOrderdateExpr). Lineitem
 // dates are derived from o_orderdate — see lineitemSpec().
 
+// A full load + 22-query pass on a slow loader (e.g. YDB BulkUpsert at SF>=1)
+// far exceeds k6's 10m default for the vus/iterations shorthand, which would
+// interrupt the iteration mid-load. Declaring a scenario lets maxDuration lift
+// that cap; override with MAX_DURATION if needed.
+const MAX_DURATION = ENV("MAX_DURATION", "24h", "Max wall-clock for the run (k6 duration)");
+
 export const options: Options = {
   summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"],
+  scenarios: {
+    tpch: {
+      executor: "shared-iterations",
+      vus: 1,
+      iterations: 1,
+      maxDuration: MAX_DURATION,
+    },
+  },
 };
 
 const TPCH_QUERY_NAMES = Array.from({ length: 22 }, (_, i) => "q" + String(i + 1));
