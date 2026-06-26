@@ -1,6 +1,7 @@
 import { Counter, Rate, Trend } from "k6/metrics";
 export { Counter, Rate, Trend };
 import { test } from "k6/execution"
+import type { Options } from "k6/options";
 import encoding from "k6/x/encoding";
 globalThis.TextEncoder = encoding.TextEncoder;
 globalThis.TextDecoder = encoding.TextDecoder;
@@ -563,6 +564,61 @@ export function declareDriverSetup(index: number, defaults: DriverSetup): Driver
   }
 
   return setup;
+}
+
+/** Per-script fallbacks for declareScenario, used when the matching env is unset. */
+export interface ScenarioDefaults {
+  /** VUs when the VUS env is unset. Default 1. */
+  vus?: number;
+  /** shared-iterations count when DURATION is unset. Default 1. */
+  iterations?: number;
+  /** constant-vus run length; when set (or DURATION env set) selects the
+   *  throughput executor instead of shared-iterations. */
+  duration?: string;
+}
+
+/**
+ * Build a single k6 scenario from the environment, unifying the two workload
+ * archetypes behind one set of knobs:
+ *
+ *   - DURATION set (env or default)  -> `constant-vus`     (throughput test:
+ *     fixed wall-clock, VUS concurrency; the result is TPS).
+ *   - DURATION unset                 -> `shared-iterations` (power test:
+ *     VUS x ITER iterations; the result is elapsed time).
+ *
+ * `maxDuration` is ALWAYS pinned (MAX_DURATION, default 24h) so a long bulk
+ * load never trips k6's 10m per-iteration cap — that cap is per-executor and
+ * cannot be lifted from the CLI. Tune via the VUS/DURATION/ITER/MAX_DURATION
+ * env vars, NOT the `-u/-d/-i` k6 shortcuts: when a script defines `scenarios`,
+ * those shortcuts make k6 discard the entire scenarios block (maxDuration
+ * included). See workloads/README for the two-run (prep then workload) flow.
+ */
+export function declareScenario(
+  name: string,
+  defaults: ScenarioDefaults = {},
+): Options["scenarios"] {
+  const vus = ENV("VUS", defaults.vus ?? 1, "Workload concurrency (VUs)") as number;
+  const duration = ENV(
+    "DURATION",
+    defaults.duration ?? "",
+    "Throughput run length (Go duration, e.g. 1h); when set selects constant-vus, result is TPS",
+  );
+  const iterations = ENV(
+    "ITER",
+    defaults.iterations ?? 1,
+    "Power-test iteration count (shared-iterations) used when DURATION is unset",
+  ) as number;
+  const maxDuration = ENV(
+    "MAX_DURATION",
+    "24h",
+    "Max wall-clock per scenario; lifts k6's 10m iteration cap for long loads",
+  );
+
+  const scenario = duration
+    ? { executor: "constant-vus", vus, duration, maxDuration }
+    : { executor: "shared-iterations", vus, iterations, maxDuration };
+
+  return { [name]: scenario } as Options["scenarios"];
 }
 
 export class DriverX implements QueryAPI {
