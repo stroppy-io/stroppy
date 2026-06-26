@@ -1,17 +1,17 @@
 {
   "name": "stroppy",
   "dependencies": {
-    "@protobuf-ts/plugin": "^2.11.0",
-    "@protobuf-ts/runtime": "^2.11.0",
+    "@protobuf-ts/plugin": "^2.11.1",
+    "@protobuf-ts/runtime": "^2.11.1",
     "k6": "^0.0.0",
-    "node-sql-parser": "^5.3.13"
+    "node-sql-parser": "^5.4.0"
   },
   "scripts": {
     "build": "node build.js"
   },
   "devDependencies": {
-    "esbuild": "^0.24.2",
-    "typescript": "^5.8.3",
-    "@types/k6": "^1.6.0"
+    "esbuild": "^0.28.1",
+    "typescript": "^5.9.3",
+    "@types/k6": "^1.7.0"
   }
 }
