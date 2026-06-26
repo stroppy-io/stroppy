@@ -29,6 +29,7 @@ const (
 	exitUsage   = 2
 	outFilePerm = 0o600
 	numQueries  = 99
+	twoPartCnt  = 2 // a two-part query's .ans holds two fixed-width blocks
 )
 
 var errInput = errors.New("input error")
@@ -52,6 +53,7 @@ func main() {
 	out := flag.String("out", "", "output JSON path (stdout when omitted)")
 	version := flag.String("version", "4.0.0", "schema/source version tag")
 	pretty := flag.Bool("pretty", true, "emit indented JSON")
+
 	flag.Parse()
 
 	if *in == "" {
@@ -74,6 +76,7 @@ func main() {
 	} else {
 		data, err = json.Marshal(root)
 	}
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tpcds-answers: marshal: %v\n", err)
 		os.Exit(1)
@@ -84,10 +87,12 @@ func main() {
 
 		return
 	}
+
 	if err := os.WriteFile(*out, data, outFilePerm); err != nil {
 		fmt.Fprintf(os.Stderr, "tpcds-answers: write %s: %v\n", *out, err)
 		os.Exit(1)
 	}
+
 	fmt.Fprintf(os.Stderr, "tpcds-answers: wrote %s (%d statements, %d bytes)\n", *out, len(root.Answers), len(data))
 }
 
@@ -97,33 +102,40 @@ func collectAnswers(in string) (map[string]*block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stat %s: %w", in, err)
 	}
+
 	if !info.IsDir() {
 		return nil, fmt.Errorf("%w: -in must be a directory, got %s", errInput, in)
 	}
 
 	answers := map[string]*block{}
-	for n := 1; n <= numQueries; n++ {
-		if skipQuery[n] {
-			fmt.Fprintf(os.Stderr, "tpcds-answers: query %d skipped (horizontally-joined two-part answer)\n", n)
+
+	for qNum := 1; qNum <= numQueries; qNum++ {
+		if skipQuery[qNum] {
+			fmt.Fprintf(os.Stderr, "tpcds-answers: query %d skipped (horizontally-joined two-part answer)\n", qNum)
 
 			continue
 		}
-		path, ok := answerPath(in, n)
+
+		path, ok := answerPath(in, qNum)
 		if !ok {
-			fmt.Fprintf(os.Stderr, "tpcds-answers: query %d has no .ans file\n", n)
+			fmt.Fprintf(os.Stderr, "tpcds-answers: query %d has no .ans file\n", qNum)
 
 			continue
 		}
+
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", path, err)
 		}
+
 		blocks, err := readBlocks(raw)
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", filepath.Base(path), err)
 		}
-		mapBlocks(answers, n, blocks, filepath.Base(path))
+
+		mapBlocks(answers, qNum, blocks, filepath.Base(path))
 	}
+
 	if len(answers) == 0 {
 		return nil, fmt.Errorf("%w: no answers parsed from %s", errInput, in)
 	}
@@ -131,16 +143,17 @@ func collectAnswers(in string) (map[string]*block, error) {
 	return answers, nil
 }
 
-// mapBlocks assigns parsed blocks to the statement key(s) for query n.
-func mapBlocks(answers map[string]*block, n int, blocks []block, fname string) {
-	if twoPart[n] {
-		if len(blocks) < 2 {
-			fmt.Fprintf(os.Stderr, "tpcds-answers: %s: expected 2 blocks for two-part query %d, got %d\n", fname, n, len(blocks))
+// mapBlocks assigns parsed blocks to the statement key(s) for query qNum.
+func mapBlocks(answers map[string]*block, qNum int, blocks []block, fname string) {
+	if twoPart[qNum] {
+		if len(blocks) < twoPartCnt {
+			fmt.Fprintf(os.Stderr, "tpcds-answers: %s: query %d two-part, want 2 blocks got %d\n", fname, qNum, len(blocks))
 		}
+
 		for idx, suffix := range []string{"a", "b"} {
 			if idx < len(blocks) {
 				b := blocks[idx]
-				answers[fmt.Sprintf("query_%d_%s", n, suffix)] = &b
+				answers[fmt.Sprintf("query_%d_%s", qNum, suffix)] = &b
 			}
 		}
 
@@ -152,7 +165,8 @@ func mapBlocks(answers map[string]*block, n int, blocks []block, fname string) {
 	for _, b := range blocks[1:] {
 		merged.Rows = append(merged.Rows, b.Rows...)
 	}
-	answers[fmt.Sprintf("query_%d", n)] = &merged
+
+	answers[fmt.Sprintf("query_%d", qNum)] = &merged
 }
 
 // answerPath finds the .ans file for query n, preferring the plain file, then
@@ -178,6 +192,7 @@ func sortedKeys(m map[string]*block) []string {
 	for k := range m {
 		keys = append(keys, k)
 	}
+
 	sort.Strings(keys)
 
 	return keys

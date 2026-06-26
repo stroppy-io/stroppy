@@ -37,6 +37,13 @@ const maxScannerBuf = 1 << 20
 // encodes, so byte-offset slicing is exact.
 const tabStop = 8
 
+// minRulerDashes guards against a stray "---" in data being read as a ruler.
+const minRulerDashes = 3
+
+// headerAndRuler is the header + dashes line pair a fixed-width block opens with;
+// data rows start that many lines below the header.
+const headerAndRuler = 2
+
 // parseAnswerBlocks parses one .ans file into its ordered result blocks.
 // It auto-detects the two upstream formats:
 //   - pipe-delimited (e.g. q39): a `col|col|col` header with no dashes line.
@@ -47,6 +54,7 @@ func parseAnswerBlocks(r io.Reader) ([]block, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if len(lines) == 0 {
 		return nil, fmt.Errorf("%w: empty answer file", errParse)
 	}
@@ -68,14 +76,18 @@ func collectLines(r io.Reader) ([]string, error) {
 	scanner.Buffer(make([]byte, maxScannerBuf), maxScannerBuf)
 
 	var lines []string
+
 	for scanner.Scan() {
 		ln := expandTabs(scanner.Text())
+
 		ln = strings.TrimRight(ln, " \t\r")
 		if ln == "" || rowsFooter.MatchString(ln) || outputMarker.MatchString(ln) {
 			continue
 		}
+
 		lines = append(lines, ln)
 	}
+
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("scan: %w", err)
 	}
@@ -86,23 +98,28 @@ func collectLines(r io.Reader) ([]string, error) {
 // expandTabs replaces tabs with spaces, advancing to the next tabStop
 // boundary — the inverse of the unexpand the kit applied.
 func expandTabs(s string) string {
-	var b strings.Builder
+	var sb strings.Builder
+
 	col := 0
-	for _, r := range s {
-		if r == '\t' {
+
+	for _, ch := range s {
+		if ch == '\t' {
 			n := tabStop - (col % tabStop)
 			for range n {
-				b.WriteByte(' ')
+				sb.WriteByte(' ')
 			}
+
 			col += n
 
 			continue
 		}
-		b.WriteRune(r)
+
+		sb.WriteRune(ch)
+
 		col++
 	}
 
-	return b.String()
+	return sb.String()
 }
 
 // isDashesLine reports whether a line is a column-span ruler: only '-' and
@@ -110,6 +127,7 @@ func expandTabs(s string) string {
 // for a ruler, and pipe-format headers never match).
 func isDashesLine(s string) bool {
 	dashes := 0
+
 	for _, r := range s {
 		switch r {
 		case '-':
@@ -120,13 +138,15 @@ func isDashesLine(s string) bool {
 		}
 	}
 
-	return dashes >= 3
+	return dashes >= minRulerDashes
 }
 
 // spansOf returns the [start,end) byte ranges of each run of '-'.
 func spansOf(dashes string) [][2]int {
 	var spans [][2]int
+
 	start := -1
+
 	for i, r := range dashes {
 		if r == '-' {
 			if start < 0 {
@@ -135,11 +155,13 @@ func spansOf(dashes string) [][2]int {
 
 			continue
 		}
+
 		if start >= 0 {
 			spans = append(spans, [2]int{start, i})
 			start = -1
 		}
 	}
+
 	if start >= 0 {
 		spans = append(spans, [2]int{start, len(dashes)})
 	}
@@ -152,16 +174,18 @@ func spansOf(dashes string) [][2]int {
 func sliceBySpans(line string, spans [][2]int) []string {
 	out := make([]string, len(spans))
 	for i, sp := range spans {
-		s, e := sp[0], sp[1]
-		if s > len(line) {
+		start, end := sp[0], sp[1]
+		if start > len(line) {
 			out[i] = ""
 
 			continue
 		}
-		if e > len(line) {
-			e = len(line)
+
+		if end > len(line) {
+			end = len(line)
 		}
-		out[i] = strings.TrimSpace(line[s:e])
+
+		out[i] = strings.TrimSpace(line[start:end])
 	}
 
 	return out
@@ -195,6 +219,7 @@ func genericNames(n int) []string {
 // header/dashes pair or EOF.
 func parseFixedWidth(lines []string) ([]block, error) {
 	var blocks []block
+
 	i := 0
 	for i < len(lines) {
 		// A block opens at a header line followed by a dashes ruler.
@@ -203,25 +228,31 @@ func parseFixedWidth(lines []string) ([]block, error) {
 
 			continue
 		}
+
 		spans := spansOf(lines[i+1])
 		cols := headerNames(lines[i], spans)
 
 		var rows [][]string
-		j := i + 2
-		for j < len(lines) {
+
+		pos := i + headerAndRuler
+		for pos < len(lines) {
 			// Stop before the next block's header (header + dashes pair).
-			if j+1 < len(lines) && isDashesLine(lines[j+1]) {
+			if pos+1 < len(lines) && isDashesLine(lines[pos+1]) {
 				break
 			}
-			if isDashesLine(lines[j]) {
+
+			if isDashesLine(lines[pos]) {
 				break
 			}
-			rows = append(rows, sliceBySpans(lines[j], spans))
-			j++
+
+			rows = append(rows, sliceBySpans(lines[pos], spans))
+			pos++
 		}
+
 		blocks = append(blocks, block{Columns: cols, Rows: rows})
-		i = j
+		i = pos
 	}
+
 	if len(blocks) == 0 {
 		return nil, fmt.Errorf("%w: no header/dashes block found", errParse)
 	}
@@ -235,7 +266,9 @@ func parsePipe(lines []string) ([]block, error) {
 	if !strings.Contains(lines[0], "|") {
 		return nil, fmt.Errorf("%w: pipe format expected, header has no '|'", errParse)
 	}
+
 	cols := splitPipe(lines[0])
+
 	rows := make([][]string, 0, len(lines)-1)
 	for _, ln := range lines[1:] {
 		rows = append(rows, splitPipe(ln))
@@ -246,6 +279,7 @@ func parsePipe(lines []string) ([]block, error) {
 
 func splitPipe(line string) []string {
 	parts := strings.Split(line, "|")
+
 	out := make([]string, len(parts))
 	for i, p := range parts {
 		out[i] = strings.TrimSpace(p)

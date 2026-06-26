@@ -15,6 +15,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -26,10 +27,24 @@ import (
 )
 
 const (
-	tolRel = 1e-3  // 0.1% relative
-	tolAbs = 0.01  // or sub-cent absolute
-	maxBuf = 1 << 26
+	tolRel  = 1e-3 // 0.1% relative
+	tolAbs  = 0.01 // or sub-cent absolute
+	maxBuf  = 1 << 26
+	initBuf = 1 << 20 // scanner starting buffer
+
+	cellSep       = 0x01    // row-key separator between cells
+	querySortLast = 1 << 30 // sort sentinel for non-query names
+	previewDeltas = 3       // mismatching cells shown per DIFF in -v
+	numDumpFields = 2       // name + payload in a __TPCDS_DUMP__ line
+	exitUsage     = 2       // exit code for bad invocation
+	maxPreview    = 5       // cap delta scan per row set
+
+	statusOK   = "ok"
+	statusDiff = "diff"
+	statusSkip = "skip"
 )
+
+var errNoDump = errors.New("no __TPCDS_DUMP__ lines")
 
 var numericRe = regexp.MustCompile(`^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$`)
 
@@ -44,100 +59,125 @@ func main() {
 	ref := flag.String("ref", "", "reference dump/log (the oracle, e.g. postgres) (required)")
 	test := flag.String("test", "", "dump/log to check against ref (required)")
 	verbose := flag.Bool("v", false, "print first mismatching cells per DIFF query")
+
 	flag.Parse()
+
 	if *ref == "" || *test == "" {
 		fmt.Fprintln(os.Stderr, "tpcds-diff: -ref and -test are required")
-		os.Exit(2)
+		os.Exit(exitUsage)
 	}
 
-	a, err := load(*ref)
+	refDump, err := load(*ref)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tpcds-diff: ref: %v\n", err)
-		os.Exit(2)
-	}
-	b, err := load(*test)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tpcds-diff: test: %v\n", err)
-		os.Exit(2)
+		os.Exit(exitUsage)
 	}
 
-	names := unionKeys(a, b)
+	testDump, err := load(*test)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tpcds-diff: test: %v\n", err)
+		os.Exit(exitUsage)
+	}
+
+	names := unionKeys(refDump, testDump)
+
 	var ok, diff, skip int
+
 	for _, name := range names {
-		line, status := compareOne(name, a, b, *verbose)
+		line, status := compareOne(name, refDump, testDump, *verbose)
 		switch status {
-		case "ok":
+		case statusOK:
 			ok++
-		case "diff":
+		case statusDiff:
 			diff++
 		default:
 			skip++
 		}
-		if status != "ok" || *verbose {
-			fmt.Println(line)
+
+		if status != statusOK || *verbose {
+			fmt.Fprintln(os.Stdout, line)
 		}
 	}
-	fmt.Printf("===== tpcds-diff: ref=%s test=%s =====\n", *ref, *test)
-	fmt.Printf("total=%d  ok=%d  diff=%d  skipped=%d\n", len(names), ok, diff, skip)
+
+	fmt.Fprintf(os.Stdout, "===== tpcds-diff: ref=%s test=%s =====\n", *ref, *test)
+	fmt.Fprintf(os.Stdout, "total=%d  ok=%d  diff=%d  skipped=%d\n", len(names), ok, diff, skip)
+
 	if diff > 0 {
 		os.Exit(1)
 	}
 }
 
 // compareOne returns a report line and a status (ok|diff|skip) for one query.
-func compareOne(name string, a, b *dump, verbose bool) (string, string) {
-	if e, isErr := a.errs[name]; isErr {
-		return fmt.Sprintf("  %-14s SKIP   ref error: %s", name, e), "skip"
+func compareOne(name string, refD, testD *dump, verbose bool) (line, status string) {
+	if e, isErr := refD.errs[name]; isErr {
+		return fmt.Sprintf("  %-14s SKIP   ref error: %s", name, e), statusSkip
 	}
-	if e, isErr := b.errs[name]; isErr {
-		return fmt.Sprintf("  %-14s DIFF   test error: %s", name, e), "diff"
+
+	if e, isErr := testD.errs[name]; isErr {
+		return fmt.Sprintf("  %-14s DIFF   test error: %s", name, e), statusDiff
 	}
-	ar, aok := a.rows[name]
-	br, bok := b.rows[name]
+
+	ar, aok := refD.rows[name]
+
+	br, bok := testD.rows[name]
 	if !aok || !bok {
-		return fmt.Sprintf("  %-14s SKIP   present ref=%v test=%v", name, aok, bok), "skip"
+		return fmt.Sprintf("  %-14s SKIP   present ref=%v test=%v", name, aok, bok), statusSkip
 	}
+
 	sortRows(ar)
 	sortRows(br)
+
 	deltas := compareRows(ar, br)
 	if len(deltas) == 0 && len(ar) == len(br) {
-		return fmt.Sprintf("  %-14s OK     rows=%d", name, len(ar)), "ok"
+		return fmt.Sprintf("  %-14s OK     rows=%d", name, len(ar)), statusOK
 	}
+
 	preview := ""
 	if verbose && len(deltas) > 0 {
-		preview = "  " + strings.Join(deltas[:min(3, len(deltas))], "; ")
+		preview = "  " + strings.Join(deltas[:min(previewDeltas, len(deltas))], "; ")
 	}
-	return fmt.Sprintf("  %-14s DIFF   rows ref=%d test=%d%s", name, len(ar), len(br), preview), "diff"
+
+	return fmt.Sprintf("  %-14s DIFF   rows ref=%d test=%d%s", name, len(ar), len(br), preview), statusDiff
 }
 
 // compareRows compares two pre-sorted row sets positionally with tolerance.
 func compareRows(ar, br [][]string) []string {
 	var deltas []string
+
 	n := len(ar)
 	if len(br) > n {
 		n = len(br)
 	}
-	for i := 0; i < n && len(deltas) < 5; i++ {
+
+	for i := 0; i < n && len(deltas) < maxPreview; i++ {
 		if i >= len(ar) {
 			deltas = append(deltas, fmt.Sprintf("row %d: extra in test", i))
+
 			continue
 		}
+
 		if i >= len(br) {
 			deltas = append(deltas, fmt.Sprintf("row %d: missing in test", i))
+
 			continue
 		}
+
 		ra, rb := ar[i], br[i]
+
 		w := len(ra)
 		if len(rb) > w {
 			w = len(rb)
 		}
-		for c := 0; c < w; c++ {
+
+		for c := range w {
 			if !cellsMatch(get(ra, c), get(rb, c)) {
 				deltas = append(deltas, fmt.Sprintf("row %d col %d: ref=%q test=%q", i, c, get(ra, c), get(rb, c)))
+
 				break
 			}
 		}
 	}
+
 	return deltas
 }
 
@@ -145,6 +185,7 @@ func get(r []string, i int) string {
 	if i < len(r) {
 		return r[i]
 	}
+
 	return ""
 }
 
@@ -152,77 +193,94 @@ func cellsMatch(a, b string) bool {
 	if a == b {
 		return true
 	}
+
 	if !numericRe.MatchString(a) || !numericRe.MatchString(b) {
 		return false
 	}
+
 	x, _ := strconv.ParseFloat(a, 64)
 	y, _ := strconv.ParseFloat(b, 64)
+
 	d := math.Abs(x - y)
 	if d <= tolAbs {
 		return true
 	}
+
 	return d/math.Max(math.Abs(y), 1) <= tolRel
 }
 
 // rowKey rounds numeric cells to 2dp so near-equal rows sort together.
 func rowKey(cells []string) string {
-	var b strings.Builder
+	var sb strings.Builder
+
 	for _, c := range cells {
 		if numericRe.MatchString(c) {
 			f, _ := strconv.ParseFloat(c, 64)
-			b.WriteString(strconv.FormatFloat(f, 'f', 2, 64))
+			sb.WriteString(strconv.FormatFloat(f, 'f', 2, 64))
 		} else {
-			b.WriteString(c)
+			sb.WriteString(c)
 		}
-		b.WriteByte(0x01)
+
+		sb.WriteByte(cellSep)
 	}
-	return b.String()
+
+	return sb.String()
 }
 
 func sortRows(rows [][]string) {
 	sort.Slice(rows, func(i, j int) bool { return rowKey(rows[i]) < rowKey(rows[j]) })
 }
 
-func unionKeys(a, b *dump) []string {
+func unionKeys(refD, testD *dump) []string {
 	seen := map[string]bool{}
-	for k := range a.rows {
+	for k := range refD.rows {
 		seen[k] = true
 	}
-	for k := range a.errs {
+
+	for k := range refD.errs {
 		seen[k] = true
 	}
-	for k := range b.rows {
+
+	for k := range testD.rows {
 		seen[k] = true
 	}
-	for k := range b.errs {
+
+	for k := range testD.errs {
 		seen[k] = true
 	}
+
 	out := make([]string, 0, len(seen))
 	for k := range seen {
 		out = append(out, k)
 	}
+
 	sort.Slice(out, func(i, j int) bool { return queryLess(out[i], out[j]) })
+
 	return out
 }
 
 // queryLess orders query_2 before query_10 (numeric, then suffix).
 func queryLess(a, b string) bool {
 	na, sa := splitQ(a)
+
 	nb, sb := splitQ(b)
 	if na != nb {
 		return na < nb
 	}
+
 	return sa < sb
 }
 
 var qNumRe = regexp.MustCompile(`query_(\d+)(.*)`)
 
-func splitQ(s string) (int, string) {
+func splitQ(s string) (num int, suffix string) {
 	m := qNumRe.FindStringSubmatch(s)
 	if m == nil {
-		return 1 << 30, s
+		return querySortLast, s
 	}
+
 	n, _ := strconv.Atoi(m[1])
+
 	return n, m[2]
 }
 
@@ -234,41 +292,52 @@ func load(path string) (*dump, error) {
 	}
 	defer f.Close()
 
-	d := &dump{rows: map[string][][]string{}, errs: map[string]string{}}
+	dmp := &dump{rows: map[string][][]string{}, errs: map[string]string{}}
 	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 1<<20), maxBuf)
+	sc.Buffer(make([]byte, initBuf), maxBuf)
+
 	for sc.Scan() {
 		line := unwrapLogMsg(sc.Text())
+
 		idx := strings.Index(line, "__TPCDS_DUMP__\t")
 		if idx < 0 {
 			continue
 		}
-		parts := strings.SplitN(line[idx+len("__TPCDS_DUMP__\t"):], "\t", 2)
-		if len(parts) != 2 {
+
+		parts := strings.SplitN(line[idx+len("__TPCDS_DUMP__\t"):], "\t", numDumpFields)
+		if len(parts) != numDumpFields {
 			continue
 		}
+
 		name, payload := parts[0], parts[1]
 		if strings.HasPrefix(payload, "ERR:") {
-			d.errs[name] = strings.TrimPrefix(payload, "ERR:")
+			dmp.errs[name] = strings.TrimPrefix(payload, "ERR:")
+
 			continue
 		}
+
 		rows, err := parseRows(payload)
 		if err != nil {
 			return nil, fmt.Errorf("query %s: %w", name, err)
 		}
-		d.rows[name] = rows
+
+		dmp.rows[name] = rows
 	}
+
 	if err := sc.Err(); err != nil {
 		return nil, err
 	}
-	if len(d.rows) == 0 && len(d.errs) == 0 {
-		return nil, fmt.Errorf("no __TPCDS_DUMP__ lines in %s", path)
+
+	if len(dmp.rows) == 0 && len(dmp.errs) == 0 {
+		return nil, fmt.Errorf("%w: %s", errNoDump, path)
 	}
-	return d, nil
+
+	return dmp, nil
 }
 
 // logMsgRe extracts the quoted message field from a k6/logrus text log line:
-//   time="..." level=info msg="__TPCDS_DUMP__\tquery_1\t[[\"..\"]]" source=console
+//
+//	time="..." level=info msg="__TPCDS_DUMP__\tquery_1\t[[\"..\"]]" source=console
 var logMsgRe = regexp.MustCompile(`msg=("(?:[^"\\]|\\.)*")`)
 
 // unwrapLogMsg returns the unescaped logrus msg field if the line is a logrus
@@ -280,10 +349,12 @@ func unwrapLogMsg(line string) string {
 	if m == nil {
 		return line
 	}
+
 	s, err := strconv.Unquote(m[1])
 	if err != nil {
 		return line
 	}
+
 	return s
 }
 
@@ -293,5 +364,6 @@ func parseRows(payload string) ([][]string, error) {
 	if err := json.Unmarshal([]byte(payload), &rows); err != nil {
 		return nil, err
 	}
+
 	return rows, nil
 }
