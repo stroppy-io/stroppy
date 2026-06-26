@@ -1,121 +1,53 @@
-import { Options } from "k6/options";
 import { sleep } from "k6";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { Counter, Trend, Step, DriverX, ENV, GlobalOnce, TxIsolationName, declareDriverSetup, declareScenario, retryWithPolicy, txRetryPolicy } from "./helpers.ts";
-import {
-  Alphabet,
-  Attr,
-  Dict,
-  Draw,
-  DrawRT,
-  Expr,
-  InsertMethod as DatagenInsertMethod,
-  Rel,
-  std,
-} from "./datagen.ts";
-import { C_LAST_DICT, tpccOriginalOr } from "./tpcc_helpers.ts";
+import { Counter, Step, DriverX, ENV, GlobalOnce, TxIsolationName, declareDriverSetup, retryWithPolicy, txRetryPolicy } from "./helpers.ts";
+import { Alphabet, DrawRT } from "./datagen.ts";
+import { C_LAST_DICT } from "./tpcc_helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
+import {
+  options,
+  WAREHOUSE_START,
+  W_ID_MAX,
+  WAREHOUSES,
+  HOME_W_ID,
+  DISTRICTS_PER_WAREHOUSE,
+  CUSTOMERS_PER_DISTRICT,
+  ITEMS,
+  POOL_SIZE,
+  RETRY_ATTEMPTS,
+  PG_UNLOGGED,
+  seedOf,
+  nextHid,
+  pickRemoteWh,
+  nurand255Gen,
+  loadData,
+  validatePopulation,
+  tpccNewOrderTotal,
+  tpccRollbackDecided,
+  tpccRollbackDone,
+  tpccPaymentTotal,
+  tpccPaymentRemote,
+  tpccPaymentByname,
+  tpccOrderStatusTotal,
+  tpccOrderStatusByname,
+  tpccDeliveryTotal,
+  tpccStockLevelTotal,
+  tpccRetryAttempts,
+  tpccNewOrderDuration,
+  tpccPaymentDuration,
+  tpccOrderStatusDuration,
+  tpccDeliveryDuration,
+  tpccStockLevelDuration,
+} from "./tpcc_common.ts";
 
-// ============================================================================
-// Data-gen simplifications remaining after the Stage-E spec-parity pass.
-// Transaction phase is byte-for-byte compliant; load phase follows TPC-C
-// §4.3 except for the single deferred item below.
-//
-//   1. Per-order line count fixed at 10 (spec wants Uniform 5..15,
-//      §4.3.3.1). Deferred: expressing a variable-degree child population
-//      under Rel.table requires Relationship/Side composition; see plan
-//      §16. With a fixed OL_CNT=10 the mean matches spec's midpoint and
-//      sum(o_ol_cnt) == count(order_line) (CC4) still holds.
-//   2. history is empty at load time per spec §4.3.4 (initial cardinality
-//      0). Not a simplification — included here for completeness.
-//
-// Everything else in §4.3 is spec-compliant:
-//   - c_last: 3-syllable cartesian from TPCC_SYLLABLES (C_LAST_DICT).
-//   - c_credit: weighted 1:9 BC/GC via Expr.choose.
-//   - i_data / s_data: "ORIGINAL" marker at random position in 10% rows.
-//   - o_carrier_id: NULL for o_id > 2100 (last 900 per district), else
-//     Uniform(1, 10). Uses Expr.if + Expr.litNull.
-//   - o_c_id: std.permuteIndex keyed per (w_id, d_id) so each district
-//     holds a distinct permutation of [1, 3000].
-//   - ol_delivery_d: NULL for the undelivered tail (ol_o_id > 2100),
-//     load-time timestamp for the delivered prefix.
-//   - ol_amount: Uniform(0.01, 9999.99) for undelivered orders, 0.00
-//     for delivered (per §4.3.3.1 column formula).
-//   - c_since, o_entry_d: constant load-captured timestamp (§4.3.2.8).
-// ============================================================================
+export { options };
 
-// Post-run compliance counters for TPC-C auditing. See TPCC_COMPILANCE_REPORT.md
-// §1.11 — these expose the observed rates of spec-mandated percentages so an
-// operator can verify compliance without instrumenting the DB side.
-const tpccNewOrderTotal       = new Counter("tpcc_new_order_total");
-const tpccRollbackDecided     = new Counter("tpcc_rollback_decided");
-const tpccRollbackDone        = new Counter("tpcc_rollback_done");
-const tpccRemoteLineTotal     = new Counter("tpcc_remote_line_total");
-const tpccRemoteLineRem       = new Counter("tpcc_remote_line_remote");
-const tpccPaymentTotal        = new Counter("tpcc_payment_total");
-const tpccPaymentRemote       = new Counter("tpcc_payment_remote");
-// §1.6: 60% of Payment / Order-Status transactions must look up the
-// customer by last name instead of by c_id. These counters expose the
-// observed by-name rate so an operator can verify that the 60% roll
-// actually reaches the DB (and wasn't lost to an early-return path).
-const tpccPaymentByname       = new Counter("tpcc_payment_byname");
-// §1.8: 10% of customers carry c_credit='BC' and Payment must compute
-// the 500-char c_data log for them (c_id, c_d_id, c_w_id, d_id, w_id,
-// h_amount, '|', old_c_data). This counter exposes the observed rate
-// so an operator can verify it tracks the population ratio.
-const tpccPaymentBc           = new Counter("tpcc_payment_bc");
-const tpccOrderStatusTotal    = new Counter("tpcc_order_status_total");
-const tpccOrderStatusByname   = new Counter("tpcc_order_status_byname");
-const tpccDeliveryTotal       = new Counter("tpcc_delivery_total");
-const tpccStockLevelTotal     = new Counter("tpcc_stock_level_total");
-// T2.3: count serialization-failure retries. PG REPEATABLE READ uses
-// snapshot isolation, so concurrent updates to the same row abort with
-// SQLSTATE 40001. The retry() helper catches those, sleeps zero, and tries
-// again — incrementing this counter each time so an operator can see how
-// often retries are firing without grepping logs. Spec §5.2.5 still caps
-// total tx_error_rate at 1%; with retries the un-retryable tail is what
-// counts against that budget.
-const tpccRetryAttempts       = new Counter("tpcc_retry_attempts");
-
-// T3.2: per-transaction response-time Trends. Spec §5.2.5.4 sets 90p
-// ceilings (NO/P/OS 5s, SL 20s, D 80s). The `true` second arg marks
-// these as time trends so k6 formats values in ms/s and the threshold
-// parser accepts "p(90)<5000" millisecond literals. Same metric names
-// as procs.ts so post-run analysis is variant-agnostic.
-const tpccNewOrderDuration    = new Trend("tpcc_new_order_duration", true);
-const tpccPaymentDuration     = new Trend("tpcc_payment_duration", true);
-const tpccOrderStatusDuration = new Trend("tpcc_order_status_duration", true);
-const tpccDeliveryDuration    = new Trend("tpcc_delivery_duration", true);
-const tpccStockLevelDuration  = new Trend("tpcc_stock_level_duration", true);
-
-// TPC-C Configuration Constants
-const POOL_SIZE   = ENV("POOL_SIZE", 100, "Connection pool size");
-const WAREHOUSES  = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
-// First warehouse id assigned to this instance. Default 1 matches the standard
-// single-instance run. Set > 1 when running multiple stroppy instances against
-// the same database in disjoint warehouse ranges (e.g. instance A: START=1
-// WAREHOUSES=100, instance B: START=101 WAREHOUSES=100). Affects the load
-// phase (w_ids are emitted in [START, START+W-1]), HOME_W_ID assignment in the
-// transaction phase, the remote-warehouse picker (pickRemoteWh), the YDB
-// partition split keys, and validate_population's w_id range filters.
-const WAREHOUSE_START = ENV("WAREHOUSE_START", 1, "First warehouse id for this instance (>=1)") as number;
-// Inclusive upper bound; this instance owns warehouses [WAREHOUSE_START, W_ID_MAX].
-const W_ID_MAX = WAREHOUSE_START + WAREHOUSES - 1;
-// The item table is global (size = ITEMS, independent of WAREHOUSES). In a
-// distributed run only ONE instance should load it. Default: only the instance
-// at WAREHOUSE_START=1 loads it; override with -e LOAD_ITEMS=true/false to
-// coordinate manually (e.g. run an item-only load step ahead of time and set
-// LOAD_ITEMS=false everywhere).
-const LOAD_ITEMS = ENV(
-  "LOAD_ITEMS",
-  WAREHOUSE_START === 1 ? "true" : "false",
-  "Load the global item table (default: true when WAREHOUSE_START=1)",
-) === "true";
-const LOAD_WORKERS = ENV("LOAD_WORKERS", 0, "Load-time worker count per spec (0 = framework default)") as number;
-// T2.3: how many attempts the retry helper makes before giving up on a
-// serialization failure. 3 = original try + 2 retries; immediate, no sleep.
-// Override via -e RETRY_ATTEMPTS=N for benchmarking the isolation tradeoff.
-const RETRY_ATTEMPTS = ENV("RETRY_ATTEMPTS", 3, "Max attempts for serialization-failure retries (1 = no retry)");
+// tx.ts-only compliance counters: the client-side bodies observe per-line
+// remote picks and the BC-credit branch that procs.ts hides inside the stored
+// procedure and can only derive post-run via SELECT.
+const tpccRemoteLineTotal = new Counter("tpcc_remote_line_total");
+const tpccRemoteLineRem   = new Counter("tpcc_remote_line_remote");
+const tpccPaymentBc       = new Counter("tpcc_payment_bc");
 
 // TPC-C §5.2.5 pacing: keying time (constant, before tx) + think time
 // (negative exponential, after tx) simulate real terminal operator behaviour.
@@ -146,61 +78,8 @@ function keyingTime(txName: string): void {
   sleep(KEYING_TIME[txName]);
 }
 
-const DISTRICTS_PER_WAREHOUSE = 10;
-const CUSTOMERS_PER_DISTRICT  = 3000;
-const ITEMS = 100000;
-
-const TOTAL_DISTRICTS = WAREHOUSES * DISTRICTS_PER_WAREHOUSE;
-const TOTAL_STOCK     = WAREHOUSES * ITEMS;
-
-declare const __VU: number;
-
-// Per-VU seed for tx-time draws. Each slot name hashes to a distinct
-// offset so concurrent VUs draw independent sequences. The VU guard
-// matches the pattern used further down in the file (see `_vu` in the
-// hid_counter block) — the probe VM runs without k6 and reports
-// undefined, so we coerce that case to 0.
-const seedOf = (slot: string): number => {
-  let h = 0;
-  for (let i = 0; i < slot.length; i++) h = (h * 131 + slot.charCodeAt(i)) | 0;
-  const vu = (typeof __VU === "number" && __VU > 0) ? __VU : 0;
-  return (vu * 0x9e3779b9) ^ (h >>> 0);
-};
-
-// Runtime NURand(255, 0, 999) picker used by the by-name branch of
-// Payment and Order-Status (§2.5.1.2 / §2.6.1.2). Module-scoped so the
-// NURand C constant is chosen once for the whole run — mirrors how the
-// existing nurand1023 / nurand8191 pickers are scoped. Indexes into
-// C_LAST_DICT (3-syllable cartesian, §4.3.2.3) populated by the load phase.
-// cSalt=0 yields the spec-compliant deterministic-default C via
-// splitmix64(0); pass per run-scope since the salt is constant for
-// this process.
-const nurand255Gen = DrawRT.nurand(seedOf("nurand255"), 255, 0, 999);
-
-// K6 options — weighted dispatch inside default(), VUs/duration set via CLI or k6 defaults.
-// T3.2: k6 thresholds on the per-tx Trend metrics auto-fail the run if any
-// p90 breaches the spec §5.2.5.4 ceiling. Using the stock threshold syntax
-// so k6 marks the run failed and the summary line shows a PASS/FAIL marker
-// next to each metric — no manual assertion needed on top of handleSummary.
-export const options: Options = {
-  // declareScenario unifies throughput (constant-vus, set DURATION) and power
-  // (shared-iterations) and pins maxDuration so a long load can't trip k6's 10m
-  // cap. Tune via VUS/DURATION/ITER env, not -u/-d/-i (which discard scenarios).
-  scenarios: declareScenario("tpcc"),
-  // Include low TPS percentiles plus p99 in the per-trend percentiles k6 computes.
-  summaryTrendStats: [
-    "avg", "min", "med", "max",
-    "p(1)", "p(5)", "p(10)",
-    "p(90)", "p(95)", "p(99)",
-  ],
-  thresholds: {
-    "tpcc_new_order_duration":    ["p(90)<5000"],
-    "tpcc_payment_duration":      ["p(90)<5000"],
-    "tpcc_order_status_duration": ["p(90)<5000"],
-    "tpcc_stock_level_duration":  ["p(90)<20000"],
-    "tpcc_delivery_duration":     ["p(90)<80000"],
-  },
-};
+// Schema cardinalities, seedOf, nurand255Gen, and the k6 options (scenario +
+// thresholds) live in tpcc_common.ts (options re-exported above).
 
 // Driver config: defaults for postgres, overridable via CLI (--driver pg/mysql/pico/ydb)
 const driverConfig = declareDriverSetup(0, {
@@ -288,37 +167,8 @@ function renderDDL(s: string): string {
     .replace(/\{partition_count\}/g, String(Math.max(WAREHOUSES, 1)));
 }
 
-// Per-VU monotonic counter for h_id only. history has no natural PK in the
-// TPC-C spec, but picodata/ydb require one, so we add h_id to all dialects
-// and generate it client-side. o_id is NOT a counter — we read d_next_o_id
-// from district at the start of each new_order tx (see below).
-const _vu = (typeof __VU === "number" && __VU > 0) ? __VU : 1;
-let hid_counter = _vu * 10_000_000;
-const nextHid = (): number => ++hid_counter;
-
-// Spec §5.2.2 / Clause 4.2: each VU ("terminal") is bound to a single home
-// warehouse for the run. This is what drives the 1%/15% remote-access
-// minimums in new_order/payment. Scaling beyond WAREHOUSES VUs wraps within
-// this instance's range [WAREHOUSE_START, W_ID_MAX].
-const HOME_W_ID = WAREHOUSE_START + ((_vu - 1) % WAREHOUSES);
-
-// Pick a uniformly-random OTHER warehouse in
-// [WAREHOUSE_START, W_ID_MAX] \ {HOME_W_ID}. Callers must guard with
-// WAREHOUSES > 1; with a single warehouse there is no valid remote target
-// and the caller must fall back to HOME_W_ID. Remote picks stay within this
-// instance's range — coordinating cross-range remote picks across instances
-// is out of scope here.
-const _remoteWhGen = WAREHOUSES > 1
-  ? DrawRT.intUniform(seedOf("remoteWh"), 1, WAREHOUSES - 1)
-  : null;
-function pickRemoteWh(): number {
-  if (_remoteWhGen === null) return HOME_W_ID;
-  // _remoteWhGen returns [1, W-1]; offset to [WAREHOUSE_START, W_ID_MAX - 1]
-  // then shift past HOME_W_ID so the result spans the full range minus the
-  // home slot. With WAREHOUSE_START=1 this collapses to the original formula.
-  const alt = (_remoteWhGen.next() as number) + WAREHOUSE_START - 1;
-  return alt >= HOME_W_ID ? alt + 1 : alt;
-}
+// nextHid, HOME_W_ID, and pickRemoteWh live in tpcc_common.ts (per-VU state and
+// the home-warehouse binding are identical across both variants).
 
 const tpccTxRetryPolicy = txRetryPolicy(driverConfig.driverType, {
   maxAttempts: RETRY_ATTEMPTS,
@@ -349,367 +199,9 @@ function tpccRetry<T>(fn: () => T): T {
 // phase composes into a single Rel.table per entity without nested Sides.
 // ============================================================================
 
-const ORDERS_DELIVERED   = 2100;
-const ORDERS_UNDELIVERED = CUSTOMERS_PER_DISTRICT - ORDERS_DELIVERED; // 900
-const OL_CNT_FIXED       = 10;
-const ITEMS_PER_WH       = ITEMS;
-
-// Per-population seeds — frozen once so a repeated run with the same
-// WAREHOUSES produces a byte-identical load. Values are arbitrary
-// 64-bit constants chosen only for mnemonic readability.
-const SEED_WAREHOUSE  = 0xC0FFEE01;
-const SEED_DISTRICT   = 0xC0FFEE02;
-const SEED_CUSTOMER   = 0xC0FFEE03;
-const SEED_ITEM       = 0xC0FFEE04;
-const SEED_STOCK      = 0xC0FFEE05;
-const SEED_ORDERS     = 0xC0FFEE06;
-const SEED_ORDER_LINE = 0xC0FFEE07;
-const SEED_NEW_ORDER  = 0xC0FFEE08;
-
-// Currency literal note: `Expr.lit(300000.0)` collapses to int64 because
-// `Number.isInteger(300000.0)` is true in JS, which trips YDB BulkUpsert
-// on `Double` columns (w_ytd, d_ytd, c_credit_lim, c_balance,
-// c_ytd_payment). `Expr.litFloat(...)` forces the Double oneof arm; other
-// dialects accept an int64 into their DECIMAL/NUMERIC columns identically.
-
-// Draw.ascii helper: fixed-width ASCII over an alphabet (default Alphabet.en).
-function asciiFixed(
-  width: number,
-  alphabet: readonly { min: number; max: number }[] = Alphabet.en,
-) {
-  const n = Expr.lit(width);
-  return Draw.ascii({ min: n, max: n, alphabet });
-}
-
-// Draw.ascii helper: variable-width ASCII over an alphabet.
-function asciiRange(
-  minLen: number,
-  maxLen: number,
-  alphabet: readonly { min: number; max: number }[] = Alphabet.en,
-) {
-  return Draw.ascii({ min: Expr.lit(minLen), max: Expr.lit(maxLen), alphabet });
-}
-
-// Spec §4.3.2.8 / §4.3.3.1: c_since, o_entry_d, and the delivered branch
-// of ol_delivery_d all carry the OS-captured load-time timestamp. We
-// snapshot it once at module load so every row in this run receives the
-// same value and the compliance tests can key off a single deterministic
-// instant. `Expr.lit(Date)` emits
-// int64 (epoch days on the wire), so we lift through `std.daysToDate`
-// to get the time.Time scalar the driver layer expects on DATETIME /
-// TIMESTAMP columns.
-const LOAD_TIMESTAMP       = new Date();
-const LOAD_TIMESTAMP_EXPR  = std.daysToDate(Expr.lit(LOAD_TIMESTAMP));
-
-// Warehouse spec: w_id = rowIndex() + WAREHOUSE_START ∈ [START, W_ID_MAX].
-function warehouseSpec() {
-  return Rel.table("warehouse", {
-    size: WAREHOUSES,
-    seed: SEED_WAREHOUSE,
-    method: DatagenInsertMethod.NATIVE,
-    parallelism: LOAD_WORKERS || undefined,
-    attrs: {
-      w_id:       Expr.add(Attr.rowIndex(), Expr.lit(WAREHOUSE_START)),
-      w_name:     asciiRange(6, 10),
-      w_street_1: asciiRange(10, 20),
-      w_street_2: asciiRange(10, 20),
-      w_city:     asciiRange(10, 20),
-      w_state:    asciiFixed(2, Alphabet.enUpper),
-      w_zip:      asciiFixed(9, Alphabet.num),
-      w_tax:      Draw.decimal({ min: Expr.lit(0), max: Expr.lit(0.2), scale: 4 }),
-      w_ytd:      Expr.litFloat(300000.0),
-    },
-  });
-}
-
-// District spec: row-index layout r ∈ [0, 10W):
-//   d_w_id = r / 10 + WAREHOUSE_START ∈ [START, W_ID_MAX]
-//   d_id   = r % 10 + 1 ∈ [1, 10]
-function districtSpec() {
-  const dWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(DISTRICTS_PER_WAREHOUSE)), Expr.lit(WAREHOUSE_START));
-  const dId  = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(DISTRICTS_PER_WAREHOUSE)), Expr.lit(1));
-  return Rel.table("district", {
-    size: TOTAL_DISTRICTS,
-    seed: SEED_DISTRICT,
-    method: DatagenInsertMethod.NATIVE,
-    parallelism: LOAD_WORKERS || undefined,
-    attrs: {
-      d_id:        dId,
-      d_w_id:      dWId,
-      d_name:      asciiRange(6, 10),
-      d_street_1:  asciiRange(10, 20),
-      d_street_2:  asciiRange(10, 20),
-      d_city:      asciiRange(10, 20),
-      d_state:     asciiFixed(2, Alphabet.enUpper),
-      d_zip:       asciiFixed(9, Alphabet.num),
-      d_tax:       Draw.decimal({ min: Expr.lit(0), max: Expr.lit(0.2), scale: 4 }),
-      d_ytd:       Expr.litFloat(30000.0),
-      d_next_o_id: Expr.lit(3001),
-    },
-  });
-}
-
-// Customer spec: row-index layout r ∈ [0, 30_000 W):
-//   c_w_id = r / 30_000 + WAREHOUSE_START ∈ [START, W_ID_MAX]
-//   c_d_id = (r / 3000) % 10 + 1 ∈ [1, 10]
-//   c_id   = r % 3000 + 1 ∈ [1, 3000]
-// Spec §4.3.2.3: first 1000 c_ids per district use sequential C_LAST indices
-// [0..999] so every name in the 1000-entry dict is guaranteed present in each
-// district; remaining 2000 draw via NURand(A=255, x=0, y=999). Without the
-// sequential prefix, by-name lookups at tx time (Payment / Order-Status) can
-// roll a c_last that no customer in (c_w_id, c_d_id) carries.
-// c_credit splits 1:9 BC/GC through Expr.choose.
-function customerSpec() {
-  const perWh = CUSTOMERS_PER_DISTRICT * DISTRICTS_PER_WAREHOUSE; // 30_000
-  const cWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(WAREHOUSE_START));
-  const cDId  = Expr.add(
-    Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
-    Expr.lit(1),
-  );
-  const cId   = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(1));
-  const lastNameDict = Dict.values(C_LAST_DICT);
-  const cLastIdx = Expr.if(
-    Expr.le(cId, Expr.lit(C_LAST_DICT.length)),
-    Expr.sub(cId, Expr.lit(1)),
-    Draw.nurand({ a: 255, x: 0, y: 999, cSalt: 0xC1A57 }),
-  );
-  return Rel.table("customer", {
-    size: WAREHOUSES * perWh,
-    seed: SEED_CUSTOMER,
-    method: DatagenInsertMethod.NATIVE,
-    parallelism: LOAD_WORKERS || undefined,
-    attrs: {
-      c_id:           cId,
-      c_d_id:         cDId,
-      c_w_id:         cWId,
-      c_first:        asciiRange(8, 16),
-      c_middle:       Expr.lit("OE"),
-      c_last:         Attr.dictAt(lastNameDict, cLastIdx),
-      c_street_1:     asciiRange(10, 20),
-      c_street_2:     asciiRange(10, 20),
-      c_city:         asciiRange(10, 20),
-      c_state:        asciiFixed(2, Alphabet.enUpper),
-      c_zip:          asciiFixed(9, Alphabet.num),
-      c_phone:        asciiFixed(16, Alphabet.num),
-      c_since:        LOAD_TIMESTAMP_EXPR,
-      c_credit:       Expr.choose([
-        { weight: 1, expr: Expr.lit("BC") },
-        { weight: 9, expr: Expr.lit("GC") },
-      ]),
-      c_credit_lim:   Expr.litFloat(50000.0),
-      c_discount:     Draw.decimal({ min: Expr.lit(0), max: Expr.lit(0.5), scale: 4 }),
-      c_balance:      Expr.litFloat(-10.0),
-      c_ytd_payment:  Expr.litFloat(10.0),
-      c_payment_cnt:  Expr.lit(1),
-      c_delivery_cnt: Expr.lit(0),
-      c_data:         asciiRange(300, 500),
-    },
-  });
-}
-
-// Item spec: i_id = rowIndex()+1 ∈ [1, 100_000].
-// Spec §4.3.3.1: i_data is a 26..50 a-string; 10% of rows carry the literal
-// "ORIGINAL" at a random position. tpccOriginalOr composes both branches.
-function itemSpec() {
-  return Rel.table("item", {
-    size: ITEMS_PER_WH,
-    seed: SEED_ITEM,
-    method: DatagenInsertMethod.NATIVE,
-    parallelism: LOAD_WORKERS || undefined,
-    attrs: {
-      i_id:    Attr.rowId(),
-      i_im_id: Draw.intUniform({ min: Expr.lit(1), max: Expr.lit(10_000) }),
-      i_name:  asciiRange(14, 24),
-      i_price: Draw.decimal({ min: Expr.lit(1.0), max: Expr.lit(100.0), scale: 2 }),
-      i_data:  tpccOriginalOr(26, 50),
-    },
-  });
-}
-
-// Stock spec: row-index layout r ∈ [0, 100_000 W):
-//   s_w_id = r / 100_000 + WAREHOUSE_START ∈ [START, W_ID_MAX]
-//   s_i_id = r % 100_000 + 1 ∈ [1, 100_000]
-function stockSpec() {
-  const sWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(ITEMS_PER_WH)), Expr.lit(WAREHOUSE_START));
-  const sIId = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(ITEMS_PER_WH)), Expr.lit(1));
-  // attrs typed as Record<string, PbExpr> via Expr.lit's return type so
-  // the s_dist_01..s_dist_10 loop below can append without ceremony.
-  type AttrExpr = ReturnType<typeof Expr.lit>;
-  const attrs: Record<string, AttrExpr> = {
-    s_i_id:     sIId,
-    s_w_id:     sWId,
-    s_quantity: Draw.intUniform({ min: Expr.lit(10), max: Expr.lit(100) }),
-  };
-  for (let i = 1; i <= 10; i++) {
-    const key = "s_dist_" + String(i).padStart(2, "0");
-    attrs[key] = asciiFixed(24);
-  }
-  attrs.s_ytd        = Expr.lit(0);
-  attrs.s_order_cnt  = Expr.lit(0);
-  attrs.s_remote_cnt = Expr.lit(0);
-  // Spec §4.3.3.1: s_data is a 26..50 a-string; 10% of rows carry the
-  // literal "ORIGINAL" at a random position.
-  attrs.s_data       = tpccOriginalOr(26, 50);
-  return Rel.table("stock", {
-    size: TOTAL_STOCK,
-    seed: SEED_STOCK,
-    method: DatagenInsertMethod.NATIVE,
-    parallelism: LOAD_WORKERS || undefined,
-    attrs,
-  });
-}
-
-// Orders spec: row-index layout r ∈ [0, 30_000 W):
-//   o_w_id = r / 30_000 + 1 ∈ [1, W]
-//   o_d_id = (r / 3000) % 10 + 1 ∈ [1, 10]
-//   o_id   = r % 3000 + 1 ∈ [1, 3000]
-//
-// Spec §4.3.3.1:
-//   - o_c_id: per-district permutation of [1, 3000]. Realized via
-//     std.permuteIndex keyed off (w_id, d_id) so each district's C-ID
-//     assignment is a distinct Feistel-shuffled bijection.
-//   - o_entry_d: OS-captured load-time timestamp (LOAD_TIMESTAMP_EXPR).
-//   - o_carrier_id: NULL for the last 900 rows per district (o_id >
-//     2100), else Uniform(1, 10). Expressed as Expr.if + Expr.litNull so
-//     the split is deterministic and matches the new_order population by
-//     construction.
-// Distinct salt per scope so permutation streams for o_c_id are
-// uncorrelated with any other per-district key in the workload.
-const ORDERS_PERMUTE_SALT = BigInt("0x1BEEF02CACE1DAD1");
-function ordersSpec() {
-  const perWh = CUSTOMERS_PER_DISTRICT * DISTRICTS_PER_WAREHOUSE; // 30_000
-  const oWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(WAREHOUSE_START));
-  const oDId  = Expr.add(
-    Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
-    Expr.lit(1),
-  );
-  const oId   = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(CUSTOMERS_PER_DISTRICT)), Expr.lit(1));
-
-  // Per-(w_id, d_id) seed: `w_id * 100 + d_id` plus a 64-bit salt so
-  // districts across different warehouses don't collide and the seed is
-  // uncorrelated with other populations keyed by (w, d). permuteIndex
-  // treats the seed as an opaque int64 round-function key — any nonzero
-  // value that varies with (w, d) yields a distinct permutation.
-  const districtKey = Expr.add(
-    Expr.mul(Expr.col("o_w_id"), Expr.lit(100)),
-    Expr.col("o_d_id"),
-  );
-  const permuteSeed = Expr.add(districtKey, Expr.lit(ORDERS_PERMUTE_SALT));
-  const oCId = Expr.add(
-    std.permuteIndex(
-      permuteSeed,
-      Expr.sub(Expr.col("o_id"), Expr.lit(1)),
-      Expr.lit(CUSTOMERS_PER_DISTRICT),
-    ),
-    Expr.lit(1),
-  );
-
-  // o_carrier_id: NULL for the undelivered tail, otherwise Uniform(1,10).
-  const oCarrierId = Expr.if(
-    Expr.gt(Expr.col("o_id"), Expr.lit(ORDERS_DELIVERED)),
-    Expr.litNull(),
-    Draw.intUniform({ min: Expr.lit(1), max: Expr.lit(10) }),
-  );
-
-  return Rel.table("orders", {
-    size: WAREHOUSES * perWh,
-    seed: SEED_ORDERS,
-    method: DatagenInsertMethod.NATIVE,
-    parallelism: LOAD_WORKERS || undefined,
-    attrs: {
-      o_id:         oId,
-      o_d_id:       oDId,
-      o_w_id:       oWId,
-      o_c_id:       oCId,
-      o_entry_d:    LOAD_TIMESTAMP_EXPR,
-      o_carrier_id: oCarrierId,
-      o_ol_cnt:     Expr.lit(OL_CNT_FIXED),
-      o_all_local:  Expr.lit(1),
-    },
-  });
-}
-
-// Order_line spec: row-index layout r ∈ [0, 300_000 W), 10 lines per
-// (o_w_id, o_d_id, o_id) in orders:
-//   ol_w_id   = r / 300_000 + 1 ∈ [1, W]
-//   ol_d_id   = (r / 30_000) % 10 + 1 ∈ [1, 10]
-//   ol_o_id   = (r / 10) % 3000 + 1 ∈ [1, 3000]
-//   ol_number = r % 10 + 1 ∈ [1, 10]
-// FK integrity against orders is exact because every parent (o_w_id,
-// o_d_id, o_id) has exactly 10 children at matching indices.
-function orderLineSpec() {
-  const perDWh = CUSTOMERS_PER_DISTRICT * DISTRICTS_PER_WAREHOUSE * OL_CNT_FIXED; // 300_000
-  const perD   = CUSTOMERS_PER_DISTRICT * OL_CNT_FIXED;                           // 30_000
-  const olWId  = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perDWh)), Expr.lit(WAREHOUSE_START));
-  const olDId  = Expr.add(
-    Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(perD)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
-    Expr.lit(1),
-  );
-  const olOId  = Expr.add(
-    Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(OL_CNT_FIXED)), Expr.lit(CUSTOMERS_PER_DISTRICT)),
-    Expr.lit(1),
-  );
-  const olNum  = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(OL_CNT_FIXED)), Expr.lit(1));
-
-  // Spec §4.3.3.1:
-  //   - ol_delivery_d: NULL for undelivered orders (ol_o_id > 2100), else
-  //     the OS-captured load timestamp.
-  //   - ol_amount: Uniform(0.01, 9999.99) for undelivered rows, 0.00 for
-  //     delivered rows.
-  const undelivered = Expr.gt(Expr.col("ol_o_id"), Expr.lit(ORDERS_DELIVERED));
-  const olDeliveryD = Expr.if(undelivered, Expr.litNull(), LOAD_TIMESTAMP_EXPR);
-  const olAmount    = Expr.if(
-    undelivered,
-    Draw.decimal({ min: Expr.lit(0.01), max: Expr.lit(9999.99), scale: 2 }),
-    Expr.litFloat(0.0),
-  );
-
-  return Rel.table("order_line", {
-    size: WAREHOUSES * perDWh,
-    seed: SEED_ORDER_LINE,
-    method: DatagenInsertMethod.NATIVE,
-    parallelism: LOAD_WORKERS || undefined,
-    attrs: {
-      ol_o_id:        olOId,
-      ol_d_id:        olDId,
-      ol_w_id:        olWId,
-      ol_number:      olNum,
-      ol_i_id:        Draw.intUniform({ min: Expr.lit(1), max: Expr.lit(ITEMS_PER_WH) }),
-      ol_supply_w_id: olWId,
-      ol_delivery_d:  olDeliveryD,
-      ol_quantity:    Draw.intUniform({ min: Expr.lit(1), max: Expr.lit(5) }),
-      ol_amount:      olAmount,
-      ol_dist_info:   asciiFixed(24),
-    },
-  });
-}
-
-// New_order spec: last 900 o_ids per district per warehouse.
-// Row-index layout r ∈ [0, 9000 W):
-//   no_w_id = r / 9000 + 1 ∈ [1, W]
-//   no_d_id = (r / 900) % 10 + 1 ∈ [1, 10]
-//   no_o_id = r % 900 + 2101 ∈ [2101, 3000]
-function newOrderSpec() {
-  const perWh = ORDERS_UNDELIVERED * DISTRICTS_PER_WAREHOUSE; // 9000
-  const noWId = Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(perWh)), Expr.lit(WAREHOUSE_START));
-  const noDId = Expr.add(
-    Expr.mod(Expr.div(Attr.rowIndex(), Expr.lit(ORDERS_UNDELIVERED)), Expr.lit(DISTRICTS_PER_WAREHOUSE)),
-    Expr.lit(1),
-  );
-  const noOId = Expr.add(Expr.mod(Attr.rowIndex(), Expr.lit(ORDERS_UNDELIVERED)), Expr.lit(ORDERS_DELIVERED + 1));
-  return Rel.table("new_order", {
-    size: WAREHOUSES * perWh,
-    seed: SEED_NEW_ORDER,
-    method: DatagenInsertMethod.NATIVE,
-    parallelism: LOAD_WORKERS || undefined,
-    attrs: {
-      no_o_id: noOId,
-      no_d_id: noDId,
-      no_w_id: noWId,
-    },
-  });
-}
-
+// The seeded InsertSpec builders, loadData, and validatePopulation live in
+// tpcc_common.ts (shared byte-for-byte with procs.ts). Only the client-side
+// transaction bodies and dialect branches remain below.
 function prepareDatabase() {
   Step("drop_schema", () => {
     sql("drop_schema").forEach((query) => driver.exec(query, {}));
@@ -731,24 +223,7 @@ function prepareDatabase() {
   // an InsertSpec into the new datagen runtime via driver.insertSpec;
   // FK-friendly order (warehouse → district → customer → item → stock →
   // orders → order_line → new_order) matches the PG REFERENCES constraints.
-  Step("load_data", () => {
-    driver.insertSpec(warehouseSpec());
-    driver.insertSpec(districtSpec());
-    driver.insertSpec(customerSpec());
-    // item is a global table (size = ITEMS, not warehouse-scoped). In a
-    // distributed run only ONE instance should load it — by default the
-    // instance with WAREHOUSE_START=1, opt-in/out via -e LOAD_ITEMS=...
-    if (LOAD_ITEMS) {
-      driver.insertSpec(itemSpec());
-    } else {
-      console.log(`load_data: skipping item (LOAD_ITEMS=false; WAREHOUSE_START=${WAREHOUSE_START})`);
-    }
-    driver.insertSpec(stockSpec());
-    driver.insertSpec(ordersSpec());
-    driver.insertSpec(orderLineSpec());
-    driver.insertSpec(newOrderSpec());
-    // history is empty at load time (spec §4.3.4 initial cardinality 0).
-  });
+  Step("load_data", () => loadData(driver));
 
   // Secondary indexes built post-load (spec-permitted; serve the C_LAST by-name
   // and customer's-latest-order access paths) on pg/mysql/ydb. A one-shot build
@@ -768,221 +243,8 @@ function prepareDatabase() {
     (sql("analyze") ?? []).forEach((query) => driver.exec(query, {}));
   });
 
-  // Spec §3.3.2 CC1-CC4 + §4.3.4 cardinalities + §4.3.3.1 distribution rules.
-  // Fails setup() hard if any assertion trips so downstream transaction
-  // runs cannot execute on silently-broken data.
-  //
-  // Portability: CC2/CC3 originally use scalar-subquery subtraction and
-  // correlated MAX, which YDB's YQL rejects (it expects Module::Func
-  // syntax inside subquery contexts). We fetch aggregates with plain
-  // `SELECT ... GROUP BY` and fold the per-district comparisons in JS;
-  // every dialect supports the flat shape. `LIKE '%ORIGINAL%'` scans
-  // over item/stock can be expensive on sbroad's default vdbe opcode
-  // budget — the stroppy-playground compose bumps the limit cluster-wide
-  // (see README); locally `make tmpfs-up` is fine for WAREHOUSES=1.
-  Step("validate_population", () => {
-    const TOTAL_ORDERS     = TOTAL_DISTRICTS * CUSTOMERS_PER_DISTRICT;
-    const TOTAL_NEW_ORDER  = TOTAL_DISTRICTS * ORDERS_UNDELIVERED;
-    const TOTAL_ORDER_LINE = TOTAL_ORDERS * OL_CNT_FIXED;
-    const TOTAL_CUSTOMERS  = TOTAL_ORDERS; // 3000 per district
-
-    // All counts here describe this instance's warehouse slice only; item is
-    // global and stays unfiltered. The helper inlines a BETWEEN predicate so
-    // we don't need a per-dialect param-binding dance for what is a constant
-    // pair of integers, and so it composes cleanly into existing aggregate
-    // queries (some of which don't accept named params on every dialect).
-    const wWhere = (col: string) => `WHERE ${col} BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`;
-
-    type DistRow = { dNextOId: number };
-    type NoStats = { maxNoOId: number; minNoOId: number; cnt: number };
-
-    const dKey = (w: unknown, d: unknown) => `${Number(w)}/${Number(d)}`;
-    const distMap: Record<string, DistRow> = {};
-    const ordMaxMap: Record<string, number> = {};
-    const noStatsMap: Record<string, NoStats> = {};
-
-    let cc1WSum = NaN, cc1DSum = NaN;
-    let cc4OSum = NaN, cc4OlCnt = NaN;
-
-    try {
-      for (const r of driver.queryRows(
-        `SELECT d_w_id, d_id, d_next_o_id FROM district ${wWhere("d_w_id")}`,
-      )) {
-        distMap[dKey(r[0], r[1])] = { dNextOId: Number(r[2]) };
-      }
-      for (const r of driver.queryRows(
-        `SELECT o_w_id, o_d_id, MAX(o_id) FROM orders ${wWhere("o_w_id")} GROUP BY o_w_id, o_d_id`,
-      )) {
-        ordMaxMap[dKey(r[0], r[1])] = Number(r[2]);
-      }
-      for (const r of driver.queryRows(
-        `SELECT no_w_id, no_d_id, MAX(no_o_id), MIN(no_o_id), COUNT(*) FROM new_order ${wWhere("no_w_id")} GROUP BY no_w_id, no_d_id`,
-      )) {
-        noStatsMap[dKey(r[0], r[1])] = {
-          maxNoOId: Number(r[2]),
-          minNoOId: Number(r[3]),
-          cnt:      Number(r[4]),
-        };
-      }
-      cc1WSum  = Number(driver.queryValue(`SELECT SUM(w_ytd) FROM warehouse ${wWhere("w_id")}`));
-      cc1DSum  = Number(driver.queryValue(`SELECT SUM(d_ytd) FROM district ${wWhere("d_w_id")}`));
-      cc4OSum  = Number(driver.queryValue(`SELECT SUM(o_ol_cnt) FROM orders ${wWhere("o_w_id")}`));
-      cc4OlCnt = Number(driver.queryValue(`SELECT COUNT(*) FROM order_line ${wWhere("ol_w_id")}`));
-    } catch (e) {
-      throw new Error(`validate_population: prefetch failed: ${e}`);
-    }
-
-    const evalCc2a = (): { ok: boolean; detail: string } => {
-      for (const k in distMap) {
-        const want = distMap[k].dNextOId - 1;
-        const got = ordMaxMap[k];
-        if (got !== want) return { ok: false, detail: `district ${k}: d_next_o_id-1=${want}, max(o_id)=${got}` };
-      }
-      return { ok: true, detail: "" };
-    };
-    const evalCc2b = (): { ok: boolean; detail: string } => {
-      for (const k in distMap) {
-        const om = ordMaxMap[k];
-        const ns = noStatsMap[k];
-        const noMax = ns ? ns.maxNoOId : undefined;
-        if (om !== noMax) return { ok: false, detail: `district ${k}: max(o_id)=${om}, max(no_o_id)=${noMax}` };
-      }
-      return { ok: true, detail: "" };
-    };
-    const evalCc3 = (): { ok: boolean; detail: string } => {
-      for (const k in distMap) {
-        const ns = noStatsMap[k];
-        if (!ns) return { ok: false, detail: `district ${k}: missing new_order stats` };
-        if (ns.maxNoOId - ns.minNoOId + 1 !== ns.cnt) {
-          return { ok: false, detail: `district ${k}: max-min+1=${ns.maxNoOId - ns.minNoOId + 1} vs count=${ns.cnt}` };
-        }
-      }
-      return { ok: true, detail: "" };
-    };
-
-    type QueryCheck    = { name: string; query: string; ok: (v: unknown) => boolean };
-    type ComputedCheck = { name: string; computed: () => { ok: boolean; detail: string } };
-    type Check         = QueryCheck | ComputedCheck;
-
-    // Local-slice cardinalities. item is global (not warehouse-scoped) so
-    // its check stays unfiltered — every instance assumes it's loaded once.
-    const checks: Check[] = [
-      // --- §4.3.4 initial cardinalities (this instance's slice) ---
-      { name: `ITEM = ${ITEMS}`,
-        query: "SELECT COUNT(*) FROM item",
-        ok: v => Number(v) === ITEMS },
-      { name: `WAREHOUSE = ${WAREHOUSES}`,
-        query: `SELECT COUNT(*) FROM warehouse ${wWhere("w_id")}`,
-        ok: v => Number(v) === WAREHOUSES },
-      { name: `DISTRICT = ${TOTAL_DISTRICTS}`,
-        query: `SELECT COUNT(*) FROM district ${wWhere("d_w_id")}`,
-        ok: v => Number(v) === TOTAL_DISTRICTS },
-      { name: `CUSTOMER = ${TOTAL_CUSTOMERS}`,
-        query: `SELECT COUNT(*) FROM customer ${wWhere("c_w_id")}`,
-        ok: v => Number(v) === TOTAL_CUSTOMERS },
-      { name: `STOCK = ${TOTAL_STOCK}`,
-        query: `SELECT COUNT(*) FROM stock ${wWhere("s_w_id")}`,
-        ok: v => Number(v) === TOTAL_STOCK },
-      { name: `ORDERS = ${TOTAL_ORDERS}`,
-        query: `SELECT COUNT(*) FROM orders ${wWhere("o_w_id")}`,
-        ok: v => Number(v) === TOTAL_ORDERS },
-      { name: `NEW_ORDER = ${TOTAL_NEW_ORDER}`,
-        query: `SELECT COUNT(*) FROM new_order ${wWhere("no_w_id")}`,
-        ok: v => Number(v) === TOTAL_NEW_ORDER },
-      { name: `ORDER_LINE = ${TOTAL_ORDER_LINE}`,
-        query: `SELECT COUNT(*) FROM order_line ${wWhere("ol_w_id")}`,
-        ok: v => Number(v) === TOTAL_ORDER_LINE },
-
-      // --- §3.3.2 CC1: sum(W_YTD) == sum(D_YTD) (over this instance's slice) ---
-      { name: "CC1 sum(W_YTD) = sum(D_YTD)",
-        computed: () => Math.abs(cc1WSum - cc1DSum) < 0.01
-          ? { ok: true, detail: "" }
-          : { ok: false, detail: `sum(w_ytd)=${cc1WSum}, sum(d_ytd)=${cc1DSum}` } },
-
-      // --- §3.3.2 CC2: D_NEXT_O_ID - 1 = max(O_ID) = max(NO_O_ID) per district ---
-      { name: "CC2a D_NEXT_O_ID - 1 = max(O_ID) per district",
-        computed: evalCc2a },
-      { name: "CC2b max(O_ID) = max(NO_O_ID) per district",
-        computed: evalCc2b },
-
-      // --- §3.3.2 CC3: max(NO_O_ID) - min(NO_O_ID) + 1 = count(new_order) per district ---
-      { name: "CC3 new_order contiguous range per district",
-        computed: evalCc3 },
-
-      // --- §3.3.2 CC4: sum(O_OL_CNT) = count(ORDER_LINE) ---
-      { name: "CC4 sum(O_OL_CNT) = count(order_line)",
-        computed: () => cc4OSum === cc4OlCnt
-          ? { ok: true, detail: "" }
-          : { ok: false, detail: `sum(o_ol_cnt)=${cc4OSum}, count(order_line)=${cc4OlCnt}` } },
-
-      // --- §4.3.3.1 distribution rules (5% tolerance — spec allows modest skew) ---
-      { name: "I_DATA 10% contains ORIGINAL (5..15%)",
-        query: "SELECT 100.0 * SUM(CASE WHEN i_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM item",
-        ok: v => Number(v) >= 5 && Number(v) <= 15 },
-      { name: "S_DATA 10% contains ORIGINAL (5..15%)",
-        query: `SELECT 100.0 * SUM(CASE WHEN s_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM stock ${wWhere("s_w_id")}`,
-        ok: v => Number(v) >= 5 && Number(v) <= 15 },
-      { name: "C_CREDIT 10% BC (5..15%)",
-        query: `SELECT 100.0 * SUM(CASE WHEN c_credit = 'BC' THEN 1 ELSE 0 END) / COUNT(*) FROM customer ${wWhere("c_w_id")}`,
-        ok: v => Number(v) >= 5 && Number(v) <= 15 },
-
-      // --- fixed-value sanity checks (this instance's slice) ---
-      { name: "C_MIDDLE = 'OE' everywhere",
-        query: `SELECT COUNT(*) FROM customer WHERE c_middle <> 'OE' AND c_w_id BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`,
-        ok: v => Number(v) === 0 },
-      { name: "W_YTD = 300000 everywhere",
-        query: `SELECT COUNT(*) FROM warehouse WHERE w_ytd <> 300000 AND w_id BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`,
-        ok: v => Number(v) === 0 },
-      { name: "D_NEXT_O_ID = 3001 everywhere",
-        query: `SELECT COUNT(*) FROM district WHERE d_next_o_id <> 3001 AND d_w_id BETWEEN ${WAREHOUSE_START} AND ${W_ID_MAX}`,
-        ok: v => Number(v) === 0 },
-    ];
-
-    const failures: string[] = [];
-    for (const c of checks) {
-      if ("query" in c) {
-        let v: unknown;
-        try {
-          v = driver.queryValue(c.query);
-        } catch (e) {
-          const msg = `  ✗ ${c.name}: query error: ${e}`;
-          console.error(msg);
-          failures.push(msg);
-          continue;
-        }
-        if (c.ok(v)) {
-          console.log(`  ✓ ${c.name}`);
-        } else {
-          const msg = `  ✗ ${c.name}: got ${v}`;
-          console.error(msg);
-          failures.push(msg);
-        }
-      } else {
-        let res: { ok: boolean; detail: string };
-        try {
-          res = c.computed();
-        } catch (e) {
-          const msg = `  ✗ ${c.name}: compute error: ${e}`;
-          console.error(msg);
-          failures.push(msg);
-          continue;
-        }
-        if (res.ok) {
-          console.log(`  ✓ ${c.name}`);
-        } else {
-          const msg = `  ✗ ${c.name}: ${res.detail}`;
-          console.error(msg);
-          failures.push(msg);
-        }
-      }
-    }
-    if (failures.length > 0) {
-      throw new Error(
-        `validate_population: ${failures.length} check(s) failed:\n${failures.join("\n")}`,
-      );
-    }
-  });
-
+  // Spec §3.3.2 CC1-CC4 + §4.3.4 cardinalities (shared with procs.ts).
+  Step("validate_population", () => validatePopulation(driver));
 }
 
 // Run the load once across all VUs in the process (concurrent VUs block here
