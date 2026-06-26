@@ -32,6 +32,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 - Data loading moved out of k6's `setup()` and into the workload phase for every workload, so load progress now emits **live metrics** (k6 emits none during `setup()`). The measured workload is a single skippable `workload` step, which enables a clean two-run flow: load once with `--no-steps workload`, then measure against the loaded data with `--steps workload` (the throughput number is then uncontaminated by load time). A normal single run still loads and measures in one pass.
 
+### Fixed
+
+- TPC-B now declares the canonical pgbench `--foreign-keys` constraints (tellers/accounts/history → branches, history → tellers/accounts) on PostgreSQL and MySQL, added post-load in a `create_foreign_keys` step. They were missing — the schema had the `bid` indexes that exist to back those references but not the references themselves. (YDB/Picodata don't support foreign keys, so the step is a no-op there.)
+
 ## [5.4.0] - 2026-06-22
 
 ### Added

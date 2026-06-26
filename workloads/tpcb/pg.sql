@@ -105,6 +105,22 @@ CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid);
 CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid);
 
 
+--+ create_foreign_keys
+-- pgbench --foreign-keys schema: the bid/tid/aid columns reference their parent
+-- tables. Added post-load (referenced rows already present); the bid indexes
+-- above back the accounts/tellers -> branches references.
+--= tellers_bid_fk
+ALTER TABLE pgbench_tellers  ADD CONSTRAINT pgbench_tellers_bid_fkey  FOREIGN KEY (bid) REFERENCES pgbench_branches (bid);
+--= accounts_bid_fk
+ALTER TABLE pgbench_accounts ADD CONSTRAINT pgbench_accounts_bid_fkey FOREIGN KEY (bid) REFERENCES pgbench_branches (bid);
+--= history_bid_fk
+ALTER TABLE pgbench_history  ADD CONSTRAINT pgbench_history_bid_fkey  FOREIGN KEY (bid) REFERENCES pgbench_branches (bid);
+--= history_tid_fk
+ALTER TABLE pgbench_history  ADD CONSTRAINT pgbench_history_tid_fkey  FOREIGN KEY (tid) REFERENCES pgbench_tellers (tid);
+--= history_aid_fk
+ALTER TABLE pgbench_history  ADD CONSTRAINT pgbench_history_aid_fkey  FOREIGN KEY (aid) REFERENCES pgbench_accounts (aid);
+
+
 --+ set_logged
 -- Restore durability after the UNLOGGED bulk load (pg-only, PG_UNLOGGED).
 --= branches

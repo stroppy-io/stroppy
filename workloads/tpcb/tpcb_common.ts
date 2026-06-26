@@ -187,6 +187,10 @@ function prepareDatabase(procedures: boolean): void {
     driver.insertSpec(accountsSpec());
   });
   Step("create_indexes", () => runSection("create_indexes"));
+  // pgbench --foreign-keys semantics: FK constraints added post-load, once the
+  // referenced rows exist, and backed by the bid indexes built above. Absent on
+  // dialects that don't support foreign keys (ydb/picodata) -> no-op.
+  Step("create_foreign_keys", () => runSection("create_foreign_keys"));
   if (useUnlogged) {
     Step("set_logged", () => runSection("set_logged"));
   }

@@ -73,6 +73,22 @@ CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid)
 CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid)
 
 
+--+ create_foreign_keys
+-- pgbench --foreign-keys schema: bid/tid/aid reference their parent tables.
+-- Added post-load; InnoDB requires (and the accounts/tellers bid indexes above
+-- provide, others it auto-creates) a child-side index for each FK.
+--= tellers_bid_fk
+ALTER TABLE pgbench_tellers  ADD CONSTRAINT pgbench_tellers_bid_fk  FOREIGN KEY (bid) REFERENCES pgbench_branches (bid)
+--= accounts_bid_fk
+ALTER TABLE pgbench_accounts ADD CONSTRAINT pgbench_accounts_bid_fk FOREIGN KEY (bid) REFERENCES pgbench_branches (bid)
+--= history_bid_fk
+ALTER TABLE pgbench_history  ADD CONSTRAINT pgbench_history_bid_fk  FOREIGN KEY (bid) REFERENCES pgbench_branches (bid)
+--= history_tid_fk
+ALTER TABLE pgbench_history  ADD CONSTRAINT pgbench_history_tid_fk  FOREIGN KEY (tid) REFERENCES pgbench_tellers (tid)
+--= history_aid_fk
+ALTER TABLE pgbench_history  ADD CONSTRAINT pgbench_history_aid_fk  FOREIGN KEY (aid) REFERENCES pgbench_accounts (aid)
+
+
 --+ analyze
 -- Refresh planner statistics after the bulk load.
 --=
