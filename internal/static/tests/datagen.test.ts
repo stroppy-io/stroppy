@@ -13,6 +13,12 @@ import {
   RowIndex_Kind,
 } from "../datagen.ts";
 
+// InsertSpec.source now lives under the `generator` oneof; unwrap it for the
+// assertions below, which all exercise the native relational source arm.
+function relSource(spec: ReturnType<typeof Rel.table>) {
+  return spec.generator.oneofKind === "source" ? spec.generator.source : undefined;
+}
+
 describe("Rel.table", () => {
   it("infers columnOrder from attrs insertion order", () => {
     const spec = Rel.table("nations", {
@@ -24,19 +30,19 @@ describe("Rel.table", () => {
         n_regionkey: Expr.lit(0),
       },
     });
-    expect(spec.source?.columnOrder).toEqual([
+    expect(relSource(spec)?.columnOrder).toEqual([
       "n_nationkey",
       "n_name",
       "n_regionkey",
     ]);
-    expect(spec.source?.attrs.map((a) => a.name)).toEqual([
+    expect(relSource(spec)?.attrs.map((a) => a.name)).toEqual([
       "n_nationkey",
       "n_name",
       "n_regionkey",
     ]);
     expect(spec.table).toBe("nations");
     expect(spec.seed).toBe("42");
-    expect(spec.source?.population?.size).toBe("25");
+    expect(relSource(spec)?.population?.size).toBe("25");
     expect(spec.method).toBe(InsertMethod.PLAIN_QUERY);
   });
 
@@ -46,7 +52,7 @@ describe("Rel.table", () => {
       attrs: { a: Expr.lit(1), b: Expr.lit(2) },
       columnOrder: ["b", "a"],
     });
-    expect(spec.source?.columnOrder).toEqual(["b", "a"]);
+    expect(relSource(spec)?.columnOrder).toEqual(["b", "a"]);
   });
 
   it("rejects columnOrder with unknown or missing attrs", () => {
@@ -71,7 +77,7 @@ describe("Rel.table", () => {
       size: BigInt("9999999999"),
       attrs: { a: Attr.rowId() },
     });
-    expect(spec.source?.population?.size).toBe("9999999999");
+    expect(relSource(spec)?.population?.size).toBe("9999999999");
   });
 });
 
@@ -92,8 +98,8 @@ describe("Dict dedup", () => {
     expect(key).toMatch(/^d_[0-9a-f]{16}$/);
 
     // Both attrs must reference the same key.
-    const attr1 = spec.source?.attrs[0].expr!;
-    const attr2 = spec.source?.attrs[1].expr!;
+    const attr1 = relSource(spec)?.attrs[0].expr!;
+    const attr2 = relSource(spec)?.attrs[1].expr!;
     if (attr1.kind.oneofKind !== "dictAt" || attr2.kind.oneofKind !== "dictAt") {
       throw new Error("expected dictAt arms");
     }
@@ -384,12 +390,12 @@ describe("Rel.table with relationships / iter / lookupPops", () => {
       },
     });
 
-    expect(spec.source?.iter).toBe("orders_lineitem");
-    expect(spec.source?.relationships).toHaveLength(1);
-    expect(spec.source?.relationships[0].name).toBe("orders_lineitem");
-    expect(spec.source?.lookupPops).toHaveLength(1);
-    expect(spec.source?.lookupPops[0].population?.name).toBe("region");
-    expect(spec.source?.lookupPops[0].population?.pure).toBe(true);
+    expect(relSource(spec)?.iter).toBe("orders_lineitem");
+    expect(relSource(spec)?.relationships).toHaveLength(1);
+    expect(relSource(spec)?.relationships[0].name).toBe("orders_lineitem");
+    expect(relSource(spec)?.lookupPops).toHaveLength(1);
+    expect(relSource(spec)?.lookupPops[0].population?.name).toBe("region");
+    expect(relSource(spec)?.lookupPops[0].population?.pure).toBe(true);
   });
 });
 
@@ -416,11 +422,11 @@ describe("Dict dedup with lookupPops", () => {
     expect(keys).toHaveLength(1);
     const key = keys[0];
     // Both the table attr and the lookup-pop attr resolve to the same key.
-    const tableAttr = spec.source?.attrs[1].expr!;
+    const tableAttr = relSource(spec)?.attrs[1].expr!;
     if (tableAttr.kind.oneofKind !== "dictAt") throw new Error("expected dictAt");
     expect(tableAttr.kind.dictAt.dictKey).toBe(key);
 
-    const lpAttr = spec.source?.lookupPops[0].attrs[1].expr!;
+    const lpAttr = relSource(spec)?.lookupPops[0].attrs[1].expr!;
     if (lpAttr.kind.oneofKind !== "dictAt") throw new Error("expected dictAt");
     expect(lpAttr.kind.dictAt.dictKey).toBe(key);
   });
@@ -495,14 +501,14 @@ describe("Rel.table with scd2", () => {
       },
       scd2: s,
     });
-    expect(spec.source?.columnOrder).toEqual([
+    expect(relSource(spec)?.columnOrder).toEqual([
       "i_id",
       "i_name",
       "valid_from",
       "valid_to",
     ]);
-    expect(spec.source?.scd2?.startCol).toBe("valid_from");
-    expect(spec.source?.scd2?.endCol).toBe("valid_to");
+    expect(relSource(spec)?.scd2?.startCol).toBe("valid_from");
+    expect(relSource(spec)?.scd2?.endCol).toBe("valid_to");
   });
 
   it("rejects a scd2 column that collides with an attr name", () => {
@@ -538,7 +544,7 @@ describe("Rel.table with scd2", () => {
       columnOrder: ["vf", "a", "vt", "b"],
       scd2: s,
     });
-    expect(spec.source?.columnOrder).toEqual(["vf", "a", "vt", "b"]);
+    expect(relSource(spec)?.columnOrder).toEqual(["vf", "a", "vt", "b"]);
   });
 });
 
@@ -980,7 +986,7 @@ describe("Dict dedup: cohort entity-range and joint draws", () => {
     expect(keys).toHaveLength(1);
     const key = keys[0];
 
-    const first = spec.source!.attrs[0].expr!;
+    const first = relSource(spec)!.attrs[0].expr!;
     if (first.kind.oneofKind !== "streamDraw") throw new Error("expected streamDraw");
     const arm = first.kind.streamDraw.draw;
     if (arm.oneofKind !== "dict") throw new Error("expected dict arm");
@@ -1021,9 +1027,9 @@ describe("Rel.table with cohorts", () => {
       },
       cohorts: [c],
     });
-    expect(spec.source?.cohorts).toHaveLength(1);
-    expect(spec.source?.cohorts[0].name).toBe("hot");
-    expect(spec.source?.cohorts[0].cohortSize).toBe("20");
+    expect(relSource(spec)?.cohorts).toHaveLength(1);
+    expect(relSource(spec)?.cohorts[0].name).toBe("hot");
+    expect(relSource(spec)?.cohorts[0].cohortSize).toBe("20");
   });
 });
 
