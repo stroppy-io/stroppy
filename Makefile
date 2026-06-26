@@ -106,7 +106,7 @@ REQUIRED_BINS = git node npm go curl unzip \
 		echo "All required binaries are available"; \
 	fi
 
-VALIDATE_PROTO_PATH := $(HOME)/.easyp/mod/github.com/bufbuild/protoc-gen-validate/v1.2.1
+VALIDATE_PROTO_PATH := $(HOME)/.easyp/mod/github.com/bufbuild/protoc-gen-validate/v1.3.3
 
 PROTOC_VERSION ?= 32.1
 PROTOC_BIN := $(LOCAL_BIN)/protoc
@@ -130,15 +130,15 @@ PROTOC_TMP := /tmp/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH)
 .PHONY: .install-easyp
 .install-easyp:
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/easyp-tech/easyp/cmd/easyp@v0.7.15
+	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/easyp-tech/easyp/cmd/easyp@v0.16.6
 
 .PHONY: .install-go-proto-deps
 .install-go-proto-deps:
 	mkdir -p $(LOCAL_BIN)
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/envoyproxy/protoc-gen-validate@v1.2.1
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.19.1
+	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/envoyproxy/protoc-gen-validate@v1.3.3
+	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.20.0
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@v1.5.1
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/pubg/protoc-gen-jsonschema@v0.8.0
 

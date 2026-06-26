@@ -8,7 +8,7 @@ lint:
   allow_comment_ignores: false
   ignore_only: {}
 deps:
-  - github.com/bufbuild/protoc-gen-validate@v1.2.1
+  - github.com/bufbuild/protoc-gen-validate@v1.3.3
 generate:
   inputs:
     - directory: proto/stroppy
