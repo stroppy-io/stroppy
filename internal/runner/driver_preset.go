@@ -18,6 +18,13 @@ import (
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
+// Driver preset literals reused across the postgres-family presets and
+// their default insert method.
+const (
+	driverPostgres  = "postgres"
+	insertPlainBulk = "plain_bulk"
+)
+
 // pathFields lists Extra keys that contain file paths and must be
 // resolved to absolute paths before the working directory changes.
 var pathFields = map[string]bool{
@@ -68,7 +75,7 @@ type DriverPreset struct {
 // keeping credentials out of string literals for static analysis.
 func postgresURL(user, pass, host string) string {
 	return (&url.URL{
-		Scheme: "postgres",
+		Scheme: driverPostgres,
 		User:   url.UserPassword(user, pass),
 		Host:   host,
 	}).String()
@@ -77,23 +84,23 @@ func postgresURL(user, pass, host string) string {
 // driverPresets maps short driver names to their default configurations.
 var driverPresets = map[string]DriverPreset{
 	"pg": {
-		DriverType:          "postgres",
-		URL:                 postgresURL("postgres", "postgres", "localhost:5432"),
+		DriverType:          driverPostgres,
+		URL:                 postgresURL(driverPostgres, driverPostgres, "localhost:5432"),
 		DefaultInsertMethod: "native",
-		PoolKind:            "postgres",
+		PoolKind:            driverPostgres,
 	},
 	"mysql": {
 		DriverType: "mysql",
 		URL: "myuser:mypassword@tcp(localhost:3306)" +
 			"/mydb?charset=utf8mb4&parseTime=True&loc=Local",
-		DefaultInsertMethod: "plain_bulk",
+		DefaultInsertMethod: insertPlainBulk,
 		PoolKind:            "sql",
 	},
 	"pico": {
 		DriverType:          "picodata",
 		URL:                 postgresURL("admin", "T0psecret", "localhost:1331"),
-		DefaultInsertMethod: "plain_bulk",
-		PoolKind:            "postgres",
+		DefaultInsertMethod: insertPlainBulk,
+		PoolKind:            driverPostgres,
 	},
 	"ydb": {
 		DriverType:          "ydb",
@@ -104,7 +111,7 @@ var driverPresets = map[string]DriverPreset{
 	"noop": {
 		DriverType:          "noop",
 		URL:                 "noop://localhost",
-		DefaultInsertMethod: "plain_bulk",
+		DefaultInsertMethod: insertPlainBulk,
 		PoolKind:            "",
 	},
 }

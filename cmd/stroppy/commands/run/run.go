@@ -22,6 +22,7 @@ const (
 	consumedPairFlag = 2 // number of tokens consumed for a two-token flag (e.g. "-d pg")
 	flagSteps        = "--steps"
 	flagNoSteps      = "--no-steps"
+	flagDriverOpt    = "--driver-opt"
 )
 
 var (
@@ -574,7 +575,7 @@ func parseDriverOptFlag(args []string, i int) (driverIndex int, key, value strin
 	}
 
 	// -D=key=value / -D1=key=value / --driver-opt=key=value / --driver1-opt=key=value
-	for _, prefix := range []string{"-D", "--driver-opt"} {
+	for _, prefix := range []string{"-D", flagDriverOpt} {
 		if idx, rest, ok := parseLongFlagWithEquals(arg, prefix); ok {
 			key, value, err = splitKeyValue(rest)
 			if err != nil {
