@@ -507,6 +507,23 @@ BEGIN
     AND s_quantity < threshold;
 END
 
+
+--+ create_indexes
+-- TPC-C secondary indexes (spec-permitted, Clause 1.4): the C_LAST by-name path
+-- (Payment/Order-Status) and the customer's-latest-order lookup. Built post-load
+-- to keep write amplification out of the bulk-load path; mirror the ydb dialect.
+--= idx_customer_name
+CREATE INDEX idx_customer_name ON customer (c_w_id, c_d_id, c_last, c_first)
+--= idx_order
+CREATE INDEX idx_order ON orders (o_w_id, o_d_id, o_c_id, o_id)
+
+
+--+ analyze
+-- Refresh planner statistics after the bulk load.
+--=
+ANALYZE TABLE warehouse, district, customer, history, new_order, orders, order_line, item, stock
+
+
 --+ workload_procs
 --= new_order
 CALL NEWORD(:w_id, :min_w_id, :max_w_id, :d_id, :c_id, :ol_cnt, :force_rollback)

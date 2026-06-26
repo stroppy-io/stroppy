@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import { sleep } from "k6";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { Counter, Trend, Step, DriverX, ENV, TxIsolationName, declareDriverSetup, retryWithPolicy, txRetryPolicy } from "./helpers.ts";
+import { Counter, Trend, Step, DriverX, ENV, GlobalOnce, TxIsolationName, declareDriverSetup, declareScenario, retryWithPolicy, txRetryPolicy } from "./helpers.ts";
 import {
   Alphabet,
   Attr,
@@ -183,7 +183,10 @@ const nurand255Gen = DrawRT.nurand(seedOf("nurand255"), 255, 0, 999);
 // so k6 marks the run failed and the summary line shows a PASS/FAIL marker
 // next to each metric — no manual assertion needed on top of handleSummary.
 export const options: Options = {
-  setupTimeout: String(WAREHOUSES * 5) + "m",
+  // declareScenario unifies throughput (constant-vus, set DURATION) and power
+  // (shared-iterations) and pins maxDuration so a long load can't trip k6's 10m
+  // cap. Tune via VUS/DURATION/ITER env, not -u/-d/-i (which discard scenarios).
+  scenarios: declareScenario("tpcc"),
   // Include low TPS percentiles plus p99 in the per-trend percentiles k6 computes.
   summaryTrendStats: [
     "avg", "min", "med", "max",
@@ -236,6 +239,11 @@ const TX_ISOLATION = (
 ) as TxIsolationName;
 
 const driver = DriverX.create().setup(driverConfig);
+
+// PostgreSQL only: flip to UNLOGGED for a WAL-free bulk load, back to LOGGED
+// after. Disable with PG_UNLOGGED=false.
+const PG_UNLOGGED = ENV("PG_UNLOGGED", "true", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") !== "false";
+const useUnlogged = PG_UNLOGGED && driverConfig.driverType === "postgres";
 
 // picodata/sbroad doesn't support SELECT ... OFFSET, so the by-name
 // customer median pick (Payment §2.5.2.2, Order-Status §2.6.2.2) has to
@@ -702,7 +710,7 @@ function newOrderSpec() {
   });
 }
 
-export function setup() {
+function prepareDatabase() {
   Step("drop_schema", () => {
     sql("drop_schema").forEach((query) => driver.exec(query, {}));
   });
@@ -712,6 +720,12 @@ export function setup() {
       driver.exec({ ...query, sql: renderDDL(query.sql) }, {}),
     );
   });
+
+  if (useUnlogged) {
+    Step("set_unlogged", () => {
+      (sql("set_unlogged") ?? []).forEach((query) => driver.exec(query, {}));
+    });
+  }
 
   // Single bulk-load step covering all nine TPC-C tables. Each call feeds
   // an InsertSpec into the new datagen runtime via driver.insertSpec;
@@ -736,11 +750,22 @@ export function setup() {
     // history is empty at load time (spec §4.3.4 initial cardinality 0).
   });
 
-  // Built post-load on YDB to keep secondary-index write amplification
-  // out of the bulk-load path. Other dialects don't define this section,
-  // so the lookup returns undefined and this step is a no-op.
+  // Secondary indexes built post-load (spec-permitted; serve the C_LAST by-name
+  // and customer's-latest-order access paths) on pg/mysql/ydb. A one-shot build
+  // is cheaper than per-row maintenance, and cheaper still while UNLOGGED.
   Step("create_indexes", () => {
     (sql("create_indexes") ?? []).forEach((query) => driver.exec(query, {}));
+  });
+
+  if (useUnlogged) {
+    Step("set_logged", () => {
+      (sql("set_logged") ?? []).forEach((query) => driver.exec(query, {}));
+    });
+  }
+
+  // Refresh planner statistics after the bulk load.
+  Step("analyze", () => {
+    (sql("analyze") ?? []).forEach((query) => driver.exec(query, {}));
   });
 
   // Spec §3.3.2 CC1-CC4 + §4.3.4 cardinalities + §4.3.3.1 distribution rules.
@@ -958,7 +983,14 @@ export function setup() {
     }
   });
 
-  Step.begin("workload");
+}
+
+// Run the load once across all VUs in the process (concurrent VUs block here
+// until the single loader finishes). Each prep step is individually skippable,
+// so the canonical run is two passes: `--no-steps workload` (prep) then
+// `--steps workload` (measure against the loaded data).
+function prepare(): void {
+  GlobalOnce("tpcc.prepare", prepareDatabase);
 }
 
 // =====================================================================
@@ -1608,19 +1640,22 @@ const _txNameByFn = new Map<Function, string>([
 const NO_DEFAULT = ENV("STROPPY_NO_DEFAULT", "false", "Skip the transaction body in default()") === "true";
 
 export default function (): void {
+  prepare();
   if (NO_DEFAULT) return;
-  const workload = picker.pickWeighted(
-    [new_order, payment, order_status, delivery, stock_level],
-    [45, 43, 4, 4, 4],
-  ) as () => void;
-  const txName = _txNameByFn.get(workload) ?? "new_order";
-  keyingTime(txName);
-  workload();
-  thinkTime(txName);
+
+  Step("workload", () => {
+    const workload = picker.pickWeighted(
+      [new_order, payment, order_status, delivery, stock_level],
+      [45, 43, 4, 4, 4],
+    ) as () => void;
+    const txName = _txNameByFn.get(workload) ?? "new_order";
+    keyingTime(txName);
+    workload();
+    thinkTime(txName);
+  });
 }
 
 export function teardown() {
-  Step.end("workload");
   Teardown();
 }
 

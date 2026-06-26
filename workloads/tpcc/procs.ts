@@ -1,6 +1,6 @@
 import { Options } from "k6/options";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { Counter, Trend, Step, DriverX, ENV, TxIsolationName, declareDriverSetup, retry, isSerializationError } from "./helpers.ts";
+import { Counter, Trend, Step, DriverX, ENV, GlobalOnce, TxIsolationName, declareDriverSetup, declareScenario, retry, isSerializationError } from "./helpers.ts";
 import {
   Alphabet,
   Attr,
@@ -85,9 +85,12 @@ const TOTAL_DISTRICTS = WAREHOUSES * DISTRICTS_PER_WAREHOUSE;
 const TOTAL_CUSTOMERS = WAREHOUSES * DISTRICTS_PER_WAREHOUSE * CUSTOMERS_PER_DISTRICT;
 const TOTAL_STOCK     = WAREHOUSES * ITEMS;
 
-// K6 options — weighted dispatch inside default(), VUs/duration set via CLI or k6 defaults.
+// K6 options — weighted dispatch inside default(). declareScenario unifies the
+// throughput (constant-vus, set DURATION) and power (shared-iterations) shapes
+// and pins maxDuration so a long load can't trip k6's 10m cap. Thresholds stay
+// (TPC-C §5.2.5.4 p90 ceilings).
 export const options: Options = {
-  setupTimeout: String(WAREHOUSES * 5) + "m",
+  scenarios: declareScenario("tpcc"),
   summaryTrendStats: [
     "avg", "min", "med", "max",
     "p(1)", "p(5)", "p(10)",
@@ -144,6 +147,11 @@ const TX_ISOLATION = (
 ) as TxIsolationName;
 
 const driver = DriverX.create().setup(driverConfig);
+
+// PostgreSQL only: flip to UNLOGGED for a WAL-free bulk load, back to LOGGED
+// after. Disable with PG_UNLOGGED=false.
+const PG_UNLOGGED = ENV("PG_UNLOGGED", "true", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") !== "false";
+const useUnlogged = PG_UNLOGGED && driverConfig.driverType === "postgres";
 
 const sql = parse_sql_with_sections(open(SQL_FILE));
 
@@ -465,7 +473,7 @@ function tpccRetry<T>(fn: () => T): T {
   );
 }
 
-export function setup() {
+function prepareDatabase() {
   Step("drop_schema", () => {
     sql("drop_schema").forEach((query) => driver.exec(query, {}));
   });
@@ -477,6 +485,12 @@ export function setup() {
   Step("create_procedures", () => {
     sql("create_procedures").forEach((query) => driver.exec(query, {}));
   });
+
+  if (useUnlogged) {
+    Step("set_unlogged", () => {
+      (sql("set_unlogged") ?? []).forEach((query) => driver.exec(query, {}));
+    });
+  }
 
   Step("load_data", () => {
     driver.insertSpec(warehouseSpec());
@@ -495,8 +509,26 @@ export function setup() {
     driver.insertSpec(newOrderSpec());
   });
 
+  // Secondary indexes built post-load (spec-permitted; serve the C_LAST by-name
+  // and customer's-latest-order access paths). One-shot build is far cheaper
+  // than per-row maintenance, and cheaper still while tables are UNLOGGED.
+  Step("create_indexes", () => {
+    (sql("create_indexes") ?? []).forEach((query) => driver.exec(query, {}));
+  });
+
+  if (useUnlogged) {
+    Step("set_logged", () => {
+      (sql("set_logged") ?? []).forEach((query) => driver.exec(query, {}));
+    });
+  }
+
+  // Refresh planner statistics after the bulk load.
+  Step("analyze", () => {
+    (sql("analyze") ?? []).forEach((query) => driver.exec(query, {}));
+  });
+
   // Spec §3.3.2 CC1-CC4 + §4.3.4 cardinalities + §4.3.3.1 distribution rules.
-  // Halts setup() if any assertion fails so workload cannot run on
+  // Halts prepare() if any assertion fails so workload cannot run on
   // silently-broken data.
   Step("validate_population", () => {
     const TOTAL_ORDERS     = TOTAL_CUSTOMERS;
@@ -687,8 +719,14 @@ export function setup() {
       );
     }
   });
+}
 
-  Step.begin("workload");
+// Run the load once across all VUs in the process (concurrent VUs block here
+// until the single loader finishes). Each prep step is individually skippable,
+// so the canonical run is two passes: `--no-steps workload` (prep) then
+// `--steps workload` (measure against the loaded data).
+function prepare(): void {
+  GlobalOnce("tpcc.prepare", prepareDatabase);
 }
 
 // =====================================================================
@@ -890,15 +928,18 @@ function stock_level() {
 const picker = NewPicker(0);
 
 export default function (): void {
-  const workload = picker.pickWeighted(
-    [new_order, payment, order_status, delivery, stock_level],
-    [45,        43,      4,            4,        4],
-  ) as () => void;
-  workload();
+  prepare();
+
+  Step("workload", () => {
+    const workload = picker.pickWeighted(
+      [new_order, payment, order_status, delivery, stock_level],
+      [45,        43,      4,            4,        4],
+    ) as () => void;
+    workload();
+  });
 }
 
 export function teardown() {
-  Step.end("workload");
   Teardown();
 }
 
