@@ -916,7 +916,7 @@ function relTable(name: string, opts: RelTableOpts): PbInsertSpec {
     seed: uint64ToString(opts.seed ?? 0),
     method: opts.method ?? InsertMethod.PLAIN_QUERY,
     parallelism,
-    source,
+    generator: { oneofKind: "source", source },
     dicts,
   };
 }

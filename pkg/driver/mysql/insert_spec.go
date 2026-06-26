@@ -60,6 +60,31 @@ func (d *Driver) InsertSpec(
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
+// maxMySQLPlaceholders is the server-side cap on bound parameters in a single
+// prepared statement (Error 1390 "too many placeholders"). A multi-row bulk
+// INSERT binds rows*columns placeholders, so wide tables (e.g. catalog_sales,
+// 34 cols) overflow the default batch size; capBatchByColumns keeps each batch
+// under the limit.
+const maxMySQLPlaceholders = 65535
+
+// capBatchByColumns clamps the configured batch size so rows*colCount stays
+// within mysql's placeholder limit. colCount <= 0 leaves the size unchanged.
+func capBatchByColumns(batchSize, colCount int) int {
+	if colCount <= 0 {
+		return batchSize
+	}
+
+	if maxBatch := maxMySQLPlaceholders / colCount; maxBatch < batchSize {
+		batchSize = maxBatch
+	}
+
+	if batchSize < 1 {
+		batchSize = 1
+	}
+
+	return batchSize
+}
+
 // runChunk dispatches one partition's rows according to spec.Method.
 // src is drained to EOF. PLAIN_QUERY degrades to a bulk path with
 // batchSize=1 so both arms share one codepath.
@@ -72,7 +97,9 @@ func (d *Driver) runChunk(
 
 	switch spec.GetMethod() {
 	case dgproto.InsertMethod_NATIVE, dgproto.InsertMethod_PLAIN_BULK:
-		return sqldriver.RunBulkInsert(ctx, d.db, table, src, d.dialect, d.bulkSize)
+		batchSize := capBatchByColumns(d.bulkSize, len(src.Columns()))
+
+		return sqldriver.RunBulkInsert(ctx, d.db, table, src, d.dialect, batchSize)
 	case dgproto.InsertMethod_PLAIN_QUERY:
 		return sqldriver.RunBulkInsert(ctx, d.db, table, src, d.dialect, 1)
 	default:

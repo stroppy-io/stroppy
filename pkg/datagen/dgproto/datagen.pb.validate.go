@@ -239,6 +239,47 @@ func (m *InsertSpec) validate(all bool) error {
 			}
 		}
 
+	case *InsertSpec_Tpcds:
+		if v == nil {
+			err := InsertSpecValidationError{
+				field:  "Generator",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetTpcds()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InsertSpecValidationError{
+						field:  "Tpcds",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InsertSpecValidationError{
+						field:  "Tpcds",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTpcds()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InsertSpecValidationError{
+					field:  "Tpcds",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -440,6 +481,127 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = TpchSourceValidationError{}
+
+// Validate checks the field values on TpcdsSource with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *TpcdsSource) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TpcdsSource with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in TpcdsSourceMultiError, or
+// nil if none found.
+func (m *TpcdsSource) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TpcdsSource) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetTable()) < 1 {
+		err := TpcdsSourceValidationError{
+			field:  "Table",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetScaleFactor() <= 0 {
+		err := TpcdsSourceValidationError{
+			field:  "ScaleFactor",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return TpcdsSourceMultiError(errors)
+	}
+
+	return nil
+}
+
+// TpcdsSourceMultiError is an error wrapping multiple validation errors
+// returned by TpcdsSource.ValidateAll() if the designated constraints aren't met.
+type TpcdsSourceMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TpcdsSourceMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TpcdsSourceMultiError) AllErrors() []error { return m }
+
+// TpcdsSourceValidationError is the validation error returned by
+// TpcdsSource.Validate if the designated constraints aren't met.
+type TpcdsSourceValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TpcdsSourceValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TpcdsSourceValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TpcdsSourceValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TpcdsSourceValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TpcdsSourceValidationError) ErrorName() string { return "TpcdsSourceValidationError" }
+
+// Error satisfies the builtin error interface
+func (e TpcdsSourceValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTpcdsSource.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TpcdsSourceValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TpcdsSourceValidationError{}
 
 // Validate checks the field values on Parallelism with the rules defined in
 // the proto definition for this message. If any rules are violated, the first

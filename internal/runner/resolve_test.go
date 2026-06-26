@@ -124,13 +124,13 @@ func TestResolveInput_ExplicitSQL(t *testing.T) {
 	restoreDir := chdir(t, tmp)
 	defer restoreDir()
 
-	input, err := ResolveInput("tpcds", "tpcds-scale-1")
+	input, err := ResolveInput("tpcds", "pg")
 	require.NoError(t, err)
 
 	require.Equal(t, "tpcds.ts", input.Script.Name)
 	require.Equal(t, SourceEmbedded, input.Script.Source)
 	require.NotNil(t, input.SQL)
-	require.Equal(t, "tpcds-scale-1.sql", input.SQL.Name)
+	require.Equal(t, "pg.sql", input.SQL.Name)
 	require.Equal(t, SourceEmbedded, input.SQL.Source)
 }
 
