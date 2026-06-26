@@ -8,7 +8,7 @@ import { Step } from "./helpers.ts";
 import {
   driver,
   sql,
-  options,
+  options as scenarioOptions,
   prepare,
   teardown,
   TX_ISOLATION,
@@ -19,7 +19,9 @@ import {
   nextHid,
 } from "./tpcb_common.ts";
 
-export { options, teardown };
+// options re-declared (not `export { … }`) so the catalog's entrypoint scan finds it.
+export const options = scenarioOptions;
+export { teardown };
 
 export default function (): void {
   // Load runs once across all VUs (process-global); the measured workload is a

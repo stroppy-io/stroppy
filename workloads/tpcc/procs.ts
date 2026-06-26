@@ -4,7 +4,7 @@ import { DrawRT } from "./datagen.ts";
 import { C_LAST_DICT } from "./tpcc_helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 import {
-  options,
+  options as scenarioOptions,
   WAREHOUSE_START,
   W_ID_MAX,
   WAREHOUSES,
@@ -46,7 +46,8 @@ import {
 // driver.beginTx. pg + mysql only (no stored procs on picodata/ydb).
 // =====================================================================
 
-export { options };
+// Re-declared (not `export { … }`) so the catalog's entrypoint scan finds it.
+export const options = scenarioOptions;
 
 // Driver config: pg/mysql, errorMode=throw so new_order() can catch the
 // §2.4.2.3 rollback signal ("tpcc_rollback:item_not_found"). "log" would

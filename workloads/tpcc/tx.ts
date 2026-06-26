@@ -5,7 +5,7 @@ import { Alphabet, DrawRT } from "./datagen.ts";
 import { C_LAST_DICT } from "./tpcc_helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
 import {
-  options,
+  options as scenarioOptions,
   WAREHOUSE_START,
   W_ID_MAX,
   WAREHOUSES,
@@ -40,7 +40,8 @@ import {
   tpccStockLevelDuration,
 } from "./tpcc_common.ts";
 
-export { options };
+// Re-declared (not `export { … }`) so the catalog's entrypoint scan finds it.
+export const options = scenarioOptions;
 
 // tx.ts-only compliance counters: the client-side bodies observe per-line
 // remote picks and the BC-credit branch that procs.ts hides inside the stored

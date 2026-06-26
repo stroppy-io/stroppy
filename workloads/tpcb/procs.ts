@@ -7,7 +7,7 @@ import {
   driver,
   sql,
   driverType,
-  options,
+  options as scenarioOptions,
   prepare,
   teardown,
   aidGen,
@@ -17,7 +17,9 @@ import {
   nextHid,
 } from "./tpcb_common.ts";
 
-export { options, teardown };
+// options re-declared (not `export { … }`) so the catalog's entrypoint scan finds it.
+export const options = scenarioOptions;
+export { teardown };
 
 if (driverType === "picodata" || driverType === "ydb") {
   throw new Error(
