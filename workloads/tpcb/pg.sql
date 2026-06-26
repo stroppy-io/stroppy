@@ -42,10 +42,19 @@ CREATE TABLE pgbench_history (
     mtime TIMESTAMP,
     filler CHAR(22)
 );
---=
-CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid);
---=
-CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid);
+
+
+--+ set_unlogged
+-- Flip tables to UNLOGGED for a WAL-free bulk load; set_logged restores
+-- durability after population. Gated by PG_UNLOGGED (default true), pg-only.
+--= branches
+ALTER TABLE pgbench_branches SET UNLOGGED;
+--= tellers
+ALTER TABLE pgbench_tellers  SET UNLOGGED;
+--= accounts
+ALTER TABLE pgbench_accounts SET UNLOGGED;
+--= history
+ALTER TABLE pgbench_history  SET UNLOGGED;
 
 
 --+ create_procedures
@@ -85,6 +94,49 @@ BEGIN
     RETURN v_balance;
 END;
 $$;
+
+
+--+ create_indexes
+-- Built AFTER the bulk load: a one-shot index build is far cheaper than
+-- maintaining the index per row during population.
+--= accounts_bid
+CREATE INDEX pgbench_accounts_bid_idx ON pgbench_accounts (bid);
+--= tellers_bid
+CREATE INDEX pgbench_tellers_bid_idx ON pgbench_tellers (bid);
+
+
+--+ create_foreign_keys
+-- pgbench --foreign-keys schema: the bid/tid/aid columns reference their parent
+-- tables. Added post-load (referenced rows already present); the bid indexes
+-- above back the accounts/tellers -> branches references.
+--= tellers_bid_fk
+ALTER TABLE pgbench_tellers  ADD CONSTRAINT pgbench_tellers_bid_fkey  FOREIGN KEY (bid) REFERENCES pgbench_branches (bid);
+--= accounts_bid_fk
+ALTER TABLE pgbench_accounts ADD CONSTRAINT pgbench_accounts_bid_fkey FOREIGN KEY (bid) REFERENCES pgbench_branches (bid);
+--= history_bid_fk
+ALTER TABLE pgbench_history  ADD CONSTRAINT pgbench_history_bid_fkey  FOREIGN KEY (bid) REFERENCES pgbench_branches (bid);
+--= history_tid_fk
+ALTER TABLE pgbench_history  ADD CONSTRAINT pgbench_history_tid_fkey  FOREIGN KEY (tid) REFERENCES pgbench_tellers (tid);
+--= history_aid_fk
+ALTER TABLE pgbench_history  ADD CONSTRAINT pgbench_history_aid_fkey  FOREIGN KEY (aid) REFERENCES pgbench_accounts (aid);
+
+
+--+ set_logged
+-- Restore durability after the UNLOGGED bulk load (pg-only, PG_UNLOGGED).
+--= branches
+ALTER TABLE pgbench_branches SET LOGGED;
+--= tellers
+ALTER TABLE pgbench_tellers  SET LOGGED;
+--= accounts
+ALTER TABLE pgbench_accounts SET LOGGED;
+--= history
+ALTER TABLE pgbench_history  SET LOGGED;
+
+
+--+ analyze
+-- Refresh planner statistics after the bulk load.
+--=
+ANALYZE;
 
 
 --+ workload_procs

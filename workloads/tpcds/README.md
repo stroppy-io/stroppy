@@ -129,3 +129,25 @@ DataMaint2, scored as QphDS@SF. This workload covers:
 - Not yet done: the Data Maintenance phase (refresh-data generation + insert/
   delete DM functions) and the QphDS@SF metric; SF=1 answer-set validation against
   the kit's `answer_sets/`; Picodata + YDB dialect files (queries and schema).
+
+## Run shapes and the two-run flow
+
+All TPC workloads share one set of run knobs (set with `-e KEY=VALUE`, **not** the
+`-u/-d/-i` k6 shortcuts, which would discard the scenario):
+
+- `DURATION` set → fixed-duration throughput test (constant `VUS`); result is TPS.
+- `DURATION` unset → power test (`ITER` iterations); result is elapsed time.
+- `MAX_DURATION` (default `24h`) lifts k6's 10-minute per-iteration cap for large loads.
+- `PG_UNLOGGED=false` disables the PostgreSQL `UNLOGGED` bulk-load dance.
+
+The measured workload is a single gatable `workload` step, so prep and measurement
+can run as two passes for a throughput number uncontaminated by load time:
+
+```bash
+# 1. load only (drop / create / load / create_indexes / analyze), no workload
+./build/stroppy run <workload> -e SCALE_FACTOR=10 --no-steps workload
+# 2. measure only, against the already-loaded data
+./build/stroppy run <workload> -e VUS=64 -e DURATION=1h --steps workload
+```
+
+A normal single run (no `--steps`) loads and measures in one pass.

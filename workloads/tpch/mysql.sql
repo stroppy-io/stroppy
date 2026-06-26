@@ -140,6 +140,11 @@ CREATE INDEX idx_lineitem_shipdate   ON lineitem (l_shipdate)
 --= idx_orders_orderdate
 CREATE INDEX idx_orders_orderdate    ON orders   (o_orderdate)
 
+--+ analyze
+-- Refresh planner statistics after the bulk load.
+--=
+ANALYZE TABLE region, nation, part, supplier, partsupp, customer, orders, lineitem
+
 --+ finalize_totals
 -- Spec §4.2.3 o_totalprice = Σ lineitem l_extendedprice × (1 + l_tax) × (1 - l_discount).
 -- Post-load UPDATE; see pg.sql header for the rationale.

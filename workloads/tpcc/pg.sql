@@ -132,6 +132,30 @@ CREATE TABLE stock (
   PRIMARY KEY (s_w_id, s_i_id)
 )
 
+
+--+ set_unlogged
+-- Flip tables to UNLOGGED for a WAL-free bulk load; set_logged restores
+-- durability after population. Gated by PG_UNLOGGED (default true), pg-only.
+--= warehouse
+ALTER TABLE warehouse  SET UNLOGGED;
+--= district
+ALTER TABLE district   SET UNLOGGED;
+--= customer
+ALTER TABLE customer   SET UNLOGGED;
+--= history
+ALTER TABLE history    SET UNLOGGED;
+--= new_order
+ALTER TABLE new_order  SET UNLOGGED;
+--= orders
+ALTER TABLE orders     SET UNLOGGED;
+--= order_line
+ALTER TABLE order_line SET UNLOGGED;
+--= item
+ALTER TABLE item       SET UNLOGGED;
+--= stock
+ALTER TABLE stock      SET UNLOGGED;
+
+
 --+ create_procedures
 /* TPC-C §3.4.0.1 Table 3-1: NO/P/D require isolation Level 3
    (phantom-protected), OS/SL require Level 2 (repeatable read).
@@ -501,6 +525,46 @@ BEGIN
   RETURN COALESCE(stock_count, 0);
 END;
 $$ LANGUAGE 'plpgsql';
+
+
+--+ create_indexes
+-- TPC-C secondary indexes (spec-permitted, Clause 1.4.10 Comment 2): they serve
+-- the C_LAST by-name path (Payment/Order-Status §2.5.2.2/§2.6.2.2) and the
+-- customer's-latest-order lookup (§2.6.2.2). Built post-load to keep write
+-- amplification out of the bulk-load path; mirror the ydb dialect's two indexes.
+--= idx_customer_name
+CREATE INDEX idx_customer_name ON customer (c_w_id, c_d_id, c_last, c_first);
+--= idx_order
+CREATE INDEX idx_order ON orders (o_w_id, o_d_id, o_c_id, o_id);
+
+
+--+ set_logged
+-- Restore durability after the UNLOGGED bulk load (pg-only, PG_UNLOGGED).
+--= warehouse
+ALTER TABLE warehouse  SET LOGGED;
+--= district
+ALTER TABLE district   SET LOGGED;
+--= customer
+ALTER TABLE customer   SET LOGGED;
+--= history
+ALTER TABLE history    SET LOGGED;
+--= new_order
+ALTER TABLE new_order  SET LOGGED;
+--= orders
+ALTER TABLE orders     SET LOGGED;
+--= order_line
+ALTER TABLE order_line SET LOGGED;
+--= item
+ALTER TABLE item       SET LOGGED;
+--= stock
+ALTER TABLE stock      SET LOGGED;
+
+
+--+ analyze
+-- Refresh planner statistics after the bulk load.
+--=
+ANALYZE;
+
 
 --+ workload_procs
 --= new_order

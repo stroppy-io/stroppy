@@ -1,6 +1,6 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { Counter, DriverX, Step, ENV, GlobalOnce, Trend, TxIsolationName, declareDriverSetup } from "./helpers.ts";
+import { Counter, DriverX, Step, ENV, GlobalOnce, Trend, TxIsolationName, declareDriverSetup, declareScenario } from "./helpers.ts";
 import {
   Alphabet,
   Attr,
@@ -186,21 +186,12 @@ const SEED_LINEITEM = 0x7EC108;
 // dates are derived from o_orderdate — see lineitemSpec().
 
 // A full load + 22-query pass on a slow loader (e.g. YDB BulkUpsert at SF>=1)
-// far exceeds k6's 10m default for the vus/iterations shorthand, which would
-// interrupt the iteration mid-load. Declaring a scenario lets maxDuration lift
-// that cap; override with MAX_DURATION if needed.
-const MAX_DURATION = ENV("MAX_DURATION", "24h", "Max wall-clock for the run (k6 duration)");
-
+// far exceeds k6's 10m default for the vus/iterations shorthand. declareScenario
+// pins maxDuration (MAX_DURATION, default 24h) so the load can't be interrupted;
+// the power test runs once (no DURATION), or set DURATION to loop the query set.
 export const options: Options = {
   summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"],
-  scenarios: {
-    tpch: {
-      executor: "shared-iterations",
-      vus: 1,
-      iterations: 1,
-      maxDuration: MAX_DURATION,
-    },
-  },
+  scenarios: declareScenario("tpch"),
 };
 
 const TPCH_QUERY_NAMES = Array.from({ length: 22 }, (_, i) => "q" + String(i + 1));
@@ -277,6 +268,11 @@ const TX_ISOLATION = (
   "read_committed"
 ) as TxIsolationName;
 void TX_ISOLATION; // queries are read-only; kept for symmetry with other workloads.
+
+// PostgreSQL only: create LOGGED, flip to UNLOGGED for a WAL-free bulk load,
+// then back to LOGGED before the workload. Disable with PG_UNLOGGED=false.
+const PG_UNLOGGED = ENV("PG_UNLOGGED", "true", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") !== "false";
+const useUnlogged = PG_UNLOGGED && driverConfig.driverType === "postgres";
 
 const driver = DriverX.create().setup(driverConfig);
 const sql = parse_sql_with_sections(open(SQL_FILE));
@@ -789,6 +785,12 @@ function prepareDatabase(): void {
     runSection(section);
   });
 
+  if (useUnlogged) {
+    Step("set_unlogged", () => {
+      runSection("set_unlogged");
+    });
+  }
+
   Step("load_data", () => {
     if (USE_GOTPC) {
       // Ported dbgen: the Go side owns generation; pass table + scale factor.
@@ -808,16 +810,6 @@ function prepareDatabase(): void {
     driver.insertSpec(lineitemSpec());
   });
 
-  // pg-only: flip UNLOGGED → LOGGED and ANALYZE. Other dialects ship the
-  // section empty (or missing), so runSection just noops.
-  Step("set_logged", () => {
-    runSection("set_logged");
-  });
-
-  Step("create_indexes", () => {
-    runSection("create_indexes");
-  });
-
   // Spec §4.2.3: o_totalprice = Σ l_extendedprice × (1+l_tax) × (1-l_discount)
   // over lineitems. relgen fills it post-load since it depends on yet-to-be
   // generated lines at orders-emit time. gotpc computes o_totalprice at
@@ -828,6 +820,25 @@ function prepareDatabase(): void {
       return;
     }
     runFinalizeTotals();
+  });
+
+  // Build indexes after the bulk load (and while still UNLOGGED on pg — a
+  // one-shot build is far cheaper than per-row maintenance).
+  Step("create_indexes", () => {
+    runSection("create_indexes");
+  });
+
+  // pg-only: restore durability after the UNLOGGED bulk load.
+  if (useUnlogged) {
+    Step("set_logged", () => {
+      runSection("set_logged");
+    });
+  }
+
+  // Refresh planner statistics post-load so Q20/Q21 pick sane plans instead of
+  // nested-loop-hanging.
+  Step("analyze", () => {
+    runSection("analyze");
   });
 
   Step("validate_answers", () => {
@@ -852,20 +863,20 @@ function prepareDatabase(): void {
     const results = runAndCompareAllQueries(driver, queries, queryParams, answersSf1);
     logSummary(results);
   });
-
-  Step.begin("workload");
 }
 
 export default function (): void {
+  // Load runs once across all VUs (process-global); the measured query pass is
+  // a separate, skippable step so prep and measure can run as two passes:
+  // `--no-steps workload` (prep) then `--steps workload` (measure).
   GlobalOnce("tpch.prepare", prepareDatabase);
 
-  Step("queries", () => {
+  Step("workload", () => {
     runTpchQueries();
   });
 }
 
 export function teardown(): void {
-  Step.end("workload");
   Teardown();
 }
 

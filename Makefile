@@ -346,6 +346,15 @@ run-simple-test:
 	./build/stroppy gen --workdir $(WORKDIR) --preset=simple
 	cd $(WORKDIR) && ./stroppy run simple.ts
 
+# Workload run knobs (all four TPC workloads share these):
+#   prep then measure (recommended for a clean throughput number):
+#     ./build/stroppy run tpcb/tx -e SCALE_FACTOR=10 --no-steps workload   # load only
+#     ./build/stroppy run tpcb/tx -e VUS=64 -e DURATION=1h --steps workload # measure only
+#   single pass (load + measure in one run):
+#     ./build/stroppy run tpcb/tx -e SCALE_FACTOR=10 -e ITER=1
+#   knobs: VUS, DURATION (set => constant-vus throughput), ITER (power test),
+#          MAX_DURATION (default 24h), PG_UNLOGGED=false to disable the pg
+#          UNLOGGED bulk-load dance. The targets below are single-pass smoke runs.
 run-tpcb-test:
 	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
 		./build/stroppy run tpcb/procs.ts

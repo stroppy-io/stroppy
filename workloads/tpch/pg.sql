@@ -23,14 +23,14 @@ DROP TABLE IF EXISTS region;
 
 --+ create_schema
 --= create_region
-CREATE UNLOGGED TABLE region (
+CREATE TABLE region (
     r_regionkey  INTEGER         NOT NULL,
     r_name       CHAR(25)        NOT NULL,
     r_comment    VARCHAR(152),
     PRIMARY KEY (r_regionkey)
 );
 --= create_nation
-CREATE UNLOGGED TABLE nation (
+CREATE TABLE nation (
     n_nationkey  INTEGER         NOT NULL,
     n_name       CHAR(25)        NOT NULL,
     n_regionkey  INTEGER         NOT NULL,
@@ -38,7 +38,7 @@ CREATE UNLOGGED TABLE nation (
     PRIMARY KEY (n_nationkey)
 );
 --= create_part
-CREATE UNLOGGED TABLE part (
+CREATE TABLE part (
     p_partkey     BIGINT          NOT NULL,
     p_name        VARCHAR(55)     NOT NULL,
     p_mfgr        CHAR(25)        NOT NULL,
@@ -51,7 +51,7 @@ CREATE UNLOGGED TABLE part (
     PRIMARY KEY (p_partkey)
 );
 --= create_supplier
-CREATE UNLOGGED TABLE supplier (
+CREATE TABLE supplier (
     s_suppkey    INTEGER          NOT NULL,
     s_name       CHAR(25)         NOT NULL,
     s_address    VARCHAR(40)      NOT NULL,
@@ -62,7 +62,7 @@ CREATE UNLOGGED TABLE supplier (
     PRIMARY KEY (s_suppkey)
 );
 --= create_partsupp
-CREATE UNLOGGED TABLE partsupp (
+CREATE TABLE partsupp (
     ps_partkey    BIGINT          NOT NULL,
     ps_suppkey    INTEGER         NOT NULL,
     ps_availqty   INTEGER         NOT NULL,
@@ -71,7 +71,7 @@ CREATE UNLOGGED TABLE partsupp (
     PRIMARY KEY (ps_partkey, ps_suppkey)
 );
 --= create_customer
-CREATE UNLOGGED TABLE customer (
+CREATE TABLE customer (
     c_custkey     INTEGER         NOT NULL,
     c_name        VARCHAR(25)     NOT NULL,
     c_address     VARCHAR(40)     NOT NULL,
@@ -83,7 +83,7 @@ CREATE UNLOGGED TABLE customer (
     PRIMARY KEY (c_custkey)
 );
 --= create_orders
-CREATE UNLOGGED TABLE orders (
+CREATE TABLE orders (
     o_orderkey      BIGINT          NOT NULL,
     o_custkey       INTEGER         NOT NULL,
     o_orderstatus   CHAR(1)         NOT NULL,
@@ -96,7 +96,7 @@ CREATE UNLOGGED TABLE orders (
     PRIMARY KEY (o_orderkey)
 );
 --= create_lineitem
-CREATE UNLOGGED TABLE lineitem (
+CREATE TABLE lineitem (
     l_orderkey      BIGINT          NOT NULL,
     l_partkey       BIGINT          NOT NULL,
     l_suppkey       INTEGER         NOT NULL,
@@ -116,10 +116,28 @@ CREATE UNLOGGED TABLE lineitem (
     PRIMARY KEY (l_orderkey, l_linenumber)
 );
 
+--+ set_unlogged
+-- Flip tables to UNLOGGED for a WAL-free bulk load; set_logged restores
+-- durability after population. Gated by PG_UNLOGGED (default true), pg-only.
+--= region
+ALTER TABLE region   SET UNLOGGED;
+--= nation
+ALTER TABLE nation   SET UNLOGGED;
+--= part
+ALTER TABLE part     SET UNLOGGED;
+--= supplier
+ALTER TABLE supplier SET UNLOGGED;
+--= partsupp
+ALTER TABLE partsupp SET UNLOGGED;
+--= customer
+ALTER TABLE customer SET UNLOGGED;
+--= orders
+ALTER TABLE orders   SET UNLOGGED;
+--= lineitem
+ALTER TABLE lineitem SET UNLOGGED;
+
 --+ set_logged
--- Flip tables from UNLOGGED (fast bulk-load on tmpfs / fsync-off pg) back to
--- LOGGED once population completes. ANALYZE afterward so the planner picks
--- sane plans for Q20/Q21 instead of nested-loop-hanging.
+-- Restore durability after the UNLOGGED bulk load (pg-only, PG_UNLOGGED).
 --= region
 ALTER TABLE region   SET LOGGED;
 --= nation
@@ -136,7 +154,11 @@ ALTER TABLE customer SET LOGGED;
 ALTER TABLE orders   SET LOGGED;
 --= lineitem
 ALTER TABLE lineitem SET LOGGED;
---= analyze
+
+--+ analyze
+-- Refresh planner statistics after the bulk load so Q20/Q21 pick sane plans
+-- instead of nested-loop-hanging.
+--=
 ANALYZE;
 
 --+ create_indexes

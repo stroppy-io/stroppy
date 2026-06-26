@@ -76,3 +76,25 @@ make gen-tpch-json   # regenerates distributions.json and answers_sf1.json
   phone_cc, grammar, np, vp, nouns, verbs, adjectives, adverbs,
   auxiliaries, prepositions, terminators).
 - `answers_sf1.json` — SF=1 reference answers produced by `cmd/tpch-answers/`.
+
+## Run shapes and the two-run flow
+
+All TPC workloads share one set of run knobs (set with `-e KEY=VALUE`, **not** the
+`-u/-d/-i` k6 shortcuts, which would discard the scenario):
+
+- `DURATION` set → fixed-duration throughput test (constant `VUS`); result is TPS.
+- `DURATION` unset → power test (`ITER` iterations); result is elapsed time.
+- `MAX_DURATION` (default `24h`) lifts k6's 10-minute per-iteration cap for large loads.
+- `PG_UNLOGGED=false` disables the PostgreSQL `UNLOGGED` bulk-load dance.
+
+The measured workload is a single gatable `workload` step, so prep and measurement
+can run as two passes for a throughput number uncontaminated by load time:
+
+```bash
+# 1. load only (drop / create / load / create_indexes / analyze), no workload
+./build/stroppy run <workload> -e SCALE_FACTOR=10 --no-steps workload
+# 2. measure only, against the already-loaded data
+./build/stroppy run <workload> -e VUS=64 -e DURATION=1h --steps workload
+```
+
+A normal single run (no `--steps`) loads and measures in one pass.
