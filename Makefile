@@ -135,7 +135,7 @@ PROTOC_TMP := /tmp/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH)
 .PHONY: .install-go-proto-deps
 .install-go-proto-deps:
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.9
+	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/envoyproxy/protoc-gen-validate@v1.2.1
 	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.19.1
@@ -161,7 +161,8 @@ TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
 	cp $(CURDIR)/internal/static/parse_sql.ts $(TMP_BUNDLE_DIR)/parse_sql.ts
 	cp $(TS_BUNDLE_DIR)/build.js $(TMP_BUNDLE_DIR)/
 	cp $(TS_BUNDLE_DIR)/package.json $(TMP_BUNDLE_DIR)/
-	cd $(TMP_BUNDLE_DIR) && npm install
+	cp $(TS_BUNDLE_DIR)/package-lock.json $(TMP_BUNDLE_DIR)/
+	cd $(TMP_BUNDLE_DIR) && npm ci
 	cd $(TMP_BUNDLE_DIR) && node build.js
 	cp $(TMP_BUNDLE_DIR)/stroppy.pb.ts $(TS_TARGET_DIR)/stroppy.pb.ts
 	cp $(TMP_BUNDLE_DIR)/dist/bundle.js $(TS_TARGET_DIR)/stroppy.pb.js
@@ -184,7 +185,7 @@ install-linter: # Install golangci-lint
 install-xk6:
 	$(info Installing xk6...)
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) go install go.k6.io/xk6@v1.1.5
+	GOBIN=$(LOCAL_BIN) go install go.k6.io/xk6@v1.4.6
 
 .PHONY: .install-proto-deps
 .install-proto-deps: .install-protoc .install-easyp .install-go-proto-deps .install-node-proto-deps
@@ -289,7 +290,7 @@ STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 K6_OUT_FILE=$(CURDIR)/build/k6
 K6_COMMON_FLAGS := --verbose \
-		--k6-version v1.7.0 \
+		--k6-version v1.8.0 \
 		--with github.com/stroppy-io/stroppy/cmd/xk6air=./cmd/xk6air/ \
 		--replace github.com/stroppy-io/stroppy=./ \
 		--with github.com/oleiade/xk6-encoding@v0.0.0-20251120082946-fbe7a8cbb88e \
