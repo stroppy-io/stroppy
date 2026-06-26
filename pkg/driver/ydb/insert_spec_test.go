@@ -102,7 +102,7 @@ func TestConvertRowInto(t *testing.T) {
 	columns := []string{"w_id", "w_tax"}
 	dest := make([]any, 2)
 
-	err := convertRowInto(ydbDialect{}, columns, dest, []any{int64(1), 0.05})
+	err := convertRowInto(ydbDialect{}, columns, nil, dest, []any{int64(1), 0.05})
 	if err != nil {
 		t.Fatalf("convertRowInto: %v", err)
 	}
@@ -113,6 +113,43 @@ func TestConvertRowInto(t *testing.T) {
 
 	if dest[1] != 0.05 {
 		t.Fatalf("dest[1] = %v", dest[1])
+	}
+}
+
+func TestConvertRowIntoKinds(t *testing.T) {
+	t.Parallel()
+
+	// Timestamp column: date string -> *time.Time. Double column: int64 ->
+	// float64. Passthrough string column is left untouched.
+	columns := []string{"l_orderkey", "l_shipdate", "l_quantity", "l_comment"}
+	kinds := []colKind{kindPassthrough, kindTimestamp, kindDouble, kindPassthrough}
+	dest := make([]any, 4)
+
+	err := convertRowInto(ydbDialect{}, columns, kinds, dest,
+		[]any{int64(7), "1996-01-02", int64(17), "not-a-date"})
+	if err != nil {
+		t.Fatalf("convertRowInto: %v", err)
+	}
+
+	if dest[0] != int64(7) {
+		t.Fatalf("dest[0] = %v (%T), want int64 7", dest[0], dest[0])
+	}
+
+	ts, ok := dest[1].(*time.Time)
+	if !ok {
+		t.Fatalf("dest[1] type = %T, want *time.Time", dest[1])
+	}
+
+	if ts.Year() != 1996 || ts.Month() != time.January || ts.Day() != 2 {
+		t.Fatalf("dest[1] = %v, want 1996-01-02", ts)
+	}
+
+	if dest[2] != float64(17) {
+		t.Fatalf("dest[2] = %v (%T), want float64 17", dest[2], dest[2])
+	}
+
+	if dest[3] != "not-a-date" {
+		t.Fatalf("dest[3] = %v, want string untouched", dest[3])
 	}
 }
 

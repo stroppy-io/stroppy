@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
@@ -101,7 +102,23 @@ type bulkUpsertWriter struct {
 	fieldsBuf  []types.StructValueOption
 	batchLen   int
 	bulkSize   int
+	// colKind[i] coerces cell i to the type the table declares: the generator
+	// emits dates as strings and integral quantities as int64, but the YDB
+	// schema may want Timestamp / Double, and BulkUpsert does not coerce.
+	// Resolved once via DescribeTable on the first row.
+	colKind   []colKind
+	described bool
 }
+
+// colKind is the schema-driven coercion applied to a generated cell before
+// BulkUpsert type inference.
+type colKind uint8
+
+const (
+	kindPassthrough colKind = iota // type already matches; leave as-is
+	kindTimestamp                  // date string -> *time.Time
+	kindDouble                     // int64 -> float64
+)
 
 func newBulkUpsertWriter(
 	ydbDriver *Driver,
@@ -132,7 +149,15 @@ func newBulkUpsertWriter(
 }
 
 func (w *bulkUpsertWriter) appendRowCtx(ctx context.Context, row []any) error {
-	if err := convertRowInto(w.d.dialect, w.columns, w.rowCells[w.batchLen], row); err != nil {
+	if !w.described {
+		if err := w.resolveColumnKinds(ctx); err != nil {
+			return err
+		}
+
+		w.described = true
+	}
+
+	if err := convertRowInto(w.d.dialect, w.columns, w.colKind, w.rowCells[w.batchLen], row); err != nil {
 		return err
 	}
 
@@ -231,19 +256,95 @@ func (d *Driver) bulkUpsertRuntime(
 	return writer.flush(ctx)
 }
 
-// convertRowInto runs each cell through the dialect.Convert hook into
-// dest, which must be sized to the row width.
-func convertRowInto(dialect queries.Dialect, columns []string, dest, row []any) error {
+// dateLayout is the ISO date string the dbgen generators emit (misc.go
+// makeAscDate: "%4d-%02d-%02d").
+const dateLayout = "2006-01-02"
+
+// convertRowInto runs each cell through the dialect.Convert hook into dest,
+// which must be sized to the row width, then coerces it to the type the table
+// declares (kinds[idx]) so BulkUpsert's type inference matches the column:
+// date strings -> *time.Time (Timestamp), int64 -> float64 (Double).
+func convertRowInto(dialect queries.Dialect, columns []string, kinds []colKind, dest, row []any) error {
 	for idx, col := range columns {
 		conv, err := dialect.Convert(row[idx])
 		if err != nil {
 			return fmt.Errorf("ydb: convert col %q: %w", col, err)
 		}
 
+		kind := kindPassthrough
+		if idx < len(kinds) {
+			kind = kinds[idx]
+		}
+
+		switch kind {
+		case kindTimestamp:
+			if s, ok := conv.(string); ok && s != "" {
+				t, perr := time.Parse(dateLayout, s)
+				if perr != nil {
+					return fmt.Errorf("ydb: parse timestamp col %q value %q: %w", col, s, perr)
+				}
+
+				conv = &t
+			}
+		case kindDouble:
+			if n, ok := conv.(int64); ok {
+				conv = float64(n)
+			}
+		case kindPassthrough:
+		}
+
 		dest[idx] = conv
 	}
 
 	return nil
+}
+
+// resolveColumnKinds describes the target table once and records, per writer
+// column, the coercion needed to match the declared type (see colKind). The
+// generator emits a single representation for all dialects (dates as strings,
+// quantities as int64); YDB BulkUpsert is strict, so we adapt here.
+func (w *bulkUpsertWriter) resolveColumnKinds(ctx context.Context) error {
+	var desc options.Description
+
+	err := w.d.nativeDB.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+		var e error
+
+		desc, e = s.DescribeTable(ctx, w.tablePath)
+
+		return e
+	})
+	if err != nil {
+		return fmt.Errorf("ydb: describe table %q: %w", w.tableName, err)
+	}
+
+	kindByName := make(map[string]colKind, len(desc.Columns))
+	for _, c := range desc.Columns {
+		kindByName[c.Name] = columnKind(c.Type)
+	}
+
+	w.colKind = make([]colKind, len(w.columns))
+	for i, col := range w.columns {
+		w.colKind[i] = kindByName[col]
+	}
+
+	return nil
+}
+
+// columnKind maps a declared YDB column type (unwrapping a nullable
+// Optional<T>) to the coercion the generated cell needs.
+func columnKind(t types.Type) colKind {
+	if optional, inner := types.IsOptional(t); optional {
+		t = inner
+	}
+
+	switch {
+	case types.Equal(t, types.TypeTimestamp):
+		return kindTimestamp
+	case types.Equal(t, types.TypeDouble):
+		return kindDouble
+	default:
+		return kindPassthrough
+	}
 }
 
 // columnsWithNulls returns a boolean mask: mask[i] is true iff any row
