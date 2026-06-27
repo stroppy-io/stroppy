@@ -1,9 +1,18 @@
 # TPC-H workload
 
-Relational-framework implementation of TPC-H (spec §4). Eight tables
-seeded from Rel-framework specs; reads answers_sf1.json for query
-validation at SF=1 for PostgreSQL. Load and query execution have dialect
-files for PostgreSQL, MySQL, Picodata, and YDB.
+TPC-H (spec §4): eight tables, the 22-query suite, query validation
+against `answers_sf1.json` at SF=1 for PostgreSQL. Load and query execution
+have dialect files for PostgreSQL, MySQL, Picodata, and YDB.
+
+Two data generators, selected with `TPCH_GENERATOR`:
+
+- `gotpc` (default) — a faithful port of the official `dbgen`. Byte-faithful
+  output, correct query answers, and `o_totalprice` computed at generation
+  time (so the `finalize_totals` step is skipped). Markedly faster than
+  `relgen`.
+- `relgen` — the native datagen-framework generator (`Rel.table` specs), kept
+  for comparison. Needs the `finalize_totals` post-load step and carries the
+  simplifications noted below.
 
 ## Run it
 
@@ -23,6 +32,7 @@ Useful env overrides:
 -e scale_factor=0.01   # 0.01, 1, or any positive float. 1 enables answer validation.
 -e pool_size=50        # per-VU pool size
 -e load_workers=8      # parallel InsertSpec workers during load_data
+-e tpch_generator=relgen   # data generator: gotpc (default) | relgen
 ```
 
 ## Steps
@@ -36,14 +46,18 @@ Useful env overrides:
 4. `set_logged` — flips from UNLOGGED to LOGGED for query durability.
 5. `create_indexes` — creates the ~12 secondary indexes needed for q1–q22.
 6. `finalize_totals` — runs the `o_totalprice` recompute UPDATE (spec
-   §4.2.3 formula depends on post-load lineitems).
+   §4.2.3 formula depends on post-load lineitems). Skipped under `gotpc`,
+   which finalizes `o_totalprice` at generation time.
 7. `queries` — workload-phase step in `default()`. Each iteration executes
    q1–q22 in order, logs `[tpch] qN: ok in ...ms`, and feeds the final
    consolidated timing report with per-query totals and a SUM row.
 8. `validate_answers` — diffs query results against `answers_sf1.json`
    (SF=1 only; skipped otherwise).
 
-## Known simplifications vs spec
+## Known simplifications vs spec (`relgen` only)
+
+The default `gotpc` generator is byte-faithful to `dbgen`; the points below
+apply only to the legacy `relgen` generator (`TPCH_GENERATOR=relgen`).
 
 - Addresses, phones, names use ASCII alphabet draws rather than dbgen's
   exact character repertoire. Query match ratios shift slightly vs dbgen.

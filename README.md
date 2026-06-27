@@ -8,7 +8,7 @@ Database stress testing CLI tool powered by the k6 workload engine.
 
 ## Features
 
-- Built-in TPC-B, TPC-C, TPC-H, and TPC-DS-like workload tests
+- Built-in TPC-B, TPC-C, TPC-H, and TPC-DS workload tests
 - Custom workload support in TypeScript
 - Deterministic relational data generation with `Rel.table` and `driver.insertSpec`
 - PostgreSQL, MySQL, YDB, Picodata, CSV, and noop drivers
@@ -65,7 +65,9 @@ TPC-B and TPC-C each ship two scripts:
 - `tx` — uses raw transactions; works with **all SQL drivers** (PostgreSQL, MySQL, Picodata, YDB)
 
 TPC-H ships `tpch/tx`, a relational-framework workload that loads all eight
-tables and runs the 22 query suite. TPC-DS is available as a SQL-query workload.
+tables and runs the 22 query suite. TPC-DS ships `tpcds/tpcds`, which generates
+and loads all 24 tables (faithful `dsdgen` port) and runs the 99 query suite on
+PostgreSQL and MySQL; scale via `SCALE_FACTOR`.
 
 ```bash
 stroppy run tpcc/procs        # TPC-C, stored procedures (pg/mysql)
@@ -74,7 +76,7 @@ stroppy run tpcc/tx           # TPC-C, raw transactions (any DB)
 stroppy run tpcb/procs        # TPC-B, stored procedures (pg/mysql)
 stroppy run tpcb/tx           # TPC-B, raw transactions (any DB)
 stroppy run tpch/tx           # TPC-H, relational load + query suite
-stroppy run tpcds tpcds-scale-100  # TPC-DS-like SQL query set
+stroppy run tpcds/tpcds -e SCALE_FACTOR=1  # TPC-DS, load 24 tables + 99 queries
 ```
 
 And you can mix builtin tests with your own scripts or SQL files:
@@ -143,18 +145,21 @@ stroppy help probe
 ├─ tpcb
 │  ├─ procs.ts            (stored procedures — pg/mysql)
 │  ├─ tx.ts               (raw transactions  — any DB)
+│  ├─ tpcb_common.ts
 │  └─ pg.sql mysql.sql pico.sql ydb.sql
 ├─ tpcc
 │  ├─ procs.ts            (stored procedures — pg/mysql)
 │  ├─ tx.ts               (raw transactions  — any DB)
+│  ├─ tpcc_common.ts tpcc_helpers.ts
 │  └─ pg.sql mysql.sql pico.sql ydb.sql ydb_no_indexes.sql
 ├─ tpch
 │  ├─ tx.ts               (relational load + 22 queries)
 │  ├─ tpch_helpers.ts tpch_validate.ts
 │  └─ pg.sql mysql.sql pico.sql ydb.sql distributions.json answers_sf1.json
 └─ tpcds
-   ├─ tpcds-scale-(1/10/100/300/1000/3000/10000/30000/50000/100000).sql
-   └─ tpcds.ts
+   ├─ tpcds.ts            (load 24 tables + 99 queries — pg/mysql)
+   ├─ tpcds_validate.ts
+   └─ schema.pg.sql schema.mysql.sql pg.sql mysql.sql answers_sf1.json
 ```
 
 ### Generate Test Workspace
