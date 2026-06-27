@@ -248,10 +248,10 @@ func encodeValue(val any) string {
 		return string(typed)
 	case bool:
 		if typed {
-			return "true"
+			return csvTrue
 		}
 
-		return "false"
+		return csvFalse
 	case time.Time:
 		return typed.UTC().Format(time.RFC3339Nano)
 	case *time.Time:

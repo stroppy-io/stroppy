@@ -19,8 +19,12 @@ import (
 	"github.com/stroppy-io/stroppy/internal/version"
 )
 
+// appName is the binary / command name, reused across the cobra command
+// definition, version output, and the k6-subcommand argv rewrite.
+const appName = "stroppy"
+
 var rootCmd = &cobra.Command{
-	Use:   "stroppy",
+	Use:   appName,
 	Short: "Generate and run k6-powered database stress tests",
 }
 
@@ -34,7 +38,7 @@ var versionCmd = &cobra.Command{
 	Short: "Print versions of stroppy components",
 	Run: func(_ *cobra.Command, _ []string) {
 		versions := map[string]string{
-			"stroppy": version.Version,
+			appName: version.Version,
 		}
 
 		// Pull dependency versions from the compiled binary's module info.
@@ -60,7 +64,7 @@ var versionCmd = &cobra.Command{
 		} else {
 			// Fixed order for readable output.
 			for _, kv := range []struct{ k, v string }{
-				{"stroppy", versions["stroppy"]},
+				{appName, versions[appName]},
 				{"k6", versions["k6"]},
 				{"pgx", versions["pgx"]},
 			} {
@@ -95,8 +99,8 @@ func K6Subcommand(gs *state.GlobalState) *cobra.Command {
 
 func init() {
 	// Skip "k6 x stroppy" prefix if binary file already named as "stroppy"
-	if filepath.Base(os.Args[0]) == "stroppy" {
-		os.Args = append([]string{"k6", "x", "stroppy"}, os.Args[1:]...)
+	if filepath.Base(os.Args[0]) == appName {
+		os.Args = append([]string{"k6", "x", appName}, os.Args[1:]...)
 
 		// [cobra.Command] help message should think that stroppy rootCmd have no parent
 		oldUsageFunc := rootCmd.UsageFunc()

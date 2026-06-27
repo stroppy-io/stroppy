@@ -30,7 +30,7 @@ jobs:
         arch: [amd64, arm64]
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v6
         with:
@@ -79,7 +79,7 @@ jobs:
           tar -C "${OUTDIR}" -czf "${{ steps.names.outputs.archive }}" . ${EXTRAS[@]+"${EXTRAS[@]}"}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.names.outputs.pkg }}
           path: dist/${{ steps.names.outputs.archive }}
@@ -90,7 +90,7 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           path: dist
 

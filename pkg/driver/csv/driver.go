@@ -50,12 +50,19 @@ const (
 	fileMode = 0o644
 )
 
+// Canonical CSV boolean spellings: accepted as parse input (alongside
+// the aliases below) and emitted as the encoded form for bool values.
+const (
+	csvTrue  = "true"
+	csvFalse = "false"
+)
+
 // Accepted boolean-option strings. parseConfig applies them to any
 // ?merge / ?header query param. Everything else returns
 // ErrInvalidOption.
 var (
-	boolTrue  = map[string]struct{}{"true": {}, "1": {}, "yes": {}}
-	boolFalse = map[string]struct{}{"false": {}, "0": {}, "no": {}}
+	boolTrue  = map[string]struct{}{csvTrue: {}, "1": {}, "yes": {}}
+	boolFalse = map[string]struct{}{csvFalse: {}, "0": {}, "no": {}}
 )
 
 // ErrInvalidOption is the static parent error for any invalid URL

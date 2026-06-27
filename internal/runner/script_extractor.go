@@ -26,6 +26,17 @@ import (
 	_ "embed"
 )
 
+// Source/data file extensions shared by the esbuild resolver config and
+// the workload-sibling filter.
+const (
+	extTS   = ".ts"
+	extTSX  = ".tsx"
+	extJS   = ".js"
+	extMJS  = ".mjs"
+	extJSON = ".json"
+	extSQL  = ".sql"
+)
+
 var (
 	ErrEsbuild         = errors.New("esbuild error")
 	ErrNoEsbuildOutput = errors.New("no output from esbuild")
@@ -58,13 +69,13 @@ func TranspileTypeScript(entryPath string) (string, error) {
 		AbsWorkingDir:     dirAbs,
 		External:          []string{"k6", "k6/x/*", "k6/*", "./parse_sql.js"},
 		MainFields:        []string{"module", "main"},
-		ResolveExtensions: []string{".ts", ".tsx", ".js", ".mjs", ".json"},
+		ResolveExtensions: []string{extTS, extTSX, extJS, extMJS, extJSON},
 		Loader: map[string]api.Loader{
-			".ts":   api.LoaderTS,
-			".tsx":  api.LoaderTSX,
-			".js":   api.LoaderJS,
-			".mjs":  api.LoaderJS,
-			".json": api.LoaderJSON,
+			extTS:   api.LoaderTS,
+			extTSX:  api.LoaderTSX,
+			extJS:   api.LoaderJS,
+			extMJS:  api.LoaderJS,
+			extJSON: api.LoaderJSON,
 		},
 	})
 

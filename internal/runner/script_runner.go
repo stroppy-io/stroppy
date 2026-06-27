@@ -211,11 +211,29 @@ func CreateAndInitTempDir(
 	return tempDir, filenames, nil
 }
 
+// secureJoin joins name onto baseDir and verifies the cleaned result stays
+// within baseDir, guarding against path traversal in names taken from
+// resolved-file specs or directory listings (gosec G703).
+func secureJoin(baseDir, name string) (string, error) {
+	dest := filepath.Join(baseDir, name)
+
+	rel, err := filepath.Rel(baseDir, dest)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("%w: %q", errPathEscape, name)
+	}
+
+	return dest, nil
+}
+
 // writeResolvedFile writes a ResolvedFile to the target directory.
 func writeResolvedFile(rf ResolvedFile, targetDir string) error {
-	dest := filepath.Join(targetDir, rf.Name)
+	dest, err := secureJoin(targetDir, rf.Name)
+	if err != nil {
+		return err
+	}
+
 	if rf.Content != nil {
-		return os.WriteFile(dest, rf.Content, common.FileMode)
+		return os.WriteFile(dest, rf.Content, common.FileMode) // #nosec G703 -- dest validated by secureJoin
 	}
 
 	return copyFile(rf.Path, dest)
@@ -227,13 +245,14 @@ func copyFile(src, dst string) error {
 		return err
 	}
 
-	return os.WriteFile(dst, data, common.FileMode)
+	return os.WriteFile(dst, data, common.FileMode) // #nosec G703 -- dst validated by secureJoin at call sites
 }
 
 var (
 	ErrNotADir      = errors.New("is not a directory")
 	errNoSteps      = errors.New("script has no steps")
 	errUnknownSteps = errors.New("unknown steps")
+	errPathEscape   = errors.New("file name escapes target directory")
 )
 
 func copyFiles(srcDir, dstDir string, excludeNames []string) (copied []string, err error) {
@@ -270,7 +289,11 @@ func copyFiles(srcDir, dstDir string, excludeNames []string) (copied []string, e
 		}
 
 		srcPath := filepath.Join(srcDir, entry.Name())
-		dstPath := filepath.Join(dstDir, entry.Name())
+
+		dstPath, err := secureJoin(dstDir, entry.Name())
+		if err != nil {
+			return copied, err
+		}
 
 		if err := copyFile(srcPath, dstPath); err != nil {
 			return copied, err
@@ -631,7 +654,11 @@ func copyLocalSiblings(srcDir, targetDir string) ([]string, error) {
 			continue
 		}
 
-		dest := filepath.Join(targetDir, entry.Name())
+		dest, err := secureJoin(targetDir, entry.Name())
+		if err != nil {
+			return copied, err
+		}
+
 		if _, err := os.Stat(dest); err == nil {
 			continue
 		}
@@ -641,7 +668,7 @@ func copyLocalSiblings(srcDir, targetDir string) ([]string, error) {
 			return copied, err
 		}
 
-		if err := os.WriteFile(dest, data, common.FileMode); err != nil {
+		if err := os.WriteFile(dest, data, common.FileMode); err != nil { // #nosec G703 -- dest validated by secureJoin
 			return copied, err
 		}
 
@@ -658,7 +685,7 @@ func copyLocalSiblings(srcDir, targetDir string) ([]string, error) {
 func isWorkloadSibling(name string) bool {
 	ext := filepath.Ext(name)
 
-	return ext == ".ts" || ext == ".sql" || ext == ".json"
+	return ext == extTS || ext == extSQL || ext == extJSON
 }
 
 // setEnvs set environment variables in [os.Environ] compatible format.
