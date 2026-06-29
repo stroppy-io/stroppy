@@ -121,6 +121,10 @@ function prepareDatabase(): void {
   if (useUnlogged) {
     Step("set_logged", () => runSection("set_logged"));
   }
+  // FK constraints post-load, AFTER set_logged (pg checks FK persistence both
+  // directions, so they can't exist during the UNLOGGED load/flips). No-op on
+  // dialects lacking the section.
+  Step("create_foreign_keys", () => runSection("create_foreign_keys"));
   Step("analyze", () => runSection("analyze"));
   Step("validate_population", () => validatePopulation(driver));
 }

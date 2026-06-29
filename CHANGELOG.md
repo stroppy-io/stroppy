@@ -8,6 +8,12 @@ Newest on top. Everything under `## [Unreleased]` is not yet released.
 Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 `([#NN](https://github.com/stroppy-io/stroppy/pull/NN))` when the change had one.
 
+## [5.5.1] - 2026-06-29
+
+### Fixed
+
+- The default `UNLOGGED` fast bulk-load (`PG_UNLOGGED=true`) on PostgreSQL no longer fails while preparing TPC-C or TPC-B. PostgreSQL refuses to flip a table to `UNLOGGED`/`LOGGED` while it shares a foreign key with a table in the other persistence state (in either direction), so TPC-C errored on `set_unlogged` (`could not change table … because it references logged table …`, SQLSTATE 42P16) and TPC-B would hit the same on `set_logged`. Foreign keys are now created in a `create_foreign_keys` step that runs **after** `set_logged`, once every table is back to `LOGGED`. The unlogged fast-load path now works for all workloads; previously only `PG_UNLOGGED=false` succeeded. Runs that pass an explicit `steps` allowlist must add `create_foreign_keys` to it.
+
 ## [5.5.0] - 2026-06-27
 
 ### Added

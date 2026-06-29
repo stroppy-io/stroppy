@@ -187,13 +187,16 @@ function prepareDatabase(procedures: boolean): void {
     driver.insertSpec(accountsSpec());
   });
   Step("create_indexes", () => runSection("create_indexes"));
-  // pgbench --foreign-keys semantics: FK constraints added post-load, once the
-  // referenced rows exist, and backed by the bid indexes built above. Absent on
-  // dialects that don't support foreign keys (ydb/picodata) -> no-op.
-  Step("create_foreign_keys", () => runSection("create_foreign_keys"));
   if (useUnlogged) {
     Step("set_logged", () => runSection("set_logged"));
   }
+  // pgbench --foreign-keys semantics: FK constraints added post-load, once the
+  // referenced rows exist, and backed by the bid indexes built above. Added AFTER
+  // set_logged: pg checks FK persistence in BOTH directions, so a logged<->unlogged
+  // FK edge may never exist -> creating them while tables are still UNLOGGED would
+  // make the SET LOGGED flip fail. Absent on dialects without foreign keys
+  // (ydb/picodata) -> no-op.
+  Step("create_foreign_keys", () => runSection("create_foreign_keys"));
   Step("analyze", () => runSection("analyze"));
 }
 

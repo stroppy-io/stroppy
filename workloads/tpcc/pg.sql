@@ -20,7 +20,7 @@ CREATE TABLE warehouse (
 --= district
 CREATE TABLE district (
   d_id INTEGER,
-  d_w_id INTEGER REFERENCES warehouse(w_id),
+  d_w_id INTEGER,
   d_name VARCHAR(10),
   d_street_1 VARCHAR(20),
   d_street_2 VARCHAR(20),
@@ -36,7 +36,7 @@ CREATE TABLE district (
 CREATE TABLE customer (
   c_id INTEGER,
   c_d_id INTEGER,
-  c_w_id INTEGER REFERENCES warehouse(w_id),
+  c_w_id INTEGER,
   c_first VARCHAR(16),
   c_middle CHAR(2),
   c_last VARCHAR(16),
@@ -73,14 +73,14 @@ CREATE TABLE history (
 CREATE TABLE new_order (
   no_o_id INTEGER,
   no_d_id INTEGER,
-  no_w_id INTEGER REFERENCES warehouse(w_id),
+  no_w_id INTEGER,
   PRIMARY KEY (no_w_id, no_d_id, no_o_id)
 )
 --= orders
 CREATE TABLE orders (
   o_id INTEGER,
   o_d_id INTEGER,
-  o_w_id INTEGER REFERENCES warehouse(w_id),
+  o_w_id INTEGER,
   o_c_id INTEGER,
   o_entry_d TIMESTAMP,
   o_carrier_id INTEGER,
@@ -92,7 +92,7 @@ CREATE TABLE orders (
 CREATE TABLE order_line (
   ol_o_id INTEGER,
   ol_d_id INTEGER,
-  ol_w_id INTEGER REFERENCES warehouse(w_id),
+  ol_w_id INTEGER,
   ol_number INTEGER,
   ol_i_id INTEGER,
   ol_supply_w_id INTEGER,
@@ -112,8 +112,8 @@ CREATE TABLE item (
 )
 --= stock
 CREATE TABLE stock (
-  s_i_id INTEGER REFERENCES item(i_id),
-  s_w_id INTEGER REFERENCES warehouse(w_id),
+  s_i_id INTEGER,
+  s_w_id INTEGER,
   s_quantity INTEGER,
   s_dist_01 CHAR(24),
   s_dist_02 CHAR(24),
@@ -558,6 +558,28 @@ ALTER TABLE order_line SET LOGGED;
 ALTER TABLE item       SET LOGGED;
 --= stock
 ALTER TABLE stock      SET LOGGED;
+
+
+--+ create_foreign_keys
+-- FK constraints added post-load, AFTER set_logged, on already-logged tables.
+-- Postgres checks FK persistence in BOTH directions, so a logged<->unlogged FK
+-- edge may never exist: keeping these out of create_schema lets set_unlogged and
+-- set_logged flip every table cleanly. warehouse/item are the referenced parents.
+-- pg-only; dialects without this section no-op.
+--= district_w_fk
+ALTER TABLE district   ADD CONSTRAINT district_w_fk   FOREIGN KEY (d_w_id)  REFERENCES warehouse(w_id);
+--= customer_w_fk
+ALTER TABLE customer   ADD CONSTRAINT customer_w_fk   FOREIGN KEY (c_w_id)  REFERENCES warehouse(w_id);
+--= new_order_w_fk
+ALTER TABLE new_order  ADD CONSTRAINT new_order_w_fk  FOREIGN KEY (no_w_id) REFERENCES warehouse(w_id);
+--= orders_w_fk
+ALTER TABLE orders     ADD CONSTRAINT orders_w_fk     FOREIGN KEY (o_w_id)  REFERENCES warehouse(w_id);
+--= order_line_w_fk
+ALTER TABLE order_line ADD CONSTRAINT order_line_w_fk FOREIGN KEY (ol_w_id) REFERENCES warehouse(w_id);
+--= stock_i_fk
+ALTER TABLE stock      ADD CONSTRAINT stock_i_fk      FOREIGN KEY (s_i_id)  REFERENCES item(i_id);
+--= stock_w_fk
+ALTER TABLE stock      ADD CONSTRAINT stock_w_fk      FOREIGN KEY (s_w_id)  REFERENCES warehouse(w_id);
 
 
 --+ analyze

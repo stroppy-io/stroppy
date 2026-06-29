@@ -239,6 +239,14 @@ function prepareDatabase() {
     });
   }
 
+  // FK constraints added post-load, AFTER set_logged, on logged tables. PG checks
+  // FK persistence in BOTH directions, so they must not exist during the UNLOGGED
+  // load/flips (would break set_unlogged/set_logged). Section absent on non-pg
+  // dialects -> no-op.
+  Step("create_foreign_keys", () => {
+    (sql("create_foreign_keys") ?? []).forEach((query) => driver.exec(query, {}));
+  });
+
   // Refresh planner statistics after the bulk load.
   Step("analyze", () => {
     (sql("analyze") ?? []).forEach((query) => driver.exec(query, {}));
