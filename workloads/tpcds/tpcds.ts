@@ -157,11 +157,14 @@ function resolveQueries(): Array<{ name: string }> {
 // prepareDatabase creates the schema, then generates and bulk-loads every table
 // with the ported dsdgen generator. Runs once per process via GlobalOnce.
 function prepareDatabase(): void {
-  // Drop in reverse load order (fact tables before their dimensions); tpcds has
-  // no FK constraints so IF EXISTS is enough, but reverse order is tidy.
+  // Drop in reverse load order (fact tables before their dimensions). CASCADE is
+  // required for idempotent re-runs: a prior run leaves dependents (e.g. views or
+  // any cross-table object) that make a plain DROP fail with SQLSTATE 2BP01
+  // "cannot drop table ... because other objects depend on it". MySQL accepts and
+  // ignores the CASCADE keyword, so the same statement is portable.
   Step("drop_schema", () => {
     for (const table of [...TPCDS_TABLES].reverse()) {
-      driver.exec(`DROP TABLE IF EXISTS ${table}` as unknown as { name: string }, {});
+      driver.exec(`DROP TABLE IF EXISTS ${table} CASCADE` as unknown as { name: string }, {});
     }
   });
 
