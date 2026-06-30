@@ -1,5 +1,5 @@
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { Step, DriverX, ENV, GlobalOnce, TxIsolationName, declareDriverSetup, retry, isSerializationError } from "./helpers.ts";
+import { Step, execEachLogged, DriverX, ENV, GlobalOnce, TxIsolationName, declareDriverSetup, retry, isSerializationError } from "./helpers.ts";
 import { DrawRT } from "./datagen.ts";
 import { C_LAST_DICT } from "./tpcc_helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
@@ -117,9 +117,9 @@ function prepareDatabase(): void {
   Step("load_data", () => loadData(driver));
   // Secondary indexes built post-load (spec-permitted; serve the C_LAST by-name
   // and customer's-latest-order access paths). Cheaper one-shot than per-row.
-  Step("create_indexes", () => runSection("create_indexes"));
+  Step("create_indexes", () => execEachLogged(sql("create_indexes"), (q) => driver.exec(q, {})));
   if (useUnlogged) {
-    Step("set_logged", () => runSection("set_logged"));
+    Step("set_logged", () => execEachLogged(sql("set_logged"), (q) => driver.exec(q, {})));
   }
   // FK constraints post-load, AFTER set_logged (pg checks FK persistence both
   // directions, so they can't exist during the UNLOGGED load/flips). No-op on
@@ -337,7 +337,7 @@ export default function (): void {
       [45,        43,      4,            4,        4],
     ) as () => void;
     workload();
-  });
+  }, { silent: true });
 }
 
 export function teardown() {

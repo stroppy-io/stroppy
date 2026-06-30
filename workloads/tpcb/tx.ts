@@ -49,5 +49,5 @@ export default function (): void {
       tx.exec(sql("workload_tx_tpcb", "update_branch")!, { bid, delta });
       tx.exec(sql("workload_tx_tpcb", "insert_history")!, { hid, tid, bid, aid, delta });
     });
-  });
+  }, { silent: true });
 }

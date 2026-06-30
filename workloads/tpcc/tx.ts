@@ -1,6 +1,6 @@
 import { sleep } from "k6";
 import { Teardown, NewPicker } from "k6/x/stroppy";
-import { Counter, Step, DriverX, ENV, GlobalOnce, TxIsolationName, declareDriverSetup, retryWithPolicy, txRetryPolicy } from "./helpers.ts";
+import { Counter, Step, execEachLogged, DriverX, ENV, GlobalOnce, TxIsolationName, declareDriverSetup, retryWithPolicy, txRetryPolicy } from "./helpers.ts";
 import { Alphabet, DrawRT } from "./datagen.ts";
 import { C_LAST_DICT } from "./tpcc_helpers.ts";
 import { parse_sql_with_sections } from "./parse_sql.js";
@@ -229,14 +229,10 @@ function prepareDatabase() {
   // Secondary indexes built post-load (spec-permitted; serve the C_LAST by-name
   // and customer's-latest-order access paths) on pg/mysql/ydb. A one-shot build
   // is cheaper than per-row maintenance, and cheaper still while UNLOGGED.
-  Step("create_indexes", () => {
-    (sql("create_indexes") ?? []).forEach((query) => driver.exec(query, {}));
-  });
+  Step("create_indexes", () => execEachLogged(sql("create_indexes"), (q) => driver.exec(q, {})));
 
   if (useUnlogged) {
-    Step("set_logged", () => {
-      (sql("set_logged") ?? []).forEach((query) => driver.exec(query, {}));
-    });
+    Step("set_logged", () => execEachLogged(sql("set_logged"), (q) => driver.exec(q, {})));
   }
 
   // FK constraints added post-load, AFTER set_logged, on logged tables. PG checks
@@ -923,7 +919,7 @@ export default function (): void {
     keyingTime(txName);
     workload();
     thinkTime(txName);
-  });
+  }, { silent: true });
 }
 
 export function teardown() {

@@ -1,7 +1,7 @@
 import { Options } from "k6/options";
 import exec from "k6/execution";
 import { Teardown, GenerateTpcdsQueries } from "k6/x/stroppy";
-import { DriverX, Step, ENV, GlobalOnce, declareDriverSetup, declareScenario } from "./helpers.ts";
+import { DriverX, Step, execEachLogged, ENV, GlobalOnce, declareDriverSetup, declareScenario } from "./helpers.ts";
 import { parse_sql, parse_sql_with_sections } from "./parse_sql.js";
 import type { SqlQuery } from "./helpers.ts";
 import {
@@ -179,11 +179,11 @@ function prepareDatabase(): void {
   // restores durability after. Driven from the TPCDS_TABLES list (like ANALYZE
   // below) rather than per-table SQL, since the schema lives in schema.*.sql.
   if (useUnlogged) {
-    Step("set_unlogged", () => {
-      for (const table of TPCDS_TABLES) {
-        driver.exec(`ALTER TABLE ${table} SET UNLOGGED` as unknown as { name: string }, {});
-      }
-    });
+    Step("set_unlogged", () => execEachLogged(
+      TPCDS_TABLES,
+      (table) => driver.exec(`ALTER TABLE ${table} SET UNLOGGED` as unknown as { name: string }, {}),
+      (table) => `SET UNLOGGED ${table}`,
+    ));
   }
 
   Step("load_data", () => {
@@ -197,19 +197,14 @@ function prepareDatabase(): void {
   // maintaining them per-insert, and cheaper still while tables are UNLOGGED).
   // Without them the unindexed multi-way joins are unrunnable at scale,
   // especially on MySQL's nested-loop joins.
-  Step("create_indexes", () => {
-    const stmts = schema("create_indexes");
-    if (stmts) {
-      stmts.forEach((q) => driver.exec(q, {}));
-    }
-  });
+  Step("create_indexes", () => execEachLogged(schema("create_indexes"), (q) => driver.exec(q, {})));
 
   if (useUnlogged) {
-    Step("set_logged", () => {
-      for (const table of TPCDS_TABLES) {
-        driver.exec(`ALTER TABLE ${table} SET LOGGED` as unknown as { name: string }, {});
-      }
-    });
+    Step("set_logged", () => execEachLogged(
+      TPCDS_TABLES,
+      (table) => driver.exec(`ALTER TABLE ${table} SET LOGGED` as unknown as { name: string }, {}),
+      (table) => `SET LOGGED ${table}`,
+    ));
   }
 
   // Bulk load leaves the planner with no statistics; without ANALYZE pg/mysql
@@ -241,7 +236,7 @@ export default function (): void {
       resolveQueries().forEach((query) => {
         driver.exec(query, {});
       });
-    });
+    }, { silent: true });
   }
 
   const named = (): NamedQuery[] =>

@@ -824,38 +824,93 @@ function isStepEnabled(name: string): boolean {
   return true;
 }
 
+export interface StepOpts {
+  /** Suppress the per-invocation "Start/End of step" console lines. Use for
+   *  steps run once per iteration (e.g. "workload") that would otherwise spam
+   *  the log. The step's status notification to the host still fires. */
+  silent?: boolean;
+}
+
+// Wall-clock start of each running step, keyed by name, so end() can report
+// how long the step took. Cleared on end so it never leaks across iterations.
+const _stepStart = new Map<string, number>();
+
+/** Format a millisecond duration compactly: "850ms", "12.34s", "3m04s". */
+export function fmtDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(2)}s`;
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  return `${m}m${s.toString().padStart(2, "0")}s`;
+}
+
 export const Step = Object.assign(
-  (name: string, step: () => void): void => {
+  (name: string, step: () => void, opts?: StepOpts): void => {
     if (!isStepEnabled(name)) {
       console.log(`Skipping step '${name}'`);
       return;
     }
-    Step.begin(name);
+    Step.begin(name, opts);
     let completed = false;
     try {
       step();
       completed = true;
     } finally {
       if (completed) {
-        Step.end(name);
+        Step.end(name, opts);
       } else {
         ClearStepTag(name);
       }
     }
   },
   {
-    begin: (name: string): void => {
+    begin: (name: string, opts?: StepOpts): void => {
       SetStepTag(name);
       NotifyStep(name, StroppyRun_Status.STATUS_RUNNING);
-      console.log(`Start of '${name}' step`);
+      if (!opts?.silent) {
+        _stepStart.set(name, Date.now());
+        console.log(`Start of '${name}' step`);
+      }
     },
-    end: (name: string): void => {
-      console.log(`End of '${name}' step`);
+    end: (name: string, opts?: StepOpts): void => {
+      if (!opts?.silent) {
+        const t0 = _stepStart.get(name);
+        _stepStart.delete(name);
+        const took = t0 !== undefined ? ` (took ${fmtDuration(Date.now() - t0)})` : "";
+        console.log(`End of '${name}' step${took}`);
+      }
       NotifyStep(name, StroppyRun_Status.STATUS_COMPLETED);
       ClearStepTag(name);
     },
   }
 );
+
+/** Run each item of a list, logging when every statement starts and ends with
+ *  its elapsed time. For slow DDL phases (create_indexes, set_logged) where one
+ *  progress line per statement beats a single opaque step boundary. Items are
+ *  usually parsed SQL queries (labelled by their name or SQL text) but may be
+ *  anything when an explicit `label` is supplied (e.g. per-table ALTERs). */
+export function execEachLogged<T>(
+  items: ReadonlyArray<T> | undefined,
+  exec: (item: T) => void,
+  label?: (item: T) => string,
+): void {
+  const list = items ?? [];
+  list.forEach((item, i) => {
+    const text = label ? label(item) : defaultLabel(item);
+    const tag = `[${i + 1}/${list.length}]`;
+    console.log(`  ${tag} start: ${text}`);
+    const t0 = Date.now();
+    exec(item);
+    console.log(`  ${tag} done (${fmtDuration(Date.now() - t0)}): ${text}`);
+  });
+}
+
+function defaultLabel(item: unknown): string {
+  const q = item as Partial<ParsedQuery>;
+  const raw = q?.name || (typeof q?.sql === "string" ? q.sql : String(item));
+  return raw.replace(/\s+/g, " ").trim().slice(0, 80);
+}
 
 
 /** Wrap a function so it executes only once per VU.

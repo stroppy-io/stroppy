@@ -7,6 +7,7 @@ import { Teardown } from "k6/x/stroppy";
 import {
   DriverX,
   Step,
+  execEachLogged,
   ENV,
   GlobalOnce,
   TxIsolationName,
@@ -186,9 +187,9 @@ function prepareDatabase(procedures: boolean): void {
     driver.insertSpec(tellersSpec());
     driver.insertSpec(accountsSpec());
   });
-  Step("create_indexes", () => runSection("create_indexes"));
+  Step("create_indexes", () => execEachLogged(sql("create_indexes"), (q) => driver.exec(q, {})));
   if (useUnlogged) {
-    Step("set_logged", () => runSection("set_logged"));
+    Step("set_logged", () => execEachLogged(sql("set_logged"), (q) => driver.exec(q, {})));
   }
   // pgbench --foreign-keys semantics: FK constraints added post-load, once the
   // referenced rows exist, and backed by the bid indexes built above. Added AFTER

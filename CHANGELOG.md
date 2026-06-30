@@ -8,6 +8,17 @@ Newest on top. Everything under `## [Unreleased]` is not yet released.
 Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 `([#NN](https://github.com/stroppy-io/stroppy/pull/NN))` when the change had one.
 
+## [Unreleased]
+
+### Added
+
+- Each completed step now reports how long it took, e.g. `End of 'create_schema' step (took 1.23s)`. ([#83](https://github.com/stroppy-io/stroppy/pull/83))
+- The `create_indexes` and `set_logged` steps now log one progress line per statement, with elapsed time, so you can see which index or table flip is slow instead of waiting on one opaque step boundary. ([#83](https://github.com/stroppy-io/stroppy/pull/83))
+
+### Changed
+
+- The per-iteration `workload` step no longer prints a `Start/End of 'workload' step` line on every transaction — that pair was flooding the log. The step still runs and reports its status as before; it is just silent on the console. ([#83](https://github.com/stroppy-io/stroppy/pull/83))
+
 ## [5.5.2] - 2026-06-30
 
 ### Fixed
