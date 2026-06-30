@@ -337,11 +337,11 @@ revision: # Recreate git tag with version tag=<semver>
 ## Local K6 fast tests
 ##
 
-.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcc-mysql-test run-tpcds-test run-k6-tests
+.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcc-mysql-test run-tpcds-test run-k6-tests run-scenario-smoke run-workload-branches
 
 WORKDIR=dev
 
-run-simple-test:
+run-simple-test: # Smoke: run the simple preset
 	rm -rf $(WORKDIR)
 	./build/stroppy gen --workdir $(WORKDIR) --preset=simple
 	cd $(WORKDIR) && ./stroppy run simple.ts
@@ -355,19 +355,19 @@ run-simple-test:
 #   knobs: VUS, DURATION (set => constant-vus throughput), ITER (power test),
 #          MAX_DURATION (default 24h), PG_UNLOGGED=false to disable the pg
 #          UNLOGGED bulk-load dance. The targets below are single-pass smoke runs.
-run-tpcb-test:
+run-tpcb-test: # Smoke: TPC-B procs workload (single pass)
 	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
 		./build/stroppy run tpcb/procs.ts
 
-run-tpcc-test:
+run-tpcc-test: # Smoke: TPC-C procs workload (single pass)
 	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
 		./build/stroppy run tpcc/procs.ts
 
-run-tpcc-mysql-test:
+run-tpcc-mysql-test: # Smoke: TPC-C procs workload on MySQL
 	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
 		./build/stroppy run tpcc/procs.ts -d mysql -- -q
 
-run-tpcds-test:
+run-tpcds-test: # Smoke: TPC-DS workload at SF=0.01
 	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
 		./build/stroppy run tpcds/tpcds -e SCALE_FACTOR=0.01
 
@@ -378,6 +378,54 @@ run-k6-tests: # Run SQL API integration tests
 	./build/stroppy run tests/sqlapi_test -- -q        || rc=1; \
 	./build/stroppy run tests/multi_drivers_test -- -q || rc=1; \
 	./build/stroppy run tests/transaction_test -- -q   || rc=1; \
+	exit $$rc
+
+# Gate one smoke run: fail on a non-zero exit OR any k6 `level=error` line.
+# k6/stroppy exit 0 even when every iteration errors (e.g. a failed GlobalOnce
+# load), so the exit code alone is not a reliable signal; default error mode
+# logs every error at level=error, which this catches. $(1)=label, rest=command.
+define smoke_run
+	echo "== $(1) =="; \
+	out=$$($(2) 2>&1); code=$$?; printf '%s\n' "$$out"; \
+	if [ $$code -ne 0 ] || printf '%s' "$$out" | grep -q 'level=error'; then \
+		echo "FAIL ($(1)): exit=$$code"; rc=1; \
+	fi
+endef
+
+# Scenario-branch smoke on the noop driver (NO database). Every workload has
+# two executor archetypes behind declareScenario — constant-vus (DURATION set,
+# throughput) and shared-iterations (power test) — which are distinct k6 option
+# JSON paths that only fail at init. The noop driver runs the full lifecycle
+# without a DB, so this catches executor/options regressions for ~free. The
+# VUS=2/ITER=1 case also guards the shared-iterations "iterations < VUs" floor.
+# Third field skips each workload's data-validation step (noop has no data to
+# check, so those steps would flood the log); "-" means nothing to skip.
+run-scenario-smoke: # Tier 0: scenario-branch smoke on noop (no DB), all workloads x both branches
+	@rc=0;                                                                          \
+	for spec in "tpcb/tx 1 -" "tpcc/tx 1 validate_population" "tpcds 0.01 -" "tpch/tx 0.01 validate_answers"; do \
+		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns=""; [ "$$skip" = "-" ] || ns="--no-steps $$skip"; \
+		$(call smoke_run,noop constant-vus: $$wl,./build/stroppy run $$wl -d noop -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=2 $$ns); \
+		$(call smoke_run,noop shared-iters: $$wl,./build/stroppy run $$wl -d noop -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns); \
+	done;                                                                           \
+	exit $$rc
+
+# Real-Postgres smoke of BOTH scenario branches for the light workloads at tiny
+# scale (default pg preset = localhost:5432). Complements run-scenario-smoke by
+# exercising the actual DB path (load + run) in throughput and power modes.
+# tpch's validate_answers golden set is SF=1 only, so it is skipped at smoke
+# scale (answer correctness is a heavier, separate concern); validate_population
+# stays on for tpcc since it passes at SF=1.
+# tpcds is intentionally NOT here: its fixed-cardinality dimensions (e.g.
+# customer_demographics ~1.92M rows) do not shrink with SF, so even SF=0.01 is a
+# multi-million-row load+index — too heavy for a free CI runner's Postgres. Its
+# scenario branches are covered DB-free by run-scenario-smoke (noop) instead.
+run-workload-branches: # Tier 1: real-Postgres smoke of both branches (tpcb/tpcc/tpch)
+	@rc=0;                                                                          \
+	for spec in "tpcb/tx 1 -" "tpcc/tx 1 -" "tpch/tx 0.01 validate_answers"; do \
+		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns=""; [ "$$skip" = "-" ] || ns="--no-steps $$skip"; \
+		$(call smoke_run,pg constant-vus: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=2 $$ns -- -q); \
+		$(call smoke_run,pg shared-iters: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns -- -q); \
+	done;                                                                           \
 	exit $$rc
 
 ##
