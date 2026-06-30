@@ -608,14 +608,17 @@ export function declareScenario(
     defaults.iterations ?? 1,
     "Power-test iteration count (shared-iterations) used when DURATION is unset",
   ) as number;
+  // maxDuration only valid on iteration-based executors, where it lifts k6's
+  // 10m default cap. constant-vus has no such cap (bounded by duration) and
+  // k6 rejects the field with `json: unknown field "maxDuration"`.
   const maxDuration = ENV(
     "MAX_DURATION",
     "24h",
-    "Max wall-clock per scenario; lifts k6's 10m iteration cap for long loads",
+    "Max wall-clock for the iterations (power) run; lifts k6's 10m iteration cap",
   );
 
   const scenario = duration
-    ? { executor: "constant-vus", vus, duration, maxDuration }
+    ? { executor: "constant-vus", vus, duration }
     : { executor: "shared-iterations", vus, iterations, maxDuration };
 
   return { [name]: scenario } as Options["scenarios"];
