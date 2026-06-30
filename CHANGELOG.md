@@ -8,6 +8,14 @@ Newest on top. Everything under `## [Unreleased]` is not yet released.
 Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 `([#NN](https://github.com/stroppy-io/stroppy/pull/NN))` when the change had one.
 
+## [5.5.2] - 2026-06-30
+
+### Fixed
+
+- Fixed-duration throughput runs (with `DURATION` set) no longer fail to start. The run selects k6's constant-VUs executor, which does not accept the `maxDuration` option the workload was still passing, so it aborted at startup with `json: unknown field "maxDuration"`. `maxDuration` is now applied only to power tests, where it belongs. ([#82](https://github.com/stroppy-io/stroppy/pull/82))
+- Power tests with more than one VU (`VUS>1`) and the default iteration count no longer fail to start with `the number of iterations can't be less than the number of VUs`. The iteration count is now raised to at least `VUS`. ([#82](https://github.com/stroppy-io/stroppy/pull/82))
+- The TPC-DS workload can now be re-run against a database that still holds its schema from a previous run. `drop_schema` drops with `CASCADE`, so it no longer fails with `cannot drop table item because other objects depend on it` (SQLSTATE 2BP01). ([#82](https://github.com/stroppy-io/stroppy/pull/82))
+
 ## [5.5.1] - 2026-06-29
 
 ### Fixed
