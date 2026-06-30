@@ -49,47 +49,33 @@ jobs:
       - name: Run TS tests
         run: make ts-test
 
-  build:
+  # Integration builds stroppy once, runs the smoke tiers, and uploads the
+  # binary artifact. Build is gated behind it — the published binary is the one
+  # the integration tests actually exercised, and we never build twice.
+  integration:
     needs: [golang-ci, typescript-ci]
+    uses: ./.github/workflows/integration.yml
+
+  # Publish the integration-built binary as a per-commit nightly pre-release.
+  # No rebuild: it downloads the artifact integration produced. Main only.
+  publish:
+    needs: [integration]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Install xk6 (k6 builder)
-        run: make install-xk6
-
       - name: Compute short SHA
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - name: Build
-        env:
-          CGO_ENABLED: "0"
-          XK6_RACE_DETECTOR: "0"
-          GOOS: linux
-          GOARCH: amd64
-          VERSION: nightly-${{ steps.sha.outputs.short }}
-        run: make build
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v7
+      - name: Download binary artifact
+        uses: actions/download-artifact@v8
         with:
           name: stroppy-linux-amd64
-          path: build/stroppy
-          if-no-files-found: error
-          retention-days: 7
+          path: build
 
       - name: Pre-release per commit
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: nightly-${{ steps.sha.outputs.short }}
@@ -99,7 +85,3 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  integration:
-    needs: [golang-ci, typescript-ci]
-    uses: ./.github/workflows/integration.yml

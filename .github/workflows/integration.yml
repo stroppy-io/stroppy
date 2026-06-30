@@ -35,11 +35,41 @@ jobs:
       - name: Install xk6
         run: make install-xk6
 
+      - name: Compute short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # Build once here; the publish job consumes this same binary via artifact,
+      # so the pipeline never builds twice or tests a binary it didn't gate.
       - name: Build stroppy
+        env:
+          CGO_ENABLED: "0"
+          XK6_RACE_DETECTOR: "0"
+          GOOS: linux
+          GOARCH: amd64
+          VERSION: nightly-${{ steps.sha.outputs.short }}
         run: make build
 
-      - name: Run k6 integration tests
+      # Tier 0: scenario-branch smoke on the noop driver — no database, exercises
+      # both executor archetypes (constant-vus / shared-iterations) for every
+      # workload. Fast and catches k6 options/executor regressions for ~free.
+      - name: Scenario smoke (noop, no DB)
+        run: make run-scenario-smoke
+
+      - name: Run k6 SQL API integration tests
         run: make run-k6-tests
 
-      - name: Run TPC-B smoke test
+      - name: Run TPC-B procs smoke test
         run: make run-tpcb-test
+
+      # Tier 1: real-Postgres smoke of both scenario branches for every workload.
+      - name: Run workload branch tests (Postgres)
+        run: make run-workload-branches
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: stroppy-linux-amd64
+          path: build/stroppy
+          if-no-files-found: error
+          retention-days: 7
