@@ -897,7 +897,7 @@ export function execEachLogged<T>(
 ): void {
   const list = items ?? [];
   list.forEach((item, i) => {
-    const text = label ? label(item) : defaultLabel(item);
+    const text = label ? label(item) : stmtLabel(item);
     const tag = `[${i + 1}/${list.length}]`;
     console.log(`  ${tag} start: ${text}`);
     const t0 = Date.now();
@@ -906,7 +906,7 @@ export function execEachLogged<T>(
   });
 }
 
-function defaultLabel(item: unknown): string {
+function stmtLabel(item: unknown): string {
   const q = item as Partial<ParsedQuery>;
   const raw = q?.name || (typeof q?.sql === "string" ? q.sql : String(item));
   return raw.replace(/\s+/g, " ").trim().slice(0, 80);
