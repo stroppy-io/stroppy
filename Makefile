@@ -341,7 +341,7 @@ revision: # Recreate git tag with version tag=<semver>
 
 WORKDIR=dev
 
-run-simple-test:
+run-simple-test: # Smoke: run the simple preset
 	rm -rf $(WORKDIR)
 	./build/stroppy gen --workdir $(WORKDIR) --preset=simple
 	cd $(WORKDIR) && ./stroppy run simple.ts
@@ -355,19 +355,19 @@ run-simple-test:
 #   knobs: VUS, DURATION (set => constant-vus throughput), ITER (power test),
 #          MAX_DURATION (default 24h), PG_UNLOGGED=false to disable the pg
 #          UNLOGGED bulk-load dance. The targets below are single-pass smoke runs.
-run-tpcb-test:
+run-tpcb-test: # Smoke: TPC-B procs workload (single pass)
 	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
 		./build/stroppy run tpcb/procs.ts
 
-run-tpcc-test:
+run-tpcc-test: # Smoke: TPC-C procs workload (single pass)
 	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
 		./build/stroppy run tpcc/procs.ts
 
-run-tpcc-mysql-test:
+run-tpcc-mysql-test: # Smoke: TPC-C procs workload on MySQL
 	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
 		./build/stroppy run tpcc/procs.ts -d mysql -- -q
 
-run-tpcds-test:
+run-tpcds-test: # Smoke: TPC-DS workload at SF=0.01
 	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
 		./build/stroppy run tpcds/tpcds -e SCALE_FACTOR=0.01
 
@@ -400,7 +400,7 @@ endef
 # VUS=2/ITER=1 case also guards the shared-iterations "iterations < VUs" floor.
 # Third field skips each workload's data-validation step (noop has no data to
 # check, so those steps would flood the log); "-" means nothing to skip.
-run-scenario-smoke:
+run-scenario-smoke: # Tier 0: scenario-branch smoke on noop (no DB), all workloads x both branches
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 validate_population" "tpcds 0.01 -" "tpch/tx 0.01 validate_answers"; do \
 		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns=""; [ "$$skip" = "-" ] || ns="--no-steps $$skip"; \
@@ -419,7 +419,7 @@ run-scenario-smoke:
 # customer_demographics ~1.92M rows) do not shrink with SF, so even SF=0.01 is a
 # multi-million-row load+index — too heavy for a free CI runner's Postgres. Its
 # scenario branches are covered DB-free by run-scenario-smoke (noop) instead.
-run-workload-branches:
+run-workload-branches: # Tier 1: real-Postgres smoke of both branches (tpcb/tpcc/tpch)
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 -" "tpch/tx 0.01 validate_answers"; do \
 		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns=""; [ "$$skip" = "-" ] || ns="--no-steps $$skip"; \
