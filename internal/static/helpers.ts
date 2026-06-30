@@ -603,11 +603,15 @@ export function declareScenario(
     defaults.duration ?? "",
     "Throughput run length (Go duration, e.g. 1h); when set selects constant-vus, result is TPS",
   );
-  const iterations = ENV(
+  const iterationsEnv = ENV(
     "ITER",
     defaults.iterations ?? 1,
     "Power-test iteration count (shared-iterations) used when DURATION is unset",
   ) as number;
+  // shared-iterations rejects iterations < vus at init ("the number of
+  // iterations can't be less than the number of VUs"). Clamp to vus so a
+  // power test run with VUS>1 (and default ITER) starts instead of crashing.
+  const iterations = Math.max(iterationsEnv, vus);
   // maxDuration only valid on iteration-based executors, where it lifts k6's
   // 10m default cap. constant-vus has no such cap (bounded by duration) and
   // k6 rejects the field with `json: unknown field "maxDuration"`.
