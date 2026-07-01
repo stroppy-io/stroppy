@@ -82,8 +82,8 @@ message DriverRunConfig {
   optional string default_tx_isolation = 12;
 
   /**
-   * Driver-level insert method. One of: "plain_query", "plain_bulk", "native".
-   * Matches TS DriverSetup.defaultInsertMethod.
+   * Driver-level insert method. One of: "plain_query", "plain_bulk",
+   * "columnar", "native". Matches TS DriverSetup.defaultInsertMethod.
    */
   optional string default_insert_method = 13;
 

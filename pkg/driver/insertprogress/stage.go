@@ -14,6 +14,8 @@ const (
 	StagePostgresCopyFrom = "postgres_copy_from"
 	// StagePostgresBulkInsertExec means the PostgreSQL driver is executing a VALUES INSERT.
 	StagePostgresBulkInsertExec = "postgres_bulk_insert_exec"
+	// StagePostgresColumnarExec means the PostgreSQL driver is executing an unnest INSERT.
+	StagePostgresColumnarExec = "postgres_columnar_exec"
 	// StageYDBBulkUpsert means the YDB driver is flushing a BulkUpsert batch.
 	StageYDBBulkUpsert = "ydb_bulk_upsert"
 	// StageCSVWrite means the CSV driver is writing generated rows to a shard file.

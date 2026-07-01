@@ -62,8 +62,14 @@ enum InsertMethod {
   PLAIN_QUERY = 0;
   // Multi-row VALUES statement prepared as one query.
   PLAIN_BULK = 1;
+  // Columnar bulk: one array parameter per column expanded back to rows
+  // server-side, so bound-parameter count is the column count regardless of
+  // batch size. Beats engine bind-param limits (Postgres' 65535) while
+  // remaining a plain INSERT. Each driver maps this to its own struct-of-arrays
+  // expander (Postgres unnest); drivers without an analog reject it.
+  COLUMNAR = 2;
   // Driver-native path: COPY for Postgres, upload for YDB, bulk for MySQL.
-  NATIVE = 2;
+  NATIVE = 3;
 }
 
 // Parallelism carries worker hints from the spec author.
