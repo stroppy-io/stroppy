@@ -1,6 +1,6 @@
 import { Options } from "k6/options";
 import { Teardown } from "k6/x/stroppy";
-import { Counter, DriverX, Step, ENV, GlobalOnce, Trend, TxIsolationName, declareDriverSetup, declareScenario } from "./helpers.ts";
+import { Counter, DriverX, Step, execEachLogged, ENV, GlobalOnce, Trend, TxIsolationName, declareDriverSetup, declareScenario } from "./helpers.ts";
 import {
   Alphabet,
   Attr,
@@ -824,15 +824,11 @@ function prepareDatabase(): void {
 
   // Build indexes after the bulk load (and while still UNLOGGED on pg — a
   // one-shot build is far cheaper than per-row maintenance).
-  Step("create_indexes", () => {
-    runSection("create_indexes");
-  });
+  Step("create_indexes", () => execEachLogged(sql("create_indexes"), (q) => driver.exec(q, {})));
 
   // pg-only: restore durability after the UNLOGGED bulk load.
   if (useUnlogged) {
-    Step("set_logged", () => {
-      runSection("set_logged");
-    });
+    Step("set_logged", () => execEachLogged(sql("set_logged"), (q) => driver.exec(q, {})));
   }
 
   // Refresh planner statistics post-load so Q20/Q21 pick sane plans instead of
@@ -873,7 +869,7 @@ export default function (): void {
 
   Step("workload", () => {
     runTpchQueries();
-  });
+  }, { silent: true });
 }
 
 export function teardown(): void {

@@ -41,5 +41,5 @@ export default function (): void {
       p_delta: deltaGen.next(),
       p_hid: nextHid(),
     });
-  });
+  }, { silent: true });
 }
