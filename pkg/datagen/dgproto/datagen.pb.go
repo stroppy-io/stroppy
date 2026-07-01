@@ -31,8 +31,14 @@ const (
 	InsertMethod_PLAIN_QUERY InsertMethod = 0
 	// Multi-row VALUES statement prepared as one query.
 	InsertMethod_PLAIN_BULK InsertMethod = 1
+	// Columnar bulk: one array parameter per column expanded back to rows
+	// server-side, so bound-parameter count is the column count regardless of
+	// batch size. Beats engine bind-param limits (Postgres' 65535) while
+	// remaining a plain INSERT. Each driver maps this to its own struct-of-arrays
+	// expander (Postgres unnest); drivers without an analog reject it.
+	InsertMethod_COLUMNAR InsertMethod = 2
 	// Driver-native path: COPY for Postgres, upload for YDB, bulk for MySQL.
-	InsertMethod_NATIVE InsertMethod = 2
+	InsertMethod_NATIVE InsertMethod = 3
 )
 
 // Enum value maps for InsertMethod.
@@ -40,12 +46,14 @@ var (
 	InsertMethod_name = map[int32]string{
 		0: "PLAIN_QUERY",
 		1: "PLAIN_BULK",
-		2: "NATIVE",
+		2: "COLUMNAR",
+		3: "NATIVE",
 	}
 	InsertMethod_value = map[string]int32{
 		"PLAIN_QUERY": 0,
 		"PLAIN_BULK":  1,
-		"NATIVE":      2,
+		"COLUMNAR":    2,
+		"NATIVE":      3,
 	}
 )
 
@@ -4533,13 +4541,14 @@ const file_proto_stroppy_datagen_proto_rawDesc = "" +
 	"\x0ehistorical_end\x18\x05 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\rhistoricalEnd\x12D\n" +
 	"\rcurrent_start\x18\x06 \x01(\v2\x15.stroppy.datagen.ExprB\b\xfaB\x05\x8a\x01\x02\x10\x01R\fcurrentStart\x126\n" +
 	"\vcurrent_end\x18\a \x01(\v2\x15.stroppy.datagen.ExprR\n" +
-	"currentEnd*;\n" +
+	"currentEnd*I\n" +
 	"\fInsertMethod\x12\x0f\n" +
 	"\vPLAIN_QUERY\x10\x00\x12\x0e\n" +
 	"\n" +
-	"PLAIN_BULK\x10\x01\x12\n" +
+	"PLAIN_BULK\x10\x01\x12\f\n" +
+	"\bCOLUMNAR\x10\x02\x12\n" +
 	"\n" +
-	"\x06NATIVE\x10\x02B3Z1github.com/stroppy-io/stroppy/pkg/datagen/dgprotob\x06proto3"
+	"\x06NATIVE\x10\x03B3Z1github.com/stroppy-io/stroppy/pkg/datagen/dgprotob\x06proto3"
 
 var (
 	file_proto_stroppy_datagen_proto_rawDescOnce sync.Once

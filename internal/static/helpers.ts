@@ -100,11 +100,16 @@ const txIsolationMap: Record<TxIsolationName, TxIsolationLevel> = {
   none: TxIsolationLevel.NONE,
 };
 
-export type InsertMethodName = "plain_query" | "plain_bulk" | "native";
+export type InsertMethodName =
+  | "plain_query"
+  | "plain_bulk"
+  | "columnar"
+  | "native";
 
 const insertMethodMap: Record<InsertMethodName, InsertMethod> = {
   plain_query: InsertMethod.PLAIN_QUERY,
   plain_bulk: InsertMethod.PLAIN_BULK,
+  columnar: InsertMethod.COLUMNAR,
   native: InsertMethod.NATIVE,
 };
 

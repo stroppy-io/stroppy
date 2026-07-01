@@ -60,8 +60,8 @@ type DriverRunConfig struct {
 	// Matches TS DriverSetup.defaultTxIsolation.
 	DefaultTxIsolation *string `protobuf:"bytes,12,opt,name=default_tx_isolation,json=defaultTxIsolation,proto3,oneof" json:"default_tx_isolation,omitempty"`
 	// *
-	// Driver-level insert method. One of: "plain_query", "plain_bulk", "native".
-	// Matches TS DriverSetup.defaultInsertMethod.
+	// Driver-level insert method. One of: "plain_query", "plain_bulk",
+	// "columnar", "native". Matches TS DriverSetup.defaultInsertMethod.
 	DefaultInsertMethod *string `protobuf:"bytes,13,opt,name=default_insert_method,json=defaultInsertMethod,proto3,oneof" json:"default_insert_method,omitempty"`
 	// *
 	// PostgreSQL-specific pool config. Matches TS DriverSetup.postgres.

@@ -8928,11 +8928,21 @@ export enum InsertMethod {
      */
     PLAIN_BULK = 1,
     /**
+     * Columnar bulk: one array parameter per column expanded back to rows
+     * server-side, so bound-parameter count is the column count regardless of
+     * batch size. Beats engine bind-param limits (Postgres' 65535) while
+     * remaining a plain INSERT. Each driver maps this to its own struct-of-arrays
+     * expander (Postgres unnest); drivers without an analog reject it.
+     *
+     * @generated from protobuf enum value: COLUMNAR = 2;
+     */
+    COLUMNAR = 2,
+    /**
      * Driver-native path: COPY for Postgres, upload for YDB, bulk for MySQL.
      *
-     * @generated from protobuf enum value: NATIVE = 2;
+     * @generated from protobuf enum value: NATIVE = 3;
      */
-    NATIVE = 2
+    NATIVE = 3
 }
 // @generated message type with reflection information, may provide speed optimized methods
 class InsertSpec$Type extends MessageType<InsertSpec> {
@@ -12602,8 +12612,8 @@ export interface DriverRunConfig {
     defaultTxIsolation?: string;
     /**
      * *
-     * Driver-level insert method. One of: "plain_query", "plain_bulk", "native".
-     * Matches TS DriverSetup.defaultInsertMethod.
+     * Driver-level insert method. One of: "plain_query", "plain_bulk",
+     * "columnar", "native". Matches TS DriverSetup.defaultInsertMethod.
      *
      * @generated from protobuf field: optional string default_insert_method = 13
      */

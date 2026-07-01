@@ -290,6 +290,8 @@ func insertMethodName(method dgproto.InsertMethod) string {
 		return "plain_query"
 	case dgproto.InsertMethod_PLAIN_BULK:
 		return "plain_bulk"
+	case dgproto.InsertMethod_COLUMNAR:
+		return "columnar"
 	case dgproto.InsertMethod_NATIVE:
 		return "native"
 	default:
