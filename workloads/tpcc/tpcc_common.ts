@@ -19,6 +19,7 @@ import {
 } from "./datagen.ts";
 import { C_LAST_DICT, tpccOriginalOr } from "./tpcc_helpers.ts";
 import type { Options } from "k6/options";
+import exec from "k6/execution";
 
 declare const __VU: number;
 
@@ -492,7 +493,7 @@ export function validatePopulation(driver: DriverX): void {
     cc4OSum  = Number(driver.queryValue(`SELECT SUM(o_ol_cnt) FROM orders ${wWhere("o_w_id")}`));
     cc4OlCnt = Number(driver.queryValue(`SELECT COUNT(*) FROM order_line ${wWhere("ol_w_id")}`));
   } catch (e) {
-    throw new Error(`validate_population: prefetch failed: ${e}`);
+    exec.test.abort(`validate_population: prefetch failed: ${e}`);
   }
 
   const evalCc2a = (): { ok: boolean; detail: string } => {
@@ -631,7 +632,7 @@ export function validatePopulation(driver: DriverX): void {
     }
   }
   if (failures.length > 0) {
-    throw new Error(
+    exec.test.abort(
       `validate_population: ${failures.length} check(s) failed:\n${failures.join("\n")}`,
     );
   }
