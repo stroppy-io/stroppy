@@ -19,6 +19,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 - The per-iteration `workload` step no longer prints a `Start/End of 'workload' step` line on every transaction — that pair was flooding the log. The step still runs and reports its status as before; it is just silent on the console. ([#83](https://github.com/stroppy-io/stroppy/pull/83))
 
+### Fixed
+
+- A failed TPC-C `validate_population` check now makes the run exit non-zero instead of reporting success. The check detected a bad population and logged every failed assertion, but `stroppy run` still exited `0`, so CI and matrix runs that gate on the exit code saw a false pass. The run now aborts with a dedicated exit code (108) on any population mismatch; a skipped check (`--no-steps validate_population`) still exits `0`. ([#92](https://github.com/stroppy-io/stroppy/pull/92))
+
 ## [5.5.2] - 2026-06-30
 
 ### Fixed
