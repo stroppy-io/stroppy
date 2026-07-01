@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- New PostgreSQL insert method `columnar`: pass one array per column and let the database expand it back to rows (`unnest`), so a batch binds as many parameters as there are columns instead of rows × columns. This clears PostgreSQL's 65535 bind-parameter limit that plain multi-row inserts hit on wide tables, and loads roughly 2.5–3× faster than `plain_bulk` — close to `COPY` while still being an ordinary `INSERT`. Select it with `-D defaultInsertMethod=columnar` (or `"defaultInsertMethod": "columnar"` in a driver config). ([#93](https://github.com/stroppy-io/stroppy/pull/93))
 - Each completed step now reports how long it took, e.g. `End of 'create_schema' step (took 1.23s)`. ([#83](https://github.com/stroppy-io/stroppy/pull/83))
 - The `create_indexes` and `set_logged` steps now log one progress line per statement, with elapsed time, so you can see which index or table flip is slow instead of waiting on one opaque step boundary. ([#83](https://github.com/stroppy-io/stroppy/pull/83))
 
