@@ -1,0 +1,11 @@
+version: "2"
+run:
+  go: "1.26"
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
