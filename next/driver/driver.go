@@ -1,0 +1,125 @@
+package driver
+
+import (
+	"context"
+
+	"github.com/stroppy-io/stroppy/next/mem"
+	"github.com/stroppy-io/stroppy/next/sqlfile"
+)
+
+// Driver is a configured database backend. It hands out pinned connections and
+// owns backend-wide teardown. It records no metrics (see package doc).
+type Driver interface {
+	// Connect returns a connection pinned to one VU for its whole lifetime. The
+	// caller owns it and must Close it. Concrete drivers open a dedicated
+	// connection here rather than borrowing from a shared pool, so the measured
+	// path has no pool contention (RFC 0001 §10).
+	Connect(ctx context.Context) (Conn, error)
+	// Teardown releases backend-wide resources after every connection is closed.
+	Teardown(ctx context.Context) error
+}
+
+// Conn is a pinned connection: the query surface plus prepared handles,
+// transactions and the bulk columnar-insert path. Not safe for concurrent use.
+type Conn interface {
+	// Prepare parses q and prepares it once on this connection, returning a
+	// reusable handle. Call it in the plan phase; the hot path only binds and
+	// executes the handle, never touching SQL text.
+	Prepare(ctx context.Context, q *sqlfile.Query) (Stmt, error)
+
+	// Exec runs s for its side effect, binding args positionally. The variadic
+	// slice allocates per call — use ExecWithArgs on the hot path.
+	Exec(ctx context.Context, s Stmt, args ...any) error
+	// QueryRow runs s and returns its first row (or a Row carrying ErrNoRows).
+	QueryRow(ctx context.Context, s Stmt, args ...any) Row
+	// Query runs s and returns a cursor over its rows.
+	Query(ctx context.Context, s Stmt, args ...any) (Rows, error)
+
+	// ExecWithArgs is Exec on the reusable-buffer bind path (no variadic slice).
+	ExecWithArgs(ctx context.Context, s Stmt, a *Args) error
+	// QueryRowWithArgs is QueryRow on the reusable-buffer bind path.
+	QueryRowWithArgs(ctx context.Context, s Stmt, a *Args) Row
+	// QueryWithArgs is Query on the reusable-buffer bind path.
+	QueryWithArgs(ctx context.Context, s Stmt, a *Args) (Rows, error)
+
+	// Begin starts a transaction at the given isolation. None and
+	// ConnectionOnly pass through to this connection without a BEGIN.
+	Begin(ctx context.Context, iso Isolation) (Tx, error)
+
+	// InsertColumns bulk-loads buf's columns into table via the driver's fast
+	// path (COPY for postgres), returning the rows written. The columnar buffer
+	// is consumed without a per-row materialisation pass on the caller side.
+	InsertColumns(ctx context.Context, table string, buf *mem.RowBuf) (int64, error)
+
+	// Close releases the connection.
+	Close(ctx context.Context) error
+}
+
+// Tx is a transaction: the same query surface as Conn (minus bulk insert) plus
+// Commit/Rollback. A Stmt prepared on the owning Conn is valid inside its Tx.
+type Tx interface {
+	Prepare(ctx context.Context, q *sqlfile.Query) (Stmt, error)
+
+	Exec(ctx context.Context, s Stmt, args ...any) error
+	QueryRow(ctx context.Context, s Stmt, args ...any) Row
+	Query(ctx context.Context, s Stmt, args ...any) (Rows, error)
+
+	ExecWithArgs(ctx context.Context, s Stmt, a *Args) error
+	QueryRowWithArgs(ctx context.Context, s Stmt, a *Args) Row
+	QueryWithArgs(ctx context.Context, s Stmt, a *Args) (Rows, error)
+
+	// Commit commits the transaction. For pass-through modes (Isolation.None /
+	// Isolation.Conn) it is a no-op.
+	Commit(ctx context.Context) error
+	// Rollback aborts the transaction. For pass-through modes it is a no-op.
+	Rollback(ctx context.Context) error
+}
+
+// Stmt is a prepared handle. Bind yields the connection-local Args buffer for
+// the hot bind path; the handle is otherwise opaque and driver-owned.
+type Stmt interface {
+	// Bind returns this statement's reusable argument buffer, reset to empty.
+	// Fill it with typed setters in parameter order, then pass it to a
+	// *WithArgs method. The buffer is owned by the statement and reused every
+	// call, so binding is allocation-free once warm.
+	Bind() *Args
+}
+
+// Row is a single result row with by-index typed scans. It is self-contained:
+// no Close is needed. When the query returned no row, every scan and Err report
+// ErrNoRows.
+type Row interface {
+	ScanInt64(i int) (int64, error)
+	ScanFloat64(i int) (float64, error)
+	ScanBool(i int) (bool, error)
+	ScanBytes(i int) ([]byte, error)
+	ScanString(i int) (string, error)
+	// Err reports a query, no-row or scan error.
+	Err() error
+}
+
+// Rows is a forward-only cursor. Advance with Next, read the current row via
+// RawValues (zero-copy where the driver allows) or the by-index typed scans,
+// then Close. Check Err after the loop.
+type Rows interface {
+	// Next advances to the next row, reporting whether one is available.
+	Next() bool
+	// RawValues returns the current row's column bytes without decoding. Where
+	// the driver allows (pgx does) the slices alias the read buffer with no
+	// copy, and are only valid until the next Next or Close.
+	RawValues() [][]byte
+	// ScanInt64 decodes column i of the current row.
+	ScanInt64(i int) (int64, error)
+	// ScanFloat64 decodes column i of the current row.
+	ScanFloat64(i int) (float64, error)
+	// ScanBool decodes column i of the current row.
+	ScanBool(i int) (bool, error)
+	// ScanBytes decodes column i of the current row.
+	ScanBytes(i int) ([]byte, error)
+	// ScanString decodes column i of the current row.
+	ScanString(i int) (string, error)
+	// Err reports the first error seen during iteration.
+	Err() error
+	// Close releases the cursor. Safe to call more than once.
+	Close()
+}
