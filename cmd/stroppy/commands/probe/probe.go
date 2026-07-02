@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/probe"
 	"github.com/stroppy-io/stroppy/workloads"
 )
@@ -47,8 +48,9 @@ var (
 without executing the actual benchmark. Shows configuration, k6 options,
 SQL structure, steps, environment variables, and driver setup.
 
-With no script argument, probe lists the embedded presets and which of
-their scripts are runnable (-o json for machine output).
+With no script argument, probe lists the embedded presets, which of
+their scripts are runnable, and the insert methods each driver
+supports (-o json for machine output).
 
 Use section flags (--config, --options, --sql, --steps, --envs, --drivers)
 to filter output. See 'stroppy help probe' for section descriptions.
@@ -189,30 +191,64 @@ func buildSections(cmd *cobra.Command) runner.ExplainSection {
 	return sections
 }
 
-// printCatalog renders the embedded preset catalog in the requested format.
+// printCatalog renders the embedded preset catalog and the driver
+// insert-method matrix in the requested format.
 func printCatalog(format string) error {
 	catalog, err := workloads.Catalog()
 	if err != nil {
 		return fmt.Errorf("failed to build workloads catalog: %w", err)
 	}
 
+	drivers := driverCatalog()
+
 	switch format {
 	case jsonFormat:
-		bytes, err := json.Marshal(map[string]any{"presets": catalog})
+		bytes, err := json.Marshal(map[string]any{"presets": catalog, "drivers": drivers})
 		if err != nil {
 			return fmt.Errorf("can't marshal catalog: %w", err)
 		}
 
 		fmt.Fprintf(os.Stdout, "%s\n", string(bytes))
 	case humanFormat:
-		fmt.Fprint(os.Stdout, formatCatalog(catalog))
+		fmt.Fprint(os.Stdout, formatCatalog(catalog, drivers))
 	}
 
 	return nil
 }
 
-// formatCatalog builds the human-readable preset listing.
-func formatCatalog(catalog []workloads.PresetInfo) string {
+// driverEntry is one row of the driver capability matrix in catalog output.
+type driverEntry struct {
+	Type          string   `json:"type"`
+	InsertMethods []string `json:"insert_methods"`
+}
+
+// driverCatalog converts the static driver→insert-method matrix to
+// lowercase names ("postgres", "plain_bulk") for catalog output.
+func driverCatalog() []driverEntry {
+	capabilities := driver.InsertCapabilities()
+
+	entries := make([]driverEntry, 0, len(capabilities))
+
+	for _, capability := range capabilities {
+		methods := make([]string, 0, len(capability.InsertMethods))
+		for _, method := range capability.InsertMethods {
+			methods = append(methods, strings.ToLower(method.String()))
+		}
+
+		entries = append(entries, driverEntry{
+			Type: strings.ToLower(
+				strings.TrimPrefix(capability.Type.String(), "DRIVER_TYPE_"),
+			),
+			InsertMethods: methods,
+		})
+	}
+
+	return entries
+}
+
+// formatCatalog builds the human-readable preset listing and driver
+// insert-method matrix.
+func formatCatalog(catalog []workloads.PresetInfo, drivers []driverEntry) string {
 	var builder strings.Builder
 
 	builder.WriteString("\nPRESETS (embedded workloads)\n\n")
@@ -247,7 +283,19 @@ func formatCatalog(catalog []workloads.PresetInfo) string {
 		builder.WriteString("\n")
 	}
 
-	builder.WriteString("Probe any script for details:  stroppy probe <preset>/<script>\n")
+	builder.WriteString("DRIVERS (supported insert methods)\n\n")
+
+	typeWidth := 0
+	for _, entry := range drivers {
+		typeWidth = max(typeWidth, len(entry.Type))
+	}
+
+	for _, entry := range drivers {
+		fmt.Fprintf(&builder, "  %-*s  %s\n",
+			typeWidth, entry.Type, strings.Join(entry.InsertMethods, ", "))
+	}
+
+	builder.WriteString("\nProbe any script for details:  stroppy probe <preset>/<script>\n")
 
 	return builder.String()
 }
