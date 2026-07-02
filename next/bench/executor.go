@@ -1,0 +1,314 @@
+package bench
+
+import (
+	"context"
+	"log"
+	"sync"
+	"time"
+
+	"github.com/stroppy-io/stroppy/next/mem"
+	"github.com/stroppy-io/stroppy/next/metrics"
+	"github.com/stroppy-io/stroppy/next/rng"
+)
+
+// defaultArenaChunk is the per-VU arena chunk size used when Config.ArenaSize is
+// zero. Sized to comfortably hold a batch of bound row bytes without growing.
+const defaultArenaChunk = 4096
+
+// Config is the plan-phase configuration shared by every executor policy. The
+// zero value is usable (Log error mode, partitioned cycles, a default arena and
+// reporter interval, a discard sink); the DAG-wiring milestone fills it from the
+// parsed Test.
+type Config struct {
+	// Name tags this executor's instruments (the step name).
+	Name string
+	// StepID seeds the rng derivation for this step; distinct steps must use
+	// distinct ids for independent streams.
+	StepID uint32
+	// Seed is the run root seed. Together with StepID and a stream id it fixes
+	// every rng draw.
+	Seed uint64
+	// ArenaSize is the per-VU arena chunk size in bytes; zero uses a default.
+	ArenaSize int
+	// OnErr classifies Iter/Close errors. Zero value is Log.
+	OnErr ErrorMode
+	// Retry wraps each Iter. Zero value is a single attempt.
+	Retry RetryPolicy
+	// CycleMode selects cycle allocation for Closed/Pool. Zero is partitioned.
+	CycleMode CycleMode
+	// Interval is the reporter tick; zero uses metrics.DefaultInterval.
+	Interval time.Duration
+	// Sink receives interval and summary reports; nil discards them.
+	Sink metrics.Sink
+	// Reg is an optional shared registry. Nil means the executor owns a private
+	// one (the M3 default; the wiring milestone will share one across steps).
+	Reg *metrics.Registry
+}
+
+// Executor is a constructed, runnable load policy. It owns its VUs, their
+// metrics shards and a reporter, all allocated at construction (plan phase). Run
+// drives the hot phase; it may be called once. Run has the exact
+// func(ctx) error shape dag.Node.Run consumes, so the wiring milestone attaches
+// an executor to a graph node without an adapter.
+type Executor struct {
+	name    string
+	handler Handler
+	onErr   ErrorMode
+	retry   RetryPolicy
+
+	reg      *metrics.Registry
+	shards   []*metrics.Shard
+	vus      []*VU
+	inst     *instruments
+	reporter *metrics.Reporter
+
+	run func(ctx context.Context) error // policy loop, set by the constructor
+
+	// cancel aborts the run's context (Abort mode / Init failure); set in Run.
+	cancel context.CancelCauseFunc
+
+	errMu    sync.Mutex
+	firstErr error
+}
+
+// newExecutor performs the plan-phase allocation shared by every policy: it
+// builds the registry and built-in instruments, one VU (with its shard, arena
+// and rng cache) per worker, and the reporter over those shards.
+func newExecutor(cfg Config, nVUs int, open bool) *Executor {
+	if nVUs < 1 {
+		nVUs = 1
+	}
+	name := cfg.Name
+	if name == "" {
+		name = "step"
+	}
+	arenaSz := cfg.ArenaSize
+	if arenaSz <= 0 {
+		arenaSz = defaultArenaChunk
+	}
+	reg := cfg.Reg
+	if reg == nil {
+		reg = metrics.NewRegistry()
+	}
+	inst := registerInstruments(reg, name, open)
+
+	e := &Executor{
+		name:   name,
+		onErr:  cfg.OnErr,
+		retry:  cfg.Retry,
+		reg:    reg,
+		inst:   inst,
+		shards: make([]*metrics.Shard, nVUs),
+		vus:    make([]*VU, nVUs),
+	}
+	for i := range e.vus {
+		sh := reg.NewShard()
+		e.shards[i] = sh
+		e.vus[i] = &VU{
+			index:    i,
+			stepID:   cfg.StepID,
+			rootSeed: cfg.Seed,
+			arena:    mem.NewArena(arenaSz),
+			shard:    sh,
+			inst:     inst,
+			streams:  make(map[uint32]rng.Stream),
+		}
+	}
+	sink := cfg.Sink
+	if sink == nil {
+		sink = discardSink{}
+	}
+	e.reporter = metrics.NewReporter(reg, e.shards, cfg.Interval, sink)
+	return e
+}
+
+// Run executes the policy, blocking until every VU is done (or the context is
+// canceled), then returns the aggregate error (nil unless the error mode is Fail
+// or Abort and an error occurred, or a VU's Init failed). It may be called once.
+func (e *Executor) Run(ctx context.Context) error {
+	ctx, e.cancel = context.WithCancelCause(ctx)
+	defer e.cancel(nil)
+
+	e.reporter.Start()
+	err := e.run(ctx)
+	e.reporter.Stop() // all writers have returned; final summary is exact
+
+	if err != nil {
+		return err
+	}
+	return e.aggErr()
+}
+
+// withVU runs one worker's lifecycle: Init, then body, then Close. Close runs
+// exactly once and only after a successful Init, even when body returns early on
+// cancellation. An Init failure is fatal: it is stored and aborts the executor.
+func (e *Executor) withVU(vu *VU, body func()) {
+	if err := e.handler.Init(vu); err != nil {
+		e.abort(&vuError{stage: "init", vu: vu.index, err: err})
+		return
+	}
+	defer func() {
+		if err := e.handler.Close(vu); err != nil {
+			e.onError(vu, &vuError{stage: "close", vu: vu.index, err: err})
+		}
+	}()
+	body()
+}
+
+// iterate is the shared hot-path body: reset the arena, set the cycle, run the
+// (retry-wrapped) Iter while timing it, and record servicetime plus the
+// iteration count. Open records waittime separately before calling this. Zero
+// allocation in steady state.
+func (e *Executor) iterate(vu *VU, cycle uint64) {
+	vu.cycle = cycle
+	vu.arena.Reset()
+	start := time.Now()
+	err := e.runIter(vu)
+	vu.shard.Record(vu.inst.Servicetime, time.Since(start).Nanoseconds())
+	vu.shard.Inc(vu.inst.Iters)
+	if err != nil {
+		e.onError(vu, err)
+	}
+}
+
+// newCycler builds the cycle allocator for a Closed/Pool run.
+func newCycler(mode CycleMode, vus int) cycler {
+	if mode == CycleAtomic {
+		return newAtomicCycler()
+	}
+	return newPartitionedCycler(vus)
+}
+
+// runIter applies the retry policy around one Iter and returns the surviving
+// error (nil if any attempt succeeded). Zero allocation when the first attempt
+// succeeds — the steady-state case.
+func (e *Executor) runIter(vu *VU) error {
+	max := e.retry.MaxAttempts
+	if max < 1 {
+		max = 1
+	}
+	var err error
+	for attempt := 1; ; attempt++ {
+		if err = e.handler.Iter(vu); err == nil {
+			return nil
+		}
+		if attempt >= max || e.retry.Retryable == nil || !e.retry.Retryable(err) {
+			return err
+		}
+		vu.shard.Inc(vu.inst.Retries)
+		if e.retry.Backoff != nil {
+			if d := e.retry.Backoff(attempt); d > 0 {
+				time.Sleep(d)
+			}
+		}
+	}
+}
+
+// onError counts an error and applies the executor's [ErrorMode]. Off the hot
+// path: it runs only when an Iter (or Close) actually failed.
+func (e *Executor) onError(vu *VU, err error) {
+	vu.shard.Inc(vu.inst.Errors)
+	switch e.onErr {
+	case Silent:
+	case Log:
+		e.logErr(vu, err)
+	case Fail:
+		e.logErr(vu, err)
+		e.storeErr(err)
+	case Abort:
+		e.logErr(vu, err)
+		e.abort(err)
+	}
+}
+
+func (e *Executor) logErr(vu *VU, err error) {
+	log.Printf("[stroppy] step %q vu %d cycle %d: %v", e.name, vu.index, vu.cycle, err)
+}
+
+// storeErr records the first error for the aggregate Run return.
+func (e *Executor) storeErr(err error) {
+	e.errMu.Lock()
+	if e.firstErr == nil {
+		e.firstErr = err
+	}
+	e.errMu.Unlock()
+}
+
+// abort records the error and cancels the executor context so in-flight Iters
+// finish, every Close runs, and Run returns promptly.
+func (e *Executor) abort(err error) {
+	e.storeErr(err)
+	if e.cancel != nil {
+		e.cancel(err)
+	}
+}
+
+func (e *Executor) aggErr() error {
+	e.errMu.Lock()
+	defer e.errMu.Unlock()
+	return e.firstErr
+}
+
+// Registry returns the executor's metrics registry.
+func (e *Executor) Registry() *metrics.Registry { return e.reg }
+
+// Shards returns the per-VU metrics shards (one per worker).
+func (e *Executor) Shards() []*metrics.Shard { return e.shards }
+
+// Handles returns the built-in instrument handles.
+func (e *Executor) Handles() Instruments { return e.inst.Instruments }
+
+// TotalIters sums completed iterations across all VUs.
+func (e *Executor) TotalIters() int64 { return e.sumCounter(e.inst.Iters) }
+
+// TotalErrors sums surviving errors across all VUs.
+func (e *Executor) TotalErrors() int64 { return e.sumCounter(e.inst.Errors) }
+
+// TotalRetries sums retry attempts across all VUs.
+func (e *Executor) TotalRetries() int64 { return e.sumCounter(e.inst.Retries) }
+
+// BehindSchedule reports the behind-schedule gauge: the count of late Open
+// iterations. Zero for non-Open executors and for a healthy paced run.
+func (e *Executor) BehindSchedule() int64 {
+	if !e.inst.hasWait {
+		return 0
+	}
+	return e.sumCounter(e.inst.Behind)
+}
+
+func (e *Executor) sumCounter(c metrics.CounterHandle) int64 {
+	var t int64
+	for _, s := range e.shards {
+		t += s.Counter(c)
+	}
+	return t
+}
+
+// Servicetime merges the per-VU servicetime histograms into a fresh histogram
+// for percentile queries. Call only after Run returns (no concurrent writers);
+// it allocates, so it is a reporting/test convenience, not a hot path.
+func (e *Executor) Servicetime() *metrics.Histogram {
+	return e.mergeHist(e.inst.Servicetime)
+}
+
+// Waittime merges the per-VU waittime histograms (Open only; nil otherwise).
+func (e *Executor) Waittime() *metrics.Histogram {
+	if !e.inst.hasWait {
+		return nil
+	}
+	return e.mergeHist(e.inst.Waittime)
+}
+
+func (e *Executor) mergeHist(h metrics.MetricHandle) *metrics.Histogram {
+	out := metrics.NewHistogram()
+	for _, s := range e.shards {
+		out.Merge(s.Histogram(h))
+	}
+	return out
+}
+
+// discardSink drops every report; the default when Config.Sink is nil.
+type discardSink struct{}
+
+func (discardSink) Interval(*metrics.Report) {}
+func (discardSink) Summary(*metrics.Report)  {}
