@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- `stroppy probe` (no arguments) now also lists which insert methods each driver supports — `plain_query`, `plain_bulk`, `columnar`, `native` per database — as a `DRIVERS` block in the human output and a `drivers` key in `-o json`, so external tooling can discover valid `defaultInsertMethod` values per target without reading stroppy source. ([#96](https://github.com/stroppy-io/stroppy/pull/96))
+
 ## [5.6.0] - 2026-07-01
 
 ### Added
