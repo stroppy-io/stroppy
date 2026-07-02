@@ -153,6 +153,70 @@ func TestConvertRowIntoKinds(t *testing.T) {
 	}
 }
 
+// The TPC-DS generator emits every cell as text; Int64/Double columns must
+// parse those strings (kindInt64 / kindDouble string arm), while Utf8 columns
+// pass the string through unchanged.
+func TestConvertRowIntoTpcdsTextCells(t *testing.T) {
+	t.Parallel()
+
+	columns := []string{"ss_item_sk", "ss_net_profit", "s_state", "ss_sold_date_sk"}
+	kinds := []colKind{kindInt64, kindDouble, kindPassthrough, kindInt64}
+	dest := make([]any, 4)
+
+	err := convertRowInto(ydbDialect{}, columns, kinds, dest,
+		[]any{"42", "-12.50", "TN", nil})
+	if err != nil {
+		t.Fatalf("convertRowInto: %v", err)
+	}
+
+	if dest[0] != int64(42) {
+		t.Fatalf("dest[0] = %v (%T), want int64 42", dest[0], dest[0])
+	}
+
+	if dest[1] != float64(-12.5) {
+		t.Fatalf("dest[1] = %v (%T), want float64 -12.5", dest[1], dest[1])
+	}
+
+	if dest[2] != "TN" {
+		t.Fatalf("dest[2] = %v, want string untouched", dest[2])
+	}
+
+	if dest[3] != nil {
+		t.Fatalf("dest[3] = %v, want nil passthrough", dest[3])
+	}
+}
+
+func TestConvertRowIntoRejectsBadNumericText(t *testing.T) {
+	t.Parallel()
+
+	dest := make([]any, 1)
+	if err := convertRowInto(ydbDialect{}, []string{"n"}, []colKind{kindInt64}, dest,
+		[]any{"not-a-number"}); err == nil {
+		t.Fatal("convertRowInto: want error on non-integer text, got nil")
+	}
+}
+
+// An all-null column in a batch has nothing to infer from; the declared schema
+// type must win over the Int64 fallback so a legitimately-empty Utf8 column
+// (TPC-DS c_login) is not sent as Int64 and rejected by BulkUpsert.
+func TestEffectiveColumnTypesDeclaredFallback(t *testing.T) {
+	t.Parallel()
+
+	cached := make([]types.Type, 2)
+	declared := []types.Type{types.TypeInt64, types.TypeText}
+	dest := make([]types.Type, 2)
+
+	got := effectiveColumnTypesInto(dest, cached, declared, [][]any{{int64(1), nil}})
+
+	if got[0] != types.TypeInt64 {
+		t.Fatalf("col0 = %v, want Int64 (inferred)", got[0])
+	}
+
+	if got[1] != types.TypeText {
+		t.Fatalf("col1 = %v, want Text (declared fallback for all-null)", got[1])
+	}
+}
+
 func TestDialectConvertAnySlice(t *testing.T) {
 	t.Parallel()
 

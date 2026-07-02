@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- TPC-DS now runs on YDB: `stroppy run tpcds/tpcds -d ydb -D url=grpc://host:2136/database`. Ships a typed YQL schema (`schema.ydb.sql`, row- and column-store layouts, pick with `-e YDB_STORE_MODE=row|column`) and the 99-query suite ported to YQL (`ydb.sql`). The loader now feeds YDB's native bulk upsert directly from the generator. Answer-set validation and the in-process query-stream generator stay PostgreSQL/MySQL-only, so YDB runs the baked power test.
+
 ## [5.6.0] - 2026-07-01
 
 ### Added

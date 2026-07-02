@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -90,12 +91,18 @@ func (d *Driver) runChunk(
 // bulkUpsertWriter streams converted rows into BulkUpsert batches while
 // reusing buffers and caching per-column YDB types across flushes.
 type bulkUpsertWriter struct {
-	d          *Driver
-	tablePath  string
-	tableName  string
-	columns    []string
-	colTypes   []types.Type
-	effective  []types.Type
+	d         *Driver
+	tablePath string
+	tableName string
+	columns   []string
+	colTypes  []types.Type
+	effective []types.Type
+	// declared[i] is the base (Optional-unwrapped) YDB type the schema declares
+	// for column i, from DescribeTable. Used as the type of an all-null column
+	// in a batch, where value inference has nothing to go on — falling back to
+	// Int64 there mismatches Utf8/Double columns that are legitimately empty
+	// across a whole batch (TPC-DS c_login, always NULL, is the canonical case).
+	declared   []types.Type
 	hasNullBuf []bool
 	rowCells   [][]any
 	valueBatch []types.Value
@@ -117,7 +124,8 @@ type colKind uint8
 const (
 	kindPassthrough colKind = iota // type already matches; leave as-is
 	kindTimestamp                  // date string -> *time.Time
-	kindDouble                     // int64 -> float64
+	kindDouble                     // int64 / numeric string -> float64
+	kindInt64                      // integer string -> int64
 )
 
 func newBulkUpsertWriter(
@@ -134,6 +142,7 @@ func newBulkUpsertWriter(
 		columns:    columns,
 		colTypes:   make([]types.Type, columnCount),
 		effective:  make([]types.Type, columnCount),
+		declared:   make([]types.Type, columnCount),
 		hasNullBuf: make([]bool, columnCount),
 		rowCells:   make([][]any, ydbDriver.bulkSize),
 		valueBatch: make([]types.Value, 0, ydbDriver.bulkSize),
@@ -180,7 +189,7 @@ func (w *bulkUpsertWriter) flush(ctx context.Context) error {
 	batchRows := int64(w.batchLen)
 
 	mergeColumnTypes(w.colTypes, batch)
-	colTypes := effectiveColumnTypesInto(w.effective, w.colTypes, batch)
+	colTypes := effectiveColumnTypesInto(w.effective, w.colTypes, w.declared, batch)
 	hasNull := columnsWithNullsInto(w.hasNullBuf, batch)
 
 	w.valueBatch = w.valueBatch[:0]
@@ -263,7 +272,10 @@ const dateLayout = "2006-01-02"
 // convertRowInto runs each cell through the dialect.Convert hook into dest,
 // which must be sized to the row width, then coerces it to the type the table
 // declares (kinds[idx]) so BulkUpsert's type inference matches the column:
-// date strings -> *time.Time (Timestamp), int64 -> float64 (Double).
+// date strings -> *time.Time (Timestamp), numeric strings/int64 -> float64
+// (Double), integer strings -> int64 (Int64). The TPC-DS generator emits every
+// non-null cell as text (pkg/datagen/tpcdsgen.normalize), so the string cases
+// here are what let a typed YDB schema load that single text representation.
 func convertRowInto(dialect queries.Dialect, columns []string, kinds []colKind, dest, row []any) error {
 	for idx, col := range columns {
 		conv, err := dialect.Convert(row[idx])
@@ -276,27 +288,82 @@ func convertRowInto(dialect queries.Dialect, columns []string, kinds []colKind, 
 			kind = kinds[idx]
 		}
 
-		switch kind {
-		case kindTimestamp:
-			if s, ok := conv.(string); ok && s != "" {
-				t, perr := time.Parse(dateLayout, s)
-				if perr != nil {
-					return fmt.Errorf("ydb: parse timestamp col %q value %q: %w", col, s, perr)
-				}
-
-				conv = &t
-			}
-		case kindDouble:
-			if n, ok := conv.(int64); ok {
-				conv = float64(n)
-			}
-		case kindPassthrough:
+		conv, err = coerceToKind(kind, col, conv)
+		if err != nil {
+			return err
 		}
 
 		dest[idx] = conv
 	}
 
 	return nil
+}
+
+// coerceToKind adapts one already-dialect-converted cell to the schema-declared
+// kind. The generator emits dates and numbers as text, so the string arms parse
+// them into the *time.Time / float64 / int64 shapes BulkUpsert's type inference
+// expects; a passthrough kind (or a non-string already-typed cell) is untouched.
+func coerceToKind(kind colKind, col string, conv any) (any, error) {
+	switch kind {
+	case kindTimestamp:
+		return coerceTimestamp(col, conv)
+	case kindDouble:
+		return coerceDouble(col, conv)
+	case kindInt64:
+		return coerceInt64(col, conv)
+	case kindPassthrough:
+		return conv, nil
+	default:
+		return conv, nil
+	}
+}
+
+func coerceTimestamp(col string, conv any) (any, error) {
+	s, ok := conv.(string)
+	if !ok || s == "" {
+		return conv, nil
+	}
+
+	t, err := time.Parse(dateLayout, s)
+	if err != nil {
+		return nil, fmt.Errorf("ydb: parse timestamp col %q value %q: %w", col, s, err)
+	}
+
+	return &t, nil
+}
+
+func coerceDouble(col string, conv any) (any, error) {
+	switch n := conv.(type) {
+	case int64:
+		return float64(n), nil
+	case string:
+		if n == "" {
+			return conv, nil
+		}
+
+		f, err := strconv.ParseFloat(n, 64)
+		if err != nil {
+			return nil, fmt.Errorf("ydb: parse double col %q value %q: %w", col, n, err)
+		}
+
+		return f, nil
+	default:
+		return conv, nil
+	}
+}
+
+func coerceInt64(col string, conv any) (any, error) {
+	s, ok := conv.(string)
+	if !ok || s == "" {
+		return conv, nil
+	}
+
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("ydb: parse int64 col %q value %q: %w", col, s, err)
+	}
+
+	return n, nil
 }
 
 // resolveColumnKinds describes the target table once and records, per writer
@@ -318,13 +385,23 @@ func (w *bulkUpsertWriter) resolveColumnKinds(ctx context.Context) error {
 	}
 
 	kindByName := make(map[string]colKind, len(desc.Columns))
+	typeByName := make(map[string]types.Type, len(desc.Columns))
+
 	for _, c := range desc.Columns {
 		kindByName[c.Name] = columnKind(c.Type)
+
+		t := c.Type
+		if optional, inner := types.IsOptional(t); optional {
+			t = inner
+		}
+
+		typeByName[c.Name] = t
 	}
 
 	w.colKind = make([]colKind, len(w.columns))
 	for i, col := range w.columns {
 		w.colKind[i] = kindByName[col]
+		w.declared[i] = typeByName[col]
 	}
 
 	return nil
@@ -342,6 +419,8 @@ func columnKind(t types.Type) colKind {
 		return kindTimestamp
 	case types.Equal(t, types.TypeDouble):
 		return kindDouble
+	case types.Equal(t, types.TypeInt64):
+		return kindInt64
 	default:
 		return kindPassthrough
 	}
@@ -394,12 +473,13 @@ func mergeColumnTypes(colTypes []types.Type, batch [][]any) {
 
 // effectiveColumnTypes returns per-batch types for materialization.
 func effectiveColumnTypes(cached []types.Type, batch [][]any) []types.Type {
-	return effectiveColumnTypesInto(make([]types.Type, len(cached)), cached, batch)
+	return effectiveColumnTypesInto(make([]types.Type, len(cached)), cached, nil, batch)
 }
 
-// effectiveColumnTypesInto fills dest with cached types, batch inference,
-// and TypeInt64 fallback for all-nil unknown columns.
-func effectiveColumnTypesInto(dest, cached []types.Type, batch [][]any) []types.Type {
+// effectiveColumnTypesInto fills dest with cached types, batch inference, then
+// the schema-declared type (fallback[idx]) for a column that is all-nil across
+// the batch, and TypeInt64 only when even the declared type is unknown.
+func effectiveColumnTypesInto(dest, cached, fallback []types.Type, batch [][]any) []types.Type {
 	copy(dest, cached)
 
 	for idx := range dest {
@@ -418,6 +498,10 @@ func effectiveColumnTypesInto(dest, cached []types.Type, batch [][]any) []types.
 
 				break
 			}
+		}
+
+		if dest[idx] == nil && fallback != nil {
+			dest[idx] = fallback[idx]
 		}
 
 		if dest[idx] == nil {
