@@ -1,9 +1,13 @@
 package bench
 
 import (
+	"context"
+
+	"github.com/stroppy-io/stroppy/next/driver"
 	"github.com/stroppy-io/stroppy/next/mem"
 	"github.com/stroppy-io/stroppy/next/metrics"
 	"github.com/stroppy-io/stroppy/next/rng"
+	"github.com/stroppy-io/stroppy/next/sqlfile"
 )
 
 // VU is the per-worker runtime context handed to a [Handler]. One VU is built
@@ -32,7 +36,32 @@ type VU struct {
 	// in the hot path are a map read, not a Derive. Populated lazily; steady
 	// state (all ids seen) is allocation-free.
 	streams map[uint32]rng.Stream
+
+	// ctx is the run context for the current step; driver calls take it. Set by
+	// the executor before Init and valid through Close.
+	ctx context.Context
+	// hotIter is true while a hot-loop executor (Closed/Open/Pool) is inside
+	// Iter; it gates [VU.Conn]/[VU.Prepare] against first-establishing a
+	// connection or statement on the hot path.
+	hotIter bool
+
+	// drivers is the run-level driver per slot (shared across VUs); conns holds
+	// this VU's own pinned connection per slot, established lazily and closed
+	// after the step. slot is the step's default slot (from StepDef.Uses).
+	drivers []driver.Driver
+	conns   []driver.Conn
+	slot    int
+	// stmts memoizes prepared handles per query for this VU's default-slot conn.
+	stmts map[*sqlfile.Query]driver.Stmt
 }
+
+// Ctx returns the run context for the current step. Pass it to driver calls
+// (Exec/Query/Commit) inside a [Handler]. It is canceled when the run aborts.
+func (vu *VU) Ctx() context.Context { return vu.ctx }
+
+// Slot reports the default driver slot for this step (from StepDef.Uses; 0 when
+// unset). Handlers that target the step's declared slot pass it to [VU.Conn].
+func (vu *VU) Slot() int { return vu.slot }
 
 // Index reports the VU's zero-based worker index within its executor.
 func (vu *VU) Index() int { return vu.index }

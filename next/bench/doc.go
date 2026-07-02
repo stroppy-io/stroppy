@@ -2,10 +2,28 @@
 // per-worker VU runtime and the executor policies that drive a [Handler] under
 // the four load shapes of RFC 0001 §7.2 (Once, Pool, Closed, Open).
 //
-// This is the M3 milestone slice. It deliberately excludes the Test/StepDef/DAG
-// wiring and the CLI Main entry point; a later milestone attaches an [Executor]
-// to a dag node (each executor exposes a Run(ctx) error method with the exact
-// shape dag.Node.Run expects) and populates [Config] from the parsed Test.
+// The executor policies are the M3 slice; the M6a slice adds the runnable
+// surface on top of them: [Test]/[StepDef]/[Main] wire the executors into a
+// dag.Graph (each [Executor.Run] has the exact func(ctx) error shape dag.Node.Run
+// expects), parse options and driver slots from the environment, and drive a
+// single run-level reporter over one shared registry spanning every step.
+//
+// # Run wiring (M6a)
+//
+// A [Test] is declarative data: a name, seed, options struct, driver slots and a
+// step DAG. [Main] parses env/flags into it, builds one [Executor] per step over
+// a shared [metrics.Registry], materializes them all (which freezes the
+// registry), then runs the graph under one [metrics.Reporter] so a single exact
+// summary covers the whole run. Each step's rng streams derive from a stable step
+// id (the FNV-1a hash of its name; see stepID's stability contract) so a run is
+// reproducible and independent of step ordering.
+//
+// Each VU pins a [driver.Conn] per slot on first use in Init ([VU.Conn]) and
+// prepares SQL handles per query ([VU.Prepare]); both are plan-phase work and
+// panic if first called on a hot-loop Iter. Connections are reconnected per step
+// (closed after the step's Close) — an accepted PoC cost, to revisit post-PoC.
+// Step-level [StepDef.Retry] maps to the executor retry around a single Iter, not
+// dag-level node retry (re-running a whole load step is not a PoC need).
 //
 // # Allocation phases (RFC 0001 §6)
 //

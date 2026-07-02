@@ -2,10 +2,12 @@ package bench
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/stroppy-io/stroppy/next/driver"
 	"github.com/stroppy-io/stroppy/next/mem"
 	"github.com/stroppy-io/stroppy/next/metrics"
 	"github.com/stroppy-io/stroppy/next/rng"
@@ -41,8 +43,18 @@ type Config struct {
 	// Sink receives interval and summary reports; nil discards them.
 	Sink metrics.Sink
 	// Reg is an optional shared registry. Nil means the executor owns a private
-	// one (the M3 default; the wiring milestone will share one across steps).
+	// one (M3 default) and builds its own reporter; non-nil means the wiring
+	// layer shares one registry across steps and drives a single run-level
+	// reporter, so the executor registers its instruments but defers shard
+	// creation (materialize) until Run and never starts a private reporter.
 	Reg *metrics.Registry
+	// Drivers are the run-level resolved database backends, one per declared
+	// driver slot. Each VU pins its own connection to a slot lazily via
+	// [VU.Conn]. Nil when a step needs no database.
+	Drivers []driver.Driver
+	// Slot is the default driver slot this step's VUs connect to (from
+	// StepDef.Uses); [VU.Conn] can still reach any slot by index.
+	Slot int
 }
 
 // Executor is a constructed, runnable load policy. It owns its VUs, their
@@ -62,6 +74,17 @@ type Executor struct {
 	inst     *instruments
 	reporter *metrics.Reporter
 
+	// plan-phase state captured by newExecutor and consumed by materialize, so
+	// shard creation can be deferred past registration when a registry is shared.
+	nVUs         int
+	arenaSz      int
+	stepID       uint32
+	seed         uint64
+	drivers      []driver.Driver
+	slot         int
+	hot          bool // set by Closed/Open/Pool: Iter is a hot loop (bans Conn/Prepare)
+	materialized bool
+
 	run func(ctx context.Context) error // policy loop, set by the constructor
 
 	// cancel aborts the run's context (Abort mode / Init failure); set in Run.
@@ -71,9 +94,15 @@ type Executor struct {
 	firstErr error
 }
 
-// newExecutor performs the plan-phase allocation shared by every policy: it
-// builds the registry and built-in instruments, one VU (with its shard, arena
-// and rng cache) per worker, and the reporter over those shards.
+// newExecutor performs the plan-phase registration shared by every policy: it
+// resolves (or shares) the registry and registers the built-in instruments.
+//
+// With a private registry (Config.Reg nil, the M3 default) it also materializes
+// eagerly — allocating every VU and a private reporter — so behaviour is
+// unchanged for standalone executor use. With a shared registry it registers
+// only: shard creation waits for materialize (called by Run, or up front by the
+// wiring layer once every step has registered), because the shared registry
+// freezes on its first NewShard and all steps must register before that.
 func newExecutor(cfg Config, nVUs int, open bool) *Executor {
 	if nVUs < 1 {
 		nVUs = 1
@@ -86,6 +115,7 @@ func newExecutor(cfg Config, nVUs int, open bool) *Executor {
 	if arenaSz <= 0 {
 		arenaSz = defaultArenaChunk
 	}
+	shared := cfg.Reg != nil
 	reg := cfg.Reg
 	if reg == nil {
 		reg = metrics.NewRegistry()
@@ -93,45 +123,80 @@ func newExecutor(cfg Config, nVUs int, open bool) *Executor {
 	inst := registerInstruments(reg, name, open)
 
 	e := &Executor{
-		name:   name,
-		onErr:  cfg.OnErr,
-		retry:  cfg.Retry,
-		reg:    reg,
-		inst:   inst,
-		shards: make([]*metrics.Shard, nVUs),
-		vus:    make([]*VU, nVUs),
+		name:    name,
+		onErr:   cfg.OnErr,
+		retry:   cfg.Retry,
+		reg:     reg,
+		inst:    inst,
+		nVUs:    nVUs,
+		arenaSz: arenaSz,
+		stepID:  cfg.StepID,
+		seed:    cfg.Seed,
+		drivers: cfg.Drivers,
+		slot:    cfg.Slot,
 	}
-	for i := range e.vus {
-		sh := reg.NewShard()
-		e.shards[i] = sh
-		e.vus[i] = &VU{
-			index:    i,
-			stepID:   cfg.StepID,
-			rootSeed: cfg.Seed,
-			arena:    mem.NewArena(arenaSz),
-			shard:    sh,
-			inst:     inst,
-			streams:  make(map[uint32]rng.Stream),
+
+	if !shared {
+		e.materialize()
+		sink := cfg.Sink
+		if sink == nil {
+			sink = discardSink{}
 		}
+		e.reporter = metrics.NewReporter(reg, e.shards, cfg.Interval, sink)
 	}
-	sink := cfg.Sink
-	if sink == nil {
-		sink = discardSink{}
-	}
-	e.reporter = metrics.NewReporter(reg, e.shards, cfg.Interval, sink)
 	return e
+}
+
+// materialize allocates the executor's VUs and their shards. It is idempotent;
+// the first call for a shared registry freezes it against further registration
+// (so every step must be constructed before any materialize). For a private
+// registry it runs eagerly inside newExecutor.
+func (e *Executor) materialize() {
+	if e.materialized {
+		return
+	}
+	e.materialized = true
+	e.shards = make([]*metrics.Shard, e.nVUs)
+	e.vus = make([]*VU, e.nVUs)
+	for i := range e.vus {
+		sh := e.reg.NewShard()
+		e.shards[i] = sh
+		vu := &VU{
+			index:    i,
+			stepID:   e.stepID,
+			rootSeed: e.seed,
+			arena:    mem.NewArena(e.arenaSz),
+			shard:    sh,
+			inst:     e.inst,
+			streams:  make(map[uint32]rng.Stream),
+			drivers:  e.drivers,
+			slot:     e.slot,
+		}
+		if len(e.drivers) > 0 {
+			vu.conns = make([]driver.Conn, len(e.drivers))
+		}
+		e.vus[i] = vu
+	}
 }
 
 // Run executes the policy, blocking until every VU is done (or the context is
 // canceled), then returns the aggregate error (nil unless the error mode is Fail
 // or Abort and an error occurred, or a VU's Init failed). It may be called once.
 func (e *Executor) Run(ctx context.Context) error {
+	e.materialize() // no-op when already done by newExecutor or the wiring layer
 	ctx, e.cancel = context.WithCancelCause(ctx)
 	defer e.cancel(nil)
 
-	e.reporter.Start()
+	// A private reporter exists only in standalone (unshared-registry) use; under
+	// a shared registry the run-level reporter is owned and driven by the wiring
+	// layer, spanning every step.
+	if e.reporter != nil {
+		e.reporter.Start()
+	}
 	err := e.run(ctx)
-	e.reporter.Stop() // all writers have returned; final summary is exact
+	if e.reporter != nil {
+		e.reporter.Stop() // all writers have returned; final summary is exact
+	}
 
 	if err != nil {
 		return err
@@ -141,18 +206,55 @@ func (e *Executor) Run(ctx context.Context) error {
 
 // withVU runs one worker's lifecycle: Init, then body, then Close. Close runs
 // exactly once and only after a successful Init, even when body returns early on
-// cancellation. An Init failure is fatal: it is stored and aborts the executor.
-func (e *Executor) withVU(vu *VU, body func()) {
-	if err := e.handler.Init(vu); err != nil {
+// cancellation, and the VU's pinned connections are released after it. An Init
+// failure is fatal: it is stored and aborts the executor. A panic in any phase
+// (e.g. a driver connect failure surfaced by [VU.Conn]) is recovered and treated
+// as an error of that phase, so a worker goroutine never crashes the process.
+func (e *Executor) withVU(ctx context.Context, vu *VU, body func()) {
+	vu.ctx = ctx
+	vu.hotIter = false
+	if err := call1(e.handler.Init, vu); err != nil {
 		e.abort(&vuError{stage: "init", vu: vu.index, err: err})
 		return
 	}
 	defer func() {
-		if err := e.handler.Close(vu); err != nil {
+		if err := call1(e.handler.Close, vu); err != nil {
 			e.onError(vu, &vuError{stage: "close", vu: vu.index, err: err})
+		}
+		vu.closeConns()
+	}()
+	if err := callBody(body); err != nil {
+		e.abort(&vuError{stage: "iter", vu: vu.index, err: err})
+	}
+}
+
+// call1 invokes a VU lifecycle method, converting a recovered panic to an error.
+func call1(fn func(*VU) error, vu *VU) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = panicErr(r)
+		}
+	}()
+	return fn(vu)
+}
+
+// callBody runs a policy loop body, converting a recovered panic to an error.
+func callBody(body func()) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = panicErr(r)
 		}
 	}()
 	body()
+	return nil
+}
+
+// panicErr renders a recovered panic value as an error.
+func panicErr(r any) error {
+	if e, ok := r.(error); ok {
+		return fmt.Errorf("panic: %w", e)
+	}
+	return fmt.Errorf("panic: %v", r)
 }
 
 // iterate is the shared hot-path body: reset the arena, set the cycle, run the
@@ -162,6 +264,7 @@ func (e *Executor) withVU(vu *VU, body func()) {
 func (e *Executor) iterate(vu *VU, cycle uint64) {
 	vu.cycle = cycle
 	vu.arena.Reset()
+	vu.hotIter = e.hot
 	start := time.Now()
 	err := e.runIter(vu)
 	vu.shard.Record(vu.inst.Servicetime, time.Since(start).Nanoseconds())

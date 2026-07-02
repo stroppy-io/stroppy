@@ -30,6 +30,7 @@ func Closed(cfg Config, b ClosedBudget, h Handler) *Executor {
 	}
 	e := newExecutor(cfg, vus, false)
 	e.handler = h
+	e.hot = true
 	cyc := newCycler(cfg.CycleMode, vus)
 
 	e.run = func(ctx context.Context) error {
@@ -42,7 +43,7 @@ func Closed(cfg Config, b ClosedBudget, h Handler) *Executor {
 			wg.Add(1)
 			go func(vu *VU) {
 				defer wg.Done()
-				e.withVU(vu, func() { e.closedLoop(ctx, vu, cyc, b, deadline) })
+				e.withVU(ctx, vu, func() { e.closedLoop(ctx, vu, cyc, b, deadline) })
 			}(vu)
 		}
 		wg.Wait()

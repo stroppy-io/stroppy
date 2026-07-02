@@ -1,0 +1,159 @@
+package bench
+
+import (
+	"time"
+
+	"github.com/stroppy-io/stroppy/next/driver"
+	"github.com/stroppy-io/stroppy/next/metrics"
+)
+
+// execKind selects a step's executor policy (RFC 0001 §7.2).
+type execKind uint8
+
+const (
+	kindOnce execKind = iota
+	kindPool
+	kindClosed
+	kindOpen
+)
+
+// String renders the executor kind name (also the probe/plan label).
+func (k execKind) String() string {
+	switch k {
+	case kindOnce:
+		return "once"
+	case kindPool:
+		return "pool"
+	case kindClosed:
+		return "closed"
+	case kindOpen:
+		return "open"
+	default:
+		return "unknown"
+	}
+}
+
+// StepDef is the builder for one DAG step: a named [Handler] plus its executor
+// policy, dependency edges, condition, error/retry handling and driver slot. The
+// chainable setters return the same *StepDef, so a step reads as one expression.
+// A freshly built step defaults to the Once policy on driver slot 0.
+type StepDef struct {
+	name    string
+	handler Handler
+
+	kind    execKind
+	workers int
+	items   []string
+	vus     int
+	dur     time.Duration
+	iters   uint64
+	rate    float64
+
+	after     []string
+	afterAny  []string
+	onFailure []string
+	ifPred    func(*Run) bool
+
+	retry RetryPolicy
+	onErr ErrorMode
+	uses  string
+}
+
+// Step begins a step named name driven by h. Chain a policy and edges onto it.
+func Step(name string, h Handler) *StepDef {
+	return &StepDef{name: name, handler: h, kind: kindOnce}
+}
+
+// Once runs the handler a single time (DDL, load, validation). It is the default.
+func (s *StepDef) Once() *StepDef { s.kind = kindOnce; return s }
+
+// Pool runs workers workers over items, one Iter per item ([VU.Item]).
+func (s *StepDef) Pool(workers int, items ...string) *StepDef {
+	s.kind, s.workers, s.items = kindPool, workers, items
+	return s
+}
+
+// Closed runs vus closed-loop workers for wall-clock duration d.
+func (s *StepDef) Closed(vus int, d time.Duration) *StepDef {
+	s.kind, s.vus, s.dur, s.iters = kindClosed, vus, d, 0
+	return s
+}
+
+// ClosedIters runs vus closed-loop workers until each completes iters iterations.
+func (s *StepDef) ClosedIters(vus int, iters uint64) *StepDef {
+	s.kind, s.vus, s.iters, s.dur = kindClosed, vus, iters, 0
+	return s
+}
+
+// Open runs an open-loop schedule at rate arrivals/second across vus workers for
+// duration d.
+func (s *StepDef) Open(rate float64, vus int, d time.Duration) *StepDef {
+	s.kind, s.rate, s.vus, s.dur = kindOpen, rate, vus, d
+	return s
+}
+
+// After gates this step on every listed step having Succeeded.
+func (s *StepDef) After(deps ...string) *StepDef { s.after = append(s.after, deps...); return s }
+
+// AfterAny gates this step on every listed step being terminal and at least one
+// having Succeeded.
+func (s *StepDef) AfterAny(deps ...string) *StepDef {
+	s.afterAny = append(s.afterAny, deps...)
+	return s
+}
+
+// OnFailure makes this a cleanup step that runs when a listed step Failed; such
+// steps survive an AbortRun abort (RFC 0001 §7.1).
+func (s *StepDef) OnFailure(deps ...string) *StepDef {
+	s.onFailure = append(s.onFailure, deps...)
+	return s
+}
+
+// If sets a readiness predicate evaluated once the step's edges are satisfied; a
+// false result skips the step and its After-dependents. The predicate receives
+// the [Run] so it can branch on the resolved driver kind, options or seed.
+func (s *StepDef) If(pred func(*Run) bool) *StepDef { s.ifPred = pred; return s }
+
+// Retry sets the per-Iter retry policy for this step's executor. Per the M6
+// wiring decision this maps to the EXECUTOR retry (around a single Iter), not
+// dag-level node retry: re-running a whole load step is not a PoC need, so the
+// dag node's own retry stays unused by a StepDef.
+func (s *StepDef) Retry(p RetryPolicy) *StepDef { s.retry = p; return s }
+
+// OnErr sets how the executor classifies an Iter/Close error (silent/log/fail/
+// abort).
+func (s *StepDef) OnErr(m ErrorMode) *StepDef { s.onErr = m; return s }
+
+// Uses names the driver slot this step's VUs connect to by default (slot 0 when
+// unset). Handlers still reach any slot via [VU.Conn].
+func (s *StepDef) Uses(slot string) *StepDef { s.uses = slot; return s }
+
+// buildExecutor constructs the executor for sd under cfg, dispatching on policy.
+func buildExecutor(cfg Config, sd *StepDef) *Executor {
+	switch sd.kind {
+	case kindPool:
+		return Pool(cfg, sd.workers, sd.items, sd.handler)
+	case kindClosed:
+		return Closed(cfg, ClosedBudget{VUs: sd.vus, Duration: sd.dur, Iters: sd.iters}, sd.handler)
+	case kindOpen:
+		return Open(cfg, OpenSchedule{Rate: sd.rate, VUs: sd.vus, Duration: sd.dur}, sd.handler)
+	default:
+		return Once(cfg, sd.handler)
+	}
+}
+
+// stepConfig builds the executor Config for sd, threading run-level state: the
+// stable step id (feeds rng), the run seed, the shared registry and the resolved
+// drivers with this step's default slot.
+func stepConfig(sd *StepDef, seed uint64, reg *metrics.Registry, drivers []driver.Driver, slot int) Config {
+	return Config{
+		Name:    sd.name,
+		StepID:  stepID(sd.name),
+		Seed:    seed,
+		OnErr:   sd.onErr,
+		Retry:   sd.retry,
+		Reg:     reg,
+		Drivers: drivers,
+		Slot:    slot,
+	}
+}

@@ -10,7 +10,7 @@ func Once(cfg Config, h Handler) *Executor {
 	e.handler = h
 	e.run = func(ctx context.Context) error {
 		vu := e.vus[0]
-		e.withVU(vu, func() {
+		e.withVU(ctx, vu, func() {
 			if ctx.Err() != nil {
 				return
 			}

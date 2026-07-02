@@ -30,6 +30,7 @@ func Open(cfg Config, s OpenSchedule, h Handler) *Executor {
 	}
 	e := newExecutor(cfg, vus, true)
 	e.handler = h
+	e.hot = true
 
 	var n int64
 	var nsPerArrival float64
@@ -47,7 +48,7 @@ func Open(cfg Config, s OpenSchedule, h Handler) *Executor {
 			wg.Add(1)
 			go func(vu *VU) {
 				defer wg.Done()
-				e.withVU(vu, func() { e.openLoop(ctx, vu, n, int64(vus), startNs, nsPerArrival) })
+				e.withVU(ctx, vu, func() { e.openLoop(ctx, vu, n, int64(vus), startNs, nsPerArrival) })
 			}(vu)
 		}
 		wg.Wait()

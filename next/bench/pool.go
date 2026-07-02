@@ -22,6 +22,7 @@ func Pool(cfg Config, workers int, items []string, h Handler) *Executor {
 	}
 	e := newExecutor(cfg, workers, false)
 	e.handler = h
+	e.hot = true
 
 	e.run = func(ctx context.Context) error {
 		var cursor atomic.Int64
@@ -30,7 +31,7 @@ func Pool(cfg Config, workers int, items []string, h Handler) *Executor {
 			wg.Add(1)
 			go func(vu *VU) {
 				defer wg.Done()
-				e.withVU(vu, func() { e.poolLoop(ctx, vu, items, &cursor) })
+				e.withVU(ctx, vu, func() { e.poolLoop(ctx, vu, items, &cursor) })
 			}(vu)
 		}
 		wg.Wait()
