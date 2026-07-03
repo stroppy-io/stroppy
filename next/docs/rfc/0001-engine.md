@@ -146,7 +146,7 @@ type Test struct {
     Seed    uint64
     Opts    any                          // ptr to user struct; `env:"..."` tags → parse, validate, probe
     Drivers []DriverSlot                 // declared; CLI-overridable (-d/-D semantics kept)
-    Graph   []*StepDef
+    Build   func(*Run) []*StepDef        // called after options are parsed (M7: removes double-parse)
 }
 
 func Step(name string, h Handler) *StepDef
@@ -173,10 +173,15 @@ func (vu *VU) Index() int
 func (vu *VU) Cycle() uint64
 func (vu *VU) Rand(stream uint32) *Rand   // derived (seed, step, stream); seekable
 func (vu *VU) Arena() *Arena              // bump slab; auto-Reset per Iter
-func (vu *VU) Conn(slot int) driver.Conn  // pinned connection
+func (vu *VU) Conn() driver.Conn                    // step's slot; panics on failure (FuncOnce one-liners)
+func (vu *VU) ConnE() (driver.Conn, error)          // step's slot; first-class Init error path
+func (vu *VU) ConnSlot(slot int) (driver.Conn, error) // multi-driver steps
+func (vu *VU) Prepare(q *sqlfile.Query) driver.Stmt // memoized; PrepareE variant for Init
 func (vu *VU) M(h MetricHandle, v int64)
 func (vu *VU) Item() string               // Pool executor's assigned item
 ```
+
+(M7 freeze: connection establishment and statement preparation are Init-phase only — first use in Iter panics; metrics.Registry has an explicit Freeze() two-phase lifecycle.)
 
 Error taxonomy ported from v5: retryable (SQLSTATE 40001 / deadlock detection), expected-failure, fatal; `ErrorMode` decides logging/abort behavior.
 
