@@ -18,10 +18,14 @@
 // id (the FNV-1a hash of its name; see stepID's stability contract) so a run is
 // reproducible and independent of step ordering.
 //
-// Each VU pins a [driver.Conn] per slot on first use in Init ([VU.Conn]) and
-// prepares SQL handles per query ([VU.Prepare]); both are plan-phase work and
-// panic if first called on a hot-loop Iter. Connections are reconnected per step
-// (closed after the step's Close) — an accepted PoC cost, to revisit post-PoC.
+// Each VU pins a [driver.Conn] to its step's default slot on first use in Init
+// ([VU.ConnE], returning the connect failure as a first-class error; [VU.Conn]
+// is the panic-on-failure form for trivial FuncOnce bodies) and prepares SQL
+// handles per query ([VU.PrepareE]/[VU.Prepare]). Both are plan-phase work:
+// establishing a connection or statement for the first time inside a hot-loop
+// Iter is an error, since connecting is not hot-path work. Connections are
+// reconnected per step (closed after the step's Close) — an accepted PoC cost,
+// to revisit post-PoC.
 // Step-level [StepDef.Retry] maps to the executor retry around a single Iter, not
 // dag-level node retry (re-running a whole load step is not a PoC need).
 //

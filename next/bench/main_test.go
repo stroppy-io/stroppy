@@ -56,7 +56,7 @@ func TestValidationFailureExits(t *testing.T) {
 		Name:    "bad",
 		Opts:    &validatedOpts{}, // Validate rejects N=0 (the default)
 		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
-		Steps:   []*StepDef{Step("a", okHandler{})},
+		Build:   func(*Run) []*StepDef { return []*StepDef{Step("a", okHandler{})} },
 	}
 	var out strings.Builder
 	if code := runMain(tst, nil, envMap(nil), &out, &out); code == 0 {
@@ -69,12 +69,14 @@ func twoStepTest(dur time.Duration) *Test {
 	return &Test{
 		Name:    "twostep",
 		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
-		Steps: []*StepDef{
-			Step("setup", FuncOnce(func(vu *VU) error {
-				vu.Conn(0) // pin a (noop) connection
-				return nil
-			})),
-			Step("work", &closedNoopDB{}).Closed(2, dur).After("setup"),
+		Build: func(*Run) []*StepDef {
+			return []*StepDef{
+				Step("setup", FuncOnce(func(vu *VU) error {
+					vu.Conn() // pin a (noop) connection
+					return nil
+				})),
+				Step("work", &closedNoopDB{}).Closed(2, dur).After("setup"),
+			}
 		},
 	}
 }
@@ -82,10 +84,13 @@ func twoStepTest(dur time.Duration) *Test {
 // closedNoopDB pins a connection in Init and does a trivial per-Iter driver call.
 type closedNoopDB struct{}
 
-func (closedNoopDB) Init(vu *VU) error { vu.Conn(0); return nil }
+func (closedNoopDB) Init(vu *VU) error {
+	_, err := vu.ConnE()
+	return err
+}
 func (closedNoopDB) Iter(vu *VU) error {
 	// Cache hit on the hot path: allowed. A no-op exec against the pinned conn.
-	_ = vu.Conn(0)
+	_ = vu.Conn()
 	return nil
 }
 func (closedNoopDB) Close(*VU) error { return nil }

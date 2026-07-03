@@ -2,23 +2,10 @@ package bench
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"strconv"
 	"time"
 )
-
-// LoadOptions parses process environment into opts (a pointer to an options
-// struct, per [Test.Opts]) and runs its Validate hook if present. A test calls
-// it before building steps whose executor parameters read the options (VU count,
-// duration, ...); [Main] re-parses idempotently, so calling it is safe and
-// optional. A nil opts is a no-op.
-func LoadOptions(opts any) error {
-	if _, err := parseOptions(opts, os.Getenv); err != nil {
-		return err
-	}
-	return validateOptions(opts)
-}
 
 // OptionSchema is one option's probe description: its env variable, struct
 // field, type, declared default and current (post-parse) value.

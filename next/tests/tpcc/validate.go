@@ -34,7 +34,7 @@ func scalarInt(vu *bench.VU, conn driver.Conn, sqlText string) (int64, error) {
 // gated by VALIDATE.
 func validatePopulation(w *world) bench.Handler {
 	return bench.FuncOnce(func(vu *bench.VU) error {
-		conn := vu.Conn(vu.Slot())
+		conn := vu.Conn()
 		wn := w.warehouses
 
 		counts := []struct {
@@ -100,7 +100,7 @@ func validatePopulation(w *world) bench.Handler {
 // warehouse and one of its districts by the same amount.
 func checkConsistency() bench.Handler {
 	return bench.FuncOnce(func(vu *bench.VU) error {
-		if err := checkWYTD(vu, vu.Conn(vu.Slot())); err != nil {
+		if err := checkWYTD(vu, vu.Conn()); err != nil {
 			return err
 		}
 		log.Printf("[tpcc] check_consistency: OK")

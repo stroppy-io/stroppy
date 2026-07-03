@@ -9,16 +9,18 @@
 //	go run ./tests/tpcc -plan        # print the step DAG
 //	go run ./tests/tpcc -probe       # machine-readable description
 //
-// # SDK gap (per-transaction metrics)
+// # SDK gap (per-transaction metrics) — deferred past the M7 freeze
 //
 // The built-in per-step servicetime histogram aggregates all five transaction
 // types. Per-transaction-type latency histograms are not available: user
-// instruments must be registered before the metrics registry freezes (at
-// executor materialize, before any Handler.Init), but a Handler has no access to
-// the registry — Test/VU expose no registration hook. This port therefore counts
+// instruments must be registered before the metrics registry freezes
+// (metrics.Registry.Freeze, driven by the wiring layer before any Handler.Init),
+// but a Handler runs only after the freeze and has no access to the registry —
+// Test/VU expose no registration hook. M7 made the registry freeze an explicit,
+// first-class seam (metrics.Registry.Freeze) — the foundation a hook would build
+// on — but a Handler-reachable instrument declaration is a feature, not an API
+// wart, and is deferred to a post-PoC metrics pass. This port therefore counts
 // per-transaction outcomes in per-VU state and reports counts only (see report).
-// A registration hook reachable from Init (or a Test-level instrument
-// declaration) is the M7 fix.
 package main
 
 import (
@@ -97,26 +99,25 @@ func isolationByName(name string) (driver.Isolation, bool) {
 
 func main() {
 	o := &options{}
-	if err := bench.LoadOptions(o); err != nil {
-		log.Fatalf("tpcc: %v", err)
-	}
-	iso, _ := isolationByName(o.TxIsolation)
-
-	file, err := sqlfile.Parse(pgSQL)
-	if err != nil {
-		log.Fatalf("tpcc: parse pg.sql: %v", err)
-	}
-	extra, err := sqlfile.Parse(extraSQL)
-	if err != nil {
-		log.Fatalf("tpcc: parse tpcc.sql: %v", err)
-	}
-
 	t := &bench.Test{
 		Name:    "tpcc",
 		Seed:    tpccSeed,
 		Opts:    o,
 		Drivers: []bench.DriverSlot{{Name: "main", Kind: "pg"}},
-		Steps:   buildSteps(o, iso, file, extra),
+		// Build runs after the SDK parses options, so it reads the final o
+		// (isolation level, warehouse count, VU/worker counts) with no pre-parse.
+		Build: func(*bench.Run) []*bench.StepDef {
+			iso, _ := isolationByName(o.TxIsolation)
+			file, err := sqlfile.Parse(pgSQL)
+			if err != nil {
+				log.Fatalf("tpcc: parse pg.sql: %v", err)
+			}
+			extra, err := sqlfile.Parse(extraSQL)
+			if err != nil {
+				log.Fatalf("tpcc: parse tpcc.sql: %v", err)
+			}
+			return buildSteps(o, iso, file, extra)
+		},
 	}
 	bench.Main(t)
 }
@@ -186,7 +187,7 @@ func buildSteps(o *options, iso driver.Isolation, file, extra *sqlfile.File) []*
 // order for side effect (DDL groups: drop, create, index).
 func multiExec(qs []*sqlfile.Query) bench.Handler {
 	return bench.FuncOnce(func(vu *bench.VU) error {
-		conn := vu.Conn(vu.Slot())
+		conn := vu.Conn()
 		for _, q := range qs {
 			st, err := conn.Prepare(vu.Ctx(), q)
 			if err != nil {

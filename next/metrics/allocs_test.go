@@ -6,6 +6,7 @@ import "testing"
 func TestAllocsRecord(t *testing.T) {
 	reg := NewRegistry()
 	h := reg.Histogram(Instrument{Name: "latency", Step: "load"})
+	reg.Freeze()
 	sh := reg.NewShard()
 	var v int64 = 1
 	got := testing.AllocsPerRun(1000, func() {
@@ -24,6 +25,7 @@ func TestAllocsRecord(t *testing.T) {
 func TestAllocsCounter(t *testing.T) {
 	reg := NewRegistry()
 	c := reg.Counter(Instrument{Name: "errors", Step: "load"})
+	reg.Freeze()
 	sh := reg.NewShard()
 	inc := testing.AllocsPerRun(1000, func() {
 		sh.Inc(c)

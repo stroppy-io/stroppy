@@ -10,9 +10,14 @@ import (
 )
 
 // Test is a complete, declarative description of a benchmark: its name, root
-// seed, options struct, driver slots and step DAG. A user test builds one and
-// hands it to [Main]. It is plain data — parsing, graph construction and
-// execution all happen in Main — so it doubles as the probe/plan description.
+// seed, options struct, driver slots and a step-DAG builder. A user test builds
+// one and hands it to [Main].
+//
+// [Main] parses options before it calls Build, so the builder sees fully-parsed
+// options and can size executor policies from them (Closed(o.VUs, o.Duration),
+// Pool(o.LoadWorkers, ...)) directly — there is no separate options pre-parse.
+// Everything else (graph construction, execution) still happens in Main from
+// this declarative data, so a Test doubles as the probe/plan description.
 type Test struct {
 	// Name identifies the test (used in metrics tags and the probe/plan output).
 	Name string
@@ -21,16 +26,20 @@ type Test struct {
 	Seed uint64
 	// Opts is an optional pointer to a user options struct whose exported fields
 	// carry `env:"NAME"` and `default:"..."` tags. Main parses process env into
-	// it at startup and, if it implements interface{ Validate() error }, calls
-	// Validate. Supported field types: string, int, int64, uint64, float64,
-	// bool, time.Duration.
+	// it at startup, before Build, and, if it implements interface{ Validate()
+	// error }, calls Validate. Supported field types: string, int, int64,
+	// uint64, float64, bool, time.Duration.
 	Opts any
 	// Drivers declares the database backends by slot. Slot 0 is the default a
 	// step's VUs connect to; env overrides apply per slot (see [DriverSlot]).
 	Drivers []DriverSlot
-	// Steps are the DAG nodes in declaration order (used for status reporting
-	// and as the deterministic build order; dependencies are declared per step).
-	Steps []*StepDef
+	// Build returns the DAG steps in declaration order (used for status
+	// reporting and as the deterministic build order; dependencies are declared
+	// per step). Main calls it exactly once, after options are parsed and driver
+	// slots resolved, passing the [Run] so steps may branch on the resolved
+	// options, seed or driver kinds. Steps that need no options can ignore the
+	// Run and return a fixed slice.
+	Build func(*Run) []*StepDef
 }
 
 // DriverSlot declares one database backend. URL and Kind are overridable from

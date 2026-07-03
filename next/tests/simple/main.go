@@ -56,27 +56,33 @@ const valLen = 16
 
 func main() {
 	o := &options{}
-	// Parse options up front so the executor policies below can read them; the
-	// SDK re-parses idempotently inside bench.Main.
-	if err := bench.LoadOptions(o); err != nil {
-		log.Fatalf("simple: %v", err)
-	}
-
-	file, err := sqlfile.Parse(sqlSrc)
-	if err != nil {
-		log.Fatalf("simple: parse sql: %v", err)
-	}
-	dropQ := mustQuery(file, "schema", "drop")
-	createQ := mustQuery(file, "schema", "create")
-	selectQ := mustQuery(file, "workload", "point_select")
-	countQ := mustQuery(file, "check", "count")
-
 	t := &bench.Test{
 		Name:    "simple",
 		Seed:    1,
 		Opts:    o,
 		Drivers: []bench.DriverSlot{{Name: "main", Kind: "pg"}},
-		Steps: []*bench.StepDef{
+		// Build runs after the SDK has parsed options, so the executor policies
+		// below read the final o.VUs / o.Duration directly (no pre-parse).
+		Build: buildSteps(o),
+	}
+	bench.Main(t)
+}
+
+// buildSteps returns the test's step-builder closure. It parses the embedded SQL
+// and assembles the load → workload → check lifecycle, closing over the parsed
+// options.
+func buildSteps(o *options) func(*bench.Run) []*bench.StepDef {
+	return func(*bench.Run) []*bench.StepDef {
+		file, err := sqlfile.Parse(sqlSrc)
+		if err != nil {
+			log.Fatalf("simple: parse sql: %v", err)
+		}
+		dropQ := mustQuery(file, "schema", "drop")
+		createQ := mustQuery(file, "schema", "create")
+		selectQ := mustQuery(file, "workload", "point_select")
+		countQ := mustQuery(file, "check", "count")
+
+		return []*bench.StepDef{
 			// DROP may fail on a fresh database (no table yet); Silent keeps the
 			// step green and the run moving.
 			bench.Step("drop_schema", exec(dropQ)).
@@ -99,15 +105,16 @@ func main() {
 
 			bench.Step("cleanup", exec(dropQ)).
 				After("check").Uses("main"),
-		},
+		}
 	}
-	bench.Main(t)
 }
 
 // exec is a run-once handler that prepares q and executes it for side effect.
+// As a trivial FuncOnce body it uses the panic-on-failure Conn/Prepare; the
+// executor recovers any connect/prepare failure into the step's error.
 func exec(q *sqlfile.Query) bench.Handler {
 	return bench.FuncOnce(func(vu *bench.VU) error {
-		return vu.Conn(vu.Slot()).Exec(vu.Ctx(), vu.Prepare(q))
+		return vu.Conn().Exec(vu.Ctx(), vu.Prepare(q))
 	})
 }
 
@@ -130,7 +137,11 @@ type loadHandler struct{ opts *options }
 
 func (h *loadHandler) Init(vu *bench.VU) error {
 	st := bench.Local[loadState](vu)
-	st.conn = vu.Conn(vu.Slot())
+	conn, err := vu.ConnE()
+	if err != nil {
+		return err
+	}
+	st.conn = conn
 	st.buf = mem.NewRowBuf(loadBatch,
 		mem.ColSpec{Name: "id", Type: mem.TypeInt64},
 		mem.ColSpec{Name: "val", Type: mem.TypeBytes},
@@ -178,8 +189,16 @@ type workloadHandler struct {
 
 func (h *workloadHandler) Init(vu *bench.VU) error {
 	st := bench.Local[wlState](vu)
-	st.conn = vu.Conn(vu.Slot())
-	st.stmt = vu.Prepare(h.query)
+	conn, err := vu.ConnE()
+	if err != nil {
+		return err
+	}
+	st.conn = conn
+	stmt, err := vu.PrepareE(h.query)
+	if err != nil {
+		return err
+	}
+	st.stmt = stmt
 	return nil
 }
 
@@ -212,7 +231,7 @@ type checkHandler struct {
 func (h *checkHandler) Init(*bench.VU) error { return nil }
 
 func (h *checkHandler) Iter(vu *bench.VU) error {
-	row := vu.Conn(vu.Slot()).QueryRow(vu.Ctx(), vu.Prepare(h.query))
+	row := vu.Conn().QueryRow(vu.Ctx(), vu.Prepare(h.query))
 	n, err := row.ScanInt64(0)
 	if err != nil {
 		return err

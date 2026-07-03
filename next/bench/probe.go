@@ -45,13 +45,14 @@ type probeStep struct {
 	UsesSlot  int       `json:"usesSlot"`
 }
 
-// buildProbe assembles the probe description from the test and resolved slots.
-func buildProbe(t *Test, seed uint64, schema []OptionSchema, slots []slotSpec) probeDoc {
+// buildProbe assembles the probe description from the test, its built steps and
+// the resolved slots.
+func buildProbe(t *Test, steps []*StepDef, seed uint64, schema []OptionSchema, slots []slotSpec) probeDoc {
 	doc := probeDoc{Name: t.Name, Seed: seed, Options: schema}
 	for _, s := range slots {
 		doc.Drivers = append(doc.Drivers, probeDriver{Name: s.name, Kind: s.kind, URL: s.url})
 	}
-	for _, sd := range t.Steps {
+	for _, sd := range steps {
 		usesSlot, _ := resolveUses(sd, slots)
 		doc.Steps = append(doc.Steps, probeStep{
 			Name:      sd.name,

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/pprof"
 	"strings"
 	"text/tabwriter"
 
@@ -36,6 +37,9 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 		probeFlag   = fs.Bool("probe", false, "print the test description as JSON and exit")
 		planFlag    = fs.Bool("plan", false, "print the DAG plan (text) and exit")
 		planDOTFlag = fs.Bool("plan-dot", false, "print the DAG plan (Graphviz DOT) and exit")
+		// cpuprofile is a hidden diagnostic (not shown in -help): write a pprof
+		// CPU profile of the run to the given file. Used for the M7 pprof pass.
+		cpuprofileFlag = fs.String("cpuprofile", "", "")
 	)
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -54,8 +58,13 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 	seed := *seedFlag
 	slots := resolveSlots(t.Drivers, getenv)
 
+	// Build the steps once, now that options are parsed and slots resolved, so
+	// the builder can size executor policies from the options (no pre-parse).
+	run := &Run{test: t, seed: seed, slots: slots}
+	steps := buildSteps(t, run)
+
 	if *probeFlag {
-		if err := writeProbe(stdout, buildProbe(t, seed, schema, slots)); err != nil {
+		if err := writeProbe(stdout, buildProbe(t, steps, seed, schema, slots)); err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -74,9 +83,8 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 		return 1
 	}
 
-	run := &Run{test: t, seed: seed, slots: slots}
 	reg := metrics.NewRegistry()
-	built, execs, err := buildGraph(t, run, seed, reg, drivers, slots, filter)
+	built, execs, err := buildGraph(steps, run, seed, reg, drivers, slots, filter)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "bench: %v\n", err)
 		return 1
@@ -91,26 +99,58 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 		return 0
 	}
 
-	return execute(built, execs, drivers, reg, stdout, t)
+	if *cpuprofileFlag != "" {
+		stop, err := startCPUProfile(*cpuprofileFlag)
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
+		defer stop()
+	}
+
+	return execute(built, execs, drivers, reg, stdout, steps)
+}
+
+// buildSteps invokes the test's step builder (nil-safe: a Test with no Build
+// contributes no steps).
+func buildSteps(t *Test, run *Run) []*StepDef {
+	if t.Build == nil {
+		return nil
+	}
+	return t.Build(run)
+}
+
+// startCPUProfile begins writing a pprof CPU profile to path and returns a stop
+// function that ends the profile and closes the file. It backs the hidden
+// -cpuprofile flag (the M7 pprof pass).
+func startCPUProfile(path string) (func(), error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, fmt.Errorf("bench: create cpu profile: %w", err)
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		_ = f.Close()
+		return nil, fmt.Errorf("bench: start cpu profile: %w", err)
+	}
+	return func() {
+		pprof.StopCPUProfile()
+		_ = f.Close()
+	}, nil
 }
 
 // execute materializes every executor, spans them with one run-level reporter,
 // runs the DAG, prints per-step statuses, tears the drivers down and returns the
 // exit code.
-func execute(built *dag.Built, execs []*Executor, drivers []driver.Driver, reg *metrics.Registry, stdout io.Writer, t *Test) int {
-	// Materialize all executors (this freezes the shared registry) and gather
-	// every VU shard so a single reporter spans the whole run.
-	var shards []*metrics.Shard
-	for _, ex := range execs {
-		ex.materialize()
-		shards = append(shards, ex.Shards()...)
-	}
+func execute(built *dag.Built, execs []*Executor, drivers []driver.Driver, reg *metrics.Registry, stdout io.Writer, steps []*StepDef) int {
+	// Freeze the shared registry and materialize every executor's shards, then
+	// span them with a single run-level reporter.
+	shards := materializeAll(reg, execs)
 	reporter := metrics.NewReporter(reg, shards, metrics.DefaultInterval, metrics.NewConsoleSink(stdout))
 
 	ctx := context.Background()
 	reporter.Start()
 	result := dag.Run(ctx, built)
-	printStatuses(stdout, t, result)
+	printStatuses(stdout, steps, result)
 	reporter.Stop() // writers stopped; emits the exact run summary
 
 	for _, d := range drivers {
@@ -125,10 +165,10 @@ func execute(built *dag.Built, execs []*Executor, drivers []driver.Driver, reg *
 
 // buildGraph builds one executor per step over the shared registry and assembles
 // the dag with each step's edges and combined condition, then validates it.
-func buildGraph(t *Test, run *Run, seed uint64, reg *metrics.Registry, drivers []driver.Driver, slots []slotSpec, filter stepFilter) (*dag.Built, []*Executor, error) {
+func buildGraph(steps []*StepDef, run *Run, seed uint64, reg *metrics.Registry, drivers []driver.Driver, slots []slotSpec, filter stepFilter) (*dag.Built, []*Executor, error) {
 	g := dag.NewGraph()
-	execs := make([]*Executor, 0, len(t.Steps))
-	for _, sd := range t.Steps {
+	execs := make([]*Executor, 0, len(steps))
+	for _, sd := range steps {
 		slot, err := resolveUses(sd, slots)
 		if err != nil {
 			return nil, nil, err
@@ -200,11 +240,11 @@ func toSet(csv string) map[string]bool {
 }
 
 // printStatuses writes the per-step status table in declaration order.
-func printStatuses(w io.Writer, t *Test, result *dag.RunResult) {
+func printStatuses(w io.Writer, steps []*StepDef, result *dag.RunResult) {
 	_, _ = fmt.Fprintf(w, "\n=== steps (%s) ===\n", result.Status)
 	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 	_, _ = fmt.Fprintln(tw, "step\tstatus\tattempts\tduration")
-	for _, sd := range t.Steps {
+	for _, sd := range steps {
 		r := result.Node(sd.name)
 		if r == nil {
 			_, _ = fmt.Fprintf(tw, "%s\t%s\t-\t-\n", sd.name, "Absent")

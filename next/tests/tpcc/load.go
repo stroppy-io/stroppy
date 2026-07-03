@@ -73,7 +73,11 @@ type loadState struct {
 
 func (h *loadHandler) Init(vu *bench.VU) error {
 	st := bench.Local[loadState](vu)
-	st.conn = vu.Conn(vu.Slot())
+	conn, err := vu.ConnE()
+	if err != nil {
+		return err
+	}
+	st.conn = conn
 	st.buf = mem.NewRowBuf(loadBatch+maxRowsPerCycle, h.tbl.cols...)
 	st.strm = make([]rng.Stream, h.tbl.nStreams)
 	for i := range st.strm {

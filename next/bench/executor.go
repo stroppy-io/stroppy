@@ -97,12 +97,13 @@ type Executor struct {
 // newExecutor performs the plan-phase registration shared by every policy: it
 // resolves (or shares) the registry and registers the built-in instruments.
 //
-// With a private registry (Config.Reg nil, the M3 default) it also materializes
-// eagerly — allocating every VU and a private reporter — so behaviour is
-// unchanged for standalone executor use. With a shared registry it registers
-// only: shard creation waits for materialize (called by Run, or up front by the
-// wiring layer once every step has registered), because the shared registry
-// freezes on its first NewShard and all steps must register before that.
+// With a private registry (Config.Reg nil, the M3 default) the executor owns
+// the registry outright, so it freezes and materializes eagerly here —
+// allocating every VU and a private reporter — leaving standalone use a plain
+// construct-then-Run. With a shared registry it registers only: the registry
+// spans every step and must not freeze until all of them have registered, so
+// freeze and shard creation are deferred to [materializeAll], which the wiring
+// layer calls once the whole graph is built.
 func newExecutor(cfg Config, nVUs int, open bool) *Executor {
 	if nVUs < 1 {
 		nVUs = 1
@@ -137,6 +138,7 @@ func newExecutor(cfg Config, nVUs int, open bool) *Executor {
 	}
 
 	if !shared {
+		reg.Freeze() // sole owner of a private registry: safe to close registration now
 		e.materialize()
 		sink := cfg.Sink
 		if sink == nil {
@@ -147,10 +149,26 @@ func newExecutor(cfg Config, nVUs int, open bool) *Executor {
 	return e
 }
 
-// materialize allocates the executor's VUs and their shards. It is idempotent;
-// the first call for a shared registry freezes it against further registration
-// (so every step must be constructed before any materialize). For a private
-// registry it runs eagerly inside newExecutor.
+// materializeAll freezes the shared registry — closing registration now that
+// every step has registered its instruments — and allocates every executor's
+// VUs and shards, returning the full shard set so one run-level reporter can
+// span the whole run. It is the single freeze/materialize seam for shared-
+// registry (wiring) use; standalone executors freeze and materialize eagerly in
+// newExecutor instead.
+func materializeAll(reg *metrics.Registry, execs []*Executor) []*metrics.Shard {
+	reg.Freeze()
+	var shards []*metrics.Shard
+	for _, ex := range execs {
+		ex.materialize()
+		shards = append(shards, ex.Shards()...)
+	}
+	return shards
+}
+
+// materialize allocates the executor's VUs and their shards against the (now
+// frozen) registry. It is idempotent. For a shared registry the wiring layer
+// drives it through [materializeAll] after freezing; for a private registry it
+// runs eagerly inside newExecutor.
 func (e *Executor) materialize() {
 	if e.materialized {
 		return

@@ -72,7 +72,7 @@ func (allocHandler) Iter(vu *VU) error {
 
 func (allocHandler) Close(*VU) error { return nil }
 
-// TestClosedZeroAllocSteadyState asserts amortized-zero harness allocations per
+// TestAllocsClosedSteadyState asserts amortized-zero harness allocations per
 // Iter. Method (per M3 exit criteria): AllocsPerRun around a live executor is
 // awkward, so we run a Closed executor for a large fixed iteration count and
 // bound the runtime.ReadMemStats Mallocs delta per iteration. A warm-up run
@@ -80,7 +80,7 @@ func (allocHandler) Close(*VU) error { return nil }
 // (interval far past the run) so no tick allocates. Fixed per-Run costs
 // (goroutine, context, waitgroup) amortize to nothing over the iteration count,
 // so a per-iter figure below 0.01 means the hot loop itself allocates nothing.
-func TestClosedZeroAllocSteadyState(t *testing.T) {
+func TestAllocsClosedSteadyState(t *testing.T) {
 	const iters = 3_000_000
 
 	warm := Closed(quietCfg(), ClosedBudget{VUs: 1, Iters: 100_000}, allocHandler{})

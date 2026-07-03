@@ -60,11 +60,13 @@ func diamondTest() *Test {
 	return &Test{
 		Name:    "diamond",
 		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
-		Steps: []*StepDef{
-			Step("a", okHandler{}),
-			Step("b", okHandler{}).After("a"),
-			Step("c", okHandler{}).After("a").If(func(*Run) bool { return true }),
-			Step("d", okHandler{}).After("b", "c"),
+		Build: func(*Run) []*StepDef {
+			return []*StepDef{
+				Step("a", okHandler{}),
+				Step("b", okHandler{}).After("a"),
+				Step("c", okHandler{}).After("a").If(func(*Run) bool { return true }),
+				Step("d", okHandler{}).After("b", "c"),
+			}
 		},
 	}
 }
@@ -74,7 +76,7 @@ func TestBuildGraphEdges(t *testing.T) {
 	run := &Run{test: tst, slots: []slotSpec{{name: "main", kind: "noop"}}}
 	reg := metrics.NewRegistry()
 	drivers, _ := buildDrivers(run.slots)
-	built, execs, err := buildGraph(tst, run, 0, reg, drivers, run.slots, nil)
+	built, execs, err := buildGraph(buildSteps(tst, run), run, 0, reg, drivers, run.slots, nil)
 	if err != nil {
 		t.Fatalf("buildGraph: %v", err)
 	}
@@ -97,11 +99,11 @@ func TestBuildGraphUnknownSlot(t *testing.T) {
 	tst := &Test{
 		Name:    "x",
 		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
-		Steps:   []*StepDef{Step("a", okHandler{}).Uses("nope")},
+		Build:   func(*Run) []*StepDef { return []*StepDef{Step("a", okHandler{}).Uses("nope")} },
 	}
 	run := &Run{test: tst, slots: resolveSlots(tst.Drivers, envMap(nil))}
 	drivers, _ := buildDrivers(run.slots)
-	if _, _, err := buildGraph(tst, run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
+	if _, _, err := buildGraph(buildSteps(tst, run), run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
 		t.Fatal("expected an error for a step using an unknown slot")
 	}
 }
@@ -110,11 +112,11 @@ func TestBuildGraphDuplicateStepRejected(t *testing.T) {
 	tst := &Test{
 		Name:    "dup",
 		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
-		Steps:   []*StepDef{Step("a", okHandler{}), Step("a", okHandler{})},
+		Build:   func(*Run) []*StepDef { return []*StepDef{Step("a", okHandler{}), Step("a", okHandler{})} },
 	}
 	run := &Run{test: tst, slots: resolveSlots(tst.Drivers, envMap(nil))}
 	drivers, _ := buildDrivers(run.slots)
-	if _, _, err := buildGraph(tst, run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
+	if _, _, err := buildGraph(buildSteps(tst, run), run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
 		t.Fatal("expected a duplicate-id error from the dag builder")
 	}
 }
@@ -124,13 +126,15 @@ func TestProbeGolden(t *testing.T) {
 		Name:    "golden",
 		Seed:    42,
 		Drivers: []DriverSlot{{Name: "main", Kind: "noop", URL: "noop://"}},
-		Steps: []*StepDef{
-			Step("setup", okHandler{}).OnErr(Silent),
-			Step("run", okHandler{}).
-				Closed(4, 3*time.Second).
-				After("setup").
-				If(func(*Run) bool { return true }).
-				Uses("main"),
+		Build: func(*Run) []*StepDef {
+			return []*StepDef{
+				Step("setup", okHandler{}).OnErr(Silent),
+				Step("run", okHandler{}).
+					Closed(4, 3*time.Second).
+					After("setup").
+					If(func(*Run) bool { return true }).
+					Uses("main"),
+			}
 		},
 	}
 	schema, err := parseOptions(tst.Opts, envMap(nil))
@@ -138,8 +142,9 @@ func TestProbeGolden(t *testing.T) {
 		t.Fatalf("parseOptions: %v", err)
 	}
 	slots := resolveSlots(tst.Drivers, envMap(nil))
+	run := &Run{test: tst, seed: tst.Seed, slots: slots}
 	var sb strings.Builder
-	if err := writeProbe(&sb, buildProbe(tst, tst.Seed, schema, slots)); err != nil {
+	if err := writeProbe(&sb, buildProbe(tst, buildSteps(tst, run), tst.Seed, schema, slots)); err != nil {
 		t.Fatalf("writeProbe: %v", err)
 	}
 	got := sb.String()

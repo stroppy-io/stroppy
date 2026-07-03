@@ -7,6 +7,7 @@ import "testing"
 func BenchmarkRecord(b *testing.B) {
 	reg := NewRegistry()
 	h := reg.Histogram(Instrument{Name: "latency", Step: "load"})
+	reg.Freeze()
 	sh := reg.NewShard()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -26,6 +27,7 @@ func BenchmarkRecord(b *testing.B) {
 func BenchmarkRecordFixed(b *testing.B) {
 	reg := NewRegistry()
 	h := reg.Histogram(Instrument{Name: "latency"})
+	reg.Freeze()
 	sh := reg.NewShard()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -38,6 +40,7 @@ func BenchmarkRecordFixed(b *testing.B) {
 func BenchmarkCounterInc(b *testing.B) {
 	reg := NewRegistry()
 	c := reg.Counter(Instrument{Name: "iters"})
+	reg.Freeze()
 	sh := reg.NewShard()
 	b.ReportAllocs()
 	b.ResetTimer()

@@ -8,10 +8,11 @@
 // plan phase, and only mutated during the hot phase. A [Registry] assigns an
 // integer [MetricHandle] / [CounterHandle] to each instrument at plan time and
 // resolves its static tags (step, tx, table, name) there and only there — the
-// hot path never touches a tag, a string or a map. [Registry.NewShard] then
-// preallocates one [Shard] per VU: a flat slice of histograms plus a flat slice
-// of counters. Recording a value is a bucket-index computation followed by a
-// single array increment.
+// hot path never touches a tag, a string or a map. Once every instrument is
+// registered the registry is frozen ([Registry.Freeze]); [Registry.NewShard]
+// then preallocates one [Shard] per VU: a flat slice of histograms plus a flat
+// slice of counters. Recording a value is a bucket-index computation followed by
+// a single array increment.
 //
 // # Single writer, concurrent reporter
 //

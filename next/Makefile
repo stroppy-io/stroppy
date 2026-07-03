@@ -9,5 +9,5 @@ bench: # Run benchmarks, no unit tests
 lint: # Run golangci-lint
 	golangci-lint run
 
-allocgate: # Run alloc-gate tests (name-filtered; ordinary go test underneath)
-	go test -run TestAllocs -tags allocgate ./...
+allocgate: # Run every alloc-gate test (all named TestAllocs*), race-free
+	go test -run '^TestAllocs' ./...

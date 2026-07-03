@@ -60,7 +60,8 @@ type VU struct {
 func (vu *VU) Ctx() context.Context { return vu.ctx }
 
 // Slot reports the default driver slot for this step (from StepDef.Uses; 0 when
-// unset). Handlers that target the step's declared slot pass it to [VU.Conn].
+// unset). [VU.Conn]/[VU.ConnE] use it implicitly; Slot is only needed to compute
+// a target for [VU.ConnSlot] on a multi-driver step.
 func (vu *VU) Slot() int { return vu.slot }
 
 // Index reports the VU's zero-based worker index within its executor.

@@ -18,6 +18,7 @@ func TestShardSplitAggregate(t *testing.T) {
 
 	const shards = 8
 	const n = 80_000
+	reg.Freeze()
 	sh := make([]*Shard, shards)
 	for i := range sh {
 		sh[i] = reg.NewShard()
@@ -63,6 +64,7 @@ func TestReporterConcurrent(t *testing.T) {
 
 	const shards = 8
 	const perShard = 50_000
+	reg.Freeze()
 	sh := make([]*Shard, shards)
 	for i := range sh {
 		sh[i] = reg.NewShard()
@@ -109,6 +111,7 @@ func TestReporterConcurrent(t *testing.T) {
 func TestReporterIntervalRate(t *testing.T) {
 	reg := NewRegistry()
 	h := reg.Histogram(Instrument{Name: "latency", Step: "wl"})
+	reg.Freeze()
 	sh := []*Shard{reg.NewShard()}
 
 	sink := &captureSink{}
@@ -141,14 +144,27 @@ func TestReporterIntervalRate(t *testing.T) {
 	}
 }
 
-// TestRegistryFreeze checks registration after NewShard panics.
+// TestRegistryFreeze checks the two-phase lifecycle: NewShard before Freeze
+// panics, and registration after Freeze panics.
 func TestRegistryFreeze(t *testing.T) {
 	reg := NewRegistry()
 	reg.Histogram(Instrument{Name: "a"})
-	reg.NewShard()
+
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("expected panic minting a shard before Freeze")
+			}
+		}()
+		reg.NewShard()
+	}()
+
+	reg.Freeze()
+	reg.NewShard() // now allowed
+
 	defer func() {
 		if recover() == nil {
-			t.Fatal("expected panic registering after NewShard")
+			t.Fatal("expected panic registering after Freeze")
 		}
 	}()
 	reg.Histogram(Instrument{Name: "b"})
@@ -159,6 +175,7 @@ func TestConsoleSink(t *testing.T) {
 	reg := NewRegistry()
 	h := reg.Histogram(Instrument{Name: "latency", Step: "wl", Tx: "new_order"})
 	c := reg.Counter(Instrument{Name: "errors", Step: "wl"})
+	reg.Freeze()
 	sh := []*Shard{reg.NewShard()}
 	for i := 0; i < 100; i++ {
 		sh[0].Record(h, 500_000)
