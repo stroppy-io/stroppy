@@ -281,23 +281,18 @@ export default function (): void {
       query: q as unknown as SqlQuery,
     }));
 
-  // Safety: cap any single query so a pathological plan can't wedge the run.
-  // A capped query throws → captured as ERR: in the dump, run continues.
-  const QUERY_CAP_MS = Number(ENV("QUERY_CAP_MS", "180000", "Per-query timeout (ms) in validate/dump"));
+  // Per-query cap and planner tweaks live with the dialect, as set_timeout and
+  // preconfigure_db sections in schema.<driver>.sql — each engine carries its
+  // own session setup instead of a driver branch here (pg forces hash joins for
+  // the year_total CTE self-join + skips JIT; mysql sets the cap; ydb has none
+  // and the absent section is a no-op). SETs are session-scoped, so these run
+  // inline on the same connection as the query pass below — wrapping them in a
+  // Step hands the next exec to a different pooled connection and the SET is lost.
   if (answersSf1 || ANSWER_DUMP) {
     try {
-      if (driverConfig.driverType === "postgres") {
-        driver.exec(`SET statement_timeout = '${QUERY_CAP_MS}'` as unknown as SqlQuery, {});
-        // Force hash joins: the year_total queries self-join a materialized
-        // CTE that carries no statistics, so the planner under-estimates the
-        // filtered scans and picks nested loops that blow past the cap. Hash
-        // joins keep them seconds, not minutes. Scoped to validate/dump.
-        driver.exec(`SET enable_nestloop = off` as unknown as SqlQuery, {});
-        driver.exec(`SET jit = off` as unknown as SqlQuery, {});
-      } else if (driverConfig.driverType === "mysql") {
-        driver.exec(`SET SESSION max_execution_time = ${QUERY_CAP_MS}` as unknown as SqlQuery, {});
-      }
-    } catch (_e) { /* best-effort */ }
+      execEachLogged(schema("set_timeout"), (q) => driver.exec(q, {}));
+      execEachLogged(schema("preconfigure_db"), (q) => driver.exec(q, {}));
+    } catch (_e) { /* best-effort: a SET must not abort the pass */ }
   }
 
   // Run each query once; feed both the official SF=1 compare (answersSf1) and

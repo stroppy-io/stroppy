@@ -687,3 +687,20 @@ create index i_inv_date_sk on inventory (inv_date_sk);
 create index i_inv_item_sk on inventory (inv_item_sk);
 --= i_inv_warehouse_sk
 create index i_inv_warehouse_sk on inventory (inv_warehouse_sk);
+
+--+ set_timeout
+-- Per-query cap (milliseconds) for the dump/validate pass; a pathological plan
+-- throws and is captured as ERR: in the dump instead of wedging the run.
+--= statement_timeout
+SET statement_timeout = '180000';
+
+--+ preconfigure_db
+-- Engine-specific session setup for the dump/validate pass. The year_total
+-- queries self-join a materialized CTE that carries no statistics, so the
+-- planner under-estimates the filtered scans and picks nested loops that blow
+-- past the cap above; force hash joins. Skip JIT — its compile cost hurts more
+-- than the saved execution time on these heavy aggregates.
+--= enable_nestloop_off
+SET enable_nestloop = off;
+--= jit_off
+SET jit = off;
