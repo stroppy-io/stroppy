@@ -98,31 +98,38 @@ func TestIsolationString(t *testing.T) {
 	}
 }
 
-// fakeSQLState is a minimal error carrying a SQLSTATE, used to test IsRetryable
-// without a real driver dependency.
+func TestActionString(t *testing.T) {
+	cases := map[driver.Action]string{
+		driver.Retry:    "Retry",
+		driver.Continue: "Continue",
+		driver.Fail:     "Fail",
+		driver.Abort:    "Abort",
+	}
+	for a, want := range cases {
+		if got := a.String(); got != want {
+			t.Errorf("Action(%d).String() = %q, want %q", a, got, want)
+		}
+	}
+}
+
+// fakeSQLState is a minimal error carrying a SQLSTATE, used to test the base
+// package's SQLSTATE extraction helper without a real driver dependency.
 type fakeSQLState struct{ code string }
 
 func (e fakeSQLState) Error() string    { return "sqlstate " + e.code }
 func (e fakeSQLState) SQLState() string { return e.code }
 
-func TestIsRetryable(t *testing.T) {
-	cases := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{"serialization 40001", fakeSQLState{"40001"}, true},
-		{"deadlock 40P01", fakeSQLState{"40P01"}, true},
-		{"wrapped serialization", fmt.Errorf("tx failed: %w", fakeSQLState{"40001"}), true},
-		{"application error P0001", fakeSQLState{"P0001"}, false},
-		{"unique violation 23505", fakeSQLState{"23505"}, false},
-		{"plain error", errors.New("boom"), false},
-		{"nil", nil, false},
+func TestSQLStateExtraction(t *testing.T) {
+	code, ok := driver.SQLState(fakeSQLState{"40001"})
+	if !ok || code != "40001" {
+		t.Fatalf("SQLState(fakeSQLState{40001}) = %q,%v, want 40001,true", code, ok)
 	}
-
-	for _, c := range cases {
-		if got := driver.IsRetryable(c.err); got != c.want {
-			t.Errorf("%s: IsRetryable = %v, want %v", c.name, got, c.want)
-		}
+	// Wrapping with %w must not hide the code (errors.As unwrap).
+	code, ok = driver.SQLState(fmt.Errorf("tx failed: %w", fakeSQLState{"40P01"}))
+	if !ok || code != "40P01" {
+		t.Fatalf("SQLState on wrapped err = %q,%v, want 40P01,true", code, ok)
+	}
+	if _, ok := driver.SQLState(errors.New("plain")); ok {
+		t.Fatal("SQLState on a plain error should report no code")
 	}
 }

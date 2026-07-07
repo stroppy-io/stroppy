@@ -36,14 +36,20 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 	st.hid++
 
 	// update_get_warehouse [amount, w_id] RETURNING w_name,...
-	q := vu.Prepare(h.q.pUpdWh)
+	q, err := vu.Prepare(h.q.pUpdWh)
+	if err != nil {
+		return err
+	}
 	wName, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Float64(amount).Int64(wID)).ScanBytes(0)
 	if err != nil {
 		return err
 	}
 
 	// update_get_district [amount, w_id, d_id] RETURNING d_name,...
-	q = vu.Prepare(h.q.pUpdDist)
+	q, err = vu.Prepare(h.q.pUpdDist)
+	if err != nil {
+		return err
+	}
 	dName, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Float64(amount).Int64(wID).Int64(dID)).ScanBytes(0)
 	if err != nil {
 		return err
@@ -53,7 +59,10 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 	var cCredit, cDataOld []byte
 	if byName {
 		cLast := clastName(vu, rng.NURand(vu.Rand(sPayClast), cy, 255, 0, 999, h.w.cLastRun))
-		q = vu.Prepare(h.q.pCountByName)
+		q, err = vu.Prepare(h.q.pCountByName)
+		if err != nil {
+			return err
+		}
 		n, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(cWID).Int64(cDID).Bytes(cLast)).ScanInt64(0)
 		if err != nil {
 			return err
@@ -63,7 +72,10 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 		}
 		st.c.bynamePayment++
 		// get_customer_by_name: c_id,c_first,c_middle,c_last,...,c_credit(10),...,c_data(15)
-		q = vu.Prepare(h.q.pGetByName)
+		q, err = vu.Prepare(h.q.pGetByName)
+		if err != nil {
+			return err
+		}
 		row := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(cWID).Int64(cDID).Bytes(cLast).Int64((n-1)/2))
 		if cID, err = row.ScanInt64(0); err != nil {
 			return err
@@ -77,7 +89,10 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 	} else {
 		cID = cIDPick
 		// get_customer_by_id: c_first,...,c_credit(9),...,c_data(14)
-		q = vu.Prepare(h.q.pGetByID)
+		q, err = vu.Prepare(h.q.pGetByID)
+		if err != nil {
+			return err
+		}
 		row := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(cWID).Int64(cDID).Int64(cID))
 		if cCredit, err = row.ScanBytes(9); err != nil {
 			return err
@@ -90,13 +105,19 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 	if bytes.Equal(bytes.TrimSpace(cCredit), bcCredit) {
 		st.c.bcPayment++
 		cDataNew := buildCData(vu, cID, cDID, cWID, dID, wID, amount, cDataOld)
-		q = vu.Prepare(h.q.pUpdCustBC)
+		q, err = vu.Prepare(h.q.pUpdCustBC)
+		if err != nil {
+			return err
+		}
 		if err := tx.ExecWithArgs(ctx, q,
 			q.Bind().Float64(amount).Bytes(cDataNew).Int64(cWID).Int64(cDID).Int64(cID)); err != nil {
 			return err
 		}
 	} else {
-		q = vu.Prepare(h.q.pUpdCust)
+		q, err = vu.Prepare(h.q.pUpdCust)
+		if err != nil {
+			return err
+		}
 		if err := tx.ExecWithArgs(ctx, q,
 			q.Bind().Float64(amount).Int64(cWID).Int64(cDID).Int64(cID)); err != nil {
 			return err
@@ -105,7 +126,10 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 
 	// insert_history [h_id, h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_amount, h_data].
 	hData := buildHData(vu, wName, dName)
-	q = vu.Prepare(h.q.pInsHist)
+	q, err = vu.Prepare(h.q.pInsHist)
+	if err != nil {
+		return err
+	}
 	return tx.ExecWithArgs(ctx, q,
 		q.Bind().Int64(hid).Int64(cID).Int64(cDID).Int64(cWID).Int64(dID).Int64(wID).
 			Float64(amount).Bytes(hData))

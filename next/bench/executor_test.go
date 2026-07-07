@@ -141,71 +141,34 @@ func TestGracefulStop(t *testing.T) {
 	}
 }
 
-// flakyHandler fails the first failN attempts of each VU, then succeeds.
-type flakyHandler struct {
-	failN int
-	err   error
-}
+// failRootHandler emits a Fail-rooted error once, then succeeds. The executor
+// must let the run finish (Fail = complete-then-halt), recording the failure.
+type failRootHandler struct{ emitted atomic.Bool }
 
-func (flakyHandler) Init(vu *VU) error { vu.Local = new(int); return nil }
-func (h flakyHandler) Iter(vu *VU) error {
-	n := vu.Local.(*int)
-	*n++
-	if *n <= h.failN {
-		return h.err
+func (*failRootHandler) Init(*VU) error  { return nil }
+func (h *failRootHandler) Iter(vu *VU) error {
+	if !h.emitted.Swap(true) {
+		return Fail(errors.New("validation failed"))
 	}
 	return nil
 }
-func (flakyHandler) Close(*VU) error { return nil }
+func (*failRootHandler) Close(*VU) error { return nil }
 
-func TestRetryFlakySucceeds(t *testing.T) {
-	sentinel := errors.New("flaky")
-	ex := Closed(Config{
-		Interval: time.Hour,
-		Retry: RetryPolicy{
-			MaxAttempts: 3,
-			Retryable:   func(e error) bool { return errors.Is(e, sentinel) },
-		},
-	}, ClosedBudget{VUs: 1, Iters: 1}, flakyHandler{failN: 2, err: sentinel})
+// abortRootHandler emits an Abort-rooted error on its first Iter. The executor
+// must halt promptly (Abort = cancel in-flight, drain Close, return error).
+type abortRootHandler struct{ emitted atomic.Bool }
 
-	if err := ex.Run(context.Background()); err != nil {
-		t.Fatalf("Run: %v", err)
+func (*abortRootHandler) Init(*VU) error  { return nil }
+func (h *abortRootHandler) Iter(vu *VU) error {
+	if !h.emitted.Swap(true) {
+		return Abort(errors.New("connection lost"))
 	}
-	if ex.TotalErrors() != 0 {
-		t.Fatalf("errors=%d, want 0 (retry absorbed them)", ex.TotalErrors())
-	}
-	if ex.TotalRetries() != 2 {
-		t.Fatalf("retries=%d, want 2", ex.TotalRetries())
-	}
-	if ex.TotalIters() != 1 {
-		t.Fatalf("iters=%d, want 1", ex.TotalIters())
-	}
+	return nil
 }
-
-func TestRetryNonRetryableStops(t *testing.T) {
-	ex := Closed(Config{
-		Interval: time.Hour,
-		OnErr:    Fail,
-		Retry: RetryPolicy{
-			MaxAttempts: 3,
-			Retryable:   func(error) bool { return false },
-		},
-	}, ClosedBudget{VUs: 1, Iters: 1}, failHandler{err: errors.New("boom")})
-
-	err := ex.Run(context.Background())
-	if err == nil {
-		t.Fatal("Fail mode with a real error should return an aggregate error")
-	}
-	if ex.TotalRetries() != 0 {
-		t.Fatalf("retries=%d, want 0 (non-retryable)", ex.TotalRetries())
-	}
-	if ex.TotalErrors() != 1 {
-		t.Fatalf("errors=%d, want 1", ex.TotalErrors())
-	}
-}
+func (*abortRootHandler) Close(*VU) error { return nil }
 
 func TestErrorModeSilentFinishes(t *testing.T) {
-	ex := Closed(Config{Interval: time.Hour, OnErr: Silent},
+	ex := Closed(Config{Interval: time.Hour, OnErr: ModeSilent},
 		ClosedBudget{VUs: 1, Iters: 5}, failHandler{err: errors.New("x")})
 	if err := ex.Run(context.Background()); err != nil {
 		t.Fatalf("Silent must not surface an error, got %v", err)
@@ -216,7 +179,7 @@ func TestErrorModeSilentFinishes(t *testing.T) {
 }
 
 func TestErrorModeFailFinishesThenReturns(t *testing.T) {
-	ex := Closed(Config{Interval: time.Hour, OnErr: Fail},
+	ex := Closed(Config{Interval: time.Hour, OnErr: ModeFail},
 		ClosedBudget{VUs: 1, Iters: 5}, failHandler{err: errors.New("x")})
 	err := ex.Run(context.Background())
 	if err == nil {
@@ -228,7 +191,7 @@ func TestErrorModeFailFinishesThenReturns(t *testing.T) {
 }
 
 func TestErrorModeAbortStopsPromptly(t *testing.T) {
-	ex := Closed(Config{Interval: time.Hour, OnErr: Abort},
+	ex := Closed(Config{Interval: time.Hour, OnErr: ModeAbort},
 		ClosedBudget{VUs: 4, Duration: time.Hour},
 		failHandler{err: errors.New("fatal"), pause: time.Millisecond})
 
@@ -238,6 +201,47 @@ func TestErrorModeAbortStopsPromptly(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("Abort must return the error")
+	}
+	if elapsed > time.Second {
+		t.Fatalf("Abort took %v, want prompt", elapsed)
+	}
+}
+
+// TestRootFailFinishesRun checks that a Handler-emitted bench.Fail overrides
+// ErrorMode and lets the current run finish, then surfaces the error. The run
+// is configured ModeSilent (which would otherwise swallow it), proving the
+// override.
+func TestRootFailFinishesRun(t *testing.T) {
+	ex := Closed(Config{Interval: time.Hour, OnErr: ModeSilent},
+		ClosedBudget{VUs: 1, Iters: 5}, &failRootHandler{})
+	err := ex.Run(context.Background())
+	if err == nil {
+		t.Fatal("Fail root error must surface as the aggregate Run error")
+	}
+	if !IsFail(err) {
+		t.Fatalf("aggregate err not Fail-rooted: %v", err)
+	}
+	if ex.TotalIters() != 5 {
+		t.Fatalf("iters=%d, want 5 (Fail lets the step finish)", ex.TotalIters())
+	}
+	if ex.TotalErrors() != 1 {
+		t.Fatalf("errors=%d, want 1", ex.TotalErrors())
+	}
+}
+
+// TestRootAbortStopsPromptly checks that a Handler-emitted bench.Abort overrides
+// ErrorMode and halts the executor promptly.
+func TestRootAbortStopsPromptly(t *testing.T) {
+	ex := Closed(Config{Interval: time.Hour, OnErr: ModeSilent},
+		ClosedBudget{VUs: 1, Duration: time.Hour}, &abortRootHandler{})
+	start := time.Now()
+	err := ex.Run(context.Background())
+	elapsed := time.Since(start)
+	if err == nil {
+		t.Fatal("Abort root error must surface")
+	}
+	if !IsAbort(err) {
+		t.Fatalf("aggregate err not Abort-rooted: %v", err)
 	}
 	if elapsed > time.Second {
 		t.Fatalf("Abort took %v, want prompt", elapsed)

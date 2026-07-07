@@ -77,7 +77,7 @@ type loadState struct {
 
 func (h *loadHandler) Init(vu *bench.VU) error {
 	st := bench.Local[loadState](vu)
-	conn, err := vu.ConnE()
+	conn, err := vu.Conn()
 	if err != nil {
 		return err
 	}

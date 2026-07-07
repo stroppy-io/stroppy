@@ -7,28 +7,63 @@ import "errors"
 // stay driver-agnostic.
 var ErrNoRows = errors.New("driver: no rows in result set")
 
+// Action is the resolved run-level outcome for an error, as classified by the
+// backend that produced it (see [Driver.Classify]). It is the single input the
+// query/tx wrapper (D9's bench.Transaction) and the executor feed into their
+// retry/lifecycle decisions — there is no separate global matcher.
+//
+// The steady-state hot path returns nil and never consults Classify, so the
+// enum only exists on the rare failure branch.
+type Action int
+
+const (
+	// Retry marks a transient, serialization-class failure the wrapper should
+	// replay (pg 40001/40P01, ydb transient, …). Only the dbdrv knows which
+	// backend errors are transient, hence Classify lives on the driver.
+	Retry Action = iota
+	// Continue swallows the error into telemetry and proceeds. The default for
+	// a plain non-retryable error and for a retry budget exhausted.
+	Continue
+	// Fail completes the current step, then halts the run with this step
+	// marked Failed. Motivated by validation: every assertion still runs.
+	Fail
+	// Abort halts the run immediately — cancel in-flight work, drain Close,
+	// exit non-zero. For connection-lost and SDK-system faults.
+	Abort
+)
+
+// String renders the Action name.
+func (a Action) String() string {
+	switch a {
+	case Retry:
+		return "Retry"
+	case Continue:
+		return "Continue"
+	case Fail:
+		return "Fail"
+	case Abort:
+		return "Abort"
+	default:
+		return "Unknown"
+	}
+}
+
 // sqlStater is implemented by driver errors that carry a SQLSTATE code
-// (pgconn.PgError does, via SQLState). Matching on this interface lets the base
-// package classify errors without importing any concrete SQL driver.
+// (pgconn.PgError does, via SQLState). Matching on this interface lets a
+// concrete driver classify errors without the base package importing any SQL
+// driver. Kept unexported: only pg's Classify reads it today; a future backend
+// implements Classify however it likes.
 type sqlStater interface {
 	SQLState() string
 }
 
-// IsRetryable reports whether err is a transient serialization failure that a
-// transaction may retry, porting v5's isSerializationError (helpers.ts): a
-// serialization failure (SQLSTATE 40001) or a deadlock (SQLSTATE 40P01). The
-// error is unwrapped (errors.As) to find a SQLSTATE-bearing cause, so wrapping
-// with %w does not hide it. Any other error — including application rollbacks
-// raised with RAISE EXCEPTION (e.g. tpcc's item-not-found sentinel, SQLSTATE
-// P0001) — is not retryable.
-func IsRetryable(err error) bool {
+// SQLState unwraps err and reports its SQLSTATE code, if any. It is the shared
+// SQLSTATE-extraction helper concrete drivers (pg today) build their Classify
+// on, so the unwrap-once logic is not duplicated per backend.
+func SQLState(err error) (string, bool) {
 	var s sqlStater
 	if errors.As(err, &s) {
-		switch s.SQLState() {
-		case "40001", "40P01":
-			return true
-		}
+		return s.SQLState(), true
 	}
-
-	return false
+	return "", false
 }

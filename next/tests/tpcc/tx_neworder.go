@@ -44,39 +44,57 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 	}
 
 	// get_customer [w_id, d_id, c_id] — read (values unused downstream).
-	q := vu.Prepare(h.q.noGetCustomer)
+	q, err := vu.Prepare(h.q.noGetCustomer)
+	if err != nil {
+		return err
+	}
 	if err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(wID).Int64(dID).Int64(cID)).Err(); err != nil {
 		return err
 	}
 
 	// get_warehouse [w_id].
-	q = vu.Prepare(h.q.noGetWarehouse)
+	q, err = vu.Prepare(h.q.noGetWarehouse)
+	if err != nil {
+		return err
+	}
 	if err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(wID)).Err(); err != nil {
 		return err
 	}
 
 	// get_district [d_id, w_id] FOR UPDATE -> o_id = d_next_o_id.
-	q = vu.Prepare(h.q.noGetDistrict)
+	q, err = vu.Prepare(h.q.noGetDistrict)
+	if err != nil {
+		return err
+	}
 	oID, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(dID).Int64(wID)).ScanInt64(0)
 	if err != nil {
 		return err
 	}
 
 	// update_district [d_id, w_id].
-	q = vu.Prepare(h.q.noUpdDistrict)
+	q, err = vu.Prepare(h.q.noUpdDistrict)
+	if err != nil {
+		return err
+	}
 	if err := tx.ExecWithArgs(ctx, q, q.Bind().Int64(dID).Int64(wID)); err != nil {
 		return err
 	}
 
 	// insert_order [o_id, d_id, w_id, c_id, ol_cnt, all_local].
-	q = vu.Prepare(h.q.noInsOrder)
+	q, err = vu.Prepare(h.q.noInsOrder)
+	if err != nil {
+		return err
+	}
 	if err := tx.ExecWithArgs(ctx, q,
 		q.Bind().Int64(oID).Int64(dID).Int64(wID).Int64(cID).Int64(olCnt).Int64(allLocal)); err != nil {
 		return err
 	}
 
 	// insert_new_order [o_id, d_id, w_id].
-	q = vu.Prepare(h.q.noInsNewOrder)
+	q, err = vu.Prepare(h.q.noInsNewOrder)
+	if err != nil {
+		return err
+	}
 	if err := tx.ExecWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID)); err != nil {
 		return err
 	}
@@ -87,7 +105,10 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 		iID, iQty, sup := itemID[i], qty[i], supply[i]
 
 		// get_item [i_id] -> i_price. A miss is the rollback sentinel.
-		q = vu.Prepare(h.q.noGetItem)
+		q, err = vu.Prepare(h.q.noGetItem)
+		if err != nil {
+			return err
+		}
 		price, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(iID)).ScanFloat64(0)
 		if err != nil {
 			if errors.Is(err, driver.ErrNoRows) {
@@ -100,7 +121,10 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 		}
 
 		// get_stock [i_id, supply_w_id] -> s_quantity + district s_dist_NN.
-		q = vu.Prepare(h.q.noGetStock)
+		q, err = vu.Prepare(h.q.noGetStock)
+		if err != nil {
+			return err
+		}
 		row := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(iID).Int64(sup))
 		sQty, err := row.ScanInt64(0)
 		if err != nil {
@@ -122,14 +146,20 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 		}
 
 		// update_stock [quantity, ol_quantity, remote_cnt, i_id, supply_w_id].
-		q = vu.Prepare(h.q.noUpdStock)
+		q, err = vu.Prepare(h.q.noUpdStock)
+		if err != nil {
+			return err
+		}
 		if err := tx.ExecWithArgs(ctx, q,
 			q.Bind().Int64(newQty).Int64(iQty).Int64(remoteCnt).Int64(iID).Int64(sup)); err != nil {
 			return err
 		}
 
 		// insert_order_line [o_id, d_id, w_id, ol_number, i_id, supply_w_id, quantity, amount, dist_info].
-		q = vu.Prepare(h.q.noInsOrderLine)
+		q, err = vu.Prepare(h.q.noInsOrderLine)
+		if err != nil {
+			return err
+		}
 		if err := tx.ExecWithArgs(ctx, q,
 			q.Bind().Int64(oID).Int64(dID).Int64(wID).Int64(ln).Int64(iID).Int64(sup).
 				Int64(iQty).Float64(float64(iQty)*price).Bytes(dist)); err != nil {

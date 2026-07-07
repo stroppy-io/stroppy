@@ -126,29 +126,38 @@ func requirePG(t *testing.T) string {
 
 // --- unit tests (no database) ---
 
-// TestIsRetryablePgError checks the ported v5 classifier against real
+// TestClassifyPgError checks the pg Classify port against real
 // pgconn.PgError values, including a wrapped one.
-func TestIsRetryablePgError(t *testing.T) {
+func TestClassifyPgError(t *testing.T) {
+	d := New(driver.Config{URL: "postgres://-"}) // no connection opened: Classify is pure
+
 	cases := []struct {
 		code string
-		want bool
+		want driver.Action
 	}{
-		{"40001", true},  // serialization failure
-		{"40P01", true},  // deadlock detected
-		{"P0001", false}, // raise_exception (tpcc rollback sentinel path)
-		{"23505", false}, // unique_violation
+		{"40001", driver.Retry},  // serialization failure
+		{"40P01", driver.Retry},  // deadlock detected
+		{"P0001", driver.Continue}, // raise_exception (tpcc rollback sentinel path)
+		{"23505", driver.Continue}, // unique_violation
 	}
 
 	for _, c := range cases {
 		err := error(&pgconn.PgError{Code: c.code})
-		if got := driver.IsRetryable(err); got != c.want {
-			t.Errorf("IsRetryable(%s) = %v, want %v", c.code, got, c.want)
+		if got := d.Classify(err); got != c.want {
+			t.Errorf("Classify(%s) = %v, want %v", c.code, got, c.want)
 		}
 	}
 
 	wrapped := fmt.Errorf("exec: %w", &pgconn.PgError{Code: "40001"})
-	if !driver.IsRetryable(wrapped) {
-		t.Error("IsRetryable did not unwrap a wrapped serialization error")
+	if got := d.Classify(wrapped); got != driver.Retry {
+		t.Errorf("Classify on wrapped serialization error = %v, want Retry", got)
+	}
+
+	if got := d.Classify(nil); got != driver.Continue {
+		t.Errorf("Classify(nil) = %v, want Continue", got)
+	}
+	if got := d.Classify(errors.New("boom")); got != driver.Continue {
+		t.Errorf("Classify(plain) = %v, want Continue", got)
 	}
 }
 
@@ -443,7 +452,7 @@ func scanCount(t *testing.T, row driver.Row) int64 {
 }
 
 // TestRetryableSerialization forces a REPEATABLE READ serialization failure
-// (SQLSTATE 40001) with two connections and checks IsRetryable classifies it.
+// (SQLSTATE 40001) with two connections and checks Classify flags it Retry.
 func TestRetryableSerialization(t *testing.T) {
 	ctx := context.Background()
 	c1, f := connect(t)
@@ -498,8 +507,8 @@ func TestRetryableSerialization(t *testing.T) {
 		t.Fatal("expected a serialization failure, got nil")
 	}
 
-	if !driver.IsRetryable(err) {
-		t.Fatalf("serialization error not classified retryable: %v", err)
+	if got := d.Classify(err); got != driver.Retry {
+		t.Fatalf("serialization error classified %v, want Retry: %v", got, err)
 	}
 
 	_ = tx1.Rollback(ctx)

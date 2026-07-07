@@ -7,7 +7,7 @@ package bench
 //     everything the hot path will touch and stash it in vu.Local.
 //   - Iter runs in the hot phase and must be allocation-free in steady state.
 //     Its returned error is a value, classified by the executor's [ErrorMode]
-//     and [RetryPolicy]; it is never thrown.
+//     (or an explicit [Fail]/[Abort] root error); it is never thrown.
 //   - Close runs once per VU (per worker for Pool) at teardown, even when the
 //     run is aborted or its context is canceled.
 //

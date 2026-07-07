@@ -7,6 +7,12 @@ import (
 	"github.com/stroppy-io/stroppy/next/metrics"
 )
 
+// Step-level retry is intentionally absent. Retry is tx-level only (D10/D9):
+// the bench.Transaction helper replays a whole transaction on a driver-classed
+// retryable error, and queries inside just return err. A per-step retry policy
+// may return later as its own option; it is not wired now, so StepDef exposes no
+// Retry setter.
+
 // execKind selects a step's executor policy (RFC 0001 §7.2).
 type execKind uint8
 
@@ -34,7 +40,7 @@ func (k execKind) String() string {
 }
 
 // StepDef is the builder for one DAG step: a named [Handler] plus its executor
-// policy, dependency edges, condition, error/retry handling and driver slot. The
+// policy, dependency edges, condition, error handling and driver slot. The
 // chainable setters return the same *StepDef, so a step reads as one expression.
 // A freshly built step defaults to the Once policy on driver slot 0.
 type StepDef struct {
@@ -54,7 +60,6 @@ type StepDef struct {
 	onFailure []string
 	ifPred    func(*Run) bool
 
-	retry RetryPolicy
 	onErr ErrorMode
 	uses  string
 }
@@ -114,14 +119,9 @@ func (s *StepDef) OnFailure(deps ...string) *StepDef {
 // the [Run] so it can branch on the resolved driver kind, options or seed.
 func (s *StepDef) If(pred func(*Run) bool) *StepDef { s.ifPred = pred; return s }
 
-// Retry sets the per-Iter retry policy for this step's executor. Per the M6
-// wiring decision this maps to the EXECUTOR retry (around a single Iter), not
-// dag-level node retry: re-running a whole load step is not a PoC need, so the
-// dag node's own retry stays unused by a StepDef.
-func (s *StepDef) Retry(p RetryPolicy) *StepDef { s.retry = p; return s }
-
-// OnErr sets how the executor classifies an Iter/Close error (silent/log/fail/
-// abort).
+// OnErr sets how the executor classifies an Iter/Close error that is neither
+// driver-classified (D9 tx retry) nor an explicit [Fail]/[Abort] root error:
+// silent/log/fail/abort. A Handler-emitted [Fail] or [Abort] overrides OnErr.
 func (s *StepDef) OnErr(m ErrorMode) *StepDef { s.onErr = m; return s }
 
 // Uses names the driver slot this step's VUs connect to by default (slot 0 when
@@ -151,7 +151,6 @@ func stepConfig(sd *StepDef, seed uint64, reg *metrics.Registry, drivers []drive
 		StepID:  stepID(sd.name),
 		Seed:    seed,
 		OnErr:   sd.onErr,
-		Retry:   sd.retry,
 		Reg:     reg,
 		Drivers: drivers,
 		Slot:    slot,

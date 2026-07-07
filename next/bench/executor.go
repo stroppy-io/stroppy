@@ -32,10 +32,9 @@ type Config struct {
 	Seed uint64
 	// ArenaSize is the per-VU arena chunk size in bytes; zero uses a default.
 	ArenaSize int
-	// OnErr classifies Iter/Close errors. Zero value is Log.
+	// OnErr classifies Iter/Close errors that are neither driver-classified nor
+	// an explicit [Fail]/[Abort] root error. Zero value is Log.
 	OnErr ErrorMode
-	// Retry wraps each Iter. Zero value is a single attempt.
-	Retry RetryPolicy
 	// Interval is the reporter tick; zero uses metrics.DefaultInterval.
 	Interval time.Duration
 	// Sink receives interval and summary reports; nil discards them.
@@ -64,7 +63,6 @@ type Executor struct {
 	name    string
 	handler Handler
 	onErr   ErrorMode
-	retry   RetryPolicy
 
 	reg      *metrics.Registry
 	shards   []*metrics.Shard
@@ -124,7 +122,6 @@ func newExecutor(cfg Config, nVUs int, open bool) *Executor {
 	e := &Executor{
 		name:    name,
 		onErr:   cfg.OnErr,
-		retry:   cfg.Retry,
 		reg:     reg,
 		inst:    inst,
 		nVUs:    nVUs,
@@ -273,16 +270,15 @@ func panicErr(r any) error {
 	return fmt.Errorf("panic: %v", r)
 }
 
-// iterate is the shared hot-path body: reset the arena, set the cycle, run the
-// (retry-wrapped) Iter while timing it, and record servicetime plus the
-// iteration count. Open records waittime separately before calling this. Zero
-// allocation in steady state.
+// iterate is the shared hot-path body: reset the arena, set the cycle, run Iter
+// while timing it, and record servicetime plus the iteration count. Open records
+// waittime separately before calling this. Zero allocation in steady state.
 func (e *Executor) iterate(vu *VU, cycle uint64) {
 	vu.cycle = cycle
 	vu.arena.Reset()
 	vu.hotIter = e.hot
 	start := time.Now()
-	err := e.runIter(vu)
+	err := e.handler.Iter(vu)
 	vu.shard.Record(vu.inst.Servicetime, time.Since(start).Nanoseconds())
 	vu.shard.Inc(vu.inst.Iters)
 	if err != nil {
@@ -290,43 +286,31 @@ func (e *Executor) iterate(vu *VU, cycle uint64) {
 	}
 }
 
-// runIter applies the retry policy around one Iter and returns the surviving
-// error (nil if any attempt succeeded). Zero allocation when the first attempt
-// succeeds — the steady-state case.
-func (e *Executor) runIter(vu *VU) error {
-	max := e.retry.MaxAttempts
-	if max < 1 {
-		max = 1
-	}
-	var err error
-	for attempt := 1; ; attempt++ {
-		if err = e.handler.Iter(vu); err == nil {
-			return nil
-		}
-		if attempt >= max || e.retry.Retryable == nil || !e.retry.Retryable(err) {
-			return err
-		}
-		vu.shard.Inc(vu.inst.Retries)
-		if e.retry.Backoff != nil {
-			if d := e.retry.Backoff(attempt); d > 0 {
-				time.Sleep(d)
-			}
-		}
-	}
-}
-
-// onError counts an error and applies the executor's [ErrorMode]. Off the hot
-// path: it runs only when an Iter (or Close) actually failed.
+// onError counts an error and applies the executor's policy. Off the hot path:
+// it runs only when an Iter (or Close) actually failed. An explicit [Fail] or
+// [Abort] root error overrides the step's [ErrorMode]: the author emits one to
+// pin the run-level outcome regardless of config; a plain error falls through
+// to OnErr.
 func (e *Executor) onError(vu *VU, err error) {
-	vu.shard.Inc(vu.inst.Errors)
-	switch e.onErr {
-	case Silent:
-	case Log:
+	vu.shard.Inc(e.inst.Errors)
+	if kind, ok := rootAction(err); ok {
 		e.logErr(vu, err)
-	case Fail:
+		switch kind {
+		case kindAbort:
+			e.abort(err)
+		case kindFail:
+			e.storeErr(err)
+		}
+		return
+	}
+	switch e.onErr {
+	case ModeSilent:
+	case ModeLog:
+		e.logErr(vu, err)
+	case ModeFail:
 		e.logErr(vu, err)
 		e.storeErr(err)
-	case Abort:
+	case ModeAbort:
 		e.logErr(vu, err)
 		e.abort(err)
 	}

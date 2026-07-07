@@ -18,46 +18,67 @@ func (h *workloadHandler) delivery(vu *bench.VU, tx driver.Tx, st *txState) erro
 
 	for dID := int64(1); dID <= districtsPerWarehouse; dID++ {
 		// get_min_new_order [d_id, w_id]; NULL (empty district) -> skip.
-		q := vu.Prepare(h.q.dGetMinNO)
+		q, err := vu.Prepare(h.q.dGetMinNO)
+		if err != nil {
+			return err
+		}
 		oID, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(dID).Int64(wID)).ScanInt64(0)
 		if err != nil {
 			continue
 		}
 
 		// delete_new_order [o_id, d_id, w_id].
-		q = vu.Prepare(h.q.dDelNO)
+		q, err = vu.Prepare(h.q.dDelNO)
+		if err != nil {
+			return err
+		}
 		if err := tx.ExecWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID)); err != nil {
 			return err
 		}
 
 		// get_order [o_id, d_id, w_id] -> o_c_id.
-		q = vu.Prepare(h.q.dGetOrder)
+		q, err = vu.Prepare(h.q.dGetOrder)
+		if err != nil {
+			return err
+		}
 		cID, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID)).ScanInt64(0)
 		if err != nil {
 			continue
 		}
 
 		// update_order [carrier_id, o_id, d_id, w_id].
-		q = vu.Prepare(h.q.dUpdOrder)
+		q, err = vu.Prepare(h.q.dUpdOrder)
+		if err != nil {
+			return err
+		}
 		if err := tx.ExecWithArgs(ctx, q, q.Bind().Int64(carrier).Int64(oID).Int64(dID).Int64(wID)); err != nil {
 			return err
 		}
 
 		// update_order_line [o_id, d_id, w_id].
-		q = vu.Prepare(h.q.dUpdOrderLine)
+		q, err = vu.Prepare(h.q.dUpdOrderLine)
+		if err != nil {
+			return err
+		}
 		if err := tx.ExecWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID)); err != nil {
 			return err
 		}
 
 		// get_order_line_amount [o_id, d_id, w_id] -> SUM(ol_amount).
-		q = vu.Prepare(h.q.dGetAmount)
+		q, err = vu.Prepare(h.q.dGetAmount)
+		if err != nil {
+			return err
+		}
 		total, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID)).ScanFloat64(0)
 		if err != nil {
 			total = 0
 		}
 
 		// update_customer [amount, c_id, d_id, w_id].
-		q = vu.Prepare(h.q.dUpdCust)
+		q, err = vu.Prepare(h.q.dUpdCust)
+		if err != nil {
+			return err
+		}
 		if err := tx.ExecWithArgs(ctx, q, q.Bind().Float64(total).Int64(cID).Int64(dID).Int64(wID)); err != nil {
 			return err
 		}

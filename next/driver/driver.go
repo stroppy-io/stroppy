@@ -15,6 +15,13 @@ type Driver interface {
 	// connection here rather than borrowing from a shared pool, so the measured
 	// path has no pool contention (RFC 0001 §10).
 	Connect(ctx context.Context) (Conn, error)
+	// Classify maps an error this driver produced to a run-level [Action] the
+	// query/tx wrapper and executor act on. What is transient is backend-
+	// specific (pg SQLSTATE 40001/40P01, ydb transient, mongo write-conflict,
+	// http 5xx) — only the dbdrv knows — so the classifier lives here rather
+	// than as a global matcher. A nil err is Continue; the steady-state hot
+	// path never calls this.
+	Classify(err error) Action
 	// Teardown releases backend-wide resources after every connection is closed.
 	Teardown(ctx context.Context) error
 }

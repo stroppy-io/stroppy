@@ -22,7 +22,10 @@ func (h *workloadHandler) orderStatus(vu *bench.VU, tx driver.Tx, st *txState) e
 	var cID int64
 	if byName {
 		cLast := clastName(vu, rng.NURand(vu.Rand(sOsClast), cy, 255, 0, 999, h.w.cLastRun))
-		q := vu.Prepare(h.q.osCountByName)
+		q, err := vu.Prepare(h.q.osCountByName)
+		if err != nil {
+			return err
+		}
 		n, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(wID).Int64(dID).Bytes(cLast)).ScanInt64(0)
 		if err != nil {
 			return err
@@ -30,7 +33,10 @@ func (h *workloadHandler) orderStatus(vu *bench.VU, tx driver.Tx, st *txState) e
 		if n == 0 {
 			return nil
 		}
-		q = vu.Prepare(h.q.osGetByName)
+		q, err = vu.Prepare(h.q.osGetByName)
+		if err != nil {
+			return err
+		}
 		id, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(wID).Int64(dID).Bytes(cLast).Int64((n-1)/2)).ScanInt64(4)
 		if err != nil {
 			if errors.Is(err, driver.ErrNoRows) {
@@ -41,7 +47,10 @@ func (h *workloadHandler) orderStatus(vu *bench.VU, tx driver.Tx, st *txState) e
 		cID = id
 	} else {
 		cID = rng.NURand(vu.Rand(sOsCID), cy, 1023, 1, 3000, h.w.cID)
-		q := vu.Prepare(h.q.osGetByID)
+		q, err := vu.Prepare(h.q.osGetByID)
+		if err != nil {
+			return err
+		}
 		if err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(cID).Int64(dID).Int64(wID)).Err(); err != nil {
 			if errors.Is(err, driver.ErrNoRows) {
 				return nil
@@ -51,7 +60,10 @@ func (h *workloadHandler) orderStatus(vu *bench.VU, tx driver.Tx, st *txState) e
 	}
 
 	// get_last_order [d_id, w_id, c_id] -> o_id (latest).
-	q := vu.Prepare(h.q.osGetLastOrder)
+	q, err := vu.Prepare(h.q.osGetLastOrder)
+	if err != nil {
+		return err
+	}
 	oID, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(dID).Int64(wID).Int64(cID)).ScanInt64(0)
 	if err != nil {
 		if errors.Is(err, driver.ErrNoRows) {
@@ -61,7 +73,10 @@ func (h *workloadHandler) orderStatus(vu *bench.VU, tx driver.Tx, st *txState) e
 	}
 
 	// get_order_lines [o_id, d_id, w_id] -> read and discard.
-	q = vu.Prepare(h.q.osGetOrderLines)
+	q, err = vu.Prepare(h.q.osGetOrderLines)
+	if err != nil {
+		return err
+	}
 	rows, err := tx.QueryWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID))
 	if err != nil {
 		return err

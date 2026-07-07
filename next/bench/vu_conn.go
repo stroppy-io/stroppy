@@ -36,38 +36,28 @@ func (vu *VU) connect(slot int) (driver.Conn, error) {
 	return c, nil
 }
 
-// Conn returns this VU's pinned connection to the step's default slot ([VU.Slot],
-// set by [StepDef.Uses]), establishing it on first use. It panics on a connect
-// failure; the executor recovers the panic into the step's Init/Iter failure, so
-// a bad DSN exits the run non-zero rather than crashing. Use it for trivial
-// [FuncOnce] bodies where an error return would be ceremony; a [Handler] with an
-// Init should establish its connection there with [VU.ConnE] instead, so the
-// failure is a first-class value on the plan-phase path.
-func (vu *VU) Conn() driver.Conn {
-	c, err := vu.connect(vu.slot)
-	if err != nil {
-		panic(err)
-	}
-	return c
-}
-
-// ConnE is [VU.Conn] with the connect failure returned rather than panicked: the
-// first-class Init path. Establish the connection in a [Handler]'s Init and stash
-// it for the hot loop:
+// Conn returns this VU's pinned connection to the step's default slot
+// ([VU.Slot], set by [StepDef.Uses]), establishing it on first use and returning
+// any connect failure as a value. Establish the connection in a [Handler]'s Init
+// and stash it for the hot loop:
 //
 //	func (h *myHandler) Init(vu *bench.VU) error {
 //		st := bench.Local[myState](vu)
 //		var err error
-//		if st.conn, err = vu.ConnE(); err != nil {
+//		if st.conn, err = vu.Conn(); err != nil {
 //			return err
 //		}
 //		return nil
 //	}
-func (vu *VU) ConnE() (driver.Conn, error) { return vu.connect(vu.slot) }
+//
+// SDK and driver functions return native errors, never panic (D10): there is no
+// panic-on-failure Conn variant. A FuncOnce body receives the error directly and
+// returns it; the executor counts the failed Iter.
+func (vu *VU) Conn() (driver.Conn, error) { return vu.connect(vu.slot) }
 
 // ConnSlot returns this VU's pinned connection to an explicit driver slot,
 // establishing it on first use, for the rare multi-driver step that reaches a
-// slot other than its default. Like [VU.ConnE] it returns the connect failure as
+// slot other than its default. Like [VU.Conn] it returns the connect failure as
 // a value; establish in Init.
 func (vu *VU) ConnSlot(slot int) (driver.Conn, error) { return vu.connect(slot) }
 
@@ -100,19 +90,10 @@ func (vu *VU) prepare(q *sqlfile.Query) (driver.Stmt, error) {
 // Prepare returns the prepared handle for q on this VU's default-slot connection,
 // preparing and caching it on first use. Repeated calls for the same query are a
 // map read, so calling it on the hot path after Init has warmed the cache is
-// allocation-free. It panics on a prepare failure (recovered by the executor as a
-// step failure); use [VU.PrepareE] on the first-class Init path.
-func (vu *VU) Prepare(q *sqlfile.Query) driver.Stmt {
-	s, err := vu.prepare(q)
-	if err != nil {
-		panic(err)
-	}
-	return s
-}
-
-// PrepareE is [VU.Prepare] with the prepare failure returned rather than
-// panicked: the first-class Init path for warming the per-VU handle cache.
-func (vu *VU) PrepareE(q *sqlfile.Query) (driver.Stmt, error) { return vu.prepare(q) }
+// allocation-free. It returns the prepare failure as a value rather than
+// panicking (D10): no panic-on-failure Prepare variant exists. On the hot path
+// the cache hit returns a nil error, so the err check is a plain branch.
+func (vu *VU) Prepare(q *sqlfile.Query) (driver.Stmt, error) { return vu.prepare(q) }
 
 // closeConns closes every connection this VU established, ignoring errors (best
 // effort teardown against a fresh context so an aborted run still releases

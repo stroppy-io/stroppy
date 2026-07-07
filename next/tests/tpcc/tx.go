@@ -127,7 +127,7 @@ type txState struct {
 
 func (h *workloadHandler) Init(vu *bench.VU) error {
 	st := bench.Local[txState](vu)
-	conn, err := vu.ConnE()
+	conn, err := vu.Conn()
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (h *workloadHandler) Init(vu *bench.VU) error {
 	st.home = 1 + int64(vu.Index())%h.w.warehouses
 	st.hid = int64(vu.Index()+1) * 100_000_000 // disjoint from loaded history ids and across VUs
 	for _, q := range h.q.all() {
-		if _, err := vu.PrepareE(q); err != nil { // warm the per-VU handle cache (plan phase)
+		if _, err := vu.Prepare(q); err != nil { // warm the per-VU handle cache (plan phase)
 			return err
 		}
 	}

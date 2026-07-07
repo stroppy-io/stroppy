@@ -154,62 +154,21 @@ func (w *walker) status(id string) Status {
 	return w.results[id].Status
 }
 
-// execute runs n.Run against ctx, retrying per n.Retry while attempts
-// remain, the error is classified retryable, and ctx is not done. A
-// panic in Run is recovered and treated as a Failed attempt.
+// execute runs n.Run against ctx once. A panic in Run is recovered and treated
+// as a Failed attempt — defensive only; SDK/driver functions return errors
+// rather than panicking (D10), so this catches author bugs, not API faults.
 func (w *walker) execute(ctx context.Context, n *Node) (Status, int, error) {
-	maxAttempts := n.Retry.MaxAttempts
-	if maxAttempts < 1 {
-		maxAttempts = 1
+	err := call(ctx, n)
+	if err == nil {
+		return Succeeded, 1, nil
 	}
-
-	var lastErr error
-
-	attempt := 0
-	for attempt < maxAttempts {
-		attempt++
-		lastErr = call(ctx, n)
-
-		if lastErr == nil {
-			return Succeeded, attempt, nil
-		}
-
-		if ctx.Err() != nil {
-			return Canceled, attempt, lastErr
-		}
-
-		if attempt >= maxAttempts || n.Retry.Retryable == nil || !n.Retry.Retryable(lastErr) {
-			break
-		}
-
-		if !sleep(ctx, n.Retry.Backoff, attempt) {
-			return Canceled, attempt, lastErr
-		}
+	if ctx.Err() != nil {
+		return Canceled, 1, err
 	}
-
 	if n.Failure == AbortRun {
 		w.cancel()
 	}
-
-	return Failed, attempt, lastErr
-}
-
-// sleep waits out the backoff for the given attempt, or returns false if
-// ctx is done first.
-func sleep(ctx context.Context, backoff func(int) time.Duration, attempt int) bool {
-	if backoff == nil {
-		return true
-	}
-
-	timer := time.NewTimer(backoff(attempt))
-	defer timer.Stop()
-
-	select {
-	case <-timer.C:
-		return true
-	case <-ctx.Done():
-		return false
-	}
+	return Failed, 1, err
 }
 
 // call invokes n.Run, converting a recovered panic into an error.

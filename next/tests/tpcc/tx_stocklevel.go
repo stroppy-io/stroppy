@@ -22,14 +22,20 @@ func (h *workloadHandler) stockLevel(vu *bench.VU, tx driver.Tx, st *txState) er
 	threshold := rng.UniformInt(vu.Rand(sSlThreshold), cy, 10, 20)
 
 	// get_district [w_id, d_id] -> d_next_o_id.
-	q := vu.Prepare(h.q.slGetDistrict)
+	q, err := vu.Prepare(h.q.slGetDistrict)
+	if err != nil {
+		return err
+	}
 	nextO, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(wID).Int64(dID)).ScanInt64(0)
 	if err != nil {
 		return err
 	}
 
 	// count_low_stock [w_id, d_id, min_o_id, next_o_id, threshold] -> read, discard.
-	q = vu.Prepare(h.q.slCountLow)
+	q, err = vu.Prepare(h.q.slCountLow)
+	if err != nil {
+		return err
+	}
 	return tx.QueryRowWithArgs(ctx, q,
 		q.Bind().Int64(wID).Int64(dID).Int64(nextO-stockLevelWindow).Int64(nextO).Int64(threshold)).Err()
 }

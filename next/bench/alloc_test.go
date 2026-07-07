@@ -24,12 +24,12 @@ type fullStackState struct {
 
 func (h *fullStackHandler) Init(vu *VU) error {
 	st := Local[fullStackState](vu)
-	conn, err := vu.ConnE()
+	conn, err := vu.Conn()
 	if err != nil {
 		return err
 	}
 	st.conn = conn
-	stmt, err := vu.PrepareE(h.q)
+	stmt, err := vu.Prepare(h.q)
 	if err != nil {
 		return err
 	}

@@ -19,15 +19,35 @@
 // reproducible and independent of step ordering.
 //
 // Each VU pins a [driver.Conn] to its step's default slot on first use in Init
-// ([VU.ConnE], returning the connect failure as a first-class error; [VU.Conn]
-// is the panic-on-failure form for trivial FuncOnce bodies) and prepares SQL
-// handles per query ([VU.PrepareE]/[VU.Prepare]). Both are plan-phase work:
-// establishing a connection or statement for the first time inside a hot-loop
-// Iter is an error, since connecting is not hot-path work. Connections are
-// reconnected per step (closed after the step's Close) — an accepted PoC cost,
-// to revisit post-PoC.
-// Step-level [StepDef.Retry] maps to the executor retry around a single Iter, not
-// dag-level node retry (re-running a whole load step is not a PoC need).
+// ([VU.Conn]) and prepares SQL handles per query ([VU.Prepare]). Both return
+// errors as values — there are no panic-on-failure variants (D10: native errors
+// only, no panics, no throw). Both are plan-phase work: establishing a
+// connection or statement for the first time inside a hot-loop Iter is an error,
+// since connecting is not hot-path work. Connections are reconnected per step
+// (closed after the step's Close) — an accepted PoC cost, to revisit post-PoC.
+//
+// # Error system, retry & lifecycle (D10)
+//
+// SDK and driver functions emit Go native errors explicitly, never panic. An
+// Iter error is resolved in three layers, in priority order:
+//
+//  1. A driver classifier — [driver.Driver.Classify] — maps a backend error to
+//     an [driver.Action] in {Retry, Continue, Fail, Abort}. What is transient is
+//     backend-specific (pg SQLSTATE 40001/40P01, etc.); only the dbdrv knows.
+//     The D9 bench.Transaction helper retries a whole tx on Retry and surfaces
+//     the others; for now Classify is set up on each driver (pg, noop) and the
+//     tx-consuming wrapper lands in D9.
+//  2. A Handler may emit an explicit root error — [Fail] or [Abort] — to pin the
+//     run-level outcome regardless of the step's ErrorMode. Fail lets the current
+//     step run to completion then halts; Abort cancels in-flight work and halts
+//     immediately. Validation uses Fail so every assertion still executes.
+//  3. Otherwise the step's [ErrorMode] (ModeSilent/ModeLog/ModeFail/ModeAbort)
+//     decides, porting v5's silent|log|throw|fail|abort (throw and fail collapse
+//     into ModeFail since Go surfaces the Iter error as a value already).
+//
+// Step-level retry is intentionally absent: retry is tx-level only (the D9
+// bench.Transaction helper replays a whole transaction). A per-step retry
+// policy may return later; StepDef exposes no Retry setter for now.
 //
 // # Allocation phases (RFC 0001 §6)
 //
@@ -85,30 +105,4 @@
 // which stays zero on a healthy paced run and grows under saturation. This is
 // the difference between measuring the database and measuring the harness's
 // politeness (RFC 0001 §7.2).
-//
-// # Error modes (ported from v5)
-//
-// v5's ErrorModeName (silent|log|throw|fail|abort, internal/static/helpers.ts)
-// maps onto the Go [ErrorMode] enum. The Go model has one fewer value because Go
-// returns errors as values rather than throwing:
-//
-//	v5 "silent" -> Silent : count the error, no log, keep running.
-//	v5 "log"    -> Log    : count + log to stderr, keep running (default).
-//	v5 "throw"  -> Fail  \ In v5 "throw" rethrows the error into the surrounding
-//	v5 "fail"   -> Fail  / control flow while "fail" marks the run failed; both
-//	                       let the run continue and end up failed. In Go the Iter
-//	                       error is already a value surfaced to the executor loop,
-//	                       so the two collapse: count + log, keep running, and
-//	                       Run returns the first error as an aggregate at the end.
-//	v5 "abort"  -> Abort  : count + log, cancel the executor context (in-flight
-//	                        Iters finish and Close runs), Run returns promptly.
-//
-// throw is merged into Fail rather than Abort because in v5 an uncaught throw
-// does not stop the run — only abort does — so Fail (finish-but-failed) is the
-// faithful home for it.
-//
-// A [RetryPolicy] wraps each Iter: retryable errors are retried up to
-// MaxAttempts with an optional backoff before the [ErrorMode] classification
-// sees them. A retried-then-succeeded iteration surfaces no error and is not
-// counted in the error counter; each retry bumps the retries counter.
 package bench

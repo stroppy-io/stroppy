@@ -54,7 +54,6 @@ type probeStep struct {
 	OnFailure []string  `json:"onFailure,omitempty"`
 	If        bool      `json:"if"`
 	OnErr     string    `json:"onErr"`
-	Retry     int       `json:"retryMaxAttempts"`
 	Uses      string    `json:"uses"`
 	UsesSlot  int       `json:"usesSlot"`
 }
@@ -94,7 +93,6 @@ func buildProbe(t *Test, steps []*StepDef, seed uint64, schema []OptionSchema, s
 			OnFailure: sd.onFailure,
 			If:        sd.ifPred != nil,
 			OnErr:     sd.onErr.String(),
-			Retry:     sd.retry.MaxAttempts,
 			Uses:      sd.uses,
 			UsesSlot:  usesSlot,
 		})

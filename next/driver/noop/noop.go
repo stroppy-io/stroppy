@@ -35,6 +35,16 @@ func (*Driver) Connect(context.Context) (driver.Conn, error) {
 // Teardown does nothing.
 func (*Driver) Teardown(context.Context) error { return nil }
 
+// Classify never returns Retry: the noop driver produces no real backend
+// errors, so nothing is worth replaying. A non-nil err (only seen in tests)
+// falls through to Continue.
+func (*Driver) Classify(err error) driver.Action {
+	if err == nil {
+		return driver.Continue
+	}
+	return driver.Continue
+}
+
 type conn struct {
 	rows *rows
 	row  *row

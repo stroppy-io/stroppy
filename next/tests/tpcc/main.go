@@ -144,7 +144,7 @@ func buildSteps(o *options, seed uint64, iso driver.Isolation, file *sqlfile.Fil
 	idxQs := file.Section("create_indexes")
 
 	steps := []*bench.StepDef{
-		bench.Step("drop_schema", multiExec(dropQs)).OnErr(bench.Silent).Uses("main"),
+		bench.Step("drop_schema", multiExec(dropQs)).OnErr(bench.ModeSilent).Uses("main"),
 		bench.Step("create_schema", multiExec(createQs)).After("drop_schema").Uses("main"),
 	}
 
@@ -173,7 +173,6 @@ func buildSteps(o *options, seed uint64, iso driver.Isolation, file *sqlfile.Fil
 		bench.Step("workload", &workloadHandler{w: w, q: q, iso: iso}).
 			Closed(o.VUs, o.Duration).
 			AfterAny("validate_population", "create_indexes").
-			Retry(bench.RetryPolicy{MaxAttempts: 3, Retryable: driver.IsRetryable}).
 			Uses("main"),
 
 		bench.Step("check_consistency", checkConsistency()).
@@ -190,7 +189,10 @@ func buildSteps(o *options, seed uint64, iso driver.Isolation, file *sqlfile.Fil
 // order for side effect (DDL groups: drop, create, index).
 func multiExec(qs []*sqlfile.Query) bench.Handler {
 	return bench.FuncOnce(func(vu *bench.VU) error {
-		conn := vu.Conn()
+		conn, err := vu.Conn()
+		if err != nil {
+			return err
+		}
 		for _, q := range qs {
 			st, err := conn.Prepare(vu.Ctx(), q)
 			if err != nil {

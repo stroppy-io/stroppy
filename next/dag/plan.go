@@ -39,10 +39,6 @@ func planLine(n *Node) string {
 	sb.WriteString(" policy=")
 	sb.WriteString(n.Failure.String())
 
-	if n.Retry.MaxAttempts > 1 {
-		fmt.Fprintf(&sb, " retry=%dx", n.Retry.MaxAttempts)
-	}
-
 	return sb.String()
 }
 

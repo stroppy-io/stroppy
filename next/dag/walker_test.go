@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -384,68 +383,6 @@ func TestAfterAny(t *testing.T) {
 	requireStatus(t, res, "a", Failed)
 	requireStatus(t, res, "b", Succeeded)
 	requireStatus(t, res, "d", Succeeded)
-}
-
-// TestRetry covers a flaky node recovering within its attempt budget and
-// a non-retryable error stopping after the first attempt.
-func TestRetry(t *testing.T) {
-	t.Run("flaky node succeeds on attempt 3", func(t *testing.T) {
-		var attempts atomic.Int32
-
-		n := &Node{
-			ID: "flaky",
-			Run: func(context.Context) error {
-				if attempts.Add(1) < 3 {
-					return errors.New("transient")
-				}
-
-				return nil
-			},
-			Retry: RetryPolicy{MaxAttempts: 5, Retryable: func(error) bool { return true }},
-		}
-
-		b, err := NewGraph().Add(n).Build()
-		if err != nil {
-			t.Fatalf("build: %v", err)
-		}
-
-		res := Run(context.Background(), b)
-		requireStatus(t, res, "flaky", Succeeded)
-
-		if got := res.Node("flaky").Attempts; got != 3 {
-			t.Fatalf("attempts = %d, want 3", got)
-		}
-	})
-
-	t.Run("non-retryable error does not retry", func(t *testing.T) {
-		var attempts atomic.Int32
-
-		n := &Node{
-			ID: "bad",
-			Run: func(context.Context) error {
-				attempts.Add(1)
-
-				return errors.New("permanent")
-			},
-			Retry: RetryPolicy{MaxAttempts: 5, Retryable: func(error) bool { return false }},
-		}
-
-		b, err := NewGraph().Add(n).Build()
-		if err != nil {
-			t.Fatalf("build: %v", err)
-		}
-
-		res := Run(context.Background(), b)
-		requireStatus(t, res, "bad", Failed)
-
-		if got := res.Node("bad").Attempts; got != 1 {
-			t.Fatalf("attempts = %d, want 1", got)
-		}
-
-		if got := attempts.Load(); got != 1 {
-			t.Fatalf("Run invoked %d times, want 1", got)
-		}
-	})
 }
 
 // TestExternalCancelMidRun checks that canceling the caller's context

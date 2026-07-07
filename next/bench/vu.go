@@ -42,7 +42,7 @@ type VU struct {
 	ctx context.Context
 	// hotIter is true while a hot-loop executor (Closed/Open/Pool) is inside
 	// Iter; it gates [VU.Conn]/[VU.Prepare] against first-establishing a
-	// connection or statement on the hot path.
+	// connection or statement on the hot path (both are plan-phase work).
 	hotIter bool
 
 	// drivers is the run-level driver per slot (shared across VUs); conns holds
@@ -60,8 +60,8 @@ type VU struct {
 func (vu *VU) Ctx() context.Context { return vu.ctx }
 
 // Slot reports the default driver slot for this step (from StepDef.Uses; 0 when
-// unset). [VU.Conn]/[VU.ConnE] use it implicitly; Slot is only needed to compute
-// a target for [VU.ConnSlot] on a multi-driver step.
+// unset). [VU.Conn] uses it implicitly; Slot is only needed to compute a target
+// for [VU.ConnSlot] on a multi-driver step.
 func (vu *VU) Slot() int { return vu.slot }
 
 // Index reports the VU's zero-based worker index within its executor.

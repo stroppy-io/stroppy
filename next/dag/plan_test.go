@@ -10,7 +10,7 @@ func TestPlanRendering(t *testing.T) {
 		Add(okNode("a")).
 		Add(afterNode("b", "a")).
 		Add(&Node{ID: "c", Run: okRun, AfterAny: []string{"a"}}).
-		Add(&Node{ID: "cleanup", Run: okRun, OnFailure: []string{"a"}, Retry: RetryPolicy{MaxAttempts: 3}})
+		Add(&Node{ID: "cleanup", Run: okRun, OnFailure: []string{"a"}, Failure: SkipDependents})
 
 	b, err := g.Build()
 	if err != nil {
@@ -24,11 +24,7 @@ func TestPlanRendering(t *testing.T) {
 		}
 	}
 
-	if !strings.Contains(text, "retry=3x") {
-		t.Fatalf("PlanText missing retry annotation:\n%s", text)
-	}
-
-	if !strings.Contains(text, "policy="+AbortRun.String()) {
+	if !strings.Contains(text, "policy="+SkipDependents.String()) {
 		t.Fatalf("PlanText missing policy annotation:\n%s", text)
 	}
 

@@ -128,7 +128,7 @@ func TestProbeGolden(t *testing.T) {
 		Drivers: []DriverSlot{{Name: "main", Kind: "noop", URL: "noop://"}},
 		Build: func(*Run) []*StepDef {
 			return []*StepDef{
-				Step("setup", okHandler{}).OnErr(Silent),
+				Step("setup", okHandler{}).OnErr(ModeSilent),
 				Step("run", okHandler{}).
 					Closed(4, 3*time.Second).
 					After("setup").
@@ -167,7 +167,6 @@ func TestProbeGolden(t *testing.T) {
       },
       "if": false,
       "onErr": "silent",
-      "retryMaxAttempts": 0,
       "uses": "",
       "usesSlot": 0
     },
@@ -183,7 +182,6 @@ func TestProbeGolden(t *testing.T) {
       ],
       "if": true,
       "onErr": "log",
-      "retryMaxAttempts": 0,
       "uses": "main",
       "usesSlot": 0
     }

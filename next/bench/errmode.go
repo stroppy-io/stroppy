@@ -1,9 +1,6 @@
 package bench
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
 // vuError wraps an Init/Close failure with the VU index and lifecycle stage, so
 // an aggregate Run error names where it came from.
@@ -19,61 +16,48 @@ func (e *vuError) Error() string {
 
 func (e *vuError) Unwrap() error { return e.err }
 
-// ErrorMode decides what an executor does with an Iter error that a
-// [RetryPolicy] did not resolve. It is the Go port of v5's ErrorModeName
+// ErrorMode decides what an executor does with an Iter error that the driver
+// classifier (D9's tx wrapper) did not resolve and that is not an explicit
+// [Fail]/[Abort] root error. It is the Go port of v5's ErrorModeName
 // (silent|log|throw|fail|abort); see the package doc for the full mapping and
 // the rationale for merging throw into Fail.
+//
+// The constants carry a Mode prefix so the canonical error constructors
+// [Fail] and [Abort] keep the bare names the D10 decision specifies.
+//
+// Per-error override: a Handler may emit [Fail] or [Abort] to force the
+// run-level outcome regardless of the step's configured ErrorMode — validation
+// uses Fail so every assertion still runs; connection-lost uses Abort to halt
+// immediately.
 type ErrorMode int
 
 const (
-	// Log counts the error, logs it to stderr, and keeps running. Default
+	// ModeLog counts the error, logs it to stderr, and keeps running. Default
 	// (the zero value), matching v5's default of "log".
-	Log ErrorMode = iota
-	// Silent counts the error and keeps running, without logging. (v5 "silent")
-	Silent
-	// Fail counts and logs the error and keeps running, but the executor's Run
-	// returns the first such error as an aggregate. (v5 "throw" and "fail")
-	Fail
-	// Abort counts and logs the error, cancels the executor context so in-flight
-	// Iters finish and every VU's Close runs, and Run returns promptly with the
-	// error. (v5 "abort")
-	Abort
+	ModeLog ErrorMode = iota
+	// ModeSilent counts the error and keeps running, without logging. (v5 "silent")
+	ModeSilent
+	// ModeFail counts and logs the error and keeps running, but the executor's
+	// Run returns the first such error as an aggregate. (v5 "throw" and "fail")
+	ModeFail
+	// ModeAbort counts and logs the error, cancels the executor context so
+	// in-flight Iters finish and every VU's Close runs, and Run returns promptly
+	// with the error. (v5 "abort")
+	ModeAbort
 )
 
 // String renders the ErrorMode name.
 func (m ErrorMode) String() string {
 	switch m {
-	case Log:
+	case ModeLog:
 		return "log"
-	case Silent:
+	case ModeSilent:
 		return "silent"
-	case Fail:
+	case ModeFail:
 		return "fail"
-	case Abort:
+	case ModeAbort:
 		return "abort"
 	default:
 		return "unknown"
 	}
-}
-
-// RetryPolicy bounds retry of a single Iter. The zero value is a single attempt
-// with no retry. It is applied inside the executor loop, before the [ErrorMode]
-// classification sees the error, so a retried-then-succeeded iteration surfaces
-// no error at all.
-//
-// It is structurally identical to dag.RetryPolicy; the wiring milestone may
-// unify them once an executor is a dag node.
-type RetryPolicy struct {
-	// MaxAttempts is the total number of attempts including the first. Values
-	// below 1 mean a single attempt.
-	MaxAttempts int
-	// Backoff returns the delay before the next attempt given the 1-based
-	// number of the attempt that just failed. Nil means no delay. Kept as a
-	// function (not a fixed duration) so serialization retries can be immediate
-	// while transient-network retries back off — matching v5's retry helpers.
-	Backoff func(attempt int) time.Duration
-	// Retryable classifies an error as worth retrying. Nil means never retry,
-	// regardless of MaxAttempts. (M5 wires the SQLSTATE 40001 / deadlock
-	// classifier here, porting v5's isSerializationError.)
-	Retryable func(err error) bool
 }

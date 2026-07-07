@@ -72,8 +72,8 @@ func twoStepTest(dur time.Duration) *Test {
 		Build: func(*Run) []*StepDef {
 			return []*StepDef{
 				Step("setup", FuncOnce(func(vu *VU) error {
-					vu.Conn() // pin a (noop) connection
-					return nil
+					_, err := vu.Conn() // pin a (noop) connection
+					return err
 				})),
 				Step("work", &closedNoopDB{}).Closed(2, dur).After("setup"),
 			}
@@ -85,12 +85,12 @@ func twoStepTest(dur time.Duration) *Test {
 type closedNoopDB struct{}
 
 func (closedNoopDB) Init(vu *VU) error {
-	_, err := vu.ConnE()
+	_, err := vu.Conn()
 	return err
 }
 func (closedNoopDB) Iter(vu *VU) error {
 	// Cache hit on the hot path: allowed. A no-op exec against the pinned conn.
-	_ = vu.Conn()
-	return nil
+	_, err := vu.Conn()
+	return err
 }
 func (closedNoopDB) Close(*VU) error { return nil }

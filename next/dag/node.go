@@ -75,21 +75,6 @@ func (p FailurePolicy) String() string {
 	}
 }
 
-// RetryPolicy bounds retry of a node's Run. The zero value means a
-// single attempt with no retry.
-type RetryPolicy struct {
-	// MaxAttempts is the total number of attempts, including the first.
-	// Values below 1 are treated as 1 (no retry).
-	MaxAttempts int
-	// Backoff returns the delay before the next attempt, given the
-	// 1-based number of the attempt that just failed. Nil means no
-	// delay.
-	Backoff func(attempt int) time.Duration
-	// Retryable classifies an error as worth retrying. Nil means never
-	// retry, regardless of MaxAttempts.
-	Retryable func(err error) bool
-}
-
 // Node is one unit of work in the graph. The executor policy (once,
 // worker pool, rate-paced loop, ...) lives inside Run; the walker only
 // calls it and tracks its terminal status.
@@ -128,7 +113,6 @@ type Node struct {
 	OnFailure []string
 
 	Failure FailurePolicy
-	Retry   RetryPolicy
 }
 
 // NodeResult is a node's terminal outcome and execution accounting.

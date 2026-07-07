@@ -86,7 +86,7 @@ func buildSteps(o *options) func(*bench.Run) []*bench.StepDef {
 			// DROP may fail on a fresh database (no table yet); Silent keeps the
 			// step green and the run moving.
 			bench.Step("drop_schema", exec(dropQ)).
-				OnErr(bench.Silent).Uses("main"),
+				OnErr(bench.ModeSilent).Uses("main"),
 
 			bench.Step("create_schema", exec(createQ)).
 				After("drop_schema").Uses("main"),
@@ -110,11 +110,19 @@ func buildSteps(o *options) func(*bench.Run) []*bench.StepDef {
 }
 
 // exec is a run-once handler that prepares q and executes it for side effect.
-// As a trivial FuncOnce body it uses the panic-on-failure Conn/Prepare; the
-// executor recovers any connect/prepare failure into the step's error.
+// Conn/Prepare return errors (D10: native errors, no panics); a FuncOnce body
+// surfaces them directly and the executor counts the failed Iter.
 func exec(q *sqlfile.Query) bench.Handler {
 	return bench.FuncOnce(func(vu *bench.VU) error {
-		return vu.Conn().Exec(vu.Ctx(), vu.Prepare(q))
+		conn, err := vu.Conn()
+		if err != nil {
+			return err
+		}
+		st, err := vu.Prepare(q)
+		if err != nil {
+			return err
+		}
+		return conn.Exec(vu.Ctx(), st)
 	})
 }
 
@@ -137,7 +145,7 @@ type loadHandler struct{ opts *options }
 
 func (h *loadHandler) Init(vu *bench.VU) error {
 	st := bench.Local[loadState](vu)
-	conn, err := vu.ConnE()
+	conn, err := vu.Conn()
 	if err != nil {
 		return err
 	}
@@ -189,12 +197,12 @@ type workloadHandler struct {
 
 func (h *workloadHandler) Init(vu *bench.VU) error {
 	st := bench.Local[wlState](vu)
-	conn, err := vu.ConnE()
+	conn, err := vu.Conn()
 	if err != nil {
 		return err
 	}
 	st.conn = conn
-	stmt, err := vu.PrepareE(h.query)
+	stmt, err := vu.Prepare(h.query)
 	if err != nil {
 		return err
 	}
@@ -231,7 +239,15 @@ type checkHandler struct {
 func (h *checkHandler) Init(*bench.VU) error { return nil }
 
 func (h *checkHandler) Iter(vu *bench.VU) error {
-	row := vu.Conn().QueryRow(vu.Ctx(), vu.Prepare(h.query))
+	conn, err := vu.Conn()
+	if err != nil {
+		return err
+	}
+	st, err := vu.Prepare(h.query)
+	if err != nil {
+		return err
+	}
+	row := conn.QueryRow(vu.Ctx(), st)
 	n, err := row.ScanInt64(0)
 	if err != nil {
 		return err
