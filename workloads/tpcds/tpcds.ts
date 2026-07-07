@@ -82,13 +82,14 @@ const _schemaByDriver: Record<string, string> = {
   ydb: "./schema.ydb.sql",
 };
 
-// YDB storage layout. Default 'row': YDB row store keeps the full analytic
-// query surface (window functions, grouping) that the column store still
-// restricts. 'column' selects the OLAP column-store schema for scan-heavy runs.
+// YDB storage layout. Default 'column': the OLAP column store is the right
+// layout for TPC-DS' scan-heavy queries and runs the full suite (window
+// functions, rollup, grouping sets all verified on it). 'row' selects the
+// row-store schema instead.
 const YDB_STORE_MODE = ENV(
   "YDB_STORE_MODE",
-  "row",
-  "ydb only: 'row' (default, full query surface) or 'column' (OLAP column store)",
+  "column",
+  "ydb only: 'column' (default, OLAP column store) or 'row' (row store)",
 );
 const SQL_FILE =
   ENV("SQL_FILE", "", "Path to TPC-DS query SQL file (defaults per driverType)") ||

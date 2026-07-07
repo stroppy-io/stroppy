@@ -29,7 +29,7 @@ Env overrides:
 ```bash
 -e SCALE_FACTOR=0.01   # any positive float; fractional for smoke tests.
 -e LOAD_WORKERS=4      # parallel InsertSpec workers per table during load.
--e YDB_STORE_MODE=row  # ydb only: 'row' (default) or 'column' storage layout.
+-e YDB_STORE_MODE=column # ydb only: 'column' (default) or 'row' storage layout.
 -e MAX_DURATION=24h    # run wall-clock cap (default 24h; the workload sets its
                        # own so large-scale loads aren't killed by k6's 10m default).
 -e STREAMS=4           # concurrent throughput streams (1 = single power-test stream).
@@ -79,9 +79,13 @@ strings — TPC-DS `date_dim` spans 1900–2100, outside YDB's unsigned
 `Timestamp`/`Date` epoch; ISO strings compare lexicographically so `between`/`=`
 date filters hold). Tables carry a `PRIMARY KEY` (no FK); only key columns are
 `NOT NULL` since TPC-DS fact foreign keys are genuinely nullable. Two storage
-layouts ship as sections `create_schema` (row, default) and
-`create_schema_column` (column), selected by `YDB_STORE_MODE`; row store is the
-default because it plans the full window-function/grouping query surface. Query
+layouts ship as sections `create_schema_column` (column, default, auto-partitioned
+by size) and `create_schema` (row), selected by `YDB_STORE_MODE`; column store is
+the OLAP-correct layout for these scan-heavy queries and runs the full suite
+(window functions, rollup, grouping sets all verified on it). Secondary indexes
+are omitted — YDB column tables support only local bloom/min-max indexes, not
+global secondary indexes, and the spec lists indexes as auxiliary for this
+full-scan workload. Query
 rewrites vs `pg.sql`: every statement opens with `PRAGMA AnsiImplicitCrossJoin`
 (TPC-DS uses comma joins); ANSI `WITH` CTEs become YQL `$named` subqueries;
 GROUP BY / SELECT / ORDER BY columns in multi-source blocks are qualified with a

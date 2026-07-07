@@ -1,13 +1,4 @@
--- TPC-DS query workload for YDB (YQL). 99 queries (query_14/23/24/39 are two
--- parts _a/_b, so 103 named --= sections), derived from the canonical pg.sql at
--- the same qualification parameters. Every statement opens with PRAGMA
--- AnsiImplicitCrossJoin (TPC-DS uses comma joins). YQL rewrites vs pg.sql: ANSI
--- WITH CTEs become $named subqueries; multi-source GROUP BY / SELECT / ORDER BY
--- columns are correlation-qualified; correlated subqueries/EXISTS are
--- decorrelated (YQL has none); dates are Utf8 ISO strings (schema.ydb.sql), so
--- date literals drop the cast and date arithmetic is baked to a literal;
--- decimal casts become Double, substring becomes Unicode::Substring. See
--- workloads/tpcds/README.md.
+-- TPC-DS query workload for YDB (YQL). Transpiled from pg.sql; see .claude/jobs/98ec48b4/tmp/pg2yql.py.
 
 --= query_1
 PRAGMA AnsiImplicitCrossJoin;
@@ -35,8 +26,7 @@ and ctr_store_avg.ctr_store_sk = ctr1.ctr_store_sk
 and s_store_sk = ctr1.ctr_store_sk
 and s_state = 'TN'
 and ctr1.ctr_customer_sk = c_customer_sk
-order by c_customer_id
-limit 100;
+order by ((c_customer_id) IS NULL), c_customer_id limit 100;
 
 --= query_2
 PRAGMA AnsiImplicitCrossJoin;
@@ -96,7 +86,7 @@ $wswscs = (select date_dim.d_week_seq AS d_week_seq,
   where date_dim.d_week_seq = wswscs.d_week_seq and
         d_year = 1998+1) z
  where d_week_seq1=d_week_seq2-53
- order by d_week_seq1;
+ order by ((d_week_seq1) IS NULL), d_week_seq1;
 
 --= query_3
 PRAGMA AnsiImplicitCrossJoin;
@@ -112,8 +102,7 @@ select dt.d_year AS d_year,
    and item.i_manufact_id = 816
    and dt.d_moy=11
  group by dt.d_year, item.i_brand, item.i_brand_id
- order by d_year, sum_agg desc, brand_id
- limit 100;
+ order by ((d_year) IS NULL), d_year, ((sum_agg) IS NOT NULL), sum_agg DESC, ((brand_id) IS NULL), brand_id limit 100;
 
 --= query_4
 PRAGMA AnsiImplicitCrossJoin;
@@ -204,11 +193,7 @@ $year_total = (select customer.c_customer_id AS customer_id,
            > case when t_s_firstyear.year_total > 0 then t_s_secyear.year_total / t_s_firstyear.year_total else null end
    and case when t_c_firstyear.year_total > 0 then t_c_secyear.year_total / t_c_firstyear.year_total else null end
            > case when t_w_firstyear.year_total > 0 then t_w_secyear.year_total / t_w_firstyear.year_total else null end
- order by t_s_secyear.customer_id
-         ,t_s_secyear.customer_first_name
-         ,t_s_secyear.customer_last_name
-         ,t_s_secyear.customer_birth_country
-limit 100;
+ order by ((t_s_secyear.customer_id) IS NULL), t_s_secyear.customer_id, ((t_s_secyear.customer_first_name) IS NULL), t_s_secyear.customer_first_name, ((t_s_secyear.customer_last_name) IS NULL), t_s_secyear.customer_last_name, ((t_s_secyear.customer_birth_country) IS NULL), t_s_secyear.customer_birth_country limit 100;
 
 --= query_5
 PRAGMA AnsiImplicitCrossJoin;
@@ -334,8 +319,7 @@ $wsr = (select web_site.web_site_id AS web_site_id,
  ) x
  group by  rollup (channel, id)
  
- order by channel, id
- limit 100;
+ order by ((channel) IS NULL), channel, ((id) IS NULL), id limit 100;
 
 --= query_6
 PRAGMA AnsiImplicitCrossJoin;
@@ -363,8 +347,7 @@ select a.ca_state AS state,
  	and i.i_current_price > 1.2 * iavg.iavg_price
  group by a.ca_state
  having count(*) >= 10
- order by cnt, state
- limit 100;
+ order by ((cnt) IS NULL), cnt, ((state) IS NULL), state limit 100;
 
 --= query_7
 PRAGMA AnsiImplicitCrossJoin;
@@ -384,8 +367,7 @@ select item.i_item_id AS i_item_id,
        (p_channel_email = 'N' or p_channel_event = 'N') and
        d_year = 2001 
  group by item.i_item_id
- order by i_item_id
- limit 100;
+ order by ((i_item_id) IS NULL), i_item_id limit 100;
 
 --= query_8
 PRAGMA AnsiImplicitCrossJoin;
@@ -493,8 +475,7 @@ select store.s_store_name AS s_store_name,
   and d_qoy = 2 and d_year = 1998
   and (Unicode::Substring(s_zip, CAST(0 AS Uint32), CAST(2 AS Uint32)) = Unicode::Substring(V1.ca_zip, CAST(0 AS Uint32), CAST(2 AS Uint32)))
  group by store.s_store_name
- order by s_store_name
- limit 100;
+ order by ((s_store_name) IS NULL), s_store_name limit 100;
 
 --= query_9
 PRAGMA AnsiImplicitCrossJoin;
@@ -578,8 +559,7 @@ select customer_demographics.cd_gender AS cd_gender,
                   d_year = 2001 and
                   d_moy between 3 and 3+3))
  group by customer_demographics.cd_gender, customer_demographics.cd_marital_status, customer_demographics.cd_education_status, customer_demographics.cd_purchase_estimate, customer_demographics.cd_credit_rating, customer_demographics.cd_dep_count, customer_demographics.cd_dep_employed_count, customer_demographics.cd_dep_college_count
- order by cd_gender, cd_marital_status, cd_education_status, cd_purchase_estimate, cd_credit_rating, cd_dep_count, cd_dep_employed_count, cd_dep_college_count
- limit 100;
+ order by ((cd_gender) IS NULL), cd_gender, ((cd_marital_status) IS NULL), cd_marital_status, ((cd_education_status) IS NULL), cd_education_status, ((cd_purchase_estimate) IS NULL), cd_purchase_estimate, ((cd_credit_rating) IS NULL), cd_credit_rating, ((cd_dep_count) IS NULL), cd_dep_count, ((cd_dep_employed_count) IS NULL), cd_dep_employed_count, ((cd_dep_college_count) IS NULL), cd_dep_college_count limit 100;
 
 --= query_11
 PRAGMA AnsiImplicitCrossJoin;
@@ -642,11 +622,7 @@ $year_total = (select customer.c_customer_id AS customer_id,
          and t_w_firstyear.year_total > 0
          and case when t_w_firstyear.year_total > 0 then t_w_secyear.year_total / t_w_firstyear.year_total else 0.0 end
              > case when t_s_firstyear.year_total > 0 then t_s_secyear.year_total / t_s_firstyear.year_total else 0.0 end
- order by t_s_secyear.customer_id
-         ,t_s_secyear.customer_first_name
-         ,t_s_secyear.customer_last_name
-         ,t_s_secyear.customer_email_address
-limit 100;
+ order by ((t_s_secyear.customer_id) IS NULL), t_s_secyear.customer_id, ((t_s_secyear.customer_first_name) IS NULL), t_s_secyear.customer_first_name, ((t_s_secyear.customer_last_name) IS NULL), t_s_secyear.customer_last_name, ((t_s_secyear.customer_email_address) IS NULL), t_s_secyear.customer_email_address limit 100;
 
 --= query_12
 PRAGMA AnsiImplicitCrossJoin;
@@ -669,8 +645,7 @@ where
 	and d_date between ('2001-06-15') 
 				and '2001-07-15'
 group by item.i_item_id, item.i_item_desc, item.i_category, item.i_class, item.i_current_price
- order by i_category, i_class, i_item_id, i_item_desc, revenueratio
- limit 100;
+ order by ((i_category) IS NULL), i_category, ((i_class) IS NULL), i_class, ((i_item_id) IS NULL), i_item_id, ((i_item_desc) IS NULL), i_item_desc, ((revenueratio) IS NULL), revenueratio limit 100;
 
 --= query_13
 PRAGMA AnsiImplicitCrossJoin;
@@ -841,8 +816,7 @@ $avg_sales = (select avg(quantity*list_price) average_sales
  ) y
  group by  rollup (channel, i_brand_id,i_class_id,i_category_id)
  
- order by channel, i_brand_id, i_class_id, i_category_id
- limit 100;
+ order by ((channel) IS NULL), channel, ((i_brand_id) IS NULL), i_brand_id, ((i_class_id) IS NULL), i_class_id, ((i_category_id) IS NULL), i_category_id limit 100;
 
 --= query_14_b
 PRAGMA AnsiImplicitCrossJoin;
@@ -956,8 +930,7 @@ $avg_sales = (select avg(quantity*list_price) average_sales
  where this_year.i_brand_id= last_year.i_brand_id
    and this_year.i_class_id = last_year.i_class_id
    and this_year.i_category_id = last_year.i_category_id
- order by this_year.channel, this_year.i_brand_id, this_year.i_class_id, this_year.i_category_id
- limit 100;
+ order by ((this_year.channel) IS NULL), this_year.channel, ((this_year.i_brand_id) IS NULL), this_year.i_brand_id, ((this_year.i_class_id) IS NULL), this_year.i_class_id, ((this_year.i_category_id) IS NULL), this_year.i_category_id limit 100;
 
 --= query_15
 PRAGMA AnsiImplicitCrossJoin;
@@ -976,8 +949,7 @@ select customer_address.ca_zip AS ca_zip,
  	and cs_sold_date_sk = d_date_sk
  	and d_qoy = 2 and d_year = 2001
  group by customer_address.ca_zip
- order by ca_zip
- limit 100;
+ order by ((ca_zip) IS NULL), ca_zip limit 100;
 
 --= query_16
 PRAGMA AnsiImplicitCrossJoin;
@@ -995,8 +967,7 @@ where d_date between '2002-04-01' and '2002-05-31'
  from catalog_sales group by cs_order_number
  having count(distinct cs_warehouse_sk) > 1)
   and cs1.cs_order_number not in (select cr_order_number from catalog_returns)
-order by `order count`
- limit 100;
+order by ((`order count`) IS NULL), `order count` limit 100;
 
 --= query_17
 PRAGMA AnsiImplicitCrossJoin;
@@ -1005,16 +976,16 @@ select item.i_item_id AS i_item_id,
   store.s_state AS s_state,
   count(store_sales.ss_quantity) AS store_sales_quantitycount,
   avg(store_sales.ss_quantity) AS store_sales_quantityave,
-  stddev_samp(store_sales.ss_quantity) AS store_sales_quantitystdev,
-  stddev_samp(store_sales.ss_quantity)/avg(store_sales.ss_quantity) AS store_sales_quantitycov,
+  (CASE WHEN Math::IsNaN(stddev_samp(store_sales.ss_quantity)) THEN NULL ELSE stddev_samp(store_sales.ss_quantity) END) AS store_sales_quantitystdev,
+  (CASE WHEN Math::IsNaN(stddev_samp(store_sales.ss_quantity)) THEN NULL ELSE stddev_samp(store_sales.ss_quantity) END)/avg(store_sales.ss_quantity) AS store_sales_quantitycov,
   count(store_returns.sr_return_quantity) AS store_returns_quantitycount,
   avg(store_returns.sr_return_quantity) AS store_returns_quantityave,
-  stddev_samp(store_returns.sr_return_quantity) AS store_returns_quantitystdev,
-  stddev_samp(store_returns.sr_return_quantity)/avg(store_returns.sr_return_quantity) AS store_returns_quantitycov,
+  (CASE WHEN Math::IsNaN(stddev_samp(store_returns.sr_return_quantity)) THEN NULL ELSE stddev_samp(store_returns.sr_return_quantity) END) AS store_returns_quantitystdev,
+  (CASE WHEN Math::IsNaN(stddev_samp(store_returns.sr_return_quantity)) THEN NULL ELSE stddev_samp(store_returns.sr_return_quantity) END)/avg(store_returns.sr_return_quantity) AS store_returns_quantitycov,
   count(catalog_sales.cs_quantity) AS catalog_sales_quantitycount,
   avg(catalog_sales.cs_quantity) AS catalog_sales_quantityave,
-  stddev_samp(catalog_sales.cs_quantity) AS catalog_sales_quantitystdev,
-  stddev_samp(catalog_sales.cs_quantity)/avg(catalog_sales.cs_quantity) AS catalog_sales_quantitycov
+  (CASE WHEN Math::IsNaN(stddev_samp(catalog_sales.cs_quantity)) THEN NULL ELSE stddev_samp(catalog_sales.cs_quantity) END) AS catalog_sales_quantitystdev,
+  (CASE WHEN Math::IsNaN(stddev_samp(catalog_sales.cs_quantity)) THEN NULL ELSE stddev_samp(catalog_sales.cs_quantity) END)/avg(catalog_sales.cs_quantity) AS catalog_sales_quantitycov
  from store_sales
      ,store_returns
      ,catalog_sales
@@ -1037,8 +1008,7 @@ select item.i_item_id AS i_item_id,
    and cs_sold_date_sk = d3.d_date_sk
    and d3.d_quarter_name in ('2001Q1','2001Q2','2001Q3')
  group by item.i_item_id, item.i_item_desc, store.s_state
- order by i_item_id, i_item_desc, s_state
- limit 100;
+ order by ((i_item_id) IS NULL), i_item_id, ((i_item_desc) IS NULL), i_item_desc, ((s_state) IS NULL), s_state limit 100;
 
 --= query_18
 PRAGMA AnsiImplicitCrossJoin;
@@ -1069,8 +1039,7 @@ select item.i_item_id AS i_item_id,
                    ,'GA','MT','IN','CA')
  group by  rollup (item.i_item_id, customer_address.ca_country, customer_address.ca_state, customer_address.ca_county)
  
- order by ca_country, ca_state, ca_county, i_item_id
- limit 100;
+ order by ((ca_country) IS NULL), ca_country, ((ca_state) IS NULL), ca_state, ((ca_county) IS NULL), ca_county, ((i_item_id) IS NULL), i_item_id limit 100;
 
 --= query_19
 PRAGMA AnsiImplicitCrossJoin;
@@ -1090,8 +1059,7 @@ select item.i_brand_id AS brand_id,
    and Unicode::Substring(ca_zip, CAST(0 AS Uint32), CAST(5 AS Uint32)) <> Unicode::Substring(s_zip, CAST(0 AS Uint32), CAST(5 AS Uint32)) 
    and ss_store_sk = s_store_sk 
  group by item.i_brand, item.i_brand_id, item.i_manufact_id, item.i_manufact
- order by ext_price desc, brand, brand_id, i_manufact_id, i_manufact
- limit 100;
+ order by ((ext_price) IS NOT NULL), ext_price DESC, ((brand) IS NULL), brand, ((brand_id) IS NULL), brand_id, ((i_manufact_id) IS NULL), i_manufact_id, ((i_manufact) IS NULL), i_manufact limit 100;
 
 --= query_20
 PRAGMA AnsiImplicitCrossJoin;
@@ -1112,13 +1080,11 @@ select item.i_item_id AS i_item_id,
  and d_date between ('2002-06-18') 
  				and '2002-07-18'
  group by item.i_item_id, item.i_item_desc, item.i_category, item.i_class, item.i_current_price
- order by i_category, i_class, i_item_id, i_item_desc, revenueratio
- limit 100;
+ order by ((i_category) IS NULL), i_category, ((i_class) IS NULL), i_class, ((i_item_id) IS NULL), i_item_id, ((i_item_desc) IS NULL), i_item_desc, ((revenueratio) IS NULL), revenueratio limit 100;
 
 --= query_21
 PRAGMA AnsiImplicitCrossJoin;
-select  *
- from(select warehouse.w_warehouse_name AS w_warehouse_name,
+select w_warehouse_name, i_item_id, inv_before, inv_after from(select warehouse.w_warehouse_name AS w_warehouse_name,
   item.i_item_id AS i_item_id,
   sum(case when ((date_dim.d_date) < ('1999-06-22'))
 	                then inventory.inv_quantity_on_hand 
@@ -1142,9 +1108,7 @@ select  *
              then inv_after / inv_before 
              else null
              end) between 2.0/3.0 and 3.0/2.0
- order by w_warehouse_name
-         ,i_item_id
- limit 100;
+ order by ((w_warehouse_name) IS NULL), w_warehouse_name, ((i_item_id) IS NULL), i_item_id limit 100;
 
 --= query_22
 PRAGMA AnsiImplicitCrossJoin;
@@ -1164,8 +1128,7 @@ select item.i_product_name AS i_product_name,
                        ,item.i_class
                        ,item.i_category)
 
- order by qoh, i_product_name, i_brand, i_class, i_category
- limit 100;
+ order by ((qoh) IS NULL), qoh, ((i_product_name) IS NULL), i_product_name, ((i_brand) IS NULL), i_brand, ((i_class) IS NULL), i_class, ((i_category) IS NULL), i_category limit 100;
 
 --= query_23_a
 PRAGMA AnsiImplicitCrossJoin;
@@ -1287,8 +1250,7 @@ $best_ss_customer = (select customer.c_customer_sk AS c_customer_sk,
          and ws_bill_customer_sk = c_customer_sk
        group by customer.c_last_name, customer.c_first_name
  ) AS _sq2 
-     order by c_last_name,c_first_name,sales
-  limit 100;
+     order by ((c_last_name) IS NULL), c_last_name, ((c_first_name) IS NULL), c_first_name, ((sales) IS NULL), sales limit 100;
 
 --= query_24_a
 PRAGMA AnsiImplicitCrossJoin;
@@ -1330,7 +1292,7 @@ where i_color = 'aquamarine'
 group by c_last_name, c_first_name, s_store_name
  having sum(netpaid) > (select 0.05*avg(netpaid)
                                  from $ssales AS ssales)
-order by c_last_name, c_first_name, s_store_name;
+order by ((c_last_name) IS NULL), c_last_name, ((c_first_name) IS NULL), c_first_name, ((s_store_name) IS NULL), s_store_name;
 
 --= query_24_b
 PRAGMA AnsiImplicitCrossJoin;
@@ -1372,7 +1334,7 @@ where i_color = 'seashell'
 group by c_last_name, c_first_name, s_store_name
  having sum(netpaid) > (select 0.05*avg(netpaid)
                            from $ssales AS ssales)
-order by c_last_name, c_first_name, s_store_name;
+order by ((c_last_name) IS NULL), c_last_name, ((c_first_name) IS NULL), c_first_name, ((s_store_name) IS NULL), s_store_name;
 
 --= query_25
 PRAGMA AnsiImplicitCrossJoin;
@@ -1410,8 +1372,7 @@ select item.i_item_id AS i_item_id,
  and d3.d_moy               between 4 and  10 
  and d3.d_year              = 1999
  group by item.i_item_id, item.i_item_desc, store.s_store_id, store.s_store_name
- order by i_item_id, i_item_desc, s_store_id, s_store_name
- limit 100;
+ order by ((i_item_id) IS NULL), i_item_id, ((i_item_desc) IS NULL), i_item_desc, ((s_store_id) IS NULL), s_store_id, ((s_store_name) IS NULL), s_store_name limit 100;
 
 --= query_26
 PRAGMA AnsiImplicitCrossJoin;
@@ -1431,8 +1392,7 @@ select item.i_item_id AS i_item_id,
        (p_channel_email = 'N' or p_channel_event = 'N') and
        d_year = 2002 
  group by item.i_item_id
- order by i_item_id
- limit 100;
+ order by ((i_item_id) IS NULL), i_item_id limit 100;
 
 --= query_27
 PRAGMA AnsiImplicitCrossJoin;
@@ -1455,13 +1415,11 @@ select item.i_item_id AS i_item_id,
        s_state in ('TN','TN', 'TN', 'TN', 'TN', 'TN')
  group by  rollup (item.i_item_id, store.s_state)
  
- order by i_item_id, s_state
- limit 100;
+ order by ((i_item_id) IS NULL), i_item_id, ((s_state) IS NULL), s_state limit 100;
 
 --= query_28
 PRAGMA AnsiImplicitCrossJoin;
-select  *
-from (select avg(ss_list_price) B1_LP
+select B1_LP, B1_CNT, B1_CNTD, B2_LP, B2_CNT, B2_CNTD, B3_LP, B3_CNT, B3_CNTD, B4_LP, B4_CNT, B4_CNTD, B5_LP, B5_CNT, B5_CNTD, B6_LP, B6_CNT, B6_CNTD from (select avg(ss_list_price) B1_LP
             ,count(ss_list_price) B1_CNT
             ,count(distinct ss_list_price) B1_CNTD
       from store_sales
@@ -1546,8 +1504,7 @@ select item.i_item_id AS i_item_id,
  and cs_sold_date_sk        = d3.d_date_sk     
  and d3.d_year              in (1998,1998+1,1998+2)
  group by item.i_item_id, item.i_item_desc, store.s_store_id, store.s_store_name
- order by i_item_id, i_item_desc, s_store_id, s_store_name
- limit 100;
+ order by ((i_item_id) IS NULL), i_item_id, ((i_item_desc) IS NULL), i_item_desc, ((s_store_id) IS NULL), s_store_id, ((s_store_name) IS NULL), s_store_name limit 100;
 
 --= query_30
 PRAGMA AnsiImplicitCrossJoin;
@@ -1579,10 +1536,7 @@ $ctr_state_avg = (select ctr_state AS ctr_state,
        and ca_address_sk = c_current_addr_sk
        and ca_state = 'AR'
        and ctr1.ctr_customer_sk = c_customer_sk
- order by c_customer_id,c_salutation,c_first_name,c_last_name,c_preferred_cust_flag
-                  ,c_birth_day,c_birth_month,c_birth_year,c_birth_country,c_login,c_email_address
-                  ,c_last_review_date,ctr_total_return
-limit 100;
+ order by ((c_customer_id) IS NULL), c_customer_id, ((c_salutation) IS NULL), c_salutation, ((c_first_name) IS NULL), c_first_name, ((c_last_name) IS NULL), c_last_name, ((c_preferred_cust_flag) IS NULL), c_preferred_cust_flag, ((c_birth_day) IS NULL), c_birth_day, ((c_birth_month) IS NULL), c_birth_month, ((c_birth_year) IS NULL), c_birth_year, ((c_birth_country) IS NULL), c_birth_country, ((c_login) IS NULL), c_login, ((c_email_address) IS NULL), c_email_address, ((c_last_review_date) IS NULL), c_last_review_date, ((ctr_total_return) IS NULL), ctr_total_return limit 100;
 
 --= query_31
 PRAGMA AnsiImplicitCrossJoin;
@@ -1641,7 +1595,7 @@ $ws = (select customer_address.ca_county AS ca_county,
        > case when ss1.store_sales > 0 then ss2.store_sales/ss1.store_sales else null end
     and case when ws2.web_sales > 0 then ws3.web_sales/ws2.web_sales else null end
        > case when ss2.store_sales > 0 then ss3.store_sales/ss2.store_sales else null end
- order by store_q2_q3_increase;
+ order by ((store_q2_q3_increase) IS NULL), store_q2_q3_increase;
 
 --= query_32
 PRAGMA AnsiImplicitCrossJoin;
@@ -1737,8 +1691,7 @@ where i_category in ('Books'))
         union all
         select * from $ws AS ws) tmp1
  group by i_manufact_id
- order by total_sales
- limit 100;
+ order by ((total_sales) IS NULL), total_sales limit 100;
 
 --= query_34
 PRAGMA AnsiImplicitCrossJoin;
@@ -1770,7 +1723,7 @@ select c_last_name
  ) dn,customer
     where ss_customer_sk = c_customer_sk
       and cnt between 15 and 20
-    order by c_last_name,c_first_name,c_salutation,c_preferred_cust_flag desc, ss_ticket_number;
+    order by ((c_last_name) IS NULL), c_last_name, ((c_first_name) IS NULL), c_first_name, ((c_salutation) IS NULL), c_salutation, ((c_preferred_cust_flag) IS NOT NULL), c_preferred_cust_flag DESC, ((ss_ticket_number) IS NULL), ss_ticket_number;
 
 --= query_35
 PRAGMA AnsiImplicitCrossJoin;
@@ -1780,17 +1733,17 @@ select ca.ca_state AS ca_state,
   customer_demographics.cd_dep_count AS cd_dep_count,
   count(*) AS cnt1,
   avg(customer_demographics.cd_dep_count) AS aggone1,
-  stddev_samp(customer_demographics.cd_dep_count) AS aggtwo1,
+  (CASE WHEN Math::IsNaN(stddev_samp(customer_demographics.cd_dep_count)) THEN NULL ELSE stddev_samp(customer_demographics.cd_dep_count) END) AS aggtwo1,
   sum(customer_demographics.cd_dep_count) AS aggthree1,
   customer_demographics.cd_dep_employed_count AS cd_dep_employed_count,
   count(*) AS cnt2,
   avg(customer_demographics.cd_dep_employed_count) AS aggone2,
-  stddev_samp(customer_demographics.cd_dep_employed_count) AS aggtwo2,
+  (CASE WHEN Math::IsNaN(stddev_samp(customer_demographics.cd_dep_employed_count)) THEN NULL ELSE stddev_samp(customer_demographics.cd_dep_employed_count) END) AS aggtwo2,
   sum(customer_demographics.cd_dep_employed_count) AS aggthree2,
   customer_demographics.cd_dep_college_count AS cd_dep_college_count,
   count(*) AS cnt3,
   avg(customer_demographics.cd_dep_college_count) AS aggone3,
-  stddev_samp(customer_demographics.cd_dep_college_count) AS aggtwo3,
+  (CASE WHEN Math::IsNaN(stddev_samp(customer_demographics.cd_dep_college_count)) THEN NULL ELSE stddev_samp(customer_demographics.cd_dep_college_count) END) AS aggtwo3,
   sum(customer_demographics.cd_dep_college_count) AS aggthree3
  from
   customer c,customer_address ca,customer_demographics
@@ -1807,8 +1760,7 @@ select ca.ca_state AS ca_state,
                   d_year = 1999 and
                   d_qoy < 4))
  group by ca.ca_state, customer_demographics.cd_gender, customer_demographics.cd_marital_status, customer_demographics.cd_dep_count, customer_demographics.cd_dep_employed_count, customer_demographics.cd_dep_college_count
- order by ca_state, cd_gender, cd_marital_status, cd_dep_count, cd_dep_employed_count, cd_dep_college_count
- limit 100;
+ order by ((ca_state) IS NULL), ca_state, ((cd_gender) IS NULL), cd_gender, ((cd_marital_status) IS NULL), cd_marital_status, ((cd_dep_count) IS NULL), cd_dep_count, ((cd_dep_employed_count) IS NULL), cd_dep_employed_count, ((cd_dep_college_count) IS NULL), cd_dep_college_count limit 100;
 
 --= query_36
 PRAGMA AnsiImplicitCrossJoin;
@@ -1819,7 +1771,7 @@ select sum(store_sales.ss_net_profit)/sum(store_sales.ss_ext_sales_price) AS gro
   rank() over (
  	partition by grouping(item.i_category)+grouping(item.i_class),
  	case when grouping(item.i_class) = 0 then item.i_category  else null end 
- 	order by sum(store_sales.ss_net_profit)/sum(store_sales.ss_ext_sales_price) asc) AS rank_within_parent
+ 	order by ((sum(store_sales.ss_net_profit)/sum(store_sales.ss_ext_sales_price)) IS NULL), sum(store_sales.ss_net_profit)/sum(store_sales.ss_ext_sales_price) ASC ) AS rank_within_parent
  from
     store_sales
    ,date_dim       d1
@@ -1834,8 +1786,7 @@ select sum(store_sales.ss_net_profit)/sum(store_sales.ss_ext_sales_price) AS gro
                  'TN','TN','TN','TN')
  group by  rollup(item.i_category,item.i_class)
  
- order by lochierarchy desc, case when lochierarchy = 0 then i_category  else null end, rank_within_parent
- limit 100;
+ order by ((lochierarchy) IS NOT NULL), lochierarchy DESC, ((case when lochierarchy = 0 then i_category  else null end) IS NULL), case when lochierarchy = 0 then i_category  else null end, ((rank_within_parent) IS NULL), rank_within_parent limit 100;
 
 --= query_37
 PRAGMA AnsiImplicitCrossJoin;
@@ -1851,8 +1802,7 @@ select item.i_item_id AS i_item_id,
  and inv_quantity_on_hand between 100 and 500
  and cs_item_sk = i_item_sk
  group by item.i_item_id, item.i_item_desc, item.i_current_price
- order by i_item_id
- limit 100;
+ order by ((i_item_id) IS NULL), i_item_id limit 100;
 
 --= query_38
 PRAGMA AnsiImplicitCrossJoin;
@@ -1885,7 +1835,7 @@ $inv = (select w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy
   warehouse.w_warehouse_sk AS w_warehouse_sk,
   item.i_item_sk AS i_item_sk,
   date_dim.d_moy AS d_moy,
-  stddev_samp(inventory.inv_quantity_on_hand) AS stdev,
+  (CASE WHEN Math::IsNaN(stddev_samp(inventory.inv_quantity_on_hand)) THEN NULL ELSE stddev_samp(inventory.inv_quantity_on_hand) END) AS stdev,
   avg(inventory.inv_quantity_on_hand) AS mean
  from inventory
           ,item
@@ -1906,8 +1856,7 @@ where inv1.i_item_sk = inv2.i_item_sk
   and inv1.w_warehouse_sk =  inv2.w_warehouse_sk
   and inv1.d_moy=1
   and inv2.d_moy=1+1
-order by inv1.w_warehouse_sk,inv1.i_item_sk,inv1.d_moy,inv1.mean,inv1.cov
-        ,inv2.d_moy,inv2.mean, inv2.cov;
+order by ((inv1.w_warehouse_sk) IS NULL), inv1.w_warehouse_sk, ((inv1.i_item_sk) IS NULL), inv1.i_item_sk, ((inv1.d_moy) IS NULL), inv1.d_moy, ((inv1.mean) IS NULL), inv1.mean, ((inv1.cov) IS NULL), inv1.cov, ((inv2.d_moy) IS NULL), inv2.d_moy, ((inv2.mean) IS NULL), inv2.mean, ((inv2.cov) IS NULL), inv2.cov;
 
 --= query_39_b
 PRAGMA AnsiImplicitCrossJoin;
@@ -1917,7 +1866,7 @@ $inv = (select w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy
   warehouse.w_warehouse_sk AS w_warehouse_sk,
   item.i_item_sk AS i_item_sk,
   date_dim.d_moy AS d_moy,
-  stddev_samp(inventory.inv_quantity_on_hand) AS stdev,
+  (CASE WHEN Math::IsNaN(stddev_samp(inventory.inv_quantity_on_hand)) THEN NULL ELSE stddev_samp(inventory.inv_quantity_on_hand) END) AS stdev,
   avg(inventory.inv_quantity_on_hand) AS mean
  from inventory
           ,item
@@ -1939,8 +1888,7 @@ where inv1.i_item_sk = inv2.i_item_sk
   and inv1.d_moy=1
   and inv2.d_moy=1+1
   and inv1.cov > 1.5
-order by inv1.w_warehouse_sk,inv1.i_item_sk,inv1.d_moy,inv1.mean,inv1.cov
-        ,inv2.d_moy,inv2.mean, inv2.cov;
+order by ((inv1.w_warehouse_sk) IS NULL), inv1.w_warehouse_sk, ((inv1.i_item_sk) IS NULL), inv1.i_item_sk, ((inv1.d_moy) IS NULL), inv1.d_moy, ((inv1.mean) IS NULL), inv1.mean, ((inv1.cov) IS NULL), inv1.cov, ((inv2.d_moy) IS NULL), inv2.d_moy, ((inv2.mean) IS NULL), inv2.mean, ((inv2.cov) IS NULL), inv2.cov;
 
 --= query_40
 PRAGMA AnsiImplicitCrossJoin;
@@ -1965,8 +1913,7 @@ select warehouse.w_state AS w_state,
  and d_date between '2001-04-02'
                 and '2001-06-01' 
  group by warehouse.w_state, item.i_item_id
- order by w_state, i_item_id
- limit 100;
+ order by ((w_state) IS NULL), w_state, ((i_item_id) IS NULL), i_item_id limit 100;
 
 --= query_41
 PRAGMA AnsiImplicitCrossJoin;
@@ -1984,8 +1931,7 @@ select distinct(i_product_name)
  from item i1
  where i_manufact_id between 704 and 704+40
    and i1.i_manufact in (select i_manufact from $mfg AS mfg)
- order by i_product_name
- limit 100;
+ order by ((i_product_name) IS NULL), i_product_name limit 100;
 
 --= query_42
 PRAGMA AnsiImplicitCrossJoin;
@@ -2002,8 +1948,7 @@ select dt.d_year AS d_year,
  	and dt.d_moy=11
  	and dt.d_year=1998
  group by dt.d_year, item.i_category_id, item.i_category
- order by c9 desc, d_year, i_category_id, i_category
- limit 100;
+ order by ((c9) IS NOT NULL), c9 DESC, ((d_year) IS NULL), d_year, ((i_category_id) IS NULL), i_category_id, ((i_category) IS NULL), i_category limit 100;
 
 --= query_43
 PRAGMA AnsiImplicitCrossJoin;
@@ -2022,14 +1967,13 @@ select store.s_store_name AS s_store_name,
        s_gmt_offset = -5 and
        d_year = 2000 
  group by store.s_store_name, store.s_store_id
- order by s_store_name, s_store_id, sun_sales, mon_sales, tue_sales, wed_sales, thu_sales, fri_sales, sat_sales
- limit 100;
+ order by ((s_store_name) IS NULL), s_store_name, ((s_store_id) IS NULL), s_store_id, ((sun_sales) IS NULL), sun_sales, ((mon_sales) IS NULL), mon_sales, ((tue_sales) IS NULL), tue_sales, ((wed_sales) IS NULL), wed_sales, ((thu_sales) IS NULL), thu_sales, ((fri_sales) IS NULL), fri_sales, ((sat_sales) IS NULL), sat_sales limit 100;
 
 --= query_44
 PRAGMA AnsiImplicitCrossJoin;
 select  asceding.rnk AS rnk, i1.i_product_name best_performing, i2.i_product_name worst_performing
 from(select *
-     from (select item_sk,rank() over (order by rank_col asc) rnk
+     from (select item_sk,rank() over (order by ((rank_col) IS NULL), rank_col ASC ) rnk
            from (select ss_item_sk AS item_sk,
   avg(ss_net_profit) AS rank_col
  from store_sales ss1
@@ -2043,7 +1987,7 @@ from(select *
  ))V1)V11
      where rnk  < 11) asceding,
     (select *
-     from (select item_sk,rank() over (order by rank_col desc) rnk
+     from (select item_sk,rank() over (order by ((rank_col) IS NOT NULL), rank_col DESC ) rnk
            from (select ss_item_sk AS item_sk,
   avg(ss_net_profit) AS rank_col
  from store_sales ss1
@@ -2061,8 +2005,7 @@ item i2
 where asceding.rnk = descending.rnk 
   and i1.i_item_sk=asceding.item_sk
   and i2.i_item_sk=descending.item_sk
-order by asceding.rnk
-limit 100;
+order by ((asceding.rnk) IS NULL), asceding.rnk limit 100;
 
 --= query_45
 PRAGMA AnsiImplicitCrossJoin;
@@ -2083,8 +2026,7 @@ select customer_address.ca_zip AS ca_zip,
  	and ws_sold_date_sk = d_date_sk
  	and d_qoy = 1 and d_year = 2000
  group by customer_address.ca_zip, customer_address.ca_city
- order by ca_zip, ca_city
- limit 100;
+ order by ((ca_zip) IS NULL), ca_zip, ((ca_city) IS NULL), ca_city limit 100;
 
 --= query_46
 PRAGMA AnsiImplicitCrossJoin;
@@ -2115,12 +2057,7 @@ select  c_last_name
     where ss_customer_sk = c_customer_sk
       and customer.c_current_addr_sk = current_addr.ca_address_sk
       and current_addr.ca_city <> bought_city
-  order by c_last_name
-          ,c_first_name
-          ,ca_city
-          ,bought_city
-          ,ss_ticket_number
-  limit 100;
+  order by ((c_last_name) IS NULL), c_last_name, ((c_first_name) IS NULL), c_first_name, ((ca_city) IS NULL), ca_city, ((bought_city) IS NULL), bought_city, ((ss_ticket_number) IS NULL), ss_ticket_number limit 100;
 
 --= query_47
 PRAGMA AnsiImplicitCrossJoin;
@@ -2137,7 +2074,7 @@ $v1 = (select item.i_category AS i_category,
   rank() over
           (partition by item.i_category, item.i_brand,
                      store.s_store_name, store.s_company_name
-           order by date_dim.d_year, date_dim.d_moy) AS rn
+           order by ((date_dim.d_year) IS NULL), date_dim.d_year, ((date_dim.d_moy) IS NULL), date_dim.d_moy ) AS rn
  from item, store_sales, date_dim, store
  where ss_item_sk = i_item_sk and
        ss_sold_date_sk = d_date_sk and
@@ -2165,13 +2102,11 @@ $v2 = (select v1.s_store_name AS s_store_name, v1.s_company_name AS s_company_na
        v1.rn = v1_lag.rn + 1 and
        v1.rn = v1_lead.rn - 1);
 
-  select  *
- from $v2 AS v2
+  select s_store_name, s_company_name, d_year, avg_monthly_sales, sum_sales, psum, nsum from $v2 AS v2
  where  d_year = 2000 and    
         avg_monthly_sales > 0 and
         case when avg_monthly_sales > 0 then abs(sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
- order by sum_sales - avg_monthly_sales, nsum
- limit 100;
+ order by ((sum_sales - avg_monthly_sales) IS NULL), sum_sales - avg_monthly_sales, ((nsum) IS NULL), nsum limit 100;
 
 --= query_48
 PRAGMA AnsiImplicitCrossJoin;
@@ -2253,8 +2188,8 @@ select  channel, item, return_ratio, return_rank, currency_rank from
  	 item
  	,return_ratio
  	,currency_ratio
- 	,rank() over (order by return_ratio) as return_rank
- 	,rank() over (order by currency_ratio) as currency_rank
+ 	,rank() over (order by ((return_ratio) IS NULL), return_ratio ) as return_rank
+ 	,rank() over (order by ((currency_ratio) IS NULL), currency_ratio ) as currency_rank
  	from
  	(	select ws.ws_item_sk AS item,
   (cast(sum(coalesce(wr.wr_return_quantity,0)) as Double)/
@@ -2295,8 +2230,8 @@ select  channel, item, return_ratio, return_rank, currency_rank from
  	 item
  	,return_ratio
  	,currency_ratio
- 	,rank() over (order by return_ratio) as return_rank
- 	,rank() over (order by currency_ratio) as currency_rank
+ 	,rank() over (order by ((return_ratio) IS NULL), return_ratio ) as return_rank
+ 	,rank() over (order by ((currency_ratio) IS NULL), currency_ratio ) as currency_rank
  	from
  	(	select cs.cs_item_sk AS item,
   (cast(sum(coalesce(cr.cr_return_quantity,0)) as Double)/
@@ -2337,8 +2272,8 @@ select  channel, item, return_ratio, return_rank, currency_rank from
  	 item
  	,return_ratio
  	,currency_ratio
- 	,rank() over (order by return_ratio) as return_rank
- 	,rank() over (order by currency_ratio) as currency_rank
+ 	,rank() over (order by ((return_ratio) IS NULL), return_ratio ) as return_rank
+ 	,rank() over (order by ((currency_ratio) IS NULL), currency_ratio ) as currency_rank
  	from
  	(	select sts.ss_item_sk AS item,
   (cast(sum(coalesce(sr.sr_return_quantity,0)) as Double)/cast(sum(coalesce(sts.ss_quantity,0)) as Double )) AS return_ratio,
@@ -2364,8 +2299,7 @@ select  channel, item, return_ratio, return_rank, currency_rank from
  store.currency_rank <= 10
  )
  ) AS _sq1
- order by channel, return_rank, currency_rank, item
- limit 100;
+ order by ((channel) IS NULL), channel, ((return_rank) IS NULL), return_rank, ((currency_rank) IS NULL), currency_rank, ((item) IS NULL), item limit 100;
 
 --= query_50
 PRAGMA AnsiImplicitCrossJoin;
@@ -2403,15 +2337,14 @@ and sr_returned_date_sk   = d2.d_date_sk
 and ss_customer_sk = sr_customer_sk
 and ss_store_sk = s_store_sk
 group by store.s_store_name, store.s_company_id, store.s_street_number, store.s_street_name, store.s_street_type, store.s_suite_number, store.s_city, store.s_county, store.s_state, store.s_zip
- order by s_store_name, s_company_id, s_street_number, s_street_name, s_street_type, s_suite_number, s_city, s_county, s_state, s_zip
- limit 100;
+ order by ((s_store_name) IS NULL), s_store_name, ((s_company_id) IS NULL), s_company_id, ((s_street_number) IS NULL), s_street_number, ((s_street_name) IS NULL), s_street_name, ((s_street_type) IS NULL), s_street_type, ((s_suite_number) IS NULL), s_suite_number, ((s_city) IS NULL), s_city, ((s_county) IS NULL), s_county, ((s_state) IS NULL), s_state, ((s_zip) IS NULL), s_zip limit 100;
 
 --= query_51
 PRAGMA AnsiImplicitCrossJoin;
 $web_v1 = (select web_sales.ws_item_sk AS item_sk,
   date_dim.d_date AS d_date,
   sum(sum(web_sales.ws_sales_price))
-      over (partition by web_sales.ws_item_sk order by date_dim.d_date rows between unbounded preceding and current row) AS cume_sales
+      over (partition by web_sales.ws_item_sk order by ((date_dim.d_date) IS NULL), date_dim.d_date rows between unbounded preceding and current row ) AS cume_sales
  from web_sales
     ,date_dim
 where ws_sold_date_sk=d_date_sk
@@ -2422,7 +2355,7 @@ group by web_sales.ws_item_sk, date_dim.d_date
 $store_v1 = (select store_sales.ss_item_sk AS item_sk,
   date_dim.d_date AS d_date,
   sum(sum(store_sales.ss_sales_price))
-      over (partition by store_sales.ss_item_sk order by date_dim.d_date rows between unbounded preceding and current row) AS cume_sales
+      over (partition by store_sales.ss_item_sk order by ((date_dim.d_date) IS NULL), date_dim.d_date rows between unbounded preceding and current row ) AS cume_sales
  from store_sales
     ,date_dim
 where ss_sold_date_sk=d_date_sk
@@ -2431,15 +2364,14 @@ where ss_sold_date_sk=d_date_sk
 group by store_sales.ss_item_sk, date_dim.d_date
  );
 
- select  *
-from (select item_sk
+ select item_sk, d_date || ' 00:00:00 +0000 UTC' AS d_date, web_sales, store_sales, web_cumulative, store_cumulative from (select item_sk
      ,d_date
      ,web_sales
      ,store_sales
      ,max(web_sales)
-         over (partition by item_sk order by d_date rows between unbounded preceding and current row) web_cumulative
+         over (partition by item_sk order by ((d_date) IS NULL), d_date rows between unbounded preceding and current row ) web_cumulative
      ,max(store_sales)
-         over (partition by item_sk order by d_date rows between unbounded preceding and current row) store_cumulative
+         over (partition by item_sk order by ((d_date) IS NULL), d_date rows between unbounded preceding and current row ) store_cumulative
      from (select case when web.item_sk is not null then web.item_sk else store.item_sk end item_sk
                  ,case when web.d_date is not null then web.d_date else store.d_date end d_date
                  ,web.cume_sales web_sales
@@ -2448,9 +2380,7 @@ from (select item_sk
                                                           and web.d_date = store.d_date)
           )x )y
 where web_cumulative > store_cumulative
-order by item_sk
-        ,d_date
-limit 100;
+order by ((item_sk) IS NULL), item_sk, ((d_date) IS NULL), d_date limit 100;
 
 --= query_52
 PRAGMA AnsiImplicitCrossJoin;
@@ -2467,12 +2397,11 @@ select dt.d_year AS d_year,
     and dt.d_moy=12
     and dt.d_year=2000
  group by dt.d_year, item.i_brand, item.i_brand_id
- order by d_year, ext_price desc, brand_id
- limit 100;
+ order by ((d_year) IS NULL), d_year, ((ext_price) IS NOT NULL), ext_price DESC, ((brand_id) IS NULL), brand_id limit 100;
 
 --= query_53
 PRAGMA AnsiImplicitCrossJoin;
-select  * from 
+select i_manufact_id, sum_sales, avg_quarterly_sales from 
 (select item.i_manufact_id AS i_manufact_id,
   sum(store_sales.ss_sales_price) AS sum_sales,
   avg(sum(store_sales.ss_sales_price)) over (partition by item.i_manufact_id) AS avg_quarterly_sales
@@ -2494,10 +2423,7 @@ group by item.i_manufact_id, date_dim.d_qoy
 where case when avg_quarterly_sales > 0 
 	then abs (sum_sales - avg_quarterly_sales)/ avg_quarterly_sales 
 	else null end > 0.1
-order by avg_quarterly_sales,
-	 sum_sales,
-	 i_manufact_id
-limit 100;
+order by ((avg_quarterly_sales) IS NULL), avg_quarterly_sales, ((sum_sales) IS NULL), sum_sales, ((i_manufact_id) IS NULL), i_manufact_id limit 100;
 
 --= query_54
 PRAGMA AnsiImplicitCrossJoin;
@@ -2550,8 +2476,7 @@ $segments = (select cast((revenue/50) as Int32) as segment
   segment*50 AS segment_base
  from $segments AS segments
  group by segment
- order by segment, num_customers
- limit 100;
+ order by ((segment) IS NULL), segment, ((num_customers) IS NULL), num_customers limit 100;
 
 --= query_55
 PRAGMA AnsiImplicitCrossJoin;
@@ -2565,8 +2490,7 @@ select item.i_brand_id AS brand_id,
  	and d_moy=11
  	and d_year=2000
  group by item.i_brand, item.i_brand_id
- order by ext_price desc, brand_id
- limit 100;
+ order by ((ext_price) IS NOT NULL), ext_price DESC, ((brand_id) IS NULL), brand_id limit 100;
 
 --= query_56
 PRAGMA AnsiImplicitCrossJoin;
@@ -2638,8 +2562,7 @@ where i_color in ('powder','orchid','pink'))
         union all
         select * from $ws AS ws) tmp1
  group by i_item_id
- order by total_sales, i_item_id
- limit 100;
+ order by ((total_sales) IS NULL), total_sales, ((i_item_id) IS NULL), i_item_id limit 100;
 
 --= query_57
 PRAGMA AnsiImplicitCrossJoin;
@@ -2655,7 +2578,7 @@ $v1 = (select item.i_category AS i_category,
   rank() over
           (partition by item.i_category, item.i_brand,
                      call_center.cc_name
-           order by date_dim.d_year, date_dim.d_moy) AS rn
+           order by ((date_dim.d_year) IS NULL), date_dim.d_year, ((date_dim.d_moy) IS NULL), date_dim.d_moy ) AS rn
  from item, catalog_sales, date_dim, call_center
  where cs_item_sk = i_item_sk and
        cs_sold_date_sk = d_date_sk and
@@ -2681,13 +2604,11 @@ $v2 = (select v1.i_category AS i_category, v1.i_brand AS i_brand, v1.cc_name AS 
        v1.rn = v1_lag.rn + 1 and
        v1.rn = v1_lead.rn - 1);
 
-  select  *
- from $v2 AS v2
+  select i_category, i_brand, cc_name, d_year, avg_monthly_sales, sum_sales, psum, nsum from $v2 AS v2
  where  d_year = 2001 and
         avg_monthly_sales > 0 and
         case when avg_monthly_sales > 0 then abs(sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
- order by sum_sales - avg_monthly_sales, avg_monthly_sales
- limit 100;
+ order by ((sum_sales - avg_monthly_sales) IS NULL), sum_sales - avg_monthly_sales, ((avg_monthly_sales) IS NULL), avg_monthly_sales limit 100;
 
 --= query_58
 PRAGMA AnsiImplicitCrossJoin;
@@ -2751,9 +2672,7 @@ $ws_items = (select item.i_item_id AS item_id,
    and cs_item_rev between 0.9 * ws_item_rev and 1.1 * ws_item_rev
    and ws_item_rev between 0.9 * ss_item_rev and 1.1 * ss_item_rev
    and ws_item_rev between 0.9 * cs_item_rev and 1.1 * cs_item_rev
- order by item_id
-         ,ss_item_rev
- limit 100;
+ order by ((item_id) IS NULL), item_id, ((ss_item_rev) IS NULL), ss_item_rev limit 100;
 
 --= query_59
 PRAGMA AnsiImplicitCrossJoin;
@@ -2796,8 +2715,7 @@ $wss = (select date_dim.d_week_seq AS d_week_seq,
         d_month_seq between 1195+ 12 and 1195 + 23) x
  where s_store_id1=s_store_id2
    and d_week_seq1=d_week_seq2-52
- order by s_store_name1,s_store_id1,d_week_seq1
-limit 100;
+ order by ((s_store_name1) IS NULL), s_store_name1, ((s_store_id1) IS NULL), s_store_id1, ((d_week_seq1) IS NULL), d_week_seq1 limit 100;
 
 --= query_60
 PRAGMA AnsiImplicitCrossJoin;
@@ -2873,8 +2791,7 @@ where i_category in ('Jewelry'))
         union all
         select * from $ws AS ws) tmp1
  group by i_item_id
- order by i_item_id, total_sales
- limit 100;
+ order by ((i_item_id) IS NULL), i_item_id, ((total_sales) IS NULL), total_sales limit 100;
 
 --= query_61
 PRAGMA AnsiImplicitCrossJoin;
@@ -2917,8 +2834,7 @@ from
    and   s_gmt_offset = -7
    and   d_year = 2000
    and   d_moy  = 12) all_sales
-order by promotions, total
-limit 100;
+order by ((promotions) IS NULL), promotions, ((total) IS NULL), total limit 100;
 
 --= query_62
 PRAGMA AnsiImplicitCrossJoin;
@@ -2946,13 +2862,11 @@ and ws_warehouse_sk   = w_warehouse_sk
 and ws_ship_mode_sk   = sm_ship_mode_sk
 and ws_web_site_sk    = web_site_sk
 group by Unicode::Substring(warehouse.w_warehouse_name, CAST(0 AS Uint32), CAST(20 AS Uint32)) AS gk12, ship_mode.sm_type, web_site.web_name
- order by gk12, sm_type, web_name
- limit 100;
+ order by ((gk12) IS NULL), gk12, ((sm_type) IS NULL), sm_type, ((web_name) IS NULL), web_name limit 100;
 
 --= query_63
 PRAGMA AnsiImplicitCrossJoin;
-select  * 
-from (select item.i_manager_id AS i_manager_id,
+select i_manager_id, sum_sales, avg_monthly_sales from (select item.i_manager_id AS i_manager_id,
   sum(store_sales.ss_sales_price) AS sum_sales,
   avg(sum(store_sales.ss_sales_price)) over (partition by item.i_manager_id) AS avg_monthly_sales
  from item
@@ -2974,10 +2888,7 @@ from (select item.i_manager_id AS i_manager_id,
 group by item.i_manager_id, date_dim.d_moy
  ) tmp1
 where case when avg_monthly_sales > 0 then abs (sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
-order by i_manager_id
-        ,avg_monthly_sales
-        ,sum_sales
-limit 100;
+order by ((i_manager_id) IS NULL), i_manager_id, ((avg_monthly_sales) IS NULL), avg_monthly_sales, ((sum_sales) IS NULL), sum_sales limit 100;
 
 --= query_64
 PRAGMA AnsiImplicitCrossJoin;
@@ -3080,11 +2991,7 @@ where cs1.item_sk=cs2.item_sk and
      cs2.cnt <= cs1.cnt and
      cs1.store_name = cs2.store_name and
      cs1.store_zip = cs2.store_zip
-order by cs1.product_name
-       ,cs1.store_name
-       ,cs2.cnt
-       ,cs1.s1
-       ,cs2.s1;
+order by ((cs1.product_name) IS NULL), cs1.product_name, ((cs1.store_name) IS NULL), cs1.store_name, ((cs2.cnt) IS NULL), cs2.cnt, ((cs1.s1) IS NULL), cs1.s1, ((cs2.s1) IS NULL), cs2.s1;
 
 --= query_65
 PRAGMA AnsiImplicitCrossJoin;
@@ -3119,8 +3026,7 @@ select
        sc.revenue <= 0.1 * sb.ave and
        s_store_sk = sc.ss_store_sk and
        i_item_sk = sc.ss_item_sk
- order by s_store_name, i_item_desc
-limit 100;
+ order by ((s_store_name) IS NULL), s_store_name, ((i_item_desc) IS NULL), i_item_desc limit 100;
 
 --= query_66
 PRAGMA AnsiImplicitCrossJoin;
@@ -3314,13 +3220,11 @@ select w_warehouse_name AS w_warehouse_name,
      group by warehouse.w_warehouse_name, warehouse.w_warehouse_sq_ft, warehouse.w_city, warehouse.w_county, warehouse.w_state, warehouse.w_country, date_dim.d_year
  ) x
  group by w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, year
- order by w_warehouse_name
- limit 100;
+ order by ((w_warehouse_name) IS NULL), w_warehouse_name limit 100;
 
 --= query_67
 PRAGMA AnsiImplicitCrossJoin;
-select  *
-from (select i_category
+select i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy, s_store_id, sumsales, rk from (select i_category
             ,i_class
             ,i_brand
             ,i_product_name
@@ -3329,7 +3233,7 @@ from (select i_category
             ,d_moy
             ,s_store_id
             ,sumsales
-            ,rank() over (partition by i_category order by sumsales desc) rk
+            ,rank() over (partition by i_category order by ((sumsales) IS NOT NULL), sumsales DESC ) rk
       from (select item.i_category AS i_category,
   item.i_class AS i_class,
   item.i_brand AS i_brand,
@@ -3350,17 +3254,7 @@ from (select i_category
        group by   rollup(item.i_category, item.i_class, item.i_brand, item.i_product_name, date_dim.d_year, date_dim.d_qoy, date_dim.d_moy,store.s_store_id)
  )dw1) dw2
 where rk <= 100
-order by i_category
-        ,i_class
-        ,i_brand
-        ,i_product_name
-        ,d_year
-        ,d_qoy
-        ,d_moy
-        ,s_store_id
-        ,sumsales
-        ,rk
-limit 100;
+order by ((i_category) IS NULL), i_category, ((i_class) IS NULL), i_class, ((i_brand) IS NULL), i_brand, ((i_product_name) IS NULL), i_product_name, ((d_year) IS NULL), d_year, ((d_qoy) IS NULL), d_qoy, ((d_moy) IS NULL), d_moy, ((s_store_id) IS NULL), s_store_id, ((sumsales) IS NULL), sumsales, ((rk) IS NULL), rk limit 100;
 
 --= query_68
 PRAGMA AnsiImplicitCrossJoin;
@@ -3399,9 +3293,7 @@ select  c_last_name
  where ss_customer_sk = c_customer_sk
    and customer.c_current_addr_sk = current_addr.ca_address_sk
    and current_addr.ca_city <> bought_city
- order by c_last_name
-         ,ss_ticket_number
- limit 100;
+ order by ((c_last_name) IS NULL), c_last_name, ((ss_ticket_number) IS NULL), ss_ticket_number limit 100;
 
 --= query_69
 PRAGMA AnsiImplicitCrossJoin;
@@ -3424,13 +3316,14 @@ select customer_demographics.cd_gender AS cd_gender,
                 d_moy between 1 and 1+2) and
    (c.c_customer_sk not in (select ws_bill_customer_sk from web_sales,date_dim where ws_sold_date_sk = d_date_sk and
                   d_year = 2002 and
-                  d_moy between 1 and 1+2) and
+                  d_moy between 1 and 1+2 and
+                  ws_bill_customer_sk is not null) and
     c.c_customer_sk not in (select cs_ship_customer_sk from catalog_sales,date_dim where cs_sold_date_sk = d_date_sk and
                   d_year = 2002 and
-                  d_moy between 1 and 1+2))
+                  d_moy between 1 and 1+2 and
+                  cs_ship_customer_sk is not null))
  group by customer_demographics.cd_gender, customer_demographics.cd_marital_status, customer_demographics.cd_education_status, customer_demographics.cd_purchase_estimate, customer_demographics.cd_credit_rating
- order by cd_gender, cd_marital_status, cd_education_status, cd_purchase_estimate, cd_credit_rating
- limit 100;
+ order by ((cd_gender) IS NULL), cd_gender, ((cd_marital_status) IS NULL), cd_marital_status, ((cd_education_status) IS NULL), cd_education_status, ((cd_purchase_estimate) IS NULL), cd_purchase_estimate, ((cd_credit_rating) IS NULL), cd_credit_rating limit 100;
 
 --= query_70
 PRAGMA AnsiImplicitCrossJoin;
@@ -3441,7 +3334,7 @@ select sum(store_sales.ss_net_profit) AS total_sum,
   rank() over (
  	partition by grouping(store.s_state)+grouping(store.s_county),
  	case when grouping(store.s_county) = 0 then store.s_state  else null end 
- 	order by sum(store_sales.ss_net_profit) desc) AS rank_within_parent
+ 	order by ((sum(store_sales.ss_net_profit)) IS NOT NULL), sum(store_sales.ss_net_profit) DESC ) AS rank_within_parent
  from
     store_sales
    ,date_dim       d1
@@ -3453,7 +3346,7 @@ select sum(store_sales.ss_net_profit) AS total_sum,
  and s_state in
              ( select s_state
                from  (select store.s_state AS s_state,
-  rank() over ( partition by store.s_state order by sum(store_sales.ss_net_profit) desc) AS ranking
+  rank() over ( partition by store.s_state order by ((sum(store_sales.ss_net_profit)) IS NOT NULL), sum(store_sales.ss_net_profit) DESC ) AS ranking
  from   store_sales, store, date_dim
                       where  d_month_seq between 1220 and 1220+11
  			    and d_date_sk = ss_sold_date_sk
@@ -3464,8 +3357,7 @@ select sum(store_sales.ss_net_profit) AS total_sum,
              )
  group by  rollup(store.s_state,store.s_county)
  
- order by lochierarchy desc, case when lochierarchy = 0 then s_state  else null end, rank_within_parent
- limit 100;
+ order by ((lochierarchy) IS NOT NULL), lochierarchy DESC, ((case when lochierarchy = 0 then s_state  else null end) IS NULL), case when lochierarchy = 0 then s_state  else null end, ((rank_within_parent) IS NULL), rank_within_parent limit 100;
 
 --= query_71
 PRAGMA AnsiImplicitCrossJoin;
@@ -3507,7 +3399,7 @@ select item.i_brand_id AS brand_id,
    and time_sk = t_time_sk
    and (t_meal_time = 'breakfast' or t_meal_time = 'dinner')
  group by item.i_brand, item.i_brand_id, time_dim.t_hour, time_dim.t_minute
- order by ext_price desc, brand_id;
+ order by ((ext_price) IS NOT NULL), ext_price DESC, ((brand_id) IS NULL), brand_id;
 
 --= query_72
 PRAGMA AnsiImplicitCrossJoin;
@@ -3535,8 +3427,7 @@ where d1.d_week_seq = d2.d_week_seq
   and d1.d_year = 1998
   and cd_marital_status = 'S'
 group by item.i_item_desc, warehouse.w_warehouse_name, d1.d_week_seq
- order by total_cnt desc, i_item_desc, w_warehouse_name, d_week_seq
- limit 100;
+ order by ((total_cnt) IS NOT NULL), total_cnt DESC, ((i_item_desc) IS NULL), i_item_desc, ((w_warehouse_name) IS NULL), w_warehouse_name, ((d_week_seq) IS NULL), d_week_seq limit 100;
 
 --= query_73
 PRAGMA AnsiImplicitCrossJoin;
@@ -3565,7 +3456,7 @@ select c_last_name
  ) dj,customer
     where ss_customer_sk = c_customer_sk
       and cnt between 1 and 5
-    order by cnt desc, c_last_name asc;
+    order by ((cnt) IS NOT NULL), cnt DESC, ((c_last_name) IS NULL), c_last_name ASC;
 
 --= query_74
 PRAGMA AnsiImplicitCrossJoin;
@@ -3619,8 +3510,7 @@ $year_total = (select customer.c_customer_id AS customer_id,
          and t_w_firstyear.year_total > 0
          and case when t_w_firstyear.year_total > 0 then t_w_secyear.year_total / t_w_firstyear.year_total else null end
            > case when t_s_firstyear.year_total > 0 then t_s_secyear.year_total / t_s_firstyear.year_total else null end
- order by customer_id, customer_last_name, customer_first_name
- limit 100;
+ order by ((customer_id) IS NULL), customer_id, ((customer_last_name) IS NULL), customer_last_name, ((customer_first_name) IS NULL), customer_first_name limit 100;
 
 --= query_75
 PRAGMA AnsiImplicitCrossJoin;
@@ -3690,8 +3580,7 @@ $all_sales = (SELECT d_year AS d_year,
    AND curr_yr.d_year=2002
    AND prev_yr.d_year=2002-1
    AND CAST(curr_yr.sales_cnt as Double)/CAST(prev_yr.sales_cnt as Double)<0.9
- ORDER BY sales_cnt_diff,sales_amt_diff
- limit 100;
+ ORDER BY ((sales_cnt_diff) IS NULL), sales_cnt_diff, ((sales_amt_diff) IS NULL), sales_amt_diff limit 100;
 
 --= query_76
 PRAGMA AnsiImplicitCrossJoin;
@@ -3721,8 +3610,7 @@ select channel AS channel,
            AND cs_sold_date_sk=d_date_sk
            AND cs_item_sk=i_item_sk) foo
 GROUP BY channel, col_name, d_year, d_qoy, i_category
- ORDER BY channel, col_name, d_year, d_qoy, i_category
- limit 100;
+ ORDER BY ((channel) IS NULL), channel, ((col_name) IS NULL), col_name, ((d_year) IS NULL), d_year, ((d_qoy) IS NULL), d_qoy, ((i_category) IS NULL), i_category limit 100;
 
 --= query_77
 PRAGMA AnsiImplicitCrossJoin;
@@ -3827,8 +3715,7 @@ $wr = (select web_page.wp_web_page_sk AS wp_web_page_sk,
  ) x
  group by  rollup (channel, id)
  
- order by channel, id
- limit 100;
+ order by ((channel) IS NULL), channel, ((id) IS NULL), id limit 100;
 
 --= query_78
 PRAGMA AnsiImplicitCrossJoin;
@@ -3880,14 +3767,7 @@ from $ss AS ss
 left join $ws AS ws on (ws.ws_sold_year=ss.ss_sold_year and ws.ws_item_sk=ss.ss_item_sk and ws.ws_customer_sk=ss.ss_customer_sk)
 left join $cs AS cs on (cs.cs_sold_year=ss.ss_sold_year and cs.cs_item_sk=ss.ss_item_sk and cs.cs_customer_sk=ss.ss_customer_sk)
 where (coalesce(ws_qty,0)>0 or coalesce(cs_qty, 0)>0) and ss_sold_year=1998
-order by 
-  ss_customer_sk,
-  ss_qty desc, ss_wc desc, ss_sp desc,
-  other_chan_qty,
-  other_chan_wholesale_cost,
-  other_chan_sales_price,
-  ratio
-limit 100;
+order by ((ss_customer_sk) IS NULL), ss_customer_sk, ((ss_qty) IS NOT NULL), ss_qty DESC, ((ss_wc) IS NOT NULL), ss_wc DESC, ((ss_sp) IS NOT NULL), ss_sp DESC, ((other_chan_qty) IS NULL), other_chan_qty, ((other_chan_wholesale_cost) IS NULL), other_chan_wholesale_cost, ((other_chan_sales_price) IS NULL), other_chan_sales_price, ((ratio) IS NULL), ratio limit 100;
 
 --= query_79
 PRAGMA AnsiImplicitCrossJoin;
@@ -3910,8 +3790,7 @@ select
     group by store_sales.ss_ticket_number, store_sales.ss_customer_sk, store_sales.ss_addr_sk, store.s_city
  ) ms,customer
     where ss_customer_sk = c_customer_sk
- order by c_last_name,c_first_name,Unicode::Substring(s_city, CAST(0 AS Uint32), CAST(30 AS Uint32)), profit
-limit 100;
+ order by ((c_last_name) IS NULL), c_last_name, ((c_first_name) IS NULL), c_first_name, ((Unicode::Substring(s_city, CAST(0 AS Uint32), CAST(30 AS Uint32))) IS NULL), Unicode::Substring(s_city, CAST(0 AS Uint32), CAST(30 AS Uint32)), ((profit) IS NULL), profit limit 100;
 
 --= query_80
 PRAGMA AnsiImplicitCrossJoin;
@@ -4005,8 +3884,7 @@ group by web_site.web_site_id
  ) x
  group by  rollup (channel, id)
  
- order by channel, id
- limit 100;
+ order by ((channel) IS NULL), channel, ((id) IS NULL), id limit 100;
 
 --= query_81
 PRAGMA AnsiImplicitCrossJoin;
@@ -4038,10 +3916,7 @@ $ctr_state_avg = (select ctr_state AS ctr_state,
        and ca_address_sk = c_current_addr_sk
        and ca_state = 'TN'
        and ctr1.ctr_customer_sk = c_customer_sk
- order by c_customer_id,c_salutation,c_first_name,c_last_name,ca_street_number,ca_street_name
-                   ,ca_street_type,ca_suite_number,ca_city,ca_county,ca_state,ca_zip,ca_country,ca_gmt_offset
-                  ,ca_location_type,ctr_total_return
- limit 100;
+ order by ((c_customer_id) IS NULL), c_customer_id, ((c_salutation) IS NULL), c_salutation, ((c_first_name) IS NULL), c_first_name, ((c_last_name) IS NULL), c_last_name, ((ca_street_number) IS NULL), ca_street_number, ((ca_street_name) IS NULL), ca_street_name, ((ca_street_type) IS NULL), ca_street_type, ((ca_suite_number) IS NULL), ca_suite_number, ((ca_city) IS NULL), ca_city, ((ca_county) IS NULL), ca_county, ((ca_state) IS NULL), ca_state, ((ca_zip) IS NULL), ca_zip, ((ca_country) IS NULL), ca_country, ((ca_gmt_offset) IS NULL), ca_gmt_offset, ((ca_location_type) IS NULL), ca_location_type, ((ctr_total_return) IS NULL), ctr_total_return limit 100;
 
 --= query_82
 PRAGMA AnsiImplicitCrossJoin;
@@ -4057,8 +3932,7 @@ select item.i_item_id AS i_item_id,
  and inv_quantity_on_hand between 100 and 500
  and ss_item_sk = i_item_sk
  group by item.i_item_id, item.i_item_desc, item.i_current_price
- order by i_item_id
- limit 100;
+ order by ((i_item_id) IS NULL), i_item_id limit 100;
 
 --= query_83
 PRAGMA AnsiImplicitCrossJoin;
@@ -4124,9 +3998,7 @@ $wr_items = (select item.i_item_id AS item_id,
      ,$wr_items AS wr_items
  where sr_items.item_id=cr_items.item_id
    and sr_items.item_id=wr_items.item_id 
- order by sr_items.item_id
-         ,sr_item_qty
- limit 100;
+ order by ((sr_items.item_id) IS NULL), sr_items.item_id, ((sr_item_qty) IS NULL), sr_item_qty limit 100;
 
 --= query_84
 PRAGMA AnsiImplicitCrossJoin;
@@ -4146,8 +4018,7 @@ select  c_customer_id as customer_id
    and cd_demo_sk = c_current_cdemo_sk
    and hd_demo_sk = c_current_hdemo_sk
    and sr_cdemo_sk = cd_demo_sk
- order by c_customer_id
- limit 100;
+ order by ((c_customer_id) IS NULL), c_customer_id limit 100;
 
 --= query_85
 PRAGMA AnsiImplicitCrossJoin;
@@ -4227,8 +4098,7 @@ select Unicode::Substring(reason.r_reason_desc, CAST(0 AS Uint32), CAST(20 AS Ui
     )
    )
 group by reason.r_reason_desc
- order by c13, c14, c15, c16
- limit 100;
+ order by ((c13) IS NULL), c13, ((c14) IS NULL), c14, ((c15) IS NULL), c15, ((c16) IS NULL), c16 limit 100;
 
 --= query_86
 PRAGMA AnsiImplicitCrossJoin;
@@ -4239,7 +4109,7 @@ select sum(web_sales.ws_net_paid) AS total_sum,
   rank() over (
  	partition by grouping(item.i_category)+grouping(item.i_class),
  	case when grouping(item.i_class) = 0 then item.i_category  else null end 
- 	order by sum(web_sales.ws_net_paid) desc) AS rank_within_parent
+ 	order by ((sum(web_sales.ws_net_paid)) IS NOT NULL), sum(web_sales.ws_net_paid) DESC ) AS rank_within_parent
  from
     web_sales
    ,date_dim       d1
@@ -4250,8 +4120,7 @@ select sum(web_sales.ws_net_paid) AS total_sum,
  and i_item_sk  = ws_item_sk
  group by  rollup(item.i_category,item.i_class)
  
- order by lochierarchy desc, case when lochierarchy = 0 then i_category  else null end, rank_within_parent
- limit 100;
+ order by ((lochierarchy) IS NOT NULL), lochierarchy DESC, ((case when lochierarchy = 0 then i_category  else null end) IS NULL), case when lochierarchy = 0 then i_category  else null end, ((rank_within_parent) IS NULL), rank_within_parent limit 100;
 
 --= query_87
 PRAGMA AnsiImplicitCrossJoin;
@@ -4277,8 +4146,7 @@ from ((select distinct c_last_name, c_first_name, d_date
 
 --= query_88
 PRAGMA AnsiImplicitCrossJoin;
-select  *
-from
+select h8_30_to_9, h9_to_9_30, h9_30_to_10, h10_to_10_30, h10_30_to_11, h11_to_11_30, h11_30_to_12, h12_to_12_30 from
  (select count(*) AS h8_30_to_9
  from store_sales, household_demographics , time_dim, store
  where ss_sold_time_sk = time_dim.t_time_sk   
@@ -4370,8 +4238,7 @@ from
 
 --= query_89
 PRAGMA AnsiImplicitCrossJoin;
-select  *
-from(
+select i_category, i_class, i_brand, s_store_name, s_company_name, d_moy, sum_sales, avg_monthly_sales from(
 select item.i_category AS i_category,
   item.i_class AS i_class,
   item.i_brand AS i_brand,
@@ -4395,8 +4262,7 @@ where ss_item_sk = i_item_sk and
 group by item.i_category, item.i_class, item.i_brand, store.s_store_name, store.s_company_name, date_dim.d_moy
  ) tmp1
 where case when (avg_monthly_sales <> 0) then (abs(sum_sales - avg_monthly_sales) / avg_monthly_sales) else null end > 0.1
-order by sum_sales - avg_monthly_sales, s_store_name
-limit 100;
+order by ((sum_sales - avg_monthly_sales) IS NULL), sum_sales - avg_monthly_sales, ((s_store_name) IS NULL), s_store_name limit 100;
 
 --= query_90
 PRAGMA AnsiImplicitCrossJoin;
@@ -4417,8 +4283,7 @@ select  cast(amc as Double)/nullif(cast(pmc as Double),0) am_pm_ratio
          and time_dim.t_hour between 14 and 14+1
          and household_demographics.hd_dep_count = 6
          and web_page.wp_char_count between 5000 and 5200) pt
- order by am_pm_ratio
- limit 100;
+ order by ((am_pm_ratio) IS NULL), am_pm_ratio limit 100;
 
 --= query_91
 PRAGMA AnsiImplicitCrossJoin;
@@ -4448,7 +4313,7 @@ and     ( (cd_marital_status       = 'M' and cd_education_status     = 'Unknown'
 and     hd_buy_potential like 'Unknown%'
 and     ca_gmt_offset           = -7
 group by call_center.cc_call_center_id, call_center.cc_name, call_center.cc_manager, customer_demographics.cd_marital_status, customer_demographics.cd_education_status
- order by Returns_Loss desc;
+ order by ((Returns_Loss) IS NOT NULL), Returns_Loss DESC;
 
 --= query_92
 PRAGMA AnsiImplicitCrossJoin;
@@ -4468,8 +4333,7 @@ where i_manufact_id = 714
   and d_date_sk = ws_sold_date_sk
   and disc.ditem = web_sales.ws_item_sk
   and web_sales.ws_ext_discount_amt > disc.avg_disc
-order by `Excess Discount Amount`
- limit 100;
+order by ((`Excess Discount Amount`) IS NULL), `Excess Discount Amount` limit 100;
 
 --= query_93
 PRAGMA AnsiImplicitCrossJoin;
@@ -4486,8 +4350,7 @@ select ss_customer_sk AS ss_customer_sk,
             where sr_reason_sk = r_reason_sk
               and r_reason_desc = 'reason 58') t
       group by ss_customer_sk
- order by sumsales, ss_customer_sk
- limit 100;
+ order by ((sumsales) IS NULL), sumsales, ((ss_customer_sk) IS NULL), ss_customer_sk limit 100;
 
 --= query_94
 PRAGMA AnsiImplicitCrossJoin;
@@ -4505,8 +4368,7 @@ where d_date between '2002-05-01' and '2002-06-30'
  from web_sales group by ws_order_number
  having count(distinct ws_warehouse_sk) > 1)
   and ws1.ws_order_number not in (select wr_order_number from web_returns)
-order by `order count`
- limit 100;
+order by ((`order count`) IS NULL), `order count` limit 100;
 
 --= query_95
 PRAGMA AnsiImplicitCrossJoin;
@@ -4536,8 +4398,7 @@ and ws1.ws_order_number in (select ws_order_number
 and ws1.ws_order_number in (select wr_order_number
                             from web_returns,$ws_wh AS ws_wh
                             where wr_order_number = ws_wh.ws_order_number)
-order by `order count`
- limit 100;
+order by ((`order count`) IS NULL), `order count` limit 100;
 
 --= query_96
 PRAGMA AnsiImplicitCrossJoin;
@@ -4552,8 +4413,7 @@ where ss_sold_time_sk = time_dim.t_time_sk
     and time_dim.t_minute >= 30
     and household_demographics.hd_dep_count = 0
     and store.s_store_name = 'ese'
-order by c17
- limit 100;
+order by ((c17) IS NULL), c17 limit 100;
 
 --= query_97
 PRAGMA AnsiImplicitCrossJoin;
@@ -4600,7 +4460,7 @@ where
 	and d_date between ('1999-02-05') 
 				and '1999-03-07'
 group by item.i_item_id, item.i_item_desc, item.i_category, item.i_class, item.i_current_price
- order by i_category, i_class, i_item_id, i_item_desc, revenueratio;
+ order by ((i_category) IS NULL), i_category, ((i_class) IS NULL), i_class, ((i_item_id) IS NULL), i_item_id, ((i_item_desc) IS NULL), i_item_desc, ((revenueratio) IS NULL), revenueratio;
 
 --= query_99
 PRAGMA AnsiImplicitCrossJoin;
@@ -4628,5 +4488,4 @@ and cs_warehouse_sk   = w_warehouse_sk
 and cs_ship_mode_sk   = sm_ship_mode_sk
 and cs_call_center_sk = cc_call_center_sk
 group by Unicode::Substring(warehouse.w_warehouse_name, CAST(0 AS Uint32), CAST(20 AS Uint32)) AS gk18, ship_mode.sm_type, call_center.cc_name
- order by gk18, sm_type, cc_name
- limit 100;
+ order by ((gk18) IS NULL), gk18, ((sm_type) IS NULL), sm_type, ((cc_name) IS NULL), cc_name limit 100;

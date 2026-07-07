@@ -13,15 +13,15 @@
 -- nullable, and BulkUpsert must accept the generated nulls.
 --
 -- Two storage sections, chosen by YDB_STORE_MODE in tpcds.ts:
---   create_schema        (row store, default)  keeps window functions and the
---                        full analytic query surface that YDB column store
---                        still restricts.
---   create_schema_column (column store)        OLAP layout for scan-heavy runs;
---                        some window/grouping queries may not plan.
+--   create_schema_column (column store, default)  the OLAP layout for TPC-DS'
+--                        scan-heavy queries; auto-partitions by size. The full
+--                        query suite (window functions, rollup, grouping sets)
+--                        runs on it.
+--   create_schema        (row store)              row layout, kept as an option.
 -- Fact and large dimension tables start at 64 partitions, small dims at 1.
--- Secondary indexes are omitted (full-scan analytics; the spec lists them as
--- auxiliary) — create_indexes is a noop so the tpcds.ts pipeline step is a
--- no-op for ydb.
+-- Secondary indexes are omitted: YDB column tables do not support global
+-- secondary indexes (only local bloom/min-max), and the spec lists indexes as
+-- auxiliary for this full-scan workload, so create_indexes is a noop for ydb.
 
 --+ drop_schema
 --= drop_web_returns
@@ -727,7 +727,9 @@ CREATE TABLE income_band (
 PARTITION BY HASH (ib_income_band_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= ship_mode
 CREATE TABLE ship_mode (
@@ -742,7 +744,9 @@ CREATE TABLE ship_mode (
 PARTITION BY HASH (sm_ship_mode_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= reason
 CREATE TABLE reason (
@@ -754,7 +758,9 @@ CREATE TABLE reason (
 PARTITION BY HASH (r_reason_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= household_demographics
 CREATE TABLE household_demographics (
@@ -768,7 +774,9 @@ CREATE TABLE household_demographics (
 PARTITION BY HASH (hd_demo_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= customer_demographics
 CREATE TABLE customer_demographics (
@@ -786,7 +794,9 @@ CREATE TABLE customer_demographics (
 PARTITION BY HASH (cd_demo_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 )
 --= date_dim
 CREATE TABLE date_dim (
@@ -823,7 +833,9 @@ CREATE TABLE date_dim (
 PARTITION BY HASH (d_date_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= time_dim
 CREATE TABLE time_dim (
@@ -842,7 +854,9 @@ CREATE TABLE time_dim (
 PARTITION BY HASH (t_time_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= warehouse
 CREATE TABLE warehouse (
@@ -865,7 +879,9 @@ CREATE TABLE warehouse (
 PARTITION BY HASH (w_warehouse_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= web_page
 CREATE TABLE web_page (
@@ -888,7 +904,9 @@ CREATE TABLE web_page (
 PARTITION BY HASH (wp_web_page_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= web_site
 CREATE TABLE web_site (
@@ -923,7 +941,9 @@ CREATE TABLE web_site (
 PARTITION BY HASH (web_site_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= catalog_page
 CREATE TABLE catalog_page (
@@ -941,7 +961,9 @@ CREATE TABLE catalog_page (
 PARTITION BY HASH (cp_catalog_page_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= customer_address
 CREATE TABLE customer_address (
@@ -963,7 +985,9 @@ CREATE TABLE customer_address (
 PARTITION BY HASH (ca_address_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 )
 --= customer
 CREATE TABLE customer (
@@ -990,7 +1014,9 @@ CREATE TABLE customer (
 PARTITION BY HASH (c_customer_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 )
 --= call_center
 CREATE TABLE call_center (
@@ -1030,7 +1056,9 @@ CREATE TABLE call_center (
 PARTITION BY HASH (cc_call_center_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= store
 CREATE TABLE store (
@@ -1068,7 +1096,9 @@ CREATE TABLE store (
 PARTITION BY HASH (s_store_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= promotion
 CREATE TABLE promotion (
@@ -1096,7 +1126,9 @@ CREATE TABLE promotion (
 PARTITION BY HASH (p_promo_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 50
 )
 --= item
 CREATE TABLE item (
@@ -1127,7 +1159,9 @@ CREATE TABLE item (
 PARTITION BY HASH (i_item_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 )
 --= inventory
 CREATE TABLE inventory (
@@ -1140,7 +1174,9 @@ CREATE TABLE inventory (
 PARTITION BY HASH (inv_date_sk, inv_item_sk, inv_warehouse_sk)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 )
 --= store_sales
 CREATE TABLE store_sales (
@@ -1172,7 +1208,9 @@ CREATE TABLE store_sales (
 PARTITION BY HASH (ss_item_sk, ss_ticket_number)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 )
 --= store_returns
 CREATE TABLE store_returns (
@@ -1201,7 +1239,9 @@ CREATE TABLE store_returns (
 PARTITION BY HASH (sr_item_sk, sr_ticket_number)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 )
 --= catalog_sales
 CREATE TABLE catalog_sales (
@@ -1244,7 +1284,9 @@ CREATE TABLE catalog_sales (
 PARTITION BY HASH (cs_item_sk, cs_order_number)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 )
 --= catalog_returns
 CREATE TABLE catalog_returns (
@@ -1280,7 +1322,9 @@ CREATE TABLE catalog_returns (
 PARTITION BY HASH (cr_item_sk, cr_order_number)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 )
 --= web_sales
 CREATE TABLE web_sales (
@@ -1323,7 +1367,9 @@ CREATE TABLE web_sales (
 PARTITION BY HASH (ws_item_sk, ws_order_number)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 )
 --= web_returns
 CREATE TABLE web_returns (
@@ -1356,7 +1402,9 @@ CREATE TABLE web_returns (
 PARTITION BY HASH (wr_item_sk, wr_order_number)
 WITH (
     STORE = COLUMN,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_BY_SIZE = ENABLED,
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64,
+    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
 )
 
 --+ create_indexes
