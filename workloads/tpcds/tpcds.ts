@@ -288,6 +288,12 @@ export default function (): void {
     try {
       if (driverConfig.driverType === "postgres") {
         driver.exec(`SET statement_timeout = '${QUERY_CAP_MS}'` as unknown as SqlQuery, {});
+        // Force hash joins: the year_total queries self-join a materialized
+        // CTE that carries no statistics, so the planner under-estimates the
+        // filtered scans and picks nested loops that blow past the cap. Hash
+        // joins keep them seconds, not minutes. Scoped to validate/dump.
+        driver.exec(`SET enable_nestloop = off` as unknown as SqlQuery, {});
+        driver.exec(`SET jit = off` as unknown as SqlQuery, {});
       } else if (driverConfig.driverType === "mysql") {
         driver.exec(`SET SESSION max_execution_time = ${QUERY_CAP_MS}` as unknown as SqlQuery, {});
       }
