@@ -1,6 +1,7 @@
 package bench
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -51,32 +52,38 @@ func TestStepsNoStepsMutuallyExclusive(t *testing.T) {
 	}
 }
 
-func TestValidationFailureExits(t *testing.T) {
+func TestDefineErrorExits(t *testing.T) {
+	// A Define that returns a non-nil error is a configuration failure: runMain
+	// surfaces it and exits non-zero before any run starts (replaces the old
+	// Opts.Validate hook, D7).
 	tst := &Test{
-		Name:    "bad",
-		Opts:    &validatedOpts{}, // Validate rejects N=0 (the default)
-		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
-		Build:   func(*Run) []*StepDef { return []*StepDef{Step("a", okHandler{})} },
+		Name: "bad",
+		Define: func(d *Def) error {
+			d.Driver("main", "noop")
+			d.Step("a", okHandler{})
+			return fmt.Errorf("boom")
+		},
 	}
 	var out strings.Builder
 	if code := runMain(tst, nil, envMap(nil), &out, &out); code == 0 {
-		t.Fatalf("expected non-zero exit on validation failure\n%s", out.String())
+		t.Fatalf("expected non-zero exit on Define error\n%s", out.String())
 	}
 }
 
-// twoStepTest is a setup(Once) -> work(Closed) test on the noop driver.
+// twoStepTest is a setup(Once) -> work(Closed) test on the noop driver, built
+// via Define.
 func twoStepTest(dur time.Duration) *Test {
 	return &Test{
-		Name:    "twostep",
-		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
-		Build: func(*Run) []*StepDef {
-			return []*StepDef{
-				Step("setup", FuncOnce(func(vu *VU) error {
-					_, err := vu.Conn() // pin a (noop) connection
-					return err
-				})),
-				Step("work", &closedNoopDB{}).Closed(2, dur).After("setup"),
-			}
+		Name: "twostep",
+		Define: func(d *Def) error {
+			d.Driver("main", "noop")
+			d.Step("setup", FuncOnce(func(vu *VU) error {
+				_, err := vu.Conn() // pin a (noop) connection
+				return err
+			}))
+			d.Step("work", &closedNoopDB{}).Closed(2, dur).After("setup")
+			d.Variant("full")
+			return nil
 		},
 	}
 }

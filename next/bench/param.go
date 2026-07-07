@@ -78,20 +78,20 @@ type paramDecl struct {
 }
 
 // param is the typed handle to one declared param. Construct it through a
-// [paramSet] accessor ([paramSet.Int], [paramSet.String], ...); the value is
+// [ParamSet] accessor ([ParamSet.Int], [ParamSet.String], ...); the value is
 // resolved from the input bags at construction (immediate-mode: cli > env >
 // config > default), so Value returns the real datum and authors can derive and
 // branch inline on it. D7's Define callback is the author-facing entry point;
 // until it lands the struct-tag adapter and the SDK's own standard params use
 // these handles internally.
-type param[T any] struct {
+type Param[T any] struct {
 	decl *paramDecl
 }
 
 // Value returns the resolved value (the declared default when resolution failed
 // at construction, so a downstream declare is never poisoned by an earlier
 // parse error).
-func (p *param[T]) Value() T {
+func (p *Param[T]) Value() T {
 	if p.decl == nil || p.decl.value == nil {
 		var z T
 		return z
@@ -100,7 +100,7 @@ func (p *param[T]) Value() T {
 }
 
 // Source reports where Value came from.
-func (p *param[T]) Source() Source {
+func (p *Param[T]) Source() Source {
 	if p.decl == nil {
 		return SourceDefault
 	}
@@ -125,11 +125,11 @@ func optStandard() paramOpt {
 	return func(d *paramDecl) { d.standard = true }
 }
 
-// paramSet is the param registry: params declared over one run's resolved input
+// ParamSet is the param registry: params declared over one run's resolved input
 // bags. Each source is parsed into a bag BEFORE any param is declared, so each
 // accessor both registers metadata and resolves the value immediately. The set
 // is the single source of truth behind probe, --help, and the typed handles.
-type paramSet struct {
+type ParamSet struct {
 	cli    map[string]string          // --name=val flags
 	env    func(string) string        // process env lookup
 	cfg    map[string]json.RawMessage // flat JSON config, keyed by param name
@@ -143,8 +143,8 @@ type paramSet struct {
 
 // newParamSet builds a registry over the three input sources. Any source may be
 // nil (treated as empty).
-func newParamSet(cli map[string]string, env func(string) string, cfg map[string]json.RawMessage) *paramSet {
-	return &paramSet{
+func newParamSet(cli map[string]string, env func(string) string, cfg map[string]json.RawMessage) *ParamSet {
+	return &ParamSet{
 		cli: cli, env: env, cfg: cfg,
 		byName:  make(map[string]*paramDecl),
 		cliUsed: make(map[string]bool),
@@ -153,7 +153,7 @@ func newParamSet(cli map[string]string, env func(string) string, cfg map[string]
 
 // declare registers d's metadata and returns the fresh decl, or an error if the
 // name is already taken. It does not resolve the value.
-func (s *paramSet) declare(name string, kind paramKind, help, defStr string, opts []paramOpt) (*paramDecl, error) {
+func (s *ParamSet) declare(name string, kind paramKind, help, defStr string, opts []paramOpt) (*paramDecl, error) {
 	if _, dup := s.byName[name]; dup {
 		return nil, fmt.Errorf("bench: param %q declared twice", name)
 	}
@@ -175,7 +175,7 @@ func (s *paramSet) declare(name string, kind paramKind, help, defStr string, opt
 
 // pick resolves the source for d: cli > env > config > default. For config it
 // returns the [json.RawMessage] text and fromCfg=true; otherwise the raw string.
-func (s *paramSet) pick(d *paramDecl) (raw string, fromCfg bool, src Source, found bool) {
+func (s *ParamSet) pick(d *paramDecl) (raw string, fromCfg bool, src Source, found bool) {
 	if s.cli != nil {
 		if v, ok := s.cli[d.name]; ok {
 			s.cliUsed[d.name] = true
@@ -196,19 +196,19 @@ func (s *paramSet) pick(d *paramDecl) (raw string, fromCfg bool, src Source, fou
 }
 
 // fail records the first resolution error. Declaring continues so a probe can
-// still report the full catalog; the caller checks [paramSet.Err] after.
-func (s *paramSet) fail(err error) {
+// still report the full catalog; the caller checks [ParamSet.Err] after.
+func (s *ParamSet) fail(err error) {
 	if s.err == nil {
 		s.err = err
 	}
 }
 
 // Err returns the first resolution error recorded during declaration, or nil.
-func (s *paramSet) Err() error { return s.err }
+func (s *ParamSet) Err() error { return s.err }
 
 // checkUnknown reports a --flag that no registered param consumed (a typo),
 // listing the offending names.
-func (s *paramSet) checkUnknown() error {
+func (s *ParamSet) checkUnknown() error {
 	var unknown []string
 	for k := range s.cli {
 		if !s.cliUsed[k] {
@@ -222,7 +222,7 @@ func (s *paramSet) checkUnknown() error {
 }
 
 // Schema returns every declared param in registration order.
-func (s *paramSet) Schema() []ParamSchema {
+func (s *ParamSet) Schema() []ParamSchema {
 	out := make([]ParamSchema, 0, len(s.order))
 	for _, d := range s.order {
 		out = append(out, d.schema())
@@ -247,11 +247,11 @@ func (d *paramDecl) schema() ParamSchema {
 // the same text-parse path as cli/env, so authors write durations the same way
 // in a file as on the command line; any other JSON value (number/bool) unmarshals
 // directly into T.
-func resolveParam[T any](s *paramSet, name string, kind paramKind, def T, defStr, help string, parse func(string) (T, error), opts []paramOpt) *param[T] {
+func resolveParam[T any](s *ParamSet, name string, kind paramKind, def T, defStr, help string, parse func(string) (T, error), opts []paramOpt) *Param[T] {
 	d, err := s.declare(name, kind, help, defStr, opts)
 	if err != nil {
 		s.fail(err)
-		return &param[T]{}
+		return &Param[T]{}
 	}
 	raw, fromCfg, src, found := s.pick(d)
 	d.src = src
@@ -266,13 +266,13 @@ func resolveParam[T any](s *paramSet, name string, kind paramKind, def T, defStr
 		if e := json.Unmarshal([]byte(raw), &text); e != nil {
 			s.fail(fmt.Errorf("bench: param %q: %w", name, e))
 			d.value, d.raw = def, defStr
-			return &param[T]{d}
+			return &Param[T]{d}
 		}
 		v, e := parse(text)
 		if e != nil {
 			s.fail(fmt.Errorf("bench: param %q: %w", name, e))
 			d.value, d.raw = def, defStr
-			return &param[T]{d}
+			return &Param[T]{d}
 		}
 		d.value, d.raw = v, render(v)
 	case fromCfg:
@@ -281,7 +281,7 @@ func resolveParam[T any](s *paramSet, name string, kind paramKind, def T, defStr
 		if e := json.Unmarshal([]byte(raw), &v); e != nil {
 			s.fail(fmt.Errorf("bench: param %q: %w", name, e))
 			d.value, d.raw = def, defStr
-			return &param[T]{d}
+			return &Param[T]{d}
 		}
 		d.value, d.raw = v, render(v)
 	default: // cli or env: parse the raw text
@@ -289,11 +289,11 @@ func resolveParam[T any](s *paramSet, name string, kind paramKind, def T, defStr
 		if e != nil {
 			s.fail(fmt.Errorf("bench: param %q: %w", name, e))
 			d.value, d.raw = def, defStr
-			return &param[T]{d}
+			return &Param[T]{d}
 		}
 		d.value, d.raw = v, render(v)
 	}
-	return &param[T]{d}
+	return &Param[T]{d}
 }
 
 // render is the canonical text form of a resolved value for the schema's Current
@@ -309,34 +309,34 @@ func render(v any) string {
 // The typed accessors. Each returns a handle whose Value is already resolved
 // (immediate-mode); the default is also the fallback when a parse fails.
 
-func (s *paramSet) Int(name string, def int, help string, opts ...paramOpt) *param[int] {
+func (s *ParamSet) Int(name string, def int, help string, opts ...paramOpt) *Param[int] {
 	return resolveParam(s, name, kindInt, def, strconv.Itoa(def), help, strconv.Atoi, opts)
 }
 
-func (s *paramSet) Int64(name string, def int64, help string, opts ...paramOpt) *param[int64] {
+func (s *ParamSet) Int64(name string, def int64, help string, opts ...paramOpt) *Param[int64] {
 	return resolveParam(s, name, kindInt64, def, strconv.FormatInt(def, 10), help,
 		func(x string) (int64, error) { return strconv.ParseInt(x, 10, 64) }, opts)
 }
 
-func (s *paramSet) Uint64(name string, def uint64, help string, opts ...paramOpt) *param[uint64] {
+func (s *ParamSet) Uint64(name string, def uint64, help string, opts ...paramOpt) *Param[uint64] {
 	return resolveParam(s, name, kindUint64, def, strconv.FormatUint(def, 10), help,
 		func(x string) (uint64, error) { return strconv.ParseUint(x, 10, 64) }, opts)
 }
 
-func (s *paramSet) Float64(name string, def float64, help string, opts ...paramOpt) *param[float64] {
+func (s *ParamSet) Float64(name string, def float64, help string, opts ...paramOpt) *Param[float64] {
 	return resolveParam(s, name, kindFloat64, def, strconv.FormatFloat(def, 'f', -1, 64), help,
 		func(x string) (float64, error) { return strconv.ParseFloat(x, 64) }, opts)
 }
 
-func (s *paramSet) Bool(name string, def bool, help string, opts ...paramOpt) *param[bool] {
+func (s *ParamSet) Bool(name string, def bool, help string, opts ...paramOpt) *Param[bool] {
 	return resolveParam(s, name, kindBool, def, strconv.FormatBool(def), help, strconv.ParseBool, opts)
 }
 
-func (s *paramSet) String(name string, def, help string, opts ...paramOpt) *param[string] {
+func (s *ParamSet) String(name string, def, help string, opts ...paramOpt) *Param[string] {
 	return resolveParam(s, name, kindString, def, def, help,
 		func(x string) (string, error) { return x, nil }, opts)
 }
 
-func (s *paramSet) Duration(name string, def time.Duration, help string, opts ...paramOpt) *param[time.Duration] {
+func (s *ParamSet) Duration(name string, def time.Duration, help string, opts ...paramOpt) *Param[time.Duration] {
 	return resolveParam(s, name, kindDuration, def, def.String(), help, time.ParseDuration, opts)
 }

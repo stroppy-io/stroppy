@@ -10,14 +10,15 @@ import (
 )
 
 // Test is a complete, declarative description of a benchmark: its name, root
-// seed, options struct, driver slots and a step-DAG builder. A user test builds
-// one and hands it to [Main].
+// seed, and one [Def]-based Define callback that registers everything else
+// (params, drivers, query-sets, steps, variants, instruments). A user test
+// builds one and hands it to [Main].
 //
-// [Main] parses options before it calls Build, so the builder sees fully-parsed
-// options and can size executor policies from them (Closed(o.VUs, o.Duration),
-// Pool(o.LoadWorkers, ...)) directly — there is no separate options pre-parse.
-// Everything else (graph construction, execution) still happens in Main from
-// this declarative data, so a Test doubles as the probe/plan description.
+// Define runs against fully-parsed input bags (cli > env > config > default),
+// so each declaration resolves immediately: a param's [Param.Value] is the real
+// datum, a query-set is parsed, a driver slot knows its kind. Authors derive and
+// branch inline. The Test doubles as the probe/plan description — replaying
+// Define under the given inputs reproduces the exact plan an operator gets.
 type Test struct {
 	// Name identifies the test (used in metrics tags and the probe/plan output).
 	Name string
@@ -28,41 +29,11 @@ type Test struct {
 	// all sources. The resolved uint64 root feeds DeriveStream and fixes every
 	// rng draw (RFC 0001 §5). An empty Seed defaults to "0" (a valid seed, D11).
 	Seed string
-	// Opts is an optional pointer to a user options struct whose exported fields
-	// carry `env:"NAME"` and `default:"..."` tags. Main parses process env into
-	// it at startup, before Build, and, if it implements interface{ Validate()
-	// error }, calls Validate. Supported field types: string, int, int64,
-	// uint64, float64, bool, time.Duration. Each tagged field is projected
-	// uniformly to a --flag, an env var, and a config key (D1); an optional
-	// `help:"..."` tag supplies the --help line.
-	Opts any
-	// Drivers declares the database backends by slot. Slot 0 is the default a
-	// step's VUs connect to; env overrides apply per slot (see [DriverSlot]).
-	Drivers []DriverSlot
-	// QuerySets registers the test's baked query-set sources. A Build callback
-	// resolves each by name through [Run.Queries] against the active driver
-	// kind; users override any entry from the environment. See [BakedQuerySet]
-	// for the resolution chain and override convention.
-	QuerySets []BakedQuerySet
-	// Build returns the DAG steps in declaration order (used for status
-	// reporting and as the deterministic build order; dependencies are declared
-	// per step). Main calls it exactly once, after options are parsed and driver
-	// slots resolved, passing the [Run] so steps may branch on the resolved
-	// options, seed or driver kinds. Steps that need no options can ignore the
-	// Run and return a fixed slice.
-	Build func(*Run) []*StepDef
-}
-
-// DriverSlot declares one database backend. URL and Kind are overridable from
-// the environment: slot 0 reads STROPPY_DRIVER_URL / STROPPY_DRIVER_KIND, slot N
-// reads STROPPY_DRIVER<N>_URL / STROPPY_DRIVER<N>_KIND. Kind defaults to "pg".
-type DriverSlot struct {
-	// Name labels the slot so a step's Uses can target it by name.
-	Name string
-	// Kind selects the driver implementation: "pg" or "noop".
-	Kind string
-	// URL is the connection string passed to the driver (ignored by noop).
-	URL string
+	// Define registers the test's params, driver slots, query-sets, steps,
+	// variants and instruments against d, using the typed handles D1/D7 provide.
+	// It returns a Go native error (no panics, no throw — D10); [Main] surfaces
+	// a non-nil return as a configuration failure before any run starts.
+	Define func(d *Def) error
 }
 
 // slotSpec is a driver slot resolved against the environment: the concrete kind
@@ -71,38 +42,6 @@ type slotSpec struct {
 	name string
 	kind string
 	url  string
-}
-
-// resolveSlots resolves each declared slot. Slot 0 takes its url/kind from the
-// standard driver.url/driver.kind params (already resolved cli > env > config >
-// the slot's declared default); slots beyond the first still read the legacy
-// STROPPY_DRIVER<N>_URL / STROPPY_DRIVER<N>_KIND env (multi-driver, F2-pending).
-// An empty kind defaults to "pg". Safe for -probe/-plan: it constructs nothing.
-func resolveSlots(decls []DriverSlot, slot0url, slot0kind string, getenv func(string) string) []slotSpec {
-	out := make([]slotSpec, len(decls))
-	for i, d := range decls {
-		s := slotSpec{name: d.Name, kind: d.Kind, url: d.URL}
-		if i == 0 {
-			if slot0url != "" {
-				s.url = slot0url
-			}
-			if slot0kind != "" {
-				s.kind = slot0kind
-			}
-		} else {
-			if u := getenv(fmt.Sprintf("STROPPY_DRIVER%d_URL", i)); u != "" {
-				s.url = u
-			}
-			if k := getenv(fmt.Sprintf("STROPPY_DRIVER%d_KIND", i)); k != "" {
-				s.kind = k
-			}
-		}
-		if s.kind == "" {
-			s.kind = "pg"
-		}
-		out[i] = s
-	}
-	return out
 }
 
 // buildDrivers constructs the concrete driver per slot. It does not connect;

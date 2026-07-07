@@ -1,11 +1,10 @@
 package bench
 
-// Run is the read-only view of a run handed to a step's If predicate. It exposes
-// the resolved run parameters — seed, options and per-slot driver kind — so a
-// condition can branch on how the run was configured (for example, skipping a
-// verification step under the noop driver). It also carries the env lookup so
-// [Run.Queries] can honor user-provided query-set overrides, and the memoized
-// query-set resolutions so probe can report them.
+// Run is the read-only runtime view of one resolved run. It is what a step's If
+// predicate and the query-set resolver read: the resolved seed, the per-slot
+// driver kinds, and the env lookup that honors user-provided query-set
+// overrides. Define populates slots and baked query-sets; [Main] threads the
+// resolved seed in after Define.
 type Run struct {
 	test  *Test
 	seed  uint64
@@ -13,6 +12,18 @@ type Run struct {
 
 	getenv func(string) string
 
+	// stdDriverURL/stdDriverKind are the operator-facing standard params for
+	// slot 0; [Def.Driver] folds them onto slot 0's declared defaults. They are
+	// set by [registerStandardParams] before Define runs.
+	stdDriverURL *Param[string]
+	stdDriverKind *Param[string]
+
+	// bakes holds the baked query-set sources registered by [Def.Queries]; the
+	// resolver reads them in declaration order.
+	bakes map[string]*BakedQuerySet
+
+	// qset/qOrder memoize each [Def.Queries]/[Run.Queries] resolution so probe
+	// can list the exact set an override would target without re-resolving.
 	qset   map[string]*resolvedQuerySet
 	qOrder []string
 }
@@ -22,10 +33,6 @@ func (r *Run) Name() string { return r.test.Name }
 
 // Seed reports the effective run seed (after any -seed override).
 func (r *Run) Seed() uint64 { return r.seed }
-
-// Opts reports the (parsed) options struct pointer, or nil if the test declares
-// none. A predicate type-asserts it back to the test's own options type.
-func (r *Run) Opts() any { return r.test.Opts }
 
 // DriverKind reports the resolved kind ("pg"/"noop") of driver slot, or "" if
 // the slot index is out of range.

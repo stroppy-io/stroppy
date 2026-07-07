@@ -62,6 +62,8 @@ type StepDef struct {
 
 	onErr ErrorMode
 	uses  string
+
+	skippable bool
 }
 
 // Step begins a step named name driven by h. Chain a policy and edges onto it.
@@ -127,6 +129,14 @@ func (s *StepDef) OnErr(m ErrorMode) *StepDef { s.onErr = m; return s }
 // Uses names the driver slot this step's VUs connect to by default (slot 0 when
 // unset). Handlers still reach any slot via [VU.Conn].
 func (s *StepDef) Uses(slot string) *StepDef { s.uses = slot; return s }
+
+// Skippable marks this step as one the operator may skip via -skip (D5). A step
+// not marked Skippable is required: skipping it would break the graph's
+// invariant, so the SDK refuses. Edges to a skipped step are preserved: skip
+// means the handler does not run, not that the node disappears (F3: a Skipped
+// step still unblocks its After/AfterAny dependents). The -skip enforcement
+// lands with D3b; for now this is the author-marked guardrail the probe reports.
+func (s *StepDef) Skippable() *StepDef { s.skippable = true; return s }
 
 // buildExecutor constructs the executor for sd under cfg, dispatching on policy.
 func buildExecutor(cfg Config, sd *StepDef) *Executor {

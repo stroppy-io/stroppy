@@ -18,16 +18,17 @@ import (
 	"github.com/stroppy-io/stroppy/next/metrics"
 )
 
-// Main parses flags, environment and config, builds and runs the test's step
-// DAG, prints per-step statuses and a metrics summary, and exits: 0 on success,
-// non-zero on any step failure or configuration error. It is the entry point of
-// a test's `func main`.
+// Main parses flags, environment and config, drives the test's Define callback,
+// builds and runs the chosen variant's step DAG, prints per-step statuses and a
+// metrics summary, and exits: 0 on success, non-zero on any step failure or
+// configuration error. It is the entry point of a test's `func main`.
 //
-// Params are defined once (struct tags on Test.Opts, plus SDK-injected standard
-// params) and projected uniformly to --flags, env vars, and a flat JSON config
-// file, with precedence cli > env > config > default (D1). SDK control flags
-// (-steps/-no-steps/-probe/-plan/-plan-dot/-cpuprofile/--config/-help) are not
-// params and are parsed alongside them. -help lists STANDARD then TEST params.
+// Params are defined once inside Define (typed handles on [Def.Param], plus
+// SDK-injected standard params) and projected uniformly to --flags, env vars,
+// and a flat JSON config file, with precedence cli > env > config > default
+// (D1). SDK control flags (-steps/-no-steps/-probe/-plan/-plan-dot/
+// -cpuprofile/--config/-help) are not params and are parsed alongside them.
+// -help lists STANDARD then TEST params.
 func Main(t *Test) {
 	os.Exit(runMain(t, os.Args[1:], os.Getenv, os.Stdout, os.Stderr))
 }
@@ -54,18 +55,47 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 	}
 
 	set := newParamSet(cli, getenv, cfg)
-	seedParam, drvURL, drvKind := registerStandardParams(t, set)
-	optsErr := parseOptions(t.Opts, set)
+	seedParam, drvURL, drvKind, variantParam := registerStandardParams(t, set)
+
+	// Resolve the root seed before Define so authors can size eagerly-built
+	// run-global state (e.g. a generation world) from it via [Def.Seed]. An
+	// invalid seed is recorded and surfaced after Define (and tolerated by
+	// -help, which is pure discovery); "auto"/"now" draws once here.
+	rootSeed, seedErr := resolveSeed(seedParam.Value(), t.Seed)
+
+	// Phase 2 (Define): drive the test's declarative callback against the
+	// resolved bags. Each d.Param.* resolves immediately; d.Driver folds slot 0
+	// onto the operator's driver.url/driver.kind overrides; d.Queries parses
+	// eagerly; d.Step/d.Variant/d.Histogram/d.Counter record their declarations.
+	run := &Run{test: t, seed: rootSeed, getenv: getenv, stdDriverURL: drvURL, stdDriverKind: drvKind}
+	d := newDef(t, set, run)
+	defineErr := error(nil)
+	if t.Define != nil {
+		defineErr = t.Define(d)
+	}
+	// Slot 0's declared defaults now known — reflect them back into the standard
+	// driver params so the schema shows the test's defaults (not empty).
+	if len(d.drivers) > 0 {
+		patchDriverDefault(drvURL, d.drivers[0].url)
+		patchDriverDefault(drvKind, d.drivers[0].kind)
+	}
+	slots := run.slots
+	if slots == nil {
+		// No d.Driver call: synthesize a slot-0 noop default so probe/plan still
+		// function for a test that declares no driver.
+		slots = []slotSpec{{name: "main", kind: "noop"}}
+		run.slots = slots
+	}
 
 	// -help short-circuits after the registry is populated (params + their
-	// resolved defaults are all known), so a config error or an unknown -e does
-	// not block the operator from discovering the surface.
+	// resolved defaults are all known), so a config error or an unknown flag
+	// does not block the operator from discovering the surface.
 	if f.help {
 		writeHelp(stdout, t, set)
 		return 0
 	}
-	if optsErr != nil {
-		fmt.Fprintln(stderr, optsErr)
+	if defineErr != nil {
+		fmt.Fprintln(stderr, defineErr)
 		return 1
 	}
 	if err := set.Err(); err != nil {
@@ -76,23 +106,20 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
-	if err := validateOptions(t.Opts); err != nil {
-		fmt.Fprintf(stderr, "bench: invalid options: %v\n", err)
+	if seedErr != nil {
+		fmt.Fprintln(stderr, seedErr)
 		return 1
 	}
 
-	rootSeed, err := resolveSeed(seedParam.Value(), t.Seed)
+	activeSteps, activeSet, err := selectVariantSteps(d, variantParam.Value())
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
-
-	slots := resolveSlots(t.Drivers, drvURL.Value(), drvKind.Value(), getenv)
-	run := &Run{test: t, seed: rootSeed, slots: slots, getenv: getenv}
-	steps := buildSteps(t, run)
+	pruneEdges(activeSteps, activeSet)
 
 	if f.probe {
-		if err := writeProbe(stdout, buildProbe(t, steps, rootSeed, set.Schema(), slots, run)); err != nil {
+		if err := writeProbe(stdout, buildProbe(t, activeSteps, rootSeed, set.Schema(), slots, run, d, variantParam.Value())); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -113,10 +140,10 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 
 	// Report the effective seed before the run starts: for --seed=auto the
 	// operator needs to see the chosen number to reproduce the dataset.
-	fmt.Fprintf(stderr, "%s: seed=%d (source: %s)\n", t.Name, rootSeed, seedParam.Source())
+	fmt.Fprintf(stderr, "%s: seed=%d (source: %s) variant=%s\n", t.Name, rootSeed, seedParam.Source(), variantParam.Value())
 
 	reg := metrics.NewRegistry()
-	built, execs, err := buildGraph(steps, run, rootSeed, reg, drivers, slots, filter)
+	built, execs, err := buildGraph(activeSteps, run, rootSeed, reg, drivers, slots, filter)
 	if err != nil {
 		fmt.Fprintf(stderr, "bench: %v\n", err)
 		return 1
@@ -140,7 +167,95 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 		defer stop()
 	}
 
-	return execute(built, execs, drivers, reg, stdout, steps)
+	return execute(built, execs, drivers, reg, stdout, activeSteps)
+}
+
+// newDef builds the declaration context over set and run for t.
+func newDef(t *Test, set *ParamSet, run *Run) *Def {
+	return &Def{
+		Param: set, test: t, run: run, set: set,
+		drvName:    make(map[string]*DriverSpec),
+		stepByName: make(map[string]*StepDef),
+		varByName:  make(map[string]*variantDef),
+	}
+}
+
+// selectVariantSteps resolves the chosen variant's step set. If Define declared
+// no variants, every declared step is active (the implicit "full"). A variant
+// with an empty step set means "all declared steps" (D3b). Returns the active
+// steps in declaration order and the active-name set; edges to inactive steps
+// are pruned separately by [pruneEdges].
+func selectVariantSteps(d *Def, chosen string) ([]*StepDef, map[string]bool, error) {
+	active := make(map[string]bool, len(d.steps))
+	for _, s := range d.steps {
+		active[s.name] = true
+	}
+	if len(d.variants) > 0 {
+		// D5: a test that declares variants must provide a "full" default (the
+		// standard variant param's default resolves to it).
+		if d.varByName["full"] == nil {
+			return nil, nil, fmt.Errorf("bench: test declares variants but none is named %q (the required default)", "full")
+		}
+		v, ok := d.varByName[chosen]
+		if !ok {
+			names := make([]string, 0, len(d.variants))
+			for _, vv := range d.variants {
+				names = append(names, vv.name)
+			}
+			return nil, nil, fmt.Errorf("bench: variant %q not declared (available: %s)", chosen, strings.Join(names, ", "))
+		}
+		if len(v.steps) > 0 {
+			active = make(map[string]bool, len(v.steps))
+			for name := range v.steps {
+				active[name] = true
+			}
+		}
+	}
+	out := make([]*StepDef, 0, len(d.steps))
+	for _, s := range d.steps {
+		if active[s.name] {
+			out = append(out, s)
+		}
+	}
+	return out, active, nil
+}
+
+// pruneEdges drops each active step's edges to steps outside the active set
+// (D3b: cross-variant edges prune). An edge to an inactive step would otherwise
+// reference a node the builder never added.
+func pruneEdges(steps []*StepDef, active map[string]bool) {
+	for _, s := range steps {
+		s.after = filterActive(s.after, active)
+		s.afterAny = filterActive(s.afterAny, active)
+		s.onFailure = filterActive(s.onFailure, active)
+	}
+}
+
+func filterActive(deps []string, active map[string]bool) []string {
+	if len(deps) == 0 {
+		return deps
+	}
+	kept := deps[:0]
+	for _, d := range deps {
+		if active[d] {
+			kept = append(kept, d)
+		}
+	}
+	return kept
+}
+
+// patchDriverDefault reflects a slot-0 declared default back into its standard
+// driver param so the schema/help shows the test's default rather than empty.
+// The operator's override (source != Default) is preserved.
+func patchDriverDefault(p *Param[string], declared string) {
+	if p == nil || p.decl == nil {
+		return
+	}
+	p.decl.defStr = declared
+	if p.decl.src == SourceDefault {
+		p.decl.value = declared
+		p.decl.raw = declared
+	}
 }
 
 // sdkFlags carries the parsed SDK control flags (everything that is not a param).
@@ -261,10 +376,13 @@ func loadConfig(path string) (map[string]json.RawMessage, error) {
 }
 
 // registerStandardParams declares the SDK-injected STANDARD params every test
-// shares: the run seed (string, F6) and the slot-0 driver url/kind. The seed's
-// declared default is Test.Seed (the spec-representative value), or "0" when the
-// test leaves it unset (D11: 0 is a valid seed).
-func registerStandardParams(t *Test, set *paramSet) (seed, drvURL, drvKind *param[string]) {
+// shares: the run seed (string, F6), the slot-0 driver url/kind, and the active
+// variant name. The seed's declared default is Test.Seed (the spec-representative
+// value), or "0" when the test leaves it unset (D11: 0 is a valid seed). The
+// driver url/kind default to empty and are patched post-Define to reflect slot
+// 0's declared default (see [patchDriverDefault]); the variant defaults to
+// "full" (D5).
+func registerStandardParams(t *Test, set *ParamSet) (seed, drvURL, drvKind, variant *Param[string]) {
 	seedDef := t.Seed
 	if seedDef == "" {
 		seedDef = "0"
@@ -273,19 +391,14 @@ func registerStandardParams(t *Test, set *paramSet) (seed, drvURL, drvKind *para
 		"run root seed: auto|now (random per run), fixed|canonical (this test's spec seed), or a uint64",
 		optEnv("SEED"), optStandard())
 
-	drvURLDef, drvKindDef := "", "pg"
-	if len(t.Drivers) > 0 {
-		drvURLDef = t.Drivers[0].URL
-		drvKindDef = t.Drivers[0].Kind
-		if drvKindDef == "" {
-			drvKindDef = "pg"
-		}
-	}
-	drvURL = set.String("driver.url", drvURLDef, "slot-0 database URL",
+	drvURL = set.String("driver.url", "", "slot-0 database URL",
 		optEnv("STROPPY_DRIVER_URL"), optStandard())
-	drvKind = set.String("driver.kind", drvKindDef, "slot-0 driver kind (pg|noop)",
+	drvKind = set.String("driver.kind", "", "slot-0 driver kind (pg|noop)",
 		optEnv("STROPPY_DRIVER_KIND"), optStandard())
-	return seed, drvURL, drvKind
+	variant = set.String("variant", "full",
+		"active variant subgraph (declared by the test)",
+		optEnv("VARIANT"), optStandard())
+	return seed, drvURL, drvKind, variant
 }
 
 // resolveSeed turns the seed param's string value into the uint64 root fed to
@@ -321,7 +434,7 @@ func resolveSeed(seedVal, canonicalSeed string) (uint64, error) {
 // writeHelp prints the auto-generated option list, grouped STANDARD (SDK) then
 // TEST (author), followed by the SDK control flags. Param defaults and env names
 // come from the resolved registry.
-func writeHelp(w io.Writer, t *Test, set *paramSet) {
+func writeHelp(w io.Writer, t *Test, set *ParamSet) {
 	fmt.Fprintf(w, "Usage: %s [options]\n\n", t.Name)
 	fmt.Fprintf(w, "Source precedence for every param: --flag  >  env  >  config file  >  default.\n\n")
 	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
@@ -358,22 +471,13 @@ func writeParamHelp(tw *tabwriter.Writer, d *paramDecl) {
 		d.name, d.kind, d.help, d.env, d.defStr)
 }
 
-func hasTestParams(set *paramSet) bool {
+func hasTestParams(set *ParamSet) bool {
 	for _, d := range set.order {
 		if !d.standard {
 			return true
 		}
 	}
 	return false
-}
-
-// buildSteps invokes the test's step builder (nil-safe: a Test with no Build
-// contributes no steps).
-func buildSteps(t *Test, run *Run) []*StepDef {
-	if t.Build == nil {
-		return nil
-	}
-	return t.Build(run)
 }
 
 // startCPUProfile begins writing a pprof CPU profile to path and returns a stop

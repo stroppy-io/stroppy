@@ -58,9 +58,9 @@ type resolvedQuerySet struct {
 // author-facing handle; placeholder rendering ($1 vs ?) is the driver's
 // concern, never the caller's.
 //
-// A missing source or a parse failure is returned as an error; the typical
-// caller in a Build callback treats it as fatal (log.Fatalf) since the run
-// cannot proceed without the corpus.
+// A missing source or a parse failure is returned as an error. The author path
+// is [Def.Queries] inside Define (which returns the error from Define); this
+// method remains the lower-level resolver used by tests and probe replay.
 func (r *Run) Queries(name string) (*sqlfile.File, error) {
 	rs := r.resolveQuerySet(name)
 	if rs.err != nil {
@@ -84,13 +84,7 @@ func (r *Run) resolveQuerySet(name string) *resolvedQuerySet {
 	r.qOrder = append(r.qOrder, name)
 
 	envKey := queryOverrideEnv(name)
-	var bake *BakedQuerySet
-	for i := range r.test.QuerySets {
-		if r.test.QuerySets[i].Name == name {
-			bake = &r.test.QuerySets[i]
-			break
-		}
-	}
+	bake := r.bakes[name]
 	kind := r.activeKind()
 
 	// 1. User-provided override file (env), highest priority. A set-but-broken

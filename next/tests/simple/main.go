@@ -1,7 +1,7 @@
 // Command simple is the canonical stroppy-next example test: it loads one table
 // and runs a point-select workload against it, exercising the whole SDK stack —
-// options, driver slots, the SQL corpus parser, the step DAG, all four VU
-// lifecycle phases and the metrics reporter.
+// the Define declarative pass, driver slots, the SQL corpus parser, the step
+// DAG, all four VU lifecycle phases and the metrics reporter.
 //
 //	STROPPY_DRIVER_URL=postgres://stroppy@127.0.0.1:5432/postgres go run ./tests/simple
 //	go run ./tests/simple -plan          # print the step DAG
@@ -15,7 +15,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	_ "embed"
@@ -30,24 +29,6 @@ import (
 //go:embed simple.sql
 var sqlSrc []byte
 
-// options are the test's tunables, filled from the environment by the SDK.
-type options struct {
-	Rows     int           `env:"ROWS" default:"10000" help:"number of rows to generate"`
-	VUs      int           `env:"VUS" default:"4" help:"closed-loop virtual users"`
-	Duration time.Duration `env:"DURATION" default:"5s" help:"workload duration"`
-}
-
-// Validate enforces sane bounds; the SDK calls it after parsing.
-func (o *options) Validate() error {
-	if o.Rows <= 0 {
-		return fmt.Errorf("ROWS must be positive, got %d", o.Rows)
-	}
-	if o.VUs <= 0 {
-		return fmt.Errorf("VUS must be positive, got %d", o.VUs)
-	}
-	return nil
-}
-
 // loadBatch is the columnar insert batch size.
 const loadBatch = 1000
 
@@ -55,58 +36,67 @@ const loadBatch = 1000
 const valLen = 16
 
 func main() {
-	o := &options{}
 	t := &bench.Test{
 		Name: "simple",
 		Seed: "1",
-		Opts: o,
-		Drivers: []bench.DriverSlot{{Name: "main", Kind: "pg"}},
-		// Build runs after the SDK has parsed options, so the executor policies
-		// below read the final o.VUs / o.Duration directly (no pre-parse).
-		Build: buildSteps(o),
-	}
-	bench.Main(t)
-}
+		Define: func(d *bench.Def) error {
+			// One declarative pass: params resolve immediately, so the values
+			// feed straight into executor policies and handler config below.
+			rows := d.Param.Int("rows", 10000, "number of rows to generate")
+			vus := d.Param.Int("vus", 4, "closed-loop virtual users")
+			dur := d.Param.Duration("duration", 5*time.Second, "workload duration")
+			if rows.Value() <= 0 {
+				return fmt.Errorf("rows must be positive, got %d", rows.Value())
+			}
+			if vus.Value() <= 0 {
+				return fmt.Errorf("vus must be positive, got %d", vus.Value())
+			}
 
-// buildSteps returns the test's step-builder closure. It parses the embedded SQL
-// and assembles the load → workload → check lifecycle, closing over the parsed
-// options.
-func buildSteps(o *options) func(*bench.Run) []*bench.StepDef {
-	return func(*bench.Run) []*bench.StepDef {
-		file, err := sqlfile.Parse(sqlSrc)
-		if err != nil {
-			log.Fatalf("simple: parse sql: %v", err)
-		}
-		dropQ := mustQuery(file, "schema", "drop")
-		createQ := mustQuery(file, "schema", "create")
-		selectQ := mustQuery(file, "workload", "point_select")
-		countQ := mustQuery(file, "check", "count")
+			d.Driver("main", "pg")
 
-		return []*bench.StepDef{
-			// DROP may fail on a fresh database (no table yet); Silent keeps the
-			// step green and the run moving.
-			bench.Step("drop_schema", exec(dropQ)).
-				OnErr(bench.ModeSilent).Uses("main"),
+			// Eager query-set resolution (F1): File is usable inside Define.
+			qs := d.Queries("simple", sqlSrc)
+			file, err := qs.File()
+			if err != nil {
+				return fmt.Errorf("simple: parse sql: %w", err)
+			}
+			dropQ, err := mustQuery(file, "schema", "drop")
+			if err != nil {
+				return err
+			}
+			createQ, err := mustQuery(file, "schema", "create")
+			if err != nil {
+				return err
+			}
+			selectQ, err := mustQuery(file, "workload", "point_select")
+			if err != nil {
+				return err
+			}
+			countQ, err := mustQuery(file, "check", "count")
+			if err != nil {
+				return err
+			}
 
-			bench.Step("create_schema", exec(createQ)).
-				After("drop_schema").Uses("main"),
-
-			bench.Step("load", &loadHandler{opts: o}).
-				After("create_schema").Uses("main"),
-
-			bench.Step("workload", &workloadHandler{opts: o, query: selectQ}).
-				Closed(o.VUs, o.Duration).After("load").Uses("main"),
-
+			// DROP may fail on a fresh database (no table yet); Silent keeps
+			// the step green and the run moving.
+			d.Step("drop_schema", exec(dropQ)).OnErr(bench.ModeSilent).Uses("main")
+			d.Step("create_schema", exec(createQ)).After("drop_schema").Uses("main")
+			d.Step("load", &loadHandler{rows: rows.Value()}).
+				After("create_schema").Uses("main")
+			d.Step("workload", &workloadHandler{rows: rows.Value(), query: selectQ}).
+				Closed(vus.Value(), dur.Value()).After("load").Uses("main")
 			// Row-count verification only holds against a real database.
-			bench.Step("check", &checkHandler{opts: o, query: countQ}).
+			d.Step("check", &checkHandler{rows: rows.Value(), query: countQ}).
 				After("workload").
 				If(func(r *bench.Run) bool { return r.DriverKind(0) != "noop" }).
-				Uses("main"),
+				Uses("main")
+			d.Step("cleanup", exec(dropQ)).After("check").Uses("main")
 
-			bench.Step("cleanup", exec(dropQ)).
-				After("check").Uses("main"),
-		}
+			d.Variant("full")
+			return nil
+		},
 	}
+	bench.Main(t)
 }
 
 // exec is a run-once handler that prepares q and executes it for side effect.
@@ -126,12 +116,12 @@ func exec(q *sqlfile.Query) bench.Handler {
 	})
 }
 
-func mustQuery(f *sqlfile.File, section, name string) *sqlfile.Query {
+func mustQuery(f *sqlfile.File, section, name string) (*sqlfile.Query, error) {
 	q, ok := f.Query(section, name)
 	if !ok {
-		log.Fatalf("simple: missing query %s/%s", section, name)
+		return nil, fmt.Errorf("simple: missing query %s/%s", section, name)
 	}
-	return q
+	return q, nil
 }
 
 // loadState is the load worker's per-VU state.
@@ -140,8 +130,8 @@ type loadState struct {
 	buf  *mem.RowBuf
 }
 
-// loadHandler generates opts.Rows rows and bulk-inserts them in columnar batches.
-type loadHandler struct{ opts *options }
+// loadHandler generates rows rows and bulk-inserts them in columnar batches.
+type loadHandler struct{ rows int }
 
 func (h *loadHandler) Init(vu *bench.VU) error {
 	st := bench.Local[loadState](vu)
@@ -164,9 +154,9 @@ func (h *loadHandler) Iter(vu *bench.VU) error {
 	numRnd := vu.Rand(2)
 	var name [valLen]byte
 
-	for base := 0; base < h.opts.Rows; base += loadBatch {
+	for base := 0; base < h.rows; base += loadBatch {
 		st.buf.Reset()
-		end := min(base+loadBatch, h.opts.Rows)
+		end := min(base+loadBatch, h.rows)
 		for id := base; id < end; id++ {
 			st.buf.AppendInt64(0, int64(id))
 			rng.FillAlpha(name[:], valRnd, uint64(id))
@@ -188,10 +178,10 @@ type wlState struct {
 	stmt driver.Stmt
 }
 
-// workloadHandler point-selects a uniformly random row per iteration and discards
-// the result.
+// workloadHandler point-selects a uniformly random row per iteration and
+// discards the result.
 type workloadHandler struct {
-	opts  *options
+	rows  int
 	query *sqlfile.Query
 }
 
@@ -212,7 +202,7 @@ func (h *workloadHandler) Init(vu *bench.VU) error {
 
 func (h *workloadHandler) Iter(vu *bench.VU) error {
 	st := bench.Local[wlState](vu)
-	id := rng.UniformInt(vu.Rand(0), vu.Cycle(), 0, int64(h.opts.Rows)-1)
+	id := rng.UniformInt(vu.Rand(0), vu.Cycle(), 0, int64(h.rows)-1)
 
 	args := st.stmt.Bind()
 	args.Int64(id)
@@ -230,9 +220,9 @@ func (h *workloadHandler) Iter(vu *bench.VU) error {
 
 func (h *workloadHandler) Close(*bench.VU) error { return nil }
 
-// checkHandler asserts the loaded row count equals opts.Rows.
+// checkHandler asserts the loaded row count equals rows.
 type checkHandler struct {
-	opts  *options
+	rows  int
 	query *sqlfile.Query
 }
 
@@ -252,8 +242,8 @@ func (h *checkHandler) Iter(vu *bench.VU) error {
 	if err != nil {
 		return err
 	}
-	if int(n) != h.opts.Rows {
-		return fmt.Errorf("row count = %d, want %d", n, h.opts.Rows)
+	if int(n) != h.rows {
+		return fmt.Errorf("row count = %d, want %d", n, h.rows)
 	}
 	return nil
 }

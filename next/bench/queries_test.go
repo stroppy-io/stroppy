@@ -14,20 +14,22 @@ import (
 const twoSectionCorpus = "--+ schema\n--= create\nSELECT 1\n--+ workload\n--= point\nSELECT 2 WHERE id = :id\n"
 
 // newResolverRun builds a Run wired to a Test with the given baked query sets,
-// slot kind and env, without exercising the executor stack.
+// slot kind and env, without exercising the executor stack. The baked sources
+// are installed into the Run as [Def.Queries] would do.
 func newResolverRun(t *testing.T, kind string, bakes []BakedQuerySet, env map[string]string) *Run {
 	t.Helper()
-	tst := &Test{
-		Name:      "x",
-		Drivers:   []DriverSlot{{Name: "main", Kind: kind}},
-		QuerySets: bakes,
-	}
-	return &Run{
+	tst := &Test{Name: "x"}
+	r := &Run{
 		test:   tst,
 		seed:   1,
-		slots:  resolveSlots(tst.Drivers, "", "", envMap(env)),
+		slots:  []slotSpec{{name: "main", kind: kind}},
 		getenv: envMap(env),
 	}
+	r.bakes = make(map[string]*BakedQuerySet, len(bakes))
+	for i := range bakes {
+		r.bakes[bakes[i].Name] = &bakes[i]
+	}
+	return r
 }
 
 func TestQueries_GenericFallback(t *testing.T) {

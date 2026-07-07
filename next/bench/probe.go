@@ -11,9 +11,11 @@ import (
 type probeDoc struct {
 	Name      string          `json:"name"`
 	Seed      uint64          `json:"seed"`
+	Variant   string          `json:"variant"`
 	Params    []ParamSchema   `json:"params"`
 	Drivers   []probeDriver   `json:"drivers"`
 	QuerySets []probeQuerySet `json:"querySets,omitempty"`
+	Variants  []string        `json:"variants,omitempty"`
 	Steps     []probeStep     `json:"steps"`
 }
 
@@ -56,14 +58,16 @@ type probeStep struct {
 	OnErr     string    `json:"onErr"`
 	Uses      string    `json:"uses"`
 	UsesSlot  int       `json:"usesSlot"`
+	Skippable bool      `json:"skippable,omitempty"`
 }
 
-// buildProbe assembles the probe description from the test, its built steps and
-// the resolved slots. The run carries the query-set resolutions recorded while
-// Build ran (each [Run.Queries] call appended one), so probe reports the exact
-// set an override would target.
-func buildProbe(t *Test, steps []*StepDef, seed uint64, schema []ParamSchema, slots []slotSpec, run *Run) probeDoc {
-	doc := probeDoc{Name: t.Name, Seed: seed, Params: schema}
+// buildProbe assembles the probe description from the test, its active steps,
+// the resolved slots, and the declarations captured during Define. The run
+// carries the query-set resolutions recorded as each d.Queries ran, so probe
+// reports the exact set an override would target; d carries the declared
+// variants.
+func buildProbe(t *Test, steps []*StepDef, seed uint64, schema []ParamSchema, slots []slotSpec, run *Run, d *Def, chosenVariant string) probeDoc {
+	doc := probeDoc{Name: t.Name, Seed: seed, Variant: chosenVariant, Params: schema}
 	for _, s := range slots {
 		doc.Drivers = append(doc.Drivers, probeDriver{Name: s.name, Kind: s.kind, URL: s.url})
 	}
@@ -83,6 +87,11 @@ func buildProbe(t *Test, steps []*StepDef, seed uint64, schema []ParamSchema, sl
 			doc.QuerySets = append(doc.QuerySets, pqs)
 		}
 	}
+	if d != nil {
+		for _, v := range d.variants {
+			doc.Variants = append(doc.Variants, v.name)
+		}
+	}
 	for _, sd := range steps {
 		usesSlot, _ := resolveUses(sd, slots)
 		doc.Steps = append(doc.Steps, probeStep{
@@ -95,6 +104,7 @@ func buildProbe(t *Test, steps []*StepDef, seed uint64, schema []ParamSchema, sl
 			OnErr:     sd.onErr.String(),
 			Uses:      sd.uses,
 			UsesSlot:  usesSlot,
+			Skippable: sd.skippable,
 		})
 	}
 	return doc

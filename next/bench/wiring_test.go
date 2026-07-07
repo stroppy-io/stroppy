@@ -55,28 +55,36 @@ func (okHandler) Init(*VU) error  { return nil }
 func (okHandler) Iter(*VU) error  { return nil }
 func (okHandler) Close(*VU) error { return nil }
 
-// diamondTest builds a→{b,c}→d with an If on c.
+// diamondDefine builds a→{b,c}→d with an If on c into d.
+func diamondDefine(d *Def) error {
+	d.Driver("main", "noop")
+	d.Step("a", okHandler{})
+	d.Step("b", okHandler{}).After("a")
+	d.Step("c", okHandler{}).After("a").If(func(*Run) bool { return true })
+	d.Step("d", okHandler{}).After("b", "c")
+	d.Variant("full")
+	return nil
+}
+
 func diamondTest() *Test {
-	return &Test{
-		Name:    "diamond",
-		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
-		Build: func(*Run) []*StepDef {
-			return []*StepDef{
-				Step("a", okHandler{}),
-				Step("b", okHandler{}).After("a"),
-				Step("c", okHandler{}).After("a").If(func(*Run) bool { return true }),
-				Step("d", okHandler{}).After("b", "c"),
-			}
-		},
-	}
+	return &Test{Name: "diamond", Define: diamondDefine}
 }
 
 func TestBuildGraphEdges(t *testing.T) {
 	tst := diamondTest()
 	run := &Run{test: tst, slots: []slotSpec{{name: "main", kind: "noop"}}}
+	d := newDef(tst, newParamSet(nil, envMap(nil), nil), run)
+	if err := tst.Define(d); err != nil {
+		t.Fatalf("Define: %v", err)
+	}
+	active, activeSet, err := selectVariantSteps(d, "full")
+	if err != nil {
+		t.Fatalf("selectVariantSteps: %v", err)
+	}
+	pruneEdges(active, activeSet)
 	reg := metrics.NewRegistry()
 	drivers, _ := buildDrivers(run.slots)
-	built, execs, err := buildGraph(buildSteps(tst, run), run, 0, reg, drivers, run.slots, nil)
+	built, execs, err := buildGraph(active, run, 0, reg, drivers, run.slots, nil)
 	if err != nil {
 		t.Fatalf("buildGraph: %v", err)
 	}
@@ -97,70 +105,105 @@ func TestBuildGraphEdges(t *testing.T) {
 
 func TestBuildGraphUnknownSlot(t *testing.T) {
 	tst := &Test{
-		Name:    "x",
-		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
-		Build:   func(*Run) []*StepDef { return []*StepDef{Step("a", okHandler{}).Uses("nope")} },
+		Name: "x",
+		Define: func(d *Def) error {
+			d.Driver("main", "noop")
+			d.Step("a", okHandler{}).Uses("nope")
+			return nil
+		},
 	}
-	run := &Run{test: tst, slots: resolveSlots(tst.Drivers, "", "", envMap(nil))}
+	run := &Run{test: tst}
+	d := newDef(tst, newParamSet(nil, envMap(nil), nil), run)
+	if err := tst.Define(d); err != nil {
+		t.Fatalf("Define: %v", err)
+	}
+	active, activeSet, err := selectVariantSteps(d, "full")
+	if err != nil {
+		t.Fatalf("selectVariantSteps: %v", err)
+	}
+	pruneEdges(active, activeSet)
 	drivers, _ := buildDrivers(run.slots)
-	if _, _, err := buildGraph(buildSteps(tst, run), run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
+	if _, _, err := buildGraph(active, run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
 		t.Fatal("expected an error for a step using an unknown slot")
 	}
 }
 
 func TestBuildGraphDuplicateStepRejected(t *testing.T) {
 	tst := &Test{
-		Name:    "dup",
-		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
-		Build:   func(*Run) []*StepDef { return []*StepDef{Step("a", okHandler{}), Step("a", okHandler{})} },
+		Name: "dup",
+		Define: func(d *Def) error {
+			d.Driver("main", "noop")
+			d.Step("a", okHandler{})
+			d.Step("a", okHandler{})
+			return nil
+		},
 	}
-	run := &Run{test: tst, slots: resolveSlots(tst.Drivers, "", "", envMap(nil))}
+	run := &Run{test: tst}
+	d := newDef(tst, newParamSet(nil, envMap(nil), nil), run)
+	if err := tst.Define(d); err != nil {
+		t.Fatalf("Define: %v", err)
+	}
+	active, activeSet, err := selectVariantSteps(d, "full")
+	if err != nil {
+		t.Fatalf("selectVariantSteps: %v", err)
+	}
+	pruneEdges(active, activeSet)
 	drivers, _ := buildDrivers(run.slots)
-	if _, _, err := buildGraph(buildSteps(tst, run), run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
+	if _, _, err := buildGraph(active, run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
 		t.Fatal("expected a duplicate-id error from the dag builder")
 	}
 }
 
 func TestProbeGolden(t *testing.T) {
 	tst := &Test{
-		Name:    "golden",
-		Seed:    "42",
-		Drivers: []DriverSlot{{Name: "main", Kind: "noop", URL: "noop://"}},
-		Build: func(*Run) []*StepDef {
-			return []*StepDef{
-				Step("setup", okHandler{}).OnErr(ModeSilent),
-				Step("run", okHandler{}).
-					Closed(4, 3*time.Second).
-					After("setup").
-					If(func(*Run) bool { return true }).
-					Uses("main"),
-			}
+		Name: "golden",
+		Seed: "42",
+		Define: func(d *Def) error {
+			d.Driver("main", "noop", WithURL("noop://"))
+			d.Step("setup", okHandler{}).OnErr(ModeSilent)
+			d.Step("run", okHandler{}).
+				Closed(4, 3*time.Second).
+				After("setup").
+				If(func(*Run) bool { return true }).
+				Uses("main")
+			d.Variant("full")
+			return nil
 		},
 	}
 	// Mirror runMain's probe path: bags -> paramSet -> standard params ->
-	// struct-tag bridge -> schema -> probe.
+	// Define -> schema -> probe.
 	set := newParamSet(nil, envMap(nil), nil)
-	seedP, drvURL, drvKind := registerStandardParams(tst, set)
-	if err := parseOptions(tst.Opts, set); err != nil {
-		t.Fatalf("parseOptions: %v", err)
-	}
-	if err := set.Err(); err != nil {
-		t.Fatalf("param set: %v", err)
-	}
+	seedP, drvURL, drvKind, variantP := registerStandardParams(tst, set)
 	rootSeed, err := resolveSeed(seedP.Value(), tst.Seed)
 	if err != nil {
 		t.Fatalf("resolveSeed: %v", err)
 	}
-	slots := resolveSlots(tst.Drivers, drvURL.Value(), drvKind.Value(), envMap(nil))
-	run := &Run{test: tst, seed: rootSeed, slots: slots}
+	run := &Run{test: tst, seed: rootSeed, getenv: envMap(nil), stdDriverURL: drvURL, stdDriverKind: drvKind}
+	d := newDef(tst, set, run)
+	if err := tst.Define(d); err != nil {
+		t.Fatalf("Define: %v", err)
+	}
+	if len(d.drivers) > 0 {
+		patchDriverDefault(drvURL, d.drivers[0].url)
+		patchDriverDefault(drvKind, d.drivers[0].kind)
+	}
+	if err := set.Err(); err != nil {
+		t.Fatalf("param set: %v", err)
+	}
+	active, activeSet, err := selectVariantSteps(d, variantP.Value())
+	if err != nil {
+		t.Fatalf("selectVariantSteps: %v", err)
+	}
+	pruneEdges(active, activeSet)
 	var sb strings.Builder
-	if err := writeProbe(&sb, buildProbe(tst, buildSteps(tst, run), rootSeed, set.Schema(), slots, run)); err != nil {
+	if err := writeProbe(&sb, buildProbe(tst, active, rootSeed, set.Schema(), run.slots, run, d, variantP.Value())); err != nil {
 		t.Fatalf("writeProbe: %v", err)
 	}
 	got := sb.String()
 	want := `{
   "name": "golden",
   "seed": 42,
+  "variant": "full",
   "params": [
     {
       "name": "seed",
@@ -194,6 +237,17 @@ func TestProbeGolden(t *testing.T) {
       "default": "noop",
       "current": "noop",
       "source": "default"
+    },
+    {
+      "name": "variant",
+      "env": "VARIANT",
+      "flag": "--variant",
+      "config": "variant",
+      "type": "string",
+      "help": "active variant subgraph (declared by the test)",
+      "default": "full",
+      "current": "full",
+      "source": "default"
     }
   ],
   "drivers": [
@@ -202,6 +256,9 @@ func TestProbeGolden(t *testing.T) {
       "kind": "noop",
       "url": "noop://"
     }
+  ],
+  "variants": [
+    "full"
   ],
   "steps": [
     {
