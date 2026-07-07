@@ -24,34 +24,42 @@ func envMap(m map[string]string) func(string) string {
 	return func(k string) string { return m[k] }
 }
 
+// runParse runs the struct-tag bridge over opts with the given env and returns
+// the populated paramSet (schema available via set.Schema()).
+func runParse(opts any, env map[string]string) (*paramSet, error) {
+	set := newParamSet(nil, envMap(env), nil)
+	return set, parseOptions(opts, set)
+}
+
 func TestParseOptionsDefaults(t *testing.T) {
 	o := &allOpts{}
-	schema, err := parseOptions(o, envMap(nil))
+	set, err := runParse(o, nil)
 	if err != nil {
 		t.Fatalf("parseOptions: %v", err)
 	}
 	if o.Str != "hello" || o.I != 7 || o.I64 != 9 || o.U64 != 11 || o.F != 1.5 || !o.B || o.D != 3*time.Second {
 		t.Fatalf("defaults not applied: %+v", o)
 	}
+	schema := set.Schema()
 	if len(schema) != 7 {
 		t.Fatalf("schema has %d entries, want 7 (Ignored/Excluded skipped)", len(schema))
 	}
-	if schema[0].Name != "STR" || schema[0].Field != "Str" || schema[0].Type != "string" ||
-		schema[0].Default != "hello" || schema[0].Current != "hello" {
-		t.Fatalf("first schema entry wrong: %+v", schema[0])
+	s0 := schema[0]
+	if s0.Name != "str" || s0.Env != "STR" || s0.Flag != "--str" || s0.Config != "str" ||
+		s0.Type != "string" || s0.Default != "hello" || s0.Current != "hello" || s0.Source != "default" {
+		t.Fatalf("first schema entry wrong: %+v", s0)
 	}
-	if schema[6].Type != "duration" || schema[6].Current != "3s" {
+	if schema[6].Type != "duration" || schema[6].Current != "3s" || schema[6].Flag != "--d" {
 		t.Fatalf("duration schema entry wrong: %+v", schema[6])
 	}
 }
 
 func TestParseOptionsFromEnv(t *testing.T) {
 	o := &allOpts{}
-	_, err := parseOptions(o, envMap(map[string]string{
+	if _, err := runParse(o, map[string]string{
 		"STR": "world", "I": "42", "I64": "-5", "U64": "1000",
 		"F": "2.75", "B": "false", "D": "1m30s",
-	}))
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("parseOptions: %v", err)
 	}
 	if o.Str != "world" || o.I != 42 || o.I64 != -5 || o.U64 != 1000 ||
@@ -62,16 +70,20 @@ func TestParseOptionsFromEnv(t *testing.T) {
 
 func TestParseOptionsBadValue(t *testing.T) {
 	o := &allOpts{}
-	if _, err := parseOptions(o, envMap(map[string]string{"I": "notanint"})); err == nil {
-		t.Fatal("expected a parse error for a non-integer int option")
+	set, err := runParse(o, map[string]string{"I": "notanint"})
+	if err != nil {
+		t.Fatalf("parseOptions struct-level error unexpected: %v", err)
+	}
+	if set.Err() == nil {
+		t.Fatal("expected a parse error recorded on the set for a non-integer int option")
 	}
 }
 
 func TestParseOptionsNotPointer(t *testing.T) {
-	if _, err := parseOptions(allOpts{}, envMap(nil)); err == nil {
+	if _, err := runParse(allOpts{}, nil); err == nil {
 		t.Fatal("expected an error for a non-pointer Opts")
 	}
-	if _, err := parseOptions(nil, envMap(nil)); err != nil {
+	if _, err := runParse(nil, nil); err != nil {
 		t.Fatalf("nil Opts must be a no-op, got %v", err)
 	}
 }
@@ -89,7 +101,7 @@ func (o *validatedOpts) Validate() error {
 
 func TestValidateOptionsHook(t *testing.T) {
 	o := &validatedOpts{}
-	if _, err := parseOptions(o, envMap(nil)); err != nil {
+	if _, err := runParse(o, nil); err != nil {
 		t.Fatalf("parseOptions: %v", err)
 	}
 	if err := validateOptions(o); err == nil {

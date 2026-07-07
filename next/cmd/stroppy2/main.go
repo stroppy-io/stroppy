@@ -57,13 +57,17 @@ func usage(w *os.File) {
 	_, _ = fmt.Fprint(w, `stroppy2 — run stroppy-next tests
 
 Usage:
-  stroppy2 run   <target> [-e KEY=VAL ...] [--steps a,b | --no-steps a,b] [-- test-flags]
+  stroppy2 run   <target> [-e KEY=VAL ...] [--param=val ...] [-- passthrough]
   stroppy2 probe <target>
   stroppy2 plan  <target> [--dot]
   stroppy2 eject <builtin> [dir]
   stroppy2 version
 
 target: a built-in name (simple, tpcc), a .go file, or a package directory.
+
+run forwards every --name=val flag to the test binary (its param registry);
+only -e KEY=VAL is extracted here (into the test process environment). See
+`+ "`stroppy2 run <target> --help`" + ` for the test's own param list.
 `)
 }
 
@@ -180,39 +184,33 @@ func cmdEject(args []string, stdout, stderr *os.File) int {
 
 // runParams is a parsed `run` invocation.
 type runParams struct {
-	target      string
-	env         []string // -e KEY=VAL, passed to the test process environment
-	steps       string   // --steps
-	noSteps     string   // --no-steps
-	seed        string   // --seed (empty = unset)
-	passthrough []string // args after --, forwarded verbatim
+	target string
+	env    []string // -e KEY=VAL, passed to the test process environment
+	flags  []string // forwarded to the test binary verbatim (--name=val, -steps, ...)
 }
 
-// testArgs builds the test binary's argument list from the forwarded flags plus
-// the verbatim passthrough. The test binary uses single-dash flag syntax.
+// testArgs returns the flags to hand to the test binary. All non-env flags flow
+// through unchanged: the test's own param registry parses --name=val, and the
+// SDK control flags (-steps/-no-steps/-probe/...) are interpreted there too.
 func (p runParams) testArgs() []string {
-	var a []string
-	if p.steps != "" {
-		a = append(a, "-steps="+p.steps)
+	if len(p.flags) == 0 {
+		return nil
 	}
-	if p.noSteps != "" {
-		a = append(a, "-no-steps="+p.noSteps)
-	}
-	if p.seed != "" {
-		a = append(a, "-seed="+p.seed)
-	}
-	return append(a, p.passthrough...)
+	return p.flags
 }
 
-// parseRun parses `run` args: the first positional is the target, then -e/--steps/
-// --no-steps/--seed flags, and everything after a bare -- is forwarded verbatim.
+// parseRun parses `run` args: the first positional is the target, -e KEY=VAL is
+// extracted into the test process environment, and every other token (flag or
+// positional) is forwarded to the test binary verbatim. The shim stays thin: it
+// does not know the test's param surface, so it never rejects a --name=val flag
+// (a typo surfaces from the test binary's own registry).
 func parseRun(args []string) (runParams, error) {
 	var p runParams
-	i := 0
-	for ; i < len(args); i++ {
+	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a == "--" {
-			p.passthrough = args[i+1:]
+			// Forward the bare -- too, so the test binary sees a passthrough.
+			p.flags = append(p.flags, args[i:]...)
 			break
 		}
 		switch {
@@ -225,46 +223,19 @@ func parseRun(args []string) (runParams, error) {
 				return p, fmt.Errorf("invalid -e %q, want KEY=VAL", args[i])
 			}
 			p.env = append(p.env, args[i])
-		case strings.HasPrefix(a, "-e="):
-			p.env = append(p.env, strings.TrimPrefix(a, "-e="))
-		case a == "--steps" || a == "-steps":
-			i++
-			if i >= len(args) {
-				return p, fmt.Errorf("%s needs a value", a)
-			}
-			p.steps = args[i]
-		case strings.HasPrefix(a, "--steps=") || strings.HasPrefix(a, "-steps="):
-			p.steps = a[strings.IndexByte(a, '=')+1:]
-		case a == "--no-steps" || a == "-no-steps":
-			i++
-			if i >= len(args) {
-				return p, fmt.Errorf("%s needs a value", a)
-			}
-			p.noSteps = args[i]
-		case strings.HasPrefix(a, "--no-steps=") || strings.HasPrefix(a, "-no-steps="):
-			p.noSteps = a[strings.IndexByte(a, '=')+1:]
-		case a == "--seed" || a == "-seed":
-			i++
-			if i >= len(args) {
-				return p, fmt.Errorf("%s needs a value", a)
-			}
-			p.seed = args[i]
-		case strings.HasPrefix(a, "--seed=") || strings.HasPrefix(a, "-seed="):
-			p.seed = a[strings.IndexByte(a, '=')+1:]
-		case strings.HasPrefix(a, "-"):
-			return p, fmt.Errorf("unknown flag %q (put test flags after --)", a)
+		case strings.HasPrefix(a, "-e=") || strings.HasPrefix(a, "--env="):
+			p.env = append(p.env, a[strings.IndexByte(a, '=')+1:])
 		default:
-			if p.target != "" {
-				return p, fmt.Errorf("unexpected argument %q", a)
+			// First bare token is the target; thereafter everything forwards.
+			if p.target == "" && !strings.HasPrefix(a, "-") {
+				p.target = a
+				continue
 			}
-			p.target = a
+			p.flags = append(p.flags, a)
 		}
 	}
 	if p.target == "" {
 		return p, fmt.Errorf("missing target")
-	}
-	if p.steps != "" && p.noSteps != "" {
-		return p, fmt.Errorf("--steps and --no-steps are mutually exclusive")
 	}
 	return p, nil
 }

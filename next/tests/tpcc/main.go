@@ -38,21 +38,23 @@ import (
 //go:embed tpcc.sql
 var tpccSQL []byte
 
-// tpccSeed is the run's default root seed (Test.Seed). It is only the default
-// for the -seed flag; the effective seed reaches every derivation — both the
-// SDK's per-step rng streams and the world's generation constants — via
-// Run.Seed, so overriding -seed is total. There is no private seed literal the
-// flag cannot reach.
-const tpccSeed = 1
+// tpccSeed is the spec-representative root seed in its uint64 form: world-gen
+// and executor configs (repro_test) consume it directly. The seed param's
+// "canonical"/"fixed" keyword (F6) resolves to canonicalSeed, its string form,
+// which is Test.Seed. TPC-C's canonical seed is 1.
+const (
+	tpccSeed       uint64 = 1
+	canonicalSeed        = "1"
+)
 
 // options are the tpcc tunables, filled from the environment by the SDK.
 type options struct {
-	Warehouses  int64         `env:"WAREHOUSES" default:"1"`
-	LoadWorkers int           `env:"LOAD_WORKERS" default:"4"`
-	VUs         int           `env:"VUS" default:"4"`
-	Duration    time.Duration `env:"DURATION" default:"30s"`
-	TxIsolation string        `env:"TX_ISOLATION" default:"read_committed"`
-	DoValidate  bool          `env:"VALIDATE" default:"true"`
+	Warehouses  int64         `env:"WAREHOUSES" default:"1" help:"warehouse count (scale factor)"`
+	LoadWorkers int           `env:"LOAD_WORKERS" default:"4" help:"parallel COPY workers per load step"`
+	VUs         int           `env:"VUS" default:"4" help:"closed-loop virtual users (terminals per warehouse)"`
+	Duration    time.Duration `env:"DURATION" default:"30s" help:"workload duration"`
+	TxIsolation string        `env:"TX_ISOLATION" default:"read_committed" help:"transaction isolation level"`
+	DoValidate  bool          `env:"VALIDATE" default:"true" help:"run population and consistency validation"`
 }
 
 // Validate enforces sane bounds and a known isolation level.
@@ -75,9 +77,9 @@ func (o *options) Validate() error {
 func main() {
 	o := &options{}
 	t := &bench.Test{
-		Name:    "tpcc",
-		Seed:    tpccSeed,
-		Opts:    o,
+		Name: "tpcc",
+		Seed: canonicalSeed,
+		Opts: o,
 		Drivers: []bench.DriverSlot{{Name: "main", Kind: "pg"}},
 		// QuerySets registers the baked tpcc corpus as the query-set named
 		// "tpcc". The SDK resolves it per the active driver kind (override ->

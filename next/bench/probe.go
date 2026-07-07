@@ -9,12 +9,12 @@ import (
 // the CLI contract. Field names are fixed; slices are emitted in declaration
 // order.
 type probeDoc struct {
-	Name      string           `json:"name"`
-	Seed      uint64           `json:"seed"`
-	Options   []OptionSchema   `json:"options"`
-	Drivers   []probeDriver    `json:"drivers"`
-	QuerySets []probeQuerySet  `json:"querySets,omitempty"`
-	Steps     []probeStep      `json:"steps"`
+	Name      string          `json:"name"`
+	Seed      uint64          `json:"seed"`
+	Params    []ParamSchema   `json:"params"`
+	Drivers   []probeDriver   `json:"drivers"`
+	QuerySets []probeQuerySet `json:"querySets,omitempty"`
+	Steps     []probeStep     `json:"steps"`
 }
 
 // probeQuerySet is one query-set's resolution as probe reports it: the name a
@@ -62,8 +62,8 @@ type probeStep struct {
 // the resolved slots. The run carries the query-set resolutions recorded while
 // Build ran (each [Run.Queries] call appended one), so probe reports the exact
 // set an override would target.
-func buildProbe(t *Test, steps []*StepDef, seed uint64, schema []OptionSchema, slots []slotSpec, run *Run) probeDoc {
-	doc := probeDoc{Name: t.Name, Seed: seed, Options: schema}
+func buildProbe(t *Test, steps []*StepDef, seed uint64, schema []ParamSchema, slots []slotSpec, run *Run) probeDoc {
+	doc := probeDoc{Name: t.Name, Seed: seed, Params: schema}
 	for _, s := range slots {
 		doc.Drivers = append(doc.Drivers, probeDriver{Name: s.name, Kind: s.kind, URL: s.url})
 	}

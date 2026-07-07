@@ -32,9 +32,9 @@ var sqlSrc []byte
 
 // options are the test's tunables, filled from the environment by the SDK.
 type options struct {
-	Rows     int           `env:"ROWS" default:"10000"`
-	VUs      int           `env:"VUS" default:"4"`
-	Duration time.Duration `env:"DURATION" default:"5s"`
+	Rows     int           `env:"ROWS" default:"10000" help:"number of rows to generate"`
+	VUs      int           `env:"VUS" default:"4" help:"closed-loop virtual users"`
+	Duration time.Duration `env:"DURATION" default:"5s" help:"workload duration"`
 }
 
 // Validate enforces sane bounds; the SDK calls it after parsing.
@@ -57,9 +57,9 @@ const valLen = 16
 func main() {
 	o := &options{}
 	t := &bench.Test{
-		Name:    "simple",
-		Seed:    1,
-		Opts:    o,
+		Name: "simple",
+		Seed: "1",
+		Opts: o,
 		Drivers: []bench.DriverSlot{{Name: "main", Kind: "pg"}},
 		// Build runs after the SDK has parsed options, so the executor policies
 		// below read the final o.VUs / o.Duration directly (no pre-parse).

@@ -101,7 +101,7 @@ func TestBuildGraphUnknownSlot(t *testing.T) {
 		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
 		Build:   func(*Run) []*StepDef { return []*StepDef{Step("a", okHandler{}).Uses("nope")} },
 	}
-	run := &Run{test: tst, slots: resolveSlots(tst.Drivers, envMap(nil))}
+	run := &Run{test: tst, slots: resolveSlots(tst.Drivers, "", "", envMap(nil))}
 	drivers, _ := buildDrivers(run.slots)
 	if _, _, err := buildGraph(buildSteps(tst, run), run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
 		t.Fatal("expected an error for a step using an unknown slot")
@@ -114,7 +114,7 @@ func TestBuildGraphDuplicateStepRejected(t *testing.T) {
 		Drivers: []DriverSlot{{Name: "main", Kind: "noop"}},
 		Build:   func(*Run) []*StepDef { return []*StepDef{Step("a", okHandler{}), Step("a", okHandler{})} },
 	}
-	run := &Run{test: tst, slots: resolveSlots(tst.Drivers, envMap(nil))}
+	run := &Run{test: tst, slots: resolveSlots(tst.Drivers, "", "", envMap(nil))}
 	drivers, _ := buildDrivers(run.slots)
 	if _, _, err := buildGraph(buildSteps(tst, run), run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
 		t.Fatal("expected a duplicate-id error from the dag builder")
@@ -124,7 +124,7 @@ func TestBuildGraphDuplicateStepRejected(t *testing.T) {
 func TestProbeGolden(t *testing.T) {
 	tst := &Test{
 		Name:    "golden",
-		Seed:    42,
+		Seed:    "42",
 		Drivers: []DriverSlot{{Name: "main", Kind: "noop", URL: "noop://"}},
 		Build: func(*Run) []*StepDef {
 			return []*StepDef{
@@ -137,21 +137,65 @@ func TestProbeGolden(t *testing.T) {
 			}
 		},
 	}
-	schema, err := parseOptions(tst.Opts, envMap(nil))
-	if err != nil {
+	// Mirror runMain's probe path: bags -> paramSet -> standard params ->
+	// struct-tag bridge -> schema -> probe.
+	set := newParamSet(nil, envMap(nil), nil)
+	seedP, drvURL, drvKind := registerStandardParams(tst, set)
+	if err := parseOptions(tst.Opts, set); err != nil {
 		t.Fatalf("parseOptions: %v", err)
 	}
-	slots := resolveSlots(tst.Drivers, envMap(nil))
-	run := &Run{test: tst, seed: tst.Seed, slots: slots}
+	if err := set.Err(); err != nil {
+		t.Fatalf("param set: %v", err)
+	}
+	rootSeed, err := resolveSeed(seedP.Value(), tst.Seed)
+	if err != nil {
+		t.Fatalf("resolveSeed: %v", err)
+	}
+	slots := resolveSlots(tst.Drivers, drvURL.Value(), drvKind.Value(), envMap(nil))
+	run := &Run{test: tst, seed: rootSeed, slots: slots}
 	var sb strings.Builder
-	if err := writeProbe(&sb, buildProbe(tst, buildSteps(tst, run), tst.Seed, schema, slots, run)); err != nil {
+	if err := writeProbe(&sb, buildProbe(tst, buildSteps(tst, run), rootSeed, set.Schema(), slots, run)); err != nil {
 		t.Fatalf("writeProbe: %v", err)
 	}
 	got := sb.String()
 	want := `{
   "name": "golden",
   "seed": 42,
-  "options": null,
+  "params": [
+    {
+      "name": "seed",
+      "env": "SEED",
+      "flag": "--seed",
+      "config": "seed",
+      "type": "string",
+      "help": "run root seed: auto|now (random per run), fixed|canonical (this test's spec seed), or a uint64",
+      "default": "42",
+      "current": "42",
+      "source": "default"
+    },
+    {
+      "name": "driver.url",
+      "env": "STROPPY_DRIVER_URL",
+      "flag": "--driver.url",
+      "config": "driver.url",
+      "type": "string",
+      "help": "slot-0 database URL",
+      "default": "noop://",
+      "current": "noop://",
+      "source": "default"
+    },
+    {
+      "name": "driver.kind",
+      "env": "STROPPY_DRIVER_KIND",
+      "flag": "--driver.kind",
+      "config": "driver.kind",
+      "type": "string",
+      "help": "slot-0 driver kind (pg|noop)",
+      "default": "noop",
+      "current": "noop",
+      "source": "default"
+    }
+  ],
   "drivers": [
     {
       "name": "main",

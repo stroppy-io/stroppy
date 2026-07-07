@@ -20,19 +20,19 @@ func TestParseRun(t *testing.T) {
 			want: runParams{target: "simple"},
 		},
 		{
-			name: "env and steps",
-			args: []string{"tpcc", "-e", "WAREHOUSES=1", "-e", "DURATION=5s", "--steps", "load,workload"},
-			want: runParams{target: "tpcc", env: []string{"WAREHOUSES=1", "DURATION=5s"}, steps: "load,workload"},
+			name: "env plus forwarded param and control flags",
+			args: []string{"tpcc", "-e", "WAREHOUSES=1", "-e", "DURATION=5s", "--warehouses=4", "-steps", "load,workload"},
+			want: runParams{target: "tpcc", env: []string{"WAREHOUSES=1", "DURATION=5s"}, flags: []string{"--warehouses=4", "-steps", "load,workload"}},
 		},
 		{
-			name: "equals forms and seed",
+			name: "equals forms forwarded verbatim",
 			args: []string{"./t", "-e=A=1", "--no-steps=check", "--seed=7"},
-			want: runParams{target: "./t", env: []string{"A=1"}, noSteps: "check", seed: "7"},
+			want: runParams{target: "./t", env: []string{"A=1"}, flags: []string{"--no-steps=check", "--seed=7"}},
 		},
 		{
 			name: "passthrough after dashdash",
 			args: []string{"simple", "-e", "X=1", "--", "-probe", "-cpuprofile", "p"},
-			want: runParams{target: "simple", env: []string{"X=1"}, passthrough: []string{"-probe", "-cpuprofile", "p"}},
+			want: runParams{target: "simple", env: []string{"X=1"}, flags: []string{"--", "-probe", "-cpuprofile", "p"}},
 		},
 		{
 			name: "target after flags",
@@ -41,10 +41,20 @@ func TestParseRun(t *testing.T) {
 		},
 		{name: "missing target", args: []string{"-e", "X=1"}, wantErr: true},
 		{name: "bad env", args: []string{"t", "-e", "NOEQUALS"}, wantErr: true},
-		{name: "steps and no-steps", args: []string{"t", "--steps", "a", "--no-steps", "b"}, wantErr: true},
-		{name: "unknown flag", args: []string{"t", "--wat"}, wantErr: true},
-		{name: "two targets", args: []string{"a", "b"}, wantErr: true},
 		{name: "dangling -e", args: []string{"t", "-e"}, wantErr: true},
+		// The shim is deliberately thin: an unknown flag and a mutually-exclusive
+		// -steps/-no-steps pair both forward verbatim and surface from the test
+		// binary's own param registry / flag parser, not here.
+		{
+			name: "unknown flag forwards",
+			args: []string{"t", "--wat=1"},
+			want: runParams{target: "t", flags: []string{"--wat=1"}},
+		},
+		{
+			name: "steps and no-steps forwards",
+			args: []string{"t", "-steps=a", "-no-steps=b"},
+			want: runParams{target: "t", flags: []string{"-steps=a", "-no-steps=b"}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -66,7 +76,7 @@ func TestParseRun(t *testing.T) {
 }
 
 func TestTestArgs(t *testing.T) {
-	p := runParams{steps: "a,b", seed: "9", passthrough: []string{"-plan"}}
+	p := runParams{flags: []string{"-steps=a,b", "-seed=9", "-plan"}}
 	want := []string{"-steps=a,b", "-seed=9", "-plan"}
 	if got := p.testArgs(); !reflect.DeepEqual(got, want) {
 		t.Errorf("testArgs = %v, want %v", got, want)

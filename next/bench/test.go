@@ -21,14 +21,20 @@ import (
 type Test struct {
 	// Name identifies the test (used in metrics tags and the probe/plan output).
 	Name string
-	// Seed is the run root seed; the -seed flag overrides it. Together with each
-	// step's id it fixes every rng draw (RFC 0001 §5).
-	Seed uint64
+	// Seed is the test's spec-representative root seed, as a string. It is the
+	// default value of the standard seed param, and the value the seed keywords
+	// "fixed"/"canonical" resolve to (F6). The seed param also accepts "auto"/
+	// "now" (a fresh random seed per run) or any uint64 literal; --seed overrides
+	// all sources. The resolved uint64 root feeds DeriveStream and fixes every
+	// rng draw (RFC 0001 §5). An empty Seed defaults to "0" (a valid seed, D11).
+	Seed string
 	// Opts is an optional pointer to a user options struct whose exported fields
 	// carry `env:"NAME"` and `default:"..."` tags. Main parses process env into
 	// it at startup, before Build, and, if it implements interface{ Validate()
 	// error }, calls Validate. Supported field types: string, int, int64,
-	// uint64, float64, bool, time.Duration.
+	// uint64, float64, bool, time.Duration. Each tagged field is projected
+	// uniformly to a --flag, an env var, and a config key (D1); an optional
+	// `help:"..."` tag supplies the --help line.
 	Opts any
 	// Drivers declares the database backends by slot. Slot 0 is the default a
 	// step's VUs connect to; env overrides apply per slot (see [DriverSlot]).
@@ -67,23 +73,29 @@ type slotSpec struct {
 	url  string
 }
 
-// resolveSlots applies the per-slot env overrides to the declared slots and
-// defaults an empty kind to "pg". It does not construct drivers (see
-// buildDrivers), so it is safe for -probe/-plan.
-func resolveSlots(decls []DriverSlot, getenv func(string) string) []slotSpec {
+// resolveSlots resolves each declared slot. Slot 0 takes its url/kind from the
+// standard driver.url/driver.kind params (already resolved cli > env > config >
+// the slot's declared default); slots beyond the first still read the legacy
+// STROPPY_DRIVER<N>_URL / STROPPY_DRIVER<N>_KIND env (multi-driver, F2-pending).
+// An empty kind defaults to "pg". Safe for -probe/-plan: it constructs nothing.
+func resolveSlots(decls []DriverSlot, slot0url, slot0kind string, getenv func(string) string) []slotSpec {
 	out := make([]slotSpec, len(decls))
 	for i, d := range decls {
 		s := slotSpec{name: d.Name, kind: d.Kind, url: d.URL}
-		urlEnv, kindEnv := "STROPPY_DRIVER_URL", "STROPPY_DRIVER_KIND"
-		if i > 0 {
-			urlEnv = fmt.Sprintf("STROPPY_DRIVER%d_URL", i)
-			kindEnv = fmt.Sprintf("STROPPY_DRIVER%d_KIND", i)
-		}
-		if u := getenv(urlEnv); u != "" {
-			s.url = u
-		}
-		if k := getenv(kindEnv); k != "" {
-			s.kind = k
+		if i == 0 {
+			if slot0url != "" {
+				s.url = slot0url
+			}
+			if slot0kind != "" {
+				s.kind = slot0kind
+			}
+		} else {
+			if u := getenv(fmt.Sprintf("STROPPY_DRIVER%d_URL", i)); u != "" {
+				s.url = u
+			}
+			if k := getenv(fmt.Sprintf("STROPPY_DRIVER%d_KIND", i)); k != "" {
+				s.kind = k
+			}
 		}
 		if s.kind == "" {
 			s.kind = "pg"

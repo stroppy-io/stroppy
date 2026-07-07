@@ -25,7 +25,7 @@ func newResolverRun(t *testing.T, kind string, bakes []BakedQuerySet, env map[st
 	return &Run{
 		test:   tst,
 		seed:   1,
-		slots:  resolveSlots(tst.Drivers, envMap(env)),
+		slots:  resolveSlots(tst.Drivers, "", "", envMap(env)),
 		getenv: envMap(env),
 	}
 }
