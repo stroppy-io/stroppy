@@ -20,7 +20,8 @@ func init() {
 CATALOG (no script argument)
 
   Run probe with no script to list the embedded presets and which of their
-  scripts are runnable, plus the SQL dialects/variants each ships with:
+  scripts are runnable, plus the SQL dialects/variants each ships with, and
+  the insert methods each driver supports ("drivers" key in JSON):
 
     stroppy probe            # human-readable catalog
     stroppy probe -o json    # machine-readable catalog
