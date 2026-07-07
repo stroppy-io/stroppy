@@ -26,7 +26,8 @@ func (h *workloadHandler) orderStatus(vu *bench.VU, tx driver.Tx, st *txState) e
 		if err != nil {
 			return err
 		}
-		n, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(wID).Int64(dID).Bytes(cLast)).ScanInt64(0)
+		n, err := tx.QueryRowWithArgs(ctx, q,
+			q.Bind().SetInt64("w_id", wID).SetInt64("d_id", dID).SetBytes("c_last", cLast)).ScanInt64(0)
 		if err != nil {
 			return err
 		}
@@ -37,7 +38,9 @@ func (h *workloadHandler) orderStatus(vu *bench.VU, tx driver.Tx, st *txState) e
 		if err != nil {
 			return err
 		}
-		id, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(wID).Int64(dID).Bytes(cLast).Int64((n-1)/2)).ScanInt64(4)
+		id, err := tx.QueryRowWithArgs(ctx, q,
+			q.Bind().SetInt64("w_id", wID).SetInt64("d_id", dID).SetBytes("c_last", cLast).
+				SetInt64("offset", (n-1)/2)).ScanInt64(4)
 		if err != nil {
 			if errors.Is(err, driver.ErrNoRows) {
 				return nil
@@ -51,7 +54,8 @@ func (h *workloadHandler) orderStatus(vu *bench.VU, tx driver.Tx, st *txState) e
 		if err != nil {
 			return err
 		}
-		if err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(cID).Int64(dID).Int64(wID)).Err(); err != nil {
+		if err := tx.QueryRowWithArgs(ctx, q,
+			q.Bind().SetInt64("c_id", cID).SetInt64("d_id", dID).SetInt64("w_id", wID)).Err(); err != nil {
 			if errors.Is(err, driver.ErrNoRows) {
 				return nil
 			}
@@ -64,7 +68,8 @@ func (h *workloadHandler) orderStatus(vu *bench.VU, tx driver.Tx, st *txState) e
 	if err != nil {
 		return err
 	}
-	oID, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(dID).Int64(wID).Int64(cID)).ScanInt64(0)
+	oID, err := tx.QueryRowWithArgs(ctx, q,
+		q.Bind().SetInt64("d_id", dID).SetInt64("w_id", wID).SetInt64("c_id", cID)).ScanInt64(0)
 	if err != nil {
 		if errors.Is(err, driver.ErrNoRows) {
 			return nil
@@ -77,7 +82,8 @@ func (h *workloadHandler) orderStatus(vu *bench.VU, tx driver.Tx, st *txState) e
 	if err != nil {
 		return err
 	}
-	rows, err := tx.QueryWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID))
+	rows, err := tx.QueryWithArgs(ctx, q,
+		q.Bind().SetInt64("o_id", oID).SetInt64("d_id", dID).SetInt64("w_id", wID))
 	if err != nil {
 		return err
 	}

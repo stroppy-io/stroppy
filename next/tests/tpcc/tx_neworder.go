@@ -48,7 +48,8 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 	if err != nil {
 		return err
 	}
-	if err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(wID).Int64(dID).Int64(cID)).Err(); err != nil {
+	if err := tx.QueryRowWithArgs(ctx, q,
+		q.Bind().SetInt64("w_id", wID).SetInt64("d_id", dID).SetInt64("c_id", cID)).Err(); err != nil {
 		return err
 	}
 
@@ -57,7 +58,7 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 	if err != nil {
 		return err
 	}
-	if err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(wID)).Err(); err != nil {
+	if err := tx.QueryRowWithArgs(ctx, q, q.Bind().SetInt64("w_id", wID)).Err(); err != nil {
 		return err
 	}
 
@@ -66,7 +67,8 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 	if err != nil {
 		return err
 	}
-	oID, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(dID).Int64(wID)).ScanInt64(0)
+	oID, err := tx.QueryRowWithArgs(ctx, q,
+		q.Bind().SetInt64("d_id", dID).SetInt64("w_id", wID)).ScanInt64(0)
 	if err != nil {
 		return err
 	}
@@ -76,7 +78,7 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 	if err != nil {
 		return err
 	}
-	if err := tx.ExecWithArgs(ctx, q, q.Bind().Int64(dID).Int64(wID)); err != nil {
+	if err := tx.ExecWithArgs(ctx, q, q.Bind().SetInt64("d_id", dID).SetInt64("w_id", wID)); err != nil {
 		return err
 	}
 
@@ -86,7 +88,8 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 		return err
 	}
 	if err := tx.ExecWithArgs(ctx, q,
-		q.Bind().Int64(oID).Int64(dID).Int64(wID).Int64(cID).Int64(olCnt).Int64(allLocal)); err != nil {
+		q.Bind().SetInt64("o_id", oID).SetInt64("d_id", dID).SetInt64("w_id", wID).
+			SetInt64("c_id", cID).SetInt64("ol_cnt", olCnt).SetInt64("all_local", allLocal)); err != nil {
 		return err
 	}
 
@@ -95,7 +98,8 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 	if err != nil {
 		return err
 	}
-	if err := tx.ExecWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID)); err != nil {
+	if err := tx.ExecWithArgs(ctx, q,
+		q.Bind().SetInt64("o_id", oID).SetInt64("d_id", dID).SetInt64("w_id", wID)); err != nil {
 		return err
 	}
 
@@ -109,7 +113,7 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 		if err != nil {
 			return err
 		}
-		price, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(iID)).ScanFloat64(0)
+		price, err := tx.QueryRowWithArgs(ctx, q, q.Bind().SetInt64("i_id", iID)).ScanFloat64(0)
 		if err != nil {
 			if errors.Is(err, driver.ErrNoRows) {
 				if forceRollback && ln == olCnt {
@@ -125,7 +129,7 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 		if err != nil {
 			return err
 		}
-		row := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(iID).Int64(sup))
+		row := tx.QueryRowWithArgs(ctx, q, q.Bind().SetInt64("i_id", iID).SetInt64("w_id", sup))
 		sQty, err := row.ScanInt64(0)
 		if err != nil {
 			return err
@@ -151,7 +155,8 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 			return err
 		}
 		if err := tx.ExecWithArgs(ctx, q,
-			q.Bind().Int64(newQty).Int64(iQty).Int64(remoteCnt).Int64(iID).Int64(sup)); err != nil {
+			q.Bind().SetInt64("quantity", newQty).SetInt64("ol_quantity", iQty).
+				SetInt64("remote_cnt", remoteCnt).SetInt64("i_id", iID).SetInt64("w_id", sup)); err != nil {
 			return err
 		}
 
@@ -161,8 +166,10 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 			return err
 		}
 		if err := tx.ExecWithArgs(ctx, q,
-			q.Bind().Int64(oID).Int64(dID).Int64(wID).Int64(ln).Int64(iID).Int64(sup).
-				Int64(iQty).Float64(float64(iQty)*price).Bytes(dist)); err != nil {
+			q.Bind().SetInt64("o_id", oID).SetInt64("d_id", dID).SetInt64("w_id", wID).
+				SetInt64("ol_number", ln).SetInt64("i_id", iID).SetInt64("supply_w_id", sup).
+				SetInt64("quantity", iQty).SetFloat64("amount", float64(iQty)*price).
+				SetBytes("dist_info", dist)); err != nil {
 			return err
 		}
 	}

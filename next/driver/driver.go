@@ -26,14 +26,14 @@ type Driver interface {
 	Teardown(ctx context.Context) error
 }
 
-// Conn is a pinned connection: the query surface plus prepared handles,
-// transactions and the bulk columnar-insert path. Not safe for concurrent use.
-type Conn interface {
-	// Prepare parses q and prepares it once on this connection, returning a
-	// reusable handle. Call it in the plan phase; the hot path only binds and
-	// executes the handle, never touching SQL text.
-	Prepare(ctx context.Context, q *sqlfile.Query) (Stmt, error)
-
+// Queryer is the shared query surface: the six bound-argument execution methods
+// common to a pinned connection and a transaction. Conn and Tx both embed it so
+// a test body issues queries through the same calls whether it holds a Conn or a
+// Tx — v5's QueryAPI pattern. The variadic forms allocate the "...any" slice per
+// call (cold path / setup); the *WithArgs forms take a reusable [Args] and are
+// the hot path. Prepare, Begin, Commit/Rollback and InsertColumns live on the
+// concrete interfaces, not here.
+type Queryer interface {
 	// Exec runs s for its side effect, binding args positionally. The variadic
 	// slice allocates per call — use ExecWithArgs on the hot path.
 	Exec(ctx context.Context, s Stmt, args ...any) error
@@ -48,6 +48,17 @@ type Conn interface {
 	QueryRowWithArgs(ctx context.Context, s Stmt, a *Args) Row
 	// QueryWithArgs is Query on the reusable-buffer bind path.
 	QueryWithArgs(ctx context.Context, s Stmt, a *Args) (Rows, error)
+}
+
+// Conn is a pinned connection: the query surface plus prepared handles,
+// transactions and the bulk columnar-insert path. Not safe for concurrent use.
+type Conn interface {
+	Queryer
+
+	// Prepare parses q and prepares it once on this connection, returning a
+	// reusable handle. Call it in the plan phase; the hot path only binds and
+	// executes the handle, never touching SQL text.
+	Prepare(ctx context.Context, q *sqlfile.Query) (Stmt, error)
 
 	// Begin starts a transaction at the given isolation. None and
 	// ConnectionOnly pass through to this connection without a BEGIN.
@@ -62,18 +73,14 @@ type Conn interface {
 	Close(ctx context.Context) error
 }
 
-// Tx is a transaction: the same query surface as Conn (minus bulk insert) plus
+// Tx is a transaction: the same query surface as Conn (via [Queryer]) plus
 // Commit/Rollback. A Stmt prepared on the owning Conn is valid inside its Tx.
 type Tx interface {
+	Queryer
+
+	// Prepare prepares on the owning connection; the handle is valid inside this
+	// transaction because it runs on the same connection.
 	Prepare(ctx context.Context, q *sqlfile.Query) (Stmt, error)
-
-	Exec(ctx context.Context, s Stmt, args ...any) error
-	QueryRow(ctx context.Context, s Stmt, args ...any) Row
-	Query(ctx context.Context, s Stmt, args ...any) (Rows, error)
-
-	ExecWithArgs(ctx context.Context, s Stmt, a *Args) error
-	QueryRowWithArgs(ctx context.Context, s Stmt, a *Args) Row
-	QueryWithArgs(ctx context.Context, s Stmt, a *Args) (Rows, error)
 
 	// Commit commits the transaction. For pass-through modes (Isolation.None /
 	// Isolation.Conn) it is a no-op.

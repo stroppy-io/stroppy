@@ -55,6 +55,15 @@ func (vu *VU) connect(slot int) (driver.Conn, error) {
 // returns it; the executor counts the failed Iter.
 func (vu *VU) Conn() (driver.Conn, error) { return vu.connect(vu.slot) }
 
+// Classify delegates to this VU's default-slot driver classifier, the same one
+// its pinned connection reports errors through. It is the bridge a Handler
+// passes to [Transaction] so the helper can replay a tx on the backend's own
+// definition of a transient error (pg 40001/40P01, ydb transient, …). The
+// steady-state hot path returns nil and never calls this.
+func (vu *VU) Classify(err error) driver.Action {
+	return vu.drivers[vu.slot].Classify(err)
+}
+
 // ConnSlot returns this VU's pinned connection to an explicit driver slot,
 // establishing it on first use, for the rare multi-driver step that reaches a
 // slot other than its default. Like [VU.Conn] it returns the connect failure as

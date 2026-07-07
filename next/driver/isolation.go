@@ -53,3 +53,30 @@ func (i Isolation) String() string {
 		return "unknown"
 	}
 }
+
+// ParseIsolation maps a v5 isolation name (as produced by [Isolation.String]) to
+// its level, mirroring the table v5 owned in tpcc's isolationByName. It is the
+// single authority for the name→level direction so a test's TX_ISOLATION knob
+// resolves through the SDK rather than each test re-rolling the switch. An
+// unrecognized name reports ok=false; the zero value (DBDefault) leaves the
+// server default unchanged, so callers may ignore ok on a defaulted config.
+func ParseIsolation(name string) (Isolation, bool) {
+	switch name {
+	case DBDefault.String():
+		return DBDefault, true
+	case ReadUncommitted.String():
+		return ReadUncommitted, true
+	case ReadCommitted.String():
+		return ReadCommitted, true
+	case RepeatableRead.String():
+		return RepeatableRead, true
+	case Serializable.String():
+		return Serializable, true
+	case ConnectionOnly.String():
+		return ConnectionOnly, true
+	case None.String():
+		return None, true
+	default:
+		return 0, false
+	}
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"sync/atomic"
+	"time"
 
 	"github.com/stroppy-io/stroppy/next/bench"
 	"github.com/stroppy-io/stroppy/next/driver"
@@ -43,6 +44,11 @@ const (
 	sSlDID       uint32 = 500
 	sSlThreshold uint32 = 501
 )
+
+// txRetry bounds the per-transaction serialization retry the bench.Transaction
+// helper drives. Eight attempts covers a conflict storm under contention; the
+// small backoff lets the conflicting tx commit before the replay reads.
+var txRetry = bench.RetryOpts{MaxAttempts: 8, Backoff: 100 * time.Microsecond}
 
 // errRollback is the sentinel for the spec-mandated 1% new_order rollback
 // (§2.4.2.3). It is not a serialization failure, so IsRetryable rejects it; the
@@ -146,36 +152,34 @@ func (h *workloadHandler) Iter(vu *bench.VU) error {
 	st := bench.Local[txState](vu)
 	pick := mixPick(vu.Rand(sMix), vu.Cycle())
 
-	tx, err := st.conn.Begin(vu.Ctx(), h.iso)
+	// bench.Transaction owns begin/commit/rollback and replays the whole tx on a
+	// driver-classified Retry (serialization conflicts), so each tx-type fn only
+	// reports outcome. The spec-mandated 1% rollback sentinel is not a backend
+	// error, so the classifier returns Continue and the helper surfaces it for
+	// the Iter to count as a completed New-Order.
+	err := bench.Transaction(vu.Ctx(), st.conn, vu.Classify, h.iso, txRetry, nil,
+		func(tx driver.Tx) error {
+			switch pick {
+			case txNewOrder:
+				return h.newOrder(vu, tx, st)
+			case txPayment:
+				return h.payment(vu, tx, st)
+			case txOrderStatus:
+				return h.orderStatus(vu, tx, st)
+			case txDelivery:
+				return h.delivery(vu, tx, st)
+			case txStockLevel:
+				return h.stockLevel(vu, tx, st)
+			}
+			return nil
+		})
 	if err != nil {
-		return err
-	}
-
-	var txErr error
-	switch pick {
-	case txNewOrder:
-		txErr = h.newOrder(vu, tx, st)
-	case txPayment:
-		txErr = h.payment(vu, tx, st)
-	case txOrderStatus:
-		txErr = h.orderStatus(vu, tx, st)
-	case txDelivery:
-		txErr = h.delivery(vu, tx, st)
-	case txStockLevel:
-		txErr = h.stockLevel(vu, tx, st)
-	}
-
-	if txErr != nil {
-		_ = tx.Rollback(vu.Ctx())
-		if errors.Is(txErr, errRollback) {
+		if errors.Is(err, errRollback) {
 			// Spec-mandated 1% rollback: a completed New-Order, not an error.
 			st.c.newOrder++
 			st.c.rollback++
 			return nil
 		}
-		return txErr
-	}
-	if err := tx.Commit(vu.Ctx()); err != nil {
 		return err
 	}
 

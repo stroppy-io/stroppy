@@ -22,7 +22,8 @@ func (h *workloadHandler) delivery(vu *bench.VU, tx driver.Tx, st *txState) erro
 		if err != nil {
 			return err
 		}
-		oID, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(dID).Int64(wID)).ScanInt64(0)
+		oID, err := tx.QueryRowWithArgs(ctx, q,
+			q.Bind().SetInt64("d_id", dID).SetInt64("w_id", wID)).ScanInt64(0)
 		if err != nil {
 			continue
 		}
@@ -32,7 +33,8 @@ func (h *workloadHandler) delivery(vu *bench.VU, tx driver.Tx, st *txState) erro
 		if err != nil {
 			return err
 		}
-		if err := tx.ExecWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID)); err != nil {
+		if err := tx.ExecWithArgs(ctx, q,
+			q.Bind().SetInt64("o_id", oID).SetInt64("d_id", dID).SetInt64("w_id", wID)); err != nil {
 			return err
 		}
 
@@ -41,7 +43,8 @@ func (h *workloadHandler) delivery(vu *bench.VU, tx driver.Tx, st *txState) erro
 		if err != nil {
 			return err
 		}
-		cID, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID)).ScanInt64(0)
+		cID, err := tx.QueryRowWithArgs(ctx, q,
+			q.Bind().SetInt64("o_id", oID).SetInt64("d_id", dID).SetInt64("w_id", wID)).ScanInt64(0)
 		if err != nil {
 			continue
 		}
@@ -51,7 +54,9 @@ func (h *workloadHandler) delivery(vu *bench.VU, tx driver.Tx, st *txState) erro
 		if err != nil {
 			return err
 		}
-		if err := tx.ExecWithArgs(ctx, q, q.Bind().Int64(carrier).Int64(oID).Int64(dID).Int64(wID)); err != nil {
+		if err := tx.ExecWithArgs(ctx, q,
+			q.Bind().SetInt64("carrier_id", carrier).SetInt64("o_id", oID).
+				SetInt64("d_id", dID).SetInt64("w_id", wID)); err != nil {
 			return err
 		}
 
@@ -60,7 +65,8 @@ func (h *workloadHandler) delivery(vu *bench.VU, tx driver.Tx, st *txState) erro
 		if err != nil {
 			return err
 		}
-		if err := tx.ExecWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID)); err != nil {
+		if err := tx.ExecWithArgs(ctx, q,
+			q.Bind().SetInt64("o_id", oID).SetInt64("d_id", dID).SetInt64("w_id", wID)); err != nil {
 			return err
 		}
 
@@ -69,7 +75,8 @@ func (h *workloadHandler) delivery(vu *bench.VU, tx driver.Tx, st *txState) erro
 		if err != nil {
 			return err
 		}
-		total, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(oID).Int64(dID).Int64(wID)).ScanFloat64(0)
+		total, err := tx.QueryRowWithArgs(ctx, q,
+			q.Bind().SetInt64("o_id", oID).SetInt64("d_id", dID).SetInt64("w_id", wID)).ScanFloat64(0)
 		if err != nil {
 			total = 0
 		}
@@ -79,7 +86,9 @@ func (h *workloadHandler) delivery(vu *bench.VU, tx driver.Tx, st *txState) erro
 		if err != nil {
 			return err
 		}
-		if err := tx.ExecWithArgs(ctx, q, q.Bind().Float64(total).Int64(cID).Int64(dID).Int64(wID)); err != nil {
+		if err := tx.ExecWithArgs(ctx, q,
+			q.Bind().SetFloat64("amount", total).SetInt64("c_id", cID).
+				SetInt64("d_id", dID).SetInt64("w_id", wID)); err != nil {
 			return err
 		}
 	}

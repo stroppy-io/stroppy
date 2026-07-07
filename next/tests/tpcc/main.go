@@ -66,32 +66,10 @@ func (o *options) Validate() error {
 	if o.VUs < 1 {
 		return fmt.Errorf("VUS must be >= 1, got %d", o.VUs)
 	}
-	if _, ok := isolationByName(o.TxIsolation); !ok {
+	if _, ok := driver.ParseIsolation(o.TxIsolation); !ok {
 		return fmt.Errorf("TX_ISOLATION %q is not a known level", o.TxIsolation)
 	}
 	return nil
-}
-
-// isolationByName maps a TX_ISOLATION string to a driver.Isolation.
-func isolationByName(name string) (driver.Isolation, bool) {
-	switch name {
-	case "db_default":
-		return driver.DBDefault, true
-	case "read_uncommitted":
-		return driver.ReadUncommitted, true
-	case "read_committed":
-		return driver.ReadCommitted, true
-	case "repeatable_read":
-		return driver.RepeatableRead, true
-	case "serializable":
-		return driver.Serializable, true
-	case "conn":
-		return driver.ConnectionOnly, true
-	case "none":
-		return driver.None, true
-	default:
-		return 0, false
-	}
 }
 
 func main() {
@@ -114,7 +92,7 @@ func main() {
 		// Build runs after the SDK parses options, so it reads the final o
 		// (isolation level, warehouse count, VU/worker counts) with no pre-parse.
 		Build: func(r *bench.Run) []*bench.StepDef {
-			iso, _ := isolationByName(o.TxIsolation)
+			iso, _ := driver.ParseIsolation(o.TxIsolation)
 			file, err := r.Queries("tpcc")
 			if err != nil {
 				log.Fatalf("tpcc: %v", err)

@@ -26,7 +26,8 @@ func (h *workloadHandler) stockLevel(vu *bench.VU, tx driver.Tx, st *txState) er
 	if err != nil {
 		return err
 	}
-	nextO, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(wID).Int64(dID)).ScanInt64(0)
+	nextO, err := tx.QueryRowWithArgs(ctx, q,
+		q.Bind().SetInt64("w_id", wID).SetInt64("d_id", dID)).ScanInt64(0)
 	if err != nil {
 		return err
 	}
@@ -37,5 +38,7 @@ func (h *workloadHandler) stockLevel(vu *bench.VU, tx driver.Tx, st *txState) er
 		return err
 	}
 	return tx.QueryRowWithArgs(ctx, q,
-		q.Bind().Int64(wID).Int64(dID).Int64(nextO-stockLevelWindow).Int64(nextO).Int64(threshold)).Err()
+		q.Bind().SetInt64("w_id", wID).SetInt64("d_id", dID).
+			SetInt64("min_o_id", nextO-stockLevelWindow).
+			SetInt64("next_o_id", nextO).SetInt64("threshold", threshold)).Err()
 }

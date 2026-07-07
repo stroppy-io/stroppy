@@ -35,7 +35,8 @@ var _ driver.Conn = (*conn)(nil)
 
 // Prepare prepares q on the connection under a unique name and returns a handle
 // referencing it. pgx serves a prepared statement by name on later Exec/Query,
-// so the hot path never re-sends SQL text.
+// so the hot path never re-sends SQL text. The handle's bind buffer is switched
+// into named-bind mode when q carries :params, so callers bind by name.
 func (c *conn) Prepare(ctx context.Context, q *sqlfile.Query) (driver.Stmt, error) {
 	c.prepN++
 	name := "s" + strconv.Itoa(c.prepN)
@@ -45,7 +46,9 @@ func (c *conn) Prepare(ctx context.Context, q *sqlfile.Query) (driver.Stmt, erro
 		return nil, err
 	}
 
-	return &stmt{name: name, sd: sd}, nil
+	s := &stmt{name: name, sd: sd}
+	s.args.SetNames(driver.BuildNameIndex(q.Params()))
+	return s, nil
 }
 
 func (c *conn) Exec(ctx context.Context, s driver.Stmt, args ...any) error {

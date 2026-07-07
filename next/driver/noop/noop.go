@@ -53,8 +53,12 @@ type conn struct {
 
 var _ driver.Conn = (*conn)(nil)
 
-func (c *conn) Prepare(_ context.Context, _ *sqlfile.Query) (driver.Stmt, error) {
-	return &stmt{}, nil
+func (c *conn) Prepare(_ context.Context, q *sqlfile.Query) (driver.Stmt, error) {
+	s := &stmt{}
+	if q != nil {
+		s.args.SetNames(driver.BuildNameIndex(q.Params()))
+	}
+	return s, nil
 }
 
 func (c *conn) Exec(context.Context, driver.Stmt, ...any) error               { return nil }

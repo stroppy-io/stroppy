@@ -40,7 +40,8 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 	if err != nil {
 		return err
 	}
-	wName, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Float64(amount).Int64(wID)).ScanBytes(0)
+	wName, err := tx.QueryRowWithArgs(ctx, q,
+		q.Bind().SetFloat64("amount", amount).SetInt64("w_id", wID)).ScanBytes(0)
 	if err != nil {
 		return err
 	}
@@ -50,7 +51,8 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 	if err != nil {
 		return err
 	}
-	dName, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Float64(amount).Int64(wID).Int64(dID)).ScanBytes(0)
+	dName, err := tx.QueryRowWithArgs(ctx, q,
+		q.Bind().SetFloat64("amount", amount).SetInt64("w_id", wID).SetInt64("d_id", dID)).ScanBytes(0)
 	if err != nil {
 		return err
 	}
@@ -63,7 +65,8 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 		if err != nil {
 			return err
 		}
-		n, err := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(cWID).Int64(cDID).Bytes(cLast)).ScanInt64(0)
+		n, err := tx.QueryRowWithArgs(ctx, q,
+			q.Bind().SetInt64("w_id", cWID).SetInt64("d_id", cDID).SetBytes("c_last", cLast)).ScanInt64(0)
 		if err != nil {
 			return err
 		}
@@ -76,7 +79,9 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 		if err != nil {
 			return err
 		}
-		row := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(cWID).Int64(cDID).Bytes(cLast).Int64((n-1)/2))
+		row := tx.QueryRowWithArgs(ctx, q,
+			q.Bind().SetInt64("w_id", cWID).SetInt64("d_id", cDID).SetBytes("c_last", cLast).
+				SetInt64("offset", (n-1)/2))
 		if cID, err = row.ScanInt64(0); err != nil {
 			return err
 		}
@@ -93,7 +98,8 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 		if err != nil {
 			return err
 		}
-		row := tx.QueryRowWithArgs(ctx, q, q.Bind().Int64(cWID).Int64(cDID).Int64(cID))
+		row := tx.QueryRowWithArgs(ctx, q,
+			q.Bind().SetInt64("w_id", cWID).SetInt64("d_id", cDID).SetInt64("c_id", cID))
 		if cCredit, err = row.ScanBytes(9); err != nil {
 			return err
 		}
@@ -110,7 +116,8 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 			return err
 		}
 		if err := tx.ExecWithArgs(ctx, q,
-			q.Bind().Float64(amount).Bytes(cDataNew).Int64(cWID).Int64(cDID).Int64(cID)); err != nil {
+			q.Bind().SetFloat64("amount", amount).SetBytes("c_data_new", cDataNew).
+				SetInt64("w_id", cWID).SetInt64("d_id", cDID).SetInt64("c_id", cID)); err != nil {
 			return err
 		}
 	} else {
@@ -119,7 +126,8 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 			return err
 		}
 		if err := tx.ExecWithArgs(ctx, q,
-			q.Bind().Float64(amount).Int64(cWID).Int64(cDID).Int64(cID)); err != nil {
+			q.Bind().SetFloat64("amount", amount).SetInt64("w_id", cWID).
+				SetInt64("d_id", cDID).SetInt64("c_id", cID)); err != nil {
 			return err
 		}
 	}
@@ -131,8 +139,9 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 		return err
 	}
 	return tx.ExecWithArgs(ctx, q,
-		q.Bind().Int64(hid).Int64(cID).Int64(cDID).Int64(cWID).Int64(dID).Int64(wID).
-			Float64(amount).Bytes(hData))
+		q.Bind().SetInt64("h_id", hid).SetInt64("h_c_id", cID).SetInt64("h_c_d_id", cDID).
+			SetInt64("h_c_w_id", cWID).SetInt64("h_d_id", dID).SetInt64("h_w_id", wID).
+			SetFloat64("h_amount", amount).SetBytes("h_data", hData))
 }
 
 // clastName writes the c_last name for index n into arena memory and returns the

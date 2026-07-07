@@ -42,7 +42,7 @@ func (h *fullStackHandler) Iter(vu *VU) error {
 	st := Local[fullStackState](vu)
 	id := int64(vu.Rand(0).At(vu.Cycle()))
 	args := st.stmt.Bind()
-	args.Int64(id)
+	args.SetInt64("id", id)
 	_, err := st.conn.QueryRowWithArgs(vu.Ctx(), st.stmt, args).ScanInt64(0)
 	return err
 }
