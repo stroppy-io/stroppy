@@ -659,3 +659,54 @@ errors).
 - **SCALE_FACTOR** = a standard D1 param.
 - **SF=1 answer validation** against v5's answer files, retained as a validation step; per-query
   metrics via the D6 instruments (servicetime tagged by query).
+
+---
+
+## Pool-2 research outcomes & rulings
+
+7 read-only design agents (D7/D1/D2/D3b/D6/D8/tpch), 50 micro-questions. Rulings on the
+genuine forks (F1–F7); the rest auto-accepted on the agent's recommendation.
+
+**Forks (ruled):**
+- **F1 — no purity police.** Define is plain Go; the SDK does not enforce no-IO. QuerySet
+  resolves eagerly; no phase-guards or panic machinery. Authors hack as they need.
+- **F2 — multi-driver, v5 paradigm.** Author declares N driver slots in Define (name/kind/
+  config-from-params) + step→`Use(slot)` + **acquisition mode per slot: shared (one pool across
+  VUs) or per-VU**. Port `workloads/tests/multi_drivers_test.ts` cleanly; kill the `once`/
+  setup-in-default uglies. Adds a shared-acquisition mode to next (currently per-VU only).
+- **F3 — skip unblocks.** `Skipped` satisfies `After`/`AfterAny` universally (one semantic;
+  migrate simple's cleanup). Unblocks something unwanted? Skip that too.
+- **F4 — drop `--steps`.** Only `-skip` remains (author-marked-skippable steps); mass-skip is
+  the escape hatch.
+- **F5 — instrument hook in pool-2.** Authors can declare their own metrics (histograms/
+  counters, taggable by tx/query) before Freeze; kills the `fmt.Printf` side-channel in tpcc
+  and prevents it in tpch. (The "instrument" = an author-defined metric to record into.)
+- **F6 — seed as string keyword.** `auto`/`now` (random per run), `fixed`/`canonical` (test's
+  spec-representative seed), or an explicit value. Resolves to a uint64 root seed for
+  `DeriveStream`. tpch `canonical` = dbgen spec seeds; tpcc `canonical` = 1.
+- **F7 — defer Emitter.** Ship single-table `Loader` now; tpch regenerates cogenerated tables
+  (existing pattern). Emitter (`StartTable/PutRow/EndBatch`) deferred until a workload can't
+  tolerate regeneration.
+
+**Auto-accepted (agent rec, object-if-bites):**
+- D1: typed `Param[T]` handle (`.Value()`/`.Source()`) · flat `--name=val` parser · flat JSON
+  config file (registry-keyed) · `ParamSchema` in probe (replaces `OptionSchema`) · grouped
+  STANDARD/TEST `--help`.
+- D7: `Define func(*Def) error` · full removal of `Opts/Drivers/QuerySets/Build` + `DriverSlot`
+  · env = bare uppercase + `Env()` override · forward-ref handles for Histogram/QuerySet.
+- D2: Isolation stays in `driver` pkg (doc note) · Native = opaque map + per-dbdrv accessor ·
+  auth/TLS folded into URL · pool bounds kept (pooled-only doc) · optional `DefaultIsolation()`
+  · `bulkSize`/`defaultInsertMethod` OUT · server-prepare = bool + pgx enum.
+- D3b: variant membership `empty=all` · cross-variant edges validate-full-then-prune · `-skip`
+  on non-skippable = hard error · variant decl = catalog → `d.Variant` in D7.
+- D6: tag column = fan-out (one handle per combo) · Transaction records whole-tx latency
+  (`TxRecorder`) · step auto-record stays · freeze `EventRow` schema in stage-1 · intern
+  run-scoped · sampling = buffer+window (system derives rate) · live log viewer in stage-2.
+- D8: streams per-step · `bench.Loader` owns the Handler · `chunkRanges/parseRange`→SDK ·
+  accept one-time golden re-derive under `FNV(name)` · ship Normal+Decimal now, defer
+  Zipf/Phrase/Dict/Grammar to tpch/tpcds.
+- tpch: hand-roll `load.go`, extract `Loader` after · lineitem/partsupp fan-out inline · single
+  `full` DAG + `-skip` · keep PG_UNLOGGED flip.
+
+**Build order (sequenced, gated):** pool-2a = D1 → D7 → D6 (spine + reporting); pool-2b =
+D2 → D3b → D8 → tpch (breadth + port). Verify checkpoint between.
