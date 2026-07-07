@@ -41,11 +41,11 @@ var pgSQL []byte
 //go:embed tpcc.sql
 var extraSQL []byte
 
-// tpccSeed is the run's declared root seed. The world's generation constants and
-// the SDK's per-step rng streams (via Test.Seed) both derive from it, so they
-// stay consistent. The -seed flag overrides the SDK streams but not the world
-// constants; the built-in tests use the default, and a run is reproducible for a
-// fixed seed regardless.
+// tpccSeed is the run's default root seed (Test.Seed). It is only the default
+// for the -seed flag; the effective seed reaches every derivation — both the
+// SDK's per-step rng streams and the world's generation constants — via
+// Run.Seed, so overriding -seed is total. There is no private seed literal the
+// flag cannot reach.
 const tpccSeed = 1
 
 // options are the tpcc tunables, filled from the environment by the SDK.
@@ -106,7 +106,7 @@ func main() {
 		Drivers: []bench.DriverSlot{{Name: "main", Kind: "pg"}},
 		// Build runs after the SDK parses options, so it reads the final o
 		// (isolation level, warehouse count, VU/worker counts) with no pre-parse.
-		Build: func(*bench.Run) []*bench.StepDef {
+		Build: func(r *bench.Run) []*bench.StepDef {
 			iso, _ := isolationByName(o.TxIsolation)
 			file, err := sqlfile.Parse(pgSQL)
 			if err != nil {
@@ -116,7 +116,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("tpcc: parse tpcc.sql: %v", err)
 			}
-			return buildSteps(o, iso, file, extra)
+			return buildSteps(o, r.Seed(), iso, file, extra)
 		},
 	}
 	bench.Main(t)
@@ -132,8 +132,8 @@ func main() {
 // validation (VALIDATE=false) still lets the workload run — a Skipped node fails
 // an After gate but AfterAny is satisfied by create_indexes succeeding, while
 // still ordering the workload after validation completes.
-func buildSteps(o *options, iso driver.Isolation, file, extra *sqlfile.File) []*bench.StepDef {
-	w := newWorld(tpccSeed, o.Warehouses)
+func buildSteps(o *options, seed uint64, iso driver.Isolation, file, extra *sqlfile.File) []*bench.StepDef {
+	w := newWorld(seed, o.Warehouses)
 	q := resolveTxQueries(file, extra)
 
 	dropQs := file.Section("drop_schema")

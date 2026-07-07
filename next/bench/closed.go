@@ -21,8 +21,8 @@ type ClosedBudget struct {
 // Closed builds a closed-loop executor: VUs workers each iterate as fast as
 // completion allows until the budget is spent or the context is canceled.
 // Cancellation is graceful — a VU finishes its in-flight Iter, then Close runs.
-// Cycles are allocated per Config.CycleMode (contiguous per-VU ranges by
-// default; see [CycleMode]).
+// Cycles are partitioned into per-VU contiguous ranges (see the package doc on
+// determinism).
 func Closed(cfg Config, b ClosedBudget, h Handler) *Executor {
 	vus := b.VUs
 	if vus < 1 {
@@ -31,7 +31,7 @@ func Closed(cfg Config, b ClosedBudget, h Handler) *Executor {
 	e := newExecutor(cfg, vus, false)
 	e.handler = h
 	e.hot = true
-	cyc := newCycler(cfg.CycleMode, vus)
+	cyc := newPartitionedCycler(vus)
 
 	e.run = func(ctx context.Context) error {
 		var deadline time.Time
@@ -54,7 +54,7 @@ func Closed(cfg Config, b ClosedBudget, h Handler) *Executor {
 
 // closedLoop is one VU's tight loop: iterate until the iteration budget is
 // exhausted, the deadline passes, or the context is canceled.
-func (e *Executor) closedLoop(ctx context.Context, vu *VU, cyc cycler, b ClosedBudget, deadline time.Time) {
+func (e *Executor) closedLoop(ctx context.Context, vu *VU, cyc partitionedCycler, b ClosedBudget, deadline time.Time) {
 	var local uint64
 	for {
 		if ctx.Err() != nil {

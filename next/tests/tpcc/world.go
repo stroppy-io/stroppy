@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/stroppy-io/stroppy/next/bench"
 	"github.com/stroppy-io/stroppy/next/rng"
 )
 
@@ -58,17 +59,22 @@ type world struct {
 // constant streams never collide with a step's data streams.
 const constStepID = 0xC0FFEE
 
-// newWorld builds the run-global generation context from the run seed.
+// newWorld builds the run-global generation context from the run root seed.
+// Every constant derives from seed via the bench-layer helper, so a single
+// --seed override reaches both the SDK's per-step streams and these world
+// constants — there is no private seed literal the flag cannot reach. The
+// derivation (helper(stepID, streamID) over the fixed constStepID) is unchanged,
+// so the default seed yields byte-identical data.
 func newWorld(seed uint64, warehouses int64) *world {
 	w := &world{warehouses: warehouses}
-	w.olCnt = rng.Derive(seed, constStepID, 1)
+	w.olCnt = bench.DeriveStream(seed, constStepID, 1)
 
 	// c_last: load constant in [0,255], run constant = load + valid delta.
-	w.cLastLoad = rng.NURandConst(rng.Derive(seed, constStepID, 2), 255)
-	w.cLastRun = w.cLastLoad + validDelta(rng.Derive(seed, constStepID, 3))
+	w.cLastLoad = rng.NURandConst(bench.DeriveStream(seed, constStepID, 2), 255)
+	w.cLastRun = w.cLastLoad + validDelta(bench.DeriveStream(seed, constStepID, 3))
 
-	w.cID = rng.NURandConst(rng.Derive(seed, constStepID, 4), 1023)
-	w.olID = rng.NURandConst(rng.Derive(seed, constStepID, 5), 8191)
+	w.cID = rng.NURandConst(bench.DeriveStream(seed, constStepID, 4), 1023)
+	w.olID = rng.NURandConst(bench.DeriveStream(seed, constStepID, 5), 8191)
 	return w
 }
 

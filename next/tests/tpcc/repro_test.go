@@ -85,22 +85,29 @@ func genTableDigest(w *world, tbl *table, nChunks int) uint64 {
 // (seed, cycle), so a fixed seed yields an identical per-table content digest
 // across independent runs, and — because content is keyed by the global cycle,
 // never by the work partition — that digest is invariant under the chunk count
-// (i.e. LOAD_WORKERS). This is the fast mirror of TestLoadReproduciblePG.
+// (i.e. LOAD_WORKERS), including the LOAD_WORKERS=1 case. This is the structural
+// worker-count-invariance guarantee: a generator's signature is
+// (world, RowBuf, cycle, streams) — no worker index — so it cannot encode worker
+// identity even if it wanted to. This is the fast mirror of
+// TestLoadReproduciblePG.
 func TestLoadStreamReproducible(t *testing.T) {
 	w := newWorld(tpccSeed, 1)
+	// Chunk counts span the LOAD_WORKERS space, deliberately including 1 (a
+	// single worker) and several uneven values so a partition-dependent bug in
+	// the generator cannot hide behind a round worker count.
+	chunkCounts := []int{1, 2, 4, 7, 13}
 	for _, tbl := range tables() {
-		a := genTableDigest(w, tbl, 4)
-		again := genTableDigest(w, tbl, 4)
-		if a != again {
-			t.Errorf("%s: two runs of the generator disagree (%d != %d)", tbl.name, a, again)
+		digests := make([]uint64, len(chunkCounts))
+		for i, nChunks := range chunkCounts {
+			digests[i] = genTableDigest(w, tbl, nChunks)
 		}
-		// A different chunk partition (as a different LOAD_WORKERS would give)
-		// must not change the content digest.
-		repartitioned := genTableDigest(w, tbl, 13)
-		if a != repartitioned {
-			t.Errorf("%s: digest changed with chunk count 4 vs 13 (%d != %d)", tbl.name, a, repartitioned)
+		for i := 1; i < len(digests); i++ {
+			if digests[i] != digests[0] {
+				t.Errorf("%s: digest changed with chunk count %d vs %d (%d != %d)",
+					tbl.name, chunkCounts[i], chunkCounts[0], digests[i], digests[0])
+			}
 		}
-		if a == 0 {
+		if digests[0] == 0 {
 			t.Errorf("%s: empty digest (generator produced no rows?)", tbl.name)
 		}
 	}

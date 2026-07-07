@@ -24,6 +24,10 @@ const (
 // slice is the table's per-field derived rng streams (built once in Init); cycle
 // is the global generation index, so a row's content is a pure function of
 // (seed, cycle) and independent of how work units partition the cycle space.
+//
+// The signature deliberately takes cycle, not a worker index: a generator
+// cannot see worker identity, so LOAD_WORKERS 1 vs N yields byte-identical data
+// by construction. The reproducibility test pins this guarantee.
 type genFn func(w *world, b *mem.RowBuf, cycle int64, s []rng.Stream)
 
 // table describes one table's load: its name (also the step name suffix), its

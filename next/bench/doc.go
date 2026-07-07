@@ -48,16 +48,18 @@
 //
 // # Determinism (RFC 0001 §5)
 //
+// Run-repro is a non-goal at the concurrent layer: worker scheduling is not
+// bit-reproducible across runs, and the engine does not aspire to bit-identical
+// interleaving. The contract is data-repro — the generated dataset is
+// bit-identical given (seed, scale) — plus deterministic per-step rng streams.
 // Every iteration is keyed by a uint64 cycle; the cycle selects both the rng
 // draws ([VU.Rand] streams derive from run seed + step id + stream id, seeked by
 // cycle) and, for Pool, the assigned item. Cycle allocation is deterministic and
-// contention-free by default:
+// contention-free:
 //
-//   - Closed: each VU owns a contiguous cycle range (see [CyclePartitioned]);
-//     VU k walks base_k, base_k+1, ... where base_k = k * (2^64 / vus). Ranges
-//     never overlap, so two runs with the same (vus, iters, seed) reproduce the
-//     identical cycle->VU assignment and rng stream. An opt-in shared atomic
-//     counter ([CycleAtomic]) trades that reproducibility for skew balancing.
+//   - Closed: each VU owns a contiguous cycle range; VU k walks base_k,
+//     base_k+1, ... where base_k = k * (2^64 / vus). Ranges never overlap, so
+//     the cycle->VU assignment is a pure function of vus.
 //   - Pool: cycle == item index, independent of which worker steals the item, so
 //     item i always draws from the same rng position.
 //   - Open: cycle == schedule index; VU k serves indices k, k+vus, k+2vus, ...

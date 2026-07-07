@@ -3,7 +3,6 @@ package bench
 import (
 	"context"
 	"runtime"
-	"sync"
 	"testing"
 	"time"
 )
@@ -21,33 +20,6 @@ func TestClosedDeterministic(t *testing.T) {
 	a, b := run(), run()
 	if a != b {
 		t.Fatalf("two identical Closed runs differ: %d != %d", a, b)
-	}
-}
-
-func TestClosedAtomicCoversAllCycles(t *testing.T) {
-	// Atomic mode is not reproducible, but every cycle 0..N-1 must be served
-	// exactly once across VUs (no gaps, no repeats).
-	const total = 5000
-	var mu sync.Mutex
-	seen := make(map[uint64]int)
-	h := FuncOnce(func(vu *VU) error {
-		mu.Lock()
-		seen[vu.Cycle()]++
-		mu.Unlock()
-		return nil
-	})
-	ex := Closed(Config{CycleMode: CycleAtomic, Interval: time.Hour},
-		ClosedBudget{VUs: 8, Iters: total / 8}, h)
-	if err := ex.Run(context.Background()); err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if len(seen) != total {
-		t.Fatalf("distinct cycles served = %d, want %d", len(seen), total)
-	}
-	for c, n := range seen {
-		if n != 1 {
-			t.Fatalf("cycle %d served %d times, want 1", c, n)
-		}
 	}
 }
 

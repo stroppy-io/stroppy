@@ -36,8 +36,6 @@ type Config struct {
 	OnErr ErrorMode
 	// Retry wraps each Iter. Zero value is a single attempt.
 	Retry RetryPolicy
-	// CycleMode selects cycle allocation for Closed/Pool. Zero is partitioned.
-	CycleMode CycleMode
 	// Interval is the reporter tick; zero uses metrics.DefaultInterval.
 	Interval time.Duration
 	// Sink receives interval and summary reports; nil discards them.
@@ -290,14 +288,6 @@ func (e *Executor) iterate(vu *VU, cycle uint64) {
 	if err != nil {
 		e.onError(vu, err)
 	}
-}
-
-// newCycler builds the cycle allocator for a Closed/Pool run.
-func newCycler(mode CycleMode, vus int) cycler {
-	if mode == CycleAtomic {
-		return newAtomicCycler()
-	}
-	return newPartitionedCycler(vus)
 }
 
 // runIter applies the retry policy around one Iter and returns the surviving
