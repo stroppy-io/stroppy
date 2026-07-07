@@ -33,6 +33,11 @@ type Test struct {
 	// Drivers declares the database backends by slot. Slot 0 is the default a
 	// step's VUs connect to; env overrides apply per slot (see [DriverSlot]).
 	Drivers []DriverSlot
+	// QuerySets registers the test's baked query-set sources. A Build callback
+	// resolves each by name through [Run.Queries] against the active driver
+	// kind; users override any entry from the environment. See [BakedQuerySet]
+	// for the resolution chain and override convention.
+	QuerySets []BakedQuerySet
 	// Build returns the DAG steps in declaration order (used for status
 	// reporting and as the deterministic build order; dependencies are declared
 	// per step). Main calls it exactly once, after options are parsed and driver

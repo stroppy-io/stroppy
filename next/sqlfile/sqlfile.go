@@ -14,8 +14,9 @@ const (
 )
 
 // Query is one "--= name" entry: its section, source line, raw text and
-// named parameters. Rewritten text for each PlaceholderStyle is computed
-// once at parse time.
+// named parameters. The author-facing form is Raw + the ":name" markers; the
+// per-PlaceholderStyle rewrites are computed once at parse time and read only
+// by the dbdrv at Prepare time (see Text).
 type Query struct {
 	// Section is the enclosing "--+" section name.
 	Section string
@@ -44,6 +45,10 @@ func (q *Query) Params() []string {
 // distinct name ($n back-reference, matching pgx); Question style emits a
 // fresh "?" per occurrence, matching database/sql drivers that require one
 // bound value per placeholder.
+//
+// Text is dbdrv-internal: a driver calls it once at Prepare time to select
+// its dialect's rendering. Test/author code never calls Text — it passes the
+// Query to [driver.Conn].Prepare and the driver picks the style.
 func (q *Query) Text(style PlaceholderStyle) string {
 	if style == Question {
 		return q.question

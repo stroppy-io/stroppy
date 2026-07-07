@@ -6,8 +6,12 @@ import (
 	"strings"
 )
 
-// PlaceholderStyle selects the positional-parameter syntax used when
-// rewriting a query's ":name" markers for a specific SQL dialect.
+// PlaceholderStyle selects the positional-placeholder syntax a dbdrv renders
+// ":name" markers down to. It is a dbdrv-internal detail: an author writes
+// ":param" and the driver picks its style at Prepare time, so test code never
+// references PlaceholderStyle. The two rewrites are precomputed at parse time
+// (cheap, once) so a driver selects one by reading the matching field — no
+// per-call work on the prepared-handle hot path.
 type PlaceholderStyle int
 
 const (

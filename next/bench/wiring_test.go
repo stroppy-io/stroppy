@@ -144,7 +144,7 @@ func TestProbeGolden(t *testing.T) {
 	slots := resolveSlots(tst.Drivers, envMap(nil))
 	run := &Run{test: tst, seed: tst.Seed, slots: slots}
 	var sb strings.Builder
-	if err := writeProbe(&sb, buildProbe(tst, buildSteps(tst, run), tst.Seed, schema, slots)); err != nil {
+	if err := writeProbe(&sb, buildProbe(tst, buildSteps(tst, run), tst.Seed, schema, slots, run)); err != nil {
 		t.Fatalf("writeProbe: %v", err)
 	}
 	got := sb.String()

@@ -126,9 +126,9 @@ func TestLoadReproduciblePG(t *testing.T) {
 	if url == "" {
 		t.Skip("set STROPPY_TEST_PG_URL to run the postgres reproducibility test")
 	}
-	file, err := sqlfile.Parse(pgSQL)
+	file, err := sqlfile.Parse(tpccSQL)
 	if err != nil {
-		t.Fatalf("parse pg.sql: %v", err)
+		t.Fatalf("parse tpcc.sql: %v", err)
 	}
 
 	a := loadAndDigestPG(t, url, file, 2)

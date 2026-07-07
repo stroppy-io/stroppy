@@ -35,11 +35,8 @@ import (
 	"github.com/stroppy-io/stroppy/next/sqlfile"
 )
 
-//go:embed pg.sql
-var pgSQL []byte
-
 //go:embed tpcc.sql
-var extraSQL []byte
+var tpccSQL []byte
 
 // tpccSeed is the run's default root seed (Test.Seed). It is only the default
 // for the -seed flag; the effective seed reaches every derivation — both the
@@ -104,19 +101,25 @@ func main() {
 		Seed:    tpccSeed,
 		Opts:    o,
 		Drivers: []bench.DriverSlot{{Name: "main", Kind: "pg"}},
+		// QuerySets registers the baked tpcc corpus as the query-set named
+		// "tpcc". The SDK resolves it per the active driver kind (override ->
+		// per-kind -> generic); Build then asks for it by name through
+		// [bench.Run.Queries], so probe can list the required set back to the
+		// operator. tpcc.sql is the reference (pg) dialect today, registered
+		// as the generic fallback so every kind resolves without an override.
+		QuerySets: []bench.BakedQuerySet{{
+			Name:    "tpcc",
+			Generic: tpccSQL,
+		}},
 		// Build runs after the SDK parses options, so it reads the final o
 		// (isolation level, warehouse count, VU/worker counts) with no pre-parse.
 		Build: func(r *bench.Run) []*bench.StepDef {
 			iso, _ := isolationByName(o.TxIsolation)
-			file, err := sqlfile.Parse(pgSQL)
+			file, err := r.Queries("tpcc")
 			if err != nil {
-				log.Fatalf("tpcc: parse pg.sql: %v", err)
+				log.Fatalf("tpcc: %v", err)
 			}
-			extra, err := sqlfile.Parse(extraSQL)
-			if err != nil {
-				log.Fatalf("tpcc: parse tpcc.sql: %v", err)
-			}
-			return buildSteps(o, r.Seed(), iso, file, extra)
+			return buildSteps(o, r.Seed(), iso, file)
 		},
 	}
 	bench.Main(t)
@@ -132,9 +135,9 @@ func main() {
 // validation (VALIDATE=false) still lets the workload run — a Skipped node fails
 // an After gate but AfterAny is satisfied by create_indexes succeeding, while
 // still ordering the workload after validation completes.
-func buildSteps(o *options, seed uint64, iso driver.Isolation, file, extra *sqlfile.File) []*bench.StepDef {
+func buildSteps(o *options, seed uint64, iso driver.Isolation, file *sqlfile.File) []*bench.StepDef {
 	w := newWorld(seed, o.Warehouses)
-	q := resolveTxQueries(file, extra)
+	q := resolveTxQueries(file)
 
 	dropQs := file.Section("drop_schema")
 	createQs := file.Section("create_schema")

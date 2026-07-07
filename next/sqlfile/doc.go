@@ -14,6 +14,8 @@
 // verbatim, including any ";" they contain — a "--=" entry is never split
 // on ";", matching v5.
 //
-// Named parameters ":name" are extracted in first-occurrence order and
-// rewritten per PlaceholderStyle; see Query.Text.
+// Named parameters are the author-facing placeholder: write ":name". The
+// dbdrv renders them to indexed ("$1") or positional ("?") at Prepare time
+// (see [Query.Text] and [PlaceholderStyle]); that rendering is a driver
+// detail, never the author's concern.
 package sqlfile

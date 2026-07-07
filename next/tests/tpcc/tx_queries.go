@@ -24,7 +24,7 @@ type txQueries struct {
 	// delivery
 	dGetMinNO, dDelNO, dGetOrder, dUpdOrder, dUpdOrderLine, dGetAmount, dUpdCust *sqlfile.Query
 
-	// stock_level (district next-o-id + the single-shot count from tpcc.sql)
+	// stock_level (district next-o-id + the single-shot low-stock count)
 	slGetDistrict, slCountLow *sqlfile.Query
 }
 
@@ -40,11 +40,14 @@ func (q *txQueries) all() []*sqlfile.Query {
 	}
 }
 
-// resolveTxQueries looks up every workload query from the pg.sql corpus (file)
-// and the tpcc.sql supplement (extra), fatally reporting any missing one.
-func resolveTxQueries(file, extra *sqlfile.File) *txQueries {
-	get := func(f *sqlfile.File, section, name string) *sqlfile.Query {
-		q, ok := f.Query(section, name)
+// resolveTxQueries looks up every workload query from the resolved tpcc corpus,
+// fatally reporting any missing one. The corpus carries the same section layout
+// across every dialect (the N+M contract); count_low_stock lives in the
+// workload_tx_stock_level section alongside the get_district / window / count
+// entries the v5 two-step form used.
+func resolveTxQueries(file *sqlfile.File) *txQueries {
+	get := func(section, name string) *sqlfile.Query {
+		q, ok := file.Query(section, name)
 		if !ok {
 			log.Fatalf("tpcc: missing query %s/%s", section, name)
 		}
@@ -56,41 +59,41 @@ func resolveTxQueries(file, extra *sqlfile.File) *txQueries {
 	del := "workload_tx_delivery"
 	sl := "workload_tx_stock_level"
 	return &txQueries{
-		noGetCustomer:  get(file, no, "get_customer"),
-		noGetWarehouse: get(file, no, "get_warehouse"),
-		noGetDistrict:  get(file, no, "get_district"),
-		noUpdDistrict:  get(file, no, "update_district"),
-		noInsOrder:     get(file, no, "insert_order"),
-		noInsNewOrder:  get(file, no, "insert_new_order"),
-		noGetItem:      get(file, no, "get_item"),
-		noGetStock:     get(file, no, "get_stock"),
-		noUpdStock:     get(file, no, "update_stock"),
-		noInsOrderLine: get(file, no, "insert_order_line"),
+		noGetCustomer:  get(no, "get_customer"),
+		noGetWarehouse: get(no, "get_warehouse"),
+		noGetDistrict:  get(no, "get_district"),
+		noUpdDistrict:  get(no, "update_district"),
+		noInsOrder:     get(no, "insert_order"),
+		noInsNewOrder:  get(no, "insert_new_order"),
+		noGetItem:      get(no, "get_item"),
+		noGetStock:     get(no, "get_stock"),
+		noUpdStock:     get(no, "update_stock"),
+		noInsOrderLine: get(no, "insert_order_line"),
 
-		pUpdWh:       get(file, pay, "update_get_warehouse"),
-		pUpdDist:     get(file, pay, "update_get_district"),
-		pCountByName: get(file, pay, "count_customers_by_name"),
-		pGetByName:   get(file, pay, "get_customer_by_name"),
-		pGetByID:     get(file, pay, "get_customer_by_id"),
-		pUpdCust:     get(file, pay, "update_customer"),
-		pUpdCustBC:   get(file, pay, "update_customer_bc"),
-		pInsHist:     get(file, pay, "insert_history"),
+		pUpdWh:       get(pay, "update_get_warehouse"),
+		pUpdDist:     get(pay, "update_get_district"),
+		pCountByName: get(pay, "count_customers_by_name"),
+		pGetByName:   get(pay, "get_customer_by_name"),
+		pGetByID:     get(pay, "get_customer_by_id"),
+		pUpdCust:     get(pay, "update_customer"),
+		pUpdCustBC:   get(pay, "update_customer_bc"),
+		pInsHist:     get(pay, "insert_history"),
 
-		osGetByID:       get(file, os, "get_customer_by_id"),
-		osCountByName:   get(file, os, "count_customers_by_name"),
-		osGetByName:     get(file, os, "get_customer_by_name"),
-		osGetLastOrder:  get(file, os, "get_last_order"),
-		osGetOrderLines: get(file, os, "get_order_lines"),
+		osGetByID:       get(os, "get_customer_by_id"),
+		osCountByName:   get(os, "count_customers_by_name"),
+		osGetByName:     get(os, "get_customer_by_name"),
+		osGetLastOrder:  get(os, "get_last_order"),
+		osGetOrderLines: get(os, "get_order_lines"),
 
-		dGetMinNO:     get(file, del, "get_min_new_order"),
-		dDelNO:        get(file, del, "delete_new_order"),
-		dGetOrder:     get(file, del, "get_order"),
-		dUpdOrder:     get(file, del, "update_order"),
-		dUpdOrderLine: get(file, del, "update_order_line"),
-		dGetAmount:    get(file, del, "get_order_line_amount"),
-		dUpdCust:      get(file, del, "update_customer"),
+		dGetMinNO:     get(del, "get_min_new_order"),
+		dDelNO:        get(del, "delete_new_order"),
+		dGetOrder:     get(del, "get_order"),
+		dUpdOrder:     get(del, "update_order"),
+		dUpdOrderLine: get(del, "update_order_line"),
+		dGetAmount:    get(del, "get_order_line_amount"),
+		dUpdCust:      get(del, "update_customer"),
 
-		slGetDistrict: get(file, sl, "get_district"),
-		slCountLow:    get(extra, sl, "count_low_stock"),
+		slGetDistrict: get(sl, "get_district"),
+		slCountLow:    get(sl, "count_low_stock"),
 	}
 }

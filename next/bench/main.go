@@ -60,11 +60,11 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 
 	// Build the steps once, now that options are parsed and slots resolved, so
 	// the builder can size executor policies from the options (no pre-parse).
-	run := &Run{test: t, seed: seed, slots: slots}
+	run := &Run{test: t, seed: seed, slots: slots, getenv: getenv}
 	steps := buildSteps(t, run)
 
 	if *probeFlag {
-		if err := writeProbe(stdout, buildProbe(t, steps, seed, schema, slots)); err != nil {
+		if err := writeProbe(stdout, buildProbe(t, steps, seed, schema, slots, run)); err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
 			return 1
 		}
