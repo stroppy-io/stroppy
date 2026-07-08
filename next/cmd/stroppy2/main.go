@@ -186,12 +186,12 @@ func cmdEject(args []string, stdout, stderr *os.File) int {
 type runParams struct {
 	target string
 	env    []string // -e KEY=VAL, passed to the test process environment
-	flags  []string // forwarded to the test binary verbatim (--name=val, -steps, ...)
+	flags  []string // forwarded to the test binary verbatim (--name=val, -skip, ...)
 }
 
 // testArgs returns the flags to hand to the test binary. All non-env flags flow
 // through unchanged: the test's own param registry parses --name=val, and the
-// SDK control flags (-steps/-no-steps/-probe/...) are interpreted there too.
+// SDK control flags (-skip/-probe/...) are interpreted there too.
 func (p runParams) testArgs() []string {
 	if len(p.flags) == 0 {
 		return nil

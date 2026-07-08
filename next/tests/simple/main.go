@@ -86,11 +86,20 @@ func main() {
 			d.Step("workload", &workloadHandler{rows: rows.Value(), query: selectQ}).
 				Closed(vus.Value(), dur.Value()).After("load").Uses("main")
 			// Row-count verification only holds against a real database.
+			notNoop := func(r *bench.Run) bool { return r.DriverKind(0) != "noop" }
 			d.Step("check", &checkHandler{rows: rows.Value(), query: countQ}).
 				After("workload").
-				If(func(r *bench.Run) bool { return r.DriverKind(0) != "noop" }).
+				If(notNoop).
 				Uses("main")
-			d.Step("cleanup", exec(dropQ)).After("check").Uses("main")
+			// cleanup carries the same If as check: under F3 a Skipped step
+			// unblocks its dependents, so a gate on check alone would let
+			// cleanup run on noop — there's nothing to drop there. The
+			// explicit If keeps cleanup skipped on noop rather than relying
+			// on the old block-on-skip cascade.
+			d.Step("cleanup", exec(dropQ)).
+				After("check").
+				If(notNoop).
+				Uses("main")
 
 			d.Variant("full")
 			return nil

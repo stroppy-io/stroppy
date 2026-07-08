@@ -99,11 +99,17 @@ func (s *StepDef) Open(rate float64, vus int, d time.Duration) *StepDef {
 	return s
 }
 
-// After gates this step on every listed step having Succeeded.
+// After gates this step on every listed step having reached a terminal state
+// that satisfies the edge: Succeeded or Skipped (F3: a skipped dep unblocks its
+// dependents), or Failed under OnErr/Continue semantics at the dag layer. Use
+// After for "run once these finish, however they finish short of failure."
 func (s *StepDef) After(deps ...string) *StepDef { s.after = append(s.after, deps...); return s }
 
 // AfterAny gates this step on every listed step being terminal and at least one
-// having Succeeded.
+// having Succeeded or Skipped (F3). The pre-F3 reason to reach for AfterAny —
+// "a Skipped dep must not block" — is now plain After's behavior; AfterAny is
+// retained for the narrower "any of these satisfies" reading (e.g. race a fast
+// path and a fallback).
 func (s *StepDef) AfterAny(deps ...string) *StepDef {
 	s.afterAny = append(s.afterAny, deps...)
 	return s
@@ -130,12 +136,14 @@ func (s *StepDef) OnErr(m ErrorMode) *StepDef { s.onErr = m; return s }
 // unset). Handlers still reach any slot via [VU.Conn].
 func (s *StepDef) Uses(slot string) *StepDef { s.uses = slot; return s }
 
-// Skippable marks this step as one the operator may skip via -skip (D5). A step
-// not marked Skippable is required: skipping it would break the graph's
-// invariant, so the SDK refuses. Edges to a skipped step are preserved: skip
-// means the handler does not run, not that the node disappears (F3: a Skipped
-// step still unblocks its After/AfterAny dependents). The -skip enforcement
-// lands with D3b; for now this is the author-marked guardrail the probe reports.
+// Skippable marks this step as one the operator may skip via -skip (D5/F4). A
+// step not marked Skippable is required: -skip on a non-Skippable step is a
+// hard error before run (the SDK refuses), so a skip can't break required
+// structure. Requiredness is the author's guarantee that a Skipped step is safe
+// to release dependents after. Edges to a skipped step are preserved: skip means
+// the handler does not run, not that the node disappears (F3: a Skipped step
+// still unblocks its After/AfterAny dependents). The probe surfaces Skippable
+// per step so the operator can see exactly what -skip may target.
 func (s *StepDef) Skippable() *StepDef { s.skippable = true; return s }
 
 // buildExecutor constructs the executor for sd under cfg, dispatching on policy.

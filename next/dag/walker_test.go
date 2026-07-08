@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -192,7 +193,12 @@ func TestFailurePolicies(t *testing.T) {
 		}
 	})
 
-	t.Run("SkipDependents skips exactly the success-descendant closure", func(t *testing.T) {
+	t.Run("SkipDependents skips direct After-edge dependents only", func(t *testing.T) {
+		// F3 removed the block-on-skip cascade: a Skipped node unblocks its
+		// dependents. So SkipDependents now skips exactly the direct
+		// After-edge dependents of the Failed node (a Failed dep never
+		// satisfies After); their own dependents proceed (b is Skipped ->
+		// c's gate is satisfied). Use AbortRun for a full halt.
 		g := NewGraph().
 			Add(&Node{ID: "a", Run: failRun("boom"), Failure: SkipDependents}).
 			Add(afterNode("b", "a")).
@@ -206,8 +212,8 @@ func TestFailurePolicies(t *testing.T) {
 
 		res := Run(context.Background(), b)
 		requireStatus(t, res, "a", Failed)
-		requireStatus(t, res, "b", Skipped)
-		requireStatus(t, res, "c", Skipped)
+		requireStatus(t, res, "b", Skipped)   // direct dependent of Failed a
+		requireStatus(t, res, "c", Succeeded) // F3: b-Skipped unblocks c
 		requireStatus(t, res, "d", Succeeded)
 
 		if res.Status != Failed {
@@ -343,8 +349,10 @@ func TestFailurePolicies(t *testing.T) {
 	})
 }
 
-// TestIfPredicatePrune checks that a false If skips the node and its
-// success-dependent closure, while unrelated nodes are unaffected.
+// TestIfPredicatePrune checks that a false If skips the node while
+// unrelated nodes are unaffected. F3: a Skipped node unblocks its After/
+// AfterAny dependents (skip an extra step and the rest still runs), so a
+// false If on a no longer cascades — its dependents run.
 func TestIfPredicatePrune(t *testing.T) {
 	g := NewGraph().
 		Add(&Node{ID: "a", Run: okRun, If: func() bool { return false }}).
@@ -358,12 +366,66 @@ func TestIfPredicatePrune(t *testing.T) {
 
 	res := Run(context.Background(), b)
 	requireStatus(t, res, "a", Skipped)
-	requireStatus(t, res, "b", Skipped)
+	requireStatus(t, res, "b", Succeeded) // F3: skipped a unblocks b
 	requireStatus(t, res, "c", Succeeded)
 
 	if res.Status != Succeeded {
 		t.Fatalf("run status = %v, want Succeeded (Skipped is not a failure)", res.Status)
 	}
+}
+
+// TestSkipUnblocks is the F3 contract: a Skipped dependency satisfies After
+// and AfterAny universally. Skip an extra/optional step and the rest of the
+// graph still runs; nothing is dressed up as "succeeded" (Skipped is its own
+// status, but for ordering it releases dependents).
+func TestSkipUnblocks(t *testing.T) {
+	t.Run("After sees Skipped as satisfied", func(t *testing.T) {
+		g := NewGraph().
+			Add(&Node{ID: "extra", Run: okRun, If: func() bool { return false }}).
+			Add(afterNode("main", "extra"))
+
+		b, err := g.Build()
+		if err != nil {
+			t.Fatalf("build: %v", err)
+		}
+
+		res := Run(context.Background(), b)
+		requireStatus(t, res, "extra", Skipped)
+		requireStatus(t, res, "main", Succeeded) // unblocked by the skipped extra
+	})
+
+	t.Run("AfterAny sees Skipped as satisfied", func(t *testing.T) {
+		g := NewGraph().
+			Add(&Node{ID: "extra", Run: okRun, If: func() bool { return false }}).
+			Add(&Node{ID: "sib", Run: okRun, If: func() bool { return false }}).
+			Add(&Node{ID: "main", Run: okRun, AfterAny: []string{"extra", "sib"}})
+
+		b, err := g.Build()
+		if err != nil {
+			t.Fatalf("build: %v", err)
+		}
+
+		res := Run(context.Background(), b)
+		requireStatus(t, res, "extra", Skipped)
+		requireStatus(t, res, "sib", Skipped)
+		requireStatus(t, res, "main", Succeeded) // neither succeeded, both skipped -> still unblocks
+	})
+
+	t.Run("Canceled never satisfies", func(t *testing.T) {
+		// If a dep is Canceled (aborted run), its After-dependent must not run.
+		g := NewGraph().
+			Add(&Node{ID: "boom", Run: failRun("x"), Failure: AbortRun}).
+			Add(afterNode("after_boom", "boom"))
+
+		b, err := g.Build()
+		if err != nil {
+			t.Fatalf("build: %v", err)
+		}
+
+		res := Run(context.Background(), b)
+		requireStatus(t, res, "boom", Failed)
+		requireStatus(t, res, "after_boom", Canceled)
+	})
 }
 
 // TestAfterAny checks that a node gated on AfterAny runs once one listed
@@ -453,6 +515,84 @@ func TestPanicInNode(t *testing.T) {
 	}
 
 	requireStatus(t, res, "sibling", Succeeded)
+}
+
+// TestIndependentRootsRunConcurrently verifies the composition primitive
+// (D3b): independent steps — no edges between them — execute in parallel,
+// not serially. Three root nodes each sleep 80ms; if the walker ran them
+// sequentially the run would take ~240ms+, but concurrent launch lands
+// near one sleep. This is the structural basis for load+bg+workload parallel
+// via a variant containing all three: declare them edge-disjoint and the
+// walker fans them out across goroutines on its own.
+func TestIndependentRootsRunConcurrently(t *testing.T) {
+	const sleep = 80 * time.Millisecond
+	g := NewGraph()
+	for i := range 3 {
+		g.Add(&Node{
+			ID: fmt.Sprintf("r%d", i),
+			Run: func(context.Context) error {
+				time.Sleep(sleep)
+				return nil
+			},
+		})
+	}
+
+	b, err := g.Build()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	start := time.Now()
+	res := Run(context.Background(), b)
+	elapsed := time.Since(start)
+
+	for i := range 3 {
+		requireStatus(t, res, fmt.Sprintf("r%d", i), Succeeded)
+	}
+	// Concurrent: one sleep dominates (~80ms) plus scheduler slop. Serial
+	// would be ~240ms. The 2x bar sits well above one-sleep-with-slop and
+	// well below two sleeps.
+	if elapsed > 2*sleep {
+		t.Fatalf("independent roots ran near-serially: elapsed=%v, want < %v", elapsed, 2*sleep)
+	}
+}
+
+// TestWarmupReusePattern demonstrates the warmup/composition ergonomics
+// (D3b/D5): the same Handler drives two steps under different names with
+// different executor magnitudes, sequenced via After. Authors reuse one body
+// for a short warmup and a long measure; the SDK treats them as distinct
+// steps (distinct stepIDs, distinct metrics) with no special API.
+func TestWarmupReusePattern(t *testing.T) {
+	calls := make(map[string]int)
+	var mu sync.Mutex
+	counting := func(name string) func(context.Context) error {
+		return func(context.Context) error {
+			mu.Lock()
+			calls[name]++
+			mu.Unlock()
+			return nil
+		}
+	}
+	body := counting("shared")
+	g := NewGraph().
+		Add(&Node{ID: "warmup", Run: body}).
+		Add(&Node{ID: "measure", Run: body, After: []string{"warmup"}})
+
+	b, err := g.Build()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	res := Run(context.Background(), b)
+	requireStatus(t, res, "warmup", Succeeded)
+	requireStatus(t, res, "measure", Succeeded)
+	assertOrder(t, res, "warmup", "measure")
+
+	mu.Lock()
+	defer mu.Unlock()
+	if calls["shared"] != 2 {
+		t.Fatalf("shared body ran %d times, want 2 (once per step name)", calls["shared"])
+	}
 }
 
 // TestNoGoroutineLeak runs a moderately wide graph and checks the

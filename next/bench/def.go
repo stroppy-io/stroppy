@@ -234,6 +234,14 @@ func (d *Def) Step(name string, h Handler) *StepDef {
 // declared steps" (D3b). At least one variant named "full" is required (D5); if
 // no variant is declared at all, the SDK synthesizes "full" = all steps. The
 // operator picks the active variant via the standard `variant` param.
+//
+// Composition (D3b): independent steps — those with no edges between them, or
+// sharing a common After — run concurrently (the walker launches each ready
+// node in its own goroutine). So a variant containing load + background + work
+// runs them in parallel; the same Handler reused under two step names with
+// different executor magnitudes gives the warmup/measure pattern (declare the
+// body once, size each step's policy). Variants only select which steps run;
+// the graph shape (edges, parallelism) is authored on the steps themselves.
 func (d *Def) Variant(name string, steps ...*StepDef) {
 	if name == "" {
 		d.set.fail(fmt.Errorf("bench: variant has an empty name"))

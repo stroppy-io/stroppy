@@ -34,18 +34,77 @@ func TestStepIDStableAndPure(t *testing.T) {
 	}
 }
 
-func TestBuildStepFilter(t *testing.T) {
-	steps := buildStepFilter("a, b", "")
-	if steps == nil || !steps("a") || !steps("b") || steps("c") {
-		t.Fatal("-steps filter should admit only a,b")
+func TestBuildSkipFilter(t *testing.T) {
+	declared := map[string]*StepDef{
+		"a": Step("a", okHandler{}).Skippable(),
+		"b": Step("b", okHandler{}).Skippable(),
+		"c": Step("c", okHandler{}), // required (not Skippable)
 	}
-	no := buildStepFilter("", "c,d")
-	if no == nil || !no("a") || no("c") || no("d") {
-		t.Fatal("-no-steps filter should admit all but c,d")
+
+	// -skip=a,b admits all but a,b (both Skippable).
+	f, err := buildSkipFilter("a, b", declared)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if buildStepFilter("", "") != nil {
-		t.Fatal("no selection should produce a nil filter")
+	if f == nil || !f("c") || f("a") || f("b") {
+		t.Fatal("-skip filter should admit all but a,b")
 	}
+
+	// -skip on a required (non-Skippable) step is a hard error.
+	if _, err := buildSkipFilter("c", declared); err == nil {
+		t.Fatal("-skip on a non-skippable step should be a hard error")
+	}
+
+	// -skip on an undeclared name is a hard error (typo guard).
+	if _, err := buildSkipFilter("ghost", declared); err == nil {
+		t.Fatal("-skip on an undeclared step should be a hard error")
+	}
+
+	// Empty -skip produces a nil filter (no admission change).
+	if got, err := buildSkipFilter("", declared); err != nil || got != nil {
+		t.Fatal("empty -skip should produce a nil filter with no error")
+	}
+}
+
+// TestValidateFullGraph: validateFullGraph catches typo edges and cycles in the
+// FULL declared graph (every step, every author edge) before variant pruning
+// silently drops them — D3b validate-full-then-prune.
+func TestValidateFullGraph(t *testing.T) {
+	t.Run("typo edge reported against the full graph", func(t *testing.T) {
+		steps := []*StepDef{
+			Step("a", okHandler{}),
+			Step("b", okHandler{}).After("ghost"), // typo: ghost is not declared
+		}
+		if err := validateFullGraph(steps); err == nil {
+			t.Fatal("validateFullGraph should report the typo edge to ghost")
+		}
+	})
+
+	t.Run("cycle reported", func(t *testing.T) {
+		steps := []*StepDef{
+			Step("a", okHandler{}).After("b"),
+			Step("b", okHandler{}).After("a"),
+		}
+		if err := validateFullGraph(steps); err == nil {
+			t.Fatal("validateFullGraph should report the cycle")
+		}
+	})
+
+	t.Run("valid graph accepted", func(t *testing.T) {
+		steps := []*StepDef{
+			Step("a", okHandler{}),
+			Step("b", okHandler{}).After("a"),
+		}
+		if err := validateFullGraph(steps); err != nil {
+			t.Fatalf("validateFullGraph rejected a valid graph: %v", err)
+		}
+	})
+
+	t.Run("empty declaration accepted", func(t *testing.T) {
+		if err := validateFullGraph(nil); err != nil {
+			t.Fatalf("validateFullGraph(nil) = %v, want nil", err)
+		}
+	})
 }
 
 // okHandler is a no-op handler for translation tests.

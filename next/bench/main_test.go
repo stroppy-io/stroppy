@@ -29,26 +29,47 @@ func TestRunEndToEndNoop(t *testing.T) {
 	}
 }
 
-func TestRunStepsFilterPrunes(t *testing.T) {
-	tst := twoStepTest(20 * time.Millisecond)
+func TestRunSkipSkippable(t *testing.T) {
+	tst := skipStepTest()
 	var out strings.Builder
-	// -no-steps=work prunes the workload; setup still runs, work is Skipped.
-	code := runMain(tst, []string{"-no-steps", "work"}, envMap(nil), &out, &out)
+	// -skip=extra skips the Skippable step; setup still runs, extra is Skipped.
+	// F3: a downstream step gated on extra via After still runs.
+	code := runMain(tst, []string{"-skip", "extra"}, envMap(nil), &out, &out)
 	if code != 0 {
 		t.Fatalf("exit=%d, want 0\n%s", code, out.String())
 	}
 	s := out.String()
-	if !strings.Contains(s, "work") || !strings.Contains(s, "Skipped") {
-		t.Fatalf("work should be Skipped under -no-steps:\n%s", s)
+	if !strings.Contains(s, "extra") || !strings.Contains(s, "Skipped") {
+		t.Fatalf("extra should be Skipped under -skip:\n%s", s)
+	}
+	if !strings.Contains(s, "after") || !strings.Contains(s, "Succeeded") {
+		t.Fatalf("after-extra should still run (F3 unblock) and succeed:\n%s", s)
 	}
 }
 
-func TestStepsNoStepsMutuallyExclusive(t *testing.T) {
-	tst := twoStepTest(time.Millisecond)
+func TestRunSkipNonSkippableHardErrors(t *testing.T) {
+	tst := skipStepTest()
 	var out strings.Builder
-	code := runMain(tst, []string{"-steps", "a", "-no-steps", "b"}, envMap(nil), &out, &out)
-	if code != 2 {
-		t.Fatalf("exit=%d, want 2 for -steps + -no-steps together\n%s", code, out.String())
+	// -skip on a required (non-Skippable) step is a hard error before run.
+	code := runMain(tst, []string{"-skip", "setup"}, envMap(nil), &out, &out)
+	if code == 0 {
+		t.Fatalf("exit=0, want non-zero for -skip on a non-skippable step\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "not skippable") {
+		t.Fatalf("error should mention the non-skippable guardrail:\n%s", out.String())
+	}
+}
+
+func TestRunSkipUnknownStepHardErrors(t *testing.T) {
+	tst := skipStepTest()
+	var out strings.Builder
+	// -skip on an undeclared name is a hard error (typo guard).
+	code := runMain(tst, []string{"-skip", "ghost"}, envMap(nil), &out, &out)
+	if code == 0 {
+		t.Fatalf("exit=0, want non-zero for -skip on an unknown step\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "not declared") {
+		t.Fatalf("error should mention the undeclared step:\n%s", out.String())
 	}
 }
 
@@ -82,6 +103,31 @@ func twoStepTest(dur time.Duration) *Test {
 				return err
 			}))
 			d.Step("work", &closedNoopDB{}).Closed(2, dur).After("setup")
+			d.Variant("full")
+			return nil
+		},
+	}
+}
+
+// skipStepTest is the F4/-skip fixture: setup -> extra(Skippable) -> after,
+// all on the noop driver. "extra" is author-marked Skippable (so -skip targets
+// it); "setup" is required (so -skip on it is a hard error); "after" gates on
+// extra via After, so under -skip=extra the F3 unblock is observable (after
+// still runs).
+func skipStepTest() *Test {
+	return &Test{
+		Name: "skiptest",
+		Define: func(d *Def) error {
+			d.Driver("main", "noop")
+			d.Step("setup", FuncOnce(func(vu *VU) error {
+				_, err := vu.Conn()
+				return err
+			}))
+			d.Step("extra", &closedNoopDB{}).Closed(1, 5*time.Millisecond).After("setup").Skippable()
+			d.Step("after", FuncOnce(func(vu *VU) error {
+				_, err := vu.Conn()
+				return err
+			})).After("extra")
 			d.Variant("full")
 			return nil
 		},

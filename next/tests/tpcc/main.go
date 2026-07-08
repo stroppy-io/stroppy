@@ -129,12 +129,12 @@ func main() {
 //	  -> create_indexes -> validate_population(If VALIDATE)
 //	  -> workload(Closed) -> check_consistency(If VALIDATE)
 //
-// workload uses AfterAny(validate_population, create_indexes) so a skipped
-// validation (VALIDATE=false) still lets the workload run — a Skipped node fails
-// an After gate but AfterAny is satisfied by create_indexes succeeding, while
-// still ordering the workload after validation completes. The transaction mix
-// and tpmC are reported by the MixSink from the workload's per-tx instruments,
-// not by a report step (D6).
+// workload gates on After(validate_population, create_indexes): with F3 a
+// Skipped validate_population (VALIDATE=false) unblocks its dependents just
+// like a Succeeded one, so plain After orders the workload after both without
+// the AfterAny workaround the block-on-skip cascade used to require. The
+// transaction mix and tpmC are reported by the MixSink from the workload's
+// per-tx instruments, not by a report step (D6).
 func buildSteps(d *bench.Def, o *options, seed uint64, iso driver.Isolation, file *sqlfile.File, txLat *bench.Histogram, txCnt *bench.Counter) error {
 	w := newWorld(seed, o.Warehouses)
 	q := resolveTxQueries(file)
@@ -168,7 +168,7 @@ func buildSteps(d *bench.Def, o *options, seed uint64, iso driver.Isolation, fil
 
 	d.Step("workload", &workloadHandler{w: w, q: q, iso: iso, lat: txLat, cnt: txCnt}).
 		Closed(o.VUs, o.Duration).
-		AfterAny("validate_population", "create_indexes").
+		After("validate_population", "create_indexes").
 		Uses("main")
 
 	d.Step("check_consistency", checkConsistency()).

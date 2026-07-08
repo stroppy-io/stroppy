@@ -26,7 +26,7 @@ import (
 // Params are defined once inside Define (typed handles on [Def.Param], plus
 // SDK-injected standard params) and projected uniformly to --flags, env vars,
 // and a flat JSON config file, with precedence cli > env > config > default
-// (D1). SDK control flags (-steps/-no-steps/-probe/-plan/-plan-dot/
+// (D1). SDK control flags (-skip/-probe/-plan/-plan-dot/
 // -cpuprofile/--config/-help) are not params and are parsed alongside them.
 // -help lists STANDARD then TEST params.
 func Main(t *Test) {
@@ -116,6 +116,14 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
+	// Validate the FULL declared graph (every step, every author-declared edge)
+	// before variant pruning drops anything. An edge to a typo or to a step
+	// absent from the active variant is reported once against the full graph,
+	// not silently pruned to a misleading plan (D3b: validate-full-then-prune).
+	if err := validateFullGraph(d.steps); err != nil {
+		fmt.Fprintf(stderr, "bench: %v\n", err)
+		return 1
+	}
 	pruneEdges(activeSteps, activeSet)
 
 	if f.probe {
@@ -126,11 +134,16 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 		return 0
 	}
 
-	if f.steps != "" && f.noSteps != "" {
-		fmt.Fprintln(stderr, "bench: -steps and -no-steps are mutually exclusive")
-		return 2
+	// -skip targets author-marked-Skippable steps only (F4/D5 guardrail): a
+	// name that is not a declared Skippable step is a hard error before run,
+	// so an operator can't break required structure. Edges to a skipped step
+	// are preserved (F3): the step's handler doesn't run, but its dependents
+	// proceed.
+	filter, err := buildSkipFilter(f.skip, d.stepByName)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
 	}
-	filter := buildStepFilter(f.steps, f.noSteps)
 
 	drivers, acq, err := buildDrivers(slots)
 	if err != nil {
@@ -268,8 +281,7 @@ func patchDriverDefault(p *Param[string], declared string) {
 
 // sdkFlags carries the parsed SDK control flags (everything that is not a param).
 type sdkFlags struct {
-	steps   string
-	noSteps string
+	skip    string
 	probe   bool
 	plan    bool
 	planDOT bool
@@ -282,7 +294,7 @@ type sdkFlags struct {
 // else on the command line is a param flag (--name=val) collected into cli.
 var (
 	sdkBoolFlags = map[string]bool{"probe": true, "plan": true, "plan-dot": true, "help": true, "h": true}
-	sdkValFlags  = map[string]bool{"steps": true, "no-steps": true, "cpuprofile": true, "config": true}
+	sdkValFlags  = map[string]bool{"skip": true, "cpuprofile": true, "config": true}
 )
 
 // parseFlags splits args into SDK control flags (written into f) and param flags
@@ -318,10 +330,8 @@ func parseFlags(args []string, f *sdkFlags, cli map[string]string) (passthrough 
 				val = args[i]
 			}
 			switch name {
-			case "steps":
-				f.steps = val
-			case "no-steps":
-				f.noSteps = val
+			case "skip":
+				f.skip = val
 			case "cpuprofile":
 				f.cpuProf = val
 			case "config":
@@ -464,8 +474,7 @@ func writeHelp(w io.Writer, t *Test, set *ParamSet) {
 	fmt.Fprintln(tw)
 	fmt.Fprintln(tw, "OTHER:")
 	fmt.Fprintln(tw, "  --config=<path>\tload params from a flat JSON config file")
-	fmt.Fprintln(tw, "  -steps=<list>\tcomma-separated steps to run (exclusive with -no-steps)")
-	fmt.Fprintln(tw, "  -no-steps=<list>\tcomma-separated steps to skip")
+	fmt.Fprintln(tw, "  -skip=<list>\tcomma-separated Skippable steps to skip (mass-skip allowed)")
 	fmt.Fprintln(tw, "  -probe\tprint the test description as JSON and exit")
 	fmt.Fprintln(tw, "  -plan\tprint the DAG plan (text) and exit")
 	fmt.Fprintln(tw, "  -plan-dot\tprint the DAG plan (Graphviz DOT) and exit")
@@ -559,9 +568,11 @@ func buildGraph(steps []*StepDef, run *Run, seed uint64, reg *metrics.Registry, 
 	return built, execs, nil
 }
 
-// nodeIf combines the -steps/-no-steps filter with the step's own If predicate
-// into the dag node's condition (nil when neither is set). A step runs only when
-// the filter admits it and its predicate returns true.
+// nodeIf combines the -skip filter with the step's own If predicate into the
+// dag node's condition (nil when neither is set). A step runs only when the
+// filter admits it and its predicate returns true. A -skip admission returns
+// false here, resolving the node Skipped — and via F3 still unblocking its
+// dependents.
 func nodeIf(sd *StepDef, run *Run, filter stepFilter) func() bool {
 	if sd.ifPred == nil && filter == nil {
 		return nil
@@ -577,23 +588,32 @@ func nodeIf(sd *StepDef, run *Run, filter stepFilter) func() bool {
 	}
 }
 
-// stepFilter reports whether a step name is admitted by the -steps/-no-steps
-// selection.
+// stepFilter reports whether a step name is admitted to run. Returning false
+// resolves the node Skipped (its handler doesn't run; F3 still unblocks
+// dependents).
 type stepFilter func(name string) bool
 
-// buildStepFilter turns the -steps / -no-steps values into a filter (nil when
-// neither is set). -steps admits only listed names; -no-steps admits all but the
-// listed names. The caller guarantees at most one is non-empty.
-func buildStepFilter(steps, noSteps string) stepFilter {
-	if steps != "" {
-		set := toSet(steps)
-		return func(n string) bool { return set[n] }
+// buildSkipFilter validates the -skip list against the declared steps and
+// returns a filter that admits every step except the listed Skippable ones
+// (F4: -skip replaces the removed --steps/--no-steps include-list; only -skip
+// remains, and mass-skip is allowed). A name that is not a declared Skippable
+// step is a hard error: the operator may only skip steps the author marked
+// [StepDef.Skippable] (D5 guardrail), so a skip can't break required structure.
+func buildSkipFilter(skip string, declared map[string]*StepDef) (stepFilter, error) {
+	if skip == "" {
+		return nil, nil
 	}
-	if noSteps != "" {
-		set := toSet(noSteps)
-		return func(n string) bool { return !set[n] }
+	set := toSet(skip)
+	for name := range set {
+		sd, ok := declared[name]
+		if !ok {
+			return nil, fmt.Errorf("-skip: step %q is not declared", name)
+		}
+		if !sd.skippable {
+			return nil, fmt.Errorf("-skip: step %q is not skippable (only steps the author marked Skippable may be skipped)", name)
+		}
 	}
-	return nil
+	return func(n string) bool { return !set[n] }, nil
 }
 
 // toSet splits a comma list into a set, trimming spaces and dropping empties.
@@ -605,6 +625,31 @@ func toSet(csv string) map[string]bool {
 		}
 	}
 	return set
+}
+
+// validateFullGraph builds the full graph of every declared step (regardless of
+// variant membership) with its author-declared edges, only to validate it —
+// typo edges, cycles, duplicate IDs. It catches author errors that variant
+// pruning would otherwise hide: an After("typo") or an edge to a step absent
+// from the active variant is reported once against the full graph instead of
+// being silently pruned. The result is discarded; the real run graph is built
+// later from the variant-pruned active set. Run is a noop (Build never calls
+// it); context is unused by Build.
+func validateFullGraph(steps []*StepDef) error {
+	if len(steps) == 0 {
+		return nil
+	}
+	g := dag.NewGraph()
+	for _, sd := range steps {
+		g.Add(&dag.Node{
+			ID:        sd.name,
+			After:     sd.after,
+			AfterAny:  sd.afterAny,
+			OnFailure: sd.onFailure,
+		})
+	}
+	_, err := g.Build()
+	return err
 }
 
 // printStatuses writes the per-step status table in declaration order.

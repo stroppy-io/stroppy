@@ -21,13 +21,13 @@ func TestParseRun(t *testing.T) {
 		},
 		{
 			name: "env plus forwarded param and control flags",
-			args: []string{"tpcc", "-e", "WAREHOUSES=1", "-e", "DURATION=5s", "--warehouses=4", "-steps", "load,workload"},
-			want: runParams{target: "tpcc", env: []string{"WAREHOUSES=1", "DURATION=5s"}, flags: []string{"--warehouses=4", "-steps", "load,workload"}},
+			args: []string{"tpcc", "-e", "WAREHOUSES=1", "-e", "DURATION=5s", "--warehouses=4", "-skip", "validate_population"},
+			want: runParams{target: "tpcc", env: []string{"WAREHOUSES=1", "DURATION=5s"}, flags: []string{"--warehouses=4", "-skip", "validate_population"}},
 		},
 		{
 			name: "equals forms forwarded verbatim",
-			args: []string{"./t", "-e=A=1", "--no-steps=check", "--seed=7"},
-			want: runParams{target: "./t", env: []string{"A=1"}, flags: []string{"--no-steps=check", "--seed=7"}},
+			args: []string{"./t", "-e=A=1", "--skip=check", "--seed=7"},
+			want: runParams{target: "./t", env: []string{"A=1"}, flags: []string{"--skip=check", "--seed=7"}},
 		},
 		{
 			name: "passthrough after dashdash",
@@ -42,18 +42,19 @@ func TestParseRun(t *testing.T) {
 		{name: "missing target", args: []string{"-e", "X=1"}, wantErr: true},
 		{name: "bad env", args: []string{"t", "-e", "NOEQUALS"}, wantErr: true},
 		{name: "dangling -e", args: []string{"t", "-e"}, wantErr: true},
-		// The shim is deliberately thin: an unknown flag and a mutually-exclusive
-		// -steps/-no-steps pair both forward verbatim and surface from the test
-		// binary's own param registry / flag parser, not here.
+		// The shim is deliberately thin: an unknown flag forwards verbatim and
+		// surfaces from the test binary's own param registry / flag parser, not
+		// here. -skip is forwarded the same way and interpreted by the test
+		// binary (which validates names against the author's Skippable set).
 		{
 			name: "unknown flag forwards",
 			args: []string{"t", "--wat=1"},
 			want: runParams{target: "t", flags: []string{"--wat=1"}},
 		},
 		{
-			name: "steps and no-steps forwards",
-			args: []string{"t", "-steps=a", "-no-steps=b"},
-			want: runParams{target: "t", flags: []string{"-steps=a", "-no-steps=b"}},
+			name: "skip forwards",
+			args: []string{"t", "-skip=a,b"},
+			want: runParams{target: "t", flags: []string{"-skip=a,b"}},
 		},
 	}
 	for _, tt := range tests {
@@ -76,8 +77,8 @@ func TestParseRun(t *testing.T) {
 }
 
 func TestTestArgs(t *testing.T) {
-	p := runParams{flags: []string{"-steps=a,b", "-seed=9", "-plan"}}
-	want := []string{"-steps=a,b", "-seed=9", "-plan"}
+	p := runParams{flags: []string{"-skip=a,b", "-seed=9", "-plan"}}
+	want := []string{"-skip=a,b", "-seed=9", "-plan"}
 	if got := p.testArgs(); !reflect.DeepEqual(got, want) {
 		t.Errorf("testArgs = %v, want %v", got, want)
 	}

@@ -52,9 +52,12 @@ const (
 	// not cancel them (external cancellation still does). Default.
 	AbortRun FailurePolicy = iota
 	// SkipDependents leaves the rest of the graph running; only this
-	// node's After-edge dependent closure resolves to Skipped, via the
+	// node's direct After-edge dependents resolve to Skipped, via the
 	// normal edge-gate evaluation (a Failed dependency never satisfies
-	// After).
+	// After). Under F3 a Skipped node unblocks its own dependents, so the
+	// skip is one-hop, not a transitive closure — the block-on-skip
+	// cascade that used to extend it was removed to give skip one uniform
+	// semantic. Use AbortRun when a failure should halt everything pending.
 	SkipDependents
 	// Continue records the failure but satisfies this node's direct
 	// After-edge dependents as if it had succeeded, so they still run.
@@ -81,11 +84,12 @@ func (p FailurePolicy) String() string {
 //
 // Dependency edges are declared as three independent ID lists:
 //
-//   - After: this node runs only once every listed dependency has
-//     Succeeded (a Failed dependency under FailurePolicy Continue also
-//     satisfies After).
+//   - After: this node runs once every listed dependency has reached a
+//     terminal state and each satisfies the gate — Succeeded or Skipped
+//     (F3: a skipped dependency unblocks its dependents), or Failed under
+//     FailurePolicy Continue.
 //   - AfterAny: this node runs once every listed dependency has reached
-//     a terminal state and at least one Succeeded.
+//     a terminal state and at least one has Succeeded or Skipped (F3).
 //   - OnFailure: this node runs once every listed dependency has reached
 //     a terminal state and at least one Failed — a cleanup path. Such
 //     nodes survive an AbortRun abort: they execute against the caller's
