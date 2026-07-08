@@ -1,6 +1,8 @@
 package pg
 
 import (
+	"time"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -63,7 +65,35 @@ func (r *rows) ScanBool(i int) (bool, error) {
 // is only valid until the next Next or Close; copy it to retain it.
 func (r *rows) ScanBytes(i int) ([]byte, error) { return r.raw[i], nil }
 
-func (r *rows) ScanString(i int) (string, error) { return string(r.raw[i]), nil }
+// ScanString returns column i's text representation. pgx's extended protocol
+// (the default, ServerPrepare=true) returns numeric/temporal columns in binary
+// wire format, so the raw bytes are not the text rendering — decode through the
+// type map so the result matches PostgreSQL's text output regardless of format.
+func (r *rows) ScanString(i int) (string, error) {
+	return scanString(r.tm, r.fds[i], r.raw[i])
+}
+
+// scanString decodes one column's raw bytes to its PostgreSQL text rendering.
+// The *string plan covers text/varchar/int/float/etc. (returns their text form
+// for both wire formats); date/timestamp codecs lack a *string plan, so fall
+// back to *time.Time and render the date (TPC-H date columns are YYYY-MM-DD).
+func scanString(tm *pgtype.Map, fd pgconn.FieldDescription, src []byte) (string, error) {
+	if len(src) == 0 {
+		return "", nil
+	}
+	var s string
+	if err := tm.Scan(fd.DataTypeOID, fd.Format, src, &s); err == nil && s != "" {
+		return s, nil
+	}
+	var t time.Time
+	if err := tm.Scan(fd.DataTypeOID, fd.Format, src, &t); err == nil {
+		if t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0 {
+			return t.Format("2006-01-02"), nil
+		}
+		return t.Format("2006-01-02 15:04:05"), nil
+	}
+	return string(src), nil
+}
 
 func (r *rows) Err() error { return r.pr.Err() }
 
@@ -166,7 +196,7 @@ func (r *row) ScanString(i int) (string, error) {
 		return "", r.err
 	}
 
-	return string(r.vals[i]), nil
+	return scanString(r.tm, r.fds[i], r.vals[i])
 }
 
 func (r *row) Err() error { return r.err }
