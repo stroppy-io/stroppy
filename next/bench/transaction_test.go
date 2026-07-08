@@ -41,10 +41,10 @@ func noopConn(t *testing.T) driver.Conn {
 func TestTransactionCommit(t *testing.T) {
 	ctx := context.Background()
 	conn := noopConn(t)
-	var stats TxStats
+	var rec TxRecorder
 
 	called := 0
-	err := Transaction(ctx, conn, classifyRetry, driver.ReadCommitted, RetryOpts{MaxAttempts: 3}, &stats,
+	err := Transaction(ctx, conn, classifyRetry, driver.ReadCommitted, RetryOpts{MaxAttempts: 3}, &rec,
 		func(tx driver.Tx) error {
 			called++
 			return nil
@@ -55,8 +55,8 @@ func TestTransactionCommit(t *testing.T) {
 	if called != 1 {
 		t.Errorf("fn called %d times, want 1", called)
 	}
-	if stats.Committed != 1 || stats.RolledBack != 0 || stats.Retried != 0 {
-		t.Errorf("stats = %+v, want Committed=1", stats)
+	if rec.Committed != 1 || rec.RolledBack != 0 || rec.Retried != 0 {
+		t.Errorf("rec = %+v, want Committed=1", rec)
 	}
 }
 
@@ -65,11 +65,11 @@ func TestTransactionCommit(t *testing.T) {
 func TestTransactionRollbackTerminal(t *testing.T) {
 	ctx := context.Background()
 	conn := noopConn(t)
-	var stats TxStats
+	var rec TxRecorder
 	errSentinel := errors.New("boom")
 
 	called := 0
-	err := Transaction(ctx, conn, classifyRetry, driver.ReadCommitted, RetryOpts{MaxAttempts: 3}, &stats,
+	err := Transaction(ctx, conn, classifyRetry, driver.ReadCommitted, RetryOpts{MaxAttempts: 3}, &rec,
 		func(tx driver.Tx) error {
 			called++
 			return errSentinel
@@ -80,8 +80,8 @@ func TestTransactionRollbackTerminal(t *testing.T) {
 	if called != 1 {
 		t.Errorf("fn called %d times, want 1 (no retry on Continue)", called)
 	}
-	if stats.Committed != 0 || stats.RolledBack != 1 {
-		t.Errorf("stats = %+v, want RolledBack=1", stats)
+	if rec.Committed != 0 || rec.RolledBack != 1 {
+		t.Errorf("rec = %+v, want RolledBack=1", rec)
 	}
 }
 
@@ -90,11 +90,11 @@ func TestTransactionRollbackTerminal(t *testing.T) {
 func TestTransactionRetriesUntilSuccess(t *testing.T) {
 	ctx := context.Background()
 	conn := noopConn(t)
-	var stats TxStats
+	var rec TxRecorder
 
 	called := 0
 	err := Transaction(ctx, conn, classifyRetry, driver.ReadCommitted,
-		RetryOpts{MaxAttempts: 5, Backoff: time.Microsecond}, &stats,
+		RetryOpts{MaxAttempts: 5, Backoff: time.Microsecond}, &rec,
 		func(tx driver.Tx) error {
 			called++
 			if called < 3 {
@@ -108,8 +108,8 @@ func TestTransactionRetriesUntilSuccess(t *testing.T) {
 	if called != 3 {
 		t.Errorf("fn called %d times, want 3", called)
 	}
-	if stats.Committed != 1 || stats.RolledBack != 2 || stats.Retried != 2 {
-		t.Errorf("stats = %+v, want Committed=1 RolledBack=2 Retried=2", stats)
+	if rec.Committed != 1 || rec.RolledBack != 2 || rec.Retried != 2 {
+		t.Errorf("rec = %+v, want Committed=1 RolledBack=2 Retried=2", rec)
 	}
 }
 
@@ -118,11 +118,11 @@ func TestTransactionRetriesUntilSuccess(t *testing.T) {
 func TestTransactionRetriesExhausted(t *testing.T) {
 	ctx := context.Background()
 	conn := noopConn(t)
-	var stats TxStats
+	var rec TxRecorder
 
 	called := 0
 	err := Transaction(ctx, conn, classifyRetry, driver.ReadCommitted,
-		RetryOpts{MaxAttempts: 3, Backoff: time.Microsecond}, &stats,
+		RetryOpts{MaxAttempts: 3, Backoff: time.Microsecond}, &rec,
 		func(tx driver.Tx) error {
 			called++
 			return errRetryable
@@ -133,8 +133,8 @@ func TestTransactionRetriesExhausted(t *testing.T) {
 	if called != 3 {
 		t.Errorf("fn called %d times, want 3 (MaxAttempts)", called)
 	}
-	if stats.Committed != 0 || stats.RolledBack != 3 || stats.Retried != 2 {
-		t.Errorf("stats = %+v, want RolledBack=3 Retried=2", stats)
+	if rec.Committed != 0 || rec.RolledBack != 3 || rec.Retried != 2 {
+		t.Errorf("rec = %+v, want RolledBack=3 Retried=2", rec)
 	}
 }
 
@@ -177,10 +177,10 @@ func TestTransactionZeroOptsRunsOnce(t *testing.T) {
 	}
 }
 
-// TestTransactionStatsOptional confirms a nil stats pointer is accepted (the
-// recording path is skipped silently). Mirrors how tpcc passes nil and keeps its
-// own per-VU counts.
-func TestTransactionStatsOptional(t *testing.T) {
+// TestTransactionRecorderOptional confirms a nil recorder pointer is accepted
+// (the recording path is skipped silently) — the contract an author uses to opt
+// out of whole-tx latency recording for raw uninstrumented timing.
+func TestTransactionRecorderOptional(t *testing.T) {
 	ctx := context.Background()
 	conn := noopConn(t)
 

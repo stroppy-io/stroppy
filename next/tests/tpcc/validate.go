@@ -132,33 +132,3 @@ WHERE round(w.w_ytd::numeric, 2) <> round(d.s::numeric, 2)`)
 	}
 	return nil
 }
-
-// report prints the per-transaction tally and the New-Order throughput (tpmC-style)
-// after the workload completes. Per-transaction latency histograms are not
-// available (see the SDK-gap note in the package doc), so this is a count-only
-// summary plus the built-in servicetime histogram from the reporter.
-func report(o *options) bench.Handler {
-	return bench.FuncOnce(func(vu *bench.VU) error {
-		no := stats.newOrder.Load()
-		total := no + stats.payment.Load() + stats.orderStatus.Load() +
-			stats.delivery.Load() + stats.stockLevel.Load()
-		mins := o.Duration.Seconds() / 60.0
-		var tpmc float64
-		if mins > 0 {
-			tpmc = float64(no) / mins
-		}
-		fmt.Printf("\n=== tpcc transaction mix (W=%d, VUs=%d, %s) ===\n",
-			o.Warehouses, o.VUs, o.Duration)
-		fmt.Printf("  new_order    %8d  (rollbacks %d, remote lines %d)\n",
-			no, stats.rollback.Load(), stats.remoteLine.Load())
-		fmt.Printf("  payment      %8d  (remote %d, by-name %d, bc %d)\n",
-			stats.payment.Load(), stats.remotePayment.Load(),
-			stats.bynamePayment.Load(), stats.bcPayment.Load())
-		fmt.Printf("  order_status %8d\n", stats.orderStatus.Load())
-		fmt.Printf("  delivery     %8d\n", stats.delivery.Load())
-		fmt.Printf("  stock_level  %8d\n", stats.stockLevel.Load())
-		fmt.Printf("  total        %8d\n", total)
-		fmt.Printf("  tpmC (new_order/min) = %.1f\n", tpmc)
-		return nil
-	})
-}

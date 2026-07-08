@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/next/driver"
+	"github.com/stroppy-io/stroppy/next/metrics"
 )
 
 // RetryOpts bounds a [Transaction] retry loop. MaxAttempts is the total attempt
@@ -18,13 +19,30 @@ type RetryOpts struct {
 	Backoff     time.Duration
 }
 
-// TxStats tallies transaction outcomes for a caller that wants the helper's own
-// accounting — the seam D6's unified telemetry plugs into once it lands. Fields
-// are int64 so a *TxStats can be owned by one VU and aggregated at Close without
-// synchronization, matching the per-VU shard pattern. A nil *TxStats is accepted
-// by [Transaction] to skip recording: a caller with richer per-VU counts (tpcc's
-// txCounts) passes nil to avoid double-counting.
-type TxStats struct {
+// TxRecorder is the per-VU telemetry seam a [Transaction] records into: whole-tx
+// wall-clock latency (Begin -> terminal Commit/Rollback, including any replay
+// attempts) plus outcome counts. It replaces D9's count-only *TxStats seam:
+// D6's unified telemetry routes the latency through an author-declared histogram
+// (typically per-tx via [Def.Histogram] with [Tag] values), and the counts stay
+// for callers that want the helper's own outcome accounting.
+//
+// Recording is gated by Shard: a nil Shard (or a nil *TxRecorder) records
+// nothing — for an author who wants raw uninstrumented timing. A non-nil Shard
+// records whole-tx wall-clock latency (Begin -> terminal) into Latency on a
+// commit; any handle value is valid, including 0 (the first-registered
+// histogram). The author typically stores one TxRecorder per VU in step state,
+// points Latency at the picked tx's histogram handle per iteration, and leaves
+// Shard fixed across iters.
+type TxRecorder struct {
+	// Latency is the histogram handle that records whole-tx wall-clock latency.
+	// Any value is valid (handle 0 is the first-registered histogram); it is
+	// read only when Shard is non-nil.
+	Latency metrics.MetricHandle
+	// Shard is the per-VU shard Latency records into. It is the recording
+	// switch: nil disables latency recording (outcome counters still accrue).
+	Shard *metrics.Shard
+
+	// Outcome counters, valid only when the recorder is non-nil at the call.
 	Committed  int64
 	RolledBack int64
 	Retried    int64
@@ -39,9 +57,11 @@ type TxStats struct {
 //
 // classify is the connection's own driver classifier (a [driver.Driver.Classify]
 // bound to the connection's backend); pass nil to disable retry and treat every
-// error as terminal. stats records committed/rolled-back/retried counts when
-// non-nil. Returns nil on a committed tx, the terminal fn/commit error
-// otherwise (including errRollback-style sentinels the caller may reinterpret).
+// error as terminal. rec, when non-nil, records whole-tx wall-clock latency
+// (Begin -> terminal) into rec.Latency on a commit and tallies outcome counts
+// on every terminal outcome. Returns nil on a committed tx, the terminal
+// fn/commit error otherwise (including errRollback-style sentinels the caller
+// may reinterpret).
 //
 // Begin failures are not retried here: a connect-level fault is surfaced
 // immediately for the executor's ErrorMode to handle (it is rarely transient in
@@ -52,7 +72,7 @@ func Transaction(
 	classify func(error) driver.Action,
 	iso driver.Isolation,
 	opts RetryOpts,
-	stats *TxStats,
+	rec *TxRecorder,
 	fn func(tx driver.Tx) error,
 ) error {
 	if opts.MaxAttempts < 1 {
@@ -63,6 +83,17 @@ func Transaction(
 			return false
 		}
 		return classify(err) == driver.Retry
+	}
+
+	// Whole-tx latency = wall clock from the first Begin to the terminal
+	// Commit/Rollback, so a multi-attempt tx reports the full retry cost. The
+	// start is captured once, outside the attempt loop; only the rare recording
+	// path (commit success with a non-nil Shard) calls time.Since. Shard is the
+	// gate (handle 0 is a valid histogram, so Latency cannot signal on/off).
+	record := rec != nil && rec.Shard != nil
+	var start time.Time
+	if record {
+		start = time.Now()
 	}
 
 	var lastErr error
@@ -82,10 +113,13 @@ func Transaction(
 		}
 
 		if terminal == nil {
-			if stats != nil {
-				stats.Committed++
+			if rec != nil {
+				rec.Committed++
 				if attempt > 1 {
-					stats.Retried += int64(attempt - 1)
+					rec.Retried += int64(attempt - 1)
+				}
+				if record {
+					rec.Shard.Record(rec.Latency, time.Since(start).Nanoseconds())
 				}
 			}
 			return nil
@@ -93,17 +127,17 @@ func Transaction(
 
 		lastErr = terminal
 		if !retryable(terminal) || attempt == opts.MaxAttempts {
-			if stats != nil {
-				stats.RolledBack++
+			if rec != nil {
+				rec.RolledBack++
 				if attempt > 1 {
-					stats.Retried += int64(attempt - 1)
+					rec.Retried += int64(attempt - 1)
 				}
 			}
 			return terminal
 		}
 
-		if stats != nil {
-			stats.RolledBack++
+		if rec != nil {
+			rec.RolledBack++
 		}
 		sleepBackoff(ctx, opts.Backoff)
 	}

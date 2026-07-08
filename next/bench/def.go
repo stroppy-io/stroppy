@@ -51,13 +51,13 @@ type variantDef struct {
 }
 
 // instrumentDecl is one author-declared metric, recorded at Define and
-// registered with the metrics.Registry at phase 3 (D6 populates the
-// registration; until then the handle's [Histogram.Handle]/[Counter.Handle]
-// panics, since the underlying MetricHandle is not yet assigned).
+// registered with the metrics.Registry at phase 3 by [assignInstruments] (D6).
+// Until that runs the handle's [Histogram.Handle]/[Histogram.For]/[Counter...]
+// methods panic, since the underlying MetricHandle is not yet assigned.
 type instrumentDecl struct {
-	kind  instrumentKind
-	name  string
-	tags  []instrumentTag
+	kind   instrumentKind
+	name   string
+	tags   []instrumentTag
 	handle *metricsHandle // the forward-ref handle assigned at phase 3
 }
 
@@ -68,20 +68,28 @@ const (
 	kindCounter
 )
 
-// instrumentTag is one tag column of an author instrument (D6 tag columns).
-// Recorded now so phase-3 registration has the full fan-out; the value space is
-// resolved by D6.
+// instrumentTag is one tag column of an author instrument (D6 tag columns). A
+// tag with a declared value space (Values non-empty) fans the instrument out to
+// one handle per value at phase-3 registration; a tag with no values declares
+// the column only (no fan-out). Stage-1 uses the first tag carrying values for
+// fan-out; multi-tag fan-out is a stage-2 concern.
 type instrumentTag struct {
-	name string
+	name   string
+	values []string
 }
 
-// metricsHandle is the shared forward-ref state of a Histogram/Counter: the
-// underlying metrics handle is nil until phase-3 registration assigns it (D6).
+// metricsHandle is the shared forward-ref state of a Histogram/Counter. The
+// underlying metrics handle is unassigned until phase-3 registration
+// ([assignInstruments]) runs. A tagged instrument (one declared with at least
+// one tag value) holds a per-value map; an untagged one holds a single handle.
 type metricsHandle struct {
 	assigned bool
-	mh       metrics.MetricHandle // valid only when assigned
-	ch       metrics.CounterHandle
 	isHist   bool
+	tagged   bool                          // true when a tag column has values
+	single   metrics.MetricHandle          // untagged histogram
+	singleC  metrics.CounterHandle         // untagged counter
+	byValue  map[string]metrics.MetricHandle  // tagged histogram (keyed by tag value)
+	byValueC map[string]metrics.CounterHandle // tagged counter
 }
 
 // Seed reports the resolved run root seed (the uint64 fed to DeriveStream).
@@ -225,10 +233,14 @@ func (d *Def) Variant(name string, steps ...*StepDef) {
 }
 
 // Histogram declares one histogram instrument, taggable by tx/query/table
-// (D6). The returned handle is a forward reference: its underlying
-// [metrics.MetricHandle] is assigned at phase-3 registration (after Freeze);
-// calling [Histogram.Handle] before then panics. D6 wires the registration; for
-// now authors declare instruments and the schema records them.
+// (D6). The returned handle is a forward reference: its underlying handles are
+// assigned at phase-3 registration by [assignInstruments] (before Freeze);
+// calling [Histogram.Handle] or [Histogram.For] before then panics.
+//
+// A tag declared with values — Tag("tx", "new_order", "payment", ...) — fans
+// the instrument out to one handle per value; the author resolves the right one
+// per record via [Histogram.For]. A tag declared without values records the
+// column only (no fan-out); the instrument has a single handle ([Histogram.Handle]).
 func (d *Def) Histogram(name string, opts ...MetricOpt) *Histogram {
 	tags := collectTags(opts)
 	h := &Histogram{name: name, tags: tags, mh: &metricsHandle{isHist: true}}
@@ -255,6 +267,81 @@ func collectTags(opts []MetricOpt) []instrumentTag {
 		tags = append(tags, o()...)
 	}
 	return tags
+}
+
+// assignInstruments is the phase-3 registration seam (D6): it walks every
+// author-declared instrument and registers it with the shared metrics.Registry,
+// resolving the forward-ref handles to real MetricHandles/CounterHandles. It
+// runs BEFORE per-step built-in registration (so author instruments join the 5
+// built-ins in the same Registry) and BEFORE Freeze (so shards minted later see
+// the full set). The Registry must not yet be frozen.
+//
+// For a tag column with declared values, one instrument is registered per value
+// (fan-out, D6); the value rides on the matching Instrument field (Tag name
+// "tx" -> Instrument.Tx, "table" -> Instrument.Table, otherwise Tx). An
+// untagged instrument registers once.
+func assignInstruments(d *Def, reg *metrics.Registry) {
+	for _, decl := range d.instruments {
+		decl.handle.assign(reg, decl)
+	}
+}
+
+// assign registers decl's instrument(s) into reg and resolves the forward-ref
+// handle. A tag column with values fans out one instrument per declared value.
+func (mh *metricsHandle) assign(reg *metrics.Registry, decl *instrumentDecl) {
+	tagName, values := fanOutAxis(decl.tags)
+	if len(values) == 0 {
+		inst := metrics.Instrument{Name: decl.name}
+		if mh.isHist {
+			mh.single = reg.Histogram(inst)
+		} else {
+			mh.singleC = reg.Counter(inst)
+		}
+		mh.assigned = true
+		return
+	}
+	mh.tagged = true
+	if mh.isHist {
+		mh.byValue = make(map[string]metrics.MetricHandle, len(values))
+	} else {
+		mh.byValueC = make(map[string]metrics.CounterHandle, len(values))
+	}
+	for _, v := range values {
+		inst := metrics.Instrument{Name: decl.name}
+		applyTag(&inst, tagName, v)
+		if mh.isHist {
+			mh.byValue[v] = reg.Histogram(inst)
+		} else {
+			mh.byValueC[v] = reg.Counter(inst)
+		}
+	}
+	mh.assigned = true
+}
+
+// fanOutAxis picks the tag column driving fan-out for decl: the first tag with
+// a non-empty value space. Stage-1 supports a single fan-out axis; later tags
+// (if any) are recorded but do not multiply the handle set. Returns ("", nil)
+// when no tag carries values — the instrument registers once.
+func fanOutAxis(tags []instrumentTag) (name string, values []string) {
+	for _, t := range tags {
+		if len(t.values) > 0 {
+			return t.name, t.values
+		}
+	}
+	return "", nil
+}
+
+// applyTag writes value into the Instrument field matching tagName ("tx" -> Tx,
+// "table" -> Table). Any other tag name maps to Tx — the field that backs the
+// per-tx mix today. Stage-1 simplification: extend Instrument with more tag
+// fields when a workload needs them.
+func applyTag(inst *metrics.Instrument, tagName, value string) {
+	switch tagName {
+	case "table":
+		inst.Table = value
+	default:
+		inst.Tx = value
+	}
 }
 
 // DriverSpec is the handle to one declared driver slot. The slot index is its
@@ -327,15 +414,18 @@ func (q *QuerySet) Section(name string) ([]*sqlfile.Query, error) {
 // MetricOpt adds tag columns to a declared instrument (D6).
 type MetricOpt func() []instrumentTag
 
-// Tag adds one tag column (e.g. tx, query, table) to an instrument. Multiple
-// Tag opts fan the instrument out one handle per combination (D6).
-func Tag(name string) MetricOpt {
-	return func() []instrumentTag { return []instrumentTag{{name: name}} }
+// Tag adds one tag column (e.g. tx, query, table) to an instrument. Optional
+// values declare the tag's enum space: when non-empty, the instrument fans out
+// to one handle per value (D6 tag column = fan-out) and the author resolves the
+// per-record handle via [Histogram.For]/[Counter.For]. With no values the
+// column is declared only and the instrument has a single handle.
+func Tag(name string, values ...string) MetricOpt {
+	return func() []instrumentTag { return []instrumentTag{{name: name, values: values}} }
 }
 
 // Histogram is the forward-ref handle to a declared histogram instrument. The
-// underlying metrics handle is assigned at phase-3 registration (after Freeze);
-// Handle panics before then (D6 wires the assignment).
+// underlying handles are assigned at phase-3 registration by [assignInstruments]
+// (before Freeze); Handle/For panic until then.
 type Histogram struct {
 	name string
 	tags []instrumentTag
@@ -345,13 +435,37 @@ type Histogram struct {
 // Name reports the instrument name.
 func (h *Histogram) Name() string { return h.name }
 
-// Handle returns the underlying metrics handle for direct recording via
-// [VU.M]. It panics until phase-3 registration assigns it (D6).
+// Handle returns the single metrics handle for an untagged histogram, for
+// direct recording via [VU.M]. It panics until phase-3 registration assigns it,
+// and panics for a tagged histogram (call [Histogram.For] with the tag value
+// instead).
 func (h *Histogram) Handle() metrics.MetricHandle {
 	if h.mh == nil || !h.mh.assigned {
-		panic("bench: histogram " + h.name + ": handle not assigned (phase-3 registration lands with D6)")
+		panic("bench: histogram " + h.name + ": handle not assigned (phase-3 registration pending)")
 	}
-	return h.mh.mh
+	if h.mh.tagged {
+		panic("bench: histogram " + h.name + ": tagged instrument; use For(value)")
+	}
+	return h.mh.single
+}
+
+// For returns the metrics handle for one tag value of a tagged histogram. For
+// an untagged histogram it returns the single handle regardless of value, so
+// the same call site works before and after adding a Tag. Panics until phase-3
+// registration runs, and panics for an undeclared value (a programming bug —
+// the tag's enum space is fixed at declaration).
+func (h *Histogram) For(value string) metrics.MetricHandle {
+	if h.mh == nil || !h.mh.assigned {
+		panic("bench: histogram " + h.name + ": handle not assigned (phase-3 registration pending)")
+	}
+	if !h.mh.tagged {
+		return h.mh.single
+	}
+	m, ok := h.mh.byValue[value]
+	if !ok {
+		panic("bench: histogram " + h.name + ": tag value " + value + " not declared")
+	}
+	return m
 }
 
 // Counter is the forward-ref handle to a declared counter instrument. See
@@ -365,11 +479,31 @@ type Counter struct {
 // Name reports the instrument name.
 func (c *Counter) Name() string { return c.name }
 
-// Handle returns the underlying counter handle for direct recording via
-// [VU.Inc]/[VU.Add]. It panics until phase-3 registration assigns it (D6).
+// Handle returns the single counter handle for an untagged counter. See
+// [Histogram.Handle] for the panic contract; use [Counter.For] for a tagged
+// counter.
 func (c *Counter) Handle() metrics.CounterHandle {
 	if c.mh == nil || !c.mh.assigned {
-		panic("bench: counter " + c.name + ": handle not assigned (phase-3 registration lands with D6)")
+		panic("bench: counter " + c.name + ": handle not assigned (phase-3 registration pending)")
 	}
-	return c.mh.ch
+	if c.mh.tagged {
+		panic("bench: counter " + c.name + ": tagged instrument; use For(value)")
+	}
+	return c.mh.singleC
+}
+
+// For returns the counter handle for one tag value of a tagged counter. See
+// [Histogram.For] for the untagged/panic contract.
+func (c *Counter) For(value string) metrics.CounterHandle {
+	if c.mh == nil || !c.mh.assigned {
+		panic("bench: counter " + c.name + ": handle not assigned (phase-3 registration pending)")
+	}
+	if !c.mh.tagged {
+		return c.mh.singleC
+	}
+	ch, ok := c.mh.byValueC[value]
+	if !ok {
+		panic("bench: counter " + c.name + ": tag value " + value + " not declared")
+	}
+	return ch
 }

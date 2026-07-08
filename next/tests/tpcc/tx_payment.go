@@ -27,7 +27,6 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 	if h.w.warehouses > 1 && rng.UniformInt(vu.Rand(sPayRemote), cy, 1, 100) <= 15 {
 		cWID = pickRemoteWarehouse(vu.Rand(sPayRemote), cy, wID, h.w.warehouses)
 		cDID = rng.UniformInt(vu.Rand(sPayCDID), cy, 1, 10)
-		st.c.remotePayment++
 	}
 	byName := rng.UniformInt(vu.Rand(sPayByname), cy, 1, 100) <= 60
 	cIDPick := rng.NURand(vu.Rand(sPayCID), cy, 1023, 1, 3000, h.w.cID)
@@ -73,7 +72,6 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 		if n == 0 {
 			return nil // no such name (does not occur with the standard population)
 		}
-		st.c.bynamePayment++
 		// get_customer_by_name: c_id,c_first,c_middle,c_last,...,c_credit(10),...,c_data(15)
 		q, err = vu.Prepare(h.q.pGetByName)
 		if err != nil {
@@ -109,7 +107,6 @@ func (h *workloadHandler) payment(vu *bench.VU, tx driver.Tx, st *txState) error
 	}
 
 	if bytes.Equal(bytes.TrimSpace(cCredit), bcCredit) {
-		st.c.bcPayment++
 		cDataNew := buildCData(vu, cID, cDID, cWID, dID, wID, amount, cDataOld)
 		q, err = vu.Prepare(h.q.pUpdCustBC)
 		if err != nil {

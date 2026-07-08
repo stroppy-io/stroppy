@@ -2,11 +2,11 @@ package main
 
 import (
 	"errors"
-	"sync/atomic"
 	"time"
 
 	"github.com/stroppy-io/stroppy/next/bench"
 	"github.com/stroppy-io/stroppy/next/driver"
+	"github.com/stroppy-io/stroppy/next/metrics"
 	"github.com/stroppy-io/stroppy/next/rng"
 )
 
@@ -66,6 +66,17 @@ const (
 	txStockLevel
 )
 
+// txNames is the per-txKind name, used both as the Tag("tx") value space when
+// declaring the per-tx instruments and as the MixSink's mix-table ordering. It
+// is the single source of truth for the tx-tag enum (D6 fixed-tag column).
+var txNames = [5]string{
+	txNewOrder:    "new_order",
+	txPayment:     "payment",
+	txOrderStatus: "order_status",
+	txDelivery:    "delivery",
+	txStockLevel:  "stock_level",
+}
+
 // mixPick chooses a transaction type by the TPC-C weighting 45/43/4/4/4
 // (§5.2.3), deterministically from (stream, cycle).
 func mixPick(s rng.Stream, cy uint64) txKind {
@@ -83,44 +94,21 @@ func mixPick(s rng.Stream, cy uint64) txKind {
 	}
 }
 
-// txStats accumulates per-transaction outcome counts across the whole run. Each
-// VU keeps its own unsynchronized txCounts on the hot path and flushes them here
-// once, in Close, so the hot path pays no cross-VU atomic contention.
-type txStats struct {
-	newOrder, payment, orderStatus, delivery, stockLevel          atomic.Int64
-	rollback, remoteLine, remotePayment, bcPayment, bynamePayment atomic.Int64
-}
-
-// stats is the run-global transaction tally, read by the report step.
-var stats txStats
-
-// txCounts is one VU's private outcome tally (no atomics; single writer).
-type txCounts struct {
-	newOrder, payment, orderStatus, delivery, stockLevel          int64
-	rollback, remoteLine, remotePayment, bcPayment, bynamePayment int64
-}
-
-// flush adds this VU's counts into the run-global stats.
-func (c *txCounts) flush() {
-	stats.newOrder.Add(c.newOrder)
-	stats.payment.Add(c.payment)
-	stats.orderStatus.Add(c.orderStatus)
-	stats.delivery.Add(c.delivery)
-	stats.stockLevel.Add(c.stockLevel)
-	stats.rollback.Add(c.rollback)
-	stats.remoteLine.Add(c.remoteLine)
-	stats.remotePayment.Add(c.remotePayment)
-	stats.bcPayment.Add(c.bcPayment)
-	stats.bynamePayment.Add(c.bynamePayment)
-}
-
 // workloadHandler runs the five-transaction mix. One value is shared across VUs;
-// per-VU state (connection, home warehouse, history-id counter, counts) lives in
-// txState.
+// per-VU state (connection, home warehouse, history-id counter, the resolved
+// per-tx instrument handles and the whole-tx recorder) lives in txState.
+//
+// lat/cnt are the author-declared per-tx instruments (D6/F5): a Histogram and a
+// Counter tagged with the five tx names. They are forward references at Define
+// time; each VU resolves the per-txKind handles once in Init (after phase-3
+// registration assigns them), so the Iter hot path is a flat array index — no
+// map lookup, no allocation.
 type workloadHandler struct {
 	w   *world
 	q   *txQueries
 	iso driver.Isolation
+	lat *bench.Histogram // tx_latency, tagged by tx
+	cnt *bench.Counter   // tx_count, tagged by tx
 }
 
 // txState is the workload's per-VU state.
@@ -128,7 +116,14 @@ type txState struct {
 	conn driver.Conn
 	home int64 // this terminal's home warehouse (§2.1: a terminal is warehouse-bound)
 	hid  int64 // monotonic history id, unique per VU
-	c    txCounts
+
+	// Resolved per-txKind instrument handles (latency histogram, count counter),
+	// fixed once in Init. The recorder is reused across Iters with only its
+	// Latency handle repointed per drawn pick, so recording whole-tx latency adds
+	// no allocation to the hot path.
+	lat [5]metrics.MetricHandle
+	cnt [5]metrics.CounterHandle
+	rec *bench.TxRecorder
 }
 
 func (h *workloadHandler) Init(vu *bench.VU) error {
@@ -140,6 +135,13 @@ func (h *workloadHandler) Init(vu *bench.VU) error {
 	st.conn = conn
 	st.home = 1 + int64(vu.Index())%h.w.warehouses
 	st.hid = int64(vu.Index()+1) * 100_000_000 // disjoint from loaded history ids and across VUs
+	// Resolve the per-txKind instrument handles once (phase-3 registration has
+	// assigned them before Init runs). Each later Iter is a flat array index.
+	for k, name := range txNames {
+		st.lat[k] = h.lat.For(name)
+		st.cnt[k] = h.cnt.For(name)
+	}
+	st.rec = &bench.TxRecorder{Shard: vu.Shard()}
 	for _, q := range h.q.all() {
 		if _, err := vu.Prepare(q); err != nil { // warm the per-VU handle cache (plan phase)
 			return err
@@ -153,11 +155,13 @@ func (h *workloadHandler) Iter(vu *bench.VU) error {
 	pick := mixPick(vu.Rand(sMix), vu.Cycle())
 
 	// bench.Transaction owns begin/commit/rollback and replays the whole tx on a
-	// driver-classified Retry (serialization conflicts), so each tx-type fn only
-	// reports outcome. The spec-mandated 1% rollback sentinel is not a backend
-	// error, so the classifier returns Continue and the helper surfaces it for
-	// the Iter to count as a completed New-Order.
-	err := bench.Transaction(vu.Ctx(), st.conn, vu.Classify, h.iso, txRetry, nil,
+	// driver-classified Retry (serialization conflicts). The recorder points at
+	// the drawn pick's latency handle, so whole-tx wall-clock latency lands in
+	// the right per-tx histogram (D6 TxRecorder). The spec-mandated 1% rollback
+	// sentinel is not a backend error, so the classifier returns Continue and the
+	// helper surfaces it for Iter to count as a completed New-Order.
+	st.rec.Latency = st.lat[pick]
+	err := bench.Transaction(vu.Ctx(), st.conn, vu.Classify, h.iso, txRetry, st.rec,
 		func(tx driver.Tx) error {
 			switch pick {
 			case txNewOrder:
@@ -173,35 +177,16 @@ func (h *workloadHandler) Iter(vu *bench.VU) error {
 			}
 			return nil
 		})
-	if err != nil {
-		if errors.Is(err, errRollback) {
-			// Spec-mandated 1% rollback: a completed New-Order, not an error.
-			st.c.newOrder++
-			st.c.rollback++
-			return nil
-		}
-		return err
+	if err != nil && !errors.Is(err, errRollback) {
+		return err // real failure: the executor counts it as an iteration error
 	}
-
-	switch pick {
-	case txNewOrder:
-		st.c.newOrder++
-	case txPayment:
-		st.c.payment++
-	case txOrderStatus:
-		st.c.orderStatus++
-	case txDelivery:
-		st.c.delivery++
-	case txStockLevel:
-		st.c.stockLevel++
-	}
+	// Completed tx (committed, or the spec-mandated 1% rollback): tally it as a
+	// tx of the drawn kind via the per-tx counter — the MixSink reads these.
+	vu.Inc(st.cnt[pick])
 	return nil
 }
 
-func (h *workloadHandler) Close(vu *bench.VU) error {
-	bench.Local[txState](vu).c.flush()
-	return nil
-}
+func (h *workloadHandler) Close(*bench.VU) error { return nil }
 
 // pickRemoteWarehouse returns a warehouse uniformly chosen from all warehouses
 // except home (§2.4.1.5 / §2.5.1.2 remote path). Callers guard on W>1.

@@ -3,10 +3,12 @@ package bench
 import (
 	"fmt"
 	"hash/fnv"
+	"io"
 
 	"github.com/stroppy-io/stroppy/next/driver"
 	"github.com/stroppy-io/stroppy/next/driver/noop"
 	"github.com/stroppy-io/stroppy/next/driver/pg"
+	"github.com/stroppy-io/stroppy/next/metrics"
 )
 
 // Test is a complete, declarative description of a benchmark: its name, root
@@ -34,6 +36,15 @@ type Test struct {
 	// It returns a Go native error (no panics, no throw — D10); [Main] surfaces
 	// a non-nil return as a configuration failure before any run starts.
 	Define func(d *Def) error
+	// WrapSink, when non-nil, wraps the default [metrics.ConsoleSink] (which
+	// writes the interval and summary tables to stdout) with a domain sink of
+	// the test's choosing — e.g. tpcc's MixSink, which reads the final Report
+	// and computes the transaction-mix table from the tx-tagged histograms. The
+	// returned sink replaces the default; use [metrics.MultiSink] to run both.
+	// WrapSink is called from execute (after Define), with the default sink and
+	// the same stdout writer execute uses, so the wrapped sink shares the test's
+	// output stream. Nil leaves the default ConsoleSink in place.
+	WrapSink func(defaultSink metrics.Sink, stdout io.Writer) metrics.Sink
 }
 
 // slotSpec is a driver slot resolved against the environment: the concrete kind

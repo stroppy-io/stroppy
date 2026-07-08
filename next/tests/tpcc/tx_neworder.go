@@ -146,7 +146,6 @@ func (h *workloadHandler) newOrder(vu *bench.VU, tx driver.Tx, st *txState) erro
 		var remoteCnt int64
 		if sup != wID {
 			remoteCnt = 1
-			st.c.remoteLine++
 		}
 
 		// update_stock [quantity, ol_quantity, remote_cnt, i_id, supply_w_id].

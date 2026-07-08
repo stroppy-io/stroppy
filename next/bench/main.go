@@ -143,6 +143,10 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 	fmt.Fprintf(stderr, "%s: seed=%d (source: %s) variant=%s\n", t.Name, rootSeed, seedParam.Source(), variantParam.Value())
 
 	reg := metrics.NewRegistry()
+	// Phase-3 author instrument registration (D6): resolve the forward-ref
+	// handles declared in Define against the shared registry BEFORE per-step
+	// built-in registration (so they join the 5 built-ins) and before Freeze.
+	assignInstruments(d, reg)
 	built, execs, err := buildGraph(activeSteps, run, rootSeed, reg, drivers, slots, filter)
 	if err != nil {
 		fmt.Fprintf(stderr, "bench: %v\n", err)
@@ -167,7 +171,11 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 		defer stop()
 	}
 
-	return execute(built, execs, drivers, reg, stdout, activeSteps)
+	sink := metrics.Sink(metrics.NewConsoleSink(stdout))
+	if t.WrapSink != nil {
+		sink = t.WrapSink(sink, stdout)
+	}
+	return execute(built, execs, drivers, reg, sink, stdout, activeSteps)
 }
 
 // newDef builds the declaration context over set and run for t.
@@ -501,11 +509,11 @@ func startCPUProfile(path string) (func(), error) {
 // execute materializes every executor, spans them with one run-level reporter,
 // runs the DAG, prints per-step statuses, tears the drivers down and returns the
 // exit code.
-func execute(built *dag.Built, execs []*Executor, drivers []driver.Driver, reg *metrics.Registry, stdout io.Writer, steps []*StepDef) int {
+func execute(built *dag.Built, execs []*Executor, drivers []driver.Driver, reg *metrics.Registry, sink metrics.Sink, stdout io.Writer, steps []*StepDef) int {
 	// Freeze the shared registry and materialize every executor's shards, then
-	// span them with a single run-level reporter.
+	// span them with a single run-level reporter over the (possibly wrapped) sink.
 	shards := materializeAll(reg, execs)
-	reporter := metrics.NewReporter(reg, shards, metrics.DefaultInterval, metrics.NewConsoleSink(stdout))
+	reporter := metrics.NewReporter(reg, shards, metrics.DefaultInterval, sink)
 
 	ctx := context.Background()
 	reporter.Start()

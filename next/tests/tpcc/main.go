@@ -9,24 +9,26 @@
 //	go run ./tests/tpcc -plan        # print the step DAG
 //	go run ./tests/tpcc -probe       # machine-readable description
 //
-// # SDK gap (per-transaction metrics) — instruments declared, recording lands in D6
+// # Per-transaction metrics (D6)
 //
-// The built-in per-step servicetime histogram aggregates all five transaction
-// types. The D7 Define spine now lets an author declare per-tx instruments
-// ([bench.Def.Histogram]/[Counter]) before the metrics registry freezes, but the
-// phase-3 registration that assigns their handles is D6's job, so this port
-// still counts per-transaction outcomes in per-VU state and reports counts only
-// (see report).
+// The workload declares per-tx instruments in Define — tx_latency (Histogram)
+// and tx_count (Counter), each tagged with the five tx names — and records
+// whole-tx wall-clock latency through bench.Transaction's TxRecorder plus one
+// counter Inc per completed tx. The MixSink reads those tx-tagged instruments
+// from the final Report and formats the transaction-mix table + tpmC, replacing
+// the count-only print side-channel this port used to carry.
 package main
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	_ "embed"
 
 	"github.com/stroppy-io/stroppy/next/bench"
 	"github.com/stroppy-io/stroppy/next/driver"
+	"github.com/stroppy-io/stroppy/next/metrics"
 	"github.com/stroppy-io/stroppy/next/sqlfile"
 )
 
@@ -99,9 +101,23 @@ func main() {
 				return fmt.Errorf("tpcc: %w", err)
 			}
 
+			// Per-tx instruments (D6/F5): one latency histogram and one counter,
+			// each fanned out across the five tx names. The handles are forward
+			// references here; phase-3 registration resolves them before the
+			// workload's Init runs. Declared unconditionally at the top of
+			// Define so discovery (probe/plan) sees the full instrument catalog.
+			txLat := d.Histogram(txLatencyInst, bench.Tag("tx", txNames[:]...))
+			txCnt := d.Counter(txCountInst, bench.Tag("tx", txNames[:]...))
+
 			iso, _ := driver.ParseIsolation(o.TxIsolation)
 			d.Driver("main", "pg")
-			return buildSteps(d, o, d.Seed(), iso, file)
+			return buildSteps(d, o, d.Seed(), iso, file, txLat, txCnt)
+		},
+		// WrapSink composes the generic ConsoleSink with tpcc's MixSink so both
+		// the per-instrument table and the domain mix/tpmC view render from one
+		// Report — the print side-channel is gone.
+		WrapSink: func(defaultSink metrics.Sink, stdout io.Writer) metrics.Sink {
+			return metrics.MultiSink{defaultSink, newMixSink(stdout, o)}
 		},
 	}
 	bench.Main(t)
@@ -111,13 +127,15 @@ func main() {
 //
 //	drop_schema(Silent) -> create_schema -> load_* (Pool, per table, concurrent)
 //	  -> create_indexes -> validate_population(If VALIDATE)
-//	  -> workload(Closed) -> {check_consistency(If VALIDATE), report}
+//	  -> workload(Closed) -> check_consistency(If VALIDATE)
 //
 // workload uses AfterAny(validate_population, create_indexes) so a skipped
 // validation (VALIDATE=false) still lets the workload run — a Skipped node fails
 // an After gate but AfterAny is satisfied by create_indexes succeeding, while
-// still ordering the workload after validation completes.
-func buildSteps(d *bench.Def, o *options, seed uint64, iso driver.Isolation, file *sqlfile.File) error {
+// still ordering the workload after validation completes. The transaction mix
+// and tpmC are reported by the MixSink from the workload's per-tx instruments,
+// not by a report step (D6).
+func buildSteps(d *bench.Def, o *options, seed uint64, iso driver.Isolation, file *sqlfile.File, txLat *bench.Histogram, txCnt *bench.Counter) error {
 	w := newWorld(seed, o.Warehouses)
 	q := resolveTxQueries(file)
 
@@ -148,7 +166,7 @@ func buildSteps(d *bench.Def, o *options, seed uint64, iso driver.Isolation, fil
 		If(func(r *bench.Run) bool { return o.DoValidate }).
 		Uses("main")
 
-	d.Step("workload", &workloadHandler{w: w, q: q, iso: iso}).
+	d.Step("workload", &workloadHandler{w: w, q: q, iso: iso, lat: txLat, cnt: txCnt}).
 		Closed(o.VUs, o.Duration).
 		AfterAny("validate_population", "create_indexes").
 		Uses("main")
@@ -157,8 +175,6 @@ func buildSteps(d *bench.Def, o *options, seed uint64, iso driver.Isolation, fil
 		After("workload").
 		If(func(r *bench.Run) bool { return o.DoValidate }).
 		Uses("main")
-
-	d.Step("report", report(o)).After("workload").Uses("main")
 
 	d.Variant("full")
 	return nil

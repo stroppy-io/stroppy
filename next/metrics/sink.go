@@ -110,6 +110,30 @@ func (c *ConsoleSink) Summary(rep *Report) {
 	}
 }
 
+// MultiSink fans every report out to each sink in declaration order. A nil
+// element is skipped, so a caller can compose a console sink with an optional
+// domain sink without conditionals at the call site. The zero-length MultiSink
+// is a valid no-op sink.
+type MultiSink []Sink
+
+// Interval forwards the report to every non-nil sink in order.
+func (m MultiSink) Interval(rep *Report) {
+	for _, s := range m {
+		if s != nil {
+			s.Interval(rep)
+		}
+	}
+}
+
+// Summary forwards the final report to every non-nil sink in order.
+func (m MultiSink) Summary(rep *Report) {
+	for _, s := range m {
+		if s != nil {
+			s.Summary(rep)
+		}
+	}
+}
+
 // label renders an instrument as a compact "step/name" key, appending tx/table
 // when present.
 func label(inst Instrument) string {
