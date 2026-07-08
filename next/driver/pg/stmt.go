@@ -6,12 +6,17 @@ import (
 	"github.com/stroppy-io/stroppy/next/driver"
 )
 
-// stmt is a prepared handle: the pgx statement name to execute by, its
-// description, and a reusable bind buffer.
+// stmt is a reusable query handle. In the default (extended) path it carries the
+// pgx prepared-statement name to execute by plus its description; in the simple
+// path (server_prepare = false) it carries the SQL text instead and the
+// executor runs it directly with no server-side prepare. The reusable bind
+// buffer is shared by both paths.
 type stmt struct {
-	name string
-	sd   *pgconn.StatementDescription
-	args driver.Args
+	name   string                         // extended path: pgx prepared name
+	text   string                         // simple path: raw SQL
+	sd     *pgconn.StatementDescription   // extended path only
+	simple bool
+	args   driver.Args
 }
 
 var _ driver.Stmt = (*stmt)(nil)

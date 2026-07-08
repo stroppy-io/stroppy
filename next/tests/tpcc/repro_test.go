@@ -148,7 +148,7 @@ func loadAndDigestPG(t *testing.T, url string, file *sqlfile.File, workers int) 
 	t.Helper()
 	ctx := context.Background()
 	w := newWorld(tpccSeed, 1)
-	drv := pg.New(driver.Config{URL: url})
+	drv := pg.New(driver.Spec{URL: url})
 	defer func() { _ = drv.Teardown(ctx) }()
 
 	ddl := func(section string) {

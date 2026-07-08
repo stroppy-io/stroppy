@@ -129,7 +129,7 @@ func requirePG(t *testing.T) string {
 // TestClassifyPgError checks the pg Classify port against real
 // pgconn.PgError values, including a wrapped one.
 func TestClassifyPgError(t *testing.T) {
-	d := New(driver.Config{URL: "postgres://-"}) // no connection opened: Classify is pure
+	d := New(driver.Spec{URL: "postgres://-"}) // no connection opened: Classify is pure
 
 	cases := []struct {
 		code string
@@ -234,7 +234,7 @@ func connect(t *testing.T) (driver.Conn, *sqlfile.File) {
 	t.Helper()
 
 	ctx := context.Background()
-	d := New(driver.Config{URL: requirePG(t), ConnectTimeout: 5 * time.Second})
+	d := New(driver.Spec{URL: requirePG(t), ConnectTimeout: 5 * time.Second})
 
 	c, err := d.Connect(ctx)
 	if err != nil {
@@ -461,7 +461,7 @@ func TestRetryableSerialization(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	d := New(driver.Config{URL: requirePG(t)})
+	d := New(driver.Spec{URL: requirePG(t)})
 
 	c2, err := d.Connect(ctx)
 	if err != nil {
@@ -536,7 +536,7 @@ func prepUpdate(t *testing.T, c driver.Conn) driver.Stmt {
 // count and a spot-check of values across every column type, including a null.
 func TestInsertColumnsCopy(t *testing.T) {
 	ctx := context.Background()
-	d := New(driver.Config{URL: requirePG(t)})
+	d := New(driver.Spec{URL: requirePG(t)})
 
 	c, err := d.Connect(ctx)
 	if err != nil {
@@ -670,7 +670,7 @@ SELECT a, b, c, d, e, f, g, h, i FROM copy_t ORDER BY a
 }
 
 func TestTeardown(t *testing.T) {
-	d := New(driver.Config{URL: requirePG(t)})
+	d := New(driver.Spec{URL: requirePG(t)})
 
 	if err := d.Teardown(context.Background()); err != nil {
 		t.Fatalf("teardown: %v", err)

@@ -2,7 +2,9 @@ package bench
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/stroppy-io/stroppy/next/driver"
 	"github.com/stroppy-io/stroppy/next/metrics"
 	"github.com/stroppy-io/stroppy/next/sqlfile"
 )
@@ -105,9 +107,12 @@ func (d *Def) Seed() uint64 { return d.run.seed }
 //
 // For slot 0, the operator's standard params --driver.url/--driver.kind (env
 // STROPPY_DRIVER_URL/STROPPY_DRIVER_KIND) override the declared url/kind; for
-// later slots, STROPPY_DRIVER<N>_URL/STROPPY_DRIVER<N>_KIND apply (multi-driver,
-// F2). opts carry driver-native config (URL, pool bounds — D2 class B/C/D); the
-// URL opt seeds slot 0's standard-param default when the operator sets neither.
+// later slots the name-based env STROPPY_DRIVER<NAME>_URL/_KIND (upper-cased
+// slot name) applies first, falling back to the index form
+// STROPPY_DRIVER<N>_URL/_KIND (multi-driver, F2). opts carry driver-native
+// config: [WithURL], acquisition ([Shared]/[PerVU]), pool bounds ([Pool],
+// [Pin], [Derive]) and native knobs ([NativeKV]) — D2 class B/C/D. The URL opt
+// seeds slot 0's standard-param default when the operator sets neither.
 func (d *Def) Driver(name, kind string, opts ...DriverOpt) *DriverSpec {
 	if name == "" {
 		d.set.fail(fmt.Errorf("bench: driver slot %d has an empty name", len(d.drivers)))
@@ -120,32 +125,55 @@ func (d *Def) Driver(name, kind string, opts ...DriverOpt) *DriverSpec {
 	if kind == "" {
 		kind = "pg"
 	}
-	spec := &DriverSpec{name: name, kind: kind, url: ""}
+	spec := &DriverSpec{name: name, kind: kind}
 	for _, o := range opts {
 		o(spec)
+	}
+	// Inherit the URL set by [WithURL] into the working value the env override
+	// below folds onto, then back into the resolved Spec at the end.
+	if spec.url == "" {
+		spec.url = spec.spec.URL
 	}
 	d.drivers = append(d.drivers, spec)
 	d.drvName[name] = spec
 
 	// Slot 0 honors the operator's standard driver.url/driver.kind params; an
 	// empty standard value falls back to the spec's declared url/kind. Slots
-	// beyond the first honor STROPPY_DRIVER<N>_URL / _KIND (multi-driver, F2).
+	// beyond the first honor the name-based env (upper-cased slot name) first,
+	// then the index form (multi-driver, F2).
 	if len(d.drivers) == 1 {
 		spec.url, spec.kind = d.resolveSlot0(spec.url, spec.kind)
-	} else if d.run.getenv != nil {
+	} else {
 		idx := len(d.drivers) - 1
-		if u := d.run.getenv(fmt.Sprintf("STROPPY_DRIVER%d_URL", idx)); u != "" {
-			spec.url = u
-		}
-		if k := d.run.getenv(fmt.Sprintf("STROPPY_DRIVER%d_KIND", idx)); k != "" {
-			spec.kind = k
-		}
+		spec.url, spec.kind = d.resolveExtraSlot(name, idx, spec.url, spec.kind)
 	}
 	if spec.kind == "" {
 		spec.kind = "pg"
 	}
-	d.run.slots = append(d.run.slots, slotSpec{name: spec.name, kind: spec.kind, url: spec.url})
+	spec.spec.URL = spec.url
+	d.run.slots = append(d.run.slots, slotSpec{name: spec.name, kind: spec.kind, spec: spec.spec})
 	return spec
+}
+
+// resolveExtraSlot folds the name-based then index-based env overrides for a
+// slot beyond the first onto its declared defaults (multi-driver, F2).
+func (d *Def) resolveExtraSlot(name string, idx int, declURL, declKind string) (url, kind string) {
+	url, kind = declURL, declKind
+	if d.run.getenv == nil {
+		return url, kind
+	}
+	envName := strings.ToUpper(name)
+	if u := d.run.getenv("STROPPY_DRIVER"+envName+"_URL"); u != "" {
+		url = u
+	} else if u := d.run.getenv(fmt.Sprintf("STROPPY_DRIVER%d_URL", idx)); u != "" {
+		url = u
+	}
+	if k := d.run.getenv("STROPPY_DRIVER" + envName + "_KIND"); k != "" {
+		kind = k
+	} else if k := d.run.getenv(fmt.Sprintf("STROPPY_DRIVER%d_KIND", idx)); k != "" {
+		kind = k
+	}
+	return url, kind
 }
 
 // resolveSlot0 folds slot 0's standard-param overrides onto the declared
@@ -346,11 +374,13 @@ func applyTag(inst *metrics.Instrument, tagName, value string) {
 
 // DriverSpec is the handle to one declared driver slot. The slot index is its
 // position in declaration order (slot 0 first); [StepDef.Uses] targets a slot
-// by name. D2 will add pin/derive config methods here.
+// by name. It carries the resolved [driver.Spec]: acquisition mode (Shared vs
+// PerVU), pool bounds, and the opaque Native map a per-dbdrv accessor reads.
 type DriverSpec struct {
 	name string
 	kind string
 	url  string
+	spec driver.Spec
 }
 
 // Name reports the slot name.
@@ -362,14 +392,93 @@ func (s *DriverSpec) Kind() string { return s.kind }
 // URL reports the resolved connection URL (operator override honored for slot 0).
 func (s *DriverSpec) URL() string { return s.url }
 
+// Mode reports the resolved acquisition mode (PerVU default, Shared when
+// [Shared] was declared).
+func (s *DriverSpec) Mode() driver.Acquisition { return s.spec.Mode }
+
+// Spec reports the resolved driver configuration: URL, pool bounds, Native
+// knobs and per-field provenance (D2 introspection).
+func (s *DriverSpec) Spec() driver.Spec { return s.spec }
+
 // DriverOpt reconfigures a driver slot at declaration (D2 class B/C/D config).
 type DriverOpt func(*DriverSpec)
 
 // WithURL sets the slot's declared connection URL — the default the operator's
 // --driver.url standard param overrides for slot 0.
 func WithURL(url string) DriverOpt {
-	return func(s *DriverSpec) { s.url = url }
+	return func(s *DriverSpec) { s.url = url; s.spec.URL = url }
 }
+
+// Shared selects the shared-pool acquisition mode: one connection pool across
+// every VU of the slot's step; a VU borrows per use and returns on Close (D2/
+// F2). The default is [PerVU]; [Shared] is for non-measured slots. Pool bounds
+// ([Pool], [Pin], [Derive]) become meaningful under Shared.
+func Shared() DriverOpt {
+	return func(s *DriverSpec) { s.spec.Mode = driver.Shared; s.spec.SetSource("mode", driver.FieldPinned) }
+}
+
+// PerVU explicitly selects the pinned-conn acquisition mode (the default): one
+// dedicated connection per VU, no pool contention (RFC 0001 §10).
+func PerVU() DriverOpt {
+	return func(s *DriverSpec) { s.spec.Mode = driver.PerVU; s.spec.SetSource("mode", driver.FieldPinned) }
+}
+
+// PoolBounds sets the connection-pool bounds (Shared only; a PerVU slot ignores
+// them). min/max are the pool's target size and hard cap. Recorded as a soft
+// default — prefer [Pin] for a hard requirement or [Derive] to compute the size
+// from a resolved param.
+func PoolBounds(min, max int) DriverOpt {
+	return func(s *DriverSpec) {
+		s.spec.MinConns = int32(min)
+		s.spec.MaxConns = int32(max)
+	}
+}
+
+// Pin sets field to a hard requirement that wins over an operator override (D2
+// class C). Recognized fields are [PoolMin] and [PoolMax]; e.g. a single-
+// connection test pins Pin(PoolMax, 1).
+func Pin(field string, val int) DriverOpt {
+	return func(s *DriverSpec) {
+		switch field {
+		case PoolMin:
+			s.spec.MinConns = int32(val)
+			s.spec.SetSource(PoolMin, driver.FieldPinned)
+		case PoolMax:
+			s.spec.MaxConns = int32(val)
+			s.spec.SetSource(PoolMax, driver.FieldPinned)
+		}
+	}
+}
+
+// Derive computes field from other resolved params at declaration time (D2 class
+// C), e.g. Derive(PoolMax, func() int { return vus.Value() }) for pool=vus.
+// Recognized fields are [PoolMin] and [PoolMax].
+func Derive(field string, fn func() int) DriverOpt {
+	return func(s *DriverSpec) {
+		val := int32(fn())
+		switch field {
+		case PoolMin:
+			s.spec.MinConns = val
+			s.spec.SetSource(PoolMin, driver.FieldDerived)
+		case PoolMax:
+			s.spec.MaxConns = val
+			s.spec.SetSource(PoolMax, driver.FieldDerived)
+		}
+	}
+}
+
+// NativeKV adds one driver-specific advanced knob (D2 class B) to the slot's
+// opaque Native map; a per-dbdrv typed accessor (pg.Native) reads it. Repeat to
+// set several. Auth/TLS are not native knobs — they fold into the URL.
+func NativeKV(key string, val any) DriverOpt {
+	return func(s *DriverSpec) { s.spec.SetNative(key, val) }
+}
+
+// Pool-field constants for [Pin]/[Derive].
+const (
+	PoolMin = "pool_min"
+	PoolMax = "pool_max"
+)
 
 // PerKind adds a kind-specific baked source to a query-set, winning over the
 // generic source for the matching driver kind (D3).

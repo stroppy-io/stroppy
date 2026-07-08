@@ -14,22 +14,39 @@ import (
 // QueryRow, InsertColumns and their *WithArgs variants — is allocation-free:
 // preallocated result objects are returned by pointer (an interface conversion
 // of a pointer does not allocate), and bound arguments are read from nowhere.
+//
+// It implements [driver.Pooled] so a Shared slot can be exercised in unit tests
+// without a database: Acquire returns a fresh canned connection whose Close is
+// a no-op (nothing is lent, so nothing returns).
 type Driver struct{}
 
-var _ driver.Driver = (*Driver)(nil)
+var (
+	_ driver.Driver = (*Driver)(nil)
+	_ driver.Pooled = (*Driver)(nil)
+)
 
-// New returns a no-op driver.
-func New() *Driver { return &Driver{} }
+// New returns a no-op driver. The Spec is accepted for API symmetry with
+// concrete drivers and ignored: the no-op backend carries no real
+// configuration.
+func New(_ driver.Spec) *Driver { return &Driver{} }
 
 // Connect returns a pinned no-op connection with its result objects
 // preallocated so later hot calls allocate nothing.
-func (*Driver) Connect(context.Context) (driver.Conn, error) {
+func (*Driver) Connect(context.Context) (driver.Conn, error) { return newConn(), nil }
+
+// Acquire returns a borrowed no-op connection for [driver.Shared] acquisition.
+// Nothing is actually lent, so Close is a no-op; the method exists so a Shared
+// slot can be exercised end-to-end in unit tests without a database.
+func (*Driver) Acquire(context.Context) (driver.Conn, error) { return newConn(), nil }
+
+// newConn assembles a canned no-op connection with its result objects
+// preallocated.
+func newConn() *conn {
 	c := &conn{}
 	c.rows = &rows{}
 	c.row = &row{}
 	c.tx = &tx{conn: c}
-
-	return c, nil
+	return c
 }
 
 // Teardown does nothing.

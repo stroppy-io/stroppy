@@ -33,9 +33,14 @@ type probeQuerySet struct {
 }
 
 type probeDriver struct {
-	Name string `json:"name"`
-	Kind string `json:"kind"`
-	URL  string `json:"url"`
+	Name     string            `json:"name"`
+	Kind     string            `json:"kind"`
+	URL      string            `json:"url"`
+	Mode     string            `json:"mode"`
+	MinConns int32             `json:"minConns,omitempty"`
+	MaxConns int32             `json:"maxConns,omitempty"`
+	Sources  map[string]string `json:"sources,omitempty"`
+	Native   map[string]any    `json:"native,omitempty"`
 }
 
 type probeExec struct {
@@ -69,7 +74,22 @@ type probeStep struct {
 func buildProbe(t *Test, steps []*StepDef, seed uint64, schema []ParamSchema, slots []slotSpec, run *Run, d *Def, chosenVariant string) probeDoc {
 	doc := probeDoc{Name: t.Name, Seed: seed, Variant: chosenVariant, Params: schema}
 	for _, s := range slots {
-		doc.Drivers = append(doc.Drivers, probeDriver{Name: s.name, Kind: s.kind, URL: s.url})
+		pd := probeDriver{
+			Name:     s.name,
+			Kind:     s.kind,
+			URL:      s.spec.URL,
+			Mode:     s.spec.Mode.String(),
+			MinConns: s.spec.MinConns,
+			MaxConns: s.spec.MaxConns,
+			Native:   s.spec.Native,
+		}
+		if len(s.spec.Sources) > 0 {
+			pd.Sources = make(map[string]string, len(s.spec.Sources))
+			for k, v := range s.spec.Sources {
+				pd.Sources[k] = v.String()
+			}
+		}
+		doc.Drivers = append(doc.Drivers, pd)
 	}
 	if run != nil {
 		kind := run.activeKind()

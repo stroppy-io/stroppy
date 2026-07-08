@@ -48,28 +48,33 @@ type Test struct {
 }
 
 // slotSpec is a driver slot resolved against the environment: the concrete kind
-// and url a run (or a probe) will use.
+// and the resolved [driver.Spec] (URL, acquisition mode, pool bounds, native
+// knobs, provenance) a run (or a probe) will use.
 type slotSpec struct {
 	name string
 	kind string
-	url  string
+	spec driver.Spec
 }
 
-// buildDrivers constructs the concrete driver per slot. It does not connect;
-// connections are opened per VU at each step's Init.
-func buildDrivers(slots []slotSpec) ([]driver.Driver, error) {
+// buildDrivers constructs the concrete driver per slot from its resolved Spec.
+// It does not connect; connections are opened per VU at each step's Init (PerVU)
+// or borrowed per use (Shared). The per-slot acquisition mode is returned
+// alongside so the bench layer can route Conn (pinned) vs Acquire (borrowed).
+func buildDrivers(slots []slotSpec) ([]driver.Driver, []driver.Acquisition, error) {
 	out := make([]driver.Driver, len(slots))
+	acq := make([]driver.Acquisition, len(slots))
 	for i, s := range slots {
 		switch s.kind {
 		case "pg":
-			out[i] = pg.New(driver.Config{URL: s.url})
+			out[i] = pg.New(s.spec)
 		case "noop":
-			out[i] = noop.New()
+			out[i] = noop.New(s.spec)
 		default:
-			return nil, fmt.Errorf("bench: driver slot %d (%q): unknown kind %q", i, s.name, s.kind)
+			return nil, nil, fmt.Errorf("bench: driver slot %d (%q): unknown kind %q", i, s.name, s.kind)
 		}
+		acq[i] = s.spec.Mode
 	}
-	return out, nil
+	return out, acq, nil
 }
 
 // resolveUses maps a step's Uses slot name to its slot index. An empty name is

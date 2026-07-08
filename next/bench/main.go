@@ -76,14 +76,14 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 	// Slot 0's declared defaults now known — reflect them back into the standard
 	// driver params so the schema shows the test's defaults (not empty).
 	if len(d.drivers) > 0 {
-		patchDriverDefault(drvURL, d.drivers[0].url)
+		patchDriverDefault(drvURL, d.drivers[0].spec.URL)
 		patchDriverDefault(drvKind, d.drivers[0].kind)
 	}
 	slots := run.slots
 	if slots == nil {
 		// No d.Driver call: synthesize a slot-0 noop default so probe/plan still
 		// function for a test that declares no driver.
-		slots = []slotSpec{{name: "main", kind: "noop"}}
+		slots = []slotSpec{{name: "main", kind: "noop", spec: driver.Spec{}}}
 		run.slots = slots
 	}
 
@@ -132,7 +132,7 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 	}
 	filter := buildStepFilter(f.steps, f.noSteps)
 
-	drivers, err := buildDrivers(slots)
+	drivers, acq, err := buildDrivers(slots)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -147,7 +147,7 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 	// handles declared in Define against the shared registry BEFORE per-step
 	// built-in registration (so they join the 5 built-ins) and before Freeze.
 	assignInstruments(d, reg)
-	built, execs, err := buildGraph(activeSteps, run, rootSeed, reg, drivers, slots, filter)
+	built, execs, err := buildGraph(activeSteps, run, rootSeed, reg, drivers, acq, slots, filter)
 	if err != nil {
 		fmt.Fprintf(stderr, "bench: %v\n", err)
 		return 1
@@ -533,7 +533,7 @@ func execute(built *dag.Built, execs []*Executor, drivers []driver.Driver, reg *
 
 // buildGraph builds one executor per step over the shared registry and assembles
 // the dag with each step's edges and combined condition, then validates it.
-func buildGraph(steps []*StepDef, run *Run, seed uint64, reg *metrics.Registry, drivers []driver.Driver, slots []slotSpec, filter stepFilter) (*dag.Built, []*Executor, error) {
+func buildGraph(steps []*StepDef, run *Run, seed uint64, reg *metrics.Registry, drivers []driver.Driver, acq []driver.Acquisition, slots []slotSpec, filter stepFilter) (*dag.Built, []*Executor, error) {
 	g := dag.NewGraph()
 	execs := make([]*Executor, 0, len(steps))
 	for _, sd := range steps {
@@ -541,7 +541,7 @@ func buildGraph(steps []*StepDef, run *Run, seed uint64, reg *metrics.Registry, 
 		if err != nil {
 			return nil, nil, err
 		}
-		ex := buildExecutor(stepConfig(sd, seed, reg, drivers, slot), sd)
+		ex := buildExecutor(stepConfig(sd, seed, reg, drivers, acq, slot), sd)
 		execs = append(execs, ex)
 		g.Add(&dag.Node{
 			ID:        sd.name,

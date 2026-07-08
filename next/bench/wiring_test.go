@@ -83,8 +83,8 @@ func TestBuildGraphEdges(t *testing.T) {
 	}
 	pruneEdges(active, activeSet)
 	reg := metrics.NewRegistry()
-	drivers, _ := buildDrivers(run.slots)
-	built, execs, err := buildGraph(active, run, 0, reg, drivers, run.slots, nil)
+	drivers, acq, _ := buildDrivers(run.slots)
+	built, execs, err := buildGraph(active, run, 0, reg, drivers, acq, run.slots, nil)
 	if err != nil {
 		t.Fatalf("buildGraph: %v", err)
 	}
@@ -122,8 +122,8 @@ func TestBuildGraphUnknownSlot(t *testing.T) {
 		t.Fatalf("selectVariantSteps: %v", err)
 	}
 	pruneEdges(active, activeSet)
-	drivers, _ := buildDrivers(run.slots)
-	if _, _, err := buildGraph(active, run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
+	drivers, acq, _ := buildDrivers(run.slots)
+	if _, _, err := buildGraph(active, run, 0, metrics.NewRegistry(), drivers, acq, run.slots, nil); err == nil {
 		t.Fatal("expected an error for a step using an unknown slot")
 	}
 }
@@ -148,8 +148,8 @@ func TestBuildGraphDuplicateStepRejected(t *testing.T) {
 		t.Fatalf("selectVariantSteps: %v", err)
 	}
 	pruneEdges(active, activeSet)
-	drivers, _ := buildDrivers(run.slots)
-	if _, _, err := buildGraph(active, run, 0, metrics.NewRegistry(), drivers, run.slots, nil); err == nil {
+	drivers, acq, _ := buildDrivers(run.slots)
+	if _, _, err := buildGraph(active, run, 0, metrics.NewRegistry(), drivers, acq, run.slots, nil); err == nil {
 		t.Fatal("expected a duplicate-id error from the dag builder")
 	}
 }
@@ -184,7 +184,7 @@ func TestProbeGolden(t *testing.T) {
 		t.Fatalf("Define: %v", err)
 	}
 	if len(d.drivers) > 0 {
-		patchDriverDefault(drvURL, d.drivers[0].url)
+		patchDriverDefault(drvURL, d.drivers[0].spec.URL)
 		patchDriverDefault(drvKind, d.drivers[0].kind)
 	}
 	if err := set.Err(); err != nil {
@@ -254,7 +254,8 @@ func TestProbeGolden(t *testing.T) {
     {
       "name": "main",
       "kind": "noop",
-      "url": "noop://"
+      "url": "noop://",
+      "mode": "per-vu"
     }
   ],
   "variants": [

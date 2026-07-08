@@ -47,8 +47,13 @@ type Config struct {
 	Reg *metrics.Registry
 	// Drivers are the run-level resolved database backends, one per declared
 	// driver slot. Each VU pins its own connection to a slot lazily via
-	// [VU.Conn]. Nil when a step needs no database.
+	// [VU.Conn] (PerVU) or borrows one via [VU.Acquire] (Shared). Nil when a
+	// step needs no database.
 	Drivers []driver.Driver
+	// Acq is the per-slot acquisition mode (PerVU vs Shared), parallel to
+	// Drivers. It routes [VU.Conn] (PerVU, pinned) vs [VU.Acquire] (Shared,
+	// borrowed from the slot's pool).
+	Acq []driver.Acquisition
 	// Slot is the default driver slot this step's VUs connect to (from
 	// StepDef.Uses); [VU.Conn] can still reach any slot by index.
 	Slot int
@@ -77,6 +82,7 @@ type Executor struct {
 	stepID       uint32
 	seed         uint64
 	drivers      []driver.Driver
+	acq          []driver.Acquisition
 	slot         int
 	hot          bool // set by Closed/Open/Pool: Iter is a hot loop (bans Conn/Prepare)
 	materialized bool
@@ -129,6 +135,7 @@ func newExecutor(cfg Config, nVUs int, open bool) *Executor {
 		stepID:  cfg.StepID,
 		seed:    cfg.Seed,
 		drivers: cfg.Drivers,
+		acq:     cfg.Acq,
 		slot:    cfg.Slot,
 	}
 
@@ -183,6 +190,7 @@ func (e *Executor) materialize() {
 			inst:     e.inst,
 			streams:  make(map[uint32]rng.Stream),
 			drivers:  e.drivers,
+			acq:      e.acq,
 			slot:     e.slot,
 		}
 		if len(e.drivers) > 0 {

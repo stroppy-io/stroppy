@@ -18,9 +18,15 @@ import (
 // establishing a connection inside a hot-loop Iter (Closed/Open/Pool) is an
 // error — connecting is not hot-path work. (Once steps are not hot loops, so
 // their single Iter may establish connections; that is the FuncOnce convenience.)
+//
+// A Shared slot rejects connect — its connections are borrowed per use via
+// [VU.Acquire], never pinned.
 func (vu *VU) connect(slot int) (driver.Conn, error) {
 	if slot < 0 || slot >= len(vu.conns) {
 		return nil, fmt.Errorf("bench: connection slot %d out of range (%d slots declared)", slot, len(vu.conns))
+	}
+	if vu.isShared(slot) {
+		return nil, fmt.Errorf("bench: slot %d is shared; use VU.Acquire (per-iter borrow) not Conn (pinned)", slot)
 	}
 	if c := vu.conns[slot]; c != nil {
 		return c, nil
@@ -34,6 +40,11 @@ func (vu *VU) connect(slot int) (driver.Conn, error) {
 	}
 	vu.conns[slot] = c
 	return c, nil
+}
+
+// isShared reports whether slot is in Shared acquisition mode.
+func (vu *VU) isShared(slot int) bool {
+	return slot >= 0 && slot < len(vu.acq) && vu.acq[slot] == driver.Shared
 }
 
 // Conn returns this VU's pinned connection to the step's default slot
@@ -67,8 +78,33 @@ func (vu *VU) Classify(err error) driver.Action {
 // ConnSlot returns this VU's pinned connection to an explicit driver slot,
 // establishing it on first use, for the rare multi-driver step that reaches a
 // slot other than its default. Like [VU.Conn] it returns the connect failure as
-// a value; establish in Init.
+// a value; establish in Init. A Shared slot rejects ConnSlot — use [VU.Acquire].
 func (vu *VU) ConnSlot(slot int) (driver.Conn, error) { return vu.connect(slot) }
+
+// Acquire borrows a connection from a Shared slot's pool for one use and returns
+// it; the caller returns it via the [driver.Conn.Close]. It is the shared-
+// acquisition analog of [VU.Conn]/[VU.ConnSlot]: Conn pins (PerVU), Acquire
+// borrows (Shared). A handler on a shared slot calls Acquire inside Iter (or
+// once in Init when it can hold the borrow for the step's lifetime), uses the
+// connection, then closes it. Unlike Conn, Acquire is safe to call on the hot
+// path — borrowing is the per-iteration unit for shared slots.
+//
+// Returns an error when the slot's driver does not pool (a PerVU-only driver
+// targeted by a Shared slot) or the slot index is out of range.
+func (vu *VU) Acquire(slot int) (driver.Conn, error) {
+	if slot < 0 || slot >= len(vu.drivers) {
+		return nil, fmt.Errorf("bench: acquire slot %d out of range (%d slots declared)", slot, len(vu.drivers))
+	}
+	pooled, ok := vu.drivers[slot].(driver.Pooled)
+	if !ok {
+		return nil, fmt.Errorf("bench: slot %d does not support shared acquisition (driver is per-VU only)", slot)
+	}
+	c, err := pooled.Acquire(vu.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("bench: acquire slot %d: %w", slot, err)
+	}
+	return c, nil
+}
 
 // prepare parses and prepares q once on this VU's default-slot connection and
 // memoizes the handle per query, so repeated calls for the same query are a map

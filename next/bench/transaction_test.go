@@ -28,7 +28,7 @@ func classifyRetry(err error) driver.Action {
 // noopConn returns a pinned noop connection for the helper tests.
 func noopConn(t *testing.T) driver.Conn {
 	t.Helper()
-	c, err := noop.New().Connect(context.Background())
+	c, err := noop.New(driver.Spec{}).Connect(context.Background())
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}

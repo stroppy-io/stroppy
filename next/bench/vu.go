@@ -47,8 +47,11 @@ type VU struct {
 
 	// drivers is the run-level driver per slot (shared across VUs); conns holds
 	// this VU's own pinned connection per slot, established lazily and closed
-	// after the step. slot is the step's default slot (from StepDef.Uses).
+	// after the step. acq is the per-slot acquisition mode: PerVU slots use
+	// [VU.Conn] (pinned); Shared slots use [VU.Acquire] (borrowed per use). slot
+	// is the step's default slot (from StepDef.Uses).
 	drivers []driver.Driver
+	acq     []driver.Acquisition
 	conns   []driver.Conn
 	slot    int
 	// stmts memoizes prepared handles per query for this VU's default-slot conn.

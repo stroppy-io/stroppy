@@ -70,7 +70,7 @@ func TestAllocsFullStack(t *testing.T) {
 	}
 
 	cfg := func() Config {
-		return Config{Interval: quietCfg().Interval, Drivers: []driver.Driver{noop.New()}}
+		return Config{Interval: quietCfg().Interval, Drivers: []driver.Driver{noop.New(driver.Spec{})}}
 	}
 	warm := Closed(cfg(), ClosedBudget{VUs: 1, Iters: 100_000}, &fullStackHandler{q: q})
 	if err := warm.Run(context.Background()); err != nil {

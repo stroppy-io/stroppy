@@ -7,8 +7,13 @@ import (
 	"github.com/stroppy-io/stroppy/next/sqlfile"
 )
 
-// Driver is a configured database backend. It hands out pinned connections and
-// owns backend-wide teardown. It records no metrics (see package doc).
+// Driver is a configured database backend. It hands out connections and owns
+// backend-wide teardown. It records no metrics (see package doc).
+//
+// A Driver supports the per-VU pinned-conn model ([Driver.Connect]) — the
+// default, contention-free measured path (RFC 0001 §10). The optional [Pooled]
+// interface adds the shared-pool model ([Pooled.Acquire]) for non-measured
+// slots (D2/F2).
 type Driver interface {
 	// Connect returns a connection pinned to one VU for its whole lifetime. The
 	// caller owns it and must Close it. Concrete drivers open a dedicated
@@ -24,6 +29,29 @@ type Driver interface {
 	Classify(err error) Action
 	// Teardown releases backend-wide resources after every connection is closed.
 	Teardown(ctx context.Context) error
+}
+
+// Pooled is implemented by drivers that lend borrowed connections from a shared
+// pool — the [Spec.Shared] acquisition mode (D2/F2). A SHARED slot's VU calls
+// Acquire per use and Close on the returned [Conn] to return it; the pool, not
+// the caller, owns the underlying connection. Drivers that run PerVU-only need
+// not implement it; the bench layer reports an error when a step targets a
+// shared slot whose driver does not pool.
+type Pooled interface {
+	Driver
+	// Acquire borrows a connection from the shared pool. The returned Conn is
+	// for transient use: the caller returns it via Close.
+	Acquire(ctx context.Context) (Conn, error)
+}
+
+// DefaultIsolationer is implemented by drivers whose backend has a known safe
+// default isolation level (pg: read_committed). Conn.Begin resolves
+// [DBDefault] through it so a run is reproducible regardless of server config
+// drift: an unspecified isolation selects the backend's known default rather
+// than whatever the server happens to be set to. Drivers without a meaningful
+// default do not implement it; DBDefault then passes through unchanged.
+type DefaultIsolationer interface {
+	DefaultIsolation() Isolation
 }
 
 // Queryer is the shared query surface: the six bound-argument execution methods

@@ -157,7 +157,7 @@ func TestDriverSlot0Override(t *testing.T) {
 	if got := run.slots[0].kind; got != "noop" {
 		t.Fatalf("slot 0 kind = %q, want noop (operator override)", got)
 	}
-	if got := run.slots[0].url; got != "postgres://x" {
+	if got := run.slots[0].spec.URL; got != "postgres://x" {
 		t.Fatalf("slot 0 url = %q, want declared default (no override)", got)
 	}
 }
