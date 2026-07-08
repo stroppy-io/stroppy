@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/stroppy-io/stroppy/next/bench"
 	"github.com/stroppy-io/stroppy/next/mem"
-	"github.com/stroppy-io/stroppy/next/rng"
 )
 
 // historyInitialAmount is the h_amount of every load-time history row (§4.3.3.1).
@@ -24,26 +24,28 @@ var historyTable = &table{
 		{Name: "h_amount", Type: mem.TypeFloat64},
 		{Name: "h_data", Type: mem.TypeBytes},
 	},
-	nStreams: 1,
-	cycles:   func(w *world) int64 { return w.warehouses * districtsPerWarehouse * customersPerDistrict },
-	gen:      genHistory,
+	cycles:  func(w *world) int64 { return w.warehouses * districtsPerWarehouse * customersPerDistrict },
+	makeGen: genHistory,
 }
 
-func genHistory(_ *world, b *mem.RowBuf, cycle int64, s []rng.Stream) {
-	cy := uint64(cycle)
-	wID := cycle/(districtsPerWarehouse*customersPerDistrict) + 1
-	dID := (cycle/customersPerDistrict)%districtsPerWarehouse + 1
-	cID := cycle%customersPerDistrict + 1
+func genHistory(_ *world) bench.GenFn {
+	return func(b *mem.RowBuf, cycle int64, s *bench.Streams) {
+		cy := uint64(cycle)
+		wID := cycle/(districtsPerWarehouse*customersPerDistrict) + 1
+		dID := (cycle/customersPerDistrict)%districtsPerWarehouse + 1
+		cID := cycle%customersPerDistrict + 1
 
-	var data [24]byte
+		data := s.Stream("h_data")
+		var dataBuf [24]byte
 
-	b.AppendInt64(0, cycle) // h_id (unique)
-	b.AppendInt64(1, cID)
-	b.AppendInt64(2, dID)
-	b.AppendInt64(3, wID)
-	b.AppendInt64(4, dID)
-	b.AppendInt64(5, wID)
-	b.AppendBytes(6, loadTS)
-	b.AppendFloat64(7, historyInitialAmount)
-	b.AppendBytes(8, data[:aStr(data[:], s[0], cy, 12, 24)])
+		b.AppendInt64(0, cycle) // h_id (unique)
+		b.AppendInt64(1, cID)
+		b.AppendInt64(2, dID)
+		b.AppendInt64(3, wID)
+		b.AppendInt64(4, dID)
+		b.AppendInt64(5, wID)
+		b.AppendBytes(6, loadTS)
+		b.AppendFloat64(7, historyInitialAmount)
+		b.AppendBytes(8, dataBuf[:aStr(dataBuf[:], data, cy, 12, 24)])
+	}
 }

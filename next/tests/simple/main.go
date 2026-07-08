@@ -81,8 +81,34 @@ func main() {
 			// the step green and the run moving.
 			d.Step("drop_schema", exec(dropQ)).OnErr(bench.ModeSilent).Uses("main")
 			d.Step("create_schema", exec(createQ)).After("drop_schema").Uses("main")
-			d.Step("load", &loadHandler{rows: rows.Value()}).
-				After("create_schema").Uses("main")
+
+			// Load is a single-table columnar COPY of `rows` rows; bench.Loader
+			// owns the fill-batch-flush loop and the named-stream namespace, so
+			// only the generator is authored here. One worker (the load is
+			// small and not the measured path); 8 chunks per worker for the
+			// same skew-tolerance split the Pool executor expects.
+			loadSpec := bench.Spec{
+				Step:  "load",
+				Table: "simple_kv",
+				Cols: []mem.ColSpec{
+					{Name: "id", Type: mem.TypeInt64},
+					{Name: "val", Type: mem.TypeBytes},
+					{Name: "num", Type: mem.TypeFloat64},
+				},
+				Batch:  loadBatch,
+				Cycles: func() int64 { return int64(rows.Value()) },
+				Gen: func(b *mem.RowBuf, cycle int64, s *bench.Streams) {
+					valRnd := s.Stream("val")
+					numRnd := s.Stream("num")
+					var name [valLen]byte
+					b.AppendInt64(0, cycle)
+					rng.FillAlpha(name[:], valRnd, uint64(cycle))
+					b.AppendBytes(1, name[:])
+					b.AppendFloat64(2, rng.UniformFloat(numRnd, uint64(cycle)))
+				},
+			}
+			bench.Loader(d, 1, 8, loadSpec).After("create_schema").Uses("main")
+
 			d.Step("workload", &workloadHandler{rows: rows.Value(), query: selectQ}).
 				Closed(vus.Value(), dur.Value()).After("load").Uses("main")
 			// Row-count verification only holds against a real database.
@@ -133,54 +159,6 @@ func mustQuery(f *sqlfile.File, section, name string) (*sqlfile.Query, error) {
 	return q, nil
 }
 
-// loadState is the load worker's per-VU state.
-type loadState struct {
-	conn driver.Conn
-	buf  *mem.RowBuf
-}
-
-// loadHandler generates rows rows and bulk-inserts them in columnar batches.
-type loadHandler struct{ rows int }
-
-func (h *loadHandler) Init(vu *bench.VU) error {
-	st := bench.Local[loadState](vu)
-	conn, err := vu.Conn()
-	if err != nil {
-		return err
-	}
-	st.conn = conn
-	st.buf = mem.NewRowBuf(loadBatch,
-		mem.ColSpec{Name: "id", Type: mem.TypeInt64},
-		mem.ColSpec{Name: "val", Type: mem.TypeBytes},
-		mem.ColSpec{Name: "num", Type: mem.TypeFloat64},
-	)
-	return nil
-}
-
-func (h *loadHandler) Iter(vu *bench.VU) error {
-	st := bench.Local[loadState](vu)
-	valRnd := vu.Rand(1)
-	numRnd := vu.Rand(2)
-	var name [valLen]byte
-
-	for base := 0; base < h.rows; base += loadBatch {
-		st.buf.Reset()
-		end := min(base+loadBatch, h.rows)
-		for id := base; id < end; id++ {
-			st.buf.AppendInt64(0, int64(id))
-			rng.FillAlpha(name[:], valRnd, uint64(id))
-			st.buf.AppendBytes(1, name[:])
-			st.buf.AppendFloat64(2, rng.UniformFloat(numRnd, uint64(id)))
-		}
-		if _, err := st.conn.InsertColumns(vu.Ctx(), "simple_kv", st.buf); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (h *loadHandler) Close(*bench.VU) error { return nil }
-
 // wlState is the workload worker's per-VU state.
 type wlState struct {
 	conn driver.Conn
@@ -211,7 +189,7 @@ func (h *workloadHandler) Init(vu *bench.VU) error {
 
 func (h *workloadHandler) Iter(vu *bench.VU) error {
 	st := bench.Local[wlState](vu)
-	id := rng.UniformInt(vu.Rand(0), vu.Cycle(), 0, int64(h.rows)-1)
+	id := rng.UniformInt(vu.Rand(bench.StreamID("row_pick")), vu.Cycle(), 0, int64(h.rows)-1)
 
 	args := st.stmt.Bind()
 	args.Int64(id)

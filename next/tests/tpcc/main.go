@@ -148,13 +148,12 @@ func buildSteps(d *bench.Def, o *options, seed uint64, iso driver.Isolation, fil
 
 	// One Pool load step per table (item once; the rest scale with W). Row
 	// content is keyed by the global cycle, so the chunk count (sized by
-	// LOAD_WORKERS) changes only parallelism, never the data.
-	nChunks := o.LoadWorkers * 8
+	// LOAD_WORKERS) changes only parallelism, never the data. bench.Loader owns
+	// the fill-batch-flush COPY loop and the named-stream namespace; the table
+	// struct supplies only schema, cycle count and generator.
 	loadNames := make([]string, 0, len(tables()))
 	for _, tbl := range tables() {
-		items := chunkRanges(tbl.cycles(w), nChunks)
-		d.Step(tbl.step(), &loadHandler{w: w, tbl: tbl}).
-			Pool(o.LoadWorkers, items...).
+		bench.Loader(d, o.LoadWorkers, 8, tbl.spec(w)).
 			After("create_schema").Uses("main")
 		loadNames = append(loadNames, tbl.step())
 	}

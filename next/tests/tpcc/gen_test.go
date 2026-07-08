@@ -3,42 +3,21 @@ package main
 import (
 	"testing"
 
+	"github.com/stroppy-io/stroppy/next/bench"
 	"github.com/stroppy-io/stroppy/next/mem"
-	"github.com/stroppy-io/stroppy/next/rng"
 )
 
-// genStreams builds the per-field rng stream slice a generator receives, exactly
-// as the load handler does (vu.Rand under the table's load step id), so golden
-// values computed here match a live load.
-func genStreams(t *table) []rng.Stream {
-	stepID := loadStepID(t.step())
-	s := make([]rng.Stream, t.nStreams)
-	for i := range s {
-		s[i] = rng.Derive(tpccSeed, stepID, uint32(i))
-	}
-	return s
-}
-
-// loadStepID mirrors bench's stepID (FNV-32a of the step name) so tests derive
-// the same streams the SDK does. It is verified against a live load by the
-// determinism acceptance (identical data), not asserted here directly.
-func loadStepID(name string) uint32 {
-	const (
-		off   uint32 = 2166136261
-		prime uint32 = 16777619
-	)
-	h := off
-	for i := 0; i < len(name); i++ {
-		h ^= uint32(name[i])
-		h *= prime
-	}
-	return h
+// genStreams builds the per-VU named-stream namespace a generator receives,
+// exactly as the Loader handler does in Init (bench.StreamsFrom(vu) under the
+// table's load step id), so values computed here match a live load.
+func genStreams(t *table) *bench.Streams {
+	return bench.NewStreams(tpccSeed, t.step())
 }
 
 // genOne runs a single-row generator for one cycle and returns the RowBuf.
 func genOne(w *world, t *table, cycle int64) *mem.RowBuf {
 	b := mem.NewRowBuf(loadBatch+maxRowsPerCycle, t.cols...)
-	t.gen(w, b, cycle, genStreams(t))
+	t.makeGen(w)(b, cycle, genStreams(t))
 	return b
 }
 
@@ -83,8 +62,15 @@ func cellEqual(a, b *mem.RowBuf, col, row int) bool {
 }
 
 // TestGenItemGolden pins the item generator's first row (i_id 1) for the default
-// seed. Regenerating these values is an explicit, reviewed change (they guard the
-// rng/derivation compatibility contract), not a silent update.
+// seed. Regenerating these values is an explicit, reviewed change (they guard
+// the rng/derivation compatibility contract), not a silent update.
+//
+// Constants were re-derived under FNV-32a(name) stream ids (D8): the named-
+// stream migration shifts every draw relative to the old hand-numbered ids, so
+// the values changed once, deliberately, when stream identity moved from
+// position to name. Invariance across chunk counts (TestLoadStreamReproducible)
+// is the durable contract; these goldens pin one concrete draw against silent
+// drift of the rng or the name→id map.
 func TestGenItemGolden(t *testing.T) {
 	w := newWorld(tpccSeed, 1)
 	b := genOne(w, itemTable, 0)
@@ -99,11 +85,12 @@ func TestGenItemGolden(t *testing.T) {
 	if price < 1 || price > 100 {
 		t.Errorf("i_price = %f, out of [1,100]", price)
 	}
-	// Golden: exact values for cycle 0 under seed 1. If the rng or generator
-	// changes intentionally, update these deliberately.
+	// Golden: exact values for cycle 0 under seed 1, post named-stream
+	// migration. If the rng, the FNV-32a name→id map, or the generator changes
+	// intentionally, update these deliberately.
 	const (
-		wantIMID = int64(7700)
-		wantName = "y3n2vzkMeM8I32HZhDQ"
+		wantIMID = int64(1206)
+		wantName = "xU3zC6isg5enVN1LdNzKVUo"
 	)
 	if imID != wantIMID {
 		t.Errorf("i_im_id golden = %d, want %d (update deliberately if rng changed)", imID, wantIMID)

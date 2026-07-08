@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/stroppy-io/stroppy/next/bench"
 	"github.com/stroppy-io/stroppy/next/mem"
-	"github.com/stroppy-io/stroppy/next/rng"
 )
 
 // District load constants (§4.3.3.1).
@@ -27,32 +27,41 @@ var districtTable = &table{
 		{Name: "d_ytd", Type: mem.TypeFloat64},
 		{Name: "d_next_o_id", Type: mem.TypeInt64},
 	},
-	nStreams: 7,
-	cycles:   func(w *world) int64 { return w.warehouses * districtsPerWarehouse },
-	gen:      genDistrict,
+	cycles:  func(w *world) int64 { return w.warehouses * districtsPerWarehouse },
+	makeGen: genDistrict,
 }
 
-func genDistrict(_ *world, b *mem.RowBuf, cycle int64, s []rng.Stream) {
-	cy := uint64(cycle)
-	wID := cycle/districtsPerWarehouse + 1
-	dID := cycle%districtsPerWarehouse + 1
+func genDistrict(_ *world) bench.GenFn {
+	return func(b *mem.RowBuf, cycle int64, s *bench.Streams) {
+		cy := uint64(cycle)
+		wID := cycle/districtsPerWarehouse + 1
+		dID := cycle%districtsPerWarehouse + 1
 
-	var name [10]byte
-	var st1, st2, city [20]byte
-	var state [2]byte
-	var z [9]byte
+		name := s.Stream("d_name")
+		st1 := s.Stream("d_street_1")
+		st2 := s.Stream("d_street_2")
+		city := s.Stream("d_city")
+		state := s.Stream("d_state")
+		zipStr := s.Stream("d_zip")
+		tax := s.Stream("d_tax")
 
-	b.AppendInt64(0, dID)
-	b.AppendInt64(1, wID)
-	b.AppendBytes(2, name[:aStr(name[:], s[0], cy, 6, 10)])
-	b.AppendBytes(3, st1[:aStr(st1[:], s[1], cy, 10, 20)])
-	b.AppendBytes(4, st2[:aStr(st2[:], s[2], cy, 10, 20)])
-	b.AppendBytes(5, city[:aStr(city[:], s[3], cy, 10, 20)])
-	aStrFixed(state[:], s[4], cy)
-	b.AppendBytes(6, state[:])
-	zip(z[:], s[5], cy)
-	b.AppendBytes(7, z[:])
-	b.AppendFloat64(8, rf(s[6], cy, 0, 0.2)) // d_tax
-	b.AppendFloat64(9, districtInitialYTD)
-	b.AppendInt64(10, districtInitialNextO)
+		var nameBuf [10]byte
+		var st1Buf, st2Buf, cityBuf [20]byte
+		var stateBuf [2]byte
+		var zipBuf [9]byte
+
+		b.AppendInt64(0, dID)
+		b.AppendInt64(1, wID)
+		b.AppendBytes(2, nameBuf[:aStr(nameBuf[:], name, cy, 6, 10)])
+		b.AppendBytes(3, st1Buf[:aStr(st1Buf[:], st1, cy, 10, 20)])
+		b.AppendBytes(4, st2Buf[:aStr(st2Buf[:], st2, cy, 10, 20)])
+		b.AppendBytes(5, cityBuf[:aStr(cityBuf[:], city, cy, 10, 20)])
+		aStrFixed(stateBuf[:], state, cy)
+		b.AppendBytes(6, stateBuf[:])
+		zip(zipBuf[:], zipStr, cy)
+		b.AppendBytes(7, zipBuf[:])
+		b.AppendFloat64(8, rf(tax, cy, 0, 0.2)) // d_tax
+		b.AppendFloat64(9, districtInitialYTD)
+		b.AppendInt64(10, districtInitialNextO)
+	}
 }

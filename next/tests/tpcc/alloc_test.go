@@ -7,7 +7,7 @@ import (
 )
 
 // TestAllocsGen gates the load generators against per-row allocation: with a
-// reused RowBuf (Reset each row, as the load handler does within a batch) a
+// reused RowBuf (Reset each row, as the Loader handler does within a batch) a
 // generator must allocate nothing in steady state. This is the hot-path
 // zero-alloc contract (RFC 0001 §6) for the generation side; the driver COPY
 // path allocates separately and is out of scope here.
@@ -16,16 +16,18 @@ func TestAllocsGen(t *testing.T) {
 	for _, tbl := range tables() {
 		buf := mem.NewRowBuf(loadBatch+maxRowsPerCycle, tbl.cols...)
 		strm := genStreams(tbl)
+		gen := tbl.makeGen(w)
 		var cycle int64
-		// Warm up so the RowBuf's byte slabs reach their high-water mark.
+		// Warm up so the RowBuf's byte slabs reach their high-water mark and the
+		// *bench.Streams cache is fully populated (every name seen).
 		for i := 0; i < 64; i++ {
 			buf.Reset()
-			tbl.gen(w, buf, cycle, strm)
+			gen(buf, cycle, strm)
 			cycle++
 		}
 		got := testing.AllocsPerRun(200, func() {
 			buf.Reset()
-			tbl.gen(w, buf, cycle, strm)
+			gen(buf, cycle, strm)
 			cycle++
 		})
 		if got != 0 {

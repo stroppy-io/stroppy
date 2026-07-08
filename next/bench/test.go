@@ -91,7 +91,7 @@ func resolveUses(sd *StepDef, slots []slotSpec) (int, error) {
 	return 0, fmt.Errorf("bench: step %q uses unknown driver slot %q", sd.name, sd.uses)
 }
 
-// stepID is the rng step id for a step: the 32-bit FNV-1a hash of its name.
+// StepID is the rng step id for a step: the 32-bit FNV-1a hash of its name.
 //
 // Stability contract: a step's id is a pure function of its name — stable across
 // runs and independent of the step's position or the presence of other steps.
@@ -99,8 +99,17 @@ func resolveUses(sd *StepDef, slots []slotSpec) (int, error) {
 // adding steps does not. Distinct step names (already required by the DAG, which
 // rejects duplicate ids) yield distinct step ids barring an astronomically
 // unlikely 32-bit hash collision.
-func stepID(name string) uint32 {
+//
+// [StreamID] applies the same hash to stream names; the two share an algorithm
+// but live in different rng-derivation slots (step name → step id, stream name
+// → stream id under that step), so a step and a stream may share a name without
+// colliding.
+func StepID(name string) uint32 {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(name))
 	return h.Sum32()
 }
+
+// stepID is the internal alias kept so existing call sites read as before the
+// export; new public callers should use [StepID].
+func stepID(name string) uint32 { return StepID(name) }

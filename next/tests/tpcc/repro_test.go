@@ -49,14 +49,15 @@ func rowHash(b *mem.RowBuf, row int) uint64 {
 	return h.Sum64()
 }
 
-// genTableDigest generates a whole table's rows the way the load handler does —
-// walking chunkRanges(nChunks) work items, generating into a reused RowBuf and
-// flushing loadBatch-sized batches — and folds every generated row into an
+// genTableDigest generates a whole table's rows the way the Loader handler does
+// — walking ChunkRanges(nChunks) work items, generating into a reused RowBuf
+// and flushing loadBatch-sized batches — and folds every generated row into an
 // order-independent digest (a sum of per-row hashes). Because the digest sums
 // per-row hashes, it is independent of how the cycle space is partitioned into
 // chunks: only the row content, keyed by cycle, feeds it.
 func genTableDigest(w *world, tbl *table, nChunks int) uint64 {
 	strm := genStreams(tbl)
+	gen := tbl.makeGen(w)
 	buf := mem.NewRowBuf(loadBatch+maxRowsPerCycle, tbl.cols...)
 	var acc uint64
 	fold := func() {
@@ -65,10 +66,10 @@ func genTableDigest(w *world, tbl *table, nChunks int) uint64 {
 		}
 		buf.Reset()
 	}
-	for _, item := range chunkRanges(tbl.cycles(w), nChunks) {
-		start, end := parseRange(item)
+	for _, item := range bench.ChunkRanges(tbl.cycles(w), nChunks) {
+		start, end := bench.ParseRange(item)
 		for c := start; c < end; c++ {
-			tbl.gen(w, buf, c, strm)
+			gen(buf, c, strm)
 			if buf.Rows() >= loadBatch {
 				fold()
 			}
@@ -86,10 +87,9 @@ func genTableDigest(w *world, tbl *table, nChunks int) uint64 {
 // across independent runs, and — because content is keyed by the global cycle,
 // never by the work partition — that digest is invariant under the chunk count
 // (i.e. LOAD_WORKERS), including the LOAD_WORKERS=1 case. This is the structural
-// worker-count-invariance guarantee: a generator's signature is
-// (world, RowBuf, cycle, streams) — no worker index — so it cannot encode worker
-// identity even if it wanted to. This is the fast mirror of
-// TestLoadReproduciblePG.
+// worker-count-invariance guarantee: a generator's signature carries cycle +
+// named streams but no worker index, so it cannot encode worker identity even
+// if it wanted to. This is the fast mirror of TestLoadReproduciblePG.
 func TestLoadStreamReproducible(t *testing.T) {
 	w := newWorld(tpccSeed, 1)
 	// Chunk counts span the LOAD_WORKERS space, deliberately including 1 (a
@@ -141,7 +141,7 @@ func TestLoadReproduciblePG(t *testing.T) {
 	}
 }
 
-// loadAndDigestPG drops and recreates the schema, runs the full per-table Pool
+// loadAndDigestPG drops and recreates the schema, runs the full per-table Loader
 // load with the given worker count, and returns each table's order-independent
 // content aggregate (count + sum of per-row hashtext) queried from postgres.
 func loadAndDigestPG(t *testing.T, url string, file *sqlfile.File, workers int) map[string]string {
@@ -172,15 +172,16 @@ func loadAndDigestPG(t *testing.T, url string, file *sqlfile.File, workers int) 
 
 	nChunks := workers * 8
 	for _, tbl := range tables() {
-		items := chunkRanges(tbl.cycles(w), nChunks)
+		spec := tbl.spec(w)
 		cfg := bench.Config{
-			Name:     tbl.step(),
-			StepID:   loadStepID(tbl.step()),
-			Seed:     tpccSeed,
-			Drivers:  []driver.Driver{drv},
+			Name:    tbl.step(),
+			StepID:  bench.StepID(tbl.step()),
+			Seed:    tpccSeed,
+			Drivers: []driver.Driver{drv},
 			Interval: time.Hour,
 		}
-		ex := bench.Pool(cfg, workers, items, &loadHandler{w: w, tbl: tbl})
+		items := bench.ChunkRanges(spec.Cycles(), nChunks)
+		ex := bench.Pool(cfg, workers, items, bench.NewLoader(spec))
 		if err := ex.Run(ctx); err != nil {
 			t.Fatalf("load %s (workers=%d): %v", tbl.name, workers, err)
 		}
