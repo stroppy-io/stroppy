@@ -44,6 +44,7 @@ import (
 	"github.com/stroppy-io/stroppy/next/bench"
 	"github.com/stroppy-io/stroppy/next/metrics"
 	"github.com/stroppy-io/stroppy/next/sqlfile"
+	"github.com/stroppy-io/stroppy/next/tests/tpch/dbgen"
 )
 
 //go:embed tpch.sql
@@ -131,6 +132,10 @@ func main() {
 // set_unlogged/set_logged/validate_answers unblocks its After-dependents (F3), so
 // plain After orders the chain without an AfterAny workaround.
 func buildSteps(d *bench.Def, o *options, file *sqlfile.File, lat *bench.Histogram, runs, errs *bench.Counter) error {
+	// dbgen's scale-dependent globals (tDefs, distributions, text pool, per-table
+	// ranges) are lazy-initialized by EnsureInit; declareLoad reads BaseRowCount
+	// (tDefs), so init must precede it. Idempotent — re-inits if SF changed.
+	dbgen.EnsureInit(o.ScaleFactor)
 	dropQs := file.Section("drop_schema")
 	createQs := file.Section("create_schema")
 	unloggedQs := file.Section("set_unlogged")
