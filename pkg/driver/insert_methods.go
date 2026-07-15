@@ -42,6 +42,7 @@ var insertMethodsByDriver = map[stroppy.DriverConfig_DriverType][]dgproto.Insert
 	stroppy.DriverConfig_DRIVER_TYPE_YDB: {
 		dgproto.InsertMethod_PLAIN_QUERY,
 		dgproto.InsertMethod_PLAIN_BULK,
+		dgproto.InsertMethod_COLUMNAR,
 		dgproto.InsertMethod_NATIVE,
 	},
 	stroppy.DriverConfig_DRIVER_TYPE_NOOP: {

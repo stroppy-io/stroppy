@@ -38,10 +38,20 @@ func (d *Driver) InsertSpec(
 	}
 
 	switch spec.GetMethod() {
-	case dgproto.InsertMethod_NATIVE, dgproto.InsertMethod_PLAIN_BULK, dgproto.InsertMethod_PLAIN_QUERY:
+	case dgproto.InsertMethod_NATIVE, dgproto.InsertMethod_PLAIN_BULK,
+		dgproto.InsertMethod_PLAIN_QUERY, dgproto.InsertMethod_COLUMNAR:
 		// Supported below.
 	default:
 		return nil, fmt.Errorf("%w: %s", driver.ErrInsertSpecNotImplemented, spec.GetMethod().String())
+	}
+
+	// COLUMNAR has no dedicated YDB SQL path. NATIVE BulkUpsert already ships a
+	// struct-of-arrays payload (types.ListValue of per-row structs) with no
+	// bind-parameter ceiling, so COLUMNAR is redirected onto it rather than
+	// maintaining a redundant AS_TABLE($rows) SQL arm.
+	if spec.GetMethod() == dgproto.InsertMethod_COLUMNAR {
+		d.logger.Warn("ydb: COLUMNAR insert method redirects to NATIVE BulkUpsert " +
+			"(already struct-of-arrays, limit-free); no separate SQL path")
 	}
 
 	part, err := loadsource.Build(spec)
@@ -76,7 +86,7 @@ func (d *Driver) runChunk(
 	src source.RowSource,
 ) error {
 	switch spec.GetMethod() {
-	case dgproto.InsertMethod_NATIVE:
+	case dgproto.InsertMethod_NATIVE, dgproto.InsertMethod_COLUMNAR:
 		return d.bulkUpsertRuntime(ctx, spec.GetTable(), src)
 	case dgproto.InsertMethod_PLAIN_BULK:
 		return sqldriver.RunBulkInsert(ctx, d.db, spec.GetTable(), src, d.dialect, d.bulkSize)
