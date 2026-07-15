@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- The `columnar` insert method is now accepted by the YDB driver and redirected to the native `BulkUpsert` (already a struct-of-arrays, limit-free payload), logging a one-time warning, instead of being rejected. `columnar` is now listed for YDB in `stroppy probe`. MySQL and Picodata keep their existing insert methods: on MySQL `columnar` showed no throughput benefit over multi-row `plain_bulk` (measured against TPC-C/H/DS at SF 1), and Picodata's SQL has no array/JSON-expansion path.
+- The `columnar` insert method is now accepted by the YDB driver and redirected to the native `BulkUpsert` (already a struct-of-arrays, limit-free payload), logging a one-time warning, instead of being rejected. `columnar` is now listed for YDB in `stroppy probe`. MySQL and Picodata keep their existing insert methods: on MySQL `columnar` showed no throughput benefit over multi-row `plain_bulk` (measured against TPC-C/H/DS at SF 1), and Picodata's SQL has no array/JSON-expansion path. ([#99](https://github.com/stroppy-io/stroppy/pull/99))
 
 - `stroppy probe` (no arguments) now also lists which insert methods each driver supports — `plain_query`, `plain_bulk`, `columnar`, `native` per database — as a `DRIVERS` block in the human output and a `drivers` key in `-o json`, so external tooling can discover valid `defaultInsertMethod` values per target without reading stroppy source. ([#96](https://github.com/stroppy-io/stroppy/pull/96))
 
