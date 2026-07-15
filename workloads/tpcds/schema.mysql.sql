@@ -688,3 +688,8 @@ create index i_inv_date_sk on inventory (inv_date_sk);
 create index i_inv_item_sk on inventory (inv_item_sk);
 --= i_inv_warehouse_sk
 create index i_inv_warehouse_sk on inventory (inv_warehouse_sk);
+
+--+ set_timeout
+-- Per-query cap (milliseconds) for the dump/validate pass.
+--= max_execution_time
+SET SESSION max_execution_time = 180000;
