@@ -17,6 +17,11 @@ templates at the canonical qualification parameters.
 ./build/stroppy run tpcds/tpcds -d mysql \
     -D "url=root:pass@tcp(127.0.0.1:3306)/stroppy?charset=utf8mb4&parseTime=True&loc=Local" \
     -e SCALE_FACTOR=0.01 -e LOAD_WORKERS=4
+
+# YDB (YQL via the native driver):
+./build/stroppy run tpcds/tpcds -d ydb \
+    -D url=grpc://localhost:2136/local \
+    -e SCALE_FACTOR=0.01
 ```
 
 Env overrides:
@@ -24,6 +29,7 @@ Env overrides:
 ```bash
 -e SCALE_FACTOR=0.01   # any positive float; fractional for smoke tests.
 -e LOAD_WORKERS=4      # parallel InsertSpec workers per table during load.
+-e YDB_STORE_MODE=column # ydb only: 'column' (default) or 'row' storage layout.
 -e MAX_DURATION=24h    # run wall-clock cap (default 24h; the workload sets its
                        # own so large-scale loads aren't killed by k6's 10m default).
 -e STREAMS=4           # concurrent throughput streams (1 = single power-test stream).
@@ -66,6 +72,31 @@ Universal fixes (all dialects):
 
 PostgreSQL (`pg.sql`): `limit N`; date arithmetic as `<date> ± N` (Postgres
 adds integer days to a date directly).
+
+YDB (`ydb.sql` + `schema.ydb.sql`, YQL via the native driver): schema types map
+`integer→Int64`, `char/varchar→Utf8`, `decimal→Double`, and `date→Utf8` (ISO
+strings — TPC-DS `date_dim` spans 1900–2100, outside YDB's unsigned
+`Timestamp`/`Date` epoch; ISO strings compare lexicographically so `between`/`=`
+date filters hold). Tables carry a `PRIMARY KEY` (no FK); only key columns are
+`NOT NULL` since TPC-DS fact foreign keys are genuinely nullable. Two storage
+layouts ship as sections `create_schema_column` (column, default, auto-partitioned
+by size) and `create_schema` (row), selected by `YDB_STORE_MODE`; column store is
+the OLAP-correct layout for these scan-heavy queries and runs the full suite
+(window functions, rollup, grouping sets all verified on it). Secondary indexes
+are omitted — YDB column tables support only local bloom/min-max indexes, not
+global secondary indexes, and the spec lists indexes as auxiliary for this
+full-scan workload. Query
+rewrites vs `pg.sql`: every statement opens with `PRAGMA AnsiImplicitCrossJoin`
+(TPC-DS uses comma joins); ANSI `WITH` CTEs become YQL `$named` subqueries;
+GROUP BY / SELECT / ORDER BY columns in multi-source blocks are qualified with a
+correlation name (YQL requires it); correlated subqueries and `EXISTS` are
+decorrelated into `IN` / grouped joins (YQL has no correlated subqueries); date
+literals drop the `cast(… as date)` and `date + N days` arithmetic is baked to a
+literal string; `cast(… as decimal)`→`Double`, `substring`→`Unicode::Substring`.
+The ported generator emits every cell as text; the YDB driver's bulk-upsert path
+parses those strings into each column's declared type. Answer-set validation and
+the in-process query-stream generator (`STREAMS>1`, `QUERY_STREAM`) stay
+PostgreSQL/MySQL-only, so YDB runs the baked power test.
 
 MySQL (`mysql.sql`, MySQL 8.0): date arithmetic as `± interval N day`;
 `group by rollup(...)` → `group by ... with rollup`; `||` string concat →
@@ -124,11 +155,11 @@ DataMaint2, scored as QphDS@SF. This workload covers:
 
 ## Status / TODO
 
-- PostgreSQL and MySQL: load + all 103 statements verified on a local
+- PostgreSQL, MySQL, and YDB: load + all 103 statements verified on a local
   instance at SCALE_FACTOR=0.01.
 - Not yet done: the Data Maintenance phase (refresh-data generation + insert/
   delete DM functions) and the QphDS@SF metric; SF=1 answer-set validation against
-  the kit's `answer_sets/`; Picodata + YDB dialect files (queries and schema).
+  the kit's `answer_sets/`; the Picodata dialect files (queries and schema).
 
 ## Run shapes and the two-run flow
 

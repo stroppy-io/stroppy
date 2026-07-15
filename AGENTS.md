@@ -8,9 +8,7 @@ Database stress testing CLI powered by k6. Apache 2.0.
 
 ## Binary Layout
 
-- `./build/stroppy` — main binary (built by `make build`)
-- `./build/k6` — k6 with stroppy extension embedded
-- Both produced by the same `make build` target
+`make build` produces ONE binary: xk6 builds `build/k6` with stroppy embedded (`--with cmd/xk6air`), then `build/stroppy` is `cp build/k6 build/stroppy`. Both names are the same file; dispatch is strictly by name — invoked as `stroppy` it strips the `k6 x stroppy` prefix, any other name acts as k6 + extension.
 
 ## Build & Lint
 
@@ -153,6 +151,16 @@ Relational workloads use `Step("load_data", ...)` and `driver.insertSpec(Rel.tab
 ./build/stroppy run tpcc/tx -d pg -e LOAD_WORKERS=8 --steps drop_schema,create_schema,load_data
 ```
 
+**Scenario selection** (`declareScenario(name, defaults)` in `helpers.ts`):
+- `DURATION` set → `constant-vus` executor (throughput run)
+- `DURATION` unset → `shared-iterations` executor (power run)
+- `MAX_DURATION` (default `24h`) lifts k6's hardcoded 10m cap on iteration executors — always pinned
+- Tune via env `VUS`/`DURATION`/`ITER`/`MAX_DURATION`, NOT the k6 `-u`/`-d`/`-i` shortflags (see K6 Passthrough footgun)
+
+**SCALE_FACTOR semantics** differ by workload: tpcb and tpcc take an INTEGER (≥1, = branch/warehouse count); tpch and tpcds take a FRACTIONAL row-scale (0.01 ok). tpcds also carries fixed-size static dims (~1.9M rows for `customer_demographics`) that do not shrink with SF.
+
+**Setup vs executor:** k6 emits NO per-iteration builtins (`iteration`, `iteration_duration`) during `setup()` — they fire only inside an executor. A load in `setup()` therefore looks dead (no live metrics), which is why data loads live in `default()` + `GlobalOnce`, not `setup()`.
+
 Isolation by driver in `tx.ts`:
 - postgres → `read_committed`
 - mysql → `read_committed`
@@ -222,7 +230,7 @@ Prefer `go doc` over grepping source for type/interface definitions. Never read 
 
 ## Key Dependencies
 
-- `go.k6.io/k6 v1.7.0` — load testing engine
+- `go.k6.io/k6 v1.8.0` — load testing engine
 - `github.com/jackc/pgx/v5` — PostgreSQL driver
 - `github.com/grafana/sobek` — JavaScript engine
 - `github.com/spf13/cobra` — CLI
@@ -234,3 +242,4 @@ Prefer `go doc` over grepping source for type/interface definitions. Never read 
 - `K6_WEB_DASHBOARD=true` — real-time dashboard
 - `K6_WEB_DASHBOARD_EXPORT=report.html` — HTML report
 - All k6 CLI flags work after `--` separator
+- **Scenarios footgun:** defining `options.scenarios` in the script makes k6 CLI shortflags (`-u`/`-d`/`-i`, `--vus`/`--iterations`/`--duration`) OVERWRITE the entire scenarios block — including `maxDuration`. Passing them after `--` discards the workload's scenario entirely (k6 logs `"cli" level configuration overrode scenarios configuration entirely`). Parameterize scenarios via ENV (`VUS`/`DURATION`/`ITER`/`MAX_DURATION`), never the shortflags.

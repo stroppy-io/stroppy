@@ -74,11 +74,23 @@ const useUnlogged = PG_UNLOGGED && driverConfig.driverType === "postgres";
 const _sqlByDriver: Record<string, string> = {
   postgres: "./pg.sql",
   mysql: "./mysql.sql",
+  ydb: "./ydb.sql",
 };
 const _schemaByDriver: Record<string, string> = {
   postgres: "./schema.pg.sql",
   mysql: "./schema.mysql.sql",
+  ydb: "./schema.ydb.sql",
 };
+
+// YDB storage layout. Default 'column': the OLAP column store is the right
+// layout for TPC-DS' scan-heavy queries and runs the full suite (window
+// functions, rollup, grouping sets all verified on it). 'row' selects the
+// row-store schema instead.
+const YDB_STORE_MODE = ENV(
+  "YDB_STORE_MODE",
+  "column",
+  "ydb only: 'column' (default, OLAP column store) or 'row' (row store)",
+);
 const SQL_FILE =
   ENV("SQL_FILE", "", "Path to TPC-DS query SQL file (defaults per driverType)") ||
   _sqlByDriver[driverConfig.driverType!] ||
@@ -97,6 +109,18 @@ const QUERY_STREAM = ENV(
 const QUERY_SEED = Number(
   ENV("QUERY_SEED", "19620718", "RNG seed for generated query streams"),
 );
+
+// The in-process stream generator (GenerateTpcdsQueries) emits ANSI/pg and
+// MySQL text; it cannot express the structural YQL rewrites the baked ydb.sql
+// carries (named subqueries for CTEs, correlation-qualified GROUP BY). So ydb
+// runs only the baked query set (power test); reject the generated-stream
+// modes with a clear message instead of an opaque generator error.
+if (driverConfig.driverType === "ydb" && (THROUGHPUT || QUERY_STREAM !== "")) {
+  throw new Error(
+    "[tpcds] ydb supports the baked query set (power test) only; STREAMS>1 and " +
+      "QUERY_STREAM need the in-process generator, which does not target YQL yet.",
+  );
+}
 
 // Answer validation runs only for the baked qualification set at SF=1 (the
 // only scale the kit ships answers for). The kit answers are byte-oracle
@@ -163,13 +187,25 @@ function prepareDatabase(): void {
   // "cannot drop table ... because other objects depend on it". MySQL accepts and
   // ignores the CASCADE keyword, so the same statement is portable.
   Step("drop_schema", () => {
+    if (driverConfig.driverType === "ydb") {
+      // YDB has no CASCADE keyword; drop from the schema file's drop_schema
+      // section (per-table `DROP TABLE IF EXISTS`, reverse load order).
+      execEachLogged(schema("drop_schema"), (q) => driver.exec(q, {}));
+      return;
+    }
     for (const table of [...TPCDS_TABLES].reverse()) {
       driver.exec(`DROP TABLE IF EXISTS ${table} CASCADE` as unknown as { name: string }, {});
     }
   });
 
   Step("create_schema", () => {
-    const stmts = schema("create_schema");
+    // YDB ships two storage layouts as separate sections; every other driver
+    // has a single create_schema section.
+    const section =
+      driverConfig.driverType === "ydb" && YDB_STORE_MODE === "column"
+        ? "create_schema_column"
+        : "create_schema";
+    const stmts = schema(section);
     if (stmts) {
       stmts.forEach((q) => driver.exec(q, {}));
     }
@@ -245,17 +281,18 @@ export default function (): void {
       query: q as unknown as SqlQuery,
     }));
 
-  // Safety: cap any single query so a pathological plan can't wedge the run.
-  // A capped query throws → captured as ERR: in the dump, run continues.
-  const QUERY_CAP_MS = Number(ENV("QUERY_CAP_MS", "180000", "Per-query timeout (ms) in validate/dump"));
+  // Per-query cap and planner tweaks live with the dialect, as set_timeout and
+  // preconfigure_db sections in schema.<driver>.sql — each engine carries its
+  // own session setup instead of a driver branch here (pg forces hash joins for
+  // the year_total CTE self-join + skips JIT; mysql sets the cap; ydb has none
+  // and the absent section is a no-op). SETs are session-scoped, so these run
+  // inline on the same connection as the query pass below — wrapping them in a
+  // Step hands the next exec to a different pooled connection and the SET is lost.
   if (answersSf1 || ANSWER_DUMP) {
     try {
-      if (driverConfig.driverType === "postgres") {
-        driver.exec(`SET statement_timeout = '${QUERY_CAP_MS}'` as unknown as SqlQuery, {});
-      } else if (driverConfig.driverType === "mysql") {
-        driver.exec(`SET SESSION max_execution_time = ${QUERY_CAP_MS}` as unknown as SqlQuery, {});
-      }
-    } catch (_e) { /* best-effort */ }
+      execEachLogged(schema("set_timeout"), (q) => driver.exec(q, {}));
+      execEachLogged(schema("preconfigure_db"), (q) => driver.exec(q, {}));
+    } catch (_e) { /* best-effort: a SET must not abort the pass */ }
   }
 
   // Run each query once; feed both the official SF=1 compare (answersSf1) and
