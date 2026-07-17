@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/stroppy-io/stroppy/next/driver"
+	"github.com/stroppy-io/stroppy/next/driver/mysql"
 	"github.com/stroppy-io/stroppy/next/driver/noop"
 	"github.com/stroppy-io/stroppy/next/driver/pg"
 	"github.com/stroppy-io/stroppy/next/metrics"
@@ -73,6 +74,8 @@ func buildDrivers(slots []slotSpec) ([]driver.Driver, []driver.Acquisition, erro
 		switch s.kind {
 		case "pg":
 			out[i] = pg.New(s.spec)
+		case "mysql":
+			out[i] = mysql.New(s.spec)
 		case "noop":
 			out[i] = noop.New(s.spec)
 		default:

@@ -29,6 +29,7 @@ type Query struct {
 	Raw string
 
 	params   []string
+	occur    []string // per-occurrence param names (with dups) — Question-order
 	dollar   string
 	question string
 }
@@ -38,6 +39,16 @@ type Query struct {
 // owned by the Query and must not be mutated.
 func (q *Query) Params() []string {
 	return q.params
+}
+
+// Occurrences returns the query's named parameters in occurrence order — every
+// ":name" marker as it appears left to right, duplicates included. It is the
+// Question-order counterpart of [Query.Params]: a driver whose placeholder
+// syntax emits one marker per occurrence (mysql "?") binds one value per entry
+// here, whereas [Params] gives the de-duplicated order a $n-back-reference
+// dialect (pgx) binds. The returned slice is owned by the Query.
+func (q *Query) Occurrences() []string {
+	return q.occur
 }
 
 // Text returns Raw with every ":name" marker rewritten to the positional
@@ -273,7 +284,7 @@ func parseQueries(section string, lineStart int, lines []string) ([]*Query, erro
 }
 
 func newQuery(section, name string, line int, text string) (*Query, error) {
-	params, dollar, question, err := rewriteParams(text)
+	params, occur, dollar, question, err := rewriteParams(text)
 	if err != nil {
 		var se *scanError
 		if errors.As(err, &se) {
@@ -295,6 +306,7 @@ func newQuery(section, name string, line int, text string) (*Query, error) {
 		Line:     line,
 		Raw:      text,
 		params:   params,
+		occur:    occur,
 		dollar:   dollar,
 		question: question,
 	}, nil

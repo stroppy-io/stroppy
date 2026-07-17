@@ -137,21 +137,21 @@ func TestRewrite_NoParams(t *testing.T) {
 }
 
 func TestRewrite_UnterminatedString(t *testing.T) {
-	_, _, _, err := rewriteParams("SELECT 'unterminated")
+	_, _, _, _, err := rewriteParams("SELECT 'unterminated")
 	if err == nil {
 		t.Fatal("want error")
 	}
 }
 
 func TestRewrite_UnterminatedBlockComment(t *testing.T) {
-	_, _, _, err := rewriteParams("SELECT 1 /* unterminated")
+	_, _, _, _, err := rewriteParams("SELECT 1 /* unterminated")
 	if err == nil {
 		t.Fatal("want error")
 	}
 }
 
 func TestRewrite_UnterminatedDollarQuote(t *testing.T) {
-	_, _, _, err := rewriteParams("CREATE FUNCTION f() AS $$ BEGIN END;")
+	_, _, _, _, err := rewriteParams("CREATE FUNCTION f() AS $$ BEGIN END;")
 	if err == nil {
 		t.Fatal("want error")
 	}

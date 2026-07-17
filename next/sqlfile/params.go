@@ -46,7 +46,7 @@ var (
 // name must be whitespace, end-of-text, ";", ",", ")" or "::" — mirroring
 // the boundary rule proven against this corpus by
 // pkg/driver/sqldriver/run_query.go's argsRe in the v5 tree.
-func rewriteParams(text string) (params []string, dollar, question string, err error) {
+func rewriteParams(text string) (params, occur []string, dollar, question string, err error) {
 	var dollarB, questionB strings.Builder
 
 	dollarB.Grow(len(text))
@@ -62,7 +62,7 @@ func rewriteParams(text string) (params []string, dollar, question string, err e
 		case c == '\'' || c == '"' || c == '`':
 			end, ok := scanQuoted(text, i, c)
 			if !ok {
-				return nil, "", "", &scanError{i, errUnterminatedString}
+				return nil, nil, "", "", &scanError{i, errUnterminatedString}
 			}
 
 			dollarB.WriteString(text[i:end])
@@ -72,7 +72,7 @@ func rewriteParams(text string) (params []string, dollar, question string, err e
 		case c == '/' && i+1 < n && text[i+1] == '*':
 			end, ok := scanBlockComment(text, i)
 			if !ok {
-				return nil, "", "", &scanError{i, errUnterminatedComment}
+				return nil, nil, "", "", &scanError{i, errUnterminatedComment}
 			}
 
 			dollarB.WriteString(text[i:end])
@@ -82,7 +82,7 @@ func rewriteParams(text string) (params []string, dollar, question string, err e
 		case c == '$':
 			end, isTag, ok := scanDollarQuote(text, i)
 			if isTag && !ok {
-				return nil, "", "", &scanError{i, errUnterminatedDollar}
+				return nil, nil, "", "", &scanError{i, errUnterminatedDollar}
 			}
 
 			if isTag {
@@ -116,6 +116,7 @@ func rewriteParams(text string) (params []string, dollar, question string, err e
 
 			dollarB.WriteString("$" + strconv.Itoa(idx+1))
 			questionB.WriteByte('?')
+			occur = append(occur, name)
 
 			i = end
 
@@ -126,7 +127,7 @@ func rewriteParams(text string) (params []string, dollar, question string, err e
 		}
 	}
 
-	return params, dollarB.String(), questionB.String(), nil
+	return params, occur, dollarB.String(), questionB.String(), nil
 }
 
 // scanQuoted returns the index just past the closing quote matching text[start],
