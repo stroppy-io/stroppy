@@ -54,12 +54,22 @@ type DefaultIsolationer interface {
 	DefaultIsolation() Isolation
 }
 
+// Pinger is implemented by drivers whose backend can be reached for a readiness
+// probe without opening a measured connection. The bench layer's readiness step
+// ([github.com/stroppy-io/stroppy/next/bench.Wait]) loops Ping until the
+// database answers; the driver contributes only Ping so the retry loop stays
+// shared, not copied per backend. Drivers that cannot probe do not implement
+// it; their readiness step then errors explicitly.
+type Pinger interface {
+	Ping(ctx context.Context) error
+}
+
 // Queryer is the shared query surface: the six bound-argument execution methods
 // common to a pinned connection and a transaction. Conn and Tx both embed it so
 // a test body issues queries through the same calls whether it holds a Conn or a
 // Tx — v5's QueryAPI pattern. The variadic forms allocate the "...any" slice per
 // call (cold path / setup); the *WithArgs forms take a reusable [Args] and are
-// the hot path. Prepare, Begin, Commit/Rollback and InsertColumns live on the
+// the hot path. Prepare, Begin, Commit/Rollback and Insert live on the
 // concrete interfaces, not here.
 type Queryer interface {
 	// Exec runs s for its side effect, binding args positionally. The variadic
@@ -92,10 +102,12 @@ type Conn interface {
 	// ConnectionOnly pass through to this connection without a BEGIN.
 	Begin(ctx context.Context, iso Isolation) (Tx, error)
 
-	// InsertColumns bulk-loads buf's columns into table via the driver's fast
-	// path (COPY for postgres), returning the rows written. The columnar buffer
-	// is consumed without a per-row materialisation pass on the caller side.
-	InsertColumns(ctx context.Context, table string, buf *mem.RowBuf) (int64, error)
+	// Insert drains buf's rows into table via the selected [InsertMethod],
+	// returning the rows written. [InsertNative] lets the driver pick its
+	// fastest path (COPY for postgres); the other methods are explicit drain
+	// shapes a caller selects to measure a theory. The buffer is consumed
+	// without a per-row materialisation pass on the caller side.
+	Insert(ctx context.Context, table string, buf *mem.RowBuf, m InsertMethod) (int64, error)
 
 	// Close releases the connection.
 	Close(ctx context.Context) error

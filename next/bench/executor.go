@@ -57,6 +57,9 @@ type Config struct {
 	// Slot is the default driver slot this step's VUs connect to (from
 	// StepDef.Uses); [VU.Conn] can still reach any slot by index.
 	Slot int
+	// Retry is the run-level default [RetryOpts] a VU hands to callers via
+	// [VU.RetryOpts] — resolved from the --retry.* params over the test default.
+	Retry RetryOpts
 }
 
 // Executor is a constructed, runnable load policy. It owns its VUs, their
@@ -84,6 +87,7 @@ type Executor struct {
 	drivers      []driver.Driver
 	acq          []driver.Acquisition
 	slot         int
+	retry        RetryOpts
 	hot          bool // set by Closed/Open/Pool: Iter is a hot loop (bans Conn/Prepare)
 	materialized bool
 
@@ -137,6 +141,7 @@ func newExecutor(cfg Config, nVUs int, open bool) *Executor {
 		drivers: cfg.Drivers,
 		acq:     cfg.Acq,
 		slot:    cfg.Slot,
+		retry:   cfg.Retry,
 	}
 
 	if !shared {
@@ -192,6 +197,7 @@ func (e *Executor) materialize() {
 			drivers:  e.drivers,
 			acq:      e.acq,
 			slot:     e.slot,
+			retry:    e.retry,
 		}
 		if len(e.drivers) > 0 {
 			vu.conns = make([]driver.Conn, len(e.drivers))

@@ -93,6 +93,49 @@ func TestRowBufNulls(t *testing.T) {
 	}
 }
 
+func TestRowBufRowValue(t *testing.T) {
+	b := NewRowBuf(4, schema()...)
+
+	b.AppendInt64(0, 7)
+	b.AppendFloat64(1, 2.25)
+	b.AppendBytes(2, []byte("dan"))
+	b.AppendBool(3, false)
+
+	b.AppendNull(0)
+	b.AppendNull(1)
+	b.AppendNull(2)
+	b.AppendNull(3)
+
+	var dst []any
+	row0 := b.RowValue(0, dst[:0])
+	if len(row0) != 4 {
+		t.Fatalf("row0 len = %d, want 4", len(row0))
+	}
+	if row0[0].(int64) != 7 {
+		t.Errorf("row0[0] = %v, want 7", row0[0])
+	}
+	if row0[1].(float64) != 2.25 {
+		t.Errorf("row0[1] = %v, want 2.25", row0[1])
+	}
+	if string(row0[2].([]byte)) != "dan" {
+		t.Errorf("row0[2] = %v, want dan", row0[2])
+	}
+	if row0[3].(bool) != false {
+		t.Errorf("row0[3] = %v, want false", row0[3])
+	}
+
+	// dst reused across rows; row1 all-null reads as nil cells.
+	row1 := b.RowValue(1, row0[:0])
+	if &row1[0] != &row0[0] {
+		t.Error("RowValue did not reuse dst backing")
+	}
+	for col, v := range row1 {
+		if v != nil {
+			t.Errorf("row1[%d] = %v, want nil", col, v)
+		}
+	}
+}
+
 func TestRowBufResetReuse(t *testing.T) {
 	b := NewRowBuf(4, schema()...)
 

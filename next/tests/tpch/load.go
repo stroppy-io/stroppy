@@ -68,6 +68,7 @@ type loadHandler struct {
 type loadState struct {
 	conn driver.Conn
 	buf  *mem.RowBuf
+	method driver.InsertMethod
 }
 
 func (h *loadHandler) Init(vu *bench.VU) error {
@@ -78,6 +79,7 @@ func (h *loadHandler) Init(vu *bench.VU) error {
 	}
 	st.conn = conn
 	st.buf = mem.NewRowBuf(h.bat+h.t.maxRows, h.t.cols...)
+	st.method = vu.InsertMethod(driver.InsertNative)
 	return nil
 }
 
@@ -97,14 +99,14 @@ func (h *loadHandler) Iter(vu *bench.VU) error {
 		h.t.emit(g, idx+1, st.buf) // dbgen makers are 1-based
 		g.RowStop(h.t.genTable)
 		if st.buf.Rows() >= h.bat {
-			if _, err := st.conn.InsertColumns(vu.Ctx(), h.t.name, st.buf); err != nil {
+			if _, err := st.conn.Insert(vu.Ctx(), h.t.name, st.buf, st.method); err != nil {
 				return err
 			}
 			st.buf.Reset()
 		}
 	}
 	if st.buf.Rows() > 0 {
-		if _, err := st.conn.InsertColumns(vu.Ctx(), h.t.name, st.buf); err != nil {
+		if _, err := st.conn.Insert(vu.Ctx(), h.t.name, st.buf, st.method); err != nil {
 			return err
 		}
 	}

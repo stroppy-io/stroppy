@@ -22,17 +22,20 @@ import (
 // pgx's query execution mode (extended vs simple protocol, prepared vs text) is
 // controlled by the class-B native knobs (D2): see [Native].
 type Driver struct {
-	spec       driver.Spec
-	native     NativeConfig
-	defaultIso driver.Isolation
-	pool       *pgxpool.Pool // non-nil when spec.Mode == Shared
-	poolErr    error         // construction error surfaced on Acquire/Connect
+	spec         driver.Spec
+	native       NativeConfig
+	defaultIso   driver.Isolation
+	insertMethod driver.InsertMethod
+	pool         *pgxpool.Pool // non-nil when spec.Mode == Shared
+	poolErr      error         // construction error surfaced on Acquire/Connect
 }
 
 var (
-	_ driver.Driver            = (*Driver)(nil)
-	_ driver.Pooled            = (*Driver)(nil) // Shared acquisition
+	_ driver.Driver          = (*Driver)(nil)
+	_ driver.Pooled          = (*Driver)(nil) // Shared acquisition
 	_ driver.DefaultIsolationer = (*Driver)(nil)
+	_ driver.InsertDefaulter = (*Driver)(nil)
+	_ driver.Pinger          = (*Driver)(nil)
 )
 
 // New returns a pg Driver for spec. For Shared acquisition it eagerly builds the
@@ -40,7 +43,12 @@ var (
 // deferred to the first Connect/Acquire so a probe (which connects nothing)
 // still succeeds. New does not open a PerVU connection; Connect does.
 func New(spec driver.Spec) *Driver {
-	d := &Driver{spec: spec, native: Native(spec), defaultIso: driver.ReadCommitted}
+	d := &Driver{
+		spec:         spec,
+		native:       Native(spec),
+		defaultIso:   driver.ReadCommitted,
+		insertMethod: spec.InsertMethod,
+	}
 	if spec.Mode == driver.Shared {
 		d.pool, d.poolErr = buildPool(spec, d.native)
 	}
@@ -115,6 +123,32 @@ func (d *Driver) Acquire(ctx context.Context) (driver.Conn, error) {
 // DefaultIsolation reports pg's safe default: read_committed (the server default
 // and the level TPC-C targets). Conn.Begin resolves DBDefault through it.
 func (d *Driver) DefaultIsolation() driver.Isolation { return d.defaultIso }
+
+// DefaultInsertMethod reports the slot's resolved insert method, set from
+// [driver.Spec.InsertMethod] at construction. The bench layer resolves a
+// caller's [driver.InsertNative] through it so an operator's --insert.method
+// reaches a load step that did not pin its own.
+func (d *Driver) DefaultInsertMethod() driver.InsertMethod { return d.insertMethod }
+
+// Ping opens a throwaway connection, pings it, and closes it — the readiness
+// probe a [driver.Pinger] contributes to the bench layer's WaitForDB loop. It
+// does not touch the per-VU pinned-conn path; a successful ping means the
+// backend is up, nothing more.
+func (d *Driver) Ping(ctx context.Context) error {
+	cfg, err := pgx.ParseConfig(d.spec.URL)
+	if err != nil {
+		return fmt.Errorf("pg: parse url: %w", err)
+	}
+	if d.spec.ConnectTimeout > 0 {
+		cfg.ConnectTimeout = d.spec.ConnectTimeout
+	}
+	c, err := pgx.ConnectConfig(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = c.Close(ctx) }()
+	return c.Ping(ctx)
+}
 
 // Classify ports v5's isSerializationError (helpers.ts): a serialization
 // failure (SQLSTATE 40001) or a deadlock (40P01) is Retry, every other error

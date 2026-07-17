@@ -2,7 +2,7 @@ package main
 
 // Integration smoke test for the dbgen loadHandler against the noop driver:
 // drives the full Pool executor path (Init: Conn+RowBuf; Iter: fresh-seek,
-// emit, InsertColumns flush; Close) for every table at SF=0.01 without a
+// emit, Insert flush; Close) for every table at SF=0.01 without a
 // database. Row-count semantics (partsupp=4×part, lineitem band, fixed
 // dimensions) are covered by gen_test's driverless digestRange; this test
 // proves the handler wires cleanly into the executor and completes every item.

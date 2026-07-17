@@ -17,12 +17,13 @@ import (
 // target table's.
 var ErrColumnCountMismatch = errors.New("pg: RowBuf column count does not match table")
 
-// InsertColumns bulk-loads buf into table via COPY FROM. It first learns the
+// insertColumnar bulk-loads buf into table via COPY FROM. It first learns the
 // table's column type OIDs (once per table) so it can hand each value to pgx in
 // the exact Go type COPY BINARY requires (int16 for int2, int32 for int4,
 // float32 for float4, string for text, []byte for bytea), then streams rows
-// straight from buf's columns through a CopyFromSource.
-func (c *conn) InsertColumns(ctx context.Context, table string, buf *mem.RowBuf) (int64, error) {
+// straight from buf's columns through a CopyFromSource. This is pg's
+// [driver.InsertColumnar] and [driver.InsertNative] path.
+func (c *conn) insertColumnar(ctx context.Context, table string, buf *mem.RowBuf) (int64, error) {
 	cols := c.copyCols(table, buf)
 
 	oids, err := c.columnOIDs(ctx, table, buf)
@@ -129,44 +130,34 @@ func (s *copySource) Next() bool {
 func (s *copySource) Values() ([]any, error) {
 	r := s.i - 1
 
-	for col := range s.scratch {
-		if s.buf.IsNull(col, r) {
-			s.scratch[col] = nil
-
+	// RowValue boxes the row into natural Go types (int64/float64/bool/[]byte/
+	// nil); pg then narrows each cell to the exact COPY BINARY type the column
+	// OID requires (int2/int4, float4, text vs bytea). Only pg knows the wire
+	// types, so the narrowing lives here; the columnar read stays in RowBuf.
+	row := s.buf.RowValue(r, s.scratch[:0])
+	for col, v := range row {
+		if v == nil {
 			continue
 		}
-
-		switch s.buf.Type(col) {
-		case mem.TypeInt64:
-			v := s.buf.Int64Col(col)[r]
-
+		switch x := v.(type) {
+		case int64:
 			switch s.oids[col] {
 			case pgtype.Int2OID:
-				s.scratch[col] = int16(v)
+				row[col] = int16(x)
 			case pgtype.Int4OID:
-				s.scratch[col] = int32(v)
-			default:
-				s.scratch[col] = v
+				row[col] = int32(x)
 			}
-		case mem.TypeFloat64:
-			v := s.buf.Float64Col(col)[r]
+		case float64:
 			if s.oids[col] == pgtype.Float4OID {
-				s.scratch[col] = float32(v)
-			} else {
-				s.scratch[col] = v
+				row[col] = float32(x)
 			}
-		case mem.TypeBool:
-			s.scratch[col] = s.buf.BoolCol(col)[r]
-		case mem.TypeBytes:
-			b := s.buf.BytesAt(col, r)
-			if s.oids[col] == pgtype.ByteaOID {
-				s.scratch[col] = b
-			} else {
-				s.scratch[col] = unsafeString(b)
+		case []byte:
+			if s.oids[col] != pgtype.ByteaOID {
+				row[col] = unsafeString(x)
 			}
 		}
 	}
-
+	s.scratch = row
 	return s.scratch, nil
 }
 

@@ -77,9 +77,14 @@ func main() {
 				return err
 			}
 
+			// Readiness gate: ping the database until it answers (or timeout),
+			// before any step opens a connection. Explicit and skippable via
+			// --steps, rather than buried in driver construction.
+			bench.ReadyStep(d, 30*time.Second, time.Second).Uses("main")
+
 			// DROP may fail on a fresh database (no table yet); Silent keeps
 			// the step green and the run moving.
-			d.Step("drop_schema", exec(dropQ)).OnErr(bench.ModeSilent).Uses("main")
+			d.Step("drop_schema", exec(dropQ)).OnErr(bench.ModeSilent).After("ready").Uses("main")
 			d.Step("create_schema", exec(createQ)).After("drop_schema").Uses("main")
 
 			// Load is a single-table columnar COPY of `rows` rows; bench.Loader

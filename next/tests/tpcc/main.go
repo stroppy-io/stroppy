@@ -76,8 +76,9 @@ func (o *options) validate() error {
 func main() {
 	o := &options{}
 	t := &bench.Test{
-		Name: "tpcc",
-		Seed: canonicalSeed,
+		Name:  "tpcc",
+		Seed:  canonicalSeed,
+		Retry: txRetry,
 		Define: func(d *bench.Def) error {
 			// One declarative pass: each param resolves at registration, so the
 			// values feed straight into validation, the world and the executor

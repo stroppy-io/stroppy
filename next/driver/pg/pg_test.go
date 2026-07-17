@@ -532,9 +532,10 @@ func prepUpdate(t *testing.T, c driver.Conn) driver.Stmt {
 	return st
 }
 
-// TestInsertColumnsCopy loads a multi-type RowBuf via COPY and verifies the row
-// count and a spot-check of values across every column type, including a null.
-func TestInsertColumnsCopy(t *testing.T) {
+// TestInsertMethods loads a multi-type RowBuf through every insert method and
+// verifies the row count and a spot-check of values across every column type,
+// including a null. Each method must yield the same landed rows.
+func TestInsertMethods(t *testing.T) {
 	ctx := context.Background()
 	d := New(driver.Spec{URL: requirePG(t)})
 
@@ -559,113 +560,124 @@ SELECT a, b, c, d, e, f, g, h, i FROM copy_t ORDER BY a
 
 	dropQ, _ := ddl.Query("s", "drop")
 	createQ, _ := ddl.Query("s", "create")
-
-	if st, e := c.Prepare(ctx, dropQ); e != nil {
-		t.Fatalf("prep drop: %v", e)
-	} else if e := c.Exec(ctx, st); e != nil {
-		t.Fatalf("drop: %v", e)
-	}
-
-	if st, e := c.Prepare(ctx, createQ); e != nil {
-		t.Fatalf("prep create: %v", e)
-	} else if e := c.Exec(ctx, st); e != nil {
-		t.Fatalf("create: %v", e)
-	}
-
-	buf := mem.NewRowBuf(8,
-		mem.ColSpec{Name: "a", Type: mem.TypeInt64},
-		mem.ColSpec{Name: "b", Type: mem.TypeInt64},
-		mem.ColSpec{Name: "c", Type: mem.TypeInt64},
-		mem.ColSpec{Name: "d", Type: mem.TypeFloat64},
-		mem.ColSpec{Name: "e", Type: mem.TypeFloat64},
-		mem.ColSpec{Name: "f", Type: mem.TypeBool},
-		mem.ColSpec{Name: "g", Type: mem.TypeBytes},
-		mem.ColSpec{Name: "h", Type: mem.TypeBytes},
-		mem.ColSpec{Name: "i", Type: mem.TypeInt64},
-	)
-
-	// row 0
-	buf.AppendInt64(0, 1)
-	buf.AppendInt64(1, 100)
-	buf.AppendInt64(2, 7)
-	buf.AppendFloat64(3, 2.5)
-	buf.AppendFloat64(4, 1.25)
-	buf.AppendBool(5, true)
-	buf.AppendBytes(6, []byte("hello"))
-	buf.AppendBytes(7, []byte{0x01, 0x02, 0x03})
-	buf.AppendInt64(8, 42)
-
-	// row 1 — column i is null
-	buf.AppendInt64(0, 2)
-	buf.AppendInt64(1, 200)
-	buf.AppendInt64(2, 8)
-	buf.AppendFloat64(3, -3.5)
-	buf.AppendFloat64(4, 0.5)
-	buf.AppendBool(5, false)
-	buf.AppendBytes(6, []byte("world"))
-	buf.AppendBytes(7, []byte{0xff})
-	buf.AppendNull(8)
-
-	n, err := c.InsertColumns(ctx, "copy_t", buf)
-	if err != nil {
-		t.Fatalf("InsertColumns: %v", err)
-	}
-
-	if n != 2 {
-		t.Fatalf("copied %d rows, want 2", n)
-	}
-
 	allQ, _ := ddl.Query("s", "all")
 
-	st, err := c.Prepare(ctx, allQ)
-	if err != nil {
-		t.Fatalf("prep all: %v", err)
-	}
+	for _, tc := range []struct {
+		name string
+		m    driver.InsertMethod
+	}{
+		{"native", driver.InsertNative},
+		{"columnar", driver.InsertColumnar},
+		{"plain_bulk", driver.InsertPlainBulk},
+		{"plain_query", driver.InsertPlainQuery},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if st, e := c.Prepare(ctx, dropQ); e != nil {
+				t.Fatalf("prep drop: %v", e)
+			} else if e := c.Exec(ctx, st); e != nil {
+				t.Fatalf("drop: %v", e)
+			}
 
-	rows, err := c.Query(ctx, st)
-	if err != nil {
-		t.Fatalf("select all: %v", err)
-	}
-	defer rows.Close()
+			if st, e := c.Prepare(ctx, createQ); e != nil {
+				t.Fatalf("prep create: %v", e)
+			} else if e := c.Exec(ctx, st); e != nil {
+				t.Fatalf("create: %v", e)
+			}
 
-	// row 0 spot-checks
-	if !rows.Next() {
-		t.Fatal("no first row")
-	}
+			buf := mem.NewRowBuf(8,
+				mem.ColSpec{Name: "a", Type: mem.TypeInt64},
+				mem.ColSpec{Name: "b", Type: mem.TypeInt64},
+				mem.ColSpec{Name: "c", Type: mem.TypeInt64},
+				mem.ColSpec{Name: "d", Type: mem.TypeFloat64},
+				mem.ColSpec{Name: "e", Type: mem.TypeFloat64},
+				mem.ColSpec{Name: "f", Type: mem.TypeBool},
+				mem.ColSpec{Name: "g", Type: mem.TypeBytes},
+				mem.ColSpec{Name: "h", Type: mem.TypeBytes},
+				mem.ColSpec{Name: "i", Type: mem.TypeInt64},
+			)
 
-	if a, _ := rows.ScanInt64(0); a != 1 {
-		t.Errorf("row0 a = %d, want 1", a)
-	}
-	if c2, _ := rows.ScanInt64(2); c2 != 7 {
-		t.Errorf("row0 c = %d, want 7", c2)
-	}
-	if d0, _ := rows.ScanFloat64(3); d0 != 2.5 {
-		t.Errorf("row0 d = %v, want 2.5", d0)
-	}
-	if f0, _ := rows.ScanBool(5); !f0 {
-		t.Errorf("row0 f = false, want true")
-	}
-	if g0, _ := rows.ScanString(6); g0 != "hello" {
-		t.Errorf("row0 g = %q, want hello", g0)
-	}
-	if h0, _ := rows.ScanBytes(7); string(h0) != string([]byte{1, 2, 3}) {
-		t.Errorf("row0 h = %v, want [1 2 3]", h0)
-	}
-	if i0, _ := rows.ScanInt64(8); i0 != 42 {
-		t.Errorf("row0 i = %d, want 42", i0)
-	}
+			// row 0
+			buf.AppendInt64(0, 1)
+			buf.AppendInt64(1, 100)
+			buf.AppendInt64(2, 7)
+			buf.AppendFloat64(3, 2.5)
+			buf.AppendFloat64(4, 1.25)
+			buf.AppendBool(5, true)
+			buf.AppendBytes(6, []byte("hello"))
+			buf.AppendBytes(7, []byte{0x01, 0x02, 0x03})
+			buf.AppendInt64(8, 42)
 
-	// row 1 — check null column via RawValues
-	if !rows.Next() {
-		t.Fatal("no second row")
-	}
+			// row 1 — column i is null
+			buf.AppendInt64(0, 2)
+			buf.AppendInt64(1, 200)
+			buf.AppendInt64(2, 8)
+			buf.AppendFloat64(3, -3.5)
+			buf.AppendFloat64(4, 0.5)
+			buf.AppendBool(5, false)
+			buf.AppendBytes(6, []byte("world"))
+			buf.AppendBytes(7, []byte{0xff})
+			buf.AppendNull(8)
 
-	if raw := rows.RawValues(); raw[8] != nil {
-		t.Errorf("row1 i raw = %v, want nil (null)", raw[8])
-	}
+			n, err := c.Insert(ctx, "copy_t", buf, tc.m)
+			if err != nil {
+				t.Fatalf("Insert %s: %v", tc.name, err)
+			}
 
-	if rows.Next() {
-		t.Fatal("unexpected third row")
+			if n != 2 {
+				t.Fatalf("inserted %d rows, want 2", n)
+			}
+
+			st, err := c.Prepare(ctx, allQ)
+			if err != nil {
+				t.Fatalf("prep all: %v", err)
+			}
+
+			rows, err := c.Query(ctx, st)
+			if err != nil {
+				t.Fatalf("select all: %v", err)
+			}
+			defer rows.Close()
+
+			// row 0 spot-checks
+			if !rows.Next() {
+				t.Fatal("no first row")
+			}
+
+			if a, _ := rows.ScanInt64(0); a != 1 {
+				t.Errorf("row0 a = %d, want 1", a)
+			}
+			if c2, _ := rows.ScanInt64(2); c2 != 7 {
+				t.Errorf("row0 c = %d, want 7", c2)
+			}
+			if d0, _ := rows.ScanFloat64(3); d0 != 2.5 {
+				t.Errorf("row0 d = %v, want 2.5", d0)
+			}
+			if f0, _ := rows.ScanBool(5); !f0 {
+				t.Errorf("row0 f = false, want true")
+			}
+			if g0, _ := rows.ScanString(6); g0 != "hello" {
+				t.Errorf("row0 g = %q, want hello", g0)
+			}
+			if h0, _ := rows.ScanBytes(7); string(h0) != string([]byte{1, 2, 3}) {
+				t.Errorf("row0 h = %v, want [1 2 3]", h0)
+			}
+			if i0, _ := rows.ScanInt64(8); i0 != 42 {
+				t.Errorf("row0 i = %d, want 42", i0)
+			}
+
+			// row 1 — check null column via RawValues
+			if !rows.Next() {
+				t.Fatal("no second row")
+			}
+
+			if raw := rows.RawValues(); raw[8] != nil {
+				t.Errorf("row1 i raw = %v, want nil (null)", raw[8])
+			}
+
+			if rows.Next() {
+				t.Fatal("unexpected third row")
+			}
+		})
 	}
 }
 

@@ -18,6 +18,16 @@ type Run struct {
 	stdDriverURL *Param[string]
 	stdDriverKind *Param[string]
 
+	// stdInsertMethod is the operator-facing standard param for slot 0's
+	// default insert method; [Def.Driver] folds it onto slot 0's declared
+	// default so --insert.method reaches a load step that did not pin its own.
+	stdInsertMethod *Param[string]
+
+	// retryOpts is the run-level default [RetryOpts], resolved from the
+	// --retry.* standard params over the test's [Test.Retry] default.
+	// [VU.RetryOpts] hands it to callers that have no per-call override.
+	retryOpts RetryOpts
+
 	// bakes holds the baked query-set sources registered by [Def.Queries]; the
 	// resolver reads them in declaration order.
 	bakes map[string]*BakedQuerySet

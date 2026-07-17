@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/stroppy-io/stroppy/next/dag"
 	"github.com/stroppy-io/stroppy/next/driver"
@@ -55,7 +56,8 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 	}
 
 	set := newParamSet(cli, getenv, cfg)
-	seedParam, drvURL, drvKind, variantParam := registerStandardParams(t, set)
+	seedParam, drvURL, drvKind, insMethodParam, variantParam := registerStandardParams(t, set)
+	retryAttempts, retryBackoff, retryJitter := registerRetryParams(t, set)
 
 	// Resolve the root seed before Define so authors can size eagerly-built
 	// run-global state (e.g. a generation world) from it via [Def.Seed]. An
@@ -67,7 +69,8 @@ func runMain(t *Test, args []string, getenv func(string) string, stdout, stderr 
 	// resolved bags. Each d.Param.* resolves immediately; d.Driver folds slot 0
 	// onto the operator's driver.url/driver.kind overrides; d.Queries parses
 	// eagerly; d.Step/d.Variant/d.Histogram/d.Counter record their declarations.
-	run := &Run{test: t, seed: rootSeed, getenv: getenv, stdDriverURL: drvURL, stdDriverKind: drvKind}
+	run := &Run{test: t, seed: rootSeed, getenv: getenv, stdDriverURL: drvURL, stdDriverKind: drvKind, stdInsertMethod: insMethodParam,
+		retryOpts: RetryOpts{MaxAttempts: retryAttempts.Value(), Backoff: retryBackoff.Value(), Jitter: retryJitter.Value()}}
 	d := newDef(t, set, run)
 	defineErr := error(nil)
 	if t.Define != nil {
@@ -400,7 +403,7 @@ func loadConfig(path string) (map[string]json.RawMessage, error) {
 // driver url/kind default to empty and are patched post-Define to reflect slot
 // 0's declared default (see [patchDriverDefault]); the variant defaults to
 // "full" (D5).
-func registerStandardParams(t *Test, set *ParamSet) (seed, drvURL, drvKind, variant *Param[string]) {
+func registerStandardParams(t *Test, set *ParamSet) (seed, drvURL, drvKind, insMethod, variant *Param[string]) {
 	seedDef := t.Seed
 	if seedDef == "" {
 		seedDef = "0"
@@ -413,10 +416,30 @@ func registerStandardParams(t *Test, set *ParamSet) (seed, drvURL, drvKind, vari
 		optEnv("STROPPY_DRIVER_URL"), optStandard())
 	drvKind = set.String("driver.kind", "", "slot-0 driver kind (pg|noop)",
 		optEnv("STROPPY_DRIVER_KIND"), optStandard())
+	insMethod = set.String("insert.method", "native",
+		"slot-0 default insert method (native|plain_query|plain_bulk|columnar)",
+		optEnv("STROPPY_INSERT_METHOD"), optStandard())
 	variant = set.String("variant", "full",
 		"active variant subgraph (declared by the test)",
 		optEnv("VARIANT"), optStandard())
-	return seed, drvURL, drvKind, variant
+	return seed, drvURL, drvKind, insMethod, variant
+}
+
+// registerRetryParams declares the standard --retry.* params, defaulting each to
+// the test's [Test.Retry] value, and returns them. Resolution into a run-level
+// [RetryOpts] happens in [Main]; [VU.RetryOpts] hands the resolved value to
+// callers. The default is disabled (one attempt) unless the test pins otherwise.
+func registerRetryParams(t *Test, set *ParamSet) (attempts *Param[int], backoff, jitter *Param[time.Duration]) {
+	attempts = set.Int("retry.attempts", t.Retry.MaxAttempts,
+		"total attempts per retried call (1 = disabled)",
+		optEnv("STROPPY_RETRY_ATTEMPTS"), optStandard())
+	backoff = set.Duration("retry.backoff", t.Retry.Backoff,
+		"sleep between retries (0 = none)",
+		optEnv("STROPPY_RETRY_BACKOFF"), optStandard())
+	jitter = set.Duration("retry.jitter", t.Retry.Jitter,
+		"uniform jitter added to each backoff (0 = none)",
+		optEnv("STROPPY_RETRY_JITTER"), optStandard())
+	return attempts, backoff, jitter
 }
 
 // resolveSeed turns the seed param's string value into the uint64 root fed to
@@ -550,7 +573,7 @@ func buildGraph(steps []*StepDef, run *Run, seed uint64, reg *metrics.Registry, 
 		if err != nil {
 			return nil, nil, err
 		}
-		ex := buildExecutor(stepConfig(sd, seed, reg, drivers, acq, slot), sd)
+		ex := buildExecutor(stepConfig(sd, seed, reg, drivers, acq, slot, run.retryOpts), sd)
 		execs = append(execs, ex)
 		g.Add(&dag.Node{
 			ID:        sd.name,

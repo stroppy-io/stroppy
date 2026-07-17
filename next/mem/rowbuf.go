@@ -208,6 +208,49 @@ func (b *RowBuf) BoolCol(col int) []bool { return b.bl[b.slot[col]] }
 // BytesAt returns row's bytes for a TypeBytes column as a view into the slab.
 // The view is valid until the next Reset or Append to that column.
 func (b *RowBuf) BytesAt(col, row int) []byte {
+	return b.bytesView(col, row)
+}
+
+// RowValue fills dst with row's values boxed into interface cells, one per
+// column in schema order, and returns dst truncated to Cols. NULL cells become
+// nil. It is the driver-side read primitive: the only shape a drain path
+// (COPY, multi-row VALUES, per-row INSERT) needs to take rows out of the
+// columnar buffer without reaching into the typed column slices.
+//
+// Each cell carries its natural Go type — int64, float64, bool, or a []byte
+// view into the bytes slab — so type-driven narrowing to a wire format
+// (int16 vs int64 for pg's int2, []byte vs string) stays the driver's job;
+// only the driver knows the target column type. dst is reused (truncated
+// first); the boxing into interface is the per-cell allocation a real driver
+// pays at its wire boundary regardless of how it reads the buffer.
+//
+// The []byte view aliases the slab and is valid until the next Reset or
+// Append to that column; a drain loop reads synchronously without mutating
+// the buffer, so views are stable across the loop.
+func (b *RowBuf) RowValue(row int, dst []any) []any {
+	dst = dst[:0]
+	for col := range b.types {
+		if b.IsNull(col, row) {
+			dst = append(dst, nil)
+			continue
+		}
+		switch b.types[col] {
+		case TypeInt64:
+			dst = append(dst, b.i64[b.slot[col]][row])
+		case TypeFloat64:
+			dst = append(dst, b.f64[b.slot[col]][row])
+		case TypeBool:
+			dst = append(dst, b.bl[b.slot[col]][row])
+		case TypeBytes:
+			dst = append(dst, b.bytesView(col, row))
+		}
+	}
+	return dst
+}
+
+// bytesView returns row's bytes for a TypeBytes column as a view into the slab.
+// It is the shared backing for [RowBuf.BytesAt] and [RowBuf.RowValue].
+func (b *RowBuf) bytesView(col, row int) []byte {
 	s := b.slot[col]
 
 	start := int32(0)

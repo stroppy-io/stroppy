@@ -81,6 +81,11 @@ type Spec struct {
 	ConnectTimeout time.Duration
 	// Mode selects PerVU (pinned, default) or Shared (pooled) acquisition.
 	Mode Acquisition
+	// InsertMethod is the slot's resolved default insert method, inherited by a
+	// load step that does not pin its own. The zero value ([InsertNative]) lets
+	// each driver pick its fastest path. An operator's --insert.method override
+	// folds into slot 0 here at resolution time.
+	InsertMethod InsertMethod
 	// Native holds driver-specific advanced knobs (D2 class B). Opaque to the
 	// SDK; a per-dbdrv typed accessor (pg.Native) reads it.
 	Native map[string]any

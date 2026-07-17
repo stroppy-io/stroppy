@@ -11,7 +11,7 @@ import (
 // Driver is a no-op driver: it discards every write and returns canned empty
 // results. It exists to isolate harness-side allocation and overhead from any
 // real database (RFC 0001 §6). Every steady-state hot call — Exec, Query,
-// QueryRow, InsertColumns and their *WithArgs variants — is allocation-free:
+// QueryRow, Insert and their *WithArgs variants — is allocation-free:
 // preallocated result objects are returned by pointer (an interface conversion
 // of a pointer does not allocate), and bound arguments are read from nowhere.
 //
@@ -23,12 +23,16 @@ type Driver struct{}
 var (
 	_ driver.Driver = (*Driver)(nil)
 	_ driver.Pooled = (*Driver)(nil)
+	_ driver.Pinger = (*Driver)(nil)
 )
 
 // New returns a no-op driver. The Spec is accepted for API symmetry with
 // concrete drivers and ignored: the no-op backend carries no real
 // configuration.
 func New(_ driver.Spec) *Driver { return &Driver{} }
+
+// Ping is the readiness probe: the no-op backend is always ready.
+func (*Driver) Ping(context.Context) error { return nil }
 
 // Connect returns a pinned no-op connection with its result objects
 // preallocated so later hot calls allocate nothing.
@@ -100,8 +104,10 @@ func (c *conn) QueryWithArgs(context.Context, driver.Stmt, *driver.Args) (driver
 
 func (c *conn) Begin(context.Context, driver.Isolation) (driver.Tx, error) { return c.tx, nil }
 
-// InsertColumns discards buf and reports its row count as if written.
-func (c *conn) InsertColumns(_ context.Context, _ string, buf *mem.RowBuf) (int64, error) {
+// Insert discards buf and reports its row count as if written. The method is
+// accepted but ignored: the no-op backend has no real drain path, so every
+// [driver.InsertMethod] reads the same.
+func (c *conn) Insert(_ context.Context, _ string, buf *mem.RowBuf, _ driver.InsertMethod) (int64, error) {
 	return int64(buf.Rows()), nil
 }
 

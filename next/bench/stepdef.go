@@ -163,7 +163,7 @@ func buildExecutor(cfg Config, sd *StepDef) *Executor {
 // stepConfig builds the executor Config for sd, threading run-level state: the
 // stable step id (feeds rng), the run seed, the shared registry, the resolved
 // drivers with their per-slot acquisition modes, and this step's default slot.
-func stepConfig(sd *StepDef, seed uint64, reg *metrics.Registry, drivers []driver.Driver, acq []driver.Acquisition, slot int) Config {
+func stepConfig(sd *StepDef, seed uint64, reg *metrics.Registry, drivers []driver.Driver, acq []driver.Acquisition, slot int, retry RetryOpts) Config {
 	return Config{
 		Name:    sd.name,
 		StepID:  stepID(sd.name),
@@ -173,5 +173,6 @@ func stepConfig(sd *StepDef, seed uint64, reg *metrics.Registry, drivers []drive
 		Drivers: drivers,
 		Acq:     acq,
 		Slot:    slot,
+		Retry:   retry,
 	}
 }

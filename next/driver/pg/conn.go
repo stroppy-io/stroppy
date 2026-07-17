@@ -24,7 +24,7 @@ type executor interface {
 // was lent by a shared pool, in which case Close returns it rather than closing.
 // scratch is the reused []any the hot bind path materialises Args into (one per
 // connection); oidCache/colCache memoise each table's column layout for
-// InsertColumns. simple selects the no-server-prepare text-run path (D2 class
+// Insert. simple selects the no-server-prepare text-run path (D2 class
 // B native knob); defaultIso resolves [driver.DBDefault] at Begin.
 type conn struct {
 	conn     *pgx.Conn

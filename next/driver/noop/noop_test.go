@@ -76,9 +76,9 @@ func TestQueryAllocs(t *testing.T) {
 	}
 }
 
-// TestInsertColumnsAllocs gates the steady-state InsertColumns path at zero
-// allocations (the buffer is built once, outside the measured closure).
-func TestInsertColumnsAllocs(t *testing.T) {
+// TestInsertAllocs gates the steady-state Insert path at zero allocations (the
+// buffer is built once, outside the measured closure).
+func TestInsertAllocs(t *testing.T) {
 	ctx := context.Background()
 	c := mustConn(t)
 
@@ -87,14 +87,14 @@ func TestInsertColumnsAllocs(t *testing.T) {
 	buf.AppendInt64(0, 2)
 
 	allocs := testing.AllocsPerRun(1000, func() {
-		n, err := c.InsertColumns(ctx, "t", buf)
+		n, err := c.Insert(ctx, "t", buf, driver.InsertNative)
 		if err != nil || n != 2 {
-			t.Fatalf("InsertColumns n=%d err=%v", n, err)
+			t.Fatalf("Insert n=%d err=%v", n, err)
 		}
 	})
 
 	if allocs != 0 {
-		t.Fatalf("InsertColumns allocs = %v, want 0", allocs)
+		t.Fatalf("Insert allocs = %v, want 0", allocs)
 	}
 }
 

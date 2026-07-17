@@ -232,7 +232,8 @@ func TestProbeGolden(t *testing.T) {
 	// Mirror runMain's probe path: bags -> paramSet -> standard params ->
 	// Define -> schema -> probe.
 	set := newParamSet(nil, envMap(nil), nil)
-	seedP, drvURL, drvKind, variantP := registerStandardParams(tst, set)
+	seedP, drvURL, drvKind, _, variantP := registerStandardParams(tst, set)
+	registerRetryParams(tst, set)
 	rootSeed, err := resolveSeed(seedP.Value(), tst.Seed)
 	if err != nil {
 		t.Fatalf("resolveSeed: %v", err)
@@ -298,6 +299,17 @@ func TestProbeGolden(t *testing.T) {
       "source": "default"
     },
     {
+      "name": "insert.method",
+      "env": "STROPPY_INSERT_METHOD",
+      "flag": "--insert.method",
+      "config": "insert.method",
+      "type": "string",
+      "help": "slot-0 default insert method (native|plain_query|plain_bulk|columnar)",
+      "default": "native",
+      "current": "native",
+      "source": "default"
+    },
+    {
       "name": "variant",
       "env": "VARIANT",
       "flag": "--variant",
@@ -306,6 +318,39 @@ func TestProbeGolden(t *testing.T) {
       "help": "active variant subgraph (declared by the test)",
       "default": "full",
       "current": "full",
+      "source": "default"
+    },
+    {
+      "name": "retry.attempts",
+      "env": "STROPPY_RETRY_ATTEMPTS",
+      "flag": "--retry.attempts",
+      "config": "retry.attempts",
+      "type": "int",
+      "help": "total attempts per retried call (1 = disabled)",
+      "default": "0",
+      "current": "0",
+      "source": "default"
+    },
+    {
+      "name": "retry.backoff",
+      "env": "STROPPY_RETRY_BACKOFF",
+      "flag": "--retry.backoff",
+      "config": "retry.backoff",
+      "type": "duration",
+      "help": "sleep between retries (0 = none)",
+      "default": "0s",
+      "current": "0s",
+      "source": "default"
+    },
+    {
+      "name": "retry.jitter",
+      "env": "STROPPY_RETRY_JITTER",
+      "flag": "--retry.jitter",
+      "config": "retry.jitter",
+      "type": "duration",
+      "help": "uniform jitter added to each backoff (0 = none)",
+      "default": "0s",
+      "current": "0s",
       "source": "default"
     }
   ],

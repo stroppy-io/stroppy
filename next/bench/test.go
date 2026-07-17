@@ -31,6 +31,12 @@ type Test struct {
 	// all sources. The resolved uint64 root feeds DeriveStream and fixes every
 	// rng draw (RFC 0001 §5). An empty Seed defaults to "0" (a valid seed, D11).
 	Seed string
+	// Retry is the test's default [RetryOpts], the default an operator's
+	// --retry.* standard params override. The zero value disables retry (one
+	// attempt) — set MaxAttempts > 1 (and a Backoff) for a workload like TPC-C
+	// that needs serialization replay. Per-call sites may still pass an explicit
+	// RetryOpts to [Transaction]/[Retry] for finer control.
+	Retry RetryOpts
 	// Define registers the test's params, driver slots, query-sets, steps,
 	// variants and instruments against d, using the typed handles D1/D7 provide.
 	// It returns a Go native error (no panics, no throw — D10); [Main] surfaces

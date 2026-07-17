@@ -143,6 +143,7 @@ func (d *Def) Driver(name, kind string, opts ...DriverOpt) *DriverSpec {
 	// then the index form (multi-driver, F2).
 	if len(d.drivers) == 1 {
 		spec.url, spec.kind = d.resolveSlot0(spec.url, spec.kind)
+		spec.spec.InsertMethod = d.resolveSlot0InsertMethod(spec.spec.InsertMethod)
 	} else {
 		idx := len(d.drivers) - 1
 		spec.url, spec.kind = d.resolveExtraSlot(name, idx, spec.url, spec.kind)
@@ -192,6 +193,24 @@ func (d *Def) resolveSlot0(declURL, declKind string) (url, kind string) {
 		}
 	}
 	return url, kind
+}
+
+// resolveSlot0InsertMethod folds the operator's --insert.method override onto
+// the declared default. Unlike driver.url/kind (which default to empty), the
+// insert.method standard param defaults to "native", so only an explicitly set
+// value (source != Default) wins over the test's declared default — otherwise
+// [WithURL]-style test defaults and the driver's own Native would be clobbered.
+// An unrecognized value leaves the declared default and surfaces no error here
+// (a typo is caught when the param schema is rendered).
+func (d *Def) resolveSlot0InsertMethod(decl driver.InsertMethod) driver.InsertMethod {
+	p := d.run.stdInsertMethod
+	if p == nil || p.Source() == SourceDefault {
+		return decl
+	}
+	if m, ok := driver.ParseInsertMethod(p.Value()); ok {
+		return m
+	}
+	return decl
 }
 
 // Queries registers one baked query-set and resolves it eagerly against the
@@ -415,6 +434,15 @@ type DriverOpt func(*DriverSpec)
 // --driver.url standard param overrides for slot 0.
 func WithURL(url string) DriverOpt {
 	return func(s *DriverSpec) { s.url = url; s.spec.URL = url }
+}
+
+// WithInsertMethod sets the slot's declared default insert method — the default
+// a load step inherits when it does not pin its own, and the fallback an
+// operator's --insert.method override (slot 0) replaces only when set
+// explicitly. The zero value ([driver.InsertNative]) is the default and lets
+// each driver pick its fastest path.
+func WithInsertMethod(m driver.InsertMethod) DriverOpt {
+	return func(s *DriverSpec) { s.spec.InsertMethod = m }
 }
 
 // Shared selects the shared-pool acquisition mode: one connection pool across

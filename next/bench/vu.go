@@ -54,6 +54,7 @@ type VU struct {
 	acq     []driver.Acquisition
 	conns   []driver.Conn
 	slot    int
+	retry   RetryOpts
 	// stmts memoizes prepared handles per query for this VU's default-slot conn.
 	stmts map[*sqlfile.Query]driver.Stmt
 }
@@ -66,6 +67,27 @@ func (vu *VU) Ctx() context.Context { return vu.ctx }
 // unset). [VU.Conn] uses it implicitly; Slot is only needed to compute a target
 // for [VU.ConnSlot] on a multi-driver step.
 func (vu *VU) Slot() int { return vu.slot }
+
+// InsertMethod resolves the insert method for this VU's default slot: m if it
+// pins a concrete method, else the slot driver's default (when it implements
+// [driver.InsertDefaulter]), else [driver.InsertNative]. It is the single
+// resolution point where a load step's per-call choice meets the slot/operator
+// default — the umbrella "per-call > slot default > driver-native" chain.
+func (vu *VU) InsertMethod(m driver.InsertMethod) driver.InsertMethod {
+	if m != driver.InsertNative {
+		return m
+	}
+	if d, ok := vu.drivers[vu.slot].(driver.InsertDefaulter); ok {
+		return d.DefaultInsertMethod()
+	}
+	return driver.InsertNative
+}
+
+// RetryOpts reports the run-level default [RetryOpts], resolved from the
+// --retry.* standard params over the test's [Test.Retry] default. A tx/query
+// call site that has no per-call override passes this; one that wants finer
+// control builds its own [RetryOpts]. Disabled by default (one attempt).
+func (vu *VU) RetryOpts() RetryOpts { return vu.retry }
 
 // Index reports the VU's zero-based worker index within its executor.
 func (vu *VU) Index() int { return vu.index }

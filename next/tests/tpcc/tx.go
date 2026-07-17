@@ -45,9 +45,10 @@ const (
 	sSlThreshold uint32 = 501
 )
 
-// txRetry bounds the per-transaction serialization retry the bench.Transaction
-// helper drives. Eight attempts covers a conflict storm under contention; the
-// small backoff lets the conflicting tx commit before the replay reads.
+// txRetry is tpcc's default serialization-retry policy: eight attempts covers a
+// conflict storm under contention; the small backoff lets the conflicting tx
+// commit before the replay reads. It seeds [bench.Test.Retry] so an operator's
+// --retry.* override reaches a tx that did not pin its own.
 var txRetry = bench.RetryOpts{MaxAttempts: 8, Backoff: 100 * time.Microsecond}
 
 // errRollback is the sentinel for the spec-mandated 1% new_order rollback
@@ -161,7 +162,7 @@ func (h *workloadHandler) Iter(vu *bench.VU) error {
 	// sentinel is not a backend error, so the classifier returns Continue and the
 	// helper surfaces it for Iter to count as a completed New-Order.
 	st.rec.Latency = st.lat[pick]
-	err := bench.Transaction(vu.Ctx(), st.conn, vu.Classify, h.iso, txRetry, st.rec,
+	err := bench.Transaction(vu.Ctx(), st.conn, vu.Classify, h.iso, vu.RetryOpts(), st.rec,
 		func(tx driver.Tx) error {
 			switch pick {
 			case txNewOrder:

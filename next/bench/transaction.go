@@ -2,21 +2,59 @@ package bench
 
 import (
 	"context"
+	"math/rand"
 	"time"
 
 	"github.com/stroppy-io/stroppy/next/driver"
 	"github.com/stroppy-io/stroppy/next/metrics"
 )
 
-// RetryOpts bounds a [Transaction] retry loop. MaxAttempts is the total attempt
-// count (the first attempt plus retries); a value below 1 is treated as 1, so a
-// zero-value RetryOpts runs the tx exactly once with no replay. Backoff is the
-// sleep between retries; zero sleeps nothing. Retries are driven by the
-// connection's own driver classifier — only the dbdrv knows which errors are
-// transient (D2/D10).
+// RetryOpts bounds a retry loop. MaxAttempts is the total attempt count (the
+// first attempt plus retries); a value below 1 is treated as 1, so a zero-value
+// RetryOpts runs the call exactly once with no replay — retry is opt-in and
+// disabled by default. Backoff is the sleep between retries; Jitter is added
+// uniformly on top of it ([0,Jitter)). Retries are driven by a classifier —
+// only the dbdrv knows which errors are transient (D2/D10).
 type RetryOpts struct {
 	MaxAttempts int
 	Backoff     time.Duration
+	Jitter      time.Duration
+}
+
+// Retry calls fn up to opts.MaxAttempts times, replaying it when classify maps
+// the returned error to [driver.Retry], sleeping opts.Backoff (+ jitter)
+// between attempts. It is the retry primitive a transaction ([Transaction]) and
+// a plain-query path share: fn is the unit of replay, classify decides what is
+// transient. A nil classifier disables retry (every error is terminal); a
+// zero-value RetryOpts runs fn once. The steady-state success path returns nil
+// and never consults classify, so the enum only exists on the failure branch.
+//
+// Jitter uses the process rand source, not the step's seed-derived stream:
+// retry sleep timing is not part of the data-repro contract (only rng draws
+// are), and the retry path is rare enough that its timing does not feed back
+// into measured steady-state results.
+func Retry(
+	ctx context.Context,
+	classify func(error) driver.Action,
+	opts RetryOpts,
+	fn func() error,
+) error {
+	if opts.MaxAttempts < 1 {
+		opts.MaxAttempts = 1
+	}
+	var lastErr error
+	for attempt := 1; attempt <= opts.MaxAttempts; attempt++ {
+		err := fn()
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+		if classify == nil || classify(err) != driver.Retry || attempt == opts.MaxAttempts {
+			return err
+		}
+		sleepBackoff(ctx, opts.Backoff, opts.Jitter)
+	}
+	return lastErr
 }
 
 // TxRecorder is the per-VU telemetry seam a [Transaction] records into: whole-tx
@@ -51,17 +89,19 @@ type TxRecorder struct {
 // Transaction runs fn inside a transaction on conn at iso. It commits when fn
 // returns nil, rolls back when fn returns a non-nil error, and replays the whole
 // fn when classify maps the fn error or a commit failure to [driver.Retry], up
-// to opts.MaxAttempts attempts with opts.Backoff between them. A transaction
-// replays whole, not per-query — the unit the TPC-C new_order semantics require
-// (a serialization retry re-runs every statement against fresh state).
+// to opts.MaxAttempts attempts with opts.Backoff (+ jitter) between them. A
+// transaction replays whole, not per-query — the unit the TPC-C new_order
+// semantics require (a serialization retry re-runs every statement against
+// fresh state).
 //
-// classify is the connection's own driver classifier (a [driver.Driver.Classify]
-// bound to the connection's backend); pass nil to disable retry and treat every
-// error as terminal. rec, when non-nil, records whole-tx wall-clock latency
-// (Begin -> terminal) into rec.Latency on a commit and tallies outcome counts
-// on every terminal outcome. Returns nil on a committed tx, the terminal
-// fn/commit error otherwise (including errRollback-style sentinels the caller
-// may reinterpret).
+// It is built on [Retry]: the retry decision and backoff/jitter are shared with
+// the plain-query path; the closure owns the tx lifecycle (Begin/Commit/
+// Rollback) and telemetry. classify is the connection's own driver classifier
+// (a [driver.Driver.Classify] bound to the connection's backend); pass nil to
+// disable retry and treat every error as terminal. rec, when non-nil, records
+// whole-tx wall-clock latency (Begin -> terminal) into rec.Latency on a commit
+// and tallies outcome counts on every terminal outcome. Returns nil on a
+// committed tx, the terminal fn/commit error otherwise.
 //
 // Begin failures are not retried here: a connect-level fault is surfaced
 // immediately for the executor's ErrorMode to handle (it is rarely transient in
@@ -75,29 +115,15 @@ func Transaction(
 	rec *TxRecorder,
 	fn func(tx driver.Tx) error,
 ) error {
-	if opts.MaxAttempts < 1 {
-		opts.MaxAttempts = 1
-	}
-	retryable := func(err error) bool {
-		if classify == nil || err == nil {
-			return false
-		}
-		return classify(err) == driver.Retry
-	}
-
-	// Whole-tx latency = wall clock from the first Begin to the terminal
-	// Commit/Rollback, so a multi-attempt tx reports the full retry cost. The
-	// start is captured once, outside the attempt loop; only the rare recording
-	// path (commit success with a non-nil Shard) calls time.Since. Shard is the
-	// gate (handle 0 is a valid histogram, so Latency cannot signal on/off).
 	record := rec != nil && rec.Shard != nil
 	var start time.Time
 	if record {
 		start = time.Now()
 	}
 
-	var lastErr error
-	for attempt := 1; attempt <= opts.MaxAttempts; attempt++ {
+	attempt := 0
+	err := Retry(ctx, classify, opts, func() error {
+		attempt++
 		tx, err := conn.Begin(ctx, iso)
 		if err != nil {
 			return err
@@ -115,9 +141,6 @@ func Transaction(
 		if terminal == nil {
 			if rec != nil {
 				rec.Committed++
-				if attempt > 1 {
-					rec.Retried += int64(attempt - 1)
-				}
 				if record {
 					rec.Shard.Record(rec.Latency, time.Since(start).Nanoseconds())
 				}
@@ -125,29 +148,27 @@ func Transaction(
 			return nil
 		}
 
-		lastErr = terminal
-		if !retryable(terminal) || attempt == opts.MaxAttempts {
-			if rec != nil {
-				rec.RolledBack++
-				if attempt > 1 {
-					rec.Retried += int64(attempt - 1)
-				}
-			}
-			return terminal
-		}
-
 		if rec != nil {
 			rec.RolledBack++
 		}
-		sleepBackoff(ctx, opts.Backoff)
+		return terminal
+	})
+	// Retried counts replays across the whole call (success after retries or
+	// exhaustion), tallied once from the final attempt number.
+	if rec != nil && attempt > 1 {
+		rec.Retried += int64(attempt - 1)
 	}
-	return lastErr
+	return err
 }
 
-// sleepBackoff sleeps for d, returning early if ctx is canceled. The retry path
-// is rare (only serialization-class failures), so the timer allocation here is
-// off the steady-state hot path.
-func sleepBackoff(ctx context.Context, d time.Duration) {
+// sleepBackoff sleeps for backoff plus uniform jitter in [0,jitter), returning
+// early if ctx is canceled. The retry path is rare (only serialization-class
+// failures), so the timer allocation here is off the steady-state hot path.
+func sleepBackoff(ctx context.Context, backoff, jitter time.Duration) {
+	d := backoff
+	if jitter > 0 {
+		d += time.Duration(rand.Int63n(int64(jitter)))
+	}
 	if d <= 0 {
 		return
 	}

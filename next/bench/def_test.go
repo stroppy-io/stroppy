@@ -9,7 +9,7 @@ import (
 // registration); Handle panics with a clear message until then.
 func TestHistogramCounterForwardRef(t *testing.T) {
 	set := newParamSet(nil, envMap(nil), nil)
-	_, _, _, _ = registerStandardParams(&Test{Name: "x"}, set)
+	_, _, _, _, _ = registerStandardParams(&Test{Name: "x"}, set)
 	run := &Run{test: &Test{Name: "x"}, getenv: envMap(nil)}
 	d := newDef(&Test{Name: "x"}, set, run)
 
@@ -46,7 +46,7 @@ func TestHistogramCounterForwardRef(t *testing.T) {
 // steps; an unknown variant name is rejected; an empty step set means all.
 func TestVariantSelection(t *testing.T) {
 	set := newParamSet(nil, envMap(nil), nil)
-	_, _, _, _ = registerStandardParams(&Test{Name: "x"}, set)
+	_, _, _, _, _ = registerStandardParams(&Test{Name: "x"}, set)
 	run := &Run{test: &Test{Name: "x"}, getenv: envMap(nil)}
 	d := newDef(&Test{Name: "x"}, set, run)
 
@@ -91,7 +91,7 @@ func TestVariantSelection(t *testing.T) {
 // declared step (D3b: empty = all).
 func TestVariantEmptyMeansAll(t *testing.T) {
 	set := newParamSet(nil, envMap(nil), nil)
-	_, _, _, _ = registerStandardParams(&Test{Name: "x"}, set)
+	_, _, _, _, _ = registerStandardParams(&Test{Name: "x"}, set)
 	run := &Run{test: &Test{Name: "x"}, getenv: envMap(nil)}
 	d := newDef(&Test{Name: "x"}, set, run)
 	d.Step("a", okHandler{})
@@ -107,7 +107,7 @@ func TestVariantEmptyMeansAll(t *testing.T) {
 // "full" is rejected (D5: the standard variant param defaults to "full").
 func TestVariantFullRequired(t *testing.T) {
 	set := newParamSet(nil, envMap(nil), nil)
-	_, _, _, _ = registerStandardParams(&Test{Name: "x"}, set)
+	_, _, _, _, _ = registerStandardParams(&Test{Name: "x"}, set)
 	run := &Run{test: &Test{Name: "x"}, getenv: envMap(nil)}
 	d := newDef(&Test{Name: "x"}, set, run)
 	a := d.Step("a", okHandler{})
@@ -122,7 +122,7 @@ func TestVariantFullRequired(t *testing.T) {
 // name is only validated when variants exist).
 func TestNoVariantsAdmitsAll(t *testing.T) {
 	set := newParamSet(nil, envMap(nil), nil)
-	_, _, _, _ = registerStandardParams(&Test{Name: "x"}, set)
+	_, _, _, _, _ = registerStandardParams(&Test{Name: "x"}, set)
 	run := &Run{test: &Test{Name: "x"}, getenv: envMap(nil)}
 	d := newDef(&Test{Name: "x"}, set, run)
 	d.Step("a", okHandler{})
@@ -150,7 +150,7 @@ func TestSkippableMarker(t *testing.T) {
 func TestDriverSlot0Override(t *testing.T) {
 	cli := map[string]string{"driver.kind": "noop"}
 	set := newParamSet(cli, envMap(nil), nil)
-	_, drvURL, drvKind, _ := registerStandardParams(&Test{Name: "x"}, set)
+	_, drvURL, drvKind, _, _ := registerStandardParams(&Test{Name: "x"}, set)
 	run := &Run{test: &Test{Name: "x"}, getenv: envMap(nil), stdDriverURL: drvURL, stdDriverKind: drvKind}
 	d := newDef(&Test{Name: "x"}, set, run)
 	d.Driver("main", "pg", WithURL("postgres://x"))

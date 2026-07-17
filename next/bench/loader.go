@@ -9,9 +9,9 @@ import (
 	"github.com/stroppy-io/stroppy/next/mem"
 )
 
-// Loader owns the fill-batch-flush COPY loop that every relational load step
+// Loader owns the fill-batch-flush insert loop that every relational load step
 // repeats verbatim: each worker is handed a contiguous cycle range, walks it
-// calling the author's generator into a reused [mem.RowBuf], and flushes a COPY
+// calling the author's generator into a reused [mem.RowBuf], and flushes an insert
 // whenever the buffer reaches the batch size. The author writes only the
 // generator ([Spec.Gen]); the handler owns Init (build the RowBuf + Streams),
 // Iter (fill-batch-flush) and Close.
@@ -26,7 +26,7 @@ import (
 // variable-row emission without rewriting the single-table path, so a Loader is
 // structured to make that add, not a replacement.
 
-// DefaultBatch is the COPY flush batch size used when Spec.Batch is unset.
+// DefaultBatch is the insert flush batch size used when Spec.Batch is unset.
 const DefaultBatch = 2000
 
 // Spec configures one single-table load step.
@@ -34,13 +34,19 @@ type Spec struct {
 	// Step is the load step name (also the source of the step's rng id via
 	// FNV-1a, so it must be unique within the test).
 	Step string
-	// Table is the COPY target table name.
+	// Table is the insert target table name.
 	Table string
 	// Cols is the columnar schema passed to [mem.NewRowBuf].
 	Cols []mem.ColSpec
-	// Batch is the row count at which the handler flushes a COPY. Zero means
+	// Batch is the row count at which the handler flushes an insert. Zero means
 	// [DefaultBatch].
 	Batch int
+	// Method is the insert method a step pins. The zero value
+	// ([driver.InsertNative]) inherits the slot's resolved default (operator
+	// --insert.method for slot 0, else the driver's own best). Set a concrete
+	// method to force it for this step — e.g. [driver.InsertPlainQuery] to
+	// measure per-row overhead.
+	Method driver.InsertMethod
 	// MaxRowsPerCycle is the most rows one Gen call can append. The RowBuf is
 	// sized Batch+MaxRowsPerCycle so a gen call that crosses the flush
 	// threshold never exceeds capacity mid-fill. Defaults to 1; set higher
@@ -98,6 +104,7 @@ type loaderState struct {
 	conn    driver.Conn
 	buf     *mem.RowBuf
 	streams *Streams
+	method  driver.InsertMethod
 }
 
 func (h *loaderHandler) Init(vu *VU) error {
@@ -109,6 +116,7 @@ func (h *loaderHandler) Init(vu *VU) error {
 	st.conn = conn
 	st.buf = mem.NewRowBuf(h.spec.Batch+h.spec.MaxRowsPerCycle, h.spec.Cols...)
 	st.streams = StreamsFrom(vu)
+	st.method = vu.InsertMethod(h.spec.Method)
 	return nil
 }
 
@@ -119,14 +127,14 @@ func (h *loaderHandler) Iter(vu *VU) error {
 	for c := start; c < end; c++ {
 		h.spec.Gen(st.buf, c, st.streams)
 		if st.buf.Rows() >= h.spec.Batch {
-			if _, err := st.conn.InsertColumns(vu.Ctx(), h.spec.Table, st.buf); err != nil {
+			if _, err := st.conn.Insert(vu.Ctx(), h.spec.Table, st.buf, st.method); err != nil {
 				return err
 			}
 			st.buf.Reset()
 		}
 	}
 	if st.buf.Rows() > 0 {
-		if _, err := st.conn.InsertColumns(vu.Ctx(), h.spec.Table, st.buf); err != nil {
+		if _, err := st.conn.Insert(vu.Ctx(), h.spec.Table, st.buf, st.method); err != nil {
 			return err
 		}
 	}
@@ -136,7 +144,7 @@ func (h *loaderHandler) Iter(vu *VU) error {
 func (h *loaderHandler) Close(*VU) error { return nil }
 
 // RunRange drives spec's generator over the half-open cycle range [start, end),
-// flushing COPY batches through conn as the buffer fills. It is the synchronous,
+// flushing insert batches through conn as the buffer fills. It is the synchronous,
 // single-connection counterpart to the Pool-driven [Loader] step — for a test
 // that needs the generated data in-process, a one-off backfill, or any non-DAG
 // caller that wants the load without the executor. streams is the named-stream
@@ -158,7 +166,7 @@ func RunRange(ctx context.Context, spec Spec, conn driver.Conn, streams *Streams
 	for c := start; c < end; c++ {
 		spec.Gen(buf, c, streams)
 		if buf.Rows() >= spec.Batch {
-			n, err := conn.InsertColumns(ctx, spec.Table, buf)
+			n, err := conn.Insert(ctx, spec.Table, buf, spec.Method)
 			rows += n
 			if err != nil {
 				return rows, err
@@ -167,7 +175,7 @@ func RunRange(ctx context.Context, spec Spec, conn driver.Conn, streams *Streams
 		}
 	}
 	if buf.Rows() > 0 {
-		n, err := conn.InsertColumns(ctx, spec.Table, buf)
+		n, err := conn.Insert(ctx, spec.Table, buf, spec.Method)
 		rows += n
 		if err != nil {
 			return rows, err

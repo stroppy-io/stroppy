@@ -197,3 +197,59 @@ func TestTransactionRecorderOptional(t *testing.T) {
 		t.Errorf("fn called %d times, want 1", called)
 	}
 }
+
+// TestRetryReplays is the plain-query (non-tx) path: Retry calls fn again when
+// classify maps the error to Retry, up to MaxAttempts, then succeeds.
+func TestRetryReplays(t *testing.T) {
+	ctx := context.Background()
+	called := 0
+	err := Retry(ctx, classifyRetry, RetryOpts{MaxAttempts: 4, Backoff: time.Microsecond},
+		func() error {
+			called++
+			if called < 3 {
+				return errRetryable
+			}
+			return nil
+		})
+	if err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if called != 3 {
+		t.Errorf("fn called %d times, want 3", called)
+	}
+}
+
+// TestRetryExhausted surfaces the final error once attempts run out.
+func TestRetryExhausted(t *testing.T) {
+	ctx := context.Background()
+	called := 0
+	err := Retry(ctx, classifyRetry, RetryOpts{MaxAttempts: 2, Backoff: time.Microsecond},
+		func() error {
+			called++
+			return errRetryable
+		})
+	if !errors.Is(err, errRetryable) {
+		t.Fatalf("err = %v, want errRetryable", err)
+	}
+	if called != 2 {
+		t.Errorf("fn called %d times, want 2", called)
+	}
+}
+
+// TestRetryDisabledByDefault confirms a zero-value RetryOpts runs fn once — the
+// opt-in contract (retry is never silently enabled).
+func TestRetryDisabledByDefault(t *testing.T) {
+	ctx := context.Background()
+	called := 0
+	err := Retry(ctx, classifyRetry, RetryOpts{},
+		func() error {
+			called++
+			return errRetryable
+		})
+	if !errors.Is(err, errRetryable) {
+		t.Fatalf("err = %v, want errRetryable", err)
+	}
+	if called != 1 {
+		t.Errorf("fn called %d times, want 1", called)
+	}
+}
