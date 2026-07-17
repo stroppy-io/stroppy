@@ -272,9 +272,11 @@ func TestParamBindingBothPaths(t *testing.T) {
 		t.Fatalf("exec variadic: %v", err)
 	}
 
-	// reusable *Args path
+	// reusable *Args path — the insert query carries :id/:n/:s, so Bind yields a
+	// named-mode buffer; bind by name (positional setters on a named buffer are
+	// undefined — see Args).
 	a := ins.Bind()
-	a.Int64(2).Int64(20).String("world")
+	a.SetInt64("id", 2).SetInt64("n", 20).SetString("s", "world")
 
 	if err := c.ExecWithArgs(ctx, ins, a); err != nil {
 		t.Fatalf("exec withargs: %v", err)
