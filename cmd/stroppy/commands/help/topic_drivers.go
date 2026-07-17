@@ -79,7 +79,8 @@ DRIVER OPTIONS (-D / --driver-opt)
     url                    string    Database connection URL
     driverType             string    postgres | mysql | picodata | ydb |
                                      noop | csv
-    defaultInsertMethod    string    plain_query | native | plain_bulk
+    defaultInsertMethod    string    plain_query | native | plain_bulk |
+                                     columnar
     defaultTxIsolation     string    read_uncommitted | read_committed |
                                      repeatable_read | serializable |
                                      db_default | conn | none
