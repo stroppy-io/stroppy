@@ -75,11 +75,13 @@ const _sqlByDriver: Record<string, string> = {
   postgres: "./pg.sql",
   mysql: "./mysql.sql",
   ydb: "./ydb.sql",
+  picodata: "./pico.sql",
 };
 const _schemaByDriver: Record<string, string> = {
   postgres: "./schema.pg.sql",
   mysql: "./schema.mysql.sql",
   ydb: "./schema.ydb.sql",
+  picodata: "./schema.pico.sql",
 };
 
 // YDB storage layout. Default 'column': the OLAP column store is the right
@@ -156,6 +158,16 @@ const answersSf1: AnswersFile | null = VALIDATE_ANSWERS ? readAnswersSf1() : nul
 const baked =
   !THROUGHPUT && QUERY_STREAM === "" ? parse_sql(open(SQL_FILE)) : null;
 
+// picodata's sbroad engine has no rank()/dense_rank()/lag()/lead() and no
+// correlated-subquery support to emulate them, so pico.sql omits these 8
+// queries. Log the skip once so a run makes clear why the count is 95, not 103.
+if (driverConfig.driverType === "picodata" && baked) {
+  console.log(
+    "[tpcds] picodata: 8 queries skipped — sbroad lacks rank/dense_rank/lag/lead " +
+      "(query_36, query_44, query_47, query_49, query_57, query_67, query_70, query_86).",
+  );
+}
+
 // resolveQueries returns this VU's query list. Throughput: VU N runs stream N
 // (in-process generated + permuted). Single QUERY_STREAM: that stream. Otherwise
 // the baked canonical set. Memoized per VU.
@@ -187,9 +199,9 @@ function prepareDatabase(): void {
   // "cannot drop table ... because other objects depend on it". MySQL accepts and
   // ignores the CASCADE keyword, so the same statement is portable.
   Step("drop_schema", () => {
-    if (driverConfig.driverType === "ydb") {
-      // YDB has no CASCADE keyword; drop from the schema file's drop_schema
-      // section (per-table `DROP TABLE IF EXISTS`, reverse load order).
+    if (driverConfig.driverType === "ydb" || driverConfig.driverType === "picodata") {
+      // YDB and picodata have no CASCADE keyword; drop from the schema file's
+      // drop_schema section (per-table `DROP TABLE IF EXISTS`, reverse load order).
       execEachLogged(schema("drop_schema"), (q) => driver.exec(q, {}));
       return;
     }
@@ -254,6 +266,8 @@ function prepareDatabase(): void {
         driver.exec(`ANALYZE TABLE ${table}` as unknown as { name: string }, {});
       }
     }
+    // ydb / picodata: no ANALYZE statement (sbroad rejects it); planner runs
+    // without refreshed stats. Indexes built in create_indexes carry it.
   });
 }
 

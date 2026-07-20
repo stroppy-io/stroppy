@@ -12,6 +12,14 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- TPC-DS now loads on Picodata: `stroppy run tpcds/tpcds -d pico -D url=postgres://admin:...@host:1336/admin -e SCALE_FACTOR=0.01 --no-steps workload`. Ships a typed sbroad schema (`schema.pico.sql`: `char`→`varchar`, `date`→`datetime`, a `PRIMARY KEY` per Tarantool space, no FK). The 99-query suite does **not** yet run on picodata — sbroad has no comma-join, no `CROSS JOIN`, and no implicit-cross-join pragma, and ~88 of the TPC-DS queries use comma joins (template style), so they fail at parse time. `pico.sql` is kept as the mechanical-transform skeleton for the future query port; until then run with `--no-steps workload` for load only. ([#100](https://github.com/stroppy-io/stroppy/pull/100))
+
+### Fixed
+
+- Wide-table bulk loads on Picodata (and the latent YDB `plain_bulk` path) no longer hit the bound-parameter limit. The batch-size-by-column-count clamp that kept multi-row INSERTs under 65535 bound parameters lived in the MySQL driver only; it now runs centrally in the shared `sqldriver.RunBulkInsert`, so every sql.DB-backed dialect is protected. Previously TPC-DS `date_dim` (28 cols), `catalog_sales`, and `web_sales` (34 cols) aborted with `extended protocol limited to 65535 parameters` and loaded zero rows. ([#100](https://github.com/stroppy-io/stroppy/pull/100))
+
+### Added
+
 - The `columnar` insert method is now accepted by the YDB driver and redirected to the native `BulkUpsert` (already a struct-of-arrays, limit-free payload), logging a one-time warning, instead of being rejected. `columnar` is now listed for YDB in `stroppy probe`. MySQL and Picodata keep their existing insert methods: on MySQL `columnar` showed no throughput benefit over multi-row `plain_bulk` (measured against TPC-C/H/DS at SF 1), and Picodata's SQL has no array/JSON-expansion path. ([#99](https://github.com/stroppy-io/stroppy/pull/99))
 - TPC-DS now runs on YDB: `stroppy run tpcds/tpcds -d ydb -D url=grpc://host:2136/database`. Ships a typed YQL schema (`schema.ydb.sql`, column-store default with row-store as an option via `-e YDB_STORE_MODE=row`) and the 99-query suite ported to YQL (`ydb.sql`). The loader now feeds YDB's native bulk upsert directly from the generator. Answer-set validation and the in-process query-stream generator stay PostgreSQL/MySQL-only, so YDB runs the baked power test. ([#97](https://github.com/stroppy-io/stroppy/pull/97))
 - `stroppy probe` (no arguments) now also lists which insert methods each driver supports — `plain_query`, `plain_bulk`, `columnar`, `native` per database — as a `DRIVERS` block in the human output and a `drivers` key in `-o json`, so external tooling can discover valid `defaultInsertMethod` values per target without reading stroppy source. ([#96](https://github.com/stroppy-io/stroppy/pull/96))

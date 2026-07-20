@@ -72,6 +72,33 @@ func RunInsertSpec[T any](
 // Exposed separately from RunInsertSpec so callers that already run
 // their own InsertMethod switch (for example, to call a driver-native
 // path for NATIVE) can reuse the bulk implementation directly.
+// maxBoundParameters is the per-statement bound-parameter cap shared by the
+// pgwire extended protocol (picodata, postgres) and MySQL's prepared-statement
+// path (Error 1390 "too many placeholders"): 65535. A multi-row bulk INSERT
+// binds rows*columns placeholders, so wide tables (e.g. TPC-DS catalog_sales,
+// 34 cols) overflow a configured batch size; clampBatchByColumns keeps each
+// batch under the limit. Applied centrally here so every sqldriver-based
+// dialect (mysql, picodata, ydb plain_bulk) is protected.
+const maxBoundParameters = 65535
+
+// clampBatchByColumns clamps batchSize so rows*colCount stays within
+// maxBoundParameters. colCount <= 0 leaves the size unchanged.
+func clampBatchByColumns(batchSize, colCount int) int {
+	if colCount <= 0 {
+		return batchSize
+	}
+
+	if maxBatch := maxBoundParameters / colCount; maxBatch < batchSize {
+		batchSize = maxBatch
+	}
+
+	if batchSize < 1 {
+		batchSize = 1
+	}
+
+	return batchSize
+}
+
 func RunBulkInsert[T any](
 	ctx context.Context,
 	db ExecContext[T],
@@ -80,16 +107,16 @@ func RunBulkInsert[T any](
 	dialect queries.Dialect,
 	batchSize int,
 ) error {
-	if batchSize < 1 {
-		batchSize = 1
-	}
-
 	columns := src.Columns()
 
 	colCount := len(columns)
 	if colCount == 0 {
 		return fmt.Errorf("%w: table %q", ErrEmptyColumnOrder, table)
 	}
+
+	// Clamp by column count so a wide table's batch never exceeds the bound-
+	// parameter cap (pgwire / MySQL prepared statements = 65535).
+	batchSize = clampBatchByColumns(batchSize, colCount)
 
 	// Buffers reused across this worker's batches: a fixed pool of row slices
 	// (filled in place by convertRowInto), the flattened args slice, and the
