@@ -153,6 +153,10 @@ func (d *Driver) bulkInsertRuntime(
 	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
 	for {
+		if err := insertprogress.Canceled(ctx); err != nil {
+			return err
+		}
+
 		row, err := src.Next()
 		if errors.Is(err, io.EOF) {
 			break
@@ -339,6 +343,10 @@ func (d *Driver) columnarInsertRuntime(
 	insertprogress.SetStage(ctx, insertprogress.StageRuntimeNext)
 
 	for {
+		if err := insertprogress.Canceled(ctx); err != nil {
+			return err
+		}
+
 		row, err := src.Next()
 		if errors.Is(err, io.EOF) {
 			break

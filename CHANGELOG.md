@@ -16,6 +16,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Pressing Ctrl-C twice during a data load now stops the run instead of leaving the process stuck and unkillable except by `kill -9`. Every InsertSpec drain loop (noop, mysql, postgres bulk/columnar, ydb, csv) never consulted its context at all, so a worker kept generating rows until the whole table drained before noticing the run was aborted — one long uninterruptible native call that k6 cannot preempt. The drain loops now check cancellation per row via a shared `insertprogress.Canceled` helper, so k6's abort (which cancels the VU context on Ctrl-C) unblocks the load promptly.
 - Wide-table bulk loads on Picodata (and the latent YDB `plain_bulk` path) no longer hit the bound-parameter limit. The batch-size-by-column-count clamp that kept multi-row INSERTs under 65535 bound parameters lived in the MySQL driver only; it now runs centrally in the shared `sqldriver.RunBulkInsert`, so every sql.DB-backed dialect is protected. Previously TPC-DS `date_dim` (28 cols), `catalog_sales`, and `web_sales` (34 cols) aborted with `extended protocol limited to 65535 parameters` and loaded zero rows. ([#100](https://github.com/stroppy-io/stroppy/pull/100))
 
 ### Added

@@ -43,3 +43,17 @@ func WorkerFromContext(ctx context.Context) int {
 
 	return workerIndex
 }
+
+// Canceled reports whether ctx has been canceled. Insert workers call it
+// inside their row-drain loops so an aborted run — k6 cancels the VU context
+// on Ctrl-C, which propagates through errgroup.WithContext — unblocks the
+// worker instead of letting it drain the whole table. The non-blocking select
+// keeps the per-row cost negligible.
+func Canceled(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		return nil
+	}
+}

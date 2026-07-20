@@ -168,6 +168,10 @@ func drainRows(
 	insertprogress.SetStage(ctx, insertprogress.StageCSVWrite)
 
 	for {
+		if err := insertprogress.Canceled(ctx); err != nil {
+			return written, err
+		}
+
 		row, err := src.Next()
 		if errors.Is(err, io.EOF) {
 			break

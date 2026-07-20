@@ -120,6 +120,10 @@ func drainSource(ctx context.Context, src source.RowSource) error {
 	var drainedRows int64
 
 	for {
+		if err := insertprogress.Canceled(ctx); err != nil {
+			return err
+		}
+
 		if _, err := src.Next(); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
