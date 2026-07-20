@@ -12,11 +12,11 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- TPC-DS now loads on Picodata: `stroppy run tpcds/tpcds -d pico -D url=postgres://admin:...@host:1336/admin -e SCALE_FACTOR=0.01 --no-steps workload`. Ships a typed sbroad schema (`schema.pico.sql`: `char`→`varchar`, `date`→`datetime`, a `PRIMARY KEY` per Tarantool space, no FK). The 99-query suite does **not** yet run on picodata — sbroad has no comma-join, no `CROSS JOIN`, and no implicit-cross-join pragma, and ~88 of the TPC-DS queries use comma joins (template style), so they fail at parse time. `pico.sql` is kept as the mechanical-transform skeleton for the future query port; until then run with `--no-steps workload` for load only.
+- TPC-DS now loads on Picodata: `stroppy run tpcds/tpcds -d pico -D url=postgres://admin:...@host:1336/admin -e SCALE_FACTOR=0.01 --no-steps workload`. Ships a typed sbroad schema (`schema.pico.sql`: `char`→`varchar`, `date`→`datetime`, a `PRIMARY KEY` per Tarantool space, no FK). The 99-query suite does **not** yet run on picodata — sbroad has no comma-join, no `CROSS JOIN`, and no implicit-cross-join pragma, and ~88 of the TPC-DS queries use comma joins (template style), so they fail at parse time. `pico.sql` is kept as the mechanical-transform skeleton for the future query port; until then run with `--no-steps workload` for load only. ([#100](https://github.com/stroppy-io/stroppy/pull/100))
 
 ### Fixed
 
-- Wide-table bulk loads on Picodata (and the latent YDB `plain_bulk` path) no longer hit the bound-parameter limit. The batch-size-by-column-count clamp that kept multi-row INSERTs under 65535 bound parameters lived in the MySQL driver only; it now runs centrally in the shared `sqldriver.RunBulkInsert`, so every sql.DB-backed dialect is protected. Previously TPC-DS `date_dim` (28 cols), `catalog_sales`, and `web_sales` (34 cols) aborted with `extended protocol limited to 65535 parameters` and loaded zero rows.
+- Wide-table bulk loads on Picodata (and the latent YDB `plain_bulk` path) no longer hit the bound-parameter limit. The batch-size-by-column-count clamp that kept multi-row INSERTs under 65535 bound parameters lived in the MySQL driver only; it now runs centrally in the shared `sqldriver.RunBulkInsert`, so every sql.DB-backed dialect is protected. Previously TPC-DS `date_dim` (28 cols), `catalog_sales`, and `web_sales` (34 cols) aborted with `extended protocol limited to 65535 parameters` and loaded zero rows. ([#100](https://github.com/stroppy-io/stroppy/pull/100))
 
 ### Added
 
