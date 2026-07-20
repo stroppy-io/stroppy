@@ -22,6 +22,12 @@ templates at the canonical qualification parameters.
 ./build/stroppy run tpcds/tpcds -d ydb \
     -D url=grpc://localhost:2136/local \
     -e SCALE_FACTOR=0.01
+
+# Picodata (pgwire) — LOAD ONLY. Query execution is not yet supported on
+# picodata (see Status); run the prep steps without the workload:
+./build/stroppy run tpcds/tpcds -d pico \
+    -D url=postgres://admin:T0psecret@localhost:1331/admin \
+    -e SCALE_FACTOR=0.01 --no-steps workload
 ```
 
 Env overrides:
@@ -157,9 +163,27 @@ DataMaint2, scored as QphDS@SF. This workload covers:
 
 - PostgreSQL, MySQL, and YDB: load + all 103 statements verified on a local
   instance at SCALE_FACTOR=0.01.
+- Picodata: **load supported** (schema + all 24-table bulk load verified at
+  SCALE_FACTOR=0.01). **Query execution is not yet supported** — see the
+  picodata query blockers note below.
 - Not yet done: the Data Maintenance phase (refresh-data generation + insert/
-  delete DM functions) and the QphDS@SF metric; SF=1 answer-set validation against
-  the kit's `answer_sets/`; the Picodata dialect files (queries and schema).
+  delete DM functions) and the QphDS@SF metric; SF=1 answer-set validation
+  against the kit's `answer_sets/`.
+
+### Picodata query blockers
+
+The picodata schema and data-load path ship today; the 99-query suite does
+not yet run on picodata. sbroad (picodata 26.3) accepts only explicit
+`INNER JOIN ... ON` and has no comma-join, no `CROSS JOIN`, and no
+implicit-cross-join pragma/session setting (YDB has `AnsiImplicitCrossJoin`;
+sbroad does not). TPC-DS query templates use comma joins pervasively, so
+~88 of 95 queries fail at parse time. Secondary gaps behind that one:
+`rollup`/`grouping sets`, `INTERSECT`, `FULL OUTER JOIN`,
+`rank()`/`dense_rank()`/`lag()`/`lead()`, correlated subqueries,
+`datetime+int`, and `round()`. `pico.sql` carries the mechanical-transform
+skeleton (date/char/cast fixes, date+N baked) as the port starting point;
+the workload step is expected to fail until the comma-join rewrite lands.
+Load picodata with `--no-steps workload`.
 
 ## Run shapes and the two-run flow
 
