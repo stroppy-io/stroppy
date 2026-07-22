@@ -752,6 +752,11 @@ function runTpchQueries(): void {
     }
 
     const params = withEndDates(queryParams[name] ?? {});
+    // picodata lacks `date - interval` arithmetic (see pico.sql q1 header), so
+    // the q1 shipdate cutoff is precomputed client-side and bound as a date.
+    if (name === "q1" && driverConfig.driverType === "picodata") {
+      params.shipdate_cutoff = shiftDate("1998-12-01", -(queryParams.q1.delta as number), 0, 0);
+    }
     const t0 = Date.now();
     try {
       const result = driver.getDriver().runQuery(body.sql, params);

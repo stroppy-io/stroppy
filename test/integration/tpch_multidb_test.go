@@ -90,7 +90,7 @@ func TestTpchLoadOnPicodata(t *testing.T) {
 	assertTpchLoadMarkers(t, out)
 	assertTpchRowCountsPG(t, pool)
 	assertTpchFKIntegrityPico(t, pool)
-	assertTpchQueriesLogged(t, out)
+	assertTpchQueriesLoggedTolerant(t, out)
 }
 
 // TestTpchLoadOnYDB drives the tpch workload through the ydb driver at

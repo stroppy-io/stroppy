@@ -4,15 +4,33 @@
 --   - CHAR(N) → VARCHAR(N) (sbroad lacks fixed-width CHAR).
 --   - DATE → DATETIME (sbroad stores dates as Tarantool datetime).
 --   - No FK constraints; only PRIMARY KEY.
---   - Queries keep the pg-style `date '...'` literal, `|| ` string concat,
---     substring(x FROM a FOR b) scalar, and the spec's correlated
---     subqueries where sbroad accepts them.
 --
--- Queries not supported on picodata (sbroad planner gaps):
---   (none so far; the picodata-init raises sql_vdbe_opcode_max to allow
---   the full-scan aggregations. Any query that errors at run-time is
---   reported in the integration test log and the failure is treated as
---   informational until a dedicated rewrite lands.)
+-- sbroad planner/grammar gaps that forced rewrites vs the pg text (every
+-- rewrite below is answer-checked against postgres on identical data at
+-- SF=0.01 — result sets are row-for-row equal):
+--   - Implicit comma joins (FROM a, b) are rejected → explicit JOIN ON.
+--   - Typed date literal `date '1998-12-01'` is rejected → bare string
+--     '1998-12-01' (DATETIME columns compare fine against a string).
+--   - `interval` arithmetic is unsupported → q1's `date - interval` cutoff
+--     is precomputed client-side and bound as :shipdate_cutoff; the other
+--     window ends are shifted client-side and bound as :date_1m/_3m/_1y
+--     (tx.ts NEEDS_END_DATES).
+--   - `extract(year FROM col)` is rejected → substring(cast(col AS string)
+--     FROM 1 FOR 4) in q7/q8/q9.
+--   - `NOT LIKE` is rejected (even `x NOT LIKE 'literal'`) → NOT (x LIKE …)
+--     in q13/q16.
+--   - Correlated outer-column refs inside a subquery are unresolvable
+--     ("column … and scan Some(…) not found"). q2/q17/q20/q21 are
+--     decorrelated via JOIN-on-aggregate CTEs; q4/q22 swap correlated
+--     EXISTS/NOT EXISTS for uncorrelated IN / NOT IN.
+-- The post-load totalprice recompute (UPDATE-with-correlated-subquery) has
+-- no sbroad equivalent, but the datagen runtime emits the real o_totalprice
+-- per spec §4.2.3 at load time, so q18 sees correct values without it.
+--
+-- sbroad resource caps: the multi-join aggregates (q3, q10, q21) fan out
+-- large intermediate rows and need sql_vdbe_opcode_max and
+-- sql_motion_row_max raised well above sbroad defaults; the tmpfs-all
+-- compose init does both before this workload runs.
 
 --+ drop_schema
 --= drop_lineitem
@@ -83,14 +101,14 @@ CREATE TABLE partsupp (
 )
 --= create_customer
 CREATE TABLE customer (
-    c_custkey     INTEGER        NOT NULL,
-    c_name        VARCHAR(25)    NOT NULL,
-    c_address     VARCHAR(40)    NOT NULL,
-    c_nationkey   INTEGER        NOT NULL,
-    c_phone       VARCHAR(15)    NOT NULL,
-    c_acctbal     DECIMAL(12,2)  NOT NULL,
-    c_mktsegment  VARCHAR(10)    NOT NULL,
-    c_comment     VARCHAR(117)   NOT NULL,
+    c_custkey     INTEGER         NOT NULL,
+    c_name        VARCHAR(25)     NOT NULL,
+    c_address     VARCHAR(40)     NOT NULL,
+    c_nationkey   INTEGER         NOT NULL,
+    c_phone       VARCHAR(15)     NOT NULL,
+    c_acctbal     DECIMAL(12,2)   NOT NULL,
+    c_mktsegment  VARCHAR(10)     NOT NULL,
+    c_comment     VARCHAR(117)    NOT NULL,
     PRIMARY KEY (c_custkey)
 )
 --= create_orders
@@ -152,12 +170,10 @@ CREATE INDEX idx_lineitem_shipdate   ON lineitem (l_shipdate)
 CREATE INDEX idx_orders_orderdate    ON orders   (o_orderdate)
 
 --+ finalize_totals
--- Spec §4.2.3 o_totalprice = Σ l_extendedprice × (1 + l_tax) × (1 - l_discount).
--- sbroad doesn't support correlated outer-column refs in an UPDATE SET
--- subquery, nor `UPDATE ... FROM`, nor ALTER TABLE RENAME. The post-load
--- totalprice recompute stays on the orders-emit placeholder (0) for
--- picodata. Q18 still ORDER BY o_totalprice; the values collapse to 0 so
--- the ORDER BY degenerates but the query still executes.
+-- The spec §4.2.3 recompute is an UPDATE-with-correlated-subquery, which
+-- sbroad cannot plan. It is unnecessary here: the datagen runtime emits the
+-- real o_totalprice (Σ l_extendedprice × (1+l_tax) × (1-l_discount)) at
+-- orders-emit time, so q18 sees correct values without a post-load UPDATE.
 -- Placeholder step body kept so `--steps finalize_totals` runs cleanly.
 --= noop
 SELECT 1 FROM region WHERE r_regionkey = -1
@@ -178,74 +194,79 @@ SELECT l_returnflag, l_linestatus,
        avg(l_discount) AS avg_disc,
        count(*) AS count_order
 FROM   lineitem
-WHERE  l_shipdate <= date '1998-12-01' - (:delta * interval '1 day')
+WHERE  l_shipdate <= :shipdate_cutoff
 GROUP  BY l_returnflag, l_linestatus
 ORDER  BY l_returnflag, l_linestatus
 
 --+ q2
 --= body
-SELECT s_acctbal, s_name, n_name, p_partkey, p_mfgr, s_address, s_phone, s_comment
-FROM   part, supplier, partsupp, nation, region
-WHERE  p_partkey = ps_partkey
-  AND  s_suppkey = ps_suppkey
-  AND  p_size   = :size
-  AND  p_type LIKE '%' || :type
-  AND  s_nationkey = n_nationkey
-  AND  n_regionkey = r_regionkey
-  AND  r_name = :region
-  AND  ps_supplycost = (
-       SELECT min(ps_supplycost)
-       FROM   partsupp, supplier, nation, region
-       WHERE  p_partkey = ps_partkey
-         AND  s_suppkey = ps_suppkey
-         AND  s_nationkey = n_nationkey
-         AND  n_regionkey = r_regionkey
-         AND  r_name = :region
-  )
-ORDER BY s_acctbal DESC, n_name, s_name, p_partkey
+-- Decorrelated: precompute min(ps_supplycost) per partkey in :region.
+WITH mincost(p_partkey, mincost) AS (
+    SELECT ps_partkey, min(ps_supplycost)
+    FROM   partsupp ps
+           JOIN supplier s   ON s.s_suppkey = ps.ps_suppkey
+           JOIN nation n     ON s.s_nationkey = n.n_nationkey
+           JOIN region r     ON n.n_regionkey = r.r_regionkey
+    WHERE  r.r_name = :region
+    GROUP  BY ps.ps_partkey
+)
+SELECT s.s_acctbal, s.s_name, n.n_name, p.p_partkey, p.p_mfgr,
+       s.s_address, s.s_phone, s.s_comment
+FROM   part p
+       JOIN partsupp ps ON p.p_partkey = ps.ps_partkey
+       JOIN supplier s  ON s.s_suppkey = ps.ps_suppkey
+       JOIN nation n    ON s.s_nationkey = n.n_nationkey
+       JOIN region r    ON n.n_regionkey = r.r_regionkey
+       JOIN mincost m   ON m.p_partkey = p.p_partkey
+WHERE  p.p_size = :size
+  AND  p.p_type LIKE '%' || :type
+  AND  r.r_name = :region
+  AND  ps.ps_supplycost = m.mincost
+ORDER BY s.s_acctbal DESC, n.n_name, s.s_name, p.p_partkey
 LIMIT 100
 
 --+ q3
 --= body
 SELECT l_orderkey,
        sum(l_extendedprice * (1 - l_discount)) AS revenue,
-       o_orderdate,
+       o.o_orderdate,
        o_shippriority
-FROM   customer, orders, lineitem
-WHERE  c_mktsegment = :segment
-  AND  c_custkey = o_custkey
-  AND  l_orderkey = o_orderkey
-  AND  o_orderdate < :date
-  AND  l_shipdate  > :date
-GROUP  BY l_orderkey, o_orderdate, o_shippriority
-ORDER  BY revenue DESC, o_orderdate
+FROM   customer c
+       JOIN orders o   ON c.c_custkey = o.o_custkey
+       JOIN lineitem l ON l.l_orderkey = o.o_orderkey
+WHERE  c.c_mktsegment = :segment
+  AND  o.o_orderdate < :date
+  AND  l.l_shipdate  > :date
+GROUP  BY l_orderkey, o.o_orderdate, o_shippriority
+ORDER  BY revenue DESC, o.o_orderdate
 LIMIT 10
 
 --+ q4
 --= body
+-- Correlated EXISTS decorrelated via IN on the qualifying orderkeys.
 SELECT o_orderpriority, count(*) AS order_count
 FROM   orders
 WHERE  o_orderdate >= :date
   AND  o_orderdate <  :date_3m
-  AND  EXISTS (SELECT * FROM lineitem
-               WHERE l_orderkey = o_orderkey
-                 AND l_commitdate < l_receiptdate)
+  AND  o_orderkey IN (
+       SELECT l_orderkey FROM lineitem WHERE l_commitdate < l_receiptdate
+  )
 GROUP  BY o_orderpriority
 ORDER  BY o_orderpriority
 
 --+ q5
 --= body
 SELECT n_name, sum(l_extendedprice * (1 - l_discount)) AS revenue
-FROM   customer, orders, lineitem, supplier, nation, region
-WHERE  c_custkey = o_custkey
-  AND  l_orderkey = o_orderkey
-  AND  l_suppkey = s_suppkey
-  AND  c_nationkey = s_nationkey
-  AND  s_nationkey = n_nationkey
-  AND  n_regionkey = r_regionkey
-  AND  r_name = :region
-  AND  o_orderdate >= :date
-  AND  o_orderdate <  :date_1y
+FROM   customer c
+       JOIN orders o   ON c.c_custkey = o.o_custkey
+       JOIN lineitem l ON l.l_orderkey = o.o_orderkey
+       JOIN supplier s ON l.l_suppkey = s.s_suppkey
+       JOIN nation n   ON s.s_nationkey = n.n_nationkey
+       JOIN region r   ON n.n_regionkey = r.r_regionkey
+WHERE  c.c_nationkey = s.s_nationkey
+  AND  r.r_name = :region
+  AND  o.o_orderdate >= :date
+  AND  o.o_orderdate <  :date_1y
 GROUP  BY n_name
 ORDER  BY revenue DESC
 
@@ -264,17 +285,17 @@ SELECT supp_nation, cust_nation, l_year, sum(volume) AS revenue
 FROM (
   SELECT n1.n_name AS supp_nation,
          n2.n_name AS cust_nation,
-         extract(year FROM l_shipdate) AS l_year,
+         substring(cast(l_shipdate AS string) FROM 1 FOR 4) AS l_year,
          l_extendedprice * (1 - l_discount) AS volume
-  FROM   supplier, lineitem, orders, customer, nation n1, nation n2
-  WHERE  s_suppkey = l_suppkey
-    AND  o_orderkey = l_orderkey
-    AND  c_custkey = o_custkey
-    AND  s_nationkey = n1.n_nationkey
-    AND  c_nationkey = n2.n_nationkey
-    AND  ( (n1.n_name = :nation1 AND n2.n_name = :nation2)
+  FROM   supplier s
+         JOIN lineitem l ON s.s_suppkey = l.l_suppkey
+         JOIN orders o   ON o.o_orderkey = l.l_orderkey
+         JOIN customer c ON c.c_custkey = o.o_custkey
+         JOIN nation n1  ON s.s_nationkey = n1.n_nationkey
+         JOIN nation n2  ON c.c_nationkey = n2.n_nationkey
+  WHERE  ( (n1.n_name = :nation1 AND n2.n_name = :nation2)
         OR (n1.n_name = :nation2 AND n2.n_name = :nation1))
-    AND  l_shipdate BETWEEN date '1995-01-01' AND date '1996-12-31'
+    AND  l_shipdate BETWEEN '1995-01-01' AND '1996-12-31'
 ) AS shipping
 GROUP  BY supp_nation, cust_nation, l_year
 ORDER  BY supp_nation, cust_nation, l_year
@@ -284,19 +305,19 @@ ORDER  BY supp_nation, cust_nation, l_year
 SELECT o_year,
        sum(CASE WHEN nation = :nation THEN volume ELSE 0 END) / sum(volume) AS mkt_share
 FROM (
-  SELECT extract(year FROM o_orderdate) AS o_year,
+  SELECT substring(cast(o_orderdate AS string) FROM 1 FOR 4) AS o_year,
          l_extendedprice * (1 - l_discount) AS volume,
          n2.n_name AS nation
-  FROM   part, supplier, lineitem, orders, customer, nation n1, nation n2, region
-  WHERE  p_partkey = l_partkey
-    AND  s_suppkey = l_suppkey
-    AND  l_orderkey = o_orderkey
-    AND  o_custkey = c_custkey
-    AND  c_nationkey = n1.n_nationkey
-    AND  n1.n_regionkey = r_regionkey
-    AND  r_name = :region
-    AND  s_nationkey = n2.n_nationkey
-    AND  o_orderdate BETWEEN date '1995-01-01' AND date '1996-12-31'
+  FROM   part p
+         JOIN lineitem l ON p.p_partkey = l.l_partkey
+         JOIN supplier s ON s.s_suppkey = l.l_suppkey
+         JOIN orders o   ON l.l_orderkey = o.o_orderkey
+         JOIN customer c ON o.o_custkey = c.c_custkey
+         JOIN nation n1  ON c.c_nationkey = n1.n_nationkey
+         JOIN region r   ON n1.n_regionkey = r.r_regionkey
+         JOIN nation n2  ON s.s_nationkey = n2.n_nationkey
+  WHERE  r.r_name = :region
+    AND  o_orderdate BETWEEN '1995-01-01' AND '1996-12-31'
     AND  p_type = :type
 ) AS all_nations
 GROUP  BY o_year
@@ -306,17 +327,16 @@ ORDER  BY o_year
 --= body
 SELECT nation, o_year, sum(amount) AS sum_profit
 FROM (
-  SELECT n_name AS nation,
-         extract(year FROM o_orderdate) AS o_year,
+  SELECT n.n_name AS nation,
+         substring(cast(o_orderdate AS string) FROM 1 FOR 4) AS o_year,
          l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity AS amount
-  FROM   part, supplier, lineitem, partsupp, orders, nation
-  WHERE  s_suppkey = l_suppkey
-    AND  ps_suppkey = l_suppkey
-    AND  ps_partkey = l_partkey
-    AND  p_partkey = l_partkey
-    AND  o_orderkey = l_orderkey
-    AND  s_nationkey = n_nationkey
-    AND  p_name LIKE '%' || :color || '%'
+  FROM   part p
+         JOIN lineitem l ON p.p_partkey = l.l_partkey
+         JOIN supplier s ON s.s_suppkey = l.l_suppkey
+         JOIN partsupp ps ON ps.ps_suppkey = l.l_suppkey AND ps.ps_partkey = l.l_partkey
+         JOIN orders o   ON o.o_orderkey = l.l_orderkey
+         JOIN nation n   ON s.s_nationkey = n.n_nationkey
+  WHERE  p_name LIKE '%' || :color || '%'
 ) AS profit
 GROUP  BY nation, o_year
 ORDER  BY nation, o_year DESC
@@ -326,13 +346,13 @@ ORDER  BY nation, o_year DESC
 SELECT c_custkey, c_name,
        sum(l_extendedprice * (1 - l_discount)) AS revenue,
        c_acctbal, n_name, c_address, c_phone, c_comment
-FROM   customer, orders, lineitem, nation
-WHERE  c_custkey = o_custkey
-  AND  l_orderkey = o_orderkey
-  AND  o_orderdate >= :date
-  AND  o_orderdate <  :date_3m
+FROM   customer c
+       JOIN orders o   ON c.c_custkey = o.o_custkey
+       JOIN lineitem l ON l.l_orderkey = o.o_orderkey
+       JOIN nation n   ON c.c_nationkey = n.n_nationkey
+WHERE  o.o_orderdate >= :date
+  AND  o.o_orderdate <  :date_3m
   AND  l_returnflag = 'R'
-  AND  c_nationkey = n_nationkey
 GROUP  BY c_custkey, c_name, c_acctbal, c_phone, n_name, c_address, c_comment
 ORDER  BY revenue DESC
 LIMIT 20
@@ -340,17 +360,17 @@ LIMIT 20
 --+ q11
 --= body
 SELECT ps_partkey, sum(ps_supplycost * ps_availqty) AS value
-FROM   partsupp, supplier, nation
-WHERE  ps_suppkey = s_suppkey
-  AND  s_nationkey = n_nationkey
-  AND  n_name = :nation
+FROM   partsupp ps
+       JOIN supplier s ON ps.ps_suppkey = s.s_suppkey
+       JOIN nation n   ON s.s_nationkey = n.n_nationkey
+WHERE  n.n_name = :nation
 GROUP  BY ps_partkey
 HAVING sum(ps_supplycost * ps_availqty) > (
-       SELECT sum(ps_supplycost * ps_availqty) * :fraction
-       FROM   partsupp, supplier, nation
-       WHERE  ps_suppkey = s_suppkey
-         AND  s_nationkey = n_nationkey
-         AND  n_name = :nation
+       SELECT sum(ps2.ps_supplycost * ps2.ps_availqty) * cast(:fraction AS decimal)
+       FROM   partsupp ps2
+              JOIN supplier s2 ON ps2.ps_suppkey = s2.s_suppkey
+              JOIN nation n2   ON s2.s_nationkey = n2.n_nationkey
+       WHERE  n2.n_name = :nation
 )
 ORDER  BY value DESC
 
@@ -363,25 +383,26 @@ SELECT l_shipmode,
        sum(CASE WHEN o_orderpriority <> '1-URGENT'
                 AND o_orderpriority <> '2-HIGH'
                 THEN 1 ELSE 0 END) AS low_line_count
-FROM   orders, lineitem
-WHERE  o_orderkey = l_orderkey
-  AND  l_shipmode IN (:shipmode1, :shipmode2)
-  AND  l_commitdate < l_receiptdate
-  AND  l_shipdate   < l_commitdate
-  AND  l_receiptdate >= :date
-  AND  l_receiptdate <  :date_1y
+FROM   orders o
+       JOIN lineitem l ON o.o_orderkey = l.l_orderkey
+WHERE  l.l_shipmode IN (:shipmode1, :shipmode2)
+  AND  l.l_commitdate < l.l_receiptdate
+  AND  l.l_shipdate   < l.l_commitdate
+  AND  l.l_receiptdate >= :date
+  AND  l.l_receiptdate <  :date_1y
 GROUP  BY l_shipmode
 ORDER  BY l_shipmode
 
 --+ q13
 --= body
+-- sbroad rejects NOT LIKE; the join-predicate negation moves inside NOT(…).
 SELECT c_count, count(*) AS custdist
 FROM (
-  SELECT c_custkey, count(o_orderkey) AS c_count
-  FROM   customer LEFT OUTER JOIN orders
-                  ON c_custkey = o_custkey
-                 AND o_comment NOT LIKE '%' || :word1 || '%' || :word2 || '%'
-  GROUP  BY c_custkey
+  SELECT c.c_custkey, count(o.o_orderkey) AS c_count
+  FROM   customer c
+         LEFT JOIN orders o ON c.c_custkey = o.o_custkey
+                           AND NOT (o.o_comment LIKE '%' || :word1 || '%' || :word2 || '%')
+  GROUP  BY c.c_custkey
 ) AS c_orders
 GROUP  BY c_count
 ORDER  BY custdist DESC, c_count DESC
@@ -392,10 +413,10 @@ SELECT 100.00 * sum(CASE WHEN p_type LIKE 'PROMO%'
                          THEN l_extendedprice * (1 - l_discount)
                          ELSE 0 END)
                / sum(l_extendedprice * (1 - l_discount)) AS promo_revenue
-FROM   lineitem, part
-WHERE  l_partkey = p_partkey
-  AND  l_shipdate >= :date
-  AND  l_shipdate <  :date_1m
+FROM   lineitem l
+       JOIN part p ON l.l_partkey = p.p_partkey
+WHERE  l.l_shipdate >= :date
+  AND  l.l_shipdate <  :date_1m
 
 --+ q15
 --= body
@@ -407,20 +428,20 @@ WITH revenue(supplier_no, total_revenue) AS (
     GROUP  BY l_suppkey
 )
 SELECT s_suppkey, s_name, s_address, s_phone, total_revenue
-FROM   supplier, revenue
-WHERE  s_suppkey = supplier_no
-  AND  total_revenue = (SELECT max(total_revenue) FROM revenue)
+FROM   supplier s
+       JOIN revenue ON s.s_suppkey = supplier_no
+WHERE  total_revenue = (SELECT max(total_revenue) FROM revenue)
 ORDER  BY s_suppkey
 
 --+ q16
 --= body
 SELECT p_brand, p_type, p_size, count(DISTINCT ps_suppkey) AS supplier_cnt
-FROM   partsupp, part
-WHERE  p_partkey = ps_partkey
-  AND  p_brand <> :brand
-  AND  p_type NOT LIKE :type_prefix || '%'
-  AND  p_size IN (:s1, :s2, :s3, :s4, :s5, :s6, :s7, :s8)
-  AND  ps_suppkey NOT IN (
+FROM   partsupp ps
+       JOIN part p ON p.p_partkey = ps.ps_partkey
+WHERE  p.p_brand <> :brand
+  AND  NOT (p.p_type LIKE :type_prefix || '%')
+  AND  p.p_size IN (:s1, :s2, :s3, :s4, :s5, :s6, :s7, :s8)
+  AND  ps.ps_suppkey NOT IN (
        SELECT s_suppkey FROM supplier
        WHERE  s_comment LIKE '%Customer%Complaints%'
   )
@@ -429,28 +450,29 @@ ORDER  BY supplier_cnt DESC, p_brand, p_type, p_size
 
 --+ q17
 --= body
+-- Correlated on p_partkey → JOIN-on-aggregate per partkey.
+WITH partavg(l_partkey, avgq) AS (
+    SELECT l_partkey, 0.2 * avg(l_quantity) FROM lineitem GROUP BY l_partkey
+)
 SELECT sum(l_extendedprice) / 7.0 AS avg_yearly
-FROM   lineitem, part
-WHERE  p_partkey = l_partkey
-  AND  p_brand = :brand
-  AND  p_container = :container
-  AND  l_quantity < (
-       SELECT 0.2 * avg(l_quantity)
-       FROM   lineitem
-       WHERE  l_partkey = p_partkey
-  )
+FROM   lineitem l
+       JOIN part p    ON p.p_partkey = l.l_partkey
+       JOIN partavg pa ON pa.l_partkey = l.l_partkey
+WHERE  p.p_brand = :brand
+  AND  p.p_container = :container
+  AND  l.l_quantity < pa.avgq
 
 --+ q18
 --= body
 SELECT c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice, sum(l_quantity)
-FROM   customer, orders, lineitem
-WHERE  o_orderkey IN (
+FROM   customer c
+       JOIN orders o   ON c.c_custkey = o.o_custkey
+       JOIN lineitem l ON o.o_orderkey = l.l_orderkey
+WHERE  o.o_orderkey IN (
        SELECT l_orderkey FROM lineitem
        GROUP  BY l_orderkey
        HAVING sum(l_quantity) > :quantity
   )
-  AND  c_custkey = o_custkey
-  AND  o_orderkey = l_orderkey
 GROUP  BY c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
 ORDER  BY o_totalprice DESC, o_orderdate
 LIMIT 100
@@ -458,83 +480,95 @@ LIMIT 100
 --+ q19
 --= body
 SELECT sum(l_extendedprice * (1 - l_discount)) AS revenue
-FROM   lineitem, part
+FROM   lineitem l
+       JOIN part p ON l.l_partkey = p.p_partkey
 WHERE  (
-       p_partkey = l_partkey
-  AND  p_brand = :brand1
-  AND  p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
-  AND  l_quantity >= :q1 AND l_quantity <= :q1 + 10
-  AND  p_size BETWEEN 1 AND 5
-  AND  l_shipmode IN ('AIR', 'AIR REG')
-  AND  l_shipinstruct = 'DELIVER IN PERSON'
+       p.p_brand = :brand1
+  AND  p.p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
+  AND  l.l_quantity >= :q1 AND l.l_quantity <= :q1 + 10
+  AND  p.p_size BETWEEN 1 AND 5
+  AND  l.l_shipmode IN ('AIR', 'AIR REG')
+  AND  l.l_shipinstruct = 'DELIVER IN PERSON'
 )
 OR (
-       p_partkey = l_partkey
-  AND  p_brand = :brand2
-  AND  p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
-  AND  l_quantity >= :q2 AND l_quantity <= :q2 + 10
-  AND  p_size BETWEEN 1 AND 10
-  AND  l_shipmode IN ('AIR', 'AIR REG')
-  AND  l_shipinstruct = 'DELIVER IN PERSON'
+       p.p_brand = :brand2
+  AND  p.p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
+  AND  l.l_quantity >= :q2 AND l.l_quantity <= :q2 + 10
+  AND  p.p_size BETWEEN 1 AND 10
+  AND  l.l_shipmode IN ('AIR', 'AIR REG')
+  AND  l.l_shipinstruct = 'DELIVER IN PERSON'
 )
 OR (
-       p_partkey = l_partkey
-  AND  p_brand = :brand3
-  AND  p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
-  AND  l_quantity >= :q3 AND l_quantity <= :q3 + 10
-  AND  p_size BETWEEN 1 AND 15
-  AND  l_shipmode IN ('AIR', 'AIR REG')
-  AND  l_shipinstruct = 'DELIVER IN PERSON'
+       p.p_brand = :brand3
+  AND  p.p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
+  AND  l.l_quantity >= :q3 AND l.l_quantity <= :q3 + 10
+  AND  p.p_size BETWEEN 1 AND 15
+  AND  l.l_shipmode IN ('AIR', 'AIR REG')
+  AND  l.l_shipinstruct = 'DELIVER IN PERSON'
 )
 
 --+ q20
 --= body
-SELECT s_name, s_address
-FROM   supplier, nation
-WHERE  s_suppkey IN (
-       SELECT ps_suppkey
-       FROM   partsupp
-       WHERE  ps_partkey IN (
-              SELECT p_partkey
-              FROM   part
-              WHERE  p_name LIKE :color || '%'
-       )
-         AND  ps_availqty > (
-              SELECT 0.5 * sum(l_quantity)
-              FROM   lineitem
-              WHERE  l_partkey = ps_partkey
-                AND  l_suppkey = ps_suppkey
-                AND  l_shipdate >= :date
-                AND  l_shipdate <  :date_1y
-       )
+-- Correlated on (ps_partkey, ps_suppkey) decorrelated via JOIN-on-aggregate.
+WITH lsum(l_partkey, l_suppkey, qty) AS (
+    SELECT l_partkey, l_suppkey, 0.5 * sum(l_quantity)
+    FROM   lineitem
+    WHERE  l_shipdate >= :date
+      AND  l_shipdate <  :date_1y
+    GROUP  BY l_partkey, l_suppkey
 )
-  AND  s_nationkey = n_nationkey
-  AND  n_name = :nation
+SELECT s_name, s_address
+FROM   supplier s
+       JOIN nation n ON s.s_nationkey = n.n_nationkey
+WHERE  s.s_suppkey IN (
+       SELECT ps.ps_suppkey
+       FROM   partsupp ps
+              JOIN lsum ON lsum.l_partkey = ps.ps_partkey AND lsum.l_suppkey = ps.ps_suppkey
+       WHERE  ps.ps_partkey IN (
+              SELECT p.p_partkey FROM part p WHERE p.p_name LIKE :color || '%'
+       )
+         AND  ps.ps_availqty > lsum.qty
+)
+  AND  n.n_name = :nation
 ORDER  BY s_name
 
 --+ q21
 --= body
-SELECT s_name, count(*) AS numwait
-FROM   supplier, lineitem l1, orders, nation
-WHERE  s_suppkey = l1.l_suppkey
-  AND  o_orderkey = l1.l_orderkey
-  AND  o_orderstatus = 'F'
+-- Two correlated EXISTS/NOT EXISTS decorrelated: order_has_multi flags
+-- orders served by ≥2 suppliers; late_per_order counts a order's distinct
+-- late suppliers. "this supplier late, another supplier on the order, no
+-- other late supplier" = l1 late, order in order_has_multi, and exactly one
+-- late supplier on the order (which is l1). count(*) is cast: sbroad's
+-- count returns unsigned and ORDER BY on an unsigned column is rejected.
+WITH order_has_multi(orderkey) AS (
+    SELECT l_orderkey FROM lineitem
+    GROUP  BY l_orderkey
+    HAVING count(DISTINCT l_suppkey) > 1
+),
+late_per_order(orderkey, late_suppliers) AS (
+    SELECT l_orderkey, cast(count(DISTINCT l_suppkey) AS integer)
+    FROM   lineitem
+    WHERE  l_receiptdate > l_commitdate
+    GROUP  BY l_orderkey
+)
+SELECT s_name, cast(count(*) AS integer) AS numwait
+FROM   supplier s
+       JOIN lineitem l1        ON s.s_suppkey = l1.l_suppkey
+       JOIN orders o           ON o.o_orderkey = l1.l_orderkey
+       JOIN nation n           ON s.s_nationkey = n.n_nationkey
+       JOIN order_has_multi m  ON m.orderkey = l1.l_orderkey
+       JOIN late_per_order lp  ON lp.orderkey = l1.l_orderkey
+WHERE  o.o_orderstatus = 'F'
   AND  l1.l_receiptdate > l1.l_commitdate
-  AND  EXISTS (SELECT * FROM lineitem l2
-               WHERE l2.l_orderkey = l1.l_orderkey
-                 AND l2.l_suppkey <> l1.l_suppkey)
-  AND  NOT EXISTS (SELECT * FROM lineitem l3
-                   WHERE l3.l_orderkey = l1.l_orderkey
-                     AND l3.l_suppkey <> l1.l_suppkey
-                     AND l3.l_receiptdate > l3.l_commitdate)
-  AND  s_nationkey = n_nationkey
-  AND  n_name = :nation
+  AND  lp.late_suppliers = 1
+  AND  n.n_name = :nation
 GROUP  BY s_name
 ORDER  BY numwait DESC, s_name
 LIMIT 100
 
 --+ q22
 --= body
+-- Correlated NOT EXISTS → uncorrelated NOT IN (o_custkey is NOT NULL).
 SELECT cntrycode, count(*) AS numcust, sum(c_acctbal) AS totacctbal
 FROM (
   SELECT substring(c_phone FROM 1 FOR 2) AS cntrycode, c_acctbal
@@ -548,7 +582,7 @@ FROM (
            AND  substring(c_phone FROM 1 FOR 2) IN
                 (:cc1, :cc2, :cc3, :cc4, :cc5, :cc6, :cc7)
     )
-    AND  NOT EXISTS (SELECT * FROM orders WHERE o_custkey = c_custkey)
+    AND  c_custkey NOT IN (SELECT o_custkey FROM orders)
 ) AS custsale
 GROUP  BY cntrycode
 ORDER  BY cntrycode

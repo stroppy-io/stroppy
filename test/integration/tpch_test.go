@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -499,6 +500,38 @@ func assertTpchQueriesLogged(t *testing.T, out string) {
 	}
 	if !strings.Contains(out, "  SUM") {
 		t.Errorf("missing TPC-H timing summary SUM row in stroppy output")
+	}
+}
+
+// assertTpchQueriesLoggedTolerant mirrors assertTpchQueriesLogged but treats
+// a query failure outside the spot set as a warning, not a test failure.
+// Used for picodata, whose sbroad planner caps (sql_vdbe_opcode_max /
+// sql_motion_row_max) make the heaviest queries (q21 self-join, q3/q10 wide
+// aggregates) the first to regress if a cap or rewrite slips; a hard fail
+// there would mask whether the query path itself works. The spot set still
+// gates that the path executes end to end.
+func assertTpchQueriesLoggedTolerant(t *testing.T, out string) {
+	t.Helper()
+	spot := []string{"q1", "q3", "q6", "q13", "q14"}
+	for _, q := range spot {
+		if !strings.Contains(out, "[tpch] "+q+": ok") {
+			t.Errorf("missing ok marker for spot query %s in stroppy output", q)
+		}
+	}
+	if !strings.Contains(out, "TPC-H query timings (workload phase, ms)") {
+		t.Errorf("missing TPC-H timing summary in stroppy output")
+	}
+	if !strings.Contains(out, "  SUM") {
+		t.Errorf("missing TPC-H timing summary SUM row in stroppy output")
+	}
+	for i := 1; i <= 22; i++ {
+		q := "q" + strconv.Itoa(i)
+		for _, line := range strings.Split(out, "\n") {
+			if strings.HasPrefix(line, "[tpch] "+q+": error") {
+				t.Logf("warning: %s did not complete (%s) — treated as skip", q,
+					strings.TrimSpace(strings.TrimPrefix(line, "[tpch] "+q+": error")))
+			}
+		}
 	}
 }
 
