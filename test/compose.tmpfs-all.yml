@@ -76,9 +76,10 @@ services:
     volumes:
       - pico_data_tmpfs:/pico
 
-  # One-shot init: picodata's default sql_vdbe_opcode_max (45000) trips the
-  # big full-scan aggregates some workloads need. Raise cluster-wide; the
-  # setting is raft-persisted, idempotent, survives restart.
+  # One-shot init: raise sbroad's resource caps cluster-wide. Defaults
+  # (sql_vdbe_opcode_max=45000, sql_motion_row_max=5000) trip the big
+  # multi-join aggregates (tpch q3/q10/q21 fan out wide intermediate rows).
+  # Both are raft-persisted, idempotent, survive restart.
   picodata-init:
     image: postgres:17
     container_name: stroppy-pico-init-all
@@ -95,9 +96,11 @@ services:
         until psql -h picodata-tmpfs-all -p 5432 -U admin -d admin -c 'SELECT 1' >/dev/null 2>&1; do
           sleep 1
         done
-        echo "picodata-init: raising sql_vdbe_opcode_max."
+        echo "picodata-init: raising sql_vdbe_opcode_max and sql_motion_row_max."
         psql -h picodata-tmpfs-all -p 5432 -U admin -d admin -c \
-          "ALTER SYSTEM SET sql_vdbe_opcode_max = 100000000;"
+          "ALTER SYSTEM SET sql_vdbe_opcode_max = 10000000000;"
+        psql -h picodata-tmpfs-all -p 5432 -U admin -d admin -c \
+          "ALTER SYSTEM SET sql_motion_row_max = 10000000;"
         echo "picodata-init: done."
 
   ydb-tmpfs-all:
