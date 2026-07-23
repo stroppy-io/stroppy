@@ -4,7 +4,7 @@
 // materializes client-side (that is what pgbench measures). Shares all
 // load/prepare/config logic with procs.ts via tpcb_common.ts; supports all four
 // drivers (pg/mysql/picodata/ydb).
-import { Step } from "./helpers.ts";
+import { Step, retryWithPolicy, txRetryPolicy } from "./helpers.ts";
 import {
   driver,
   sql,
@@ -17,11 +17,26 @@ import {
   bidGen,
   deltaGen,
   nextHid,
+  driverType,
+  RETRY_ATTEMPTS,
+  tpcbRetryAttempts,
 } from "./tpcb_common.ts";
 
 // options re-declared (not `export { … }`) so the catalog's entrypoint scan finds it.
 export const options = scenarioOptions;
 export { teardown };
+
+// Retry serialization/transient failures (PG SQLSTATE 40001/40P01, MySQL 1213,
+// YDB operation/ABORTED + "Transaction locks invalidated") the same way tpcc
+// does: at SF=1 every VU contends on the single pgbench_branches row, so
+// serializable aborts are expected and must be replayed, not thrown.
+const tpcbTxRetryPolicy = txRetryPolicy(driverType, {
+  maxAttempts: RETRY_ATTEMPTS,
+  onRetry: () => { tpcbRetryAttempts.add(1); },
+});
+function tpcbRetry<T>(fn: () => T): T {
+  return retryWithPolicy(tpcbTxRetryPolicy, fn);
+}
 
 export default function (): void {
   // Load runs once across all VUs (process-global); the measured workload is a
@@ -35,7 +50,7 @@ export default function (): void {
   const hid = nextHid();
 
   Step("workload", () => {
-    driver.beginTx({ isolation: TX_ISOLATION, name: "tpcb" }, (tx) => {
+    tpcbRetry(() => driver.beginTx({ isolation: TX_ISOLATION, name: "tpcb" }, (tx) => {
       tx.exec(sql("workload_tx_tpcb", "update_account")!, { aid, delta });
 
       const abalance = tx.queryValue<number>(
@@ -48,6 +63,6 @@ export default function (): void {
       tx.exec(sql("workload_tx_tpcb", "update_teller")!, { tid, delta });
       tx.exec(sql("workload_tx_tpcb", "update_branch")!, { bid, delta });
       tx.exec(sql("workload_tx_tpcb", "insert_history")!, { hid, tid, bid, aid, delta });
-    });
+    }));
   }, { silent: true });
 }
