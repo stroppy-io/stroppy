@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Changed
+
+- Stroppy runs scale better at high VU counts. A single shared mutex guarded the active-step tag and was write-locked on every `Step()` plus read on every metric sample, so all VUs serialized on it — a 30s CPU profile of a `tpcb` run showed ~940 of ~1000 goroutines parked waiting for it while the database sat idle. The step tag now lives per-VU (lock-free), and the per-transaction metrics snapshot path no longer takes a mutex (pointers are immutable after one-time registration). Microbenchmarks of both paths drop ~140 ns/op to under 1 ns/op at 8 cores. ([#NN](https://github.com/stroppy-io/stroppy/pull/NN))
+
 ## [5.7.0] - 2026-07-22
 
 ### Added

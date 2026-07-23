@@ -80,9 +80,6 @@ type RootModule struct {
 	stepsMu sync.Mutex
 	steps   map[string]stroppy.StroppyRun_Status
 
-	activeStepMu sync.RWMutex
-	activeStep   string
-
 	txMetrics *txMetrics
 }
 
@@ -111,26 +108,6 @@ func (r *RootModule) NotifyStep(name string, status int32) {
 		Cmd:    "",
 		Steps:  snapshot,
 	})
-}
-
-func (r *RootModule) SetCurrentStep(name string) {
-	r.activeStepMu.Lock()
-	r.activeStep = name
-	r.activeStepMu.Unlock()
-}
-
-func (r *RootModule) ClearCurrentStep(name string) {
-	r.activeStepMu.Lock()
-	if r.activeStep == name {
-		r.activeStep = ""
-	}
-	r.activeStepMu.Unlock()
-}
-
-func (r *RootModule) CurrentStep() string {
-	r.activeStepMu.RLock()
-	defer r.activeStepMu.RUnlock()
-	return r.activeStep
 }
 
 func (r *RootModule) globalOnceSlot(name string) *globalOnceSlot {

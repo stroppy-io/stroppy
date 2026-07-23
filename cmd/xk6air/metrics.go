@@ -16,8 +16,11 @@ import (
 const throughputInterval = time.Second
 
 type txMetrics struct {
-	mu sync.Mutex
-
+	// mu guards registration only. After registered is set, all metric/tag
+	// pointers below are immutable, so the hot snapshot/start/stop paths read
+	// them lock-free.
+	mu          sync.Mutex
+	registered  atomic.Bool
 	txCount      *k6metrics.Metric
 	txTPS        *k6metrics.Metric
 	runQueryQPS  *k6metrics.Metric
@@ -34,13 +37,17 @@ type txMetrics struct {
 }
 
 type throughputSampler struct {
-	started bool
-	stopped bool
+	started atomic.Bool
+	stopped atomic.Bool
 	stopCh  chan struct{}
 	doneCh  chan struct{}
 }
 
 func (m *txMetrics) ensureRegistered(vu modules.VU, lg *zap.Logger) {
+	if m.registered.Load() {
+		return
+	}
+
 	initEnv := vu.InitEnv()
 	if initEnv == nil {
 		return
@@ -48,8 +55,7 @@ func (m *txMetrics) ensureRegistered(vu modules.VU, lg *zap.Logger) {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.txCount != nil && m.txTPS != nil && m.runQueryQPS != nil &&
-		m.insertRows != nil && m.progressRows != nil && m.progressRPS != nil {
+	if m.registered.Load() {
 		return
 	}
 
@@ -86,6 +92,7 @@ func (m *txMetrics) ensureRegistered(vu modules.VU, lg *zap.Logger) {
 	m.progressRows = progressRows
 	m.progressRPS = progressRPS
 	m.tags = registry.RootTagSet()
+	m.registered.Store(true)
 }
 
 func (m *txMetrics) recordQuery(vu modules.VU) {
@@ -112,8 +119,6 @@ func (m *txMetrics) recordInsertProgress(vu modules.VU, snapshot insertprogress.
 	}
 	if state.Tags != nil {
 		tags = currentVUTags(state.Tags.GetCurrentValues(), tags)
-	} else {
-		tags = withCurrentStepTag(tags)
 	}
 
 	tags = tags.With("table_name", snapshot.Table).
@@ -157,8 +162,6 @@ func (m *txMetrics) recordInsert(vu modules.VU, table string, rows int64) {
 	}
 	if state.Tags != nil {
 		tags = currentVUTags(state.Tags.GetCurrentValues(), tags)
-	} else {
-		tags = withCurrentStepTag(tags)
 	}
 
 	if table == "" {
@@ -198,8 +201,6 @@ func (m *txMetrics) record(vu modules.VU, action, name string, isolation stroppy
 	}
 	if state.Tags != nil {
 		tags = currentVUTags(state.Tags.GetCurrentValues(), tags)
-	} else {
-		tags = withCurrentStepTag(tags)
 	}
 	now := time.Now()
 	tags = tags.With("tx_action", action)
@@ -221,11 +222,8 @@ func (m *txMetrics) record(vu modules.VU, action, name string, isolation stroppy
 }
 
 func (m *txMetrics) start(samples chan<- k6metrics.SampleContainer, ctx context.Context) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.startSamplerLocked(&m.txSampler, &m.txTotal, ctx, samples, m.txTPS, m.tags)
-	m.startSamplerLocked(&m.querySampler, &m.queryTotal, ctx, samples, m.runQueryQPS, m.tags)
+	m.startSampler(&m.txSampler, &m.txTotal, ctx, samples, m.txTPS, m.tags)
+	m.startSampler(&m.querySampler, &m.queryTotal, ctx, samples, m.runQueryQPS, m.tags)
 }
 
 func (m *txMetrics) stop() {
@@ -233,7 +231,7 @@ func (m *txMetrics) stop() {
 	m.stopSampler(&m.querySampler)
 }
 
-func (m *txMetrics) startSamplerLocked(
+func (m *txMetrics) startSampler(
 	sampler *throughputSampler,
 	total *uint64,
 	ctx context.Context,
@@ -241,38 +239,35 @@ func (m *txMetrics) startSamplerLocked(
 	metric *k6metrics.Metric,
 	tags *k6metrics.TagSet,
 ) {
-	if sampler.started || sampler.stopped || metric == nil || tags == nil {
+	if metric == nil || tags == nil || sampler.stopped.Load() {
+		return
+	}
+	if !sampler.started.CompareAndSwap(false, true) {
 		return
 	}
 
-	sampler.started = true
 	sampler.stopCh = make(chan struct{})
 	sampler.doneCh = make(chan struct{})
 	go runThroughputSampler(ctx, samples, metric, tags, total, sampler.stopCh, sampler.doneCh)
 }
 
 func (m *txMetrics) stopSampler(sampler *throughputSampler) {
-	m.mu.Lock()
-	if !sampler.started || sampler.stopped {
-		m.mu.Unlock()
+	if !sampler.stopped.CompareAndSwap(false, true) {
 		return
 	}
-	stopCh := sampler.stopCh
-	doneCh := sampler.doneCh
-	sampler.stopped = true
-	close(stopCh)
-	m.mu.Unlock()
+	if !sampler.started.Load() {
+		return
+	}
 
+	close(sampler.stopCh)
 	select {
-	case <-doneCh:
+	case <-sampler.doneCh:
 	case <-time.After(2 * time.Second):
 	}
 }
 
 func (m *txMetrics) snapshotCountMetric() (*k6metrics.Metric, *k6metrics.TagSet, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.txCount == nil || m.tags == nil {
+	if !m.registered.Load() {
 		return nil, nil, false
 	}
 	return m.txCount, m.tags, true
@@ -283,12 +278,9 @@ func (m *txMetrics) snapshotInsertMetrics() (
 	*k6metrics.TagSet,
 	bool,
 ) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.insertRows == nil || m.tags == nil {
+	if !m.registered.Load() {
 		return nil, nil, false
 	}
-
 	return m.insertRows, m.tags, true
 }
 
@@ -298,36 +290,20 @@ func (m *txMetrics) snapshotProgressMetrics() (
 	*k6metrics.TagSet,
 	bool,
 ) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.progressRows == nil || m.progressRPS == nil || m.tags == nil {
+	if !m.registered.Load() {
 		return nil, nil, nil, false
 	}
-
 	return m.progressRows, m.progressRPS, m.tags, true
 }
 
+// currentVUTags returns the VU's live tag set, which already carries the
+// "step" tag set by SetStepTag. Falls back to the metric's base tag set when
+// the VU has no tags yet (init phase).
 func currentVUTags(tagsAndMeta k6metrics.TagsAndMeta, fallback *k6metrics.TagSet) *k6metrics.TagSet {
-	tags := fallback
-	if tagsAndMeta.Tags == nil {
-		return withCurrentStepTag(tags)
+	if tagsAndMeta.Tags != nil {
+		return tagsAndMeta.Tags
 	}
-
-	tags = tagsAndMeta.Tags
-	return withCurrentStepTag(tags)
-}
-
-func withCurrentStepTag(tags *k6metrics.TagSet) *k6metrics.TagSet {
-	if tags == nil {
-		return nil
-	}
-	if _, ok := tags.Get("step"); ok {
-		return tags
-	}
-	if step := rootModule.CurrentStep(); step != "" {
-		return tags.With("step", step)
-	}
-	return tags
+	return fallback
 }
 
 func runThroughputSampler(
