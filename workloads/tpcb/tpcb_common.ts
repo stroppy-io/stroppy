@@ -5,6 +5,7 @@
 // prepare/measure lifecycle, the scenario, and teardown.
 import { Teardown } from "k6/x/stroppy";
 import {
+  Counter,
   DriverX,
   Step,
   execEachLogged,
@@ -29,6 +30,8 @@ declare const __VU: number;
 
 // TPC-B Configuration Constants
 export const SCALE_FACTOR = ENV(["SCALE_FACTOR", "BRANCHES"], 1, "TPC-B scale factor");
+export const RETRY_ATTEMPTS = ENV("RETRY_ATTEMPTS", 3, "Max attempts for serialization-failure retries (1 = no retry)");
+export const tpcbRetryAttempts = new Counter("tpcb_retry_attempts");
 const POOL_SIZE = ENV("POOL_SIZE", 50, "Connection pool size");
 const LOAD_WORKERS = ENV("LOAD_WORKERS", 0, "Load-time worker count per spec (0 = framework default)") as number;
 // PostgreSQL only: create LOGGED, flip to UNLOGGED for a WAL-free bulk load,
