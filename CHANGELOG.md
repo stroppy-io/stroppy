@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
-- TPC-B transactions now retry on serialization conflicts instead of failing the run. The `tpcb/tx` workload issued its transaction with no retry wrapper, so under concurrent VUs the first serializable abort — PostgreSQL `40001`/`40P01`, MySQL `1213`, or YDB `Transaction locks invalidated` — was thrown straight to the error log and aborted the whole run, even though every other transactional workload (tpcc/tpch/tpcds) already retries these. tpcb now applies the same retry policy, so transient contention is replayed instead of surfaced (visible as the new `tpcb_retry_attempts` counter).
+- TPC-B transactions now retry on serialization conflicts instead of failing the run. The `tpcb/tx` workload issued its transaction with no retry wrapper, so under concurrent VUs the first serializable abort — PostgreSQL `40001`/`40P01`, MySQL `1213`, or YDB `Transaction locks invalidated` — was thrown straight to the error log and aborted the whole run, even though every other transactional workload (tpcc/tpch/tpcds) already retries these. tpcb now applies the same retry policy, so transient contention is replayed instead of surfaced (visible as the new `tpcb_retry_attempts` counter). ([#108](https://github.com/stroppy-io/stroppy/pull/108))
 
 ## [5.7.0] - 2026-07-22
 
