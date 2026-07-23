@@ -29,6 +29,11 @@ type Instance struct {
 
 	// drivers tracks all DriverWrappers created by this instance for teardown.
 	drivers []*DriverWrapper
+
+	// activeStep is the logical Stroppy step this VU is currently in.
+	// Per-VU and single-goroutine (k6 drives one VU on one goroutine), so no
+	// lock needed. A shared mutex here serialized every VU on every Step().
+	activeStep string
 }
 
 // NewInstance creates new instance of module.
@@ -52,7 +57,7 @@ func (i *Instance) Exports() modules.Exports {
 			"NotifyStep":   rootModule.NotifyStep,
 			"SetStepTag":   i.SetStepTag,
 			"ClearStepTag": i.ClearStepTag,
-			"CurrentStep":  rootModule.CurrentStep,
+			"CurrentStep":  i.CurrentStep,
 			"NewDriver":    i.NewDriver,
 			"Teardown":     rootModule.Teardown,
 			"NewPicker":    NewPicker,
@@ -90,7 +95,7 @@ func (i *Instance) Exports() modules.Exports {
 
 // SetStepTag marks subsequent VU metric samples with the logical Stroppy step.
 func (i *Instance) SetStepTag(name string) {
-	rootModule.SetCurrentStep(name)
+	i.activeStep = name
 
 	state := i.vu.State()
 	if state == nil || state.Tags == nil {
@@ -104,7 +109,9 @@ func (i *Instance) SetStepTag(name string) {
 
 // ClearStepTag removes the logical Stroppy step tag if it is still active.
 func (i *Instance) ClearStepTag(name string) {
-	rootModule.ClearCurrentStep(name)
+	if i.activeStep == name {
+		i.activeStep = ""
+	}
 
 	state := i.vu.State()
 	if state == nil || state.Tags == nil {
@@ -117,6 +124,11 @@ func (i *Instance) ClearStepTag(name string) {
 			tagsAndMeta.DeleteTag("step")
 		}
 	})
+}
+
+// CurrentStep returns the logical Stroppy step this VU is currently in.
+func (i *Instance) CurrentStep() string {
+	return i.activeStep
 }
 
 // NewDriver creates an empty DriverWrapper shell.
