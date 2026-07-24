@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
-- PostgreSQL data loads now keep tables `LOGGED` by default instead of flipping them to `UNLOGGED` for the bulk load. The `UNLOGGED` optimization (WAL-free load, then flip back) is now opt-in via `-e PG_UNLOGGED=true`. It traded load speed for a sharp footgun: a `prepare` that ran twice on the same schema failed with `could not change table "warehouse" to unlogged because it references logged table "district" (42P16)`, because the foreign keys added at the end of the first prepare block the unlogged flip at the start of the second — so re-running a workload without dropping the schema aborted every iteration. Logged-by-default removes that failure mode entirely.
+- PostgreSQL data loads now keep tables `LOGGED` by default instead of flipping them to `UNLOGGED` for the bulk load. The `UNLOGGED` optimization (WAL-free load, then flip back) is now opt-in via `-e PG_UNLOGGED=true`. It traded load speed for a sharp footgun: a `prepare` that ran twice on the same schema failed with `could not change table "warehouse" to unlogged because it references logged table "district" (42P16)`, because the foreign keys added at the end of the first prepare block the unlogged flip at the start of the second — so re-running a workload without dropping the schema aborted every iteration. Logged-by-default removes that failure mode entirely. ([#111](https://github.com/stroppy-io/stroppy/pull/111))
 
 ## [5.7.1] - 2026-07-23
 
