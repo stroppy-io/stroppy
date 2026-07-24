@@ -63,8 +63,8 @@ const driverConfig = declareDriverSetup(0, {
 const driver = DriverX.create().setup(driverConfig);
 
 // PostgreSQL only: flip to UNLOGGED for a WAL-free bulk load of the 24 tables,
-// back to LOGGED after. Disable with PG_UNLOGGED=false.
-const PG_UNLOGGED = ENV("PG_UNLOGGED", "true", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") !== "false";
+// back to LOGGED after. Off by default; enable with PG_UNLOGGED=true.
+const PG_UNLOGGED = ENV("PG_UNLOGGED", "false", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") === "true";
 const useUnlogged = PG_UNLOGGED && driverConfig.driverType === "postgres";
 
 // The 99 TPC-DS queries, generated per dialect from the official query templates

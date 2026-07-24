@@ -118,7 +118,7 @@ CREATE TABLE lineitem (
 
 --+ set_unlogged
 -- Flip tables to UNLOGGED for a WAL-free bulk load; set_logged restores
--- durability after population. Gated by PG_UNLOGGED (default true), pg-only.
+-- durability after population. Gated by PG_UNLOGGED (default false), pg-only.
 --= region
 ALTER TABLE region   SET UNLOGGED;
 --= nation

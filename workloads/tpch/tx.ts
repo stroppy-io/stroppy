@@ -270,8 +270,8 @@ const TX_ISOLATION = (
 void TX_ISOLATION; // queries are read-only; kept for symmetry with other workloads.
 
 // PostgreSQL only: create LOGGED, flip to UNLOGGED for a WAL-free bulk load,
-// then back to LOGGED before the workload. Disable with PG_UNLOGGED=false.
-const PG_UNLOGGED = ENV("PG_UNLOGGED", "true", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") !== "false";
+// then back to LOGGED before the workload. Off by default; enable with PG_UNLOGGED=true.
+const PG_UNLOGGED = ENV("PG_UNLOGGED", "false", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") === "true";
 const useUnlogged = PG_UNLOGGED && driverConfig.driverType === "postgres";
 
 const driver = DriverX.create().setup(driverConfig);

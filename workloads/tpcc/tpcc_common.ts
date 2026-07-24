@@ -69,8 +69,8 @@ const LOAD_ITEMS = ENV(
 const LOAD_WORKERS = ENV("LOAD_WORKERS", 0, "Load-time worker count per spec (0 = framework default)") as number;
 export const RETRY_ATTEMPTS = ENV("RETRY_ATTEMPTS", 3, "Max attempts for serialization-failure retries (1 = no retry)");
 // PostgreSQL only: flip to UNLOGGED for a WAL-free bulk load, back to LOGGED
-// after. Disable with PG_UNLOGGED=false. The driverType test stays per-variant.
-export const PG_UNLOGGED = ENV("PG_UNLOGGED", "true", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") !== "false";
+// after. Off by default; enable with PG_UNLOGGED=true. The driverType test stays per-variant.
+export const PG_UNLOGGED = ENV("PG_UNLOGGED", "false", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") === "true";
 
 export const DISTRICTS_PER_WAREHOUSE = 10;
 export const CUSTOMERS_PER_DISTRICT  = 3000;
