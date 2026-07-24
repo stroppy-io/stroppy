@@ -35,8 +35,8 @@ export const tpcbRetryAttempts = new Counter("tpcb_retry_attempts");
 const POOL_SIZE = ENV("POOL_SIZE", 50, "Connection pool size");
 const LOAD_WORKERS = ENV("LOAD_WORKERS", 0, "Load-time worker count per spec (0 = framework default)") as number;
 // PostgreSQL only: create LOGGED, flip to UNLOGGED for a WAL-free bulk load,
-// then back to LOGGED before the workload. Disable with PG_UNLOGGED=false.
-const PG_UNLOGGED = ENV("PG_UNLOGGED", "true", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") !== "false";
+// then back to LOGGED before the workload. Off by default; enable with PG_UNLOGGED=true.
+const PG_UNLOGGED = ENV("PG_UNLOGGED", "false", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") === "true";
 
 const BRANCHES = SCALE_FACTOR;
 const TELLERS = 10 * SCALE_FACTOR;

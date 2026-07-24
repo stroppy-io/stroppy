@@ -135,7 +135,7 @@ CREATE TABLE stock (
 
 --+ set_unlogged
 -- Flip tables to UNLOGGED for a WAL-free bulk load; set_logged restores
--- durability after population. Gated by PG_UNLOGGED (default true), pg-only.
+-- durability after population. Gated by PG_UNLOGGED (default false), pg-only.
 --= warehouse
 ALTER TABLE warehouse  SET UNLOGGED;
 --= district

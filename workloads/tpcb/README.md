@@ -79,7 +79,7 @@ All TPC workloads share one set of run knobs (set with `-e KEY=VALUE`, **not** t
 - `DURATION` set → fixed-duration throughput test (constant `VUS`); result is TPS.
 - `DURATION` unset → power test (`ITER` iterations); result is elapsed time.
 - `MAX_DURATION` (default `24h`) lifts k6's 10-minute per-iteration cap for large loads.
-- `PG_UNLOGGED=false` disables the PostgreSQL `UNLOGGED` bulk-load dance.
+- `PG_UNLOGGED=true` enables the PostgreSQL `UNLOGGED` bulk-load dance (off by default).
 
 The measured workload is a single gatable `workload` step, so prep and measurement
 can run as two passes for a throughput number uncontaminated by load time:
