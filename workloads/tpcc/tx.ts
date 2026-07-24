@@ -121,8 +121,8 @@ const TX_ISOLATION = (
 const driver = DriverX.create().setup(driverConfig);
 
 // PostgreSQL only: flip to UNLOGGED for a WAL-free bulk load, back to LOGGED
-// after. Disable with PG_UNLOGGED=false.
-const PG_UNLOGGED = ENV("PG_UNLOGGED", "true", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") !== "false";
+// after. Off by default; enable with PG_UNLOGGED=true.
+const PG_UNLOGGED = ENV("PG_UNLOGGED", "false", "pg only: bulk-load with UNLOGGED tables, flip back to LOGGED after") === "true";
 const useUnlogged = PG_UNLOGGED && driverConfig.driverType === "postgres";
 
 // picodata/sbroad doesn't support SELECT ... OFFSET, so the by-name
