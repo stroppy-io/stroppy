@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Changed
+
+- Stroppy allocates far less memory in the hot transaction loop. Every reference to a named import (`Step`, `ENV`, `Rel`, `Draw`, `retry`, `DriverX`, …) had k6 rebuild the full module exports table from scratch, which a 30s heap profile showed as the single largest allocator. The exports table is now built once per VU and reused, cutting that churn entirely. ([#110](https://github.com/stroppy-io/stroppy/pull/110))
+
 ## [5.7.1] - 2026-07-23
 
 ### Changed
