@@ -34,6 +34,13 @@ type Instance struct {
 	// Per-VU and single-goroutine (k6 drives one VU on one goroutine), so no
 	// lock needed. A shared mutex here serialized every VU on every Step().
 	activeStep string
+
+	// exports memoizes the module exports table. k6 resolves each named-import
+	// binding through GetBindingValue, which calls Exports() on every read;
+	// rebuilding the map per binding access dominated VU allocation. Static
+	// after NewInstance (closures capture this stable pointer), single
+	// goroutine, so no lock.
+	exports modules.Exports
 }
 
 // NewInstance creates new instance of module.
@@ -51,7 +58,10 @@ func NewInstance(vu modules.VU) modules.Instance {
 }
 
 func (i *Instance) Exports() modules.Exports {
-	return modules.Exports{
+	if i.exports.Named != nil {
+		return i.exports
+	}
+	i.exports = modules.Exports{
 		Default: i,
 		Named: map[string]any{
 			"NotifyStep":   rootModule.NotifyStep,
@@ -91,6 +101,7 @@ func (i *Instance) Exports() modules.Exports {
 			"NewDrawGrammar":      NewDrawGrammar,
 		},
 	}
+	return i.exports
 }
 
 // SetStepTag marks subsequent VU metric samples with the logical Stroppy step.
