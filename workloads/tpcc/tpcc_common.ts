@@ -5,7 +5,22 @@
 // metrics, the seeded load specs, the load + population-validation logic, and
 // the scenario. The two variants supply only their transaction bodies,
 // dialect branches, retry strategy, and handleSummary.
-import { Counter, Trend, ENV, DriverX, declareScenario } from "./helpers.ts";
+import { sleep } from "k6";
+import { Teardown } from "k6/x/stroppy";
+import {
+  Counter,
+  Trend,
+  ENV,
+  DriverX,
+  Step,
+  execEachLogged,
+  GlobalOnce,
+  TxIsolationName,
+  declareDriverSetup,
+  declareScenario,
+  retryWithPolicy,
+  txRetryPolicy,
+} from "./helpers.ts";
 import {
   Alphabet,
   Attr,
@@ -18,6 +33,7 @@ import {
   std,
 } from "./datagen.ts";
 import { C_LAST_DICT, tpccOriginalOr } from "./tpcc_helpers.ts";
+import { parse_sql_with_sections } from "./parse_sql.js";
 import type { Options } from "k6/options";
 import exec from "k6/execution";
 
@@ -636,5 +652,385 @@ export function validatePopulation(driver: DriverX): void {
       `validate_population: ${failures.length} check(s) failed:\n${failures.join("\n")}`,
     );
   }
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+// ============================================================================
+// Shared execution scaffolding — driver setup, SQL parse, isolation, retry,
+// prepare lifecycle, §5.2.5 pacing, weighted dispatch, and the post-run
+// compliance summary. Both variants (procs.ts: stored-proc calls; tx.ts:
+// client-side multi-statement tx) import these so only their transaction
+// bodies differ. Mirrors the tpcb_common.ts layout.
+// ============================================================================
+
+// Driver config: defaults for postgres, overridable via CLI (-d pg/mysql/pico/ydb).
+// errorMode "throw" so query failures surface as exceptions to the tx bodies
+// (procs needs it to catch the §2.4.2.3 rollback sentinel; tx's if-no-row
+// guards work identically under throw).
+export const driverConfig = declareDriverSetup(0, {
+  url: "postgres://postgres:postgres@localhost:5432",
+  driverType: "postgres",
+  defaultInsertMethod: "native",
+  errorMode: "throw",
+  pool: { maxConns: POOL_SIZE, minConns: POOL_SIZE },
+});
+export const driverType = driverConfig.driverType;
+
+const _sqlByDriver: Record<string, string> = {
+  postgres: "./pg.sql",
+  mysql:    "./mysql.sql",
+  picodata: "./pico.sql",
+  ydb:      "./ydb.sql",
+};
+const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file path (defaults per driverType)")
+  ?? _sqlByDriver[driverType!]
+  ?? "./pg.sql";
+
+// Per-driver isolation default. TPC-C §3.4.0.1 Table 3-1 requires Level 3
+// (phantom protection) for NO/P/D and Level 2 for OS. PG's REPEATABLE READ =
+// snapshot isolation (phantom-protected); MySQL InnoDB's REPEATABLE READ uses
+// next-key locking (phantom-protected). Both satisfy the spec.
+// picodata MUST be "none" — picodata.Begin always errors.
+// ydb default `serializable` is above spec and compliant.
+const _isoByDriver: Record<string, TxIsolationName> = {
+  postgres: "repeatable_read",
+  mysql:    "repeatable_read",
+  picodata: "none",
+  ydb:      "serializable",
+};
+export const TX_ISOLATION = (
+  ENV("TX_ISOLATION", ENV.auto, "Override transaction isolation level (read_committed/repeatable_read/serializable/conn/none/...)")
+  ?? _isoByDriver[driverType!]
+  ?? "read_committed"
+) as TxIsolationName;
+
+export const driver = DriverX.create().setup(driverConfig);
+
+const useUnlogged = PG_UNLOGGED && driverType === "postgres";
+
+// picodata/sbroad doesn't support SELECT ... OFFSET, so the by-name customer
+// median pick (Payment §2.5.2.2, Order-Status §2.6.2.2) fetches all matching
+// rows and indexes client-side; other dialects keep LIMIT 1 OFFSET.
+export const IS_PICODATA = driverType === "picodata";
+// pg and ydb support UPDATE...RETURNING — merge UPDATE + SELECT into one
+// round-trip in payment() for warehouse/district YTD updates.
+export const HAS_RETURNING = driverType === "postgres" || driverType === "ydb";
+// YDB-only path: IN-list queries take their id list as a bound List<Int64>
+// parameter instead of inlining a comma list, so the query text stays identical
+// across calls and YDB's query-service plan cache hits.
+export const IS_YDB = driverType === "ydb";
+
+const sql = parse_sql_with_sections(open(SQL_FILE));
+export { sql };
+
+// ydb.sql DDL placeholders. {partition_keys} expands to a comma-list of (w_id)
+// split points giving one tablet per warehouse in this instance's range
+// [WAREHOUSE_START, W_ID_MAX]; {partition_count} to W. For W=1 the split list
+// collapses to a single key, satisfying YDB's "PARTITION_AT_KEYS must be
+// non-empty" rule. Other dialects' .sql files lack these tokens → no-op.
+function ydbPartitionKeys(): string {
+  if (WAREHOUSES <= 1) return `(${WAREHOUSE_START + 1})`;
+  const parts: string[] = [];
+  for (let i = WAREHOUSE_START + 1; i <= W_ID_MAX; i++) parts.push(`(${i})`);
+  return parts.join(", ");
+}
+function renderDDL(s: string): string {
+  return s
+    .replace(/\{partition_keys\}/g, ydbPartitionKeys())
+    .replace(/\{partition_count\}/g, String(Math.max(WAREHOUSES, 1)));
+}
+
+// Retry serialization/transient failures (PG SQLSTATE 40001/40P01, MySQL 1213,
+// YDB operation/ABORTED + "Transaction locks invalidated"). Driver-aware policy;
+// each retry counts ONCE in tpccRetryAttempts regardless of where the abort
+// fired. The policy preserves the §2.4.2.3 New-Order rollback sentinel by never
+// retrying `tpcc_rollback:`.
+const tpccTxRetryPolicy = txRetryPolicy(driverType, {
+  maxAttempts: RETRY_ATTEMPTS,
+  onRetry: () => { tpccRetryAttempts.add(1); },
+});
+export function tpccRetry<T>(fn: () => T): T {
+  return retryWithPolicy(tpccTxRetryPolicy, fn);
+}
+
+// Run the load once across all VUs in the process (concurrent VUs block here
+// until the single loader finishes). Each prep step is individually skippable,
+// so the canonical run is two passes: `--no-steps workload` (prep) then
+// `--steps workload` (measure against the loaded data).
+//
+// `withProcedures` runs the create_procedures section (procs variant only;
+// tx.ts issues client-side transactions and has no stored procs). renderDDL is
+// applied to create_schema unconditionally — a no-op on dialects whose .sql
+// lacks the {partition_*} tokens.
+function prepareDatabase(opts: { withProcedures: boolean }): void {
+  Step("drop_schema", () => {
+    (sql("drop_schema") ?? []).forEach((query) => driver.exec(query, {}));
+  });
+  Step("create_schema", () => {
+    (sql("create_schema") ?? []).forEach((query) =>
+      driver.exec({ ...query, sql: renderDDL(query.sql) }, {}),
+    );
+  });
+  if (opts.withProcedures) {
+    Step("create_procedures", () => {
+      (sql("create_procedures") ?? []).forEach((query) => driver.exec(query, {}));
+    });
+  }
+  if (useUnlogged) {
+    Step("set_unlogged", () => {
+      (sql("set_unlogged") ?? []).forEach((query) => driver.exec(query, {}));
+    });
+  }
+  Step("load_data", () => loadData(driver));
+  // Secondary indexes built post-load (spec-permitted; serve the C_LAST by-name
+  // and customer's-latest-order access paths). Cheaper one-shot than per-row.
+  Step("create_indexes", () => execEachLogged(sql("create_indexes"), (q) => driver.exec(q, {})));
+  if (useUnlogged) {
+    Step("set_logged", () => execEachLogged(sql("set_logged"), (q) => driver.exec(q, {})));
+  }
+  // FK constraints post-load, AFTER set_logged (pg checks FK persistence both
+  // directions, so they can't exist during the UNLOGGED load/flips). No-op on
+  // dialects lacking the section.
+  Step("create_foreign_keys", () => {
+    (sql("create_foreign_keys") ?? []).forEach((query) => driver.exec(query, {}));
+  });
+  Step("analyze", () => {
+    (sql("analyze") ?? []).forEach((query) => driver.exec(query, {}));
+  });
+  Step("validate_population", () => validatePopulation(driver));
+}
+
+export function prepare(withProcedures: boolean): void {
+  GlobalOnce("tpcc.prepare", () => prepareDatabase({ withProcedures }));
+}
+
+// ============================================================================
+// TPC-C §5.2.5 pacing: keying time (constant, before tx) + think time
+// (negative exponential, after tx) simulate real terminal operator behaviour.
+// Disabled by default for raw throughput benchmarking; enable with
+// -e PACING=true for spec-compliant pacing.
+// ============================================================================
+const PACING = ENV("PACING", "false", "Enable keying + think time delays (§5.2.5)") === "true";
+
+// §5.2.5.2 minimum keying times (seconds), §5.2.5.7 Table.
+const KEYING_TIME: Record<string, number> = {
+  new_order: 18, payment: 3, order_status: 2, delivery: 2, stock_level: 2,
+};
+// §5.2.5.4 / §5.2.5.7: mean think time (seconds) for neg-exp distribution.
+const THINK_TIME_MEAN: Record<string, number> = {
+  new_order: 12, payment: 12, order_status: 10, delivery: 5, stock_level: 5,
+};
+
+// §5.2.5.4: T_t = -log(r) * μ, truncated at 10μ.
+function thinkTime(txName: string): void {
+  if (!PACING) return;
+  const mu = THINK_TIME_MEAN[txName];
+  let t = -Math.log(Math.random()) * mu;
+  if (t > 10 * mu) t = 10 * mu;
+  sleep(t);
+}
+function keyingTime(txName: string): void {
+  if (!PACING) return;
+  sleep(KEYING_TIME[txName]);
+}
+
+// STROPPY_NO_DEFAULT=1 short-circuits the default() iteration to a no-op. k6
+// always runs default() at least once (minimum 1 VU × 1 iter); integration tests
+// that only want to validate the load phase set this to observe the
+// post-populate state without transaction mutations.
+export const NO_DEFAULT = ENV("STROPPY_NO_DEFAULT", "false", "Skip the transaction body in default()") === "true";
+
+// §5.2.1/§5.2.5: each VU iteration is: keying time → tx → think time. Weighted
+// dispatch is the TPC-C standard mix 45/43/4/4/4. The variant supplies its five
+// transaction functions and a Function→name map (for pacing lookup).
+export function runTpccIteration(
+  picker: { pickWeighted(fns: unknown[], weights: number[]): unknown },
+  fns: (() => void)[],
+  weights: number[],
+  nameByFn: Map<Function, string>,
+): void {
+  Step("workload", () => {
+    const workload = picker.pickWeighted(fns, weights) as () => void;
+    const txName = nameByFn.get(workload) ?? "new_order";
+    keyingTime(txName);
+    workload();
+    thinkTime(txName);
+  }, { silent: true });
+}
+
+export function teardown(): void {
+  Teardown();
+}
+
+// ============================================================================
+// handleSummary — TPC-C §1.11 post-run transaction mix + compliance rates.
+// Overrides the default k6 end-of-test summary. Prints observed percentages
+// alongside spec bounds so operators can verify compliance without
+// instrumenting the DB.
+//
+// tx.ts can observe new_order remote-line and payment BC-credit rates
+// client-side; procs.ts hides those inside the stored procedure and can only
+// derive them post-run via SELECT, so the procs variant marks those two rows
+// "(via proc)". All other rows are identical.
+//
+// Statistical mix-floor check: one-sided 3σ upper bound against the §5.2.3
+// floor (NO 45 / P 43 / OS 4 / D 4 / SL 4) — flag only if the true share is
+// genuinely below spec at ~99.87% confidence. Violations are printed to stdout,
+// NOT thrown (a thrown handleSummary makes k6 discard the custom output). k6
+// threshold failures on the tpcc_*_duration Trends still mark the run failed.
+// ============================================================================
+export type TpccVariant = "tx" | "procs";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export function makeTpccSummary(variant: TpccVariant) {
+  return function handleSummary(data: any): Record<string, string> {
+    const m = data.metrics ?? {};
+    const cnt = (name: string): number => Number(m[name]?.values?.count ?? 0);
+    const pct = (num: number, den: number): string =>
+      den > 0 ? ((num / den) * 100).toFixed(2) + "%" : "n/a";
+
+    const trendLine = (name: string): string => {
+      const v = m[name]?.values ?? {};
+      const fmt = (x: any) => (typeof x === "number" ? x.toFixed(1) : "—");
+      return `avg=${fmt(v.avg)}  p50=${fmt(v.med)}  p90=${fmt(v["p(90)"])}  p95=${fmt(v["p(95)"])}  p99=${fmt(v["p(99)"])}`;
+    };
+    const throughputTrendLines = (label: string, name: string): [string, string] => {
+      const v = m[name]?.values ?? {};
+      const fmt = (x: any) => (typeof x === "number" ? x.toFixed(1) : "—");
+      const prefix = `  ${label}: `;
+      const indent = " ".repeat(prefix.length);
+      return [
+        `${prefix}avg=${fmt(v.avg)}  p1=${fmt(v["p(1)"])}  p5=${fmt(v["p(5)"])}  ` +
+          `p10=${fmt(v["p(10)"])}`,
+        `${indent}p50=${fmt(v.med)}  p90=${fmt(v["p(90)"])}  ` +
+          `p95=${fmt(v["p(95)"])}  p99=${fmt(v["p(99)"])}  (active 1s buckets)`,
+      ];
+    };
+    const rateStr = (name: string): string => {
+      const v = m[name]?.values?.rate;
+      return typeof v === "number" ? (v * 100).toFixed(2) + "%" : "n/a";
+    };
+    const counterRateStr = (name: string): string => {
+      const v = m[name]?.values?.rate;
+      return typeof v === "number" ? v.toFixed(2) + "/s" : "n/a";
+    };
+
+    const no  = cnt("tpcc_new_order_total");
+    const pay = cnt("tpcc_payment_total");
+    const os  = cnt("tpcc_order_status_total");
+    const dl  = cnt("tpcc_delivery_total");
+    const sl  = cnt("tpcc_stock_level_total");
+    const tot = no + pay + os + dl + sl;
+
+    const rbDone = cnt("tpcc_rollback_done");
+    const payRem = cnt("tpcc_payment_remote");
+    const payBN  = cnt("tpcc_payment_byname");
+    const osBN   = cnt("tpcc_order_status_byname");
+    const retries = cnt("tpcc_retry_attempts");
+
+    // tx-only counters (absent/0 in a procs run → "(via proc)" rows instead).
+    const rlTot = cnt("tpcc_remote_line_total");
+    const rlRem = cnt("tpcc_remote_line_remote");
+    const payBC = cnt("tpcc_payment_bc");
+
+    const payBcRow = variant === "tx"
+      ? `  payment BC credit      : ${pct(payBC, pay).padStart(7)}  (spec  10% of payment,  §2.5.2.2)`
+      : `  payment BC credit      :  (via proc)  (spec  10% of payment,  §2.5.2.2 — derive post-run)`;
+    const remoteLineRow = variant === "tx"
+      ? `  new_order remote lines : ${pct(rlRem, rlTot).padStart(7)}  (spec  ~1% of lines,  §2.4.1.5)`
+      : `  new_order remote lines :  (via proc)  (spec  ~1% of lines,  §2.4.1.5 — derive post-run)`;
+
+    const iters   = cnt("iterations");
+    const iterDur = m.iteration_duration?.values?.avg;
+    const iterDurStr = typeof iterDur === "number" ? iterDur.toFixed(2) + " ms" : "n/a";
+    const queries = cnt("run_query_count");
+    const txs = cnt("tx_count");
+
+    const lines: string[] = [
+      "",
+      "===== TPC-C transaction mix (observed vs spec §5.2.3) =====",
+      `  new_order    : ${pct(no, tot).padStart(7)}  (spec 45%, min 45%)`,
+      `  payment      : ${pct(pay, tot).padStart(7)}  (spec 43%, min 43%)`,
+      `  order_status : ${pct(os, tot).padStart(7)}  (spec  4%, min  4%)`,
+      `  delivery     : ${pct(dl, tot).padStart(7)}  (spec  4%, min  4%)`,
+      `  stock_level  : ${pct(sl, tot).padStart(7)}  (spec  4%, min  4%)`,
+      "",
+      "===== TPC-C compliance rates =====",
+      `  rollback rate          : ${pct(rbDone, no).padStart(7)}  (spec ~1% of new_order, §2.4.1.4)`,
+      `  payment remote         : ${pct(payRem, pay).padStart(7)}  (spec  15% of payment,  §2.5.1.2)`,
+      `  payment by-name        : ${pct(payBN, pay).padStart(7)}  (spec  60% of payment,  §2.5.1.2)`,
+      payBcRow,
+      `  order_status by-name   : ${pct(osBN, os).padStart(7)}  (spec  60% of order_status, §2.6.1.2)`,
+      remoteLineRow,
+      `  serialization retries  : ${String(retries).padStart(7)}  (retry helper, spec §5.2.5 / §4.1)`,
+      "",
+      "===== TPC-C per-tx response time distribution (ms; §5.2.5.4 p90 ceilings) =====",
+      `  new_order    (ceil  5000): ${trendLine("tpcc_new_order_duration")}`,
+      `  payment      (ceil  5000): ${trendLine("tpcc_payment_duration")}`,
+      `  order_status (ceil  5000): ${trendLine("tpcc_order_status_duration")}`,
+      `  stock_level  (ceil 20000): ${trendLine("tpcc_stock_level_duration")}`,
+      `  delivery     (ceil 80000): ${trendLine("tpcc_delivery_duration")}`,
+      "",
+      "===== Driver query / tx metrics =====",
+      `  queries executed    : ${queries}`,
+      `  avg query throughput: ${counterRateStr("run_query_count")}`,
+      ...throughputTrendLines("query_qps buckets (q/s)", "run_query_qps"),
+      `  tx attempts         : ${txs}`,
+      `  avg tx throughput   : ${counterRateStr("tx_count")}  (whole run)`,
+      ...throughputTrendLines("tx_tps buckets (tx/s)", "tx_tps"),
+      `  run_query_duration  : ${trendLine("run_query_duration")}`,
+      `  run_query_error_rate: ${rateStr("run_query_error_rate")}`,
+      `  tx_total_duration   : ${trendLine("tx_total_duration")}`,
+      `  tx_clean_duration   : ${trendLine("tx_clean_duration")}`,
+      `  tx_queries_per_tx   : ${trendLine("tx_queries_per_tx")}`,
+      `  tx_commit_rate      : ${rateStr("tx_commit_rate")}`,
+      `  tx_error_rate       : ${rateStr("tx_error_rate")}`,
+      "",
+      "===== k6 rollups =====",
+      `  iterations        : ${iters}`,
+      `  avg iter duration : ${iterDurStr}`,
+      `  total tpcc txs    : ${tot}`,
+      "",
+    ];
+
+    const violations: string[] = [];
+    if (tot >= 50) {
+      const check = (label: string, got: number, floor: number) => {
+        const p = got / tot;
+        const share = p * 100;
+        const stdPct = Math.sqrt((p * (1 - p)) / tot) * 100;
+        const upper = share + 3 * stdPct;
+        if (upper < floor) {
+          violations.push(
+            `  ${label.padEnd(13)}: observed ${share.toFixed(2)}% ±${stdPct.toFixed(2)}pp, ` +
+            `3σ upper bound ${upper.toFixed(2)}% < floor ${floor}% (spec §5.2.3, N=${tot})`,
+          );
+        }
+      };
+      check("new_order",    no,  45);
+      check("payment",      pay, 43);
+      check("order_status", os,  4);
+      check("delivery",     dl,  4);
+      check("stock_level",  sl,  4);
+    } else {
+      lines.push(
+        `(skipping mix floor check — total ${tot} < 50, insufficient sample)`,
+        "",
+      );
+    }
+
+    if (violations.length > 0) {
+      lines.push(
+        "===== TPC-C §5.2.3 mix floor VIOLATIONS =====",
+        ...violations,
+        "",
+        "(Violation means 3σ upper bound still below the spec floor — i.e. the",
+        " picker is genuinely miscalibrated, not just sampling noise. The k6",
+        " run exit code is determined by options.thresholds, not this check.)",
+        "",
+      );
+    }
+
+    return { stdout: lines.join("\n") };
+  };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
