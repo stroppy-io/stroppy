@@ -12,11 +12,11 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
-- `PACING=true` now applies keying and think-time delays to `tpcc/procs` as well as `tpcc/tx`. The pacing code lived only in the `tx` variant, so stored-procedure runs ignored it entirely and ran unpaced regardless of the flag.
+- `PACING=true` now applies keying and think-time delays to `tpcc/procs` as well as `tpcc/tx`. The pacing code lived only in the `tx` variant, so stored-procedure runs ignored it entirely and ran unpaced regardless of the flag. ([#114](https://github.com/stroppy-io/stroppy/pull/114))
 
 ### Changed
 
-- The `tpcc/tx` and `tpcc/procs` workloads now share their driver setup, load/prepare lifecycle, retry policy, pacing, weighted dispatch, and post-run summary through `tpcc_common.ts` (matching the existing `tpcb` layout), instead of each carrying its own copy. Both variants now run queries with `errorMode=throw` (previously `procs` threw while `tx` logged), so database errors surface as exceptions consistently.
+- The `tpcc/tx` and `tpcc/procs` workloads now share their driver setup, load/prepare lifecycle, retry policy, pacing, weighted dispatch, and post-run summary through `tpcc_common.ts` (matching the existing `tpcb` layout), instead of each carrying its own copy. Both variants now run queries with `errorMode=throw` (previously `procs` threw while `tx` logged), so database errors surface as exceptions consistently. ([#114](https://github.com/stroppy-io/stroppy/pull/114))
 
 ## [5.7.2] - 2026-07-27
 
