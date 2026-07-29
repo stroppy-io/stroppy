@@ -1,0 +1,46 @@
+name: Cleanup
+
+# Weekly housekeeping: prune stale per-commit nightly prereleases and
+# branches already merged into main. Nothing here deletes commits from
+# history — merged branch tips live on in main, and nightly builds are
+# throwaway per-commit binaries.
+on:
+  schedule:
+    - cron: "17 3 * * 1" # Sun 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  nightly-retention:
+    name: Keep newest 10 nightly prereleases
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete nightly prereleases beyond newest 10
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh release list -R "$GITHUB_REPOSITORY" --limit 200 \
+            --json tagName,isPrerelease,publishedAt \
+            -q '.[] | select(.isPrerelease) | "\(.publishedAt) \(.tagName)"' \
+            | sort -r | tail -n +11 | awk '{print $2}' \
+            | xargs -r -I{} gh release delete {} -R "$GITHUB_REPOSITORY" --cleanup-tag --yes
+
+  merged-branches:
+    name: Delete branches merged into main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Delete merged branches (skip main)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          git branch -r --merged origin/main \
+            | grep -vE 'origin/(main|HEAD)' \
+            | sed 's|origin/||;s/^ *//' \
+            | xargs -r -I{} git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete {}
