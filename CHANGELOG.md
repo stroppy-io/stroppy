@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [5.7.3] - 2026-07-29
+
 ### Fixed
 
 - `PACING=true` now applies keying and think-time delays to `tpcc/procs` as well as `tpcc/tx`. The pacing code lived only in the `tx` variant, so stored-procedure runs ignored it entirely and ran unpaced regardless of the flag. ([#114](https://github.com/stroppy-io/stroppy/pull/114))
