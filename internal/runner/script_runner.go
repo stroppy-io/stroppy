@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/internal/common"
+	"github.com/stroppy-io/stroppy/internal/engine"
 	"github.com/stroppy-io/stroppy/internal/static"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -523,9 +524,17 @@ func effectiveEnvValue(envs []string, key string) (value string, ok bool) {
 
 // runK6 executes the k6.
 func (r *ScriptRunner) runK6(
-	_ context.Context,
+	ctx context.Context,
 	args, envs []string,
 ) (err error) {
+	// STROPPY_OWN_ENGINE=1 selects the native engine instead of k6cmd.Execute().
+	// Both paths share the same staged tempdir + built envs, so the engines are
+	// comparable online by toggling the flag.
+	if os.Getenv("STROPPY_OWN_ENGINE") == "1" {
+		r.logger.Info("Running native engine (STROPPY_OWN_ENGINE=1)")
+		return engine.Run(ctx, r.scriptPath, r.tempDir, envs, r.logger)
+	}
+
 	scriptName := filepath.Base(r.scriptPath)
 	// dump state
 	argsBefore := os.Args
