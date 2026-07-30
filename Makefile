@@ -1,55 +1,9 @@
 LOCAL_BIN:=$(CURDIR)/bin
-NODE_BIN:=$(CURDIR)/bin/node_bin/bin
-PATH:=$(LOCAL_BIN):$(NODE_BIN):$(PATH)
+PATH:=$(LOCAL_BIN):$(PATH)
 GOPROXY:=proxy.golang.org,direct
 BUILD_TARGET_DIR=$(CURDIR)/build
-PROTO_BUILD_TARGET_DIR=$(CURDIR)/proto/build
 
 VERSION=$(shell git describe --tags --always 2>/dev/null || echo "0.0.0")
-
-UNAME_S := $(shell uname -s)
-UNAME_M := $(shell uname -m)
-
-# Detect system info
-ifeq ($(UNAME_S),Darwin)
-  OS := osx
-else ifeq ($(UNAME_S),Linux)
-  OS := linux
-else
-  $(error Unsupported OS: $(UNAME_S))
-endif
-
-ifeq ($(UNAME_M),x86_64)
-  ARCH := x86_64
-else ifeq ($(UNAME_M),arm64)
-  ARCH := aarch_64
-else ifeq ($(UNAME_M), aarch64)
-  ARCH := aarch_64
-else
-  $(error Unsupported architecture: $(UNAME_M))
-endif
-
-# Set GOOS only if not already set
-ifndef GOOS
-  ifeq ($(OS),osx)
-    GOOS := darwin
-  else ifeq ($(OS),linux)
-    GOOS := linux
-  else
-    $(error Unsupported OS for Go: $(OS))
-  endif
-endif
-
-# Set GOARCH only if not already set
-ifndef GOARCH
-  ifeq ($(ARCH),aarch_64)
-    GOARCH := arm64
-  else ifeq ($(ARCH),x86_64)
-    GOARCH := amd64
-  else
-    $(error Unsupported architecture for Go: $(ARCH))
-  endif
-endif
 
 default: help
 
@@ -57,41 +11,13 @@ default: help
 help: # Show help in Makefile
 	@grep -E '^[a-zA-Z0-9 _-]+:.*#'  Makefile | sort | while read -r l; do printf "\033[1;32m$$(echo $$l | cut -f 1 -d':')\033[00m:$$(echo $$l | cut -f 2- -d'#')\n"; done
 
-# List of required binaries (default checks PATH)
-# Optional: Specify custom paths for binaries not in PATH
-# Format: binary_name=/path/to/binary
-REQUIRED_BINS = git node npm go curl unzip \
-	protoc=$(LOCAL_BIN)/protoc \
-	easyp=$(LOCAL_BIN)/easyp \
-	protoc-gen-ts=$(NODE_BIN)/protoc-gen-ts \
-	protoc-gen-go=$(LOCAL_BIN)/protoc-gen-go \
-	protoc-gen-go-grpc=$(LOCAL_BIN)/protoc-gen-go-grpc \
-	protoc-gen-validate=$(LOCAL_BIN)/protoc-gen-validate \
-	protoc-gen-doc=$(LOCAL_BIN)/protoc-gen-doc \
-	protoc-gen-jsonschema=$(LOCAL_BIN)/protoc-gen-jsonschema \
-	xk6=$(LOCAL_BIN)/xk6
+# List of required binaries for a local build/check.
+REQUIRED_BINS = git go curl unzip docker
 .PHONY: .check-bins
 .check-bins: # Check for required binaries if build locally
 	@echo "Checking for required binaries..."
 	@missing=0; \
-	for bin_spec in $(REQUIRED_BINS); do \
-		case "$$bin_spec" in \
-			*=*) \
-				bin=$${bin_spec%%=*}; \
-				custom_path=$${bin_spec#*=}; \
-				if [ -x "$$custom_path" ]; then \
-					echo "✓ $$bin is installed at $$custom_path"; \
-					continue; \
-				else \
-					echo "✗ $$bin expected at $$custom_path but not found"; \
-					missing=1; \
-					continue; \
-				fi \
-				;; \
-			*) \
-				bin=$$bin_spec; \
-				;; \
-		esac; \
+	for bin in $(REQUIRED_BINS); do \
 		if command -v "$$bin" >/dev/null 2>&1; then \
 			echo "✓ $$bin is installed in PATH"; \
 		else \
@@ -106,142 +32,31 @@ REQUIRED_BINS = git node npm go curl unzip \
 		echo "All required binaries are available"; \
 	fi
 
-VALIDATE_PROTO_PATH := $(HOME)/.easyp/mod/github.com/bufbuild/protoc-gen-validate/v1.3.3
-
-PROTOC_VERSION ?= 32.1
-PROTOC_BIN := $(LOCAL_BIN)/protoc
-PROTOC_URL := https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH).zip
-PROTOC_ZIP := /tmp/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH).zip
-PROTOC_TMP := /tmp/protoc-$(PROTOC_VERSION)-$(OS)-$(ARCH)
-.PHONY: .install-protoc
-.install-protoc:
-	@echo ">>> Installing protoc v$(PROTOC_VERSION) to $(PROTOC_BIN)"
-	@mkdir -p $(LOCAL_BIN)
-	@rm -rf $(PROTOC_TMP) && rm -rf $(PROTOC_ZIP) && rm -rf $(LOCAL_BIN)/include && rm -rf $(LOCAL_BIN)/protoc
-	@echo ">>> Downloading $(PROTOC_URL)"
-	@curl -SL -o $(PROTOC_ZIP) $(PROTOC_URL)
-	@unzip -o -q $(PROTOC_ZIP) -d $(PROTOC_TMP)
-	@mkdir -p $(LOCAL_BIN)/include
-	@cp $(PROTOC_TMP)/bin/protoc $(PROTOC_BIN)
-	@cp -r $(PROTOC_TMP)/include/* $(LOCAL_BIN)/include/
-	@chmod +x $(PROTOC_BIN)
-	@rm $(PROTOC_ZIP) && rm -rf $(PROTOC_TMP)
-
-.PHONY: .install-easyp
-.install-easyp:
-	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/easyp-tech/easyp/cmd/easyp@v0.16.6
-
-.PHONY: .install-go-proto-deps
-.install-go-proto-deps:
-	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/envoyproxy/protoc-gen-validate@v1.3.3
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.20.0
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@v1.5.1
-	GOBIN=$(LOCAL_BIN) GOPROXY=$(GOPROXY) go install github.com/pubg/protoc-gen-jsonschema@v0.8.0
-
-.PHONY: .install-node-proto-deps
-.install-node-proto-deps:
-	mkdir -p $(LOCAL_BIN)
-	npm install --global --prefix $(LOCAL_BIN)/node_bin @protobuf-ts/plugin@2.11.1
-
-TS_TARGET_DIR=$(PROTO_BUILD_TARGET_DIR)/ts
-TS_BUNDLE_DIR=$(CURDIR)/proto/ts_bundle
-TMP_BUNDLE_DIR=$(TS_BUNDLE_DIR)/tmp
-.PHONY: .build-proto-ts-sdk
-.build-proto-ts-sdk: # Build ts sdk with single js file for proto files
-	rm -rf $(TMP_BUNDLE_DIR)
-	mkdir -p $(TS_TARGET_DIR)
-	mkdir -p $(TMP_BUNDLE_DIR)
-# Copy the entire directory structure to preserve relative imports
-	cp -r $(TS_TARGET_DIR) $(TMP_BUNDLE_DIR)/ts_source
-# Copy analyze_ddl source before building
-	cp $(CURDIR)/internal/static/parse_sql.ts $(TMP_BUNDLE_DIR)/parse_sql.ts
-	cp $(TS_BUNDLE_DIR)/build.js $(TMP_BUNDLE_DIR)/
-	cp $(TS_BUNDLE_DIR)/package.json $(TMP_BUNDLE_DIR)/
-	cp $(TS_BUNDLE_DIR)/package-lock.json $(TMP_BUNDLE_DIR)/
-	cd $(TMP_BUNDLE_DIR) && npm ci
-	cd $(TMP_BUNDLE_DIR) && node build.js
-	cp $(TMP_BUNDLE_DIR)/stroppy.pb.ts $(TS_TARGET_DIR)/stroppy.pb.ts
-	cp $(TMP_BUNDLE_DIR)/dist/bundle.js $(TS_TARGET_DIR)/stroppy.pb.js
-# Bundle parse_sql with node-sql-parser (handled by build.js)
-# TODO: make single bundle aka stroppy.js or automatically copy all from dist
-	cp $(TMP_BUNDLE_DIR)/dist/parse_sql.js $(TS_TARGET_DIR)/parse_sql.js
-	rm -rf $(TMP_BUNDLE_DIR)
-
-.PHONY: .easyp-gen
-.easyp-gen:
-	$(LOCAL_BIN)/easyp generate
-
 .PHONY: install-linter
 install-linter: # Install golangci-lint
 	$(info Installing golangci-lint...)
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
-
-.PHONY: install-xk6
-install-xk6:
-	$(info Installing xk6...)
-	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) go install go.k6.io/xk6@v1.4.6
-
-.PHONY: .install-proto-deps
-.install-proto-deps: .install-protoc .install-easyp .install-go-proto-deps .install-node-proto-deps
+	GOBIN=$(LOCAL_BIN) go install github.com/golangci-lint/v2/cmd/golangci-lint@v2.12.2
 
 .PHONY: install-bin-deps
-install-bin-deps: install-linter install-xk6 .install-proto-deps # Install binary dependencies in ./bin
+install-bin-deps: install-linter # Install binary dependencies in ./bin
 	$(info Installing binary dependencies...)
 
 .PHONY: app-deps
-app-deps: # Install application dependencies in ./bin
-	GOPROXY=$(GOPROXY)						go mod tidy
-	GOPROXY=$(GOPROXY) cd cmd/xk6air/    && go mod tidy
+app-deps: # Install application dependencies
+	GOPROXY=$(GOPROXY) go mod tidy
 
-.PHONY: proto
-proto: .check-bins
-	rm -rf $(CURDIR)/pkg/common/proto/*
-	rm -rf $(CURDIR)/pkg/datagen/dgproto
-	rm -rf $(PROTO_BUILD_TARGET_DIR)/ts
-	mkdir -p $(PROTO_BUILD_TARGET_DIR)/ts/stroppy
-	mkdir -p $(PROTO_BUILD_TARGET_DIR)/docs
-	mkdir -p $(PROTO_BUILD_TARGET_DIR)/go
-	$(MAKE) .easyp-gen && $(MAKE) .build-proto-ts-sdk
-# NOTE: easyp generates the code into the right place 'proto/stroppy' by itself
-# datagen.proto declares go_package=".../pkg/datagen/dgproto"; relocate its
-# generated files from the source-relative layout into that package.
-	mkdir -p $(CURDIR)/pkg/datagen/dgproto
-	mv $(CURDIR)/pkg/common/proto/stroppy/datagen.pb.go $(CURDIR)/pkg/datagen/dgproto/datagen.pb.go
-	mv $(CURDIR)/pkg/common/proto/stroppy/datagen.pb.validate.go $(CURDIR)/pkg/datagen/dgproto/datagen.pb.validate.go
-
-	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.ts $(CURDIR)/internal/static/
-	cp $(PROTO_BUILD_TARGET_DIR)/ts/stroppy.pb.js $(CURDIR)/internal/static/
-	cp $(PROTO_BUILD_TARGET_DIR)/ts/parse_sql.js $(CURDIR)/internal/static/
-	cp $(PROTO_BUILD_TARGET_DIR)/docs/proto.md $(CURDIR)/docs
-	$(MAKE) jsonschema
-
-.PHONY: jsonschema
-jsonschema: # Generate JSON Schema for RunConfig (IDE autocomplete for stroppy-config.json)
-	mkdir -p $(PROTO_BUILD_TARGET_DIR)/jsonschema
-	$(PROTOC_BIN) \
-		-I . \
-		-I $(LOCAL_BIN)/include \
-		-I $(VALIDATE_PROTO_PATH) \
-		--plugin=protoc-gen-jsonschema=$(LOCAL_BIN)/protoc-gen-jsonschema \
-		--jsonschema_out=$(PROTO_BUILD_TARGET_DIR)/jsonschema \
-		--jsonschema_opt=pretty_json_output=true,entrypoint_message=RunConfig \
-		proto/stroppy/run.proto
-	mkdir -p $(CURDIR)/docs/jsonschema
-	cp $(PROTO_BUILD_TARGET_DIR)/jsonschema/proto/stroppy/run.schema.json $(CURDIR)/docs/jsonschema/run.schema.json
+# NOTE: the .pb.go types under pkg/common/proto/stroppy and pkg/datagen/dgproto
+# are frozen hand-edited Go types (the driver/workload contract). There is no
+# .proto source and no codegen step; do not regenerate.
 
 .PHONY: linter linter_fix tests
 
-linter: # Start linter
+linter: # Start linter (read-only check)
 	$(LOCAL_BIN)/golangci-lint cache clean
 	$(LOCAL_BIN)/golangci-lint --config $(CURDIR)/.golangci.yml run
 
-linter_fix: # Start linter with possible fixes
+linter_fix: # Start linter with possible fixes (NEVER run casually — rewrites the whole repo)
 	$(LOCAL_BIN)/golangci-lint cache clean
 	$(LOCAL_BIN)/golangci-lint --config $(CURDIR)/.golangci.yml run --fix
 
@@ -283,15 +98,11 @@ gen-tpch-json: # Regenerate workloads/tpch/distributions.json and answers_sf1.js
 
 # Stroppy build section
 
-.PHONY: build-k6 build-k6-debug build-debug build build-all
+.PHONY: build build-debug build-all
 
 STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 STROPPY_LDFLAGS=-ldflags "-s -w -X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'"
-
-build-k6: build # alias kept for muscle memory
-
-build-k6-debug: build-debug # alias kept for muscle memory
 
 build-debug: # Build binary stroppy (with symbols)
 	@mkdir -p $(CURDIR)/build
@@ -319,56 +130,14 @@ revision: # Recreate git tag with version tag=<semver>
 
 
 ##
-## Local K6 fast tests
+## Smoke runs (Go-native workloads)
 ##
 
-.PHONY: run-simple-test run-tpcb-test run-tpcc-test run-tpcc-mysql-test run-tpcds-test run-k6-tests run-scenario-smoke run-workload-branches
-
-WORKDIR=dev
-
-run-simple-test: # Smoke: run the simple preset
-	rm -rf $(WORKDIR)
-	./build/stroppy gen --workdir $(WORKDIR) --preset=simple
-	cd $(WORKDIR) && ./stroppy run simple.ts
-
-# Workload run knobs (all four TPC workloads share these):
-#   prep then measure (recommended for a clean throughput number):
-#     ./build/stroppy run tpcb/tx -e SCALE_FACTOR=10 --no-steps workload   # load only
-#     ./build/stroppy run tpcb/tx -e VUS=64 -e DURATION=1h --steps workload # measure only
-#   single pass (load + measure in one run):
-#     ./build/stroppy run tpcb/tx -e SCALE_FACTOR=10 -e ITER=1
-#   knobs: VUS, DURATION (set => constant-vus throughput), ITER (power test),
-#          MAX_DURATION (default 24h), PG_UNLOGGED=false to disable the pg
-#          UNLOGGED bulk-load dance. The targets below are single-pass smoke runs.
-run-tpcb-test: # Smoke: TPC-B procs workload (single pass)
-	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
-		./build/stroppy run tpcb/procs.ts
-
-run-tpcc-test: # Smoke: TPC-C procs workload (single pass)
-	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
-		./build/stroppy run tpcc/procs.ts
-
-run-tpcc-mysql-test: # Smoke: TPC-C procs workload on MySQL
-	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
-		./build/stroppy run tpcc/procs.ts -d mysql -- -q
-
-run-tpcds-test: # Smoke: TPC-DS workload at SF=0.01
-	LOG_LEVEL=DEBUG STROPPY_ERROR_MODE=throw \
-		./build/stroppy run tpcds/tpcds -e SCALE_FACTOR=0.01
-
-run-k6-tests: # Run SQL API integration tests
-# rc - return code
-# This allows to run all the test and to exit with the nonzero code if any failed
-	@rc=0;                                                      \
-	./build/stroppy run tests/sqlapi_test -- -q        || rc=1; \
-	./build/stroppy run tests/multi_drivers_test -- -q || rc=1; \
-	./build/stroppy run tests/transaction_test -- -q   || rc=1; \
-	exit $$rc
-
-# Gate one smoke run: fail on a non-zero exit OR any k6 `level=error` line.
-# k6/stroppy exit 0 even when every iteration errors (e.g. a failed GlobalOnce
+# Gate one smoke run: fail on a non-zero exit OR any `level=error` line.
+# stroppy exits 0 even when every iteration errors (e.g. a failed GlobalOnce
 # load), so the exit code alone is not a reliable signal; default error mode
-# logs every error at level=error, which this catches. $(1)=label, rest=command.
+# logs every error at level=error, which this catches.
+# $(1)=label, rest=command.
 define smoke_run
 	echo "== $(1) =="; \
 	out=$$($(2) 2>&1); code=$$?; printf '%s\n' "$$out"; \
@@ -378,13 +147,13 @@ define smoke_run
 endef
 
 # Scenario-branch smoke on the noop driver (NO database). Every workload has
-# two executor archetypes behind declareScenario — constant-vus (DURATION set,
-# throughput) and shared-iterations (power test) — which are distinct k6 option
-# JSON paths that only fail at init. The noop driver runs the full lifecycle
+# two executor archetypes — constant-vus (DURATION set, throughput) and
+# shared-iterations (power test). The noop driver runs the full lifecycle
 # without a DB, so this catches executor/options regressions for ~free. The
 # VUS=2/ITER=1 case also guards the shared-iterations "iterations < VUs" floor.
 # Third field skips each workload's data-validation step (noop has no data to
-# check, so those steps would flood the log); "-" means nothing to skip.
+# check); "-" means nothing to skip.
+.PHONY: run-scenario-smoke
 run-scenario-smoke: # Tier 0: scenario-branch smoke on noop (no DB), all workloads x both branches
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 validate_population" "tpcds 0.01 -" "tpch/tx 0.01 validate_answers"; do \
@@ -398,41 +167,20 @@ run-scenario-smoke: # Tier 0: scenario-branch smoke on noop (no DB), all workloa
 # scale (default pg preset = localhost:5432). Complements run-scenario-smoke by
 # exercising the actual DB path (load + run) in throughput and power modes.
 # tpch's validate_answers golden set is SF=1 only, so it is skipped at smoke
-# scale (answer correctness is a heavier, separate concern); validate_population
-# stays on for tpcc since it passes at SF=1.
-# tpcds is intentionally NOT here: its fixed-cardinality dimensions (e.g.
-# customer_demographics ~1.92M rows) do not shrink with SF, so even SF=0.01 is a
-# multi-million-row load+index — too heavy for a free CI runner's Postgres. Its
-# scenario branches are covered DB-free by run-scenario-smoke (noop) instead.
+# scale; validate_population stays on for tpcc since it passes at SF=1.
+# tpcds is intentionally NOT here: its fixed-cardinality dimensions do not
+# shrink with SF, so even SF=0.01 is a multi-million-row load+index — too heavy
+# for a free CI runner's Postgres. Its scenario branches are covered DB-free by
+# run-scenario-smoke (noop) instead.
+.PHONY: run-workload-branches
 run-workload-branches: # Tier 1: real-Postgres smoke of both branches (tpcb/tpcc/tpch)
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 -" "tpch/tx 0.01 validate_answers"; do \
 		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns=""; [ "$$skip" = "-" ] || ns="--no-steps $$skip"; \
-		$(call smoke_run,pg constant-vus: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=2 $$ns -- -q); \
-		$(call smoke_run,pg shared-iters: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns -- -q); \
+		$(call smoke_run,pg constant-vus: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=2 $$ns); \
+		$(call smoke_run,pg shared-iters: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns); \
 	done;                                                                           \
 	exit $$rc
-
-##
-## TypeScript Development
-##
-
-.PHONY: ts-setup ts-test ts-watch ts-typecheck
-
-ts-setup: # Setup TypeScript testing environment
-	@echo "Setting up TypeScript testing environment..."
-	cd internal/static && npm install
-	@echo "✓ TypeScript testing environment ready!"
-	@echo "Run 'make ts-test' to run tests or 'make ts-watch' for watch mode"
-
-ts-typecheck: # Typecheck TypeScript framework code (helpers.ts, parse_sql.ts, stroppy.d.ts)
-	cd internal/static && npx tsc --noEmit
-
-ts-test: # Run TypeScript unit tests
-	cd internal/static && npm test
-
-ts-watch: # Watch TypeScript files and run tests automatically
-	cd internal/static && npm run test:watch
 
 ##
 ## Tmpfs Postgres integration harness
