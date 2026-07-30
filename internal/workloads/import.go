@@ -8,4 +8,5 @@ import (
 	_ "github.com/stroppy-io/stroppy/internal/workloads/tpcb"
 	_ "github.com/stroppy-io/stroppy/internal/workloads/tpcc"
 	_ "github.com/stroppy-io/stroppy/internal/workloads/tpch"
+	_ "github.com/stroppy-io/stroppy/internal/workloads/tpcds"
 )

@@ -130,3 +130,16 @@ func (s *SQL) Query(section, query string) (string, bool) {
 	}
 	return "", false
 }
+
+// Names returns the query names of a section in file order. Workloads with a flat
+// query file (no sections) keep every query under the empty section name "".
+func (s *SQL) Names(section string) []string {
+	qs := s.sections[section]
+	out := make([]string, 0, len(qs))
+	for _, q := range qs {
+		if q.sql != "" {
+			out = append(out, q.name)
+		}
+	}
+	return out
+}
