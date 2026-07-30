@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -59,6 +60,29 @@ func init() {
 }
 
 func (w *workload) Name() string { return "tpcc/" + w.variant }
+
+// renderDDL expands the ydb.sql {partition_keys}/{partition_count} tablet-split
+// placeholders from the warehouse range (one tablet per warehouse in
+// [warehouseStart, wIDMax]). No-op on dialects whose .sql lacks the tokens.
+// Ports tpcc_common.ts renderDDL/ydbPartitionKeys.
+func (w *workload) renderDDL(s string) string {
+	if !strings.Contains(s, "{partition_") {
+		return s
+	}
+	var keys string
+	if w.warehouses <= 1 {
+		keys = "(" + strconv.FormatInt(w.warehouseStart+1, 10) + ")"
+	} else {
+		parts := make([]string, 0, w.warehouses)
+		for i := w.warehouseStart + 1; i <= w.wIDMax; i++ {
+			parts = append(parts, "("+strconv.FormatInt(i, 10)+")")
+		}
+		keys = strings.Join(parts, ", ")
+	}
+	count := strconv.FormatInt(max(w.warehouses, 1), 10)
+	s = strings.ReplaceAll(s, "{partition_keys}", keys)
+	return strings.ReplaceAll(s, "{partition_count}", count)
+}
 
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.driverType = b.DriverTypeName()
@@ -121,7 +145,17 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	addStep := func(name string, fn func() error) { steps = append(steps, step{name, fn}) }
 
 	addStep("drop_schema", func() error { return runSection("drop_schema") })
-	addStep("create_schema", func() error { return runSection("create_schema") })
+	addStep("create_schema", func() error {
+		// ydb.sql DDL carries {partition_keys}/{partition_count} tablet-split
+		// placeholders that tx.ts renders from the warehouse range; expand them
+		// here. No-op on dialects whose .sql lacks the tokens.
+		for _, q := range w.sql.Section("create_schema") {
+			if err := b.Exec(ctx, w.renderDDL(q), nil); err != nil {
+				return fmt.Errorf("create_schema: %w", err)
+			}
+		}
+		return nil
+	})
 	if w.variant == "procs" {
 		addStep("create_procedures", func() error { return runSection("create_procedures") })
 	}
