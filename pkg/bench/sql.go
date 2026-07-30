@@ -28,6 +28,9 @@ const (
 	commentPrefix = "--"
 )
 
+// ParseSQL parses SQL text into sections (the string form of LoadSQL, for inline SQL).
+func ParseSQL(content string) *SQL { return parseSQL(content) }
+
 // LoadSQL reads a workload SQL file (cwd → workloads/<preset>/ → embedded) and
 // parses it into sections.
 func LoadSQL(preset, filename string) (*SQL, error) {

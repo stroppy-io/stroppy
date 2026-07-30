@@ -170,9 +170,22 @@ Config file flags:
 			}
 		}
 
+		// Go-native execute_sql: a .sql file, inline SQL (contains spaces), or the
+		// execute_sql preset routes to the Go runner with the SQL source passed via env
+		// (STROPPY_SQL_BODY for inline, SQL_FILE for a path) — replacing the TS wrapper.
+		// Checked before the registered-name lookup so the preset's sql arg is honored.
+		if name, body, file, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
+			if body != "" {
+				envOverrides["STROPPY_SQL_BODY"] = body
+			} else if file != "" {
+				envOverrides["SQL_FILE"] = file
+			}
+			return runGoWorkload(parsed, name, envOverrides, driverConfigs)
+		}
+
 		// Go-native workload: if a Go workload is registered under the bare
 		// script name, dispatch to bench.Run instead of the TS/k6 path. Explicit
-		// .ts/.sql paths and inline SQL fall through to the TS runner.
+		// .ts paths fall through to the TS runner.
 		if _, ok := bench.Lookup(scriptArg); ok {
 			return runGoWorkload(parsed, scriptArg, envOverrides, driverConfigs)
 		}
@@ -217,6 +230,27 @@ func invalidConfig(err error) error {
 
 // runGoWorkload dispatches to the Go-native bench engine. Driver CLI configs are
 // converted to *stroppy.DriverConfig; -e overrides become the script env map;
+// executeSQLGoRoute detects the execute_sql cases that have no registered Go workload
+// name: inline SQL (the arg contains spaces), a .sql file (the arg is the path), and the
+// execute_sql preset. It returns the workload name plus the inline body / file path to run
+// (mirroring internal/runner/resolve.go). ok is false for ordinary presets and .ts scripts.
+func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bool) {
+	switch {
+	case strings.Contains(scriptArg, " "):
+		// Inline SQL is wrapped in one `--= query` marker, matching resolveInlineSQL.
+		return "execute_sql", fmt.Sprintf("--= query\n%s;\n", strings.TrimSuffix(strings.TrimSpace(scriptArg), ";")), "", true
+	case strings.HasSuffix(scriptArg, ".sql"):
+		return "execute_sql", "", scriptArg, true
+	case scriptArg == "execute_sql":
+		// Preset: SQL comes from -e SQL_FILE (already in env) or the sql arg.
+		if sqlArg != "" {
+			return "execute_sql", "", sqlArg, true
+		}
+		return "execute_sql", "", "", true
+	}
+	return "", "", "", false
+}
+
 // --steps/--no-steps are published via STROPPY_STEPS env (the bench step filter
 // reads it at Run start).
 func runGoWorkload(
