@@ -185,15 +185,22 @@ func installK6Globals(vm *js.Runtime, vu *VU, envMap map[string]string) error {
 	_ = console.Set("warn", consoleOut("warn"))
 	_ = console.Set("error", consoleOut("error"))
 
-	exec := vm.NewObject()
-	test := vm.NewObject()
+	// exec / test as objects; exec.vu fields are re-set each iteration (live).
+	testObj := vm.NewObject()
+	_ = testObj.Set("abort", func(call js.FunctionCall) js.Value { panic(abortSentinel{msg: fmt.Sprint(call.Argument(0))}) })
+	_ = testObj.Set("fail", func(call js.FunctionCall) js.Value { panic(fmt.Errorf("test fail: %v", call.Argument(0))) })
+
 	execVu := vm.NewObject()
-	abortFn := func(msg string) { panic(abortSentinel{msg}) }
-	_ = test.Set("abort", func(call js.FunctionCall) js.Value { abortFn(fmt.Sprint(call.Argument(0))); return js.Undefined() })
-	_ = test.Set("fail", func(call js.FunctionCall) js.Value { panic(fmt.Errorf("test fail: %v", call.Argument(0))) })
 	_ = execVu.Set("idInTest", vu.vuid)
-	_ = exec.Set("test", test)
-	_ = exec.Set("vu", execVu)
+	_ = execVu.Set("idInInstance", vu.vuid)
+	_ = execVu.Set("iterationInTest", uint64(0))
+	_ = execVu.Set("iterationInInstance", uint64(0))
+	_ = execVu.Set("iterationInScenario", uint64(0))
+	vu.execVu = execVu
+
+	execObj := vm.NewObject()
+	_ = execObj.Set("vu", execVu)
+	_ = execObj.Set("test", testObj)
 
 	mocks := Mocks{
 		{"__ENV", envObj},
@@ -208,8 +215,8 @@ func installK6Globals(vm *js.Runtime, vu *VU, envMap map[string]string) error {
 		{"console", console},
 		{"sleep", func(t float64) { time.Sleep(time.Duration(t * float64(time.Second))) }},
 		{"sleepMs", func(ms float64) { time.Sleep(time.Duration(ms) * time.Millisecond) }},
-		{"exec", exec},
-		{"test", test},
+		{"exec", execObj},
+		{"test", testObj},
 		{"Counter", vu.metricCtor(k6metrics.Counter)},
 		{"Rate", vu.metricCtor(k6metrics.Rate)},
 		{"Trend", vu.metricCtor(k6metrics.Trend)},
@@ -309,9 +316,31 @@ func readScenarios(vm *js.Runtime) ([]scenarioSpec, error) {
 	if opts == nil || js.IsUndefined(opts) || js.IsNull(opts) {
 		return nil, errors.New("script exports no `options`")
 	}
-	scenariosVal := opts.ToObject(vm).Get("scenarios")
+	optsObj := opts.ToObject(vm)
+	scenariosVal := optsObj.Get("scenarios")
 	if scenariosVal == nil || js.IsUndefined(scenariosVal) || js.IsNull(scenariosVal) {
-		return nil, errors.New("`options` has no scenarios")
+		// k6 semantics: no scenarios → implicit default scenario. Top-level
+		// vus/iterations/duration shortcuts (DeriveScenariosFromShortcuts) apply to it.
+		spec := scenarioSpec{name: "default", exec: "default"}
+		spec.vus = int(getInteger(optsObj, "vus"))
+		if spec.vus < 1 {
+			spec.vus = 1
+		}
+		if d := getString(optsObj, "duration"); d != "" {
+			dur, err := time.ParseDuration(d)
+			if err != nil {
+				return nil, fmt.Errorf("options.duration %q: %w", d, err)
+			}
+			spec.executor = "constant-vus"
+			spec.duration = dur
+		} else {
+			spec.executor = "shared-iterations"
+			spec.iterations = getInteger(optsObj, "iterations")
+			if spec.iterations < 1 {
+				spec.iterations = 1
+			}
+		}
+		return []scenarioSpec{spec}, nil
 	}
 
 	var out []scenarioSpec
@@ -338,6 +367,10 @@ func readScenarios(vm *js.Runtime) ([]scenarioSpec, error) {
 			spec.duration = dur
 		}
 		out = append(out, spec)
+	}
+	// k6 semantics: no scenarios → implicit default scenario (default fn, 1 VU, 1 iter).
+	if len(out) == 0 {
+		out = []scenarioSpec{{name: "default", executor: "shared-iterations", exec: "default", vus: 1, iterations: 1}}
 	}
 	return out, nil
 }
@@ -472,6 +505,13 @@ func runWorkerLoop(ctx context.Context, r *RootState, envMap map[string]string, 
 	vu.initPhase = false
 	for keep() {
 		vu.ctx = ctx
+		vu.iterTest++
+		vu.iterScenario++
+		if vu.execVu != nil {
+			_ = vu.execVu.Set("iterationInTest", vu.iterTest)
+			_ = vu.execVu.Set("iterationInInstance", vu.iterTest)
+			_ = vu.execVu.Set("iterationInScenario", vu.iterScenario)
+		}
 		if err := execJSFunc(vm, execFn, true); err != nil {
 			if errors.Is(err, errAbort) {
 				return

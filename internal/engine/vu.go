@@ -22,8 +22,16 @@ type VU struct {
 	initPhase bool
 
 	// per-iteration mutable state
-	ctx     context.Context
+	ctx context.Context
 	stepTag string
+
+	// iteration counters, incremented before each exec call. Exposed via
+	// exec.vu.* (k6 parity: idInTest, iterationInTest, iterationInScenario, ...).
+	iterTest     uint64
+	iterScenario uint64
+
+	// execVu is the live `exec.vu` object; its fields are re-set each iteration.
+	execVu *js.Object
 }
 
 func (v *VU) Context() context.Context { return v.ctx }
