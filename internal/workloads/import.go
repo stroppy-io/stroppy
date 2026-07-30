@@ -6,4 +6,5 @@ package workloads
 import (
 	_ "github.com/stroppy-io/stroppy/internal/workloads/simple"
 	_ "github.com/stroppy-io/stroppy/internal/workloads/tpcb"
+	_ "github.com/stroppy-io/stroppy/internal/workloads/tpcc"
 )
