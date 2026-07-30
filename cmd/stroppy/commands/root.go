@@ -17,6 +17,7 @@ import (
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
 	"github.com/stroppy-io/stroppy/internal/runner"
 	"github.com/stroppy-io/stroppy/internal/version"
+	_ "github.com/stroppy-io/stroppy/internal/workloads"
 )
 
 // appName is the binary / command name, reused across the cobra command

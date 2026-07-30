@@ -2,6 +2,7 @@ package run
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -15,7 +16,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
+	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 const (
@@ -167,6 +170,13 @@ Config file flags:
 			}
 		}
 
+		// Go-native workload: if a Go workload is registered under the bare
+		// script name, dispatch to bench.Run instead of the TS/k6 path. Explicit
+		// .ts/.sql paths and inline SQL fall through to the TS runner.
+		if _, ok := bench.Lookup(scriptArg); ok {
+			return runGoWorkload(parsed, scriptArg, envOverrides, driverConfigs)
+		}
+
 		// Resolve files through search path.
 		input, err := runner.ResolveInput(scriptArg, sqlArg)
 		if err != nil {
@@ -203,6 +213,71 @@ Config file flags:
 
 func invalidConfig(err error) error {
 	return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+}
+
+// runGoWorkload dispatches to the Go-native bench engine. Driver CLI configs are
+// converted to *stroppy.DriverConfig; -e overrides become the script env map;
+// --steps/--no-steps are published via STROPPY_STEPS env (the bench step filter
+// reads it at Run start).
+func runGoWorkload(
+	parsed runArgs,
+	name string,
+	envOverrides map[string]string,
+	driverConfigs runner.DriverCLIConfigs,
+) error {
+	drivers := map[int]*stroppy.DriverConfig{}
+
+	for idx, cfg := range driverConfigs {
+		dc := &stroppy.DriverConfig{Url: cfg.URL}
+		// driverType arrives as a preset short name ("noop"); translate to the
+		// proto enum the driver layer expects.
+		if cfg.DriverType != "" {
+			t, err := bench.ParseDriverType(cfg.DriverType)
+			if err != nil {
+				return invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
+			}
+
+			dc.DriverType = t
+		}
+		// defaultInsertMethod is TS-only (a Rel.table default); Go workloads set
+		// Method on each InsertSpec, so it is intentionally not carried here.
+		// Extra (-D postgres.* / sql.*) merges as nested proto fields.
+		if len(cfg.Extra) > 0 {
+			if extraJSON, err := json.Marshal(cfg.Extra); err == nil {
+				_ = json.Unmarshal(extraJSON, dc)
+			}
+		}
+
+		drivers[idx] = dc
+	}
+
+	if _, ok := drivers[0]; !ok {
+		// No -d given: default to the local postgres preset (mirrors TS
+		// declareDriverSetup defaults).
+		drivers[0] = &stroppy.DriverConfig{
+			DriverType: stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
+			Url:        "postgres://postgres:postgres@localhost:5432",
+		}
+	}
+
+	// Steps are read from env by the bench step filter at Run start.
+	os.Unsetenv("STROPPY_STEPS")
+	os.Unsetenv("STROPPY_NO_STEPS")
+
+	if len(parsed.steps) > 0 {
+		os.Setenv("STROPPY_STEPS", strings.Join(parsed.steps, ","))
+	}
+
+	if len(parsed.noSteps) > 0 {
+		os.Setenv("STROPPY_NO_STEPS", strings.Join(parsed.noSteps, ","))
+	}
+
+	ctx := context.Background()
+	if err := bench.Run(ctx, name, drivers, envOverrides, logger.Global()); err != nil {
+		return fmt.Errorf("failed to run go workload: %w", err)
+	}
+
+	return nil
 }
 
 // runArgs holds the result of parseRunArgs.

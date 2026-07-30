@@ -1,0 +1,364 @@
+package bench
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
+	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+)
+
+// BeginOpts selects isolation + names the tx for metrics.
+type BeginOpts struct {
+	Isolation TxIsolationName
+	Name      string
+}
+
+// Exec runs a statement that returns no rows.
+func (b *Bench) Exec(ctx context.Context, sql string, args map[string]any) error {
+	res, err := b.runQuery(ctx, sql, args)
+	if res != nil {
+		res.Rows.Close()
+	}
+
+	return err
+}
+
+// QueryValue returns the first column of the first row (or nil if no rows).
+func (b *Bench) QueryValue(ctx context.Context, sql string, args map[string]any) (any, error) {
+	res, err := b.runQuery(ctx, sql, args)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Rows.Close()
+
+	if !res.Rows.Next() {
+		return nil, nil
+	}
+
+	vals := res.Rows.Values()
+	if len(vals) == 0 {
+		return nil, nil
+	}
+
+	return vals[0], res.Rows.Err()
+}
+
+// QueryRow returns the first row (or nil if no rows).
+func (b *Bench) QueryRow(ctx context.Context, sql string, args map[string]any) ([]any, error) {
+	res, err := b.runQuery(ctx, sql, args)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Rows.Close()
+
+	if !res.Rows.Next() {
+		return nil, res.Rows.Err()
+	}
+
+	return res.Rows.Values(), res.Rows.Err()
+}
+
+// QueryRows returns all rows (up to a large cap).
+func (b *Bench) QueryRows(ctx context.Context, sql string, args map[string]any) ([][]any, error) {
+	res, err := b.runQuery(ctx, sql, args)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Rows.Close()
+
+	return res.Rows.ReadAll(0), res.Rows.Err()
+}
+
+func (b *Bench) runQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
+	res, err := b.drv.RunQuery(ctx, sql, args)
+
+	var elapsed time.Duration
+	if res != nil && res.Stats != nil {
+		elapsed = res.Stats.Elapsed
+	}
+
+	b.root.txMetrics.recordQueryResult(b.vu, elapsed, err)
+
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
+	}
+
+	return res, nil
+}
+
+// InsertSpec runs a relational bulk insert.
+func (b *Bench) InsertSpec(ctx context.Context, spec *dgproto.InsertSpec) (*stats.Query, error) {
+	tracker, err := b.newInsertProgressTracker(spec)
+	if err != nil {
+		return nil, fmt.Errorf("insert %q: %w", spec.GetTable(), err)
+	}
+
+	runCtx := ctx
+	if tracker.Enabled() {
+		runCtx = insertprogress.ContextWithTracker(ctx, tracker)
+		tracker.Start(runCtx)
+	}
+
+	result, err := b.drv.InsertSpec(runCtx, spec)
+	if tracker.Enabled() {
+		tracker.Finish(err)
+	}
+
+	var elapsed time.Duration
+	if result != nil {
+		elapsed = result.Elapsed
+	}
+
+	b.root.txMetrics.recordInsertResult(b.vu, spec.GetTable(), elapsed, err)
+
+	if err != nil {
+		return nil, fmt.Errorf("insert %q: %w", spec.GetTable(), err)
+	}
+
+	b.root.txMetrics.recordInsert(b.vu, spec.GetTable(), result.Rows)
+
+	return result, nil
+}
+
+// newInsertProgressTracker builds the periodic insert-progress tracker (on by
+// default) wired to emit progress metrics. Mirrors the engine's wrapper.
+func (b *Bench) newInsertProgressTracker(spec *dgproto.InsertSpec) (*insertprogress.Tracker, error) {
+	config := insertprogress.DefaultConfig()
+	config.Table = spec.GetTable()
+	config.Method = insertMethodName(spec.GetMethod())
+	config.Workers = int(spec.GetParallelism().GetWorkers())
+	config.Logger = b.lg.Named("insert-progress")
+	config.OnSample = func(snapshot insertprogress.Snapshot) {
+		b.root.txMetrics.recordInsertProgress(b.vu, snapshot)
+	}
+
+	return insertprogress.NewTracker(&config), nil
+}
+
+func insertMethodName(method dgproto.InsertMethod) string {
+	switch method {
+	case dgproto.InsertMethod_PLAIN_QUERY:
+		return "plain_query"
+	case dgproto.InsertMethod_PLAIN_BULK:
+		return "plain_bulk"
+	case dgproto.InsertMethod_COLUMNAR:
+		return "columnar"
+	case dgproto.InsertMethod_NATIVE:
+		return "native"
+	default:
+		return strings.ToLower(method.String())
+	}
+}
+
+// InsertTpch loads one TPC-H table via the ported dbgen generator.
+func (b *Bench) InsertTpch(ctx context.Context, table string, scaleFactor float64, workers int) (*stats.Query, error) {
+	if workers < 1 {
+		workers = 1
+	}
+
+	spec := &dgproto.InsertSpec{
+		Table: table, Method: dgproto.InsertMethod_NATIVE,
+		Parallelism: &dgproto.Parallelism{Workers: int32(workers)},
+		Generator:   &dgproto.InsertSpec_Tpch{Tpch: &dgproto.TpchSource{Table: table, ScaleFactor: scaleFactor}},
+	}
+
+	return b.InsertSpec(ctx, spec)
+}
+
+// InsertTpcds loads one TPC-DS table via the ported dsdgen generator.
+func (b *Bench) InsertTpcds(ctx context.Context, table string, scaleFactor float64, workers int) (*stats.Query, error) {
+	if workers < 1 {
+		workers = 1
+	}
+
+	spec := &dgproto.InsertSpec{
+		Table: table, Method: dgproto.InsertMethod_NATIVE,
+		Parallelism: &dgproto.Parallelism{Workers: int32(workers)},
+		Generator:   &dgproto.InsertSpec_Tpcds{Tpcds: &dgproto.TpcdsSource{Table: table, ScaleFactor: scaleFactor}},
+	}
+
+	return b.InsertSpec(ctx, spec)
+}
+
+// Begin starts a transaction.
+func (b *Bench) Begin(ctx context.Context, opts BeginOpts) (*TxX, error) {
+	iso, err := ParseTxIsolation(string(opts.Isolation))
+	if err != nil {
+		return nil, err
+	}
+
+	if iso == stroppy.TxIsolationLevel_NONE {
+		return &TxX{tx: nil, b: b, iso: iso, name: opts.Name, start: time.Now()}, nil
+	}
+
+	tx, err := b.drv.Begin(ctx, iso)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+
+	return &TxX{tx: tx, b: b, iso: iso, name: opts.Name, start: time.Now()}, nil
+}
+
+// BeginTx runs fn inside a transaction: commits on nil return, rolls back on error.
+func (b *Bench) BeginTx(ctx context.Context, opts BeginOpts, fn func(*TxX) error) error {
+	tx, err := b.Begin(ctx, opts)
+	if err != nil {
+		return err
+	}
+
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback(ctx)
+
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// TxX is the transaction handle (sugar over driver.Tx; NONE mode delegates to the driver).
+type TxX struct {
+	tx      driver.Tx
+	b       *Bench
+	iso     stroppy.TxIsolationLevel
+	name    string
+	start   time.Time
+	queries int
+	done    bool
+}
+
+func (t *TxX) Exec(ctx context.Context, sql string, args map[string]any) error {
+	res, err := t.runQuery(ctx, sql, args)
+	if res != nil {
+		res.Rows.Close()
+	}
+
+	return err
+}
+
+func (t *TxX) QueryValue(ctx context.Context, sql string, args map[string]any) (any, error) {
+	res, err := t.runQuery(ctx, sql, args)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Rows.Close()
+
+	if !res.Rows.Next() {
+		return nil, nil
+	}
+
+	vals := res.Rows.Values()
+	if len(vals) == 0 {
+		return nil, nil
+	}
+
+	return vals[0], res.Rows.Err()
+}
+
+func (t *TxX) QueryRow(ctx context.Context, sql string, args map[string]any) ([]any, error) {
+	res, err := t.runQuery(ctx, sql, args)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Rows.Close()
+
+	if !res.Rows.Next() {
+		return nil, res.Rows.Err()
+	}
+
+	return res.Rows.Values(), res.Rows.Err()
+}
+
+func (t *TxX) QueryRows(ctx context.Context, sql string, args map[string]any) ([][]any, error) {
+	res, err := t.runQuery(ctx, sql, args)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Rows.Close()
+
+	return res.Rows.ReadAll(0), res.Rows.Err()
+}
+
+func (t *TxX) runQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
+	t.queries++
+	if t.tx == nil {
+		// NONE mode: delegate to the parent driver.
+		res, err := t.b.drv.RunQuery(ctx, sql, args)
+
+		var elapsed time.Duration
+		if res != nil && res.Stats != nil {
+			elapsed = res.Stats.Elapsed
+		}
+
+		t.b.root.txMetrics.recordQueryResult(t.b.vu, elapsed, err)
+
+		if err != nil {
+			return nil, fmt.Errorf("query: %w", err)
+		}
+
+		return res, nil
+	}
+
+	res, err := t.tx.RunQuery(ctx, sql, args)
+
+	var elapsed time.Duration
+	if res != nil && res.Stats != nil {
+		elapsed = res.Stats.Elapsed
+	}
+
+	t.b.root.txMetrics.recordQueryResult(t.b.vu, elapsed, err)
+
+	if err != nil {
+		return nil, fmt.Errorf("tx query: %w", err)
+	}
+
+	return res, nil
+}
+
+func (t *TxX) Commit(ctx context.Context) error {
+	committed := true
+	if t.tx != nil {
+		if err := t.tx.Commit(ctx); err != nil {
+			committed = false
+			return err
+		}
+	}
+
+	t.b.root.txMetrics.record(t.b.vu, "commit", t.name, t.iso)
+	t.recordEnd(committed)
+
+	return nil
+}
+
+func (t *TxX) Rollback(ctx context.Context) error {
+	if t.tx != nil {
+		if err := t.tx.Rollback(ctx); err != nil {
+			return err
+		}
+	}
+
+	t.b.root.txMetrics.record(t.b.vu, "rollback", t.name, t.iso)
+	t.recordEnd(false)
+
+	return nil
+}
+
+// recordEnd emits the per-transaction summary metrics (total duration, commit
+// rate, query count) once. Idempotent — safe if a workload calls both paths.
+func (t *TxX) recordEnd(committed bool) {
+	if t.done {
+		return
+	}
+	t.done = true
+	t.b.root.txMetrics.recordTxEnd(t.b.vu, t.name, time.Since(t.start), t.queries, committed)
+}
+
+// Compile-tick: ensure zap import stays used if expanded later.
+var _ = zap.NewNop
