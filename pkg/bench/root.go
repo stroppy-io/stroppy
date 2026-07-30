@@ -6,7 +6,6 @@ import (
 	"net"
 	"sync"
 
-	k6metrics "go.k6.io/k6/metrics"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -27,8 +26,8 @@ type RootState struct {
 	dialer *net.Dialer
 
 	// metrics sink (k6/metrics substrate).
-	registry *k6metrics.Registry
-	samples  chan k6metrics.SampleContainer
+	registry *Registry
+	samples  chan SampleContainer
 
 	txMetrics *txMetrics
 
@@ -61,8 +60,8 @@ func newRootState(lg *zap.Logger, ctx context.Context, env map[string]string) *R
 		lg:              lg,
 		ctx:             ctx,
 		dialer:          &net.Dialer{},
-		registry:        k6metrics.NewRegistry(),
-		samples:         make(chan k6metrics.SampleContainer, 4096),
+		registry:        NewRegistry(),
+		samples:         make(chan SampleContainer, 4096),
 		txMetrics:       &txMetrics{},
 		sharedSlots:     make(map[uint64]*sharedDriverSlot),
 		globalOnceSlots: make(map[string]*globalOnceSlot),

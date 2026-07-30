@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	k6metrics "go.k6.io/k6/metrics"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -18,26 +17,26 @@ const throughputInterval = time.Second
 type txMetrics struct {
 	mu           sync.Mutex
 	registered   atomic.Bool
-	txCount      *k6metrics.Metric
-	txTPS        *k6metrics.Metric
-	runQueryQPS  *k6metrics.Metric
-	insertRows   *k6metrics.Metric
-	progressRows *k6metrics.Metric
-	progressRPS  *k6metrics.Metric
-	tags         *k6metrics.TagSet
+	txCount      *metric
+	txTPS        *metric
+	runQueryQPS  *metric
+	insertRows   *metric
+	progressRows *metric
+	progressRPS  *metric
+	tags         *TagSet
 
 	// Per-operation metrics mirroring the TS DriverX wrapper.
-	runQueryDuration *k6metrics.Metric
-	runQueryCount    *k6metrics.Metric
-	runQueryErrRate  *k6metrics.Metric
-	insertDuration   *k6metrics.Metric
-	insertErrRate    *k6metrics.Metric
-	iterationDur     *k6metrics.Metric
-	iterations       *k6metrics.Metric
-	txTotalDuration  *k6metrics.Metric
-	txCommitRate     *k6metrics.Metric
-	txErrorRate      *k6metrics.Metric
-	txQueriesPerTx   *k6metrics.Metric
+	runQueryDuration *metric
+	runQueryCount    *metric
+	runQueryErrRate  *metric
+	insertDuration   *metric
+	insertErrRate    *metric
+	iterationDur     *metric
+	iterations       *metric
+	txTotalDuration  *metric
+	txCommitRate     *metric
+	txErrorRate      *metric
+	txQueriesPerTx   *metric
 
 	txTotal    uint64
 	queryTotal uint64
@@ -67,87 +66,87 @@ func (m *txMetrics) ensureRegistered(vu *VU, lg *zap.Logger) {
 
 	registry := vu.root.registry
 
-	txCount, err := registry.NewMetric("tx_count", k6metrics.Counter)
+	txCount, err := registry.NewMetric("tx_count", Counter)
 	if err != nil {
 		lg.Fatal("can't register tx_count metric", zap.Error(err))
 	}
 
-	txTPS, err := registry.NewMetric("tx_tps", k6metrics.Trend)
+	txTPS, err := registry.NewMetric("tx_tps", Trend)
 	if err != nil {
 		lg.Fatal("can't register tx_tps metric", zap.Error(err))
 	}
 
-	runQueryQPS, err := registry.NewMetric("run_query_qps", k6metrics.Trend)
+	runQueryQPS, err := registry.NewMetric("run_query_qps", Trend)
 	if err != nil {
 		lg.Fatal("can't register run_query_qps metric", zap.Error(err))
 	}
 
-	insertRows, err := registry.NewMetric("insert_rows_total", k6metrics.Counter)
+	insertRows, err := registry.NewMetric("insert_rows_total", Counter)
 	if err != nil {
 		lg.Fatal("can't register insert_rows_total metric", zap.Error(err))
 	}
 
-	progressRows, err := registry.NewMetric("insert_progress_rows_total", k6metrics.Counter)
+	progressRows, err := registry.NewMetric("insert_progress_rows_total", Counter)
 	if err != nil {
 		lg.Fatal("can't register insert_progress_rows_total metric", zap.Error(err))
 	}
 
-	progressRPS, err := registry.NewMetric("insert_progress_rows_per_second", k6metrics.Trend)
+	progressRPS, err := registry.NewMetric("insert_progress_rows_per_second", Trend)
 	if err != nil {
 		lg.Fatal("can't register insert_progress_rows_per_second metric", zap.Error(err))
 	}
 
-	runQueryDuration, err := registry.NewMetric("run_query_duration", k6metrics.Trend)
+	runQueryDuration, err := registry.NewMetric("run_query_duration", Trend)
 	if err != nil {
 		lg.Fatal("can't register run_query_duration metric", zap.Error(err))
 	}
 
-	runQueryCount, err := registry.NewMetric("run_query_count", k6metrics.Counter)
+	runQueryCount, err := registry.NewMetric("run_query_count", Counter)
 	if err != nil {
 		lg.Fatal("can't register run_query_count metric", zap.Error(err))
 	}
 
-	runQueryErrRate, err := registry.NewMetric("run_query_error_rate", k6metrics.Rate)
+	runQueryErrRate, err := registry.NewMetric("run_query_error_rate", Rate)
 	if err != nil {
 		lg.Fatal("can't register run_query_error_rate metric", zap.Error(err))
 	}
 
-	insertDuration, err := registry.NewMetric("insert_duration", k6metrics.Trend)
+	insertDuration, err := registry.NewMetric("insert_duration", Trend)
 	if err != nil {
 		lg.Fatal("can't register insert_duration metric", zap.Error(err))
 	}
 
-	insertErrRate, err := registry.NewMetric("insert_error_rate", k6metrics.Rate)
+	insertErrRate, err := registry.NewMetric("insert_error_rate", Rate)
 	if err != nil {
 		lg.Fatal("can't register insert_error_rate metric", zap.Error(err))
 	}
 
-	iterationDur, err := registry.NewMetric("iteration_duration", k6metrics.Trend)
+	iterationDur, err := registry.NewMetric("iteration_duration", Trend)
 	if err != nil {
 		lg.Fatal("can't register iteration_duration metric", zap.Error(err))
 	}
 
-	iterations, err := registry.NewMetric("iterations", k6metrics.Counter)
+	iterations, err := registry.NewMetric("iterations", Counter)
 	if err != nil {
 		lg.Fatal("can't register iterations metric", zap.Error(err))
 	}
 
-	txTotalDuration, err := registry.NewMetric("tx_total_duration", k6metrics.Trend)
+	txTotalDuration, err := registry.NewMetric("tx_total_duration", Trend)
 	if err != nil {
 		lg.Fatal("can't register tx_total_duration metric", zap.Error(err))
 	}
 
-	txCommitRate, err := registry.NewMetric("tx_commit_rate", k6metrics.Rate)
+	txCommitRate, err := registry.NewMetric("tx_commit_rate", Rate)
 	if err != nil {
 		lg.Fatal("can't register tx_commit_rate metric", zap.Error(err))
 	}
 
-	txQueriesPerTx, err := registry.NewMetric("tx_queries_per_tx", k6metrics.Trend)
+	txQueriesPerTx, err := registry.NewMetric("tx_queries_per_tx", Trend)
 	if err != nil {
 		lg.Fatal("can't register tx_queries_per_tx metric", zap.Error(err))
 	}
 
-	txErrorRate, err := registry.NewMetric("tx_error_rate", k6metrics.Rate)
+	txErrorRate, err := registry.NewMetric("tx_error_rate", Rate)
 	if err != nil {
 		lg.Fatal("can't register tx_error_rate metric", zap.Error(err))
 	}
@@ -173,7 +172,7 @@ func (m *txMetrics) ensureRegistered(vu *VU, lg *zap.Logger) {
 	m.registered.Store(true)
 }
 
-func applyStepTag(tags *k6metrics.TagSet, step string) *k6metrics.TagSet {
+func applyStepTag(tags *TagSet, step string) *TagSet {
 	if step != "" {
 		return tags.With("step", step)
 	}
@@ -181,14 +180,13 @@ func applyStepTag(tags *k6metrics.TagSet, step string) *k6metrics.TagSet {
 	return tags
 }
 
-func (m *txMetrics) emit(vu *VU, metric *k6metrics.Metric, value float64, tags *k6metrics.TagSet) {
+func (m *txMetrics) emit(vu *VU, metric *metric, value float64, tags *TagSet) {
 	if metric == nil {
 		return
 	}
 
-	k6metrics.PushIfNotDone(vu.Context(), vu.root.samples, k6metrics.Sample{
-		TimeSeries: k6metrics.TimeSeries{Metric: metric, Tags: tags},
-		Time:       time.Now(), Value: value,
+	PushIfNotDone(vu.Context(), vu.root.samples, Sample{Metric: metric, Tags: tags,
+		Time: time.Now(), Value: value,
 	})
 }
 
@@ -273,15 +271,13 @@ func (m *txMetrics) recordInsertProgress(vu *VU, snapshot insertprogress.Snapsho
 
 	now := time.Now()
 	if snapshot.DeltaRows > 0 {
-		k6metrics.PushIfNotDone(vu.Context(), vu.root.samples, k6metrics.Sample{
-			TimeSeries: k6metrics.TimeSeries{Metric: progressRows, Tags: tags},
-			Time:       now, Value: float64(snapshot.DeltaRows),
+		PushIfNotDone(vu.Context(), vu.root.samples, Sample{Metric: progressRows, Tags: tags,
+			Time: now, Value: float64(snapshot.DeltaRows),
 		})
 	}
 
-	k6metrics.PushIfNotDone(vu.Context(), vu.root.samples, k6metrics.Sample{
-		TimeSeries: k6metrics.TimeSeries{Metric: progressRPS, Tags: tags},
-		Time:       now, Value: snapshot.CurrentRowsPerSecond,
+	PushIfNotDone(vu.Context(), vu.root.samples, Sample{Metric: progressRPS, Tags: tags,
+		Time: now, Value: snapshot.CurrentRowsPerSecond,
 	})
 }
 
@@ -305,9 +301,8 @@ func (m *txMetrics) recordInsert(vu *VU, table string, rows int64) {
 
 	now := time.Now()
 	tags = tags.With("table_name", table)
-	k6metrics.PushIfNotDone(vu.Context(), vu.root.samples, k6metrics.Sample{
-		TimeSeries: k6metrics.TimeSeries{Metric: insertRows, Tags: tags},
-		Time:       now, Value: float64(rows),
+	PushIfNotDone(vu.Context(), vu.root.samples, Sample{Metric: insertRows, Tags: tags,
+		Time: now, Value: float64(rows),
 	})
 }
 
@@ -333,13 +328,12 @@ func (m *txMetrics) record(vu *VU, action, name string, isolation stroppy.TxIsol
 		tags = tags.With("tx_isolation", iso)
 	}
 
-	k6metrics.PushIfNotDone(vu.Context(), vu.root.samples, k6metrics.Sample{
-		TimeSeries: k6metrics.TimeSeries{Metric: txCount, Tags: tags},
-		Time:       now, Value: 1,
+	PushIfNotDone(vu.Context(), vu.root.samples, Sample{Metric: txCount, Tags: tags,
+		Time: now, Value: 1,
 	})
 }
 
-func (m *txMetrics) start(samples chan<- k6metrics.SampleContainer, ctx context.Context) {
+func (m *txMetrics) start(samples chan<- SampleContainer, ctx context.Context) {
 	m.startSampler(&m.txSampler, &m.txTotal, ctx, samples, m.txTPS, m.tags)
 	m.startSampler(&m.querySampler, &m.queryTotal, ctx, samples, m.runQueryQPS, m.tags)
 }
@@ -351,7 +345,7 @@ func (m *txMetrics) stop() {
 
 func (m *txMetrics) startSampler(
 	sampler *throughputSampler, total *uint64, ctx context.Context,
-	samples chan<- k6metrics.SampleContainer, metric *k6metrics.Metric, tags *k6metrics.TagSet,
+	samples chan<- SampleContainer, metric *metric, tags *TagSet,
 ) {
 	if metric == nil || tags == nil || sampler.stopped.Load() {
 		return
@@ -384,7 +378,7 @@ func (m *txMetrics) stopSampler(sampler *throughputSampler) {
 	}
 }
 
-func (m *txMetrics) snapshotCountMetric() (*k6metrics.Metric, *k6metrics.TagSet, bool) {
+func (m *txMetrics) snapshotCountMetric() (*metric, *TagSet, bool) {
 	if !m.registered.Load() {
 		return nil, nil, false
 	}
@@ -392,7 +386,7 @@ func (m *txMetrics) snapshotCountMetric() (*k6metrics.Metric, *k6metrics.TagSet,
 	return m.txCount, m.tags, true
 }
 
-func (m *txMetrics) snapshotInsertMetrics() (*k6metrics.Metric, *k6metrics.TagSet, bool) {
+func (m *txMetrics) snapshotInsertMetrics() (*metric, *TagSet, bool) {
 	if !m.registered.Load() {
 		return nil, nil, false
 	}
@@ -400,7 +394,7 @@ func (m *txMetrics) snapshotInsertMetrics() (*k6metrics.Metric, *k6metrics.TagSe
 	return m.insertRows, m.tags, true
 }
 
-func (m *txMetrics) snapshotProgressMetrics() (*k6metrics.Metric, *k6metrics.Metric, *k6metrics.TagSet, bool) {
+func (m *txMetrics) snapshotProgressMetrics() (*metric, *metric, *TagSet, bool) {
 	if !m.registered.Load() {
 		return nil, nil, nil, false
 	}
@@ -409,8 +403,8 @@ func (m *txMetrics) snapshotProgressMetrics() (*k6metrics.Metric, *k6metrics.Met
 }
 
 func runThroughputSampler(
-	ctx context.Context, samples chan<- k6metrics.SampleContainer, metric *k6metrics.Metric,
-	tags *k6metrics.TagSet, total *uint64, stopCh <-chan struct{}, doneCh chan<- struct{},
+	ctx context.Context, samples chan<- SampleContainer, metric *metric,
+	tags *TagSet, total *uint64, stopCh <-chan struct{}, doneCh chan<- struct{},
 ) {
 	defer close(doneCh)
 
@@ -433,8 +427,8 @@ func runThroughputSampler(
 }
 
 func emitThroughput(
-	ctx context.Context, samples chan<- k6metrics.SampleContainer, metric *k6metrics.Metric,
-	tags *k6metrics.TagSet, totalCounter *uint64, prevTotal uint64, prevTime time.Time,
+	ctx context.Context, samples chan<- SampleContainer, metric *metric,
+	tags *TagSet, totalCounter *uint64, prevTotal uint64, prevTime time.Time,
 	now time.Time, emitZero bool,
 ) (uint64, time.Time) {
 	elapsed := now.Sub(prevTime)
@@ -449,9 +443,8 @@ func emitThroughput(
 		return total, now
 	}
 
-	k6metrics.PushIfNotDone(ctx, samples, k6metrics.Sample{
-		TimeSeries: k6metrics.TimeSeries{Metric: metric, Tags: tags},
-		Time:       now, Value: float64(delta) / elapsed.Seconds(),
+	PushIfNotDone(ctx, samples, Sample{Metric: metric, Tags: tags,
+		Time: now, Value: float64(delta) / elapsed.Seconds(),
 	})
 
 	return total, now

@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	k6metrics "go.k6.io/k6/metrics"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -241,14 +240,14 @@ var errAbort = errors.New("aborted")
 
 type Metric struct {
 	root *RootState
-	m    *k6metrics.Metric
+	m    *metric
 }
 
-func (b *Bench) Counter(name string) *Metric { return b.newMetric(name, k6metrics.Counter) }
-func (b *Bench) Trend(name string) *Metric   { return b.newMetric(name, k6metrics.Trend) }
-func (b *Bench) Rate(name string) *Metric    { return b.newMetric(name, k6metrics.Rate) }
+func (b *Bench) Counter(name string) *Metric { return b.newMetric(name, Counter) }
+func (b *Bench) Trend(name string) *Metric   { return b.newMetric(name, Trend) }
+func (b *Bench) Rate(name string) *Metric    { return b.newMetric(name, Rate) }
 
-func (b *Bench) newMetric(name string, t k6metrics.MetricType) *Metric {
+func (b *Bench) newMetric(name string, t metricType) *Metric {
 	m, err := b.root.registry.NewMetric(name, t)
 	if err != nil {
 		b.lg.Fatal("can't register metric", zap.String("name", name), zap.Error(err))
@@ -264,16 +263,15 @@ func (m *Metric) Add(v float64, tags ...string) {
 		tagSet = tagSet.With(tags[i], tags[i+1])
 	}
 
-	k6metrics.PushIfNotDone(context.Background(), m.root.samples, k6metrics.Sample{
-		TimeSeries: k6metrics.TimeSeries{Metric: m.m, Tags: tagSet},
-		Time:       time.Now(), Value: v,
+	PushIfNotDone(context.Background(), m.root.samples, Sample{Metric: m.m, Tags: tagSet,
+		Time: time.Now(), Value: v,
 	})
 }
 
 // --- summary (drain samples, print) ---
 
 type metricSink struct {
-	typ   k6metrics.MetricType
+	typ   metricType
 	count uint64
 	sum   float64
 	vals  []float64
@@ -304,7 +302,7 @@ func (s *summary) start(ctx context.Context) {
 	}()
 }
 
-func (s *summary) ingest(sc k6metrics.SampleContainer) {
+func (s *summary) ingest(sc SampleContainer) {
 	for _, sample := range sc.GetSamples() {
 		name := sample.Metric.Name
 
@@ -319,7 +317,7 @@ func (s *summary) ingest(sc k6metrics.SampleContainer) {
 		sk.count++
 
 		sk.sum += sample.Value
-		if sk.typ == k6metrics.Trend {
+		if sk.typ == Trend {
 			sk.vals = append(sk.vals, sample.Value)
 		}
 		s.mu.Unlock()
@@ -353,11 +351,11 @@ func (s *summary) print() {
 	for _, n := range names {
 		sk := s.sinks[n]
 		switch sk.typ {
-		case k6metrics.Counter:
+		case Counter:
 			fmt.Fprintf(os.Stderr, "  %-40s %d\n", n, uint64(sk.sum))
-		case k6metrics.Trend:
+		case Trend:
 			fmt.Fprintf(os.Stderr, "  %-40s count=%d avg=%.3f %s\n", n, sk.count, sk.sum/float64(max1(sk.count)), percentiles(sk.vals))
-		case k6metrics.Rate:
+		case Rate:
 			pct := 0.0
 			if sk.count > 0 {
 				pct = 100 * sk.sum / float64(sk.count)
