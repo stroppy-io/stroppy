@@ -8,12 +8,9 @@ WORKDIR /app
 
 # Copy dependency files first for better caching
 COPY go.mod go.sum ./
-COPY cmd/xk6air/go.mod cmd/xk6air/go.sum ./cmd/xk6air/
 COPY Makefile ./
 
 RUN go mod download
-
-RUN make install-xk6
 
 # Copy source code
 COPY . .

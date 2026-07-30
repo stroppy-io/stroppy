@@ -4,16 +4,16 @@
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/2mSSrkBkHm)
 [![Docs](https://img.shields.io/badge/docs-stroppy--io.github.io-blue)](https://stroppy-io.github.io)
 
-Database stress testing CLI tool powered by the k6 workload engine.
+Database stress testing CLI. A single self-contained Go binary — no k6, no
+Node, no runtime dependencies.
 
 ## Features
 
 - Built-in TPC-B, TPC-C, TPC-H, and TPC-DS workload tests
-- Custom workload support in TypeScript
-- Deterministic relational data generation with `Rel.table` and `driver.insertSpec`
+- Deterministic relational data generation with `driver.insertSpec`
 - PostgreSQL, MySQL, YDB, Picodata, CSV, and noop drivers
 - Transaction support with configurable isolation levels
-- k6-based load generation, metrics, thresholds, and output integrations
+- Go-native load generation and metrics
 
 ## Installation
 
@@ -25,9 +25,7 @@ Download the latest release from [GitHub Releases](https://github.com/stroppy-io
 
 ```bash
 docker pull ghcr.io/stroppy-io/stroppy:latest
-```
-
-```bash
+# or build locally
 docker build -t stroppy .
 ```
 
@@ -36,7 +34,6 @@ docker build -t stroppy .
 Build requirements: Go 1.24.3+
 
 ```bash
-make install-xk6  # installs k6, used internally by stroppy
 make build
 ```
 
@@ -50,221 +47,105 @@ Configure the target database via driver flags:
 stroppy run tpcc/tx -d pg -D url=postgres://user:password@host:5432/dbname
 ```
 
-### Run Tests
-
-You can run a test from the local directory.
+The first argument selects a built-in workload; the optional second is a `.sql`
+schema file override. Inline SQL is also accepted:
 
 ```bash
-./stroppy run workloads/simple/simple.ts
+stroppy run tpcc/tx           # TPC-C, raw transactions (any DB)
+stroppy run tpcc/procs        # TPC-C, stored procedures (pg/mysql)
+stroppy run tpcb/tx           # TPC-B, raw transactions (any DB)
+stroppy run tpch/tx           # TPC-H, relational load + query suite
+stroppy run tpcds -e SCALE_FACTOR=1   # TPC-DS, load 24 tables + 99 queries
+stroppy run queries.sql       # execute a SQL file
+stroppy run "select 1"        # execute inline SQL
 ```
 
-Many tests are embedded in stroppy. The first argument is a `.ts` workload, the optional second is a `.sql` schema file. Extensions may be omitted.
-
-TPC-B and TPC-C each ship two scripts:
+TPC-B and TPC-C each ship two variants:
 - `procs` — uses stored procedures; supports **PostgreSQL and MySQL**
 - `tx` — uses raw transactions; works with **all SQL drivers** (PostgreSQL, MySQL, Picodata, YDB)
 
-TPC-H ships `tpch/tx`, a relational-framework workload that loads all eight
-tables and runs the 22 query suite. TPC-DS ships `tpcds/tpcds`, which generates
-and loads all 24 tables (faithful `dsdgen` port) and runs the 99 query suite on
-PostgreSQL and MySQL; scale via `SCALE_FACTOR`.
-
-```bash
-stroppy run tpcc/procs        # TPC-C, stored procedures (pg/mysql)
-stroppy run tpcc/procs.ts     # same, explicit extension
-stroppy run tpcc/tx           # TPC-C, raw transactions (any DB)
-stroppy run tpcb/procs        # TPC-B, stored procedures (pg/mysql)
-stroppy run tpcb/tx           # TPC-B, raw transactions (any DB)
-stroppy run tpch/tx           # TPC-H, relational load + query suite
-stroppy run tpcds/tpcds -e SCALE_FACTOR=1  # TPC-DS, load 24 tables + 99 queries
-```
-
-And you can mix builtin tests with your own scripts or SQL files:
-
-```bash
-stroppy run tpcb/procs ./my-experimental.sql
-stroppy run ./my-tpcb.ts tpcb/pg.sql
-```
+TPC-H loads all eight tables and runs the 22 query suite. TPC-DS generates and
+loads all 24 tables (faithful `dsdgen` port) and runs the 99 query suite; scale
+either via `SCALE_FACTOR`.
 
 Use `-d` to select a driver preset and `-D` to override driver options:
 
 ```bash
-stroppy run tpcc/procs -d pg
-stroppy run tpcc/procs -d mysql -D url=mysql://root:pass@localhost:3306/bench
-stroppy run tpcc/tx -d pico                   # picodata: use tx variant
-stroppy run tpcc/procs -d pg -d1 mysql        # two drivers
-stroppy run simple -d noop                    # framework/runner overhead only
+stroppy run tpcc/tx -d pg
+stroppy run tpcc/tx -d mysql -D url=mysql://root:pass@localhost:3306/bench
+stroppy run tpcc/tx -d pico
+stroppy run tpcc/tx -d pg -d1 mysql        # two drivers
+stroppy run simple -d noop                  # framework/runner overhead only
 ```
 
-Pass environment variables to the script with `-e` (keys are auto-uppercased):
+Pass environment variables to the workload with `-e` (keys are auto-uppercased).
+Concurrency is configured via env, not CLI flags:
 
 ```bash
+stroppy run tpcc/tx -e VUS=10 -e DURATION=60s     # throughput run
+stroppy run tpcc/tx -e ITER=100                   # fixed-iteration power run
 stroppy run tpcc/tx -e pool_size=200
-stroppy run tpcc/tx -d pg -e scale_factor=2
-stroppy run tpcc/tx -d pg -e load_workers=8   # parallelize load_data InsertSpecs
+stroppy run tpcc/tx -d pg -e load_workers=8       # parallelize load_data
 ```
 
 Collect repeated settings in `stroppy-config.json` or an explicit `-f` file:
 
 ```bash
 stroppy run -f prod.json
-stroppy probe -f prod.json --envs --drivers
 ```
 
 Precedence is: real environment > `-e` > config `env` > `-d/-D` >
-config `drivers` > script defaults.
+config `drivers` > workload defaults.
 
 Use `stroppy help` to explore available topics:
 
 ```bash
 stroppy help drivers
-stroppy help resolution
-stroppy help datagen
+stroppy help config-file
 ```
 
-### Probe Tests
+### Probe
 
-Probe inspects a workload and prints its configuration and SQL schema without running it.
+Probe lists the embedded workload presets and the insert methods each driver
+supports:
 
 ```bash
-stroppy probe tpcc/procs
-stroppy probe tpcc/tx.ts
-
-stroppy help probe
+stroppy probe
+stroppy probe -o json
 ```
 
-### Presets Tree
+### Workload Tree
+
 ```
-├─ execute_sql
-│  └─ execute_sql.ts
-├─ simple
-│  └─ simple.ts
-├─ tests
-│  └─ csv_smoke.ts multi_drivers_test.ts runtime_generators_api_test.ts
-│     sqlapi_test.ts transaction_test.ts
+├─ execute_sql            (run a .sql file or inline SQL)
+├─ simple                 (smoke / overhead benchmark)
 ├─ tpcb
-│  ├─ procs.ts            (stored procedures — pg/mysql)
-│  ├─ tx.ts               (raw transactions  — any DB)
-│  ├─ tpcb_common.ts
+│  ├─ tx                  (raw transactions — any DB)
 │  └─ pg.sql mysql.sql pico.sql ydb.sql
 ├─ tpcc
-│  ├─ procs.ts            (stored procedures — pg/mysql)
-│  ├─ tx.ts               (raw transactions  — any DB)
-│  ├─ tpcc_common.ts tpcc_helpers.ts
+│  ├─ tx                  (raw transactions — any DB)
+│  ├─ procs               (stored procedures — pg/mysql)
 │  └─ pg.sql mysql.sql pico.sql ydb.sql ydb_no_indexes.sql
 ├─ tpch
-│  ├─ tx.ts               (relational load + 22 queries)
-│  ├─ tpch_helpers.ts tpch_validate.ts
+│  ├─ tx                  (relational load + 22 queries)
 │  └─ pg.sql mysql.sql pico.sql ydb.sql distributions.json answers_sf1.json
 └─ tpcds
-   ├─ tpcds.ts            (load 24 tables + 99 queries — pg/mysql)
-   ├─ tpcds_validate.ts
-   └─ schema.pg.sql schema.mysql.sql pg.sql mysql.sql answers_sf1.json
+   ├─ tpcds               (load 24 tables + 99 queries)
+   └─ schema.pg.sql schema.mysql.sql schema.pico.sql schema.ydb.sql \
+        pg.sql mysql.sql pico.sql ydb.sql answers_sf1.json
 ```
-
-### Generate Test Workspace
-
-Generate workspace with preset:
-
-```bash
-stroppy gen --workdir mytest --preset=simple
-```
-
-Check available presets:
-
-```bash
-stroppy help gen
-```
-
-This creates a new directory with:
-- Stroppy binary
-- Test configuration files
-- TypeScript test templates
-
-Install dependencies:
-
-```bash
-cd mytest && npm install
-```
-
-## Developing Test Scripts
-
-After generating a workspace:
-
-1. Edit TypeScript test files in your workdir
-2. Import stroppy helpers and, for generated loads, `datagen.ts`.
-3. Use k6 APIs for test scenarios
-4. Run with `./stroppy run <test-file>.ts`
-
-Look at `simple.ts`, `tpcb/tx.ts`, and `docs/datagen-framework.md` first as
-references.
 
 ## Docker Usage
 
-### Using Built-in Workloads
-
-Run directly (--network host to reach localhost databases):
+Run directly (`--network host` to reach localhost databases):
 
 ```bash
 docker run --network host ghcr.io/stroppy-io/stroppy run simple
-```
-
-> Add the tag to image:
-> ```bash
-> docker tag ghcr.io/stroppy-io/stroppy stroppy
-> ```
-
-```bash
-docker run --network host stroppy run tpcb/procs \
+docker run --network host stroppy run tpcc/tx \
   -d pg -D url=postgres://user:password@host:5432/dbname
 ```
 
-Available workloads: `simple`, `tpcb`, `tpcc`, `tpch`, `tpcds`, `execute_sql`
-
-### Create Persistent Workdir
-
-```bash
-# Generate workspace
-docker run -v $(pwd):/workspace stroppy gen --workdir mytest --preset=simple
-cd mytest
-
-# Run test
-docker run -v $(pwd):/workspace stroppy run simple.ts
-```
-
-## Advanced Usage
-
-### Using as k6 Extension
-
-Stroppy is built as a k6 extension. If you're familiar with k6, you can use the k6 binary directly to access all [k6 features](https://grafana.com/docs/k6/latest/using-k6/k6-options/reference/):
-
-```bash
-# Build both k6 and stroppy binaries
-make build
-
-# Use k6 binary directly with all k6 options
-./build/k6 run --vus 10 --duration 30s test.ts
-
-# Use k6 output options (JSON, InfluxDB, etc.)
-./build/k6 run --out json=results.json test.ts
-
-# All the stroppy commands accessible as extension
-./build/k6 x stroppy run workloads/simple/simple.ts
-```
-
-The stroppy extensions are available via `k6/x/stroppy` module in your test scripts, giving you full access to both k6 and stroppy capabilities.
-
-## Contribution
-
-### Full Build With Generated Files
-
-Build requirements: Go 1.24.3+, Node.js and npm, git, curl, unzip
-
-```bash
-make install-bin-deps
-make proto            # build protobuf and ts framework bundle
-make build
-```
+Available workloads: `simple`, `tpcb/tx`, `tpcc/tx`, `tpch/tx`, `tpcds`, `execute_sql`.
 
 ## License
 
