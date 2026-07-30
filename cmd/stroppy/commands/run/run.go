@@ -248,6 +248,17 @@ func runGoWorkload(
 			}
 		}
 
+		// POOL_SIZE script env (-e pool_size=N) maps to the postgres pool size,
+		// mirroring declareDriverSetup's pool config in the TS workloads.
+		if dc.DriverType == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
+			if ps, ok := envOverrides["POOL_SIZE"]; ok {
+				if n, err := strconv.Atoi(ps); err == nil && n > 0 {
+					nc := int32(n)
+					dc.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: &stroppy.DriverConfig_PostgresConfig{MaxConns: &nc, MinConns: &nc}}
+				}
+			}
+		}
+
 		drivers[idx] = dc
 	}
 

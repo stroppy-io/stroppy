@@ -23,7 +23,8 @@ import (
 var txNames = []string{"new_order", "payment", "order_status", "delivery", "stock_level"}
 
 type workload struct {
-	sql *bench.SQL
+	sql     *bench.SQL
+	variant string // "tx" (DML steps) or "procs" (stored procedures)
 
 	driverType   bench.DriverTypeName
 	iso          bench.TxIsolationName
@@ -52,12 +53,18 @@ type metrics struct {
 	newOrderDur, paymentDur, orderStatusDur, deliveryDur, stockLevelDur           *bench.Metric
 }
 
-func init() { bench.Register(&workload{}) }
+func init() {
+	bench.Register(&workload{variant: "tx"})
+	bench.Register(&workload{variant: "procs"})
+}
 
-func (*workload) Name() string { return "tpcc/tx" }
+func (w *workload) Name() string { return "tpcc/" + w.variant }
 
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.driverType = b.DriverTypeName()
+	if w.variant == "procs" && (w.driverType == bench.DriverPicodata || w.driverType == bench.DriverYDB) {
+		return errors.New("tpcc/procs only supports postgres and mysql; use tpcc/tx for picodata/ydb")
+	}
 	w.warehouses = max(int64(bench.EnvInt("SCALE_FACTOR", bench.EnvInt("WAREHOUSES", 1))), 1)
 	w.warehouseStart = int64(bench.EnvInt("WAREHOUSE_START", 1))
 	w.wIDMax = w.warehouseStart + w.warehouses - 1
@@ -71,6 +78,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.isPicodata = w.driverType == bench.DriverPicodata
 	w.isYdb = w.driverType == bench.DriverYDB
 	w.hasReturning = w.driverType == bench.DriverPostgres || w.driverType == bench.DriverYDB
+	useUnlogged := bench.Env("PG_UNLOGGED", "false") == "true" && w.driverType == bench.DriverPostgres
 
 	w.m = &metrics{
 		newOrderTotal:     b.Counter("tpcc_new_order_total"),
@@ -105,48 +113,59 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		return nil
 	}
 
-	steps := []struct {
+	type step struct {
 		name string
 		fn   func() error
-	}{
-		{"drop_schema", func() error { return runSection("drop_schema") }},
-		{"create_schema", func() error { return runSection("create_schema") }},
-		{"load_data", func() error {
-			if _, err := b.InsertSpec(ctx, warehouseSpec(w.warehouses, w.warehouseStart)); err != nil {
-				return err
-			}
-			if _, err := b.InsertSpec(ctx, districtSpec(w.warehouses, w.warehouseStart)); err != nil {
-				return err
-			}
-			if _, err := b.InsertSpec(ctx, customerSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
-				return err
-			}
-			if w.loadItems {
-				if _, err := b.InsertSpec(ctx, itemSpec()); err != nil {
-					return err
-				}
-			}
-			if _, err := b.InsertSpec(ctx, stockSpec(w.warehouses, w.warehouseStart)); err != nil {
-				return err
-			}
-			if _, err := b.InsertSpec(ctx, ordersSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
-				return err
-			}
-			if _, err := b.InsertSpec(ctx, orderLineSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
-				return err
-			}
-			if _, err := b.InsertSpec(ctx, newOrderSpec(w.warehouses, w.warehouseStart)); err != nil {
-				return err
-			}
-			return nil
-		}},
-		{"create_indexes", func() error { return runSection("create_indexes") }},
-		{"create_foreign_keys", func() error { return runSection("create_foreign_keys") }},
-		{"analyze", func() error { return runSection("analyze") }},
-		{"validate_population", func() error {
-			return validatePopulation(ctx, b, w.warehouses, w.warehouseStart, w.wIDMax)
-		}},
 	}
+	var steps []step
+	addStep := func(name string, fn func() error) { steps = append(steps, step{name, fn}) }
+
+	addStep("drop_schema", func() error { return runSection("drop_schema") })
+	addStep("create_schema", func() error { return runSection("create_schema") })
+	if w.variant == "procs" {
+		addStep("create_procedures", func() error { return runSection("create_procedures") })
+	}
+	if useUnlogged {
+		addStep("set_unlogged", func() error { return runSection("set_unlogged") })
+	}
+	addStep("load_data", func() error {
+		if _, err := b.InsertSpec(ctx, warehouseSpec(w.warehouses, w.warehouseStart)); err != nil {
+			return err
+		}
+		if _, err := b.InsertSpec(ctx, districtSpec(w.warehouses, w.warehouseStart)); err != nil {
+			return err
+		}
+		if _, err := b.InsertSpec(ctx, customerSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+			return err
+		}
+		if w.loadItems {
+			if _, err := b.InsertSpec(ctx, itemSpec()); err != nil {
+				return err
+			}
+		}
+		if _, err := b.InsertSpec(ctx, stockSpec(w.warehouses, w.warehouseStart)); err != nil {
+			return err
+		}
+		if _, err := b.InsertSpec(ctx, ordersSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+			return err
+		}
+		if _, err := b.InsertSpec(ctx, orderLineSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+			return err
+		}
+		if _, err := b.InsertSpec(ctx, newOrderSpec(w.warehouses, w.warehouseStart)); err != nil {
+			return err
+		}
+		return nil
+	})
+	addStep("create_indexes", func() error { return runSection("create_indexes") })
+	if useUnlogged {
+		addStep("set_logged", func() error { return runSection("set_logged") })
+	}
+	addStep("create_foreign_keys", func() error { return runSection("create_foreign_keys") })
+	addStep("analyze", func() error { return runSection("analyze") })
+	addStep("validate_population", func() error {
+		return validatePopulation(ctx, b, w.warehouses, w.warehouseStart, w.wIDMax)
+	})
 	for _, s := range steps {
 		if err := b.Step(s.name, s.fn); err != nil {
 			return err
@@ -158,6 +177,9 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	vs := w.vuState(b.VUID(), w.warehouseStart, w.warehouses)
+	if w.variant == "procs" {
+		return w.iterateProcs(ctx, b, vs)
+	}
 
 	return b.Step("workload", func() error {
 		idx := weightedPick(vs.picker, txWeights)

@@ -36,6 +36,7 @@ type txMetrics struct {
 	iterations       *k6metrics.Metric
 	txTotalDuration  *k6metrics.Metric
 	txCommitRate     *k6metrics.Metric
+	txErrorRate      *k6metrics.Metric
 	txQueriesPerTx   *k6metrics.Metric
 
 	txTotal    uint64
@@ -146,6 +147,11 @@ func (m *txMetrics) ensureRegistered(vu *VU, lg *zap.Logger) {
 		lg.Fatal("can't register tx_queries_per_tx metric", zap.Error(err))
 	}
 
+	txErrorRate, err := registry.NewMetric("tx_error_rate", k6metrics.Rate)
+	if err != nil {
+		lg.Fatal("can't register tx_error_rate metric", zap.Error(err))
+	}
+
 	m.txCount = txCount
 	m.txTPS = txTPS
 	m.runQueryQPS = runQueryQPS
@@ -161,6 +167,7 @@ func (m *txMetrics) ensureRegistered(vu *VU, lg *zap.Logger) {
 	m.iterations = iterations
 	m.txTotalDuration = txTotalDuration
 	m.txCommitRate = txCommitRate
+	m.txErrorRate = txErrorRate
 	m.txQueriesPerTx = txQueriesPerTx
 	m.tags = registry.RootTagSet()
 	m.registered.Store(true)
@@ -241,8 +248,10 @@ func (m *txMetrics) recordTxEnd(vu *VU, name string, elapsed time.Duration, quer
 	}
 	if committed {
 		m.emit(vu, m.txCommitRate, 1, tags)
+		m.emit(vu, m.txErrorRate, 0, tags)
 	} else {
 		m.emit(vu, m.txCommitRate, 0, tags)
+		m.emit(vu, m.txErrorRate, 1, tags)
 	}
 	m.emit(vu, m.txTotalDuration, elapsed.Seconds()*1000, tags)
 	m.emit(vu, m.txQueriesPerTx, float64(queries), tags)
