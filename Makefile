@@ -281,42 +281,27 @@ gen-tpch-json: # Regenerate workloads/tpch/distributions.json and answers_sf1.js
 	go run ./cmd/tpch-answers -in $(TPCH_ANSWERS_DIR) -out workloads/tpch/answers_sf1.json
 
 
-# K6/Stroppy build section
+# Stroppy build section
 
 .PHONY: build-k6 build-k6-debug build-debug build build-all
 
 STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
-K6_OUT_FILE=$(CURDIR)/build/k6
-K6_COMMON_FLAGS := --verbose \
-		--k6-version v1.8.0 \
-		--with github.com/stroppy-io/stroppy/cmd/xk6air=./cmd/xk6air/ \
-		--replace github.com/stroppy-io/stroppy=./ \
-		--with github.com/oleiade/xk6-encoding@v0.0.0-20251120082946-fbe7a8cbb88e \
-		--with github.com/grafana/xk6-dashboard@v0.8.1 \
-		--output $(K6_OUT_FILE)
+STROPPY_LDFLAGS=-ldflags "-s -w -X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'"
 
-build-k6: # Build k6 module
+build-k6: build # alias kept for muscle memory
+
+build-k6-debug: build-debug # alias kept for muscle memory
+
+build-debug: # Build binary stroppy (with symbols)
 	@mkdir -p $(CURDIR)/build
+	echo $(VERSION)
+	go build -trimpath -ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'" -o $(STROPPY_OUT_FILE) ./cmd/stroppy
 
-	CGO_ENABLED=0 XK6_RACE_DETECTOR=0 \
-	xk6 build $(K6_COMMON_FLAGS) \
-		--build-flags -trimpath \
-		--build-flags "-ldflags=-s -w -X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'"
-
-build-k6-debug: # Build k6 module
+build: # Build binary stroppy
 	@mkdir -p $(CURDIR)/build
-
-	xk6 build $(K6_COMMON_FLAGS) \
-		--build-flags "-ldflags=-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'"
-
-build-debug: build-k6-debug # Build binary stroppy
 	echo $(VERSION)
-	cp $(K6_OUT_FILE) $(STROPPY_OUT_FILE)
-
-build: build-k6 # Build binary stroppy
-	echo $(VERSION)
-	cp $(K6_OUT_FILE) $(STROPPY_OUT_FILE)
+	CGO_ENABLED=0 go build -trimpath $(STROPPY_LDFLAGS) -o $(STROPPY_OUT_FILE) ./cmd/stroppy
 
 build-all: build
 
