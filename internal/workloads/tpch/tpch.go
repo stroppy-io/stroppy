@@ -7,11 +7,14 @@ package tpch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
 )
+
+var errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")
 
 type workload struct {
 	sql           *bench.SQL
@@ -43,7 +46,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 
 	w.scaleFactor = bench.EnvFloat("SCALE_FACTOR", 1)
 	if w.scaleFactor <= 0 {
-		return fmt.Errorf("SCALE_FACTOR must be positive, got %v", w.scaleFactor)
+		return fmt.Errorf("%w, got %v", errScaleFactorMustBePositive, w.scaleFactor)
 	}
 
 	w.loadWorkers = bench.EnvInt("LOAD_WORKERS", 0)

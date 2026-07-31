@@ -11,6 +11,13 @@ import (
 	"github.com/stroppy-io/stroppy/third_party/gotpcds/dsqgen"
 )
 
+var (
+	errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")
+	errUnknownDialect            = errors.New("dsqgen: unknown dialect")
+	errYdbBakedOnly              = errors.New("[tpcds] ydb supports the baked query set (power test) only; " +
+		"STREAMS>1 and QUERY_STREAM need the in-process generator, which does not target YQL yet")
+)
+
 type workload struct {
 	schemaSQL *bench.SQL
 	querySQL  *bench.SQL
@@ -44,7 +51,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 
 	w.scaleFactor = bench.EnvFloat("SCALE_FACTOR", 1)
 	if w.scaleFactor <= 0 {
-		return fmt.Errorf("SCALE_FACTOR must be positive, got %v", w.scaleFactor)
+		return fmt.Errorf("%w, got %v", errScaleFactorMustBePositive, w.scaleFactor)
 	}
 
 	w.loadWorkers = bench.EnvInt("LOAD_WORKERS", 0)
@@ -64,7 +71,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	}
 
 	if w.driver == bench.DriverYDB && (w.throughput || w.genStream >= 0) {
-		return errors.New("[tpcds] ydb supports the baked query set (power test) only; STREAMS>1 and QUERY_STREAM need the in-process generator, which does not target YQL yet")
+		return errYdbBakedOnly
 	}
 
 	schemaFile, queryFile := dialectFiles(w.driver)
@@ -198,7 +205,7 @@ func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 func generateStream(dialect string, scale float64, seed int64, stream int) ([]namedQuery, error) {
 	d, ok := dsqgen.DialectByName(dialect)
 	if !ok {
-		return nil, fmt.Errorf("dsqgen: unknown dialect %q", dialect)
+		return nil, fmt.Errorf("%w %q", errUnknownDialect, dialect)
 	}
 
 	res, err := dsqgen.Generate(d, scale, seed, stream)

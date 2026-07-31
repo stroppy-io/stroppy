@@ -6,6 +6,7 @@ package tpcb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"sync"
@@ -14,6 +15,8 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 )
+
+var errAccountNotFound = errors.New("tpc-b: account not found")
 
 const (
 	preset = "tpcb"
@@ -135,7 +138,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 				}
 
 				if abalance == nil {
-					return fmt.Errorf("tpc-b: account %d not found", aid)
+					return fmt.Errorf("%w: %d", errAccountNotFound, aid)
 				}
 
 				if err := tx.Exec(ctx, updateTeller, map[string]any{"tid": tid, "delta": delta}); err != nil {

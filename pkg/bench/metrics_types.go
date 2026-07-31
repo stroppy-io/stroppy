@@ -6,10 +6,13 @@ package bench
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 )
+
+var errMetricAlreadyRegistered = errors.New("metric already registered")
 
 type metricType int
 
@@ -38,7 +41,7 @@ func (r *Registry) NewMetric(name string, t metricType) (*metric, error) {
 	defer r.mu.Unlock()
 
 	if _, ok := r.metrics[name]; ok {
-		return nil, fmt.Errorf("metric %q already registered", name)
+		return nil, fmt.Errorf("%w: %q", errMetricAlreadyRegistered, name)
 	}
 
 	m := &metric{Name: name, Type: t}

@@ -23,6 +23,17 @@ import (
 
 var txNames = []string{"new_order", "payment", "order_status", "delivery", "stock_level"}
 
+var (
+	errProcsDriverUnsupported = errors.New("tpcc/procs only supports postgres and mysql; use tpcc/tx for picodata/ydb")
+	errDistrictNotFound       = errors.New("new_order: district not found")
+	errItemNotFound           = errors.New("tpcc_rollback:item_not_found")
+	errPaymentNoCustomers     = errors.New("payment: no customers match c_last")
+	errPaymentByNameNoRow     = errors.New("payment: by-name SELECT returned no row")
+	errPaymentCustomerMissing = errors.New("payment: customer not found")
+	errPaymentWarehouseMiss   = errors.New("payment: warehouse not found")
+	errPaymentDistrictMiss    = errors.New("payment: district not found")
+)
+
 type workload struct {
 	sql     *bench.SQL
 	variant string // "tx" (DML steps) or "procs" (stored procedures)
@@ -91,7 +102,7 @@ func (w *workload) renderDDL(s string) string {
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.driverType = b.DriverTypeName()
 	if w.variant == "procs" && (w.driverType == bench.DriverPicodata || w.driverType == bench.DriverYDB) {
-		return errors.New("tpcc/procs only supports postgres and mysql; use tpcc/tx for picodata/ydb")
+		return errProcsDriverUnsupported
 	}
 
 	w.warehouses = max(int64(bench.EnvInt("SCALE_FACTOR", bench.EnvInt("WAREHOUSES", 1))), 1)
@@ -373,7 +384,7 @@ func (w *workload) newOrderBody(ctx context.Context, tx *bench.TxX, wID, dID, cI
 	}
 
 	if distRow == nil {
-		return fmt.Errorf("new_order: district (%d,%d) not found", wID, dID)
+		return fmt.Errorf("%w: (%d,%d)", errDistrictNotFound, wID, dID)
 	}
 
 	oID := toInt64(distRow[0])
@@ -413,7 +424,7 @@ func (w *workload) newOrderBody(ctx context.Context, tx *bench.TxX, wID, dID, cI
 	if forceRollback && !itemMapHas(itemMap, lineIID[olCnt-1]) {
 		w.m.rollbackDone.Add(1)
 
-		return errors.New("tpcc_rollback:item_not_found")
+		return errItemNotFound
 	}
 
 	// Batch stock read, grouped by supply warehouse.
@@ -460,7 +471,7 @@ func (w *workload) newOrderBody(ctx context.Context, tx *bench.TxX, wID, dID, cI
 		if !ok {
 			w.m.rollbackDone.Add(1)
 
-			return errors.New("tpcc_rollback:item_not_found")
+			return errItemNotFound
 		}
 
 		iPrice := toFloat64(itemRow[1])
@@ -604,7 +615,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 
 				nameCount := toInt64(cnt)
 				if nameCount == 0 {
-					return fmt.Errorf("payment: no customers match c_last=%q in (%d,%d)", cLastPick, cWID, cDID)
+					return fmt.Errorf("%w=%q in (%d,%d)", errPaymentNoCustomers, cLastPick, cWID, cDID)
 				}
 
 				offset := (nameCount - 1) / 2
@@ -615,7 +626,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 				}
 
 				if nameRow == nil {
-					return fmt.Errorf("payment: by-name SELECT returned no row for c_last=%q", cLastPick)
+					return fmt.Errorf("%w for c_last=%q", errPaymentByNameNoRow, cLastPick)
 				}
 
 				cID = toInt64(nameRow[0])
@@ -632,7 +643,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 				}
 
 				if custRow == nil {
-					return fmt.Errorf("payment: customer %d not found", cID)
+					return fmt.Errorf("%w: %d", errPaymentCustomerMissing, cID)
 				}
 
 				cCredit = strings.TrimSpace(toStr(custRow[9]))
@@ -698,7 +709,7 @@ func (w *workload) paymentUpdateWarehouse(
 		}
 
 		if row == nil {
-			return "", fmt.Errorf("payment: warehouse %d not found", wID)
+			return "", fmt.Errorf("%w: %d", errPaymentWarehouseMiss, wID)
 		}
 
 		return toStr(row[0]), nil
@@ -716,7 +727,7 @@ func (w *workload) paymentUpdateWarehouse(
 	}
 
 	if row == nil {
-		return "", fmt.Errorf("payment: warehouse %d not found", wID)
+		return "", fmt.Errorf("%w: %d", errPaymentWarehouseMiss, wID)
 	}
 
 	return toStr(row[0]), nil
@@ -734,7 +745,7 @@ func (w *workload) paymentUpdateDistrict(
 		}
 
 		if row == nil {
-			return "", fmt.Errorf("payment: district (%d,%d) not found", wID, dID)
+			return "", fmt.Errorf("%w: (%d,%d)", errPaymentDistrictMiss, wID, dID)
 		}
 
 		return toStr(row[0]), nil
@@ -752,7 +763,7 @@ func (w *workload) paymentUpdateDistrict(
 	}
 
 	if row == nil {
-		return "", fmt.Errorf("payment: district (%d,%d) not found", wID, dID)
+		return "", fmt.Errorf("%w: (%d,%d)", errPaymentDistrictMiss, wID, dID)
 	}
 
 	return toStr(row[0]), nil

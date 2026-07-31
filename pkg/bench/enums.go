@@ -1,10 +1,18 @@
 package bench
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+)
+
+var (
+	errUnknownDriverType    = errors.New("unknown driver type")
+	errUnknownErrorMode     = errors.New("unknown error mode")
+	errUnknownTxIsolation   = errors.New("unknown tx isolation")
+	errUnknownInsertMethod  = errors.New("unknown insert method")
 )
 
 // String-typed enums a Go workload authors with; resolved to the proto enums the
@@ -36,7 +44,7 @@ func ParseDriverType(s string) (stroppy.DriverConfig_DriverType, error) {
 	case "csv":
 		return stroppy.DriverConfig_DRIVER_TYPE_CSV, nil
 	default:
-		return 0, fmt.Errorf("unknown driver type %q", s)
+		return 0, fmt.Errorf("%w %q", errUnknownDriverType, s)
 	}
 }
 
@@ -84,7 +92,7 @@ func ParseErrorMode(s string) (stroppy.DriverConfig_ErrorMode, error) {
 	case "abort":
 		return stroppy.DriverConfig_ERROR_MODE_ABORT, nil
 	default:
-		return 0, fmt.Errorf("unknown error mode %q", s)
+		return 0, fmt.Errorf("%w %q", errUnknownErrorMode, s)
 	}
 }
 
@@ -117,7 +125,7 @@ func ParseTxIsolation(s string) (stroppy.TxIsolationLevel, error) {
 	case "none":
 		return stroppy.TxIsolationLevel_NONE, nil
 	default:
-		return 0, fmt.Errorf("unknown tx isolation %q", s)
+		return 0, fmt.Errorf("%w %q", errUnknownTxIsolation, s)
 	}
 }
 
@@ -141,6 +149,6 @@ func ParseInsertMethod(s string) (dgproto.InsertMethod, error) {
 	case "native":
 		return dgproto.InsertMethod_NATIVE, nil
 	default:
-		return 0, fmt.Errorf("unknown insert method %q", s)
+		return 0, fmt.Errorf("%w %q", errUnknownInsertMethod, s)
 	}
 }

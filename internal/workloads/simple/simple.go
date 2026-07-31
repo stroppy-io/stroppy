@@ -6,12 +6,15 @@ package simple
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 )
+
+var errRowCount = errors.New("row count mismatch")
 
 const (
 	demoRows = 100
@@ -59,7 +62,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	}
 
 	if toInt(count) != demoRows {
-		return fmt.Errorf("expected %d rows, got %v", demoRows, count)
+		return fmt.Errorf("%w: expected %d, got %v", errRowCount, demoRows, count)
 	}
 
 	b.Logger().Sugar().Infof("loaded %v rows into stroppy_demo", count)

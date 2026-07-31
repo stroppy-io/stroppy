@@ -2,12 +2,15 @@ package tpcc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
 )
+
+var errValidatePopulation = errors.New("validate_population")
 
 // validatePopulation runs the §1.3.1 consistency/cardinality checks and aborts
 // (returns an error) if any fail, mirroring validatePopulation in tpcc_common.ts.
@@ -117,7 +120,8 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 		"SELECT COUNT(*) FROM district WHERE d_next_o_id <> 3001 AND d_w_id "+wRange, 0))
 
 	if len(failures) > 0 {
-		return fmt.Errorf("validate_population: %d check(s) failed:\n  %s", len(failures), strings.Join(failures, "\n  "))
+		detail := strings.Join(failures, "\n  ")
+		return fmt.Errorf("%w: %d check(s) failed:\n  %s", errValidatePopulation, len(failures), detail)
 	}
 
 	return nil

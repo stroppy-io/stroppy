@@ -14,6 +14,11 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/bench"
 )
 
+var (
+	errNoSQLSource       = errors.New("execute_sql: no SQL source — set STROPPY_SQL_BODY (inline) or SQL_FILE (path)")
+	errSQLFileNoQueries  = errors.New("execute_sql: SQL_FILE has no `--= name` queries")
+)
+
 type workload struct {
 	sql    *bench.SQL
 	names  []string
@@ -36,12 +41,12 @@ func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
 
 		w.sql = s
 	} else {
-		return errors.New("execute_sql: no SQL source — set STROPPY_SQL_BODY (inline) or SQL_FILE (path)")
+		return errNoSQLSource
 	}
 
 	w.names = w.sql.Names("")
 	if len(w.names) == 0 {
-		return errors.New("execute_sql: SQL_FILE has no `--= name` queries")
+		return errSQLFileNoQueries
 	}
 
 	b.StepBegin("workload")

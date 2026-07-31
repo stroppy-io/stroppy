@@ -59,6 +59,10 @@ func (b *Bench) Logger() *zap.Logger { return b.lg }
 var (
 	regMu        sync.Mutex
 	regWorkloads = map[string]Workload{}
+
+	errNoWorkloadRegistered = errors.New("bench: no workload registered")
+	errDriverIndexMissing   = errors.New("bench: driver index 0 not configured")
+	errUnsupportedExecutor  = errors.New("unsupported executor")
 )
 
 // Register a Go workload (called from workload init()).
@@ -93,7 +97,7 @@ func Run(
 ) error {
 	wl, ok := Lookup(name)
 	if !ok {
-		return fmt.Errorf("bench: no workload registered as %q", name)
+		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
 	}
 
 	root = newRootState(lg, ctx, env)
@@ -105,7 +109,7 @@ func Run(
 
 	cfg := drivers[0]
 	if cfg == nil {
-		return errors.New("bench: driver index 0 not configured")
+		return errDriverIndexMissing
 	}
 
 	drv, err := driver.Dispatch(ctx, driver.Options{Config: cfg, Logger: lg, DialFunc: root.dialer.DialContext})
@@ -220,7 +224,7 @@ func runScenario(ctx context.Context, sc scenarioSpec, iterate func(*VU) error) 
 
 		wg.Wait()
 	default:
-		return fmt.Errorf("unsupported executor %q", sc.executor)
+		return fmt.Errorf("%w %q", errUnsupportedExecutor, sc.executor)
 	}
 
 	return nil
