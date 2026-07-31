@@ -3,57 +3,54 @@ package help
 func init() {
 	Register(Topic{
 		Name:  "steps",
-		Short: "Logical benchmark phases: defining, filtering, and discovering steps",
+		Short: "Logical benchmark phases: SQL sections, filtering, and discovery",
 		Long: `STEPS
 
-  Steps are named logical phases of a benchmark script — for example,
-  drop_schema, create_schema, load_data, run. They let you run only part of a
-  benchmark without changing the script.
+  Steps are named logical phases of a benchmark workload — for example,
+  drop_schema, create_schema, load_data, plus the per-transaction workload_tx_*
+  bodies. They let you run only part of a workload without editing code.
 
-DEFINING STEPS IN TYPESCRIPT
+DEFINING STEPS
 
-  Wrap a phase in Step() inside the setup() or default() function:
+  Steps come from SQL section markers (--+ section_name) in the workload's
+  .sql file. Each workload splits its work into named sections such as:
 
-    Step("create_schema", () => {
-      sql("create_schema").forEach((q) => driver.exec(q, {}));
-    });
+    --+ drop_schema
+    --+ create_schema
+    --+ create_procedures
+    --+ workload_procs
+    --+ workload_tx_<txname>
 
-    Step("load_data", () => {
-      driver.insert("orders", COUNT, { params: { ... } });
-    });
+  The Go workload body wraps each phase in a b.Step("<name>", ...) call.
+  When a step is filtered out, its body is skipped entirely (logged as
+  "skipping step").
 
-  When a step is filtered out (via --steps or --no-steps), Step() logs
-  "Skipping step '<name>'" and returns immediately without executing the body.
-
-  Step() also exposes begin/end helpers for splitting a step across multiple
-  code blocks:
-
-    Step.begin("my_step");
-    // ... work ...
-    Step.end("my_step");
+  Section layout is identical across per-dialect SQL files (pg.sql,
+  mysql.sql, pico.sql, ydb.sql) for a given workload. See
+  'stroppy help sql' for the section/query marker grammar.
 
 FILTERING FROM THE CLI
 
   --steps step1,step2      Run only the listed steps; skip all others.
   --no-steps step1,step2   Skip the listed steps; run everything else.
 
-  The two flags are mutually exclusive. Stroppy validates the names against
-  the script's declared steps before launching k6 — unknown names are
-  rejected immediately.
-
-  Comma-separated list or space-separated repeated flag forms both work:
+  The two flags are mutually exclusive. Comma-separated and =forms both work:
 
     --steps create_schema,load_data
     --steps=create_schema,load_data
 
-DISCOVERING STEPS
+  Unknown step names are not rejected upfront — they simply never match, so
+  nothing runs for them. Check the workload's .sql file (or run with
+  LOG_LEVEL=debug) to see which step names a workload recognizes.
 
-  To see which steps a script declares before running it:
+CONFIG FILE
 
-    stroppy probe <script> --steps
+  steps and noSteps may also be set in the config file. CLI --steps fully
+  overrides the file's steps list.
 
-  This runs the script in a mocked environment and prints the registered
-  step names in order.
+    {
+      "steps": ["create_schema", "load_data"]
+    }
 
 EXAMPLES
 
@@ -66,15 +63,14 @@ EXAMPLES
   # Run everything except the schema drop
   stroppy run tpcc/tx --no-steps drop_schema
 
-  # See what steps tpcc defines
-  stroppy probe tpcc/tx --steps
+  # Filter steps while loading TPC-H
+  stroppy run tpch/tx -d pg --steps drop_schema,create_schema,load_data
 
 SEE ALSO
 
   stroppy run --help
-  stroppy probe --help
-  stroppy help probe
-  stroppy help config-file   (steps and no_steps can be set in config file)
+  stroppy help sql         (section and query markers)
+  stroppy help config-file (steps and no_steps in config file)
 `,
 	})
 }

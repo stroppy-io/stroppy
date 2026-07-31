@@ -3,145 +3,96 @@ package help
 func init() {
 	Register(Topic{
 		Name:  "envs",
-		Short: "Environment variables in stroppy scripts",
+		Short: "Environment variables, scenario selection, and -e overrides",
 		Long: `ENVS
 
-  Stroppy scripts declare their configuration through environment variables.
-  The ENV() helper function (from helpers.ts) is the standard way to declare
-  and read them.
+  Stroppy workloads read their configuration through environment variables.
+  The Go engine exposes them via the Env/EnvInt helpers in pkg/bench; real
+  process env always takes precedence over -e and config-file values.
 
-ENV() FUNCTION
-
-  Import and call ENV() at the top level of your script:
-
-    import { ENV } from "./helpers.js";
-
-    const WAREHOUSES = ENV("WAREHOUSES", 1, "Number of warehouses");
-    const DURATION   = ENV("DURATION", "5m", "Test duration");
-
-  Signature:
-
-    ENV(name, default, description)
-    ENV([name, alias, ...], default, description)
-
-  Arguments:
-
-    name / [name, alias, ...]   Environment variable name(s). When an array is
-                                given, each name is tried in order; the first
-                                non-empty value wins. All names are registered
-                                as aliases for probe output.
-    default                     Value used when no name resolves to a non-empty
-                                string. May be a string or number — the return
-                                type matches the default type.
-                                Use ENV.auto when the script resolves the value
-                                itself (see AUTO-RESOLVED DEFAULTS below).
-    description                 Human-readable description shown by probe.
-
-  Examples:
-
-    // Single name, string default
-    const DURATION = ENV("DURATION", "5m", "Test duration");
-
-    // Single name, numeric default (return type is number)
-    const POOL_SIZE = ENV("POOL_SIZE", 100, "Connection pool size");
-
-    // Aliases: SCALE_FACTOR or WAREHOUSES, first non-empty wins
-    const WAREHOUSES = ENV(["SCALE_FACTOR", "WAREHOUSES"], 1, "Number of warehouses");
-
-    // Auto-resolved: script picks the value itself when not overridden
-    const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file") || "./default.sql";
+  There is no k6, no __ENV global, and no ENV() TypeScript helper — those
+  belonged to the removed script runtime.
 
 SETTING VALUES
 
   Export variables in your shell before running:
 
     export WAREHOUSES=50
-    stroppy run tpcc/procs
+    stroppy run tpcc/tx
 
   Or set them inline for a single run:
 
     WAREHOUSES=50 stroppy run tpcc/tx
 
-  Or use stroppy's -e/--env flag before the k6 separator. Keys are
-  uppercased, logged, and checked against the workload's ENV()
-  declarations:
+  Or use stroppy's -e/--env flag. Keys are uppercased, so the following
+  are equivalent:
 
-    stroppy run tpcc/procs -e warehouses=20 -e pool_size=50
+    stroppy run tpcc/tx -e warehouses=20 -e pool_size=50
+    stroppy run tpcc/tx -e WAREHOUSES=20 -e POOL_SIZE=50
 
-DEFAULTS
+  Multiple -e flags accumulate.
 
-  When an env var is not set (or is an empty string), ENV() returns the
-  default value provided in the call. The script behaves as if that value
-  was set in the environment.
+SCENARIO SELECTION
 
-AUTO-RESOLVED DEFAULTS (ENV.auto)
+  The bench engine chooses an executor from env (see readScenario in
+  pkg/bench/runtime.go):
 
-  Some variables are auto-resolved by the script at runtime — for example,
-  a SQL file chosen based on the active driver type. These use ENV.auto as
-  the default:
+    DURATION set   -> constant-vus executor (throughput run)
+                      VUs spin for the given duration.
+    DURATION unset -> shared-iterations executor (power run)
+                      VUs share a fixed iteration count.
 
-    const SQL_FILE = ENV("SQL_FILE", ENV.auto, "SQL file path")
-      || ({ postgres: "./pg.sql", mysql: "./mysql.sql" }[driverConfig.driverType!]
-          ?? "./pg.sql");
+  Tune with:
+    VUS       int           Number of virtual users (default 1)
+    DURATION  Go duration   Throughput run length, e.g. "60s", "10m"
+    ITER      int           Total iterations for power runs (default 1)
 
-  When the default is ENV.auto:
-    - If the user sets the variable, that value is used.
-    - If the user does not set it, ENV() returns undefined and the
-      script's fallback expression (||) takes over.
-    - Probe shows (default: <auto>) so users know the value is handled
-      automatically and does not need to be provided.
+  Examples:
 
-PROBE INTEGRATION
+    # TPC-C throughput: 10 VUs for 60 seconds
+    stroppy run tpcc/tx -d pg -e VUS=10 -e DURATION=60s
 
-  Use probe to inspect all env vars a script declares before running it:
+    # TPC-B fixed-iteration power run
+    stroppy run tpcb/tx -d pg -e ITER=100
 
-    stroppy probe <script> --envs
+  There are no k6 shortflags and no "--" passthrough. Configure concurrency
+  exclusively via VUS / DURATION / ITER.
 
-  Output shows each declared variable with its current value or default:
+PER-WORKLOAD VARIABLES
 
-    # Environment Variables:
-      SCALE_FACTOR | WAREHOUSES=50         # currently set via env
-      DURATION="" (default: 1h)            # not set; default shown
-      SQL_FILE="" (default: <auto>)        # auto-resolved by script
+  Each workload documents its own env vars; common ones:
 
-  Variables declared via ENV() display their aliases, default, and
-  description. Variables accessed via __ENV directly (legacy) are also
-  listed but without metadata.
+    SCALE_FACTOR  tpcb/tpcc: integer branch/warehouse count (>=1)
+                  tpch/tpcds: fractional row scale (e.g. 0.01)
+    WAREHOUSES    Alias used by tpcc
+    LOAD_WORKERS  Per-table InsertSpec fan-out where wired
+    TX_ISOLATION  Override per-driver isolation default
+    POOL_SIZE     Postgres-only shorthand: sets pgx MinConns=MaxConns
+    SQL_FILE      SQL file path for execute_sql workload
 
-PLAIN __ENV ACCESS (LEGACY)
+  Driver-specific isolation defaults (tx variants):
+    postgres -> read_committed
+    mysql    -> read_committed
+    picodata -> "none"  (Begin() always errors; do NOT use "conn")
+    ydb      -> serializable
 
-  Scripts may read variables directly from the k6 __ENV global without
-  going through ENV():
+  Full isolation names: read_uncommitted, read_committed, repeatable_read,
+  serializable, db_default, conn, none.
 
-    declare const __ENV: Record<string, string>;
-    const raw = __ENV["MY_VAR"] ?? "";
+PROBE
 
-  Probe still captures these accesses and lists them in --envs output, but
-  no default or description is available for them. Prefer ENV() for new code.
+  'stroppy probe' lists embedded workload presets and the SQL dialects/docs
+  each ships with. It does not enumerate per-workload env vars — read the
+  workload source (internal/workloads/<name>/) or its .sql file for the
+  authoritative list.
 
-EXAMPLES
-
-  # Run with custom scale factor (procs — pg/mysql stored procedures)
-  export SCALE_FACTOR=10
-  stroppy run tpcc/procs
-
-  # Run with custom scale factor (tx — universal, works with any DB)
-  SCALE_FACTOR=10 stroppy run tpcc/tx
-
-  # Inspect what env vars a script uses
-  stroppy probe tpcc/procs --envs
-  stroppy probe tpcc/tx.ts --envs
-
-  # Pass via stroppy -e before the k6 separator
-  stroppy run tpcc/procs -e WAREHOUSES=20 -e POOL_SIZE=50
-
-  # Parallelize Rel.table InsertSpec loads where supported
-  stroppy run tpcc/tx -e LOAD_WORKERS=8 --steps drop_schema,create_schema,load_data
+  stroppy probe
+  stroppy probe -o json
 
 CONFIG FILE ALTERNATIVE
 
-  Instead of repeating -e flags on every run, collect env overrides in a
-  config file under the "env" key:
+  Instead of repeating -e flags, collect env overrides in a config file
+  under the "env" key:
 
     {
       "env": {
@@ -150,35 +101,25 @@ CONFIG FILE ALTERNATIVE
       }
     }
 
-  Precedence: real env > -e flags > config file env > script defaults.
+  Precedence: real env > -e flags > config file env > workload defaults.
   See 'stroppy help config-file' for the full format and precedence rules.
 
 DEBUG: TRACING ENV RESOLUTION
 
-  Normal run logs show -e/config env entries that were applied:
+  At LOG_LEVEL=debug the engine logs env precedence decisions:
 
-    stroppy run tpcc/tx -e load_workers=8
-
-    INFO script_runner Applied script env {"source":"cli","env":["LOAD_WORKERS=8"]}
-
-  If an applied env key is not declared by the workload's ENV() calls, Stroppy
-  warns so typos are visible:
-
-    WARN script_runner Script env is not declared by workload {"keys":["LOAD_WROKERS"]}
-
-  To inspect skipped env entries and precedence decisions:
-
-    LOG_LEVEL=debug stroppy run <script>
+    LOG_LEVEL=debug stroppy run tpcc/tx -e load_workers=8
 
   The env_override logger emits a debug line whenever the real environment
-  takes precedence over a -e flag or config file env entry, identifying the
+  takes precedence over a -e flag or config-file entry, identifying the
   key that was skipped.
 
 SEE ALSO
 
-  stroppy probe --help
+  stroppy run --help
   stroppy help drivers
   stroppy help config-file
+  stroppy help steps
 `,
 	})
 }
