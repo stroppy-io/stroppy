@@ -199,16 +199,26 @@ func (c *noopConn) Rollback(_ context.Context) error { return nil }
 
 // ── rows ─────────────────────────────────────────────────────────────────────
 // One-row stub cursor returned by wrapRows. Mirrors the probe-time rowsStub
-// in internal/runner/script_extractor.go: pretends exactly one row containing
-// a single int64(1) exists so workload bodies with defensive null-row checks
-// (e.g. `if (!distRow) throw ...`) and counting guards (e.g. payment's
-// `if (nameCount === 0) throw ...`) can execute past them. Using 1 rather
-// than 0 is deliberate — a zero COUNT(*) return would trip the by-name
-// payment/order-status throws. Downstream numeric reads (`Number(row[N])`)
-// see 1 for column 0 and NaN for higher indices, which stays non-throwing
-// in JS; string reads (`String(row[N] ?? "")`) see "1" for column 0 and ""
-// elsewhere. Good enough to exercise the full stroppy → driver → JS roundtrip
-// without any real I/O, which is the whole point of the noop driver.
+// in internal/runner/script_extractor.go: pretends exactly one row exists so
+// workload bodies with defensive null-row checks (e.g. `if distRow == nil`)
+// and counting guards (e.g. payment's `if nameCount == 0`) can execute past
+// them. Column 0 is int64(1) — deliberately non-zero so a COUNT(*) read does
+// not trip the by-name payment/order-status guards. The row is padded to
+// noopRowWidth so positional reads (row[N], N up to the widest workload SELECT)
+// never index out of range: the original JS/k6 path returned NaN/"" for
+// out-of-range columns, but Go's []any index panics, so the row must be wide
+// enough for every column a workload body reads.
+
+const noopRowWidth = 32
+
+var noopRow = func() []any {
+	r := make([]any, noopRowWidth)
+	for i := range r {
+		r[i] = int64(1)
+	}
+
+	return r
+}()
 
 type rows struct {
 	consumed bool
@@ -228,8 +238,8 @@ func (r *rows) Next() bool {
 	return true
 }
 
-func (r *rows) Values() []any         { return []any{int64(1)} }
-func (r *rows) ReadAll(_ int) [][]any { return [][]any{{int64(1)}} }
+func (r *rows) Values() []any         { return noopRow }
+func (r *rows) ReadAll(_ int) [][]any { return [][]any{noopRow} }
 func (r *rows) Err() error            { return nil }
 func (r *rows) Close() error          { return nil }
 
