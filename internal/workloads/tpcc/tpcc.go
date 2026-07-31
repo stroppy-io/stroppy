@@ -365,7 +365,13 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) {
 	})
 }
 
-func (w *workload) newOrderBody(ctx context.Context, tx *bench.TxX, wID, dID, cID, olCnt, allLocal int64, lineIID, lineQty, lineSupply []int64, forceRollback bool) error {
+//nolint:gocognit,cyclop,funlen // TPC-C spec transaction; complexity is inherent to the spec.
+func (w *workload) newOrderBody(
+	ctx context.Context, tx *bench.TxX,
+	wID, dID, cID, olCnt, allLocal int64,
+	lineIID, lineQty, lineSupply []int64,
+	forceRollback bool,
+) error {
 	if _, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_customer"), map[string]any{
 		"c_id": cID, "d_id": dID, "w_id": wID,
 	}); err != nil {
@@ -548,6 +554,7 @@ func (w *workload) batchRead(
 
 // --- payment ---
 
+//nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 	w.m.paymentTotal.Add(1)
 
@@ -605,7 +612,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 				cCredit, cDataOld string
 			)
 
-			if isByName {
+			if isByName { //nolint:nestif // TPC-C by-name customer lookup branch
 				cnt, err := tx.QueryValue(ctx, w.q("workload_tx_payment", "count_customers_by_name"), map[string]any{
 					"w_id": cWID, "d_id": cDID, "c_last": cLastPick,
 				})
@@ -797,6 +804,7 @@ func (w *workload) customerByName(
 
 // --- order_status (read-only) ---
 
+//nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState) {
 	w.m.orderStatusTotal.Add(1)
 
@@ -820,7 +828,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.TxX) error {
 			var cID int64
 
-			if isByName {
+			if isByName { //nolint:nestif // TPC-C by-name customer lookup branch
 				cnt, err := tx.QueryValue(ctx, w.q("workload_tx_order_status", "count_customers_by_name"), map[string]any{
 					"w_id": wID, "d_id": dID, "c_last": cLastPick,
 				})
@@ -887,6 +895,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 
 // --- delivery ---
 
+//nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 	w.m.deliveryTotal.Add(1)
 
@@ -968,6 +977,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 
 // --- stock_level (read-only) ---
 
+//nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) {
 	w.m.stockLevelTotal.Add(1)
 
