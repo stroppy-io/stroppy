@@ -182,7 +182,7 @@ func backoffSeconds(attempt int, base, max float64) float64 {
 	retryIndex := max0(attempt - 1)
 	capped := min(max, base*pow2(retryIndex))
 
-	return capped + rand.Float64()*capped*0.2
+	return capped + rand.Float64()*capped*0.2 //nolint:gosec // G404: retry backoff jitter RNG, not security-sensitive
 }
 
 func sleepForRetry(seconds float64) {

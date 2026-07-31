@@ -227,7 +227,7 @@ func runScenario(ctx context.Context, sc scenarioSpec, iterate func(*VU) error) 
 }
 
 func runWorker(ctx context.Context, vuid int, iterate func(*VU) error, keep func() bool) {
-	vu := &VU{root: root, vuid: uint64(vuid), ctx: ctx}
+	vu := &VU{root: root, vuid: uint64(vuid), ctx: ctx} //nolint:gosec // G115: scale-bound, no overflow
 	for keep() {
 		vu.iterTest++
 		vu.iterScenario++

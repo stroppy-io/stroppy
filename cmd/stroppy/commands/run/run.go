@@ -249,7 +249,7 @@ func runGoWorkload(
 		if dc.GetDriverType() == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
 			if ps, ok := envOverrides["POOL_SIZE"]; ok {
 				if n, err := strconv.Atoi(ps); err == nil && n > 0 {
-					nc := int32(n)
+					nc := int32(n) //nolint:gosec // G109: parsed config value, bounded by user input, not untrusted
 					dc.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: &stroppy.DriverConfig_PostgresConfig{
 						MaxConns: &nc, MinConns: &nc,
 					}}
@@ -263,7 +263,7 @@ func runGoWorkload(
 	if _, ok := drivers[0]; !ok {
 		// No -d given: default to the local postgres preset (mirrors TS
 		// declareDriverSetup defaults).
-		drivers[0] = &stroppy.DriverConfig{
+		drivers[0] = &stroppy.DriverConfig{ //nolint:gosec // G101: URL field name, not an embedded credential
 			DriverType: stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
 			Url:        "postgres://postgres:postgres@localhost:5432",
 		}

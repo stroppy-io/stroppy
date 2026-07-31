@@ -22,7 +22,7 @@ type workload struct {
 	pick *rand.Rand
 }
 
-func init() { bench.Register(&workload{pick: rand.New(rand.NewPCG(demoSeed^1, 0))}) }
+func init() { bench.Register(&workload{pick: rand.New(rand.NewPCG(demoSeed^1, 0))}) } //nolint:gosec // G404: data RNG
 
 func (*workload) Name() string { return "simple" }
 

@@ -32,7 +32,7 @@ func cLast(idx int) string { return cLastDict[idx%1000] }
 // c_last picks. cSalt personalizes paramC per generator so streams stay independent.
 func nurand(r *rand.Rand, paramA, lower, upper int, cSalt uint64) int {
 	span := int64(upper - lower + 1)
-	paramC := int64(seed.SplitMix64(cSalt)) & int64(paramA)
+	paramC := int64(seed.SplitMix64(cSalt)) & int64(paramA) //nolint:gosec // G115: scale-bound, no overflow
 	aDraw := r.IntN(paramA + 1)
 	yDraw := r.IntN(upper-lower+1) + lower
 

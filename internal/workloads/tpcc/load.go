@@ -22,7 +22,7 @@ func lastNameDict() *dgproto.Dict {
 
 func workers() *dgproto.Parallelism {
 	if n := bench.EnvInt("LOAD_WORKERS", 0); n > 0 {
-		return &dgproto.Parallelism{Workers: int32(n)}
+		return &dgproto.Parallelism{Workers: int32(n)} //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	}
 
 	return nil

@@ -1058,10 +1058,10 @@ func (w *workload) vuState(vuid uint64, warehouseStart, warehouses int64) *vuSta
 	newRand := func(slot string) *rand.Rand {
 		s := seedOf(slot, vuid)
 
-		return rand.New(rand.NewPCG(s, s))
+		return rand.New(rand.NewPCG(s, s)) //nolint:gosec // G404: workload data RNG, cryptographic strength not required
 	}
 	vs := &vuState{
-		homeWID:        warehouseStart + (int64(vuid)-1)%warehouses,
+		homeWID:        warehouseStart + (int64(vuid)-1)%warehouses, //nolint:gosec // G115: scale-bound, no overflow
 		warehouses:     warehouses,
 		warehouseStart: warehouseStart,
 		picker:         newRand("picker"),
@@ -1093,7 +1093,7 @@ func (w *workload) vuState(vuid uint64, warehouseStart, warehouses int64) *vuSta
 		osCIDSalt:      seedOf("ostat.c_id", vuid),
 		nurand255Salt:  seedOf("nurand255", vuid),
 	}
-	vs.hid.Store(int64(vuid) * 10_000_000)
+	vs.hid.Store(int64(vuid) * 10_000_000) //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	actual, _ := w.vuStates.LoadOrStore(vuid, vs)
 
 	return actual.(*vuState)
@@ -1239,7 +1239,7 @@ func thinkTime(r *rand.Rand, mean float64) float64 {
 func seedOf(slot string, vuid uint64) uint64 {
 	var h uint32
 	for _, c := range slot {
-		h = h*131 + uint32(c)
+		h = h*131 + uint32(c) //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	}
 
 	return (vuid * 0x9e3779b9) ^ uint64(h)

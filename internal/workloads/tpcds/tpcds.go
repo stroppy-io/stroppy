@@ -185,7 +185,7 @@ func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 
 	streamIdx := 0
 	if w.throughput {
-		streamIdx = int(b.VUID()) - 1
+		streamIdx = int(b.VUID()) - 1 //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	} else {
 		streamIdx = w.genStream
 	}

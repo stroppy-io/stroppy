@@ -218,12 +218,12 @@ func (w *workload) vuState(vuid uint64) *vuState {
 	}
 
 	vs := &vuState{
-		aid:   rand.New(rand.NewPCG(seedOf("aid", vuid), seedOf("aid", vuid))),
-		tid:   rand.New(rand.NewPCG(seedOf("tid", vuid), seedOf("tid", vuid))),
-		bid:   rand.New(rand.NewPCG(seedOf("bid", vuid), seedOf("bid", vuid))),
-		delta: rand.New(rand.NewPCG(seedOf("delta", vuid), seedOf("delta", vuid))),
+		aid:   rand.New(rand.NewPCG(seedOf("aid", vuid), seedOf("aid", vuid))),   //nolint:gosec // G404: benchmark RNG
+		tid:   rand.New(rand.NewPCG(seedOf("tid", vuid), seedOf("tid", vuid))),   //nolint:gosec // G404: benchmark RNG
+		bid:   rand.New(rand.NewPCG(seedOf("bid", vuid), seedOf("bid", vuid))),   //nolint:gosec // G404: benchmark RNG
+		delta: rand.New(rand.NewPCG(seedOf("delta", vuid), seedOf("delta", vuid))), //nolint:gosec // G404: benchmark RNG
 	}
-	vs.hid.Store(int64(vuid) * 1_000_000_000)
+	vs.hid.Store(int64(vuid) * 1_000_000_000) //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	actual, _ := w.vuStates.LoadOrStore(vuid, vs)
 
 	return actual.(*vuState)
@@ -236,7 +236,7 @@ func (v *vuState) nextHid() int64 { return v.hid.Add(1) }
 func seedOf(slot string, vuid uint64) uint64 {
 	var h uint32
 	for _, c := range slot {
-		h = h*131 + uint32(c)
+		h = h*131 + uint32(c) //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	}
 
 	return (vuid * 0x9e3779b9) ^ uint64(h)
@@ -252,7 +252,7 @@ func (w *workload) retryCounter(b *bench.Bench) *bench.Metric {
 
 func workers() *dgproto.Parallelism {
 	if n := bench.EnvInt("LOAD_WORKERS", 0); n > 0 {
-		return &dgproto.Parallelism{Workers: int32(n)}
+		return &dgproto.Parallelism{Workers: int32(n)} //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	}
 
 	return nil
