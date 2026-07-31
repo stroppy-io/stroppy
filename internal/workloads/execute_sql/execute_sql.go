@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	errNoSQLSource       = errors.New("execute_sql: no SQL source — set STROPPY_SQL_BODY (inline) or SQL_FILE (path)")
-	errSQLFileNoQueries  = errors.New("execute_sql: SQL_FILE has no `--= name` queries")
+	errNoSQLSource      = errors.New("execute_sql: no SQL source — set STROPPY_SQL_BODY (inline) or SQL_FILE (path)")
+	errSQLFileNoQueries = errors.New("execute_sql: SQL_FILE has no `--= name` queries")
 )
 
 type workload struct {

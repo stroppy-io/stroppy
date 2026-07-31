@@ -11,16 +11,16 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
 )
 
-// TPCC_SYLLABLES + cLastDict: spec §4.3.2.3 — C_LAST is a 3-syllable concat indexed
+// tpccSyllables + cLastDict: spec §4.3.2.3 — C_LAST is a 3-syllable concat indexed
 // by the three base-10 digits of i ∈ [0,999]. 1000 deterministic last names, shared
 // by the load and the by-name lookup branches of payment/order_status.
-var TPCC_SYLLABLES = [10]string{"BAR", "OUGHT", "ABLE", "PRI", "PRES", "ESE", "ANTI", "CALLY", "ATION", "EING"}
+var tpccSyllables = [10]string{"BAR", "OUGHT", "ABLE", "PRI", "PRES", "ESE", "ANTI", "CALLY", "ATION", "EING"}
 
 var cLastDict [1000]string
 
 func init() {
 	for i := range 1000 {
-		cLastDict[i] = TPCC_SYLLABLES[i/100] + TPCC_SYLLABLES[(i/10)%10] + TPCC_SYLLABLES[i%10]
+		cLastDict[i] = tpccSyllables[i/100] + tpccSyllables[(i/10)%10] + tpccSyllables[i%10]
 	}
 }
 

@@ -121,6 +121,7 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 
 	if len(failures) > 0 {
 		detail := strings.Join(failures, "\n  ")
+
 		return fmt.Errorf("%w: %d check(s) failed:\n  %s", errValidatePopulation, len(failures), detail)
 	}
 

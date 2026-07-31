@@ -9,9 +9,9 @@ import "github.com/stroppy-io/stroppy/pkg/bench"
 
 const preset = "tpcds"
 
-// TPCDS_TABLES is the load order: dimensions and static tables first, fan-out fact
+// tpcdsTables is the load order: dimensions and static tables first, fan-out fact
 // tables last (each returns after its parent sales table). Matches tpcds.ts.
-var TPCDS_TABLES = [24]string{
+var tpcdsTables = [24]string{
 	"income_band", "ship_mode", "reason", "household_demographics",
 	"customer_demographics", "date_dim", "time_dim", "warehouse",
 	"web_page", "web_site", "catalog_page", "customer_address",

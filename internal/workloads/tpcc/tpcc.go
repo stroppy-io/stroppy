@@ -666,8 +666,8 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 				wasBC = true
 			} else {
 				if err := tx.Exec(ctx, w.q("workload_tx_payment", "update_customer"), map[string]any{
-				"w_id": cWID, "d_id": cDID, "c_id": cID, "amount": amount,
-			}); err != nil {
+					"w_id": cWID, "d_id": cDID, "c_id": cID, "amount": amount,
+				}); err != nil {
 					return err
 				}
 			}
@@ -906,7 +906,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 					return err
 				}
 
-				if minRow == nil || minRow[0] == nil {
+				if len(minRow) == 0 || minRow[0] == nil {
 					continue
 				}
 
@@ -950,7 +950,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 				}
 
 				olTotal := int64(0)
-				if sumRow != nil && sumRow[0] != nil {
+				if len(sumRow) > 0 && sumRow[0] != nil {
 					olTotal = toInt64(sumRow[0])
 				}
 
@@ -1063,7 +1063,9 @@ type vuState struct {
 
 func (w *workload) vuState(vuid uint64, warehouseStart, warehouses int64) *vuState {
 	if v, ok := w.vuStates.Load(vuid); ok {
-		return v.(*vuState)
+		vs, _ := v.(*vuState) //nolint:errcheck // vuStates only stores *vuState values
+
+		return vs
 	}
 
 	newRand := func(slot string) *rand.Rand {
@@ -1106,8 +1108,9 @@ func (w *workload) vuState(vuid uint64, warehouseStart, warehouses int64) *vuSta
 	}
 	vs.hid.Store(int64(vuid) * 10_000_000) //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	actual, _ := w.vuStates.LoadOrStore(vuid, vs)
+	stored, _ := actual.(*vuState) //nolint:errcheck // vuStates only stores *vuState values
 
-	return actual.(*vuState)
+	return stored
 }
 
 func (v *vuState) nextHid() int64 { return v.hid.Add(1) }
@@ -1238,8 +1241,8 @@ func thinkTime(r *rand.Rand, mean float64) float64 {
 	}
 
 	t := -math.Log(1-r.Float64()) * mean
-	if cap := 10 * mean; t > cap {
-		t = cap
+	if capVal := 10 * mean; t > capVal {
+		t = capVal
 	}
 
 	return t

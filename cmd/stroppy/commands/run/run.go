@@ -240,7 +240,7 @@ func runGoWorkload(
 		// Extra (-D postgres.* / sql.*) merges as nested proto fields.
 		if len(cfg.Extra) > 0 {
 			if extraJSON, err := json.Marshal(cfg.Extra); err == nil {
-				_ = json.Unmarshal(extraJSON, dc)
+				_ = json.Unmarshal(extraJSON, dc) //nolint:musttag // frozen proto type, out of scope to tag
 			}
 		}
 

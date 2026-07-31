@@ -100,7 +100,7 @@ func demoInsertSpec() *dgproto.InsertSpec {
 			Population:  &dgproto.Population{Name: "stroppy_demo", Size: demoRows},
 			ColumnOrder: []string{"id", "label", "value"},
 			Attrs: []*dgproto.Attr{
-				{Name: "id", Expr: rowId()},
+				{Name: "id", Expr: rowID()},
 				{Name: "label", Expr: asciiDraw(8, 8)},
 				{Name: "value", Expr: intUniformDraw(0, 999)},
 			},
@@ -108,7 +108,7 @@ func demoInsertSpec() *dgproto.InsertSpec {
 	}
 }
 
-func rowId() *dgproto.Expr {
+func rowID() *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{
 		Op: dgproto.BinOp_ADD,
 		A:  &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{}}},
@@ -128,10 +128,10 @@ func asciiDraw(minLen, maxLen int64) *dgproto.Expr {
 	}}}
 }
 
-func intUniformDraw(min, max int64) *dgproto.Expr {
+func intUniformDraw(minVal, maxVal int64) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
 		Draw: &dgproto.StreamDraw_IntUniform{IntUniform: &dgproto.DrawIntUniform{
-			Min: litInt(min), Max: litInt(max),
+			Min: litInt(minVal), Max: litInt(maxVal),
 		}},
 	}}}
 }

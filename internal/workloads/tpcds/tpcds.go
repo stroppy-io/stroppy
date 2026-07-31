@@ -95,7 +95,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	}
 
 	if err := addStep("load_data", func() error {
-		for _, table := range TPCDS_TABLES {
+		for _, table := range tpcdsTables {
 			if _, err := b.InsertTpcds(ctx, table, w.scaleFactor, w.loadWorkers); err != nil {
 				return fmt.Errorf("load %s: %w", table, err)
 			}
@@ -190,7 +190,7 @@ func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 		return out, nil
 	}
 
-	streamIdx := 0
+	var streamIdx int
 	if w.throughput {
 		streamIdx = int(b.VUID()) - 1 //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	} else {
@@ -263,8 +263,8 @@ func (w *workload) dropSchema(ctx context.Context, b *bench.Bench) func() error 
 			return w.runSection(ctx, b, w.schemaSQL, "drop_schema")
 		}
 		// pg/mysql: reverse load order, CASCADE (mysql accepts/ignores the keyword).
-		for i := len(TPCDS_TABLES) - 1; i >= 0; i-- {
-			if err := b.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s CASCADE", TPCDS_TABLES[i]), nil); err != nil {
+		for i := len(tpcdsTables) - 1; i >= 0; i-- {
+			if err := b.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s CASCADE", tpcdsTables[i]), nil); err != nil {
 				return fmt.Errorf("drop_schema: %w", err)
 			}
 		}
@@ -286,7 +286,7 @@ func (w *workload) createSchema(ctx context.Context, b *bench.Bench) func() erro
 
 func (w *workload) setUnlogged(ctx context.Context, b *bench.Bench, mode string) func() error {
 	return func() error {
-		for _, table := range TPCDS_TABLES {
+		for _, table := range tpcdsTables {
 			if err := b.Exec(ctx, fmt.Sprintf("ALTER TABLE %s SET %s", table, mode), nil); err != nil {
 				return fmt.Errorf("set_%s %s: %w", strings.ToLower(mode), table, err)
 			}
@@ -302,11 +302,13 @@ func (w *workload) analyze(ctx context.Context, b *bench.Bench) func() error {
 		case bench.DriverPostgres:
 			return b.Exec(ctx, "ANALYZE", nil)
 		case bench.DriverMySQL:
-			for _, table := range TPCDS_TABLES {
+			for _, table := range tpcdsTables {
 				if err := b.Exec(ctx, "ANALYZE TABLE "+table, nil); err != nil {
 					return fmt.Errorf("analyze %s: %w", table, err)
 				}
 			}
+		case bench.DriverPicodata, bench.DriverYDB, bench.DriverNoop, bench.DriverCSV:
+			// no ANALYZE; planner runs on index stats from create_indexes.
 		}
 		// ydb/picodata: no ANALYZE; planner runs on index stats from create_indexes.
 		return nil

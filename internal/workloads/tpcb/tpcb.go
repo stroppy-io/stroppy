@@ -217,19 +217,22 @@ type vuState struct {
 
 func (w *workload) vuState(vuid uint64) *vuState {
 	if v, ok := w.vuStates.Load(vuid); ok {
-		return v.(*vuState)
+		vs, _ := v.(*vuState) //nolint:errcheck // vuStates only stores *vuState values
+
+		return vs
 	}
 
 	vs := &vuState{
-		aid:   rand.New(rand.NewPCG(seedOf("aid", vuid), seedOf("aid", vuid))),   //nolint:gosec // G404: benchmark RNG
-		tid:   rand.New(rand.NewPCG(seedOf("tid", vuid), seedOf("tid", vuid))),   //nolint:gosec // G404: benchmark RNG
-		bid:   rand.New(rand.NewPCG(seedOf("bid", vuid), seedOf("bid", vuid))),   //nolint:gosec // G404: benchmark RNG
+		aid:   rand.New(rand.NewPCG(seedOf("aid", vuid), seedOf("aid", vuid))),     //nolint:gosec // G404: benchmark RNG
+		tid:   rand.New(rand.NewPCG(seedOf("tid", vuid), seedOf("tid", vuid))),     //nolint:gosec // G404: benchmark RNG
+		bid:   rand.New(rand.NewPCG(seedOf("bid", vuid), seedOf("bid", vuid))),     //nolint:gosec // G404: benchmark RNG
 		delta: rand.New(rand.NewPCG(seedOf("delta", vuid), seedOf("delta", vuid))), //nolint:gosec // G404: benchmark RNG
 	}
 	vs.hid.Store(int64(vuid) * 1_000_000_000) //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	actual, _ := w.vuStates.LoadOrStore(vuid, vs)
+	stored, _ := actual.(*vuState) //nolint:errcheck // vuStates only stores *vuState values
 
-	return actual.(*vuState)
+	return stored
 }
 
 func (v *vuState) nextHid() int64 { return v.hid.Add(1) }
@@ -269,7 +272,7 @@ func branchesSpec(scale int64) *dgproto.InsertSpec {
 			Population:  &dgproto.Population{Name: "branches", Size: branches(scale)},
 			ColumnOrder: []string{"bid", "bbalance", "filler"},
 			Attrs: []*dgproto.Attr{
-				{Name: "bid", Expr: rowId()},
+				{Name: "bid", Expr: rowID()},
 				{Name: "bbalance", Expr: litInt(0)},
 				{Name: "filler", Expr: asciiDraw(branchesFiller)},
 			},
@@ -285,7 +288,7 @@ func tellersSpec(scale int64) *dgproto.InsertSpec {
 			Population:  &dgproto.Population{Name: "tellers", Size: tellers(scale)},
 			ColumnOrder: []string{"tid", "bid", "tbalance", "filler"},
 			Attrs: []*dgproto.Attr{
-				{Name: "tid", Expr: rowId()},
+				{Name: "tid", Expr: rowID()},
 				{Name: "bid", Expr: binOp(dgproto.BinOp_DIV, rowIndex(), litInt(tellersPerBranch), litInt(1))},
 				{Name: "tbalance", Expr: litInt(0)},
 				{Name: "filler", Expr: asciiDraw(tellersFiller)},
@@ -302,7 +305,7 @@ func accountsSpec(scale int64) *dgproto.InsertSpec {
 			Population:  &dgproto.Population{Name: "accounts", Size: accounts(scale)},
 			ColumnOrder: []string{"aid", "bid", "abalance", "filler"},
 			Attrs: []*dgproto.Attr{
-				{Name: "aid", Expr: rowId()},
+				{Name: "aid", Expr: rowID()},
 				{Name: "bid", Expr: binOp(dgproto.BinOp_DIV, rowIndex(), litInt(accountsPerBranch), litInt(1))},
 				{Name: "abalance", Expr: litInt(0)},
 				{Name: "filler", Expr: asciiDraw(accountFiller)},
@@ -311,7 +314,7 @@ func accountsSpec(scale int64) *dgproto.InsertSpec {
 	}
 }
 
-func rowId() *dgproto.Expr {
+func rowID() *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{
 		Op: dgproto.BinOp_ADD,
 		A:  &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{}}},

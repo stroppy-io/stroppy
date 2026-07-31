@@ -120,7 +120,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	}
 
 	addStep("load_data", func() error {
-		for _, table := range TPCH_TABLES {
+		for _, table := range tpchTables {
 			if _, err := b.InsertTpch(ctx, table, w.scaleFactor, w.loadWorkers); err != nil {
 				return err
 			}

@@ -36,12 +36,12 @@ func col(name string) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_Col{Col: &dgproto.ColRef{Name: name}}}
 }
 
-// rowIndex is 0-based; rowId is 1-based.
+// rowIndex is 0-based; rowID is 1-based.
 func rowIndex() *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{}}}
 }
 
-func rowId() *dgproto.Expr { return add(rowIndex(), litInt(1)) }
+func rowID() *dgproto.Expr { return add(rowIndex(), litInt(1)) }
 
 func binOp(op dgproto.BinOp_Op, a, b *dgproto.Expr) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{Op: op, A: a, B: b}}}
@@ -82,16 +82,16 @@ func choose(streamID uint32, branches ...branch) *dgproto.Expr {
 
 // --- StreamDraw builders ---
 
-func intUniform(min, max int64) *dgproto.Expr {
+func intUniform(minVal, maxVal int64) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
-		Draw: &dgproto.StreamDraw_IntUniform{IntUniform: &dgproto.DrawIntUniform{Min: litInt(min), Max: litInt(max)}},
+		Draw: &dgproto.StreamDraw_IntUniform{IntUniform: &dgproto.DrawIntUniform{Min: litInt(minVal), Max: litInt(maxVal)}},
 	}}}
 }
 
-func decimal(min, max float64, scale uint32) *dgproto.Expr {
+func decimal(minVal, maxVal float64, scale uint32) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
 		Draw: &dgproto.StreamDraw_Decimal{Decimal: &dgproto.DrawDecimal{
-			Min: litFloat(min), Max: litFloat(max), Scale: scale,
+			Min: litFloat(minVal), Max: litFloat(maxVal), Scale: scale,
 		}},
 	}}}
 }

@@ -13,7 +13,7 @@ const lastNameDictKey = "tpcc_c_last"
 // syllable-concat surname each, no weights.
 func lastNameDict() *dgproto.Dict {
 	rows := make([]*dgproto.DictRow, len(cLastDict))
-	for i, s := range cLastDict {
+	for i, s := range &cLastDict {
 		rows[i] = &dgproto.DictRow{Values: []string{s}}
 	}
 
@@ -49,7 +49,7 @@ func tpccOriginalOr(minLen, maxLen int64) *dgproto.Expr {
 }
 
 // --- 8 InsertSpec builders. Column order matches create_schema; attr exprs match
-// tpcc_common.ts Spec builders verbatim (rowIndex is 0-based, rowId 1-based). ---
+// tpcc_common.ts Spec builders verbatim (rowIndex is 0-based, rowID 1-based). ---
 
 func warehouseSpec(scale, warehouseStart int64) *dgproto.InsertSpec {
 	return spec("warehouse", seedWarehouse, scale, []string{
@@ -137,7 +137,7 @@ func customerSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
 
 func itemSpec() *dgproto.InsertSpec {
 	return spec("item", seedItem, items, []string{"i_id", "i_im_id", "i_name", "i_price", "i_data"}, []*dgproto.Attr{
-		{Name: "i_id", Expr: rowId()},
+		{Name: "i_id", Expr: rowID()},
 		{Name: "i_im_id", Expr: intUniform(1, 10000)},
 		{Name: "i_name", Expr: asciiRange(14, 24, alphaEn)},
 		{Name: "i_price", Expr: decimal(1, 100, 2)},
@@ -184,7 +184,7 @@ func ordersSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
 		call("std.permuteIndex", permuteSeed, sub(col("o_id"), litInt(1)), litInt(customersPerDistrict)),
 		litInt(1),
 	)
-	oCarrierId := ifExpr(gt(col("o_id"), litInt(ordersDelivered)), litNull(), intUniform(1, 10))
+	oCarrierID := ifExpr(gt(col("o_id"), litInt(ordersDelivered)), litNull(), intUniform(1, 10))
 
 	return spec("orders", seedOrders, scale*customersPerWh, []string{
 		"o_id", "o_d_id", "o_w_id", "o_c_id", "o_entry_d", "o_carrier_id", "o_ol_cnt", "o_all_local",
@@ -197,7 +197,7 @@ func ordersSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
 		{Name: "o_w_id", Expr: add(div(rowIndex(), litInt(customersPerWh)), litInt(warehouseStart))},
 		{Name: "o_c_id", Expr: oCId},
 		{Name: "o_entry_d", Expr: daysToDate(loadDays)},
-		{Name: "o_carrier_id", Expr: oCarrierId},
+		{Name: "o_carrier_id", Expr: oCarrierID},
 		{Name: "o_ol_cnt", Expr: litInt(olCntFixed)},
 		{Name: "o_all_local", Expr: litInt(1)},
 	})

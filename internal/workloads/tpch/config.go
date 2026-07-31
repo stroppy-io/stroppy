@@ -9,8 +9,8 @@ import (
 
 const preset = "tpch"
 
-// TPCH_TABLES is the load order: parents before children (FK consistency).
-var TPCH_TABLES = [8]string{"region", "nation", "part", "supplier", "partsupp", "customer", "orders", "lineitem"}
+// tpchTables is the load order: parents before children (FK consistency).
+var tpchTables = [8]string{"region", "nation", "part", "supplier", "partsupp", "customer", "orders", "lineitem"}
 
 // queryNames is q1..q22, in TPC-H spec order.
 var queryNames [22]string
