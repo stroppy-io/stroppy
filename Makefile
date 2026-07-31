@@ -36,7 +36,7 @@ REQUIRED_BINS = git go curl unzip docker
 install-linter: # Install golangci-lint
 	$(info Installing golangci-lint...)
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) go install github.com/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
 
 .PHONY: install-bin-deps
 install-bin-deps: install-linter # Install binary dependencies in ./bin
