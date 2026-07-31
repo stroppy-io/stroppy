@@ -243,10 +243,7 @@ linters:
         text: in package name
     paths:
       - pb.go$
-      - internal/repositories/models
       - ^third_party/
-      - builtin$
-      - examples$
 issues:
   max-same-issues: 50
 formatters:
@@ -259,7 +256,6 @@ formatters:
       sections:
         - standard
         - default
-        - prefix(github.com/stroppy-io/stroppy-core)
         - prefix(github.com/stroppy-io/stroppy)
         - localmodule
         - blank
@@ -268,7 +264,4 @@ formatters:
   exclusions:
     generated: lax
     paths:
-      - internal/repositories/models
       - ^third_party/
-      - builtin$
-      - examples$

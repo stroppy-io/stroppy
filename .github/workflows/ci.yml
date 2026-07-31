@@ -29,31 +29,11 @@ jobs:
       - name: Run tests
         run: make tests
 
-  typescript-ci:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-
-      - name: Install TS dependencies
-        run: make ts-setup
-
-      - name: Run type check
-        run: make ts-typecheck
-
-      - name: Run TS tests
-        run: make ts-test
-
   # Integration builds stroppy once, runs the smoke tiers, and uploads the
   # binary artifact. Build is gated behind it — the published binary is the one
   # the integration tests actually exercised, and we never build twice.
   integration:
-    needs: [golang-ci, typescript-ci]
+    needs: [golang-ci]
     uses: ./.github/workflows/integration.yml
 
   # Publish the integration-built binary as a per-commit nightly pre-release.
