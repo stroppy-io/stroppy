@@ -224,37 +224,9 @@ func runGoWorkload(
 	drivers := map[int]*stroppy.DriverConfig{}
 
 	for idx, cfg := range driverConfigs {
-		dc := &stroppy.DriverConfig{Url: cfg.URL}
-		// driverType arrives as a preset short name ("noop"); translate to the
-		// proto enum the driver layer expects.
-		if cfg.DriverType != "" {
-			t, err := bench.ParseDriverType(cfg.DriverType)
-			if err != nil {
-				return invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
-			}
-
-			dc.DriverType = t
-		}
-		// defaultInsertMethod is TS-only (a Rel.table default); Go workloads set
-		// Method on each InsertSpec, so it is intentionally not carried here.
-		// Extra (-D postgres.* / sql.*) merges as nested proto fields.
-		if len(cfg.Extra) > 0 {
-			if extraJSON, err := json.Marshal(cfg.Extra); err == nil {
-				_ = json.Unmarshal(extraJSON, dc) //nolint:musttag // frozen proto type, out of scope to tag
-			}
-		}
-
-		// POOL_SIZE script env (-e pool_size=N) maps to the postgres pool size,
-		// mirroring declareDriverSetup's pool config in the TS workloads.
-		if dc.GetDriverType() == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
-			if ps, ok := envOverrides["POOL_SIZE"]; ok {
-				if n, err := strconv.Atoi(ps); err == nil && n > 0 {
-					nc := int32(n) //nolint:gosec // G109: parsed config value, bounded by user input, not untrusted
-					dc.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: &stroppy.DriverConfig_PostgresConfig{
-						MaxConns: &nc, MinConns: &nc,
-					}}
-				}
-			}
+		dc, err := buildDriverConfig(idx, cfg, envOverrides)
+		if err != nil {
+			return err
 		}
 
 		drivers[idx] = dc
@@ -287,6 +259,45 @@ func runGoWorkload(
 	}
 
 	return nil
+}
+
+// buildDriverConfig translates one parsed -d/-D driver entry into the proto
+// DriverConfig the bench layer expects. driverType arrives as a preset short
+// name ("noop"); Extra (-D postgres.* / sql.*) merges as nested proto fields.
+// POOL_SIZE script env maps to the postgres pool size.
+func buildDriverConfig(
+	idx int, cfg *runner.DriverCLIConfig, envOverrides map[string]string,
+) (*stroppy.DriverConfig, error) {
+	dc := &stroppy.DriverConfig{Url: cfg.URL}
+
+	if cfg.DriverType != "" {
+		t, err := bench.ParseDriverType(cfg.DriverType)
+		if err != nil {
+			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
+		}
+
+		dc.DriverType = t
+	}
+
+	// defaultInsertMethod is TS-only; Go workloads set Method on each InsertSpec.
+	if len(cfg.Extra) > 0 {
+		if extraJSON, err := json.Marshal(cfg.Extra); err == nil {
+			_ = json.Unmarshal(extraJSON, dc) //nolint:musttag // frozen proto type, out of scope to tag
+		}
+	}
+
+	if dc.GetDriverType() == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
+		if ps, ok := envOverrides["POOL_SIZE"]; ok {
+			if n, err := strconv.Atoi(ps); err == nil && n > 0 {
+				nc := int32(n) //nolint:gosec // G109: parsed config value, bounded by user input, not untrusted
+				dc.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: &stroppy.DriverConfig_PostgresConfig{
+					MaxConns: &nc, MinConns: &nc,
+				}}
+			}
+		}
+	}
+
+	return dc, nil
 }
 
 // runArgs holds the result of parseRunArgs.

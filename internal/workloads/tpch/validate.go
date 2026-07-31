@@ -114,9 +114,9 @@ type compareResult struct {
 }
 
 func compareQuery(query string, gotRows [][]any, want answerBlock) compareResult {
-	var deltas []string
-
 	rowBudget := max(len(gotRows), len(want.Rows))
+	deltas := make([]string, 0, rowBudget)
+
 	for i := range rowBudget {
 		var (
 			got []any
@@ -131,39 +131,7 @@ func compareQuery(query string, gotRows [][]any, want answerBlock) compareResult
 			w = want.Rows[i]
 		}
 
-		if got == nil {
-			deltas = append(deltas, fmt.Sprintf("row %d: missing, want=%v", i, w))
-
-			continue
-		}
-
-		if w == nil {
-			ncells := make([]string, len(got))
-			for c, cv := range got {
-				ncells[c] = normalizeCell(cv)
-			}
-
-			deltas = append(deltas, fmt.Sprintf("row %d: extra, got=%v", i, ncells))
-
-			continue
-		}
-
-		colBudget := max(len(got), len(w))
-		for c := range colBudget {
-			g := ""
-			if c < len(got) {
-				g = normalizeCell(got[c])
-			}
-
-			ww := ""
-			if c < len(w) {
-				ww = strings.TrimSpace(w[c])
-			}
-
-			if !cellsMatch(g, ww) {
-				deltas = append(deltas, fmt.Sprintf("row %d col %d: got=%s want=%s", i, c, g, ww))
-			}
-		}
+		deltas = append(deltas, compareRow(i, got, w)...)
 	}
 
 	status := "ok"
@@ -172,6 +140,44 @@ func compareQuery(query string, gotRows [][]any, want answerBlock) compareResult
 	}
 
 	return compareResult{query: query, status: status, gotRows: len(gotRows), wantRows: len(want.Rows), deltas: deltas}
+}
+
+// compareRow returns the delta descriptions for one result row: missing,
+// extra, or per-cell mismatches.
+func compareRow(i int, got []any, w []string) []string {
+	if got == nil {
+		return []string{fmt.Sprintf("row %d: missing, want=%v", i, w)}
+	}
+
+	if w == nil {
+		ncells := make([]string, len(got))
+		for c, cv := range got {
+			ncells[c] = normalizeCell(cv)
+		}
+
+		return []string{fmt.Sprintf("row %d: extra, got=%v", i, ncells)}
+	}
+
+	var deltas []string
+
+	colBudget := max(len(got), len(w))
+	for c := range colBudget {
+		g := ""
+		if c < len(got) {
+			g = normalizeCell(got[c])
+		}
+
+		ww := ""
+		if c < len(w) {
+			ww = strings.TrimSpace(w[c])
+		}
+
+		if !cellsMatch(g, ww) {
+			deltas = append(deltas, fmt.Sprintf("row %d col %d: got=%s want=%s", i, c, g, ww))
+		}
+	}
+
+	return deltas
 }
 
 // validateAnswers runs all 22 queries against the SF=1 reference answers and logs a

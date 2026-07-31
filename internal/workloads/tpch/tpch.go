@@ -44,47 +44,16 @@ func (*workload) Name() string { return "tpch/tx" }
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.driverType = b.DriverTypeName()
 
-	w.scaleFactor = bench.EnvFloat("SCALE_FACTOR", 1)
-	if w.scaleFactor <= 0 {
-		return fmt.Errorf("%w, got %v", errScaleFactorMustBePositive, w.scaleFactor)
+	if err := w.initConfig(); err != nil {
+		return err
 	}
-
-	w.loadWorkers = bench.EnvInt("LOAD_WORKERS", 0)
-	w.useUnlogged = bench.Env("PG_UNLOGGED", "false") == "true" && w.driverType == bench.DriverPostgres
-	w.ydbColumn = w.driverType == bench.DriverYDB && bench.Env("YDB_STORE_MODE", "column") == "column"
-	w.isPicodata = w.driverType == bench.DriverPicodata
-	w.needsEndDates = w.isPicodata || w.driverType == bench.DriverYDB
-	w.sql = mustLoadSQL(w.driverType)
 
 	// Per-query metrics (22 × 4).
-	w.m = make(map[string]*queryMetrics, len(queryNames))
-	for _, name := range queryNames {
-		w.m[name] = &queryMetrics{
-			duration:     b.Trend("tpch_" + name + "_duration"),
-			runs:         b.Counter("tpch_" + name + "_runs"),
-			errors:       b.Counter("tpch_" + name + "_errors"),
-			elapsedTotal: b.Counter("tpch_" + name + "_elapsed_total"),
-		}
-	}
+	w.m = w.initMetrics(b)
 
-	// Final per-query params: base §2.4 values, with pico/ydb end dates and the q1
-	// picodata shipdate_cutoff precomputed once.
-	w.params = make(map[string]map[string]any, len(queryNames))
-	base := queryParams(w.scaleFactor)
-
-	for _, name := range queryNames {
-		p := map[string]any{}
-		for k, v := range base[name] {
-			p[k] = v
-		}
-
-		p = withEndDates(p, w.needsEndDates)
-		if name == "q1" && w.isPicodata {
-			p["shipdate_cutoff"] = shiftDate("1998-12-01", -90, 0, 0)
-		}
-
-		w.params[name] = p
-	}
+	// Final per-query params: base §2.4 values, with pico/ydb end dates and the
+	// q1 picodata shipdate_cutoff precomputed once.
+	w.params = w.buildParams()
 
 	runSection := func(name string) error {
 		for _, q := range w.sql.Section(name) {
@@ -150,6 +119,61 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	b.StepBegin("workload")
 
 	return nil
+}
+
+// initConfig reads env-driven workload tuning into w fields.
+func (w *workload) initConfig() error {
+	w.scaleFactor = bench.EnvFloat("SCALE_FACTOR", 1)
+	if w.scaleFactor <= 0 {
+		return fmt.Errorf("%w, got %v", errScaleFactorMustBePositive, w.scaleFactor)
+	}
+
+	w.loadWorkers = bench.EnvInt("LOAD_WORKERS", 0)
+	w.useUnlogged = bench.Env("PG_UNLOGGED", "false") == "true" && w.driverType == bench.DriverPostgres
+	w.ydbColumn = w.driverType == bench.DriverYDB && bench.Env("YDB_STORE_MODE", "column") == "column"
+	w.isPicodata = w.driverType == bench.DriverPicodata
+	w.needsEndDates = w.isPicodata || w.driverType == bench.DriverYDB
+	w.sql = mustLoadSQL(w.driverType)
+
+	return nil
+}
+
+// initMetrics wires the per-query duration/counters (22 × 4).
+func (w *workload) initMetrics(b *bench.Bench) map[string]*queryMetrics {
+	m := make(map[string]*queryMetrics, len(queryNames))
+	for _, name := range queryNames {
+		m[name] = &queryMetrics{
+			duration:     b.Trend("tpch_" + name + "_duration"),
+			runs:         b.Counter("tpch_" + name + "_runs"),
+			errors:       b.Counter("tpch_" + name + "_errors"),
+			elapsedTotal: b.Counter("tpch_" + name + "_elapsed_total"),
+		}
+	}
+
+	return m
+}
+
+// buildParams assembles per-query params: base §2.4 values, with pico/ydb end
+// dates and the q1 picodata shipdate_cutoff precomputed once.
+func (w *workload) buildParams() map[string]map[string]any {
+	params := make(map[string]map[string]any, len(queryNames))
+	base := queryParams(w.scaleFactor)
+
+	for _, name := range queryNames {
+		p := map[string]any{}
+		for k, v := range base[name] {
+			p[k] = v
+		}
+
+		p = withEndDates(p, w.needsEndDates)
+		if name == "q1" && w.isPicodata {
+			p["shipdate_cutoff"] = shiftDate("1998-12-01", -90, 0, 0)
+		}
+
+		params[name] = p
+	}
+
+	return params
 }
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {

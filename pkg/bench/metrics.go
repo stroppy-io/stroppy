@@ -77,111 +77,34 @@ func (m *txMetrics) ensureRegistered(vu *VU, lg *zap.Logger) {
 		return
 	}
 
-	registry := vu.root.registry
+	r := vu.root.registry
+	newMetric := func(name string, typ metricType) *metric {
+		mm, err := r.NewMetric(name, typ)
+		if err != nil {
+			lg.Fatal("can't register "+name+" metric", zap.Error(err))
+		}
 
-	txCount, err := registry.NewMetric("tx_count", Counter)
-	if err != nil {
-		lg.Fatal("can't register tx_count metric", zap.Error(err))
+		return mm
 	}
 
-	txTPS, err := registry.NewMetric("tx_tps", Trend)
-	if err != nil {
-		lg.Fatal("can't register tx_tps metric", zap.Error(err))
-	}
-
-	runQueryQPS, err := registry.NewMetric("run_query_qps", Trend)
-	if err != nil {
-		lg.Fatal("can't register run_query_qps metric", zap.Error(err))
-	}
-
-	insertRows, err := registry.NewMetric("insert_rows_total", Counter)
-	if err != nil {
-		lg.Fatal("can't register insert_rows_total metric", zap.Error(err))
-	}
-
-	progressRows, err := registry.NewMetric("insert_progress_rows_total", Counter)
-	if err != nil {
-		lg.Fatal("can't register insert_progress_rows_total metric", zap.Error(err))
-	}
-
-	progressRPS, err := registry.NewMetric("insert_progress_rows_per_second", Trend)
-	if err != nil {
-		lg.Fatal("can't register insert_progress_rows_per_second metric", zap.Error(err))
-	}
-
-	runQueryDuration, err := registry.NewMetric("run_query_duration", Trend)
-	if err != nil {
-		lg.Fatal("can't register run_query_duration metric", zap.Error(err))
-	}
-
-	runQueryCount, err := registry.NewMetric("run_query_count", Counter)
-	if err != nil {
-		lg.Fatal("can't register run_query_count metric", zap.Error(err))
-	}
-
-	runQueryErrRate, err := registry.NewMetric("run_query_error_rate", Rate)
-	if err != nil {
-		lg.Fatal("can't register run_query_error_rate metric", zap.Error(err))
-	}
-
-	insertDuration, err := registry.NewMetric("insert_duration", Trend)
-	if err != nil {
-		lg.Fatal("can't register insert_duration metric", zap.Error(err))
-	}
-
-	insertErrRate, err := registry.NewMetric("insert_error_rate", Rate)
-	if err != nil {
-		lg.Fatal("can't register insert_error_rate metric", zap.Error(err))
-	}
-
-	iterationDur, err := registry.NewMetric("iteration_duration", Trend)
-	if err != nil {
-		lg.Fatal("can't register iteration_duration metric", zap.Error(err))
-	}
-
-	iterations, err := registry.NewMetric("iterations", Counter)
-	if err != nil {
-		lg.Fatal("can't register iterations metric", zap.Error(err))
-	}
-
-	txTotalDuration, err := registry.NewMetric("tx_total_duration", Trend)
-	if err != nil {
-		lg.Fatal("can't register tx_total_duration metric", zap.Error(err))
-	}
-
-	txCommitRate, err := registry.NewMetric("tx_commit_rate", Rate)
-	if err != nil {
-		lg.Fatal("can't register tx_commit_rate metric", zap.Error(err))
-	}
-
-	txQueriesPerTx, err := registry.NewMetric("tx_queries_per_tx", Trend)
-	if err != nil {
-		lg.Fatal("can't register tx_queries_per_tx metric", zap.Error(err))
-	}
-
-	txErrorRate, err := registry.NewMetric("tx_error_rate", Rate)
-	if err != nil {
-		lg.Fatal("can't register tx_error_rate metric", zap.Error(err))
-	}
-
-	m.txCount = txCount
-	m.txTPS = txTPS
-	m.runQueryQPS = runQueryQPS
-	m.insertRows = insertRows
-	m.progressRows = progressRows
-	m.progressRPS = progressRPS
-	m.runQueryDuration = runQueryDuration
-	m.runQueryCount = runQueryCount
-	m.runQueryErrRate = runQueryErrRate
-	m.insertDuration = insertDuration
-	m.insertErrRate = insertErrRate
-	m.iterationDur = iterationDur
-	m.iterations = iterations
-	m.txTotalDuration = txTotalDuration
-	m.txCommitRate = txCommitRate
-	m.txErrorRate = txErrorRate
-	m.txQueriesPerTx = txQueriesPerTx
-	m.tags = registry.RootTagSet()
+	m.txCount = newMetric("tx_count", Counter)
+	m.txTPS = newMetric("tx_tps", Trend)
+	m.runQueryQPS = newMetric("run_query_qps", Trend)
+	m.insertRows = newMetric("insert_rows_total", Counter)
+	m.progressRows = newMetric("insert_progress_rows_total", Counter)
+	m.progressRPS = newMetric("insert_progress_rows_per_second", Trend)
+	m.runQueryDuration = newMetric("run_query_duration", Trend)
+	m.runQueryCount = newMetric("run_query_count", Counter)
+	m.runQueryErrRate = newMetric("run_query_error_rate", Rate)
+	m.insertDuration = newMetric("insert_duration", Trend)
+	m.insertErrRate = newMetric("insert_error_rate", Rate)
+	m.iterationDur = newMetric("iteration_duration", Trend)
+	m.iterations = newMetric("iterations", Counter)
+	m.txTotalDuration = newMetric("tx_total_duration", Trend)
+	m.txCommitRate = newMetric("tx_commit_rate", Rate)
+	m.txQueriesPerTx = newMetric("tx_queries_per_tx", Trend)
+	m.txErrorRate = newMetric("tx_error_rate", Rate)
+	m.tags = r.RootTagSet()
 	m.registered.Store(true)
 }
 

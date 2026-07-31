@@ -78,6 +78,18 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.schemaSQL = mustLoad(preset, schemaFile)
 	w.querySQL = mustLoad(preset, queryFile)
 
+	if err := w.runSteps(ctx, b); err != nil {
+		return err
+	}
+
+	b.StepBegin("workload")
+
+	return nil
+}
+
+// runSteps executes the ordered setup pipeline (drop → create → load → index →
+// analyze → optional validate). Returns the first step error.
+func (w *workload) runSteps(ctx context.Context, b *bench.Bench) error {
 	addStep := func(name string, fn func() error) error { return b.Step(name, fn) }
 
 	if err := addStep("drop_schema", w.dropSchema(ctx, b)); err != nil {
@@ -119,6 +131,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	if err := addStep("analyze", w.analyze(ctx, b)); err != nil {
 		return err
 	}
+
 	// SF=1 baked answer validation (pg/mysql), once. validateAnswers runs inside a tx
 	// that applies the schema's set_timeout/preconfigure_db SETs on the pinned conn.
 	// Deviation from tpcds.ts: the TS makes the validate pass and the measured pass
@@ -133,8 +146,6 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 			return err
 		}
 	}
-
-	b.StepBegin("workload")
 
 	return nil
 }

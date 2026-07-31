@@ -194,23 +194,7 @@ func compareQuery(query string, got [][]string, want answerBlock) compareResult 
 		case w == nil:
 			deltas = append(deltas, fmt.Sprintf("row %d: extra, got=%v", i, g))
 		default:
-			colBudget := max(len(g), len(w))
-			for c := range colBudget {
-				gc, wc := "", ""
-				if c < len(g) {
-					gc = g[c]
-				}
-
-				if c < len(w) {
-					wc = w[c]
-				}
-
-				if !cellsMatch(gc, wc) {
-					deltas = append(deltas, fmt.Sprintf("row %d col %d: got=%s want=%s", i, c, gc, wc))
-
-					break
-				}
-			}
+			deltas = append(deltas, cellDeltas(i, g, w)...)
 		}
 
 		if len(deltas) >= maxDeltas {
@@ -224,6 +208,28 @@ func compareQuery(query string, got [][]string, want answerBlock) compareResult 
 	}
 
 	return compareResult{query: query, status: status, gotRows: len(got), wantRows: len(wantRows), deltas: deltas}
+}
+
+// cellDeltas compares the cells of one matched row and returns the first
+// mismatch description (empty if all cells match).
+func cellDeltas(i int, g, w []string) []string {
+	colBudget := max(len(g), len(w))
+	for c := range colBudget {
+		gc, wc := "", ""
+		if c < len(g) {
+			gc = g[c]
+		}
+
+		if c < len(w) {
+			wc = w[c]
+		}
+
+		if !cellsMatch(gc, wc) {
+			return []string{fmt.Sprintf("row %d col %d: got=%s want=%s", i, c, gc, wc)}
+		}
+	}
+
+	return nil
 }
 
 // validateAnswers runs every query against the SF=1 reference answers and logs a summary.

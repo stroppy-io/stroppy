@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 )
 
 var txNames = []string{"new_order", "payment", "order_status", "delivery", "stock_level"}
@@ -105,42 +106,9 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		return errProcsDriverUnsupported
 	}
 
-	w.warehouses = max(int64(bench.EnvInt("SCALE_FACTOR", bench.EnvInt("WAREHOUSES", 1))), 1)
-	w.warehouseStart = int64(bench.EnvInt("WAREHOUSE_START", 1))
-	w.wIDMax = w.warehouseStart + w.warehouses - 1
-
-	defLoadItems := w.warehouseStart == 1
-	w.loadItems = bench.Env("LOAD_ITEMS", boolStr(defLoadItems)) == "true"
-
-	w.pacing = bench.Env("PACING", "false") == "true"
-	w.iso = resolveIsolation(w.driverType)
-	w.sql = mustLoadSQL(w.driverType)
-	w.isPicodata = w.driverType == bench.DriverPicodata
-	w.isYdb = w.driverType == bench.DriverYDB
-	w.hasReturning = w.driverType == bench.DriverPostgres || w.driverType == bench.DriverYDB
+	w.initConfig()
 	useUnlogged := bench.Env("PG_UNLOGGED", "false") == "true" && w.driverType == bench.DriverPostgres
-
-	w.m = &metrics{
-		newOrderTotal:     b.Counter("tpcc_new_order_total"),
-		paymentTotal:      b.Counter("tpcc_payment_total"),
-		orderStatusTotal:  b.Counter("tpcc_order_status_total"),
-		deliveryTotal:     b.Counter("tpcc_delivery_total"),
-		stockLevelTotal:   b.Counter("tpcc_stock_level_total"),
-		rollbackDecided:   b.Counter("tpcc_rollback_decided"),
-		rollbackDone:      b.Counter("tpcc_rollback_done"),
-		paymentRemote:     b.Counter("tpcc_payment_remote"),
-		paymentByname:     b.Counter("tpcc_payment_byname"),
-		paymentBc:         b.Counter("tpcc_payment_bc"),
-		orderStatusByname: b.Counter("tpcc_order_status_byname"),
-		remoteLineTotal:   b.Counter("tpcc_remote_line_total"),
-		remoteLineRemote:  b.Counter("tpcc_remote_line_remote"),
-		retryAttempts:     b.Counter("tpcc_retry_attempts"),
-		newOrderDur:       b.Trend("tpcc_new_order_duration"),
-		paymentDur:        b.Trend("tpcc_payment_duration"),
-		orderStatusDur:    b.Trend("tpcc_order_status_duration"),
-		deliveryDur:       b.Trend("tpcc_delivery_duration"),
-		stockLevelDur:     b.Trend("tpcc_stock_level_duration"),
-	}
+	w.m = w.initMetrics(b)
 
 	loadDays := time.Now().UTC().Unix() / 86400
 
@@ -185,43 +153,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		addStep("set_unlogged", func() error { return runSection("set_unlogged") })
 	}
 
-	addStep("load_data", func() error {
-		if _, err := b.InsertSpec(ctx, warehouseSpec(w.warehouses, w.warehouseStart)); err != nil {
-			return err
-		}
-
-		if _, err := b.InsertSpec(ctx, districtSpec(w.warehouses, w.warehouseStart)); err != nil {
-			return err
-		}
-
-		if _, err := b.InsertSpec(ctx, customerSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
-			return err
-		}
-
-		if w.loadItems {
-			if _, err := b.InsertSpec(ctx, itemSpec()); err != nil {
-				return err
-			}
-		}
-
-		if _, err := b.InsertSpec(ctx, stockSpec(w.warehouses, w.warehouseStart)); err != nil {
-			return err
-		}
-
-		if _, err := b.InsertSpec(ctx, ordersSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
-			return err
-		}
-
-		if _, err := b.InsertSpec(ctx, orderLineSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
-			return err
-		}
-
-		if _, err := b.InsertSpec(ctx, newOrderSpec(w.warehouses, w.warehouseStart)); err != nil {
-			return err
-		}
-
-		return nil
-	})
+	addStep("load_data", func() error { return w.loadData(ctx, b, loadDays) })
 	addStep("create_indexes", func() error { return runSection("create_indexes") })
 
 	if useUnlogged {
@@ -241,6 +173,76 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	}
 
 	b.StepBegin("workload")
+
+	return nil
+}
+
+// initConfig reads env-driven workload tuning into w fields.
+func (w *workload) initConfig() {
+	w.warehouses = max(int64(bench.EnvInt("SCALE_FACTOR", bench.EnvInt("WAREHOUSES", 1))), 1)
+	w.warehouseStart = int64(bench.EnvInt("WAREHOUSE_START", 1))
+	w.wIDMax = w.warehouseStart + w.warehouses - 1
+
+	defLoadItems := w.warehouseStart == 1
+	w.loadItems = bench.Env("LOAD_ITEMS", boolStr(defLoadItems)) == "true"
+
+	w.pacing = bench.Env("PACING", "false") == "true"
+	w.iso = resolveIsolation(w.driverType)
+	w.sql = mustLoadSQL(w.driverType)
+	w.isPicodata = w.driverType == bench.DriverPicodata
+	w.isYdb = w.driverType == bench.DriverYDB
+	w.hasReturning = w.driverType == bench.DriverPostgres || w.driverType == bench.DriverYDB
+}
+
+// initMetrics wires the per-transaction counters and duration trends.
+func (w *workload) initMetrics(b *bench.Bench) *metrics {
+	return &metrics{
+		newOrderTotal:     b.Counter("tpcc_new_order_total"),
+		paymentTotal:      b.Counter("tpcc_payment_total"),
+		orderStatusTotal:  b.Counter("tpcc_order_status_total"),
+		deliveryTotal:     b.Counter("tpcc_delivery_total"),
+		stockLevelTotal:   b.Counter("tpcc_stock_level_total"),
+		rollbackDecided:   b.Counter("tpcc_rollback_decided"),
+		rollbackDone:      b.Counter("tpcc_rollback_done"),
+		paymentRemote:     b.Counter("tpcc_payment_remote"),
+		paymentByname:     b.Counter("tpcc_payment_byname"),
+		paymentBc:         b.Counter("tpcc_payment_bc"),
+		orderStatusByname: b.Counter("tpcc_order_status_byname"),
+		remoteLineTotal:   b.Counter("tpcc_remote_line_total"),
+		remoteLineRemote:  b.Counter("tpcc_remote_line_remote"),
+		retryAttempts:     b.Counter("tpcc_retry_attempts"),
+		newOrderDur:       b.Trend("tpcc_new_order_duration"),
+		paymentDur:        b.Trend("tpcc_payment_duration"),
+		orderStatusDur:    b.Trend("tpcc_order_status_duration"),
+		deliveryDur:       b.Trend("tpcc_delivery_duration"),
+		stockLevelDur:     b.Trend("tpcc_stock_level_duration"),
+	}
+}
+
+// loadData runs the relational load: warehouse, district, customer, item,
+// stock, orders, order_line, new_order.
+func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64) error {
+	specs := []*dgproto.InsertSpec{
+		warehouseSpec(w.warehouses, w.warehouseStart),
+		districtSpec(w.warehouses, w.warehouseStart),
+		customerSpec(w.warehouses, w.warehouseStart, loadDays),
+	}
+	if w.loadItems {
+		specs = append(specs, itemSpec())
+	}
+
+	specs = append(specs,
+		stockSpec(w.warehouses, w.warehouseStart),
+		ordersSpec(w.warehouses, w.warehouseStart, loadDays),
+		orderLineSpec(w.warehouses, w.warehouseStart, loadDays),
+		newOrderSpec(w.warehouses, w.warehouseStart),
+	)
+
+	for _, spec := range specs {
+		if _, err := b.InsertSpec(ctx, spec); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
