@@ -38,10 +38,12 @@ func loadAnswers() (*answersFile, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var af answersFile
 	if err := json.Unmarshal(data, &af); err != nil {
 		return nil, err
 	}
+
 	return &af, nil
 }
 
@@ -68,11 +70,13 @@ func normalizeCell(v any) string {
 		if x {
 			return "t"
 		}
+
 		return "f"
 	case float64:
 		if math.IsInf(x, 0) || math.IsNaN(x) {
 			return ""
 		}
+
 		return strconv.FormatFloat(x, 'g', -1, 64)
 	case int64:
 		return strconv.FormatInt(x, 10)
@@ -92,7 +96,9 @@ func cellsMatch(got, want string) bool {
 	if got == want {
 		return true
 	}
+
 	gN, errG := strconv.ParseFloat(got, 64)
+
 	wN, errW := strconv.ParseFloat(want, 64)
 	if errG != nil || errW != nil || math.IsInf(gN, 0) || math.IsInf(wN, 0) {
 		return false
@@ -101,10 +107,12 @@ func cellsMatch(got, want string) bool {
 	if !isNumeric(got) || !isNumeric(want) {
 		return false
 	}
+
 	abs := math.Abs(gN - wN)
 	if abs <= toleranceAbs {
 		return true
 	}
+
 	return abs/math.Max(math.Abs(wN), 1) <= toleranceRel
 }
 
@@ -119,6 +127,7 @@ func rowKey(cells []string) string {
 			parts[i] = c
 		}
 	}
+
 	return strings.Join(parts, "")
 }
 
@@ -129,9 +138,12 @@ func sortedRows(raw [][]any) [][]string {
 		for c, cv := range row {
 			cells[c] = normalizeCell(cv)
 		}
+
 		out[i] = cells
 	}
+
 	sort.SliceStable(out, func(i, j int) bool { return rowKey(out[i]) < rowKey(out[j]) })
+
 	return out
 }
 
@@ -142,9 +154,12 @@ func sortedWant(rows [][]string) [][]string {
 		for c, cv := range row {
 			cells[c] = strings.TrimSpace(strings.TrimSpace(cv))
 		}
+
 		out[i] = cells
 	}
+
 	sort.SliceStable(out, func(i, j int) bool { return rowKey(out[i]) < rowKey(out[j]) })
+
 	return out
 }
 
@@ -159,16 +174,20 @@ type compareResult struct {
 
 func compareQuery(query string, got [][]string, want answerBlock) compareResult {
 	wantRows := sortedWant(want.Rows)
+
 	var deltas []string
+
 	budget := max(len(got), len(wantRows))
 	for i := range budget {
 		var g, w []string
 		if i < len(got) {
 			g = got[i]
 		}
+
 		if i < len(wantRows) {
 			w = wantRows[i]
 		}
+
 		switch {
 		case g == nil:
 			deltas = append(deltas, fmt.Sprintf("row %d: missing, want=%v", i, w))
@@ -181,23 +200,29 @@ func compareQuery(query string, got [][]string, want answerBlock) compareResult 
 				if c < len(g) {
 					gc = g[c]
 				}
+
 				if c < len(w) {
 					wc = w[c]
 				}
+
 				if !cellsMatch(gc, wc) {
 					deltas = append(deltas, fmt.Sprintf("row %d col %d: got=%s want=%s", i, c, gc, wc))
+
 					break
 				}
 			}
 		}
+
 		if len(deltas) >= maxDeltas {
 			break
 		}
 	}
+
 	status := "ok"
 	if len(deltas) > 0 || len(got) != len(wantRows) {
 		status = "mismatch"
 	}
+
 	return compareResult{query: query, status: status, gotRows: len(got), wantRows: len(wantRows), deltas: deltas}
 }
 
@@ -218,16 +243,20 @@ func validateAnswers(ctx context.Context, b *bench.Bench, schema, queries *bench
 	lg := b.Logger().Sugar()
 	if dt != bench.DriverPostgres && dt != bench.DriverMySQL {
 		lg.Infof("[tpcds_validate] skipped: answers_sf1 validates postgres/mysql only; driverType=%s", dt)
+
 		return
 	}
+
 	if math.Abs(scaleFactor-1) > 1e-9 && bench.Env("VALIDATE_FORCE", "") == "" {
 		lg.Info("[tpcds_validate] skipped: answers_sf1 is SF=1 only (set VALIDATE_FORCE=1 to run anyway)")
+
 		return
 	}
 
 	af, err := loadAnswers()
 	if err != nil {
 		lg.Errorf("[tpcds_validate] failed to load answers: %v", err)
+
 		return
 	}
 
@@ -235,6 +264,7 @@ func validateAnswers(ctx context.Context, b *bench.Bench, schema, queries *bench
 	for _, section := range []string{"set_timeout", "preconfigure_db"} {
 		sets = append(sets, schema.Section(section)...)
 	}
+
 	iso := bench.IsoReadCommitted
 	if dt == bench.DriverPicodata {
 		iso = bench.IsoNone // picodata Begin() always errors
@@ -243,58 +273,77 @@ func validateAnswers(ctx context.Context, b *bench.Bench, schema, queries *bench
 	results := make([]compareResult, 0, len(names))
 	for _, name := range names {
 		want, hasWant := af.Answers[name]
+
 		body, ok := queries.Query("", name)
 		if !ok {
 			results = append(results, compareResult{query: name, status: "skipped", deltas: []string{"query text missing"}})
+
 			continue
 		}
+
 		if !hasWant {
 			results = append(results, compareResult{query: name, status: "skipped", deltas: []string{"no reference answer"}})
+
 			continue
 		}
+
 		var (
 			gotRows [][]any
 			qerr    error
 		)
+
 		txErr := b.BeginTx(ctx, bench.BeginOpts{Isolation: iso, Name: "tpcds_validate"}, func(tx *bench.TxX) error {
 			for _, set := range sets {
 				_ = tx.Exec(ctx, set, nil) // best-effort; a failed SET must not abort
 			}
+
 			gotRows, qerr = tx.QueryRows(ctx, body, nil)
+
 			return qerr
 		})
 		if txErr != nil {
 			results = append(results, compareResult{query: name, status: "error", wantRows: len(want.Rows), errMsg: txErr.Error()})
+
 			continue
 		}
+
 		results = append(results, compareQuery(name, sortedRows(gotRows), want))
 	}
+
 	logSummary(b, results)
 }
 
 func logSummary(b *bench.Bench, results []compareResult) {
 	var ok, mismatch, skipped, errN int
+
 	lines := []string{"===== TPC-DS query validation vs answers_sf1.json ====="}
+
 	for _, r := range results {
 		switch r.status {
 		case "ok":
 			ok++
+
 			lines = append(lines, fmt.Sprintf("  %-12s: OK      rows=%d", r.query, r.gotRows))
 		case "mismatch":
 			mismatch++
+
 			preview := strings.Join(r.deltas[:min(3, len(r.deltas))], "; ")
 			if len(r.deltas) > 3 {
 				preview += " …"
 			}
+
 			lines = append(lines, fmt.Sprintf("  %-12s: DIFF    rows=%d/%d  %s", r.query, r.gotRows, r.wantRows, preview))
 		case "skipped":
 			skipped++
+
 			lines = append(lines, fmt.Sprintf("  %-12s: SKIP    %s", r.query, strings.Join(r.deltas, "; ")))
 		case "error":
 			errN++
+
 			lines = append(lines, fmt.Sprintf("  %-12s: ERROR   %s", r.query, r.errMsg))
 		}
 	}
+
 	lines = append(lines, fmt.Sprintf("  total=%d  ok=%d  diff=%d  skipped=%d  error=%d", len(results), ok, mismatch, skipped, errN))
 	b.Logger().Sugar().Info(strings.Join(lines, "\n"))
 }

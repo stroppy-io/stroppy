@@ -7,6 +7,7 @@ package execute_sql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -32,40 +33,51 @@ func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
 		if err != nil {
 			return fmt.Errorf("execute_sql: load %s: %w", file, err)
 		}
+
 		w.sql = s
 	} else {
-		return fmt.Errorf("execute_sql: no SQL source — set STROPPY_SQL_BODY (inline) or SQL_FILE (path)")
+		return errors.New("execute_sql: no SQL source — set STROPPY_SQL_BODY (inline) or SQL_FILE (path)")
 	}
+
 	w.names = w.sql.Names("")
 	if len(w.names) == 0 {
-		return fmt.Errorf("execute_sql: SQL_FILE has no `--= name` queries")
+		return errors.New("execute_sql: SQL_FILE has no `--= name` queries")
 	}
+
 	b.StepBegin("workload")
+
 	return nil
 }
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	return b.Step("workload", func() error {
 		lg := b.Logger().Sugar()
+
 		for _, name := range w.names {
 			body, ok := w.sql.Query("", name)
 			if !ok {
 				continue
 			}
+
 			start := time.Now()
 			err := b.Exec(ctx, body, nil)
+
 			ms := time.Since(start).Milliseconds()
 			if err != nil {
 				lg.Infof("[execute_sql] %s: error in %dms %v", name, ms, err)
+
 				continue
 			}
+
 			lg.Infof("[execute_sql] %s: ok in %dms", name, ms)
 		}
+
 		return nil
 	})
 }
 
 func (*workload) Teardown(_ context.Context, b *bench.Bench) error {
 	b.StepEnd("workload")
+
 	return nil
 }

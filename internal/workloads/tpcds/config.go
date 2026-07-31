@@ -40,5 +40,6 @@ func mustLoad(preset, file string) *bench.SQL {
 	if err != nil {
 		panic(err)
 	}
+
 	return s
 }

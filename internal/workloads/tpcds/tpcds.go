@@ -2,6 +2,7 @@ package tpcds
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -45,6 +46,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	if w.scaleFactor <= 0 {
 		return fmt.Errorf("SCALE_FACTOR must be positive, got %v", w.scaleFactor)
 	}
+
 	w.loadWorkers = bench.EnvInt("LOAD_WORKERS", 0)
 	w.useUnlogged = bench.Env("PG_UNLOGGED", "false") == "true" && w.driver == bench.DriverPostgres
 
@@ -53,14 +55,16 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	// only — the generator targets ANSI/pg/MySQL, not YQL.
 	w.streams = bench.EnvInt("STREAMS", 1)
 	w.throughput = w.streams > 1
+
 	w.seed = int64(bench.EnvInt("QUERY_SEED", 19620718))
 	if qs := bench.Env("QUERY_STREAM", ""); qs != "" {
 		w.genStream = bench.EnvInt("QUERY_STREAM", 0)
 	} else {
 		w.genStream = -1
 	}
+
 	if w.driver == bench.DriverYDB && (w.throughput || w.genStream >= 0) {
-		return fmt.Errorf("[tpcds] ydb supports the baked query set (power test) only; STREAMS>1 and QUERY_STREAM need the in-process generator, which does not target YQL yet")
+		return errors.New("[tpcds] ydb supports the baked query set (power test) only; STREAMS>1 and QUERY_STREAM need the in-process generator, which does not target YQL yet")
 	}
 
 	schemaFile, queryFile := dialectFiles(w.driver)
@@ -72,32 +76,39 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	if err := addStep("drop_schema", w.dropSchema(ctx, b)); err != nil {
 		return err
 	}
+
 	if err := addStep("create_schema", w.createSchema(ctx, b)); err != nil {
 		return err
 	}
+
 	if w.useUnlogged {
 		if err := addStep("set_unlogged", w.setUnlogged(ctx, b, "UNLOGGED")); err != nil {
 			return err
 		}
 	}
+
 	if err := addStep("load_data", func() error {
 		for _, table := range TPCDS_TABLES {
 			if _, err := b.InsertTpcds(ctx, table, w.scaleFactor, w.loadWorkers); err != nil {
 				return fmt.Errorf("load %s: %w", table, err)
 			}
 		}
+
 		return nil
 	}); err != nil {
 		return err
 	}
+
 	if err := addStep("create_indexes", w.runSchemaSection(ctx, b, "create_indexes")); err != nil {
 		return err
 	}
+
 	if w.useUnlogged {
 		if err := addStep("set_logged", w.setUnlogged(ctx, b, "LOGGED")); err != nil {
 			return err
 		}
 	}
+
 	if err := addStep("analyze", w.analyze(ctx, b)); err != nil {
 		return err
 	}
@@ -109,6 +120,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	if !w.throughput && w.genStream < 0 && w.isPgOrMs {
 		if err := addStep("validate_answers", func() error {
 			validateAnswers(ctx, b, w.schemaSQL, w.querySQL, w.querySQL.Names(""), w.scaleFactor, w.driver)
+
 			return nil
 		}); err != nil {
 			return err
@@ -116,6 +128,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	}
 
 	b.StepBegin("workload")
+
 	return nil
 }
 
@@ -129,22 +142,28 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 		// set_timeout/preconfigure_db session setup is a validate-pass concern (applied
 		// inside the validation tx above) and is unnecessary for the throughput pass.
 		lg := b.Logger().Sugar()
+
 		for _, q := range queries {
 			start := time.Now()
 			err := b.Exec(ctx, q.sql, nil)
+
 			ms := time.Since(start).Milliseconds()
 			if err != nil {
 				lg.Infof("[tpcds] %s: error in %dms %v", q.name, ms, err)
+
 				continue
 			}
+
 			lg.Infof("[tpcds] %s: ok in %dms", q.name, ms)
 		}
+
 		return nil
 	})
 }
 
 func (*workload) Teardown(_ context.Context, b *bench.Bench) error {
 	b.StepEnd("workload")
+
 	return nil
 }
 
@@ -153,20 +172,24 @@ func (*workload) Teardown(_ context.Context, b *bench.Bench) error {
 func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 	if w.genStream < 0 && !w.throughput {
 		names := w.querySQL.Names("")
+
 		out := make([]namedQuery, 0, len(names))
 		for _, name := range names {
 			if body, ok := w.querySQL.Query("", name); ok {
 				out = append(out, namedQuery{name, body})
 			}
 		}
+
 		return out, nil
 	}
+
 	streamIdx := 0
 	if w.throughput {
 		streamIdx = int(b.VUID()) - 1
 	} else {
 		streamIdx = w.genStream
 	}
+
 	return generateStream(string(w.driver), w.scaleFactor, w.seed, streamIdx)
 }
 
@@ -177,28 +200,36 @@ func generateStream(dialect string, scale float64, seed int64, stream int) ([]na
 	if !ok {
 		return nil, fmt.Errorf("dsqgen: unknown dialect %q", dialect)
 	}
+
 	res, err := dsqgen.Generate(d, scale, seed, stream)
 	if err != nil {
 		return nil, err
 	}
+
 	suffix := []string{"_a", "_b", "_c"}
+
 	out := make([]namedQuery, 0, len(res.Queries))
 	for _, q := range res.Queries {
 		stmts := strings.Split(q.SQL, ";")
+
 		var n int
+
 		for _, s := range stmts {
 			s = strings.TrimSpace(s)
 			if s == "" {
 				continue
 			}
+
 			name := q.Name
 			if len(stmts) > 1 && n < len(suffix) {
 				name += suffix[n]
 			}
+
 			out = append(out, namedQuery{name, s})
 			n++
 		}
 	}
+
 	return out, nil
 }
 
@@ -210,6 +241,7 @@ func (w *workload) runSection(ctx context.Context, b *bench.Bench, sql *bench.SQ
 			return fmt.Errorf("%s: %w", section, err)
 		}
 	}
+
 	return nil
 }
 
@@ -229,6 +261,7 @@ func (w *workload) dropSchema(ctx context.Context, b *bench.Bench) func() error 
 				return fmt.Errorf("drop_schema: %w", err)
 			}
 		}
+
 		return nil
 	}
 }
@@ -239,6 +272,7 @@ func (w *workload) createSchema(ctx context.Context, b *bench.Bench) func() erro
 		if w.ydbColumn {
 			section = "create_schema_column"
 		}
+
 		return w.runSection(ctx, b, w.schemaSQL, section)
 	}
 }
@@ -250,6 +284,7 @@ func (w *workload) setUnlogged(ctx context.Context, b *bench.Bench, mode string)
 				return fmt.Errorf("set_%s %s: %w", strings.ToLower(mode), table, err)
 			}
 		}
+
 		return nil
 	}
 }
@@ -261,7 +296,7 @@ func (w *workload) analyze(ctx context.Context, b *bench.Bench) func() error {
 			return b.Exec(ctx, "ANALYZE", nil)
 		case bench.DriverMySQL:
 			for _, table := range TPCDS_TABLES {
-				if err := b.Exec(ctx, fmt.Sprintf("ANALYZE TABLE %s", table), nil); err != nil {
+				if err := b.Exec(ctx, "ANALYZE TABLE "+table, nil); err != nil {
 					return fmt.Errorf("analyze %s: %w", table, err)
 				}
 			}

@@ -174,7 +174,7 @@ func runScenario(ctx context.Context, sc scenarioSpec, iterate func(*VU) error) 
 	switch sc.executor {
 	case "shared-iterations":
 		var (
-			remaining int64 = sc.iterations
+			remaining = sc.iterations
 			wg        sync.WaitGroup
 		)
 		for i := range sc.vus {
@@ -263,7 +263,8 @@ func (m *Metric) Add(v float64, tags ...string) {
 		tagSet = tagSet.With(tags[i], tags[i+1])
 	}
 
-	PushIfNotDone(context.Background(), m.root.samples, Sample{Metric: m.m, Tags: tagSet,
+	PushIfNotDone(context.Background(), m.root.samples, Sample{
+		Metric: m.m, Tags: tagSet,
 		Time: time.Now(), Value: v,
 	})
 }

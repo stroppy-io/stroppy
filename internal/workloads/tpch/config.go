@@ -25,6 +25,7 @@ func sqlFile(dt bench.DriverTypeName) string {
 	if v := bench.Env("SQL_FILE", ""); v != "" {
 		return v
 	}
+
 	switch dt {
 	case bench.DriverMySQL:
 		return "mysql.sql"
@@ -42,6 +43,7 @@ func mustLoadSQL(dt bench.DriverTypeName) *bench.SQL {
 	if err != nil {
 		panic(err)
 	}
+
 	return s
 }
 
@@ -53,6 +55,7 @@ func shiftDate(iso string, days, months, years int) string {
 	if err != nil {
 		return iso
 	}
+
 	return t.AddDate(years, months, days).Format("2006-01-02")
 }
 
@@ -74,8 +77,10 @@ func queryParams(scaleFactor float64) map[string]map[string]any {
 		"q13": {"word1": "special", "word2": "requests"},
 		"q14": {"date": "1995-09-01"},
 		"q15": {"date": "1996-01-01"},
-		"q16": {"brand": "Brand#45", "type_prefix": "MEDIUM POLISHED",
-			"s1": 49, "s2": 14, "s3": 23, "s4": 45, "s5": 19, "s6": 3, "s7": 36, "s8": 9},
+		"q16": {
+			"brand": "Brand#45", "type_prefix": "MEDIUM POLISHED",
+			"s1": 49, "s2": 14, "s3": 23, "s4": 45, "s5": 19, "s6": 3, "s7": 36, "s8": 9,
+		},
 		"q17": {"brand": "Brand#23", "container": "MED BOX"},
 		"q18": {"quantity": 300},
 		"q19": {"brand1": "Brand#12", "brand2": "Brand#23", "brand3": "Brand#34", "q1": 1, "q2": 10, "q3": 20},
@@ -83,6 +88,7 @@ func queryParams(scaleFactor float64) map[string]map[string]any {
 		"q21": {"nation": "SAUDI ARABIA"},
 		"q22": {"cc1": "13", "cc2": "31", "cc3": "23", "cc4": "29", "cc5": "30", "cc6": "18", "cc7": "17"},
 	}
+
 	return m
 }
 
@@ -92,12 +98,15 @@ func withEndDates(p map[string]any, needsEndDates bool) map[string]any {
 	if !needsEndDates {
 		return p
 	}
+
 	d, ok := p["date"].(string)
 	if !ok {
 		return p
 	}
+
 	p["date_1m"] = shiftDate(d, 0, 1, 0)
 	p["date_3m"] = shiftDate(d, 0, 3, 0)
 	p["date_1y"] = shiftDate(d, 0, 0, 1)
+
 	return p
 }

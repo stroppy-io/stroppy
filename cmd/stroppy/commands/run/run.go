@@ -170,6 +170,7 @@ Config file flags:
 			} else if file != "" {
 				envOverrides["SQL_FILE"] = file
 			}
+
 			return runGoWorkload(name, steps, noSteps, envOverrides, driverConfigs)
 		}
 
@@ -203,8 +204,10 @@ func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bo
 		if sqlArg != "" {
 			return "execute_sql", "", sqlArg, true
 		}
+
 		return "execute_sql", "", "", true
 	}
+
 	return "", "", "", false
 }
 
@@ -243,7 +246,7 @@ func runGoWorkload(
 
 		// POOL_SIZE script env (-e pool_size=N) maps to the postgres pool size,
 		// mirroring declareDriverSetup's pool config in the TS workloads.
-		if dc.DriverType == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
+		if dc.GetDriverType() == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
 			if ps, ok := envOverrides["POOL_SIZE"]; ok {
 				if n, err := strconv.Atoi(ps); err == nil && n > 0 {
 					nc := int32(n)

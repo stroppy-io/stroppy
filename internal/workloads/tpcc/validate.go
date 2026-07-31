@@ -23,6 +23,7 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 	wWhere := func(col string) string { return "WHERE " + col + " " + wRange }
 
 	var failures []string
+
 	check := func(name string, ok bool) {
 		if !ok {
 			failures = append(failures, name)
@@ -34,6 +35,7 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 	if err != nil {
 		return fmt.Errorf("validate_population: prefetch failed: %w", err)
 	}
+
 	distNext := map[string]int64{} // "w/d" -> d_next_o_id
 	for _, r := range distRows {
 		distNext[fmt.Sprintf("%v/%v", r[0], r[1])] = toInt64(r[2])
@@ -43,6 +45,7 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 	if err != nil {
 		return fmt.Errorf("validate_population: prefetch failed: %w", err)
 	}
+
 	ordMax := map[string]int64{}
 	for _, r := range ordRows {
 		ordMax[fmt.Sprintf("%v/%v", r[0], r[1])] = toInt64(r[2])
@@ -52,7 +55,9 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 	if err != nil {
 		return fmt.Errorf("validate_population: prefetch failed: %w", err)
 	}
+
 	type noStat struct{ max, min, cnt int64 }
+
 	noStats := map[string]noStat{}
 	for _, r := range noRows {
 		noStats[fmt.Sprintf("%v/%v", r[0], r[1])] = noStat{toInt64(r[2]), toInt64(r[3]), toInt64(r[4])}
@@ -75,19 +80,23 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 
 	// Consistency.
 	check("CC1 sum(W_YTD) = sum(D_YTD)", absf(cc1WSum-cc1DSum) < 0.01)
+
 	for k, dNext := range distNext {
 		check("CC2a D_NEXT_O_ID-1 = max(O_ID) ["+k+"]", ordMax[k] == dNext-1)
 		check("CC2b max(O_ID) = max(NO_O_ID) ["+k+"]", ordMax[k] == noStats[k].max)
 		st := noStats[k]
 		check("CC3 new_order contiguous ["+k+"]", st.max-st.min+1 == st.cnt)
 	}
+
 	check("CC4 sum(O_OL_CNT) = count(order_line)", cc4OSum == cc4OlCnt)
 
 	// Distribution + constants.
 	iDataPct, _ := qfloat(ctx, b, "SELECT 100.0 * SUM(CASE WHEN i_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM item")
 	check("I_DATA 10% ORIGINAL (5..15%)", iDataPct >= 5 && iDataPct <= 15)
+
 	sDataPct, _ := qfloat(ctx, b, "SELECT 100.0 * SUM(CASE WHEN s_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM stock "+wWhere("s_w_id"))
 	check("S_DATA 10% ORIGINAL (5..15%)", sDataPct >= 5 && sDataPct <= 15)
+
 	bcPct, _ := qfloat(ctx, b, "SELECT 100.0 * SUM(CASE WHEN c_credit = 'BC' THEN 1 ELSE 0 END) / COUNT(*) FROM customer "+wWhere("c_w_id"))
 	check("C_CREDIT 10% BC (5..15%)", bcPct >= 5 && bcPct <= 15)
 	check("C_MIDDLE = 'OE' everywhere", qintEq(ctx, b, "SELECT COUNT(*) FROM customer WHERE c_middle <> 'OE' AND c_w_id "+wRange, 0))
@@ -97,12 +106,14 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 	if len(failures) > 0 {
 		return fmt.Errorf("validate_population: %d check(s) failed:\n  %s", len(failures), strings.Join(failures, "\n  "))
 	}
+
 	return nil
 }
 
 // qint runs a scalar COUNT/SUM-int query and compares to want.
 func qintEq(ctx context.Context, b *bench.Bench, sql string, want int64) bool {
 	got, err := qint(ctx, b, sql)
+
 	return err == nil && got == want
 }
 
@@ -111,6 +122,7 @@ func qint(ctx context.Context, b *bench.Bench, sql string) (int64, error) {
 	if err != nil || v == nil {
 		return 0, err
 	}
+
 	return toInt64(v), nil
 }
 
@@ -119,6 +131,7 @@ func qfloat(ctx context.Context, b *bench.Bench, sql string) (float64, error) {
 	if err != nil || v == nil {
 		return 0, err
 	}
+
 	return toFloat64(v), nil
 }
 
@@ -173,51 +186,69 @@ func absf(f float64) float64 {
 	if f < 0 {
 		return -f
 	}
+
 	return f
 }
 
 func atoi(s string) int64 {
 	var n int64
+
 	neg := false
-	for i := 0; i < len(s); i++ {
+
+	for i := range len(s) {
 		c := s[i]
 		if c == '-' {
 			neg = true
+
 			continue
 		}
+
 		if c == '.' {
 			break
 		}
+
 		if c < '0' || c > '9' {
 			continue
 		}
+
 		n = n*10 + int64(c-'0')
 	}
+
 	if neg {
 		return -n
 	}
+
 	return n
 }
 
 func atof(s string) float64 {
-	var f float64
-	var frac float64
+	var (
+		f    float64
+		frac float64
+	)
+
 	div := 1.0
 	neg := false
 	seenDot := false
-	for i := 0; i < len(s); i++ {
+
+	for i := range len(s) {
 		c := s[i]
 		if c == '-' {
 			neg = true
+
 			continue
 		}
+
 		if c == '.' {
 			seenDot = true
+
 			continue
 		}
+
 		if c < '0' || c > '9' {
 			continue
 		}
+
 		if seenDot {
 			div *= 10
 			frac = frac*10 + float64(c-'0')
@@ -225,9 +256,11 @@ func atof(s string) float64 {
 			f = f*10 + float64(c-'0')
 		}
 	}
+
 	f += frac / div
 	if neg {
 		return -f
 	}
+
 	return f
 }

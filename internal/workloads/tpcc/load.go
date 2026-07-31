@@ -16,6 +16,7 @@ func lastNameDict() *dgproto.Dict {
 	for i, s := range cLastDict {
 		rows[i] = &dgproto.DictRow{Values: []string{s}}
 	}
+
 	return &dgproto.Dict{Rows: rows}
 }
 
@@ -23,6 +24,7 @@ func workers() *dgproto.Parallelism {
 	if n := bench.EnvInt("LOAD_WORKERS", 0); n > 0 {
 		return &dgproto.Parallelism{Workers: int32(n)}
 	}
+
 	return nil
 }
 
@@ -35,9 +37,11 @@ func daysToDate(loadDays int64) *dgproto.Expr { return call("std.daysToDate", li
 // random offset within [minLen,maxLen].
 func tpccOriginalOr(minLen, maxLen int64) *dgproto.Expr {
 	const marker = "ORIGINAL"
+
 	sideMin := (minLen - int64(len(marker)) + 1) / 2 // ceil((minLen-8)/2) = 9 at defaults
 	sideMax := (maxLen - int64(len(marker))) / 2     // floor((maxLen-8)/2) = 21 at defaults
 	injected := concat(concat(asciiRange(sideMin, sideMax, alphaEn), litStr(marker)), asciiRange(sideMin, sideMax, alphaEn))
+
 	return choose(1, branch{1, injected}, branch{9, asciiRange(minLen, maxLen, alphaEn)})
 }
 
@@ -109,6 +113,7 @@ func customerSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
 		{Name: "c_delivery_cnt", Expr: litInt(0)},
 		{Name: "c_data", Expr: asciiRange(300, 500, alphaEn)},
 	}
+
 	return &dgproto.InsertSpec{
 		Table: "customer", Seed: seedCustomer, Method: dgproto.InsertMethod_NATIVE, Parallelism: workers(),
 		Dicts: map[string]*dgproto.Dict{lastNameDictKey: lastNameDict()},
@@ -143,17 +148,21 @@ func stockSpec(scale, warehouseStart int64) *dgproto.InsertSpec {
 	for d := 1; d <= 10; d++ {
 		attrs = append(attrs, &dgproto.Attr{Name: sDistCol(d), Expr: asciiFixed(24, alphaEn)})
 	}
+
 	attrs = append(attrs,
 		&dgproto.Attr{Name: "s_ytd", Expr: litInt(0)},
 		&dgproto.Attr{Name: "s_order_cnt", Expr: litInt(0)},
 		&dgproto.Attr{Name: "s_remote_cnt", Expr: litInt(0)},
 		&dgproto.Attr{Name: "s_data", Expr: tpccOriginalOr(26, 50)},
 	)
+
 	colOrder := []string{"s_i_id", "s_w_id", "s_quantity"}
 	for d := 1; d <= 10; d++ {
 		colOrder = append(colOrder, sDistCol(d))
 	}
+
 	colOrder = append(colOrder, "s_ytd", "s_order_cnt", "s_remote_cnt", "s_data")
+
 	return &dgproto.InsertSpec{
 		Table: "stock", Seed: seedStock, Method: dgproto.InsertMethod_NATIVE, Parallelism: workers(),
 		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
@@ -167,6 +176,7 @@ func ordersSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
 	permuteSeed := add(districtKey, litInt(int64(ordersPermuteSalt)))
 	oCId := add(call("std.permuteIndex", permuteSeed, sub(col("o_id"), litInt(1)), litInt(customersPerDistrict)), litInt(1))
 	oCarrierId := ifExpr(gt(col("o_id"), litInt(ordersDelivered)), litNull(), intUniform(1, 10))
+
 	return spec("orders", seedOrders, scale*customersPerWh, []string{
 		"o_id", "o_d_id", "o_w_id", "o_c_id", "o_entry_d", "o_carrier_id", "o_ol_cnt", "o_all_local",
 	}, []*dgproto.Attr{
@@ -182,9 +192,12 @@ func ordersSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
 }
 
 func orderLineSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
-	const perDWh = customersPerWh * olCntFixed     // 300000
+	const perDWh = customersPerWh * olCntFixed // 300000
+
 	const perD = customersPerDistrict * olCntFixed // 30000
+
 	undelivered := gt(col("ol_o_id"), litInt(ordersDelivered))
+
 	return spec("order_line", seedOrderLine, scale*perDWh, []string{
 		"ol_o_id", "ol_d_id", "ol_w_id", "ol_number", "ol_i_id", "ol_supply_w_id",
 		"ol_delivery_d", "ol_quantity", "ol_amount", "ol_dist_info",
@@ -204,6 +217,7 @@ func orderLineSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
 
 func newOrderSpec(scale, warehouseStart int64) *dgproto.InsertSpec {
 	const perWh = ordersUndelivered * districtsPerWarehouse // 9000
+
 	return spec("new_order", seedNewOrder, scale*perWh, []string{"no_o_id", "no_d_id", "no_w_id"}, []*dgproto.Attr{
 		{Name: "no_o_id", Expr: add(mod(rowIndex(), litInt(ordersUndelivered)), litInt(ordersDelivered+1))},
 		{Name: "no_d_id", Expr: add(mod(div(rowIndex(), litInt(ordersUndelivered)), litInt(districtsPerWarehouse)), litInt(1))},
@@ -227,5 +241,6 @@ func dictAt(key string, idx *dgproto.Expr) *dgproto.Expr {
 
 func sDistCol(d int) string {
 	const digits = "0123456789"
+
 	return "s_dist_" + string(digits[d/10]) + string(digits[d%10])
 }

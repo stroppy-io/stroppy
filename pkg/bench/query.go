@@ -324,9 +324,11 @@ func (t *TxX) runQuery(ctx context.Context, sql string, args map[string]any) (*d
 
 func (t *TxX) Commit(ctx context.Context) error {
 	committed := true
+
 	if t.tx != nil {
 		if err := t.tx.Commit(ctx); err != nil {
 			committed = false
+
 			return err
 		}
 	}
@@ -356,6 +358,7 @@ func (t *TxX) recordEnd(committed bool) {
 	if t.done {
 		return
 	}
+
 	t.done = true
 	t.b.root.txMetrics.recordTxEnd(t.b.vu, t.name, time.Since(t.start), t.queries, committed)
 }

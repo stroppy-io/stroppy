@@ -185,7 +185,8 @@ func (m *txMetrics) emit(vu *VU, metric *metric, value float64, tags *TagSet) {
 		return
 	}
 
-	PushIfNotDone(vu.Context(), vu.root.samples, Sample{Metric: metric, Tags: tags,
+	PushIfNotDone(vu.Context(), vu.root.samples, Sample{
+		Metric: metric, Tags: tags,
 		Time: time.Now(), Value: value,
 	})
 }
@@ -201,6 +202,7 @@ func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr er
 	tags := applyStepTag(m.tags, vu.stepTag)
 	if queryErr != nil {
 		m.emit(vu, m.runQueryErrRate, 1, tags)
+
 		return
 	}
 
@@ -221,6 +223,7 @@ func (m *txMetrics) recordInsertResult(vu *VU, table string, elapsed time.Durati
 	tags := applyStepTag(m.tags, vu.stepTag).With("table_name", table)
 	if insertErr != nil {
 		m.emit(vu, m.insertErrRate, 1, tags)
+
 		return
 	}
 
@@ -240,10 +243,12 @@ func (m *txMetrics) recordIteration(vu *VU, elapsed time.Duration) {
 // total wall duration, commit success rate, and query count per transaction.
 func (m *txMetrics) recordTxEnd(vu *VU, name string, elapsed time.Duration, queries int, committed bool) {
 	m.ensureRegistered(vu, root.lg)
+
 	tags := applyStepTag(m.tags, vu.stepTag)
 	if name != "" {
 		tags = tags.With("tx_name", name)
 	}
+
 	if committed {
 		m.emit(vu, m.txCommitRate, 1, tags)
 		m.emit(vu, m.txErrorRate, 0, tags)
@@ -251,6 +256,7 @@ func (m *txMetrics) recordTxEnd(vu *VU, name string, elapsed time.Duration, quer
 		m.emit(vu, m.txCommitRate, 0, tags)
 		m.emit(vu, m.txErrorRate, 1, tags)
 	}
+
 	m.emit(vu, m.txTotalDuration, elapsed.Seconds()*1000, tags)
 	m.emit(vu, m.txQueriesPerTx, float64(queries), tags)
 }
@@ -271,12 +277,14 @@ func (m *txMetrics) recordInsertProgress(vu *VU, snapshot insertprogress.Snapsho
 
 	now := time.Now()
 	if snapshot.DeltaRows > 0 {
-		PushIfNotDone(vu.Context(), vu.root.samples, Sample{Metric: progressRows, Tags: tags,
+		PushIfNotDone(vu.Context(), vu.root.samples, Sample{
+			Metric: progressRows, Tags: tags,
 			Time: now, Value: float64(snapshot.DeltaRows),
 		})
 	}
 
-	PushIfNotDone(vu.Context(), vu.root.samples, Sample{Metric: progressRPS, Tags: tags,
+	PushIfNotDone(vu.Context(), vu.root.samples, Sample{
+		Metric: progressRPS, Tags: tags,
 		Time: now, Value: snapshot.CurrentRowsPerSecond,
 	})
 }
@@ -301,7 +309,8 @@ func (m *txMetrics) recordInsert(vu *VU, table string, rows int64) {
 
 	now := time.Now()
 	tags = tags.With("table_name", table)
-	PushIfNotDone(vu.Context(), vu.root.samples, Sample{Metric: insertRows, Tags: tags,
+	PushIfNotDone(vu.Context(), vu.root.samples, Sample{
+		Metric: insertRows, Tags: tags,
 		Time: now, Value: float64(rows),
 	})
 }
@@ -328,7 +337,8 @@ func (m *txMetrics) record(vu *VU, action, name string, isolation stroppy.TxIsol
 		tags = tags.With("tx_isolation", iso)
 	}
 
-	PushIfNotDone(vu.Context(), vu.root.samples, Sample{Metric: txCount, Tags: tags,
+	PushIfNotDone(vu.Context(), vu.root.samples, Sample{
+		Metric: txCount, Tags: tags,
 		Time: now, Value: 1,
 	})
 }
@@ -443,7 +453,8 @@ func emitThroughput(
 		return total, now
 	}
 
-	PushIfNotDone(ctx, samples, Sample{Metric: metric, Tags: tags,
+	PushIfNotDone(ctx, samples, Sample{
+		Metric: metric, Tags: tags,
 		Time: now, Value: float64(delta) / elapsed.Seconds(),
 	})
 

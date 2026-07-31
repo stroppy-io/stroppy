@@ -40,10 +40,12 @@ func (*workload) Name() string { return "tpch/tx" }
 
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.driverType = b.DriverTypeName()
+
 	w.scaleFactor = bench.EnvFloat("SCALE_FACTOR", 1)
 	if w.scaleFactor <= 0 {
 		return fmt.Errorf("SCALE_FACTOR must be positive, got %v", w.scaleFactor)
 	}
+
 	w.loadWorkers = bench.EnvInt("LOAD_WORKERS", 0)
 	w.useUnlogged = bench.Env("PG_UNLOGGED", "false") == "true" && w.driverType == bench.DriverPostgres
 	w.ydbColumn = w.driverType == bench.DriverYDB && bench.Env("YDB_STORE_MODE", "column") == "column"
@@ -66,15 +68,18 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	// picodata shipdate_cutoff precomputed once.
 	w.params = make(map[string]map[string]any, len(queryNames))
 	base := queryParams(w.scaleFactor)
+
 	for _, name := range queryNames {
 		p := map[string]any{}
 		for k, v := range base[name] {
 			p[k] = v
 		}
+
 		p = withEndDates(p, w.needsEndDates)
 		if name == "q1" && w.isPicodata {
 			p["shipdate_cutoff"] = shiftDate("1998-12-01", -90, 0, 0)
 		}
+
 		w.params[name] = p
 	}
 
@@ -84,6 +89,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 				return fmt.Errorf("%s: %w", name, err)
 			}
 		}
+
 		return nil
 	}
 
@@ -91,7 +97,9 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		name string
 		fn   func() error
 	}
+
 	var steps []step
+
 	addStep := func(name string, fn func() error) { steps = append(steps, step{name, fn}) }
 
 	addStep("drop_schema", func() error { return runSection("drop_schema") })
@@ -100,26 +108,33 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		if w.ydbColumn {
 			section = "create_schema_column"
 		}
+
 		return runSection(section)
 	})
+
 	if w.useUnlogged {
 		addStep("set_unlogged", func() error { return runSection("set_unlogged") })
 	}
+
 	addStep("load_data", func() error {
 		for _, table := range TPCH_TABLES {
 			if _, err := b.InsertTpch(ctx, table, w.scaleFactor, w.loadWorkers); err != nil {
 				return err
 			}
 		}
+
 		return nil
 	})
 	addStep("create_indexes", func() error { return runSection("create_indexes") })
+
 	if w.useUnlogged {
 		addStep("set_logged", func() error { return runSection("set_logged") })
 	}
+
 	addStep("analyze", func() error { return runSection("analyze") })
 	addStep("validate_answers", func() error {
 		validateAnswers(ctx, b, w.sql, w.params, w.scaleFactor, w.driverType)
+
 		return nil
 	})
 
@@ -128,13 +143,16 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 			return err
 		}
 	}
+
 	b.StepBegin("workload")
+
 	return nil
 }
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	return b.Step("workload", func() error {
 		w.runQueries(ctx, b)
+
 		return nil
 	})
 }
@@ -143,20 +161,26 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 // recording per-query timing/error metrics. Rows are discarded (throughput pass).
 func (w *workload) runQueries(ctx context.Context, b *bench.Bench) {
 	lg := b.Logger().Sugar()
+
 	for _, name := range queryNames {
 		body, ok := w.sql.Query(name, "body")
 		if !ok {
 			lg.Infof("[tpch] %s: skipped (no body in SQL file)", name)
+
 			continue
 		}
+
 		start := time.Now()
 		_, err := b.QueryRows(ctx, body, w.params[name])
 		elapsed := time.Since(start).Milliseconds()
 		w.recordAttempt(name, float64(elapsed), err != nil)
+
 		if err != nil {
 			lg.Infof("[tpch] %s: error in %dms %v", name, elapsed, err)
+
 			continue
 		}
+
 		lg.Infof("[tpch] %s: ok in %dms", name, elapsed)
 	}
 }
@@ -166,9 +190,11 @@ func (w *workload) recordAttempt(name string, elapsedMs float64, failed bool) {
 	if qm == nil {
 		return
 	}
+
 	qm.runs.Add(1)
 	qm.duration.Add(elapsedMs)
 	qm.elapsedTotal.Add(elapsedMs)
+
 	if failed {
 		qm.errors.Add(1)
 	}
@@ -176,5 +202,6 @@ func (w *workload) recordAttempt(name string, elapsedMs float64, failed bool) {
 
 func (*workload) Teardown(_ context.Context, b *bench.Bench) error {
 	b.StepEnd("workload")
+
 	return nil
 }

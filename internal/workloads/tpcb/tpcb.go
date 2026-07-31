@@ -48,10 +48,12 @@ func (*workload) Name() string { return "tpcb/tx" }
 
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.driverType = b.DriverTypeName()
+
 	w.scale = int64(bench.EnvInt("SCALE_FACTOR", 1))
 	if w.scale < 1 {
 		w.scale = 1
 	}
+
 	w.iso = resolveIsolation(w.driverType)
 	w.sql = mustLoadSQL(w.driverType)
 
@@ -61,6 +63,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 				return fmt.Errorf("%s: %w", name, err)
 			}
 		}
+
 		return nil
 	}
 
@@ -74,12 +77,15 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 			if _, err := b.InsertSpec(ctx, branchesSpec(w.scale)); err != nil {
 				return err
 			}
+
 			if _, err := b.InsertSpec(ctx, tellersSpec(w.scale)); err != nil {
 				return err
 			}
+
 			if _, err := b.InsertSpec(ctx, accountsSpec(w.scale)); err != nil {
 				return err
 			}
+
 			return nil
 		}},
 		{"create_indexes", func() error { return runSection("create_indexes") }},
@@ -91,7 +97,9 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 			return err
 		}
 	}
+
 	b.StepBegin("workload")
+
 	return nil
 }
 
@@ -120,19 +128,24 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 				if err := tx.Exec(ctx, updateAccount, map[string]any{"aid": aid, "delta": delta}); err != nil {
 					return err
 				}
+
 				abalance, err := tx.QueryValue(ctx, getBalance, map[string]any{"aid": aid})
 				if err != nil {
 					return err
 				}
+
 				if abalance == nil {
 					return fmt.Errorf("tpc-b: account %d not found", aid)
 				}
+
 				if err := tx.Exec(ctx, updateTeller, map[string]any{"tid": tid, "delta": delta}); err != nil {
 					return err
 				}
+
 				if err := tx.Exec(ctx, updateBranch, map[string]any{"bid": bid, "delta": delta}); err != nil {
 					return err
 				}
+
 				return tx.Exec(ctx, insertHistory, map[string]any{"hid": hid, "tid": tid, "bid": bid, "aid": aid, "delta": delta})
 			})
 		})
@@ -141,6 +154,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 
 func (*workload) Teardown(ctx context.Context, b *bench.Bench) error {
 	b.StepEnd("workload")
+
 	return nil
 }
 
@@ -154,6 +168,7 @@ func resolveIsolation(dt bench.DriverTypeName) bench.TxIsolationName {
 	if v := bench.Env("TX_ISOLATION", ""); v != "" {
 		return bench.TxIsolationName(v)
 	}
+
 	switch dt {
 	case bench.DriverPicodata:
 		return bench.IsoNone
@@ -168,6 +183,7 @@ func sqlFile(dt bench.DriverTypeName) string {
 	if v := bench.Env("SQL_FILE", ""); v != "" {
 		return v
 	}
+
 	switch dt {
 	case bench.DriverMySQL:
 		return "mysql.sql"
@@ -185,6 +201,7 @@ func mustLoadSQL(dt bench.DriverTypeName) *bench.SQL {
 	if err != nil {
 		panic(err)
 	}
+
 	return s
 }
 
@@ -199,6 +216,7 @@ func (w *workload) vuState(vuid uint64) *vuState {
 	if v, ok := w.vuStates.Load(vuid); ok {
 		return v.(*vuState)
 	}
+
 	vs := &vuState{
 		aid:   rand.New(rand.NewPCG(seedOf("aid", vuid), seedOf("aid", vuid))),
 		tid:   rand.New(rand.NewPCG(seedOf("tid", vuid), seedOf("tid", vuid))),
@@ -207,6 +225,7 @@ func (w *workload) vuState(vuid uint64) *vuState {
 	}
 	vs.hid.Store(int64(vuid) * 1_000_000_000)
 	actual, _ := w.vuStates.LoadOrStore(vuid, vs)
+
 	return actual.(*vuState)
 }
 
@@ -219,11 +238,13 @@ func seedOf(slot string, vuid uint64) uint64 {
 	for _, c := range slot {
 		h = h*131 + uint32(c)
 	}
+
 	return (vuid * 0x9e3779b9) ^ uint64(h)
 }
 
 func (w *workload) retryCounter(b *bench.Bench) *bench.Metric {
 	w.retryMetricOnce.Do(func() { w.retryMetric = b.Counter("tpcb_retry_attempts") })
+
 	return w.retryMetric
 }
 
@@ -233,6 +254,7 @@ func workers() *dgproto.Parallelism {
 	if n := bench.EnvInt("LOAD_WORKERS", 0); n > 0 {
 		return &dgproto.Parallelism{Workers: int32(n)}
 	}
+
 	return nil
 }
 
@@ -301,11 +323,13 @@ func rowIndex() *dgproto.Expr {
 // binOp(div, a/b + c) builds (a DIV b) ADD c — the bid fan-out expressions.
 func binOp(op dgproto.BinOp_Op, a, b, addC *dgproto.Expr) *dgproto.Expr {
 	div := &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{Op: op, A: a, B: b}}}
+
 	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{Op: dgproto.BinOp_ADD, A: div, B: addC}}}
 }
 
 func asciiDraw(width int) *dgproto.Expr {
 	n := litInt(int64(width))
+
 	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
 		Draw: &dgproto.StreamDraw_Ascii{Ascii: &dgproto.DrawAscii{
 			MinLen: n, MaxLen: n,

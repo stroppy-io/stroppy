@@ -51,6 +51,7 @@ func resolveIsolation(dt bench.DriverTypeName) bench.TxIsolationName {
 	if v := bench.Env("TX_ISOLATION", ""); v != "" {
 		return bench.TxIsolationName(v)
 	}
+
 	switch dt {
 	case bench.DriverPicodata:
 		return bench.IsoNone
@@ -65,6 +66,7 @@ func sqlFile(dt bench.DriverTypeName) string {
 	if v := bench.Env("SQL_FILE", ""); v != "" {
 		return v
 	}
+
 	switch dt {
 	case bench.DriverMySQL:
 		return "mysql.sql"
@@ -82,5 +84,6 @@ func mustLoadSQL(dt bench.DriverTypeName) *bench.SQL {
 	if err != nil {
 		panic(err)
 	}
+
 	return s
 }

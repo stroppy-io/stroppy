@@ -35,6 +35,7 @@ func nurand(r *rand.Rand, paramA, lower, upper int, cSalt uint64) int {
 	paramC := int64(seed.SplitMix64(cSalt)) & int64(paramA)
 	aDraw := r.IntN(paramA + 1)
 	yDraw := r.IntN(upper-lower+1) + lower
+
 	return int(((int64(aDraw)|int64(yDraw))+paramC)%span) + lower
 }
 
@@ -45,7 +46,9 @@ func weightedPick(r *rand.Rand, weights []int) int {
 	for _, w := range weights {
 		total += w
 	}
+
 	threshold := r.Float64() * float64(total)
+
 	cum := 0.0
 	for i, w := range weights {
 		cum += float64(w)
@@ -53,5 +56,6 @@ func weightedPick(r *rand.Rand, weights []int) int {
 			return i
 		}
 	}
+
 	return len(weights) - 1
 }

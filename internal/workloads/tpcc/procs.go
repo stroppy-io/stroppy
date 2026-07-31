@@ -13,6 +13,7 @@ func bynameInt(b bool) int64 {
 	if b {
 		return 1
 	}
+
 	return 0
 }
 
@@ -46,12 +47,14 @@ func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, vs *vuState
 		if w.pacing {
 			sleepSeconds(thinkTime(vs.picker, thinkTimeMean[name]))
 		}
+
 		return nil
 	})
 }
 
 func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState) {
 	w.m.newOrderTotal.Add(1)
+
 	start := time.Now()
 	defer func() { w.m.newOrderDur.Add(float64(time.Since(start).Milliseconds())) }()
 
@@ -59,6 +62,7 @@ func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState
 	if forceRollback {
 		w.m.rollbackDecided.Add(1)
 	}
+
 	dID := vs.ri(vs.noDID, 1, districtsPerWarehouse)
 	cID := vs.nurand(vs.noCID, 1023, 1, customersPerDistrict, vs.noCIDSalt)
 	olCnt := vs.ri(vs.noOlCnt, 5, 15)
@@ -82,6 +86,7 @@ func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState
 
 func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState) {
 	w.m.paymentTotal.Add(1)
+
 	start := time.Now()
 	defer func() { w.m.paymentDur.Add(float64(time.Since(start).Milliseconds())) }()
 
@@ -93,16 +98,20 @@ func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState)
 	if isRemote {
 		w.m.paymentRemote.Add(1)
 	}
+
 	cWID := vs.homeWID
 	if isRemote {
 		cWID = vs.pickRemoteWh()
 	}
+
 	cDID := dID
 	if isRemote {
 		cDID = vs.ri(vs.payCDID, 1, districtsPerWarehouse)
 	}
+
 	isByName := vs.ri(vs.payByName, 1, 100) <= 60
 	cIDPick := vs.nurand(vs.payCID, 1023, 1, customersPerDistrict, vs.payCIDSalt) // always drained
+
 	cLastPick := ""
 	if isByName {
 		cLastPick = cLast(int(vs.nurand(vs.nurand255, 255, 0, 999, vs.nurand255Salt)))
@@ -125,12 +134,14 @@ func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState)
 
 func (w *workload) procOrderStatus(ctx context.Context, b *bench.Bench, vs *vuState) {
 	w.m.orderStatusTotal.Add(1)
+
 	start := time.Now()
 	defer func() { w.m.orderStatusDur.Add(float64(time.Since(start).Milliseconds())) }()
 
 	dID := vs.ri(vs.osDID, 1, districtsPerWarehouse)
 	cIDPick := vs.nurand(vs.osCID, 1023, 1, customersPerDistrict, vs.osCIDSalt)
 	isByName := vs.ri(vs.osByName, 1, 100) <= 60
+
 	cLastPick := ""
 	if isByName {
 		cLastPick = cLast(int(vs.nurand(vs.nurand255, 255, 0, 999, vs.nurand255Salt)))
@@ -140,10 +151,13 @@ func (w *workload) procOrderStatus(ctx context.Context, b *bench.Bench, vs *vuSt
 		"os_w_id": vs.homeWID, "os_d_id": dID, "os_c_id": cIDPick, "byname": bynameInt(isByName), "os_c_last": cLastPick,
 	}
 	bynameObserved := false
+
 	_ = bench.Retry0(w.retryPolicy(), func() error {
 		bynameObserved = false
+
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.TxX) error {
 			bynameObserved = isByName
+
 			return tx.Exec(ctx, w.q("workload_procs", "order_status"), args)
 		})
 	})
@@ -154,6 +168,7 @@ func (w *workload) procOrderStatus(ctx context.Context, b *bench.Bench, vs *vuSt
 
 func (w *workload) procDelivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 	w.m.deliveryTotal.Add(1)
+
 	start := time.Now()
 	defer func() { w.m.deliveryDur.Add(float64(time.Since(start).Milliseconds())) }()
 
@@ -168,6 +183,7 @@ func (w *workload) procDelivery(ctx context.Context, b *bench.Bench, vs *vuState
 
 func (w *workload) procStockLevel(ctx context.Context, b *bench.Bench, vs *vuState) {
 	w.m.stockLevelTotal.Add(1)
+
 	start := time.Now()
 	defer func() { w.m.stockLevelDur.Add(float64(time.Since(start).Milliseconds())) }()
 

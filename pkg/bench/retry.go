@@ -77,6 +77,7 @@ func Retry0(policy RetryPolicy, fn func() error) error {
 	_, err := RetryWithPolicy(policy, func() (struct{}, error) {
 		return struct{}{}, fn()
 	})
+
 	return err
 }
 

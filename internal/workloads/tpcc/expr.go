@@ -76,6 +76,7 @@ func choose(streamID uint32, branches ...branch) *dgproto.Expr {
 	for i, b := range branches {
 		bs[i] = &dgproto.ChooseBranch{Weight: b.weight, Expr: b.expr}
 	}
+
 	return &dgproto.Expr{Kind: &dgproto.Expr_Choose{Choose: &dgproto.Choose{StreamId: streamID, Branches: bs}}}
 }
 
