@@ -14,6 +14,19 @@ import (
 
 const throughputInterval = time.Second
 
+// Named numeric constants for the magic-number linter (see metrics.go, retry.go,
+// root.go, runtime.go, step.go). Kept package-local and purpose-named.
+const (
+	millisPerSecond       = 1000.0 // seconds→milliseconds conversion factor
+	sampleChannelCapacity = 4096   // buffered sample channel depth
+	samplerStopGrace      = 2 * time.Second
+	percentScale          = 100.0 // ratio→percent
+	medianP               = 0.5   // p50 percentile argument
+	p90                   = 0.9
+	p95                   = 0.95
+	p99                   = 0.99
+)
+
 type txMetrics struct {
 	mu           sync.Mutex
 	registered   atomic.Bool
@@ -206,7 +219,7 @@ func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr er
 		return
 	}
 
-	m.emit(vu, m.runQueryDuration, elapsed.Seconds()*1000, tags)
+	m.emit(vu, m.runQueryDuration, elapsed.Seconds()*millisPerSecond, tags)
 	m.emit(vu, m.runQueryErrRate, 0, tags)
 	m.emit(vu, m.runQueryCount, 1, tags)
 }
@@ -227,7 +240,7 @@ func (m *txMetrics) recordInsertResult(vu *VU, table string, elapsed time.Durati
 		return
 	}
 
-	m.emit(vu, m.insertDuration, elapsed.Seconds()*1000, tags)
+	m.emit(vu, m.insertDuration, elapsed.Seconds()*millisPerSecond, tags)
 	m.emit(vu, m.insertErrRate, 0, tags)
 }
 
@@ -235,7 +248,7 @@ func (m *txMetrics) recordInsertResult(vu *VU, table string, elapsed time.Durati
 func (m *txMetrics) recordIteration(vu *VU, elapsed time.Duration) {
 	m.ensureRegistered(vu, root.lg)
 	tags := applyStepTag(m.tags, vu.stepTag)
-	m.emit(vu, m.iterationDur, elapsed.Seconds()*1000, tags)
+	m.emit(vu, m.iterationDur, elapsed.Seconds()*millisPerSecond, tags)
 	m.emit(vu, m.iterations, 1, tags)
 }
 
@@ -257,11 +270,11 @@ func (m *txMetrics) recordTxEnd(vu *VU, name string, elapsed time.Duration, quer
 		m.emit(vu, m.txErrorRate, 1, tags)
 	}
 
-	m.emit(vu, m.txTotalDuration, elapsed.Seconds()*1000, tags)
+	m.emit(vu, m.txTotalDuration, elapsed.Seconds()*millisPerSecond, tags)
 	m.emit(vu, m.txQueriesPerTx, float64(queries), tags)
 }
 
-func (m *txMetrics) recordInsertProgress(vu *VU, snapshot insertprogress.Snapshot) {
+func (m *txMetrics) recordInsertProgress(vu *VU, snapshot *insertprogress.Snapshot) {
 	m.ensureRegistered(vu, root.lg)
 
 	progressRows, progressRPS, tags, ok := m.snapshotProgressMetrics()
@@ -384,7 +397,7 @@ func (m *txMetrics) stopSampler(sampler *throughputSampler) {
 
 	select {
 	case <-sampler.doneCh:
-	case <-time.After(2 * time.Second):
+	case <-time.After(samplerStopGrace):
 	}
 }
 
@@ -404,7 +417,7 @@ func (m *txMetrics) snapshotInsertMetrics() (*metric, *TagSet, bool) {
 	return m.insertRows, m.tags, true
 }
 
-func (m *txMetrics) snapshotProgressMetrics() (*metric, *metric, *TagSet, bool) {
+func (m *txMetrics) snapshotProgressMetrics() (rowsMetric, rpsMetric *metric, tags *TagSet, ok bool) {
 	if !m.registered.Load() {
 		return nil, nil, nil, false
 	}

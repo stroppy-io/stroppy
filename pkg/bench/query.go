@@ -40,11 +40,13 @@ func (b *Bench) QueryValue(ctx context.Context, sql string, args map[string]any)
 	defer res.Rows.Close()
 
 	if !res.Rows.Next() {
+		//nolint:nilnil // no-row sentinel: callers (validate.go, simple, tpcc) branch on `v == nil` after `err == nil`
 		return nil, nil
 	}
 
 	vals := res.Rows.Values()
 	if len(vals) == 0 {
+		//nolint:nilnil // no-row sentinel: empty row means "no value"; same caller contract as above
 		return nil, nil
 	}
 
@@ -96,10 +98,7 @@ func (b *Bench) runQuery(ctx context.Context, sql string, args map[string]any) (
 
 // InsertSpec runs a relational bulk insert.
 func (b *Bench) InsertSpec(ctx context.Context, spec *dgproto.InsertSpec) (*stats.Query, error) {
-	tracker, err := b.newInsertProgressTracker(spec)
-	if err != nil {
-		return nil, fmt.Errorf("insert %q: %w", spec.GetTable(), err)
-	}
+	tracker := b.newInsertProgressTracker(spec)
 
 	runCtx := ctx
 	if tracker.Enabled() {
@@ -130,17 +129,17 @@ func (b *Bench) InsertSpec(ctx context.Context, spec *dgproto.InsertSpec) (*stat
 
 // newInsertProgressTracker builds the periodic insert-progress tracker (on by
 // default) wired to emit progress metrics. Mirrors the engine's wrapper.
-func (b *Bench) newInsertProgressTracker(spec *dgproto.InsertSpec) (*insertprogress.Tracker, error) {
+func (b *Bench) newInsertProgressTracker(spec *dgproto.InsertSpec) *insertprogress.Tracker {
 	config := insertprogress.DefaultConfig()
 	config.Table = spec.GetTable()
 	config.Method = insertMethodName(spec.GetMethod())
 	config.Workers = int(spec.GetParallelism().GetWorkers())
 	config.Logger = b.lg.Named("insert-progress")
 	config.OnSample = func(snapshot insertprogress.Snapshot) {
-		b.root.txMetrics.recordInsertProgress(b.vu, snapshot)
+		b.root.txMetrics.recordInsertProgress(b.vu, &snapshot)
 	}
 
-	return insertprogress.NewTracker(&config), nil
+	return insertprogress.NewTracker(&config)
 }
 
 func insertMethodName(method dgproto.InsertMethod) string {
@@ -251,11 +250,13 @@ func (t *TxX) QueryValue(ctx context.Context, sql string, args map[string]any) (
 	defer res.Rows.Close()
 
 	if !res.Rows.Next() {
+		//nolint:nilnil // no-row sentinel: tpcc tx workloads branch on `v == nil` after `err == nil`
 		return nil, nil
 	}
 
 	vals := res.Rows.Values()
 	if len(vals) == 0 {
+		//nolint:nilnil // no-row sentinel: empty row means "no value"; same caller contract as above
 		return nil, nil
 	}
 
@@ -327,8 +328,6 @@ func (t *TxX) Commit(ctx context.Context) error {
 
 	if t.tx != nil {
 		if err := t.tx.Commit(ctx); err != nil {
-			committed = false
-
 			return err
 		}
 	}

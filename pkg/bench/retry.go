@@ -11,6 +11,12 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// MySQL driver error codes returned for retryable lock contention.
+const (
+	mySQLErrLockDeadlock    = 1213 // ER_LOCK_DEADLOCK
+	mySQLErrLockWaitTimeout = 1205 // ER_LOCK_WAIT_TIMEOUT
+)
+
 // IsSerializationError reports whether err is a retryable serialization/deadlock
 // failure. The rollback sentinel injected by TPC-C ("tpcc_rollback:") is never
 // retryable. Driver errors are matched by typed errors.As on the underlying
@@ -36,7 +42,7 @@ func IsSerializationError(err error) bool {
 	var myErr *mysql.MySQLError
 	if errors.As(err, &myErr) {
 		switch myErr.Number {
-		case 1213, 1205: // ER_LOCK_DEADLOCK, ER_LOCK_WAIT_TIMEOUT
+		case mySQLErrLockDeadlock, mySQLErrLockWaitTimeout:
 			return true
 		}
 	}
@@ -178,9 +184,9 @@ func TxRetryPolicy(driverType DriverTypeName, opts TxRetryPolicyOptions) RetryPo
 }
 
 // backoffSeconds is exponential with a +-20% jitter, capped at maxSeconds.
-func backoffSeconds(attempt int, base, max float64) float64 {
+func backoffSeconds(attempt int, base, maxSeconds float64) float64 {
 	retryIndex := max0(attempt - 1)
-	capped := min(max, base*pow2(retryIndex))
+	capped := min(maxSeconds, base*pow2(retryIndex))
 
 	return capped + rand.Float64()*capped*0.2 //nolint:gosec // G404: retry backoff jitter RNG, not security-sensitive
 }

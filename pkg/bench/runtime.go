@@ -105,7 +105,7 @@ func Run(
 
 	sum.start(ctx)
 	defer sum.print()
-	defer root.Teardown()
+	defer func() { _ = root.Teardown() }()
 
 	cfg := drivers[0]
 	if cfg == nil {
@@ -378,7 +378,7 @@ func (s *summary) print() {
 		case Rate:
 			pct := 0.0
 			if sk.count > 0 {
-				pct = 100 * sk.sum / float64(sk.count)
+				pct = percentScale * sk.sum / float64(sk.count)
 			}
 
 			fmt.Fprintf(os.Stderr, "  %-40s %.2f%%  %d out of %d\n", n, pct, uint64(sk.sum), sk.count)
@@ -407,5 +407,5 @@ func percentiles(vals []float64) string {
 
 	pct := func(p float64) float64 { return s[int(float64(len(s)-1)*p)] }
 
-	return fmt.Sprintf("p(50)=%.3f p(90)=%.3f p(95)=%.3f p(99)=%.3f", pct(0.5), pct(0.9), pct(0.95), pct(0.99))
+	return fmt.Sprintf("p(50)=%.3f p(90)=%.3f p(95)=%.3f p(99)=%.3f", pct(medianP), pct(p90), pct(p95), pct(p99))
 }

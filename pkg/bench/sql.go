@@ -101,7 +101,7 @@ func parseQueries(lines []string) []sqlQuery {
 	hasName := false
 	name := ""
 
-	var body []string
+	body := make([]string, 0, len(lines))
 
 	flush := func() {
 		if hasName {
@@ -117,7 +117,7 @@ func parseQueries(lines []string) []sqlQuery {
 
 			name = strings.TrimSpace(strings.TrimPrefix(line, queryPrefix))
 			hasName = true
-			body = nil
+			body = body[:0]
 		case strings.HasPrefix(t, commentPrefix):
 			// skip full-line comments
 		default:

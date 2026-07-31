@@ -8,7 +8,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
@@ -20,7 +19,7 @@ var root *RootState
 // a no-op at the floor.
 type RootState struct {
 	lg  *zap.Logger
-	ctx context.Context
+	ctx context.Context //nolint:containedctx // engine lifecycle ctx stored for async teardown/cancellation
 
 	// dialer backs shared and per-VU drivers.
 	dialer *net.Dialer
@@ -34,9 +33,6 @@ type RootState struct {
 	sharedMu    sync.Mutex
 	sharedSlots map[uint64]*sharedDriverSlot
 
-	globalOnceMu    sync.Mutex
-	globalOnceSlots map[string]*globalOnceSlot
-
 	// env is the script env (-e overrides, config) passed to Run; consulted by
 	// Env after the real process environment (real env takes precedence).
 	env map[string]string
@@ -46,68 +42,21 @@ type RootState struct {
 }
 
 type sharedDriverSlot struct {
-	once sync.Once
-	drv  driver.Driver
-}
-
-type globalOnceSlot struct {
-	once sync.Once
-	err  error
+	drv driver.Driver
 }
 
 func newRootState(lg *zap.Logger, ctx context.Context, env map[string]string) *RootState {
 	return &RootState{
-		lg:              lg,
-		ctx:             ctx,
-		dialer:          &net.Dialer{},
-		registry:        NewRegistry(),
-		samples:         make(chan SampleContainer, 4096),
-		txMetrics:       &txMetrics{},
-		sharedSlots:     make(map[uint64]*sharedDriverSlot),
-		globalOnceSlots: make(map[string]*globalOnceSlot),
-		env:             env,
-		stepFilter:      newStepFilter(),
+		lg:          lg,
+		ctx:         ctx,
+		dialer:      &net.Dialer{},
+		registry:    NewRegistry(),
+		samples:     make(chan SampleContainer, sampleChannelCapacity),
+		txMetrics:   &txMetrics{},
+		sharedSlots: make(map[uint64]*sharedDriverSlot),
+		env:         env,
+		stepFilter:  newStepFilter(),
 	}
-}
-
-func (r *RootState) globalOnceSlot(name string) *globalOnceSlot {
-	r.globalOnceMu.Lock()
-	defer r.globalOnceMu.Unlock()
-
-	slot, ok := r.globalOnceSlots[name]
-	if !ok {
-		slot = &globalOnceSlot{}
-		r.globalOnceSlots[name] = slot
-	}
-
-	return slot
-}
-
-// initSharedDriver lazily creates a shared driver on the first VU to call it.
-func (r *RootState) initSharedDriver(index uint64, vu *VU, cfg *stroppy.DriverConfig) driver.Driver {
-	r.sharedMu.Lock()
-
-	slot, ok := r.sharedSlots[index]
-	if !ok {
-		slot = &sharedDriverSlot{}
-		r.sharedSlots[index] = slot
-	}
-	r.sharedMu.Unlock()
-
-	slot.once.Do(func() {
-		drv, err := driver.Dispatch(vu.Context(), driver.Options{
-			Config:   cfg,
-			Logger:   r.lg,
-			DialFunc: r.dialer.DialContext,
-		})
-		if err != nil {
-			r.lg.Fatal("can't initialize shared driver", zap.Error(err))
-		}
-
-		slot.drv = drv
-	})
-
-	return slot.drv
 }
 
 // NotifyStep is a no-op at the floor (cloud notification deferred).

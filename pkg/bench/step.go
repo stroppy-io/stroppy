@@ -100,19 +100,21 @@ func stepEnd(b *Bench, name string) {
 const (
 	statusRunning   int32 = 1
 	statusCompleted int32 = 2
+
+	secondsPerMinute = 60
 )
 
 func fmtStepDuration(d time.Duration) string {
 	switch {
 	case d < time.Millisecond:
 		return "0ms"
-	case d < time.Second:
-		return d.Truncate(time.Millisecond).String()
 	case d < time.Minute:
-		return (d / time.Millisecond * time.Millisecond).String()
+		// Truncate to millisecond precision for display; Truncate avoids the
+		// mul-after-div precision loss that durationcheck flags.
+		return d.Truncate(time.Millisecond).String()
 	default:
 		m := int(d.Minutes())
-		s := int(d.Seconds()) - m*60
+		s := int(d.Seconds()) - m*secondsPerMinute
 
 		return fmt.Sprintf("%dm%02ds", m, s)
 	}

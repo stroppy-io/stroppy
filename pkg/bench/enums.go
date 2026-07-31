@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	errUnknownDriverType    = errors.New("unknown driver type")
-	errUnknownErrorMode     = errors.New("unknown error mode")
-	errUnknownTxIsolation   = errors.New("unknown tx isolation")
-	errUnknownInsertMethod  = errors.New("unknown insert method")
+	errUnknownDriverType   = errors.New("unknown driver type")
+	errUnknownErrorMode    = errors.New("unknown error mode")
+	errUnknownTxIsolation  = errors.New("unknown tx isolation")
+	errUnknownInsertMethod = errors.New("unknown insert method")
 )
 
 // String-typed enums a Go workload authors with; resolved to the proto enums the
