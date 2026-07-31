@@ -239,7 +239,11 @@ func compareQuery(query string, got [][]string, want answerBlock) compareResult 
 // SETs do not persist across calls, and a single transaction would let one query's
 // error abort every following query (25P02 "transaction is aborted"). Per-query tx
 // keeps errors isolated and the planner setup bound to the connection that runs the query.
-func validateAnswers(ctx context.Context, b *bench.Bench, schema, queries *bench.SQL, names []string, scaleFactor float64, dt bench.DriverTypeName) {
+func validateAnswers(
+	ctx context.Context, b *bench.Bench,
+	schema, queries *bench.SQL, names []string,
+	scaleFactor float64, dt bench.DriverTypeName,
+) {
 	lg := b.Logger().Sugar()
 	if dt != bench.DriverPostgres && dt != bench.DriverMySQL {
 		lg.Infof("[tpcds_validate] skipped: answers_sf1 validates postgres/mysql only; driverType=%s", dt)
@@ -302,7 +306,10 @@ func validateAnswers(ctx context.Context, b *bench.Bench, schema, queries *bench
 			return qerr
 		})
 		if txErr != nil {
-			results = append(results, compareResult{query: name, status: "error", wantRows: len(want.Rows), errMsg: txErr.Error()})
+			results = append(results, compareResult{
+				query: name, status: "error",
+				wantRows: len(want.Rows), errMsg: txErr.Error(),
+			})
 
 			continue
 		}
@@ -344,6 +351,9 @@ func logSummary(b *bench.Bench, results []compareResult) {
 		}
 	}
 
-	lines = append(lines, fmt.Sprintf("  total=%d  ok=%d  diff=%d  skipped=%d  error=%d", len(results), ok, mismatch, skipped, errN))
+	lines = append(lines, fmt.Sprintf(
+		"  total=%d  ok=%d  diff=%d  skipped=%d  error=%d",
+		len(results), ok, mismatch, skipped, errN),
+	)
 	b.Logger().Sugar().Info(strings.Join(lines, "\n"))
 }

@@ -40,7 +40,10 @@ func tpccOriginalOr(minLen, maxLen int64) *dgproto.Expr {
 
 	sideMin := (minLen - int64(len(marker)) + 1) / 2 // ceil((minLen-8)/2) = 9 at defaults
 	sideMax := (maxLen - int64(len(marker))) / 2     // floor((maxLen-8)/2) = 21 at defaults
-	injected := concat(concat(asciiRange(sideMin, sideMax, alphaEn), litStr(marker)), asciiRange(sideMin, sideMax, alphaEn))
+	injected := concat(
+		concat(asciiRange(sideMin, sideMax, alphaEn), litStr(marker)),
+		asciiRange(sideMin, sideMax, alphaEn),
+	)
 
 	return choose(1, branch{1, injected}, branch{9, asciiRange(minLen, maxLen, alphaEn)})
 }
@@ -92,7 +95,10 @@ func customerSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
 	)
 	attrs := []*dgproto.Attr{
 		{Name: "c_id", Expr: add(mod(rowIndex(), litInt(customersPerDistrict)), litInt(1))},
-		{Name: "c_d_id", Expr: add(mod(div(rowIndex(), litInt(customersPerDistrict)), litInt(districtsPerWarehouse)), litInt(1))},
+		{Name: "c_d_id", Expr: add(
+			mod(div(rowIndex(), litInt(customersPerDistrict)), litInt(districtsPerWarehouse)),
+			litInt(1),
+		)},
 		{Name: "c_w_id", Expr: add(div(rowIndex(), litInt(customersPerWh)), litInt(warehouseStart))},
 		{Name: "c_first", Expr: asciiRange(8, 16, alphaEn)},
 		{Name: "c_middle", Expr: litStr("OE")},
@@ -174,14 +180,20 @@ func stockSpec(scale, warehouseStart int64) *dgproto.InsertSpec {
 func ordersSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
 	districtKey := add(mul(col("o_w_id"), litInt(100)), col("o_d_id"))
 	permuteSeed := add(districtKey, litInt(int64(ordersPermuteSalt)))
-	oCId := add(call("std.permuteIndex", permuteSeed, sub(col("o_id"), litInt(1)), litInt(customersPerDistrict)), litInt(1))
+	oCId := add(
+		call("std.permuteIndex", permuteSeed, sub(col("o_id"), litInt(1)), litInt(customersPerDistrict)),
+		litInt(1),
+	)
 	oCarrierId := ifExpr(gt(col("o_id"), litInt(ordersDelivered)), litNull(), intUniform(1, 10))
 
 	return spec("orders", seedOrders, scale*customersPerWh, []string{
 		"o_id", "o_d_id", "o_w_id", "o_c_id", "o_entry_d", "o_carrier_id", "o_ol_cnt", "o_all_local",
 	}, []*dgproto.Attr{
 		{Name: "o_id", Expr: add(mod(rowIndex(), litInt(customersPerDistrict)), litInt(1))},
-		{Name: "o_d_id", Expr: add(mod(div(rowIndex(), litInt(customersPerDistrict)), litInt(districtsPerWarehouse)), litInt(1))},
+		{Name: "o_d_id", Expr: add(
+			mod(div(rowIndex(), litInt(customersPerDistrict)), litInt(districtsPerWarehouse)),
+			litInt(1),
+		)},
 		{Name: "o_w_id", Expr: add(div(rowIndex(), litInt(customersPerWh)), litInt(warehouseStart))},
 		{Name: "o_c_id", Expr: oCId},
 		{Name: "o_entry_d", Expr: daysToDate(loadDays)},
@@ -220,7 +232,10 @@ func newOrderSpec(scale, warehouseStart int64) *dgproto.InsertSpec {
 
 	return spec("new_order", seedNewOrder, scale*perWh, []string{"no_o_id", "no_d_id", "no_w_id"}, []*dgproto.Attr{
 		{Name: "no_o_id", Expr: add(mod(rowIndex(), litInt(ordersUndelivered)), litInt(ordersDelivered+1))},
-		{Name: "no_d_id", Expr: add(mod(div(rowIndex(), litInt(ordersUndelivered)), litInt(districtsPerWarehouse)), litInt(1))},
+		{Name: "no_d_id", Expr: add(
+			mod(div(rowIndex(), litInt(ordersUndelivered)), litInt(districtsPerWarehouse)),
+			litInt(1),
+		)},
 		{Name: "no_w_id", Expr: add(div(rowIndex(), litInt(perWh)), litInt(warehouseStart))},
 	})
 }

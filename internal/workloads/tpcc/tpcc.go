@@ -339,7 +339,8 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) {
 			return err
 		}
 
-		if err := w.newOrderBody(ctx, tx, wID, dID, cID, olCnt, allLocal, lineIID, lineQty, lineSupply, forceRollback); err != nil {
+		if err := w.newOrderBody(ctx, tx, wID, dID, cID, olCnt, allLocal,
+			lineIID, lineQty, lineSupply, forceRollback); err != nil {
 			_ = tx.Rollback(ctx)
 
 			if isRollbackSentinel(err) {
@@ -354,7 +355,9 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) {
 }
 
 func (w *workload) newOrderBody(ctx context.Context, tx *bench.TxX, wID, dID, cID, olCnt, allLocal int64, lineIID, lineQty, lineSupply []int64, forceRollback bool) error {
-	if _, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_customer"), map[string]any{"c_id": cID, "d_id": dID, "w_id": wID}); err != nil {
+	if _, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_customer"), map[string]any{
+		"c_id": cID, "d_id": dID, "w_id": wID,
+	}); err != nil {
 		return err
 	}
 
@@ -362,7 +365,9 @@ func (w *workload) newOrderBody(ctx context.Context, tx *bench.TxX, wID, dID, cI
 		return err
 	}
 
-	distRow, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_district"), map[string]any{"d_id": dID, "w_id": wID})
+	distRow, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_district"), map[string]any{
+		"d_id": dID, "w_id": wID,
+	})
 	if err != nil {
 		return err
 	}
@@ -373,15 +378,22 @@ func (w *workload) newOrderBody(ctx context.Context, tx *bench.TxX, wID, dID, cI
 
 	oID := toInt64(distRow[0])
 
-	if err := tx.Exec(ctx, w.q("workload_tx_new_order", "update_district"), map[string]any{"d_id": dID, "w_id": wID}); err != nil {
+	if err := tx.Exec(ctx, w.q("workload_tx_new_order", "update_district"), map[string]any{
+		"d_id": dID, "w_id": wID,
+	}); err != nil {
 		return err
 	}
 
-	if err := tx.Exec(ctx, w.q("workload_tx_new_order", "insert_order"), map[string]any{"o_id": oID, "d_id": dID, "w_id": wID, "c_id": cID, "ol_cnt": olCnt, "all_local": allLocal}); err != nil {
+	if err := tx.Exec(ctx, w.q("workload_tx_new_order", "insert_order"), map[string]any{
+		"o_id": oID, "d_id": dID, "w_id": wID, "c_id": cID,
+		"ol_cnt": olCnt, "all_local": allLocal,
+	}); err != nil {
 		return err
 	}
 
-	if err := tx.Exec(ctx, w.q("workload_tx_new_order", "insert_new_order"), map[string]any{"o_id": oID, "d_id": dID, "w_id": wID}); err != nil {
+	if err := tx.Exec(ctx, w.q("workload_tx_new_order", "insert_new_order"), map[string]any{
+		"o_id": oID, "d_id": dID, "w_id": wID,
+	}); err != nil {
 		return err
 	}
 
@@ -478,12 +490,19 @@ func (w *workload) newOrderBody(ctx context.Context, tx *bench.TxX, wID, dID, cI
 			remoteCnt = 1
 		}
 
-		if err := tx.Exec(ctx, w.q("workload_tx_new_order", "update_stock"), map[string]any{"quantity": newQuantity, "ol_quantity": olQuantity, "remote_cnt": remoteCnt, "i_id": iid, "w_id": supplyWID}); err != nil {
+		if err := tx.Exec(ctx, w.q("workload_tx_new_order", "update_stock"), map[string]any{
+			"quantity": newQuantity, "ol_quantity": olQuantity,
+			"remote_cnt": remoteCnt, "i_id": iid, "w_id": supplyWID,
+		}); err != nil {
 			return err
 		}
 
 		amount := math.Round(float64(olQuantity)*iPrice*100) / 100
-		if err := tx.Exec(ctx, w.q("workload_tx_new_order", "insert_order_line"), map[string]any{"o_id": oID, "d_id": dID, "w_id": wID, "ol_number": olNumber, "i_id": iid, "supply_w_id": supplyWID, "quantity": olQuantity, "amount": amount, "dist_info": distInfo}); err != nil {
+		if err := tx.Exec(ctx, w.q("workload_tx_new_order", "insert_order_line"), map[string]any{
+			"o_id": oID, "d_id": dID, "w_id": wID, "ol_number": olNumber,
+			"i_id": iid, "supply_w_id": supplyWID, "quantity": olQuantity,
+			"amount": amount, "dist_info": distInfo,
+		}); err != nil {
 			return err
 		}
 	}
@@ -493,7 +512,11 @@ func (w *workload) newOrderBody(ctx context.Context, tx *bench.TxX, wID, dID, cI
 
 // batchRead issues a get_items_batch / get_stocks_batch query whose {item_ids}
 // placeholder is either client-interpolated (pg/mysql/pico) or bound as a list (ydb).
-func (w *workload) batchRead(ctx context.Context, tx *bench.TxX, section, query, placeholder string, wID int64, ids []int64, isItem bool) ([][]any, error) {
+func (w *workload) batchRead(
+	ctx context.Context, tx *bench.TxX,
+	section, query, placeholder string,
+	wID int64, ids []int64, isItem bool,
+) ([][]any, error) {
 	tmpl := w.q(section, query)
 	if w.isYdb {
 		args := map[string]any{"item_ids": idsToIntAny(ids)}
@@ -572,7 +595,9 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 			)
 
 			if isByName {
-				cnt, err := tx.QueryValue(ctx, w.q("workload_tx_payment", "count_customers_by_name"), map[string]any{"w_id": cWID, "d_id": cDID, "c_last": cLastPick})
+				cnt, err := tx.QueryValue(ctx, w.q("workload_tx_payment", "count_customers_by_name"), map[string]any{
+					"w_id": cWID, "d_id": cDID, "c_last": cLastPick,
+				})
 				if err != nil {
 					return err
 				}
@@ -599,7 +624,9 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 			} else {
 				cID = cIDPick
 
-				custRow, err := tx.QueryRow(ctx, w.q("workload_tx_payment", "get_customer_by_id"), map[string]any{"w_id": cWID, "d_id": cDID, "c_id": cID})
+				custRow, err := tx.QueryRow(ctx, w.q("workload_tx_payment", "get_customer_by_id"), map[string]any{
+					"w_id": cWID, "d_id": cDID, "c_id": cID,
+				})
 				if err != nil {
 					return err
 				}
@@ -618,13 +645,18 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 					cDataNew = cDataNew[:500]
 				}
 
-				if err := tx.Exec(ctx, w.q("workload_tx_payment", "update_customer_bc"), map[string]any{"w_id": cWID, "d_id": cDID, "c_id": cID, "amount": amount, "c_data_new": cDataNew}); err != nil {
+				if err := tx.Exec(ctx, w.q("workload_tx_payment", "update_customer_bc"), map[string]any{
+					"w_id": cWID, "d_id": cDID, "c_id": cID,
+					"amount": amount, "c_data_new": cDataNew,
+				}); err != nil {
 					return err
 				}
 
 				wasBC = true
 			} else {
-				if err := tx.Exec(ctx, w.q("workload_tx_payment", "update_customer"), map[string]any{"w_id": cWID, "d_id": cDID, "c_id": cID, "amount": amount}); err != nil {
+				if err := tx.Exec(ctx, w.q("workload_tx_payment", "update_customer"), map[string]any{
+				"w_id": cWID, "d_id": cDID, "c_id": cID, "amount": amount,
+			}); err != nil {
 					return err
 				}
 			}
@@ -638,7 +670,10 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 				hDataFull = hData
 			}
 
-			return tx.Exec(ctx, w.q("workload_tx_payment", "insert_history"), map[string]any{"h_id": hID, "h_c_id": cID, "h_c_d_id": cDID, "h_c_w_id": cWID, "h_d_id": dID, "h_w_id": wID, "h_amount": amount, "h_data": hDataFull})
+			return tx.Exec(ctx, w.q("workload_tx_payment", "insert_history"), map[string]any{
+				"h_id": hID, "h_c_id": cID, "h_c_d_id": cDID, "h_c_w_id": cWID,
+				"h_d_id": dID, "h_w_id": wID, "h_amount": amount, "h_data": hDataFull,
+			})
 		})
 	})
 
@@ -651,9 +686,13 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 	}
 }
 
-func (w *workload) paymentUpdateWarehouse(ctx context.Context, tx *bench.TxX, wID int64, amount float64) (string, error) {
+func (w *workload) paymentUpdateWarehouse(
+	ctx context.Context, tx *bench.TxX, wID int64, amount float64,
+) (string, error) {
 	if w.hasReturning {
-		row, err := tx.QueryRow(ctx, w.q("workload_tx_payment", "update_get_warehouse"), map[string]any{"w_id": wID, "amount": amount})
+		row, err := tx.QueryRow(ctx, w.q("workload_tx_payment", "update_get_warehouse"), map[string]any{
+			"w_id": wID, "amount": amount,
+		})
 		if err != nil {
 			return "", err
 		}
@@ -665,7 +704,9 @@ func (w *workload) paymentUpdateWarehouse(ctx context.Context, tx *bench.TxX, wI
 		return toStr(row[0]), nil
 	}
 
-	if err := tx.Exec(ctx, w.q("workload_tx_payment", "update_warehouse"), map[string]any{"w_id": wID, "amount": amount}); err != nil {
+	if err := tx.Exec(ctx, w.q("workload_tx_payment", "update_warehouse"), map[string]any{
+		"w_id": wID, "amount": amount,
+	}); err != nil {
 		return "", err
 	}
 
@@ -681,9 +722,13 @@ func (w *workload) paymentUpdateWarehouse(ctx context.Context, tx *bench.TxX, wI
 	return toStr(row[0]), nil
 }
 
-func (w *workload) paymentUpdateDistrict(ctx context.Context, tx *bench.TxX, wID, dID int64, amount float64) (string, error) {
+func (w *workload) paymentUpdateDistrict(
+	ctx context.Context, tx *bench.TxX, wID, dID int64, amount float64,
+) (string, error) {
 	if w.hasReturning {
-		row, err := tx.QueryRow(ctx, w.q("workload_tx_payment", "update_get_district"), map[string]any{"w_id": wID, "d_id": dID, "amount": amount})
+		row, err := tx.QueryRow(ctx, w.q("workload_tx_payment", "update_get_district"), map[string]any{
+			"w_id": wID, "d_id": dID, "amount": amount,
+		})
 		if err != nil {
 			return "", err
 		}
@@ -695,7 +740,9 @@ func (w *workload) paymentUpdateDistrict(ctx context.Context, tx *bench.TxX, wID
 		return toStr(row[0]), nil
 	}
 
-	if err := tx.Exec(ctx, w.q("workload_tx_payment", "update_district"), map[string]any{"w_id": wID, "d_id": dID, "amount": amount}); err != nil {
+	if err := tx.Exec(ctx, w.q("workload_tx_payment", "update_district"), map[string]any{
+		"w_id": wID, "d_id": dID, "amount": amount,
+	}); err != nil {
 		return "", err
 	}
 
@@ -713,9 +760,14 @@ func (w *workload) paymentUpdateDistrict(ctx context.Context, tx *bench.TxX, wID
 
 // customerByName resolves the median customer by c_last. Picodata has no OFFSET, so
 // it fetches all rows and picks the median client-side; other drivers use :offset.
-func (w *workload) customerByName(ctx context.Context, tx *bench.TxX, section string, wID, dID int64, cLast string, offset int64) ([]any, error) {
+func (w *workload) customerByName(
+	ctx context.Context, tx *bench.TxX, section string,
+	wID, dID int64, cLast string, offset int64,
+) ([]any, error) {
 	if w.isPicodata {
-		rows, err := tx.QueryRows(ctx, w.q(section, "get_customer_by_name"), map[string]any{"w_id": wID, "d_id": dID, "c_last": cLast})
+		rows, err := tx.QueryRows(ctx, w.q(section, "get_customer_by_name"), map[string]any{
+			"w_id": wID, "d_id": dID, "c_last": cLast,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -727,7 +779,9 @@ func (w *workload) customerByName(ctx context.Context, tx *bench.TxX, section st
 		return rows[offset], nil
 	}
 
-	return tx.QueryRow(ctx, w.q(section, "get_customer_by_name"), map[string]any{"w_id": wID, "d_id": dID, "c_last": cLast, "offset": offset})
+	return tx.QueryRow(ctx, w.q(section, "get_customer_by_name"), map[string]any{
+		"w_id": wID, "d_id": dID, "c_last": cLast, "offset": offset,
+	})
 }
 
 // --- order_status (read-only) ---
@@ -756,7 +810,9 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 			var cID int64
 
 			if isByName {
-				cnt, err := tx.QueryValue(ctx, w.q("workload_tx_order_status", "count_customers_by_name"), map[string]any{"w_id": wID, "d_id": dID, "c_last": cLastPick})
+				cnt, err := tx.QueryValue(ctx, w.q("workload_tx_order_status", "count_customers_by_name"), map[string]any{
+					"w_id": wID, "d_id": dID, "c_last": cLastPick,
+				})
 				if err != nil {
 					return err
 				}
@@ -781,7 +837,9 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 			} else {
 				cID = cIDPick
 
-				custRow, err := tx.QueryRow(ctx, w.q("workload_tx_order_status", "get_customer_by_id"), map[string]any{"c_id": cID, "d_id": dID, "w_id": wID})
+				custRow, err := tx.QueryRow(ctx, w.q("workload_tx_order_status", "get_customer_by_id"), map[string]any{
+					"c_id": cID, "d_id": dID, "w_id": wID,
+				})
 				if err != nil {
 					return err
 				}
@@ -791,7 +849,9 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 				}
 			}
 
-			lastRow, err := tx.QueryRow(ctx, w.q("workload_tx_order_status", "get_last_order"), map[string]any{"d_id": dID, "w_id": wID, "c_id": cID})
+			lastRow, err := tx.QueryRow(ctx, w.q("workload_tx_order_status", "get_last_order"), map[string]any{
+				"d_id": dID, "w_id": wID, "c_id": cID,
+			})
 			if err != nil {
 				return err
 			}
@@ -801,7 +861,9 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 			}
 
 			oID := toInt64(lastRow[0])
-			_, _ = tx.QueryRows(ctx, w.q("workload_tx_order_status", "get_order_lines"), map[string]any{"o_id": oID, "d_id": dID, "w_id": wID})
+			_, _ = tx.QueryRows(ctx, w.q("workload_tx_order_status", "get_order_lines"), map[string]any{
+				"o_id": oID, "d_id": dID, "w_id": wID,
+			})
 
 			return nil
 		})
@@ -826,7 +888,9 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 	_ = bench.Retry0(w.retryPolicy(), func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.TxX) error {
 			for dID := int64(1); dID <= districtsPerWarehouse; dID++ {
-				minRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_min_new_order"), map[string]any{"d_id": dID, "w_id": wID})
+				minRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_min_new_order"), map[string]any{
+					"d_id": dID, "w_id": wID,
+				})
 				if err != nil {
 					return err
 				}
@@ -836,11 +900,15 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 				}
 
 				oID := toInt64(minRow[0])
-				if err := tx.Exec(ctx, w.q("workload_tx_delivery", "delete_new_order"), map[string]any{"o_id": oID, "d_id": dID, "w_id": wID}); err != nil {
+				if err := tx.Exec(ctx, w.q("workload_tx_delivery", "delete_new_order"), map[string]any{
+					"o_id": oID, "d_id": dID, "w_id": wID,
+				}); err != nil {
 					return err
 				}
 
-				orderRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_order"), map[string]any{"o_id": oID, "d_id": dID, "w_id": wID})
+				orderRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_order"), map[string]any{
+					"o_id": oID, "d_id": dID, "w_id": wID,
+				})
 				if err != nil {
 					return err
 				}
@@ -851,15 +919,21 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 
 				cID := toInt64(orderRow[0])
 
-				if err := tx.Exec(ctx, w.q("workload_tx_delivery", "update_order"), map[string]any{"carrier_id": carrierID, "o_id": oID, "d_id": dID, "w_id": wID}); err != nil {
+				if err := tx.Exec(ctx, w.q("workload_tx_delivery", "update_order"), map[string]any{
+					"carrier_id": carrierID, "o_id": oID, "d_id": dID, "w_id": wID,
+				}); err != nil {
 					return err
 				}
 
-				if err := tx.Exec(ctx, w.q("workload_tx_delivery", "update_order_line"), map[string]any{"o_id": oID, "d_id": dID, "w_id": wID}); err != nil {
+				if err := tx.Exec(ctx, w.q("workload_tx_delivery", "update_order_line"), map[string]any{
+					"o_id": oID, "d_id": dID, "w_id": wID,
+				}); err != nil {
 					return err
 				}
 
-				sumRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_order_line_amount"), map[string]any{"o_id": oID, "d_id": dID, "w_id": wID})
+				sumRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_order_line_amount"), map[string]any{
+					"o_id": oID, "d_id": dID, "w_id": wID,
+				})
 				if err != nil {
 					return err
 				}
@@ -869,7 +943,9 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 					olTotal = toInt64(sumRow[0])
 				}
 
-				if err := tx.Exec(ctx, w.q("workload_tx_delivery", "update_customer"), map[string]any{"amount": olTotal, "c_id": cID, "d_id": dID, "w_id": wID}); err != nil {
+				if err := tx.Exec(ctx, w.q("workload_tx_delivery", "update_customer"), map[string]any{
+					"amount": olTotal, "c_id": cID, "d_id": dID, "w_id": wID,
+				}); err != nil {
 					return err
 				}
 			}
@@ -893,7 +969,9 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 
 	_ = bench.Retry0(w.retryPolicy(), func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"}, func(tx *bench.TxX) error {
-			nextOIDv, err := tx.QueryValue(ctx, w.q("workload_tx_stock_level", "get_district"), map[string]any{"w_id": wID, "d_id": dID})
+			nextOIDv, err := tx.QueryValue(ctx, w.q("workload_tx_stock_level", "get_district"), map[string]any{
+				"w_id": wID, "d_id": dID,
+			})
 			if err != nil {
 				return err
 			}
@@ -904,7 +982,10 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 
 			nextOID := toInt64(nextOIDv)
 
-			olRows, err := tx.QueryRows(ctx, w.q("workload_tx_stock_level", "get_window_items"), map[string]any{"w_id": wID, "d_id": dID, "min_o_id": nextOID - 20, "next_o_id": nextOID})
+			olRows, err := tx.QueryRows(ctx, w.q("workload_tx_stock_level", "get_window_items"), map[string]any{
+				"w_id": wID, "d_id": dID,
+				"min_o_id": nextOID - 20, "next_o_id": nextOID,
+			})
 			if err != nil {
 				return err
 			}

@@ -250,7 +250,9 @@ func runGoWorkload(
 			if ps, ok := envOverrides["POOL_SIZE"]; ok {
 				if n, err := strconv.Atoi(ps); err == nil && n > 0 {
 					nc := int32(n)
-					dc.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: &stroppy.DriverConfig_PostgresConfig{MaxConns: &nc, MinConns: &nc}}
+					dc.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: &stroppy.DriverConfig_PostgresConfig{
+						MaxConns: &nc, MinConns: &nc,
+					}}
 				}
 			}
 		}

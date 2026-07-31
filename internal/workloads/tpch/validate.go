@@ -177,7 +177,10 @@ func compareQuery(query string, gotRows [][]any, want answerBlock) compareResult
 // validateAnswers runs all 22 queries against the SF=1 reference answers and logs a
 // summary. No-op unless SF=1 and postgres (the only driver the answers were generated
 // against). Params are passed raw (no withEndDates): postgres does date math server-side.
-func validateAnswers(ctx context.Context, b *bench.Bench, sql *bench.SQL, params map[string]map[string]any, scaleFactor float64, dt bench.DriverTypeName) {
+func validateAnswers(
+	ctx context.Context, b *bench.Bench, sql *bench.SQL,
+	params map[string]map[string]any, scaleFactor float64, dt bench.DriverTypeName,
+) {
 	lg := b.Logger().Sugar()
 	if math.Abs(scaleFactor-1) > 1e-9 {
 		lg.Info("[tpch_validate] skipped: answers_sf1 is SF=1 only")
@@ -218,7 +221,10 @@ func validateAnswers(ctx context.Context, b *bench.Bench, sql *bench.SQL, params
 
 		rows, qerr := b.QueryRows(ctx, body, params[name])
 		if qerr != nil {
-			results = append(results, compareResult{query: name, status: "error", wantRows: len(want.Rows), errMsg: qerr.Error()})
+			results = append(results, compareResult{
+				query: name, status: "error",
+				wantRows: len(want.Rows), errMsg: qerr.Error(),
+			})
 
 			continue
 		}
@@ -260,6 +266,9 @@ func logSummary(b *bench.Bench, results []compareResult) {
 		}
 	}
 
-	lines = append(lines, fmt.Sprintf("  total=%d  ok=%d  diff=%d  skipped=%d  error=%d", len(results), ok, mismatch, skipped, errN))
+	lines = append(lines, fmt.Sprintf(
+		"  total=%d  ok=%d  diff=%d  skipped=%d  error=%d",
+		len(results), ok, mismatch, skipped, errN),
+	)
 	b.Logger().Sugar().Info(strings.Join(lines, "\n"))
 }

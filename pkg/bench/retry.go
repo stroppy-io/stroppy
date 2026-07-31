@@ -47,7 +47,12 @@ func IsSerializationError(err error) bool {
 // Retry runs fn up to maxAttempts times, retrying while isRetryable returns true.
 // No backoff: serialization retries are immediate by design. onRetry fires once
 // per retry, before re-invoking fn, with the upcoming (2-based) attempt number.
-func Retry[T any](maxAttempts int, isRetryable func(error) bool, fn func() (T, error), onRetry ...func(int, error)) (T, error) {
+func Retry[T any](
+	maxAttempts int,
+	isRetryable func(error) bool,
+	fn func() (T, error),
+	onRetry ...func(int, error),
+) (T, error) {
 	var (
 		lastErr error
 		zero    T

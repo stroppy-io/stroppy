@@ -90,7 +90,9 @@ func intUniform(min, max int64) *dgproto.Expr {
 
 func decimal(min, max float64, scale uint32) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
-		Draw: &dgproto.StreamDraw_Decimal{Decimal: &dgproto.DrawDecimal{Min: litFloat(min), Max: litFloat(max), Scale: scale}},
+		Draw: &dgproto.StreamDraw_Decimal{Decimal: &dgproto.DrawDecimal{
+			Min: litFloat(min), Max: litFloat(max), Scale: scale,
+		}},
 	}}}
 }
 
@@ -104,7 +106,9 @@ func asciiRange(minLen, maxLen int64, alphabet []*dgproto.AsciiRange) *dgproto.E
 
 func asciiDraw(minLen, maxLen int64, alphabet []*dgproto.AsciiRange) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
-		Draw: &dgproto.StreamDraw_Ascii{Ascii: &dgproto.DrawAscii{MinLen: litInt(minLen), MaxLen: litInt(maxLen), Alphabet: alphabet}},
+		Draw: &dgproto.StreamDraw_Ascii{Ascii: &dgproto.DrawAscii{
+			MinLen: litInt(minLen), MaxLen: litInt(maxLen), Alphabet: alphabet,
+		}},
 	}}}
 }
 

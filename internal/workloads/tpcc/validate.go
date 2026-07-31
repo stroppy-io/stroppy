@@ -41,7 +41,9 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 		distNext[fmt.Sprintf("%v/%v", r[0], r[1])] = toInt64(r[2])
 	}
 
-	ordRows, err := b.QueryRows(ctx, "SELECT o_w_id, o_d_id, MAX(o_id) FROM orders "+wWhere("o_w_id")+" GROUP BY o_w_id, o_d_id", nil)
+	ordRows, err := b.QueryRows(ctx,
+		"SELECT o_w_id, o_d_id, MAX(o_id) FROM orders "+wWhere("o_w_id")+
+			" GROUP BY o_w_id, o_d_id", nil)
 	if err != nil {
 		return fmt.Errorf("validate_population: prefetch failed: %w", err)
 	}
@@ -51,7 +53,8 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 		ordMax[fmt.Sprintf("%v/%v", r[0], r[1])] = toInt64(r[2])
 	}
 
-	noRows, err := b.QueryRows(ctx, "SELECT no_w_id, no_d_id, MAX(no_o_id), MIN(no_o_id), COUNT(*) FROM new_order "+wWhere("no_w_id")+" GROUP BY no_w_id, no_d_id", nil)
+	noRows, err := b.QueryRows(ctx, "SELECT no_w_id, no_d_id, MAX(no_o_id), MIN(no_o_id), COUNT(*) FROM new_order "+
+		wWhere("no_w_id")+" GROUP BY no_w_id, no_d_id", nil)
 	if err != nil {
 		return fmt.Errorf("validate_population: prefetch failed: %w", err)
 	}
@@ -75,8 +78,10 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 	check("CUSTOMER = TOTAL_CUSTOMERS", qintEq(ctx, b, "SELECT COUNT(*) FROM customer "+wWhere("c_w_id"), totalCustomers))
 	check("STOCK = TOTAL_STOCK", qintEq(ctx, b, "SELECT COUNT(*) FROM stock "+wWhere("s_w_id"), totalStock))
 	check("ORDERS = TOTAL_ORDERS", qintEq(ctx, b, "SELECT COUNT(*) FROM orders "+wWhere("o_w_id"), totalOrders))
-	check("NEW_ORDER = TOTAL_NEW_ORDER", qintEq(ctx, b, "SELECT COUNT(*) FROM new_order "+wWhere("no_w_id"), totalNewOrder))
-	check("ORDER_LINE = TOTAL_ORDER_LINE", qintEq(ctx, b, "SELECT COUNT(*) FROM order_line "+wWhere("ol_w_id"), totalOrderLine))
+	check("NEW_ORDER = TOTAL_NEW_ORDER", qintEq(ctx, b,
+		"SELECT COUNT(*) FROM new_order "+wWhere("no_w_id"), totalNewOrder))
+	check("ORDER_LINE = TOTAL_ORDER_LINE", qintEq(ctx, b,
+		"SELECT COUNT(*) FROM order_line "+wWhere("ol_w_id"), totalOrderLine))
 
 	// Consistency.
 	check("CC1 sum(W_YTD) = sum(D_YTD)", absf(cc1WSum-cc1DSum) < 0.01)
@@ -91,17 +96,25 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 	check("CC4 sum(O_OL_CNT) = count(order_line)", cc4OSum == cc4OlCnt)
 
 	// Distribution + constants.
-	iDataPct, _ := qfloat(ctx, b, "SELECT 100.0 * SUM(CASE WHEN i_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM item")
+	iDataPct, _ := qfloat(ctx, b,
+		"SELECT 100.0 * SUM(CASE WHEN i_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM item")
 	check("I_DATA 10% ORIGINAL (5..15%)", iDataPct >= 5 && iDataPct <= 15)
 
-	sDataPct, _ := qfloat(ctx, b, "SELECT 100.0 * SUM(CASE WHEN s_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM stock "+wWhere("s_w_id"))
+	sDataPct, _ := qfloat(ctx, b,
+		"SELECT 100.0 * SUM(CASE WHEN s_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM stock "+
+			wWhere("s_w_id"))
 	check("S_DATA 10% ORIGINAL (5..15%)", sDataPct >= 5 && sDataPct <= 15)
 
-	bcPct, _ := qfloat(ctx, b, "SELECT 100.0 * SUM(CASE WHEN c_credit = 'BC' THEN 1 ELSE 0 END) / COUNT(*) FROM customer "+wWhere("c_w_id"))
+	bcPct, _ := qfloat(ctx, b,
+		"SELECT 100.0 * SUM(CASE WHEN c_credit = 'BC' THEN 1 ELSE 0 END) / COUNT(*) FROM customer "+
+			wWhere("c_w_id"))
 	check("C_CREDIT 10% BC (5..15%)", bcPct >= 5 && bcPct <= 15)
-	check("C_MIDDLE = 'OE' everywhere", qintEq(ctx, b, "SELECT COUNT(*) FROM customer WHERE c_middle <> 'OE' AND c_w_id "+wRange, 0))
-	check("W_YTD = 300000 everywhere", qintEq(ctx, b, "SELECT COUNT(*) FROM warehouse WHERE w_ytd <> 300000 AND w_id "+wRange, 0))
-	check("D_NEXT_O_ID = 3001 everywhere", qintEq(ctx, b, "SELECT COUNT(*) FROM district WHERE d_next_o_id <> 3001 AND d_w_id "+wRange, 0))
+	check("C_MIDDLE = 'OE' everywhere", qintEq(ctx, b,
+		"SELECT COUNT(*) FROM customer WHERE c_middle <> 'OE' AND c_w_id "+wRange, 0))
+	check("W_YTD = 300000 everywhere", qintEq(ctx, b,
+		"SELECT COUNT(*) FROM warehouse WHERE w_ytd <> 300000 AND w_id "+wRange, 0))
+	check("D_NEXT_O_ID = 3001 everywhere", qintEq(ctx, b,
+		"SELECT COUNT(*) FROM district WHERE d_next_o_id <> 3001 AND d_w_id "+wRange, 0))
 
 	if len(failures) > 0 {
 		return fmt.Errorf("validate_population: %d check(s) failed:\n  %s", len(failures), strings.Join(failures, "\n  "))

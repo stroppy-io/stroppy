@@ -84,7 +84,13 @@ func Lookup(name string) (Workload, bool) {
 // *stroppy.DriverConfig the TS path consumes); env is the script env (-e overrides +
 // config), consulted by Env after the real process environment. Scenario comes from
 // VUS/DURATION/ITER env.
-func Run(ctx context.Context, name string, drivers map[int]*stroppy.DriverConfig, env map[string]string, lg *zap.Logger) error {
+func Run(
+	ctx context.Context,
+	name string,
+	drivers map[int]*stroppy.DriverConfig,
+	env map[string]string,
+	lg *zap.Logger,
+) error {
 	wl, ok := Lookup(name)
 	if !ok {
 		return fmt.Errorf("bench: no workload registered as %q", name)
@@ -108,7 +114,11 @@ func Run(ctx context.Context, name string, drivers map[int]*stroppy.DriverConfig
 	}
 
 	setupVU := &VU{root: root, vuid: 1, initPhase: true, ctx: ctx}
-	setupBench := &Bench{root: root, vu: setupVU, lg: lg.Named("workload").With(zap.String("workload", name)), drv: drv, cfg: cfg}
+	setupBench := &Bench{
+		root: root, vu: setupVU,
+		lg:  lg.Named("workload").With(zap.String("workload", name)),
+		drv: drv, cfg: cfg,
+	}
 
 	if err := wl.Setup(ctx, setupBench); err != nil {
 		return fmt.Errorf("setup: %w", err)
@@ -116,7 +126,11 @@ func Run(ctx context.Context, name string, drivers map[int]*stroppy.DriverConfig
 
 	sc := readScenario()
 	if err := runScenario(ctx, sc, func(vu *VU) error {
-		b := &Bench{root: root, vu: vu, lg: lg.Named("workload").With(zap.String("workload", name), zap.Uint64("VUID", vu.VUID())), drv: drv, cfg: cfg}
+		b := &Bench{
+			root: root, vu: vu,
+			lg:  lg.Named("workload").With(zap.String("workload", name), zap.Uint64("VUID", vu.VUID())),
+			drv: drv, cfg: cfg,
+		}
 
 		return wl.Iterate(ctx, b)
 	}); err != nil {
@@ -355,7 +369,8 @@ func (s *summary) print() {
 		case Counter:
 			fmt.Fprintf(os.Stderr, "  %-40s %d\n", n, uint64(sk.sum))
 		case Trend:
-			fmt.Fprintf(os.Stderr, "  %-40s count=%d avg=%.3f %s\n", n, sk.count, sk.sum/float64(max1(sk.count)), percentiles(sk.vals))
+			fmt.Fprintf(os.Stderr, "  %-40s count=%d avg=%.3f %s\n",
+				n, sk.count, sk.sum/float64(max1(sk.count)), percentiles(sk.vals))
 		case Rate:
 			pct := 0.0
 			if sk.count > 0 {
