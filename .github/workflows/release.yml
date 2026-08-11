@@ -50,15 +50,9 @@ jobs:
           echo "outdir=${OUTDIR}" >> $GITHUB_OUTPUT
           echo "archive=${ARCHIVE}" >> $GITHUB_OUTPUT
 
-      - name: Install xk6 (k6 builder)
-        shell: bash
-        run: |
-          make install-xk6
-
       - name: Build
         env:
           CGO_ENABLED: "0"
-          XK6_RACE_DETECTOR: "0"
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           VERSION: ${{ github.ref_name }}

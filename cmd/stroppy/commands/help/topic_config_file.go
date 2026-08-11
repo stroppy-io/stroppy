@@ -4,29 +4,24 @@ package help
 func init() {
 	Register(Topic{
 		Name:  "config-file",
-		Short: "Load run/probe settings from a JSON config file",
+		Short: "Load run settings from a JSON config file",
 		Long: `stroppy config file (stroppy-config.json)
 
-Stroppy supports a JSON config file as an alternative to long flag chains.
-The default filename is stroppy-config.json in the current directory.
-Use -f/--file to specify a different path.
+  Stroppy supports a JSON config file as an alternative to long flag chains.
+  The default filename is stroppy-config.json in the current directory.
+  Use -f/--file to specify a different path.
 
-  stroppy run                         # uses ./stroppy-config.json if present
-  stroppy run -f prod.json            # explicit config file
-  stroppy run -f prod.json tpcc/procs     # config file + override script
-  stroppy probe -f prod.json tpcc/tx      # probe with effective config
+    stroppy run                            # uses ./stroppy-config.json if present
+    stroppy run -f prod.json               # explicit config file
+    stroppy run -f prod.json tpcc/tx       # config file + override workload
+    stroppy run -f prod.json ./local.sql   # config file + override SQL file
 
-Precedence (highest to lowest):
-  real environment variables
-  -e KEY=VALUE flags
-  config file "env" map
-  -d/-D driver flags
-  config file "drivers" map
-  script defaults (declareDriverSetup / export const options)
+  The config file is decoded with protojson semantics against the frozen
+  RunConfig Go type (see pkg/common/proto/stroppy/run.pb.go). Unknown fields
+  are rejected.
 
 Example stroppy-config.json:
   {
-    "version": "1",
     "script": "tpcc/tx",
     "global": {
       "logger": { "logLevel": "LOG_LEVEL_INFO" },
@@ -38,7 +33,6 @@ Example stroppy-config.json:
       "0": {
         "driverType": "postgres",
         "url": "postgres://user:pass@db:5432/bench",
-        "defaultInsertMethod": "native",
         "insertProgress": { "interval": "30s", "stallAfter": "2m", "mode": "both" },
         "pool": { "maxConns": 200, "minConns": 200 }
       }
@@ -47,12 +41,22 @@ Example stroppy-config.json:
       "WAREHOUSES": "10",
       "POOL_SIZE": "200"
     },
-    "k6Args": ["--vus", "10", "--duration", "30m"]
+    "steps": ["create_schema", "load_data"]
   }
 
-Driver types: postgres, mysql, picodata, ydb, noop, csv
-Error modes:  silent, log, throw, fail, abort
-Insert methods: native, plain_bulk, plain_query
+  Top-level fields:
+
+    script   string            Workload name, .sql path, or inline SQL
+    sql      string            Explicit SQL file override (2nd positional)
+    global   object            Logger and OTEL exporter config (no CLI equivalent)
+    drivers  map[string]obj    Per-index driver configs (keys "0", "1", ...)
+    env      map[string]string Workload env overrides (keys uppercased on load)
+    steps    []string          Step allowlist (same as CLI --steps)
+    noSteps  []string          Step blocklist (same as CLI --no-steps)
+
+  Driver types: postgres, mysql, picodata, ydb, noop, csv
+  Error modes:  silent, log, throw, fail, abort
+  Insert methods: native, plain_bulk, plain_query (set per InsertSpec in code)
 
 PRECEDENCE (highest to lowest)
 
@@ -64,47 +68,40 @@ PRECEDENCE (highest to lowest)
     3. Config file "env" map
     4. -d/-D driver flags (CLI driver presets and overrides)
     5. Config file "drivers" map
-    6. Script defaults (declareDriverSetup / export const options)
+    6. Workload defaults
 
   Special cases:
 
-    script / sql positional args:  CLI arg > config file "script"/"sql" fields
-    steps / no-steps:              CLI --steps > config file "steps" field
-    k6Args:                        config file "k6Args" prepended, then CLI "--" args appended
-                                   (last-wins for most k6 flags, so CLI overrides)
-    logger / OTEL exporter:        config file "global" only (no CLI equivalent)
+    workload / sql positionals:  CLI arg > config file "script"/"sql" fields
+    steps / noSteps:             CLI --steps > config file "steps" field
+    logger / OTEL exporter:      config file "global" only (no CLI equivalent)
+
+  There is no "--" k6-args passthrough and no k6Args field in effect:
+  concurrency is env-driven via VUS / DURATION / ITER (see scenario selection
+  in AGENTS.md or 'stroppy run --help').
 
 DEBUG LOGGING
 
   To trace exactly how each parameter is resolved, enable debug output:
 
-    LOG_LEVEL=debug stroppy run tpcc/procs -f stroppy-config.json
+    LOG_LEVEL=debug stroppy run tpcc/tx -f stroppy-config.json
 
   At DEBUG level each override decision is logged with source and value:
 
     config_file    loaded path, script field, env keys, driver indices
-    run            when CLI script/steps/k6_args override file values
+    run            when CLI workload/steps override file values
     env_override   when real env takes precedence over -e or file env keys
-    driver_preset  which source was applied per STROPPY_DRIVER_N index
+    driver_preset  which source was applied per driver index
 
   At INFO level (default) stroppy logs:
 
     "Loaded config file: <path>"
-    "Starting benchmark: script=<name> steps=[...] config_file=true"
-    "Running k6: args=[k6 run ...]"
-
-  The same logger config is propagated to the embedded k6 process:
-
-    LOG_LEVEL_DEBUG       enables k6 --verbose
-    LOG_MODE_DEVELOPMENT  maps to K6_LOG_FORMAT=text
-    LOG_MODE_PRODUCTION   maps to K6_LOG_FORMAT=json
 
 SEE ALSO
 
   stroppy help drivers   (driver types, presets, pool options)
-  stroppy help envs      (ENV() function, setting values, debug)
+  stroppy help envs      (workload env vars, scenario selection, debug)
   stroppy help steps     (step filtering)
-  stroppy help probe     (inspect effective config with -f)
 `,
 	})
 }

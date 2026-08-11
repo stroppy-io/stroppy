@@ -1,4 +1,4 @@
-// Package workloads provides embedded TypeScript scripts and SQL files workloads.
+// Package workloads provides embedded SQL/JSON workload files.
 package workloads
 
 import (
@@ -14,12 +14,10 @@ import (
 type Preset string
 
 const (
-	PresetSimple     Preset = "simple"
-	PresetTPCC       Preset = "tpcc"
-	PresetTPCB       Preset = "tpcb"
-	PresetTPCDS      Preset = "tpcds"
-	PresetTPCH       Preset = "tpch"
-	PresetExecuteSQL Preset = "execute_sql"
+	PresetTPCC  Preset = "tpcc"
+	PresetTPCB  Preset = "tpcb"
+	PresetTPCDS Preset = "tpcds"
+	PresetTPCH  Preset = "tpch"
 )
 
 // ErrUnknownPreset is returned when an unknown preset name is requested.
@@ -31,10 +29,8 @@ var Content embed.FS
 // AvailablePresets returns list of available preset names.
 func AvailablePresets() []string {
 	return []string{
-		string(PresetSimple),
 		string(PresetTPCC),
 		string(PresetTPCB),
-		string(PresetExecuteSQL),
 		string(PresetTPCDS),
 		string(PresetTPCH),
 	}

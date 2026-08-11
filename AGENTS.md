@@ -1,6 +1,7 @@
 # Stroppy — Agent Context
 
-Database stress testing CLI powered by k6. Apache 2.0.
+Database stress testing CLI. A single self-contained Go binary — no k6, no
+Node, no TypeScript runtime. Apache 2.0.
 
 ## Changelog
 
@@ -8,43 +9,52 @@ Database stress testing CLI powered by k6. Apache 2.0.
 
 ## Binary Layout
 
-`make build` produces ONE binary: xk6 builds `build/k6` with stroppy embedded (`--with cmd/xk6air`), then `build/stroppy` is `cp build/k6 build/stroppy`. Both names are the same file; dispatch is strictly by name — invoked as `stroppy` it strips the `k6 x stroppy` prefix, any other name acts as k6 + extension.
+`make build` runs `go build -trimpath -o build/stroppy ./cmd/stroppy`. One
+binary, one name. There is no longer a separate k6 binary and no
+name-dispatch/carriage contract.
 
 ## Build & Lint
 
 ```
-make build          # ALWAYS use this — never go build ./...
-make linter_fix     # run first, auto-fixes formatting
+make build          # plain go build — never go build ./... (use the target for -ldflags version injection)
+make linter_fix     # run first, auto-fixes formatting — NEVER run casually, it rewrites the whole repo
 make linter         # read-only check after linter_fix
 make tests          # all tests with race detector and coverage
-make proto          # regenerate Go/TS/docs from .proto; wipes pkg/common/proto/* — never hand-edit generated files
-make ts-test        # TypeScript unit tests
-make ts-typecheck   # typecheck helpers.ts / datagen.ts / parse_sql.ts / stroppy.d.ts
 ```
 
-**Embedded FS rebuild rule:** `workloads/` is `//go:embed *` — if you pass a workload by short name (`tpcc/tx`, `tpcb/procs`), the binary serves from its embedded snapshot. Edits to `workloads/` on disk have **no effect** until `make build` reruns.
+There is no `make proto` and no TypeScript toolchain. The `.pb.go` types under
+`pkg/common/proto/stroppy/` and `pkg/datagen/dgproto/` are frozen hand-edited
+Go types (the driver/workload contract); they are not regenerated.
 
-**Local path bypass:** If you pass an explicit local path (`./workloads/tpcc/tx.ts`, `./workloads/tpcc/pg.sql`), the runner resolves from cwd **first** — no rebuild needed. Use this during the edit-run loop:
+**Embedded FS rebuild rule:** `workloads/` is `//go:embed *` (SQL/JSON/MD only).
+If you pass a workload by short name (`tpcc/tx`), the binary serves its SQL from
+the embedded snapshot. Edits to `workloads/*.sql` on disk have **no effect** until
+`make build` reruns.
+
+**Local path bypass:** If you pass an explicit local `.sql` path
+(`./workloads/tpcc/pico.sql`), the runner resolves it from cwd **first** — no
+rebuild needed. Use this during the edit-run loop:
 ```bash
-./build/stroppy run ./workloads/tpcc/tx.ts ./workloads/tpcc/pg.sql -d pg -D url=postgres://...
+./build/stroppy run tpcc/tx ./workloads/tpcc/pico.sql -d pico -D url=http://...
 ```
 
-Resolution order: **cwd → `~/.stroppy/` → embedded**.
+Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 
 ## Directory Map
 
 | Path | Role |
 |------|------|
-| `cmd/stroppy/commands/` | cobra CLI subcommands: gen, run, probe, version |
-| `cmd/xk6air/` | k6 extension entry; registers `k6/x/stroppy`, manages per-VU instances |
+| `cmd/stroppy/` | entrypoint (`main.go` blank-imports the drivers) + cobra subcommands: run, probe, version |
+| `cmd/stroppy/commands/run/` | arg parsing, driver/env/step resolution, dispatch to `bench.Run` |
+| `pkg/bench/` | Go-native engine: `Workload` interface, `Run`, scenario executor, VU/Bench SDK, metrics sink + summary |
+| `internal/workloads/` | the Go workloads (simple, tpcb, tpcc, tpch, tpcds, execute_sql); aggregated by blank import |
 | `pkg/driver/dispatcher.go` | driver registry: `RegisterDriver()` + `Dispatch()` |
 | `pkg/driver/{postgres,mysql,picodata,ydb,noop,csv}/` | driver implementations |
 | `pkg/driver/sqldriver/` | shared sql.DB-backed base (mysql, ydb use this) |
 | `pkg/datagen/` | relational data-generation runtime: compile, expr, runtime, lookup, cohort, stdlib, seed |
-| `internal/static/` | `helpers.ts`, `datagen.ts`, `parse_sql.ts`, generated TS type bindings |
-| `internal/runner/` | esbuild transpilation, config extraction via Sobek, k6 process management |
-| `proto/stroppy/` | protobuf schemas (config, run, descriptor, datagen, common, runtime) |
-| `workloads/` | embedded workloads: simple, tpcb, tpcc, tpch, tpcds, execute_sql |
+| `internal/runner/` | run-config merge, env override parsing, driver presets, config-file load |
+| `pkg/common/proto/stroppy/`, `pkg/datagen/dgproto/` | frozen Go types (RunConfig, DriverConfig, etc.) — the contract, not codegen |
+| `workloads/` | embedded SQL/JSON workloads: tpcb, tpcc, tpch, tpcds |
 | `docs/datagen-framework.md` | authoritative relational datagen guide |
 | `docs/parallelism.md` | InsertSpec parallelism contract and tuning |
 
@@ -66,26 +76,28 @@ CSV example:
   --steps drop_schema,create_schema,load_data
 ```
 
-Add driver: package under `pkg/driver/<name>/`, implement `driver.Driver` (`InsertSpec`, `RunQuery`, `Begin`, `Teardown`), call `RegisterDriver()` in `init()`, import in `cmd/xk6air/module.go`.
+Add driver: package under `pkg/driver/<name>/`, implement `driver.Driver`
+(`InsertSpec`, `RunQuery`, `Begin`, `Teardown`), call `RegisterDriver()` in
+`init()`, and add a blank import in `cmd/stroppy/main.go`.
 
 ## CLI Usage
 
 ```bash
-./build/stroppy run <workload> [sql-override] [flags] [-- k6-args]
+./build/stroppy run <workload> [sql-override] [flags]
 ```
 
 **Positional:**
-- 1st: workload — preset-relative path (`tpcc/tx`, `tpcb/procs`, `tpch/tx`), bare preset with a matching `.ts` (`simple`, `tpcds`), `.ts` file, `.sql` file, or inline SQL string
+- 1st: workload — a registered Go workload name (`tpcc/tx`, `tpcb/tx`, `tpch/tx`, `tpcds`, `simple`, `execute_sql`), a `.sql` file, or an inline SQL string (contains spaces)
 - 2nd (optional): SQL file override (e.g. `tpcc/pico`, `./workloads/tpcc/pico.sql`)
 
 **Driver flags:**
 - `-d <preset>` — driver preset: `pg`, `mysql`, `pico`, `ydb`, `noop`
 - `-d '{"url":"...","bulkSize":20}'` — raw JSON driver config
-- `-D key=value` — override driver field (url, driverType, defaultInsertMethod, defaultTxIsolation, errorMode, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
+- `-D key=value` — override driver field (url, driverType, defaultTxIsolation, errorMode, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
 - `-d1 <preset>`, `-D1 key=value` — same for second driver index (multi-driver workloads)
 
-**Script env flags:**
-- `-e KEY=VALUE` — set script ENV() value (uppercased); takes precedence over config file and script defaults
+**Env flags:**
+- `-e KEY=VALUE` — set workload env value (uppercased); takes precedence over config file and workload defaults
 
 **Step control:**
 - `--steps step1,step2` — run only listed steps
@@ -95,30 +107,29 @@ Add driver: package under `pkg/driver/<name>/`, implement `driver.Driver` (`Inse
 **Config file:**
 - Default: `stroppy-config.json` in cwd (auto-loaded if present)
 - `-f prod.json` — explicit path
-- Precedence (highest→lowest): real env > `-e` > config `env` > `-d/-D` > config `drivers` > script defaults
+- Precedence (highest→lowest): real env > `-e` > config `env` > `-d/-D` > config `drivers` > workload defaults
 
-**k6 passthrough:**
-- `-- <k6-args>` after separator, passed directly to k6
+There is **no** `--` k6-args passthrough. Concurrency is env-driven (see Scenario selection).
 
 **Examples:**
 ```bash
-# TPC-C with postgres
-./build/stroppy run tpcc/tx -d pg -D url=postgres://... -- --vus 10 --duration 60s
+# TPC-C with postgres, 10 VUs for 60s
+./build/stroppy run tpcc/tx -d pg -D url=postgres://... -e VUS=10 -e DURATION=60s
 
 # TPC-C with picodata, local SQL file (no rebuild needed)
-./build/stroppy run ./workloads/tpcc/tx.ts ./workloads/tpcc/pico.sql -d pico -D url=http://...
+./build/stroppy run tpcc/tx ./workloads/tpcc/pico.sql -d pico -D url=http://...
 
-# TPC-B
-./build/stroppy run tpcb/tx -d pg -D url=postgres://... -- --duration 30s
+# TPC-B fixed-iteration power run
+./build/stroppy run tpcb/tx -d pg -D url=postgres://... -e ITER=100
 
 # TPC-H
 ./build/stroppy run tpch/tx -d pg -D url=postgres://... -e SCALE_FACTOR=0.01
 
 # Noop overhead benchmark
-./build/stroppy run simple -d noop -- --vus 4 --duration 10s
+./build/stroppy run simple -d noop -e VUS=4 -e DURATION=10s
 
-# Probe: inspect script ENV declarations and SQL sections
-./build/stroppy probe tpcc/tx
+# Probe: list embedded presets + driver insert methods
+./build/stroppy probe
 ```
 
 ## Workload Structure
@@ -138,30 +149,35 @@ Section layout (must be identical across dialects):
   --= step2
 ```
 
-Two TS variants per workload:
-- `procs.ts` — calls stored procs via `workload_procs` section; pg + mysql only; throws at load time on pico/ydb
-- `tx.ts` — runs ordered DML steps inside `driver.beginTx()`; SQL drivers (pg/mysql/pico/ydb); has `export default function` and `export const options`
+Each Go workload implements the `bench.Workload` interface (`Setup`, `Iterate`,
+`Teardown`) in `internal/workloads/<name>/`. TPC-B and TPC-C each ship two
+registered variants:
+- `procs` — calls stored procs via the `workload_procs` section; pg + mysql only
+- `tx` — runs ordered DML steps inside `driver.beginTx()`; all SQL drivers (pg/mysql/pico/ydb)
 
-Both `tx.ts` files export a `default` function — `-- --vus N --duration Xs` works for both tpcc and tpcb.
+TPC-H (`tpch/tx`) does a relational load of 8 tables plus q1–q22 execution;
+SF=1 answer validation is PostgreSQL-only, while load/query execution has
+pg/mysql/pico/ydb dialect files. TPC-DS (`tpcds`) loads all 24 tables and runs
+the 99 query suite.
 
-TPC-H has `tpch/tx.ts` only: relational load of 8 tables plus q1–q22 execution; SF=1 answer validation is PostgreSQL-only, while load/query execution has pg/mysql/pico/ydb dialect files.
-
-Relational workloads use `Step("load_data", ...)` and `driver.insertSpec(Rel.table(...))`. `LOAD_WORKERS` controls per-table InsertSpec fan-out where wired:
+Relational loads use `b.Step("load_data", ...)` and `driver.insertSpec(...)`.
+`LOAD_WORKERS` controls per-table InsertSpec fan-out where wired:
 ```bash
 ./build/stroppy run tpcc/tx -d pg -e LOAD_WORKERS=8 --steps drop_schema,create_schema,load_data
 ```
 
-**Scenario selection** (`declareScenario(name, defaults)` in `helpers.ts`):
+**Scenario selection** (`readScenario` in `pkg/bench/runtime.go`, env-driven):
 - `DURATION` set → `constant-vus` executor (throughput run)
 - `DURATION` unset → `shared-iterations` executor (power run)
-- `MAX_DURATION` (default `24h`) lifts k6's hardcoded 10m cap on iteration executors — always pinned
-- Tune via env `VUS`/`DURATION`/`ITER`/`MAX_DURATION`, NOT the k6 `-u`/`-d`/`-i` shortflags (see K6 Passthrough footgun)
+- Tune via env `VUS` / `DURATION` / `ITER`. There are no k6 shortflags.
 
 **SCALE_FACTOR semantics** differ by workload: tpcb and tpcc take an INTEGER (≥1, = branch/warehouse count); tpch and tpcds take a FRACTIONAL row-scale (0.01 ok). tpcds also carries fixed-size static dims (~1.9M rows for `customer_demographics`) that do not shrink with SF.
 
-**Setup vs executor:** k6 emits NO per-iteration builtins (`iteration`, `iteration_duration`) during `setup()` — they fire only inside an executor. A load in `setup()` therefore looks dead (no live metrics), which is why data loads live in `default()` + `GlobalOnce`, not `setup()`.
+**Setup vs executor:** the data load lives in the workload body guarded by
+`GlobalOnce` (a once-per-process barrier), not in a separate setup phase with
+no live metrics. Load progress emits metrics as it runs.
 
-Isolation by driver in `tx.ts`:
+Isolation by driver in the `tx` variants:
 - postgres → `read_committed`
 - mysql → `read_committed`
 - picodata → `"none"` (**not** `"conn"` — `Begin()` always errors)
@@ -170,47 +186,18 @@ Isolation by driver in `tx.ts`:
 
 Full isolation type names: `read_uncommitted`, `read_committed`, `repeatable_read`, `serializable`, `db_default`, `conn`, `none`
 
-## TypeScript API
-
-### `helpers.ts`
-
-- `DriverX` — typed driver wrapper with metrics; `DriverX.create().setup()`, `.insertSpec()`, `.exec()`, `.queryRows()`, `.queryRow()`, `.queryValue<T>()`, `.queryCursor()`, `.begin()`, `.beginTx()`
-- `TxX` — transaction wrapper; full query API: `exec`, `queryRow`, `queryValue<T>`, `queryRows`, `queryCursor`
-- `declareDriverSetup(index, defaults)` — reads CLI driver config, merges over TS defaults; returns `DriverSetup`
-- `ENV(name, default?)` — typed env accessor; metadata captured by probe
-- `Step(name, fn)` — named execution block with cloud notification
-- `InsertMethodName` — `"plain_query" | "plain_bulk" | "native"` (pg→COPY, ydb→BulkUpsert)
-- `ErrorModeName` — `"silent" | "log" | "throw" | "fail" | "abort"`
-- `DriverTypeName` — `"postgres" | "mysql" | "picodata" | "ydb" | "noop" | "csv"`
-- `retry<T>(fn, maxAttempts, isRetryable, onRetry?)`, `retryWithPolicy()`, `txRetryPolicy()` — retry helpers
-- `isSerializationError(e)` — detects SQLSTATE 40001 / deadlock for retry decisions
-- `once` — run-once guard utility
-
-`TxX` query methods return real values — always use `tx.queryRow()`/`tx.queryValue<T>()` to thread values within a transaction. Synthetic per-VU counters are only justified for PKs with no DB-side value (e.g. synthetic `h_id` on history table for picodata/ydb).
-
-### `datagen.ts`
-
-- `Rel.table(name, opts)` — build an InsertSpec for a table; use `driver.insertSpec(spec)` in `load_data`
-- `Attr` — attribute helpers: `rowIndex`, `rowId`, `dictAt`, `dictAtInt/Float`, `lookup`, `blockRef`, `cohortDraw`, `cohortLive`
-- `Expr` — literals, `litFloat`, `litNull`, `col`, arithmetic/comparison/logical ops, `if`, stdlib calls
-- `Draw` — deterministic load-time distributions: int/float uniform, normal, zipf, NURand, decimal, ascii, phrase, dict, joint, grammar, bernoulli, date
-- `DrawRT` — transaction-time random generators; construct at init, call `.next()`/`.sample()`/`.seek()`/`.reset()` in workload code
-- `Dict` — inline dictionaries and JSON dictionaries, auto-emitted under InsertSpec dicts when referenced
-- `Rel.relationship`, `Rel.lookupPop`, `Rel.cohort`, `Rel.scd2` — relationship, lookup, cohort, and SCD-2 population features
-- `InsertMethod` — datagen enum used in `Rel.table({ method })`; driver config `defaultInsertMethod` can pin/override per-spec method
-
 ## SQL Syntax Rules
 
 - Query parameters: `:paramName` — converted to `$1, $2...` (PostgreSQL), `?` (MySQL)
 - `--+ section_name` — groups statements into sections
 - `--= query_name` — names individual queries within a section
-- `parse_sql_with_sections()` → section/query lookup function; `parse_sql()` → flat query lookup
-- **`--` comment lines inside query bodies are stripped by `parse_sql.ts`** before reaching DB. Use `/* */` block comments inside procedure bodies — except on picodata (see below).
+- The SQL parser (`pkg/bench` SQL loading) resolves sections/queries by name
+- **`--` comment lines inside query bodies are stripped before reaching DB.** Use `/* */` block comments inside procedure bodies — except on picodata (see below).
 
 ## Picodata-Specific Limits
 
-1. **No `/* */` block comments** at statement head — sbroad parser rejects them. Use `-- ` line comments (stripped by parse_sql before sending).
-2. **No `OFFSET` in SELECT** — sbroad doesn't support `LIMIT n OFFSET m`. Branch in ts via `IS_PICODATA`: picodata path uses `queryRows` + `rows[offset]`.
+1. **No `/* */` block comments** at statement head — sbroad parser rejects them. Use `-- ` line comments (stripped before sending).
+2. **No `OFFSET` in SELECT** — sbroad doesn't support `LIMIT n OFFSET m`. Branch in the workload: fetch the key set with `queryRows`, then index `rows[offset]`.
 3. **`sql_vdbe_opcode_max` default (45000) too low** for full-scan aggregations. Before tpcc validate_population: `ALTER SYSTEM SET sql_vdbe_opcode_max = 100000000;`
 4. **Sharded joins intermittently fail** with `Temporary SQL table TMP_... not found`. Split into two round-trips: fetch key set, then query with inline `IN (...)` list. See `workloads/tpcc/pico.sql` `get_window_items` + `stock_count_in` pattern.
 
@@ -222,24 +209,17 @@ Full isolation type names: `read_uncommitted`, `read_committed`, `repeatable_rea
 
 ```bash
 go doc github.com/jackc/pgx/v5.Rows        # pgx Rows interface
-go doc github.com/pashagolub/pgxmock/v4 NewPool
 go doc ./pkg/driver Rows                    # local interface
+go doc ./pkg/bench Workload                 # workload interface
 ```
 
-Prefer `go doc` over grepping source for type/interface definitions. Never read `*.pb.go` — read `.proto` source instead.
+Prefer `go doc` over grepping source for type/interface definitions. The `.pb.go`
+files under `pkg/common/proto/stroppy/` are frozen hand-edited types — read them
+directly (there is no `.proto` source).
 
 ## Key Dependencies
 
-- `go.k6.io/k6 v1.8.0` — load testing engine
 - `github.com/jackc/pgx/v5` — PostgreSQL driver
-- `github.com/grafana/sobek` — JavaScript engine
 - `github.com/spf13/cobra` — CLI
-- `connectrpc.com/connect` — gRPC
-- OpenTelemetry SDKs — metrics export
-
-## K6 Passthrough
-
-- `K6_WEB_DASHBOARD=true` — real-time dashboard
-- `K6_WEB_DASHBOARD_EXPORT=report.html` — HTML report
-- All k6 CLI flags work after `--` separator
-- **Scenarios footgun:** defining `options.scenarios` in the script makes k6 CLI shortflags (`-u`/`-d`/`-i`, `--vus`/`--iterations`/`--duration`) OVERWRITE the entire scenarios block — including `maxDuration`. Passing them after `--` discards the workload's scenario entirely (k6 logs `"cli" level configuration overrode scenarios configuration entirely`). Parameterize scenarios via ENV (`VUS`/`DURATION`/`ITER`/`MAX_DURATION`), never the shortflags.
+- `google.golang.org/grpc` — YDB SDK transport
+- `google.golang.org/protobuf` — frozen `.pb.go` types compile against it

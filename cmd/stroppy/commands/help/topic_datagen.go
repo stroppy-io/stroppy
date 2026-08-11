@@ -3,68 +3,52 @@ package help
 func init() {
 	Register(Topic{
 		Name:  "datagen",
-		Short: "Relational data generation with Rel.table and InsertSpec",
+		Short: "Relational data generation: the InsertSpec load path",
 		Long: `DATAGEN
 
-  Stroppy's current load path is the relational data-generation framework.
-  Workloads declare table shapes in TypeScript, serialize them as InsertSpec
-  protobuf messages, and stream rows through the selected driver.
+  Stroppy's load path is the relational data-generation framework. Workloads
+  build an InsertSpec (a protobuf message describing a table's shape and
+  size), hand it to the driver, and rows are streamed through a pure-function
+  generator implemented in the Go runtime under pkg/datagen/.
 
-CORE API
+  There is no TypeScript surface and no k6: the generator, the spec, and the
+  driver are all Go. Workload authors write Go against the bench SDK.
 
-  Import datagen builders from datagen.ts:
+LOAD FLOW
 
-    import { Attr, Draw, DrawRT, Expr, InsertMethod, Rel } from "./datagen.ts";
+  1. The workload builds an InsertSpec (table, columns, seed, generator
+     source, optional parallelism) — see pkg/datagen/dgproto for the wire
+     type and pkg/bench/query.go for InsertSpec helpers.
 
-  A table load is declared with Rel.table:
+  2. The workload calls b.InsertSpec(ctx, spec) inside a load_data step.
+     The bench engine forwards the spec to the driver and emits metrics
+     (insert_duration, insert_error_rate) plus optional progress reports.
 
-    const accounts = Rel.table("accounts", {
-      size: 100_000,
-      seed: 0xA11CE,
-      method: InsertMethod.NATIVE,
-      parallelism: LOAD_WORKERS || undefined,
-      attrs: {
-        aid: Attr.rowId(),
-        bid: Expr.add(Expr.div(Attr.rowIndex(), Expr.lit(100_000)), Expr.lit(1)),
-        abalance: Draw.intUniform({ min: Expr.lit(0), max: Expr.lit(0) }),
-      },
-    });
-
-    Step("load_data", () => driver.insertSpec(accounts));
-
-  Common builders:
-
-    Rel.table(...)          table-level InsertSpec
-    Attr.rowId()            1-based id derived from the row index
-    Attr.lookup(...)        read from another generated population
-    Expr.*                  arithmetic, literals, conditionals, stdlib calls
-    Draw.*                  deterministic load-time distributions
-    DrawRT.*                transaction-time random generators for workload code
+  3. Each driver implements driver.InsertSpec:
+       postgres  -> COPY (native) or bulk INSERT
+       mysql     -> bulk INSERT via sqldriver
+       picodata  -> sql.DB bulk path
+       ydb       -> BulkUpsert (native)
+       csv       -> write rows to CSV files
+       noop      -> discard (benchmarks framework overhead)
 
 DETERMINISM AND PARALLEL LOAD
 
   Each generated value is a pure function of the table seed, attribute path,
-  and row index. That makes generated rows reproducible and lets drivers split
-  a table into independent worker ranges.
+  and row index. That makes generated rows reproducible and lets drivers
+  split a table into independent worker ranges — any worker can start at any
+  row with no warm-up.
 
-  Workloads that support parallel load read:
-
-    const LOAD_WORKERS = ENV("LOAD_WORKERS", 0, "Load-time worker count");
-
-  and pass it to Rel.table({ parallelism: LOAD_WORKERS || undefined }).
-
-  Example:
+  Workloads that support parallel load read LOAD_WORKERS and pass it into
+  the InsertSpec fan-out:
 
     stroppy run tpcc/tx -d pg -e LOAD_WORKERS=8 \
       --steps drop_schema,create_schema,load_data
 
-DRIVERS
+CSV OUTPUT
 
-  InsertSpec is implemented by postgres, mysql, picodata, ydb, noop, and csv.
-  Native mode maps to COPY for PostgreSQL, BulkUpsert for YDB, driver-native
-  bulk paths where available, CSV file output for csv, and discard for noop.
-
-  CSV is useful for reference datasets:
+  CSV is useful for reference datasets. It supports relational InsertSpec
+  loads only (no runtime query path):
 
     stroppy run tpcb/tx -D driverType=csv \
       -D url='/tmp/tpcb-csv?merge=true&workload=tpcb' \
@@ -72,11 +56,15 @@ DRIVERS
 
 REFERENCES
 
-  docs/datagen-framework.md   Full workload-author guide
+  docs/datagen-framework.md   Workload-author guide (note: some sections
+                              still describe the removed TS surface; the
+                              Go runtime under pkg/datagen/ is authoritative)
   docs/parallelism.md         Parallel InsertSpec contract and tuning
-  workloads/simple/simple.ts  Minimal example
-  workloads/tpcb/tx.ts        Small relational workload
-  workloads/tpch/tx.ts        Relationship and dictionary-heavy workload
+  internal/workloads/simple/  Minimal Go workload
+  internal/workloads/tpcb/    Small relational workload
+  internal/workloads/tpch/    Relationship and dictionary-heavy workload
+  pkg/datagen/                Go generator runtime
+  pkg/bench/query.go          InsertSpec helpers (InsertSpec, TpchLoad, ...)
 `,
 	})
 }

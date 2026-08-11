@@ -59,21 +59,3 @@ func EffectiveNoSteps(cliNoSteps []string, cfg *stroppy.RunConfig) []string {
 
 	return nil
 }
-
-// EffectiveK6Args merges config file k6_args with CLI after-dash args.
-// Config file args come first so CLI args can override (last-wins for most k6 flags).
-func EffectiveK6Args(cliAfterDash []string, cfg *stroppy.RunConfig) []string {
-	if cfg == nil || len(cfg.GetK6Args()) == 0 {
-		return cliAfterDash
-	}
-
-	if len(cliAfterDash) == 0 {
-		return cfg.GetK6Args()
-	}
-
-	merged := make([]string, 0, len(cfg.GetK6Args())+len(cliAfterDash))
-	merged = append(merged, cfg.GetK6Args()...)
-	merged = append(merged, cliAfterDash...)
-
-	return merged
-}

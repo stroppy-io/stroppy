@@ -2,6 +2,7 @@ package run
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -10,12 +11,12 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
+	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
 const (
@@ -36,27 +37,27 @@ var (
 	errTooManyPositionals = errors.New(
 		"too many positional arguments; expected script and optional sql_file before --",
 	)
+	errK6PassthroughRemoved = errors.New(
+		"the '--' k6 passthrough is removed; configure concurrency via env (VUS/DURATION/ITER)",
+	)
+	errUnknownWorkload = errors.New("unknown workload; expected a registered Go workload, a .sql file, or inline SQL")
 )
 
 var Cmd = &cobra.Command{
-	Use: "run [<script>] [sql_file] [-f config.json] [-d driver] [-D key=value] " +
-		"[-e KEY=VALUE] [--steps step1,step2] [-- k6-args...]",
-	Short: "Run benchmark script with k6",
-	Long: `Run a benchmark with k6. The extension determines the mode:
+	Use: "run [<workload>] [sql_file] [-f config.json] [-d driver] [-D key=value] " +
+		"[-e KEY=VALUE] [--steps step1,step2]",
+	Short: "Run a benchmark workload",
+	Long: `Run a Go-native benchmark workload. The first positional selects the mode:
 
-  no extension → preset    stroppy run simple
-  .ts          → script    stroppy run bench.ts
-  .sql         → SQL file  stroppy run queries.sql
-  "..."        → inline    stroppy run "select 1"
+  <name>       → registered workload   stroppy run tpcc/tx
+  <name>.sql   → SQL file              stroppy run queries.sql
+  "..."        → inline SQL            stroppy run "select 1"
 
-Files are searched in: current directory → ~/.stroppy/ → built-in workloads.
-Legacy <preset>.sql files are auto-derived when present; modern multi-dialect
-workloads usually choose sibling SQL files inside TypeScript by driver type.
-See 'stroppy help resolution' for details on how files are found.
-The script and optional sql_file positionals must be adjacent before --.
+SQL files are searched in: current directory -> ~/.stroppy/ -> built-in workloads.
+The workload and optional sql_file positionals must be adjacent.
 
 Environment flags:
-  -e, --env KEY=VALUE     Set env var for the script (lowercase auto-uppercased)
+  -e, --env KEY=VALUE     Set env var for the workload (lowercase auto-uppercased)
                           Real env takes precedence over -e values.
 
 Driver flags:
@@ -74,20 +75,16 @@ Config file flags:
 	SilenceErrors:      false,
 	Example: `
   stroppy run tpcc/tx                           # built-in TPC-C tx workload
-  stroppy run tpcb/tx -- --duration 5m          # workload with k6 args
-  stroppy run tpcds tpcds-scale-100             # preset with explicit SQL variant
+  stroppy run tpcb/tx                           # TPC-B tx workload
   stroppy run tpch/tx                           # TPC-H load + query suite
-  stroppy run simple                            # preset without SQL
-  stroppy run my_benchmark.ts                   # custom test script
-  stroppy run ./benchmarks/custom.ts data.sql   # explicit paths
+  stroppy run tpcds                             # TPC-DS load + query suite
   stroppy run queries.sql                       # execute a SQL file
   stroppy run "select 1"                        # execute inline SQL
   stroppy run tpcc/tx --steps create_schema,load_data  # only run specified steps
   stroppy run tpcc/tx --no-steps load_data       # run all steps except specified
   stroppy run tpcc/tx -d pg                      # use PostgreSQL driver preset
   stroppy run tpcc/tx -d pg -D url=postgres://prod:5432  # preset with URL override
-  stroppy run tpcc/procs -d pg -d1 mysql         # two drivers: pg + mysql
-  stroppy run tpcc/tx -e pool_size=200           # set POOL_SIZE env for the script
+  stroppy run tpcc/tx -e pool_size=200           # set POOL_SIZE env for the workload
   stroppy run tpcc/tx -e FOO=bar -e BAZ=qux      # multiple env overrides
   stroppy run tpcb/tx -D driverType=csv -D url='/tmp/tpcb-csv?merge=true' \
     --steps drop_schema,create_schema,load_data  # dump generated rows to CSV
@@ -113,10 +110,13 @@ Config file flags:
 		sqlArg := runner.EffectiveSQL(parsed.sqlArg, fileConfig)
 		steps := runner.EffectiveSteps(parsed.steps, fileConfig)
 		noSteps := runner.EffectiveNoSteps(parsed.noSteps, fileConfig)
-		k6RunArgs := runner.EffectiveK6Args(parsed.afterDash, fileConfig)
 
 		if scriptArg == "" {
 			return invalidConfig(errNoScript)
+		}
+
+		if len(parsed.afterDash) > 0 {
+			return invalidConfig(errK6PassthroughRemoved)
 		}
 
 		// Log override decisions when both CLI and file config are present.
@@ -134,13 +134,6 @@ Config file flags:
 				lg.Debug("CLI --steps overrides config file steps",
 					zap.Strings("cli", parsed.steps),
 					zap.Strings("file", fileConfig.GetSteps()),
-				)
-			}
-
-			if len(parsed.afterDash) > 0 && len(fileConfig.GetK6Args()) > 0 {
-				lg.Debug("CLI k6 args merged with config file k6_args",
-					zap.Strings("file", fileConfig.GetK6Args()),
-					zap.Strings("cli", parsed.afterDash),
 				)
 			}
 		}
@@ -167,42 +160,144 @@ Config file flags:
 			}
 		}
 
-		// Resolve files through search path.
-		input, err := runner.ResolveInput(scriptArg, sqlArg)
-		if err != nil {
-			return invalidConfig(fmt.Errorf("failed to resolve input: %w", err))
+		// Go-native execute_sql: a .sql file, inline SQL (contains spaces), or the
+		// execute_sql preset routes to the Go runner with the SQL source passed via env
+		// (STROPPY_SQL_BODY for inline, SQL_FILE for a path) — replacing the TS wrapper.
+		// Checked before the registered-name lookup so the preset's sql arg is honored.
+		if name, body, file, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
+			if body != "" {
+				envOverrides["STROPPY_SQL_BODY"] = body
+			} else if file != "" {
+				envOverrides["SQL_FILE"] = file
+			}
+
+			return runGoWorkload(name, steps, noSteps, envOverrides, driverConfigs)
 		}
 
-		scriptRunner, err := runner.NewScriptRunner(
-			input,
-			k6RunArgs,
-			steps,
-			noSteps,
-			driverConfigs,
-			envOverrides,
-			fileConfig,
-		)
-		if err != nil {
-			return invalidConfig(fmt.Errorf("failed to create runner: %w", err))
+		// Go-native workload: if a Go workload is registered under the bare
+		// script name, dispatch to bench.Run.
+		if _, ok := bench.Lookup(scriptArg); ok {
+			return runGoWorkload(scriptArg, steps, noSteps, envOverrides, driverConfigs)
 		}
 
-		err = scriptRunner.Run(context.Background())
-
-		var exitErr *runner.ExitError
-		if errors.As(err, &exitErr) {
-			os.Exit(exitErr.Code)
-		}
-
-		if err != nil {
-			return fmt.Errorf("failed to run benchmark: %w", err)
-		}
-
-		return nil
+		return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
 	},
 }
 
 func invalidConfig(err error) error {
-	return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+	return fmt.Errorf("invalid config: %w", err)
+}
+
+// executeSQLGoRoute detects the execute_sql cases that have no registered Go workload
+// name: inline SQL (the arg contains spaces), a .sql file (the arg is the path), and the
+// execute_sql preset. It returns the workload name plus the inline body / file path to run.
+// ok is false for ordinary registered workload names.
+func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bool) {
+	switch {
+	case strings.Contains(scriptArg, " "):
+		// Inline SQL is wrapped in one `--= query` marker, matching resolveInlineSQL.
+		return "execute_sql", fmt.Sprintf("--= query\n%s;\n", strings.TrimSuffix(strings.TrimSpace(scriptArg), ";")), "", true
+	case strings.HasSuffix(scriptArg, ".sql"):
+		return "execute_sql", "", scriptArg, true
+	case scriptArg == "execute_sql":
+		// Preset: SQL comes from -e SQL_FILE (already in env) or the sql arg.
+		if sqlArg != "" {
+			return "execute_sql", "", sqlArg, true
+		}
+
+		return "execute_sql", "", "", true
+	}
+
+	return "", "", "", false
+}
+
+// runGoWorkload dispatches to the Go-native bench engine. Driver CLI configs are
+// converted to *stroppy.DriverConfig; -e overrides become the script env map;
+// steps/noSteps are the merged (CLI over config-file) step filters, published via
+// STROPPY_STEPS env (the bench step filter reads it at Run start).
+func runGoWorkload(
+	name string,
+	steps, noSteps []string,
+	envOverrides map[string]string,
+	driverConfigs runner.DriverCLIConfigs,
+) error {
+	drivers := map[int]*stroppy.DriverConfig{}
+
+	for idx, cfg := range driverConfigs {
+		dc, err := buildDriverConfig(idx, cfg, envOverrides)
+		if err != nil {
+			return err
+		}
+
+		drivers[idx] = dc
+	}
+
+	if _, ok := drivers[0]; !ok {
+		// No -d given: default to the local postgres preset (mirrors TS
+		// declareDriverSetup defaults).
+		drivers[0] = &stroppy.DriverConfig{ //nolint:gosec // G101: URL field name, not an embedded credential
+			DriverType: stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
+			Url:        "postgres://postgres:postgres@localhost:5432",
+		}
+	}
+
+	// Steps are read from env by the bench step filter at Run start.
+	os.Unsetenv("STROPPY_STEPS")
+	os.Unsetenv("STROPPY_NO_STEPS")
+
+	if len(steps) > 0 {
+		os.Setenv("STROPPY_STEPS", strings.Join(steps, ","))
+	}
+
+	if len(noSteps) > 0 {
+		os.Setenv("STROPPY_NO_STEPS", strings.Join(noSteps, ","))
+	}
+
+	ctx := context.Background()
+	if err := bench.Run(ctx, name, drivers, envOverrides, logger.Global()); err != nil {
+		return fmt.Errorf("failed to run go workload: %w", err)
+	}
+
+	return nil
+}
+
+// buildDriverConfig translates one parsed -d/-D driver entry into the proto
+// DriverConfig the bench layer expects. driverType arrives as a preset short
+// name ("noop"); Extra (-D postgres.* / sql.*) merges as nested proto fields.
+// POOL_SIZE script env maps to the postgres pool size.
+func buildDriverConfig(
+	idx int, cfg *runner.DriverCLIConfig, envOverrides map[string]string,
+) (*stroppy.DriverConfig, error) {
+	dc := &stroppy.DriverConfig{Url: cfg.URL}
+
+	if cfg.DriverType != "" {
+		t, err := bench.ParseDriverType(cfg.DriverType)
+		if err != nil {
+			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
+		}
+
+		dc.DriverType = t
+	}
+
+	// defaultInsertMethod is TS-only; Go workloads set Method on each InsertSpec.
+	if len(cfg.Extra) > 0 {
+		if extraJSON, err := json.Marshal(cfg.Extra); err == nil {
+			_ = json.Unmarshal(extraJSON, dc) //nolint:musttag // frozen proto type, out of scope to tag
+		}
+	}
+
+	if dc.GetDriverType() == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
+		if ps, ok := envOverrides["POOL_SIZE"]; ok {
+			if n, err := strconv.Atoi(ps); err == nil && n > 0 {
+				nc := int32(n) //nolint:gosec // G109: parsed config value, bounded by user input, not untrusted
+				dc.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: &stroppy.DriverConfig_PostgresConfig{
+					MaxConns: &nc, MinConns: &nc,
+				}}
+			}
+		}
+	}
+
+	return dc, nil
 }
 
 // runArgs holds the result of parseRunArgs.

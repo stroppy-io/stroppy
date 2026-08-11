@@ -10,6 +10,14 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Changed
+
+- The `stroppy help <topic>` topics (drivers, config-file, steps, resolution, sql, envs, datagen, probe) now describe the Go-native binary — the previous text still documented the removed TypeScript/k6 workflow (`k6Args`, `declareDriverSetup`, `.ts` script mode, the `--` passthrough).
+
+### Removed
+
+- Stroppy no longer depends on k6, TypeScript, sobek, esbuild, or node/npm. The engine is now a single plain Go binary built with `go build` — authoring benchmarks in TypeScript, the `--` k6-args passthrough, the `gen` scaffolding command, and the cloud status gRPC service are all gone. Concurrency is configured with the `VUS`/`DURATION`/`ITER` environment variables instead of k6 flags. Workloads are Go-native (`tpcc/tx`, `tpcb/tx`, `tpch/tx`, `tpcds`, `simple`, `execute_sql`); `.sql` files and inline SQL still work.
+
 ## [5.7.3] - 2026-07-29
 
 ### Fixed

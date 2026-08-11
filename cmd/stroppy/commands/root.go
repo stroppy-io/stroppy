@@ -5,27 +5,23 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"runtime/debug"
 
 	"github.com/spf13/cobra"
-	"go.k6.io/k6/cmd/state"
 
-	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/gen"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/help"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/probe"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
-	"github.com/stroppy-io/stroppy/internal/runner"
 	"github.com/stroppy-io/stroppy/internal/version"
+	_ "github.com/stroppy-io/stroppy/internal/workloads"
 )
 
-// appName is the binary / command name, reused across the cobra command
-// definition, version output, and the k6-subcommand argv rewrite.
+// appName is the binary / command name.
 const appName = "stroppy"
 
 var rootCmd = &cobra.Command{
 	Use:   appName,
-	Short: "Generate and run k6-powered database stress tests",
+	Short: "Generate and run Go-native database stress tests",
 }
 
 // versionJSON controls whether `stroppy version` outputs machine-readable JSON.
@@ -45,10 +41,7 @@ var versionCmd = &cobra.Command{
 		// These stay in sync with go.mod automatically — no hardcoding.
 		if info, ok := debug.ReadBuildInfo(); ok {
 			for _, dep := range info.Deps {
-				switch dep.Path {
-				case "go.k6.io/k6":
-					versions["k6"] = dep.Version
-				case "github.com/jackc/pgx/v5":
+				if dep.Path == "github.com/jackc/pgx/v5" {
 					versions["pgx"] = dep.Version
 				}
 			}
@@ -65,7 +58,6 @@ var versionCmd = &cobra.Command{
 			// Fixed order for readable output.
 			for _, kv := range []struct{ k, v string }{
 				{appName, versions[appName]},
-				{"k6", versions["k6"]},
 				{"pgx", versions["pgx"]},
 			} {
 				if kv.v != "" {
@@ -87,40 +79,12 @@ func Root() *cobra.Command {
 	return rootCmd
 }
 
-func K6Subcommand(gs *state.GlobalState) *cobra.Command {
-	inteceptInteruptSignals(gs)
-
-	if runner.K6ExitCaptureEnabled() {
-		gs.OSExit = runner.OSExit
-	}
-
-	return rootCmd
-}
-
 func init() {
-	// Skip "k6 x stroppy" prefix if binary file already named as "stroppy"
-	if filepath.Base(os.Args[0]) == appName {
-		os.Args = append([]string{"k6", "x", appName}, os.Args[1:]...)
-
-		// [cobra.Command] help message should think that stroppy rootCmd have no parent
-		oldUsageFunc := rootCmd.UsageFunc()
-		rootCmd.SetUsageFunc(func(c *cobra.Command) error {
-			parent := rootCmd.Parent()
-			parent.RemoveCommand(rootCmd)
-
-			err := oldUsageFunc(c)
-
-			parent.AddCommand(rootCmd)
-
-			return err
-		})
-	}
-
 	cobra.EnableCommandSorting = false
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 
 	rootCmd.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)
 
 	versionCmd.Flags().BoolVar(&versionJSON, "json", false, "output versions as JSON")
-	rootCmd.AddCommand(versionCmd, run.Cmd, gen.Cmd, probe.Cmd, help.Cmd)
+	rootCmd.AddCommand(versionCmd, run.Cmd, probe.Cmd, help.Cmd)
 }

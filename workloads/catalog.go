@@ -1,35 +1,20 @@
 package workloads
 
 import (
-	"bytes"
 	"fmt"
-	"path"
 	"sort"
 	"strings"
 )
 
-// runnableMarker identifies a TypeScript file as a runnable k6 entrypoint.
-// Helper modules export only named functions and lack this declaration (the
-// probe VM panics on them in unwrapOptions), so this static check is both the
-// fast and the reliable signal for "can this script be run?".
-const runnableMarker = "export const options"
-
-// ScriptInfo describes a single .ts file within a preset.
-type ScriptInfo struct {
-	Name     string `json:"name"`     // e.g. "procs.ts"
-	Runnable bool   `json:"runnable"` // true if it is a k6 entrypoint
-}
-
-// PresetInfo describes one embedded preset and its files.
+// PresetInfo describes one embedded preset and its SQL dialect/variant stems
+// and docs.
 type PresetInfo struct {
-	Name    string       `json:"name"` // e.g. "tpcc"
-	Scripts []ScriptInfo `json:"scripts,omitempty"`
-	SQL     []string     `json:"sql,omitempty"`  // dialect/variant stems, e.g. "pg"
-	Docs    []string     `json:"docs,omitempty"` // e.g. "README.md"
+	Name string   `json:"name"`          // e.g. "tpcc"
+	SQL  []string `json:"sql,omitempty"` // dialect/variant stems, e.g. "pg"
+	Docs []string `json:"docs,omitempty"`
 }
 
-// Catalog walks the embedded presets and classifies their files so callers can
-// show users which presets exist and which scripts are runnable.
+// Catalog walks the embedded presets and classifies their files.
 func Catalog() ([]PresetInfo, error) {
 	presets := AvailablePresets()
 	sort.Strings(presets)
@@ -50,11 +35,6 @@ func Catalog() ([]PresetInfo, error) {
 			}
 
 			switch fileName := entry.Name(); {
-			case strings.HasSuffix(fileName, ".ts"):
-				info.Scripts = append(info.Scripts, ScriptInfo{
-					Name:     fileName,
-					Runnable: isRunnable(name, fileName),
-				})
 			case strings.HasSuffix(fileName, ".sql"):
 				info.SQL = append(info.SQL, strings.TrimSuffix(fileName, ".sql"))
 			case strings.HasSuffix(fileName, ".md"):
@@ -66,14 +46,4 @@ func Catalog() ([]PresetInfo, error) {
 	}
 
 	return out, nil
-}
-
-// isRunnable reports whether a preset's .ts file is a k6 entrypoint.
-func isRunnable(preset, fileName string) bool {
-	content, err := Content.ReadFile(path.Join(preset, fileName))
-	if err != nil {
-		return false
-	}
-
-	return bytes.Contains(content, []byte(runnableMarker))
 }

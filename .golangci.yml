@@ -18,7 +18,6 @@ linters:
     - bodyclose
     - canonicalheader
     - containedctx
-    - contextcheck
     - copyloopvar
     - cyclop
     - decorder
@@ -38,7 +37,6 @@ linters:
     - gocheckcompilerdirectives
     - gochecksumtype
     - gocognit
-    - goconst
     - gocritic
     - gocyclo
     - godot
@@ -89,7 +87,6 @@ linters:
     - unconvert
     - unparam
     - usestdlibvars
-    - varnamelen
     - wastedassign
     - wsl_v5
   settings:
@@ -165,28 +162,6 @@ linters:
       case:
         rules:
           json: snake
-    varnamelen:
-      max-distance: 10
-      min-name-length: 2
-      check-receiver: false
-      check-return: false
-      check-type-param: false
-      ignore-names:
-        - err
-        - tc
-      ignore-type-assert-ok: true
-      ignore-map-index-ok: true
-      ignore-chan-recv-ok: true
-      ignore-decls:
-        - c echo.Context
-        - t testing.T
-        - f *foo.Bar
-        - e error
-        - i int
-        - const C
-        - T any
-        - m map[string]int
-        - lg *zap.Logger
   exclusions:
     generated: lax
     presets:
@@ -221,16 +196,17 @@ linters:
           - forcetypeassert
           - funlen
           - gocognit
-          - goconst
           - gocritic
           - gosec
           - maintidx
           - mnd
           - noctx
           - protogetter
-          - varnamelen
           - wrapcheck
         path: _test\.go
+      - linters:
+          - mnd
+        path: ^internal/workloads/
       - linters:
           - unused
         path: bind.go
@@ -243,10 +219,7 @@ linters:
         text: in package name
     paths:
       - pb.go$
-      - internal/repositories/models
       - ^third_party/
-      - builtin$
-      - examples$
 issues:
   max-same-issues: 50
 formatters:
@@ -259,7 +232,6 @@ formatters:
       sections:
         - standard
         - default
-        - prefix(github.com/stroppy-io/stroppy-core)
         - prefix(github.com/stroppy-io/stroppy)
         - localmodule
         - blank
@@ -268,7 +240,4 @@ formatters:
   exclusions:
     generated: lax
     paths:
-      - internal/repositories/models
       - ^third_party/
-      - builtin$
-      - examples$
