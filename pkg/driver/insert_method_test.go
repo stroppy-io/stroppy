@@ -3,7 +3,6 @@ package driver_test
 import (
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
@@ -20,6 +19,7 @@ func TestParseInsertMethod(t *testing.T) {
 		{"columnar", driver.InsertColumnar},
 		{"native", driver.InsertNative},
 	}
+
 	for _, c := range cases {
 		got, err := driver.ParseInsertMethod(c.in)
 		if err != nil {
@@ -40,22 +40,20 @@ func TestParseInsertMethod(t *testing.T) {
 	}
 }
 
-func TestMethodProtoRoundTrip(t *testing.T) {
+func TestInsertMethodString(t *testing.T) {
 	t.Parallel()
 
-	for _, m := range []driver.InsertMethod{
-		driver.InsertPlainQuery,
-		driver.InsertPlainBulk,
-		driver.InsertColumnar,
-		driver.InsertNative,
+	for _, c := range []struct {
+		m    driver.InsertMethod
+		want string
+	}{
+		{driver.InsertPlainQuery, "plain_query"},
+		{driver.InsertPlainBulk, "plain_bulk"},
+		{driver.InsertColumnar, "columnar"},
+		{driver.InsertNative, "native"},
 	} {
-		if driver.MethodFromProto(driver.MethodToProto(m)) != m {
-			t.Fatalf("round-trip lost for %v", m)
+		if got := c.m.String(); got != c.want {
+			t.Fatalf("%v.String() = %q, want %q", c.m, got, c.want)
 		}
-	}
-	// The zero/unknown proto value maps to the zero InsertMethod.
-	var zero driver.InsertMethod
-	if driver.MethodFromProto(dgproto.InsertMethod(999)) != zero {
-		t.Fatalf("unknown proto did not map to zero")
 	}
 }

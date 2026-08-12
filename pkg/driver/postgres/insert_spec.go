@@ -10,9 +10,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
@@ -39,47 +36,6 @@ var ErrColumnCountMismatch = errors.New("postgres: describe column count mismatc
 // ErrUnregisteredColumnType is returned by the columnar path when a target
 // column has a type OID that pgx's type map cannot name for the array cast.
 var ErrUnregisteredColumnType = errors.New("postgres: unregistered column type OID")
-
-// InsertSpec runs one relational InsertSpec through the postgres driver.
-// It builds a source.Partitionable from the spec, then dispatches by
-// spec.Method to one of three row-insertion strategies (NATIVE COPY,
-// PLAIN_BULK multi-row INSERT, PLAIN_QUERY per-row INSERT). Workers fan
-// the spec out across per-partition RowSources via
-// common.RunParallelByWorkers; each RowSource is pre-seeked and bounded
-// to its chunk.
-func (d *Driver) InsertSpec(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-) (*stats.Query, error) {
-	if spec == nil {
-		return nil, fmt.Errorf("%w: nil spec", runtime.ErrInvalidSpec)
-	}
-
-	part, err := loadsource.Build(spec)
-	if err != nil {
-		return nil, fmt.Errorf("postgres: %w", err)
-	}
-
-	workers := int(spec.GetParallelism().GetWorkers())
-	if workers < 1 {
-		workers = 1
-	}
-
-	method := driver.MethodFromProto(spec.GetMethod())
-	table := spec.GetTable()
-
-	start := time.Now()
-
-	rows, err := common.RunParallelByWorkers(ctx, part, workers,
-		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
-			return d.runInsertChunk(workerCtx, table, method, src)
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
-}
 
 // Insert runs a typed [driver.InsertRequest] through the postgres driver.
 // Each worker prepares a [gen.Cursor] partition, adapts it to a

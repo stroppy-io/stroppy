@@ -14,9 +14,6 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
@@ -67,43 +64,6 @@ func NewDriver(opts driver.Options) *Driver {
 		logger:   lg,
 		bulkSize: bulkSize,
 	}
-}
-
-// InsertSpec drains a relational source end-to-end and discards the rows.
-// Exercises the full generation pipeline so benchmarks stay comparable, but
-// no I/O is performed. Honors spec.Parallelism.Workers so framework-only
-// scaling is measurable: workers fan out through common.RunParallelByWorkers,
-// each draining its own partition. There is no I/O to arbitrate: the whole
-// point is to scale row generation alone.
-func (d *Driver) InsertSpec(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-) (*stats.Query, error) {
-	if spec == nil {
-		return nil, fmt.Errorf("noop: %w", runtime.ErrInvalidSpec)
-	}
-
-	part, err := loadsource.Build(spec)
-	if err != nil {
-		return nil, fmt.Errorf("noop: %w", err)
-	}
-
-	workers := int(spec.GetParallelism().GetWorkers())
-	if workers < 1 {
-		workers = 1
-	}
-
-	start := time.Now()
-
-	rows, err := common.RunParallelByWorkers(ctx, part, workers,
-		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
-			return drainSource(workerCtx, src)
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
 // Insert runs a typed [driver.InsertRequest] through the noop driver. It

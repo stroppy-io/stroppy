@@ -15,9 +15,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
@@ -32,66 +29,6 @@ import (
 // not synthesize. Matches the rejection pattern used by the other
 // drivers.
 var ErrUnsupportedInsertMethod = errors.New("csv: unsupported InsertSpec method")
-
-// InsertSpec runs one relational InsertSpec through the CSV driver by
-// draining each partition's RowSource into one file per worker. Under
-// parallelism each worker writes to its own shard so the hot path is
-// lock-free; the single-worker case naturally falls out as one chunk
-// (index 0 → w000). Final per-table merge happens at Teardown when
-// merge=true.
-func (d *Driver) InsertSpec(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-) (*stats.Query, error) {
-	if spec == nil {
-		return nil, fmt.Errorf("csv: %w", runtime.ErrInvalidSpec)
-	}
-
-	if spec.GetMethod() != dgproto.InsertMethod_NATIVE {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedInsertMethod, spec.GetMethod().String())
-	}
-
-	part, err := loadsource.Build(spec)
-	if err != nil {
-		return nil, fmt.Errorf("csv: %w", err)
-	}
-
-	workers := int(spec.GetParallelism().GetWorkers())
-	if workers < 1 {
-		workers = 1
-	}
-
-	start := time.Now()
-
-	var columns []string
-
-	rows, err := common.RunParallelByWorkers(ctx, part, workers,
-		func(workerCtx context.Context, chunk common.Chunk, src source.RowSource) error {
-			rowCount, err := d.writeShard(workerCtx, spec.GetTable(), src, chunk.Index)
-			if err != nil {
-				return err
-			}
-
-			d.recordShards(spec.GetTable(), src.Columns(), 1, rowCount)
-
-			if chunk.Index == 0 {
-				columns = append([]string(nil), src.Columns()...)
-			}
-
-			return nil
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	// Make sure the registry has the canonical column order even when
-	// the first-indexed worker completed after a later one.
-	if len(columns) > 0 {
-		d.recordShards(spec.GetTable(), columns, 0, 0)
-	}
-
-	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
-}
 
 // Insert runs a typed [driver.InsertRequest] through the CSV driver by
 // draining each worker's [gen.Cursor] partition into one file per

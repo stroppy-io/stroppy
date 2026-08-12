@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
@@ -24,46 +22,6 @@ var ErrEmptyColumnOrder = errors.New("sqldriver: source reports zero columns")
 // NATIVE is driver-specific and must be handled by each driver before
 // delegating here.
 var ErrUnsupportedInsertMethod = errors.New("sqldriver: unsupported InsertSpec method")
-
-// RunInsertSpec executes one relational InsertSpec through a dialect-agnostic
-// database/sql–style Execer. It handles the two SQL-based InsertMethod
-// arms uniformly:
-//
-//   - PLAIN_QUERY: one INSERT statement per row, drained from src.
-//   - PLAIN_BULK: multi-row INSERTs of at most batchSize rows each.
-//
-// src is drained to io.EOF; its row range is already bounded by the
-// partition. dialect supplies placeholder formatting and per-value type
-// conversions. batchSize values ≤ 1 collapse the bulk path into the
-// per-row path; callers pass 1 explicitly for PLAIN_QUERY.
-//
-// NATIVE is deliberately not routed here: each driver's native bulk
-// primitive is too different to share (pg COPY, ydb BulkUpsert), so
-// RunInsertSpec returns ErrUnsupportedInsertMethod for it — the driver
-// must intercept NATIVE before calling.
-func RunInsertSpec[T any](
-	ctx context.Context,
-	db ExecContext[T],
-	spec *dgproto.InsertSpec,
-	src source.RowSource,
-	dialect queries.Dialect,
-	batchSize int,
-) error {
-	if spec == nil {
-		return fmt.Errorf("%w: nil spec", runtime.ErrInvalidSpec)
-	}
-
-	switch spec.GetMethod() {
-	case dgproto.InsertMethod_PLAIN_BULK:
-		return RunBulkInsert(ctx, db, spec.GetTable(), src, dialect, batchSize)
-	case dgproto.InsertMethod_PLAIN_QUERY:
-		return RunBulkInsert(ctx, db, spec.GetTable(), src, dialect, 1)
-	case dgproto.InsertMethod_NATIVE:
-		return fmt.Errorf("%w: NATIVE", ErrUnsupportedInsertMethod)
-	default:
-		return fmt.Errorf("%w: %s", ErrUnsupportedInsertMethod, spec.GetMethod().String())
-	}
-}
 
 // RunBulkInsert drains src into multi-row INSERTs against table, batching
 // by batchSize rows. src is drained to io.EOF; its row range is already
@@ -340,19 +298,4 @@ func appendFlatArgs(dst []any, rows [][]any) []any {
 	}
 
 	return dst
-}
-
-// buildBulkInsertSQL returns the multi-row INSERT statement and flattened args
-// for a row batch. Retained for callers/tests that build both at once; the
-// hot path uses buildBulkInsertQuery + appendFlatArgs to reuse buffers.
-func buildBulkInsertSQL(
-	dialect queries.Dialect,
-	table string,
-	columns []string,
-	rows [][]any,
-) (query string, args []any) {
-	query = buildBulkInsertQuery(dialect, table, columns, len(rows))
-	args = appendFlatArgs(make([]any, 0, len(rows)*len(columns)), rows)
-
-	return query, args
 }

@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
@@ -15,48 +12,6 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
-
-// InsertSpec runs one relational InsertSpec through the picodata driver.
-// Picodata speaks the postgres wire protocol via pgx but does not expose
-// COPY or any other dedicated bulk primitive, so NATIVE collapses onto
-// the multi-row PLAIN_BULK path. Workers fan the spec out across
-// per-partition RowSources via common.RunParallelByWorkers.
-func (d *Driver) InsertSpec(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-) (*stats.Query, error) {
-	if spec == nil {
-		return nil, fmt.Errorf("%w: nil spec", runtime.ErrInvalidSpec)
-	}
-
-	method := driver.MethodFromProto(spec.GetMethod())
-	if !picodataMethodSupported(method) {
-		return nil, fmt.Errorf("%w: %s", driver.ErrInsertMethodNotSupported, method)
-	}
-
-	part, err := loadsource.Build(spec)
-	if err != nil {
-		return nil, fmt.Errorf("picodata: %w", err)
-	}
-
-	workers := int(spec.GetParallelism().GetWorkers())
-	if workers < 1 {
-		workers = 1
-	}
-
-	table := spec.GetTable()
-	start := time.Now()
-
-	rows, err := common.RunParallelByWorkers(ctx, part, workers,
-		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
-			return d.runInsertChunk(workerCtx, table, method, src)
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
-}
 
 // Insert runs a typed [driver.InsertRequest] through the picodata driver.
 // Each worker prepares a [gen.Cursor] partition, adapts it to a

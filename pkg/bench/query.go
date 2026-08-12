@@ -3,13 +3,11 @@ package bench
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 	"github.com/stroppy-io/stroppy/pkg/datagen/tpcdsgen"
 	"github.com/stroppy-io/stroppy/pkg/datagen/tpchgen"
 	"github.com/stroppy-io/stroppy/pkg/driver"
@@ -98,56 +96,10 @@ func (b *Bench) runQuery(ctx context.Context, sql string, args map[string]any) (
 	return res, nil
 }
 
-// InsertSpec runs a relational bulk insert.
-func (b *Bench) InsertSpec(ctx context.Context, spec *dgproto.InsertSpec) (*stats.Query, error) {
-	tracker := b.newInsertProgressTracker(spec)
-
-	runCtx := ctx
-	if tracker.Enabled() {
-		runCtx = insertprogress.ContextWithTracker(ctx, tracker)
-		tracker.Start(runCtx)
-	}
-
-	result, err := b.drv.InsertSpec(runCtx, spec)
-	if tracker.Enabled() {
-		tracker.Finish(err)
-	}
-
-	var elapsed time.Duration
-	if result != nil {
-		elapsed = result.Elapsed
-	}
-
-	b.root.txMetrics.recordInsertResult(b.vu, spec.GetTable(), elapsed, err)
-
-	if err != nil {
-		return nil, fmt.Errorf("insert %q: %w", spec.GetTable(), err)
-	}
-
-	b.root.txMetrics.recordInsert(b.vu, spec.GetTable(), result.Rows)
-
-	return result, nil
-}
-
-// newInsertProgressTracker builds the periodic insert-progress tracker (on by
-// default) wired to emit progress metrics. Mirrors the engine's wrapper.
-func (b *Bench) newInsertProgressTracker(spec *dgproto.InsertSpec) *insertprogress.Tracker {
-	config := insertprogress.DefaultConfig()
-	config.Table = spec.GetTable()
-	config.Method = insertMethodName(spec.GetMethod())
-	config.Workers = int(spec.GetParallelism().GetWorkers())
-	config.Logger = b.lg.Named("insert-progress")
-	config.OnSample = func(snapshot insertprogress.Snapshot) {
-		b.root.txMetrics.recordInsertProgress(b.vu, &snapshot)
-	}
-
-	return insertprogress.NewTracker(&config)
-}
-
 // Insert runs a typed [driver.InsertRequest] through the benchmark driver,
-// the typed successor to InsertSpec. It wires the same progress tracker and
-// metrics recording the legacy path uses, but streams rows from a
-// workload-authored [gen.BatchSource] instead of a dgproto generator.
+// the typed successor to InsertSpec. It wires the progress tracker and
+// metrics recording, streaming rows from a workload-authored
+// [gen.BatchSource] instead of a dgproto generator.
 func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Query, error) {
 	tracker := b.newBatchInsertTracker(req)
 
@@ -192,21 +144,6 @@ func (b *Bench) newBatchInsertTracker(req *driver.InsertRequest) *insertprogress
 	}
 
 	return insertprogress.NewTracker(&config)
-}
-
-func insertMethodName(method dgproto.InsertMethod) string {
-	switch method {
-	case dgproto.InsertMethod_PLAIN_QUERY:
-		return "plain_query"
-	case dgproto.InsertMethod_PLAIN_BULK:
-		return "plain_bulk"
-	case dgproto.InsertMethod_COLUMNAR:
-		return "columnar"
-	case dgproto.InsertMethod_NATIVE:
-		return "native"
-	default:
-		return strings.ToLower(method.String())
-	}
 }
 
 // InsertTpch loads one TPC-H table via the ported dbgen generator, streamed

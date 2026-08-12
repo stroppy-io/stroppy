@@ -13,9 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
@@ -25,61 +22,6 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
-
-// InsertSpec runs one relational InsertSpec through the ydb driver.
-// NATIVE uses ydb-go-sdk's Table().BulkUpsert for non-transactional
-// batch writes; PLAIN_BULK and PLAIN_QUERY go through the generic
-// sqldriver helper. Workers fan the spec out across per-partition
-// RowSources via common.RunParallelByWorkers.
-func (d *Driver) InsertSpec(
-	ctx context.Context,
-	spec *dgproto.InsertSpec,
-) (*stats.Query, error) {
-	if spec == nil {
-		return nil, fmt.Errorf("%w: nil spec", runtime.ErrInvalidSpec)
-	}
-
-	switch spec.GetMethod() {
-	case dgproto.InsertMethod_NATIVE, dgproto.InsertMethod_PLAIN_BULK,
-		dgproto.InsertMethod_PLAIN_QUERY, dgproto.InsertMethod_COLUMNAR:
-		// Supported below.
-	default:
-		return nil, fmt.Errorf("%w: %s", driver.ErrInsertSpecNotImplemented, spec.GetMethod().String())
-	}
-
-	// COLUMNAR has no dedicated YDB SQL path. NATIVE BulkUpsert already ships a
-	// struct-of-arrays payload (types.ListValue of per-row structs) with no
-	// bind-parameter ceiling, so COLUMNAR is redirected onto it rather than
-	// maintaining a redundant AS_TABLE($rows) SQL arm.
-	if spec.GetMethod() == dgproto.InsertMethod_COLUMNAR {
-		d.logger.Warn("ydb: COLUMNAR insert method redirects to NATIVE BulkUpsert " +
-			"(already struct-of-arrays, limit-free); no separate SQL path")
-	}
-
-	part, err := loadsource.Build(spec)
-	if err != nil {
-		return nil, fmt.Errorf("ydb: %w", err)
-	}
-
-	workers := int(spec.GetParallelism().GetWorkers())
-	if workers < 1 {
-		workers = 1
-	}
-
-	method := driver.MethodFromProto(spec.GetMethod())
-	tableName := spec.GetTable()
-	start := time.Now()
-
-	rows, err := common.RunParallelByWorkers(ctx, part, workers,
-		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
-			return d.runInsertChunk(workerCtx, tableName, method, src)
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
-}
 
 // Insert runs a typed [driver.InsertRequest] through the ydb driver.
 // Each worker prepares a [gen.Cursor] partition, adapts it to a
