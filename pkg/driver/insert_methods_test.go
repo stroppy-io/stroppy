@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 )
 
 // TestInsertMethodsCoverAllDriverTypes guards the matrix against new driver
@@ -36,10 +35,12 @@ func TestInsertMethodsValidAndUnique(t *testing.T) {
 	t.Parallel()
 
 	for driverType, methods := range insertMethodsByDriver {
-		seen := map[dgproto.InsertMethod]bool{}
+		seen := map[InsertMethod]bool{}
 
 		for _, method := range methods {
-			if _, ok := dgproto.InsertMethod_name[int32(method)]; !ok {
+			switch method {
+			case InsertPlainQuery, InsertPlainBulk, InsertColumnar, InsertNative:
+			default:
 				t.Errorf("%s: unknown insert method value %d", driverType, method)
 			}
 

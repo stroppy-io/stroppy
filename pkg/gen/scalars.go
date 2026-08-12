@@ -31,7 +31,7 @@ const (
 
 // Uint64 returns a raw 64-bit value for entity (sub 0).
 func (f Field) Uint64(entity uint64) uint64 {
-	return splitMix64(f.seed0 + entity*f.gamma)
+	return SplitMix64(f.seed0 + entity*f.gamma)
 }
 
 // Int64 returns an int64 uniformly in [lo, hi] inclusive for entity. hi < lo
@@ -106,7 +106,7 @@ func (f Field) uniform(entity, n uint64) uint64 {
 	_, r := bits.Div64(1, 0, n) // r = 2^64 mod n; n >= 2 so hi=1 < n
 
 	for sub := uint64(0); ; sub++ {
-		x := splitMix64(f.seed0 + entity*f.gamma + sub*subGamma)
+		x := SplitMix64(f.seed0 + entity*f.gamma + sub*subGamma)
 
 		hi, lo := bits.Mul64(x, n)
 		if lo >= r {

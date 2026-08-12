@@ -1,9 +1,8 @@
-package stdlib
+package gen
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
 )
 
 // feistelRounds is the Feistel round count. Four rounds over a
@@ -25,47 +24,21 @@ const feistelRoundShift = 32
 // `seed = 0` still get non-trivial permutations.
 const permuteSeedSalt uint64 = 0xD1CE_C0FF_BEEF_A5A5
 
-func init() {
-	registry["std.permuteIndex"] = permuteIndex
-}
+// errBadArg is returned by [Permute] for an out-of-range seed/idx/domain.
+var errBadArg = errors.New("gen: permute argument out of range")
 
-// permuteIndex implements `std.permuteIndex(seed int64, idx int64, n int64) → int64`.
-//
-// The output is the image of `idx` under a bijective permutation of
-// [0, n) that is deterministic in (seed, n): every call with the same
-// (seed, idx, n) returns the same result, and iterating idx across
-// [0, n) produces exactly the elements of [0, n) in a shuffled order
-// (no duplicates, no omissions). Different seeds yield uncorrelated
-// permutations.
-//
-// Construction: a 4-round Feistel cipher on w-bit blocks (w such that
-// 2^w ≥ n) combined with cycle-walking. If the Feistel output lands
-// in [n, 2^w), the cipher is re-applied until the output falls inside
-// [0, n). Cycle-walking preserves bijection on arbitrary domain sizes
-// and terminates quickly: for the worst case n = 2^(w-1) + 1 the
-// expected iterations per draw are ~2.
-//
-// Stateless by construction — parallel workers may call this freely
-// for disjoint idx ranges without coordination.
-// Permute is the pure form of std.permuteIndex: it returns the image of idx
-// under a bijective permutation of [0, n) that is deterministic in (seed, n).
-// Iterating idx across [0, n) yields every element of [0, n) exactly once;
-// different seeds yield uncorrelated permutations. Stateless by construction
-// — parallel workers may call it for disjoint idx ranges without coordination.
-//
-// Extracted so the typed imperative generators can call it directly without
-// the []any runtime-call wrapper. The runtime permuteIndex delegates here.
+// Permute returns the image of idx under a bijective permutation of [0, n)
+// that is deterministic in (seed, n). Iterating idx across [0, n) yields
+// every element of [0, n) exactly once; different seeds yield uncorrelated
+// permutations. Stateless by construction — parallel workers may call it for
+// disjoint idx ranges without coordination.
 func Permute(seedVal, idx, n int64) (int64, error) {
 	if n <= 0 {
-		return 0, fmt.Errorf(
-			"%w: std.permuteIndex n must be > 0, got %d", ErrBadArg, n,
-		)
+		return 0, fmt.Errorf("%w: n must be > 0, got %d", errBadArg, n)
 	}
 
 	if idx < 0 || idx >= n {
-		return 0, fmt.Errorf(
-			"%w: std.permuteIndex idx %d out of [0, %d)", ErrBadArg, idx, n,
-		)
+		return 0, fmt.Errorf("%w: idx %d out of [0, %d)", errBadArg, idx, n)
 	}
 
 	return permute(seedVal, idx, n), nil
@@ -109,38 +82,6 @@ func permute(seedVal, idx, n int64) int64 {
 	return idx
 }
 
-func permuteIndex(args []any) (any, error) {
-	const wantArgs = 3
-	if len(args) != wantArgs {
-		return nil, fmt.Errorf(
-			"%w: std.permuteIndex needs %d, got %d", ErrArity, wantArgs, len(args),
-		)
-	}
-
-	seedVal, ok := toInt64(args[0])
-	if !ok {
-		return nil, fmt.Errorf(
-			"%w: std.permuteIndex arg 0: expected int64, got %T", ErrArgType, args[0],
-		)
-	}
-
-	idx, ok := toInt64(args[1])
-	if !ok {
-		return nil, fmt.Errorf(
-			"%w: std.permuteIndex arg 1: expected int64, got %T", ErrArgType, args[1],
-		)
-	}
-
-	domainSize, ok := toInt64(args[2])
-	if !ok {
-		return nil, fmt.Errorf(
-			"%w: std.permuteIndex arg 2: expected int64, got %T", ErrArgType, args[2],
-		)
-	}
-
-	return Permute(seedVal, idx, domainSize)
-}
-
 // halfWidthBits returns the bit width of each Feistel half so that
 // 2^(feistelHalves * halfBits) >= size. Minimum 1 to guarantee a
 // usable two-half split even for tiny domains.
@@ -168,7 +109,7 @@ func feistelEncrypt(x, key, halfBits, halfMask uint64) uint64 {
 	right := x & halfMask
 
 	for round := range uint64(feistelRounds) {
-		mixed := seed.SplitMix64(key ^ (round << feistelRoundShift) ^ right)
+		mixed := SplitMix64(key ^ (round << feistelRoundShift) ^ right)
 		newRight := (left ^ mixed) & halfMask
 		left = right
 		right = newRight

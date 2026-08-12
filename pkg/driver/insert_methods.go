@@ -4,14 +4,13 @@ import (
 	"slices"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 )
 
-// InsertCapability pairs a driver type with the InsertSpec methods its
+// InsertCapability pairs a driver type with the insert methods its
 // implementation serves.
 type InsertCapability struct {
 	Type          stroppy.DriverConfig_DriverType
-	InsertMethods []dgproto.InsertMethod
+	InsertMethods []InsertMethod
 }
 
 // insertMethodsByDriver is the static driver→insert-method matrix. It is
@@ -19,40 +18,40 @@ type InsertCapability struct {
 // stroppy CLI links only this package — probe must answer offline without
 // pulling driver implementations (and their database clients) into the
 // binary. Keep each row in sync with the method switch in
-// pkg/driver/<type>/insert_spec.go.
+// pkg/driver/<type>.
 //
 //nolint:exhaustive // DRIVER_TYPE_UNSPECIFIED deliberately has no capability row.
-var insertMethodsByDriver = map[stroppy.DriverConfig_DriverType][]dgproto.InsertMethod{
+var insertMethodsByDriver = map[stroppy.DriverConfig_DriverType][]InsertMethod{
 	stroppy.DriverConfig_DRIVER_TYPE_POSTGRES: {
-		dgproto.InsertMethod_PLAIN_QUERY,
-		dgproto.InsertMethod_PLAIN_BULK,
-		dgproto.InsertMethod_COLUMNAR,
-		dgproto.InsertMethod_NATIVE,
+		InsertPlainQuery,
+		InsertPlainBulk,
+		InsertColumnar,
+		InsertNative,
 	},
 	stroppy.DriverConfig_DRIVER_TYPE_MYSQL: {
-		dgproto.InsertMethod_PLAIN_QUERY,
-		dgproto.InsertMethod_PLAIN_BULK,
-		dgproto.InsertMethod_NATIVE,
+		InsertPlainQuery,
+		InsertPlainBulk,
+		InsertNative,
 	},
 	stroppy.DriverConfig_DRIVER_TYPE_PICODATA: {
-		dgproto.InsertMethod_PLAIN_QUERY,
-		dgproto.InsertMethod_PLAIN_BULK,
-		dgproto.InsertMethod_NATIVE,
+		InsertPlainQuery,
+		InsertPlainBulk,
+		InsertNative,
 	},
 	stroppy.DriverConfig_DRIVER_TYPE_YDB: {
-		dgproto.InsertMethod_PLAIN_QUERY,
-		dgproto.InsertMethod_PLAIN_BULK,
-		dgproto.InsertMethod_COLUMNAR,
-		dgproto.InsertMethod_NATIVE,
+		InsertPlainQuery,
+		InsertPlainBulk,
+		InsertColumnar,
+		InsertNative,
 	},
 	stroppy.DriverConfig_DRIVER_TYPE_NOOP: {
-		dgproto.InsertMethod_PLAIN_QUERY,
-		dgproto.InsertMethod_PLAIN_BULK,
-		dgproto.InsertMethod_COLUMNAR,
-		dgproto.InsertMethod_NATIVE,
+		InsertPlainQuery,
+		InsertPlainBulk,
+		InsertColumnar,
+		InsertNative,
 	},
 	stroppy.DriverConfig_DRIVER_TYPE_CSV: {
-		dgproto.InsertMethod_NATIVE,
+		InsertNative,
 	},
 }
 

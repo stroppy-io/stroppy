@@ -4,8 +4,6 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
-	"github.com/stroppy-io/stroppy/pkg/datagen/stdlib"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
@@ -77,9 +75,9 @@ func fillDataWithOriginal(
 
 const originalFraction = 0.1
 
-// secondsPerDay is the epoch-day invariant (UTC, no leap seconds), matching
-// stdlib.daysToDate so the typed date columns land on the same UTC midnight
-// the legacy generator produced.
+// secondsPerDay is the epoch-day invariant (UTC, no leap seconds), so the
+// typed date columns land on the same UTC midnight the legacy generator
+// produced.
 const secondsPerDay int64 = 86_400
 
 // Fixed-value load constants (the legacy literals from the proto builders).
@@ -306,7 +304,7 @@ func customerSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.I
 	// paramC is the NURand per-generator constant: SplitMix64(CSalt) & A.
 	// Matches the legacy DrawNURand and helpers.nurand so load-time c_last
 	// values are drawn from the same distribution tx-time picks look up.
-	paramC := int64(seed.SplitMix64(lastNameCSalt)) & int64(nurandA) //nolint:gosec // G115: masked to 8 bits
+	paramC := int64(gen.SplitMix64(lastNameCSalt)) & int64(nurandA) //nolint:gosec // G115: masked to 8 bits
 
 	b := gen.NewSchemaBuilder()
 	cID := b.Int64("c_id")
@@ -578,7 +576,7 @@ func ordersSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.Ind
 		// o_c_id is the per-district customer permutation of (o_id-1).
 		permuteSeed := oWIDVal*100 + oDIDVal + int64(ordersPermuteSalt)
 		//nolint:errcheck // inputs are valid by construction
-		ocid, _ := stdlib.Permute(permuteSeed, oIDVal-1, int64(customersPerDistrict))
+		ocid, _ := gen.Permute(permuteSeed, oIDVal-1, int64(customersPerDistrict))
 		r.SetInt64(oCID, ocid+1)
 
 		r.SetTime(oEntryD, entryDate)

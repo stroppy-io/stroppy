@@ -14,7 +14,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 - New `pkg/gen` random-generation primitives library: deterministic, seekable, allocation-free scalar and text draws composed in plain Go, intended to replace the relational datagen expression framework for workload data loading.
 - `pkg/gen` now provides typed direct-output batches: a reusable columnar [Batch] with bound [Column] handles and an [IndexedSource] that fills rows through a plain Go row callback, so workload formulas write straight into prepared storage with zero generation-time allocations after preparation.
-- Insert-method ownership moves to the driver package: `driver.InsertMethod` is the Go-native enum for the upcoming typed insert path, with `ParseInsertMethod` and `dgproto` conversion helpers alongside the existing legacy protobuf method.
+- Insert-method ownership moves to the driver package: `driver.InsertMethod` is the Go-native enum for the typed insert path, with `ParseInsertMethod` for authoring strings (`plain_query`, `plain_bulk`, `columnar`, `native`).
 - Typed insert path: `driver.InsertRequest` + `Driver.Insert` + `Bench.Insert` stream rows from a workload-authored `gen.BatchSource` through every driver (postgres, mysql, picodata, ydb, noop, csv), with a typed parallel runner in `pkg/driver/common`. The legacy `InsertSpec` path keeps working unchanged alongside it.
 - The `simple` workload loads `stroppy_demo` through the typed insert path: a plain Go row formula (id, 8-char label, uniform value) over a versioned `gen` source replaces the relational InsertSpec struct literal.
 - TPC-B loads `pgbench_branches`, `pgbench_tellers`, and `pgbench_accounts` through the typed insert path: per-table `gen` sources preserve the bid fan-out arithmetic (`floor(entity/perBranch)+1`), fixed-width ASCII fillers, and the legacy per-table seeds.
@@ -36,6 +36,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Removed
 
+- The relational data-generation expression framework is gone. `pkg/datagen/{compile,expr,runtime,lookup,cohort,stdlib,seed}` and the frozen `pkg/datagen/dgproto` protobuf types (InsertSpec, Expr, StreamDraw, …) are deleted; workload data generation is now exclusively plain Go under `pkg/gen`. The surviving primitives (`gen.Permute`, `gen.SplitMix64`) moved into `pkg/gen`, and the `datagen-framework.md` and `proto.md` guides were removed — `docs/parallelism.md` is the load-parallelism reference. The TPC-H/TPC-DS canonical generators keep their original algorithms and seeds.
 - Stroppy no longer depends on k6, TypeScript, sobek, esbuild, or node/npm. The engine is now a single plain Go binary built with `go build` — authoring benchmarks in TypeScript, the `--` k6-args passthrough, the `gen` scaffolding command, and the cloud status gRPC service are all gone. Concurrency is configured with the `VUS`/`DURATION`/`ITER` environment variables instead of k6 flags. Workloads are Go-native (`tpcc/tx`, `tpcb/tx`, `tpch/tx`, `tpcds`, `simple`, `execute_sql`); `.sql` files and inline SQL still work.
 
 ## [5.7.3] - 2026-07-29

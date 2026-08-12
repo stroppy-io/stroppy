@@ -7,16 +7,16 @@ import "math/bits"
 // A Field's value at an entity is a pure function of (field state, entity,
 // sub):
 //
-//	raw(entity, sub) = splitMix64(seed0 + entity*gamma + sub*subGamma)
+//	raw(entity, sub) = SplitMix64(seed0 + entity*gamma + sub*subGamma)
 //
-// splitMix64 is the Steele/Lea/Flood 2014 bit-mixer (a bijection with strong
+// SplitMix64 is the Steele/Lea/Flood 2014 bit-mixer (a bijection with strong
 // avalanche). Each field owns its own seed0 and an odd gamma so fields
 // decorrelate rather than being shifted views of one sequence; subGamma is a
 // second odd increment so multi-word values (filled strings, NURand) walk a
 // different stride than successive entities. Any entity is reachable in O(1)
 // with no sequential state.
 
-// splitMix64 round constants (Steele, Lea, Flood 2014).
+// smix* are the SplitMix64 round constants (Steele, Lea, Flood 2014).
 const (
 	smixGamma  = 0x9E3779B97F4A7C15 // golden-ratio odd increment
 	smixMul1   = 0xBF58476D1CE4E5B9
@@ -32,10 +32,11 @@ const (
 // entity counter.
 const subGamma = 0xD1B54A32D192ED03
 
-// splitMix64 is the full splitmix64 bit-mixer (5 XORs + 2 multiplies), the
+// SplitMix64 is the full splitmix64 bit-mixer (5 XORs + 2 multiplies), the
 // single mixing primitive for both derivation and the counter core. It is a
-// bijection with BigCrush-passing avalanche.
-func splitMix64(x uint64) uint64 {
+// bijection with BigCrush-passing avalanche. Exported so imperative generators
+// can mix a derived key directly (for example TPC-C NURand).
+func SplitMix64(x uint64) uint64 {
 	x += smixGamma
 	x = (x ^ (x >> smixShift1)) * smixMul1
 	x = (x ^ (x >> smixShift2)) * smixMul2
@@ -65,7 +66,7 @@ func (r Root) Seed() uint64 { return r.seed }
 //
 // Domain is immutable and safe to copy and share.
 func (r Root) Domain(name string) Domain {
-	return Domain{seed: splitMix64(r.seed ^ fnv1a64(name))}
+	return Domain{seed: SplitMix64(r.seed ^ fnv1a64(name))}
 }
 
 // Domain is a namespace within a Root. Fields derived from a domain are
@@ -81,11 +82,11 @@ type Domain struct{ seed uint64 }
 //
 // Field is immutable and safe to copy and share across goroutines.
 func (d Domain) Field(name string) Field {
-	key := splitMix64(d.seed ^ fnv1a64(name))
+	key := SplitMix64(d.seed ^ fnv1a64(name))
 
 	return Field{
-		seed0: splitMix64(key),
-		gamma: splitMix64(key^smixGamma) | 1, // force odd → full-period Weyl walk
+		seed0: SplitMix64(key),
+		gamma: SplitMix64(key^smixGamma) | 1, // force odd → full-period Weyl walk
 	}
 }
 
@@ -125,7 +126,7 @@ type Draw struct {
 // raw returns the 64-bit output for the current entity at the current
 // sub-draw, then advances the sub-draw cursor.
 func (d *Draw) raw() uint64 {
-	v := splitMix64(d.f.seed0 + d.entity*d.f.gamma + d.sub*subGamma)
+	v := SplitMix64(d.f.seed0 + d.entity*d.f.gamma + d.sub*subGamma)
 	d.sub++
 
 	return v

@@ -23,8 +23,9 @@ make tests          # all tests with race detector and coverage
 ```
 
 There is no `make proto` and no TypeScript toolchain. The `.pb.go` types under
-`pkg/common/proto/stroppy/` and `pkg/datagen/dgproto/` are frozen hand-edited
-Go types (the driver/workload contract); they are not regenerated.
+`pkg/common/proto/stroppy/` are frozen hand-edited Go types (RunConfig,
+DriverConfig, etc.), and `pkg/datagen/dgproto` no longer exists — load-time
+generation is plain Go under `pkg/gen/` (see `docs/parallelism.md`).
 
 **Embedded FS rebuild rule:** `workloads/` is `//go:embed *` (SQL/JSON/MD only).
 If you pass a workload by short name (`tpcc/tx`), the binary serves its SQL from
@@ -51,12 +52,12 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 | `pkg/driver/dispatcher.go` | driver registry: `RegisterDriver()` + `Dispatch()` |
 | `pkg/driver/{postgres,mysql,picodata,ydb,noop,csv}/` | driver implementations |
 | `pkg/driver/sqldriver/` | shared sql.DB-backed base (mysql, ydb use this) |
-| `pkg/datagen/` | relational data-generation runtime: compile, expr, runtime, lookup, cohort, stdlib, seed |
+| `pkg/gen/` | imperative generation primitives: Root/Domain/Field scalars, reusable typed Batches, IndexedSource, Permute/SplitMix64 |
+| `pkg/datagen/` | row-production seam: `source` (Partitionable/RowSource) + canonical TPC-DS/TPC-H generator adapters (`tpcdsgen`, `tpchgen`) |
 | `internal/runner/` | run-config merge, env override parsing, driver presets, config-file load |
-| `pkg/common/proto/stroppy/`, `pkg/datagen/dgproto/` | frozen Go types (RunConfig, DriverConfig, etc.) — the contract, not codegen |
+| `pkg/common/proto/stroppy/` | frozen Go types (RunConfig, DriverConfig, etc.) — the contract, not codegen |
 | `workloads/` | embedded SQL/JSON workloads: tpcb, tpcc, tpch, tpcds |
-| `docs/datagen-framework.md` | authoritative relational datagen guide |
-| `docs/parallelism.md` | InsertSpec parallelism contract and tuning |
+| `docs/parallelism.md` | InsertRequest parallelism contract and tuning |
 
 ## Drivers
 
@@ -67,7 +68,7 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 | `pico` | DRIVER_TYPE_PICODATA | sql.DB-backed; `Begin()` always errors — use isolation `"none"` |
 | `ydb` | DRIVER_TYPE_YDB | sql.DB-backed; native maps to BulkUpsert |
 | `noop` | DRIVER_TYPE_NOOP = 5 | discards all I/O; benchmarks stroppy/framework overhead |
-| *(no preset)* | DRIVER_TYPE_CSV = 6 | URL-configured CSV output driver; InsertSpec/native-only, no query path |
+| *(no preset)* | DRIVER_TYPE_CSV = 6 | URL-configured CSV output driver; native-only, no query path |
 
 CSV example:
 ```bash
@@ -77,7 +78,7 @@ CSV example:
 ```
 
 Add driver: package under `pkg/driver/<name>/`, implement `driver.Driver`
-(`InsertSpec`, `RunQuery`, `Begin`, `Teardown`), call `RegisterDriver()` in
+(`Insert`, `RunQuery`, `Begin`, `Teardown`), call `RegisterDriver()` in
 `init()`, and add a blank import in `cmd/stroppy/main.go`.
 
 ## CLI Usage
@@ -160,8 +161,9 @@ SF=1 answer validation is PostgreSQL-only, while load/query execution has
 pg/mysql/pico/ydb dialect files. TPC-DS (`tpcds`) loads all 24 tables and runs
 the 99 query suite.
 
-Relational loads use `b.Step("load_data", ...)` and `driver.insertSpec(...)`.
-`LOAD_WORKERS` controls per-table InsertSpec fan-out where wired:
+Relational loads use `b.Step("load_data", ...)` and `b.Insert(ctx, req)` with
+a `driver.InsertRequest`. `LOAD_WORKERS` controls the per-request worker
+fan-out where wired:
 ```bash
 ./build/stroppy run tpcc/tx -d pg -e LOAD_WORKERS=8 --steps drop_schema,create_schema,load_data
 ```
