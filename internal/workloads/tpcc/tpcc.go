@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
 )
 
 var txNames = []string{"new_order", "payment", "order_status", "delivery", "stock_level"}
@@ -220,28 +219,42 @@ func (w *workload) initMetrics(b *bench.Bench) *metrics {
 }
 
 // loadData runs the relational load: warehouse, district, customer, item,
-// stock, orders, order_line, new_order.
+// stock, orders, order_line, new_order. The four basic tables (warehouse,
+// district, item, new_order) run on the typed insert path; the rest still
+// use the legacy InsertSpec until the complex-table port lands.
 func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64) error {
-	specs := []*dgproto.InsertSpec{
-		warehouseSpec(w.warehouses, w.warehouseStart),
-		districtSpec(w.warehouses, w.warehouseStart),
-		customerSpec(w.warehouses, w.warehouseStart, loadDays),
+	if _, err := b.Insert(ctx, warehouseRequest(w.warehouses, w.warehouseStart)); err != nil {
+		return err
 	}
+
+	if _, err := b.Insert(ctx, districtRequest(w.warehouses, w.warehouseStart)); err != nil {
+		return err
+	}
+
+	if _, err := b.InsertSpec(ctx, customerSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+		return err
+	}
+
 	if w.loadItems {
-		specs = append(specs, itemSpec())
-	}
-
-	specs = append(specs,
-		stockSpec(w.warehouses, w.warehouseStart),
-		ordersSpec(w.warehouses, w.warehouseStart, loadDays),
-		orderLineSpec(w.warehouses, w.warehouseStart, loadDays),
-		newOrderSpec(w.warehouses, w.warehouseStart),
-	)
-
-	for _, spec := range specs {
-		if _, err := b.InsertSpec(ctx, spec); err != nil {
+		if _, err := b.Insert(ctx, itemRequest()); err != nil {
 			return err
 		}
+	}
+
+	if _, err := b.InsertSpec(ctx, stockSpec(w.warehouses, w.warehouseStart)); err != nil {
+		return err
+	}
+
+	if _, err := b.InsertSpec(ctx, ordersSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+		return err
+	}
+
+	if _, err := b.InsertSpec(ctx, orderLineSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+		return err
+	}
+
+	if _, err := b.Insert(ctx, newOrderRequest(w.warehouses, w.warehouseStart)); err != nil {
+		return err
 	}
 
 	return nil

@@ -36,12 +36,10 @@ func col(name string) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_Col{Col: &dgproto.ColRef{Name: name}}}
 }
 
-// rowIndex is 0-based; rowID is 1-based.
+// rowIndex is the 0-based global row index used by the legacy proto builders.
 func rowIndex() *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{}}}
 }
-
-func rowID() *dgproto.Expr { return add(rowIndex(), litInt(1)) }
 
 func binOp(op dgproto.BinOp_Op, a, b *dgproto.Expr) *dgproto.Expr {
 	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{Op: op, A: a, B: b}}}
