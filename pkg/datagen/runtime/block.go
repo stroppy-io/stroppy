@@ -108,6 +108,8 @@ func (b *blockCache) get(slot string) (any, error) {
 
 // evalCount returns how many times the cache invoked its eval callback.
 // Test-only, not part of the public API.
+//
+//nolint:unused // introspection helper; removed with the relational runtime in commit 14
 func (b *blockCache) evalCount() int {
 	return b.evals
 }
