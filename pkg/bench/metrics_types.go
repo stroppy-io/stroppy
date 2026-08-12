@@ -6,12 +6,16 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"go.opentelemetry.io/otel/attribute"
 	otelmetric "go.opentelemetry.io/otel/metric"
 )
 
-const tagPairSize = 2
+const (
+	tagPairSize       = 2
+	maxCachedTagParts = 16
+)
 
 var (
 	errMetricAlreadyRegistered = errors.New("metric already registered")
@@ -41,14 +45,23 @@ type metricAttributes struct {
 	record []otelmetric.RecordOption
 }
 
+type metricTagKey struct {
+	count uint8
+	parts [maxCachedTagParts]string
+}
+
 type metric struct {
-	Name      string
-	Type      metricType
-	counter   otelmetric.Float64Counter
-	histogram otelmetric.Float64Histogram
-	gauge     otelmetric.Float64Gauge
-	rateTrue  otelmetric.Float64Counter
-	rateTotal otelmetric.Float64Counter
+	Name       string
+	Type       metricType
+	counter    otelmetric.Float64Counter
+	histogram  otelmetric.Float64Histogram
+	gauge      otelmetric.Float64Gauge
+	rateTrue   otelmetric.Float64Counter
+	rateTotal  otelmetric.Float64Counter
+	emptyAttrs metricAttributes
+	overflow   metricAttributes
+	tagAttrs   sync.Map
+	tagCount   atomic.Int64
 }
 
 func (m *metric) add(ctx context.Context, value float64, attrs metricAttributes) {
@@ -87,7 +100,12 @@ func (r *Registry) NewMetric(name string, typ metricType) (*metric, error) {
 		return nil, fmt.Errorf("%w: %q", errMetricAlreadyRegistered, name)
 	}
 
-	m := &metric{Name: name, Type: typ}
+	m := &metric{
+		Name:       name,
+		Type:       typ,
+		emptyAttrs: attributes(),
+		overflow:   attributes("otel.metric.overflow", "true"),
+	}
 	exportedName := r.prefix + name
 
 	var err error
@@ -122,6 +140,54 @@ func (r *Registry) NewMetric(name string, typ metricType) (*metric, error) {
 	r.metrics[name] = m
 
 	return m, nil
+}
+
+func (m *metric) taggedAttributes(tags []string) metricAttributes {
+	if len(tags) == 0 {
+		return m.emptyAttrs
+	}
+
+	if len(tags)%tagPairSize != 0 {
+		tags = tags[:len(tags)-1]
+	}
+
+	if len(tags) == 0 {
+		return m.emptyAttrs
+	}
+
+	if len(tags) > maxCachedTagParts {
+		return m.overflow
+	}
+
+	var key metricTagKey
+
+	key.count = uint8(len(tags)) //nolint:gosec // bounded by maxCachedTagParts
+	copy(key.parts[:], tags)
+
+	if cached, ok := m.tagAttrs.Load(key); ok {
+		if attrs, valid := cached.(metricAttributes); valid {
+			return attrs
+		}
+	}
+
+	if m.tagCount.Add(1) > metricCardinalityLimit {
+		m.tagCount.Add(-1)
+
+		return m.overflow
+	}
+
+	attrs := attributes(tags...)
+
+	cached, loaded := m.tagAttrs.LoadOrStore(key, attrs)
+	if loaded {
+		m.tagCount.Add(-1)
+	}
+
+	if result, valid := cached.(metricAttributes); valid {
+		return result
+	}
+
+	return m.overflow
 }
 
 func histogramBounds(name string) []float64 {

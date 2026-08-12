@@ -284,7 +284,7 @@ func (b *Bench) newMetric(name string, typ metricType) *Metric {
 
 // Add records a value with optional tag key/value pairs.
 func (m *Metric) Add(value float64, tags ...string) {
-	m.m.add(context.Background(), value, attributes(tags...))
+	m.m.add(context.Background(), value, m.m.taggedAttributes(tags))
 }
 
 // --- summary ---
@@ -317,10 +317,7 @@ func (s *summary) print() {
 
 				lines = append(lines, fmt.Sprintf("  %-40s %.3f", name, total))
 			case metricdata.Gauge[float64]:
-				if len(aggregation.DataPoints) > 0 {
-					lastPoint := aggregation.DataPoints[len(aggregation.DataPoints)-1]
-					lines = append(lines, fmt.Sprintf("  %-40s %.3f", name, lastPoint.Value))
-				}
+				lines = append(lines, fmt.Sprintf("  %-40s %.3f", name, sumGauge(aggregation.DataPoints)))
 			case metricdata.Histogram[float64]:
 				lines = append(lines, formatHistogramSummary(name, aggregation.DataPoints))
 			}
@@ -338,6 +335,15 @@ func (s *summary) print() {
 	for _, line := range lines {
 		fmt.Fprintln(os.Stderr, line)
 	}
+}
+
+func sumGauge(points []metricdata.DataPoint[float64]) float64 {
+	var total float64
+	for _, point := range points {
+		total += point.Value
+	}
+
+	return total
 }
 
 func formatHistogramSummary(name string, points []metricdata.HistogramDataPoint[float64]) string {

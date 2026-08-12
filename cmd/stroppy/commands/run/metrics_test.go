@@ -42,6 +42,15 @@ func TestMetricsConfig(t *testing.T) {
 	require.Equal(t, map[string]string{"environment": "test"}, got.ResourceAttributes)
 }
 
+func TestMetricsConfigWithGlobalWithoutExporter(t *testing.T) {
+	t.Parallel()
+
+	got := metricsConfig(&stroppy.RunConfig{Global: &stroppy.GlobalConfig{RunId: "run-42"}})
+	require.Equal(t, "run-42", got.RunID)
+	require.Empty(t, got.GRPCEndpoint)
+	require.Empty(t, got.HTTPEndpoint)
+}
+
 func TestMetricsConfigWithoutFile(t *testing.T) {
 	t.Parallel()
 

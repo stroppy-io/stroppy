@@ -3,6 +3,7 @@ package bench
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -38,6 +39,10 @@ func newMeterProvider(
 	ctx context.Context,
 	config *MetricsConfig,
 ) (*sdkmetric.MeterProvider, *sdkmetric.ManualReader, string, error) {
+	if config == nil {
+		config = &MetricsConfig{}
+	}
+
 	manualReader := sdkmetric.NewManualReader()
 	options := []sdkmetric.Option{
 		sdkmetric.WithReader(manualReader),
@@ -72,7 +77,10 @@ func newMeterProvider(
 }
 
 func newMetricExporter(ctx context.Context, config *MetricsConfig) (sdkmetric.Exporter, bool, error) {
-	headers := parseOTLPHeaders(config.Headers)
+	headers, err := parseOTLPHeaders(config.Headers)
+	if err != nil {
+		return nil, false, err
+	}
 
 	if config.GRPCEndpoint != "" {
 		options := []otlpmetricgrpc.Option{otlpmetricgrpc.WithEndpoint(config.GRPCEndpoint)}
@@ -134,21 +142,28 @@ func metricsResource(config *MetricsConfig) (*resource.Resource, error) {
 	return resource.Merge(resource.Default(), resource.NewSchemaless(attrs...))
 }
 
-func parseOTLPHeaders(raw string) map[string]string {
+func parseOTLPHeaders(raw string) (map[string]string, error) {
 	if raw == "" {
-		return nil
+		return map[string]string{}, nil
 	}
 
 	headers := make(map[string]string)
 
 	for part := range strings.SplitSeq(raw, ",") {
 		key, value, ok := strings.Cut(strings.TrimSpace(part), "=")
-		if ok && key != "" {
-			headers[key] = value
+		if !ok || key == "" {
+			continue
 		}
+
+		decoded, err := url.PathUnescape(value)
+		if err != nil {
+			return nil, fmt.Errorf("decode OTLP header %q: %w", key, err)
+		}
+
+		headers[key] = strings.TrimSpace(decoded)
 	}
 
-	return headers
+	return headers, nil
 }
 
 func metricExportInterval() time.Duration {

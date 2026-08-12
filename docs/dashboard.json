@@ -425,7 +425,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(sum(increase(${prefix}tx_errors_total{job=~\"$job\", step=~\"$step\", tx_name=~\"$tx_name\"}[$__range])) or vector(0)) / clamp_min(sum(increase(${prefix}transactions_total{job=~\"$job\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__range])), 1)",
+          "expr": "(sum(increase(${prefix}tx_errors_total{job=~\"$job\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__range])) or vector(0)) / clamp_min(sum(increase(${prefix}transactions_total{job=~\"$job\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__range])), 1)",
           "legendFormat": "errors",
           "range": false,
           "refId": "A",

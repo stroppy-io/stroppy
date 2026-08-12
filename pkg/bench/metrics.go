@@ -47,8 +47,9 @@ type txMetrics struct {
 }
 
 type attributeCache struct {
-	values sync.Map
-	size   atomic.Int64
+	values   sync.Map
+	size     atomic.Int64
+	overflow atomic.Pointer[metricAttributes]
 }
 
 type tableAttributeKey struct {
@@ -114,6 +115,19 @@ func (m *txMetrics) emit(vu *VU, metric *metric, value float64, attrs metricAttr
 	}
 }
 
+func overflowAttributes(cache *attributeCache) metricAttributes {
+	if attrs := cache.overflow.Load(); attrs != nil {
+		return *attrs
+	}
+
+	attrs := attributes("otel.metric.overflow", "true")
+	if cache.overflow.CompareAndSwap(nil, &attrs) {
+		return attrs
+	}
+
+	return *cache.overflow.Load()
+}
+
 func cachedAttributes(cache *attributeCache, key any, tags ...string) metricAttributes {
 	if cached, ok := cache.values.Load(key); ok {
 		attrs, valid := cached.(metricAttributes)
@@ -122,13 +136,13 @@ func cachedAttributes(cache *attributeCache, key any, tags ...string) metricAttr
 		}
 	}
 
-	attrs := attributes(tags...)
-
 	if cache.size.Add(1) > metricCardinalityLimit {
 		cache.size.Add(-1)
 
-		return attrs
+		return overflowAttributes(cache)
 	}
+
+	attrs := attributes(tags...)
 
 	cached, loaded := cache.values.LoadOrStore(key, attrs)
 	if loaded {
@@ -228,10 +242,17 @@ func (m *txMetrics) recordIteration(vu *VU, elapsed time.Duration) {
 	m.emit(vu, m.iterations, 1, attrs)
 }
 
-func (m *txMetrics) recordTxEnd(vu *VU, name string, elapsed time.Duration, queries int, committed bool) {
+func (m *txMetrics) recordTxEnd(
+	vu *VU,
+	action, name string,
+	isolation stroppy.TxIsolationLevel,
+	elapsed time.Duration,
+	queries int,
+	committed bool,
+) {
 	m.ensureRegistered(vu, root.lg)
 
-	attrs := m.txAttributes(vu.stepTag, "", name, "")
+	attrs := m.txAttributes(vu.stepTag, action, name, txIsolationName(isolation))
 	if committed {
 		m.emit(vu, m.txCommits, 1, attrs)
 	} else {
