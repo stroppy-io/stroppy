@@ -1,18 +1,22 @@
 package bench
 
-// stroppy-owned metrics substrate — mirrors the subset of go.k6.io/k6/metrics
-// that pkg/bench consumes, so the k6 dependency can be dropped from the Go
-// runtime path. Tags are carried for parity but the floor sink ignores them.
-
 import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
-	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	otelmetric "go.opentelemetry.io/otel/metric"
 )
 
-var errMetricAlreadyRegistered = errors.New("metric already registered")
+const tagPairSize = 2
+
+var (
+	errMetricAlreadyRegistered = errors.New("metric already registered")
+	errUnknownMetricType       = errors.New("unknown metric type")
+)
 
 type metricType int
 
@@ -20,23 +24,62 @@ const (
 	Counter metricType = iota
 	Trend
 	Rate
+	Gauge
 )
 
+var (
+	durationMillisecondsBounds = []float64{
+		0.1, 0.25, 0.5, 1, 2.5, 5, 10, 25, 50, 100,
+		250, 500, 1000, 2500, 5000, 10000, 30000, 60000,
+	}
+	countBounds = []float64{0, 1, 2, 5, 10, 20, 50, 100, 250, 500, 1000}
+)
+
+type metricAttributes struct {
+	set    attribute.Set
+	add    []otelmetric.AddOption
+	record []otelmetric.RecordOption
+}
+
 type metric struct {
-	Name string
-	Type metricType
+	Name      string
+	Type      metricType
+	counter   otelmetric.Float64Counter
+	histogram otelmetric.Float64Histogram
+	gauge     otelmetric.Float64Gauge
+	rateTrue  otelmetric.Float64Counter
+	rateTotal otelmetric.Float64Counter
+}
+
+func (m *metric) add(ctx context.Context, value float64, attrs metricAttributes) {
+	switch m.Type {
+	case Counter:
+		m.counter.Add(ctx, value, attrs.add...)
+	case Trend:
+		m.histogram.Record(ctx, value, attrs.record...)
+	case Rate:
+		m.rateTotal.Add(ctx, 1, attrs.add...)
+
+		if value != 0 {
+			m.rateTrue.Add(ctx, 1, attrs.add...)
+		}
+	case Gauge:
+		m.gauge.Record(ctx, value, attrs.record...)
+	}
 }
 
 type Registry struct {
 	mu      sync.Mutex
+	meter   otelmetric.Meter
+	prefix  string
 	metrics map[string]*metric
 }
 
-func NewRegistry() *Registry {
-	return &Registry{metrics: map[string]*metric{}}
+func NewRegistry(meter otelmetric.Meter, prefix string) *Registry {
+	return &Registry{meter: meter, prefix: prefix, metrics: map[string]*metric{}}
 }
 
-func (r *Registry) NewMetric(name string, t metricType) (*metric, error) {
+func (r *Registry) NewMetric(name string, typ metricType) (*metric, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -44,49 +87,68 @@ func (r *Registry) NewMetric(name string, t metricType) (*metric, error) {
 		return nil, fmt.Errorf("%w: %q", errMetricAlreadyRegistered, name)
 	}
 
-	m := &metric{Name: name, Type: t}
+	m := &metric{Name: name, Type: typ}
+	exportedName := r.prefix + name
+
+	var err error
+
+	switch typ {
+	case Counter:
+		m.counter, err = r.meter.Float64Counter(exportedName)
+	case Trend:
+		options := []otelmetric.Float64HistogramOption{
+			otelmetric.WithExplicitBucketBoundaries(histogramBounds(name)...),
+		}
+		if strings.HasSuffix(name, "_duration") {
+			options = append(options, otelmetric.WithUnit("ms"))
+		}
+
+		m.histogram, err = r.meter.Float64Histogram(exportedName, options...)
+	case Rate:
+		m.rateTotal, err = r.meter.Float64Counter(exportedName + "_events_total")
+		if err == nil {
+			m.rateTrue, err = r.meter.Float64Counter(exportedName + "_true_total")
+		}
+	case Gauge:
+		m.gauge, err = r.meter.Float64Gauge(exportedName)
+	default:
+		err = fmt.Errorf("%w: %d", errUnknownMetricType, typ)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("create metric %q: %w", name, err)
+	}
+
 	r.metrics[name] = m
 
 	return m, nil
 }
 
-// RootTagSet returns an empty tag set sentinel.
-func (r *Registry) RootTagSet() *TagSet { return &TagSet{} }
-
-// TagSet is an immutable, copy-on-extend set of tag key/value pairs.
-type TagSet struct {
-	pairs [][2]string
-}
-
-func (t *TagSet) With(k, v string) *TagSet {
-	if t == nil {
-		t = &TagSet{}
+func histogramBounds(name string) []float64 {
+	if strings.HasSuffix(name, "_duration") {
+		return durationMillisecondsBounds
 	}
 
-	out := &TagSet{pairs: make([][2]string, 0, len(t.pairs)+1)}
-	out.pairs = append(out.pairs, t.pairs...)
-	out.pairs = append(out.pairs, [2]string{k, v})
-
-	return out
+	return countBounds
 }
 
-type Sample struct {
-	Metric *metric
-	Tags   *TagSet
-	Time   time.Time
-	Value  float64
-}
+func attributes(tags ...string) metricAttributes {
+	var set attribute.Set
 
-type SampleContainer interface{ GetSamples() []Sample }
+	if len(tags) >= tagPairSize {
+		pairs := make([]attribute.KeyValue, 0, len(tags)/tagPairSize)
+		for i := 0; i+1 < len(tags); i += tagPairSize {
+			pairs = append(pairs, attribute.String(tags[i], tags[i+1]))
+		}
 
-type sampleContainer []Sample
+		set = attribute.NewSet(pairs...)
+	} else {
+		set = attribute.NewSet()
+	}
 
-func (s sampleContainer) GetSamples() []Sample { return []Sample(s) }
-
-// PushIfNotDone sends s on ch unless ctx is already done. Blocks until either.
-func PushIfNotDone(ctx context.Context, ch chan<- SampleContainer, s Sample) {
-	select {
-	case <-ctx.Done():
-	case ch <- sampleContainer{s}:
+	return metricAttributes{
+		set:    set,
+		add:    []otelmetric.AddOption{otelmetric.WithAttributeSet(set)},
+		record: []otelmetric.RecordOption{otelmetric.WithAttributeSet(set)},
 	}
 }

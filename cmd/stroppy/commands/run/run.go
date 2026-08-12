@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
+	"github.com/stroppy-io/stroppy/internal/version"
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -171,17 +172,42 @@ Config file flags:
 				envOverrides["SQL_FILE"] = file
 			}
 
-			return runGoWorkload(name, steps, noSteps, envOverrides, driverConfigs)
+			return runGoWorkload(name, steps, noSteps, envOverrides, driverConfigs, metricsConfig(fileConfig))
 		}
 
 		// Go-native workload: if a Go workload is registered under the bare
 		// script name, dispatch to bench.Run.
 		if _, ok := bench.Lookup(scriptArg); ok {
-			return runGoWorkload(scriptArg, steps, noSteps, envOverrides, driverConfigs)
+			return runGoWorkload(scriptArg, steps, noSteps, envOverrides, driverConfigs, metricsConfig(fileConfig))
 		}
 
 		return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
 	},
+}
+
+func metricsConfig(config *stroppy.RunConfig) *bench.MetricsConfig {
+	metrics := &bench.MetricsConfig{ServiceVersion: version.Version}
+	if config == nil || config.GetGlobal() == nil {
+		return metrics
+	}
+
+	global := config.GetGlobal()
+	metrics.RunID = global.GetRunId()
+	metrics.ResourceAttributes = global.GetMetadata()
+
+	export := global.GetExporter().GetOtlpExport()
+	if export == nil {
+		return metrics
+	}
+
+	metrics.GRPCEndpoint = export.GetOtlpGrpcEndpoint()
+	metrics.HTTPEndpoint = export.GetOtlpHttpEndpoint()
+	metrics.HTTPPath = export.GetOtlpHttpExporterUrlPath()
+	metrics.Headers = export.GetOtlpHeaders()
+	metrics.Insecure = export.GetOtlpEndpointInsecure()
+	metrics.Prefix = export.GetOtlpMetricsPrefix()
+
+	return metrics
 }
 
 func invalidConfig(err error) error {
@@ -220,6 +246,7 @@ func runGoWorkload(
 	steps, noSteps []string,
 	envOverrides map[string]string,
 	driverConfigs runner.DriverCLIConfigs,
+	metrics *bench.MetricsConfig,
 ) error {
 	drivers := map[int]*stroppy.DriverConfig{}
 
@@ -254,7 +281,7 @@ func runGoWorkload(
 	}
 
 	ctx := context.Background()
-	if err := bench.Run(ctx, name, drivers, envOverrides, logger.Global()); err != nil {
+	if err := bench.Run(ctx, name, drivers, envOverrides, logger.Global(), metrics); err != nil {
 		return fmt.Errorf("failed to run go workload: %w", err)
 	}
 
