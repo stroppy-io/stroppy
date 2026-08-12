@@ -10,6 +10,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/tpchgen"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
@@ -207,19 +208,26 @@ func insertMethodName(method dgproto.InsertMethod) string {
 	}
 }
 
-// InsertTpch loads one TPC-H table via the ported dbgen generator.
+// InsertTpch loads one TPC-H table via the ported dbgen generator, streamed
+// through the typed [driver.InsertRequest] path. The dbgen generator lives
+// behind a [gen.BatchSource] adapter (tpchgen.NewBatchSource), so no dgproto
+// InsertSpec is synthesized; canonical seeds, seeking, and entity fan-out are
+// preserved unchanged.
 func (b *Bench) InsertTpch(ctx context.Context, table string, scaleFactor float64, workers int) (*stats.Query, error) {
 	if workers < 1 {
 		workers = 1
 	}
 
-	spec := &dgproto.InsertSpec{
-		Table: table, Method: dgproto.InsertMethod_NATIVE,
-		Parallelism: &dgproto.Parallelism{Workers: int32(workers)},
-		Generator:   &dgproto.InsertSpec_Tpch{Tpch: &dgproto.TpchSource{Table: table, ScaleFactor: scaleFactor}},
+	src, err := tpchgen.NewBatchSource(table, scaleFactor)
+	if err != nil {
+		return nil, fmt.Errorf("tpch %q: %w", table, err)
 	}
 
-	return b.InsertSpec(ctx, spec)
+	req := &driver.InsertRequest{
+		Table: table, Method: driver.InsertNative, Workers: workers, Source: src,
+	}
+
+	return b.Insert(ctx, req)
 }
 
 // InsertTpcds loads one TPC-DS table via the ported dsdgen generator.

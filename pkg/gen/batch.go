@@ -185,6 +185,24 @@ func (b *Batch) Reset() {
 // value; setters write through it into the batch's backing storage.
 func (b *Batch) Row(i int) Row { return Row{b: b, off: i} }
 
+// AddRow reserves the next unfilled row slot, advances the filled count by
+// one, and returns a facade over it. It is the stateful-cursor entry point
+// for generators that fill rows one at a time from a non-indexed source
+// (for example a canonical dbgen stream): the caller drains one upstream row,
+// calls AddRow, and writes its cells through the returned [Row] before the
+// next call. Panics if the batch is already full; callers bound the loop
+// with [Batch.Len] < [Batch.Cap].
+func (b *Batch) AddRow() Row {
+	if b.n >= b.cap {
+		panic("gen: Batch.AddRow overflow")
+	}
+
+	r := Row{b: b, off: b.n}
+	b.n++
+
+	return r
+}
+
 // Row is the author-facing facade over one row of a [Batch]. A workload's row
 // callback receives a *Row and writes each column through a bound [Column]
 // handle; no seed, RNG, buffer, or positional index appears at the call site.
