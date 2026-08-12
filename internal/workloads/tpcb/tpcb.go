@@ -13,7 +13,8 @@ import (
 	"sync/atomic"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
 var errAccountNotFound = errors.New("tpc-b: account not found")
@@ -77,15 +78,15 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		{"drop_schema", func() error { return runSection("drop_schema") }},
 		{"create_schema", func() error { return runSection("create_schema") }},
 		{"load_data", func() error {
-			if _, err := b.InsertSpec(ctx, branchesSpec(w.scale)); err != nil {
+			if _, err := b.Insert(ctx, branchesRequest(w.scale)); err != nil {
 				return err
 			}
 
-			if _, err := b.InsertSpec(ctx, tellersSpec(w.scale)); err != nil {
+			if _, err := b.Insert(ctx, tellersRequest(w.scale)); err != nil {
 				return err
 			}
 
-			if _, err := b.InsertSpec(ctx, accountsSpec(w.scale)); err != nil {
+			if _, err := b.Insert(ctx, accountsRequest(w.scale)); err != nil {
 				return err
 			}
 
@@ -254,98 +255,145 @@ func (w *workload) retryCounter(b *bench.Bench) *bench.Metric {
 	return w.retryMetric
 }
 
-// --- InsertSpec builders (struct literals, what Rel/Draw compiles to) ---
+// --- typed insert requests (plain Go row formulas) ---
 
-func workers() *dgproto.Parallelism {
+// loadWorkers returns the per-table worker fan-out from LOAD_WORKERS, or 1
+// when unset. Replaces the legacy workers() *dgproto.Parallelism helper.
+func loadWorkers() int {
 	if n := bench.EnvInt("LOAD_WORKERS", 0); n > 0 {
-		return &dgproto.Parallelism{Workers: int32(n)} //nolint:gosec // G115: value bounded by scale factor, no overflow path
+		return n
 	}
 
-	return nil
+	return 1
 }
 
-func branchesSpec(scale int64) *dgproto.InsertSpec {
-	return &dgproto.InsertSpec{
-		Table: "pgbench_branches", Seed: seedBranches, Method: dgproto.InsertMethod_NATIVE,
-		Parallelism: workers(),
-		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
-			Population:  &dgproto.Population{Name: "branches", Size: branches(scale)},
-			ColumnOrder: []string{"bid", "bbalance", "filler"},
-			Attrs: []*dgproto.Attr{
-				{Name: "bid", Expr: rowID()},
-				{Name: "bbalance", Expr: litInt(0)},
-				{Name: "filler", Expr: asciiDraw(branchesFiller)},
-			},
-		}},
+// branchesRequest builds the typed insert request for pgbench_branches.
+// bid is the 1-based row counter, bbalance is 0, filler is a fixed-width
+// [A-Za-z] string. Preserves the legacy table name, method (NATIVE), and
+// seedBranches derivation.
+func branchesRequest(scale int64) *driver.InsertRequest {
+	root := gen.New(seedBranches)
+
+	return &driver.InsertRequest{
+		Table: "pgbench_branches", Method: driver.InsertNative, Workers: loadWorkers(),
+		Source: branchesSource(root, branches(scale)),
 	}
 }
 
-func tellersSpec(scale int64) *dgproto.InsertSpec {
-	return &dgproto.InsertSpec{
-		Table: "pgbench_tellers", Seed: seedTellers, Method: dgproto.InsertMethod_NATIVE,
-		Parallelism: workers(),
-		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
-			Population:  &dgproto.Population{Name: "tellers", Size: tellers(scale)},
-			ColumnOrder: []string{"tid", "bid", "tbalance", "filler"},
-			Attrs: []*dgproto.Attr{
-				{Name: "tid", Expr: rowID()},
-				{Name: "bid", Expr: binOp(dgproto.BinOp_DIV, rowIndex(), litInt(tellersPerBranch), litInt(1))},
-				{Name: "tbalance", Expr: litInt(0)},
-				{Name: "filler", Expr: asciiDraw(tellersFiller)},
-			},
-		}},
+func tellersRequest(scale int64) *driver.InsertRequest {
+	root := gen.New(seedTellers)
+
+	return &driver.InsertRequest{
+		Table: "pgbench_tellers", Method: driver.InsertNative, Workers: loadWorkers(),
+		Source: tellersSource(root, tellers(scale)),
 	}
 }
 
-func accountsSpec(scale int64) *dgproto.InsertSpec {
-	return &dgproto.InsertSpec{
-		Table: "pgbench_accounts", Seed: seedAccounts, Method: dgproto.InsertMethod_NATIVE,
-		Parallelism: workers(),
-		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
-			Population:  &dgproto.Population{Name: "accounts", Size: accounts(scale)},
-			ColumnOrder: []string{"aid", "bid", "abalance", "filler"},
-			Attrs: []*dgproto.Attr{
-				{Name: "aid", Expr: rowID()},
-				{Name: "bid", Expr: binOp(dgproto.BinOp_DIV, rowIndex(), litInt(accountsPerBranch), litInt(1))},
-				{Name: "abalance", Expr: litInt(0)},
-				{Name: "filler", Expr: asciiDraw(accountFiller)},
-			},
-		}},
+func accountsRequest(scale int64) *driver.InsertRequest {
+	root := gen.New(seedAccounts)
+
+	return &driver.InsertRequest{
+		Table: "pgbench_accounts", Method: driver.InsertNative, Workers: loadWorkers(),
+		Source: accountsSource(root, accounts(scale)),
 	}
 }
 
-func rowID() *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{
-		Op: dgproto.BinOp_ADD,
-		A:  &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{}}},
-		B:  litInt(1),
-	}}}
+// branchesSource returns the indexed source for pgbench_branches. Each
+// row's bid is its 1-based entity index; the filler column is the only
+// random field, so it owns its own gen.Field under the versioned domain.
+//
+//nolint:dupl // each table's load formula is kept explicit for readability
+func branchesSource(root gen.Root, totalRows int64) *gen.IndexedSource {
+	fillerField := root.Domain("tpcb/branches@1").Field("filler")
+
+	b := gen.NewSchemaBuilder()
+	bidCol := b.Int64("bid")
+	bbalanceCol := b.Int64("bbalance")
+	fillerCol := b.Bytes("filler", branchesFiller)
+	schema := b.Build()
+
+	fn := func(r gen.Row, entity uint64) error {
+		r.SetInt64(bidCol, int64(entity)+1) //nolint:gosec // G115: bounded by totalRows
+		r.SetInt64(bbalanceCol, 0)
+
+		dst, err := r.Bytes(fillerCol, branchesFiller)
+		if err != nil {
+			return err
+		}
+
+		draw := fillerField.At(entity)
+		gen.Alpha.Fill(&draw, dst)
+
+		return nil
+	}
+
+	return gen.NewIndexedSource(schema, root, "tpcb/branches@1", totalRows, 64, fn)
 }
 
-func rowIndex() *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_RowIndex{RowIndex: &dgproto.RowIndex{}}}
+// tellersSource returns the indexed source for pgbench_tellers. bid fans
+// out as floor(entity / tellersPerBranch) + 1, matching the legacy DIV
+// expression; tid is the 1-based entity index, tbalance is 0.
+//
+//nolint:dupl // each table's load formula is kept explicit for readability
+func tellersSource(root gen.Root, totalRows int64) *gen.IndexedSource {
+	fillerField := root.Domain("tpcb/tellers@1").Field("filler")
+
+	b := gen.NewSchemaBuilder()
+	tidCol := b.Int64("tid")
+	bidCol := b.Int64("bid")
+	tbalanceCol := b.Int64("tbalance")
+	fillerCol := b.Bytes("filler", tellersFiller)
+	schema := b.Build()
+
+	fn := func(r gen.Row, entity uint64) error {
+		r.SetInt64(tidCol, int64(entity)+1)                          //nolint:gosec // G115: bounded by totalRows
+		r.SetInt64(bidCol, int64(entity/uint64(tellersPerBranch))+1) //nolint:gosec // G115: bounded
+		r.SetInt64(tbalanceCol, 0)
+
+		dst, err := r.Bytes(fillerCol, tellersFiller)
+		if err != nil {
+			return err
+		}
+
+		draw := fillerField.At(entity)
+		gen.Alpha.Fill(&draw, dst)
+
+		return nil
+	}
+
+	return gen.NewIndexedSource(schema, root, "tpcb/tellers@1", totalRows, 64, fn)
 }
 
-// binOp(div, a/b + c) builds (a DIV b) ADD c — the bid fan-out expressions.
-func binOp(op dgproto.BinOp_Op, a, b, addC *dgproto.Expr) *dgproto.Expr {
-	div := &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{Op: op, A: a, B: b}}}
+// accountsSource returns the indexed source for pgbench_accounts. bid fans
+// out as floor(entity / accountsPerBranch) + 1; aid is the 1-based entity
+// index, abalance is 0.
+//
+//nolint:dupl // each table's load formula is kept explicit for readability
+func accountsSource(root gen.Root, totalRows int64) *gen.IndexedSource {
+	fillerField := root.Domain("tpcb/accounts@1").Field("filler")
 
-	return &dgproto.Expr{Kind: &dgproto.Expr_BinOp{BinOp: &dgproto.BinOp{Op: dgproto.BinOp_ADD, A: div, B: addC}}}
-}
+	b := gen.NewSchemaBuilder()
+	aidCol := b.Int64("aid")
+	bidCol := b.Int64("bid")
+	abalanceCol := b.Int64("abalance")
+	fillerCol := b.Bytes("filler", accountFiller)
+	schema := b.Build()
 
-func asciiDraw(width int) *dgproto.Expr {
-	n := litInt(int64(width))
+	fn := func(r gen.Row, entity uint64) error {
+		r.SetInt64(aidCol, int64(entity)+1)                           //nolint:gosec // G115: bounded by totalRows
+		r.SetInt64(bidCol, int64(entity/uint64(accountsPerBranch))+1) //nolint:gosec // G115: bounded
+		r.SetInt64(abalanceCol, 0)
 
-	return &dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
-		Draw: &dgproto.StreamDraw_Ascii{Ascii: &dgproto.DrawAscii{
-			MinLen: n, MaxLen: n,
-			Alphabet: []*dgproto.AsciiRange{{Min: 65, Max: 90}, {Min: 97, Max: 122}},
-		}},
-	}}}
-}
+		dst, err := r.Bytes(fillerCol, accountFiller)
+		if err != nil {
+			return err
+		}
 
-func litInt(n int64) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_Lit{Lit: &dgproto.Literal{
-		Value: &dgproto.Literal_Int64{Int64: n},
-	}}}
+		draw := fillerField.At(entity)
+		gen.Alpha.Fill(&draw, dst)
+
+		return nil
+	}
+
+	return gen.NewIndexedSource(schema, root, "tpcb/accounts@1", totalRows, 64, fn)
 }

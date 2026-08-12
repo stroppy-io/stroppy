@@ -17,6 +17,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - Insert-method ownership moves to the driver package: `driver.InsertMethod` is the Go-native enum for the upcoming typed insert path, with `ParseInsertMethod` and `dgproto` conversion helpers alongside the existing legacy protobuf method.
 - Typed insert path: `driver.InsertRequest` + `Driver.Insert` + `Bench.Insert` stream rows from a workload-authored `gen.BatchSource` through every driver (postgres, mysql, picodata, ydb, noop, csv), with a typed parallel runner in `pkg/driver/common`. The legacy `InsertSpec` path keeps working unchanged alongside it.
 - The `simple` workload loads `stroppy_demo` through the typed insert path: a plain Go row formula (id, 8-char label, uniform value) over a versioned `gen` source replaces the relational InsertSpec struct literal.
+- TPC-B loads `pgbench_branches`, `pgbench_tellers`, and `pgbench_accounts` through the typed insert path: per-table `gen` sources preserve the bid fan-out arithmetic (`floor(entity/perBranch)+1`), fixed-width ASCII fillers, and the legacy per-table seeds.
 - Metrics can again be exported to an OpenTelemetry collector through the existing `global.exporter.otlpExport` gRPC or HTTP configuration. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
 
 ### Changed
