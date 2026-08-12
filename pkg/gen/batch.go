@@ -234,8 +234,19 @@ func (r Row) SetTime(c Column, v time.Time) {
 // SetNull marks column c NULL for this row. A NULL overrides any value set
 // for the same column in the same row; drivers read the null flag before the
 // typed value.
+//
+// For bytes columns it also reserves zero bytes at this row's offset, so the
+// sequential byte-offset invariant (boff[R+1] == boff[R] + len(R)) holds even
+// when a row writes no bytes; otherwise the next non-null row would read a
+// stale start offset.
 func (r Row) SetNull(c Column) {
-	r.b.cols[c.idx].nulls[r.off] = true
+	col := &r.b.cols[c.idx]
+	col.nulls[r.off] = true
+
+	if col.kind == KindBytes {
+		col.boff[r.off+1] = col.boff[r.off]
+		col.blens[r.off] = 0
+	}
 }
 
 // ClearNull marks column c non-NULL (the default). Useful when a batch is

@@ -10,6 +10,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/tpcdsgen"
 	"github.com/stroppy-io/stroppy/pkg/datagen/tpchgen"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
@@ -230,19 +231,26 @@ func (b *Bench) InsertTpch(ctx context.Context, table string, scaleFactor float6
 	return b.Insert(ctx, req)
 }
 
-// InsertTpcds loads one TPC-DS table via the ported dsdgen generator.
+// InsertTpcds loads one TPC-DS table via the ported dsdgen generator, streamed
+// through the typed [driver.InsertRequest] path. The dsdgen generator lives
+// behind a [gen.BatchSource] adapter (tpcdsgen.NewBatchSource), so no dgproto
+// InsertSpec is synthesized; canonical text, null semantics, ticket fan-out,
+// and per-partition seeking are preserved unchanged.
 func (b *Bench) InsertTpcds(ctx context.Context, table string, scaleFactor float64, workers int) (*stats.Query, error) {
 	if workers < 1 {
 		workers = 1
 	}
 
-	spec := &dgproto.InsertSpec{
-		Table: table, Method: dgproto.InsertMethod_NATIVE,
-		Parallelism: &dgproto.Parallelism{Workers: int32(workers)},
-		Generator:   &dgproto.InsertSpec_Tpcds{Tpcds: &dgproto.TpcdsSource{Table: table, ScaleFactor: scaleFactor}},
+	src, err := tpcdsgen.NewBatchSource(table, scaleFactor)
+	if err != nil {
+		return nil, fmt.Errorf("tpcds %q: %w", table, err)
 	}
 
-	return b.InsertSpec(ctx, spec)
+	req := &driver.InsertRequest{
+		Table: table, Method: driver.InsertNative, Workers: workers, Source: src,
+	}
+
+	return b.Insert(ctx, req)
 }
 
 // Begin starts a transaction.
