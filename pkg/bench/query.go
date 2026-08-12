@@ -142,6 +142,56 @@ func (b *Bench) newInsertProgressTracker(spec *dgproto.InsertSpec) *insertprogre
 	return insertprogress.NewTracker(&config)
 }
 
+// Insert runs a typed [driver.InsertRequest] through the benchmark driver,
+// the typed successor to InsertSpec. It wires the same progress tracker and
+// metrics recording the legacy path uses, but streams rows from a
+// workload-authored [gen.BatchSource] instead of a dgproto generator.
+func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Query, error) {
+	tracker := b.newBatchInsertTracker(req)
+
+	runCtx := ctx
+	if tracker.Enabled() {
+		runCtx = insertprogress.ContextWithTracker(ctx, tracker)
+		tracker.Start(runCtx)
+	}
+
+	result, err := b.drv.Insert(runCtx, req)
+	if tracker.Enabled() {
+		tracker.Finish(err)
+	}
+
+	var elapsed time.Duration
+	if result != nil {
+		elapsed = result.Elapsed
+	}
+
+	b.root.txMetrics.recordInsertResult(b.vu, req.Table, elapsed, err)
+
+	if err != nil {
+		return nil, fmt.Errorf("insert %q: %w", req.Table, err)
+	}
+
+	b.root.txMetrics.recordInsert(b.vu, req.Table, result.Rows)
+
+	return result, nil
+}
+
+// newBatchInsertTracker builds the progress tracker for the typed Insert
+// path from the request's table/method/workers, mirroring the legacy
+// spec-driven tracker.
+func (b *Bench) newBatchInsertTracker(req *driver.InsertRequest) *insertprogress.Tracker {
+	config := insertprogress.DefaultConfig()
+	config.Table = req.Table
+	config.Method = req.Method.String()
+	config.Workers = req.Workers
+	config.Logger = b.lg.Named("insert-progress")
+	config.OnSample = func(snapshot insertprogress.Snapshot) {
+		b.root.txMetrics.recordInsertProgress(b.vu, &snapshot)
+	}
+
+	return insertprogress.NewTracker(&config)
+}
+
 func insertMethodName(method dgproto.InsertMethod) string {
 	switch method {
 	case dgproto.InsertMethod_PLAIN_QUERY:

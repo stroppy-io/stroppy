@@ -23,6 +23,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
 // ErrUnsupportedInsertMethod is returned when an InsertSpec requests
@@ -92,6 +93,63 @@ func (d *Driver) InsertSpec(
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
+// Insert runs a typed [driver.InsertRequest] through the CSV driver by
+// draining each worker's [gen.Cursor] partition into one file per
+// worker, mirroring the legacy InsertSpec shard layout. NATIVE is the
+// only method: CSV is write-only and does not synthesize SQL-shaped
+// emission for PLAIN_BULK/PLAIN_QUERY.
+func (d *Driver) Insert(
+	ctx context.Context,
+	req *driver.InsertRequest,
+) (*stats.Query, error) {
+	if err := driver.ValidateInsert(req); err != nil {
+		return nil, err
+	}
+
+	if req.Method != driver.InsertNative {
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedInsertMethod, req.Method)
+	}
+
+	workers := req.Workers
+	if workers < 1 {
+		workers = 1
+	}
+
+	columns := req.Source.Schema().ColumnNames()
+	start := time.Now()
+
+	var columnOrder []string
+
+	rows, err := common.RunParallelBatch(ctx, req.Source, workers, csvBatchRows,
+		func(workerCtx context.Context, chunk common.Chunk, cur gen.Cursor) error {
+			src := common.NewBatchRowSource(cur, columns, len(columns))
+
+			rowCount, err := d.writeShard(workerCtx, req.Table, src, chunk.Index)
+			if err != nil {
+				return err
+			}
+
+			d.recordShards(req.Table, columns, 1, rowCount)
+
+			if chunk.Index == 0 {
+				columnOrder = append([]string(nil), columns...)
+			}
+
+			return nil
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	// Make sure the registry has the canonical column order even when
+	// the first-indexed worker completed after a later one.
+	if len(columnOrder) > 0 {
+		d.recordShards(req.Table, columnOrder, 0, 0)
+	}
+
+	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
+}
+
 // writeShard drains src to EOF, serializing each row into the shard file
 // for table/worker. Returns the number of rows written.
 func (d *Driver) writeShard(
@@ -150,6 +208,13 @@ func (d *Driver) writeShard(
 // drainRows pulls rows from src, encodes each into record strings, and
 // writes them to writer until EOF. writer.Flush is the caller's
 // responsibility.
+
+// csvBatchRows is the per-cursor typed-batch capacity the CSV path
+// prepares. CSV reads one row at a time and has no driver bulk size, so
+// this only sizes the reusable gen batch; a modest value balances cursor
+// fill cost against memory.
+const csvBatchRows = 4096
+
 func drainRows(
 	ctx context.Context,
 	src source.RowSource,

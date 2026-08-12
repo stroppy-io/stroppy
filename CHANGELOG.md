@@ -15,6 +15,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - New `pkg/gen` random-generation primitives library: deterministic, seekable, allocation-free scalar and text draws composed in plain Go, intended to replace the relational datagen expression framework for workload data loading.
 - `pkg/gen` now provides typed direct-output batches: a reusable columnar [Batch] with bound [Column] handles and an [IndexedSource] that fills rows through a plain Go row callback, so workload formulas write straight into prepared storage with zero generation-time allocations after preparation.
 - Insert-method ownership moves to the driver package: `driver.InsertMethod` is the Go-native enum for the upcoming typed insert path, with `ParseInsertMethod` and `dgproto` conversion helpers alongside the existing legacy protobuf method.
+- Typed insert path: `driver.InsertRequest` + `Driver.Insert` + `Bench.Insert` stream rows from a workload-authored `gen.BatchSource` through every driver (postgres, mysql, picodata, ydb, noop, csv), with a typed parallel runner in `pkg/driver/common`. The legacy `InsertSpec` path keeps working unchanged alongside it.
 - Metrics can again be exported to an OpenTelemetry collector through the existing `global.exporter.otlpExport` gRPC or HTTP configuration. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
 
 ### Changed

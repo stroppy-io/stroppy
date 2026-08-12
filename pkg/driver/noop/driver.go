@@ -24,6 +24,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
 const defaultBulkSize = 2500
@@ -96,6 +97,41 @@ func (d *Driver) InsertSpec(
 
 	rows, err := common.RunParallelByWorkers(ctx, part, workers,
 		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
+			return drainSource(workerCtx, src)
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
+}
+
+// Insert runs a typed [driver.InsertRequest] through the noop driver. It
+// exercises the full typed generation pipeline (cursor prepare, batch
+// fill, row materialization) and discards the rows without I/O, so
+// framework overhead stays comparable to the legacy InsertSpec path.
+// Every method is accepted: there is no I/O to gate on, so the whole
+// point is to scale row generation alone.
+func (d *Driver) Insert(
+	ctx context.Context,
+	req *driver.InsertRequest,
+) (*stats.Query, error) {
+	if err := driver.ValidateInsert(req); err != nil {
+		return nil, err
+	}
+
+	workers := req.Workers
+	if workers < 1 {
+		workers = 1
+	}
+
+	columns := req.Source.Schema().ColumnNames()
+	start := time.Now()
+
+	rows, err := common.RunParallelBatch(ctx, req.Source, workers, d.bulkSize,
+		func(workerCtx context.Context, _ common.Chunk, cur gen.Cursor) error {
+			src := common.NewBatchRowSource(cur, columns, len(columns))
+
 			return drainSource(workerCtx, src)
 		})
 	if err != nil {

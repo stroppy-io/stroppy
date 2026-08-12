@@ -48,6 +48,12 @@ type (
 		// InsertSpec runs a relational InsertSpec through the driver, streaming
 		// rows from a dgproto-driven runtime.Runtime into the database.
 		InsertSpec(ctx context.Context, spec *dgproto.InsertSpec) (*stats.Query, error)
+		// Insert runs a typed [InsertRequest] through the driver, streaming
+		// rows from a workload-authored [gen.BatchSource] into the database.
+		// Generation after cursor preparation allocates nothing; driver-side
+		// encoding and materialization may. It is the typed successor to
+		// InsertSpec and coexists with it until the legacy path is removed.
+		Insert(ctx context.Context, req *InsertRequest) (*stats.Query, error)
 		RunQuery(ctx context.Context, sql string, args map[string]any) (*QueryResult, error)
 		Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (Tx, error)
 		Teardown(ctx context.Context) error
