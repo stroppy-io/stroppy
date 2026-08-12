@@ -1,7 +1,6 @@
 package bench
 
 import (
-	"context"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,57 +11,61 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 )
 
-const throughputInterval = time.Second
-
-// Named numeric constants for the magic-number linter (see metrics.go, retry.go,
-// root.go, runtime.go, step.go). Kept package-local and purpose-named.
 const (
-	millisPerSecond       = 1000.0 // seconds→milliseconds conversion factor
-	sampleChannelCapacity = 4096   // buffered sample channel depth
-	samplerStopGrace      = 2 * time.Second
-	percentScale          = 100.0 // ratio→percent
-	medianP               = 0.5   // p50 percentile argument
-	p90                   = 0.9
-	p95                   = 0.95
-	p99                   = 0.99
+	millisPerSecond = 1000.0
+	percentScale    = 100.0
+	medianP         = 0.5
+	p90             = 0.9
+	p95             = 0.95
+	p99             = 0.99
 )
 
 type txMetrics struct {
-	mu           sync.Mutex
-	registered   atomic.Bool
-	txCount      *metric
-	txTPS        *metric
-	runQueryQPS  *metric
-	insertRows   *metric
-	progressRows *metric
-	progressRPS  *metric
-	tags         *TagSet
+	mu         sync.Mutex
+	registered atomic.Bool
 
-	// Per-operation metrics mirroring the TS DriverX wrapper.
-	runQueryDuration *metric
-	runQueryCount    *metric
-	runQueryErrRate  *metric
+	transactions     *metric
+	queryOperations  *metric
+	queryErrors      *metric
+	insertRows       *metric
+	progressRows     *metric
+	progressRPS      *metric
+	queryDuration    *metric
+	insertOperations *metric
+	insertErrors     *metric
 	insertDuration   *metric
-	insertErrRate    *metric
 	iterationDur     *metric
 	iterations       *metric
 	txTotalDuration  *metric
-	txCommitRate     *metric
-	txErrorRate      *metric
+	txCommits        *metric
+	txErrors         *metric
 	txQueriesPerTx   *metric
-
-	txTotal    uint64
-	queryTotal uint64
-
-	txSampler    throughputSampler
-	querySampler throughputSampler
+	stepAttrs        attributeCache
+	tableAttrs       attributeCache
+	txAttrs          attributeCache
+	progressAttrs    attributeCache
 }
 
-type throughputSampler struct {
-	started atomic.Bool
-	stopped atomic.Bool
-	stopCh  chan struct{}
-	doneCh  chan struct{}
+type attributeCache struct {
+	values   sync.Map
+	size     atomic.Int64
+	overflow atomic.Pointer[metricAttributes]
+}
+
+type tableAttributeKey struct {
+	step  string
+	table string
+}
+
+type txAttributeKey struct {
+	step      string
+	action    string
+	name      string
+	isolation string
+}
+
+type progressAttributeKey struct {
+	step, table, method, event, rowKind string
 }
 
 func (m *txMetrics) ensureRegistered(vu *VU, lg *zap.Logger) {
@@ -87,68 +90,132 @@ func (m *txMetrics) ensureRegistered(vu *VU, lg *zap.Logger) {
 		return mm
 	}
 
-	m.txCount = newMetric("tx_count", Counter)
-	m.txTPS = newMetric("tx_tps", Trend)
-	m.runQueryQPS = newMetric("run_query_qps", Trend)
+	m.transactions = newMetric("transactions_total", Counter)
+	m.queryOperations = newMetric("run_query_operations_total", Counter)
+	m.queryErrors = newMetric("run_query_errors_total", Counter)
 	m.insertRows = newMetric("insert_rows_total", Counter)
 	m.progressRows = newMetric("insert_progress_rows_total", Counter)
-	m.progressRPS = newMetric("insert_progress_rows_per_second", Trend)
-	m.runQueryDuration = newMetric("run_query_duration", Trend)
-	m.runQueryCount = newMetric("run_query_count", Counter)
-	m.runQueryErrRate = newMetric("run_query_error_rate", Rate)
+	m.progressRPS = newMetric("insert_progress_rows_per_second", Gauge)
+	m.queryDuration = newMetric("run_query_duration", Trend)
+	m.insertOperations = newMetric("insert_operations_total", Counter)
+	m.insertErrors = newMetric("insert_errors_total", Counter)
 	m.insertDuration = newMetric("insert_duration", Trend)
-	m.insertErrRate = newMetric("insert_error_rate", Rate)
 	m.iterationDur = newMetric("iteration_duration", Trend)
-	m.iterations = newMetric("iterations", Counter)
+	m.iterations = newMetric("iterations_total", Counter)
 	m.txTotalDuration = newMetric("tx_total_duration", Trend)
-	m.txCommitRate = newMetric("tx_commit_rate", Rate)
+	m.txCommits = newMetric("tx_commits_total", Counter)
+	m.txErrors = newMetric("tx_errors_total", Counter)
 	m.txQueriesPerTx = newMetric("tx_queries_per_tx", Trend)
-	m.txErrorRate = newMetric("tx_error_rate", Rate)
-	m.tags = r.RootTagSet()
 	m.registered.Store(true)
 }
 
-func applyStepTag(tags *TagSet, step string) *TagSet {
-	if step != "" {
-		return tags.With("step", step)
+func (m *txMetrics) emit(vu *VU, metric *metric, value float64, attrs metricAttributes) {
+	if metric != nil {
+		metric.add(vu.Context(), value, attrs)
 	}
-
-	return tags
 }
 
-func (m *txMetrics) emit(vu *VU, metric *metric, value float64, tags *TagSet) {
-	if metric == nil {
-		return
+func overflowAttributes(cache *attributeCache) metricAttributes {
+	if attrs := cache.overflow.Load(); attrs != nil {
+		return *attrs
 	}
 
-	PushIfNotDone(vu.Context(), vu.root.samples, Sample{
-		Metric: metric, Tags: tags,
-		Time: time.Now(), Value: value,
-	})
+	attrs := attributes("otel.metric.overflow", "true")
+	if cache.overflow.CompareAndSwap(nil, &attrs) {
+		return attrs
+	}
+
+	return *cache.overflow.Load()
 }
 
-// recordQueryResult emits the per-query metrics (duration/count/error_rate),
-// mirroring the TS DriverX wrapper. elapsed is the driver-reported duration;
-// on error only the error rate is recorded (no count/duration).
+func cachedAttributes(cache *attributeCache, key any, tags ...string) metricAttributes {
+	if cached, ok := cache.values.Load(key); ok {
+		attrs, valid := cached.(metricAttributes)
+		if valid {
+			return attrs
+		}
+	}
+
+	if cache.size.Add(1) > metricCardinalityLimit {
+		cache.size.Add(-1)
+
+		return overflowAttributes(cache)
+	}
+
+	attrs := attributes(tags...)
+
+	cached, loaded := cache.values.LoadOrStore(key, attrs)
+	if loaded {
+		cache.size.Add(-1)
+	}
+
+	result, valid := cached.(metricAttributes)
+	if !valid {
+		return attrs
+	}
+
+	return result
+}
+
+func (m *txMetrics) stepAttributes(step string) metricAttributes {
+	if step == "" {
+		return cachedAttributes(&m.stepAttrs, step)
+	}
+
+	return cachedAttributes(&m.stepAttrs, step, "step", step)
+}
+
+func (m *txMetrics) tableAttributes(step, table string) metricAttributes {
+	key := tableAttributeKey{step: step, table: table}
+	if step == "" {
+		return cachedAttributes(&m.tableAttrs, key, "table_name", table)
+	}
+
+	return cachedAttributes(&m.tableAttrs, key, "step", step, "table_name", table)
+}
+
+func (m *txMetrics) txAttributes(step, action, name, isolation string) metricAttributes {
+	key := txAttributeKey{step: step, action: action, name: name, isolation: isolation}
+
+	return cachedAttributes(
+		&m.txAttrs, key,
+		"step", step,
+		"tx_action", action,
+		"tx_name", name,
+		"tx_isolation", isolation,
+	)
+}
+
+func (m *txMetrics) progressAttributes(snapshot *insertprogress.Snapshot, step string) metricAttributes {
+	key := progressAttributeKey{
+		step: step, table: snapshot.Table, method: snapshot.Method,
+		event: string(snapshot.Event), rowKind: snapshot.RowKind,
+	}
+
+	return cachedAttributes(
+		&m.progressAttrs, key,
+		"step", step,
+		"table_name", snapshot.Table,
+		"method", snapshot.Method,
+		"event", string(snapshot.Event),
+		"row_kind", snapshot.RowKind,
+	)
+}
+
 func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr error) {
 	m.ensureRegistered(vu, root.lg)
-	m.start(vu.root.samples, vu.root.ctx)
-	atomic.AddUint64(&m.queryTotal, 1)
+	attrs := m.stepAttributes(vu.stepTag)
+	m.emit(vu, m.queryOperations, 1, attrs)
 
-	tags := applyStepTag(m.tags, vu.stepTag)
 	if queryErr != nil {
-		m.emit(vu, m.runQueryErrRate, 1, tags)
+		m.emit(vu, m.queryErrors, 1, attrs)
 
 		return
 	}
 
-	m.emit(vu, m.runQueryDuration, elapsed.Seconds()*millisPerSecond, tags)
-	m.emit(vu, m.runQueryErrRate, 0, tags)
-	m.emit(vu, m.runQueryCount, 1, tags)
+	m.emit(vu, m.queryDuration, elapsed.Seconds()*millisPerSecond, attrs)
 }
 
-// recordInsertResult emits insert_duration / insert_error_rate for one InsertSpec
-// call. insert_rows_total is emitted separately by recordInsert.
 func (m *txMetrics) recordInsertResult(vu *VU, table string, elapsed time.Duration, insertErr error) {
 	m.ensureRegistered(vu, root.lg)
 
@@ -156,84 +223,59 @@ func (m *txMetrics) recordInsertResult(vu *VU, table string, elapsed time.Durati
 		table = "unknown"
 	}
 
-	tags := applyStepTag(m.tags, vu.stepTag).With("table_name", table)
+	attrs := m.tableAttributes(vu.stepTag, table)
+	m.emit(vu, m.insertOperations, 1, attrs)
+
 	if insertErr != nil {
-		m.emit(vu, m.insertErrRate, 1, tags)
+		m.emit(vu, m.insertErrors, 1, attrs)
 
 		return
 	}
 
-	m.emit(vu, m.insertDuration, elapsed.Seconds()*millisPerSecond, tags)
-	m.emit(vu, m.insertErrRate, 0, tags)
+	m.emit(vu, m.insertDuration, elapsed.Seconds()*millisPerSecond, attrs)
 }
 
-// recordIteration emits iteration_duration + iterations for one Iterate call.
 func (m *txMetrics) recordIteration(vu *VU, elapsed time.Duration) {
 	m.ensureRegistered(vu, root.lg)
-	tags := applyStepTag(m.tags, vu.stepTag)
-	m.emit(vu, m.iterationDur, elapsed.Seconds()*millisPerSecond, tags)
-	m.emit(vu, m.iterations, 1, tags)
+	attrs := m.stepAttributes(vu.stepTag)
+	m.emit(vu, m.iterationDur, elapsed.Seconds()*millisPerSecond, attrs)
+	m.emit(vu, m.iterations, 1, attrs)
 }
 
-// recordTxEnd emits the per-transaction summary metrics mirroring the TS TxX:
-// total wall duration, commit success rate, and query count per transaction.
-func (m *txMetrics) recordTxEnd(vu *VU, name string, elapsed time.Duration, queries int, committed bool) {
+func (m *txMetrics) recordTxEnd(
+	vu *VU,
+	action, name string,
+	isolation stroppy.TxIsolationLevel,
+	elapsed time.Duration,
+	queries int,
+	committed bool,
+) {
 	m.ensureRegistered(vu, root.lg)
 
-	tags := applyStepTag(m.tags, vu.stepTag)
-	if name != "" {
-		tags = tags.With("tx_name", name)
-	}
-
+	attrs := m.txAttributes(vu.stepTag, action, name, txIsolationName(isolation))
 	if committed {
-		m.emit(vu, m.txCommitRate, 1, tags)
-		m.emit(vu, m.txErrorRate, 0, tags)
+		m.emit(vu, m.txCommits, 1, attrs)
 	} else {
-		m.emit(vu, m.txCommitRate, 0, tags)
-		m.emit(vu, m.txErrorRate, 1, tags)
+		m.emit(vu, m.txErrors, 1, attrs)
 	}
 
-	m.emit(vu, m.txTotalDuration, elapsed.Seconds()*millisPerSecond, tags)
-	m.emit(vu, m.txQueriesPerTx, float64(queries), tags)
+	m.emit(vu, m.txTotalDuration, elapsed.Seconds()*millisPerSecond, attrs)
+	m.emit(vu, m.txQueriesPerTx, float64(queries), attrs)
 }
 
 func (m *txMetrics) recordInsertProgress(vu *VU, snapshot *insertprogress.Snapshot) {
 	m.ensureRegistered(vu, root.lg)
 
-	progressRows, progressRPS, tags, ok := m.snapshotProgressMetrics()
-	if !ok {
-		return
-	}
-
-	tags = applyStepTag(tags, vu.stepTag)
-	tags = tags.With("table_name", snapshot.Table).
-		With("method", snapshot.Method).
-		With("event", string(snapshot.Event)).
-		With("row_kind", snapshot.RowKind)
-
-	now := time.Now()
+	attrs := m.progressAttributes(snapshot, vu.stepTag)
 	if snapshot.DeltaRows > 0 {
-		PushIfNotDone(vu.Context(), vu.root.samples, Sample{
-			Metric: progressRows, Tags: tags,
-			Time: now, Value: float64(snapshot.DeltaRows),
-		})
+		m.emit(vu, m.progressRows, float64(snapshot.DeltaRows), attrs)
 	}
 
-	PushIfNotDone(vu.Context(), vu.root.samples, Sample{
-		Metric: progressRPS, Tags: tags,
-		Time: now, Value: snapshot.CurrentRowsPerSecond,
-	})
+	m.emit(vu, m.progressRPS, snapshot.CurrentRowsPerSecond, attrs)
 }
 
 func (m *txMetrics) recordInsert(vu *VU, table string, rows int64) {
 	m.ensureRegistered(vu, root.lg)
-
-	insertRows, tags, ok := m.snapshotInsertMetrics()
-	if !ok {
-		return
-	}
-
-	tags = applyStepTag(tags, vu.stepTag)
 
 	if table == "" {
 		table = "unknown"
@@ -243,158 +285,12 @@ func (m *txMetrics) recordInsert(vu *VU, table string, rows int64) {
 		rows = 0
 	}
 
-	now := time.Now()
-	tags = tags.With("table_name", table)
-	PushIfNotDone(vu.Context(), vu.root.samples, Sample{
-		Metric: insertRows, Tags: tags,
-		Time: now, Value: float64(rows),
-	})
+	m.emit(vu, m.insertRows, float64(rows), m.tableAttributes(vu.stepTag, table))
 }
 
 func (m *txMetrics) record(vu *VU, action, name string, isolation stroppy.TxIsolationLevel) {
 	m.ensureRegistered(vu, root.lg)
-	m.start(vu.root.samples, vu.root.ctx)
-	atomic.AddUint64(&m.txTotal, 1)
-
-	txCount, tags, ok := m.snapshotCountMetric()
-	if !ok {
-		return
-	}
-
-	tags = applyStepTag(tags, vu.stepTag)
-	now := time.Now()
-
-	tags = tags.With("tx_action", action)
-	if name != "" {
-		tags = tags.With("tx_name", name)
-	}
-
-	if iso := txIsolationName(isolation); iso != "" {
-		tags = tags.With("tx_isolation", iso)
-	}
-
-	PushIfNotDone(vu.Context(), vu.root.samples, Sample{
-		Metric: txCount, Tags: tags,
-		Time: now, Value: 1,
-	})
-}
-
-func (m *txMetrics) start(samples chan<- SampleContainer, ctx context.Context) {
-	m.startSampler(&m.txSampler, &m.txTotal, ctx, samples, m.txTPS, m.tags)
-	m.startSampler(&m.querySampler, &m.queryTotal, ctx, samples, m.runQueryQPS, m.tags)
-}
-
-func (m *txMetrics) stop() {
-	m.stopSampler(&m.txSampler)
-	m.stopSampler(&m.querySampler)
-}
-
-func (m *txMetrics) startSampler(
-	sampler *throughputSampler, total *uint64, ctx context.Context,
-	samples chan<- SampleContainer, metric *metric, tags *TagSet,
-) {
-	if metric == nil || tags == nil || sampler.stopped.Load() {
-		return
-	}
-
-	if !sampler.started.CompareAndSwap(false, true) {
-		return
-	}
-
-	sampler.stopCh = make(chan struct{})
-
-	sampler.doneCh = make(chan struct{})
-	go runThroughputSampler(ctx, samples, metric, tags, total, sampler.stopCh, sampler.doneCh)
-}
-
-func (m *txMetrics) stopSampler(sampler *throughputSampler) {
-	if !sampler.stopped.CompareAndSwap(false, true) {
-		return
-	}
-
-	if !sampler.started.Load() {
-		return
-	}
-
-	close(sampler.stopCh)
-
-	select {
-	case <-sampler.doneCh:
-	case <-time.After(samplerStopGrace):
-	}
-}
-
-func (m *txMetrics) snapshotCountMetric() (*metric, *TagSet, bool) {
-	if !m.registered.Load() {
-		return nil, nil, false
-	}
-
-	return m.txCount, m.tags, true
-}
-
-func (m *txMetrics) snapshotInsertMetrics() (*metric, *TagSet, bool) {
-	if !m.registered.Load() {
-		return nil, nil, false
-	}
-
-	return m.insertRows, m.tags, true
-}
-
-func (m *txMetrics) snapshotProgressMetrics() (rowsMetric, rpsMetric *metric, tags *TagSet, ok bool) {
-	if !m.registered.Load() {
-		return nil, nil, nil, false
-	}
-
-	return m.progressRows, m.progressRPS, m.tags, true
-}
-
-func runThroughputSampler(
-	ctx context.Context, samples chan<- SampleContainer, metric *metric,
-	tags *TagSet, total *uint64, stopCh <-chan struct{}, doneCh chan<- struct{},
-) {
-	defer close(doneCh)
-
-	ticker := time.NewTicker(throughputInterval)
-	defer ticker.Stop()
-
-	prevTotal := atomic.LoadUint64(total)
-	prevTime := time.Now()
-
-	for {
-		select {
-		case now := <-ticker.C:
-			prevTotal, prevTime = emitThroughput(ctx, samples, metric, tags, total, prevTotal, prevTime, now, true)
-		case <-stopCh:
-			return
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func emitThroughput(
-	ctx context.Context, samples chan<- SampleContainer, metric *metric,
-	tags *TagSet, totalCounter *uint64, prevTotal uint64, prevTime time.Time,
-	now time.Time, emitZero bool,
-) (uint64, time.Time) {
-	elapsed := now.Sub(prevTime)
-	if elapsed <= 0 {
-		return prevTotal, prevTime
-	}
-
-	total := atomic.LoadUint64(totalCounter)
-
-	delta := total - prevTotal
-	if delta == 0 && !emitZero {
-		return total, now
-	}
-
-	PushIfNotDone(ctx, samples, Sample{
-		Metric: metric, Tags: tags,
-		Time: now, Value: float64(delta) / elapsed.Seconds(),
-	})
-
-	return total, now
+	m.emit(vu, m.transactions, 1, m.txAttributes(vu.stepTag, action, name, txIsolationName(isolation)))
 }
 
 func txIsolationName(isolation stroppy.TxIsolationLevel) string {

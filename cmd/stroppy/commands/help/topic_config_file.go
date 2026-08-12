@@ -54,6 +54,15 @@ Example stroppy-config.json:
     steps    []string          Step allowlist (same as CLI --steps)
     noSteps  []string          Step blocklist (same as CLI --no-steps)
 
+  OTLP METRICS
+
+    Configure either otlpGrpcEndpoint or otlpHttpEndpoint. If both are set,
+    gRPC wins. otlpEndpointInsecure disables TLS, otlpHeaders accepts a
+    comma-separated key=value list, and otlpMetricsPrefix defaults to
+    "stroppy_". HTTP uses /v1/metrics unless otlpHttpExporterUrlPath overrides
+    it. OTEL_METRIC_EXPORT_INTERVAL sets the export interval in milliseconds
+    (default 10000). With no endpoint, metrics still appear in the local summary.
+
   Driver types: postgres, mysql, picodata, ydb, noop, csv
   Error modes:  silent, log, throw, fail, abort
   Insert methods: native, plain_bulk, plain_query (set per InsertSpec in code)

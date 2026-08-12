@@ -333,7 +333,7 @@ func (t *TxX) Commit(ctx context.Context) error {
 	}
 
 	t.b.root.txMetrics.record(t.b.vu, "commit", t.name, t.iso)
-	t.recordEnd(committed)
+	t.recordEnd("commit", committed)
 
 	return nil
 }
@@ -346,20 +346,22 @@ func (t *TxX) Rollback(ctx context.Context) error {
 	}
 
 	t.b.root.txMetrics.record(t.b.vu, "rollback", t.name, t.iso)
-	t.recordEnd(false)
+	t.recordEnd("rollback", false)
 
 	return nil
 }
 
 // recordEnd emits the per-transaction summary metrics (total duration, commit
 // rate, query count) once. Idempotent — safe if a workload calls both paths.
-func (t *TxX) recordEnd(committed bool) {
+func (t *TxX) recordEnd(action string, committed bool) {
 	if t.done {
 		return
 	}
 
 	t.done = true
-	t.b.root.txMetrics.recordTxEnd(t.b.vu, t.name, time.Since(t.start), t.queries, committed)
+	t.b.root.txMetrics.recordTxEnd(
+		t.b.vu, action, t.name, t.iso, time.Since(t.start), t.queries, committed,
+	)
 }
 
 // Compile-tick: ensure zap import stays used if expanded later.

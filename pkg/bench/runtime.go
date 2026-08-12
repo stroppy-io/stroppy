@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -94,16 +95,23 @@ func Run(
 	drivers map[int]*stroppy.DriverConfig,
 	env map[string]string,
 	lg *zap.Logger,
+	metricsConfig *MetricsConfig,
 ) error {
 	wl, ok := Lookup(name)
 	if !ok {
 		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
 	}
 
-	root = newRootState(lg, ctx, env)
+	var err error
+
+	root, err = newRootState(lg, ctx, env, metricsConfig)
+	if err != nil {
+		return fmt.Errorf("initialize metrics: %w", err)
+	}
+
 	sum := newSummary(root)
 
-	sum.start(ctx)
+	defer root.shutdownMetrics()
 	defer sum.print()
 	defer func() { _ = root.Teardown() }()
 
@@ -265,8 +273,8 @@ func (b *Bench) Counter(name string) *Metric { return b.newMetric(name, Counter)
 func (b *Bench) Trend(name string) *Metric   { return b.newMetric(name, Trend) }
 func (b *Bench) Rate(name string) *Metric    { return b.newMetric(name, Rate) }
 
-func (b *Bench) newMetric(name string, t metricType) *Metric {
-	m, err := b.root.registry.NewMetric(name, t)
+func (b *Bench) newMetric(name string, typ metricType) *Metric {
+	m, err := b.root.registry.NewMetric(name, typ)
 	if err != nil {
 		b.lg.Fatal("can't register metric", zap.String("name", name), zap.Error(err))
 	}
@@ -274,138 +282,127 @@ func (b *Bench) newMetric(name string, t metricType) *Metric {
 	return &Metric{root: b.root, m: m}
 }
 
-// Add records a value with optional tag key/values.
-func (m *Metric) Add(v float64, tags ...string) {
-	tagSet := m.root.registry.RootTagSet()
-	for i := 0; i+1 < len(tags); i += 2 {
-		tagSet = tagSet.With(tags[i], tags[i+1])
-	}
-
-	PushIfNotDone(context.Background(), m.root.samples, Sample{
-		Metric: m.m, Tags: tagSet,
-		Time: time.Now(), Value: v,
-	})
+// Add records a value with optional tag key/value pairs.
+func (m *Metric) Add(value float64, tags ...string) {
+	m.m.add(context.Background(), value, m.m.taggedAttributes(tags))
 }
 
-// --- summary (drain samples, print) ---
-
-type metricSink struct {
-	typ   metricType
-	count uint64
-	sum   float64
-	vals  []float64
-}
+// --- summary ---
 
 type summary struct {
-	root  *RootState
-	mu    sync.Mutex
-	sinks map[string]*metricSink
+	root *RootState
 }
 
-func newSummary(r *RootState) *summary { return &summary{root: r, sinks: map[string]*metricSink{}} }
-
-func (s *summary) start(ctx context.Context) {
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case sc, ok := <-s.root.samples:
-				if !ok {
-					return
-				}
-
-				s.ingest(sc)
-			}
-		}
-	}()
-}
-
-func (s *summary) ingest(sc SampleContainer) {
-	for _, sample := range sc.GetSamples() {
-		name := sample.Metric.Name
-
-		s.mu.Lock()
-
-		sk, ok := s.sinks[name]
-		if !ok {
-			sk = &metricSink{typ: sample.Metric.Type}
-			s.sinks[name] = sk
-		}
-
-		sk.count++
-
-		sk.sum += sample.Value
-		if sk.typ == Trend {
-			sk.vals = append(sk.vals, sample.Value)
-		}
-		s.mu.Unlock()
-	}
-}
+func newSummary(root *RootState) *summary { return &summary{root: root} }
 
 func (s *summary) print() {
-	close(s.root.samples)
+	var data metricdata.ResourceMetrics
+	if err := s.root.manualReader.Collect(context.Background(), &data); err != nil {
+		fmt.Fprintf(os.Stderr, "bench: collect metrics: %v\n", err)
 
-	for sc := range s.root.samples {
-		s.ingest(sc)
+		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	var lines []string
 
-	if len(s.sinks) == 0 {
+	for _, scope := range data.ScopeMetrics {
+		for _, metric := range scope.Metrics {
+			name := strings.TrimPrefix(metric.Name, s.root.metricsPrefix)
+			switch aggregation := metric.Data.(type) {
+			case metricdata.Sum[float64]:
+				var total float64
+				for _, point := range aggregation.DataPoints {
+					total += point.Value
+				}
+
+				lines = append(lines, fmt.Sprintf("  %-40s %.3f", name, total))
+			case metricdata.Gauge[float64]:
+				lines = append(lines, fmt.Sprintf("  %-40s %.3f", name, sumGauge(aggregation.DataPoints)))
+			case metricdata.Histogram[float64]:
+				lines = append(lines, formatHistogramSummary(name, aggregation.DataPoints))
+			}
+		}
+	}
+
+	if len(lines) == 0 {
 		fmt.Fprintln(os.Stderr, "bench: no metrics recorded")
 
 		return
 	}
 
-	names := make([]string, 0, len(s.sinks))
-	for n := range s.sinks {
-		names = append(names, n)
-	}
-
-	sort.Strings(names)
 	fmt.Fprintln(os.Stderr, "\n=== bench summary ===")
 
-	for _, n := range names {
-		sk := s.sinks[n]
-		switch sk.typ {
-		case Counter:
-			fmt.Fprintf(os.Stderr, "  %-40s %d\n", n, uint64(sk.sum))
-		case Trend:
-			fmt.Fprintf(os.Stderr, "  %-40s count=%d avg=%.3f %s\n",
-				n, sk.count, sk.sum/float64(max1(sk.count)), percentiles(sk.vals))
-		case Rate:
-			pct := 0.0
-			if sk.count > 0 {
-				pct = percentScale * sk.sum / float64(sk.count)
-			}
+	for _, line := range lines {
+		fmt.Fprintln(os.Stderr, line)
+	}
+}
 
-			fmt.Fprintf(os.Stderr, "  %-40s %.2f%%  %d out of %d\n", n, pct, uint64(sk.sum), sk.count)
-		default:
-			fmt.Fprintf(os.Stderr, "  %-40s count=%d sum=%.3f\n", n, sk.count, sk.sum)
+func sumGauge(points []metricdata.DataPoint[float64]) float64 {
+	var total float64
+	for _, point := range points {
+		total += point.Value
+	}
+
+	return total
+}
+
+func formatHistogramSummary(name string, points []metricdata.HistogramDataPoint[float64]) string {
+	var (
+		count   uint64
+		sum     float64
+		bounds  []float64
+		buckets []uint64
+	)
+
+	for _, point := range points {
+		count += point.Count
+
+		sum += point.Sum
+		if len(bounds) == 0 {
+			bounds = point.Bounds
+			buckets = make([]uint64, len(point.BucketCounts))
+		}
+
+		for i, bucketCount := range point.BucketCounts {
+			buckets[i] += bucketCount
 		}
 	}
-}
 
-func max1(n uint64) uint64 {
-	if n == 0 {
-		return 1
+	average := 0.0
+	if count > 0 {
+		average = sum / float64(count)
 	}
 
-	return n
+	return fmt.Sprintf(
+		"  %-40s count=%d avg=%.3f p(50)~=%.3f p(90)~=%.3f p(95)~=%.3f p(99)~=%.3f",
+		name, count, average,
+		histogramQuantile(bounds, buckets, count, medianP),
+		histogramQuantile(bounds, buckets, count, p90),
+		histogramQuantile(bounds, buckets, count, p95),
+		histogramQuantile(bounds, buckets, count, p99),
+	)
 }
 
-func percentiles(vals []float64) string {
-	if len(vals) == 0 {
-		return ""
+func histogramQuantile(bounds []float64, buckets []uint64, count uint64, quantile float64) float64 {
+	if count == 0 || len(buckets) == 0 {
+		return 0
 	}
 
-	s := make([]float64, len(vals))
-	copy(s, vals)
-	sort.Float64s(s)
+	target := uint64(float64(count-1)*quantile) + 1
 
-	pct := func(p float64) float64 { return s[int(float64(len(s)-1)*p)] }
+	var cumulative uint64
+	for i, bucketCount := range buckets {
+		cumulative += bucketCount
+		if cumulative >= target {
+			if i < len(bounds) {
+				return bounds[i]
+			}
 
-	return fmt.Sprintf("p(50)=%.3f p(90)=%.3f p(95)=%.3f p(99)=%.3f", pct(medianP), pct(p90), pct(p95), pct(p99))
+			if len(bounds) > 0 {
+				return bounds[len(bounds)-1]
+			}
+		}
+	}
+
+	return 0
 }

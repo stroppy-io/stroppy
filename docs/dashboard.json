@@ -80,7 +80,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(increase(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__range])) / $__range_s",
+          "expr": "sum(increase(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__range])) / $__range_s",
           "legendFormat": "tx/s",
           "range": false,
           "refId": "A",
@@ -149,7 +149,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(increase(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__range]))",
+          "expr": "sum(increase(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__range]))",
           "legendFormat": "tx",
           "range": false,
           "refId": "A",
@@ -218,7 +218,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(increase(${prefix}run_query_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", name=~\"$query_name\", type=~\"$query_type\"}[$__range])) / $__range_s",
+          "expr": "sum(increase(${prefix}run_query_operations_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", name=~\"$query_name\", type=~\"$query_type\"}[$__range])) / $__range_s",
           "legendFormat": "queries/s",
           "range": false,
           "refId": "A",
@@ -425,7 +425,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(sum(increase({__name__=\"${prefix}tx_error_rate_total\", condition=\"nonzero\", job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__range])) or vector(0)) / clamp_min(sum(increase({__name__=\"${prefix}tx_error_rate_total\", job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__range])), 1e-9)",
+          "expr": "(sum(increase(${prefix}tx_errors_total{job=~\"$job\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__range])) or vector(0)) / clamp_min(sum(increase(${prefix}transactions_total{job=~\"$job\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__range])), 1)",
           "legendFormat": "errors",
           "range": false,
           "refId": "A",
@@ -676,7 +676,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__rate_interval]))",
+          "expr": "sum(rate(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__rate_interval]))",
           "legendFormat": "tx/s",
           "range": true,
           "refId": "A"
@@ -687,7 +687,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(${prefix}run_query_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", name=~\"$query_name\", type=~\"$query_type\"}[$__rate_interval]))",
+          "expr": "sum(rate(${prefix}run_query_operations_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", name=~\"$query_name\", type=~\"$query_type\"}[$__rate_interval]))",
           "legendFormat": "queries/s",
           "range": true,
           "refId": "B"
@@ -922,7 +922,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "quantile_over_time(0.01, sum(rate(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__rate_interval]))[$__range:])",
+          "expr": "quantile_over_time(0.01, sum(rate(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__rate_interval]))[$__range:])",
           "legendFormat": "p1",
           "range": false,
           "refId": "A",
@@ -934,7 +934,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "quantile_over_time(0.05, sum(rate(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__rate_interval]))[$__range:])",
+          "expr": "quantile_over_time(0.05, sum(rate(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__rate_interval]))[$__range:])",
           "legendFormat": "p5",
           "range": false,
           "refId": "B",
@@ -946,7 +946,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "quantile_over_time(0.10, sum(rate(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__rate_interval]))[$__range:])",
+          "expr": "quantile_over_time(0.10, sum(rate(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__rate_interval]))[$__range:])",
           "legendFormat": "p10",
           "range": false,
           "refId": "C",
@@ -1016,7 +1016,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(10, quantile_over_time(0.01, sum by (tx_name) (rate(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\", tx_name!=\"\"}[$__rate_interval]))[$__range:]))",
+          "expr": "topk(10, quantile_over_time(0.01, sum by (tx_name) (rate(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\", tx_name!=\"\"}[$__rate_interval]))[$__range:]))",
           "legendFormat": "{{tx_name}}",
           "range": false,
           "refId": "A",
@@ -1086,7 +1086,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(10, quantile_over_time(0.05, sum by (tx_name) (rate(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\", tx_name!=\"\"}[$__rate_interval]))[$__range:]))",
+          "expr": "topk(10, quantile_over_time(0.05, sum by (tx_name) (rate(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\", tx_name!=\"\"}[$__rate_interval]))[$__range:]))",
           "legendFormat": "{{tx_name}}",
           "range": false,
           "refId": "A",
@@ -1156,7 +1156,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(10, quantile_over_time(0.10, sum by (tx_name) (rate(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\", tx_name!=\"\"}[$__rate_interval]))[$__range:]))",
+          "expr": "topk(10, quantile_over_time(0.10, sum by (tx_name) (rate(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\", tx_name!=\"\"}[$__rate_interval]))[$__range:]))",
           "legendFormat": "{{tx_name}}",
           "range": false,
           "refId": "A",
@@ -1226,7 +1226,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(10, sum by (tx_name) (increase(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\", tx_name!=\"\"}[$__range])) / $__range_s)",
+          "expr": "topk(10, sum by (tx_name) (increase(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\", tx_name!=\"\"}[$__range])) / $__range_s)",
           "legendFormat": "{{tx_name}}",
           "range": false,
           "refId": "A",
@@ -1466,7 +1466,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (tx_name) (rate(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\", tx_name!=\"\"}[$__rate_interval]))",
+          "expr": "sum by (tx_name) (rate(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\", tx_name!=\"\"}[$__rate_interval]))",
           "legendFormat": "{{tx_name}}",
           "range": true,
           "refId": "A"
@@ -1565,7 +1565,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (tx_action) (rate(${prefix}tx_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__rate_interval]))",
+          "expr": "sum by (tx_action) (rate(${prefix}transactions_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", tx_name=~\"$tx_name\", tx_action=~\"$tx_action\", tx_isolation=~\"$tx_isolation\"}[$__rate_interval]))",
           "legendFormat": "{{tx_action}}",
           "range": true,
           "refId": "A"
@@ -1647,7 +1647,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(20, sum by (name) (increase(${prefix}run_query_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", name=~\"$query_name\", type=~\"$query_type\", name=~\"$query_name\", name!=\"\", type=~\"$query_type\"}[$__range])) / $__range_s)",
+          "expr": "topk(20, sum by (name) (increase(${prefix}run_query_operations_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", name=~\"$query_name\", type=~\"$query_type\", name=~\"$query_name\", name!=\"\", type=~\"$query_type\"}[$__range])) / $__range_s)",
           "legendFormat": "{{name}}",
           "range": false,
           "refId": "A",
@@ -1882,7 +1882,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (type) (rate(${prefix}run_query_count_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", name=~\"$query_name\", type=~\"$query_type\", type!=\"\"}[$__rate_interval]))",
+          "expr": "sum by (type) (rate(${prefix}run_query_operations_total{job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", name=~\"$query_name\", type=~\"$query_type\", type!=\"\"}[$__rate_interval]))",
           "legendFormat": "{{type}}",
           "range": true,
           "refId": "A"
@@ -2296,7 +2296,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(sum by (table_name) (max_over_time({__name__=\"${prefix}insert_error_rate_total\", condition=\"nonzero\", job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", table_name=~\"$table_name\"}[$__range])) or sum by (table_name) (max_over_time({__name__=\"${prefix}insert_error_rate_total\", job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", table_name=~\"$table_name\"}[$__range])) * 0) / clamp_min(sum by (table_name) (max_over_time({__name__=\"${prefix}insert_error_rate_total\", job=~\"$job\", scenario=~\"$scenario\", step=~\"$step\", table_name=~\"$table_name\"}[$__range])), 1e-9)",
+          "expr": "(sum by (table_name) (increase(${prefix}insert_errors_total{job=~\"$job\", step=~\"$step\", table_name=~\"$table_name\"}[$__range])) or sum by (table_name) (increase(${prefix}insert_operations_total{job=~\"$job\", step=~\"$step\", table_name=~\"$table_name\"}[$__range])) * 0) / clamp_min(sum by (table_name) (increase(${prefix}insert_operations_total{job=~\"$job\", step=~\"$step\", table_name=~\"$table_name\"}[$__range])), 1)",
           "legendFormat": "{{table_name}}",
           "range": false,
           "refId": "A",
@@ -3435,7 +3435,7 @@
         "multi": true,
         "name": "tx_name",
         "options": [],
-        "query": "label_values({__name__=\"${prefix}tx_count\", job=~\"$job\", step=~\"$step\"}, tx_name)",
+        "query": "label_values({__name__=\"${prefix}transactions_total\", job=~\"$job\", step=~\"$step\"}, tx_name)",
         "refresh": 2,
         "sort": 1,
         "type": "query"
@@ -3455,7 +3455,7 @@
         "multi": true,
         "name": "tx_action",
         "options": [],
-        "query": "label_values({__name__=\"${prefix}tx_count\", job=~\"$job\", step=~\"$step\"}, tx_action)",
+        "query": "label_values({__name__=\"${prefix}transactions_total\", job=~\"$job\", step=~\"$step\"}, tx_action)",
         "refresh": 2,
         "sort": 1,
         "type": "query"
@@ -3475,7 +3475,7 @@
         "multi": true,
         "name": "tx_isolation",
         "options": [],
-        "query": "label_values({__name__=\"${prefix}tx_count\", job=~\"$job\", step=~\"$step\"}, tx_isolation)",
+        "query": "label_values({__name__=\"${prefix}transactions_total\", job=~\"$job\", step=~\"$step\"}, tx_isolation)",
         "refresh": 2,
         "sort": 1,
         "type": "query"
@@ -3495,7 +3495,7 @@
         "multi": true,
         "name": "query_name",
         "options": [],
-        "query": "label_values({__name__=\"${prefix}run_query_count\", job=~\"$job\", step=~\"$step\"}, name)",
+        "query": "label_values({__name__=\"${prefix}run_query_operations_total\", job=~\"$job\", step=~\"$step\"}, name)",
         "refresh": 2,
         "sort": 1,
         "type": "query"
@@ -3515,7 +3515,7 @@
         "multi": true,
         "name": "query_type",
         "options": [],
-        "query": "label_values({__name__=\"${prefix}run_query_count\", job=~\"$job\", step=~\"$step\"}, type)",
+        "query": "label_values({__name__=\"${prefix}run_query_operations_total\", job=~\"$job\", step=~\"$step\"}, type)",
         "refresh": 2,
         "sort": 1,
         "type": "query"
