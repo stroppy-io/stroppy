@@ -47,6 +47,68 @@ func init() {
 //
 // Stateless by construction — parallel workers may call this freely
 // for disjoint idx ranges without coordination.
+// Permute is the pure form of std.permuteIndex: it returns the image of idx
+// under a bijective permutation of [0, n) that is deterministic in (seed, n).
+// Iterating idx across [0, n) yields every element of [0, n) exactly once;
+// different seeds yield uncorrelated permutations. Stateless by construction
+// — parallel workers may call it for disjoint idx ranges without coordination.
+//
+// Extracted so the typed imperative generators can call it directly without
+// the []any runtime-call wrapper. The runtime permuteIndex delegates here.
+func Permute(seedVal, idx, n int64) (int64, error) {
+	if n <= 0 {
+		return 0, fmt.Errorf(
+			"%w: std.permuteIndex n must be > 0, got %d", ErrBadArg, n,
+		)
+	}
+
+	if idx < 0 || idx >= n {
+		return 0, fmt.Errorf(
+			"%w: std.permuteIndex idx %d out of [0, %d)", ErrBadArg, idx, n,
+		)
+	}
+
+	return permute(seedVal, idx, n), nil
+}
+
+// permute is the parameter-already-validated core. It assumes n > 0 and
+// 0 <= idx < n.
+func permute(seedVal, idx, n int64) int64 {
+	//nolint:gosec // bit reinterpret of seed into hash space is intentional
+	key := uint64(seedVal) ^ permuteSeedSalt
+
+	//nolint:gosec // idx validated non-negative above
+	cur := uint64(idx)
+
+	//nolint:gosec // n validated positive above
+	size := uint64(n)
+
+	// size==1 has only one possible image; skip the mixer entirely.
+	if size == 1 {
+		return 0
+	}
+
+	halfBits := halfWidthBits(size)
+	halfMask := (uint64(1) << halfBits) - 1
+	blockSize := uint64(1) << (halfBits * feistelHalves)
+
+	// Cycle-walking: re-encipher until the result lands in [0, size).
+	const maxWalks = 1 << 20
+	for range maxWalks {
+		cur = feistelEncrypt(cur, key, halfBits, halfMask)
+		if cur < size {
+			//nolint:gosec // bounded by size <= int64 range
+			return int64(cur)
+		}
+		// Wrap inside the block so the next round starts from a valid position.
+		cur &= blockSize - 1
+	}
+
+	// Unreachable for any valid input; the cycle-walk converges in expected
+	// <= 2 iterations. Return idx unchanged as a defensive fallback.
+	return idx
+}
+
 func permuteIndex(args []any) (any, error) {
 	const wantArgs = 3
 	if len(args) != wantArgs {
@@ -76,55 +138,7 @@ func permuteIndex(args []any) (any, error) {
 		)
 	}
 
-	if domainSize <= 0 {
-		return nil, fmt.Errorf(
-			"%w: std.permuteIndex n must be > 0, got %d", ErrBadArg, domainSize,
-		)
-	}
-
-	if idx < 0 || idx >= domainSize {
-		return nil, fmt.Errorf(
-			"%w: std.permuteIndex idx %d out of [0, %d)", ErrBadArg, idx, domainSize,
-		)
-	}
-
-	//nolint:gosec // bit reinterpret of seed into hash space is intentional
-	key := uint64(seedVal) ^ permuteSeedSalt
-
-	//nolint:gosec // idx validated non-negative above
-	cur := uint64(idx)
-
-	//nolint:gosec // domainSize validated positive above
-	size := uint64(domainSize)
-
-	// size==1 has only one possible image; skip the mixer entirely.
-	if size == 1 {
-		return int64(0), nil
-	}
-
-	halfBits := halfWidthBits(size)
-	halfMask := (uint64(1) << halfBits) - 1
-	blockSize := uint64(1) << (halfBits * feistelHalves)
-
-	// Cycle-walking: re-encipher until the result lands in [0, size).
-	// Loop bound is a hard safety net — in practice the expected
-	// iteration count is <= 2 per call for any size.
-	const maxWalks = 1 << 20
-	for range maxWalks {
-		cur = feistelEncrypt(cur, key, halfBits, halfMask)
-		if cur < size {
-			//nolint:gosec // bounded by size <= int64 range
-			return int64(cur), nil
-		}
-		// Wrap inside the block so the next round starts from a
-		// valid position (cur < blockSize always after one encrypt,
-		// but defensively mask).
-		cur &= blockSize - 1
-	}
-
-	return nil, fmt.Errorf(
-		"%w: std.permuteIndex cycle-walk did not converge (n=%d)", ErrBadArg, domainSize,
-	)
+	return Permute(seedVal, idx, domainSize)
 }
 
 // halfWidthBits returns the bit width of each Feistel half so that

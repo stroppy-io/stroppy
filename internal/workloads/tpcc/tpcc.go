@@ -231,7 +231,7 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 		return err
 	}
 
-	if _, err := b.InsertSpec(ctx, customerSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+	if _, err := b.Insert(ctx, customerRequest(w.warehouses, w.warehouseStart, loadDays)); err != nil {
 		return err
 	}
 
@@ -241,15 +241,15 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 		}
 	}
 
-	if _, err := b.InsertSpec(ctx, stockSpec(w.warehouses, w.warehouseStart)); err != nil {
+	if _, err := b.Insert(ctx, stockRequest(w.warehouses, w.warehouseStart)); err != nil {
 		return err
 	}
 
-	if _, err := b.InsertSpec(ctx, ordersSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+	if _, err := b.Insert(ctx, ordersRequest(w.warehouses, w.warehouseStart, loadDays)); err != nil {
 		return err
 	}
 
-	if _, err := b.InsertSpec(ctx, orderLineSpec(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+	if _, err := b.Insert(ctx, orderLineRequest(w.warehouses, w.warehouseStart, loadDays)); err != nil {
 		return err
 	}
 

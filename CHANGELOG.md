@@ -19,6 +19,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - The `simple` workload loads `stroppy_demo` through the typed insert path: a plain Go row formula (id, 8-char label, uniform value) over a versioned `gen` source replaces the relational InsertSpec struct literal.
 - TPC-B loads `pgbench_branches`, `pgbench_tellers`, and `pgbench_accounts` through the typed insert path: per-table `gen` sources preserve the bid fan-out arithmetic (`floor(entity/perBranch)+1`), fixed-width ASCII fillers, and the legacy per-table seeds.
 - TPC-C basic tables (`warehouse`, `district`, `item`, `new_order`) load through the typed insert path: variable/fixed-width text columns, 4-scale decimals, and the ~10% ORIGINAL marker on `i_data` are plain Go over bound `gen` columns. The four complex tables still use the legacy `InsertSpec` until the next port.
+- TPC-C complex tables (`customer`, `stock`, `orders`, `order_line`) load through the typed insert path: the per-district `o_c_id` Feistel permutation, NURand `c_last`, the ~10% `BC`/`GC` credit split, the 10 `s_dist_NN` columns, the ORIGINAL `s_data` marker, the delivered/undelivered `o_carrier_id`/`ol_delivery_d`/`ol_amount` split, and the first-1000 surname mapping are plain Go over bound `gen` columns. The TPC-C expression/protobuf helpers are gone.
 - Metrics can again be exported to an OpenTelemetry collector through the existing `global.exporter.otlpExport` gRPC or HTTP configuration. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
 
 ### Changed

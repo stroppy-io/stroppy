@@ -1,8 +1,11 @@
 package tpcc
 
 import (
+	"time"
+
 	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
+	"github.com/stroppy-io/stroppy/pkg/datagen/stdlib"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
@@ -74,11 +77,33 @@ func fillDataWithOriginal(
 
 const originalFraction = 0.1
 
+// secondsPerDay is the epoch-day invariant (UTC, no leap seconds), matching
+// stdlib.daysToDate so the typed date columns land on the same UTC midnight
+// the legacy generator produced.
+const secondsPerDay int64 = 86_400
+
 // Fixed-value load constants (the legacy literals from the proto builders).
 const (
-	warehouseYTD    = 300000.0
-	districtYTD     = 30000.0
-	districtNextOID = 3001
+	warehouseYTD                   = 300000.0
+	districtYTD                    = 30000.0
+	districtNextOID                = 3001
+	customerMiddle                 = "OE"
+	customerCreditBC               = "BC"
+	customerCreditGC               = "GC"
+	customerCreditLim              = 50000.0
+	customerBalance                = -10.0
+	customerYtdPayment             = 10.0
+	customerPaymentCnt       int64 = 1
+	customerDeliveryCnt      int64 = 0
+	customerCreditBCFraction       = 0.1 // 10% "BC", 90% "GC"
+)
+
+// NURand parameters for the c_last load-time draw (TPC-C §2.1.6). Match the
+// legacy DrawNURand and helpers.nurand so by-name lookups find populated rows.
+const (
+	nurandA              = 255
+	nurandY              = 999
+	lastNameCSalt uint64 = 0xC1A57
 )
 
 // loadWorkersCount returns the per-table worker fan-out from LOAD_WORKERS, or
@@ -90,52 +115,6 @@ func loadWorkersCount() int {
 
 	return 1
 }
-
-// Opaque key under which the 1000-entry C_LAST surname dict ships on the customer
-// InsertSpec. dictAt reads it by index.
-const lastNameDictKey = "tpcc_c_last"
-
-// lastNameDict builds the scalar Dict.values(C_LAST_DICT) payload: 1000 rows, one
-// syllable-concat surname each, no weights.
-func lastNameDict() *dgproto.Dict {
-	rows := make([]*dgproto.DictRow, len(cLastDict))
-	for i, s := range &cLastDict {
-		rows[i] = &dgproto.DictRow{Values: []string{s}}
-	}
-
-	return &dgproto.Dict{Rows: rows}
-}
-
-func workers() *dgproto.Parallelism {
-	if n := bench.EnvInt("LOAD_WORKERS", 0); n > 0 {
-		return &dgproto.Parallelism{Workers: int32(n)} //nolint:gosec // G115: value bounded by scale factor, no overflow path
-	}
-
-	return nil
-}
-
-// daysToDate wraps std.daysToDate so c_since/o_entry_d/ol_delivery_d land on the
-// load day's UTC midnight (TS truncates new Date() the same way via daysToDate).
-func daysToDate(loadDays int64) *dgproto.Expr { return call("std.daysToDate", litInt(loadDays)) }
-
-// tpccOriginalOr: 10% of strings embed the "ORIGINAL" marker (§4.3.3.1), 90% plain.
-// tpccOriginalInjected splits the marker across two random sides so it lands at a
-// random offset within [minLen,maxLen].
-func tpccOriginalOr(minLen, maxLen int64) *dgproto.Expr {
-	const marker = "ORIGINAL"
-
-	sideMin := (minLen - int64(len(marker)) + 1) / 2 // ceil((minLen-8)/2) = 9 at defaults
-	sideMax := (maxLen - int64(len(marker))) / 2     // floor((maxLen-8)/2) = 21 at defaults
-	injected := concat(
-		concat(asciiRange(sideMin, sideMax, alphaEn), litStr(marker)),
-		asciiRange(sideMin, sideMax, alphaEn),
-	)
-
-	return choose(1, branch{1, injected}, branch{9, asciiRange(minLen, maxLen, alphaEn)})
-}
-
-// --- 8 InsertSpec builders. Column order matches create_schema; attr exprs match
-// tpcc_common.ts Spec builders verbatim (rowIndex is 0-based, rowID 1-based). ---
 
 // warehouseRequest builds the typed insert request for the warehouse table.
 func warehouseRequest(scale, warehouseStart int64) *driver.InsertRequest {
@@ -289,54 +268,144 @@ func districtSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSour
 	)
 }
 
-func customerSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
-	cLastIdx := ifExpr(
-		le(col("c_id"), litInt(int64(len(cLastDict)))),
-		sub(col("c_id"), litInt(1)),
-		&dgproto.Expr{Kind: &dgproto.Expr_StreamDraw{StreamDraw: &dgproto.StreamDraw{
-			Draw: &dgproto.StreamDraw_Nurand{Nurand: &dgproto.DrawNURand{A: 255, X: 0, Y: 999, CSalt: 0xC1A57}},
-		}}},
-	)
-	attrs := []*dgproto.Attr{
-		{Name: "c_id", Expr: add(mod(rowIndex(), litInt(customersPerDistrict)), litInt(1))},
-		{Name: "c_d_id", Expr: add(
-			mod(div(rowIndex(), litInt(customersPerDistrict)), litInt(districtsPerWarehouse)),
-			litInt(1),
-		)},
-		{Name: "c_w_id", Expr: add(div(rowIndex(), litInt(customersPerWh)), litInt(warehouseStart))},
-		{Name: "c_first", Expr: asciiRange(8, 16, alphaEn)},
-		{Name: "c_middle", Expr: litStr("OE")},
-		{Name: "c_last", Expr: dictAt(lastNameDictKey, cLastIdx)},
-		{Name: "c_street_1", Expr: asciiRange(10, 20, alphaEn)},
-		{Name: "c_street_2", Expr: asciiRange(10, 20, alphaEn)},
-		{Name: "c_city", Expr: asciiRange(10, 20, alphaEn)},
-		{Name: "c_state", Expr: asciiFixed(2, alphaEnUpper)},
-		{Name: "c_zip", Expr: asciiFixed(9, alphaNum)},
-		{Name: "c_phone", Expr: asciiFixed(16, alphaNum)},
-		{Name: "c_since", Expr: daysToDate(loadDays)},
-		{Name: "c_credit", Expr: choose(1, branch{1, litStr("BC")}, branch{9, litStr("GC")})},
-		{Name: "c_credit_lim", Expr: litFloat(50000)},
-		{Name: "c_discount", Expr: decimal(0, 0.5, 4)},
-		{Name: "c_balance", Expr: litFloat(-10)},
-		{Name: "c_ytd_payment", Expr: litFloat(10)},
-		{Name: "c_payment_cnt", Expr: litInt(1)},
-		{Name: "c_delivery_cnt", Expr: litInt(0)},
-		{Name: "c_data", Expr: asciiRange(300, 500, alphaEn)},
+// customerRequest builds the typed insert request for the customer table.
+func customerRequest(scale, warehouseStart, loadDays int64) *driver.InsertRequest {
+	root := gen.New(seedCustomer)
+
+	return &driver.InsertRequest{
+		Table: "customer", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Source: customerSource(root, scale, warehouseStart, loadDays),
+	}
+}
+
+// customerSource returns the indexed source for the customer table. c_id,
+// c_d_id, c_w_id fan out like the orders keys. c_last is the syllable-concat
+// surname: for c_id in [1,1000] it is the sequential dict entry c_id-1, for
+// c_id in [1001,3000] it is a TPC-C NURand(255, 0, 999) index into the same
+// 1000-name dict — matching the legacy DrawNURand and the tx-time nurand so
+// by-name lookups find a populated row. c_credit is "BC" for ~10% and "GC"
+// otherwise. totalRows = scale * customersPerWh.
+//
+//nolint:dupl,funlen // per-table load formula kept explicit for readability
+func customerSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.IndexedSource {
+	d := root.Domain("tpcc/customer@1")
+
+	firstLen, firstFill := varFields(d, "c_first")
+	cLastA := d.Field("c_last.a")
+	cLastY := d.Field("c_last.y")
+	st1Len, st1Fill := varFields(d, "c_street_1")
+	st2Len, st2Fill := varFields(d, "c_street_2")
+	cityLen, cityFill := varFields(d, "c_city")
+	stateFill := d.Field("c_state")
+	zipFill := d.Field("c_zip")
+	phoneFill := d.Field("c_phone")
+	discount := d.Field("c_discount")
+	creditChance := d.Field("c_credit")
+	dataLen, dataFill := varFields(d, "c_data")
+
+	// paramC is the NURand per-generator constant: SplitMix64(CSalt) & A.
+	// Matches the legacy DrawNURand and helpers.nurand so load-time c_last
+	// values are drawn from the same distribution tx-time picks look up.
+	paramC := int64(seed.SplitMix64(lastNameCSalt)) & int64(nurandA) //nolint:gosec // G115: masked to 8 bits
+
+	b := gen.NewSchemaBuilder()
+	cID := b.Int64("c_id")
+	cDID := b.Int64("c_d_id")
+	cWID := b.Int64("c_w_id")
+	cFirst := b.Bytes("c_first", 16)
+	cMiddle := b.Bytes("c_middle", 2)
+	cLastCol := b.Bytes("c_last", 16)
+	cStreet1 := b.Bytes("c_street_1", 20)
+	cStreet2 := b.Bytes("c_street_2", 20)
+	cCity := b.Bytes("c_city", 20)
+	cState := b.Bytes("c_state", 2)
+	cZip := b.Bytes("c_zip", 9)
+	cPhone := b.Bytes("c_phone", 16)
+	cSince := b.Time("c_since")
+	cCredit := b.Bytes("c_credit", 2)
+	cCreditLim := b.Float64("c_credit_lim")
+	cDiscount := b.Float64("c_discount")
+	cBalance := b.Float64("c_balance")
+	cYtdPayment := b.Float64("c_ytd_payment")
+	cPaymentCnt := b.Int64("c_payment_cnt")
+	cDeliveryCnt := b.Int64("c_delivery_cnt")
+	cData := b.Bytes("c_data", 500)
+	schema := b.Build()
+
+	sinceDate := time.Unix(loadDays*secondsPerDay, 0).UTC()
+
+	fn := func(r gen.Row, entity uint64) error {
+		//nolint:gosec // G115: ids bounded by scale; fit int64
+		cIDVal := int64(entity%uint64(customersPerDistrict)) + 1
+		//nolint:gosec // G115: ids bounded by scale; fit int64
+		cDIDVal := int64(entity/uint64(customersPerDistrict)%uint64(districtsPerWarehouse)) + 1
+		//nolint:gosec // G115: ids bounded by scale; fit int64
+		cWIDVal := int64(entity/uint64(customersPerWh)) + warehouseStart
+
+		r.SetInt64(cID, cIDVal)
+		r.SetInt64(cDID, cDIDVal)
+		r.SetInt64(cWID, cWIDVal)
+
+		if err := fillVar(r, cFirst, entity, 8, 16, firstLen, firstFill, gen.Alpha); err != nil {
+			return err
+		}
+
+		// c_middle is the fixed literal "OE".
+		dst, _ := r.Bytes(cMiddle, len(customerMiddle)) //nolint:errcheck // fits the 2-byte budget
+		copy(dst, customerMiddle)
+
+		// c_last: sequential for the first 1000 customers, NURand beyond.
+		var cLastIdx int64
+		if cIDVal <= int64(len(cLastDict)) {
+			cLastIdx = cIDVal - 1
+		} else {
+			aDraw := cLastA.Int64(entity, 0, nurandA)
+			yDraw := cLastY.Int64(entity, 0, nurandY)
+			cLastIdx = ((aDraw | yDraw) + paramC) % int64(len(cLastDict))
+		}
+
+		lastName := cLast(int(cLastIdx))            //nolint:gosec // G115: idx bounded by %1000
+		ldst, _ := r.Bytes(cLastCol, len(lastName)) //nolint:errcheck // fits the 16-byte budget
+		copy(ldst, lastName)
+
+		if err := fillVar(r, cStreet1, entity, 10, 20, st1Len, st1Fill, gen.Alpha); err != nil {
+			return err
+		}
+
+		if err := fillVar(r, cStreet2, entity, 10, 20, st2Len, st2Fill, gen.Alpha); err != nil {
+			return err
+		}
+
+		if err := fillVar(r, cCity, entity, 10, 20, cityLen, cityFill, gen.Alpha); err != nil {
+			return err
+		}
+
+		fillFixed(r, cState, entity, 2, stateFill, gen.AlphaUpper)
+		fillFixed(r, cZip, entity, 9, zipFill, gen.Numeric)
+		fillFixed(r, cPhone, entity, 16, phoneFill, gen.Numeric)
+		r.SetTime(cSince, sinceDate)
+
+		if creditChance.Chance(entity, customerCreditBCFraction) {
+			creditDst, _ := r.Bytes(cCredit, len(customerCreditBC)) //nolint:errcheck // 2-byte budget
+			copy(creditDst, customerCreditBC)
+		} else {
+			creditDst, _ := r.Bytes(cCredit, len(customerCreditGC)) //nolint:errcheck // 2-byte budget
+			copy(creditDst, customerCreditGC)
+		}
+
+		r.SetFloat64(cCreditLim, customerCreditLim)
+		r.SetFloat64(cDiscount, discount.Decimal(entity, 0, 0.5, 4))
+		r.SetFloat64(cBalance, customerBalance)
+		r.SetFloat64(cYtdPayment, customerYtdPayment)
+		r.SetInt64(cPaymentCnt, customerPaymentCnt)
+		r.SetInt64(cDeliveryCnt, customerDeliveryCnt)
+
+		return fillVar(r, cData, entity, 300, 500, dataLen, dataFill, gen.Alpha)
 	}
 
-	return &dgproto.InsertSpec{
-		Table: "customer", Seed: seedCustomer, Method: dgproto.InsertMethod_NATIVE, Parallelism: workers(),
-		Dicts: map[string]*dgproto.Dict{lastNameDictKey: lastNameDict()},
-		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
-			Population: &dgproto.Population{Name: "customer", Size: scale * customersPerWh},
-			Attrs:      attrs,
-			ColumnOrder: []string{
-				"c_id", "c_d_id", "c_w_id", "c_first", "c_middle", "c_last", "c_street_1", "c_street_2",
-				"c_city", "c_state", "c_zip", "c_phone", "c_since", "c_credit", "c_credit_lim",
-				"c_discount", "c_balance", "c_ytd_payment", "c_payment_cnt", "c_delivery_cnt", "c_data",
-			},
-		}},
-	}
+	return gen.NewIndexedSource(
+		schema, root, "tpcc/customer@1", scale*customersPerWh, 64, fn,
+	)
 }
 
 // itemRequest builds the typed insert request for the item table.
@@ -390,86 +459,227 @@ func itemSource(root gen.Root) *gen.IndexedSource {
 	return gen.NewIndexedSource(schema, root, "tpcc/item@1", items, 64, fn)
 }
 
-func stockSpec(scale, warehouseStart int64) *dgproto.InsertSpec {
-	attrs := []*dgproto.Attr{
-		{Name: "s_i_id", Expr: add(mod(rowIndex(), litInt(itemsPerWh)), litInt(1))},
-		{Name: "s_w_id", Expr: add(div(rowIndex(), litInt(itemsPerWh)), litInt(warehouseStart))},
-		{Name: "s_quantity", Expr: intUniform(10, 100)},
-	}
-	for d := 1; d <= 10; d++ {
-		attrs = append(attrs, &dgproto.Attr{Name: sDistCol(d), Expr: asciiFixed(24, alphaEn)})
-	}
+// stockRequest builds the typed insert request for the stock table.
+func stockRequest(scale, warehouseStart int64) *driver.InsertRequest {
+	root := gen.New(seedStock)
 
-	attrs = append(attrs,
-		&dgproto.Attr{Name: "s_ytd", Expr: litInt(0)},
-		&dgproto.Attr{Name: "s_order_cnt", Expr: litInt(0)},
-		&dgproto.Attr{Name: "s_remote_cnt", Expr: litInt(0)},
-		&dgproto.Attr{Name: "s_data", Expr: tpccOriginalOr(26, 50)},
-	)
-
-	colOrder := []string{"s_i_id", "s_w_id", "s_quantity"}
-	for d := 1; d <= 10; d++ {
-		colOrder = append(colOrder, sDistCol(d))
-	}
-
-	colOrder = append(colOrder, "s_ytd", "s_order_cnt", "s_remote_cnt", "s_data")
-
-	return &dgproto.InsertSpec{
-		Table: "stock", Seed: seedStock, Method: dgproto.InsertMethod_NATIVE, Parallelism: workers(),
-		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
-			Population: &dgproto.Population{Name: "stock", Size: scale * itemsPerWh}, Attrs: attrs, ColumnOrder: colOrder,
-		}},
+	return &driver.InsertRequest{
+		Table: "stock", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Source: stockSource(root, scale, warehouseStart),
 	}
 }
 
-func ordersSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
-	districtKey := add(mul(col("o_w_id"), litInt(100)), col("o_d_id"))
-	permuteSeed := add(districtKey, litInt(int64(ordersPermuteSalt)))
-	oCId := add(
-		call("std.permuteIndex", permuteSeed, sub(col("o_id"), litInt(1)), litInt(customersPerDistrict)),
-		litInt(1),
-	)
-	oCarrierID := ifExpr(gt(col("o_id"), litInt(ordersDelivered)), litNull(), intUniform(1, 10))
+// stockSource returns the indexed source for the stock table. s_i_id cycles
+// 1..itemsPerWh within each warehouse; s_w_id fans out as
+// floor(entity / itemsPerWh) + warehouseStart; s_quantity is uniform [10,100];
+// the 10 s_dist_NN columns are fixed 24-byte [A-Za-z]; s_data carries the
+// ~10% ORIGINAL marker. totalRows = scale * itemsPerWh.
+//
+//nolint:dupl // per-table load formula kept explicit for readability
+func stockSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSource {
+	d := root.Domain("tpcc/stock@1")
 
-	return spec("orders", seedOrders, scale*customersPerWh, []string{
-		"o_id", "o_d_id", "o_w_id", "o_c_id", "o_entry_d", "o_carrier_id", "o_ol_cnt", "o_all_local",
-	}, []*dgproto.Attr{
-		{Name: "o_id", Expr: add(mod(rowIndex(), litInt(customersPerDistrict)), litInt(1))},
-		{Name: "o_d_id", Expr: add(
-			mod(div(rowIndex(), litInt(customersPerDistrict)), litInt(districtsPerWarehouse)),
-			litInt(1),
-		)},
-		{Name: "o_w_id", Expr: add(div(rowIndex(), litInt(customersPerWh)), litInt(warehouseStart))},
-		{Name: "o_c_id", Expr: oCId},
-		{Name: "o_entry_d", Expr: daysToDate(loadDays)},
-		{Name: "o_carrier_id", Expr: oCarrierID},
-		{Name: "o_ol_cnt", Expr: litInt(olCntFixed)},
-		{Name: "o_all_local", Expr: litInt(1)},
-	})
+	quantity := d.Field("s_quantity")
+	distFields := [10]gen.Field{
+		d.Field("s_dist_01"), d.Field("s_dist_02"), d.Field("s_dist_03"), d.Field("s_dist_04"),
+		d.Field("s_dist_05"), d.Field("s_dist_06"), d.Field("s_dist_07"), d.Field("s_dist_08"),
+		d.Field("s_dist_09"), d.Field("s_dist_10"),
+	}
+	dataLen, dataFill := varFields(d, "s_data")
+	dataChance := d.Field("s_data.chance")
+	dataPos := d.Field("s_data.pos")
+
+	b := gen.NewSchemaBuilder()
+	sIID := b.Int64("s_i_id")
+	sWID := b.Int64("s_w_id")
+	sQuantity := b.Int64("s_quantity")
+	sDist := [10]gen.Column{
+		b.Bytes(sDistCol(1), 24), b.Bytes(sDistCol(2), 24), b.Bytes(sDistCol(3), 24),
+		b.Bytes(sDistCol(4), 24), b.Bytes(sDistCol(5), 24), b.Bytes(sDistCol(6), 24),
+		b.Bytes(sDistCol(7), 24), b.Bytes(sDistCol(8), 24), b.Bytes(sDistCol(9), 24),
+		b.Bytes(sDistCol(10), 24),
+	}
+	sYtd := b.Int64("s_ytd")
+	sOrderCnt := b.Int64("s_order_cnt")
+	sRemoteCnt := b.Int64("s_remote_cnt")
+	sData := b.Bytes("s_data", 50)
+	schema := b.Build()
+
+	fn := func(r gen.Row, entity uint64) error {
+		//nolint:gosec // G115: ids bounded by scale; fit int64
+		r.SetInt64(sIID, int64(entity%uint64(itemsPerWh))+1)
+		//nolint:gosec // G115: ids bounded by scale; fit int64
+		r.SetInt64(sWID, int64(entity/uint64(itemsPerWh))+warehouseStart)
+		r.SetInt64(sQuantity, quantity.Int64(entity, 10, 100))
+		r.SetInt64(sYtd, 0)
+		r.SetInt64(sOrderCnt, 0)
+		r.SetInt64(sRemoteCnt, 0)
+
+		for i := range distFields {
+			fillFixed(r, sDist[i], entity, 24, distFields[i], gen.Alpha)
+		}
+
+		return fillDataWithOriginal(
+			r, sData, entity, 26, 50, dataLen, dataFill, dataChance, dataPos, gen.Alpha,
+		)
+	}
+
+	return gen.NewIndexedSource(schema, root, "tpcc/stock@1", scale*itemsPerWh, 64, fn)
 }
 
-func orderLineSpec(scale, warehouseStart, loadDays int64) *dgproto.InsertSpec {
-	const perDWh = customersPerWh * olCntFixed // 300000
+// ordersRequest builds the typed insert request for the orders table.
+func ordersRequest(scale, warehouseStart, loadDays int64) *driver.InsertRequest {
+	root := gen.New(seedOrders)
 
-	const perD = customersPerDistrict * olCntFixed // 30000
+	return &driver.InsertRequest{
+		Table: "orders", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Source: ordersSource(root, scale, warehouseStart, loadDays),
+	}
+}
 
-	undelivered := gt(col("ol_o_id"), litInt(ordersDelivered))
+// ordersSource returns the indexed source for the orders table. o_id cycles
+// 1..customersPerDistrict within each district; o_d_id cycles 1..districtsPerWarehouse
+// within each warehouse; o_w_id fans out by warehouse. o_c_id is the image of
+// (o_id-1) under a deterministic Feistel permutation keyed by the warehouse+district
+// (preserving the legacy per-district customer permutation). o_carrier_id is NULL for
+// undelivered orders (o_id > ordersDelivered), else uniform [1,10]. totalRows =
+// scale * customersPerWh.
+//
+//nolint:dupl // per-table load formula kept explicit for readability
+func ordersSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.IndexedSource {
+	d := root.Domain("tpcc/orders@1")
+	carrier := d.Field("o_carrier_id")
 
-	return spec("order_line", seedOrderLine, scale*perDWh, []string{
-		"ol_o_id", "ol_d_id", "ol_w_id", "ol_number", "ol_i_id", "ol_supply_w_id",
-		"ol_delivery_d", "ol_quantity", "ol_amount", "ol_dist_info",
-	}, []*dgproto.Attr{
-		{Name: "ol_o_id", Expr: add(mod(div(rowIndex(), litInt(olCntFixed)), litInt(customersPerDistrict)), litInt(1))},
-		{Name: "ol_d_id", Expr: add(mod(div(rowIndex(), litInt(perD)), litInt(districtsPerWarehouse)), litInt(1))},
-		{Name: "ol_w_id", Expr: add(div(rowIndex(), litInt(perDWh)), litInt(warehouseStart))},
-		{Name: "ol_number", Expr: add(mod(rowIndex(), litInt(olCntFixed)), litInt(1))},
-		{Name: "ol_i_id", Expr: intUniform(1, itemsPerWh)},
-		{Name: "ol_supply_w_id", Expr: col("ol_w_id")},
-		{Name: "ol_delivery_d", Expr: ifExpr(undelivered, litNull(), daysToDate(loadDays))},
-		{Name: "ol_quantity", Expr: intUniform(1, 5)},
-		{Name: "ol_amount", Expr: ifExpr(undelivered, decimal(0.01, 9999.99, 2), litFloat(0))},
-		{Name: "ol_dist_info", Expr: asciiFixed(24, alphaEn)},
-	})
+	b := gen.NewSchemaBuilder()
+	oID := b.Int64("o_id")
+	oDID := b.Int64("o_d_id")
+	oWID := b.Int64("o_w_id")
+	oCID := b.Int64("o_c_id")
+	oEntryD := b.Time("o_entry_d")
+	oCarrierID := b.Int64("o_carrier_id")
+	oOlCnt := b.Int64("o_ol_cnt")
+	oAllLocal := b.Int64("o_all_local")
+	schema := b.Build()
+
+	entryDate := time.Unix(loadDays*secondsPerDay, 0).UTC()
+
+	fn := func(r gen.Row, entity uint64) error {
+		//nolint:gosec // G115: ids bounded by scale; fit int64
+		oIDVal := int64(entity%uint64(customersPerDistrict)) + 1
+		//nolint:gosec // G115: ids bounded by scale; fit int64
+		oDIDVal := int64(entity/uint64(customersPerDistrict)%uint64(districtsPerWarehouse)) + 1
+		//nolint:gosec // G115: ids bounded by scale; fit int64
+		oWIDVal := int64(entity/uint64(customersPerWh)) + warehouseStart
+
+		r.SetInt64(oID, oIDVal)
+		r.SetInt64(oDID, oDIDVal)
+		r.SetInt64(oWID, oWIDVal)
+
+		// o_c_id is the per-district customer permutation of (o_id-1).
+		permuteSeed := oWIDVal*100 + oDIDVal + int64(ordersPermuteSalt)
+		//nolint:errcheck // inputs are valid by construction
+		ocid, _ := stdlib.Permute(permuteSeed, oIDVal-1, int64(customersPerDistrict))
+		r.SetInt64(oCID, ocid+1)
+
+		r.SetTime(oEntryD, entryDate)
+
+		if oIDVal > ordersDelivered {
+			r.SetNull(oCarrierID)
+		} else {
+			r.SetInt64(oCarrierID, carrier.Int64(entity, 1, 10))
+		}
+
+		r.SetInt64(oOlCnt, olCntFixed)
+		r.SetInt64(oAllLocal, 1)
+
+		return nil
+	}
+
+	return gen.NewIndexedSource(
+		schema, root, "tpcc/orders@1", scale*customersPerWh, 64, fn,
+	)
+}
+
+// orderLineRequest builds the typed insert request for the order_line table.
+func orderLineRequest(scale, warehouseStart, loadDays int64) *driver.InsertRequest {
+	root := gen.New(seedOrderLine)
+
+	return &driver.InsertRequest{
+		Table: "order_line", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Source: orderLineSource(root, scale, warehouseStart, loadDays),
+	}
+}
+
+// orderLineSource returns the indexed source for the order_line table. Each
+// order fans out into olCntFixed (10) order-line rows; ol_o_id / ol_d_id /
+// ol_w_id mirror the orders fan-out divided by olCnt; ol_number is
+// (entity mod olCnt) + 1. ol_i_id is uniform [1, items]; ol_quantity uniform
+// [1,5]; ol_delivery_d and ol_amount are NULL/0 for undelivered orders.
+// totalRows = scale * customersPerWh * olCntFixed.
+//
+//nolint:dupl // per-table load formula kept explicit for readability
+func orderLineSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.IndexedSource {
+	const (
+		perD   = int64(customersPerDistrict) * olCntFixed // 30000
+		perDWh = int64(customersPerWh) * olCntFixed       // 300000
+	)
+
+	d := root.Domain("tpcc/order_line@1")
+	iID := d.Field("ol_i_id")
+	quantity := d.Field("ol_quantity")
+	amount := d.Field("ol_amount")
+	distInfo := d.Field("ol_dist_info")
+
+	b := gen.NewSchemaBuilder()
+	olOID := b.Int64("ol_o_id")
+	olDID := b.Int64("ol_d_id")
+	olWID := b.Int64("ol_w_id")
+	olNumber := b.Int64("ol_number")
+	olIID := b.Int64("ol_i_id")
+	olSupplyWID := b.Int64("ol_supply_w_id")
+	olDeliveryD := b.Time("ol_delivery_d")
+	olQuantity := b.Int64("ol_quantity")
+	olAmount := b.Float64("ol_amount")
+	olDistInfo := b.Bytes("ol_dist_info", 24)
+	schema := b.Build()
+
+	entryDate := time.Unix(loadDays*secondsPerDay, 0).UTC()
+
+	fn := func(r gen.Row, entity uint64) error {
+		//nolint:gosec // G115: ids bounded by scale; fit int64
+		olOIDVal := int64(entity/uint64(olCntFixed)%uint64(customersPerDistrict)) + 1
+		//nolint:gosec // G115: ids bounded by scale; fit int64
+		olDIDVal := int64(entity/uint64(perD)%uint64(districtsPerWarehouse)) + 1
+		//nolint:gosec // G115: ids bounded by scale; fit int64
+		olWIDVal := int64(entity/uint64(perDWh)) + warehouseStart
+
+		r.SetInt64(olOID, olOIDVal)
+		r.SetInt64(olDID, olDIDVal)
+		r.SetInt64(olWID, olWIDVal)
+		//nolint:gosec // G115: bounded by olCnt
+		r.SetInt64(olNumber, int64(entity%uint64(olCntFixed))+1)
+		r.SetInt64(olIID, iID.Int64(entity, 1, items))
+		r.SetInt64(olSupplyWID, olWIDVal)
+
+		if olOIDVal > ordersDelivered {
+			// Undelivered (new order): NULL delivery date, random outstanding amount.
+			r.SetNull(olDeliveryD)
+			r.SetFloat64(olAmount, amount.Decimal(entity, 0.01, 9999.99, 2))
+		} else {
+			// Delivered: delivery date set, amount zero (settled).
+			r.SetTime(olDeliveryD, entryDate)
+			r.SetFloat64(olAmount, 0)
+		}
+
+		r.SetInt64(olQuantity, quantity.Int64(entity, 1, 5))
+		fillFixed(r, olDistInfo, entity, 24, distInfo, gen.Alpha)
+
+		return nil
+	}
+
+	return gen.NewIndexedSource(
+		schema, root, "tpcc/order_line@1", scale*perDWh, 64, fn,
+	)
 }
 
 // newOrderRequest builds the typed insert request for the new_order table.
@@ -511,20 +721,6 @@ func newOrderSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSour
 	}
 
 	return gen.NewIndexedSource(schema, root, "tpcc/new_order@1", scale*perWh, 64, fn)
-}
-
-// spec is the common NATIVE InsertSpec shape for tables without a dict payload.
-func spec(table string, seed uint64, size int64, colOrder []string, attrs []*dgproto.Attr) *dgproto.InsertSpec {
-	return &dgproto.InsertSpec{
-		Table: table, Seed: seed, Method: dgproto.InsertMethod_NATIVE, Parallelism: workers(),
-		Generator: &dgproto.InsertSpec_Source{Source: &dgproto.RelSource{
-			Population: &dgproto.Population{Name: table, Size: size}, Attrs: attrs, ColumnOrder: colOrder,
-		}},
-	}
-}
-
-func dictAt(key string, idx *dgproto.Expr) *dgproto.Expr {
-	return &dgproto.Expr{Kind: &dgproto.Expr_DictAt{DictAt: &dgproto.DictAt{DictKey: key, Index: idx}}}
 }
 
 func sDistCol(d int) string {
