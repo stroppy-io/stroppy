@@ -55,8 +55,6 @@ func (d *Driver) Insert(
 	columns := req.Source.Schema().ColumnNames()
 	start := time.Now()
 
-	var columnOrder []string
-
 	rows, err := common.RunParallelBatch(ctx, req.Source, workers, csvBatchRows,
 		func(workerCtx context.Context, chunk common.Chunk, cur gen.Cursor) error {
 			src := common.NewBatchRowSource(cur, columns, len(columns))
@@ -68,20 +66,10 @@ func (d *Driver) Insert(
 
 			d.recordShards(req.Table, columns, 1, rowCount)
 
-			if chunk.Index == 0 {
-				columnOrder = append([]string(nil), columns...)
-			}
-
 			return nil
 		})
 	if err != nil {
 		return nil, err
-	}
-
-	// Make sure the registry has the canonical column order even when
-	// the first-indexed worker completed after a later one.
-	if len(columnOrder) > 0 {
-		d.recordShards(req.Table, columnOrder, 0, 0)
 	}
 
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil

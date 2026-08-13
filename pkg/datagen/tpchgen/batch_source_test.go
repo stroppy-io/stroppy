@@ -14,6 +14,10 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
+var batchSourceTables = []string{
+	"region", "nation", "part", "supplier", "partsupp", "customer", "orders", "lineitem",
+}
+
 // drainBatchSource prepares a full-range cursor over src and returns every
 // row as a [][]any via MaterializeRow, in entity order.
 func drainBatchSource(t *testing.T, src gen.BatchSource) [][]any {
@@ -58,9 +62,7 @@ func drainBatchSource(t *testing.T, src gen.BatchSource) [][]any {
 // typed adapter reproduces dbgen output byte-for-byte (MaterializeRow yields
 // the same []any the legacy streamSource emits).
 func TestBatchSourceGoldenHashSF001(t *testing.T) {
-	tables := []string{"region", "nation", "part", "supplier", "partsupp", "customer", "orders", "lineitem"}
-
-	for _, table := range tables {
+	for _, table := range batchSourceTables {
 		src, err := tpchgen.NewBatchSource(table, sf)
 		if err != nil {
 			t.Fatalf("%s: %v", table, err)
@@ -83,9 +85,7 @@ func TestBatchSourceGoldenHashSF001(t *testing.T) {
 // TestBatchSourceUnitsAndTotalRows asserts the typed source reports the same
 // partition-unit and nominal-row counts as the legacy Partitionable.
 func TestBatchSourceUnitsAndTotalRows(t *testing.T) {
-	tables := []string{"region", "nation", "part", "supplier", "partsupp", "customer", "orders", "lineitem"}
-
-	for _, table := range tables {
+	for _, table := range batchSourceTables {
 		legacy, err := tpchgen.New(table, sf)
 		if err != nil {
 			t.Fatalf("%s: %v", table, err)
@@ -166,9 +166,7 @@ func rowKey(row []any) string {
 // the typed BatchSource produce the same row multiset as one full single-
 // worker pass — the seek path reproduces the exact suffix a full run emits.
 func TestBatchSourceParallelMatchesSingle(t *testing.T) {
-	tables := []string{"region", "nation", "part", "supplier", "partsupp", "customer", "orders", "lineitem"}
-
-	for _, table := range tables {
+	for _, table := range batchSourceTables {
 		src, err := tpchgen.NewBatchSource(table, sf)
 		if err != nil {
 			t.Fatalf("%s: %v", table, err)

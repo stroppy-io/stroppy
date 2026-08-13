@@ -72,42 +72,7 @@ func drainTyped(t *testing.T, table string, count int64) [][]string {
 		t.Fatalf("%s: %v", table, err)
 	}
 
-	cur, err := src.Prepare(0, count, 64)
-	if err != nil {
-		t.Fatalf("%s: Prepare: %v", table, err)
-	}
-
-	cols := src.Schema().ColumnNames()
-	scratch := make([]any, len(cols))
-
-	var rows [][]string
-
-	for {
-		b, err := cur.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-
-			t.Fatalf("%s: Next: %v", table, err)
-		}
-
-		for i := range b.Len() {
-			b.MaterializeRow(i, scratch)
-
-			out := make([]string, len(cols))
-
-			for j, v := range scratch {
-				if v != nil {
-					out[j] = fmt.Sprint(v)
-				}
-			}
-
-			rows = append(rows, out)
-		}
-	}
-
-	return rows
+	return drainTypedRange(t, src, 0, count)
 }
 
 // TestBatchSourceMatchesLegacy asserts the typed BatchSource reproduces the

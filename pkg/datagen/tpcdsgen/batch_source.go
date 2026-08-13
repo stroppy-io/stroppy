@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/gen"
@@ -13,7 +14,11 @@ import (
 // tpcdsBytesBudget is the per-row byte budget for every TPC-DS column. dsdgen's
 // normalize renders each non-null cell as canonical text; the widest observed
 // cell is 200 bytes (item), so 256 covers every column with headroom.
-const tpcdsBytesBudget = 256
+const (
+	tpcdsBytesBudget = 256
+	decimalBase      = 10
+	floatBits        = 64
+)
 
 // NewBatchSource returns a [gen.BatchSource] over `table` at scale `sf`, the
 // typed successor to [New]. It wraps the same dsdgen streams, per-partition
@@ -169,6 +174,32 @@ var errRowWidthMismatch = errors.New("tpcds: row width does not match schema")
 // cells are rendered as canonical text (matching the legacy normalize); nulls
 // become SQL NULL. MaterializeRow reproduces the exact []any the legacy
 // streamSource emitted.
+func appendTpcdsCell(dst []byte, v any) []byte {
+	switch value := v.(type) {
+	case string:
+		return append(dst, value...)
+	case []byte:
+		return append(dst, value...)
+	case int:
+		return strconv.AppendInt(dst, int64(value), decimalBase)
+	case int64:
+		return strconv.AppendInt(dst, value, decimalBase)
+	case float64:
+		return strconv.AppendFloat(dst, value, 'g', -1, floatBits)
+	case dsdgen.Decimal:
+		number := float64(value.Number)
+		for range value.Precision {
+			number /= 10
+		}
+
+		return strconv.AppendFloat(dst, number, 'f', value.Precision, floatBits)
+	case dsdgen.Date:
+		return fmt.Appendf(dst, "%4d-%02d-%02d", value.Year, value.Month, value.Day)
+	default:
+		return fmt.Appendf(dst, "%v", value)
+	}
+}
+
 func fillTpcdsRow(r gen.Row, row []any, cols []gen.Column) error {
 	if len(row) != len(cols) {
 		return fmt.Errorf("%w: row has %d columns, schema has %d", errRowWidthMismatch, len(row), len(cols))
@@ -181,14 +212,16 @@ func fillTpcdsRow(r gen.Row, row []any, cols []gen.Column) error {
 			continue
 		}
 
-		s := fmt.Sprintf("%v", v) // canonical dsdgen text, matching normalize
+		var text [tpcdsBytesBudget]byte
 
-		dst, err := r.Bytes(cols[i], len(s))
+		formatted := appendTpcdsCell(text[:0], v)
+
+		dst, err := r.Bytes(cols[i], len(formatted))
 		if err != nil {
 			return err
 		}
 
-		copy(dst, s)
+		copy(dst, formatted)
 	}
 
 	return nil

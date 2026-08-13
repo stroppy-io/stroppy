@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
@@ -178,7 +177,7 @@ func TestAccountsSourceBidFanOut(t *testing.T) {
 
 		for i := range b.Len() {
 			b.MaterializeRow(i, scratch)
-			bid := scratch[1].(int64)
+			bid := mustInt64(t, scratch[1], "bid")
 			bidCounts[bid]++
 			entity++
 		}
@@ -209,6 +208,7 @@ func TestSourcesWorkerInvariance(t *testing.T) {
 	}{
 		{"branches", branchesSource(gen.New(seedBranches), 7), 7},
 		{"tellers", tellersSource(gen.New(seedTellers), 21), 21},
+		{"accounts", accountsSource(gen.New(seedAccounts), 35), 35},
 	}
 
 	for _, c := range cases {
@@ -267,6 +267,3 @@ func TestAccountsSourceSteadyZeroAlloc(t *testing.T) {
 		t.Fatalf("steady fill allocs = %v, want 0", n)
 	}
 }
-
-// keep driver import referenced (typed requests use it elsewhere).
-var _ = driver.InsertPlainBulk

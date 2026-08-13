@@ -57,6 +57,10 @@ func setText(r gen.Row, col gen.Column, value string) error {
 	return nil
 }
 
+func loadDayUTC(loadDays int64) time.Time {
+	return time.Unix(loadDays*secondsPerDay, 0).UTC()
+}
+
 // originalMarker is the 8-byte TPC-C §4.3.3.1 marker embedded in ~10% of
 // i_data / s_data strings.
 var originalMarker = []byte("ORIGINAL")
@@ -358,7 +362,7 @@ func customerSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.I
 	cData := b.Bytes("c_data", 500)
 	schema := b.Build()
 
-	sinceDate := time.Unix(loadDays*secondsPerDay, 0).UTC()
+	sinceDate := loadDayUTC(loadDays)
 
 	fn := func(r gen.Row, entity uint64) error {
 		//nolint:gosec // G115: ids bounded by scale; fit int64
@@ -601,7 +605,7 @@ func ordersSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.Ind
 	oAllLocal := b.Int64("o_all_local")
 	schema := b.Build()
 
-	entryDate := time.Unix(loadDays*secondsPerDay, 0).UTC()
+	entryDate := loadDayUTC(loadDays)
 
 	fn := func(r gen.Row, entity uint64) error {
 		//nolint:gosec // G115: ids bounded by scale; fit int64
@@ -687,7 +691,7 @@ func orderLineSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.
 	olDistInfo := b.Bytes("ol_dist_info", 24)
 	schema := b.Build()
 
-	entryDate := time.Unix(loadDays*secondsPerDay, 0).UTC()
+	entryDate := loadDayUTC(loadDays)
 
 	fn := func(r gen.Row, entity uint64) error {
 		//nolint:gosec // G115: ids bounded by scale; fit int64

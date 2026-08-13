@@ -2,6 +2,7 @@ package sqldriver
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -121,7 +122,7 @@ func TestRunBulkInsertTypedClampsByColumns(t *testing.T) {
 
 	cols := make([]gen.Column, colCount)
 	for i := range colCount {
-		cols[i] = b.Int64("c" + itoa(i))
+		cols[i] = b.Int64("c" + strconv.Itoa(i))
 	}
 
 	schema := b.Build()
@@ -145,32 +146,16 @@ func TestRunBulkInsertTypedClampsByColumns(t *testing.T) {
 	}
 
 	maxPlaceholders := maxBoundParameters
+	wantPlaceholders := maxPlaceholders / colCount * colCount
 
 	for i, c := range m.calls {
 		n := strings.Count(c.sql, "?")
 		if n > maxPlaceholders {
 			t.Fatalf("call %d: %d placeholders, want <= %d", i, n, maxPlaceholders)
 		}
+
+		if i < len(m.calls)-1 && n != wantPlaceholders {
+			t.Fatalf("call %d: %d placeholders, want %d", i, n, wantPlaceholders)
+		}
 	}
-}
-
-// itoa returns the decimal string of i without importing strconv (keeps
-// the test file's import list minimal).
-func itoa(i int) string {
-	if i == 0 {
-		return "0"
-	}
-
-	var buf [20]byte
-
-	pos := len(buf)
-
-	for i > 0 {
-		pos--
-
-		buf[pos] = byte('0' + i%10)
-		i /= 10
-	}
-
-	return string(buf[pos:])
 }

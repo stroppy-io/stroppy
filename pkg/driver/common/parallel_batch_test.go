@@ -103,7 +103,7 @@ func TestRunParallelBatchWorkerInvariance(t *testing.T) {
 			mu   sync.Mutex
 		)
 
-		_, _ = RunParallelBatch(context.Background(), simpleSource(total), workers, 32,
+		_, err := RunParallelBatch(context.Background(), simpleSource(total), workers, 32,
 			func(_ context.Context, _ Chunk, cur gen.Cursor) error {
 				src := NewBatchRowSource(cur, cols, len(cols))
 
@@ -129,6 +129,9 @@ func TestRunParallelBatchWorkerInvariance(t *testing.T) {
 
 				return nil
 			})
+		if err != nil {
+			t.Fatalf("workers=%d: %v", workers, err)
+		}
 
 		return rows
 	}
