@@ -192,6 +192,20 @@ func TestInt64Degenerate(t *testing.T) {
 	}
 }
 
+func TestFullWidthIntRanges(t *testing.T) {
+	f := gen.New(4).Domain("full").Field("f")
+
+	for entity := range uint64(10) {
+		if got, want := f.Int64(entity, math.MinInt64, math.MaxInt64), int64(f.Uint64(entity)); got != want {
+			t.Fatalf("Int64 entity %d: got %d, want %d", entity, got, want)
+		}
+
+		if got, want := f.Int(entity, math.MinInt, math.MaxInt), int(f.Uint64(entity)); got != want {
+			t.Fatalf("Int entity %d: got %d, want %d", entity, got, want)
+		}
+	}
+}
+
 // Float64 stays in [0,1) across many draws.
 func TestFloat64Range(t *testing.T) {
 	f := gen.New(5).Domain("fl").Field("x")

@@ -101,6 +101,10 @@ func (b *Bench) runQuery(ctx context.Context, sql string, args map[string]any) (
 // metrics recording, streaming rows from a workload-authored
 // [gen.BatchSource] instead of a dgproto generator.
 func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Query, error) {
+	if err := driver.ValidateInsert(req); err != nil {
+		return nil, fmt.Errorf("insert: %w", err)
+	}
+
 	tracker := b.newBatchInsertTracker(req)
 
 	runCtx := ctx

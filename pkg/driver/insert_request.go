@@ -2,17 +2,14 @@ package driver
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
-// InsertRequest is the typed successor to dgproto.InsertSpec: it carries
-// a driver-owned [InsertMethod], a worker count, and a [gen.BatchSource]
-// whose prepared partitions fill reusable typed batches. The legacy
-// InsertSpec path builds a Partitionable from a protobuf generator oneof;
-// this path hands a workload-authored source straight to the driver, so
-// generation stays allocation-free and no protobuf is synthesized.
+// InsertRequest carries a driver-owned [InsertMethod], a worker count, and a
+// [gen.BatchSource] whose prepared partitions fill reusable typed batches.
+// Workloads hand their source straight to the driver, so generation avoids
+// intermediate protobuf values.
 //
 // Source, Method, and Workers are the driver's full input; the table
 // name is carried separately because generation is table-agnostic.
@@ -41,15 +38,15 @@ var ErrInsertMethodNotSupported = errors.New("driver: insert method not supporte
 // is validated in each driver.
 func ValidateInsert(req *InsertRequest) error {
 	if req == nil {
-		return fmt.Errorf("%w", ErrNilInsertRequest)
+		return ErrNilInsertRequest
 	}
 
 	if req.Source == nil {
-		return fmt.Errorf("%w", ErrNilInsertSource)
+		return ErrNilInsertSource
 	}
 
 	if req.Source.Schema().Columns() == 0 {
-		return fmt.Errorf("%w", ErrNilInsertSource)
+		return gen.ErrEmptySchema
 	}
 
 	return nil

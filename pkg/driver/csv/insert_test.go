@@ -3,6 +3,7 @@ package csv
 import (
 	"context"
 	stdcsv "encoding/csv"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -46,6 +47,19 @@ func typedRowsReq(table string, total int64, workers int) *driver.InsertRequest 
 		Method:  driver.InsertNative,
 		Workers: workers,
 		Source:  typedRowsSource(total),
+	}
+}
+
+func TestInsertRejectsUnsupportedMethod(t *testing.T) {
+	t.Parallel()
+
+	d, _ := newTestDriver(t, nil)
+	req := typedRowsReq("unsupported", 1, 1)
+	req.Method = driver.InsertPlainQuery
+
+	_, err := d.Insert(context.Background(), req)
+	if !errors.Is(err, driver.ErrInsertMethodNotSupported) {
+		t.Fatalf("Insert error = %v, want ErrInsertMethodNotSupported", err)
 	}
 }
 

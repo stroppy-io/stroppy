@@ -44,7 +44,7 @@ func (d *Driver) Insert(
 	}
 
 	if req.Method != driver.InsertNative {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedInsertMethod, req.Method)
+		return nil, fmt.Errorf("%w: %s", driver.ErrInsertMethodNotSupported, req.Method)
 	}
 
 	workers := req.Workers

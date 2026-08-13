@@ -52,9 +52,9 @@ How `LOAD_WORKERS=4` becomes four goroutines writing concurrently.
 1. **Workload.** Builds a source and a request, calls `b.Insert` inside
    a `load_data` step (guarded by `GlobalOnce`).
 2. **Source.** Either a `gen.IndexedSource`
-   (`gen.NewIndexedSource(schema, totalRows, rowFn)`) for row formulas,
-   or a stateful canonical `gen.BatchSource` (tpcc/tpcb) or the
-   TPC-H/TPC-DS adapters (`tpchgen.NewBatchSource`, `tpcdsgen.NewBatchSource`).
+   (`gen.NewIndexedSource(schema, root, domain, totalRows, batchRows, rowFn)`)
+   for plain-Go row formulas used by simple, TPC-B, and TPC-C, or a canonical
+   TPC-H/TPC-DS adapter (`tpchgen.NewBatchSource`, `tpcdsgen.NewBatchSource`).
 3. **Chunking.** `common.RunParallelBatch` calls `SplitChunks(src.Units(),
    workers)`, dividing `[0, Units)` into contiguous ranges — every chunk
    holds `floor(Units/workers)` entities; the last absorbs the remainder.

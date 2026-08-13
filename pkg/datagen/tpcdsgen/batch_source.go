@@ -163,11 +163,17 @@ func (c *tpcdsCursor) Next() (*gen.Batch, error) {
 	return c.batch, nil
 }
 
+var errRowWidthMismatch = errors.New("tpcds: row width does not match schema")
+
 // fillTpcdsRow copies one dsdgen []any row into a typed batch row. Non-null
 // cells are rendered as canonical text (matching the legacy normalize); nulls
 // become SQL NULL. MaterializeRow reproduces the exact []any the legacy
 // streamSource emitted.
 func fillTpcdsRow(r gen.Row, row []any, cols []gen.Column) error {
+	if len(row) != len(cols) {
+		return fmt.Errorf("%w: row has %d columns, schema has %d", errRowWidthMismatch, len(row), len(cols))
+	}
+
 	for i, v := range row {
 		if v == nil {
 			r.SetNull(cols[i])

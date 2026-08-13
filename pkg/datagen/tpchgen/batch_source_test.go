@@ -176,23 +176,14 @@ func TestBatchSourceParallelMatchesSingle(t *testing.T) {
 
 		single := drainBatchSource(t, src)
 
-		units := src.Units()
-
-		// 4 contiguous chunks.
-		chunk := units / 4
-		if chunk == 0 {
-			chunk = units
-		}
+		chunks := min(src.Units(), 4)
+		chunk := (src.Units() + chunks - 1) / chunks
 
 		var combined [][]any
 
-		for w := range 4 {
-			start := int64(w) * chunk
-
-			count := chunk
-			if w == 3 {
-				count = units - start
-			}
+		for w := range chunks {
+			start := w * chunk
+			count := min(chunk, src.Units()-start)
 
 			cur, err := src.Prepare(start, count, 256)
 			if err != nil {

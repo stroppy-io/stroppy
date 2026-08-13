@@ -34,11 +34,27 @@ func fillVar(
 func fillFixed(
 	r gen.Row, col gen.Column, entity uint64, n int,
 	fillField gen.Field, alphabet gen.Alphabet,
-) {
-	dst, _ := r.Bytes(col, n) //nolint:errcheck // n is the column's declared budget
+) error {
+	dst, err := r.Bytes(col, n)
+	if err != nil {
+		return err
+	}
 
 	draw := fillField.At(entity)
 	alphabet.Fill(&draw, dst)
+
+	return nil
+}
+
+func setText(r gen.Row, col gen.Column, value string) error {
+	dst, err := r.Bytes(col, len(value))
+	if err != nil {
+		return err
+	}
+
+	copy(dst, value)
+
+	return nil
 }
 
 // originalMarker is the 8-byte TPC-C §4.3.3.1 marker embedded in ~10% of
@@ -173,8 +189,14 @@ func warehouseSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSou
 			return err
 		}
 
-		fillFixed(r, wState, entity, 2, stateFill, gen.AlphaUpper)
-		fillFixed(r, wZip, entity, 9, zipFill, gen.Numeric)
+		if err := fillFixed(r, wState, entity, 2, stateFill, gen.AlphaUpper); err != nil {
+			return err
+		}
+
+		if err := fillFixed(r, wZip, entity, 9, zipFill, gen.Numeric); err != nil {
+			return err
+		}
+
 		r.SetFloat64(wTax, tax.Decimal(entity, 0, 0.2, 4))
 
 		return nil
@@ -254,8 +276,14 @@ func districtSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSour
 			return err
 		}
 
-		fillFixed(r, dState, entity, 2, stateFill, gen.AlphaUpper)
-		fillFixed(r, dZip, entity, 9, zipFill, gen.Numeric)
+		if err := fillFixed(r, dState, entity, 2, stateFill, gen.AlphaUpper); err != nil {
+			return err
+		}
+
+		if err := fillFixed(r, dZip, entity, 9, zipFill, gen.Numeric); err != nil {
+			return err
+		}
+
 		r.SetFloat64(dTax, tax.Decimal(entity, 0, 0.2, 4))
 
 		return nil
@@ -284,7 +312,7 @@ func customerRequest(scale, warehouseStart, loadDays int64) *driver.InsertReques
 // by-name lookups find a populated row. c_credit is "BC" for ~10% and "GC"
 // otherwise. totalRows = scale * customersPerWh.
 //
-//nolint:dupl,funlen // per-table load formula kept explicit for readability
+//nolint:dupl,funlen,gocognit // per-table load formula kept explicit for readability
 func customerSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.IndexedSource {
 	d := root.Domain("tpcc/customer@1")
 
@@ -349,8 +377,9 @@ func customerSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.I
 		}
 
 		// c_middle is the fixed literal "OE".
-		dst, _ := r.Bytes(cMiddle, len(customerMiddle)) //nolint:errcheck // fits the 2-byte budget
-		copy(dst, customerMiddle)
+		if err := setText(r, cMiddle, customerMiddle); err != nil {
+			return err
+		}
 
 		// c_last: sequential for the first 1000 customers, NURand beyond.
 		var cLastIdx int64
@@ -362,9 +391,10 @@ func customerSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.I
 			cLastIdx = ((aDraw | yDraw) + paramC) % int64(len(cLastDict))
 		}
 
-		lastName := cLast(int(cLastIdx))            //nolint:gosec // G115: idx bounded by %1000
-		ldst, _ := r.Bytes(cLastCol, len(lastName)) //nolint:errcheck // fits the 16-byte budget
-		copy(ldst, lastName)
+		lastName := cLast(int(cLastIdx)) //nolint:gosec // G115: idx bounded by %1000
+		if err := setText(r, cLastCol, lastName); err != nil {
+			return err
+		}
 
 		if err := fillVar(r, cStreet1, entity, 10, 20, st1Len, st1Fill, gen.Alpha); err != nil {
 			return err
@@ -378,17 +408,27 @@ func customerSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.I
 			return err
 		}
 
-		fillFixed(r, cState, entity, 2, stateFill, gen.AlphaUpper)
-		fillFixed(r, cZip, entity, 9, zipFill, gen.Numeric)
-		fillFixed(r, cPhone, entity, 16, phoneFill, gen.Numeric)
+		if err := fillFixed(r, cState, entity, 2, stateFill, gen.AlphaUpper); err != nil {
+			return err
+		}
+
+		if err := fillFixed(r, cZip, entity, 9, zipFill, gen.Numeric); err != nil {
+			return err
+		}
+
+		if err := fillFixed(r, cPhone, entity, 16, phoneFill, gen.Numeric); err != nil {
+			return err
+		}
+
 		r.SetTime(cSince, sinceDate)
 
+		credit := customerCreditGC
 		if creditChance.Chance(entity, customerCreditBCFraction) {
-			creditDst, _ := r.Bytes(cCredit, len(customerCreditBC)) //nolint:errcheck // 2-byte budget
-			copy(creditDst, customerCreditBC)
-		} else {
-			creditDst, _ := r.Bytes(cCredit, len(customerCreditGC)) //nolint:errcheck // 2-byte budget
-			copy(creditDst, customerCreditGC)
+			credit = customerCreditBC
+		}
+
+		if err := setText(r, cCredit, credit); err != nil {
+			return err
 		}
 
 		r.SetFloat64(cCreditLim, customerCreditLim)
@@ -514,7 +554,9 @@ func stockSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSource 
 		r.SetInt64(sRemoteCnt, 0)
 
 		for i := range distFields {
-			fillFixed(r, sDist[i], entity, 24, distFields[i], gen.Alpha)
+			if err := fillFixed(r, sDist[i], entity, 24, distFields[i], gen.Alpha); err != nil {
+				return err
+			}
 		}
 
 		return fillDataWithOriginal(
@@ -575,8 +617,12 @@ func ordersSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.Ind
 
 		// o_c_id is the per-district customer permutation of (o_id-1).
 		permuteSeed := oWIDVal*100 + oDIDVal + int64(ordersPermuteSalt)
-		//nolint:errcheck // inputs are valid by construction
-		ocid, _ := gen.Permute(permuteSeed, oIDVal-1, int64(customersPerDistrict))
+
+		ocid, err := gen.Permute(permuteSeed, oIDVal-1, int64(customersPerDistrict))
+		if err != nil {
+			return err
+		}
+
 		r.SetInt64(oCID, ocid+1)
 
 		r.SetTime(oEntryD, entryDate)
@@ -670,9 +716,8 @@ func orderLineSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.
 		}
 
 		r.SetInt64(olQuantity, quantity.Int64(entity, 1, 5))
-		fillFixed(r, olDistInfo, entity, 24, distInfo, gen.Alpha)
 
-		return nil
+		return fillFixed(r, olDistInfo, entity, 24, distInfo, gen.Alpha)
 	}
 
 	return gen.NewIndexedSource(

@@ -109,11 +109,8 @@ func (s *IndexedSource) Prepare(start, count int64, batchRows int) (Cursor, erro
 	}
 
 	end := s.totalRows
-	if count >= 0 {
+	if count >= 0 && count < s.totalRows-start {
 		end = start + count
-		if end > s.totalRows {
-			end = s.totalRows
-		}
 	}
 
 	if batchRows < 1 {

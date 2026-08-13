@@ -218,10 +218,8 @@ func (w *workload) initMetrics(b *bench.Bench) *metrics {
 	}
 }
 
-// loadData runs the relational load: warehouse, district, customer, item,
-// stock, orders, order_line, new_order. The four basic tables (warehouse,
-// district, item, new_order) run on the typed insert path; the rest still
-// use the legacy InsertSpec until the complex-table port lands.
+// loadData loads warehouse, district, customer, item, stock, orders,
+// order_line, and new_order through typed insert requests.
 func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64) error {
 	if _, err := b.Insert(ctx, warehouseRequest(w.warehouses, w.warehouseStart)); err != nil {
 		return err

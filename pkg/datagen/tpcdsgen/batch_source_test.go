@@ -226,9 +226,14 @@ func TestBatchSourceSchemaColumns(t *testing.T) {
 // suffix a full run emits.
 func TestBatchSourceParallelMatchesSingle(t *testing.T) {
 	tables := []string{"reason", "ship_mode", "store_sales", "web_returns"}
+	scale := 1.0
+
+	if testing.Short() {
+		scale = 0.01
+	}
 
 	for _, table := range tables {
-		src, err := tpcdsgen.NewBatchSource(table, 1)
+		src, err := tpcdsgen.NewBatchSource(table, scale)
 		if err != nil {
 			t.Fatalf("%s: %v", table, err)
 		}

@@ -41,17 +41,18 @@ func (f Field) Int64(entity uint64, lo, hi int64) int64 {
 		return lo
 	}
 
-	return lo + int64(f.uniform(entity, uint64(hi-lo)+1)) //nolint:gosec // G115: span bounded by caller's int64 range
+	span := uint64(hi) - uint64(lo) + 1 //nolint:gosec // bit-preserving signed range arithmetic
+	if span == 0 {
+		return int64(f.Uint64(entity)) //nolint:gosec // every bit pattern is valid in the full-width range
+	}
+
+	return int64(uint64(lo) + f.uniform(entity, span)) //nolint:gosec // result is within the requested signed range
 }
 
 // Int returns an int uniformly in [lo, hi] inclusive for entity. hi < lo
 // yields lo.
 func (f Field) Int(entity uint64, lo, hi int) int {
-	if hi <= lo {
-		return lo
-	}
-
-	return lo + int(f.uniform(entity, uint64(hi-lo)+1)) //nolint:gosec // G115: span bounded by caller's int range
+	return int(f.Int64(entity, int64(lo), int64(hi)))
 }
 
 // Float64 returns a float64 uniformly in [0, 1) for entity.

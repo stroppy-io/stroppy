@@ -60,8 +60,8 @@ linter_fix: # Start linter with possible fixes (NEVER run casually — rewrites 
 	$(LOCAL_BIN)/golangci-lint cache clean
 	$(LOCAL_BIN)/golangci-lint --config $(CURDIR)/.golangci.yml run --fix
 
-tests: # Run tests with coverage
-	go test -race ./... -coverprofile=coverage.out
+tests: # Run tests with coverage; pass TEST_FLAGS=-short for the CI-sized suite
+	go test -race $(TEST_FLAGS) ./... -coverprofile=coverage.out
 
 
 ##

@@ -3,6 +3,7 @@ package gen_test
 import (
 	"errors"
 	"io"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -161,6 +162,32 @@ func drain(t *testing.T, root gen.Root, domain string, start, count int64, c idC
 	}
 
 	return rows
+}
+
+func TestPrepareClampsWithoutOverflow(t *testing.T) {
+	t.Parallel()
+
+	schema, c := exampleItemSchema()
+	root := gen.New(0xC0FFEE)
+	src := gen.NewIndexedSource(schema, root, "test/clamp@1", 10, 4, func(r gen.Row, entity uint64) error {
+		r.SetInt64(c.id, int64(entity))
+
+		return nil
+	})
+
+	cur, err := src.Prepare(1, math.MaxInt64, 4)
+	if err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+
+	rows := drainFromCursor(t, cur, c)
+	if len(rows) != 9 {
+		t.Fatalf("rows = %d, want 9", len(rows))
+	}
+
+	if rows[0].id != 1 || rows[len(rows)-1].id != 9 {
+		t.Fatalf("ids = [%d,%d], want [1,9]", rows[0].id, rows[len(rows)-1].id)
+	}
 }
 
 func TestBatchFillAndRead(t *testing.T) {

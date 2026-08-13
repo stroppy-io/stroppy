@@ -35,10 +35,11 @@ LOAD FLOW
 
 DETERMINISM AND PARALLEL LOAD
 
-  Every generated value is a pure function of the run seed, a versioned field
-  name, and the entity index. Rows are reproducible and independent across
-  workers, batch sizes, and partition boundaries, so a driver can split a
-  table into worker ranges with no warm-up.
+  pkg/gen IndexedSource values are pure functions of the run seed, versioned
+  field name, and entity index. Canonical TPC-H/TPC-DS adapters preserve their
+  generator seeds and support deterministic range seeking. Both source types
+  reproduce rows across workers, batch sizes, and partition boundaries, so a
+  driver can split a table into worker ranges with no warm-up.
 
   Workloads that support parallel load read LOAD_WORKERS and pass it as the
   request worker count:

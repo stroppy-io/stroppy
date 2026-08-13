@@ -41,8 +41,8 @@ func TestValidateInsert(t *testing.T) {
 	)
 	if err := driver.ValidateInsert(&driver.InsertRequest{
 		Table: "t", Method: driver.InsertNative, Workers: 1, Source: empty,
-	}); !errors.Is(err, driver.ErrNilInsertSource) {
-		t.Fatalf("empty schema: err = %v, want ErrNilInsertSource", err)
+	}); !errors.Is(err, gen.ErrEmptySchema) {
+		t.Fatalf("empty schema: err = %v, want ErrEmptySchema", err)
 	}
 
 	if err := driver.ValidateInsert(&driver.InsertRequest{
