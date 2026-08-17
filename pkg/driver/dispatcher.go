@@ -51,6 +51,7 @@ type (
 		Insert(ctx context.Context, req *InsertRequest) (*stats.Query, error)
 		RunQuery(ctx context.Context, sql string, args map[string]any) (*QueryResult, error)
 		Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (Tx, error)
+		ClassifyError(err error) ErrorFacts
 		Teardown(ctx context.Context) error
 	}
 

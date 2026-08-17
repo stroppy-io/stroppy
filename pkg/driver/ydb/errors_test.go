@@ -1,0 +1,35 @@
+package ydb
+
+import (
+	"errors"
+	"testing"
+
+	ydbretry "github.com/ydb-platform/ydb-go-sdk/v3/retry"
+
+	"github.com/stroppy-io/stroppy/pkg/driver"
+)
+
+func TestClassifyError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want driver.ErrorKind
+	}{
+		{name: "retryable", err: ydbretry.RetryableError(errors.New("transient")), want: driver.ErrorKindTransient},
+		{name: "unsupported insert", err: ErrUnsupportedInsertMethod, want: driver.ErrorKindUnsupported},
+		{name: "unsupported type", err: ErrUnsupportedType, want: driver.ErrorKindUnsupported},
+		{name: "other", err: errors.New("boom"), want: driver.ErrorKindUnknown},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := (*Driver)(nil).ClassifyError(tt.err).Kind; got != tt.want {
+				t.Fatalf("ClassifyError().Kind = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
