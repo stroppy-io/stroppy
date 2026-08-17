@@ -144,7 +144,7 @@ func Run(
 			drv: drv, cfg: cfg,
 		}
 
-		return wl.Iterate(ctx, b)
+		return wl.Iterate(vu.Context(), b)
 	}); err != nil {
 		return fmt.Errorf("scenario %q: %w", sc.name, err)
 	}
@@ -195,6 +195,7 @@ func runScenario(ctx context.Context, sc scenarioSpec, iterate func(*VU) error) 
 	defer cancel()
 
 	fatalErrors := make(chan error, 1)
+
 	var wg sync.WaitGroup
 
 	startWorker := func(vuid int, keep func() bool) {
@@ -257,6 +258,7 @@ func runWorker(ctx context.Context, vuid int, iterate func(*VU) error, keep func
 			if IsFatalError(err) {
 				return err
 			}
+
 			if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
 				return ctx.Err()
 			}
