@@ -38,12 +38,16 @@ type workload struct {
 	sql     *bench.SQL
 	variant string // "tx" (DML steps) or "procs" (stored procedures)
 
-	driverType   bench.DriverTypeName
-	iso          bench.TxIsolationName
-	isPicodata   bool
-	isYdb        bool
-	hasReturning bool
-	pacing       bool
+	driverType    bench.DriverTypeName
+	iso           bench.TxIsolationName
+	isPicodata    bool
+	isYdb         bool
+	hasReturning  bool
+	pacing        bool
+	pgUnlogged    bool
+	retryAttempts int
+	sqlFile       string
+	loadWorkers   int
 
 	warehouses     int64
 	warehouseStart int64
@@ -73,7 +77,24 @@ func init() {
 
 func (w *workload) Name() string { return "tpcc/" + w.variant }
 
-func (*workload) Define(*bench.Def) error { return nil }
+func (w *workload) Define(d *bench.Def) error {
+	warehouses := d.Param.Int(
+		"scale-factor", 1, "Number of warehouses.", bench.LegacyEnvAliases("WAREHOUSES"),
+	).Value()
+	w.warehouses = int64(max(warehouses, 1))
+	w.warehouseStart = int64(d.Param.Int("warehouse-start", 1, "First warehouse ID.").Value())
+	w.wIDMax = w.warehouseStart + w.warehouses - 1
+	w.loadItems = d.Param.Bool("load-items", w.warehouseStart == 1, "Load the shared item table.").Value()
+	w.pacing = d.Param.Bool("pacing", false, "Apply TPC-C keying and think times.").Value()
+	w.retryAttempts = d.Param.Int("retry-attempts", 3, "Maximum transaction attempts.").Value()
+	w.pgUnlogged = d.Param.Bool("pg-unlogged", false, "Use unlogged PostgreSQL tables while loading.").Value()
+	w.iso = bench.TxIsolationName(d.Param.String("tx-isolation", "", "Transaction isolation override.").Value())
+	w.sqlFile = d.Param.String("sql-file", "", "SQL dialect file override.").Value()
+	w.loadWorkers = d.Param.Int("load-workers", 1, "Workers used to load each table.").Value()
+	w.loadWorkers = max(w.loadWorkers, 1)
+
+	return nil
+}
 
 // renderDDL expands the ydb.sql {partition_keys}/{partition_count} tablet-split
 // placeholders from the warehouse range (one tablet per warehouse in
@@ -109,10 +130,10 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	}
 
 	w.initConfig()
-	useUnlogged := bench.Env("PG_UNLOGGED", "false") == "true" && w.driverType == bench.DriverPostgres
+	useUnlogged := w.pgUnlogged && w.driverType == bench.DriverPostgres
 	w.m = w.initMetrics(b)
 	w.retryPolicy = b.TxRetryPolicy(bench.TxRetryPolicyOptions{
-		MaxAttempts: bench.EnvInt("RETRY_ATTEMPTS", 3),
+		MaxAttempts: w.retryAttempts,
 		OnRetry:     func(int, error, bench.RetryDecision) { w.m.retryAttempts.Add(1) },
 	})
 
@@ -183,18 +204,10 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	return nil
 }
 
-// initConfig reads env-driven workload tuning into w fields.
+// initConfig resolves driver-specific workload configuration.
 func (w *workload) initConfig() {
-	w.warehouses = max(int64(bench.EnvInt("SCALE_FACTOR", bench.EnvInt("WAREHOUSES", 1))), 1)
-	w.warehouseStart = int64(bench.EnvInt("WAREHOUSE_START", 1))
-	w.wIDMax = w.warehouseStart + w.warehouses - 1
-
-	defLoadItems := w.warehouseStart == 1
-	w.loadItems = bench.Env("LOAD_ITEMS", boolStr(defLoadItems)) == "true"
-
-	w.pacing = bench.Env("PACING", "false") == "true"
-	w.iso = resolveIsolation(w.driverType)
-	w.sql = mustLoadSQL(w.driverType)
+	w.iso = resolveIsolation(w.driverType, w.iso)
+	w.sql = mustLoadSQL(w.driverType, w.sqlFile)
 	w.isPicodata = w.driverType == bench.DriverPicodata
 	w.isYdb = w.driverType == bench.DriverYDB
 	w.hasReturning = w.driverType == bench.DriverPostgres || w.driverType == bench.DriverYDB
@@ -228,37 +241,37 @@ func (w *workload) initMetrics(b *bench.Bench) *metrics {
 // loadData loads warehouse, district, customer, item, stock, orders,
 // order_line, and new_order through typed insert requests.
 func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64) error {
-	if _, err := b.Insert(ctx, warehouseRequest(w.warehouses, w.warehouseStart)); err != nil {
+	if _, err := b.Insert(ctx, warehouseRequest(w.warehouses, w.warehouseStart, w.loadWorkers)); err != nil {
 		return err
 	}
 
-	if _, err := b.Insert(ctx, districtRequest(w.warehouses, w.warehouseStart)); err != nil {
+	if _, err := b.Insert(ctx, districtRequest(w.warehouses, w.warehouseStart, w.loadWorkers)); err != nil {
 		return err
 	}
 
-	if _, err := b.Insert(ctx, customerRequest(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+	if _, err := b.Insert(ctx, customerRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers)); err != nil {
 		return err
 	}
 
 	if w.loadItems {
-		if _, err := b.Insert(ctx, itemRequest()); err != nil {
+		if _, err := b.Insert(ctx, itemRequest(w.loadWorkers)); err != nil {
 			return err
 		}
 	}
 
-	if _, err := b.Insert(ctx, stockRequest(w.warehouses, w.warehouseStart)); err != nil {
+	if _, err := b.Insert(ctx, stockRequest(w.warehouses, w.warehouseStart, w.loadWorkers)); err != nil {
 		return err
 	}
 
-	if _, err := b.Insert(ctx, ordersRequest(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+	if _, err := b.Insert(ctx, ordersRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers)); err != nil {
 		return err
 	}
 
-	if _, err := b.Insert(ctx, orderLineRequest(w.warehouses, w.warehouseStart, loadDays)); err != nil {
+	if _, err := b.Insert(ctx, orderLineRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers)); err != nil {
 		return err
 	}
 
-	if _, err := b.Insert(ctx, newOrderRequest(w.warehouses, w.warehouseStart)); err != nil {
+	if _, err := b.Insert(ctx, newOrderRequest(w.warehouses, w.warehouseStart, w.loadWorkers)); err != nil {
 		return err
 	}
 
@@ -1253,14 +1266,6 @@ func toStr(v any) string {
 func fmtAmount(amount float64) string {
 	// tx.ts used amount.toFixed(2) on the float draw; mirror the 2-decimal form.
 	return fmt.Sprintf("%.2f", amount)
-}
-
-func boolStr(b bool) string {
-	if b {
-		return "true"
-	}
-
-	return "false"
 }
 
 func sleepSeconds(s float64) {

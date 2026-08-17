@@ -25,9 +25,13 @@ type workload struct {
 	isPgOrMs  bool
 	ydbColumn bool
 
-	scaleFactor float64
-	loadWorkers int
-	useUnlogged bool
+	scaleFactor   float64
+	loadWorkers   int
+	useUnlogged   bool
+	ydbStoreMode  string
+	schemaFile    string
+	sqlFile       string
+	validateForce bool
 
 	throughput bool
 	streams    int
@@ -44,39 +48,48 @@ func init() { bench.Register(func() bench.Workload { return &workload{} }) }
 
 func (*workload) Name() string { return "tpcds" }
 
-func (*workload) Define(*bench.Def) error { return nil }
+func (w *workload) Define(d *bench.Def) error {
+	w.scaleFactor = d.Param.Float64("scale-factor", 1, "TPC-DS scale factor.").Value()
+	w.loadWorkers = d.Param.Int("load-workers", 0, "Workers used to load each table.").Value()
+	w.useUnlogged = d.Param.Bool("pg-unlogged", false, "Use unlogged PostgreSQL tables while loading.").Value()
+	w.ydbStoreMode = d.Param.String("ydb-store-mode", "column", "YDB table store mode.").Value()
+	w.streams = d.Param.Int("streams", 1, "Number of query streams.").Value()
+	w.seed = int64(d.Param.Int("query-seed", 19620718, "Query generator seed.").Value())
 
-func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
-	w.driver = b.DriverTypeName()
-	w.isPgOrMs = w.driver == bench.DriverPostgres || w.driver == bench.DriverMySQL
-	w.ydbColumn = w.driver == bench.DriverYDB && bench.Env("YDB_STORE_MODE", "column") == "column"
+	queryStream := d.Param.Int("query-stream", 0, "Query stream to generate.")
+	if queryStream.Explicit() {
+		w.genStream = queryStream.Value()
+	} else {
+		w.genStream = -1
+	}
 
-	w.scaleFactor = bench.EnvFloat("SCALE_FACTOR", 1)
+	w.schemaFile = d.Param.String("schema-file", "", "Schema SQL file override.").Value()
+	w.sqlFile = d.Param.String("sql-file", "", "Query SQL file override.").Value()
+	w.validateForce = d.Param.Bool("validate-force", false, "Validate answers outside scale factor 1.").Value()
+
 	if w.scaleFactor <= 0 {
 		return fmt.Errorf("%w, got %v", errScaleFactorMustBePositive, w.scaleFactor)
 	}
 
-	w.loadWorkers = bench.EnvInt("LOAD_WORKERS", 0)
-	w.useUnlogged = bench.Env("PG_UNLOGGED", "false") == "true" && w.driver == bench.DriverPostgres
+	return nil
+}
+
+func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
+	w.driver = b.DriverTypeName()
+	w.isPgOrMs = w.driver == bench.DriverPostgres || w.driver == bench.DriverMySQL
+	w.ydbColumn = w.driver == bench.DriverYDB && w.ydbStoreMode == "column"
+	w.useUnlogged = w.useUnlogged && w.driver == bench.DriverPostgres
 
 	// Query source. Throughput (STREAMS>1) or an explicit QUERY_STREAM selects the
 	// in-process generator; otherwise the baked canonical set. ydb runs the baked set
 	// only — the generator targets ANSI/pg/MySQL, not YQL.
-	w.streams = bench.EnvInt("STREAMS", 1)
 	w.throughput = w.streams > 1
-
-	w.seed = int64(bench.EnvInt("QUERY_SEED", 19620718))
-	if qs := bench.Env("QUERY_STREAM", ""); qs != "" {
-		w.genStream = bench.EnvInt("QUERY_STREAM", 0)
-	} else {
-		w.genStream = -1
-	}
 
 	if w.driver == bench.DriverYDB && (w.throughput || w.genStream >= 0) {
 		return errYdbBakedOnly
 	}
 
-	schemaFile, queryFile := dialectFiles(w.driver)
+	schemaFile, queryFile := dialectFiles(w.driver, w.schemaFile, w.sqlFile)
 	w.schemaSQL = mustLoad(preset, schemaFile)
 	w.querySQL = mustLoad(preset, queryFile)
 
@@ -141,7 +154,10 @@ func (w *workload) runSteps(ctx context.Context, b *bench.Bench) error {
 	// (mirrors the tpch port), so the queries execute twice at SF=1.
 	if !w.throughput && w.genStream < 0 && w.isPgOrMs {
 		if err := addStep("validate_answers", func() error {
-			validateAnswers(ctx, b, w.schemaSQL, w.querySQL, w.querySQL.Names(""), w.scaleFactor, w.driver)
+			validateAnswers(
+				ctx, b, w.schemaSQL, w.querySQL, w.querySQL.Names(""),
+				w.scaleFactor, w.driver, w.validateForce,
+			)
 
 			return nil
 		}); err != nil {

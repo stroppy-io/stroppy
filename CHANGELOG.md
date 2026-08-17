@@ -28,6 +28,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- Built-in workloads expose their tuning options as typed parameters while preserving the existing environment-variable names.
 - TPC-DS typed loads format common cell types directly into reusable buffers. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Benchmark metrics now use standard OpenTelemetry counters, gauges, and fixed-bucket histograms. Query throughput and error rates are derived from monotonic `*_total` counters instead of k6-style sampled rates. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
 - The `stroppy help <topic>` topics (drivers, config-file, steps, resolution, sql, envs, datagen, probe) now describe the Go-native binary — the previous text still documented the removed TypeScript/k6 workflow (`k6Args`, `declareDriverSetup`, `.ts` script mode, the `--` passthrough).

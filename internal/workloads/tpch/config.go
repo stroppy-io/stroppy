@@ -21,9 +21,9 @@ func init() {
 	}
 }
 
-func sqlFile(dt bench.DriverTypeName) string {
-	if v := bench.Env("SQL_FILE", ""); v != "" {
-		return v
+func sqlFile(dt bench.DriverTypeName, override string) string {
+	if override != "" {
+		return override
 	}
 
 	switch dt {
@@ -38,8 +38,8 @@ func sqlFile(dt bench.DriverTypeName) string {
 	}
 }
 
-func mustLoadSQL(dt bench.DriverTypeName) *bench.SQL {
-	s, err := bench.LoadSQL(preset, sqlFile(dt))
+func mustLoadSQL(dt bench.DriverTypeName, override string) *bench.SQL {
+	s, err := bench.LoadSQL(preset, sqlFile(dt, override))
 	if err != nil {
 		panic(err)
 	}

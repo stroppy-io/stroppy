@@ -20,25 +20,30 @@ var (
 )
 
 type workload struct {
-	sql    *bench.SQL
-	names  []string
-	preset string
+	sql     *bench.SQL
+	names   []string
+	preset  string
+	sqlFile string
 }
 
 func init() { bench.Register(func() bench.Workload { return &workload{} }) }
 
 func (*workload) Name() string { return "execute_sql" }
 
-func (*workload) Define(*bench.Def) error { return nil }
+func (w *workload) Define(d *bench.Def) error {
+	w.sqlFile = d.Param.String("sql-file", "", "SQL file to execute.").Value()
+
+	return nil
+}
 
 func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
 	w.preset = "execute_sql"
 	if body := bench.Env("STROPPY_SQL_BODY", ""); body != "" {
 		w.sql = bench.ParseSQL(body)
-	} else if file := bench.Env("SQL_FILE", ""); file != "" {
-		s, err := bench.LoadSQL(w.preset, file)
+	} else if w.sqlFile != "" {
+		s, err := bench.LoadSQL(w.preset, w.sqlFile)
 		if err != nil {
-			return fmt.Errorf("execute_sql: load %s: %w", file, err)
+			return fmt.Errorf("execute_sql: load %s: %w", w.sqlFile, err)
 		}
 
 		w.sql = s

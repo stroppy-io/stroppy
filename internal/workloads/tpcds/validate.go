@@ -248,7 +248,7 @@ func cellDeltas(i int, g, w []string) []string {
 func validateAnswers(
 	ctx context.Context, b *bench.Bench,
 	schema, queries *bench.SQL, names []string,
-	scaleFactor float64, dt bench.DriverTypeName,
+	scaleFactor float64, dt bench.DriverTypeName, force bool,
 ) {
 	lg := b.Logger().Sugar()
 	if dt != bench.DriverPostgres && dt != bench.DriverMySQL {
@@ -257,7 +257,7 @@ func validateAnswers(
 		return
 	}
 
-	if math.Abs(scaleFactor-1) > 1e-9 && bench.Env("VALIDATE_FORCE", "") == "" {
+	if math.Abs(scaleFactor-1) > 1e-9 && !force {
 		lg.Info("[tpcds_validate] skipped: answers_sf1 is SF=1 only (set VALIDATE_FORCE=1 to run anyway)")
 
 		return

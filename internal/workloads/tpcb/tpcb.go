@@ -35,10 +35,13 @@ const (
 )
 
 type workload struct {
-	sql        *bench.SQL
-	driverType bench.DriverTypeName
-	iso        bench.TxIsolationName
-	scale      int64
+	sql           *bench.SQL
+	driverType    bench.DriverTypeName
+	iso           bench.TxIsolationName
+	scale         int64
+	retryAttempts int
+	sqlFile       string
+	loadWorkers   int
 
 	retryMetricOnce sync.Once
 	retryMetric     *bench.Metric
@@ -51,15 +54,22 @@ func init() { bench.Register(func() bench.Workload { return &workload{} }) }
 
 func (*workload) Name() string { return "tpcb/tx" }
 
-func (*workload) Define(*bench.Def) error { return nil }
+func (w *workload) Define(d *bench.Def) error {
+	w.scale = int64(max(d.Param.Int("scale-factor", 1, "TPC-B scale factor.").Value(), 1))
+	w.retryAttempts = d.Param.Int("retry-attempts", 3, "Maximum transaction attempts.").Value()
+	w.iso = bench.TxIsolationName(d.Param.String("tx-isolation", "", "Transaction isolation override.").Value())
+	w.sqlFile = d.Param.String("sql-file", "", "SQL dialect file override.").Value()
+	w.loadWorkers = d.Param.Int("load-workers", 1, "Workers used to load each table.").Value()
+	w.loadWorkers = max(w.loadWorkers, 1)
+
+	return nil
+}
 
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.driverType = b.DriverTypeName()
 
-	w.scale = int64(max(bench.EnvInt("SCALE_FACTOR", 1), 1))
-
-	w.iso = resolveIsolation(w.driverType)
-	w.sql = mustLoadSQL(w.driverType)
+	w.iso = resolveIsolation(w.driverType, w.iso)
+	w.sql = mustLoadSQL(w.driverType, w.sqlFile)
 
 	runSection := func(name string) error {
 		for _, q := range w.sql.Section(name) {
@@ -78,15 +88,15 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		{"drop_schema", func() error { return runSection("drop_schema") }},
 		{"create_schema", func() error { return runSection("create_schema") }},
 		{"load_data", func() error {
-			if _, err := b.Insert(ctx, branchesRequest(w.scale)); err != nil {
+			if _, err := b.Insert(ctx, branchesRequest(w.scale, w.loadWorkers)); err != nil {
 				return err
 			}
 
-			if _, err := b.Insert(ctx, tellersRequest(w.scale)); err != nil {
+			if _, err := b.Insert(ctx, tellersRequest(w.scale, w.loadWorkers)); err != nil {
 				return err
 			}
 
-			if _, err := b.Insert(ctx, accountsRequest(w.scale)); err != nil {
+			if _, err := b.Insert(ctx, accountsRequest(w.scale, w.loadWorkers)); err != nil {
 				return err
 			}
 
@@ -104,7 +114,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 
 	b.StepBegin("workload")
 	w.retryPolicy = b.TxRetryPolicy(bench.TxRetryPolicyOptions{
-		MaxAttempts: bench.EnvInt("RETRY_ATTEMPTS", 3),
+		MaxAttempts: w.retryAttempts,
 		OnRetry:     func(int, error, bench.RetryDecision) { w.retryCounter(b).Add(1) },
 	})
 
@@ -167,9 +177,9 @@ func branches(s int64) int64 { return s }
 func tellers(s int64) int64  { return 10 * s }
 func accounts(s int64) int64 { return 100_000 * s }
 
-func resolveIsolation(dt bench.DriverTypeName) bench.TxIsolationName {
-	if v := bench.Env("TX_ISOLATION", ""); v != "" {
-		return bench.TxIsolationName(v)
+func resolveIsolation(dt bench.DriverTypeName, override bench.TxIsolationName) bench.TxIsolationName {
+	if override != "" {
+		return override
 	}
 
 	switch dt {
@@ -182,9 +192,9 @@ func resolveIsolation(dt bench.DriverTypeName) bench.TxIsolationName {
 	}
 }
 
-func sqlFile(dt bench.DriverTypeName) string {
-	if v := bench.Env("SQL_FILE", ""); v != "" {
-		return v
+func sqlFile(dt bench.DriverTypeName, override string) string {
+	if override != "" {
+		return override
 	}
 
 	switch dt {
@@ -199,8 +209,8 @@ func sqlFile(dt bench.DriverTypeName) string {
 	}
 }
 
-func mustLoadSQL(dt bench.DriverTypeName) *bench.SQL {
-	s, err := bench.LoadSQL(preset, sqlFile(dt))
+func mustLoadSQL(dt bench.DriverTypeName, override string) *bench.SQL {
+	s, err := bench.LoadSQL(preset, sqlFile(dt, override))
 	if err != nil {
 		panic(err)
 	}
@@ -256,43 +266,33 @@ func (w *workload) retryCounter(b *bench.Bench) *bench.Metric {
 
 // --- typed insert requests (plain Go row formulas) ---
 
-// loadWorkers returns the per-table worker fan-out from LOAD_WORKERS, or 1
-// when unset. Replaces the legacy workers() *dgproto.Parallelism helper.
-func loadWorkers() int {
-	if n := bench.EnvInt("LOAD_WORKERS", 0); n > 0 {
-		return n
-	}
-
-	return 1
-}
-
 // branchesRequest builds the typed insert request for pgbench_branches.
 // bid is the 1-based row counter, bbalance is 0, filler is a fixed-width
 // [A-Za-z] string. Preserves the legacy table name, method (NATIVE), and
 // seedBranches derivation.
-func branchesRequest(scale int64) *driver.InsertRequest {
+func branchesRequest(scale int64, workers int) *driver.InsertRequest {
 	root := gen.New(seedBranches)
 
 	return &driver.InsertRequest{
-		Table: "pgbench_branches", Method: driver.InsertNative, Workers: loadWorkers(),
+		Table: "pgbench_branches", Method: driver.InsertNative, Workers: workers,
 		Source: branchesSource(root, branches(scale)),
 	}
 }
 
-func tellersRequest(scale int64) *driver.InsertRequest {
+func tellersRequest(scale int64, workers int) *driver.InsertRequest {
 	root := gen.New(seedTellers)
 
 	return &driver.InsertRequest{
-		Table: "pgbench_tellers", Method: driver.InsertNative, Workers: loadWorkers(),
+		Table: "pgbench_tellers", Method: driver.InsertNative, Workers: workers,
 		Source: tellersSource(root, tellers(scale)),
 	}
 }
 
-func accountsRequest(scale int64) *driver.InsertRequest {
+func accountsRequest(scale int64, workers int) *driver.InsertRequest {
 	root := gen.New(seedAccounts)
 
 	return &driver.InsertRequest{
-		Table: "pgbench_accounts", Method: driver.InsertNative, Workers: loadWorkers(),
+		Table: "pgbench_accounts", Method: driver.InsertNative, Workers: workers,
 		Source: accountsSource(root, accounts(scale)),
 	}
 }
