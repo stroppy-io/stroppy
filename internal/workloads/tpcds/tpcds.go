@@ -65,7 +65,16 @@ func (w *workload) Define(d *bench.Def) error {
 
 	w.schemaFile = d.Param.String("schema-file", "", "Schema SQL file override.").Value()
 	w.sqlFile = d.Param.String("sql-file", "", "Query SQL file override.").Value()
-	w.validateForce = d.Param.Bool("validate-force", false, "Validate answers outside scale factor 1.").Value()
+	validateForce := d.Param.Bool("validate-force", false, "Validate answers outside scale factor 1.")
+
+	w.validateForce = validateForce.Value()
+
+	legacyForce := validateForce.Source() == bench.ParamSourceProcessEnv ||
+		validateForce.Source() == bench.ParamSourceLegacyEnv ||
+		validateForce.Source() == bench.ParamSourceLegacyConfigEnv
+	if validateForce.Explicit() && legacyForce {
+		w.validateForce = true
+	}
 
 	if w.scaleFactor <= 0 {
 		return fmt.Errorf("%w, got %v", errScaleFactorMustBePositive, w.scaleFactor)
