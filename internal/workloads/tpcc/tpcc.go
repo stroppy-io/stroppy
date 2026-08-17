@@ -309,8 +309,8 @@ func (w *workload) q(section, name string) string {
 	return s
 }
 
-func (w *workload) retryPolicy() bench.RetryPolicy {
-	return bench.TxRetryPolicy(w.driverType, bench.TxRetryPolicyOptions{
+func (w *workload) retryPolicy(b *bench.Bench) bench.RetryPolicy {
+	return b.TxRetryPolicy(bench.TxRetryPolicyOptions{
 		MaxAttempts: bench.EnvInt("RETRY_ATTEMPTS", 3),
 		OnRetry:     func(int, error, bench.RetryDecision) { w.m.retryAttempts.Add(1) },
 	})
@@ -357,7 +357,7 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) {
 		lineIID[olCnt-1] = items + 1 // nonexistent item → sentinel rollback
 	}
 
-	_ = bench.Retry0(w.retryPolicy(), func() error {
+	_ = bench.Retry0(ctx, w.retryPolicy(b), func() error {
 		tx, err := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
 		if err != nil {
 			return err
@@ -606,7 +606,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 
 	var wasBC bool
 
-	_ = bench.Retry0(w.retryPolicy(), func() error {
+	_ = bench.Retry0(ctx, w.retryPolicy(b), func() error {
 		wasBC = false
 
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.TxX) error {
@@ -835,7 +835,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 	}
 
 	bynameObserved := false
-	_ = bench.Retry0(w.retryPolicy(), func() error {
+	_ = bench.Retry0(ctx, w.retryPolicy(b), func() error {
 		bynameObserved = false
 
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.TxX) error {
@@ -918,7 +918,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 	wID := vs.homeWID
 	carrierID := vs.ri(vs.dCarrier, 1, 10)
 
-	_ = bench.Retry0(w.retryPolicy(), func() error {
+	_ = bench.Retry0(ctx, w.retryPolicy(b), func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.TxX) error {
 			for dID := int64(1); dID <= districtsPerWarehouse; dID++ {
 				minRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_min_new_order"), map[string]any{
@@ -1001,7 +1001,7 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 	dID := vs.ri(vs.slDID, 1, districtsPerWarehouse)
 	threshold := vs.ri(vs.slThreshold, 10, 20)
 
-	_ = bench.Retry0(w.retryPolicy(), func() error {
+	_ = bench.Retry0(ctx, w.retryPolicy(b), func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"}, func(tx *bench.TxX) error {
 			nextOIDv, err := tx.QueryValue(ctx, w.q("workload_tx_stock_level", "get_district"), map[string]any{
 				"w_id": wID, "d_id": dID,

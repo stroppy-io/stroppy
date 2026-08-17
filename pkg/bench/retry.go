@@ -3,183 +3,203 @@ package bench
 import (
 	"context"
 	"errors"
+	"maps"
 	"math/rand/v2"
-	"strings"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
-// MySQL driver error codes returned for retryable lock contention.
+// ErrorAction is workload policy for one classified driver error.
+type ErrorAction uint8
+
 const (
-	mySQLErrLockDeadlock    = 1213 // ER_LOCK_DEADLOCK
-	mySQLErrLockWaitTimeout = 1205 // ER_LOCK_WAIT_TIMEOUT
+	ErrorActionError ErrorAction = iota
+	ErrorActionRetry
+	ErrorActionIgnore
+	ErrorActionFatal
 )
 
-// IsSerializationError reports whether err is a retryable serialization/deadlock
-// failure. The rollback sentinel injected by TPC-C ("tpcc_rollback:") is never
-// retryable. Driver errors are matched by typed errors.As on the underlying
-// pgconn/mysql error plus its SQLSTATE, replacing the TS regex port. YDB's
-// transient tx errors have no SQLSTATE and stay text-based (see TxRetryPolicy).
-func IsSerializationError(err error) bool {
-	if err == nil {
-		return false
+// ErrorActionMap maps database-independent error kinds to workload actions.
+type ErrorActionMap map[driver.ErrorKind]ErrorAction
+
+// DefaultErrorActions returns safe transaction defaults. Contention and
+// unconditional transient failures retry; everything else remains an error.
+func DefaultErrorActions(idempotent bool) ErrorActionMap {
+	actions := ErrorActionMap{
+		driver.ErrorKindSerialization: ErrorActionRetry,
+		driver.ErrorKindDeadlock:      ErrorActionRetry,
+		driver.ErrorKindLockTimeout:   ErrorActionRetry,
+		driver.ErrorKindTransient:     ErrorActionRetry,
+	}
+	if idempotent {
+		actions[driver.ErrorKindTransientIfIdempotent] = ErrorActionRetry
 	}
 
-	if strings.Contains(err.Error(), "tpcc_rollback:") {
-		return false
-	}
-
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		switch pgErr.Code {
-		case "40001", "40P01": // serialization_failure, deadlock_detected
-			return true
-		}
-	}
-
-	var myErr *mysql.MySQLError
-	if errors.As(err, &myErr) {
-		switch myErr.Number {
-		case mySQLErrLockDeadlock, mySQLErrLockWaitTimeout:
-			return true
-		}
-	}
-
-	return false
+	return actions
 }
 
-// Retry runs fn up to maxAttempts times, retrying while isRetryable returns true.
-// No backoff: serialization retries are immediate by design. onRetry fires once
-// per retry, before re-invoking fn, with the upcoming (2-based) attempt number.
-func Retry[T any](
-	maxAttempts int,
-	isRetryable func(error) bool,
-	fn func() (T, error),
-	onRetry ...func(int, error),
-) (T, error) {
-	var (
-		lastErr error
-		zero    T
-	)
+// With returns a copy with overrides applied. Missing kinds keep the safe
+// ErrorActionError fallback.
+func (m ErrorActionMap) With(overrides ErrorActionMap) ErrorActionMap {
+	result := make(ErrorActionMap, len(m)+len(overrides))
+	maps.Copy(result, m)
+	maps.Copy(result, overrides)
 
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		v, err := fn()
-		if err == nil {
-			return v, nil
-		}
-
-		lastErr = err
-		if !isRetryable(err) || attempt == maxAttempts {
-			return zero, err
-		}
-
-		for _, cb := range onRetry {
-			cb(attempt+1, err)
-		}
-	}
-
-	return zero, lastErr // unreachable — last iteration always returns
+	return result
 }
 
-// Retry0 is RetryWithPolicy for a void fn (the common tx-replay shape).
-func Retry0(policy RetryPolicy, fn func() error) error {
-	_, err := RetryWithPolicy(policy, func() (struct{}, error) {
+func (m ErrorActionMap) action(kind driver.ErrorKind) ErrorAction {
+	if action, ok := m[kind]; ok {
+		return action
+	}
+
+	return ErrorActionError
+}
+
+// FatalError marks an error that must stop the whole scenario.
+type FatalError struct {
+	err error
+}
+
+func (e *FatalError) Error() string { return e.err.Error() }
+func (e *FatalError) Unwrap() error { return e.err }
+
+// IsFatalError reports whether err carries a fatal workload action.
+func IsFatalError(err error) bool {
+	_, ok := errors.AsType[*FatalError](err)
+
+	return ok
+}
+
+// Retry0 is RetryWithPolicy for a void fn (the common transaction-replay shape).
+func Retry0(ctx context.Context, policy RetryPolicy, fn func() error) error {
+	_, err := RetryWithPolicy(ctx, policy, func() (struct{}, error) {
 		return struct{}{}, fn()
 	})
 
 	return err
 }
 
-// RetryDecision is the verdict a RetryPolicy.Classify returns for one error.
+// RetryDecision records the classified facts and resolved action for one error.
 type RetryDecision struct {
-	Retry        bool
+	Action       ErrorAction
+	Facts        driver.ErrorFacts
 	DelaySeconds float64
-	Reason       string
 }
 
-// RetryPolicy owns error classification and optional backoff for RetryWithPolicy.
+// RetryPolicy combines driver classification with workload-owned actions.
 type RetryPolicy struct {
 	MaxAttempts int
-	Classify    func(err error, attempt int) RetryDecision
+	Classify    func(error) driver.ErrorFacts
+	Actions     ErrorActionMap
 	OnRetry     func(attempt int, err error, decision RetryDecision)
+
+	baseDelaySeconds float64
+	maxDelaySeconds  float64
 }
 
-// RetryWithPolicy runs fn under policy. The policy owns classification and
-// optional backoff; the caller owns the transaction closure being replayed.
-func RetryWithPolicy[T any](policy RetryPolicy, fn func() (T, error)) (T, error) {
+// RetryWithPolicy runs fn under policy. Error and fatal actions preserve the
+// original error, ignore returns the zero value, and retry replays fn.
+func RetryWithPolicy[T any](
+	ctx context.Context,
+	policy RetryPolicy,
+	fn func() (T, error),
+) (T, error) {
 	var (
 		lastErr error
 		zero    T
 	)
 
-	for attempt := 1; attempt <= policy.MaxAttempts; attempt++ {
-		v, err := fn()
-		if err == nil {
-			return v, nil
-		}
-
-		lastErr = err
-
-		decision := policy.Classify(err, attempt)
-		if !decision.Retry || attempt == policy.MaxAttempts {
+	maxAttempts := max(policy.MaxAttempts, 1)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
 			return zero, err
 		}
 
-		if policy.OnRetry != nil {
-			policy.OnRetry(attempt+1, err, decision)
+		value, err := fn()
+		if err == nil {
+			return value, nil
+		}
+		lastErr = err
+
+		facts := driver.DefaultErrorFacts(err)
+		if policy.Classify != nil {
+			facts = policy.Classify(err)
 		}
 
-		if decision.DelaySeconds > 0 {
-			sleepForRetry(decision.DelaySeconds)
+		decision := RetryDecision{
+			Action: policy.Actions.action(facts.Kind),
+			Facts:  facts,
+		}
+
+		switch decision.Action {
+		case ErrorActionIgnore:
+			return zero, nil
+		case ErrorActionFatal:
+			return zero, &FatalError{err: err}
+		case ErrorActionRetry:
+			if attempt == maxAttempts {
+				return zero, err
+			}
+
+			if facts.Backoff {
+				decision.DelaySeconds = backoffSeconds(
+					attempt,
+					policy.baseDelaySeconds,
+					policy.maxDelaySeconds,
+				)
+			}
+
+			if policy.OnRetry != nil {
+				policy.OnRetry(attempt+1, err, decision)
+			}
+
+			if err := sleepForRetry(ctx, decision.DelaySeconds); err != nil {
+				return zero, err
+			}
+		default:
+			return zero, err
 		}
 	}
 
-	return zero, lastErr // unreachable
+	return zero, lastErr // unreachable: final attempt returns above
 }
 
-// TxRetryPolicyOptions configures TxRetryPolicy.
+// TxRetryPolicyOptions configures Bench.TxRetryPolicy.
 type TxRetryPolicyOptions struct {
 	MaxAttempts      int
+	Idempotent       bool
+	Actions          ErrorActionMap
 	BaseDelaySeconds float64
 	MaxDelaySeconds  float64
 	OnRetry          func(attempt int, err error, decision RetryDecision)
 }
 
-// TxRetryPolicy builds the standard transaction-retry policy: immediate retry on
-// serialization errors, exponential backoff on YDB transient errors, never on the
-// rollback sentinel. driverType selects the YDB backoff branch.
-func TxRetryPolicy(driverType DriverTypeName, opts TxRetryPolicyOptions) RetryPolicy {
+// TxRetryPolicy builds a policy from this bench's driver classifier and
+// workload overrides.
+func (b *Bench) TxRetryPolicy(opts TxRetryPolicyOptions) RetryPolicy {
+	return newTxRetryPolicy(b.drv.ClassifyError, opts)
+}
+
+func newTxRetryPolicy(
+	classify func(error) driver.ErrorFacts,
+	opts TxRetryPolicyOptions,
+) RetryPolicy {
 	if opts.BaseDelaySeconds == 0 {
 		opts.BaseDelaySeconds = 0.05
 	}
-
 	if opts.MaxDelaySeconds == 0 {
 		opts.MaxDelaySeconds = 1
 	}
 
 	return RetryPolicy{
-		MaxAttempts: opts.MaxAttempts,
-		OnRetry:     opts.OnRetry,
-		Classify: func(err error, attempt int) RetryDecision {
-			if err == nil || strings.Contains(err.Error(), "tpcc_rollback:") {
-				return RetryDecision{}
-			}
-
-			if IsSerializationError(err) {
-				return RetryDecision{Retry: true, Reason: "serialization"}
-			}
-
-			if driverType == DriverYDB && isYDBTransientTxError(err.Error()) {
-				return RetryDecision{
-					Retry: true, Reason: "ydb_transient",
-					DelaySeconds: backoffSeconds(attempt, opts.BaseDelaySeconds, opts.MaxDelaySeconds),
-				}
-			}
-
-			return RetryDecision{}
-		},
+		MaxAttempts:      opts.MaxAttempts,
+		Classify:         classify,
+		Actions:          DefaultErrorActions(opts.Idempotent).With(opts.Actions),
+		OnRetry:          opts.OnRetry,
+		baseDelaySeconds: opts.BaseDelaySeconds,
+		maxDelaySeconds:  opts.MaxDelaySeconds,
 	}
 }
 
@@ -191,39 +211,20 @@ func backoffSeconds(attempt int, base, maxSeconds float64) float64 {
 	return capped + rand.Float64()*capped*0.2 //nolint:gosec // G404: retry backoff jitter RNG, not security-sensitive
 }
 
-func sleepForRetry(seconds float64) {
+func sleepForRetry(ctx context.Context, seconds float64) error {
+	if seconds <= 0 {
+		return ctx.Err()
+	}
+
 	timer := time.NewTimer(time.Duration(seconds * float64(time.Second)))
 	defer timer.Stop()
 
 	select {
 	case <-timer.C:
-	case <-context.Background().Done():
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-}
-
-// isYDBTransientTxError matches gRPC status/issue text from ydb-go-sdk, including
-// split/offline shard states that never surface as a SQLSTATE.
-func isYDBTransientTxError(msg string) bool {
-	for _, pat := range ydbTransientPatterns {
-		if strings.Contains(strings.ToLower(msg), pat) {
-			return true
-		}
-	}
-
-	return false
-}
-
-var ydbTransientPatterns = []string{
-	"operation/overloaded",
-	"operation/aborted",
-	"operation/unavailable",
-	"operation/bad_session",
-	"operation/session_busy",
-	"code = 400050",
-	"code = 400060",
-	"code = 400100",
-	"wrong_shard_state",
-	"transaction locks invalidated",
 }
 
 func max0(n int) int {

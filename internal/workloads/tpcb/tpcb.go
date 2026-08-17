@@ -115,7 +115,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	delta := vs.delta.IntN(10001) - 5000
 	hid := vs.nextHid()
 
-	policy := bench.TxRetryPolicy(w.driverType, bench.TxRetryPolicyOptions{
+	policy := b.TxRetryPolicy(bench.TxRetryPolicyOptions{
 		MaxAttempts: bench.EnvInt("RETRY_ATTEMPTS", 3),
 		OnRetry:     func(int, error, bench.RetryDecision) { w.retryCounter(b).Add(1) },
 	})
@@ -127,7 +127,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	insertHistory, _ := w.sql.Query("workload_tx_tpcb", "insert_history")
 
 	return b.Step("workload", func() error {
-		return bench.Retry0(policy, func() error {
+		return bench.Retry0(ctx, policy, func() error {
 			return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "tpcb"}, func(tx *bench.TxX) error {
 				if err := tx.Exec(ctx, updateAccount, map[string]any{"aid": aid, "delta": delta}); err != nil {
 					return err
