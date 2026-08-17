@@ -42,6 +42,7 @@ type workload struct {
 
 	retryMetricOnce sync.Once
 	retryMetric     *bench.Metric
+	retryPolicy     bench.RetryPolicy
 
 	vuStates sync.Map // uint64 -> *vuState
 }
@@ -100,6 +101,10 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	}
 
 	b.StepBegin("workload")
+	w.retryPolicy = b.TxRetryPolicy(bench.TxRetryPolicyOptions{
+		MaxAttempts: bench.EnvInt("RETRY_ATTEMPTS", 3),
+		OnRetry:     func(int, error, bench.RetryDecision) { w.retryCounter(b).Add(1) },
+	})
 
 	return nil
 }
@@ -112,11 +117,6 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	delta := vs.delta.IntN(10001) - 5000
 	hid := vs.nextHid()
 
-	policy := b.TxRetryPolicy(bench.TxRetryPolicyOptions{
-		MaxAttempts: bench.EnvInt("RETRY_ATTEMPTS", 3),
-		OnRetry:     func(int, error, bench.RetryDecision) { w.retryCounter(b).Add(1) },
-	})
-
 	updateAccount, _ := w.sql.Query("workload_tx_tpcb", "update_account")
 	getBalance, _ := w.sql.Query("workload_tx_tpcb", "get_balance")
 	updateTeller, _ := w.sql.Query("workload_tx_tpcb", "update_teller")
@@ -124,7 +124,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	insertHistory, _ := w.sql.Query("workload_tx_tpcb", "insert_history")
 
 	return b.Step("workload", func() error {
-		return bench.Retry0(ctx, policy, func() error {
+		return bench.Retry0(ctx, w.retryPolicy, func() error {
 			return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "tpcb"}, func(tx *bench.TxX) error {
 				if err := tx.Exec(ctx, updateAccount, map[string]any{"aid": aid, "delta": delta}); err != nil {
 					return err

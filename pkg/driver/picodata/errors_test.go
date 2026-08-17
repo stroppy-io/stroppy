@@ -17,7 +17,11 @@ func TestClassifyError(t *testing.T) {
 		want driver.ErrorKind
 	}{
 		{name: "transactions unsupported", err: ErrTransactionsUnsupported, want: driver.ErrorKindUnsupported},
-		{name: "wrapped native unsupported", err: fmt.Errorf("insert: %w", ErrNativeUnsupported), want: driver.ErrorKindUnsupported},
+		{
+			name: "wrapped native unsupported",
+			err:  fmt.Errorf("insert: %w", ErrNativeUnsupported),
+			want: driver.ErrorKindUnsupported,
+		},
 		{name: "unsupported type", err: ErrUnsupportedType, want: driver.ErrorKindUnsupported},
 		{name: "other", err: errors.New("boom"), want: driver.ErrorKindUnknown},
 	}

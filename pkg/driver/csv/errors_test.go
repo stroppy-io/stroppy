@@ -17,7 +17,11 @@ func TestClassifyError(t *testing.T) {
 		want driver.ErrorKind
 	}{
 		{name: "query unsupported", err: ErrCsvDriverNoQuery, want: driver.ErrorKindUnsupported},
-		{name: "wrapped insert unsupported", err: fmt.Errorf("insert: %w", ErrUnsupportedInsertMethod), want: driver.ErrorKindUnsupported},
+		{
+			name: "wrapped insert unsupported",
+			err:  fmt.Errorf("insert: %w", ErrUnsupportedInsertMethod),
+			want: driver.ErrorKindUnsupported,
+		},
 		{name: "other", err: errors.New("boom"), want: driver.ErrorKindUnknown},
 	}
 

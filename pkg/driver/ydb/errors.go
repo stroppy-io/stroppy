@@ -23,7 +23,11 @@ func (*Driver) ClassifyError(err error) driver.ErrorFacts {
 	case mode.MustRetry(false):
 		return driver.ErrorFacts{Kind: driver.ErrorKindTransient, Backoff: mode.MustBackoff()}
 	case mode.MustRetry(true):
-		return driver.ErrorFacts{Kind: driver.ErrorKindTransientIfIdempotent, Backoff: mode.MustBackoff()}
+		return driver.ErrorFacts{
+			Kind:                driver.ErrorKindTransient,
+			Backoff:             mode.MustBackoff(),
+			RequiresIdempotency: true,
+		}
 	default:
 		return facts
 	}

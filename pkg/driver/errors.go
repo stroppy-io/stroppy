@@ -9,21 +9,21 @@ import (
 type ErrorKind string
 
 const (
-	ErrorKindUnknown               ErrorKind = "unknown"
-	ErrorKindSerialization         ErrorKind = "serialization"
-	ErrorKindDeadlock              ErrorKind = "deadlock"
-	ErrorKindLockTimeout           ErrorKind = "lock_timeout"
-	ErrorKindTransient             ErrorKind = "transient"
-	ErrorKindTransientIfIdempotent ErrorKind = "transient_if_idempotent"
-	ErrorKindUnsupported           ErrorKind = "unsupported"
-	ErrorKindCanceled              ErrorKind = "canceled"
-	ErrorKindTimeout               ErrorKind = "timeout"
+	ErrorKindUnknown       ErrorKind = "unknown"
+	ErrorKindSerialization ErrorKind = "serialization"
+	ErrorKindDeadlock      ErrorKind = "deadlock"
+	ErrorKindLockTimeout   ErrorKind = "lock_timeout"
+	ErrorKindTransient     ErrorKind = "transient"
+	ErrorKindUnsupported   ErrorKind = "unsupported"
+	ErrorKindCanceled      ErrorKind = "canceled"
+	ErrorKindTimeout       ErrorKind = "timeout"
 )
 
 // ErrorFacts are backend-neutral properties used by workload error policy.
 type ErrorFacts struct {
-	Kind    ErrorKind
-	Backoff bool
+	Kind                ErrorKind
+	Backoff             bool
+	RequiresIdempotency bool
 }
 
 // DefaultErrorFacts classifies errors shared by every driver. Unknown errors

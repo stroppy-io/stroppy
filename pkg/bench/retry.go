@@ -24,29 +24,14 @@ const (
 type ErrorActionMap map[driver.ErrorKind]ErrorAction
 
 // DefaultErrorActions returns safe transaction defaults. Contention and
-// unconditional transient failures retry; everything else remains an error.
-func DefaultErrorActions(idempotent bool) ErrorActionMap {
-	actions := ErrorActionMap{
+// transient failures retry; everything else remains an error.
+func DefaultErrorActions() ErrorActionMap {
+	return ErrorActionMap{ //nolint:exhaustive // absent kinds use ErrorActionError
 		driver.ErrorKindSerialization: ErrorActionRetry,
 		driver.ErrorKindDeadlock:      ErrorActionRetry,
 		driver.ErrorKindLockTimeout:   ErrorActionRetry,
 		driver.ErrorKindTransient:     ErrorActionRetry,
 	}
-	if idempotent {
-		actions[driver.ErrorKindTransientIfIdempotent] = ErrorActionRetry
-	}
-
-	return actions
-}
-
-// With returns a copy with overrides applied. Missing kinds keep the safe
-// ErrorActionError fallback.
-func (m ErrorActionMap) With(overrides ErrorActionMap) ErrorActionMap {
-	result := make(ErrorActionMap, len(m)+len(overrides))
-	maps.Copy(result, m)
-	maps.Copy(result, overrides)
-
-	return result
 }
 
 func (m ErrorActionMap) action(kind driver.ErrorKind) ErrorAction {
@@ -72,15 +57,6 @@ func IsFatalError(err error) bool {
 	return ok
 }
 
-// Retry0 is RetryWithPolicy for a void fn (the common transaction-replay shape).
-func Retry0(ctx context.Context, policy RetryPolicy, fn func() error) error {
-	_, err := RetryWithPolicy(ctx, policy, func() (struct{}, error) {
-		return struct{}{}, fn()
-	})
-
-	return err
-}
-
 // RetryDecision records the classified facts and resolved action for one error.
 type RetryDecision struct {
 	Action       ErrorAction
@@ -95,75 +71,94 @@ type RetryPolicy struct {
 	Actions     ErrorActionMap
 	OnRetry     func(attempt int, err error, decision RetryDecision)
 
+	idempotent       bool
 	baseDelaySeconds float64
 	maxDelaySeconds  float64
 }
 
-// RetryWithPolicy runs fn under policy. Error and fatal actions preserve the
-// original error, ignore returns the zero value, and retry replays fn.
-func RetryWithPolicy[T any](
-	ctx context.Context,
-	policy RetryPolicy,
-	fn func() (T, error),
-) (T, error) {
-	var (
-		lastErr error
-		zero    T
-	)
+// Retry0 runs a void operation under policy. Error and fatal actions preserve
+// the original error, ignore returns nil, and retry replays fn.
+func Retry0(ctx context.Context, policy RetryPolicy, fn func() error) error {
+	var lastErr error
 
 	maxAttempts := max(policy.MaxAttempts, 1)
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
-			return zero, err
+			return err
 		}
 
-		value, err := fn()
+		err := fn()
 		if err == nil {
-			return value, nil
+			return nil
 		}
+
 		lastErr = err
+		decision := policy.decision(err)
 
-		facts := driver.DefaultErrorFacts(err)
-		if policy.Classify != nil {
-			facts = policy.Classify(err)
-		}
+		done, result := applyRetryDecision(ctx, policy, attempt, maxAttempts, err, decision)
 
-		decision := RetryDecision{
-			Action: policy.Actions.action(facts.Kind),
-			Facts:  facts,
-		}
-
-		switch decision.Action {
-		case ErrorActionIgnore:
-			return zero, nil
-		case ErrorActionFatal:
-			return zero, &FatalError{err: err}
-		case ErrorActionRetry:
-			if attempt == maxAttempts {
-				return zero, err
-			}
-
-			if facts.Backoff {
-				decision.DelaySeconds = backoffSeconds(
-					attempt,
-					policy.baseDelaySeconds,
-					policy.maxDelaySeconds,
-				)
-			}
-
-			if policy.OnRetry != nil {
-				policy.OnRetry(attempt+1, err, decision)
-			}
-
-			if err := sleepForRetry(ctx, decision.DelaySeconds); err != nil {
-				return zero, err
-			}
-		default:
-			return zero, err
+		if done {
+			return result
 		}
 	}
 
-	return zero, lastErr // unreachable: final attempt returns above
+	return lastErr // unreachable: final attempt returns above
+}
+
+func applyRetryDecision(
+	ctx context.Context,
+	policy RetryPolicy,
+	attempt int,
+	maxAttempts int,
+	err error,
+	decision RetryDecision,
+) (bool, error) {
+	switch decision.Action {
+	case ErrorActionIgnore:
+		return true, nil
+	case ErrorActionFatal:
+		return true, &FatalError{err: err}
+	case ErrorActionRetry:
+		if attempt == maxAttempts {
+			return true, err
+		}
+
+		if decision.Facts.Backoff {
+			decision.DelaySeconds = backoffSeconds(
+				attempt,
+				policy.baseDelaySeconds,
+				policy.maxDelaySeconds,
+			)
+		}
+
+		if policy.OnRetry != nil {
+			policy.OnRetry(attempt+1, err, decision)
+		}
+
+		if decision.DelaySeconds > 0 {
+			if err := sleepForRetry(ctx, decision.DelaySeconds); err != nil {
+				return true, err
+			}
+		}
+
+		return false, nil
+	default:
+		return true, err
+	}
+}
+
+func (p RetryPolicy) decision(err error) RetryDecision {
+	facts := driver.DefaultErrorFacts(err)
+	if p.Classify != nil {
+		facts = p.Classify(err)
+	}
+
+	action := p.Actions.action(facts.Kind)
+	if action == ErrorActionRetry && facts.RequiresIdempotency && !p.idempotent {
+		action = ErrorActionError
+	}
+
+	return RetryDecision{Action: action, Facts: facts}
 }
 
 // TxRetryPolicyOptions configures Bench.TxRetryPolicy.
@@ -189,15 +184,20 @@ func newTxRetryPolicy(
 	if opts.BaseDelaySeconds == 0 {
 		opts.BaseDelaySeconds = 0.05
 	}
+
 	if opts.MaxDelaySeconds == 0 {
 		opts.MaxDelaySeconds = 1
 	}
 
+	actions := DefaultErrorActions()
+	maps.Copy(actions, opts.Actions)
+
 	return RetryPolicy{
 		MaxAttempts:      opts.MaxAttempts,
 		Classify:         classify,
-		Actions:          DefaultErrorActions(opts.Idempotent).With(opts.Actions),
+		Actions:          actions,
 		OnRetry:          opts.OnRetry,
+		idempotent:       opts.Idempotent,
 		baseDelaySeconds: opts.BaseDelaySeconds,
 		maxDelaySeconds:  opts.MaxDelaySeconds,
 	}
@@ -212,10 +212,6 @@ func backoffSeconds(attempt int, base, maxSeconds float64) float64 {
 }
 
 func sleepForRetry(ctx context.Context, seconds float64) error {
-	if seconds <= 0 {
-		return ctx.Err()
-	}
-
 	timer := time.NewTimer(time.Duration(seconds * float64(time.Second)))
 	defer timer.Stop()
 

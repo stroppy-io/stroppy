@@ -50,7 +50,8 @@ type workload struct {
 	wIDMax         int64
 	loadItems      bool
 
-	m *metrics
+	m           *metrics
+	retryPolicy bench.RetryPolicy
 
 	vuStates sync.Map // uint64 -> *vuState
 }
@@ -108,6 +109,10 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.initConfig()
 	useUnlogged := bench.Env("PG_UNLOGGED", "false") == "true" && w.driverType == bench.DriverPostgres
 	w.m = w.initMetrics(b)
+	w.retryPolicy = b.TxRetryPolicy(bench.TxRetryPolicyOptions{
+		MaxAttempts: bench.EnvInt("RETRY_ATTEMPTS", 3),
+		OnRetry:     func(int, error, bench.RetryDecision) { w.m.retryAttempts.Add(1) },
+	})
 
 	loadDays := time.Now().UTC().Unix() / 86400
 
@@ -273,6 +278,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 		}
 
 		var err error
+
 		switch idx {
 		case 0:
 			err = w.newOrder(ctx, b, vs)
@@ -285,6 +291,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 		case 4:
 			err = w.stockLevel(ctx, b, vs)
 		}
+
 		if err != nil {
 			return err
 		}
@@ -311,13 +318,6 @@ func (w *workload) q(section, name string) string {
 	}
 
 	return s
-}
-
-func (w *workload) retryPolicy(b *bench.Bench) bench.RetryPolicy {
-	return b.TxRetryPolicy(bench.TxRetryPolicyOptions{
-		MaxAttempts: bench.EnvInt("RETRY_ATTEMPTS", 3),
-		OnRetry:     func(int, error, bench.RetryDecision) { w.m.retryAttempts.Add(1) },
-	})
 }
 
 // --- new_order ---
@@ -361,7 +361,7 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 		lineIID[olCnt-1] = items + 1 // nonexistent item → sentinel rollback
 	}
 
-	return bench.Retry0(ctx, w.retryPolicy(b), func() error {
+	return bench.Retry0(ctx, w.retryPolicy, func() error {
 		tx, err := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
 		if err != nil {
 			return err
@@ -610,7 +610,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) err
 
 	var wasBC bool
 
-	err := bench.Retry0(ctx, w.retryPolicy(b), func() error {
+	err := bench.Retry0(ctx, w.retryPolicy, func() error {
 		wasBC = false
 
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.TxX) error {
@@ -841,7 +841,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 	}
 
 	bynameObserved := false
-	err := bench.Retry0(ctx, w.retryPolicy(b), func() error {
+	err := bench.Retry0(ctx, w.retryPolicy, func() error {
 		bynameObserved = false
 
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.TxX) error {
@@ -926,7 +926,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) er
 	wID := vs.homeWID
 	carrierID := vs.ri(vs.dCarrier, 1, 10)
 
-	return bench.Retry0(ctx, w.retryPolicy(b), func() error {
+	return bench.Retry0(ctx, w.retryPolicy, func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.TxX) error {
 			for dID := int64(1); dID <= districtsPerWarehouse; dID++ {
 				minRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_min_new_order"), map[string]any{
@@ -1009,7 +1009,7 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 	dID := vs.ri(vs.slDID, 1, districtsPerWarehouse)
 	threshold := vs.ri(vs.slThreshold, 10, 20)
 
-	return bench.Retry0(ctx, w.retryPolicy(b), func() error {
+	return bench.Retry0(ctx, w.retryPolicy, func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"}, func(tx *bench.TxX) error {
 			nextOIDv, err := tx.QueryValue(ctx, w.q("workload_tx_stock_level", "get_district"), map[string]any{
 				"w_id": wID, "d_id": dID,

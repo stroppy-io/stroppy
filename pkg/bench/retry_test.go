@@ -12,17 +12,14 @@ func TestDefaultErrorActions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		kind       driver.ErrorKind
-		idempotent bool
-		want       ErrorAction
+		name string
+		kind driver.ErrorKind
+		want ErrorAction
 	}{
 		{name: "serialization", kind: driver.ErrorKindSerialization, want: ErrorActionRetry},
 		{name: "deadlock", kind: driver.ErrorKindDeadlock, want: ErrorActionRetry},
 		{name: "lock timeout", kind: driver.ErrorKindLockTimeout, want: ErrorActionRetry},
 		{name: "transient", kind: driver.ErrorKindTransient, want: ErrorActionRetry},
-		{name: "conditional transient", kind: driver.ErrorKindTransientIfIdempotent, want: ErrorActionError},
-		{name: "idempotent conditional transient", kind: driver.ErrorKindTransientIfIdempotent, idempotent: true, want: ErrorActionRetry},
 		{name: "unknown", kind: driver.ErrorKindUnknown, want: ErrorActionError},
 		{name: "unsupported", kind: driver.ErrorKindUnsupported, want: ErrorActionError},
 	}
@@ -31,32 +28,31 @@ func TestDefaultErrorActions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := DefaultErrorActions(tt.idempotent).action(tt.kind); got != tt.want {
+			if got := DefaultErrorActions().action(tt.kind); got != tt.want {
 				t.Fatalf("action(%q) = %v, want %v", tt.kind, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestErrorActionMapWith(t *testing.T) {
+func TestErrorActionOverrides(t *testing.T) {
 	t.Parallel()
 
-	defaults := DefaultErrorActions(false)
-	got := defaults.With(ErrorActionMap{
+	overrides := ErrorActionMap{ //nolint:exhaustive // test overrides selected kinds
 		driver.ErrorKindSerialization: ErrorActionIgnore,
 		driver.ErrorKindUnknown:       ErrorActionFatal,
-	})
-
-	if defaults.action(driver.ErrorKindSerialization) != ErrorActionRetry {
-		t.Fatal("With mutated defaults")
 	}
-	if got.action(driver.ErrorKindSerialization) != ErrorActionIgnore {
+	policy := newTxRetryPolicy(nil, TxRetryPolicyOptions{Actions: overrides})
+
+	if policy.Actions.action(driver.ErrorKindSerialization) != ErrorActionIgnore {
 		t.Fatal("serialization override not applied")
 	}
-	if got.action(driver.ErrorKindUnknown) != ErrorActionFatal {
+
+	if policy.Actions.action(driver.ErrorKindUnknown) != ErrorActionFatal {
 		t.Fatal("unknown override not applied")
 	}
-	if got.action(driver.ErrorKindDeadlock) != ErrorActionRetry {
+
+	if policy.Actions.action(driver.ErrorKindDeadlock) != ErrorActionRetry {
 		t.Fatal("default deadlock action not preserved")
 	}
 }
@@ -66,7 +62,9 @@ func TestRetryWithPolicyRetriesClassifiedError(t *testing.T) {
 
 	sentinel := errors.New("conflict")
 	attempts := 0
+
 	var retried []int
+
 	policy := newTxRetryPolicy(
 		func(error) driver.ErrorFacts { return driver.ErrorFacts{Kind: driver.ErrorKindSerialization} },
 		TxRetryPolicyOptions{
@@ -75,9 +73,11 @@ func TestRetryWithPolicyRetriesClassifiedError(t *testing.T) {
 				if !errors.Is(err, sentinel) {
 					t.Errorf("OnRetry error = %v, want sentinel", err)
 				}
+
 				if decision.Facts.Kind != driver.ErrorKindSerialization {
 					t.Errorf("OnRetry kind = %q", decision.Facts.Kind)
 				}
+
 				retried = append(retried, attempt)
 			},
 		},
@@ -94,9 +94,11 @@ func TestRetryWithPolicyRetriesClassifiedError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Retry0() error = %v", err)
 	}
+
 	if attempts != 3 {
 		t.Fatalf("attempts = %d, want 3", attempts)
 	}
+
 	if len(retried) != 2 || retried[0] != 2 || retried[1] != 3 {
 		t.Fatalf("retry attempts = %v, want [2 3]", retried)
 	}
@@ -126,7 +128,7 @@ func TestRetryWithPolicyActions(t *testing.T) {
 				func(error) driver.ErrorFacts { return driver.ErrorFacts{Kind: driver.ErrorKindUnknown} },
 				TxRetryPolicyOptions{
 					MaxAttempts: 3,
-					Actions: ErrorActionMap{
+					Actions: ErrorActionMap{ //nolint:exhaustive // test overrides one kind
 						driver.ErrorKindUnknown: tt.action,
 					},
 				},
@@ -140,9 +142,11 @@ func TestRetryWithPolicyActions(t *testing.T) {
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("Retry0() error = %v, want %v", err, tt.wantErr)
 			}
+
 			if IsFatalError(err) != tt.wantFatal {
 				t.Fatalf("IsFatalError() = %v, want %v", IsFatalError(err), tt.wantFatal)
 			}
+
 			if attempts != 1 {
 				t.Fatalf("attempts = %d, want 1", attempts)
 			}
@@ -154,7 +158,10 @@ func TestRetryWithPolicyConditionalIdempotency(t *testing.T) {
 	t.Parallel()
 
 	classify := func(error) driver.ErrorFacts {
-		return driver.ErrorFacts{Kind: driver.ErrorKindTransientIfIdempotent}
+		return driver.ErrorFacts{
+			Kind:                driver.ErrorKindTransient,
+			RequiresIdempotency: true,
+		}
 	}
 
 	for _, idempotent := range []bool{false, true} {
@@ -175,10 +182,12 @@ func TestRetryWithPolicyConditionalIdempotency(t *testing.T) {
 			if idempotent && err != nil {
 				t.Fatalf("Retry0() error = %v", err)
 			}
+
 			wantAttempts := 1
 			if idempotent {
 				wantAttempts = 2
 			}
+
 			if attempts != wantAttempts {
 				t.Fatalf("attempts = %d, want %d", attempts, wantAttempts)
 			}
@@ -203,6 +212,7 @@ func TestRetryWithPolicyCancellationDuringBackoff(t *testing.T) {
 	)
 
 	attempts := 0
+
 	err := Retry0(ctx, policy, func() error {
 		attempts++
 
@@ -211,6 +221,7 @@ func TestRetryWithPolicyCancellationDuringBackoff(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Retry0() error = %v, want context.Canceled", err)
 	}
+
 	if attempts != 1 {
 		t.Fatalf("attempts = %d, want 1", attempts)
 	}
@@ -221,6 +232,7 @@ func TestRetryWithPolicyMinimumAttempt(t *testing.T) {
 
 	sentinel := errors.New("boom")
 	attempts := 0
+
 	err := Retry0(context.Background(), RetryPolicy{}, func() error {
 		attempts++
 
@@ -229,6 +241,7 @@ func TestRetryWithPolicyMinimumAttempt(t *testing.T) {
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("Retry0() error = %v, want sentinel", err)
 	}
+
 	if attempts != 1 {
 		t.Fatalf("attempts = %d, want 1", attempts)
 	}

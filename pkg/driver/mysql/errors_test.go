@@ -19,7 +19,11 @@ func TestClassifyError(t *testing.T) {
 		want driver.ErrorKind
 	}{
 		{name: "deadlock", err: &gomysql.MySQLError{Number: errLockDeadlock}, want: driver.ErrorKindDeadlock},
-		{name: "wrapped lock timeout", err: fmt.Errorf("query: %w", &gomysql.MySQLError{Number: errLockWaitTimeout}), want: driver.ErrorKindLockTimeout},
+		{
+			name: "wrapped lock timeout",
+			err:  fmt.Errorf("query: %w", &gomysql.MySQLError{Number: errLockWaitTimeout}),
+			want: driver.ErrorKindLockTimeout,
+		},
 		{name: "other mysql", err: &gomysql.MySQLError{Number: 1062}, want: driver.ErrorKindUnknown},
 		{name: "other", err: errors.New("boom"), want: driver.ErrorKindUnknown},
 	}
