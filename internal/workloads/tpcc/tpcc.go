@@ -899,11 +899,11 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 			}
 
 			oID := toInt64(lastRow[0])
-			_, _ = tx.QueryRows(ctx, w.q("workload_tx_order_status", "get_order_lines"), map[string]any{
+			_, err = tx.QueryRows(ctx, w.q("workload_tx_order_status", "get_order_lines"), map[string]any{
 				"o_id": oID, "d_id": dID, "w_id": wID,
 			})
 
-			return nil
+			return err
 		})
 	})
 
@@ -1049,13 +1049,17 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 
 			tmpl := w.q("workload_tx_stock_level", "stock_count_in")
 			if w.isYdb {
-				_, _ = tx.QueryValue(ctx, tmpl, map[string]any{"w_id": wID, "threshold": threshold, "ids": idsToIntAny(ids)})
-			} else {
-				rendered := strings.ReplaceAll(tmpl, "{ids}", joinInt64s(ids))
-				_, _ = tx.QueryValue(ctx, rendered, map[string]any{"w_id": wID, "threshold": threshold})
+				_, err = tx.QueryValue(ctx, tmpl, map[string]any{
+					"w_id": wID, "threshold": threshold, "ids": idsToIntAny(ids),
+				})
+
+				return err
 			}
 
-			return nil
+			rendered := strings.ReplaceAll(tmpl, "{ids}", joinInt64s(ids))
+			_, err = tx.QueryValue(ctx, rendered, map[string]any{"w_id": wID, "threshold": threshold})
+
+			return err
 		})
 	})
 }

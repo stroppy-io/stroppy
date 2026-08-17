@@ -157,6 +157,7 @@ func TestRetryWithPolicyActions(t *testing.T) {
 func TestRetryWithPolicyConditionalIdempotency(t *testing.T) {
 	t.Parallel()
 
+	transientErr := errors.New("transient")
 	classify := func(error) driver.ErrorFacts {
 		return driver.ErrorFacts{
 			Kind:                driver.ErrorKindTransient,
@@ -173,7 +174,7 @@ func TestRetryWithPolicyConditionalIdempotency(t *testing.T) {
 			err := Retry0(context.Background(), policy, func() error {
 				attempts++
 				if attempts == 1 {
-					return errors.New("transient")
+					return transientErr
 				}
 
 				return nil
@@ -181,6 +182,10 @@ func TestRetryWithPolicyConditionalIdempotency(t *testing.T) {
 
 			if idempotent && err != nil {
 				t.Fatalf("Retry0() error = %v", err)
+			}
+
+			if !idempotent && !errors.Is(err, transientErr) {
+				t.Fatalf("Retry0() error = %v, want transient error", err)
 			}
 
 			wantAttempts := 1
