@@ -37,6 +37,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Workload help and shell completion expose typed flags accurately, including explicit booleans and contextual defaults, and SQL override positionals reach registered workload bindings.
 - Typed run parameters and SQL sources keep CLI-over-environment precedence, config env names reject case-only collisions, and shared driver pool settings remain active alongside driver-specific settings.
 - Typed inserts reject malformed requests consistently, and generator ranges remain correct at integer boundaries. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Long high-throughput workloads keep bounded metric memory instead of retaining every latency observation until the final summary. ([#125](https://github.com/stroppy-io/stroppy/pull/125))

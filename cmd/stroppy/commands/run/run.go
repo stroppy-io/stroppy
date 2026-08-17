@@ -87,6 +87,7 @@ Config file flags:
 `,
 	DisableFlagParsing: true,
 	SilenceErrors:      false,
+	ValidArgsFunction:  completeRunArgs,
 	Example: `
   stroppy run tpcc/tx                           # built-in TPC-C tx workload
   stroppy run tpcb/tx                           # TPC-B tx workload
@@ -211,6 +212,7 @@ Config file flags:
 				body,
 				file,
 				envOverrides,
+				paramInputs.WorkloadConfig,
 				paramInputs.LegacyConfigEnv,
 			)
 			applySQLSource(rootEnv, sqlSource)
@@ -227,12 +229,14 @@ Config file flags:
 		// Go-native workload: if a Go workload is registered under the bare
 		// script name, dispatch to bench.Run.
 		if _, ok := bench.Lookup(scriptArg); ok {
+			workloadParamInputs := withEffectiveSQLFile(paramInputs, sqlArg)
+
 			return runGoWorkload(
 				scriptArg,
 				steps,
 				noSteps,
 				rootEnv,
-				paramInputs,
+				workloadParamInputs,
 				driverConfigs,
 				metricsConfig(loadedRunConfig(fileConfig)),
 			)
@@ -240,6 +244,19 @@ Config file flags:
 
 		return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
 	},
+}
+
+func withEffectiveSQLFile(inputs bench.ParamInputs, sqlFile string) bench.ParamInputs {
+	if sqlFile == "" {
+		return inputs
+	}
+
+	inputs.CLI = cloneStringMap(inputs.CLI)
+	if _, explicit := inputs.CLI["sql-file"]; !explicit {
+		inputs.CLI["sql-file"] = sqlFile
+	}
+
+	return inputs
 }
 
 func cloneStringMap(values map[string]string) map[string]string {
@@ -289,6 +306,49 @@ func metricsConfig(config *stroppy.RunConfig) *bench.MetricsConfig {
 	return metrics
 }
 
+func completeRunArgs(
+	_ *cobra.Command,
+	args []string,
+	toComplete string,
+) ([]string, cobra.ShellCompDirective) {
+	if !strings.HasPrefix(toComplete, "--") {
+		return nil, cobra.ShellCompDirectiveDefault
+	}
+
+	parsed, err := parseRunArgs(args)
+	if err != nil || parsed.scriptArg == "" {
+		return nil, cobra.ShellCompDirectiveDefault
+	}
+
+	describeName := parsed.scriptArg
+	if name, _, _, ok := executeSQLGoRoute(parsed.scriptArg, parsed.sqlArg); ok {
+		describeName = name
+	}
+
+	description, err := bench.Describe(describeName)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveDefault
+	}
+
+	completions := make([]string, 0, len(description.Params))
+	for idx := range description.Params {
+		param := &description.Params[idx]
+
+		candidates := []string{param.Flag}
+		if param.Type == bench.ParamTypeBool {
+			candidates = []string{param.Flag + "=true", param.Flag + "=false"}
+		}
+
+		for _, candidate := range candidates {
+			if strings.HasPrefix(candidate, toComplete) {
+				completions = append(completions, candidate+"\t"+param.Description)
+			}
+		}
+	}
+
+	return completions, cobra.ShellCompDirectiveNoFileComp
+}
+
 func printSelectedWorkloadHelp(cmd *cobra.Command, scriptArg, sqlArg string) error {
 	describeName := scriptArg
 	if name, _, _, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
@@ -315,6 +375,7 @@ func printWorkloadHelp(cmd *cobra.Command, description bench.Description) error 
 	output.WriteString("      --steps NAMES        Run only named steps\n")
 	output.WriteString("      --no-steps NAMES     Skip named steps\n")
 	output.WriteString("  -h, --help               Show this help\n")
+	output.WriteString("\nBoolean parameters require an explicit value: --flag=true or --flag=false.\n")
 
 	writeParamHelpSection(&output, "Run parameters", description.Params, bench.ParamScopeRun)
 	writeParamHelpSection(&output, "Workload parameters", description.Params, bench.ParamScopeWorkload)
@@ -338,12 +399,22 @@ func writeParamHelpSection(
 			continue
 		}
 
+		flag := param.Flag
+		if param.Type == bench.ParamTypeBool {
+			flag += "=true|false"
+		}
+
+		defaultValue := param.Default
+		if param.DefaultDescription != "" {
+			defaultValue = param.DefaultDescription
+		}
+
 		fmt.Fprintf(
 			output,
 			"  %-22s %-8s default=%v\n      %s (env %s, config %s)\n",
-			param.Flag,
+			flag,
 			param.Type,
-			param.Default,
+			defaultValue,
 			param.Description,
 			param.Env,
 			param.Config,
@@ -387,7 +458,9 @@ type sqlSource struct {
 func resolveSQLSource(
 	parsed *runArgs,
 	routeBody, routeFile string,
-	cliEnv, configEnv map[string]string,
+	cliEnv map[string]string,
+	workloadConfig map[string]json.RawMessage,
+	configEnv map[string]string,
 ) sqlSource {
 	if file, ok := parsed.typedParams["sql-file"]; ok {
 		return sqlSource{envKey: sqlFileEnv, value: file, explicitCLI: true}
@@ -405,6 +478,10 @@ func resolveSQLSource(
 	}
 
 	if source := sqlSourceFromMap(cliEnv); source.envKey != "" {
+		return source
+	}
+
+	if source := sqlSourceFromWorkloadConfig(workloadConfig); source.envKey != "" {
 		return source
 	}
 
@@ -447,6 +524,20 @@ func sqlSourceFromProcess() sqlSource {
 
 func sqlSourceFromMap(values map[string]string) sqlSource {
 	return sqlSourceFor(values[sqlBodyEnv], values[sqlFileEnv])
+}
+
+func sqlSourceFromWorkloadConfig(values map[string]json.RawMessage) sqlSource {
+	raw, ok := values["sqlFile"]
+	if !ok {
+		return sqlSource{}
+	}
+
+	var file string
+	if err := json.Unmarshal(raw, &file); err != nil {
+		return sqlSource{}
+	}
+
+	return sqlSource{envKey: sqlFileEnv, value: file}
 }
 
 func applySQLSource(env map[string]string, source sqlSource) {
@@ -576,23 +667,40 @@ func buildDriverConfig(
 		return nil, invalidConfig(err)
 	}
 
-	if dc.GetDriverType() == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
-		ps, ok := os.LookupEnv("POOL_SIZE")
-		if !ok {
-			ps, ok = envOverrides["POOL_SIZE"]
-		}
-
-		if ok {
-			if n, err := strconv.Atoi(ps); err == nil && n > 0 {
-				nc := int32(n) //nolint:gosec // G109: parsed config value, bounded by user input, not untrusted
-				dc.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: &stroppy.DriverConfig_PostgresConfig{
-					MaxConns: &nc, MinConns: &nc,
-				}}
-			}
-		}
-	}
+	applyLegacyPostgresPoolSize(dc, envOverrides)
 
 	return dc, nil
+}
+
+func applyLegacyPostgresPoolSize(config *stroppy.DriverConfig, env map[string]string) {
+	if config.GetDriverType() != stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
+		return
+	}
+
+	poolSize, ok := os.LookupEnv("POOL_SIZE")
+	if !ok {
+		poolSize, ok = env["POOL_SIZE"]
+	}
+
+	if !ok {
+		return
+	}
+
+	value, err := strconv.Atoi(poolSize)
+	if err != nil || value <= 0 {
+		return
+	}
+
+	connections := int32(value) //nolint:gosec // G109: parsed config value, bounded by user input
+
+	postgres := config.GetPostgres()
+	if postgres == nil {
+		postgres = &stroppy.DriverConfig_PostgresConfig{}
+	}
+
+	postgres.MaxConns = &connections
+	postgres.MinConns = &connections
+	config.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: postgres}
 }
 
 func applyDriverExtras(idx int, config *stroppy.DriverConfig, extras map[string]any) error {
@@ -1343,5 +1451,41 @@ func applyDriverOpt(configs runner.DriverCLIConfigs, idx int, key, value string)
 		configs[idx] = cfg
 	}
 
-	return cfg.ApplyOverride(key, value)
+	if err := cfg.ApplyOverride(key, value); err != nil {
+		return err
+	}
+
+	if specificKey := poolSpecificDriverOverride(cfg.DriverType, key); specificKey != "" {
+		return cfg.ApplyOverride(specificKey, value)
+	}
+
+	return nil
+}
+
+func poolSpecificDriverOverride(driverType, key string) string {
+	field, ok := strings.CutPrefix(key, "pool.")
+	if !ok {
+		return ""
+	}
+
+	switch driverType {
+	case "postgres":
+		switch field {
+		case "maxConns", "minConns", "minIdleConns",
+			"maxConnLifetime", "maxConnIdleTime", "traceLogLevel",
+			"defaultQueryExecMode", "descriptionCacheCapacity", "statementCacheCapacity":
+			return "postgres." + field
+		default:
+			return ""
+		}
+	case "mysql", "picodata", "ydb":
+		switch field {
+		case "maxOpenConns", "maxIdleConns", "connMaxLifetime", "connMaxIdleTime":
+			return "sql." + field
+		default:
+			return ""
+		}
+	default:
+		return ""
+	}
 }

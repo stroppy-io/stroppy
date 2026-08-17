@@ -278,6 +278,51 @@ func TestParamConfigScopesRejectCrossedKeys(t *testing.T) {
 	}
 }
 
+func TestDerivedDefaultHidesConcreteSchemaDefault(t *testing.T) {
+	def := newDef(ParamInputs{}, true)
+	def.scope = ParamScopeWorkload
+
+	binding := def.Param.Int("batch-size", 10, "", DerivedDefault("selected by driver"))
+	if err := def.finish(); err != nil {
+		t.Fatalf("finish() error = %v", err)
+	}
+
+	if binding.Value() != 10 || binding.Source() != ParamSourceDefault {
+		t.Fatalf("binding = %#v", binding)
+	}
+
+	schema := def.schema()
+	if len(schema) != 1 || schema[0].Default != nil || schema[0].DefaultDescription != "selected by driver" {
+		t.Fatalf("schema = %#v", schema)
+	}
+}
+
+func TestParamRejectsIndexedDriverFlagNames(t *testing.T) {
+	for _, name := range []string{
+		"driver0", "driver1", "driver01", "driver-0", "driver-1",
+		"driver0-opt", "driver1-opt", "driver01-opt", "driver-1-opt",
+	} {
+		t.Run(name, func(t *testing.T) {
+			def := newDef(ParamInputs{}, true)
+			def.scope = ParamScopeWorkload
+			def.Param.String(name, "", "")
+
+			err := def.finish()
+			if err == nil || !strings.Contains(err.Error(), "reserved parameter name") {
+				t.Fatalf("finish() error = %v", err)
+			}
+		})
+	}
+
+	def := newDef(ParamInputs{}, true)
+	def.scope = ParamScopeWorkload
+	def.Param.String("driver999999999999999999999999999999", "", "")
+
+	if err := def.finish(); err != nil {
+		t.Fatalf("overflowing non-driver index was reserved: %v", err)
+	}
+}
+
 func TestParamNamesAliasesAndDeferredUnknownChecks(t *testing.T) {
 	clearParamEnv(t, "FIRST_VALUE", "SECOND_VALUE", "OLD_SECOND")
 

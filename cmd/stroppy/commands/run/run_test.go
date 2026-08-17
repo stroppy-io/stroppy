@@ -7,7 +7,10 @@ import (
 	"errors"
 	"maps"
 	"os"
+	"sync"
 	"testing"
+
+	"github.com/spf13/cobra"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
 	"github.com/stroppy-io/stroppy/pkg/bench"
@@ -546,6 +549,7 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 	errorMode := "throw"
 	bulkSize := int32(20)
 	maxConns := int32(7)
+	specificMaxConns := int32(5)
 	statementCache := int32(13)
 
 	configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*stroppy.DriverRunConfig{
@@ -555,7 +559,10 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 			ErrorMode:  &errorMode,
 			BulkSize:   &bulkSize,
 			Pool:       &stroppy.DriverRunConfig_PoolConfig{MaxConns: &maxConns},
-			Postgres:   &stroppy.DriverConfig_PostgresConfig{StatementCacheCapacity: &statementCache},
+			Postgres: &stroppy.DriverConfig_PostgresConfig{
+				MaxConns:               &specificMaxConns,
+				StatementCacheCapacity: &statementCache,
+			},
 		},
 	})
 	if err != nil {
@@ -563,7 +570,11 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 	}
 
 	if err := applyDriverOpt(configs, 0, "url", "postgres://cli"); err != nil {
-		t.Fatalf("applyDriverOpt() error = %v", err)
+		t.Fatalf("applyDriverOpt(url) error = %v", err)
+	}
+
+	if err := applyDriverOpt(configs, 0, "pool.maxConns", "10"); err != nil {
+		t.Fatalf("applyDriverOpt(pool.maxConns) error = %v", err)
 	}
 
 	if configs[0].DriverType != "postgres" || configs[0].URL != "postgres://cli" {
@@ -578,24 +589,32 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 	if runtimeConfig.GetUrl() != "postgres://cli" ||
 		runtimeConfig.GetBulkSize() != 20 ||
 		runtimeConfig.GetErrorMode() != stroppy.DriverConfig_ERROR_MODE_THROW ||
-		runtimeConfig.GetPostgres().GetMaxConns() != 7 ||
+		runtimeConfig.GetPostgres().GetMaxConns() != 10 ||
 		runtimeConfig.GetPostgres().GetStatementCacheCapacity() != 13 {
 		t.Fatalf("runtime driver config = %#v, extra = %#v", runtimeConfig, configs[0].Extra)
 	}
 
 	mysql := "mysql"
 	maxOpenConns := int32(9)
+	specificMaxOpenConns := int32(5)
 	maxIdleConns := int32(4)
 
 	configs, err = runner.DriverCLIConfigsFromFile(map[uint32]*stroppy.DriverRunConfig{
 		0: {
 			DriverType: &mysql,
 			Pool:       &stroppy.DriverRunConfig_PoolConfig{MaxOpenConns: &maxOpenConns},
-			Sql:        &stroppy.DriverConfig_SqlConfig{MaxIdleConns: &maxIdleConns},
+			Sql: &stroppy.DriverConfig_SqlConfig{
+				MaxOpenConns: &specificMaxOpenConns,
+				MaxIdleConns: &maxIdleConns,
+			},
 		},
 	})
 	if err != nil {
 		t.Fatalf("DriverCLIConfigsFromFile(mysql) error = %v", err)
+	}
+
+	if err := applyDriverOpt(configs, 0, "pool.maxOpenConns", "12"); err != nil {
+		t.Fatalf("applyDriverOpt(pool.maxOpenConns) error = %v", err)
 	}
 
 	runtimeConfig, err = buildDriverConfig(0, configs[0], nil)
@@ -603,8 +622,31 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("buildDriverConfig(mysql) error = %v", err)
 	}
 
-	if runtimeConfig.GetSql().GetMaxOpenConns() != 9 || runtimeConfig.GetSql().GetMaxIdleConns() != 4 {
+	if runtimeConfig.GetSql().GetMaxOpenConns() != 12 || runtimeConfig.GetSql().GetMaxIdleConns() != 4 {
 		t.Fatalf("runtime mysql driver config = %#v", runtimeConfig)
+	}
+}
+
+func TestPoolSizePreservesPostgresSpecificConfig(t *testing.T) {
+	t.Setenv("POOL_SIZE", "11")
+
+	config, err := buildDriverConfig(0, &runner.DriverCLIConfig{
+		DriverType: "postgres",
+		Extra: map[string]any{
+			"postgres": map[string]any{
+				"statementCacheCapacity": 13,
+				"maxConnLifetime":        "1h",
+			},
+		},
+	}, nil)
+	if err != nil {
+		t.Fatalf("buildDriverConfig() error = %v", err)
+	}
+
+	postgres := config.GetPostgres()
+	if postgres.GetMaxConns() != 11 || postgres.GetMinConns() != 11 ||
+		postgres.GetStatementCacheCapacity() != 13 || postgres.GetMaxConnLifetime() != "1h" {
+		t.Fatalf("postgres config = %#v", postgres)
 	}
 }
 
@@ -616,6 +658,7 @@ func TestResolveSQLSourcePrecedence(t *testing.T) {
 			&runArgs{scriptArg: "execute_sql", sqlArg: "cli.sql"},
 			"",
 			"cli.sql",
+			nil,
 			nil,
 			map[string]string{sqlBodyEnv: "select 'config'"},
 		)
@@ -640,6 +683,7 @@ func TestResolveSQLSourcePrecedence(t *testing.T) {
 			"select 'config route'",
 			"",
 			nil,
+			nil,
 			map[string]string{sqlBodyEnv: "select 'config env'"},
 		)
 		if source.envKey != sqlFileEnv || source.value != "typed.sql" || !source.explicitCLI {
@@ -655,6 +699,7 @@ func TestResolveSQLSourcePrecedence(t *testing.T) {
 			&runArgs{scriptArg: "select 1"},
 			"--= query\nselect 1;\n",
 			"",
+			nil,
 			nil,
 			nil,
 		)
@@ -681,6 +726,29 @@ func TestResolveSQLSourcePrecedence(t *testing.T) {
 		}
 	})
 
+	t.Run("typed workload config beats config env body", func(t *testing.T) {
+		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
+
+		source := resolveSQLSource(
+			&runArgs{},
+			"",
+			"",
+			nil,
+			map[string]json.RawMessage{"sqlFile": json.RawMessage(`"typed-config.sql"`)},
+			map[string]string{sqlBodyEnv: "select 'config env'"},
+		)
+		if source.envKey != sqlFileEnv || source.value != "typed-config.sql" {
+			t.Fatalf("source = %#v", source)
+		}
+
+		env := map[string]string{sqlBodyEnv: "select 'config env'"}
+		applySQLSource(env, source)
+
+		if !maps.Equal(env, map[string]string{sqlFileEnv: "typed-config.sql"}) {
+			t.Fatalf("resolved env = %v", env)
+		}
+	})
+
 	t.Run("process beats legacy and config sources", func(t *testing.T) {
 		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
 		t.Setenv(sqlFileEnv, "process.sql")
@@ -690,6 +758,7 @@ func TestResolveSQLSourcePrecedence(t *testing.T) {
 			"select 'config route'",
 			"",
 			map[string]string{sqlBodyEnv: "select '-e'"},
+			nil,
 			map[string]string{sqlBodyEnv: "select 'config env'"},
 		)
 		if source.envKey != sqlFileEnv || source.value != "process.sql" {
@@ -708,7 +777,7 @@ func TestBuildDriverConfigReturnsJSONConversionErrors(t *testing.T) {
 }
 
 func TestDynamicWorkloadHelpAndBadTypedParam(t *testing.T) {
-	bench.Register(func() bench.Workload { return &runParamTestWorkload{} })
+	registerRunParamTestWorkload()
 
 	previousOutput := Cmd.OutOrStdout()
 	defer Cmd.SetOut(previousOutput)
@@ -728,7 +797,15 @@ func TestDynamicWorkloadHelpAndBadTypedParam(t *testing.T) {
 	}
 
 	help := output.String()
-	for _, expected := range []string{"Run parameters:", "Workload parameters:", "--executor", "--enabled", "--count"} {
+	for _, expected := range []string{
+		"Run parameters:",
+		"Workload parameters:",
+		"--executor",
+		"--enabled=true|false",
+		"Boolean parameters require an explicit value",
+		"--count",
+		"default=selected at runtime",
+	} {
 		if !contains(help, expected) {
 			t.Fatalf("help output missing %q:\n%s", expected, help)
 		}
@@ -763,13 +840,122 @@ func TestDynamicWorkloadHelpAndBadTypedParam(t *testing.T) {
 	}
 }
 
+func TestWorkloadTypedFlagCompletion(t *testing.T) {
+	registerRunParamTestWorkload()
+
+	completions, directive := Cmd.ValidArgsFunction(
+		Cmd,
+		[]string{"test/run-typed-params"},
+		"--en",
+	)
+	if directive != cobra.ShellCompDirectiveNoFileComp {
+		t.Fatalf("directive = %v", directive)
+	}
+
+	for _, expected := range []string{
+		"--enabled=true\tEnable test behavior.",
+		"--enabled=false\tEnable test behavior.",
+	} {
+		if !containsCompletion(completions, expected) {
+			t.Fatalf("completions %v missing %q", completions, expected)
+		}
+	}
+
+	completions, directive = Cmd.ValidArgsFunction(
+		Cmd,
+		[]string{"test/run-typed-params"},
+		"--sql",
+	)
+	if directive != cobra.ShellCompDirectiveNoFileComp ||
+		!containsCompletion(completions, "--sql-file\tSQL dialect override file.") {
+		t.Fatalf("sql-file completions = %v, directive = %v", completions, directive)
+	}
+
+	completions, directive = Cmd.ValidArgsFunction(Cmd, nil, "--en")
+	if len(completions) != 0 || directive != cobra.ShellCompDirectiveDefault {
+		t.Fatalf("generic completions = %v, directive = %v", completions, directive)
+	}
+}
+
+func TestRegisteredWorkloadReceivesEffectiveSQLFile(t *testing.T) {
+	registerRunParamTestWorkload()
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "second positional",
+			args: []string{
+				"test/run-typed-params", "compat.sql", "--count=bad", "-d", "noop",
+			},
+			want: "compat.sql",
+		},
+		{
+			name: "direct typed flag wins",
+			args: []string{
+				"test/run-typed-params", "compat.sql", "--sql-file=direct.sql", "--count=bad", "-d", "noop",
+			},
+			want: "direct.sql",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			lastRunParamSQLFile = ""
+
+			err := Cmd.RunE(Cmd, test.args)
+			if err == nil || !contains(err.Error(), `parameter "count"`) {
+				t.Fatalf("RunE() error = %v", err)
+			}
+
+			if lastRunParamSQLFile != test.want {
+				t.Fatalf("sql-file binding = %q, want %q", lastRunParamSQLFile, test.want)
+			}
+		})
+	}
+
+	configPath := t.TempDir() + "/sql.json"
+	if err := os.WriteFile(configPath, []byte(`{
+		"script":"test/run-typed-params",
+		"sql":"config.sql"
+	}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	lastRunParamSQLFile = ""
+
+	err := Cmd.RunE(Cmd, []string{"-f", configPath, "--count=bad", "-d", "noop"})
+	if err == nil || !contains(err.Error(), `parameter "count"`) {
+		t.Fatalf("RunE(config) error = %v", err)
+	}
+
+	if lastRunParamSQLFile != "config.sql" {
+		t.Fatalf("config sql-file binding = %q", lastRunParamSQLFile)
+	}
+}
+
 type runParamTestWorkload struct{}
+
+var (
+	lastRunParamSQLFile          string
+	registerRunParamWorkloadOnce sync.Once
+)
+
+func registerRunParamTestWorkload() {
+	registerRunParamWorkloadOnce.Do(func() {
+		bench.Register(func() bench.Workload { return &runParamTestWorkload{} })
+	})
+}
 
 func (*runParamTestWorkload) Name() string { return "test/run-typed-params" }
 
 func (*runParamTestWorkload) Define(def *bench.Def) error {
 	def.Param.Bool("enabled", false, "Enable test behavior.")
-	def.Param.Int("count", 1, "Number of test operations.")
+	def.Param.Int("count", 1, "Number of test operations.", bench.DerivedDefault("selected at runtime"))
+	sqlFile := def.Param.String("sql-file", "", "SQL dialect override file.")
+	lastRunParamSQLFile = sqlFile.Value()
 
 	return nil
 }
@@ -779,6 +965,16 @@ func (*runParamTestWorkload) Iterate(context.Context, *bench.Bench) error  { ret
 func (*runParamTestWorkload) Teardown(context.Context, *bench.Bench) error { return nil }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+func containsCompletion(completions []string, expected string) bool {
+	for _, completion := range completions {
+		if completion == expected {
+			return true
+		}
+	}
+
+	return false
+}
 
 func contains(s, substr string) bool {
 	return len(substr) == 0 || (len(s) >= len(substr) && containsStr(s, substr))

@@ -68,15 +68,16 @@ const (
 
 // ParamSchema is a copied projection of one parameter declaration.
 type ParamSchema struct {
-	Name             string
-	Flag             string
-	Scope            ParamScope
-	Type             ParamType
-	Description      string
-	Default          any
-	Env              string
-	LegacyEnvAliases []string
-	Config           string
+	Name               string
+	Flag               string
+	Scope              ParamScope
+	Type               ParamType
+	Description        string
+	Default            any
+	DefaultDescription string
+	Env                string
+	LegacyEnvAliases   []string
+	Config             string
 }
 
 // Description is the discoverable, default-only schema for a workload.
@@ -105,15 +106,25 @@ func LegacyEnvAliases(names ...string) ParamOption {
 	})
 }
 
+// DerivedDefault hides the concrete fallback when its effective value is contextual.
+func DerivedDefault(description string) ParamOption {
+	return paramOption(func(desc *paramDescriptor) error {
+		desc.defaultDescription = description
+
+		return nil
+	})
+}
+
 type paramDescriptor struct {
-	name             string
-	scope            ParamScope
-	typ              ParamType
-	description      string
-	defaultValue     any
-	env              string
-	legacyEnvAliases []string
-	config           string
+	name               string
+	scope              ParamScope
+	typ                ParamType
+	description        string
+	defaultValue       any
+	defaultDescription string
+	env                string
+	legacyEnvAliases   []string
+	config             string
 }
 
 type paramParser[T any] struct {
@@ -365,7 +376,8 @@ func (d *Def) register(desc *paramDescriptor) bool {
 	}
 
 	if desc.scope == ParamScopeWorkload {
-		if _, reserved := reservedWorkloadParamNames[desc.name]; reserved {
+		_, staticReserved := reservedWorkloadParamNames[desc.name]
+		if staticReserved || indexedDriverParamReserved(desc.name) {
 			d.addError(fmt.Errorf("%w %q", errReservedParamName, desc.name))
 
 			valid = false
@@ -588,16 +600,23 @@ func (d *Def) schema() []ParamSchema {
 	schema := make([]ParamSchema, len(d.descriptors))
 	for idx := range d.descriptors {
 		desc := &d.descriptors[idx]
+
+		defaultValue := desc.defaultValue
+		if desc.defaultDescription != "" {
+			defaultValue = nil
+		}
+
 		schema[idx] = ParamSchema{
-			Name:             desc.name,
-			Flag:             "--" + desc.name,
-			Scope:            desc.scope,
-			Type:             desc.typ,
-			Description:      desc.description,
-			Default:          desc.defaultValue,
-			Env:              desc.env,
-			LegacyEnvAliases: slices.Clone(desc.legacyEnvAliases),
-			Config:           desc.config,
+			Name:               desc.name,
+			Flag:               "--" + desc.name,
+			Scope:              desc.scope,
+			Type:               desc.typ,
+			Description:        desc.description,
+			Default:            defaultValue,
+			DefaultDescription: desc.defaultDescription,
+			Env:                desc.env,
+			LegacyEnvAliases:   slices.Clone(desc.legacyEnvAliases),
+			Config:             desc.config,
 		}
 	}
 
@@ -616,6 +635,22 @@ func (d *Def) addError(err error) {
 	if err != nil {
 		d.errs = append(d.errs, err)
 	}
+}
+
+func indexedDriverParamReserved(name string) bool {
+	suffix, ok := strings.CutPrefix(name, "driver")
+	if !ok {
+		return false
+	}
+
+	suffix = strings.TrimSuffix(suffix, "-opt")
+	if suffix == "" {
+		return false
+	}
+
+	_, err := strconv.Atoi(suffix)
+
+	return err == nil
 }
 
 func kebabToEnv(name string) string {
