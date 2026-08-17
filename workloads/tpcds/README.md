@@ -145,16 +145,19 @@ DataMaint2, scored as QphDS@SF. This workload covers:
 
 - **Database Load Test** — `load_data` step. ✅
 - **Power Test** (1 stream, 99 queries serially) — default run (`--streams=1`). ✅
-- **Throughput Test** (Sq concurrent streams, each a permuted 99) — `--streams=Sq`
-  runs Sq VUs, one stream each, load shared once. ✅ (Sq should be even ≥ 4 for a
-  compliant run; any value works for testing.)
+- **Throughput Test** (concurrent generated streams) — `--streams=Sq` enables
+  per-VU generated streams; run concurrency is controlled separately by `--vus`.
+  Use the constant-VUs executor for overlapping streams. (Sq should be even ≥ 4
+  for a compliant run; this workload does not yet implement the complete scored
+  phase sequencing.)
 - **Data Maintenance Test** (sequential refresh runs: fact insert/delete +
   inventory delete over dsdgen refresh data) — not implemented.
 - **QphDS@SF metric** — not computed (per-step timings are reported by k6).
 
 ```bash
-# Throughput test: 4 concurrent streams
-./build/stroppy run tpcds -d pg -D url=... --scale-factor 1 --streams 4
+# Throughput-style run: 4 concurrent generated streams for 10 minutes
+./build/stroppy run tpcds -d pg -D url=... --scale-factor 1 --streams 4 \
+  --executor constant-vus --vus 4 --duration 10m
 ```
 
 ## Status / TODO

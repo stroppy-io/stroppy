@@ -118,15 +118,16 @@ type workloadEntry struct {
 }
 
 type paramEntry struct {
-	Name          string           `json:"name"`
-	Flag          string           `json:"flag"`
-	Scope         bench.ParamScope `json:"scope"`
-	Type          bench.ParamType  `json:"type"`
-	Description   string           `json:"description"`
-	Default       any              `json:"default"`
-	Env           string           `json:"env"`
-	LegacyAliases []string         `json:"legacy_aliases"`
-	Config        string           `json:"config"`
+	Name               string           `json:"name"`
+	Flag               string           `json:"flag"`
+	Scope              bench.ParamScope `json:"scope"`
+	Type               bench.ParamType  `json:"type"`
+	Description        string           `json:"description"`
+	Default            any              `json:"default"`
+	DefaultDescription string           `json:"default_description,omitempty"`
+	Env                string           `json:"env"`
+	LegacyAliases      []string         `json:"legacy_aliases"`
+	Config             string           `json:"config"`
 }
 
 func describeWorkloads(descriptions []bench.Description) []workloadEntry {
@@ -143,15 +144,16 @@ func describeWorkloads(descriptions []bench.Description) []workloadEntry {
 			}
 
 			params = append(params, paramEntry{
-				Name:          param.Name,
-				Flag:          param.Flag,
-				Scope:         param.Scope,
-				Type:          param.Type,
-				Description:   param.Description,
-				Default:       defaultValue,
-				Env:           param.Env,
-				LegacyAliases: append([]string{}, param.LegacyEnvAliases...),
-				Config:        param.Config,
+				Name:               param.Name,
+				Flag:               param.Flag,
+				Scope:              param.Scope,
+				Type:               param.Type,
+				Description:        param.Description,
+				Default:            defaultValue,
+				DefaultDescription: param.DefaultDescription,
+				Env:                param.Env,
+				LegacyAliases:      append([]string{}, param.LegacyEnvAliases...),
+				Config:             param.Config,
 			})
 		}
 

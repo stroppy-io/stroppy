@@ -118,6 +118,12 @@ func assertRepresentativeParams(t *testing.T, workloads []workloadEntry) {
 	if duration.Type != bench.ParamTypeDuration || duration.Default != "0s" {
 		t.Fatalf("duration schema = %#v", duration)
 	}
+
+	loadItems := findParam(t, tpcc.Params, "load-items")
+	if loadItems.Default != nil ||
+		loadItems.DefaultDescription != "true when warehouse-start is 1; false otherwise" {
+		t.Fatalf("load-items schema = %#v", loadItems)
+	}
 }
 
 func findWorkload(t *testing.T, workloads []workloadEntry, name string) workloadEntry {

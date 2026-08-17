@@ -77,7 +77,6 @@ All TPC workloads share typed run flags:
 
 - `--executor shared-iterations --iterations N` runs a fixed iteration count.
 - `--executor constant-vus --vus N --duration 1h` runs a throughput test.
-- `--pg-unlogged` enables the PostgreSQL `UNLOGGED` bulk-load dance.
 
 Select the executor explicitly. Legacy `DURATION` without an executor remains
 compatible, infers `constant-vus`, and emits a warning.

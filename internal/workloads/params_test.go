@@ -133,7 +133,13 @@ func isEnvRead(name string) bool {
 
 func tpccParamSchema() []bench.ParamSchema {
 	return []bench.ParamSchema{
-		param("load-items", bench.ParamTypeBool, true, "LOAD_ITEMS", "loadItems"),
+		derivedParam(
+			"load-items",
+			bench.ParamTypeBool,
+			"LOAD_ITEMS",
+			"loadItems",
+			"true when warehouse-start is 1; false otherwise",
+		),
 		param("load-workers", bench.ParamTypeInt, 1, "LOAD_WORKERS", "loadWorkers"),
 		param("pacing", bench.ParamTypeBool, false, "PACING", "pacing"),
 		param("pg-unlogged", bench.ParamTypeBool, false, "PG_UNLOGGED", "pgUnlogged"),
@@ -157,6 +163,17 @@ func param(
 		Type: typ, Default: defaultValue, Env: env,
 		LegacyEnvAliases: aliases, Config: config,
 	}
+}
+
+func derivedParam(
+	name string,
+	typ bench.ParamType,
+	env, config, defaultDescription string,
+) bench.ParamSchema {
+	schema := param(name, typ, nil, env, config)
+	schema.DefaultDescription = defaultDescription
+
+	return schema
 }
 
 func workloadParams(params []bench.ParamSchema) []bench.ParamSchema {

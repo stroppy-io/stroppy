@@ -23,10 +23,15 @@ func init() {
 
 Example stroppy-config.json:
   {
+    "version": "1",
     "script": "tpcc/tx",
     "global": {
-      "logger": { "logLevel": "LOG_LEVEL_INFO" },
+      "version": "1",
+      "runId": "",
+      "seed": 0,
+      "logger": { "logLevel": "LOG_LEVEL_INFO", "logMode": "LOG_MODE_PRODUCTION" },
       "exporter": {
+        "name": "otlp",
         "otlpExport": { "otlpGrpcEndpoint": "otel-collector:4317", "otlpEndpointInsecure": true }
       }
     },

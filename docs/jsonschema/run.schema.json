@@ -1935,26 +1935,6 @@
               }
             }
           ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "k6Config"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "k6Config"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
         }
       ],
       "properties": {
@@ -2001,27 +1981,10 @@
         },
         "noSteps": {
           "$ref": "#/$defs/.stroppy.RunConfig.no_steps"
-        },
-        "k6Args": {
-          "$ref": "#/$defs/.stroppy.RunConfig.k6_args"
-        },
-        "k6Config": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.RunConfig.k6_config"
-            }
-          ]
         }
       },
       "additionalProperties": false,
       "type": "object",
-      "required": [
-        "version",
-        "global"
-      ],
       "description": "Top-level stroppy config. Typed parameter precedence: CLI flag > process environment > -e override > matching run/params value > env map > declared default. The selected workload schema validates names and concrete values in params at runtime."
     },
     ".stroppy.RunConfig.drivers": {

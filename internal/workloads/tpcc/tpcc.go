@@ -84,7 +84,12 @@ func (w *workload) Define(d *bench.Def) error {
 	w.warehouses = int64(max(warehouses, 1))
 	w.warehouseStart = int64(d.Param.Int("warehouse-start", 1, "First warehouse ID.").Value())
 	w.wIDMax = w.warehouseStart + w.warehouses - 1
-	w.loadItems = d.Param.Bool("load-items", w.warehouseStart == 1, "Load the shared item table.").Value()
+	w.loadItems = d.Param.Bool(
+		"load-items",
+		w.warehouseStart == 1,
+		"Load the shared item table.",
+		bench.DerivedDefault("true when warehouse-start is 1; false otherwise"),
+	).Value()
 	w.pacing = d.Param.Bool("pacing", false, "Apply TPC-C keying and think times.").Value()
 	w.retryAttempts = d.Param.Int("retry-attempts", 3, "Maximum transaction attempts.").Value()
 	w.pgUnlogged = d.Param.Bool("pg-unlogged", false, "Use unlogged PostgreSQL tables while loading.").Value()

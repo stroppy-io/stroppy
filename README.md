@@ -94,6 +94,7 @@ and the string-valued `env` map remains available for compatibility:
 
 ```json
 {
+  "version": "1",
   "script": "tpcc/tx",
   "run": {"executor": "constant-vus", "vus": 10, "duration": "60s"},
   "params": {"scaleFactor": 10, "loadWorkers": 8}
