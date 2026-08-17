@@ -1,7 +1,11 @@
 package runner
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -16,13 +20,26 @@ import (
 // DefaultConfigFile is the file auto-discovered in the current directory.
 const DefaultConfigFile = "stroppy-config.json"
 
+var (
+	errConfigObjectExpected = errors.New("JSON object expected")
+	errDuplicateConfigField = errors.New("duplicate JSON field")
+	errTrailingConfigData   = errors.New("trailing JSON data")
+)
+
+// LoadedConfig keeps the frozen run config separate from typed parameter scopes.
+type LoadedConfig struct {
+	RunConfig *stroppy.RunConfig
+	Run       map[string]json.RawMessage
+	Params    map[string]json.RawMessage
+}
+
 // LoadRunConfig loads a RunConfig from a JSON file.
 //
 //   - If path is non-empty: load from that path; return error if not found.
 //   - If path is empty: try DefaultConfigFile in cwd; return (nil, false, nil) if absent.
 //
 // Returns (config, loaded, error).
-func LoadRunConfig(path string) (*stroppy.RunConfig, bool, error) {
+func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 	if path == "" {
 		if _, err := os.Stat(DefaultConfigFile); os.IsNotExist(err) {
 			return nil, false, nil
@@ -36,8 +53,28 @@ func LoadRunConfig(path string) (*stroppy.RunConfig, bool, error) {
 		return nil, false, fmt.Errorf("reading config file %q: %w", path, err)
 	}
 
+	fields, err := decodeRawObject(data)
+	if err != nil {
+		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
+	}
+
+	runParams, err := takeParamScope(fields, "run")
+	if err != nil {
+		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
+	}
+
+	workloadParams, err := takeParamScope(fields, "params")
+	if err != nil {
+		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
+	}
+
+	protoData, err := json.Marshal(fields)
+	if err != nil {
+		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
+	}
+
 	cfg := &stroppy.RunConfig{}
-	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(data, cfg); err != nil {
+	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(protoData, cfg); err != nil {
 		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
 	}
 
@@ -76,7 +113,82 @@ func LoadRunConfig(path string) (*stroppy.RunConfig, bool, error) {
 		)
 	}
 
-	return cfg, true, nil
+	return &LoadedConfig{RunConfig: cfg, Run: runParams, Params: workloadParams}, true, nil
+}
+
+func takeParamScope(fields map[string]json.RawMessage, name string) (map[string]json.RawMessage, error) {
+	raw, ok := fields[name]
+	if !ok {
+		return map[string]json.RawMessage{}, nil
+	}
+
+	delete(fields, name)
+
+	scope, err := decodeRawObject(raw)
+	if err != nil {
+		return nil, fmt.Errorf("config field %q: %w", name, err)
+	}
+
+	return scope, nil
+}
+
+func decodeRawObject(data []byte) (map[string]json.RawMessage, error) {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+
+	token, err := decoder.Token()
+	if err != nil {
+		return nil, err
+	}
+
+	if delimiter, ok := token.(json.Delim); !ok || delimiter != '{' {
+		return nil, errConfigObjectExpected
+	}
+
+	fields := make(map[string]json.RawMessage)
+
+	for decoder.More() {
+		keyToken, err := decoder.Token()
+		if err != nil {
+			return nil, err
+		}
+
+		key, ok := keyToken.(string)
+		if !ok {
+			return nil, errConfigObjectExpected
+		}
+
+		if _, duplicate := fields[key]; duplicate {
+			return nil, fmt.Errorf("%w %q", errDuplicateConfigField, key)
+		}
+
+		var raw json.RawMessage
+		if err := decoder.Decode(&raw); err != nil {
+			return nil, err
+		}
+
+		fields[key] = raw
+	}
+
+	if _, err := decoder.Token(); err != nil {
+		return nil, err
+	}
+
+	if err := ensureJSONEnd(decoder); err != nil {
+		return nil, err
+	}
+
+	return fields, nil
+}
+
+func ensureJSONEnd(decoder *json.Decoder) error {
+	var extra any
+	if err := decoder.Decode(&extra); errors.Is(err, io.EOF) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	return errTrailingConfigData
 }
 
 // BuildProbeEnvFromRunConfig returns the config-derived environment that probe

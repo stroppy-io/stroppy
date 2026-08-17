@@ -25,8 +25,8 @@ func TestLoadRunConfig_ExplicitPath(t *testing.T) {
 		cfg, loaded, err := runner.LoadRunConfig(f.Name())
 		require.NoError(t, err)
 		assert.True(t, loaded)
-		assert.Equal(t, "tpcc", cfg.GetScript())
-		assert.Equal(t, "30m", cfg.Env["DURATION"]) // key uppercased
+		assert.Equal(t, "tpcc", cfg.RunConfig.GetScript())
+		assert.Equal(t, "30m", cfg.RunConfig.Env["DURATION"]) // key uppercased
 	})
 
 	t.Run("file not found", func(t *testing.T) {
@@ -84,7 +84,7 @@ func TestLoadRunConfig_AutoDiscovery(t *testing.T) {
 		cfg, loaded, err := runner.LoadRunConfig("")
 		require.NoError(t, err)
 		assert.True(t, loaded)
-		assert.Equal(t, "bar", cfg.Env["FOO"])
+		assert.Equal(t, "bar", cfg.RunConfig.Env["FOO"])
 	})
 }
 
@@ -115,7 +115,7 @@ func TestLoadRunConfig_DriverConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, loaded)
 
-	drv := cfg.Drivers[0]
+	drv := cfg.RunConfig.Drivers[0]
 	require.NotNil(t, drv)
 	assert.Equal(t, "postgres", drv.GetDriverType())
 	assert.Equal(t, "postgres://user:pass@localhost:5432/bench", drv.GetUrl())
@@ -124,6 +124,45 @@ func TestLoadRunConfig_DriverConfig(t *testing.T) {
 	assert.Equal(t, int32(5), drv.Pool.GetMinIdleConns())
 	assert.Equal(t, int32(128), drv.Postgres.GetStatementCacheCapacity())
 	assert.Equal(t, int32(12), drv.Sql.GetMaxOpenConns())
+}
+
+func TestLoadRunConfig_TypedParameterScopes(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{
+		"version": "1",
+		"run": {"executor":"constant-vus","vus":3,"duration":"2s","future":true},
+		"params": {"scaleFactor":1.5,"enabled":false,"label":"sample"}
+	}`), 0o600))
+
+	cfg, loaded, err := runner.LoadRunConfig(path)
+	require.NoError(t, err)
+	assert.True(t, loaded)
+	assert.JSONEq(t, `"constant-vus"`, string(cfg.Run["executor"]))
+	assert.JSONEq(t, `3`, string(cfg.Run["vus"]))
+	assert.JSONEq(t, `true`, string(cfg.Run["future"]))
+	assert.JSONEq(t, `1.5`, string(cfg.Params["scaleFactor"]))
+	assert.JSONEq(t, `false`, string(cfg.Params["enabled"]))
+	assert.JSONEq(t, `"sample"`, string(cfg.Params["label"]))
+}
+
+func TestLoadRunConfig_RejectsInvalidParameterScopes(t *testing.T) {
+	tests := map[string]string{
+		"null run":            `{"run":null}`,
+		"array params":        `{"params":[]}`,
+		"duplicate run":       `{"run":{},"run":{}}`,
+		"duplicate run field": `{"run":{"vus":1,"vus":2}}`,
+		"unknown top level":   `{"unknown":{}}`,
+	}
+
+	for name, content := range tests {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+			_, _, err := runner.LoadRunConfig(path)
+			require.Error(t, err)
+		})
+	}
 }
 
 func TestBuildProbeEnvFromRunConfigIncludesFileDriver(t *testing.T) {

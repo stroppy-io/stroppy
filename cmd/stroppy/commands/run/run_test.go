@@ -1,14 +1,20 @@
 package run
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"os"
 	"testing"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
+	"github.com/stroppy-io/stroppy/pkg/bench"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
 
+//nolint:cyclop // one table covers the complete run argument grammar
 func TestParseRunArgs(t *testing.T) {
 	t.Parallel()
 
@@ -21,6 +27,8 @@ func TestParseRunArgs(t *testing.T) {
 		wantSteps     []string
 		wantNoSteps   []string
 		wantAfterDash []string
+		wantTyped     map[string]string
+		wantHelp      bool
 		wantPresets   map[int]string
 		wantOpts      map[int][][2]string
 		wantErr       error
@@ -57,9 +65,28 @@ func TestParseRunArgs(t *testing.T) {
 			wantErrStr: "too many positional arguments",
 		},
 		{
-			name:       "unknown flag before separator returns error",
+			name:       "typed flag pair form",
 			args:       []string{"tpcc", "--vus", "10"},
-			wantErrStr: "pass k6 flags after --",
+			wantScript: "tpcc",
+			wantTyped:  map[string]string{"vus": "10"},
+		},
+		{
+			name:       "typed bool equals form",
+			args:       []string{"--enabled=false", "tpcc"},
+			wantScript: "tpcc",
+			wantTyped:  map[string]string{"enabled": "false"},
+		},
+		{
+			name:       "typed negative pair value",
+			args:       []string{"tpcc", "--offset", "-10"},
+			wantScript: "tpcc",
+			wantTyped:  map[string]string{"offset": "-10"},
+		},
+		{
+			name:       "help after workload",
+			args:       []string{"tpcc", "--help"},
+			wantScript: "tpcc",
+			wantHelp:   true,
 		},
 		{
 			name:        "inline SQL query with spaces and equals is single positional",
@@ -480,6 +507,14 @@ func TestParseRunArgs(t *testing.T) {
 				t.Errorf("afterDash: got %v, want %v", got.afterDash, tt.wantAfterDash)
 			}
 
+			if !maps.Equal(got.typedParams, tt.wantTyped) {
+				t.Errorf("typedParams: got %v, want %v", got.typedParams, tt.wantTyped)
+			}
+
+			if got.help != tt.wantHelp {
+				t.Errorf("help: got %v, want %v", got.help, tt.wantHelp)
+			}
+
 			if !presetMapsEqual(got.driverPresets, tt.wantPresets) {
 				t.Errorf("driverPresets: got %v, want %v", got.driverPresets, tt.wantPresets)
 			}
@@ -490,6 +525,132 @@ func TestParseRunArgs(t *testing.T) {
 		})
 	}
 }
+
+func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
+	merged := mergeLegacyEnv(
+		map[string]string{"CONFIG_ONLY": "file", "SHARED": "file"},
+		map[string]string{"CLI_ONLY": "cli", "SHARED": "cli"},
+	)
+	if !maps.Equal(merged, map[string]string{
+		"CONFIG_ONLY": "file",
+		"CLI_ONLY":    "cli",
+		"SHARED":      "cli",
+	}) {
+		t.Fatalf("merged env = %v", merged)
+	}
+
+	driverType := "postgres"
+	fileURL := "postgres://file"
+	errorMode := "throw"
+	bulkSize := int32(20)
+	maxConns := int32(7)
+
+	configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*stroppy.DriverRunConfig{
+		0: {
+			DriverType: &driverType,
+			Url:        &fileURL,
+			ErrorMode:  &errorMode,
+			BulkSize:   &bulkSize,
+			Pool:       &stroppy.DriverRunConfig_PoolConfig{MaxConns: &maxConns},
+		},
+	})
+	if err != nil {
+		t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
+	}
+
+	if err := applyDriverOpt(configs, 0, "url", "postgres://cli"); err != nil {
+		t.Fatalf("applyDriverOpt() error = %v", err)
+	}
+
+	if configs[0].DriverType != "postgres" || configs[0].URL != "postgres://cli" {
+		t.Fatalf("merged driver config = %#v", configs[0])
+	}
+
+	runtimeConfig, err := buildDriverConfig(0, configs[0], nil)
+	if err != nil {
+		t.Fatalf("buildDriverConfig() error = %v", err)
+	}
+
+	if runtimeConfig.GetUrl() != "postgres://cli" ||
+		runtimeConfig.GetBulkSize() != 20 ||
+		runtimeConfig.GetErrorMode() != stroppy.DriverConfig_ERROR_MODE_THROW ||
+		runtimeConfig.GetPostgres().GetMaxConns() != 7 {
+		t.Fatalf("runtime driver config = %#v, extra = %#v", runtimeConfig, configs[0].Extra)
+	}
+}
+
+func TestBuildDriverConfigReturnsJSONConversionErrors(t *testing.T) {
+	_, err := buildDriverConfig(0, &runner.DriverCLIConfig{
+		Extra: map[string]any{"invalid": func() {}},
+	}, nil)
+	if err == nil || !contains(err.Error(), "extra config") {
+		t.Fatalf("buildDriverConfig() error = %v", err)
+	}
+}
+
+func TestDynamicWorkloadHelpAndBadTypedParam(t *testing.T) {
+	bench.Register(func() bench.Workload { return &runParamTestWorkload{} })
+
+	previousOutput := Cmd.OutOrStdout()
+	defer Cmd.SetOut(previousOutput)
+
+	var output bytes.Buffer
+	Cmd.SetOut(&output)
+
+	if err := Cmd.RunE(Cmd, []string{"test/run-typed-params", "--help"}); err != nil {
+		t.Fatalf("RunE(help) error = %v", err)
+	}
+
+	help := output.String()
+	for _, expected := range []string{"Run parameters:", "Workload parameters:", "--executor", "--enabled", "--count"} {
+		if !contains(help, expected) {
+			t.Fatalf("help output missing %q:\n%s", expected, help)
+		}
+	}
+
+	err := Cmd.RunE(Cmd, []string{"test/run-typed-params", "--count=bad", "-d", "noop"})
+	if err == nil || !contains(err.Error(), `parameter "count"`) {
+		t.Fatalf("RunE(bad param) error = %v", err)
+	}
+
+	if contains(err.Error(), "driver dispatch") {
+		t.Fatalf("bad parameter reached driver dispatch: %v", err)
+	}
+
+	configPath := t.TempDir() + "/scoped.json"
+	if err := os.WriteFile(configPath, []byte(`{
+		"script":"test/run-typed-params",
+		"run":{"count":2},
+		"params":{"vus":3}
+	}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	err = Cmd.RunE(Cmd, []string{"-f", configPath, "-d", "noop"})
+	if err == nil || !contains(err.Error(), "unknown run config parameter") ||
+		!contains(err.Error(), "unknown workload config parameter") {
+		t.Fatalf("RunE(crossed config scopes) error = %v", err)
+	}
+
+	if contains(err.Error(), "driver dispatch") {
+		t.Fatalf("crossed config scopes reached driver dispatch: %v", err)
+	}
+}
+
+type runParamTestWorkload struct{}
+
+func (*runParamTestWorkload) Name() string { return "test/run-typed-params" }
+
+func (*runParamTestWorkload) Define(def *bench.Def) error {
+	def.Param.Bool("enabled", false, "Enable test behavior.")
+	def.Param.Int("count", 1, "Number of test operations.")
+
+	return nil
+}
+
+func (*runParamTestWorkload) Setup(context.Context, *bench.Bench) error    { return nil }
+func (*runParamTestWorkload) Iterate(context.Context, *bench.Bench) error  { return nil }
+func (*runParamTestWorkload) Teardown(context.Context, *bench.Bench) error { return nil }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 

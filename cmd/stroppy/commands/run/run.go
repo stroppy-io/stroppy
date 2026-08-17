@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
 	"github.com/stroppy-io/stroppy/internal/version"
@@ -35,6 +37,7 @@ var (
 	errUnknownRunFlag     = errors.New("unknown run flag")
 	errPositionalAfterOpt = errors.New("unexpected positional argument after options")
 	errKeyValuePositional = errors.New("unexpected key=value positional argument")
+	errDriverExtraType    = errors.New("invalid driver extra field type")
 	errTooManyPositionals = errors.New(
 		"too many positional arguments; expected script and optional sql_file before --",
 	)
@@ -58,8 +61,13 @@ SQL files are searched in: current directory -> ~/.stroppy/ -> built-in workload
 The workload and optional sql_file positionals must be adjacent.
 
 Environment flags:
-  -e, --env KEY=VALUE     Set env var for the workload (lowercase auto-uppercased)
-                          Real env takes precedence over -e values.
+  -e, --env KEY=VALUE     Set a legacy env value for the workload.
+                          Real env and typed flags take precedence.
+
+Typed parameter flags:
+  --name VALUE            Set a run or selected-workload parameter.
+  --name=VALUE            Equals form. Boolean values must be explicit.
+  Use 'stroppy run <workload> --help' to list available typed parameters.
 
 Driver flags:
   -d, --driver NAME       Use a driver preset (pg, mysql, pico, ydb, noop)
@@ -69,7 +77,9 @@ Driver flags:
 
 Config file flags:
   -f, --file PATH         Load config from file (default: ./stroppy-config.json if exists)
-                          Config file values are lower precedence than -e/-d/-D flags.
+                          "run" holds scenario params; "params" holds workload params.
+                          Config env values are lower precedence than -e and typed values.
+                          Config drivers are lower precedence than -d/-D.
                           See 'stroppy help config-file' for details.
 `,
 	DisableFlagParsing: true,
@@ -79,6 +89,7 @@ Config file flags:
   stroppy run tpcb/tx                           # TPC-B tx workload
   stroppy run tpch/tx                           # TPC-H load + query suite
   stroppy run tpcds                             # TPC-DS load + query suite
+  stroppy run simple --executor constant-vus --duration 10s --vus 4
   stroppy run queries.sql                       # execute a SQL file
   stroppy run "select 1"                        # execute inline SQL
   stroppy run tpcc/tx --steps create_schema,load_data  # only run specified steps
@@ -91,10 +102,6 @@ Config file flags:
     --steps drop_schema,create_schema,load_data  # dump generated rows to CSV
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) > 0 && (args[0] == "--help" || args[0] == "-h") {
-			return cmd.Help()
-		}
-
 		parsed, err := parseRunArgs(args)
 		if err != nil {
 			return invalidConfig(err)
@@ -112,6 +119,24 @@ Config file flags:
 		steps := runner.EffectiveSteps(parsed.steps, fileConfig)
 		noSteps := runner.EffectiveNoSteps(parsed.noSteps, fileConfig)
 
+		if parsed.help {
+			if scriptArg == "" {
+				return cmd.Help()
+			}
+
+			describeName := scriptArg
+			if name, _, _, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
+				describeName = name
+			}
+
+			description, err := bench.Describe(describeName)
+			if err != nil {
+				return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
+			}
+
+			return printWorkloadHelp(cmd, description)
+		}
+
 		if scriptArg == "" {
 			return invalidConfig(errNoScript)
 		}
@@ -124,17 +149,17 @@ Config file flags:
 		if fileConfig != nil {
 			lg := logger.Global().Named("run")
 
-			if parsed.scriptArg != "" && fileConfig.GetScript() != "" {
+			if parsed.scriptArg != "" && fileConfig.RunConfig.GetScript() != "" {
 				lg.Debug("CLI script overrides config file",
 					zap.String("cli", parsed.scriptArg),
-					zap.String("file", fileConfig.GetScript()),
+					zap.String("file", fileConfig.RunConfig.GetScript()),
 				)
 			}
 
-			if len(parsed.steps) > 0 && len(fileConfig.GetSteps()) > 0 {
+			if len(parsed.steps) > 0 && len(fileConfig.RunConfig.GetSteps()) > 0 {
 				lg.Debug("CLI --steps overrides config file steps",
 					zap.Strings("cli", parsed.steps),
-					zap.Strings("file", fileConfig.GetSteps()),
+					zap.Strings("file", fileConfig.RunConfig.GetSteps()),
 				)
 			}
 		}
@@ -145,7 +170,25 @@ Config file flags:
 			return invalidConfig(err)
 		}
 
+		paramInputs := bench.ParamInputs{
+			CLI:       parsed.typedParams,
+			LegacyEnv: envOverrides,
+		}
+		rootEnv := cloneStringMap(envOverrides)
+
 		driverConfigs := runner.DriverCLIConfigs{}
+
+		if fileConfig != nil {
+			paramInputs.RunConfig = fileConfig.Run
+			paramInputs.WorkloadConfig = fileConfig.Params
+			paramInputs.LegacyConfigEnv = fileConfig.RunConfig.GetEnv()
+			rootEnv = mergeLegacyEnv(fileConfig.RunConfig.GetEnv(), envOverrides)
+
+			driverConfigs, err = runner.DriverCLIConfigsFromFile(fileConfig.RunConfig.GetDrivers())
+			if err != nil {
+				return invalidConfig(err)
+			}
+		}
 
 		for idx, presetName := range parsed.driverPresets {
 			if err := applyDriverPreset(driverConfigs, idx, presetName); err != nil {
@@ -168,21 +211,55 @@ Config file flags:
 		if name, body, file, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
 			if body != "" {
 				envOverrides["STROPPY_SQL_BODY"] = body
+				rootEnv["STROPPY_SQL_BODY"] = body
 			} else if file != "" {
 				envOverrides["SQL_FILE"] = file
+				rootEnv["SQL_FILE"] = file
 			}
 
-			return runGoWorkload(name, steps, noSteps, envOverrides, driverConfigs, metricsConfig(fileConfig))
+			return runGoWorkload(
+				name, steps, noSteps, rootEnv, paramInputs, driverConfigs, metricsConfig(loadedRunConfig(fileConfig)),
+			)
 		}
 
 		// Go-native workload: if a Go workload is registered under the bare
 		// script name, dispatch to bench.Run.
 		if _, ok := bench.Lookup(scriptArg); ok {
-			return runGoWorkload(scriptArg, steps, noSteps, envOverrides, driverConfigs, metricsConfig(fileConfig))
+			return runGoWorkload(
+				scriptArg,
+				steps,
+				noSteps,
+				rootEnv,
+				paramInputs,
+				driverConfigs,
+				metricsConfig(loadedRunConfig(fileConfig)),
+			)
 		}
 
 		return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
 	},
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	cloned := make(map[string]string, len(values))
+	maps.Copy(cloned, values)
+
+	return cloned
+}
+
+func mergeLegacyEnv(configEnv, cliEnv map[string]string) map[string]string {
+	merged := cloneStringMap(configEnv)
+	maps.Copy(merged, cliEnv)
+
+	return merged
+}
+
+func loadedRunConfig(config *runner.LoadedConfig) *stroppy.RunConfig {
+	if config == nil {
+		return nil
+	}
+
+	return config.RunConfig
 }
 
 func metricsConfig(config *stroppy.RunConfig) *bench.MetricsConfig {
@@ -208,6 +285,54 @@ func metricsConfig(config *stroppy.RunConfig) *bench.MetricsConfig {
 	metrics.Prefix = export.GetOtlpMetricsPrefix()
 
 	return metrics
+}
+
+func printWorkloadHelp(cmd *cobra.Command, description bench.Description) error {
+	var output strings.Builder
+
+	fmt.Fprintf(&output, "Usage:\n  stroppy run %s [sql_file] [flags]\n\n", description.Name)
+	output.WriteString("Static flags:\n")
+	output.WriteString("  -f, --file PATH          Load a config file\n")
+	output.WriteString("  -d, --driver NAME        Use a driver preset\n")
+	output.WriteString("  -D, --driver-opt K=V     Override a driver field\n")
+	output.WriteString("  -e, --env KEY=VALUE      Set a legacy workload environment value\n")
+	output.WriteString("      --steps NAMES        Run only named steps\n")
+	output.WriteString("      --no-steps NAMES     Skip named steps\n")
+	output.WriteString("  -h, --help               Show this help\n")
+
+	writeParamHelpSection(&output, "Run parameters", description.Params, bench.ParamScopeRun)
+	writeParamHelpSection(&output, "Workload parameters", description.Params, bench.ParamScopeWorkload)
+
+	_, err := fmt.Fprint(cmd.OutOrStdout(), output.String())
+
+	return err
+}
+
+func writeParamHelpSection(
+	output *strings.Builder,
+	title string,
+	params []bench.ParamSchema,
+	scope bench.ParamScope,
+) {
+	output.WriteString("\n" + title + ":\n")
+
+	for idx := range params {
+		param := &params[idx]
+		if param.Scope != scope {
+			continue
+		}
+
+		fmt.Fprintf(
+			output,
+			"  %-22s %-8s default=%v\n      %s (env %s, config %s)\n",
+			param.Flag,
+			param.Type,
+			param.Default,
+			param.Description,
+			param.Env,
+			param.Config,
+		)
+	}
 }
 
 func invalidConfig(err error) error {
@@ -244,14 +369,15 @@ func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bo
 func runGoWorkload(
 	name string,
 	steps, noSteps []string,
-	envOverrides map[string]string,
+	env map[string]string,
+	paramInputs bench.ParamInputs,
 	driverConfigs runner.DriverCLIConfigs,
 	metrics *bench.MetricsConfig,
 ) error {
 	drivers := map[int]*stroppy.DriverConfig{}
 
 	for idx, cfg := range driverConfigs {
-		dc, err := buildDriverConfig(idx, cfg, envOverrides)
+		dc, err := buildDriverConfig(idx, cfg, env)
 		if err != nil {
 			return err
 		}
@@ -285,8 +411,8 @@ func runGoWorkload(
 		ctx,
 		name,
 		drivers,
-		envOverrides,
-		bench.ParamInputs{LegacyEnv: envOverrides},
+		env,
+		paramInputs,
 		logger.Global(),
 		metrics,
 	); err != nil {
@@ -314,15 +440,18 @@ func buildDriverConfig(
 		dc.DriverType = t
 	}
 
-	// defaultInsertMethod is TS-only; Go workloads set Method on each InsertSpec.
-	if len(cfg.Extra) > 0 {
-		if extraJSON, err := json.Marshal(cfg.Extra); err == nil {
-			_ = json.Unmarshal(extraJSON, dc) //nolint:musttag // frozen proto type, out of scope to tag
-		}
+	// defaultInsertMethod is owned by each Go workload's InsertRequest.
+	if err := applyDriverExtras(idx, dc, cfg.Extra); err != nil {
+		return nil, invalidConfig(err)
 	}
 
 	if dc.GetDriverType() == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
-		if ps, ok := envOverrides["POOL_SIZE"]; ok {
+		ps, ok := os.LookupEnv("POOL_SIZE")
+		if !ok {
+			ps, ok = envOverrides["POOL_SIZE"]
+		}
+
+		if ok {
 			if n, err := strconv.Atoi(ps); err == nil && n > 0 {
 				nc := int32(n) //nolint:gosec // G109: parsed config value, bounded by user input, not untrusted
 				dc.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: &stroppy.DriverConfig_PostgresConfig{
@@ -335,6 +464,110 @@ func buildDriverConfig(
 	return dc, nil
 }
 
+func applyDriverExtras(idx int, config *stroppy.DriverConfig, extras map[string]any) error {
+	if len(extras) == 0 {
+		return nil
+	}
+
+	values := maps.Clone(extras)
+
+	if errorModeValue, ok := popDriverExtra(values, "errorMode", "error_mode"); ok {
+		errorMode, isString := errorModeValue.(string)
+		if !isString {
+			return fmt.Errorf("driver %d errorMode: %w", idx, errDriverExtraType)
+		}
+
+		parsed, err := bench.ParseErrorMode(errorMode)
+		if err != nil {
+			return fmt.Errorf("driver %d errorMode: %w", idx, err)
+		}
+
+		config.ErrorMode = parsed
+	}
+
+	_, _ = popDriverExtra(values, "defaultTxIsolation", "default_tx_isolation")
+	pool, hasPool := popDriverExtra(values, "pool")
+
+	if config.GetDriverType() == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
+		_, _ = popDriverExtra(values, "sql")
+	} else {
+		_, _ = popDriverExtra(values, "postgres")
+	}
+
+	extraConfig := &stroppy.DriverConfig{}
+
+	data, err := json.Marshal(values)
+	if err != nil {
+		return fmt.Errorf("driver %d extra config: %w", idx, err)
+	}
+
+	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(data, extraConfig); err != nil {
+		return fmt.Errorf("driver %d extra config: %w", idx, err)
+	}
+
+	if extraConfig.GetDriverSpecific() == nil && hasPool {
+		if err := applyPoolDriverSpecific(config.GetDriverType(), pool, extraConfig); err != nil {
+			return fmt.Errorf("driver %d pool config: %w", idx, err)
+		}
+	}
+
+	config.BulkSize = extraConfig.BulkSize
+	config.DriverSpecific = extraConfig.GetDriverSpecific()
+	config.CaCertFile = extraConfig.CaCertFile
+	config.AuthToken = extraConfig.AuthToken
+	config.AuthUser = extraConfig.AuthUser
+	config.AuthPassword = extraConfig.AuthPassword
+	config.TlsInsecureSkipVerify = extraConfig.TlsInsecureSkipVerify
+	config.InsertProgress = extraConfig.GetInsertProgress()
+
+	return nil
+}
+
+func popDriverExtra(values map[string]any, names ...string) (any, bool) {
+	for _, name := range names {
+		if value, ok := values[name]; ok {
+			delete(values, name)
+
+			return value, true
+		}
+	}
+
+	return nil, false
+}
+
+func applyPoolDriverSpecific(
+	driverType stroppy.DriverConfig_DriverType,
+	pool any,
+	config *stroppy.DriverConfig,
+) error {
+	data, err := json.Marshal(pool)
+	if err != nil {
+		return err
+	}
+
+	unmarshal := protojson.UnmarshalOptions{DiscardUnknown: true}
+
+	if driverType == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
+		postgres := &stroppy.DriverConfig_PostgresConfig{}
+		if err := unmarshal.Unmarshal(data, postgres); err != nil {
+			return err
+		}
+
+		config.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: postgres}
+
+		return nil
+	}
+
+	sqlConfig := &stroppy.DriverConfig_SqlConfig{}
+	if err := unmarshal.Unmarshal(data, sqlConfig); err != nil {
+		return err
+	}
+
+	config.DriverSpecific = &stroppy.DriverConfig_Sql{Sql: sqlConfig}
+
+	return nil
+}
+
 // runArgs holds the result of parseRunArgs.
 type runArgs struct {
 	scriptArg     string
@@ -343,7 +576,9 @@ type runArgs struct {
 	steps         []string
 	noSteps       []string
 	afterDash     []string
-	envArgs       []string            // -e KEY=VALUE raw pairs
+	envArgs       []string          // -e KEY=VALUE raw pairs
+	typedParams   map[string]string // provisional --name=value workload/run params
+	help          bool
 	driverPresets map[int]string      // driver index → preset name
 	driverOpts    map[int][][2]string // driver index → list of [key, value] pairs
 }
@@ -375,10 +610,12 @@ func parseRunArgs(args []string) (runArgs, error) {
 	}
 
 	parsers := []flagParser{
+		parseHelpFlag,
 		parseStepsFlag,
 		parseFileFlag,
 		parseEnvFlag,
 		parseDriverFlags,
+		parseTypedParamFlag,
 	}
 
 	if err := parseRunArgsBeforeDash(positional, parsers, &parsed); err != nil {
@@ -460,6 +697,66 @@ func dispatchFlag(parsers []flagParser, positional []string, i int, parsed *runA
 	}
 
 	return 0, nil
+}
+
+func parseHelpFlag(args []string, i int, parsed *runArgs) (int, error) {
+	if args[i] != "--help" && args[i] != "-h" {
+		return 0, nil
+	}
+
+	parsed.help = true
+
+	return 1, nil
+}
+
+func parseTypedParamFlag(args []string, i int, parsed *runArgs) (int, error) {
+	arg := args[i]
+	if !strings.HasPrefix(arg, "--") {
+		return 0, nil
+	}
+
+	nameValue := strings.TrimPrefix(arg, "--")
+
+	name, value, hasEquals := strings.Cut(nameValue, "=")
+	if name == "" {
+		return 0, fmt.Errorf("%w %q", errUnknownRunFlag, arg)
+	}
+
+	consumed := 1
+
+	if !hasEquals {
+		var err error
+
+		value, err = nextTypedFlagValue(args, i)
+		if err != nil {
+			return 0, err
+		}
+
+		consumed = consumedPairFlag
+	}
+
+	if parsed.typedParams == nil {
+		parsed.typedParams = make(map[string]string)
+	}
+
+	parsed.typedParams[name] = value
+
+	return consumed, nil
+}
+
+func nextTypedFlagValue(args []string, i int) (string, error) {
+	flag := args[i]
+	if i+1 >= len(args) {
+		return "", fmt.Errorf("%s: %w", flag, errFlagRequiresValue)
+	}
+
+	next := args[i+1]
+	if strings.HasPrefix(next, "--") || next == "-h" ||
+		(strings.HasPrefix(next, "-") && (len(next) < 2 || next[1] < '0' || next[1] > '9')) {
+		return "", fmt.Errorf("%s: %w", flag, errFlagRequiresValue)
+	}
+
+	return next, nil
 }
 
 // parseStepsFlag handles --steps and --no-steps in both space and equals forms.

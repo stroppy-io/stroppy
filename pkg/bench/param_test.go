@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"reflect"
 	"strings"
@@ -30,7 +31,7 @@ func TestParamResolutionPrecedence(t *testing.T) {
 			inputs: ParamInputs{
 				CLI:             map[string]string{"sample-value": "cli"},
 				LegacyEnv:       map[string]string{"SAMPLE_VALUE": "legacy-env"},
-				Config:          map[string]json.RawMessage{"sampleValue": json.RawMessage(`"config"`)},
+				WorkloadConfig:  map[string]json.RawMessage{"sampleValue": json.RawMessage(`"config"`)},
 				LegacyConfigEnv: map[string]string{"SAMPLE_VALUE": "config-env"},
 			},
 			processEnv: stringPointer("process"),
@@ -42,7 +43,7 @@ func TestParamResolutionPrecedence(t *testing.T) {
 			processEnv: stringPointer("process"),
 			inputs: ParamInputs{
 				LegacyEnv:       map[string]string{"SAMPLE_VALUE": "legacy-env"},
-				Config:          map[string]json.RawMessage{"sampleValue": json.RawMessage(`"config"`)},
+				WorkloadConfig:  map[string]json.RawMessage{"sampleValue": json.RawMessage(`"config"`)},
 				LegacyConfigEnv: map[string]string{"SAMPLE_VALUE": "config-env"},
 			},
 			want:       "process",
@@ -52,7 +53,7 @@ func TestParamResolutionPrecedence(t *testing.T) {
 			name: "legacy -e",
 			inputs: ParamInputs{
 				LegacyEnv:       map[string]string{"SAMPLE_VALUE": "legacy-env"},
-				Config:          map[string]json.RawMessage{"sampleValue": json.RawMessage(`"config"`)},
+				WorkloadConfig:  map[string]json.RawMessage{"sampleValue": json.RawMessage(`"config"`)},
 				LegacyConfigEnv: map[string]string{"SAMPLE_VALUE": "config-env"},
 			},
 			want:       "legacy-env",
@@ -61,7 +62,7 @@ func TestParamResolutionPrecedence(t *testing.T) {
 		{
 			name: "typed config",
 			inputs: ParamInputs{
-				Config:          map[string]json.RawMessage{"sampleValue": json.RawMessage(`"config"`)},
+				WorkloadConfig:  map[string]json.RawMessage{"sampleValue": json.RawMessage(`"config"`)},
 				LegacyConfigEnv: map[string]string{"SAMPLE_VALUE": "config-env"},
 			},
 			want:       "config",
@@ -87,7 +88,7 @@ func TestParamResolutionPrecedence(t *testing.T) {
 			}
 
 			def := newDef(test.inputs, false)
-			def.standard = false
+			def.scope = ParamScopeWorkload
 
 			param := def.Param.String(
 				"sample-value", "default", "sample", LegacyEnvAliases("OLD_SAMPLE_VALUE"),
@@ -119,7 +120,7 @@ func TestParamConcreteTypesFromCLI(t *testing.T) {
 		"ratio":    "1.25",
 		"timeout":  "1m30s",
 	}}, false)
-	def.standard = false
+	def.scope = ParamScopeWorkload
 
 	empty := def.Param.String("empty", "fallback", "")
 	enabled := def.Param.Bool("enabled", false, "")
@@ -145,7 +146,7 @@ func TestParamConcreteTypesFromCLI(t *testing.T) {
 func TestParamConcreteTypesFromNativeConfig(t *testing.T) {
 	clearParamEnv(t, "TEXT", "ENABLED", "COUNT", "LARGE", "UNSIGNED", "RATIO", "TIMEOUT")
 
-	def := newDef(ParamInputs{Config: map[string]json.RawMessage{
+	def := newDef(ParamInputs{WorkloadConfig: map[string]json.RawMessage{
 		"text":     json.RawMessage(`"value"`),
 		"enabled":  json.RawMessage(`true`),
 		"count":    json.RawMessage(`-12`),
@@ -154,7 +155,7 @@ func TestParamConcreteTypesFromNativeConfig(t *testing.T) {
 		"ratio":    json.RawMessage(`1.25`),
 		"timeout":  json.RawMessage(`"1m30s"`),
 	}}, false)
-	def.standard = false
+	def.scope = ParamScopeWorkload
 
 	text := def.Param.String("text", "", "")
 	enabled := def.Param.Bool("enabled", false, "")
@@ -193,25 +194,25 @@ func TestParamRejectsEmptyNonStringAndInvalidConfigTypes(t *testing.T) {
 		},
 		{
 			name:   "config null",
-			inputs: ParamInputs{Config: map[string]json.RawMessage{"count": json.RawMessage(`null`)}},
+			inputs: ParamInputs{WorkloadConfig: map[string]json.RawMessage{"count": json.RawMessage(`null`)}},
 			define: func(def *Def) { def.Param.Int("count", 1, "") },
 			want:   "null is not allowed",
 		},
 		{
 			name:   "config number as string",
-			inputs: ParamInputs{Config: map[string]json.RawMessage{"count": json.RawMessage(`"1"`)}},
+			inputs: ParamInputs{WorkloadConfig: map[string]json.RawMessage{"count": json.RawMessage(`"1"`)}},
 			define: func(def *Def) { def.Param.Int("count", 1, "") },
 			want:   "cannot unmarshal string",
 		},
 		{
 			name:   "config duration as number",
-			inputs: ParamInputs{Config: map[string]json.RawMessage{"timeout": json.RawMessage(`10`)}},
+			inputs: ParamInputs{WorkloadConfig: map[string]json.RawMessage{"timeout": json.RawMessage(`10`)}},
 			define: func(def *Def) { def.Param.Duration("timeout", time.Second, "") },
 			want:   "cannot unmarshal number",
 		},
 		{
 			name:   "config string as bool",
-			inputs: ParamInputs{Config: map[string]json.RawMessage{"enabled": json.RawMessage(`"true"`)}},
+			inputs: ParamInputs{WorkloadConfig: map[string]json.RawMessage{"enabled": json.RawMessage(`"true"`)}},
 			define: func(def *Def) { def.Param.Bool("enabled", false, "") },
 			want:   "cannot unmarshal string",
 		},
@@ -220,7 +221,7 @@ func TestParamRejectsEmptyNonStringAndInvalidConfigTypes(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			def := newDef(test.inputs, false)
-			def.standard = false
+			def.scope = ParamScopeWorkload
 			test.define(def)
 
 			err := def.finish()
@@ -231,6 +232,52 @@ func TestParamRejectsEmptyNonStringAndInvalidConfigTypes(t *testing.T) {
 	}
 }
 
+func TestParamRejectsNonFiniteFloatDefaults(t *testing.T) {
+	for name, value := range map[string]float64{
+		"nan":      math.NaN(),
+		"positive": math.Inf(1),
+		"negative": math.Inf(-1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			def := newDef(ParamInputs{}, true)
+			def.scope = ParamScopeWorkload
+			def.Param.Float64("ratio", value, "")
+
+			err := def.finish()
+			if err == nil || !strings.Contains(err.Error(), "must be finite") {
+				t.Fatalf("finish() error = %v", err)
+			}
+		})
+	}
+}
+
+func TestParamConfigScopesRejectCrossedKeys(t *testing.T) {
+	clearScenarioEnv(t)
+	clearParamEnv(t, "SCALE_FACTOR")
+
+	workload := &paramTestWorkload{
+		name: "test/scoped-config",
+		define: func(def *Def) error {
+			def.Param.Float64("scale-factor", 1, "")
+
+			return nil
+		},
+	}
+
+	_, _, err := defineWorkload(workload, ParamInputs{
+		RunConfig:      map[string]json.RawMessage{"scaleFactor": json.RawMessage(`2`)},
+		WorkloadConfig: map[string]json.RawMessage{"vus": json.RawMessage(`3`)},
+	}, false)
+	if err == nil {
+		t.Fatal("defineWorkload() error = nil")
+	}
+
+	if !strings.Contains(err.Error(), `unknown run config parameter "scaleFactor"`) ||
+		!strings.Contains(err.Error(), `unknown workload config parameter "vus"`) {
+		t.Fatalf("defineWorkload() error = %v", err)
+	}
+}
+
 func TestParamNamesAliasesAndDeferredUnknownChecks(t *testing.T) {
 	clearParamEnv(t, "FIRST_VALUE", "SECOND_VALUE", "OLD_SECOND")
 
@@ -238,7 +285,7 @@ func TestParamNamesAliasesAndDeferredUnknownChecks(t *testing.T) {
 		def := newDef(ParamInputs{
 			CLI: map[string]string{"second-value": "set"},
 		}, false)
-		def.standard = false
+		def.scope = ParamScopeWorkload
 		first := def.Param.String("first-value", "first", "")
 		second := def.Param.String("second-value", "second", "", LegacyEnvAliases("OLD_SECOND"))
 
@@ -260,11 +307,11 @@ func TestParamNamesAliasesAndDeferredUnknownChecks(t *testing.T) {
 		{
 			name: "unknown typed inputs sorted",
 			inputs: ParamInputs{
-				CLI:    map[string]string{"z-last": "1"},
-				Config: map[string]json.RawMessage{"aFirst": json.RawMessage(`1`)},
+				CLI:            map[string]string{"z-last": "1"},
+				WorkloadConfig: map[string]json.RawMessage{"aFirst": json.RawMessage(`1`)},
 			},
 			define: func(*Def) {},
-			want:   []string{`unknown CLI parameter "z-last"`, `unknown config parameter "aFirst"`},
+			want:   []string{`unknown CLI parameter "z-last"`, `unknown workload config parameter "aFirst"`},
 		},
 		{
 			name:   "duplicate",
@@ -291,7 +338,7 @@ func TestParamNamesAliasesAndDeferredUnknownChecks(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			def := newDef(test.inputs, false)
-			def.standard = false
+			def.scope = ParamScopeWorkload
 			test.define(def)
 
 			err := def.finish()
@@ -347,6 +394,8 @@ func TestDescribeUsesDefaultsAndCopiesSchema(t *testing.T) {
 
 	want := ParamSchema{
 		Name:             "batch-size",
+		Flag:             "--batch-size",
+		Scope:            ParamScopeWorkload,
 		Type:             ParamTypeInt,
 		Description:      "Rows in a batch.",
 		Default:          10,
@@ -354,19 +403,19 @@ func TestDescribeUsesDefaultsAndCopiesSchema(t *testing.T) {
 		LegacyEnvAliases: []string{"OLD_BATCH_SIZE"},
 		Config:           "batchSize",
 	}
-	if !reflect.DeepEqual(description.Params[0], want) {
-		t.Fatalf("workload schema = %#v, want %#v", description.Params[0], want)
+	if !reflect.DeepEqual(description.Params[4], want) {
+		t.Fatalf("workload schema = %#v, want %#v", description.Params[4], want)
 	}
 
-	description.Params[0].LegacyEnvAliases[0] = "MUTATED"
+	description.Params[4].LegacyEnvAliases[0] = "MUTATED"
 
 	again, err := Describe("test/describe-params")
 	if err != nil {
 		t.Fatalf("Describe() again error = %v", err)
 	}
 
-	if again.Params[0].LegacyEnvAliases[0] != "OLD_BATCH_SIZE" {
-		t.Fatalf("schema alias was mutated: %#v", again.Params[0])
+	if again.Params[4].LegacyEnvAliases[0] != "OLD_BATCH_SIZE" {
+		t.Fatalf("schema alias was mutated: %#v", again.Params[4])
 	}
 }
 
@@ -394,6 +443,41 @@ func TestRegistryFactoriesAreFreshAndDuplicatesPanic(t *testing.T) {
 	}()
 
 	Register(func() Workload { return &paramTestWorkload{name: "test/fresh-factory"} })
+}
+
+func TestRegisterRejectsTypedNilWorkload(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("Register() accepted a typed-nil workload")
+		}
+	}()
+
+	var workload *paramTestWorkload
+
+	Register(func() Workload { return workload })
+}
+
+func TestLookupRejectsTypedNilWorkload(t *testing.T) {
+	calls := 0
+
+	Register(func() Workload {
+		calls++
+		if calls != 2 {
+			return &paramTestWorkload{name: "test/typed-nil-lookup"}
+		}
+
+		var workload *paramTestWorkload
+
+		return workload
+	})
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("Lookup() accepted a typed-nil workload")
+		}
+	}()
+
+	_, _ = Lookup("test/typed-nil-lookup")
 }
 
 func TestDescribeAllIsSorted(t *testing.T) {
@@ -430,7 +514,7 @@ func TestScenarioTypedDurationRequiresExplicitConstantVUs(t *testing.T) {
 		t.Fatalf("scenario = %#v", spec)
 	}
 
-	spec, err = scenarioForTest(ParamInputs{Config: map[string]json.RawMessage{
+	spec, err = scenarioForTest(ParamInputs{RunConfig: map[string]json.RawMessage{
 		"executor": json.RawMessage(`"constant-vus"`),
 		"duration": json.RawMessage(`"3s"`),
 	}}, zap.NewNop())
@@ -480,6 +564,51 @@ func TestScenarioLegacyDurationInfersConstantVUsWithWarning(t *testing.T) {
 				t.Fatalf("executor = %q", legacySpec.executor)
 			}
 		})
+	}
+}
+
+func TestScenarioLegacyDurationIgnoresLegacyIterations(t *testing.T) {
+	clearScenarioEnv(t)
+
+	t.Setenv("DURATION", "2s")
+	t.Setenv("ITER", "invalid")
+
+	spec, err := scenarioForTest(ParamInputs{}, zap.NewNop())
+	if err != nil {
+		t.Fatalf("legacy duration scenario error = %v", err)
+	}
+
+	if spec.executor != "constant-vus" || spec.duration != 2*time.Second {
+		t.Fatalf("scenario = %#v", spec)
+	}
+
+	clearParamEnv(t, "DURATION", "ITER")
+
+	for name, inputs := range map[string]ParamInputs{
+		"legacy -e": {
+			LegacyEnv: map[string]string{"DURATION": "2s", "ITER": "0"},
+		},
+		"legacy config env": {
+			LegacyConfigEnv: map[string]string{"DURATION": "2s", "ITER": "invalid"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := scenarioForTest(inputs, zap.NewNop()); err != nil {
+				t.Fatalf("legacy duration scenario error = %v", err)
+			}
+		})
+	}
+}
+
+func TestScenarioLegacyDurationStillValidatesTypedIterations(t *testing.T) {
+	clearScenarioEnv(t)
+
+	_, err := scenarioForTest(ParamInputs{
+		CLI:       map[string]string{"iterations": "0"},
+		LegacyEnv: map[string]string{"DURATION": "2s"},
+	}, zap.NewNop())
+	if err == nil || !strings.Contains(err.Error(), "iterations must be at least 1") {
+		t.Fatalf("typed iterations error = %v", err)
 	}
 }
 

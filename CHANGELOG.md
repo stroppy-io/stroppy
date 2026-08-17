@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- Typed scenario and workload parameters can be set with `--name` flags or native JSON values in the config file's `run` and `params` objects, and `stroppy run <workload> --help` lists the available parameters.
 - Go workloads can declare typed string, boolean, numeric, and duration parameters with defaults, descriptions, source tracking, and discoverable schemas.
 - Database errors are classified by each driver into shared facts, and Go workloads can override the default retry, error, ignore, or fatal action for each fact without matching backend-specific codes or messages. ([#127](https://github.com/stroppy-io/stroppy/pull/127))
 - New `pkg/gen` random-generation primitives library: deterministic, seekable, allocation-free scalar and text draws composed in plain Go, intended to replace the relational datagen expression framework for workload data loading.

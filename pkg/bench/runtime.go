@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -82,7 +83,7 @@ func Register(factory func() Workload) {
 	}
 
 	wl := factory()
-	if wl == nil {
+	if nilWorkload(wl) {
 		panic("bench: workload factory returned nil")
 	}
 
@@ -114,11 +115,25 @@ func Lookup(name string) (Workload, bool) {
 	}
 
 	wl := factory()
-	if wl == nil || wl.Name() != name {
+	if nilWorkload(wl) || wl.Name() != name {
 		panic(fmt.Sprintf("bench: workload factory for %q returned an invalid workload", name))
 	}
 
 	return wl, true
+}
+
+func nilWorkload(workload Workload) bool {
+	if workload == nil {
+		return true
+	}
+
+	value := reflect.ValueOf(workload)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }
 
 // Describe returns a workload's deterministic parameter schema without setup or drivers.
@@ -263,21 +278,75 @@ func defineWorkload(
 	defaultsOnly bool,
 ) (scenarioParams, []ParamSchema, error) {
 	def := newDef(inputs, defaultsOnly)
+
+	iterationOptions := []ParamOption{LegacyEnvAliases("ITER")}
+	if !defaultsOnly && legacyDurationWillInfer(inputs) {
+		iterationOptions = nil
+	}
+
 	params := scenarioParams{
 		executor: def.Param.String(
 			"executor", "shared-iterations", "Scenario executor: shared-iterations or constant-vus.",
 		),
 		vus: def.Param.Int("vus", 1, "Number of concurrent virtual users."),
 		iterations: def.Param.Int64(
-			"iterations", 1, "Total shared iterations.", LegacyEnvAliases("ITER"),
+			"iterations", 1, "Total shared iterations.", iterationOptions...,
 		),
 		duration: def.Param.Duration("duration", 0, "Duration of a constant-vus scenario."),
 	}
 
-	def.standard = false
+	def.scope = ParamScopeWorkload
 	defineErr := wl.Define(def)
 
 	return params, def.schema(), errors.Join(defineErr, def.finish())
+}
+
+func legacyDurationWillInfer(inputs ParamInputs) bool {
+	legacyDuration := false
+
+	if _, ok := inputs.CLI["duration"]; ok {
+		return false
+	}
+
+	_, processDuration := os.LookupEnv("DURATION")
+	_, legacyEnvDuration := inputs.LegacyEnv["DURATION"]
+	_, runConfigDuration := inputs.RunConfig["duration"]
+	_, configEnvDuration := inputs.LegacyConfigEnv["DURATION"]
+
+	switch {
+	case processDuration:
+		legacyDuration = true
+	case legacyEnvDuration:
+		legacyDuration = true
+	case runConfigDuration:
+		return false
+	case configEnvDuration:
+		legacyDuration = true
+	}
+
+	return legacyDuration && !executorExplicit(inputs)
+}
+
+func executorExplicit(inputs ParamInputs) bool {
+	if _, ok := inputs.CLI["executor"]; ok {
+		return true
+	}
+
+	if _, ok := os.LookupEnv("EXECUTOR"); ok {
+		return true
+	}
+
+	if _, ok := inputs.LegacyEnv["EXECUTOR"]; ok {
+		return true
+	}
+
+	if _, ok := inputs.RunConfig["executor"]; ok {
+		return true
+	}
+
+	_, ok := inputs.LegacyConfigEnv["EXECUTOR"]
+
+	return ok
 }
 
 func (params *scenarioParams) spec(lg *zap.Logger) (scenarioSpec, error) {

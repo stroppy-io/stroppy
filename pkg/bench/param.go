@@ -18,7 +18,8 @@ import (
 type ParamInputs struct {
 	CLI             map[string]string
 	LegacyEnv       map[string]string
-	Config          map[string]json.RawMessage
+	RunConfig       map[string]json.RawMessage
+	WorkloadConfig  map[string]json.RawMessage
 	LegacyConfigEnv map[string]string
 }
 
@@ -57,9 +58,19 @@ const (
 	ParamTypeDuration ParamType = "duration"
 )
 
+// ParamScope identifies the config object that owns a declaration.
+type ParamScope string
+
+const (
+	ParamScopeRun      ParamScope = "run"
+	ParamScopeWorkload ParamScope = "workload"
+)
+
 // ParamSchema is a copied projection of one parameter declaration.
 type ParamSchema struct {
 	Name             string
+	Flag             string
+	Scope            ParamScope
 	Type             ParamType
 	Description      string
 	Default          any
@@ -96,6 +107,7 @@ func LegacyEnvAliases(names ...string) ParamOption {
 
 type paramDescriptor struct {
 	name             string
+	scope            ParamScope
 	typ              ParamType
 	description      string
 	defaultValue     any
@@ -115,7 +127,7 @@ type Def struct {
 
 	inputs       ParamInputs
 	defaultsOnly bool
-	standard     bool
+	scope        ParamScope
 	descriptors  []paramDescriptor
 	names        map[string]struct{}
 	envNames     map[string]string
@@ -142,7 +154,8 @@ var (
 	errNullParamValue        = errors.New("null is not allowed")
 	errNonFiniteParamValue   = errors.New("must be finite")
 	errUnknownCLIParam       = errors.New("unknown CLI parameter")
-	errUnknownConfigParam    = errors.New("unknown config parameter")
+	errUnknownRunConfigParam = errors.New("unknown run config parameter")
+	errUnknownWorkloadConfig = errors.New("unknown workload config parameter")
 )
 
 var reservedWorkloadParamNames = map[string]struct{}{
@@ -154,7 +167,7 @@ func newDef(inputs ParamInputs, defaultsOnly bool) *Def {
 	d := &Def{
 		inputs:       cloneParamInputs(inputs),
 		defaultsOnly: defaultsOnly,
-		standard:     true,
+		scope:        ParamScopeRun,
 		names:        make(map[string]struct{}),
 		envNames:     make(map[string]string),
 	}
@@ -167,7 +180,8 @@ func cloneParamInputs(inputs ParamInputs) ParamInputs {
 	return ParamInputs{
 		CLI:             cloneStringMap(inputs.CLI),
 		LegacyEnv:       cloneStringMap(inputs.LegacyEnv),
-		Config:          cloneRawMap(inputs.Config),
+		RunConfig:       cloneRawMap(inputs.RunConfig),
+		WorkloadConfig:  cloneRawMap(inputs.WorkloadConfig),
 		LegacyConfigEnv: cloneStringMap(inputs.LegacyConfigEnv),
 	}
 }
@@ -262,6 +276,10 @@ func (p ParamDeclarations) Float64(
 	description string,
 	opts ...ParamOption,
 ) Param[float64] {
+	if math.IsInf(defaultValue, 0) || math.IsNaN(defaultValue) {
+		p.def.addError(fmt.Errorf("parameter %q default: %w", name, errNonFiniteParamValue))
+	}
+
 	return declareParam(p.def, name, ParamTypeFloat64, defaultValue, description, paramParser[float64]{
 		text: parseFiniteFloat,
 		raw:  decodeFiniteFloat,
@@ -298,6 +316,7 @@ func declareParam[T any](
 ) Param[T] {
 	desc := paramDescriptor{
 		name:         name,
+		scope:        d.scope,
 		typ:          typ,
 		description:  description,
 		defaultValue: defaultValue,
@@ -345,7 +364,7 @@ func (d *Def) register(desc *paramDescriptor) bool {
 		valid = false
 	}
 
-	if !d.standard {
+	if desc.scope == ParamScopeWorkload {
 		if _, reserved := reservedWorkloadParamNames[desc.name]; reserved {
 			d.addError(fmt.Errorf("%w %q", errReservedParamName, desc.name))
 
@@ -432,7 +451,12 @@ func resolveParam[T any](
 		return parsed, ParamSourceLegacyEnv, true, err
 	}
 
-	if value, ok := inputs.Config[desc.config]; ok {
+	config := inputs.WorkloadConfig
+	if desc.scope == ParamScopeRun {
+		config = inputs.RunConfig
+	}
+
+	if value, ok := config[desc.config]; ok {
 		parsed, err := parser.raw(value)
 
 		return parsed, ParamSourceConfig, true, err
@@ -522,14 +546,27 @@ func (d *Def) finish() error {
 		}
 	}
 
-	configNames := make(map[string]struct{}, len(d.descriptors))
-	for _, desc := range d.descriptors {
-		configNames[desc.config] = struct{}{}
+	runConfigNames := make(map[string]struct{})
+	workloadConfigNames := make(map[string]struct{})
+
+	for idx := range d.descriptors {
+		desc := &d.descriptors[idx]
+		if desc.scope == ParamScopeRun {
+			runConfigNames[desc.config] = struct{}{}
+		} else {
+			workloadConfigNames[desc.config] = struct{}{}
+		}
 	}
 
-	for _, name := range sortedKeys(d.inputs.Config) {
-		if _, ok := configNames[name]; !ok {
-			d.addError(fmt.Errorf("%w %q", errUnknownConfigParam, name))
+	for _, name := range sortedKeys(d.inputs.RunConfig) {
+		if _, ok := runConfigNames[name]; !ok {
+			d.addError(fmt.Errorf("%w %q", errUnknownRunConfigParam, name))
+		}
+	}
+
+	for _, name := range sortedKeys(d.inputs.WorkloadConfig) {
+		if _, ok := workloadConfigNames[name]; !ok {
+			d.addError(fmt.Errorf("%w %q", errUnknownWorkloadConfig, name))
 		}
 	}
 
@@ -549,9 +586,12 @@ func sortedKeys[V any](values map[string]V) []string {
 
 func (d *Def) schema() []ParamSchema {
 	schema := make([]ParamSchema, len(d.descriptors))
-	for idx, desc := range d.descriptors {
+	for idx := range d.descriptors {
+		desc := &d.descriptors[idx]
 		schema[idx] = ParamSchema{
 			Name:             desc.name,
+			Flag:             "--" + desc.name,
+			Scope:            desc.scope,
 			Type:             desc.typ,
 			Description:      desc.description,
 			Default:          desc.defaultValue,
@@ -562,6 +602,10 @@ func (d *Def) schema() []ParamSchema {
 	}
 
 	slices.SortFunc(schema, func(left, right ParamSchema) int {
+		if left.Scope != right.Scope {
+			return strings.Compare(string(left.Scope), string(right.Scope))
+		}
+
 		return strings.Compare(left.Name, right.Name)
 	})
 
