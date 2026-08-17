@@ -153,17 +153,16 @@ func param(
 	aliases ...string,
 ) bench.ParamSchema {
 	return bench.ParamSchema{
-		Name: name, Type: typ, Default: defaultValue, Env: env,
+		Name: name, Flag: "--" + name, Scope: bench.ParamScopeWorkload,
+		Type: typ, Default: defaultValue, Env: env,
 		LegacyEnvAliases: aliases, Config: config,
 	}
 }
 
 func workloadParams(params []bench.ParamSchema) []bench.ParamSchema {
-	standard := map[string]bool{"duration": true, "executor": true, "iterations": true, "vus": true}
-
 	workload := make([]bench.ParamSchema, 0, len(params))
 	for _, schema := range params {
-		if standard[schema.Name] {
+		if schema.Scope != bench.ParamScopeWorkload {
 			continue
 		}
 
