@@ -78,8 +78,15 @@ CSV example:
 ```
 
 Add driver: package under `pkg/driver/<name>/`, implement `driver.Driver`
-(`Insert`, `RunQuery`, `Begin`, `Teardown`), call `RegisterDriver()` in
-`init()`, and add a blank import in `cmd/stroppy/main.go`.
+(`Insert`, `RunQuery`, `Begin`, `ClassifyError`, `Teardown`), call
+`RegisterDriver()` in `init()`, and add a blank import in `cmd/stroppy/main.go`.
+
+Driver `ClassifyError` methods translate backend errors into `driver.ErrorFacts`;
+they do not choose workload behavior. Transactional workloads build policy with
+`b.TxRetryPolicy(opts)`. Defaults retry serialization, deadlock, lock-timeout,
+and unconditional transient facts; unknown facts return errors. Override selected
+facts per workload with `TxRetryPolicyOptions.Actions`; set `Idempotent` to allow
+conditional transient retries.
 
 ## CLI Usage
 
