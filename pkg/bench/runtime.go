@@ -280,7 +280,7 @@ func defineWorkload(
 	def := newDef(inputs, defaultsOnly)
 
 	iterationOptions := []ParamOption{LegacyEnvAliases("ITER")}
-	if !defaultsOnly && legacyDurationWillInfer(inputs) {
+	if !defaultsOnly && effectiveDurationIsLegacy(inputs) {
 		iterationOptions = nil
 	}
 
@@ -301,9 +301,7 @@ func defineWorkload(
 	return params, def.schema(), errors.Join(defineErr, def.finish())
 }
 
-func legacyDurationWillInfer(inputs ParamInputs) bool {
-	legacyDuration := false
-
+func effectiveDurationIsLegacy(inputs ParamInputs) bool {
 	if _, ok := inputs.CLI["duration"]; ok {
 		return false
 	}
@@ -314,39 +312,13 @@ func legacyDurationWillInfer(inputs ParamInputs) bool {
 	_, configEnvDuration := inputs.LegacyConfigEnv["DURATION"]
 
 	switch {
-	case processDuration:
-		legacyDuration = true
-	case legacyEnvDuration:
-		legacyDuration = true
+	case processDuration, legacyEnvDuration:
+		return true
 	case runConfigDuration:
 		return false
-	case configEnvDuration:
-		legacyDuration = true
+	default:
+		return configEnvDuration
 	}
-
-	return legacyDuration && !executorExplicit(inputs)
-}
-
-func executorExplicit(inputs ParamInputs) bool {
-	if _, ok := inputs.CLI["executor"]; ok {
-		return true
-	}
-
-	if _, ok := os.LookupEnv("EXECUTOR"); ok {
-		return true
-	}
-
-	if _, ok := inputs.LegacyEnv["EXECUTOR"]; ok {
-		return true
-	}
-
-	if _, ok := inputs.RunConfig["executor"]; ok {
-		return true
-	}
-
-	_, ok := inputs.LegacyConfigEnv["EXECUTOR"]
-
-	return ok
 }
 
 func (params *scenarioParams) spec(lg *zap.Logger) (scenarioSpec, error) {

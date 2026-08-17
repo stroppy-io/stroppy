@@ -23,6 +23,7 @@ const DefaultConfigFile = "stroppy-config.json"
 var (
 	errConfigObjectExpected = errors.New("JSON object expected")
 	errDuplicateConfigField = errors.New("duplicate JSON field")
+	errConfigEnvCollision   = errors.New("config env keys collide case-insensitively")
 	errTrailingConfigData   = errors.New("trailing JSON data")
 )
 
@@ -78,14 +79,8 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
 	}
 
-	// Uppercase all env keys for consistency with -e flag behavior.
-	if len(cfg.GetEnv()) > 0 {
-		normalized := make(map[string]string, len(cfg.GetEnv()))
-		for k, v := range cfg.GetEnv() {
-			normalized[strings.ToUpper(k)] = v
-		}
-
-		cfg.Env = normalized
+	if err := normalizeRunConfigEnv(cfg); err != nil {
+		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
 	}
 
 	lg := logger.Global().Named("config_file")
@@ -114,6 +109,36 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 	}
 
 	return &LoadedConfig{RunConfig: cfg, Run: runParams, Params: workloadParams}, true, nil
+}
+
+func normalizeRunConfigEnv(config *stroppy.RunConfig) error {
+	if len(config.GetEnv()) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(config.GetEnv()))
+	for key := range config.GetEnv() {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
+	normalized := make(map[string]string, len(config.GetEnv()))
+	original := make(map[string]string, len(config.GetEnv()))
+
+	for _, key := range keys {
+		upper := strings.ToUpper(key)
+		if previous, exists := original[upper]; exists && previous != key {
+			return fmt.Errorf("%w: %q and %q", errConfigEnvCollision, previous, key)
+		}
+
+		normalized[upper] = config.GetEnv()[key]
+		original[upper] = key
+	}
+
+	config.Env = normalized
+
+	return nil
 }
 
 func takeParamScope(fields map[string]json.RawMessage, name string) (map[string]json.RawMessage, error) {

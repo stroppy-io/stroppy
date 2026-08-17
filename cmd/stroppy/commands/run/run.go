@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
 	"github.com/stroppy-io/stroppy/internal/version"
@@ -27,6 +28,8 @@ const (
 	flagSteps        = "--steps"
 	flagNoSteps      = "--no-steps"
 	flagDriverOpt    = "--driver-opt"
+	sqlBodyEnv       = "STROPPY_SQL_BODY"
+	sqlFileEnv       = "SQL_FILE"
 )
 
 var (
@@ -107,6 +110,10 @@ Config file flags:
 			return invalidConfig(err)
 		}
 
+		if parsed.help && parsed.scriptArg != "" {
+			return printSelectedWorkloadHelp(cmd, parsed.scriptArg, parsed.sqlArg)
+		}
+
 		// Load config file if -f is specified or stroppy-config.json exists.
 		fileConfig, _, err := runner.LoadRunConfig(parsed.fileArg)
 		if err != nil {
@@ -124,17 +131,7 @@ Config file flags:
 				return cmd.Help()
 			}
 
-			describeName := scriptArg
-			if name, _, _, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
-				describeName = name
-			}
-
-			description, err := bench.Describe(describeName)
-			if err != nil {
-				return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
-			}
-
-			return printWorkloadHelp(cmd, description)
+			return printSelectedWorkloadHelp(cmd, scriptArg, sqlArg)
 		}
 
 		if scriptArg == "" {
@@ -209,17 +206,22 @@ Config file flags:
 		// (STROPPY_SQL_BODY for inline, SQL_FILE for a path) — replacing the TS wrapper.
 		// Checked before the registered-name lookup so the preset's sql arg is honored.
 		if name, body, file, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
-			if body != "" {
-				envOverrides["STROPPY_SQL_BODY"] = body
-				rootEnv["STROPPY_SQL_BODY"] = body
-			} else if file != "" {
-				envOverrides["SQL_FILE"] = file
-				rootEnv["SQL_FILE"] = file
+			sqlSource := resolveSQLSource(
+				&parsed,
+				body,
+				file,
+				envOverrides,
+				paramInputs.LegacyConfigEnv,
+			)
+			applySQLSource(rootEnv, sqlSource)
+
+			run := func() error {
+				return runGoWorkload(
+					name, steps, noSteps, rootEnv, paramInputs, driverConfigs, metricsConfig(loadedRunConfig(fileConfig)),
+				)
 			}
 
-			return runGoWorkload(
-				name, steps, noSteps, rootEnv, paramInputs, driverConfigs, metricsConfig(loadedRunConfig(fileConfig)),
-			)
+			return withProcessSQLSource(sqlSource, run)
 		}
 
 		// Go-native workload: if a Go workload is registered under the bare
@@ -285,6 +287,20 @@ func metricsConfig(config *stroppy.RunConfig) *bench.MetricsConfig {
 	metrics.Prefix = export.GetOtlpMetricsPrefix()
 
 	return metrics
+}
+
+func printSelectedWorkloadHelp(cmd *cobra.Command, scriptArg, sqlArg string) error {
+	describeName := scriptArg
+	if name, _, _, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
+		describeName = name
+	}
+
+	description, err := bench.Describe(describeName)
+	if err != nil {
+		return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
+	}
+
+	return printWorkloadHelp(cmd, description)
 }
 
 func printWorkloadHelp(cmd *cobra.Command, description bench.Description) error {
@@ -360,6 +376,121 @@ func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bo
 	}
 
 	return "", "", "", false
+}
+
+type sqlSource struct {
+	envKey      string
+	value       string
+	explicitCLI bool
+}
+
+func resolveSQLSource(
+	parsed *runArgs,
+	routeBody, routeFile string,
+	cliEnv, configEnv map[string]string,
+) sqlSource {
+	if file, ok := parsed.typedParams["sql-file"]; ok {
+		return sqlSource{envKey: sqlFileEnv, value: file, explicitCLI: true}
+	}
+
+	routeSource := sqlSourceFor(routeBody, routeFile)
+	if routeSource.envKey != "" && explicitCLISQLSource(parsed) {
+		routeSource.explicitCLI = true
+
+		return routeSource
+	}
+
+	if source := sqlSourceFromProcess(); source.envKey != "" {
+		return source
+	}
+
+	if source := sqlSourceFromMap(cliEnv); source.envKey != "" {
+		return source
+	}
+
+	if routeSource.envKey != "" {
+		return routeSource
+	}
+
+	return sqlSourceFromMap(configEnv)
+}
+
+func explicitCLISQLSource(parsed *runArgs) bool {
+	return parsed.sqlArg != "" ||
+		strings.Contains(parsed.scriptArg, " ") ||
+		strings.HasSuffix(parsed.scriptArg, ".sql")
+}
+
+func sqlSourceFor(body, file string) sqlSource {
+	if body != "" {
+		return sqlSource{envKey: sqlBodyEnv, value: body}
+	}
+
+	if file != "" {
+		return sqlSource{envKey: sqlFileEnv, value: file}
+	}
+
+	return sqlSource{}
+}
+
+func sqlSourceFromProcess() sqlSource {
+	if body, ok := os.LookupEnv(sqlBodyEnv); ok && body != "" {
+		return sqlSource{envKey: sqlBodyEnv, value: body}
+	}
+
+	if file, ok := os.LookupEnv(sqlFileEnv); ok && file != "" {
+		return sqlSource{envKey: sqlFileEnv, value: file}
+	}
+
+	return sqlSource{}
+}
+
+func sqlSourceFromMap(values map[string]string) sqlSource {
+	return sqlSourceFor(values[sqlBodyEnv], values[sqlFileEnv])
+}
+
+func applySQLSource(env map[string]string, source sqlSource) {
+	delete(env, sqlBodyEnv)
+	delete(env, sqlFileEnv)
+
+	if source.envKey != "" {
+		env[source.envKey] = source.value
+	}
+}
+
+func withProcessSQLSource(source sqlSource, run func() error) error {
+	if !source.explicitCLI {
+		return run()
+	}
+
+	body, bodySet := os.LookupEnv(sqlBodyEnv)
+	file, fileSet := os.LookupEnv(sqlFileEnv)
+
+	applyProcessSQLSource(source)
+
+	defer restoreProcessEnv(sqlBodyEnv, body, bodySet)
+	defer restoreProcessEnv(sqlFileEnv, file, fileSet)
+
+	return run()
+}
+
+func applyProcessSQLSource(source sqlSource) {
+	_ = os.Unsetenv(sqlBodyEnv)
+	_ = os.Unsetenv(sqlFileEnv)
+
+	if source.envKey != "" {
+		_ = os.Setenv(source.envKey, source.value)
+	}
+}
+
+func restoreProcessEnv(name, value string, set bool) {
+	if set {
+		_ = os.Setenv(name, value)
+
+		return
+	}
+
+	_ = os.Unsetenv(name)
 }
 
 // runGoWorkload dispatches to the Go-native bench engine. Driver CLI configs are
@@ -505,8 +636,8 @@ func applyDriverExtras(idx int, config *stroppy.DriverConfig, extras map[string]
 		return fmt.Errorf("driver %d extra config: %w", idx, err)
 	}
 
-	if extraConfig.GetDriverSpecific() == nil && hasPool {
-		if err := applyPoolDriverSpecific(config.GetDriverType(), pool, extraConfig); err != nil {
+	if hasPool {
+		if err := mergePoolDriverSpecific(config.GetDriverType(), pool, extraConfig); err != nil {
 			return fmt.Errorf("driver %d pool config: %w", idx, err)
 		}
 	}
@@ -535,7 +666,7 @@ func popDriverExtra(values map[string]any, names ...string) (any, bool) {
 	return nil, false
 }
 
-func applyPoolDriverSpecific(
+func mergePoolDriverSpecific(
 	driverType stroppy.DriverConfig_DriverType,
 	pool any,
 	config *stroppy.DriverConfig,
@@ -553,6 +684,10 @@ func applyPoolDriverSpecific(
 			return err
 		}
 
+		if specific := config.GetPostgres(); specific != nil {
+			proto.Merge(postgres, specific)
+		}
+
 		config.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: postgres}
 
 		return nil
@@ -561,6 +696,10 @@ func applyPoolDriverSpecific(
 	sqlConfig := &stroppy.DriverConfig_SqlConfig{}
 	if err := unmarshal.Unmarshal(data, sqlConfig); err != nil {
 		return err
+	}
+
+	if specific := config.GetSql(); specific != nil {
+		proto.Merge(sqlConfig, specific)
 	}
 
 	config.DriverSpecific = &stroppy.DriverConfig_Sql{Sql: sqlConfig}

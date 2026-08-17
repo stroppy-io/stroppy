@@ -527,6 +527,8 @@ func TestParseRunArgs(t *testing.T) {
 }
 
 func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
+	unsetRunTestEnv(t, "POOL_SIZE")
+
 	merged := mergeLegacyEnv(
 		map[string]string{"CONFIG_ONLY": "file", "SHARED": "file"},
 		map[string]string{"CLI_ONLY": "cli", "SHARED": "cli"},
@@ -544,6 +546,7 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 	errorMode := "throw"
 	bulkSize := int32(20)
 	maxConns := int32(7)
+	statementCache := int32(13)
 
 	configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*stroppy.DriverRunConfig{
 		0: {
@@ -552,6 +555,7 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 			ErrorMode:  &errorMode,
 			BulkSize:   &bulkSize,
 			Pool:       &stroppy.DriverRunConfig_PoolConfig{MaxConns: &maxConns},
+			Postgres:   &stroppy.DriverConfig_PostgresConfig{StatementCacheCapacity: &statementCache},
 		},
 	})
 	if err != nil {
@@ -574,9 +578,124 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 	if runtimeConfig.GetUrl() != "postgres://cli" ||
 		runtimeConfig.GetBulkSize() != 20 ||
 		runtimeConfig.GetErrorMode() != stroppy.DriverConfig_ERROR_MODE_THROW ||
-		runtimeConfig.GetPostgres().GetMaxConns() != 7 {
+		runtimeConfig.GetPostgres().GetMaxConns() != 7 ||
+		runtimeConfig.GetPostgres().GetStatementCacheCapacity() != 13 {
 		t.Fatalf("runtime driver config = %#v, extra = %#v", runtimeConfig, configs[0].Extra)
 	}
+
+	mysql := "mysql"
+	maxOpenConns := int32(9)
+	maxIdleConns := int32(4)
+
+	configs, err = runner.DriverCLIConfigsFromFile(map[uint32]*stroppy.DriverRunConfig{
+		0: {
+			DriverType: &mysql,
+			Pool:       &stroppy.DriverRunConfig_PoolConfig{MaxOpenConns: &maxOpenConns},
+			Sql:        &stroppy.DriverConfig_SqlConfig{MaxIdleConns: &maxIdleConns},
+		},
+	})
+	if err != nil {
+		t.Fatalf("DriverCLIConfigsFromFile(mysql) error = %v", err)
+	}
+
+	runtimeConfig, err = buildDriverConfig(0, configs[0], nil)
+	if err != nil {
+		t.Fatalf("buildDriverConfig(mysql) error = %v", err)
+	}
+
+	if runtimeConfig.GetSql().GetMaxOpenConns() != 9 || runtimeConfig.GetSql().GetMaxIdleConns() != 4 {
+		t.Fatalf("runtime mysql driver config = %#v", runtimeConfig)
+	}
+}
+
+func TestResolveSQLSourcePrecedence(t *testing.T) {
+	t.Run("CLI SQL positional beats config inline body", func(t *testing.T) {
+		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
+
+		source := resolveSQLSource(
+			&runArgs{scriptArg: "execute_sql", sqlArg: "cli.sql"},
+			"",
+			"cli.sql",
+			nil,
+			map[string]string{sqlBodyEnv: "select 'config'"},
+		)
+		if source.envKey != sqlFileEnv || source.value != "cli.sql" || !source.explicitCLI {
+			t.Fatalf("source = %#v", source)
+		}
+
+		env := map[string]string{sqlBodyEnv: "select 'config'"}
+		applySQLSource(env, source)
+
+		if !maps.Equal(env, map[string]string{sqlFileEnv: "cli.sql"}) {
+			t.Fatalf("resolved env = %v", env)
+		}
+	})
+
+	t.Run("typed CLI sql-file beats process and config body", func(t *testing.T) {
+		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
+		t.Setenv(sqlBodyEnv, "select 'process'")
+
+		source := resolveSQLSource(
+			&runArgs{typedParams: map[string]string{"sql-file": "typed.sql"}},
+			"select 'config route'",
+			"",
+			nil,
+			map[string]string{sqlBodyEnv: "select 'config env'"},
+		)
+		if source.envKey != sqlFileEnv || source.value != "typed.sql" || !source.explicitCLI {
+			t.Fatalf("source = %#v", source)
+		}
+	})
+
+	t.Run("CLI inline SQL masks process file", func(t *testing.T) {
+		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
+		t.Setenv(sqlFileEnv, "process.sql")
+
+		source := resolveSQLSource(
+			&runArgs{scriptArg: "select 1"},
+			"--= query\nselect 1;\n",
+			"",
+			nil,
+			nil,
+		)
+		if !source.explicitCLI || source.envKey != sqlBodyEnv {
+			t.Fatalf("source = %#v", source)
+		}
+
+		if err := withProcessSQLSource(source, func() error {
+			if body := os.Getenv(sqlBodyEnv); body != source.value {
+				t.Fatalf("process body = %q", body)
+			}
+
+			if _, ok := os.LookupEnv(sqlFileEnv); ok {
+				t.Fatal("process SQL_FILE was not masked")
+			}
+
+			return nil
+		}); err != nil {
+			t.Fatalf("withProcessSQLSource() error = %v", err)
+		}
+
+		if file := os.Getenv(sqlFileEnv); file != "process.sql" {
+			t.Fatalf("process SQL_FILE was not restored: %q", file)
+		}
+	})
+
+	t.Run("process beats legacy and config sources", func(t *testing.T) {
+		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
+		t.Setenv(sqlFileEnv, "process.sql")
+
+		source := resolveSQLSource(
+			&runArgs{},
+			"select 'config route'",
+			"",
+			map[string]string{sqlBodyEnv: "select '-e'"},
+			map[string]string{sqlBodyEnv: "select 'config env'"},
+		)
+		if source.envKey != sqlFileEnv || source.value != "process.sql" {
+			t.Fatalf("source = %#v", source)
+		}
+	})
 }
 
 func TestBuildDriverConfigReturnsJSONConversionErrors(t *testing.T) {
@@ -597,7 +716,14 @@ func TestDynamicWorkloadHelpAndBadTypedParam(t *testing.T) {
 	var output bytes.Buffer
 	Cmd.SetOut(&output)
 
-	if err := Cmd.RunE(Cmd, []string{"test/run-typed-params", "--help"}); err != nil {
+	malformedConfig := t.TempDir() + "/stroppy-config.json"
+	if err := os.WriteFile(malformedConfig, []byte(`{malformed`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if err := Cmd.RunE(Cmd, []string{
+		"-f", malformedConfig, "test/run-typed-params", "--help",
+	}); err != nil {
 		t.Fatalf("RunE(help) error = %v", err)
 	}
 
@@ -877,6 +1003,25 @@ func TestToEnvVarsSetsWhenNotInEnv(t *testing.T) {
 
 	if len(envs) == 0 {
 		t.Fatal("expected STROPPY_DRIVER_0 to be set")
+	}
+}
+
+func unsetRunTestEnv(t *testing.T, names ...string) {
+	t.Helper()
+
+	for _, name := range names {
+		value, set := os.LookupEnv(name)
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatalf("Unsetenv(%q) error = %v", name, err)
+		}
+
+		t.Cleanup(func() {
+			if set {
+				_ = os.Setenv(name, value)
+			} else {
+				_ = os.Unsetenv(name)
+			}
+		})
 	}
 }
 

@@ -588,6 +588,10 @@ func TestScenarioLegacyDurationIgnoresLegacyIterations(t *testing.T) {
 		"legacy -e": {
 			LegacyEnv: map[string]string{"DURATION": "2s", "ITER": "0"},
 		},
+		"legacy -e with explicit constant-vus": {
+			CLI:       map[string]string{"executor": "constant-vus"},
+			LegacyEnv: map[string]string{"DURATION": "2s", "ITER": "invalid"},
+		},
 		"legacy config env": {
 			LegacyConfigEnv: map[string]string{"DURATION": "2s", "ITER": "invalid"},
 		},
@@ -603,12 +607,26 @@ func TestScenarioLegacyDurationIgnoresLegacyIterations(t *testing.T) {
 func TestScenarioLegacyDurationStillValidatesTypedIterations(t *testing.T) {
 	clearScenarioEnv(t)
 
-	_, err := scenarioForTest(ParamInputs{
-		CLI:       map[string]string{"iterations": "0"},
-		LegacyEnv: map[string]string{"DURATION": "2s"},
-	}, zap.NewNop())
-	if err == nil || !strings.Contains(err.Error(), "iterations must be at least 1") {
-		t.Fatalf("typed iterations error = %v", err)
+	for name, inputs := range map[string]ParamInputs{
+		"CLI": {
+			CLI: map[string]string{
+				"executor":   "constant-vus",
+				"iterations": "0",
+			},
+			LegacyEnv: map[string]string{"DURATION": "2s"},
+		},
+		"run config": {
+			CLI:       map[string]string{"executor": "constant-vus"},
+			RunConfig: map[string]json.RawMessage{"iterations": json.RawMessage(`0`)},
+			LegacyEnv: map[string]string{"DURATION": "2s"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := scenarioForTest(inputs, zap.NewNop())
+			if err == nil || !strings.Contains(err.Error(), "iterations must be at least 1") {
+				t.Fatalf("typed iterations error = %v", err)
+			}
+		})
 	}
 }
 

@@ -165,6 +165,15 @@ func TestLoadRunConfig_RejectsInvalidParameterScopes(t *testing.T) {
 	}
 }
 
+func TestLoadRunConfigRejectsCaseInsensitiveEnvCollisions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"env":{"vus":"1","VUS":"2"}}`), 0o600))
+
+	_, _, err := runner.LoadRunConfig(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `config env keys collide case-insensitively: "VUS" and "vus"`)
+}
+
 func TestBuildProbeEnvFromRunConfigIncludesFileDriver(t *testing.T) {
 	cfg := &stroppy.RunConfig{
 		Env: map[string]string{"WAREHOUSES": "10"},
