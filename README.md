@@ -55,7 +55,7 @@ stroppy run tpcc/tx           # TPC-C, raw transactions (any DB)
 stroppy run tpcc/procs        # TPC-C, stored procedures (pg/mysql)
 stroppy run tpcb/tx           # TPC-B, raw transactions (any DB)
 stroppy run tpch/tx           # TPC-H, relational load + query suite
-stroppy run tpcds -e SCALE_FACTOR=1   # TPC-DS, load 24 tables + 99 queries
+stroppy run tpcds --scale-factor 1   # TPC-DS, load 24 tables + 99 queries
 stroppy run queries.sql       # execute a SQL file
 stroppy run "select 1"        # execute inline SQL
 ```
@@ -66,7 +66,7 @@ TPC-B and TPC-C each ship two variants:
 
 TPC-H loads all eight tables and runs the 22 query suite. TPC-DS generates and
 loads all 24 tables (faithful `dsdgen` port) and runs the 99 query suite; scale
-either via `SCALE_FACTOR`.
+either via `--scale-factor`.
 
 Use `-d` to select a driver preset and `-D` to override driver options:
 
@@ -78,24 +78,36 @@ stroppy run tpcc/tx -d pg -d1 mysql        # two drivers
 stroppy run simple -d noop                  # framework/runner overhead only
 ```
 
-Pass environment variables to the workload with `-e` (keys are auto-uppercased).
-Concurrency is configured via env, not CLI flags:
+Registered workloads expose typed direct flags. Select the executor explicitly;
+use `stroppy run <workload> --help` to inspect that workload's parameters:
 
 ```bash
-stroppy run tpcc/tx -e VUS=10 -e DURATION=60s     # throughput run
-stroppy run tpcc/tx -e ITER=100                   # fixed-iteration power run
-stroppy run tpcc/tx -e pool_size=200
-stroppy run tpcc/tx -d pg -e load_workers=8       # parallelize load_data
+stroppy run tpcc/tx --executor constant-vus --vus 10 --duration 60s
+stroppy run tpcc/tx --executor shared-iterations --iterations 100
+stroppy run tpcc/tx --scale-factor 10 --load-workers 8
+stroppy run tpcc/tx -e pool_size=200   # legacy env compatibility
 ```
 
-Collect repeated settings in `stroppy-config.json` or an explicit `-f` file:
+Collect repeated settings in `stroppy-config.json` or an explicit `-f` file.
+Typed scenario parameters belong under `run`, workload parameters under `params`,
+and the string-valued `env` map remains available for compatibility:
+
+```json
+{
+  "script": "tpcc/tx",
+  "run": {"executor": "constant-vus", "vus": 10, "duration": "60s"},
+  "params": {"scaleFactor": 10, "loadWorkers": 8}
+}
+```
 
 ```bash
 stroppy run -f prod.json
 ```
 
-Precedence is: real environment > `-e` > config `env` > `-d/-D` >
-config `drivers` > workload defaults.
+Typed parameter precedence is: CLI flag > process environment > `-e` > matching
+`run`/`params` config > config `env` > declared default. Driver precedence is
+`-d/-D` > config `drivers`. Legacy `DURATION` inference remains compatible but
+warns; use an explicit executor.
 
 Use `stroppy help` to explore available topics:
 
@@ -106,8 +118,8 @@ stroppy help config-file
 
 ### Probe
 
-Probe lists the embedded workload presets and the insert methods each driver
-supports:
+Probe lists registered workload parameter schemas, embedded presets, and the insert
+methods each driver supports:
 
 ```bash
 stroppy probe

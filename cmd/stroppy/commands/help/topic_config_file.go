@@ -97,7 +97,9 @@ PRECEDENCE (highest to lowest)
 
   There is no "--" k6-args passthrough and no k6Args field in effect.
   Use typed executor/vus/iterations/duration parameters; legacy
-  VUS/DURATION/ITER environment values remain compatible.
+  VUS/DURATION/ITER environment values remain compatible. Legacy DURATION
+  without an explicit executor infers constant-vus and emits a warning; prefer
+  an explicit "run.executor" value.
 
 DEBUG LOGGING
 

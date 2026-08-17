@@ -104,8 +104,14 @@ conditional transient retries.
 - `-D key=value` — override driver field (url, driverType, defaultTxIsolation, errorMode, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
 - `-d1 <preset>`, `-D1 key=value` — same for second driver index (multi-driver workloads)
 
-**Env flags:**
-- `-e KEY=VALUE` — set workload env value (uppercased); takes precedence over config file and workload defaults
+**Workload and run parameters:**
+- Registered workloads expose typed `--name VALUE` flags. Run
+  `stroppy run <workload> --help` to see the selected workload's schema.
+- Shared run flags: `--executor`, `--vus`, `--iterations`, `--duration`.
+- Workload flags include `--scale-factor`, `--load-workers`, and other
+  workload-specific declarations.
+- `-e KEY=VALUE` remains a compatibility input; keys are uppercased. Multiple
+  `-e` flags accumulate.
 
 **Step control:**
 - `--steps step1,step2` — run only listed steps
@@ -115,28 +121,44 @@ conditional transient retries.
 **Config file:**
 - Default: `stroppy-config.json` in cwd (auto-loaded if present)
 - `-f prod.json` — explicit path
-- Precedence (highest→lowest): real env > `-e` > config `env` > `-d/-D` > config `drivers` > workload defaults
+- Typed scenario parameters go under `run`; selected-workload parameters go
+  under `params`. The legacy string-valued `env` map remains compatible.
+- Typed parameter precedence (highest→lowest): typed CLI > process env > `-e` >
+  matching typed config (`run`/`params`) > config `env` > declared default.
+- Driver precedence is `-d/-D` > config `drivers`.
 
-There is **no** `--` k6-args passthrough. Concurrency is env-driven (see Scenario selection).
+```json
+{
+  "script": "tpcc/tx",
+  "run": {"executor": "constant-vus", "vus": 10, "duration": "60s"},
+  "params": {"scaleFactor": 10, "loadWorkers": 8}
+}
+```
+
+There is **no** `--` k6-args passthrough. Select the executor explicitly with
+`--executor shared-iterations` or `--executor constant-vus`.
 
 **Examples:**
 ```bash
 # TPC-C with postgres, 10 VUs for 60s
-./build/stroppy run tpcc/tx -d pg -D url=postgres://... -e VUS=10 -e DURATION=60s
+./build/stroppy run tpcc/tx -d pg -D url=postgres://... \
+  --executor constant-vus --vus 10 --duration 60s
 
 # TPC-C with picodata, local SQL file (no rebuild needed)
 ./build/stroppy run tpcc/tx ./workloads/tpcc/pico.sql -d pico -D url=http://...
 
 # TPC-B fixed-iteration power run
-./build/stroppy run tpcb/tx -d pg -D url=postgres://... -e ITER=100
+./build/stroppy run tpcb/tx -d pg -D url=postgres://... \
+  --executor shared-iterations --iterations 100
 
 # TPC-H
-./build/stroppy run tpch/tx -d pg -D url=postgres://... -e SCALE_FACTOR=0.01
+./build/stroppy run tpch/tx -d pg -D url=postgres://... --scale-factor 0.01
 
 # Noop overhead benchmark
-./build/stroppy run simple -d noop -e VUS=4 -e DURATION=10s
+./build/stroppy run simple -d noop \
+  --executor constant-vus --vus 4 --duration 10s
 
-# Probe: list embedded presets + driver insert methods
+# Probe: list workload schemas, embedded presets, and driver insert methods
 ./build/stroppy probe
 ```
 
@@ -172,15 +194,17 @@ Relational loads use `b.Step("load_data", ...)` and `b.Insert(ctx, req)` with
 a `driver.InsertRequest`. `LOAD_WORKERS` controls the per-request worker
 fan-out where wired:
 ```bash
-./build/stroppy run tpcc/tx -d pg -e LOAD_WORKERS=8 --steps drop_schema,create_schema,load_data
+./build/stroppy run tpcc/tx -d pg --load-workers 8 --steps drop_schema,create_schema,load_data
 ```
 
-**Scenario selection** (`readScenario` in `pkg/bench/runtime.go`, env-driven):
-- `DURATION` set → `constant-vus` executor (throughput run)
-- `DURATION` unset → `shared-iterations` executor (power run)
-- Tune via env `VUS` / `DURATION` / `ITER`. There are no k6 shortflags.
+**Scenario selection** (typed run parameters in `pkg/bench/runtime.go`):
+- `--executor shared-iterations --iterations N` → power run; VUs share N iterations.
+- `--executor constant-vus --vus N --duration 60s` → throughput run.
+- `--vus` applies to either executor. There are no k6 shortflags.
+- Legacy `DURATION` without an explicit executor still infers `constant-vus` and
+  emits a warning; use an explicit executor in new invocations and config.
 
-**SCALE_FACTOR semantics** differ by workload: tpcb and tpcc take an INTEGER (≥1, = branch/warehouse count); tpch and tpcds take a FRACTIONAL row-scale (0.01 ok). tpcds also carries fixed-size static dims (~1.9M rows for `customer_demographics`) that do not shrink with SF.
+**`--scale-factor` semantics** differ by workload: tpcb and tpcc take an INTEGER (≥1, = branch/warehouse count); tpch and tpcds take a FRACTIONAL row-scale (0.01 ok). tpcds also carries fixed-size static dims (~1.9M rows for `customer_demographics`) that do not shrink with SF.
 
 **Setup vs executor:** the data load lives in the workload body guarded by
 `GlobalOnce` (a once-per-process barrier), not in a separate setup phase with
@@ -191,7 +215,7 @@ Isolation by driver in the `tx` variants:
 - mysql → `read_committed`
 - picodata → `"none"` (**not** `"conn"` — `Begin()` always errors)
 - ydb → `serializable`
-- Override: `-e TX_ISOLATION=...`
+- Override: `--tx-isolation <name>` (`-e TX_ISOLATION=...` remains compatible)
 
 Full isolation type names: `read_uncommitted`, `read_committed`, `repeatable_read`, `serializable`, `db_default`, `conn`, `none`
 

@@ -28,18 +28,18 @@ Replace `pg` with `mysql`, `pico`, or `ydb` to change driver.
 ./build/stroppy run ./workloads/tpcb/tx.ts \
   -D url='/tmp/tpcb-csv?merge=true&workload=tpcb' \
   -D driverType=csv \
-  -e SCALE_FACTOR=1 \
+  --scale-factor 1 \
   --steps drop_schema,create_schema,load_data
 
 # Stored-procs variant (pg / mysql only)
 ./build/stroppy run tpcb/procs -d pg
 ```
 
-Useful env overrides:
+Useful parameters (`stroppy run tpcb/tx --help` lists the full schema):
 
 ```bash
--e scale_factor=10     # N branches × 10 tellers × 100_000 accounts
--e pool_size=200       # per-VU connection pool size
+--scale-factor 10       # N branches × 10 tellers × 100_000 accounts
+-e pool_size=200        # compatibility override for the driver pool size
 ```
 
 ## Steps
@@ -73,22 +73,23 @@ go test -tags=integration -run TestTpcbWorkloadEndToEnd ./test/integration/... -
 
 ## Run shapes and the two-run flow
 
-All TPC workloads share one set of run knobs (set with `-e KEY=VALUE`, **not** the
-`-u/-d/-i` k6 shortcuts, which would discard the scenario):
+All TPC workloads share typed run flags:
 
-- `DURATION` set → fixed-duration throughput test (constant `VUS`); result is TPS.
-- `DURATION` unset → power test (`ITER` iterations); result is elapsed time.
-- `MAX_DURATION` (default `24h`) lifts k6's 10-minute per-iteration cap for large loads.
-- `PG_UNLOGGED=true` enables the PostgreSQL `UNLOGGED` bulk-load dance (off by default).
+- `--executor shared-iterations --iterations N` runs a fixed iteration count.
+- `--executor constant-vus --vus N --duration 1h` runs a throughput test.
+- `--pg-unlogged` enables the PostgreSQL `UNLOGGED` bulk-load dance.
+
+Select the executor explicitly. Legacy `DURATION` without an executor remains
+compatible, infers `constant-vus`, and emits a warning.
 
 The measured workload is a single gatable `workload` step, so prep and measurement
 can run as two passes for a throughput number uncontaminated by load time:
 
 ```bash
 # 1. load only (drop / create / load / create_indexes / analyze), no workload
-./build/stroppy run <workload> -e SCALE_FACTOR=10 --no-steps workload
+./build/stroppy run <workload> --scale-factor 10 --no-steps workload
 # 2. measure only, against the already-loaded data
-./build/stroppy run <workload> -e VUS=64 -e DURATION=1h --steps workload
+./build/stroppy run <workload> --executor constant-vus --vus 64 --duration 1h --steps workload
 ```
 
 A normal single run (no `--steps`) loads and measures in one pass.

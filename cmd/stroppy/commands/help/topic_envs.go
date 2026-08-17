@@ -3,123 +3,97 @@ package help
 func init() {
 	Register(Topic{
 		Name:  "envs",
-		Short: "Environment variables, scenario selection, and -e overrides",
-		Long: `ENVS
+		Short: "Typed parameters, environment compatibility, and precedence",
+		Long: `ENVS AND TYPED PARAMETERS
 
-  Stroppy workloads read their configuration through environment variables.
-  The Go engine exposes them via the Env/EnvInt helpers in pkg/bench; real
-  process env always takes precedence over -e and config-file values.
+  Registered workloads declare typed run and workload parameters. Set them with
+  direct flags and inspect the selected schema dynamically:
 
-  There is no k6, no __ENV global, and no ENV() TypeScript helper — those
-  belonged to the removed script runtime.
+    stroppy run tpcc/tx --help
+    stroppy run tpcc/tx --scale-factor 10 --load-workers 8
 
-SETTING VALUES
+  Scenario parameters are shared by every workload:
 
-  Export variables in your shell before running:
+    --executor     shared-iterations or constant-vus
+    --vus          Number of virtual users
+    --iterations   Total shared iterations
+    --duration     Run length as a Go duration, e.g. 60s or 10m
 
-    export WAREHOUSES=50
-    stroppy run tpcc/tx
-
-  Or set them inline for a single run:
-
-    WAREHOUSES=50 stroppy run tpcc/tx
-
-  Or use stroppy's -e/--env flag. Keys are uppercased, so the following
-  are equivalent:
-
-    stroppy run tpcc/tx -e warehouses=20 -e pool_size=50
-    stroppy run tpcc/tx -e WAREHOUSES=20 -e POOL_SIZE=50
-
-  Multiple -e flags accumulate.
-
-SCENARIO SELECTION
-
-  The bench engine chooses an executor from env (see readScenario in
-  pkg/bench/runtime.go):
-
-    DURATION set   -> constant-vus executor (throughput run)
-                      VUs spin for the given duration.
-    DURATION unset -> shared-iterations executor (power run)
-                      VUs share a fixed iteration count.
-
-  Tune with:
-    VUS       int           Number of virtual users (default 1)
-    DURATION  Go duration   Throughput run length, e.g. "60s", "10m"
-    ITER      int           Total iterations for power runs (default 1)
-
-  Examples:
+  Select the executor explicitly. Examples:
 
     # TPC-C throughput: 10 VUs for 60 seconds
-    stroppy run tpcc/tx -d pg -e VUS=10 -e DURATION=60s
+    stroppy run tpcc/tx -d pg --executor constant-vus --vus 10 --duration 60s
 
     # TPC-B fixed-iteration power run
-    stroppy run tpcb/tx -d pg -e ITER=100
+    stroppy run tpcb/tx -d pg --executor shared-iterations --iterations 100
 
-  There are no k6 shortflags and no "--" passthrough. Configure concurrency
-  exclusively via VUS / DURATION / ITER.
+SOURCES AND PRECEDENCE
 
-PER-WORKLOAD VARIABLES
+  Every declared parameter has a direct flag, projected environment name, typed
+  config key, and default. Some also accept legacy environment aliases. Source
+  precedence, highest to lowest:
 
-  Each workload documents its own env vars; common ones:
+    1. Typed --name CLI flag
+    2. Process environment
+    3. -e KEY=VALUE compatibility override
+    4. Matching typed config object ("run" or "params")
+    5. Config file "env" map
+    6. Declared default
 
-    SCALE_FACTOR  tpcb/tpcc: integer branch/warehouse count (>=1)
-                  tpch/tpcds: fractional row scale (e.g. 0.01)
-    WAREHOUSES    Alias used by tpcc
-    LOAD_WORKERS  Per-table InsertSpec fan-out where wired
-    TX_ISOLATION  Override per-driver isolation default
-    POOL_SIZE     Postgres-only shorthand: sets pgx MinConns=MaxConns
-    SQL_FILE      SQL file path for execute_sql workload
+  Process environment examples:
 
-  Driver-specific isolation defaults (tx variants):
-    postgres -> read_committed
-    mysql    -> read_committed
-    picodata -> "none"  (Begin() always errors; do NOT use "conn")
-    ydb      -> serializable
+    SCALE_FACTOR=10 stroppy run tpcc/tx
+    export LOAD_WORKERS=8
 
-  Full isolation names: read_uncommitted, read_committed, repeatable_read,
-  serializable, db_default, conn, none.
+  The repeatable -e/--env flag remains available for compatibility. Keys are
+  uppercased:
 
-PROBE
+    stroppy run tpcc/tx -e warehouses=10 -e load_workers=8
 
-  'stroppy probe' lists embedded workload presets and the SQL dialects/docs
-  each ships with. It does not enumerate per-workload env vars — read the
-  workload source (internal/workloads/<name>/) or its .sql file for the
-  authoritative list.
+  Legacy DURATION without an explicit executor still infers constant-vus and
+  emits a warning. Prefer --executor constant-vus, or "run.executor" in config,
+  so the run shape is unambiguous. There are no k6 shortflags or "--" passthrough.
 
-  stroppy probe
-  stroppy probe -o json
+DISCOVERY
 
-CONFIG FILE ALTERNATIVE
+  'stroppy probe' lists registered workloads and their typed parameter flags.
+  JSON output includes each parameter's name, scope, type, description, default,
+  environment names, legacy aliases, and config key:
 
-  Instead of repeating -e flags, collect env overrides in a config file
-  under the "env" key:
+    stroppy probe
+    stroppy probe -o json
+
+  Use 'stroppy run <workload> --help' for the detailed selected-workload view.
+
+CONFIG FILE
+
+  Typed scenario values belong under "run" and workload-specific values under
+  "params". The legacy string-valued "env" map remains supported:
 
     {
+      "run": {
+        "executor": "constant-vus",
+        "vus": 10,
+        "duration": "60s"
+      },
+      "params": {
+        "scaleFactor": 10,
+        "loadWorkers": 8
+      },
       "env": {
-        "WAREHOUSES": "10",
         "POOL_SIZE": "200"
       }
     }
 
-  Precedence: real env > -e flags > config file env > workload defaults.
-  See 'stroppy help config-file' for the full format and precedence rules.
-
-DEBUG: TRACING ENV RESOLUTION
-
-  At LOG_LEVEL=debug the engine logs env precedence decisions:
-
-    LOG_LEVEL=debug stroppy run tpcc/tx -e load_workers=8
-
-  The env_override logger emits a debug line whenever the real environment
-  takes precedence over a -e flag or config-file entry, identifying the
-  key that was skipped.
+  The selected workload's runtime schema validates typed names and values. See
+  'stroppy help config-file' for the full file format.
 
 SEE ALSO
 
-  stroppy run --help
-  stroppy help drivers
+  stroppy run <workload> --help
+  stroppy help probe
   stroppy help config-file
-  stroppy help steps
+  stroppy help drivers
 `,
 	})
 }

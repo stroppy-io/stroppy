@@ -25,30 +25,30 @@ spec-mandated ratios.
 ./build/stroppy run tpcc/procs -d pg
 ```
 
-Useful env overrides:
+Useful parameters (`stroppy run tpcc/tx --help` lists the full schema):
 
 ```bash
--e warehouses=1        # scale factor (W); default 1 for smoke
--e pool_size=200       # per-VU pool size
--e warehouse_start=1   # first warehouse id for this instance (>=1)
--e load_items=true     # load the global item table (default: true when WAREHOUSE_START=1)
+--scale-factor 1        # warehouse count (W); default 1 for smoke
+--warehouse-start 1     # first warehouse ID for this instance (>=1)
+--load-items=true       # load the global item table (default at warehouse start 1)
+-e pool_size=200        # compatibility override for the driver pool size
 ```
 
 ## Distributed runs (multiple instances over disjoint warehouse ranges)
 
 Several stroppy instances can target the same database collectively, each
-handling a slice of warehouses. Set `WAREHOUSE_START` per instance so the
+handling a slice of warehouses. Set `--warehouse-start` per instance so the
 slices don't overlap:
 
 ```bash
 # Instance A: warehouses 1..100, also creates schema + loads the global item table.
 ./build/stroppy run tpcc/tx -d pg -D url=postgres://host/db \
-  -e WAREHOUSE_START=1 -e WAREHOUSES=100 \
+  --warehouse-start 1 --scale-factor 100 \
   --steps drop_schema,create_schema,load_data,validate_population
 
 # Instance B: warehouses 101..200, skips schema + item load.
 ./build/stroppy run tpcc/tx -d pg -D url=postgres://host/db \
-  -e WAREHOUSE_START=101 -e WAREHOUSES=100 \
+  --warehouse-start 101 --scale-factor 100 \
   --steps load_data,validate_population
 
 # After every slice is loaded, all instances can run the transaction phase
@@ -56,22 +56,21 @@ slices don't overlap:
 # remote-warehouse picks (Payment §2.5.1.2, New-Order §2.4.1.5) stay
 # inside the local slice.
 ./build/stroppy run tpcc/tx -d pg -D url=postgres://host/db \
-  -e WAREHOUSE_START=1 -e WAREHOUSES=100 \
+  --warehouse-start 1 --scale-factor 100 \
   --no-steps drop_schema,create_schema,load_data,validate_population \
-  -- --vus 50 --duration 5m
+  --executor constant-vus --vus 50 --duration 5m
 ```
 
 Notes:
 
 - The `item` table is global (100 000 rows independent of W). Only the
-  first instance (default `WAREHOUSE_START=1`) loads it; other instances
-  default `LOAD_ITEMS=false`. Override with `-e LOAD_ITEMS=true/false`.
-- For YDB, run `create_schema` once with `WAREHOUSE_START=1` and
-  `WAREHOUSES=<total>` so the partition split keys cover every warehouse
+  first instance (`--warehouse-start=1`) loads it by default; other instances
+  default `--load-items=false`. Override with `--load-items=true/false`.
+- For YDB, run `create_schema` once with `--warehouse-start=1` and
+  `--scale-factor=<total>` so the partition split keys cover every warehouse
   globally. Loader instances then skip `create_schema`.
 - `validate_population` filters all per-warehouse aggregates by
-  `w_id BETWEEN WAREHOUSE_START AND WAREHOUSE_START + WAREHOUSES - 1`,
-  so each instance validates only its own slice.
+  the range selected by `--warehouse-start` and `--scale-factor`, so each instance validates only its own slice.
 
 ## Steps
 
@@ -103,20 +102,18 @@ comparison. To benchmark load time, run both and diff the
 ```bash
 # baseline (1 tablet per table, no indexes)
 stroppy run tpcc/tx tpcc/ydb_no_indexes -d ydb -D url=grpc://host:2136/db \
-  -e SCALE_FACTOR=50 -e LOAD_WORKERS=8 \
-  --steps drop_schema,create_schema,load_data \
-  -- --duration 15s --vus 1
+  --scale-factor 50 --load-workers 8 \
+  --steps drop_schema,create_schema,load_data
 
 # tuned (W tablets per warehouse-keyed table, post-load indexes)
 stroppy run tpcc/tx tpcc/ydb -d ydb -D url=grpc://host:2136/db \
-  -e SCALE_FACTOR=50 -e LOAD_WORKERS=8 \
-  --steps drop_schema,create_schema,load_data,create_indexes \
-  -- --duration 15s --vus 1
+  --scale-factor 50 --load-workers 8 \
+  --steps drop_schema,create_schema,load_data,create_indexes
 ```
 
 The `Start of 'load_data' step` and `End of 'load_data' step` console
-lines mark the load interval. k6 args (`--duration`, `--vus`) must come
-after `--`.
+lines mark the load interval. Typed flags are accepted directly; run
+`stroppy run tpcc/tx --help` for the selected schema.
 
 ## Known simplifications vs spec
 
@@ -140,22 +137,23 @@ go test -tags=integration -run TestTpccWorkloadEndToEnd ./test/integration/... -
 
 ## Run shapes and the two-run flow
 
-All TPC workloads share one set of run knobs (set with `-e KEY=VALUE`, **not** the
-`-u/-d/-i` k6 shortcuts, which would discard the scenario):
+All TPC workloads share typed run flags:
 
-- `DURATION` set → fixed-duration throughput test (constant `VUS`); result is TPS.
-- `DURATION` unset → power test (`ITER` iterations); result is elapsed time.
-- `MAX_DURATION` (default `24h`) lifts k6's 10-minute per-iteration cap for large loads.
-- `PG_UNLOGGED=true` enables the PostgreSQL `UNLOGGED` bulk-load dance (off by default).
+- `--executor shared-iterations --iterations N` runs a fixed iteration count.
+- `--executor constant-vus --vus N --duration 1h` runs a throughput test.
+- `--pg-unlogged` enables the PostgreSQL `UNLOGGED` bulk-load dance.
+
+Select the executor explicitly. Legacy `DURATION` without an executor remains
+compatible, infers `constant-vus`, and emits a warning.
 
 The measured workload is a single gatable `workload` step, so prep and measurement
 can run as two passes for a throughput number uncontaminated by load time:
 
 ```bash
 # 1. load only (drop / create / load / create_indexes / analyze), no workload
-./build/stroppy run <workload> -e SCALE_FACTOR=10 --no-steps workload
+./build/stroppy run <workload> --scale-factor 10 --no-steps workload
 # 2. measure only, against the already-loaded data
-./build/stroppy run <workload> -e VUS=64 -e DURATION=1h --steps workload
+./build/stroppy run <workload> --executor constant-vus --vus 64 --duration 1h --steps workload
 ```
 
 A normal single run (no `--steps`) loads and measures in one pass.
