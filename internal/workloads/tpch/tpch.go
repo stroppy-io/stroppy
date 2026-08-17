@@ -37,9 +37,11 @@ type queryMetrics struct {
 	elapsedTotal *bench.Metric
 }
 
-func init() { bench.Register(&workload{}) }
+func init() { bench.Register(func() bench.Workload { return &workload{} }) }
 
 func (*workload) Name() string { return "tpch/tx" }
+
+func (*workload) Define(*bench.Def) error { return nil }
 
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.driverType = b.DriverTypeName()

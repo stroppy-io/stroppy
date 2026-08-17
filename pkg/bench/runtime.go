@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,10 +18,12 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
-// Workload is a Go-native benchmark. Setup runs once (schema + load steps);
-// Iterate is the measured body driven across VUs by the executor; Teardown runs once.
+// Workload is a Go-native benchmark. Define declares and binds typed parameters;
+// Setup runs once (schema + load steps); Iterate is the measured body driven across
+// VUs by the executor; Teardown runs once.
 type Workload interface {
 	Name() string
+	Define(def *Def) error
 	Setup(ctx context.Context, b *Bench) error
 	Iterate(ctx context.Context, b *Bench) error
 	Teardown(ctx context.Context, b *Bench) error
@@ -58,42 +61,116 @@ func (b *Bench) Logger() *zap.Logger { return b.lg }
 // --- registry ---
 
 var (
-	regMu        sync.Mutex
-	regWorkloads = map[string]Workload{}
+	regMu        sync.RWMutex
+	regWorkloads = map[string]func() Workload{}
 
-	errNoWorkloadRegistered = errors.New("bench: no workload registered")
-	errDriverIndexMissing   = errors.New("bench: driver index 0 not configured")
-	errUnsupportedExecutor  = errors.New("unsupported executor")
+	errNoWorkloadRegistered      = errors.New("bench: no workload registered")
+	errDriverIndexMissing        = errors.New("bench: driver index 0 not configured")
+	errUnsupportedExecutor       = errors.New("unsupported executor")
+	errVUsOutOfRange             = errors.New("vus must be at least 1")
+	errIterationsOutOfRange      = errors.New("iterations must be at least 1")
+	errDurationOutOfRange        = errors.New("duration must be positive")
+	errDurationNeedsExecutor     = errors.New("duration requires an explicit constant-vus executor")
+	errDurationWithWrongExecutor = errors.New("duration is only valid with the constant-vus executor")
+	errConstantVUsNeedsDuration  = errors.New("constant-vus requires duration")
 )
 
-// Register a Go workload (called from workload init()).
-func Register(w Workload) {
+// Register adds a workload factory. Workload packages call it during init.
+func Register(factory func() Workload) {
+	if factory == nil {
+		panic("bench: register nil workload factory")
+	}
+
+	wl := factory()
+	if wl == nil {
+		panic("bench: workload factory returned nil")
+	}
+
+	name := wl.Name()
+	if name == "" {
+		panic("bench: register workload with empty name")
+	}
+
 	regMu.Lock()
 	defer regMu.Unlock()
 
-	regWorkloads[w.Name()] = w
+	if _, exists := regWorkloads[name]; exists {
+		panic(fmt.Sprintf("bench: workload %q already registered", name))
+	}
+
+	regWorkloads[name] = factory
 }
 
-// Lookup a registered Go workload by name.
+// Lookup returns a fresh instance of a registered Go workload.
 func Lookup(name string) (Workload, bool) {
-	regMu.Lock()
-	defer regMu.Unlock()
+	regMu.RLock()
 
-	w, ok := regWorkloads[name]
+	factory, ok := regWorkloads[name]
 
-	return w, ok
+	regMu.RUnlock()
+
+	if !ok {
+		return nil, false
+	}
+
+	wl := factory()
+	if wl == nil || wl.Name() != name {
+		panic(fmt.Sprintf("bench: workload factory for %q returned an invalid workload", name))
+	}
+
+	return wl, true
 }
 
-// Run looks up the named Go workload and executes it: Setup once, Iterate across the
-// scenario, Teardown once. drivers carries the resolved per-index driver configs (same
-// *stroppy.DriverConfig the TS path consumes); env is the script env (-e overrides +
-// config), consulted by Env after the real process environment. Scenario comes from
-// VUS/DURATION/ITER env.
+// Describe returns a workload's deterministic parameter schema without setup or drivers.
+func Describe(name string) (Description, error) {
+	wl, ok := Lookup(name)
+	if !ok {
+		return Description{}, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
+	}
+
+	_, schema, err := defineWorkload(wl, ParamInputs{}, true)
+	if err != nil {
+		return Description{}, fmt.Errorf("define workload %q: %w", name, err)
+	}
+
+	return Description{Name: name, Params: schema}, nil
+}
+
+// DescribeAll returns all registered workload schemas ordered by workload name.
+func DescribeAll() ([]Description, error) {
+	regMu.RLock()
+
+	names := make([]string, 0, len(regWorkloads))
+	for name := range regWorkloads {
+		names = append(names, name)
+	}
+
+	regMu.RUnlock()
+
+	slices.Sort(names)
+
+	descriptions := make([]Description, 0, len(names))
+	for _, name := range names {
+		description, err := Describe(name)
+		if err != nil {
+			return nil, err
+		}
+
+		descriptions = append(descriptions, description)
+	}
+
+	return descriptions, nil
+}
+
+// Run looks up a fresh workload instance and executes it: Define and parameter
+// resolution first, Setup once, Iterate across the scenario, then Teardown once.
+// env remains available to legacy workload Env calls through the root state.
 func Run(
 	ctx context.Context,
 	name string,
 	drivers map[int]*stroppy.DriverConfig,
 	env map[string]string,
+	paramInputs ParamInputs,
 	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
 ) error {
@@ -102,7 +179,15 @@ func Run(
 		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
 	}
 
-	var err error
+	scenarioParams, _, err := defineWorkload(wl, paramInputs, false)
+	if err != nil {
+		return fmt.Errorf("define workload %q: %w", name, err)
+	}
+
+	sc, err := scenarioParams.spec(lg)
+	if err != nil {
+		return fmt.Errorf("scenario: %w", err)
+	}
 
 	root, err = newRootState(lg, ctx, env, metricsConfig)
 	if err != nil {
@@ -136,7 +221,6 @@ func Run(
 		return fmt.Errorf("setup: %w", err)
 	}
 
-	sc := readScenario()
 	if err := runScenario(ctx, sc, func(vu *VU) error {
 		b := &Bench{
 			root: root, vu: vu,
@@ -156,7 +240,7 @@ func Run(
 	return nil
 }
 
-// --- scenario (read from env, mirrors declareScenario) ---
+// --- scenario ---
 
 type scenarioSpec struct {
 	name       string
@@ -166,26 +250,94 @@ type scenarioSpec struct {
 	duration   time.Duration
 }
 
-func readScenario() scenarioSpec {
-	spec := scenarioSpec{name: "workload"}
+type scenarioParams struct {
+	executor   Param[string]
+	vus        Param[int]
+	iterations Param[int64]
+	duration   Param[time.Duration]
+}
 
-	spec.vus = max(EnvInt("VUS", 1), 1)
+func defineWorkload(
+	wl Workload,
+	inputs ParamInputs,
+	defaultsOnly bool,
+) (scenarioParams, []ParamSchema, error) {
+	def := newDef(inputs, defaultsOnly)
+	params := scenarioParams{
+		executor: def.Param.String(
+			"executor", "shared-iterations", "Scenario executor: shared-iterations or constant-vus.",
+		),
+		vus: def.Param.Int("vus", 1, "Number of concurrent virtual users."),
+		iterations: def.Param.Int64(
+			"iterations", 1, "Total shared iterations.", LegacyEnvAliases("ITER"),
+		),
+		duration: def.Param.Duration("duration", 0, "Duration of a constant-vus scenario."),
+	}
 
-	if d := Env("DURATION", ""); d != "" {
-		dur, err := time.ParseDuration(d)
-		if err == nil {
-			spec.executor = "constant-vus"
-			spec.duration = dur
+	def.standard = false
+	defineErr := wl.Define(def)
 
-			return spec
+	return params, def.schema(), errors.Join(defineErr, def.finish())
+}
+
+func (params *scenarioParams) spec(lg *zap.Logger) (scenarioSpec, error) {
+	executor := params.executor.Value()
+	legacyDuration := params.duration.Explicit() && slices.Contains([]ParamSource{
+		ParamSourceProcessEnv,
+		ParamSourceLegacyEnv,
+		ParamSourceLegacyConfigEnv,
+	}, params.duration.Source())
+
+	if legacyDuration && !params.executor.Explicit() {
+		executor = "constant-vus"
+
+		if lg != nil {
+			lg.Warn(
+				"legacy DURATION inferred the constant-vus executor; set executor explicitly",
+				zap.String("source", string(params.duration.Source())),
+			)
 		}
 	}
 
-	spec.executor = "shared-iterations"
+	if params.vus.Value() < 1 {
+		return scenarioSpec{}, fmt.Errorf("%w, got %d", errVUsOutOfRange, params.vus.Value())
+	}
 
-	spec.iterations = int64(max(EnvInt("ITER", 1), 1))
+	if params.iterations.Value() < 1 {
+		return scenarioSpec{}, fmt.Errorf("%w, got %d", errIterationsOutOfRange, params.iterations.Value())
+	}
 
-	return spec
+	if params.duration.Explicit() && params.duration.Value() <= 0 {
+		return scenarioSpec{}, fmt.Errorf("%w, got %s", errDurationOutOfRange, params.duration.Value())
+	}
+
+	if params.duration.Explicit() && !legacyDuration &&
+		(!params.executor.Explicit() || executor != "constant-vus") {
+		return scenarioSpec{}, errDurationNeedsExecutor
+	}
+
+	spec := scenarioSpec{
+		name:       "workload",
+		executor:   executor,
+		vus:        params.vus.Value(),
+		iterations: params.iterations.Value(),
+		duration:   params.duration.Value(),
+	}
+
+	switch executor {
+	case "shared-iterations":
+		if params.duration.Explicit() {
+			return scenarioSpec{}, errDurationWithWrongExecutor
+		}
+	case "constant-vus":
+		if !params.duration.Explicit() {
+			return scenarioSpec{}, errConstantVUsNeedsDuration
+		}
+	default:
+		return scenarioSpec{}, fmt.Errorf("%w %q", errUnsupportedExecutor, executor)
+	}
+
+	return spec, nil
 }
 
 // --- executor (shared-iterations + constant-vus) ---

@@ -25,9 +25,11 @@ type workload struct {
 	preset string
 }
 
-func init() { bench.Register(&workload{}) }
+func init() { bench.Register(func() bench.Workload { return &workload{} }) }
 
 func (*workload) Name() string { return "execute_sql" }
+
+func (*workload) Define(*bench.Def) error { return nil }
 
 func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
 	w.preset = "execute_sql"

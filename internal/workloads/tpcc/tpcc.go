@@ -67,11 +67,13 @@ type metrics struct {
 }
 
 func init() {
-	bench.Register(&workload{variant: "tx"})
-	bench.Register(&workload{variant: "procs"})
+	bench.Register(func() bench.Workload { return &workload{variant: "tx"} })
+	bench.Register(func() bench.Workload { return &workload{variant: "procs"} })
 }
 
 func (w *workload) Name() string { return "tpcc/" + w.variant }
+
+func (*workload) Define(*bench.Def) error { return nil }
 
 // renderDDL expands the ydb.sql {partition_keys}/{partition_count} tablet-split
 // placeholders from the warehouse range (one tablet per warehouse in

@@ -281,7 +281,15 @@ func runGoWorkload(
 	}
 
 	ctx := context.Background()
-	if err := bench.Run(ctx, name, drivers, envOverrides, logger.Global(), metrics); err != nil {
+	if err := bench.Run(
+		ctx,
+		name,
+		drivers,
+		envOverrides,
+		bench.ParamInputs{LegacyEnv: envOverrides},
+		logger.Global(),
+		metrics,
+	); err != nil {
 		return fmt.Errorf("failed to run go workload: %w", err)
 	}
 

@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- Go workloads can declare typed string, boolean, numeric, and duration parameters with defaults, descriptions, source tracking, and discoverable schemas.
 - Database errors are classified by each driver into shared facts, and Go workloads can override the default retry, error, ignore, or fatal action for each fact without matching backend-specific codes or messages. ([#127](https://github.com/stroppy-io/stroppy/pull/127))
 - New `pkg/gen` random-generation primitives library: deterministic, seekable, allocation-free scalar and text draws composed in plain Go, intended to replace the relational datagen expression framework for workload data loading.
 - `pkg/gen` now provides typed direct-output batches: a reusable columnar [Batch] with bound [Column] handles and an [IndexedSource] that fills rows through a plain Go row callback, so workload formulas write straight into prepared storage with zero generation-time allocations after preparation.

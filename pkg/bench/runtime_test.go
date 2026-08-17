@@ -75,14 +75,20 @@ func TestRunScenarioReturnsParentCancellation(t *testing.T) {
 }
 
 func TestRunPassesScenarioCancellationToWorkload(t *testing.T) {
-	workload := &fatalContextWorkload{secondStarted: make(chan struct{})}
-	Register(workload)
+	var workload *fatalContextWorkload
+
+	Register(func() Workload {
+		workload = &fatalContextWorkload{secondStarted: make(chan struct{})}
+
+		return workload
+	})
 
 	err := Run(
 		context.Background(),
-		workload.Name(),
+		"test/fatal-context",
 		map[int]*stroppy.DriverConfig{0: {DriverType: stroppy.DriverConfig_DRIVER_TYPE_NOOP}},
 		map[string]string{"VUS": "2", "ITER": "2"},
+		ParamInputs{LegacyEnv: map[string]string{"VUS": "2", "ITER": "2"}},
 		zap.NewNop(),
 		&MetricsConfig{},
 	)
@@ -103,6 +109,8 @@ type fatalContextWorkload struct {
 }
 
 func (*fatalContextWorkload) Name() string { return "test/fatal-context" }
+
+func (*fatalContextWorkload) Define(*Def) error { return nil }
 
 func (w *fatalContextWorkload) Setup(context.Context, *Bench) error {
 	w.fatalErr = errors.New("fatal iteration")
