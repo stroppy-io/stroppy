@@ -10,13 +10,12 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
 // ErrUnsupportedInsertMethod is returned when an InsertSpec requests a
@@ -38,36 +37,33 @@ var ErrColumnCountMismatch = errors.New("postgres: describe column count mismatc
 // column has a type OID that pgx's type map cannot name for the array cast.
 var ErrUnregisteredColumnType = errors.New("postgres: unregistered column type OID")
 
-// InsertSpec runs one relational InsertSpec through the postgres driver.
-// It builds a source.Partitionable from the spec, then dispatches by
-// spec.Method to one of three row-insertion strategies (NATIVE COPY,
-// PLAIN_BULK multi-row INSERT, PLAIN_QUERY per-row INSERT). Workers fan
-// the spec out across per-partition RowSources via
-// common.RunParallelByWorkers; each RowSource is pre-seeked and bounded
-// to its chunk.
-func (d *Driver) InsertSpec(
+// Insert runs a typed [driver.InsertRequest] through the postgres driver.
+// Each worker prepares a [gen.Cursor] partition, adapts it to a
+// source.RowSource, and drains it through the same runInsertChunk the
+// legacy path uses. Generation is allocation-free after preparation;
+// driver-side row materialization and COPY/bulk encoding may allocate.
+func (d *Driver) Insert(
 	ctx context.Context,
-	spec *dgproto.InsertSpec,
+	req *driver.InsertRequest,
 ) (*stats.Query, error) {
-	if spec == nil {
-		return nil, fmt.Errorf("%w: nil spec", runtime.ErrInvalidSpec)
+	if err := driver.ValidateInsert(req); err != nil { //nolint:errcheck // sentinel wrapped below
+		return nil, err
 	}
 
-	part, err := loadsource.Build(spec)
-	if err != nil {
-		return nil, fmt.Errorf("postgres: %w", err)
-	}
-
-	workers := int(spec.GetParallelism().GetWorkers())
+	workers := req.Workers
 	if workers < 1 {
 		workers = 1
 	}
 
+	columns := req.Source.Schema().ColumnNames()
+
 	start := time.Now()
 
-	rows, err := common.RunParallelByWorkers(ctx, part, workers,
-		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
-			return d.runChunk(workerCtx, spec, src)
+	rows, err := common.RunParallelBatch(ctx, req.Source, workers, d.bulkSize,
+		func(workerCtx context.Context, _ common.Chunk, cur gen.Cursor) error {
+			src := common.NewBatchRowSource(cur, columns, len(columns))
+
+			return d.runInsertChunk(workerCtx, req.Table, req.Method, src)
 		})
 	if err != nil {
 		return nil, err
@@ -76,26 +72,27 @@ func (d *Driver) InsertSpec(
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
-// runChunk dispatches one partition's output into the database per the
-// spec's InsertMethod. src is drained to EOF.
-func (d *Driver) runChunk(
+// runInsertChunk dispatches one partition's output into the database per
+// the request's InsertMethod. src is drained to EOF.
+func (d *Driver) runInsertChunk(
 	ctx context.Context,
-	spec *dgproto.InsertSpec,
+	table string,
+	method driver.InsertMethod,
 	src source.RowSource,
 ) error {
-	switch spec.GetMethod() {
-	case dgproto.InsertMethod_NATIVE:
-		return d.copyFromRuntime(ctx, spec.GetTable(), src)
-	case dgproto.InsertMethod_PLAIN_BULK:
-		return d.bulkInsertRuntime(ctx, spec.GetTable(), src, d.bulkSize)
-	case dgproto.InsertMethod_COLUMNAR:
-		return d.columnarInsertRuntime(ctx, spec.GetTable(), src, d.bulkSize)
-	case dgproto.InsertMethod_PLAIN_QUERY:
+	switch method {
+	case driver.InsertNative:
+		return d.copyFromRuntime(ctx, table, src)
+	case driver.InsertPlainBulk:
+		return d.bulkInsertRuntime(ctx, table, src, d.bulkSize)
+	case driver.InsertColumnar:
+		return d.columnarInsertRuntime(ctx, table, src, d.bulkSize)
+	case driver.InsertPlainQuery:
 		// Per-row INSERT reuses the bulk path with batch_size=1 so both
 		// arms share exactly one SQL-building codepath.
-		return d.bulkInsertRuntime(ctx, spec.GetTable(), src, 1)
+		return d.bulkInsertRuntime(ctx, table, src, 1)
 	default:
-		return fmt.Errorf("%w: %s", ErrUnsupportedInsertMethod, spec.GetMethod().String())
+		return fmt.Errorf("%w: %s", ErrUnsupportedInsertMethod, method)
 	}
 }
 

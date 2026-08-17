@@ -3,13 +3,13 @@ package bench
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
+	"github.com/stroppy-io/stroppy/pkg/datagen/tpcdsgen"
+	"github.com/stroppy-io/stroppy/pkg/datagen/tpchgen"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
@@ -96,9 +96,16 @@ func (b *Bench) runQuery(ctx context.Context, sql string, args map[string]any) (
 	return res, nil
 }
 
-// InsertSpec runs a relational bulk insert.
-func (b *Bench) InsertSpec(ctx context.Context, spec *dgproto.InsertSpec) (*stats.Query, error) {
-	tracker := b.newInsertProgressTracker(spec)
+// Insert runs a typed [driver.InsertRequest] through the benchmark driver,
+// the typed successor to InsertSpec. It wires the progress tracker and
+// metrics recording, streaming rows from a workload-authored
+// [gen.BatchSource] instead of a dgproto generator.
+func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Query, error) {
+	if err := driver.ValidateInsert(req); err != nil {
+		return nil, fmt.Errorf("insert: %w", err)
+	}
+
+	tracker := b.newBatchInsertTracker(req)
 
 	runCtx := ctx
 	if tracker.Enabled() {
@@ -106,7 +113,7 @@ func (b *Bench) InsertSpec(ctx context.Context, spec *dgproto.InsertSpec) (*stat
 		tracker.Start(runCtx)
 	}
 
-	result, err := b.drv.InsertSpec(runCtx, spec)
+	result, err := b.drv.Insert(runCtx, req)
 	if tracker.Enabled() {
 		tracker.Finish(err)
 	}
@@ -116,24 +123,25 @@ func (b *Bench) InsertSpec(ctx context.Context, spec *dgproto.InsertSpec) (*stat
 		elapsed = result.Elapsed
 	}
 
-	b.root.txMetrics.recordInsertResult(b.vu, spec.GetTable(), elapsed, err)
+	b.root.txMetrics.recordInsertResult(b.vu, req.Table, elapsed, err)
 
 	if err != nil {
-		return nil, fmt.Errorf("insert %q: %w", spec.GetTable(), err)
+		return nil, fmt.Errorf("insert %q: %w", req.Table, err)
 	}
 
-	b.root.txMetrics.recordInsert(b.vu, spec.GetTable(), result.Rows)
+	b.root.txMetrics.recordInsert(b.vu, req.Table, result.Rows)
 
 	return result, nil
 }
 
-// newInsertProgressTracker builds the periodic insert-progress tracker (on by
-// default) wired to emit progress metrics. Mirrors the engine's wrapper.
-func (b *Bench) newInsertProgressTracker(spec *dgproto.InsertSpec) *insertprogress.Tracker {
+// newBatchInsertTracker builds the progress tracker for the typed Insert
+// path from the request's table/method/workers, mirroring the legacy
+// spec-driven tracker.
+func (b *Bench) newBatchInsertTracker(req *driver.InsertRequest) *insertprogress.Tracker {
 	config := insertprogress.DefaultConfig()
-	config.Table = spec.GetTable()
-	config.Method = insertMethodName(spec.GetMethod())
-	config.Workers = int(spec.GetParallelism().GetWorkers())
+	config.Table = req.Table
+	config.Method = req.Method.String()
+	config.Workers = req.Workers
 	config.Logger = b.lg.Named("insert-progress")
 	config.OnSample = func(snapshot insertprogress.Snapshot) {
 		b.root.txMetrics.recordInsertProgress(b.vu, &snapshot)
@@ -142,49 +150,48 @@ func (b *Bench) newInsertProgressTracker(spec *dgproto.InsertSpec) *insertprogre
 	return insertprogress.NewTracker(&config)
 }
 
-func insertMethodName(method dgproto.InsertMethod) string {
-	switch method {
-	case dgproto.InsertMethod_PLAIN_QUERY:
-		return "plain_query"
-	case dgproto.InsertMethod_PLAIN_BULK:
-		return "plain_bulk"
-	case dgproto.InsertMethod_COLUMNAR:
-		return "columnar"
-	case dgproto.InsertMethod_NATIVE:
-		return "native"
-	default:
-		return strings.ToLower(method.String())
-	}
-}
-
-// InsertTpch loads one TPC-H table via the ported dbgen generator.
+// InsertTpch loads one TPC-H table via the ported dbgen generator, streamed
+// through the typed [driver.InsertRequest] path. The dbgen generator lives
+// behind a [gen.BatchSource] adapter (tpchgen.NewBatchSource), so no dgproto
+// InsertSpec is synthesized; canonical seeds, seeking, and entity fan-out are
+// preserved unchanged.
 func (b *Bench) InsertTpch(ctx context.Context, table string, scaleFactor float64, workers int) (*stats.Query, error) {
 	if workers < 1 {
 		workers = 1
 	}
 
-	spec := &dgproto.InsertSpec{
-		Table: table, Method: dgproto.InsertMethod_NATIVE,
-		Parallelism: &dgproto.Parallelism{Workers: int32(workers)},
-		Generator:   &dgproto.InsertSpec_Tpch{Tpch: &dgproto.TpchSource{Table: table, ScaleFactor: scaleFactor}},
+	src, err := tpchgen.NewBatchSource(table, scaleFactor)
+	if err != nil {
+		return nil, fmt.Errorf("tpch %q: %w", table, err)
 	}
 
-	return b.InsertSpec(ctx, spec)
+	req := &driver.InsertRequest{
+		Table: table, Method: driver.InsertNative, Workers: workers, Source: src,
+	}
+
+	return b.Insert(ctx, req)
 }
 
-// InsertTpcds loads one TPC-DS table via the ported dsdgen generator.
+// InsertTpcds loads one TPC-DS table via the ported dsdgen generator, streamed
+// through the typed [driver.InsertRequest] path. The dsdgen generator lives
+// behind a [gen.BatchSource] adapter (tpcdsgen.NewBatchSource), so no dgproto
+// InsertSpec is synthesized; canonical text, null semantics, ticket fan-out,
+// and per-partition seeking are preserved unchanged.
 func (b *Bench) InsertTpcds(ctx context.Context, table string, scaleFactor float64, workers int) (*stats.Query, error) {
 	if workers < 1 {
 		workers = 1
 	}
 
-	spec := &dgproto.InsertSpec{
-		Table: table, Method: dgproto.InsertMethod_NATIVE,
-		Parallelism: &dgproto.Parallelism{Workers: int32(workers)},
-		Generator:   &dgproto.InsertSpec_Tpcds{Tpcds: &dgproto.TpcdsSource{Table: table, ScaleFactor: scaleFactor}},
+	src, err := tpcdsgen.NewBatchSource(table, scaleFactor)
+	if err != nil {
+		return nil, fmt.Errorf("tpcds %q: %w", table, err)
 	}
 
-	return b.InsertSpec(ctx, spec)
+	req := &driver.InsertRequest{
+		Table: table, Method: driver.InsertNative, Workers: workers, Source: src,
+	}
+
+	return b.Insert(ctx, req)
 }
 
 // Begin starts a transaction.

@@ -13,9 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
@@ -23,53 +20,39 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
-// InsertSpec runs one relational InsertSpec through the ydb driver.
-// NATIVE uses ydb-go-sdk's Table().BulkUpsert for non-transactional
-// batch writes; PLAIN_BULK and PLAIN_QUERY go through the generic
-// sqldriver helper. Workers fan the spec out across per-partition
-// RowSources via common.RunParallelByWorkers.
-func (d *Driver) InsertSpec(
+// Insert runs a typed [driver.InsertRequest] through the ydb driver.
+// Each worker prepares a [gen.Cursor] partition, adapts it to a
+// source.RowSource, and drains it through the same runInsertChunk the
+// legacy path uses. COLUMNAR redirects to NATIVE BulkUpsert (already
+// struct-of-arrays), matching the legacy path.
+func (d *Driver) Insert(
 	ctx context.Context,
-	spec *dgproto.InsertSpec,
+	req *driver.InsertRequest,
 ) (*stats.Query, error) {
-	if spec == nil {
-		return nil, fmt.Errorf("%w: nil spec", runtime.ErrInvalidSpec)
+	if err := driver.ValidateInsert(req); err != nil {
+		return nil, err
 	}
 
-	switch spec.GetMethod() {
-	case dgproto.InsertMethod_NATIVE, dgproto.InsertMethod_PLAIN_BULK,
-		dgproto.InsertMethod_PLAIN_QUERY, dgproto.InsertMethod_COLUMNAR:
-		// Supported below.
-	default:
-		return nil, fmt.Errorf("%w: %s", driver.ErrInsertSpecNotImplemented, spec.GetMethod().String())
+	if !ydbMethodSupported(req.Method) {
+		return nil, fmt.Errorf("%w: %s", driver.ErrInsertMethodNotSupported, req.Method)
 	}
 
-	// COLUMNAR has no dedicated YDB SQL path. NATIVE BulkUpsert already ships a
-	// struct-of-arrays payload (types.ListValue of per-row structs) with no
-	// bind-parameter ceiling, so COLUMNAR is redirected onto it rather than
-	// maintaining a redundant AS_TABLE($rows) SQL arm.
-	if spec.GetMethod() == dgproto.InsertMethod_COLUMNAR {
-		d.logger.Warn("ydb: COLUMNAR insert method redirects to NATIVE BulkUpsert " +
-			"(already struct-of-arrays, limit-free); no separate SQL path")
-	}
-
-	part, err := loadsource.Build(spec)
-	if err != nil {
-		return nil, fmt.Errorf("ydb: %w", err)
-	}
-
-	workers := int(spec.GetParallelism().GetWorkers())
+	workers := req.Workers
 	if workers < 1 {
 		workers = 1
 	}
 
+	columns := req.Source.Schema().ColumnNames()
 	start := time.Now()
 
-	rows, err := common.RunParallelByWorkers(ctx, part, workers,
-		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
-			return d.runChunk(workerCtx, spec, src)
+	rows, err := common.RunParallelBatch(ctx, req.Source, workers, d.bulkSize,
+		func(workerCtx context.Context, _ common.Chunk, cur gen.Cursor) error {
+			src := common.NewBatchRowSource(cur, columns, len(columns))
+
+			return d.runInsertChunk(workerCtx, req.Table, req.Method, src)
 		})
 	if err != nil {
 		return nil, err
@@ -78,23 +61,37 @@ func (d *Driver) InsertSpec(
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
 }
 
-// runChunk dispatches one partition's rows per spec.Method. NATIVE uses
+// ydbMethodSupported reports whether the ydb driver serves method. NATIVE
+// uses BulkUpsert; COLUMNAR redirects to it; PLAIN_BULK/PLAIN_QUERY use
+// the SQL path.
+func ydbMethodSupported(method driver.InsertMethod) bool {
+	switch method {
+	case driver.InsertNative, driver.InsertColumnar,
+		driver.InsertPlainBulk, driver.InsertPlainQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// runInsertChunk dispatches one partition's rows per method. NATIVE uses
 // BulkUpsert; PLAIN_BULK and PLAIN_QUERY share the SQL path. src is
 // drained to EOF.
-func (d *Driver) runChunk(
+func (d *Driver) runInsertChunk(
 	ctx context.Context,
-	spec *dgproto.InsertSpec,
+	tableName string,
+	method driver.InsertMethod,
 	src source.RowSource,
 ) error {
-	switch spec.GetMethod() {
-	case dgproto.InsertMethod_NATIVE, dgproto.InsertMethod_COLUMNAR:
-		return d.bulkUpsertRuntime(ctx, spec.GetTable(), src)
-	case dgproto.InsertMethod_PLAIN_BULK:
-		return sqldriver.RunBulkInsert(ctx, d.db, spec.GetTable(), src, d.dialect, d.bulkSize)
-	case dgproto.InsertMethod_PLAIN_QUERY:
-		return sqldriver.RunBulkInsert(ctx, d.db, spec.GetTable(), src, d.dialect, 1)
+	switch method {
+	case driver.InsertNative, driver.InsertColumnar:
+		return d.bulkUpsertRuntime(ctx, tableName, src)
+	case driver.InsertPlainBulk:
+		return sqldriver.RunBulkInsert(ctx, d.db, tableName, src, d.dialect, d.bulkSize)
+	case driver.InsertPlainQuery:
+		return sqldriver.RunBulkInsert(ctx, d.db, tableName, src, d.dialect, 1)
 	default:
-		return fmt.Errorf("%w: %s", driver.ErrInsertSpecNotImplemented, spec.GetMethod().String())
+		return fmt.Errorf("%w: %s", driver.ErrInsertMethodNotSupported, method)
 	}
 }
 

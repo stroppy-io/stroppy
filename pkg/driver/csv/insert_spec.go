@@ -15,14 +15,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
 // ErrUnsupportedInsertMethod is returned when an InsertSpec requests
@@ -32,61 +30,46 @@ import (
 // drivers.
 var ErrUnsupportedInsertMethod = errors.New("csv: unsupported InsertSpec method")
 
-// InsertSpec runs one relational InsertSpec through the CSV driver by
-// draining each partition's RowSource into one file per worker. Under
-// parallelism each worker writes to its own shard so the hot path is
-// lock-free; the single-worker case naturally falls out as one chunk
-// (index 0 → w000). Final per-table merge happens at Teardown when
-// merge=true.
-func (d *Driver) InsertSpec(
+// Insert runs a typed [driver.InsertRequest] through the CSV driver by
+// draining each worker's [gen.Cursor] partition into one file per
+// worker, mirroring the legacy InsertSpec shard layout. NATIVE is the
+// only method: CSV is write-only and does not synthesize SQL-shaped
+// emission for PLAIN_BULK/PLAIN_QUERY.
+func (d *Driver) Insert(
 	ctx context.Context,
-	spec *dgproto.InsertSpec,
+	req *driver.InsertRequest,
 ) (*stats.Query, error) {
-	if spec == nil {
-		return nil, fmt.Errorf("csv: %w", runtime.ErrInvalidSpec)
+	if err := driver.ValidateInsert(req); err != nil {
+		return nil, err
 	}
 
-	if spec.GetMethod() != dgproto.InsertMethod_NATIVE {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedInsertMethod, spec.GetMethod().String())
+	if req.Method != driver.InsertNative {
+		return nil, fmt.Errorf("%w: %s", driver.ErrInsertMethodNotSupported, req.Method)
 	}
 
-	part, err := loadsource.Build(spec)
-	if err != nil {
-		return nil, fmt.Errorf("csv: %w", err)
-	}
-
-	workers := int(spec.GetParallelism().GetWorkers())
+	workers := req.Workers
 	if workers < 1 {
 		workers = 1
 	}
 
+	columns := req.Source.Schema().ColumnNames()
 	start := time.Now()
 
-	var columns []string
+	rows, err := common.RunParallelBatch(ctx, req.Source, workers, csvBatchRows,
+		func(workerCtx context.Context, chunk common.Chunk, cur gen.Cursor) error {
+			src := common.NewBatchRowSource(cur, columns, len(columns))
 
-	rows, err := common.RunParallelByWorkers(ctx, part, workers,
-		func(workerCtx context.Context, chunk common.Chunk, src source.RowSource) error {
-			rowCount, err := d.writeShard(workerCtx, spec.GetTable(), src, chunk.Index)
+			rowCount, err := d.writeShard(workerCtx, req.Table, src, chunk.Index)
 			if err != nil {
 				return err
 			}
 
-			d.recordShards(spec.GetTable(), src.Columns(), 1, rowCount)
-
-			if chunk.Index == 0 {
-				columns = append([]string(nil), src.Columns()...)
-			}
+			d.recordShards(req.Table, columns, 1, rowCount)
 
 			return nil
 		})
 	if err != nil {
 		return nil, err
-	}
-
-	// Make sure the registry has the canonical column order even when
-	// the first-indexed worker completed after a later one.
-	if len(columns) > 0 {
-		d.recordShards(spec.GetTable(), columns, 0, 0)
 	}
 
 	return &stats.Query{Elapsed: time.Since(start), Rows: rows}, nil
@@ -150,6 +133,13 @@ func (d *Driver) writeShard(
 // drainRows pulls rows from src, encodes each into record strings, and
 // writes them to writer until EOF. writer.Flush is the caller's
 // responsibility.
+
+// csvBatchRows is the per-cursor typed-batch capacity the CSV path
+// prepares. CSV reads one row at a time and has no driver bulk size, so
+// this only sizes the reusable gen batch; a modest value balances cursor
+// fill cost against memory.
+const csvBatchRows = 4096
+
 func drainRows(
 	ctx context.Context,
 	src source.RowSource,

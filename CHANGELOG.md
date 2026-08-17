@@ -12,19 +12,32 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- New `pkg/gen` random-generation primitives library: deterministic, seekable, allocation-free scalar and text draws composed in plain Go, intended to replace the relational datagen expression framework for workload data loading.
+- `pkg/gen` now provides typed direct-output batches: a reusable columnar [Batch] with bound [Column] handles and an [IndexedSource] that fills rows through a plain Go row callback, so workload formulas write straight into prepared storage with zero generation-time allocations after preparation.
+- Insert-method ownership moves to the driver package: `driver.InsertMethod` is the Go-native enum for the typed insert path, with `ParseInsertMethod` for authoring strings (`plain_query`, `plain_bulk`, `columnar`, `native`).
+- Typed insert path: `driver.InsertRequest` + `Driver.Insert` + `Bench.Insert` stream rows from a workload-authored `gen.BatchSource` through every driver (postgres, mysql, picodata, ydb, noop, csv), with a typed parallel runner in `pkg/driver/common`.
+- The `simple` workload loads `stroppy_demo` through the typed insert path: a plain Go row formula (id, 8-char label, uniform value) over a versioned `gen` source replaces the relational InsertSpec struct literal.
+- TPC-B loads `pgbench_branches`, `pgbench_tellers`, and `pgbench_accounts` through the typed insert path: per-table `gen` sources preserve the bid fan-out arithmetic (`floor(entity/perBranch)+1`), fixed-width ASCII fillers, and the legacy per-table seeds.
+- TPC-C loads all eight tables (`warehouse`, `district`, `customer`, `item`, `stock`, `orders`, `order_line`, `new_order`) through typed plain-Go sources, preserving NURand surnames, per-district customer permutations, fixed-width fields, decimal scales, credit and delivery splits, and ORIGINAL markers.
+- TPC-H loads through the typed insert path: all eight tables (`region`, `nation`, `part`, `supplier`, `partsupp`, `customer`, `orders`, `lineitem`) stream from a `gen.BatchSource` adapter over the canonical dbgen generator, so `InsertTpch` no longer synthesizes a protobuf `InsertSpec`. Canonical dbgen seeds, per-district seeking, entity fan-out, and SF=1 output are unchanged (the FNV golden hashes still match). The dbgen `Make*` layer still allocates `[]any` per entity internally — that is the documented allocation boundary, not the typed adapter.
+- TPC-DS loads through the typed insert path: all 24 tables (18 dimension tables, inventory, and 6 fan-out sales/returns fact tables) stream from a `gen.BatchSource` adapter over the canonical dsdgen generator, so `InsertTpcds` no longer synthesizes a protobuf `InsertSpec`. Canonical dsdgen text output, null semantics, ticket fan-out, and nominal fact-row reporting are unchanged.
+- The legacy `InsertSpec` load path is gone. `Driver.InsertSpec`, `Bench.InsertSpec`, `loadsource.Build`, the per-driver `InsertSpec` methods, `RunParallelByWorkers`, and the dgproto↔driver `MethodFromProto`/`MethodToProto` boundary converters are removed; every workload now loads exclusively through the typed `driver.Insert`/`Bench.Insert` path over `gen.BatchSource`. The shared `Chunk`/`SplitChunks` helpers moved to `pkg/driver/common/chunks.go`; per-driver `runInsertChunk`/bulk/COPY helpers are unchanged. Insert-method strings (`plain_query`, `plain_bulk`, `columnar`, `native`), probe output, and progress/metrics semantics are preserved.
 - Metrics can again be exported to an OpenTelemetry collector through the existing `global.exporter.otlpExport` gRPC or HTTP configuration. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
 
 ### Changed
 
+- TPC-DS typed loads format common cell types directly into reusable buffers. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Benchmark metrics now use standard OpenTelemetry counters, gauges, and fixed-bucket histograms. Query throughput and error rates are derived from monotonic `*_total` counters instead of k6-style sampled rates. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
 - The `stroppy help <topic>` topics (drivers, config-file, steps, resolution, sql, envs, datagen, probe) now describe the Go-native binary — the previous text still documented the removed TypeScript/k6 workflow (`k6Args`, `declareDriverSetup`, `.ts` script mode, the `--` passthrough).
 
 ### Fixed
 
+- Typed inserts reject malformed requests consistently, and generator ranges remain correct at integer boundaries. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Long high-throughput workloads keep bounded metric memory instead of retaining every latency observation until the final summary. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
 
 ### Removed
 
+- The relational data-generation expression framework is gone. `pkg/datagen/{compile,expr,runtime,lookup,cohort,stdlib,seed}` and the frozen `pkg/datagen/dgproto` protobuf types (InsertSpec, Expr, StreamDraw, …) are deleted; workload data generation is now exclusively plain Go under `pkg/gen`. The surviving primitives (`gen.Permute`, `gen.SplitMix64`) moved into `pkg/gen`, and the `datagen-framework.md` and `proto.md` guides were removed — `docs/parallelism.md` is the load-parallelism reference. The TPC-H/TPC-DS canonical generators keep their original algorithms and seeds. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Stroppy no longer depends on k6, TypeScript, sobek, esbuild, or node/npm. The engine is now a single plain Go binary built with `go build` — authoring benchmarks in TypeScript, the `--` k6-args passthrough, the `gen` scaffolding command, and the cloud status gRPC service are all gone. Concurrency is configured with the `VUS`/`DURATION`/`ITER` environment variables instead of k6 flags. Workloads are Go-native (`tpcc/tx`, `tpcb/tx`, `tpch/tx`, `tpcds`, `simple`, `execute_sql`); `.sql` files and inline SQL still work.
 
 ## [5.7.3] - 2026-07-29

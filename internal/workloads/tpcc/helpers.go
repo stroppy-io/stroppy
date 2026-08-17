@@ -8,7 +8,7 @@ package tpcc
 import (
 	"math/rand/v2"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/seed"
+	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
 // tpccSyllables + cLastDict: spec §4.3.2.3 — C_LAST is a 3-syllable concat indexed
@@ -27,12 +27,12 @@ func init() {
 // cLast returns the syllable-concat surname for a NURand index in [0,999].
 func cLast(idx int) string { return cLastDict[idx%1000] }
 
-// nurand is the TPC-C §2.1.6 non-uniform random draw, ported from
-// pkg/datagen/expr/kernels.go KernelNURand. Used at tx time for c_id / ol_i_id /
-// c_last picks. cSalt personalizes paramC per generator so streams stay independent.
+// nurand is the TPC-C §2.1.6 non-uniform random draw, salted with gen.SplitMix64
+// so each generator's c-parameter stream stays independent. Used at tx time for
+// c_id / ol_i_id / c_last picks.
 func nurand(r *rand.Rand, paramA, lower, upper int, cSalt uint64) int {
 	span := int64(upper - lower + 1)
-	paramC := int64(seed.SplitMix64(cSalt)) & int64(paramA) //nolint:gosec // G115: scale-bound, no overflow
+	paramC := int64(gen.SplitMix64(cSalt)) & int64(paramA) //nolint:gosec // G115: scale-bound, no overflow
 	aDraw := r.IntN(paramA + 1)
 	yDraw := r.IntN(upper-lower+1) + lower
 

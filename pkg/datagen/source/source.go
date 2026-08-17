@@ -1,8 +1,9 @@
 // Package source defines the row-production contract that every load-time data
 // generator implements and every driver consumes. It is the seam that lets a
-// driver stream rows without knowing whether they come from the native
-// seekable evaluator (pkg/datagen/runtime) or a ported generator such as
-// TPC-H dbgen (pkg/datagen/tpchgen).
+// driver stream rows without knowing whether they come from a ported canonical
+// generator such as TPC-H dbgen (pkg/datagen/tpchgen) or TPC-DS dsdgen
+// (pkg/datagen/tpcdsgen), or from a typed gen.BatchSource adapted via the
+// common.BatchRowSource shim.
 //
 // The contract is deliberately tiny: a RowSource is a forward iterator with a
 // known column order, and a Partitionable hands out independent RowSources for
@@ -21,7 +22,7 @@ type RowSource interface {
 //
 // Units is the number of partitionable units — the range the loader carves into
 // chunks and the unit of Partition's (start, count). For row-at-a-time
-// generators (the native runtime) a unit is one output row, so Units ==
+// generators (TPC-H itself, TPC-DS facts) a unit is one output row, so Units ==
 // TotalRows. For generators whose unit fans out into many rows (TPC-H: one
 // order -> many lineitems, one part -> many partsupps) a unit is one entity and
 // Units < TotalRows.
@@ -35,7 +36,7 @@ type RowSource interface {
 // start to the end" (the single-worker path).
 //
 // Partition implementations must be safe to call and drain concurrently across
-// chunks (both the native runtime and the instanced TPC-H generator own their
+// chunks (the instanced TPC-H generator and TPC-DS streams own their
 // per-partition state).
 type Partitionable interface {
 	Units() int64

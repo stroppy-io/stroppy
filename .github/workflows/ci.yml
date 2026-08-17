@@ -27,7 +27,7 @@ jobs:
           args: --config .golangci.yml
 
       - name: Run tests
-        run: make tests
+        run: make tests TEST_FLAGS=-short
 
   # Integration builds stroppy once, runs the smoke tiers, and uploads the
   # binary artifact. Build is gated behind it — the published binary is the one

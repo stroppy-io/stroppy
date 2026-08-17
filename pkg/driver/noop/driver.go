@@ -14,9 +14,6 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
-	"github.com/stroppy-io/stroppy/pkg/datagen/dgproto"
-	"github.com/stroppy-io/stroppy/pkg/datagen/loadsource"
-	"github.com/stroppy-io/stroppy/pkg/datagen/runtime"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
@@ -24,6 +21,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
 const defaultBulkSize = 2500
@@ -68,34 +66,32 @@ func NewDriver(opts driver.Options) *Driver {
 	}
 }
 
-// InsertSpec drains a relational source end-to-end and discards the rows.
-// Exercises the full generation pipeline so benchmarks stay comparable, but
-// no I/O is performed. Honors spec.Parallelism.Workers so framework-only
-// scaling is measurable: workers fan out through common.RunParallelByWorkers,
-// each draining its own partition. There is no I/O to arbitrate: the whole
+// Insert runs a typed [driver.InsertRequest] through the noop driver. It
+// exercises the full typed generation pipeline (cursor prepare, batch
+// fill, row materialization) and discards the rows without I/O, so
+// framework overhead stays comparable to the legacy InsertSpec path.
+// Every method is accepted: there is no I/O to gate on, so the whole
 // point is to scale row generation alone.
-func (d *Driver) InsertSpec(
+func (d *Driver) Insert(
 	ctx context.Context,
-	spec *dgproto.InsertSpec,
+	req *driver.InsertRequest,
 ) (*stats.Query, error) {
-	if spec == nil {
-		return nil, fmt.Errorf("noop: %w", runtime.ErrInvalidSpec)
+	if err := driver.ValidateInsert(req); err != nil {
+		return nil, err
 	}
 
-	part, err := loadsource.Build(spec)
-	if err != nil {
-		return nil, fmt.Errorf("noop: %w", err)
-	}
-
-	workers := int(spec.GetParallelism().GetWorkers())
+	workers := req.Workers
 	if workers < 1 {
 		workers = 1
 	}
 
+	columns := req.Source.Schema().ColumnNames()
 	start := time.Now()
 
-	rows, err := common.RunParallelByWorkers(ctx, part, workers,
-		func(workerCtx context.Context, _ common.Chunk, src source.RowSource) error {
+	rows, err := common.RunParallelBatch(ctx, req.Source, workers, d.bulkSize,
+		func(workerCtx context.Context, _ common.Chunk, cur gen.Cursor) error {
+			src := common.NewBatchRowSource(cur, columns, len(columns))
+
 			return drainSource(workerCtx, src)
 		})
 	if err != nil {
