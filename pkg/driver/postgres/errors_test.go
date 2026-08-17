@@ -19,7 +19,12 @@ func TestClassifyError(t *testing.T) {
 		want driver.ErrorKind
 	}{
 		{name: "serialization", err: &pgconn.PgError{Code: "40001"}, want: driver.ErrorKindSerialization},
-		{name: "wrapped deadlock", err: fmt.Errorf("query: %w", &pgconn.PgError{Code: "40P01"}), want: driver.ErrorKindDeadlock},
+		{
+			name: "wrapped deadlock",
+			err:  fmt.Errorf("query: %w", &pgconn.PgError{Code: "40P01"}),
+			want: driver.ErrorKindDeadlock,
+		},
+		{name: "lock timeout", err: &pgconn.PgError{Code: "55P03"}, want: driver.ErrorKindLockTimeout},
 		{name: "other postgres", err: &pgconn.PgError{Code: "23505"}, want: driver.ErrorKindUnknown},
 		{name: "other", err: errors.New("boom"), want: driver.ErrorKindUnknown},
 	}

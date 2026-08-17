@@ -15,6 +15,8 @@ func (*Driver) ClassifyError(err error) driver.ErrorFacts {
 			return driver.ErrorFacts{Kind: driver.ErrorKindSerialization}
 		case "40P01":
 			return driver.ErrorFacts{Kind: driver.ErrorKindDeadlock}
+		case "55P03":
+			return driver.ErrorFacts{Kind: driver.ErrorKindLockTimeout}
 		}
 	}
 
