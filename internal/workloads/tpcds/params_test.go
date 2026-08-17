@@ -83,7 +83,7 @@ func TestTypedParameterSemantics(t *testing.T) {
 		{
 			name: "typed config false remains false",
 			inputs: bench.ParamInputs{
-				Config: map[string]json.RawMessage{"validateForce": json.RawMessage("false")},
+				WorkloadConfig: map[string]json.RawMessage{"validateForce": json.RawMessage("false")},
 			},
 			wantStream: -1,
 		},
