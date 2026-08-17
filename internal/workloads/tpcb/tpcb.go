@@ -53,10 +53,7 @@ func (*workload) Name() string { return "tpcb/tx" }
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.driverType = b.DriverTypeName()
 
-	w.scale = int64(bench.EnvInt("SCALE_FACTOR", 1))
-	if w.scale < 1 {
-		w.scale = 1
-	}
+	w.scale = int64(max(bench.EnvInt("SCALE_FACTOR", 1), 1))
 
 	w.iso = resolveIsolation(w.driverType)
 	w.sql = mustLoadSQL(w.driverType)

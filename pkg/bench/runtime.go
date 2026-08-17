@@ -169,10 +169,7 @@ type scenarioSpec struct {
 func readScenario() scenarioSpec {
 	spec := scenarioSpec{name: "workload"}
 
-	spec.vus = EnvInt("VUS", 1)
-	if spec.vus < 1 {
-		spec.vus = 1
-	}
+	spec.vus = max(EnvInt("VUS", 1), 1)
 
 	if d := Env("DURATION", ""); d != "" {
 		dur, err := time.ParseDuration(d)
@@ -186,10 +183,7 @@ func readScenario() scenarioSpec {
 
 	spec.executor = "shared-iterations"
 
-	spec.iterations = int64(EnvInt("ITER", 1))
-	if spec.iterations < 1 {
-		spec.iterations = 1
-	}
+	spec.iterations = int64(max(EnvInt("ITER", 1), 1))
 
 	return spec
 }
@@ -197,50 +191,61 @@ func readScenario() scenarioSpec {
 // --- executor (shared-iterations + constant-vus) ---
 
 func runScenario(ctx context.Context, sc scenarioSpec, iterate func(*VU) error) error {
+	scenarioCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	fatalErrors := make(chan error, 1)
+	var wg sync.WaitGroup
+
+	startWorker := func(vuid int, keep func() bool) {
+		wg.Go(func() {
+			if err := runWorker(scenarioCtx, vuid, iterate, keep); IsFatalError(err) {
+				select {
+				case fatalErrors <- err:
+					cancel()
+				default:
+				}
+			}
+		})
+	}
+
 	switch sc.executor {
 	case "shared-iterations":
-		var (
-			remaining = sc.iterations
-			wg        sync.WaitGroup
-		)
+		remaining := sc.iterations
 		for i := range sc.vus {
-			wg.Add(1)
-			go func(vuid int) {
-				defer wg.Done()
-
-				runWorker(ctx, vuid, iterate, func() bool {
-					return atomic.AddInt64(&remaining, -1) >= 0
-				})
-			}(i + 1)
+			startWorker(i+1, func() bool {
+				return atomic.AddInt64(&remaining, -1) >= 0
+			})
 		}
-
-		wg.Wait()
 	case "constant-vus":
 		deadline := time.Now().Add(sc.duration)
-
-		var wg sync.WaitGroup
 		for i := range sc.vus {
-			wg.Add(1)
-			go func(vuid int) {
-				defer wg.Done()
-
-				runWorker(ctx, vuid, iterate, func() bool {
-					return time.Now().Before(deadline)
-				})
-			}(i + 1)
+			startWorker(i+1, func() bool {
+				return time.Now().Before(deadline)
+			})
 		}
-
-		wg.Wait()
 	default:
 		return fmt.Errorf("%w %q", errUnsupportedExecutor, sc.executor)
 	}
 
-	return nil
+	wg.Wait()
+
+	select {
+	case err := <-fatalErrors:
+		return err
+	default:
+	}
+
+	return ctx.Err()
 }
 
-func runWorker(ctx context.Context, vuid int, iterate func(*VU) error, keep func() bool) {
+func runWorker(ctx context.Context, vuid int, iterate func(*VU) error, keep func() bool) error {
 	vu := &VU{root: root, vuid: uint64(vuid), ctx: ctx} //nolint:gosec // G115: scale-bound, no overflow
 	for keep() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		vu.iterTest++
 		vu.iterScenario++
 
@@ -249,18 +254,21 @@ func runWorker(ctx context.Context, vuid int, iterate func(*VU) error, keep func
 		root.txMetrics.recordIteration(vu, time.Since(start))
 
 		if err != nil {
-			if errors.Is(err, errAbort) {
-				return
+			if IsFatalError(err) {
+				return err
+			}
+			if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
+				return ctx.Err()
 			}
 
 			root.lg.Error("iteration failed", zap.Int("vu", vuid), zap.Error(err))
 
-			return
+			return nil
 		}
 	}
-}
 
-var errAbort = errors.New("aborted")
+	return nil
+}
 
 // --- metric handles (Counter/Trend/Rate) ---
 

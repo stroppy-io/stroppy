@@ -272,17 +272,21 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 			sleepSeconds(float64(keyingTime[name]))
 		}
 
+		var err error
 		switch idx {
 		case 0:
-			w.newOrder(ctx, b, vs)
+			err = w.newOrder(ctx, b, vs)
 		case 1:
-			w.payment(ctx, b, vs)
+			err = w.payment(ctx, b, vs)
 		case 2:
-			w.orderStatus(ctx, b, vs)
+			err = w.orderStatus(ctx, b, vs)
 		case 3:
-			w.delivery(ctx, b, vs)
+			err = w.delivery(ctx, b, vs)
 		case 4:
-			w.stockLevel(ctx, b, vs)
+			err = w.stockLevel(ctx, b, vs)
+		}
+		if err != nil {
+			return err
 		}
 
 		if w.pacing {
@@ -318,7 +322,7 @@ func (w *workload) retryPolicy(b *bench.Bench) bench.RetryPolicy {
 
 // --- new_order ---
 
-func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) {
+func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.newOrderTotal.Add(1)
 
 	start := time.Now()
@@ -357,7 +361,7 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) {
 		lineIID[olCnt-1] = items + 1 // nonexistent item → sentinel rollback
 	}
 
-	_ = bench.Retry0(ctx, w.retryPolicy(b), func() error {
+	return bench.Retry0(ctx, w.retryPolicy(b), func() error {
 		tx, err := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
 		if err != nil {
 			return err
@@ -568,7 +572,7 @@ func (w *workload) batchRead(
 // --- payment ---
 
 //nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
-func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
+func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.paymentTotal.Add(1)
 
 	start := time.Now()
@@ -606,7 +610,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 
 	var wasBC bool
 
-	_ = bench.Retry0(ctx, w.retryPolicy(b), func() error {
+	err := bench.Retry0(ctx, w.retryPolicy(b), func() error {
 		wasBC = false
 
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.TxX) error {
@@ -715,6 +719,8 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) {
 	if wasBC {
 		w.m.paymentBc.Add(1)
 	}
+
+	return err
 }
 
 func (w *workload) paymentUpdateWarehouse(
@@ -818,7 +824,7 @@ func (w *workload) customerByName(
 // --- order_status (read-only) ---
 
 //nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
-func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState) {
+func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.orderStatusTotal.Add(1)
 
 	start := time.Now()
@@ -835,7 +841,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 	}
 
 	bynameObserved := false
-	_ = bench.Retry0(ctx, w.retryPolicy(b), func() error {
+	err := bench.Retry0(ctx, w.retryPolicy(b), func() error {
 		bynameObserved = false
 
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.TxX) error {
@@ -904,12 +910,14 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 	if bynameObserved {
 		w.m.orderStatusByname.Add(1)
 	}
+
+	return err
 }
 
 // --- delivery ---
 
 //nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
-func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
+func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.deliveryTotal.Add(1)
 
 	start := time.Now()
@@ -918,7 +926,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 	wID := vs.homeWID
 	carrierID := vs.ri(vs.dCarrier, 1, 10)
 
-	_ = bench.Retry0(ctx, w.retryPolicy(b), func() error {
+	return bench.Retry0(ctx, w.retryPolicy(b), func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.TxX) error {
 			for dID := int64(1); dID <= districtsPerWarehouse; dID++ {
 				minRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_min_new_order"), map[string]any{
@@ -991,7 +999,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) {
 // --- stock_level (read-only) ---
 
 //nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
-func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) {
+func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.stockLevelTotal.Add(1)
 
 	start := time.Now()
@@ -1001,7 +1009,7 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 	dID := vs.ri(vs.slDID, 1, districtsPerWarehouse)
 	threshold := vs.ri(vs.slThreshold, 10, 20)
 
-	_ = bench.Retry0(ctx, w.retryPolicy(b), func() error {
+	return bench.Retry0(ctx, w.retryPolicy(b), func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"}, func(tx *bench.TxX) error {
 			nextOIDv, err := tx.QueryValue(ctx, w.q("workload_tx_stock_level", "get_district"), map[string]any{
 				"w_id": wID, "d_id": dID,
