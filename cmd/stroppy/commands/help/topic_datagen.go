@@ -41,10 +41,10 @@ DETERMINISM AND PARALLEL LOAD
   reproduce rows across workers, batch sizes, and partition boundaries, so a
   driver can split a table into worker ranges with no warm-up.
 
-  Workloads that support parallel load read LOAD_WORKERS and pass it as the
+  Workloads that support parallel load declare --load-workers and pass it as the
   request worker count:
 
-    stroppy run tpcc/tx -d pg -e LOAD_WORKERS=8 \
+    stroppy run tpcc/tx -d pg --load-workers 8 \
       --steps drop_schema,create_schema,load_data
 
 CSV OUTPUT

@@ -318,6 +318,27 @@ func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
 // DriverCLIConfigs holds parsed driver configurations indexed by driver number.
 type DriverCLIConfigs map[int]*DriverCLIConfig
 
+// DriverCLIConfigsFromFile converts frozen config-file drivers into mutable CLI configs.
+func DriverCLIConfigsFromFile(fileDrivers map[uint32]*stroppy.DriverRunConfig) (DriverCLIConfigs, error) {
+	configs := make(DriverCLIConfigs, len(fileDrivers))
+
+	for idx, fileConfig := range fileDrivers {
+		data, err := (protojson.MarshalOptions{EmitUnpopulated: false}).Marshal(fileConfig)
+		if err != nil {
+			return nil, fmt.Errorf("serialize config file driver %d: %w", idx, err)
+		}
+
+		config, err := NewDriverCLIConfigFromJSON(string(data))
+		if err != nil {
+			return nil, fmt.Errorf("convert config file driver %d: %w", idx, err)
+		}
+
+		configs[int(idx)] = &config
+	}
+
+	return configs, nil
+}
+
 // ToEnvVars serializes all driver configs to STROPPY_DRIVER_N=<json> pairs.
 // If a STROPPY_DRIVER_N env var is already set in the process environment,
 // the CLI-composed value is skipped — user-set env takes precedence.

@@ -1,7 +1,7 @@
 # parallelism
 
 How stroppy's typed data-generation load parallelism works, why it is
-deterministic across workers, and how to tune `LOAD_WORKERS` for a
+deterministic across workers, and how to tune `--load-workers` for a
 workload.
 
 `pkg/gen` replaces the relational expression framework: generation is
@@ -14,14 +14,15 @@ mutable runtime, and nothing to race.
 
 ## 1. Model
 
-**One dial.** A workload reads `LOAD_WORKERS` and passes it as the
-`Workers` field of `driver.InsertRequest`:
+**One dial.** A workload declares `--load-workers` (`params.loadWorkers` in
+config) and passes the resolved value as the `Workers` field of
+`driver.InsertRequest`:
 
 ```go
 req := &driver.InsertRequest{
     Table:   "orders",
     Method:  driver.InsertNative,
-    Workers: loadWorkers,            // -e LOAD_WORKERS=N
+    Workers: loadWorkers,            // --load-workers=N
     Source:  source,
 }
 b.Insert(ctx, req)
@@ -47,7 +48,7 @@ single worker, and batches are worker-private after `Prepare`.
 
 ## 2. End-to-end trace
 
-How `LOAD_WORKERS=4` becomes four goroutines writing concurrently.
+How `--load-workers=4` becomes four goroutines writing concurrently.
 
 1. **Workload.** Builds a source and a request, calls `b.Insert` inside
    a `load_data` step (guarded by `GlobalOnce`).
@@ -105,7 +106,7 @@ stats.
 
 ---
 
-## 5. Setting `LOAD_WORKERS`
+## 5. Setting `--load-workers`
 
 Guideline for workload authors.
 

@@ -47,9 +47,9 @@ var (
 var txWeights = []int{45, 43, 4, 4, 4}
 
 // resolveIsolation mirrors tpcc_common: pg/mysql→repeatable_read, pico→none, ydb→serializable.
-func resolveIsolation(dt bench.DriverTypeName) bench.TxIsolationName {
-	if v := bench.Env("TX_ISOLATION", ""); v != "" {
-		return bench.TxIsolationName(v)
+func resolveIsolation(dt bench.DriverTypeName, override bench.TxIsolationName) bench.TxIsolationName {
+	if override != "" {
+		return override
 	}
 
 	switch dt {
@@ -62,9 +62,9 @@ func resolveIsolation(dt bench.DriverTypeName) bench.TxIsolationName {
 	}
 }
 
-func sqlFile(dt bench.DriverTypeName) string {
-	if v := bench.Env("SQL_FILE", ""); v != "" {
-		return v
+func sqlFile(dt bench.DriverTypeName, override string) string {
+	if override != "" {
+		return override
 	}
 
 	switch dt {
@@ -79,8 +79,8 @@ func sqlFile(dt bench.DriverTypeName) string {
 	}
 }
 
-func mustLoadSQL(dt bench.DriverTypeName) *bench.SQL {
-	s, err := bench.LoadSQL(preset, sqlFile(dt))
+func mustLoadSQL(dt bench.DriverTypeName, override string) *bench.SQL {
+	s, err := bench.LoadSQL(preset, sqlFile(dt, override))
 	if err != nil {
 		panic(err)
 	}

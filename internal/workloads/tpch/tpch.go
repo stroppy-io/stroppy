@@ -25,6 +25,8 @@ type workload struct {
 	loadWorkers   int
 	useUnlogged   bool
 	ydbColumn     bool
+	ydbStoreMode  string
+	sqlFile       string
 
 	params map[string]map[string]any // final per-query params (end dates + q1 cutoff precomputed)
 	m      map[string]*queryMetrics
@@ -37,16 +39,28 @@ type queryMetrics struct {
 	elapsedTotal *bench.Metric
 }
 
-func init() { bench.Register(&workload{}) }
+func init() { bench.Register(func() bench.Workload { return &workload{} }) }
 
 func (*workload) Name() string { return "tpch/tx" }
+
+func (w *workload) Define(d *bench.Def) error {
+	w.scaleFactor = d.Param.Float64("scale-factor", 1, "TPC-H scale factor.").Value()
+	w.loadWorkers = d.Param.Int("load-workers", 0, "Workers used to load each table.").Value()
+	w.useUnlogged = d.Param.Bool("pg-unlogged", false, "Use unlogged PostgreSQL tables while loading.").Value()
+	w.ydbStoreMode = d.Param.String("ydb-store-mode", "column", "YDB table store mode.").Value()
+	w.sqlFile = d.Param.String("sql-file", "", "SQL dialect file override.").Value()
+
+	if w.scaleFactor <= 0 {
+		return fmt.Errorf("%w, got %v", errScaleFactorMustBePositive, w.scaleFactor)
+	}
+
+	return nil
+}
 
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.driverType = b.DriverTypeName()
 
-	if err := w.initConfig(); err != nil {
-		return err
-	}
+	w.initConfig()
 
 	// Per-query metrics (22 × 4).
 	w.m = w.initMetrics(b)
@@ -121,21 +135,13 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	return nil
 }
 
-// initConfig reads env-driven workload tuning into w fields.
-func (w *workload) initConfig() error {
-	w.scaleFactor = bench.EnvFloat("SCALE_FACTOR", 1)
-	if w.scaleFactor <= 0 {
-		return fmt.Errorf("%w, got %v", errScaleFactorMustBePositive, w.scaleFactor)
-	}
-
-	w.loadWorkers = bench.EnvInt("LOAD_WORKERS", 0)
-	w.useUnlogged = bench.Env("PG_UNLOGGED", "false") == "true" && w.driverType == bench.DriverPostgres
-	w.ydbColumn = w.driverType == bench.DriverYDB && bench.Env("YDB_STORE_MODE", "column") == "column"
+// initConfig resolves driver-specific workload configuration.
+func (w *workload) initConfig() {
+	w.useUnlogged = w.useUnlogged && w.driverType == bench.DriverPostgres
+	w.ydbColumn = w.driverType == bench.DriverYDB && w.ydbStoreMode == "column"
 	w.isPicodata = w.driverType == bench.DriverPicodata
 	w.needsEndDates = w.isPicodata || w.driverType == bench.DriverYDB
-	w.sql = mustLoadSQL(w.driverType)
-
-	return nil
+	w.sql = mustLoadSQL(w.driverType, w.sqlFile)
 }
 
 // initMetrics wires the per-query duration/counters (22 × 4).

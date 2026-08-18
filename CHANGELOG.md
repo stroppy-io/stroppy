@@ -12,6 +12,9 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- `stroppy probe` now lists registered workload parameter flags, and its JSON output includes each workload's typed schema for tooling and discovery. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
+- Typed scenario and workload parameters can be set with `--name` flags or native JSON values in the config file's `run` and `params` objects, and `stroppy run <workload> --help` lists the available parameters. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
+- Go workloads can declare typed string, boolean, numeric, and duration parameters with defaults, descriptions, source tracking, and discoverable schemas. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Database errors are classified by each driver into shared facts, and Go workloads can override the default retry, error, ignore, or fatal action for each fact without matching backend-specific codes or messages. ([#127](https://github.com/stroppy-io/stroppy/pull/127))
 - New `pkg/gen` random-generation primitives library: deterministic, seekable, allocation-free scalar and text draws composed in plain Go, intended to replace the relational datagen expression framework for workload data loading.
 - `pkg/gen` now provides typed direct-output batches: a reusable columnar [Batch] with bound [Column] handles and an [IndexedSource] that fills rows through a plain Go row callback, so workload formulas write straight into prepared storage with zero generation-time allocations after preparation.
@@ -27,12 +30,15 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- Built-in workloads expose their tuning options as typed parameters while preserving the existing environment-variable names. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - TPC-DS typed loads format common cell types directly into reusable buffers. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Benchmark metrics now use standard OpenTelemetry counters, gauges, and fixed-bucket histograms. Query throughput and error rates are derived from monotonic `*_total` counters instead of k6-style sampled rates. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
 - The `stroppy help <topic>` topics (drivers, config-file, steps, resolution, sql, envs, datagen, probe) now describe the Go-native binary — the previous text still documented the removed TypeScript/k6 workflow (`k6Args`, `declareDriverSetup`, `.ts` script mode, the `--` passthrough).
 
 ### Fixed
 
+- Workload help and shell completion expose typed flags accurately, including explicit booleans and contextual defaults, and SQL override positionals reach registered workload bindings. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
+- Typed run parameters and SQL sources keep CLI-over-environment precedence, config env names reject case-only collisions, shared driver pool settings remain active alongside driver-specific settings, and invalid pool fields fail clearly instead of being ignored. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Typed inserts reject malformed requests consistently, and generator ranges remain correct at integer boundaries. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Long high-throughput workloads keep bounded metric memory instead of retaining every latency observation until the final summary. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
 

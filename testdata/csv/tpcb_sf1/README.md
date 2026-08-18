@@ -1,8 +1,7 @@
 # Golden SHA-256 hashes — TPC-B SF=1 via the CSV driver
 
 Each `<table>.csv.sha256` is the hex-encoded SHA-256 of the
-corresponding merged CSV emitted by `workloads/tpcb/tx.ts` at
-`SCALE_FACTOR=1` with the CSV driver's default options (`?merge=true`,
+corresponding merged CSV emitted by `tpcb/tx` at a scale factor of 1 with the CSV driver's default options (`?merge=true`,
 comma separator, headers on).
 
 Shape: header row + 1 / 10 / 100_000 data rows for
@@ -14,11 +13,11 @@ line endings, RFC-4180 quoting as produced by `encoding/csv`.
 ## Regenerate
 
 ```
-./build/stroppy run ./workloads/tpcb/tx.ts \
+./build/stroppy run tpcb/tx \
   -D url='/tmp/tpcb-csv?merge=true&workload=tpcb_sf1' \
   -D driverType=csv \
-  -e SCALE_FACTOR=1 \
-  -e LOAD_WORKERS=1 \
+  --scale-factor 1 \
+  --load-workers 1 \
   --steps drop_schema,create_schema,load_data
 
 sha256sum /tmp/tpcb-csv/tpcb_sf1/*.csv > new-hashes.txt

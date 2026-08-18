@@ -9,45 +9,43 @@ templates at the canonical qualification parameters.
 
 ```bash
 # PostgreSQL
-./build/stroppy run tpcds/tpcds -d pg \
+./build/stroppy run tpcds -d pg \
     -D url=postgres://postgres:postgres@localhost:5432 \
-    -e SCALE_FACTOR=0.01
+    --scale-factor 0.01
 
 # MySQL — note the go-sql-driver DSN form (NOT a mysql:// URL):
-./build/stroppy run tpcds/tpcds -d mysql \
+./build/stroppy run tpcds -d mysql \
     -D "url=root:pass@tcp(127.0.0.1:3306)/stroppy?charset=utf8mb4&parseTime=True&loc=Local" \
-    -e SCALE_FACTOR=0.01 -e LOAD_WORKERS=4
+    --scale-factor 0.01 --load-workers 4
 
 # YDB (YQL via the native driver):
-./build/stroppy run tpcds/tpcds -d ydb \
+./build/stroppy run tpcds -d ydb \
     -D url=grpc://localhost:2136/local \
-    -e SCALE_FACTOR=0.01
+    --scale-factor 0.01
 
 # Picodata (pgwire) — LOAD ONLY. Query execution is not yet supported on
 # picodata (see Status); run the prep steps without the workload:
-./build/stroppy run tpcds/tpcds -d pico \
+./build/stroppy run tpcds -d pico \
     -D url=postgres://admin:T0psecret@localhost:1331/admin \
-    -e SCALE_FACTOR=0.01 --no-steps workload
+    --scale-factor 0.01 --no-steps workload
 ```
 
-Env overrides:
+Typed parameters (`stroppy run tpcds --help` lists the full schema):
 
 ```bash
--e SCALE_FACTOR=0.01   # any positive float; fractional for smoke tests.
--e LOAD_WORKERS=4      # parallel InsertSpec workers per table during load.
--e YDB_STORE_MODE=column # ydb only: 'column' (default) or 'row' storage layout.
--e MAX_DURATION=24h    # run wall-clock cap (default 24h; the workload sets its
-                       # own so large-scale loads aren't killed by k6's 10m default).
--e STREAMS=4           # concurrent throughput streams (1 = single power-test stream).
--e QUERY_STREAM=0      # single generated stream N in-process (empty = baked set).
--e QUERY_SEED=42       # seed for generated streams.
--e SQL_FILE=./pg.sql   # override the per-driver baked query file.
+--scale-factor 0.01      # any positive float; fractional for smoke tests
+--load-workers 4         # parallel workers per table during load
+--ydb-store-mode column  # ydb only: column (default) or row storage
+--streams 4              # number of query streams
+--query-stream 0         # generated stream N (omit for the baked set)
+--query-seed 42          # generated-stream seed
+--sql-file ./pg.sql      # override the per-driver query file
 ```
 
 Note: the static tables (`date_dim`, `time_dim`, `customer_demographics`)
 do not scale down — `customer_demographics` is always ~1.9M rows — so load
-time at small SCALE_FACTOR is dominated by them, especially on MySQL whose
-parameterized bulk INSERT is slower than Postgres COPY (use LOAD_WORKERS).
+time at small scale factors is dominated by them, especially on MySQL whose
+parameterized bulk INSERT is slower than Postgres COPY (increase `--load-workers`).
 
 ## Steps
 
@@ -118,17 +116,17 @@ Postgres does not; the rewrite is semantically identical).
 
 The default run uses the baked, verified `pg.sql` / `mysql.sql` (the canonical
 qualification parameters). For throughput-style runs that vary parameters,
-set `QUERY_STREAM` and the workload generates that stream's queries **in-process**
+set `--query-stream N` and the workload generates that stream's queries **in-process**
 during the run — no offline step:
 
 ```bash
-./build/stroppy run tpcds/tpcds -d pg \
+./build/stroppy run tpcds -d pg \
     -D url=postgres://postgres:postgres@localhost:5432 \
-    -e SCALE_FACTOR=1 -e QUERY_STREAM=0 -e QUERY_SEED=42
+    --scale-factor 1 --query-stream 0 --query-seed 42
 ```
 
-- `QUERY_STREAM=N` selects stream N (empty = baked canonical set).
-- `QUERY_SEED` seeds the generator (reproducible per seed).
+- `--query-stream=N` selects stream N (omit it for the baked canonical set).
+- `--query-seed` seeds the generator (reproducible per seed).
 
 The generator parses the official query templates' `define` headers and produces
 valid, scale-correct parameter values with its own seeded RNG (it does NOT
@@ -146,25 +144,28 @@ The full benchmark is Load + Power + Throughput1 + DataMaint1 + Throughput2 +
 DataMaint2, scored as QphDS@SF. This workload covers:
 
 - **Database Load Test** — `load_data` step. ✅
-- **Power Test** (1 stream, 99 queries serially) — default run (`STREAMS=1`). ✅
-- **Throughput Test** (Sq concurrent streams, each a permuted 99) — `STREAMS=Sq`
-  runs Sq VUs, one stream each, load shared once. ✅ (Sq should be even ≥ 4 for a
-  compliant run; any value works for testing.)
+- **Power Test** (1 stream, 99 queries serially) — default run (`--streams=1`). ✅
+- **Throughput Test** (concurrent generated streams) — `--streams=Sq` enables
+  per-VU generated streams; run concurrency is controlled separately by `--vus`.
+  Use the constant-VUs executor for overlapping streams. (Sq should be even ≥ 4
+  for a compliant run; this workload does not yet implement the complete scored
+  phase sequencing.)
 - **Data Maintenance Test** (sequential refresh runs: fact insert/delete +
   inventory delete over dsdgen refresh data) — not implemented.
 - **QphDS@SF metric** — not computed (per-step timings are reported by k6).
 
 ```bash
-# Throughput test: 4 concurrent streams
-./build/stroppy run tpcds/tpcds -d pg -D url=... -e SCALE_FACTOR=1 -e STREAMS=4
+# Throughput-style run: 4 concurrent generated streams for 10 minutes
+./build/stroppy run tpcds -d pg -D url=... --scale-factor 1 --streams 4 \
+  --executor constant-vus --vus 4 --duration 10m
 ```
 
 ## Status / TODO
 
 - PostgreSQL, MySQL, and YDB: load + all 103 statements verified on a local
-  instance at SCALE_FACTOR=0.01.
+  instance at scale factor 0.01.
 - Picodata: **load supported** (schema + all 24-table bulk load verified at
-  SCALE_FACTOR=0.01). **Query execution is not yet supported** — see the
+  scale factor 0.01). **Query execution is not yet supported** — see the
   picodata query blockers note below.
 - Not yet done: the Data Maintenance phase (refresh-data generation + insert/
   delete DM functions) and the QphDS@SF metric; SF=1 answer-set validation
@@ -187,22 +188,23 @@ Load picodata with `--no-steps workload`.
 
 ## Run shapes and the two-run flow
 
-All TPC workloads share one set of run knobs (set with `-e KEY=VALUE`, **not** the
-`-u/-d/-i` k6 shortcuts, which would discard the scenario):
+All TPC workloads share typed run flags:
 
-- `DURATION` set → fixed-duration throughput test (constant `VUS`); result is TPS.
-- `DURATION` unset → power test (`ITER` iterations); result is elapsed time.
-- `MAX_DURATION` (default `24h`) lifts k6's 10-minute per-iteration cap for large loads.
-- `PG_UNLOGGED=true` enables the PostgreSQL `UNLOGGED` bulk-load dance (off by default).
+- `--executor shared-iterations --iterations N` runs a fixed iteration count.
+- `--executor constant-vus --vus N --duration 1h` runs a throughput test.
+- `--pg-unlogged` enables the PostgreSQL `UNLOGGED` bulk-load dance.
+
+Select the executor explicitly. Legacy `DURATION` without an executor remains
+compatible, infers `constant-vus`, and emits a warning.
 
 The measured workload is a single gatable `workload` step, so prep and measurement
 can run as two passes for a throughput number uncontaminated by load time:
 
 ```bash
 # 1. load only (drop / create / load / create_indexes / analyze), no workload
-./build/stroppy run <workload> -e SCALE_FACTOR=10 --no-steps workload
+./build/stroppy run <workload> --scale-factor 10 --no-steps workload
 # 2. measure only, against the already-loaded data
-./build/stroppy run <workload> -e VUS=64 -e DURATION=1h --steps workload
+./build/stroppy run <workload> --executor constant-vus --vus 64 --duration 1h --steps workload
 ```
 
 A normal single run (no `--steps`) loads and measures in one pass.

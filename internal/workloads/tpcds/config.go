@@ -20,19 +20,29 @@ var tpcdsTables = [24]string{
 	"web_sales", "web_returns",
 }
 
-// dialectFile maps a driver to its (schema, query) SQL files. SQL_FILE / SCHEMA_FILE
-// env overrides take precedence. Dialects without their own query file fall back to pg.
-func dialectFiles(dt bench.DriverTypeName) (schema, queries string) {
+// dialectFiles maps a driver to its (schema, query) SQL files. Explicit file
+// parameters take precedence over driver defaults.
+func dialectFiles(dt bench.DriverTypeName, schemaOverride, queryOverride string) (schema, queries string) {
 	switch dt {
 	case bench.DriverMySQL:
-		return bench.Env("SCHEMA_FILE", "schema.mysql.sql"), bench.Env("SQL_FILE", "mysql.sql")
+		schema, queries = "schema.mysql.sql", "mysql.sql"
 	case bench.DriverPicodata:
-		return bench.Env("SCHEMA_FILE", "schema.pico.sql"), bench.Env("SQL_FILE", "pico.sql")
+		schema, queries = "schema.pico.sql", "pico.sql"
 	case bench.DriverYDB:
-		return bench.Env("SCHEMA_FILE", "schema.ydb.sql"), bench.Env("SQL_FILE", "ydb.sql")
+		schema, queries = "schema.ydb.sql", "ydb.sql"
 	default:
-		return bench.Env("SCHEMA_FILE", "schema.pg.sql"), bench.Env("SQL_FILE", "pg.sql")
+		schema, queries = "schema.pg.sql", "pg.sql"
 	}
+
+	if schemaOverride != "" {
+		schema = schemaOverride
+	}
+
+	if queryOverride != "" {
+		queries = queryOverride
+	}
+
+	return schema, queries
 }
 
 func mustLoad(preset, file string) *bench.SQL {

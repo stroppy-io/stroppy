@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/workloads"
 )
@@ -30,7 +31,8 @@ var (
 			Use:   "probe",
 			Short: "List embedded workload presets and supported drivers",
 			Long: `Probe lists the embedded workload presets (their SQL dialects and docs)
-and the insert methods each driver supports.
+and the insert methods each driver supports. Registered workload parameter schemas
+are read without setting up a workload or connecting to a database.
 
   -o json   machine-readable output
 `,
@@ -47,7 +49,7 @@ and the insert methods each driver supports.
 					)
 				}
 
-				return printCatalog(formatFlagValue)
+				return printCatalog(cmd.OutOrStdout(), formatFlagValue)
 			},
 		}
 
@@ -69,29 +71,96 @@ func contains(haystack []string, needle string) bool {
 	return false
 }
 
-// printCatalog renders the embedded preset catalog and the driver
+// printCatalog renders the embedded preset catalog, workload schemas, and driver
 // insert-method matrix in the requested format.
-func printCatalog(format string) error {
+func printCatalog(output io.Writer, format string) error {
 	catalog, err := workloads.Catalog()
 	if err != nil {
 		return fmt.Errorf("failed to build workloads catalog: %w", err)
 	}
 
+	descriptions, err := bench.DescribeAll()
+	if err != nil {
+		return fmt.Errorf("failed to describe workloads: %w", err)
+	}
+
 	drivers := driverCatalog()
+	workloadSchemas := describeWorkloads(descriptions)
 
 	switch format {
 	case jsonFormat:
-		bytes, err := json.Marshal(map[string]any{"presets": catalog, "drivers": drivers})
+		bytes, err := json.Marshal(catalogOutput{
+			Presets:   catalog,
+			Drivers:   drivers,
+			Workloads: workloadSchemas,
+		})
 		if err != nil {
 			return fmt.Errorf("can't marshal catalog: %w", err)
 		}
 
-		fmt.Fprintf(os.Stdout, "%s\n", string(bytes))
+		fmt.Fprintf(output, "%s\n", string(bytes))
 	case humanFormat:
-		fmt.Fprint(os.Stdout, formatCatalog(catalog, drivers))
+		fmt.Fprint(output, formatCatalog(catalog, drivers, workloadSchemas))
 	}
 
 	return nil
+}
+
+type catalogOutput struct {
+	Presets   []workloads.PresetInfo `json:"presets"`
+	Drivers   []driverEntry          `json:"drivers"`
+	Workloads []workloadEntry        `json:"workloads"`
+}
+
+type workloadEntry struct {
+	Name   string       `json:"name"`
+	Params []paramEntry `json:"params"`
+}
+
+type paramEntry struct {
+	Name               string           `json:"name"`
+	Flag               string           `json:"flag"`
+	Scope              bench.ParamScope `json:"scope"`
+	Type               bench.ParamType  `json:"type"`
+	Description        string           `json:"description"`
+	Default            any              `json:"default"`
+	DefaultDescription string           `json:"default_description,omitempty"`
+	Env                string           `json:"env"`
+	LegacyAliases      []string         `json:"legacy_aliases"`
+	Config             string           `json:"config"`
+}
+
+func describeWorkloads(descriptions []bench.Description) []workloadEntry {
+	entries := make([]workloadEntry, 0, len(descriptions))
+
+	for _, description := range descriptions {
+		params := make([]paramEntry, 0, len(description.Params))
+		for idx := range description.Params {
+			param := &description.Params[idx]
+
+			defaultValue := param.Default
+			if param.Type == bench.ParamTypeDuration {
+				defaultValue = fmt.Sprint(param.Default)
+			}
+
+			params = append(params, paramEntry{
+				Name:               param.Name,
+				Flag:               param.Flag,
+				Scope:              param.Scope,
+				Type:               param.Type,
+				Description:        param.Description,
+				Default:            defaultValue,
+				DefaultDescription: param.DefaultDescription,
+				Env:                param.Env,
+				LegacyAliases:      append([]string{}, param.LegacyEnvAliases...),
+				Config:             param.Config,
+			})
+		}
+
+		entries = append(entries, workloadEntry{Name: description.Name, Params: params})
+	}
+
+	return entries
 }
 
 // driverEntry is one row of the driver capability matrix in catalog output.
@@ -124,9 +193,13 @@ func driverCatalog() []driverEntry {
 	return entries
 }
 
-// formatCatalog builds the human-readable preset listing and driver
-// insert-method matrix.
-func formatCatalog(catalog []workloads.PresetInfo, drivers []driverEntry) string {
+// formatCatalog builds the human-readable preset listing, workload schemas,
+// and driver insert-method matrix.
+func formatCatalog(
+	catalog []workloads.PresetInfo,
+	drivers []driverEntry,
+	workloadSchemas []workloadEntry,
+) string {
 	var builder strings.Builder
 
 	builder.WriteString("\nPRESETS (embedded workloads)\n\n")
@@ -145,6 +218,28 @@ func formatCatalog(catalog []workloads.PresetInfo, drivers []driverEntry) string
 		builder.WriteString("\n")
 	}
 
+	builder.WriteString("WORKLOADS (typed parameters)\n\n")
+
+	for _, workload := range workloadSchemas {
+		builder.WriteString("  " + workload.Name + "\n")
+
+		for _, group := range []struct {
+			label string
+			scope bench.ParamScope
+		}{
+			{"run", bench.ParamScopeRun},
+			{"workload", bench.ParamScopeWorkload},
+		} {
+			flags := paramFlags(workload.Params, group.scope)
+			if len(flags) > 0 {
+				fmt.Fprintf(&builder, "    %-9s %s\n", group.label+":", strings.Join(flags, ", "))
+			}
+		}
+
+		builder.WriteString("\n")
+	}
+
+	builder.WriteString("  Use 'stroppy run <workload> --help' for types, defaults, and sources.\n\n")
 	builder.WriteString("DRIVERS (supported insert methods)\n\n")
 
 	typeWidth := 0
@@ -160,4 +255,16 @@ func formatCatalog(catalog []workloads.PresetInfo, drivers []driverEntry) string
 	builder.WriteString("\n")
 
 	return builder.String()
+}
+
+func paramFlags(params []paramEntry, scope bench.ParamScope) []string {
+	flags := make([]string, 0, len(params))
+	for idx := range params {
+		param := &params[idx]
+		if param.Scope == scope {
+			flags = append(flags, param.Flag)
+		}
+	}
+
+	return flags
 }

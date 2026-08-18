@@ -35,6 +35,20 @@ INPUT MODES
 
   Unknown names (not registered, not .sql, not inline SQL) are rejected.
 
+PARAMETER DISCOVERY AND RESOLUTION
+
+  Once a registered workload is selected, stroppy builds its typed schema and
+  recognizes direct --name flags for its parameters. The help view is dynamic:
+
+    stroppy run tpcc/tx --help
+    stroppy run tpcc/tx --scale-factor 10 --load-workers 8
+
+  Shared run parameters are --executor, --vus, --iterations, and --duration.
+  Select shared-iterations or constant-vus explicitly. Typed values resolve in
+  this order: CLI flag > process env > -e > matching "run"/"params" config >
+  config "env" > declared default. Legacy DURATION can still infer constant-vus,
+  but emits a warning; prefer an explicit executor.
+
 SQL RESOLUTION ORDER
 
   For a SQL file (passed explicitly or selected by the workload), stroppy

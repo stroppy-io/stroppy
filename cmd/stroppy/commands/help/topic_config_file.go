@@ -16,16 +16,22 @@ func init() {
     stroppy run -f prod.json tpcc/tx       # config file + override workload
     stroppy run -f prod.json ./local.sql   # config file + override SQL file
 
-  The config file is decoded with protojson semantics against the frozen
-  RunConfig Go type (see pkg/common/proto/stroppy/run.pb.go). Unknown fields
-  are rejected.
+  Frozen RunConfig fields use strict protojson decoding. The "run" and "params"
+  objects retain native JSON values for typed scenario and workload parameters;
+  their names are validated after the selected workload declares its schema.
+  Unknown top-level fields and unknown names within either scope are rejected.
 
 Example stroppy-config.json:
   {
+    "version": "1",
     "script": "tpcc/tx",
     "global": {
-      "logger": { "logLevel": "LOG_LEVEL_INFO" },
+      "version": "1",
+      "runId": "",
+      "seed": 0,
+      "logger": { "logLevel": "LOG_LEVEL_INFO", "logMode": "LOG_MODE_PRODUCTION" },
       "exporter": {
+        "name": "otlp",
         "otlpExport": { "otlpGrpcEndpoint": "otel-collector:4317", "otlpEndpointInsecure": true }
       }
     },
@@ -37,6 +43,12 @@ Example stroppy-config.json:
         "pool": { "maxConns": 200, "minConns": 200 }
       }
     },
+    "run": {
+      "executor": "constant-vus",
+      "vus": 10,
+      "duration": "30s"
+    },
+    "params": {},
     "env": {
       "WAREHOUSES": "10",
       "POOL_SIZE": "200"
@@ -50,7 +62,9 @@ Example stroppy-config.json:
     sql      string            Explicit SQL file override (2nd positional)
     global   object            Logger and OTEL exporter config (no CLI equivalent)
     drivers  map[string]obj    Per-index driver configs (keys "0", "1", ...)
-    env      map[string]string Workload env overrides (keys uppercased on load)
+    run      object            Typed scenario params: executor, vus, iterations, duration
+    params   object            Typed parameters declared by the selected workload
+    env      map[string]string Legacy workload env overrides (keys uppercased on load)
     steps    []string          Step allowlist (same as CLI --steps)
     noSteps  []string          Step blocklist (same as CLI --no-steps)
 
@@ -69,15 +83,16 @@ Example stroppy-config.json:
 
 PRECEDENCE (highest to lowest)
 
-  The same parameter can come from multiple sources. The first source that
-  provides a non-empty value wins:
+  Typed parameters use strict presence and type validation:
 
-    1. Real environment variables (OS / container env)
-    2. -e KEY=VALUE flags (CLI env overrides)
-    3. Config file "env" map
-    4. -d/-D driver flags (CLI driver presets and overrides)
-    5. Config file "drivers" map
-    6. Workload defaults
+    1. Typed --name CLI flag
+    2. Real environment variable
+    3. -e KEY=VALUE legacy env override
+    4. Matching config object ("run" or "params")
+    5. Config file "env" map
+    6. Declared default
+
+  Driver precedence is CLI -d/-D over the config file "drivers" map.
 
   Special cases:
 
@@ -85,9 +100,11 @@ PRECEDENCE (highest to lowest)
     steps / noSteps:             CLI --steps > config file "steps" field
     logger / OTEL exporter:      config file "global" only (no CLI equivalent)
 
-  There is no "--" k6-args passthrough and no k6Args field in effect:
-  concurrency is env-driven via VUS / DURATION / ITER (see scenario selection
-  in AGENTS.md or 'stroppy run --help').
+  There is no "--" k6-args passthrough and no k6Args field in effect.
+  Use typed executor/vus/iterations/duration parameters; legacy
+  VUS/DURATION/ITER environment values remain compatible. Legacy DURATION
+  without an explicit executor infers constant-vus and emits a warning; prefer
+  an explicit "run.executor" value.
 
 DEBUG LOGGING
 

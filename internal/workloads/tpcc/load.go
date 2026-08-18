@@ -3,7 +3,6 @@ package tpcc
 import (
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
@@ -124,22 +123,12 @@ const (
 	lastNameCSalt uint64 = 0xC1A57
 )
 
-// loadWorkersCount returns the per-table worker fan-out from LOAD_WORKERS, or
-// 1 when unset. The typed counterpart of the legacy workers() helper.
-func loadWorkersCount() int {
-	if n := bench.EnvInt("LOAD_WORKERS", 0); n > 0 {
-		return n
-	}
-
-	return 1
-}
-
 // warehouseRequest builds the typed insert request for the warehouse table.
-func warehouseRequest(scale, warehouseStart int64) *driver.InsertRequest {
+func warehouseRequest(scale, warehouseStart int64, workers int) *driver.InsertRequest {
 	root := gen.New(seedWarehouse)
 
 	return &driver.InsertRequest{
-		Table: "warehouse", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Table: "warehouse", Method: driver.InsertNative, Workers: workers,
 		Source: warehouseSource(root, scale, warehouseStart),
 	}
 }
@@ -217,11 +206,11 @@ func varFields(d gen.Domain, name string) (length, content gen.Field) {
 }
 
 // districtRequest builds the typed insert request for the district table.
-func districtRequest(scale, warehouseStart int64) *driver.InsertRequest {
+func districtRequest(scale, warehouseStart int64, workers int) *driver.InsertRequest {
 	root := gen.New(seedDistrict)
 
 	return &driver.InsertRequest{
-		Table: "district", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Table: "district", Method: driver.InsertNative, Workers: workers,
 		Source: districtSource(root, scale, warehouseStart),
 	}
 }
@@ -299,11 +288,11 @@ func districtSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSour
 }
 
 // customerRequest builds the typed insert request for the customer table.
-func customerRequest(scale, warehouseStart, loadDays int64) *driver.InsertRequest {
+func customerRequest(scale, warehouseStart, loadDays int64, workers int) *driver.InsertRequest {
 	root := gen.New(seedCustomer)
 
 	return &driver.InsertRequest{
-		Table: "customer", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Table: "customer", Method: driver.InsertNative, Workers: workers,
 		Source: customerSource(root, scale, warehouseStart, loadDays),
 	}
 }
@@ -451,11 +440,11 @@ func customerSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.I
 }
 
 // itemRequest builds the typed insert request for the item table.
-func itemRequest() *driver.InsertRequest {
+func itemRequest(workers int) *driver.InsertRequest {
 	root := gen.New(seedItem)
 
 	return &driver.InsertRequest{
-		Table: "item", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Table: "item", Method: driver.InsertNative, Workers: workers,
 		Source: itemSource(root),
 	}
 }
@@ -502,11 +491,11 @@ func itemSource(root gen.Root) *gen.IndexedSource {
 }
 
 // stockRequest builds the typed insert request for the stock table.
-func stockRequest(scale, warehouseStart int64) *driver.InsertRequest {
+func stockRequest(scale, warehouseStart int64, workers int) *driver.InsertRequest {
 	root := gen.New(seedStock)
 
 	return &driver.InsertRequest{
-		Table: "stock", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Table: "stock", Method: driver.InsertNative, Workers: workers,
 		Source: stockSource(root, scale, warehouseStart),
 	}
 }
@@ -572,11 +561,11 @@ func stockSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSource 
 }
 
 // ordersRequest builds the typed insert request for the orders table.
-func ordersRequest(scale, warehouseStart, loadDays int64) *driver.InsertRequest {
+func ordersRequest(scale, warehouseStart, loadDays int64, workers int) *driver.InsertRequest {
 	root := gen.New(seedOrders)
 
 	return &driver.InsertRequest{
-		Table: "orders", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Table: "orders", Method: driver.InsertNative, Workers: workers,
 		Source: ordersSource(root, scale, warehouseStart, loadDays),
 	}
 }
@@ -649,11 +638,11 @@ func ordersSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.Ind
 }
 
 // orderLineRequest builds the typed insert request for the order_line table.
-func orderLineRequest(scale, warehouseStart, loadDays int64) *driver.InsertRequest {
+func orderLineRequest(scale, warehouseStart, loadDays int64, workers int) *driver.InsertRequest {
 	root := gen.New(seedOrderLine)
 
 	return &driver.InsertRequest{
-		Table: "order_line", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Table: "order_line", Method: driver.InsertNative, Workers: workers,
 		Source: orderLineSource(root, scale, warehouseStart, loadDays),
 	}
 }
@@ -731,11 +720,11 @@ func orderLineSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.
 
 // newOrderRequest builds the typed insert request for the new_order table.
 // perWh = ordersUndelivered * districtsPerWarehouse (9000).
-func newOrderRequest(scale, warehouseStart int64) *driver.InsertRequest {
+func newOrderRequest(scale, warehouseStart int64, workers int) *driver.InsertRequest {
 	root := gen.New(seedNewOrder)
 
 	return &driver.InsertRequest{
-		Table: "new_order", Method: driver.InsertNative, Workers: loadWorkersCount(),
+		Table: "new_order", Method: driver.InsertNative, Workers: workers,
 		Source: newOrderSource(root, scale, warehouseStart),
 	}
 }

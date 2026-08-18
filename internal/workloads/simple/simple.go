@@ -30,9 +30,15 @@ type workload struct {
 	pick *rand.Rand
 }
 
-func init() { bench.Register(&workload{pick: rand.New(rand.NewPCG(demoSeed^1, 0))}) } //nolint:gosec // G404: data RNG
+func init() {
+	bench.Register(func() bench.Workload {
+		return &workload{pick: rand.New(rand.NewPCG(demoSeed^1, 0))} //nolint:gosec // G404: data RNG
+	})
+}
 
 func (*workload) Name() string { return "simple" }
+
+func (*workload) Define(*bench.Def) error { return nil }
 
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	if err := b.Step("drop_schema", func() error {

@@ -1935,26 +1935,6 @@
               }
             }
           ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "k6Config"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "k6Config"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
         }
       ],
       "properties": {
@@ -1990,32 +1970,22 @@
         "env": {
           "$ref": "#/$defs/.stroppy.RunConfig.env"
         },
+        "run": {
+          "$ref": "#/$defs/.stroppy.RunConfig.run"
+        },
+        "params": {
+          "$ref": "#/$defs/.stroppy.RunConfig.params"
+        },
         "steps": {
           "$ref": "#/$defs/.stroppy.RunConfig.steps"
         },
         "noSteps": {
           "$ref": "#/$defs/.stroppy.RunConfig.no_steps"
-        },
-        "k6Args": {
-          "$ref": "#/$defs/.stroppy.RunConfig.k6_args"
-        },
-        "k6Config": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.RunConfig.k6_config"
-            }
-          ]
         }
       },
+      "additionalProperties": false,
       "type": "object",
-      "required": [
-        "version",
-        "global"
-      ],
-      "description": "*\n RunConfig is the top-level stroppy config file schema.\n\n Default file: ./stroppy-config.json (auto-discovered by stroppy run and stroppy probe).\n Override with -f/--file flag.\n\n Precedence (highest to lowest):\n   real env \u003e -e flags \u003e this file \u003e -d/-D presets \u003e script defaults\n\n Example (stroppy-config.json):\n   {\n     \"version\": \"1\",\n     \"script\": \"tpcc\",\n     \"global\": {\n       \"logger\": { \"logLevel\": \"LOG_LEVEL_INFO\" }\n     },\n     \"drivers\": {\n       \"0\": { \"driverType\": \"postgres\", \"url\": \"postgres://user:pass@db:5432/bench\",\n               \"defaultInsertMethod\": \"native\", \"pool\": { \"maxConns\": 200 } }\n     },\n     \"env\": { \"WAREHOUSES\": \"10\" },\n     \"k6Args\": [\"--vus\", \"10\", \"--duration\", \"30m\"]\n   }"
+      "description": "Top-level stroppy config. Typed parameter precedence: CLI flag > process environment > -e override > matching run/params value > env map > declared default. The selected workload schema validates names and concrete values in params at runtime."
     },
     ".stroppy.RunConfig.drivers": {
       "additionalProperties": {
@@ -2029,23 +1999,51 @@
         "type": "string"
       },
       "type": "object",
-      "description": "*\n Environment variable overrides for the k6 script.\n Equivalent to -e KEY=VALUE. All keys are uppercased on load.\n Precedence: real env \u003e -e flags \u003e this map \u003e script ENV() defaults."
+      "description": "Legacy string-valued parameter overrides. Keys are uppercased on load."
+    },
+    ".stroppy.RunConfig.run": {
+      "additionalProperties": false,
+      "properties": {
+        "executor": {
+          "type": "string",
+          "enum": [
+            "shared-iterations",
+            "constant-vus"
+          ]
+        },
+        "vus": {
+          "type": "integer"
+        },
+        "iterations": {
+          "type": "integer"
+        },
+        "duration": {
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "description": "Typed shared run parameters. Select shared-iterations or constant-vus explicitly."
+    },
+    ".stroppy.RunConfig.params": {
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "type": "object",
+      "description": "Typed parameters declared by the selected workload. Names and concrete types are validated against that workload's runtime schema."
     },
     ".stroppy.RunConfig.global": {
       "$ref": "#/$defs/.stroppy.GlobalConfig",
       "description": "*\n Global stroppy settings: logger level/mode, OTEL exporter, seed, run_id, metadata.\n These activate the previously-dead GlobalConfig plumbing."
-    },
-    ".stroppy.RunConfig.k6_args": {
-      "items": {
-        "type": "string",
-        "description": "*\n Additional raw args passed directly to \"k6 run\".\n Placed before CLI -- args, so CLI args can override (last-wins for most k6 flags).\n Example: [\"--vus\", \"10\", \"--duration\", \"30m\"]"
-      },
-      "type": "array",
-      "description": "*\n Additional raw args passed directly to \"k6 run\".\n Placed before CLI -- args, so CLI args can override (last-wins for most k6 flags).\n Example: [\"--vus\", \"10\", \"--duration\", \"30m\"]"
-    },
-    ".stroppy.RunConfig.k6_config": {
-      "type": "string",
-      "description": "*\n Optional path to a k6 native config JSON file.\n If set, \"--config \u003cpath\u003e\" is prepended to k6 run args.\n Useful for setting scenarios, thresholds, or other options not available via CLI flags."
     },
     ".stroppy.RunConfig.no_steps": {
       "items": {
