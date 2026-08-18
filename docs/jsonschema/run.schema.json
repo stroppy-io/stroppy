@@ -2045,18 +2045,6 @@
       "$ref": "#/$defs/.stroppy.GlobalConfig",
       "description": "*\n Global stroppy settings: logger level/mode, OTEL exporter, seed, run_id, metadata.\n These activate the previously-dead GlobalConfig plumbing."
     },
-    ".stroppy.RunConfig.k6_args": {
-      "items": {
-        "type": "string",
-        "description": "*\n Additional raw args passed directly to \"k6 run\".\n Placed before CLI -- args, so CLI args can override (last-wins for most k6 flags).\n Example: [\"--vus\", \"10\", \"--duration\", \"30m\"]"
-      },
-      "type": "array",
-      "description": "*\n Additional raw args passed directly to \"k6 run\".\n Placed before CLI -- args, so CLI args can override (last-wins for most k6 flags).\n Example: [\"--vus\", \"10\", \"--duration\", \"30m\"]"
-    },
-    ".stroppy.RunConfig.k6_config": {
-      "type": "string",
-      "description": "*\n Optional path to a k6 native config JSON file.\n If set, \"--config \u003cpath\u003e\" is prepended to k6 run args.\n Useful for setting scenarios, thresholds, or other options not available via CLI flags."
-    },
     ".stroppy.RunConfig.no_steps": {
       "items": {
         "type": "string",

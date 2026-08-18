@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"os"
 	"slices"
 	"strconv"
@@ -41,6 +42,7 @@ var (
 	errPositionalAfterOpt = errors.New("unexpected positional argument after options")
 	errKeyValuePositional = errors.New("unexpected key=value positional argument")
 	errDriverExtraType    = errors.New("invalid driver extra field type")
+	errSQLFilePositional  = errors.New("workload does not accept sql_file positional")
 	errTooManyPositionals = errors.New(
 		"too many positional arguments; expected script and optional sql_file before --",
 	)
@@ -229,7 +231,10 @@ Config file flags:
 		// Go-native workload: if a Go workload is registered under the bare
 		// script name, dispatch to bench.Run.
 		if _, ok := bench.Lookup(scriptArg); ok {
-			workloadParamInputs := withEffectiveSQLFile(paramInputs, sqlArg)
+			workloadParamInputs, err := withEffectiveSQLFile(scriptArg, paramInputs, sqlArg)
+			if err != nil {
+				return invalidConfig(err)
+			}
 
 			return runGoWorkload(
 				scriptArg,
@@ -246,9 +251,21 @@ Config file flags:
 	},
 }
 
-func withEffectiveSQLFile(inputs bench.ParamInputs, sqlFile string) bench.ParamInputs {
+func withEffectiveSQLFile(name string, inputs bench.ParamInputs, sqlFile string) (bench.ParamInputs, error) {
 	if sqlFile == "" {
-		return inputs
+		return inputs, nil
+	}
+
+	description, err := bench.Describe(name)
+	if err != nil {
+		return inputs, err
+	}
+
+	acceptsSQLFile := slices.ContainsFunc(description.Params, func(param bench.ParamSchema) bool {
+		return param.Scope == bench.ParamScopeWorkload && param.Name == "sql-file"
+	})
+	if !acceptsSQLFile {
+		return inputs, fmt.Errorf("%w for workload %q", errSQLFilePositional, name)
 	}
 
 	inputs.CLI = cloneStringMap(inputs.CLI)
@@ -256,7 +273,7 @@ func withEffectiveSQLFile(inputs bench.ParamInputs, sqlFile string) bench.ParamI
 		inputs.CLI["sql-file"] = sqlFile
 	}
 
-	return inputs
+	return inputs, nil
 }
 
 func cloneStringMap(values map[string]string) map[string]string {
@@ -687,11 +704,11 @@ func applyLegacyPostgresPoolSize(config *stroppy.DriverConfig, env map[string]st
 	}
 
 	value, err := strconv.Atoi(poolSize)
-	if err != nil || value <= 0 {
+	if err != nil || value <= 0 || value > math.MaxInt32 {
 		return
 	}
 
-	connections := int32(value) //nolint:gosec // G109: parsed config value, bounded by user input
+	connections := int32(value) //nolint:gosec // G109: range-checked above
 
 	postgres := config.GetPostgres()
 	if postgres == nil {
@@ -724,13 +741,24 @@ func applyDriverExtras(idx int, config *stroppy.DriverConfig, extras map[string]
 		config.ErrorMode = parsed
 	}
 
-	_, _ = popDriverExtra(values, "defaultTxIsolation", "default_tx_isolation")
+	if _, ok := popDriverExtra(values, "defaultTxIsolation", "default_tx_isolation"); ok {
+		warnIgnoredDriverExtra(idx, "defaultTxIsolation", "use workload parameter --tx-isolation")
+	}
+
 	pool, hasPool := popDriverExtra(values, "pool")
 
 	if config.GetDriverType() == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
-		_, _ = popDriverExtra(values, "sql")
-	} else {
-		_, _ = popDriverExtra(values, "postgres")
+		if _, ok := popDriverExtra(values, "sql"); ok {
+			warnIgnoredDriverExtra(idx, "sql", "PostgreSQL uses postgres pool settings")
+		}
+	} else if _, ok := popDriverExtra(values, "postgres"); ok {
+		warnIgnoredDriverExtra(idx, "postgres", "only PostgreSQL uses postgres pool settings")
+	}
+
+	if hasPool && !driverSupportsPool(config.GetDriverType()) {
+		warnIgnoredDriverExtra(idx, "pool", "selected driver has no connection pool")
+
+		hasPool = false
 	}
 
 	extraConfig := &stroppy.DriverConfig{}
@@ -774,6 +802,27 @@ func popDriverExtra(values map[string]any, names ...string) (any, bool) {
 	return nil, false
 }
 
+func warnIgnoredDriverExtra(idx int, field, reason string) {
+	logger.Global().Named("run").Warn(
+		"ignoring driver option",
+		zap.Int("driver", idx),
+		zap.String("field", field),
+		zap.String("reason", reason),
+	)
+}
+
+func driverSupportsPool(driverType stroppy.DriverConfig_DriverType) bool {
+	switch driverType {
+	case stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
+		stroppy.DriverConfig_DRIVER_TYPE_MYSQL,
+		stroppy.DriverConfig_DRIVER_TYPE_PICODATA,
+		stroppy.DriverConfig_DRIVER_TYPE_YDB:
+		return true
+	default:
+		return false
+	}
+}
+
 func mergePoolDriverSpecific(
 	driverType stroppy.DriverConfig_DriverType,
 	pool any,
@@ -784,7 +833,7 @@ func mergePoolDriverSpecific(
 		return err
 	}
 
-	unmarshal := protojson.UnmarshalOptions{DiscardUnknown: true}
+	unmarshal := protojson.UnmarshalOptions{DiscardUnknown: false}
 
 	if driverType == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
 		postgres := &stroppy.DriverConfig_PostgresConfig{}

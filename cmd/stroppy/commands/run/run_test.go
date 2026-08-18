@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
+	_ "github.com/stroppy-io/stroppy/internal/workloads/simple"
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 )
@@ -650,6 +651,19 @@ func TestPoolSizePreservesPostgresSpecificConfig(t *testing.T) {
 	}
 }
 
+func TestLegacyPostgresPoolSizeRejectsInt32Overflow(t *testing.T) {
+	t.Setenv("POOL_SIZE", "2147483648")
+
+	config, err := buildDriverConfig(0, &runner.DriverCLIConfig{DriverType: "postgres"}, nil)
+	if err != nil {
+		t.Fatalf("buildDriverConfig() error = %v", err)
+	}
+
+	if config.GetPostgres() != nil {
+		t.Fatalf("postgres config = %#v", config.GetPostgres())
+	}
+}
+
 func TestResolveSQLSourcePrecedence(t *testing.T) {
 	t.Run("CLI SQL positional beats config inline body", func(t *testing.T) {
 		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
@@ -936,6 +950,13 @@ func TestRegisteredWorkloadReceivesEffectiveSQLFile(t *testing.T) {
 	}
 }
 
+func TestSimpleRejectsSQLFilePositional(t *testing.T) {
+	err := Cmd.RunE(Cmd, []string{"simple", "unused.sql", "-d", "noop"})
+	if err == nil || !contains(err.Error(), "workload does not accept sql_file positional") {
+		t.Fatalf("RunE() error = %v", err)
+	}
+}
+
 type runParamTestWorkload struct{}
 
 var (
@@ -1114,7 +1135,9 @@ func TestApplyDriverOptDottedPoolMergesJSONPreset(t *testing.T) {
 func TestApplyDriverOptDottedPoolUnknownField(t *testing.T) {
 	t.Parallel()
 
-	configs := runner.DriverCLIConfigs{}
+	configs := runner.DriverCLIConfigs{
+		0: &runner.DriverCLIConfig{DriverType: "postgres"},
+	}
 
 	if err := applyDriverOpt(configs, 0, "pool.maximum", "20"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1125,6 +1148,10 @@ func TestApplyDriverOptDottedPoolUnknownField(t *testing.T) {
 
 	if pool["maximum"] != float64(20) {
 		t.Errorf("pool.maximum: got %v, want 20", pool["maximum"])
+	}
+
+	if _, err := buildDriverConfig(0, configs[0], nil); err == nil || !contains(err.Error(), "unknown field") {
+		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
 }
 

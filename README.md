@@ -66,7 +66,7 @@ TPC-B and TPC-C each ship two variants:
 
 TPC-H loads all eight tables and runs the 22 query suite. TPC-DS generates and
 loads all 24 tables (faithful `dsdgen` port) and runs the 99 query suite; scale
-either via `--scale-factor`.
+either workload via `--scale-factor`.
 
 Use `-d` to select a driver preset and `-D` to override driver options:
 

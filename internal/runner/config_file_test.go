@@ -152,6 +152,7 @@ func TestLoadRunConfig_RejectsInvalidParameterScopes(t *testing.T) {
 		"duplicate run":       `{"run":{},"run":{}}`,
 		"duplicate run field": `{"run":{"vus":1,"vus":2}}`,
 		"unknown top level":   `{"unknown":{}}`,
+		"trailing data":       `{"version":"1"} {"version":"2"}`,
 	}
 
 	for name, content := range tests {
