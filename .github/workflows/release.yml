@@ -67,7 +67,7 @@ jobs:
       - name: Verify version
         run: |
           expected="${{ github.ref_name }}"
-          if ! strings build/stroppy | grep -qx "${expected}"; then
+          if ! strings build/stroppy | grep -Fqx "${expected}"; then
             echo "version mismatch: expected '${expected}' not embedded in build/stroppy"
             exit 1
           fi
