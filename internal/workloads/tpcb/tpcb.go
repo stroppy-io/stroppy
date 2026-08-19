@@ -1,7 +1,13 @@
-// Package tpcb is the Go-native port of workloads/tpcb/tx.ts: pgbench's canonical
-// 5-statement TPC-B transaction under one explicit transaction per iteration.
-// Shares load/config with the procs variant (not ported here). Supports pg/mysql/
-// picodata/ydb; isolation + SQL file are selected by driver type.
+// Package tpcb is the Go-native port of pgbench's canonical 5-statement TPC-B
+// transaction, shipping two registered variants:
+//
+//   - tpcb/tx runs the five DML steps inline under one client-side transaction
+//     per iteration; supports pg/mysql/picodata/ydb.
+//   - tpcb/procs calls the stored procedure tpcb_transaction (workload_procs
+//     section) as a single server-side round-trip; pg/mysql only.
+//
+// Both variants share parameter declarations, schema/load lifecycle, retry
+// policy, metrics, and data generation.
 package tpcb
 
 import (
@@ -17,7 +23,10 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
-var errAccountNotFound = errors.New("tpc-b: account not found")
+var (
+	errAccountNotFound        = errors.New("tpc-b: account not found")
+	errProcsDriverUnsupported = errors.New("tpcb/procs only supports postgres and mysql; use tpcb/tx for picodata/ydb")
+)
 
 const (
 	preset = "tpcb"
@@ -35,7 +44,10 @@ const (
 )
 
 type workload struct {
+	variant string // "tx" (inline DML) or "procs" (stored procedure)
+
 	sql           *bench.SQL
+	procQuery     string // resolved workload_procs/tpcb_transaction (procs variant)
 	driverType    bench.DriverTypeName
 	iso           bench.TxIsolationName
 	scale         int64
@@ -50,9 +62,12 @@ type workload struct {
 	vuStates sync.Map // uint64 -> *vuState
 }
 
-func init() { bench.Register(func() bench.Workload { return &workload{} }) }
+func init() {
+	bench.Register(func() bench.Workload { return &workload{variant: "tx"} })
+	bench.Register(func() bench.Workload { return &workload{variant: "procs"} })
+}
 
-func (*workload) Name() string { return "tpcb/tx" }
+func (w *workload) Name() string { return "tpcb/" + w.variant }
 
 func (w *workload) Define(d *bench.Def) error {
 	w.scale = int64(max(d.Param.Int("scale-factor", 1, "TPC-B scale factor.").Value(), 1))
@@ -67,9 +82,21 @@ func (w *workload) Define(d *bench.Def) error {
 
 func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	w.driverType = b.DriverTypeName()
+	if w.variant == "procs" && !procsSupported(w.driverType) {
+		return errProcsDriverUnsupported
+	}
 
 	w.iso = resolveIsolation(w.driverType, w.iso)
 	w.sql = mustLoadSQL(w.driverType, w.sqlFile)
+
+	if w.variant == "procs" {
+		proc, ok := w.sql.Query("workload_procs", "tpcb_transaction")
+		if !ok {
+			return fmt.Errorf("tpc-b/procs: missing query workload_procs/tpcb_transaction")
+		}
+
+		w.procQuery = proc
+	}
 
 	runSection := func(name string) error {
 		for _, q := range w.sql.Section(name) {
@@ -81,13 +108,21 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		return nil
 	}
 
-	steps := []struct {
+	type step struct {
 		name string
 		fn   func() error
-	}{
+	}
+
+	steps := []step{
 		{"drop_schema", func() error { return runSection("drop_schema") }},
 		{"create_schema", func() error { return runSection("create_schema") }},
-		{"load_data", func() error {
+	}
+	if w.variant == "procs" {
+		steps = append(steps, step{"create_procedures", func() error { return runSection("create_procedures") }})
+	}
+
+	steps = append(steps,
+		step{"load_data", func() error {
 			if _, err := b.Insert(ctx, branchesRequest(w.scale, w.loadWorkers)); err != nil {
 				return err
 			}
@@ -102,10 +137,11 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 
 			return nil
 		}},
-		{"create_indexes", func() error { return runSection("create_indexes") }},
-		{"create_foreign_keys", func() error { return runSection("create_foreign_keys") }},
-		{"analyze", func() error { return runSection("analyze") }},
-	}
+		step{"create_indexes", func() error { return runSection("create_indexes") }},
+		step{"create_foreign_keys", func() error { return runSection("create_foreign_keys") }},
+		step{"analyze", func() error { return runSection("analyze") }},
+	)
+
 	for _, s := range steps {
 		if err := b.Step(s.name, s.fn); err != nil {
 			return err
@@ -123,11 +159,11 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	vs := w.vuState(b.VUID())
-	aid := vs.aid.IntN(int(accounts(w.scale))) + 1
-	tid := vs.tid.IntN(int(tellers(w.scale))) + 1
-	bid := vs.bid.IntN(int(branches(w.scale))) + 1
-	delta := vs.delta.IntN(10001) - 5000
-	hid := vs.nextHid()
+	aid, tid, bid, delta, hid := vs.txParams(w.scale)
+
+	if w.variant == "procs" {
+		return w.iterateProcs(ctx, b, aid, tid, bid, delta, hid)
+	}
 
 	updateAccount, _ := w.sql.Query("workload_tx_tpcb", "update_account")
 	getBalance, _ := w.sql.Query("workload_tx_tpcb", "get_balance")
@@ -165,6 +201,23 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	})
 }
 
+// iterateProcs executes the stored procedure tpcb_transaction as a single
+// server-side round-trip per iteration (workload_procs section). No client-side
+// BeginTx wraps the call: the procedure body runs the whole 5-statement
+// transaction on the server (postgres' implicit statement transaction; mysql's
+// procedure manages its own START TRANSACTION ... COMMIT). By design the procs
+// variant therefore emits no client-side commit/rollback metric — the commit
+// happens inside the procedure — so its metric shape differs from tpcb/tx.
+func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, aid, tid, bid, delta int, hid int64) error {
+	return b.Step("workload", func() error {
+		return bench.Retry0(ctx, w.retryPolicy, func() error {
+			return b.Exec(ctx, w.procQuery, map[string]any{
+				"p_aid": aid, "p_tid": tid, "p_bid": bid, "p_delta": delta, "p_hid": hid,
+			})
+		})
+	})
+}
+
 func (*workload) Teardown(ctx context.Context, b *bench.Bench) error {
 	b.StepEnd("workload")
 
@@ -189,6 +242,19 @@ func resolveIsolation(dt bench.DriverTypeName, override bench.TxIsolationName) b
 		return bench.IsoSerializable
 	default:
 		return bench.IsoReadCommitted
+	}
+}
+
+// procsSupported reports whether the procs variant can run on dt: postgres and
+// mysql carry the create_procedures + workload_procs sections, and noop is
+// allowed for offline overhead runs. Everything else (picodata, ydb, csv, ...)
+// is rejected at setup with errProcsDriverUnsupported.
+func procsSupported(dt bench.DriverTypeName) bool {
+	switch dt {
+	case bench.DriverPostgres, bench.DriverMySQL, bench.DriverNoop:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -246,6 +312,16 @@ func (w *workload) vuState(vuid uint64) *vuState {
 }
 
 func (v *vuState) nextHid() int64 { return v.hid.Add(1) }
+
+// txParams draws one iteration's TPC-B transaction parameters. Shared by the
+// tx and procs variants so identical VUs draw identical sequences.
+func (v *vuState) txParams(scale int64) (aid, tid, bid, delta int, hid int64) {
+	return v.aid.IntN(int(accounts(scale))) + 1,
+		v.tid.IntN(int(tellers(scale))) + 1,
+		v.bid.IntN(int(branches(scale))) + 1,
+		v.delta.IntN(10001) - 5000,
+		v.nextHid()
+}
 
 // seedOf mirrors tpcb_common.seedOf: a per-VU, per-slot offset so concurrent VUs
 // draw independent sequences.

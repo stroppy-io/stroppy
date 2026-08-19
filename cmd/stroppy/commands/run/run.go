@@ -93,6 +93,7 @@ Config file flags:
 	Example: `
   stroppy run tpcc/tx                           # built-in TPC-C tx workload
   stroppy run tpcb/tx                           # TPC-B tx workload
+  stroppy run tpcb/procs                        # TPC-B stored-procedure variant (pg/mysql)
   stroppy run tpch/tx                           # TPC-H load + query suite
   stroppy run tpcds                             # TPC-DS load + query suite
   stroppy run simple --executor constant-vus --duration 10s --vus 4
