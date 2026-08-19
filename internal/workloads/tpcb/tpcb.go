@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -250,8 +251,13 @@ func validateSQL(sql *bench.SQL) error {
 	}
 
 	for _, q := range requiredTxQueries {
-		if _, ok := sql.Query(q.section, q.query); !ok {
+		body, ok := sql.Query(q.section, q.query)
+		if !ok {
 			return fmt.Errorf("tpc-b: missing query %s/%s", q.section, q.query)
+		}
+
+		if strings.TrimSpace(body) == "" {
+			return fmt.Errorf("tpc-b: empty query %s/%s", q.section, q.query)
 		}
 	}
 
