@@ -19,6 +19,22 @@ import (
 
 var errAccountNotFound = errors.New("tpc-b: account not found")
 
+// requiredTxQueries are the named transaction queries the measured iteration
+// depends on. Every custom SQL file must provide them; a missing one would
+// otherwise parse as an empty statement and run as a silent noop.
+var requiredTxQueries = []struct{ section, query string }{
+	{"workload_tx_tpcb", "update_account"},
+	{"workload_tx_tpcb", "get_balance"},
+	{"workload_tx_tpcb", "update_teller"},
+	{"workload_tx_tpcb", "update_branch"},
+	{"workload_tx_tpcb", "insert_history"},
+}
+
+// requiredSetupSections are the schema sections the setup steps execute. They are
+// present in every dialect (unlike the pg/mysql-only index/fk/analyze sections,
+// which legitimately no-op on picodata/ydb).
+var requiredSetupSections = []string{"drop_schema", "create_schema"}
+
 const (
 	preset = "tpcb"
 
@@ -70,6 +86,10 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 
 	w.iso = resolveIsolation(w.driverType, w.iso)
 	w.sql = mustLoadSQL(w.driverType, w.sqlFile)
+
+	if err := validateSQL(w.sql); err != nil {
+		return err
+	}
 
 	runSection := func(name string) error {
 		for _, q := range w.sql.Section(name) {
@@ -216,6 +236,26 @@ func mustLoadSQL(dt bench.DriverTypeName, override string) *bench.SQL {
 	}
 
 	return s
+}
+
+// validateSQL asserts the schema sections and named transaction queries the
+// workload needs are present before measured execution, so a custom SQL file
+// that omits TPC-B statements fails with a named missing query/section instead
+// of degrading into successful noop iterations.
+func validateSQL(sql *bench.SQL) error {
+	for _, name := range requiredSetupSections {
+		if len(sql.Section(name)) == 0 {
+			return fmt.Errorf("tpc-b: missing section %q", name)
+		}
+	}
+
+	for _, q := range requiredTxQueries {
+		if _, ok := sql.Query(q.section, q.query); !ok {
+			return fmt.Errorf("tpc-b: missing query %s/%s", q.section, q.query)
+		}
+	}
+
+	return nil
 }
 
 // --- per-VU tx-time generators ---
