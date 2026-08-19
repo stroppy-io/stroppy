@@ -61,6 +61,18 @@ jobs:
           mkdir -p "${{ steps.names.outputs.outdir }}"
           cp build/stroppy "${{ steps.names.outputs.outdir }}/${{ steps.names.outputs.bin }}"
 
+      # Guard: the release binary must embed exactly the release tag. Cross-compiled
+      # binaries (darwin/arm64, linux/arm64, ...) cannot be executed on the ubuntu
+      # runner, so assert the version `-X`-injected into the binary directly.
+      - name: Verify version
+        run: |
+          expected="${{ github.ref_name }}"
+          if ! strings build/stroppy | grep -qx "${expected}"; then
+            echo "version mismatch: expected '${expected}' not embedded in build/stroppy"
+            exit 1
+          fi
+          echo "version ok: ${expected}"
+
       #  [ -f ../README.md ] && EXTRAS+=("../README.md")
       #  [ -f ../LICENSE ] && EXTRAS+=("../LICENSE")
       - name: Package (.tar.gz)
