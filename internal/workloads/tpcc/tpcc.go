@@ -57,6 +57,8 @@ type workload struct {
 	m           *metrics
 	retryPolicy bench.RetryPolicy
 
+	measureStart time.Time
+
 	vuStates sync.Map // uint64 -> *vuState
 }
 
@@ -206,6 +208,8 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 
 	b.StepBegin("workload")
 
+	w.measureStart = time.Now()
+
 	return nil
 }
 
@@ -324,9 +328,11 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	})
 }
 
-func (*workload) Teardown(_ context.Context, _ *bench.Bench) error {
+func (w *workload) Teardown(_ context.Context, b *bench.Bench) error {
 	// workload step tag is opened/closed per-iteration via Step("workload"); the
 	// long-lived StepBegin in Setup is balanced here.
+	w.emitComplianceReport(b)
+
 	return nil
 }
 
