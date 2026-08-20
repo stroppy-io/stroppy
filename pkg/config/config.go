@@ -4,10 +4,13 @@
 // pkg/common/proto/stroppy: the JSON field names are preserved verbatim, but
 // the protobuf reflection, descriptors, validators, and oneof wrappers are gone.
 //
-//go:generate go run github.com/stroppy-io/stroppy/internal/jsonschema-gen -out ../../../docs/jsonschema/run.schema.json
+//go:generate go run github.com/stroppy-io/stroppy/internal/jsonschema-gen -out ../../docs/jsonschema/run.schema.json
 package config
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // DriverType identifies a database driver implementation.
 type DriverType int32
@@ -89,6 +92,41 @@ const (
 	LogLevelFatal LogLevel = "LOG_LEVEL_FATAL"
 )
 
+// LogLevelValues returns every declared LogLevel constant in canonical order.
+func LogLevelValues() []LogLevel {
+	return []LogLevel{
+		LogLevelDebug,
+		LogLevelInfo,
+		LogLevelWarn,
+		LogLevelError,
+		LogLevelFatal,
+	}
+}
+
+// UnmarshalJSON rejects values outside the LogLevel constant set. The frozen
+// protobuf schema encoded this as a strict enum; an untyped string would
+// otherwise silently accept any value.
+func (l *LogLevel) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		*l = ""
+		return nil
+	}
+
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	for _, valid := range LogLevelValues() {
+		if s == string(valid) {
+			*l = valid
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid logLevel %q", s)
+}
+
 // LogMode is the logging output mode.
 type LogMode string
 
@@ -96,6 +134,35 @@ const (
 	LogModeDevelopment LogMode = "LOG_MODE_DEVELOPMENT"
 	LogModeProduction  LogMode = "LOG_MODE_PRODUCTION"
 )
+
+// LogModeValues returns every declared LogMode constant in canonical order.
+func LogModeValues() []LogMode {
+	return []LogMode{LogModeDevelopment, LogModeProduction}
+}
+
+// UnmarshalJSON rejects values outside the LogMode constant set. The frozen
+// protobuf schema encoded this as a strict enum; an untyped string would
+// otherwise silently accept any value.
+func (m *LogMode) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		*m = ""
+		return nil
+	}
+
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	for _, valid := range LogModeValues() {
+		if s == string(valid) {
+			*m = valid
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid logMode %q", s)
+}
 
 // RunConfig is the top-level stroppy config file schema.
 type RunConfig struct {

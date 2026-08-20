@@ -85,6 +85,8 @@ func TestRunConfigJSONRejects(t *testing.T) {
 		"wrong scalar type":       `{"drivers":{"0":{"bulkSize":"twenty"}}}`,
 		"wrong nested type":       `{"global":{"seed":"not-a-number"}}`,
 		"wrong bool type":         `{"drivers":{"0":{"tlsInsecureSkipVerify":"yes"}}}`,
+		"unknown logLevel":        `{"global":{"logger":{"logLevel":"NOT_A_LEVEL"}}}`,
+		"unknown logMode":         `{"global":{"logger":{"logMode":"NOT_A_MODE"}}}`,
 	}
 
 	for name, doc := range cases {
@@ -97,14 +99,30 @@ func TestRunConfigJSONRejects(t *testing.T) {
 
 func TestJSONFieldNamesPreserved(t *testing.T) {
 	driver := config.DriverRunConfig{
-		DriverType: ptr("postgres"),
-		Url:        ptr("postgres://x"),
-		BulkSize:   ptr[int32](20),
+		DriverType:         ptr("postgres"),
+		Url:                ptr("postgres://x"),
+		ErrorMode:          ptr("throw"),
+		BulkSize:           ptr[int32](20),
+		CaCertFile:         ptr("/tls/ca.pem"),
+		AuthToken:          ptr("token"),
+		AuthUser:           ptr("bench"),
+		AuthPassword:       ptr("secret"),
+		DefaultTxIsolation: ptr("read_committed"),
 	}
 
 	data, err := json.Marshal(&driver)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"driverType":"postgres","url":"postgres://x","bulkSize":20}`, string(data))
+	require.JSONEq(t, `{
+		"driverType": "postgres",
+		"url": "postgres://x",
+		"errorMode": "throw",
+		"bulkSize": 20,
+		"caCertFile": "/tls/ca.pem",
+		"authToken": "token",
+		"authUser": "bench",
+		"authPassword": "secret",
+		"defaultTxIsolation": "read_committed"
+	}`, string(data))
 }
 
 func ptr[T any](v T) *T { return &v }

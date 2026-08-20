@@ -17,21 +17,21 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
-// schemas maps Go type name -> JSON Schema for the enum-backed string types
-// that reflection cannot enumerate. Keep in sync with the constants in
-// pkg/config.
+// enumValues maps Go type name -> the allowed string values for the enum-backed
+// string types that reflection cannot enumerate. The values are derived from the
+// constant lists exported by pkg/config so the schema cannot drift from the code.
 var enumValues = map[string][]string{
-	"LogLevel": {
-		"LOG_LEVEL_DEBUG",
-		"LOG_LEVEL_INFO",
-		"LOG_LEVEL_WARN",
-		"LOG_LEVEL_ERROR",
-		"LOG_LEVEL_FATAL",
-	},
-	"LogMode": {
-		"LOG_MODE_DEVELOPMENT",
-		"LOG_MODE_PRODUCTION",
-	},
+	"LogLevel": enumStrings(config.LogLevelValues()),
+	"LogMode":  enumStrings(config.LogModeValues()),
+}
+
+func enumStrings[T ~string](values []T) []string {
+	out := make([]string, len(values))
+	for i, v := range values {
+		out[i] = string(v)
+	}
+
+	return out
 }
 
 func main() {
