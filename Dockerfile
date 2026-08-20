@@ -1,6 +1,6 @@
 FROM golang:1.26-alpine3.22 AS builder
 
-ARG VERSION=0.0.0
+ARG VERSION=unknown
 
 RUN apk add --no-cache make curl git
 
