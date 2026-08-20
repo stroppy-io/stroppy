@@ -988,6 +988,7 @@ func TestStepsNoStepsMergedMutualExclusion(t *testing.T) {
 			}
 
 			args := append([]string{"-f", configPath}, test.args...)
+
 			err := Cmd.RunE(Cmd, args)
 			if !errors.Is(err, errStepsMutExclusive) {
 				t.Fatalf("RunE() error = %v, want %v", err, errStepsMutExclusive)

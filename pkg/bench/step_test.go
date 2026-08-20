@@ -18,12 +18,18 @@ import (
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
 
-// testStepBench builds a Bench wired to an observer logger and a fresh meter
-// provider so step behavior (console records + metric step tag) can be asserted
-// without a full Run. The returned reader and prefix are for metric collection.
-func testStepBench(
-	t *testing.T,
-) (*Bench, *observer.ObservedLogs, *RootState, *sdkmetric.ManualReader, string) {
+// testBenchFixture wires a Bench to an observer logger and a fresh meter provider
+// so step behavior (console records + metric step tag) can be asserted without a
+// full Run. reader and prefix support metric collection.
+type testBenchFixture struct {
+	b         *Bench
+	logs      *observer.ObservedLogs
+	rootState *RootState
+	reader    *sdkmetric.ManualReader
+	prefix    string
+}
+
+func newTestBenchFixture(t *testing.T) *testBenchFixture {
 	t.Helper()
 
 	core, logs := observer.New(zapcore.InfoLevel)
@@ -40,75 +46,94 @@ func testStepBench(
 		stepFilter: newStepFilter(),
 	}
 
-	return &Bench{
-		root: rootState,
-		vu:   &VU{root: rootState, ctx: context.Background()},
-		lg:   lg,
-	}, logs, rootState, reader, prefix
+	return &testBenchFixture{
+		b: &Bench{
+			root: rootState,
+			vu:   &VU{root: rootState, ctx: context.Background()},
+			lg:   lg,
+		},
+		logs:      logs,
+		rootState: rootState,
+		reader:    reader,
+		prefix:    prefix,
+	}
 }
 
 func TestStepLogsStartAndEnd(t *testing.T) {
-	b, logs, _, _, _ := testStepBench(t)
+	fx := newTestBenchFixture(t)
 
-	require.NoError(t, b.Step("load_data", func() error { return nil }))
+	require.NoError(t, fx.b.Step("load_data", func() error { return nil }))
 
-	require.Equal(t, 2, logs.Len())
-	require.Equal(t, "Start of 'load_data' step", logs.All()[0].Message)
-	require.True(t, strings.Contains(logs.All()[1].Message, "End of 'load_data' step"))
-	require.Empty(t, b.vu.stepTag) // tag cleared after the step
+	require.Equal(t, 2, fx.logs.Len())
+	require.Equal(t, "Start of 'load_data' step", fx.logs.All()[0].Message)
+	require.Contains(t, fx.logs.All()[1].Message, "End of 'load_data' step")
+	require.Empty(t, fx.b.vu.stepTag) // tag cleared after the step
 }
 
 func TestStepSilentKeepsMetricTagWithoutLogging(t *testing.T) {
-	b, logs, rootState, reader, prefix := testStepBench(t)
+	fx := newTestBenchFixture(t)
 
 	// stepBegin/stepEnd read the package-global root for NotifyStep (a no-op), so
 	// install the test root the same way metrics_test.go does.
 	previousRoot := root
-	root = rootState
+	root = fx.rootState
+
 	t.Cleanup(func() { root = previousRoot })
 
 	var tagDuring string
-	err := b.StepSilent("workload", func() error {
-		tagDuring = b.vu.stepTag
-		rootState.txMetrics.recordQueryResult(b.vu, time.Millisecond, nil)
+
+	err := fx.b.StepSilent("workload", func() error {
+		tagDuring = fx.b.vu.stepTag
+		fx.rootState.txMetrics.recordQueryResult(fx.b.vu, time.Millisecond, nil)
 
 		return nil
 	})
 	require.NoError(t, err)
 
 	require.Equal(t, "workload", tagDuring, "step tag must be set for the iteration metrics")
-	require.Empty(t, b.vu.stepTag, "step tag must be cleared after the step")
-	require.Zero(t, logs.Len(), "a silent step must not emit start/end records")
+	require.Empty(t, fx.b.vu.stepTag, "step tag must be cleared after the step")
+	require.Zero(t, fx.logs.Len(), "a silent step must not emit start/end records")
 
 	var data metricdata.ResourceMetrics
-	require.NoError(t, reader.Collect(context.Background(), &data))
-	hist := findHistogram(t, data, prefix+"run_query_duration")
+	require.NoError(t, fx.reader.Collect(context.Background(), &data))
+
+	hist := findHistogram(t, data, fx.prefix+"run_query_duration")
 	require.Len(t, hist.DataPoints, 1)
 	require.Equal(t, "workload", attributeValue(hist.DataPoints[0].Attributes, "step"))
 }
 
 func TestStepAndStepSilentRespectFilter(t *testing.T) {
 	t.Run("loud skip is logged", func(t *testing.T) {
-		b, logs, rootState, _, _ := testStepBench(t)
-		rootState.stepFilter.only = map[string]struct{}{"load_data": {}}
+		fx := newTestBenchFixture(t)
+		fx.rootState.stepFilter.only = map[string]struct{}{"load_data": {}}
 
 		var ran atomic.Bool
-		require.NoError(t, b.Step("workload", func() error { ran.Store(true); return nil }))
+
+		require.NoError(t, fx.b.Step("workload", func() error {
+			ran.Store(true)
+
+			return nil
+		}))
 
 		require.False(t, ran.Load(), "filtered step must not run")
-		require.Equal(t, 1, logs.Len())
-		require.Equal(t, "Skipping step 'workload'", logs.All()[0].Message)
+		require.Equal(t, 1, fx.logs.Len())
+		require.Equal(t, "Skipping step 'workload'", fx.logs.All()[0].Message)
 	})
 
 	t.Run("silent skip is quiet", func(t *testing.T) {
-		b, logs, rootState, _, _ := testStepBench(t)
-		rootState.stepFilter.only = map[string]struct{}{"load_data": {}}
+		fx := newTestBenchFixture(t)
+		fx.rootState.stepFilter.only = map[string]struct{}{"load_data": {}}
 
 		var ran atomic.Bool
-		require.NoError(t, b.StepSilent("workload", func() error { ran.Store(true); return nil }))
+
+		require.NoError(t, fx.b.StepSilent("workload", func() error {
+			ran.Store(true)
+
+			return nil
+		}))
 
 		require.False(t, ran.Load(), "filtered step must not run")
-		require.Zero(t, logs.Len(), "silent skip must not emit records")
+		require.Zero(t, fx.logs.Len(), "silent skip must not emit records")
 	})
 }
 
@@ -164,6 +189,7 @@ func TestWorkloadRunLogVolumeIsBounded(t *testing.T) {
 	require.Equal(t, baseCount, highCount, "log volume must be independent of iteration count")
 
 	workloadRecords, setupStarts, setupEnds := 0, 0, 0
+
 	for _, entry := range base.All() {
 		if strings.Contains(entry.Message, "workload' step") {
 			workloadRecords++
