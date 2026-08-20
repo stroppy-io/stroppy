@@ -42,7 +42,7 @@ func TestProcsSharesTxParams(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(tx.Params, procs.Params) {
-		t.Fatalf("procs params diverge from tx:\n  tx:    %+#v\n  procs: %+#v", tx.Params, procs.Params)
+		t.Fatalf("procs params diverge from the tx variant:\n  tx:    %+#v\n  procs: %+#v", tx.Params, procs.Params)
 	}
 }
 

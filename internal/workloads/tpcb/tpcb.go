@@ -26,6 +26,7 @@ import (
 var (
 	errAccountNotFound        = errors.New("tpc-b: account not found")
 	errProcsDriverUnsupported = errors.New("tpcb/procs only supports postgres and mysql; use tpcb/tx for picodata/ydb")
+	errProcsMissingQuery      = errors.New("tpc-b/procs: missing query")
 )
 
 const (
@@ -92,7 +93,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	if w.variant == "procs" {
 		proc, ok := w.sql.Query("workload_procs", "tpcb_transaction")
 		if !ok {
-			return fmt.Errorf("tpc-b/procs: missing query workload_procs/tpcb_transaction")
+			return fmt.Errorf("%w workload_procs/tpcb_transaction", errProcsMissingQuery)
 		}
 
 		w.procQuery = proc
@@ -165,40 +166,47 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 		return w.iterateProcs(ctx, b, aid, tid, bid, delta, hid)
 	}
 
+	return b.Step("workload", func() error {
+		return bench.Retry0(ctx, w.retryPolicy, func() error {
+			return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "tpcb"}, func(tx *bench.TxX) error {
+				return w.txBody(ctx, tx, aid, tid, bid, delta, hid)
+			})
+		})
+	})
+}
+
+// txBody runs the ordered DML of one client-side TPC-B transaction: update
+// account, read balance, update teller, update branch, insert history. Extracted
+// from Iterate to keep the transaction body out of the retry/begin closures.
+func (w *workload) txBody(ctx context.Context, tx *bench.TxX, aid, tid, bid, delta int, hid int64) error {
 	updateAccount, _ := w.sql.Query("workload_tx_tpcb", "update_account")
 	getBalance, _ := w.sql.Query("workload_tx_tpcb", "get_balance")
 	updateTeller, _ := w.sql.Query("workload_tx_tpcb", "update_teller")
 	updateBranch, _ := w.sql.Query("workload_tx_tpcb", "update_branch")
 	insertHistory, _ := w.sql.Query("workload_tx_tpcb", "insert_history")
 
-	return b.Step("workload", func() error {
-		return bench.Retry0(ctx, w.retryPolicy, func() error {
-			return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "tpcb"}, func(tx *bench.TxX) error {
-				if err := tx.Exec(ctx, updateAccount, map[string]any{"aid": aid, "delta": delta}); err != nil {
-					return err
-				}
+	if err := tx.Exec(ctx, updateAccount, map[string]any{"aid": aid, "delta": delta}); err != nil {
+		return err
+	}
 
-				abalance, err := tx.QueryValue(ctx, getBalance, map[string]any{"aid": aid})
-				if err != nil {
-					return err
-				}
+	abalance, err := tx.QueryValue(ctx, getBalance, map[string]any{"aid": aid})
+	if err != nil {
+		return err
+	}
 
-				if abalance == nil {
-					return fmt.Errorf("%w: %d", errAccountNotFound, aid)
-				}
+	if abalance == nil {
+		return fmt.Errorf("%w: %d", errAccountNotFound, aid)
+	}
 
-				if err := tx.Exec(ctx, updateTeller, map[string]any{"tid": tid, "delta": delta}); err != nil {
-					return err
-				}
+	if err := tx.Exec(ctx, updateTeller, map[string]any{"tid": tid, "delta": delta}); err != nil {
+		return err
+	}
 
-				if err := tx.Exec(ctx, updateBranch, map[string]any{"bid": bid, "delta": delta}); err != nil {
-					return err
-				}
+	if err := tx.Exec(ctx, updateBranch, map[string]any{"bid": bid, "delta": delta}); err != nil {
+		return err
+	}
 
-				return tx.Exec(ctx, insertHistory, map[string]any{"hid": hid, "tid": tid, "bid": bid, "aid": aid, "delta": delta})
-			})
-		})
-	})
+	return tx.Exec(ctx, insertHistory, map[string]any{"hid": hid, "tid": tid, "bid": bid, "aid": aid, "delta": delta})
 }
 
 // iterateProcs executes the stored procedure tpcb_transaction as a single
