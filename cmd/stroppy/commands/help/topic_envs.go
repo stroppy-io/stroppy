@@ -81,7 +81,7 @@ CONFIG FILE
         "loadWorkers": 8
       },
       "env": {
-        "POOL_SIZE": "200"
+        "WAREHOUSES": "10"
       }
     }
 

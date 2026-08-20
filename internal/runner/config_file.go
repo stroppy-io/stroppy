@@ -24,6 +24,9 @@ var (
 	errDuplicateConfigField = errors.New("duplicate JSON field")
 	errConfigEnvCollision   = errors.New("config env keys collide case-insensitively")
 	errTrailingConfigData   = errors.New("trailing JSON data")
+	errRemovedK6Fields      = errors.New(
+		"k6Args and k6Config are removed; configure concurrency with typed executor/vus/iterations/duration parameters",
+	)
 )
 
 // LoadedConfig keeps the run config separate from typed parameter scopes.
@@ -66,6 +69,15 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 	workloadParams, err := takeParamScope(fields, "params")
 	if err != nil {
 		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
+	}
+
+	// The historical k6Args/k6Config top-level fields are removed from the v6
+	// schema. Guide users to the replacement before strict unmarshalling turns
+	// them into an opaque "unknown field" error.
+	for _, removed := range []string{"k6Args", "k6Config"} {
+		if _, ok := fields[removed]; ok {
+			return nil, false, fmt.Errorf("parsing config file %q: %w", path, errRemovedK6Fields)
+		}
 	}
 
 	runData, err := json.Marshal(fields)
@@ -213,55 +225,4 @@ func ensureJSONEnd(decoder *json.Decoder) error {
 	}
 
 	return errTrailingConfigData
-}
-
-// BuildProbeEnvFromRunConfig returns the config-derived environment that probe
-// should expose through the mocked __ENV object before the script is executed.
-func BuildProbeEnvFromRunConfig(cfg *config.RunConfig) (map[string]string, error) {
-	if cfg == nil {
-		return map[string]string{}, nil
-	}
-
-	env := make(map[string]string)
-
-	for _, entry := range BuildFileEnvLookup(cfg.Env) {
-		addEnvEntry(env, entry)
-	}
-
-	driverEnvs, err := fileDriverRunConfigsToEnvVars(cfg.Drivers, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, entry := range driverEnvs {
-		addEnvEntry(env, entry)
-	}
-
-	for key := range cfg.Env {
-		if value, ok := os.LookupEnv(key); ok {
-			env[key] = value
-		}
-	}
-
-	for idx := range cfg.Drivers {
-		key := fmt.Sprintf("STROPPY_DRIVER_%d", idx)
-		if value, ok := os.LookupEnv(key); ok {
-			env[key] = value
-		}
-	}
-
-	if len(env) == 0 {
-		return map[string]string{}, nil
-	}
-
-	return env, nil
-}
-
-func addEnvEntry(env map[string]string, entry string) {
-	key, value, ok := strings.Cut(entry, "=")
-	if !ok || key == "" {
-		return
-	}
-
-	env[key] = value
 }

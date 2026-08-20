@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
-	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 func TestLoadRunConfig_ExplicitPath(t *testing.T) {
@@ -174,32 +173,18 @@ func TestLoadRunConfigRejectsCaseInsensitiveEnvCollisions(t *testing.T) {
 	assert.Contains(t, err.Error(), `config env keys collide case-insensitively: "VUS" and "vus"`)
 }
 
-func TestBuildProbeEnvFromRunConfigIncludesFileDriver(t *testing.T) {
-	cfg := &config.RunConfig{
-		Env: map[string]string{"WAREHOUSES": "10"},
-		Drivers: map[uint32]*config.DriverRunConfig{
-			0: {
-				DriverType:          ptr("ydb"),
-				URL:                 ptr("grpc://localhost:2136/local"),
-				DefaultInsertMethod: ptr("native"),
-				DefaultTxIsolation:  ptr("repeatable_read"),
-				Pool: &config.PoolConfig{
-					MaxOpenConns: ptr[int32](7),
-				},
-			},
-		},
-	}
+func TestLoadRunConfigRejectsRemovedK6FieldsWithGuidance(t *testing.T) {
+	for _, field := range []string{"k6Args", "k6Config"} {
+		t.Run(field, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			require.NoError(t, os.WriteFile(path, []byte(`{"script":"tpcc/tx","`+field+`":"x"}`), 0o600))
 
-	env, err := runner.BuildProbeEnvFromRunConfig(cfg)
-	require.NoError(t, err)
-	assert.Equal(t, "10", env["WAREHOUSES"])
-	assert.JSONEq(t, `{
-		"driverType": "ydb",
-		"url": "grpc://localhost:2136/local",
-		"defaultInsertMethod": "native",
-		"defaultTxIsolation": "repeatable_read",
-		"pool": { "maxOpenConns": 7 }
-	}`, env["STROPPY_DRIVER_0"])
+			_, _, err := runner.LoadRunConfig(path)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "k6Args and k6Config are removed")
+			assert.Contains(t, err.Error(), "executor/vus/iterations/duration")
+		})
+	}
 }
 
 func ptr[T any](v T) *T { return &v }

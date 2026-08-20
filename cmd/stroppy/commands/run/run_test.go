@@ -531,20 +531,6 @@ func TestParseRunArgs(t *testing.T) {
 }
 
 func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
-	unsetRunTestEnv(t, "POOL_SIZE")
-
-	merged := mergeLegacyEnv(
-		map[string]string{"CONFIG_ONLY": "file", "SHARED": "file"},
-		map[string]string{"CLI_ONLY": "cli", "SHARED": "cli"},
-	)
-	if !maps.Equal(merged, map[string]string{
-		"CONFIG_ONLY": "file",
-		"CLI_ONLY":    "cli",
-		"SHARED":      "cli",
-	}) {
-		t.Fatalf("merged env = %v", merged)
-	}
-
 	driverType := "postgres"
 	fileURL := "postgres://file"
 	errorMode := "throw"
@@ -582,7 +568,7 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("merged driver config = %#v", configs[0])
 	}
 
-	runtimeConfig, err := buildDriverConfig(0, configs[0], nil)
+	runtimeConfig, err := buildDriverConfig(0, configs[0])
 	if err != nil {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
@@ -618,7 +604,7 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("applyDriverOpt(pool.maxOpenConns) error = %v", err)
 	}
 
-	runtimeConfig, err = buildDriverConfig(0, configs[0], nil)
+	runtimeConfig, err = buildDriverConfig(0, configs[0])
 	if err != nil {
 		t.Fatalf("buildDriverConfig(mysql) error = %v", err)
 	}
@@ -628,155 +614,56 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 	}
 }
 
-func TestPoolSizePreservesPostgresSpecificConfig(t *testing.T) {
-	t.Setenv("POOL_SIZE", "11")
+func TestWithExecuteSQLSource(t *testing.T) {
+	t.Run("inline positional binds sql-body", func(t *testing.T) {
+		inputs := withExecuteSQLSource(bench.ParamInputs{CLI: map[string]string{}}, "--= query\nselect 1;\n", "")
 
-	config, err := buildDriverConfig(0, &runner.DriverCLIConfig{
-		DriverType: "postgres",
-		Extra: map[string]any{
-			"postgres": map[string]any{
-				"statementCacheCapacity": 13,
-				"maxConnLifetime":        "1h",
-			},
-		},
-	}, nil)
-	if err != nil {
-		t.Fatalf("buildDriverConfig() error = %v", err)
-	}
-
-	postgres := config.Postgres
-	if postgres.GetMaxConns() != 11 || postgres.GetMinConns() != 11 ||
-		postgres.GetStatementCacheCapacity() != 13 || postgres.GetMaxConnLifetime() != "1h" {
-		t.Fatalf("postgres config = %#v", postgres)
-	}
-}
-
-func TestLegacyPostgresPoolSizeRejectsInt32Overflow(t *testing.T) {
-	t.Setenv("POOL_SIZE", "2147483648")
-
-	config, err := buildDriverConfig(0, &runner.DriverCLIConfig{DriverType: "postgres"}, nil)
-	if err != nil {
-		t.Fatalf("buildDriverConfig() error = %v", err)
-	}
-
-	if config.Postgres != nil {
-		t.Fatalf("postgres config = %#v", config.Postgres)
-	}
-}
-
-func TestResolveSQLSourcePrecedence(t *testing.T) {
-	t.Run("CLI SQL positional beats config inline body", func(t *testing.T) {
-		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
-
-		source := resolveSQLSource(
-			&runArgs{scriptArg: "execute_sql", sqlArg: "cli.sql"},
-			"",
-			"cli.sql",
-			nil,
-			nil,
-			map[string]string{sqlBodyEnv: "select 'config'"},
-		)
-		if source.envKey != sqlFileEnv || source.value != "cli.sql" || !source.explicitCLI {
-			t.Fatalf("source = %#v", source)
+		if inputs.CLI["sql-body"] != "--= query\nselect 1;\n" {
+			t.Fatalf("sql-body = %q", inputs.CLI["sql-body"])
 		}
 
-		env := map[string]string{sqlBodyEnv: "select 'config'"}
-		applySQLSource(env, source)
-
-		if !maps.Equal(env, map[string]string{sqlFileEnv: "cli.sql"}) {
-			t.Fatalf("resolved env = %v", env)
+		if _, ok := inputs.CLI["sql-file"]; ok {
+			t.Fatal("sql-file should not be set")
 		}
 	})
 
-	t.Run("typed CLI sql-file beats process and config body", func(t *testing.T) {
-		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
-		t.Setenv(sqlBodyEnv, "select 'process'")
+	t.Run("sql file positional binds sql-file", func(t *testing.T) {
+		inputs := withExecuteSQLSource(bench.ParamInputs{CLI: map[string]string{}}, "", "queries.sql")
 
-		source := resolveSQLSource(
-			&runArgs{typedParams: map[string]string{"sql-file": "typed.sql"}},
-			"select 'config route'",
-			"",
-			nil,
-			nil,
-			map[string]string{sqlBodyEnv: "select 'config env'"},
-		)
-		if source.envKey != sqlFileEnv || source.value != "typed.sql" || !source.explicitCLI {
-			t.Fatalf("source = %#v", source)
+		if inputs.CLI["sql-file"] != "queries.sql" {
+			t.Fatalf("sql-file = %q", inputs.CLI["sql-file"])
+		}
+
+		if _, ok := inputs.CLI["sql-body"]; ok {
+			t.Fatal("sql-body should not be set")
 		}
 	})
 
-	t.Run("CLI inline SQL masks process file", func(t *testing.T) {
-		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
-		t.Setenv(sqlFileEnv, "process.sql")
-
-		source := resolveSQLSource(
-			&runArgs{scriptArg: "select 1"},
+	t.Run("explicit typed sql-file wins over inline positional", func(t *testing.T) {
+		inputs := withExecuteSQLSource(
+			bench.ParamInputs{CLI: map[string]string{"sql-file": "typed.sql"}},
 			"--= query\nselect 1;\n",
 			"",
-			nil,
-			nil,
-			nil,
 		)
-		if !source.explicitCLI || source.envKey != sqlBodyEnv {
-			t.Fatalf("source = %#v", source)
+
+		if inputs.CLI["sql-file"] != "typed.sql" {
+			t.Fatalf("sql-file = %q", inputs.CLI["sql-file"])
 		}
 
-		if err := withProcessSQLSource(source, func() error {
-			if body := os.Getenv(sqlBodyEnv); body != source.value {
-				t.Fatalf("process body = %q", body)
-			}
-
-			if _, ok := os.LookupEnv(sqlFileEnv); ok {
-				t.Fatal("process SQL_FILE was not masked")
-			}
-
-			return nil
-		}); err != nil {
-			t.Fatalf("withProcessSQLSource() error = %v", err)
-		}
-
-		if file := os.Getenv(sqlFileEnv); file != "process.sql" {
-			t.Fatalf("process SQL_FILE was not restored: %q", file)
+		if _, ok := inputs.CLI["sql-body"]; ok {
+			t.Fatal("sql-body should not be set")
 		}
 	})
 
-	t.Run("typed workload config beats config env body", func(t *testing.T) {
-		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
+	t.Run("no source leaves params untouched", func(t *testing.T) {
+		inputs := withExecuteSQLSource(bench.ParamInputs{CLI: map[string]string{}}, "", "")
 
-		source := resolveSQLSource(
-			&runArgs{},
-			"",
-			"",
-			nil,
-			map[string]json.RawMessage{"sqlFile": json.RawMessage(`"typed-config.sql"`)},
-			map[string]string{sqlBodyEnv: "select 'config env'"},
-		)
-		if source.envKey != sqlFileEnv || source.value != "typed-config.sql" {
-			t.Fatalf("source = %#v", source)
+		if _, ok := inputs.CLI["sql-body"]; ok {
+			t.Fatal("sql-body should not be set")
 		}
 
-		env := map[string]string{sqlBodyEnv: "select 'config env'"}
-		applySQLSource(env, source)
-
-		if !maps.Equal(env, map[string]string{sqlFileEnv: "typed-config.sql"}) {
-			t.Fatalf("resolved env = %v", env)
-		}
-	})
-
-	t.Run("process beats legacy and config sources", func(t *testing.T) {
-		unsetRunTestEnv(t, sqlBodyEnv, sqlFileEnv)
-		t.Setenv(sqlFileEnv, "process.sql")
-
-		source := resolveSQLSource(
-			&runArgs{},
-			"select 'config route'",
-			"",
-			map[string]string{sqlBodyEnv: "select '-e'"},
-			nil,
-			map[string]string{sqlBodyEnv: "select 'config env'"},
-		)
-		if source.envKey != sqlFileEnv || source.value != "process.sql" {
-			t.Fatalf("source = %#v", source)
+		if _, ok := inputs.CLI["sql-file"]; ok {
+			t.Fatal("sql-file should not be set")
 		}
 	})
 }
@@ -784,9 +671,25 @@ func TestResolveSQLSourcePrecedence(t *testing.T) {
 func TestBuildDriverConfigReturnsJSONConversionErrors(t *testing.T) {
 	_, err := buildDriverConfig(0, &runner.DriverCLIConfig{
 		Extra: map[string]any{"invalid": func() {}},
-	}, nil)
+	})
 	if err == nil || !contains(err.Error(), "extra config") {
 		t.Fatalf("buildDriverConfig() error = %v", err)
+	}
+}
+
+func TestBuildDriverConfigRejectsDefaultTxIsolation(t *testing.T) {
+	t.Parallel()
+
+	_, err := buildDriverConfig(0, &runner.DriverCLIConfig{
+		DriverType: "postgres",
+		Extra:      map[string]any{"defaultTxIsolation": "read_committed"},
+	})
+	if err == nil {
+		t.Fatal("buildDriverConfig() accepted defaultTxIsolation")
+	}
+
+	if !contains(err.Error(), "--tx-isolation") {
+		t.Fatalf("buildDriverConfig() error = %v, want --tx-isolation migration guidance", err)
 	}
 }
 
@@ -1150,7 +1053,7 @@ func TestApplyDriverOptDottedPoolUnknownField(t *testing.T) {
 		t.Errorf("pool.maximum: got %v, want 20", pool["maximum"])
 	}
 
-	if _, err := buildDriverConfig(0, configs[0], nil); err == nil || !contains(err.Error(), "unknown field") {
+	if _, err := buildDriverConfig(0, configs[0]); err == nil || !contains(err.Error(), "unknown field") {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
 }
@@ -1189,62 +1092,6 @@ func TestApplyDriverOptDottedPathConflict(t *testing.T) {
 
 	if !contains(err.Error(), "conflicts") {
 		t.Fatalf("got error %q, want conflict", err.Error())
-	}
-}
-
-func TestToEnvVarsRespectsExistingEnv(t *testing.T) {
-	t.Setenv("STROPPY_DRIVER_0", `{"url":"from-env"}`)
-
-	configs := runner.DriverCLIConfigs{
-		0: &runner.DriverCLIConfig{URL: "from-cli"},
-	}
-
-	envs, err := configs.ToEnvVars()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	for _, env := range envs {
-		if len(env) > 16 && env[:16] == "STROPPY_DRIVER_0" {
-			t.Fatalf("ToEnvVars should not override existing STROPPY_DRIVER_0, got: %s", env)
-		}
-	}
-}
-
-func TestToEnvVarsSetsWhenNotInEnv(t *testing.T) {
-	// Ensure STROPPY_DRIVER_0 is not set.
-	os.Unsetenv("STROPPY_DRIVER_0")
-
-	configs := runner.DriverCLIConfigs{
-		0: &runner.DriverCLIConfig{URL: "from-cli"},
-	}
-
-	envs, err := configs.ToEnvVars()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(envs) == 0 {
-		t.Fatal("expected STROPPY_DRIVER_0 to be set")
-	}
-}
-
-func unsetRunTestEnv(t *testing.T, names ...string) {
-	t.Helper()
-
-	for _, name := range names {
-		value, set := os.LookupEnv(name)
-		if err := os.Unsetenv(name); err != nil {
-			t.Fatalf("Unsetenv(%q) error = %v", name, err)
-		}
-
-		t.Cleanup(func() {
-			if set {
-				_ = os.Setenv(name, value)
-			} else {
-				_ = os.Unsetenv(name)
-			}
-		})
 	}
 }
 

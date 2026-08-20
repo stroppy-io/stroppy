@@ -51,8 +51,7 @@ Example stroppy-config.json:
     },
     "params": {},
     "env": {
-      "WAREHOUSES": "10",
-      "POOL_SIZE": "200"
+      "WAREHOUSES": "10"
     },
     "steps": ["create_schema", "load_data"]
   }
@@ -101,8 +100,10 @@ PRECEDENCE (highest to lowest)
     steps / noSteps:             CLI --steps > config file "steps" field
     logger / OTEL exporter:      config file "global" only (no CLI equivalent)
 
-  There is no "--" k6-args passthrough and no k6Args field in effect.
-  Use typed executor/vus/iterations/duration parameters; legacy
+  There is no "--" k6-args passthrough. The historical k6Args and k6Config
+  config fields and the driver-level defaultTxIsolation field are removed and
+  now rejected as unknown. Use typed executor/vus/iterations/duration
+  parameters and the workload's --tx-isolation parameter instead; legacy
   VUS/DURATION/ITER environment values remain compatible. Legacy DURATION
   without an explicit executor infers constant-vus and emits a warning; prefer
   an explicit "run.executor" value.

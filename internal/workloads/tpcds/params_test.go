@@ -145,8 +145,9 @@ func runCaptured(t *testing.T, captured <-chan *workload, inputs bench.ParamInpu
 		context.Background(),
 		captureWorkloadName,
 		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		nil,
 		inputs,
+		nil,
+		nil,
 		zap.NewNop(),
 		&bench.MetricsConfig{},
 	)

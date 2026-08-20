@@ -6,14 +6,10 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"go.uber.org/zap"
-
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
@@ -133,7 +129,8 @@ func LookupDriverPreset(name string) (DriverPreset, error) {
 }
 
 // DriverCLIConfig represents a fully resolved driver configuration from CLI flags.
-// It is serialized to JSON and passed as STROPPY_DRIVER_N env var to the k6 script.
+// Known fields are kept on the struct; -D extras live in Extra and are merged into
+// the runtime *config.DriverConfig by the run command's buildDriverConfig.
 type DriverCLIConfig struct {
 	// Base fields from preset (overridable via -D).
 	DriverType          string `json:"driverType,omitempty"`
@@ -165,8 +162,8 @@ func (d DriverCLIConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(merged)
 }
 
-// ApplyOverride sets a field by key=value. Known fields are set on the struct,
-// unknown fields go into Extra for pass-through to TS.
+// ApplyOverride sets a field by key=value. Known fields are set on the struct;
+// unknown fields go into Extra for later strict decoding into DriverConfig.
 func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
 	if key == "" {
 		return fmt.Errorf("%w: empty key", errInvalidDriverOverride)
@@ -336,80 +333,4 @@ func DriverCLIConfigsFromFile(fileDrivers map[uint32]*config.DriverRunConfig) (D
 	}
 
 	return configs, nil
-}
-
-// ToEnvVars serializes all driver configs to STROPPY_DRIVER_N=<json> pairs.
-// If a STROPPY_DRIVER_N env var is already set in the process environment,
-// the CLI-composed value is skipped — user-set env takes precedence.
-func (configs DriverCLIConfigs) ToEnvVars() ([]string, error) {
-	lg := logger.Global().Named("driver_preset")
-	envs := make([]string, 0, len(configs))
-
-	for idx, cfg := range configs {
-		envKey := fmt.Sprintf("STROPPY_DRIVER_%d", idx)
-
-		if _, ok := os.LookupEnv(envKey); ok {
-			lg.Debug("CLI driver skipped: real env takes precedence", zap.String("key", envKey))
-
-			continue
-		}
-
-		data, err := json.Marshal(cfg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize driver %d config: %w", idx, err)
-		}
-
-		lg.Debug("Applying CLI driver config", zap.Int("index", idx), zap.String("type", cfg.DriverType))
-
-		envs = append(envs, envKey+"="+string(data))
-	}
-
-	return envs, nil
-}
-
-// fileDriverRunConfigsToEnvVars serializes config-file driver configs to
-// STROPPY_DRIVER_N env vars. Only emits vars for driver indices that are
-// absent from both the real environment and cliConfigs (CLI -d/-D flags).
-//
-// json.Marshal produces camelCase field names matching the driver setup schema.
-func fileDriverRunConfigsToEnvVars(
-	fileDrivers map[uint32]*config.DriverRunConfig,
-	cliConfigs DriverCLIConfigs,
-) ([]string, error) {
-	if len(fileDrivers) == 0 {
-		return nil, nil
-	}
-
-	lg := logger.Global().Named("driver_preset")
-	envs := make([]string, 0, len(fileDrivers))
-
-	for idx, drCfg := range fileDrivers {
-		envKey := fmt.Sprintf("STROPPY_DRIVER_%d", idx)
-
-		if _, ok := os.LookupEnv(envKey); ok {
-			lg.Debug("Config file driver skipped: real env takes precedence", zap.String("key", envKey))
-
-			continue
-		}
-
-		if _, ok := cliConfigs[int(idx)]; ok {
-			lg.Debug("Config file driver skipped: CLI -d/-D takes precedence", zap.Uint32("index", idx))
-
-			continue
-		}
-
-		data, err := json.Marshal(drCfg) //nolint:gosec // serializing config to env vars, not extracting a secret
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize file driver %d config: %w", idx, err)
-		}
-
-		lg.Debug("Applying config file driver",
-			zap.Uint32("index", idx),
-			zap.String("type", drCfg.GetDriverType()),
-		)
-
-		envs = append(envs, envKey+"="+string(data))
-	}
-
-	return envs, nil
 }
