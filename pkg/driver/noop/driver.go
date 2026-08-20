@@ -49,10 +49,7 @@ type Driver struct {
 var _ driver.Driver = (*Driver)(nil)
 
 func NewDriver(opts driver.Options) *Driver {
-	lg := opts.Logger
-	if lg == nil {
-		lg = logger.NewFromEnv().Named("noop")
-	}
+	lg := logger.Global().Named("noop")
 
 	bulkSize := defaultBulkSize
 	if opts.Config.BulkSize != nil {

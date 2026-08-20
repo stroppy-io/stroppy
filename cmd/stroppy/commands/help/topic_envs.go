@@ -19,6 +19,13 @@ func init() {
     --iterations   Total shared iterations
     --duration     Run length as a Go duration, e.g. 60s or 10m
 
+  Logging controls also use typed flags and shared precedence:
+
+    --log-level    debug, info, warn, error, or fatal (env LOG_LEVEL)
+    --log-mode     production or development (env LOG_MODE)
+
+  They override the config file's global.logger and default to info/production.
+
   Select the executor explicitly. Examples:
 
     # TPC-C throughput: 10 VUs for 60 seconds

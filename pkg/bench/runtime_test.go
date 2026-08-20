@@ -71,7 +71,6 @@ func TestRunRejectsNegativeQueryTimeout(t *testing.T) {
 		ParamInputs{CLI: map[string]string{"query-timeout": "-5s"}},
 		nil,
 		nil,
-		zap.NewNop(),
 		&MetricsConfig{},
 	)
 	if err == nil || !strings.Contains(err.Error(), "query-timeout must not be negative") {
@@ -111,7 +110,6 @@ func TestRunPassesScenarioCancellationToWorkload(t *testing.T) {
 		ParamInputs{LegacyEnv: map[string]string{"VUS": "2", "ITER": "2"}},
 		nil,
 		nil,
-		zap.NewNop(),
 		&MetricsConfig{},
 	)
 	if !errors.Is(err, workload.fatalErr) {

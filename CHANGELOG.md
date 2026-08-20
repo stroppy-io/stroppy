@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- `--log-level` and `--log-mode` flags (also `LOG_LEVEL`/`LOG_MODE`, and `-e LOG_LEVEL=`/`-e LOG_MODE=`) select a run's log level and mode, overriding `global.logger` from the config file; with no input they default to `info` (level) and `production` (mode).
 - `--query-timeout` (also `QUERY_TIMEOUT` and config `run.queryTimeout`) bounds each executed statement with a per-statement deadline; `0` (the default) disables it. Timed-out statements are reported distinctly from a canceled run, and MySQL adds a server-side `MAX_EXECUTION_TIME` hint so a timed-out query keeps its pooled connection. ([#153](https://github.com/stroppy-io/stroppy/pull/153))
 - Restored configurable insert-method selection: `--insert-method` (also `INSERT_METHOD`, config `run.insertMethod`, or `-D insertMethod`/`-D defaultInsertMethod`) sets the row-insert method (`plain_query`, `plain_bulk`, `columnar`, `native`) for every workload load, validated against the selected driver; invalid or unsupported methods now fail before loading starts, and omitting an override keeps the workload's own default. ([#152](https://github.com/stroppy-io/stroppy/pull/152))
 - `stroppy probe` now lists registered workload parameter flags, and its JSON output includes each workload's typed schema for tooling and discovery. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
@@ -32,6 +33,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- Logging is consolidated into one process-wide logger, initialized once from the effective configuration before drivers and workloads start; every driver and workload now logs through a named child of it, and the per-driver optional logger and environment construction are gone.
 - Built-in workloads expose their tuning options as typed parameters while preserving the existing environment-variable names. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - TPC-DS typed loads format common cell types directly into reusable buffers. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Benchmark metrics now use standard OpenTelemetry counters, gauges, and fixed-bucket histograms. Query throughput and error rates are derived from monotonic `*_total` counters instead of k6-style sampled rates. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
@@ -41,6 +43,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Database URLs and DSNs are redacted before being written to the log, at every level, so credentials never appear in driver, workload, or config output.
 - Workload help and shell completion expose typed flags accurately, including explicit booleans and contextual defaults, and SQL override positionals reach registered workload bindings. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Typed run parameters and SQL sources keep CLI-over-environment precedence, config env names reject case-only collisions, shared driver pool settings remain active alongside driver-specific settings, and invalid pool fields fail clearly instead of being ignored. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Typed inserts reject malformed requests consistently, and generator ranges remain correct at integer boundaries. ([#126](https://github.com/stroppy-io/stroppy/pull/126))

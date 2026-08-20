@@ -782,7 +782,6 @@ func TestRunResolvesParamsBeforeDriverInitialization(t *testing.T) {
 		ParamInputs{CLI: map[string]string{"count": "invalid"}},
 		nil,
 		nil,
-		zap.NewNop(),
 		&MetricsConfig{},
 	)
 

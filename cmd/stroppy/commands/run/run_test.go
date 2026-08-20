@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"maps"
 	"os"
 	"sync"
@@ -15,7 +16,9 @@ import (
 	"github.com/stroppy-io/stroppy/internal/runner"
 	_ "github.com/stroppy-io/stroppy/internal/workloads/simple"
 	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/config"
+	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
 
 //nolint:cyclop // one table covers the complete run argument grammar
@@ -988,6 +991,143 @@ var (
 	lastRunParamSQLFile          string
 	registerRunParamWorkloadOnce sync.Once
 )
+
+func TestResolveLoggerSettings_Precedence(t *testing.T) {
+	warnCfg := &config.LoggerConfig{
+		LogLevel: config.LogLevelWarn,
+		LogMode:  config.LogModeDevelopment,
+	}
+
+	t.Run("defaults", func(t *testing.T) {
+		level, mode, err := resolveLoggerSettings(nil, nil, nil)
+		if err != nil {
+			t.Fatalf("resolveLoggerSettings() error = %v", err)
+		}
+
+		if level != "info" || mode != "production" {
+			t.Fatalf("got %q/%q, want info/production", level, mode)
+		}
+	})
+
+	t.Run("config global.logger", func(t *testing.T) {
+		level, mode, err := resolveLoggerSettings(nil, nil, warnCfg)
+		if err != nil {
+			t.Fatalf("resolveLoggerSettings() error = %v", err)
+		}
+
+		if level != "warn" || mode != "development" {
+			t.Fatalf("got %q/%q, want warn/development", level, mode)
+		}
+	})
+
+	t.Run("env overrides config", func(t *testing.T) {
+		t.Setenv("LOG_LEVEL", "error")
+		t.Setenv("LOG_MODE", "production")
+
+		level, mode, err := resolveLoggerSettings(nil, nil, warnCfg)
+		if err != nil {
+			t.Fatalf("resolveLoggerSettings() error = %v", err)
+		}
+
+		if level != "error" || mode != "production" {
+			t.Fatalf("got %q/%q, want error/production", level, mode)
+		}
+	})
+
+	t.Run("legacy env overrides config", func(t *testing.T) {
+		level, mode, err := resolveLoggerSettings(
+			nil,
+			map[string]string{"LOG_LEVEL": "debug"},
+			warnCfg,
+		)
+		if err != nil {
+			t.Fatalf("resolveLoggerSettings() error = %v", err)
+		}
+
+		if level != "debug" || mode != "development" {
+			t.Fatalf("got %q/%q, want debug/development", level, mode)
+		}
+	})
+
+	t.Run("cli overrides everything", func(t *testing.T) {
+		t.Setenv("LOG_LEVEL", "error")
+		t.Setenv("LOG_MODE", "production")
+
+		level, mode, err := resolveLoggerSettings(
+			map[string]string{"log-level": "debug", "log-mode": "development"},
+			map[string]string{"LOG_LEVEL": "warn"},
+			warnCfg,
+		)
+		if err != nil {
+			t.Fatalf("resolveLoggerSettings() error = %v", err)
+		}
+
+		if level != "debug" || mode != "development" {
+			t.Fatalf("got %q/%q, want debug/development", level, mode)
+		}
+	})
+
+	t.Run("invalid level rejected", func(t *testing.T) {
+		_, _, err := resolveLoggerSettings(map[string]string{"log-level": "verbose"}, nil, nil)
+		if err == nil {
+			t.Fatal("expected an error for invalid log level")
+		}
+	})
+
+	t.Run("invalid mode rejected", func(t *testing.T) {
+		t.Setenv("LOG_MODE", "fancy")
+
+		_, _, err := resolveLoggerSettings(nil, nil, nil)
+		if err == nil {
+			t.Fatal("expected an error for invalid log mode")
+		}
+	})
+}
+
+func TestErrorLevelSuppressesInfoAndDebug(t *testing.T) {
+	origStderr := os.Stderr
+
+	readEnd, writeEnd, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe() error = %v", err)
+	}
+
+	// Redirect stderr before RunE so logger.Init opens the pipe as its sink.
+	os.Stderr = writeEnd
+
+	runErr := Cmd.RunE(Cmd, []string{
+		"simple", "-d", "noop",
+		"--log-level=error",
+		"--executor", "shared-iterations",
+		"--iterations", "1",
+	})
+
+	// Close the write end so ReadAll reaches EOF, then flush the captured output.
+	writeEnd.Close()
+
+	captured, readErr := io.ReadAll(readEnd)
+	readEnd.Close()
+
+	os.Stderr = origStderr
+
+	// Repoint the process-wide logger at the restored stderr for later tests.
+	if initErr := logger.Init("info", "production"); initErr != nil {
+		t.Fatalf("restore logger: %v", initErr)
+	}
+
+	if runErr != nil {
+		t.Fatalf("RunE() error = %v", runErr)
+	}
+
+	if readErr != nil {
+		t.Fatalf("reading captured output: %v", readErr)
+	}
+
+	output := string(captured)
+	if contains(output, "INFO") || contains(output, "DEBUG") {
+		t.Fatalf("error-level run emitted INFO/DEBUG records:\n%s", output)
+	}
+}
 
 func registerRunParamTestWorkload() {
 	registerRunParamWorkloadOnce.Do(func() {

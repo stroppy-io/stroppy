@@ -7,8 +7,6 @@ import (
 	"net"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
@@ -17,7 +15,6 @@ type (
 	Options struct {
 		// Allows to pass k6 DialFunc to driver for proper network metrics.
 		DialFunc func(ctx context.Context, network, addr string) (net.Conn, error)
-		Logger   *zap.Logger
 		Config   *config.DriverConfig
 
 		// QueryTimeout bounds each statement; <= 0 disables the deadline.

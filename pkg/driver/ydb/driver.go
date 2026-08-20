@@ -50,10 +50,7 @@ func NewDriver(
 	ctx context.Context,
 	opts driver.Options,
 ) (*Driver, error) {
-	lg := opts.Logger
-	if lg == nil {
-		lg = logger.NewFromEnv().Named("ydb")
-	}
+	lg := logger.Global().Named("ydb")
 
 	cfg := opts.Config
 	sqlCfg := cfg.SQL
@@ -132,7 +129,7 @@ func tryConnect(
 		return nil, nil, fmt.Errorf("apply SQL config: %w", err)
 	}
 
-	lg.Debug("Checking db connection...", zap.String("url", cfg.URL))
+	lg.Debug("Checking db connection...", zap.String("url", logger.RedactDSN(cfg.URL)))
 
 	if err = sqldriver.WaitForDB(ctx, lg, &sqldriver.DBPinger{DB: db}, pingTimeout); err != nil {
 		db.Close()

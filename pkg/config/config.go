@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // DriverType identifies a database driver implementation.
@@ -120,6 +121,70 @@ func LogLevelValues() []LogLevel {
 // LogModeValues returns every declared LogMode constant in canonical order.
 func LogModeValues() []LogMode {
 	return []LogMode{LogModeDevelopment, LogModeProduction}
+}
+
+// LevelShort returns the short (zap-style) spelling used by --log-level and
+// LOG_LEVEL for a configured LogLevel constant. It returns "" when unset.
+func (l LogLevel) LevelShort() string {
+	switch l {
+	case LogLevelDebug:
+		return "debug"
+	case LogLevelInfo:
+		return "info"
+	case LogLevelWarn:
+		return "warn"
+	case LogLevelError:
+		return "error"
+	case LogLevelFatal:
+		return "fatal"
+	default:
+		return ""
+	}
+}
+
+// ModeShort returns the short spelling used by --log-mode and LOG_MODE for a
+// configured LogMode constant. It returns "" when unset.
+func (m LogMode) ModeShort() string {
+	switch m {
+	case LogModeDevelopment:
+		return "development"
+	case LogModeProduction:
+		return "production"
+	default:
+		return ""
+	}
+}
+
+// ValidateLogLevel validates a CLI/env log level value and returns its
+// canonical short spelling. It rejects values outside the LogLevel set.
+func ValidateLogLevel(value string) (string, error) {
+	switch strings.ToLower(value) {
+	case "debug":
+		return "debug", nil
+	case "info":
+		return "info", nil
+	case "warn":
+		return "warn", nil
+	case "error":
+		return "error", nil
+	case "fatal":
+		return "fatal", nil
+	default:
+		return "", fmt.Errorf("%w: %q (want debug|info|warn|error|fatal)", errInvalidLogLevel, value)
+	}
+}
+
+// ValidateLogMode validates a CLI/env log mode value and returns its canonical
+// short spelling. It rejects values outside the LogMode set.
+func ValidateLogMode(value string) (string, error) {
+	switch strings.ToLower(value) {
+	case "development":
+		return "development", nil
+	case "production":
+		return "production", nil
+	default:
+		return "", fmt.Errorf("%w: %q (want development|production)", errInvalidLogMode, value)
+	}
 }
 
 // UnmarshalJSON rejects values outside the LogLevel constant set. The frozen

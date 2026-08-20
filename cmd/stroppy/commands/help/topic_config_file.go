@@ -60,7 +60,7 @@ Example stroppy-config.json:
 
     script   string            Workload name, .sql path, or inline SQL
     sql      string            Explicit SQL file override (2nd positional)
-    global   object            Logger and OTEL exporter config (no CLI equivalent)
+    global   object            Logger and OTEL exporter config (logger overridable via --log-level/--log-mode)
     drivers  map[string]obj    Per-index driver configs (keys "0", "1", ...)
     run      object            Typed scenario params: executor, vus, iterations, duration
     params   object            Typed parameters declared by the selected workload
@@ -98,7 +98,21 @@ PRECEDENCE (highest to lowest)
 
     workload / sql positionals:  CLI arg > config file "script"/"sql" fields
     steps / noSteps:             CLI --steps > config file "steps" field
-    logger / OTEL exporter:      config file "global" only (no CLI equivalent)
+    OTEL exporter:               config file "global" only (no CLI equivalent)
+
+  LOGGING
+
+    The logger level and mode are configured by global.logger.logLevel /
+    global.logger.logMode ("LOG_LEVEL_INFO" / "LOG_MODE_PRODUCTION"), and
+    overridden by --log-level / --log-mode flags or the LOG_LEVEL / LOG_MODE
+    environment variables (short spellings: debug|info|warn|error and
+    production|development). Precedence matches typed parameters:
+
+      1. --log-level / --log-mode        (e.g. --log-level debug)
+      2. LOG_LEVEL / LOG_MODE env        (e.g. LOG_LEVEL=debug)
+      3. -e LOG_LEVEL= -e LOG_MODE=
+      4. global.logger in the config file
+      5. Declared default (info / production)
 
   There is no "--" k6-args passthrough. The historical k6Args and k6Config
   config fields and the driver-level defaultTxIsolation field are removed and

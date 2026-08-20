@@ -34,6 +34,7 @@ type LoadedConfig struct {
 	RunConfig *config.RunConfig
 	Run       map[string]json.RawMessage
 	Params    map[string]json.RawMessage
+	Path      string
 }
 
 // LoadRunConfig loads a RunConfig from a JSON file.
@@ -94,8 +95,20 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
 	}
 
+	return &LoadedConfig{RunConfig: cfg, Run: runParams, Params: workloadParams, Path: path}, true, nil
+}
+
+// LogConfigFile emits the config-file diagnostics after the process-wide logger
+// is configured. Driver URLs are redacted so credentials never print.
+func LogConfigFile(loaded *LoadedConfig) {
+	if loaded == nil || loaded.RunConfig == nil {
+		return
+	}
+
 	lg := logger.Global().Named("config_file")
-	lg.Info("Loaded config file", zap.String("path", path))
+	cfg := loaded.RunConfig
+
+	lg.Info("Loaded config file", zap.String("path", loaded.Path))
 
 	if cfg.GetScript() != "" {
 		lg.Debug("Config file script", zap.String("script", cfg.GetScript()))
@@ -115,11 +128,9 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 		lg.Debug("Config file driver",
 			zap.Uint32("index", idx),
 			zap.String("type", drv.GetDriverType()),
-			zap.String("url", drv.GetURL()),
+			zap.String("url", logger.RedactDSN(drv.GetURL())),
 		)
 	}
-
-	return &LoadedConfig{RunConfig: cfg, Run: runParams, Params: workloadParams}, true, nil
 }
 
 func normalizeRunConfigEnv(runConfig *config.RunConfig) error {
