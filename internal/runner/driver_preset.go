@@ -36,6 +36,7 @@ const (
 	driverTypeKey          = "drivertype"
 	urlKey                 = "url"
 	defaultInsertMethodKey = "defaultinsertmethod"
+	insertMethodKey        = "insertmethod"
 )
 
 // inferType converts a CLI string value to its most specific Go type
@@ -174,7 +175,7 @@ func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
 		d.DriverType = value
 	case urlKey:
 		d.URL = value
-	case defaultInsertMethodKey:
+	case defaultInsertMethodKey, insertMethodKey:
 		d.DefaultInsertMethod = value
 	default:
 		return d.setExtraPath(strings.Split(key, "."), convertOverrideValue(key, value))
@@ -239,7 +240,7 @@ func validateOverridePath(path []string) error {
 
 func isDriverCLIField(key string) bool {
 	switch normalizeKey(key) {
-	case driverTypeKey, urlKey, defaultInsertMethodKey:
+	case driverTypeKey, urlKey, defaultInsertMethodKey, insertMethodKey:
 		return true
 	default:
 		return false
@@ -289,7 +290,7 @@ func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
 			cfg.DriverType = str
 		case urlKey:
 			cfg.URL = str
-		case defaultInsertMethodKey:
+		case defaultInsertMethodKey, insertMethodKey:
 			cfg.DefaultInsertMethod = str
 		default:
 			if cfg.Extra == nil {

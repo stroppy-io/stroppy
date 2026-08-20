@@ -35,10 +35,13 @@ func TestHumanCatalogIncludesGroupedWorkloads(t *testing.T) {
 		"PRESETS (embedded workloads)",
 		"WORKLOADS (typed parameters)",
 		"  tpcc/tx\n",
-		"    run:      --duration, --executor, --iterations, --vus",
+		"    run:      --duration, --executor, --insert-method, --iterations, --vus",
 		"    workload: --load-items",
 		"stroppy run <workload> --help",
 		"DRIVERS (supported insert methods)",
+		"  postgres  plain_query, plain_bulk, columnar, native",
+		"  mysql     plain_query, plain_bulk, native",
+		"  csv       native",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("human output does not contain %q\n%s", want, text)
@@ -114,6 +117,8 @@ func assertRepresentativeParams(t *testing.T, workloads []workloadEntry) {
 		t.Fatalf("executor schema = %#v", executor)
 	}
 
+	assertInsertMethodParam(t, tpcc)
+
 	duration := findParam(t, tpcc.Params, "duration")
 	if duration.Type != bench.ParamTypeDuration || duration.Default != "0s" {
 		t.Fatalf("duration schema = %#v", duration)
@@ -123,6 +128,17 @@ func assertRepresentativeParams(t *testing.T, workloads []workloadEntry) {
 	if loadItems.Default != nil ||
 		loadItems.DefaultDescription != "true when warehouse-start is 1; false otherwise" {
 		t.Fatalf("load-items schema = %#v", loadItems)
+	}
+}
+
+func assertInsertMethodParam(t *testing.T, tpcc workloadEntry) {
+	t.Helper()
+
+	insertMethod := findParam(t, tpcc.Params, "insert-method")
+	if insertMethod.Scope != bench.ParamScopeRun || insertMethod.Flag != "--insert-method" ||
+		insertMethod.Config != "insertMethod" || insertMethod.Default != nil ||
+		insertMethod.DefaultDescription != "workload default" {
+		t.Fatalf("insert-method schema = %#v", insertMethod)
 	}
 }
 

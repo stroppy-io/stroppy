@@ -433,7 +433,7 @@ func TestDescribeUsesDefaultsAndCopiesSchema(t *testing.T) {
 		t.Fatalf("Setup calls = %d, want 0", setupCalls.Load())
 	}
 
-	if description.Name != "test/describe-params" || len(description.Params) != 5 {
+	if description.Name != "test/describe-params" || len(description.Params) != 6 {
 		t.Fatalf("description = %#v", description)
 	}
 
@@ -448,19 +448,19 @@ func TestDescribeUsesDefaultsAndCopiesSchema(t *testing.T) {
 		LegacyEnvAliases: []string{"OLD_BATCH_SIZE"},
 		Config:           "batchSize",
 	}
-	if !reflect.DeepEqual(description.Params[4], want) {
-		t.Fatalf("workload schema = %#v, want %#v", description.Params[4], want)
+	if !reflect.DeepEqual(description.Params[5], want) {
+		t.Fatalf("workload schema = %#v, want %#v", description.Params[5], want)
 	}
 
-	description.Params[4].LegacyEnvAliases[0] = "MUTATED"
+	description.Params[5].LegacyEnvAliases[0] = "MUTATED"
 
 	again, err := Describe("test/describe-params")
 	if err != nil {
 		t.Fatalf("Describe() again error = %v", err)
 	}
 
-	if again.Params[4].LegacyEnvAliases[0] != "OLD_BATCH_SIZE" {
-		t.Fatalf("schema alias was mutated: %#v", again.Params[4])
+	if again.Params[5].LegacyEnvAliases[0] != "OLD_BATCH_SIZE" {
+		t.Fatalf("schema alias was mutated: %#v", again.Params[5])
 	}
 }
 

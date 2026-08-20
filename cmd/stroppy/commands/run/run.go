@@ -18,6 +18,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
 const (
@@ -531,7 +532,15 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 		dc.DriverType = t
 	}
 
-	// defaultInsertMethod is owned by each Go workload's InsertRequest.
+	if cfg.DefaultInsertMethod != "" {
+		method, err := driver.ResolveInsertMethod(dc.DriverType, cfg.DefaultInsertMethod)
+		if err != nil {
+			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
+		}
+
+		dc.InsertMethod = method.String()
+	}
+
 	if err := applyDriverExtras(idx, dc, cfg.Extra); err != nil {
 		return nil, invalidConfig(err)
 	}

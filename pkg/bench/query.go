@@ -105,6 +105,12 @@ func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Q
 		return nil, fmt.Errorf("insert: %w", err)
 	}
 
+	// Apply the run's effective insert method when one was resolved, so every
+	// load request honors the user override. Zero keeps the workload's own method.
+	if b.insertMethod != 0 {
+		req.Method = b.insertMethod
+	}
+
 	tracker := b.newBatchInsertTracker(req)
 
 	runCtx := ctx

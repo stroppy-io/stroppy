@@ -1,6 +1,8 @@
 package driver
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/stroppy-io/stroppy/pkg/config"
@@ -75,4 +77,35 @@ func InsertCapabilities() []InsertCapability {
 	}
 
 	return capabilities
+}
+
+// InsertMethods returns every supported insert method in enum order. It is the
+// authoritative value set probe and workload help enumerate.
+func InsertMethods() []InsertMethod {
+	return []InsertMethod{InsertPlainQuery, InsertPlainBulk, InsertColumnar, InsertNative}
+}
+
+// ErrInsertMethodUnsupported is returned when a resolved insert method is not
+// served by the selected driver.
+var ErrInsertMethodUnsupported = errors.New("insert method not supported by driver")
+
+// SupportsInsertMethod reports whether driverType's implementation serves method.
+func SupportsInsertMethod(driverType config.DriverType, method InsertMethod) bool {
+	return slices.Contains(insertMethodsByDriver[driverType], method)
+}
+
+// ResolveInsertMethod parses an authoring string and rejects methods the
+// selected driver does not serve, so an invalid or unsupported value fails
+// before a run starts loading.
+func ResolveInsertMethod(driverType config.DriverType, s string) (InsertMethod, error) {
+	method, err := ParseInsertMethod(s)
+	if err != nil {
+		return 0, err
+	}
+
+	if !SupportsInsertMethod(driverType, method) {
+		return 0, fmt.Errorf("%w %q (%s driver)", ErrInsertMethodUnsupported, s, driverType)
+	}
+
+	return method, nil
 }
