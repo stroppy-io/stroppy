@@ -86,6 +86,11 @@ Config file flags:
                           Config env values are lower precedence than -e and typed values.
                           Config drivers are lower precedence than -d/-D.
                           See 'stroppy help config-file' for details.
+
+Signals:
+  SIGINT and SIGTERM cancel the running workload and trigger graceful teardown.
+  A second signal forces immediate exit. The command exits 130 after a graceful
+  cancellation and 1 after a forced exit.
 `,
 	DisableFlagParsing: true,
 	SilenceErrors:      false,
@@ -221,6 +226,7 @@ Config file flags:
 
 			run := func() error {
 				return runGoWorkload(
+					cmd.Context(),
 					name, steps, noSteps, rootEnv, paramInputs, driverConfigs, metricsConfig(loadedRunConfig(fileConfig)),
 				)
 			}
@@ -237,6 +243,7 @@ Config file flags:
 			}
 
 			return runGoWorkload(
+				cmd.Context(),
 				scriptArg,
 				steps,
 				noSteps,
@@ -606,6 +613,7 @@ func restoreProcessEnv(name, value string, set bool) {
 // steps/noSteps are the merged (CLI over config-file) step filters, published via
 // STROPPY_STEPS env (the bench step filter reads it at Run start).
 func runGoWorkload(
+	ctx context.Context,
 	name string,
 	steps, noSteps []string,
 	env map[string]string,
@@ -645,7 +653,6 @@ func runGoWorkload(
 		os.Setenv("STROPPY_NO_STEPS", strings.Join(noSteps, ","))
 	}
 
-	ctx := context.Background()
 	if err := bench.Run(
 		ctx,
 		name,
