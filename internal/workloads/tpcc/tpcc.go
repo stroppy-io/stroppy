@@ -378,7 +378,6 @@ func (w *workload) q(section, name string) string {
 
 func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.newOrderTotal.Add(1)
-	w.recordSteady()
 
 	start := time.Now()
 	defer func() { w.m.newOrderDur.Add(float64(time.Since(start).Milliseconds())) }()
@@ -416,7 +415,7 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 		lineIID[olCnt-1] = items + 1 // nonexistent item → sentinel rollback
 	}
 
-	return bench.Retry0(ctx, w.retryPolicy, func() error {
+	if err := bench.Retry0(ctx, w.retryPolicy, func() error {
 		tx, err := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
 		if err != nil {
 			return err
@@ -428,7 +427,13 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 		}
 
 		return tx.Commit(ctx)
-	})
+	}); err != nil {
+		return err
+	}
+
+	w.recordSteady()
+
+	return nil
 }
 
 // finishNewOrder maps a new-order body error and its rollback error to the

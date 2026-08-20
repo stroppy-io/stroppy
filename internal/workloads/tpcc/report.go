@@ -255,9 +255,9 @@ type steadySeries struct {
 
 // snapshot copies the per-slot counts that fall within elapsed, up to capacity.
 func (s *steady) snapshot(elapsed time.Duration) steadySeries {
-	active := int(elapsed / s.width)
-	if active < 0 {
-		active = 0
+	active := 0
+	if elapsed > 0 {
+		active = int((elapsed + s.width - 1) / s.width)
 	}
 
 	if active > len(s.slots) {

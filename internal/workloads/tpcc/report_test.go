@@ -288,6 +288,31 @@ func TestStockLevelCeilingBoundary(t *testing.T) {
 	}
 }
 
+func TestSteadySnapshotIncludesFinalPartialSlot(t *testing.T) {
+	start := time.Unix(0, 0)
+
+	tracker := newSteady(start, steadySlotWidth, minSteadySlots+1)
+	for _, offset := range []time.Duration{0, 10 * steadySlotWidth, 20 * steadySlotWidth} {
+		tracker.record(start.Add(offset))
+	}
+
+	elapsed := time.Duration(minSteadySlots)*steadySlotWidth + steadySlotWidth/10
+	tracker.record(start.Add(elapsed))
+
+	series := tracker.snapshot(elapsed)
+	if len(series.counts) != minSteadySlots+1 {
+		t.Fatalf("snapshot slots = %d, want %d", len(series.counts), minSteadySlots+1)
+	}
+
+	if series.counts[minSteadySlots] != 1 {
+		t.Fatalf("final partial slot count = %d, want 1", series.counts[minSteadySlots])
+	}
+
+	if got := computeSteadiness(series); got.Status != "fail" {
+		t.Fatalf("Steadiness.Status = %s, want fail with final partial slot included", got.Status)
+	}
+}
+
 func TestSteadinessPass(t *testing.T) {
 	counts := make([]uint64, 600)
 	for i := range counts {

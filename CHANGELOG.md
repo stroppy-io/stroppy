@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- TPC-C runs now emit a §5.2.5 compliance report: per-transaction count, mix, throughput, and p50/p90/p95/p99 response times, with pass/fail against the response-time ceilings and transaction-mix minimums, a statistical-validity indicator, and a machine-readable JSON block, for paced runs only. ([#147](https://github.com/stroppy-io/stroppy/pull/147))
+- All TPC-C runs now emit text and JSON reports with per-transaction count, mix, throughput, and p50/p90/p95/p99 response times; paced runs additionally receive §5.2.5 response-time and transaction-mix verdicts, statistical-validity status, and a steady-state assessment, while unpaced runs mark compliance not applicable. ([#147](https://github.com/stroppy-io/stroppy/pull/147))
 - Restored the `tpcb/procs` workload: TPC-B ships both `tx` and `procs` variants again, with `tpcb/procs` running each transaction as one server-side stored-procedure call (`tpcb_transaction`) on PostgreSQL and MySQL. ([#146](https://github.com/stroppy-io/stroppy/pull/146))
 - `stroppy probe` now lists registered workload parameter flags, and its JSON output includes each workload's typed schema for tooling and discovery. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Typed scenario and workload parameters can be set with `--name` flags or native JSON values in the config file's `run` and `params` objects, and `stroppy run <workload> --help` lists the available parameters. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
