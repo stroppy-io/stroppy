@@ -16,6 +16,17 @@ const (
 	ForcedExitCode = 2
 )
 
+const (
+	// exitCodeSignalBase is the shell-convention offset for a graceful-cancel
+	// exit status: 128 + signal number.
+	exitCodeSignalBase = 128
+
+	// signalBufferSize sizes the signal channel. It holds the first
+	// SIGINT/SIGTERM plus one more, so a second signal queues for the forced
+	// exit path without dropping as soon as the handler is installed.
+	signalBufferSize = 2
+)
+
 // ExitCodeFor returns the shell-convention exit status (128 + signal number)
 // for a graceful cancellation triggered by sig: 130 for SIGINT, 143 for
 // SIGTERM. Returns 1 when sig is not a recognizable signal.
@@ -25,7 +36,7 @@ func ExitCodeFor(sig os.Signal) int {
 		return 1
 	}
 
-	return 128 + int(s)
+	return exitCodeSignalBase + int(s)
 }
 
 // NotifyContext returns a context canceled by the first SIGINT/SIGTERM, a stop
@@ -37,10 +48,14 @@ func ExitCodeFor(sig os.Signal) int {
 // Call stop exactly once when the command is done. It releases the OS handler,
 // drops any already-delivered-but-unconsumed signal, and cancels ctx so no
 // handler goroutine outlives the command.
-func NotifyContext(parent context.Context, force func(int)) (context.Context, func(), func() int) {
-	ctx, cancel := context.WithCancel(parent)
+func NotifyContext(parent context.Context, force func(int)) (
+	ctx context.Context, stop func(), exitStatus func() int,
+) {
+	var cancel context.CancelFunc
 
-	sigCh := make(chan os.Signal, 2)
+	ctx, cancel = context.WithCancel(parent)
+
+	sigCh := make(chan os.Signal, signalBufferSize)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
 	if force == nil {
@@ -54,7 +69,7 @@ func NotifyContext(parent context.Context, force func(int)) (context.Context, fu
 
 	done := monitorSignals(sigCh, cancel, force, &stopped, &firstSig)
 
-	stop := func() {
+	stop = func() {
 		stopped.Store(true) // gate: no force can fire once stop begins
 		signal.Stop(sigCh)  // no new deliveries
 		drainSignals(sigCh) // drop already-buffered signals so monitor can't pick them
@@ -62,13 +77,11 @@ func NotifyContext(parent context.Context, force func(int)) (context.Context, fu
 		cancel()
 	}
 
-	exitStatus := func() int {
+	exitStatus = func() int {
 		if sig := syscall.Signal(firstSig.Load()); sig != 0 {
 			return ExitCodeFor(sig)
 		}
 
-		// Canceled without a recorded signal (e.g. parent canceled): fall back
-		// to the SIGINT convention.
 		return ExitCodeFor(syscall.SIGINT)
 	}
 
@@ -115,6 +128,7 @@ func sigNumber(sig os.Signal) int32 {
 		return 0
 	}
 
+	//nolint:gosec // G115: sig is a bounded Unix signal number (SIGINT=2, SIGTERM=15), well within int32
 	return int32(s)
 }
 

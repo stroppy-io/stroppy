@@ -109,6 +109,7 @@ func (w *teardownTrackingWorkload) Iterate(ctx context.Context, _ *Bench) error 
 
 func (w *teardownTrackingWorkload) Teardown(ctx context.Context, _ *Bench) error {
 	w.teardownCalls.Add(1)
+
 	if ctx.Err() != nil {
 		w.teardownCtxCanceled.Store(true)
 	}

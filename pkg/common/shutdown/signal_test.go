@@ -17,8 +17,10 @@ func TestMonitorSignalsCancelThenForce(t *testing.T) {
 		stopped  atomic.Bool
 		firstSig atomic.Int32
 	)
+
 	forced := make(chan int, 1)
 	done := monitorSignals(sigCh, cancel, func(code int) { forced <- code }, &stopped, &firstSig)
+
 	defer close(done)
 
 	sigCh <- syscall.SIGINT
@@ -57,10 +59,12 @@ func TestMonitorSignalsStoppedIgnoresSignal(t *testing.T) {
 		stopped  atomic.Bool
 		firstSig atomic.Int32
 	)
+
 	stopped.Store(true)
 
 	forced := make(chan int, 1)
 	done := monitorSignals(sigCh, cancel, func(code int) { forced <- code }, &stopped, &firstSig)
+
 	defer close(done)
 
 	sigCh <- syscall.SIGINT
@@ -78,6 +82,7 @@ func TestMonitorSignalsStoppedIgnoresSignal(t *testing.T) {
 func TestDrainSignals(t *testing.T) {
 	ch := make(chan os.Signal, 2)
 	ch <- syscall.SIGINT
+
 	ch <- syscall.SIGTERM
 
 	drainSignals(ch)
@@ -145,6 +150,7 @@ func TestNotifyContextDeliversSignals(t *testing.T) {
 
 	forced := make(chan int, 1)
 	ctx, stop, exitStatus := NotifyContext(context.Background(), func(code int) { forced <- code })
+
 	defer stop()
 
 	if err := syscall.Kill(os.Getpid(), syscall.SIGINT); err != nil {
