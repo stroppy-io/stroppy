@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- `--query-timeout` (also `QUERY_TIMEOUT` and config `run.queryTimeout`) bounds each executed statement with a per-statement deadline; `0` (the default) disables it. Timed-out statements are reported distinctly from a canceled run, and MySQL adds a server-side `MAX_EXECUTION_TIME` hint so a timed-out query keeps its pooled connection.
+- `--query-timeout` (also `QUERY_TIMEOUT` and config `run.queryTimeout`) bounds each executed statement with a per-statement deadline; `0` (the default) disables it. Timed-out statements are reported distinctly from a canceled run, and MySQL adds a server-side `MAX_EXECUTION_TIME` hint so a timed-out query keeps its pooled connection. ([#153](https://github.com/stroppy-io/stroppy/pull/153))
 - All TPC-C runs now emit text and JSON reports with per-transaction count, mix, throughput, and p50/p90/p95/p99 response times; paced runs additionally receive §5.2.5 response-time and transaction-mix verdicts, statistical-validity status, and a steady-state assessment, while unpaced runs mark compliance not applicable. ([#147](https://github.com/stroppy-io/stroppy/pull/147))
 - Restored the `tpcb/procs` workload: TPC-B ships both `tx` and `procs` variants again, with `tpcb/procs` running each transaction as one server-side stored-procedure call (`tpcb_transaction`) on PostgreSQL and MySQL. ([#146](https://github.com/stroppy-io/stroppy/pull/146))
 - `stroppy probe` now lists registered workload parameter flags, and its JSON output includes each workload's typed schema for tooling and discovery. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
