@@ -89,8 +89,9 @@ Config file flags:
 
 Signals:
   SIGINT and SIGTERM cancel the running workload and trigger graceful teardown.
-  A second signal forces immediate exit. The command exits 130 after a graceful
-  cancellation and 1 after a forced exit.
+  A second signal forces immediate exit.
+  Exit statuses: 130 (SIGINT) or 143 (SIGTERM) after a graceful cancellation,
+  2 after a forced exit, 1 for other errors.
 `,
 	DisableFlagParsing: true,
 	SilenceErrors:      false,

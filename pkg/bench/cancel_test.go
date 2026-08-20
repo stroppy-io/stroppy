@@ -3,6 +3,7 @@ package bench
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -85,5 +86,73 @@ func TestRunScenarioConstantVUsCancellation(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("runScenario() did not stop after cancellation — workers leaked")
+	}
+}
+
+// teardownTrackingWorkload blocks Iterate until ctx is canceled and records
+// whether Teardown ran (and under what context), so we can assert graceful
+// cancellation still performs workload teardown exactly once under a fresh ctx.
+type teardownTrackingWorkload struct {
+	teardownCalls       atomic.Int32
+	teardownCtxCanceled atomic.Bool
+}
+
+func (*teardownTrackingWorkload) Name() string                        { return "test/teardown-on-cancel" }
+func (*teardownTrackingWorkload) Define(*Def) error                   { return nil }
+func (*teardownTrackingWorkload) Setup(context.Context, *Bench) error { return nil }
+
+func (w *teardownTrackingWorkload) Iterate(ctx context.Context, _ *Bench) error {
+	<-ctx.Done()
+
+	return ctx.Err()
+}
+
+func (w *teardownTrackingWorkload) Teardown(ctx context.Context, _ *Bench) error {
+	w.teardownCalls.Add(1)
+	if ctx.Err() != nil {
+		w.teardownCtxCanceled.Store(true)
+	}
+
+	return nil
+}
+
+// TestRunTeardownRunsOnCancellation verifies that when a run is canceled, the
+// workload Teardown still runs exactly once, under a fresh (non-canceled)
+// context, so schema cleanup (DROP TABLE etc.) is not skipped.
+func TestRunTeardownRunsOnCancellation(t *testing.T) {
+	var wl *teardownTrackingWorkload
+
+	Register(func() Workload {
+		wl = &teardownTrackingWorkload{}
+
+		return wl
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		cancel()
+	}()
+
+	err := Run(
+		ctx,
+		"test/teardown-on-cancel",
+		map[int]*stroppy.DriverConfig{0: {DriverType: stroppy.DriverConfig_DRIVER_TYPE_NOOP}},
+		nil,
+		ParamInputs{},
+		zap.NewNop(),
+		&MetricsConfig{},
+	)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", err)
+	}
+
+	if got := wl.teardownCalls.Load(); got != 1 {
+		t.Fatalf("Teardown called %d times, want 1", got)
+	}
+
+	if wl.teardownCtxCanceled.Load() {
+		t.Fatal("Teardown received a canceled context")
 	}
 }

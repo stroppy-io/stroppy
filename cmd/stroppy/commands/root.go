@@ -80,18 +80,27 @@ func Execute() {
 
 // execute wires the cancellation context, runs Cobra, and returns the process
 // exit code without terminating. Kept separate from Execute so the exit-status
-// mapping is a pure function of the returned error.
+// mapping is a pure function of the returned error. exitStatus is read only
+// after the command returns, so it reflects whichever signal canceled the run.
 func execute() int {
-	ctx, stop := shutdown.NotifyContext(context.Background(), nil)
+	ctx, stop, exitStatus := shutdown.NotifyContext(context.Background(), nil)
 	defer stop()
 
 	err := rootCmd.ExecuteContext(ctx)
+
+	return exitCodeFor(exitStatus(), err)
+}
+
+// exitCodeFor maps a command error to a process exit status. A graceful
+// cancellation uses the signal-derived code (130 SIGINT / 143 SIGTERM); any
+// other error uses 1.
+func exitCodeFor(cancelCode int, err error) int {
 	if err == nil {
 		return 0
 	}
 
 	if errors.Is(err, context.Canceled) {
-		return shutdown.CanceledExitCode
+		return cancelCode
 	}
 
 	return 1
