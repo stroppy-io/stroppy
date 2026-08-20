@@ -24,6 +24,9 @@ var (
 	errDuplicateConfigField = errors.New("duplicate JSON field")
 	errConfigEnvCollision   = errors.New("config env keys collide case-insensitively")
 	errTrailingConfigData   = errors.New("trailing JSON data")
+	errRemovedK6Fields      = errors.New(
+		"k6Args and k6Config are removed; configure concurrency with typed executor/vus/iterations/duration parameters",
+	)
 )
 
 // LoadedConfig keeps the run config separate from typed parameter scopes.
@@ -66,6 +69,15 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 	workloadParams, err := takeParamScope(fields, "params")
 	if err != nil {
 		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
+	}
+
+	// The historical k6Args/k6Config top-level fields are removed from the v6
+	// schema. Guide users to the replacement before strict unmarshalling turns
+	// them into an opaque "unknown field" error.
+	for _, removed := range []string{"k6Args", "k6Config"} {
+		if _, ok := fields[removed]; ok {
+			return nil, false, fmt.Errorf("parsing config file %q: %w", path, errRemovedK6Fields)
+		}
 	}
 
 	runData, err := json.Marshal(fields)

@@ -101,7 +101,7 @@ conditional transient retries.
 **Driver flags:**
 - `-d <preset>` — driver preset: `pg`, `mysql`, `pico`, `ydb`, `noop`
 - `-d '{"url":"...","bulkSize":20}'` — raw JSON driver config
-- `-D key=value` — override driver field (url, driverType, defaultTxIsolation, errorMode, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
+- `-D key=value` — override driver field (url, driverType, errorMode, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
 - `-d1 <preset>`, `-D1 key=value` — same for second driver index (multi-driver workloads)
 
 **Workload and run parameters:**

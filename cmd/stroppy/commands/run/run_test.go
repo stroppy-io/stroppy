@@ -677,6 +677,22 @@ func TestBuildDriverConfigReturnsJSONConversionErrors(t *testing.T) {
 	}
 }
 
+func TestBuildDriverConfigRejectsDefaultTxIsolation(t *testing.T) {
+	t.Parallel()
+
+	_, err := buildDriverConfig(0, &runner.DriverCLIConfig{
+		DriverType: "postgres",
+		Extra:      map[string]any{"defaultTxIsolation": "read_committed"},
+	})
+	if err == nil {
+		t.Fatal("buildDriverConfig() accepted defaultTxIsolation")
+	}
+
+	if !contains(err.Error(), "--tx-isolation") {
+		t.Fatalf("buildDriverConfig() error = %v, want --tx-isolation migration guidance", err)
+	}
+}
+
 func TestDynamicWorkloadHelpAndBadTypedParam(t *testing.T) {
 	registerRunParamTestWorkload()
 

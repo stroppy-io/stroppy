@@ -173,4 +173,18 @@ func TestLoadRunConfigRejectsCaseInsensitiveEnvCollisions(t *testing.T) {
 	assert.Contains(t, err.Error(), `config env keys collide case-insensitively: "VUS" and "vus"`)
 }
 
+func TestLoadRunConfigRejectsRemovedK6FieldsWithGuidance(t *testing.T) {
+	for _, field := range []string{"k6Args", "k6Config"} {
+		t.Run(field, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			require.NoError(t, os.WriteFile(path, []byte(`{"script":"tpcc/tx","`+field+`":"x"}`), 0o600))
+
+			_, _, err := runner.LoadRunConfig(path)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "k6Args and k6Config are removed")
+			assert.Contains(t, err.Error(), "executor/vus/iterations/duration")
+		})
+	}
+}
+
 func ptr[T any](v T) *T { return &v }
