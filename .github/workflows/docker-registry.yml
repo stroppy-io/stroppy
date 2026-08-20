@@ -44,3 +44,17 @@ jobs:
           tags: |
             ghcr.io/${{ steps.lowercase.outputs.lowercase }}:${{ github.ref_name }}.${{ github.run_number }}
             ghcr.io/${{ steps.lowercase.outputs.lowercase }}:latest
+
+      # Guard: the pushed image's binary must report the pushed tag, not the
+      # Docker ARG fallback. Running it also confirms the pushed image is sound.
+      - name: Verify image version
+        run: |
+          expected="${{ github.ref_name }}"
+          image="ghcr.io/${{ steps.lowercase.outputs.lowercase }}:${{ github.ref_name }}.${{ github.run_number }}"
+          actual="$(docker run --rm "${image}" version --json | jq -r '.stroppy')"
+          echo "expected=${expected}"
+          echo "actual=${actual}"
+          if [ "${actual}" != "${expected}" ]; then
+            echo "version mismatch: ${actual} != ${expected}"
+            exit 1
+          fi
