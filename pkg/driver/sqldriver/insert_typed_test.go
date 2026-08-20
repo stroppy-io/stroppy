@@ -52,7 +52,7 @@ func TestRunBulkInsertTypedPlainBulk(t *testing.T) {
 	src, cols := typedIntSource(4)
 	m := &mockExecer{}
 
-	if err := RunBulkInsert[int64](ctx, m, "t_bulk", typedRowSource(t, src, cols), qmark{}, 10); err != nil {
+	if err := RunBulkInsert[int64](ctx, m, "t_bulk", typedRowSource(t, src, cols), qmark{}, 10, 0); err != nil {
 		t.Fatalf("RunBulkInsert: %v", err)
 	}
 
@@ -82,7 +82,7 @@ func TestRunBulkInsertTypedRemainder(t *testing.T) {
 	src, cols := typedIntSource(total)
 	m := &mockExecer{}
 
-	if err := RunBulkInsert[int64](ctx, m, "t_rem", typedRowSource(t, src, cols), qmark{}, 500); err != nil {
+	if err := RunBulkInsert[int64](ctx, m, "t_rem", typedRowSource(t, src, cols), qmark{}, 500, 0); err != nil {
 		t.Fatalf("RunBulkInsert: %v", err)
 	}
 
@@ -141,7 +141,7 @@ func TestRunBulkInsertTypedClampsByColumns(t *testing.T) {
 	m := &mockExecer{}
 
 	if err := RunBulkInsert[int64](context.Background(), m, "t_wide",
-		typedRowSource(t, src, colNames), qmark{}, 2000); err != nil {
+		typedRowSource(t, src, colNames), qmark{}, 2000, 0); err != nil {
 		t.Fatalf("RunBulkInsert: %v", err)
 	}
 

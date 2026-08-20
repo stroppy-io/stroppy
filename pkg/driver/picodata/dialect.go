@@ -75,3 +75,7 @@ func (PicoDialect) Convert(val any) (any, error) {
 }
 
 func (PicoDialect) Deduplicate() bool { return true }
+
+// StatementTimeoutHint returns sql unchanged; picodata honors context
+// cancellation for its per-statement deadline.
+func (PicoDialect) StatementTimeoutHint(sql string, _ time.Duration) string { return sql }

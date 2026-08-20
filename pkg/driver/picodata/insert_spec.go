@@ -73,9 +73,9 @@ func (d *Driver) runInsertChunk(
 ) error {
 	switch method {
 	case driver.InsertNative, driver.InsertPlainBulk:
-		return sqldriver.RunBulkInsert(ctx, d.pool, table, src, PicoDialect{}, d.bulkSize)
+		return sqldriver.RunBulkInsert(ctx, d.pool, table, src, PicoDialect{}, d.bulkSize, d.queryTimeout)
 	case driver.InsertPlainQuery:
-		return sqldriver.RunBulkInsert(ctx, d.pool, table, src, PicoDialect{}, 1)
+		return sqldriver.RunBulkInsert(ctx, d.pool, table, src, PicoDialect{}, 1, d.queryTimeout)
 	default:
 		return fmt.Errorf("%w: %s", driver.ErrInsertMethodNotSupported, method)
 	}

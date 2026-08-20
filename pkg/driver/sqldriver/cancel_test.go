@@ -57,6 +57,7 @@ func TestRunQueryCancelsBlockedQuery(t *testing.T) {
 		zap.NewNop(),
 		"SELECT 1",
 		nil,
+		0,
 	)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("RunQuery() error = %v, want context.Canceled", err)

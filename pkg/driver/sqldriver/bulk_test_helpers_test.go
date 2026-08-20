@@ -2,6 +2,7 @@ package sqldriver
 
 import (
 	"context"
+	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 )
@@ -37,5 +38,7 @@ type qmark struct{}
 func (qmark) Placeholder(_ int) string   { return "?" }
 func (qmark) Convert(v any) (any, error) { return v, nil } //nolint:nilnil // pass-through
 func (qmark) Deduplicate() bool          { return false }
+
+func (qmark) StatementTimeoutHint(sql string, _ time.Duration) string { return sql }
 
 var _ queries.Dialect = qmark{}

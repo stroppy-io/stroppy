@@ -433,7 +433,7 @@ func TestDescribeUsesDefaultsAndCopiesSchema(t *testing.T) {
 		t.Fatalf("Setup calls = %d, want 0", setupCalls.Load())
 	}
 
-	if description.Name != "test/describe-params" || len(description.Params) != 5 {
+	if description.Name != "test/describe-params" || len(description.Params) != 6 {
 		t.Fatalf("description = %#v", description)
 	}
 
@@ -448,19 +448,19 @@ func TestDescribeUsesDefaultsAndCopiesSchema(t *testing.T) {
 		LegacyEnvAliases: []string{"OLD_BATCH_SIZE"},
 		Config:           "batchSize",
 	}
-	if !reflect.DeepEqual(description.Params[4], want) {
-		t.Fatalf("workload schema = %#v, want %#v", description.Params[4], want)
+	if !reflect.DeepEqual(description.Params[5], want) {
+		t.Fatalf("workload schema = %#v, want %#v", description.Params[5], want)
 	}
 
-	description.Params[4].LegacyEnvAliases[0] = "MUTATED"
+	description.Params[5].LegacyEnvAliases[0] = "MUTATED"
 
 	again, err := Describe("test/describe-params")
 	if err != nil {
 		t.Fatalf("Describe() again error = %v", err)
 	}
 
-	if again.Params[4].LegacyEnvAliases[0] != "OLD_BATCH_SIZE" {
-		t.Fatalf("schema alias was mutated: %#v", again.Params[4])
+	if again.Params[5].LegacyEnvAliases[0] != "OLD_BATCH_SIZE" {
+		t.Fatalf("schema alias was mutated: %#v", again.Params[5])
 	}
 }
 
@@ -535,6 +535,55 @@ func TestDescribeAllIsSorted(t *testing.T) {
 		if descriptions[idx-1].Name > descriptions[idx].Name {
 			t.Fatalf("descriptions are not sorted at %d: %q > %q", idx, descriptions[idx-1].Name, descriptions[idx].Name)
 		}
+	}
+}
+
+func TestScenarioQueryTimeoutResolution(t *testing.T) {
+	clearScenarioEnv(t)
+	clearParamEnv(t, "QUERY_TIMEOUT")
+
+	params, _, err := defineWorkload(&paramTestWorkload{name: "test/query-timeout"},
+		ParamInputs{CLI: map[string]string{"query-timeout": "5s"}}, false)
+	if err != nil {
+		t.Fatalf("defineWorkload() error = %v", err)
+	}
+
+	if got := params.queryTimeout.Value(); got != 5*time.Second {
+		t.Fatalf("queryTimeout = %v, want 5s", got)
+	}
+
+	if params.queryTimeout.Source() != ParamSourceCLI {
+		t.Fatalf("queryTimeout source = %q, want %q", params.queryTimeout.Source(), ParamSourceCLI)
+	}
+
+	t.Setenv("QUERY_TIMEOUT", "2s")
+
+	params, _, err = defineWorkload(&paramTestWorkload{name: "test/query-timeout"}, ParamInputs{}, false)
+	if err != nil {
+		t.Fatalf("defineWorkload() env error = %v", err)
+	}
+
+	if got := params.queryTimeout.Value(); got != 2*time.Second {
+		t.Fatalf("queryTimeout = %v, want 2s", got)
+	}
+
+	if params.queryTimeout.Source() != ParamSourceProcessEnv {
+		t.Fatalf("queryTimeout source = %q, want %q", params.queryTimeout.Source(), ParamSourceProcessEnv)
+	}
+
+	clearParamEnv(t, "QUERY_TIMEOUT")
+
+	params, _, err = defineWorkload(&paramTestWorkload{name: "test/query-timeout"}, ParamInputs{}, false)
+	if err != nil {
+		t.Fatalf("defineWorkload() default error = %v", err)
+	}
+
+	if got := params.queryTimeout.Value(); got != 0 {
+		t.Fatalf("queryTimeout = %v, want disabled default 0", got)
+	}
+
+	if params.queryTimeout.Source() != ParamSourceDefault {
+		t.Fatalf("queryTimeout source = %q, want %q", params.queryTimeout.Source(), ParamSourceDefault)
 	}
 }
 

@@ -87,9 +87,9 @@ func (d *Driver) runInsertChunk(
 	case driver.InsertNative, driver.InsertColumnar:
 		return d.bulkUpsertRuntime(ctx, tableName, src)
 	case driver.InsertPlainBulk:
-		return sqldriver.RunBulkInsert(ctx, d.db, tableName, src, d.dialect, d.bulkSize)
+		return sqldriver.RunBulkInsert(ctx, d.db, tableName, src, d.dialect, d.bulkSize, d.queryTimeout)
 	case driver.InsertPlainQuery:
-		return sqldriver.RunBulkInsert(ctx, d.db, tableName, src, d.dialect, 1)
+		return sqldriver.RunBulkInsert(ctx, d.db, tableName, src, d.dialect, 1, d.queryTimeout)
 	default:
 		return fmt.Errorf("%w: %s", driver.ErrInsertMethodNotSupported, method)
 	}

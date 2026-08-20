@@ -47,9 +47,10 @@ type Executor interface {
 }
 
 type Driver struct {
-	logger   *zap.Logger
-	pool     Executor
-	bulkSize int
+	logger       *zap.Logger
+	pool         Executor
+	bulkSize     int
+	queryTimeout time.Duration
 }
 
 var _ driver.Driver = new(Driver)
@@ -68,8 +69,9 @@ func NewDriver(
 	const defaultBulkSize = 2500
 
 	d = &Driver{
-		logger:   lg,
-		bulkSize: defaultBulkSize,
+		logger:       lg,
+		bulkSize:     defaultBulkSize,
+		queryTimeout: opts.QueryTimeout,
 	}
 
 	cfg := opts.Config
@@ -114,7 +116,7 @@ func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) 
 			return nil, err
 		}
 
-		return NewConnOnlyTx(conn, d.logger), nil
+		return NewConnOnlyTx(conn, d.logger, d.queryTimeout), nil
 	}
 
 	pgxTx, err := d.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: toTxIsoLevel(isolation)})
@@ -139,5 +141,5 @@ func (d *Driver) RunQuery(
 	sql string,
 	args map[string]any,
 ) (*driver.QueryResult, error) {
-	return sqldriver.RunQuery(ctx, d.pool, NewRows, PgxDialect{}, d.logger, sql, args)
+	return sqldriver.RunQuery(ctx, d.pool, NewRows, PgxDialect{}, d.logger, sql, args, d.queryTimeout)
 }
