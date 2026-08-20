@@ -120,11 +120,12 @@ func init() {
 // newOrderRunner is a thin workload that invokes the new-order body once with
 // canned line items, capturing the resulting error.
 type newOrderRunner struct {
-	w          *workload
-	lineIID    []int64
-	lineQty    []int64
-	lineSupply []int64
-	err        error
+	w             *workload
+	lineIID       []int64
+	lineQty       []int64
+	lineSupply    []int64
+	forceRollback bool
+	err           error
 }
 
 func (*newOrderRunner) Name() string                                 { return newOrderTestWorkloadName }
@@ -142,14 +143,19 @@ func (r *newOrderRunner) Iterate(ctx context.Context, b *bench.Bench) error {
 
 	r.err = r.w.newOrderBody(ctx, tx,
 		1, 1, 1, int64(len(r.lineIID)), 1,
-		r.lineIID, r.lineQty, r.lineSupply, false)
+		r.lineIID, r.lineQty, r.lineSupply, r.forceRollback)
 
 	return r.err
 }
 
 // runNewOrderBody executes newOrderBody once against the given tx row responses
 // and returns the resulting error.
-func runNewOrderBody(t *testing.T, respond func(sql string) ([][]any, error), lineIID []int64) error {
+func runNewOrderBody(
+	t *testing.T,
+	respond func(sql string) ([][]any, error),
+	lineIID []int64,
+	forceRollback bool,
+) error {
 	t.Helper()
 
 	w := &workload{sql: bench.ParseSQL(newOrderTestSQL), variant: "tx"}
@@ -163,7 +169,10 @@ func runNewOrderBody(t *testing.T, respond func(sql string) ([][]any, error), li
 	}
 
 	currentDriver = &fakeDriver{tx: &fakeTx{respond: respond}}
-	currentRunner = &newOrderRunner{w: w, lineIID: lineIID, lineQty: lineQty, lineSupply: lineSupply}
+	currentRunner = &newOrderRunner{
+		w: w, lineIID: lineIID, lineQty: lineQty, lineSupply: lineSupply,
+		forceRollback: forceRollback,
+	}
 
 	if err := bench.Run(
 		context.Background(),
@@ -205,7 +214,7 @@ func TestNewOrderBodyMissingCustomer(t *testing.T) {
 	err := runNewOrderBody(t, newOrderResponds(map[string][][]any{
 		"WAREHOUSE_ROW": {warehouseRow()},
 		"DISTRICT_ROW":  {districtRow()},
-	}), []int64{1})
+	}), []int64{1}, false)
 	if !errors.Is(err, errNewOrderCustomerMissing) {
 		t.Fatalf("missing customer error = %v, want %v", err, errNewOrderCustomerMissing)
 	}
@@ -215,7 +224,7 @@ func TestNewOrderBodyMissingWarehouse(t *testing.T) {
 	err := runNewOrderBody(t, newOrderResponds(map[string][][]any{
 		"CUSTOMER_ROW": {customerRow()},
 		"DISTRICT_ROW": {districtRow()},
-	}), []int64{1})
+	}), []int64{1}, false)
 	if !errors.Is(err, errNewOrderWarehouseMissing) {
 		t.Fatalf("missing warehouse error = %v, want %v", err, errNewOrderWarehouseMissing)
 	}
@@ -228,9 +237,20 @@ func TestNewOrderBodyMissingItem(t *testing.T) {
 		"DISTRICT_ROW":  {districtRow()},
 		"ITEM_ROWS":     {itemRow(10)}, // item 20 absent
 		"STOCK_ROWS":    {stockRow(10)},
-	}), []int64{10, 20})
+	}), []int64{10, 20}, false)
 	if !errors.Is(err, errItemNotFound) {
 		t.Fatalf("missing item error = %v, want %v", err, errItemNotFound)
+	}
+}
+
+func TestNewOrderBodyForcedRollbackReportsMissingRegularItem(t *testing.T) {
+	err := runNewOrderBody(t, newOrderResponds(map[string][][]any{
+		"CUSTOMER_ROW":  {customerRow()},
+		"WAREHOUSE_ROW": {warehouseRow()},
+		"DISTRICT_ROW":  {districtRow()},
+	}), []int64{10, items + 1}, true)
+	if !errors.Is(err, errItemNotFound) {
+		t.Fatalf("forced rollback with missing regular item error = %v, want %v", err, errItemNotFound)
 	}
 }
 
@@ -241,7 +261,7 @@ func TestNewOrderBodyMissingStock(t *testing.T) {
 		"DISTRICT_ROW":  {districtRow()},
 		"ITEM_ROWS":     {itemRow(10)},
 		// STOCK_ROWS omitted: item 10 has no stock row.
-	}), []int64{10})
+	}), []int64{10}, false)
 	if !errors.Is(err, errNewOrderStockMissing) {
 		t.Fatalf("missing stock error = %v, want %v", err, errNewOrderStockMissing)
 	}

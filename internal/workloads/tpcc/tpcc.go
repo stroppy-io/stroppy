@@ -425,7 +425,7 @@ func finishNewOrder(bodyErr, rollbackErr error) error {
 	return bodyErr
 }
 
-//nolint:gocognit,cyclop,funlen // TPC-C spec transaction; complexity is inherent to the spec.
+//nolint:gocognit,gocyclo,cyclop,funlen // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) newOrderBody(
 	ctx context.Context, tx *bench.TxX,
 	wID, dID, cID, olCnt, allLocal int64,
@@ -498,6 +498,12 @@ func (w *workload) newOrderBody(
 	}
 
 	if forceRollback && !itemMapHas(itemMap, lineIID[olCnt-1]) {
+		for _, iid := range lineIID[:olCnt-1] {
+			if !itemMapHas(itemMap, iid) {
+				return fmt.Errorf("%w: %d", errItemNotFound, iid)
+			}
+		}
+
 		w.m.rollbackDone.Add(1)
 
 		return errRollbackSentinel
