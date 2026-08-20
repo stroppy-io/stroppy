@@ -112,7 +112,6 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		}
 	}
 
-	b.StepBegin("workload")
 	w.retryPolicy = b.TxRetryPolicy(bench.TxRetryPolicyOptions{
 		MaxAttempts: w.retryAttempts,
 		OnRetry:     func(int, error, bench.RetryDecision) { w.retryCounter(b).Add(1) },
@@ -135,7 +134,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	updateBranch, _ := w.sql.Query("workload_tx_tpcb", "update_branch")
 	insertHistory, _ := w.sql.Query("workload_tx_tpcb", "insert_history")
 
-	return b.Step("workload", func() error {
+	return b.StepSilent("workload", func() error {
 		return bench.Retry0(ctx, w.retryPolicy, func() error {
 			return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "tpcb"}, func(tx *bench.TxX) error {
 				if err := tx.Exec(ctx, updateAccount, map[string]any{"aid": aid, "delta": delta}); err != nil {
@@ -166,8 +165,6 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 }
 
 func (*workload) Teardown(ctx context.Context, b *bench.Bench) error {
-	b.StepEnd("workload")
-
 	return nil
 }
 

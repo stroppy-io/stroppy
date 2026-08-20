@@ -204,8 +204,6 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		}
 	}
 
-	b.StepBegin("workload")
-
 	return nil
 }
 
@@ -289,7 +287,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 		return w.iterateProcs(ctx, b, vs)
 	}
 
-	return b.Step("workload", func() error {
+	return b.StepSilent("workload", func() error {
 		idx := weightedPick(vs.picker, txWeights)
 		name := txNames[idx]
 
@@ -325,8 +323,6 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 }
 
 func (*workload) Teardown(_ context.Context, _ *bench.Bench) error {
-	// workload step tag is opened/closed per-iteration via Step("workload"); the
-	// long-lived StepBegin in Setup is balanced here.
 	return nil
 }
 

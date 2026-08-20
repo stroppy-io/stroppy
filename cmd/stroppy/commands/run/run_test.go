@@ -957,6 +957,49 @@ func TestSimpleRejectsSQLFilePositional(t *testing.T) {
 	}
 }
 
+func TestStepsNoStepsMergedMutualExclusion(t *testing.T) {
+	tests := []struct {
+		name   string
+		config string
+		args   []string
+	}{
+		{
+			name:   "config steps with CLI no-steps",
+			config: `{"script":"simple","steps":["load_data"]}`,
+			args:   []string{"--no-steps", "analyze", "-d", "noop"},
+		},
+		{
+			name:   "config no_steps with CLI steps",
+			config: `{"script":"simple","no_steps":["analyze"]}`,
+			args:   []string{"--steps", "load_data", "-d", "noop"},
+		},
+		{
+			name:   "both in config",
+			config: `{"script":"simple","steps":["load_data"],"no_steps":["analyze"]}`,
+			args:   []string{"-d", "noop"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configPath := t.TempDir() + "/stroppy-config.json"
+			if err := os.WriteFile(configPath, []byte(test.config), 0o600); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
+
+			args := append([]string{"-f", configPath}, test.args...)
+			err := Cmd.RunE(Cmd, args)
+			if !errors.Is(err, errStepsMutExclusive) {
+				t.Fatalf("RunE() error = %v, want %v", err, errStepsMutExclusive)
+			}
+
+			if contains(err.Error(), "driver dispatch") {
+				t.Fatalf("merged conflict reached driver dispatch: %v", err)
+			}
+		})
+	}
+}
+
 type runParamTestWorkload struct{}
 
 var (
