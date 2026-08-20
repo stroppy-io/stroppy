@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	stroppyconfig "github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
@@ -40,7 +40,7 @@ func newTestDriver(t *testing.T, extra map[string]string) (*Driver, string) {
 	raw := buildURL(root, workload, extra)
 
 	d, err := NewDriver(context.Background(), driver.Options{
-		Config: &stroppy.DriverConfig{Url: raw},
+		Config: &stroppyconfig.DriverConfig{Url: raw},
 	})
 	if err != nil {
 		t.Fatalf("NewDriver: %v", err)

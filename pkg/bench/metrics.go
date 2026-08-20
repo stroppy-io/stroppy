@@ -7,7 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 )
 
@@ -245,7 +245,7 @@ func (m *txMetrics) recordIteration(vu *VU, elapsed time.Duration) {
 func (m *txMetrics) recordTxEnd(
 	vu *VU,
 	action, name string,
-	isolation stroppy.TxIsolationLevel,
+	isolation config.TxIsolationLevel,
 	elapsed time.Duration,
 	queries int,
 	committed bool,
@@ -288,26 +288,26 @@ func (m *txMetrics) recordInsert(vu *VU, table string, rows int64) {
 	m.emit(vu, m.insertRows, float64(rows), m.tableAttributes(vu.stepTag, table))
 }
 
-func (m *txMetrics) record(vu *VU, action, name string, isolation stroppy.TxIsolationLevel) {
+func (m *txMetrics) record(vu *VU, action, name string, isolation config.TxIsolationLevel) {
 	m.ensureRegistered(vu, root.lg)
 	m.emit(vu, m.transactions, 1, m.txAttributes(vu.stepTag, action, name, txIsolationName(isolation)))
 }
 
-func txIsolationName(isolation stroppy.TxIsolationLevel) string {
+func txIsolationName(isolation config.TxIsolationLevel) string {
 	switch isolation {
-	case stroppy.TxIsolationLevel_UNSPECIFIED:
+	case config.TxIsolationLevelUnspecified:
 		return "db_default"
-	case stroppy.TxIsolationLevel_READ_UNCOMMITTED:
+	case config.TxIsolationLevelReadUncommitted:
 		return "read_uncommitted"
-	case stroppy.TxIsolationLevel_READ_COMMITTED:
+	case config.TxIsolationLevelReadCommitted:
 		return "read_committed"
-	case stroppy.TxIsolationLevel_REPEATABLE_READ:
+	case config.TxIsolationLevelRepeatableRead:
 		return "repeatable_read"
-	case stroppy.TxIsolationLevel_SERIALIZABLE:
+	case config.TxIsolationLevelSerializable:
 		return "serializable"
-	case stroppy.TxIsolationLevel_CONNECTION_ONLY:
+	case config.TxIsolationLevelConnectionOnly:
 		return "conn"
-	case stroppy.TxIsolationLevel_NONE:
+	case config.TxIsolationLevelNone:
 		return "none"
 	default:
 		return ""

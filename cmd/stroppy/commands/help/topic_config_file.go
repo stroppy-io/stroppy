@@ -16,10 +16,11 @@ func init() {
     stroppy run -f prod.json tpcc/tx       # config file + override workload
     stroppy run -f prod.json ./local.sql   # config file + override SQL file
 
-  Frozen RunConfig fields use strict protojson decoding. The "run" and "params"
-  objects retain native JSON values for typed scenario and workload parameters;
-  their names are validated after the selected workload declares its schema.
-  Unknown top-level fields and unknown names within either scope are rejected.
+  RunConfig fields use strict JSON decoding (unknown fields are rejected). The
+  "run" and "params" objects retain native JSON values for typed scenario and
+  workload parameters; their names are validated after the selected workload
+  declares its schema. Unknown top-level fields and unknown names within either
+  scope are rejected.
 
 Example stroppy-config.json:
   {

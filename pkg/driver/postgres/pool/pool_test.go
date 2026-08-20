@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 func ptr[T any](x T) *T {
@@ -16,17 +16,15 @@ func ptr[T any](x T) *T {
 
 func TestParseConfig_Success(t *testing.T) {
 	t.Run("allConfigured", func(t *testing.T) {
-		params := &stroppy.DriverConfig{
+		params := &config.DriverConfig{
 			Url: "postgres://user:pass@localhost:5432/db",
-			DriverSpecific: &stroppy.DriverConfig_Postgres{
-				Postgres: &stroppy.DriverConfig_PostgresConfig{
-					MaxConnLifetime: ptr("1h"),
-					MaxConnIdleTime: ptr("10m"),
-					MaxConns:        ptr[int32](10),
-					MinConns:        ptr[int32](1),
-					MinIdleConns:    ptr[int32](2),
-					TraceLogLevel:   ptr("info"),
-				},
+			Postgres: &config.PostgresConfig{
+				MaxConnLifetime: ptr("1h"),
+				MaxConnIdleTime: ptr("10m"),
+				MaxConns:        ptr[int32](10),
+				MinConns:        ptr[int32](1),
+				MinIdleConns:    ptr[int32](2),
+				TraceLogLevel:   ptr("info"),
 			},
 		}
 		cfg, err := ParseConfig(params, logger.Global())
@@ -40,13 +38,11 @@ func TestParseConfig_Success(t *testing.T) {
 	})
 
 	t.Run("statementCache", func(t *testing.T) {
-		params := &stroppy.DriverConfig{
+		params := &config.DriverConfig{
 			Url: "postgres://user:pass@localhost:5432/db",
-			DriverSpecific: &stroppy.DriverConfig_Postgres{
-				Postgres: &stroppy.DriverConfig_PostgresConfig{
-					DefaultQueryExecMode:   ptr("cache_statement"),
-					StatementCacheCapacity: ptr[int32](1000),
-				},
+			Postgres: &config.PostgresConfig{
+				DefaultQueryExecMode:   ptr("cache_statement"),
+				StatementCacheCapacity: ptr[int32](1000),
 			},
 		}
 		cfg, err := ParseConfig(params, logger.Global())
@@ -56,12 +52,10 @@ func TestParseConfig_Success(t *testing.T) {
 }
 
 func TestNewDriverConfig_InvalidDuration(t *testing.T) {
-	params := &stroppy.DriverConfig{
+	params := &config.DriverConfig{
 		Url: "postgres://user:pass@localhost:5432/db",
-		DriverSpecific: &stroppy.DriverConfig_Postgres{
-			Postgres: &stroppy.DriverConfig_PostgresConfig{
-				MaxConnLifetime: ptr("notaduration"),
-			},
+		Postgres: &config.PostgresConfig{
+			MaxConnLifetime: ptr("notaduration"),
 		},
 	}
 	_, err := ParseConfig(params, logger.Global())

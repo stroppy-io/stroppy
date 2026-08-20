@@ -32,7 +32,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	stroppyconfig "github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
@@ -92,7 +92,7 @@ type config struct {
 
 func init() {
 	driver.RegisterDriver(
-		stroppy.DriverConfig_DRIVER_TYPE_CSV,
+		stroppyconfig.DriverTypeCSV,
 		func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
 			return NewDriver(ctx, opts)
 		},
@@ -141,7 +141,7 @@ func NewDriver(_ context.Context, opts driver.Options) (*Driver, error) {
 		lg = logger.NewFromEnv().Named("csv")
 	}
 
-	cfg, err := parseConfig(opts.Config.GetUrl())
+	cfg, err := parseConfig(opts.Config.Url)
 	if err != nil {
 		return nil, fmt.Errorf("csv: parse url: %w", err)
 	}

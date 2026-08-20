@@ -7,9 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 func TestFileDriverRunConfigsToEnvVarsSerializesDriverSetupFields(t *testing.T) {
@@ -25,20 +24,20 @@ func TestFileDriverRunConfigsToEnvVarsSerializesDriverSetupFields(t *testing.T) 
 		}
 	})
 
-	envs, err := fileDriverRunConfigsToEnvVars(map[uint32]*stroppy.DriverRunConfig{
+	envs, err := fileDriverRunConfigsToEnvVars(map[uint32]*config.DriverRunConfig{
 		99: {
-			DriverType:          proto.String("postgres"),
-			Url:                 proto.String("postgres://user:pass@localhost:5432/bench"),
-			DefaultInsertMethod: proto.String("native"),
-			Pool: &stroppy.DriverRunConfig_PoolConfig{
-				MaxConns:     proto.Int32(200),
-				MinIdleConns: proto.Int32(5),
+			DriverType:          ptr("postgres"),
+			Url:                 ptr("postgres://user:pass@localhost:5432/bench"),
+			DefaultInsertMethod: ptr("native"),
+			Pool: &config.PoolConfig{
+				MaxConns:     ptr[int32](200),
+				MinIdleConns: ptr[int32](5),
 			},
-			Postgres: &stroppy.DriverConfig_PostgresConfig{
-				StatementCacheCapacity: proto.Int32(128),
+			Postgres: &config.PostgresConfig{
+				StatementCacheCapacity: ptr[int32](128),
 			},
-			Sql: &stroppy.DriverConfig_SqlConfig{
-				MaxOpenConns: proto.Int32(12),
+			Sql: &config.SqlConfig{
+				MaxOpenConns: ptr[int32](12),
 			},
 		},
 	}, nil)
@@ -68,3 +67,5 @@ func TestFileDriverRunConfigsToEnvVarsSerializesDriverSetupFields(t *testing.T) 
 	require.True(t, ok)
 	require.Equal(t, json.Number("12"), sql["maxOpenConns"])
 }
+
+func ptr[T any](v T) *T { return &v }

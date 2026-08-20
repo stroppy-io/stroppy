@@ -7,7 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/datagen/tpcdsgen"
 	"github.com/stroppy-io/stroppy/pkg/datagen/tpchgen"
 	"github.com/stroppy-io/stroppy/pkg/driver"
@@ -201,7 +201,7 @@ func (b *Bench) Begin(ctx context.Context, opts BeginOpts) (*TxX, error) {
 		return nil, err
 	}
 
-	if iso == stroppy.TxIsolationLevel_NONE {
+	if iso == config.TxIsolationLevelNone {
 		return &TxX{tx: nil, b: b, iso: iso, name: opts.Name, start: time.Now()}, nil
 	}
 
@@ -233,7 +233,7 @@ func (b *Bench) BeginTx(ctx context.Context, opts BeginOpts, fn func(*TxX) error
 type TxX struct {
 	tx      driver.Tx
 	b       *Bench
-	iso     stroppy.TxIsolationLevel
+	iso     config.TxIsolationLevel
 	name    string
 	start   time.Time
 	queries int

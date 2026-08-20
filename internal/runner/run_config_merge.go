@@ -36,7 +36,7 @@ func EffectiveSteps(cliSteps []string, cfg *LoadedConfig) []string {
 	}
 
 	if cfg != nil && cfg.RunConfig != nil {
-		return cfg.RunConfig.GetSteps()
+		return cfg.RunConfig.Steps
 	}
 
 	return nil
@@ -50,7 +50,7 @@ func EffectiveNoSteps(cliNoSteps []string, cfg *LoadedConfig) []string {
 	}
 
 	if cfg != nil && cfg.RunConfig != nil {
-		return cfg.RunConfig.GetNoSteps()
+		return cfg.RunConfig.NoSteps
 	}
 
 	return nil

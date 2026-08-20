@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 func TestMetricsConfig(t *testing.T) {
@@ -18,10 +18,10 @@ func TestMetricsConfig(t *testing.T) {
 	insecure := true
 	prefix := "bench_"
 
-	config := &stroppy.RunConfig{Global: &stroppy.GlobalConfig{
+	config := &config.RunConfig{Global: &config.GlobalConfig{
 		RunId:    "run-42",
 		Metadata: map[string]string{"environment": "test"},
-		Exporter: &stroppy.ExporterConfig{OtlpExport: &stroppy.OtlpExport{
+		Exporter: &config.ExporterConfig{OtlpExport: &config.OtlpExport{
 			OtlpGrpcEndpoint:        &grpcEndpoint,
 			OtlpHttpEndpoint:        &httpEndpoint,
 			OtlpHttpExporterUrlPath: &httpPath,
@@ -45,7 +45,7 @@ func TestMetricsConfig(t *testing.T) {
 func TestMetricsConfigWithGlobalWithoutExporter(t *testing.T) {
 	t.Parallel()
 
-	got := metricsConfig(&stroppy.RunConfig{Global: &stroppy.GlobalConfig{RunId: "run-42"}})
+	got := metricsConfig(&config.RunConfig{Global: &config.GlobalConfig{RunId: "run-42"}})
 	require.Equal(t, "run-42", got.RunID)
 	require.Empty(t, got.GRPCEndpoint)
 	require.Empty(t, got.HTTPEndpoint)

@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	stroppyconfig "github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
@@ -51,7 +51,7 @@ func (d *Driver) RunQuery(
 
 // Begin refuses to start a transaction. CSV writes have no rollback
 // semantics and workloads that call tx.* are not supported.
-func (d *Driver) Begin(_ context.Context, _ stroppy.TxIsolationLevel) (driver.Tx, error) {
+func (d *Driver) Begin(_ context.Context, _ stroppyconfig.TxIsolationLevel) (driver.Tx, error) {
 	return nil, fmt.Errorf("%w: Begin", ErrCsvDriverNoQuery)
 }
 
