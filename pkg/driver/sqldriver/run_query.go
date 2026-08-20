@@ -152,7 +152,7 @@ func RunQuery[R any](
 
 	processedSQL = dialect.StatementTimeoutHint(processedSQL, timeout)
 
-	queryCtx, cancel := StatementTimeout(ctx, timeout)
+	queryCtx, cancel := StatementTimeout(ctx, dialect.StatementDeadline(timeout))
 	defer cancel()
 
 	start := time.Now()

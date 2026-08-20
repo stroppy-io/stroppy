@@ -255,6 +255,9 @@ func (noopDialect) Deduplicate() bool        { return false }
 // StatementTimeoutHint returns sql unchanged; noop performs no I/O to bound.
 func (noopDialect) StatementTimeoutHint(sql string, _ time.Duration) string { return sql }
 
+// StatementDeadline returns timeout unchanged; noop has no server-side hint.
+func (noopDialect) StatementDeadline(timeout time.Duration) time.Duration { return timeout }
+
 func (noopDialect) Convert(v any) (any, error) {
 	return v, nil
 }

@@ -24,6 +24,7 @@ func TestClassifyError(t *testing.T) {
 			err:  fmt.Errorf("query: %w", &gomysql.MySQLError{Number: errLockWaitTimeout}),
 			want: driver.ErrorKindLockTimeout,
 		},
+		{name: "query timeout", err: &gomysql.MySQLError{Number: errQueryTimeout}, want: driver.ErrorKindTimeout},
 		{name: "other mysql", err: &gomysql.MySQLError{Number: 1062}, want: driver.ErrorKindUnknown},
 		{name: "other", err: errors.New("boom"), want: driver.ErrorKindUnknown},
 	}

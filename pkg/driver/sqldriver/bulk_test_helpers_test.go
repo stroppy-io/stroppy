@@ -40,5 +40,6 @@ func (qmark) Convert(v any) (any, error) { return v, nil } //nolint:nilnil // pa
 func (qmark) Deduplicate() bool          { return false }
 
 func (qmark) StatementTimeoutHint(sql string, _ time.Duration) string { return sql }
+func (qmark) StatementDeadline(timeout time.Duration) time.Duration   { return timeout }
 
 var _ queries.Dialect = qmark{}

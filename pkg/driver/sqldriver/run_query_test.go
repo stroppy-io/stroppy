@@ -21,6 +21,7 @@ func (testDialect) Deduplicate() bool { return false }
 func (testDialect) StatementTimeoutHint(sql string, _ time.Duration) string {
 	return sql
 }
+func (testDialect) StatementDeadline(timeout time.Duration) time.Duration { return timeout }
 
 var errConvertTest = errors.New("convert failed")
 

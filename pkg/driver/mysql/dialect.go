@@ -21,12 +21,22 @@ type mysqlDialect struct{}
 func (mysqlDialect) Placeholder(_ int) string { return "?" }
 func (mysqlDialect) Deduplicate() bool        { return false }
 
+// statementTimeoutGrace pads the client-side deadline past the server-side
+// MAX_EXECUTION_TIME hint. Without it the client context timer fires one
+// round-trip earlier than the server hint, so go-sql-driver/mysql cancels and
+// discards the connection instead of letting the hint return its own 3024
+// error. The hint fires at `timeout` (server-side); the padded client deadline
+// is only a backstop.
+const statementTimeoutGrace = time.Second
+
 // StatementTimeoutHint bounds SELECT statements server-side with the
 // MAX_EXECUTION_TIME optimizer hint so a timed-out query aborts cleanly and
 // keeps its pooled connection, unlike client-side cancellation which forces
-// go-sql-driver/mysql to discard the connection. The hint is ignored by
-// non-SELECT statements, so inserting it after the SELECT keyword only is
-// safe for the DDL and DML that also flow through this dialect.
+// go-sql-driver/mysql to discard the connection. The hint is recognized only
+// when the statement's first token is SELECT: WITH/EXPLAIN-prefixed or
+// comment-prefixed statements rely on the client deadline backstop, and
+// non-SELECT statements (including INSERT ... SELECT) are intentionally left
+// untouched because the hint does not bind them.
 func (mysqlDialect) StatementTimeoutHint(sql string, timeout time.Duration) string {
 	if timeout <= 0 {
 		return sql
@@ -55,6 +65,16 @@ func (mysqlDialect) StatementTimeoutHint(sql string, timeout time.Duration) stri
 
 	return lead + trimmed[:len(keyword)] + " " +
 		fmt.Sprintf("/*+ MAX_EXECUTION_TIME(%d) */", ms) + trimmed[len(keyword):]
+}
+
+// StatementDeadline returns the client-side deadline padded past the
+// server-side hint so the hint's 3024 timeout wins over client cancellation.
+func (mysqlDialect) StatementDeadline(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return timeout
+	}
+
+	return timeout + statementTimeoutGrace
 }
 
 func isSQLWhitespace(c byte) bool {
