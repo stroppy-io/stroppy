@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- Restored the `tpcb/procs` workload: TPC-B ships both `tx` and `procs` variants again, with `tpcb/procs` running each transaction as one server-side stored-procedure call (`tpcb_transaction`) on PostgreSQL and MySQL. ([#146](https://github.com/stroppy-io/stroppy/pull/146))
 - `stroppy probe` now lists registered workload parameter flags, and its JSON output includes each workload's typed schema for tooling and discovery. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Typed scenario and workload parameters can be set with `--name` flags or native JSON values in the config file's `run` and `params` objects, and `stroppy run <workload> --help` lists the available parameters. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Go workloads can declare typed string, boolean, numeric, and duration parameters with defaults, descriptions, source tracking, and discoverable schemas. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
