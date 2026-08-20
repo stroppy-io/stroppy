@@ -36,6 +36,12 @@ var requiredTxQueries = []struct{ section, query string }{
 // which legitimately no-op on picodata/ydb).
 var requiredSetupSections = []string{"drop_schema", "create_schema"}
 
+var (
+	errMissingSection = errors.New("tpc-b: missing section")
+	errMissingQuery   = errors.New("tpc-b: missing query")
+	errEmptyQuery     = errors.New("tpc-b: empty query")
+)
+
 const (
 	preset = "tpcb"
 
@@ -246,18 +252,18 @@ func mustLoadSQL(dt bench.DriverTypeName, override string) *bench.SQL {
 func validateSQL(sql *bench.SQL) error {
 	for _, name := range requiredSetupSections {
 		if len(sql.Section(name)) == 0 {
-			return fmt.Errorf("tpc-b: missing section %q", name)
+			return fmt.Errorf("%w %q", errMissingSection, name)
 		}
 	}
 
 	for _, q := range requiredTxQueries {
 		body, ok := sql.Query(q.section, q.query)
 		if !ok {
-			return fmt.Errorf("tpc-b: missing query %s/%s", q.section, q.query)
+			return fmt.Errorf("%w %s/%s", errMissingQuery, q.section, q.query)
 		}
 
 		if strings.TrimSpace(body) == "" {
-			return fmt.Errorf("tpc-b: empty query %s/%s", q.section, q.query)
+			return fmt.Errorf("%w %s/%s", errEmptyQuery, q.section, q.query)
 		}
 	}
 

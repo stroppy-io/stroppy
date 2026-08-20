@@ -22,6 +22,7 @@ func tpcbSQL(missing struct{ section, query string }) string {
 	}
 
 	b.WriteString("--+ workload_tx_tpcb\n")
+
 	for _, q := range requiredTxQueries {
 		if missing.section == q.section && missing.query == q.query {
 			continue
@@ -80,6 +81,7 @@ func tpcbSQLWithEmptyQuery(empty struct{ section, query string }) string {
 
 	for _, q := range requiredTxQueries {
 		b.WriteString("--= " + q.query + "\n")
+
 		if empty.section == q.section && empty.query == q.query {
 			continue // declared but empty: the next marker follows immediately
 		}

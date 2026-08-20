@@ -50,8 +50,10 @@ func (r *fakeRows) Columns() []string { return nil }
 func (r *fakeRows) Next() bool {
 	if r.idx < len(r.rows) {
 		r.idx++
+
 		return true
 	}
+
 	return false
 }
 func (r *fakeRows) Values() []any         { return r.rows[r.idx-1] }
@@ -154,6 +156,7 @@ func runNewOrderBody(t *testing.T, respond func(sql string) ([][]any, error), li
 
 	lineQty := make([]int64, len(lineIID))
 	lineSupply := make([]int64, len(lineIID))
+
 	for i := range lineIID {
 		lineQty[i] = 5
 		lineSupply[i] = 1
