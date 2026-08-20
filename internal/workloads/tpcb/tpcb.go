@@ -324,6 +324,10 @@ func (w *workload) resolveSQLQueries() error {
 		return fmt.Errorf("%w workload_procs/tpcb_transaction", errProcsMissingQuery)
 	}
 
+	if strings.TrimSpace(proc) == "" {
+		return fmt.Errorf("%w workload_procs/tpcb_transaction", errEmptyQuery)
+	}
+
 	w.procQuery = proc
 
 	return nil

@@ -2,6 +2,7 @@ package tpcb
 
 import (
 	"context"
+	"errors"
 	"os"
 	"reflect"
 	"strings"
@@ -65,6 +66,21 @@ func TestProcsResolvesProcSection(t *testing.T) {
 		if !strings.Contains(q, "tpcb_transaction") {
 			t.Errorf("%s: proc query %q does not reference tpcb_transaction", dt, q)
 		}
+	}
+}
+
+func TestResolveSQLQueriesRejectsEmptyProcedureQuery(t *testing.T) {
+	sql := bench.ParseSQL(tpcbSQL(struct{ section, query string }{}) + `
+--+ workload_procs
+--= tpcb_transaction
+
+--= trailing
+SELECT 1;
+`)
+	w := &workload{variant: "procs", sql: sql}
+
+	if err := w.resolveSQLQueries(); !errors.Is(err, errEmptyQuery) {
+		t.Fatalf("resolveSQLQueries() error = %v, want %v", err, errEmptyQuery)
 	}
 }
 

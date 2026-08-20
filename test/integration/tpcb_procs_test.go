@@ -89,16 +89,22 @@ func TestTpcbProcsPostgres(t *testing.T) {
 		t.Errorf("pgbench_history rows = %d, want 1", history)
 	}
 
-	var branches, tellers, accounts int64
+	var branches, tellers, accounts, historyDelta int64
 	if err := pool.QueryRow(ctx, `
 		SELECT
 			COALESCE((SELECT SUM(bbalance) FROM pgbench_branches), 0),
 			COALESCE((SELECT SUM(tbalance) FROM pgbench_tellers), 0),
-			COALESCE((SELECT SUM(abalance) FROM pgbench_accounts), 0)`).Scan(&branches, &tellers, &accounts); err != nil {
+			COALESCE((SELECT SUM(abalance) FROM pgbench_accounts), 0),
+			(SELECT delta FROM pgbench_history LIMIT 1)`).Scan(
+		&branches, &tellers, &accounts, &historyDelta,
+	); err != nil {
 		t.Fatalf("balance sums: %v", err)
 	}
-	if branches != tellers || tellers != accounts {
-		t.Errorf("balance sums diverge: branches=%d tellers=%d accounts=%d, want equal", branches, tellers, accounts)
+	if branches != historyDelta || tellers != historyDelta || accounts != historyDelta {
+		t.Errorf(
+			"balance sums: branches=%d tellers=%d accounts=%d, want history delta %d",
+			branches, tellers, accounts, historyDelta,
+		)
 	}
 }
 
@@ -144,15 +150,21 @@ func assertTpcbProcsBalanceSumsMySQL(t *testing.T, db *sql.DB) {
 	t.Helper()
 
 	ctx := context.Background()
-	var branches, tellers, accounts int64
+	var branches, tellers, accounts, historyDelta int64
 	if err := db.QueryRowContext(ctx, `
 		SELECT
 			COALESCE((SELECT SUM(bbalance) FROM pgbench_branches), 0),
 			COALESCE((SELECT SUM(tbalance) FROM pgbench_tellers), 0),
-			COALESCE((SELECT SUM(abalance) FROM pgbench_accounts), 0)`).Scan(&branches, &tellers, &accounts); err != nil {
+			COALESCE((SELECT SUM(abalance) FROM pgbench_accounts), 0),
+			(SELECT delta FROM pgbench_history LIMIT 1)`).Scan(
+		&branches, &tellers, &accounts, &historyDelta,
+	); err != nil {
 		t.Fatalf("balance sums: %v", err)
 	}
-	if branches != tellers || tellers != accounts {
-		t.Errorf("balance sums diverge: branches=%d tellers=%d accounts=%d, want equal", branches, tellers, accounts)
+	if branches != historyDelta || tellers != historyDelta || accounts != historyDelta {
+		t.Errorf(
+			"balance sums: branches=%d tellers=%d accounts=%d, want history delta %d",
+			branches, tellers, accounts, historyDelta,
+		)
 	}
 }
