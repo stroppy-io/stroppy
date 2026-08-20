@@ -13,17 +13,13 @@ import (
 var testBounds = []float64{100, 500, 1000, 2000, 5000, 10000, 20000, 30000, 60000}
 
 // binSamples sorts raw millisecond samples into testBounds buckets, mirroring the
-// explicit-bucket histogram the duration metrics record into.
+// explicit-bucket histogram the duration metrics record into: len(testBounds)+1
+// bucket counts, where the trailing count is the +Inf overflow bucket.
 func binSamples(samples []float64) txObservation {
-	buckets := make([]uint64, len(testBounds))
+	buckets := make([]uint64, len(testBounds)+1)
 
 	for _, s := range samples {
-		i := sort.SearchFloat64s(testBounds, s)
-		if i >= len(testBounds) {
-			i = len(testBounds) - 1
-		}
-
-		buckets[i]++
+		buckets[sort.SearchFloat64s(testBounds, s)]++
 	}
 
 	return txObservation{count: uint64(len(samples)), bounds: testBounds, bucketCounts: buckets}
@@ -86,6 +82,14 @@ func TestComplianceReportPassingPacedRun(t *testing.T) {
 		t.Fatal("new_order ResponsePass = false, want true")
 	}
 
+	if report.MixTolerancePct != mixTolerancePct {
+		t.Fatalf("MixTolerancePct = %f, want %f", report.MixTolerancePct, mixTolerancePct)
+	}
+
+	if newOrder.MixMinPercent == nil || *newOrder.MixMinPercent != 44.0 {
+		t.Fatalf("new_order MixMinPercent = %v, want the effective floor 44.0", newOrder.MixMinPercent)
+	}
+
 	if report.TpmC != 450 {
 		t.Fatalf("TpmC = %f, want 450", report.TpmC)
 	}
@@ -132,6 +136,34 @@ func TestComplianceReportFailingMix(t *testing.T) {
 
 	if report.Transactions[0].MixPass == nil || *report.Transactions[0].MixPass {
 		t.Fatal("new_order MixPass = true, want false for 0%% mix")
+	}
+
+	// A transaction type never measured must not claim a vacuous response pass.
+	if report.Transactions[0].ResponsePass != nil {
+		t.Fatalf("new_order ResponsePass = %v, want nil for a zero-count transaction", *report.Transactions[0].ResponsePass)
+	}
+}
+
+func TestComplianceReportMismatchedBuckets(t *testing.T) {
+	obs := make([]txObservation, len(complianceTxTable))
+	obs[0] = txObservation{count: 5, bounds: []float64{1, 2}, bucketCounts: []uint64{1, 1}} // missing +Inf bucket
+
+	if _, err := complianceReport(obs, reportOptions{paced: true, elapsed: time.Second}); err == nil {
+		t.Fatal("complianceReport returned nil error for a histogram missing the +Inf bucket")
+	}
+}
+
+func TestComplianceReportAcceptsOverflowBucket(t *testing.T) {
+	obs := make([]txObservation, len(complianceTxTable))
+	obs[0] = txObservation{count: 5, bounds: []float64{1, 2}, bucketCounts: []uint64{1, 2, 3}} // +Inf shape
+
+	report, err := complianceReport(obs, reportOptions{paced: true, elapsed: time.Second})
+	if err != nil {
+		t.Fatalf("complianceReport rejected a histogram with the +Inf overflow bucket: %v", err)
+	}
+
+	if report.Transactions[0].Count != 5 {
+		t.Fatalf("new_order Count = %d, want 5", report.Transactions[0].Count)
 	}
 }
 
@@ -191,20 +223,6 @@ func TestComplianceReportUnpacedRun(t *testing.T) {
 	}
 }
 
-func TestComplianceReportMismatchedBuckets(t *testing.T) {
-	obs := []txObservation{
-		{bounds: []float64{1, 2}, bucketCounts: []uint64{1}},
-		{},
-		{},
-		{},
-		{},
-	}
-
-	if _, err := complianceReport(obs, reportOptions{paced: true, elapsed: time.Second}); err == nil {
-		t.Fatal("complianceReport returned nil error for mismatched bounds/buckets")
-	}
-}
-
 func TestObservationQuantile(t *testing.T) {
 	obs := binSamples(repeat(6000, 100)) // all samples in the (5000,10000] bucket
 
@@ -240,6 +258,76 @@ func TestReportText(t *testing.T) {
 		if !strings.Contains(report.text(), want) {
 			t.Fatalf("text() missing %q:\n%s", want, report.text())
 		}
+	}
+}
+
+func TestStockLevelCeilingBoundary(t *testing.T) {
+	// Stock-Level ceiling is 20000ms. Samples at 15000ms land in the (10000,20000]
+	// bucket, whose upper bound must be 20000 (not 30000), so the run passes.
+	obs := fullMix([]float64{50, 40, 30, 60, 15000})
+
+	report, err := complianceReport(
+		obs,
+		reportOptions{workload: "tpcc/tx", paced: true, elapsed: time.Minute},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stock := report.Transactions[4]
+	if stock.Name != "stock_level" {
+		t.Fatalf("transaction 4 = %s, want stock_level", stock.Name)
+	}
+
+	if stock.P90Ms != 20000 {
+		t.Fatalf("stock_level p90 = %f, want 20000 (upper bound)", stock.P90Ms)
+	}
+
+	if stock.ResponsePass == nil || !*stock.ResponsePass {
+		t.Fatal("stock_level ResponsePass = false, want true for p90 within the 20s ceiling")
+	}
+}
+
+func TestSteadinessPass(t *testing.T) {
+	counts := make([]uint64, 600)
+	for i := range counts {
+		counts[i] = 7 // perfectly steady New-Order rate
+	}
+
+	s := computeSteadiness(steadySeries{counts: counts})
+
+	if s.Status != "pass" {
+		t.Fatalf("Steadiness.Status = %s, want pass", s.Status)
+	}
+
+	if s.CV != 0 {
+		t.Fatalf("Steadiness.CV = %f, want 0 for a steady series", s.CV)
+	}
+}
+
+func TestSteadinessFail(t *testing.T) {
+	counts := make([]uint64, 600)
+	for i := range 300 {
+		counts[i] = 100
+	}
+	// Second half at zero: a bimodal series with high coefficient of variation.
+
+	s := computeSteadiness(steadySeries{counts: counts})
+
+	if s.Status != "fail" {
+		t.Fatalf("Steadiness.Status = %s, want fail", s.Status)
+	}
+}
+
+func TestSteadinessInsufficient(t *testing.T) {
+	s := computeSteadiness(steadySeries{counts: make([]uint64, minSteadySlots-1)})
+
+	if s.Status != "insufficient" {
+		t.Fatalf("Steadiness.Status = %s, want insufficient", s.Status)
+	}
+
+	if s.Reason == "" {
+		t.Fatal("Steadiness.Reason is empty for an insufficient sample")
 	}
 }
 

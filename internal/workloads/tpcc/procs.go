@@ -60,6 +60,7 @@ func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, vs *vuState
 
 func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.newOrderTotal.Add(1)
+	w.recordSteady()
 
 	start := time.Now()
 	defer func() { w.m.newOrderDur.Add(float64(time.Since(start).Milliseconds())) }()

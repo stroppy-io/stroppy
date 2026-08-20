@@ -58,6 +58,7 @@ type workload struct {
 	retryPolicy bench.RetryPolicy
 
 	measureStart time.Time
+	steady       *steady
 
 	vuStates sync.Map // uint64 -> *vuState
 }
@@ -209,8 +210,18 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	b.StepBegin("workload")
 
 	w.measureStart = time.Now()
+	w.steady = w.initSteady()
 
 	return nil
+}
+
+// initSteady allocates the paced steady-state tracker, or nil for unpaced runs.
+func (w *workload) initSteady() *steady {
+	if !w.pacing {
+		return nil
+	}
+
+	return newSteady(w.measureStart, steadySlotWidth, steadySlotCount)
 }
 
 // initConfig resolves driver-specific workload configuration.
@@ -336,6 +347,14 @@ func (w *workload) Teardown(_ context.Context, b *bench.Bench) error {
 	return nil
 }
 
+// recordSteady buckets a New-Order completion into the paced steady-state time
+// series, for the report's 3σ spread check. No-op on unpaced runs.
+func (w *workload) recordSteady() {
+	if w.steady != nil {
+		w.steady.record(time.Now())
+	}
+}
+
 // q fetches one named query, panicking on a missing section/query (a schema drift).
 func (w *workload) q(section, name string) string {
 	s, ok := w.sql.Query(section, name)
@@ -350,6 +369,7 @@ func (w *workload) q(section, name string) string {
 
 func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.newOrderTotal.Add(1)
+	w.recordSteady()
 
 	start := time.Now()
 	defer func() { w.m.newOrderDur.Add(float64(time.Since(start).Milliseconds())) }()
