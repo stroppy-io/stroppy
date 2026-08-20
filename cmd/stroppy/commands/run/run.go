@@ -129,13 +129,6 @@ Config file flags:
 		steps := runner.EffectiveSteps(parsed.steps, fileConfig)
 		noSteps := runner.EffectiveNoSteps(parsed.noSteps, fileConfig)
 
-		// Mutual exclusion is checked on the merged inputs (CLI over config file),
-		// not just CLI-vs-CLI, so `config steps + CLI --no-steps` (and vice versa)
-		// is rejected the same way.
-		if len(steps) > 0 && len(noSteps) > 0 {
-			return invalidConfig(errStepsMutExclusive)
-		}
-
 		if parsed.help {
 			if scriptArg == "" {
 				return cmd.Help()
@@ -146,6 +139,13 @@ Config file flags:
 
 		if scriptArg == "" {
 			return invalidConfig(errNoScript)
+		}
+
+		// Mutual exclusion is checked on the merged inputs (CLI over config file),
+		// not just CLI-vs-CLI, so `config steps + CLI --no-steps` (and vice versa)
+		// is rejected the same way.
+		if len(steps) > 0 && len(noSteps) > 0 {
+			return invalidConfig(errStepsMutExclusive)
 		}
 
 		if len(parsed.afterDash) > 0 {

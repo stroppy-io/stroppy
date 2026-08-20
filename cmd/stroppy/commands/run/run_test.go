@@ -1000,6 +1000,31 @@ func TestStepsNoStepsMergedMutualExclusion(t *testing.T) {
 	}
 }
 
+func TestStepsNoStepsConflictDoesNotBlockHelp(t *testing.T) {
+	configPath := t.TempDir() + "/stroppy-config.json"
+	if err := os.WriteFile(configPath, []byte(`{
+		"script":"simple",
+		"steps":["load_data"],
+		"no_steps":["analyze"]
+	}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	previousOutput := Cmd.OutOrStdout()
+	defer Cmd.SetOut(previousOutput)
+
+	var output bytes.Buffer
+	Cmd.SetOut(&output)
+
+	if err := Cmd.RunE(Cmd, []string{"-f", configPath, "--help"}); err != nil {
+		t.Fatalf("RunE(help) error = %v", err)
+	}
+
+	if output.Len() == 0 {
+		t.Fatal("RunE(help) produced no output")
+	}
+}
+
 type runParamTestWorkload struct{}
 
 var (
