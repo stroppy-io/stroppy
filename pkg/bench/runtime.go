@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
@@ -192,9 +193,10 @@ func Run(
 	drivers map[int]*config.DriverConfig,
 	paramInputs ParamInputs,
 	steps, noSteps []string,
-	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
 ) error {
+	lg := logger.Global()
+
 	wl, ok := Lookup(name)
 	if !ok {
 		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
@@ -238,7 +240,6 @@ func Run(
 
 	drv, err := driver.Dispatch(ctx, driver.Options{
 		Config:       cfg,
-		Logger:       lg,
 		DialFunc:     root.dialer.DialContext,
 		QueryTimeout: queryTimeout,
 	})

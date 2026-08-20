@@ -5,8 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"go.uber.org/zap"
-
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
@@ -174,7 +172,6 @@ func runCapture(
 		inputs,
 		nil,
 		nil,
-		zap.NewNop(),
 		&bench.MetricsConfig{},
 	)
 	if err != nil {

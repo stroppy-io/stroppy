@@ -136,10 +136,7 @@ var _ driver.Driver = (*Driver)(nil)
 // The output directory is created lazily (on first write) so Setup
 // succeeds even when dir is a prefix that does not yet exist.
 func NewDriver(_ context.Context, opts driver.Options) (*Driver, error) {
-	lg := opts.Logger
-	if lg == nil {
-		lg = logger.NewFromEnv().Named("csv")
-	}
+	lg := logger.Global().Named("csv")
 
 	cfg, err := parseConfig(opts.Config.URL)
 	if err != nil {

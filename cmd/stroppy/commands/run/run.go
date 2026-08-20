@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -120,11 +121,26 @@ Config file flags:
 			return printSelectedWorkloadHelp(cmd, parsed.scriptArg, parsed.sqlArg)
 		}
 
+		// Resolve -e overrides (uppercase keys, validate format) first so the
+		// logger can honor -e LOG_LEVEL / LOG_MODE inputs.
+		envOverrides, err := runner.ResolveEnvOverrides(parsed.envArgs)
+		if err != nil {
+			return invalidConfig(err)
+		}
+
 		// Load config file if -f is specified or stroppy-config.json exists.
 		fileConfig, _, err := runner.LoadRunConfig(parsed.fileArg)
 		if err != nil {
 			return invalidConfig(fmt.Errorf("failed to load config file: %w", err))
 		}
+
+		// Initialize the process-wide logger once from the effective inputs,
+		// before any config/driver/workload logging.
+		if err := initializeLogger(parsed.typedParams, envOverrides, fileConfig); err != nil {
+			return invalidConfig(err)
+		}
+
+		runner.LogConfigFile(fileConfig)
 
 		// Apply effective values: CLI overrides config file.
 		scriptArg := runner.EffectiveScript(parsed.scriptArg, fileConfig)
@@ -167,14 +183,8 @@ Config file flags:
 			}
 		}
 
-		// Resolve -e overrides (uppercase keys, validate format).
-		envOverrides, err := runner.ResolveEnvOverrides(parsed.envArgs)
-		if err != nil {
-			return invalidConfig(err)
-		}
-
 		paramInputs := bench.ParamInputs{
-			CLI:       parsed.typedParams,
+			CLI:       withoutLoggerParams(parsed.typedParams),
 			LegacyEnv: envOverrides,
 		}
 
@@ -453,6 +463,96 @@ func invalidConfig(err error) error {
 	return fmt.Errorf("invalid config: %w", err)
 }
 
+// loggerParams are the top-level logging controls handled before the workload
+// parameter resolution, so every other layer (command, bench, workload,
+// driver) logs through the same configured logger.
+const (
+	loggerLevelParam = "log-level"
+	loggerModeParam  = "log-mode"
+	envLogLevelVar   = "LOG_LEVEL"
+	envLogModeVar    = "LOG_MODE"
+	defaultLogLevel  = "info"
+	defaultLogMode   = "production"
+)
+
+// initializeLogger configures the process-wide logger once from the effective
+// log-level/log-mode inputs. Precedence (highest first) matches typed
+// parameters: --log-level > LOG_LEVEL env > -e LOG_LEVEL > global.logger >
+// declared default.
+func initializeLogger(
+	cli, legacyEnv map[string]string,
+	fileConfig *runner.LoadedConfig,
+) error {
+	var loggerCfg *config.LoggerConfig
+	if fileConfig != nil && fileConfig.RunConfig != nil && fileConfig.RunConfig.Global != nil {
+		loggerCfg = fileConfig.RunConfig.Global.Logger
+	}
+
+	level, mode, err := resolveLoggerSettings(cli, legacyEnv, loggerCfg)
+	if err != nil {
+		return err
+	}
+
+	return logger.Init(level, mode)
+}
+
+// resolveLoggerSettings collapses the four logger inputs into a single level
+// and mode. cli and legacyEnv carry --log-level/--log-mode and -e overrides;
+// loggerCfg is the config file's global.logger (already strict-decoded).
+func resolveLoggerSettings(
+	cli, legacyEnv map[string]string,
+	loggerCfg *config.LoggerConfig,
+) (level, mode string, err error) {
+	level = defaultLogLevel
+	mode = defaultLogMode
+
+	switch {
+	case cli[loggerLevelParam] != "":
+		if level, err = config.ValidateLogLevel(cli[loggerLevelParam]); err != nil {
+			return "", "", err
+		}
+	case os.Getenv(envLogLevelVar) != "":
+		if level, err = config.ValidateLogLevel(os.Getenv(envLogLevelVar)); err != nil {
+			return "", "", err
+		}
+	case legacyEnv[envLogLevelVar] != "":
+		if level, err = config.ValidateLogLevel(legacyEnv[envLogLevelVar]); err != nil {
+			return "", "", err
+		}
+	case loggerCfg != nil && loggerCfg.LogLevel != "":
+		level = loggerCfg.LogLevel.LevelShort()
+	}
+
+	switch {
+	case cli[loggerModeParam] != "":
+		if mode, err = config.ValidateLogMode(cli[loggerModeParam]); err != nil {
+			return "", "", err
+		}
+	case os.Getenv(envLogModeVar) != "":
+		if mode, err = config.ValidateLogMode(os.Getenv(envLogModeVar)); err != nil {
+			return "", "", err
+		}
+	case legacyEnv[envLogModeVar] != "":
+		if mode, err = config.ValidateLogMode(legacyEnv[envLogModeVar]); err != nil {
+			return "", "", err
+		}
+	case loggerCfg != nil && loggerCfg.LogMode != "":
+		mode = loggerCfg.LogMode.ModeShort()
+	}
+
+	return level, mode, nil
+}
+
+// withoutLoggerParams strips the top-level logger controls from the typed CLI
+// inputs so they are not treated as workload/run parameters downstream.
+func withoutLoggerParams(cli map[string]string) map[string]string {
+	out := maps.Clone(cli)
+	delete(out, loggerLevelParam)
+	delete(out, loggerModeParam)
+
+	return out
+}
+
 // executeSQLGoRoute detects the execute_sql cases that have no registered Go workload
 // name: inline SQL (the arg contains spaces), a .sql file (the arg is the path), and the
 // execute_sql preset. It returns the workload name plus the inline body / file path to run.
@@ -511,7 +611,6 @@ func runGoWorkload(
 		paramInputs,
 		steps,
 		noSteps,
-		logger.Global(),
 		metrics,
 	); err != nil {
 		return fmt.Errorf("failed to run go workload: %w", err)

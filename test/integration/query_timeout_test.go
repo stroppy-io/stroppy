@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/mysql"
@@ -22,7 +20,6 @@ func dispatchQueryTimeout(t *testing.T, typ config.DriverType, url string, timeo
 
 	drv, err := driver.Dispatch(context.Background(), driver.Options{
 		Config:       &config.DriverConfig{DriverType: typ, URL: url},
-		Logger:       zap.NewNop(),
 		QueryTimeout: timeout,
 	})
 	if err != nil {
