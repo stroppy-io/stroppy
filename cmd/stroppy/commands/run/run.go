@@ -50,6 +50,9 @@ var (
 	errDefaultTxIsolationRemoved = errors.New(
 		"defaultTxIsolation is removed; set the workload parameter --tx-isolation instead",
 	)
+	errInsertMethodNeedsDriverType = errors.New(
+		"insert method requires a driver preset or -D driverType",
+	)
 )
 
 var Cmd = &cobra.Command{
@@ -533,6 +536,10 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 	}
 
 	if cfg.DefaultInsertMethod != "" {
+		if dc.DriverType == config.DriverTypeUnspecified {
+			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, errInsertMethodNeedsDriverType))
+		}
+
 		method, err := driver.ResolveInsertMethod(dc.DriverType, cfg.DefaultInsertMethod)
 		if err != nil {
 			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))

@@ -70,17 +70,6 @@ func TestInsertCapabilitiesDeterministic(t *testing.T) {
 	}
 }
 
-func TestInsertMethodsEnumeratesAll(t *testing.T) {
-	t.Parallel()
-
-	methods := InsertMethods()
-	want := []InsertMethod{InsertPlainQuery, InsertPlainBulk, InsertColumnar, InsertNative}
-
-	if !slices.Equal(methods, want) {
-		t.Fatalf("InsertMethods() = %v, want %v", methods, want)
-	}
-}
-
 func TestResolveInsertMethod(t *testing.T) {
 	t.Parallel()
 

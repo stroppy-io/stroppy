@@ -79,12 +79,6 @@ func InsertCapabilities() []InsertCapability {
 	return capabilities
 }
 
-// InsertMethods returns every supported insert method in enum order. It is the
-// authoritative value set probe and workload help enumerate.
-func InsertMethods() []InsertMethod {
-	return []InsertMethod{InsertPlainQuery, InsertPlainBulk, InsertColumnar, InsertNative}
-}
-
 // ErrInsertMethodUnsupported is returned when a resolved insert method is not
 // served by the selected driver.
 var ErrInsertMethodUnsupported = errors.New("insert method not supported by driver")

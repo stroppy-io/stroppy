@@ -112,7 +112,8 @@ conditional transient retries.
   (`plain_query`, `plain_bulk`, `columnar`, `native`). Precedence (highest
   first): `--insert-method` (CLI > `INSERT_METHOD` env > `-e` > config
   `run.insertMethod`) > `-D insertMethod`/config `drivers[N].defaultInsertMethod` >
-  the workload's own hard-coded method. Unsupported methods fail before load.
+  the workload's own hard-coded method. Driver presets carry no insert-method
+  opinion. Unsupported methods fail before load.
 - Workload flags include `--scale-factor`, `--load-workers`, and other
   workload-specific declarations.
 - `-e KEY=VALUE` remains a compatibility input; keys are uppercased. Multiple

@@ -77,6 +77,16 @@ func TestResolveInsertMethodPrecedence(t *testing.T) {
 			t.Fatal("resolveInsertMethod() accepted columnar for mysql")
 		}
 	})
+
+	t.Run("unsupported driver default rejected", func(t *testing.T) {
+		_, err := resolveInsertMethod(unset(), &config.DriverConfig{
+			DriverType:   config.DriverTypeMySQL,
+			InsertMethod: "columnar",
+		})
+		if err == nil {
+			t.Fatal("resolveInsertMethod() accepted columnar for mysql driver default")
+		}
+	})
 }
 
 func validInsertSource(total int64) *gen.IndexedSource {

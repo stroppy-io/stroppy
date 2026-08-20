@@ -319,18 +319,18 @@ func defineWorkload(
 }
 
 // resolveInsertMethod merges the explicit typed --insert-method override with
-// the driver-level defaultInsertMethod. Precedence: an explicit typed value
-// (CLI/env/config) wins; otherwise the driver-configured method is used; when
-// neither is set the result is zero, so workloads keep their own
-// InsertRequest.Method.
+// the user-set driver-level defaultInsertMethod (-D/JSON/config drivers).
+// Precedence: an explicit typed value (CLI/env/config) wins; otherwise the
+// user-set driver method is used; when neither is set the result is zero, so
+// workloads keep their own InsertRequest.Method. Presets carry no method, so
+// there is no hidden preset tier.
 func resolveInsertMethod(paramValue Param[string], cfg *config.DriverConfig) (driver.InsertMethod, error) {
 	if paramValue.Explicit() {
 		return driver.ResolveInsertMethod(cfg.DriverType, paramValue.Value())
 	}
 
 	if cfg.GetInsertMethod() != "" {
-		// Already validated at driver-build time.
-		return driver.ParseInsertMethod(cfg.GetInsertMethod())
+		return driver.ResolveInsertMethod(cfg.DriverType, cfg.GetInsertMethod())
 	}
 
 	return 0, nil
