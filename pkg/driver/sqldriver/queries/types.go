@@ -26,4 +26,11 @@ type Dialect interface {
 	// keep the pooled connection reusable on timeout, where client-side context
 	// cancellation alone would discard it.
 	StatementTimeoutHint(sql string, timeout time.Duration) string
+
+	// StatementDeadline returns the client-side deadline to pair with the
+	// server-side bound from StatementTimeoutHint. A dialect with a server-side
+	// hint pads the deadline so the backend's own timeout fires first and keeps
+	// the pooled connection; others return timeout unchanged. A non-positive
+	// timeout stays non-positive (disabled).
+	StatementDeadline(timeout time.Duration) time.Duration
 }
