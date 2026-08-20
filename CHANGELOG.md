@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- `--query-timeout` (also `QUERY_TIMEOUT` and config `run.queryTimeout`) bounds each executed statement with a per-statement deadline; `0` (the default) disables it. Timed-out statements are reported distinctly from a canceled run, and MySQL adds a server-side `MAX_EXECUTION_TIME` hint so a timed-out query keeps its pooled connection.
 - Restored configurable insert-method selection: `--insert-method` (also `INSERT_METHOD`, config `run.insertMethod`, or `-D insertMethod`/`-D defaultInsertMethod`) sets the row-insert method (`plain_query`, `plain_bulk`, `columnar`, `native`) for every workload load, validated against the selected driver; invalid or unsupported methods now fail before loading starts, and omitting an override keeps the workload's own default. ([#152](https://github.com/stroppy-io/stroppy/pull/152))
 - `stroppy probe` now lists registered workload parameter flags, and its JSON output includes each workload's typed schema for tooling and discovery. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Typed scenario and workload parameters can be set with `--name` flags or native JSON values in the config file's `run` and `params` objects, and `stroppy run <workload> --help` lists the available parameters. ([#128](https://github.com/stroppy-io/stroppy/pull/128))

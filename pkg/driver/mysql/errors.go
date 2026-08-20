@@ -11,6 +11,7 @@ import (
 const (
 	errLockDeadlock    = 1213 // ER_LOCK_DEADLOCK
 	errLockWaitTimeout = 1205 // ER_LOCK_WAIT_TIMEOUT
+	errQueryTimeout    = 3024 // ER_QUERY_TIMEOUT (MAX_EXECUTION_TIME) — aborted with max_execution_time exceeded
 )
 
 func (*Driver) ClassifyError(err error) driver.ErrorFacts {
@@ -20,6 +21,8 @@ func (*Driver) ClassifyError(err error) driver.ErrorFacts {
 			return driver.ErrorFacts{Kind: driver.ErrorKindDeadlock}
 		case errLockWaitTimeout:
 			return driver.ErrorFacts{Kind: driver.ErrorKindLockTimeout}
+		case errQueryTimeout:
+			return driver.ErrorFacts{Kind: driver.ErrorKindTimeout}
 		}
 	}
 

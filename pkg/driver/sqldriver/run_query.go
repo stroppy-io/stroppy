@@ -112,7 +112,23 @@ func parseQueryTemplate(dialect queries.Dialect, sqlStr string) *parsedQuery {
 	}
 }
 
+// StatementTimeout returns a child context bounded by timeout, or ctx unchanged
+// (with a no-op cancel) when timeout is non-positive. Callers defer the cancel
+// to release the timer once the statement completes.
+func StatementTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout <= 0 {
+		return ctx, func() {}
+	}
+
+	return context.WithTimeout(ctx, timeout)
+}
+
 // RunQuery executes sql with named :arg placeholders and returns rows cursor.
+// timeout > 0 bounds the single statement: every call derives a child context
+// so the deadline applies per statement rather than to an entire query suite,
+// and a dialect-provided server-side hint (MySQL MAX_EXECUTION_TIME) bounds the
+// backend where client-side cancellation alone would not keep the pooled
+// connection reusable.
 func RunQuery[R any](
 	ctx context.Context,
 	db QueryContext[R],
@@ -121,6 +137,7 @@ func RunQuery[R any](
 	lg *zap.Logger,
 	sqlStr string,
 	args map[string]any,
+	timeout time.Duration,
 ) (*driver.QueryResult, error) {
 	processedSQL, argsArr, err := ProcessArgs(dialect, sqlStr, args)
 	if err != nil {
@@ -133,8 +150,13 @@ func RunQuery[R any](
 		}
 	}
 
+	processedSQL = dialect.StatementTimeoutHint(processedSQL, timeout)
+
+	queryCtx, cancel := StatementTimeout(ctx, timeout)
+	defer cancel()
+
 	start := time.Now()
-	rawRows, err := db.QueryContext(ctx, processedSQL, argsArr...)
+	rawRows, err := db.QueryContext(queryCtx, processedSQL, argsArr...)
 	elapsed := time.Since(start)
 
 	if err != nil {

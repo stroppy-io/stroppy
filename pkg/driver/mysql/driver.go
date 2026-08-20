@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	gomysql "github.com/go-sql-driver/mysql"
 	"go.uber.org/zap"
@@ -30,11 +31,12 @@ func init() {
 }
 
 type Driver struct {
-	db       *sql.DB
-	dialect  queries.Dialect
-	logger   *zap.Logger
-	sqlCfg   *config.SQLConfig
-	bulkSize int
+	db           *sql.DB
+	dialect      queries.Dialect
+	logger       *zap.Logger
+	sqlCfg       *config.SQLConfig
+	bulkSize     int
+	queryTimeout time.Duration
 }
 
 var _ driver.Driver = (*Driver)(nil)
@@ -80,11 +82,12 @@ func NewDriver(
 	}
 
 	return &Driver{
-		db:       db,
-		dialect:  mysqlDialect{},
-		logger:   lg,
-		sqlCfg:   sqlCfg,
-		bulkSize: bulkSize,
+		db:           db,
+		dialect:      mysqlDialect{},
+		logger:       lg,
+		sqlCfg:       sqlCfg,
+		bulkSize:     bulkSize,
+		queryTimeout: opts.QueryTimeout,
 	}, nil
 }
 
@@ -192,7 +195,7 @@ func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (
 			return nil, err
 		}
 
-		return sqldriver.NewConnOnlyTx(conn, sqldriver.NewRows, d.dialect, d.logger, conn.Close), nil
+		return sqldriver.NewConnOnlyTx(conn, sqldriver.NewRows, d.dialect, d.logger, d.queryTimeout, conn.Close), nil
 	}
 
 	sqlTx, err := d.db.BeginTx(ctx, &sql.TxOptions{Isolation: sqldriver.IsolationToSQL(isolation)})
@@ -206,6 +209,7 @@ func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (
 		isolation,
 		d.dialect,
 		d.logger,
+		d.queryTimeout,
 	), nil
 }
 
@@ -214,7 +218,7 @@ func (d *Driver) RunQuery(
 	sqlStr string,
 	args map[string]any,
 ) (*driver.QueryResult, error) {
-	return sqldriver.RunQuery(ctx, d.db, sqldriver.NewRows, d.dialect, d.logger, sqlStr, args)
+	return sqldriver.RunQuery(ctx, d.db, sqldriver.NewRows, d.dialect, d.logger, sqlStr, args, d.queryTimeout)
 }
 
 func (d *Driver) Teardown(ctx context.Context) error {

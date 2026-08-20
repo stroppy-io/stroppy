@@ -78,6 +78,7 @@ var (
 	errDurationNeedsExecutor     = errors.New("duration requires an explicit constant-vus executor")
 	errDurationWithWrongExecutor = errors.New("duration is only valid with the constant-vus executor")
 	errConstantVUsNeedsDuration  = errors.New("constant-vus requires duration")
+	errNegativeQueryTimeout      = errors.New("query-timeout must not be negative")
 )
 
 // Register adds a workload factory. Workload packages call it during init.
@@ -230,7 +231,17 @@ func Run(
 		return fmt.Errorf("insert method: %w", err)
 	}
 
-	drv, err := driver.Dispatch(ctx, driver.Options{Config: cfg, Logger: lg, DialFunc: root.dialer.DialContext})
+	queryTimeout := scenarioParams.queryTimeout.Value()
+	if queryTimeout < 0 {
+		return fmt.Errorf("%w, got %s", errNegativeQueryTimeout, queryTimeout)
+	}
+
+	drv, err := driver.Dispatch(ctx, driver.Options{
+		Config:       cfg,
+		Logger:       lg,
+		DialFunc:     root.dialer.DialContext,
+		QueryTimeout: queryTimeout,
+	})
 	if err != nil {
 		return fmt.Errorf("driver dispatch: %w", err)
 	}
@@ -282,6 +293,7 @@ type scenarioParams struct {
 	duration   Param[time.Duration]
 
 	insertMethod Param[string]
+	queryTimeout Param[time.Duration]
 }
 
 func defineWorkload(
@@ -309,6 +321,10 @@ func defineWorkload(
 			"insert-method", "",
 			"Row insert method: plain_query, plain_bulk, columnar, or native.",
 			DerivedDefault("workload default"),
+		),
+		queryTimeout: def.Param.Duration(
+			"query-timeout", 0,
+			"Per-statement query deadline (e.g. 30s, 5s, 500ms); 0 disables it.",
 		),
 	}
 

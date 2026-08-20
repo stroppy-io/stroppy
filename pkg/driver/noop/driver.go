@@ -39,10 +39,11 @@ func init() {
 // Every method runs the full stroppy framework stack (data generation,
 // argument processing, transaction bookkeeping) but discards the final I/O.
 type Driver struct {
-	conn     *noopConn
-	dialect  queries.Dialect
-	logger   *zap.Logger
-	bulkSize int
+	conn         *noopConn
+	dialect      queries.Dialect
+	logger       *zap.Logger
+	bulkSize     int
+	queryTimeout time.Duration
 }
 
 var _ driver.Driver = (*Driver)(nil)
@@ -59,10 +60,11 @@ func NewDriver(opts driver.Options) *Driver {
 	}
 
 	return &Driver{
-		conn:     &noopConn{},
-		dialect:  noopDialect{},
-		logger:   lg,
-		bulkSize: bulkSize,
+		conn:         &noopConn{},
+		dialect:      noopDialect{},
+		logger:       lg,
+		bulkSize:     bulkSize,
+		queryTimeout: opts.QueryTimeout,
 	}
 }
 
@@ -144,7 +146,7 @@ func (d *Driver) RunQuery(
 	sqlStr string,
 	args map[string]any,
 ) (*driver.QueryResult, error) {
-	return sqldriver.RunQuery(ctx, d.conn, wrapRows, d.dialect, d.logger, sqlStr, args)
+	return sqldriver.RunQuery(ctx, d.conn, wrapRows, d.dialect, d.logger, sqlStr, args, d.queryTimeout)
 }
 
 func (d *Driver) Begin(
@@ -153,12 +155,12 @@ func (d *Driver) Begin(
 ) (driver.Tx, error) {
 	if isolation == config.TxIsolationLevelConnectionOnly {
 		return sqldriver.NewConnOnlyTx(
-			d.conn, wrapRows, d.dialect, d.logger,
+			d.conn, wrapRows, d.dialect, d.logger, d.queryTimeout,
 			func() error { return nil },
 		), nil
 	}
 
-	return sqldriver.NewTx(d.conn, wrapRows, isolation, d.dialect, d.logger), nil
+	return sqldriver.NewTx(d.conn, wrapRows, isolation, d.dialect, d.logger, d.queryTimeout), nil
 }
 
 func (d *Driver) Teardown(_ context.Context) error {
@@ -249,6 +251,9 @@ var _ queries.Dialect = noopDialect{}
 
 func (noopDialect) Placeholder(_ int) string { return "?" }
 func (noopDialect) Deduplicate() bool        { return false }
+
+// StatementTimeoutHint returns sql unchanged; noop performs no I/O to bound.
+func (noopDialect) StatementTimeoutHint(sql string, _ time.Duration) string { return sql }
 
 func (noopDialect) Convert(v any) (any, error) {
 	return v, nil

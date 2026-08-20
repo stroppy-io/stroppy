@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -46,6 +47,7 @@ func newTx(pgxTx pgx.Tx, isolation config.TxIsolationLevel, d *Driver) *sqldrive
 		isolation,
 		PgxDialect{},
 		d.logger,
+		d.queryTimeout,
 	)
 }
 
@@ -60,12 +62,13 @@ func (a *pgxConnAdapter) QueryContext(
 	return a.conn.Query(ctx, sql, args...)
 }
 
-func NewConnOnlyTx(conn *pgxpool.Conn, lg *zap.Logger) *sqldriver.ConnOnlyTx[pgx.Rows] {
+func NewConnOnlyTx(conn *pgxpool.Conn, lg *zap.Logger, timeout time.Duration) *sqldriver.ConnOnlyTx[pgx.Rows] {
 	return sqldriver.NewConnOnlyTx(
 		&pgxConnAdapter{conn},
 		NewRows,
 		PgxDialect{},
 		lg,
+		timeout,
 		func() error {
 			conn.Release()
 

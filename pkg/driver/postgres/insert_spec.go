@@ -14,6 +14,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
+	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
@@ -96,6 +97,11 @@ func (d *Driver) runInsertChunk(
 	}
 }
 
+// statementCtx derives the per-statement deadline for a single COPY/INSERT.
+func (d *Driver) statementCtx(ctx context.Context) (context.Context, context.CancelFunc) {
+	return sqldriver.StatementTimeout(ctx, d.queryTimeout)
+}
+
 // copyFromRuntime streams source rows into pgx.CopyFrom without buffering
 // the full result set. The adapter drains src to EOF.
 func (d *Driver) copyFromRuntime(
@@ -109,8 +115,11 @@ func (d *Driver) copyFromRuntime(
 		progress: insertprogress.NewGeneratedRowCounter(ctx),
 	}
 
+	stmtCtx, cancel := d.statementCtx(ctx)
+	defer cancel()
+
 	start := time.Now()
-	rowsCopied, err := d.pool.CopyFrom(ctx, pgx.Identifier{table}, src.Columns(), copySrc)
+	rowsCopied, err := d.pool.CopyFrom(stmtCtx, pgx.Identifier{table}, src.Columns(), copySrc)
 	copySrc.progress.Flush()
 
 	if err != nil {
@@ -226,7 +235,10 @@ func (d *Driver) execBulkBatch(
 ) error {
 	query, args := buildBulkInsert(table, columns, rows)
 
-	if _, err := d.pool.Exec(ctx, query, args...); err != nil {
+	stmtCtx, cancel := d.statementCtx(ctx)
+	defer cancel()
+
+	if _, err := d.pool.Exec(stmtCtx, query, args...); err != nil {
 		return fmt.Errorf("postgres: bulk INSERT %q: %w", table, err)
 	}
 
@@ -424,7 +436,10 @@ func (d *Driver) execProgressColumnarBatch(
 		args[i+1] = col
 	}
 
-	if _, err := d.pool.Exec(ctx, query, args...); err != nil {
+	stmtCtx, cancel := d.statementCtx(ctx)
+	defer cancel()
+
+	if _, err := d.pool.Exec(stmtCtx, query, args...); err != nil {
 		return fmt.Errorf("postgres: columnar INSERT %q: %w", table, err)
 	}
 

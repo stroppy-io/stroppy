@@ -107,7 +107,7 @@ conditional transient retries.
 **Workload and run parameters:**
 - Registered workloads expose typed `--name VALUE` flags. Run
   `stroppy run <workload> --help` to see the selected workload's schema.
-- Shared run flags: `--executor`, `--vus`, `--iterations`, `--duration`.
+- Shared run flags: `--executor`, `--vus`, `--iterations`, `--duration`, `--query-timeout`.
 - `--insert-method` selects the effective row-insert method for every load
   (`plain_query`, `plain_bulk`, `columnar`, `native`). Precedence (highest
   first): `--insert-method` (CLI > `INSERT_METHOD` env > `-e` > config

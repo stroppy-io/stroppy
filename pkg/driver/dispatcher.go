@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -18,6 +19,9 @@ type (
 		DialFunc func(ctx context.Context, network, addr string) (net.Conn, error)
 		Logger   *zap.Logger
 		Config   *config.DriverConfig
+
+		// QueryTimeout bounds each statement; <= 0 disables the deadline.
+		QueryTimeout time.Duration
 	}
 
 	// Rows provides cursor-style iteration over query result rows.
