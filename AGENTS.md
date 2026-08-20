@@ -101,13 +101,19 @@ conditional transient retries.
 **Driver flags:**
 - `-d <preset>` — driver preset: `pg`, `mysql`, `pico`, `ydb`, `noop`
 - `-d '{"url":"...","bulkSize":20}'` — raw JSON driver config
-- `-D key=value` — override driver field (url, driverType, errorMode, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
+- `-D key=value` — override driver field (url, driverType, errorMode, bulkSize, insertMethod/defaultInsertMethod, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
 - `-d1 <preset>`, `-D1 key=value` — same for second driver index (multi-driver workloads)
 
 **Workload and run parameters:**
 - Registered workloads expose typed `--name VALUE` flags. Run
   `stroppy run <workload> --help` to see the selected workload's schema.
 - Shared run flags: `--executor`, `--vus`, `--iterations`, `--duration`.
+- `--insert-method` selects the effective row-insert method for every load
+  (`plain_query`, `plain_bulk`, `columnar`, `native`). Precedence (highest
+  first): `--insert-method` (CLI > `INSERT_METHOD` env > `-e` > config
+  `run.insertMethod`) > `-D insertMethod`/config `drivers[N].defaultInsertMethod` >
+  the workload's own hard-coded method. Driver presets carry no insert-method
+  opinion. Unsupported methods fail before load.
 - Workload flags include `--scale-factor`, `--load-workers`, and other
   workload-specific declarations.
 - `-e KEY=VALUE` remains a compatibility input; keys are uppercased. Multiple

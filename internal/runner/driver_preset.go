@@ -13,12 +13,8 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
-// Driver preset literals reused across the postgres-family presets and
-// their default insert method.
-const (
-	driverPostgres  = "postgres"
-	insertPlainBulk = "plain_bulk"
-)
+// Driver preset literal reused across the postgres-family presets.
+const driverPostgres = "postgres"
 
 // pathFields lists Extra keys that contain file paths and must be
 // resolved to absolute paths before the working directory changes.
@@ -36,6 +32,7 @@ const (
 	driverTypeKey          = "drivertype"
 	urlKey                 = "url"
 	defaultInsertMethodKey = "defaultinsertmethod"
+	insertMethodKey        = "insertmethod"
 )
 
 // inferType converts a CLI string value to its most specific Go type
@@ -60,10 +57,9 @@ func inferType(value string) any {
 // DriverPreset contains default configuration for a known database driver.
 // These are used when the user specifies --driver / -d on the CLI.
 type DriverPreset struct {
-	DriverType          string `json:"driverType"`
-	URL                 string `json:"url"`
-	DefaultInsertMethod string `json:"defaultInsertMethod,omitempty"`
-	PoolKind            string `json:"-"` // "postgres" or "sql" — determines which pool config block to use
+	DriverType string `json:"driverType"`
+	URL        string `json:"url"`
+	PoolKind   string `json:"-"` // "postgres" or "sql" — determines which pool config block to use
 }
 
 // postgresURL builds a postgres:// connection URL from components,
@@ -79,35 +75,30 @@ func postgresURL(user, pass, host string) string {
 // driverPresets maps short driver names to their default configurations.
 var driverPresets = map[string]DriverPreset{
 	"pg": {
-		DriverType:          driverPostgres,
-		URL:                 postgresURL(driverPostgres, driverPostgres, "localhost:5432"),
-		DefaultInsertMethod: "native",
-		PoolKind:            driverPostgres,
+		DriverType: driverPostgres,
+		URL:        postgresURL(driverPostgres, driverPostgres, "localhost:5432"),
+		PoolKind:   driverPostgres,
 	},
 	"mysql": {
 		DriverType: "mysql",
 		URL: "myuser:mypassword@tcp(localhost:3306)" +
 			"/mydb?charset=utf8mb4&parseTime=True&loc=Local",
-		DefaultInsertMethod: insertPlainBulk,
-		PoolKind:            "sql",
+		PoolKind: "sql",
 	},
 	"pico": {
-		DriverType:          "picodata",
-		URL:                 postgresURL("admin", "T0psecret", "localhost:1331"),
-		DefaultInsertMethod: insertPlainBulk,
-		PoolKind:            driverPostgres,
+		DriverType: "picodata",
+		URL:        postgresURL("admin", "T0psecret", "localhost:1331"),
+		PoolKind:   driverPostgres,
 	},
 	"ydb": {
-		DriverType:          "ydb",
-		URL:                 "grpc://localhost:2136/local",
-		DefaultInsertMethod: "native",
-		PoolKind:            "sql",
+		DriverType: "ydb",
+		URL:        "grpc://localhost:2136/local",
+		PoolKind:   "sql",
 	},
 	"noop": {
-		DriverType:          "noop",
-		URL:                 "noop://localhost",
-		DefaultInsertMethod: insertPlainBulk,
-		PoolKind:            "",
+		DriverType: "noop",
+		URL:        "noop://localhost",
+		PoolKind:   "",
 	},
 }
 
@@ -174,7 +165,7 @@ func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
 		d.DriverType = value
 	case urlKey:
 		d.URL = value
-	case defaultInsertMethodKey:
+	case defaultInsertMethodKey, insertMethodKey:
 		d.DefaultInsertMethod = value
 	default:
 		return d.setExtraPath(strings.Split(key, "."), convertOverrideValue(key, value))
@@ -239,7 +230,7 @@ func validateOverridePath(path []string) error {
 
 func isDriverCLIField(key string) bool {
 	switch normalizeKey(key) {
-	case driverTypeKey, urlKey, defaultInsertMethodKey:
+	case driverTypeKey, urlKey, defaultInsertMethodKey, insertMethodKey:
 		return true
 	default:
 		return false
@@ -265,9 +256,8 @@ func normalizeKey(key string) string {
 // NewDriverCLIConfigFromPreset creates a DriverCLIConfig from a preset.
 func NewDriverCLIConfigFromPreset(p DriverPreset) DriverCLIConfig {
 	return DriverCLIConfig{
-		DriverType:          p.DriverType,
-		URL:                 p.URL,
-		DefaultInsertMethod: p.DefaultInsertMethod,
+		DriverType: p.DriverType,
+		URL:        p.URL,
 	}
 }
 
@@ -289,7 +279,7 @@ func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
 			cfg.DriverType = str
 		case urlKey:
 			cfg.URL = str
-		case defaultInsertMethodKey:
+		case defaultInsertMethodKey, insertMethodKey:
 			cfg.DefaultInsertMethod = str
 		default:
 			if cfg.Extra == nil {

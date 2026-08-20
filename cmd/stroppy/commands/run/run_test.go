@@ -693,6 +693,128 @@ func TestBuildDriverConfigRejectsDefaultTxIsolation(t *testing.T) {
 	}
 }
 
+func TestBuildDriverConfigResolvesInsertMethod(t *testing.T) {
+	t.Parallel()
+
+	t.Run("valid method stored canonically", func(t *testing.T) {
+		t.Parallel()
+
+		dc, err := buildDriverConfig(0, &runner.DriverCLIConfig{
+			DriverType:          "postgres",
+			DefaultInsertMethod: "columnar",
+		})
+		if err != nil {
+			t.Fatalf("buildDriverConfig() error = %v", err)
+		}
+
+		if dc.InsertMethod != "columnar" {
+			t.Fatalf("InsertMethod = %q, want columnar", dc.InsertMethod)
+		}
+	})
+
+	t.Run("preset carries no insert method", func(t *testing.T) {
+		t.Parallel()
+
+		p, err := runner.LookupDriverPreset("pg")
+		if err != nil {
+			t.Fatalf("LookupDriverPreset(pg): %v", err)
+		}
+
+		cfg := runner.NewDriverCLIConfigFromPreset(p)
+
+		dc, err := buildDriverConfig(0, &cfg)
+		if err != nil {
+			t.Fatalf("buildDriverConfig() error = %v", err)
+		}
+
+		if dc.InsertMethod != "" {
+			t.Fatalf("InsertMethod = %q, want empty (workload default)", dc.InsertMethod)
+		}
+	})
+
+	t.Run("explicit -D insertMethod overrides", func(t *testing.T) {
+		t.Parallel()
+
+		configs := runner.DriverCLIConfigs{0: &runner.DriverCLIConfig{DriverType: "postgres"}}
+		if err := applyDriverOpt(configs, 0, "insertMethod", "columnar"); err != nil {
+			t.Fatalf("applyDriverOpt() error = %v", err)
+		}
+
+		dc, err := buildDriverConfig(0, configs[0])
+		if err != nil {
+			t.Fatalf("buildDriverConfig() error = %v", err)
+		}
+
+		if dc.InsertMethod != "columnar" {
+			t.Fatalf("InsertMethod = %q, want columnar", dc.InsertMethod)
+		}
+	})
+
+	t.Run("method without driver type rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := buildDriverConfig(0, &runner.DriverCLIConfig{
+			DefaultInsertMethod: "native",
+		})
+		if err == nil || !contains(err.Error(), "driver preset or -D driverType") {
+			t.Fatalf("buildDriverConfig() error = %v, want driverType guidance", err)
+		}
+	})
+
+	t.Run("invalid value rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := buildDriverConfig(0, &runner.DriverCLIConfig{
+			DriverType:          "postgres",
+			DefaultInsertMethod: "bogus",
+		})
+		if err == nil {
+			t.Fatal("buildDriverConfig() accepted bogus insert method")
+		}
+	})
+
+	t.Run("unsupported value rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := buildDriverConfig(0, &runner.DriverCLIConfig{
+			DriverType:          "mysql",
+			DefaultInsertMethod: "columnar",
+		})
+		if err == nil {
+			t.Fatal("buildDriverConfig() accepted columnar for mysql")
+		}
+	})
+
+	t.Run("empty method leaves workload default", func(t *testing.T) {
+		t.Parallel()
+
+		dc, err := buildDriverConfig(0, &runner.DriverCLIConfig{DriverType: "postgres"})
+		if err != nil {
+			t.Fatalf("buildDriverConfig() error = %v", err)
+		}
+
+		if dc.InsertMethod != "" {
+			t.Fatalf("InsertMethod = %q, want empty", dc.InsertMethod)
+		}
+	})
+}
+
+func TestApplyDriverOptAcceptsInsertMethodAliases(t *testing.T) {
+	t.Parallel()
+
+	for _, key := range []string{"insertMethod", "insert_method", "defaultInsertMethod"} {
+		configs := runner.DriverCLIConfigs{0: &runner.DriverCLIConfig{}}
+		if err := applyDriverOpt(configs, 0, key, "plain_bulk"); err != nil {
+			t.Fatalf("applyDriverOpt(%q) error = %v", key, err)
+		}
+
+		if configs[0].DefaultInsertMethod != "plain_bulk" {
+			t.Fatalf("applyDriverOpt(%q): DefaultInsertMethod = %q, want plain_bulk",
+				key, configs[0].DefaultInsertMethod)
+		}
+	}
+}
+
 func TestDynamicWorkloadHelpAndBadTypedParam(t *testing.T) {
 	registerRunParamTestWorkload()
 

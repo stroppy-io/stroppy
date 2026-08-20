@@ -18,6 +18,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
 const (
@@ -48,6 +49,9 @@ var (
 	)
 	errDefaultTxIsolationRemoved = errors.New(
 		"defaultTxIsolation is removed; set the workload parameter --tx-isolation instead",
+	)
+	errInsertMethodNeedsDriverType = errors.New(
+		"insert method requires a driver preset or -D driverType",
 	)
 )
 
@@ -531,7 +535,19 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 		dc.DriverType = t
 	}
 
-	// defaultInsertMethod is owned by each Go workload's InsertRequest.
+	if cfg.DefaultInsertMethod != "" {
+		if dc.DriverType == config.DriverTypeUnspecified {
+			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, errInsertMethodNeedsDriverType))
+		}
+
+		method, err := driver.ResolveInsertMethod(dc.DriverType, cfg.DefaultInsertMethod)
+		if err != nil {
+			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
+		}
+
+		dc.InsertMethod = method.String()
+	}
+
 	if err := applyDriverExtras(idx, dc, cfg.Extra); err != nil {
 		return nil, invalidConfig(err)
 	}
