@@ -66,6 +66,9 @@ type workload struct {
 	m           *metrics
 	retryPolicy bench.RetryPolicy
 
+	measureStart time.Time
+	steady       *steady
+
 	vuStates sync.Map // uint64 -> *vuState
 }
 
@@ -215,7 +218,19 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 
 	b.StepBegin("workload")
 
+	w.measureStart = time.Now()
+	w.steady = w.initSteady()
+
 	return nil
+}
+
+// initSteady allocates the paced steady-state tracker, or nil for unpaced runs.
+func (w *workload) initSteady() *steady {
+	if !w.pacing {
+		return nil
+	}
+
+	return newSteady(w.measureStart, steadySlotWidth, steadySlotCount)
 }
 
 // initConfig resolves driver-specific workload configuration.
@@ -333,10 +348,20 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	})
 }
 
-func (*workload) Teardown(_ context.Context, _ *bench.Bench) error {
+func (w *workload) Teardown(_ context.Context, b *bench.Bench) error {
 	// workload step tag is opened/closed per-iteration via Step("workload"); the
 	// long-lived StepBegin in Setup is balanced here.
+	w.emitComplianceReport(b)
+
 	return nil
+}
+
+// recordSteady buckets a New-Order completion into the paced steady-state time
+// series, for the report's 3σ spread check. No-op on unpaced runs.
+func (w *workload) recordSteady() {
+	if w.steady != nil {
+		w.steady.record(time.Now())
+	}
 }
 
 // q fetches one named query, panicking on a missing section/query (a schema drift).
@@ -390,7 +415,7 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 		lineIID[olCnt-1] = items + 1 // nonexistent item → sentinel rollback
 	}
 
-	return bench.Retry0(ctx, w.retryPolicy, func() error {
+	if err := bench.Retry0(ctx, w.retryPolicy, func() error {
 		tx, err := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
 		if err != nil {
 			return err
@@ -402,7 +427,13 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 		}
 
 		return tx.Commit(ctx)
-	})
+	}); err != nil {
+		return err
+	}
+
+	w.recordSteady()
+
+	return nil
 }
 
 // finishNewOrder maps a new-order body error and its rollback error to the
