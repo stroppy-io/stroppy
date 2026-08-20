@@ -21,8 +21,8 @@ func EffectiveSQL(cliSQL string, cfg *LoadedConfig) string {
 		return cliSQL
 	}
 
-	if cfg != nil && cfg.RunConfig != nil && cfg.RunConfig.Sql != nil {
-		return cfg.RunConfig.GetSql()
+	if cfg != nil && cfg.RunConfig != nil && cfg.RunConfig.SQL != nil {
+		return cfg.RunConfig.GetSQL()
 	}
 
 	return ""

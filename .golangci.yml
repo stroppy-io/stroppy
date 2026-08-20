@@ -187,6 +187,11 @@ linters:
         path: driver_preset\.go
         text: json\(snake\)
       - linters:
+          - tagliatelle
+        path: pkg/config/.*\.go
+        text: json\(snake\)
+        # camelCase json tags are the protojson wire format; preserved intentionally (see #143)
+      - linters:
           - bodyclose
           - containedctx
           - dupl

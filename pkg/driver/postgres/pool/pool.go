@@ -67,8 +67,8 @@ func NewPool(
 	return &PoolX{pool}, nil
 }
 
-func NewWithConfig(ctx context.Context, config *pgxpool.Config) (*PoolX, error) {
-	pool, err := pgxpool.NewWithConfig(ctx, config)
+func NewWithConfig(ctx context.Context, pgConfig *pgxpool.Config) (*PoolX, error) {
+	pool, err := pgxpool.NewWithConfig(ctx, pgConfig)
 
 	return &PoolX{pool}, err
 }
@@ -77,7 +77,7 @@ func ParseConfig(
 	driverConfig *config.DriverConfig,
 	logger *zap.Logger,
 ) (*pgxpool.Config, error) {
-	cfg, err := pgxpool.ParseConfig(driverConfig.Url)
+	cfg, err := pgxpool.ParseConfig(driverConfig.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func ParseConfig(
 	// Disable connection lifetime limits
 	// NOTE: unfortunately "MaxConnLifetime = 0" != "no lifetime limits".
 	// "MaxConnLifetime = 0" == spam with expired connections.
-	if !strings.Contains(driverConfig.Url, "pool_max_conn_lifetime") {
+	if !strings.Contains(driverConfig.URL, "pool_max_conn_lifetime") {
 		const oneDay = 24 * time.Hour
 
 		cfg.MaxConnLifetime = oneDay // Nearly never
@@ -253,7 +253,7 @@ func applySecurityOverrides(
 	// TLS overrides — only when DSN did not configure TLS (sslmode=disable
 	// or absent → TLSConfig == nil).
 	caCert := driverCfg.GetCaCertFile()
-	skipVerify := driverCfg.GetTlsInsecureSkipVerify()
+	skipVerify := driverCfg.GetTLSInsecureSkipVerify()
 
 	if caCert == "" && !skipVerify {
 		return

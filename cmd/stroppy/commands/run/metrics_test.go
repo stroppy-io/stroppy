@@ -19,12 +19,12 @@ func TestMetricsConfig(t *testing.T) {
 	prefix := "bench_"
 
 	config := &config.RunConfig{Global: &config.GlobalConfig{
-		RunId:    "run-42",
+		RunID:    "run-42",
 		Metadata: map[string]string{"environment": "test"},
 		Exporter: &config.ExporterConfig{OtlpExport: &config.OtlpExport{
 			OtlpGrpcEndpoint:        &grpcEndpoint,
-			OtlpHttpEndpoint:        &httpEndpoint,
-			OtlpHttpExporterUrlPath: &httpPath,
+			OtlpHTTPEndpoint:        &httpEndpoint,
+			OtlpHTTPExporterURLPath: &httpPath,
 			OtlpHeaders:             &headers,
 			OtlpEndpointInsecure:    &insecure,
 			OtlpMetricsPrefix:       &prefix,
@@ -45,7 +45,7 @@ func TestMetricsConfig(t *testing.T) {
 func TestMetricsConfigWithGlobalWithoutExporter(t *testing.T) {
 	t.Parallel()
 
-	got := metricsConfig(&config.RunConfig{Global: &config.GlobalConfig{RunId: "run-42"}})
+	got := metricsConfig(&config.RunConfig{Global: &config.GlobalConfig{RunID: "run-42"}})
 	require.Equal(t, "run-42", got.RunID)
 	require.Empty(t, got.GRPCEndpoint)
 	require.Empty(t, got.HTTPEndpoint)

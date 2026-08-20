@@ -51,12 +51,12 @@ func TestRunConfigJSONAccepted(t *testing.T) {
 	require.NoError(t, unmarshalStrict(doc, &cfg))
 
 	require.Equal(t, "tpcc/tx", cfg.GetScript())
-	require.Equal(t, "pico.sql", cfg.GetSql())
+	require.Equal(t, "pico.sql", cfg.GetSQL())
 	require.Nil(t, cfg.K6Args)
 	require.Nil(t, cfg.K6Config)
 
 	require.NotNil(t, cfg.Global)
-	require.Equal(t, "run-42", cfg.Global.RunId)
+	require.Equal(t, "run-42", cfg.Global.RunID)
 	require.Equal(t, uint64(7), cfg.Global.Seed)
 	require.Equal(t, map[string]string{"env": "ci"}, cfg.Global.Metadata)
 	require.Equal(t, config.LogLevelInfo, cfg.Global.Logger.LogLevel)
@@ -67,7 +67,7 @@ func TestRunConfigJSONAccepted(t *testing.T) {
 	driver := cfg.Drivers[0]
 	require.NotNil(t, driver)
 	require.Equal(t, "postgres", driver.GetDriverType())
-	require.Equal(t, "postgres://user:pass@localhost:5432/bench", driver.GetUrl())
+	require.Equal(t, "postgres://user:pass@localhost:5432/bench", driver.GetURL())
 	require.Equal(t, "native", driver.GetDefaultInsertMethod())
 	require.Equal(t, int32(200), driver.GetBulkSize())
 	require.Equal(t, int32(200), driver.Pool.GetMaxConns())
@@ -100,7 +100,7 @@ func TestRunConfigJSONRejects(t *testing.T) {
 func TestJSONFieldNamesPreserved(t *testing.T) {
 	driver := config.DriverRunConfig{
 		DriverType:         ptr("postgres"),
-		Url:                ptr("postgres://x"),
+		URL:                ptr("postgres://x"),
 		ErrorMode:          ptr("throw"),
 		BulkSize:           ptr[int32](20),
 		CaCertFile:         ptr("/tls/ca.pem"),

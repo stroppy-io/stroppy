@@ -39,7 +39,7 @@ type Driver struct {
 	nativeDB *ydbsdk.Driver
 	dialect  queries.Dialect
 	logger   *zap.Logger
-	sqlCfg   *config.SqlConfig
+	sqlCfg   *config.SQLConfig
 	bulkSize int
 }
 
@@ -55,7 +55,7 @@ func NewDriver(
 	}
 
 	cfg := opts.Config
-	sqlCfg := cfg.Sql
+	sqlCfg := cfg.SQL
 	connOpts := buildConnectionOptions(lg, cfg, opts.DialFunc)
 
 	primaryCtx, cancelPrimary := context.WithTimeout(ctx, primaryConnectTimeout)
@@ -101,11 +101,11 @@ func tryConnect(
 	ctx context.Context,
 	lg *zap.Logger,
 	cfg *config.DriverConfig,
-	sqlCfg *config.SqlConfig,
+	sqlCfg *config.SQLConfig,
 	connOpts []ydbsdk.Option,
 	pingTimeout time.Duration,
 ) (*sql.DB, *ydbsdk.Driver, error) {
-	nativeDB, err := ydbsdk.Open(ctx, cfg.Url, connOpts...)
+	nativeDB, err := ydbsdk.Open(ctx, cfg.URL, connOpts...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open ydb connection: %w", err)
 	}
@@ -130,7 +130,7 @@ func tryConnect(
 		return nil, nil, fmt.Errorf("apply SQL config: %w", err)
 	}
 
-	lg.Debug("Checking db connection...", zap.String("url", cfg.Url))
+	lg.Debug("Checking db connection...", zap.String("url", cfg.URL))
 
 	if err = sqldriver.WaitForDB(ctx, lg, &sqldriver.DBPinger{DB: db}, pingTimeout); err != nil {
 		db.Close()
@@ -168,7 +168,7 @@ func buildConnectionOptions(
 		opts = append(opts, ydbsdk.WithCertificatesFromFile(f))
 	}
 
-	if cfg.GetTlsInsecureSkipVerify() {
+	if cfg.GetTLSInsecureSkipVerify() {
 		lg.Warn("TLS certificate verification disabled (insecure)")
 
 		opts = append(opts, ydbsdk.WithTLSSInsecureSkipVerify())

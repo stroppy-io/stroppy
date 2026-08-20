@@ -138,16 +138,16 @@ func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Q
 // path from the request's table/method/workers, mirroring the legacy
 // spec-driven tracker.
 func (b *Bench) newBatchInsertTracker(req *driver.InsertRequest) *insertprogress.Tracker {
-	config := insertprogress.DefaultConfig()
-	config.Table = req.Table
-	config.Method = req.Method.String()
-	config.Workers = req.Workers
-	config.Logger = b.lg.Named("insert-progress")
-	config.OnSample = func(snapshot insertprogress.Snapshot) {
+	cfg := insertprogress.DefaultConfig()
+	cfg.Table = req.Table
+	cfg.Method = req.Method.String()
+	cfg.Workers = req.Workers
+	cfg.Logger = b.lg.Named("insert-progress")
+	cfg.OnSample = func(snapshot insertprogress.Snapshot) {
 		b.root.txMetrics.recordInsertProgress(b.vu, &snapshot)
 	}
 
-	return insertprogress.NewTracker(&config)
+	return insertprogress.NewTracker(&cfg)
 }
 
 // InsertTpch loads one TPC-H table via the ported dbgen generator, streamed

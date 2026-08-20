@@ -17,6 +17,10 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
+// schemaFileMode is the permission for the generated schema file. It is
+// committed to the repo, so it stays world-readable like the rest of docs/.
+const schemaFileMode = 0o644
+
 // enumValues maps Go type name -> the allowed string values for the enum-backed
 // string types that reflection cannot enumerate. The values are derived from the
 // constant lists exported by pkg/config so the schema cannot drift from the code.
@@ -36,9 +40,11 @@ func enumStrings[T ~string](values []T) []string {
 
 func main() {
 	out := flag.String("out", "", "output file path (defaults to stdout)")
+
 	flag.Parse()
 
 	schema := buildSchema()
+
 	data, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
 		fatal(err)
@@ -54,7 +60,8 @@ func main() {
 		return
 	}
 
-	if err := os.WriteFile(*out, data, 0o644); err != nil {
+	err = os.WriteFile(*out, data, schemaFileMode)
+	if err != nil {
 		fatal(err)
 	}
 }
@@ -138,18 +145,18 @@ func enumType(t reflect.Type) map[string]any {
 func structSchema(t reflect.Type, defs map[string]any) map[string]any {
 	// Config structs are acyclic, so fields resolved here are registered in
 	// defs by resolveType before any deeper reference to the same type.
+	properties := map[string]any{}
+
 	schema := map[string]any{
 		"type":                 "object",
 		"additionalProperties": false,
-		"properties":           map[string]any{},
+		"properties":           properties,
 	}
 
-	properties := schema["properties"].(map[string]any)
-
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		field := t.Field(i)
 
-		name := jsonName(field)
+		name := jsonName(&field)
 		if name == "-" {
 			continue
 		}
@@ -160,7 +167,7 @@ func structSchema(t reflect.Type, defs map[string]any) map[string]any {
 	return schema
 }
 
-func jsonName(field reflect.StructField) string {
+func jsonName(field *reflect.StructField) string {
 	tag := field.Tag.Get("json")
 	if tag == "" {
 		return strings.ToLower(field.Name[:1]) + field.Name[1:]

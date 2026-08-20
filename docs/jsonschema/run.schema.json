@@ -126,7 +126,7 @@
         "sql": {
           "anyOf": [
             {
-              "$ref": "#/$defs/SqlConfig"
+              "$ref": "#/$defs/SQLConfig"
             },
             {
               "type": "null"
@@ -669,7 +669,7 @@
       },
       "type": "object"
     },
-    "SqlConfig": {
+    "SQLConfig": {
       "additionalProperties": false,
       "properties": {
         "connMaxIdleTime": {

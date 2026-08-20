@@ -40,7 +40,7 @@ func newTestDriver(t *testing.T, extra map[string]string) (*Driver, string) {
 	raw := buildURL(root, workload, extra)
 
 	d, err := NewDriver(context.Background(), driver.Options{
-		Config: &stroppyconfig.DriverConfig{Url: raw},
+		Config: &stroppyconfig.DriverConfig{URL: raw},
 	})
 	if err != nil {
 		t.Fatalf("NewDriver: %v", err)

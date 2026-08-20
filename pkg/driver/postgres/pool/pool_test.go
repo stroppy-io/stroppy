@@ -17,7 +17,7 @@ func ptr[T any](x T) *T {
 func TestParseConfig_Success(t *testing.T) {
 	t.Run("allConfigured", func(t *testing.T) {
 		params := &config.DriverConfig{
-			Url: "postgres://user:pass@localhost:5432/db",
+			URL: "postgres://user:pass@localhost:5432/db",
 			Postgres: &config.PostgresConfig{
 				MaxConnLifetime: ptr("1h"),
 				MaxConnIdleTime: ptr("10m"),
@@ -39,7 +39,7 @@ func TestParseConfig_Success(t *testing.T) {
 
 	t.Run("statementCache", func(t *testing.T) {
 		params := &config.DriverConfig{
-			Url: "postgres://user:pass@localhost:5432/db",
+			URL: "postgres://user:pass@localhost:5432/db",
 			Postgres: &config.PostgresConfig{
 				DefaultQueryExecMode:   ptr("cache_statement"),
 				StatementCacheCapacity: ptr[int32](1000),
@@ -53,7 +53,7 @@ func TestParseConfig_Success(t *testing.T) {
 
 func TestNewDriverConfig_InvalidDuration(t *testing.T) {
 	params := &config.DriverConfig{
-		Url: "postgres://user:pass@localhost:5432/db",
+		URL: "postgres://user:pass@localhost:5432/db",
 		Postgres: &config.PostgresConfig{
 			MaxConnLifetime: ptr("notaduration"),
 		},

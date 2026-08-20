@@ -96,7 +96,7 @@ func NewDriver(
 		}
 	}
 
-	d.logger.Debug("Checking db connection...", zap.String("url", cfg.Url))
+	d.logger.Debug("Checking db connection...", zap.String("url", cfg.URL))
 
 	// TODO: make waiting optional
 	err = sqldriver.WaitForDB(ctx, d.logger, d.pool, dbConnectionTimeout)

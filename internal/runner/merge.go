@@ -68,9 +68,9 @@ func MergePostgresConfig(dst, src *config.PostgresConfig) *config.PostgresConfig
 	return &merged
 }
 
-// MergeSqlConfig merges src into dst with the same non-nil-overrides semantics
+// MergeSQLConfig merges src into dst with the same non-nil-overrides semantics
 // as MergePostgresConfig, for the generic database/sql pool block.
-func MergeSqlConfig(dst, src *config.SqlConfig) *config.SqlConfig {
+func MergeSQLConfig(dst, src *config.SQLConfig) *config.SQLConfig {
 	if dst == nil {
 		return src
 	}

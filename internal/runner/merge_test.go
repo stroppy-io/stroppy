@@ -30,17 +30,17 @@ func TestMergePostgresConfig(t *testing.T) {
 	require.Nil(t, merged.MinIdleConns)                              // untouched from dst
 }
 
-func TestMergeSqlConfig(t *testing.T) {
-	dst := &config.SqlConfig{
+func TestMergeSQLConfig(t *testing.T) {
+	dst := &config.SQLConfig{
 		MaxOpenConns:    ptr[int32](9),
 		ConnMaxLifetime: ptr("1h"),
 	}
 
-	src := &config.SqlConfig{
+	src := &config.SQLConfig{
 		MaxOpenConns: ptr[int32](12),
 	}
 
-	merged := runner.MergeSqlConfig(dst, src)
+	merged := runner.MergeSQLConfig(dst, src)
 
 	require.Equal(t, int32(12), merged.GetMaxOpenConns()) // src overrides
 	require.Equal(t, "1h", merged.GetConnMaxLifetime())   // dst preserved
@@ -49,8 +49,8 @@ func TestMergeSqlConfig(t *testing.T) {
 
 func TestMergeNilSourceIsNoop(t *testing.T) {
 	dst := &config.PostgresConfig{MaxConns: ptr[int32](10)}
-	sqlDst := &config.SqlConfig{MaxIdleConns: ptr[int32](3)}
+	sqlDst := &config.SQLConfig{MaxIdleConns: ptr[int32](3)}
 
 	require.Same(t, dst, runner.MergePostgresConfig(dst, nil))
-	require.Same(t, sqlDst, runner.MergeSqlConfig(sqlDst, nil))
+	require.Same(t, sqlDst, runner.MergeSQLConfig(sqlDst, nil))
 }

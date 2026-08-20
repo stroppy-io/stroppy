@@ -27,7 +27,7 @@ func TestFileDriverRunConfigsToEnvVarsSerializesDriverSetupFields(t *testing.T) 
 	envs, err := fileDriverRunConfigsToEnvVars(map[uint32]*config.DriverRunConfig{
 		99: {
 			DriverType:          ptr("postgres"),
-			Url:                 ptr("postgres://user:pass@localhost:5432/bench"),
+			URL:                 ptr("postgres://user:pass@localhost:5432/bench"),
 			DefaultInsertMethod: ptr("native"),
 			Pool: &config.PoolConfig{
 				MaxConns:     ptr[int32](200),
@@ -36,7 +36,7 @@ func TestFileDriverRunConfigsToEnvVarsSerializesDriverSetupFields(t *testing.T) 
 			Postgres: &config.PostgresConfig{
 				StatementCacheCapacity: ptr[int32](128),
 			},
-			Sql: &config.SqlConfig{
+			SQL: &config.SQLConfig{
 				MaxOpenConns: ptr[int32](12),
 			},
 		},

@@ -556,7 +556,7 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 	configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
 		0: {
 			DriverType: &driverType,
-			Url:        &fileURL,
+			URL:        &fileURL,
 			ErrorMode:  &errorMode,
 			BulkSize:   &bulkSize,
 			Pool:       &config.PoolConfig{MaxConns: &maxConns},
@@ -587,7 +587,7 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
 
-	if runtimeConfig.Url != "postgres://cli" ||
+	if runtimeConfig.URL != "postgres://cli" ||
 		runtimeConfig.GetBulkSize() != 20 ||
 		runtimeConfig.ErrorMode != config.ErrorModeThrow ||
 		runtimeConfig.Postgres.GetMaxConns() != 10 ||
@@ -604,7 +604,7 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		0: {
 			DriverType: &mysql,
 			Pool:       &config.PoolConfig{MaxOpenConns: &maxOpenConns},
-			Sql: &config.SqlConfig{
+			SQL: &config.SQLConfig{
 				MaxOpenConns: &specificMaxOpenConns,
 				MaxIdleConns: &maxIdleConns,
 			},
@@ -623,7 +623,7 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("buildDriverConfig(mysql) error = %v", err)
 	}
 
-	if runtimeConfig.Sql.GetMaxOpenConns() != 12 || runtimeConfig.Sql.GetMaxIdleConns() != 4 {
+	if runtimeConfig.SQL.GetMaxOpenConns() != 12 || runtimeConfig.SQL.GetMaxIdleConns() != 4 {
 		t.Fatalf("runtime mysql driver config = %#v", runtimeConfig)
 	}
 }

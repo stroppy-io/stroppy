@@ -33,7 +33,7 @@ type Driver struct {
 	db       *sql.DB
 	dialect  queries.Dialect
 	logger   *zap.Logger
-	sqlCfg   *config.SqlConfig
+	sqlCfg   *config.SQLConfig
 	bulkSize int
 }
 
@@ -57,14 +57,14 @@ func NewDriver(
 
 	db := sql.OpenDB(connector)
 
-	sqlCfg := cfg.Sql
+	sqlCfg := cfg.SQL
 	if err = sqldriver.ApplySQLConfig(db, sqlCfg); err != nil {
 		db.Close()
 
 		return nil, fmt.Errorf("failed to apply SQL config: %w", err)
 	}
 
-	lg.Debug("Checking db connection...", zap.String("url", cfg.Url))
+	lg.Debug("Checking db connection...", zap.String("url", cfg.URL))
 
 	if err = sqldriver.WaitForDB(ctx, lg, &sqldriver.DBPinger{DB: db}, 0); err != nil {
 		db.Close()
@@ -93,7 +93,7 @@ func prepareConnector(
 	dialFunc func(ctx context.Context, network, addr string) (net.Conn, error),
 	lg *zap.Logger,
 ) (godriver.Connector, error) {
-	mysqlCfg, err := gomysql.ParseDSN(driverCfg.Url)
+	mysqlCfg, err := gomysql.ParseDSN(driverCfg.URL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse mysql DSN: %w", err)
 	}
@@ -135,7 +135,7 @@ func applySecurityOverrides(
 	// TLS overrides — only when DSN did not configure TLS
 	// (TLSConfig == "" and TLS == nil means no TLS from DSN).
 	caCert := driverCfg.GetCaCertFile()
-	skipVerify := driverCfg.GetTlsInsecureSkipVerify()
+	skipVerify := driverCfg.GetTLSInsecureSkipVerify()
 
 	if caCert == "" && !skipVerify {
 		return

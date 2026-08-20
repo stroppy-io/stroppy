@@ -132,7 +132,7 @@ type tableState struct {
 
 var _ driver.Driver = (*Driver)(nil)
 
-// NewDriver parses opts.Config.Url and returns a ready-to-use Driver.
+// NewDriver parses opts.Config.URL and returns a ready-to-use Driver.
 // The output directory is created lazily (on first write) so Setup
 // succeeds even when dir is a prefix that does not yet exist.
 func NewDriver(_ context.Context, opts driver.Options) (*Driver, error) {
@@ -141,7 +141,7 @@ func NewDriver(_ context.Context, opts driver.Options) (*Driver, error) {
 		lg = logger.NewFromEnv().Named("csv")
 	}
 
-	cfg, err := parseConfig(opts.Config.Url)
+	cfg, err := parseConfig(opts.Config.URL)
 	if err != nil {
 		return nil, fmt.Errorf("csv: parse url: %w", err)
 	}

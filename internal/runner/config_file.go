@@ -103,7 +103,7 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 		lg.Debug("Config file driver",
 			zap.Uint32("index", idx),
 			zap.String("type", drv.GetDriverType()),
-			zap.String("url", drv.GetUrl()),
+			zap.String("url", drv.GetURL()),
 		)
 	}
 

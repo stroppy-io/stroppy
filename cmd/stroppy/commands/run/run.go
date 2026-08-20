@@ -303,7 +303,7 @@ func metricsConfig(cfg *config.RunConfig) *bench.MetricsConfig {
 	}
 
 	global := cfg.Global
-	metrics.RunID = global.RunId
+	metrics.RunID = global.RunID
 	metrics.ResourceAttributes = global.Metadata
 
 	if global.Exporter == nil || global.Exporter.OtlpExport == nil {
@@ -312,8 +312,8 @@ func metricsConfig(cfg *config.RunConfig) *bench.MetricsConfig {
 
 	export := global.Exporter.OtlpExport
 	metrics.GRPCEndpoint = export.GetOtlpGrpcEndpoint()
-	metrics.HTTPEndpoint = export.GetOtlpHttpEndpoint()
-	metrics.HTTPPath = export.GetOtlpHttpExporterUrlPath()
+	metrics.HTTPEndpoint = export.GetOtlpHTTPEndpoint()
+	metrics.HTTPPath = export.GetOtlpHTTPExporterURLPath()
 	metrics.Headers = export.GetOtlpHeaders()
 	metrics.Insecure = export.GetOtlpEndpointInsecure()
 	metrics.Prefix = export.GetOtlpMetricsPrefix()
@@ -627,7 +627,7 @@ func runGoWorkload(
 		// declareDriverSetup defaults).
 		drivers[0] = &config.DriverConfig{ //nolint:gosec // G101: URL field name, not an embedded credential
 			DriverType: config.DriverTypePostgres,
-			Url:        "postgres://postgres:postgres@localhost:5432",
+			URL:        "postgres://postgres:postgres@localhost:5432",
 		}
 	}
 
@@ -666,7 +666,7 @@ func runGoWorkload(
 func buildDriverConfig(
 	idx int, cfg *runner.DriverCLIConfig, envOverrides map[string]string,
 ) (*config.DriverConfig, error) {
-	dc := &config.DriverConfig{Url: cfg.URL}
+	dc := &config.DriverConfig{URL: cfg.URL}
 
 	if cfg.DriverType != "" {
 		t, err := bench.ParseDriverType(cfg.DriverType)
@@ -778,12 +778,12 @@ func applyDriverExtras(idx int, driverConfig *config.DriverConfig, extras map[st
 
 	driverConfig.BulkSize = extraConfig.BulkSize
 	driverConfig.Postgres = extraConfig.Postgres
-	driverConfig.Sql = extraConfig.Sql
+	driverConfig.SQL = extraConfig.SQL
 	driverConfig.CaCertFile = extraConfig.CaCertFile
 	driverConfig.AuthToken = extraConfig.AuthToken
 	driverConfig.AuthUser = extraConfig.AuthUser
 	driverConfig.AuthPassword = extraConfig.AuthPassword
-	driverConfig.TlsInsecureSkipVerify = extraConfig.TlsInsecureSkipVerify
+	driverConfig.TLSInsecureSkipVerify = extraConfig.TLSInsecureSkipVerify
 	driverConfig.InsertProgress = extraConfig.InsertProgress
 
 	return nil
@@ -847,16 +847,16 @@ func mergePoolDriverSpecific(
 		return nil
 	}
 
-	sqlConfig := &config.SqlConfig{}
+	sqlConfig := &config.SQLConfig{}
 	if err := runner.UnmarshalStrict(data, sqlConfig); err != nil {
 		return err
 	}
 
-	if specific := driverConfig.Sql; specific != nil {
-		sqlConfig = runner.MergeSqlConfig(sqlConfig, specific)
+	if specific := driverConfig.SQL; specific != nil {
+		sqlConfig = runner.MergeSQLConfig(sqlConfig, specific)
 	}
 
-	driverConfig.Sql = sqlConfig
+	driverConfig.SQL = sqlConfig
 
 	return nil
 }

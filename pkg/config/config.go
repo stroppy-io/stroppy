@@ -9,6 +9,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -92,6 +93,19 @@ const (
 	LogLevelFatal LogLevel = "LOG_LEVEL_FATAL"
 )
 
+// LogMode is the logging output mode.
+type LogMode string
+
+const (
+	LogModeDevelopment LogMode = "LOG_MODE_DEVELOPMENT"
+	LogModeProduction  LogMode = "LOG_MODE_PRODUCTION"
+)
+
+var (
+	errInvalidLogLevel = errors.New("invalid log level")
+	errInvalidLogMode  = errors.New("invalid log mode")
+)
+
 // LogLevelValues returns every declared LogLevel constant in canonical order.
 func LogLevelValues() []LogLevel {
 	return []LogLevel{
@@ -103,12 +117,18 @@ func LogLevelValues() []LogLevel {
 	}
 }
 
+// LogModeValues returns every declared LogMode constant in canonical order.
+func LogModeValues() []LogMode {
+	return []LogMode{LogModeDevelopment, LogModeProduction}
+}
+
 // UnmarshalJSON rejects values outside the LogLevel constant set. The frozen
 // protobuf schema encoded this as a strict enum; an untyped string would
 // otherwise silently accept any value.
 func (l *LogLevel) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		*l = ""
+
 		return nil
 	}
 
@@ -120,24 +140,12 @@ func (l *LogLevel) UnmarshalJSON(data []byte) error {
 	for _, valid := range LogLevelValues() {
 		if s == string(valid) {
 			*l = valid
+
 			return nil
 		}
 	}
 
-	return fmt.Errorf("invalid logLevel %q", s)
-}
-
-// LogMode is the logging output mode.
-type LogMode string
-
-const (
-	LogModeDevelopment LogMode = "LOG_MODE_DEVELOPMENT"
-	LogModeProduction  LogMode = "LOG_MODE_PRODUCTION"
-)
-
-// LogModeValues returns every declared LogMode constant in canonical order.
-func LogModeValues() []LogMode {
-	return []LogMode{LogModeDevelopment, LogModeProduction}
+	return fmt.Errorf("%w: %q", errInvalidLogLevel, s)
 }
 
 // UnmarshalJSON rejects values outside the LogMode constant set. The frozen
@@ -146,6 +154,7 @@ func LogModeValues() []LogMode {
 func (m *LogMode) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		*m = ""
+
 		return nil
 	}
 
@@ -157,18 +166,19 @@ func (m *LogMode) UnmarshalJSON(data []byte) error {
 	for _, valid := range LogModeValues() {
 		if s == string(valid) {
 			*m = valid
+
 			return nil
 		}
 	}
 
-	return fmt.Errorf("invalid logMode %q", s)
+	return fmt.Errorf("%w: %q", errInvalidLogMode, s)
 }
 
 // RunConfig is the top-level stroppy config file schema.
 type RunConfig struct {
 	Version  string                      `json:"version,omitempty"`
 	Script   *string                     `json:"script,omitempty"`
-	Sql      *string                     `json:"sql,omitempty"`
+	SQL      *string                     `json:"sql,omitempty"`
 	Global   *GlobalConfig               `json:"global,omitempty"`
 	Drivers  map[uint32]*DriverRunConfig `json:"drivers,omitempty"`
 	Env      map[string]string           `json:"env,omitempty"`
@@ -186,9 +196,9 @@ func (c *RunConfig) GetScript() string {
 	return ""
 }
 
-func (c *RunConfig) GetSql() string {
-	if c != nil && c.Sql != nil {
-		return *c.Sql
+func (c *RunConfig) GetSQL() string {
+	if c != nil && c.SQL != nil {
+		return *c.SQL
 	}
 
 	return ""
@@ -205,7 +215,7 @@ func (c *RunConfig) GetK6Config() string {
 // DriverRunConfig is the user-facing driver configuration for the config file.
 type DriverRunConfig struct {
 	DriverType            *string               `json:"driverType,omitempty"`
-	Url                   *string               `json:"url,omitempty"`
+	URL                   *string               `json:"url,omitempty"`
 	Pool                  *PoolConfig           `json:"pool,omitempty"`
 	ErrorMode             *string               `json:"errorMode,omitempty"`
 	BulkSize              *int32                `json:"bulkSize,omitempty"`
@@ -213,11 +223,11 @@ type DriverRunConfig struct {
 	AuthToken             *string               `json:"authToken,omitempty"`
 	AuthUser              *string               `json:"authUser,omitempty"`
 	AuthPassword          *string               `json:"authPassword,omitempty"`
-	TlsInsecureSkipVerify *bool                 `json:"tlsInsecureSkipVerify,omitempty"`
+	TLSInsecureSkipVerify *bool                 `json:"tlsInsecureSkipVerify,omitempty"`
 	DefaultTxIsolation    *string               `json:"defaultTxIsolation,omitempty"`
 	DefaultInsertMethod   *string               `json:"defaultInsertMethod,omitempty"`
 	Postgres              *PostgresConfig       `json:"postgres,omitempty"`
-	Sql                   *SqlConfig            `json:"sql,omitempty"`
+	SQL                   *SQLConfig            `json:"sql,omitempty"`
 	InsertProgress        *InsertProgressConfig `json:"insertProgress,omitempty"`
 }
 
@@ -229,9 +239,9 @@ func (c *DriverRunConfig) GetDriverType() string {
 	return ""
 }
 
-func (c *DriverRunConfig) GetUrl() string {
-	if c != nil && c.Url != nil {
-		return *c.Url
+func (c *DriverRunConfig) GetURL() string {
+	if c != nil && c.URL != nil {
+		return *c.URL
 	}
 
 	return ""
@@ -285,9 +295,9 @@ func (c *DriverRunConfig) GetAuthPassword() string {
 	return ""
 }
 
-func (c *DriverRunConfig) GetTlsInsecureSkipVerify() bool {
-	if c != nil && c.TlsInsecureSkipVerify != nil {
-		return *c.TlsInsecureSkipVerify
+func (c *DriverRunConfig) GetTLSInsecureSkipVerify() bool {
+	if c != nil && c.TLSInsecureSkipVerify != nil {
+		return *c.TLSInsecureSkipVerify
 	}
 
 	return false
@@ -310,7 +320,7 @@ func (c *DriverRunConfig) GetDefaultInsertMethod() string {
 }
 
 // PoolConfig is a sugar pool block accepted on the config-file driver. It maps
-// to PostgresConfig or SqlConfig based on driver type.
+// to PostgresConfig or SQLConfig based on driver type.
 type PoolConfig struct {
 	MaxConns                 *int32  `json:"maxConns,omitempty"`
 	MinConns                 *int32  `json:"minConns,omitempty"`
@@ -434,17 +444,17 @@ func (c *PoolConfig) GetConnMaxIdleTime() string {
 // DriverConfig is the runtime driver configuration consumed by the drivers and
 // bench engine. It is assembled internally, never JSON-decoded directly.
 type DriverConfig struct {
-	Url                   string                `json:"url,omitempty"`
+	URL                   string                `json:"url,omitempty"`
 	DriverType            DriverType            `json:"driverType,omitempty"`
 	BulkSize              *int32                `json:"bulkSize,omitempty"`
 	ErrorMode             ErrorMode             `json:"errorMode,omitempty"`
 	Postgres              *PostgresConfig       `json:"postgres,omitempty"`
-	Sql                   *SqlConfig            `json:"sql,omitempty"`
+	SQL                   *SQLConfig            `json:"sql,omitempty"`
 	CaCertFile            *string               `json:"caCertFile,omitempty"`
 	AuthToken             *string               `json:"authToken,omitempty"`
 	AuthUser              *string               `json:"authUser,omitempty"`
 	AuthPassword          *string               `json:"authPassword,omitempty"`
-	TlsInsecureSkipVerify *bool                 `json:"tlsInsecureSkipVerify,omitempty"`
+	TLSInsecureSkipVerify *bool                 `json:"tlsInsecureSkipVerify,omitempty"`
 	InsertProgress        *InsertProgressConfig `json:"insertProgress,omitempty"`
 }
 
@@ -488,9 +498,9 @@ func (c *DriverConfig) GetAuthPassword() string {
 	return ""
 }
 
-func (c *DriverConfig) GetTlsInsecureSkipVerify() bool {
-	if c != nil && c.TlsInsecureSkipVerify != nil {
-		return *c.TlsInsecureSkipVerify
+func (c *DriverConfig) GetTLSInsecureSkipVerify() bool {
+	if c != nil && c.TLSInsecureSkipVerify != nil {
+		return *c.TLSInsecureSkipVerify
 	}
 
 	return false
@@ -581,15 +591,15 @@ func (c *PostgresConfig) GetStatementCacheCapacity() int32 {
 	return 0
 }
 
-// SqlConfig is generic database/sql pool settings for SQL-based drivers.
-type SqlConfig struct {
+// SQLConfig is generic database/sql pool settings for SQL-based drivers.
+type SQLConfig struct {
 	MaxOpenConns    *int32  `json:"maxOpenConns,omitempty"`
 	MaxIdleConns    *int32  `json:"maxIdleConns,omitempty"`
 	ConnMaxLifetime *string `json:"connMaxLifetime,omitempty"`
 	ConnMaxIdleTime *string `json:"connMaxIdleTime,omitempty"`
 }
 
-func (c *SqlConfig) GetMaxOpenConns() int32 {
+func (c *SQLConfig) GetMaxOpenConns() int32 {
 	if c != nil && c.MaxOpenConns != nil {
 		return *c.MaxOpenConns
 	}
@@ -597,7 +607,7 @@ func (c *SqlConfig) GetMaxOpenConns() int32 {
 	return 0
 }
 
-func (c *SqlConfig) GetMaxIdleConns() int32 {
+func (c *SQLConfig) GetMaxIdleConns() int32 {
 	if c != nil && c.MaxIdleConns != nil {
 		return *c.MaxIdleConns
 	}
@@ -605,7 +615,7 @@ func (c *SqlConfig) GetMaxIdleConns() int32 {
 	return 0
 }
 
-func (c *SqlConfig) GetConnMaxLifetime() string {
+func (c *SQLConfig) GetConnMaxLifetime() string {
 	if c != nil && c.ConnMaxLifetime != nil {
 		return *c.ConnMaxLifetime
 	}
@@ -613,7 +623,7 @@ func (c *SqlConfig) GetConnMaxLifetime() string {
 	return ""
 }
 
-func (c *SqlConfig) GetConnMaxIdleTime() string {
+func (c *SQLConfig) GetConnMaxIdleTime() string {
 	if c != nil && c.ConnMaxIdleTime != nil {
 		return *c.ConnMaxIdleTime
 	}
@@ -665,7 +675,7 @@ func (c *InsertProgressConfig) GetMode() string {
 // and metadata.
 type GlobalConfig struct {
 	Version  string            `json:"version,omitempty"`
-	RunId    string            `json:"runId,omitempty"`
+	RunID    string            `json:"runId,omitempty"`
 	Seed     uint64            `json:"seed,omitempty"`
 	Metadata map[string]string `json:"metadata,omitempty"`
 	Logger   *LoggerConfig     `json:"logger,omitempty"`
@@ -687,8 +697,8 @@ type ExporterConfig struct {
 // OtlpExport contains configuration for exporting metrics via OTLP.
 type OtlpExport struct {
 	OtlpGrpcEndpoint        *string `json:"otlpGrpcEndpoint,omitempty"`
-	OtlpHttpEndpoint        *string `json:"otlpHttpEndpoint,omitempty"`
-	OtlpHttpExporterUrlPath *string `json:"otlpHttpExporterUrlPath,omitempty"`
+	OtlpHTTPEndpoint        *string `json:"otlpHttpEndpoint,omitempty"`
+	OtlpHTTPExporterURLPath *string `json:"otlpHttpExporterUrlPath,omitempty"`
 	OtlpEndpointInsecure    *bool   `json:"otlpEndpointInsecure,omitempty"`
 	OtlpHeaders             *string `json:"otlpHeaders,omitempty"`
 	OtlpMetricsPrefix       *string `json:"otlpMetricsPrefix,omitempty"`
@@ -702,17 +712,17 @@ func (o *OtlpExport) GetOtlpGrpcEndpoint() string {
 	return ""
 }
 
-func (o *OtlpExport) GetOtlpHttpEndpoint() string {
-	if o != nil && o.OtlpHttpEndpoint != nil {
-		return *o.OtlpHttpEndpoint
+func (o *OtlpExport) GetOtlpHTTPEndpoint() string {
+	if o != nil && o.OtlpHTTPEndpoint != nil {
+		return *o.OtlpHTTPEndpoint
 	}
 
 	return ""
 }
 
-func (o *OtlpExport) GetOtlpHttpExporterUrlPath() string {
-	if o != nil && o.OtlpHttpExporterUrlPath != nil {
-		return *o.OtlpHttpExporterUrlPath
+func (o *OtlpExport) GetOtlpHTTPExporterURLPath() string {
+	if o != nil && o.OtlpHTTPExporterURLPath != nil {
+		return *o.OtlpHTTPExporterURLPath
 	}
 
 	return ""

@@ -11,7 +11,7 @@ import (
 
 // ApplySQLConfig applies SQL pool configuration to a *sql.DB.
 // Returns an error if any duration string is malformed.
-func ApplySQLConfig(db *sql.DB, sqlCfg *config.SqlConfig) error {
+func ApplySQLConfig(db *sql.DB, sqlCfg *config.SQLConfig) error {
 	if sqlCfg == nil {
 		return nil
 	}

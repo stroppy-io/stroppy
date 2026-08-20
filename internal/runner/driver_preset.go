@@ -322,17 +322,17 @@ func DriverCLIConfigsFromFile(fileDrivers map[uint32]*config.DriverRunConfig) (D
 	configs := make(DriverCLIConfigs, len(fileDrivers))
 
 	for idx, fileConfig := range fileDrivers {
-		data, err := json.Marshal(fileConfig)
+		data, err := json.Marshal(fileConfig) //nolint:gosec // serializing config to env vars, not extracting a secret
 		if err != nil {
 			return nil, fmt.Errorf("serialize config file driver %d: %w", idx, err)
 		}
 
-		config, err := NewDriverCLIConfigFromJSON(string(data))
+		cfg, err := NewDriverCLIConfigFromJSON(string(data))
 		if err != nil {
 			return nil, fmt.Errorf("convert config file driver %d: %w", idx, err)
 		}
 
-		configs[int(idx)] = &config
+		configs[int(idx)] = &cfg
 	}
 
 	return configs, nil
@@ -398,7 +398,7 @@ func fileDriverRunConfigsToEnvVars(
 			continue
 		}
 
-		data, err := json.Marshal(drCfg)
+		data, err := json.Marshal(drCfg) //nolint:gosec // serializing config to env vars, not extracting a secret
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize file driver %d config: %w", idx, err)
 		}

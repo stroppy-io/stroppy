@@ -93,7 +93,7 @@ func NewDriver(
 		d.bulkSize = int(cfg.GetBulkSize())
 	}
 
-	d.logger.Debug("Connecting to Picodata...", zap.String("url", cfg.Url))
+	d.logger.Debug("Connecting to Picodata...", zap.String("url", cfg.URL))
 
 	const maxConnPerInstance = 20
 
@@ -128,7 +128,7 @@ func NewDriver(
 
 	d.pool = &PoolX{conn}
 
-	d.logger.Debug("Checking db connection...", zap.String("url", cfg.Url))
+	d.logger.Debug("Checking db connection...", zap.String("url", cfg.URL))
 
 	if err := sqldriver.WaitForDB(ctx, d.logger, d.pool, dbConnectionTimeout); err != nil {
 		return nil, err
