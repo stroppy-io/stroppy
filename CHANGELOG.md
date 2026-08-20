@@ -37,8 +37,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
-- The `workload` step is silent on the console again (no `Start`/`End` record per transaction), while setup/load/schema steps still log a single start/end and the `simple` workload now honors `--steps`/`--no-steps` like the other workloads.
-- `--steps` and `--no-steps` are rejected as mutually exclusive even when one is set in the config file and the other on the command line.
+- The `workload` step is silent on the console again (no `Start`/`End` record per transaction), while setup/load/schema steps still log a single start/end and the `simple` workload now honors `--steps`/`--no-steps` like the other workloads. ([#149](https://github.com/stroppy-io/stroppy/pull/149))
+- `--steps` and `--no-steps` are rejected as mutually exclusive even when one is set in the config file and the other on the command line. ([#149](https://github.com/stroppy-io/stroppy/pull/149))
 - Workload help and shell completion expose typed flags accurately, including explicit booleans and contextual defaults, and SQL override positionals reach registered workload bindings. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Typed run parameters and SQL sources keep CLI-over-environment precedence, config env names reject case-only collisions, shared driver pool settings remain active alongside driver-specific settings, and invalid pool fields fail clearly instead of being ignored. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Typed inserts reject malformed requests consistently, and generator ranges remain correct at integer boundaries. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
