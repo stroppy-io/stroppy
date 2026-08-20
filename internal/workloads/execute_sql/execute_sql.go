@@ -1,7 +1,7 @@
 // Package execute_sql is the Go-native port of workloads/execute_sql/execute_sql.ts:
 // a generic runner that executes every query in a SQL file (or inline SQL string) once.
-// The SQL source is STROPPY_SQL_BODY (inline, CLI-wrapped with a --= marker) or, failing
-// that, SQL_FILE (a path resolved cwd → workloads/execute_sql/ → embedded). Queries are
+// The SQL source is one of two typed workload parameters: --sql-file (a path resolved
+// cwd → workloads/execute_sql/ → embedded) or --sql-body (inline SQL text). Queries are
 // delimited by `--= name` markers, matching parse_sql.ts — a markerless file yields none.
 package execute_sql
 
@@ -15,14 +15,15 @@ import (
 )
 
 var (
-	errNoSQLSource      = errors.New("execute_sql: no SQL source — set STROPPY_SQL_BODY (inline) or SQL_FILE (path)")
-	errSQLFileNoQueries = errors.New("execute_sql: SQL_FILE has no `--= name` queries")
+	errNoSQLSource      = errors.New("execute_sql: no SQL source — pass --sql-file <path> or --sql-body <inline sql>")
+	errSQLFileNoQueries = errors.New("execute_sql: SQL file has no `--= name` queries")
 )
 
 type workload struct {
 	sql     *bench.SQL
 	names   []string
 	preset  string
+	sqlBody string
 	sqlFile string
 }
 
@@ -31,6 +32,10 @@ func init() { bench.Register(func() bench.Workload { return &workload{} }) }
 func (*workload) Name() string { return "execute_sql" }
 
 func (w *workload) Define(d *bench.Def) error {
+	w.sqlBody = d.Param.String(
+		"sql-body", "", "Inline SQL to execute.",
+		bench.LegacyEnvAliases("STROPPY_SQL_BODY"),
+	).Value()
 	w.sqlFile = d.Param.String("sql-file", "", "SQL file to execute.").Value()
 
 	return nil
@@ -38,16 +43,18 @@ func (w *workload) Define(d *bench.Def) error {
 
 func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
 	w.preset = "execute_sql"
-	if body := bench.Env("STROPPY_SQL_BODY", ""); body != "" {
-		w.sql = bench.ParseSQL(body)
-	} else if w.sqlFile != "" {
+
+	switch {
+	case w.sqlBody != "":
+		w.sql = bench.ParseSQL(w.sqlBody)
+	case w.sqlFile != "":
 		s, err := bench.LoadSQL(w.preset, w.sqlFile)
 		if err != nil {
 			return fmt.Errorf("execute_sql: load %s: %w", w.sqlFile, err)
 		}
 
 		w.sql = s
-	} else {
+	default:
 		return errNoSQLSource
 	}
 

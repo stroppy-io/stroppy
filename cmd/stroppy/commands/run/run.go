@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"math"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,8 +25,6 @@ const (
 	flagSteps        = "--steps"
 	flagNoSteps      = "--no-steps"
 	flagDriverOpt    = "--driver-opt"
-	sqlBodyEnv       = "STROPPY_SQL_BODY"
-	sqlFileEnv       = "SQL_FILE"
 )
 
 var (
@@ -47,7 +43,12 @@ var (
 	errK6PassthroughRemoved = errors.New(
 		"the '--' k6 passthrough is removed; configure concurrency via env (VUS/DURATION/ITER)",
 	)
-	errUnknownWorkload = errors.New("unknown workload; expected a registered Go workload, a .sql file, or inline SQL")
+	errUnknownWorkload = errors.New(
+		"unknown workload; expected a registered Go workload, a .sql file, or inline SQL",
+	)
+	errDefaultTxIsolationRemoved = errors.New(
+		"defaultTxIsolation is removed; set the workload parameter --tx-isolation instead",
+	)
 )
 
 var Cmd = &cobra.Command{
@@ -100,7 +101,7 @@ Config file flags:
   stroppy run tpcc/tx --no-steps load_data       # run all steps except specified
   stroppy run tpcc/tx -d pg                      # use PostgreSQL driver preset
   stroppy run tpcc/tx -d pg -D url=postgres://prod:5432  # preset with URL override
-  stroppy run tpcc/tx -e pool_size=200           # set POOL_SIZE env for the workload
+  stroppy run tpcc/tx -e load_workers=8         # set a legacy env override
   stroppy run tpcc/tx -e FOO=bar -e BAZ=qux      # multiple env overrides
   stroppy run tpcb/tx -D driverType=csv -D url='/tmp/tpcb-csv?merge=true' \
     --steps drop_schema,create_schema,load_data  # dump generated rows to CSV
@@ -172,7 +173,6 @@ Config file flags:
 			CLI:       parsed.typedParams,
 			LegacyEnv: envOverrides,
 		}
-		rootEnv := cloneStringMap(envOverrides)
 
 		driverConfigs := runner.DriverCLIConfigs{}
 
@@ -180,7 +180,6 @@ Config file flags:
 			paramInputs.RunConfig = fileConfig.Run
 			paramInputs.WorkloadConfig = fileConfig.Params
 			paramInputs.LegacyConfigEnv = fileConfig.RunConfig.Env
-			rootEnv = mergeLegacyEnv(fileConfig.RunConfig.Env, envOverrides)
 
 			driverConfigs, err = runner.DriverCLIConfigsFromFile(fileConfig.RunConfig.Drivers)
 			if err != nil {
@@ -203,27 +202,19 @@ Config file flags:
 		}
 
 		// Go-native execute_sql: a .sql file, inline SQL (contains spaces), or the
-		// execute_sql preset routes to the Go runner with the SQL source passed via env
-		// (STROPPY_SQL_BODY for inline, SQL_FILE for a path) — replacing the TS wrapper.
-		// Checked before the registered-name lookup so the preset's sql arg is honored.
+		// execute_sql preset routes to the Go runner with the SQL source bound as an
+		// explicit typed workload parameter (--sql-body / --sql-file) — replacing the
+		// TS wrapper. Checked before the registered-name lookup so the preset's sql
+		// arg is honored.
 		if name, body, file, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
-			sqlSource := resolveSQLSource(
-				&parsed,
-				body,
-				file,
-				envOverrides,
-				paramInputs.WorkloadConfig,
-				paramInputs.LegacyConfigEnv,
+			return runGoWorkload(
+				name,
+				steps,
+				noSteps,
+				withExecuteSQLSource(paramInputs, body, file),
+				driverConfigs,
+				metricsConfig(loadedRunConfig(fileConfig)),
 			)
-			applySQLSource(rootEnv, sqlSource)
-
-			run := func() error {
-				return runGoWorkload(
-					name, steps, noSteps, rootEnv, paramInputs, driverConfigs, metricsConfig(loadedRunConfig(fileConfig)),
-				)
-			}
-
-			return withProcessSQLSource(sqlSource, run)
 		}
 
 		// Go-native workload: if a Go workload is registered under the bare
@@ -238,7 +229,6 @@ Config file flags:
 				scriptArg,
 				steps,
 				noSteps,
-				rootEnv,
 				workloadParamInputs,
 				driverConfigs,
 				metricsConfig(loadedRunConfig(fileConfig)),
@@ -281,11 +271,29 @@ func cloneStringMap(values map[string]string) map[string]string {
 	return cloned
 }
 
-func mergeLegacyEnv(configEnv, cliEnv map[string]string) map[string]string {
-	merged := cloneStringMap(configEnv)
-	maps.Copy(merged, cliEnv)
+// withExecuteSQLSource binds the execute_sql workflow's SQL source as explicit
+// typed CLI inputs. The positional/inline source acts like a --sql-body or
+// --sql-file flag, so an existing explicit typed flag still wins.
+func withExecuteSQLSource(inputs bench.ParamInputs, body, file string) bench.ParamInputs {
+	if _, hasSQLFile := inputs.CLI["sql-file"]; hasSQLFile {
+		return inputs
+	}
 
-	return merged
+	if _, hasSQLBody := inputs.CLI["sql-body"]; hasSQLBody {
+		return inputs
+	}
+
+	inputs.CLI = cloneStringMap(inputs.CLI)
+
+	if body != "" {
+		inputs.CLI["sql-body"] = body
+	}
+
+	if file != "" {
+		inputs.CLI["sql-file"] = file
+	}
+
+	return inputs
 }
 
 func loadedRunConfig(loaded *runner.LoadedConfig) *config.RunConfig {
@@ -453,7 +461,7 @@ func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bo
 	case strings.HasSuffix(scriptArg, ".sql"):
 		return "execute_sql", "", scriptArg, true
 	case scriptArg == "execute_sql":
-		// Preset: SQL comes from -e SQL_FILE (already in env) or the sql arg.
+		// Preset: SQL comes from the --sql-file/--sql-body params or the sql arg.
 		if sqlArg != "" {
 			return "execute_sql", "", sqlArg, true
 		}
@@ -464,149 +472,9 @@ func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bo
 	return "", "", "", false
 }
 
-type sqlSource struct {
-	envKey      string
-	value       string
-	explicitCLI bool
-}
-
-func resolveSQLSource(
-	parsed *runArgs,
-	routeBody, routeFile string,
-	cliEnv map[string]string,
-	workloadConfig map[string]json.RawMessage,
-	configEnv map[string]string,
-) sqlSource {
-	if file, ok := parsed.typedParams["sql-file"]; ok {
-		return sqlSource{envKey: sqlFileEnv, value: file, explicitCLI: true}
-	}
-
-	routeSource := sqlSourceFor(routeBody, routeFile)
-	if routeSource.envKey != "" && explicitCLISQLSource(parsed) {
-		routeSource.explicitCLI = true
-
-		return routeSource
-	}
-
-	if source := sqlSourceFromProcess(); source.envKey != "" {
-		return source
-	}
-
-	if source := sqlSourceFromMap(cliEnv); source.envKey != "" {
-		return source
-	}
-
-	if source := sqlSourceFromWorkloadConfig(workloadConfig); source.envKey != "" {
-		return source
-	}
-
-	if routeSource.envKey != "" {
-		return routeSource
-	}
-
-	return sqlSourceFromMap(configEnv)
-}
-
-func explicitCLISQLSource(parsed *runArgs) bool {
-	return parsed.sqlArg != "" ||
-		strings.Contains(parsed.scriptArg, " ") ||
-		strings.HasSuffix(parsed.scriptArg, ".sql")
-}
-
-func sqlSourceFor(body, file string) sqlSource {
-	if body != "" {
-		return sqlSource{envKey: sqlBodyEnv, value: body}
-	}
-
-	if file != "" {
-		return sqlSource{envKey: sqlFileEnv, value: file}
-	}
-
-	return sqlSource{}
-}
-
-func sqlSourceFromProcess() sqlSource {
-	if body, ok := os.LookupEnv(sqlBodyEnv); ok && body != "" {
-		return sqlSource{envKey: sqlBodyEnv, value: body}
-	}
-
-	if file, ok := os.LookupEnv(sqlFileEnv); ok && file != "" {
-		return sqlSource{envKey: sqlFileEnv, value: file}
-	}
-
-	return sqlSource{}
-}
-
-func sqlSourceFromMap(values map[string]string) sqlSource {
-	return sqlSourceFor(values[sqlBodyEnv], values[sqlFileEnv])
-}
-
-func sqlSourceFromWorkloadConfig(values map[string]json.RawMessage) sqlSource {
-	raw, ok := values["sqlFile"]
-	if !ok {
-		return sqlSource{}
-	}
-
-	var file string
-	if err := json.Unmarshal(raw, &file); err != nil {
-		return sqlSource{}
-	}
-
-	return sqlSource{envKey: sqlFileEnv, value: file}
-}
-
-func applySQLSource(env map[string]string, source sqlSource) {
-	delete(env, sqlBodyEnv)
-	delete(env, sqlFileEnv)
-
-	if source.envKey != "" {
-		env[source.envKey] = source.value
-	}
-}
-
-func withProcessSQLSource(source sqlSource, run func() error) error {
-	if !source.explicitCLI {
-		return run()
-	}
-
-	body, bodySet := os.LookupEnv(sqlBodyEnv)
-	file, fileSet := os.LookupEnv(sqlFileEnv)
-
-	applyProcessSQLSource(source)
-
-	defer restoreProcessEnv(sqlBodyEnv, body, bodySet)
-	defer restoreProcessEnv(sqlFileEnv, file, fileSet)
-
-	return run()
-}
-
-func applyProcessSQLSource(source sqlSource) {
-	_ = os.Unsetenv(sqlBodyEnv)
-	_ = os.Unsetenv(sqlFileEnv)
-
-	if source.envKey != "" {
-		_ = os.Setenv(source.envKey, source.value)
-	}
-}
-
-func restoreProcessEnv(name, value string, set bool) {
-	if set {
-		_ = os.Setenv(name, value)
-
-		return
-	}
-
-	_ = os.Unsetenv(name)
-}
-
-// runGoWorkload dispatches to the Go-native bench engine. Driver CLI configs are
-// converted to *config.DriverConfig; -e overrides become the script env map;
-// steps/noSteps are the merged (CLI over config-file) step filters, published via
-// STROPPY_STEPS env (the bench step filter reads it at Run start).
 func runGoWorkload(
 	name string,
 	steps, noSteps []string,
-	env map[string]string,
 	paramInputs bench.ParamInputs,
 	driverConfigs runner.DriverCLIConfigs,
 	metrics *bench.MetricsConfig,
@@ -614,7 +482,7 @@ func runGoWorkload(
 	drivers := map[int]*config.DriverConfig{}
 
 	for idx, cfg := range driverConfigs {
-		dc, err := buildDriverConfig(idx, cfg, env)
+		dc, err := buildDriverConfig(idx, cfg)
 		if err != nil {
 			return err
 		}
@@ -631,25 +499,14 @@ func runGoWorkload(
 		}
 	}
 
-	// Steps are read from env by the bench step filter at Run start.
-	os.Unsetenv("STROPPY_STEPS")
-	os.Unsetenv("STROPPY_NO_STEPS")
-
-	if len(steps) > 0 {
-		os.Setenv("STROPPY_STEPS", strings.Join(steps, ","))
-	}
-
-	if len(noSteps) > 0 {
-		os.Setenv("STROPPY_NO_STEPS", strings.Join(noSteps, ","))
-	}
-
 	ctx := context.Background()
 	if err := bench.Run(
 		ctx,
 		name,
 		drivers,
-		env,
 		paramInputs,
+		steps,
+		noSteps,
 		logger.Global(),
 		metrics,
 	); err != nil {
@@ -662,10 +519,7 @@ func runGoWorkload(
 // buildDriverConfig translates one parsed -d/-D driver entry into the runtime
 // DriverConfig the bench layer expects. driverType arrives as a preset short
 // name ("noop"); Extra (-D postgres.* / sql.*) merges as nested config fields.
-// POOL_SIZE script env maps to the postgres pool size.
-func buildDriverConfig(
-	idx int, cfg *runner.DriverCLIConfig, envOverrides map[string]string,
-) (*config.DriverConfig, error) {
+func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConfig, error) {
 	dc := &config.DriverConfig{URL: cfg.URL}
 
 	if cfg.DriverType != "" {
@@ -682,40 +536,7 @@ func buildDriverConfig(
 		return nil, invalidConfig(err)
 	}
 
-	applyLegacyPostgresPoolSize(dc, envOverrides)
-
 	return dc, nil
-}
-
-func applyLegacyPostgresPoolSize(driverConfig *config.DriverConfig, env map[string]string) {
-	if driverConfig.DriverType != config.DriverTypePostgres {
-		return
-	}
-
-	poolSize, ok := os.LookupEnv("POOL_SIZE")
-	if !ok {
-		poolSize, ok = env["POOL_SIZE"]
-	}
-
-	if !ok {
-		return
-	}
-
-	value, err := strconv.Atoi(poolSize)
-	if err != nil || value <= 0 || value > math.MaxInt32 {
-		return
-	}
-
-	connections := int32(value) //nolint:gosec // G109: range-checked above
-
-	postgres := driverConfig.Postgres
-	if postgres == nil {
-		postgres = &config.PostgresConfig{}
-	}
-
-	postgres.MaxConns = &connections
-	postgres.MinConns = &connections
-	driverConfig.Postgres = postgres
 }
 
 func applyDriverExtras(idx int, driverConfig *config.DriverConfig, extras map[string]any) error {
@@ -740,7 +561,7 @@ func applyDriverExtras(idx int, driverConfig *config.DriverConfig, extras map[st
 	}
 
 	if _, ok := popDriverExtra(values, "defaultTxIsolation", "default_tx_isolation"); ok {
-		warnIgnoredDriverExtra(idx, "defaultTxIsolation", "use workload parameter --tx-isolation")
+		return fmt.Errorf("driver %d: %w", idx, errDefaultTxIsolationRemoved)
 	}
 
 	pool, hasPool := popDriverExtra(values, "pool")

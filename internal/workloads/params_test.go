@@ -22,6 +22,7 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 		want []bench.ParamSchema
 	}{
 		{"execute_sql", []bench.ParamSchema{
+			param("sql-body", bench.ParamTypeString, "", "SQL_BODY", "sqlBody", "STROPPY_SQL_BODY"),
 			param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
 		}},
 		{"simple", []bench.ParamSchema{}},
@@ -72,6 +73,10 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 	}
 }
 
+// TestBuiltInWorkloadsDoNotReadPublicEnvDirectly pins the H823 invariant that a
+// built-in workload never reaches for process env directly: every knob is typed
+// and resolved through the scene/param machinery. bench.Env is gone, so any
+// leftover bench.Env/EnvInt/EnvFloat call is a regression.
 func TestBuiltInWorkloadsDoNotReadPublicEnvDirectly(t *testing.T) {
 	t.Parallel()
 
@@ -113,7 +118,7 @@ func TestBuiltInWorkloadsDoNotReadPublicEnvDirectly(t *testing.T) {
 			}
 
 			name, err := strconv.Unquote(literal.Value)
-			if err == nil && name != "STROPPY_SQL_BODY" {
+			if err == nil {
 				t.Errorf("%s reads public workload knob %s through bench.%s", path, name, selector.Sel.Name)
 			}
 

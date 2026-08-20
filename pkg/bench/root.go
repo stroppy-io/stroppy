@@ -35,8 +35,6 @@ type RootState struct {
 	sharedMu    sync.Mutex
 	sharedSlots map[uint64]*sharedDriverSlot
 
-	env map[string]string
-
 	stepFilter *stepFilterState
 }
 
@@ -47,7 +45,7 @@ type sharedDriverSlot struct {
 func newRootState(
 	lg *zap.Logger,
 	ctx context.Context,
-	env map[string]string,
+	steps, noSteps []string,
 	metricsConfig *MetricsConfig,
 ) (*RootState, error) {
 	provider, reader, prefix, err := newMeterProvider(ctx, metricsConfig)
@@ -65,8 +63,7 @@ func newRootState(
 		metricsPrefix: prefix,
 		txMetrics:     &txMetrics{},
 		sharedSlots:   make(map[uint64]*sharedDriverSlot),
-		env:           env,
-		stepFilter:    newStepFilter(),
+		stepFilter:    newStepFilter(steps, noSteps),
 	}, nil
 }
 

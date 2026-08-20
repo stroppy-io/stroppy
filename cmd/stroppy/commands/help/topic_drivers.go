@@ -73,9 +73,6 @@ DRIVER OPTIONS (-D / --driver-opt)
     url                    string    Database connection URL
     driverType             string    postgres | mysql | picodata | ydb |
                                      noop | csv
-    defaultTxIsolation     string    read_uncommitted | read_committed |
-                                     repeatable_read | serializable |
-                                     db_default | conn | none
     errorMode              string    silent | log | throw | fail | abort
     bulkSize               int       Rows per bulk INSERT (default: 2500)
     insertProgress.enabled bool      Enable InsertSpec progress watcher
@@ -104,8 +101,9 @@ DRIVER OPTIONS (-D / --driver-opt)
   pool.* options are sugar — they map to the driver-specific pool config
   (pgx pool or sql pool) based on driverType. They are ignored for noop/csv.
 
-  POOL_SIZE env (for the postgres driver) is a shorthand that sets both the
-  pgx pool MinConns and MaxConns to the same value.
+  Transaction isolation is a workload parameter, not a driver option: set
+  --tx-isolation on the workload directly. The legacy driver-level
+  defaultTxIsolation option is removed and rejected.
 
 HOW IT WORKS
 
@@ -113,10 +111,6 @@ HOW IT WORKS
 
   2. Each DriverConfig is passed directly to the Go-native bench engine,
      which dispatches to the registered driver implementation.
-
-  3. STROPPY_DRIVER_N env vars are honored by the config-file loader: if
-     STROPPY_DRIVER_N is already set in the environment, CLI-composed driver
-     config for that index is skipped — user-set env takes precedence.
 
   To inspect the driver insert methods each driver supports:
 
@@ -158,9 +152,6 @@ EXAMPLES
   # YDB with static credentials
   stroppy run tpcc/tx -d ydb -D url=grpcs://host:2135/db \
     -D authUser=admin -D authPassword=secret
-
-  # Pre-set env takes precedence over CLI flags
-  STROPPY_DRIVER_0='{"url":"postgres://staging:5432"}' stroppy run tpcc/tx -d pg
 
   # List driver insert methods
   stroppy probe

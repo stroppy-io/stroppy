@@ -63,16 +63,6 @@
             }
           ]
         },
-        "defaultTxIsolation": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "driverType": {
           "anyOf": [
             {
@@ -609,22 +599,6 @@
           "anyOf": [
             {
               "$ref": "#/$defs/GlobalConfig"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "k6Args": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "k6Config": {
-          "anyOf": [
-            {
-              "type": "string"
             },
             {
               "type": "null"

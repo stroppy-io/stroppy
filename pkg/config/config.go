@@ -176,16 +176,14 @@ func (m *LogMode) UnmarshalJSON(data []byte) error {
 
 // RunConfig is the top-level stroppy config file schema.
 type RunConfig struct {
-	Version  string                      `json:"version,omitempty"`
-	Script   *string                     `json:"script,omitempty"`
-	SQL      *string                     `json:"sql,omitempty"`
-	Global   *GlobalConfig               `json:"global,omitempty"`
-	Drivers  map[uint32]*DriverRunConfig `json:"drivers,omitempty"`
-	Env      map[string]string           `json:"env,omitempty"`
-	Steps    []string                    `json:"steps,omitempty"`
-	NoSteps  []string                    `json:"noSteps,omitempty"`
-	K6Args   []string                    `json:"k6Args,omitempty"`
-	K6Config *string                     `json:"k6Config,omitempty"`
+	Version string                      `json:"version,omitempty"`
+	Script  *string                     `json:"script,omitempty"`
+	SQL     *string                     `json:"sql,omitempty"`
+	Global  *GlobalConfig               `json:"global,omitempty"`
+	Drivers map[uint32]*DriverRunConfig `json:"drivers,omitempty"`
+	Env     map[string]string           `json:"env,omitempty"`
+	Steps   []string                    `json:"steps,omitempty"`
+	NoSteps []string                    `json:"noSteps,omitempty"`
 }
 
 func (c *RunConfig) GetScript() string {
@@ -204,14 +202,6 @@ func (c *RunConfig) GetSQL() string {
 	return ""
 }
 
-func (c *RunConfig) GetK6Config() string {
-	if c != nil && c.K6Config != nil {
-		return *c.K6Config
-	}
-
-	return ""
-}
-
 // DriverRunConfig is the user-facing driver configuration for the config file.
 type DriverRunConfig struct {
 	DriverType            *string               `json:"driverType,omitempty"`
@@ -224,7 +214,6 @@ type DriverRunConfig struct {
 	AuthUser              *string               `json:"authUser,omitempty"`
 	AuthPassword          *string               `json:"authPassword,omitempty"`
 	TLSInsecureSkipVerify *bool                 `json:"tlsInsecureSkipVerify,omitempty"`
-	DefaultTxIsolation    *string               `json:"defaultTxIsolation,omitempty"`
 	DefaultInsertMethod   *string               `json:"defaultInsertMethod,omitempty"`
 	Postgres              *PostgresConfig       `json:"postgres,omitempty"`
 	SQL                   *SQLConfig            `json:"sql,omitempty"`
@@ -301,14 +290,6 @@ func (c *DriverRunConfig) GetTLSInsecureSkipVerify() bool {
 	}
 
 	return false
-}
-
-func (c *DriverRunConfig) GetDefaultTxIsolation() string {
-	if c != nil && c.DefaultTxIsolation != nil {
-		return *c.DefaultTxIsolation
-	}
-
-	return ""
 }
 
 func (c *DriverRunConfig) GetDefaultInsertMethod() string {
