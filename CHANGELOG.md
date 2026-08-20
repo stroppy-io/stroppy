@@ -38,6 +38,9 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- TPC-B fails fast with a named missing query/section instead of running a silent noop iteration when a custom SQL file omits required statements. ([#145](https://github.com/stroppy-io/stroppy/pull/145))
+- TPC-C treats absent customer, warehouse, item, and stock rows as transaction errors, propagates rollback failures instead of reporting an unknown outcome as success, and fails population-validation checks whose aggregate queries error. ([#145](https://github.com/stroppy-io/stroppy/pull/145))
+- `stroppy version` now reports the real build version for Docker images (pushed tag), nightly artifacts (`nightly-<short-sha>`), and release archives (release tag), instead of the generic `0.0.0` fallback. ([#144](https://github.com/stroppy-io/stroppy/pull/144))
 - Workload help and shell completion expose typed flags accurately, including explicit booleans and contextual defaults, and SQL override positionals reach registered workload bindings. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Typed run parameters and SQL sources keep CLI-over-environment precedence, config env names reject case-only collisions, shared driver pool settings remain active alongside driver-specific settings, and invalid pool fields fail clearly instead of being ignored. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - Typed inserts reject malformed requests consistently, and generator ranges remain correct at integer boundaries. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
