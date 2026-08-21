@@ -123,7 +123,7 @@ func (d *Driver) copyFromRuntime(
 	copySrc.progress.Flush()
 
 	if err != nil {
-		return fmt.Errorf("postgres: CopyFrom %q: %w", table, err)
+		return fmt.Errorf("postgres: CopyFrom %q: %w", table, statementContextError(stmtCtx, err))
 	}
 
 	insertprogress.AddConfirmed(ctx, rowsCopied)
@@ -239,7 +239,7 @@ func (d *Driver) execBulkBatch(
 	defer cancel()
 
 	if _, err := d.pool.Exec(stmtCtx, query, args...); err != nil {
-		return fmt.Errorf("postgres: bulk INSERT %q: %w", table, err)
+		return fmt.Errorf("postgres: bulk INSERT %q: %w", table, statementContextError(stmtCtx, err))
 	}
 
 	return nil
@@ -440,7 +440,7 @@ func (d *Driver) execProgressColumnarBatch(
 	defer cancel()
 
 	if _, err := d.pool.Exec(stmtCtx, query, args...); err != nil {
-		return fmt.Errorf("postgres: columnar INSERT %q: %w", table, err)
+		return fmt.Errorf("postgres: columnar INSERT %q: %w", table, statementContextError(stmtCtx, err))
 	}
 
 	insertprogress.AddConfirmed(ctx, rows)
@@ -465,7 +465,11 @@ func (d *Driver) describeColumnCastTypes(
 
 	conn, err := d.pool.Acquire(stmtCtx)
 	if err != nil {
-		return nil, fmt.Errorf("postgres: acquire conn for describe %q: %w", table, err)
+		return nil, fmt.Errorf(
+			"postgres: acquire conn for describe %q: %w",
+			table,
+			statementContextError(stmtCtx, err),
+		)
 	}
 	defer conn.Release()
 
@@ -486,7 +490,11 @@ func (d *Driver) describeColumnCastTypes(
 
 	sd, err := conn.Conn().Prepare(stmtCtx, "", sb.String())
 	if err != nil {
-		return nil, fmt.Errorf("postgres: describe columns of %q: %w", table, err)
+		return nil, fmt.Errorf(
+			"postgres: describe columns of %q: %w",
+			table,
+			statementContextError(stmtCtx, err),
+		)
 	}
 
 	if len(sd.Fields) != len(columns) {

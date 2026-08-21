@@ -10,12 +10,14 @@ import (
 	"testing"
 	"time"
 
-	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 )
 
@@ -55,26 +57,12 @@ func realPGDriverWithTimeout(t *testing.T, bulkSize int, queryTimeout time.Durat
 		t.Skip("STROPPY_PG_DSN not set; skipping real-postgres columnar test")
 	}
 
-	cfg, err := pgxpool.ParseConfig(dsn)
+	cfg, err := pool.ParseConfig(&stroppy.DriverConfig{Url: dsn}, logger.Global())
 	if err != nil {
 		t.Fatalf("parse dsn: %v", err)
 	}
 
-	// Match the production pool default (QueryExecModeExec): extended protocol
-	// but no server-side parameter Describe, so pgx infers param OIDs from the Go
-	// values. A []any array has no inferable OID there, so the columnar path must
-	// override to a describe-based mode per Exec — and this mode is also where
-	// the 65535 bind-parameter limit that the columnar path exists to beat bites.
-	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
-	if queryTimeout > 0 {
-		cfg.MaxConns = 1
-	}
-
-	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
-		pgxdecimal.Register(conn.TypeMap())
-
-		return nil
-	}
+	cfg.MaxConns = 1
 
 	pgxPool, err := pgxpool.NewWithConfig(context.Background(), cfg)
 	if err != nil {
@@ -155,6 +143,113 @@ func queryOneRow(t *testing.T, d *Driver, sql string, dest ...any) {
 	if err := rows.Scan(dest...); err != nil {
 		t.Fatalf("scan %q: %v", sql, err)
 	}
+}
+
+func sleepingQueryError(d *Driver, ctx context.Context) error {
+	result, err := d.RunQuery(ctx, "SELECT pg_sleep(10)", nil)
+	if err != nil {
+		return err
+	}
+
+	_ = result.Rows.ReadAll(0)
+
+	return result.Rows.Err()
+}
+
+func backendPID(t *testing.T, d *Driver) int {
+	t.Helper()
+
+	var pid int
+	queryOneRow(t, d, "SELECT pg_backend_pid()", &pid)
+
+	return pid
+}
+
+func requireServerCancellation(t *testing.T, err error) {
+	t.Helper()
+
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "57014" {
+		t.Fatalf("error = %v, want PostgreSQL SQLSTATE 57014", err)
+	}
+}
+
+func requireReusableBackend(t *testing.T, d *Driver, wantPID int) {
+	t.Helper()
+
+	var (
+		gotPID int
+		value  int
+	)
+	queryOneRow(t, d, "SELECT pg_backend_pid(), 42", &gotPID, &value)
+
+	if gotPID != wantPID {
+		t.Fatalf("follow-up backend PID = %d, want %d", gotPID, wantPID)
+	}
+
+	if value != 42 {
+		t.Fatalf("follow-up query value = %d, want 42", value)
+	}
+}
+
+func TestRunQueryParentCancellationPreservesConnection(t *testing.T) {
+	for _, tt := range []struct {
+		name         string
+		queryTimeout time.Duration
+	}{
+		{name: "timeout disabled"},
+		{name: "timeout enabled", queryTimeout: 5 * time.Second},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			d := realPGDriverWithTimeout(t, 1, tt.queryTimeout)
+			pid := backendPID(t, d)
+
+			ctx, cancel := context.WithCancel(context.Background())
+
+			timer := time.AfterFunc(200*time.Millisecond, cancel)
+			defer timer.Stop()
+			defer cancel()
+
+			err := sleepingQueryError(d, ctx)
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("query error = %v, want context.Canceled", err)
+			}
+
+			if errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("query error = %v, do not want context.DeadlineExceeded", err)
+			}
+
+			if got := d.ClassifyError(err).Kind; got != driver.ErrorKindCanceled {
+				t.Fatalf("error kind = %q, want %q", got, driver.ErrorKindCanceled)
+			}
+
+			requireServerCancellation(t, err)
+			requireReusableBackend(t, d, pid)
+		})
+	}
+}
+
+func TestRunQueryDeadlinePreservesConnection(t *testing.T) {
+	const timeout = 200 * time.Millisecond
+
+	d := realPGDriverWithTimeout(t, 1, timeout)
+	pid := backendPID(t, d)
+
+	err := sleepingQueryError(d, context.Background())
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("query error = %v, want context.DeadlineExceeded", err)
+	}
+
+	if errors.Is(err, context.Canceled) {
+		t.Fatalf("query error = %v, do not want context.Canceled", err)
+	}
+
+	if got := d.ClassifyError(err).Kind; got != driver.ErrorKindTimeout {
+		t.Fatalf("error kind = %q, want %q", got, driver.ErrorKindTimeout)
+	}
+
+	requireServerCancellation(t, err)
+	requireReusableBackend(t, d, pid)
 }
 
 // TestColumnarInsertRoundTrip drives the unnest path against a real Postgres for

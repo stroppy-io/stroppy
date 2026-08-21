@@ -141,5 +141,7 @@ func (d *Driver) RunQuery(
 	sql string,
 	args map[string]any,
 ) (*driver.QueryResult, error) {
-	return sqldriver.RunQuery(ctx, d.pool, NewRows, PgxDialect{}, d.logger, sql, args, d.queryTimeout)
+	query := statementQuery{query: d.pool.QueryContext}
+
+	return sqldriver.RunQuery(ctx, query, NewRows, PgxDialect{}, d.logger, sql, args, d.queryTimeout)
 }

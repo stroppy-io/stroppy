@@ -22,7 +22,7 @@ func (a *pgxTxAdapter) QueryContext(
 	sql string,
 	args ...any,
 ) (pgx.Rows, error) {
-	return a.Query(ctx, sql, args...)
+	return statementQuery{query: a.Query}.QueryContext(ctx, sql, args...)
 }
 
 func toTxIsoLevel(level stroppy.TxIsolationLevel) pgx.TxIsoLevel {
@@ -59,7 +59,7 @@ func (a *pgxConnAdapter) QueryContext(
 	sql string,
 	args ...any,
 ) (pgx.Rows, error) {
-	return a.conn.Query(ctx, sql, args...)
+	return statementQuery{query: a.conn.Query}.QueryContext(ctx, sql, args...)
 }
 
 func NewConnOnlyTx(conn *pgxpool.Conn, lg *zap.Logger, timeout time.Duration) *sqldriver.ConnOnlyTx[pgx.Rows] {
