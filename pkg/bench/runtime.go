@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
@@ -37,7 +37,7 @@ type Bench struct {
 	vu   *VU
 	lg   *zap.Logger
 	drv  driver.Driver
-	cfg  *stroppy.DriverConfig
+	cfg  *config.DriverConfig
 
 	stepStart time.Time
 }
@@ -45,12 +45,12 @@ type Bench struct {
 // Driver returns the raw driver (escape hatch).
 func (b *Bench) Driver() driver.Driver { return b.drv }
 
-// DriverType returns the resolved driver type proto enum.
-func (b *Bench) DriverType() stroppy.DriverConfig_DriverType { return b.cfg.GetDriverType() }
+// DriverType returns the resolved driver type enum.
+func (b *Bench) DriverType() config.DriverType { return b.cfg.DriverType }
 
 // DriverTypeName returns the driver type as the string enum a workload authors with.
 func (b *Bench) DriverTypeName() DriverTypeName {
-	return DriverTypeNameFromProto(b.cfg.GetDriverType())
+	return DriverTypeNameOf(b.cfg.DriverType)
 }
 
 // VUID returns the 1-based VU id.
@@ -188,7 +188,7 @@ const teardownTimeout = 30 * time.Second
 func Run(
 	ctx context.Context,
 	name string,
-	drivers map[int]*stroppy.DriverConfig,
+	drivers map[int]*config.DriverConfig,
 	env map[string]string,
 	paramInputs ParamInputs,
 	lg *zap.Logger,

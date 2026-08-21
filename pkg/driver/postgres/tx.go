@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 )
 
@@ -24,22 +24,22 @@ func (a *pgxTxAdapter) QueryContext(
 	return a.Query(ctx, sql, args...)
 }
 
-func toTxIsoLevel(level stroppy.TxIsolationLevel) pgx.TxIsoLevel {
+func toTxIsoLevel(level config.TxIsolationLevel) pgx.TxIsoLevel {
 	switch level {
-	case stroppy.TxIsolationLevel_READ_UNCOMMITTED:
+	case config.TxIsolationLevelReadUncommitted:
 		return pgx.ReadUncommitted
-	case stroppy.TxIsolationLevel_READ_COMMITTED:
+	case config.TxIsolationLevelReadCommitted:
 		return pgx.ReadCommitted
-	case stroppy.TxIsolationLevel_REPEATABLE_READ:
+	case config.TxIsolationLevelRepeatableRead:
 		return pgx.RepeatableRead
-	case stroppy.TxIsolationLevel_SERIALIZABLE:
+	case config.TxIsolationLevelSerializable:
 		return pgx.Serializable
 	default:
 		return "" // use server default
 	}
 }
 
-func newTx(pgxTx pgx.Tx, isolation stroppy.TxIsolationLevel, d *Driver) *sqldriver.Tx[pgx.Rows] {
+func newTx(pgxTx pgx.Tx, isolation config.TxIsolationLevel, d *Driver) *sqldriver.Tx[pgx.Rows] {
 	return sqldriver.NewTx(
 		&pgxTxAdapter{pgxTx},
 		NewRows,

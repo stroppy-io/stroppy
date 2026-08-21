@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
@@ -28,7 +28,7 @@ const defaultBulkSize = 2500
 
 func init() {
 	driver.RegisterDriver(
-		stroppy.DriverConfig_DRIVER_TYPE_NOOP,
+		config.DriverTypeNoop,
 		func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
 			return NewDriver(opts), nil
 		},
@@ -149,9 +149,9 @@ func (d *Driver) RunQuery(
 
 func (d *Driver) Begin(
 	ctx context.Context,
-	isolation stroppy.TxIsolationLevel,
+	isolation config.TxIsolationLevel,
 ) (driver.Tx, error) {
-	if isolation == stroppy.TxIsolationLevel_CONNECTION_ONLY {
+	if isolation == config.TxIsolationLevelConnectionOnly {
 		return sqldriver.NewConnOnlyTx(
 			d.conn, wrapRows, d.dialect, d.logger,
 			func() error { return nil },

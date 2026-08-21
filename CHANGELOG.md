@@ -37,6 +37,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - TPC-DS typed loads format common cell types directly into reusable buffers. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Benchmark metrics now use standard OpenTelemetry counters, gauges, and fixed-bucket histograms. Query throughput and error rates are derived from monotonic `*_total` counters instead of k6-style sampled rates. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
 - The `stroppy help <topic>` topics (drivers, config-file, steps, resolution, sql, envs, datagen, probe) now describe the Go-native binary — the previous text still documented the removed TypeScript/k6 workflow (`k6Args`, `declareDriverSetup`, `.ts` script mode, the `--` passthrough).
+- Stroppy config (the `stroppy-config.json` file, driver settings, pool settings, logger/exporter, and isolation types) is now plain Go under `pkg/config` instead of frozen protobuf types. The JSON field names are unchanged, so existing v5 config files load as before; the config schema inherits the same camelCase field names and `-D`/`-d` driver options keep identical precedence (`-D postgres.*` overrides `-D pool.*`). One accepted-form divergence: `global.seed` now requires a bare JSON number, so the quoted-number form (`"seed":"7"`) is rejected. ([#150](https://github.com/stroppy-io/stroppy/pull/150))
 
 ### Fixed
 
@@ -52,6 +53,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 - The relational data-generation expression framework is gone. `pkg/datagen/{compile,expr,runtime,lookup,cohort,stdlib,seed}` and the frozen `pkg/datagen/dgproto` protobuf types (InsertSpec, Expr, StreamDraw, …) are deleted; workload data generation is now exclusively plain Go under `pkg/gen`. The surviving primitives (`gen.Permute`, `gen.SplitMix64`) moved into `pkg/gen`, and the `datagen-framework.md` and `proto.md` guides were removed — `docs/parallelism.md` is the load-parallelism reference. The TPC-H/TPC-DS canonical generators keep their original algorithms and seeds. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Stroppy no longer depends on k6, TypeScript, sobek, esbuild, or node/npm. The engine is now a single plain Go binary built with `go build` — authoring benchmarks in TypeScript, the `--` k6-args passthrough, the `gen` scaffolding command, and the cloud status gRPC service are all gone. Concurrency is configured with the `VUS`/`DURATION`/`ITER` environment variables instead of k6 flags. Workloads are Go-native (`tpcc/tx`, `tpcb/tx`, `tpch/tx`, `tpcds`, `simple`, `execute_sql`); `.sql` files and inline SQL still work.
+- The frozen protobuf configuration types under `pkg/common/proto/stroppy` (RunConfig, DriverConfig, pool/isolation/logger/exporter types, and their generated descriptors and validators) are replaced by the plain-Go `pkg/config` package and deleted. The unused `pkg/utils/protovalue` and `pkg/utils/protoyaml` helpers and the `protoc-gen-validate` dependency are removed with them. ([#150](https://github.com/stroppy-io/stroppy/pull/150))
 
 ## [5.7.3] - 2026-07-29
 

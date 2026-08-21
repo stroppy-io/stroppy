@@ -7,10 +7,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 func TestLoadRunConfig_ExplicitPath(t *testing.T) {
@@ -118,12 +117,12 @@ func TestLoadRunConfig_DriverConfig(t *testing.T) {
 	drv := cfg.RunConfig.Drivers[0]
 	require.NotNil(t, drv)
 	assert.Equal(t, "postgres", drv.GetDriverType())
-	assert.Equal(t, "postgres://user:pass@localhost:5432/bench", drv.GetUrl())
+	assert.Equal(t, "postgres://user:pass@localhost:5432/bench", drv.GetURL())
 	assert.Equal(t, int32(200), drv.Pool.GetMaxConns())
 	assert.Equal(t, "native", drv.GetDefaultInsertMethod())
 	assert.Equal(t, int32(5), drv.Pool.GetMinIdleConns())
 	assert.Equal(t, int32(128), drv.Postgres.GetStatementCacheCapacity())
-	assert.Equal(t, int32(12), drv.Sql.GetMaxOpenConns())
+	assert.Equal(t, int32(12), drv.SQL.GetMaxOpenConns())
 }
 
 func TestLoadRunConfig_TypedParameterScopes(t *testing.T) {
@@ -176,16 +175,16 @@ func TestLoadRunConfigRejectsCaseInsensitiveEnvCollisions(t *testing.T) {
 }
 
 func TestBuildProbeEnvFromRunConfigIncludesFileDriver(t *testing.T) {
-	cfg := &stroppy.RunConfig{
+	cfg := &config.RunConfig{
 		Env: map[string]string{"WAREHOUSES": "10"},
-		Drivers: map[uint32]*stroppy.DriverRunConfig{
+		Drivers: map[uint32]*config.DriverRunConfig{
 			0: {
-				DriverType:          proto.String("ydb"),
-				Url:                 proto.String("grpc://localhost:2136/local"),
-				DefaultInsertMethod: proto.String("native"),
-				DefaultTxIsolation:  proto.String("repeatable_read"),
-				Pool: &stroppy.DriverRunConfig_PoolConfig{
-					MaxOpenConns: proto.Int32(7),
+				DriverType:          ptr("ydb"),
+				URL:                 ptr("grpc://localhost:2136/local"),
+				DefaultInsertMethod: ptr("native"),
+				DefaultTxIsolation:  ptr("repeatable_read"),
+				Pool: &config.PoolConfig{
+					MaxOpenConns: ptr[int32](7),
 				},
 			},
 		},
@@ -202,3 +201,5 @@ func TestBuildProbeEnvFromRunConfigIncludesFileDriver(t *testing.T) {
 		"pool": { "maxOpenConns": 7 }
 	}`, env["STROPPY_DRIVER_0"])
 }
+
+func ptr[T any](v T) *T { return &v }

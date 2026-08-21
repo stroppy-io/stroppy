@@ -12,10 +12,9 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 // Driver preset literals reused across the postgres-family presets and
@@ -318,22 +317,22 @@ func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
 // DriverCLIConfigs holds parsed driver configurations indexed by driver number.
 type DriverCLIConfigs map[int]*DriverCLIConfig
 
-// DriverCLIConfigsFromFile converts frozen config-file drivers into mutable CLI configs.
-func DriverCLIConfigsFromFile(fileDrivers map[uint32]*stroppy.DriverRunConfig) (DriverCLIConfigs, error) {
+// DriverCLIConfigsFromFile converts config-file drivers into mutable CLI configs.
+func DriverCLIConfigsFromFile(fileDrivers map[uint32]*config.DriverRunConfig) (DriverCLIConfigs, error) {
 	configs := make(DriverCLIConfigs, len(fileDrivers))
 
 	for idx, fileConfig := range fileDrivers {
-		data, err := (protojson.MarshalOptions{EmitUnpopulated: false}).Marshal(fileConfig)
+		data, err := json.Marshal(fileConfig) //nolint:gosec // serializing config to env vars, not extracting a secret
 		if err != nil {
 			return nil, fmt.Errorf("serialize config file driver %d: %w", idx, err)
 		}
 
-		config, err := NewDriverCLIConfigFromJSON(string(data))
+		cfg, err := NewDriverCLIConfigFromJSON(string(data))
 		if err != nil {
 			return nil, fmt.Errorf("convert config file driver %d: %w", idx, err)
 		}
 
-		configs[int(idx)] = &config
+		configs[int(idx)] = &cfg
 	}
 
 	return configs, nil
@@ -372,10 +371,9 @@ func (configs DriverCLIConfigs) ToEnvVars() ([]string, error) {
 // STROPPY_DRIVER_N env vars. Only emits vars for driver indices that are
 // absent from both the real environment and cliConfigs (CLI -d/-D flags).
 //
-// protojson produces camelCase field names matching the TypeScript DriverSetup
-// interface consumed by declareDriverSetup() in helpers.ts.
+// json.Marshal produces camelCase field names matching the driver setup schema.
 func fileDriverRunConfigsToEnvVars(
-	fileDrivers map[uint32]*stroppy.DriverRunConfig,
+	fileDrivers map[uint32]*config.DriverRunConfig,
 	cliConfigs DriverCLIConfigs,
 ) ([]string, error) {
 	if len(fileDrivers) == 0 {
@@ -400,7 +398,7 @@ func fileDriverRunConfigsToEnvVars(
 			continue
 		}
 
-		data, err := (protojson.MarshalOptions{EmitUnpopulated: false}).Marshal(drCfg)
+		data, err := json.Marshal(drCfg) //nolint:gosec // serializing config to env vars, not extracting a secret
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize file driver %d config: %w", idx, err)
 		}

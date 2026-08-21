@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 // ApplySQLConfig applies SQL pool configuration to a *sql.DB.
 // Returns an error if any duration string is malformed.
-func ApplySQLConfig(db *sql.DB, sqlCfg *stroppy.DriverConfig_SqlConfig) error {
+func ApplySQLConfig(db *sql.DB, sqlCfg *config.SQLConfig) error {
 	if sqlCfg == nil {
 		return nil
 	}

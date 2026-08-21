@@ -32,7 +32,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	stroppyconfig "github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
@@ -92,7 +92,7 @@ type config struct {
 
 func init() {
 	driver.RegisterDriver(
-		stroppy.DriverConfig_DRIVER_TYPE_CSV,
+		stroppyconfig.DriverTypeCSV,
 		func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
 			return NewDriver(ctx, opts)
 		},
@@ -132,7 +132,7 @@ type tableState struct {
 
 var _ driver.Driver = (*Driver)(nil)
 
-// NewDriver parses opts.Config.Url and returns a ready-to-use Driver.
+// NewDriver parses opts.Config.URL and returns a ready-to-use Driver.
 // The output directory is created lazily (on first write) so Setup
 // succeeds even when dir is a prefix that does not yet exist.
 func NewDriver(_ context.Context, opts driver.Options) (*Driver, error) {
@@ -141,7 +141,7 @@ func NewDriver(_ context.Context, opts driver.Options) (*Driver, error) {
 		lg = logger.NewFromEnv().Named("csv")
 	}
 
-	cfg, err := parseConfig(opts.Config.GetUrl())
+	cfg, err := parseConfig(opts.Config.URL)
 	if err != nil {
 		return nil, fmt.Errorf("csv: parse url: %w", err)
 	}

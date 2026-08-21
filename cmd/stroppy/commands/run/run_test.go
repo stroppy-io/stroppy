@@ -15,7 +15,7 @@ import (
 	"github.com/stroppy-io/stroppy/internal/runner"
 	_ "github.com/stroppy-io/stroppy/internal/workloads/simple"
 	"github.com/stroppy-io/stroppy/pkg/bench"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 //nolint:cyclop // one table covers the complete run argument grammar
@@ -553,14 +553,14 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 	specificMaxConns := int32(5)
 	statementCache := int32(13)
 
-	configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*stroppy.DriverRunConfig{
+	configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
 		0: {
 			DriverType: &driverType,
-			Url:        &fileURL,
+			URL:        &fileURL,
 			ErrorMode:  &errorMode,
 			BulkSize:   &bulkSize,
-			Pool:       &stroppy.DriverRunConfig_PoolConfig{MaxConns: &maxConns},
-			Postgres: &stroppy.DriverConfig_PostgresConfig{
+			Pool:       &config.PoolConfig{MaxConns: &maxConns},
+			Postgres: &config.PostgresConfig{
 				MaxConns:               &specificMaxConns,
 				StatementCacheCapacity: &statementCache,
 			},
@@ -587,11 +587,11 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
 
-	if runtimeConfig.GetUrl() != "postgres://cli" ||
+	if runtimeConfig.URL != "postgres://cli" ||
 		runtimeConfig.GetBulkSize() != 20 ||
-		runtimeConfig.GetErrorMode() != stroppy.DriverConfig_ERROR_MODE_THROW ||
-		runtimeConfig.GetPostgres().GetMaxConns() != 10 ||
-		runtimeConfig.GetPostgres().GetStatementCacheCapacity() != 13 {
+		runtimeConfig.ErrorMode != config.ErrorModeThrow ||
+		runtimeConfig.Postgres.GetMaxConns() != 10 ||
+		runtimeConfig.Postgres.GetStatementCacheCapacity() != 13 {
 		t.Fatalf("runtime driver config = %#v, extra = %#v", runtimeConfig, configs[0].Extra)
 	}
 
@@ -600,11 +600,11 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 	specificMaxOpenConns := int32(5)
 	maxIdleConns := int32(4)
 
-	configs, err = runner.DriverCLIConfigsFromFile(map[uint32]*stroppy.DriverRunConfig{
+	configs, err = runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
 		0: {
 			DriverType: &mysql,
-			Pool:       &stroppy.DriverRunConfig_PoolConfig{MaxOpenConns: &maxOpenConns},
-			Sql: &stroppy.DriverConfig_SqlConfig{
+			Pool:       &config.PoolConfig{MaxOpenConns: &maxOpenConns},
+			SQL: &config.SQLConfig{
 				MaxOpenConns: &specificMaxOpenConns,
 				MaxIdleConns: &maxIdleConns,
 			},
@@ -623,7 +623,7 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("buildDriverConfig(mysql) error = %v", err)
 	}
 
-	if runtimeConfig.GetSql().GetMaxOpenConns() != 12 || runtimeConfig.GetSql().GetMaxIdleConns() != 4 {
+	if runtimeConfig.SQL.GetMaxOpenConns() != 12 || runtimeConfig.SQL.GetMaxIdleConns() != 4 {
 		t.Fatalf("runtime mysql driver config = %#v", runtimeConfig)
 	}
 }
@@ -644,7 +644,7 @@ func TestPoolSizePreservesPostgresSpecificConfig(t *testing.T) {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
 
-	postgres := config.GetPostgres()
+	postgres := config.Postgres
 	if postgres.GetMaxConns() != 11 || postgres.GetMinConns() != 11 ||
 		postgres.GetStatementCacheCapacity() != 13 || postgres.GetMaxConnLifetime() != "1h" {
 		t.Fatalf("postgres config = %#v", postgres)
@@ -659,8 +659,8 @@ func TestLegacyPostgresPoolSizeRejectsInt32Overflow(t *testing.T) {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
 
-	if config.GetPostgres() != nil {
-		t.Fatalf("postgres config = %#v", config.GetPostgres())
+	if config.Postgres != nil {
+		t.Fatalf("postgres config = %#v", config.Postgres)
 	}
 }
 

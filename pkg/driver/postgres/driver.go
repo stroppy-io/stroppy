@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
@@ -20,7 +20,7 @@ const dbConnectionTimeout = 5 * time.Second
 
 func init() {
 	driver.RegisterDriver(
-		stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
+		config.DriverTypePostgres,
 		func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
 			return NewDriver(ctx, opts)
 		},
@@ -96,7 +96,7 @@ func NewDriver(
 		}
 	}
 
-	d.logger.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
+	d.logger.Debug("Checking db connection...", zap.String("url", cfg.URL))
 
 	// TODO: make waiting optional
 	err = sqldriver.WaitForDB(ctx, d.logger, d.pool, dbConnectionTimeout)
@@ -107,8 +107,8 @@ func NewDriver(
 	return d, nil
 }
 
-func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (driver.Tx, error) {
-	if isolation == stroppy.TxIsolationLevel_CONNECTION_ONLY {
+func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (driver.Tx, error) {
+	if isolation == config.TxIsolationLevelConnectionOnly {
 		conn, err := d.pool.Acquire(ctx)
 		if err != nil {
 			return nil, err

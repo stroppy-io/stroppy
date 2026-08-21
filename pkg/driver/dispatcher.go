@@ -8,7 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
@@ -17,7 +17,7 @@ type (
 		// Allows to pass k6 DialFunc to driver for proper network metrics.
 		DialFunc func(ctx context.Context, network, addr string) (net.Conn, error)
 		Logger   *zap.Logger
-		Config   *stroppy.DriverConfig
+		Config   *config.DriverConfig
 	}
 
 	// Rows provides cursor-style iteration over query result rows.
@@ -40,7 +40,7 @@ type (
 		RunQuery(ctx context.Context, sql string, args map[string]any) (*QueryResult, error)
 		Commit(ctx context.Context) error
 		Rollback(ctx context.Context) error
-		Isolation() stroppy.TxIsolationLevel
+		Isolation() config.TxIsolationLevel
 	}
 
 	Driver interface {
@@ -50,7 +50,7 @@ type (
 		// encoding and materialization may.
 		Insert(ctx context.Context, req *InsertRequest) (*stats.Query, error)
 		RunQuery(ctx context.Context, sql string, args map[string]any) (*QueryResult, error)
-		Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (Tx, error)
+		Begin(ctx context.Context, isolation config.TxIsolationLevel) (Tx, error)
 		ClassifyError(err error) ErrorFacts
 		Teardown(ctx context.Context) error
 	}
@@ -60,10 +60,10 @@ type (
 
 var ErrNoRegisteredDriver = errors.New("no registered driver")
 
-var registry = map[stroppy.DriverConfig_DriverType]driverConstructor{}
+var registry = map[config.DriverType]driverConstructor{}
 
 func RegisterDriver(
-	driverType stroppy.DriverConfig_DriverType,
+	driverType config.DriverType,
 	constructor driverConstructor,
 ) {
 	registry[driverType] = constructor
@@ -73,7 +73,7 @@ func Dispatch(
 	ctx context.Context,
 	opts Options,
 ) (Driver, error) {
-	drvType := opts.Config.GetDriverType()
+	drvType := opts.Config.DriverType
 	if constructor, ok := registry[drvType]; ok {
 		return constructor(ctx, opts)
 	}

@@ -7,7 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/datagen/tpcdsgen"
 	"github.com/stroppy-io/stroppy/pkg/datagen/tpchgen"
 	"github.com/stroppy-io/stroppy/pkg/driver"
@@ -138,16 +138,16 @@ func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Q
 // path from the request's table/method/workers, mirroring the legacy
 // spec-driven tracker.
 func (b *Bench) newBatchInsertTracker(req *driver.InsertRequest) *insertprogress.Tracker {
-	config := insertprogress.DefaultConfig()
-	config.Table = req.Table
-	config.Method = req.Method.String()
-	config.Workers = req.Workers
-	config.Logger = b.lg.Named("insert-progress")
-	config.OnSample = func(snapshot insertprogress.Snapshot) {
+	cfg := insertprogress.DefaultConfig()
+	cfg.Table = req.Table
+	cfg.Method = req.Method.String()
+	cfg.Workers = req.Workers
+	cfg.Logger = b.lg.Named("insert-progress")
+	cfg.OnSample = func(snapshot insertprogress.Snapshot) {
 		b.root.txMetrics.recordInsertProgress(b.vu, &snapshot)
 	}
 
-	return insertprogress.NewTracker(&config)
+	return insertprogress.NewTracker(&cfg)
 }
 
 // InsertTpch loads one TPC-H table via the ported dbgen generator, streamed
@@ -201,7 +201,7 @@ func (b *Bench) Begin(ctx context.Context, opts BeginOpts) (*TxX, error) {
 		return nil, err
 	}
 
-	if iso == stroppy.TxIsolationLevel_NONE {
+	if iso == config.TxIsolationLevelNone {
 		return &TxX{tx: nil, b: b, iso: iso, name: opts.Name, start: time.Now()}, nil
 	}
 
@@ -233,7 +233,7 @@ func (b *Bench) BeginTx(ctx context.Context, opts BeginOpts, fn func(*TxX) error
 type TxX struct {
 	tx      driver.Tx
 	b       *Bench
-	iso     stroppy.TxIsolationLevel
+	iso     config.TxIsolationLevel
 	name    string
 	start   time.Time
 	queries int

@@ -6,7 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
 )
@@ -23,7 +23,7 @@ type TxConn[R any] interface {
 type Tx[R any] struct {
 	conn      TxConn[R]
 	wrapRows  func(R) driver.Rows
-	isolation stroppy.TxIsolationLevel
+	isolation config.TxIsolationLevel
 	dialect   queries.Dialect
 	logger    *zap.Logger
 }
@@ -31,7 +31,7 @@ type Tx[R any] struct {
 func NewTx[R any](
 	conn TxConn[R],
 	wrapRows func(R) driver.Rows,
-	isolation stroppy.TxIsolationLevel,
+	isolation config.TxIsolationLevel,
 	dialect queries.Dialect,
 	logger *zap.Logger,
 ) *Tx[R] {
@@ -60,7 +60,7 @@ func (t *Tx[R]) Rollback(ctx context.Context) error {
 	return t.conn.Rollback(ctx)
 }
 
-func (t *Tx[R]) Isolation() stroppy.TxIsolationLevel {
+func (t *Tx[R]) Isolation() config.TxIsolationLevel {
 	return t.isolation
 }
 
@@ -127,20 +127,20 @@ func (t *ConnOnlyTx[R]) Rollback(_ context.Context) error {
 	return nil
 }
 
-func (t *ConnOnlyTx[R]) Isolation() stroppy.TxIsolationLevel {
-	return stroppy.TxIsolationLevel_CONNECTION_ONLY
+func (t *ConnOnlyTx[R]) Isolation() config.TxIsolationLevel {
+	return config.TxIsolationLevelConnectionOnly
 }
 
-// IsolationToSQL maps stroppy isolation level to database/sql isolation level.
-func IsolationToSQL(level stroppy.TxIsolationLevel) sql.IsolationLevel {
+// IsolationToSQL maps the isolated level to database/sql isolation level.
+func IsolationToSQL(level config.TxIsolationLevel) sql.IsolationLevel {
 	switch level {
-	case stroppy.TxIsolationLevel_READ_UNCOMMITTED:
+	case config.TxIsolationLevelReadUncommitted:
 		return sql.LevelReadUncommitted
-	case stroppy.TxIsolationLevel_READ_COMMITTED:
+	case config.TxIsolationLevelReadCommitted:
 		return sql.LevelReadCommitted
-	case stroppy.TxIsolationLevel_REPEATABLE_READ:
+	case config.TxIsolationLevelRepeatableRead:
 		return sql.LevelRepeatableRead
-	case stroppy.TxIsolationLevel_SERIALIZABLE:
+	case config.TxIsolationLevelSerializable:
 		return sql.LevelSerializable
 	default:
 		return sql.LevelDefault

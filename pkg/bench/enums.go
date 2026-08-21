@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 var (
@@ -13,8 +13,8 @@ var (
 	errUnknownTxIsolation = errors.New("unknown tx isolation")
 )
 
-// String-typed enums a Go workload authors with; resolved to the proto enums the
-// driver layer consumes. Ports helpers.ts string<->enum maps.
+// String-typed enums a Go workload authors with; resolved to the config enums
+// the driver layer consumes. Ports helpers.ts string<->enum maps.
 
 type DriverTypeName string
 
@@ -27,40 +27,39 @@ const (
 	DriverCSV      DriverTypeName = "csv"
 )
 
-func ParseDriverType(s string) (stroppy.DriverConfig_DriverType, error) {
+func ParseDriverType(s string) (config.DriverType, error) {
 	switch s {
 	case "", "postgres":
-		return stroppy.DriverConfig_DRIVER_TYPE_POSTGRES, nil
+		return config.DriverTypePostgres, nil
 	case "mysql":
-		return stroppy.DriverConfig_DRIVER_TYPE_MYSQL, nil
+		return config.DriverTypeMySQL, nil
 	case "picodata", "pico":
-		return stroppy.DriverConfig_DRIVER_TYPE_PICODATA, nil
+		return config.DriverTypePicodata, nil
 	case "ydb":
-		return stroppy.DriverConfig_DRIVER_TYPE_YDB, nil
+		return config.DriverTypeYDB, nil
 	case "noop":
-		return stroppy.DriverConfig_DRIVER_TYPE_NOOP, nil
+		return config.DriverTypeNoop, nil
 	case "csv":
-		return stroppy.DriverConfig_DRIVER_TYPE_CSV, nil
+		return config.DriverTypeCSV, nil
 	default:
 		return 0, fmt.Errorf("%w %q", errUnknownDriverType, s)
 	}
 }
 
-// DriverTypeNameFromProto reverse-maps the proto driver enum to the authoring
-// string name.
-func DriverTypeNameFromProto(t stroppy.DriverConfig_DriverType) DriverTypeName {
+// DriverTypeNameOf reverse-maps the driver enum to the authoring string name.
+func DriverTypeNameOf(t config.DriverType) DriverTypeName {
 	switch t {
-	case stroppy.DriverConfig_DRIVER_TYPE_POSTGRES:
+	case config.DriverTypePostgres:
 		return DriverPostgres
-	case stroppy.DriverConfig_DRIVER_TYPE_MYSQL:
+	case config.DriverTypeMySQL:
 		return DriverMySQL
-	case stroppy.DriverConfig_DRIVER_TYPE_PICODATA:
+	case config.DriverTypePicodata:
 		return DriverPicodata
-	case stroppy.DriverConfig_DRIVER_TYPE_YDB:
+	case config.DriverTypeYDB:
 		return DriverYDB
-	case stroppy.DriverConfig_DRIVER_TYPE_NOOP:
+	case config.DriverTypeNoop:
 		return DriverNoop
-	case stroppy.DriverConfig_DRIVER_TYPE_CSV:
+	case config.DriverTypeCSV:
 		return DriverCSV
 	default:
 		return ""
@@ -77,18 +76,18 @@ const (
 	ErrorAbort  ErrorModeName = "abort"
 )
 
-func ParseErrorMode(s string) (stroppy.DriverConfig_ErrorMode, error) {
+func ParseErrorMode(s string) (config.ErrorMode, error) {
 	switch s {
 	case "", "silent":
-		return stroppy.DriverConfig_ERROR_MODE_SILENT, nil
+		return config.ErrorModeSilent, nil
 	case "log":
-		return stroppy.DriverConfig_ERROR_MODE_LOG, nil
+		return config.ErrorModeLog, nil
 	case "throw":
-		return stroppy.DriverConfig_ERROR_MODE_THROW, nil
+		return config.ErrorModeThrow, nil
 	case "fail":
-		return stroppy.DriverConfig_ERROR_MODE_FAIL, nil
+		return config.ErrorModeFail, nil
 	case "abort":
-		return stroppy.DriverConfig_ERROR_MODE_ABORT, nil
+		return config.ErrorModeAbort, nil
 	default:
 		return 0, fmt.Errorf("%w %q", errUnknownErrorMode, s)
 	}
@@ -106,22 +105,22 @@ const (
 	IsoNone            TxIsolationName = "none"
 )
 
-func ParseTxIsolation(s string) (stroppy.TxIsolationLevel, error) {
+func ParseTxIsolation(s string) (config.TxIsolationLevel, error) {
 	switch s {
 	case "", "db_default":
-		return stroppy.TxIsolationLevel_UNSPECIFIED, nil
+		return config.TxIsolationLevelUnspecified, nil
 	case "read_uncommitted":
-		return stroppy.TxIsolationLevel_READ_UNCOMMITTED, nil
+		return config.TxIsolationLevelReadUncommitted, nil
 	case "read_committed":
-		return stroppy.TxIsolationLevel_READ_COMMITTED, nil
+		return config.TxIsolationLevelReadCommitted, nil
 	case "repeatable_read":
-		return stroppy.TxIsolationLevel_REPEATABLE_READ, nil
+		return config.TxIsolationLevelRepeatableRead, nil
 	case "serializable":
-		return stroppy.TxIsolationLevel_SERIALIZABLE, nil
+		return config.TxIsolationLevelSerializable, nil
 	case "conn":
-		return stroppy.TxIsolationLevel_CONNECTION_ONLY, nil
+		return config.TxIsolationLevelConnectionOnly, nil
 	case "none":
-		return stroppy.TxIsolationLevel_NONE, nil
+		return config.TxIsolationLevelNone, nil
 	default:
 		return 0, fmt.Errorf("%w %q", errUnknownTxIsolation, s)
 	}

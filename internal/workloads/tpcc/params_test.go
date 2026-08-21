@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
@@ -170,7 +170,7 @@ func runCapture(
 	err := bench.Run(
 		context.Background(),
 		name,
-		map[int]*stroppy.DriverConfig{0: {DriverType: stroppy.DriverConfig_DRIVER_TYPE_NOOP}},
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
 		nil,
 		inputs,
 		zap.NewNop(),

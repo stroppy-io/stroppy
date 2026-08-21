@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
@@ -39,7 +39,7 @@ func noopReq(method driver.InsertMethod, total int64, workers int) *driver.Inser
 func newNoopDriver(t *testing.T) *Driver {
 	t.Helper()
 
-	return NewDriver(driver.Options{Config: &stroppy.DriverConfig{}})
+	return NewDriver(driver.Options{Config: &config.DriverConfig{}})
 }
 
 // TestInsertNilGuards verifies Insert rejects a nil request, nil source,
