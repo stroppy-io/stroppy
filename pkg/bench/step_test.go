@@ -156,6 +156,7 @@ func (stepLifecycleWorkload) Setup(_ context.Context, b *Bench) error {
 func (stepLifecycleWorkload) Iterate(ctx context.Context, b *Bench) error {
 	return b.StepSilent("workload", func() error {
 		stepLifecycleWorkloadRuns.Add(1)
+
 		_, err := b.QueryValue(ctx, "SELECT 1", nil)
 
 		return err
