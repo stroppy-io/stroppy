@@ -49,6 +49,10 @@ func TestMonitorSignalsCancelThenForce(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("second signal did not trigger forced exit")
 	}
+
+	if !stopped.Load() {
+		t.Fatal("forced exit did not claim the stop gate")
+	}
 }
 
 func TestMonitorSignalsStoppedIgnoresSignal(t *testing.T) {
@@ -107,6 +111,15 @@ func TestExitCodeFor(t *testing.T) {
 		if got := ExitCodeFor(tc.sig); got != tc.want {
 			t.Errorf("ExitCodeFor(%v) = %d, want %d", tc.sig, got, tc.want)
 		}
+	}
+}
+
+func TestNotifyContextExitStatusWithoutSignal(t *testing.T) {
+	_, stop, exitStatus := NotifyContext(context.Background(), func(int) {})
+	defer stop()
+
+	if got := exitStatus(); got != 1 {
+		t.Fatalf("exitStatus() = %d, want 1", got)
 	}
 }
 

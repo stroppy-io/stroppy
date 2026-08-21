@@ -75,7 +75,9 @@ var versionCmd = &cobra.Command{
 // graceful cancellation to a documented exit status: the first SIGINT/SIGTERM
 // cancels the command context, and a second signal forces immediate exit.
 func Execute() {
-	os.Exit(execute())
+	if code := execute(); code != 0 {
+		os.Exit(code)
+	}
 }
 
 // execute wires the cancellation context, runs Cobra, and returns the process

@@ -41,9 +41,9 @@ func ExitCodeFor(sig os.Signal) int {
 
 // NotifyContext returns a context canceled by the first SIGINT/SIGTERM, a stop
 // func, and an exitStatus func reporting the graceful-shutdown exit code derived
-// from that first signal. A second signal after cancellation invokes
-// force(ForcedExitCode) as a bounded escape hatch for a hung teardown; force
-// defaults to os.Exit.
+// from that first signal, or 1 before any signal. A second signal after
+// cancellation invokes force(ForcedExitCode) as a bounded escape hatch for a
+// hung teardown; force defaults to os.Exit.
 //
 // Call stop exactly once when the command is done. It releases the OS handler,
 // drops any already-delivered-but-unconsumed signal, and cancels ctx so no
@@ -82,7 +82,7 @@ func NotifyContext(parent context.Context, force func(int)) (
 			return ExitCodeFor(sig)
 		}
 
-		return ExitCodeFor(syscall.SIGINT)
+		return 1
 	}
 
 	return ctx, stop, exitStatus
@@ -111,7 +111,11 @@ func monitorSignals(
 				if firstSig.CompareAndSwap(0, sigNumber(sig)) {
 					cancel() // first signal → graceful teardown
 				} else {
-					force(ForcedExitCode) // second signal → forced exit
+					if stopped.CompareAndSwap(false, true) {
+						force(ForcedExitCode) // second signal → forced exit
+					}
+
+					return
 				}
 			case <-done:
 				return

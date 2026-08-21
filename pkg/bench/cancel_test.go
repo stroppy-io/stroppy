@@ -92,9 +92,12 @@ func TestRunScenarioConstantVUsCancellation(t *testing.T) {
 // teardownTrackingWorkload blocks Iterate until ctx is canceled and records
 // whether Teardown ran (and under what context), so we can assert graceful
 // cancellation still performs workload teardown exactly once under a fresh ctx.
+type teardownContextKey struct{}
+
 type teardownTrackingWorkload struct {
 	teardownCalls       atomic.Int32
 	teardownCtxCanceled atomic.Bool
+	teardownCtxValue    any
 }
 
 func (*teardownTrackingWorkload) Name() string                        { return "test/teardown-on-cancel" }
@@ -109,6 +112,7 @@ func (w *teardownTrackingWorkload) Iterate(ctx context.Context, _ *Bench) error 
 
 func (w *teardownTrackingWorkload) Teardown(ctx context.Context, _ *Bench) error {
 	w.teardownCalls.Add(1)
+	w.teardownCtxValue = ctx.Value(teardownContextKey{})
 
 	if ctx.Err() != nil {
 		w.teardownCtxCanceled.Store(true)
@@ -117,9 +121,9 @@ func (w *teardownTrackingWorkload) Teardown(ctx context.Context, _ *Bench) error
 	return nil
 }
 
-// TestRunTeardownRunsOnCancellation verifies that when a run is canceled, the
-// workload Teardown still runs exactly once, under a fresh (non-canceled)
-// context, so schema cleanup (DROP TABLE etc.) is not skipped.
+// TestRunTeardownRunsOnCancellation verifies that when a run is canceled,
+// workload Teardown still runs exactly once under a non-canceled context that
+// preserves caller values, so schema cleanup is not skipped.
 func TestRunTeardownRunsOnCancellation(t *testing.T) {
 	var wl *teardownTrackingWorkload
 
@@ -129,7 +133,8 @@ func TestRunTeardownRunsOnCancellation(t *testing.T) {
 		return wl
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx := context.WithValue(context.Background(), teardownContextKey{}, "preserved")
+	ctx, cancel := context.WithCancel(ctx)
 
 	go func() {
 		time.Sleep(20 * time.Millisecond)
@@ -155,5 +160,9 @@ func TestRunTeardownRunsOnCancellation(t *testing.T) {
 
 	if wl.teardownCtxCanceled.Load() {
 		t.Fatal("Teardown received a canceled context")
+	}
+
+	if got := wl.teardownCtxValue; got != "preserved" {
+		t.Fatalf("Teardown context value = %v, want preserved", got)
 	}
 }

@@ -177,8 +177,9 @@ func DescribeAll() ([]Description, error) {
 	return descriptions, nil
 }
 
-// teardownTimeout bounds workload Teardown. It runs under a fresh context so a
-// cancellation that stopped Setup or the scenario does not skip cleanup.
+// teardownTimeout bounds workload Teardown. It runs under a detached context so
+// cancellation that stopped Setup or the scenario does not skip cleanup while
+// caller values remain available.
 const teardownTimeout = 30 * time.Second
 
 // Run looks up a fresh workload instance and executes it: Define and parameter
@@ -237,11 +238,10 @@ func Run(
 	}
 
 	// Teardown always runs exactly once, even when Setup or the scenario returns
-	// early on cancellation or error. It executes under a fresh timeout context
-	// (not the run ctx, which is already canceled on the graceful-cancel path),
-	// and its error is joined with any returned error.
+	// early on cancellation or error. It executes under a timeout detached from
+	// cancellation of the run ctx, and its error is joined with any returned error.
 	defer func() {
-		teardownCtx, cancel := context.WithTimeout(context.Background(), teardownTimeout)
+		teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
 		defer cancel()
 
 		if err := wl.Teardown(teardownCtx, setupBench); err != nil {
