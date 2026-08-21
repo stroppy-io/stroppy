@@ -167,7 +167,6 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		}
 	}
 
-	b.StepBegin("workload")
 	w.retryPolicy = b.TxRetryPolicy(bench.TxRetryPolicyOptions{
 		MaxAttempts: w.retryAttempts,
 		OnRetry:     func(int, error, bench.RetryDecision) { w.retryCounter(b).Add(1) },
@@ -184,7 +183,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 		return w.iterateProcs(ctx, b, aid, tid, bid, delta, hid)
 	}
 
-	return b.Step("workload", func() error {
+	return b.StepSilent("workload", func() error {
 		return bench.Retry0(ctx, w.retryPolicy, func() error {
 			return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "tpcb"}, func(tx *bench.TxX) error {
 				return w.txBody(ctx, tx, aid, tid, bid, delta, hid)
@@ -235,7 +234,7 @@ func (w *workload) txBody(ctx context.Context, tx *bench.TxX, aid, tid, bid, del
 // variant therefore emits no client-side commit/rollback metric — the commit
 // happens inside the procedure — so its metric shape differs from tpcb/tx.
 func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, aid, tid, bid, delta int, hid int64) error {
-	return b.Step("workload", func() error {
+	return b.StepSilent("workload", func() error {
 		return bench.Retry0(ctx, w.retryPolicy, func() error {
 			return b.Exec(ctx, w.procQuery, map[string]any{
 				"p_aid": aid, "p_tid": tid, "p_bid": bid, "p_delta": delta, "p_hid": hid,
@@ -245,8 +244,6 @@ func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, aid, tid, b
 }
 
 func (*workload) Teardown(ctx context.Context, b *bench.Bench) error {
-	b.StepEnd("workload")
-
 	return nil
 }
 

@@ -133,8 +133,8 @@ Signals:
 		// Apply effective values: CLI overrides config file.
 		scriptArg := runner.EffectiveScript(parsed.scriptArg, fileConfig)
 		sqlArg := runner.EffectiveSQL(parsed.sqlArg, fileConfig)
-		steps := runner.EffectiveSteps(parsed.steps, fileConfig)
-		noSteps := runner.EffectiveNoSteps(parsed.noSteps, fileConfig)
+		steps := normalizeStepNames(runner.EffectiveSteps(parsed.steps, fileConfig))
+		noSteps := normalizeStepNames(runner.EffectiveNoSteps(parsed.noSteps, fileConfig))
 
 		if parsed.help {
 			if scriptArg == "" {
@@ -146,6 +146,13 @@ Signals:
 
 		if scriptArg == "" {
 			return invalidConfig(errNoScript)
+		}
+
+		// Mutual exclusion is checked on the merged inputs (CLI over config file),
+		// not just CLI-vs-CLI, so `config steps + CLI --no-steps` (and vice versa)
+		// is rejected the same way.
+		if len(steps) > 0 && len(noSteps) > 0 {
+			return invalidConfig(errStepsMutExclusive)
 		}
 
 		if len(parsed.afterDash) > 0 {
@@ -927,11 +934,27 @@ func parseRunArgs(args []string) (runArgs, error) {
 		return runArgs{}, err
 	}
 
-	if len(parsed.steps) > 0 && len(parsed.noSteps) > 0 {
+	steps := normalizeStepNames(parsed.steps)
+	noSteps := normalizeStepNames(parsed.noSteps)
+
+	if len(steps) > 0 && len(noSteps) > 0 {
 		return runArgs{}, errStepsMutExclusive
 	}
 
 	return parsed, nil
+}
+
+func normalizeStepNames(names []string) []string {
+	normalized := make([]string, 0, len(names))
+	for _, group := range names {
+		for _, name := range strings.Split(group, ",") {
+			if name = strings.TrimSpace(name); name != "" {
+				normalized = append(normalized, name)
+			}
+		}
+	}
+
+	return normalized
 }
 
 func parseRunArgsBeforeDash(positional []string, parsers []flagParser, parsed *runArgs) error {
