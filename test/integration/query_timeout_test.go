@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
@@ -72,8 +73,8 @@ func assertReusable(t *testing.T, drv driver.Driver) {
 }
 
 // TestQueryTimeoutPostgres blocks pg_sleep past the deadline and verifies the
-// statement is cut off as a timeout (pgx CancelRequest → context.DeadlineExceeded)
-// rather than a parent cancel, and that the pooled connection is reusable after.
+// statement is classified as a timeout rather than a parent cancel, and that
+// the pooled connection is reusable afterward.
 func TestQueryTimeoutPostgres(t *testing.T) {
 	skipIfRequested(t)
 
@@ -91,7 +92,10 @@ func TestQueryTimeoutPostgres(t *testing.T) {
 		t.Fatalf("ClassifyError = %q, want %q (err=%v)", facts.Kind, driver.ErrorKindTimeout, err)
 	}
 	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("pg timeout err = %v, want context.DeadlineExceeded", err)
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "57014" {
+			t.Fatalf("pg timeout err = %v, want deadline or SQLSTATE 57014", err)
+		}
 	}
 	if errors.Is(err, context.Canceled) {
 		t.Fatalf("pg timeout err = %v was classified as canceled", err)
