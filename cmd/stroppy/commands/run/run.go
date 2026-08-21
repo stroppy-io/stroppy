@@ -133,8 +133,8 @@ Signals:
 		// Apply effective values: CLI overrides config file.
 		scriptArg := runner.EffectiveScript(parsed.scriptArg, fileConfig)
 		sqlArg := runner.EffectiveSQL(parsed.sqlArg, fileConfig)
-		steps := runner.EffectiveSteps(parsed.steps, fileConfig)
-		noSteps := runner.EffectiveNoSteps(parsed.noSteps, fileConfig)
+		steps := normalizeStepNames(runner.EffectiveSteps(parsed.steps, fileConfig))
+		noSteps := normalizeStepNames(runner.EffectiveNoSteps(parsed.noSteps, fileConfig))
 
 		if parsed.help {
 			if scriptArg == "" {
@@ -934,11 +934,25 @@ func parseRunArgs(args []string) (runArgs, error) {
 		return runArgs{}, err
 	}
 
-	if len(parsed.steps) > 0 && len(parsed.noSteps) > 0 {
+	steps := normalizeStepNames(parsed.steps)
+	noSteps := normalizeStepNames(parsed.noSteps)
+
+	if len(steps) > 0 && len(noSteps) > 0 {
 		return runArgs{}, errStepsMutExclusive
 	}
 
 	return parsed, nil
+}
+
+func normalizeStepNames(names []string) []string {
+	normalized := make([]string, 0, len(names))
+	for _, name := range names {
+		if name = strings.TrimSpace(name); name != "" {
+			normalized = append(normalized, name)
+		}
+	}
+
+	return normalized
 }
 
 func parseRunArgsBeforeDash(positional []string, parsers []flagParser, parsed *runArgs) error {

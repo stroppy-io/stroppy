@@ -16,6 +16,7 @@ import (
 	_ "github.com/stroppy-io/stroppy/internal/workloads/simple"
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
 
 //nolint:cyclop // one table covers the complete run argument grammar
@@ -172,6 +173,13 @@ func TestParseRunArgs(t *testing.T) {
 			args:        []string{"tpcc", "--no-steps=load,run"},
 			wantScript:  "tpcc",
 			wantNoSteps: []string{"load", "run"},
+		},
+		{
+			name:        "explicit empty steps remains an override beside no-steps",
+			args:        []string{"tpcc", "--steps=", "--no-steps=workload"},
+			wantScript:  "tpcc",
+			wantSteps:   []string{""},
+			wantNoSteps: []string{"workload"},
 		},
 		{
 			name:    "--steps and --no-steps together returns error",
@@ -996,6 +1004,54 @@ func TestStepsNoStepsMergedMutualExclusion(t *testing.T) {
 
 			if contains(err.Error(), "driver dispatch") {
 				t.Fatalf("merged conflict reached driver dispatch: %v", err)
+			}
+		})
+	}
+}
+
+func TestBlankStepNamesDoNotConflictWithNoSteps(t *testing.T) {
+	unsetRunTestEnv(t, "STROPPY_STEPS", "STROPPY_NO_STEPS")
+
+	previousContext := Cmd.Context()
+	Cmd.SetContext(t.Context())
+	t.Cleanup(func() { Cmd.SetContext(previousContext) })
+
+	tests := []struct {
+		name   string
+		config string
+		args   []string
+	}{
+		{
+			name:   "explicit empty CLI steps clears config allowlist",
+			config: `{"script":"simple","steps":["load_data"]}`,
+			args:   []string{"--steps=", "--no-steps", "workload"},
+		},
+		{
+			name:   "blank config steps with real config noSteps",
+			config: `{"script":"simple","steps":[""],"noSteps":["workload"]}`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configPath := t.TempDir() + "/stroppy-config.json"
+			if err := os.WriteFile(configPath, []byte(test.config), 0o600); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
+
+			args := append([]string{"-f", configPath, "-d", "noop"}, test.args...)
+			args = append(args, "--executor", "shared-iterations", "--iterations", "1", "--vus", "1")
+
+			if err := Cmd.RunE(Cmd, args); err != nil {
+				t.Fatalf("RunE() error = %v", err)
+			}
+
+			if steps, set := os.LookupEnv("STROPPY_STEPS"); set {
+				t.Fatalf("dispatched STROPPY_STEPS = %q, want unset", steps)
+			}
+
+			if noSteps := os.Getenv("STROPPY_NO_STEPS"); noSteps != "workload" {
+				t.Fatalf("dispatched STROPPY_NO_STEPS = %q, want workload", noSteps)
 			}
 		})
 	}
