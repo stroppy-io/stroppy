@@ -27,7 +27,7 @@ func dispatchQueryTimeout(
 
 	drv, err := driver.Dispatch(context.Background(), driver.Options{
 		Config:       &stroppy.DriverConfig{DriverType: typ, Url: url},
-		Logger:       zap.NewNop(),
+		Logger:       zap.NewExample(),
 		QueryTimeout: timeout,
 	})
 	if err != nil {
@@ -37,6 +37,18 @@ func dispatchQueryTimeout(
 	t.Cleanup(func() { _ = drv.Teardown(context.Background()) })
 
 	return drv
+}
+
+func runQueryToCompletion(drv driver.Driver, sql string) error {
+	res, err := drv.RunQuery(context.Background(), sql, nil)
+	if err != nil {
+		return err
+	}
+	defer res.Rows.Close()
+
+	res.Rows.ReadAll(0)
+
+	return res.Rows.Err()
 }
 
 // assertReusable drives a fast query on the same driver after a timeout to
@@ -69,7 +81,7 @@ func TestQueryTimeoutPostgres(t *testing.T) {
 	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_POSTGRES, url, 150*time.Millisecond)
 
 	start := time.Now()
-	_, err := drv.RunQuery(context.Background(), "SELECT pg_sleep(10)", nil)
+	err := runQueryToCompletion(drv, "SELECT pg_sleep(10)")
 	elapsed := time.Since(start)
 
 	if err == nil {
@@ -91,8 +103,8 @@ func TestQueryTimeoutPostgres(t *testing.T) {
 	assertReusable(t, drv)
 }
 
-// TestQueryTimeoutMySQL blocks SELECT SLEEP past the deadline and verifies the
-// server-side MAX_EXECUTION_TIME hint (error 3024) fires ahead of the padded
+// TestQueryTimeoutMySQL runs a large metadata join past the deadline and verifies
+// the server-side MAX_EXECUTION_TIME hint (error 3024) fires ahead of the padded
 // client deadline, so the connection is not discarded and stays reusable.
 func TestQueryTimeoutMySQL(t *testing.T) {
 	skipIfRequested(t)
@@ -100,12 +112,15 @@ func TestQueryTimeoutMySQL(t *testing.T) {
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
 	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, 150*time.Millisecond)
 
+	const query = "SELECT COUNT(*) FROM information_schema.columns a " +
+		"CROSS JOIN information_schema.columns b CROSS JOIN information_schema.columns c"
+
 	start := time.Now()
-	_, err := drv.RunQuery(context.Background(), "SELECT SLEEP(10)", nil)
+	err := runQueryToCompletion(drv, query)
 	elapsed := time.Since(start)
 
 	if err == nil {
-		t.Fatalf("SELECT SLEEP returned nil error, want timeout")
+		t.Fatal("large metadata join returned nil error, want timeout")
 	}
 	if facts := drv.ClassifyError(err); facts.Kind != driver.ErrorKindTimeout {
 		t.Fatalf("ClassifyError = %q, want %q (err=%v)", facts.Kind, driver.ErrorKindTimeout, err)
@@ -117,7 +132,7 @@ func TestQueryTimeoutMySQL(t *testing.T) {
 		t.Fatalf("mysql timeout err = %v was classified as canceled", err)
 	}
 	if elapsed > 5*time.Second {
-		t.Fatalf("SELECT SLEEP(10) ran %v, deadline did not fire", elapsed)
+		t.Fatalf("large metadata join ran %v, deadline did not fire", elapsed)
 	}
 
 	assertReusable(t, drv)

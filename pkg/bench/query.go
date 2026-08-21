@@ -39,18 +39,26 @@ func (b *Bench) QueryValue(ctx context.Context, sql string, args map[string]any)
 	}
 	defer res.Rows.Close()
 
-	if !res.Rows.Next() {
-		//nolint:nilnil // no-row sentinel: callers (validate.go, simple, tpcc) branch on `v == nil` after `err == nil`
+	return firstQueryValue(res.Rows)
+}
+
+func firstQueryValue(rows driver.Rows) (any, error) {
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+
+		//nolint:nilnil // no-row sentinel: workloads branch on `v == nil` after `err == nil`
 		return nil, nil
 	}
 
-	vals := res.Rows.Values()
+	vals := rows.Values()
 	if len(vals) == 0 {
 		//nolint:nilnil // no-row sentinel: empty row means "no value"; same caller contract as above
 		return nil, nil
 	}
 
-	return vals[0], res.Rows.Err()
+	return vals[0], rows.Err()
 }
 
 // QueryRow returns the first row (or nil if no rows).
@@ -256,18 +264,7 @@ func (t *TxX) QueryValue(ctx context.Context, sql string, args map[string]any) (
 	}
 	defer res.Rows.Close()
 
-	if !res.Rows.Next() {
-		//nolint:nilnil // no-row sentinel: tpcc tx workloads branch on `v == nil` after `err == nil`
-		return nil, nil
-	}
-
-	vals := res.Rows.Values()
-	if len(vals) == 0 {
-		//nolint:nilnil // no-row sentinel: empty row means "no value"; same caller contract as above
-		return nil, nil
-	}
-
-	return vals[0], res.Rows.Err()
+	return firstQueryValue(res.Rows)
 }
 
 func (t *TxX) QueryRow(ctx context.Context, sql string, args map[string]any) ([]any, error) {

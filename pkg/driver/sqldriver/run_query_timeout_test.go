@@ -23,6 +23,41 @@ func (f *fakeQuery) QueryContext(ctx context.Context, _ string, _ ...any) (int, 
 
 func noopWrap(int) driver.Rows { return nil }
 
+type lazyQueryRows struct {
+	ctx context.Context
+	err error
+}
+
+func (*lazyQueryRows) Columns() []string   { return nil }
+func (*lazyQueryRows) Values() []any       { return nil }
+func (*lazyQueryRows) ReadAll(int) [][]any { return nil }
+func (r *lazyQueryRows) Err() error        { return r.err }
+func (*lazyQueryRows) Close() error        { return nil }
+func (r *lazyQueryRows) Next() bool {
+	<-r.ctx.Done()
+	r.err = r.ctx.Err()
+
+	return false
+}
+
+type lazyQuery struct{}
+
+func (lazyQuery) QueryContext(ctx context.Context, _ string, _ ...any) (*lazyQueryRows, error) {
+	return &lazyQueryRows{ctx: ctx}, nil
+}
+
+type immediateRowsErrorQuery struct {
+	err error
+}
+
+func (q immediateRowsErrorQuery) QueryContext(
+	context.Context,
+	string,
+	...any,
+) (*lazyQueryRows, error) {
+	return &lazyQueryRows{err: q.err}, nil
+}
+
 func TestStatementTimeoutDisabled(t *testing.T) {
 	t.Parallel()
 
@@ -58,6 +93,63 @@ func TestRunQueryAppliesPerStatementDeadline(t *testing.T) {
 
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Fatalf("deadline did not fire promptly: took %v", elapsed)
+	}
+
+	if parent.Err() != nil {
+		t.Fatalf("parent context mutated: %v", parent.Err())
+	}
+}
+
+func TestRunQueryReturnsImmediateRowsError(t *testing.T) {
+	t.Parallel()
+
+	sentinel := errors.New("rows")
+
+	res, err := RunQuery(
+		context.Background(),
+		immediateRowsErrorQuery{err: sentinel},
+		func(rows *lazyQueryRows) driver.Rows { return rows },
+		testDialect{},
+		zap.NewNop(),
+		"SELECT 1",
+		nil,
+		30*time.Millisecond,
+	)
+	if res != nil {
+		t.Fatalf("RunQuery() result = %#v, want nil", res)
+	}
+
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("RunQuery() error = %v, want sentinel", err)
+	}
+}
+
+func TestRunQueryDeadlineCoversRowIteration(t *testing.T) {
+	t.Parallel()
+
+	parent := context.Background()
+
+	res, err := RunQuery(
+		parent,
+		lazyQuery{},
+		func(rows *lazyQueryRows) driver.Rows { return rows },
+		testDialect{},
+		zap.NewNop(),
+		"SELECT 1",
+		nil,
+		30*time.Millisecond,
+	)
+	if err != nil {
+		t.Fatalf("RunQuery() error = %v", err)
+	}
+	defer res.Rows.Close()
+
+	if res.Rows.Next() {
+		t.Fatal("Next() = true, want deadline to stop row iteration")
+	}
+
+	if err := res.Rows.Err(); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Rows.Err() = %v, want context.DeadlineExceeded", err)
 	}
 
 	if parent.Err() != nil {

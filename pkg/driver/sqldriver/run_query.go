@@ -113,14 +113,45 @@ func parseQueryTemplate(dialect queries.Dialect, sqlStr string) *parsedQuery {
 }
 
 // StatementTimeout returns a child context bounded by timeout, or ctx unchanged
-// (with a no-op cancel) when timeout is non-positive. Callers defer the cancel
-// to release the timer once the statement completes.
+// (with a no-op cancel) when timeout is non-positive. Callers release the child
+// once the statement and any result-row iteration complete.
 func StatementTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	if timeout <= 0 {
 		return ctx, func() {}
 	}
 
 	return context.WithTimeout(ctx, timeout)
+}
+
+type cancelRows struct {
+	driver.Rows
+	cancel context.CancelFunc
+	once   sync.Once
+}
+
+func (r *cancelRows) Next() bool {
+	next := r.Rows.Next()
+	if !next {
+		r.release()
+	}
+
+	return next
+}
+
+func (r *cancelRows) ReadAll(limit int) [][]any {
+	defer r.release()
+
+	return r.Rows.ReadAll(limit)
+}
+
+func (r *cancelRows) Close() error {
+	defer r.release()
+
+	return r.Rows.Close()
+}
+
+func (r *cancelRows) release() {
+	r.once.Do(r.cancel)
 }
 
 // RunQuery executes sql with named :arg placeholders and returns rows cursor.
@@ -153,19 +184,37 @@ func RunQuery[R any](
 	processedSQL = dialect.StatementTimeoutHint(processedSQL, timeout)
 
 	queryCtx, cancel := StatementTimeout(ctx, dialect.StatementDeadline(timeout))
-	defer cancel()
 
 	start := time.Now()
 	rawRows, err := db.QueryContext(queryCtx, processedSQL, argsArr...)
 	elapsed := time.Since(start)
 
 	if err != nil {
+		cancel()
+
 		return nil, fmt.Errorf("failed to execute sql: %w", err)
+	}
+
+	rows := wrapRows(rawRows)
+	if rows != nil {
+		if rowsErr := rows.Err(); rowsErr != nil {
+			_ = rows.Close()
+
+			cancel()
+
+			return nil, fmt.Errorf("failed to execute sql: %w", rowsErr)
+		}
+	}
+
+	if timeout > 0 && rows != nil {
+		rows = &cancelRows{Rows: rows, cancel: cancel}
+	} else {
+		cancel()
 	}
 
 	return &driver.QueryResult{
 		Stats: &stats.Query{Elapsed: elapsed},
-		Rows:  wrapRows(rawRows),
+		Rows:  rows,
 	}, nil
 }
 
