@@ -10,18 +10,23 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
+	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/mysql"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/postgres"
 )
 
 // dispatchQueryTimeout builds a stroppy driver with a per-statement deadline.
-func dispatchQueryTimeout(t *testing.T, typ config.DriverType, url string, timeout time.Duration) driver.Driver {
+func dispatchQueryTimeout(
+	t *testing.T,
+	typ stroppy.DriverConfig_DriverType,
+	url string,
+	timeout time.Duration,
+) driver.Driver {
 	t.Helper()
 
 	drv, err := driver.Dispatch(context.Background(), driver.Options{
-		Config:       &config.DriverConfig{DriverType: typ, URL: url},
+		Config:       &stroppy.DriverConfig{DriverType: typ, Url: url},
 		Logger:       zap.NewNop(),
 		QueryTimeout: timeout,
 	})
@@ -61,7 +66,7 @@ func TestQueryTimeoutPostgres(t *testing.T) {
 	skipIfRequested(t)
 
 	url := envOr(envTmpfsURL, defaultTmpfsURL)
-	drv := dispatchQueryTimeout(t, config.DriverTypePostgres, url, 150*time.Millisecond)
+	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_POSTGRES, url, 150*time.Millisecond)
 
 	start := time.Now()
 	_, err := drv.RunQuery(context.Background(), "SELECT pg_sleep(10)", nil)
@@ -93,7 +98,7 @@ func TestQueryTimeoutMySQL(t *testing.T) {
 	skipIfRequested(t)
 
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
-	drv := dispatchQueryTimeout(t, config.DriverTypeMySQL, url, 150*time.Millisecond)
+	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, 150*time.Millisecond)
 
 	start := time.Now()
 	_, err := drv.RunQuery(context.Background(), "SELECT SLEEP(10)", nil)

@@ -130,7 +130,7 @@ func TestLoadRunConfig_TypedParameterScopes(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	require.NoError(t, os.WriteFile(path, []byte(`{
 		"version": "1",
-		"run": {"executor":"constant-vus","vus":3,"duration":"2s","future":true},
+		"run": {"executor":"constant-vus","vus":3,"duration":"2s","queryTimeout":"250ms","future":true},
 		"params": {"scaleFactor":1.5,"enabled":false,"label":"sample"}
 	}`), 0o600))
 
@@ -139,6 +139,7 @@ func TestLoadRunConfig_TypedParameterScopes(t *testing.T) {
 	assert.True(t, loaded)
 	assert.JSONEq(t, `"constant-vus"`, string(cfg.Run["executor"]))
 	assert.JSONEq(t, `3`, string(cfg.Run["vus"]))
+	assert.JSONEq(t, `"250ms"`, string(cfg.Run["queryTimeout"]))
 	assert.JSONEq(t, `true`, string(cfg.Run["future"]))
 	assert.JSONEq(t, `1.5`, string(cfg.Params["scaleFactor"]))
 	assert.JSONEq(t, `false`, string(cfg.Params["enabled"]))

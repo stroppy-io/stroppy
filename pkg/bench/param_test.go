@@ -573,6 +573,21 @@ func TestScenarioQueryTimeoutResolution(t *testing.T) {
 
 	clearParamEnv(t, "QUERY_TIMEOUT")
 
+	params, _, err = defineWorkload(&paramTestWorkload{name: "test/query-timeout"}, ParamInputs{
+		RunConfig: map[string]json.RawMessage{"queryTimeout": json.RawMessage(`"250ms"`)},
+	}, false)
+	if err != nil {
+		t.Fatalf("defineWorkload() config error = %v", err)
+	}
+
+	if got := params.queryTimeout.Value(); got != 250*time.Millisecond {
+		t.Fatalf("queryTimeout = %v, want 250ms", got)
+	}
+
+	if params.queryTimeout.Source() != ParamSourceConfig {
+		t.Fatalf("queryTimeout source = %q, want %q", params.queryTimeout.Source(), ParamSourceConfig)
+	}
+
 	params, _, err = defineWorkload(&paramTestWorkload{name: "test/query-timeout"}, ParamInputs{}, false)
 	if err != nil {
 		t.Fatalf("defineWorkload() default error = %v", err)
