@@ -2,6 +2,7 @@ package bench
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -24,20 +25,18 @@ type BeginOpts struct {
 // Exec runs a statement that returns no rows.
 func (b *Bench) Exec(ctx context.Context, sql string, args map[string]any) error {
 	res, err := b.runQuery(ctx, sql, args)
-	if res != nil {
-		res.Rows.Close()
-	}
 
-	return err
+	return b.finishQuery(res, err)
 }
 
 // QueryValue returns the first column of the first row (or nil if no rows).
-func (b *Bench) QueryValue(ctx context.Context, sql string, args map[string]any) (any, error) {
+func (b *Bench) QueryValue(ctx context.Context, sql string, args map[string]any) (_ any, err error) {
 	res, err := b.runQuery(ctx, sql, args)
+	defer func() { err = b.finishQuery(res, err) }()
+
 	if err != nil {
 		return nil, err
 	}
-	defer res.Rows.Close()
 
 	return firstQueryValue(res.Rows)
 }
@@ -62,12 +61,13 @@ func firstQueryValue(rows driver.Rows) (any, error) {
 }
 
 // QueryRow returns the first row (or nil if no rows).
-func (b *Bench) QueryRow(ctx context.Context, sql string, args map[string]any) ([]any, error) {
+func (b *Bench) QueryRow(ctx context.Context, sql string, args map[string]any) (_ []any, err error) {
 	res, err := b.runQuery(ctx, sql, args)
+	defer func() { err = b.finishQuery(res, err) }()
+
 	if err != nil {
 		return nil, err
 	}
-	defer res.Rows.Close()
 
 	if !res.Rows.Next() {
 		return nil, res.Rows.Err()
@@ -77,31 +77,40 @@ func (b *Bench) QueryRow(ctx context.Context, sql string, args map[string]any) (
 }
 
 // QueryRows returns all rows (up to a large cap).
-func (b *Bench) QueryRows(ctx context.Context, sql string, args map[string]any) ([][]any, error) {
+func (b *Bench) QueryRows(ctx context.Context, sql string, args map[string]any) (_ [][]any, err error) {
 	res, err := b.runQuery(ctx, sql, args)
+	defer func() { err = b.finishQuery(res, err) }()
+
 	if err != nil {
 		return nil, err
 	}
-	defer res.Rows.Close()
 
 	return res.Rows.ReadAll(0), res.Rows.Err()
 }
 
 func (b *Bench) runQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
 	res, err := b.drv.RunQuery(ctx, sql, args)
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
+	}
+
+	return res, nil
+}
+
+func (b *Bench) finishQuery(res *driver.QueryResult, queryErr error) error {
+	if res != nil && res.Rows != nil {
+		closeErr := res.Rows.Close()
+		queryErr = errors.Join(queryErr, res.Rows.Err(), closeErr)
+	}
 
 	var elapsed time.Duration
 	if res != nil && res.Stats != nil {
 		elapsed = res.Stats.Elapsed
 	}
 
-	b.root.txMetrics.recordQueryResult(b.vu, elapsed, err)
+	b.root.txMetrics.recordQueryResult(b.vu, elapsed, queryErr)
 
-	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
-	}
-
-	return res, nil
+	return queryErr
 }
 
 // Insert runs a typed [driver.InsertRequest] through the benchmark driver,
@@ -250,29 +259,28 @@ type TxX struct {
 
 func (t *TxX) Exec(ctx context.Context, sql string, args map[string]any) error {
 	res, err := t.runQuery(ctx, sql, args)
-	if res != nil {
-		res.Rows.Close()
-	}
 
-	return err
+	return t.b.finishQuery(res, err)
 }
 
-func (t *TxX) QueryValue(ctx context.Context, sql string, args map[string]any) (any, error) {
+func (t *TxX) QueryValue(ctx context.Context, sql string, args map[string]any) (_ any, err error) {
 	res, err := t.runQuery(ctx, sql, args)
+	defer func() { err = t.b.finishQuery(res, err) }()
+
 	if err != nil {
 		return nil, err
 	}
-	defer res.Rows.Close()
 
 	return firstQueryValue(res.Rows)
 }
 
-func (t *TxX) QueryRow(ctx context.Context, sql string, args map[string]any) ([]any, error) {
+func (t *TxX) QueryRow(ctx context.Context, sql string, args map[string]any) (_ []any, err error) {
 	res, err := t.runQuery(ctx, sql, args)
+	defer func() { err = t.b.finishQuery(res, err) }()
+
 	if err != nil {
 		return nil, err
 	}
-	defer res.Rows.Close()
 
 	if !res.Rows.Next() {
 		return nil, res.Rows.Err()
@@ -281,12 +289,13 @@ func (t *TxX) QueryRow(ctx context.Context, sql string, args map[string]any) ([]
 	return res.Rows.Values(), res.Rows.Err()
 }
 
-func (t *TxX) QueryRows(ctx context.Context, sql string, args map[string]any) ([][]any, error) {
+func (t *TxX) QueryRows(ctx context.Context, sql string, args map[string]any) (_ [][]any, err error) {
 	res, err := t.runQuery(ctx, sql, args)
+	defer func() { err = t.b.finishQuery(res, err) }()
+
 	if err != nil {
 		return nil, err
 	}
-	defer res.Rows.Close()
 
 	return res.Rows.ReadAll(0), res.Rows.Err()
 }
@@ -296,14 +305,6 @@ func (t *TxX) runQuery(ctx context.Context, sql string, args map[string]any) (*d
 	if t.tx == nil {
 		// NONE mode: delegate to the parent driver.
 		res, err := t.b.drv.RunQuery(ctx, sql, args)
-
-		var elapsed time.Duration
-		if res != nil && res.Stats != nil {
-			elapsed = res.Stats.Elapsed
-		}
-
-		t.b.root.txMetrics.recordQueryResult(t.b.vu, elapsed, err)
-
 		if err != nil {
 			return nil, fmt.Errorf("query: %w", err)
 		}
@@ -312,14 +313,6 @@ func (t *TxX) runQuery(ctx context.Context, sql string, args map[string]any) (*d
 	}
 
 	res, err := t.tx.RunQuery(ctx, sql, args)
-
-	var elapsed time.Duration
-	if res != nil && res.Stats != nil {
-		elapsed = res.Stats.Elapsed
-	}
-
-	t.b.root.txMetrics.recordQueryResult(t.b.vu, elapsed, err)
-
 	if err != nil {
 		return nil, fmt.Errorf("tx query: %w", err)
 	}
