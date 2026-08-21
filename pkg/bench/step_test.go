@@ -32,6 +32,8 @@ type testBenchFixture struct {
 
 func newTestBenchFixture(t *testing.T) *testBenchFixture {
 	t.Helper()
+	t.Setenv("STROPPY_STEPS", "")
+	t.Setenv("STROPPY_NO_STEPS", "")
 
 	core, logs := observer.New(zapcore.InfoLevel)
 	lg := zap.New(core)
@@ -153,6 +155,7 @@ func (stepLifecycleWorkload) Setup(_ context.Context, b *Bench) error {
 
 func (stepLifecycleWorkload) Iterate(ctx context.Context, b *Bench) error {
 	return b.StepSilent("workload", func() error {
+		stepLifecycleWorkloadRuns.Add(1)
 		_, err := b.QueryValue(ctx, "SELECT 1", nil)
 
 		return err
@@ -160,6 +163,8 @@ func (stepLifecycleWorkload) Iterate(ctx context.Context, b *Bench) error {
 }
 
 func (stepLifecycleWorkload) Teardown(context.Context, *Bench) error { return nil }
+
+var stepLifecycleWorkloadRuns atomic.Int64
 
 var registerStepLifecycleWorkloadOnce sync.Once
 
@@ -171,8 +176,12 @@ func registerStepLifecycleWorkload() {
 
 func TestWorkloadRunLogVolumeIsBounded(t *testing.T) {
 	registerStepLifecycleWorkload()
+	t.Setenv("STROPPY_STEPS", "")
+	t.Setenv("STROPPY_NO_STEPS", "")
 
-	runAndCount := func(iterations string) (*observer.ObservedLogs, int) {
+	runAndCount := func(iterations string) (*observer.ObservedLogs, int, int64) {
+		stepLifecycleWorkloadRuns.Store(0)
+
 		core, logs := observer.New(zapcore.InfoLevel)
 		lg := zap.New(core)
 
@@ -187,11 +196,14 @@ func TestWorkloadRunLogVolumeIsBounded(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		return logs, logs.Len()
+		return logs, logs.Len(), stepLifecycleWorkloadRuns.Load()
 	}
 
-	base, baseCount := runAndCount("100")
-	_, highCount := runAndCount("10000")
+	base, baseCount, baseIterations := runAndCount("100")
+	_, highCount, highIterations := runAndCount("10000")
+
+	require.Equal(t, int64(100), baseIterations)
+	require.Equal(t, int64(10000), highIterations)
 
 	// The per-iteration workload step is silent, so a 100x increase in iteration
 	// count must not change the log volume: only the one setup step records.
