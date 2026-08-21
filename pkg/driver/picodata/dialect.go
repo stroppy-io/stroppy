@@ -78,7 +78,9 @@ func (PicoDialect) Deduplicate() bool { return true }
 
 // StatementTimeoutHint returns sql unchanged; picodata honors context
 // cancellation for its per-statement deadline.
-func (PicoDialect) StatementTimeoutHint(sql string, _ time.Duration) string { return sql }
+func (PicoDialect) StatementTimeoutHint(sql string, _ time.Duration) (string, bool) {
+	return sql, false
+}
 
 // StatementDeadline returns timeout unchanged; there is no server-side hint
 // to outlast.

@@ -18,8 +18,8 @@ func (testDialect) Convert(v any) (any, error) {
 	return v, nil
 }
 func (testDialect) Deduplicate() bool { return false }
-func (testDialect) StatementTimeoutHint(sql string, _ time.Duration) string {
-	return sql
+func (testDialect) StatementTimeoutHint(sql string, _ time.Duration) (string, bool) {
+	return sql, false
 }
 func (testDialect) StatementDeadline(timeout time.Duration) time.Duration { return timeout }
 

@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"math"
+	"strings"
 	"testing"
 	"time"
 )
@@ -13,52 +14,67 @@ func TestStatementTimeoutHint(t *testing.T) {
 	maxTimeout := time.Duration(math.MaxUint32) * time.Millisecond
 
 	tests := []struct {
-		name    string
-		sql     string
-		timeout time.Duration
-		want    string
+		name       string
+		sql        string
+		timeout    time.Duration
+		want       string
+		wantActive bool
 	}{
 		{
-			name:    "select gets hint after keyword",
-			sql:     "SELECT 1",
-			timeout: time.Second,
-			want:    "SELECT /*+ MAX_EXECUTION_TIME(1000) */ 1",
+			name:       "select gets hint after keyword",
+			sql:        "SELECT 1",
+			timeout:    time.Second,
+			want:       "SELECT /*+ MAX_EXECUTION_TIME(1000) */ 1",
+			wantActive: true,
 		},
 		{
-			name:    "lowercase select preserves its keyword case",
-			sql:     "select * from t",
-			timeout: 2 * time.Second,
-			want:    "select /*+ MAX_EXECUTION_TIME(2000) */ * from t",
+			name:       "lowercase select preserves its keyword case",
+			sql:        "select * from t",
+			timeout:    2 * time.Second,
+			want:       "select /*+ MAX_EXECUTION_TIME(2000) */ * from t",
+			wantActive: true,
 		},
 		{
-			name:    "leading whitespace preserved",
-			sql:     "  SELECT x",
-			timeout: time.Second,
-			want:    "  SELECT /*+ MAX_EXECUTION_TIME(1000) */ x",
+			name:       "leading whitespace preserved",
+			sql:        "  SELECT x",
+			timeout:    time.Second,
+			want:       "  SELECT /*+ MAX_EXECUTION_TIME(1000) */ x",
+			wantActive: true,
 		},
 		{
-			name:    "existing optimizer hints share one block",
-			sql:     "SeLeCt\t/*+ SET_VAR(sort_buffer_size=32768) BKA(t) */\n1",
-			timeout: 1500 * time.Millisecond,
-			want:    "SeLeCt\t/*+ SET_VAR(sort_buffer_size=32768) BKA(t) MAX_EXECUTION_TIME(1500) */\n1",
+			name:       "existing optimizer hints share one block",
+			sql:        "SeLeCt\t/*+ SET_VAR(sort_buffer_size=32768) BKA(t) */\n1",
+			timeout:    1500 * time.Millisecond,
+			want:       "SeLeCt\t/*+ SET_VAR(sort_buffer_size=32768) BKA(t) MAX_EXECUTION_TIME(1500) */\n1",
+			wantActive: true,
 		},
 		{
-			name:    "adjacent optimizer hint block is merged",
-			sql:     "SELECT/*+SET_VAR(sort_buffer_size=32768)*/1",
-			timeout: time.Second,
-			want:    "SELECT/*+SET_VAR(sort_buffer_size=32768) MAX_EXECUTION_TIME(1000)*/1",
+			name:       "adjacent optimizer hint block is merged",
+			sql:        "SELECT/*+SET_VAR(sort_buffer_size=32768)*/1",
+			timeout:    time.Second,
+			want:       "SELECT/*+SET_VAR(sort_buffer_size=32768) MAX_EXECUTION_TIME(1000)*/1",
+			wantActive: true,
 		},
 		{
-			name:    "existing timeout spacing and case are replaced",
-			sql:     "SELECT /*+ set_var(sort_buffer_size=32768) mAx_ExEcUtIoN_tImE \n ( \t5000 ) BKA(t) */ 1",
-			timeout: 250 * time.Millisecond,
-			want:    "SELECT /*+ set_var(sort_buffer_size=32768) MAX_EXECUTION_TIME(250) BKA(t) */ 1",
+			name:       "existing timeout spacing and case are replaced",
+			sql:        "SELECT /*+ set_var(sort_buffer_size=32768) mAx_ExEcUtIoN_tImE \n ( \t5000 ) BKA(t) */ 1",
+			timeout:    250 * time.Millisecond,
+			want:       "SELECT /*+ set_var(sort_buffer_size=32768) MAX_EXECUTION_TIME(250) BKA(t) */ 1",
+			wantActive: true,
 		},
 		{
-			name:    "all duplicate timeouts collapse to configured timeout",
-			sql:     "SELECT /*+ MAX_EXECUTION_TIME(1) SET_VAR(sort_buffer_size=32768) max_execution_time (2) */ 1",
-			timeout: 250 * time.Millisecond,
-			want:    "SELECT /*+ MAX_EXECUTION_TIME(250) SET_VAR(sort_buffer_size=32768)  */ 1",
+			name:       "all duplicate timeouts collapse to configured timeout",
+			sql:        "SELECT /*+ MAX_EXECUTION_TIME(1) SET_VAR(sort_buffer_size=32768) max_execution_time (2) */ 1",
+			timeout:    250 * time.Millisecond,
+			want:       "SELECT /*+ MAX_EXECUTION_TIME(250) SET_VAR(sort_buffer_size=32768)  */ 1",
+			wantActive: true,
+		},
+		{
+			name:       "canonical timeout remains active without a rewrite",
+			sql:        "SELECT /*+ MAX_EXECUTION_TIME(1000) */ 1",
+			timeout:    time.Second,
+			want:       "SELECT /*+ MAX_EXECUTION_TIME(1000) */ 1",
+			wantActive: true,
 		},
 		{
 			name:    "select sleep remains on exact client deadline",
@@ -85,16 +101,18 @@ func TestStatementTimeoutHint(t *testing.T) {
 			want:    "SELECT /* probe */ SLEEP(10)",
 		},
 		{
-			name:    "sleep identifier prefix remains eligible",
-			sql:     "SELECT SLEEPING(10)",
-			timeout: time.Second,
-			want:    "SELECT /*+ MAX_EXECUTION_TIME(1000) */ SLEEPING(10)",
+			name:       "sleep identifier prefix remains eligible",
+			sql:        "SELECT SLEEPING(10)",
+			timeout:    time.Second,
+			want:       "SELECT /*+ MAX_EXECUTION_TIME(1000) */ SLEEPING(10)",
+			wantActive: true,
 		},
 		{
-			name:    "select expression without whitespace is eligible",
-			sql:     "SELECT(1)",
-			timeout: time.Second,
-			want:    "SELECT /*+ MAX_EXECUTION_TIME(1000) */(1)",
+			name:       "select expression without whitespace is eligible",
+			sql:        "SELECT(1)",
+			timeout:    time.Second,
+			want:       "SELECT /*+ MAX_EXECUTION_TIME(1000) */(1)",
+			wantActive: true,
 		},
 		{
 			name:    "non-select unchanged",
@@ -151,22 +169,25 @@ func TestStatementTimeoutHint(t *testing.T) {
 			want:    "SELECT 1",
 		},
 		{
-			name:    "one millisecond is representable",
-			sql:     "SELECT 1",
-			timeout: time.Millisecond,
-			want:    "SELECT /*+ MAX_EXECUTION_TIME(1) */ 1",
+			name:       "one millisecond is representable",
+			sql:        "SELECT 1",
+			timeout:    time.Millisecond,
+			want:       "SELECT /*+ MAX_EXECUTION_TIME(1) */ 1",
+			wantActive: true,
 		},
 		{
-			name:    "fractional milliseconds use representable integer part",
-			sql:     "SELECT 1",
-			timeout: time.Millisecond + 500*time.Microsecond,
-			want:    "SELECT /*+ MAX_EXECUTION_TIME(1) */ 1",
+			name:       "fractional milliseconds use representable integer part",
+			sql:        "SELECT 1",
+			timeout:    time.Millisecond + 500*time.Microsecond,
+			want:       "SELECT /*+ MAX_EXECUTION_TIME(1) */ 1",
+			wantActive: true,
 		},
 		{
-			name:    "uint32 maximum milliseconds is representable",
-			sql:     "SELECT 1",
-			timeout: maxTimeout,
-			want:    "SELECT /*+ MAX_EXECUTION_TIME(4294967295) */ 1",
+			name:       "uint32 maximum milliseconds is representable",
+			sql:        "SELECT 1",
+			timeout:    maxTimeout,
+			want:       "SELECT /*+ MAX_EXECUTION_TIME(4294967295) */ 1",
+			wantActive: true,
 		},
 		{
 			name:    "duration above uint32 maximum unchanged",
@@ -180,10 +201,85 @@ func TestStatementTimeoutHint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := dialect.StatementTimeoutHint(tt.sql, tt.timeout); got != tt.want {
-				t.Fatalf("StatementTimeoutHint() = %q, want %q", got, tt.want)
+			hintedSQL, active := dialect.StatementTimeoutHint(tt.sql, tt.timeout)
+			if hintedSQL != tt.want || active != tt.wantActive {
+				t.Fatalf(
+					"StatementTimeoutHint() = (%q, %t), want (%q, %t)",
+					hintedSQL,
+					active,
+					tt.want,
+					tt.wantActive,
+				)
 			}
 		})
+	}
+}
+
+func TestStatementTimeoutHintTopLevelSleepWrappers(t *testing.T) {
+	t.Parallel()
+
+	dialect := mysqlDialect{}
+	selectPrefixes := []string{
+		"SELECT /* expression */ ",
+		"SELECT /*+ SET_VAR(sort_buffer_size=32768) */ /* expression */ ",
+	}
+	calls := []string{
+		"SLEEP(10)",
+		"sleep /* call */ (10)",
+		"SlEeP(IF(1, 10, 0))",
+	}
+
+	for depth := range 5 {
+		opening := strings.Repeat("( /* open */ ", depth)
+		closing := strings.Repeat(" /* close */ )", depth)
+
+		for _, prefix := range selectPrefixes {
+			for _, call := range calls {
+				sql := prefix + opening + "/* before */ " + call + " /* after */" + closing + " AS slept"
+				hintedSQL, active := dialect.StatementTimeoutHint(sql, time.Second)
+
+				if hintedSQL != sql || active {
+					t.Errorf(
+						"depth %d StatementTimeoutHint(%q) = (%q, %t), want (%q, false)",
+						depth,
+						sql,
+						hintedSQL,
+						active,
+						sql,
+					)
+				}
+			}
+		}
+	}
+}
+
+func TestStatementTimeoutHintDoesNotPromoteNestedSleep(t *testing.T) {
+	t.Parallel()
+
+	dialect := mysqlDialect{}
+	expressions := []string{
+		"ABS(SLEEP(10))",
+		"(ABS(SLEEP(10)))",
+		"SLEEP(10) + 1",
+		"(SLEEP(10) + 1)",
+		"(SLEEP(10)) + 1",
+		"(SELECT SLEEP(10))",
+	}
+
+	for _, expression := range expressions {
+		sql := "SELECT " + expression
+		want := "SELECT /*+ MAX_EXECUTION_TIME(1000) */ " + expression
+		hintedSQL, active := dialect.StatementTimeoutHint(sql, time.Second)
+
+		if hintedSQL != want || !active {
+			t.Errorf(
+				"StatementTimeoutHint(%q) = (%q, %t), want (%q, true)",
+				sql,
+				hintedSQL,
+				active,
+				want,
+			)
+		}
 	}
 }
 

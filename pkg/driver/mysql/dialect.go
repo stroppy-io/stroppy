@@ -45,15 +45,15 @@ var maxExecutionTimeHintPattern = regexp.MustCompile(
 // kept in the single hint block MySQL recognizes after SELECT. WITH/EXPLAIN-
 // prefixed, comment-prefixed, non-SELECT, and top-level SELECT SLEEP statements
 // rely on the client deadline backstop.
-func (mysqlDialect) StatementTimeoutHint(sql string, timeout time.Duration) string {
+func (mysqlDialect) StatementTimeoutHint(sql string, timeout time.Duration) (string, bool) {
 	milliseconds, ok := mysqlTimeoutMilliseconds(timeout)
 	if !ok {
-		return sql
+		return sql, false
 	}
 
 	selectEnd, ok := selectKeywordEnd(sql)
 	if !ok {
-		return sql
+		return sql, false
 	}
 
 	hintStart, hintEnd, hasHint := optimizerHintBounds(sql, selectEnd)
@@ -64,12 +64,12 @@ func (mysqlDialect) StatementTimeoutHint(sql string, timeout time.Duration) stri
 	}
 
 	if isTopLevelSleep(sql[expressionStart:]) {
-		return sql
+		return sql, false
 	}
 
 	timeoutHint := fmt.Sprintf("MAX_EXECUTION_TIME(%d)", milliseconds)
 	if !hasHint {
-		return sql[:selectEnd] + " /*+ " + timeoutHint + " */" + sql[selectEnd:]
+		return sql[:selectEnd] + " /*+ " + timeoutHint + " */" + sql[selectEnd:], true
 	}
 
 	contentStart := hintStart + len("/*+")
@@ -83,7 +83,7 @@ func (mysqlDialect) StatementTimeoutHint(sql string, timeout time.Duration) stri
 		content = insertOptimizerHint(content, timeoutHint)
 	}
 
-	return sql[:contentStart] + content + sql[contentEnd:]
+	return sql[:contentStart] + content + sql[contentEnd:], true
 }
 
 func replaceMaxExecutionTimeHints(content, hint string) (string, bool) {
@@ -177,37 +177,171 @@ func insertOptimizerHint(content, hint string) string {
 }
 
 func isTopLevelSleep(sql string) bool {
-	start := skipLeadingBlockComments(sql)
+	offset, ok := skipSQLTrivia(sql, 0)
+	if !ok {
+		return false
+	}
+
+	wrappers := 0
+	for offset < len(sql) && sql[offset] == '(' {
+		wrappers++
+
+		offset, ok = skipSQLTrivia(sql, offset+1)
+		if !ok {
+			return false
+		}
+	}
 
 	const function = "SLEEP"
 
-	end := start + len(function)
-	if end > len(sql) || !strings.EqualFold(sql[start:end], function) {
+	functionEnd := offset + len(function)
+	if functionEnd > len(sql) || !strings.EqualFold(sql[offset:functionEnd], function) {
 		return false
 	}
 
-	if end < len(sql) && isSQLIdentifierByte(sql[end]) {
+	if functionEnd < len(sql) && isSQLIdentifierByte(sql[functionEnd]) {
 		return false
 	}
 
-	end = skipSQLWhitespace(sql, end)
+	offset, ok = skipSQLTrivia(sql, functionEnd)
+	if !ok || offset >= len(sql) || sql[offset] != '(' {
+		return false
+	}
 
-	return end < len(sql) && sql[end] == '('
+	offset, ok = parenthesizedEnd(sql, offset)
+	if !ok {
+		return false
+	}
+
+	for range wrappers {
+		offset, ok = skipSQLTrivia(sql, offset)
+		if !ok || offset >= len(sql) || sql[offset] != ')' {
+			return false
+		}
+
+		offset++
+	}
+
+	offset, ok = skipSQLTrivia(sql, offset)
+	if !ok {
+		return false
+	}
+
+	return isTopLevelSleepSuffix(sql, offset)
 }
 
-func skipLeadingBlockComments(sql string) int {
-	offset := skipSQLWhitespace(sql, 0)
-	for strings.HasPrefix(sql[offset:], "/*") {
+func skipSQLTrivia(sql string, offset int) (int, bool) {
+	for {
+		offset = skipSQLWhitespace(sql, offset)
+		if !strings.HasPrefix(sql[offset:], "/*") {
+			return offset, true
+		}
+
 		closeOffset := strings.Index(sql[offset+len("/*"):], "*/")
 		if closeOffset < 0 {
-			return offset
+			return offset, false
 		}
 
 		offset += len("/*") + closeOffset + len("*/")
-		offset = skipSQLWhitespace(sql, offset)
+	}
+}
+
+func parenthesizedEnd(sql string, start int) (int, bool) {
+	depth := 0
+
+	for offset := start; offset < len(sql); {
+		if strings.HasPrefix(sql[offset:], "/*") {
+			closeOffset := strings.Index(sql[offset+len("/*"):], "*/")
+			if closeOffset < 0 {
+				return 0, false
+			}
+
+			offset += len("/*") + closeOffset + len("*/")
+
+			continue
+		}
+
+		switch sql[offset] {
+		case '\'', '"', '`':
+			var ok bool
+
+			offset, ok = quotedSQLEnd(sql, offset)
+			if !ok {
+				return 0, false
+			}
+		case '(':
+			depth++
+			offset++
+		case ')':
+			depth--
+			offset++
+
+			if depth == 0 {
+				return offset, true
+			}
+		default:
+			offset++
+		}
 	}
 
-	return offset
+	return 0, false
+}
+
+func quotedSQLEnd(sql string, start int) (int, bool) {
+	quote := sql[start]
+
+	for offset := start + 1; offset < len(sql); offset++ {
+		if sql[offset] == '\\' {
+			offset++
+
+			continue
+		}
+
+		if sql[offset] != quote {
+			continue
+		}
+
+		if offset+1 < len(sql) && sql[offset+1] == quote {
+			offset++
+
+			continue
+		}
+
+		return offset + 1, true
+	}
+
+	return 0, false
+}
+
+func isTopLevelSleepSuffix(sql string, offset int) bool {
+	if offset == len(sql) {
+		return true
+	}
+
+	if sql[offset] == ',' || sql[offset] == ';' {
+		return true
+	}
+
+	return hasSQLKeyword(sql, offset, "AS") ||
+		hasSQLKeyword(sql, offset, "FROM") ||
+		hasSQLKeyword(sql, offset, "INTO") ||
+		hasSQLKeyword(sql, offset, "WHERE") ||
+		hasSQLKeyword(sql, offset, "GROUP") ||
+		hasSQLKeyword(sql, offset, "HAVING") ||
+		hasSQLKeyword(sql, offset, "ORDER") ||
+		hasSQLKeyword(sql, offset, "LIMIT") ||
+		hasSQLKeyword(sql, offset, "FOR") ||
+		hasSQLKeyword(sql, offset, "LOCK") ||
+		hasSQLKeyword(sql, offset, "UNION")
+}
+
+func hasSQLKeyword(sql string, offset int, keyword string) bool {
+	end := offset + len(keyword)
+	if end > len(sql) || !strings.EqualFold(sql[offset:end], keyword) {
+		return false
+	}
+
+	return end == len(sql) || !isSQLIdentifierByte(sql[end])
 }
 
 func skipSQLWhitespace(sql string, offset int) int {

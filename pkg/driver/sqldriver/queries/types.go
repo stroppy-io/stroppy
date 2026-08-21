@@ -20,14 +20,15 @@ type Dialect interface {
 	Deduplicate() bool
 
 	// StatementTimeoutHint returns sql with a server-side per-statement
-	// timeout bound (e.g. an optimizer-hint comment) applied, or sql unchanged
-	// when timeout is non-positive or the dialect has no such mechanism.
-	// Dialects that bound execution server-side (MySQL MAX_EXECUTION_TIME)
-	// keep the pooled connection reusable on timeout, where client-side context
-	// cancellation alone would discard it.
-	StatementTimeoutHint(sql string, timeout time.Duration) string
+	// timeout bound (e.g. an optimizer-hint comment) and reports whether that
+	// bound is active. The boolean remains true when sql already contains the
+	// canonical bound and therefore needs no textual change. Dialects that bound
+	// execution server-side (MySQL MAX_EXECUTION_TIME) keep the pooled connection
+	// reusable on timeout, where client-side context cancellation alone would
+	// discard it.
+	StatementTimeoutHint(sql string, timeout time.Duration) (hintedSQL string, active bool)
 
-	// StatementDeadline returns the client-side deadline to pair with the
+	// StatementDeadline returns the client-side deadline to pair with an active
 	// server-side bound from StatementTimeoutHint. A dialect with a server-side
 	// hint pads the deadline so the backend's own timeout fires first and keeps
 	// the pooled connection; others return timeout unchanged. A non-positive

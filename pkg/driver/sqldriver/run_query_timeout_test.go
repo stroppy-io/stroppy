@@ -42,12 +42,16 @@ func (q *deadlineCaptureQuery) QueryContext(
 
 type selectiveHintDialect struct{ testDialect }
 
-func (selectiveHintDialect) StatementTimeoutHint(sql string, _ time.Duration) string {
+func (selectiveHintDialect) StatementTimeoutHint(sql string, _ time.Duration) (string, bool) {
 	if sql == "SELECT 1" {
-		return "SELECT /* timeout hint */ 1"
+		return "SELECT /* timeout hint */ 1", true
 	}
 
-	return sql
+	if sql == "SELECT /* timeout hint */ 1" {
+		return sql, true
+	}
+
+	return sql, false
 }
 
 func (selectiveHintDialect) StatementDeadline(timeout time.Duration) time.Duration {
@@ -114,6 +118,12 @@ func TestRunQueryDeadlineMatchesHintApplication(t *testing.T) {
 		{
 			name:         "hinted statement gets grace",
 			sql:          "SELECT 1",
+			wantSQL:      "SELECT /* timeout hint */ 1",
+			wantDeadline: timeout + time.Second,
+		},
+		{
+			name:         "canonical hint still gets grace",
+			sql:          "SELECT /* timeout hint */ 1",
 			wantSQL:      "SELECT /* timeout hint */ 1",
 			wantDeadline: timeout + time.Second,
 		},
