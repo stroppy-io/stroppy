@@ -2,14 +2,21 @@ package bench
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
+	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/driver/mysql"
 )
 
 func TestInsertRejectsNilRequest(t *testing.T) {
@@ -166,7 +173,8 @@ func newQueryTestTarget(
 
 func TestQueryTerminalErrorsAndMetrics(t *testing.T) {
 	rowErr := context.DeadlineExceeded
-	closeErr := errors.New("close rows")
+	closeFailure := errors.New("close rows")
+	closeErr := errors.Join(closeFailure, fmt.Errorf("close: %w", rowErr))
 	runErr := errors.New("run query")
 
 	paths := []struct {
@@ -237,7 +245,8 @@ func TestQueryTerminalErrorsAndMetrics(t *testing.T) {
 
 				err := operation.run(target)
 				require.ErrorIs(t, err, context.DeadlineExceeded)
-				require.ErrorIs(t, err, closeErr)
+				require.ErrorIs(t, err, closeFailure)
+				require.Equal(t, 1, strings.Count(err.Error(), context.DeadlineExceeded.Error()))
 				require.False(t, metricsRecordedBeforeClose)
 				require.Equal(t, 1, rows.closeCalls)
 
@@ -319,4 +328,100 @@ func queryMetricCount(t *testing.T, data metricdata.ResourceMetrics, name string
 	}
 
 	return 0
+}
+
+type closeCountingDriver struct {
+	driver.Driver
+	closeCalls int
+}
+
+func (d *closeCountingDriver) RunQuery(
+	ctx context.Context,
+	sql string,
+	args map[string]any,
+) (*driver.QueryResult, error) {
+	res, err := d.Driver.RunQuery(ctx, sql, args)
+	if res != nil && res.Rows != nil {
+		res.Rows = &closeCountingRows{Rows: res.Rows, closeCalls: &d.closeCalls}
+	}
+
+	return res, err
+}
+
+type closeCountingRows struct {
+	driver.Rows
+	closeCalls *int
+}
+
+func (r *closeCountingRows) Close() error {
+	*r.closeCalls++
+
+	return r.Rows.Close()
+}
+
+func TestMySQLCallTimeoutIsReportedOnce(t *testing.T) {
+	const (
+		procedure = "stroppy_bench_result_cleanup_timeout"
+		timeout   = 100 * time.Millisecond
+	)
+
+	dsn := os.Getenv("STROPPY_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("STROPPY_MYSQL_DSN not set; skipping real-MySQL timeout test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	mysqlDriver, err := mysql.NewDriver(ctx, driver.Options{
+		Logger: zap.NewNop(),
+		Config: &stroppy.DriverConfig{
+			Url:        dsn,
+			DriverType: stroppy.DriverConfig_DRIVER_TYPE_MYSQL,
+		},
+		QueryTimeout: timeout,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		teardownCtx, teardownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer teardownCancel()
+
+		require.NoError(t, mysqlDriver.Teardown(teardownCtx))
+	})
+
+	fixtureDB, err := sql.Open("mysql", dsn)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, fixtureDB.Close()) })
+
+	execFixture := func(query string) {
+		fixtureCtx, fixtureCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer fixtureCancel()
+
+		_, err := fixtureDB.ExecContext(fixtureCtx, query)
+		require.NoError(t, err)
+	}
+	execFixture("DROP PROCEDURE IF EXISTS " + procedure)
+	execFixture("CREATE PROCEDURE " + procedure + "() BEGIN SELECT 1; DO SLEEP(2); END")
+	t.Cleanup(func() { execFixture("DROP PROCEDURE IF EXISTS " + procedure) })
+
+	fx := newTestBenchFixture(t)
+	previousRoot := root
+	root = fx.rootState
+
+	t.Cleanup(func() { root = previousRoot })
+
+	countingDriver := &closeCountingDriver{Driver: mysqlDriver}
+	fx.b.drv = countingDriver
+
+	err = fx.b.Exec(context.Background(), "CALL "+procedure+"()", nil)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.Equal(t, 1, strings.Count(err.Error(), context.DeadlineExceeded.Error()))
+	require.Equal(t, 1, countingDriver.closeCalls)
+
+	var data metricdata.ResourceMetrics
+	require.NoError(t, fx.reader.Collect(context.Background(), &data))
+	require.Equal(t, queryMetricCounts{
+		operations: 1,
+		errors:     1,
+	}, collectQueryMetricCounts(t, data, fx.prefix))
 }

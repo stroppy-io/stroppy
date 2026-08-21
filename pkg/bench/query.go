@@ -2,7 +2,6 @@ package bench
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -100,7 +99,7 @@ func (b *Bench) runQuery(ctx context.Context, sql string, args map[string]any) (
 func (b *Bench) finishQuery(res *driver.QueryResult, queryErr error) error {
 	if res != nil && res.Rows != nil {
 		closeErr := res.Rows.Close()
-		queryErr = errors.Join(queryErr, res.Rows.Err(), closeErr)
+		queryErr = driver.JoinErrors(queryErr, res.Rows.Err(), closeErr)
 	}
 
 	var elapsed time.Duration

@@ -38,3 +38,49 @@ func DefaultErrorFacts(err error) ErrorFacts {
 		return ErrorFacts{Kind: ErrorKindUnknown}
 	}
 }
+
+// JoinErrors combines distinct error causes while preserving errors.Is behavior.
+func JoinErrors(errs ...error) error {
+	unique := make([]error, 0, len(errs))
+	for _, err := range errs {
+		appendDistinctError(&unique, err)
+	}
+
+	return errors.Join(unique...)
+}
+
+func appendDistinctError(unique *[]error, err error) {
+	if err == nil {
+		return
+	}
+
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, cause := range joined.Unwrap() {
+			appendDistinctError(unique, cause)
+		}
+
+		return
+	}
+
+	for _, candidate := range *unique {
+		if sameErrorCause(candidate, err) {
+			return
+		}
+	}
+
+	*unique = append(*unique, err)
+}
+
+func sameErrorCause(left, right error) bool {
+	for left != nil {
+		for candidate := right; candidate != nil; candidate = errors.Unwrap(candidate) {
+			if errors.Is(left, candidate) || errors.Is(candidate, left) {
+				return true
+			}
+		}
+
+		left = errors.Unwrap(left)
+	}
+
+	return false
+}

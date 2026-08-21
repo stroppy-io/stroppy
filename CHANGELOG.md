@@ -41,6 +41,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Query timeouts that surface while closing database result sets are reported once instead of repeating the same error. ([#153](https://github.com/stroppy-io/stroppy/pull/153))
 - Empty, whitespace-only, or comma-only step filters no longer conflict with a real opposite filter; `--steps=` still clears configured steps before `--no-steps` is applied. ([#149](https://github.com/stroppy-io/stroppy/pull/149))
 - The `workload` step is silent on the console again (no `Start`/`End` record per transaction), while setup/load/schema steps still log a single start/end and the `simple` workload now honors `--steps`/`--no-steps` like the other workloads. ([#149](https://github.com/stroppy-io/stroppy/pull/149))
 - `--steps` and `--no-steps` are rejected as mutually exclusive even when one is set in the config file and the other on the command line. ([#149](https://github.com/stroppy-io/stroppy/pull/149))

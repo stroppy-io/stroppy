@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"errors"
+	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -158,12 +160,21 @@ func TestRowsCloseDrainsEveryResultSet(t *testing.T) {
 
 func TestRowsClosePreservesTerminalErrors(t *testing.T) {
 	tests := []struct {
-		name        string
-		terminalErr error
-		closeErr    error
+		name            string
+		terminalErr     error
+		closeErr        error
+		wantErr         error
+		wantTimeoutOnce bool
 	}{
 		{name: "iteration", terminalErr: errors.New("iteration failed")},
 		{name: "close", closeErr: errors.New("close failed")},
+		{
+			name:            "duplicate deadline",
+			terminalErr:     context.DeadlineExceeded,
+			closeErr:        fmt.Errorf("close: %w", context.DeadlineExceeded),
+			wantErr:         context.DeadlineExceeded,
+			wantTimeoutOnce: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -183,13 +194,21 @@ func TestRowsClosePreservesTerminalErrors(t *testing.T) {
 			rows := NewRows(sqlRows)
 			err = rows.Close()
 
-			wantErr := tt.terminalErr
+			wantErr := tt.wantErr
+			if wantErr == nil {
+				wantErr = tt.terminalErr
+			}
+
 			if wantErr == nil {
 				wantErr = tt.closeErr
 			}
 
 			if !errors.Is(err, wantErr) {
 				t.Fatalf("Close() error = %v, want %v", err, wantErr)
+			}
+
+			if tt.wantTimeoutOnce && strings.Count(err.Error(), context.DeadlineExceeded.Error()) != 1 {
+				t.Fatalf("Close() error = %q, want one deadline", err)
 			}
 
 			if tt.terminalErr != nil && !errors.Is(rows.Err(), tt.terminalErr) {

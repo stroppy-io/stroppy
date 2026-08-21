@@ -2,7 +2,6 @@ package sqldriver
 
 import (
 	"database/sql"
-	"errors"
 
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
@@ -108,5 +107,5 @@ func (r *Rows) close(currentResultDone bool) error {
 		}
 	}
 
-	return errors.Join(r.sqlRows.Err(), r.sqlRows.Close())
+	return driver.JoinErrors(r.sqlRows.Err(), r.sqlRows.Close())
 }
