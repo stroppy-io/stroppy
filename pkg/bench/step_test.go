@@ -3,6 +3,7 @@ package bench
 import (
 	"context"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -160,8 +161,16 @@ func (stepLifecycleWorkload) Iterate(ctx context.Context, b *Bench) error {
 
 func (stepLifecycleWorkload) Teardown(context.Context, *Bench) error { return nil }
 
+var registerStepLifecycleWorkloadOnce sync.Once
+
+func registerStepLifecycleWorkload() {
+	registerStepLifecycleWorkloadOnce.Do(func() {
+		Register(func() Workload { return stepLifecycleWorkload{} })
+	})
+}
+
 func TestWorkloadRunLogVolumeIsBounded(t *testing.T) {
-	Register(func() Workload { return stepLifecycleWorkload{} })
+	registerStepLifecycleWorkload()
 
 	runAndCount := func(iterations string) (*observer.ObservedLogs, int) {
 		core, logs := observer.New(zapcore.InfoLevel)
