@@ -32,6 +32,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- SIGINT and SIGTERM now cancel the running workload and trigger graceful teardown; a second signal forces immediate exit. Exit status is 130 (SIGINT) or 143 (SIGTERM) after a graceful cancellation, 2 after a forced exit, and 1 for other errors. ([#148](https://github.com/stroppy-io/stroppy/pull/148))
 - Built-in workloads expose their tuning options as typed parameters while preserving the existing environment-variable names. ([#128](https://github.com/stroppy-io/stroppy/pull/128))
 - TPC-DS typed loads format common cell types directly into reusable buffers. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Benchmark metrics now use standard OpenTelemetry counters, gauges, and fixed-bucket histograms. Query throughput and error rates are derived from monotonic `*_total` counters instead of k6-style sampled rates. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
