@@ -1017,18 +1017,32 @@ func TestBlankStepNamesDoNotConflictWithNoSteps(t *testing.T) {
 	t.Cleanup(func() { Cmd.SetContext(previousContext) })
 
 	tests := []struct {
-		name   string
-		config string
-		args   []string
+		name        string
+		config      string
+		args        []string
+		wantSteps   string
+		wantNoSteps string
 	}{
 		{
-			name:   "explicit empty CLI steps clears config allowlist",
-			config: `{"script":"simple","steps":["load_data"]}`,
-			args:   []string{"--steps=", "--no-steps", "workload"},
+			name:        "explicit empty CLI steps clears config allowlist",
+			config:      `{"script":"simple","steps":["load_data"]}`,
+			args:        []string{"--steps=", "--no-steps", "workload"},
+			wantNoSteps: "workload",
 		},
 		{
-			name:   "blank config steps with real config noSteps",
-			config: `{"script":"simple","steps":[""],"noSteps":["workload"]}`,
+			name:        "blank config steps with real config noSteps",
+			config:      `{"script":"simple","steps":[""],"noSteps":["workload"]}`,
+			wantNoSteps: "workload",
+		},
+		{
+			name:        "comma-only config steps with real config noSteps",
+			config:      `{"script":"simple","steps":[" , , "],"noSteps":["workload"]}`,
+			wantNoSteps: "workload",
+		},
+		{
+			name:      "real config steps with comma-only config noSteps",
+			config:    `{"script":"simple","steps":["load_data"],"noSteps":[" , , "]}`,
+			wantSteps: "load_data",
 		},
 	}
 
@@ -1046,12 +1060,24 @@ func TestBlankStepNamesDoNotConflictWithNoSteps(t *testing.T) {
 				t.Fatalf("RunE() error = %v", err)
 			}
 
-			if steps, set := os.LookupEnv("STROPPY_STEPS"); set {
-				t.Fatalf("dispatched STROPPY_STEPS = %q, want unset", steps)
+			if steps, set := os.LookupEnv("STROPPY_STEPS"); steps != test.wantSteps || set != (test.wantSteps != "") {
+				t.Fatalf(
+					"dispatched STROPPY_STEPS = %q, set = %t; want %q, set = %t",
+					steps,
+					set,
+					test.wantSteps,
+					test.wantSteps != "",
+				)
 			}
 
-			if noSteps := os.Getenv("STROPPY_NO_STEPS"); noSteps != "workload" {
-				t.Fatalf("dispatched STROPPY_NO_STEPS = %q, want workload", noSteps)
+			if noSteps, set := os.LookupEnv("STROPPY_NO_STEPS"); noSteps != test.wantNoSteps || set != (test.wantNoSteps != "") {
+				t.Fatalf(
+					"dispatched STROPPY_NO_STEPS = %q, set = %t; want %q, set = %t",
+					noSteps,
+					set,
+					test.wantNoSteps,
+					test.wantNoSteps != "",
+				)
 			}
 		})
 	}

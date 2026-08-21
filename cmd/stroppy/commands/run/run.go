@@ -946,9 +946,11 @@ func parseRunArgs(args []string) (runArgs, error) {
 
 func normalizeStepNames(names []string) []string {
 	normalized := make([]string, 0, len(names))
-	for _, name := range names {
-		if name = strings.TrimSpace(name); name != "" {
-			normalized = append(normalized, name)
+	for _, group := range names {
+		for _, name := range strings.Split(group, ",") {
+			if name = strings.TrimSpace(name); name != "" {
+				normalized = append(normalized, name)
+			}
 		}
 	}
 
