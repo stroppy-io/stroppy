@@ -25,6 +25,7 @@ func TestClassifyError(t *testing.T) {
 			want: driver.ErrorKindDeadlock,
 		},
 		{name: "lock timeout", err: &pgconn.PgError{Code: "55P03"}, want: driver.ErrorKindLockTimeout},
+		{name: "query canceled", err: &pgconn.PgError{Code: "57014"}, want: driver.ErrorKindTimeout},
 		{name: "other postgres", err: &pgconn.PgError{Code: "23505"}, want: driver.ErrorKindUnknown},
 		{name: "other", err: errors.New("boom"), want: driver.ErrorKindUnknown},
 	}
