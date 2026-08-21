@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	gomysql "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 
@@ -72,7 +73,45 @@ func assertReusable(t *testing.T, drv driver.Driver) {
 	}
 }
 
-func assertMySQLClientTimeout(
+func querySingleString(t *testing.T, drv driver.Driver, sql string) string {
+	t.Helper()
+
+	res, err := drv.RunQuery(context.Background(), sql, nil)
+	if err != nil {
+		t.Fatalf("query %q: %v", sql, err)
+	}
+	defer res.Rows.Close()
+
+	if !res.Rows.Next() {
+		t.Fatalf("query %q returned no rows: %v", sql, res.Rows.Err())
+	}
+
+	values := res.Rows.Values()
+	if len(values) != 1 {
+		t.Fatalf("query %q returned %d values, want 1", sql, len(values))
+	}
+
+	value, ok := values[0].(string)
+	if !ok {
+		t.Fatalf("query %q returned %T, want string", sql, values[0])
+	}
+
+	return value
+}
+
+func assertTimeoutElapsed(t *testing.T, elapsed, timeout time.Duration) {
+	t.Helper()
+
+	if minimum := timeout / 2; elapsed < minimum {
+		t.Fatalf("query timed out after %v, want at least %v", elapsed, minimum)
+	}
+
+	if maximum := timeout + 500*time.Millisecond; elapsed > maximum {
+		t.Fatalf("query timed out after %v, want at most %v", elapsed, maximum)
+	}
+}
+
+func assertMySQLClientTimeoutError(
 	t *testing.T,
 	drv driver.Driver,
 	sql string,
@@ -96,10 +135,51 @@ func assertMySQLClientTimeout(
 	if errors.Is(err, context.Canceled) {
 		t.Fatalf("query %q error = %v was classified as canceled", sql, err)
 	}
-	if limit := timeout + 500*time.Millisecond; elapsed > limit {
-		t.Fatalf("query %q timed out after %v, want client timeout within %v", sql, elapsed, limit)
+
+	assertTimeoutElapsed(t, elapsed, timeout)
+}
+
+func assertMySQLClientTimeout(
+	t *testing.T,
+	drv driver.Driver,
+	sql string,
+	timeout time.Duration,
+) {
+	t.Helper()
+	assertMySQLClientTimeoutError(t, drv, sql, timeout)
+	assertReusable(t, drv)
+}
+
+func assertMySQLServerTimeout(
+	t *testing.T,
+	drv driver.Driver,
+	sql string,
+	timeout time.Duration,
+) {
+	t.Helper()
+
+	start := time.Now()
+	err := runQueryToCompletion(drv, sql)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatalf("query %q returned nil error, want MySQL timeout", sql)
 	}
 
+	if facts := drv.ClassifyError(err); facts.Kind != driver.ErrorKindTimeout {
+		t.Fatalf("ClassifyError = %q, want %q (err=%v)", facts.Kind, driver.ErrorKindTimeout, err)
+	}
+
+	var mysqlErr *gomysql.MySQLError
+	if !errors.As(err, &mysqlErr) || mysqlErr.Number != 3024 {
+		t.Fatalf("query %q error = %v, want MySQL error 3024", sql, err)
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		t.Fatalf("query %q error = %v, want server timeout", sql, err)
+	}
+
+	assertTimeoutElapsed(t, elapsed, timeout)
 	assertReusable(t, drv)
 }
 
@@ -138,39 +218,73 @@ func TestQueryTimeoutPostgres(t *testing.T) {
 	assertReusable(t, drv)
 }
 
-// TestQueryTimeoutMySQL runs a large metadata join past the deadline and verifies
-// the server-side MAX_EXECUTION_TIME hint (error 3024) fires ahead of the padded
-// client deadline, so the connection is not discarded and stays reusable.
+// TestQueryTimeoutMySQL verifies an eligible SELECT receives a server-side
+// MAX_EXECUTION_TIME hint and reports MySQL error 3024 near the configured bound.
 func TestQueryTimeoutMySQL(t *testing.T) {
 	skipIfRequested(t)
 
+	const timeout = 150 * time.Millisecond
+
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
-	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, 150*time.Millisecond)
+	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, timeout)
 
 	const query = "SELECT COUNT(*) FROM information_schema.columns a " +
 		"CROSS JOIN information_schema.columns b CROSS JOIN information_schema.columns c"
 
-	start := time.Now()
-	err := runQueryToCompletion(drv, query)
-	elapsed := time.Since(start)
+	assertMySQLServerTimeout(t, drv, query, timeout)
+}
 
-	if err == nil {
-		t.Fatal("large metadata join returned nil error, want timeout")
-	}
-	if facts := drv.ClassifyError(err); facts.Kind != driver.ErrorKindTimeout {
-		t.Fatalf("ClassifyError = %q, want %q (err=%v)", facts.Kind, driver.ErrorKindTimeout, err)
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("mysql timeout err = %v reached the client deadline, want server-side 3024", err)
-	}
-	if errors.Is(err, context.Canceled) {
-		t.Fatalf("mysql timeout err = %v was classified as canceled", err)
-	}
-	if elapsed > 5*time.Second {
-		t.Fatalf("large metadata join ran %v, deadline did not fire", elapsed)
-	}
+func TestQueryTimeoutMySQLMergesOptimizerHints(t *testing.T) {
+	skipIfRequested(t)
 
-	assertReusable(t, drv)
+	const timeout = 150 * time.Millisecond
+
+	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
+	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, timeout)
+
+	t.Run("SET_VAR survives", func(t *testing.T) {
+		const query = "SELECT /*+ SET_VAR(sort_buffer_size=32768) */ " +
+			"CAST(@@sort_buffer_size AS CHAR)"
+
+		if got := querySingleString(t, drv, query); got != "32768" {
+			t.Fatalf("statement sort_buffer_size = %q, want 32768", got)
+		}
+	})
+
+	t.Run("existing timeout is replaced", func(t *testing.T) {
+		const query = "SELECT /*+ SET_VAR(sort_buffer_size=32768) " +
+			"mAx_ExEcUtIoN_tImE ( 5000 ) */ COUNT(*) " +
+			"FROM information_schema.columns a " +
+			"CROSS JOIN information_schema.columns b " +
+			"CROSS JOIN information_schema.columns c"
+
+		assertMySQLServerTimeout(t, drv, query, timeout)
+	})
+}
+
+func TestQueryTimeoutMySQLSelectSleep(t *testing.T) {
+	skipIfRequested(t)
+
+	const timeout = 150 * time.Millisecond
+
+	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
+	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, timeout)
+
+	assertMySQLClientTimeout(t, drv, "SELECT SLEEP(10)", timeout)
+}
+
+func TestQueryTimeoutMySQLUnrepresentableDuration(t *testing.T) {
+	skipIfRequested(t)
+
+	const timeout = time.Millisecond - time.Nanosecond
+
+	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
+	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, timeout)
+
+	const query = "SELECT COUNT(*) FROM information_schema.columns a " +
+		"CROSS JOIN information_schema.columns b CROSS JOIN information_schema.columns c"
+
+	assertMySQLClientTimeoutError(t, drv, query, timeout)
 }
 
 func TestQueryTimeoutMySQLUnhintedStatements(t *testing.T) {

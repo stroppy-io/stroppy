@@ -9,7 +9,8 @@ import (
 func TestStatementTimeoutHint(t *testing.T) {
 	t.Parallel()
 
-	dynamic := mysqlDialect{}
+	dialect := mysqlDialect{}
+	maxTimeout := time.Duration(math.MaxUint32) * time.Millisecond
 
 	tests := []struct {
 		name    string
@@ -34,6 +35,66 @@ func TestStatementTimeoutHint(t *testing.T) {
 			sql:     "  SELECT x",
 			timeout: time.Second,
 			want:    "  SELECT /*+ MAX_EXECUTION_TIME(1000) */ x",
+		},
+		{
+			name:    "existing optimizer hints share one block",
+			sql:     "SeLeCt\t/*+ SET_VAR(sort_buffer_size=32768) BKA(t) */\n1",
+			timeout: 1500 * time.Millisecond,
+			want:    "SeLeCt\t/*+ SET_VAR(sort_buffer_size=32768) BKA(t) MAX_EXECUTION_TIME(1500) */\n1",
+		},
+		{
+			name:    "adjacent optimizer hint block is merged",
+			sql:     "SELECT/*+SET_VAR(sort_buffer_size=32768)*/1",
+			timeout: time.Second,
+			want:    "SELECT/*+SET_VAR(sort_buffer_size=32768) MAX_EXECUTION_TIME(1000)*/1",
+		},
+		{
+			name:    "existing timeout spacing and case are replaced",
+			sql:     "SELECT /*+ set_var(sort_buffer_size=32768) mAx_ExEcUtIoN_tImE \n ( \t5000 ) BKA(t) */ 1",
+			timeout: 250 * time.Millisecond,
+			want:    "SELECT /*+ set_var(sort_buffer_size=32768) MAX_EXECUTION_TIME(250) BKA(t) */ 1",
+		},
+		{
+			name:    "all duplicate timeouts collapse to configured timeout",
+			sql:     "SELECT /*+ MAX_EXECUTION_TIME(1) SET_VAR(sort_buffer_size=32768) max_execution_time (2) */ 1",
+			timeout: 250 * time.Millisecond,
+			want:    "SELECT /*+ MAX_EXECUTION_TIME(250) SET_VAR(sort_buffer_size=32768)  */ 1",
+		},
+		{
+			name:    "select sleep remains on exact client deadline",
+			sql:     "SELECT SLEEP(10) AS slept",
+			timeout: time.Second,
+			want:    "SELECT SLEEP(10) AS slept",
+		},
+		{
+			name:    "select sleep accepts keyword spacing and case",
+			sql:     "select\nSlEeP \t (10)",
+			timeout: time.Second,
+			want:    "select\nSlEeP \t (10)",
+		},
+		{
+			name:    "select sleep after optimizer hints remains unchanged",
+			sql:     "SELECT /*+ SET_VAR(sort_buffer_size=32768) */ SLEEP(10)",
+			timeout: time.Second,
+			want:    "SELECT /*+ SET_VAR(sort_buffer_size=32768) */ SLEEP(10)",
+		},
+		{
+			name:    "select sleep after ordinary block comment remains unchanged",
+			sql:     "SELECT /* probe */ SLEEP(10)",
+			timeout: time.Second,
+			want:    "SELECT /* probe */ SLEEP(10)",
+		},
+		{
+			name:    "sleep identifier prefix remains eligible",
+			sql:     "SELECT SLEEPING(10)",
+			timeout: time.Second,
+			want:    "SELECT /*+ MAX_EXECUTION_TIME(1000) */ SLEEPING(10)",
+		},
+		{
+			name:    "select expression without whitespace is eligible",
+			sql:     "SELECT(1)",
+			timeout: time.Second,
+			want:    "SELECT /*+ MAX_EXECUTION_TIME(1000) */(1)",
 		},
 		{
 			name:    "non-select unchanged",
@@ -77,13 +138,49 @@ func TestStatementTimeoutHint(t *testing.T) {
 			timeout: 0,
 			want:    "SELECT 1",
 		},
+		{
+			name:    "negative timeout unchanged",
+			sql:     "SELECT 1",
+			timeout: -time.Second,
+			want:    "SELECT 1",
+		},
+		{
+			name:    "sub-millisecond timeout unchanged",
+			sql:     "SELECT 1",
+			timeout: time.Millisecond - time.Nanosecond,
+			want:    "SELECT 1",
+		},
+		{
+			name:    "one millisecond is representable",
+			sql:     "SELECT 1",
+			timeout: time.Millisecond,
+			want:    "SELECT /*+ MAX_EXECUTION_TIME(1) */ 1",
+		},
+		{
+			name:    "fractional milliseconds use representable integer part",
+			sql:     "SELECT 1",
+			timeout: time.Millisecond + 500*time.Microsecond,
+			want:    "SELECT /*+ MAX_EXECUTION_TIME(1) */ 1",
+		},
+		{
+			name:    "uint32 maximum milliseconds is representable",
+			sql:     "SELECT 1",
+			timeout: maxTimeout,
+			want:    "SELECT /*+ MAX_EXECUTION_TIME(4294967295) */ 1",
+		},
+		{
+			name:    "duration above uint32 maximum unchanged",
+			sql:     "SELECT 1",
+			timeout: maxTimeout + time.Nanosecond,
+			want:    "SELECT 1",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := dynamic.StatementTimeoutHint(tt.sql, tt.timeout); got != tt.want {
+			if got := dialect.StatementTimeoutHint(tt.sql, tt.timeout); got != tt.want {
 				t.Fatalf("StatementTimeoutHint() = %q, want %q", got, tt.want)
 			}
 		})
@@ -93,26 +190,55 @@ func TestStatementTimeoutHint(t *testing.T) {
 func TestStatementDeadline(t *testing.T) {
 	t.Parallel()
 
-	dynamic := mysqlDialect{}
+	dialect := mysqlDialect{}
+	maxTimeout := time.Duration(math.MaxUint32) * time.Millisecond
 
-	if got := dynamic.StatementDeadline(150 * time.Millisecond); got != 150*time.Millisecond+statementTimeoutGrace {
-		t.Fatalf("StatementDeadline(150ms) = %v, want 150ms + grace", got)
+	tests := []struct {
+		name    string
+		timeout time.Duration
+		want    time.Duration
+	}{
+		{name: "disabled", timeout: 0, want: 0},
+		{name: "negative", timeout: -time.Second, want: -time.Second},
+		{
+			name:    "sub-millisecond remains exact",
+			timeout: time.Millisecond - time.Nanosecond,
+			want:    time.Millisecond - time.Nanosecond,
+		},
+		{
+			name:    "minimum hint gets grace",
+			timeout: time.Millisecond,
+			want:    time.Millisecond + statementTimeoutGrace,
+		},
+		{
+			name:    "fractional milliseconds get grace",
+			timeout: time.Millisecond + 500*time.Microsecond,
+			want:    time.Millisecond + 500*time.Microsecond + statementTimeoutGrace,
+		},
+		{
+			name:    "maximum hint gets grace",
+			timeout: maxTimeout,
+			want:    maxTimeout + statementTimeoutGrace,
+		},
+		{
+			name:    "above maximum remains exact",
+			timeout: maxTimeout + time.Nanosecond,
+			want:    maxTimeout + time.Nanosecond,
+		},
+		{
+			name:    "maximum duration remains exact",
+			timeout: time.Duration(math.MaxInt64),
+			want:    time.Duration(math.MaxInt64),
+		},
 	}
 
-	if got := dynamic.StatementDeadline(0); got != 0 {
-		t.Fatalf("StatementDeadline(0) = %v, want 0 (disabled)", got)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	if got := dynamic.StatementDeadline(-time.Second); got != -time.Second {
-		t.Fatalf("StatementDeadline(-1s) = %v, want -1s (disabled)", got)
-	}
-
-	maxDuration := time.Duration(math.MaxInt64)
-	if got := dynamic.StatementDeadline(maxDuration); got != maxDuration {
-		t.Fatalf("StatementDeadline(max duration) = %v, want saturated %v", got, maxDuration)
-	}
-
-	if got := dynamic.StatementDeadline(maxDuration - statementTimeoutGrace); got != maxDuration {
-		t.Fatalf("StatementDeadline(max duration - grace) = %v, want %v", got, maxDuration)
+			if got := dialect.StatementDeadline(tt.timeout); got != tt.want {
+				t.Fatalf("StatementDeadline(%v) = %v, want %v", tt.timeout, got, tt.want)
+			}
+		})
 	}
 }

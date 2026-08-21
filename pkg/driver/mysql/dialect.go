@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 	"time"
 
@@ -28,58 +29,200 @@ func (mysqlDialect) Deduplicate() bool        { return false }
 // discards the connection instead of letting the hint return its own 3024
 // error. The hint fires at `timeout` (server-side); the padded client deadline
 // is only a backstop.
-const statementTimeoutGrace = time.Second
+const (
+	statementTimeoutGrace = time.Second
+	maxStatementTimeout   = time.Duration(math.MaxUint32) * time.Millisecond
+)
 
-// StatementTimeoutHint bounds SELECT statements server-side with the
+var maxExecutionTimeHintPattern = regexp.MustCompile(
+	`(?i)\bMAX_EXECUTION_TIME[ \t\r\n]*\([ \t\r\n]*[0-9]+[ \t\r\n]*\)`,
+)
+
+// StatementTimeoutHint bounds eligible SELECT statements server-side with the
 // MAX_EXECUTION_TIME optimizer hint so a timed-out query aborts cleanly and
 // keeps its pooled connection, unlike client-side cancellation which forces
-// go-sql-driver/mysql to discard the connection. The hint is recognized only
-// when the statement's first token is SELECT: WITH/EXPLAIN-prefixed or
-// comment-prefixed statements rely on the client deadline backstop, and
-// non-SELECT statements (including INSERT ... SELECT) are intentionally left
-// untouched because the hint does not bind them.
+// go-sql-driver/mysql to discard the connection. Existing optimizer hints are
+// kept in the single hint block MySQL recognizes after SELECT. WITH/EXPLAIN-
+// prefixed, comment-prefixed, non-SELECT, and top-level SELECT SLEEP statements
+// rely on the client deadline backstop.
 func (mysqlDialect) StatementTimeoutHint(sql string, timeout time.Duration) string {
-	if timeout <= 0 {
+	milliseconds, ok := mysqlTimeoutMilliseconds(timeout)
+	if !ok {
 		return sql
 	}
 
-	const keyword = "SELECT"
-
-	trimmed := strings.TrimLeft(sql, " \t\r\n")
-
-	upper := strings.ToUpper(trimmed)
-	if !strings.HasPrefix(upper, keyword) {
+	selectEnd, ok := selectKeywordEnd(sql)
+	if !ok {
 		return sql
 	}
 
-	// Only inject when "SELECT" is a whole keyword, not a longer identifier.
-	if rest := upper[len(keyword):]; rest != "" && !isSQLWhitespace(rest[0]) {
+	hintStart, hintEnd, hasHint := optimizerHintBounds(sql, selectEnd)
+
+	expressionStart := selectEnd
+	if hasHint {
+		expressionStart = hintEnd
+	}
+
+	if isTopLevelSleep(sql[expressionStart:]) {
 		return sql
 	}
 
-	ms := timeout.Milliseconds()
-	if ms < 1 {
-		ms = 1
+	timeoutHint := fmt.Sprintf("MAX_EXECUTION_TIME(%d)", milliseconds)
+	if !hasHint {
+		return sql[:selectEnd] + " /*+ " + timeoutHint + " */" + sql[selectEnd:]
 	}
 
-	lead := sql[:len(sql)-len(trimmed)]
+	contentStart := hintStart + len("/*+")
+	contentEnd := hintEnd - len("*/")
+	content := sql[contentStart:contentEnd]
 
-	return lead + trimmed[:len(keyword)] + " " +
-		fmt.Sprintf("/*+ MAX_EXECUTION_TIME(%d) */", ms) + trimmed[len(keyword):]
+	replaced, found := replaceMaxExecutionTimeHints(content, timeoutHint)
+	if found {
+		content = replaced
+	} else {
+		content = insertOptimizerHint(content, timeoutHint)
+	}
+
+	return sql[:contentStart] + content + sql[contentEnd:]
 }
 
-// StatementDeadline returns the client-side deadline padded past the
-// server-side hint so the hint's 3024 timeout wins over client cancellation.
+func replaceMaxExecutionTimeHints(content, hint string) (string, bool) {
+	matches := maxExecutionTimeHintPattern.FindAllStringIndex(content, -1)
+	if len(matches) == 0 {
+		return content, false
+	}
+
+	var replaced strings.Builder
+	replaced.Grow(len(content) - matches[0][1] + matches[0][0] + len(hint))
+
+	last := 0
+	for index, match := range matches {
+		replaced.WriteString(content[last:match[0]])
+
+		if index == 0 {
+			replaced.WriteString(hint)
+		}
+
+		last = match[1]
+	}
+
+	replaced.WriteString(content[last:])
+
+	return replaced.String(), true
+}
+
+// StatementDeadline pads the client-side deadline only for durations that can
+// be represented by a MAX_EXECUTION_TIME hint.
 func (mysqlDialect) StatementDeadline(timeout time.Duration) time.Duration {
-	if timeout <= 0 {
+	if _, ok := mysqlTimeoutMilliseconds(timeout); !ok {
 		return timeout
 	}
 
-	if timeout > time.Duration(math.MaxInt64)-statementTimeoutGrace {
-		return time.Duration(math.MaxInt64)
+	return timeout + statementTimeoutGrace
+}
+
+func mysqlTimeoutMilliseconds(timeout time.Duration) (uint32, bool) {
+	if timeout < time.Millisecond || timeout > maxStatementTimeout {
+		return 0, false
 	}
 
-	return timeout + statementTimeoutGrace
+	return uint32(timeout / time.Millisecond), true
+}
+
+func selectKeywordEnd(sql string) (int, bool) {
+	const keyword = "SELECT"
+
+	start := skipSQLWhitespace(sql, 0)
+	end := start + len(keyword)
+
+	if end > len(sql) || !strings.EqualFold(sql[start:end], keyword) {
+		return 0, false
+	}
+
+	if end < len(sql) && isSQLIdentifierByte(sql[end]) {
+		return 0, false
+	}
+
+	return end, true
+}
+
+func optimizerHintBounds(sql string, offset int) (hintStart, hintEnd int, found bool) {
+	start := skipSQLWhitespace(sql, offset)
+	if !strings.HasPrefix(sql[start:], "/*+") {
+		return 0, 0, false
+	}
+
+	closeOffset := strings.Index(sql[start+len("/*+"):], "*/")
+	if closeOffset < 0 {
+		return 0, 0, false
+	}
+
+	end := start + len("/*+") + closeOffset + len("*/")
+
+	return start, end, true
+}
+
+func insertOptimizerHint(content, hint string) string {
+	insertAt := len(content)
+	for insertAt > 0 && isSQLWhitespace(content[insertAt-1]) {
+		insertAt--
+	}
+
+	separator := ""
+	if insertAt > 0 {
+		separator = " "
+	}
+
+	return content[:insertAt] + separator + hint + content[insertAt:]
+}
+
+func isTopLevelSleep(sql string) bool {
+	start := skipLeadingBlockComments(sql)
+
+	const function = "SLEEP"
+
+	end := start + len(function)
+	if end > len(sql) || !strings.EqualFold(sql[start:end], function) {
+		return false
+	}
+
+	if end < len(sql) && isSQLIdentifierByte(sql[end]) {
+		return false
+	}
+
+	end = skipSQLWhitespace(sql, end)
+
+	return end < len(sql) && sql[end] == '('
+}
+
+func skipLeadingBlockComments(sql string) int {
+	offset := skipSQLWhitespace(sql, 0)
+	for strings.HasPrefix(sql[offset:], "/*") {
+		closeOffset := strings.Index(sql[offset+len("/*"):], "*/")
+		if closeOffset < 0 {
+			return offset
+		}
+
+		offset += len("/*") + closeOffset + len("*/")
+		offset = skipSQLWhitespace(sql, offset)
+	}
+
+	return offset
+}
+
+func skipSQLWhitespace(sql string, offset int) int {
+	for offset < len(sql) && isSQLWhitespace(sql[offset]) {
+		offset++
+	}
+
+	return offset
+}
+
+func isSQLIdentifierByte(char byte) bool {
+	return char >= 'a' && char <= 'z' ||
+		char >= 'A' && char <= 'Z' ||
+		char >= '0' && char <= '9' ||
+		char == '_' || char == '$' || char >= 0x80
 }
 
 func isSQLWhitespace(c byte) bool {
