@@ -182,6 +182,7 @@ func RunQuery[R any](
 	}
 
 	hintedSQL := dialect.StatementTimeoutHint(processedSQL, timeout)
+
 	deadline := timeout
 	if hintedSQL != processedSQL {
 		deadline = dialect.StatementDeadline(timeout)

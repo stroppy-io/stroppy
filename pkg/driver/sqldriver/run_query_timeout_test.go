@@ -143,17 +143,22 @@ func TestRunQueryDeadlineMatchesHintApplication(t *testing.T) {
 				timeout,
 			)
 			after := time.Now()
+
 			if err != nil {
 				t.Fatalf("RunQuery() error = %v", err)
 			}
+
 			if capture.sql != tt.wantSQL {
 				t.Fatalf("QueryContext() SQL = %q, want %q", capture.sql, tt.wantSQL)
 			}
+
 			if !capture.hasLimit {
 				t.Fatal("QueryContext() context has no deadline")
 			}
+
 			earliest := before.Add(tt.wantDeadline)
 			latest := after.Add(tt.wantDeadline)
+
 			if capture.deadline.Before(earliest) || capture.deadline.After(latest) {
 				t.Fatalf("context deadline = %v, want between %v and %v", capture.deadline, earliest, latest)
 			}

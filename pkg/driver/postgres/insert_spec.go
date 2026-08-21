@@ -502,9 +502,11 @@ func (d *Driver) describeColumnCastTypes(
 	for i, field := range sd.Fields {
 		pgType, ok := typeMap.TypeForOID(field.DataTypeOID)
 		if !ok {
+			column := columns[i] //nolint:gosec // field and column counts are checked above
+
 			return nil, fmt.Errorf(
 				"%w: table %q column %q OID %d",
-				ErrUnregisteredColumnType, table, columns[i], field.DataTypeOID,
+				ErrUnregisteredColumnType, table, column, field.DataTypeOID,
 			)
 		}
 

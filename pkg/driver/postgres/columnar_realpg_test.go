@@ -96,27 +96,34 @@ func TestColumnarDescribeStatementContext(t *testing.T) {
 
 	parent := context.Background()
 	zeroDriver := &Driver{}
+
 	ctx, cancel := zeroDriver.statementCtx(parent)
 	defer cancel()
+
 	if ctx != parent {
 		t.Fatal("zero query timeout should preserve the parent context")
 	}
 
-	cancelledParent, cancelParent := context.WithCancel(parent)
+	canceledParent, cancelParent := context.WithCancel(parent)
 	cancelParent()
+
 	timedDriver := &Driver{queryTimeout: time.Minute}
-	ctx, cancel = timedDriver.statementCtx(cancelledParent)
+
+	ctx, cancel = timedDriver.statementCtx(canceledParent)
 	defer cancel()
+
 	if !errors.Is(ctx.Err(), context.Canceled) {
-		t.Fatalf("cancelled parent error = %v, want context.Canceled", ctx.Err())
+		t.Fatalf("canceled parent error = %v, want context.Canceled", ctx.Err())
 	}
 
 	ctx, cancel = timedDriver.statementCtx(parent)
 	defer cancel()
+
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		t.Fatal("positive query timeout should set a deadline")
 	}
+
 	if remaining := time.Until(deadline); remaining <= 0 || remaining > time.Minute {
 		t.Fatalf("deadline remaining = %s, want (0, %s]", remaining, time.Minute)
 	}
@@ -231,12 +238,14 @@ func TestColumnarDescribeTimeoutReleasesConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connect lock holder: %v", err)
 	}
+
 	t.Cleanup(func() { _ = locker.Close(context.Background()) })
 
 	lockTx, err := locker.Begin(context.Background())
 	if err != nil {
 		t.Fatalf("begin lock holder: %v", err)
 	}
+
 	t.Cleanup(func() { _ = lockTx.Rollback(context.Background()) })
 
 	if _, err := lockTx.Exec(context.Background(), "LOCK TABLE "+table+" IN ACCESS EXCLUSIVE MODE"); err != nil {
@@ -246,9 +255,11 @@ func TestColumnarDescribeTimeoutReleasesConnection(t *testing.T) {
 	start := time.Now()
 	_, err = d.describeColumnCastTypes(context.Background(), table, []string{"id"})
 	elapsed := time.Since(start)
+
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("describeColumnCastTypes error = %v, want context.DeadlineExceeded", err)
 	}
+
 	if elapsed < timeout/2 || elapsed > timeout*5 {
 		t.Fatalf("describeColumnCastTypes took %s, want near %s", elapsed, timeout)
 	}

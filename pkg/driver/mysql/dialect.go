@@ -74,6 +74,7 @@ func (mysqlDialect) StatementDeadline(timeout time.Duration) time.Duration {
 	if timeout <= 0 {
 		return timeout
 	}
+
 	if timeout > time.Duration(math.MaxInt64)-statementTimeoutGrace {
 		return time.Duration(math.MaxInt64)
 	}

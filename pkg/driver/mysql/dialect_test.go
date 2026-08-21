@@ -111,6 +111,7 @@ func TestStatementDeadline(t *testing.T) {
 	if got := dynamic.StatementDeadline(maxDuration); got != maxDuration {
 		t.Fatalf("StatementDeadline(max duration) = %v, want saturated %v", got, maxDuration)
 	}
+
 	if got := dynamic.StatementDeadline(maxDuration - statementTimeoutGrace); got != maxDuration {
 		t.Fatalf("StatementDeadline(max duration - grace) = %v, want %v", got, maxDuration)
 	}
