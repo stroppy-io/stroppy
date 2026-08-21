@@ -31,13 +31,15 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 		return err
 	}
 
-	cc1WSum, _ := qfloat(ctx, b, "SELECT SUM(w_ytd) FROM warehouse WHERE w_id "+wRange)
-	cc1DSum, _ := qfloat(ctx, b, "SELECT SUM(d_ytd) FROM district "+wWhere("d_w_id"))
-	cc4OSum, _ := qint(ctx, b, "SELECT SUM(o_ol_cnt) FROM orders "+wWhere("o_w_id"))
-	cc4OlCnt, _ := qint(ctx, b, "SELECT COUNT(*) FROM order_line "+wWhere("ol_w_id"))
+	cc1WSum, cc1WErr := qfloat(ctx, b, "SELECT SUM(w_ytd) FROM warehouse WHERE w_id "+wRange)
+	cc1DSum, cc1DErr := qfloat(ctx, b, "SELECT SUM(d_ytd) FROM district "+wWhere("d_w_id"))
+	cc4OSum, cc4OErr := qint(ctx, b, "SELECT SUM(o_ol_cnt) FROM orders "+wWhere("o_w_id"))
+	cc4OlCnt, cc4OlErr := qint(ctx, b, "SELECT COUNT(*) FROM order_line "+wWhere("ol_w_id"))
 
 	checkCardinalities(ctx, b, check, wWhere, wRange, warehouses)
-	checkConsistency(check, distNext, ordMax, noStats, cc1WSum, cc1DSum, cc4OSum, cc4OlCnt)
+	checkConsistency(check, distNext, ordMax, noStats,
+		cc1WSum, cc1DSum, cc1WErr, cc1DErr,
+		cc4OSum, cc4OlCnt, cc4OErr, cc4OlErr)
 	checkDistribution(ctx, b, check, wWhere, wRange)
 
 	if len(failures) > 0 {
@@ -119,13 +121,20 @@ func checkCardinalities(
 }
 
 // checkConsistency runs the CC1–CC4 logical-consistency checks against the
-// prefetched district/order/new_order aggregates.
+// prefetched district/order/new_order aggregates. A CC1/CC4 aggregate query error
+// fails its check outright, before any comparison: two zero fallback values could
+// otherwise compare equal and spuriously pass.
 func checkConsistency(
 	check func(string, bool),
 	distNext map[string]int64, ordMax map[string]int64, noStats map[string]noStat,
-	cc1WSum, cc1DSum float64, cc4OSum, cc4OlCnt int64,
+	cc1WSum, cc1DSum float64, cc1WErr, cc1DErr error,
+	cc4OSum, cc4OlCnt int64, cc4OErr, cc4OlErr error,
 ) {
-	check("CC1 sum(W_YTD) = sum(D_YTD)", absf(cc1WSum-cc1DSum) < 0.01)
+	if cc1WErr != nil || cc1DErr != nil {
+		check("CC1 sum(W_YTD) = sum(D_YTD)", false)
+	} else {
+		check("CC1 sum(W_YTD) = sum(D_YTD)", absf(cc1WSum-cc1DSum) < 0.01)
+	}
 
 	for k, dNext := range distNext {
 		check("CC2a D_NEXT_O_ID-1 = max(O_ID) ["+k+"]", ordMax[k] == dNext-1)
@@ -134,7 +143,11 @@ func checkConsistency(
 		check("CC3 new_order contiguous ["+k+"]", st.max-st.min+1 == st.cnt)
 	}
 
-	check("CC4 sum(O_OL_CNT) = count(order_line)", cc4OSum == cc4OlCnt)
+	if cc4OErr != nil || cc4OlErr != nil {
+		check("CC4 sum(O_OL_CNT) = count(order_line)", false)
+	} else {
+		check("CC4 sum(O_OL_CNT) = count(order_line)", cc4OSum == cc4OlCnt)
+	}
 }
 
 // checkDistribution runs the §1.3.1 data-distribution and constant-column checks.

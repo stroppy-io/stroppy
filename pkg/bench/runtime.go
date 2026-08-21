@@ -177,6 +177,11 @@ func DescribeAll() ([]Description, error) {
 	return descriptions, nil
 }
 
+// teardownTimeout bounds workload Teardown. It runs under a detached context so
+// cancellation that stopped Setup or the scenario does not skip cleanup while
+// caller values remain available.
+const teardownTimeout = 30 * time.Second
+
 // Run looks up a fresh workload instance and executes it: Define and parameter
 // resolution first, Setup once, Iterate across the scenario, then Teardown once.
 // env remains available to legacy workload Env calls through the root state.
@@ -188,7 +193,7 @@ func Run(
 	paramInputs ParamInputs,
 	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
-) error {
+) (retErr error) {
 	wl, ok := Lookup(name)
 	if !ok {
 		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
@@ -232,6 +237,18 @@ func Run(
 		drv: drv, cfg: cfg,
 	}
 
+	// Teardown always runs exactly once, even when Setup or the scenario returns
+	// early on cancellation or error. It executes under a timeout detached from
+	// cancellation of the run ctx, and its error is joined with any returned error.
+	defer func() {
+		teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
+		defer cancel()
+
+		if err := wl.Teardown(teardownCtx, setupBench); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("teardown: %w", err))
+		}
+	}()
+
 	if err := wl.Setup(ctx, setupBench); err != nil {
 		return fmt.Errorf("setup: %w", err)
 	}
@@ -246,10 +263,6 @@ func Run(
 		return wl.Iterate(vu.Context(), b)
 	}); err != nil {
 		return fmt.Errorf("scenario %q: %w", sc.name, err)
-	}
-
-	if err := wl.Teardown(ctx, setupBench); err != nil {
-		return fmt.Errorf("teardown: %w", err)
 	}
 
 	return nil

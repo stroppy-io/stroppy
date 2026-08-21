@@ -24,9 +24,18 @@ import (
 var txNames = []string{"new_order", "payment", "order_status", "delivery", "stock_level"}
 
 var (
-	errProcsDriverUnsupported = errors.New("tpcc/procs only supports postgres and mysql; use tpcc/tx for picodata/ydb")
-	errDistrictNotFound       = errors.New("new_order: district not found")
-	errItemNotFound           = errors.New("tpcc_rollback:item_not_found")
+	errProcsDriverUnsupported   = errors.New("tpcc/procs only supports postgres and mysql; use tpcc/tx for picodata/ydb")
+	errDistrictNotFound         = errors.New("new_order: district not found")
+	errNewOrderCustomerMissing  = errors.New("new_order: customer not found")
+	errNewOrderWarehouseMissing = errors.New("new_order: warehouse not found")
+	errItemNotFound             = errors.New("new_order: item not found")
+	errNewOrderStockMissing     = errors.New("new_order: stock not found")
+
+	// errRollbackSentinel marks the spec-mandated invalid-item rollback: the
+	// transaction rolls back on a bogus item id and is reported as success.
+	// isRollbackSentinel matches this value and the equivalent server-side raise.
+	errRollbackSentinel = errors.New("tpcc_rollback:item_not_found")
+
 	errPaymentNoCustomers     = errors.New("payment: no customers match c_last")
 	errPaymentByNameNoRow     = errors.New("payment: by-name SELECT returned no row")
 	errPaymentCustomerMissing = errors.New("payment: customer not found")
@@ -56,6 +65,9 @@ type workload struct {
 
 	m           *metrics
 	retryPolicy bench.RetryPolicy
+
+	measureStart time.Time
+	steady       *steady
 
 	vuStates sync.Map // uint64 -> *vuState
 }
@@ -204,7 +216,19 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		}
 	}
 
+	w.measureStart = time.Now()
+	w.steady = w.initSteady()
+
 	return nil
+}
+
+// initSteady allocates the paced steady-state tracker, or nil for unpaced runs.
+func (w *workload) initSteady() *steady {
+	if !w.pacing {
+		return nil
+	}
+
+	return newSteady(w.measureStart, steadySlotWidth, steadySlotCount)
 }
 
 // initConfig resolves driver-specific workload configuration.
@@ -322,8 +346,18 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	})
 }
 
-func (*workload) Teardown(_ context.Context, _ *bench.Bench) error {
+func (w *workload) Teardown(_ context.Context, b *bench.Bench) error {
+	w.emitComplianceReport(b)
+
 	return nil
+}
+
+// recordSteady buckets a New-Order completion into the paced steady-state time
+// series, for the report's 3σ spread check. No-op on unpaced runs.
+func (w *workload) recordSteady() {
+	if w.steady != nil {
+		w.steady.record(time.Now())
+	}
 }
 
 // q fetches one named query, panicking on a missing section/query (a schema drift).
@@ -377,7 +411,7 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 		lineIID[olCnt-1] = items + 1 // nonexistent item → sentinel rollback
 	}
 
-	return bench.Retry0(ctx, w.retryPolicy, func() error {
+	if err := bench.Retry0(ctx, w.retryPolicy, func() error {
 		tx, err := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
 		if err != nil {
 			return err
@@ -385,34 +419,64 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 
 		if err := w.newOrderBody(ctx, tx, wID, dID, cID, olCnt, allLocal,
 			lineIID, lineQty, lineSupply, forceRollback); err != nil {
-			_ = tx.Rollback(ctx)
-
-			if isRollbackSentinel(err) {
-				return nil // spec-mandated rollback counts as success
-			}
-
-			return err
+			return finishNewOrder(err, tx.Rollback(ctx))
 		}
 
 		return tx.Commit(ctx)
-	})
+	}); err != nil {
+		return err
+	}
+
+	w.recordSteady()
+
+	return nil
 }
 
-//nolint:gocognit,cyclop,funlen // TPC-C spec transaction; complexity is inherent to the spec.
+// finishNewOrder maps a new-order body error and its rollback error to the
+// transaction result. The spec-mandated invalid-item rollback (sentinel body
+// error) counts as success only when the rollback completed; any rollback error
+// is propagated so an unknown transaction outcome is never reported as success.
+func finishNewOrder(bodyErr, rollbackErr error) error {
+	if rollbackErr != nil {
+		if isRollbackSentinel(bodyErr) {
+			return fmt.Errorf("new_order: rollback after spec rollback: %w", rollbackErr)
+		}
+
+		return errors.Join(bodyErr, rollbackErr)
+	}
+
+	if isRollbackSentinel(bodyErr) {
+		return nil
+	}
+
+	return bodyErr
+}
+
+//nolint:gocognit,gocyclo,cyclop,funlen // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) newOrderBody(
 	ctx context.Context, tx *bench.TxX,
 	wID, dID, cID, olCnt, allLocal int64,
 	lineIID, lineQty, lineSupply []int64,
 	forceRollback bool,
 ) error {
-	if _, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_customer"), map[string]any{
+	custRow, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_customer"), map[string]any{
 		"c_id": cID, "d_id": dID, "w_id": wID,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 
-	if _, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_warehouse"), map[string]any{"w_id": wID}); err != nil {
+	if custRow == nil {
+		return fmt.Errorf("%w: (%d,%d,%d)", errNewOrderCustomerMissing, wID, dID, cID)
+	}
+
+	whRow, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_warehouse"), map[string]any{"w_id": wID})
+	if err != nil {
 		return err
+	}
+
+	if whRow == nil {
+		return fmt.Errorf("%w: %d", errNewOrderWarehouseMissing, wID)
 	}
 
 	distRow, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_district"), map[string]any{
@@ -461,9 +525,15 @@ func (w *workload) newOrderBody(
 	}
 
 	if forceRollback && !itemMapHas(itemMap, lineIID[olCnt-1]) {
+		for _, iid := range lineIID[:olCnt-1] {
+			if !itemMapHas(itemMap, iid) {
+				return fmt.Errorf("%w: %d", errItemNotFound, iid)
+			}
+		}
+
 		w.m.rollbackDone.Add(1)
 
-		return errItemNotFound
+		return errRollbackSentinel
 	}
 
 	// Batch stock read, grouped by supply warehouse.
@@ -508,16 +578,14 @@ func (w *workload) newOrderBody(
 
 		itemRow, ok := itemMap[iid]
 		if !ok {
-			w.m.rollbackDone.Add(1)
-
-			return errItemNotFound
+			return fmt.Errorf("%w: %d", errItemNotFound, iid)
 		}
 
 		iPrice := toFloat64(itemRow[1])
 
 		stockRow, ok := stockMap[stockKey{supplyWID, iid}]
 		if !ok {
-			continue // skip line if stock missing (matches tx.ts)
+			return fmt.Errorf("%w: (%d,%d)", errNewOrderStockMissing, supplyWID, iid)
 		}
 
 		sQuantityOld := toInt64(stockRow[1])
