@@ -23,6 +23,37 @@ func (f *fakeQuery) QueryContext(ctx context.Context, _ string, _ ...any) (int, 
 
 func noopWrap(int) driver.Rows { return nil }
 
+type deadlineCaptureQuery struct {
+	sql      string
+	deadline time.Time
+	hasLimit bool
+}
+
+func (q *deadlineCaptureQuery) QueryContext(
+	ctx context.Context,
+	sql string,
+	_ ...any,
+) (int, error) {
+	q.sql = sql
+	q.deadline, q.hasLimit = ctx.Deadline()
+
+	return 0, nil
+}
+
+type selectiveHintDialect struct{ testDialect }
+
+func (selectiveHintDialect) StatementTimeoutHint(sql string, _ time.Duration) string {
+	if sql == "SELECT 1" {
+		return "SELECT /* timeout hint */ 1"
+	}
+
+	return sql
+}
+
+func (selectiveHintDialect) StatementDeadline(timeout time.Duration) time.Duration {
+	return timeout + time.Second
+}
+
 type lazyQueryRows struct {
 	ctx context.Context
 	err error
@@ -66,6 +97,67 @@ func TestStatementTimeoutDisabled(t *testing.T) {
 
 	if ctx != context.Background() {
 		t.Fatal("zero timeout should return the parent context unchanged")
+	}
+}
+
+func TestRunQueryDeadlineMatchesHintApplication(t *testing.T) {
+	t.Parallel()
+
+	const timeout = 150 * time.Millisecond
+
+	tests := []struct {
+		name         string
+		sql          string
+		wantSQL      string
+		wantDeadline time.Duration
+	}{
+		{
+			name:         "hinted statement gets grace",
+			sql:          "SELECT 1",
+			wantSQL:      "SELECT /* timeout hint */ 1",
+			wantDeadline: timeout + time.Second,
+		},
+		{
+			name:         "unhinted statement gets exact timeout",
+			sql:          "DO 1",
+			wantSQL:      "DO 1",
+			wantDeadline: timeout,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			capture := &deadlineCaptureQuery{}
+			before := time.Now()
+
+			_, err := RunQuery(
+				context.Background(),
+				capture,
+				noopWrap,
+				selectiveHintDialect{},
+				zap.NewNop(),
+				tt.sql,
+				nil,
+				timeout,
+			)
+			after := time.Now()
+			if err != nil {
+				t.Fatalf("RunQuery() error = %v", err)
+			}
+			if capture.sql != tt.wantSQL {
+				t.Fatalf("QueryContext() SQL = %q, want %q", capture.sql, tt.wantSQL)
+			}
+			if !capture.hasLimit {
+				t.Fatal("QueryContext() context has no deadline")
+			}
+			earliest := before.Add(tt.wantDeadline)
+			latest := after.Add(tt.wantDeadline)
+			if capture.deadline.Before(earliest) || capture.deadline.After(latest) {
+				t.Fatalf("context deadline = %v, want between %v and %v", capture.deadline, earliest, latest)
+			}
+		})
 	}
 }
 

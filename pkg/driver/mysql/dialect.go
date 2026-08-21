@@ -3,6 +3,7 @@ package mysql
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -72,6 +73,9 @@ func (mysqlDialect) StatementTimeoutHint(sql string, timeout time.Duration) stri
 func (mysqlDialect) StatementDeadline(timeout time.Duration) time.Duration {
 	if timeout <= 0 {
 		return timeout
+	}
+	if timeout > time.Duration(math.MaxInt64)-statementTimeoutGrace {
+		return time.Duration(math.MaxInt64)
 	}
 
 	return timeout + statementTimeoutGrace

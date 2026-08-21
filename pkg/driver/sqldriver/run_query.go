@@ -181,12 +181,16 @@ func RunQuery[R any](
 		}
 	}
 
-	processedSQL = dialect.StatementTimeoutHint(processedSQL, timeout)
+	hintedSQL := dialect.StatementTimeoutHint(processedSQL, timeout)
+	deadline := timeout
+	if hintedSQL != processedSQL {
+		deadline = dialect.StatementDeadline(timeout)
+	}
 
-	queryCtx, cancel := StatementTimeout(ctx, dialect.StatementDeadline(timeout))
+	queryCtx, cancel := StatementTimeout(ctx, deadline)
 
 	start := time.Now()
-	rawRows, err := db.QueryContext(queryCtx, processedSQL, argsArr...)
+	rawRows, err := db.QueryContext(queryCtx, hintedSQL, argsArr...)
 	elapsed := time.Since(start)
 
 	if err != nil {

@@ -72,6 +72,37 @@ func assertReusable(t *testing.T, drv driver.Driver) {
 	}
 }
 
+func assertMySQLClientTimeout(
+	t *testing.T,
+	drv driver.Driver,
+	sql string,
+	timeout time.Duration,
+) {
+	t.Helper()
+
+	start := time.Now()
+	err := runQueryToCompletion(drv, sql)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatalf("query %q returned nil error, want client timeout", sql)
+	}
+	if facts := drv.ClassifyError(err); facts.Kind != driver.ErrorKindTimeout {
+		t.Fatalf("ClassifyError = %q, want %q (err=%v)", facts.Kind, driver.ErrorKindTimeout, err)
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("query %q error = %v, want context.DeadlineExceeded", sql, err)
+	}
+	if errors.Is(err, context.Canceled) {
+		t.Fatalf("query %q error = %v was classified as canceled", sql, err)
+	}
+	if limit := timeout + 500*time.Millisecond; elapsed > limit {
+		t.Fatalf("query %q timed out after %v, want client timeout within %v", sql, elapsed, limit)
+	}
+
+	assertReusable(t, drv)
+}
+
 // TestQueryTimeoutPostgres blocks pg_sleep past the deadline and verifies the
 // statement is classified as a timeout rather than a parent cancel, and that
 // the pooled connection is reusable afterward.
@@ -140,4 +171,31 @@ func TestQueryTimeoutMySQL(t *testing.T) {
 	}
 
 	assertReusable(t, drv)
+}
+
+func TestQueryTimeoutMySQLUnhintedStatements(t *testing.T) {
+	skipIfRequested(t)
+
+	const timeout = 150 * time.Millisecond
+
+	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
+	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, timeout)
+
+	tests := []struct {
+		name string
+		sql  string
+	}{
+		{name: "do", sql: "DO SLEEP(10)"},
+		{name: "leading comment select", sql: "/* probe */ SELECT SLEEP(10)"},
+		{
+			name: "cte",
+			sql:  "WITH sleeper AS (SELECT SLEEP(10) AS value) SELECT value FROM sleeper",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertMySQLClientTimeout(t, drv, tt.sql, timeout)
+		})
+	}
 }

@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -39,6 +40,12 @@ func TestStatementTimeoutHint(t *testing.T) {
 			sql:     "INSERT INTO t VALUES (1)",
 			timeout: time.Second,
 			want:    "INSERT INTO t VALUES (1)",
+		},
+		{
+			name:    "do unchanged",
+			sql:     "DO SLEEP(10)",
+			timeout: time.Second,
+			want:    "DO SLEEP(10)",
 		},
 		{
 			name:    "select as identifier prefix unchanged",
@@ -98,5 +105,13 @@ func TestStatementDeadline(t *testing.T) {
 
 	if got := dynamic.StatementDeadline(-time.Second); got != -time.Second {
 		t.Fatalf("StatementDeadline(-1s) = %v, want -1s (disabled)", got)
+	}
+
+	maxDuration := time.Duration(math.MaxInt64)
+	if got := dynamic.StatementDeadline(maxDuration); got != maxDuration {
+		t.Fatalf("StatementDeadline(max duration) = %v, want saturated %v", got, maxDuration)
+	}
+	if got := dynamic.StatementDeadline(maxDuration - statementTimeoutGrace); got != maxDuration {
+		t.Fatalf("StatementDeadline(max duration - grace) = %v, want %v", got, maxDuration)
 	}
 }
