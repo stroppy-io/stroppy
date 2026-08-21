@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -43,6 +44,12 @@ func (f *fakeSource) Next() ([]any, error) {
 func realPGDriver(t *testing.T, bulkSize int) *Driver {
 	t.Helper()
 
+	return realPGDriverWithTimeout(t, bulkSize, 0)
+}
+
+func realPGDriverWithTimeout(t *testing.T, bulkSize int, queryTimeout time.Duration) *Driver {
+	t.Helper()
+
 	dsn := os.Getenv("STROPPY_PG_DSN")
 	if dsn == "" {
 		t.Skip("STROPPY_PG_DSN not set; skipping real-postgres columnar test")
@@ -59,6 +66,9 @@ func realPGDriver(t *testing.T, bulkSize int) *Driver {
 	// override to a describe-based mode per Exec — and this mode is also where
 	// the 65535 bind-parameter limit that the columnar path exists to beat bites.
 	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+	if queryTimeout > 0 {
+		cfg.MaxConns = 1
+	}
 
 	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
@@ -74,9 +84,41 @@ func realPGDriver(t *testing.T, bulkSize int) *Driver {
 	t.Cleanup(pgxPool.Close)
 
 	return &Driver{
-		logger:   logger.Global(),
-		pool:     &pool.PoolX{Pool: pgxPool},
-		bulkSize: bulkSize,
+		logger:       logger.Global(),
+		pool:         &pool.PoolX{Pool: pgxPool},
+		bulkSize:     bulkSize,
+		queryTimeout: queryTimeout,
+	}
+}
+
+func TestColumnarDescribeStatementContext(t *testing.T) {
+	t.Parallel()
+
+	parent := context.Background()
+	zeroDriver := &Driver{}
+	ctx, cancel := zeroDriver.statementCtx(parent)
+	defer cancel()
+	if ctx != parent {
+		t.Fatal("zero query timeout should preserve the parent context")
+	}
+
+	cancelledParent, cancelParent := context.WithCancel(parent)
+	cancelParent()
+	timedDriver := &Driver{queryTimeout: time.Minute}
+	ctx, cancel = timedDriver.statementCtx(cancelledParent)
+	defer cancel()
+	if !errors.Is(ctx.Err(), context.Canceled) {
+		t.Fatalf("cancelled parent error = %v, want context.Canceled", ctx.Err())
+	}
+
+	ctx, cancel = timedDriver.statementCtx(parent)
+	defer cancel()
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		t.Fatal("positive query timeout should set a deadline")
+	}
+	if remaining := time.Until(deadline); remaining <= 0 || remaining > time.Minute {
+		t.Fatalf("deadline remaining = %s, want (0, %s]", remaining, time.Minute)
 	}
 }
 
@@ -171,6 +213,52 @@ func TestColumnarInsertRoundTrip(t *testing.T) {
 
 	if string(payload) != "\x00\x01" {
 		t.Errorf("payload = %x, want 0001", payload)
+	}
+}
+
+func TestColumnarDescribeTimeoutReleasesConnection(t *testing.T) {
+	const (
+		table   = "columnar_describe_timeout_test"
+		timeout = 200 * time.Millisecond
+	)
+
+	d := realPGDriverWithTimeout(t, 1, timeout)
+	execSQL(t, d, "DROP TABLE IF EXISTS "+table)
+	execSQL(t, d, "CREATE TABLE "+table+" (id bigint)")
+	t.Cleanup(func() { execSQL(t, d, "DROP TABLE IF EXISTS "+table) })
+
+	locker, err := pgx.Connect(context.Background(), os.Getenv("STROPPY_PG_DSN"))
+	if err != nil {
+		t.Fatalf("connect lock holder: %v", err)
+	}
+	t.Cleanup(func() { _ = locker.Close(context.Background()) })
+
+	lockTx, err := locker.Begin(context.Background())
+	if err != nil {
+		t.Fatalf("begin lock holder: %v", err)
+	}
+	t.Cleanup(func() { _ = lockTx.Rollback(context.Background()) })
+
+	if _, err := lockTx.Exec(context.Background(), "LOCK TABLE "+table+" IN ACCESS EXCLUSIVE MODE"); err != nil {
+		t.Fatalf("lock table: %v", err)
+	}
+
+	start := time.Now()
+	_, err = d.describeColumnCastTypes(context.Background(), table, []string{"id"})
+	elapsed := time.Since(start)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("describeColumnCastTypes error = %v, want context.DeadlineExceeded", err)
+	}
+	if elapsed < timeout/2 || elapsed > timeout*5 {
+		t.Fatalf("describeColumnCastTypes took %s, want near %s", elapsed, timeout)
+	}
+
+	if err := lockTx.Rollback(context.Background()); err != nil {
+		t.Fatalf("release table lock: %v", err)
+	}
+
+	if _, err := d.describeColumnCastTypes(context.Background(), table, []string{"id"}); err != nil {
+		t.Fatalf("describeColumnCastTypes after lock release: %v", err)
 	}
 }
 

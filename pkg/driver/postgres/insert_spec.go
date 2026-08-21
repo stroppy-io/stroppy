@@ -460,7 +460,10 @@ func (d *Driver) describeColumnCastTypes(
 	table string,
 	columns []string,
 ) ([]string, error) {
-	conn, err := d.pool.Acquire(ctx)
+	stmtCtx, cancel := d.statementCtx(ctx)
+	defer cancel()
+
+	conn, err := d.pool.Acquire(stmtCtx)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: acquire conn for describe %q: %w", table, err)
 	}
@@ -481,7 +484,7 @@ func (d *Driver) describeColumnCastTypes(
 	sb.WriteString(" FROM ")
 	sb.WriteString(pgx.Identifier{table}.Sanitize())
 
-	sd, err := conn.Conn().Prepare(ctx, "", sb.String())
+	sd, err := conn.Conn().Prepare(stmtCtx, "", sb.String())
 	if err != nil {
 		return nil, fmt.Errorf("postgres: describe columns of %q: %w", table, err)
 	}
