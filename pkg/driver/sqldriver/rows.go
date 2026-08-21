@@ -2,6 +2,7 @@ package sqldriver
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
@@ -31,8 +32,7 @@ func (r *Rows) Next() bool {
 
 	hasNext := r.sqlRows.Next()
 	if !hasNext {
-		r.closed = true
-		r.sqlRows.Close()
+		_ = r.close(true)
 	}
 
 	return hasNext
@@ -86,10 +86,27 @@ func (r *Rows) Err() error {
 }
 
 func (r *Rows) Close() error {
-	if !r.closed {
-		r.closed = true
-		r.sqlRows.Close()
+	return r.close(false)
+}
+
+func (r *Rows) close(currentResultDone bool) error {
+	if r.closed {
+		return r.sqlRows.Err()
 	}
 
-	return r.sqlRows.Err()
+	r.closed = true
+
+	// Consume every result set before the final Close so the driver's query
+	// context remains active while trailing server responses are received.
+	if !currentResultDone {
+		for r.sqlRows.Next() {
+		}
+	}
+
+	for r.sqlRows.NextResultSet() {
+		for r.sqlRows.Next() {
+		}
+	}
+
+	return errors.Join(r.sqlRows.Err(), r.sqlRows.Close())
 }
