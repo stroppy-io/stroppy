@@ -72,15 +72,5 @@ func appendDistinctError(unique *[]error, err error) {
 }
 
 func sameErrorCause(left, right error) bool {
-	for left != nil {
-		for candidate := right; candidate != nil; candidate = errors.Unwrap(candidate) {
-			if errors.Is(left, candidate) || errors.Is(candidate, left) {
-				return true
-			}
-		}
-
-		left = errors.Unwrap(left)
-	}
-
-	return false
+	return errors.Is(left, right) || errors.Is(right, left)
 }

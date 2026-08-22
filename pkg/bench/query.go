@@ -41,6 +41,11 @@ func (b *Bench) QueryValue(ctx context.Context, sql string, args map[string]any)
 }
 
 func firstQueryValue(rows driver.Rows) (any, error) {
+	if rows == nil {
+		//nolint:nilnil // no-row sentinel: a driver may report no result set
+		return nil, nil
+	}
+
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
 			return nil, err
@@ -59,6 +64,28 @@ func firstQueryValue(rows driver.Rows) (any, error) {
 	return vals[0], rows.Err()
 }
 
+func firstQueryRow(rows driver.Rows) ([]any, error) {
+	if rows == nil {
+		//nolint:nilnil // no-row sentinel: a driver may report no result set
+		return nil, nil
+	}
+
+	if !rows.Next() {
+		return nil, rows.Err()
+	}
+
+	return rows.Values(), rows.Err()
+}
+
+func readQueryRows(rows driver.Rows) ([][]any, error) {
+	if rows == nil {
+		//nolint:nilnil // no-row sentinel: a driver may report no result set
+		return nil, nil
+	}
+
+	return rows.ReadAll(0), rows.Err()
+}
+
 // QueryRow returns the first row (or nil if no rows).
 func (b *Bench) QueryRow(ctx context.Context, sql string, args map[string]any) (_ []any, err error) {
 	res, err := b.runQuery(ctx, sql, args)
@@ -68,11 +95,7 @@ func (b *Bench) QueryRow(ctx context.Context, sql string, args map[string]any) (
 		return nil, err
 	}
 
-	if !res.Rows.Next() {
-		return nil, res.Rows.Err()
-	}
-
-	return res.Rows.Values(), res.Rows.Err()
+	return firstQueryRow(res.Rows)
 }
 
 // QueryRows returns all rows (up to a large cap).
@@ -84,7 +107,7 @@ func (b *Bench) QueryRows(ctx context.Context, sql string, args map[string]any) 
 		return nil, err
 	}
 
-	return res.Rows.ReadAll(0), res.Rows.Err()
+	return readQueryRows(res.Rows)
 }
 
 func (b *Bench) runQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
@@ -281,11 +304,7 @@ func (t *TxX) QueryRow(ctx context.Context, sql string, args map[string]any) (_ 
 		return nil, err
 	}
 
-	if !res.Rows.Next() {
-		return nil, res.Rows.Err()
-	}
-
-	return res.Rows.Values(), res.Rows.Err()
+	return firstQueryRow(res.Rows)
 }
 
 func (t *TxX) QueryRows(ctx context.Context, sql string, args map[string]any) (_ [][]any, err error) {
@@ -296,7 +315,7 @@ func (t *TxX) QueryRows(ctx context.Context, sql string, args map[string]any) (_
 		return nil, err
 	}
 
-	return res.Rows.ReadAll(0), res.Rows.Err()
+	return readQueryRows(res.Rows)
 }
 
 func (t *TxX) runQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {

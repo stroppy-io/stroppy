@@ -2,9 +2,11 @@ package sqldriver
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/gen"
@@ -41,6 +43,56 @@ func typedRowSource(t *testing.T, src *gen.IndexedSource, cols []string) *common
 	}
 
 	return common.NewBatchRowSource(cur, cols, len(cols))
+}
+
+type blockingExecer struct {
+	calls int
+}
+
+func (e *blockingExecer) ExecContext(ctx context.Context, _ string, _ ...any) (int64, error) {
+	e.calls++
+
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case <-time.After(time.Second):
+		return 0, errors.New("statement context was not canceled")
+	}
+}
+
+var _ ExecContext[int64] = (*blockingExecer)(nil)
+
+func TestRunBulkInsertTypedStatementTimeout(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		total     int64
+		batchSize int
+	}{
+		{name: "full_batch", total: 2, batchSize: 2},
+		{name: "final_remainder", total: 1, batchSize: 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			src, cols := typedIntSource(tt.total)
+			exec := &blockingExecer{}
+
+			err := RunBulkInsert[int64](
+				context.Background(), exec, "t_timeout", typedRowSource(t, src, cols), qmark{}, tt.batchSize, 10*time.Millisecond,
+			)
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("RunBulkInsert error = %v, want context deadline exceeded", err)
+			}
+
+			if exec.calls != 1 {
+				t.Fatalf("got %d exec calls, want 1", exec.calls)
+			}
+		})
+	}
 }
 
 // TestRunBulkInsertTypedPlainBulk proves the shared SQL bulk helper

@@ -171,6 +171,67 @@ func newQueryTestTarget(
 	return tx
 }
 
+func TestQueryNilRowsUseNoRowSemantics(t *testing.T) {
+	paths := []struct {
+		name      string
+		isolation TxIsolationName
+	}{
+		{name: "bench"},
+		{name: "tx_none", isolation: IsoNone},
+		{name: "tx_real", isolation: IsoReadCommitted},
+	}
+
+	operations := []struct {
+		name string
+		run  func(queryAPI) (any, error)
+	}{
+		{
+			name: "query_value",
+			run: func(q queryAPI) (any, error) {
+				return q.QueryValue(context.Background(), "SELECT 1", nil)
+			},
+		},
+		{
+			name: "query_row",
+			run: func(q queryAPI) (any, error) {
+				return q.QueryRow(context.Background(), "SELECT 1", nil)
+			},
+		},
+		{
+			name: "query_rows",
+			run: func(q queryAPI) (any, error) {
+				return q.QueryRows(context.Background(), "SELECT 1", nil)
+			},
+		},
+	}
+
+	for _, path := range paths {
+		for _, operation := range operations {
+			t.Run(path.name+"/"+operation.name, func(t *testing.T) {
+				fx := newTestBenchFixture(t)
+				previousRoot := root
+				root = fx.rootState
+
+				t.Cleanup(func() { root = previousRoot })
+
+				drv := &queryTestDriver{result: &driver.QueryResult{}}
+				target := newQueryTestTarget(t, fx.b, drv, path.isolation)
+
+				got, err := operation.run(target)
+				require.NoError(t, err)
+				require.Nil(t, got)
+
+				var data metricdata.ResourceMetrics
+				require.NoError(t, fx.reader.Collect(context.Background(), &data))
+				require.Equal(t, queryMetricCounts{
+					operations: 1,
+					durations:  1,
+				}, collectQueryMetricCounts(t, data, fx.prefix))
+			})
+		}
+	}
+}
+
 func TestQueryTerminalErrorsAndMetrics(t *testing.T) {
 	rowErr := context.DeadlineExceeded
 	closeFailure := errors.New("close rows")
