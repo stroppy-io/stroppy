@@ -63,9 +63,10 @@ func (p *PoolX) QueryContext(ctx context.Context, sql string, args ...any) (pgx.
 
 // Driver implements the driver.Driver interface for Picodata DB.
 type Driver struct {
-	logger   *zap.Logger
-	pool     Executor
-	bulkSize int
+	logger       *zap.Logger
+	pool         Executor
+	bulkSize     int
+	queryTimeout time.Duration
 }
 
 // NewDriver creates a new Picodata driver instance.
@@ -85,8 +86,9 @@ func NewDriver(
 	cfg := opts.Config
 
 	d = &Driver{
-		logger:   lg,
-		bulkSize: defaultBulkSize,
+		logger:       lg,
+		bulkSize:     defaultBulkSize,
+		queryTimeout: opts.QueryTimeout,
 	}
 
 	if cfg.BulkSize != nil {
@@ -166,6 +168,7 @@ func (d *Driver) RunQuery(
 		d.logger,
 		sql,
 		args,
+		d.queryTimeout,
 	)
 }
 

@@ -46,7 +46,8 @@ Example stroppy-config.json:
     "run": {
       "executor": "constant-vus",
       "vus": 10,
-      "duration": "30s"
+      "duration": "30s",
+      "queryTimeout": "5s"
     },
     "params": {},
     "env": {
@@ -62,7 +63,8 @@ Example stroppy-config.json:
     sql      string            Explicit SQL file override (2nd positional)
     global   object            Logger and OTEL exporter config (no CLI equivalent)
     drivers  map[string]obj    Per-index driver configs (keys "0", "1", ...)
-    run      object            Typed scenario params: executor, vus, iterations, duration
+    run      object            Typed scenario params: executor, vus, iterations, duration,
+                              queryTimeout
     params   object            Typed parameters declared by the selected workload
     env      map[string]string Legacy workload env overrides (keys uppercased on load)
     steps    []string          Step allowlist (same as CLI --steps)
@@ -101,8 +103,9 @@ PRECEDENCE (highest to lowest)
     logger / OTEL exporter:      config file "global" only (no CLI equivalent)
 
   There is no "--" k6-args passthrough and no k6Args field in effect.
-  Use typed executor/vus/iterations/duration parameters; legacy
-  VUS/DURATION/ITER environment values remain compatible. Legacy DURATION
+  Use typed executor/vus/iterations/duration/queryTimeout parameters. The
+  VUS/DURATION/ITER/QUERY_TIMEOUT environment values remain compatible. A
+  queryTimeout of "0" disables the per-statement deadline. Legacy DURATION
   without an explicit executor infers constant-vus and emits a warning; prefer
   an explicit "run.executor" value.
 

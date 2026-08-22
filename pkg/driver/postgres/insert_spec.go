@@ -14,6 +14,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
+	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
@@ -96,6 +97,11 @@ func (d *Driver) runInsertChunk(
 	}
 }
 
+// statementCtx derives the per-statement deadline for a single COPY/INSERT.
+func (d *Driver) statementCtx(ctx context.Context) (context.Context, context.CancelFunc) {
+	return sqldriver.StatementTimeout(ctx, d.queryTimeout)
+}
+
 // copyFromRuntime streams source rows into pgx.CopyFrom without buffering
 // the full result set. The adapter drains src to EOF.
 func (d *Driver) copyFromRuntime(
@@ -109,12 +115,15 @@ func (d *Driver) copyFromRuntime(
 		progress: insertprogress.NewGeneratedRowCounter(ctx),
 	}
 
+	stmtCtx, cancel := d.statementCtx(ctx)
+	defer cancel()
+
 	start := time.Now()
-	rowsCopied, err := d.pool.CopyFrom(ctx, pgx.Identifier{table}, src.Columns(), copySrc)
+	rowsCopied, err := d.pool.CopyFrom(stmtCtx, pgx.Identifier{table}, src.Columns(), copySrc)
 	copySrc.progress.Flush()
 
 	if err != nil {
-		return fmt.Errorf("postgres: CopyFrom %q: %w", table, err)
+		return fmt.Errorf("postgres: CopyFrom %q: %w", table, statementContextError(stmtCtx, err))
 	}
 
 	insertprogress.AddConfirmed(ctx, rowsCopied)
@@ -226,8 +235,11 @@ func (d *Driver) execBulkBatch(
 ) error {
 	query, args := buildBulkInsert(table, columns, rows)
 
-	if _, err := d.pool.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("postgres: bulk INSERT %q: %w", table, err)
+	stmtCtx, cancel := d.statementCtx(ctx)
+	defer cancel()
+
+	if _, err := d.pool.Exec(stmtCtx, query, args...); err != nil {
+		return fmt.Errorf("postgres: bulk INSERT %q: %w", table, statementContextError(stmtCtx, err))
 	}
 
 	return nil
@@ -424,8 +436,11 @@ func (d *Driver) execProgressColumnarBatch(
 		args[i+1] = col
 	}
 
-	if _, err := d.pool.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("postgres: columnar INSERT %q: %w", table, err)
+	stmtCtx, cancel := d.statementCtx(ctx)
+	defer cancel()
+
+	if _, err := d.pool.Exec(stmtCtx, query, args...); err != nil {
+		return fmt.Errorf("postgres: columnar INSERT %q: %w", table, statementContextError(stmtCtx, err))
 	}
 
 	insertprogress.AddConfirmed(ctx, rows)
@@ -445,9 +460,16 @@ func (d *Driver) describeColumnCastTypes(
 	table string,
 	columns []string,
 ) ([]string, error) {
-	conn, err := d.pool.Acquire(ctx)
+	stmtCtx, cancel := d.statementCtx(ctx)
+	defer cancel()
+
+	conn, err := d.pool.Acquire(stmtCtx)
 	if err != nil {
-		return nil, fmt.Errorf("postgres: acquire conn for describe %q: %w", table, err)
+		return nil, fmt.Errorf(
+			"postgres: acquire conn for describe %q: %w",
+			table,
+			statementContextError(stmtCtx, err),
+		)
 	}
 	defer conn.Release()
 
@@ -466,9 +488,13 @@ func (d *Driver) describeColumnCastTypes(
 	sb.WriteString(" FROM ")
 	sb.WriteString(pgx.Identifier{table}.Sanitize())
 
-	sd, err := conn.Conn().Prepare(ctx, "", sb.String())
+	sd, err := conn.Conn().Prepare(stmtCtx, "", sb.String())
 	if err != nil {
-		return nil, fmt.Errorf("postgres: describe columns of %q: %w", table, err)
+		return nil, fmt.Errorf(
+			"postgres: describe columns of %q: %w",
+			table,
+			statementContextError(stmtCtx, err),
+		)
 	}
 
 	if len(sd.Fields) != len(columns) {
@@ -484,9 +510,11 @@ func (d *Driver) describeColumnCastTypes(
 	for i, field := range sd.Fields {
 		pgType, ok := typeMap.TypeForOID(field.DataTypeOID)
 		if !ok {
+			column := columns[i] //nolint:gosec // field and column counts are checked above
+
 			return nil, fmt.Errorf(
 				"%w: table %q column %q OID %d",
-				ErrUnregisteredColumnType, table, columns[i], field.DataTypeOID,
+				ErrUnregisteredColumnType, table, column, field.DataTypeOID,
 			)
 		}
 

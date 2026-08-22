@@ -87,9 +87,9 @@ func (d *Driver) runInsertChunk(
 	case driver.InsertNative, driver.InsertColumnar:
 		return d.bulkUpsertRuntime(ctx, tableName, src)
 	case driver.InsertPlainBulk:
-		return sqldriver.RunBulkInsert(ctx, d.db, tableName, src, d.dialect, d.bulkSize)
+		return sqldriver.RunBulkInsert(ctx, d.db, tableName, src, d.dialect, d.bulkSize, d.queryTimeout)
 	case driver.InsertPlainQuery:
-		return sqldriver.RunBulkInsert(ctx, d.db, tableName, src, d.dialect, 1)
+		return sqldriver.RunBulkInsert(ctx, d.db, tableName, src, d.dialect, 1, d.queryTimeout)
 	default:
 		return fmt.Errorf("%w: %s", driver.ErrInsertMethodNotSupported, method)
 	}
@@ -384,7 +384,10 @@ func coerceInt64(col string, conv any) (any, error) {
 func (w *bulkUpsertWriter) resolveColumnKinds(ctx context.Context) error {
 	var desc options.Description
 
-	err := w.d.nativeDB.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+	stmtCtx, cancel := sqldriver.StatementTimeout(ctx, w.d.queryTimeout)
+	defer cancel()
+
+	err := w.d.nativeDB.Table().Do(stmtCtx, func(ctx context.Context, s table.Session) error {
 		var e error
 
 		desc, e = s.DescribeTable(ctx, w.tablePath)
@@ -600,8 +603,12 @@ func (d *Driver) flushBulk(
 	batch []types.Value,
 ) error {
 	rows := types.ListValue(batch...)
+
+	stmtCtx, cancel := sqldriver.StatementTimeout(ctx, d.queryTimeout)
+	defer cancel()
+
 	if err := d.nativeDB.Table().BulkUpsert(
-		ctx, tablePath, table.BulkUpsertDataRows(rows),
+		stmtCtx, tablePath, table.BulkUpsertDataRows(rows),
 	); err != nil {
 		return fmt.Errorf("ydb bulk upsert %q: %w", tableName, err)
 	}

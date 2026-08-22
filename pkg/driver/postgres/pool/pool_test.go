@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
@@ -37,6 +38,12 @@ func TestParseConfig_Success(t *testing.T) {
 		require.Equal(t, int32(2), cfg.MinIdleConns)
 		require.Equal(t, time.Hour, cfg.MaxConnLifetime)
 		require.Equal(t, 10*time.Minute, cfg.MaxConnIdleTime)
+
+		handler := cfg.ConnConfig.BuildContextWatcherHandler(new(pgconn.PgConn))
+		watcher, ok := handler.(*pgconn.CancelRequestContextWatcherHandler)
+		require.True(t, ok)
+		require.Zero(t, watcher.CancelRequestDelay)
+		require.Equal(t, cancelRequestFallbackDeadline, watcher.DeadlineDelay)
 	})
 
 	t.Run("statementCache", func(t *testing.T) {
