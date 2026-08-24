@@ -168,7 +168,7 @@ func RedactDSN(dsn string) string {
 
 	mysqlRedacted, mysqlOK := redactMySQL(dsn)
 	if conninfoOK {
-		if mysqlOK || hasMySQLStructure(dsn) && hasMySQLPasswordEnvelope(dsn) {
+		if mysqlOK {
 			return redactedDSN
 		}
 
@@ -248,21 +248,12 @@ func redactMySQL(dsn string) (redacted string, ok bool) {
 		}
 	}()
 
-	if !hasMySQLStructure(dsn) {
-		return "", false
-	}
-
 	cfg, err := mysql.ParseDSN(dsn)
 	if err != nil {
 		return "", false
 	}
 
-	passwordPresent := hasMySQLPasswordEnvelope(dsn)
-	if cfg.Passwd != "" && !passwordPresent {
-		return "", false
-	}
-
-	if passwordPresent {
+	if cfg.Passwd != "" {
 		cfg.Passwd = redactedSecret
 	}
 
@@ -277,76 +268,7 @@ func redactMySQL(dsn string) (redacted string, ok bool) {
 		}
 	}
 
-	formatted := cfg.FormatDSN()
-	if passwordPresent && !strings.Contains(formatted, redactedSecret) {
-		return "", false
-	}
-
-	return formatted, true
-}
-
-type mysqlEnvelope struct {
-	userinfoEnd int
-	valid       bool
-}
-
-func parseMySQLEnvelope(dsn string) mysqlEnvelope {
-	databaseSlash := strings.LastIndexByte(dsn, '/')
-	if databaseSlash < 0 {
-		return mysqlEnvelope{userinfoEnd: -1}
-	}
-
-	end := len(dsn)
-	if queryStart := strings.IndexByte(dsn[databaseSlash+1:], '?'); queryStart >= 0 {
-		end = databaseSlash + queryStart + 1
-	}
-
-	for at := databaseSlash - 1; at >= 0; at-- {
-		if dsn[at] == '@' && isMySQLEndpoint(dsn, at+1, end) {
-			return mysqlEnvelope{userinfoEnd: at, valid: true}
-		}
-	}
-
-	if isMySQLEndpoint(dsn, 0, end) {
-		return mysqlEnvelope{userinfoEnd: -1, valid: true}
-	}
-
-	return mysqlEnvelope{userinfoEnd: -1}
-}
-
-func isMySQLEndpoint(dsn string, start, end int) bool {
-	if start >= end {
-		return false
-	}
-
-	if dsn[start] == '/' {
-		return true
-	}
-
-	suffix := dsn[start:end]
-	open := strings.IndexByte(suffix, '(')
-
-	slash := strings.IndexByte(suffix, '/')
-	if open >= 0 && (slash < 0 || open < slash) {
-		closing := strings.IndexByte(suffix[open+1:], ')')
-		if closing < 0 {
-			return false
-		}
-
-		return open+closing+2 < len(suffix) && suffix[open+closing+2] == '/'
-	}
-
-	return slash > 0
-}
-
-func hasMySQLStructure(dsn string) bool {
-	return parseMySQLEnvelope(dsn).valid
-}
-
-func hasMySQLPasswordEnvelope(dsn string) bool {
-	envelope := parseMySQLEnvelope(dsn)
-
-	return envelope.valid && envelope.userinfoEnd >= 0 && strings.IndexByte(dsn[:envelope.userinfoEnd], ':') >= 0
+	return cfg.FormatDSN(), true
 }
 
 type conninfoAssignment struct {
