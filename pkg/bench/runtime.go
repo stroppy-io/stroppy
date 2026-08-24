@@ -244,6 +244,15 @@ func Run(
 		return fmt.Errorf("driver dispatch: %w", err)
 	}
 
+	defer func() {
+		teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
+		defer cancel()
+
+		if err := drv.Teardown(teardownCtx); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("driver teardown: %w", err))
+		}
+	}()
+
 	setupVU := &VU{root: root, vuid: 1, initPhase: true, ctx: ctx}
 	setupBench := &Bench{
 		root: root, vu: setupVU,

@@ -22,6 +22,36 @@ make linter         # read-only check after linter_fix
 make tests          # all tests with race detector and coverage
 ```
 
+### Integration tests
+
+The mandatory tagged suite requires the built binary, Docker (for the OTEL
+collector), PostgreSQL, and MySQL. The local baseline harness uses PostgreSQL on
+`localhost:5434` and MySQL on `localhost:3307`:
+
+```bash
+make tmpfs-up
+make build
+make integration
+make tmpfs-down
+```
+
+`STROPPY_TMPFS_URL` / `STROPPY_PG_URL` and `STROPPY_MYSQL_URL` override those
+service URLs. Once selected, baseline tests fail when the binary, Docker daemon,
+or either database is unavailable; there is no integration skip switch.
+
+Picodata and YDB are a separate optional suite. Stop the baseline harness before
+starting the four-database harness because they share host ports:
+
+```bash
+make tmpfs-all-up
+make integration-optional
+make tmpfs-all-down
+```
+
+The large TPC-H SF=1 answer check is separate as `make integration-sf1` and uses
+the baseline PostgreSQL service. CI builds once, runs both smoke tiers and
+`make integration`, then uploads that same tested binary.
+
 Application configuration is plain Go under `pkg/config`; `config.Unmarshal` owns
 strict JSON/ProtoJSON compatibility. Regenerate the committed file-envelope schema
 with `go generate ./pkg/config`. There is no application protobuf generation step,

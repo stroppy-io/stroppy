@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -16,51 +15,26 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// TestTpcbWorkloadEndToEnd drives the rewritten `workloads/tpcb/tx.ts`
-// through the stroppy binary end to end: drop + create schema, then load
-// branches / tellers / accounts via `driver.insertSpec`. It asserts the
-// TPC-B scale-1 row counts, branch fan-out, zero starting balances, and
-// filler widths. k6 always runs the default() iteration at least once
-// (requires ≥1 VU/iter), so we TRUNCATE pgbench_history between the run
-// and the assertions to pin the expected empty-at-load count at zero.
+const completedErrorsMarker = "bench completed with errors"
+
+// TestTpcbWorkloadEndToEnd loads TPC-B through the registered Go workload and
+// checks the scale-1 population left by the load-only step selection.
 func TestTpcbWorkloadEndToEnd(t *testing.T) {
-	if os.Getenv(envSkip) == "1" {
-		t.Skipf("skipping integration test: %s=1", envSkip)
-	}
-
-	repoRoot := findRepoRoot(t)
-	binary := filepath.Join(repoRoot, "build", "stroppy")
-	if _, err := os.Stat(binary); err != nil {
-		t.Fatalf("stroppy binary not found at %s (run `make build` first): %v", binary, err)
-	}
-
 	pool := NewTmpfsPG(t)
 	ResetSchema(t, pool)
 
-	url := os.Getenv(envTmpfsURL)
-	if url == "" {
-		url = defaultTmpfsURL
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
+	url := envOr(envTmpfsURL, defaultTmpfsURL)
 	start := time.Now()
-	cmd := exec.CommandContext(ctx, binary,
-		"run", "./workloads/tpcb/tx.ts",
+	out := runStroppy(t, 2*time.Minute,
+		"run", "tpcb/tx",
+		"-d", "pg",
 		"-D", "url="+url,
-		"-e", "SCALE_FACTOR=1",
+		"--scale-factor", "1",
+		"--load-workers", "4",
+		"--executor", "shared-iterations",
+		"--iterations", "1",
 		"--steps", "drop_schema,create_schema,load_data",
 	)
-	cmd.Dir = repoRoot
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("stroppy run failed: %v\n--- stdout ---\n%s\n--- stderr ---\n%s",
-			err, stdout.String(), stderr.String())
-	}
 	loadElapsed := time.Since(start)
 	t.Logf("stroppy run completed in %s", loadElapsed)
 
@@ -68,30 +42,9 @@ func TestTpcbWorkloadEndToEnd(t *testing.T) {
 		t.Errorf("load took %s, exceeds the 30s SF=1 tmpfs budget", loadElapsed)
 	}
 
-	out := stdout.String() + stderr.String()
-	for _, marker := range []string{
-		"InsertSpec into 'pgbench_branches'",
-		"InsertSpec into 'pgbench_tellers'",
-		"InsertSpec into 'pgbench_accounts'",
-	} {
-		if !strings.Contains(out, marker) {
-			t.Errorf("missing log marker %q in stroppy output", marker)
-		}
-	}
-
-	// k6 forces at least one default() iteration even when every `Step()`
-	// is excluded; that iteration mutates a single branch/teller/account
-	// balance and inserts one history row. Undo just those side effects so
-	// the asserts below observe the load as it leaves the generator.
-	fixups := []string{
-		"TRUNCATE TABLE pgbench_history",
-		"UPDATE pgbench_branches SET bbalance = 0",
-		"UPDATE pgbench_tellers SET tbalance = 0",
-		"UPDATE pgbench_accounts SET abalance = 0",
-	}
-	for _, stmt := range fixups {
-		if _, err := pool.Exec(ctx, stmt); err != nil {
-			t.Fatalf("post-run fixup %q: %v", stmt, err)
+	for _, table := range []string{"pgbench_branches", "pgbench_tellers", "pgbench_accounts"} {
+		if !strings.Contains(out, table) {
+			t.Errorf("missing insert progress for %q in stroppy output", table)
 		}
 	}
 
@@ -101,26 +54,68 @@ func TestTpcbWorkloadEndToEnd(t *testing.T) {
 	assertTpcbFillerWidths(t, pool)
 }
 
-// findRepoRoot walks upward from this test file until it finds go.mod,
-// yielding the repository root so exec.Command can cd there for `./workloads/...`.
+// findRepoRoot walks upward from this test file until it finds go.mod.
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
 
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
-		t.Fatalf("runtime.Caller failed")
+		t.Fatal("runtime.Caller failed")
 	}
+
 	dir := filepath.Dir(file)
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
 			return dir
 		}
+
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			t.Fatalf("go.mod not found walking up from %s", file)
 		}
+
 		dir = parent
 	}
+}
+
+func stroppyBinary(t *testing.T) (string, string) {
+	t.Helper()
+
+	repoRoot := findRepoRoot(t)
+	binary := filepath.Join(repoRoot, "build", "stroppy")
+	info, err := os.Stat(binary)
+	if err != nil {
+		t.Fatalf("stroppy binary not found at %s (run `make build` first): %v", binary, err)
+	}
+	if info.IsDir() {
+		t.Fatalf("stroppy binary path %s is a directory", binary)
+	}
+
+	return repoRoot, binary
+}
+
+// runStroppy executes a success-expected workload invocation. Nonfatal workload
+// errors exit zero, so their final summary marker is an explicit test failure.
+func runStroppy(t *testing.T, timeout time.Duration, args ...string) string {
+	t.Helper()
+
+	repoRoot, binary := stroppyBinary(t)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binary, args...)
+	cmd.Dir = repoRoot
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("stroppy %s failed: %v\n%s", strings.Join(args, " "), err, output)
+	}
+
+	text := string(output)
+	if strings.Contains(text, completedErrorsMarker) {
+		t.Fatalf("stroppy %s reported nonfatal errors despite exit 0:\n%s", strings.Join(args, " "), text)
+	}
+
+	return text
 }
 
 // assertTpcbCounts verifies each table holds the TPC-B SF=1 row count.
@@ -167,7 +162,7 @@ func assertTpcbBalancesZero(t *testing.T, pool *pgxpool.Pool) {
 }
 
 // assertTpcbBidRanges verifies the branch-fanout invariant: every teller
-// and account row references a branch id within [1, BRANCHES=1] at SF=1,
+// and account row references a branch id within the one-branch SF=1 range,
 // and the (tid-1)/10+1 / (aid-1)/100000+1 mappings are honored.
 func assertTpcbBidRanges(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()

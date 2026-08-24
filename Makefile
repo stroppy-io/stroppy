@@ -63,6 +63,20 @@ linter_fix: # Start linter with possible fixes (NEVER run casually — rewrites 
 tests: # Run tests with coverage; pass TEST_FLAGS=-short for the CI-sized suite
 	go test -race $(TEST_FLAGS) ./... -coverprofile=coverage.out
 
+.PHONY: integration integration-optional integration-sf1
+
+integration: # Run mandatory tagged PostgreSQL, MySQL, CSV, and OTEL integration tests
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags=integration -count=1 -timeout=15m ./test/integration
+
+integration-optional: # Run optional Picodata and YDB tagged integration tests
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(Picodata|YDB)' ./test/integration
+
+integration-sf1: # Run the explicit heavy TPC-H SF=1 answer validation
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags='integration integration_sf1' -count=1 -timeout=75m -run TestTpchAnswersSpotCheck ./test/integration
+
 
 ##
 ## Reference-data JSON regeneration (build-time, run with upstream inputs)
@@ -185,30 +199,30 @@ run-workload-branches: # Tier 1: real-Postgres smoke of both branches (tpcb/tpcc
 	exit $$rc
 
 ##
-## Tmpfs Postgres integration harness
+## Baseline PostgreSQL + MySQL integration harness
 ##
 
 .PHONY: tmpfs-up tmpfs-down tmpfs-clean tmpfs-psql
 
-tmpfs-up: # Start tmpfs Postgres container for integration tests
+tmpfs-up: # Start baseline tmpfs PostgreSQL and MySQL services
 	docker compose -f test/compose.tmpfs.yml up -d --wait
 
-tmpfs-down: # Stop and remove tmpfs Postgres container and volumes
+tmpfs-down: # Stop baseline integration services and remove their volumes
 	docker compose -f test/compose.tmpfs.yml down -v
 
-tmpfs-clean: # Recycle the tmpfs Postgres container; discards all data
+tmpfs-clean: # Recycle baseline integration services; discard all data
 	$(MAKE) tmpfs-down && $(MAKE) tmpfs-up
 
 tmpfs-psql: # Open psql shell into the tmpfs Postgres container
 	docker exec -it stroppy-pg-tmpfs psql -U postgres -d stroppy
 
 ##
-## Multi-DB tmpfs integration harness (postgres + mysql + picodata + ydb)
+## Optional multi-DB tmpfs integration harness
 ##
 
 .PHONY: tmpfs-all-up tmpfs-all-down tmpfs-all-clean
 
-tmpfs-all-up: # Start all 4 DBs (pg, mysql, picodata, ydb) on non-default ports
+tmpfs-all-up: # Start optional PostgreSQL, MySQL, Picodata, and YDB harness
 	docker compose -f test/compose.tmpfs-all.yml up -d --wait pg-tmpfs-all mysql-tmpfs-all picodata-tmpfs-all ydb-tmpfs-all
 	docker compose -f test/compose.tmpfs-all.yml up picodata-init
 
