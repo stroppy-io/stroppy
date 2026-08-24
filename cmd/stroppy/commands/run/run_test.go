@@ -626,6 +626,10 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("applyDriverOpt(pool.maxOpenConns) error = %v", err)
 	}
 
+	if err := applyDriverOpt(configs, 0, "pool.maxConns", "20"); err != nil {
+		t.Fatalf("applyDriverOpt(pool.maxConns) error = %v", err)
+	}
+
 	runtimeConfig, err = buildDriverConfig(0, configs[0], nil)
 	if err != nil {
 		t.Fatalf("buildDriverConfig(mysql) error = %v", err)
@@ -1325,9 +1329,11 @@ func TestDriverExtrasRejectAliasCollisionsAndWrongCase(t *testing.T) {
 
 func TestApplyDriverOptStrictNumericLexemes(t *testing.T) {
 	configs := runner.DriverCLIConfigs{}
+
 	if err := applyDriverOpt(configs, 0, "driverType", "postgres"); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := applyDriverOpt(configs, 0, "bulkSize", "1e1"); err != nil {
 		t.Fatal(err)
 	}
@@ -1336,16 +1342,19 @@ func TestApplyDriverOptStrictNumericLexemes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if got.GetBulkSize() != 10 {
 		t.Fatalf("bulkSize = %d, want 10", got.GetBulkSize())
 	}
 
 	for _, value := range []string{"1.0000000000000001", "1.", "01"} {
-		configs := runner.DriverCLIConfigs{}
-		if err := applyDriverOpt(configs, 0, "bulkSize", value); err != nil {
+		invalidConfigs := runner.DriverCLIConfigs{}
+
+		if err := applyDriverOpt(invalidConfigs, 0, "bulkSize", value); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := buildDriverConfig(0, configs[0], nil); err == nil {
+
+		if _, err := buildDriverConfig(0, invalidConfigs[0], nil); err == nil {
 			t.Errorf("bulkSize %q unexpectedly succeeded", value)
 		}
 	}

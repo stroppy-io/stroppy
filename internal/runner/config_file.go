@@ -99,6 +99,7 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 
 func configLogger(cfg *config.LoggerConfig) *logger.Config {
 	level := "debug"
+
 	switch cfg.LogLevel {
 	case config.LogLevelDebug:
 		level = "debug"
@@ -113,6 +114,7 @@ func configLogger(cfg *config.LoggerConfig) *logger.Config {
 	}
 
 	mode := logger.DevelopmentMod
+
 	switch cfg.LogMode {
 	case config.LogModeDevelopment:
 		mode = logger.DevelopmentMod

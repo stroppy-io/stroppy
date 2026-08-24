@@ -355,7 +355,11 @@ func TestStrictConfigRejectsInvalidJSON(t *testing.T) {
 		{name: "invalid enum name", doc: `{"global":{"logger":{"logLevel":"INFO"}}}`, path: `$.global.logger.logLevel`},
 		{name: "invalid enum ordinal", doc: `{"global":{"logger":{"logMode":2}}}`, path: `$.global.logger.logMode`},
 		{name: "fractional enum ordinal", doc: `{"global":{"logger":{"logLevel":1.5}}}`, path: `$.global.logger.logLevel`},
-		{name: "overflowing enum ordinal", doc: `{"global":{"logger":{"logLevel":2147483648}}}`, path: `$.global.logger.logLevel`},
+		{
+			name: "overflowing enum ordinal",
+			doc:  `{"global":{"logger":{"logLevel":2147483648}}}`,
+			path: `$.global.logger.logLevel`,
+		},
 		{name: "undeclared enum ordinal", doc: `{"global":{"logger":{"logLevel":9}}}`, path: `$.global.logger.logLevel`},
 		{name: "quoted enum ordinal", doc: `{"global":{"logger":{"logLevel":"1.0"}}}`, path: `$.global.logger.logLevel`},
 		{name: "quoted seed", doc: `{"global":{"seed":"7"}}`, path: `$.global.seed`},

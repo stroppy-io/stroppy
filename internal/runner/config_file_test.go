@@ -290,12 +290,14 @@ func TestLoadRunConfigLogger(t *testing.T) {
 			))
 
 			cmd := exec.Command(os.Args[0], "-test.run=^TestLoadRunConfigLogger$")
+
 			cmd.Env = append(os.Environ(), configPathEnv+"="+path)
 			output, err := cmd.CombinedOutput()
 			require.NoError(t, err, string(output))
 
 			gotLog := strings.Contains(string(output), "Loaded config file")
 			assert.Equal(t, test.wantLog, gotLog, string(output))
+
 			if test.wantJSONLog {
 				assert.Contains(t, string(output), `"level":"info"`)
 			}

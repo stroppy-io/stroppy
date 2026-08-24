@@ -689,10 +689,12 @@ func buildDriverConfig(
 
 	driverType := cfg.DriverType
 	url := cfg.URL
+
 	if overrides != nil {
 		if overrides.DriverType != nil {
 			driverType = overrides.GetDriverType()
 		}
+
 		if overrides.URL != nil {
 			url = overrides.GetURL()
 		}
@@ -713,6 +715,7 @@ func buildDriverConfig(
 	if err := applyDriverExtras(idx, dc, cfg.Extra); err != nil {
 		return nil, invalidConfig(err)
 	}
+
 	if overrides != nil {
 		if err := applyDriverRunConfigExtras(idx, dc, overrides); err != nil {
 			return nil, invalidConfig(err)
@@ -795,58 +798,46 @@ func applyDriverRunConfigExtras(
 		warnIgnoredDriverExtra(idx, "defaultTxIsolation", "use workload parameter --tx-isolation")
 	}
 
-	pool := fileConfig.Pool
-
-	if driverConfig.DriverType == config.DriverTypePostgres {
-		if fileConfig.SQL != nil {
-			warnIgnoredDriverExtra(idx, "sql", "PostgreSQL uses postgres pool settings")
-
-			fileConfig.SQL = nil
-		}
-	} else if fileConfig.Postgres != nil {
-		warnIgnoredDriverExtra(idx, "postgres", "only PostgreSQL uses postgres pool settings")
-
-		fileConfig.Postgres = nil
-	}
-
-	if pool != nil && !driverSupportsPool(driverConfig.DriverType) {
-		warnIgnoredDriverExtra(idx, "pool", "selected driver has no connection pool")
-
-		pool = nil
-	}
+	pool := applicableDriverPool(idx, driverConfig.DriverType, fileConfig)
 
 	if fileConfig.BulkSize != nil {
 		driverConfig.BulkSize = fileConfig.BulkSize
 	}
+
 	if fileConfig.Postgres != nil {
 		driverConfig.Postgres = runner.MergePostgresConfig(driverConfig.Postgres, fileConfig.Postgres)
 	}
+
 	if fileConfig.SQL != nil {
 		driverConfig.SQL = runner.MergeSQLConfig(driverConfig.SQL, fileConfig.SQL)
 	}
+
 	if fileConfig.CaCertFile != nil {
 		driverConfig.CaCertFile = fileConfig.CaCertFile
 	}
+
 	if fileConfig.AuthToken != nil {
 		driverConfig.AuthToken = fileConfig.AuthToken
 	}
+
 	if fileConfig.AuthUser != nil {
 		driverConfig.AuthUser = fileConfig.AuthUser
 	}
+
 	if fileConfig.AuthPassword != nil {
 		driverConfig.AuthPassword = fileConfig.AuthPassword
 	}
+
 	if fileConfig.TLSInsecureSkipVerify != nil {
 		driverConfig.TLSInsecureSkipVerify = fileConfig.TLSInsecureSkipVerify
 	}
+
 	if fileConfig.InsertProgress != nil {
 		driverConfig.InsertProgress = fileConfig.InsertProgress
 	}
 
 	if pool != nil {
-		if err := mergePoolDriverSpecific(driverConfig.DriverType, pool, driverConfig); err != nil {
-			return fmt.Errorf("driver %d pool config: %w", idx, err)
-		}
+		mergePoolDriverSpecific(driverConfig.DriverType, pool, driverConfig)
 	}
 
 	return nil
@@ -859,6 +850,32 @@ func warnIgnoredDriverExtra(idx int, field, reason string) {
 		zap.String("field", field),
 		zap.String("reason", reason),
 	)
+}
+
+func applicableDriverPool(
+	idx int,
+	driverType config.DriverType,
+	fileConfig *config.DriverRunConfig,
+) *config.PoolConfig {
+	if driverType == config.DriverTypePostgres {
+		if fileConfig.SQL != nil {
+			warnIgnoredDriverExtra(idx, "sql", "PostgreSQL uses postgres pool settings")
+
+			fileConfig.SQL = nil
+		}
+	} else if fileConfig.Postgres != nil {
+		warnIgnoredDriverExtra(idx, "postgres", "only PostgreSQL uses postgres pool settings")
+
+		fileConfig.Postgres = nil
+	}
+
+	if fileConfig.Pool != nil && !driverSupportsPool(driverType) {
+		warnIgnoredDriverExtra(idx, "pool", "selected driver has no connection pool")
+
+		return nil
+	}
+
+	return fileConfig.Pool
 }
 
 func driverSupportsPool(driverType config.DriverType) bool {
@@ -877,39 +894,47 @@ func mergePoolDriverSpecific(
 	driverType config.DriverType,
 	pool *config.PoolConfig,
 	driverConfig *config.DriverConfig,
-) error {
-	data, err := json.Marshal(pool)
-	if err != nil {
-		return err
-	}
-
+) {
 	if driverType == config.DriverTypePostgres {
-		postgres := &config.PostgresConfig{}
-		if err := runner.UnmarshalStrict(data, postgres); err != nil {
-			return err
-		}
-
+		postgres := poolPostgresConfig(pool)
 		if specific := driverConfig.Postgres; specific != nil {
 			postgres = runner.MergePostgresConfig(postgres, specific)
 		}
 
 		driverConfig.Postgres = postgres
 
-		return nil
+		return
 	}
 
-	sqlConfig := &config.SQLConfig{}
-	if err := runner.UnmarshalStrict(data, sqlConfig); err != nil {
-		return err
-	}
-
+	sqlConfig := poolSQLConfig(pool)
 	if specific := driverConfig.SQL; specific != nil {
 		sqlConfig = runner.MergeSQLConfig(sqlConfig, specific)
 	}
 
 	driverConfig.SQL = sqlConfig
+}
 
-	return nil
+func poolPostgresConfig(pool *config.PoolConfig) *config.PostgresConfig {
+	return &config.PostgresConfig{
+		TraceLogLevel:            pool.TraceLogLevel,
+		MaxConnLifetime:          pool.MaxConnLifetime,
+		MaxConnIdleTime:          pool.MaxConnIdleTime,
+		MaxConns:                 pool.MaxConns,
+		MinConns:                 pool.MinConns,
+		MinIdleConns:             pool.MinIdleConns,
+		DefaultQueryExecMode:     pool.DefaultQueryExecMode,
+		DescriptionCacheCapacity: pool.DescriptionCacheCapacity,
+		StatementCacheCapacity:   pool.StatementCacheCapacity,
+	}
+}
+
+func poolSQLConfig(pool *config.PoolConfig) *config.SQLConfig {
+	return &config.SQLConfig{
+		MaxOpenConns:    pool.MaxOpenConns,
+		MaxIdleConns:    pool.MaxIdleConns,
+		ConnMaxLifetime: pool.ConnMaxLifetime,
+		ConnMaxIdleTime: pool.ConnMaxIdleTime,
+	}
 }
 
 // runArgs holds the result of parseRunArgs.

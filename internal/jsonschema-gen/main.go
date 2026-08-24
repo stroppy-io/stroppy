@@ -238,19 +238,35 @@ func runScopeSchema() map[string]any {
 		"type":        "string",
 		"description": "Per-statement query deadline as a Go duration; 0 disables it.",
 	}
+	executor := map[string]any{"type": "string"}
+	vus := bareIntegerSchema()
+	iterations := bareIntegerSchema()
+	duration := map[string]any{"type": "string"}
 	properties := map[string]any{
-		"executor":      map[string]any{"type": "string"},
-		"vus":           bareIntegerSchema(),
-		"iterations":    bareIntegerSchema(),
-		"duration":      map[string]any{"type": "string"},
+		"executor":      executor,
+		"vus":           vus,
+		"iterations":    iterations,
+		"duration":      duration,
 		"queryTimeout":  queryTimeout,
 		"query_timeout": queryTimeout,
 	}
 
 	return map[string]any{
-		"type":                 "object",
-		"additionalProperties": false,
-		"properties":           properties,
+		"type":       "object",
+		"properties": properties,
+		"propertyNames": map[string]any{
+			"anyOf": []any{
+				map[string]any{"pattern": "^[a-z][A-Za-z0-9]*$"},
+				map[string]any{"pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)+$"},
+			},
+		},
+		"additionalProperties": map[string]any{
+			"anyOf": []any{
+				map[string]any{"type": "string"},
+				map[string]any{"type": "boolean"},
+				map[string]any{"type": "number"},
+			},
+		},
 		"allOf": []any{
 			aliasCollision("queryTimeout", "query_timeout"),
 		},

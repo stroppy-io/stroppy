@@ -77,7 +77,11 @@ func Dispatch(
 	ctx context.Context,
 	opts Options,
 ) (Driver, error) {
-	drvType := opts.Config.DriverType
+	drvType := config.DriverTypeUnspecified
+	if opts.Config != nil {
+		drvType = opts.Config.DriverType
+	}
+
 	if constructor, ok := registry[drvType]; ok {
 		return constructor(ctx, opts)
 	}

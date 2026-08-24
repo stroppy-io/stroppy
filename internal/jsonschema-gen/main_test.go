@@ -19,14 +19,20 @@ func TestBuildSchemaDescribesFileEnvelope(t *testing.T) {
 	properties := object(t, runConfig["properties"])
 	run := object(t, properties["run"])
 	params := object(t, properties["params"])
-	require.Equal(t, false, run["additionalProperties"])
+	require.NotNil(t, run["additionalProperties"])
+	require.NotNil(t, run["propertyNames"])
 	require.NotNil(t, params["additionalProperties"])
 	require.NotContains(t, anyOf(t, params["additionalProperties"]), map[string]any{"type": "null"})
 
 	runProperties := object(t, run["properties"])
-	require.Contains(t, runProperties, "queryTimeout")
-	require.Contains(t, runProperties, "query_timeout")
+	for _, name := range []string{
+		"executor", "vus", "iterations", "duration", "queryTimeout", "query_timeout",
+	} {
+		require.Contains(t, runProperties, name)
+	}
+
 	require.Equal(t, runProperties["queryTimeout"], runProperties["query_timeout"])
+	require.Contains(t, anyOf(t, run["additionalProperties"]), map[string]any{"type": "boolean"})
 
 	global := object(t, defs["GlobalConfig"])
 	require.NotContains(t, object(t, global["properties"]), "queryTimeout")

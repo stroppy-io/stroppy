@@ -118,6 +118,8 @@ type DriverCLIConfig struct {
 }
 
 // MarshalJSON produces a flat JSON object merging known fields and extras.
+//
+//nolint:gocritic // Value serialization is part of DriverCLIConfig's JSON contract.
 func (d DriverCLIConfig) MarshalJSON() ([]byte, error) {
 	merged := make(map[string]any)
 
@@ -227,9 +229,11 @@ func driverOverrideValue(value string) any {
 	if value == "true" {
 		return true
 	}
+
 	if value == "false" {
 		return false
 	}
+
 	if looksNumeric(value) {
 		return json.Number(value)
 	}
@@ -247,9 +251,9 @@ func isDriverCLIField(key string) bool {
 }
 
 // DecodeOverrides validates retained -D input with the shared config decoder.
-func (d DriverCLIConfig) DecodeOverrides() (*config.DriverRunConfig, error) {
+func (d *DriverCLIConfig) DecodeOverrides() (*config.DriverRunConfig, error) {
 	if len(d.Overrides) == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilnil // No retained overrides means no configuration to merge.
 	}
 
 	data, err := marshalDriverOverrides(d.Overrides)
@@ -322,6 +326,7 @@ func (node *driverOverrideNode) object(name string) *driverOverrideNode {
 
 func (node *driverOverrideNode) writeJSON(out *bytes.Buffer) error {
 	out.WriteByte('{')
+
 	for index, field := range node.fields {
 		if index > 0 {
 			out.WriteByte(',')
@@ -331,6 +336,7 @@ func (node *driverOverrideNode) writeJSON(out *bytes.Buffer) error {
 		if err != nil {
 			return err
 		}
+
 		out.Write(name)
 		out.WriteByte(':')
 
@@ -342,27 +348,36 @@ func (node *driverOverrideNode) writeJSON(out *bytes.Buffer) error {
 			continue
 		}
 
-		writeDriverOverrideValue(out, *field.value)
+		if err := writeDriverOverrideValue(out, *field.value); err != nil {
+			return err
+		}
 	}
+
 	out.WriteByte('}')
 
 	return nil
 }
 
-func writeDriverOverrideValue(out *bytes.Buffer, value string) {
+func writeDriverOverrideValue(out *bytes.Buffer, value string) error {
 	if value == "true" || value == "false" || looksNumeric(value) {
 		out.WriteString(value)
 
-		return
+		return nil
 	}
 
-	encoded, _ := json.Marshal(value)
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
 	out.Write(encoded)
+
+	return nil
 }
 
 func looksNumeric(value string) bool {
 	index := 0
-	if len(value) > 0 && (value[0] == '-' || value[0] == '+') {
+	if value != "" && (value[0] == '-' || value[0] == '+') {
 		index++
 	}
 
