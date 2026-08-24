@@ -74,6 +74,7 @@ var (
 	errDurationNeedsExecutor     = errors.New("duration requires an explicit constant-vus executor")
 	errDurationWithWrongExecutor = errors.New("duration is only valid with the constant-vus executor")
 	errConstantVUsNeedsDuration  = errors.New("constant-vus requires duration")
+	errNegativeQueryTimeout      = errors.New("query-timeout must not be negative")
 )
 
 // Register adds a workload factory. Workload packages call it during init.
@@ -177,6 +178,11 @@ func DescribeAll() ([]Description, error) {
 	return descriptions, nil
 }
 
+// teardownTimeout bounds workload Teardown. It runs under a detached context so
+// cancellation that stopped Setup or the scenario does not skip cleanup while
+// caller values remain available.
+const teardownTimeout = 30 * time.Second
+
 // Run looks up a fresh workload instance and executes it: Define and parameter
 // resolution first, Setup once, Iterate across the scenario, then Teardown once.
 // steps/noSteps are the explicit --steps / --no-steps filters; drivers and params
@@ -189,7 +195,7 @@ func Run(
 	steps, noSteps []string,
 	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
-) error {
+) (retErr error) {
 	wl, ok := Lookup(name)
 	if !ok {
 		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
@@ -221,7 +227,17 @@ func Run(
 		return errDriverIndexMissing
 	}
 
-	drv, err := driver.Dispatch(ctx, driver.Options{Config: cfg, Logger: lg, DialFunc: root.dialer.DialContext})
+	queryTimeout := scenarioParams.queryTimeout.Value()
+	if queryTimeout < 0 {
+		return fmt.Errorf("%w, got %s", errNegativeQueryTimeout, queryTimeout)
+	}
+
+	drv, err := driver.Dispatch(ctx, driver.Options{
+		Config:       cfg,
+		Logger:       lg,
+		DialFunc:     root.dialer.DialContext,
+		QueryTimeout: queryTimeout,
+	})
 	if err != nil {
 		return fmt.Errorf("driver dispatch: %w", err)
 	}
@@ -232,6 +248,18 @@ func Run(
 		lg:  lg.Named("workload").With(zap.String("workload", name)),
 		drv: drv, cfg: cfg,
 	}
+
+	// Teardown always runs exactly once, even when Setup or the scenario returns
+	// early on cancellation or error. It executes under a timeout detached from
+	// cancellation of the run ctx, and its error is joined with any returned error.
+	defer func() {
+		teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
+		defer cancel()
+
+		if err := wl.Teardown(teardownCtx, setupBench); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("teardown: %w", err))
+		}
+	}()
 
 	if err := wl.Setup(ctx, setupBench); err != nil {
 		return fmt.Errorf("setup: %w", err)
@@ -247,10 +275,6 @@ func Run(
 		return wl.Iterate(vu.Context(), b)
 	}); err != nil {
 		return fmt.Errorf("scenario %q: %w", sc.name, err)
-	}
-
-	if err := wl.Teardown(ctx, setupBench); err != nil {
-		return fmt.Errorf("teardown: %w", err)
 	}
 
 	return nil
@@ -271,6 +295,8 @@ type scenarioParams struct {
 	vus        Param[int]
 	iterations Param[int64]
 	duration   Param[time.Duration]
+
+	queryTimeout Param[time.Duration]
 }
 
 func defineWorkload(
@@ -294,6 +320,10 @@ func defineWorkload(
 			"iterations", 1, "Total shared iterations.", iterationOptions...,
 		),
 		duration: def.Param.Duration("duration", 0, "Duration of a constant-vus scenario."),
+		queryTimeout: def.Param.Duration(
+			"query-timeout", 0,
+			"Per-statement query deadline (e.g. 30s, 5s, 500ms); 0 disables it.",
+		),
 	}
 
 	def.scope = ParamScopeWorkload

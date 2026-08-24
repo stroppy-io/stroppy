@@ -46,18 +46,33 @@ func (s *stepFilterState) enabled(name string) bool {
 	return true
 }
 
-// Step runs fn as a named phase: skips if filtered out, otherwise tags metrics,
-// notifies (cloud, no-op), logs timing, clears the tag, and returns fn's error.
-// Mirrors helpers.ts Step.
+// Step runs fn as a named phase: skips if filtered out (logging the skip), otherwise
+// tags metrics, notifies, logs start/end timing, clears the tag, and returns fn's
+// error. Use it for one-shot setup/load/schema steps, which should each emit one
+// start/end record. Mirrors helpers.ts Step.
 func (b *Bench) Step(name string, fn func() error) error {
+	return b.step(name, fn, false)
+}
+
+// StepSilent runs fn under the named step tag with the same filtering semantics as
+// Step, but emits no console records. Use it for a step that wraps every iteration
+// (the "workload" step): per-VU query/transaction metrics keep the step tag while
+// the iterations stay quiet.
+func (b *Bench) StepSilent(name string, fn func() error) error {
+	return b.step(name, fn, true)
+}
+
+func (b *Bench) step(name string, fn func() error, silent bool) error {
 	if !b.root.stepFilter.enabled(name) {
-		b.lg.Sugar().Infof("Skipping step '%s'", name)
+		if !silent {
+			b.lg.Sugar().Infof("Skipping step '%s'", name)
+		}
 
 		return nil
 	}
 
-	stepBegin(b, name)
-	defer stepEnd(b, name)
+	stepBegin(b, name, silent)
+	defer stepEnd(b, name, silent)
 
 	if fn != nil {
 		return fn()
@@ -66,22 +81,22 @@ func (b *Bench) Step(name string, fn func() error) error {
 	return nil
 }
 
-// StepBegin / StepEnd mark a long-lived step spanning many iterations.
-func (b *Bench) StepBegin(name string) { stepBegin(b, name) }
-func (b *Bench) StepEnd(name string)   { stepEnd(b, name) }
-
-func stepBegin(b *Bench, name string) {
+func stepBegin(b *Bench, name string, silent bool) {
 	b.vu.stepTag = name
 	if root != nil {
 		root.NotifyStep(name, statusRunning)
+	}
+
+	if silent {
+		return
 	}
 
 	b.lg.Sugar().Infof("Start of '%s' step", name)
 	b.stepStart = time.Now()
 }
 
-func stepEnd(b *Bench, name string) {
-	if !b.stepStart.IsZero() {
+func stepEnd(b *Bench, name string, silent bool) {
+	if !silent && !b.stepStart.IsZero() {
 		b.lg.Sugar().Infof("End of '%s' step (took %s)", name, fmtStepDuration(time.Since(b.stepStart)))
 	}
 

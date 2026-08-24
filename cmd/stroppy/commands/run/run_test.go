@@ -16,6 +16,7 @@ import (
 	_ "github.com/stroppy-io/stroppy/internal/workloads/simple"
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/config"
+	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
 
 //nolint:cyclop // one table covers the complete run argument grammar
@@ -172,6 +173,13 @@ func TestParseRunArgs(t *testing.T) {
 			args:        []string{"tpcc", "--no-steps=load,run"},
 			wantScript:  "tpcc",
 			wantNoSteps: []string{"load", "run"},
+		},
+		{
+			name:        "explicit empty steps remains an override beside no-steps",
+			args:        []string{"tpcc", "--steps=", "--no-steps=workload"},
+			wantScript:  "tpcc",
+			wantSteps:   []string{""},
+			wantNoSteps: []string{"workload"},
 		},
 		{
 			name:    "--steps and --no-steps together returns error",
@@ -530,7 +538,7 @@ func TestParseRunArgs(t *testing.T) {
 	}
 }
 
-func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
+func TestConfigDriversMergeBelowCLI(t *testing.T) {
 	driverType := "postgres"
 	fileURL := "postgres://file"
 	errorMode := "throw"
@@ -604,6 +612,10 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("applyDriverOpt(pool.maxOpenConns) error = %v", err)
 	}
 
+	if err := applyDriverOpt(configs, 0, "pool.maxConns", "20"); err != nil {
+		t.Fatalf("applyDriverOpt(pool.maxConns) error = %v", err)
+	}
+
 	runtimeConfig, err = buildDriverConfig(0, configs[0])
 	if err != nil {
 		t.Fatalf("buildDriverConfig(mysql) error = %v", err)
@@ -615,57 +627,65 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 }
 
 func TestWithExecuteSQLSource(t *testing.T) {
-	t.Run("inline positional binds sql-body", func(t *testing.T) {
-		inputs := withExecuteSQLSource(bench.ParamInputs{CLI: map[string]string{}}, "--= query\nselect 1;\n", "")
+	tests := []struct {
+		name   string
+		inputs bench.ParamInputs
+		body   string
+		file   string
+		want   map[string]string
+	}{
+		{
+			name: "inline positional binds body",
+			body: "--= query\nselect 1;\n",
+			want: map[string]string{"sql-body": "--= query\nselect 1;\n", "sql-file": ""},
+		},
+		{
+			name: "file positional binds file",
+			file: "queries.sql",
+			want: map[string]string{"sql-body": "", "sql-file": "queries.sql"},
+		},
+		{
+			name:   "typed file wins over inline positional",
+			inputs: bench.ParamInputs{CLI: map[string]string{"sql-file": "typed.sql"}},
+			body:   "--= query\nselect 1;\n",
+			want:   map[string]string{"sql-body": "", "sql-file": "typed.sql"},
+		},
+		{
+			name:   "typed body wins over file positional",
+			inputs: bench.ParamInputs{CLI: map[string]string{"sql-body": "--= typed\nselect 2;"}},
+			file:   "queries.sql",
+			want:   map[string]string{"sql-body": "--= typed\nselect 2;", "sql-file": ""},
+		},
+		{
+			name:   "typed file wins when both typed sources are set",
+			inputs: bench.ParamInputs{CLI: map[string]string{"sql-body": "body", "sql-file": "file.sql"}},
+			want:   map[string]string{"sql-body": "", "sql-file": "file.sql"},
+		},
+	}
 
-		if inputs.CLI["sql-body"] != "--= query\nselect 1;\n" {
-			t.Fatalf("sql-body = %q", inputs.CLI["sql-body"])
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := withExecuteSQLSource(test.inputs, test.body, test.file)
+			if !maps.Equal(got.CLI, test.want) {
+				t.Fatalf("CLI inputs = %v, want %v", got.CLI, test.want)
+			}
+		})
+	}
+}
 
-		if _, ok := inputs.CLI["sql-file"]; ok {
-			t.Fatal("sql-file should not be set")
-		}
-	})
+func TestWithExecuteSQLSourceDoesNotMutateProcessEnv(t *testing.T) {
+	t.Setenv("STROPPY_SQL_BODY", "process body")
+	t.Setenv("SQL_FILE", "process.sql")
 
-	t.Run("sql file positional binds sql-file", func(t *testing.T) {
-		inputs := withExecuteSQLSource(bench.ParamInputs{CLI: map[string]string{}}, "", "queries.sql")
+	_ = withExecuteSQLSource(bench.ParamInputs{}, "route body", "")
 
-		if inputs.CLI["sql-file"] != "queries.sql" {
-			t.Fatalf("sql-file = %q", inputs.CLI["sql-file"])
-		}
+	if got := os.Getenv("STROPPY_SQL_BODY"); got != "process body" {
+		t.Fatalf("STROPPY_SQL_BODY = %q", got)
+	}
 
-		if _, ok := inputs.CLI["sql-body"]; ok {
-			t.Fatal("sql-body should not be set")
-		}
-	})
-
-	t.Run("explicit typed sql-file wins over inline positional", func(t *testing.T) {
-		inputs := withExecuteSQLSource(
-			bench.ParamInputs{CLI: map[string]string{"sql-file": "typed.sql"}},
-			"--= query\nselect 1;\n",
-			"",
-		)
-
-		if inputs.CLI["sql-file"] != "typed.sql" {
-			t.Fatalf("sql-file = %q", inputs.CLI["sql-file"])
-		}
-
-		if _, ok := inputs.CLI["sql-body"]; ok {
-			t.Fatal("sql-body should not be set")
-		}
-	})
-
-	t.Run("no source leaves params untouched", func(t *testing.T) {
-		inputs := withExecuteSQLSource(bench.ParamInputs{CLI: map[string]string{}}, "", "")
-
-		if _, ok := inputs.CLI["sql-body"]; ok {
-			t.Fatal("sql-body should not be set")
-		}
-
-		if _, ok := inputs.CLI["sql-file"]; ok {
-			t.Fatal("sql-file should not be set")
-		}
-	})
+	if got := os.Getenv("SQL_FILE"); got != "process.sql" {
+		t.Fatalf("SQL_FILE = %q", got)
+	}
 }
 
 func TestBuildDriverConfigReturnsJSONConversionErrors(t *testing.T) {
@@ -674,22 +694,6 @@ func TestBuildDriverConfigReturnsJSONConversionErrors(t *testing.T) {
 	})
 	if err == nil || !contains(err.Error(), "extra config") {
 		t.Fatalf("buildDriverConfig() error = %v", err)
-	}
-}
-
-func TestBuildDriverConfigRejectsDefaultTxIsolation(t *testing.T) {
-	t.Parallel()
-
-	_, err := buildDriverConfig(0, &runner.DriverCLIConfig{
-		DriverType: "postgres",
-		Extra:      map[string]any{"defaultTxIsolation": "read_committed"},
-	})
-	if err == nil {
-		t.Fatal("buildDriverConfig() accepted defaultTxIsolation")
-	}
-
-	if !contains(err.Error(), "--tx-isolation") {
-		t.Fatalf("buildDriverConfig() error = %v, want --tx-isolation migration guidance", err)
 	}
 }
 
@@ -860,6 +864,132 @@ func TestSimpleRejectsSQLFilePositional(t *testing.T) {
 	}
 }
 
+func TestStepsNoStepsMergedMutualExclusion(t *testing.T) {
+	tests := []struct {
+		name   string
+		config string
+		args   []string
+	}{
+		{
+			name:   "config steps with CLI no-steps",
+			config: `{"script":"simple","steps":["load_data"]}`,
+			args:   []string{"--no-steps", "analyze", "-d", "noop"},
+		},
+		{
+			name:   "config no_steps with CLI steps",
+			config: `{"script":"simple","no_steps":["analyze"]}`,
+			args:   []string{"--steps", "load_data", "-d", "noop"},
+		},
+		{
+			name:   "both in config",
+			config: `{"script":"simple","steps":["load_data"],"no_steps":["analyze"]}`,
+			args:   []string{"-d", "noop"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configPath := t.TempDir() + "/stroppy-config.json"
+			if err := os.WriteFile(configPath, []byte(test.config), 0o600); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
+
+			args := append([]string{"-f", configPath}, test.args...)
+
+			err := Cmd.RunE(Cmd, args)
+			if !errors.Is(err, errStepsMutExclusive) {
+				t.Fatalf("RunE() error = %v, want %v", err, errStepsMutExclusive)
+			}
+
+			if contains(err.Error(), "driver dispatch") {
+				t.Fatalf("merged conflict reached driver dispatch: %v", err)
+			}
+		})
+	}
+}
+
+func TestBlankStepNamesDoNotConflictOrMutateProcessEnv(t *testing.T) {
+	t.Setenv("STROPPY_STEPS", "sentinel-steps")
+	t.Setenv("STROPPY_NO_STEPS", "sentinel-no-steps")
+
+	previousContext := Cmd.Context()
+	Cmd.SetContext(t.Context())
+	t.Cleanup(func() { Cmd.SetContext(previousContext) })
+
+	tests := []struct {
+		name   string
+		config string
+		args   []string
+	}{
+		{
+			name:   "explicit empty CLI steps clears config allowlist",
+			config: `{"script":"simple","steps":["load_data"]}`,
+			args:   []string{"--steps=", "--no-steps", "workload"},
+		},
+		{
+			name:   "blank config steps with real config noSteps",
+			config: `{"script":"simple","steps":[""],"noSteps":["workload"]}`,
+		},
+		{
+			name:   "comma-only config steps with real config noSteps",
+			config: `{"script":"simple","steps":[" , , "],"noSteps":["workload"]}`,
+		},
+		{
+			name:   "real config steps with comma-only config noSteps",
+			config: `{"script":"simple","steps":["load_data"],"noSteps":[" , , "]}`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configPath := t.TempDir() + "/stroppy-config.json"
+			if err := os.WriteFile(configPath, []byte(test.config), 0o600); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
+
+			args := append([]string{"-f", configPath, "-d", "noop"}, test.args...)
+			args = append(args, "--executor", "shared-iterations", "--iterations", "1", "--vus", "1")
+
+			if err := Cmd.RunE(Cmd, args); err != nil {
+				t.Fatalf("RunE() error = %v", err)
+			}
+
+			if got := os.Getenv("STROPPY_STEPS"); got != "sentinel-steps" {
+				t.Fatalf("STROPPY_STEPS = %q", got)
+			}
+
+			if got := os.Getenv("STROPPY_NO_STEPS"); got != "sentinel-no-steps" {
+				t.Fatalf("STROPPY_NO_STEPS = %q", got)
+			}
+		})
+	}
+}
+
+func TestStepsNoStepsConflictDoesNotBlockHelp(t *testing.T) {
+	configPath := t.TempDir() + "/stroppy-config.json"
+	if err := os.WriteFile(configPath, []byte(`{
+		"script":"simple",
+		"steps":["load_data"],
+		"no_steps":["analyze"]
+	}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	previousOutput := Cmd.OutOrStdout()
+	defer Cmd.SetOut(previousOutput)
+
+	var output bytes.Buffer
+	Cmd.SetOut(&output)
+
+	if err := Cmd.RunE(Cmd, []string{"-f", configPath, "--help"}); err != nil {
+		t.Fatalf("RunE(help) error = %v", err)
+	}
+
+	if output.Len() == 0 {
+		t.Fatal("RunE(help) produced no output")
+	}
+}
+
 type runParamTestWorkload struct{}
 
 var (
@@ -985,6 +1115,129 @@ func TestApplyDriverPresetInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestApplyDriverPresetStrictJSON(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  string
+		path string
+	}{
+		{name: "exact duplicate", doc: `{"url":"a","url":"b"}`, path: `$.url`},
+		{name: "alias collision", doc: `{"bulkSize":1,"bulk_size":2}`, path: `$.bulkSize`},
+		{name: "wrong case", doc: `{"DriverType":"postgres"}`, path: `$["DriverType"]`},
+		{name: "unknown nested field", doc: `{"pool":{"MaxConns":1}}`, path: `$.pool["MaxConns"]`},
+		{name: "fractional int32", doc: `{"bulkSize":1.5}`, path: `$.bulkSize`},
+		{name: "trailing JSON", doc: `{} {}`, path: `$`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configs := runner.DriverCLIConfigs{}
+
+			err := applyDriverPreset(configs, 0, test.doc)
+			if err == nil || !contains(err.Error(), test.path) {
+				t.Fatalf("applyDriverPreset() error = %v, want path %s", err, test.path)
+			}
+		})
+	}
+}
+
+func TestApplyDriverPresetAliasesReachRuntimeConfig(t *testing.T) {
+	configs := runner.DriverCLIConfigs{}
+	if err := applyDriverPreset(
+		configs,
+		0,
+		`  {"driver_type":"postgres","bulk_size":"2e2","pool":{"max_conns":3}}  `,
+	); err != nil {
+		t.Fatalf("applyDriverPreset() error = %v", err)
+	}
+
+	got, err := buildDriverConfig(0, configs[0])
+	if err != nil {
+		t.Fatalf("buildDriverConfig() error = %v", err)
+	}
+
+	if got.GetBulkSize() != 200 {
+		t.Fatalf("bulkSize = %d, want 200", got.GetBulkSize())
+	}
+
+	if got.Postgres.GetMaxConns() != 3 {
+		t.Fatalf("postgres.maxConns = %d, want 3", got.Postgres.GetMaxConns())
+	}
+}
+
+func TestDriverExtrasRejectAliasCollisionsAndWrongCase(t *testing.T) {
+	tests := []struct {
+		name string
+		keys [][2]string
+		path string
+	}{
+		{
+			name: "alias collision",
+			keys: [][2]string{{"bulkSize", "1"}, {"bulk_size", "2"}},
+			path: `$.bulkSize`,
+		},
+		{
+			name: "nested alias collision",
+			keys: [][2]string{{"pool.maxConns", "1"}, {"pool.max_conns", "2"}},
+			path: `$.pool.maxConns`,
+		},
+		{
+			name: "wrong case",
+			keys: [][2]string{{"pool.MaxConns", "1"}},
+			path: `$.pool["MaxConns"]`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configs := runner.DriverCLIConfigs{0: {DriverType: "postgres"}}
+			for _, keyValue := range test.keys {
+				if err := applyDriverOpt(configs, 0, keyValue[0], keyValue[1]); err != nil {
+					t.Fatalf("applyDriverOpt(%q) error = %v", keyValue[0], err)
+				}
+			}
+
+			_, err := buildDriverConfig(0, configs[0])
+			if err == nil || !contains(err.Error(), test.path) {
+				t.Fatalf("buildDriverConfig() error = %v, want path %s", err, test.path)
+			}
+		})
+	}
+}
+
+func TestApplyDriverOptStrictNumericLexemes(t *testing.T) {
+	configs := runner.DriverCLIConfigs{}
+
+	if err := applyDriverOpt(configs, 0, "driverType", "postgres"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := applyDriverOpt(configs, 0, "bulkSize", "1e1"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := buildDriverConfig(0, configs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.GetBulkSize() != 10 {
+		t.Fatalf("bulkSize = %d, want 10", got.GetBulkSize())
+	}
+
+	for _, value := range []string{"1.0000000000000001", "1.", "01"} {
+		invalidConfigs := runner.DriverCLIConfigs{}
+
+		if err := applyDriverOpt(invalidConfigs, 0, "bulkSize", value); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := buildDriverConfig(0, invalidConfigs[0]); err == nil {
+			t.Errorf("bulkSize %q unexpectedly succeeded", value)
+		}
+	}
+}
+
 func TestApplyDriverOptDottedPool(t *testing.T) {
 	t.Parallel()
 
@@ -1092,6 +1345,52 @@ func TestApplyDriverOptDottedPathConflict(t *testing.T) {
 
 	if !contains(err.Error(), "conflicts") {
 		t.Fatalf("got error %q, want conflict", err.Error())
+	}
+}
+
+func TestRemovedIsolationRejectedAtDriverCLISurfaces(t *testing.T) {
+	configPath := t.TempDir() + "/stroppy-config.json"
+	if err := os.WriteFile(configPath, []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name       string
+		driverArgs []string
+		path       string
+	}{
+		{
+			name:       "raw driver JSON",
+			driverArgs: []string{"-d", `{"driverType":"noop","defaultTxIsolation":"none"}`},
+			path:       `$.defaultTxIsolation`,
+		},
+		{
+			name:       "raw driver JSON alias",
+			driverArgs: []string{"-d", `{"driverType":"noop","default_tx_isolation":"none"}`},
+			path:       `$["default_tx_isolation"]`,
+		},
+		{
+			name:       "driver option",
+			driverArgs: []string{"-d", "noop", "-D", "defaultTxIsolation=none"},
+			path:       `$.defaultTxIsolation`,
+		},
+		{
+			name:       "driver option alias",
+			driverArgs: []string{"-d", "noop", "-D", "default_tx_isolation=none"},
+			path:       `$["default_tx_isolation"]`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := append([]string{"-f", configPath, "simple"}, test.driverArgs...)
+			args = append(args, "--executor", "shared-iterations", "--iterations", "1")
+
+			err := Cmd.RunE(Cmd, args)
+			if err == nil || !contains(err.Error(), test.path) || !contains(err.Error(), "unknown field") {
+				t.Fatalf("RunE() error = %v, want ordinary unknown-field error at %s", err, test.path)
+			}
+		})
 	}
 }
 

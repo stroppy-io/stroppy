@@ -75,3 +75,14 @@ func (PgxDialect) Convert(val any) (any, error) {
 }
 
 func (PgxDialect) Deduplicate() bool { return true }
+
+// StatementTimeoutHint returns sql unchanged: pgx already turns a deadline
+// into a PostgreSQL CancelRequest, so no session-level statement_timeout (and
+// no pooled-connection state to leak) is needed.
+func (PgxDialect) StatementTimeoutHint(sql string, _ time.Duration) (string, bool) {
+	return sql, false
+}
+
+// StatementDeadline returns timeout unchanged; there is no server-side hint
+// to outlast, so the client deadline is the timeout itself.
+func (PgxDialect) StatementDeadline(timeout time.Duration) time.Duration { return timeout }

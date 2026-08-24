@@ -130,8 +130,6 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		}
 	}
 
-	b.StepBegin("workload")
-
 	return nil
 }
 
@@ -183,7 +181,7 @@ func (w *workload) buildParams() map[string]map[string]any {
 }
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	return b.Step("workload", func() error {
+	return b.StepSilent("workload", func() error {
 		w.runQueries(ctx, b)
 
 		return nil
@@ -234,7 +232,5 @@ func (w *workload) recordAttempt(name string, elapsedMs float64, failed bool) {
 }
 
 func (*workload) Teardown(_ context.Context, b *bench.Bench) error {
-	b.StepEnd("workload")
-
 	return nil
 }

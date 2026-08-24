@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -18,6 +19,9 @@ type (
 		DialFunc func(ctx context.Context, network, addr string) (net.Conn, error)
 		Logger   *zap.Logger
 		Config   *config.DriverConfig
+
+		// QueryTimeout bounds each statement; <= 0 disables the deadline.
+		QueryTimeout time.Duration
 	}
 
 	// Rows provides cursor-style iteration over query result rows.
@@ -73,7 +77,11 @@ func Dispatch(
 	ctx context.Context,
 	opts Options,
 ) (Driver, error) {
-	drvType := opts.Config.DriverType
+	drvType := config.DriverTypeUnspecified
+	if opts.Config != nil {
+		drvType = opts.Config.DriverType
+	}
+
 	if constructor, ok := registry[drvType]; ok {
 		return constructor(ctx, opts)
 	}

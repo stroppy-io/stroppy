@@ -64,6 +64,7 @@ func RunBulkInsert[T any](
 	src source.RowSource,
 	dialect queries.Dialect,
 	batchSize int,
+	timeout time.Duration,
 ) error {
 	columns := src.Columns()
 
@@ -127,7 +128,7 @@ func RunBulkInsert[T any](
 			var err error
 
 			args, err = flushBulkInsertBatch(
-				ctx, db, table, columns, batch[:filled], dialect, args, &fullBatchQuery)
+				ctx, db, table, columns, batch[:filled], dialect, args, &fullBatchQuery, timeout)
 			if err != nil {
 				return err
 			}
@@ -137,7 +138,7 @@ func RunBulkInsert[T any](
 	}
 
 	return flushBulkInsertRemainder(
-		ctx, db, table, columns, batch[:filled], dialect, args, &fullBatchQuery, generatedProgress)
+		ctx, db, table, columns, batch[:filled], dialect, args, &fullBatchQuery, generatedProgress, timeout)
 }
 
 func flushBulkInsertRemainder[T any](
@@ -150,6 +151,7 @@ func flushBulkInsertRemainder[T any](
 	args []any,
 	fullBatchQuery *string,
 	generatedProgress insertprogress.RowCounter,
+	timeout time.Duration,
 ) error {
 	if len(rows) == 0 {
 		return nil
@@ -157,7 +159,7 @@ func flushBulkInsertRemainder[T any](
 
 	generatedProgress.Flush()
 
-	_, err := flushBulkInsertBatch(ctx, db, table, columns, rows, dialect, args, fullBatchQuery)
+	_, err := flushBulkInsertBatch(ctx, db, table, columns, rows, dialect, args, fullBatchQuery, timeout)
 
 	return err
 }
@@ -171,7 +173,13 @@ func flushBulkInsertBatch[T any](
 	dialect queries.Dialect,
 	args []any,
 	fullBatchQuery *string,
+	timeout time.Duration,
 ) ([]any, error) {
+	// Bound each batch (one multi-row INSERT statement) independently so the
+	// per-statement deadline does not accumulate over the whole load.
+	batchCtx, cancel := StatementTimeout(ctx, timeout)
+	defer cancel()
+
 	rowCount := len(rows)
 
 	query := buildBulkInsertQuery(dialect, table, columns, rowCount)
@@ -184,7 +192,7 @@ func flushBulkInsertBatch[T any](
 	}
 
 	args = appendFlatArgs(args, rows)
-	if err := execProgressBulkBatch(ctx, db, table, query, args, int64(rowCount)); err != nil {
+	if err := execProgressBulkBatch(batchCtx, db, table, query, args, int64(rowCount)); err != nil {
 		return args, err
 	}
 
