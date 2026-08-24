@@ -141,7 +141,7 @@ DEBUG LOGGING
     env_override   when real env takes precedence over -e or file env keys
     driver_preset  which source was applied per driver index
 
-  At INFO level (default) stroppy logs:
+  With the debug/development defaults, stroppy logs:
 
     "Loaded config file: <path>"
 

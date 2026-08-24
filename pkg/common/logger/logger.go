@@ -148,7 +148,7 @@ func RedactDSN(dsn string) string {
 		return dsn
 	}
 
-	return redactUserinfo(redactQueryValues(dsn))
+	return redactUserinfo(redactKeywordValues(redactQueryValues(dsn)))
 }
 
 func redactQueryValues(dsn string) string {
@@ -175,6 +175,125 @@ func redactQueryValues(dsn string) string {
 	}
 
 	return dsn[:queryStart+1] + strings.Join(parts, "&") + dsn[queryEnd:]
+}
+
+type conninfoAssignment struct {
+	key                  string
+	valueStart, valueEnd int
+	next                 int
+}
+
+func redactKeywordValues(dsn string) string {
+	var result strings.Builder
+
+	lastRedaction := 0
+
+	for index := 0; index < len(dsn); {
+		assignment := nextConninfoAssignment(dsn, index)
+		index = assignment.next
+
+		if !isSecretKey(assignment.key) {
+			continue
+		}
+
+		result.WriteString(dsn[lastRedaction:assignment.valueStart])
+		result.WriteString(redactedSecret)
+
+		lastRedaction = assignment.valueEnd
+	}
+
+	if lastRedaction == 0 {
+		return dsn
+	}
+
+	result.WriteString(dsn[lastRedaction:])
+
+	return result.String()
+}
+
+func nextConninfoAssignment(dsn string, index int) conninfoAssignment {
+	index = skipConninfoSpaces(dsn, index)
+
+	keyStart := index
+	keyEnd := conninfoKeyEnd(dsn, index)
+	index = skipConninfoSpaces(dsn, keyEnd)
+
+	if keyEnd == keyStart || index == len(dsn) || dsn[index] != '=' || !isConninfoKey(dsn[keyStart:keyEnd]) {
+		return conninfoAssignment{next: skipConninfoToken(dsn, index)}
+	}
+
+	valueStart := skipConninfoSpaces(dsn, index+1)
+	valueEnd := conninfoValueEnd(dsn, valueStart)
+
+	return conninfoAssignment{
+		key:        dsn[keyStart:keyEnd],
+		valueStart: valueStart,
+		valueEnd:   valueEnd,
+		next:       valueEnd,
+	}
+}
+
+func skipConninfoSpaces(dsn string, index int) int {
+	for index < len(dsn) && unicode.IsSpace(rune(dsn[index])) {
+		index++
+	}
+
+	return index
+}
+
+func conninfoKeyEnd(dsn string, index int) int {
+	for index < len(dsn) && !unicode.IsSpace(rune(dsn[index])) && dsn[index] != '=' {
+		index++
+	}
+
+	return index
+}
+
+func skipConninfoToken(dsn string, index int) int {
+	for index < len(dsn) && !unicode.IsSpace(rune(dsn[index])) {
+		index++
+	}
+
+	return index
+}
+
+func isConninfoKey(key string) bool {
+	for _, r := range key {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' && r != '-' {
+			return false
+		}
+	}
+
+	return key != ""
+}
+
+func conninfoValueEnd(dsn string, start int) int {
+	if start == len(dsn) || dsn[start] != '\'' {
+		for start < len(dsn) && !unicode.IsSpace(rune(dsn[start])) {
+			start++
+		}
+
+		return start
+	}
+
+	for index := start + 1; index < len(dsn); index++ {
+		if dsn[index] == '\\' && index+1 < len(dsn) {
+			index++
+
+			continue
+		}
+
+		if dsn[index] == '\'' {
+			index++
+			for index < len(dsn) && !unicode.IsSpace(rune(dsn[index])) {
+				index++
+			}
+
+			return index
+		}
+	}
+
+	return len(dsn)
 }
 
 func isSecretKey(key string) bool {
@@ -284,14 +403,14 @@ func fromHex(value byte) (byte, bool) {
 }
 
 func redactUserinfo(dsn string) string {
-	end := len(dsn)
-	if queryStart := strings.IndexByte(dsn, '?'); queryStart >= 0 {
-		end = queryStart
+	start := 0
+	if scheme := strings.Index(dsn, "://"); scheme >= 0 {
+		start = scheme + len("://")
 	}
 
-	start := 0
-	if scheme := strings.Index(dsn[:end], "://"); scheme >= 0 {
-		start = scheme + len("://")
+	end := authorityEnd(dsn, start)
+	if start == 0 && strings.Contains(dsn[:end], "=") {
+		return dsn
 	}
 
 	at := strings.LastIndexByte(dsn[start:end], '@')
@@ -311,4 +430,12 @@ func redactUserinfo(dsn string) string {
 	colon += start
 
 	return dsn[:colon+1] + redactedSecret + dsn[at:]
+}
+
+func authorityEnd(dsn string, start int) int {
+	if delimiter := strings.IndexAny(dsn[start:], "/?#"); delimiter >= 0 {
+		return start + delimiter
+	}
+
+	return len(dsn)
 }

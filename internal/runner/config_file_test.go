@@ -26,7 +26,8 @@ func TestLoadRunConfigIsSilentUntilLogged(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "config.json")
 	require.NoError(t, os.WriteFile(path, []byte(`{
-		"drivers":{"0":{"driverType":"postgres","url":"postgres://user:secret@host/db?token=token"}}
+		"drivers":{"0":{"driverType":"postgres","url":"host=localhost user=bench password=dsn-secret`+
+		` sslmode=require token=token-secret client_secret=client-secret"}}
 	}`), 0o600))
 
 	loaded, found, err := runner.LoadRunConfig(path)
@@ -39,8 +40,15 @@ func TestLoadRunConfigIsSilentUntilLogged(t *testing.T) {
 	entries := observed.All()
 	require.Len(t, entries, 2)
 	require.Equal(t, "Loaded config file", entries[0].Message)
-	require.NotContains(t, entries[1].ContextMap()["url"], "secret")
-	require.NotContains(t, entries[1].ContextMap()["url"], "=token")
+
+	url := entries[1].ContextMap()["url"]
+	for _, secret := range []string{"dsn-secret", "token-secret", "client-secret"} {
+		require.NotContains(t, url, secret)
+	}
+
+	for _, option := range []string{"host=localhost", "user=bench", "sslmode=require"} {
+		require.Contains(t, url, option)
+	}
 }
 
 func TestLoadRunConfig_ExplicitPath(t *testing.T) {

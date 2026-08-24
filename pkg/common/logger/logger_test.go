@@ -172,6 +172,58 @@ func TestRedactDSN(t *testing.T) {
 			secrets:   []string{"userinfo-secret", "db-password", "client-secret", "password-secret"},
 			preserved: []string{"keep=yes", "charset=utf8"},
 		},
+		{
+			name:      "userinfo stays inside URL authority",
+			dsn:       "postgres://user:dsn-secret@host:5432/db@name",
+			want:      "postgres://user:xxxxx@host:5432/db@name",
+			secrets:   []string{"dsn-secret"},
+			preserved: []string{"host:5432/db@name"},
+		},
+		{
+			name:      "userinfo does not scan URL fragment",
+			dsn:       "postgres://user:dsn-secret@host:5432/db#note@name",
+			want:      "postgres://user:xxxxx@host:5432/db#note@name",
+			secrets:   []string{"dsn-secret"},
+			preserved: []string{"host:5432/db#note@name"},
+		},
+		{
+			name:      "userinfo does not scan no scheme path",
+			dsn:       "user:dsn-secret@tcp(host:3306)/db@name",
+			want:      "user:xxxxx@tcp(host:3306)/db@name",
+			secrets:   []string{"dsn-secret"},
+			preserved: []string{"tcp(host:3306)/db@name"},
+		},
+		{
+			name: "PostgreSQL keyword secrets",
+			dsn: "host=localhost user=bench password=dsn-secret sslmode=require" +
+				" token=token-secret client_secret=client-secret application_name=worker:one@host",
+			want: "host=localhost user=bench password=xxxxx sslmode=require" +
+				" token=xxxxx client_secret=xxxxx application_name=worker:one@host",
+			secrets:   []string{"dsn-secret", "token-secret", "client-secret"},
+			preserved: []string{"host=localhost", "user=bench", "sslmode=require", "application_name=worker:one@host"},
+		},
+		{
+			name: "quoted and escaped PostgreSQL keyword secrets",
+			dsn: `host=localhost password='quoted secret' token='token\'secret' ` +
+				`client_secret='client\ secret' application_name='bench run'`,
+			want:      `host=localhost password=xxxxx token=xxxxx client_secret=xxxxx application_name='bench run'`,
+			secrets:   []string{"quoted secret", `token\'secret`, `client\ secret`},
+			preserved: []string{"host=localhost", "application_name='bench run'"},
+		},
+		{
+			name:      "unterminated PostgreSQL secret value",
+			dsn:       "host=localhost password='unterminated-secret sslmode=require",
+			want:      "host=localhost password=xxxxx",
+			secrets:   []string{"unterminated-secret"},
+			preserved: []string{"host=localhost"},
+		},
+		{
+			name:      "malformed PostgreSQL key value spacing",
+			dsn:       "host=localhost password = dsn-secret sslmode=require",
+			want:      "host=localhost password = xxxxx sslmode=require",
+			secrets:   []string{"dsn-secret"},
+			preserved: []string{"host=localhost", "sslmode=require"},
+		},
 	}
 
 	for _, test := range tests {
