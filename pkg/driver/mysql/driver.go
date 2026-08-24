@@ -47,7 +47,7 @@ func NewDriver(
 ) (*Driver, error) {
 	lg := opts.Logger
 	if lg == nil {
-		lg = logger.NewFromEnv().Named("mysql")
+		lg = logger.Global().Named("mysql")
 	}
 
 	cfg := opts.Config
@@ -66,7 +66,7 @@ func NewDriver(
 		return nil, fmt.Errorf("failed to apply SQL config: %w", err)
 	}
 
-	lg.Debug("Checking db connection...", zap.String("url", cfg.URL))
+	lg.Debug("Checking db connection...", zap.String("url", logger.RedactDSN(cfg.URL)))
 
 	if err = sqldriver.WaitForDB(ctx, lg, &sqldriver.DBPinger{DB: db}, 0); err != nil {
 		db.Close()

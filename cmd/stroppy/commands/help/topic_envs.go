@@ -41,6 +41,12 @@ SOURCES AND PRECEDENCE
     5. Config file "env" map
     6. Declared default
 
+  Logging is configured separately before workload binding. --log-level and
+  --log-mode take precedence over LOG_LEVEL/LOG_MODE process variables, then
+  -e LOG_LEVEL/LOG_MODE, then global.logger in the config file, then the
+  debug/development defaults. Each accepts a short name, its v5
+  LOG_LEVEL_*/LOG_MODE_* name, or a valid ordinal.
+
   Process environment examples:
 
     SCALE_FACTOR=10 stroppy run tpcc/tx

@@ -588,10 +588,15 @@
                 {
                   "enum": [
                     "LOG_LEVEL_DEBUG",
+                    "debug",
                     "LOG_LEVEL_INFO",
+                    "info",
                     "LOG_LEVEL_WARN",
+                    "warn",
                     "LOG_LEVEL_ERROR",
-                    "LOG_LEVEL_FATAL"
+                    "error",
+                    "LOG_LEVEL_FATAL",
+                    "fatal"
                   ],
                   "type": "string"
                 },
@@ -619,7 +624,9 @@
                 {
                   "enum": [
                     "LOG_MODE_DEVELOPMENT",
-                    "LOG_MODE_PRODUCTION"
+                    "development",
+                    "LOG_MODE_PRODUCTION",
+                    "production"
                   ],
                   "type": "string"
                 },
@@ -644,10 +651,15 @@
                 {
                   "enum": [
                     "LOG_LEVEL_DEBUG",
+                    "debug",
                     "LOG_LEVEL_INFO",
+                    "info",
                     "LOG_LEVEL_WARN",
+                    "warn",
                     "LOG_LEVEL_ERROR",
-                    "LOG_LEVEL_FATAL"
+                    "error",
+                    "LOG_LEVEL_FATAL",
+                    "fatal"
                   ],
                   "type": "string"
                 },
@@ -675,7 +687,9 @@
                 {
                   "enum": [
                     "LOG_MODE_DEVELOPMENT",
-                    "LOG_MODE_PRODUCTION"
+                    "development",
+                    "LOG_MODE_PRODUCTION",
+                    "production"
                   ],
                   "type": "string"
                 },

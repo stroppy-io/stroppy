@@ -315,9 +315,9 @@ func aliasCollision(canonical, alias string) map[string]any {
 func logLevelNames() []string {
 	values := config.LogLevelValues()
 
-	names := make([]string, len(values))
-	for index, value := range values {
-		names[index] = value.String()
+	names := make([]string, 0, len(values)+len(values))
+	for _, value := range values {
+		names = append(names, value.String(), value.Short())
 	}
 
 	return names
@@ -326,9 +326,9 @@ func logLevelNames() []string {
 func logModeNames() []string {
 	values := config.LogModeValues()
 
-	names := make([]string, len(values))
-	for index, value := range values {
-		names[index] = value.String()
+	names := make([]string, 0, len(values)+len(values))
+	for _, value := range values {
+		names = append(names, value.String(), value.Short())
 	}
 
 	return names

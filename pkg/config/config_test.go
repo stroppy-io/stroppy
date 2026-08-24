@@ -340,6 +340,12 @@ func TestLoggerEnumAcceptedForms(t *testing.T) {
 			mode:  config.LogModeProduction,
 		},
 		{
+			name:  "short names",
+			value: `{"logLevel":"warn","logMode":"development"}`,
+			level: config.LogLevelWarn,
+			mode:  config.LogModeDevelopment,
+		},
+		{
 			name:  "numeric ordinals",
 			value: `{"logLevel":3,"logMode":0}`,
 			level: config.LogLevelError,
@@ -413,6 +419,11 @@ func TestStrictConfigRejectsInvalidJSON(t *testing.T) {
 		},
 		{name: "undeclared enum ordinal", doc: `{"global":{"logger":{"logLevel":9}}}`, path: `$.global.logger.logLevel`},
 		{name: "quoted enum ordinal", doc: `{"global":{"logger":{"logLevel":"1.0"}}}`, path: `$.global.logger.logLevel`},
+		{
+			name: "quoted integral enum ordinal",
+			doc:  `{"global":{"logger":{"logLevel":"0"}}}`,
+			path: `$.global.logger.logLevel`,
+		},
 		{name: "quoted seed", doc: `{"global":{"seed":"7"}}`, path: `$.global.seed`},
 		{name: "exponent seed", doc: `{"global":{"seed":1e2}}`, path: `$.global.seed`},
 		{name: "decimal seed", doc: `{"global":{"seed":1.0}}`, path: `$.global.seed`},

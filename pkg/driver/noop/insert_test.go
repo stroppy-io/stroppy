@@ -5,6 +5,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/gen"
@@ -40,6 +46,32 @@ func newNoopDriver(t *testing.T) *Driver {
 	t.Helper()
 
 	return NewDriver(driver.Options{Config: &config.DriverConfig{}})
+}
+
+func TestNewDriverPreservesInjectedLogger(t *testing.T) {
+	injected := zap.NewNop()
+
+	d := NewDriver(driver.Options{
+		Config: &config.DriverConfig{},
+		Logger: injected,
+	})
+
+	require.Same(t, injected, d.logger)
+}
+
+func TestNewDriverFallsBackToNamedGlobalLogger(t *testing.T) {
+	core, observed := observer.New(zap.DebugLevel)
+
+	require.NoError(t, logger.Init("debug", "development", zap.WrapCore(func(zapcore.Core) zapcore.Core {
+		return core
+	})))
+
+	d := NewDriver(driver.Options{Config: &config.DriverConfig{}})
+	d.logger.Debug("fallback logger")
+
+	entries := observed.All()
+	require.Len(t, entries, 1)
+	require.Equal(t, "noop", entries[0].LoggerName)
 }
 
 // TestInsertNilGuards verifies Insert rejects a nil request, nil source,

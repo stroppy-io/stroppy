@@ -138,7 +138,7 @@ var _ driver.Driver = (*Driver)(nil)
 func NewDriver(_ context.Context, opts driver.Options) (*Driver, error) {
 	lg := opts.Logger
 	if lg == nil {
-		lg = logger.NewFromEnv().Named("csv")
+		lg = logger.Global().Named("csv")
 	}
 
 	cfg, err := parseConfig(opts.Config.URL)

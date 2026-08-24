@@ -1,14 +1,17 @@
 package logger
 
 import (
+	"errors"
 	"fmt"
-	"os"
+	"strings"
 	"sync/atomic"
+	"unicode"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+// LogMod names a logger output mode.
 type LogMod string
 
 const (
@@ -16,105 +19,284 @@ const (
 	ProductionMod  LogMod = "production"
 )
 
+// Config is the plain-Go logger configuration.
 type Config struct {
-	LogMod   LogMod `default:"production" mapstructure:"mod"   validate:"oneof=production development"`
-	LogLevel string `default:"info"       mapstructure:"level" validate:"oneof=debug info warn error"`
+	LogMod   LogMod `default:"development" mapstructure:"mod"   validate:"oneof=production development"`
+	LogLevel string `default:"debug"       mapstructure:"level" validate:"oneof=debug info warn error fatal"`
 }
 
-var globalLogger = atomic.Pointer[zap.Logger]{}
+var (
+	errInvalidLogMode     = errors.New("invalid log mode")
+	errInvalidQueryEscape = errors.New("invalid query escape")
+	globalLogger          atomic.Pointer[zap.Logger]
+)
 
 func init() {
-	setGlobalLogger(newDefault())
+	globalLogger.Store(newDefault())
 }
 
-// newDefault creates new default logger.
+// Init validates and installs a new process-wide logger. Invalid settings leave
+// the previously installed logger unchanged.
+func Init(level, mode string, opts ...zap.Option) error {
+	built, err := build(level, mode, opts...)
+	if err != nil {
+		return err
+	}
+
+	globalLogger.Store(built)
+
+	return nil
+}
+
+// NewFromConfig installs a logger built from a plain-Go configuration.
+//
+// It preserves the historical panic-on-invalid-config behavior; prefer Init
+// when configuration errors must be returned to the caller.
+func NewFromConfig(cfg *Config, opts ...zap.Option) *zap.Logger {
+	if cfg == nil {
+		panic("logger config is nil")
+	}
+
+	if err := Init(cfg.LogLevel, string(cfg.LogMod), opts...); err != nil {
+		panic(err)
+	}
+
+	return Global()
+}
+
+func build(level, mode string, opts ...zap.Option) (*zap.Logger, error) {
+	zapLevel, err := zapcore.ParseLevel(level)
+	if err != nil {
+		return nil, fmt.Errorf("invalid log level %q: %w", level, err)
+	}
+
+	logMod, err := ParseMode(mode)
+	if err != nil {
+		return nil, err
+	}
+
+	built, err := newZapCfg(logMod, zapLevel).Build(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return built, nil
+}
+
+// ParseMode validates a logger output mode.
+func ParseMode(mode string) (LogMod, error) {
+	switch LogMod(mode) {
+	case DevelopmentMod, ProductionMod:
+		return LogMod(mode), nil
+	default:
+		return "", fmt.Errorf("%w: %q (want %q or %q)", errInvalidLogMode, mode, DevelopmentMod, ProductionMod)
+	}
+}
+
+// Global returns the process-wide logger. It is always non-nil.
+func Global() *zap.Logger {
+	return globalLogger.Load()
+}
+
+// newDefault creates the startup logger used before Init runs.
 func newDefault(opts ...zap.Option) *zap.Logger {
-	cfg := newZapCfg(DevelopmentMod, zapcore.DebugLevel)
-	logger, _ := cfg.Build(opts...)
+	logger, err := newZapCfg(DevelopmentMod, zapcore.DebugLevel).Build(opts...)
+	if err != nil {
+		panic(err)
+	}
 
 	return logger
 }
 
-// newZapCfg creates new zap config.
+// newZapCfg creates a zap config for the given mode and level.
 func newZapCfg(mod LogMod, logLevel zapcore.Level) zap.Config {
 	var cfg zap.Config
 
 	switch mod {
 	case ProductionMod:
 		cfg = zap.NewProductionConfig()
-		cfg.Level.SetLevel(logLevel)
 	case DevelopmentMod:
 		cfg = zap.NewDevelopmentConfig()
-		cfg.Level.SetLevel(logLevel)
 	default:
 		cfg = zap.NewDevelopmentConfig()
-		cfg.Level.SetLevel(logLevel)
 	}
 
+	cfg.Level.SetLevel(logLevel)
 	cfg.DisableStacktrace = true
 
 	return cfg
 }
 
-// NewFromConfig creates new logger from config.
-func NewFromConfig(cfg *Config, opts ...zap.Option) *zap.Logger {
-	level, parseErr := zapcore.ParseLevel(cfg.LogLevel)
-	if parseErr != nil {
-		levels := getAllLevelsNames()
-		panic(fmt.Errorf("available levels is '%v' error: %w", levels, parseErr))
-	}
+// StructLogger is an alias for *zap.Logger included in project structs.
+type StructLogger = *zap.Logger
 
-	zapCfg := newZapCfg(cfg.LogMod, level)
-
-	logger, err := zapCfg.Build(opts...)
-	if err != nil {
-		panic(err)
-	}
-
-	setGlobalLogger(logger)
-
-	return Global()
-}
-
-func getAllLevelsNames() []string {
-	levelsFrom := int(zapcore.DebugLevel)
-	levelsTo := int(zapcore.FatalLevel)
-
-	levels := make([]string, 0, levelsTo-levelsFrom)
-	for i := levelsFrom; i <= levelsTo; i++ {
-		levels = append(levels, zapcore.Level(i).String()) //nolint: gosec // it's safe
-	}
-
-	return levels
+// NewStructLogger returns a named child of the process-wide logger.
+func NewStructLogger(name string) StructLogger {
+	return Global().Named(name)
 }
 
 const (
-	envLogLevel = "LOG_LEVEL"
-	envLogMod   = "LOG_MODE"
+	redactedSecret           = "xxxxx"
+	queryDecodePasses        = 2
+	percentEscapeDigits      = 2
+	hexAlphabetBase     byte = 10
 )
 
-func NewFromEnv(opts ...zap.Option) *zap.Logger {
-	cfg := &Config{
-		LogLevel: os.Getenv(envLogLevel),
-		LogMod:   LogMod(os.Getenv(envLogMod)),
+// RedactDSN masks credentials in database URLs and DSNs while preserving the
+// endpoint, database path, and non-secret query options.
+func RedactDSN(dsn string) string {
+	if dsn == "" {
+		return dsn
 	}
 
-	return NewFromConfig(cfg, opts...)
+	return redactUserinfo(redactQueryValues(dsn))
 }
 
-func setGlobalLogger(logger *zap.Logger) {
-	globalLogger.Store(logger)
+func redactQueryValues(dsn string) string {
+	queryStart := strings.IndexByte(dsn, '?')
+	if queryStart < 0 {
+		return dsn
+	}
+
+	queryEnd := strings.IndexByte(dsn[queryStart+1:], '#')
+	if queryEnd >= 0 {
+		queryEnd += queryStart + 1
+	} else {
+		queryEnd = len(dsn)
+	}
+
+	query := dsn[queryStart+1 : queryEnd]
+
+	parts := strings.Split(query, "&")
+	for index, part := range parts {
+		key, _, hasValue := strings.Cut(part, "=")
+		if hasValue && isSecretKey(key) {
+			parts[index] = key + "=" + redactedSecret
+		}
+	}
+
+	return dsn[:queryStart+1] + strings.Join(parts, "&") + dsn[queryEnd:]
 }
 
-// Global returns the global logger.
-func Global() *zap.Logger {
-	return globalLogger.Load()
+func isSecretKey(key string) bool {
+	decoded := key
+	for range queryDecodePasses {
+		value, err := urlQueryUnescape(decoded)
+		if err != nil {
+			decoded = stripMalformedEscapes(decoded)
+
+			break
+		}
+
+		if value == decoded {
+			break
+		}
+
+		decoded = value
+	}
+
+	var normalized strings.Builder
+
+	for _, r := range decoded {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			normalized.WriteRune(unicode.ToLower(r))
+		}
+	}
+
+	switch normalized.String() {
+	case "password", "passwd", "pwd", "token", "authtoken", "accesstoken", "secret", "credential", "credentials", "apikey":
+		return true
+	default:
+		return false
+	}
 }
 
-// StructLogger is an alias for *zap.Logger included in project struct.
-type StructLogger = *zap.Logger
+func stripMalformedEscapes(value string) string {
+	var result strings.Builder
 
-// NewStructLogger returns a new StructLogger with the given name.
-func NewStructLogger(name string) StructLogger {
-	return Global().Named(name)
+	for index := 0; index < len(value); index++ {
+		if value[index] != '%' {
+			result.WriteByte(value[index])
+
+			continue
+		}
+
+		index += min(percentEscapeDigits, len(value)-index-1)
+	}
+
+	return result.String()
+}
+
+func urlQueryUnescape(value string) (string, error) {
+	var result strings.Builder
+
+	for index := 0; index < len(value); index++ {
+		if value[index] == '+' {
+			result.WriteByte(' ')
+
+			continue
+		}
+
+		if value[index] != '%' || index+percentEscapeDigits >= len(value) {
+			result.WriteByte(value[index])
+
+			continue
+		}
+
+		high, okHigh := fromHex(value[index+1])
+
+		low, okLow := fromHex(value[index+percentEscapeDigits])
+		if !okHigh || !okLow {
+			return "", errInvalidQueryEscape
+		}
+
+		result.WriteByte(high<<4 | low)
+
+		index += percentEscapeDigits
+	}
+
+	return result.String(), nil
+}
+
+func fromHex(value byte) (byte, bool) {
+	switch {
+	case value >= '0' && value <= '9':
+		return value - '0', true
+	case value >= 'a' && value <= 'f':
+		return value - 'a' + hexAlphabetBase, true
+	case value >= 'A' && value <= 'F':
+		return value - 'A' + hexAlphabetBase, true
+	default:
+		return 0, false
+	}
+}
+
+func redactUserinfo(dsn string) string {
+	end := len(dsn)
+	if queryStart := strings.IndexByte(dsn, '?'); queryStart >= 0 {
+		end = queryStart
+	}
+
+	start := 0
+	if scheme := strings.Index(dsn[:end], "://"); scheme >= 0 {
+		start = scheme + len("://")
+	}
+
+	at := strings.LastIndexByte(dsn[start:end], '@')
+	if at < 0 {
+		return dsn
+	}
+
+	at += start
+
+	userinfo := dsn[start:at]
+
+	colon := strings.LastIndexByte(userinfo, ':')
+	if colon < 0 {
+		return dsn
+	}
+
+	colon += start
+
+	return dsn[:colon+1] + redactedSecret + dsn[at:]
 }

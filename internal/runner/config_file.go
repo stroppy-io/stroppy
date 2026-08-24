@@ -21,6 +21,7 @@ var errConfigEnvCollision = errors.New("config env keys collide case-insensitive
 
 // LoadedConfig keeps the run config separate from typed parameter scopes.
 type LoadedConfig struct {
+	Path      string
 	RunConfig *config.RunConfig
 	Run       map[string]json.RawMessage
 	Params    map[string]json.RawMessage
@@ -65,12 +66,18 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
 	}
 
-	if cfg.Global != nil && cfg.Global.Logger != nil {
-		logger.NewFromConfig(configLogger(cfg.Global.Logger))
+	return &LoadedConfig{Path: path, RunConfig: cfg, Run: runParams, Params: workloadParams}, true, nil
+}
+
+// LogConfigFile emits config-file diagnostics after logger initialization.
+func LogConfigFile(loaded *LoadedConfig) {
+	if loaded == nil || loaded.RunConfig == nil {
+		return
 	}
 
+	cfg := loaded.RunConfig
 	lg := logger.Global().Named("config_file")
-	lg.Info("Loaded config file", zap.String("path", path))
+	lg.Info("Loaded config file", zap.String("path", loaded.Path))
 
 	if cfg.GetScript() != "" {
 		lg.Debug("Config file script", zap.String("script", cfg.GetScript()))
@@ -78,8 +85,8 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 
 	if len(cfg.Env) > 0 {
 		keys := make([]string, 0, len(cfg.Env))
-		for k := range cfg.Env {
-			keys = append(keys, k)
+		for key := range cfg.Env {
+			keys = append(keys, key)
 		}
 
 		sort.Strings(keys)
@@ -90,39 +97,9 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 		lg.Debug("Config file driver",
 			zap.Uint32("index", idx),
 			zap.String("type", drv.GetDriverType()),
-			zap.String("url", drv.GetURL()),
+			zap.String("url", logger.RedactDSN(drv.GetURL())),
 		)
 	}
-
-	return &LoadedConfig{RunConfig: cfg, Run: runParams, Params: workloadParams}, true, nil
-}
-
-func configLogger(cfg *config.LoggerConfig) *logger.Config {
-	level := "debug"
-
-	switch cfg.LogLevel {
-	case config.LogLevelDebug:
-		level = "debug"
-	case config.LogLevelInfo:
-		level = "info"
-	case config.LogLevelWarn:
-		level = "warn"
-	case config.LogLevelError:
-		level = "error"
-	case config.LogLevelFatal:
-		level = "fatal"
-	}
-
-	mode := logger.DevelopmentMod
-
-	switch cfg.LogMode {
-	case config.LogModeDevelopment:
-		mode = logger.DevelopmentMod
-	case config.LogModeProduction:
-		mode = logger.ProductionMod
-	}
-
-	return &logger.Config{LogLevel: level, LogMod: mode}
 }
 
 func normalizeRunConfigEnv(runConfig *config.RunConfig) error {

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
 	_ "github.com/stroppy-io/stroppy/internal/workloads/simple"
@@ -18,6 +19,105 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/config"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
+
+func unsetLoggerEnv(t *testing.T) {
+	t.Helper()
+
+	oldLevel, hadLevel := os.LookupEnv(envLogLevel)
+	oldMode, hadMode := os.LookupEnv(envLogMode)
+
+	require.NoError(t, os.Unsetenv(envLogLevel))
+	require.NoError(t, os.Unsetenv(envLogMode))
+	t.Cleanup(func() {
+		if hadLevel {
+			require.NoError(t, os.Setenv(envLogLevel, oldLevel))
+		} else {
+			require.NoError(t, os.Unsetenv(envLogLevel))
+		}
+
+		if hadMode {
+			require.NoError(t, os.Setenv(envLogMode, oldMode))
+		} else {
+			require.NoError(t, os.Unsetenv(envLogMode))
+		}
+	})
+}
+
+func TestResolveLoggerSettingsPrecedence(t *testing.T) {
+	t.Setenv(envLogLevel, "error")
+	t.Setenv(envLogMode, "production")
+
+	fileLogger := &config.LoggerConfig{
+		LogLevel: config.LogLevelInfo,
+		LogMode:  config.LogModeDevelopment,
+	}
+
+	tests := []struct {
+		name      string
+		cli       map[string]string
+		legacy    map[string]string
+		wantLevel string
+		wantMode  string
+	}{
+		{
+			name:      "cli independently overrides each field",
+			cli:       map[string]string{loggerLevelParam: "warn"},
+			legacy:    map[string]string{envLogMode: "LOG_MODE_DEVELOPMENT"},
+			wantLevel: "warn",
+			wantMode:  "production",
+		},
+		{
+			name:      "process environment independently overrides legacy and config",
+			legacy:    map[string]string{envLogLevel: "debug", envLogMode: "development"},
+			wantLevel: "error",
+			wantMode:  "production",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			level, err := resolveLogLevel(test.cli, test.legacy, fileLogger)
+			require.NoError(t, err)
+			require.Equal(t, test.wantLevel, level)
+
+			mode, err := resolveLogMode(test.cli, test.legacy, fileLogger)
+			require.NoError(t, err)
+			require.Equal(t, test.wantMode, mode)
+		})
+	}
+}
+
+func TestResolveLoggerSettingsFallbacks(t *testing.T) {
+	unsetLoggerEnv(t)
+
+	level, err := resolveLogLevel(nil, map[string]string{envLogLevel: "LOG_LEVEL_FATAL"}, nil)
+	require.NoError(t, err)
+	require.Equal(t, "fatal", level)
+
+	mode, err := resolveLogMode(nil, map[string]string{envLogMode: "0"}, nil)
+	require.NoError(t, err)
+	require.Equal(t, "development", mode)
+
+	level, err = resolveLogLevel(nil, nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, defaultLogLevel, level)
+
+	mode, err = resolveLogMode(nil, nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, defaultLogMode, mode)
+}
+
+func TestWithoutLoggerParams(t *testing.T) {
+	inputs := map[string]string{"scale-factor": "1", loggerLevelParam: "debug", loggerModeParam: "development"}
+	require.Equal(t, map[string]string{"scale-factor": "1"}, withoutLoggerParams(inputs))
+
+	wantInputs := map[string]string{
+		"scale-factor":   "1",
+		loggerLevelParam: "debug",
+		loggerModeParam:  "development",
+	}
+	require.Equal(t, wantInputs, inputs)
+}
 
 //nolint:cyclop // one table covers the complete run argument grammar
 func TestParseRunArgs(t *testing.T) {

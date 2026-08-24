@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 )
 
 // DriverType identifies a database driver implementation.
@@ -168,55 +169,176 @@ func (m LogMode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(int32(m))
 }
 
+func (l LogLevel) Short() string {
+	switch l {
+	case LogLevelDebug:
+		return "debug"
+	case LogLevelInfo:
+		return "info"
+	case LogLevelWarn:
+		return "warn"
+	case LogLevelError:
+		return "error"
+	case LogLevelFatal:
+		return "fatal"
+	default:
+		return ""
+	}
+}
+
+func (m LogMode) Short() string {
+	switch m {
+	case LogModeDevelopment:
+		return "development"
+	case LogModeProduction:
+		return "production"
+	default:
+		return ""
+	}
+}
+
+// ParseLogLevel accepts the short and v5 logging level names, or a valid ordinal.
+func ParseLogLevel(value string) (LogLevel, error) {
+	if level, ok := parseLogLevelName(value); ok {
+		return level, nil
+	}
+
+	ordinal, err := strconv.ParseInt(value, 10, 32)
+	if err == nil {
+		level := LogLevel(ordinal)
+		if _, ok := logLevelNames[level]; ok {
+			return level, nil
+		}
+	}
+
+	return 0, fmt.Errorf("%w: %q", errInvalidLogLevel, value)
+}
+
+// ParseLogMode accepts the short and v5 logging mode names, or a valid ordinal.
+func parseLogLevelName(value string) (LogLevel, bool) {
+	for _, level := range LogLevelValues() {
+		if value == level.Short() || value == level.String() {
+			return level, true
+		}
+	}
+
+	return 0, false
+}
+
+func ParseLogMode(value string) (LogMode, error) {
+	if mode, ok := parseLogModeName(value); ok {
+		return mode, nil
+	}
+
+	ordinal, err := strconv.ParseInt(value, 10, 32)
+	if err == nil {
+		mode := LogMode(ordinal)
+		if _, ok := logModeNames[mode]; ok {
+			return mode, nil
+		}
+	}
+
+	return 0, fmt.Errorf("%w: %q", errInvalidLogMode, value)
+}
+
+func parseLogModeName(value string) (LogMode, bool) {
+	for _, mode := range LogModeValues() {
+		if value == mode.Short() || value == mode.String() {
+			return mode, true
+		}
+	}
+
+	return 0, false
+}
+
 func (l *LogLevel) UnmarshalJSON(data []byte) error {
-	value, err := unmarshalEnum(data, logLevelNames, errInvalidLogLevel)
+	value, err := unmarshalLogLevel(data)
 	if err != nil {
 		return err
 	}
 
-	*l = LogLevel(value)
+	*l = value
 
 	return nil
 }
 
 func (m *LogMode) UnmarshalJSON(data []byte) error {
-	value, err := unmarshalEnum(data, logModeNames, errInvalidLogMode)
+	value, err := unmarshalLogMode(data)
 	if err != nil {
 		return err
 	}
 
-	*m = LogMode(value)
+	*m = value
 
 	return nil
 }
 
-func unmarshalEnum[T ~int32](data []byte, names map[T]string, kind error) (int32, error) {
+func unmarshalLogLevel(data []byte) (LogLevel, error) {
 	if string(data) == "null" {
-		return 0, nil
+		return LogLevelDebug, nil
 	}
 
-	var name string
 	if len(data) > 0 && data[0] == '"' {
+		var name string
 		if err := json.Unmarshal(data, &name); err != nil {
 			return 0, err
 		}
 
-		for value, candidate := range names {
-			if name == candidate {
-				return int32(value), nil
-			}
+		if level, ok := parseLogLevelName(name); ok {
+			return level, nil
 		}
 
-		return 0, fmt.Errorf("%w: %q", kind, name)
+		return 0, fmt.Errorf("%w: %q", errInvalidLogLevel, name)
 	}
 
+	ordinal, err := unmarshalEnumOrdinal(data, errInvalidLogLevel)
+	if err != nil {
+		return 0, err
+	}
+
+	level := LogLevel(ordinal)
+	if _, ok := logLevelNames[level]; !ok {
+		return 0, fmt.Errorf("%w: %d", errInvalidLogLevel, ordinal)
+	}
+
+	return level, nil
+}
+
+func unmarshalLogMode(data []byte) (LogMode, error) {
+	if string(data) == "null" {
+		return LogModeDevelopment, nil
+	}
+
+	if len(data) > 0 && data[0] == '"' {
+		var name string
+		if err := json.Unmarshal(data, &name); err != nil {
+			return 0, err
+		}
+
+		if mode, ok := parseLogModeName(name); ok {
+			return mode, nil
+		}
+
+		return 0, fmt.Errorf("%w: %q", errInvalidLogMode, name)
+	}
+
+	ordinal, err := unmarshalEnumOrdinal(data, errInvalidLogMode)
+	if err != nil {
+		return 0, err
+	}
+
+	mode := LogMode(ordinal)
+	if _, ok := logModeNames[mode]; !ok {
+		return 0, fmt.Errorf("%w: %d", errInvalidLogMode, ordinal)
+	}
+
+	return mode, nil
+}
+
+func unmarshalEnumOrdinal(data []byte, kind error) (int32, error) {
 	var ordinal int32
 	if err := json.Unmarshal(data, &ordinal); err != nil {
 		return 0, fmt.Errorf("%w: %s", kind, data)
-	}
-
-	if _, ok := names[T(ordinal)]; !ok {
-		return 0, fmt.Errorf("%w: %d", kind, ordinal)
 	}
 
 	return ordinal, nil
