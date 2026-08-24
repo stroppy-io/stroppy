@@ -106,6 +106,41 @@ func TestDriverCLIConfigDecodeOverridesPreservesLexemes(t *testing.T) {
 	}
 }
 
+func TestDriverCLIConfigCanonicalizesInsertMethodOverrides(t *testing.T) {
+	for _, key := range []string{
+		"defaultInsertMethod",
+		"default_insert_method",
+		"insertMethod",
+		"insert_method",
+	} {
+		t.Run(key, func(t *testing.T) {
+			cfg := &runner.DriverCLIConfig{}
+			require.NoError(t, cfg.ApplyOverride(key, "columnar"))
+			require.Equal(t, []runner.DriverOverride{{Key: "defaultInsertMethod", Value: "columnar"}}, cfg.Overrides)
+
+			overrides, err := cfg.DecodeOverrides()
+			require.NoError(t, err)
+			require.Equal(t, "columnar", overrides.GetDefaultInsertMethod())
+		})
+	}
+}
+
+func TestDriverCLIConfigInsertMethodAliasConflictIsOrderIndependent(t *testing.T) {
+	for _, alias := range []string{"default_insert_method", "insertMethod", "insert_method"} {
+		t.Run(alias, func(t *testing.T) {
+			first := &runner.DriverCLIConfig{}
+			require.NoError(t, first.ApplyOverride("defaultInsertMethod", "native"))
+			firstErr := first.ApplyOverride(alias, "columnar")
+			require.Error(t, firstErr)
+
+			second := &runner.DriverCLIConfig{}
+			require.NoError(t, second.ApplyOverride(alias, "columnar"))
+			secondErr := second.ApplyOverride("defaultInsertMethod", "native")
+			require.EqualError(t, secondErr, firstErr.Error())
+		})
+	}
+}
+
 func TestDriverCLIConfigDecodeOverridesRejectsRemovedIsolation(t *testing.T) {
 	for _, key := range []string{"defaultTxIsolation", "default_tx_isolation"} {
 		t.Run(key, func(t *testing.T) {

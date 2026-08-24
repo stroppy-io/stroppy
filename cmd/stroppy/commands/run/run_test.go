@@ -1171,6 +1171,82 @@ func TestApplyDriverPresetAliasesReachRuntimeConfig(t *testing.T) {
 	}
 }
 
+func TestApplyDriverOptInsertMethodAliasesRespectPrecedenceAndIndex(t *testing.T) {
+	postgres := "postgres"
+	plainBulk := "plain_bulk"
+
+	for _, key := range []string{
+		"defaultInsertMethod",
+		"default_insert_method",
+		"insertMethod",
+		"insert_method",
+	} {
+		t.Run(key, func(t *testing.T) {
+			configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
+				0: {DriverType: &postgres, DefaultInsertMethod: &plainBulk},
+				1: {DriverType: &postgres, DefaultInsertMethod: &plainBulk},
+			})
+			if err != nil {
+				t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
+			}
+
+			for _, idx := range []int{0, 1} {
+				if err := applyDriverPreset(configs, idx, "pg"); err != nil {
+					t.Fatalf("applyDriverPreset(%d) error = %v", idx, err)
+				}
+			}
+
+			if err := applyDriverOpt(configs, 1, key, "columnar"); err != nil {
+				t.Fatalf("applyDriverOpt(%q) error = %v", key, err)
+			}
+
+			first, err := buildDriverConfig(0, configs[0])
+			if err != nil {
+				t.Fatalf("buildDriverConfig(0) error = %v", err)
+			}
+
+			second, err := buildDriverConfig(1, configs[1])
+			if err != nil {
+				t.Fatalf("buildDriverConfig(1) error = %v", err)
+			}
+
+			if first.DefaultInsertMethod != "native" || second.DefaultInsertMethod != "columnar" {
+				t.Fatalf(
+					"defaults = (%q, %q), want preset then indexed CLI override",
+					first.DefaultInsertMethod,
+					second.DefaultInsertMethod,
+				)
+			}
+		})
+	}
+}
+
+func TestApplyDriverOptInsertMethodAliasConflictIsOrderIndependent(t *testing.T) {
+	for _, alias := range []string{"default_insert_method", "insertMethod", "insert_method"} {
+		t.Run(alias, func(t *testing.T) {
+			first := runner.DriverCLIConfigs{}
+			if err := applyDriverOpt(first, 0, "defaultInsertMethod", "native"); err != nil {
+				t.Fatal(err)
+			}
+
+			firstErr := applyDriverOpt(first, 0, alias, "columnar")
+			if firstErr == nil {
+				t.Fatal("second insert method override succeeded")
+			}
+
+			second := runner.DriverCLIConfigs{}
+			if err := applyDriverOpt(second, 0, alias, "columnar"); err != nil {
+				t.Fatal(err)
+			}
+
+			secondErr := applyDriverOpt(second, 0, "defaultInsertMethod", "native")
+			if secondErr == nil || secondErr.Error() != firstErr.Error() {
+				t.Fatalf("reverse collision error = %v, want %v", secondErr, firstErr)
+			}
+		})
+	}
+}
+
 func TestDriverExtrasRejectAliasCollisionsAndWrongCase(t *testing.T) {
 	tests := []struct {
 		name string

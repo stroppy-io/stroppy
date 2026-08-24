@@ -163,12 +163,14 @@ func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
 		return err
 	}
 
+	key = canonicalDriverOverrideKey(key)
+
 	switch key {
 	case "driverType", "driver_type":
 		d.DriverType = value
 	case "url":
 		d.URL = value
-	case "insertMethod", "insert_method", "defaultInsertMethod", "default_insert_method":
+	case "defaultInsertMethod":
 		if _, err := driver.ParseInsertMethod(value); err != nil {
 			return fmt.Errorf("%w: %w", errInvalidDriverOverride, err)
 		}
@@ -187,6 +189,15 @@ func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
 	d.Overrides = append(d.Overrides, DriverOverride{Key: key, Value: value})
 
 	return nil
+}
+
+func canonicalDriverOverrideKey(key string) string {
+	switch key {
+	case "default_insert_method", "insertMethod", "insert_method":
+		return "defaultInsertMethod"
+	default:
+		return key
+	}
 }
 
 func (d *DriverCLIConfig) hasInsertMethodOverride() bool {
