@@ -15,6 +15,7 @@ import (
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgconn/ctxwatch"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
@@ -22,8 +23,9 @@ import (
 )
 
 const (
-	LoggerName       = "pgx-pool"
-	DriverLoggerName = "postgres-driver"
+	LoggerName                    = "pgx-pool"
+	DriverLoggerName              = "postgres-driver"
+	cancelRequestFallbackDeadline = 5 * time.Second
 )
 
 var (
@@ -80,6 +82,14 @@ func ParseConfig(
 	cfg, err := pgxpool.ParseConfig(driverConfig.URL)
 	if err != nil {
 		return nil, err
+	}
+
+	cfg.ConnConfig.BuildContextWatcherHandler = func(conn *pgconn.PgConn) ctxwatch.Handler {
+		return &pgconn.CancelRequestContextWatcherHandler{
+			Conn:               conn,
+			CancelRequestDelay: 0,
+			DeadlineDelay:      cancelRequestFallbackDeadline,
+		}
 	}
 
 	// Disable connection lifetime limits

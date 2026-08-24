@@ -2,13 +2,16 @@ package runner_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 func TestLoadRunConfig_ExplicitPath(t *testing.T) {
@@ -128,7 +131,7 @@ func TestLoadRunConfig_TypedParameterScopes(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	require.NoError(t, os.WriteFile(path, []byte(`{
 		"version": "1",
-		"run": {"executor":"constant-vus","vus":3,"duration":"2s","future":true},
+		"run": {"executor":"constant-vus","vus":3,"duration":"2s","queryTimeout":"250ms","future":true},
 		"params": {"scaleFactor":1.5,"enabled":false,"label":"sample"}
 	}`), 0o600))
 
@@ -137,6 +140,7 @@ func TestLoadRunConfig_TypedParameterScopes(t *testing.T) {
 	assert.True(t, loaded)
 	assert.JSONEq(t, `"constant-vus"`, string(cfg.Run["executor"]))
 	assert.JSONEq(t, `3`, string(cfg.Run["vus"]))
+	assert.JSONEq(t, `"250ms"`, string(cfg.Run["queryTimeout"]))
 	assert.JSONEq(t, `true`, string(cfg.Run["future"]))
 	assert.JSONEq(t, `1.5`, string(cfg.Params["scaleFactor"]))
 	assert.JSONEq(t, `false`, string(cfg.Params["enabled"]))
@@ -173,18 +177,158 @@ func TestLoadRunConfigRejectsCaseInsensitiveEnvCollisions(t *testing.T) {
 	assert.Contains(t, err.Error(), `config env keys collide case-insensitively: "VUS" and "vus"`)
 }
 
-func TestLoadRunConfigRejectsRemovedK6FieldsWithGuidance(t *testing.T) {
-	for _, field := range []string{"k6Args", "k6Config"} {
+func TestLoadRunConfigRejectsRemovedFieldsAsUnknown(t *testing.T) {
+	for _, field := range []string{"k6Args", "k6_args", "k6Config", "k6_config"} {
 		t.Run(field, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.json")
 			require.NoError(t, os.WriteFile(path, []byte(`{"script":"tpcc/tx","`+field+`":"x"}`), 0o600))
 
 			_, _, err := runner.LoadRunConfig(path)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "k6Args and k6Config are removed")
-			assert.Contains(t, err.Error(), "executor/vus/iterations/duration")
+
+			fieldPath := `$.` + field
+			if strings.Contains(field, "_") {
+				fieldPath = `$["` + field + `"]`
+			}
+
+			assert.Contains(t, err.Error(), fieldPath)
+			assert.Contains(t, err.Error(), `unknown field "`+field+`"`)
 		})
 	}
+}
+
+func TestLoadRunConfigRejectsRemovedDriverFieldAsUnknown(t *testing.T) {
+	for _, field := range []string{"defaultTxIsolation", "default_tx_isolation"} {
+		t.Run(field, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			doc := `{"drivers":{"0":{"` + field + `":"serializable"}}}`
+			require.NoError(t, os.WriteFile(path, []byte(doc), 0o600))
+
+			_, _, err := runner.LoadRunConfig(path)
+			require.Error(t, err)
+
+			fieldPath := `$.drivers["0"].` + field
+			if strings.Contains(field, "_") {
+				fieldPath = `$.drivers["0"]["` + field + `"]`
+			}
+
+			assert.Contains(t, err.Error(), fieldPath)
+			assert.Contains(t, err.Error(), `unknown field "`+field+`"`)
+		})
+	}
+}
+
+func TestLoadRunConfigCanonicalizesAliases(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{
+		"no_steps":["load_data"],
+		"global":{"run_id":"run-1"},
+		"drivers":{"0":{"driver_type":"postgres","bulk_size":"2e2"}},
+		"run":{"query_timeout":"250ms"},
+		"params":{"scale_factor":1}
+	}`), 0o600))
+
+	loaded, found, err := runner.LoadRunConfig(path)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, []string{"load_data"}, loaded.RunConfig.NoSteps)
+	require.Equal(t, "run-1", loaded.RunConfig.Global.RunID)
+	require.Equal(t, int32(200), loaded.RunConfig.Drivers[0].GetBulkSize())
+	require.JSONEq(t, `"250ms"`, string(loaded.Run["queryTimeout"]))
+	require.JSONEq(t, `1`, string(loaded.Params["scaleFactor"]))
+}
+
+func TestLoadRunConfigStrictErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  string
+		path string
+	}{
+		{name: "nested duplicate", doc: `{"global":{"runId":"a","runId":"b"}}`, path: `$.global.runId`},
+		{name: "alias collision", doc: `{"global":{"runId":"a","run_id":"b"}}`, path: `$.global.runId`},
+		{name: "wrong case", doc: `{"drivers":{"0":{"BulkSize":1}}}`, path: `$.drivers["0"]["BulkSize"]`},
+		{name: "nested map null", doc: `{"global":{"metadata":{"key":null}}}`, path: `$.global.metadata["key"]`},
+		{name: "scope alias collision", doc: `{"params":{"scaleFactor":1,"scale_factor":2}}`, path: `$.params.scaleFactor`},
+		{name: "scope container", doc: `{"params":{"scaleFactor":[]}}`, path: `$.params.scaleFactor`},
+		{name: "trailing JSON", doc: `{}[]`, path: `$`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			require.NoError(t, os.WriteFile(path, []byte(test.doc), 0o600))
+
+			_, _, err := runner.LoadRunConfig(path)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), test.path)
+		})
+	}
+}
+
+func TestLoadRunConfigLogger(t *testing.T) {
+	const configPathEnv = "STROPPY_TEST_CONFIG_PATH"
+
+	if path := os.Getenv(configPathEnv); path != "" {
+		_, _, err := runner.LoadRunConfig(path)
+		require.NoError(t, err)
+
+		return
+	}
+
+	tests := []struct {
+		name        string
+		logger      string
+		wantLog     bool
+		wantJSONLog bool
+	}{
+		{
+			name:   "error suppresses loader info",
+			logger: `{"logLevel":"LOG_LEVEL_ERROR","logMode":"LOG_MODE_DEVELOPMENT"}`,
+		},
+		{
+			name:        "info production emits JSON",
+			logger:      `{"logLevel":"LOG_LEVEL_INFO","logMode":"LOG_MODE_PRODUCTION"}`,
+			wantLog:     true,
+			wantJSONLog: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			require.NoError(t, os.WriteFile(
+				path,
+				[]byte(`{"global":{"logger":`+test.logger+`}}`),
+				0o600,
+			))
+
+			cmd := exec.Command(os.Args[0], "-test.run=^TestLoadRunConfigLogger$")
+
+			cmd.Env = append(os.Environ(), configPathEnv+"="+path)
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, string(output))
+
+			gotLog := strings.Contains(string(output), "Loaded config file")
+			assert.Equal(t, test.wantLog, gotLog, string(output))
+
+			if test.wantJSONLog {
+				assert.Contains(t, string(output), `"level":"info"`)
+			}
+		})
+	}
+}
+
+func TestLoadRunConfigAcceptsIntegralLoggerOrdinals(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{
+		"global":{"logger":{"logLevel":1.0,"logMode":1e0}}
+	}`), 0o600))
+
+	loaded, found, err := runner.LoadRunConfig(path)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, config.LogLevelInfo, loaded.RunConfig.Global.Logger.LogLevel)
+	require.Equal(t, config.LogModeProduction, loaded.RunConfig.Global.Logger.LogMode)
 }
 
 func ptr[T any](v T) *T { return &v }

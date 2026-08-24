@@ -538,6 +538,70 @@ func TestDescribeAllIsSorted(t *testing.T) {
 	}
 }
 
+func TestScenarioQueryTimeoutResolution(t *testing.T) {
+	clearScenarioEnv(t)
+	clearParamEnv(t, "QUERY_TIMEOUT")
+
+	params, _, err := defineWorkload(&paramTestWorkload{name: "test/query-timeout"},
+		ParamInputs{CLI: map[string]string{"query-timeout": "5s"}}, false)
+	if err != nil {
+		t.Fatalf("defineWorkload() error = %v", err)
+	}
+
+	if got := params.queryTimeout.Value(); got != 5*time.Second {
+		t.Fatalf("queryTimeout = %v, want 5s", got)
+	}
+
+	if params.queryTimeout.Source() != ParamSourceCLI {
+		t.Fatalf("queryTimeout source = %q, want %q", params.queryTimeout.Source(), ParamSourceCLI)
+	}
+
+	t.Setenv("QUERY_TIMEOUT", "2s")
+
+	params, _, err = defineWorkload(&paramTestWorkload{name: "test/query-timeout"}, ParamInputs{}, false)
+	if err != nil {
+		t.Fatalf("defineWorkload() env error = %v", err)
+	}
+
+	if got := params.queryTimeout.Value(); got != 2*time.Second {
+		t.Fatalf("queryTimeout = %v, want 2s", got)
+	}
+
+	if params.queryTimeout.Source() != ParamSourceProcessEnv {
+		t.Fatalf("queryTimeout source = %q, want %q", params.queryTimeout.Source(), ParamSourceProcessEnv)
+	}
+
+	clearParamEnv(t, "QUERY_TIMEOUT")
+
+	params, _, err = defineWorkload(&paramTestWorkload{name: "test/query-timeout"}, ParamInputs{
+		RunConfig: map[string]json.RawMessage{"queryTimeout": json.RawMessage(`"250ms"`)},
+	}, false)
+	if err != nil {
+		t.Fatalf("defineWorkload() config error = %v", err)
+	}
+
+	if got := params.queryTimeout.Value(); got != 250*time.Millisecond {
+		t.Fatalf("queryTimeout = %v, want 250ms", got)
+	}
+
+	if params.queryTimeout.Source() != ParamSourceConfig {
+		t.Fatalf("queryTimeout source = %q, want %q", params.queryTimeout.Source(), ParamSourceConfig)
+	}
+
+	params, _, err = defineWorkload(&paramTestWorkload{name: "test/query-timeout"}, ParamInputs{}, false)
+	if err != nil {
+		t.Fatalf("defineWorkload() default error = %v", err)
+	}
+
+	if got := params.queryTimeout.Value(); got != 0 {
+		t.Fatalf("queryTimeout = %v, want disabled default 0", got)
+	}
+
+	if params.queryTimeout.Source() != ParamSourceDefault {
+		t.Fatalf("queryTimeout source = %q, want %q", params.queryTimeout.Source(), ParamSourceDefault)
+	}
+}
+
 func TestScenarioTypedDurationRequiresExplicitConstantVUs(t *testing.T) {
 	clearScenarioEnv(t)
 

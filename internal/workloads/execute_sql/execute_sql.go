@@ -2,7 +2,7 @@
 // a generic runner that executes every query in a SQL file (or inline SQL string) once.
 // The SQL source is one of two typed workload parameters: --sql-file (a path resolved
 // cwd → workloads/execute_sql/ → embedded) or --sql-body (inline SQL text). Queries are
-// delimited by `--= name` markers, matching parse_sql.ts — a markerless file yields none.
+// delimited by `--= name` markers, matching parse_sql.ts — a markerless source yields none.
 package execute_sql
 
 import (
@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	errNoSQLSource      = errors.New("execute_sql: no SQL source — pass --sql-file <path> or --sql-body <inline sql>")
-	errSQLFileNoQueries = errors.New("execute_sql: SQL file has no `--= name` queries")
+	errNoSQLSource        = errors.New("execute_sql: no SQL source — pass --sql-file <path> or --sql-body <inline sql>")
+	errSQLSourceNoQueries = errors.New("execute_sql: SQL source has no `--= name` queries")
 )
 
 type workload struct {
@@ -32,13 +32,48 @@ func init() { bench.Register(func() bench.Workload { return &workload{} }) }
 func (*workload) Name() string { return "execute_sql" }
 
 func (w *workload) Define(d *bench.Def) error {
-	w.sqlBody = d.Param.String(
+	sqlBody := d.Param.String(
 		"sql-body", "", "Inline SQL to execute.",
 		bench.LegacyEnvAliases("STROPPY_SQL_BODY"),
-	).Value()
-	w.sqlFile = d.Param.String("sql-file", "", "SQL file to execute.").Value()
+	)
+	sqlFile := d.Param.String("sql-file", "", "SQL file to execute.")
+
+	bodyPriority := sqlSourcePriority(sqlBody.Source())
+	filePriority := sqlSourcePriority(sqlFile.Source())
+
+	switch {
+	case filePriority > bodyPriority:
+		w.sqlFile = sqlFile.Value()
+		w.sqlBody = ""
+	case bodyPriority > filePriority:
+		w.sqlBody = sqlBody.Value()
+		w.sqlFile = ""
+	case sqlFile.Value() != "" && sqlBody.Value() == "":
+		w.sqlFile = sqlFile.Value()
+		w.sqlBody = ""
+	default:
+		w.sqlBody = sqlBody.Value()
+		w.sqlFile = ""
+	}
 
 	return nil
+}
+
+func sqlSourcePriority(source bench.ParamSource) int {
+	switch source {
+	case bench.ParamSourceCLI:
+		return 5
+	case bench.ParamSourceProcessEnv:
+		return 4
+	case bench.ParamSourceLegacyEnv:
+		return 3
+	case bench.ParamSourceConfig:
+		return 2
+	case bench.ParamSourceLegacyConfigEnv:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
@@ -60,16 +95,14 @@ func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
 
 	w.names = w.sql.Names("")
 	if len(w.names) == 0 {
-		return errSQLFileNoQueries
+		return errSQLSourceNoQueries
 	}
-
-	b.StepBegin("workload")
 
 	return nil
 }
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	return b.Step("workload", func() error {
+	return b.StepSilent("workload", func() error {
 		lg := b.Logger().Sugar()
 
 		for _, name := range w.names {
@@ -96,7 +129,5 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 }
 
 func (*workload) Teardown(_ context.Context, b *bench.Bench) error {
-	b.StepEnd("workload")
-
 	return nil
 }

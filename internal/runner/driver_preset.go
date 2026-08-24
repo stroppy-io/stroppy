@@ -1,65 +1,45 @@
 package runner
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
 	"net/url"
 	"path/filepath"
-	"strconv"
+	"regexp"
 	"strings"
 
 	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
-// Driver preset literal reused across the postgres-family presets.
-const driverPostgres = "postgres"
-
-// pathFields lists Extra keys that contain file paths and must be
-// resolved to absolute paths before the working directory changes.
-var pathFields = map[string]bool{
-	"cacertfile": true,
-}
+// Driver preset literals reused across the postgres-family presets and
+// their default insert method.
+const (
+	driverPostgres  = "postgres"
+	insertPlainBulk = "plain_bulk"
+)
 
 var (
-	errUnknownDriver          = errors.New("unknown driver")
-	errInvalidDriverOverride  = errors.New("invalid driver override")
-	errDriverOverrideConflict = errors.New("driver override conflicts with existing non-object value")
+	errUnknownDriver             = errors.New("unknown driver")
+	errInvalidDriverOverride     = errors.New("invalid driver override")
+	errDriverOverrideConflict    = errors.New("driver override conflicts with existing non-object value")
+	errInsertMethodAliasConflict = errors.New("insert method aliases conflict")
+	errRawInsertMethodNotString  = errors.New("raw insert method must be a string")
+	errNilDriverConfig           = errors.New("nil driver config")
+
+	legacyRawInsertMethodKey = regexp.MustCompile(`([,{]\s*)"insertMethod"(\s*:)`)
 )
-
-const (
-	driverTypeKey          = "drivertype"
-	urlKey                 = "url"
-	defaultInsertMethodKey = "defaultinsertmethod"
-	insertMethodKey        = "insertmethod"
-)
-
-// inferType converts a CLI string value to its most specific Go type
-// so that JSON serialization emits a number/bool instead of a quoted string.
-// This is required because protobuf (TS side) rejects "20" for int32 fields.
-func inferType(value string) any {
-	if i, err := strconv.ParseInt(value, 10, 64); err == nil {
-		return i
-	}
-
-	if f, err := strconv.ParseFloat(value, 64); err == nil {
-		return f
-	}
-
-	if b, err := strconv.ParseBool(value); err == nil {
-		return b
-	}
-
-	return value
-}
 
 // DriverPreset contains default configuration for a known database driver.
 // These are used when the user specifies --driver / -d on the CLI.
 type DriverPreset struct {
-	DriverType string `json:"driverType"`
-	URL        string `json:"url"`
-	PoolKind   string `json:"-"` // "postgres" or "sql" — determines which pool config block to use
+	DriverType          string `json:"driverType"`
+	URL                 string `json:"url"`
+	DefaultInsertMethod string `json:"defaultInsertMethod,omitempty"`
+	PoolKind            string `json:"-"` // "postgres" or "sql" — determines which pool config block to use
 }
 
 // postgresURL builds a postgres:// connection URL from components,
@@ -75,30 +55,35 @@ func postgresURL(user, pass, host string) string {
 // driverPresets maps short driver names to their default configurations.
 var driverPresets = map[string]DriverPreset{
 	"pg": {
-		DriverType: driverPostgres,
-		URL:        postgresURL(driverPostgres, driverPostgres, "localhost:5432"),
-		PoolKind:   driverPostgres,
+		DriverType:          driverPostgres,
+		URL:                 postgresURL(driverPostgres, driverPostgres, "localhost:5432"),
+		DefaultInsertMethod: "native",
+		PoolKind:            driverPostgres,
 	},
 	"mysql": {
 		DriverType: "mysql",
 		URL: "myuser:mypassword@tcp(localhost:3306)" +
 			"/mydb?charset=utf8mb4&parseTime=True&loc=Local",
-		PoolKind: "sql",
+		DefaultInsertMethod: insertPlainBulk,
+		PoolKind:            "sql",
 	},
 	"pico": {
-		DriverType: "picodata",
-		URL:        postgresURL("admin", "T0psecret", "localhost:1331"),
-		PoolKind:   driverPostgres,
+		DriverType:          "picodata",
+		URL:                 postgresURL("admin", "T0psecret", "localhost:1331"),
+		DefaultInsertMethod: insertPlainBulk,
+		PoolKind:            driverPostgres,
 	},
 	"ydb": {
-		DriverType: "ydb",
-		URL:        "grpc://localhost:2136/local",
-		PoolKind:   "sql",
+		DriverType:          "ydb",
+		URL:                 "grpc://localhost:2136/local",
+		DefaultInsertMethod: "native",
+		PoolKind:            "sql",
 	},
 	"noop": {
-		DriverType: "noop",
-		URL:        "noop://localhost",
-		PoolKind:   "",
+		DriverType:          "noop",
+		URL:                 "noop://localhost",
+		DefaultInsertMethod: insertPlainBulk,
+		PoolKind:            "",
 	},
 }
 
@@ -116,23 +101,31 @@ func LookupDriverPreset(name string) (DriverPreset, error) {
 		return DriverPreset{}, fmt.Errorf("%w %q (available: %s)", errUnknownDriver, name, strings.Join(known, ", "))
 	}
 
+	if err := validateDefaultInsertMethod(preset.DefaultInsertMethod); err != nil {
+		return DriverPreset{}, err
+	}
+
 	return preset, nil
 }
 
-// DriverCLIConfig represents a fully resolved driver configuration from CLI flags.
-// Known fields are kept on the struct; -D extras live in Extra and are merged into
-// the runtime *config.DriverConfig by the run command's buildDriverConfig.
+// DriverCLIConfig is one mutable driver configuration assembled from -d/-D
+// inputs before conversion to the runtime config.
 type DriverCLIConfig struct {
 	// Base fields from preset (overridable via -D).
 	DriverType          string `json:"driverType,omitempty"`
 	URL                 string `json:"url,omitempty"`
 	DefaultInsertMethod string `json:"defaultInsertMethod,omitempty"`
 
-	// Extra fields from -D key=value overrides that don't map to known fields.
+	// Extra fields from config-file drivers that don't map to known fields.
 	Extra map[string]any `json:"-"`
+
+	// Overrides retains -D occurrences for strict, order-preserving decoding.
+	Overrides []DriverOverride `json:"-"`
 }
 
 // MarshalJSON produces a flat JSON object merging known fields and extras.
+//
+//nolint:gocritic // Value serialization is part of DriverCLIConfig's JSON contract.
 func (d DriverCLIConfig) MarshalJSON() ([]byte, error) {
 	merged := make(map[string]any)
 
@@ -153,32 +146,81 @@ func (d DriverCLIConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(merged)
 }
 
-// ApplyOverride sets a field by key=value. Known fields are set on the struct;
-// unknown fields go into Extra for later strict decoding into DriverConfig.
+// DriverOverride is one -D key=value occurrence.
+type DriverOverride struct {
+	Key   string
+	Value string
+}
+
+// ApplyOverride retains a driver override for strict decoding at runtime.
 func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
 	if key == "" {
 		return fmt.Errorf("%w: empty key", errInvalidDriverOverride)
 	}
 
-	switch normalizeKey(key) {
-	case driverTypeKey:
+	path := strings.Split(key, ".")
+	if err := validateOverridePath(path); err != nil {
+		return err
+	}
+
+	switch key {
+	case "driverType", "driver_type":
 		d.DriverType = value
-	case urlKey:
+	case "url":
 		d.URL = value
-	case defaultInsertMethodKey, insertMethodKey:
+	case "insertMethod", "insert_method", "defaultInsertMethod", "default_insert_method":
+		if _, err := driver.ParseInsertMethod(value); err != nil {
+			return fmt.Errorf("%w: %w", errInvalidDriverOverride, err)
+		}
+
+		if d.hasInsertMethodOverride() {
+			return errInsertMethodAliasConflict
+		}
+
 		d.DefaultInsertMethod = value
 	default:
-		return d.setExtraPath(strings.Split(key, "."), convertOverrideValue(key, value))
+		if err := d.setExtraPath(path, driverOverrideValue(value)); err != nil {
+			return err
+		}
+	}
+
+	d.Overrides = append(d.Overrides, DriverOverride{Key: key, Value: value})
+
+	return nil
+}
+
+func (d *DriverCLIConfig) hasInsertMethodOverride() bool {
+	for _, override := range d.Overrides {
+		switch override.Key {
+		case "insertMethod", "insert_method", "defaultInsertMethod", "default_insert_method":
+			return true
+		}
+	}
+
+	return false
+}
+
+func validateDefaultInsertMethod(method string) error {
+	_, err := driver.ParseInsertMethod(method)
+
+	return err
+}
+
+func validateOverridePath(path []string) error {
+	for _, part := range path {
+		if part == "" {
+			return fmt.Errorf("%w: empty dotted path segment", errInvalidDriverOverride)
+		}
+	}
+
+	if len(path) > 1 && isDriverCLIField(path[0]) {
+		return fmt.Errorf("%w: nested driver field %q", errInvalidDriverOverride, path[0])
 	}
 
 	return nil
 }
 
 func (d *DriverCLIConfig) setExtraPath(path []string, value any) error {
-	if err := validateOverridePath(path); err != nil {
-		return err
-	}
-
 	if d.Extra == nil {
 		d.Extra = make(map[string]any)
 	}
@@ -214,88 +256,277 @@ func (d *DriverCLIConfig) setExtraPath(path []string, value any) error {
 	return nil
 }
 
-func validateOverridePath(path []string) error {
-	for _, part := range path {
-		if part == "" {
-			return fmt.Errorf("%w: empty dotted path segment", errInvalidDriverOverride)
-		}
+func driverOverrideValue(value string) any {
+	if value == "true" {
+		return true
 	}
 
-	if len(path) > 1 && isDriverCLIField(path[0]) {
-		return fmt.Errorf("%w: %q", errDriverOverrideConflict, path[0])
+	if value == "false" {
+		return false
 	}
 
-	return nil
+	if looksNumeric(value) {
+		return json.Number(value)
+	}
+
+	return value
 }
 
 func isDriverCLIField(key string) bool {
-	switch normalizeKey(key) {
-	case driverTypeKey, urlKey, defaultInsertMethodKey, insertMethodKey:
+	switch key {
+	case "driverType", "driver_type", "url",
+		"insertMethod", "insert_method", "defaultInsertMethod", "default_insert_method":
 		return true
 	default:
 		return false
 	}
 }
 
-func convertOverrideValue(key, value string) any {
-	if pathFields[normalizeKey(key)] {
-		if abs, err := filepath.Abs(value); err == nil {
-			return abs
+// DecodeOverrides validates retained -D input with the shared config decoder.
+func (d *DriverCLIConfig) DecodeOverrides() (*config.DriverRunConfig, error) {
+	if len(d.Overrides) == 0 {
+		return nil, nil //nolint:nilnil // No retained overrides means no configuration to merge.
+	}
+
+	data, err := marshalDriverOverrides(d.Overrides)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := &config.DriverRunConfig{}
+	if err := config.Unmarshal(data, cfg); err != nil {
+		return nil, fmt.Errorf("invalid driver override: %w", err)
+	}
+
+	resolveDriverConfigPaths(cfg)
+
+	return cfg, nil
+}
+
+type driverOverrideNode struct {
+	fields []driverOverrideField
+}
+
+type driverOverrideField struct {
+	name  string
+	value *string
+	node  *driverOverrideNode
+}
+
+func marshalDriverOverrides(overrides []DriverOverride) ([]byte, error) {
+	root := &driverOverrideNode{}
+	for _, override := range overrides {
+		root.add(strings.Split(override.Key, "."), override.Value)
+	}
+
+	var out bytes.Buffer
+	if err := root.writeJSON(&out); err != nil {
+		return nil, err
+	}
+
+	return out.Bytes(), nil
+}
+
+func (node *driverOverrideNode) add(path []string, value string) {
+	for index, part := range path {
+		if index == len(path)-1 {
+			node.fields = append(node.fields, driverOverrideField{name: part, value: &value})
+
+			return
+		}
+
+		child := node.object(part)
+		if child == nil {
+			child = &driverOverrideNode{}
+			node.fields = append(node.fields, driverOverrideField{name: part, node: child})
+		}
+
+		node = child
+	}
+}
+
+func (node *driverOverrideNode) object(name string) *driverOverrideNode {
+	for index := range node.fields {
+		field := &node.fields[index]
+		if field.name == name && field.node != nil {
+			return field.node
 		}
 	}
 
-	return inferType(value)
+	return nil
 }
 
-func normalizeKey(key string) string {
-	replacer := strings.NewReplacer("_", "", "-", "")
+func (node *driverOverrideNode) writeJSON(out *bytes.Buffer) error {
+	out.WriteByte('{')
 
-	return strings.ToLower(replacer.Replace(key))
+	for index, field := range node.fields {
+		if index > 0 {
+			out.WriteByte(',')
+		}
+
+		name, err := json.Marshal(field.name)
+		if err != nil {
+			return err
+		}
+
+		out.Write(name)
+		out.WriteByte(':')
+
+		if field.node != nil {
+			if err := field.node.writeJSON(out); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		if err := writeDriverOverrideValue(out, *field.value); err != nil {
+			return err
+		}
+	}
+
+	out.WriteByte('}')
+
+	return nil
+}
+
+func writeDriverOverrideValue(out *bytes.Buffer, value string) error {
+	if value == "true" || value == "false" || looksNumeric(value) {
+		out.WriteString(value)
+
+		return nil
+	}
+
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	out.Write(encoded)
+
+	return nil
+}
+
+func looksNumeric(value string) bool {
+	index := 0
+	if value != "" && (value[0] == '-' || value[0] == '+') {
+		index++
+	}
+
+	if index == len(value) || (value[index] < '0' || value[index] > '9') &&
+		(value[index] != '.' || index+1 == len(value) || value[index+1] < '0' || value[index+1] > '9') {
+		return false
+	}
+
+	for ; index < len(value); index++ {
+		char := value[index]
+		if char >= '0' && char <= '9' || char == '.' || char == 'e' || char == 'E' || char == '+' || char == '-' {
+			continue
+		}
+
+		return false
+	}
+
+	return true
+}
+
+func resolveDriverConfigPaths(fileConfig *config.DriverRunConfig) {
+	if fileConfig.CaCertFile != nil {
+		if absolute, err := filepath.Abs(*fileConfig.CaCertFile); err == nil {
+			fileConfig.CaCertFile = &absolute
+		}
+	}
 }
 
 // NewDriverCLIConfigFromPreset creates a DriverCLIConfig from a preset.
 func NewDriverCLIConfigFromPreset(p DriverPreset) DriverCLIConfig {
 	return DriverCLIConfig{
-		DriverType: p.DriverType,
-		URL:        p.URL,
+		DriverType:          p.DriverType,
+		URL:                 p.URL,
+		DefaultInsertMethod: p.DefaultInsertMethod,
 	}
 }
 
-// NewDriverCLIConfigFromJSON creates a DriverCLIConfig from a raw JSON string.
-// Known fields are extracted into the struct, everything else goes into Extra.
+// NewDriverCLIConfigFromJSON strictly validates a raw -d JSON object before
+// separating its base fields from the nested driver extras.
 func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
-	var m map[string]any
-	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+	normalized, err := normalizeRawDriverJSON(raw)
+	if err != nil {
 		return DriverCLIConfig{}, fmt.Errorf("invalid driver JSON: %w", err)
 	}
 
-	cfg := DriverCLIConfig{}
+	fileConfig := &config.DriverRunConfig{}
+	if err := config.Unmarshal([]byte(normalized), fileConfig); err != nil {
+		return DriverCLIConfig{}, fmt.Errorf("invalid driver JSON: %w", err)
+	}
 
-	for field, val := range m {
-		str, _ := val.(string)
+	return driverCLIConfigFromFile(fileConfig)
+}
 
-		switch normalizeKey(field) {
-		case driverTypeKey:
-			cfg.DriverType = str
-		case urlKey:
-			cfg.URL = str
-		case defaultInsertMethodKey, insertMethodKey:
-			cfg.DefaultInsertMethod = str
-		default:
-			if cfg.Extra == nil {
-				cfg.Extra = make(map[string]any)
-			}
+func normalizeRawDriverJSON(raw string) (string, error) {
+	if !json.Valid([]byte(raw)) || !strings.HasPrefix(strings.TrimSpace(raw), "{") {
+		return raw, nil
+	}
 
-			if pathFields[normalizeKey(field)] {
-				if s, ok := val.(string); ok {
-					if abs, err := filepath.Abs(s); err == nil {
-						val = abs
-					}
-				}
-			}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &fields); err != nil {
+		return raw, fmt.Errorf("%w: %w", errInvalidDriverOverride, err)
+	}
 
-			cfg.Extra[field] = val
+	for _, key := range []string{"insertMethod", "defaultInsertMethod", "default_insert_method"} {
+		value, ok := fields[key]
+		if !ok {
+			continue
 		}
+
+		if len(value) == 0 || value[0] != '"' {
+			return "", errRawInsertMethodNotString
+		}
+
+		var method string
+		if err := json.Unmarshal(value, &method); err != nil {
+			return "", errRawInsertMethodNotString
+		}
+
+		if err := validateDefaultInsertMethod(method); err != nil {
+			return "", err
+		}
+	}
+
+	return legacyRawInsertMethodKey.ReplaceAllString(raw, `${1}"defaultInsertMethod"${2}`), nil
+}
+
+func driverCLIConfigFromFile(fileConfig *config.DriverRunConfig) (DriverCLIConfig, error) {
+	if fileConfig == nil {
+		return DriverCLIConfig{}, errNilDriverConfig
+	}
+
+	if fileConfig.DefaultInsertMethod != nil {
+		if err := validateDefaultInsertMethod(fileConfig.GetDefaultInsertMethod()); err != nil {
+			return DriverCLIConfig{}, err
+		}
+	}
+
+	extraConfig := *fileConfig
+	cfg := DriverCLIConfig{
+		DriverType:          fileConfig.GetDriverType(),
+		URL:                 fileConfig.GetURL(),
+		DefaultInsertMethod: fileConfig.GetDefaultInsertMethod(),
+	}
+
+	extraConfig.DriverType = nil
+	extraConfig.URL = nil
+	extraConfig.DefaultInsertMethod = nil
+
+	resolveDriverConfigPaths(&extraConfig)
+
+	data, err := json.Marshal(&extraConfig) //nolint:gosec // serializing validated config fields
+	if err != nil {
+		return DriverCLIConfig{}, err
+	}
+
+	if err := json.Unmarshal(data, &cfg.Extra); err != nil {
+		return DriverCLIConfig{}, err
 	}
 
 	return cfg, nil
@@ -309,12 +540,7 @@ func DriverCLIConfigsFromFile(fileDrivers map[uint32]*config.DriverRunConfig) (D
 	configs := make(DriverCLIConfigs, len(fileDrivers))
 
 	for idx, fileConfig := range fileDrivers {
-		data, err := json.Marshal(fileConfig) //nolint:gosec // serializing config to env vars, not extracting a secret
-		if err != nil {
-			return nil, fmt.Errorf("serialize config file driver %d: %w", idx, err)
-		}
-
-		cfg, err := NewDriverCLIConfigFromJSON(string(data))
+		cfg, err := driverCLIConfigFromFile(fileConfig)
 		if err != nil {
 			return nil, fmt.Errorf("convert config file driver %d: %w", idx, err)
 		}

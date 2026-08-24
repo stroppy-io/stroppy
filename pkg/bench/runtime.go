@@ -39,10 +39,6 @@ type Bench struct {
 	drv  driver.Driver
 	cfg  *config.DriverConfig
 
-	// insertMethod is the effective row-insert method resolved for this run.
-	// Zero means unset: the workload's own InsertRequest.Method is kept.
-	insertMethod driver.InsertMethod
-
 	stepStart time.Time
 }
 
@@ -78,6 +74,7 @@ var (
 	errDurationNeedsExecutor     = errors.New("duration requires an explicit constant-vus executor")
 	errDurationWithWrongExecutor = errors.New("duration is only valid with the constant-vus executor")
 	errConstantVUsNeedsDuration  = errors.New("constant-vus requires duration")
+	errNegativeQueryTimeout      = errors.New("query-timeout must not be negative")
 )
 
 // Register adds a workload factory. Workload packages call it during init.
@@ -181,6 +178,11 @@ func DescribeAll() ([]Description, error) {
 	return descriptions, nil
 }
 
+// teardownTimeout bounds workload Teardown. It runs under a detached context so
+// cancellation that stopped Setup or the scenario does not skip cleanup while
+// caller values remain available.
+const teardownTimeout = 30 * time.Second
+
 // Run looks up a fresh workload instance and executes it: Define and parameter
 // resolution first, Setup once, Iterate across the scenario, then Teardown once.
 // steps/noSteps are the explicit --steps / --no-steps filters; drivers and params
@@ -193,7 +195,7 @@ func Run(
 	steps, noSteps []string,
 	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
-) error {
+) (retErr error) {
 	wl, ok := Lookup(name)
 	if !ok {
 		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
@@ -225,12 +227,17 @@ func Run(
 		return errDriverIndexMissing
 	}
 
-	insertMethod, err := resolveInsertMethod(scenarioParams.insertMethod, cfg)
-	if err != nil {
-		return fmt.Errorf("insert method: %w", err)
+	queryTimeout := scenarioParams.queryTimeout.Value()
+	if queryTimeout < 0 {
+		return fmt.Errorf("%w, got %s", errNegativeQueryTimeout, queryTimeout)
 	}
 
-	drv, err := driver.Dispatch(ctx, driver.Options{Config: cfg, Logger: lg, DialFunc: root.dialer.DialContext})
+	drv, err := driver.Dispatch(ctx, driver.Options{
+		Config:       cfg,
+		Logger:       lg,
+		DialFunc:     root.dialer.DialContext,
+		QueryTimeout: queryTimeout,
+	})
 	if err != nil {
 		return fmt.Errorf("driver dispatch: %w", err)
 	}
@@ -239,8 +246,20 @@ func Run(
 	setupBench := &Bench{
 		root: root, vu: setupVU,
 		lg:  lg.Named("workload").With(zap.String("workload", name)),
-		drv: drv, cfg: cfg, insertMethod: insertMethod,
+		drv: drv, cfg: cfg,
 	}
+
+	// Teardown always runs exactly once, even when Setup or the scenario returns
+	// early on cancellation or error. It executes under a timeout detached from
+	// cancellation of the run ctx, and its error is joined with any returned error.
+	defer func() {
+		teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
+		defer cancel()
+
+		if err := wl.Teardown(teardownCtx, setupBench); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("teardown: %w", err))
+		}
+	}()
 
 	if err := wl.Setup(ctx, setupBench); err != nil {
 		return fmt.Errorf("setup: %w", err)
@@ -250,16 +269,12 @@ func Run(
 		b := &Bench{
 			root: root, vu: vu,
 			lg:  lg.Named("workload").With(zap.String("workload", name), zap.Uint64("VUID", vu.VUID())),
-			drv: drv, cfg: cfg, insertMethod: insertMethod,
+			drv: drv, cfg: cfg,
 		}
 
 		return wl.Iterate(vu.Context(), b)
 	}); err != nil {
 		return fmt.Errorf("scenario %q: %w", sc.name, err)
-	}
-
-	if err := wl.Teardown(ctx, setupBench); err != nil {
-		return fmt.Errorf("teardown: %w", err)
 	}
 
 	return nil
@@ -281,7 +296,7 @@ type scenarioParams struct {
 	iterations Param[int64]
 	duration   Param[time.Duration]
 
-	insertMethod Param[string]
+	queryTimeout Param[time.Duration]
 }
 
 func defineWorkload(
@@ -305,10 +320,9 @@ func defineWorkload(
 			"iterations", 1, "Total shared iterations.", iterationOptions...,
 		),
 		duration: def.Param.Duration("duration", 0, "Duration of a constant-vus scenario."),
-		insertMethod: def.Param.String(
-			"insert-method", "",
-			"Row insert method: plain_query, plain_bulk, columnar, or native.",
-			DerivedDefault("workload default"),
+		queryTimeout: def.Param.Duration(
+			"query-timeout", 0,
+			"Per-statement query deadline (e.g. 30s, 5s, 500ms); 0 disables it.",
 		),
 	}
 
@@ -316,24 +330,6 @@ func defineWorkload(
 	defineErr := wl.Define(def)
 
 	return params, def.schema(), errors.Join(defineErr, def.finish())
-}
-
-// resolveInsertMethod merges the explicit typed --insert-method override with
-// the user-set driver-level defaultInsertMethod (-D/JSON/config drivers).
-// Precedence: an explicit typed value (CLI/env/config) wins; otherwise the
-// user-set driver method is used; when neither is set the result is zero, so
-// workloads keep their own InsertRequest.Method. Presets carry no method, so
-// there is no hidden preset tier.
-func resolveInsertMethod(paramValue Param[string], cfg *config.DriverConfig) (driver.InsertMethod, error) {
-	if paramValue.Explicit() {
-		return driver.ResolveInsertMethod(cfg.DriverType, paramValue.Value())
-	}
-
-	if cfg.GetInsertMethod() != "" {
-		return driver.ResolveInsertMethod(cfg.DriverType, cfg.GetInsertMethod())
-	}
-
-	return 0, nil
 }
 
 func effectiveDurationIsLegacy(inputs ParamInputs) bool {

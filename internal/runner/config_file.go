@@ -1,11 +1,9 @@
 package runner
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"sort"
 	"strings"
@@ -19,15 +17,7 @@ import (
 // DefaultConfigFile is the file auto-discovered in the current directory.
 const DefaultConfigFile = "stroppy-config.json"
 
-var (
-	errConfigObjectExpected = errors.New("JSON object expected")
-	errDuplicateConfigField = errors.New("duplicate JSON field")
-	errConfigEnvCollision   = errors.New("config env keys collide case-insensitively")
-	errTrailingConfigData   = errors.New("trailing JSON data")
-	errRemovedK6Fields      = errors.New(
-		"k6Args and k6Config are removed; configure concurrency with typed executor/vus/iterations/duration parameters",
-	)
-)
+var errConfigEnvCollision = errors.New("config env keys collide case-insensitively")
 
 // LoadedConfig keeps the run config separate from typed parameter scopes.
 type LoadedConfig struct {
@@ -56,42 +46,27 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 		return nil, false, fmt.Errorf("reading config file %q: %w", path, err)
 	}
 
-	fields, err := decodeRawObject(data)
-	if err != nil {
-		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
-	}
-
-	runParams, err := takeParamScope(fields, "run")
-	if err != nil {
-		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
-	}
-
-	workloadParams, err := takeParamScope(fields, "params")
-	if err != nil {
-		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
-	}
-
-	// The historical k6Args/k6Config top-level fields are removed from the v6
-	// schema. Guide users to the replacement before strict unmarshalling turns
-	// them into an opaque "unknown field" error.
-	for _, removed := range []string{"k6Args", "k6Config"} {
-		if _, ok := fields[removed]; ok {
-			return nil, false, fmt.Errorf("parsing config file %q: %w", path, errRemovedK6Fields)
-		}
-	}
-
-	runData, err := json.Marshal(fields)
-	if err != nil {
-		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
-	}
-
 	cfg := &config.RunConfig{}
-	if err := UnmarshalStrict(runData, cfg); err != nil {
+	if err := UnmarshalStrict(data, cfg); err != nil {
 		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
+	}
+
+	runParams := cfg.Run
+	if runParams == nil {
+		runParams = map[string]json.RawMessage{}
+	}
+
+	workloadParams := cfg.Params
+	if workloadParams == nil {
+		workloadParams = map[string]json.RawMessage{}
 	}
 
 	if err := normalizeRunConfigEnv(cfg); err != nil {
 		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
+	}
+
+	if cfg.Global != nil && cfg.Global.Logger != nil {
+		logger.NewFromConfig(configLogger(cfg.Global.Logger))
 	}
 
 	lg := logger.Global().Named("config_file")
@@ -122,6 +97,34 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 	return &LoadedConfig{RunConfig: cfg, Run: runParams, Params: workloadParams}, true, nil
 }
 
+func configLogger(cfg *config.LoggerConfig) *logger.Config {
+	level := "debug"
+
+	switch cfg.LogLevel {
+	case config.LogLevelDebug:
+		level = "debug"
+	case config.LogLevelInfo:
+		level = "info"
+	case config.LogLevelWarn:
+		level = "warn"
+	case config.LogLevelError:
+		level = "error"
+	case config.LogLevelFatal:
+		level = "fatal"
+	}
+
+	mode := logger.DevelopmentMod
+
+	switch cfg.LogMode {
+	case config.LogModeDevelopment:
+		mode = logger.DevelopmentMod
+	case config.LogModeProduction:
+		mode = logger.ProductionMod
+	}
+
+	return &logger.Config{LogLevel: level, LogMod: mode}
+}
+
 func normalizeRunConfigEnv(runConfig *config.RunConfig) error {
 	if len(runConfig.Env) == 0 {
 		return nil
@@ -150,79 +153,4 @@ func normalizeRunConfigEnv(runConfig *config.RunConfig) error {
 	runConfig.Env = normalized
 
 	return nil
-}
-
-func takeParamScope(fields map[string]json.RawMessage, name string) (map[string]json.RawMessage, error) {
-	raw, ok := fields[name]
-	if !ok {
-		return map[string]json.RawMessage{}, nil
-	}
-
-	delete(fields, name)
-
-	scope, err := decodeRawObject(raw)
-	if err != nil {
-		return nil, fmt.Errorf("config field %q: %w", name, err)
-	}
-
-	return scope, nil
-}
-
-func decodeRawObject(data []byte) (map[string]json.RawMessage, error) {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-
-	token, err := decoder.Token()
-	if err != nil {
-		return nil, err
-	}
-
-	if delimiter, ok := token.(json.Delim); !ok || delimiter != '{' {
-		return nil, errConfigObjectExpected
-	}
-
-	fields := make(map[string]json.RawMessage)
-
-	for decoder.More() {
-		keyToken, err := decoder.Token()
-		if err != nil {
-			return nil, err
-		}
-
-		key, ok := keyToken.(string)
-		if !ok {
-			return nil, errConfigObjectExpected
-		}
-
-		if _, duplicate := fields[key]; duplicate {
-			return nil, fmt.Errorf("%w %q", errDuplicateConfigField, key)
-		}
-
-		var raw json.RawMessage
-		if err := decoder.Decode(&raw); err != nil {
-			return nil, err
-		}
-
-		fields[key] = raw
-	}
-
-	if _, err := decoder.Token(); err != nil {
-		return nil, err
-	}
-
-	if err := ensureJSONEnd(decoder); err != nil {
-		return nil, err
-	}
-
-	return fields, nil
-}
-
-func ensureJSONEnd(decoder *json.Decoder) error {
-	var extra any
-	if err := decoder.Decode(&extra); errors.Is(err, io.EOF) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	return errTrailingConfigData
 }

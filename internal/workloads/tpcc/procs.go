@@ -23,7 +23,7 @@ func bynameInt(b bool) int64 {
 // the HAS_RETURNING / IS_PICODATA branches of the tx variant are absent here. The
 // by-name / remote-wh / rollback decisions stay client-side (they feed proc params).
 func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	return b.Step("workload", func() error {
+	return b.StepSilent("workload", func() error {
 		idx := weightedPick(vs.picker, txWeights)
 		name := txNames[idx]
 
@@ -87,10 +87,16 @@ func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState
 	if isRollbackSentinel(err) {
 		w.m.rollbackDone.Add(1)
 
-		return nil
+		err = nil
 	}
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	w.recordSteady()
+
+	return nil
 }
 
 func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState) error {

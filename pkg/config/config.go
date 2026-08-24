@@ -1,8 +1,9 @@
 // Package config holds the plain-Go application configuration types for run,
-// workload, driver, pool, logger, exporter, and isolation settings. It replaces
-// the frozen protobuf types that previously lived under
-// pkg/common/proto/stroppy: the JSON field names are preserved verbatim, but
-// the protobuf reflection, descriptors, validators, and oneof wrappers are gone.
+// workload, driver, pool, logger, exporter, and isolation settings. Unmarshal is
+// the shared strict JSON entry point: it preserves v5 ProtoJSON lower-camel and
+// snake_case field names without retaining application protobuf descriptors.
+//
+// Regenerate the committed file-envelope schema after changing these types.
 //
 //go:generate go run github.com/stroppy-io/stroppy/internal/jsonschema-gen -out ../../docs/jsonschema/run.schema.json
 package config
@@ -83,28 +84,57 @@ const (
 )
 
 // LogLevel is the minimum log level to output.
-type LogLevel string
+type LogLevel int32
 
 const (
-	LogLevelDebug LogLevel = "LOG_LEVEL_DEBUG"
-	LogLevelInfo  LogLevel = "LOG_LEVEL_INFO"
-	LogLevelWarn  LogLevel = "LOG_LEVEL_WARN"
-	LogLevelError LogLevel = "LOG_LEVEL_ERROR"
-	LogLevelFatal LogLevel = "LOG_LEVEL_FATAL"
+	LogLevelDebug LogLevel = iota
+	LogLevelInfo
+	LogLevelWarn
+	LogLevelError
+	LogLevelFatal
 )
+
+var logLevelNames = map[LogLevel]string{
+	LogLevelDebug: "LOG_LEVEL_DEBUG",
+	LogLevelInfo:  "LOG_LEVEL_INFO",
+	LogLevelWarn:  "LOG_LEVEL_WARN",
+	LogLevelError: "LOG_LEVEL_ERROR",
+	LogLevelFatal: "LOG_LEVEL_FATAL",
+}
 
 // LogMode is the logging output mode.
-type LogMode string
+type LogMode int32
 
 const (
-	LogModeDevelopment LogMode = "LOG_MODE_DEVELOPMENT"
-	LogModeProduction  LogMode = "LOG_MODE_PRODUCTION"
+	LogModeDevelopment LogMode = iota
+	LogModeProduction
 )
+
+var logModeNames = map[LogMode]string{
+	LogModeDevelopment: "LOG_MODE_DEVELOPMENT",
+	LogModeProduction:  "LOG_MODE_PRODUCTION",
+}
 
 var (
 	errInvalidLogLevel = errors.New("invalid log level")
 	errInvalidLogMode  = errors.New("invalid log mode")
 )
+
+func (l LogLevel) String() string {
+	if name, ok := logLevelNames[l]; ok {
+		return name
+	}
+
+	return fmt.Sprintf("LogLevel(%d)", int32(l))
+}
+
+func (m LogMode) String() string {
+	if name, ok := logModeNames[m]; ok {
+		return name
+	}
+
+	return fmt.Sprintf("LogMode(%d)", int32(m))
+}
 
 // LogLevelValues returns every declared LogLevel constant in canonical order.
 func LogLevelValues() []LogLevel {
@@ -122,56 +152,74 @@ func LogModeValues() []LogMode {
 	return []LogMode{LogModeDevelopment, LogModeProduction}
 }
 
-// UnmarshalJSON rejects values outside the LogLevel constant set. The frozen
-// protobuf schema encoded this as a strict enum; an untyped string would
-// otherwise silently accept any value.
-func (l *LogLevel) UnmarshalJSON(data []byte) error {
-	if string(data) == "null" {
-		*l = ""
-
-		return nil
+func (l LogLevel) MarshalJSON() ([]byte, error) {
+	if name, ok := logLevelNames[l]; ok {
+		return json.Marshal(name)
 	}
 
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-
-	for _, valid := range LogLevelValues() {
-		if s == string(valid) {
-			*l = valid
-
-			return nil
-		}
-	}
-
-	return fmt.Errorf("%w: %q", errInvalidLogLevel, s)
+	return json.Marshal(int32(l))
 }
 
-// UnmarshalJSON rejects values outside the LogMode constant set. The frozen
-// protobuf schema encoded this as a strict enum; an untyped string would
-// otherwise silently accept any value.
-func (m *LogMode) UnmarshalJSON(data []byte) error {
-	if string(data) == "null" {
-		*m = ""
-
-		return nil
+func (m LogMode) MarshalJSON() ([]byte, error) {
+	if name, ok := logModeNames[m]; ok {
+		return json.Marshal(name)
 	}
 
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
+	return json.Marshal(int32(m))
+}
+
+func (l *LogLevel) UnmarshalJSON(data []byte) error {
+	value, err := unmarshalEnum(data, logLevelNames, errInvalidLogLevel)
+	if err != nil {
 		return err
 	}
 
-	for _, valid := range LogModeValues() {
-		if s == string(valid) {
-			*m = valid
+	*l = LogLevel(value)
 
-			return nil
-		}
+	return nil
+}
+
+func (m *LogMode) UnmarshalJSON(data []byte) error {
+	value, err := unmarshalEnum(data, logModeNames, errInvalidLogMode)
+	if err != nil {
+		return err
 	}
 
-	return fmt.Errorf("%w: %q", errInvalidLogMode, s)
+	*m = LogMode(value)
+
+	return nil
+}
+
+func unmarshalEnum[T ~int32](data []byte, names map[T]string, kind error) (int32, error) {
+	if string(data) == "null" {
+		return 0, nil
+	}
+
+	var name string
+	if len(data) > 0 && data[0] == '"' {
+		if err := json.Unmarshal(data, &name); err != nil {
+			return 0, err
+		}
+
+		for value, candidate := range names {
+			if name == candidate {
+				return int32(value), nil
+			}
+		}
+
+		return 0, fmt.Errorf("%w: %q", kind, name)
+	}
+
+	var ordinal int32
+	if err := json.Unmarshal(data, &ordinal); err != nil {
+		return 0, fmt.Errorf("%w: %s", kind, data)
+	}
+
+	if _, ok := names[T(ordinal)]; !ok {
+		return 0, fmt.Errorf("%w: %d", kind, ordinal)
+	}
+
+	return ordinal, nil
 }
 
 // RunConfig is the top-level stroppy config file schema.
@@ -181,6 +229,8 @@ type RunConfig struct {
 	SQL     *string                     `json:"sql,omitempty"`
 	Global  *GlobalConfig               `json:"global,omitempty"`
 	Drivers map[uint32]*DriverRunConfig `json:"drivers,omitempty"`
+	Run     map[string]json.RawMessage  `configscope:"run"        json:"run,omitempty"`
+	Params  map[string]json.RawMessage  `configscope:"params"     json:"params,omitempty"`
 	Env     map[string]string           `json:"env,omitempty"`
 	Steps   []string                    `json:"steps,omitempty"`
 	NoSteps []string                    `json:"noSteps,omitempty"`
@@ -427,9 +477,9 @@ func (c *PoolConfig) GetConnMaxIdleTime() string {
 type DriverConfig struct {
 	URL        string     `json:"url,omitempty"`
 	DriverType DriverType `json:"driverType,omitempty"`
-	// InsertMethod is the resolved canonical method name; empty means the
-	// workload's own InsertRequest.Method.
-	InsertMethod          string                `json:"insertMethod,omitempty"`
+	// DefaultInsertMethod is the driver fallback when a workload leaves
+	// InsertRequest.Method unset.
+	DefaultInsertMethod   string                `json:"defaultInsertMethod,omitempty"`
 	BulkSize              *int32                `json:"bulkSize,omitempty"`
 	ErrorMode             ErrorMode             `json:"errorMode,omitempty"`
 	Postgres              *PostgresConfig       `json:"postgres,omitempty"`
@@ -442,9 +492,9 @@ type DriverConfig struct {
 	InsertProgress        *InsertProgressConfig `json:"insertProgress,omitempty"`
 }
 
-func (c *DriverConfig) GetInsertMethod() string {
+func (c *DriverConfig) GetDefaultInsertMethod() string {
 	if c != nil {
-		return c.InsertMethod
+		return c.DefaultInsertMethod
 	}
 
 	return ""
@@ -623,7 +673,7 @@ func (c *SQLConfig) GetConnMaxIdleTime() string {
 	return ""
 }
 
-// InsertProgressConfig is periodic InsertSpec progress reporting.
+// InsertProgressConfig is periodic typed-load progress reporting.
 type InsertProgressConfig struct {
 	Enabled    *bool   `json:"enabled,omitempty"`
 	Interval   *string `json:"interval,omitempty"`

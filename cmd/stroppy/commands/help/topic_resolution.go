@@ -43,9 +43,9 @@ PARAMETER DISCOVERY AND RESOLUTION
     stroppy run tpcc/tx --help
     stroppy run tpcc/tx --scale-factor 10 --load-workers 8
 
-  Shared run parameters are --executor, --vus, --iterations, and --duration.
-  Select shared-iterations or constant-vus explicitly. Typed values resolve in
-  this order: CLI flag > process env > -e > matching "run"/"params" config >
+  Shared run parameters are --executor, --vus, --iterations, --duration, and
+  --query-timeout. Select shared-iterations or constant-vus explicitly. Typed values
+  resolve in this order: CLI flag > process env > -e > matching "run"/"params" config >
   config "env" > declared default. Legacy DURATION can still infer constant-vus,
   but emits a warning; prefer an explicit executor.
 

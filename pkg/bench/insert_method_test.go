@@ -9,91 +9,16 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
-func TestResolveInsertMethodPrecedence(t *testing.T) {
-	explicit := func(method string) Param[string] {
-		return Param[string]{value: method, source: ParamSourceCLI}
-	}
-	unset := func() Param[string] { return Param[string]{source: ParamSourceDefault} }
-
-	t.Run("typed override wins over driver default", func(t *testing.T) {
-		got, err := resolveInsertMethod(explicit("columnar"), &config.DriverConfig{
-			DriverType:   config.DriverTypePostgres,
-			InsertMethod: "native",
-		})
-		if err != nil {
-			t.Fatalf("resolveInsertMethod(): %v", err)
-		}
-
-		if got != driver.InsertColumnar {
-			t.Fatalf("resolveInsertMethod() = %v, want columnar", got)
-		}
-	})
-
-	t.Run("driver default used when typed param unset", func(t *testing.T) {
-		got, err := resolveInsertMethod(unset(), &config.DriverConfig{
-			DriverType:   config.DriverTypePostgres,
-			InsertMethod: "native",
-		})
-		if err != nil {
-			t.Fatalf("resolveInsertMethod(): %v", err)
-		}
-
-		if got != driver.InsertNative {
-			t.Fatalf("resolveInsertMethod() = %v, want native", got)
-		}
-	})
-
-	t.Run("workload default when nothing set", func(t *testing.T) {
-		got, err := resolveInsertMethod(unset(), &config.DriverConfig{
-			DriverType: config.DriverTypePostgres,
-		})
-		if err != nil {
-			t.Fatalf("resolveInsertMethod(): %v", err)
-		}
-
-		if got != 0 {
-			t.Fatalf("resolveInsertMethod() = %v, want zero (workload default)", got)
-		}
-	})
-
-	t.Run("invalid typed value rejected", func(t *testing.T) {
-		_, err := resolveInsertMethod(explicit("bogus"), &config.DriverConfig{
-			DriverType: config.DriverTypePostgres,
-		})
-		if !errors.Is(err, driver.ErrUnknownInsertMethod) {
-			t.Fatalf("resolveInsertMethod() error = %v, want ErrUnknownInsertMethod", err)
-		}
-	})
-
-	t.Run("unsupported typed value rejected", func(t *testing.T) {
-		_, err := resolveInsertMethod(explicit("columnar"), &config.DriverConfig{
-			DriverType: config.DriverTypeMySQL,
-		})
-		if err == nil {
-			t.Fatal("resolveInsertMethod() accepted columnar for mysql")
-		}
-	})
-
-	t.Run("unsupported driver default rejected", func(t *testing.T) {
-		_, err := resolveInsertMethod(unset(), &config.DriverConfig{
-			DriverType:   config.DriverTypeMySQL,
-			InsertMethod: "columnar",
-		})
-		if err == nil {
-			t.Fatal("resolveInsertMethod() accepted columnar for mysql driver default")
-		}
-	})
-}
-
-func validInsertSource(total int64) *gen.IndexedSource {
+func validInsertSource() *gen.IndexedSource {
 	b := gen.NewSchemaBuilder()
 	id := b.Int64("id")
 
-	return gen.NewIndexedSource(b.Build(), gen.Root{}, "test/insert-method@1", total, 1,
+	return gen.NewIndexedSource(b.Build(), gen.Root{}, "test/insert-method@1", 1, 1,
 		func(r gen.Row, entity uint64) error {
 			r.SetInt64(id, int64(entity))
 
@@ -101,13 +26,16 @@ func validInsertSource(total int64) *gen.IndexedSource {
 		})
 }
 
-// recordingDriver captures the method of the last InsertRequest it served.
 type recordingDriver struct {
-	method driver.InsertMethod
+	calls   int
+	method  driver.InsertMethod
+	tracker *insertprogress.Tracker
 }
 
-func (d *recordingDriver) Insert(_ context.Context, req *driver.InsertRequest) (*stats.Query, error) {
+func (d *recordingDriver) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Query, error) {
+	d.calls++
 	d.method = req.Method
+	d.tracker = insertprogress.FromContext(ctx)
 
 	return &stats.Query{Rows: 1}, nil
 }
@@ -124,35 +52,7 @@ func (d *recordingDriver) ClassifyError(error) driver.ErrorFacts { return driver
 
 func (d *recordingDriver) Teardown(context.Context) error { return nil }
 
-func TestInsertAppliesResolvedMethod(t *testing.T) {
-	installRuntimeTestRoot(t)
-
-	drv := &recordingDriver{}
-	b := &Bench{
-		root:         root,
-		vu:           &VU{root: root, vuid: 1, ctx: context.Background()},
-		lg:           zap.NewNop(),
-		drv:          drv,
-		cfg:          &config.DriverConfig{DriverType: config.DriverTypeNoop},
-		insertMethod: driver.InsertColumnar,
-	}
-
-	_, err := b.Insert(context.Background(), &driver.InsertRequest{
-		Table:   "t",
-		Method:  driver.InsertNative,
-		Workers: 1,
-		Source:  validInsertSource(1),
-	})
-	if err != nil {
-		t.Fatalf("Insert() error = %v", err)
-	}
-
-	if drv.method != driver.InsertColumnar {
-		t.Fatalf("driver received method %v, want columnar", drv.method)
-	}
-}
-
-func TestInsertKeepsWorkloadMethodWithoutOverride(t *testing.T) {
+func TestInsertUsesDriverFallbackWithoutMutatingRequest(t *testing.T) {
 	installRuntimeTestRoot(t)
 
 	drv := &recordingDriver{}
@@ -161,20 +61,115 @@ func TestInsertKeepsWorkloadMethodWithoutOverride(t *testing.T) {
 		vu:   &VU{root: root, vuid: 1, ctx: context.Background()},
 		lg:   zap.NewNop(),
 		drv:  drv,
-		cfg:  &config.DriverConfig{DriverType: config.DriverTypeNoop},
+		cfg: &config.DriverConfig{
+			DriverType:          config.DriverTypePostgres,
+			DefaultInsertMethod: "plain_bulk",
+		},
 	}
+	req := &driver.InsertRequest{Table: "t", Workers: 1, Source: validInsertSource()}
 
-	_, err := b.Insert(context.Background(), &driver.InsertRequest{
-		Table:   "t",
-		Method:  driver.InsertNative,
-		Workers: 1,
-		Source:  validInsertSource(1),
-	})
-	if err != nil {
+	if _, err := b.Insert(context.Background(), req); err != nil {
 		t.Fatalf("Insert() error = %v", err)
 	}
 
-	if drv.method != driver.InsertNative {
-		t.Fatalf("driver received method %v, want workload default native", drv.method)
+	if drv.method != driver.InsertPlainBulk {
+		t.Fatalf("driver method = %v, want plain_bulk", drv.method)
+	}
+
+	if req.Method != 0 {
+		t.Fatalf("request method = %v, want zero", req.Method)
+	}
+
+	if drv.tracker == nil {
+		t.Fatal("driver did not receive progress tracker")
+	}
+
+	if snapshot := drv.tracker.Finish(nil); snapshot.Method != "plain_bulk" {
+		t.Fatalf("progress method = %q, want plain_bulk", snapshot.Method)
+	}
+}
+
+func TestInsertWorkloadMethodOverridesDriverFallback(t *testing.T) {
+	installRuntimeTestRoot(t)
+
+	drv := &recordingDriver{}
+	b := &Bench{
+		root: root,
+		vu:   &VU{root: root, vuid: 1, ctx: context.Background()},
+		lg:   zap.NewNop(),
+		drv:  drv,
+		cfg: &config.DriverConfig{
+			DriverType:          config.DriverTypePostgres,
+			DefaultInsertMethod: "native",
+		},
+	}
+	req := &driver.InsertRequest{
+		Table: "t", Method: driver.InsertPlainQuery, Workers: 1, Source: validInsertSource(),
+	}
+
+	if _, err := b.Insert(context.Background(), req); err != nil {
+		t.Fatalf("Insert() error = %v", err)
+	}
+
+	if drv.method != driver.InsertPlainQuery {
+		t.Fatalf("driver method = %v, want plain_query", drv.method)
+	}
+
+	if req.Method != driver.InsertPlainQuery {
+		t.Fatalf("request method = %v, want plain_query", req.Method)
+	}
+}
+
+func TestInsertRejectsMissingOrUnsupportedEffectiveMethod(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  *config.DriverConfig
+		req  *driver.InsertRequest
+		err  error
+	}{
+		{
+			name: "no default",
+			cfg:  &config.DriverConfig{DriverType: config.DriverTypePostgres},
+			req:  &driver.InsertRequest{Table: "t", Workers: 1, Source: validInsertSource()},
+			err:  driver.ErrInsertMethodUnsupported,
+		},
+		{
+			name: "unsupported workload override",
+			cfg:  &config.DriverConfig{DriverType: config.DriverTypeMySQL, DefaultInsertMethod: "plain_bulk"},
+			req: &driver.InsertRequest{
+				Table: "t", Method: driver.InsertColumnar, Workers: 1, Source: validInsertSource(),
+			},
+			err: driver.ErrInsertMethodUnsupported,
+		},
+		{
+			name: "shape before method resolution",
+			cfg:  &config.DriverConfig{DriverType: config.DriverTypeCSV},
+			req:  &driver.InsertRequest{Table: "t", Workers: 1},
+			err:  driver.ErrNilInsertSource,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			installRuntimeTestRoot(t)
+
+			drv := &recordingDriver{}
+			b := &Bench{
+				root: root,
+				vu:   &VU{root: root, vuid: 1, ctx: context.Background()},
+				lg:   zap.NewNop(),
+				drv:  drv,
+				cfg:  tc.cfg,
+			}
+
+			_, err := b.Insert(context.Background(), tc.req)
+			if !errors.Is(err, tc.err) {
+				t.Fatalf("Insert() error = %v, want %v", err, tc.err)
+			}
+
+			if drv.calls != 0 {
+				t.Fatalf("driver calls = %d, want 0", drv.calls)
+			}
+		})
 	}
 }

@@ -3,6 +3,7 @@ package sqldriver
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -26,6 +27,7 @@ type Tx[R any] struct {
 	isolation config.TxIsolationLevel
 	dialect   queries.Dialect
 	logger    *zap.Logger
+	timeout   time.Duration
 }
 
 func NewTx[R any](
@@ -34,6 +36,7 @@ func NewTx[R any](
 	isolation config.TxIsolationLevel,
 	dialect queries.Dialect,
 	logger *zap.Logger,
+	timeout time.Duration,
 ) *Tx[R] {
 	return &Tx[R]{
 		conn:      conn,
@@ -41,6 +44,7 @@ func NewTx[R any](
 		isolation: isolation,
 		dialect:   dialect,
 		logger:    logger,
+		timeout:   timeout,
 	}
 }
 
@@ -49,7 +53,7 @@ func (t *Tx[R]) RunQuery(
 	sqlStr string,
 	args map[string]any,
 ) (*driver.QueryResult, error) {
-	return RunQuery(ctx, t.conn, t.wrapRows, t.dialect, t.logger, sqlStr, args)
+	return RunQuery(ctx, t.conn, t.wrapRows, t.dialect, t.logger, sqlStr, args, t.timeout)
 }
 
 func (t *Tx[R]) Commit(ctx context.Context) error {
@@ -79,6 +83,7 @@ type ConnOnlyTx[R any] struct {
 	wrapRows  func(R) driver.Rows
 	dialect   queries.Dialect
 	logger    *zap.Logger
+	timeout   time.Duration
 	closeFunc func() error
 	done      bool
 }
@@ -88,6 +93,7 @@ func NewConnOnlyTx[R any](
 	wrapRows func(R) driver.Rows,
 	dialect queries.Dialect,
 	logger *zap.Logger,
+	timeout time.Duration,
 	closeFunc func() error,
 ) *ConnOnlyTx[R] {
 	return &ConnOnlyTx[R]{
@@ -95,6 +101,7 @@ func NewConnOnlyTx[R any](
 		wrapRows:  wrapRows,
 		dialect:   dialect,
 		logger:    logger,
+		timeout:   timeout,
 		closeFunc: closeFunc,
 	}
 }
@@ -104,7 +111,7 @@ func (t *ConnOnlyTx[R]) RunQuery(
 	sqlStr string,
 	args map[string]any,
 ) (*driver.QueryResult, error) {
-	return RunQuery(ctx, t.conn, t.wrapRows, t.dialect, t.logger, sqlStr, args)
+	return RunQuery(ctx, t.conn, t.wrapRows, t.dialect, t.logger, sqlStr, args, t.timeout)
 }
 
 func (t *ConnOnlyTx[R]) Commit(_ context.Context) error {
