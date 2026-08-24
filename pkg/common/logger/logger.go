@@ -3,10 +3,11 @@ package logger
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync/atomic"
-	"unicode"
 
+	mysql "github.com/go-sql-driver/mysql"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -135,375 +136,337 @@ func NewStructLogger(name string) StructLogger {
 }
 
 const (
-	redactedSecret           = "xxxxx"
-	queryDecodePasses        = 2
-	percentEscapeDigits      = 2
-	hexAlphabetBase     byte = 10
+	redactedSecret = "xxxxx"
+	redactedDSN    = "<redacted-dsn>"
 )
 
-// RedactDSN masks credentials in database URLs and DSNs while preserving the
-// endpoint, database path, and non-secret query options.
+// RedactDSN masks credentials in supported connection-string grammars. Inputs
+// that cannot be classified unambiguously never appear in diagnostics.
 func RedactDSN(dsn string) string {
-	if dsn == "" {
+	if dsn == "" || dsn == redactedDSN {
 		return dsn
 	}
 
-	redacted := redactAuthorityUserinfo(dsn)
-	redacted = redactMySQLUserinfo(redacted)
-	redacted = redactConninfo(redacted)
-
-	return redactQueryValues(redacted)
-}
-
-func redactAuthorityUserinfo(dsn string) string {
-	schemeEnd := strings.Index(dsn, "://")
-	if schemeEnd < 0 {
-		return dsn
-	}
-
-	start := schemeEnd + len("://")
-	end := authorityEnd(dsn, start)
-
-	at := strings.LastIndexByte(dsn[start:end], '@')
-	if at < 0 {
-		return dsn
-	}
-
-	at += start
-
-	colon := strings.IndexByte(dsn[start:at], ':')
-	if colon < 0 {
-		return dsn
-	}
-
-	return dsn[:start+colon+1] + redactedSecret + dsn[at:]
-}
-
-func authorityEnd(dsn string, start int) int {
-	if delimiter := strings.IndexAny(dsn[start:], "/?#"); delimiter >= 0 {
-		return start + delimiter
-	}
-
-	return len(dsn)
-}
-
-func isConninfoDSN(dsn string) bool {
-	return nextConninfoAssignment(dsn, 0).key != ""
-}
-
-func redactMySQLUserinfo(dsn string) string {
-	if strings.Contains(dsn, "://") {
-		return dsn
-	}
-
-	at := mysqlUserinfoEnd(dsn)
-	if at < 0 {
-		at = malformedMySQLUserinfoEnd(dsn)
-	}
-
-	if at < 0 {
-		return dsn
-	}
-
-	colon := strings.IndexByte(dsn[:at], ':')
-	if colon < 0 {
-		return dsn
-	}
-
-	return dsn[:colon+1] + redactedSecret + dsn[at:]
-}
-
-func mysqlUserinfoEnd(dsn string) int {
-	userinfoEnd := -1
-
-	for index := range dsn {
-		if dsn[index] == '@' && hasMySQLEndpoint(dsn, index+1) {
-			userinfoEnd = index
+	if hasLeadingSchemeLike(dsn) {
+		if !hasLeadingRFCASCIIScheme(dsn) {
+			return redactedDSN
 		}
-	}
 
-	return userinfoEnd
-}
-
-func hasMySQLEndpoint(dsn string, start int) bool {
-	if start == len(dsn) {
-		return false
-	}
-
-	if dsn[start] == '/' {
-		return true
-	}
-
-	protocolEnd := mysqlProtocolEnd(dsn, start)
-	if protocolEnd < 0 || protocolEnd+1 >= len(dsn) {
-		return false
-	}
-
-	addressEnd := strings.IndexByte(dsn[protocolEnd+1:], ')')
-	if addressEnd < 0 {
-		return false
-	}
-
-	addressEnd += protocolEnd + 1
-
-	return addressEnd+1 < len(dsn) && dsn[addressEnd+1] == '/'
-}
-
-func mysqlProtocolEnd(dsn string, start int) int {
-	for index := start; index < len(dsn); index++ {
-		switch dsn[index] {
-		case '(':
-			if index > start {
-				return index
-			}
-		case '/', '?', '#', '@':
-			return -1
-		default:
-			if unicode.IsSpace(rune(dsn[index])) {
-				return -1
-			}
+		redacted, ok := redactURI(dsn)
+		if !ok {
+			return redactedDSN
 		}
+
+		if _, mysqlOK := redactMySQL(dsn); mysqlOK {
+			return redactedDSN
+		}
+
+		return redacted
 	}
 
-	return -1
+	if redacted, ok := redactMySQL(dsn); ok {
+		return redacted
+	}
+
+	assignments, ok := parseConninfo(dsn)
+	if ok {
+		if hasAmbiguousMySQLCredentialEnvelope(dsn) {
+			return redactedDSN
+		}
+
+		return redactConninfo(dsn, assignments)
+	}
+
+	return redactedDSN
 }
 
-func malformedMySQLUserinfoEnd(dsn string) int {
-	colon := strings.IndexByte(dsn, ':')
-	if colon < 0 {
-		return -1
+func hasLeadingSchemeLike(dsn string) bool {
+	separator := strings.Index(dsn, "://")
+	if separator <= 0 {
+		return false
 	}
 
-	at := strings.LastIndexByte(dsn[colon+1:], '@')
-	if at < 0 {
-		return -1
-	}
-
-	at += colon + 1
-	if isConninfoDSN(dsn) && !looksLikeMySQLEndpoint(dsn, at+1) {
-		return -1
-	}
-
-	return at
+	return !strings.ContainsAny(dsn[:separator], ":@/?#")
 }
 
-func looksLikeMySQLEndpoint(dsn string, start int) bool {
-	for index := start; index < len(dsn); index++ {
-		switch dsn[index] {
-		case '(', '[', '/':
-			return true
-		case '?', '#', '@':
+func hasLeadingRFCASCIIScheme(dsn string) bool {
+	separator := strings.Index(dsn, "://")
+	if separator <= 0 || !isASCIIAlpha(dsn[0]) {
+		return false
+	}
+
+	for index := 1; index < separator; index++ {
+		value := dsn[index]
+		if !isASCIIAlpha(value) && !isASCIIDigit(value) && value != '+' && value != '-' && value != '.' {
 			return false
-		default:
-			if unicode.IsSpace(rune(dsn[index])) {
-				return false
+		}
+	}
+
+	return true
+}
+
+func redactURI(dsn string) (string, bool) {
+	parsed, err := url.Parse(dsn)
+	if err != nil || parsed.Opaque != "" || parsed.Host == "" {
+		return "", false
+	}
+
+	values, err := url.ParseQuery(parsed.RawQuery)
+	if err != nil {
+		return "", false
+	}
+
+	for key, values := range values {
+		secret, certain := isSecretQueryKey(key)
+		if !certain {
+			return "", false
+		}
+
+		if secret {
+			for index := range values {
+				values[index] = redactedSecret
 			}
 		}
 	}
 
-	return false
-}
-
-func redactQueryValues(dsn string) string {
-	queryStart := strings.IndexByte(dsn, '?')
-	if queryStart < 0 {
-		return dsn
-	}
-
-	queryEnd := strings.IndexByte(dsn[queryStart+1:], '#')
-	if queryEnd >= 0 {
-		queryEnd += queryStart + 1
-	} else {
-		queryEnd = len(dsn)
-	}
-
-	query := dsn[queryStart+1 : queryEnd]
-
-	parts := strings.Split(query, "&")
-	for index, part := range parts {
-		key, _, hasValue := strings.Cut(part, "=")
-		if hasValue && isSecretKey(key) {
-			parts[index] = key + "=" + redactedSecret
+	parsed.RawQuery = values.Encode()
+	if parsed.User != nil {
+		if _, present := parsed.User.Password(); present {
+			parsed.User = url.UserPassword(parsed.User.Username(), redactedSecret)
 		}
 	}
 
-	return dsn[:queryStart+1] + strings.Join(parts, "&") + dsn[queryEnd:]
+	return parsed.Redacted(), true
+}
+
+func redactMySQL(dsn string) (redacted string, ok bool) {
+	defer func() {
+		if recover() != nil {
+			redacted, ok = "", false
+		}
+	}()
+
+	cfg, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return "", false
+	}
+
+	if cfg.Passwd != "" {
+		cfg.Passwd = redactedSecret
+	} else if hasPasswordEnvelope(dsn) {
+		return "", false
+	}
+
+	for key := range cfg.Params {
+		if isSecretName(key) {
+			cfg.Params[key] = redactedSecret
+		}
+	}
+
+	formatted := cfg.FormatDSN()
+	if hasPasswordEnvelope(dsn) && !strings.Contains(formatted, redactedSecret) {
+		return "", false
+	}
+
+	return formatted, true
+}
+
+func hasPasswordEnvelope(dsn string) bool {
+	colon := strings.IndexByte(dsn, ':')
+	at := strings.LastIndexByte(dsn, '@')
+
+	return colon >= 0 && colon < at
+}
+
+func hasAmbiguousMySQLCredentialEnvelope(dsn string) bool {
+	if !hasPasswordEnvelope(dsn) {
+		return false
+	}
+
+	at := strings.LastIndexByte(dsn, '@')
+
+	return strings.ContainsAny(dsn[at+1:], "([")
 }
 
 type conninfoAssignment struct {
 	key                  string
 	valueStart, valueEnd int
-	next                 int
 }
 
-func redactConninfo(dsn string) string {
-	var result strings.Builder
+func parseConninfo(dsn string) ([]conninfoAssignment, bool) {
+	index := skipASCIIWhitespace(dsn, 0)
+	if index == len(dsn) {
+		return nil, false
+	}
 
-	lastRedaction := 0
+	assignments := make([]conninfoAssignment, 0)
 
-	for index := 0; index < len(dsn); {
-		assignment := nextConninfoAssignment(dsn, index)
-		index = assignment.next
+	for index < len(dsn) {
+		keyStart := index
+		for index < len(dsn) && dsn[index] != '=' && !isASCIIWhitespace(dsn[index]) {
+			if !isConninfoKeyByte(dsn[index]) {
+				return nil, false
+			}
 
-		if !isSecretKey(assignment.key) {
-			continue
+			index++
 		}
 
-		result.WriteString(dsn[lastRedaction:assignment.valueStart])
-		result.WriteString(redactedSecret)
+		if index == keyStart || index == len(dsn) || dsn[index] != '=' {
+			return nil, false
+		}
 
-		lastRedaction = assignment.valueEnd
-	}
-
-	if lastRedaction == 0 {
-		return dsn
-	}
-
-	result.WriteString(dsn[lastRedaction:])
-
-	return result.String()
-}
-
-func nextConninfoAssignment(dsn string, index int) conninfoAssignment {
-	index = skipConninfoSpaces(dsn, index)
-
-	keyStart := index
-	keyEnd := conninfoKeyEnd(dsn, index)
-	index = skipConninfoSpaces(dsn, keyEnd)
-
-	if keyEnd == keyStart || index == len(dsn) || dsn[index] != '=' || !isConninfoKey(dsn[keyStart:keyEnd]) {
-		return conninfoAssignment{next: skipConninfoToken(dsn, keyStart)}
-	}
-
-	valueStart := skipConninfoSpaces(dsn, index+1)
-	valueEnd := conninfoValueEnd(dsn, valueStart)
-
-	return conninfoAssignment{
-		key:        dsn[keyStart:keyEnd],
-		valueStart: valueStart,
-		valueEnd:   valueEnd,
-		next:       valueEnd,
-	}
-}
-
-func skipConninfoSpaces(dsn string, index int) int {
-	for index < len(dsn) && unicode.IsSpace(rune(dsn[index])) {
+		key := dsn[keyStart:index]
 		index++
-	}
 
-	return index
-}
+		valueStart := index
 
-func conninfoKeyEnd(dsn string, index int) int {
-	for index < len(dsn) && !unicode.IsSpace(rune(dsn[index])) && dsn[index] != '=' {
-		index++
-	}
-
-	return index
-}
-
-func skipConninfoToken(dsn string, index int) int {
-	for index < len(dsn) && !unicode.IsSpace(rune(dsn[index])) {
-		index++
-	}
-
-	return index
-}
-
-func isConninfoKey(key string) bool {
-	for _, r := range key {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' && r != '-' {
-			return false
-		}
-	}
-
-	return key != ""
-}
-
-func conninfoValueEnd(dsn string, start int) int {
-	if start == len(dsn) || dsn[start] != '\'' {
-		return unquotedConninfoValueEnd(dsn, start)
-	}
-
-	return quotedConninfoValueEnd(dsn, start)
-}
-
-func unquotedConninfoValueEnd(dsn string, start int) int {
-	for start < len(dsn) {
-		if dsn[start] == '\\' && start+1 < len(dsn) {
-			start += 2
-
-			continue
+		valueEnd, next, ok := conninfoValueSpan(dsn, index)
+		if !ok {
+			return nil, false
 		}
 
-		if unicode.IsSpace(rune(dsn[start])) {
-			break
+		assignments = append(assignments, conninfoAssignment{
+			key:        key,
+			valueStart: valueStart,
+			valueEnd:   valueEnd,
+		})
+
+		if next == len(dsn) {
+			return assignments, true
 		}
 
-		start++
+		if !isASCIIWhitespace(dsn[next]) {
+			return nil, false
+		}
+
+		index = skipASCIIWhitespace(dsn, next)
 	}
 
-	return start
+	return assignments, true
 }
 
-func quotedConninfoValueEnd(dsn string, start int) int {
+func conninfoValueSpan(dsn string, start int) (end, next int, ok bool) {
+	if start < len(dsn) && dsn[start] == '\'' {
+		return quotedConninfoValueSpan(dsn, start)
+	}
+
+	return unquotedConninfoValueSpan(dsn, start)
+}
+
+func quotedConninfoValueSpan(dsn string, start int) (end, next int, ok bool) {
 	for index := start + 1; index < len(dsn); index++ {
-		if dsn[index] == '\\' && index+1 < len(dsn) {
+		if dsn[index] == '\\' {
+			if index+1 == len(dsn) {
+				return 0, 0, false
+			}
+
 			index++
 
 			continue
 		}
 
 		if dsn[index] == '\'' {
-			index++
-			for index < len(dsn) && !unicode.IsSpace(rune(dsn[index])) {
-				index++
+			return index + 1, index + 1, true
+		}
+	}
+
+	return 0, 0, false
+}
+
+func unquotedConninfoValueSpan(dsn string, start int) (end, next int, ok bool) {
+	index := start
+	for index < len(dsn) && !isASCIIWhitespace(dsn[index]) {
+		if dsn[index] == '\\' {
+			if index+1 == len(dsn) {
+				return 0, 0, false
 			}
 
-			return index
-		}
-	}
+			index += 2
 
-	return len(dsn)
-}
-
-func isSecretKey(key string) bool {
-	decoded := decodeQueryKey(key)
-
-	return hasSecretKeySuffix(normalizeQueryKey(decoded)) ||
-		hasSecretKeySuffix(normalizeQueryKey(stripMalformedEscapes(decoded)))
-}
-
-func decodeQueryKey(value string) string {
-	for range queryDecodePasses {
-		decoded := urlQueryUnescape(value)
-		if decoded == value {
-			break
+			continue
 		}
 
-		value = decoded
+		index++
 	}
 
-	return value
+	return index, index, true
 }
 
-func normalizeQueryKey(value string) string {
+func redactConninfo(dsn string, assignments []conninfoAssignment) string {
+	var result strings.Builder
+
+	last := 0
+
+	for _, assignment := range assignments {
+		if !isSecretName(assignment.key) {
+			continue
+		}
+
+		result.WriteString(dsn[last:assignment.valueStart])
+		result.WriteString(redactedSecret)
+
+		last = assignment.valueEnd
+	}
+
+	if last == 0 {
+		return dsn
+	}
+
+	result.WriteString(dsn[last:])
+
+	return result.String()
+}
+
+func skipASCIIWhitespace(dsn string, index int) int {
+	for index < len(dsn) && isASCIIWhitespace(dsn[index]) {
+		index++
+	}
+
+	return index
+}
+
+func isASCIIWhitespace(value byte) bool {
+	switch value {
+	case ' ', '\t', '\n', '\r', '\v', '\f':
+		return true
+	default:
+		return false
+	}
+}
+
+func isConninfoKeyByte(value byte) bool {
+	return isASCIIAlpha(value) || isASCIIDigit(value) || value == '_' || value == '-'
+}
+
+func isSecretQueryKey(key string) (secret, certain bool) {
+	decoded, err := url.QueryUnescape(key)
+	if err != nil || strings.Contains(decoded, "%") {
+		return false, false
+	}
+
+	return isSecretName(decoded), true
+}
+
+func isSecretName(name string) bool {
 	var normalized strings.Builder
 
-	for _, r := range value {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			normalized.WriteRune(unicode.ToLower(r))
+	for index := range len(name) {
+		value := name[index]
+		switch {
+		case isASCIIAlpha(value):
+			normalized.WriteByte(toASCIILower(value))
+		case isASCIIDigit(value):
+			normalized.WriteByte(value)
+		case value == '_', value == '-', value == '.':
+		default:
+			return false
 		}
 	}
 
-	return normalized.String()
-}
-
-func hasSecretKeySuffix(key string) bool {
 	for _, suffix := range []string{
 		"password", "passwd", "pwd", "secret", "token", "credential", "credentials", "apikey",
 	} {
-		if strings.HasSuffix(key, suffix) {
+		if strings.HasSuffix(normalized.String(), suffix) {
 			return true
 		}
 	}
@@ -511,64 +474,18 @@ func hasSecretKeySuffix(key string) bool {
 	return false
 }
 
-func stripMalformedEscapes(value string) string {
-	var result strings.Builder
-
-	for index := 0; index < len(value); index++ {
-		if value[index] != '%' {
-			result.WriteByte(value[index])
-
-			continue
-		}
-
-		index += min(percentEscapeDigits, len(value)-index-1)
-	}
-
-	return result.String()
+func isASCIIAlpha(value byte) bool {
+	return value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z'
 }
 
-func urlQueryUnescape(value string) string {
-	var result strings.Builder
-
-	for index := 0; index < len(value); index++ {
-		if value[index] == '+' {
-			result.WriteByte(' ')
-
-			continue
-		}
-
-		if value[index] != '%' || index+percentEscapeDigits >= len(value) {
-			result.WriteByte(value[index])
-
-			continue
-		}
-
-		high, okHigh := fromHex(value[index+1])
-
-		low, okLow := fromHex(value[index+percentEscapeDigits])
-		if !okHigh || !okLow {
-			result.WriteByte(value[index])
-
-			continue
-		}
-
-		result.WriteByte(high<<4 | low)
-
-		index += percentEscapeDigits
-	}
-
-	return result.String()
+func isASCIIDigit(value byte) bool {
+	return value >= '0' && value <= '9'
 }
 
-func fromHex(value byte) (byte, bool) {
-	switch {
-	case value >= '0' && value <= '9':
-		return value - '0', true
-	case value >= 'a' && value <= 'f':
-		return value - 'a' + hexAlphabetBase, true
-	case value >= 'A' && value <= 'F':
-		return value - 'A' + hexAlphabetBase, true
-	default:
-		return 0, false
+func toASCIILower(value byte) byte {
+	if value >= 'A' && value <= 'Z' {
+		return value + ('a' - 'A')
 	}
+
+	return value
 }
