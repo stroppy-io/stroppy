@@ -107,7 +107,7 @@ conditional transient retries.
 **Workload and run parameters:**
 - Registered workloads expose typed `--name VALUE` flags. Run
   `stroppy run <workload> --help` to see the selected workload's schema.
-- Shared run flags: `--executor`, `--vus`, `--iterations`, `--duration`.
+- Shared run flags: `--executor`, `--vus`, `--iterations`, `--duration`, `--query-timeout`.
 - Workload flags include `--scale-factor`, `--load-workers`, and other
   workload-specific declarations.
 - `-e KEY=VALUE` remains a compatibility input; keys are uppercased. Multiple

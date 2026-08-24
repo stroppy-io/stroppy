@@ -3,7 +3,7 @@ PATH:=$(LOCAL_BIN):$(PATH)
 GOPROXY:=proxy.golang.org,direct
 BUILD_TARGET_DIR=$(CURDIR)/build
 
-VERSION=$(shell git describe --tags --always 2>/dev/null || echo "0.0.0")
+VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo "unknown")
 
 default: help
 

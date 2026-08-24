@@ -1,12 +1,56 @@
 package postgres
 
 import (
+	"context"
+
 	"github.com/jackc/pgx/v5"
 
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
 var _ driver.Rows = (*Rows)(nil)
+
+type statementQuery struct {
+	query func(context.Context, string, ...any) (pgx.Rows, error)
+}
+
+func (q statementQuery) QueryContext(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	rows, err := q.query(ctx, sql, args...)
+	if rows != nil {
+		rows = &statementRows{
+			Rows: rows,
+			preserveError: func(err error) error {
+				return statementContextError(ctx, err)
+			},
+		}
+	}
+
+	return rows, statementContextError(ctx, err)
+}
+
+type statementRows struct {
+	pgx.Rows
+	preserveError func(error) error
+	err           error
+}
+
+func (r *statementRows) Next() bool {
+	if r.Rows.Next() {
+		return true
+	}
+
+	r.err = r.preserveError(r.Rows.Err())
+
+	return false
+}
+
+func (r *statementRows) Err() error {
+	if r.err == nil {
+		r.err = r.preserveError(r.Rows.Err())
+	}
+
+	return r.err
+}
 
 type Rows struct {
 	pgxRows pgx.Rows

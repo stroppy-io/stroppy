@@ -56,13 +56,11 @@ func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
 		return errSQLFileNoQueries
 	}
 
-	b.StepBegin("workload")
-
 	return nil
 }
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	return b.Step("workload", func() error {
+	return b.StepSilent("workload", func() error {
 		lg := b.Logger().Sugar()
 
 		for _, name := range w.names {
@@ -89,7 +87,5 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 }
 
 func (*workload) Teardown(_ context.Context, b *bench.Bench) error {
-	b.StepEnd("workload")
-
 	return nil
 }

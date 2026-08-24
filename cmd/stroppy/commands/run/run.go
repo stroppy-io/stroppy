@@ -84,6 +84,12 @@ Config file flags:
                           Config env values are lower precedence than -e and typed values.
                           Config drivers are lower precedence than -d/-D.
                           See 'stroppy help config-file' for details.
+
+Signals:
+  SIGINT and SIGTERM cancel the running workload and trigger graceful teardown.
+  A second signal forces immediate exit.
+  Exit statuses: 130 (SIGINT) or 143 (SIGTERM) after a graceful cancellation,
+  2 after a forced exit, 1 for other errors.
 `,
 	DisableFlagParsing: true,
 	SilenceErrors:      false,
@@ -91,6 +97,7 @@ Config file flags:
 	Example: `
   stroppy run tpcc/tx                           # built-in TPC-C tx workload
   stroppy run tpcb/tx                           # TPC-B tx workload
+  stroppy run tpcb/procs                        # TPC-B stored-procedure variant (pg/mysql)
   stroppy run tpch/tx                           # TPC-H load + query suite
   stroppy run tpcds                             # TPC-DS load + query suite
   stroppy run simple --executor constant-vus --duration 10s --vus 4
@@ -124,8 +131,8 @@ Config file flags:
 		// Apply effective values: CLI overrides config file.
 		scriptArg := runner.EffectiveScript(parsed.scriptArg, fileConfig)
 		sqlArg := runner.EffectiveSQL(parsed.sqlArg, fileConfig)
-		steps := runner.EffectiveSteps(parsed.steps, fileConfig)
-		noSteps := runner.EffectiveNoSteps(parsed.noSteps, fileConfig)
+		steps := normalizeStepNames(runner.EffectiveSteps(parsed.steps, fileConfig))
+		noSteps := normalizeStepNames(runner.EffectiveNoSteps(parsed.noSteps, fileConfig))
 
 		if parsed.help {
 			if scriptArg == "" {
@@ -137,6 +144,13 @@ Config file flags:
 
 		if scriptArg == "" {
 			return invalidConfig(errNoScript)
+		}
+
+		// Mutual exclusion is checked on the merged inputs (CLI over config file),
+		// not just CLI-vs-CLI, so `config steps + CLI --no-steps` (and vice versa)
+		// is rejected the same way.
+		if len(steps) > 0 && len(noSteps) > 0 {
+			return invalidConfig(errStepsMutExclusive)
 		}
 
 		if len(parsed.afterDash) > 0 {
@@ -219,6 +233,7 @@ Config file flags:
 
 			run := func() error {
 				return runGoWorkload(
+					cmd.Context(),
 					name, steps, noSteps, rootEnv, paramInputs, driverConfigs, metricsConfig(loadedRunConfig(fileConfig)),
 				)
 			}
@@ -235,6 +250,7 @@ Config file flags:
 			}
 
 			return runGoWorkload(
+				cmd.Context(),
 				scriptArg,
 				steps,
 				noSteps,
@@ -604,6 +620,7 @@ func restoreProcessEnv(name, value string, set bool) {
 // steps/noSteps are the merged (CLI over config-file) step filters, published via
 // STROPPY_STEPS env (the bench step filter reads it at Run start).
 func runGoWorkload(
+	ctx context.Context,
 	name string,
 	steps, noSteps []string,
 	env map[string]string,
@@ -643,7 +660,6 @@ func runGoWorkload(
 		os.Setenv("STROPPY_NO_STEPS", strings.Join(noSteps, ","))
 	}
 
-	ctx := context.Background()
 	if err := bench.Run(
 		ctx,
 		name,
@@ -915,11 +931,27 @@ func parseRunArgs(args []string) (runArgs, error) {
 		return runArgs{}, err
 	}
 
-	if len(parsed.steps) > 0 && len(parsed.noSteps) > 0 {
+	steps := normalizeStepNames(parsed.steps)
+	noSteps := normalizeStepNames(parsed.noSteps)
+
+	if len(steps) > 0 && len(noSteps) > 0 {
 		return runArgs{}, errStepsMutExclusive
 	}
 
 	return parsed, nil
+}
+
+func normalizeStepNames(names []string) []string {
+	normalized := make([]string, 0, len(names))
+	for _, group := range names {
+		for _, name := range strings.Split(group, ",") {
+			if name = strings.TrimSpace(name); name != "" {
+				normalized = append(normalized, name)
+			}
+		}
+	}
+
+	return normalized
 }
 
 func parseRunArgsBeforeDash(positional []string, parsers []flagParser, parsed *runArgs) error {

@@ -20,6 +20,16 @@ type ydbDialect struct{}
 func (ydbDialect) Placeholder(_ int) string { return "?" }
 func (ydbDialect) Deduplicate() bool        { return false }
 
+// StatementTimeoutHint returns sql unchanged; YDB honors context cancellation
+// for its per-statement deadline.
+func (ydbDialect) StatementTimeoutHint(sql string, _ time.Duration) (string, bool) {
+	return sql, false
+}
+
+// StatementDeadline returns timeout unchanged; there is no server-side hint
+// to outlast.
+func (ydbDialect) StatementDeadline(timeout time.Duration) time.Duration { return timeout }
+
 func (ydbDialect) Convert(val any) (any, error) {
 	switch v := val.(type) { //nolint:varnamelen // switch type assertion idiom
 	case nil:

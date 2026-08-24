@@ -212,6 +212,10 @@
         },
         "version": {
           "type": "string"
+        },
+        "queryTimeout": {
+          "type": "string",
+          "description": "Per-statement query deadline as a Go duration; 0 disables it."
         }
       },
       "type": "object"

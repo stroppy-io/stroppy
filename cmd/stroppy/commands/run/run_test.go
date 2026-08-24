@@ -16,6 +16,7 @@ import (
 	_ "github.com/stroppy-io/stroppy/internal/workloads/simple"
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/config"
+	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
 
 //nolint:cyclop // one table covers the complete run argument grammar
@@ -172,6 +173,13 @@ func TestParseRunArgs(t *testing.T) {
 			args:        []string{"tpcc", "--no-steps=load,run"},
 			wantScript:  "tpcc",
 			wantNoSteps: []string{"load", "run"},
+		},
+		{
+			name:        "explicit empty steps remains an override beside no-steps",
+			args:        []string{"tpcc", "--steps=", "--no-steps=workload"},
+			wantScript:  "tpcc",
+			wantSteps:   []string{""},
+			wantNoSteps: []string{"workload"},
 		},
 		{
 			name:    "--steps and --no-steps together returns error",
@@ -954,6 +962,149 @@ func TestSimpleRejectsSQLFilePositional(t *testing.T) {
 	err := Cmd.RunE(Cmd, []string{"simple", "unused.sql", "-d", "noop"})
 	if err == nil || !contains(err.Error(), "workload does not accept sql_file positional") {
 		t.Fatalf("RunE() error = %v", err)
+	}
+}
+
+func TestStepsNoStepsMergedMutualExclusion(t *testing.T) {
+	tests := []struct {
+		name   string
+		config string
+		args   []string
+	}{
+		{
+			name:   "config steps with CLI no-steps",
+			config: `{"script":"simple","steps":["load_data"]}`,
+			args:   []string{"--no-steps", "analyze", "-d", "noop"},
+		},
+		{
+			name:   "config no_steps with CLI steps",
+			config: `{"script":"simple","no_steps":["analyze"]}`,
+			args:   []string{"--steps", "load_data", "-d", "noop"},
+		},
+		{
+			name:   "both in config",
+			config: `{"script":"simple","steps":["load_data"],"no_steps":["analyze"]}`,
+			args:   []string{"-d", "noop"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configPath := t.TempDir() + "/stroppy-config.json"
+			if err := os.WriteFile(configPath, []byte(test.config), 0o600); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
+
+			args := append([]string{"-f", configPath}, test.args...)
+
+			err := Cmd.RunE(Cmd, args)
+			if !errors.Is(err, errStepsMutExclusive) {
+				t.Fatalf("RunE() error = %v, want %v", err, errStepsMutExclusive)
+			}
+
+			if contains(err.Error(), "driver dispatch") {
+				t.Fatalf("merged conflict reached driver dispatch: %v", err)
+			}
+		})
+	}
+}
+
+func TestBlankStepNamesDoNotConflictWithNoSteps(t *testing.T) {
+	unsetRunTestEnv(t, "STROPPY_STEPS", "STROPPY_NO_STEPS")
+
+	previousContext := Cmd.Context()
+	Cmd.SetContext(t.Context())
+	t.Cleanup(func() { Cmd.SetContext(previousContext) })
+
+	tests := []struct {
+		name        string
+		config      string
+		args        []string
+		wantSteps   string
+		wantNoSteps string
+	}{
+		{
+			name:        "explicit empty CLI steps clears config allowlist",
+			config:      `{"script":"simple","steps":["load_data"]}`,
+			args:        []string{"--steps=", "--no-steps", "workload"},
+			wantNoSteps: "workload",
+		},
+		{
+			name:        "blank config steps with real config noSteps",
+			config:      `{"script":"simple","steps":[""],"noSteps":["workload"]}`,
+			wantNoSteps: "workload",
+		},
+		{
+			name:        "comma-only config steps with real config noSteps",
+			config:      `{"script":"simple","steps":[" , , "],"noSteps":["workload"]}`,
+			wantNoSteps: "workload",
+		},
+		{
+			name:      "real config steps with comma-only config noSteps",
+			config:    `{"script":"simple","steps":["load_data"],"noSteps":[" , , "]}`,
+			wantSteps: "load_data",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configPath := t.TempDir() + "/stroppy-config.json"
+			if err := os.WriteFile(configPath, []byte(test.config), 0o600); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
+
+			args := append([]string{"-f", configPath, "-d", "noop"}, test.args...)
+			args = append(args, "--executor", "shared-iterations", "--iterations", "1", "--vus", "1")
+
+			if err := Cmd.RunE(Cmd, args); err != nil {
+				t.Fatalf("RunE() error = %v", err)
+			}
+
+			if steps, set := os.LookupEnv("STROPPY_STEPS"); steps != test.wantSteps || set != (test.wantSteps != "") {
+				t.Fatalf(
+					"dispatched STROPPY_STEPS = %q, set = %t; want %q, set = %t",
+					steps,
+					set,
+					test.wantSteps,
+					test.wantSteps != "",
+				)
+			}
+
+			if noSteps, set := os.LookupEnv("STROPPY_NO_STEPS"); noSteps != test.wantNoSteps || set != (test.wantNoSteps != "") {
+				t.Fatalf(
+					"dispatched STROPPY_NO_STEPS = %q, set = %t; want %q, set = %t",
+					noSteps,
+					set,
+					test.wantNoSteps,
+					test.wantNoSteps != "",
+				)
+			}
+		})
+	}
+}
+
+func TestStepsNoStepsConflictDoesNotBlockHelp(t *testing.T) {
+	configPath := t.TempDir() + "/stroppy-config.json"
+	if err := os.WriteFile(configPath, []byte(`{
+		"script":"simple",
+		"steps":["load_data"],
+		"no_steps":["analyze"]
+	}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	previousOutput := Cmd.OutOrStdout()
+	defer Cmd.SetOut(previousOutput)
+
+	var output bytes.Buffer
+	Cmd.SetOut(&output)
+
+	if err := Cmd.RunE(Cmd, []string{"-f", configPath, "--help"}); err != nil {
+		t.Fatalf("RunE(help) error = %v", err)
+	}
+
+	if output.Len() == 0 {
+		t.Fatal("RunE(help) produced no output")
 	}
 }
 

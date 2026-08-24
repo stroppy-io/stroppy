@@ -46,6 +46,19 @@ jobs:
           VERSION: nightly-${{ steps.sha.outputs.short }}
         run: make build
 
+      # Guard: the produced nightly binary must report exactly nightly-<short-sha>
+      # (not the 0.0.0/unknown fallback), so a broken version injection fails here.
+      - name: Verify binary version
+        run: |
+          expected="nightly-${{ steps.sha.outputs.short }}"
+          actual="$(./build/stroppy version --json | jq -r '.stroppy')"
+          echo "expected=${expected}"
+          echo "actual=${actual}"
+          if [ "${actual}" != "${expected}" ]; then
+            echo "version mismatch: ${actual} != ${expected}"
+            exit 1
+          fi
+
       # Tier 0: scenario-branch smoke on the noop driver — no database, exercises
       # both executor archetypes (constant-vus / shared-iterations) for every
       # workload. Fast and catches executor regressions for ~free.

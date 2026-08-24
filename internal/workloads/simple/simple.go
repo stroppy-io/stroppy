@@ -61,40 +61,38 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 		return err
 	}
 
-	b.StepBegin("workload")
-
 	return nil
 }
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	count, err := b.QueryValue(ctx, "SELECT COUNT(*) FROM stroppy_demo", nil)
-	if err != nil {
-		return err
-	}
-
-	if toInt(count) != demoRows {
-		return fmt.Errorf("%w: expected %d, got %v", errRowCount, demoRows, count)
-	}
-
-	b.Logger().Sugar().Infof("loaded %v rows into stroppy_demo", count)
-
-	for range 3 {
-		id := int64(1 + w.pick.IntN(demoRows))
-
-		label, err := b.QueryValue(ctx, "SELECT label FROM stroppy_demo WHERE id = :id", map[string]any{"id": id})
+	return b.StepSilent("workload", func() error {
+		count, err := b.QueryValue(ctx, "SELECT COUNT(*) FROM stroppy_demo", nil)
 		if err != nil {
 			return err
 		}
 
-		b.Logger().Sugar().Infof("id=%d → label=%v", id, label)
-	}
+		if toInt(count) != demoRows {
+			return fmt.Errorf("%w: expected %d, got %v", errRowCount, demoRows, count)
+		}
 
-	return nil
+		b.Logger().Sugar().Debugf("loaded %v rows into stroppy_demo", count)
+
+		for range 3 {
+			id := int64(1 + w.pick.IntN(demoRows))
+
+			label, err := b.QueryValue(ctx, "SELECT label FROM stroppy_demo WHERE id = :id", map[string]any{"id": id})
+			if err != nil {
+				return err
+			}
+
+			b.Logger().Sugar().Debugf("id=%d → label=%v", id, label)
+		}
+
+		return nil
+	})
 }
 
 func (w *workload) Teardown(ctx context.Context, b *bench.Bench) error {
-	b.StepEnd("workload")
-
 	return b.Exec(ctx, "DROP TABLE IF EXISTS stroppy_demo", nil)
 }
 

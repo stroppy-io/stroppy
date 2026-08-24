@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,7 +22,7 @@ func (a *pgxTxAdapter) QueryContext(
 	sql string,
 	args ...any,
 ) (pgx.Rows, error) {
-	return a.Query(ctx, sql, args...)
+	return statementQuery{query: a.Query}.QueryContext(ctx, sql, args...)
 }
 
 func toTxIsoLevel(level config.TxIsolationLevel) pgx.TxIsoLevel {
@@ -46,6 +47,7 @@ func newTx(pgxTx pgx.Tx, isolation config.TxIsolationLevel, d *Driver) *sqldrive
 		isolation,
 		PgxDialect{},
 		d.logger,
+		d.queryTimeout,
 	)
 }
 
@@ -57,15 +59,16 @@ func (a *pgxConnAdapter) QueryContext(
 	sql string,
 	args ...any,
 ) (pgx.Rows, error) {
-	return a.conn.Query(ctx, sql, args...)
+	return statementQuery{query: a.conn.Query}.QueryContext(ctx, sql, args...)
 }
 
-func NewConnOnlyTx(conn *pgxpool.Conn, lg *zap.Logger) *sqldriver.ConnOnlyTx[pgx.Rows] {
+func NewConnOnlyTx(conn *pgxpool.Conn, lg *zap.Logger, timeout time.Duration) *sqldriver.ConnOnlyTx[pgx.Rows] {
 	return sqldriver.NewConnOnlyTx(
 		&pgxConnAdapter{conn},
 		NewRows,
 		PgxDialect{},
 		lg,
+		timeout,
 		func() error {
 			conn.Release()
 

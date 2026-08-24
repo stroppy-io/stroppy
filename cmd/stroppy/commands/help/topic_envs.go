@@ -14,10 +14,11 @@ func init() {
 
   Scenario parameters are shared by every workload:
 
-    --executor     shared-iterations or constant-vus
-    --vus          Number of virtual users
-    --iterations   Total shared iterations
-    --duration     Run length as a Go duration, e.g. 60s or 10m
+    --executor       shared-iterations or constant-vus
+    --vus            Number of virtual users
+    --iterations     Total shared iterations
+    --duration       Run length as a Go duration, e.g. 60s or 10m
+    --query-timeout  Per-statement deadline as a Go duration; 0 disables it
 
   Select the executor explicitly. Examples:
 
@@ -74,7 +75,8 @@ CONFIG FILE
       "run": {
         "executor": "constant-vus",
         "vus": 10,
-        "duration": "60s"
+        "duration": "60s",
+        "queryTimeout": "5s"
       },
       "params": {
         "scaleFactor": 10,

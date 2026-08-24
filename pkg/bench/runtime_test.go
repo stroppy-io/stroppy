@@ -3,6 +3,7 @@ package bench
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -55,6 +56,25 @@ func TestRunScenarioKeepsOrdinaryErrorsPerWorker(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("runScenario() error = %v, want nil", err)
+	}
+}
+
+func TestRunRejectsNegativeQueryTimeout(t *testing.T) {
+	installRuntimeTestRoot(t)
+
+	Register(func() Workload { return &paramTestWorkload{name: "test/query-timeout-negative"} })
+
+	err := Run(
+		context.Background(),
+		"test/query-timeout-negative",
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
+		nil,
+		ParamInputs{CLI: map[string]string{"query-timeout": "-5s"}},
+		zap.NewNop(),
+		&MetricsConfig{},
+	)
+	if err == nil || !strings.Contains(err.Error(), "query-timeout must not be negative") {
+		t.Fatalf("Run() error = %v, want negative query-timeout", err)
 	}
 }
 
