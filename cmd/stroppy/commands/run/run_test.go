@@ -647,7 +647,6 @@ func TestParseRunArgs(t *testing.T) {
 func TestConfigDriversMergeBelowCLI(t *testing.T) {
 	driverType := "postgres"
 	fileURL := "postgres://file"
-	errorMode := "throw"
 	bulkSize := int32(20)
 	maxConns := int32(7)
 	specificMaxConns := int32(5)
@@ -657,7 +656,6 @@ func TestConfigDriversMergeBelowCLI(t *testing.T) {
 		0: {
 			DriverType: &driverType,
 			URL:        &fileURL,
-			ErrorMode:  &errorMode,
 			BulkSize:   &bulkSize,
 			Pool:       &config.PoolConfig{MaxConns: &maxConns},
 			Postgres: &config.PostgresConfig{
@@ -689,7 +687,6 @@ func TestConfigDriversMergeBelowCLI(t *testing.T) {
 
 	if runtimeConfig.URL != "postgres://cli" ||
 		runtimeConfig.GetBulkSize() != 20 ||
-		runtimeConfig.ErrorMode != config.ErrorModeThrow ||
 		runtimeConfig.Postgres.GetMaxConns() != 10 ||
 		runtimeConfig.Postgres.GetStatementCacheCapacity() != 13 {
 		t.Fatalf("runtime driver config = %#v, extra = %#v", runtimeConfig, configs[0].Extra)
@@ -1191,7 +1188,7 @@ func TestApplyDriverPresetJSON(t *testing.T) {
 
 	configs := runner.DriverCLIConfigs{}
 
-	err := applyDriverPreset(configs, 0, `{"url":"postgres://prod:5432","driverType":"postgres","errorMode":"throw"}`)
+	err := applyDriverPreset(configs, 0, `{"url":"postgres://prod:5432","driverType":"postgres"}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1204,9 +1201,20 @@ func TestApplyDriverPresetJSON(t *testing.T) {
 	if cfg.DriverType != "postgres" {
 		t.Errorf("DriverType: got %q, want %q", cfg.DriverType, "postgres")
 	}
+}
 
-	if cfg.Extra["errorMode"] != "throw" {
-		t.Errorf("Extra[errorMode]: got %v, want %q", cfg.Extra["errorMode"], "throw")
+func TestRemovedErrorModeOverrideRejected(t *testing.T) {
+	configs := runner.DriverCLIConfigs{}
+	if err := applyDriverPreset(configs, 0, "noop"); err != nil {
+		t.Fatalf("applyDriverPreset() error = %v", err)
+	}
+	if err := applyDriverOpt(configs, 0, "errorMode", "throw"); err != nil {
+		t.Fatalf("applyDriverOpt() error = %v", err)
+	}
+
+	_, err := buildDriverConfig(0, configs[0])
+	if err == nil || !contains(err.Error(), `unknown field "errorMode"`) {
+		t.Fatalf("buildDriverConfig() error = %v, want removed errorMode rejection", err)
 	}
 }
 
@@ -1230,6 +1238,7 @@ func TestApplyDriverPresetStrictJSON(t *testing.T) {
 		{name: "exact duplicate", doc: `{"url":"a","url":"b"}`, path: `$.url`},
 		{name: "alias collision", doc: `{"bulkSize":1,"bulk_size":2}`, path: `$.bulkSize`},
 		{name: "wrong case", doc: `{"DriverType":"postgres"}`, path: `$["DriverType"]`},
+		{name: "removed error mode", doc: `{"errorMode":"throw"}`, path: `$.errorMode`},
 		{name: "unknown nested field", doc: `{"pool":{"MaxConns":1}}`, path: `$.pool["MaxConns"]`},
 		{name: "fractional int32", doc: `{"bulkSize":1.5}`, path: `$.bulkSize`},
 		{name: "trailing JSON", doc: `{} {}`, path: `$`},

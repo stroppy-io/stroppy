@@ -33,6 +33,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- Nonfatal transaction and query-set errors now keep virtual users running, exit successfully, and appear in bounded warnings, terminal-error metrics, and a prominent final summary; the unused driver `errorMode` option has been removed and is now rejected.
 - Logging now uses one safely replaceable process-wide logger, with configurable level and output mode precedence plus redacted database connection diagnostics. ([#154](https://github.com/stroppy-io/stroppy/pull/154))
 - Driver insert-method defaults now fill only load requests that leave their method unset, preserving methods selected by workloads. ([#152](https://github.com/stroppy-io/stroppy/pull/152))
 - SIGINT and SIGTERM now cancel the running workload and trigger graceful teardown; a second signal forces immediate exit. Exit status is 130 (SIGINT) or 143 (SIGTERM) after a graceful cancellation, 2 after a forced exit, and 1 for other errors. ([#148](https://github.com/stroppy-io/stroppy/pull/148))
@@ -70,7 +71,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
-- The `tpcc/tx` and `tpcc/procs` workloads now share their driver setup, load/prepare lifecycle, retry policy, pacing, weighted dispatch, and post-run summary through `tpcc_common.ts` (matching the existing `tpcb` layout), instead of each carrying its own copy. Both variants now run queries with `errorMode=throw` (previously `procs` threw while `tx` logged), so database errors surface as exceptions consistently. ([#114](https://github.com/stroppy-io/stroppy/pull/114))
+- The `tpcc/tx` and `tpcc/procs` workloads now share their driver setup, load/prepare lifecycle, retry policy, pacing, weighted dispatch, and post-run summary through `tpcc_common.ts` (matching the existing `tpcb` layout), instead of each carrying its own copy. Both variants now surface database errors as exceptions consistently (previously `procs` threw while `tx` only logged). ([#114](https://github.com/stroppy-io/stroppy/pull/114))
 
 ## [5.7.2] - 2026-07-27
 

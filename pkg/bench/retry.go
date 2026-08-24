@@ -148,10 +148,7 @@ func applyRetryDecision(
 }
 
 func (p RetryPolicy) decision(err error) RetryDecision {
-	facts := driver.DefaultErrorFacts(err)
-	if p.Classify != nil {
-		facts = p.Classify(err)
-	}
+	facts := classifyError(err, p.Classify)
 
 	action := p.Actions.action(facts.Kind)
 	if action == ErrorActionRetry && facts.RequiresIdempotency && !p.idempotent {
@@ -159,6 +156,14 @@ func (p RetryPolicy) decision(err error) RetryDecision {
 	}
 
 	return RetryDecision{Action: action, Facts: facts}
+}
+
+func classifyError(err error, classify func(error) driver.ErrorFacts) driver.ErrorFacts {
+	if classify != nil {
+		return classify(err)
+	}
+
+	return driver.DefaultErrorFacts(err)
 }
 
 // TxRetryPolicyOptions configures Bench.TxRetryPolicy.
@@ -174,6 +179,16 @@ type TxRetryPolicyOptions struct {
 // TxRetryPolicy builds a policy from this bench's driver classifier and
 // workload overrides.
 func (b *Bench) TxRetryPolicy(opts TxRetryPolicyOptions) RetryPolicy {
+	workloadOnRetry := opts.OnRetry
+	opts.OnRetry = func(attempt int, err error, decision RetryDecision) {
+		if b.root != nil && b.root.errorReporter != nil {
+			b.root.errorReporter.recordRetry(b.vu)
+		}
+		if workloadOnRetry != nil {
+			workloadOnRetry(attempt, err, decision)
+		}
+	}
+
 	return newTxRetryPolicy(b.drv.ClassifyError, opts)
 }
 

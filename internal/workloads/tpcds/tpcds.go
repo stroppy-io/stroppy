@@ -192,7 +192,11 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 
 			ms := time.Since(start).Milliseconds()
 			if err != nil {
-				lg.Infof("[tpcds] %s: error in %dms %v", q.name, ms, err)
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+
+				b.RecordQueryError(q.name, err)
 
 				continue
 			}

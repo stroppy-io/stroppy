@@ -89,6 +89,14 @@ and unconditional transient facts; unknown facts return errors. Override selecte
 facts per workload with `TxRetryPolicyOptions.Actions`; set `Idempotent` to allow
 conditional transient retries.
 
+Nonfatal terminal transaction errors fail one iteration and the VU continues;
+query-set workloads count the failed query and continue. Both exit 0 but produce
+bounded WARN aggregates and a prominent final completed-with-errors summary.
+Scheduled retries are counted separately and do not mark a run failed when a
+later attempt succeeds. Setup/validation, teardown, fatal, and cancellation
+retain their nonzero or signal-derived semantics; fatal stops the scenario and
+is reported once. The removed `errorMode` driver field and alias are rejected.
+
 ## CLI Usage
 
 ```bash
@@ -102,7 +110,7 @@ conditional transient retries.
 **Driver flags:**
 - `-d <preset>` — driver preset: `pg`, `mysql`, `pico`, `ydb`, `noop`
 - `-d '{"url":"...","bulkSize":20}'` — raw JSON driver config
-- `-D key=value` — override driver field (url, driverType, errorMode, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
+- `-D key=value` — override driver field (url, driverType, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
 - `-d1 <preset>`, `-D1 key=value` — same for second driver index (multi-driver workloads)
 
 **Workload and run parameters:**

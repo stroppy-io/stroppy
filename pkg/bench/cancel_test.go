@@ -77,7 +77,7 @@ func TestRunScenarioConstantVUsCancellation(t *testing.T) {
 			<-vu.Context().Done()
 
 			return vu.Context().Err()
-		})
+		}, nil)
 	}()
 
 	select {

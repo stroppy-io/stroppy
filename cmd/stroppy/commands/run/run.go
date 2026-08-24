@@ -105,8 +105,9 @@ Config file flags:
 Signals:
   SIGINT and SIGTERM cancel the running workload and trigger graceful teardown.
   A second signal forces immediate exit.
-  Exit statuses: 130 (SIGINT) or 143 (SIGTERM) after a graceful cancellation,
-  2 after a forced exit, 1 for other errors.
+  Exit statuses: nonfatal iteration/query errors are summarized and exit 0;
+  130 (SIGINT) or 143 (SIGTERM) after a graceful cancellation, 2 after a forced
+  exit, and 1 for setup, validation, teardown, fatal, or other command errors.
 `,
 	DisableFlagParsing: true,
 	SilenceErrors:      false,
@@ -773,15 +774,6 @@ func applyDriverRunConfigExtras(
 ) error {
 	if fileConfig == nil {
 		return nil
-	}
-
-	if fileConfig.ErrorMode != nil {
-		parsed, err := bench.ParseErrorMode(fileConfig.GetErrorMode())
-		if err != nil {
-			return fmt.Errorf("driver %d errorMode: %w", idx, err)
-		}
-
-		driverConfig.ErrorMode = parsed
 	}
 
 	pool := applicableDriverPool(idx, driverConfig.DriverType, fileConfig)

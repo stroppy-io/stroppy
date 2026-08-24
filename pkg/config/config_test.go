@@ -77,6 +77,8 @@ func TestRunConfigJSONRejects(t *testing.T) {
 		"unknown top-level field": `{"unknownField": 1}`,
 		"removed k6Args":          `{"k6Args": ["--vus", "10"]}`,
 		"removed k6Config":        `{"k6Config": "k6.json"}`,
+		"removed driver errorMode": `{"drivers":{"0":{
+			"driverType":"postgres","errorMode":"throw"}}}`,
 		"removed driver defaultTxIsolation": `{"drivers":{"0":{
 			"driverType":"postgres","defaultTxIsolation":"repeatable_read"}}}`,
 		"unknown driver field": `{"drivers":{"0":{"driverType":"postgres","unknown":true}}}`,
@@ -107,6 +109,18 @@ func TestRemovedFieldsUseOrdinaryUnknownFieldErrors(t *testing.T) {
 		{name: "k6 args alias", doc: `{"k6_args":[]}`, path: `$["k6_args"]`, field: "k6_args"},
 		{name: "k6 config", doc: `{"k6Config":"k6.json"}`, path: `$.k6Config`, field: "k6Config"},
 		{name: "k6 config alias", doc: `{"k6_config":"k6.json"}`, path: `$["k6_config"]`, field: "k6_config"},
+		{
+			name:  "driver error mode",
+			doc:   `{"drivers":{"0":{"errorMode":"throw"}}}`,
+			path:  `$.drivers["0"].errorMode`,
+			field: "errorMode",
+		},
+		{
+			name:  "driver error mode alias",
+			doc:   `{"drivers":{"0":{"error_mode":"throw"}}}`,
+			path:  `$.drivers["0"]["error_mode"]`,
+			field: "error_mode",
+		},
 		{
 			name:  "driver isolation",
 			doc:   `{"drivers":{"0":{"defaultTxIsolation":"serializable"}}}`,
@@ -143,14 +157,18 @@ func TestRemovedFieldsAreAbsentFromPublicConfigTypes(t *testing.T) {
 
 	driverConfig := reflect.TypeFor[config.DriverRunConfig]()
 	_, hasDefaultTxIsolation := driverConfig.FieldByName("DefaultTxIsolation")
+	_, hasErrorMode := driverConfig.FieldByName("ErrorMode")
+	runtimeDriverConfig := reflect.TypeFor[config.DriverConfig]()
+	_, runtimeHasErrorMode := runtimeDriverConfig.FieldByName("ErrorMode")
 	require.False(t, hasDefaultTxIsolation)
+	require.False(t, hasErrorMode)
+	require.False(t, runtimeHasErrorMode)
 }
 
 func TestJSONFieldNamesPreserved(t *testing.T) {
 	driver := config.DriverRunConfig{
 		DriverType:   ptr("postgres"),
 		URL:          ptr("postgres://x"),
-		ErrorMode:    ptr("throw"),
 		BulkSize:     ptr[int32](20),
 		CaCertFile:   ptr("/tls/ca.pem"),
 		AuthToken:    ptr("token"),
@@ -163,7 +181,6 @@ func TestJSONFieldNamesPreserved(t *testing.T) {
 	require.JSONEq(t, `{
 		"driverType": "postgres",
 		"url": "postgres://x",
-		"errorMode": "throw",
 		"bulkSize": 20,
 		"caCertFile": "/tls/ca.pem",
 		"authToken": "token",

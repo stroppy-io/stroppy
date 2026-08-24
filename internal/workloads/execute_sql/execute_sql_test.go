@@ -3,8 +3,10 @@ package execute_sql
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,7 +14,9 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
 func TestSQLSourcePrecedence(t *testing.T) {
@@ -165,6 +169,57 @@ func TestSQLSourceDoesNotLeakBetweenRuns(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, errNoSQLSource, err)
 }
+
+func TestCancellationStopsRemainingQueries(t *testing.T) {
+	const driverType config.DriverType = 1000
+
+	ctx, cancel := context.WithCancel(context.Background())
+	canceling := &cancelingDriver{cancel: cancel}
+	driver.RegisterDriver(driverType, func(context.Context, driver.Options) (driver.Driver, error) {
+		return canceling, nil
+	})
+
+	err := bench.Run(
+		ctx,
+		"execute_sql",
+		map[int]*config.DriverConfig{0: {DriverType: driverType}},
+		bench.ParamInputs{CLI: map[string]string{
+			"sql-body": "--= first\nSELECT 1;\n--= second\nSELECT 2;\n",
+		}},
+		nil,
+		nil,
+		zap.NewNop(),
+		&bench.MetricsConfig{},
+	)
+	require.ErrorIs(t, err, context.Canceled)
+	require.Equal(t, int64(1), canceling.queries.Load())
+}
+
+type cancelingDriver struct {
+	cancel  context.CancelFunc
+	queries atomic.Int64
+}
+
+func (*cancelingDriver) Insert(context.Context, *driver.InsertRequest) (*stats.Query, error) {
+	return nil, errors.New("unexpected insert")
+}
+
+func (d *cancelingDriver) RunQuery(ctx context.Context, _ string, _ map[string]any) (*driver.QueryResult, error) {
+	d.queries.Add(1)
+	d.cancel()
+
+	return nil, ctx.Err()
+}
+
+func (*cancelingDriver) Begin(context.Context, config.TxIsolationLevel) (driver.Tx, error) {
+	return nil, errors.New("unexpected transaction")
+}
+
+func (*cancelingDriver) ClassifyError(err error) driver.ErrorFacts {
+	return driver.DefaultErrorFacts(err)
+}
+
+func (*cancelingDriver) Teardown(context.Context) error { return nil }
 
 func runExecuteSQL(inputs bench.ParamInputs) error {
 	return bench.Run(

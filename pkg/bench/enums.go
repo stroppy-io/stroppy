@@ -9,7 +9,6 @@ import (
 
 var (
 	errUnknownDriverType  = errors.New("unknown driver type")
-	errUnknownErrorMode   = errors.New("unknown error mode")
 	errUnknownTxIsolation = errors.New("unknown tx isolation")
 )
 
@@ -63,33 +62,6 @@ func DriverTypeNameOf(t config.DriverType) DriverTypeName {
 		return DriverCSV
 	default:
 		return ""
-	}
-}
-
-type ErrorModeName string
-
-const (
-	ErrorSilent ErrorModeName = "silent"
-	ErrorLog    ErrorModeName = "log"
-	ErrorThrow  ErrorModeName = "throw"
-	ErrorFail   ErrorModeName = "fail"
-	ErrorAbort  ErrorModeName = "abort"
-)
-
-func ParseErrorMode(s string) (config.ErrorMode, error) {
-	switch s {
-	case "", "silent":
-		return config.ErrorModeSilent, nil
-	case "log":
-		return config.ErrorModeLog, nil
-	case "throw":
-		return config.ErrorModeThrow, nil
-	case "fail":
-		return config.ErrorModeFail, nil
-	case "abort":
-		return config.ErrorModeAbort, nil
-	default:
-		return 0, fmt.Errorf("%w %q", errUnknownErrorMode, s)
 	}
 }
 

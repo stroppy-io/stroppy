@@ -36,6 +36,10 @@ type txMetrics struct {
 	insertDuration   *metric
 	iterationDur     *metric
 	iterations       *metric
+	terminalErrors   *metric
+	failedIterations *metric
+	failedQueries    *metric
+	retryAttempts    *metric
 	txTotalDuration  *metric
 	txCommits        *metric
 	txErrors         *metric
@@ -43,6 +47,7 @@ type txMetrics struct {
 	stepAttrs        attributeCache
 	tableAttrs       attributeCache
 	txAttrs          attributeCache
+	errorAttrs       attributeCache
 	progressAttrs    attributeCache
 }
 
@@ -102,6 +107,10 @@ func (m *txMetrics) ensureRegistered(vu *VU, lg *zap.Logger) {
 	m.insertDuration = newMetric("insert_duration", Trend)
 	m.iterationDur = newMetric("iteration_duration", Trend)
 	m.iterations = newMetric("iterations_total", Counter)
+	m.terminalErrors = newMetric("terminal_errors_total", Counter)
+	m.failedIterations = newMetric("failed_iterations_total", Counter)
+	m.failedQueries = newMetric("failed_queries_total", Counter)
+	m.retryAttempts = newMetric("retry_attempts_total", Counter)
 	m.txTotalDuration = newMetric("tx_total_duration", Trend)
 	m.txCommits = newMetric("tx_commits_total", Counter)
 	m.txErrors = newMetric("tx_errors_total", Counter)
@@ -186,6 +195,15 @@ func (m *txMetrics) txAttributes(step, action, name, isolation string) metricAtt
 	)
 }
 
+func (m *txMetrics) errorAttributes(group errorGroup) metricAttributes {
+	return cachedAttributes(
+		&m.errorAttrs,
+		group,
+		"operation", group.operation,
+		"error_class", string(group.kind),
+	)
+}
+
 func (m *txMetrics) progressAttributes(snapshot *insertprogress.Snapshot, step string) metricAttributes {
 	key := progressAttributeKey{
 		step: step, table: snapshot.Table, method: snapshot.Method,
@@ -203,7 +221,7 @@ func (m *txMetrics) progressAttributes(snapshot *insertprogress.Snapshot, step s
 }
 
 func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr error) {
-	m.ensureRegistered(vu, root.lg)
+	m.ensureRegistered(vu, vu.root.lg)
 	attrs := m.stepAttributes(vu.stepTag)
 	m.emit(vu, m.queryOperations, 1, attrs)
 
@@ -217,7 +235,7 @@ func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr er
 }
 
 func (m *txMetrics) recordInsertResult(vu *VU, table string, elapsed time.Duration, insertErr error) {
-	m.ensureRegistered(vu, root.lg)
+	m.ensureRegistered(vu, vu.root.lg)
 
 	if table == "" {
 		table = "unknown"
@@ -236,10 +254,28 @@ func (m *txMetrics) recordInsertResult(vu *VU, table string, elapsed time.Durati
 }
 
 func (m *txMetrics) recordIteration(vu *VU, elapsed time.Duration) {
-	m.ensureRegistered(vu, root.lg)
+	m.ensureRegistered(vu, vu.root.lg)
 	attrs := m.stepAttributes(vu.stepTag)
 	m.emit(vu, m.iterationDur, elapsed.Seconds()*millisPerSecond, attrs)
 	m.emit(vu, m.iterations, 1, attrs)
+}
+
+func (m *txMetrics) recordTerminalError(vu *VU, scope terminalErrorScope, group errorGroup) {
+	m.ensureRegistered(vu, vu.root.lg)
+	attrs := m.errorAttributes(group)
+	m.emit(vu, m.terminalErrors, 1, attrs)
+
+	switch scope {
+	case terminalErrorIteration:
+		m.emit(vu, m.failedIterations, 1, attrs)
+	case terminalErrorQuery:
+		m.emit(vu, m.failedQueries, 1, attrs)
+	}
+}
+
+func (m *txMetrics) recordRetry(vu *VU) {
+	m.ensureRegistered(vu, vu.root.lg)
+	m.emit(vu, m.retryAttempts, 1, metricAttributes{})
 }
 
 func (m *txMetrics) recordTxEnd(
@@ -250,7 +286,7 @@ func (m *txMetrics) recordTxEnd(
 	queries int,
 	committed bool,
 ) {
-	m.ensureRegistered(vu, root.lg)
+	m.ensureRegistered(vu, vu.root.lg)
 
 	attrs := m.txAttributes(vu.stepTag, action, name, txIsolationName(isolation))
 	if committed {
@@ -264,7 +300,7 @@ func (m *txMetrics) recordTxEnd(
 }
 
 func (m *txMetrics) recordInsertProgress(vu *VU, snapshot *insertprogress.Snapshot) {
-	m.ensureRegistered(vu, root.lg)
+	m.ensureRegistered(vu, vu.root.lg)
 
 	attrs := m.progressAttributes(snapshot, vu.stepTag)
 	if snapshot.DeltaRows > 0 {
@@ -275,7 +311,7 @@ func (m *txMetrics) recordInsertProgress(vu *VU, snapshot *insertprogress.Snapsh
 }
 
 func (m *txMetrics) recordInsert(vu *VU, table string, rows int64) {
-	m.ensureRegistered(vu, root.lg)
+	m.ensureRegistered(vu, vu.root.lg)
 
 	if table == "" {
 		table = "unknown"
@@ -289,7 +325,7 @@ func (m *txMetrics) recordInsert(vu *VU, table string, rows int64) {
 }
 
 func (m *txMetrics) record(vu *VU, action, name string, isolation config.TxIsolationLevel) {
-	m.ensureRegistered(vu, root.lg)
+	m.ensureRegistered(vu, vu.root.lg)
 	m.emit(vu, m.transactions, 1, m.txAttributes(vu.stepTag, action, name, txIsolationName(isolation)))
 }
 

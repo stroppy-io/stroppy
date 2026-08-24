@@ -133,15 +133,14 @@ revision: # Recreate git tag with version tag=<semver>
 ## Smoke runs (Go-native workloads)
 ##
 
-# Gate one smoke run: fail on a non-zero exit OR any `level=error` line.
-# stroppy exits 0 even when every iteration errors (e.g. a failed GlobalOnce
-# load), so the exit code alone is not a reliable signal; default error mode
-# logs every error at level=error, which this catches.
+# Gate one smoke run: fail on a non-zero exit, an error log, or the final
+# completed-with-errors marker. Nonfatal iteration/query errors intentionally
+# exit 0, so the summary marker keeps smoke runs strict.
 # $(1)=label, rest=command.
 define smoke_run
 	echo "== $(1) =="; \
 	out=$$($(2) 2>&1); code=$$?; printf '%s\n' "$$out"; \
-	if [ $$code -ne 0 ] || printf '%s' "$$out" | grep -q 'level=error'; then \
+	if [ $$code -ne 0 ] || printf '%s' "$$out" | grep -Eq 'level=error|completed with errors'; then \
 		echo "FAIL ($(1)): exit=$$code"; rc=1; \
 	fi
 endef

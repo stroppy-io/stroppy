@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/stroppy-io/stroppy/pkg/config"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
@@ -33,7 +35,7 @@ func TestRunScenarioReturnsFatalErrorAndCancelsWorkers(t *testing.T) {
 		<-vu.Context().Done()
 
 		return vu.Context().Err()
-	})
+	}, nil)
 
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("runScenario() error = %v, want sentinel", err)
@@ -44,20 +46,84 @@ func TestRunScenarioReturnsFatalErrorAndCancelsWorkers(t *testing.T) {
 	}
 }
 
-func TestRunScenarioKeepsOrdinaryErrorsPerWorker(t *testing.T) {
+func TestRunScenarioContinuesAfterOrdinaryErrors(t *testing.T) {
 	installRuntimeTestRoot(t)
+
+	var (
+		calls    atomic.Int64
+		failures atomic.Int64
+	)
 
 	err := runScenario(context.Background(), scenarioSpec{
 		executor:   "shared-iterations",
 		vus:        1,
-		iterations: 1,
+		iterations: 5,
 	}, func(*VU) error {
+		calls.Add(1)
+
 		return errors.New("iteration")
+	}, func(*VU, error) {
+		failures.Add(1)
 	})
 	if err != nil {
 		t.Fatalf("runScenario() error = %v, want nil", err)
 	}
+	if calls.Load() != 5 || failures.Load() != 5 {
+		t.Fatalf("calls = %d, failures = %d, want 5 each", calls.Load(), failures.Load())
+	}
 }
+
+func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
+	var workload *ordinaryErrorWorkload
+	Register(func() Workload {
+		workload = &ordinaryErrorWorkload{}
+
+		return workload
+	})
+
+	core, logs := observer.New(zapcore.WarnLevel)
+	err := Run(
+		context.Background(),
+		"test/ordinary-errors-continue",
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
+		ParamInputs{CLI: map[string]string{"iterations": "6", "vus": "2"}},
+		nil,
+		nil,
+		zap.New(core),
+		&MetricsConfig{},
+	)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+	if workload.calls.Load() != 6 {
+		t.Fatalf("iteration calls = %d, want 6", workload.calls.Load())
+	}
+
+	snapshot := root.errorReporter.snapshot()
+	if snapshot.terminalErrors != 6 || snapshot.failedIterations != 6 || snapshot.failedQueries != 0 {
+		t.Fatalf("error summary = %#v, want six failed iterations", snapshot)
+	}
+	if got := logs.FilterMessage("nonfatal error; continuing").Len(); got != 1 {
+		t.Fatalf("initial nonfatal warnings = %d, want 1", got)
+	}
+	if got := logs.FilterLevelExact(zapcore.ErrorLevel).Len(); got != 0 {
+		t.Fatalf("error-level logs = %d, want 0", got)
+	}
+}
+
+type ordinaryErrorWorkload struct {
+	calls atomic.Int64
+}
+
+func (*ordinaryErrorWorkload) Name() string                        { return "test/ordinary-errors-continue" }
+func (*ordinaryErrorWorkload) Define(*Def) error                   { return nil }
+func (*ordinaryErrorWorkload) Setup(context.Context, *Bench) error { return nil }
+func (w *ordinaryErrorWorkload) Iterate(context.Context, *Bench) error {
+	w.calls.Add(1)
+
+	return errors.New("ordinary iteration failure")
+}
+func (*ordinaryErrorWorkload) Teardown(context.Context, *Bench) error { return nil }
 
 func TestRunRejectsNegativeQueryTimeout(t *testing.T) {
 	installRuntimeTestRoot(t)
@@ -89,7 +155,7 @@ func TestRunScenarioReturnsParentCancellation(t *testing.T) {
 		executor:   "shared-iterations",
 		vus:        1,
 		iterations: 1,
-	}, func(*VU) error { return nil })
+	}, func(*VU) error { return nil }, nil)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("runScenario() error = %v, want context.Canceled", err)
 	}
@@ -174,6 +240,7 @@ func installRuntimeTestRoot(t *testing.T) {
 	root = testRoot
 
 	t.Cleanup(func() {
+		testRoot.errorReporter.stopAndWait()
 		testRoot.shutdownMetrics()
 
 		root = oldRoot

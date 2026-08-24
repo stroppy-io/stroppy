@@ -1,10 +1,19 @@
 package commands
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync/atomic"
 	"testing"
+
+	"github.com/spf13/cobra"
+
+	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/pkg/driver"
+	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
 
 func TestExitCodeFor(t *testing.T) {
@@ -33,3 +42,85 @@ func TestExitCodeFor(t *testing.T) {
 		})
 	}
 }
+
+func TestCommandErrorExitAndDiagnosticContract(t *testing.T) {
+	var ordinary *commandErrorWorkload
+	bench.Register(func() bench.Workload {
+		ordinary = &commandErrorWorkload{name: "test/command-ordinary-error"}
+
+		return ordinary
+	})
+	bench.Register(func() bench.Workload {
+		return &commandErrorWorkload{name: "test/command-fatal-error", fatal: true}
+	})
+
+	ordinaryCode, ordinaryOutput := executeTestCommand(t, []string{
+		"run", "test/command-ordinary-error", "-d", "noop", "--iterations", "3", "--vus", "1",
+	})
+	if ordinaryCode != 0 {
+		t.Fatalf("ordinary-error exit code = %d, output = %q, want 0", ordinaryCode, ordinaryOutput)
+	}
+	if ordinary.calls.Load() != 3 {
+		t.Fatalf("ordinary-error iterations = %d, want 3", ordinary.calls.Load())
+	}
+
+	fatalCode, fatalOutput := executeTestCommand(t, []string{
+		"run", "test/command-fatal-error", "-d", "noop", "--iterations", "10", "--vus", "2",
+	})
+	if fatalCode != 1 {
+		t.Fatalf("fatal exit code = %d, output = %q, want 1", fatalCode, fatalOutput)
+	}
+	if got := strings.Count(fatalOutput, "fatal command sentinel"); got != 1 {
+		t.Fatalf("fatal diagnostic occurrences = %d, output = %q, want 1", got, fatalOutput)
+	}
+}
+
+func executeTestCommand(t *testing.T, args []string) (int, string) {
+	t.Helper()
+
+	var output bytes.Buffer
+	clearCommandContexts(rootCmd)
+	rootCmd.SetArgs(args)
+	rootCmd.SetOut(&output)
+	rootCmd.SetErr(&output)
+	t.Cleanup(func() {
+		rootCmd.SetArgs(nil)
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+	})
+
+	return execute(), output.String()
+}
+
+func clearCommandContexts(cmd *cobra.Command) {
+	cmd.SetContext(nil)
+	for _, child := range cmd.Commands() {
+		clearCommandContexts(child)
+	}
+}
+
+type commandErrorWorkload struct {
+	name  string
+	fatal bool
+	calls atomic.Int64
+}
+
+func (w *commandErrorWorkload) Name() string                            { return w.name }
+func (*commandErrorWorkload) Define(*bench.Def) error                   { return nil }
+func (*commandErrorWorkload) Setup(context.Context, *bench.Bench) error { return nil }
+func (w *commandErrorWorkload) Iterate(ctx context.Context, b *bench.Bench) error {
+	w.calls.Add(1)
+	if !w.fatal {
+		return errors.New("ordinary command failure")
+	}
+
+	policy := b.TxRetryPolicy(bench.TxRetryPolicyOptions{
+		MaxAttempts: 1,
+		Actions: bench.ErrorActionMap{ //nolint:exhaustive // test overrides one kind
+			driver.ErrorKindUnknown: bench.ErrorActionFatal,
+		},
+	})
+
+	return bench.Retry0(ctx, policy, func() error { return errors.New("fatal command sentinel") })
+}
+func (*commandErrorWorkload) Teardown(context.Context, *bench.Bench) error { return nil }
