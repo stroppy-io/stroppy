@@ -950,8 +950,9 @@ func nextTypedFlagValue(args []string, i int) (string, error) {
 	}
 
 	next := args[i+1]
-	if strings.HasPrefix(next, "--") || next == "-h" ||
-		(strings.HasPrefix(next, "-") && (len(next) < 2 || next[1] < '0' || next[1] > '9')) {
+	if !strings.HasPrefix(next, "--=") &&
+		(strings.HasPrefix(next, "--") || next == "-h" ||
+			(strings.HasPrefix(next, "-") && (len(next) < 2 || next[1] < '0' || next[1] > '9'))) {
 		return "", fmt.Errorf("%s: %w", flag, errFlagRequiresValue)
 	}
 

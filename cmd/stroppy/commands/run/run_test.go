@@ -76,6 +76,12 @@ func TestParseRunArgs(t *testing.T) {
 			wantTyped:  map[string]string{"vus": "10"},
 		},
 		{
+			name:       "typed SQL body accepts query marker",
+			args:       []string{"execute_sql", "--sql-body", "--= query\nselect 1"},
+			wantScript: "execute_sql",
+			wantTyped:  map[string]string{"sql-body": "--= query\nselect 1"},
+		},
+		{
 			name:       "typed bool equals form",
 			args:       []string{"--enabled=false", "tpcc"},
 			wantScript: "tpcc",
