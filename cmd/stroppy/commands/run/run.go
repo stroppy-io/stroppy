@@ -18,6 +18,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
 const (
@@ -507,8 +508,9 @@ func runGoWorkload(
 		// No -d given: default to the local postgres preset (mirrors TS
 		// declareDriverSetup defaults).
 		drivers[0] = &config.DriverConfig{ //nolint:gosec // G101: URL field name, not an embedded credential
-			DriverType: config.DriverTypePostgres,
-			URL:        "postgres://postgres:postgres@localhost:5432",
+			DriverType:          config.DriverTypePostgres,
+			URL:                 "postgres://postgres:postgres@localhost:5432",
+			DefaultInsertMethod: "native",
 		}
 	}
 
@@ -540,6 +542,8 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 
 	driverType := cfg.DriverType
 	url := cfg.URL
+	defaultInsertMethod := cfg.DefaultInsertMethod
+	hasDefaultInsertMethod := cfg.HasDefaultInsertMethod()
 
 	if overrides != nil {
 		if overrides.DriverType != nil {
@@ -548,6 +552,11 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 
 		if overrides.URL != nil {
 			url = overrides.GetURL()
+		}
+
+		if overrides.DefaultInsertMethod != nil {
+			defaultInsertMethod = overrides.GetDefaultInsertMethod()
+			hasDefaultInsertMethod = true
 		}
 	}
 
@@ -562,7 +571,15 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 		dc.DriverType = t
 	}
 
-	// defaultInsertMethod is owned by each Go workload's InsertRequest.
+	if hasDefaultInsertMethod {
+		method, err := driver.ResolveInsertMethod(dc.DriverType, defaultInsertMethod)
+		if err != nil {
+			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
+		}
+
+		dc.DefaultInsertMethod = method.String()
+	}
+
 	if err := applyDriverExtras(idx, dc, cfg.Extra); err != nil {
 		return nil, invalidConfig(err)
 	}

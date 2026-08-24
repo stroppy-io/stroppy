@@ -1171,6 +1171,82 @@ func TestApplyDriverPresetAliasesReachRuntimeConfig(t *testing.T) {
 	}
 }
 
+func TestApplyDriverOptInsertMethodAliasesRespectPrecedenceAndIndex(t *testing.T) {
+	postgres := "postgres"
+	plainBulk := "plain_bulk"
+
+	for _, key := range []string{
+		"defaultInsertMethod",
+		"default_insert_method",
+		"insertMethod",
+		"insert_method",
+	} {
+		t.Run(key, func(t *testing.T) {
+			configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
+				0: {DriverType: &postgres, DefaultInsertMethod: &plainBulk},
+				1: {DriverType: &postgres, DefaultInsertMethod: &plainBulk},
+			})
+			if err != nil {
+				t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
+			}
+
+			for _, idx := range []int{0, 1} {
+				if err := applyDriverPreset(configs, idx, "pg"); err != nil {
+					t.Fatalf("applyDriverPreset(%d) error = %v", idx, err)
+				}
+			}
+
+			if err := applyDriverOpt(configs, 1, key, "columnar"); err != nil {
+				t.Fatalf("applyDriverOpt(%q) error = %v", key, err)
+			}
+
+			first, err := buildDriverConfig(0, configs[0])
+			if err != nil {
+				t.Fatalf("buildDriverConfig(0) error = %v", err)
+			}
+
+			second, err := buildDriverConfig(1, configs[1])
+			if err != nil {
+				t.Fatalf("buildDriverConfig(1) error = %v", err)
+			}
+
+			if first.DefaultInsertMethod != "native" || second.DefaultInsertMethod != "columnar" {
+				t.Fatalf(
+					"defaults = (%q, %q), want preset then indexed CLI override",
+					first.DefaultInsertMethod,
+					second.DefaultInsertMethod,
+				)
+			}
+		})
+	}
+}
+
+func TestApplyDriverOptInsertMethodAliasConflictIsOrderIndependent(t *testing.T) {
+	for _, alias := range []string{"default_insert_method", "insertMethod", "insert_method"} {
+		t.Run(alias, func(t *testing.T) {
+			first := runner.DriverCLIConfigs{}
+			if err := applyDriverOpt(first, 0, "defaultInsertMethod", "native"); err != nil {
+				t.Fatal(err)
+			}
+
+			firstErr := applyDriverOpt(first, 0, alias, "columnar")
+			if firstErr == nil {
+				t.Fatal("second insert method override succeeded")
+			}
+
+			second := runner.DriverCLIConfigs{}
+			if err := applyDriverOpt(second, 0, alias, "columnar"); err != nil {
+				t.Fatal(err)
+			}
+
+			secondErr := applyDriverOpt(second, 0, "defaultInsertMethod", "native")
+			if secondErr == nil || secondErr.Error() != firstErr.Error() {
+				t.Fatalf("reverse collision error = %v, want %v", secondErr, firstErr)
+			}
+		})
+	}
+}
+
 func TestDriverExtrasRejectAliasCollisionsAndWrongCase(t *testing.T) {
 	tests := []struct {
 		name string
@@ -1397,6 +1473,165 @@ func TestRemovedIsolationRejectedAtDriverCLISurfaces(t *testing.T) {
 				t.Fatalf("RunE() error = %v, want ordinary unknown-field error at %s", err, test.path)
 			}
 		})
+	}
+}
+
+func TestBuildDriverConfigEmptyDefaultInsertMethod(t *testing.T) {
+	postgres := "postgres"
+	empty := ""
+
+	build := func(t *testing.T, cfg *runner.DriverCLIConfig, want string) {
+		t.Helper()
+
+		got, err := buildDriverConfig(0, cfg)
+		if err != nil {
+			t.Fatalf("buildDriverConfig() error = %v", err)
+		}
+
+		if got.DefaultInsertMethod != want {
+			t.Fatalf("DefaultInsertMethod = %q, want %q", got.DefaultInsertMethod, want)
+		}
+	}
+
+	for _, key := range []string{
+		"defaultInsertMethod",
+		"default_insert_method",
+		"insertMethod",
+		"insert_method",
+	} {
+		t.Run("driver option/"+key, func(t *testing.T) {
+			cfg := &runner.DriverCLIConfig{DriverType: postgres}
+			if err := cfg.ApplyOverride(key, empty); err != nil {
+				t.Fatalf("ApplyOverride(%q) error = %v", key, err)
+			}
+
+			build(t, cfg, "plain_query")
+		})
+	}
+
+	t.Run("raw driver JSON", func(t *testing.T) {
+		cfg, err := runner.NewDriverCLIConfigFromJSON(`{"driverType":"postgres","defaultInsertMethod":""}`)
+		if err != nil {
+			t.Fatalf("NewDriverCLIConfigFromJSON() error = %v", err)
+		}
+
+		build(t, &cfg, "plain_query")
+	})
+
+	t.Run("config file", func(t *testing.T) {
+		configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
+			0: {DriverType: &postgres, DefaultInsertMethod: &empty},
+		})
+		if err != nil {
+			t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
+		}
+
+		build(t, configs[0], "plain_query")
+	})
+
+	t.Run("absent", func(t *testing.T) {
+		build(t, &runner.DriverCLIConfig{DriverType: postgres}, "")
+
+		configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
+			0: {DriverType: &postgres},
+		})
+		if err != nil {
+			t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
+		}
+
+		build(t, configs[0], "")
+	})
+}
+
+func TestBuildDriverConfigDefaultInsertMethod(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		cfg     *runner.DriverCLIConfig
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "winning supported default",
+			cfg: &runner.DriverCLIConfig{
+				DriverType: "postgres", DefaultInsertMethod: "columnar",
+			},
+			want: "columnar",
+		},
+		{
+			name: "winning unsupported default",
+			cfg: &runner.DriverCLIConfig{
+				DriverType: "mysql", DefaultInsertMethod: "columnar",
+			},
+			wantErr: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := buildDriverConfig(0, test.cfg)
+			if test.wantErr {
+				if err == nil {
+					t.Fatal("buildDriverConfig() succeeded")
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("buildDriverConfig() error = %v", err)
+			}
+
+			if got.DefaultInsertMethod != test.want {
+				t.Fatalf("DefaultInsertMethod = %q, want %q", got.DefaultInsertMethod, test.want)
+			}
+		})
+	}
+}
+
+func TestDriverDefaultInputPrecedenceAndIndices(t *testing.T) {
+	mysql := "mysql"
+	unsupported := "columnar"
+
+	configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
+		0: {DriverType: &mysql, DefaultInsertMethod: &unsupported},
+	})
+	if err != nil {
+		t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
+	}
+
+	if err := applyDriverPreset(configs, 0, "pg"); err != nil {
+		t.Fatalf("applyDriverPreset() error = %v", err)
+	}
+
+	if err := applyDriverPreset(configs, 1, "mysql"); err != nil {
+		t.Fatalf("applyDriverPreset() error = %v", err)
+	}
+
+	if err := applyDriverOpt(configs, 1, "defaultInsertMethod", "native"); err != nil {
+		t.Fatalf("applyDriverOpt() error = %v", err)
+	}
+
+	first, err := buildDriverConfig(0, configs[0])
+	if err != nil {
+		t.Fatalf("buildDriverConfig(0) error = %v", err)
+	}
+
+	second, err := buildDriverConfig(1, configs[1])
+	if err != nil {
+		t.Fatalf("buildDriverConfig(1) error = %v", err)
+	}
+
+	if first.DefaultInsertMethod != "native" || second.DefaultInsertMethod != "native" {
+		t.Fatalf("defaults = (%q, %q), want native per driver", first.DefaultInsertMethod, second.DefaultInsertMethod)
+	}
+
+	if first.DriverType != config.DriverTypePostgres || second.DriverType != config.DriverTypeMySQL {
+		t.Fatalf("driver types = (%s, %s), want postgres, mysql", first.DriverType, second.DriverType)
+	}
+}
+
+func TestGlobalInsertMethodFlagIsRejected(t *testing.T) {
+	err := Cmd.RunE(Cmd, []string{"simple", "--insert-method", "native"})
+	if err == nil || !contains(err.Error(), `unknown CLI parameter "insert-method"`) {
+		t.Fatalf("RunE() error = %v, want unknown CLI parameter", err)
 	}
 }
 

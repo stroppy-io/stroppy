@@ -95,6 +95,7 @@ DRIVER OPTIONS (-D / --driver-opt)
     authUser               string    Username for static credentials auth
     authPassword           string    Password for static credentials auth
     tlsInsecureSkipVerify  bool      Skip TLS cert verification (testing only)
+    defaultInsertMethod    string    Fallback for load requests without a method
 
   TLS is enabled automatically when the URL uses a secure scheme (e.g.
   grpcs:// for YDB). The options above are only needed when the server uses
@@ -103,9 +104,8 @@ DRIVER OPTIONS (-D / --driver-opt)
   pool.* options are sugar — they map to the driver-specific pool config
   (pgx pool or sql pool) based on driverType. They are ignored for noop/csv.
 
-  "defaultInsertMethod" remains accepted in config files for compatibility,
-  but does not control workload execution. Insert methods are owned by each
-  workload's load request.
+  defaultInsertMethod is used only when a workload leaves its load request's
+  method unset. A workload-selected method always takes precedence.
 
 HOW IT WORKS
 

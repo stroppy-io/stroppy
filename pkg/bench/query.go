@@ -144,7 +144,22 @@ func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Q
 		return nil, fmt.Errorf("insert: %w", err)
 	}
 
-	tracker := b.newBatchInsertTracker(req)
+	effectiveReq := *req
+	if effectiveReq.Method == 0 && b.cfg.GetDefaultInsertMethod() != "" {
+		method, err := driver.ResolveInsertMethod(b.cfg.DriverType, b.cfg.GetDefaultInsertMethod())
+		if err != nil {
+			return nil, fmt.Errorf("insert: %w", err)
+		}
+
+		effectiveReq.Method = method
+	}
+
+	if !driver.SupportsInsertMethod(b.cfg.DriverType, effectiveReq.Method) {
+		return nil, fmt.Errorf("insert: %w %q (%s driver)",
+			driver.ErrInsertMethodUnsupported, effectiveReq.Method.String(), b.cfg.DriverType)
+	}
+
+	tracker := b.newBatchInsertTracker(&effectiveReq)
 
 	runCtx := ctx
 	if tracker.Enabled() {
@@ -152,7 +167,7 @@ func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Q
 		tracker.Start(runCtx)
 	}
 
-	result, err := b.drv.Insert(runCtx, req)
+	result, err := b.drv.Insert(runCtx, &effectiveReq)
 	if tracker.Enabled() {
 		tracker.Finish(err)
 	}
@@ -162,13 +177,13 @@ func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Q
 		elapsed = result.Elapsed
 	}
 
-	b.root.txMetrics.recordInsertResult(b.vu, req.Table, elapsed, err)
+	b.root.txMetrics.recordInsertResult(b.vu, effectiveReq.Table, elapsed, err)
 
 	if err != nil {
-		return nil, fmt.Errorf("insert %q: %w", req.Table, err)
+		return nil, fmt.Errorf("insert %q: %w", effectiveReq.Table, err)
 	}
 
-	b.root.txMetrics.recordInsert(b.vu, req.Table, result.Rows)
+	b.root.txMetrics.recordInsert(b.vu, effectiveReq.Table, result.Rows)
 
 	return result, nil
 }

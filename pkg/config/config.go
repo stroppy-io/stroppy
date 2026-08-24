@@ -475,8 +475,11 @@ func (c *PoolConfig) GetConnMaxIdleTime() string {
 // DriverConfig is the runtime driver configuration consumed by the drivers and
 // bench engine. It is assembled internally, never JSON-decoded directly.
 type DriverConfig struct {
-	URL                   string                `json:"url,omitempty"`
-	DriverType            DriverType            `json:"driverType,omitempty"`
+	URL        string     `json:"url,omitempty"`
+	DriverType DriverType `json:"driverType,omitempty"`
+	// DefaultInsertMethod is the driver fallback when a workload leaves
+	// InsertRequest.Method unset.
+	DefaultInsertMethod   string                `json:"defaultInsertMethod,omitempty"`
 	BulkSize              *int32                `json:"bulkSize,omitempty"`
 	ErrorMode             ErrorMode             `json:"errorMode,omitempty"`
 	Postgres              *PostgresConfig       `json:"postgres,omitempty"`
@@ -487,6 +490,14 @@ type DriverConfig struct {
 	AuthPassword          *string               `json:"authPassword,omitempty"`
 	TLSInsecureSkipVerify *bool                 `json:"tlsInsecureSkipVerify,omitempty"`
 	InsertProgress        *InsertProgressConfig `json:"insertProgress,omitempty"`
+}
+
+func (c *DriverConfig) GetDefaultInsertMethod() string {
+	if c != nil {
+		return c.DefaultInsertMethod
+	}
+
+	return ""
 }
 
 func (c *DriverConfig) GetBulkSize() int32 {

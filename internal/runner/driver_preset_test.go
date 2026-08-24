@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
+	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
 func TestNewDriverCLIConfigFromJSONStrictCompatibility(t *testing.T) {
@@ -104,6 +106,41 @@ func TestDriverCLIConfigDecodeOverridesPreservesLexemes(t *testing.T) {
 	}
 }
 
+func TestDriverCLIConfigCanonicalizesInsertMethodOverrides(t *testing.T) {
+	for _, key := range []string{
+		"defaultInsertMethod",
+		"default_insert_method",
+		"insertMethod",
+		"insert_method",
+	} {
+		t.Run(key, func(t *testing.T) {
+			cfg := &runner.DriverCLIConfig{}
+			require.NoError(t, cfg.ApplyOverride(key, "columnar"))
+			require.Equal(t, []runner.DriverOverride{{Key: "defaultInsertMethod", Value: "columnar"}}, cfg.Overrides)
+
+			overrides, err := cfg.DecodeOverrides()
+			require.NoError(t, err)
+			require.Equal(t, "columnar", overrides.GetDefaultInsertMethod())
+		})
+	}
+}
+
+func TestDriverCLIConfigInsertMethodAliasConflictIsOrderIndependent(t *testing.T) {
+	for _, alias := range []string{"default_insert_method", "insertMethod", "insert_method"} {
+		t.Run(alias, func(t *testing.T) {
+			first := &runner.DriverCLIConfig{}
+			require.NoError(t, first.ApplyOverride("defaultInsertMethod", "native"))
+			firstErr := first.ApplyOverride(alias, "columnar")
+			require.Error(t, firstErr)
+
+			second := &runner.DriverCLIConfig{}
+			require.NoError(t, second.ApplyOverride(alias, "columnar"))
+			secondErr := second.ApplyOverride("defaultInsertMethod", "native")
+			require.EqualError(t, secondErr, firstErr.Error())
+		})
+	}
+}
+
 func TestDriverCLIConfigDecodeOverridesRejectsRemovedIsolation(t *testing.T) {
 	for _, key := range []string{"defaultTxIsolation", "default_tx_isolation"} {
 		t.Run(key, func(t *testing.T) {
@@ -131,4 +168,49 @@ func TestNewDriverCLIConfigAliasCollisionOrderIsDeterministic(t *testing.T) {
 
 	require.Error(t, first)
 	require.EqualError(t, second, first.Error())
+}
+
+func TestDefaultInsertMethodInputValidation(t *testing.T) {
+	preset, err := runner.LookupDriverPreset("pg")
+	require.NoError(t, err)
+	require.Equal(t, "native", runner.NewDriverCLIConfigFromPreset(preset).DefaultInsertMethod)
+
+	for _, doc := range []string{
+		`{"driverType":"mysql","defaultInsertMethod":"columnar"}`,
+		`{"driverType":"postgres","insertMethod":"native"}`,
+	} {
+		cfg, err := runner.NewDriverCLIConfigFromJSON(doc)
+		require.NoError(t, err)
+		require.NotEmpty(t, cfg.DefaultInsertMethod)
+	}
+
+	for _, doc := range []string{
+		`{"defaultInsertMethod":true}`,
+		`{"defaultInsertMethod":null}`,
+		`{"insertMethod":1}`,
+		`{"defaultInsertMethod":"bogus"}`,
+	} {
+		_, err := runner.NewDriverCLIConfigFromJSON(doc)
+		require.Error(t, err)
+	}
+
+	_, firstErr := runner.NewDriverCLIConfigFromJSON(`{"insertMethod":"native","defaultInsertMethod":"plain_bulk"}`)
+	require.Error(t, firstErr)
+
+	_, secondErr := runner.NewDriverCLIConfigFromJSON(`{"defaultInsertMethod":"plain_bulk","insertMethod":"native"}`)
+	require.EqualError(t, secondErr, firstErr.Error())
+
+	invalid := "bogus"
+	_, err = runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
+		0: {DefaultInsertMethod: &invalid},
+	})
+	require.ErrorIs(t, err, driver.ErrUnknownInsertMethod)
+
+	cli := &runner.DriverCLIConfig{}
+	require.NoError(t, cli.ApplyOverride("insertMethod", "native"))
+	require.ErrorIs(t, cli.ApplyOverride("defaultInsertMethod", "bogus"), driver.ErrUnknownInsertMethod)
+
+	cli = &runner.DriverCLIConfig{}
+	require.NoError(t, cli.ApplyOverride("defaultInsertMethod", "native"))
+	require.Error(t, cli.ApplyOverride("insertMethod", "plain_bulk"))
 }
