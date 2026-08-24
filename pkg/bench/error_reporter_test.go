@@ -87,7 +87,7 @@ func TestErrorReporterSuppressesDuplicatesAndRecordsMetrics(t *testing.T) {
 
 func TestErrorReporterBoundsGroupsAndPeriodicNotices(t *testing.T) {
 	core, logs := observer.New(zapcore.WarnLevel)
-	reporter := newErrorReporter(zap.New(core), 5*time.Millisecond)
+	reporter := newErrorReporter(zap.New(core), time.Hour)
 	t.Cleanup(reporter.stopAndWait)
 
 	for i := range maxErrorGroups + 10 {
@@ -109,10 +109,10 @@ func TestErrorReporterBoundsGroupsAndPeriodicNotices(t *testing.T) {
 		require.LessOrEqual(t, len(group.operation), maxErrorOperationBytes)
 	}
 
-	require.Eventually(t, func() bool {
-		return logs.FilterMessage("nonfatal errors continue").Len() == 1
-	}, time.Second, time.Millisecond)
-	time.Sleep(15 * time.Millisecond)
+	reporter.reportPeriodic()
+	require.Len(t, logs.FilterMessage("nonfatal errors continue").All(), 1)
+
+	reporter.reportPeriodic()
 	require.Len(t, logs.FilterMessage("nonfatal errors continue").All(), 1)
 }
 

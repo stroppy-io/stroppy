@@ -165,8 +165,9 @@ run-scenario-smoke: # Tier 0: scenario-branch smoke on noop (no DB), all workloa
 	exit $$rc
 
 # Real-Postgres smoke of BOTH scenario branches for the light workloads at tiny
-# scale (default pg preset = localhost:5432). Complements run-scenario-smoke by
-# exercising the actual DB path (load + run) in throughput and power modes.
+# scale (default pg preset = localhost:5432). Constant-vus uses one VU so this
+# scenario-shape gate does not become a contention/retry test; shared-iterations
+# keeps VUS=2/ITER=1 to guard the iterations-below-VUs floor.
 # tpch's validate_answers golden set is SF=1 only, so it is skipped at smoke
 # scale; validate_population stays on for tpcc since it passes at SF=1.
 # tpcds is intentionally NOT here: its fixed-cardinality dimensions do not
@@ -178,7 +179,7 @@ run-workload-branches: # Tier 1: real-Postgres smoke of both branches (tpcb/tpcc
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 -" "tpch/tx 0.01 validate_answers"; do \
 		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns=""; [ "$$skip" = "-" ] || ns="--no-steps $$skip"; \
-		$(call smoke_run,pg constant-vus: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=2 $$ns); \
+		$(call smoke_run,pg constant-vus: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=1 $$ns); \
 		$(call smoke_run,pg shared-iters: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns); \
 	done;                                                                           \
 	exit $$rc
