@@ -286,7 +286,15 @@ func redactMySQL(dsn string) (redacted string, ok bool) {
 }
 
 func hasMySQLStructure(dsn string) bool {
-	return strings.Contains(dsn, "/") && hasMySQLUsernameEnvelope(dsn)
+	if !strings.Contains(dsn, "/") {
+		return false
+	}
+
+	return hasMySQLUsernameEnvelope(dsn) || hasCredentialFreeMySQLEnvelope(dsn)
+}
+
+func hasCredentialFreeMySQLEnvelope(dsn string) bool {
+	return !strings.Contains(dsn, "@") && looksLikeMySQLEndpointSuffix(dsn, 0)
 }
 
 func hasMySQLUsernameEnvelope(dsn string) bool {

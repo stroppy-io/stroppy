@@ -203,6 +203,21 @@ func TestRedactDSNMySQL(t *testing.T) {
 			dsn:          "user@tcp(db:3306)/bench?charset=utf8",
 			passwordless: true,
 		},
+		{
+			name:         "credential free address",
+			dsn:          "tcp(db:3306)/bench?charset=utf8",
+			passwordless: true,
+		},
+		{
+			name:         "credential free custom network",
+			dsn:          "custom-net(db:3306)/bench?charset=utf8",
+			passwordless: true,
+		},
+		{
+			name:         "credential free addressless network",
+			dsn:          "tcp/bench?charset=utf8",
+			passwordless: true,
+		},
 	}
 
 	for _, test := range tests {
