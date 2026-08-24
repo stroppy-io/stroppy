@@ -32,6 +32,14 @@ func TestLoggerDefaultsInConfigFileHelp(t *testing.T) {
 			t.Error("config-file help incorrectly states that info is the logger default")
 		}
 
+		if strings.Contains(topic.Long, "Logger and OTEL exporter config (no CLI equivalent)") {
+			t.Error("config-file help incorrectly says logger configuration has no CLI equivalent")
+		}
+
+		if !strings.Contains(topic.Long, "--log-level/--log-mode override logger fields") {
+			t.Error("config-file help does not describe logger CLI overrides")
+		}
+
 		return
 	}
 

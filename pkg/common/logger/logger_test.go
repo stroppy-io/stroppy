@@ -305,3 +305,119 @@ func TestRedactDSNMySQLMalformedUserinfo(t *testing.T) {
 	require.NotContains(t, got, "marker-secret")
 	require.Contains(t, got, "tcp(db:3306")
 }
+
+func TestRedactDSNLayeredGrammarPasses(t *testing.T) {
+	tests := []struct {
+		name      string
+		dsn       string
+		want      string
+		secrets   []string
+		preserved []string
+	}{
+		{
+			name:    "malformed scheme authority with IPv6",
+			dsn:     "postgres_://user:marker-secret@[2001:db8::1]:5432/db?sslmode=require",
+			want:    "postgres_://user:xxxxx@[2001:db8::1]:5432/db?sslmode=require",
+			secrets: []string{"marker-secret"},
+			preserved: []string{
+				"[2001:db8::1]:5432/db", "sslmode=require",
+			},
+		},
+		{
+			name:    "MySQL username with equals",
+			dsn:     "bench=prod:marker-secret@tcp(db:3306)/bench?charset=utf8",
+			want:    "bench=prod:xxxxx@tcp(db:3306)/bench?charset=utf8",
+			secrets: []string{"marker-secret"},
+			preserved: []string{
+				"bench=prod", "tcp(db:3306)/bench", "charset=utf8",
+			},
+		},
+		{
+			name:    "custom MySQL protocol",
+			dsn:     "user:custom-secret@custom-net(db:3306)/bench?parseTime=true",
+			want:    "user:xxxxx@custom-net(db:3306)/bench?parseTime=true",
+			secrets: []string{"custom-secret"},
+			preserved: []string{
+				"custom-net(db:3306)/bench", "parseTime=true",
+			},
+		},
+		{
+			name:    "tcp4 MySQL protocol",
+			dsn:     "user:tcp4-secret@tcp4(db:3306)/bench",
+			want:    "user:xxxxx@tcp4(db:3306)/bench",
+			secrets: []string{"tcp4-secret"},
+			preserved: []string{
+				"tcp4(db:3306)/bench",
+			},
+		},
+		{
+			name:    "tcp6 MySQL protocol",
+			dsn:     "user:tcp6-secret@tcp6([::1]:3306)/bench",
+			want:    "user:xxxxx@tcp6([::1]:3306)/bench",
+			secrets: []string{"tcp6-secret"},
+			preserved: []string{
+				"tcp6([::1]:3306)/bench",
+			},
+		},
+		{
+			name:    "custom malformed MySQL protocol",
+			dsn:     "user:custom-malformed-secret@custom-net(db:3306)",
+			want:    "user:xxxxx@custom-net(db:3306)",
+			secrets: []string{"custom-malformed-secret"},
+			preserved: []string{
+				"custom-net(db:3306)",
+			},
+		},
+		{
+			name:    "malformed MySQL protocol with equals username",
+			dsn:     "bench=prod:malformed-secret@tcp[db:3306]/bench",
+			want:    "bench=prod:xxxxx@tcp[db:3306]/bench",
+			secrets: []string{"malformed-secret"},
+			preserved: []string{
+				"bench=prod", "tcp[db:3306]/bench",
+			},
+		},
+		{
+			name:    "malformed MySQL protocol",
+			dsn:     "user:malformed-secret@tcp[db:3306]/bench",
+			want:    "user:xxxxx@tcp[db:3306]/bench",
+			secrets: []string{"malformed-secret"},
+			preserved: []string{
+				"tcp[db:3306]/bench",
+			},
+		},
+		{
+			name:    "leading malformed conninfo token",
+			dsn:     "junk host=db password=marker-secret sslmode=require",
+			want:    "junk host=db password=xxxxx sslmode=require",
+			secrets: []string{"marker-secret"},
+			preserved: []string{
+				"junk", "host=db", "sslmode=require",
+			},
+		},
+		{
+			name:    "interspersed malformed conninfo token",
+			dsn:     "host=db junk password=marker-secret sslmode=require",
+			want:    "host=db junk password=xxxxx sslmode=require",
+			secrets: []string{"marker-secret"},
+			preserved: []string{
+				"host=db", "junk", "sslmode=require",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := RedactDSN(test.dsn)
+			require.Equal(t, test.want, got)
+
+			for _, secret := range test.secrets {
+				require.NotContains(t, got, secret)
+			}
+
+			for _, value := range test.preserved {
+				require.Contains(t, got, value)
+			}
+		})
+	}
+}

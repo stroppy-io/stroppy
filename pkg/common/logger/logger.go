@@ -148,39 +148,21 @@ func RedactDSN(dsn string) string {
 		return dsn
 	}
 
-	switch {
-	case hasURIScheme(dsn):
-		return redactURI(dsn)
-	case isConninfoDSN(dsn):
-		return redactConninfo(dsn)
-	default:
-		return redactMySQLDSN(dsn)
-	}
+	redacted := redactAuthorityUserinfo(dsn)
+	redacted = redactMySQLUserinfo(redacted)
+	redacted = redactConninfo(redacted)
+
+	return redactQueryValues(redacted)
 }
 
-func hasURIScheme(dsn string) bool {
+func redactAuthorityUserinfo(dsn string) string {
 	schemeEnd := strings.Index(dsn, "://")
-	if schemeEnd <= 0 || !unicode.IsLetter(rune(dsn[0])) {
-		return false
+	if schemeEnd < 0 {
+		return dsn
 	}
 
-	for _, r := range dsn[1:schemeEnd] {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '+' && r != '-' && r != '.' {
-			return false
-		}
-	}
-
-	return true
-}
-
-func redactURI(dsn string) string {
-	return redactURIUserinfo(redactQueryValues(dsn))
-}
-
-func redactURIUserinfo(dsn string) string {
-	schemeEnd := strings.Index(dsn, "://")
 	start := schemeEnd + len("://")
-	end := uriAuthorityEnd(dsn, start)
+	end := authorityEnd(dsn, start)
 
 	at := strings.LastIndexByte(dsn[start:end], '@')
 	if at < 0 {
@@ -197,7 +179,7 @@ func redactURIUserinfo(dsn string) string {
 	return dsn[:start+colon+1] + redactedSecret + dsn[at:]
 }
 
-func uriAuthorityEnd(dsn string, start int) int {
+func authorityEnd(dsn string, start int) int {
 	if delimiter := strings.IndexAny(dsn[start:], "/?#"); delimiter >= 0 {
 		return start + delimiter
 	}
@@ -209,12 +191,16 @@ func isConninfoDSN(dsn string) bool {
 	return nextConninfoAssignment(dsn, 0).key != ""
 }
 
-func redactMySQLDSN(dsn string) string {
-	return redactQueryValues(redactMySQLUserinfo(dsn))
-}
-
 func redactMySQLUserinfo(dsn string) string {
+	if strings.Contains(dsn, "://") {
+		return dsn
+	}
+
 	at := mysqlUserinfoEnd(dsn)
+	if at < 0 {
+		at = malformedMySQLUserinfoEnd(dsn)
+	}
+
 	if at < 0 {
 		return dsn
 	}
@@ -231,7 +217,7 @@ func mysqlUserinfoEnd(dsn string) int {
 	userinfoEnd := -1
 
 	for index := range dsn {
-		if dsn[index] == '@' && isMySQLProtocolDelimiter(dsn, index+1) {
+		if dsn[index] == '@' && hasMySQLEndpoint(dsn, index+1) {
 			userinfoEnd = index
 		}
 	}
@@ -239,27 +225,83 @@ func mysqlUserinfoEnd(dsn string) int {
 	return userinfoEnd
 }
 
-func isMySQLProtocolDelimiter(dsn string, start int) bool {
-	if start == len(dsn) || dsn[start] == '/' {
-		return start < len(dsn)
-	}
-
-	end := start
-	for end < len(dsn) && (unicode.IsLetter(rune(dsn[end])) || unicode.IsDigit(rune(dsn[end]))) {
-		end++
-	}
-
-	if end == start {
+func hasMySQLEndpoint(dsn string, start int) bool {
+	if start == len(dsn) {
 		return false
 	}
 
-	if end < len(dsn) && dsn[end] == '(' {
+	if dsn[start] == '/' {
 		return true
 	}
 
-	protocol := dsn[start:end]
+	protocolEnd := mysqlProtocolEnd(dsn, start)
+	if protocolEnd < 0 || protocolEnd+1 >= len(dsn) {
+		return false
+	}
 
-	return (protocol == "tcp" || protocol == "unix") && (end == len(dsn) || dsn[end] == '/')
+	addressEnd := strings.IndexByte(dsn[protocolEnd+1:], ')')
+	if addressEnd < 0 {
+		return false
+	}
+
+	addressEnd += protocolEnd + 1
+
+	return addressEnd+1 < len(dsn) && dsn[addressEnd+1] == '/'
+}
+
+func mysqlProtocolEnd(dsn string, start int) int {
+	for index := start; index < len(dsn); index++ {
+		switch dsn[index] {
+		case '(':
+			if index > start {
+				return index
+			}
+		case '/', '?', '#', '@':
+			return -1
+		default:
+			if unicode.IsSpace(rune(dsn[index])) {
+				return -1
+			}
+		}
+	}
+
+	return -1
+}
+
+func malformedMySQLUserinfoEnd(dsn string) int {
+	colon := strings.IndexByte(dsn, ':')
+	if colon < 0 {
+		return -1
+	}
+
+	at := strings.LastIndexByte(dsn[colon+1:], '@')
+	if at < 0 {
+		return -1
+	}
+
+	at += colon + 1
+	if isConninfoDSN(dsn) && !looksLikeMySQLEndpoint(dsn, at+1) {
+		return -1
+	}
+
+	return at
+}
+
+func looksLikeMySQLEndpoint(dsn string, start int) bool {
+	for index := start; index < len(dsn); index++ {
+		switch dsn[index] {
+		case '(', '[', '/':
+			return true
+		case '?', '#', '@':
+			return false
+		default:
+			if unicode.IsSpace(rune(dsn[index])) {
+				return false
+			}
+		}
+	}
+
+	return false
 }
 
 func redactQueryValues(dsn string) string {
@@ -330,7 +372,7 @@ func nextConninfoAssignment(dsn string, index int) conninfoAssignment {
 	index = skipConninfoSpaces(dsn, keyEnd)
 
 	if keyEnd == keyStart || index == len(dsn) || dsn[index] != '=' || !isConninfoKey(dsn[keyStart:keyEnd]) {
-		return conninfoAssignment{next: skipConninfoToken(dsn, index)}
+		return conninfoAssignment{next: skipConninfoToken(dsn, keyStart)}
 	}
 
 	valueStart := skipConninfoSpaces(dsn, index+1)

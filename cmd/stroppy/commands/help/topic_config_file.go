@@ -62,7 +62,8 @@ Example stroppy-config.json:
 
     script   string            Workload name, .sql path, or inline SQL
     sql      string            Explicit SQL file override (2nd positional)
-    global   object            Logger and OTEL exporter config (no CLI equivalent)
+    global   object            Logger and OTEL exporter config; --log-level/--log-mode override logger fields,
+                              while exporter has no CLI equivalent
     drivers  map[string]obj    Per-index driver configs (keys "0", "1", ...)
     run      object            Typed scenario params: executor, vus, iterations, duration,
                               queryTimeout
