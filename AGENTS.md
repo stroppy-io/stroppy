@@ -62,14 +62,14 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 
 ## Drivers
 
-| Preset | Type enum | Notes |
-|--------|-----------|-------|
-| `pg` | DRIVER_TYPE_POSTGRES | pgxpool-based; supports plain_query, plain_bulk, native (COPY) |
-| `mysql` | DRIVER_TYPE_MYSQL | sql.DB-backed via sqldriver |
-| `pico` | DRIVER_TYPE_PICODATA | sql.DB-backed; `Begin()` always errors — use isolation `"none"` |
-| `ydb` | DRIVER_TYPE_YDB | sql.DB-backed; native maps to BulkUpsert |
-| `noop` | DRIVER_TYPE_NOOP = 5 | discards all I/O; benchmarks stroppy/framework overhead |
-| *(no preset)* | DRIVER_TYPE_CSV = 6 | URL-configured CSV output driver; native-only, no query path |
+| Preset | Driver type | Notes |
+|--------|-------------|-------|
+| `pg` | `postgres` | pgxpool-based; supports plain_query, plain_bulk, native (COPY) |
+| `mysql` | `mysql` | sql.DB-backed via sqldriver |
+| `pico` | `picodata` | sql.DB-backed; `Begin()` always errors — use isolation `"none"` |
+| `ydb` | `ydb` | sql.DB-backed; native maps to BulkUpsert |
+| `noop` | `noop` | discards all I/O; benchmarks stroppy/framework overhead |
+| *(no preset)* | `csv` | URL-configured CSV output driver; native-only, no query path |
 
 CSV example:
 ```bash
@@ -102,7 +102,7 @@ conditional transient retries.
 **Driver flags:**
 - `-d <preset>` — driver preset: `pg`, `mysql`, `pico`, `ydb`, `noop`
 - `-d '{"url":"...","bulkSize":20}'` — raw JSON driver config
-- `-D key=value` — override driver field (url, driverType, defaultTxIsolation, errorMode, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
+- `-D key=value` — override driver field (url, driverType, errorMode, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
 - `-d1 <preset>`, `-D1 key=value` — same for second driver index (multi-driver workloads)
 
 **Workload and run parameters:**

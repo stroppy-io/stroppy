@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
@@ -24,37 +24,12 @@ const (
 	insertPlainBulk = "plain_bulk"
 )
 
-// pathFields lists Extra keys that contain file paths and must be
-// resolved to absolute paths before the working directory changes.
-var pathFields = map[string]bool{
-	"caCertFile":   true,
-	"ca_cert_file": true,
-}
-
 var (
 	errUnknownDriver          = errors.New("unknown driver")
 	errInvalidDriverOverride  = errors.New("invalid driver override")
 	errDriverOverrideConflict = errors.New("driver override conflicts with existing non-object value")
 	errNilDriverConfig        = errors.New("nil driver config")
 )
-
-// inferType converts a CLI string value to its most specific Go type so JSON
-// serialization preserves numeric and boolean -D values for strict validation.
-func inferType(value string) any {
-	if i, err := strconv.ParseInt(value, 10, 64); err == nil {
-		return i
-	}
-
-	if f, err := strconv.ParseFloat(value, 64); err == nil {
-		return f
-	}
-
-	if b, err := strconv.ParseBool(value); err == nil {
-		return b
-	}
-
-	return value
-}
 
 // DriverPreset contains default configuration for a known database driver.
 // These are used when the user specifies --driver / -d on the CLI.
@@ -135,8 +110,11 @@ type DriverCLIConfig struct {
 	URL                 string `json:"url,omitempty"`
 	DefaultInsertMethod string `json:"defaultInsertMethod,omitempty"`
 
-	// Extra fields from -D key=value overrides that don't map to known fields.
+	// Extra fields from config-file drivers that don't map to known fields.
 	Extra map[string]any `json:"-"`
+
+	// Overrides retains -D occurrences for strict, order-preserving decoding.
+	Overrides []DriverOverride `json:"-"`
 }
 
 // MarshalJSON produces a flat JSON object merging known fields and extras.
@@ -160,11 +138,21 @@ func (d DriverCLIConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(merged)
 }
 
-// ApplyOverride sets a field by key=value. Known fields are set on the struct;
-// remaining fields are retained for strict nested validation during conversion.
+// DriverOverride is one -D key=value occurrence.
+type DriverOverride struct {
+	Key   string
+	Value string
+}
+
+// ApplyOverride retains a driver override for strict decoding at runtime.
 func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
 	if key == "" {
 		return fmt.Errorf("%w: empty key", errInvalidDriverOverride)
+	}
+
+	path := strings.Split(key, ".")
+	if err := validateOverridePath(path); err != nil {
+		return err
 	}
 
 	switch key {
@@ -175,17 +163,31 @@ func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
 	case "defaultInsertMethod", "default_insert_method":
 		d.DefaultInsertMethod = value
 	default:
-		return d.setExtraPath(strings.Split(key, "."), convertOverrideValue(key, value))
+		if err := d.setExtraPath(path, driverOverrideValue(value)); err != nil {
+			return err
+		}
+	}
+
+	d.Overrides = append(d.Overrides, DriverOverride{Key: key, Value: value})
+
+	return nil
+}
+
+func validateOverridePath(path []string) error {
+	for _, part := range path {
+		if part == "" {
+			return fmt.Errorf("%w: empty dotted path segment", errInvalidDriverOverride)
+		}
+	}
+
+	if len(path) > 1 && isDriverCLIField(path[0]) {
+		return fmt.Errorf("%w: nested driver field %q", errInvalidDriverOverride, path[0])
 	}
 
 	return nil
 }
 
 func (d *DriverCLIConfig) setExtraPath(path []string, value any) error {
-	if err := validateOverridePath(path); err != nil {
-		return err
-	}
-
 	if d.Extra == nil {
 		d.Extra = make(map[string]any)
 	}
@@ -221,18 +223,18 @@ func (d *DriverCLIConfig) setExtraPath(path []string, value any) error {
 	return nil
 }
 
-func validateOverridePath(path []string) error {
-	for _, part := range path {
-		if part == "" {
-			return fmt.Errorf("%w: empty dotted path segment", errInvalidDriverOverride)
-		}
+func driverOverrideValue(value string) any {
+	if value == "true" {
+		return true
+	}
+	if value == "false" {
+		return false
+	}
+	if looksNumeric(value) {
+		return json.Number(value)
 	}
 
-	if len(path) > 1 && isDriverCLIField(path[0]) {
-		return fmt.Errorf("%w: %q", errDriverOverrideConflict, path[0])
-	}
-
-	return nil
+	return value
 }
 
 func isDriverCLIField(key string) bool {
@@ -244,14 +246,149 @@ func isDriverCLIField(key string) bool {
 	}
 }
 
-func convertOverrideValue(key, value string) any {
-	if pathFields[key] {
-		if abs, err := filepath.Abs(value); err == nil {
-			return abs
+// DecodeOverrides validates retained -D input with the shared config decoder.
+func (d DriverCLIConfig) DecodeOverrides() (*config.DriverRunConfig, error) {
+	if len(d.Overrides) == 0 {
+		return nil, nil
+	}
+
+	data, err := marshalDriverOverrides(d.Overrides)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := &config.DriverRunConfig{}
+	if err := config.Unmarshal(data, cfg); err != nil {
+		return nil, fmt.Errorf("invalid driver override: %w", err)
+	}
+
+	resolveDriverConfigPaths(cfg)
+
+	return cfg, nil
+}
+
+type driverOverrideNode struct {
+	fields []driverOverrideField
+}
+
+type driverOverrideField struct {
+	name  string
+	value *string
+	node  *driverOverrideNode
+}
+
+func marshalDriverOverrides(overrides []DriverOverride) ([]byte, error) {
+	root := &driverOverrideNode{}
+	for _, override := range overrides {
+		root.add(strings.Split(override.Key, "."), override.Value)
+	}
+
+	var out bytes.Buffer
+	if err := root.writeJSON(&out); err != nil {
+		return nil, err
+	}
+
+	return out.Bytes(), nil
+}
+
+func (node *driverOverrideNode) add(path []string, value string) {
+	for index, part := range path {
+		if index == len(path)-1 {
+			node.fields = append(node.fields, driverOverrideField{name: part, value: &value})
+
+			return
+		}
+
+		child := node.object(part)
+		if child == nil {
+			child = &driverOverrideNode{}
+			node.fields = append(node.fields, driverOverrideField{name: part, node: child})
+		}
+
+		node = child
+	}
+}
+
+func (node *driverOverrideNode) object(name string) *driverOverrideNode {
+	for index := range node.fields {
+		field := &node.fields[index]
+		if field.name == name && field.node != nil {
+			return field.node
 		}
 	}
 
-	return inferType(value)
+	return nil
+}
+
+func (node *driverOverrideNode) writeJSON(out *bytes.Buffer) error {
+	out.WriteByte('{')
+	for index, field := range node.fields {
+		if index > 0 {
+			out.WriteByte(',')
+		}
+
+		name, err := json.Marshal(field.name)
+		if err != nil {
+			return err
+		}
+		out.Write(name)
+		out.WriteByte(':')
+
+		if field.node != nil {
+			if err := field.node.writeJSON(out); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		writeDriverOverrideValue(out, *field.value)
+	}
+	out.WriteByte('}')
+
+	return nil
+}
+
+func writeDriverOverrideValue(out *bytes.Buffer, value string) {
+	if value == "true" || value == "false" || looksNumeric(value) {
+		out.WriteString(value)
+
+		return
+	}
+
+	encoded, _ := json.Marshal(value)
+	out.Write(encoded)
+}
+
+func looksNumeric(value string) bool {
+	index := 0
+	if len(value) > 0 && (value[0] == '-' || value[0] == '+') {
+		index++
+	}
+
+	if index == len(value) || (value[index] < '0' || value[index] > '9') &&
+		(value[index] != '.' || index+1 == len(value) || value[index+1] < '0' || value[index+1] > '9') {
+		return false
+	}
+
+	for ; index < len(value); index++ {
+		char := value[index]
+		if char >= '0' && char <= '9' || char == '.' || char == 'e' || char == 'E' || char == '+' || char == '-' {
+			continue
+		}
+
+		return false
+	}
+
+	return true
+}
+
+func resolveDriverConfigPaths(fileConfig *config.DriverRunConfig) {
+	if fileConfig.CaCertFile != nil {
+		if absolute, err := filepath.Abs(*fileConfig.CaCertFile); err == nil {
+			fileConfig.CaCertFile = &absolute
+		}
+	}
 }
 
 // NewDriverCLIConfigFromPreset creates a DriverCLIConfig from a preset.
@@ -290,11 +427,7 @@ func driverCLIConfigFromFile(fileConfig *config.DriverRunConfig) (DriverCLIConfi
 	extraConfig.URL = nil
 	extraConfig.DefaultInsertMethod = nil
 
-	if extraConfig.CaCertFile != nil {
-		if absolute, err := filepath.Abs(*extraConfig.CaCertFile); err == nil {
-			extraConfig.CaCertFile = &absolute
-		}
-	}
+	resolveDriverConfigPaths(&extraConfig)
 
 	data, err := json.Marshal(&extraConfig) //nolint:gosec // serializing validated config fields
 	if err != nil {

@@ -1323,6 +1323,34 @@ func TestDriverExtrasRejectAliasCollisionsAndWrongCase(t *testing.T) {
 	}
 }
 
+func TestApplyDriverOptStrictNumericLexemes(t *testing.T) {
+	configs := runner.DriverCLIConfigs{}
+	if err := applyDriverOpt(configs, 0, "driverType", "postgres"); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyDriverOpt(configs, 0, "bulkSize", "1e1"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := buildDriverConfig(0, configs[0], nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetBulkSize() != 10 {
+		t.Fatalf("bulkSize = %d, want 10", got.GetBulkSize())
+	}
+
+	for _, value := range []string{"1.0000000000000001", "1.", "01"} {
+		configs := runner.DriverCLIConfigs{}
+		if err := applyDriverOpt(configs, 0, "bulkSize", value); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := buildDriverConfig(0, configs[0], nil); err == nil {
+			t.Errorf("bulkSize %q unexpectedly succeeded", value)
+		}
+	}
+}
+
 func TestApplyDriverOptDottedPool(t *testing.T) {
 	t.Parallel()
 

@@ -676,15 +676,32 @@ func runGoWorkload(
 
 // buildDriverConfig translates one parsed -d/-D driver entry into the runtime
 // DriverConfig the bench layer expects. driverType arrives as a preset short
-// name ("noop"); Extra (-D postgres.* / sql.*) merges as nested config fields.
-// POOL_SIZE script env maps to the postgres pool size.
+// name ("noop"). Retained -D entries undergo strict decoding before their
+// nested driver fields merge with config-file values. POOL_SIZE script env maps
+// to the postgres pool size.
 func buildDriverConfig(
 	idx int, cfg *runner.DriverCLIConfig, envOverrides map[string]string,
 ) (*config.DriverConfig, error) {
-	dc := &config.DriverConfig{URL: cfg.URL}
+	overrides, err := cfg.DecodeOverrides()
+	if err != nil {
+		return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
+	}
 
-	if cfg.DriverType != "" {
-		t, err := bench.ParseDriverType(cfg.DriverType)
+	driverType := cfg.DriverType
+	url := cfg.URL
+	if overrides != nil {
+		if overrides.DriverType != nil {
+			driverType = overrides.GetDriverType()
+		}
+		if overrides.URL != nil {
+			url = overrides.GetURL()
+		}
+	}
+
+	dc := &config.DriverConfig{URL: url}
+
+	if driverType != "" {
+		t, err := bench.ParseDriverType(driverType)
 		if err != nil {
 			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
 		}
@@ -695,6 +712,11 @@ func buildDriverConfig(
 	// defaultInsertMethod is owned by each Go workload's InsertRequest.
 	if err := applyDriverExtras(idx, dc, cfg.Extra); err != nil {
 		return nil, invalidConfig(err)
+	}
+	if overrides != nil {
+		if err := applyDriverRunConfigExtras(idx, dc, overrides); err != nil {
+			return nil, invalidConfig(err)
+		}
 	}
 
 	applyLegacyPostgresPoolSize(dc, envOverrides)
@@ -748,6 +770,18 @@ func applyDriverExtras(idx int, driverConfig *config.DriverConfig, extras map[st
 		return fmt.Errorf("driver %d extra config: %w", idx, err)
 	}
 
+	return applyDriverRunConfigExtras(idx, driverConfig, fileConfig)
+}
+
+func applyDriverRunConfigExtras(
+	idx int,
+	driverConfig *config.DriverConfig,
+	fileConfig *config.DriverRunConfig,
+) error {
+	if fileConfig == nil {
+		return nil
+	}
+
 	if fileConfig.ErrorMode != nil {
 		parsed, err := bench.ParseErrorMode(fileConfig.GetErrorMode())
 		if err != nil {
@@ -781,15 +815,33 @@ func applyDriverExtras(idx int, driverConfig *config.DriverConfig, extras map[st
 		pool = nil
 	}
 
-	driverConfig.BulkSize = fileConfig.BulkSize
-	driverConfig.Postgres = fileConfig.Postgres
-	driverConfig.SQL = fileConfig.SQL
-	driverConfig.CaCertFile = fileConfig.CaCertFile
-	driverConfig.AuthToken = fileConfig.AuthToken
-	driverConfig.AuthUser = fileConfig.AuthUser
-	driverConfig.AuthPassword = fileConfig.AuthPassword
-	driverConfig.TLSInsecureSkipVerify = fileConfig.TLSInsecureSkipVerify
-	driverConfig.InsertProgress = fileConfig.InsertProgress
+	if fileConfig.BulkSize != nil {
+		driverConfig.BulkSize = fileConfig.BulkSize
+	}
+	if fileConfig.Postgres != nil {
+		driverConfig.Postgres = runner.MergePostgresConfig(driverConfig.Postgres, fileConfig.Postgres)
+	}
+	if fileConfig.SQL != nil {
+		driverConfig.SQL = runner.MergeSQLConfig(driverConfig.SQL, fileConfig.SQL)
+	}
+	if fileConfig.CaCertFile != nil {
+		driverConfig.CaCertFile = fileConfig.CaCertFile
+	}
+	if fileConfig.AuthToken != nil {
+		driverConfig.AuthToken = fileConfig.AuthToken
+	}
+	if fileConfig.AuthUser != nil {
+		driverConfig.AuthUser = fileConfig.AuthUser
+	}
+	if fileConfig.AuthPassword != nil {
+		driverConfig.AuthPassword = fileConfig.AuthPassword
+	}
+	if fileConfig.TLSInsecureSkipVerify != nil {
+		driverConfig.TLSInsecureSkipVerify = fileConfig.TLSInsecureSkipVerify
+	}
+	if fileConfig.InsertProgress != nil {
+		driverConfig.InsertProgress = fileConfig.InsertProgress
+	}
 
 	if pool != nil {
 		if err := mergePoolDriverSpecific(driverConfig.DriverType, pool, driverConfig); err != nil {

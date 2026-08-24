@@ -62,6 +62,46 @@ func TestNewDriverCLIConfigFromJSONRejectsStrictErrors(t *testing.T) {
 	}
 }
 
+func TestDriverCLIConfigDecodeOverridesPreservesLexemes(t *testing.T) {
+	tests := []struct {
+		name      string
+		overrides []runner.DriverOverride
+		want      int32
+	}{
+		{
+			name:      "exact decimal",
+			overrides: []runner.DriverOverride{{Key: "bulkSize", Value: "1.0"}},
+			want:      1,
+		},
+		{
+			name:      "exact exponent",
+			overrides: []runner.DriverOverride{{Key: "bulkSize", Value: "1e1"}},
+			want:      10,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := runner.DriverCLIConfig{Overrides: test.overrides}
+			decoded, err := cfg.DecodeOverrides()
+			require.NoError(t, err)
+			require.Equal(t, test.want, decoded.GetBulkSize())
+		})
+	}
+
+	for _, overrides := range [][]runner.DriverOverride{
+		{{Key: "bulkSize", Value: "1.0000000000000001"}},
+		{{Key: "bulkSize", Value: "1."}},
+		{{Key: "bulkSize", Value: "01"}},
+		{{Key: "bulkSize", Value: "1"}, {Key: "bulkSize", Value: "2"}},
+		{{Key: "bulkSize", Value: "1"}, {Key: "bulk_size", Value: "2"}},
+	} {
+		cfg := runner.DriverCLIConfig{Overrides: overrides}
+		_, err := cfg.DecodeOverrides()
+		require.Error(t, err)
+	}
+}
+
 func TestNewDriverCLIConfigAliasCollisionOrderIsDeterministic(t *testing.T) {
 	_, first := runner.NewDriverCLIConfigFromJSON(`{"bulkSize":1,"bulk_size":2}`)
 	_, second := runner.NewDriverCLIConfigFromJSON(`{"bulk_size":2,"bulkSize":1}`)

@@ -65,6 +65,10 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
 	}
 
+	if cfg.Global != nil && cfg.Global.Logger != nil {
+		logger.NewFromConfig(configLogger(cfg.Global.Logger))
+	}
+
 	lg := logger.Global().Named("config_file")
 	lg.Info("Loaded config file", zap.String("path", path))
 
@@ -91,6 +95,32 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 	}
 
 	return &LoadedConfig{RunConfig: cfg, Run: runParams, Params: workloadParams}, true, nil
+}
+
+func configLogger(cfg *config.LoggerConfig) *logger.Config {
+	level := "debug"
+	switch cfg.LogLevel {
+	case config.LogLevelDebug:
+		level = "debug"
+	case config.LogLevelInfo:
+		level = "info"
+	case config.LogLevelWarn:
+		level = "warn"
+	case config.LogLevelError:
+		level = "error"
+	case config.LogLevelFatal:
+		level = "fatal"
+	}
+
+	mode := logger.DevelopmentMod
+	switch cfg.LogMode {
+	case config.LogModeDevelopment:
+		mode = logger.DevelopmentMod
+	case config.LogModeProduction:
+		mode = logger.ProductionMod
+	}
+
+	return &logger.Config{LogLevel: level, LogMod: mode}
 }
 
 func normalizeRunConfigEnv(runConfig *config.RunConfig) error {

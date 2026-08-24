@@ -38,7 +38,7 @@ DRIVER PRESETS (-d / --driver)
   Each preset includes default credentials for local development.
   Use -D url=... to override the connection URL.
 
-  CSV is a driver type (DRIVER_TYPE_CSV) with no short preset. It dumps
+  CSV is the "csv" driver type with no short preset. It dumps
   generated rows instead of talking to a database. Configure it directly:
 
     stroppy run tpcb/tx -D driverType=csv \
@@ -75,9 +75,6 @@ DRIVER OPTIONS (-D / --driver-opt)
     url                    string    Database connection URL
     driverType             string    postgres | mysql | picodata | ydb |
                                      noop | csv
-    defaultTxIsolation     string    read_uncommitted | read_committed |
-                                     repeatable_read | serializable |
-                                     db_default | conn | none
     errorMode              string    silent | log | throw | fail | abort
     bulkSize               int       Rows per bulk INSERT (default: 2500)
     insertProgress.enabled bool      Enable load progress watcher
@@ -109,16 +106,17 @@ DRIVER OPTIONS (-D / --driver-opt)
   POOL_SIZE env (for the postgres driver) is a shorthand that sets both the
   pgx pool MinConns and MaxConns to the same value.
 
+  "defaultTxIsolation" and "defaultInsertMethod" remain accepted in config
+  files for compatibility, but do not control workload execution. Use the
+  workload's "--tx-isolation" parameter where applicable.
+
 HOW IT WORKS
 
-  1. CLI flags (-d, -D) are parsed by stroppy into a DriverConfig per index.
+  1. CLI flags (-d, -D) and config-file drivers are parsed into the selected
+     Go driver's runtime configuration.
 
-  2. Each DriverConfig is passed directly to the Go-native bench engine,
-     which dispatches to the registered driver implementation.
-
-  3. STROPPY_DRIVER_N env vars are honored by the config-file loader: if
-     STROPPY_DRIVER_N is already set in the environment, CLI-composed driver
-     config for that index is skipped — user-set env takes precedence.
+  2. STROPPY_DRIVER_N environment variables are not runtime driver inputs.
+     Use -d/-D or the config-file "drivers" map instead.
 
   To inspect the driver insert methods each driver supports:
 
@@ -160,9 +158,6 @@ EXAMPLES
   # YDB with static credentials
   stroppy run tpcc/tx -d ydb -D url=grpcs://host:2135/db \
     -D authUser=admin -D authPassword=secret
-
-  # Pre-set env takes precedence over CLI flags
-  STROPPY_DRIVER_0='{"url":"postgres://staging:5432"}' stroppy run tpcc/tx -d pg
 
   # List driver insert methods
   stroppy probe

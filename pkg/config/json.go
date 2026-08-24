@@ -626,11 +626,12 @@ func normalizeEnum[T ~int32](token json.Token, path string, names map[T]string, 
 			}
 		}
 	case json.Number:
-		if jsonIntegerPattern.MatchString(value.String()) {
-			ordinal, err := strconv.ParseInt(value.String(), decimalRadix, 32)
+		ordinalText, err := normalizeProtoInt32(value)
+		if err == nil {
+			ordinal, err := strconv.ParseInt(ordinalText, decimalRadix, 32)
 			if err == nil {
 				if _, ok := names[T(ordinal)]; ok {
-					out.WriteString(strconv.FormatInt(ordinal, 10))
+					out.WriteString(strconv.FormatInt(ordinal, decimalRadix))
 
 					return nil
 				}
