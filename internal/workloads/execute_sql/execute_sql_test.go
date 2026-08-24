@@ -126,6 +126,34 @@ func TestEmptyHigherPrioritySQLSourceMasksLowerSource(t *testing.T) {
 	}
 }
 
+func TestEmptySQLSourcesUseSourceNeutralError(t *testing.T) {
+	emptyFile := filepath.Join(t.TempDir(), "empty.sql")
+	require.NoError(t, os.WriteFile(emptyFile, nil, 0o600))
+
+	for _, test := range []struct {
+		name   string
+		inputs bench.ParamInputs
+	}{
+		{
+			name:   "file",
+			inputs: bench.ParamInputs{CLI: map[string]string{"sql-file": emptyFile}},
+		},
+		{
+			name:   "body",
+			inputs: bench.ParamInputs{CLI: map[string]string{"sql-body": " "}},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			unsetSQLSourceEnv(t)
+
+			err := runExecuteSQL(test.inputs)
+			require.ErrorIs(t, err, errSQLSourceNoQueries)
+			require.ErrorContains(t, err, "SQL source has no `--= name` queries")
+			require.NotContains(t, err.Error(), "SQL file")
+		})
+	}
+}
+
 func TestSQLSourceDoesNotLeakBetweenRuns(t *testing.T) {
 	unsetSQLSourceEnv(t)
 

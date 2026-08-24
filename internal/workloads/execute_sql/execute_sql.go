@@ -2,7 +2,7 @@
 // a generic runner that executes every query in a SQL file (or inline SQL string) once.
 // The SQL source is one of two typed workload parameters: --sql-file (a path resolved
 // cwd → workloads/execute_sql/ → embedded) or --sql-body (inline SQL text). Queries are
-// delimited by `--= name` markers, matching parse_sql.ts — a markerless file yields none.
+// delimited by `--= name` markers, matching parse_sql.ts — a markerless source yields none.
 package execute_sql
 
 import (
@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	errNoSQLSource      = errors.New("execute_sql: no SQL source — pass --sql-file <path> or --sql-body <inline sql>")
-	errSQLFileNoQueries = errors.New("execute_sql: SQL file has no `--= name` queries")
+	errNoSQLSource        = errors.New("execute_sql: no SQL source — pass --sql-file <path> or --sql-body <inline sql>")
+	errSQLSourceNoQueries = errors.New("execute_sql: SQL source has no `--= name` queries")
 )
 
 type workload struct {
@@ -95,7 +95,7 @@ func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
 
 	w.names = w.sql.Names("")
 	if len(w.names) == 0 {
-		return errSQLFileNoQueries
+		return errSQLSourceNoQueries
 	}
 
 	return nil
