@@ -218,6 +218,16 @@ func TestRedactDSNMySQL(t *testing.T) {
 			dsn:          "tcp/bench?charset=utf8",
 			passwordless: true,
 		},
+		{
+			name:         "username only endpoint boundaries",
+			dsn:          "user@tcp(db:3306)/bench@foo[bar?note=@foo[bar&charset=utf8",
+			passwordless: true,
+		},
+		{
+			name:         "credential free endpoint boundaries",
+			dsn:          "tcp(db:3306)/bench@foo[bar?note=@foo[bar&charset=utf8",
+			passwordless: true,
+		},
 	}
 
 	for _, test := range tests {

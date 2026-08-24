@@ -285,42 +285,32 @@ func redactMySQL(dsn string) (redacted string, ok bool) {
 	return formatted, true
 }
 
-func hasMySQLStructure(dsn string) bool {
-	if !strings.Contains(dsn, "/") {
-		return false
+type mysqlEnvelope struct {
+	userinfoEnd int
+	valid       bool
+}
+
+func parseMySQLEnvelope(dsn string) mysqlEnvelope {
+	end := len(dsn)
+	if queryStart := strings.IndexByte(dsn, '?'); queryStart >= 0 {
+		end = queryStart
 	}
 
-	return hasMySQLUsernameEnvelope(dsn) || hasCredentialFreeMySQLEnvelope(dsn)
-}
-
-func hasCredentialFreeMySQLEnvelope(dsn string) bool {
-	return !strings.Contains(dsn, "@") && looksLikeMySQLEndpointSuffix(dsn, 0)
-}
-
-func hasMySQLUsernameEnvelope(dsn string) bool {
-	for at := len(dsn) - 1; at >= 0; at-- {
-		if dsn[at] == '@' && looksLikeMySQLEndpointSuffix(dsn, at+1) {
-			return true
+	for at := end - 1; at >= 0; at-- {
+		if dsn[at] == '@' && isMySQLEndpoint(dsn, at+1, end) {
+			return mysqlEnvelope{userinfoEnd: at, valid: true}
 		}
 	}
 
-	return false
-}
-
-func hasMySQLPasswordEnvelope(dsn string) bool {
-	for at := len(dsn) - 1; at >= 0; at-- {
-		if dsn[at] != '@' || !looksLikeMySQLEndpointSuffix(dsn, at+1) {
-			continue
-		}
-
-		return strings.IndexByte(dsn[:at], ':') >= 0
+	if isMySQLEndpoint(dsn, 0, end) {
+		return mysqlEnvelope{userinfoEnd: -1, valid: true}
 	}
 
-	return false
+	return mysqlEnvelope{userinfoEnd: -1}
 }
 
-func looksLikeMySQLEndpointSuffix(dsn string, start int) bool {
-	if start == len(dsn) {
+func isMySQLEndpoint(dsn string, start, end int) bool {
+	if start >= end {
 		return false
 	}
 
@@ -328,20 +318,30 @@ func looksLikeMySQLEndpointSuffix(dsn string, start int) bool {
 		return true
 	}
 
-	for index := start; index < len(dsn); index++ {
-		switch dsn[index] {
-		case '(', '[', '/':
-			return true
-		case '?', '#', '@':
+	suffix := dsn[start:end]
+	open := strings.IndexByte(suffix, '(')
+
+	slash := strings.IndexByte(suffix, '/')
+	if open >= 0 && (slash < 0 || open < slash) {
+		closing := strings.IndexByte(suffix[open+1:], ')')
+		if closing < 0 {
 			return false
-		default:
-			if isASCIIWhitespace(dsn[index]) {
-				return false
-			}
 		}
+
+		return open+closing+2 < len(suffix) && suffix[open+closing+2] == '/'
 	}
 
-	return false
+	return slash > 0
+}
+
+func hasMySQLStructure(dsn string) bool {
+	return parseMySQLEnvelope(dsn).valid
+}
+
+func hasMySQLPasswordEnvelope(dsn string) bool {
+	envelope := parseMySQLEnvelope(dsn)
+
+	return envelope.valid && envelope.userinfoEnd >= 0 && strings.IndexByte(dsn[:envelope.userinfoEnd], ':') >= 0
 }
 
 type conninfoAssignment struct {
